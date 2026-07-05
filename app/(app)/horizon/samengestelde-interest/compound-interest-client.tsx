@@ -3,7 +3,7 @@
 import { ArrowLeft, TrendingUp } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Kicker, EditorialHeadline, EditorialDeck, PullQuote, HL, GlossaryTerm, PageInfoButton } from '@/components/editorial'
+import { PageOpening, PullQuote, HL, GlossaryTerm, PageInfoButton } from '@/components/editorial'
 import { PAGE_INFO } from '@/lib/page-info-content'
 import { CompoundInterestChart } from '@/components/app/horizon/compound-interest-chart'
 
@@ -36,23 +36,26 @@ export function CompoundInterestPage({
         {backLabel}
       </Link>
 
-      {/* Editorial header */}
-      <div className="space-y-4 mb-8">
-        <Kicker>
-          <TrendingUp size={12} className="inline -mt-0.5 mr-1" />
-          Samengestelde interest
-        </Kicker>
-
-        <EditorialHeadline emphasis="sneeuwbaleffect" size="lg">
-          Het sneeuwbaleffect van tijd
-        </EditorialHeadline>
-
-        <EditorialDeck>
-          Samengestelde interest is de krachtigste kracht in persoonlijke financiering.
-          Een klein maandelijks bedrag groeit exponentieel &mdash; niet lineair.
-          Het <GlossaryTerm term="rendement">rendement</GlossaryTerm> dat je verdient, verdient weer rendement.
-        </EditorialDeck>
-      </div>
+      {/* Editorial pagina-opening — module-accent via --module-active-* (horizon) */}
+      <PageOpening
+        className="mb-8"
+        kicker={
+          <>
+            <TrendingUp size={12} className="inline -mt-0.5 mr-1" />
+            Samengestelde interest
+          </>
+        }
+        titleBefore="Het "
+        emphasis="sneeuwbaleffect"
+        titleAfter=" van tijd"
+        deck={
+          <>
+            Samengestelde interest is de krachtigste kracht in persoonlijke financiering.
+            Een klein maandelijks bedrag groeit exponentieel &mdash; niet lineair.
+            Het <GlossaryTerm term="rendement">rendement</GlossaryTerm> dat je verdient, verdient weer rendement.
+          </>
+        }
+      />
 
       {/* Chart */}
       <CompoundInterestChart

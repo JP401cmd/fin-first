@@ -10,6 +10,7 @@ import { IsinResolverStatus } from '@/components/connections/isin-resolver-statu
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { useToast } from '@/components/app/toast-provider'
 import { WidgetEmpty } from '@/components/widgets/widget-empty'
+import { PageOpening } from '@/components/editorial'
 import { computeFreshness, type ConnectionsData, type ExchangeConnectionRow, type ExchangeId, type WalletAddressRow, type WalletChain } from '@/lib/connections-data'
 import type { BrokerConnectionRow, BrokerId } from '@/lib/broker-connections-data'
 import type { AangifteImportSummary } from '@/lib/aangifte/imports-loader'
@@ -340,42 +341,15 @@ export function KoppelingenClient({ initialData, brokerConnections, aangifteImpo
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-5 sm:px-6 sm:py-8">
-      {/* Editorial header — blueprint Type 2 (List) */}
-      <header className="mb-6 space-y-2">
-        {/* Kicker met streep */}
-        <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
-          <span
-            aria-hidden
-            className="inline-block h-px w-7 shrink-0"
-            style={{ background: 'var(--module-active-500)' }}
-          />
-          {moduleContext} · automatische koppelingen
-        </div>
-        {/* Headline met italic-em "automatisch" */}
-        <h1
-          className="font-bold text-[28px] tracking-[-0.02em] leading-tight"
-          style={{ fontFamily: 'var(--font-playfair, serif)', letterSpacing: '-0.03em' }}
-        >
-          Koppelingen{' '}
-          <em
-            className="font-normal italic"
-            style={{ color: 'var(--module-active-700)' }}
-          >
-            automatisch
-          </em>
-        </h1>
-        {/* Editorial deck */}
-        <p
-          className="italic text-[14px] leading-snug max-w-[60ch] text-[var(--ink-2)] pl-4 mt-2"
-          style={{
-            fontFamily: 'var(--font-source-serif, Georgia, serif)',
-            borderLeft: '2px solid var(--module-active-500)',
-          }}
-        >
-          Houd je vermogen automatisch up-to-date. Koppel je crypto-exchanges, wallets,
-          beleggingsbroker en bankrekeningen — of laat het bij handmatige invoer.
-        </p>
-      </header>
+      {/* Editorial pagina-opening — blueprint Type 2 (List) */}
+      <PageOpening
+        className="mb-6"
+        kicker={`${moduleContext} · automatische koppelingen`}
+        titleBefore="Koppelingen "
+        emphasis="automatisch"
+        titleAfter=""
+        deck="Houd je vermogen automatisch up-to-date. Koppel je crypto-exchanges, wallets, beleggingsbroker en bankrekeningen — of laat het bij handmatige invoer."
+      />
 
       {/* Sectie-uitleg strip */}
       <div className="mb-8 border-y border-[var(--border-ed)] bg-[var(--subtle)] px-4 py-3">

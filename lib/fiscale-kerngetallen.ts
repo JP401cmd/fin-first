@@ -414,8 +414,8 @@ export const FISCALE_KERNGETALLEN: FiscaalKerngetal[] = [
     source: 'SVB',
     sourceUrl: 'https://www.svb.nl/nl/aow/bedragen-aow/aow-bedragen',
     updateFrequency: 'jaarlijks',
-    lastVerified: '2026-01-01',
-    note: 'SVB indexeert de AOW-bedragen twee keer per jaar (januari/juli). Niet jaargelaagd én dubbel hardcoded in CASHFLOW_CATALOG — zie drift-punt "aow-bedrag-dubbel". De cohort-tabel aow_leeftijd (DB) is de bron voor de individuele AOW-leeftijd.',
+    lastVerified: '2026-07-04',
+    note: 'SVB indexeert de AOW-bedragen twee keer per jaar (januari/juli); dit zijn de bedragen per 1-7-2026. Niet jaargelaagd, maar de eerdere losse duplicaten in CASHFLOW_CATALOG en de AOW-prefab (defaultMonthlyIncome) zijn opgeheven — die importeren nu deze constante (zie drift-punt "aow-bedrag-dubbel"). De cohort-tabel aow_leeftijd (DB) is de bron voor de individuele AOW-leeftijd.',
   },
 
   // ── FIRE-aannames ──
@@ -512,9 +512,9 @@ export const FISCALE_DRIFT_PUNTEN: DriftPunt[] = [
   {
     id: 'aow-bedrag-dubbel',
     title: 'AOW-maandbedrag dubbel hardcoded',
-    status: 'open',
+    status: 'opgelost',
     description:
-      'De AOW-bedragen (€1.558 / €1.072) staan als NL_AOW_MONTHLY(_SAMENWONEND) in constants.ts én los hardcoded in CASHFLOW_CATALOG en de AOW-prefab (defaultMonthlyIncome) in horizon-data.ts — terwijl dat bestand de constanten al importeert. Bij de volgende SVB-indexatie drift de catalogus stilletjes.',
+      'De AOW-bedragen stonden als NL_AOW_MONTHLY(_SAMENWONEND) in constants.ts én los hardcoded in CASHFLOW_CATALOG en de AOW-prefab (defaultMonthlyIncome) in horizon-data.ts (plus in onboarding-horizon.tsx). Opgelost: alle plekken importeren nu de constante en de labels/tips zijn afgeleid; constants.ts is bijgewerkt naar de SVB-bedragen per 1-7-2026 (€1.581,55 / €1.084,13). Bewaakt door lib/fiscale-duplicaten-guard.test.ts.',
     files: ['lib/constants.ts', 'lib/horizon-data.ts'],
   },
   {

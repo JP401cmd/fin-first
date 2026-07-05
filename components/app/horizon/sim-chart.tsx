@@ -5,40 +5,196 @@ import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import type { SimRow, SimCashflow } from '@/lib/fire-simulation'
 import type { FireEndStrategy } from '@/lib/fire-strategy'
 import { NL_SWR, type ScenarioPath, type ProjectionMonth } from '@/lib/horizon-data'
-import { CHART_PAD } from '@/lib/chart-constants'
-import { ChartEventMarkers, topPaddingFor, iconStackTopFloor } from './chart-event-markers'
 import type { ChartEventOverlay, ChartEventKind } from '@/lib/chart-event-overlay'
+import {
+  buildSimChartGeometry,
+  type SimChartGeometry,
+  type ScenarioOverlay,
+  type MonteCarloOverlay,
+  type HouseholdPartnerOverlay,
+} from '@/lib/horizon/sim-chart-geometry'
+import { ChartStaticLayers } from './chart-static-layers'
 
 // ── Types ───────────────────────────────────────────────────────────────────
+//
+// De overlay-types wonen sinds de geometrie-extractie in
+// `lib/horizon/sim-chart-geometry.ts` (de pure geometrie-bouwer bezit ze). We
+// her-exporteren ze hier zodat bestaande consumers (whatif-page-client e.a.) ze
+// onveranderd vanuit dit component kunnen blijven importeren.
+export type { ScenarioOverlay, MonteCarloOverlay, HouseholdPartnerOverlay }
 
-export type ScenarioOverlay = {
-  name: string
-  label: string
-  color: string
-  points: [number, number][]  // [age, netWorth]
+/** Format an absolute value for the crosshair tooltip (no sign prefix) */
+function fmtAbs(val: number): string {
+  const abs = Math.abs(val)
+  if (abs >= 1_000_000) return `€${(abs / 1_000_000).toFixed(1)}M`
+  if (abs >= 1_000) return `€${Math.round(abs / 1_000)}K`
+  return `€${Math.round(abs)}`
 }
 
-export type HouseholdPartnerOverlay = {
-  name: string
-  color: string
-  points: [number, number][]  // [age, netWorth]
-  fireAge: number | null
-  /** Fractionele FIRE-leeftijd (bv. 52.7) — plaatst de FIRE-stip exact op de
-   *  lijn i.p.v. op de afgeronde leeftijd, net als de hoofdlijn. */
-  fireAgeFractional?: number | null
-  /** If true, renders as dashed line (used for combined household line) */
-  isDashed?: boolean
+// ── Crosshair-laag ────────────────────────────────────────────────────────────
+//
+// De ENIGE laag die op `hoveredAge` reageert: de onzichtbare hover-rect + de
+// verticale crosshair-lijn + de stip op de vermogenslijn. Bewust GEEN memo — de
+// parent re-rendert bij elke muisbeweging en deze laag mag dan mee-renderen. De
+// zware statische lagen (paden, Monte-Carlo-band) zitten in de gememoiseerde
+// `ChartStaticLayers` en blijven ongemoeid.
+function CrosshairLayer({
+  geometry,
+  disableCrosshair,
+  onMouseMove,
+  onMouseLeave,
+  showCrosshair,
+  crosshairX,
+  crosshairY,
+  crosshairDotColor,
+}: {
+  geometry: SimChartGeometry
+  disableCrosshair: boolean
+  onMouseMove: (e: React.MouseEvent<SVGRectElement>) => void
+  onMouseLeave: () => void
+  showCrosshair: boolean
+  crosshairX: number | null
+  crosshairY: number | null
+  crosshairDotColor: string
+}) {
+  const { PAD, innerW, innerH } = geometry
+  return (
+    <>
+      {/* Crosshair hover overlay — invisible rect covering chart area for mouse tracking */}
+      <rect
+        x={PAD.left} y={PAD.top}
+        width={innerW} height={innerH}
+        fill="transparent"
+        pointerEvents={disableCrosshair ? 'none' : 'all'}
+        style={{ cursor: 'crosshair' }}
+        onMouseMove={onMouseMove}
+        onMouseLeave={onMouseLeave}
+      />
+
+      {/* Crosshair vertical line */}
+      {showCrosshair && crosshairX !== null && (
+        <line
+          x1={crosshairX} x2={crosshairX}
+          y1={PAD.top} y2={PAD.top + innerH}
+          stroke="var(--ink-3)" strokeWidth={1} opacity={0.4}
+          pointerEvents="none"
+        />
+      )}
+
+      {/* Crosshair dot on the wealth line */}
+      {showCrosshair && crosshairX !== null && crosshairY !== null && (
+        <circle
+          cx={crosshairX} cy={crosshairY} r={4}
+          fill={crosshairDotColor}
+          stroke="var(--paper)" strokeWidth={1.5}
+          pointerEvents="none"
+        />
+      )}
+    </>
+  )
 }
 
-export type MonteCarloOverlay = {
-  /** Percentile bands indexed by year offset (0 = current age) */
-  p10: number[]
-  p25: number[]
-  p50: number[]
-  p75: number[]
-  p90: number[]
-  startAge: number
-}
+// ── Voorgrond-laag ─────────────────────────────────────────────────────────────
+//
+// FIRE-stip + fase-labels + FIRE-leeftijd/delta-labels. Hover-onafhankelijk,
+// dus gememoiseerd zodat een muisbeweging deze laag niet opnieuw tekent.
+// `emphasis` (walkthrough-puls) is een render-prop; wijzigt die dan re-rendert
+// deze laag éénmalig mee.
+const ChartForeground = memo(function ChartForeground({
+  geometry,
+  emphasis,
+  baselineFireAge,
+}: {
+  geometry: SimChartGeometry
+  emphasis: 'accumulation' | 'withdrawal' | 'fire' | null
+  baselineFireAge?: number | null
+}) {
+  const {
+    isPensioenMode,
+    xFire,
+    yFireDot,
+    fireAgeFractional,
+    minAge,
+    maxAge,
+    mainStrokeAcc,
+    splitFractionalAge,
+    xScale,
+    PAD,
+    COLOR_OPBOUW,
+    COLOR_AFBOUW,
+    strategy,
+    labelSafeTopY,
+  } = geometry
+  // De FIRE-stip pulseert wanneer het snijpunt-hoofdstuk actief is.
+  const firePulse = emphasis === 'fire'
+
+  return (
+    <>
+      {/* Dot at FIRE junction (hidden in pensioen mode) */}
+      {!isPensioenMode && xFire !== null && yFireDot !== null && fireAgeFractional !== null && fireAgeFractional > minAge && fireAgeFractional < maxAge && (
+        <>
+          {firePulse && (
+            <circle cx={xFire} cy={yFireDot} r={5}
+              fill="none" stroke={mainStrokeAcc} strokeWidth={2}>
+              <animate attributeName="r" from="5" to="16" dur="1.6s" repeatCount="indefinite" />
+              <animate attributeName="opacity" from="0.7" to="0" dur="1.6s" repeatCount="indefinite" />
+            </circle>
+          )}
+          <circle cx={xFire} cy={yFireDot} r={firePulse ? 6 : 5}
+            fill={mainStrokeAcc} stroke="var(--paper)" strokeWidth={1.5} />
+        </>
+      )}
+
+      {/* Phase label: OPBOUW / VERMOGENSGROEI */}
+      {splitFractionalAge !== null && splitFractionalAge > minAge + 3 && (
+        <text x={PAD.left + xScale((minAge + splitFractionalAge) / 2)} y={PAD.top + 14}
+          textAnchor="middle" fontSize={10} fill={COLOR_OPBOUW}
+          fontFamily="var(--font-inter, sans-serif)" fontWeight={600}>
+          {isPensioenMode ? 'VERMOGENSGROEI' : 'OPBOUW'}
+        </text>
+      )}
+
+      {/* Phase label: AFBOUW / BEHOUD / PENSIOEN */}
+      {splitFractionalAge !== null && splitFractionalAge < maxAge - 3 && (
+        <text x={PAD.left + xScale((splitFractionalAge + maxAge) / 2)} y={PAD.top + 14}
+          textAnchor="middle" fontSize={10}
+          fill={!isPensioenMode && strategy === 'perpetual' ? COLOR_OPBOUW : COLOR_AFBOUW}
+          fontFamily="var(--font-inter, sans-serif)" fontWeight={600}>
+          {isPensioenMode ? 'PENSIOEN' : strategy === 'perpetual' ? 'BEHOUD' : 'AFBOUW'}
+        </text>
+      )}
+
+      {/* FIRE age label (hidden in pensioen mode). y geclampt onder de
+          gereserveerde icoon-marge (labelSafeTopY) zodat het label niet botst
+          met een event-icoon dat op/bij de FIRE-leeftijd boven de lijn staat —
+          vaak voorkomend (pensioen/erfenis-trigger op FIRE-leeftijd). */}
+      {!isPensioenMode && xFire !== null && fireAgeFractional !== null && fireAgeFractional > minAge && fireAgeFractional < maxAge && (
+        <text x={xFire + 4} y={Math.max(PAD.top + 24, labelSafeTopY + 18)} fontSize={8}
+          fill={COLOR_OPBOUW} fontFamily="var(--font-inter, sans-serif)" fontWeight={600}>
+          FIRE {fireAgeFractional.toFixed(1)}
+        </text>
+      )}
+
+      {/* FIRE age delta label (what-if mode) */}
+      {xFire !== null && yFireDot !== null && fireAgeFractional !== null && baselineFireAge != null &&
+        fireAgeFractional > minAge && fireAgeFractional < maxAge &&
+        Math.abs(fireAgeFractional - baselineFireAge) > 0.1 && (
+        <text
+          x={xFire}
+          y={yFireDot - 14}
+          textAnchor="middle"
+          fontSize={9}
+          fontWeight={700}
+          fontFamily="var(--font-dm-mono, monospace)"
+          fill={fireAgeFractional < baselineFireAge ? COLOR_OPBOUW : COLOR_AFBOUW}
+        >
+          {fireAgeFractional < baselineFireAge ? '' : '+'}
+          {(fireAgeFractional - baselineFireAge).toFixed(1)} jr
+        </text>
+      )}
+    </>
+  )
+})
 
 // ── SimChart ────────────────────────────────────────────────────────────────
 
@@ -158,317 +314,62 @@ export const SimChart = memo(function SimChart({
     return () => observer.disconnect()
   }, [ref])
 
-  const W = containerW
-  const isDesktop = containerW >= 768
+  // ── Hover-onafhankelijke geometrie in één memo ────────────────────────────
+  //
+  // Alle punten, d-strings, Monte-Carlo-banden, doellijn, ticks en schaal-
+  // functies worden hier één keer berekend. De dep-array bevat ALLE geometrie-
+  // inputs (exhaustive-deps dwingt dit af); alleen `hoveredAge` en de daarvan
+  // afgeleide crosshair-waarden blijven erbuiten. Zo herberekent een muis-
+  // beweging (die enkel `hoveredAge` wijzigt) niets van dit rekenwerk.
+  const geometry = useMemo(
+    () =>
+      buildSimChartGeometry({
+        rows,
+        fireAge,
+        fireAgeFractional,
+        currentAge,
+        endAge,
+        fireTarget,
+        strategy,
+        targetEndPortfolio,
+        baselineRows,
+        scenarioOverlays,
+        monteCarloOverlay,
+        householdOverlays,
+        mainLineColor,
+        visibleMinAge,
+        visibleMaxAge,
+        aowAgeFractional,
+        planningMode,
+        eventOverlay,
+        targetInflationFactors,
+        containerW,
+      }),
+    [
+      rows,
+      fireAge,
+      fireAgeFractional,
+      currentAge,
+      endAge,
+      fireTarget,
+      strategy,
+      targetEndPortfolio,
+      baselineRows,
+      scenarioOverlays,
+      monteCarloOverlay,
+      householdOverlays,
+      mainLineColor,
+      visibleMinAge,
+      visibleMaxAge,
+      aowAgeFractional,
+      planningMode,
+      eventOverlay,
+      targetInflationFactors,
+      containerW,
+    ],
+  )
 
-  // Dynamic padding for event markers. Markers now anchor INSIDE the plot,
-  // stacked upward just above the wealth line — so we only need head-room at
-  // the top (for a stack that sits near the chart's upper edge) and no extra
-  // bottom gutter. We size the top padding to the largest stack that can occur
-  // at a single age, capped at MAX_STACK_VISIBLE, so icons never clip the top.
-  const maxStackAtAge = eventOverlay && eventOverlay.length > 0
-    ? Math.max(
-        ...Object.values(
-          eventOverlay.reduce<Record<number, number>>((acc, e) => {
-            const a = Math.floor(e.age)
-            acc[a] = (acc[a] ?? 0) + 1
-            return acc
-          }, {}),
-        ),
-      )
-    : 0
-  const extraTop = topPaddingFor(maxStackAtAge)
-  const extraBottom = 0
-  const PAD = {
-    top: CHART_PAD.top + extraTop,
-    right: CHART_PAD.right,
-    bottom: CHART_PAD.bottom + extraBottom,
-    left: CHART_PAD.left,
-  }
-  const H = (isDesktop ? 260 : 220) + extraTop + extraBottom
-  const innerW = W - PAD.left - PAD.right
-  const innerH = H - PAD.top - PAD.bottom
-
-  const minAge = visibleMinAge ?? currentAge
-  const maxAge = visibleMaxAge ?? endAge
-
-  // Build all path points from rows
-  const allPts: [number, number][] = []
-  if (rows.length > 0) {
-    allPts.push([rows[0].age, rows[0].startPortfolio])
-    for (const r of rows) {
-      allPts.push([r.age + 1, r.endPortfolio])
-    }
-  }
-
-  // Build baseline ghost-line points (what-if mode)
-  const baselinePts: [number, number][] = []
-  if (baselineRows && baselineRows.length > 0) {
-    baselinePts.push([baselineRows[0].age, baselineRows[0].startPortfolio])
-    for (const r of baselineRows) {
-      baselinePts.push([r.age + 1, r.endPortfolio])
-    }
-  }
-
-  // Filter points to visible range for Y-axis rescaling
-  const inRange = ([age]: [number, number]) => age >= minAge - 1 && age <= maxAge + 1
-  const visibleAllPts = allPts.filter(inRange)
-  const visibleBaselinePts = baselinePts.filter(inRange)
-
-  const baselineMax = visibleBaselinePts.length > 0
-    ? Math.max(...visibleBaselinePts.map(([, v]) => v))
-    : 0
-  const overlayMax = scenarioOverlays?.length
-    ? Math.max(...scenarioOverlays.flatMap(o => o.points.filter(inRange).map(([, v]) => v)))
-    : 0
-  const mcMax = monteCarloOverlay
-    ? Math.max(...monteCarloOverlay.p90.filter((_, i) => {
-        const age = monteCarloOverlay.startAge + i
-        return age >= minAge && age <= maxAge
-      }))
-    : 0
-  const hhMax = householdOverlays?.length
-    ? Math.max(...householdOverlays.flatMap(o => o.points.filter(inRange).map(([, v]) => v)))
-    : 0
-  const rawMax = visibleAllPts.length > 0
-    ? Math.max(...visibleAllPts.map(([, v]) => v), fireTarget ?? 0, baselineMax, overlayMax, mcMax, hhMax)
-    : Math.max(1, overlayMax, mcMax, hhMax)
-  const maxVal = Math.max(rawMax, 1) * 1.08
-
-  const xScale = (age: number) =>
-    maxAge > minAge ? ((age - minAge) / (maxAge - minAge)) * innerW : 0
-  const yScale = (val: number) => innerH - (val / maxVal) * innerH
-
-  function pointsToPath(pts: [number, number][]): string {
-    return pts
-      .map(([age, val], i) => {
-        const x = PAD.left + xScale(age)
-        const y = PAD.top + yScale(Math.max(val, 0))
-        return `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`
-      })
-      .join(' ')
-  }
-
-  // Build fractional FIRE junction point via linear interpolation.
-  // The engine now prorates savings in the FIRE year, so the data naturally
-  // reflects the correct portfolio value — no snapping to fireTarget needed.
-  let fireFractionalPt: [number, number] | null = null
-  if (fireAge !== null && fireAgeFractional !== null) {
-    if (fireAge > currentAge) {
-      const t = fireAgeFractional - (fireAge - 1)
-      const ptBefore = allPts.find(([a]) => a === fireAge - 1)?.[1] ?? 0
-      const ptAfter  = allPts.find(([a]) => a === fireAge)?.[1] ?? 0
-      fireFractionalPt = [fireAgeFractional, ptBefore + t * (ptAfter - ptBefore)]
-    } else {
-      // Already at FIRE at currentAge
-      fireFractionalPt = [currentAge, allPts[0]?.[1] ?? 0]
-    }
-  }
-
-  // In pensioen mode, compute AOW junction point for path splitting
-  const isPensioenMode = planningMode === 'pensioen'
-  let aowFractionalPt: [number, number] | null = null
-  if (isPensioenMode && aowAgeFractional != null) {
-    const aowFloor = Math.floor(aowAgeFractional)
-    if (aowFloor > currentAge) {
-      const t = aowAgeFractional - aowFloor
-      const ptBefore = allPts.find(([a]) => a === aowFloor)?.[1] ?? 0
-      const ptAfter  = allPts.find(([a]) => a === aowFloor + 1)?.[1] ?? 0
-      aowFractionalPt = [aowAgeFractional, ptBefore + t * (ptAfter - ptBefore)]
-    } else {
-      aowFractionalPt = [currentAge, allPts[0]?.[1] ?? 0]
-    }
-  }
-
-  // Determine split point: AOW age in pensioen mode, FIRE fractional age otherwise.
-  // Using fireAgeFractional (e.g. 60.2) ensures the gold→brown colour transition
-  // aligns with the FIRE marker, preventing the visual artifact where the gold path
-  // continues past FIRE because the integer fireAge (61) is 1 year later.
-  const splitAge = isPensioenMode
-    ? (aowAgeFractional != null ? Math.ceil(aowAgeFractional) : null)
-    : (fireAgeFractional ?? fireAge)
-  const splitFractionalPt = isPensioenMode ? aowFractionalPt : fireFractionalPt
-  const splitFractionalAge = isPensioenMode ? aowAgeFractional ?? null : fireAgeFractional
-
-  // Split at fractional point for two-colour rendering (opbouw = acc, pensioen/afbouw = dec)
-  const accPts: [number, number][] = splitFractionalPt !== null && splitAge !== null
-    ? [...allPts.filter(([age]) => age < splitAge), splitFractionalPt]
-    : splitAge !== null
-    ? allPts.filter(([age]) => age <= splitAge)
-    : allPts
-  // Build decumulation path starting from the FIRE junction point.
-  // The engine prorates savings in the FIRE year, so data naturally reflects
-  // correct values — no clamping needed.
-  const decPts: [number, number][] = splitFractionalPt !== null && splitAge !== null
-    ? [splitFractionalPt, ...allPts.filter(([age]) => age >= Math.ceil(splitAge))]
-    : splitAge !== null
-    ? allPts.filter(([age]) => age >= splitAge)
-    : []
-
-  // Use fractional position for the FIRE vertical line
-  const xFire = fireAgeFractional !== null ? PAD.left + xScale(fireAgeFractional) : null
-  const yZero = PAD.top + yScale(0)
-
-  // SVG y-coördinaat van de hoofdlijn (vermogen) op een gegeven leeftijd.
-  // De event-iconen ankeren hierop: ze zweven vlak boven de lijn op het
-  // gebeurtenis-jaar. Lineaire interpolatie over `allPts` (= de getekende
-  // hoofdlijn) zodat ook fractionele leeftijden een correcte y krijgen.
-  const lineYAt = (age: number): number | null => {
-    if (allPts.length === 0) return null
-    if (age <= allPts[0][0]) return PAD.top + yScale(Math.max(allPts[0][1], 0))
-    const last = allPts[allPts.length - 1]
-    if (age >= last[0]) return PAD.top + yScale(Math.max(last[1], 0))
-    for (let i = 0; i < allPts.length - 1; i++) {
-      const [a0, v0] = allPts[i]
-      const [a1, v1] = allPts[i + 1]
-      if (age >= a0 && age <= a1) {
-        const t = a1 === a0 ? 0 : (age - a0) / (a1 - a0)
-        const v = v0 + t * (v1 - v0)
-        return PAD.top + yScale(Math.max(v, 0))
-      }
-    }
-    return null
-  }
-
-  // Module-kleuren: Horizon goud voor opbouw/inkomen, Kern bruin voor afbouw/uitgaven
-  const COLOR_OPBOUW = 'var(--hor-t, #8a6e42)'
-  const COLOR_AFBOUW = 'var(--kern-t, #58362d)'
-  // Optionele hoofdlijn-kleur-override (bv. partner-projectie = teal, gelijk aan de
-  // partner-event-markers). Raakt alleen de hoofdlijn + FIRE-stip + legenda-swatch;
-  // cashflow-/event-markers houden hun eigen kleur.
-  const mainStrokeAcc = mainLineColor ?? COLOR_OPBOUW
-  const mainStrokeDec = mainLineColor ?? (!isPensioenMode && strategy === 'perpetual' ? COLOR_OPBOUW : COLOR_AFBOUW)
-
-  // Veilige bovengrens voor in-plot labels (doellijn-/FIRE-label) zodat ze niet
-  // omhoog in de gereserveerde icoon-marge boven het plot kruipen en daar met de
-  // (bij een hoge lijn naar boven uitwijkende) event-iconen botsen. Net ónder de
-  // plot-bovenrand; bij events laten we extra ruimte voor de onderste icoon-rij
-  // die — wanneer geclampt — vlak boven de plot-rand kan eindigen.
-  const labelSafeTopY = PAD.top + (extraTop > 0 ? 14 : 2)
-
-  // Emphasis (uitleg-walkthrough): dim de niet-benadrukte segmenten zodat het
-  // relevante stukje van de eigen curve eruit springt. Default null = ongewijzigd.
-  // Dim-contrast bewust 0.30 (niet lager): de gedimde segmenten blijven leesbaar
-  // bij lage helderheid, zodat het verschil niet puur op kleur/contrast leunt
-  // (a11y — vult de aria-labels op de CurveSlice-wrapper aan).
-  const DIMMED = 0.30
-  const accOpacity = emphasis === null || emphasis === 'accumulation' || emphasis === 'fire' ? 1 : DIMMED
-  const decOpacity = emphasis === null || emphasis === 'withdrawal' ? 1 : DIMMED
-  // De FIRE-stip pulseert wanneer het snijpunt-hoofdstuk actief is.
-  const firePulse = emphasis === 'fire'
-
-  const yTicks = [0, 0.33, 0.66, 1.0].map(f => ({
-    val: maxVal * f,
-    y: PAD.top + yScale(maxVal * f),
-  }))
-
-  const totalAgeSpan = maxAge - minAge
-  const xStep = totalAgeSpan <= 10 ? 1 : totalAgeSpan <= 20 ? 2 : totalAgeSpan <= 40 ? 5 : 10
-  const xTickAges: number[] = []
-  for (let a = Math.ceil(minAge / xStep) * xStep; a <= maxAge; a += xStep) {
-    xTickAges.push(a)
-  }
-
-  const yFireDot = fireFractionalPt !== null ? PAD.top + yScale(Math.max(fireFractionalPt[1], 0)) : null
-
-  // Meegroeiende erfenis/koopkracht-doellijn (legacy/perpetual). `targetEndPortfolio`
-  // is de NOMINALE eindwaarde op eindleeftijd; gedeeld door de inflatie-indexfactor
-  // op die leeftijd geeft het REËLE doel-van-nu (bv. €200k i.p.v. €497k). Per
-  // leeftijd: nominaal doel = reëelDoel × factor(leeftijd). We tekenen een polyline
-  // over de zichtbare reeks i.p.v. één vlakke lijn, zodat zichtbaar is dat het doel
-  // een bedrag-van-nu is dat met inflatie meegroeit. Consume-only: alle factoren
-  // komen uit `targetInflationFactors` (afgeleid van `unifiedRows`), geen eigen
-  // inflatie-aanname hier. Zonder de prop (bv. standalone widget) blijft de lijn vlak.
-  const targetLine = (() => {
-    if (targetEndPortfolio == null || targetEndPortfolio <= 0) return null
-    if (!(strategy === 'legacy' || strategy === 'perpetual')) return null
-    const factors = targetInflationFactors
-    if (!factors || factors.length === 0) return null
-    const byAge = new Map(factors.map((f) => [f.age, f.factor]))
-    // Factor op de laatste leeftijd ↔ waar targetEndPortfolio (nominaal) op slaat.
-    const lastAge = Math.max(...factors.map((f) => f.age))
-    const endFactor = byAge.get(lastAge) ?? 1
-    if (!(endFactor > 0)) return null
-    const realTargetNow = targetEndPortfolio / endFactor
-    // Punten over de zichtbare leeftijdsreeks; interpoleer factor lineair tussen
-    // bekende jaren waar nodig (factoren zijn per heel jaar gegeven).
-    const factorAt = (age: number): number => {
-      const exact = byAge.get(age)
-      if (exact != null) return exact
-      const lo = Math.floor(age)
-      const hi = Math.ceil(age)
-      const fLo = byAge.get(lo)
-      const fHi = byAge.get(hi)
-      if (fLo != null && fHi != null && hi !== lo) return fLo + (fHi - fLo) * (age - lo)
-      return fLo ?? fHi ?? endFactor
-    }
-    const pts: [number, number][] = []
-    for (const f of factors) {
-      if (f.age < minAge - 1 || f.age > maxAge + 1) continue
-      pts.push([f.age, realTargetNow * f.factor])
-    }
-    if (pts.length < 2) return null
-    return {
-      d: pointsToPath(pts),
-      realTargetNow,
-      // Y voor het eindlabel = de nominale waarde op de laatste zichtbare leeftijd.
-      labelAge: pts[pts.length - 1][0],
-      labelVal: realTargetNow * factorAt(pts[pts.length - 1][0]),
-    }
-  })()
-
-  // Pre-compute Monte Carlo band SVG paths (gradient confidence band)
-  const mcPaths = monteCarloOverlay ? (() => {
-    const mc = monteCarloOverlay
-    function bandPath(upper: number[], lower: number[]): string {
-      const fwd: string[] = []
-      const bwd: string[] = []
-      for (let i = 0; i < upper.length; i++) {
-        const age = mc.startAge + i
-        if (age < minAge || age > maxAge) continue
-        const x = PAD.left + xScale(age)
-        fwd.push(`${x.toFixed(1)},${(PAD.top + yScale(Math.max(upper[i], 0))).toFixed(1)}`)
-        bwd.unshift(`${x.toFixed(1)},${(PAD.top + yScale(Math.max(lower[i], 0))).toFixed(1)}`)
-      }
-      if (fwd.length < 2) return ''
-      return `M ${fwd[0]} ${fwd.slice(1).map(p => `L ${p}`).join(' ')} L ${bwd.join(' L ')} Z`
-    }
-    function linePath(values: number[]): string {
-      let first = true
-      return values.map((val, i) => {
-        const age = mc.startAge + i
-        if (age < minAge || age > maxAge) return null
-        const x = PAD.left + xScale(age)
-        const y = PAD.top + yScale(Math.max(val, 0))
-        const cmd = first ? 'M' : 'L'
-        first = false
-        return `${cmd} ${x.toFixed(1)} ${y.toFixed(1)}`
-      }).filter(Boolean).join(' ')
-    }
-    // Additional bands for smoother gradient effect (interpolated percentiles)
-    function interpolatePercentile(a: number[], b: number[], t: number): number[] {
-      return a.map((v, i) => v + (b[i] - v) * t)
-    }
-    const p15 = interpolatePercentile(mc.p10, mc.p25, 0.5)
-    const p35 = interpolatePercentile(mc.p25, mc.p50, 0.5)
-    const p65 = interpolatePercentile(mc.p50, mc.p75, 0.5)
-    const p85 = interpolatePercentile(mc.p75, mc.p90, 0.5)
-    return {
-      outermost: bandPath(mc.p90, mc.p10),       // p10-p90: lightest
-      outerMid: bandPath(p85, p15),               // p15-p85: slightly denser
-      inner: bandPath(mc.p75, mc.p25),            // p25-p75: medium
-      innerMid: bandPath(p65, p35),               // p35-p65: denser
-      median: linePath(mc.p50),
-    }
-  })() : null
-
-  /** Format an absolute value for the crosshair tooltip (no sign prefix) */
-  function fmtAbs(val: number): string {
-    const abs = Math.abs(val)
-    if (abs >= 1_000_000) return `€${(abs / 1_000_000).toFixed(1)}M`
-    if (abs >= 1_000) return `€${Math.round(abs / 1_000)}K`
-    return `€${Math.round(abs)}`
-  }
+  const { W, H, PAD, innerW, innerH, minAge, maxAge, xScale, yScale, allPts, mainStrokeAcc, mainStrokeDec } = geometry
 
   // ── Crosshair tooltip handlers ──────────────────────────────────────────
   const handleOverlayMouseMove = useCallback((e: React.MouseEvent<SVGRectElement>) => {
@@ -525,487 +426,40 @@ export const SimChart = memo(function SimChart({
   return (
     <div ref={ref} className="relative">
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" overflow="hidden" aria-hidden="true">
-        {/* Grid lines */}
-        {yTicks.map(({ val, y }) => (
-          <line key={val} x1={PAD.left} x2={PAD.left + innerW} y1={y} y2={y}
-            stroke="var(--border-ed)" strokeWidth={1} strokeDasharray="4 4" />
-        ))}
-
-        {/* Y-axis labels */}
-        {yTicks.map(({ val, y }) => (
-          <text key={val} x={PAD.left - 5} y={y + 4} textAnchor="end" fontSize={9}
-            fill="var(--ink-4)" fontFamily="var(--font-dm-mono, monospace)">
-            {val >= 1_000_000
-              ? `€${(val / 1_000_000).toFixed(1)}M`
-              : val >= 1_000
-              ? `€${Math.round(val / 1_000)}k`
-              : val > 0 ? `€${Math.round(val)}` : '€0'}
-          </text>
-        ))}
-
-        {/* X-axis labels */}
-        {xTickAges.map(age => (
-          <text key={age} x={PAD.left + xScale(age)} y={H - 4} textAnchor="middle" fontSize={9}
-            fill="var(--ink-4)" fontFamily="var(--font-dm-mono, monospace)">{age}</text>
-        ))}
-
-        {/* FIRE doelbedrag — horizontale dashed lijn (hidden in pensioen mode) */}
-        {!isPensioenMode && fireTarget != null && fireTarget > 0 && (
-          <>
-            <line
-              x1={PAD.left} x2={PAD.left + innerW}
-              y1={PAD.top + yScale(fireTarget)} y2={PAD.top + yScale(fireTarget)}
-              stroke="var(--hor-t, #8a6e42)" strokeWidth={1.5} strokeDasharray="6 3" opacity={0.6}
-            />
-            <text
-              x={PAD.left + innerW - 2} y={PAD.top + yScale(fireTarget) - 9}
-              fontSize={8} fill="var(--hor-t, #8a6e42)" textAnchor="end"
-              fontFamily="var(--font-inter, sans-serif)" fontWeight={600}
-            >
-              doel
-            </text>
-            <text
-              x={PAD.left + innerW - 2} y={PAD.top + yScale(fireTarget) - 1}
-              fontSize={7.5} fill="var(--hor-t, #8a6e42)" textAnchor="end"
-              fontFamily="var(--font-dm-mono, monospace)"
-            >
-              {fireTarget >= 1_000_000
-                ? `€${(fireTarget / 1_000_000).toFixed(2)}M`
-                : `€${Math.round(fireTarget / 1000)}k`}
-            </text>
-          </>
-        )}
-
-        {/* Legacy/Perpetual target — doellijn (hidden in pensioen mode).
-            Met inflatie-factoren tekenen we de OPLOPENDE lijn (reëel doel-van-nu →
-            nominale eindwaarde); zonder factoren valt 'ie terug op een vlakke lijn. */}
-        {!isPensioenMode && (strategy === 'legacy' || strategy === 'perpetual') && targetEndPortfolio != null && targetEndPortfolio > 0 && (
-          targetLine ? (
-            <>
-              <path
-                d={targetLine.d}
-                fill="none"
-                stroke="var(--kern-t, #58362d)" strokeWidth={1.5} strokeDasharray="6 3" opacity={0.6}
-                strokeLinecap="round" strokeLinejoin="round"
-              />
-              <text
-                x={Math.max(PAD.left + 44, PAD.left + xScale(targetLine.labelAge) - 2)} y={Math.max(labelSafeTopY + 8, PAD.top + yScale(targetLine.labelVal) - 12)}
-                fontSize={8} fill="var(--kern-t, #58362d)" textAnchor="end"
-                fontFamily="var(--font-inter, sans-serif)" fontWeight={600}
-              >
-                {strategy === 'perpetual' ? 'koopkracht' : 'erfenis'} {targetLine.labelVal >= 1_000_000
-                  ? `€${(targetLine.labelVal / 1_000_000).toFixed(1)}M`
-                  : `€${Math.round(targetLine.labelVal / 1000)}k`}
-              </text>
-              <text
-                x={Math.max(PAD.left + 44, PAD.left + xScale(targetLine.labelAge) - 2)} y={Math.max(labelSafeTopY + 16, PAD.top + yScale(targetLine.labelVal) - 4)}
-                fontSize={7} fill="var(--kern-t, #58362d)" textAnchor="end"
-                fontFamily="var(--font-dm-mono, monospace)" opacity={0.85}
-              >
-                {targetLine.realTargetNow >= 1_000_000
-                  ? `€${(targetLine.realTargetNow / 1_000_000).toFixed(1)}M nu`
-                  : `€${Math.round(targetLine.realTargetNow / 1000)}k nu`}
-              </text>
-            </>
-          ) : (
-            <>
-              <line
-                x1={PAD.left} x2={PAD.left + innerW}
-                y1={PAD.top + yScale(targetEndPortfolio)} y2={PAD.top + yScale(targetEndPortfolio)}
-                stroke="var(--kern-t, #58362d)" strokeWidth={1.5} strokeDasharray="6 3" opacity={0.6}
-              />
-              <text
-                x={PAD.left + innerW - 2} y={PAD.top + yScale(targetEndPortfolio) - 4}
-                fontSize={8} fill="var(--kern-t, #58362d)" textAnchor="end"
-                fontFamily="var(--font-inter, sans-serif)" fontWeight={600}
-              >
-                {strategy === 'perpetual' ? 'koopkracht' : 'erfenis'} {targetEndPortfolio >= 1_000_000
-                  ? `€${(targetEndPortfolio / 1_000_000).toFixed(1)}M`
-                  : `€${Math.round(targetEndPortfolio / 1000)}k`}
-              </text>
-            </>
-          )
-        )}
-
-        {/* Zero baseline */}
-        <line x1={PAD.left} x2={PAD.left + innerW} y1={yZero} y2={yZero}
-          stroke="var(--border-md)" strokeWidth={1.5} />
-
-        {/* Depletion zone — red tint when portfolio hits zero (AOW-stop mode) */}
-        {showDepletionWarning && (() => {
-          const depletionPt = allPts.find(([, v]) => v <= 0)
-          if (!depletionPt || depletionPt[0] >= maxAge || depletionPt[0] <= minAge) return null
-          const x1 = PAD.left + xScale(depletionPt[0])
-          const x2 = PAD.left + xScale(maxAge)
-          return (
-            <>
-              <rect x={x1} y={PAD.top} width={Math.max(0, x2 - x1)} height={innerH}
-                fill="var(--negative)" opacity={0.06} />
-              <text x={x1 + 4} y={PAD.top + 14} fontSize={8}
-                fill="var(--negative)" fontWeight={600}
-                fontFamily="var(--font-inter, sans-serif)">
-                Vermogen op
-              </text>
-            </>
-          )
-        })()}
-
-        {/* FIRE dashed vertical (hidden in pensioen mode) */}
-        {!isPensioenMode && xFire !== null && fireAgeFractional !== null && fireAgeFractional > minAge && fireAgeFractional < maxAge && (
-          <line x1={xFire} x2={xFire} y1={PAD.top} y2={PAD.top + innerH}
-            stroke={COLOR_OPBOUW} strokeWidth={1.5} strokeDasharray="4 2" opacity={0.85} />
-        )}
-
-        {/* AOW pensioenleeftijd dashed vertical (promoted in pensioen mode) */}
-        {aowAgeFractional != null && aowAgeFractional > minAge && aowAgeFractional < maxAge && (
-          <>
-            <line
-              x1={PAD.left + xScale(aowAgeFractional)}
-              x2={PAD.left + xScale(aowAgeFractional)}
-              y1={PAD.top} y2={PAD.top + innerH}
-              stroke={isPensioenMode ? COLOR_OPBOUW : "var(--ink-3, #8a8680)"}
-              strokeWidth={isPensioenMode ? 1.8 : 1.2}
-              strokeDasharray={isPensioenMode ? "4 2" : "3 3"}
-              opacity={isPensioenMode ? 0.85 : 0.6}
-            />
-            <text
-              x={PAD.left + xScale(aowAgeFractional) - 4}
-              y={PAD.top + 14}
-              textAnchor="end"
-              fontSize={8}
-              fill="var(--ink-3, #8a8680)"
-              fontFamily="var(--font-inter, sans-serif)"
-              fontWeight={600}
-            >
-              AOW
-            </text>
-            <text
-              x={PAD.left + xScale(aowAgeFractional) - 4}
-              y={PAD.top + 23}
-              textAnchor="end"
-              fontSize={7}
-              fill="var(--ink-4, #bbb8b0)"
-              fontFamily="var(--font-dm-mono, monospace)"
-            >
-              {aowAgeFractional % 1 === 0
-                ? `${aowAgeFractional}`
-                : `${Math.floor(aowAgeFractional)}+${Math.round((aowAgeFractional % 1) * 12)}m`}
-            </text>
-            {/* AOW dot at junction point (pensioen mode only) */}
-            {isPensioenMode && aowFractionalPt !== null && (
-              <circle
-                cx={PAD.left + xScale(aowFractionalPt[0])}
-                cy={PAD.top + yScale(Math.max(aowFractionalPt[1], 0))}
-                r={5}
-                fill={COLOR_OPBOUW}
-                stroke="var(--paper)"
-                strokeWidth={1.5}
-              />
-            )}
-          </>
-        )}
-
-        {/* Baseline reference line (what-if mode) — emphasis switches between
-            faint ghost (no preset active) and solid compare (preset active). */}
-        {baselinePts.length > 1 && (
-          <path
-            d={pointsToPath(baselinePts)}
-            fill="none"
-            stroke={baselineEmphasis === 'compare'
-              ? 'var(--color-horizon-700, #8a6e42)'
-              : 'var(--ink-4, #bbb8b0)'}
-            strokeWidth={baselineEmphasis === 'compare' ? 2 : 2.5}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            pathLength={1}
-            strokeDasharray="1"
-            strokeDashoffset={hasEntered ? 0 : 1}
-            opacity={baselineEmphasis === 'compare' ? 0.85 : 0.55}
-            style={{ transition: hasEntered ? 'stroke-dashoffset 1.2s cubic-bezier(.22,1,.36,1)' : 'none' }}
-          />
-        )}
-
-        {/* Monte Carlo gradient confidence band */}
-        {mcPaths && (
-          <g style={{
-            opacity: hasEntered ? 1 : 0,
-            transition: hasEntered ? 'opacity 0.8s ease 0.2s' : 'none',
-          }}>
-            {/* SVG gradient definition for confidence band fade */}
-            <defs>
-              <linearGradient id="mc-band-gradient-v" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="var(--color-horizon-600, #a07840)" stopOpacity="0" />
-                <stop offset="35%" stopColor="var(--color-horizon-600, #a07840)" stopOpacity="0.18" />
-                <stop offset="50%" stopColor="var(--color-horizon-600, #a07840)" stopOpacity="0.25" />
-                <stop offset="65%" stopColor="var(--color-horizon-600, #a07840)" stopOpacity="0.18" />
-                <stop offset="100%" stopColor="var(--color-horizon-600, #a07840)" stopOpacity="0" />
-              </linearGradient>
-              <linearGradient id="mc-band-gradient-h" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%" stopColor="var(--color-horizon-600, #a07840)" stopOpacity="0.8" />
-                <stop offset="100%" stopColor="var(--color-horizon-600, #a07840)" stopOpacity="0.4" />
-              </linearGradient>
-            </defs>
-            {/* Outermost band: p10-p90 — lightest layer */}
-            {mcPaths.outermost && (
-              <path d={mcPaths.outermost} fill="url(#mc-band-gradient-v)" opacity={0.5} />
-            )}
-            {/* Outer-mid band: p15-p85 — slightly denser */}
-            {mcPaths.outerMid && (
-              <path d={mcPaths.outerMid} fill="var(--color-horizon-600, #a07840)" opacity={0.06} />
-            )}
-            {/* Inner band: p25-p75 — medium density */}
-            {mcPaths.inner && (
-              <path d={mcPaths.inner} fill="var(--color-horizon-600, #a07840)" opacity={0.09} />
-            )}
-            {/* Inner-mid band: p35-p65 — densest fill near median */}
-            {mcPaths.innerMid && (
-              <path d={mcPaths.innerMid} fill="var(--color-horizon-600, #a07840)" opacity={0.1} />
-            )}
-            {/* Median line: p50 — clear solid line */}
-            {mcPaths.median && (
-              <path d={mcPaths.median} fill="none"
-                stroke="var(--color-horizon-600, #a07840)" strokeWidth={1.8}
-                strokeLinecap="round" strokeLinejoin="round" opacity={0.7}
-                pathLength={1}
-                strokeDasharray="1"
-                strokeDashoffset={hasEntered ? 0 : 1}
-                style={{ transition: hasEntered ? 'stroke-dashoffset 1s cubic-bezier(.22,1,.36,1) 0.3s' : 'none' }}
-              />
-            )}
-          </g>
-        )}
-
-        {/* Scenario overlay paths (behind main line) */}
-        {scenarioOverlays?.map((overlay, i) =>
-          overlay.points.length > 1 && (
-            <path
-              key={overlay.name}
-              d={pointsToPath(overlay.points)}
-              fill="none"
-              stroke={overlay.color}
-              strokeWidth={1.5}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              opacity={0.45}
-              pathLength={1}
-              strokeDasharray="1"
-              strokeDashoffset={hasEntered ? 0 : 1}
-              style={{ transition: hasEntered ? `stroke-dashoffset 1s cubic-bezier(.22,1,.36,1) ${0.3 + i * 0.1}s` : 'none' }}
-            />
-          )
-        )}
-
-        {/* Household partner overlay paths */}
-        {householdOverlays?.map((overlay, i) =>
-          overlay.points.length > 1 && (
-            <g key={`hh-${overlay.name}`}>
-              <path
-                d={pointsToPath(overlay.points)}
-                fill="none"
-                stroke={overlay.color}
-                strokeWidth={overlay.isDashed ? 2 : 1.8}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeDasharray={overlay.isDashed ? '6 4' : 'none'}
-                opacity={overlay.isDashed ? 0.7 : 0.55}
-                pathLength={1}
-                style={{
-                  strokeDashoffset: hasEntered ? 0 : (overlay.isDashed ? 0 : 1),
-                  transition: hasEntered ? `stroke-dashoffset 1s cubic-bezier(.22,1,.36,1) ${0.2 + i * 0.15}s` : 'none',
-                  ...(overlay.isDashed ? {} : { strokeDasharray: '1', strokeDashoffset: hasEntered ? 0 : 1 }),
-                }}
-              />
-              {/* Partner/gezamenlijk FIRE-punt — op de fractionele leeftijd zodat
-                  de stip exact op de lijn valt (geïnterpoleerde y), net als de hoofdlijn. */}
-              {(() => {
-                const fa = overlay.fireAgeFractional ?? overlay.fireAge
-                if (fa === null || fa < currentAge || fa > endAge) return null
-                const lo = Math.floor(fa)
-                const hi = Math.ceil(fa)
-                const frac = fa - lo
-                const yLo = overlay.points.find(([a]) => a === lo)?.[1]
-                const yHi = overlay.points.find(([a]) => a === hi)?.[1]
-                const yVal = yLo != null && yHi != null
-                  ? yLo + frac * (yHi - yLo)
-                  : (overlay.points.find(([a]) => Math.abs(a - fa) < 1)?.[1] ?? 0)
-                return (
-                  <circle
-                    cx={PAD.left + xScale(fa)}
-                    cy={PAD.top + yScale(yVal)}
-                    r={3}
-                    fill={overlay.color}
-                    opacity={hasEntered ? 0.8 : 0}
-                    style={{ transition: 'opacity 0.4s ease 1s' }}
-                  />
-                )
-              })()}
-            </g>
-          )
-        )}
-
-        {/* Accumulation path — horizon goud */}
-        {accPts.length > 1 && (
-          <path
-            d={pointsToPath(accPts)}
-            fill="none"
-            stroke={mainStrokeAcc}
-            strokeWidth={emphasis === 'accumulation' ? 3.25 : 2.5}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            pathLength={1}
-            strokeDasharray="1"
-            strokeDashoffset={hasEntered ? 0 : 1}
-            opacity={accOpacity}
-            style={{ transition: hasEntered ? 'stroke-dashoffset 1.2s cubic-bezier(.22,1,.36,1), opacity 0.4s ease' : 'opacity 0.4s ease' }}
-          />
-        )}
-
-        {/* Decumulation path — kern bruin (or horizon goud for perpetual in fire mode) */}
-        {decPts.length > 1 && (
-          <path
-            d={pointsToPath(decPts)}
-            fill="none"
-            stroke={mainStrokeDec}
-            strokeWidth={emphasis === 'withdrawal' ? 3.25 : 2.5}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            pathLength={1}
-            strokeDasharray="1"
-            strokeDashoffset={hasEntered ? 0 : 1}
-            opacity={decOpacity}
-            style={{ transition: hasEntered ? 'stroke-dashoffset 1.2s cubic-bezier(.22,1,.36,1) 0.15s, opacity 0.4s ease' : 'opacity 0.4s ease' }}
-          />
-        )}
-
-        {/* Path when FIRE not reachable — grey single line */}
-        {fireAge === null && allPts.length > 1 && (
-          <path
-            d={pointsToPath(allPts)}
-            fill="none"
-            stroke="var(--ink-3)"
-            strokeWidth={2.5}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            pathLength={1}
-            strokeDasharray="1"
-            strokeDashoffset={hasEntered ? 0 : 1}
-            style={{ transition: hasEntered ? 'stroke-dashoffset 1.2s cubic-bezier(.22,1,.36,1)' : 'none' }}
-          />
-        )}
-
-        {/* Event markers (life events + natural milestones) — rendered ABOVE the
-            confidence band and projection lines so they are never hidden */}
-        {eventOverlay && eventOverlay.length > 0 && (
-          <ChartEventMarkers
-            events={eventOverlay}
-            xScale={xScale}
-            padLeft={PAD.left}
-            chartTopY={PAD.top}
-            chartBottomY={PAD.top + innerH}
-            iconClampTopY={iconStackTopFloor(maxStackAtAge, CHART_PAD.top)}
-            lineYAt={lineYAt}
-            visibleMinAge={minAge}
-            visibleMaxAge={maxAge}
-            onEventClick={onEventClick}
-            onEventDragEnd={onEventDragEnd}
-            onEventDragMove={onEventDragMove}
-          />
-        )}
-
-        {/* Crosshair hover overlay — invisible rect covering chart area for mouse tracking */}
-        <rect
-          x={PAD.left} y={PAD.top}
-          width={innerW} height={innerH}
-          fill="transparent"
-          pointerEvents={disableCrosshair ? 'none' : 'all'}
-          style={{ cursor: 'crosshair' }}
-          onMouseMove={handleOverlayMouseMove}
-          onMouseLeave={handleOverlayMouseLeave}
+        {/* Statische lagen (grid → assen → doellijnen → projectiepaden → MC-band
+            → event-markers). Gememoiseerd: hover raakt deze subtree niet. */}
+        <ChartStaticLayers
+          geometry={geometry}
+          hasEntered={hasEntered}
+          emphasis={emphasis}
+          baselineEmphasis={baselineEmphasis}
+          showDepletionWarning={showDepletionWarning}
+          eventOverlay={eventOverlay}
+          onEventClick={onEventClick}
+          onEventDragEnd={onEventDragEnd}
+          onEventDragMove={onEventDragMove}
         />
 
-        {/* Crosshair vertical line */}
-        {showCrosshair && crosshairX !== null && (
-          <line
-            x1={crosshairX} x2={crosshairX}
-            y1={PAD.top} y2={PAD.top + innerH}
-            stroke="var(--ink-3)" strokeWidth={1} opacity={0.4}
-            pointerEvents="none"
-          />
-        )}
+        {/* Crosshair-laag (hover-rect + verticale lijn + stip) — de enige laag
+            die op hoveredAge reageert. */}
+        <CrosshairLayer
+          geometry={geometry}
+          disableCrosshair={disableCrosshair}
+          onMouseMove={handleOverlayMouseMove}
+          onMouseLeave={handleOverlayMouseLeave}
+          showCrosshair={showCrosshair}
+          crosshairX={crosshairX}
+          crosshairY={crosshairY}
+          crosshairDotColor={crosshairDotColor}
+        />
 
-        {/* Crosshair dot on the wealth line */}
-        {showCrosshair && crosshairX !== null && crosshairY !== null && (
-          <circle
-            cx={crosshairX} cy={crosshairY} r={4}
-            fill={crosshairDotColor}
-            stroke="var(--paper)" strokeWidth={1.5}
-            pointerEvents="none"
-          />
-        )}
-
-        {/* Dot at FIRE junction (hidden in pensioen mode) */}
-        {!isPensioenMode && xFire !== null && yFireDot !== null && fireAgeFractional !== null && fireAgeFractional > minAge && fireAgeFractional < maxAge && (
-          <>
-            {firePulse && (
-              <circle cx={xFire} cy={yFireDot} r={5}
-                fill="none" stroke={mainStrokeAcc} strokeWidth={2}>
-                <animate attributeName="r" from="5" to="16" dur="1.6s" repeatCount="indefinite" />
-                <animate attributeName="opacity" from="0.7" to="0" dur="1.6s" repeatCount="indefinite" />
-              </circle>
-            )}
-            <circle cx={xFire} cy={yFireDot} r={firePulse ? 6 : 5}
-              fill={mainStrokeAcc} stroke="var(--paper)" strokeWidth={1.5} />
-          </>
-        )}
-
-        {/* Phase label: OPBOUW / VERMOGENSGROEI */}
-        {splitFractionalAge !== null && splitFractionalAge > minAge + 3 && (
-          <text x={PAD.left + xScale((minAge + splitFractionalAge) / 2)} y={PAD.top + 14}
-            textAnchor="middle" fontSize={10} fill={COLOR_OPBOUW}
-            fontFamily="var(--font-inter, sans-serif)" fontWeight={600}>
-            {isPensioenMode ? 'VERMOGENSGROEI' : 'OPBOUW'}
-          </text>
-        )}
-
-        {/* Phase label: AFBOUW / BEHOUD / PENSIOEN */}
-        {splitFractionalAge !== null && splitFractionalAge < maxAge - 3 && (
-          <text x={PAD.left + xScale((splitFractionalAge + maxAge) / 2)} y={PAD.top + 14}
-            textAnchor="middle" fontSize={10}
-            fill={!isPensioenMode && strategy === 'perpetual' ? COLOR_OPBOUW : COLOR_AFBOUW}
-            fontFamily="var(--font-inter, sans-serif)" fontWeight={600}>
-            {isPensioenMode ? 'PENSIOEN' : strategy === 'perpetual' ? 'BEHOUD' : 'AFBOUW'}
-          </text>
-        )}
-
-        {/* FIRE age label (hidden in pensioen mode). y geclampt onder de
-            gereserveerde icoon-marge (labelSafeTopY) zodat het label niet botst
-            met een event-icoon dat op/bij de FIRE-leeftijd boven de lijn staat —
-            vaak voorkomend (pensioen/erfenis-trigger op FIRE-leeftijd). */}
-        {!isPensioenMode && xFire !== null && fireAgeFractional !== null && fireAgeFractional > minAge && fireAgeFractional < maxAge && (
-          <text x={xFire + 4} y={Math.max(PAD.top + 24, labelSafeTopY + 18)} fontSize={8}
-            fill={COLOR_OPBOUW} fontFamily="var(--font-inter, sans-serif)" fontWeight={600}>
-            FIRE {fireAgeFractional.toFixed(1)}
-          </text>
-        )}
-
-        {/* FIRE age delta label (what-if mode) */}
-        {xFire !== null && yFireDot !== null && fireAgeFractional !== null && baselineFireAge != null &&
-          fireAgeFractional > minAge && fireAgeFractional < maxAge &&
-          Math.abs(fireAgeFractional - baselineFireAge) > 0.1 && (
-          <text
-            x={xFire}
-            y={yFireDot - 14}
-            textAnchor="middle"
-            fontSize={9}
-            fontWeight={700}
-            fontFamily="var(--font-dm-mono, monospace)"
-            fill={fireAgeFractional < baselineFireAge ? COLOR_OPBOUW : COLOR_AFBOUW}
-          >
-            {fireAgeFractional < baselineFireAge ? '' : '+'}
-            {(fireAgeFractional - baselineFireAge).toFixed(1)} jr
-          </text>
-        )}
-
+        {/* Voorgrond (FIRE-stip + fase-/FIRE-labels) — bovenop de crosshair,
+            gememoiseerd. */}
+        <ChartForeground
+          geometry={geometry}
+          emphasis={emphasis}
+          baselineFireAge={baselineFireAge}
+        />
       </svg>
 
       {/* Crosshair tooltip (HTML overlay for crisp text rendering) */}
@@ -1096,7 +550,7 @@ export const SimChart = memo(function SimChart({
                   {drukkers.map(d => (
                     <div key={d.label} className="flex items-baseline justify-between mt-0.5" style={{ fontSize: 9 }}>
                       <span style={{ color: '#fca5a5' }}>&#9660; {d.label}</span>
-                      <span className="font-mono tabular-nums" style={{ color: '#fca5a5' }}>{'\u2212'}{fmtAbs(d.value)}</span>
+                      <span className="font-mono tabular-nums" style={{ color: '#fca5a5' }}>{'−'}{fmtAbs(d.value)}</span>
                     </div>
                   ))}
                 </>
@@ -1118,7 +572,7 @@ export const SimChart = memo(function SimChart({
                   ] as const).map(p => (
                     <div key={p.label} className="flex items-baseline justify-between mt-0.5" style={{ fontSize: 9, opacity: p.opacity }}>
                       <span style={{ color: p.label === 'p50' ? 'var(--color-horizon-300, #d4b88a)' : 'var(--ink-4, #bbb8b0)' }}>
-                        {p.label}{p.label === 'p50' ? ' \u25cf' : ''}
+                        {p.label}{p.label === 'p50' ? ' ●' : ''}
                       </span>
                       <span
                         className="font-mono tabular-nums"

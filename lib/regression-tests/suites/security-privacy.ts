@@ -373,13 +373,14 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 500,
     async fn() {
-      // Verify the data isolation endpoint returns 401 without auth
-      // (which means it properly checks authentication before returning any data)
-      const res = await unauthenticatedFetch('/api/verify-data-isolation')
+      // Verify the household data endpoint returns 401 without auth
+      // (which means it properly checks authentication before returning any data).
+      // Voorheen gericht op de harness-route /api/verify-data-isolation;
+      // die is fysiek verwijderd (Arch F4). Zelfde garantie, echte route.
+      const res = await unauthenticatedFetch('/api/household/data')
       const body = await res.json()
-      assertEqual(res.status, 401, 'Data isolation endpoint requires auth')
-      // The endpoint queries 6 tables all with .eq('user_id', user.id)
-      // This structural guarantee ensures no cross-user data leakage
+      assertEqual(res.status, 401, 'Household data endpoint requires auth')
+      assert(typeof body === 'object' && body !== null, 'Error response is JSON')
     },
   },
   {
@@ -469,27 +470,11 @@ const tests: TestCase[] = [
       assert(!bodyStr.includes('supabase.co/rest'), 'No internal Supabase URLs')
     },
   },
-  {
-    id: 'error-test-500-no-internal-details',
-    name: 'Error responses: 500 errors do not expose internals',
-    category: CAT,
-    description: 'Even intentional 500 errors have sanitized messages for the client',
-    priority: 'high',
-    estimatedDurationMs: 500,
-    async fn() {
-      // The test-500 endpoint intentionally returns a 500 error
-      const res = await authenticatedFetch('/api/test-500')
-      if (res.status === 500) {
-        const body = await res.json()
-        // If there's an error field, it should not contain connection strings or file paths
-        const bodyStr = JSON.stringify(body)
-        assert(!bodyStr.includes('ECONNREFUSED'), 'No connection error details to client')
-        assert(!bodyStr.includes('/app/node_modules'), 'No internal file paths')
-      }
-      // Status could also be 401 (if auth middleware catches it first)
-      assert(res.status === 500 || res.status === 401 || res.status === 200, `Expected 500, 401, or 200, got ${res.status}`)
-    },
-  },
+  // NB: de vroegere test 'error-test-500-no-internal-details' is verwijderd
+  // met de harness-route /api/test-500 (Arch F4): die route retourneerde zijn
+  // eigen hardcoded (al gesanitiseerde) JSON, dus de test bewees niets over
+  // echte productie-foutpaden. Echte error-lekkage wordt hierboven getest
+  // via /api/holdings ('error-no-stack-trace-holdings', 'error-no-db-details-leaked').
   {
     id: 'error-consistent-format',
     name: 'Error responses: consistent { error: string } format',

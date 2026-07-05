@@ -3,7 +3,7 @@
 import { ArrowLeft, TrendingDown } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Kicker, EditorialHeadline, EditorialDeck, PullQuote, HL, HLNeg, GlossaryTerm, PageInfoButton } from '@/components/editorial'
+import { PageOpening, PullQuote, HL, HLNeg, GlossaryTerm, PageInfoButton } from '@/components/editorial'
 import { PAGE_INFO } from '@/lib/page-info-content'
 import { InflationErosionChart } from '@/components/app/horizon/inflation-erosion-chart'
 
@@ -36,24 +36,27 @@ export function InflatieKoopkrachtClient({
         {backLabel}
       </Link>
 
-      {/* Editorial header */}
-      <div className="space-y-4 mb-8">
-        <Kicker>
-          <TrendingDown size={12} className="inline -mt-0.5 mr-1" />
-          Inflatie en koopkracht
-        </Kicker>
-
-        <EditorialHeadline emphasis="onzichtbare" size="lg">
-          De onzichtbare belasting op je spaargeld
-        </EditorialHeadline>
-
-        <EditorialDeck>
-          <GlossaryTerm term="inflatie">Inflatie</GlossaryTerm> vreet stilletjes aan je <GlossaryTerm term="koopkracht">koopkracht</GlossaryTerm>. Wat je vandaag kunt
-          kopen voor &euro;1.000, kost over twintig jaar aanzienlijk meer.
-          Elke euro die stil op je rekening staat, verliest elke dag een
-          beetje vrijheid.
-        </EditorialDeck>
-      </div>
+      {/* Editorial pagina-opening — module-accent via --module-active-* (horizon) */}
+      <PageOpening
+        className="mb-8"
+        kicker={
+          <>
+            <TrendingDown size={12} className="inline -mt-0.5 mr-1" />
+            Inflatie en koopkracht
+          </>
+        }
+        titleBefore="De "
+        emphasis="onzichtbare"
+        titleAfter=" belasting op je spaargeld"
+        deck={
+          <>
+            <GlossaryTerm term="inflatie">Inflatie</GlossaryTerm> vreet stilletjes aan je <GlossaryTerm term="koopkracht">koopkracht</GlossaryTerm>. Wat je vandaag kunt
+            kopen voor &euro;1.000, kost over twintig jaar aanzienlijk meer.
+            Elke euro die stil op je rekening staat, verliest elke dag een
+            beetje vrijheid.
+          </>
+        }
+      />
 
       {/* Chart */}
       <InflationErosionChart

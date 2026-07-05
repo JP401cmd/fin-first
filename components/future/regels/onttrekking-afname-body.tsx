@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type { WealthGroup } from '@/lib/wealth-composition'
-import { POT_RULES_DEFAULTS } from '@/lib/pot-rules'
-import { RegelIntro, RegelSectionLabel } from './shared'
-import { GroupOrderEditor, PotFlowDiagram, usePotRulesSave } from './pot-flow-diagram'
+import { POT_RULES_DEFAULTS, DEFICIT_ORDER_PRESETS } from '@/lib/pot-rules'
+import { RegelIntro, RegelSectionLabel, PrioUitlegBlok } from './shared'
+import { PotFlowDiagram, usePotRulesSave } from './pot-flow-diagram'
+import { OrderPresetPicker } from './order-preset-picker'
 import { CategoriePrioEditor, useCategoriePrioState } from './categorie-prio-editor'
 import type { RegelBodyProps } from './types'
 
@@ -58,7 +59,15 @@ export function OnttrekkingAfnameBody({
       )}
 
       <RegelSectionLabel>Volgorde bij een tegenvaller</RegelSectionLabel>
-      <GroupOrderEditor groups={order} balances={balances} onChange={setOrder} />
+      <OrderPresetPicker
+        presets={DEFICIT_ORDER_PRESETS}
+        order={order}
+        balances={balances}
+        onChange={setOrder}
+        editorLabel="Sleep de volgorde bij een tegenvaller"
+      />
+
+      <PrioUitlegBlok />
 
       <CategoriePrioEditor
         enabled={prio.enabled}
@@ -74,8 +83,8 @@ export function OnttrekkingAfnameBody({
 
       <p className="mt-5 text-[11px] text-[var(--ink-3)] italic leading-snug">
         Eerst uit de liquide pot halen beschermt je beleggingen tegen verkopen op een dieptepunt.
-        Proportioneel halen houdt je verdeling in balans. We leggen je keuze vast en tonen hem
-        hierboven op je huidige potten; de volledige doorrekening volgt later.
+        We leggen je keuze vast en tonen hem hierboven op je huidige potten; de volledige
+        doorrekening volgt later.
       </p>
     </div>
   )

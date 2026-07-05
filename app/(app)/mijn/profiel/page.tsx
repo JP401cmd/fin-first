@@ -6,6 +6,7 @@ import { HouseholdSection } from '@/components/app/household-section'
 import { HouseholdPrivacySettings } from '@/components/mijn/household-privacy-settings'
 import { HouseholdBudgetModelSection } from '@/components/mijn/household-budget-model-section'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
+import { PageOpening } from '@/components/editorial'
 
 type HouseholdType = 'solo' | 'samen' | 'gezin'
 
@@ -149,39 +150,15 @@ export default function ProfielPage() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-5 sm:px-6 sm:py-8">
       <NavStackMeta title="Profiel" bottomBar={{ kind: 'tabs' }} />
-      {/* Editorial header — blueprint Type 8 (Settings) */}
-      <header className="mb-5 sm:mb-8 space-y-2">
-        <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
-          <span
-            aria-hidden
-            className="inline-block h-px w-7 shrink-0"
-            style={{ background: 'var(--module-active-500)' }}
-          />
-          Mijn · profiel
-        </div>
-        <h1
-          className="font-bold text-3xl tracking-[-0.02em]"
-          style={{ fontFamily: 'var(--font-playfair, serif)' }}
-        >
-          Wie ben{' '}
-          <em
-            className="font-normal italic"
-            style={{ color: 'var(--module-active-700)' }}
-          >
-            jij
-          </em>
-          ?
-        </h1>
-        <p
-          className="italic text-[14px] leading-snug text-[var(--ink-2)] pl-4 mt-2"
-          style={{
-            fontFamily: 'var(--font-source-serif, Georgia, serif)',
-            borderLeft: '2px solid var(--module-active-500)',
-          }}
-        >
-          Je persoonlijke gegevens en huishoudprofiel.
-        </p>
-      </header>
+      {/* Editorial pagina-opening — blueprint Type 8 (Settings) */}
+      <PageOpening
+        className="mb-5 sm:mb-8"
+        kicker="Mijn · profiel"
+        titleBefore="Wie ben "
+        emphasis="jij"
+        titleAfter="?"
+        deck="Je persoonlijke gegevens en huishoudprofiel."
+      />
 
       {/* ── Persoonlijke Gegevens ─────────────────────────────────── */}
       <section className="mb-5 sm:mb-8 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-8">

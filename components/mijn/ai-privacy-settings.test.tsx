@@ -30,7 +30,7 @@ describe('AiPrivacySettings', () => {
     render(<AiPrivacySettings />)
     await screen.findByText('AI-features inschakelen')
     expect(screen.getByText('Wat wordt gedeeld')).toBeTruthy()
-    expect(screen.getByText('Wat altijd privé blijft')).toBeTruthy()
+    expect(screen.getByText('Wat wordt gemaskeerd')).toBeTruthy()
     expect(screen.getByText('Hoe je data wordt verwerkt')).toBeTruthy()
   })
 

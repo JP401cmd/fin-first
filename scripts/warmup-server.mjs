@@ -1,6 +1,6 @@
 const port = process.argv[2] || '3156';
 const base = `http://localhost:${port}`;
-const pages = ['/api/health', '/login', '/test-debt-crud'];
+const pages = ['/api/health', '/login'];
 
 async function main() {
   for (const page of pages) {

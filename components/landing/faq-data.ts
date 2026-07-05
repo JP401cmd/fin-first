@@ -52,7 +52,7 @@ export const FAQ_PRIJZEN: Vraag[] = [
   {
     q: 'Kan ik opzeggen?',
     a:
-      'Ja, op elk moment. Bij opzegging download je al je data als JSON of CSV — geen vendor-lock-in.',
+      'Ja, op elk moment. Bij opzegging download je je kern-financiële gegevens (transacties, budgetten, vermogen, bezittingen, schulden, doelen) als CSV — geen vendor-lock-in.',
   },
 ]
 

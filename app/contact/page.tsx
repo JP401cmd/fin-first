@@ -23,9 +23,8 @@ export default function ContactPage() {
       </MarketingSection>
 
       <MarketingSection heading="E-mail">
-        {/* TODO: bevestig definitief support-adres met product-owner */}
         <a
-          href="mailto:support@trifinity.app"
+          href="mailto:support@trifinity.nl"
           className="inline-flex items-center gap-3 rounded-[var(--r-lg)] border border-[var(--border-md)] bg-[var(--paper)] px-5 py-4 transition-all hover:border-[var(--ink-3)] hover:shadow-[var(--s0)]"
         >
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)]">
@@ -36,7 +35,7 @@ export default function ContactPage() {
               Stuur een bericht
             </span>
             <span className="block font-mono text-base text-[var(--ink)]">
-              support@trifinity.app
+              support@trifinity.nl
             </span>
           </span>
         </a>
@@ -49,12 +48,19 @@ export default function ContactPage() {
           </li>
           <li className="border-l-2 border-[var(--border-md)] pl-4">
             AVG-verzoeken: inzage, correctie, export of verwijdering van je
-            gegevens (zie ook ons{' '}
+            gegevens — mail hiervoor{' '}
+            <a
+              href="mailto:privacy@trifinity.nl"
+              className="font-semibold text-kern-700 underline hover:text-kern-800"
+            >
+              privacy@trifinity.nl
+            </a>{' '}
+            (zie ook onze{' '}
             <a
               href="/privacy"
               className="font-semibold text-kern-700 underline hover:text-kern-800"
             >
-              privacybeleid
+              privacyverklaring
             </a>
             ).
           </li>

@@ -28,12 +28,10 @@ import { HubStelselradar } from '@/components/overview/belasting/hub-stelselrada
 import { HideInSimple } from '@/components/app/hide-in-simple'
 import { Reveal } from '@/components/landing/reveal'
 import {
-  Kicker,
-  EditorialHeadline,
-  EditorialDeck,
   SectionLabel,
   ScenarioCallout,
   OrnamentColophon,
+  PageOpening,
 } from '@/components/editorial'
 
 export const metadata: Metadata = {
@@ -241,29 +239,25 @@ export default async function OverzichtBelastingPage() {
     <>
       <NavStackMeta title="Belasting" bottomBar={{ kind: 'tabs' }} />
 
-      {/* ── Editorial masthead ─────────────────────────────────────────
-          Kicker-eyebrow + redactionele deck zetten de toon: belasting als
-          vierde hefboom, vertaald naar vrijheidstijd. */}
-      <header className="relative mx-auto max-w-6xl px-4 pt-6 sm:px-6 sm:pt-8">
+      {/* ── Editorial pagina-opening (standaard-aanhef) ────────────────
+          Canonieke PageOpening: hairline-kicker → narratieve Playfair-H1 met
+          één <em>-accent → deck. De belasting-layout mapt --module-active op
+          ink (neutraal), dus de accenttokens renderen bewust neutraal. */}
+      <div className="relative mx-auto max-w-6xl px-4 pt-6 sm:px-6 sm:pt-8">
         <PageStatusDot className="absolute right-[52px] top-6 sm:right-[60px] sm:top-8" />
         <PageInfoButton
           description={PAGE_INFO['/overzicht/belasting'] ?? ''}
           className="absolute right-4 top-6 sm:right-6 sm:top-8"
         />
-        <Kicker size="large" className="pr-10">
-          De vierde hefboom · Belasting {new Date().getFullYear()}
-        </Kicker>
-        <EditorialHeadline level="h1" size="lg" emphasis="vrijheid" className="mt-4 text-[var(--ink)]">
-          Drie boxen, één rekening — betaald in vrijheid
-        </EditorialHeadline>
-        <div className="mt-4 max-w-[62ch]">
-          <EditorialDeck>
-            Wat de fiscus jaarlijks afroomt is óók vrijheidstijd. Drie boxen,
-            één som — hieronder zie je waar de hefboom het zwaarst weegt en waar
-            ruimte ligt om vrijheid terug te kopen.
-          </EditorialDeck>
-        </div>
-      </header>
+        <PageOpening
+          className="pr-20 sm:pr-24"
+          kicker={`De vierde hefboom · Belasting ${new Date().getFullYear()}`}
+          titleBefore="Drie boxen, één rekening — betaald in "
+          emphasis="vrijheid"
+          titleAfter=""
+          deck="Wat de fiscus jaarlijks afroomt is óók vrijheidstijd. Drie boxen, één som — hieronder zie je waar de hefboom het zwaarst weegt en waar ruimte ligt om vrijheid terug te kopen."
+        />
+      </div>
 
       {/* Drie box-kaarten — gedeelde viz, ongewijzigd gedrag. De kaart-header
           toont geen totaal meer; "excl. Box 2" staat in de Sectie I-callout. */}

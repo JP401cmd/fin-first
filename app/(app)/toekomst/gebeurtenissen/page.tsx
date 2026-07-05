@@ -185,7 +185,13 @@ export default async function ToekomstGebeurtenissenPage() {
 
   return (
     <>
-      <ToekomstSubpageShell kicker="Toekomst" title="Gebeurtenissen" />
+      <ToekomstSubpageShell
+        kicker="Toekomst · Gebeurtenissen"
+        titleBefore="Welke gebeurtenissen verschuiven je "
+        emphasis="vrijheid"
+        titleAfter="?"
+        deck="Kind, erfenis, AOW, pensioen en je huis — momenten die je tijdas naar voren of naar achteren duwen."
+      />
       <GebeurtenissenView
         events={horizonData.events}
         currentAge={currentAge}

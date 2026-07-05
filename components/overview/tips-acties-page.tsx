@@ -7,6 +7,7 @@ import { ActionBoard } from '@/components/app/action-board'
 import { FreedomDaysAnimationProvider } from '@/components/app/freedom-days-animation'
 import { OpzegModal } from '@/components/app/opzeg-modal'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
+import { PageOpening } from '@/components/editorial'
 import { TipsLijst } from './tips-lijst'
 import type { Action, Recommendation } from '@/lib/recommendation-data'
 import type { CancellationMetadata } from '@/lib/cancellation-types'
@@ -64,19 +65,14 @@ export function TipsActiesPage({
           />
         )}
 
-        <header className="mb-6 pr-12 sm:pr-16">
-          <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
-            Will — tips & acties
-          </div>
-          <h1 className="mt-1 font-serif text-2xl md:text-3xl font-semibold text-[var(--ink)] leading-tight">
-            Wat zou je nu kunnen doen?
-          </h1>
-          <p className="mt-2 text-sm sm:text-base text-[var(--ink-2)]">
-            Toptips van Will bovenaan; open acties eronder. Beslis op een
-            tip met Doe nu, Later of Negeren — accepteer je 'm, dan
-            verschijnt 'ie op je actielijst.
-          </p>
-        </header>
+        <PageOpening
+          className="mb-6 pr-12 sm:pr-16"
+          kicker="Tips & acties"
+          titleBefore="Wat zou je "
+          emphasis="nu"
+          titleAfter=" kunnen doen?"
+          deck="Toptips van Will bovenaan; open acties eronder. Beslis op een tip met Doe nu, Later of Negeren — accepteer je 'm, dan verschijnt 'ie op je actielijst."
+        />
 
         <TipsLijst
           recommendations={recommendations}

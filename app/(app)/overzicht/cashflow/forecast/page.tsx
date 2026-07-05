@@ -6,6 +6,7 @@ import { getServerPerspective } from '@/lib/household/server-perspective'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { CashflowSection } from '@/components/will/cashflow-section'
 import { CashflowForecast } from '@/components/overview/cashflow-forecast'
+import { PageOpening } from '@/components/editorial'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { PageStatusDot } from '@/components/app/page-status-dot'
 import { PAGE_INFO } from '@/lib/page-info-content'
@@ -41,6 +42,13 @@ export default async function OverzichtCashflowForecastPage() {
         />
       </div>
       <div className="mx-auto max-w-6xl space-y-6 px-4 pt-4 sm:px-6">
+        <PageOpening
+          kicker="Vooruitblik"
+          titleBefore="Hoeveel "
+          emphasis="vrijheid"
+          titleAfter=" bouw je op?"
+          deck="Je spaarquote, je maandelijkse overschot en de komende zes maanden — samen laten ze zien hoe snel je vrijheid groeit."
+        />
         <CashflowSection data={dashboardData} />
         <CashflowForecast
           recurrings={cashflow.recurrings}

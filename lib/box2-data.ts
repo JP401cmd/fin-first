@@ -98,6 +98,28 @@ export const BOX2_PARAMS: Record<TaxYear, Box2Params> = {
 /** Wet excessief lenen bij eigen vennootschap — drempel */
 export const DGA_LENING_DREMPEL = 500_000
 
+// ── Vennootschapsbelasting (Vpb) ─────────────────────────────
+//
+// De Vpb belast de winst van een BV vóórdat die als dividend naar privé (Box 2)
+// stroomt. Vpb hoort alleen thuis in de context van Box 2 (winst-via-dividend),
+// daarom leeft de canonieke tabel hier i.p.v. in een los bestand.
+
+export interface VpbParams {
+  tariefLaag: number   // opstaptarief (eerste schijf)
+  tariefHoog: number   // algemeen tarief
+  grens: number        // schijfgrens (opstap → algemeen)
+}
+
+/**
+ * Vpb-tarieven per jaar. Bron: Belastingdienst, Vpb-tarieven 2025 & 2026
+ * (ongewijzigd t.o.v. elkaar): 19% opstaptarief tot €200.000 winst, 25,8%
+ * daarboven. Enige canonieke bron — importeer i.p.v. lokaal her-declareren.
+ */
+export const VPB_PARAMS: Record<TaxYear, VpbParams> = {
+  2025: { tariefLaag: 0.19, tariefHoog: 0.258, grens: 200_000 },
+  2026: { tariefLaag: 0.19, tariefHoog: 0.258, grens: 200_000 },
+}
+
 export const BOX2_TOOLTIPS: Record<string, string> = {
   box2: 'Box 2 belast inkomen uit aanmerkelijk belang — dividend en verkoopwinst van deelnemingen (≥5%).',
   aanmerkelijkBelang: 'Je hebt een aanmerkelijk belang als je (direct of indirect) 5% of meer van de aandelen bezit.',

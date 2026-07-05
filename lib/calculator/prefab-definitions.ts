@@ -387,7 +387,7 @@ const bvAgioVsPrive: CalculatorDefinition = {
     { key: 'bedrag', label: 'Te investeren bedrag', kind: 'euro', default: 100000, min: 10000, max: 5000000, prefill: 'liquid_cash', hint: 'Beschikbaar in de BV' },
     { key: 'rendement', label: 'Bruto rendement', kind: 'percent', default: 0.07, min: 0.01, max: 0.15, prefill: 'gross_return' },
     { key: 'jaren', label: 'Beleggingshorizon', kind: 'years', default: 15, min: 1, max: 30 },
-    { key: 'vpb', label: 'VpB-tarief', kind: 'percent', default: 0.196, min: 0.15, max: 0.3, hint: '19,6% tot €200k winst, 25,8% daarboven' },
+    { key: 'vpb', label: 'VpB-tarief', kind: 'percent', default: 0.19, min: 0.15, max: 0.3, hint: '19% tot €200k winst, 25,8% daarboven' },
     { key: 'div_belasting', label: 'Box 2 / dividendbelasting', kind: 'percent', default: 0.245, min: 0.15, max: 0.4 },
     { key: 'box3_druk', label: 'Box 3-druk per jaar', kind: 'percent', default: 0.02, min: 0, max: 0.05 },
     { key: 'maandlasten', label: 'Maandelijkse uitgaven', kind: 'euro', default: 3000, min: 0, max: 20000, prefill: 'monthly_expenses' },

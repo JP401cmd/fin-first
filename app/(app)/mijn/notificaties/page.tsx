@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { NOTIFICATION_TYPES } from '@/lib/identity-constants'
 import { CalendarCheck, HandCoins } from 'lucide-react'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
-import { PageInfoButton } from '@/components/editorial'
+import { PageInfoButton, PageOpening } from '@/components/editorial'
 import { PAGE_INFO } from '@/lib/page-info-content'
 
 type PartnerNotifMode = 'all_shared' | 'threshold' | 'categories' | 'disabled'
@@ -200,28 +200,19 @@ export default function MijnNotificatiesPage() {
     <div className="mx-auto max-w-4xl px-4 py-5 sm:px-6 sm:py-8">
       <NavStackMeta title="Notificaties" bottomBar={{ kind: 'tabs' }} />
 
-      <header className="relative mb-6 space-y-2">
+      <PageOpening
+        className="mb-6 pr-12 sm:pr-14"
+        kicker="Mijn · notificaties"
+        titleBefore="Wat je hoort "
+        emphasis="en wanneer"
+        titleAfter=""
+        deck="Stel in welke meldingen je wilt ontvangen — push-types, partner-transacties en maandelijkse geld-checkin."
+      >
         <PageInfoButton
           description={PAGE_INFO['/mijn/notificaties'] ?? ''}
           className="absolute right-0 top-0"
         />
-        <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
-          <span aria-hidden className="inline-block h-px w-7 shrink-0" style={{ background: 'var(--module-active-500)' }} />
-          Mijn · notificaties
-        </div>
-        <h1 className="font-bold text-3xl tracking-[-0.02em]" style={{ fontFamily: 'var(--font-playfair, serif)' }}>
-          Wat je hoort{' '}
-          <em className="font-normal italic" style={{ color: 'var(--module-active-700)' }}>
-            en wanneer
-          </em>
-        </h1>
-        <p
-          className="italic text-[14px] leading-snug text-[var(--ink-2)] pl-4 mt-2"
-          style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)', borderLeft: '2px solid var(--module-active-500)' }}
-        >
-          Stel in welke meldingen je wilt ontvangen — push-types, partner-transacties en maandelijkse geld-checkin.
-        </p>
-      </header>
+      </PageOpening>
 
       {/* Context-banner: maakt duidelijk waar deze meldingen verschijnen.
           User-feedback (mei 2026): "het is mij niet duidelijk welke

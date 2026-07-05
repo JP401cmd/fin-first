@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
+import { PageOpening } from '@/components/editorial'
 import {
   CalendarCheck,
   Loader2,
@@ -111,23 +112,14 @@ export default function CheckinHistoriePage() {
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 sm:py-10">
       <NavStackMeta title="Check-in historie" />
-      {/* Header — editorial blueprint met kicker-streep */}
-      <div className="mb-6">
-        <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1">
-          <span aria-hidden className="inline-block w-5 h-px shrink-0" style={{ background: 'var(--module-active-500)' }} />
-          <span>Geldcheck-in · Archief</span>
-        </div>
-        <h1
-          className="text-[20px] sm:text-[24px] font-black tracking-[-0.02em] leading-tight text-[var(--ink)]"
-          style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
-        >
-          <em
-            className="font-normal italic"
-            style={{ color: 'var(--module-active-700)' }}
-          >Historie</em>
-          {' '}van je check-ins
-        </h1>
-      </div>
+      {/* Editorial pagina-opening */}
+      <PageOpening
+        className="mb-6"
+        kicker="Geldcheck-in · Archief"
+        titleBefore=""
+        emphasis="Historie"
+        titleAfter=" van je check-ins"
+      />
 
       {hasHousehold && (
         <div className="mb-4 flex items-center gap-2 rounded-xl bg-wil-50 px-4 py-2.5">

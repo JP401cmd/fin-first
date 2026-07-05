@@ -8,8 +8,8 @@ describe('BEHEER_GROUPS', () => {
     expect(BEHEER_GROUPS.map((g) => g.id)).toEqual(['technisch', 'functioneel', 'test', 'info'])
   })
 
-  it('bevat 38 tools met unieke routes onder /beheer/', () => {
-    expect(allTools).toHaveLength(38)
+  it('bevat 39 tools met unieke routes onder /beheer/', () => {
+    expect(allTools).toHaveLength(39)
     const hrefs = allTools.map((t) => t.href)
     expect(new Set(hrefs).size).toBe(hrefs.length)
     for (const href of hrefs) {

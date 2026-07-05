@@ -8,6 +8,7 @@ import { StepProgress } from './step-progress'
 import type { RetirementExpenseMethod } from '@/lib/budget-utils'
 import type { FireEndStrategy } from '@/lib/fire-strategy'
 import type { ModuleId } from '@/lib/module-registry'
+import { NL_AOW_MONTHLY } from '@/lib/constants'
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -90,7 +91,7 @@ function createDefaultLifeEvents(aowAge: number): LifeEventEntry[] {
       name: 'AOW',
       event_type: 'income',
       target_age: aowAge,
-      monthly_income_change: 1558,
+      monthly_income_change: NL_AOW_MONTHLY,
       is_active: true,
     },
     {

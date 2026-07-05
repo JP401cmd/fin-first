@@ -3,12 +3,12 @@ import { render, screen } from '@testing-library/react'
 import { MijnOverview } from './mijn-overview'
 
 describe('MijnOverview — render', () => {
-  it('rendert header met "Profiel & instellingen"', () => {
+  it('rendert narratieve masthead-kop', () => {
     render(<MijnOverview />)
-    // EditorialHeadline splitst de kop over meerdere spans (italic-em op
-    // "instellingen") — match daarom op de samengestelde heading-tekst.
+    // PageOpening splitst de kop over tekst + italic-em ("naar jouw hand") —
+    // match daarom op de samengestelde heading-tekst.
     const heading = screen.getByRole('heading', { level: 1 })
-    expect(heading.textContent).toBe('Profiel & instellingen')
+    expect(heading.textContent).toBe('Alles naar jouw hand gezet')
   })
 
   it('rendert 8 sub-route cards', () => {
@@ -52,8 +52,8 @@ describe('MijnOverview — render', () => {
     expect(legacyLink).toBeNull()
   })
 
-  it('toont uitleg-tekst over 8 onderwerpen', () => {
+  it('toont uitleg-deck onder de kop (telwoord-vrij)', () => {
     render(<MijnOverview />)
-    expect(screen.getByText(/Acht onderwerpen/i)).toBeTruthy()
+    expect(screen.getByText(/eigen rustige pagina/i)).toBeTruthy()
   })
 })

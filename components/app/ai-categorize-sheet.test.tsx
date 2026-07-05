@@ -451,15 +451,17 @@ describe('AICategorizeSheet — choice-fase handmatige opties', () => {
   })
 })
 
-// ── AI-flow transfer-behandeling (code-review H1) ─────────────────────────────
+// ── AI-flow transfer-behandeling ──────────────────────────────────────────────
 //
-// GEDRAGSWIJZIGING: spiegelparen (fuzzy) worden NIET meer stil als transfer
-// weggeschreven vóór de gebruiker iets ziet — ze komen als review-voorstel terug.
-// IBAN/naam-detectie (sterk) blijft wél stil toegepast. Deze suite vergrendelt:
+// GEDRAGSWIJZIGING (combined pass, Notion-kaart jul 2026, eis 2): in de "Vraag
+// Will"-automaat wordt NIETS meer stil toegepast — óók sterke IBAN/naam-
+// transfers landen als review-voorstel (label "Overboeking"). Deze suite
+// vergrendelt:
 //  (a) spiegelpaar-only → geen silent write, wél een review-suggestie;
 //  (b) een geaccepteerde eigen-rekening-suggestie schrijft transaction_type=
 //      'transfer' bij opslaan;
-//  (c) het IBAN/naam-pad blijft ongewijzigd silent toegepast.
+//  (c) óók het sterke IBAN/naam-pad wordt VOORGELEGD in plaats van stil
+//      toegepast (was vóór jul 2026 silent — bewust omgedraaid).
 
 // Eigen-rekening-budget zit zowel in de platte budgets als in een groep, zodat
 // de naam-resolutie in TransactionRow en acceptSuggestion 'm vinden.
@@ -575,7 +577,7 @@ describe('AICategorizeSheet — AI-flow transfer-behandeling', () => {
     })
   })
 
-  it('(c) IBAN/naam-pad blijft ongewijzigd: sterk signaal wordt stil toegepast', async () => {
+  it('(c) sterk IBAN/naam-signaal wordt VOORGELEGD (label "Overboeking"), niet stil toegepast', async () => {
     // Eén transactie met een eigen-rekening-IBAN (sterk signaal) + één gewone.
     autoCatContext = {
       ...autoCatContext,
@@ -618,16 +620,134 @@ describe('AICategorizeSheet — AI-flow transfer-behandeling', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Vraag Will/i }))
 
-    // De info-regel meldt de stil-gemarkeerde sterke transfer (1).
+    // Het sterke signaal verschijnt als review-voorstel met herkomst-label.
     await waitFor(() => {
-      expect(screen.getByText(/automatisch gemarkeerd/i)).toBeInTheDocument()
+      expect(screen.getByText(/Overboeking tussen eigen rekeningen/i)).toBeInTheDocument()
     })
+    expect(screen.getByText(/^Overboeking$/)).toBeInTheDocument()
 
-    // De sterke transfer is meteen (silent) als transfer weggeschreven.
+    // Cruciaal (eis 2): NIETS is stil toegepast vóór de gebruiker iets deed.
+    expect(transactionUpdates).toHaveLength(0)
+
+    // Accepteren + opslaan schrijft de transfer alsnog — mét vlag.
+    fireEvent.click(screen.getByRole('button', { name: /^OK$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Opslaan/i }))
+    await waitFor(() => {
+      expect(screen.getByText(/Klaar/i)).toBeInTheDocument()
+    })
     const transferWrites = transactionUpdates.filter((u) => u.payload.transaction_type === 'transfer')
     const writtenIds = transferWrites.flatMap((u) => u.ids)
     expect(writtenIds).toContain('strong-1')
     expect(writtenIds).not.toContain('normal-1')
+  })
+})
+
+// ── Combined pass in de sheet (Notion-kaart jul 2026) ─────────────────────────
+//
+// Eis 1+2: "Vraag Will" draait eerst de gratis regelmotor, stuurt alleen
+// onbekende tegenpartijen (1 representant per genormaliseerde tegenpartij) naar
+// de AI en propageert het oordeel — en legt ALLES ter review voor met een
+// herkomst-label per rij ("Regel" / "Will" / "Afgeleid" / "Overboeking").
+
+const boodschappenBudget = {
+  id: 'b-boodschappen',
+  name: 'Boodschappen',
+  slug: 'boodschappen',
+  budget_type: 'expense',
+  ownership: 'personal',
+  parent_id: null,
+} as unknown as Budget
+
+describe('AICategorizeSheet — combined pass (regels → AI → propagatie)', () => {
+  it('regel-zekere rijen verschijnen als "Regel"-voorstel in de review ZONDER AI-call', async () => {
+    // De auto-cat-context kent het boodschappen-budget → de trefwoordregel
+    // ("albert heijn", confidence 1.0) dekt beide transacties. Er blijft niets
+    // onbekends over → er mag GEEN enkele fetch naar /api/ai/categorize gaan.
+    autoCatContext = { ...autoCatContext, budgets: [boodschappenBudget] }
+    const txs = [
+      makeTx('ah1', { description: 'Albert Heijn 1234', counterparty_name: 'Albert Heijn' }),
+      makeTx('ah2', { description: 'Albert Heijn 5678', counterparty_name: 'Albert Heijn' }),
+    ]
+
+    render(
+      <AICategorizeSheet
+        transactions={txs}
+        budgets={[boodschappenBudget]}
+        budgetGroups={[{ parent: boodschappenBudget, children: [boodschappenBudget] }]}
+        onClose={() => {}}
+        onSaved={() => {}}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Vraag Will/i }))
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/^Regel$/).length).toBe(2)
+    })
+    // Beide voorstellen tonen het regel-budget; niets is toegepast (review-only).
+    expect(screen.getAllByText('Boodschappen').length).toBeGreaterThanOrEqual(2)
+    expect(transactionUpdates).toHaveLength(0)
+    // Geen AI-call gedaan: de regelmotor dekte alles. (useHouseholdStatus doet
+    // een eigen fetch naar /api/household/status — daarom op URL filteren.)
+    const aiCalls = vi.mocked(fetch).mock.calls.filter((c) => String(c[0]).includes('/api/ai/categorize'))
+    expect(aiCalls).toHaveLength(0)
+  })
+
+  it('onbekende tegenpartij: 1 AI-call voor de representant ("Will"), siblings "Afgeleid"', async () => {
+    // Twee transacties van dezelfde onbekende tegenpartij → de combined pass
+    // stuurt er precies ÉÉN naar de AI en leidt de tweede af.
+    const fetchMock = vi.fn((url: string, init?: { body?: string }) => {
+      // Andere fetches (o.a. /api/household/status van useHouseholdStatus) → leeg ok.
+      if (!String(url).includes('/api/ai/categorize')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) })
+      }
+      const body = JSON.parse(init?.body ?? '{}') as { transactions: { import_hash: string }[] }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({
+          results: body.transactions.map((t) => ({
+            import_hash: t.import_hash,
+            budget_slug: 'boodschappen',
+            budget_id: 'b-boodschappen',
+            confidence: 0.9,
+            reasoning: 'Lijkt op een supermarkt',
+          })),
+        }),
+      })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const txs = [
+      makeTx('nw1', { description: 'Betaling 1', counterparty_name: 'Nieuwe Winkel' }),
+      makeTx('nw2', { description: 'Betaling 2', counterparty_name: 'Nieuwe Winkel' }),
+    ]
+
+    render(
+      <AICategorizeSheet
+        transactions={txs}
+        budgets={[boodschappenBudget]}
+        budgetGroups={[{ parent: boodschappenBudget, children: [boodschappenBudget] }]}
+        onClose={() => {}}
+        onSaved={() => {}}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Vraag Will/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText(/^Will$/)).toBeInTheDocument()
+    })
+    // De sibling is afgeleid — met herkomst-label en afleidings-reasoning.
+    expect(screen.getByText(/^Afgeleid$/)).toBeInTheDocument()
+    expect(screen.getByText(/Afgeleid van Nieuwe Winkel/i)).toBeInTheDocument()
+    // Precies één AI-call, met precies één representant in de payload.
+    // (useHouseholdStatus fetcht /api/household/status — filter op URL.)
+    const aiCalls = fetchMock.mock.calls.filter((c) => String(c[0]).includes('/api/ai/categorize'))
+    expect(aiCalls).toHaveLength(1)
+    const sentBody = JSON.parse((aiCalls[0][1] as { body: string }).body) as { transactions: unknown[] }
+    expect(sentBody.transactions).toHaveLength(1)
+    // Review-only: niets toegepast vóór bevestiging.
+    expect(transactionUpdates).toHaveLength(0)
   })
 })
 

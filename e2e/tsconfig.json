@@ -1,0 +1,17 @@
+{
+  // Eigen TS-scope voor de Playwright-suite. Extends de root-config voor
+  // compiler-basics (target/lib/strict/jsx/paths), maar met een eigen
+  // include/exclude zodat dit project ALLEEN e2e/**-bestanden ziet — de
+  // root tsconfig.json sluit 'e2e' juist uit (zie tsconfig.json#exclude)
+  // zodat @playwright/test (nog niet geïnstalleerd in deze omgeving) de
+  // hoofd-`tsc --noEmit` niet breekt.
+  //
+  // Los draaien (na `npm install` + `npx playwright install`):
+  //   npx tsc -p e2e/tsconfig.json --noEmit
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules"]
+}

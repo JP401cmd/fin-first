@@ -18,6 +18,7 @@ import {
 import { LibraryCard } from '@/components/future/library-card'
 import { LibraryFilter } from '@/components/future/library-filter'
 import { DisclaimerStrip } from '@/components/future/disclaimer-strip'
+import { PageOpening } from '@/components/editorial'
 
 /**
  * /toekomst/bibliotheek — publieke Rekenhulp-bibliotheek.
@@ -179,24 +180,18 @@ export default async function BibliotheekPage({
         Terug naar rekenhulpen
       </Link>
 
-      {/* Editorial header met Wil-kicker */}
-      <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-horizon-700">
-            Toekomst — bibliotheek
-          </div>
-          <h1 className="font-serif text-2xl sm:text-3xl text-[var(--ink)] mt-1">
-            Wat anderen al hebben uitgerekend
-          </h1>
-          <p className="text-sm text-[var(--ink-2)] mt-2 leading-relaxed max-w-2xl">
-            Bekijk rekenhulpen die andere TriFinity-gebruikers met Will hebben
-            gemaakt en gedeeld. Dupliceer wat je raakt — je eigen cijfers
-            worden meteen ingevuld zodat je &apos;m op jouw situatie kunt
-            beoordelen.
-          </p>
-        </div>
+      {/* Editorial pagina-opening — module-accent via --module-active-* (horizon) */}
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <PageOpening
+          className="min-w-0"
+          kicker="Toekomst · Bibliotheek"
+          titleBefore="Wat anderen al hebben "
+          emphasis="uitgerekend"
+          titleAfter=""
+          deck="Bekijk rekenhulpen die andere TriFinity-gebruikers met Will hebben gemaakt en gedeeld. Dupliceer wat je raakt — je eigen cijfers worden meteen ingevuld zodat je 'm op jouw situatie kunt beoordelen."
+        />
         <LibraryFilter defaultEnabled={showOnlyUsable} />
-      </header>
+      </div>
 
       {/* Lijst (per tier-sectie) of empty state */}
       {visible.length === 0 ? (

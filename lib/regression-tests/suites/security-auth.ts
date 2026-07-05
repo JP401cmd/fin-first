@@ -189,14 +189,15 @@ const tests: TestCase[] = [
   // ── Step 2: Row Level Security — user A cannot access user B data ─
   {
     id: 'rls-data-isolation-contract',
-    name: 'RLS: verify-data-isolation endpoint shape',
+    name: 'RLS: household data endpoint auth guard (401)',
     category: CAT,
-    description: 'The data isolation endpoint returns user-scoped data with isolation_verified flag',
+    description: 'The household data endpoint (multi-table, user-scoped) requires authentication',
     priority: 'critical',
     estimatedDurationMs: 500,
     async fn() {
-      // When unauthenticated, this should return 401
-      const { status } = await fetchAPI('/api/verify-data-isolation')
+      // Voorheen gericht op de harness-route /api/verify-data-isolation;
+      // die is fysiek verwijderd (Arch F4). Zelfde garantie, echte route.
+      const { status } = await fetchAPI('/api/household/data')
       assertEqual(status, 401, 'Unauthenticated → 401')
     },
   },

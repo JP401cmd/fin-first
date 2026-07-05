@@ -46,7 +46,13 @@ export default async function ToekomstVoorkeurenPage() {
 
   return (
     <>
-      <ToekomstSubpageShell kicker="Toekomst" title="Voorkeuren" />
+      <ToekomstSubpageShell
+        kicker="Toekomst · Voorkeuren"
+        titleBefore="Onder welke "
+        emphasis="aannames"
+        titleAfter=" reken je?"
+        deck="Eindstrategie, onttrekking, pot-regels en markt-aannames die over je hele tijdas gelden."
+      />
       <VoorkeurenView
         fireParams={horizonData.fireParams}
         fireStrategy={horizonData.fireStrategy}

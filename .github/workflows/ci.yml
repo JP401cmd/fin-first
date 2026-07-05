@@ -1,0 +1,58 @@
+name: CI
+
+# Kwaliteitspoort (enterprise-architectuurreview 3 jul 2026, bevinding #2,
+# fase F2). De rekenkern is uitzonderlijk goed getest — Excel-oracle-pariteit
+# tot ≤ €0,01, ~1.190 engine-tests — maar niets dwong die tests af: geen CI,
+# en de husky pre-push draait alleen `tsc` met testbestanden uitgefilterd.
+# Deze workflow dwingt de typecheck én de zwaarst-gewogen rekenmotor-tests
+# af bij elke push en pull request, zodat een rekenregressie niet ongemerkt
+# gemerged kan worden.
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+# Een nieuwe push op dezelfde ref annuleert een nog lopende run: snellere
+# feedback en zuiniger met runner-minuten.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality-gate:
+    name: Typecheck + rekenmotor-tests
+    runs-on: ubuntu-latest
+    # HUSKY=0: in CI hoeven er geen lokale git-hooks geïnstalleerd te worden
+    # door het `prepare`-script tijdens `npm ci`.
+    env:
+      HUSKY: 0
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node (versie uit .nvmrc)
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies (npm ci)
+        run: npm ci
+
+      # next-env.d.ts en .next/types staan buiten git (gitignored) en worden
+      # normaal gegenereerd door `next dev` / `next build`. Op een verse
+      # checkout ontbreken ze; `next typegen` genereert de route-/pagina-types
+      # zonder een volledige build, zodat `tsc --noEmit` alle Next-types vindt.
+      - name: Generate Next route types
+        run: npx next typegen
+
+      - name: Typecheck (tsc --noEmit)
+        run: npx tsc --noEmit
+
+      # Eén gerichte vitest-run over de rekenkern (FIRE/Horizon-kernel), de
+      # Excel-oracle-pariteit (draait tegen de in-git fixtures onder
+      # test/fixtures/horizon-oracle), de fiscale motoren (box1/box3/
+      # fiscale-kerngetallen) en de architectuur-curatie. ~1.240 tests.
+      - name: Rekenmotor- & pariteitstests (vitest)
+        run: npx vitest run lib/horizon-kernel test/horizon-oracle lib/box1-tax lib/box3 lib/fiscale-kerngetallen lib/architecture

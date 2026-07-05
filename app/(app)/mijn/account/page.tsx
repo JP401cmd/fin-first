@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
+import { PageOpening } from '@/components/editorial'
 import { PAGE_INFO } from '@/lib/page-info-content'
 import { createClient } from '@/lib/supabase/server'
 import { AccountClient } from '@/components/mijn/account/account-client'
@@ -38,10 +39,18 @@ export default async function MijnAccountPage() {
   return (
     <>
       <NavStackMeta title="Account" bottomBar={{ kind: 'tabs' }} />
-      <div className="relative mx-auto max-w-3xl px-4 pt-4 sm:px-6">
+      <div className="relative mx-auto max-w-3xl px-4 pt-4 pb-6 sm:px-6">
         <PageInfoButton
           description={PAGE_INFO['/mijn/account'] ?? ''}
           className="absolute right-4 top-4 sm:right-6"
+        />
+        <PageOpening
+          className="pr-12 sm:pr-14"
+          kicker="Mijn · account"
+          titleBefore="Je "
+          emphasis="abonnement"
+          titleAfter=", je account"
+          deck="Beheer je abonnement, inloggegevens en de rest van je account."
         />
       </div>
       <AccountClient

@@ -1,4 +1,6 @@
 import { Kicker, ScenarioCallout, FiguresStrip } from '@/components/editorial'
+import { BOX2_PARAMS, VPB_PARAMS } from '@/lib/box2-data'
+import { BOX1_PARAMS } from '@/lib/box1-tax'
 import { GepaardeStaven } from './gepaarde-staven'
 
 /**
@@ -24,11 +26,14 @@ import { GepaardeStaven } from './gepaarde-staven'
  * fiscaal advies.
  */
 
-const VPB_LAAG = 0.19 // tot €200.000 winst
-const VPB_HOOG = 0.258 // daarboven
-const BOX2_LAAG = 0.245
-const BOX2_HOOG = 0.31
-const BOX1_TOP = 0.495 // referentie: loon in hoogste Box 1-schijf
+// Tarieven uit de canonieke jaartabellen (2026) — géén lokale duplicaten.
+// VPB_PARAMS/BOX2_PARAMS uit lib/box2-data.ts, Box 1-toptarief uit lib/box1-tax.ts.
+const VPB_LAAG = VPB_PARAMS['2026'].tariefLaag // 19% tot €200.000 winst
+const VPB_HOOG = VPB_PARAMS['2026'].tariefHoog // 25,8% daarboven
+const BOX2_LAAG = BOX2_PARAMS['2026'].tariefLaag // 24,5%
+const BOX2_HOOG = BOX2_PARAMS['2026'].tariefHoog // 31%
+// Hoogste (open) Box 1-schijf = referentie voor loon-vergelijking (49,5%).
+const BOX1_TOP = BOX1_PARAMS['2026'].schijven[BOX1_PARAMS['2026'].schijven.length - 1].tarief
 
 /** Gecombineerde druk: eerst Vpb, dan Box 2 over het restant. */
 function combined(vpb: number, box2: number): number {

@@ -53,7 +53,7 @@ export function VeiligheidSecties() {
             <PrivacyBullet
               Icon={Fingerprint}
               titel="Eigen export, altijd"
-              beschrijving="Download al je data als JSON of CSV wanneer je wilt. Geen vendor-lock-in bij opzegging."
+              beschrijving="Download je kern-financiële gegevens (transacties, budgetten, vermogen, bezittingen, schulden, doelen) als CSV wanneer je wilt. Geen vendor-lock-in bij opzegging."
             />
           </div>
         </Reveal>

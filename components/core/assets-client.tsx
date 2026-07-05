@@ -7,13 +7,14 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { BottomSheet } from '@/components/app/bottom-sheet'
-import { Kicker, EditorialHeadline, EditorialDeck, FiguresStrip, PageInfoButton, GlossaryTerm } from '@/components/editorial'
+import { Kicker, FiguresStrip, PageInfoButton, GlossaryTerm, PageOpening } from '@/components/editorial'
 import { PAGE_INFO } from '@/lib/page-info-content'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { AssetPane } from '@/components/app/core/assets/asset-pane'
 import { createClient } from '@/lib/supabase/client'
 import { syncBudgetingActive } from '@/lib/budgeting-active'
 import { upsertSingleBalanceSnapshot } from '@/lib/balance-snapshot'
+import { DGA_LENING_DREMPEL } from '@/lib/box2-data'
 import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
 import { calculateFreedomTime, formatFreedomTimeString, formatMaskedCurrency, dailyExpenseRate } from '@/lib/format'
 import { localMonthBounds } from '@/lib/month-range'
@@ -644,36 +645,36 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
-      {/* ═══ Editorial header (Type 2 — List) ═══════════════════════
-          Hergebruikt editorial-primitives: Kicker, EditorialHeadline,
-          EditorialDeck, FiguresStrip. Geen hand-rolled markup. */}
-
-      {/* 3px module-accent-bar */}
-      <div className="h-[3px] w-full mb-5" style={{ background: 'var(--module-active-500)' }} aria-hidden="true" />
-
-      <header className="relative mb-5 space-y-3">
+      {/* ═══ Editorial pagina-opening (standaard-aanhef) ════════════
+          Canonieke PageOpening: hairline-kicker → narratieve Playfair-H1
+          met één <em>-accent → deck. Alles eronder (FiguresStrip, toolbar,
+          grid) ongewijzigd. */}
+      <PageOpening
+        className="mb-5 pr-24 sm:pr-28"
+        kicker={
+          <>
+            Bezittingen · opgeslagen vrijheid
+            <PerspectiveContextLabel />
+          </>
+        }
+        titleBefore="Wat je bezit, is opgeslagen "
+        emphasis="vrijheid"
+        titleAfter="."
+        deck={
+          <>
+            Elke bezitting is opgeslagen tijd — geld dat voor je werkt in plaats van andersom.
+            {activeAssets.length > 0 && ` ${activeAssets.length} bezitting${activeAssets.length === 1 ? '' : 'en'} bij elkaar — gewogen naar inclusiepercentage.`}
+          </>
+        }
+      >
         <PageInfoButton
           description={pageInfoText}
           className="absolute right-0 top-0"
         />
-        <div className="flex flex-wrap items-center gap-2">
-          <Kicker size="large">Bezittingen · opgeslagen vrijheid</Kicker>
-          <PerspectiveContextLabel />
-        </div>
-
-        <EditorialHeadline emphasis="vrijheid" size="lg">
-          Opgeslagen vrijheid
-        </EditorialHeadline>
-
-        <EditorialDeck>
-          Elke bezitting is opgeslagen tijd — geld dat voor je werkt in plaats van andersom.
-          {activeAssets.length > 0 && ` ${activeAssets.length} bezitting${activeAssets.length === 1 ? '' : 'en'} bij elkaar — gewogen naar inclusiepercentage.`}
-        </EditorialDeck>
-
         {partnerAssetsHidden && (
           <PrivacyHiddenNotice hiddenCategories={['assets']} forCategories={['assets']} />
         )}
-      </header>
+      </PageOpening>
 
       {/* Figures-strip (mini-hero) — Totale waarde krijgt highlight-marker */}
       {/* In Eenvoudig alleen het hoofdcijfer "Totale waarde"; de projectie-
@@ -1213,8 +1214,8 @@ export function AssetDetailModal({
   const [allDebts, setAllDebts] = useState<{ id: string; name: string; current_balance: number; linked_asset_id: string | null }[]>([])
   const [totalDgaLeningen, setTotalDgaLeningen] = useState(0)
   const [showLinkDropdown, setShowLinkDropdown] = useState(false)
-  const WET_EXCESSIEF_LENEN_DREMPEL = 500_000
-  const WET_EXCESSIEF_LENEN_WAARSCHUWING = 400_000
+  const WET_EXCESSIEF_LENEN_DREMPEL = DGA_LENING_DREMPEL
+  const WET_EXCESSIEF_LENEN_WAARSCHUWING = 400_000 // vroegsignalering, geen wettelijke drempel
 
   useEffect(() => {
     if (!isDeelneming) return
@@ -3801,15 +3802,16 @@ export function AssetForm({
                     </div>
                     {(() => {
                       const totalDga = dgaTotal + (Number(currentValue) || 0)
-                      if (totalDga > 500000) return (
+                      // DGA-drempel uit de canonieke bron (lib/box2-data.ts) — geen losse literal.
+                      if (totalDga > DGA_LENING_DREMPEL) return (
                         <div className="rounded-[var(--r)] border border-negative/40 bg-negative/10 p-3">
-                          <p className="text-xs font-medium text-negative">Wet excessief lenen: totaal DGA-leningen &euro;{totalDga.toLocaleString('nl-NL')} overschrijdt de grens van &euro;500.000.</p>
-                          <p className="mt-0.5 text-[10px] text-negative">Het meerdere boven &euro;500.000 wordt belast als box 2-inkomen (aanmerkelijk belang).</p>
+                          <p className="text-xs font-medium text-negative">Wet excessief lenen: totaal DGA-leningen &euro;{totalDga.toLocaleString('nl-NL')} overschrijdt de grens van &euro;{DGA_LENING_DREMPEL.toLocaleString('nl-NL')}.</p>
+                          <p className="mt-0.5 text-[10px] text-negative">Het meerdere boven &euro;{DGA_LENING_DREMPEL.toLocaleString('nl-NL')} wordt belast als box 2-inkomen (aanmerkelijk belang).</p>
                         </div>
                       )
                       if (totalDga > 400000) return (
                         <div className="rounded-[var(--r)] border border-amber-300 bg-amber-50 p-3">
-                          <p className="text-xs font-medium text-amber-800">Let op: totaal DGA-leningen &euro;{totalDga.toLocaleString('nl-NL')} nadert de grens van &euro;500.000 (Wet excessief lenen).</p>
+                          <p className="text-xs font-medium text-amber-800">Let op: totaal DGA-leningen &euro;{totalDga.toLocaleString('nl-NL')} nadert de grens van &euro;{DGA_LENING_DREMPEL.toLocaleString('nl-NL')} (Wet excessief lenen).</p>
                         </div>
                       )
                       return null

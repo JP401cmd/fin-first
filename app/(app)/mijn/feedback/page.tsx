@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { MessageSquare, Check } from 'lucide-react'
+import { PageOpening } from '@/components/editorial'
 
 const CATEGORIES = [
   { value: 'bug', label: 'Bug' },
@@ -43,16 +44,19 @@ export default function MijnFeedbackPage() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 sm:px-6">
-      <header className="mb-6">
-        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
-          <MessageSquare className="h-3 w-3" />
-          Feedback
-        </div>
-        <h1 className="mt-1 font-serif text-2xl text-[var(--ink)]">Help ons TriFinity beter te maken</h1>
-        <p className="mt-2 text-sm leading-relaxed text-[var(--ink-2)]">
-          Een bug, een idee of een vraag? Laat het weten — we lezen alles.
-        </p>
-      </header>
+      <PageOpening
+        className="mb-6"
+        kicker={
+          <>
+            <MessageSquare className="h-3 w-3" aria-hidden />
+            Feedback
+          </>
+        }
+        titleBefore="Help ons TriFinity "
+        emphasis="beter"
+        titleAfter=" te maken"
+        deck="Een bug, een idee of een vraag? Laat het weten — we lezen alles."
+      />
 
       {done ? (
         <div className="flex items-start gap-2 border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">

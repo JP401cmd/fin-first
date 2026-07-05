@@ -38,6 +38,7 @@ import {
   type CategoryCorrection,
   type FrequencyMatch,
 } from '@/lib/parsers/categorize'
+import { normalizeCounterparty } from '@/lib/parsers/counterparty-normalize'
 import type { Budget } from '@/lib/budget-data'
 
 /** Minimale transactievorm die beide functies nodig hebben. */
@@ -159,6 +160,13 @@ export type AutoAssignment = {
   /** 'transfer' | 'manual' | 'rule' — landt in transactions.category_source. */
   category_source: string
   isTransfer: boolean
+  /**
+   * Zekerheid van de keten-uitkomst (categorizeTransaction): correctie 1.0/0.95,
+   * frequentie 0.6–0.95, trefwoord 0.7–1.0, transfer 1.0. Gebruikt door de
+   * combined pass om zwakke regel-hits alsnog aan de AI voor te leggen
+   * (`minRuleConfidence`); `applyAssignments`-consumers negeren dit veld.
+   */
+  confidence: number
 }
 
 export type AutoCatResult = {
@@ -173,6 +181,11 @@ export type AutoCatResult = {
    * de gebruiker (review via Vraag Will of handmatig). De UI meldt dit aantal.
    */
   mirrorCandidateCount: number
+  /**
+   * De id's achter `mirrorCandidateCount` — de combined pass bouwt hier een
+   * voorgevuld eigen-rekening-voorstel van (review, niet stil toepassen).
+   */
+  mirrorCandidateIds: string[]
   /**
    * Aantal transacties dat noch automatisch ingedeeld is, noch een spiegelpaar-
    * kandidaat. (Spiegelpaar-kandidaten worden apart in `mirrorCandidateCount`
@@ -197,7 +210,7 @@ export function computeAutoCategorization(txs: AutoCatTx[], ctx: AutoCatContext)
   const assignments: AutoAssignment[] = []
   let ruleCount = 0
   let transferCount = 0
-  let mirrorCandidateCount = 0
+  const mirrorCandidateIds: string[] = []
   let unmatchedCount = 0
 
   // Spiegelparen alléén tellen — niet toepassen. We draaien de gewone keten op
@@ -221,7 +234,7 @@ export function computeAutoCategorization(txs: AutoCatTx[], ctx: AutoCatContext)
     if (res.isTransfer) {
       // Sterk signaal (IBAN/naam) — ook als deze tx tevens in een spiegelpaar zit.
       if (ctx.eigenRekeningBudgetId) {
-        assignments.push({ id: tx.id, budget_id: ctx.eigenRekeningBudgetId, category_source: 'transfer', isTransfer: true })
+        assignments.push({ id: tx.id, budget_id: ctx.eigenRekeningBudgetId, category_source: 'transfer', isTransfer: true, confidence: res.confidence })
         transferCount++
       } else {
         unmatchedCount++
@@ -232,17 +245,18 @@ export function computeAutoCategorization(txs: AutoCatTx[], ctx: AutoCatContext)
         budget_id: res.budget_id,
         category_source: res.category_source ?? 'rule',
         isTransfer: false,
+        confidence: res.confidence,
       })
       ruleCount++
     } else if (pairIds.has(tx.id)) {
       // Spiegelpaar-only (fuzzy) → niet toepassen, tel als kandidaat.
-      mirrorCandidateCount++
+      mirrorCandidateIds.push(tx.id)
     } else {
       unmatchedCount++
     }
   }
 
-  return { assignments, ruleCount, transferCount, mirrorCandidateCount, unmatchedCount }
+  return { assignments, ruleCount, transferCount, mirrorCandidateCount: mirrorCandidateIds.length, mirrorCandidateIds, unmatchedCount }
 }
 
 export type OwnAccountResult = {
@@ -279,7 +293,7 @@ export function computeOwnAccountDetection(txs: AutoCatTx[], ctx: AutoCatContext
   for (const tx of txs) {
     if (isOwnAccountTransfer(tx.counterparty_iban, ctx.ownIbans, tx.counterparty_name, ctx.ownNamePatterns)) {
       // Sterk signaal — ook als deze tx tevens in een spiegelpaar zit.
-      assignments.push({ id: tx.id, budget_id: ctx.eigenRekeningBudgetId, category_source: 'transfer', isTransfer: true })
+      assignments.push({ id: tx.id, budget_id: ctx.eigenRekeningBudgetId, category_source: 'transfer', isTransfer: true, confidence: 1.0 })
     } else if (pairIds.has(tx.id)) {
       // Spiegelpaar-only (fuzzy) → niet toepassen, tel als kandidaat.
       mirrorCandidateCount++
@@ -292,4 +306,314 @@ export function computeOwnAccountDetection(txs: AutoCatTx[], ctx: AutoCatContext
     mirrorCandidateCount,
     unmatchedCount: txs.length - assignments.length - mirrorCandidateCount,
   }
+}
+
+// ─── Combined pass: regelmotor → AI (per genormaliseerde tegenpartij) → propagatie ───
+//
+// De "gecombineerde automaat" (Notion-kaart jul 2026): één orkestrator die de
+// bestaande pure bouwstenen samenrijgt i.p.v. of/of.
+//
+//  Stap 1 (gratis, lokaal): computeAutoCategorization — correcties + frequentie
+//         + trefwoord + sterke transfers worden VOORSTELLEN (bron 'rule'/'transfer');
+//         spiegelpaar-kandidaten krijgen een voorgevuld eigen-rekening-voorstel
+//         (bron 'mirror'). Niets wordt hier toegepast — de caller legt álles ter
+//         review voor (eis: ook slim-toewijzingen worden bevestigd).
+//  Stap 2 (AI, alleen voor de rest): de overgebleven onbekenden worden gegroepeerd
+//         op GENORMALISEERDE tegenpartij-key (zelfde normalizeCounterparty als de
+//         frequentie-motor) + richting (inkomst/uitgave). Per ronde gaat van
+//         maximaal `batchSize` (≤20) groepen één representant naar de AI-resolver.
+//  Stap 3 (slim vervolg): het AI-oordeel propageert naar alle siblings met
+//         dezelfde genormaliseerde key (bron 'propagated'); vóór elke volgende
+//         ronde worden resterende groepen ook tegen eerdere AI-antwoorden geveegd
+//         (cross-key: naam ↔ IBAN), zodat AI-rondes en slim toewijzen elkaar
+//         afwisselen tot alles behandeld is — ook bij duizenden transacties.
+//
+//  Stap 4 (leer-lus: AI-oordeel → category_corrections-regel) is BEWUST niet
+//  gebouwd — open productkeuze; alleen expliciete gebruikerskeuzes schrijven
+//  regels (bestaand gedrag in de review-UI).
+//
+// Puur op de geïnjecteerde `aiResolver` na: geen fetch, geen React, geen DB.
+// Aantal AI-calls = ceil(onbekende genormaliseerde tegenpartijen / batchSize),
+// nooit onbegrensd parallel (strikt sequentieel, ronde voor ronde).
+
+/** Transactievorm voor de combined pass (AutoCatTx + optionele referentie voor de AI). */
+export type CombinedTx = AutoCatTx & { reference?: string | null }
+
+/** Herkomst van een voorstel — de review-UI toont dit als label per rij. */
+export type CombinedProposalSource = 'rule' | 'transfer' | 'mirror' | 'ai' | 'propagated'
+
+/** Eén voorstel uit de combined pass. NIET toegepast: de caller legt het ter review voor. */
+export type CombinedProposal = {
+  id: string
+  budget_id: string
+  confidence: number
+  source: CombinedProposalSource
+  /** Waarde voor transactions.category_source bij accepteren ('rule'/'manual'/'transfer'/'ai'). */
+  category_source: string
+  isTransfer: boolean
+  reasoning: string | null
+}
+
+/** Eén transactie in een AI-batch (de resolver POST dit naar /api/ai/categorize). */
+export type CombinedAiBatchItem = {
+  id: string
+  description: string
+  counterparty_name: string | null
+  amount: number
+  reference: string | null
+  date: string | null
+}
+
+/** Antwoord van de AI-resolver per aangeboden transactie. */
+export type CombinedAiResult = {
+  id: string
+  budget_id: string | null
+  confidence: number
+  reasoning?: string | null
+}
+
+export type CombinedProgress = {
+  /** AI-ronde (0 = nog geen AI-call gedaan). */
+  round: number
+  /** Afgehandelde transacties in de AI-fase (voorstel gekregen óf definitief onbekend). */
+  processed: number
+  /** Totaal aantal transacties dat de AI-fase in ging (na de gratis regel-stap). */
+  total: number
+  /** Waarvan via propagatie (zonder eigen AI-call) van een voorstel voorzien. */
+  propagated: number
+}
+
+export type CombinedRunResult = {
+  /** Voorstellen per transactie-id. Transacties zonder entry bleven onbekend. */
+  proposals: Map<string, CombinedProposal>
+  counts: {
+    rule: number
+    transfer: number
+    mirror: number
+    ai: number
+    propagated: number
+    unresolved: number
+  }
+  /** Aantal uitgevoerde AI-rondes (= aantal resolver-aanroepen, incl. mislukte). */
+  aiRounds: number
+  /** Batches waarvan de resolver faalde — caller kan ze aanbieden voor retry. */
+  failedBatches: CombinedAiBatchItem[][]
+  /** True wanneer het signaal de run afbrak; de al-gedane voorstellen blijven staan. */
+  aborted: boolean
+}
+
+/**
+ * Groepeer-key voor AI-dedupe + propagatie: genormaliseerde tegenpartij-naam
+ * (PSP-/terminal-ruis gestript — "CCV*BAKKER 12" ↔ "Bakker"), terugvallend op
+ * IBAN. De RICHTING (inkomst/uitgave) zit in de key: een AI-oordeel over een
+ * uitgave propageert nooit naar een ontvangst van dezelfde tegenpartij
+ * (terugbetaling ≠ aankoop). Zonder naam én IBAN is er niets om op te
+ * propageren → singleton-groep per transactie.
+ */
+function combinedGroupKeys(tx: CombinedTx): { primary: string; all: string[] } {
+  const dir = tx.amount > 0 ? 'in' : 'uit'
+  const name = normalizeCounterparty(tx.counterparty_name)
+  const iban = tx.counterparty_iban ? tx.counterparty_iban.replace(/\s/g, '').toUpperCase() : ''
+  const keys: string[] = []
+  if (name) keys.push(`name:${name}:${dir}`)
+  if (iban) keys.push(`iban:${iban}:${dir}`)
+  if (keys.length === 0) return { primary: `tx:${tx.id}`, all: [] }
+  return { primary: keys[0], all: keys }
+}
+
+export async function runCombinedCategorization(
+  txs: CombinedTx[],
+  ctx: AutoCatContext,
+  aiResolver: (batch: CombinedAiBatchItem[]) => Promise<CombinedAiResult[]>,
+  opts: {
+    /** Max. representanten per AI-call. Default en plafond 20 (de route capt hard). */
+    batchSize?: number
+    /**
+     * Regel-hits (niet-transfers) onder deze zekerheid gaan alsnog naar de AI
+     * i.p.v. als regel-voorstel te landen. Default 0 = elke regel-hit blijft
+     * lokaal (geen AI-call). De import-flow geeft 0.8 mee (Feature #101-gedrag).
+     */
+    minRuleConfidence?: number
+    onProgress?: (p: CombinedProgress) => void
+    /** Per toegevoegd voorstel (ook stap 1) — voor incrementele UI-updates. */
+    onProposal?: (p: CombinedProposal) => void
+    /** Afbreken tussen rondes: al-gedane voorstellen blijven, er wordt niets toegepast. */
+    signal?: AbortSignal
+  } = {},
+): Promise<CombinedRunResult> {
+  const batchSize = Math.max(1, Math.min(20, opts.batchSize ?? 20))
+  const minRuleConfidence = opts.minRuleConfidence ?? 0
+  const proposals = new Map<string, CombinedProposal>()
+  const failedBatches: CombinedAiBatchItem[][] = []
+  let aborted = false
+
+  // ── Stap 1: gratis, lokaal — regels/frequentie/correcties/transfers ──
+  const addProposal = (p: CombinedProposal) => {
+    proposals.set(p.id, p)
+    opts.onProposal?.(p)
+  }
+
+  const stage1 = computeAutoCategorization(txs, ctx)
+  for (const a of stage1.assignments) {
+    if (!a.isTransfer && a.confidence < minRuleConfidence) continue // te zwak → AI-fase
+    addProposal({
+      id: a.id,
+      budget_id: a.budget_id,
+      confidence: a.confidence,
+      source: a.isTransfer ? 'transfer' : 'rule',
+      category_source: a.category_source,
+      isTransfer: a.isTransfer,
+      reasoning: a.isTransfer ? 'Overboeking tussen eigen rekeningen (IBAN of naam herkend)' : null,
+    })
+  }
+  // Spiegelpaar-kandidaten (fuzzy): voorgevuld eigen-rekening-voorstel, géén AI-call.
+  // Zonder eigen-rekening-budget is er geen voorstel mogelijk → gewoon de AI-fase in.
+  if (ctx.eigenRekeningBudgetId) {
+    for (const id of stage1.mirrorCandidateIds) {
+      addProposal({
+        id,
+        budget_id: ctx.eigenRekeningBudgetId,
+        confidence: 0.85,
+        source: 'mirror',
+        category_source: 'transfer',
+        isTransfer: true,
+        reasoning: 'Spiegelboeking: zelfde bedrag tegengesteld op een andere rekening',
+      })
+    }
+  }
+
+  // ── Stap 2+3: interleaved AI-rondes met propagatie op genormaliseerde key ──
+  const aiPhaseTxs = txs.filter((t) => !proposals.has(t.id))
+  const total = aiPhaseTxs.length
+  let processed = 0
+  let propagated = 0
+  let round = 0
+
+  const groups = new Map<string, CombinedTx[]>()
+  for (const tx of aiPhaseTxs) {
+    const { primary } = combinedGroupKeys(tx)
+    const list = groups.get(primary)
+    if (list) list.push(tx)
+    else groups.set(primary, [tx])
+  }
+
+  // Eerdere AI-antwoorden, geregistreerd onder ál hun keys (naam én IBAN, per
+  // richting) zodat een latere groep met een overlappende key zonder AI-call
+  // wordt afgehandeld (de "slim toewijzen"-beurt tussen de AI-beurten).
+  const answered = new Map<string, { result: CombinedAiResult; repName: string | null }>()
+
+  const propose = (tx: CombinedTx, result: CombinedAiResult, source: 'ai' | 'propagated', repName: string | null) => {
+    addProposal({
+      id: tx.id,
+      budget_id: result.budget_id!,
+      confidence: result.confidence,
+      source,
+      category_source: 'ai',
+      isTransfer: false,
+      reasoning:
+        source === 'ai'
+          ? (result.reasoning ?? null)
+          : `Afgeleid van ${repName ?? 'een vergelijkbare transactie'} (zelfde tegenpartij)`,
+    })
+    processed++
+    if (source === 'propagated') propagated++
+  }
+
+  const emitProgress = () => opts.onProgress?.({ round, processed, total, propagated })
+
+  let pendingKeys = Array.from(groups.keys())
+  emitProgress()
+
+  while (pendingKeys.length > 0) {
+    if (opts.signal?.aborted) {
+      aborted = true
+      break
+    }
+
+    // Propagatie-veeg vóór elke AI-ronde: groepen waarvan een key al beantwoord
+    // is (door een eerdere ronde) krijgen hun voorstel zonder nieuwe AI-call.
+    const stillPending: string[] = []
+    for (const key of pendingKeys) {
+      const members = groups.get(key)!
+      let hit: { result: CombinedAiResult; repName: string | null } | undefined
+      for (const m of members) {
+        for (const k of combinedGroupKeys(m).all) {
+          hit = answered.get(k)
+          if (hit) break
+        }
+        if (hit) break
+      }
+      if (hit) {
+        if (hit.result.budget_id) {
+          for (const m of members) propose(m, hit.result, 'propagated', hit.repName)
+        } else {
+          processed += members.length // eerder door de AI als "onbekend" beoordeeld
+        }
+      } else {
+        stillPending.push(key)
+      }
+    }
+    pendingKeys = stillPending
+    if (pendingKeys.length === 0) {
+      emitProgress()
+      break
+    }
+
+    // AI-ronde: één representant per groep, max `batchSize` groepen.
+    round++
+    const roundKeys = pendingKeys.slice(0, batchSize)
+    pendingKeys = pendingKeys.slice(batchSize)
+    const batch: CombinedAiBatchItem[] = roundKeys.map((k) => {
+      const rep = groups.get(k)![0]
+      return {
+        id: rep.id,
+        description: rep.description,
+        counterparty_name: rep.counterparty_name,
+        amount: rep.amount,
+        reference: rep.reference ?? null,
+        date: rep.date ?? null,
+      }
+    })
+
+    let results: CombinedAiResult[]
+    try {
+      results = await aiResolver(batch)
+    } catch {
+      // Mislukte ronde: groepen als afgehandeld-zonder-voorstel tellen zodat de
+      // lus nooit blijft hangen; de batch gaat naar failedBatches voor retry.
+      failedBatches.push(batch)
+      for (const k of roundKeys) processed += groups.get(k)!.length
+      emitProgress()
+      continue
+    }
+
+    const resultById = new Map(results.map((r) => [r.id, r]))
+    for (const k of roundKeys) {
+      const members = groups.get(k)!
+      const rep = members[0]
+      const res = resultById.get(rep.id)
+      if (!res) {
+        processed += members.length
+        continue
+      }
+      // Registreer onder álle keys van de representant (naam + IBAN, per richting).
+      for (const key of combinedGroupKeys(rep).all) {
+        if (!answered.has(key)) answered.set(key, { result: res, repName: rep.counterparty_name })
+      }
+      if (res.budget_id) {
+        propose(rep, res, 'ai', null)
+        for (const m of members.slice(1)) propose(m, res, 'propagated', rep.counterparty_name)
+      } else {
+        processed += members.length
+      }
+    }
+    emitProgress()
+  }
+
+  // ── Telling per bron ──
+  const counts = { rule: 0, transfer: 0, mirror: 0, ai: 0, propagated: 0, unresolved: 0 }
+  for (const p of proposals.values()) counts[p.source]++
+  counts.unresolved = txs.length - proposals.size
+
+  return { proposals, counts, aiRounds: round, failedBatches, aborted }
 }

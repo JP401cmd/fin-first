@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { WealthGroup } from '@/lib/wealth-composition'
 import { POT_RULES_DEFAULTS, type SurplusGroup } from '@/lib/pot-rules'
-import { RegelIntro, RegelSectionLabel, RegelOptionCard } from './shared'
+import { RegelIntro, RegelSectionLabel, RegelOptionCard, PrioUitlegBlok } from './shared'
 import { PotFlowDiagram, usePotRulesSave } from './pot-flow-diagram'
 import { CategoriePrioEditor, useCategoriePrioState } from './categorie-prio-editor'
 import type { RegelBodyProps } from './types'
@@ -80,6 +80,8 @@ export function VerdelingToenameBody({
           <PotFlowDiagram balances={balances} mode="target" targetGroup={target} />
         </div>
       )}
+
+      <PrioUitlegBlok variant="target" />
 
       <CategoriePrioEditor
         enabled={prio.enabled}

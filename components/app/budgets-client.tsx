@@ -108,6 +108,7 @@ import {
 } from '@/lib/budget-perspective'
 import { Users } from 'lucide-react'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { PageOpening } from '@/components/editorial'
 import { MASKED_AMOUNT_PLACEHOLDER } from '@/lib/format'
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
@@ -190,31 +191,18 @@ export function BudgetEditorialHeader({
   const werkelijkBedrag = formatMaskedCurrency(Math.abs(werkelijkRuimte), masked)
 
   return (
-    <header className="relative mb-6 space-y-3">
-      <div className="flex flex-wrap items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
-        <span
-          aria-hidden
-          className="inline-block h-px w-7 shrink-0"
-          style={{ background: 'var(--module-active-500)' }}
-        />
-        Budgetteren {periodKicker && `· ${periodKicker}`}
-        <PerspectiveContextLabel className="normal-case tracking-normal" />
-      </div>
-
-      <h1
-        className="font-bold leading-tight tracking-[-0.02em] text-[28px] sm:text-[36px] md:text-[44px]"
-        style={{ fontFamily: 'var(--font-playfair, serif)' }}
-      >
-        Hoeveel{' '}
-        <em
-          className="font-normal italic"
-          style={{ color: 'var(--module-active-700)' }}
-        >
-          ruimte
-        </em>{' '}
-        heb je nog?
-      </h1>
-
+    <PageOpening
+      className="mb-6"
+      kicker={
+        <>
+          Budgetteren {periodKicker && `· ${periodKicker}`}
+          <PerspectiveContextLabel className="normal-case tracking-normal" />
+        </>
+      }
+      titleBefore="Hoeveel "
+      emphasis="ruimte"
+      titleAfter=" heb je nog?"
+    >
       {/* Twee kolommen: plan vs. werkelijk. Plan gebruikt highlight-marker
           (Kern-200), werkelijk blijft sober — zo vormt het plan-cijfer het
           anker en is werkelijk de aanvullende lezing. In Eenvoudig-modus
@@ -271,7 +259,7 @@ export function BudgetEditorialHeader({
         </div>
       </div>
       )}
-    </header>
+    </PageOpening>
   )
 }
 

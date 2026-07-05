@@ -217,6 +217,12 @@ export const BEHEER_GROUPS: BeheerGroup[] = [
     stripeClass: 'bg-emerald-500',
     tools: [
       {
+        label: 'UAT-procesplaat',
+        href: '/beheer/uat',
+        description: 'Procesplaat van de UAT: succesrate, dekking en status per zone.',
+        icon: ClipboardCheck,
+      },
+      {
         label: 'Testdata',
         href: '/beheer/testdata',
         description: "Persona's seeden, onboarding-reset en mobile preview.",

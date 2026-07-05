@@ -19,6 +19,8 @@ export { GlossaryTerm } from './glossary-term'
 export type { GlossaryTermProps } from './glossary-term'
 // Re-export PageInfoButton (page context popover)
 export { PageInfoButton } from './page-info-button'
+// Re-export PageOpening (canonieke editorial pagina-aanhef — standaard-aanhef)
+export { PageOpening, PageOpeningFigure } from './page-opening'
 
 const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
 const SOURCE_SERIF = 'var(--font-source-serif, Georgia, serif)'

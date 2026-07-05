@@ -51,6 +51,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@serwist/cli": "^9.5.11",
     "@serwist/sw": "^9.5.11",
     "@tailwindcss/postcss": "^4",

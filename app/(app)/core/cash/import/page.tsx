@@ -17,6 +17,7 @@ import { detectFormat, CSV_PRESETS, type CSVPreset } from '@/lib/parsers/index'
 import type { ParsedTransaction } from '@/lib/parsers/shared'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { categorizeTransaction, isOwnAccountTransfer, isWalletTransferType, buildFrequencyMap, type CategoryCorrection, type FrequencyMatch } from '@/lib/parsers/categorize'
+import { runCombinedCategorization, type AutoCatContext, type CombinedAiBatchItem, type CombinedAiResult } from '@/lib/auto-categorize'
 import { type Budget, resolveEigenRekeningBudgetId, budgetOptionLabel } from '@/lib/budget-data'
 import { buildOwnAccountIdentifiers } from '@/lib/own-accounts'
 import { linkUnmatchedTransfers } from '@/lib/transfer-matching'
@@ -395,150 +396,107 @@ export default function ImportPage() {
         setAiReady(true)
         if (allResults.length === 0 && failed.length > 0) setAiError(true)
       } else {
-        // Feature #190: Sequential batching with auto-assignment after each batch
-        // After each AI batch returns, propagate AI-determined categories to remaining
-        // uncategorized rows that share the same counterparty_name or counterparty_iban.
-        // This drastically reduces the number of transactions sent to AI.
+        // Features #101/#190 — sinds jul 2026 via de GEDEELDE combined pass
+        // (lib/auto-categorize.ts#runCombinedCategorization), dezelfde motor als
+        // de "Vraag Will"-flow op het categoriseer-scherm. Per ronde gaat één
+        // representant per GENORMALISEERDE tegenpartij (PSP-/terminal-ruis
+        // gestript — "CCV*BAKKER 12" ↔ "Bakker", de oude inline-code matchte
+        // alleen exact) per ≤20 naar de AI, waarna het oordeel naar de overige
+        // rijen van die tegenpartij propageert; dat herhaalt tot alles behandeld
+        // is. De regel-stap van de pass is hier een bewuste no-op: rijen met
+        // regel-confidence ≥ 0.8 zijn al bij parse ingedeeld (highConfidence),
+        // en `minRuleConfidence: 0.8` stuurt de zwakkere hits alsnog naar de AI
+        // — exact het oude #101-gedrag.
+        setAiProgress({ current: 0, total: toEnrich.length, skippedHighConf: highConfidence.length, autoMatched: 0 })
 
-        // Build a lookup from import_hash → ImportRow for counterparty matching
-        const rowByHash = new Map<string, ImportRow>()
-        for (const r of importRows) rowByHash.set(r.import_hash, r)
-
-        // Track all AI results and auto-matched suggestions
-        const suggestionMap = new Map<string, AISuggestion>()
-        // Track hashes that have been categorized (AI or auto-matched) — skip in future batches
-        const categorizedHashes = new Set<string>()
-        // Track auto-matched count for progress display
-        let totalAutoMatched = 0
-
-        // All hashes that need AI categorization
-        const remainingHashes = new Set(toEnrich.map((r) => r.import_hash))
-        const originalTotal = remainingHashes.size
-        setAiProgress({ current: 0, total: originalTotal, skippedHighConf: highConfidence.length, autoMatched: 0 })
-
-        let completedCount = 0
-        const failed: typeof aiFailedBatches = []
-
-        while (remainingHashes.size > 0) {
-          // Build next batch from remaining uncategorized hashes
-          const batchHashes = Array.from(remainingHashes).slice(0, 20)
-          const batchPayload: BatchPayloadItem[] = batchHashes.map((h) => {
-            const r = rowByHash.get(h)!
-            return {
-              import_hash: r.import_hash,
-              description: r.description,
-              counterparty_name: r.counterparty_name,
-              amount: r.amount,
-              reference: r.reference,
-            }
-          })
-
-          // Send batch to AI
-          let batchResults: AISuggestion[] = []
-          try {
-            const res = await fetch('/api/ai/categorize', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ transactions: batchPayload }),
-            })
-            if (!res.ok) throw new Error('AI niet beschikbaar')
-            const data = await res.json() as { results: AISuggestion[] }
-            batchResults = data.results
-          } catch {
-            failed.push({ index: failed.length, payload: batchPayload })
-            // Remove these hashes so we don't loop forever
-            for (const h of batchHashes) remainingHashes.delete(h)
-            completedCount += batchHashes.length
-            setAiProgress((prev) => ({ ...prev, current: completedCount }))
-            continue
-          }
-
-          // Process AI results
-          for (const s of batchResults) {
-            if (s.budget_id && s.confidence >= 0.5) {
-              suggestionMap.set(s.import_hash, s)
-            }
-            categorizedHashes.add(s.import_hash)
-            remainingHashes.delete(s.import_hash)
-          }
-          // Also remove batch hashes that AI returned no result for
-          for (const h of batchHashes) remainingHashes.delete(h)
-
-          completedCount += batchHashes.length
-
-          // Feature #190: Auto-assignment pass — propagate AI categories to matching counterparties
-          // Build counterparty → {budget_id, confidence} map from ALL AI results so far
-          const counterpartyMap = new Map<string, { budget_id: string; confidence: number }>()
-          for (const [hash, s] of suggestionMap) {
-            if (!s.budget_id) continue
-            const row = rowByHash.get(hash)
-            if (!row) continue
-            // Index by counterparty_name (case-insensitive)
-            if (row.counterparty_name) {
-              const key = `name:${row.counterparty_name.toLowerCase()}`
-              if (!counterpartyMap.has(key)) {
-                counterpartyMap.set(key, { budget_id: s.budget_id, confidence: s.confidence })
-              }
-            }
-            // Index by counterparty_iban (normalized)
-            if (row.counterparty_iban) {
-              const key = `iban:${row.counterparty_iban.replace(/\s/g, '').toUpperCase()}`
-              if (!counterpartyMap.has(key)) {
-                counterpartyMap.set(key, { budget_id: s.budget_id, confidence: s.confidence })
-              }
-            }
-          }
-
-          // Match remaining uncategorized rows against counterparty map
-          let batchAutoMatched = 0
-          const autoMatchedHashes: string[] = []
-          for (const hash of remainingHashes) {
-            const row = rowByHash.get(hash)
-            if (!row) continue
-
-            let match: { budget_id: string; confidence: number } | undefined
-            // Try IBAN match first (more specific)
-            if (row.counterparty_iban) {
-              const key = `iban:${row.counterparty_iban.replace(/\s/g, '').toUpperCase()}`
-              match = counterpartyMap.get(key)
-            }
-            // Try name match
-            if (!match && row.counterparty_name) {
-              const key = `name:${row.counterparty_name.toLowerCase()}`
-              match = counterpartyMap.get(key)
-            }
-
-            if (match) {
-              suggestionMap.set(hash, {
-                import_hash: hash,
-                budget_slug: null,
-                budget_id: match.budget_id,
-                confidence: match.confidence,
-                reasoning: 'auto-matched via counterparty',
-              })
-              autoMatchedHashes.push(hash)
-              batchAutoMatched++
-            }
-          }
-
-          // Remove auto-matched hashes from remaining
-          for (const h of autoMatchedHashes) {
-            remainingHashes.delete(h)
-            categorizedHashes.add(h)
-          }
-
-          totalAutoMatched += batchAutoMatched
-          completedCount += batchAutoMatched
-
-          setAiProgress({
-            current: Math.min(completedCount, originalTotal),
-            total: originalTotal,
-            skippedHighConf: highConfidence.length,
-            autoMatched: totalAutoMatched,
-          })
-          // Update suggestions incrementally so UI shows progress
-          setAiSuggestions(new Map(suggestionMap))
+        const combinedCtx: AutoCatContext = {
+          budgets,
+          corrections,
+          freqMap,
+          // Eigen-rekening-transfers zijn al bij parse gedetecteerd (isTransfer-
+          // rijen zitten niet in toEnrich); geen transfer-/spiegelpaar-detectie
+          // meer nodig in deze fase.
+          ownIbans: new Set<string>(),
+          ownNamePatterns: [],
+          eigenRekeningBudgetId: null,
         }
+
+        // Resolver: één POST = één batch representanten. Resultaten onder de
+        // oude drempel (confidence < 0.5) tellen als "onbekend" — zelfde filter
+        // als de vorige inline-lus.
+        const aiResolver = async (batch: CombinedAiBatchItem[]): Promise<CombinedAiResult[]> => {
+          const res = await fetch('/api/ai/categorize', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              transactions: batch.map((t) => ({
+                import_hash: t.id,
+                description: t.description,
+                counterparty_name: t.counterparty_name,
+                amount: t.amount,
+                reference: t.reference,
+              })),
+            }),
+          })
+          if (!res.ok) throw new Error('AI niet beschikbaar')
+          const data = await res.json() as { results: AISuggestion[] }
+          return data.results.map((s) => ({
+            id: s.import_hash,
+            budget_id: s.budget_id && s.confidence >= 0.5 ? s.budget_id : null,
+            confidence: s.confidence,
+            reasoning: s.reasoning,
+          }))
+        }
+
+        // Incrementeel de review-tabel voeden (zoals de oude lus deed): elk
+        // AI-/propagatie-voorstel meteen in aiSuggestions zetten.
+        const suggestionMap = new Map<string, AISuggestion>()
+        const result = await runCombinedCategorization(
+          toEnrich.map((r) => ({
+            id: r.import_hash,
+            description: r.description,
+            counterparty_name: r.counterparty_name,
+            counterparty_iban: r.counterparty_iban,
+            amount: r.amount,
+            date: r.date,
+            reference: r.reference,
+          })),
+          combinedCtx,
+          aiResolver,
+          {
+            minRuleConfidence: 0.8,
+            onProposal: (p) => {
+              if (p.source !== 'ai' && p.source !== 'propagated') return
+              suggestionMap.set(p.id, {
+                import_hash: p.id,
+                budget_slug: null,
+                budget_id: p.budget_id,
+                confidence: p.confidence,
+                reasoning: p.reasoning ?? 'afgeleid via tegenpartij',
+              })
+              setAiSuggestions(new Map(suggestionMap))
+            },
+            onProgress: (prog) => {
+              setAiProgress({
+                current: Math.min(prog.processed, prog.total),
+                total: prog.total,
+                skippedHighConf: highConfidence.length,
+                autoMatched: prog.propagated,
+              })
+            },
+          },
+        )
+
+        const failed: typeof aiFailedBatches = result.failedBatches.map((batch, i) => ({
+          index: i,
+          payload: batch.map((b) => ({
+            import_hash: b.id,
+            description: b.description,
+            counterparty_name: b.counterparty_name,
+            amount: b.amount,
+            reference: b.reference,
+          })),
+        }))
 
         setAiSuggestions(suggestionMap)
         setAiFailedBatches(failed)

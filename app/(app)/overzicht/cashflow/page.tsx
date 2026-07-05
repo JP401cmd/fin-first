@@ -15,7 +15,7 @@ import { CashflowInstellingenBlok } from '@/components/overview/cashflow-instell
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { InsightToggleButton } from '@/components/editorial/insight-toggle-button'
 import { PageStatusDot } from '@/components/app/page-status-dot'
-import { Kicker, EditorialDeck } from '@/components/editorial'
+import { Kicker, PageOpening } from '@/components/editorial'
 import { HideInSimple } from '@/components/app/hide-in-simple'
 import { PAGE_INFO } from '@/lib/page-info-content'
 
@@ -64,14 +64,19 @@ export default async function OverzichtCashflowPage() {
       </div>
 
       <section className="mx-auto max-w-6xl px-4 pt-4 sm:px-6">
-        <div className="mb-2 flex flex-wrap items-center gap-2">
-          <Kicker>Je geldstroom</Kicker>
-          <PerspectiveContextLabel />
-        </div>
-        <EditorialDeck className="mb-4">
-          Het deel van je inkomen dat je opzij zet bepaalt hoe snel je vrijheid
-          bereikt. Kies een onderdeel om dieper te kijken.
-        </EditorialDeck>
+        <PageOpening
+          className="mb-4"
+          kicker={
+            <>
+              Je geldstroom
+              <PerspectiveContextLabel />
+            </>
+          }
+          titleBefore="Hoeveel "
+          emphasis="vrijheid"
+          titleAfter=" zet je elke maand opzij?"
+          deck="Het deel van je inkomen dat je opzij zet bepaalt hoe snel je vrijheid bereikt. Kies een onderdeel om dieper te kijken."
+        />
         <CashflowLandingCards cards={cards} />
       </section>
 

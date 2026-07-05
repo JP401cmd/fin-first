@@ -41,7 +41,7 @@ import { AddCategoryCard } from '@/components/core/add-category-card'
 import { CategoryGroupHeader } from '@/components/core/category-group-header'
 import { EenvoudigPillList, type PillItem } from '@/components/overview/eenvoudig-pill-list'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
-import { Kicker, EditorialHeadline, EditorialDeck, FiguresStrip, PageInfoButton, GlossaryTerm } from '@/components/editorial'
+import { Kicker, FiguresStrip, PageInfoButton, GlossaryTerm, PageOpening } from '@/components/editorial'
 import { PAGE_INFO } from '@/lib/page-info-content'
 import { loadEntitySparklines } from '@/lib/load-entity-sparklines'
 import { buildKpiContext } from '@/lib/kpi-context'
@@ -517,36 +517,36 @@ export default function DebtsPage({ toolbarFilter, debtTypeFilter }: DebtsPagePr
     <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
       <NavStackMeta title="Schulden" bottomBar={{ kind: 'tabs' }} />
 
-      {/* ═══ Editorial header (Type 2 — List) ═══════════════════════
-          Hergebruikt editorial-primitives: Kicker, EditorialHeadline,
-          EditorialDeck, FiguresStrip. Geen hand-rolled markup. */}
-
-      {/* 3px module-accent-bar */}
-      <div className="h-[3px] w-full mb-5" style={{ background: 'var(--module-active-500)' }} aria-hidden="true" />
-
-      <header className="relative mb-5 space-y-3">
+      {/* ═══ Editorial pagina-opening (standaard-aanhef) ════════════
+          Canonieke PageOpening: hairline-kicker → narratieve Playfair-H1
+          met één <em>-accent → deck. Alles eronder (FiguresStrip, aflos-
+          route, grid) ongewijzigd. */}
+      <PageOpening
+        className="mb-5 pr-20 sm:pr-24"
+        kicker={
+          <>
+            Schulden · vrijheid die je terugkoopt
+            <PerspectiveContextLabel className="normal-case tracking-normal" />
+          </>
+        }
+        titleBefore="Elke schuld is vrijheid die je "
+        emphasis="terugkoopt"
+        titleAfter="."
+        deck={
+          <>
+            Elke schuld is een claim op je toekomst. Door af te lossen koop je vrijheid terug — euro voor euro,
+            maand na maand. Een lagere <GlossaryTerm term="schuldgraad">schuldgraad</GlossaryTerm> betekent meer financiële speelruimte.
+          </>
+        }
+      >
         <PageInfoButton
           description={pageInfoText}
           className="absolute right-0 top-0"
         />
-        <div className="flex items-center gap-2">
-          <Kicker size="large">Schulden · vrijheid die je terugkoopt</Kicker>
-          <PerspectiveContextLabel className="normal-case tracking-normal" />
-        </div>
-
-        <EditorialHeadline emphasis="terugkoopt" size="lg">
-          Vrijheid die je terugkoopt
-        </EditorialHeadline>
-
-        <EditorialDeck>
-          Elke schuld is een claim op je toekomst. Door af te lossen koop je vrijheid terug — euro voor euro,
-          maand na maand. Een lagere <GlossaryTerm term="schuldgraad">schuldgraad</GlossaryTerm> betekent meer financiële speelruimte.
-        </EditorialDeck>
-
         {partnerDebtsHidden && (
           <PrivacyHiddenNotice hiddenCategories={['debts']} forCategories={['debts']} />
         )}
-      </header>
+      </PageOpening>
 
       {/* Figures-strip (mini-hero) — Type 2 blueprint sectie 2 */}
       {/* In Eenvoudig zonder de "Categorieën"-teller (cols 3). */}

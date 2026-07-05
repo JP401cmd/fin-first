@@ -5,6 +5,13 @@ import { frequencyMatch, categorizeTransaction, type FrequencyMatch } from '@/li
 import type { Budget } from '@/lib/budget-data'
 import { buildBudgetOptions, resolveSlug, type BudgetRow } from '@/app/api/ai/categorize/budget-options'
 import { buildCategorizeSystemPrompt } from '@/lib/ai/categorize-system-prompt'
+import {
+  runCombinedCategorization,
+  type AutoCatContext,
+  type CombinedAiBatchItem,
+  type CombinedAiResult,
+  type CombinedTx,
+} from '@/lib/auto-categorize'
 
 const CAT = 'kern.categorisatie'
 
@@ -210,7 +217,113 @@ const tests: TestCase[] = [
       assertNotNull(prompt.includes('"Vaste lasten wonen') ? 'ok' : null, 'parentName in prompt')
     },
   },
+  // ── Combined pass: regels → AI → propagatie (Notion-kaart jul 2026) ────────
+  {
+    id: 'cat-combined-psp-propagatie',
+    name: 'Combined pass propageert AI-oordeel over PSP-ruis heen',
+    category: CAT,
+    description:
+      '"CCV*BAKKER 12", "Bakker" en "ZETTLE_*Bakker" zijn één genormaliseerde tegenpartij: ' +
+      'precies 1 AI-call, de rest afgeleid — met correct bron-label per voorstel.',
+    priority: 'critical',
+    estimatedDurationMs: 20,
+    requiredRole: 'any',
+    async fn() {
+      const ctx = combinedCtx()
+      let aiCalls = 0
+      const resolver = async (batch: CombinedAiBatchItem[]): Promise<CombinedAiResult[]> => {
+        aiCalls++
+        return batch.map((b) => ({ id: b.id, budget_id: 'food', confidence: 0.9, reasoning: 'bakker' }))
+      }
+      const txs: CombinedTx[] = [
+        combinedTx('p1', 'CCV*BAKKER 12'),
+        combinedTx('p2', 'Bakker'),
+        combinedTx('p3', 'ZETTLE_*Bakker'),
+      ]
+      const r = await runCombinedCategorization(txs, ctx, resolver)
+      assertEqual(aiCalls, 1, 'één AI-call voor één genormaliseerde tegenpartij')
+      assertEqual(r.counts.ai, 1, 'één AI-voorstel (representant)')
+      assertEqual(r.counts.propagated, 2, 'twee afgeleide voorstellen')
+      assertEqual(r.proposals.get('p1')!.source, 'ai', 'bron-label representant = ai')
+      assertEqual(r.proposals.get('p2')!.source, 'propagated', 'bron-label sibling = propagated')
+    },
+  },
+  {
+    id: 'cat-combined-transfer-uitsluiting',
+    name: 'Combined pass houdt eigen-rekening-transfers uit de AI-batch',
+    category: CAT,
+    description:
+      'Een tegenpartij-IBAN in de eigen-IBAN-set wordt een transfer-VOORSTEL (review, niet stil) ' +
+      'en bereikt de AI-resolver nooit.',
+    priority: 'critical',
+    estimatedDurationMs: 20,
+    requiredRole: 'any',
+    async fn() {
+      const ctx = combinedCtx()
+      const sentIds: string[] = []
+      const resolver = async (batch: CombinedAiBatchItem[]): Promise<CombinedAiResult[]> => {
+        sentIds.push(...batch.map((b) => b.id))
+        return batch.map((b) => ({ id: b.id, budget_id: 'food', confidence: 0.8 }))
+      }
+      const txs: CombinedTx[] = [
+        combinedTx('tr1', null, -100, 'NL00OWN0000000000'),
+        combinedTx('u1', 'Onbekend BV', -10),
+      ]
+      const r = await runCombinedCategorization(txs, ctx, resolver)
+      assertEqual(sentIds.includes('tr1'), false, 'transfer niet in AI-batch')
+      const tr = r.proposals.get('tr1')!
+      assertEqual(tr.source, 'transfer', 'bron-label = transfer')
+      assertEqual(tr.isTransfer, true, 'isTransfer-vlag gezet')
+      assertEqual(tr.category_source, 'transfer', 'category_source = transfer')
+    },
+  },
+  {
+    id: 'cat-combined-geen-dubbel-toewijzing',
+    name: 'Combined pass geeft elke transactie hooguit één voorstel',
+    category: CAT,
+    description:
+      'Regel-hit + AI-ronde + propagatie mogen elkaar nooit overschrijven: per transactie ' +
+      'precies één voorstel, regel-hits gaan nooit alsnog naar de AI.',
+    priority: 'high',
+    estimatedDurationMs: 20,
+    requiredRole: 'any',
+    async fn() {
+      const ctx = combinedCtx()
+      const sentIds: string[] = []
+      const resolver = async (batch: CombinedAiBatchItem[]): Promise<CombinedAiResult[]> => {
+        sentIds.push(...batch.map((b) => b.id))
+        return batch.map((b) => ({ id: b.id, budget_id: 'food', confidence: 0.8 }))
+      }
+      const txs: CombinedTx[] = [
+        combinedTx('r1', 'Albert Heijn'), // trefwoordregel → nooit naar AI
+        combinedTx('u1', 'Qwerty'),
+        combinedTx('u2', 'Qwerty'),
+      ]
+      const r = await runCombinedCategorization(txs, ctx, resolver)
+      assertEqual(sentIds.includes('r1'), false, 'regel-hit niet in AI-batch')
+      assertEqual(sentIds.length, 1, 'één representant voor Qwerty')
+      assertEqual(r.proposals.size, 3, 'drie voorstellen, elk precies één')
+      assertEqual(r.proposals.get('r1')!.source, 'rule', 'regel-hit behoudt bron rule')
+      assertEqual(r.counts.unresolved, 0, 'niets onbehandeld')
+    },
+  },
 ]
+
+// Helpers voor de combined-pass-cases hierboven.
+function combinedTx(id: string, counterparty: string | null, amount = -10, iban: string | null = null): CombinedTx {
+  return { id, description: `betaling ${id}`, counterparty_name: counterparty, counterparty_iban: iban, amount }
+}
+
+function combinedCtx(): AutoCatContext {
+  return {
+    budgets: [mockBudget('food', 'Boodschappen', 'boodschappen')],
+    corrections: [],
+    freqMap: new Map<string, FrequencyMatch>(),
+    ownIbans: new Set(['NL00OWN0000000000']),
+    ownNamePatterns: [],
+    eigenRekeningBudgetId: 'eigen',
+  }
+}
 
 export function register(): void {
   registerTests(tests)

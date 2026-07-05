@@ -1,8 +1,8 @@
 import type { MetadataRoute } from 'next'
 
 // Robots-beleid: index alleen de publieke marketing-site. Alle ingelogde
-// app-surfaces, auth-flows en de ~150 /test-* preview-routes worden geweerd,
-// zodat crawlers enkel de pagina's uit sitemap.ts indexeren.
+// app-surfaces en auth-flows worden geweerd, zodat crawlers enkel de
+// pagina's uit sitemap.ts indexeren.
 export default function robots(): MetadataRoute.Robots {
   return {
     rules: {
@@ -30,7 +30,6 @@ export default function robots(): MetadataRoute.Robots {
         '/logout',
         '/holdings',
         '/household-invite',
-        '/test-',
       ],
     },
     sitemap: 'https://trifinity.app/sitemap.xml',

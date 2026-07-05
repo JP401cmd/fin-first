@@ -10,6 +10,8 @@
  * `loadHorizonData`-bundle (geen nieuwe queries).
  */
 
+import { DEFAULT_RETURN, INFLATION } from '@/lib/constants'
+
 export interface PrefillKeyMeta {
   key: string
   /** Korte omschrijving voor de AI-prompt. */
@@ -35,8 +37,8 @@ export const PREFILL_KEYS: PrefillKeyMeta[] = [
   { key: 'monthly_expenses', description: 'Maandelijkse uitgaven', unit: 'euro' },
   { key: 'monthly_surplus', description: 'Maandelijks overschot (inkomen − uitgaven)', unit: 'euro' },
   { key: 'current_age', description: 'Huidige leeftijd', unit: 'years' },
-  { key: 'gross_return', description: 'Aangenomen bruto jaarrendement (fractie, bv. 0.06)', unit: 'percent' },
-  { key: 'inflation_rate', description: 'Aangenomen inflatie (fractie, bv. 0.025)', unit: 'percent' },
+  { key: 'gross_return', description: 'Aangenomen bruto jaarrendement (fractie, bv. 0.07)', unit: 'percent' },
+  { key: 'inflation_rate', description: 'Aangenomen inflatie (fractie, bv. 0.02)', unit: 'percent' },
 ]
 
 export const PREFILL_KEY_SET = new Set(PREFILL_KEYS.map((k) => k.key))
@@ -109,7 +111,8 @@ export function buildPrefillValues(src: PrefillSource): PrefillValues {
     monthly_expenses: monthlyExpenses,
     monthly_surplus: monthlyIncome - monthlyExpenses,
     current_age: ageFromDob(ei.dateOfBirth),
-    gross_return: Number(src.fireParams?.grossReturn ?? 0.06),
-    inflation_rate: Number(src.fireParams?.inflationRate ?? 0.025),
+    // Fallbacks = canonieke FIRE-aannames (lib/constants.ts), niet los 6%/2,5%.
+    gross_return: Number(src.fireParams?.grossReturn ?? DEFAULT_RETURN),
+    inflation_rate: Number(src.fireParams?.inflationRate ?? INFLATION),
   }
 }

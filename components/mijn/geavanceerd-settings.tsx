@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Link2, ChevronRight } from 'lucide-react'
 import { ExportDropdown } from '@/components/app/export-dropdown'
+import { PageOpening } from '@/components/editorial'
 
 /**
  * GeavanceerdSettings — externe koppelingen, data-export en data-reset.
@@ -24,14 +25,13 @@ export function GeavanceerdSettings() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 sm:px-6 py-6 space-y-4">
-      <header className="mb-2">
-        <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
-          Mijn — geavanceerd
-        </div>
-        <h1 className="font-serif text-2xl text-[var(--ink)] mt-1">
-          Gegevens &amp; export
-        </h1>
-      </header>
+      <PageOpening
+        className="mb-2"
+        kicker="Mijn · geavanceerd"
+        titleBefore="Je "
+        emphasis="gegevens"
+        titleAfter=" & export"
+      />
 
       {/* ── Externe koppelingen ─────────────────────────────────── */}
       <section className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">

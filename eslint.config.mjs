@@ -71,6 +71,9 @@ const eslintConfig = defineConfig([
     "scripts/**/*.js",
     // Vendor/gegenereerd: pdfjs-worker en serwist service-worker.
     "public/**",
+    // Playwright E2E-skelet: eigen tsconfig-scope (zie e2e/tsconfig.json),
+    // draait tegen @playwright/test dat niet overal geïnstalleerd is.
+    "e2e/**",
   ]),
   {
     // Beperk dit regel-object tot exact dezelfde bestanden als de Next-config

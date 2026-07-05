@@ -193,10 +193,18 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     // investment-tracker data; crypto loopt via de exchange-sync.
     supabase.from('investment_holdings').select('id, name, ticker, units, avg_purchase_price, current_price, previous_close, last_price_update, is_favorite').eq('is_favorite', true),
     supabase.from('investment_holdings').select('name, ticker, units, avg_purchase_price, current_price, ter'),
-    supabase.from('aow_leeftijden').select('id, birth_date_from, birth_date_through, aow_years, aow_months, is_definitive, source'),
+    supabase.from('aow_leeftijd').select('id, birth_date_from, birth_date_through, aow_years, aow_months, is_definitive, source'),
     // PSD2 bank connection check (#813) — active bank connections for next-step suggestion
     supabase.from('bank_connections').select('id').eq('status', 'active').limit(1),
   ])
+
+  // AOW-referentietabel (gedeeld, RLS: authenticated read all). Val bij een leesfout NIET
+  // stil op [] terug: dat maskeerde eerder een tabelnaamfout ('aow_leeftijden'), waardoor
+  // lookupAowAge altijd naar 67 fallbackte en de FIRE-projectie fout was voor iedereen met
+  // AOW ≠ 67. Log expliciet zodat een volgende naamfout niet onopgemerkt blijft.
+  if (aowResult.error) {
+    console.error('[dashboard-data-loader] AOW-leeftijd query faalde — projectie valt terug op standaard AOW-leeftijd:', aowResult.error)
+  }
 
   // ── Derive budget subsets from single query (was 4 queries) ──
   const allBudgetsRaw = (allBudgetsRawResult.data ?? []) as { id: string; name: string; icon: string; default_limit: number; interval: string; budget_type: string; alert_threshold: number; parent_id: string | null; is_favorite: boolean; is_essential: boolean }[]
@@ -696,7 +704,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   let regelSimSnapshot: RegelSimSnapshot | null = null
   if (dob && netWorth > 0) {
     try {
-      // Look up actual AOW age from aow_leeftijden table (consistent with horizon page)
+      // Look up actual AOW age from aow_leeftijd table (consistent with horizon page)
       const userAowAge = lookupAowAge((aowResult.data ?? []) as AowLeeftijdRow[], dob)
       // Derive hasPartner from profile household_type via canonieke helper.
       // Bug-fix: voorheen vergeleek deze plek met de verouderde woordenschat

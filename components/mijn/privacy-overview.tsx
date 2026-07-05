@@ -13,6 +13,7 @@ import {
   ArrowRight,
   type LucideIcon,
 } from 'lucide-react'
+import { PageOpening } from '@/components/editorial'
 
 /**
  * PrivacyOverview — transparantie-anker op /mijn/privacy. Plan §3.4
@@ -72,7 +73,7 @@ const CATEGORIES: DataCategory[] = [
     iconTint: 'text-sky-700 bg-sky-50',
     label: 'Cashflow & transacties',
     what: 'Inkomsten, uitgaven en categorieën. Alleen aanwezig als je transacties handmatig invoert of een PSD2-bank koppelt.',
-    where: 'Supabase (EU-regio); PSD2-data nooit gedeeld met derden.',
+    where: 'Supabase (EU-regio); banktokens en IBAN’s extra veld-versleuteld (AES-256-GCM). Nooit verkocht of gedeeld voor marketing.',
     why: 'Voor je cashflow-pillar, vaste-lasten-overzicht en de Will-briefing.',
     action: { label: 'Koppelingen beheren', href: '/mijn/koppelingen' },
   },
@@ -108,20 +109,14 @@ const CATEGORIES: DataCategory[] = [
 export function PrivacyOverview() {
   return (
     <section className="mx-auto max-w-3xl px-4 sm:px-6 pb-12">
-      <header className="mb-6">
-        <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
-          Mijn — privacy & transparantie
-        </div>
-        <h1 className="font-serif text-2xl sm:text-3xl text-[var(--ink)] mt-1">
-          Wat we opslaan, waar, en waarom
-        </h1>
-        <p className="mt-2 text-sm text-[var(--ink-2)] leading-relaxed">
-          TriFinity is cloud-first — bewust, omdat partner-delen, de wekelijkse
-          briefing en multi-device synchronisatie dat vereisen. Hieronder per
-          data-categorie wat we bewaren en waar het leeft, plus directe acties
-          om je data te exporteren of te verwijderen.
-        </p>
-      </header>
+      <PageOpening
+        className="mb-6 pr-12 sm:pr-14"
+        kicker="Mijn · privacy & transparantie"
+        titleBefore="Wat we opslaan, "
+        emphasis="waar"
+        titleAfter=" en waarom"
+        deck="TriFinity is cloud-first — bewust, omdat partner-delen, de wekelijkse briefing en multi-device synchronisatie dat vereisen. Hieronder per data-categorie wat we bewaren en waar het leeft, plus directe acties om je data te exporteren of te verwijderen."
+      />
 
       <ol className="space-y-3">
         {CATEGORIES.map((cat) => (
@@ -195,7 +190,7 @@ export function PrivacyOverview() {
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--ink)] text-[var(--paper)] px-4 py-2.5 text-sm font-semibold hover:bg-[var(--ink-2)] transition-colors"
           >
             <Download className="w-4 h-4" aria-hidden="true" />
-            Data exporteren (JSON)
+            Data exporteren (CSV)
           </Link>
           <Link
             href="/mijn/geavanceerd"
@@ -206,9 +201,11 @@ export function PrivacyOverview() {
           </Link>
         </div>
         <p className="mt-3 text-[11px] italic text-[var(--ink-3)] leading-snug">
-          Account verwijderen wist al je data uit Supabase binnen 24 uur en
-          stopt alle koppelingen. Onomkeerbaar — exporteer eerst als je een
-          back-up wilt.
+          Account verwijderen wist je persoonlijke en financiële gegevens
+          direct uit de actieve database en stopt alle koppelingen. Alleen
+          beperkte beveiligingslogs (e-mail-log, audit-log, zonder financiële
+          inhoud) blijven tijdelijk bewaard — zie de privacyverklaring.
+          Onomkeerbaar — exporteer eerst als je een back-up wilt.
         </p>
       </section>
     </section>

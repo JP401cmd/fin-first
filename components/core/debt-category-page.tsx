@@ -572,12 +572,14 @@ function DebtCategoryHero({ type, total, count }: DebtCategoryHeroProps) {
       <div className="h-1" style={{ background: 'var(--module-active-500)' }} />
 
       <div className="px-4 py-5 sm:px-6 sm:py-7">
-        {/* Kicker met 28×1px streep — debts gebruiken negative-rood voor semantische scheiding */}
-        <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--negative)]">
+        {/* Hairline-kicker — canonieke PageOpening-spec in module-active-accent.
+            Rood (--negative) blijft uitsluitend voor negatieve semantiek
+            (bedragen/status), niet als kop-identiteit. */}
+        <div className="flex flex-wrap items-center gap-2.5 font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--module-active-700)]">
           <span
             aria-hidden
             className="inline-block h-px w-7 shrink-0"
-            style={{ background: 'var(--negative)' }}
+            style={{ background: 'var(--module-active-500)' }}
           />
           {DEBT_TYPE_LABELS[type]}
           <PerspectiveContextLabel className="normal-case tracking-normal" />

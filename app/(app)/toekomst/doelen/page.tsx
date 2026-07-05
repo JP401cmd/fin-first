@@ -27,7 +27,13 @@ export default async function ToekomstDoelenPage() {
 
   return (
     <>
-      <ToekomstSubpageShell kicker="Toekomst" title="Doelen" />
+      <ToekomstSubpageShell
+        kicker="Toekomst · Doelen"
+        titleBefore="Waar spaar je je "
+        emphasis="vrijheid"
+        titleAfter=" voor?"
+        deck="Je doelen met status — sparen, aflossen en groeien richting je vrijheidsgetal."
+      />
       <DoelenView
         goals={willData.goals}
         goalProgresses={willData.goalProgresses}

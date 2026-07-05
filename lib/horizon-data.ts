@@ -42,6 +42,11 @@ import {
   NL_SWR,
 } from './constants'
 
+// Afgeleide weergavebedragen (hele euro's) voor labels/tips — blijven in sync
+// met de canonieke AOW-constanten (lib/constants.ts); géén losse €-literals.
+const AOW_ALLEEN_EUR = `€${Math.round(NL_AOW_MONTHLY).toLocaleString('nl-NL')}`
+const AOW_SAMEN_EUR = `€${Math.round(NL_AOW_MONTHLY_SAMENWONEND).toLocaleString('nl-NL')}`
+
 export type FireMethod = 'nl'
 
 export function getSwrForMethod(_method: FireMethod): number {
@@ -61,8 +66,8 @@ export interface FutureCashflow {
 }
 
 export const CASHFLOW_CATALOG: Omit<FutureCashflow, 'id'>[] = [
-  { name: 'AOW (alleenstaand)',  monthlyAmount: 1558, fromAge: 67, toAge: null },
-  { name: 'AOW (per partner)',   monthlyAmount: 1072, fromAge: 67, toAge: null },
+  { name: 'AOW (alleenstaand)',  monthlyAmount: NL_AOW_MONTHLY,             fromAge: 67, toAge: null },
+  { name: 'AOW (per partner)',   monthlyAmount: NL_AOW_MONTHLY_SAMENWONEND, fromAge: 67, toAge: null },
   { name: 'Aanvullend pensioen', monthlyAmount: 0,    fromAge: 65, toAge: null },
   { name: 'Deeltijds werken',    monthlyAmount: 0,    fromAge: 55, toAge: 67 },
   { name: 'Erfenis',             monthlyAmount: 0,    fromAge: 0,  toAge: null, oneTimeAmount: 0 },
@@ -946,8 +951,9 @@ export const KINDEROPVANG_BRUTO_PER_DAG_PER_MAAND = 440
 
 /**
  * Kinderopvangtoeslag: netto kosten als percentage van bruto, per inkomenscategorie.
- * Toeslag dekt 33%–96%. We gebruiken een conservatief gemiddelde van 70% dekking
- * (= 30% netto eigen bijdrage). Werkelijke toeslag is inkomensafhankelijk.
+ * We gebruiken een conservatief gemiddelde van 70% dekking (= 30% netto eigen bijdrage).
+ * Bron: Belastingdienst/Toeslagen kinderopvangtoeslag-tabel 2026, eigen conservatieve
+ * schatting o.b.v. middeninkomen (werkelijke dekking 33%–96%, inkomensafhankelijk).
  */
 export const KINDEROPVANG_TOESLAG_DEKKING_PCT = 0.70
 
@@ -1376,18 +1382,18 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
     label: 'AOW',
     icon: 'Landmark',
     group: 'pensioen',
-    impactRange: '+€1.072–€1.558/mnd netto',
+    impactRange: `+${AOW_SAMEN_EUR}–${AOW_ALLEEN_EUR}/mnd netto`,
     defaultCost: 0,
     defaultMonthlyCost: 0,
-    defaultMonthlyIncome: 1558,
+    defaultMonthlyIncome: NL_AOW_MONTHLY,
     defaultDuration: 0,
     defaultAge: 67,
     description: 'AOW staatspension (alleenstaand netto, 2026)',
-    tip: 'AOW-leeftijd: 67 jaar (2026). Netto bedragen 2026: alleenstaand ca. €1.558/mnd, samenwonend ca. €1.072/mnd per persoon. Geïndexeerd aan minimumloon (SVB).',
+    tip: `AOW-leeftijd: 67 jaar (2026). Netto bedragen per 1-7-2026: alleenstaand ca. ${AOW_ALLEEN_EUR}/mnd, samenwonend ca. ${AOW_SAMEN_EUR}/mnd per persoon. Geïndexeerd aan minimumloon (SVB).`,
     fields: [
       { key: 'leefsituatie', label: 'Leefsituatie bij AOW-leeftijd', fieldType: 'select', default: 'alleenstaand', options: [
-        { value: 'alleenstaand', label: 'Alleenstaand (€1.558/mnd netto)' },
-        { value: 'samenwonend', label: 'Samenwonend/gehuwd (€1.072/mnd netto p.p.)' },
+        { value: 'alleenstaand', label: `Alleenstaand (${AOW_ALLEEN_EUR}/mnd netto)` },
+        { value: 'samenwonend', label: `Samenwonend/gehuwd (${AOW_SAMEN_EUR}/mnd netto p.p.)` },
       ], tip: 'Alleenstaand: 70% minimumloon. Samenwonend: 50% minimumloon per persoon. Check svb.nl voor actuele bedragen.' },
       { key: 'jarenBuitenNL', label: 'Jaren buiten Nederland', fieldType: 'number', default: 0, tip: '2% korting per jaar niet woonachtig in NL (leeftijd 15–67). Maximaal 50 opbouwjaren. Check svb.nl voor je opbouwoverzicht.' },
     ],

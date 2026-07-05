@@ -73,6 +73,42 @@ export function RegelOptionCard({
   )
 }
 
+/**
+ * Klein infoblok "Zo werkt de prioriteit" — gedeeld door de drie pot-regels zodat
+ * de uitleg van de prio-semantiek overal identiek is. Spiegelt de help-tekst in
+ * CategoriePrioEditor (gewicht ½^(prio−1), 5 = reserve) en expliciteert de relatie
+ * tussen de snelkeuze (preset/optie) en de fijnafstemming (prio per categorie).
+ *
+ * `variant`: 'order' voor de twee volgorde-regels (preset = volgorde), 'target'
+ * voor Verdeling bij toename (optie = bestemming van je overschot).
+ */
+export function PrioUitlegBlok({ variant = 'order' }: { variant?: 'order' | 'target' }) {
+  return (
+    <div className="mt-6 rounded-xl border border-[var(--border-ed)] bg-[var(--subtle)]/40 px-3 py-3">
+      <RegelSectionLabel>Zo werkt de prioriteit</RegelSectionLabel>
+      {variant === 'order' ? (
+        <p className="text-[11px] text-[var(--ink-2)] leading-snug">
+          Een <span className="font-semibold">preset</span> is een snelkeuze: hij zet in één klik
+          de volgorde van je vermogensgroepen. Wie eerder in de rij staat, wordt eerder
+          aangesproken.
+        </p>
+      ) : (
+        <p className="text-[11px] text-[var(--ink-2)] leading-snug">
+          De <span className="font-semibold">optie</span> hierboven is een snelkeuze: hij bepaalt
+          naar welke groep je overschot standaard toe gaat.
+        </p>
+      )}
+      <p className="mt-1.5 text-[11px] text-[var(--ink-2)] leading-snug">
+        Zet je hieronder <span className="font-semibold">Prioriteit per categorie</span> aan, dan
+        stuur je per categorie op een schaal 1–5: lager = eerder aangesproken, elke stap weegt
+        dubbel zo zwaar (gewicht ½<sup>prio−1</sup>), en{' '}
+        <span className="font-semibold text-[var(--ink)]">5 = reserve</span> (pas aanspreken als de
+        rest leeg is). Die per-categorie-prio&apos;s overrulen dan de keuze hierboven.
+      </p>
+    </div>
+  )
+}
+
 /** Bereken FIRE-delta in maanden tussen baseline en draft (null als onbepaald). */
 export function fireDeltaMonths(baseline: RegelProjection, draft: RegelProjection): number | null {
   if (baseline.fireAgeFractional == null || draft.fireAgeFractional == null) return null

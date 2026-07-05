@@ -12,12 +12,12 @@ import {
   ArrowRight,
   type LucideIcon,
 } from 'lucide-react'
-import { Kicker, EditorialHeadline, EditorialDeck } from '@/components/editorial'
+import { PageOpening } from '@/components/editorial'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { PAGE_INFO } from '@/lib/page-info-content'
 
 /**
- * MijnOverview — kaart-grid op /mijn root die de 8 sub-routes
+ * MijnOverview — kaart-grid op /mijn root die de sub-routes
  * overzichtelijk toont. Plan §6.4: "Mijn vervangt het 2459-regel
  * instellingenscherm. Geen accordions, één pagina per onderwerp."
  *
@@ -98,20 +98,14 @@ export function MijnOverview() {
         description={PAGE_INFO['/mijn'] ?? ''}
         className="absolute right-4 top-6 sm:right-6 sm:top-8"
       />
-      <header className="mb-6 pr-12 sm:pr-16">
-        <Kicker>Mijn TriFinity</Kicker>
-        <EditorialHeadline
-          level="h1"
-          size="sm"
-          emphasis="instellingen"
-          className="mt-1 text-[var(--ink)]"
-        >
-          Profiel & instellingen
-        </EditorialHeadline>
-        <EditorialDeck className="mt-2">
-          Acht onderwerpen, elk op een eigen rustige pagina.
-        </EditorialDeck>
-      </header>
+      <PageOpening
+        className="mb-6 pr-12 sm:pr-14"
+        kicker="Mijn TriFinity"
+        titleBefore="Alles "
+        emphasis="naar jouw hand"
+        titleAfter=" gezet"
+        deck="Elk onderwerp op een eigen rustige pagina."
+      />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         {ROUTES.map(({ href, label, description, Icon }) => (

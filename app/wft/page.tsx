@@ -35,11 +35,13 @@ export default function WftPage() {
 
       <MarketingSection heading="Geen advies in de zin van de Wft">
         <p>
-          De informatie, berekeningen, prognoses en suggesties in TriFinity zijn
-          geen financieel advies in de zin van de Wet op het financieel toezicht
-          (Wft). De app beoordeelt niet of een product of beslissing passend is
-          voor jouw persoonlijke situatie, en doet geen gepersonaliseerde
-          aanbevelingen zoals een adviseur dat zou doen.
+          De informatie, berekeningen, prognoses en suggesties in TriFinity
+          zijn geen vergunningsplichtig financieel advies in de zin van de Wet
+          op het financieel toezicht (Wft). De app beoordeelt niet of een
+          product of beslissing passend is voor jouw persoonlijke situatie, en
+          doet geen gepersonaliseerde aanbevelingen zoals een adviseur dat zou
+          doen. Dit geldt onverkort voor alles wat Will — de AI-coach — zegt,
+          rekent of suggereert.
         </p>
       </MarketingSection>
 
@@ -83,6 +85,9 @@ export default function WftPage() {
           volledige situatie wegen op een manier die een reken-instrument niet
           kan en niet beoogt. Beslissingen die je op basis van TriFinity neemt,
           neem je op eigen verantwoordelijkheid.
+        </p>
+        <p className="font-serif text-sm italic text-[var(--ink-3)]">
+          Versie 2.0 — concept, 4 juli 2026.
         </p>
       </MarketingSection>
     </MarketingPageShell>

@@ -235,3 +235,53 @@ export function isDefaultGroupOrder(groups: WealthGroup[]): boolean {
     groups.every((g, i) => g === DEFAULT_GROUP_ORDER[i])
   )
 }
+
+/**
+ * Benoemde volgorde-presets voor de twee orde-regels (onttrekkingsvolgorde &
+ * onttrekking-bij-afname). Elke preset is een vooraf ingestelde permutatie van de
+ * vijf WealthGroups — puur een herordening van `withdrawalOrderGroups` /
+ * `deficitOrderGroups`. RAAKT DE REKENKERN NIET: de kernel-adapter
+ * (prio-overgang.ts) leest dezelfde geordende arrays, dus geen datamodel- of
+ * oracle-wijziging. `'aangepast'` is het sentinel voor een handmatige volgorde
+ * (de sleep-editor) die met geen enkele preset overeenkomt.
+ */
+export type OrderPresetId =
+  | 'liquide-eerst'
+  | 'rendement-beschermen'
+  | 'fiscaal-box3'
+  | 'pensioen-sparen'
+  | 'aangepast'
+
+export interface OrderPreset {
+  /** Stabiele id; NIET 'aangepast' (dat is de custom-sentinel, geen preset). */
+  id: Exclude<OrderPresetId, 'aangepast'>
+  /** Vooraf ingestelde WealthGroup-volgorde (permutatie van de 5 groepen). */
+  order: WealthGroup[]
+}
+
+/** Regel 3 — onttrekkingsvolgorde: vier presets, 'Liquide eerst' == default. */
+export const WITHDRAWAL_ORDER_PRESETS: OrderPreset[] = [
+  { id: 'liquide-eerst', order: ['spaargeld', 'beleggingen', 'overig', 'pensioen', 'vastgoed'] },
+  { id: 'rendement-beschermen', order: ['spaargeld', 'overig', 'pensioen', 'vastgoed', 'beleggingen'] },
+  { id: 'fiscaal-box3', order: ['beleggingen', 'overig', 'spaargeld', 'pensioen', 'vastgoed'] },
+  { id: 'pensioen-sparen', order: ['spaargeld', 'beleggingen', 'overig', 'vastgoed', 'pensioen'] },
+]
+
+/** Regel 5 — onttrekking bij afname: twee presets (geen pro-rata; zie ADR/kaart). */
+export const DEFICIT_ORDER_PRESETS: OrderPreset[] = [
+  { id: 'liquide-eerst', order: ['spaargeld', 'beleggingen', 'overig', 'pensioen', 'vastgoed'] },
+  { id: 'rendement-beschermen', order: ['spaargeld', 'overig', 'pensioen', 'vastgoed', 'beleggingen'] },
+]
+
+/**
+ * Welke preset matcht de huidige volgorde exact (positie-voor-positie)?
+ * Levert de preset-id, of `'aangepast'` wanneer geen enkele preset past.
+ */
+export function detectOrderPreset(order: WealthGroup[], presets: OrderPreset[]): OrderPresetId {
+  for (const p of presets) {
+    if (p.order.length === order.length && p.order.every((g, i) => g === order[i])) {
+      return p.id
+    }
+  }
+  return 'aangepast'
+}

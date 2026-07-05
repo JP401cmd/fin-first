@@ -21,6 +21,7 @@ import { AlertTriangle, Building2 } from 'lucide-react'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { createClient } from '@/lib/supabase/client'
 import { upsertSingleBalanceSnapshot } from '@/lib/balance-snapshot'
+import { DGA_LENING_DREMPEL } from '@/lib/box2-data'
 import {
   type Debt,
   type DebtType,
@@ -837,7 +838,7 @@ export function DebtForm({
               .reduce((sum, d) => sum + Number(d.current_balance), 0)
             const thisDgaBalance = Number(currentBalance) || 0
             const totalDga = otherDgaTotal + thisDgaBalance
-            const drempel = 500_000
+            const drempel = DGA_LENING_DREMPEL
             const bovenmatig = totalDga - drempel
 
             if (totalDga >= drempel) {

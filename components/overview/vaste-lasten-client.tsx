@@ -20,6 +20,7 @@
 import { useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { PageOpening, PageOpeningFigure } from '@/components/editorial'
 import { HideInSimple } from '@/components/app/hide-in-simple'
 import { BesprekMetWillButton } from '@/components/app/chat/bespreek-met-will-button'
 import { OpzegModal } from '@/components/app/opzeg-modal'
@@ -111,49 +112,56 @@ export function VasteLastenClient({
 
   return (
     <div className="space-y-6">
-      {/* ── Kop: hoofdcijfer + vrijheidstijd + compacte meter + Will ── */}
-      <section className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-gradient-to-br from-kern-50 to-[var(--paper)] p-5 shadow-[var(--s0)] sm:p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="label-editorial mb-1 text-[var(--ink-3)]">Totaal vaste lasten</p>
-            <div className="flex items-baseline gap-1.5">
+      {/* ── Kop: editorial aanhef (canonieke PageOpening-primitive) —
+             kicker met hairline, groot mono-hoofdcijfer, vrijheidstijd-
+             onderschrift, aandeel-stoplichtmeter + Will. Geen gradient-kaart. ── */}
+      <PageOpening
+        kicker="Vaste lasten"
+        titleBefore="Hoeveel "
+        emphasis="vrijheid"
+        titleAfter=" ligt er maandelijks vast?"
+      >
+        {/* Hoofdcijfer-blok — hairline-scheiding, groot mono-cijfer, Will rechts */}
+        <div className="flex flex-wrap items-start justify-between gap-4 border-t border-[var(--border-ed)] pt-4">
+          <PageOpeningFigure
+            kicker="Totaal per maand"
+            amount={
               <MaskedAmount
                 value={insights.totalMonthly}
                 tone="kern"
-                className="font-serif text-3xl font-semibold text-[var(--ink)] sm:text-4xl"
+                className="text-[32px] font-bold leading-none tracking-[-0.01em] text-[var(--ink)] sm:text-[40px]"
               />
-              <span className="text-sm text-[var(--ink-3)]">/mnd</span>
-            </div>
-            <p className="mt-1 text-sm text-[var(--ink-3)]">
-              <MaskedAmount
-                value={insights.totalYearly}
-                tone="ink"
-                className="text-[var(--ink-2)]"
-              />{' '}
-              per jaar
-              {insights.freedomDaysPerMonth > 0 && (
-                <>
-                  {' · '}
-                  <span className="text-kern-700">
-                    ± {insights.freedomDaysPerMonth}{' '}
-                    {insights.freedomDaysPerMonth === 1 ? 'dag' : 'dagen'} vrijheid/mnd
-                  </span>
-                </>
-              )}
-            </p>
-          </div>
+            }
+            unit="/mnd"
+            sub={
+              <>
+                <MaskedAmount
+                  value={insights.totalYearly}
+                  tone="ink"
+                  className="text-[var(--ink-2)]"
+                />{' '}
+                per jaar
+                {insights.freedomDaysPerMonth > 0 && (
+                  <>
+                    {' · '}
+                    <span className="not-italic text-[var(--module-active-700)]">
+                      ± {insights.freedomDaysPerMonth}{' '}
+                      {insights.freedomDaysPerMonth === 1 ? 'dag' : 'dagen'} vrijheid/mnd
+                    </span>
+                  </>
+                )}
+              </>
+            }
+          />
           <BesprekMetWillButton
             onderwerp="Mijn vaste lasten"
             detail={willDetail}
             vraag="Waar kan ik het meeste vrijheid terugwinnen op mijn vaste lasten?"
           />
         </div>
-        {insights.hasData && (
-          <div className="mt-4">
-            <CompactMeter insights={insights} />
-          </div>
-        )}
-      </section>
+
+        {insights.hasData && <CompactMeter insights={insights} />}
+      </PageOpening>
 
       {/* ── De bestaande lijst (beide modi) ── */}
       <VasteKostenAnalyse

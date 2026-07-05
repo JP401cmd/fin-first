@@ -15,6 +15,7 @@ import { CalculatorRunner } from '@/components/future/calculator-runner'
 import { RequirementsChecklist } from '@/components/future/requirements-checklist'
 import { DisclaimerStrip } from '@/components/future/disclaimer-strip'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
+import { PageOpening } from '@/components/editorial'
 import { DetailActions } from './detail-actions'
 
 /**
@@ -175,20 +176,24 @@ export default async function BibliotheekDetailPage({
         Terug naar bibliotheek
       </Link>
 
-      {/* Header */}
-      <header className="mb-6">
-        <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-horizon-700">
-          Toekomst — bibliotheek
-        </div>
-        <h1 className="font-serif text-2xl sm:text-3xl text-[var(--ink)] mt-1">
-          {calculator.name}
-        </h1>
-        {description && (
-          <p className="text-sm text-[var(--ink-2)] mt-2 leading-relaxed">
-            {description}
-          </p>
-        )}
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-[var(--ink-3)]">
+      {/* Editorial pagina-opening — dynamische naam als accent, module-accent
+          via --module-active-* (horizon). */}
+      <PageOpening
+        className="mb-6"
+        kicker="Toekomst · Bibliotheek"
+        titleBefore="Alvast voor je "
+        emphasis="nagerekend"
+        titleAfter="."
+        deck={
+          <>
+            <strong className="font-semibold not-italic text-[var(--ink)]">
+              {calculator.name}
+            </strong>
+            {description ? ` — ${description}` : ''}
+          </>
+        }
+      >
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-[var(--ink-3)]">
           <span className="inline-flex items-center gap-1">
             <User className="w-3.5 h-3.5" aria-hidden="true" />
             Door {authorDisplayName ?? 'Anoniem'}
@@ -209,7 +214,7 @@ export default async function BibliotheekDetailPage({
             duplicaten
           </span>
         </div>
-      </header>
+      </PageOpening>
 
       {/* Acties (Like/Dupliceer/Melden) — client-component met sheets */}
       <DetailActions

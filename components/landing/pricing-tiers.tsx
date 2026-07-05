@@ -37,7 +37,7 @@ const tiers: Tier[] = [
       'Doelen + tijdas met levensgebeurtenissen',
       'Publieke rekenhulp-bibliotheek: 12 kant-en-klare rekenhulpen',
       'Kennismaken met Will, je AI-coach',
-      'Data-export als JSON of CSV',
+      'Data-export van je kerngegevens (CSV)',
       'Single-user',
     ],
     cta: 'Begin gratis',

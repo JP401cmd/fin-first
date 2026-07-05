@@ -109,7 +109,7 @@ export interface CorePageData {
    */
   currentAge: number | null
   /**
-   * AOW-leeftijd (fractional, bijv. 67.25). Opgehaald uit `aow_leeftijden`
+   * AOW-leeftijd (fractional, bijv. 67.25). Opgehaald uit `aow_leeftijd`
    * tabel; fallback naar `NL_AOW_AGE` (67) als geboortedatum onbekend of
    * geen match. Gebruikt voor de netto-vermogen-projectiechart.
    */
@@ -445,7 +445,7 @@ export const loadCoreData = cache(async function loadCoreData(
       .eq('is_active', true)
       .is('linked_asset_id', null),
     supabase
-      .from('aow_leeftijden')
+      .from('aow_leeftijd')
       .select('id, birth_date_from, birth_date_through, aow_years, aow_months, is_definitive, source'),
   ])
 
@@ -458,6 +458,13 @@ export const loadCoreData = cache(async function loadCoreData(
   if (childBudgetsResult.error) throw childBudgetsResult.error
   if (expense12Result.error) throw expense12Result.error
   if (earliestTxResult.error) throw earliestTxResult.error
+  // AOW-referentietabel (gedeeld, RLS: authenticated read all). Niet fataal, maar val bij
+  // een leesfout NIET stil op [] terug: dat maskeerde eerder een tabelnaamfout
+  // ('aow_leeftijden'), waardoor lookupAowAge altijd 67 teruggaf. Log expliciet zodat een
+  // volgende naamfout niet onopgemerkt blijft.
+  if (aowResult.error) {
+    console.error('[core-data-loader] AOW-leeftijd query faalde — aowAge valt terug op standaard AOW-leeftijd:', aowResult.error)
+  }
 
   // ── Calculate monthly income & expenses from transactions ──
   let monthlyIncome = 0

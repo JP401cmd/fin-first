@@ -42,6 +42,10 @@ export const EMPTY = '' as const
 export type Empty = typeof EMPTY
 
 // ── AOW (Auto-geb B21) ───────────────────────────────────────────────────────
+// ⚠️ ORACLE-ONLY: bewust NIET gelijk aan NL_AOW_MONTHLY/lib-constanten — deze motor
+// reproduceert de Excel-oracle 1-op-1 (ADR 0032, tolerantie €0,01) op het niveau van
+// het brondocument, niet het actuele SVB/Belastingdienst-niveau. NOOIT vervangen door
+// een lib-import; dat breekt de kernel-fixture-pariteit.
 /** AOW netto per maand, alleenstaand (2025-basis, vóór opbouwkorting). */
 const AOW_ALLEENSTAAND_PER_MAAND = 1452
 /** AOW netto per maand p.p., samenwonend (2025-basis). ONBEPROEFD in de fixtures. */
@@ -79,6 +83,11 @@ const NIBUD_FASE_FACTOR: readonly number[] = [1.2, 1.0, 1.3]
 const AANTAL_KINDEREN_SLOTS = 3
 
 // ── Erfenis (Auto-geb B55-B59) ───────────────────────────────────────────────
+// ⚠️ ORACLE-ONLY: bewust NIET gelijk aan de canonieke schenk-/erf-constanten
+// (lib/box2-data.ts / lib/horizon-data.ts) — deze motor reproduceert de Excel-oracle
+// 1-op-1 (ADR 0032, tolerantie €0,01) op het niveau van het brondocument, niet het
+// actuele Belastingdienst-niveau. NOOIT vervangen door een lib-import; dat breekt de
+// kernel-fixture-pariteit.
 /** Erf-vrijstelling kind/kleinkind (2025-benadering). */
 const ERF_VRIJSTELLING_KIND = 25490
 /** Erf-vrijstelling overige relaties (2025-benadering). ONBEPROEFD. */

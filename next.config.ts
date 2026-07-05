@@ -6,38 +6,10 @@ import type { NextConfig } from "next";
 // in Next.js 16 the build runs through Turbopack by default, which the
 // webpack-based `@serwist/next` plugin can't hook into. Configurator-mode
 // keeps the SW build framework-agnostic and Turbopack-compatible.
-// De dev-only feature-verificatie-harness (`/test-*`, `/api/verify-*`,
-// `/api/test-*`) leest broncode met `fs.readFileSync(process.cwd(), …)`.
-// Next' output-file-tracing kan dat niet statisch begrenzen en sleept
-// daardoor het HELE project (3000+ bestanden, ~45MB) in elke serverless-
-// functie → trage cold starts. Deze routes zijn in productie toch 404
-// (zie proxy.ts), dus hun trace mag leeg; de in-app regressiesuites
-// (lib/regression-tests) draaien via /beheer en blijven buiten schot.
-const VERIFY_HARNESS_TRACE_EXCLUDES = [
-  './app/**',
-  './components/**',
-  './lib/**',
-  './hooks/**',
-  './docs/**',
-  './scripts/**',
-  './supabase/**',
-  './public/**',
-  './test/**',
-  './Plannen/**',
-  './specs/**',
-  // losse root-bestanden (plannen, exports, screenshots, scratch-json)
-  './*',
-]
-
 const nextConfig: NextConfig = {
   experimental: {
     turbopackFileSystemCacheForDev: false,
     optimizePackageImports: ['lucide-react'],
-  },
-  outputFileTracingExcludes: {
-    '/api/verify-*': VERIFY_HARNESS_TRACE_EXCLUDES,
-    '/api/test-*': VERIFY_HARNESS_TRACE_EXCLUDES,
-    '/test-*': VERIFY_HARNESS_TRACE_EXCLUDES,
   },
   images: {
     formats: ['image/avif', 'image/webp'],

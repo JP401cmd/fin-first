@@ -29,6 +29,24 @@ export default function VoorwaardenPage() {
         </p>
       </MarketingSection>
 
+      <MarketingSection heading="Wat TriFinity is">
+        <p>
+          TriFinity is een educatieve app voor persoonlijk financieel inzicht:
+          je brengt je bezittingen, schulden, inkomsten en uitgaven in kaart en
+          de app vertaalt die naar overzicht, budgetten en
+          toekomstprojecties — uitgedrukt in vrijheid in tijd. De dienst wordt
+          aangeboden door JPS Holding, [rechtsvorm], gevestigd te
+          [vestigingsadres], KvK [KvK-nummer]. Vragen? Mail{' '}
+          <a
+            href="mailto:support@trifinity.nl"
+            className="font-semibold text-kern-700 underline hover:text-kern-800"
+          >
+            support@trifinity.nl
+          </a>
+          .
+        </p>
+      </MarketingSection>
+
       <MarketingSection heading="Account en toelaatbaar gebruik">
         <p>
           Je bent verantwoordelijk voor de juistheid van de gegevens die je
@@ -61,11 +79,12 @@ export default function VoorwaardenPage() {
       <MarketingSection heading="Facturatie en opzegging">
         <p>
           Een Pro-abonnement wordt maandelijks vooraf gefactureerd en verlengt
-          telkens automatisch met een maand. Je kunt op elk moment opzeggen; je
-          behoudt dan toegang tot Pro tot het einde van de lopende, reeds
-          betaalde periode. Daarna val je terug op het Gratis-niveau. We
-          restitueren geen reeds verstreken perioden, tenzij dwingend recht
-          anders bepaalt.
+          telkens automatisch met een maand. Betalingen verlopen — zodra
+          betaalde abonnementen actief zijn — via onze betaalpartner Polar. Je
+          kunt op elk moment opzeggen; je behoudt dan toegang tot Pro tot het
+          einde van de lopende, reeds betaalde periode. Daarna val je terug op
+          het Gratis-niveau. We restitueren geen reeds verstreken perioden,
+          tenzij dwingend recht anders bepaalt.
         </p>
       </MarketingSection>
 
@@ -75,10 +94,14 @@ export default function VoorwaardenPage() {
           <strong className="font-semibold text-[var(--ink)]">
             TriFinity geeft geen financieel advies.
           </strong>{' '}
-          De app is een educatief reken- en inzicht-instrument. Berekeningen,
+          De app is een educatief reken- en inzicht-instrument en verleent
+          geen vergunningsplichtig financieel advies in de zin van de Wet op
+          het financieel toezicht (Wft). TriFinity heeft geen vergunning van
+          de AFM of DNB en staat niet onder hun toezicht. Berekeningen,
           prognoses en suggesties van Will zijn illustraties op basis van
           aannames die jij invoert — geen aanbeveling om te kopen, verkopen,
-          aflossen of beleggen. Zie ook onze{' '}
+          aflossen of beleggen. Voor persoonlijke beslissingen raadpleeg je
+          een erkend adviseur. Zie ook onze{' '}
           <a
             href="/wft"
             className="font-semibold text-kern-700 underline hover:text-kern-800"
@@ -105,8 +128,10 @@ export default function VoorwaardenPage() {
 
       <MarketingSection heading="Je data bij opzegging">
         <p>
-          Voordat of nadat je opzegt, kun je al je gegevens exporteren als JSON
-          of CSV. Verwijder je je account, dan wissen we je gegevens conform ons{' '}
+          Voordat of nadat je opzegt, kun je je kern-financiële gegevens
+          (transacties, budgetten, vermogensverloop, bezittingen, schulden en
+          doelen) exporteren als CSV, rechtstreeks vanuit de app. Verwijder je
+          je account, dan wissen we je gegevens direct, conform ons{' '}
           <a
             href="/privacy"
             className="font-semibold text-kern-700 underline hover:text-kern-800"
@@ -121,6 +146,9 @@ export default function VoorwaardenPage() {
         <p>
           Op deze voorwaarden is Nederlands recht van toepassing. Geschillen
           leggen we voor aan de bevoegde rechter in Nederland.
+        </p>
+        <p className="font-serif text-sm italic text-[var(--ink-3)]">
+          Versie 2.0 — concept, 4 juli 2026.
         </p>
       </MarketingSection>
     </MarketingPageShell>

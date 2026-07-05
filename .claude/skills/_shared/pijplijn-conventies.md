@@ -6,7 +6,11 @@
 
 De hoofdchat voert de pijplijn uit als **orchestrator**, niet als uitvoerder: hij zet subagents en skills in voor het inhoudelijke werk, bewaakt volgorde, samenhang en kwaliteit tussen de stappen, en beschermt zijn eigen contextvenster door te delegeren. Zelf doet hij alleen triviale lijm en snelle checks; onderzoek, bouw, test en review lopen via de gespecialiseerde agents — parallel waar stappen onafhankelijk zijn.
 
+**Cross-brok-integratie is expliciet de taak van de orchestrator.** Wordt een feature in onafhankelijke brokken/agents opgeknipt, dan valideert elke brok alleen zíchzelf: `tsc` en de losse unit-tests kunnen groen zijn terwijl de samengevoegde output tegen de spec of tegen zusterelementen kapot is. Denk aan constanten/props die brok X definieert en brok Y consumeert, of een interactie-affordance (klik-vs-sleep-guard, aria-patroon, statuskleur) die op meerdere gelijksoortige elementen hóórt te staan maar in één brok vergeten is. Na de bouwstappen legt de orchestrator (of een gerichte review-agent) de geïntegreerde output daarom naast de spec én naast de zusterelementen — niet alleen de per-brok-rapporten vertrouwen.
+
 Eindigt een subagent voortijdig (limiet/fout) of zonder bruikbaar rapport: inventariseer eerst diens deelstaat — `git status`/`git diff` beperkt tot de **toegewezen deeltaak** — en maak het restant in de hoofdthread af, of dispatch gericht opnieuw voor alléén dat restant. Nooit blind opnieuw dispatchen, nooit een half rapport als compleet behandelen, en nooit de deelstaat van een ándere (parallelle) taak aanraken.
+
+Verifieer bestandspad- en symboolverwijzingen in een agent-briefing vóór dispatch met een snelle Glob/grep — een stale pad kost de agent een zoekronde en kan een verificatie-opdracht ongeldig maken.
 
 ## Voortgangsrapportage (verplicht)
 

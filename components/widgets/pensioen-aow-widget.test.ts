@@ -33,7 +33,7 @@ describe('pensioen-aow-widget — AOW-vermogensequivalent', () => {
     // Fallback-pad: zonder profiel-params gebruikt de widget NL_SWR.
     const capital = aowYearly / NL_SWR
     expect(capital).toBeGreaterThan(0)
-    // Sanity: AOW (~€1558/mnd) op ≈2,84% SWR ≈ €658k vermogensequivalent.
+    // Sanity: AOW (~€1.582/mnd) op ≈2,84% SWR ≈ €668k vermogensequivalent.
     expect(capital).toBeGreaterThan(500_000)
     expect(capital).toBeLessThan(800_000)
   })

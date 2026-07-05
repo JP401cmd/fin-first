@@ -2,10 +2,11 @@
  * ToekomstSubpageShell — gedeelde header voor de vier /toekomst-subpagina's
  * (Doelen, Gebeurtenissen, Voorkeuren, Rekenhulp).
  *
- * Zorgt voor een consistente terugweg naar de tijdas-landing en een
- * editorial-header (kicker + serif-titel) in dezelfde stijl als de views zelf
- * (zie components/future/doelen-view.tsx). Optionele rechter-acties komen via
- * `children` (bv. een Plannen-modus knop of print-actie).
+ * Zorgt voor een consistente terugweg naar de tijdas-landing en de canonieke
+ * editorial pagina-aanhef (`PageOpening`) in dezelfde stijl als de rest van de
+ * app. Module-identiteit loopt uitsluitend via `--module-active-*` (op /toekomst
+ * = horizon via de route-layout) — nooit vaste kleurnamen. Optionele extra rijen
+ * onder de kop komen via `children`.
  *
  * Server component — geen 'use client', geen hooks.
  */
@@ -13,16 +14,27 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
-import { Kicker } from '@/components/editorial'
+import { PageOpening } from '@/components/editorial'
 
 export function ToekomstSubpageShell({
   kicker,
-  title,
+  titleBefore,
+  emphasis,
+  titleAfter,
+  deck,
   children,
 }: {
-  kicker: string
-  title: string
-  /** Optionele rechter-acties naast de titel. */
+  /** Hairline-kicker boven de kop (tekst of nodes). */
+  kicker: ReactNode
+  /** Kop-tekst vóór het accent-woord (incl. eventuele spatie). */
+  titleBefore: string
+  /** Het italic-em-accentwoord in module-accentkleur (precies één). */
+  emphasis: string
+  /** Kop-tekst ná het accent-woord (incl. eventuele spatie). */
+  titleAfter: string
+  /** Optionele redactionele deck onder de kop. */
+  deck?: ReactNode
+  /** Optioneel blok onder de kop (extra rijen / acties). */
   children?: ReactNode
 }) {
   return (
@@ -35,13 +47,16 @@ export function ToekomstSubpageShell({
         Terug naar tijdas
       </Link>
 
-      <header className="mt-3 flex items-end justify-between gap-3 flex-wrap">
-        <div>
-          <Kicker>{kicker}</Kicker>
-          <h1 className="font-serif text-2xl text-[var(--ink)] mt-1">{title}</h1>
-        </div>
+      <PageOpening
+        className="mt-3"
+        kicker={kicker}
+        titleBefore={titleBefore}
+        emphasis={emphasis}
+        titleAfter={titleAfter}
+        deck={deck}
+      >
         {children}
-      </header>
+      </PageOpening>
     </div>
   )
 }

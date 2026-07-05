@@ -8,12 +8,7 @@ import HorizonPage from '@/components/app/horizon/horizon-client'
 import { ToekomstNavCards } from '@/components/future/toekomst-nav-cards'
 import { PrintTijdasButton } from '@/components/future/print-tijdas-button'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
-import {
-  Kicker,
-  EditorialHeadline,
-  EditorialDeck,
-  OrnamentColophon,
-} from '@/components/editorial'
+import { PageOpening, OrnamentColophon } from '@/components/editorial'
 import { PAGE_INFO } from '@/lib/page-info-content'
 
 export const metadata: Metadata = {
@@ -118,21 +113,15 @@ export default async function ToekomstPage({
           valt NavStackMeta terug op 'simple' en verdwijnt de cluster. */}
       <NavStackMeta title="Toekomst" topBar={{ kind: 'rich' }} bottomBar={{ kind: 'tabs' }} />
       <section className="mx-auto max-w-6xl px-4 sm:px-6 pt-4 sm:pt-6 print:hidden">
-        <header className="mb-4 flex items-start justify-between gap-3">
-          <div>
-            <Kicker>De Toekomst</Kicker>
-            <EditorialHeadline
-              level="h1"
-              size="sm"
-              emphasis="tijdas"
-              className="mt-1 text-[var(--ink)]"
-            >
-              Je tijdas
-            </EditorialHeadline>
-            <EditorialDeck className="mt-2">
-              Geld is opgeslagen tijd — kies wat je later met die tijd doet.
-            </EditorialDeck>
-          </div>
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <PageOpening
+            className="min-w-0 flex-1"
+            kicker="De Toekomst"
+            titleBefore="Je "
+            emphasis="tijdas"
+            titleAfter=""
+            deck="Geld is opgeslagen tijd — kies wat je later met die tijd doet."
+          />
           <div className="flex shrink-0 items-center gap-2">
             <PageInfoButton description={PAGE_INFO['/toekomst'] ?? ''} />
             {/* Print/Deel toont op basis van een ECHTE projectie (geboortedatum
@@ -140,7 +129,7 @@ export default async function ToekomstPage({
                 setup-flag. Geen data-backfill nodig. */}
             {hasProjection && <PrintTijdasButton />}
           </div>
-        </header>
+        </div>
 
         {/* Navkaarten staan nu altijd boven de altijd-zichtbare tijdas. */}
         <ToekomstNavCards

@@ -53,11 +53,11 @@ export const NL_INFLATIE = 0.02
 /** Dutch state pension (AOW) eligibility age. Source: SVB 2025. */
 export const NL_AOW_AGE = 67
 
-/** Dutch AOW netto monthly benefit, single person — €1 558. Source: SVB 2026. */
-export const NL_AOW_MONTHLY = 1558
+/** Dutch AOW netto monthly benefit, single person — €1 581,55 per 1-7-2026, SVB. */
+export const NL_AOW_MONTHLY = 1581.55
 
-/** Dutch AOW netto monthly benefit, cohabiting/married — €1 072 per person. Source: SVB 2026. */
-export const NL_AOW_MONTHLY_SAMENWONEND = 1072
+/** Dutch AOW netto monthly benefit, cohabiting/married — €1 084,13 per person, per 1-7-2026, SVB. */
+export const NL_AOW_MONTHLY_SAMENWONEND = 1084.13
 
 // ── Dutch Tax System — Box 3 (jaargebonden) ────────────────────
 //

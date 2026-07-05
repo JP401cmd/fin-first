@@ -193,6 +193,9 @@ export function AiPrivacySettings() {
                 'Budgetcategorieën en bijbehorende bedragen',
                 'Leeftijd (niet je geboortedatum)',
                 'Huishoudtype en temporal balance level',
+                'De vraag die je zelf aan Will typt — zoals jij hem typt',
+                'Bij document-import: de volledige tekst van het document dat je uploadt',
+                'Bij abonnement-herkenning: de omschrijvingen van je transacties',
               ].map((item) => (
                 <li key={item} className="flex items-start gap-2">
                   <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-wil-400" />
@@ -208,8 +211,14 @@ export function AiPrivacySettings() {
               <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-negative/10">
                 <EyeOff className="h-4 w-4 text-negative" aria-hidden="true" />
               </div>
-              <h3 className="text-sm font-semibold text-[var(--ink)]">Wat altijd privé blijft</h3>
+              <h3 className="text-sm font-semibold text-[var(--ink)]">Wat wordt gemaskeerd</h3>
             </div>
+            <p className="mb-3 text-xs text-[var(--ink-3)] leading-relaxed">
+              Op de chat-, categorisatie- en nieuwsroutes maskeren we
+              persoonsgegevens automatisch vóór verzending. Bij document-import
+              en abonnement-herkenning gaat de brontekst zelf mee — zonder die
+              inhoud kan de functie niet werken.
+            </p>
             <ul className="space-y-2 text-sm text-[var(--ink-2)]">
               {[
                 "Namen (vervangen door 'gebruiker' / 'partner')",
@@ -217,7 +226,7 @@ export function AiPrivacySettings() {
                 'BSN (burgerservicenummer)',
                 'E-mailadressen en telefoonnummers',
                 'Adressen en postcodes',
-                'Ruwe transactie-omschrijvingen (alleen categorie + bedrag)',
+                'Geboortedatum (vervangen door leeftijd)',
               ].map((item) => (
                 <li key={item} className="flex items-start gap-2">
                   <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-negative/70" />
@@ -239,22 +248,22 @@ export function AiPrivacySettings() {
               <li className="flex items-start gap-2">
                 <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-horizon-400" />
                 <span>
-                  <strong>Zero-retention:</strong> AI-providers (Anthropic, OpenAI) bewaren je data niet
-                  na verwerking
+                  <strong>Geen training:</strong> je gegevens worden door de AI-providers niet gebruikt
+                  om modellen te trainen
                 </span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-horizon-400" />
                 <span>
-                  <strong>Geen training:</strong> je gegevens worden niet gebruikt om AI-modellen te
-                  trainen
+                  <strong>Korte provider-retentie:</strong> AI-providers (Anthropic, OpenAI) bewaren
+                  verzoeken kortdurend volgens hun eigen voorwaarden, o.a. voor misbruikdetectie
                 </span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-horizon-400" />
                 <span>
-                  <strong>Data minimalisatie:</strong> alleen de noodzakelijke context wordt verstuurd via
-                  automatische sanitisatie
+                  <strong>Data-minimalisatie:</strong> per functie gaat alleen de context mee die voor
+                  die taak nodig is — nooit je volledige dataset
                 </span>
               </li>
               <li className="flex items-start gap-2">
@@ -270,7 +279,8 @@ export function AiPrivacySettings() {
           <div className="flex items-center gap-2 rounded-lg bg-[var(--subtle)] px-4 py-3">
             <Shield className="h-4 w-4 shrink-0 text-wil-600" aria-hidden="true" />
             <p className="text-xs text-[var(--ink-3)]">
-              Alle data wordt automatisch gesanitiseerd voordat het naar een AI-provider wordt verstuurd.
+              Waar het kan maskeren we persoonsgegevens automatisch vóór verzending; bij document-import
+              en sommige analyses gaat de inhoud zelf mee. AI is altijd volledig uitschakelbaar.
             </p>
           </div>
 
@@ -338,8 +348,23 @@ export function AiPrivacySettings() {
               <li className="flex items-start gap-2">
                 <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-horizon-400" />
                 <span>
-                  <strong>AI-providers:</strong> Anthropic of OpenAI ontvangen alleen geanonimiseerde,
-                  geaggregeerde financiële data
+                  <strong>AI-providers:</strong> Anthropic of OpenAI (VS) ontvangen per functie de
+                  benodigde context — op de meeste routes gemaskeerd, bij document-import en
+                  abonnement-herkenning de inhoud zelf. Geen training op jouw data.
+                </span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-horizon-400" />
+                <span>
+                  <strong>Overige verwerkers:</strong> hosting via Vercel (EU-regio), e-mail via Resend,
+                  en — alleen als jij koppelt — TrueLayer (bank) en Trading 212 (broker). De volledige
+                  sub-verwerkerslijst staat in de{' '}
+                  <a
+                    href="/privacy"
+                    className="font-medium text-wil-600 hover:text-wil-700 underline underline-offset-2"
+                  >
+                    privacyverklaring
+                  </a>
                 </span>
               </li>
               <li className="flex items-start gap-2">
@@ -363,15 +388,16 @@ export function AiPrivacySettings() {
               <li className="flex items-start gap-2">
                 <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-amber-400" />
                 <span>
-                  <strong>AI-verwerking:</strong> zero-retention — providers bewaren je data niet na
-                  verwerking
+                  <strong>AI-verwerking:</strong> providers bewaren verzoeken kortdurend volgens hun
+                  eigen voorwaarden en trainen niet op jouw data
                 </span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-amber-400" />
                 <span>
-                  <strong>Na verwijdering:</strong> bij het wissen van je account worden alle gegevens
-                  permanent verwijderd
+                  <strong>Na verwijdering:</strong> je persoonlijke en financiële gegevens worden direct
+                  permanent verwijderd; alleen beperkte beveiligingslogs (e-mail-log 12 mnd, audit-log
+                  12–24 mnd, zonder financiële inhoud) blijven tijdelijk bewaard
                 </span>
               </li>
             </ul>
@@ -430,7 +456,17 @@ export function AiPrivacySettings() {
           </div>
 
           <div className="border-t border-[var(--border-ed)] pt-4">
-            <p className="text-xs text-[var(--ink-4)]">Versie 1.0 — Laatst bijgewerkt: maart 2026</p>
+            <p className="text-xs text-[var(--ink-4)]">
+              Versie 2.0 — concept, laatst bijgewerkt: 4 juli 2026. De volledige, actuele
+              privacyverklaring staat op{' '}
+              <a
+                href="/privacy"
+                className="font-medium text-wil-600 hover:text-wil-700 underline underline-offset-2"
+              >
+                /privacy
+              </a>
+              .
+            </p>
           </div>
         </div>
       </BottomSheet>

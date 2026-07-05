@@ -1,17 +1,18 @@
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { PageStatusDot } from '@/components/app/page-status-dot'
-import { Kicker, EditorialHeadline, EditorialDeck } from '@/components/editorial'
+import { PageOpening } from '@/components/editorial'
 import { PAGE_INFO } from '@/lib/page-info-content'
 
 /**
  * Gedeelde editorial-header voor de box-subpagina's onder
- * /overzicht/belasting. Gebouwd op de canonieke editorial-primitives:
- *  - `Kicker` ("Box N") met module-streep,
- *  - `EditorialHeadline` met italic-em op één woord,
- *  - `EditorialDeck` met linker module-border.
+ * /overzicht/belasting. Gebouwd op de canonieke `PageOpening`-primitive:
+ * hairline-kicker ("Box N") → narratieve Playfair-H1 met één italic-em →
+ * redactionele deck.
  *
  * De accentkleur volgt automatisch de actieve box via `--module-active-*`
- * (gezet door `box{1,2,3}/layout.tsx`): amber / violet / teal.
+ * (gezet door `box{1,2,3}/layout.tsx` — de per-box triade box1/2/3): amber /
+ * violet / teal. `PageOpening` gebruikt uitsluitend die tokens, dus het
+ * per-box kleursysteem stroomt ongewijzigd door.
  *
  * Géén in-content terug-link meer — de shell levert de back-navigatie
  * (mobile TopBar / desktop pane-header / browser-back).
@@ -32,28 +33,33 @@ export function BelastingBoxPageHeader({
   /** Woord in `title` dat italic-em krijgt. Default: laatste woord. */
   emphasis?: string
 }) {
-  const lastWord = title.includes(' ') ? title.split(' ').pop() : undefined
+  // Splits de titel rondom het accent-woord voor PageOpening's
+  // titleBefore/emphasis/titleAfter. Zonder expliciete `emphasis` valt het
+  // accent op het laatste woord (via lastIndexOf, zodat een herhaald woord de
+  // juiste — laatste — treffer pakt); met expliciete `emphasis` op de eerste
+  // treffer. Niet gevonden → hele titel vóór, geen accent.
+  const lastWord = title.includes(' ') ? title.split(' ').pop()! : title
   const emphasisWord = emphasis ?? lastWord
+  const pos = emphasis ? title.indexOf(emphasisWord) : title.lastIndexOf(emphasisWord)
+  const titleBefore = pos >= 0 ? title.slice(0, pos) : title
+  const emphasisText = pos >= 0 ? title.slice(pos, pos + emphasisWord.length) : ''
+  const titleAfter = pos >= 0 ? title.slice(pos + emphasisWord.length) : ''
 
   return (
-    <section className="relative mx-auto max-w-6xl px-4 pt-6 pb-3 sm:px-6 sm:pt-8">
+    <div className="relative mx-auto max-w-6xl px-4 pt-6 pb-3 sm:px-6 sm:pt-8">
       <PageStatusDot className="absolute right-[52px] top-6 sm:right-[60px] sm:top-8" />
       <PageInfoButton
         description={PAGE_INFO[infoKey] ?? ''}
         className="absolute right-4 top-6 sm:right-6 sm:top-8"
       />
-      <Kicker className="pr-10">Box {number}</Kicker>
-      <EditorialHeadline
-        level="h1"
-        size="lg"
-        emphasis={emphasisWord}
-        className="mt-3 text-[var(--ink)]"
-      >
-        {title}
-      </EditorialHeadline>
-      <div className="mt-3 max-w-2xl">
-        <EditorialDeck>{subtitle}</EditorialDeck>
-      </div>
-    </section>
+      <PageOpening
+        className="pr-20 sm:pr-24"
+        kicker={`Box ${number}`}
+        titleBefore={titleBefore}
+        emphasis={emphasisText}
+        titleAfter={titleAfter}
+        deck={subtitle}
+      />
+    </div>
   )
 }

@@ -48,7 +48,13 @@ export default async function ToekomstRekenhulpPage() {
 
   return (
     <>
-      <ToekomstSubpageShell kicker="Toekomst" title="Rekenhulp" />
+      <ToekomstSubpageShell
+        kicker="Toekomst · Rekenhulp"
+        titleBefore="Wat kost een keuze je aan "
+        emphasis="tijd"
+        titleAfter="?"
+        deck="Will-ondersteunde rekenhulpen — vergelijk financiële keuzes en bewaar je eigen berekeningen."
+      />
       <RekenhulpView saved={savedCalculators} prefill={prefill} />
     </>
   )
