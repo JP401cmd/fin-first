@@ -8,6 +8,50 @@ import {
 } from '@/lib/holdings-sync'
 import { fetchCoinPricesEurBatch } from '@/lib/integrations/coingecko-client'
 
+// Deze route doet externe Yahoo/CoinGecko/forex-calls per holding. Op Vercel
+// Hobby is 60s de max toegestane functieduur; zonder deze regel valt de
+// serverless-functie terug op de (veel kortere) default en breekt de client-
+// request af nog vóór de trage lange-staart-holdings geprijsd zijn.
+export const maxDuration = 60
+export const dynamic = 'force-dynamic'
+
+/**
+ * Map over `items` met GEBONDEN concurrency (pool van `limit` tegelijk).
+ *
+ * We parallelliseren de per-holding refresh om de wall-clock te bekorten, maar
+ * NIET met een onbeperkte `Promise.all`: dat zou tientallen holdings tegelijk
+ * in-flight zetten. De rate-limiter zelf bewaakt de duurzame 5/s-grens — sinds
+ * `acquireRateLimitTokenBlocking` in `lib/price-feed.ts` wacht een aanroeper bij
+ * een lege bucket kort op capaciteit i.p.v. instant `null` (vals-"stale") terug
+ * te geven, dus de échte bound is de refill-rate, niet de poolgrootte. De pool
+ * van ~4 begrenst enkel het geheugen/aantal gelijktijdige holdings en houdt de
+ * wachttijden per holding kort; hoger mag, maar levert weinig extra doorstroom
+ * omdat de blocking-acquire alles alsnog op 5/s serialiseert. Resultaten komen
+ * index-geordend terug zodat de aanroeper ze veilig ná de pool-afronding kan
+ * samenvoegen (geen gedeelde-state-interleaving).
+ */
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length)
+  let next = 0
+  async function worker() {
+    while (true) {
+      const i = next++
+      if (i >= items.length) return
+      results[i] = await fn(items[i])
+    }
+  }
+  const poolSize = Math.min(limit, items.length)
+  await Promise.all(Array.from({ length: poolSize }, () => worker()))
+  return results
+}
+
+/** Aantal holdings dat we tegelijk verversen — zie `mapWithConcurrency`. */
+const REFRESH_CONCURRENCY = 4
+
 type RefreshResult = {
   id: string
   bucket: 'investment' | 'crypto'
@@ -74,31 +118,47 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: invErr.message }, { status: 500 })
       }
 
-      for (const holding of invHoldings ?? []) {
-        const h = holding as {
-          id: string
-          ticker: string | null
-          units: number | string | null
-          current_price: number | null
-        }
-        // Gesloten positie (0 stuks) → geen koers nodig; de waarde is 0. Scheelt
-        // ook Yahoo-calls op de lange staart aan volledig verkochte posities.
-        if (Math.abs(Number(h.units) || 0) < 1e-9) {
-          results.push({
-            id: h.id,
-            bucket: 'investment',
-            ticker: h.ticker,
-            status: 'skipped',
-            message: 'Gesloten positie (0 stuks)',
-            current_price: h.current_price,
-          })
-          continue
-        }
-        const result = await refreshInvestmentHolding(supabase, user.id, holding as never)
+      // Parallelliseer per holding met gebonden concurrency (zie
+      // `mapWithConcurrency`). Resultaten + asset-sync-ids worden index-geordend
+      // teruggegeven en pas ná de pool samengevoegd, zodat de gedeelde
+      // `results`-array en de sync-Set thread-safe gevuld blijven.
+      const invOutcomes = await mapWithConcurrency(
+        invHoldings ?? [],
+        REFRESH_CONCURRENCY,
+        async (holding): Promise<{ result: RefreshResult; assetIdToSync: string | null }> => {
+          const h = holding as {
+            id: string
+            ticker: string | null
+            units: number | string | null
+            current_price: number | null
+          }
+          // Gesloten positie (0 stuks) → geen koers nodig; de waarde is 0. Scheelt
+          // ook Yahoo-calls op de lange staart aan volledig verkochte posities.
+          if (Math.abs(Number(h.units) || 0) < 1e-9) {
+            return {
+              result: {
+                id: h.id,
+                bucket: 'investment',
+                ticker: h.ticker,
+                status: 'skipped',
+                message: 'Gesloten positie (0 stuks)',
+                current_price: h.current_price,
+              },
+              assetIdToSync: null,
+            }
+          }
+          const result = await refreshInvestmentHolding(supabase, user.id, holding as never)
+          const assetId = (holding as { asset_id?: string }).asset_id
+          return {
+            result,
+            assetIdToSync: result.status === 'updated' && assetId ? assetId : null,
+          }
+        },
+      )
+
+      for (const { result, assetIdToSync } of invOutcomes) {
         results.push(result)
-        if (result.status === 'updated' && (holding as { asset_id?: string }).asset_id) {
-          investmentAssetIdsToSync.add((holding as { asset_id: string }).asset_id)
-        }
+        if (assetIdToSync) investmentAssetIdsToSync.add(assetIdToSync)
       }
     }
 
@@ -121,6 +181,9 @@ export async function POST(request: NextRequest) {
       const yahooMisses: { id: string; symbol: string }[] = []
       const yahooResults = new Map<string, Awaited<ReturnType<typeof fetchPriceData>>>()
 
+      // Classificeer eerst synchroon (skips) en verzamel wat écht een Yahoo-
+      // call nodig heeft; vuur die daarna met gebonden concurrency af.
+      const cryToFetch: { id: string; yahooTicker: string; symbolUpper: string }[] = []
       for (const holding of cryHoldings ?? []) {
         const h = holding as {
           id: string
@@ -149,10 +212,18 @@ export async function POST(request: NextRequest) {
           })
           continue
         }
-        const yahooTicker = `${h.symbol.toUpperCase()}-EUR`
-        const priceData = await fetchPriceData(yahooTicker)
-        yahooResults.set(h.id, priceData)
-        if (!priceData) yahooMisses.push({ id: h.id, symbol: h.symbol.toUpperCase() })
+        const symbolUpper = h.symbol.toUpperCase()
+        cryToFetch.push({ id: h.id, yahooTicker: `${symbolUpper}-EUR`, symbolUpper })
+      }
+
+      const cryFetched = await mapWithConcurrency(
+        cryToFetch,
+        REFRESH_CONCURRENCY,
+        async (f) => ({ id: f.id, symbolUpper: f.symbolUpper, data: await fetchPriceData(f.yahooTicker) }),
+      )
+      for (const f of cryFetched) {
+        yahooResults.set(f.id, f.data)
+        if (!f.data) yahooMisses.push({ id: f.id, symbol: f.symbolUpper })
       }
 
       const cgPrices = yahooMisses.length > 0
@@ -190,6 +261,7 @@ export async function POST(request: NextRequest) {
     const updated = results.filter(r => r.status === 'updated').length
     const stale = results.filter(r => r.status === 'stale').length
     const skipped = results.filter(r => r.status === 'skipped').length
+    const errors = results.filter(r => r.status === 'error').length
 
     return NextResponse.json({
       results,
@@ -198,6 +270,7 @@ export async function POST(request: NextRequest) {
         updated,
         stale,
         skipped,
+        errors,
       },
       message: updated > 0
         ? `${updated} prij${updated === 1 ? 's' : 'zen'} bijgewerkt, ${stale} niet beschikbaar`

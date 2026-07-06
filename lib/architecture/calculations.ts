@@ -161,6 +161,11 @@ export const CALCULATIONS: Calculation[] = [
     constants: [
       { label: 'Methode', value: 'gewogen gemiddelde kostprijs (average-cost)' },
       { label: 'EPSILON gesloten-detectie', value: '1e-9 stuks' },
+      {
+        label: 'Pence-normalisatie (LSE/GBp)',
+        value:
+          'Yahoo "GBp"/"GBX" (pence-notatie) → GBP: current_price ÷100 bij de bron in lib/price-feed.ts (fetchPriceData), zodat de waardering hele valuta-eenheden gebruikt — geen 100× overwaardering van Londen-genoteerde aandelen',
+      },
     ],
     elementIds: ['as-vermogen', 'fn-aandelenregistratie'],
     note: 'Single source of truth: de transacties bepalen het bezit, niet andersom. computePositionFromTransactions + valuePosition (lib/holdings-aggregation.ts) is de ENIGE opbrengst-som; elke consument importeert ze (consume, don\'t recompute). De holdings-detailpagina (full-page + pane) gebruikt ze al per holding; de holdings-LIJST verrijkt sinds jun 2026 elke rij ermee via lib/holdings-pnl-enrichment.ts (loadHoldingsPnL = ÉÉN batch-query op investment_transactions.holding_id, geen N+1; attachPnLToHoldings hangt pnl_*-velden op de rij). Beide lijst-consumenten — de server-loader loadHoldingsData én GET /api/holdings — draaien dezelfde helper zodat initial-render en client-hydratie identieke getallen tonen. Nodig voor sorteren-op-opbrengst en het tonen van de gerealiseerde winst op gesloten posities (pnl_total === realizedPnL bij netUnits 0). investment_transactions heeft geen fees-kolom; de engine behandelt afwezige fees als 0.',

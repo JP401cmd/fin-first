@@ -27,9 +27,13 @@ import { probeIntegrations } from '@/lib/integrations/health-probe'
  * - Persists day-close in `investment_holding_prices` / `crypto_holding_prices`.
  * - Syncs parent asset values from the typed rollup helpers.
  *
- * Recommended schedule: hourly during market hours (08:00-22:00 CET) to cover
- * European, US, and crypto markets.
+ * Schema (werkelijkheid): dit endpoint draait 1×/dag om 18:00 UTC (zie
+ * `vercel.json`) — vaker mag niet op het Vercel-plan waarop we draaien. Tussen
+ * de dagelijkse runs door verversen gebruikers hun eigen holdings met de
+ * handmatige "Prijzen vernieuwen"-knop (POST /api/holdings/refresh-prices).
  */
+export const maxDuration = 60
+
 export async function GET(request: Request) {
   const startTime = Date.now()
 

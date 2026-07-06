@@ -75,6 +75,26 @@ function acquireRateLimitToken(): boolean {
   return false
 }
 
+// Bij een lege bucket instant `null` teruggeven markeert holdings ten onrechte
+// als "stale" zodra een aanroeper (zoals de refresh-pool) sneller vraagt dan de
+// 5/s-refill. In plaats daarvan wachten we kort en proberen opnieuw, tot een
+// gebonden max-wachttijd. Zo paced elke aanroeper — ongeacht de concurrency —
+// zichzelf vanzelf op de duurzame refill-rate, en degradeert het pas naar de
+// eerlijke 'gedeeltelijk/stale'-melding als er écht geen capaciteit is binnen de
+// tijd die de server-`maxDuration`/client-abort toestaat.
+const RATE_LIMIT_REFILL_INTERVAL_MS = Math.ceil(1000 / RATE_LIMIT_REFILL_RATE) // ~200ms per token
+const RATE_LIMIT_MAX_WAIT_MS = 15_000 // ruim binnen server-maxDuration (60s) en client-abort (55s)
+
+async function acquireRateLimitTokenBlocking(maxWaitMs: number): Promise<boolean> {
+  const deadline = Date.now() + maxWaitMs
+  for (;;) {
+    if (acquireRateLimitToken()) return true
+    if (Date.now() >= deadline) return false
+    // Iets meer dan het refill-interval zodat er gegarandeerd ≥1 token bijkomt.
+    await new Promise((resolve) => setTimeout(resolve, RATE_LIMIT_REFILL_INTERVAL_MS + 10))
+  }
+}
+
 // ── Yahoo Finance API ───────────────────────────────────────────
 
 /**
@@ -99,9 +119,9 @@ export async function fetchPriceData(ticker: string): Promise<PriceData | null> 
   const cached = getCachedPrice(normalizedTicker)
   if (cached) return cached
 
-  // Rate limit check
-  if (!acquireRateLimitToken()) {
-    // Rate limited — return null (caller will use stale price)
+  // Rate limit check — wacht kort op capaciteit i.p.v. instant 'stale'.
+  if (!(await acquireRateLimitTokenBlocking(RATE_LIMIT_MAX_WAIT_MS))) {
+    // Pas na de gebonden max-wachttijd opgeven — caller toont laatste bekende prijs.
     return null
   }
 
@@ -130,10 +150,26 @@ export async function fetchPriceData(ticker: string): Promise<PriceData | null> 
     const meta = result.meta
     if (!meta) return null
 
-    const currentPrice = meta.regularMarketPrice ?? null
+    let currentPrice: number | null = meta.regularMarketPrice ?? null
     if (currentPrice === null || currentPrice === undefined) return null
 
-    const previousClose = meta.chartPreviousClose ?? meta.previousClose ?? null
+    let previousClose: number | null = meta.chartPreviousClose ?? meta.previousClose ?? null
+    let currency: string | null = meta.currency || null
+
+    // ── Pence-notatie normaliseren (Londen/LSE-instrumenten) ────────
+    // Yahoo levert in pence genoteerde aandelen met currency "GBp" (kleine
+    // p; Yahoo's pence-conventie is exact zo gespeld) of de variant "GBX",
+    // en de prijzen 100× te hoog t.o.v. echte ponden (2947.5 pence = £29,475).
+    // Normaliseer bij de bron naar hele ponden vóór het samenstellen/cachen,
+    // zodat élke consument (cron, handmatige refresh, loader, UI, forex)
+    // canonieke GBP-waarden krijgt zonder eigen fix. LET OP: "GBP" met
+    // hoofdletter P is een écht pond en mag NIET gedeeld worden; het
+    // percentage is schaal-invariant en blijft ongemoeid.
+    if (currency === 'GBp' || currency?.toUpperCase() === 'GBX') {
+      currentPrice = currentPrice / 100
+      if (previousClose !== null) previousClose = previousClose / 100
+      currency = 'GBP'
+    }
 
     let dailyChange: number | null = null
     let dailyChangePercent: number | null = null
@@ -148,7 +184,7 @@ export async function fetchPriceData(ticker: string): Promise<PriceData | null> 
       previousClose,
       dailyChange,
       dailyChangePercent,
-      currency: meta.currency || null,
+      currency,
       displayName: meta.shortName || meta.longName || null,
       timestamp: new Date().toISOString(),
       source: 'yahoo_finance',
@@ -191,7 +227,7 @@ export async function resolveYahooSymbol(query: string): Promise<string | null> 
   const cached = symbolCache.get(key)
   if (cached && Date.now() < cached.expiresAt) return cached.symbol
 
-  if (!acquireRateLimitToken()) return null
+  if (!(await acquireRateLimitTokenBlocking(RATE_LIMIT_MAX_WAIT_MS))) return null
 
   try {
     const url = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(q)}&quotesCount=6&newsCount=0`

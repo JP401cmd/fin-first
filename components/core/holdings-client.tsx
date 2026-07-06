@@ -337,11 +337,20 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
     setRefreshing(true)
     setRefreshResult(null)
 
+    // Royale client-timeout, net onder de server-`maxDuration` (60s), zodat we
+    // een vastlopende verversing netjes afbreken i.p.v. de browser eindeloos te
+    // laten wachten. De trage lange-staart (ongekoppelde broker-holdings) kan
+    // tientallen seconden duren; deze marge geeft de server de kans om af te
+    // ronden vóór wij afbreken.
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 55_000)
+
     try {
       const res = await fetch('/api/holdings/refresh-prices', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
+        signal: controller.signal,
       })
 
       if (!res.ok) {
@@ -365,14 +374,26 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
         setPriceUpdates(updates)
       }
 
-      if (data.summary?.updated > 0) {
+      const updated = data.summary?.updated ?? 0
+      const stale = data.summary?.stale ?? 0
+      const errors = data.summary?.errors ?? 0
+      const unavailable = stale + errors
+
+      if (updated > 0 && unavailable > 0) {
+        // Gedeeltelijk succes — eerlijk benoemen i.p.v. groen wegpoetsen.
+        setRefreshResult({
+          message: `${updated} prij${updated === 1 ? 's' : 'zen'} bijgewerkt, ${unavailable} nog niet — laatste bekende prijzen worden getoond`,
+          type: 'warning',
+        })
+        loadHoldings()
+      } else if (updated > 0) {
         setRefreshResult({
           message: data.message || 'Prijzen bijgewerkt via Yahoo Finance',
           type: 'success',
         })
         // Reload holdings to get new prices
         loadHoldings()
-      } else if (data.summary?.stale > 0) {
+      } else if (unavailable > 0) {
         setRefreshResult({
           message: data.message || 'Prijsfeed niet beschikbaar — laatste bekende prijzen worden getoond',
           type: 'warning',
@@ -386,13 +407,24 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
 
       // Auto-clear message after 8 seconds
       setTimeout(() => setRefreshResult(null), 8000)
-    } catch {
-      setRefreshResult({
-        message: 'Kon prijzen niet vernieuwen — controleer je internetverbinding',
-        type: 'error',
-      })
+    } catch (err) {
+      // Onderscheid een afgebroken (te trage) verversing van een echte
+      // netwerkfout, zodat de melding klopt met wat er gebeurde.
+      const aborted = err instanceof DOMException && err.name === 'AbortError'
+      setRefreshResult(
+        aborted
+          ? {
+              message: 'Verversen duurde te lang — probeer het over een paar minuten opnieuw.',
+              type: 'warning',
+            }
+          : {
+              message: 'Kon prijzen niet vernieuwen — controleer je internetverbinding',
+              type: 'error',
+            },
+      )
       setTimeout(() => setRefreshResult(null), 8000)
     } finally {
+      clearTimeout(timeoutId)
       setRefreshing(false)
     }
   }
@@ -697,7 +729,7 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
         const kickerLabel = isSuccess
           ? 'Prijzen vernieuwd'
           : isWarning
-            ? 'Prijsdienst waarschuwt'
+            ? 'Let op'
             : 'Prijzen niet vernieuwd'
         const kickerColor = isSuccess
           ? 'text-[var(--positive)]'
