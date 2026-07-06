@@ -8,17 +8,22 @@
  *
  * `assertion.kind`:
  * - 'exact'       — een deterministisch cijfer, herleidbaar uit persona-brondata
- *                    (lib/test-personas.ts) via een echte rekenfunctie. `expected`
- *                    is het onafhankelijk narekende cijfer; `source` wijst naar de
- *                    functie die het moet reproduceren.
+ *                    (lib/test-personas.ts) via een echte rekenfunctie/constante.
+ *                    `expected` is het onafhankelijk narekende cijfer; `source`
+ *                    wijst naar de functie die het moet reproduceren.
  * - 'consistency' — een "A = B"-toets (bv. lijstwaarde = detailwaarde) zonder één
  *                    hard te verifiëren cijfer, of een cijfer dat deels op
  *                    niet-deterministische input leunt (live koersen).
+ * - 'oracle'      — een exact cijfer dat NIET met de hand na te rekenen is omdat het
+ *                    uit een zware rekenmotor komt (de horizon-kernel: FIRE-leeftijd,
+ *                    benodigd vermogen, projectiepaden). Verifieerbaar via de
+ *                    oracle-UI (`/beheer/horizon-kernel` → "Stappen & tabellen", of
+ *                    `/beheer/horizon-strategie`), niet in een pure vitest.
  * - 'direction'   — alleen de richting is toetsbaar (bv. "stijgt bij hoger bedrag").
  * - 'ui-only'     — pure interactie/weergave zonder cijfermatige uitkomst.
  */
 
-export type AcceptanceAssertionKind = 'exact' | 'consistency' | 'direction' | 'ui-only'
+export type AcceptanceAssertionKind = 'exact' | 'consistency' | 'oracle' | 'direction' | 'ui-only'
 
 export interface AcceptanceCriterion {
   /** 'WF-BEZIT-01' — de workflow uit Deel 1 (docs/uat/.../bezit.md-achtig bronbestand). */

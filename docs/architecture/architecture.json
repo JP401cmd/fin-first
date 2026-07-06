@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-05T16:03:20.278Z",
-  "generatedDate": "2026-07-05",
+  "generatedAt": "2026-07-06T13:53:17.357Z",
+  "generatedDate": "2026-07-06",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -189,11 +189,11 @@
   "stats": {
     "routes": 139,
     "routesProduction": 98,
-    "api": 241,
+    "api": 242,
     "tables": 58,
     "migrations": 121,
     "integrations": 25,
-    "components": 776,
+    "components": 778,
     "providers": 11,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -2163,6 +2163,14 @@
       ]
     },
     {
+      "url": "/api/admin/uat/latest",
+      "file": "app/api/admin/uat/latest/route.ts",
+      "domain": "admin",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
       "url": "/api/admin/uat/results",
       "file": "app/api/admin/uat/results/route.ts",
       "domain": "admin",
@@ -3928,7 +3936,7 @@
     {
       "domain": "admin",
       "label": "Beheer",
-      "count": 37,
+      "count": 38,
       "routes": [
         {
           "url": "/api/admin/ai-features",
@@ -4173,6 +4181,14 @@
         {
           "url": "/api/admin/uat/compare",
           "file": "app/api/admin/uat/compare/route.ts",
+          "domain": "admin",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/admin/uat/latest",
+          "file": "app/api/admin/uat/latest/route.ts",
           "domain": "admin",
           "methods": [
             "GET"
@@ -7183,7 +7199,7 @@
     }
   ],
   "components": {
-    "total": 776,
+    "total": 778,
     "groups": [
       {
         "group": "app",
@@ -7966,6 +7982,23 @@
         ]
       },
       {
+        "group": "editorial",
+        "count": 11,
+        "items": [
+          "chart-tips",
+          "glossary-term",
+          "index",
+          "insight-toggle-button",
+          "insight-toggle-button.test",
+          "page-blueprints",
+          "page-info-button",
+          "page-opening",
+          "progress-milestones",
+          "subtotal-line",
+          "subtotal-line.test"
+        ]
+      },
+      {
         "group": "connections",
         "count": 10,
         "items": [
@@ -7979,21 +8012,6 @@
           "isin-resolver-status",
           "market-data-sources-card",
           "sync-status-badge"
-        ]
-      },
-      {
-        "group": "editorial",
-        "count": 9,
-        "items": [
-          "chart-tips",
-          "glossary-term",
-          "index",
-          "insight-toggle-button",
-          "insight-toggle-button.test",
-          "page-blueprints",
-          "page-info-button",
-          "page-opening",
-          "progress-milestones"
         ]
       },
       {
@@ -10929,6 +10947,7 @@
           "write": true,
           "routes": [
             "/api/admin/uat/compare",
+            "/api/admin/uat/latest",
             "/api/admin/uat/results"
           ]
         }
@@ -12878,11 +12897,11 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 87
+        "commits": 88
       },
       {
         "path": "app/(app)/toekomst",
-        "commits": 34
+        "commits": 35
       },
       {
         "path": "lib/ai",
@@ -12890,18 +12909,18 @@
       },
       {
         "path": "app/api/ai",
-        "commits": 11
+        "commits": 12
       },
       {
         "path": "app/api/household",
         "commits": 10
       },
       {
-        "path": "lib/fire-simulation.ts",
-        "commits": 7
+        "path": "lib/horizon-data.ts",
+        "commits": 8
       },
       {
-        "path": "lib/horizon-data.ts",
+        "path": "lib/fire-simulation.ts",
         "commits": 7
       },
       {
@@ -12920,8 +12939,8 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 7180,
-        "commits": 74
+        "loc": 7131,
+        "commits": 72
       },
       {
         "file": "components/app/budgets-client.tsx",
@@ -12930,7 +12949,7 @@
       },
       {
         "file": "components/core/assets-client.tsx",
-        "loc": 4242,
+        "loc": 4300,
         "commits": 40
       },
       {
@@ -12941,17 +12960,17 @@
       {
         "file": "components/app/cash-account-view.tsx",
         "loc": 2614,
-        "commits": 12
+        "commits": 11
       },
       {
         "file": "app/(app)/core/cash/import/page.tsx",
         "loc": 2597,
-        "commits": 13
+        "commits": 14
       },
       {
         "file": "lib/horizon-data.ts",
         "loc": 2411,
-        "commits": 7
+        "commits": 8
       },
       {
         "file": "app/(app)/core/checkin/page.tsx",
@@ -13064,7 +13083,7 @@
         "id": "senior-developer",
         "name": "senior-developer",
         "description": "Use this agent as the senior/principal engineer for TriFinity: code-level technical direction, tricky cross-cutting refactors, hard debugging, and final technical judgement that spans multiple domains (Next.js 16, React 19, Supabase/RLS, AI, the calc engines, the self-documenting architecture). It coordinates the specialist agents, weighs trade-offs, and owns codebase-wide quality and consistency. Boundary: structural/domain decisions, enterprise fit and ADRs belong to the `architect` agent — this agent owns how it gets built well. Use it when a change touches several subsystems, needs a build/refactor plan, or when you want a seasoned 'is this the right approach?' call before committing.",
-        "model": "fable",
+        "model": "opus",
         "color": "red"
       },
       {
@@ -13739,38 +13758,20 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-07-04",
+    "previousDate": "2026-07-05",
     "hasChanges": true,
     "sections": [
       {
-        "label": "Schermen",
-        "added": [
-          "/beheer/uat"
-        ],
-        "removed": []
-      },
-      {
         "label": "API-routes",
         "added": [
-          "/api/admin/uat/compare",
-          "/api/admin/uat/results",
-          "/api/admin/uat/rounds",
-          "/api/admin/uat/rounds/[id]"
-        ],
-        "removed": []
-      },
-      {
-        "label": "Tabellen",
-        "added": [
-          "uat_results",
-          "uat_rounds"
+          "/api/admin/uat/latest"
         ],
         "removed": []
       },
       {
         "label": "Componenten (aantal)",
         "added": [
-          "+7"
+          "+2"
         ],
         "removed": []
       }
@@ -13893,6 +13894,13 @@
       "date": "2026-07-05",
       "api": 241,
       "components": 776,
+      "tables": 58,
+      "routesProduction": 98
+    },
+    {
+      "date": "2026-07-06",
+      "api": 242,
+      "components": 778,
       "tables": 58,
       "routesProduction": 98
     }

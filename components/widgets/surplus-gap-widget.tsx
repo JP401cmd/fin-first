@@ -40,8 +40,11 @@ export const SurplusGapWidget = memo(function SurplusGapWidget({ size, data, hre
   }
 
   if (!simRows || simRows.length < 2) {
+    // Géén href op de shell: de WidgetEmpty-CTA rendert een eigen <Link> en een
+    // whole-card <a> eromheen zou <a>-in-<a> geven (hydration-error). De CTA is
+    // hier de enige, intentionele navigatie.
     return (
-      <WidgetShell module="horizon" size={size} kicker={KICKER} href={href}>
+      <WidgetShell module="horizon" size={size} kicker={KICKER}>
         <WidgetEmpty
           variant="first-use"
           icon={LineChart}

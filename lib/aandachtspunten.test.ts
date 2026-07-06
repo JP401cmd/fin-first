@@ -5,6 +5,10 @@ import {
   budgetBenchmarksToAandachtspunten,
   debtsToAandachtspunten,
   assetsToAandachtspunten,
+  filterActionedAandachtspunten,
+  collectActionedIds,
+  ACTIONED_COMPLETED_WINDOW_MONTHS,
+  type ActionSuppressionRow,
   DEBT_INTEREST_THRESHOLD,
   CASH_BUFFER_MONTHS,
   MIN_CASH_EXCESS,
@@ -249,6 +253,110 @@ describe('assetsToAandachtspunten', () => {
   it('exporteert tunebare drempels', () => {
     expect(CASH_BUFFER_MONTHS).toBe(6)
     expect(MIN_CASH_EXCESS).toBe(5_000)
+  })
+})
+
+// ── filterActionedAandachtspunten ────────────────────────────
+
+describe('filterActionedAandachtspunten', () => {
+  const punten: Aandachtspunt[] = [
+    { id: 'tax:jaarruimte', domain: 'tax', title: 'Benut je jaarruimte', savings: 1200, freedomDays: 12, href: '/x' },
+    { id: 'debt:d1', domain: 'debt', title: 'Versneld aflossen', savings: 700, freedomDays: 7, href: '/y' },
+    { id: 'budget:boodschappen', domain: 'budget', title: 'Bespaar op Boodschappen', savings: 600, freedomDays: 6, href: '/z' },
+  ]
+
+  it('verwijdert punten met een gematchte id en behoudt de rest', () => {
+    const result = filterActionedAandachtspunten(punten, new Set(['tax:jaarruimte']))
+    expect(result.map((a) => a.id)).toEqual(['debt:d1', 'budget:boodschappen'])
+  })
+
+  it('verwijdert meerdere gematchte ids', () => {
+    const result = filterActionedAandachtspunten(punten, new Set(['tax:jaarruimte', 'budget:boodschappen']))
+    expect(result.map((a) => a.id)).toEqual(['debt:d1'])
+  })
+
+  it('geeft de volledige lijst terug bij een lege set', () => {
+    const result = filterActionedAandachtspunten(punten, new Set())
+    expect(result).toEqual(punten)
+  })
+
+  it('negeert ids die niet in de lijst voorkomen', () => {
+    const result = filterActionedAandachtspunten(punten, new Set(['asset:cash-drag']))
+    expect(result).toEqual(punten)
+  })
+})
+
+// ── collectActionedIds (open + recent-afgerond binnen venster) ─
+
+describe('collectActionedIds', () => {
+  // Vaste 'now' zodat de venster-grenzen deterministisch zijn.
+  const now = new Date('2026-07-06T12:00:00.000Z')
+  const row = (over: Partial<ActionSuppressionRow>): ActionSuppressionRow => ({
+    metadata: { aandachtspunt_id: 'tax:jaarruimte' },
+    status: 'open',
+    completed_at: null,
+    ...over,
+  })
+
+  it('neemt elke OPEN actie mee, ongeacht completed_at', () => {
+    const ids = collectActionedIds([row({ status: 'open' })], now)
+    expect(ids.has('tax:jaarruimte')).toBe(true)
+  })
+
+  it('neemt een AFGERONDE actie binnen het venster mee', () => {
+    // ~1 maand geleden → ruim binnen 9 mnd.
+    const ids = collectActionedIds(
+      [row({ status: 'completed', completed_at: '2026-06-01T00:00:00.000Z' })],
+      now,
+    )
+    expect(ids.has('tax:jaarruimte')).toBe(true)
+  })
+
+  it('negeert een AFGERONDE actie ouder dan het venster', () => {
+    // > 9 maanden vóór now (cutoff = 2025-10-06) → buiten het venster.
+    const ids = collectActionedIds(
+      [row({ status: 'completed', completed_at: '2025-01-01T00:00:00.000Z' })],
+      now,
+    )
+    expect(ids.has('tax:jaarruimte')).toBe(false)
+  })
+
+  it('behandelt de venster-grens inclusief (completed_at == cutoff telt mee)', () => {
+    const cutoff = new Date(now)
+    cutoff.setMonth(cutoff.getMonth() - ACTIONED_COMPLETED_WINDOW_MONTHS)
+    const ids = collectActionedIds(
+      [row({ status: 'completed', completed_at: cutoff.toISOString() })],
+      now,
+    )
+    expect(ids.has('tax:jaarruimte')).toBe(true)
+  })
+
+  it('negeert een AFGERONDE actie zonder completed_at', () => {
+    const ids = collectActionedIds([row({ status: 'completed', completed_at: null })], now)
+    expect(ids.has('tax:jaarruimte')).toBe(false)
+  })
+
+  it('onderdrukt NIET bij postponed of rejected', () => {
+    const ids = collectActionedIds(
+      [
+        row({ metadata: { aandachtspunt_id: 'a' }, status: 'postponed' }),
+        row({ metadata: { aandachtspunt_id: 'b' }, status: 'rejected' }),
+      ],
+      now,
+    )
+    expect(ids.size).toBe(0)
+  })
+
+  it('negeert rijen zonder geldig aandachtspunt_id', () => {
+    const ids = collectActionedIds(
+      [
+        row({ metadata: {}, status: 'open' }),
+        row({ metadata: null, status: 'open' }),
+        row({ metadata: { aandachtspunt_id: '' }, status: 'open' }),
+      ],
+      now,
+    )
+    expect(ids.size).toBe(0)
   })
 })
 

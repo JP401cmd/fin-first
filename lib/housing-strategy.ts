@@ -1364,3 +1364,42 @@ export function getFireEligibleNetWorth(
       return totalNetWorth - equity
   }
 }
+
+// ── Display-helpers: dubbele grondslag (incl./excl. eigen woning) ─────────────
+
+/**
+ * Overwaarde eigen woning = huidige eigen_huis-waarde − openstaande hypotheek
+ * (beide inclusion-gewogen; uit `deriveHousingContext`). Kan < 0 zijn wanneer de
+ * woning onder water staat — bewust NIET geklemd (spiegelt de `equity` in
+ * `getFireEligibleNetWorth`, die óók rauw wordt afgetrokken). Enige home voor de
+ * overwaarde-som: consumenten die het overwaarde-bedrag tonen lezen dit i.p.v.
+ * `eigenHuisValue − mortgageBalance` inline te herhalen.
+ */
+export function homeEquity(context: HousingContext): number {
+  return context.eigenHuisValue - context.mortgageBalance
+}
+
+/**
+ * Netto vermogen EXCLUSIEF eigen woning = netto vermogen − overwaarde. Een aparte
+ * WEERGAVE-grondslag (dubbele grondslag incl./excl. woning) — NIET de FIRE-pot
+ * (`getFireEligibleNetWorth`) en NIET het volledige netto vermogen. Mode-ONAFHANKELIJK:
+ * óók onder `reverse_mortgage` de ZUIVERE `netWorth − overwaarde` (géén leen-ruimte-
+ * variant). Zonder eigen woning (overwaarde 0) == `totalNetWorth`.
+ */
+export function netWorthExcludingHome(totalNetWorth: number, context: HousingContext): number {
+  return totalNetWorth - homeEquity(context)
+}
+
+/**
+ * Gating voor de dubbele-grondslag-weergave (incl./excl. eigen woning): toon de
+ * splitsing alléén wanneer er een eigen woning is ÉN de strategie de woning niet
+ * volledig meerekent (downsize / opeethypotheek / uitsluiten). Bij `include_full`
+ * of geen eigen woning valt "incl." samen met de relevante grondslag → geen
+ * splitsing nodig.
+ */
+export function shouldShowDualHousingBasis(
+  context: HousingContext,
+  config: HousingStrategyConfig,
+): boolean {
+  return context.hasEigenHuis && config.mode !== 'include_full'
+}

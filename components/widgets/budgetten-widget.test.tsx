@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import { BudgettenWidget } from './budgetten-widget'
+import { BudgettenWidget, fittingRowPlan } from './budgetten-widget'
 import type { DashboardData } from './widget-renderer'
 import { MASKED_AMOUNT_PLACEHOLDER } from '@/lib/format'
 
@@ -89,6 +89,31 @@ describe('BudgettenWidget — top-N ranking', () => {
   })
 })
 
+describe('fittingRowPlan — grootte-bewuste afkapping (geen halve rij)', () => {
+  it('valt terug op desiredN zolang niet gemeten (capacity null)', () => {
+    expect(fittingRowPlan(null, 4, 5)).toEqual({ visible: 4, hidden: 1, showMore: false })
+    expect(fittingRowPlan(null, 4, 3)).toEqual({ visible: 3, hidden: 0, showMore: false })
+  })
+
+  it('kapt af op de gemeten capaciteit zonder "+N meer" te offeren', () => {
+    // Er passen maar 2 rijen; 5 budgetten → toon 2, kap de rest netjes af.
+    expect(fittingRowPlan(2, 4, 5)).toEqual({ visible: 2, hidden: 3, showMore: false })
+  })
+
+  it('toont "+N meer" alleen bij een écht vrije rij-slot', () => {
+    // Capaciteit 5, desiredN 4, 6 budgetten → 4 rijen + vrije slot ⇒ "+2 meer".
+    expect(fittingRowPlan(5, 4, 6)).toEqual({ visible: 4, hidden: 2, showMore: true })
+  })
+
+  it('geen "+N meer" als alles zichtbaar is', () => {
+    expect(fittingRowPlan(3, 4, 2)).toEqual({ visible: 2, hidden: 0, showMore: false })
+  })
+
+  it('overschrijdt nooit desiredN, ook bij veel ruimte', () => {
+    expect(fittingRowPlan(10, 4, 8).visible).toBe(4)
+  })
+})
+
 describe('BudgettenWidget — edge cases', () => {
   it('budget zonder limiet (limit 0) crasht niet en toont — als percentage', () => {
     const data = makeData([
@@ -124,6 +149,20 @@ describe('BudgettenWidget — states', () => {
     const data = makeData([])
     render(<BudgettenWidget size="half" data={data} />)
     expect(screen.getByText('Nog geen budgetten')).toBeInTheDocument()
+  })
+
+  it('empty-state met href produceert GEEN geneste anchors (hydration-safe)', () => {
+    // Regressie: WidgetShell kreeg href (whole-card link) én de WidgetEmpty-CTA
+    // rendert een eigen <Link> → <a> in <a> = ongeldige HTML + hydration-error.
+    // In de empty-state hoort de CTA de ENIGE, intentionele navigatie te zijn.
+    const data = makeData([])
+    const { container } = render(
+      <BudgettenWidget size="half" data={data} href="/overzicht/cashflow/budget" />,
+    )
+    expect(container.querySelectorAll('a a').length).toBe(0)
+    const anchors = container.querySelectorAll('a')
+    expect(anchors.length).toBe(1)
+    expect(anchors[0]?.getAttribute('href')).toBe('/core/budgets/new')
   })
 
   it('toont activatie-hint wanneer budgetteren niet actief is', () => {

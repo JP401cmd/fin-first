@@ -31,6 +31,8 @@ import {
   parseHousingStrategy,
   deriveHousingContext,
   getFireEligibleNetWorth,
+  netWorthExcludingHome,
+  shouldShowDualHousingBasis,
   type HousingStrategyConfig,
   type HousingContext,
 } from '@/lib/housing-strategy'
@@ -153,6 +155,18 @@ export interface HorizonPageData {
   housingContext: HousingContext
   /** Belegbaar vermogen voor pensioen — totaal vermogen minus equity bij relevante strategieën. */
   fireEligibleNetWorth: number
+  /**
+   * Netto vermogen EXCLUSIEF eigen woning = netto vermogen − overwaarde (ZUIVER, ook bij
+   * reverse_mortgage). Aparte weergave-grondslag (dubbele grondslag incl./excl. woning) —
+   * NIET de FIRE-pot (`fireEligibleNetWorth`) en NIET het volledige netto vermogen; nooit op
+   * dezelfde as mengen. Eén home: lib/housing-strategy.ts#netWorthExcludingHome.
+   */
+  netWorthExclHome: number
+  /**
+   * Gating voor de dubbele-grondslag-weergave: true ⇔ eigen woning aanwezig ÉN strategie
+   * ≠ include_full (downsize / opeethypotheek / uitsluiten). lib/housing-strategy.ts#shouldShowDualHousingBasis.
+   */
+  showDualHousingBasis: boolean
   /** ISO-timestamp wanneer de housing-strategy nudge-sheet is gedismist; null = nog niet getoond. */
   housingStrategyDismissedAt: string | null
   /**
@@ -637,6 +651,11 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
     (fullDebtsResult.data ?? []) as Debt[],
   )
   const fireEligibleNetWorth = getFireEligibleNetWorth(netWorth, housingContext, housingStrategy)
+  // Dubbele grondslag (incl./excl. eigen woning). netWorthExclHome = netWorth − overwaarde
+  // (ZUIVER, ook bij reverse_mortgage); aparte weergave-grondslag, NIET de FIRE-pot. Eén home:
+  // lib/housing-strategy.ts. showDualHousingBasis gate't de splitsing.
+  const netWorthExclHome = netWorthExcludingHome(netWorth, housingContext)
+  const showDualHousingBasis = shouldShowDualHousingBasis(housingContext, housingStrategy)
 
   // ── freedomPct: canonieke vrijheidsvoortgang (zelfde grondslag als dashboard) ──
   // Deze loader draait zelf géén unified projection (de client doet dat); de
@@ -857,6 +876,8 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
     housingStrategy,
     housingContext,
     fireEligibleNetWorth,
+    netWorthExclHome,
+    showDualHousingBasis,
     housingStrategyDismissedAt,
     housingSimBasis,
   }

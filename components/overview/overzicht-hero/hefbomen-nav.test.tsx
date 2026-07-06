@@ -365,6 +365,70 @@ describe('HefbomenNav — leverScores prop (gedeelde SSoT)', () => {
   })
 })
 
+describe('HefbomenNav — dubbele grondslag (excl. eigen woning subregel)', () => {
+  afterEach(() => {
+    window.localStorage.clear()
+  })
+
+  const totals: HefbomenTotals = {
+    bezittingen: 250_000,
+    schulden: 120_000,
+    cashflow: 42,
+    belasting: 1_500,
+  }
+  // eigenHuisValue 200_000 → bezittingen excl = 50_000.
+  // mortgageBalance 100_000 → schulden excl = 20_000.
+  const housingSplit = { eigenHuisValue: 200_000, mortgageBalance: 100_000 }
+
+  it('toont "excl. eigen woning" op bezittingen én schulden bij housingSplit', () => {
+    const { container } = render(
+      <HefbomenNav health={mockHealth()} totals={totals} housingSplit={housingSplit} />,
+    )
+    // Twee subregels: één op bezittingen, één op schulden.
+    const exclNodes = screen.getAllByText(/excl\. eigen woning/i)
+    expect(exclNodes.length).toBe(2)
+    // Weging-consistente excl.-bedragen (totaal − inclusion-gewogen huis/hypotheek).
+    expect(container.textContent).toContain('50.000')
+    expect(container.textContent).toContain('20.000')
+  })
+
+  it('toont GEEN excl.-regel op cashflow of belasting', () => {
+    render(
+      <HefbomenNav health={mockHealth()} totals={totals} housingSplit={housingSplit} />,
+    )
+    // Slechts twee subregels totaal (bezittingen + schulden), niet vier.
+    expect(screen.getAllByText(/excl\. eigen woning/i).length).toBe(2)
+  })
+
+  it('toont GEEN excl.-regel wanneer housingSplit ontbreekt (null → byte-identiek)', () => {
+    const { container } = render(
+      <HefbomenNav health={mockHealth()} totals={totals} housingSplit={null} />,
+    )
+    expect(screen.queryByText(/excl\. eigen woning/i)).toBeNull()
+    // De totalen zelf blijven ongewijzigd zichtbaar.
+    expect(container.textContent).toContain('250.000')
+    expect(container.textContent).toContain('120.000')
+  })
+
+  it('toont GEEN excl.-regel wanneer housingSplit niet meegegeven (default)', () => {
+    render(<HefbomenNav health={mockHealth()} totals={totals} />)
+    expect(screen.queryByText(/excl\. eigen woning/i)).toBeNull()
+  })
+
+  it('maskeert de excl.-bedragen bij privacy-masking (label blijft, cijfers weg)', () => {
+    window.localStorage.setItem(PRIVACY_MASKED_STORAGE_KEY, 'true')
+    const { container } = render(
+      <PrivacyProvider>
+        <HefbomenNav health={mockHealth()} totals={totals} housingSplit={housingSplit} />
+      </PrivacyProvider>,
+    )
+    expect(screen.getAllByText(/excl\. eigen woning/i).length).toBe(2)
+    expect(container.textContent).toContain(MASKED_AMOUNT_PLACEHOLDER)
+    expect(container.textContent).not.toContain('50.000')
+    expect(container.textContent).not.toContain('20.000')
+  })
+})
+
 describe('HefbomenLegenda', () => {
   it('rendert drie status-labels', () => {
     render(<HefbomenLegenda />)

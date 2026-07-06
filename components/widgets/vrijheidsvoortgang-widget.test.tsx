@@ -177,6 +177,8 @@ describe('VrijheidsvoortgangWidget — full-size zonder mijlpaal-datumlijstje', 
     render(<VrijheidsvoortgangWidget size="full" data={fullData()} />)
     // Ring-centrum met het canonieke percentage.
     expect(screen.getByText('60.0%')).toBeInTheDocument()
+    // De bedrag-strip (volle breedte, gecentreerd) toont alle drie de cellen.
+    expect(screen.getByText('Vermogen')).toBeInTheDocument()
     // Groei/mnd en restbedrag zijn de full-size verdieping.
     expect(screen.getByText('Groei')).toBeInTheDocument()
     expect(screen.getByText('Nog te gaan')).toBeInTheDocument()

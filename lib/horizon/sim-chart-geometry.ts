@@ -60,6 +60,12 @@ export type SimChartGeometryInput = {
   currentAge: number
   endAge: number
   fireTarget?: number
+  /** Tweede FIRE-doel op de incl.-woning-grondslag (totaal netto vermogen bij
+   *  FIRE, `requiredFireNetWorth`). Wanneer gezet tekent SimChart een TWEEDE
+   *  horizontale doellijn op dit niveau (naast `fireTarget` = excl. woning /
+   *  liquide). Alleen doorgegeven bij de dubbele-woning-grondslag; anders
+   *  undefined → één doellijn zoals voorheen. */
+  fireTargetInclHome?: number
   strategy?: FireEndStrategy
   targetEndPortfolio?: number
   baselineRows?: SimRow[]
@@ -132,6 +138,7 @@ export type SimChartGeometry = {
   fireAge: number | null
   fireAgeFractional: number | null
   fireTarget?: number
+  fireTargetInclHome?: number
   strategy?: FireEndStrategy
   targetEndPortfolio?: number
   aowAgeFractional?: number
@@ -173,6 +180,7 @@ export function buildSimChartGeometry(input: SimChartGeometryInput): SimChartGeo
     currentAge,
     endAge,
     fireTarget,
+    fireTargetInclHome,
     strategy,
     targetEndPortfolio,
     baselineRows,
@@ -262,7 +270,7 @@ export function buildSimChartGeometry(input: SimChartGeometryInput): SimChartGeo
     ? Math.max(...householdOverlays.flatMap(o => o.points.filter(inRange).map(([, v]) => v)))
     : 0
   const rawMax = visibleAllPts.length > 0
-    ? Math.max(...visibleAllPts.map(([, v]) => v), fireTarget ?? 0, baselineMax, overlayMax, mcMax, hhMax)
+    ? Math.max(...visibleAllPts.map(([, v]) => v), fireTarget ?? 0, fireTargetInclHome ?? 0, baselineMax, overlayMax, mcMax, hhMax)
     : Math.max(1, overlayMax, mcMax, hhMax)
   const maxVal = Math.max(rawMax, 1) * 1.08
 
@@ -553,6 +561,7 @@ export function buildSimChartGeometry(input: SimChartGeometryInput): SimChartGeo
     fireAge,
     fireAgeFractional,
     fireTarget,
+    fireTargetInclHome,
     strategy,
     targetEndPortfolio,
     aowAgeFractional,

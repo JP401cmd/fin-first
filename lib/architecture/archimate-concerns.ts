@@ -79,14 +79,6 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
     elementIds: ['t-supabase', 'data-cont'],
   },
   {
-    id: 'deplete-doel-lijn-grondslag',
-    title: 'Doel-lijn (V_nodig) is liquide; getekende curve is netto vermogen',
-    detail:
-      'ERFT NAAR DE KERNEL (ADR 0032). De horizontale doel-lijn op /toekomst is gebaseerd op het liquide vermogen (kernel: Prognose!J, het B36-doelbedrag in het solver-statusblok), terwijl de getekende hoofdcurve het netto vermogen weergeeft (Prognose!I, inclusief eigen woning). Voor accounts met een groot niet-liquide eigen huis (netto >> liquide) blijft een zichtbare afstand tussen de FIRE-stip en de doel-lijn bestaan: de spanning is structureel gelijk aan onder de verwijderde v2-engine (V_nodig vs netto vermogen) — twee opties nog open (aparte liquide-curve tekenen, of een hellende doel-lijn). Verwijder zodra dat besluit genomen en doorgevoerd is. NB: de reverse_mortgage-desync (display vs engine op leenruimte-grondslag) is beslist via ADR 0029; de downsize-eligibility-desync die v2 had is met de kernel-migratie vervallen (kernel behandelt het huis pas ná verkoop als liquide, net als de display-helper — zie calc "Vrijheidsvoortgang").',
-    severity: 'info',
-    elementIds: ['as-planning', 'fn-toekomstplannen'],
-  },
-  {
     id: 'horizon-kernel-bekende-afwijkingen',
     title: 'Horizon-kernel: vier bekende, bewuste grenzen/afwijkingen t.o.v. het Excel-oracle',
     detail:

@@ -15,6 +15,9 @@ import {
   estimateMonthlyHousingCostAfterSale,
   estimateReverseMortgagePayout,
   getFireEligibleNetWorth,
+  homeEquity,
+  netWorthExcludingHome,
+  shouldShowDualHousingBasis,
   filterAssetsForFire,
   isHousingStrategyEvent,
   projectMortgageStateAt,
@@ -715,6 +718,104 @@ describe('getFireEligibleNetWorth', () => {
       eigenHuisAssets: [],
     }
     expect(getFireEligibleNetWorth(400_000, ctx, { mode: 'exclude_from_fire' })).toBe(400_000)
+  })
+})
+
+// ── Dubbele grondslag incl./excl. eigen woning (FOUNDATION-naad) ─────────────
+
+const noHouseContext: HousingContext = {
+  eigenHuisValue: 0,
+  wozValue: 0,
+  mortgageBalance: 0,
+  mortgageMonthlyPayment: 0,
+  hasEigenHuis: false,
+  eigenHuisMortgages: [],
+  eigenHuisAssets: [],
+}
+
+// Onder water: hypotheek > huiswaarde → overwaarde < 0 (bewust NIET geklemd).
+const underwaterContext: HousingContext = {
+  ...standardContext,
+  eigenHuisValue: 300_000,
+  mortgageBalance: 400_000,
+}
+
+describe('homeEquity (overwaarde)', () => {
+  it('overwaarde = eigenHuisValue − mortgageBalance', () => {
+    expect(homeEquity(standardContext)).toBe(250_000) // 500K − 250K
+  })
+  it('geen eigen woning → 0', () => {
+    expect(homeEquity(noHouseContext)).toBe(0)
+  })
+  it('onder water → negatief (niet geklemd, spiegelt getFireEligibleNetWorth-equity)', () => {
+    expect(homeEquity(underwaterContext)).toBe(-100_000) // 300K − 400K
+  })
+})
+
+describe('netWorthExcludingHome', () => {
+  it('netto vermogen − overwaarde', () => {
+    expect(netWorthExcludingHome(400_000, standardContext)).toBe(150_000) // 400K − 250K
+  })
+  it('geen eigen woning → ongewijzigd (== netWorth)', () => {
+    expect(netWorthExcludingHome(400_000, noHouseContext)).toBe(400_000)
+  })
+  it('onder water → hoger dan netWorth (negatieve overwaarde erbij)', () => {
+    expect(netWorthExcludingHome(400_000, underwaterContext)).toBe(500_000) // 400K − (−100K)
+  })
+  it('mode-ONAFHANKELIJK: ZUIVER netWorth − overwaarde, NIET de reverse_mortgage-leenruimte-variant', () => {
+    // getFireEligibleNetWorth(reverse_mortgage) telt de leen-ruimte (125K) terug:
+    // 400K − 250K + 125K = 275K. netWorthExcludingHome negeert die leenruimte bewust.
+    const fireEligibleRM = getFireEligibleNetWorth(400_000, standardContext, {
+      mode: 'reverse_mortgage',
+      trigger: 'fixed_age',
+      triggerAge: 67,
+      depletionThresholdYears: 2,
+      maxLoanPct: 0.5,
+      interestRate: 0.055,
+      monthlyPayout: null,
+    })
+    expect(fireEligibleRM).toBe(275_000)
+    expect(netWorthExcludingHome(400_000, standardContext)).toBe(150_000)
+    expect(netWorthExcludingHome(400_000, standardContext)).not.toBe(fireEligibleRM)
+  })
+})
+
+describe('shouldShowDualHousingBasis', () => {
+  it('eigen woning + include_full → false (incl. == relevante grondslag)', () => {
+    expect(shouldShowDualHousingBasis(standardContext, { mode: 'include_full' })).toBe(false)
+  })
+  it('eigen woning + exclude_from_fire → true', () => {
+    expect(shouldShowDualHousingBasis(standardContext, { mode: 'exclude_from_fire' })).toBe(true)
+  })
+  it('eigen woning + downsize → true', () => {
+    expect(
+      shouldShowDualHousingBasis(standardContext, {
+        mode: 'downsize',
+        trigger: 'fixed_age',
+        triggerAge: 67,
+        depletionThresholdYears: 0,
+        salePricePct: 1,
+        salesCostsPct: 0.04,
+        newMonthlyHousingCost: null,
+      }),
+    ).toBe(true)
+  })
+  it('eigen woning + reverse_mortgage → true', () => {
+    expect(
+      shouldShowDualHousingBasis(standardContext, {
+        mode: 'reverse_mortgage',
+        trigger: 'fixed_age',
+        triggerAge: 67,
+        depletionThresholdYears: 2,
+        maxLoanPct: 0.5,
+        interestRate: 0.055,
+        monthlyPayout: null,
+      }),
+    ).toBe(true)
+  })
+  it('geen eigen woning → false ongeacht mode', () => {
+    expect(shouldShowDualHousingBasis(noHouseContext, { mode: 'exclude_from_fire' })).toBe(false)
+    expect(shouldShowDualHousingBasis(noHouseContext, { mode: 'include_full' })).toBe(false)
   })
 })
 

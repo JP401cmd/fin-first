@@ -358,3 +358,8 @@
 - **API-routes** toegevoegd: /api/admin/uat/compare, /api/admin/uat/results, /api/admin/uat/rounds, /api/admin/uat/rounds/[id]
 - **Tabellen** toegevoegd: uat_results, uat_rounds
 - **Componenten (aantal)** toegevoegd: +7
+
+## 2026-07-06
+
+- **API-routes** toegevoegd: /api/admin/uat/latest
+- **Componenten (aantal)** toegevoegd: +2

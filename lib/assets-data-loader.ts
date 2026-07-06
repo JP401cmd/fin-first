@@ -10,6 +10,7 @@ import { loadConnectionsByAssetIds, type AssetConnectionSummary } from './connec
 import { loadPerspectiveDataServer } from './household/perspective-loader-server'
 import { localMonthBounds } from './month-range'
 import { dailyExpenseRate } from './format'
+import { parseHousingStrategy, type HousingStrategyConfig } from './housing-strategy'
 import type { Perspective } from './household-data'
 
 // ── Types ──────────────────────────────────────────────────────
@@ -41,6 +42,10 @@ export interface AssetsPageData {
   perspective: Perspective
   /** Huishoud-context voor aandeel-/badge-rendering op de kaarten. */
   context: AssetsPerspectiveContext
+  /** Eigen-woning-strategie (geparsed) — gating-bron voor het "excl. eigen
+   *  woning"-subtotaal (dubbele grondslag). Meegeleverd zodat de client de
+   *  splitsing zonder flash bij de eerste render kan tonen. */
+  housingStrategyConfig: HousingStrategyConfig
 }
 
 // ── Loader ─────────────────────────────────────────────────────
@@ -78,7 +83,7 @@ export const loadAssetsData = cache(async (
       .eq('is_active', true),
     supabase
       .from('profiles')
-      .select('budgeting_active')
+      .select('budgeting_active, housing_strategy_config')
       .single(),
     supabase
       .from('valuations')
@@ -94,6 +99,9 @@ export const loadAssetsData = cache(async (
   ) as Array<Record<string, unknown>>
   const mortgages = (mortgageRes.data ?? []) as AssetsPageData['mortgages']
   const budgetingActive = profileRes.data?.budgeting_active !== false
+  const housingStrategyConfig = parseHousingStrategy(
+    (profileRes.data as { housing_strategy_config?: unknown } | null)?.housing_strategy_config,
+  )
 
   // Calculate daily expenses
   const monthlyExpenses = (txRes.data ?? []).reduce((sum, t) => {
@@ -155,5 +163,6 @@ export const loadAssetsData = cache(async (
       partnerName: ctx.partnerName,
       mySharePct: ctx.mySharePct,
     },
+    housingStrategyConfig,
   }
 })

@@ -1,10 +1,13 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, ArrowLeft, ChevronRight, Loader2, Lock, LockOpen, Plus, X } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, ChevronRight, Layers, Loader2, Lock, LockOpen, Plus, X } from 'lucide-react'
 import { UAT_SCENARIOS, UAT_ZONES, type UatScenario, type UatZone } from '@/lib/uat/catalog'
 import { buildPlaatLayout } from '@/lib/uat/plaat-layout'
 import { BEZIT_FLOW } from '@/lib/uat/flows/bezit'
+import { SCHULD_FLOW } from '@/lib/uat/flows/schuld'
+import { TOEK_FLOW } from '@/lib/uat/flows/toek'
+import { KRUIS_FLOW } from '@/lib/uat/flows/kruis'
 import { computeFlowLayout } from '@/lib/uat/flows/flow-layout'
 import { explainZoneStatus, type ZoneStatusExplanation } from '@/lib/uat/flows/zone-status'
 import type { UatFlow } from '@/lib/uat/flows/types'
@@ -31,9 +34,9 @@ import { UatPlaatSvg } from './uat-plaat-svg'
 import { UatFlowSvg } from './uat-flow-svg'
 import { UatDetailPanel } from './uat-detail-panel'
 
-// POC-scope: alleen BEZIT heeft een gecureerd procesmodel (laag 2). Andere
-// zone-titels zijn inert (geen drill) tot hun flow bestaat.
-const FLOW_BY_ZONE: Partial<Record<UatZone, UatFlow>> = { BEZIT: BEZIT_FLOW }
+// Zones met een gecureerd procesmodel (laag 2) worden klikbaar (drill-in).
+// Overige zone-titels zijn inert tot hun flow bestaat.
+const FLOW_BY_ZONE: Partial<Record<UatZone, UatFlow>> = { BEZIT: BEZIT_FLOW, SCHULD: SCHULD_FLOW, TOEK: TOEK_FLOW, KRUIS: KRUIS_FLOW }
 const DRILLABLE_ZONES: ReadonlySet<UatZone> = new Set(Object.keys(FLOW_BY_ZONE) as UatZone[])
 const ZONE_META_BY_ID = new Map(UAT_ZONES.map((z) => [z.zone, z]))
 
@@ -485,6 +488,11 @@ export function UatPlaatClient() {
   const [newRoundOpen, setNewRoundOpen] = useState(false)
   const [roundActionLoading, setRoundActionLoading] = useState(false)
 
+  // Overzichtsmodus: de laatst bekende status per instantie (scenario×sub×platform)
+  // over ÁLLE ronden samen, i.p.v. één ronde. Alleen-lezen — er is geen enkele
+  // ronde om naar te schrijven; kies een ronde om weer te registreren.
+  const [latestMode, setLatestMode] = useState(false)
+
   // Filters (§3.3, brok 5) — dimt niet-matchende knopen; raakt de kopband-
   // cijfers (succesrate/dekking/go-no-go) bewust niet aan (§3.3: die tonen
   // altijd de hele ronde).
@@ -545,6 +553,32 @@ export function UatPlaatClient() {
     return resJson.results ?? []
   }, [])
 
+  // Laatst-bekend-overzicht: per instantie de meest recente registratie over alle ronden.
+  const loadLatest = useCallback(async (): Promise<UatResultRow[]> => {
+    const res = await fetch('/api/admin/uat/latest')
+    if (!res.ok) throw new Error(`Overzicht laden mislukte (${res.status})`)
+    const json = (await res.json()) as { results: UatResultRow[] }
+    return json.results ?? []
+  }, [])
+
+  const enterLatest = useCallback(async () => {
+    setSelected(null)
+    setDrillZone(null)
+    setLatestMode(true)
+    setCompareBaseId(null)
+    setCompareData(null)
+    setCompareError(null)
+    setLoading(true)
+    setError(null)
+    try {
+      setResults(await loadLatest())
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Onbekende fout')
+    } finally {
+      setLoading(false)
+    }
+  }, [loadLatest])
+
   // Nieuwe/gewijzigde registratie mergen: laatste registratie per (scenario,sub,platform) wint,
   // zodat de plaat + kopband + zone-kleuren direct meepropageren.
   const handleSaved = useCallback((row: UatResultRow) => {
@@ -587,6 +621,7 @@ export function UatPlaatClient() {
     async (id: string) => {
       const roundId = id || null
       setSelected(null)
+      setLatestMode(false)
       setSelectedRoundId(roundId)
       setCompareBaseId(null)
       setCompareData(null)
@@ -610,6 +645,7 @@ export function UatPlaatClient() {
 
   const handleRoundCreated = useCallback((round: UatRound) => {
     setRounds((prev) => (prev ? [round, ...prev] : [round]))
+    setLatestMode(false)
     setSelectedRoundId(round.id)
     setCompareBaseId(null)
     setCompareData(null)
@@ -618,8 +654,13 @@ export function UatPlaatClient() {
     setNewRoundOpen(false)
   }, [])
 
-  const activeRound = useMemo(() => rounds?.find((r) => r.id === selectedRoundId) ?? null, [rounds, selectedRoundId])
+  const activeRound = useMemo(
+    () => (latestMode ? null : rounds?.find((r) => r.id === selectedRoundId) ?? null),
+    [latestMode, rounds, selectedRoundId],
+  )
   const roundClosed = Boolean(activeRound?.closed_at)
+  // Er zijn resultaten om te tonen zodra er een actieve ronde is óf de overzichtsmodus aanstaat.
+  const hasResults = latestMode || Boolean(activeRound)
 
   // 409 vanuit het resultaat-formulier (race met sluiten in een andere tab): markeer
   // de actieve ronde direct als gesloten zodat de UI de read-only-status toont.
@@ -742,7 +783,7 @@ export function UatPlaatClient() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-4">
           <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--ink-3)]">Succesrate</p>
-          <p className="mt-1 font-serif text-4xl text-[var(--ink)]">{activeRound ? `${ratePct}%` : '—'}</p>
+          <p className="mt-1 font-serif text-4xl text-[var(--ink)]">{hasResults ? `${ratePct}%` : '—'}</p>
           <p className="mt-1 text-xs text-[var(--ink-3)]">
             geslaagd van {coverage.executed} uitgevoerde subscenario&apos;s
           </p>
@@ -771,15 +812,21 @@ export function UatPlaatClient() {
         <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-4">
           <div className="flex items-center justify-between">
             <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--ink-3)]">Testronde</p>
-            {activeRound && (
-              <span
-                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                  roundClosed ? 'bg-[var(--subtle,transparent)] text-[var(--ink-2)]' : 'text-[var(--positive)]'
-                }`}
-              >
-                {roundClosed ? <Lock className="h-3 w-3" /> : <LockOpen className="h-3 w-3" />}
-                {roundClosed ? 'Gesloten' : 'Open'}
+            {latestMode ? (
+              <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold text-[var(--ink-2)]">
+                <Layers className="h-3 w-3" /> Laatst bekend
               </span>
+            ) : (
+              activeRound && (
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                    roundClosed ? 'bg-[var(--subtle,transparent)] text-[var(--ink-2)]' : 'text-[var(--positive)]'
+                  }`}
+                >
+                  {roundClosed ? <Lock className="h-3 w-3" /> : <LockOpen className="h-3 w-3" />}
+                  {roundClosed ? 'Gesloten' : 'Open'}
+                </span>
+              )
             )}
           </div>
           <select
@@ -796,6 +843,19 @@ export function UatPlaatClient() {
             ))}
           </select>
           <div className="mt-2 flex flex-wrap gap-1.5">
+            <button
+              type="button"
+              onClick={() => (latestMode ? void handleSelectRound(selectedRoundId ?? '') : void enterLatest())}
+              aria-pressed={latestMode}
+              title="Toon per stap de laatst bekende uitslag over alle testrondes samen"
+              className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium transition-colors ${
+                latestMode
+                  ? 'border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)]'
+                  : 'border-[var(--border-ed)] text-[var(--ink-2)] hover:bg-[var(--subtle)]'
+              }`}
+            >
+              <Layers className="h-3 w-3" /> Laatst bekend (overzicht)
+            </button>
             <button
               type="button"
               onClick={() => setNewRoundOpen(true)}
@@ -925,9 +985,19 @@ export function UatPlaatClient() {
           </button>
         </div>
       )}
-      {!error && !loading && !activeRound && (
+      {!error && !loading && !activeRound && !latestMode && (
         <div className="rounded-lg border border-dashed border-[var(--border-ed)] bg-[var(--paper)] p-4 text-sm text-[var(--ink-2)]">
           Nog geen testronde — alles staat op grijs. Start een nieuwe testronde om resultaten te registreren.
+        </div>
+      )}
+      {!error && !loading && latestMode && (
+        <div className="flex items-start gap-2 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-3 text-sm text-[var(--ink-2)]">
+          <Layers className="mt-0.5 h-4 w-4 shrink-0 text-[var(--ink-3)]" />
+          <span>
+            <strong className="text-[var(--ink)]">Laatst bekend</strong> — per stap de meest recente uitslag over
+            álle testrondes samen, ongeacht in welke ronde die is geregistreerd. Alleen-lezen; kies hierboven een
+            ronde om resultaten te registreren of te vergelijken.
+          </span>
         </div>
       )}
 

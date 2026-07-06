@@ -14,6 +14,12 @@ import {
   DEBT_TYPE_COLORS,
 } from '@/lib/debt-data'
 import type { Asset } from '@/lib/asset-data'
+import {
+  deriveHousingContext,
+  parseHousingStrategy,
+  shouldShowDualHousingBasis,
+  type HousingStrategyConfig,
+} from '@/lib/housing-strategy'
 import { usePerspective, usePerspectiveAbort } from '@/components/app/perspective-provider'
 import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
 import { PrivacyHiddenNotice } from '@/components/app/privacy-hidden-notice'
@@ -41,7 +47,7 @@ import { AddCategoryCard } from '@/components/core/add-category-card'
 import { CategoryGroupHeader } from '@/components/core/category-group-header'
 import { EenvoudigPillList, type PillItem } from '@/components/overview/eenvoudig-pill-list'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
-import { Kicker, FiguresStrip, PageInfoButton, GlossaryTerm, PageOpening } from '@/components/editorial'
+import { Kicker, FiguresStrip, PageInfoButton, GlossaryTerm, PageOpening, SubtotalLine } from '@/components/editorial'
 import { PAGE_INFO } from '@/lib/page-info-content'
 import { loadEntitySparklines } from '@/lib/load-entity-sparklines'
 import { buildKpiContext } from '@/lib/kpi-context'
@@ -131,6 +137,12 @@ export default function DebtsPage({ toolbarFilter, debtTypeFilter }: DebtsPagePr
   const [ctx, setCtx] = useState<PerspectiveContext | null>(null)
   const [valuationsByDebtId, setValuationsByDebtId] = useState<Record<string, Valuation[]>>({})
   const [userAssets, setUserAssets] = useState<Asset[]>([])
+  // Woonstrategie-config (JSONB op `profiles`) — bepaalt of de dubbele
+  // grondslag (incl./excl. eigen woning) getoond wordt. Default = include_full
+  // tot geladen, zodat het extra subtotaal niet flikkert bij de eerste render.
+  const [housingStrategy, setHousingStrategy] = useState<HousingStrategyConfig>(() =>
+    parseHousingStrategy(null),
+  )
   // Per-debt sparkline-historie (12 maanden) voor de breuklijn-overlay op
   // VermogenDebtCard. Zelfde shape als asset-categorie-pagina.
   const [debtSparklines, setDebtSparklines] = useState<Record<string, number[]>>({})
@@ -206,11 +218,24 @@ export default function DebtsPage({ toolbarFilter, debtTypeFilter }: DebtsPagePr
     if (data) setUserAssets(data as Asset[])
   }, [])
 
+  // Woonstrategie-config lezen — één lichte eigen-rij fetch. Bepaalt samen met
+  // `deriveHousingContext` of de dubbele grondslag (incl./excl. eigen woning)
+  // relevant is. Failure is non-fataal: default `include_full` → geen subtotaal.
+  const loadHousingStrategy = useCallback(async () => {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('profiles')
+      .select('housing_strategy_config')
+      .single()
+    setHousingStrategy(parseHousingStrategy(data?.housing_strategy_config ?? null))
+  }, [])
+
   useEffect(() => {
     const signal = perspectiveSignal
     loadDebts(signal)
     loadUserAssets()
-  }, [loadDebts, loadUserAssets, perspectiveSignal])
+    loadHousingStrategy()
+  }, [loadDebts, loadUserAssets, loadHousingStrategy, perspectiveSignal])
 
   // ── Per-debt sparklines voor de cards-grid ──────────────────
   // Eén batched query op `balance_snapshots` zodra debts geladen zijn.
@@ -361,6 +386,23 @@ export default function DebtsPage({ toolbarFilter, debtTypeFilter }: DebtsPagePr
   // De aggregaatrij draagt zijn volledige (reeds gesommeerde) saldo mee.
   const totalBalance =
     activeDebts.reduce((s, d) => s + shareOf(d, Number(d.current_balance)), 0) +
+    aggregatedDebts.reduce((s, d) => s + Number(d.current_balance), 0)
+
+  // ── Dubbele grondslag: subtotaal excl. eigen woning ────────────
+  // De aan de eigen woning gekoppelde hypotheek(en) — canoniek bepaald via
+  // `deriveHousingContext` (mortgage + linked_asset_id → actief eigen_huis).
+  // Het "excl. eigen woning"-subtotaal draait EXACT dezelfde aandeel-gewogen
+  // `totalBalance`-reduce, maar dan op de lijst ZONDER die hypotheken —
+  // weging-consistent (perspectief/partner-aandeel blijft upstream input),
+  // NIET een los ongewogen hypotheekbedrag aftrekken.
+  const housingContext = deriveHousingContext(userAssets, realDebts)
+  const showDualHousingBasis =
+    shouldShowDualHousingBasis(housingContext, housingStrategy) && activeDebts.length > 0
+  const eigenHuisMortgageIds = new Set(housingContext.eigenHuisMortgages.map((m) => m.id))
+  const totalBalanceExHome =
+    activeDebts
+      .filter((d) => !eigenHuisMortgageIds.has(d.id))
+      .reduce((s, d) => s + shareOf(d, Number(d.current_balance)), 0) +
     aggregatedDebts.reduce((s, d) => s + Number(d.current_balance), 0)
   const totalMonthlyPayment = activeDebts.reduce(
     (s, d) => s + shareOf(d, Number(d.monthly_payment ?? 0)),
@@ -598,6 +640,20 @@ export default function DebtsPage({ toolbarFilter, debtTypeFilter }: DebtsPagePr
               sub: `type${(Object.keys(byType) as DebtType[]).filter((t) => byType[t]?.debts.length > 0).length === 1 ? '' : 's'} schuld`,
             },
           ]}
+        />
+      )}
+
+      {/* ═══ Subtotaal excl. eigen woning (dubbele grondslag) ═══════
+          Eén subtieler subtotaal onder de figures-strip: dezelfde aandeel-
+          gewogen som, maar met de hypotheek op de eigen woning eruit. Kern-
+          accent zodat het als tweede lezing van "Totale schuld" leest. Alleen
+          zichtbaar bij de dubbele grondslag (eigen woning + strategie die de
+          woning niet volledig meerekent). */}
+      {showDualHousingBasis && (
+        <SubtotalLine
+          label="Totale schuld · excl. eigen woning"
+          amount={totalBalanceExHome}
+          trailing="hypotheek eigen woning eruit"
         />
       )}
 

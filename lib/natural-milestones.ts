@@ -3,8 +3,11 @@
  *
  * In tegenstelling tot user-defined life events worden deze mijlpalen niet
  * opgeslagen in `life_events`, maar afgeleid uit:
- *  - asset/debt-metadata (per-item, statisch)
- *  - simulatie-output (`SimRow[]`, portfolio-niveau)
+ *  - asset-metadata + debt-rentevast-metadata (per-item, statisch)
+ *  - kernel-projectierijen (`UnifiedProjectionRow[]`) voor schuld-payoff per
+ *    `debt.id` — huisverkoop-bewust (consume, don't recompute); NIET langer uit
+ *    het statische amortisatieschema `debtProjection`, dat huisverkoop niet kent
+ *  - simulatie-output (`SimResult`, portfolio-niveau)
  *  - combinaties (schuldenvrij)
  *
  * Pure functions. Geen Supabase dependency.
@@ -12,10 +15,10 @@
 
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
-import { debtProjection } from '@/lib/debt-data'
 import { type LifeEvent } from '@/lib/horizon-data'
 import { BOX3_PARAMS } from '@/lib/box3-data'
 import type { SimResult } from '@/lib/fire-simulation'
+import type { UnifiedProjectionRow } from '@/lib/unified-projection'
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -102,30 +105,80 @@ function getBox3HeffingsvrijVermogen(hasPartner: boolean): number {
 
 // ── Static derivation (asset/debt metadata) ──────────────────────────────
 
-function deriveDebtMilestones(debts: Debt[], dob: string | null): NaturalMilestone[] {
+/**
+ * Payoff-leeftijd van één schuld uit de kernel-projectierijen (consume, don't
+ * recompute). Payoff = leeftijd van de EERSTE rij waar het saldo NIET meer
+ * materieel is (afgerond op hele euro's < €1, d.w.z. < €0,50), NÁDAT de schuld
+ * ooit materieel wás. De "was ooit boven de drempel"-guard onderscheidt een echte
+ * aflossing van een schuld die er nooit was of al vóór de horizon weg was.
+ *
+ * "Materieel" is identiek aan de tekort-lening-banner (bug 1): `Math.round(saldo)
+ * >= 1` (⇔ saldo ≥ €0,50) — geen aparte drempel, geen solver-internals.
+ *
+ * De guard kijkt óók naar `startBalance` van dezelfde rij: lost een schuld binnen
+ * het eerste projectiejaar volledig af, dan is er geen eerdere rij die de guard
+ * zet, en zonder deze check zou die payoff-mijlpaal stil verdwijnen.
+ *
+ * @returns de leeftijd van het aflos-jaar, of `null` als de schuld binnen de rijen
+ *          nooit naar ~0 gaat (bv. opeethypotheek/aflossingsvrij) — dan géén payoff.
+ */
+function findDebtPayoffAge(
+  rows: readonly UnifiedProjectionRow[],
+  debtId: string,
+): number | null {
+  const owed = (v: number | undefined) => Math.round(v ?? 0) >= 1
+  let hadBalance = false
+  for (const r of rows) {
+    const detail = r.debtBalances[debtId]
+    if (owed(detail?.startBalance)) hadBalance = true
+    if (owed(detail?.endBalance)) {
+      hadBalance = true
+    } else if (hadBalance) {
+      return r.age
+    }
+  }
+  return null
+}
+
+function deriveDebtMilestones(
+  debts: Debt[],
+  dob: string | null,
+  unifiedRows: readonly UnifiedProjectionRow[] | null,
+): NaturalMilestone[] {
   const out: NaturalMilestone[] = []
   const activeDebts = debts.filter(d => d.is_active && Number(d.current_balance) > 0)
 
-  // Per-debt payoff
+  // Rijen één keer oplopend op leeftijd (de kernel levert ze al zo aan; defensief
+  // kopiëren zodat we de bron niet muteren). Ontbreken de rijen (null/leeg) → geen
+  // payoff-detectie: we vallen bewust NIET terug op debtProjection (dubbele bron).
+  const rows = unifiedRows && unifiedRows.length > 0
+    ? [...unifiedRows].sort((a, b) => a.age - b.age)
+    : null
+
   for (const debt of activeDebts) {
-    const proj = debtProjection(debt)
-    if (!proj.isPayable || !proj.payoffDate) continue
-    const age = dateToAge(dob, proj.payoffDate)
-    if (age == null || !Number.isFinite(age)) continue
+    // ── Payoff — uit de kernel-rijen, huisverkoop-bewust ──────────────────
+    // Geen rijen, of schuld gaat nooit naar ~0 (opeethypotheek/aflossingsvrij) →
+    // géén debt_payoff-mijlpaal (dit corrigeert meteen de vroegere fabricage van
+    // een onzin-payoff uit het statische amortisatieschema).
+    const payoffAge = rows ? findDebtPayoffAge(rows, debt.id) : null
+    if (payoffAge != null) {
+      out.push({
+        id: `nat-debt-payoff-${debt.id}`,
+        kind: 'debt_payoff',
+        category: 'debt',
+        name: `${debt.name || 'Schuld'} afgelost`,
+        target_age: payoffAge,
+        target_date: ageToIsoDate(dob, payoffAge),
+        icon: 'CheckCircle2',
+        sourceId: debt.id,
+        amount: Number(debt.current_balance),
+      })
+    }
 
-    out.push({
-      id: `nat-debt-payoff-${debt.id}`,
-      kind: 'debt_payoff',
-      category: 'debt',
-      name: `${debt.name || 'Schuld'} afgelost`,
-      target_age: age,
-      target_date: proj.payoffDate,
-      icon: 'CheckCircle2',
-      sourceId: debt.id,
-      amount: Number(debt.current_balance),
-    })
-
-    // Mortgage fixed-rate reset (geen payoff, maar ander moment)
+    // ── Mortgage fixed-rate reset — ONAFHANKELIJK van payoff ──────────────
+    // Metadata-gedreven (debt.fixed_rate_end_date), geen payoff-moment. Bewust
+    // NIET achter de payoff-gate: een hypotheek zonder rows-payoff (verkocht/
+    // aflossingsvrij) moet zijn rentevast-reset nog steeds kunnen tonen.
     if (debt.debt_type === 'mortgage' && debt.fixed_rate_end_date) {
       const resetAge = dateToAge(dob, debt.fixed_rate_end_date)
       if (resetAge != null && Number.isFinite(resetAge)) {
@@ -143,7 +196,9 @@ function deriveDebtMilestones(debts: Debt[], dob: string | null): NaturalMilesto
     }
   }
 
-  // Aggregaat: schuldenvrij = laatste payoff over alle actieve debts
+  // Aggregaat: schuldenvrij = laatste (gecorrigeerde) payoff over alle actieve
+  // debts. Volgt automatisch de rows-payoffs, zodat individueel en aggregaat
+  // nooit tegenspreken.
   const payoffMilestones = out.filter(m => m.kind === 'debt_payoff')
   if (payoffMilestones.length >= 2) {
     const last = payoffMilestones.reduce((a, b) => (a.target_age > b.target_age ? a : b))
@@ -316,14 +371,20 @@ export interface DeriveNaturalMilestonesParams {
   debts: Debt[]
   assets: Asset[]
   simResult: SimResult | null
+  /**
+   * Kernel-projectierijen (`debtBalances[debt.id]` per rij) — canonieke bron voor
+   * de schuld-payoff-mijlpaal (huisverkoop-bewust). null/leeg ⇒ geen debt_payoff-
+   * mijlpalen (geen fallback naar het statische amortisatieschema).
+   */
+  unifiedRows: readonly UnifiedProjectionRow[] | null
   dob: string | null
   hasPartner: boolean
 }
 
 export function deriveNaturalMilestones(params: DeriveNaturalMilestonesParams): NaturalMilestone[] {
-  const { debts, assets, simResult, dob, hasPartner } = params
+  const { debts, assets, simResult, unifiedRows, dob, hasPartner } = params
   const milestones = [
-    ...deriveDebtMilestones(debts, dob),
+    ...deriveDebtMilestones(debts, dob, unifiedRows),
     ...deriveAssetMilestones(assets, dob),
     ...deriveSimMilestones(simResult, dob, hasPartner),
   ]

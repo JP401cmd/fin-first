@@ -72,7 +72,13 @@ export function detectDeficitLoanFromRows(
   for (const r of rows) {
     if (r.age > cutoff) continue
     const endBalance = r.debtBalances['tekort-lening']?.endBalance ?? 0
-    if (endBalance > 0) {
+    // €1-materialiteitsgate: een rij telt alléén mee (voor firstAge én peak) als
+    // het eindsaldo op hele euro's afgerond ≥ €1 is. Zo levert float-ruis (€0,003)
+    // óf een reële sub-euro (€0,30) — die beide naar € 0 afronden — géén banner met
+    // "piek € 0 (0 dagen)" meer. `firstAge` landt daardoor op de eerste materiële
+    // rij, niet op een eerdere sub-euro-ruisrij. Dekt élke onderliggende grootte
+    // (de kernel-ruisdrempel 0.005 zou een reële €0,30 laten staan → nóg steeds € 0).
+    if (Math.round(endBalance) >= 1) {
       if (firstAge === null) firstAge = r.age
       if (endBalance > peak) peak = endBalance
     }

@@ -138,6 +138,72 @@ export function aandachtspuntToActionPayload(a: Aandachtspunt): AandachtspuntAct
   return payload
 }
 
+/**
+ * Filter aandachtspunten waarvoor de gebruiker al een actie heeft (open of
+ * recent afgerond). `actionedIds` bevat de `metadata.aandachtspunt_id`-waarden
+ * van die acties; elk aandachtspunt waarvan `id` daarin voorkomt valt weg (het
+ * staat al op de actielijst — het als suggestie herhalen is ruis).
+ */
+export function filterActionedAandachtspunten(
+  punten: Aandachtspunt[],
+  actionedIds: ReadonlySet<string>,
+): Aandachtspunt[] {
+  return punten.filter((a) => !actionedIds.has(a.id))
+}
+
+/**
+ * Venster (in maanden) waarin een AFGERONDE actie het bijbehorende aandachtspunt
+ * blijft onderdrukken. Rationale: veel aandachtspunten zijn jaarlijks terugkerend
+ * (bv. jaarruimte). Wie het dit jaar benutte, wil er niet meteen weer over
+ * gepusht worden — maar ná ~9 maanden mag de kans wél opnieuw opduiken zodat de
+ * volgende ronde niet gemist wordt. Bewust < 12 mnd om de nieuwe cyclus te vangen.
+ */
+export const ACTIONED_COMPLETED_WINDOW_MONTHS = 9
+
+/** Minimale vorm van een `actions`-rij die `collectActionedIds` nodig heeft. */
+export interface ActionSuppressionRow {
+  metadata: { aandachtspunt_id?: unknown } | null
+  status?: string | null
+  /** ISO-timestamp (timestamptz) — alleen relevant voor status 'completed'. */
+  completed_at?: string | null
+}
+
+/**
+ * Bepaal welke aandachtspunt-ids als 'geactioneerd' tellen en dus onderdrukt
+ * moeten worden:
+ *   - elke OPEN actie (staat nu op de lijst), en
+ *   - elke AFGERONDE (completed) actie waarvan `completed_at` binnen het venster
+ *     (default {@link ACTIONED_COMPLETED_WINDOW_MONTHS} maanden vóór `now`) valt.
+ * Afgeronde acties ouder dan het venster tellen NIET meer mee, zodat een
+ * jaarlijks terugkerende kans na verloop van tijd weer als suggestie verschijnt.
+ *
+ * Puur en `now`-injecteerbaar (testbaar zonder DB/klok). Andere statussen
+ * (postponed/rejected) onderdrukken bewust niet — een uitgestelde of afgewezen
+ * actie is geen 'gedaan'.
+ */
+export function collectActionedIds(
+  rows: ActionSuppressionRow[],
+  now: Date = new Date(),
+  windowMonths: number = ACTIONED_COMPLETED_WINDOW_MONTHS,
+): Set<string> {
+  const cutoff = new Date(now)
+  cutoff.setMonth(cutoff.getMonth() - windowMonths)
+  const cutoffMs = cutoff.getTime()
+
+  const ids = new Set<string>()
+  for (const row of rows) {
+    const rawId = row.metadata?.aandachtspunt_id
+    if (typeof rawId !== 'string' || rawId.length === 0) continue
+    if (row.status === 'open') {
+      ids.add(rawId)
+    } else if (row.status === 'completed') {
+      const completedMs = row.completed_at ? Date.parse(row.completed_at) : NaN
+      if (Number.isFinite(completedMs) && completedMs >= cutoffMs) ids.add(rawId)
+    }
+  }
+  return ids
+}
+
 // ── Adapters (PURE) ──────────────────────────────────────────
 
 /**

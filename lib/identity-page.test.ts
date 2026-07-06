@@ -339,4 +339,19 @@ describe('Identity — computeSovereigntyLevel', () => {
   it('returns 6 for freedomPct >= 100', () => {
     expect(computeSovereigntyLevel(500_000, 2_000, 110, false)).toBe(6)
   })
+
+  // Buffer/noodfonds-tiers rekenen op de LIQUIDE pot (5e arg), niet op vol
+  // vermogen — huiseigenaar met veel overwaarde maar weinig spaargeld. Kaart:
+  // "Dashboard telt gedeeld bezit overal even zwaar".
+  it('runway-grondslag: liquide pot (5e arg) bepaalt de buffer-tiers, niet netWorth', () => {
+    // netWorth €140k (grotendeels overwaarde), liquide €15k → 5 mnd buffer.
+    // Op vol vermogen zou 30% vrijheid level 4 geven; op liquide pot level 2.
+    expect(computeSovereigntyLevel(140_000, 3_000, 30, false)).toBe(4)          // oud (4 args)
+    expect(computeSovereigntyLevel(140_000, 3_000, 30, false, 15_000)).toBe(2)  // nieuw
+  })
+
+  it('negatief vermogen blijft recovery ongeacht de liquide pot', () => {
+    expect(computeSovereigntyLevel(-5_000, 2_000, 0, false, 30_000)).toBe(-1)
+    expect(computeSovereigntyLevel(-5_000, 2_000, 0, true, 30_000)).toBe(-2)
+  })
 })

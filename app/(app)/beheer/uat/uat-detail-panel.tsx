@@ -23,6 +23,7 @@ import { UatResultForm } from './uat-result-form'
 const ASSERTION_KIND_LABEL: Record<AcceptanceAssertionKind, string> = {
   exact: 'exact',
   consistency: 'consistentie',
+  oracle: 'oracle',
   direction: 'richting',
   'ui-only': 'ui-only',
 }

@@ -41,6 +41,7 @@ function makeLeverScores(
     box3Status: 'neutral' as LeverageStatus,
     box1Status: 'neutral' as LeverageStatus,
     netWorth: 0,
+    budgetsOver: 0,
   }
 }
 

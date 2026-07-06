@@ -437,8 +437,16 @@ export interface UnifiedProjectionResult {
   fireReachable: boolean
   /** Portfoliowaarde op het moment van FIRE */
   firePortfolioAtFire: number
-  /** Minimaal benodigde portfolio bij FIRE */
+  /** Minimaal benodigde portfolio bij FIRE (LIQUIDE, excl. eigen woning = Prognose!J@FIRE) */
   requiredFirePortfolio: number
+  /**
+   * FIRE-doel INCL. eigen woning = TOTAAL netto vermogen bij FIRE (Prognose!I@FIRE,
+   * nominaal). Spiegelt `requiredFirePortfolio` (liquide); puur doorgeleid, parity-gedekt
+   * summary-veld uit de horizon-kernel-bridge — géén eigen berekening. Optioneel/additief:
+   * stub-/mock-/preview-resultaten die dit veld niet zetten blijven geldig. In het echte
+   * kernel-pad altijd gevuld en ≥ `requiredFirePortfolio` (overwaarde ≥ 0).
+   */
+  requiredFireNetWorth?: number
   /** Impliciete onttrekkingsratio (jaarlijkse uitgaven / benodigde portfolio) */
   implicitWithdrawalRate: number
   /** Gebruikte eindstrategie */
@@ -532,6 +540,7 @@ export function toSimResult(result: UnifiedProjectionResult): SimResult {
     fireAgeFractional: result.fireAgeFractional,
     firePortfolioAtFire: result.firePortfolioAtFire,
     requiredFirePortfolio: result.requiredFirePortfolio,
+    requiredFireNetWorth: result.requiredFireNetWorth,
     fireReachable: result.fireReachable,
     implicitWithdrawalRate: result.implicitWithdrawalRate,
     classic25xTarget,

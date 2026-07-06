@@ -122,10 +122,25 @@ function statusSubText(key: HefboomKey, status: StatusCode, pillar?: HealthPilla
   return null
 }
 
+/**
+ * Dubbele-grondslag-context (incl./excl. eigen woning) voor de bezittingen-
+ * en schulden-hefboom. Bron = `horizonData` (perspectief-correct), NIET
+ * `dashboardData` (persoonlijke grondslag → drift in huishoud/partner). De
+ * bedragen zijn al inclusion-gewogen in `housingContext`, dus de excl.-som is
+ * meteen de gefilterde gewogen waarde. Null → geen splitsing (byte-identiek).
+ */
+export type HefbomenHousingSplit = {
+  /** Inclusion-gewogen waarde van de eigen woning(en), uit housingContext. */
+  eigenHuisValue: number
+  /** Inclusion-gewogen openstaand hypotheeksaldo, uit housingContext. */
+  mortgageBalance: number
+}
+
 export function HefbomenNav({
   health,
   leverScores,
   totals,
+  housingSplit = null,
   simple = false,
 }: {
   health: HealthScore | null
@@ -138,6 +153,14 @@ export function HefbomenNav({
    */
   leverScores?: LeverScores | null
   totals?: HefbomenTotals
+  /**
+   * Dubbele grondslag incl./excl. eigen woning. Aanwezig (non-null) ⇔
+   * `horizonData.showDualHousingBasis` (eigen woning ÉN strategie ≠ volledig
+   * meerekenen). Alleen de bezittingen- en schulden-tegel tonen dan een
+   * subtiele "excl. eigen woning · €X"-regel; cashflow/belasting ongewijzigd.
+   * Null → geen extra regel (byte-identiek aan voorheen).
+   */
+  housingSplit?: HefbomenHousingSplit | null
   /**
    * Eenvoudige weergave (display_mode === 'simple'): verberg de chevron /
    * uitklap-drill-down op de hefboomkaarten — de kaarten blijven dan rustige,
@@ -186,6 +209,36 @@ export function HefbomenNav({
 
         const hasDrilldown = Boolean(pillar) || status !== 'neutral'
 
+        // Dubbele grondslag: subtiele "excl. eigen woning · €X"-regel op ALLEEN
+        // de bezittingen- en schulden-tegel wanneer horizonData.showDualHousingBasis
+        // (housingSplit non-null). Weging-consistent: huis/hypotheek zijn al
+        // inclusion-gewogen in housingContext, dus dit IS de gefilterde gewogen
+        // som. GEEN vrijheidstijd-trailing hier — de tegel blijft compact.
+        let subAmount: React.ReactNode = null
+        if (housingSplit) {
+          if (
+            showTotal &&
+            typeof totalValue === 'number' &&
+            (key === 'bezittingen' || key === 'schulden')
+          ) {
+            const exclValue =
+              key === 'bezittingen'
+                ? totalValue - housingSplit.eigenHuisValue
+                : totalValue - housingSplit.mortgageBalance
+            subAmount = (
+              <>excl. eigen woning · {formatMaskedCurrency(exclValue, masked)}</>
+            )
+          } else {
+            // Dual-modus actief, maar deze tegel (cashflow/belasting, of zonder
+            // totaal) heeft geen excl.-regel → lege placeholder, zodat alle vier
+            // tegels in de desktop-rij (align-items: stretch) gelijke content-
+            // hoogte houden en de absolute chevron niet wegzweeft. Spiegelt het
+            // subText-placeholder-patroon. Bij housingSplit == null: geen enkele
+            // placeholder (byte-identiek aan voorheen).
+            subAmount = <span aria-hidden="true">&nbsp;</span>
+          }
+        }
+
         return (
           <LeverageCard
             key={key}
@@ -195,6 +248,7 @@ export function HefbomenNav({
             kpi={showTotal ? formattedTotal : null}
             status={status}
             subText={subText}
+            subAmount={subAmount}
             href={href}
             tooltip={tooltip}
             expandable={hasDrilldown && !simple}

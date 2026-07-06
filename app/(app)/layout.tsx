@@ -80,6 +80,22 @@ export default async function AppLayout({
   threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
   const dateStr = threeMonthsAgo.toISOString().split('T')[0]
 
+  // ── Active modules ────────────────────────────────────
+  // Module-toggle is verwijderd uit Trifinity (zie /mijn/geavanceerd).
+  // App-zichtbaarheid wordt voortaan per individuele app afgeleid van
+  // tracking-flags op assets/debts (zie `sidebarActiveAppKeys` hieronder).
+  // Op module-niveau zijn voortaan alle modules altijd beschikbaar; de DB-
+  // kolom `profiles.active_modules` blijft staan voor migratie-doeleinden
+  // maar wordt hier bewust genegeerd.
+  //
+  // Bewust bóvenaan gedefinieerd (vóór de main-batch): de coach-data-gap-queries
+  // hieronder hangen UITSLUITEND aan deze constante — niet aan batch-uitkomsten —
+  // en kunnen daarom in dezelfde parallelle batch mee (scheelt één waterfall-stap).
+  const activeModules: ModuleId[] = [...ALL_MODULES]
+  const coachHasTransactionsModule = activeModules.includes('budgetteren')
+  const coachHasHoldingsModule = activeModules.includes('aandelenregistratie')
+  const coachHasFireModule = activeModules.includes('toekomstplannen')
+
   const [
     profileRes,
     assetsRes,
@@ -87,15 +103,18 @@ export default async function AppLayout({
     txRes,
     actionsCountRes,
     budgetCountRes,
-    budgetHealthRes,
-    budgetTxRes,
     coachConfigRes,
     platformStatusRes,
     recsCountRes,
+    coachTxRes,
+    coachHoldingsRes,
+    coachLifeEventsRes,
   ] = await Promise.all([
     // profile-select bevat velden voor sidebar/feature-access/theming.
     // expected_return + inflation_rate voeden de coach-data-gap `hasFireParams`
     // — meegenomen in deze bestaande query i.p.v. een extra round-trip.
+    // feature_preferences bevat óók deferred_onboarding_fields (coach) — geen
+    // aparte round-trip meer nodig.
     supabase.from('profiles').select('role, blocked_at, onboarding_completed, last_known_phase, module_colors, budget_colors, phase_colors, typography_theme, active_subscriptions, feature_preferences, active_modules, household_type, expected_return, inflation_rate, display_mode').eq('id', user.id).single(),
     // assets: `asset_type, net_worth_inclusion_pct` voor sidebar netWorth
     // (weighted). De tracking-flags voeden `getActiveAppKeys()` voor de
@@ -119,16 +138,9 @@ export default async function AppLayout({
     // = minimale payload (geen rows). Telt alleen top-level budgets
     // (parent_id is null) zodat sub-budgets niet meetellen.
     supabase.from('budgets').select('id', { count: 'exact', head: true }).eq('user_id', user.id).is('parent_id', null),
-    // Budget health: top-level expense budgets met limit (kompas cashflow-indicator)
-    supabase.from('budgets').select('id, default_limit, budget_type').eq('user_id', user.id).is('parent_id', null).in('budget_type', ['expense', 'savings']).eq('is_archived', false),
-    // Current-month transactions met budget_id (kompas cashflow-indicator)
-    (() => {
-      const now = new Date()
-      const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
-      const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1)
-      const monthEnd = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}-01`
-      return supabase.from('transactions').select('budget_id, amount').eq('user_id', user.id).not('budget_id', 'is', null).gte('date', monthStart).lt('date', monthEnd)
-    })(),
+    // (Budget-health + maand-budget-transacties zijn hier weggehaald: `budgetsOver`
+    // komt nu uit de gedeelde `loadLeverScores` (die dezelfde queries al draait),
+    // i.p.v. een dubbele inline-berekening in de shell — zie #847-kompas.)
     // Coach-config: per-regel overrides + globale timing/label voor de CoachBubble.
     // Beheerd via /beheer/coach. maybeSingle: rij hoeft niet te bestaan (dan defaults).
     supabase.from('app_settings').select('value').eq('key', 'coach_config').maybeSingle(),
@@ -142,6 +154,20 @@ export default async function AppLayout({
     // (De Box 1-maandinkomen-query is verhuisd naar `loadLeverScores`, de
     // gedeelde SSoT die zowel deze sidebar-dot als de status-duiding-banner
     // voedt — geen aparte query meer in de shell.)
+    // ── Coach-bubble data-gap queries (voorheen een aparte sequentiële batch) ──
+    // Verplaatst naar deze main-batch: de condities hangen UITSLUITEND aan de
+    // constante `activeModules` (hierboven), niet aan batch-uitkomsten, dus deze
+    // queries kunnen parallel mee i.p.v. één waterfall-stap later. Inactieve
+    // module → Promise.resolve(null) (geen query), identiek aan het oude gedrag.
+    coachHasTransactionsModule
+      ? supabase.from('transactions').select('id', { count: 'exact', head: true }).eq('user_id', user.id)
+      : Promise.resolve(null),
+    coachHasHoldingsModule
+      ? supabase.from('investment_holdings').select('id, isin').eq('user_id', user.id).eq('is_active', true)
+      : Promise.resolve(null),
+    coachHasFireModule
+      ? supabase.from('life_events').select('id, event_type').eq('user_id', user.id).eq('is_active', true)
+      : Promise.resolve(null),
   ])
 
   const platformStatus = parsePlatformStatus(platformStatusRes.data?.value as string | undefined)
@@ -167,14 +193,8 @@ export default async function AppLayout({
     userFeaturePrefs: (profile?.feature_preferences as Record<string, boolean>) ?? null,
   })
 
-  // ── Active modules ────────────────────────────────────
-  // Module-toggle is verwijderd uit Trifinity (zie /mijn/geavanceerd).
-  // App-zichtbaarheid wordt voortaan per individuele app afgeleid van
-  // tracking-flags op assets/debts (zie `sidebarActiveAppKeys` hieronder).
-  // Op module-niveau zijn voortaan alle modules altijd beschikbaar; de DB-
-  // kolom `profiles.active_modules` blijft staan voor migratie-doeleinden
-  // maar wordt hier bewust genegeerd.
-  const activeModules: ModuleId[] = [...ALL_MODULES]
+  // (`activeModules` + coach-module-flags zijn bovenaan gedefinieerd, vóór de
+  // main-batch, zodat de coach-queries in diezelfde parallelle batch mee kunnen.)
 
   // ── Sidebar-metrics (Kern/Wil/Horizon kerncijfers) ─────
   // Net-worth: NIET meer inline gesommeerd in de shell. Het cijfer komt
@@ -264,31 +284,16 @@ export default async function AppLayout({
   )
   const sidebarActionCount = actionsCountRes.count ?? 0
 
-  // ── Budget health (kompas cashflow-indicator #847) ───────
-  // Per top-level expense/savings budget: binnen de limiet of niet. `budgetsOver`
-  // voedt het sidebar-`budgetOver`-signaal (los van de hefboom-scores), dus deze
-  // afleiding blijft hier — los van de gedeelde lever-scores-loader.
-  type BudgetHealthRow = { id: string; default_limit: number; budget_type: string }
-  type BudgetTxRow = { budget_id: string; amount: number }
-  const healthBudgets = (budgetHealthRes.data ?? []) as BudgetHealthRow[]
-  const budgetTxRows = (budgetTxRes.data ?? []) as BudgetTxRow[]
-  // Sum spending per budget_id
-  const spendPerBudget = new Map<string, number>()
-  for (const tx of budgetTxRows) {
-    spendPerBudget.set(tx.budget_id, (spendPerBudget.get(tx.budget_id) ?? 0) + Math.abs(Number(tx.amount)))
-  }
-  const budgetsOver = healthBudgets.filter(b => {
-    if (b.default_limit <= 0) return false
-    const spent = spendPerBudget.get(b.id) ?? 0
-    return spent > b.default_limit
-  }).length
-
-  // ── Vier-hefbomen-kompas scores + Box 1/3-statussen + netto vermogen (SSoT) ──
+  // ── Vier-hefbomen-kompas scores + Box 1/3-statussen + netto vermogen + budget-
+  //    health (SSoT) ──
   // Voorheen stond hier de volledige inline assemblage (assets/debts/spaarquote/
-  // box3-input + computeLeverScores + box1JaarruimteStatus) én een aparte
-  // netto-vermogen-som. Beide komen nu uit de ÉNE bron `loadLeverScores`,
-  // gedeeld met de status-duiding-banner (lib/page-status/*) zodat de sidebar-
-  // dots, de banner én het sidebar-netWorth per definitie kloppen met de hero.
+  // box3-input + computeLeverScores + box1JaarruimteStatus), een aparte
+  // netto-vermogen-som én een aparte budget-health-berekening met eigen queries.
+  // Alles komt nu uit de ÉNE bron `loadLeverScores`, gedeeld met de status-
+  // duiding-banner (lib/page-status/*) zodat de sidebar-dots, de banner, het
+  // sidebar-netWorth én het `budgetOver`-signaal per definitie kloppen met de
+  // hero. `budgetsOver` wordt daar al berekend uit dezelfde budget-health-queries
+  // — de shell consumeert het i.p.v. die queries te dupliceren (#847-kompas).
   // Perspectief stuurt uitsluitend `netWorth` (lever-status blijft persoonlijk).
   // `cache()` dedupliceert binnen het request (zelfde perspective-arg als de
   // page-status-route → één query-set).
@@ -298,6 +303,7 @@ export default async function AppLayout({
     box1Status: sidebarBox1Status,
     box3Status: sidebarBox3Status,
     netWorth: sidebarNetWorth,
+    budgetsOver,
   } = await loadLeverScores(supabase, sidebarPerspective)
 
   const sidebarSignals: SidebarSignals = {
@@ -332,21 +338,9 @@ export default async function AppLayout({
   // Module-gating: per-module queries draaien alleen wanneer die module actief
   // is. Inactieve modules krijgen het signaal default `true`, zodat hun gap niet
   // kan vuren (de coach gate-t óók op activeModules — dubbele veiligheid).
-  const coachHasTransactionsModule = activeModules.includes('budgetteren')
-  const coachHasHoldingsModule = activeModules.includes('aandelenregistratie')
-  const coachHasFireModule = activeModules.includes('toekomstplannen')
-
-  const [coachTxRes, coachHoldingsRes, coachLifeEventsRes] = await Promise.all([
-    coachHasTransactionsModule
-      ? supabase.from('transactions').select('id', { count: 'exact', head: true }).eq('user_id', user.id)
-      : Promise.resolve(null),
-    coachHasHoldingsModule
-      ? supabase.from('investment_holdings').select('id, isin').eq('user_id', user.id).eq('is_active', true)
-      : Promise.resolve(null),
-    coachHasFireModule
-      ? supabase.from('life_events').select('id, event_type').eq('user_id', user.id).eq('is_active', true)
-      : Promise.resolve(null),
-  ])
+  // De queries (`coachTxRes`/`coachHoldingsRes`/`coachLifeEventsRes`) + hun
+  // module-flags zijn bovenaan verplaatst naar de main-batch (parallel i.p.v.
+  // een aparte sequentiële batch) — het gedrag hieronder is ongewijzigd.
 
   // Holdings: hasHoldings = ≥1 rij; hasHoldingsWithIsin = minstens één met
   // een niet-lege isin.
@@ -381,27 +375,19 @@ export default async function AppLayout({
   // ── Deferred onboarding fields (feature #830) ─────────
   // Velden die de gebruiker expliciet heeft overgeslagen met "Later invullen"
   // tijdens onboarding. Doorgestuurd naar de coach-bubble voor gerichte
-  // suggesties. Stored in feature_preferences.deferred_onboarding_fields
-  // (JSONB sub-key) — no DDL migration needed.
+  // suggesties. Opgeslagen in feature_preferences.deferred_onboarding_fields
+  // (JSONB sub-key) — geen eigen round-trip: `feature_preferences` zit al in de
+  // main-batch profile-select (B1), dus we lezen die kolom direct uit `profile`.
   const validDeferredKeys = ['income', 'assets', 'spaardoel'] as const
   type DeferredFieldKey = typeof validDeferredKeys[number]
   let coachDeferredFields: DeferredFieldKey[] = []
-  try {
-    const { data: prefsRow } = await supabase
-      .from('profiles')
-      .select('feature_preferences')
-      .eq('id', user.id)
-      .single()
-    const prefs = prefsRow?.feature_preferences as Record<string, unknown> | null
-    const rawDeferred = prefs?.deferred_onboarding_fields
-    if (Array.isArray(rawDeferred)) {
-      coachDeferredFields = (rawDeferred as string[]).filter(
-        (k): k is DeferredFieldKey =>
-          (validDeferredKeys as readonly string[]).includes(k)
-      )
-    }
-  } catch {
-    // Graceful fallback to empty array
+  const deferredPrefs = profile?.feature_preferences as Record<string, unknown> | null
+  const rawDeferred = deferredPrefs?.deferred_onboarding_fields
+  if (Array.isArray(rawDeferred)) {
+    coachDeferredFields = (rawDeferred as string[]).filter(
+      (k): k is DeferredFieldKey =>
+        (validDeferredKeys as readonly string[]).includes(k)
+    )
   }
 
   // ── Module colors (SSR) ────────────────────────────────

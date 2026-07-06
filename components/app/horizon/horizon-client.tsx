@@ -6,7 +6,7 @@ import { useDreamTransition } from '@/components/app/horizon/dream-transition-co
 import type { HorizonPageData } from '@/lib/horizon-data-loader'
 import { HORIZON_EXIT_NOTICE_DISMISSED_SLUG } from '@/lib/horizon-data-loader'
 import { useHorizonFireSim } from '@/lib/hooks/use-horizon-fire-sim'
-import { type SimCashflow, type SimRow, type SimResult } from '@/lib/fire-simulation'
+import { type SimRow, type SimResult } from '@/lib/fire-simulation'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/app/toast-provider'
 
@@ -19,7 +19,6 @@ import {
   ageAtDate, deriveCountdown,
   runMonteCarlo,
   LIFE_EVENT_CATALOG, nibudChildrenCost, berekenSchenkbelasting, berekenAutoMaandkosten, berekenErfbelasting, berekenKinderopvangNetto, kinderbijslagPerMaand, WERELDREIS_STIJL_PRESETS, VERBOUWING_TYPE_KOSTEN, STUDIE_TYPE_KOSTEN, BRUILOFT_BUDGET_PRESETS,
-  type LifeEventGroup,
   type FinancialInput, type FireProjection, type FireRange,
   type LifeEvent, type LifeEventImpact,
   type MonteCarloResult, type CatalogField,
@@ -53,14 +52,13 @@ import dynamic from 'next/dynamic'
 import {
   Hourglass, TrendingUp, Percent, Info,
   AlertTriangle, Calendar, BarChart3, FlaskConical, Landmark,
-  Plus, X, Trash2, Edit3, Zap, Target, History, Sparkles,
-  DollarSign, TableProperties, RefreshCw, GitBranch,
+  X, Edit3, Zap, Target, Sparkles,
+  TableProperties, GitBranch,
   ChevronDown, ChevronUp, Compass, SlidersHorizontal,
   Home, Lightbulb,
 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import {
-  HOUSING_STRATEGY_LABELS,
   isHousingStrategyEvent,
   getFireEligibleNetWorth,
 } from '@/lib/housing-strategy'
@@ -68,7 +66,6 @@ import { applyHousingToComposition } from '@/lib/horizon/wealth-composition-hous
 import { detectDeficitLoanFromRows } from '@/lib/horizon/deficit-loan-display'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
-import { FeatureGate } from '@/components/app/feature-gate'
 import { HideInSimple } from '@/components/app/hide-in-simple'
 import { HorizonTrendGrid } from '@/components/app/horizon/horizon-trend-grid'
 import { HouseholdFireSection } from '@/components/app/household-fire-section'
@@ -80,7 +77,7 @@ import {
 import { HouseholdRetirementPane } from '@/components/app/horizon/household-retirement-pane'
 import { usePerspective } from '@/components/app/perspective-provider'
 import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
-import { PensionParseSummaryCard, PensionPdfDownloadLink, PensionInstructionPanel, KpiTooltip, ExploreCard, computeCumulativeImpacts, type PensionParseSummaryResult, type SnapshotForTrend } from '@/components/app/horizon/horizon-helpers'
+import { PensionParseSummaryCard, PensionInstructionPanel, computeCumulativeImpacts, type SnapshotForTrend } from '@/components/app/horizon/horizon-helpers'
 import { HealthScoreReceipt } from '@/components/app/horizon/health-score-receipt'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { PageInfoButton, GlossaryTerm } from '@/components/editorial'
@@ -130,7 +127,7 @@ const SimChartModal = dynamic(() =>
   import('@/components/app/horizon/sim-chart-widget').then(m => ({ default: m.SimChartModal })),
   { ssr: false }
 )
-import { PensionPdfUpload, uploadPensionPdfToStorage, deletePensionPdfFromStorage } from '@/components/app/horizon/pension-pdf-upload'
+import { PensionPdfUpload, uploadPensionPdfToStorage } from '@/components/app/horizon/pension-pdf-upload'
 import { SimChart, buildScenarioVariants, SCENARIO_VARIANTS, type ScenarioOverlay, type MonteCarloOverlay, type HouseholdPartnerOverlay } from '@/components/app/horizon/sim-chart'
 import { ZoomableChartContainer } from '@/components/app/horizon/zoomable-chart-container'
 import { EventsTimeline } from '@/components/app/horizon/events-timeline'
@@ -151,7 +148,6 @@ import { WHATIF_SCENARIO_COLORS, type SavedScenario } from '@/lib/scenario-types
 import { applyWhatIfOverrides, buildBaselineOverrides } from '@/lib/whatif-overrides'
 import { WhatIfSlidersCollapsible, type WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
 import type { WhatIfEvent } from '@/components/app/horizon/whatif-events'
-import { CollapsibleSection } from '@/components/app/collapsible-section'
 import { ChartOverlayExplainer } from '@/components/app/horizon/chart-overlay-explainer'
 import { ChartTips } from '@/components/editorial/chart-tips'
 import {
@@ -184,7 +180,7 @@ interface HouseholdHeroData {
 }
 
 export default function HorizonPage({ initialData }: { initialData: HorizonPageData }) {
-  const { triggerDream, phase } = useDreamTransition()
+  const { triggerDream } = useDreamTransition()
   const { masked } = useMaskedAmounts()
   const { addToast } = useToast()
   const { perspective, partnerName, perspectiveVersion, refreshData } = usePerspective()
@@ -270,8 +266,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   )
   /** Rauwe AOW-tabel — voor de kern-tijdas (lookupAowAge) in de adapter. */
   const [aowRows, setAowRows] = useState<AowLeeftijdRow[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [loading] = useState(true)
   const [activeModal, setActiveModal] = useState<ActiveModal>(null)
   // Voorkeurs-tab bij het openen van de StrategieModal (bv. direct naar 'woning'
   // vanuit de "huis wordt nooit verkocht"-melding). Reset naar null bij sluiten.
@@ -500,7 +495,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const [editingEvent, setEditingEvent] = useState<LifeEvent | null>(null)
   const [formName, setFormName] = useState('')
   const [formDescription, setFormDescription] = useState('')
-  const [formType, setFormType] = useState('custom')
+  const [formType] = useState('custom')
   const [formAge, setFormAge] = useState<number | ''>('')
   const [formDuration, setFormDuration] = useState<number | ''>(0)
   const [formIsIndexed, setFormIsIndexed] = useState(true)
@@ -529,8 +524,6 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const [viewModalMode, setViewModalMode] = useState<'view' | 'edit'>('view')
   const [formCashflows, setFormCashflows] = useState<UserDefinedCashflow[]>([])
   const [editingCashflowId, setEditingCashflowId] = useState<string | null>(null)
-  const [showAddEventModal, setShowAddEventModal] = useState(false)
-  const [openCatalogGroups, setOpenCatalogGroups] = useState<Set<LifeEventGroup>>(new Set())
 
   // Simulatie-engine met echte app-data (fractionele FIRE-leeftijd + kasstromen)
   // Fase 2b (#495): gemigreerd naar runUnifiedProjection() met per-asset-type rendement
@@ -1198,28 +1191,6 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     [setEvents],
   )
 
-  // ── Gewogen asset-return voor doorrekening-inline (feature #796) ────────
-  // Weighted gross return from per-asset expected_return, falls back to
-  // fireParams.grossReturn when no assets or zero total value.
-  const weightedGrossReturn = useMemo(() => {
-    const allAssets = initialData.assets ?? []
-    const assetTotal = allAssets.reduce((s, a) => s + Number(a.current_value ?? 0), 0)
-    if (allAssets.length === 0 || assetTotal === 0) return fireParams.grossReturn
-    let weightedSum = 0
-    for (const a of allAssets) {
-      weightedSum += Number(a.current_value ?? 0) * (Number(a.expected_return ?? 0) / 100)
-    }
-    return weightedSum / assetTotal
-  }, [initialData.assets, fireParams.grossReturn])
-
-  // Savings rate 6m derived from transaction averages (same formula as server)
-  const savingsRate6m = useMemo(() => {
-    if (avgIncome6m != null && avgIncome6m > 0 && avgExpenses6m != null) {
-      return Math.round(((avgIncome6m - avgExpenses6m) / avgIncome6m) * 100)
-    }
-    return 0
-  }, [avgIncome6m, avgExpenses6m])
-
   // ── Natuurlijke mijlpalen ───────────────────────────────────────────────
   // Afgeleide events op de tijdlijn — hypotheek afgelost, autolening
   // afgelost, vermogen op, eerste miljoen, etc. Geen DB-mutatie; puur
@@ -1230,10 +1201,13 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       debts,
       assets: initialData.assets,
       simResult: simResult ?? null,
+      // Schuld-payoff-mijlpaal leest de kernel-rijen (huisverkoop-bewust) i.p.v.
+      // het statische amortisatieschema — zie lib/natural-milestones.ts.
+      unifiedRows,
       dob: effectiveInput?.dateOfBirth ?? null,
       hasPartner: initialData.hasPartner,
     })
-  }, [showNaturalMilestones, debts, initialData.assets, simResult, effectiveInput?.dateOfBirth, initialData.hasPartner])
+  }, [showNaturalMilestones, debts, initialData.assets, simResult, unifiedRows, effectiveInput?.dateOfBirth, initialData.hasPartner])
 
   const naturalMilestonesAsEvents = useMemo<LifeEvent[]>(
     () => naturalMilestones.map(naturalMilestoneToLifeEvent),
@@ -1515,6 +1489,20 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
 
   // ── Pensioen-modus afgeleid ──────────────────────────────────────────────
   const isPensioenMode = simResult?.strategy === 'pensioen'
+
+  // ── Dubbele FIRE-grondslag (incl./excl. eigen woning) ────────────────────
+  // Bij downsize/opeethypotheek/uitsluiten (showDualHousingBasis) toont /toekomst
+  // BEIDE doelen: incl. woning (requiredFireNetWorth = totaal netto vermogen bij
+  // FIRE — valt samen met de vermogenslijn) én excl. woning/liquide
+  // (requiredFirePortfolio). Valt de sim weg (requiredFireNetWorth == null) dan
+  // blijft het bestaande enkelvoudige gedrag intact. Puur al-doorgeleide velden.
+  const fireTargetInclHome = simResult?.requiredFireNetWorth ?? null
+  const fireTargetExclHome = simResult?.requiredFirePortfolio ?? null
+  const showDualFireTarget =
+    initialData.showDualHousingBasis &&
+    !isPensioenMode &&
+    fireTargetInclHome != null && fireTargetInclHome > 0 &&
+    fireTargetExclHome != null && fireTargetExclHome > 0
 
   // ── AOW-stop shortfall detectie ────────────────────────────────────────
   const isShortfallScenario = !isPensioenMode
@@ -1993,21 +1981,6 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     }
   }
 
-  /** Convert a SimCashflow to a UserDefinedCashflow for editing */
-  function toUserDefinedCashflow(flow: SimCashflow): UserDefinedCashflow {
-    return {
-      id: crypto.randomUUID(),
-      name: flow.name,
-      type: flow.type,
-      direction: flow.direction,
-      amount: flow.amount,
-      durationMonths: flow.toAge != null && flow.fromAge != null
-        ? (flow.toAge - flow.fromAge) * 12
-        : 0,
-      indexed: flow.indexed,
-    }
-  }
-
   /** Compute suggested (catalog-default) values for a given event type, using profile data */
   function computeSuggestedValues(type: string): {
     amount: number
@@ -2207,91 +2180,6 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     }
 
     return { amount, age, direction, durationType, duration, isIndexed, metadata }
-  }
-
-  function openCatalogForm(type: string) {
-    const catalog = LIFE_EVENT_CATALOG[type]
-    const suggested = computeSuggestedValues(type)
-    setFormType(type)
-    setFormName(catalog?.label ?? '')
-    setFormDescription('')
-    setShowCatalogFields(false)
-    setUseSuggestedSettings(true)
-    setFormAmount(suggested.amount)
-    setFormAge(suggested.age)
-    setFormDirection(suggested.direction)
-    setFormDurationType(suggested.durationType)
-    setFormDuration(suggested.duration)
-    setFormIsIndexed(suggested.isIndexed)
-    setFormMetadata({ ...suggested.metadata })
-    setEditingEvent(null)
-    setFormCashflows([])
-    setEditingCashflowId(null)
-    setPensionParseResult(null)
-    setAutoFilledFields(new Set())
-    setSelectedRegelingIndex(0)
-    setShowForm(true)
-  }
-
-  function openEditForm(ev: LifeEvent) {
-    setFormType(ev.event_type)
-    setFormName(ev.name)
-    setFormDescription(String(ev.metadata?.toelichting ?? ''))
-    setShowCatalogFields(false)
-    setFormDuration(Number(ev.duration_months))
-    setFormAge(ev.target_age ?? '')
-    setFormIsIndexed(ev.is_indexed ?? true)
-    // Derive UI state from stored values
-    const cost = Number(ev.one_time_cost)
-    const monthlyIncome = Number(ev.monthly_income_change)
-    const monthlyCost = Number(ev.monthly_cost_change)
-    const durMonths = Number(ev.duration_months)
-    if (cost !== 0) {
-      setFormDurationType('one_time')
-      setFormDirection(cost > 0 ? 'expense' : 'income')
-      setFormAmount(Math.abs(cost))
-    } else if (monthlyIncome !== 0) {
-      setFormDurationType(durMonths > 0 ? 'period' : 'continuous')
-      setFormDirection(monthlyIncome > 0 ? 'income' : 'expense')
-      setFormAmount(Math.abs(monthlyIncome))
-    } else if (monthlyCost !== 0) {
-      setFormDurationType(durMonths > 0 ? 'period' : 'continuous')
-      setFormDirection('expense')
-      setFormAmount(Math.abs(monthlyCost))
-    } else {
-      setFormDurationType('one_time')
-      setFormDirection('expense')
-      setFormAmount(0)
-    }
-    // Load existing metadata or initialize from catalog defaults
-    const catalog = LIFE_EVENT_CATALOG[ev.event_type]
-    const metaDefaults: Record<string, unknown> = {}
-    if (catalog?.fields) {
-      for (const f of catalog.fields) {
-        metaDefaults[f.key] = f.default
-      }
-    }
-    const merged = { ...metaDefaults, ...(ev.metadata ?? {}) }
-    setFormMetadata(merged)
-    // Pension: derive form state from metadata fields
-    if (ev.event_type === 'pension') {
-      const brutoBedrag = Number(merged.brutoBedrag ?? ev.monthly_income_change ?? 675)
-      setFormAmount(brutoBedrag)
-      setFormDurationType('continuous')
-      setFormDirection('income')
-      if (merged.ingangLeeftijd !== undefined) {
-        setFormAge(Number(merged.ingangLeeftijd))
-      }
-      setFormIsIndexed(Boolean(merged.isGeindexeerd ?? ev.is_indexed ?? false))
-      // Ensure brutoBedrag is in metadata (for older events without it)
-      if (merged.brutoBedrag === undefined) {
-        merged.brutoBedrag = brutoBedrag
-        setFormMetadata({ ...merged })
-      }
-    }
-    setEditingEvent(ev)
-    setUseSuggestedSettings(Boolean(ev.metadata?.uses_suggested ?? false))
-    setShowForm(true)
   }
 
   /** Validate event form — returns true if valid, false if errors found */
@@ -2795,18 +2683,6 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     await refreshEvents()
   }
 
-  async function deleteEvent(id: string) {
-    const supabase = createClient()
-    // Check if the event has a stored pension PDF — clean it up
-    const eventToDelete = events.find(e => e.id === id)
-    if (eventToDelete?.metadata?.pensionPdfPath) {
-      await deletePensionPdfFromStorage(id)
-    }
-    const { error } = await supabase.from('life_events').delete().eq('id', id)
-    if (error) console.error('Failed to delete life event:', error)
-    await refreshEvents()
-  }
-
   /** Drag-and-drop: update event target_age when dragged to a new position on the timeline. */
   async function handleEventDragEnd(eventId: string, newAge: number) {
     const ev = events.find(e => e.id === eventId)
@@ -3032,7 +2908,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           </div>
 
           {/* Desktop: 4-col figures-strip — editorial blueprint */}
-          <div className="hidden sm:grid sm:grid-cols-4 border-t border-b border-[var(--ink)] mb-5">
+          <div className="hidden sm:grid sm:grid-cols-4 items-start border-t border-b border-[var(--ink)] mb-5">
             {/* KPI 1: Vrijheidsleeftijd / Pensioenleeftijd — winner met highlight-marker */}
             <button
               type="button"
@@ -3087,20 +2963,55 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                 <Target className="h-3 w-3 shrink-0" aria-hidden />
                 <span>{isPensioenMode ? 'Vermogen op AOW' : 'Doelbedrag'}</span>
               </div>
-              <div
-                className="text-[24px] sm:text-[28px] font-black leading-none tracking-[-0.02em]"
-                style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
-              >
-                {hasPerspectiveHero
-                  ? <MaskedAmount value={perspectiveHero!.fireTarget} tone="horizon" monoWhenVisible={false} />
-                  : <MaskedAmount value={isPensioenMode ? (portfolioAtAow ?? 0) : (simResult?.requiredFirePortfolio ?? fire.fireTarget)} tone="horizon" monoWhenVisible={false} />}
-              </div>
-              <div
-                className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
-                style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
-              >
-                {isPensioenMode ? 'geprojecteerd' : 'benodigd'}
-              </div>
+              {!hasPerspectiveHero && showDualFireTarget ? (
+                <>
+                  {/* Doel incl. woning — het grote doel (totaal netto vermogen bij FIRE) */}
+                  <div
+                    className="text-[24px] sm:text-[28px] font-black leading-none tracking-[-0.02em]"
+                    style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+                  >
+                    <MaskedAmount value={fireTargetInclHome!} tone="horizon" monoWhenVisible={false} />
+                  </div>
+                  <div
+                    className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
+                    style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+                  >
+                    incl. woning
+                  </div>
+                  {/* Doel excl. woning (liquide) — het kleinere doel */}
+                  <div className="mt-2 pt-2 border-t border-[var(--rule-soft)]">
+                    <div
+                      className="text-[16px] sm:text-[18px] font-black leading-none tracking-[-0.02em] text-[var(--ink)]"
+                      style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+                    >
+                      <MaskedAmount value={fireTargetExclHome!} tone="horizon" monoWhenVisible={false} />
+                    </div>
+                    <div
+                      className="italic text-[11px] text-[var(--ink-3)] mt-1"
+                      style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+                    >
+                      excl. woning
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div
+                    className="text-[24px] sm:text-[28px] font-black leading-none tracking-[-0.02em]"
+                    style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+                  >
+                    {hasPerspectiveHero
+                      ? <MaskedAmount value={perspectiveHero!.fireTarget} tone="horizon" monoWhenVisible={false} />
+                      : <MaskedAmount value={isPensioenMode ? (portfolioAtAow ?? 0) : (simResult?.requiredFirePortfolio ?? fire.fireTarget)} tone="horizon" monoWhenVisible={false} />}
+                  </div>
+                  <div
+                    className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
+                    style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+                  >
+                    {isPensioenMode ? 'geprojecteerd' : 'benodigd'}
+                  </div>
+                </>
+              )}
             </button>
 
             {/* KPI 3: Opnamerate / Maandelijkse onttrekking — secundaire diepte,
@@ -3199,7 +3110,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           </div>
 
           {/* Mobile: 2x2 figures-strip — editorial blueprint */}
-          <div className="grid grid-cols-2 sm:hidden border-t border-b border-[var(--ink)] mb-5">
+          <div className="grid grid-cols-2 sm:hidden items-start border-t border-b border-[var(--ink)] mb-5">
             {/* KPI 1: Vrijheidsleeftijd / Pensioenleeftijd — winner */}
             <button
               type="button"
@@ -3250,20 +3161,55 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                 <Target className="h-3 w-3 shrink-0" aria-hidden />
                 <span>{isPensioenMode ? 'Vermogen' : 'Doelbedrag'}</span>
               </div>
-              <div
-                className="text-[18px] font-black leading-none tracking-[-0.02em]"
-                style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
-              >
-                {hasPerspectiveHero
-                  ? <MaskedAmount value={perspectiveHero!.fireTarget} tone="horizon" monoWhenVisible={false} />
-                  : <MaskedAmount value={isPensioenMode ? (portfolioAtAow ?? 0) : (simResult?.requiredFirePortfolio ?? fire.fireTarget)} tone="horizon" monoWhenVisible={false} />}
-              </div>
-              <div
-                className="italic text-[10px] text-[var(--ink-3)] mt-1"
-                style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
-              >
-                {isPensioenMode ? 'geprojecteerd' : 'benodigd'}
-              </div>
+              {!hasPerspectiveHero && showDualFireTarget ? (
+                <>
+                  {/* Doel incl. woning — het grote doel */}
+                  <div
+                    className="text-[18px] font-black leading-none tracking-[-0.02em]"
+                    style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+                  >
+                    <MaskedAmount value={fireTargetInclHome!} tone="horizon" monoWhenVisible={false} />
+                  </div>
+                  <div
+                    className="italic text-[10px] text-[var(--ink-3)] mt-1"
+                    style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+                  >
+                    incl. woning
+                  </div>
+                  {/* Doel excl. woning (liquide) — het kleinere doel */}
+                  <div className="mt-1.5 pt-1.5 border-t border-[var(--rule-soft)]">
+                    <div
+                      className="text-[13px] font-black leading-none tracking-[-0.02em] text-[var(--ink)]"
+                      style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+                    >
+                      <MaskedAmount value={fireTargetExclHome!} tone="horizon" monoWhenVisible={false} />
+                    </div>
+                    <div
+                      className="italic text-[10px] text-[var(--ink-3)] mt-1"
+                      style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+                    >
+                      excl. woning
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div
+                    className="text-[18px] font-black leading-none tracking-[-0.02em]"
+                    style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+                  >
+                    {hasPerspectiveHero
+                      ? <MaskedAmount value={perspectiveHero!.fireTarget} tone="horizon" monoWhenVisible={false} />
+                      : <MaskedAmount value={isPensioenMode ? (portfolioAtAow ?? 0) : (simResult?.requiredFirePortfolio ?? fire.fireTarget)} tone="horizon" monoWhenVisible={false} />}
+                  </div>
+                  <div
+                    className="italic text-[10px] text-[var(--ink-3)] mt-1"
+                    style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+                  >
+                    {isPensioenMode ? 'geprojecteerd' : 'benodigd'}
+                  </div>
+                </>
+              )}
             </button>
 
             {/* KPI 3: Opnamerate — verborgen in Eenvoudig-modus (hard-hide). */}
@@ -3833,6 +3779,11 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                             endAge={chartEndAge!}
                             cashflows={simCashflows}
                             fireTarget={simResult.requiredFirePortfolio}
+                            // Tweede doellijn (incl. woning) alleen op de basis-projectie,
+                            // net als targetInflationFactors — niet op partner-/huishoud-/
+                            // AOW-stop-lijnen. Bij de dubbele-woning-grondslag (downsize/
+                            // opeethypotheek/uitsluiten); anders undefined → één doellijn.
+                            fireTargetInclHome={(usePartnerMainLine || useHouseholdMainLine || isAowStopActive) ? undefined : (showDualFireTarget ? fireTargetInclHome! : undefined)}
                             strategy={simResult.strategy}
                             targetEndPortfolio={simResult.targetEndPortfolio}
                             // Meegroeiende doellijn alleen op de basis-projectie (niet op

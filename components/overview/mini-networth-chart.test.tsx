@@ -438,6 +438,56 @@ describe('MiniNetWorthChart — vrijheid bereikt → doorlopen tot eindleeftijd'
   })
 })
 
+describe('MiniNetWorthChart — dubbele grondslag (excl. eigen woning)', () => {
+  afterEach(() => {
+    window.localStorage.clear()
+  })
+
+  const baseProps = {
+    netWorthHistory: buildHistory([100_000]),
+    currentNetWorth: 300_000,
+    currentAge: 35,
+    fireAge: 52,
+    endAge: 67,
+    simNetWorthRows: buildSimRows(35, 52, 300_000),
+  }
+
+  it('toont de "excl. eigen woning"-subregel wanneer showExclHome=true', () => {
+    const { container } = render(
+      <MiniNetWorthChart {...baseProps} netWorthExclHome={130_000} showExclHome />,
+    )
+    expect(container.textContent).toMatch(/excl\. eigen woning/i)
+    expect(container.textContent).toContain('130')
+  })
+
+  it('toont GEEN excl.-regel wanneer showExclHome=false (byte-identiek default)', () => {
+    const { container } = render(
+      <MiniNetWorthChart {...baseProps} netWorthExclHome={130_000} showExclHome={false} />,
+    )
+    expect(container.textContent).not.toMatch(/excl\. eigen woning/i)
+    expect(container.textContent).not.toContain('130')
+  })
+
+  it('toont GEEN excl.-regel wanneer netWorthExclHome ontbreekt (null)', () => {
+    const { container } = render(
+      <MiniNetWorthChart {...baseProps} netWorthExclHome={null} showExclHome />,
+    )
+    expect(container.textContent).not.toMatch(/excl\. eigen woning/i)
+  })
+
+  it('maskeert het excl.-bedrag bij privacy-masking (label blijft)', () => {
+    window.localStorage.setItem(PRIVACY_MASKED_STORAGE_KEY, 'true')
+    const { container } = render(
+      <PrivacyProvider>
+        <MiniNetWorthChart {...baseProps} netWorthExclHome={130_000} showExclHome />
+      </PrivacyProvider>,
+    )
+    expect(container.textContent).toMatch(/excl\. eigen woning/i)
+    expect(container.textContent).toContain(MASKED_AMOUNT_PLACEHOLDER)
+    expect(container.textContent).not.toContain('130')
+  })
+})
+
 describe('MiniNetWorthChart — privacy-masking voor saldi', () => {
   afterEach(() => {
     window.localStorage.clear()

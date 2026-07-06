@@ -317,7 +317,7 @@ describe('bridge — synthetisch profiel: continuïteit, sommen, inflatie', () =
 
 const UNIFIED_FIELDS: (keyof UnifiedProjectionResult)[] = [
   'rows', 'fireAge', 'fireAgeFractional', 'fireReachable', 'firePortfolioAtFire',
-  'requiredFirePortfolio', 'implicitWithdrawalRate', 'strategy', 'targetEndPortfolio', 'displayEndAge',
+  'requiredFirePortfolio', 'requiredFireNetWorth', 'implicitWithdrawalRate', 'strategy', 'targetEndPortfolio', 'displayEndAge',
 ]
 
 describe('bridge — vorm-integriteit (kernel-only, alleen velden/typen)', () => {
@@ -370,6 +370,14 @@ describe('bridge — solver-doorvoer + requiredFirePortfolio-bron', () => {
     const expected = summary.nettoLiquideBijFire ?? summary.eindNettoLiquide
     expect(result.requiredFirePortfolio).toBe(expected)
     expect(result.firePortfolioAtFire).toBe(expected)
+
+    // requiredFireNetWorth = Prognose!I@FIRE (TOTAAL netto vermogen incl. woning),
+    // puur doorgeleid summary-veld (spiegel van J@FIRE hierboven). Zelfde null-fallback.
+    const expectedNetWorth = summary.nettoVermogenBijFire ?? summary.eindNettoVermogen
+    expect(result.requiredFireNetWorth).toBe(expectedNetWorth)
+    // Identiteit: I = J + (niet-liquide bezit − niet-liquide schuld). Bij een eigen woning
+    // met overwaarde ≥ 0 (SYNTH: huis 350k − hypotheek 200k) geldt I ≥ J.
+    expect(result.requiredFireNetWorth!).toBeGreaterThanOrEqual(result.requiredFirePortfolio - EUR)
 
     // fireReachable-relatie + fireAge = ceil(fireAgeFractional).
     expect(result.fireReachable).toBe(solve.status !== 'unreachable_within_horizon')

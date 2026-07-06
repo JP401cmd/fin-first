@@ -1,6 +1,6 @@
 'use client'
 
-import { memo } from 'react'
+import { memo, type ReactNode } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import { MaskedAmount } from '@/components/app/masked-amount'
@@ -200,27 +200,64 @@ export const VrijheidsvoortgangWidget = memo(function VrijheidsvoortgangWidget({
   // (FIRE-eligible vermogen vs. doelportfolio), puur presentationeel.
   const remainingToFullFreedom = Math.max(effectiveFire - freedomEligibleNetWorth, 0)
 
-  // SVG donut ring dimensions — groter nu het datumlijstje weg is, zodat de
-  // full-size hoogte gevuld blijft.
-  const RING_SIZE = 148
-  const RING_STROKE = 12
-  const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2
+  // SVG donut ring — geometrie in vaste viewBox-eenheden; de wéérgave-grootte
+  // is responsive (kleiner op mobiel, groter op desktop) zodat de ring het
+  // volle canvas benut en gecentreerd blijft (widgetreview: "rondje groter +
+  // hele canvas"). De ring schaalt via de viewBox, het %-centrum blijft via
+  // absolute inset-0 gecentreerd ongeacht de pixelgrootte.
+  const RING_VIEW = 160
+  const RING_STROKE = 13
+  const RING_RADIUS = (RING_VIEW - RING_STROKE) / 2
   const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS
   const fillLength = (Math.min(effectivePct, 100) / 100) * RING_CIRCUMFERENCE
 
+  // Bedrag-cellen als volle-breedte strip onderaan (i.p.v. rechter kolom) — dat
+  // centreert de ring en vult het canvas. Aantal cellen (1–3) bepaalt de
+  // grid-kolommen; groei/restbedrag blijven onder dezelfde voorwaarden verborgen.
+  const statItems: { label: string; value: ReactNode; sub?: ReactNode }[] = [
+    {
+      label: 'Vermogen',
+      value: <MaskedAmount value={netWorth} tone="ink" className="text-[13px] font-medium" />,
+      sub: (
+        <>
+          van <MaskedAmount value={effectiveFire} tone="ink" className="text-[10px]" />
+          {simRequiredPortfolio ? ' (sim)' : ''}
+        </>
+      ),
+    },
+  ]
+  if (monthlyGrowthRate !== null) {
+    statItems.push({
+      label: 'Groei',
+      value: (
+        <>
+          <MaskedAmount value={monthlyGrowthRate} tone="ink" className="text-[13px] font-medium" />
+          /mnd
+        </>
+      ),
+    })
+  }
+  if (effectivePct < 100 && remainingToFullFreedom > 0) {
+    statItems.push({
+      label: 'Nog te gaan',
+      value: <MaskedAmount value={remainingToFullFreedom} tone="ink" className="text-[13px] font-medium" />,
+    })
+  }
+
   return (
     <WidgetShell module="cross" size={size} kicker={kicker} href={href}>
-      <div ref={inViewRef}>
+      <div ref={inViewRef} className="flex h-full flex-col">
         {(isHouseholdView || isPartnerView) && (
-          <div className="mb-1.5 flex items-center gap-1 text-[11px] text-horizon-600">
+          <div className="mb-1 flex shrink-0 items-center justify-center gap-1 text-[11px] text-horizon-600">
             {isPartnerView ? <UserCheck className="h-3.5 w-3.5" /> : <Users className="h-3.5 w-3.5" />}
             {isPartnerView ? (partnerName ?? 'Partner') : 'Gecombineerd huishouden'}
           </div>
         )}
-        {/* Donut ring chart with percentage in center */}
-        <div className="flex items-start gap-4">
-          <div className="relative shrink-0" style={{ width: RING_SIZE, height: RING_SIZE }}>
-            <svg width={RING_SIZE} height={RING_SIZE} viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`}>
+
+        {/* Donut ring — gecentreerd, vult de resterende hoogte van het canvas */}
+        <div className="flex min-h-0 flex-1 items-center justify-center">
+          <div className="relative h-[148px] w-[148px] sm:h-[188px] sm:w-[188px]">
+            <svg viewBox={`0 0 ${RING_VIEW} ${RING_VIEW}`} className="h-full w-full">
               <defs>
                 <linearGradient id="freedom-ring-grad" x1="0%" y1="0%" x2="100%" y2="100%">
                   <stop offset="0%" stopColor="var(--horizon-400)" />
@@ -229,8 +266,8 @@ export const VrijheidsvoortgangWidget = memo(function VrijheidsvoortgangWidget({
               </defs>
               {/* Background track */}
               <circle
-                cx={RING_SIZE / 2}
-                cy={RING_SIZE / 2}
+                cx={RING_VIEW / 2}
+                cy={RING_VIEW / 2}
                 r={RING_RADIUS}
                 fill="none"
                 stroke="var(--subtle)"
@@ -238,8 +275,8 @@ export const VrijheidsvoortgangWidget = memo(function VrijheidsvoortgangWidget({
               />
               {/* Progress arc */}
               <circle
-                cx={RING_SIZE / 2}
-                cy={RING_SIZE / 2}
+                cx={RING_VIEW / 2}
+                cy={RING_VIEW / 2}
                 r={RING_RADIUS}
                 fill="none"
                 stroke="url(#freedom-ring-grad)"
@@ -247,21 +284,21 @@ export const VrijheidsvoortgangWidget = memo(function VrijheidsvoortgangWidget({
                 strokeLinecap="round"
                 strokeDasharray={`${RING_CIRCUMFERENCE}`}
                 strokeDashoffset={hasEntered ? RING_CIRCUMFERENCE - fillLength : RING_CIRCUMFERENCE}
-                transform={`rotate(-90 ${RING_SIZE / 2} ${RING_SIZE / 2})`}
+                transform={`rotate(-90 ${RING_VIEW / 2} ${RING_VIEW / 2})`}
                 style={{ transition: hasEntered ? 'stroke-dashoffset 700ms cubic-bezier(.22,1,.36,1)' : 'none' }}
               />
               {/* Milestone dots on the ring */}
               {milestones.map(m => {
                 const angle = ((m / 100) * 360) - 90
                 const rad = (angle * Math.PI) / 180
-                const dotX = RING_SIZE / 2 + RING_RADIUS * Math.cos(rad)
-                const dotY = RING_SIZE / 2 + RING_RADIUS * Math.sin(rad)
+                const dotX = RING_VIEW / 2 + RING_RADIUS * Math.cos(rad)
+                const dotY = RING_VIEW / 2 + RING_RADIUS * Math.sin(rad)
                 return (
                   <circle
                     key={m}
                     cx={dotX}
                     cy={dotY}
-                    r={3}
+                    r={3.5}
                     fill={effectivePct >= m ? 'var(--horizon-700)' : 'var(--ink-4)'}
                   />
                 )
@@ -269,48 +306,33 @@ export const VrijheidsvoortgangWidget = memo(function VrijheidsvoortgangWidget({
             </svg>
             {/* Center percentage */}
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="font-mono text-xl font-bold tabular-nums text-[var(--ink)]">
+              <span className="font-mono text-2xl sm:text-3xl font-bold tabular-nums text-[var(--ink)] leading-none">
                 {effectivePct.toFixed(1)}%
               </span>
               {pctDelta !== null && (
-                <span className={`text-[10px] font-mono tabular-nums ${pctDelta >= 0 ? 'text-positive' : 'text-negative'}`}>
+                <span className={`mt-1 text-[11px] font-mono tabular-nums ${pctDelta >= 0 ? 'text-positive' : 'text-negative'}`}>
                   {pctDelta >= 0 ? '+' : ''}{pctDelta.toFixed(1)}%
                 </span>
               )}
             </div>
           </div>
-
-          {/* Right column: wealth + growth + rest tot vrijheid */}
-          <div className="flex-1 min-w-0 flex flex-col justify-center gap-2">
-            <div>
-              <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)]">Vermogen</p>
-              <p className="text-[var(--ink-2)] truncate">
-                <MaskedAmount value={netWorth} tone="ink" className="text-[13px] font-medium" />
-              </p>
-              <p className="text-[var(--ink-4)] truncate">
-                / <MaskedAmount value={effectiveFire} tone="ink" className="text-[11px]" />{simRequiredPortfolio ? ' (sim)' : ''}
-              </p>
-            </div>
-            {monthlyGrowthRate !== null && (
-              <div>
-                <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)]">Groei</p>
-                <p className="text-[11px] text-[var(--ink-2)]">
-                  <MaskedAmount value={monthlyGrowthRate} tone="ink" className="font-medium" />/mnd
-                </p>
-              </div>
-            )}
-            {effectivePct < 100 && remainingToFullFreedom > 0 && (
-              <div>
-                <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)]">Nog te gaan</p>
-                <p className="text-[11px] text-[var(--ink-2)] truncate">
-                  <MaskedAmount value={remainingToFullFreedom} tone="ink" className="font-medium" />
-                </p>
-              </div>
-            )}
-          </div>
         </div>
 
-        <p className="mt-3 font-serif italic text-[11px] text-[var(--ink-3)]">
+        {/* Bedrag-strip — volle breedte, gecentreerd; vult de canvas-bodem */}
+        <div
+          className="mt-2 grid shrink-0 gap-2 border-t border-[var(--border-ed)] pt-2.5"
+          style={{ gridTemplateColumns: `repeat(${statItems.length}, minmax(0, 1fr))` }}
+        >
+          {statItems.map(item => (
+            <div key={item.label} className="min-w-0 text-center">
+              <p className="text-[9px] uppercase tracking-[0.08em] text-[var(--ink-4)]">{item.label}</p>
+              <p className="truncate text-[var(--ink-2)]">{item.value}</p>
+              {item.sub && <p className="truncate text-[10px] text-[var(--ink-4)]">{item.sub}</p>}
+            </div>
+          ))}
+        </div>
+
+        <p className="mt-2 shrink-0 text-center font-serif italic text-[11px] text-[var(--ink-3)]">
           {(() => {
             // Shared views have no per-user countdown date — use a neutral
             // percentage framing rather than a faked personal projection.

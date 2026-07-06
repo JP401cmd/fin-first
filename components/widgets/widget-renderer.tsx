@@ -426,6 +426,14 @@ export interface DashboardData {
   // teller van data.freedomPct; mijlpaal-widgets leggen hun datumlogica hierop
   // zodat "bereikt" en de voortgang dezelfde grondslag delen (ADR 0009).
   fireEligibleNetWorth: number
+  // Dubbele grondslag (incl./excl. eigen woning) — bundel-contract, gevuld door de loader
+  // (lib/housing-strategy.ts#netWorthExcludingHome / #shouldShowDualHousingBasis).
+  // netWorthExclHome = netWorth − overwaarde (ZUIVER, ook bij reverse_mortgage); een APARTE
+  // weergave-grondslag, NIET fireEligibleNetWorth en NIET het volledige netWorth — nooit op
+  // dezelfde Y-as mengen. showDualHousingBasis = toon de splitsing alléén bij eigen woning +
+  // strategie ≠ include_full. Optioneel/additief: mock-/empty-bundels zonder deze velden blijven geldig.
+  netWorthExclHome?: number
+  showDualHousingBasis?: boolean
   fireTarget: number
   fireProjResult: FireProjection
   // Canonieke gezondheidsscore mét trend (ADR 0008). Bevat de echte
@@ -485,6 +493,10 @@ export interface DashboardData {
   simNetWorthRows: { age: number; netWorth: number }[] | null
   // Horizon: requiredFirePortfolio uit runSimulation (null als geen birth_date)
   simRequiredPortfolio: number | null
+  // Horizon: FIRE-doel INCL. eigen woning (Prognose!I@FIRE) — spiegelt simRequiredPortfolio
+  // (liquide). Puur uit de sim (requiredFireNetWorth via kernel-bridge); null als geen sim.
+  // Optioneel/additief: mock-/empty-bundels zonder dit veld blijven geldig.
+  simRequiredNetWorth?: number | null
   // Horizon: backtesting success rate + named crash paths
   backtestSuccessRate: number | null
   backtestNamedPaths: { label: string; success: boolean }[] | null

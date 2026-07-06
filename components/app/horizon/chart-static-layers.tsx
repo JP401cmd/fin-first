@@ -74,6 +74,7 @@ export function ChartStaticLayersInner({
     yZero,
     isPensioenMode,
     fireTarget,
+    fireTargetInclHome,
     strategy,
     targetEndPortfolio,
     targetLine,
@@ -101,6 +102,13 @@ export function ChartStaticLayersInner({
   const accOpacity = emphasis === null || emphasis === 'accumulation' || emphasis === 'fire' ? 1 : DIMMED
   const decOpacity = emphasis === null || emphasis === 'withdrawal' ? 1 : DIMMED
 
+  // Bij de dubbele-woning-grondslag (fireTargetInclHome gezet) tekenen we ALLEEN
+  // de incl.-woninglijn. De excl./liquide-lijn (`fireTarget` = requiredFirePortfolio)
+  // valt weg: de hoofdlijn plot het totale netto vermogen (incl. huis), dus een
+  // liquide-drempel op diezelfde as voegt niets toe en geeft alleen ruis. Het
+  // excl.-getal blijft wél in het KPI-blok staan — enkel de grafiek-lijn verdwijnt.
+  const showExclTargetLine = fireTargetInclHome == null || fireTargetInclHome <= 0
+
   return (
     <>
       {/* Grid lines */}
@@ -127,8 +135,11 @@ export function ChartStaticLayersInner({
           fill="var(--ink-4)" fontFamily="var(--font-dm-mono, monospace)">{age}</text>
       ))}
 
-      {/* FIRE doelbedrag — horizontale dashed lijn (hidden in pensioen mode) */}
-      {!isPensioenMode && fireTarget != null && fireTarget > 0 && (
+      {/* FIRE doelbedrag — horizontale dashed lijn (hidden in pensioen mode).
+          Alleen in NIET-dual-modus: bij de dubbele-woning-grondslag vervalt deze
+          liquide-lijn (zie `showExclTargetLine` hierboven) en blijft enkel de
+          incl.-woninglijn over. */}
+      {!isPensioenMode && showExclTargetLine && fireTarget != null && fireTarget > 0 && (
         <>
           <line
             x1={PAD.left} x2={PAD.left + innerW}
@@ -150,6 +161,36 @@ export function ChartStaticLayersInner({
             {fireTarget >= 1_000_000
               ? `€${(fireTarget / 1_000_000).toFixed(2)}M`
               : `€${Math.round(fireTarget / 1000)}k`}
+          </text>
+        </>
+      )}
+
+      {/* FIRE-doel op de incl.-woning-grondslag (requiredFireNetWorth) — in de
+          dubbele-woning-grondslag DE ENIGE doellijn (de excl./liquide-lijn
+          vervalt). Zelfde stijl als de gewone doellijn; valt bij FIRE samen met
+          de vermogenslijn (totaal netto vermogen). Anders undefined → geen lijn. */}
+      {!isPensioenMode && fireTargetInclHome != null && fireTargetInclHome > 0 && (
+        <>
+          <line
+            x1={PAD.left} x2={PAD.left + innerW}
+            y1={PAD.top + yScale(fireTargetInclHome)} y2={PAD.top + yScale(fireTargetInclHome)}
+            stroke="var(--hor-t, #8a6e42)" strokeWidth={1.5} strokeDasharray="6 3" opacity={0.6}
+          />
+          <text
+            x={PAD.left + innerW - 2} y={PAD.top + yScale(fireTargetInclHome) - 9}
+            fontSize={8} fill="var(--hor-t, #8a6e42)" textAnchor="end"
+            fontFamily="var(--font-inter, sans-serif)" fontWeight={600}
+          >
+            doel incl. woning
+          </text>
+          <text
+            x={PAD.left + innerW - 2} y={PAD.top + yScale(fireTargetInclHome) - 1}
+            fontSize={7.5} fill="var(--hor-t, #8a6e42)" textAnchor="end"
+            fontFamily="var(--font-dm-mono, monospace)"
+          >
+            {fireTargetInclHome >= 1_000_000
+              ? `€${(fireTargetInclHome / 1_000_000).toFixed(2)}M`
+              : `€${Math.round(fireTargetInclHome / 1000)}k`}
           </text>
         </>
       )}

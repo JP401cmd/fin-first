@@ -53,16 +53,26 @@ export const FEATURES: FeatureDef[] = buildFeatures()
 /**
  * Compute sovereignty level from financial data.
  * Levels range from -2 (Time Deficit) to 6 (Timeless).
+ *
+ * `runwayNetWorth` is de grondslag voor de buffer/noodfonds-tiers (1/3/6
+ * maanden gedekt). Geef hier de inclusion-gewogen LIQUIDE pot (spaar/betaal/
+ * cash) door: een huis is geen opeetbare buffer, dus telt niet mee in de
+ * runway (CLAUDE.md — nettoVermogen ≠ liquide vermogen). Het teken van
+ * `netWorth` blijft bepalend voor de herstel-niveaus (negatief vermogen →
+ * recovery). Blijft `runwayNetWorth` weg, dan valt hij terug op `netWorth`
+ * (gedrag van vóór de liquide-pot-grondslag — "alles is liquide"-aanname),
+ * zodat bestaande callers zonder liquide-pot ongewijzigd blijven.
  */
 export function computeSovereigntyLevel(
   netWorth: number,
   monthlyExpenses: number,
   freedomPercentage: number,
   hasConsumerDebt: boolean,
+  runwayNetWorth: number = netWorth,
 ): number {
   if (monthlyExpenses <= 0) return 0
 
-  const monthsCovered = netWorth / monthlyExpenses
+  const monthsCovered = runwayNetWorth / monthlyExpenses
 
   // Negative net worth
   if (netWorth < 0) {

@@ -37,6 +37,7 @@ export function LeverageCard({
   kpi,
   status,
   subText,
+  subAmount,
   href,
   tooltip,
   expandable = false,
@@ -53,6 +54,13 @@ export function LeverageCard({
   status: LeverageStatus
   /** Gekleurde substext-regel onder de KPI. */
   subText?: string | null
+  /**
+   * Optionele subtiele extra regel direct onder de KPI (gedempt, `--ink-3`) —
+   * bv. de "excl. eigen woning · €X"-grondslag op de bezittingen-/schulden-
+   * hefboom. Alleen de hefbomen-rij op /overzicht vult dit; de cashflow-
+   * landingskaarten geven het niet mee → byte-identiek.
+   */
+  subAmount?: React.ReactNode
   href: string
   tooltip?: string
   /** Toont de chevron-toggle wanneer true. */
@@ -88,6 +96,11 @@ export function LeverageCard({
         {kpi && (
           <div className="mt-0.5 text-base sm:text-lg font-serif font-semibold text-[var(--ink)] tabular-nums">
             {kpi}
+          </div>
+        )}
+        {subAmount && (
+          <div className="mt-0.5 text-[11px] leading-tight text-[var(--ink-3)] tabular-nums">
+            {subAmount}
           </div>
         )}
         {/* Subtext + chevron op één rij — chevron rechts naast de

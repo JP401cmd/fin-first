@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { BottomSheet } from '@/components/app/bottom-sheet'
-import { Kicker, FiguresStrip, PageInfoButton, GlossaryTerm, PageOpening } from '@/components/editorial'
+import { Kicker, FiguresStrip, PageInfoButton, GlossaryTerm, PageOpening, SubtotalLine } from '@/components/editorial'
 import { PAGE_INFO } from '@/lib/page-info-content'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { AssetPane } from '@/components/app/core/assets/asset-pane'
@@ -84,6 +84,14 @@ import {
   type SaleStand,
   parseSaleConfig,
 } from '@/lib/sale-config'
+import {
+  deriveHousingContext,
+  parseHousingStrategy,
+  shouldShowDualHousingBasis,
+  DEFAULT_HOUSING_STRATEGY,
+  type HousingStrategyConfig,
+} from '@/lib/housing-strategy'
+import type { Debt } from '@/lib/debt-data'
 import { QuickAddWizard } from '@/components/app/quick-add-wizard/quick-add-wizard'
 import { StepLinkDebt } from '@/components/app/quick-add-wizard/steps/step-link-debt'
 import { EmptyState as QuickAddEmptyState } from '@/components/app/quick-add-wizard/empty-state'
@@ -226,6 +234,12 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
     initialData?.context ?? SOLO_ASSETS_CONTEXT,
   )
   const [mortgages, setMortgages] = useState<Mortgage[]>(initialData?.mortgages ?? [])
+  // Eigen-woning-strategie — gating-bron voor het "excl. eigen woning"-subtotaal
+  // (dubbele grondslag). Uit de loader (geen flash bij eerste render) en in
+  // `loadAssets` ververst zodat een strategie-wijziging elders meteen doorwerkt.
+  const [housingStrategyConfig, setHousingStrategyConfig] = useState<HousingStrategyConfig>(
+    initialData?.housingStrategyConfig ?? DEFAULT_HOUSING_STRATEGY,
+  )
   const [linkedBankAccounts, setLinkedBankAccounts] = useState<Map<string, { id: string; linked_asset_id: string }>>(
     initialData
       ? new Map(initialData.linkedBankAccounts.map(ba => [ba.linked_asset_id, ba]))
@@ -319,7 +333,7 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
             .eq('is_active', true),
           supabase
             .from('profiles')
-            .select('budgeting_active')
+            .select('budgeting_active, housing_strategy_config')
             .single(),
         ])
 
@@ -327,6 +341,11 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
 
         if (mortgageResult.data) setMortgages(mortgageResult.data as Mortgage[])
         setBudgetingActive(profileBaResult.data?.budgeting_active !== false)
+        setHousingStrategyConfig(
+          parseHousingStrategy(
+            (profileBaResult.data as { housing_strategy_config?: unknown } | null)?.housing_strategy_config,
+          ),
+        )
 
         // Build linked bank account map (asset_id → bank_account)
         const linksMap = new Map<string, { id: string; linked_asset_id: string }>(
@@ -389,6 +408,29 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
   const totalValue = activeAssets.reduce((s, a) => s + perspectiveAssetValue(a, perspective), 0)
   const totalPurchase = activeAssets.reduce((s, a) => s + Number(a.purchase_value) * shareFractionFor(a), 0)
   const totalMonthlyContrib = activeAssets.reduce((s, a) => s + Number(a.monthly_contribution) * shareFractionFor(a), 0)
+
+  // ── Dubbele grondslag: subtotaal "excl. eigen woning" ────────
+  // Gewogen-consistent met het bruto totaal: dezelfde per-item waarde-functie
+  // (perspectiveAssetValue) opnieuw gedraaid op de lijst ZONDER eigen-woning-
+  // assets — nooit een los, ongewogen huisbedrag van het totaal aftrekken, zodat
+  // weging (aandeel/perspectief) identiek blijft aan `totalValue`.
+  const totalValueExclHome = useMemo(
+    () =>
+      activeAssets
+        .filter((a) => a.asset_type !== 'eigen_huis')
+        .reduce((s, a) => s + perspectiveAssetValue(a, perspective), 0),
+    [activeAssets, perspective],
+  )
+  // Gating via de canonieke foundation-helper: toon de splitsing alléén bij een
+  // eigen woning ÉN strategie ≠ include_full (downsize / opeethypotheek /
+  // uitsluiten). Bij include_full valt "incl." samen met de relevante grondslag.
+  const showExclHomeSubtotal = useMemo(() => {
+    const ctx = deriveHousingContext(
+      activeAssets as Asset[],
+      mortgages.map((m) => ({ ...m, debt_type: 'mortgage' as const, is_active: true })) as unknown as Debt[],
+    )
+    return shouldShowDualHousingBasis(ctx, housingStrategyConfig)
+  }, [activeAssets, mortgages, housingStrategyConfig])
 
   // Group by type — totalen zijn perspectief-gewogen (gedeeld telt op aandeel
   // buiten huishouden, vol in huishouden).
@@ -731,6 +773,22 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
               variant: 'positive',
             },
           ]}
+        />
+      )}
+
+      {/* Dubbele grondslag — subtieler subtotaal "excl. eigen woning" onder het
+          bruto totaal. Zelfde typografie-familie (mono/tabular-nums), kern-accent,
+          mét vrijheidstijd-equivalent. Alleen bij eigen woning + strategie ≠
+          include_full (shouldShowDualHousingBasis). */}
+      {showExclHomeSubtotal && (
+        <SubtotalLine
+          label="excl. eigen woning"
+          amount={totalValueExclHome}
+          trailing={
+            dailyExpenses > 0 && totalValueExclHome > 0
+              ? `${formatFreedomTimeString(calculateFreedomTime(totalValueExclHome, dailyExpenses), 'long')} vrijheid`
+              : undefined
+          }
         />
       )}
 

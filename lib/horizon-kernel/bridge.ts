@@ -624,6 +624,14 @@ export function kernelToUnifiedResult(
   const requiredFirePortfolio = summary.nettoLiquideBijFire ?? summary.eindNettoLiquide
   const firePortfolioAtFire = requiredFirePortfolio
 
+  // requiredFireNetWorth = Prognose!I@FIRE (nominaal) = TOTAAL netto vermogen bij FIRE
+  // INCL. eigen woning. Spiegelt requiredFirePortfolio (= Prognose!J@FIRE, liquide) met
+  // dezelfde null-fallback → I op de laatste in-horizon-maand. Puur DOORGELEID,
+  // parity-gedekt summary-veld (engine.ts#nettoVermogenBijFire) — GEEN nieuwe berekening.
+  // Identiteit: I = J + (niet-liquide bezit − niet-liquide schuld) ⇒ met overwaarde ≥ 0
+  // geldt requiredFireNetWorth ≥ requiredFirePortfolio.
+  const requiredFireNetWorth = summary.nettoVermogenBijFire ?? summary.eindNettoVermogen
+
   // implicitWithdrawalRate: reële jaaruitgave geïndexeerd naar de FIRE-maand /
   // benodigde (nominale) portefeuille — spiegelt de v2-adapter-optie.
   const portfolioMonth = summary.nettoLiquideBijFire != null ? fireMonth : lastInHorizonMonth
@@ -682,6 +690,7 @@ export function kernelToUnifiedResult(
     fireReachable,
     firePortfolioAtFire,
     requiredFirePortfolio,
+    requiredFireNetWorth,
     implicitWithdrawalRate,
     strategy,
     targetEndPortfolio: solve.doelbedrag,

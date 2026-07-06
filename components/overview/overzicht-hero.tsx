@@ -12,7 +12,7 @@ import type { HealthScore } from '@/lib/financial-health'
 import type { GoalWithBudget } from '@/lib/will-data-loader'
 import type { DashboardData } from '@/components/widgets/widget-renderer'
 import type { WidgetPref } from '@/lib/widget-catalog'
-import { HefbomenNav } from './overzicht-hero/hefbomen-nav'
+import { HefbomenNav, type HefbomenHousingSplit } from './overzicht-hero/hefbomen-nav'
 import { BriefingPanel, type BriefingEntry, type BriefingWeekHistoryItem } from './briefing-panel'
 import type { FreedomHeroProps } from '@/lib/briefing/overview-briefing'
 import { MiniNetWorthChart } from './mini-networth-chart'
@@ -61,6 +61,17 @@ type OverzichtHeroProps = {
   freedomFraming?: FreedomFraming
   /** Optionele totaalbedragen per hefboom (bezittingen, schulden, etc.). */
   totals?: HefbomenTotals
+  /**
+   * Dubbele grondslag incl./excl. eigen woning — bron = `horizonData`
+   * (perspectief-correct), niet `dashboardData`. Aanwezig (non-null) ⇔
+   * `horizonData.showDualHousingBasis`. Voedt de "excl. eigen woning"-subregel
+   * op de bezittingen-/schulden-hefboom én (via `netWorthExclHome`) de
+   * subtotaal-regel onder het nettovermogen-kopgetal. Null → geen splitsing.
+   */
+  housingSplit?: HefbomenHousingSplit | null
+  /** Nettovermogen excl. eigen woning (`horizonData.netWorthExclHome`) — losse
+   *  regel onder het kopgetal van de vermogensgrafiek. Niet zelf herrekenen. */
+  netWorthExclHome?: number | null
   /**
    * Vier-hefbomen-kompas-scores uit `loadLeverScores` (gedeelde SSoT). Voedt de
    * status-dots op de hefboomkaarten, identiek aan de sidebar-dots en de
@@ -150,6 +161,8 @@ export function OverzichtHero({
   isPensioenMode,
   freedomFraming = 'building',
   totals,
+  housingSplit = null,
+  netWorthExclHome,
   leverScores,
   briefingEntries,
   briefingRefreshedAt,
@@ -257,7 +270,13 @@ export function OverzichtHero({
         </EditorialHeadline>
       </header>
 
-      <HefbomenNav health={health} leverScores={leverScores} totals={totals} simple={simple} />
+      <HefbomenNav
+        health={health}
+        leverScores={leverScores}
+        totals={totals}
+        housingSplit={housingSplit}
+        simple={simple}
+      />
 
       {/* Subtiele editorial scheiding tussen de hefbomen-rij en de
           health/chart-rij. `!my-5` tempert de standaard `my-8` van de
@@ -288,6 +307,8 @@ export function OverzichtHero({
               simNetWorthRows={simNetWorthRows ?? null}
               simRequiredPortfolio={simRequiredPortfolio ?? null}
               monthlySavings={monthlySavings ?? null}
+              netWorthExclHome={netWorthExclHome ?? null}
+              showExclHome={housingSplit != null}
             />
           </div>
         </div>

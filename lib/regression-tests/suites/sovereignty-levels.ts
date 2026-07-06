@@ -339,6 +339,41 @@ const tests: TestCase[] = [
     },
   },
 
+  // ── Runway-grondslag: buffer/noodfonds op de LIQUIDE pot, niet vol vermogen ──
+  // Regressie voor de kaart "Dashboard telt gedeeld bezit overal even zwaar":
+  // de buffer/noodfonds-tiers (1/3/6 maanden) rekenen sinds deze fix op de
+  // inclusion-gewogen liquide pot (5e arg `runwayNetWorth`), niet op het totale
+  // netto vermogen. Een huiseigenaar met veel vastgeklonken overwaarde maar
+  // weinig spaargeld zakt zo naar het niveau dat zijn ECHTE buffer rechtvaardigt.
+  {
+    id: 'sov-runway-liquide-pot-niet-volvermogen',
+    name: 'Sovereignty-buffer volgt liquide pot, niet totaal netto vermogen (huiseigenaar)',
+    category: CAT,
+    description:
+      'Huiseigenaar met €140k netto (grotendeels overwaarde) maar €15k liquide: buffer = 5 mnd (level 2), niet 46 mnd op vol vermogen. Het niveau MOET de liquide pot volgen.',
+    priority: 'critical',
+    estimatedDurationMs: 5,
+    fn() {
+      const netWorth = 140_000        // incl. (gewogen) overwaarde
+      const liquidPot = 15_000        // spaar + cash, inclusion-gewogen
+      const monthlyExpenses = 3_000
+      const freedomPct = 30           // momentum-territorium op vrijheid
+
+      // OUD (4 args → runwayNetWorth = netWorth): 46 mnd buffer + 30% → level 4.
+      const oldLevel = computeSovereigntyLevel(netWorth, monthlyExpenses, freedomPct, false)
+      assertEqual(oldLevel, 4, 'oude vol-vermogen-grondslag → level 4')
+
+      // NIEUW: buffer op liquide pot (5 mnd) haalt de 6-mnd-tier niet → level 2,
+      // ondanks 30% vrijheid.
+      const newLevel = computeSovereigntyLevel(netWorth, monthlyExpenses, freedomPct, false, liquidPot)
+      assertEqual(newLevel, 2, 'liquide-pot-grondslag → level 2')
+      assertLessThan(newLevel, oldLevel, 'liquide-pot-niveau is strikt lager dan vol-vermogen')
+
+      // Teken van netto vermogen blijft bepalend voor herstel, ongeacht liquide pot.
+      assertEqual(computeSovereigntyLevel(-5_000, monthlyExpenses, 0, true, 30_000), -2, 'negatief vermogen → recovery, ondanks buffer')
+    },
+  },
+
   // ── Edge cases ─────────────────────────────────────────────────────────────
   {
     id: 'sov-edge-zero-expenses',

@@ -153,3 +153,57 @@ describe('detectDeficitLoanFromRows — endAge-cutoff (besluit 4 juli 2026)', ()
     expect(detectDeficitLoanFromRows(undefined, { endAge: 93 })).toBeNull()
   })
 })
+
+/**
+ * BUG 1 — €1-materialiteitsgate: een rauw tekort-lening-restsaldo van float-ruis
+ * (€0,003) óf een reële sub-euro (€0,30) leverde een banner met "piek € 0
+ * (0 dagen)". Een rij telt daarom alléén mee voor `firstAge` én `peak` wanneer het
+ * eindsaldo op hele euro's afgerond ≥ €1 is (`Math.round(endBalance) >= 1`, d.w.z.
+ * saldo ≥ €0,50). Is er binnen het venster geen enkele rij ≥ €1, dan `null`.
+ * De gate werkt bínnen het bestaande endAge-venster (besluit 4 juli 2026).
+ */
+describe('detectDeficitLoanFromRows — €1-materialiteitsgate (bug 1)', () => {
+  it('float-ruis €0,003 → null (rondt naar €0, geen "piek € 0"-banner)', () => {
+    expect(detectDeficitLoanFromRows([row(40), row(41), row(42, 0.003)])).toBeNull()
+  })
+
+  it('reële sub-euro €0,30 → null (rondt naar €0)', () => {
+    expect(detectDeficitLoanFromRows([row(60, 0.3), row(61, 0.3)])).toBeNull()
+  })
+
+  it('€0,49 → null (Math.round(0.49) = 0)', () => {
+    expect(detectDeficitLoanFromRows([row(60, 0.49)])).toBeNull()
+  })
+
+  it('€0,50 → { firstAge, peak: 1 } (Math.round(0.5) = 1, expliciete grens)', () => {
+    const out = detectDeficitLoanFromRows([row(60, 0.5)])
+    expect(out).not.toBeNull()
+    expect(out!.firstAge).toBe(60)
+    expect(out!.peak).toBe(1)
+  })
+
+  it('firstAge landt op de eerste ≥€1-rij, niet op een eerdere sub-euro-ruisrij', () => {
+    // €0,02 op 68 (ruis) → mag firstAge NIET zetten; eerste materiële ≥€1 op 71.
+    const rows = [row(68, 0.02), row(69, 0.4), row(70, 0), row(71, 1_500)]
+    const out = detectDeficitLoanFromRows(rows)
+    expect(out).not.toBeNull()
+    expect(out!.firstAge).toBe(71)
+    expect(out!.peak).toBe(1_500)
+  })
+
+  it('materieel geval (€1.234) → banner intact, peak ongewijzigd t.o.v. huidig gedrag', () => {
+    const out = detectDeficitLoanFromRows([row(50, 1_234)])
+    expect(out).not.toBeNull()
+    expect(out!.firstAge).toBe(50)
+    expect(out!.peak).toBe(1_234)
+  })
+
+  it('gate werkt bínnen het endAge-venster: sub-euro vóór cutoff telt niet, ≥€1 wel', () => {
+    // endAge 93 → cutoff 92. €0,30 op 80 (ruis), ≥€1 vanaf 85, staart op 95 buiten venster.
+    const rows = [row(80, 0.3), row(85, 2_000), row(92, 3_000), row(95, 99_000)]
+    const out = detectDeficitLoanFromRows(rows, { endAge: 93 })
+    expect(out).not.toBeNull()
+    expect(out!.firstAge).toBe(85)
+    expect(out!.peak).toBe(3_000)
+  })
+})

@@ -129,6 +129,20 @@ export default async function OverzichtPage() {
       }
     : undefined
 
+  // Dubbele grondslag (incl./excl. eigen woning) voor de bezittingen-/schulden-
+  // hefboom en de nettovermogen-subregel. Bron = horizonData (perspectief-
+  // correct), NIET dashboardData. Alleen actief bij eigen woning + strategie
+  // ≠ volledig meerekenen (showDualHousingBasis). Huis/hypotheek zijn al
+  // inclusion-gewogen in housingContext. Null → geen splitsing (byte-identiek).
+  const housingSplit =
+    horizonData?.showDualHousingBasis
+      ? {
+          eigenHuisValue: horizonData.housingContext.eigenHuisValue,
+          mortgageBalance: horizonData.housingContext.mortgageBalance,
+        }
+      : null
+  const netWorthExclHome = horizonData?.netWorthExclHome ?? null
+
   // Netto vermogen (live) + vermogensverloop — basis voor zowel de
   // vrijheidstijd-hero als de mini-vermogen-grafiek verderop.
   const netWorthHistory = dashboardData.netWorthHistory ?? []
@@ -310,6 +324,8 @@ export default async function OverzichtPage() {
         isPensioenMode={isPensioenMode}
         freedomFraming={freedomFraming}
         totals={totals}
+        housingSplit={housingSplit}
+        netWorthExclHome={netWorthExclHome}
         leverScores={leverScoresResult.scores}
         briefingEntries={briefingEntries}
         briefingRefreshedAt={briefingRefreshedAt}

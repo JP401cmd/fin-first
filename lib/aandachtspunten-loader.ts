@@ -21,10 +21,13 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import {
   type Aandachtspunt,
+  type ActionSuppressionRow,
   taxOpportunitiesToAandachtspunten,
   budgetBenchmarksToAandachtspunten,
   debtsToAandachtspunten,
   assetsToAandachtspunten,
+  filterActionedAandachtspunten,
+  collectActionedIds,
 } from './aandachtspunten'
 import { dailyExpenseRate } from './format'
 import { buildTaxOverview } from './tax-overview'
@@ -38,6 +41,7 @@ import {
   calculateBenchmarks,
 } from './nibud/reference-data'
 import { localMonthBounds } from './month-range'
+import { getCachedUser } from './supabase/cached-user'
 import type { Debt } from './debt-data'
 import type { Asset } from './asset-data'
 
@@ -256,5 +260,35 @@ export async function collectAandachtspunten(
     safe(() => collectAssetAandachtspunten(supabase)),
   ])
 
-  return [...tax, ...budget, ...debt, ...asset].sort((a, b) => b.savings - a.savings)
+  const sorted = [...tax, ...budget, ...debt, ...asset].sort((a, b) => b.savings - a.savings)
+
+  // Kruis tegen de acties van de gebruiker: een aandachtspunt waarvoor al een
+  // OPEN actie op de lijst staat — óf een recent AFGERONDE actie (≤9 mnd, zie
+  // collectActionedIds) — hoort niet ook nog als suggestie op te duiken (zelfde
+  // metadata.aandachtspunt_id). Spiegelt de idempotentie-query bij het AANMAKEN
+  // van een actie (app/api/ai/actions/route.ts), maar verbreed naar 'completed'
+  // zodat het venster-oordeel client-side (en dus testbaar) blijft. Faalt zacht:
+  // bij welke fout dan ook blijft `actionedIds` leeg → geen suppressie, huidig
+  // gedrag intact.
+  let actionedIds: ReadonlySet<string> = new Set<string>()
+  try {
+    const user = await getCachedUser(supabase)
+    if (user) {
+      const { data } = await supabase
+        .from('actions')
+        .select('metadata, status, completed_at')
+        .eq('user_id', user.id)
+        .in('status', ['open', 'completed'])
+        .not('metadata->>aandachtspunt_id', 'is', null)
+        // Ruim bemeten: open + afgerond(≤9 mnd) delen deze cap. De id-ruimte is
+        // klein (per aandachtspunt hooguit enkele acties), dus 500 voorkomt dat
+        // de suppressie ooit fail-open gaat door truncatie.
+        .limit(500)
+      actionedIds = collectActionedIds((data ?? []) as ActionSuppressionRow[])
+    }
+  } catch {
+    // Nooit throwen: de bus mag niet sneuvelen op een falende actie-kruising.
+  }
+
+  return filterActionedAandachtspunten(sorted, actionedIds)
 }

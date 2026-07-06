@@ -60,6 +60,49 @@ function makeSupabase() {
   } as never
 }
 
+/**
+ * Fake-Supabase met een echte USER én een `actions`-tabel die de meegegeven
+ * open-actie-rijen teruggeeft. Alle andere tabellen (profiles/budgets/
+ * transactions/debts/assets) blijven leeg zodat alleen het belasting-
+ * aandachtspunt in het resultaat overblijft — en de actie-kruising op dat punt
+ * kan worden geasserteerd. De `actions`-chain ondersteunt de volledige leeskant
+ * (`select/eq/in/not/limit`) en levert de meegegeven rijen (met `status` en
+ * `completed_at`) zodat zowel de open- als de afgerond-binnen-venster-suppressie
+ * wordt uitgeoefend.
+ */
+function makeSupabaseWithActions(
+  actionRows: Array<{ metadata: unknown; status?: string; completed_at?: string }>,
+) {
+  const emptyQuery = {
+    select: () => emptyQuery,
+    eq: () => emptyQuery,
+    gte: () => emptyQuery,
+    lt: () => emptyQuery,
+    order: () => emptyQuery,
+    not: () => emptyQuery,
+    limit: () => Promise.resolve({ data: [], error: null }),
+    single: () => Promise.resolve({ data: null, error: null }),
+    maybeSingle: () => Promise.resolve({ data: null, error: null }),
+    then: (resolve: (v: { data: unknown[]; error: null }) => void) =>
+      resolve({ data: [], error: null }),
+  }
+  const actionsQuery = {
+    select: () => actionsQuery,
+    eq: () => actionsQuery,
+    in: () => actionsQuery,
+    not: () => actionsQuery,
+    limit: () => Promise.resolve({ data: actionRows, error: null }),
+    then: (resolve: (v: { data: unknown[]; error: null }) => void) =>
+      resolve({ data: actionRows, error: null }),
+  }
+  return {
+    auth: {
+      getUser: () => Promise.resolve({ data: { user: { id: 'u1' } }, error: null }),
+    },
+    from: (table: string) => (table === 'actions' ? actionsQuery : emptyQuery),
+  } as never
+}
+
 function pensionEvent(pensioenType: string): LifeEvent {
   return {
     id: `pe-${pensioenType}`,
@@ -170,6 +213,68 @@ describe('collectTaxAandachtspunten — jaarruimte-demping', () => {
       }),
     )
     const result = await collectAandachtspunten(makeSupabase())
+    expect(jaarruimtePunt(result)).toBeDefined()
+  })
+})
+
+describe('collectAandachtspunten — actie-kruising (suppressie)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    computeBox1TaxMock.mockReturnValue({ tax: 12345 })
+    loadPerspectiveBox3Mock.mockResolvedValue({ personal: { tax: 0 } })
+    // Gezond inkomen + bekende factor A → tax:jaarruimte verschijnt normaal.
+    loadHorizonDataMock.mockResolvedValue(
+      makeHorizonData({
+        pensioenFactorAKnown: true,
+        pensioenFactorA: 1200,
+        events: [],
+      }),
+    )
+  })
+
+  it('onderdrukt een aandachtspunt dat al als OPEN actie op de lijst staat', async () => {
+    const result = await collectAandachtspunten(
+      makeSupabaseWithActions([
+        { metadata: { aandachtspunt_id: 'tax:jaarruimte' }, status: 'open' },
+      ]),
+    )
+    expect(jaarruimtePunt(result)).toBeUndefined()
+  })
+
+  it('laat het aandachtspunt staan als de open actie een ander id heeft', async () => {
+    const result = await collectAandachtspunten(
+      makeSupabaseWithActions([
+        { metadata: { aandachtspunt_id: 'debt:andere-schuld' }, status: 'open' },
+      ]),
+    )
+    expect(jaarruimtePunt(result)).toBeDefined()
+  })
+
+  it('laat het aandachtspunt staan als de open actie geen aandachtspunt_id heeft', async () => {
+    const result = await collectAandachtspunten(
+      makeSupabaseWithActions([{ metadata: {}, status: 'open' }]),
+    )
+    expect(jaarruimtePunt(result)).toBeDefined()
+  })
+
+  it('onderdrukt een aandachtspunt met een RECENT afgeronde actie (≤9 mnd)', async () => {
+    // Gisteren afgerond → ruim binnen het 9-maandsvenster t.o.v. elke echte now.
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+    const result = await collectAandachtspunten(
+      makeSupabaseWithActions([
+        { metadata: { aandachtspunt_id: 'tax:jaarruimte' }, status: 'completed', completed_at: yesterday },
+      ]),
+    )
+    expect(jaarruimtePunt(result)).toBeUndefined()
+  })
+
+  it('laat het aandachtspunt staan als de afgeronde actie ouder dan 9 mnd is', async () => {
+    // Vaste datum ruim > 9 maanden geleden → buiten het venster t.o.v. elke echte now.
+    const result = await collectAandachtspunten(
+      makeSupabaseWithActions([
+        { metadata: { aandachtspunt_id: 'tax:jaarruimte' }, status: 'completed', completed_at: '2020-01-01T00:00:00.000Z' },
+      ]),
+    )
     expect(jaarruimtePunt(result)).toBeDefined()
   })
 })

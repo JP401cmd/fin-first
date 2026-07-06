@@ -62,6 +62,14 @@ export interface LeverScoresResult {
    * inline-som, zodat sidebar == hero == dashboard per definitie gelijk zijn.
    */
   netWorth: number
+  /**
+   * Aantal top-level expense/savings-budgets dat deze maand OVER de limiet zit
+   * (kompas cashflow-indicator #847). Voedt het sidebar-`budgetOver`-signaal.
+   * Intern al berekend uit dezelfde budget-health-queries; hier ge-expose-d
+   * zodat de shell het consumeert i.p.v. een eigen inline-blok met dubbele
+   * queries te draaien ("consume, don't recompute").
+   */
+  budgetsOver: number
 }
 
 /** Minimale profiel-velden die de loader nodig heeft. */
@@ -125,7 +133,7 @@ export const loadLeverScores = cache(async function loadLeverScores(
       box3TaxableAboveThreshold: 0,
       hasBox3Assets: false,
     }
-    return { scores: empty, taxInput, box3Status: 'neutral', box1Status: 'neutral', netWorth: 0 }
+    return { scores: empty, taxInput, box3Status: 'neutral', box1Status: 'neutral', netWorth: 0, budgetsOver: 0 }
   }
 
   // 3-maands-venster voor de spaarquote (identiek aan de shell).
@@ -334,5 +342,5 @@ export const loadLeverScores = cache(async function loadLeverScores(
     marginaalTarief: box1MarginaalTarief,
   })
 
-  return { scores, taxInput, box3Status, box1Status, netWorth }
+  return { scores, taxInput, box3Status, box1Status, netWorth, budgetsOver }
 })

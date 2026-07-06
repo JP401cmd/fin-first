@@ -50,12 +50,15 @@ import { calculateBox3, type TaxYear } from '@/lib/box3-data'
 import { NL_AOW_AGE } from '@/lib/constants'
 import { hasPartner } from '@/lib/household-type'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
-import { resolveDepreciation, computeExpectedAnnualAppreciation, type Asset } from '@/lib/asset-data'
+import { computeExpectedAnnualAppreciation, type Asset } from '@/lib/asset-data'
+import { computeAssetsByType, computeLiquidPot, monthsCoveredFrom } from '@/lib/dashboard-wealth-weighting'
 import { type Debt } from '@/lib/debt-data'
 import {
   parseHousingStrategy,
   deriveHousingContext,
   getFireEligibleNetWorth,
+  netWorthExcludingHome,
+  shouldShowDualHousingBasis,
   type HousingStrategyConfig,
 } from '@/lib/housing-strategy'
 import { formatCurrency, calculateFreedomTime, formatFreedomTimeString, dailyExpenseRate } from '@/lib/format'
@@ -266,22 +269,17 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   const netWorth = totalAssets - totalDebts
   const monthlyContributions = (assetsResult.data ?? []).reduce((s, a) => s + Number(a.monthly_contribution), 0)
 
-  // Asset breakdown per type
-  type AssetGroup = { type: string; value: number; purchaseValue: number; weightedReturn: number }
-  const assetsByType = (Object.values(
-    (assetsResult.data ?? []).reduce((acc, a) => {
-      const type = (a as { asset_type?: string | null }).asset_type ?? 'other'
-      if (!acc[type]) acc[type] = { type, value: 0, purchaseValue: 0, weightedReturn: 0 }
-      acc[type].value += Number(a.current_value)
-      acc[type].purchaseValue += Number((a as { purchase_value?: number | null }).purchase_value ?? 0)
-      const assetReturn = resolveDepreciation(a as Asset) ? 0 : Number((a as { expected_return?: number | null }).expected_return ?? 0)
-      acc[type].weightedReturn += Number(a.current_value) * assetReturn
-      return acc
-    }, {} as Record<string, AssetGroup>)
-  ) as AssetGroup[]).map(g => ({ ...g, expectedReturn: g.value > 0 ? g.weightedReturn / g.value : 0 }))
-   .sort((a, b) => b.value - a.value)
+  // Asset breakdown per type — inclusion-gewogen (gedeelde canonieke helper),
+  // zodat som(assetsByType.value) == het headline-totaal (totalAssets/netWorth).
+  const assetsByType = computeAssetsByType(assetsResult.data ?? [])
 
   const totalPurchaseValue = assetsByType.reduce((s, a) => s + a.purchaseValue, 0)
+
+  // Inclusion-gewogen liquide pot (direct besteedbaar geld: spaar/betaal/cash +
+  // niet-gekoppelde bankrekeningen). Dé grondslag voor buffer/noodfonds/runway —
+  // een huis telt hier bewust NIET als opeetbare buffer. Eén keer afgeleid en
+  // hergebruikt door sovereignty-niveau, emergencyFund en top-level monthsCovered.
+  const liquidPotWeighted = computeLiquidPot(assetsResult.data ?? [], unlinkedCash)
 
   const allChildren = allChildrenData
   // Filter children same as core-data-loader: exclude archive/income/savings
@@ -633,6 +631,11 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   const housingContext = deriveHousingContext(dashboardAssetsArr, dashboardDebtsArr)
   const fireEligibleNetWorth = getFireEligibleNetWorth(netWorth, housingContext, housingStrategyCfg)
   const fireAssetsDelta = fireEligibleNetWorth - netWorth // negatief bij exclude/downsize
+  // Dubbele grondslag (incl./excl. eigen woning). netWorthExclHome = netWorth − overwaarde
+  // (ZUIVER, ook bij reverse_mortgage — géén leen-ruimte-variant); dit is NIET de FIRE-pot
+  // (fireEligibleNetWorth) en NIET het volledige netto vermogen. Eén home: lib/housing-strategy.ts.
+  const netWorthExclHome = netWorthExcludingHome(netWorth, housingContext)
+  const showDualHousingBasis = shouldShowDualHousingBasis(housingContext, housingStrategyCfg)
 
   const horizonInput: FinancialInput = {
     totalAssets: totalAssets + fireAssetsDelta, // FIRE-pot, niet display-totaal
@@ -699,6 +702,9 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // Vandaag-punt (= volledig netto vermogen incl. huis). Zie buildSimNetWorthRows.
   let simNetWorthRows: { age: number; netWorth: number }[] | null = null
   let simRequiredPortfolio: number | null = null
+  // FIRE-doel INCL. eigen woning (Prognose!I@FIRE) — spiegelt simRequiredPortfolio (liquide,
+  // Prognose!J@FIRE). Puur uit de sim (requiredFireNetWorth via de kernel-bridge), geen eigen som.
+  let simRequiredNetWorth: number | null = null
   let simFireAgeFractional: number | null = null
   // Snapshot voor de /toekomst Voorkeuren-bewerkschermen (regel-sim baseline = Tijdas-curve).
   let regelSimSnapshot: RegelSimSnapshot | null = null
@@ -794,6 +800,8 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
           // op de eerste toereikende maand). Lees requiredFirePortfolio + fireAgeFractional
           // direct uit simResult (óók correct voor niet-pensioen).
           simRequiredPortfolio = simResult.requiredFirePortfolio > 0 ? simResult.requiredFirePortfolio : null
+          // Incl.-woning FIRE-doel (Prognose!I@FIRE) — zelfde bron/gate als simRequiredPortfolio.
+          simRequiredNetWorth = (simResult.requiredFireNetWorth ?? 0) > 0 ? simResult.requiredFireNetWorth! : null
           simFireAgeFractional = simResult.fireAgeFractional
         }
       }
@@ -802,6 +810,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       simRows = null
       simNetWorthRows = null
       simRequiredPortfolio = null
+      simRequiredNetWorth = null
       simFireAgeFractional = null
     }
   }
@@ -918,13 +927,18 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // Voorheen rekende dit pad een eigen sovFreedomPct op vol vermogen ÷ doel op
   // NL_SWR, waardoor een huiseigenaar een te hoog niveau kreeg naast een lagere
   // voortgangsbalk. Sovereignty is puur motivatie (ADR 0001), geen gating.
+  //
+  // Buffer/noodfonds-tiers (1/3/6 maanden) rekenen op de inclusion-gewogen
+  // LIQUIDE pot, niet op het totale netto vermogen: een huis is geen opeetbare
+  // buffer (CLAUDE.md). Het teken van netWorth blijft bepalend voor de
+  // herstel-niveaus (negatief vermogen → recovery).
   const consumerDebtTypes = ['personal_loan', 'credit_card', 'revolving_credit', 'payment_plan', 'car_loan']
   const hasConsumerDebt = (debtsResult.data ?? []).some(d => {
     const dt = (d as { debt_type?: string }).debt_type
     return dt != null && consumerDebtTypes.includes(dt) && Number(d.current_balance) > 0
   })
   const sovMonthlyExp = (sovereigntyTxResult.data ?? []).filter(isRealTx).reduce((s, t) => s + Math.abs(Number(t.amount)), 0) / 3
-  const sovereigntyLevel = computeSovereigntyLevel(netWorth, sovMonthlyExp, freedomPct, hasConsumerDebt)
+  const sovereigntyLevel = computeSovereigntyLevel(netWorth, sovMonthlyExp, freedomPct, hasConsumerDebt, liquidPotWeighted)
   const currentPhaseId = levelToPhaseId(sovereigntyLevel)
 
   // Widget prefs
@@ -1413,15 +1427,13 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
 
   // ── Emergency Fund: derived from liquid assets + expenses ──
   const TARGET_EMERGENCY_MONTHS = 6
-  // Liquid assets = unlinked bank accounts + savings-type assets
-  const liquidAssets = (assetsResult.data ?? [])
-    .filter(a => {
-      const type = (a as { asset_type?: string }).asset_type
-      return type === 'savings' || type === 'checking' || type === 'cash'
-    })
-    .reduce((s, a) => s + Number(a.current_value), 0) + unlinkedCash
+  // Liquide pot = niet-gekoppelde bankrekeningen + spaar/betaal/cash-bezittingen,
+  // inclusion-gewogen (gedeelde helper) — één grondslag met sovereignty-niveau
+  // en top-level monthsCovered. Een gedeelde spaarrekening telt zo hier óók maar
+  // voor het opgegeven inclusion-percentage mee.
+  const liquidAssets = liquidPotWeighted
   const targetEmergencyAmount = effectiveMonthlyExpenses * TARGET_EMERGENCY_MONTHS
-  const emergencyMonthsCovered = effectiveMonthlyExpenses > 0 ? liquidAssets / effectiveMonthlyExpenses : 0
+  const emergencyMonthsCovered = monthsCoveredFrom(liquidAssets, effectiveMonthlyExpenses)
   const emergencyFund = {
     currentAmount: Math.round(liquidAssets * 100) / 100,
     targetAmount: Math.round(targetEmergencyAmount * 100) / 100,
@@ -1931,6 +1943,11 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     // teller van de vrijheidsvoortgang, voor widgets die de mijlpaal-datums op
     // dezelfde grondslag als data.freedomPct moeten leggen (ADR 0009).
     fireEligibleNetWorth,
+    // Dubbele grondslag (incl./excl. eigen woning) — aparte weergave-grondslag, GEEN FIRE-pot.
+    // netWorthExclHome = netWorth − overwaarde (zuiver, ook bij reverse_mortgage).
+    // showDualHousingBasis gate't de splitsing (hasEigenHuis && mode !== include_full).
+    netWorthExclHome,
+    showDualHousingBasis,
     fireTarget,
     fireProjResult,
     // Canonieke gezondheidsscore mét trend (ADR 0008) — gebruikt door de
@@ -1945,7 +1962,10 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     recentRejectedActions: [],
     sovereigntyLevel,
     currentPhaseId,
-    monthsCovered: effectiveMonthlyExpenses > 0 ? netWorth / effectiveMonthlyExpenses : 0,
+    // Runway op de inclusion-gewogen LIQUIDE pot (spaar/betaal/cash), niet op het
+    // totale netto vermogen — een huis is geen direct besteedbare buffer. Zelfde
+    // grondslag als emergencyFund.monthsCovered en de Jouw Pad-buffer-mijlpalen.
+    monthsCovered: monthsCoveredFrom(liquidPotWeighted, effectiveMonthlyExpenses),
     hasConsumerDebt,
     recommendations: (recsResult.data ?? []).filter(r => (r as { status: string }).status === 'pending').length,
     goals: (goalsResult.data ?? []).length,
@@ -1975,6 +1995,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     simRows,
     simNetWorthRows,
     simRequiredPortfolio,
+    simRequiredNetWorth,
     backtestSuccessRate,
     backtestNamedPaths,
     box3Tax,

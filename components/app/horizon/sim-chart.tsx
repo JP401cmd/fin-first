@@ -206,6 +206,7 @@ export const SimChart = memo(function SimChart({
   endAge,
   cashflows,
   fireTarget,
+  fireTargetInclHome,
   forModal,
   strategy,
   targetEndPortfolio,
@@ -238,6 +239,10 @@ export const SimChart = memo(function SimChart({
   endAge: number
   cashflows: SimCashflow[]
   fireTarget?: number
+  /** Tweede FIRE-doel op de incl.-woning-grondslag (requiredFireNetWorth). Zet
+   *  je 'm, dan tekent de grafiek een tweede horizontale doellijn ("doel incl.
+   *  woning") naast de bestaande "doel excl. woning"-lijn (= fireTarget). */
+  fireTargetInclHome?: number
   forModal?: boolean
   strategy?: FireEndStrategy
   targetEndPortfolio?: number
@@ -330,6 +335,7 @@ export const SimChart = memo(function SimChart({
         currentAge,
         endAge,
         fireTarget,
+        fireTargetInclHome,
         strategy,
         targetEndPortfolio,
         baselineRows,
@@ -352,6 +358,7 @@ export const SimChart = memo(function SimChart({
       currentAge,
       endAge,
       fireTarget,
+      fireTargetInclHome,
       strategy,
       targetEndPortfolio,
       baselineRows,

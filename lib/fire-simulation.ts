@@ -92,8 +92,16 @@ export interface SimResult {
   fireAgeFractional: number | null
   /** Portfolio value at the computed FIRE age */
   firePortfolioAtFire: number
-  /** Minimum portfolio at fireAge so portfolio = 0 at endAge */
+  /** Minimum portfolio at fireAge so portfolio = 0 at endAge (LIQUIDE, excl. eigen woning = Prognose!J@FIRE) */
   requiredFirePortfolio: number
+  /**
+   * FIRE-doel INCL. eigen woning = TOTAAL netto vermogen bij FIRE (Prognose!I@FIRE,
+   * nominaal). Spiegelt `requiredFirePortfolio` (liquide); puur doorgeleid via de
+   * kernel-bridge → `toSimResult` — géén eigen berekening. Optioneel/additief: stub-/
+   * mock-/preview-`SimResult`s die het niet zetten blijven geldig. In het echte
+   * kernel-pad altijd gevuld en ≥ `requiredFirePortfolio` (overwaarde ≥ 0).
+   */
+  requiredFireNetWorth?: number
   /** Whether FIRE is reachable before endAge */
   fireReachable: boolean
   /** yearlyExpenses / requiredFirePortfolio */

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { computeConfidenceBand } from '@/lib/confidence-band'
+import { SubtotalLine } from '@/components/editorial/subtotal-line'
 import { NetWorthHistorySheet, type HistoryPoint } from './networth-history-sheet'
 
 /**
@@ -52,6 +53,8 @@ export function MiniNetWorthChart({
   simNetWorthRows,
   simRequiredPortfolio,
   monthlySavings,
+  netWorthExclHome,
+  showExclHome = false,
 }: {
   netWorthHistory: { month: string; value: number }[]
   currentNetWorth: number
@@ -80,6 +83,19 @@ export function MiniNetWorthChart({
    * 3 echte waarderingen zijn. Null/undefined → vlak geschat verloop.
    */
   monthlySavings?: number | null
+  /**
+   * Nettovermogen EXCL. eigen woning (`horizonData.netWorthExclHome` —
+   * perspectief-correct, niet zelf herrekenen). Getoond als losse subtotaal-
+   * regel onder het nettovermogen-kopgetal wanneer `showExclHome`. De grafiek-
+   * lijn zelf blijft VOLLEDIG nettovermogen incl. huis (geen tweede lijn).
+   */
+  netWorthExclHome?: number | null
+  /**
+   * Gate voor de excl.-regel ⇔ `horizonData.showDualHousingBasis` (eigen woning
+   * + strategie ≠ volledig meerekenen). Default false → geen extra regel
+   * (byte-identiek aan voorheen).
+   */
+  showExclHome?: boolean
 }) {
   // Netto vermogen + eindbedrag zijn saldi → honoreren de privacy-toggle.
   // Hooks vóór elke early-return aangeroepen (rules-of-hooks). De numerieke
@@ -391,6 +407,19 @@ export function MiniNetWorthChart({
       <div className="font-serif text-xl font-semibold text-[var(--ink)] tabular-nums">
         {formatMaskedCurrency(currentNetWorth, masked)}
       </div>
+      {/* Dubbele grondslag: nettovermogen EXCL. eigen woning als losse
+          subtotaal-regel onder het kopgetal (headline-context → gedeelde
+          SubtotalLine i.p.v. een compacte tegel-regel). Geen tweede grafieklijn:
+          een excl.-lijn op een totaal-vermogen-as voegt niets toe. Bron =
+          horizonData.netWorthExclHome (perspectief-correct). Margin-override
+          omdat de SubtotalLine-default (-mt-3 mb-5) te ruim is voor deze plek. */}
+      {showExclHome && netWorthExclHome != null && (
+        <SubtotalLine
+          label="excl. eigen woning"
+          amount={netWorthExclHome}
+          className="!mt-1 !mb-0"
+        />
+      )}
       {/* Grafiek met twee klikzones: verleden (popup) + toekomst (/toekomst).
           De zones liggen als onzichtbare hit-areas óver de SVG, gesplitst op
           de Vandaag-as. Focus-ring + hover-tint maken de zones ontdekbaar. */}

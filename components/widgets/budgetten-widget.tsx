@@ -1,6 +1,6 @@
 'use client'
 
-import { memo } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { WidgetShell } from './widget-shell'
 import { WidgetEmpty } from './widget-empty'
@@ -125,6 +125,91 @@ function TopBudgetRow({ budget, hasEntered, rich }: RowProps) {
   )
 }
 
+// ── Grootte-bewuste rijweergave ────────────────────────────────
+//
+// De widget heeft per size een VASTE kaarthoogte (WidgetShell/grid). Meer rijen
+// renderen dan er passen gaf half-afgesneden budget-rijen. We meten de werkelijke
+// beschikbare hoogte en tonen alleen rijen die er HELEMAAL op passen (nette
+// afkapping), met optioneel "+N meer" als er nog vrije ruimte over is.
+
+/**
+ * Bepaal hoeveel rijen zichtbaar zijn zodat er nooit een half-afgesneden rij
+ * ontstaat. `capacity` = aantal rijen dat volledig past (null = nog niet gemeten
+ * → toon de gewenste desiredN, bv. tijdens SSR/eerste render). De "+N meer"-regel
+ * verschijnt alleen als er een écht vrije rij-slot over is (offert nooit een
+ * databudget-rij op).
+ */
+export function fittingRowPlan(capacity: number | null, desiredN: number, total: number) {
+  const cap = capacity ?? desiredN
+  const visible = Math.min(total, desiredN, cap)
+  const hidden = total - visible
+  return { visible, hidden, showMore: hidden > 0 && visible < cap }
+}
+
+/**
+ * Meet de beschikbare kaarthoogte en bepaal hoeveel rijen er volledig op passen.
+ * `estRowH` is een veilige bovengrens van de werkelijke rijhoogte (px); `gap` de
+ * verticale tussenruimte (px). Retourneert `null` zolang niet gemeten (jsdom/SSR
+ * hebben geen layout) → caller valt dan terug op desiredN.
+ */
+function useFittingRowCount(estRowH: number, gap: number) {
+  const ref = useRef<HTMLDivElement | null>(null)
+  const [capacity, setCapacity] = useState<number | null>(null)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const measure = () => {
+      const h = el.clientHeight
+      if (h > 0) setCapacity(Math.max(1, Math.floor((h + gap) / (estRowH + gap))))
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [estRowH, gap])
+
+  return { ref, capacity }
+}
+
+interface FittingListProps {
+  ranked:     TopBudget[]
+  desiredN:   number
+  rich:       boolean
+  hasEntered: boolean
+  /** Entrance-animatie-ref van useInViewAnimation; gemerged met de meet-ref. */
+  inViewRef:  React.RefObject<HTMLDivElement | null>
+}
+
+function FittingBudgetList({ ranked, desiredN, rich, hasEntered, inViewRef }: FittingListProps) {
+  // rich (half): 3-laags rij ~38px, gap-1.5 (6px). compact (quarter): 2-laags rij ~24px, gap-2 (8px).
+  const estRowH  = rich ? 40 : 26
+  const gapPx    = rich ? 6  : 8
+  const gapClass = rich ? 'gap-1.5' : 'gap-2'
+
+  const { ref: measureRef, capacity } = useFittingRowCount(estRowH, gapPx)
+  const { visible, hidden, showMore } = fittingRowPlan(capacity, desiredN, ranked.length)
+  const rows = ranked.slice(0, visible)
+
+  const setRefs = (node: HTMLDivElement | null) => {
+    measureRef.current = node
+    inViewRef.current = node
+  }
+
+  return (
+    <div ref={setRefs} className={`flex h-full flex-col justify-center overflow-hidden ${gapClass}`}>
+      {rows.map((b) => (
+        <TopBudgetRow key={b.id} budget={b} hasEntered={hasEntered} rich={rich} />
+      ))}
+      {showMore && (
+        <p className="shrink-0 truncate text-[10px] font-medium text-[var(--ink-4)]">
+          +{hidden} {hidden === 1 ? 'budget' : 'budgetten'} meer
+        </p>
+      )}
+    </div>
+  )
+}
+
 // ── Hoofd-component ────────────────────────────────────────────
 
 export const BudgettenWidget = memo(function BudgettenWidget({ size, data, href }: Props) {
@@ -137,8 +222,12 @@ export const BudgettenWidget = memo(function BudgettenWidget({ size, data, href 
   const hasAnyBudget = configured.length > 0
 
   if (!hasAnyBudget) {
+    // Géén href op de shell in de empty-state: de WidgetEmpty-CTA rendert een
+    // eigen <Link> en een whole-card <a> eromheen zou <a>-in-<a> geven
+    // (ongeldige HTML + hydration-error). In first-use is de CTA sowieso de
+    // enige, intentionele navigatie — de kaart-link naar de (lege) hub verviel.
     return (
-      <WidgetShell module="kern" size={size} kicker="Budgetten" href={href}>
+      <WidgetShell module="kern" size={size} kicker="Budgetten">
         {/* First-use empty state — onboarding moment per design bible. */}
         <WidgetEmpty
           variant="first-use"
@@ -200,29 +289,22 @@ export const BudgettenWidget = memo(function BudgettenWidget({ size, data, href 
     .sort((a, b) => utilization(b) - utilization(a))
 
   // ── Quarter: top-3 compacte rijen (naam + balk + pct) ──
+  // Grootte-bewust: toont alleen rijen die volledig op de kaart passen (nooit
+  // een half-afgesneden rij), met "+N meer" als er ruimte overblijft.
   if (size === 'quarter') {
-    const rows = ranked.slice(0, 3)
     return (
       <WidgetShell module="kern" size={size} kicker="Budgetten" href={href}>
-        <div ref={inViewRef} className="flex h-full flex-col justify-center gap-2">
-          {rows.map((b) => (
-            <TopBudgetRow key={b.id} budget={b} hasEntered={hasEntered} rich={false} />
-          ))}
-        </div>
+        <FittingBudgetList ranked={ranked} desiredN={3} rich={false} hasEntered={hasEntered} inViewRef={inViewRef} />
       </WidgetShell>
     )
   }
 
-  // ── Half: top-4 rijen die verticaal vullen (naam + bedrag + balk + pct) ──
+  // ── Half: tot top-4 rich rijen (naam + bedrag + balk + pct) ──
+  // Idem grootte-bewust: het werkelijke aantal past zich aan de kaarthoogte aan.
   if (size === 'half') {
-    const rows = ranked.slice(0, 4)
     return (
       <WidgetShell module="kern" size={size} kicker="Budgetten" href={href}>
-        <div ref={inViewRef} className="flex h-full flex-col justify-between gap-1.5">
-          {rows.map((b) => (
-            <TopBudgetRow key={b.id} budget={b} hasEntered={hasEntered} rich />
-          ))}
-        </div>
+        <FittingBudgetList ranked={ranked} desiredN={4} rich hasEntered={hasEntered} inViewRef={inViewRef} />
       </WidgetShell>
     )
   }

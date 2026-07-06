@@ -21,6 +21,9 @@ export type { GlossaryTermProps } from './glossary-term'
 export { PageInfoButton } from './page-info-button'
 // Re-export PageOpening (canonieke editorial pagina-aanhef — standaard-aanhef)
 export { PageOpening, PageOpeningFigure } from './page-opening'
+// Re-export SubtotalLine (gedeeld "excl. eigen woning"-subtotaal; raakt privacy-context)
+export { SubtotalLine } from './subtotal-line'
+export type { SubtotalLineProps } from './subtotal-line'
 
 const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
 const SOURCE_SERIF = 'var(--font-source-serif, Georgia, serif)'
