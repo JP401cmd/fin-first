@@ -90,7 +90,7 @@ describe('Onboarding-terugknop — binnen een sectie', () => {
 
     // Terug = één scherm terug (naar spaargeld), NIET de groep uit.
     fireEvent.click(backButton())
-    expect(container.textContent).toContain('Heb je spaargeld?')
+    expect(container.textContent).toContain('Heb je een spaargeldrekening?')
     expect(onBack).not.toHaveBeenCalled()
 
     // Nog een keer terug → terug op vraag 1.
@@ -114,7 +114,7 @@ describe('Onboarding-terugknop — binnen een sectie', () => {
 
     // Nee → volgende vraag (spaargeld). Dan terug → "nog een cash?".
     fireEvent.click(footerButton('Nee'))
-    expect(container.textContent).toContain('Heb je spaargeld?')
+    expect(container.textContent).toContain('Heb je een spaargeldrekening?')
     fireEvent.click(backButton())
     expect(container.textContent).toContain('Nog een')
 

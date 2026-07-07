@@ -67,7 +67,7 @@ describe('OnboardingBezittingen — begeleide ja/nee-flow', () => {
   it('"Nee" gaat door naar de volgende vraag (spaargeld)', () => {
     const { container } = render(<Host />)
     fireEvent.click(footerButton('Nee'))
-    expect(container.textContent).toContain('Heb je spaargeld?')
+    expect(container.textContent).toContain('Heb je een spaargeldrekening?')
   })
 
   it('"Ja" → wizard → collect voegt een post toe en toont de "nog een?"-loop', () => {
@@ -92,7 +92,7 @@ describe('OnboardingBezittingen — begeleide ja/nee-flow', () => {
     expect(occurrences).toBe(2)
     // "Nee" verlaat de loop → volgende vraag (spaargeld).
     fireEvent.click(footerButton('Nee'))
-    expect(container.textContent).toContain('Heb je spaargeld?')
+    expect(container.textContent).toContain('Heb je een spaargeldrekening?')
   })
 })
 
