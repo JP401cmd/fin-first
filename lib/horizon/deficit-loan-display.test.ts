@@ -207,3 +207,57 @@ describe('detectDeficitLoanFromRows — €1-materialiteitsgate (bug 1)', () => 
     expect(out!.peak).toBe(3_000)
   })
 })
+
+/**
+ * ZELFHERSTELLEND BRUGGETJE — een tekort-lening die binnen ~één jaar-snapshot weer
+ * volledig is afgelost (en daarna €0 blijft) is een liquiditeit-brug, geen staande
+ * schuld. Klassiek geval: de paar maanden tussen "liquide op" en "huis verkocht" bij
+ * een downsize-strategie — het model overbrugt het gat en lost het meteen ná de
+ * verkoop af. Zo'n zelfherstellende transient hoort GÉÉN rode tekort-melding te
+ * geven. Een tekort dat langer aanhoudt (span > 1 jaar) of aan het venster-einde nog
+ * openstaat, is wél meldenswaardig. (Diagnose account jpsmit@jps-holding, 7 jul 2026.)
+ */
+describe('detectDeficitLoanFromRows — zelfherstellend bruggetje onderdrukken', () => {
+  it('tekort in één jaar dat het jaar erna volledig is afgelost → null (geen staande schuld)', () => {
+    // Liquide raakt op op 70, huis verkoopt op 71 → tekort €2.799 op 70, €0 vanaf 71.
+    const rows = [row(68, 0), row(69, 0), row(70, 2_799), row(71, 0), row(72, 0), row(80, 0)]
+    expect(detectDeficitLoanFromRows(rows, { endAge: 93 })).toBeNull()
+  })
+
+  it('kort tekort over twee opeenvolgende jaren dat daarna clearet → null', () => {
+    const rows = [row(69, 0), row(70, 1_500), row(71, 900), row(72, 0), row(80, 0)]
+    expect(detectDeficitLoanFromRows(rows, { endAge: 93 })).toBeNull()
+  })
+
+  it('aanhoudend tekort (span > 1 jaar) dat pas later clearet → wél gemeld', () => {
+    // 80..84 continu tekort, pas op 85 afgelost: geen bruggetje maar een echte periode.
+    const rows = [
+      row(79, 0), row(80, 3_000), row(81, 5_000), row(82, 6_000),
+      row(83, 4_000), row(84, 2_000), row(85, 0),
+    ]
+    const out = detectDeficitLoanFromRows(rows, { endAge: 93 })
+    expect(out).not.toBeNull()
+    expect(out!.firstAge).toBe(80)
+    expect(out!.peak).toBe(6_000)
+  })
+
+  it('kort tekort dat aan het venster-einde nog openstaat → wél gemeld (niet bewezen afgelost)', () => {
+    // Eén materiële rij op de laatste in-venster-leeftijd; geen clearing-bewijs → staande schuld.
+    const rows = [row(90, 0), row(91, 0), row(92, 4_000)]
+    const out = detectDeficitLoanFromRows(rows, { endAge: 93 })
+    expect(out).not.toBeNull()
+    expect(out!.firstAge).toBe(92)
+    expect(out!.peak).toBe(4_000)
+  })
+
+  it('twee episodes: kort bruggetje + latere staande schuld → meldt de staande, niet het bruggetje', () => {
+    const rows = [
+      row(69, 0), row(70, 2_500), row(71, 0), // bruggetje op 70 → onderdrukken
+      row(84, 0), row(85, 4_000), row(86, 7_000), row(87, 9_000), // staande schuld vanaf 85
+    ]
+    const out = detectDeficitLoanFromRows(rows, { endAge: 93 })
+    expect(out).not.toBeNull()
+    expect(out!.firstAge).toBe(85) // niet 70
+    expect(out!.peak).toBe(9_000)
+  })
+})

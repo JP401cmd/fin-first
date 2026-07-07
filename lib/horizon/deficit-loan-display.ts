@@ -48,6 +48,27 @@ export interface DeficitLoanDetectOptions {
 }
 
 /**
+ * Een tekort-lening die binnen dit aantal jaar-snapshots weer volledig is afgelost
+ * (en daarna €0 blijft) is een ZELFHERSTELLEND liquiditeit-bruggetje — geen staande
+ * schuld. Klassiek geval: de paar maanden tussen "liquide op" en "huis verkocht" bij
+ * een downsize-strategie; het model overbrugt het gat en lost het meteen ná de
+ * verkoop af (zie ADR 0033, tekort-aflossing-uit-liquide). Zo'n transient hoort géén
+ * rode tekort-melding te geven. `span` = `laatste materiële leeftijd − eerste
+ * materiële leeftijd` van de aaneengesloten tekort-episode; ≤ 1 betekent dat de
+ * lening in ten hoogste twee opeenvolgende jaar-snapshots stond en toen verdween.
+ *
+ * BEWUSTE KALIBRATIE (= 1, niet 0): het waargenomen huisverkoop-bruggetje staat in
+ * precies één jaar-snapshot (span 0), maar 1 geeft veiligheidsmarge voor een
+ * bruggetje dat een verjaardag-snapshotgrens overspant (liquide op vlak vóór, verkoop
+ * vlak ná de verjaardag → twee snapshots). De onderdrukking is BEWUST magnitude-blind:
+ * elk tekort dat binnen ~1 jaar volledig zelfherstelt is per definitie een liquiditeit-
+ * brug (er kwam binnen een jaar genoeg liquide binnen om het af te lossen), of het nu
+ * €3k of €150k was — dat is geen staande schuld. Een tekort dat lánger aanhoudt (span
+ * > 1) of aan het venster-einde nog openstaat (niet bewezen afgelost) blijft wél melden.
+ */
+const MAX_TRANSIENT_SPAN_YEARS = 1
+
+/**
  * Detecteer of en wanneer de tekort-lening wordt aangesproken.
  *
  * @returns `{ firstAge, peak }` zodra ≥1 rij binnen het venster een tekort-lening-
@@ -67,22 +88,50 @@ export function detectDeficitLoanFromRows(
   const cutoff = Number.isFinite(endAge)
     ? (endAge as number) - 1
     : Number.POSITIVE_INFINITY
-  let firstAge: number | null = null
-  let peak = 0
+
+  // Bouw de aaneengesloten tekort-EPISODES binnen het venster. Een rij is "materieel"
+  // als het eindsaldo op hele euro's afgerond ≥ €1 is (€1-materialiteitsgate): zo
+  // levert float-ruis (€0,003) óf een reële sub-euro (€0,30) — die beide naar €0
+  // afronden — geen fantoom-episode. Een episode eindigt zodra een immateriële
+  // in-venster-rij volgt (`clears = true`: bewijs dat de lening is afgelost) of aan
+  // het einde van het venster (`clears = false`: nog openstaand, niet bewezen afgelost).
+  interface Episode {
+    startAge: number
+    lastAge: number
+    peak: number
+    clears: boolean
+  }
+  const episodes: Episode[] = []
+  let current: Episode | null = null
   for (const r of rows) {
     if (r.age > cutoff) continue
     const endBalance = r.debtBalances['tekort-lening']?.endBalance ?? 0
-    // €1-materialiteitsgate: een rij telt alléén mee (voor firstAge én peak) als
-    // het eindsaldo op hele euro's afgerond ≥ €1 is. Zo levert float-ruis (€0,003)
-    // óf een reële sub-euro (€0,30) — die beide naar € 0 afronden — géén banner met
-    // "piek € 0 (0 dagen)" meer. `firstAge` landt daardoor op de eerste materiële
-    // rij, niet op een eerdere sub-euro-ruisrij. Dekt élke onderliggende grootte
-    // (de kernel-ruisdrempel 0.005 zou een reële €0,30 laten staan → nóg steeds € 0).
     if (Math.round(endBalance) >= 1) {
-      if (firstAge === null) firstAge = r.age
-      if (endBalance > peak) peak = endBalance
+      if (current === null) {
+        current = { startAge: r.age, lastAge: r.age, peak: endBalance, clears: false }
+      } else {
+        current.lastAge = r.age
+        if (endBalance > current.peak) current.peak = endBalance
+      }
+    } else if (current !== null) {
+      current.clears = true
+      episodes.push(current)
+      current = null
     }
   }
-  if (firstAge === null) return null
+  if (current !== null) episodes.push(current)
+
+  // Onderdruk zelfherstellende bruggetjes: een korte episode (span ≤
+  // MAX_TRANSIENT_SPAN_YEARS) die bewezen is afgelost (`clears`) is geen staande
+  // schuld en hoort geen melding te geven. Meld de eerste episode die WÉL aanhoudt —
+  // te lang aanhoudt óf aan het venster-einde nog openstaat. In een plan met eerst
+  // een bruggetje (huisverkoop) en later een echte staande schuld landt `firstAge`
+  // zo op de staande schuld, niet op het bruggetje.
+  const sustained = episodes.filter(
+    (ep) => !(ep.clears && ep.lastAge - ep.startAge <= MAX_TRANSIENT_SPAN_YEARS),
+  )
+  if (sustained.length === 0) return null
+  const firstAge = sustained[0].startAge
+  const peak = Math.max(...sustained.map((ep) => ep.peak))
   return { firstAge, peak: Math.round(peak) }
 }
