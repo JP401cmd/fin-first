@@ -102,7 +102,7 @@ export function OnboardingKlaar({
   return (
     <OnboardingShell
       kicker="Klaar"
-      romanNum="v."
+      romanNum="viii."
       title={headline}
       deck={
         hasOptionalData

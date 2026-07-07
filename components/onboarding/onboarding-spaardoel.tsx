@@ -317,7 +317,7 @@ export function OnboardingSpaardoel({
   return (
     <OnboardingShell
       kicker="Spaardoel"
-      romanNum="iv."
+      romanNum="vi."
       title={headline}
       deck="Met een spaardoel bepaal je zelf hoeveel vrijheid je opzijzet. Sla over kan altijd — je past het later aan in De Toekomst."
       factsPanel={
