@@ -16,6 +16,10 @@ Verifieer bestandspad- en symboolverwijzingen in een agent-briefing vóór dispa
 
 Houd de gebruiker doorlopend op de hoogte. Meld vóór elke stap in één à twee zinnen wat je gaat doen en welke agent(s) je inzet; meld na elke stap kort het resultaat (klaar / kernbevinding / blokkade) voordat je doorgaat. Duurt een stap naar verwachting langer dan ~5 minuten: draai de agent(s) met `run_in_background: true` en rapporteer tussentijds zodra een deelresultaat binnenkomt — laat nooit langer dan ~5 minuten stilte vallen. Stil doorwerken zonder updates is een fout, ook als het eindresultaat goed is.
 
+### Sub-agent-afrondingsdiscipline
+
+Een gedispatchte sub-agent draait zijn eigen verificatie- en review-gates (bv. `npx tsc --noEmit`, een `ux-review-expert`- of `security-specialist`-aanroep) **synchroon af** en rapporteert pas als alles klaar is. Eindig je beurt NOOIT met "ik wacht op de review/notificatie" — spawn je zelf een sub-agent voor een gate, wacht dan op diens resultaat en verwerk het vóór je terugrapporteert. Reden: de orchestrator behandelt een halve afronding als onbetrouwbaar en moet de agent hervatten, wat tokens en tijd kost.
+
 ## Git-hygiëne in de gedeelde werkboom
 
 Subagents en hoofdchat werken in dezelfde working tree, vaak náást parallelle sessies van de gebruiker. Daarom: nooit `git stash`, `git checkout -- <pad>`, `git reset` of andere tree-brede operaties als onderdeel van bouwen of testen — die vernietigen andermans ongecommitte werk. Alleen gerichte edits binnen de opdracht-scope. De oude staat van een bestand vergelijk je met `git show HEAD:<pad>` of `git diff -- <pad>`, niet door de tree terug te zetten. Bestanden die je niet zelf hebt gewijzigd blijven onaangeraakt.

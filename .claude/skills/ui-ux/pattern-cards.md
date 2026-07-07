@@ -38,6 +38,7 @@ Bewuste, niet-universele patronen. Activeer alleen wanneer het paginatype erom v
 - **Bedrag**: `font-serif font-black text-[22px] sm:text-[28px] leading-none tracking-[-0.02em] tabular-nums` (Playfair, niet DM Mono — uitzondering voor figures-strip). Kleurcodering: neutraal `text-[var(--ink)]`, negatief `text-[var(--negative)]`, positief `text-[var(--positive)]`, **eindresultaat/winnaar** `text-[var(--ink)]` MET highlight-marker. Eén per strip.
 - **Sub-meta**: `font-serif italic text-[11px] text-[var(--ink-3)] mt-1.5`.
 - **Optionele teken-prefix** voor positieve uitkomst: `+€` zoals `+€203.375`.
+- **Bedrag + kwalificatie inline** (`items-baseline`) binnen een kolom-cel: altijd `flex-wrap` + `gap-x`/`gap-y`, nooit kaal `flex` — euro-bedragen van 6-7 cijfers overschrijden anders de mobile-grid-kolombreedte.
 
 ### Categorie-app-tab hero-band (KPI-paper-blok)
 - **Toepassen op**: categorie-app-tabs binnen een module-categorie-pagina (`?tab=<appKey>`) — bv. crypto Holdings, investment Holdings, cash Budgetteren, mortgage Aflosstrategie, plus de standalone equivalenten op `/core/budgets`, `/core/assets/holdings`. Geldt ook voor andere "app"-tabs die een KPI-balk als entry-point hebben.
@@ -176,6 +177,12 @@ Bewuste, niet-universele patronen. Activeer alleen wanneer het paginatype erom v
 - **Beslis-flowchart**: heeft de gebruiker eigen oriëntatie nodig (multi-section, eigen back-stack)? → pane. Anders: snelle actie met retour naar dezelfde context? → sheet. Bevestiging van iets onomkeerbaars? → confirm.
 - **A11y**: alle drie kinds verplicht focus-trap, return-focus, `inert` op achtergrond. Hergebruik `useFocusTrap` patroon uit `bottom-sheet.tsx:232-276`.
 - **Verbod**: parallel modal-systemen bouwen ("ConfirmDialog", "DetailDrawer", etc.). Eén wrapper, drie kinds — uitbreiden via prop, niet via nieuwe component.
+
+### Hoek-anker-element naast sluitknop (geen overlap)
+- **Toepassen op**: overlays, kaarten en meldingen die een decoratief hoek-element (avatar, badge, icoon) rechtsboven verankeren én óók een sluitknop (×) rechtsboven tonen — bv. de coach-melding met avatar.
+- **Probleem**: anker-element en sluitknop claimen allebei dezelfde rechterbovenhoek en botsen (overlap), omdat ze onafhankelijk op `right-*` zijn geplaatst.
+- **Regel**: plaats de sluitknop vrij links van het anker-element. **Vrije rechter-offset van de × ≥ (`right`-offset van het anker + breedte van het anker + ~4-8px grid-marge).** Verplaats de **knop**, niet het anker — het anker heeft vaak een bewuste positie (bv. top-anchored zodat het niet meedrift bij content-groei).
+- **Voorbeeld uit de codebase**: coach-melding — avatar op `right:0.625rem` (10px) + 36px breed → linkerrand van de avatar ligt op ~46px vanaf de rechterrand; de sluitknop staat daarom op `right-14` (56px) i.p.v. `right-2.5` (10px), zodat hij vrij links van de avatar valt.
 
 ### Page action-bar (Bitvavo-stijl)
 - **Toepassen op**: edit/create-form-pagina's die buiten een pane leven (full-page form-routes), én overzicht-pagina's met een primaire CTA die altijd zichtbaar moet blijven tijdens scrollen (bv. "Volgende" in een onboarding-stap, "Toevoegen" in een list-pagina met veel scroll). Dezelfde primary/secondary affordance als de pane-footer (`SlideInPane.primaryAction`), maar dan voor standalone-pagina's.

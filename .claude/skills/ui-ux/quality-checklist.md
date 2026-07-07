@@ -72,6 +72,7 @@
 - [ ] **Dubbele lijn als finale**: total-rijen in kassabonnen, rapportage-summaries en balans-eindtotalen krijgen `border-b-4 border-double border-[var(--ink)]` als boekhoudkundige sluitstreep. Eenmalig per tabel, alleen op de eindrij — nooit als generieke divider.
 - [ ] **Ornament-colophon**: footer-meta op editorial pagina's gebruikt `✦` als scheidingsteken: `Trifinity ✦ {module} ✦ v{x.y}`. Niet `|`, niet `·`, niet `—`. Cursor-default, niet selectable.
 - [ ] **Romeinse sectie-numbering** (optioneel): long-form editorial pagina's met ≤4 secties (gids, jaaroverzicht, will-narratief) tonen `i. ii. iii. iv.` rechts in section-label, in italic Playfair `text-[var(--module-active-700)]`. Niet op dashboards/lijsten/forms. Op `<380px`: `text-xs`. Op `<320px`: verbergen.
+- [ ] **Romeinse reeks bij meerstaps-flows** (zoals onboarding): de romeinse reeks is een doorlopende telling over álle content-stappen — leid 'm af uit dezelfde bron als `STEP_GROUP_INDEX`/`currentStep`, niet uit een losse hardcoded string per stap-component, zodat een tussengevoegde stap niet stilzwijgend de rest laat verschuiven.
 
 ### Consistentie
 - [ ] Past het in het bestaande design systeem?
