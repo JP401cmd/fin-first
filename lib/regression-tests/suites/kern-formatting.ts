@@ -263,9 +263,11 @@ const tests: TestCase[] = [
       assert(!r.includes('jaar'), `geen jaar: ${r}`)
       assert(!r.includes('maand'), `geen maand: ${r}`)
 
-      // Without includeDays
+      // Zonder includeDays: dagen zijn de ENIGE zinvolle eenheid bij een sub-maand-
+      // bedrag, dus ze worden tóch getoond — een positief bedrag mag nooit als
+      // "0 dagen" verschijnen (bugfix tekort-lening-banner /toekomst).
       const rNoD = formatFreedomTimeString(b, 'long', false)
-      assertEqual(rNoD, '0 dagen', 'zonder dagen → 0 dagen')
+      assertEqual(rNoD, '15 dagen', 'sub-maand toont dagen, ook zonder includeDays')
     },
   },
   {

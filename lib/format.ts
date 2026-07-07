@@ -119,7 +119,13 @@ export interface FormatWithFreedomOptions {
   format?: 'long' | 'short'
   /** Whether to include the EUR amount before the freedom time. Default: true */
   includeCurrency?: boolean
-  /** Whether to include days in the output (only when < 1 month). Default: true */
+  /**
+   * Whether to append days when years/months are also present. Default: true.
+   * NB: days are only ever relevant for sub-month amounts (years===0 && months===0),
+   * and a positive sub-month amount ALWAYS shows its days regardless of this flag —
+   * showing "0 dagen" for a non-zero amount would be a lie. So in practice this flag
+   * only affects nothing today; kept for API stability.
+   */
   includeDays?: boolean
 }
 
@@ -185,7 +191,8 @@ export function calculateFreedomTime(
  *
  * @param breakdown - Freedom time breakdown from calculateFreedomTime()
  * @param format - 'long' for "12 jaar en 3 maanden", 'short' for "12j 3m"
- * @param includeDays - Whether to include days (shown when < 1 month)
+ * @param includeDays - Legacy flag; a positive sub-month amount always shows its days
+ *   (never "0 dagen"/"0d" for a non-zero amount), so this currently has no effect.
  * @returns Formatted Dutch freedom time string
  */
 export function formatFreedomTimeString(
@@ -206,6 +213,10 @@ export function formatFreedomTimeString(
     if (includeDays && years === 0 && months === 0 && days > 0) {
       parts.push(`${days}d`)
     }
+    // includeDays:false op een sub-maand-bedrag zou anders een POSITIEF bedrag als
+    // "0d" tonen (dagen zijn hier de enige eenheid). Toon ze dan tóch — nooit een
+    // positief bedrag als 0 vrijheid presenteren.
+    if (parts.length === 0 && days > 0) return `${days}d`
     return parts.join(' ') || '0d'
   }
 
@@ -222,6 +233,13 @@ export function formatFreedomTimeString(
   }
 
   if (parts.length === 0) {
+    // includeDays:false op een sub-maand-bedrag zou anders een POSITIEF bedrag als
+    // "0 dagen" tonen (bv. een tekort-lening-piek van €3.342 ≈ 30 dagen): dagen zijn
+    // dan de enige zinvolle eenheid. Toon ze i.p.v. te liegen; alleen een écht nul-
+    // bedrag (days === 0, afgevangen bovenaan) blijft "0 dagen".
+    if (days > 0) {
+      return `${days} ${days === 1 ? 'dag' : 'dagen'}`
+    }
     return '0 dagen'
   }
 
