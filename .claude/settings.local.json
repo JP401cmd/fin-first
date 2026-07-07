@@ -134,7 +134,14 @@
       "Bash(cp \"C:\\\\Users\\\\janpa\\\\OneDrive\\\\Prive\\\\Archief\\\\Core calc v4.xlsm\" /tmp/corecalc_v4.xlsm)",
       "Read(//tmp/**)",
       "PowerShell(Get-Item \"C:\\\\Users\\\\janpa\\\\OneDrive\\\\Prive\\\\Archief\\\\Core calc v4.xlsm\" | Select-Object Name,Length,LastWriteTime,Attributes; try { $s=[IO.File]::Open\\(\"C:\\\\Users\\\\janpa\\\\OneDrive\\\\Prive\\\\Archief\\\\Core calc v4.xlsm\",'Open','Read','ReadWrite'\\); $s.Close\\(\\); \"open Read+shareRW OK\" } catch { \"still locked: $\\($_.Exception.Message\\)\" })",
-      "PowerShell($src=\"C:\\\\Users\\\\janpa\\\\OneDrive\\\\Prive\\\\Archief\\\\Core calc v4.xlsm\"; $dst=\"$env:TEMP\\\\corecalc_v4_inspD.xlsm\"; $ok=$false; foreach\\($i in 1..20\\){ try { [IO.File]::Copy\\($src,$dst,$true\\); $ok=$true; break } catch { Start-Sleep -Milliseconds 800 } }; if\\($ok\\){ \"copied\"; \\(Get-Item $dst\\).Length } else { \"FAILED after retries\" })"
+      "PowerShell($src=\"C:\\\\Users\\\\janpa\\\\OneDrive\\\\Prive\\\\Archief\\\\Core calc v4.xlsm\"; $dst=\"$env:TEMP\\\\corecalc_v4_inspD.xlsm\"; $ok=$false; foreach\\($i in 1..20\\){ try { [IO.File]::Copy\\($src,$dst,$true\\); $ok=$true; break } catch { Start-Sleep -Milliseconds 800 } }; if\\($ok\\){ \"copied\"; \\(Get-Item $dst\\).Length } else { \"FAILED after retries\" })",
+      "PowerShell(Get-CimInstance *)",
+      "PowerShell($cpu = Get-CimInstance Win32_Processor; \"CPU: $\\($cpu.Name\\)\"; \"Cores: $\\($cpu.NumberOfCores\\)  Threads: $\\($cpu.NumberOfLogicalProcessors\\)\")",
+      "mcp__claude_ai_Notion__notion-query-database-view",
+      "mcp__claude_ai_Notion__notion-update-page",
+      "mcp__claude_ai_Notion__notion-fetch",
+      "Bash(npx tsc *)",
+      "Bash(echo \"TSC_EXIT=$?\")"
     ]
   },
   "enableAllProjectMcpServers": true,

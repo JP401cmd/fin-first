@@ -1,1 +1,0 @@
-const fs=require("fs");let c=fs.readFileSync("C:/Users/janpa/cd/development/fin/CLAUDE.md","utf8");console.log("Current length:",c.length);

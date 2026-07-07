@@ -1,5 +1,55 @@
 import type { NextConfig } from "next";
 
+/**
+ * Content-Security-Policy (Optie A — SOEPEL, zie Notion-kaart "Security
+ * response-headers"). Bewust `'unsafe-inline'` op script-src: de app draait
+ * volledig statisch/cache-vriendelijk zonder per-request nonce (dat is de
+ * niet-gekozen Optie B/middleware-variant). Bronnen zijn afgeleid uit de
+ * werkelijke code:
+ *   - script/frame/connect challenges.cloudflare.com → Turnstile (app/check).
+ *   - connect *.supabase.co (REST/auth) + wss (Realtime); img data:/blob:/https:
+ *     dekt Supabase-storage-avatars.
+ *   - connect vitals.vercel-insights.com → Vercel Speed Insights (beacon).
+ *   - worker blob: → PWA service worker; JSON-LD (faq) is data, geen script.
+ * frame-ancestors 'self' i.c.m. X-Frame-Options SAMEORIGIN houdt de beheer-
+ * mobielpreview-iframe (components/app/beheer/mobile-preview-frame.tsx) heel.
+ *
+ * Wordt eerst als Content-Security-Policy-Report-Only uitgeleverd (rustige
+ * meekijk-periode). VERVOLGSTAP: na de meekijk-periode omzetten naar de
+ * enforce-header `Content-Security-Policy`.
+ */
+const CONTENT_SECURITY_POLICY = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https:",
+  "font-src 'self' data:",
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://challenges.cloudflare.com https://vitals.vercel-insights.com",
+  "frame-src https://challenges.cloudflare.com",
+  "frame-ancestors 'self'",
+  "worker-src 'self' blob:",
+  "manifest-src 'self'",
+  "object-src 'none'",
+  "base-uri 'none'",
+  "form-action 'self'",
+  "upgrade-insecure-requests",
+].join('; ');
+
+/**
+ * Beveiligingsheaders op álle responses. Fase 1 (nul app-risico) staat direct
+ * te enforcen; de CSP staat bewust op Report-Only tot de meekijk-periode klaar
+ * is. X-Frame-Options = SAMEORIGIN (NIET DENY) zodat de beheer-mobielpreview
+ * blijft werken.
+ */
+const SECURITY_HEADERS = [
+  { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains' },
+  { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+  { key: 'X-Content-Type-Options', value: 'nosniff' },
+  { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+  { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()' },
+  { key: 'Content-Security-Policy-Report-Only', value: CONTENT_SECURITY_POLICY },
+];
+
 // Serwist (the PWA service-worker layer) is wired in via `serwist.config.js`
 // and runs as a post-build step (`npm run build` → `next build && serwist
 // build`). We deliberately do NOT use the `withSerwist()` Next.js wrapper:
@@ -16,6 +66,20 @@ const nextConfig: NextConfig = {
   },
   compress: true,
   productionBrowserSourceMaps: false,
+  poweredByHeader: false,
+
+  /**
+   * Security response-headers op alle routes (Optie A). Zie SECURITY_HEADERS /
+   * CONTENT_SECURITY_POLICY hierboven voor de bron-onderbouwing per directive.
+   */
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: SECURITY_HEADERS,
+      },
+    ]
+  },
 
   /**
    * Top-level route-redirects voor de navigatie-migratie van oude module-
