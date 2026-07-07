@@ -8,12 +8,13 @@ import { getModel } from '@/lib/ai/config'
 import type { ReportData, ReportConfig, HistoricalPeriodSummary } from '@/lib/report-data'
 import { checkTierGate } from '@/lib/require-tier'
 import { resolveFireParams } from '@/lib/fire-params'
-import { computeFreedomProgress } from '@/lib/core-metrics'
+import { computeFreedomProgressWithBasis, inclHomeTargetFromScalar } from '@/lib/core-metrics'
 import { resolveSavingsSource, savingsRateFromAggregates, computeDebtAflossingMonthly } from '@/lib/savings-source'
 import {
   deriveHousingContext,
   getFireEligibleNetWorth,
   parseHousingStrategy,
+  isHomeExcludedFromFire,
 } from '@/lib/housing-strategy'
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
@@ -332,8 +333,19 @@ export async function GET(request: Request) {
     const housingStrategy = parseHousingStrategy(profile?.housing_strategy_config)
     const housingContext = deriveHousingContext(assets as unknown as Asset[], debts as unknown as Debt[])
     const fireEligibleNetWorth = getFireEligibleNetWorth(currentNetWorth, housingContext, housingStrategy)
+    // Grondslag-keuze (ADR 0009 herzien): standaard incl. eigen woning; alleen bij
+    // exclude_from_fire → EXCL. (liquide). Incl.-noemer via scalar-fallback (het
+    // rapport laadt geen unified projection).
+    const homeExcludedFromFire = housingContext.hasEigenHuis && isHomeExcludedFromFire(housingStrategy)
+    const requiredPortfolioExclHome = fireTarget > 0 ? fireTarget : null
     const firePercentage = fireTarget > 0
-      ? Math.round(computeFreedomProgress({ fireEligibleNetWorth, requiredPortfolio: fireTarget }) * 10) / 10
+      ? Math.round(computeFreedomProgressWithBasis({
+          homeExcludedFromFire,
+          netWorthInclHome: currentNetWorth,
+          fireEligibleNetWorth,
+          requiredNetWorthInclHome: inclHomeTargetFromScalar(requiredPortfolioExclHome, currentNetWorth, fireEligibleNetWorth),
+          requiredPortfolioExclHome,
+        }) * 10) / 10
       : null
 
     // Budget breakdown

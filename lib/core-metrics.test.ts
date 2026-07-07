@@ -10,6 +10,9 @@ import {
   // NB: bestaat nog niet — canonieke helper uit het fix-ontwerp.
   // Tests hieronder pinnen de gewenste semantiek; ze zijn ROOD tot de helper bestaat.
   computeFreedomProgress,
+  computeFreedomProgressWithBasis,
+  selectFreedomProgressBasis,
+  inclHomeTargetFromScalar,
 } from './core-metrics'
 
 // ── computeSavingsRateFromNetWorthDelta ─────────────────────
@@ -296,6 +299,91 @@ describe('computeFreedomProgress', () => {
     expect(
       computeFreedomProgress({ fireEligibleNetWorth: 250_000, requiredPortfolio: 1_000_000 }),
     ).toBe(25)
+  })
+})
+
+// ── Vrijheidsvoortgang-grondslag: incl./excl. eigen woning (ADR 0009 herzien) ──
+//
+// Beslissing 2026-07: standaard telt de eigen woning mee → INCL.-woning
+// grondslag (teller = volledig netto vermogen; noemer = FIRE-doel incl. woning).
+// Alleen bij exclude_from_fire valt het terug op de EXCL. (liquide) grondslag.
+// Deze cases pinnen BEIDE takken + de scalar-fallback-invariant.
+
+describe('computeFreedomProgressWithBasis — grondslag-keuze incl./excl. eigen woning', () => {
+  // Gedeelde repro: huiseigenaar met €300k overwaarde.
+  //   netWorth (incl. huis)      = €800k
+  //   FIRE-eligible (huis eruit) = €500k
+  //   requiredFireNetWorth (I@FIRE, incl. woning) = €1.000k
+  //   requiredFirePortfolio (J@FIRE, liquide)     = €600k
+  const scenario = {
+    netWorthInclHome: 800_000,
+    fireEligibleNetWorth: 500_000,
+    requiredNetWorthInclHome: 1_000_000,
+    requiredPortfolioExclHome: 600_000,
+  }
+
+  it('woning MEEGETELD (include_full/downsize): teller = volledig vermogen, noemer = incl.-doel', () => {
+    const pct = computeFreedomProgressWithBasis({ homeExcludedFromFire: false, ...scenario })
+    // 800k / 1.000k = 80% — de eigen woning telt mee in teller én noemer.
+    expect(pct).toBeCloseTo(80, 5)
+    const basis = selectFreedomProgressBasis({ homeExcludedFromFire: false, ...scenario })
+    expect(basis.currentNetWorth).toBe(800_000)
+    expect(basis.requiredPortfolio).toBe(1_000_000)
+  })
+
+  it('woning UITGESLOTEN (exclude_from_fire): teller = FIRE-eligible, noemer = liquide doel', () => {
+    const pct = computeFreedomProgressWithBasis({ homeExcludedFromFire: true, ...scenario })
+    // 500k / 600k ≈ 83,33% — precies het pre-2026-07-gedrag (huis gefilterd).
+    expect(pct).toBeCloseTo(83.333, 2)
+    const basis = selectFreedomProgressBasis({ homeExcludedFromFire: true, ...scenario })
+    expect(basis.currentNetWorth).toBe(500_000)
+    expect(basis.requiredPortfolio).toBe(600_000)
+  })
+
+  it('de twee takken verschillen ⇒ de grondslag-keuze doet er wél toe', () => {
+    const incl = computeFreedomProgressWithBasis({ homeExcludedFromFire: false, ...scenario })
+    const excl = computeFreedomProgressWithBasis({ homeExcludedFromFire: true, ...scenario })
+    expect(incl).not.toBeCloseTo(excl, 1)
+  })
+
+  it('geen eigen woning (of include_full): incl.- en excl.-grondslag vallen samen', () => {
+    // netWorth == fireEligible én incl.-noemer == excl.-noemer ⇒ identiek %.
+    const flat = {
+      netWorthInclHome: 400_000,
+      fireEligibleNetWorth: 400_000,
+      requiredNetWorthInclHome: 500_000,
+      requiredPortfolioExclHome: 500_000,
+    }
+    expect(computeFreedomProgressWithBasis({ homeExcludedFromFire: false, ...flat })).toBe(80)
+    expect(computeFreedomProgressWithBasis({ homeExcludedFromFire: true, ...flat })).toBe(80)
+  })
+})
+
+describe('inclHomeTargetFromScalar — scalar-fallback incl.-noemer', () => {
+  it('verschuift het excl.-doel met (volledig vermogen − FIRE-eligible)', () => {
+    // Overwaarde-aandeel = 800k − 500k = 300k ⇒ incl.-doel = 600k + 300k = 900k.
+    expect(inclHomeTargetFromScalar(600_000, 800_000, 500_000)).toBe(900_000)
+  })
+
+  it('zonder eigen woning (netWorth == fireEligible) blijft het doel gelijk', () => {
+    expect(inclHomeTargetFromScalar(600_000, 400_000, 400_000)).toBe(600_000)
+  })
+
+  it('invariant: 100% wordt op HETZELFDE punt bereikt als op de excl.-grondslag', () => {
+    // FIRE-eligible == excl.-doel (600k) ⇒ excl. = 100%. Op incl.: netWorth =
+    // 600k + 300k overwaarde = 900k, incl.-doel = 900k ⇒ óók 100%.
+    const exclTarget = 600_000
+    const fireEligible = 600_000
+    const netWorth = 900_000
+    const inclTarget = inclHomeTargetFromScalar(exclTarget, netWorth, fireEligible)!
+    expect(computeFreedomProgress({ fireEligibleNetWorth: fireEligible, requiredPortfolio: exclTarget })).toBe(100)
+    expect(computeFreedomProgress({ fireEligibleNetWorth: netWorth, requiredPortfolio: inclTarget })).toBe(100)
+  })
+
+  it('null-guards: geen/negatief/nul excl.-doel ⇒ null', () => {
+    expect(inclHomeTargetFromScalar(null, 800_000, 500_000)).toBeNull()
+    expect(inclHomeTargetFromScalar(0, 800_000, 500_000)).toBeNull()
+    expect(inclHomeTargetFromScalar(-5, 800_000, 500_000)).toBeNull()
   })
 })
 

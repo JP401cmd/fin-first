@@ -29,6 +29,7 @@ const NEW_ACTIVE_ORDER = [
   'schulden',
   'pensioen',
   'spaardoel',
+  'eindstrategie',
   'klaar',
   'saving',
   'success',
@@ -393,6 +394,50 @@ describe('onboarding _resolveRestoredStep — spaardoel + klaar', () => {
   it('restores a draft saved on spaardoel without warning', () => {
     const result = _resolveRestoredStep('spaardoel', [...NEW_ACTIVE_ORDER])
     expect(result).toEqual({ step: 'spaardoel', healed: false })
+  })
+
+  it('restores a draft saved on the new eindstrategie step verbatim', () => {
+    const result = _resolveRestoredStep('eindstrategie', [...NEW_ACTIVE_ORDER])
+    expect(result).toEqual({ step: 'eindstrategie', healed: false })
+  })
+
+  it('places eindstrategie between spaardoel and klaar in the active order', () => {
+    const order = [...NEW_ACTIVE_ORDER]
+    expect(order.indexOf('eindstrategie')).toBeGreaterThan(order.indexOf('spaardoel'))
+    expect(order.indexOf('eindstrategie')).toBeLessThan(order.indexOf('klaar'))
+  })
+})
+
+describe('onboarding _reducer — SET_HORIZON (eindstrategie-keuze)', () => {
+  // De eindstrategie-stap mapt tegel 1 (FIRE) → 'deplete' en tegel 2
+  // (pensioen) → 'pensioen' via SET_HORIZON. Geen nieuwe state-slice; de keuze
+  // rijdt op het bestaande horizon-veld en wordt bij save als
+  // horizonData.fire_end_strategy meegestuurd.
+  it('zet fire_end_strategy op deplete (keuze 1 — FIRE)', () => {
+    const result = _reducer(_initialState, {
+      type: 'SET_HORIZON',
+      data: { ..._initialState.horizon, fire_end_strategy: 'deplete' },
+    })
+    expect(result.horizon.fire_end_strategy).toBe('deplete')
+  })
+
+  it('zet fire_end_strategy op pensioen (keuze 2 — werken tot pensioen)', () => {
+    const result = _reducer(_initialState, {
+      type: 'SET_HORIZON',
+      data: { ..._initialState.horizon, fire_end_strategy: 'pensioen' },
+    })
+    expect(result.horizon.fire_end_strategy).toBe('pensioen')
+    // fire_end_age blijft de bestaande default (niet functioneel voor pensioen).
+    expect(result.horizon.fire_end_age).toBe(90)
+  })
+
+  it('laat de identiteit + overige velden ongemoeid', () => {
+    const result = _reducer(_initialState, {
+      type: 'SET_HORIZON',
+      data: { ..._initialState.horizon, fire_end_strategy: 'pensioen' },
+    })
+    expect(result.identity).toEqual(_initialState.identity)
+    expect(result.spaardoel).toEqual(_initialState.spaardoel)
   })
 })
 

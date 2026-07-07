@@ -2,8 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { computeFireProjection, type FinancialInput } from '@/lib/horizon-data'
 import { localMonthBounds, localMonthStart } from '@/lib/month-range'
 import { resolveFireParams } from '@/lib/fire-params'
-import { computeFreedomProgress } from '@/lib/core-metrics'
-import { deriveHousingContext, getFireEligibleNetWorth, parseHousingStrategy } from '@/lib/housing-strategy'
+import { computeFreedomProgressWithBasis, inclHomeTargetFromScalar } from '@/lib/core-metrics'
+import { deriveHousingContext, getFireEligibleNetWorth, parseHousingStrategy, isHomeExcludedFromFire } from '@/lib/housing-strategy'
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
 
@@ -126,10 +126,21 @@ export async function GET(request: Request) {
     const housingStrategy = parseHousingStrategy(profileData?.housing_strategy_config)
     const housingContext = deriveHousingContext(assetsData as unknown as Asset[], debtsData as unknown as Debt[])
     const fireEligibleNetWorth = getFireEligibleNetWorth(netWorth, housingContext, housingStrategy)
-    const freedomPct = computeFreedomProgress({
+    // Grondslag-keuze (ADR 0009 herzien): standaard telt de eigen woning mee →
+    // INCL.-woning grondslag; alleen bij exclude_from_fire → EXCL. (liquide). De
+    // kaart toont verderop het volledige netWorth, dus incl. is óók congruent.
+    const homeExcludedFromFire = housingContext.hasEigenHuis && isHomeExcludedFromFire(housingStrategy)
+    const requiredPortfolioExclHome = fireTarget > 0 ? fireTarget : null
+    const requiredNetWorthInclHome = inclHomeTargetFromScalar(requiredPortfolioExclHome, netWorth, fireEligibleNetWorth)
+    const freedomPct = computeFreedomProgressWithBasis({
+      homeExcludedFromFire,
+      netWorthInclHome: netWorth,
       fireEligibleNetWorth,
-      requiredPortfolio: fireTarget > 0 ? fireTarget : null,
+      requiredNetWorthInclHome,
+      requiredPortfolioExclHome,
     })
+    // FIRE-doel op DEZELFDE grondslag als het Vrijheids-% (incl. woning tenzij uitgesloten).
+    const displayFireGoal = homeExcludedFromFire ? requiredPortfolioExclHome : (requiredNetWorthInclHome ?? requiredPortfolioExclHome)
 
     // FIRE projection — gepersonaliseerde return/swr/inflatie.
     const horizonInput: FinancialInput = {
@@ -207,7 +218,7 @@ export async function GET(request: Request) {
     // Full: include EUR amounts (opt-in)
     if (privacyLevel === 'full') {
       cardData.netWorth = netWorth
-      cardData.fireTarget = fireTarget > 0 ? fireTarget : null
+      cardData.fireTarget = displayFireGoal != null && displayFireGoal > 0 ? displayFireGoal : null
     }
 
     return Response.json(cardData)

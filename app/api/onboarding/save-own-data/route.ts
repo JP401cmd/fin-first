@@ -283,12 +283,20 @@ function buildRpcPayload(
       temporal_balance: horizonData?.temporal_balance ?? identity.temporal_balance ?? 3,
       news_description: newsDescription ?? null,
       onboarding_intent: intent ?? null,
-      // Housing: nieuwe accounts starten op 'exclude_from_fire' ("niet meerekenen")
-      // — de eigen woning telt standaard NIET mee in de FIRE-pot (raakt alleen de
-      // FIRE-eligible grondslag, niet nettoVermogen). We zetten dit expliciet zodat
-      // de horizonmotor altijd een geldige config heeft; de DB-default + resolver-
-      // fallback (DEFAULT_HOUSING_STRATEGY) blijven bewust include_full.
-      housing_strategy_config: { mode: 'exclude_from_fire' },
+      // ── Standaardinstellingen nieuwe gebruiker (Notion "new user standaard
+      // instellingen") ────────────────────────────────────────────────────
+      // Eigen woning: "verkopen wanneer nodig, op basis van marktwaarde"
+      // (downsize + on_depletion + marktwaarde-basis). parseHousingStrategy vult
+      // de overige velden met DEFAULT_DOWNSIZE_CONFIG. Zonder eigen_huis-asset is
+      // dit een no-op; mét eigen woning wordt die pas gemonetiseerd wanneer het
+      // liquide vermogen krap wordt. Vervangt de eerdere exclude_from_fire-default.
+      housing_strategy_config: { mode: 'downsize', trigger: 'on_depletion', saleValuationBasis: 'market' },
+      // Onttrekkingsprofiel: afnemend (enum-spiegel 'static', zoals de
+      // onttrekkings-UI schrijft). Verdeling bij toename: naar beleggen
+      // (pot_rules.surplus_group; resolvePotRules vult de orde-regels aan).
+      withdrawal_strategy: 'static',
+      withdrawal_profile_config: { profiel: 'afnemend' },
+      pot_rules: { surplus_group: 'beleggingen' },
     },
     budget_amounts: budgetAmounts,
     budgettering_mode: budgetteringMode ?? 'manual',
@@ -334,7 +342,7 @@ const bodySchema = z.object({
     inflation_rate: z.number().min(0).max(0.10).optional(),
     retirement_expense_method: z.enum(['essential_budgets', 'custom_amount', 'current_income']).optional(),
     retirement_custom_amount: z.number().min(0).optional(),
-    fire_end_strategy: z.enum(['perpetual', 'legacy', 'deplete']).optional(),
+    fire_end_strategy: z.enum(['perpetual', 'legacy', 'deplete', 'pensioen']).optional(),
     fire_legacy_amount: z.number().positive().optional(),
     fire_end_age: z.number().int().min(60).max(120).optional(),
     temporal_balance: z.number().int().min(1).max(5).optional(),
@@ -363,7 +371,7 @@ const bodySchema = z.object({
     'nieuws',
   ])).optional(),
   horizonData: z.object({
-    fire_end_strategy: z.enum(['perpetual', 'legacy', 'deplete']).optional(),
+    fire_end_strategy: z.enum(['perpetual', 'legacy', 'deplete', 'pensioen']).optional(),
     fire_end_age: z.number().int().min(60).max(120).optional(),
     fire_legacy_amount: z.number().positive().optional(),
     retirement_expense_method: z.enum(['essential_budgets', 'custom_amount', 'current_income']).optional(),
@@ -792,14 +800,28 @@ export async function POST(req: Request) {
     )
     profileData.retirement_expense_method = retirementDefaults.retirement_expense_method
     profileData.retirement_expense_custom_amount = retirementDefaults.retirement_expense_custom_amount
-    // Housing: nieuwe accounts starten op 'exclude_from_fire' ("niet meerekenen")
-    // — expliciet wegschrijven (non-RPC fallback-pad). DB-default + resolver-
-    // fallback blijven bewust include_full.
-    profileData.housing_strategy_config = { mode: 'exclude_from_fire' }
+    // ── Standaardinstellingen nieuwe gebruiker (Notion "new user standaard
+    // instellingen") — expliciet wegschrijven (primair multi-step pad) ─────
+    //   1. Eindstrategie: vermogen opeten tot leeftijd 90 (fire_end_strategy
+    //      'deplete' + fire_end_age 90 — zie de ?? fallbacks hieronder; een
+    //      expliciete gebruikerskeuze in de horizon-stap wint).
+    //   2. Eigen woning: verkopen wanneer nodig, op basis van marktwaarde
+    //      (downsize + on_depletion + saleValuationBasis 'market'). Vervangt de
+    //      eerdere exclude_from_fire-default. parseHousingStrategy vult de rest.
+    //   3. Onttrekkingsprofiel: afnemend (withdrawal_profile_config.profiel;
+    //      enum-spiegel 'static' zoals de onttrekkings-UI schrijft).
+    //   4. Verdeling bij toename: naar beleggen (pot_rules.surplus_group;
+    //      resolvePotRules vult de orde-regels met de defaults aan).
+    // Expliciet zodat elke nieuwe gebruiker deze actieve voorkeuren heeft,
+    // onafhankelijk van latere default/fallback-drift.
+    profileData.housing_strategy_config = { mode: 'downsize', trigger: 'on_depletion', saleValuationBasis: 'market' }
     profileData.fire_end_strategy = horizonData?.fire_end_strategy ?? identity.fire_end_strategy ?? 'deplete'
     profileData.fire_legacy_amount = horizonData?.fire_legacy_amount ?? identity.fire_legacy_amount ?? null
     profileData.fire_end_age = horizonData?.fire_end_age ?? identity.fire_end_age ?? 90
     profileData.temporal_balance = horizonData?.temporal_balance ?? identity.temporal_balance ?? 3
+    profileData.withdrawal_strategy = 'static'
+    profileData.withdrawal_profile_config = { profiel: 'afnemend' }
+    profileData.pot_rules = { surplus_group: 'beleggingen' }
     // Optionele metadata-kolommen: schrijf alléén als er waarde is. Dat
     // voorkomt een schema-cache-miss in omgevingen waar de bijbehorende
     // migratie nog niet is toegepast (PostgREST faalt op een onbekende
@@ -860,6 +882,9 @@ export async function POST(req: Request) {
       'income_source',
       'expenses_source',
       'housing_strategy_config',
+      'withdrawal_strategy',
+      'withdrawal_profile_config',
+      'pot_rules',
     ] as const
     let profileErr: { message?: string; code?: string } | null = null
     for (let attempt = 0; attempt < OPTIONAL_PROFILE_COLUMNS.length + 1; attempt++) {

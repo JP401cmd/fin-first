@@ -11,6 +11,7 @@ import {
   type SliderKey,
 } from '@/lib/scenario-events'
 import type { WhatIfEvent } from '@/components/app/horizon/whatif-events'
+import { WhatIfDevelopmentNotice } from '@/components/app/horizon/whatif-development-notice'
 
 /**
  * WhatIfOverrides is now a derived view, but kept as a public type for
@@ -32,6 +33,13 @@ interface SlidersProps {
   currentAge: number
   /** When true, render only the slider grid — no card wrapper, no headers. */
   bare?: boolean
+  /**
+   * Toont de "nog in ontwikkeling"-notice bovenaan de collapsible (default: true).
+   * De inline `?whatif=open`-modal (horizon-client) rendert deze component zonder
+   * prop → notice zichtbaar. De volledige what-if-pagina toont de notice zelf al
+   * bovenaan en zet deze daarom op `false` (voorkomt dubbele weergave).
+   */
+  developmentNotice?: boolean
 }
 
 function DeltaBadge({ current, base, format }: { current: number; base: number; format: (v: number) => string }) {
@@ -269,6 +277,7 @@ export function WhatIfSlidersCollapsible({
   events,
   setEvents,
   currentAge,
+  developmentNotice = true,
 }: SlidersProps) {
   // Auto-detect manual tuning: any slider-origin event present.
   const hasSliderEvent = events.some(e => e.is_scenario_only && e.scenario_origin?.startsWith('slider:'))
@@ -276,6 +285,8 @@ export function WhatIfSlidersCollapsible({
   const open = userOpen || hasSliderEvent
 
   return (
+    <>
+      {developmentNotice && <WhatIfDevelopmentNotice className="mb-3" />}
     <div className="card-editorial overflow-hidden">
       <button
         type="button"
@@ -307,5 +318,6 @@ export function WhatIfSlidersCollapsible({
         </div>
       )}
     </div>
+    </>
   )
 }

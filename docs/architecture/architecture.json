@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-06T13:53:17.357Z",
-  "generatedDate": "2026-07-06",
+  "generatedAt": "2026-07-07T16:36:13.445Z",
+  "generatedDate": "2026-07-07",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -192,8 +192,8 @@
     "api": 242,
     "tables": 58,
     "migrations": 121,
-    "integrations": 25,
-    "components": 778,
+    "integrations": 24,
+    "components": 781,
     "providers": 11,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -7199,11 +7199,11 @@
     }
   ],
   "components": {
-    "total": 778,
+    "total": 781,
     "groups": [
       {
         "group": "app",
-        "count": 321,
+        "count": 322,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -7514,6 +7514,7 @@
           "whatif-actions",
           "whatif-beslishulp",
           "whatif-chat",
+          "whatif-development-notice",
           "whatif-events",
           "whatif-header",
           "whatif-market-assumptions",
@@ -7899,13 +7900,14 @@
       },
       {
         "group": "onboarding",
-        "count": 27,
+        "count": 29,
         "items": [
           "aangifte-import-pane",
           "budget-amount-editor",
           "facts-panel",
           "onboarding-bezittingen",
           "onboarding-bezittingen.test",
+          "onboarding-eindstrategie",
           "onboarding-horizon",
           "onboarding-identity",
           "onboarding-inkomen",
@@ -7916,6 +7918,7 @@
           "onboarding-posten",
           "onboarding-schulden",
           "onboarding-schulden.test",
+          "onboarding-section-back-navigation.test",
           "onboarding-shell",
           "onboarding-spaardoel",
           "onboarding-success",
@@ -8118,10 +8121,6 @@
     },
     {
       "name": "OpenAI",
-      "category": "AI"
-    },
-    {
-      "name": "OpenRouter",
       "category": "AI"
     },
     {
@@ -12573,7 +12572,7 @@
     {
       "id": "0009-vrijheidsvoortgang-unified-grondslag",
       "title": "Vrijheidsvoortgang single-sourced op de unified-projection-grondslag",
-      "status": "aanvaard",
+      "status": "vervangen",
       "date": "2026-06-12",
       "elements": [
         "as-planning",
@@ -12890,6 +12889,19 @@
       ],
       "summary": "De horizon-kernel (ADR 0032) volgt het eigen Excel-model `Core calc v5.xlsm` byte-exact als oracle. Dit besluit legt een **bewuste, gedocumenteerde en transitionele afwijking** van dat v5-oracle vast: de tekort-lening wordt voortaan (app-pad) maandelijks afgelost uit liquide bezi",
       "file": "docs/adr/0033-tekort-aflossing-uit-liquide-transitioneel.md"
+    },
+    {
+      "id": "0034-vrijheidsvoortgang-grondslag-incl-woning",
+      "title": "Vrijheidsvoortgang: default-grondslag incl. eigen woning (herziening van ADR 0009)",
+      "status": "aanvaard",
+      "date": "2026-07-07",
+      "elements": [
+        "as-planning",
+        "fn-toekomstplannen",
+        "as-vermogen"
+      ],
+      "summary": "Vrijheidsvoortgang (freedomPct) staat vanaf nu STANDAARD op de INCL.-woning grondslag: teller = volledig netto vermogen (incl. eigen woning + overige niet-liquide bezit), noemer = `requiredFireNetWorth` (Prognose!I@FIRE, resp. `inclHomeTargetFromScalar` waar alleen een scalar-doe",
+      "file": "docs/adr/0034-vrijheidsvoortgang-grondslag-incl-woning.md"
     }
   ],
   "churn": {
@@ -12897,7 +12909,7 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 88
+        "commits": 89
       },
       {
         "path": "app/(app)/toekomst",
@@ -12916,12 +12928,12 @@
         "commits": 10
       },
       {
-        "path": "lib/horizon-data.ts",
+        "path": "lib/fire-simulation.ts",
         "commits": 8
       },
       {
-        "path": "lib/fire-simulation.ts",
-        "commits": 7
+        "path": "lib/horizon-data.ts",
+        "commits": 8
       },
       {
         "path": "components/horizon",
@@ -12939,8 +12951,8 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 7131,
-        "commits": 72
+        "loc": 7170,
+        "commits": 73
       },
       {
         "file": "components/app/budgets-client.tsx",
@@ -12950,7 +12962,7 @@
       {
         "file": "components/core/assets-client.tsx",
         "loc": 4300,
-        "commits": 40
+        "commits": 41
       },
       {
         "file": "lib/release-notes.ts",
@@ -13758,20 +13770,20 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-07-05",
+    "previousDate": "2026-07-06",
     "hasChanges": true,
     "sections": [
       {
-        "label": "API-routes",
-        "added": [
-          "/api/admin/uat/latest"
-        ],
-        "removed": []
+        "label": "Integraties",
+        "added": [],
+        "removed": [
+          "OpenRouter"
+        ]
       },
       {
         "label": "Componenten (aantal)",
         "added": [
-          "+2"
+          "+3"
         ],
         "removed": []
       }
@@ -13901,6 +13913,13 @@
       "date": "2026-07-06",
       "api": 242,
       "components": 778,
+      "tables": 58,
+      "routesProduction": 98
+    },
+    {
+      "date": "2026-07-07",
+      "api": 242,
+      "components": 781,
       "tables": 58,
       "routesProduction": 98
     }

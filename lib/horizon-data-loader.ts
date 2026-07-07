@@ -26,13 +26,14 @@ import { resolveFireStrategyWithOverride, type FireStrategyConfig } from '@/lib/
 import { resolveFireParams, type FireParams } from '@/lib/fire-params'
 import { resolveWithdrawalStrategy, type WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 import { computeHealthScoreFromInputs, type HealthScore, type HealthScoreInput } from '@/lib/financial-health'
-import { computeEffectiveExpenses, computeFireTarget, computeFreedomProgress } from '@/lib/core-metrics'
+import { computeEffectiveExpenses, computeFireTarget, computeFreedomProgressWithBasis, inclHomeTargetFromScalar } from '@/lib/core-metrics'
 import {
   parseHousingStrategy,
   deriveHousingContext,
   getFireEligibleNetWorth,
   netWorthExcludingHome,
   shouldShowDualHousingBasis,
+  isHomeExcludedFromFire,
   type HousingStrategyConfig,
   type HousingContext,
 } from '@/lib/housing-strategy'
@@ -662,9 +663,18 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
   // benodigde portfolio is hier het strategie-bewuste fireTarget op de
   // FIRE-eligible grondslag — geen nieuwe parallelle som, identieke noemer als
   // de "nog X jaar"-aftelling. Voorkomt 100% naast "nog jaren".
-  const freedomPct = computeFreedomProgress({
+  // Grondslag-keuze (ADR 0009 herzien): standaard telt de eigen woning mee →
+  // INCL.-woning grondslag. Deze loader draait zelf géén unified projection (de
+  // client doet dat), dus de incl.-noemer is de scalar-fallback (excl.-doel + huis-
+  // aandeel via inclHomeTargetFromScalar). Alleen bij exclude_from_fire → EXCL.
+  const homeExcludedFromFire = housingContext.hasEigenHuis && isHomeExcludedFromFire(housingStrategy)
+  const requiredPortfolioExclHome = fireTarget > 0 ? fireTarget : null
+  const freedomPct = computeFreedomProgressWithBasis({
+    homeExcludedFromFire,
+    netWorthInclHome: netWorth,
     fireEligibleNetWorth,
-    requiredPortfolio: fireTarget > 0 ? fireTarget : null,
+    requiredNetWorthInclHome: inclHomeTargetFromScalar(requiredPortfolioExclHome, netWorth, fireEligibleNetWorth),
+    requiredPortfolioExclHome,
   })
 
   // ── Canonieke gezondheidsscore-input (ADR 0008/0010) ──────────

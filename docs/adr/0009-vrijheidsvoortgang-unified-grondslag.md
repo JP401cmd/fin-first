@@ -1,7 +1,7 @@
 ---
 id: 0009-vrijheidsvoortgang-unified-grondslag
 title: Vrijheidsvoortgang single-sourced op de unified-projection-grondslag
-status: aanvaard
+status: vervangen
 date: 2026-06-12
 elements: [as-planning, fn-toekomstplannen, as-vermogen]
 ---
@@ -22,3 +22,22 @@ Eén grondslag, gedeeld tussen de surfaces. `lib/dashboard-data-loader.ts` en `l
   - **Household-projectie** (`lib/household-projection.ts`) draait op een eigen motor zonder huis-filter, intern consistent voor het huishoudperspectief.
   - **AI shared-context** (`lib/ai/context/shared-context.ts`) is inmiddels óók gemigreerd naar `computeFreedomProgress` op de FIRE-eligible grondslag (commit `b088ebb2b`, zelfde dag) — geen open follow-up meer.
 - Nog openstaande gaten op deze grondslag (consistentie-audit 2026-06-12, zie `docs/eenduidige-gegevens-audit.md` R2.1): het sovereignty-niveau (`lib/dashboard-data-loader.ts` sovFreedomPct + `compute-feature-access`/`compute-module-access`), de widgets `vrijheidsvoortgang`/`vrijheidsmijlpalen` + horizon-hero (eigen herberekening op vol vermogen), en `app/api/report`, `share/freedom-card`, `next-steps` (eigen FIRE-formules).
+
+## Addendum (2026-07-07) — VERVANGEN door ADR 0034
+
+De invariant "één canonieke grondslag, gedeeld tussen de surfaces" uit dit besluit
+blijft overeind, maar de **default-grondslag zelf is herzien**: vanaf 2026-07-07
+staat vrijheidsvoortgang standaard op de INCL.-woning grondslag (volledig netto
+vermogen ÷ `requiredFireNetWorth`) in plaats van de EXCL./FIRE-eligible grondslag
+die dit document beschrijft. ADR 0034
+(`0034-vrijheidsvoortgang-grondslag-incl-woning.md`) legt het vervolgbesluit vast:
+de EXCL.-grondslag van dít document leeft daarin letterlijk voort als de
+uitzonderingstak voor gebruikers met `exclude_from_fire` (huis expliciet van FIRE
+uitgesloten) — voor die groep is er dus geen inhoudelijk verschil. Voor alle
+andere huiseigenaren (meerekenen/downsize/opeethypotheek) telt de woning nu wél
+mee in teller én noemer, en valt de fire-pijler van het gezondheidsgetal daardoor
+hoger uit dan onder dit besluit. De "nog X jaar"-aftelling (aparte kernel-
+grootheid op de liquide portefeuille) en ADR 0030 (drawdown-grondslag) zijn door
+ADR 0034 ONGEMOEID gelaten. Dit document blijft staan als historisch
+besluit-record; wijzig de tekst hierboven niet met terugwerkende kracht — nieuwe
+besluiten horen in ADR 0034 of een eigen addendum.

@@ -18,6 +18,11 @@ import type {
   QuickAddInput,
 } from '@/lib/quick-add/types'
 import { formatCurrency } from '@/lib/format'
+import {
+  phaseKey,
+  useSectionPhaseNav,
+  type SectionPhase,
+} from './section-phase'
 
 /**
  * Stap — Bezittingen, als begeleide ja/nee-enumeratie (Boldin-stijl).
@@ -58,6 +63,14 @@ export interface OnboardingBezittingenProps {
   bankConnected?: boolean
   /** PSD2-callback gaf een fout (?bank_error=1). */
   bankError?: boolean
+  /**
+   * Gelifte interne fase-stack (controlled) — door de orchestrator gevoed zodat
+   * de fase een remount overleeft en Terug uit een latere groep hier op het
+   * laatst getoonde scherm landt i.p.v. op vraag 1. Zonder deze props draait de
+   * sectie uncontrolled op interne state (los renderen in tests).
+   */
+  phases?: SectionPhase[]
+  onPhasesChange?: (phases: SectionPhase[]) => void
 }
 
 // ── Vragen-volgorde ────────────────────────────────────────────────────
@@ -70,27 +83,20 @@ interface AssetQuestion {
 /** Gerichte ja/nee-vragen, in oplopende waarschijnlijkheid. */
 const ASSET_QUESTIONS: AssetQuestion[] = [
   { type: 'cash', question: 'Heb je een betaalrekening?' },
-  { type: 'savings', question: 'Heb je spaargeld?' },
+  { type: 'savings', question: 'Heb je een spaargeldrekening?' },
   { type: 'eigen_huis', question: 'Heb je een eigen huis?' },
   { type: 'investment', question: 'Heb je beleggingen?' },
 ]
 
-/** Types die al via een gerichte vraag aan bod kwamen — uit de catch-all-picker. */
-const ASKED_ASSET_TYPES: AssetType[] = ASSET_QUESTIONS.map((q) => q.type)
-
-// ── Interne sectie-fase ────────────────────────────────────────────────
-
-type SectionPhase =
-  | { kind: 'ask'; qIndex: number }
-  | { kind: 'more'; qIndex: number }
-  | { kind: 'other-ask' }
-  | { kind: 'other-pick' }
-  | { kind: 'other-more' }
-  | { kind: 'review' }
-
-/** Stabiele key per interne fase — voedt de scherm-overgang per vraag. */
-function phaseKey(phase: SectionPhase): string {
-  return `${phase.kind}-${'qIndex' in phase ? phase.qIndex : ''}`
+/**
+ * Onboarding-specifieke override voor de kleine-letter labels in de
+ * "Nog een …?"-vervolgvraag. Alleen `savings` wijkt bewust af van het
+ * gedeelde `ASSET_QUICK_ADD_LABELS` ('Spaargeld'): op de vermogensstap
+ * spreken we van een concrete "spaargeldrekening" (telbaar → "nog een …"),
+ * zonder het app-brede wizard-label te raken. Andere types vallen terug op
+ * het gedeelde label. */
+const ONBOARDING_MORE_LABELS: Partial<Record<AssetType, string>> = {
+  savings: 'spaargeldrekening',
 }
 
 // ── Component ──────────────────────────────────────────────────────────
@@ -106,8 +112,12 @@ export function OnboardingBezittingen({
   totalSteps = 7,
   bankConnected = false,
   bankError = false,
+  phases,
+  onPhasesChange,
 }: OnboardingBezittingenProps) {
-  const [phase, setPhase] = useState<SectionPhase>({ kind: 'ask', qIndex: 0 })
+  // Fase-stack (controlled door de orchestrator, anders interne useState). Terug
+  // popt één scherm; op de stack-bodem valt 'ie terug op de groep-`onBack`.
+  const { phase, push, back } = useSectionPhaseNav(phases, onPhasesChange, onBack)
   // Wanneer gezet: de wizard staat open, voorgeselecteerd op dit asset-type.
   const [wizardType, setWizardType] = useState<AssetType | null>(null)
   const [unlinkNotice, setUnlinkNotice] = useState<string | null>(null)
@@ -145,11 +155,9 @@ export function OnboardingBezittingen({
 
     // Sluit de wizard en ga naar de "nog een?"-fase voor het juiste type.
     setWizardType(null)
-    setPhase((prev) => {
-      if (prev.kind === 'ask') return { kind: 'more', qIndex: prev.qIndex }
-      if (prev.kind === 'other-pick') return { kind: 'other-more' }
-      return prev // 'more' / 'other-more' blijven staan
-    })
+    if (phase.kind === 'ask') push({ kind: 'more', qIndex: phase.qIndex })
+    else if (phase.kind === 'other-pick') push({ kind: 'other-more' })
+    // 'more' / 'other-more' → geen push, de "nog een?"-fase blijft staan.
   }
 
   // ── Verwijderen (transient input — geen confirm) ────────────────────
@@ -180,16 +188,16 @@ export function OnboardingBezittingen({
   // ── Navigatie tussen vragen ─────────────────────────────────────────
   function nextAfterQuestion(qIndex: number) {
     if (qIndex + 1 < ASSET_QUESTIONS.length) {
-      setPhase({ kind: 'ask', qIndex: qIndex + 1 })
+      push({ kind: 'ask', qIndex: qIndex + 1 })
     } else {
-      setPhase({ kind: 'other-ask' })
+      push({ kind: 'other-ask' })
     }
   }
 
   // Sectie afronden: bij gevulde lijst eerst een bevestigend overzicht,
   // bij lege lijst (bezittingen overgeslagen) direct door.
   function finishSection() {
-    if (quickAssets.length > 0) setPhase({ kind: 'review' })
+    if (quickAssets.length > 0) push({ kind: 'review' })
     else onNext()
   }
 
@@ -264,13 +272,14 @@ export function OnboardingBezittingen({
     factsPanel,
     currentStep,
     totalSteps,
-    onBack,
+    onBack: back,
   }
 
   function renderPhase() {
     if (phase.kind === 'ask' || phase.kind === 'more') {
       const q = ASSET_QUESTIONS[phase.qIndex]
-      const label = ASSET_QUICK_ADD_LABELS[q.type].toLowerCase()
+      const label =
+        ONBOARDING_MORE_LABELS[q.type] ?? ASSET_QUICK_ADD_LABELS[q.type].toLowerCase()
       const isMore = phase.kind === 'more'
       const title = isMore ? (
         <>
@@ -310,8 +319,8 @@ export function OnboardingBezittingen({
         <OnboardingVraag
           {...sharedVraagProps}
           title={questionHeadline('Heb je nog andere bezittingen?')}
-          deck="Denk aan een auto, pensioenpot, crypto, een eigen BV of waardevolle spullen."
-          onYes={() => setPhase({ kind: 'other-pick' })}
+          deck="Denk aan een auto, pensioen, crypto of een eigen BV — of een woning, spaar- of beleggingsrekening die je eerder oversloeg."
+          onYes={() => push({ kind: 'other-pick' })}
           onNo={finishSection}
         >
           {runningList}
@@ -327,7 +336,7 @@ export function OnboardingBezittingen({
           deck="Voeg er gerust meer toe — of rond de bezittingen af."
           yesLabel="Ja, nog een"
           noLabel="Nee, klaar"
-          onYes={() => setPhase({ kind: 'other-pick' })}
+          onYes={() => push({ kind: 'other-pick' })}
           onNo={finishSection}
         >
           {runningList}
@@ -345,9 +354,9 @@ export function OnboardingBezittingen({
           factsPanel={factsPanel}
           currentStep={currentStep}
           totalSteps={totalSteps}
-          onBack={onBack}
+          onBack={back}
           onConfirm={onNext}
-          onAddMore={() => setPhase({ kind: 'other-pick' })}
+          onAddMore={() => push({ kind: 'other-pick' })}
         >
           {runningList}
         </SectionReview>
@@ -364,11 +373,11 @@ export function OnboardingBezittingen({
         factsPanel={factsPanel}
         currentStep={currentStep}
         totalSteps={totalSteps}
-        onBack={onBack}
+        onBack={back}
         footer={
           <button
             type="button"
-            onClick={() => setPhase({ kind: 'other-ask' })}
+            onClick={back}
             className="w-full min-h-11 border border-[var(--border-ed)] bg-[var(--paper)] px-6 py-3 text-sm font-medium text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)]"
           >
             Terug
@@ -377,10 +386,16 @@ export function OnboardingBezittingen({
       >
         <div className="space-y-6">
           {runningList}
+          {/* Catch-all vangnet: toon de vólledige asset-catalogus (canonieke
+              `QUICK_ADD_ASSET_ORDER`), óók de vier types die al via een
+              gerichte ja/nee-vraag langskwamen. Wie daar "nee" zei maar een
+              woning/spaar-/betaalrekening/belegging vergat, kan die hier alsnog
+              toevoegen. Geen `exclude` — anders ontbreken juist de meest
+              voorkomende bezittingen. */}
           <AssetTypePicker
-            exclude={ASKED_ASSET_TYPES}
+            exclude={[]}
             onPick={(type) => setWizardType(type)}
-            onCancel={() => setPhase({ kind: 'other-ask' })}
+            onCancel={back}
           />
         </div>
       </OnboardingShell>

@@ -34,7 +34,7 @@ export function CoachMelding({
     >
       {/* platen-kop: label links, rechts ruimte voor de avatar */}
       <div className="flex min-h-[2.75rem] items-center border-b border-[var(--border-ed)] pl-3.5 pr-12">
-        <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-wil-700">
+        <span className="min-w-0 truncate font-mono text-[10px] uppercase tracking-[0.2em] text-wil-700">
           {headerLabel}
         </span>
       </div>
@@ -43,7 +43,7 @@ export function CoachMelding({
         type="button"
         onClick={(e) => { e.stopPropagation(); onClose() }}
         aria-label="Sluiten"
-        className="absolute right-2.5 top-2.5 z-10 p-1 text-[var(--ink-4)] transition-colors hover:text-[var(--ink-2)]"
+        className="absolute right-14 top-2.5 z-10 p-1 text-[var(--ink-4)] transition-colors hover:text-[var(--ink-2)]"
       >
         <X className="h-3.5 w-3.5" />
       </button>

@@ -14,11 +14,16 @@ import { OnboardingInkomen, parseBedragInput } from '@/components/onboarding/onb
 import { OnboardingBezittingen } from '@/components/onboarding/onboarding-bezittingen'
 import { OnboardingSchulden } from '@/components/onboarding/onboarding-schulden'
 import {
+  initialSectionPhases,
+  type SectionPhase,
+} from '@/components/onboarding/section-phase'
+import {
   OnboardingPensioen,
   INITIAL_PENSION_DRAFT,
   type PensionDraft,
 } from '@/components/onboarding/onboarding-pensioen'
 import { OnboardingSpaardoel } from '@/components/onboarding/onboarding-spaardoel'
+import { OnboardingEindstrategie } from '@/components/onboarding/onboarding-eindstrategie'
 import {
   OnboardingUitgavenPensioen,
   INITIAL_RETIREMENT_EXPENSE,
@@ -96,6 +101,7 @@ type Step =
   | 'schulden'
   | 'pensioen'
   | 'spaardoel'
+  | 'eindstrategie'
   | 'klaar'
   | 'saving'
   | 'success'
@@ -121,11 +127,15 @@ const STEP_GROUP_INDEX: Record<Step, number> = {
   schulden: 4,
   pensioen: 5,
   spaardoel: 6,
-  klaar: 7,
-  saving: 7,
-  success: 7,
+  // Eigen groep (7): de eindstrategie-keuze is een aparte, laatste inhoudelijke
+  // vraag (FIRE vs. pensioen) — geen sub-vraag van spaardoel. `klaar` schuift
+  // daardoor naar 8.
+  eindstrategie: 7,
+  klaar: 8,
+  saving: 8,
+  success: 8,
 }
-const TOTAL_GROUPS = 7
+const TOTAL_GROUPS = 8
 
 /**
  * Canonical order of every step that has ever existed in the flow, used as a
@@ -148,6 +158,7 @@ const CANONICAL_STEP_ORDER: readonly string[] = [
   'schulden',
   'pensioen',
   'spaardoel',     // toegevoegd mei 2026 — laagdrempelige spaardoel-keuze
+  'eindstrategie', // toegevoegd jul 2026 — FIRE vs. pensioen als laatste vraag
   'budgets',       // → klaar (legacy)
   'horizon',       // → klaar (legacy)
   'klaar',
@@ -279,6 +290,7 @@ function computeStepOrder(): Step[] {
     'schulden',
     'pensioen',
     'spaardoel',
+    'eindstrategie',
     'klaar',
     'saving',
     'success',
@@ -316,6 +328,16 @@ interface State {
   budgetAmounts: Record<string, number>
   quickAssets: AssetQuickInput[]
   quickDebts: DebtQuickInput[]
+  /**
+   * Gelifte interne fase-stack van de Bezittingen/Schulden-sub-machines. Leeft
+   * in de orchestrator (naast quickAssets/quickDebts) zodat 'ie een remount van
+   * de sectie overleeft — Terug uit een latere groep landt zo op het laatst
+   * getoonde scherm (bv. het review-overzicht) i.p.v. op vraag 1. Bewust NIET
+   * gepersisteerd naar localStorage: de fase hangt aan de (niet-herstelde)
+   * gevoelige posten, dus na een draft-restore start 'ie weer op vraag 1.
+   */
+  bezittingenPhases: SectionPhase[]
+  schuldenPhases: SectionPhase[]
   /** Stap v. — spaardoel-keuze. Skipped + presetKey=null = niet weggeschreven. */
   spaardoel: SpaardoelState
   /**
@@ -344,6 +366,10 @@ type Action =
   | { type: 'SET_BUDGET_AMOUNTS'; amounts: Record<string, number> }
   | { type: 'SET_QUICK_ASSETS'; items: AssetQuickInput[] }
   | { type: 'SET_QUICK_DEBTS'; items: DebtQuickInput[] }
+  /** Vervang de gelifte fase-stack van de Bezittingen-sub-machine. */
+  | { type: 'SET_BEZITTINGEN_PHASES'; phases: SectionPhase[] }
+  /** Vervang de gelifte fase-stack van de Schulden-sub-machine. */
+  | { type: 'SET_SCHULDEN_PHASES'; phases: SectionPhase[] }
   /**
    * Vervang de complete spaardoel-substate per dispatch — eenvoudiger dan
    * partial-update-acties want de child levert telkens de volledige shape.
@@ -378,6 +404,8 @@ export const _initialState: State = {
   budgetAmounts: {},
   quickAssets: [],
   quickDebts: [],
+  bezittingenPhases: initialSectionPhases(),
+  schuldenPhases: initialSectionPhases(),
   spaardoel: {
     presetKey: null,
     name: '',
@@ -409,6 +437,10 @@ export function _reducer(state: State, action: Action): State {
       return { ...state, quickAssets: action.items }
     case 'SET_QUICK_DEBTS':
       return { ...state, quickDebts: action.items }
+    case 'SET_BEZITTINGEN_PHASES':
+      return { ...state, bezittingenPhases: action.phases }
+    case 'SET_SCHULDEN_PHASES':
+      return { ...state, schuldenPhases: action.phases }
     case 'SET_SPAARDOEL':
       return { ...state, spaardoel: action.data }
     case 'SET_RETIREMENT_EXPENSE':
@@ -462,6 +494,10 @@ export function _reducer(state: State, action: Action): State {
         budgetAmounts: {},
         quickAssets: [],
         quickDebts: [],
+        // De fase-stack hangt aan de (net-gewiste) posten — reset naar vraag 1
+        // zodat een herstelde draft niet op een lege review-fase landt.
+        bezittingenPhases: initialSectionPhases(),
+        schuldenPhases: initialSectionPhases(),
         // Alleen preset-keuze + skip-vlag terug; naam/streefbedrag/datum blijven leeg.
         spaardoel: {
           ..._initialState.spaardoel,
@@ -1338,6 +1374,10 @@ export default function OnboardingPage() {
               totalSteps={totalContentSteps}
               bankConnected={bankConnected}
               bankError={bankError}
+              phases={state.bezittingenPhases}
+              onPhasesChange={(phases) =>
+                dispatch({ type: 'SET_BEZITTINGEN_PHASES', phases })
+              }
             />
           )}
 
@@ -1350,6 +1390,10 @@ export default function OnboardingPage() {
               onBack={goToBack}
               currentStep={currentContentStep}
               totalSteps={totalContentSteps}
+              phases={state.schuldenPhases}
+              onPhasesChange={(phases) =>
+                dispatch({ type: 'SET_SCHULDEN_PHASES', phases })
+              }
             />
           )}
 
@@ -1399,6 +1443,23 @@ export default function OnboardingPage() {
               monthlyIncome={netMonthlyIncomeForKlaar}
               monthlyExpenses={monthlyExpensesParsed}
               selectedGoals={state.selectedGoals}
+              currentStep={currentContentStep}
+              totalSteps={totalContentSteps}
+            />
+          )}
+
+          {/* ── Eindstrategie — FIRE vs. pensioen (laatste inhoudelijke vraag) ── */}
+          {state.step === 'eindstrategie' && (
+            <OnboardingEindstrategie
+              strategy={state.horizon.fire_end_strategy}
+              onChange={(strategy) =>
+                dispatch({
+                  type: 'SET_HORIZON',
+                  data: { ...state.horizon, fire_end_strategy: strategy },
+                })
+              }
+              onNext={goToNext}
+              onBack={goToBack}
               currentStep={currentContentStep}
               totalSteps={totalContentSteps}
             />

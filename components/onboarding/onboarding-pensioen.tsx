@@ -157,7 +157,10 @@ export function OnboardingPensioen({
                 htmlFor="ob-pension-gross"
                 className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]"
               >
-                Geschat bruto pensioen per maand
+                Geschat bruto pensioen per maand{' '}
+                <span className="text-xs font-normal italic text-[var(--ink-3)]">
+                  (huidige waarde)
+                </span>
               </label>
               <div className="relative">
                 <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm text-[var(--ink-4)]">
@@ -183,7 +186,8 @@ export function OnboardingPensioen({
                 className="mt-1 text-xs italic text-[var(--ink-3)]"
                 style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
               >
-                Inclusief aanvullend werkpensioen. Grof mag — later aanpasbaar.
+                De huidige waarde van wat je tot nu toe hebt opgebouwd —
+                inclusief aanvullend werkpensioen. Grof mag — later aanpasbaar.
               </p>
             </div>
 

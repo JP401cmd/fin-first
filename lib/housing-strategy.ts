@@ -1403,3 +1403,18 @@ export function shouldShowDualHousingBasis(
 ): boolean {
   return context.hasEigenHuis && config.mode !== 'include_full'
 }
+
+/**
+ * Is de eigen woning volledig UITGESLOTEN van de FIRE-berekening? Alléén de
+ * `exclude_from_fire`-modus sluit de woning uit ("dat is je dak, niet je
+ * rendement"). Alle andere modi zetten de woning uiteindelijk in om de doelen te
+ * halen — `include_full` (telt 100% mee), `downsize` (verkoop → opbrengst naar de
+ * pot) en `reverse_mortgage` (leen tegen de overwaarde). Enige home voor deze
+ * predikaat: de vrijheidsvoortgang-grondslag-keuze (ADR 0009 herzien) valt bij
+ * true terug op EXCL. (liquide), anders INCL.-woning. Gate op `hasEigenHuis` bij
+ * de callsite: zonder eigen woning is er niets uit te sluiten (dan INCL.-grondslag,
+ * die met de niet-liquide noemer óók consistenter is).
+ */
+export function isHomeExcludedFromFire(config: HousingStrategyConfig): boolean {
+  return config.mode === 'exclude_from_fire'
+}

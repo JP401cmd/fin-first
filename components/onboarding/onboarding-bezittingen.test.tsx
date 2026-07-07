@@ -137,6 +137,26 @@ describe('OnboardingBezittingen — afsluitend overzicht', () => {
     expect(container.textContent).not.toContain('Dit zijn je bezittingen')
   })
 
+  it('toont in de catch-all-picker álle bezittingscategorieën, incl. de eerder gevraagde vier', () => {
+    const { container } = render(<Host />)
+    // Loop de vier gerichte ja/nee-vragen af met "Nee" → catch-all-vraag.
+    advanceToOtherAsk(container)
+    // "Ja" op de catch-all → type-keuzelijst.
+    fireEvent.click(footerButton('Ja'))
+    expect(container.textContent).toContain('Wat voor bezitting?')
+    // Vangnet: de vier eerder gevraagde types zijn hier óók beschikbaar, zodat
+    // een vergeten woning/spaar-/betaalrekening/belegging alsnog toe te voegen is.
+    const text = container.textContent ?? ''
+    expect(text).toContain('Eigen woning')
+    expect(text).toContain('Spaargeld')
+    expect(text).toContain('Bankrekening')
+    expect(text).toContain('Beleggingen')
+    // En de resterende catalogus-categorieën blijven aanwezig.
+    expect(text).toContain('Pensioen')
+    expect(text).toContain('Vastgoed')
+    expect(text).toContain('Overig')
+  })
+
   it('"Voeg nog iets toe" vanuit review keert terug naar de picker', () => {
     const { container } = render(<Host />)
     fireEvent.click(footerButton('Ja'))

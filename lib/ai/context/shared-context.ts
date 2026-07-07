@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { computeCoreData, computeFreedomProgress, type FinancialInput } from '@/lib/core-metrics'
+import { computeCoreData, computeFreedomProgressWithBasis, inclHomeTargetFromScalar, type FinancialInput } from '@/lib/core-metrics'
 import { loadCoreData } from '@/lib/core-data-loader'
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
@@ -7,6 +7,7 @@ import {
   deriveHousingContext,
   getFireEligibleNetWorth,
   parseHousingStrategy,
+  isHomeExcludedFromFire,
 } from '@/lib/housing-strategy'
 import { isFinanciallyFree } from '@/lib/fire-strategy'
 import { section, formatCurrency, formatFreedomTime, formatPercentage } from './formatter'
@@ -98,19 +99,31 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
   // loaders gebruiken). Valt terug op het strategie-loze fireTarget wanneer de
   // projectie niet kon draaien (geen geboortedatum / geen jaaruitgaven).
   const requiredPortfolio = coreData.fireTargetFromHorizon ?? (core.fireTarget > 0 ? core.fireTarget : null)
-  const freedomPercentage = computeFreedomProgress({
+  // Grondslag-keuze (ADR 0009 herzien): standaard telt de eigen woning mee →
+  // INCL.-woning grondslag (teller = volledig netto vermogen, noemer = incl.-doel
+  // via scalar-fallback). Alleen bij exclude_from_fire → EXCL. (liquide).
+  const homeExcludedFromFire = housingContext.hasEigenHuis && isHomeExcludedFromFire(housingStrategy)
+  const requiredNetWorthInclHome = inclHomeTargetFromScalar(requiredPortfolio, core.netWorth, fireEligibleNetWorth)
+  const freedomPercentage = computeFreedomProgressWithBasis({
+    homeExcludedFromFire,
+    netWorthInclHome: core.netWorth,
     fireEligibleNetWorth,
-    requiredPortfolio,
+    requiredNetWorthInclHome,
+    requiredPortfolioExclHome: requiredPortfolio,
   })
+  // FIRE-doel op DEZELFDE grondslag als het Vrijheids-% (incl. woning tenzij
+  // uitgesloten), met fallback op het simpele fireTarget.
+  const displayFireGoal = homeExcludedFromFire
+    ? requiredPortfolio
+    : (requiredNetWorthInclHome ?? requiredPortfolio)
 
   const lines = [
     `Netto vermogen: ${formatCurrency(core.netWorth)}`,
     `Vrijgekochte tijd: ${formatFreedomTime(core.freedomYears, core.freedomMonths)}`,
     `Vrijheids-%: ${formatPercentage(freedomPercentage)}`,
-    // Toon het FIRE-doel op dezelfde grondslag als het Vrijheids-% (de
-    // unified-projection-portfolio uit de loaders), met fallback op het simpele
-    // fireTarget — zo zijn teller, noemer en doelbedrag onderling consistent.
-    `FIRE-doel: ${formatCurrency(requiredPortfolio ?? core.fireTarget)}`,
+    // Toon het FIRE-doel op dezelfde grondslag als het Vrijheids-% — zo zijn
+    // teller, noemer en doelbedrag onderling consistent.
+    `FIRE-doel: ${formatCurrency(displayFireGoal ?? core.fireTarget)}`,
     `Verwachte FIRE-datum: ${core.expectedFireDate || 'onbekend'}`,
     `Maandinkomen: ${formatCurrency(rawFinancials.monthlyIncome)} | Maanduitgaven: ${formatCurrency(rawFinancials.monthlyExpenses)}`,
     monthlyMustExpenses > 0 ? `Must-uitgaven (essentieel): ${formatCurrency(monthlyMustExpenses)}/mnd` : null,

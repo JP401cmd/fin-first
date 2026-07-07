@@ -25,7 +25,7 @@ import {
   type UserDefinedCashflow,
 } from '@/lib/horizon-data'
 import { computeHealthScoreFromInputs, type HealthScore, type HealthScoreInput } from '@/lib/financial-health'
-import { computeEffectiveExpenses, computeFireTarget, computeFreedomProgress } from '@/lib/core-metrics'
+import { computeEffectiveExpenses, computeFireTarget, computeFreedomProgressWithBasis, inclHomeTargetFromScalar } from '@/lib/core-metrics'
 import { computeEmergencyFundMonths } from '@/lib/health-score-input'
 import { NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND, STARTERSVRIJSTELLING_MAX } from '@/lib/constants'
 import { computeKostenKoper } from '@/lib/kosten-koper'
@@ -61,6 +61,7 @@ import { BottomSheet } from '@/components/app/bottom-sheet'
 import {
   isHousingStrategyEvent,
   getFireEligibleNetWorth,
+  isHomeExcludedFromFire,
 } from '@/lib/housing-strategy'
 import { applyHousingToComposition } from '@/lib/horizon/wealth-composition-housing'
 import { detectDeficitLoanFromRows } from '@/lib/horizon/deficit-loan-display'
@@ -1125,9 +1126,18 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       fireSwr,
       { strategy: fireStrategy?.strategy ?? 'deplete', yearsInRetirement: hsYearsInRetirement, realReturn: hsRealReturn },
     )
-    const fPct = computeFreedomProgress({
+    // Grondslag-keuze (ADR 0009 herzien): standaard telt de eigen woning mee →
+    // INCL.-woning grondslag; alleen bij exclude_from_fire → EXCL. (liquide). Deze
+    // what-if-recompute kent geen her-sim, dus incl.-noemer via scalar-fallback.
+    const hsHomeExcludedFromFire =
+      initialData.housingContext.hasEigenHuis && isHomeExcludedFromFire(initialData.housingStrategy)
+    const hsRequiredPortfolioExcl = hsFireTarget > 0 ? hsFireTarget : null
+    const fPct = computeFreedomProgressWithBasis({
+      homeExcludedFromFire: hsHomeExcludedFromFire,
+      netWorthInclHome: nw,
       fireEligibleNetWorth: hsFireEligibleNetWorth,
-      requiredPortfolio: hsFireTarget > 0 ? hsFireTarget : null,
+      requiredNetWorthInclHome: inclHomeTargetFromScalar(hsRequiredPortfolioExcl, nw, hsFireEligibleNetWorth),
+      requiredPortfolioExclHome: hsRequiredPortfolioExcl,
     })
     const newInput: HealthScoreInput = {
       ...healthScoreInput,
@@ -1480,10 +1490,27 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     initialData.housingContext,
     initialData.housingStrategy,
   )
+  // Grondslag-keuze (ADR 0009 herzien): standaard telt de eigen woning mee →
+  // INCL.-woning grondslag (teller = volledig netto vermogen incl. huis + niet-
+  // liquide; noemer = requiredFireNetWorth = Prognose!I@FIRE, scalar-fallback als de
+  // sim wegvalt). Alleen bij exclude_from_fire → EXCL. (liquide). De voortgangsbalk,
+  // de perspectiveHero én het balk-label erven deze effectieve grondslag.
+  const homeExcludedFromProgress =
+    initialData.housingContext.hasEigenHuis && isHomeExcludedFromFire(initialData.housingStrategy)
+  const effectiveRequiredNetWorthInclHome =
+    simResult?.requiredFireNetWorth ??
+    inclHomeTargetFromScalar(
+      effectiveFireTarget > 0 ? effectiveFireTarget : null,
+      effectiveNetWorth,
+      effectiveFireEligibleNetWorth,
+    )
   const effectiveFreedomPct = effectiveFireTarget > 0
-    ? computeFreedomProgress({
+    ? computeFreedomProgressWithBasis({
+        homeExcludedFromFire: homeExcludedFromProgress,
+        netWorthInclHome: effectiveNetWorth,
         fireEligibleNetWorth: effectiveFireEligibleNetWorth,
-        requiredPortfolio: effectiveFireTarget,
+        requiredNetWorthInclHome: effectiveRequiredNetWorthInclHome,
+        requiredPortfolioExclHome: effectiveFireTarget,
       })
     : (fire?.freedomPercentage ?? 0)
 
@@ -1503,6 +1530,14 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     !isPensioenMode &&
     fireTargetInclHome != null && fireTargetInclHome > 0 &&
     fireTargetExclHome != null && fireTargetExclHome > 0
+
+  // Doelbedrag dat bij de voortgangsbalk-grondslag hoort: incl. woning
+  // (fireTargetInclHome = requiredFireNetWorth) tenzij de woning is uitgesloten
+  // (exclude_from_fire) → dan het liquide excl.-doel. Consistent met de noemer
+  // van effectiveFreedomPct, zodat de balk-fill en het balk-label niet botsen.
+  const balkVrijheidDoel = homeExcludedFromProgress
+    ? (simResult?.requiredFirePortfolio ?? fire?.fireTarget ?? 0)
+    : (fireTargetInclHome ?? simResult?.requiredFirePortfolio ?? fire?.fireTarget ?? 0)
 
   // ── AOW-stop shortfall detectie ────────────────────────────────────────
   const isShortfallScenario = !isPensioenMode
@@ -2965,33 +3000,35 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
               </div>
               {!hasPerspectiveHero && showDualFireTarget ? (
                 <>
-                  {/* Doel incl. woning — het grote doel (totaal netto vermogen bij FIRE) */}
-                  <div
-                    className="text-[24px] sm:text-[28px] font-black leading-none tracking-[-0.02em]"
-                    style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
-                  >
-                    <MaskedAmount value={fireTargetInclHome!} tone="horizon" monoWhenVisible={false} />
-                  </div>
-                  <div
-                    className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
-                    style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
-                  >
-                    incl. woning
-                  </div>
-                  {/* Doel excl. woning (liquide) — het kleinere doel */}
-                  <div className="mt-2 pt-2 border-t border-[var(--rule-soft)]">
+                  {/* Doel incl. woning — het grote doel; kwalificatie inline zodat de kaart even hoog blijft als de buur-KPI's */}
+                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                     <div
-                      className="text-[16px] sm:text-[18px] font-black leading-none tracking-[-0.02em] text-[var(--ink)]"
+                      className="text-[24px] sm:text-[28px] font-black leading-none tracking-[-0.02em]"
+                      style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+                    >
+                      <MaskedAmount value={fireTargetInclHome!} tone="horizon" monoWhenVisible={false} />
+                    </div>
+                    <span
+                      className="italic text-[11px] text-[var(--ink-3)]"
+                      style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+                    >
+                      incl. woning
+                    </span>
+                  </div>
+                  {/* Doel excl. woning (liquide) — het kleinere doel in horizon-accent, inline kwalificatie */}
+                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 mt-1.5">
+                    <div
+                      className="text-[16px] sm:text-[18px] font-black leading-none tracking-[-0.02em] text-[var(--module-active-800)]"
                       style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
                     >
                       <MaskedAmount value={fireTargetExclHome!} tone="horizon" monoWhenVisible={false} />
                     </div>
-                    <div
-                      className="italic text-[11px] text-[var(--ink-3)] mt-1"
+                    <span
+                      className="italic text-[11px] text-[var(--ink-3)]"
                       style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
                     >
                       excl. woning
-                    </div>
+                    </span>
                   </div>
                 </>
               ) : (
@@ -3002,7 +3039,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                   >
                     {hasPerspectiveHero
                       ? <MaskedAmount value={perspectiveHero!.fireTarget} tone="horizon" monoWhenVisible={false} />
-                      : <MaskedAmount value={isPensioenMode ? (portfolioAtAow ?? 0) : (simResult?.requiredFirePortfolio ?? fire.fireTarget)} tone="horizon" monoWhenVisible={false} />}
+                      : <MaskedAmount value={isPensioenMode ? (portfolioAtAow ?? 0) : balkVrijheidDoel} tone="horizon" monoWhenVisible={false} />}
                   </div>
                   <div
                     className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
@@ -3103,7 +3140,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                   ? `${formatMaskedCurrency(perspectiveHero!.fireTarget, masked)} — ${isPartnerView ? `${perspectiveHero!.householdName}'s vrijheid` : 'gezamenlijke vrijheid'}`
                   : isPensioenMode
                     ? `${formatMaskedCurrency(portfolioAtAow ?? 0, masked)} — vermogen op AOW`
-                    : `${formatMaskedCurrency(simResult?.requiredFirePortfolio ?? fire.fireTarget, masked)} — volledige vrijheid`}
+                    : `${formatMaskedCurrency(balkVrijheidDoel, masked)} — volledige vrijheid`}
               </span>
               <span>100%</span>
             </div>
@@ -3163,33 +3200,35 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
               </div>
               {!hasPerspectiveHero && showDualFireTarget ? (
                 <>
-                  {/* Doel incl. woning — het grote doel */}
-                  <div
-                    className="text-[18px] font-black leading-none tracking-[-0.02em]"
-                    style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
-                  >
-                    <MaskedAmount value={fireTargetInclHome!} tone="horizon" monoWhenVisible={false} />
-                  </div>
-                  <div
-                    className="italic text-[10px] text-[var(--ink-3)] mt-1"
-                    style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
-                  >
-                    incl. woning
-                  </div>
-                  {/* Doel excl. woning (liquide) — het kleinere doel */}
-                  <div className="mt-1.5 pt-1.5 border-t border-[var(--rule-soft)]">
+                  {/* Doel incl. woning — het grote doel; kwalificatie inline zodat de kaart even hoog blijft als de buur-KPI's */}
+                  <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
                     <div
-                      className="text-[13px] font-black leading-none tracking-[-0.02em] text-[var(--ink)]"
+                      className="text-[18px] font-black leading-none tracking-[-0.02em]"
+                      style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+                    >
+                      <MaskedAmount value={fireTargetInclHome!} tone="horizon" monoWhenVisible={false} />
+                    </div>
+                    <span
+                      className="italic text-[10px] text-[var(--ink-3)]"
+                      style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+                    >
+                      incl. woning
+                    </span>
+                  </div>
+                  {/* Doel excl. woning (liquide) — het kleinere doel in horizon-accent, inline kwalificatie */}
+                  <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 mt-1">
+                    <div
+                      className="text-[13px] font-black leading-none tracking-[-0.02em] text-[var(--module-active-800)]"
                       style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
                     >
                       <MaskedAmount value={fireTargetExclHome!} tone="horizon" monoWhenVisible={false} />
                     </div>
-                    <div
-                      className="italic text-[10px] text-[var(--ink-3)] mt-1"
+                    <span
+                      className="italic text-[10px] text-[var(--ink-3)]"
                       style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
                     >
                       excl. woning
-                    </div>
+                    </span>
                   </div>
                 </>
               ) : (
@@ -3200,7 +3239,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                   >
                     {hasPerspectiveHero
                       ? <MaskedAmount value={perspectiveHero!.fireTarget} tone="horizon" monoWhenVisible={false} />
-                      : <MaskedAmount value={isPensioenMode ? (portfolioAtAow ?? 0) : (simResult?.requiredFirePortfolio ?? fire.fireTarget)} tone="horizon" monoWhenVisible={false} />}
+                      : <MaskedAmount value={isPensioenMode ? (portfolioAtAow ?? 0) : balkVrijheidDoel} tone="horizon" monoWhenVisible={false} />}
                   </div>
                   <div
                     className="italic text-[10px] text-[var(--ink-3)] mt-1"

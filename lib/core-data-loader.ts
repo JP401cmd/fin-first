@@ -16,7 +16,8 @@ import type { FireParams } from '@/lib/fire-params'
 import {
   type SavingsRateMethod,
   computeSavingsRateFromNetWorthDelta,
-  computeFreedomProgress,
+  computeFreedomProgressWithBasis,
+  inclHomeTargetFromScalar,
 } from '@/lib/core-metrics'
 import type { HealthScoreInput } from '@/lib/financial-health'
 import {
@@ -29,6 +30,7 @@ import {
   parseHousingStrategy,
   deriveHousingContext,
   getFireEligibleNetWorth,
+  isHomeExcludedFromFire,
 } from '@/lib/housing-strategy'
 import { computeHorizonFireTarget } from '@/lib/fire-target-shared'
 import { computeYearlyMustExpenses, computeRetirementExpenses } from '@/lib/budget-utils'
@@ -983,9 +985,19 @@ export const loadCoreData = cache(async function loadCoreData(
     debtsResult.data as unknown as Debt[],
   )
   const coreFireEligibleNetWorth = getFireEligibleNetWorth(netWorth, housingContext, housingStrategyCfg)
-  const coreFreedomPct = computeFreedomProgress({
+  // Grondslag-keuze (ADR 0009 herzien): standaard incl. eigen woning; alleen bij
+  // exclude_from_fire → EXCL. (liquide). Incl.-noemer via scalar-fallback (deze
+  // route laadt geen unified projection, alleen fireTargetFromHorizon = het
+  // strategie-loze doel op de EXCL.-grondslag).
+  const coreHomeExcludedFromFire = housingContext.hasEigenHuis && isHomeExcludedFromFire(housingStrategyCfg)
+  const coreRequiredPortfolioExcl =
+    fireTargetFromHorizon != null && fireTargetFromHorizon > 0 ? fireTargetFromHorizon : null
+  const coreFreedomPct = computeFreedomProgressWithBasis({
+    homeExcludedFromFire: coreHomeExcludedFromFire,
+    netWorthInclHome: netWorth,
     fireEligibleNetWorth: coreFireEligibleNetWorth,
-    requiredPortfolio: fireTargetFromHorizon != null && fireTargetFromHorizon > 0 ? fireTargetFromHorizon : null,
+    requiredNetWorthInclHome: inclHomeTargetFromScalar(coreRequiredPortfolioExcl, netWorth, coreFireEligibleNetWorth),
+    requiredPortfolioExclHome: coreRequiredPortfolioExcl,
   })
   const coreDebtMonthlyPayments = (debtsResult.data ?? []).reduce(
     (s, d) => s + Number((d as { monthly_payment?: number | string | null }).monthly_payment ?? 0),

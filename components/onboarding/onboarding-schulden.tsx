@@ -13,6 +13,11 @@ import {
 } from '@/lib/debt-data'
 import type { DebtQuickInput, QuickAddInput } from '@/lib/quick-add/types'
 import { formatCurrency } from '@/lib/format'
+import {
+  phaseKey,
+  useSectionPhaseNav,
+  type SectionPhase,
+} from './section-phase'
 
 /**
  * Stap — Schulden, als begeleide ja/nee-flow met ALTIJD-uitgang (Boldin-stijl).
@@ -42,6 +47,14 @@ export interface OnboardingSchuldenProps {
   onBack: () => void
   currentStep?: number
   totalSteps?: number
+  /**
+   * Gelifte interne fase-stack (controlled) — door de orchestrator gevoed zodat
+   * de fase een remount overleeft en Terug uit een latere groep hier op het
+   * laatst getoonde scherm landt i.p.v. op vraag 1. Zonder deze props draait de
+   * sectie uncontrolled op interne state (los renderen in tests).
+   */
+  phases?: SectionPhase[]
+  onPhasesChange?: (phases: SectionPhase[]) => void
 }
 
 // ── Vragen-volgorde ────────────────────────────────────────────────────
@@ -81,21 +94,6 @@ const ASKED_DEBT_TYPES: DebtType[] = [
 
 const SECTION_EXIT_LABEL = 'Ik heb (verder) geen schulden'
 
-// ── Interne sectie-fase ────────────────────────────────────────────────
-
-type SectionPhase =
-  | { kind: 'ask'; qIndex: number }
-  | { kind: 'more'; qIndex: number }
-  | { kind: 'other-ask' }
-  | { kind: 'other-pick' }
-  | { kind: 'other-more' }
-  | { kind: 'review' }
-
-/** Stabiele key per interne fase — voedt de scherm-overgang per vraag. */
-function phaseKey(phase: SectionPhase): string {
-  return `${phase.kind}-${'qIndex' in phase ? phase.qIndex : ''}`
-}
-
 // ── Component ──────────────────────────────────────────────────────────
 
 export function OnboardingSchulden({
@@ -105,6 +103,8 @@ export function OnboardingSchulden({
   onBack,
   currentStep = 4,
   totalSteps = 7,
+  phases,
+  onPhasesChange,
 }: OnboardingSchuldenProps) {
   // Hypotheek al gekoppeld via het huis-pad? Dan die vraag overslaan.
   const hasLinkedMortgage = useMemo(
@@ -116,7 +116,9 @@ export function OnboardingSchulden({
     [hasLinkedMortgage],
   )
 
-  const [phase, setPhase] = useState<SectionPhase>({ kind: 'ask', qIndex: 0 })
+  // Fase-stack (controlled door de orchestrator, anders interne useState). Terug
+  // popt één scherm; op de stack-bodem valt 'ie terug op de groep-`onBack`.
+  const { phase, push, back } = useSectionPhaseNav(phases, onPhasesChange, onBack)
   const [wizardType, setWizardType] = useState<DebtType | null>(null)
 
   // Losse schulden = zonder koppeling (gekoppelde hypotheken horen onder het
@@ -140,11 +142,9 @@ export function OnboardingSchulden({
     }
     // 'asset' / 'asset_with_debt' kunnen in de schuld-sectie niet voorkomen.
     setWizardType(null)
-    setPhase((prev) => {
-      if (prev.kind === 'ask') return { kind: 'more', qIndex: prev.qIndex }
-      if (prev.kind === 'other-pick') return { kind: 'other-more' }
-      return prev
-    })
+    if (phase.kind === 'ask') push({ kind: 'more', qIndex: phase.qIndex })
+    else if (phase.kind === 'other-pick') push({ kind: 'other-more' })
+    // 'more' / 'other-more' → geen push, de "nog een?"-fase blijft staan.
   }
 
   function removeDebt(idx: number) {
@@ -153,9 +153,9 @@ export function OnboardingSchulden({
 
   function nextAfterQuestion(qIndex: number) {
     if (qIndex + 1 < questions.length) {
-      setPhase({ kind: 'ask', qIndex: qIndex + 1 })
+      push({ kind: 'ask', qIndex: qIndex + 1 })
     } else {
-      setPhase({ kind: 'other-ask' })
+      push({ kind: 'other-ask' })
     }
   }
 
@@ -163,7 +163,7 @@ export function OnboardingSchulden({
   // bij lege lijst direct door. De altijd-zichtbare drempelloze uitgang
   // (`SECTION_EXIT_LABEL`) blijft bewust direct-naar-onNext.
   function finishSection() {
-    if (standaloneDebts.length > 0) setPhase({ kind: 'review' })
+    if (standaloneDebts.length > 0) push({ kind: 'review' })
     else onNext()
   }
 
@@ -206,7 +206,7 @@ export function OnboardingSchulden({
     factsPanel,
     currentStep,
     totalSteps,
-    onBack,
+    onBack: back,
     exitLabel: SECTION_EXIT_LABEL,
     onExit: onNext,
   }
@@ -240,7 +240,7 @@ export function OnboardingSchulden({
           {...sharedVraagProps}
           title={<span>Heb je nog een andere schuld?</span>}
           deck="Bijvoorbeeld een afbetalingsregeling, belastingschuld of familielening."
-          onYes={() => setPhase({ kind: 'other-pick' })}
+          onYes={() => push({ kind: 'other-pick' })}
           onNo={finishSection}
         >
           {runningList}
@@ -256,7 +256,7 @@ export function OnboardingSchulden({
           deck="Voeg er gerust meer toe — of rond de schulden af."
           yesLabel="Ja, nog een"
           noLabel="Nee, klaar"
-          onYes={() => setPhase({ kind: 'other-pick' })}
+          onYes={() => push({ kind: 'other-pick' })}
           onNo={finishSection}
         >
           {runningList}
@@ -274,9 +274,9 @@ export function OnboardingSchulden({
           factsPanel={factsPanel}
           currentStep={currentStep}
           totalSteps={totalSteps}
-          onBack={onBack}
+          onBack={back}
           onConfirm={onNext}
-          onAddMore={() => setPhase({ kind: 'other-pick' })}
+          onAddMore={() => push({ kind: 'other-pick' })}
         >
           {runningList}
         </SectionReview>
@@ -293,11 +293,11 @@ export function OnboardingSchulden({
         factsPanel={factsPanel}
         currentStep={currentStep}
         totalSteps={totalSteps}
-        onBack={onBack}
+        onBack={back}
         footer={
           <button
             type="button"
-            onClick={() => setPhase({ kind: 'other-ask' })}
+            onClick={back}
             className="w-full min-h-11 border border-[var(--border-ed)] bg-[var(--paper)] px-6 py-3 text-sm font-medium text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)]"
           >
             Terug
@@ -309,7 +309,7 @@ export function OnboardingSchulden({
           <DebtTypePicker
             exclude={ASKED_DEBT_TYPES}
             onPick={(type) => setWizardType(type)}
-            onCancel={() => setPhase({ kind: 'other-ask' })}
+            onCancel={back}
           />
         </div>
       </OnboardingShell>

@@ -363,3 +363,8 @@
 
 - **API-routes** toegevoegd: /api/admin/uat/latest
 - **Componenten (aantal)** toegevoegd: +2
+
+## 2026-07-07
+
+- **Integraties** verwijderd: OpenRouter
+- **Componenten (aantal)** toegevoegd: +3

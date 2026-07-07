@@ -24,7 +24,7 @@ import type {
 import type { WidgetPref, WidgetPrefs } from '@/lib/widget-catalog'
 import type { FireProjection, FireCountdown } from '@/lib/horizon-data'
 
-import { computeEffectiveExpenses, computeFireTarget, computeFreedomProgress, computeSavingsRateFromNetWorthDelta } from '@/lib/core-metrics'
+import { computeEffectiveExpenses, computeFireTarget, computeFreedomProgressWithBasis, inclHomeTargetFromScalar, computeSavingsRateFromNetWorthDelta } from '@/lib/core-metrics'
 import { localMonthStartMonthsAgo } from '@/lib/month-range'
 import {
   runBacktest,
@@ -59,6 +59,7 @@ import {
   getFireEligibleNetWorth,
   netWorthExcludingHome,
   shouldShowDualHousingBasis,
+  isHomeExcludedFromFire,
   type HousingStrategyConfig,
 } from '@/lib/housing-strategy'
 import { formatCurrency, calculateFreedomTime, formatFreedomTimeString, dailyExpenseRate } from '@/lib/format'
@@ -828,9 +829,20 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // (FIRE-eligible vermogen vandaag) en noemer blijven consistent — geen wijziging
   // aan `computeFreedomProgress`.
   const requiredPortfolioForProgress = simRequiredPortfolio ?? (fireTarget > 0 ? fireTarget : null)
-  const freedomPct = computeFreedomProgress({
+  // Grondslag-keuze (ADR 0009 herzien): standaard telt de eigen woning mee →
+  // INCL.-woning grondslag (teller = volledig netto vermogen incl. huis + niet-
+  // liquide; noemer = simRequiredNetWorth = Prognose!I@FIRE, of scalar-fallback via
+  // inclHomeTargetFromScalar). Alleen bij exclude_from_fire (mét eigen woning) valt
+  // het terug op EXCL. (liquide): fireEligibleNetWorth ÷ requiredPortfolioForProgress.
+  const homeExcludedFromFire = housingContext.hasEigenHuis && isHomeExcludedFromFire(housingStrategyCfg)
+  const requiredNetWorthForProgress =
+    simRequiredNetWorth ?? inclHomeTargetFromScalar(requiredPortfolioForProgress, netWorth, fireEligibleNetWorth)
+  const freedomPct = computeFreedomProgressWithBasis({
+    homeExcludedFromFire,
+    netWorthInclHome: netWorth,
     fireEligibleNetWorth,
-    requiredPortfolio: requiredPortfolioForProgress,
+    requiredNetWorthInclHome: requiredNetWorthForProgress,
+    requiredPortfolioExclHome: requiredPortfolioForProgress,
   })
 
   // Countdown afgeleid uit simulatie-engine (consistent met fireAgeFractional)
@@ -1038,7 +1050,13 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     {
       prevNetWorth: netWorthHistory.length >= 2 ? netWorthHistory[netWorthHistory.length - 2].value : null,
       prevSavingsRate: savingsHistory.length >= 2 ? savingsHistory[savingsHistory.length - 2].value : null,
-      requiredPortfolio: requiredPortfolioForProgress,
+      // Trend-proxy op DEZELFDE noemer als de canonieke freedomPct-grondslag: de
+      // trend-teller is prevNetWorth (volledig netto vermogen), dus bij de
+      // INCL.-woning grondslag hoort de incl.-noemer; alleen bij exclude_from_fire
+      // de excl.-portefeuille (ADR 0009 herzien).
+      requiredPortfolio: homeExcludedFromFire
+        ? requiredPortfolioForProgress
+        : (requiredNetWorthForProgress ?? requiredPortfolioForProgress),
     },
   )
 

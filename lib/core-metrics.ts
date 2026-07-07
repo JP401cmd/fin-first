@@ -126,6 +126,91 @@ export function computeFreedomProgress({
   return Math.max(0, Math.min((fireEligibleNetWorth / requiredPortfolio) * 100, 100))
 }
 
+// ── Vrijheidsvoortgang-grondslag: incl./excl. eigen woning (ADR 0009 herzien) ──
+//
+// Beslissing (2026-07): de vrijheidsvoortgang staat STANDAARD op de INCL.-woning
+// grondslag — teller = volledig netto vermogen incl. eigen woning + niet-liquide
+// assets; noemer = FIRE-doel incl. woning (Prognose!I@FIRE). Zolang de woning
+// uiteindelijk wordt ingezet om de doelen te halen (include_full / downsize /
+// opeethypotheek) is dát de juiste grondslag. Alleen wanneer de woning EXPLICIET
+// is UITGESLOTEN van FIRE (housing-strategie `exclude_from_fire`) valt de
+// grondslag terug op EXCL. (liquide): teller = FIRE-eligible vermogen, noemer =
+// benodigde portefeuille (Prognose!J@FIRE) — precies het pre-2026-07-gedrag.
+//
+// Harde invariant: teller en noemer staan ALTIJD op dezelfde grondslag. Nooit
+// incl.-teller ÷ excl.-noemer (dat is de grondslag-mismatch die de balk zou
+// opblazen). `computeFreedomProgress` blijft de grondslag-agnostische primitief;
+// deze helper kiest enkel wélke teller/noemer erin gaan.
+export interface FreedomProgressBasisInput {
+  /**
+   * True ⇒ eigen woning is uitgesloten van FIRE (exclude_from_fire mét eigen
+   * woning) ⇒ EXCL.-grondslag. False ⇒ INCL.-woning grondslag (default).
+   */
+  homeExcludedFromFire: boolean
+  /** Volledig netto vermogen incl. eigen woning + niet-liquide assets — teller bij INCL. */
+  netWorthInclHome: number
+  /** FIRE-eligible netto vermogen (huis gefilterd via housing-strategie) — teller bij EXCL. */
+  fireEligibleNetWorth: number
+  /**
+   * FIRE-doel incl. woning (Prognose!I@FIRE uit de unified projection, of het
+   * scalar-fallback-doel via `inclHomeTargetFromScalar`) — noemer bij INCL.
+   * Null / ≤ 0 ⇒ 0% (geen deling door nul).
+   */
+  requiredNetWorthInclHome: number | null
+  /**
+   * Benodigde portefeuille excl. woning (Prognose!J@FIRE / strategie-bewust
+   * fireTarget) — noemer bij EXCL. Null / ≤ 0 ⇒ 0%.
+   */
+  requiredPortfolioExclHome: number | null
+}
+
+/** Kies teller + noemer op basis van de grondslag-keuze. Enige home voor die keuze. */
+export function selectFreedomProgressBasis(input: FreedomProgressBasisInput): {
+  currentNetWorth: number
+  requiredPortfolio: number | null
+} {
+  if (input.homeExcludedFromFire) {
+    return {
+      currentNetWorth: input.fireEligibleNetWorth,
+      requiredPortfolio: input.requiredPortfolioExclHome,
+    }
+  }
+  return {
+    currentNetWorth: input.netWorthInclHome,
+    requiredPortfolio: input.requiredNetWorthInclHome,
+  }
+}
+
+/**
+ * Canonieke vrijheidsvoortgang mét grondslag-keuze (incl./excl. eigen woning).
+ * Alle display-consumers (dashboard/core/horizon-loader, AI shared-context,
+ * freedom-card, report, /toekomst-client) routeren hierlangs zodat de grondslag
+ * op één plek leeft.
+ */
+export function computeFreedomProgressWithBasis(input: FreedomProgressBasisInput): number {
+  const { currentNetWorth, requiredPortfolio } = selectFreedomProgressBasis(input)
+  return computeFreedomProgress({ fireEligibleNetWorth: currentNetWorth, requiredPortfolio })
+}
+
+/**
+ * Scalar-fallback voor de INCL.-woning noemer wanneer er GEEN unified projection
+ * beschikbaar is (loaders/routes die alleen een strategie-loos `fireTarget` op de
+ * EXCL.-grondslag kennen). De incl.-noemer = excl.-doel + (volledig netto vermogen
+ * − FIRE-eligible vermogen). Die verschuiving is exact het bedrag dat óók de teller
+ * incl.→excl. verschuift, dus 100% wordt op HETZELFDE punt bereikt als op de
+ * excl.-grondslag (invariant blijft: 100% ⇔ FIRE-doel bereikt). Waar de sim wél
+ * draait gebruik je requiredFireNetWorth (Prognose!I@FIRE) direct — geen eigen som.
+ */
+export function inclHomeTargetFromScalar(
+  exclTarget: number | null,
+  netWorthInclHome: number,
+  fireEligibleNetWorth: number,
+): number | null {
+  if (exclTarget == null || !Number.isFinite(exclTarget) || exclTarget <= 0) return null
+  const inclTarget = exclTarget + (netWorthInclHome - fireEligibleNetWorth)
+  return Number.isFinite(inclTarget) && inclTarget > 0 ? inclTarget : null
+}
+
 /** Freedom time: how many years + months net worth covers expenses. */
 export function computeFreedomTime(
   netWorth: number,

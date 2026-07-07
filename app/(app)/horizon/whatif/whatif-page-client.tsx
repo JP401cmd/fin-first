@@ -55,6 +55,7 @@ import { EventsTimeline } from '@/components/app/horizon/events-timeline'
 import { WhatIfHeader } from '@/components/app/horizon/whatif-header'
 import { WhatIfSlidersCollapsible, type WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
 import { WhatIfBeslishulp } from '@/components/app/horizon/whatif-beslishulp'
+import { WhatIfDevelopmentNotice } from '@/components/app/horizon/whatif-development-notice'
 import { applyWhatIfOverrides, buildBaselineOverrides } from '@/lib/whatif-overrides'
 import { computeDebtAflossingMonthly, savingsRateFromAggregates, resolveSavingsSource } from '@/lib/savings-source'
 import { parseHousingStrategy, type HousingStrategyConfig } from '@/lib/housing-strategy'
@@ -996,6 +997,13 @@ export default function WhatIfPage() {
         {/* ── Header ────────────────────────────────────────── */}
         <WhatIfHeader />
 
+        {/* ── "Nog in ontwikkeling"-indicatie — bovenaan de ervaring.
+            Gedeelde notice; op de modal-variant toont WhatIfSlidersCollapsible
+            'm zelf (default), hier daarom expliciet uit op de sliders. ── */}
+        <div className="mx-4 mt-4 sm:mx-6">
+          <WhatIfDevelopmentNotice />
+        </div>
+
         {/* ── Resultaat-blok: KPI + verschil-analyse + chart in één paper-card ── */}
         <section className="card-editorial overflow-hidden mt-4">
           <div className="h-1.5" style={{ background: 'var(--module-active-500)' }} />
@@ -1481,12 +1489,14 @@ export default function WhatIfPage() {
             </div>
           </div>
 
-          {/* Sliders — verfijn-niveau, gesloten by default */}
+          {/* Sliders — verfijn-niveau, gesloten by default.
+              developmentNotice uit: de pagina toont de notice zelf al bovenaan. */}
           <WhatIfSlidersCollapsible
             baseline={baseline}
             events={events}
             setEvents={setEvents}
             currentAge={currentAge ?? 30}
+            developmentNotice={false}
           />
 
           {/* Beslishulp — "Wat doe je met €X/mnd extra?" (beleggen/aflossen/noodfonds).
