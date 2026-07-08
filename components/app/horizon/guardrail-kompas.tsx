@@ -43,20 +43,22 @@ export function GuardrailKompas({ levels, you, referenceAgeLabel }: GuardrailKom
   const posOf = (v: number) => EDGE_PAD + ((v - min) / span) * (100 - 2 * EDGE_PAD)
 
   return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => setInfo(v => !v)}
-        aria-label="Uitleg guardrail-kompas"
-        aria-expanded={info}
-        className="absolute right-0 top-0 flex h-7 w-7 items-center justify-center rounded-full border border-[var(--border-ed)] bg-[var(--paper)] text-[12px] italic text-[var(--ink-3)] transition hover:border-[var(--color-horizon-500)] hover:text-[var(--color-horizon-600)]"
-        style={{ fontFamily: PLAYFAIR }}
-      >
-        i
-      </button>
+    <div>
+      <div className="mb-2 flex justify-end">
+        <button
+          type="button"
+          onClick={() => setInfo(v => !v)}
+          aria-label="Uitleg guardrail-kompas"
+          aria-expanded={info}
+          className="flex h-7 w-7 items-center justify-center rounded-full border border-[var(--border-ed)] bg-[var(--paper)] text-[12px] italic text-[var(--ink-3)] transition hover:border-[var(--color-horizon-500)] hover:text-[var(--color-horizon-600)]"
+          style={{ fontFamily: PLAYFAIR }}
+        >
+          i
+        </button>
+      </div>
 
       {info && (
-        <div className="mb-4 mr-9 rounded-md border border-[var(--border-ed)] border-l-[3px] border-l-[var(--color-horizon-500)] bg-[var(--subtle)] px-4 py-3 text-[12.5px] leading-relaxed text-[var(--ink-3)]">
+        <div className="mb-4 rounded-md border border-[var(--border-ed)] border-l-[3px] border-l-[var(--color-horizon-500)] bg-[var(--subtle)] px-4 py-3 text-[12.5px] leading-relaxed text-[var(--ink-3)]">
           <div className="mb-1.5 font-semibold text-[var(--ink)]" style={{ fontFamily: PLAYFAIR }}>
             De data achter de grenzen
           </div>

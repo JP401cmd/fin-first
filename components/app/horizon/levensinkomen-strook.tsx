@@ -56,20 +56,22 @@ export function LevensinkomenStrook({ nodes, activeAge, segments }: Levensinkome
   const activeNode = activeAge == null ? null : nearestAge(nodes, activeAge)
 
   return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => setInfo(v => !v)}
-        aria-label="Uitleg dekkingsgraad"
-        aria-expanded={info}
-        className="absolute right-0 top-0 flex h-7 w-7 items-center justify-center rounded-full border border-[var(--border-ed)] bg-[var(--paper)] text-[12px] italic text-[var(--ink-3)] transition hover:border-[var(--color-horizon-500)] hover:text-[var(--color-horizon-600)]"
-        style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
-      >
-        i
-      </button>
+    <div>
+      <div className="mb-2 flex justify-end">
+        <button
+          type="button"
+          onClick={() => setInfo(v => !v)}
+          aria-label="Uitleg dekkingsgraad"
+          aria-expanded={info}
+          className="flex h-7 w-7 items-center justify-center rounded-full border border-[var(--border-ed)] bg-[var(--paper)] text-[12px] italic text-[var(--ink-3)] transition hover:border-[var(--color-horizon-500)] hover:text-[var(--color-horizon-600)]"
+          style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+        >
+          i
+        </button>
+      </div>
 
       {info && (
-        <div className="mb-4 mr-9 rounded-md border border-[var(--border-ed)] border-l-[3px] border-l-[var(--color-horizon-500)] bg-[var(--subtle)] px-4 py-3 text-[12.5px] leading-relaxed text-[var(--ink-3)]">
+        <div className="mb-4 rounded-md border border-[var(--border-ed)] border-l-[3px] border-l-[var(--color-horizon-500)] bg-[var(--subtle)] px-4 py-3 text-[12.5px] leading-relaxed text-[var(--ink-3)]">
           <div className="mb-1.5 font-semibold text-[var(--ink)]" style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}>
             Zo werkt de dekkingsgraad
           </div>

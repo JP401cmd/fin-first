@@ -10,6 +10,7 @@
  */
 
 import type { UnifiedProjectionRow } from '@/lib/unified-projection'
+import { NL_SWR } from '@/lib/constants'
 
 /** Eén knoop in de dekkingsgraad-strook. */
 export interface CoverageNode {
@@ -61,10 +62,45 @@ function nearestRow(rows: UnifiedProjectionRow[], age: number): UnifiedProjectio
 }
 
 /**
- * Dekkingspercentage voor één projectierij.
+ * Asset-types die NIET duurzaam opneembaar zijn om besteding te dekken en dus
+ * buiten het "belegbaar vermogen" vallen: de eigen woning + tweede pand (niet te
+ * verzilveren zonder verkoop → dát maakt de brugjaren krap), auto's/fysiek bezit,
+ * en de pensioenpot (die voedt ál het pensioeninkomen dat als vaste inkomsten
+ * meetelt — anders dubbeltelling). Verzilvert de kernel de woning (downsize),
+ * dan verschuift die waarde vanzelf naar de liquide buckets in latere rijen.
+ */
+const NON_SPENDABLE_ASSET_TYPES = new Set<string>([
+  'eigen_huis',
+  'real_estate',
+  'vehicle',
+  'physical',
+  'retirement',
+])
+
+/** Belegbaar (duurzaam opneembaar) vermogen aan het eind van het jaar. */
+function spendablePortfolio(row: UnifiedProjectionRow): number {
+  const buckets = row.assetBuckets ?? {}
+  let sum = 0
+  for (const [type, detail] of Object.entries(buckets)) {
+    if (NON_SPENDABLE_ASSET_TYPES.has(type)) continue
+    sum += detail?.endValue ?? 0
+  }
+  return sum
+}
+
+/**
+ * Dekkingspercentage voor één projectierij — mockup-getrouw:
+ *   dekking = (vaste inkomsten + veilige onttrekking) ÷ gewenste besteding × 100.
+ *
  * - accumulation: 100 (er wordt nog gespaard, geen onttrekkingsbehoefte).
- * - transition/withdrawal: (salaris + gebeurtenisBaten + withdrawal) / totaalNeed × 100,
- *   met een guard: totaalNeed ≤ 0 (geen — of geen gevulde — behoefte-decompositie) → 100.
+ * - transition/withdrawal: vaste inkomsten (salaris + AOW/pensioen) plus een
+ *   VEILIGE onttrekking (NL_SWR × belegbaar vermogen), begrensd op de resterende
+ *   behoefte zodat je niet méér "dekt" dan je uitgeeft. Bewust NIET de feitelijke
+ *   `withdrawal` (die kan door liquidaties/interen ver boven de behoefte liggen →
+ *   maskeert dat je vermogen opeet). In de brugjaren (geen AOW/pensioen, huis nog
+ *   niet verzilverd) valt SWR×belegbaar < besteding → onder 100% (interen);
+ *   ná AOW + downsizing tillen inkomen + vrijgekomen vermogen de dekking terug.
+ * - guard: totaalNeed ≤ 0 (geen gevulde behoefte-decompositie) → 100.
  */
 function coveragePctForRow(row: UnifiedProjectionRow): number {
   if (row.phase === 'accumulation') return 100
@@ -74,9 +110,12 @@ function coveragePctForRow(row: UnifiedProjectionRow): number {
 
   const salaris = row.grossIncomeBySource?.salaris ?? 0
   const gebeurtenisBaten = row.grossIncomeBySource?.gebeurtenisBaten ?? 0
-  const covered = salaris + gebeurtenisBaten + row.withdrawal
+  const vasteInkomsten = salaris + gebeurtenisBaten
 
-  return Math.round((covered / totaalNeed) * 100)
+  const restNeed = Math.max(0, totaalNeed - vasteInkomsten)
+  const veiligeOnttrekking = Math.min(NL_SWR * spendablePortfolio(row), restNeed)
+
+  return Math.round(((vasteInkomsten + veiligeOnttrekking) / totaalNeed) * 100)
 }
 
 /**
