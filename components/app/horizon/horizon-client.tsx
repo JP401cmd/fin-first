@@ -56,6 +56,8 @@ import {
   TableProperties, GitBranch,
   ChevronDown, ChevronUp, Compass, SlidersHorizontal,
   Home, Lightbulb,
+  Play,
+  Pause,
 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import {
@@ -69,6 +71,12 @@ import { KassabonShell } from '@/components/app/kassabon-shell'
 import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
 import { HideInSimple } from '@/components/app/hide-in-simple'
 import { HorizonTrendGrid } from '@/components/app/horizon/horizon-trend-grid'
+import { LifelineReadout } from '@/components/app/horizon/lifeline-readout'
+import { LevensinkomenStrook } from '@/components/app/horizon/levensinkomen-strook'
+import { GuardrailKompas } from '@/components/app/horizon/guardrail-kompas'
+import { buildCoverageStrip } from '@/lib/horizon/coverage-strip'
+import { computeGuardrailBounds } from '@/lib/horizon/guardrail-bounds'
+import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { HouseholdFireSection } from '@/components/app/household-fire-section'
 import {
   buildHouseholdProjectionInput,
@@ -288,6 +296,16 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const [incomeExpenseExpanded, setIncomeExpenseExpanded] = useState(false)
   const [ieViewMode, setIeViewMode] = useState<'lines' | 'breakdown'>('lines')
   const [chartMode, setChartMode] = useState<'vermogenspad' | 'vermogensopbouw'>('vermogenspad')
+
+  // Weergavemodus (eenvoudig/volledig) — de zwevende chart-tooltip verdwijnt in de
+  // volledige weergave omdat de meebewegende cijferbar (LifelineReadout) die vervangt.
+  const { mode: displayMode } = useDisplayMode()
+
+  // Levenslijn cijferbar + "speel af" (alleen volledige weergave): de actieve leeftijd
+  // wordt gedeeld door de SimChart-hover én de playback-animatie.
+  const [lifelineAge, setLifelineAge] = useState<number | null>(null)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const playbackRafRef = useRef<number | null>(null)
 
   // Natuurlijke mijlpalen toggle — afgeleide events op de tijdlijn
   // (hypotheek afgelost, autolening afgelost, vermogen op, eerste miljoen, etc.).
@@ -1625,6 +1643,76 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     () => clipRowsToPlanEnd(unifiedRows, displayEndAge),
     [unifiedRows, displayEndAge],
   )
+
+  // ── Uitgebreide-view blokken (levensinkomenstrook + guardrail-kompas + cijferbar) ──
+  // Alles consumeert de bestaande unified-rijen / config — geen herberekening.
+  const coverageNodes = useMemo(
+    () => buildCoverageStrip(displayUnifiedRows ?? []),
+    [displayUnifiedRows],
+  )
+  const guardrailBounds = useMemo(
+    () => computeGuardrailBounds({ plannedMonthlySpend: effectiveInput?.monthlyExpenses ?? 0 }),
+    [effectiveInput?.monthlyExpenses],
+  )
+  // Cijferbar-waarden bij de actieve leeftijd (hover/playback); consumeert de
+  // unified-rij + format-helpers, herberekent niets.
+  const readoutData = useMemo(() => {
+    const rows = displayUnifiedRows ?? []
+    if (!rows.length) return null
+    const target = lifelineAge ?? (currentAge != null ? Math.round(currentAge) : rows[0].age)
+    let row = rows[0]
+    let bestDiff = Math.abs(rows[0].age - target)
+    for (const r of rows) {
+      const d = Math.abs(r.age - target)
+      if (d < bestDiff) { bestDiff = d; row = r }
+    }
+    const dRate = dailyExpenseRate(effectiveInput?.monthlyExpenses ?? 0)
+    const freedomTime = formatFreedomTimeString(calculateFreedomTime(Math.max(0, row.netWorth), dRate), 'short')
+    const isAcc = row.phase === 'accumulation'
+    const phaseLabel = isAcc ? 'Opbouw' : row.phase === 'transition' ? 'Brug FIRE → AOW' : 'Onttrekking'
+    const phaseColor = isAcc
+      ? 'var(--hor-t, #8a6e42)'
+      : row.phase === 'transition'
+        ? 'var(--color-horizon-500)'
+        : 'var(--kern-t, #58362d)'
+    return {
+      age: row.age,
+      year: new Date().getFullYear() + row.year,
+      phaseLabel,
+      phaseColor,
+      netWorth: row.netWorth,
+      freedomTime,
+      monthlyLabel: isAcc ? 'Inleg / maand' : 'Ruimte / maand',
+      monthlyAmount: isAcc
+        ? Math.max(0, row.savings) / 12
+        : (row.withdrawalNeed?.totaalNeed ?? (effectiveInput?.monthlyExpenses ?? 0) * 12) / 12,
+    }
+  }, [displayUnifiedRows, lifelineAge, currentAge, effectiveInput])
+
+  // "Speel af": animeer de actieve leeftijd van de eerste naar de laatste rij.
+  useEffect(() => {
+    if (!isPlaying) return
+    const rows = displayUnifiedRows ?? []
+    if (rows.length < 2) { setIsPlaying(false); return }
+    const startAge = rows[0].age
+    const endAgeVal = rows[rows.length - 1].age
+    const durationMs = 7000
+    let startTs = 0
+    const step = (ts: number) => {
+      if (!startTs) startTs = ts
+      const t = Math.min(1, (ts - startTs) / durationMs)
+      setLifelineAge(Math.round(startAge + t * (endAgeVal - startAge)))
+      if (t < 1) {
+        playbackRafRef.current = requestAnimationFrame(step)
+      } else {
+        setIsPlaying(false)
+      }
+    }
+    playbackRafRef.current = requestAnimationFrame(step)
+    return () => {
+      if (playbackRafRef.current != null) cancelAnimationFrame(playbackRafRef.current)
+    }
+  }, [isPlaying, displayUnifiedRows])
 
   // Chart-x-domein-eindleeftijd = één jaar vóór `displayEndAge`. De projectie-
   // data stopt op `displayEndAge − 1` (het laatste modeljaar dat de kernel als
@@ -3613,6 +3701,23 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                     Op mobiel: alleen icon. Op desktop: icon + label.
                     TrendingUp = pad/line; BarChart3 = opbouw/stack. */}
                 <div className="ml-auto flex items-center gap-1">
+                  {/* "Speel af" — animeert de levenslijn 40→einde; alleen in de
+                      volledige weergave en op de pad-grafiek (uitgebreide diepte). */}
+                  {chartMode === 'vermogenspad' && (
+                    <HideInSimple>
+                      <button
+                        type="button"
+                        onClick={() => setIsPlaying(p => !p)}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-horizon-300 bg-horizon-50 px-2.5 py-1 text-[11px] font-medium text-horizon-700 transition-colors hover:bg-horizon-100"
+                        aria-pressed={isPlaying}
+                        aria-label={isPlaying ? 'Pauzeer afspelen' : 'Speel de levenslijn af'}
+                        title={isPlaying ? 'Pauze' : 'Speel af'}
+                      >
+                        {isPlaying ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+                        <span className="hidden sm:inline">{isPlaying ? 'Pauze' : 'Speel af'}</span>
+                      </button>
+                    </HideInSimple>
+                  )}
                   {(['vermogenspad', 'vermogensopbouw'] as const).map((mode) => {
                     const btn = (
                       <button
@@ -3740,6 +3845,26 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                 onViewChart={() => { setWelcomeDismissed(true); persistOverlayVisible(true) }}
               />
 
+              {/* Cijferbar boven de grafiek — beweegt mee met hover/playback en
+                  vervangt de zwevende tooltip. Alleen volledige weergave + pad-modus. */}
+              <HideInSimple>
+                {chartMode === 'vermogenspad' && readoutData && (
+                  <div className="mb-2">
+                    <LifelineReadout
+                      age={readoutData.age}
+                      year={readoutData.year}
+                      phaseLabel={readoutData.phaseLabel}
+                      phaseColor={readoutData.phaseColor}
+                      netWorth={readoutData.netWorth}
+                      freedomTime={readoutData.freedomTime}
+                      monthlyLabel={readoutData.monthlyLabel}
+                      monthlyAmount={readoutData.monthlyAmount}
+                      isResting={lifelineAge === null}
+                    />
+                  </div>
+                )}
+              </HideInSimple>
+
               <div className="-mx-4 sm:-mx-6 md:-mx-8 overflow-hidden">
                 <ZoomableChartContainer currentAge={currentAge ?? 30} endAge={chartEndAge!}>
                   {(visibleMin, visibleMax, controls) => (
@@ -3811,6 +3936,9 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                           <SimChart
                             emphasis={overlayEmphasis}
                             disableCrosshair={overlayVisible && chartMode === 'vermogenspad'}
+                            hoverAge={lifelineAge}
+                            onHoverAge={setLifelineAge}
+                            hideValueTooltip={displayMode === 'full'}
                             rows={useHouseholdMainLine ? householdMainLine!.rows : usePartnerMainLine ? partnerLine!.rows : (isAowStopActive ? displayEffectiveSimRows : displaySimRows)}
                             fireAge={useHouseholdMainLine ? householdMainLine!.fireAge : usePartnerMainLine ? partnerLine!.fireAge : (isAowStopActive ? Math.ceil(userAowAge.fractional) : simResult.fireAge)}
                             fireAgeFractional={useHouseholdMainLine ? householdMainLine!.fireAgeFractional : usePartnerMainLine ? partnerLine!.fireAgeFractional : (isAowStopActive ? userAowAge.fractional : simResult.fireAgeFractional)}
@@ -4159,6 +4287,57 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           yearlyExpenses={effectiveInput?.yearlyMustExpenses ?? 0}
           unifiedRows={unifiedRows ?? undefined}
         />
+      )}
+
+      {/* === 4b. Levensinkomenstrook (dekkingsgraad per leeftijd) === */}
+      {coverageNodes.length > 0 && (
+        <HideInSimple>
+          <section className="mt-6 sm:mt-8">
+            <h2 className="mb-1 label-editorial text-[var(--ink-2)]">Levensinkomenstrook</h2>
+            <p className="mb-3 font-sans text-[12px] text-[var(--ink-3)]">
+              Dekkingsgraad per leeftijd — beweegt mee met de levenslijn hierboven.
+            </p>
+            <div className="card-editorial p-4 sm:p-5">
+              {(() => {
+                const first = coverageNodes[0].age
+                const last = coverageNodes[coverageNodes.length - 1].age
+                const span = Math.max(1, last - first)
+                const fire = Math.round(simResult?.fireAgeFractional ?? simResult?.fireAge ?? first)
+                const aow = Math.round(userAowAge?.fractional ?? fire)
+                const pct = (a: number) => Math.max(0, Math.min(100, ((a - first) / span) * 100))
+                const segments = [
+                  { label: 'Opbouw', color: 'var(--hor-t, #8a6e42)', widthPct: pct(fire) },
+                  { label: 'Brug FIRE → AOW', color: 'var(--color-horizon-500)', widthPct: Math.max(0, pct(aow) - pct(fire)) },
+                  { label: 'Onttrekking', color: 'var(--kern-t, #58362d)', widthPct: Math.max(0, 100 - pct(aow)) },
+                ]
+                return <LevensinkomenStrook nodes={coverageNodes} activeAge={lifelineAge} segments={segments} />
+              })()}
+            </div>
+          </section>
+        </HideInSimple>
+      )}
+
+      {/* === 4c. Guardrail-kompas (bestedingsgrenzen) === */}
+      {(effectiveInput?.monthlyExpenses ?? 0) > 0 && (
+        <HideInSimple>
+          <section className="mt-6 sm:mt-8">
+            <h2 className="mb-1 label-editorial text-[var(--ink-2)]">Guardrail-kompas</h2>
+            <p className="mb-3 font-sans text-[12px] text-[var(--ink-3)]">
+              Bij welk maandbedrag je meer of minder kunt uitgeven.
+            </p>
+            <div className="card-editorial p-4 sm:p-5">
+              <GuardrailKompas
+                levels={{
+                  teWeinig: guardrailBounds.teWeinig,
+                  veilig: guardrailBounds.veilig,
+                  gepland: guardrailBounds.gepland,
+                  meevaller: guardrailBounds.meevaller,
+                }}
+                you={guardrailBounds.you}
+              />
+            </div>
+          </section>
+        </HideInSimple>
       )}
 
       {/* === 5. Household FIRE Projections === */}

@@ -231,6 +231,9 @@ export const SimChart = memo(function SimChart({
   emphasis = null,
   targetInflationFactors,
   disableCrosshair = false,
+  hoverAge,
+  onHoverAge,
+  hideValueTooltip = false,
 }: {
   rows: SimRow[]
   fireAge: number | null
@@ -303,9 +306,20 @@ export const SimChart = memo(function SimChart({
   targetInflationFactors?: { age: number; factor: number }[]
   /** Onderdruk de crosshair-tooltip (bv. in de tips-modus van /toekomst). */
   disableCrosshair?: boolean
+  /** Controlled hover-leeftijd. Aanwezig → parent bezit de hover-state (cijferbar/
+   *  playback op /toekomst); afwezig → interne state (byte-identiek voor bestaande callers). */
+  hoverAge?: number | null
+  /** Callback wanneer de hover-leeftijd wijzigt (alleen zinvol samen met `hoverAge`). */
+  onHoverAge?: (age: number | null) => void
+  /** Onderdruk de zwevende waarde-tooltip; de crosshair-lijn/stip blijven staan. */
+  hideValueTooltip?: boolean
 }) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 1200, forModal })
-  const [hoveredAge, setHoveredAge] = useState<number | null>(null)
+  const [internalHoveredAge, setInternalHoveredAge] = useState<number | null>(null)
+  // Controlled-of-intern: de parent kan de hover-leeftijd bezitten (cijferbar/playback
+  // op /toekomst). Afwezige `hoverAge` → interne state, byte-identiek voor bestaande callers.
+  const hoveredAge = hoverAge !== undefined ? hoverAge : internalHoveredAge
+  const setHoverAge = onHoverAge ?? setInternalHoveredAge
 
   const [containerW, setContainerW] = useState(600)
   useEffect(() => {
@@ -386,12 +400,12 @@ export const SimChart = memo(function SimChart({
     const svgX = ((e.clientX - rect.left) / rect.width) * W
     const raw = minAge + ((svgX - PAD.left) / innerW) * (maxAge - minAge)
     const age = Math.max(minAge, Math.min(maxAge, Math.round(raw)))
-    setHoveredAge(age)
-  }, [ref, W, minAge, maxAge, PAD.left, innerW])
+    setHoverAge(age)
+  }, [ref, W, minAge, maxAge, PAD.left, innerW, setHoverAge])
 
   const handleOverlayMouseLeave = useCallback(() => {
-    setHoveredAge(null)
-  }, [])
+    setHoverAge(null)
+  }, [setHoverAge])
 
   /** SimRow for the currently hovered age (null if nothing hovered) */
   const hoveredRow = useMemo(() => {
@@ -470,7 +484,7 @@ export const SimChart = memo(function SimChart({
       </svg>
 
       {/* Crosshair tooltip (HTML overlay for crisp text rendering) */}
-      {showCrosshair && hoveredRow && crosshairX !== null && (() => {
+      {showCrosshair && !hideValueTooltip && hoveredRow && crosshairX !== null && (() => {
         // Convert SVG crosshair X to CSS percentage within the container
         const pctX = crosshairX / W
         // Position tooltip to the right by default; flip left if too close to right edge
