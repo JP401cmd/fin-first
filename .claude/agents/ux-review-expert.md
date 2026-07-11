@@ -40,7 +40,8 @@ Read all relevant files the user points you to, or that were recently modified. 
 ### Step 3: Evaluate against the skill's rubric
 Systematically evaluate the UI against the `ui-ux` skill — do **not** maintain a parallel checklist here. The full rubric is in `quality-checklist.md` (visuele consistentie, typografie & hiërarchie, interactiepatronen, responsiviteit, toegankelijkheid/WCAG, filosofische consistentie "geld = opgeslagen tijd", component-patronen, micro-copy & taal, animatie-standaarden), the applicable patterns in `pattern-cards.md`, and the page structure in `page-blueprints.md`. Apply them rigorously.
 
-Twee aandachtspunten die je expliciet meeneemt:
+Drie aandachtspunten die je expliciet meeneemt:
+- **Cross-pagina beloftes vs. gating van de bestemming**: elke link/CTA/deeplink die naar een andere pagina of sectie wijst ("bekijk in het lab", "beheer via …") — verifieer dat de bestemming zichtbaar is onder dezelfde condities als de bron (weergavemodus/`HideInSimple`, module-/abonnement-gating, feature-flags). Een belofte die rendert terwijl de bestemming in diezelfde modus verborgen is, is een ❌-bevinding (dode deeplink); check dit in béide richtingen wanneer een sectie gating krijgt of verliest.
 - **Module-accentkleur als tekst op `var(--paper)`**: verifieer de concrete hex/oklch van `--module-active-{700..900}` per module tegen WCAG bij de doel-fontmaat. Horizons warm-goud is het bekende risicogeval (`--module-active-700` zakt onder AA bij ~16px tekst). Beoordeel fontgrootte en kleur altijd sámen — AA vereist 4,5:1 bij tekst ≤18px normaal / ≤14px bold; een kleur die op `text-sm` (14px) net slaagt kan op een `text-[11px]`-label zakken.
 - **Animaties**: charts/sparklines/balken volgen de juiste hook + unified timing uit `quality-checklist.md`; kale `useState + setTimeout` is verboden (niet auto-reset bij remount/heropenen).
 
