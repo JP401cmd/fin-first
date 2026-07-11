@@ -45,6 +45,13 @@ Bewuste, niet-universele patronen. Activeer alleen wanneer het paginatype erom v
 - **Optionele teken-prefix** voor positieve uitkomst: `+€` zoals `+€203.375`.
 - **Bedrag + kwalificatie inline** (`items-baseline`) binnen een kolom-cel: altijd `flex-wrap` + `gap-x`/`gap-y`, nooit kaal `flex` — euro-bedragen van 6-7 cijfers overschrijden anders de mobile-grid-kolombreedte.
 
+### Gesegmenteerde katern-kaart (interne hairline-koppen)
+- **Toepassen op**: een katern met méérdere nauw verwante, gelijksoortige en (deels) conditionele duidingsblokken die als één geheel moeten lezen — bv. katern III "Wat het betekent" op /toekomst (Levensinkomenstrook + Guardrail-kompas + Dekkingsradar + Scenario's naast elkaar).
+- **Niet toepassen op**: content-groepen met elk een eigen karakter, doel of interactiemodel — daar geldt kop-bóven-kaart (h2 + subtitel boven een eigen `card-editorial`, zoals katern II op /toekomst). Ook niet voor dashboard-widgets (`WidgetShell`) of lijsten.
+- **Implementatie container**: één `card-editorial no-hover-lift divide-y divide-[var(--border-ed)]`; per segment een `div.p-4 sm:p-5` met de kop-rij (`h2.label-editorial` + evt. status-chip, `mb-1`) en subtitel (`font-sans text-[12px] text-[var(--ink-3)] mb-3`) **ín** het segment. `no-hover-lift` is verplicht — het vat is zelf niet klikbaar, dus geen hover-lift-kliksignaal.
+- **Conditionele segmenten**: render als `{cond && <div>…}` — React rendert `false` niet, dus `divide-y` plaatst nooit wees-hairlines bij ontbrekende segmenten. Laat het `SectionLabel` en de kaart één gedeelde OR-conditie gebruiken zodat label en inhoud altijd sámen verschijnen of verdwijnen.
+- **Kies-regel**: verwante analyses die samen één vraag beantwoorden → één gesegmenteerde kaart; blokken met een eigen doel of route → losse kaarten met koppen erboven.
+
 ### Categorie-app-tab hero-band (KPI-paper-blok)
 - **Toepassen op**: categorie-app-tabs binnen een module-categorie-pagina (`?tab=<appKey>`) — bv. crypto Holdings, investment Holdings, cash Budgetteren, mortgage Aflosstrategie, plus de standalone equivalenten op `/core/budgets`, `/core/assets/holdings`. Geldt ook voor andere "app"-tabs die een KPI-balk als entry-point hebben.
 - **Doel**: de KPI-balk leest als afgebakend hero-blok (paper-bg + harde ink-borders), maar **respecteert de tab-padding** zodat z'n outer-rand exact gelijk is aan tabs, charts, panels en tabellen op dezelfde tab. Geen blok mag visueel breder of smaller zijn dan een ander — uniformiteit zoals op `/core/budgets`.
