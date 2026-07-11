@@ -20,6 +20,11 @@ Bewuste, niet-universele patronen. Activeer alleen wanneer het paginatype erom v
 - **Referentie-implementaties**: `components/overview/cashflow-editorial-header.tsx` (herbruikbaar composiet, kicker+H1+deck), `BudgetEditorialHeader` in `components/app/budgets-client.tsx` en de kop in `components/overview/vaste-lasten-client.tsx` (beide mét cijferblok).
 - **NavStackMeta** blijft de nav-titel leveren — dat is géén duplicaat van deze kop (budget/transacties doen beide).
 
+### Inline info-disclosure (content-rijke i-uitleg)
+- **Toepassen op**: blok-niveau i-uitleg met formules, lijsten of meerdere paragrafen (dekkingsradar, guardrail-kompas, levensinkomenstrook, scenario-kaarten, Vrijheidsas).
+- **Niet toepassen op**: pagina-niveau uitleg van één alinea — dat is `PageInfoButton` (popover, `components/editorial`). **Keuzeregel: popover voor één alinea, inline-disclosure voor lijsten/meerdere paragrafen.**
+- **Component**: `InlineInfoDisclosure` (`components/editorial/inline-info-disclosure.tsx`) — i-knop `h-7 w-7 rounded-full border-[var(--border-ed)] bg-[var(--paper)]` met `aria-expanded` én focus-visible-ring, plus inline uitklap-paneel (`border-l-[3px] border-l-[var(--color-horizon-500)]` op `--paper-2`). Gebruik de component; herimplementeer het recept niet inline — vijf losse kopieën zijn in jul 2026 precies hierom gesaneerd.
+
 ### Pull-quote met inline highlights
 - **Toepassen op**: narratieve pagina's met menselijk verhaal (gids-intro, briefing-opener, jaarafsluiting, will-narratief, rapportage-conclusie) **en** scenario-output-samenvattingen bovenaan kassabonnen/analyses.
 - **Niet toepassen op**: data-pagina's zonder narratieve laag, dashboards, lijsten, forms.
