@@ -12,6 +12,8 @@ export type GoalType =
   | 'passive_income'
   | 'emergency_fund'
   | 'salary'
+  | 'expected_return'
+  | 'fire_age'
   | 'custom'
 
 export type GoalOwnership = 'personal' | 'shared'
@@ -36,6 +38,14 @@ export type Goal = {
   sort_order: number
   ownership: GoalOwnership
   household_id: string | null
+  /**
+   * Vrije JSONB-metadata (kolom `goals.metadata`, DEFAULT `{}`; ronde 4). Lab-
+   * gegenereerde parameter-doelen dragen `metadata.bron === 'parameter'` plus
+   * `oorsprong` (`'lab'|'backfill'`) en — voor het FIRE-doel — `margeDoelJaren`.
+   * Optioneel: oude rijen of legacy-DB's zonder de kolom leveren geen veld (de
+   * lezers behandelen ontbrekend/`null`/`{}` defensief als "geen parameter-doel").
+   */
+  metadata?: Record<string, unknown> | null
   created_at: string
   updated_at: string
 }
@@ -50,6 +60,8 @@ export const GOAL_TYPE_LABELS: Record<GoalType, string> = {
   passive_income: 'Passief inkomen',
   emergency_fund: 'Noodfonds',
   salary: 'Salaris',
+  expected_return: 'Verwacht rendement',
+  fire_age: 'Vrijheidsleeftijd',
   custom: 'Vrij doel',
 }
 
@@ -63,6 +75,8 @@ export const GOAL_TYPE_ICONS: Record<GoalType, string> = {
   passive_income: 'Banknote',
   emergency_fund: 'ShieldCheck',
   salary: 'Briefcase',
+  expected_return: 'Coins',
+  fire_age: 'Hourglass',
   custom: 'Target',
 }
 
@@ -75,6 +89,19 @@ export type GoalTypeMeta = {
   supportsAssetLink: boolean
   supportsDebtLink: boolean
   freedomTimeRelevant: boolean
+  /**
+   * Voortgangsrichting. 'up' (afwezig = default) = hoger-is-beter (spaargeld,
+   * vermogen, spaarquote …). 'down' = lager-is-beter: de gewenste waarde ligt
+   * ONDER de huidige (bv. `fire_age`: eerder vrij = beter). Alleen expliciet
+   * gezet waar het van 'up' afwijkt — zie `computeGoalProgress`.
+   */
+  direction?: 'up' | 'down'
+  /**
+   * true = dit doel-type wordt via het /toekomst-lab ("verkennen wordt richten")
+   * gegenereerd en is NIET vrij aanmaakbaar in GoalForm. Afwezig/false = normaal
+   * handmatig aanmaakbaar (bestaand gedrag, incl. `savings_rate`/`salary`).
+   */
+  viaLab?: boolean
 }
 
 export const GOAL_TYPE_META: Record<GoalType, GoalTypeMeta> = {
@@ -87,6 +114,8 @@ export const GOAL_TYPE_META: Record<GoalType, GoalTypeMeta> = {
   passive_income:  { unit: 'EUR/mnd', group: 'Financieel', step: '0.01', supportsAssetLink: false, supportsDebtLink: false, freedomTimeRelevant: false },
   emergency_fund:  { unit: 'maanden', group: 'Financieel', step: '0.5', min: 0, supportsAssetLink: false, supportsDebtLink: false, freedomTimeRelevant: false },
   salary:          { unit: 'EUR', group: 'Financieel', step: '0.01', supportsAssetLink: false, supportsDebtLink: false, freedomTimeRelevant: true },
+  expected_return: { unit: '%',   group: 'Financieel', step: '0.1', min: 0,  max: 20,  supportsAssetLink: false, supportsDebtLink: false, freedomTimeRelevant: false, viaLab: true },
+  fire_age:        { unit: 'jaar', group: 'Financieel', step: '0.5', min: 18, max: 100, supportsAssetLink: false, supportsDebtLink: false, freedomTimeRelevant: false, direction: 'down', viaLab: true },
   custom:          { unit: 'custom', group: 'Persoonlijk', step: '1',  supportsAssetLink: false, supportsDebtLink: false, freedomTimeRelevant: false },
 }
 
@@ -106,6 +135,10 @@ export function formatGoalValue(value: number, goalType: GoalType, customUnit?: 
       return `${Math.round(value)} dagen`
     case 'maanden':
       return `${value.toLocaleString('nl-NL', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} maanden`
+    case 'jaar':
+      // Halve jaren mogelijk (step 0.5) → 1 decimaal, maar trailing .0 weglaten
+      // ("58 jaar" / "58,5 jaar").
+      return `${value.toLocaleString('nl-NL', { maximumFractionDigits: 1 })} jaar`
     case 'custom':
       return customUnit ? `${value.toLocaleString('nl-NL')} ${customUnit}` : value.toLocaleString('nl-NL')
     default:
@@ -133,6 +166,10 @@ export function goalValueLabels(goalType: GoalType): { target: string; current: 
       return { target: 'Doelpercentage (%)', current: 'Huidige spaarquote (%)' }
     case 'emergency_fund':
       return { target: 'Doelmaanden', current: 'Huidige maanden' }
+    case 'expected_return':
+      return { target: 'Doelrendement (%)', current: 'Huidig rendement (%)' }
+    case 'fire_age':
+      return { target: 'Doel-vrijheidsleeftijd', current: 'Huidige vrijheidsleeftijd' }
     case 'custom':
       return { target: 'Doelwaarde', current: 'Huidige waarde' }
     default:
@@ -150,9 +187,22 @@ export const GOAL_COLORS = [
 ]
 
 /**
+ * Absolute speling (in de eenheid van het doel) waarbinnen een `down`-doel nog
+ * als "op koers" geldt. Bewust ABSOLUUT, niet relatief: 'down' geldt momenteel
+ * alleen voor `fire_age` (jaar), waar ~3 maanden vaste marge zinvol is — een
+ * relatieve marge op een leeftijd (bv. 1% van 58 ≈ 0,6 jr) zou meebewegen met
+ * de leeftijd en dat is hier onlogisch.
+ */
+const DOWN_GOAL_ONTRACK_TOLERANCE = 0.25
+
+/**
  * Compute goal progress.
  * For debt_payoff, progress = how much has been paid off.
  * For freedom_days, current value is free days per year.
+ *
+ * Richting-bewust: bij `direction: 'down'` (lager-is-beter, bv. `fire_age`) is
+ * het doel een LAGERE waarde dan de huidige; voortgang = target / current. Alle
+ * bestaande types zijn 'up' (default) en behouden exact hun gedrag.
  */
 export function computeGoalProgress(goal: Goal): {
   current: number
@@ -163,6 +213,20 @@ export function computeGoalProgress(goal: Goal): {
 } {
   const current = Number(goal.current_value)
   const target = Number(goal.target_value)
+
+  const direction = GOAL_TYPE_META[goal.goal_type]?.direction ?? 'up'
+
+  if (direction === 'down') {
+    // Lager-is-beter. Ongeldig doel of nog geen (positieve) huidige waarde →
+    // 0% en niet op koers (geen stale/misleidende voortgang).
+    if (target <= 0 || !Number.isFinite(current) || current <= 0) {
+      return { current, target, pct: 0, onTrack: false, eta: null }
+    }
+    const pct = Math.max(0, Math.min(Math.round((target / current) * 100), 100))
+    const onTrack = current <= target + DOWN_GOAL_ONTRACK_TOLERANCE
+    // target_date-tijdlijnlogica is alleen zinvol voor 'up'-doelen.
+    return { current, target, pct, onTrack, eta: null }
+  }
 
   if (target <= 0) return { current, target, pct: 0, onTrack: false, eta: null }
 

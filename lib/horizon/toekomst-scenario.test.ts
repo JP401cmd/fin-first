@@ -3,10 +3,11 @@ import type { Asset, AssetType } from '@/lib/asset-data'
 import type { WhatIfEvent } from '@/components/app/horizon/whatif-events'
 import {
   parseToekomstScenarioPrefs,
+  isDoelConceptGewijzigd,
   expandCategorieReturnDeltas,
   buildCategorieReturnGroups,
   scenarioMonthlySpendDelta,
-  type ToekomstScenarioPrefs,
+  type ToekomstScenarioStand,
 } from './toekomst-scenario'
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
@@ -47,8 +48,10 @@ function makeSliderEvent(over: Partial<WhatIfEvent>): WhatIfEvent {
 // ── parseToekomstScenarioPrefs ───────────────────────────────────────────────
 
 describe('parseToekomstScenarioPrefs', () => {
-  it('geldige roundtrip — behoudt bekende velden', () => {
-    const input: ToekomstScenarioPrefs = {
+  it('v1-input normaliseert naar v2 — behoudt alle bekende velden, voegt geen doel toe', () => {
+    // v1-fixture (de oude opgeslagen shape). De parser normaliseert ALTIJD naar v:2 met
+    // identieke veldwaarden en zonder doel-blok (v1 kende geen doel).
+    const v1input = {
       v: 1,
       sliders: { income: 4000, workdays: 4, savings: 30, extraInleg: 500 },
       returnDeltaByCategorie: { Beleggingen: 0.02, Spaargeld: -0.01 },
@@ -57,7 +60,30 @@ describe('parseToekomstScenarioPrefs', () => {
       stopMarge: 1.5,
       showScenarioLine: false,
     }
-    expect(parseToekomstScenarioPrefs(input)).toEqual(input)
+    expect(parseToekomstScenarioPrefs(v1input)).toEqual({ ...v1input, v: 2 })
+  })
+
+  it('v2-roundtrip mét doel — behoudt stand/parameters/gezetOp/goalIds', () => {
+    const v2input = {
+      v: 2,
+      sliders: { income: 4000, savings: 35 },
+      returnDeltaByCategorie: { Beleggingen: 0.02 },
+      stopAge: 55,
+      stopKoppel: false,
+      showScenarioLine: true,
+      doel: {
+        gezetOp: '2026-07-11T10:00:00.000Z',
+        parameters: { spaarquote: true, fire: true },
+        stand: {
+          sliders: { income: 4000, savings: 35 },
+          returnDeltaByCategorie: { Beleggingen: 0.02 },
+          stopAge: 55,
+          stopKoppel: false,
+        },
+        goalIds: { spaarquote: 'goal-abc', fire: 'goal-xyz' },
+      },
+    }
+    expect(parseToekomstScenarioPrefs(v2input)).toEqual(v2input)
   })
 
   it('clampt stopMarge op ±30 en negeert niet-eindige/afwezige waarden', () => {
@@ -69,19 +95,25 @@ describe('parseToekomstScenarioPrefs', () => {
     expect(parseToekomstScenarioPrefs({ v: 1 })?.stopMarge).toBeUndefined()
   })
 
-  it('niet-object of verkeerde versie → null', () => {
+  it('niet-object of onbekende versie → null', () => {
     expect(parseToekomstScenarioPrefs(null)).toBeNull()
     expect(parseToekomstScenarioPrefs(undefined)).toBeNull()
     expect(parseToekomstScenarioPrefs(42)).toBeNull()
     expect(parseToekomstScenarioPrefs('scenario')).toBeNull()
     expect(parseToekomstScenarioPrefs([])).toBeNull()
     expect(parseToekomstScenarioPrefs({})).toBeNull() // v ontbreekt
-    expect(parseToekomstScenarioPrefs({ v: 2, sliders: {} })).toBeNull()
+    // v:2 is nu een GELDIGE versie (was voorheen null) — onbekende versies blijven null.
+    expect(parseToekomstScenarioPrefs({ v: 3, sliders: {} })).toBeNull()
+    expect(parseToekomstScenarioPrefs({ v: 0 })).toBeNull()
     expect(parseToekomstScenarioPrefs({ v: '1' })).toBeNull()
+    expect(parseToekomstScenarioPrefs({ v: '2' })).toBeNull()
   })
 
-  it('minimale geldige pref (alleen v) → { v: 1 }', () => {
-    expect(parseToekomstScenarioPrefs({ v: 1 })).toEqual({ v: 1 })
+  it('minimale geldige pref → { v: 2 } (v1 én v2 normaliseren gelijk)', () => {
+    expect(parseToekomstScenarioPrefs({ v: 1 })).toEqual({ v: 2 })
+    expect(parseToekomstScenarioPrefs({ v: 2 })).toEqual({ v: 2 })
+    // v:2 met leeg sliders-object → sliders vallen weg (was voorheen null bij v:2).
+    expect(parseToekomstScenarioPrefs({ v: 2, sliders: {} })).toEqual({ v: 2 })
   })
 
   it('clampt sliderwaarden op de echte ranges', () => {
@@ -144,9 +176,9 @@ describe('parseToekomstScenarioPrefs', () => {
     })
     // De 0-delta verdwijnt; alleen de effectieve delta blijft over.
     expect(parsed?.returnDeltaByCategorie).toEqual({ Beleggingen: 0.02 })
-    // Enkel een 0-delta → hele sub-object valt weg (geen lege key-set).
+    // Enkel een 0-delta → hele sub-object valt weg (geen lege key-set). Genormaliseerd naar v:2.
     expect(parseToekomstScenarioPrefs({ v: 1, returnDeltaByCategorie: { Spaargeld: 0 } })).toEqual({
-      v: 1,
+      v: 2,
     })
   })
 
@@ -156,7 +188,245 @@ describe('parseToekomstScenarioPrefs', () => {
       sliders: { bogus: 1 },
       returnDeltaByCategorie: { Onzin: 0.02 },
     })
-    expect(parsed).toEqual({ v: 1 })
+    expect(parsed).toEqual({ v: 2 }) // genormaliseerd naar v:2
+  })
+})
+
+// ── parseToekomstScenarioPrefs — doel-blok (v2) ──────────────────────────────
+
+describe('parseToekomstScenarioPrefs — doel-blok', () => {
+  const GEZET_OP = '2026-07-11T10:00:00.000Z'
+
+  it('v1-input negeert een meegegeven doel (v1 draagt geen doel)', () => {
+    const parsed = parseToekomstScenarioPrefs({
+      v: 1,
+      sliders: { income: 4000 },
+      doel: { gezetOp: GEZET_OP, parameters: { fire: true }, stand: { stopAge: 55 } },
+    })
+    expect(parsed).toEqual({ v: 2, sliders: { income: 4000 } })
+    expect(parsed?.doel).toBeUndefined()
+  })
+
+  it('parameters: alleen bekende keys met waarde `true`', () => {
+    const parsed = parseToekomstScenarioPrefs({
+      v: 2,
+      doel: {
+        gezetOp: GEZET_OP,
+        parameters: { spaarquote: true, salaris: 'yes', fire: 1, rendement: true, onzin: true },
+        stand: { stopAge: 55, stopKoppel: false },
+      },
+    })
+    expect(parsed?.doel?.parameters).toEqual({ spaarquote: true, rendement: true })
+  })
+
+  it('goalIds: cache met alleen bekende keys en niet-lege strings', () => {
+    const parsed = parseToekomstScenarioPrefs({
+      v: 2,
+      doel: {
+        gezetOp: GEZET_OP,
+        parameters: { fire: true },
+        stand: { stopAge: 55, stopKoppel: false },
+        goalIds: { fire: 'goal-1', spaarquote: '', salaris: 42, onzin: 'x' },
+      },
+    })
+    expect(parsed?.doel?.goalIds).toEqual({ fire: 'goal-1' })
+  })
+
+  it('clampt de stand-velden met exact dezelfde clamps als de hoofdvelden', () => {
+    const parsed = parseToekomstScenarioPrefs({
+      v: 2,
+      doel: {
+        gezetOp: GEZET_OP,
+        parameters: { spaarquote: true },
+        stand: {
+          sliders: { income: 99999, savings: 200, extraInleg: -100 },
+          returnDeltaByCategorie: { Beleggingen: 0.9, Onzin: 0.03 },
+          stopAge: 250,
+          stopMarge: 80,
+        },
+      },
+    })
+    expect(parsed?.doel?.stand).toEqual({
+      sliders: { income: 15000, savings: 80, extraInleg: 0 },
+      returnDeltaByCategorie: { Beleggingen: 0.05 },
+      stopAge: 100,
+      stopMarge: 30,
+    })
+  })
+
+  it('vervuild doel-blok laat ALLEEN het doel vallen — ongeldige gezetOp', () => {
+    const parsed = parseToekomstScenarioPrefs({
+      v: 2,
+      sliders: { income: 4000 },
+      showScenarioLine: true,
+      doel: { gezetOp: 'niet-een-datum', parameters: { fire: true }, stand: { stopAge: 55 } },
+    })
+    // Doel weg, rest van de pref blijft ongemoeid.
+    expect(parsed).toEqual({ v: 2, sliders: { income: 4000 }, showScenarioLine: true })
+  })
+
+  it('vervuild doel-blok — gezetOp geen string → doel weg', () => {
+    const parsed = parseToekomstScenarioPrefs({
+      v: 2,
+      stopAge: 60,
+      doel: { gezetOp: 12345, parameters: { fire: true }, stand: { stopAge: 55 } },
+    })
+    expect(parsed).toEqual({ v: 2, stopAge: 60 })
+  })
+
+  it('vervuild doel-blok — leeg/onbekend parameters-object → doel weg', () => {
+    const parsed = parseToekomstScenarioPrefs({
+      v: 2,
+      stopAge: 60,
+      doel: {
+        gezetOp: GEZET_OP,
+        parameters: { onzin: true, spaarquote: false }, // geen enkele geldige `true`
+        stand: { stopAge: 55 },
+      },
+    })
+    expect(parsed).toEqual({ v: 2, stopAge: 60 })
+  })
+
+  it('vervuild doel-blok — rommel-stand (parset naar leeg) → doel weg', () => {
+    const parsed = parseToekomstScenarioPrefs({
+      v: 2,
+      showScenarioLine: false,
+      doel: {
+        gezetOp: GEZET_OP,
+        parameters: { fire: true },
+        stand: { bogus: 1, junk: 'x' }, // strippt naar {} → betekenisloos
+      },
+    })
+    expect(parsed).toEqual({ v: 2, showScenarioLine: false })
+  })
+
+  it('vervuild doel-blok — ontbrekende/niet-object stand → doel weg', () => {
+    expect(
+      parseToekomstScenarioPrefs({
+        v: 2,
+        doel: { gezetOp: GEZET_OP, parameters: { fire: true } }, // geen stand
+      }),
+    ).toEqual({ v: 2 })
+    expect(
+      parseToekomstScenarioPrefs({
+        v: 2,
+        doel: { gezetOp: GEZET_OP, parameters: { fire: true }, stand: 'rommel' },
+      }),
+    ).toEqual({ v: 2 })
+  })
+
+  it('geldig doel zonder goalIds — goalIds blijft afwezig', () => {
+    const parsed = parseToekomstScenarioPrefs({
+      v: 2,
+      doel: {
+        gezetOp: GEZET_OP,
+        parameters: { fire: true },
+        stand: { stopAge: 55, stopKoppel: false },
+      },
+    })
+    expect(parsed?.doel).toEqual({
+      gezetOp: GEZET_OP,
+      parameters: { fire: true },
+      stand: { stopAge: 55, stopKoppel: false },
+    })
+    expect(parsed?.doel && 'goalIds' in parsed.doel).toBe(false)
+  })
+})
+
+// ── isDoelConceptGewijzigd ───────────────────────────────────────────────────
+
+describe('isDoelConceptGewijzigd', () => {
+  const stand: ToekomstScenarioStand = {
+    sliders: { income: 4000, workdays: 4, savings: 30, extraInleg: 500 },
+    returnDeltaByCategorie: { Beleggingen: 0.02 },
+    stopAge: 55,
+    stopKoppel: false,
+  }
+
+  it('identieke stand → niet gewijzigd', () => {
+    expect(isDoelConceptGewijzigd({ ...stand }, stand)).toBe(false)
+  })
+
+  it('sub-euro income/savings-verschil rondt weg → niet gewijzigd (spiegelt persist Math.round)', () => {
+    const live: ToekomstScenarioStand = {
+      ...stand,
+      sliders: { income: 4000.4, workdays: 4, savings: 30.3, extraInleg: 500 },
+    }
+    expect(isDoelConceptGewijzigd(live, stand)).toBe(false)
+  })
+
+  it('income ≥ €1 verschil (andere afronding) → gewijzigd', () => {
+    const live = { ...stand, sliders: { ...stand.sliders!, income: 4001 } }
+    expect(isDoelConceptGewijzigd(live, stand)).toBe(true)
+  })
+
+  it('savings ≥ 1 verschil → gewijzigd', () => {
+    const live = { ...stand, sliders: { ...stand.sliders!, savings: 32 } }
+    expect(isDoelConceptGewijzigd(live, stand)).toBe(true)
+  })
+
+  it('workdays exact vergeleken → elk verschil gewijzigd', () => {
+    const live = { ...stand, sliders: { ...stand.sliders!, workdays: 3 } }
+    expect(isDoelConceptGewijzigd(live, stand)).toBe(true)
+  })
+
+  it('extraInleg exact vergeleken → elk verschil gewijzigd', () => {
+    const live = { ...stand, sliders: { ...stand.sliders!, extraInleg: 501 } }
+    expect(isDoelConceptGewijzigd(live, stand)).toBe(true)
+  })
+
+  it('rendement-delta echt verschil → gewijzigd', () => {
+    const live = { ...stand, returnDeltaByCategorie: { Beleggingen: 0.03 } }
+    expect(isDoelConceptGewijzigd(live, stand)).toBe(true)
+  })
+
+  it('rendement-delta afwezig-vs-aanwezig → gewijzigd', () => {
+    const live = { ...stand, returnDeltaByCategorie: undefined }
+    expect(isDoelConceptGewijzigd(live, stand)).toBe(true)
+  })
+
+  it('rendement-delta binnen 1e-9 → niet gewijzigd', () => {
+    const live = { ...stand, returnDeltaByCategorie: { Beleggingen: 0.02 + 1e-12 } }
+    expect(isDoelConceptGewijzigd(live, stand)).toBe(false)
+  })
+
+  it('stopAge-verschil bij koppel uit → gewijzigd', () => {
+    const live = { ...stand, stopAge: 58 }
+    expect(isDoelConceptGewijzigd(live, stand)).toBe(true)
+  })
+
+  it('stopAge undefined ≡ null (beide "geen stop") → niet gewijzigd', () => {
+    const s: ToekomstScenarioStand = { stopKoppel: false, stopAge: null }
+    const live: ToekomstScenarioStand = { stopKoppel: false } // stopAge afwezig
+    expect(isDoelConceptGewijzigd(live, s)).toBe(false)
+  })
+
+  it('stopKoppel-verschil → gewijzigd', () => {
+    const live = { ...stand, stopKoppel: true, stopMarge: 1 }
+    expect(isDoelConceptGewijzigd(live, stand)).toBe(true)
+  })
+
+  it('koppel aan in beide: marge is de waarheid — margeverschil → gewijzigd', () => {
+    const s: ToekomstScenarioStand = { stopKoppel: true, stopAge: 55, stopMarge: 2 }
+    const live: ToekomstScenarioStand = { stopKoppel: true, stopAge: 55, stopMarge: 3 }
+    expect(isDoelConceptGewijzigd(live, s)).toBe(true)
+  })
+
+  it('koppel aan: afgeleide stopAge schuift maar marge gelijk → niet gewijzigd', () => {
+    // Bij koppel is de stopAge afgeleid (verwacht + marge) en schuift met de sim;
+    // gelijke marge = hetzelfde doel, ongeacht de absolute stopAge.
+    const s: ToekomstScenarioStand = { stopKoppel: true, stopAge: 55, stopMarge: 2 }
+    const live: ToekomstScenarioStand = { stopKoppel: true, stopAge: 53, stopMarge: 2 }
+    expect(isDoelConceptGewijzigd(live, s)).toBe(false)
+  })
+
+  it('ontbrekende stand (geen doel) → niet gewijzigd', () => {
+    expect(isDoelConceptGewijzigd(stand, null)).toBe(false)
+    expect(isDoelConceptGewijzigd(stand, undefined)).toBe(false)
+  })
+
+  it('lege live-stand vs stand mét velden → gewijzigd', () => {
+    expect(isDoelConceptGewijzigd({}, stand)).toBe(true)
   })
 })
 

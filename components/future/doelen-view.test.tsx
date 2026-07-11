@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { DoelenView } from './doelen-view'
 import type { GoalWithBudget } from '@/lib/will-data-loader'
 
@@ -173,5 +173,150 @@ describe('DoelenView — basis-render', () => {
       />,
     )
     expect(screen.getByText('2 actieve doelen')).toBeTruthy()
+  })
+})
+
+// ── Groep "Jouw doelsituatie" (lab-parameter-doelen) ─────────────────────
+
+function paramGoal(overrides: Partial<GoalWithBudget> = {}): GoalWithBudget {
+  return mockGoal({
+    metadata: { bron: 'parameter', oorsprong: 'lab' },
+    ...overrides,
+  } as Partial<GoalWithBudget>)
+}
+
+describe('DoelenView — doelsituatie-groep', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('toont GEEN doelsituatie-groep zonder parameter-doelen', () => {
+    render(
+      <DoelenView
+        goals={[mockGoal()]}
+        goalProgresses={[
+          { current: 20000, target: 50000, pct: 40, onTrack: false, eta: null },
+        ]}
+      />,
+    )
+    expect(screen.queryByText('Jouw doelsituatie')).toBeNull()
+  })
+
+  it('toont de doelsituatie-groep zodra er een parameter-doel is', () => {
+    render(
+      <DoelenView
+        goals={[
+          paramGoal({ id: 'p1', name: 'Spaarquote-doel', goal_type: 'savings_rate' }),
+        ]}
+        goalProgresses={[
+          { current: 38, target: 45, pct: 84, onTrack: true, eta: null },
+        ]}
+      />,
+    )
+    expect(screen.getByText('Jouw doelsituatie')).toBeTruthy()
+  })
+
+  it('FIRE-kaart toont richting-bewuste regel + marge-subregel', () => {
+    render(
+      <DoelenView
+        goals={[
+          paramGoal({
+            id: 'pf',
+            name: 'Vrijheidsleeftijd',
+            goal_type: 'fire_age',
+            metadata: { bron: 'parameter', oorsprong: 'lab', margeDoelJaren: 5 },
+          }),
+        ]}
+        goalProgresses={[
+          { current: 54.5, target: 52, pct: 95, onTrack: true, eta: null },
+        ]}
+      />,
+    )
+    expect(screen.getByText(/nu 54,5 jaar → doel 52 jaar/)).toBeTruthy()
+    expect(
+      screen.getByText('≥ 5 jr marge — bekijk live in het lab'),
+    ).toBeTruthy()
+  })
+
+  it('degradeert naar "nog geen meting" bij current_value 0', () => {
+    render(
+      <DoelenView
+        goals={[
+          paramGoal({ id: 'ps', name: 'Spaarquote-doel', goal_type: 'savings_rate' }),
+        ]}
+        goalProgresses={[
+          { current: 0, target: 45, pct: 0, onTrack: false, eta: null },
+        ]}
+      />,
+    )
+    expect(
+      screen.getByText('nog geen meting — bekijk live in het lab'),
+    ).toBeTruthy()
+    // Geen misleidende status-pill in dit geval.
+    expect(screen.queryByText('Achter op planning')).toBeNull()
+  })
+
+  it('parameter-kaart linkt naar het lab i.p.v. GoalForm te openen', () => {
+    render(
+      <DoelenView
+        goals={[
+          paramGoal({ id: 'ps', name: 'Spaarquote-doel', goal_type: 'savings_rate' }),
+        ]}
+        goalProgresses={[
+          { current: 38, target: 45, pct: 84, onTrack: true, eta: null },
+        ]}
+      />,
+    )
+    const link = screen.getByRole('link', { name: /Bekijk .* in het lab/ })
+    expect(link.getAttribute('href')).toBe('/toekomst#verken-je-aannames')
+  })
+
+  it('overflow-menu → "Doelsituatie loslaten" → confirm → PUT loslaten', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true })
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(
+      <DoelenView
+        goals={[
+          paramGoal({ id: 'ps', name: 'Spaarquote-doel', goal_type: 'savings_rate' }),
+        ]}
+        goalProgresses={[
+          { current: 38, target: 45, pct: 84, onTrack: true, eta: null },
+        ]}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Doelsituatie-opties' }))
+    fireEvent.click(screen.getByText('Doelsituatie loslaten'))
+    // Confirm-modal verschijnt.
+    expect(screen.getByText(/Je laat je vastgelegde doelsituatie los/)).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Loslaten' }))
+    await new Promise((r) => setTimeout(r, 10))
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/toekomst-doel',
+      expect.objectContaining({ method: 'PUT' }),
+    )
+    const body = JSON.parse(fetchMock.mock.calls[0]![1].body)
+    expect(body.action).toBe('loslaten')
+  })
+
+  it('parameter-doel telt niet mee in de handmatige tel-header', () => {
+    render(
+      <DoelenView
+        goals={[
+          paramGoal({ id: 'ps', name: 'Spaarquote-doel', goal_type: 'savings_rate' }),
+          mockGoal({ id: 'm1', name: 'Noodfonds' }),
+        ]}
+        goalProgresses={[
+          { current: 38, target: 45, pct: 84, onTrack: true, eta: null },
+          { current: 20000, target: 50000, pct: 40, onTrack: false, eta: null },
+        ]}
+      />,
+    )
+    // Eén handmatig doel → "1 actief doel"; parameter-doel zit in eigen groep.
+    expect(screen.getByText('1 actief doel')).toBeTruthy()
+    expect(screen.getByText('Jouw doelsituatie')).toBeTruthy()
   })
 })

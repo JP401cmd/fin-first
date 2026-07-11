@@ -70,7 +70,8 @@ describe('PUT /api/toekomst-scenario', () => {
     const { update, eq } = mockUpdateChain()
 
     // income 99999 wordt door de parser geclampt naar de slider-max (15000);
-    // rommelvelden worden weggegooid. We verwachten dus de gesanitiseerde blob.
+    // rommelvelden worden weggegooid. De parser normaliseert v1-input ALTIJD naar v:2
+    // (transparant voor de schrijfpoort — zelfde velden), dus we verwachten de v:2-blob.
     const res = await PUT(
       putRequest(
         JSON.stringify({
@@ -86,7 +87,7 @@ describe('PUT /api/toekomst-scenario', () => {
     expect(await res.json()).toEqual({ ok: true })
     expect(mockFrom).toHaveBeenCalledWith('profiles')
     expect(update).toHaveBeenCalledWith({
-      toekomst_scenario_prefs: { v: 1, sliders: { income: 15000 }, showScenarioLine: true },
+      toekomst_scenario_prefs: { v: 2, sliders: { income: 15000 }, showScenarioLine: true },
     })
     expect(eq).toHaveBeenCalledWith('id', USER.id) // RLS-scoped op eigen rij
   })

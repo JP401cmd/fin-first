@@ -378,3 +378,12 @@
 ## 2026-07-11
 
 - **Componenten (aantal)** toegevoegd: +8
+
+## 2026-07-11
+
+- **API-routes** toegevoegd: /api/toekomst-doel
+- **Componenten (aantal)** toegevoegd: +7
+
+## 2026-07-11
+
+- Geen wijzigingen.

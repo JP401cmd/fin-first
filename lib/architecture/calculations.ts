@@ -428,6 +428,28 @@ export const CALCULATIONS: Calculation[] = [
     note: "BASELINE-CONSISTENTIE (kernbesluit, plan-doc zie-plan-van-het-stateless-horizon.md §A): de scenario-run gaat NIET via computeWhatifProjection — die adapter (whatif-varianten.ts:132-161) laat yearly_essential_expenses, marginaal_tarief, deficit_loan_rate en withdrawal_profile_config bewust weg, dus een nul-override zou van de basislijn afwijken — maar via computeConvergentieProjection met exact dezelfde ConvergentieRawContext als de hoofdlijn; alleen (a) assets vooraf door applyReturnDeltasToAssets en (b) slider-events aan lifeEvents. Nul overrides ⇒ identieke context ⇒ identieke uitkomst (per constructie), vastgepind met lib/horizon/scenario-baseline-parity.test.ts (deepEqual op rows + fireAgeFractional; diezelfde fixture via computeWhatifProjection wijkt WÉL af — pint het routerbesluit vast). CONSUME, NIET HERREKENEN: computeStopMarge doet GEEN extra solver-run — verwacht-FIRE (actief pad) én laatst-FIRE (de voorzichtige −0,02-variant uit buildScenarioPathsFromSim) komen als pure input binnen. expandCategorieReturnDeltas hergebruikt de canonieke ASSET_TYPE_TO_CATEGORIE-mapping (nu geëxporteerd uit adapter/potten.ts) met de Overig-fallback — geen tweede categorie-afleiding. buildCategorieReturnGroups toont het gewogen rendement op nul-basis (expected_return/100 zonder grossReturn-fallback) — bewust trouwer aan wat de kernel toepast dan de whatif-pagina-preview (die een userGrossReturn-fallback gebruikt en zo de effect-vs-display-drift van whatif-varianten.ts module-doc punt 2 riskeert). Stap 1 van de wat-als-scenariolaag; hook/UI/persistentie volgen in stap 2-5.",
   },
   {
+    id: 'doelvoortgang',
+    title: 'Doelvoortgang (goals)',
+    domain: 'Toekomst (FIRE)',
+    summary:
+      'Rekent voor élk doel (`goals`) de voortgang uit — % gehaald, op-koers en ETA — richting-bewust: standaard hoger-is-beter, maar `fire_age` (lager-is-beter, eerder vrij) rekent target/current i.p.v. current/target. Dé voortgangs-motor voor de doelenpagina; consumeert alleen `current_value`/`target_value`, herrekent niets financieels zelf.',
+    inputs: [
+      'goal.current_value, goal.target_value, goal.target_date, goal.created_at',
+      'GOAL_TYPE_META[goal_type].direction (up = default, down = alleen fire_age)',
+    ],
+    outputs: ['pct (0–100)', 'onTrack (boolean)', 'eta (nl-NL datumtekst) | null'],
+    formula:
+      "direction 'up' (default): pct = min(round(current/target×100), 100); onTrack via lineaire verwacht-pct t.o.v. target_date (10% tolerantie). direction 'down' (fire_age): pct = clamp(round(target/current×100), 0, 100); onTrack = current ≤ target + 0,25 (vaste marge, geen ETA — een leeftijdsdoel heeft geen lineair tijdpad).",
+    files: ['lib/goal-data.ts'],
+    functions: ['computeGoalProgress'],
+    constants: [
+      { label: 'ETA-tolerantie (up-doelen)', value: '10% onder het lineair-verwachte pct = nog op koers' },
+      { label: 'DOWN_GOAL_ONTRACK_TOLERANCE (fire_age)', value: '0,25 jaar — vast, niet relatief (zie code-comment: een relatieve marge zou meebewegen met de leeftijd)' },
+    ],
+    elementIds: ['as-planning', 'fn-toekomstplannen'],
+    note: 'Consumenten: lib/will-data-loader.ts (Will-KPI\'s), components/app/will/goal-progress-timeline.tsx en goal-detail-modal.tsx (doelenpagina + nav-cards). Ronde 4 ("verkennen wordt richten"): naast de vijf bestaande, vrij aanmaakbare doel-typen genereert `lib/horizon/toekomst-doel.ts#buildParameterGoalRows` nu ook vier LAB-doelen (spaarquote/salaris/rendement/fire_age, `metadata.bron==\'parameter\'`, via PUT /api/toekomst-doel) — computeGoalProgress zelf is generiek en ongewijzigd voor die vier; alleen `fire_age` gebruikt de reeds bestaande `direction: \'down\'`-tak (eerder toegevoegd voor dit lab-doel, nu de eerste échte consument). De actuele `current_value` van parameter-doelen wordt apart geïnjecteerd (will-data-loader.ts#injectParameterGoalCurrentValues, per type: 6m-spaarquote via savingsRateFromAggregates, salaris via profiles, doel-gewogen rendement via doelGewogenRendement, fire_age via de laatste solver-uitkomst) — die injectie is databewerking, geen tweede voortgangsformule; computeGoalProgress blijft de ENE plek die current/target naar pct/onTrack/eta vertaalt.',
+  },
+  {
     id: 'dekkingsradar',
     title: 'Dekkingsradar & laagste buffer',
     domain: 'Toekomst (FIRE)',

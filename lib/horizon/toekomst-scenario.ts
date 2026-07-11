@@ -6,7 +6,9 @@
  * gevoed ZONDER de basislijn te muteren. De scenario-run zelf draait via
  * `computeConvergentieProjection` met exact dezelfde `ConvergentieRawContext` als
  * de hoofdlijn; deze module levert enkel:
- *   - de pref-parser (`parseToekomstScenarioPrefs`) voor de server-side JSONB-pref;
+ *   - de pref-parser (`parseToekomstScenarioPrefs`) voor de server-side JSONB-pref —
+ *     normaliseert v1 én v2 ALTIJD naar de v2-shape (met optioneel vastgelegd `doel`-blok);
+ *   - de pure concept-detectie (`isDoelConceptGewijzigd`) voor de "je draait aan je doel"-banner;
  *   - de categorie→asset_type rendement-delta-expansie voor `applyReturnDeltasToAssets`;
  *   - de gewogen baseline-rendementen per bezeten categorie voor de Marktbias-UI;
  *   - de som van de scenario-bestedingsdelta (guardrail-kompas).
@@ -58,14 +60,59 @@ const VALID_CATEGORIES: readonly AssetCategorie[] = [
   'Overig',
 ]
 
-// ── Pref-shape ───────────────────────────────────────────────────────────────
+// ── Pref-shape (v2) ──────────────────────────────────────────────────────────
+
+/** De vier promoveerbare parameter-doelen die één doelscenario kan genereren. */
+export const DOEL_PARAMETERS = ['spaarquote', 'salaris', 'rendement', 'fire'] as const
+export type DoelParameter = (typeof DOEL_PARAMETERS)[number]
+
+/**
+ * De GOAL-RELEVANTE subset van de pref: exact dezelfde velden/clamps als de hoofdvelden,
+ * maar ZONDER `v` en `showScenarioLine` (die laatste is een pure weergavevlag, geen doel).
+ * Twee toepassingen:
+ *   - als vastgelegde KOPIE in `doel.stand` (voedt "herstel mijn doel" + concept-detectie);
+ *   - als vergelijkingsvorm voor `isDoelConceptGewijzigd(live, stand)`.
+ * Eén set veldnamen zodat de client één bouwer kan hergebruiken (géén tweede vorm).
+ */
+export interface ToekomstScenarioStand {
+  sliders?: {
+    income?: number
+    workdays?: number
+    savings?: number
+    extraInleg?: number
+  }
+  returnDeltaByCategorie?: Partial<Record<AssetCategorie, number>>
+  stopAge?: number | null
+  stopKoppel?: boolean
+  stopMarge?: number
+}
+
+/**
+ * Vastgelegd doelscenario ("verkennen wordt richten"): de actuele lab-stand is gepromoveerd
+ * tot een persistent doel dat parameter-doelen genereert (spaarquote/salaris/rendement/fire).
+ */
+export interface ToekomstScenarioDoel {
+  /** ISO-tijdstip van vastleggen. Moet als datum parseren, anders valt het doel-blok weg. */
+  gezetOp: string
+  /** Welke parameters bij vastleggen zijn aangevinkt. Alleen bekende keys met waarde `true`. */
+  parameters: Partial<Record<DoelParameter, true>>
+  /** De vastgelegde KOPIE van de lab-stand (voedt herstel + concept-detectie). */
+  stand: ToekomstScenarioStand
+  /**
+   * Cache van de gegenereerde goals-rij-id's per parameter — GEEN waarheid: de goals-tabel
+   * is leidend. Enkel een hint zodat de client de rijen kan terugvinden zonder her-query;
+   * een ontbrekende/stale id mag nooit tot een crash leiden (tolerante lezers).
+   */
+  goalIds?: Partial<Record<DoelParameter, string>>
+}
 
 /**
  * Server-side bewaarde scenario-voorkeuren (JSONB op `profiles`). Versioned zodat een
- * toekomstige shape-wijziging via het versieveld te onderscheiden is (`v !== 1` → null).
+ * shape-wijziging via het versieveld te onderscheiden is. De parser normaliseert v1 én v2
+ * ALTIJD naar deze v2-shape; onbekende versies (≠ 1 en ≠ 2) → `null`.
  */
 export interface ToekomstScenarioPrefs {
-  v: 1
+  v: 2
   /** Slider-standen; ontbrekend = op de baseline (geen event). */
   sliders?: {
     income?: number
@@ -89,6 +136,8 @@ export interface ToekomstScenarioPrefs {
   stopMarge?: number
   /** Toont de gestippelde 2e (wat-als)lijn in de grafiek. */
   showScenarioLine?: boolean
+  /** Vastgelegd doelscenario (ronde 4). Ontbreekt zolang de gebruiker niets promoveerde. */
+  doel?: ToekomstScenarioDoel
 }
 
 // ── Parser ───────────────────────────────────────────────────────────────────
@@ -105,22 +154,16 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
 }
 
 /**
- * Defensieve parser voor de rauwe JSONB-pref. Neemt ALLEEN bekende velden over,
- * clampt sliderwaarden op de échte sliderranges, whitelist de categorie-keys tegen
- * `AssetCategorie`, clampt de rendement-delta op het Marktbias-bereik en de stopleeftijd
- * op 18–100 (integer). Onbekende velden worden weggegooid; geen object of verkeerde
- * versie → `null` (de consument valt dan op de defaults terug).
+ * Parseert de GOAL-RELEVANTE scenario-basisvelden (sliders, per-categorie rendement-delta,
+ * stopAge, stopMarge, stopKoppel) uit een rauw object naar `out`. Gedeeld door de top-level
+ * pref én `doel.stand` zodat er ÉÉN set clamps/whitelists is (géén tweede implementatie).
+ * Neemt alleen bekende velden over; ongeldige/niet-eindige waarden worden stil overgeslagen.
  */
-export function parseToekomstScenarioPrefs(raw: unknown): ToekomstScenarioPrefs | null {
-  if (!isPlainObject(raw)) return null
-  if (raw.v !== 1) return null
-
-  const out: ToekomstScenarioPrefs = { v: 1 }
-
+function parseScenarioBaseFields(raw: Record<string, unknown>, out: ToekomstScenarioStand): void {
   // ── Sliders (clamp op de echte ranges; alleen bekende keys) ──
   if (isPlainObject(raw.sliders)) {
     const src = raw.sliders
-    const sliders: NonNullable<ToekomstScenarioPrefs['sliders']> = {}
+    const sliders: NonNullable<ToekomstScenarioStand['sliders']> = {}
     for (const key of ['income', 'workdays', 'savings', 'extraInleg'] as const) {
       const clamped = clampNumber(src[key], SLIDER_RANGES[key].min, SLIDER_RANGES[key].max)
       if (clamped !== undefined) sliders[key] = clamped
@@ -156,11 +199,159 @@ export function parseToekomstScenarioPrefs(raw: unknown): ToekomstScenarioPrefs 
     if (clamped !== undefined) out.stopMarge = clamped
   }
 
-  // ── Booleans ──
+  // ── Koppel-boolean ──
   if (typeof raw.stopKoppel === 'boolean') out.stopKoppel = raw.stopKoppel
+}
+
+/**
+ * Parseert het optionele `doel`-blok (v2). Een VERVUILD doel-blok laat alléén het doel
+ * vallen (de rest van de pref blijft). Voorwaarden voor een geldig doel:
+ *   - `gezetOp` is een string die als datum parseert (anders → doel weg);
+ *   - `parameters` bevat minstens één van de vier bekende keys met waarde `true`
+ *     (leeg parameters-object → doel weg: een doel zonder parameters is betekenisloos);
+ *   - `stand` is een plain object dat naar minstens één geldig veld parseert
+ *     (ontbrekende/lege/ongeldige stand → doel weg: een doel zonder stand is betekenisloos).
+ * `goalIds` is een pure cache (niet-lege strings, bekende keys) en beïnvloedt de geldigheid niet.
+ */
+function parseDoel(raw: Record<string, unknown>): ToekomstScenarioDoel | null {
+  if (typeof raw.gezetOp !== 'string' || Number.isNaN(Date.parse(raw.gezetOp))) return null
+
+  if (!isPlainObject(raw.parameters)) return null
+  const parameters: Partial<Record<DoelParameter, true>> = {}
+  for (const key of DOEL_PARAMETERS) {
+    if (raw.parameters[key] === true) parameters[key] = true
+  }
+  if (Object.keys(parameters).length === 0) return null
+
+  if (!isPlainObject(raw.stand)) return null
+  const stand: ToekomstScenarioStand = {}
+  parseScenarioBaseFields(raw.stand, stand)
+  if (Object.keys(stand).length === 0) return null
+
+  const doel: ToekomstScenarioDoel = { gezetOp: raw.gezetOp, parameters, stand }
+
+  if (isPlainObject(raw.goalIds)) {
+    const goalIds: Partial<Record<DoelParameter, string>> = {}
+    for (const key of DOEL_PARAMETERS) {
+      const val = raw.goalIds[key]
+      if (typeof val === 'string' && val.length > 0) goalIds[key] = val
+    }
+    if (Object.keys(goalIds).length > 0) doel.goalIds = goalIds
+  }
+
+  return doel
+}
+
+/**
+ * Defensieve parser voor de rauwe JSONB-pref. Accepteert v1 én v2 en NORMALISEERT ALTIJD
+ * naar v2 (v1-input krijgt dezelfde velden, `v: 2`, en géén doel — v1 kende geen doel).
+ * Neemt ALLEEN bekende velden over, clampt sliderwaarden op de échte sliderranges, whitelist
+ * de categorie-keys tegen `AssetCategorie`, clampt de rendement-delta op het Marktbias-bereik
+ * en de stopleeftijd op 18–100 (integer). Een vervuild `doel`-blok laat alléén het doel vallen
+ * (de rest blijft). Geen object of onbekende versie (≠ 1 en ≠ 2) → `null` (consument valt op
+ * de defaults terug). Normalisatie is transparant voor de schrijfpoort/loader (zelfde velden).
+ */
+export function parseToekomstScenarioPrefs(raw: unknown): ToekomstScenarioPrefs | null {
+  if (!isPlainObject(raw)) return null
+  if (raw.v !== 1 && raw.v !== 2) return null
+
+  const out: ToekomstScenarioPrefs = { v: 2 }
+  parseScenarioBaseFields(raw, out)
+
+  // ── Weergavevlag (geen onderdeel van de goal-stand) ──
   if (typeof raw.showScenarioLine === 'boolean') out.showScenarioLine = raw.showScenarioLine
 
+  // ── Doel-blok (alleen bij v2-input; v1 draagt per definitie geen doel) ──
+  if (raw.v === 2 && isPlainObject(raw.doel)) {
+    const doel = parseDoel(raw.doel)
+    if (doel) out.doel = doel
+  }
+
   return out
+}
+
+// ── Concept-detectie (doel gewijzigd?) ───────────────────────────────────────
+
+/** Rond af als aanwezig; `undefined` blijft `undefined` (spiegelt de persist Math.round-inclusie). */
+function roundOrUndef(v: number | undefined): number | undefined {
+  return v === undefined ? undefined : Math.round(v)
+}
+
+/** stopAge-default = null; `undefined` en `null` zijn beide "geen stop" (gelijk). */
+function normStopAge(v: number | null | undefined): number | null {
+  return v === undefined || v === null ? null : v
+}
+
+/** Twee getallen gelijk binnen 1e-9 (of beide afwezig ⇒ gelijk). */
+function numGelijk(a: number | undefined, b: number | undefined): boolean {
+  if (a === undefined && b === undefined) return true
+  if (a === undefined || b === undefined) return false
+  return Math.abs(a - b) < 1e-9
+}
+
+/** Sliders gelijk volgens de persist-effect-regels (income/savings afgerond, workdays/extraInleg exact). */
+function slidersGelijk(
+  a: ToekomstScenarioStand['sliders'],
+  b: ToekomstScenarioStand['sliders'],
+): boolean {
+  // income & savings: het persist-effect bepaalt inclusie via `Math.round` — spiegel dat, zodat
+  // een sub-euro drag-en-terug (rondt naar hetzelfde geheel getal) géén "gewijzigd" oplevert.
+  if (roundOrUndef(a?.income) !== roundOrUndef(b?.income)) return false
+  if (roundOrUndef(a?.savings) !== roundOrUndef(b?.savings)) return false
+  // workdays & extraInleg: het persist-effect vergelijkt exact (`!==` resp. `!== 0`) — spiegel exact.
+  if (a?.workdays !== b?.workdays) return false
+  if (a?.extraInleg !== b?.extraInleg) return false
+  return true
+}
+
+/** Per-categorie rendement-delta gelijk (zelfde effectieve key-set; waarden binnen 1e-9). */
+function deltaMapGelijk(
+  a: Partial<Record<AssetCategorie, number>> | undefined,
+  b: Partial<Record<AssetCategorie, number>> | undefined,
+): boolean {
+  for (const cat of VALID_CATEGORIES) {
+    if (!numGelijk(a?.[cat], b?.[cat])) return false
+  }
+  return true
+}
+
+/**
+ * Pure concept-detectie: wijkt de LIVE goal-relevante stand af van de vastgelegde `doel.stand`?
+ * Voedt de "je draait aan je doel"-banner (stap 5). Spiegelt de afronding/normalisatie van het
+ * persist-effect in horizon-client zodat een no-op géén valse "gewijzigd" geeft. Vergelijkingsregel
+ * per veld:
+ *   - `sliders.income` / `sliders.savings` : AFGEROND vergeleken (persist bepaalt inclusie via
+ *     `Math.round(x) !== Math.round(baseline)`); een sub-euro drag-en-terug telt dus als gelijk.
+ *   - `sliders.workdays` / `sliders.extraInleg` : EXACT (persist vergelijkt exact).
+ *   - `returnDeltaByCategorie` : per-categorie binnen 1e-9, zelfde effectieve key-set (de parser
+ *     dropt sub-1e-9/nul-delta's al, dus dit spiegelt wat er zou worden weggeschreven).
+ *   - stop (koppel-bewust): `stopKoppel` verschilt ⇒ gewijzigd. Anders — koppel AAN in beide ⇒
+ *     vergelijk `stopMarge` (bij koppel is de marge de bewaarde waarheid; de stopAge is afgeleid
+ *     en schuift met de sim, dus die niet vergelijken). Koppel UIT in beide ⇒ vergelijk de
+ *     absolute `stopAge` (undefined ≡ null; beide "geen stop").
+ * Ontbrekende `stand` (geen doel) ⇒ `false` (er is niets om van af te wijken).
+ */
+export function isDoelConceptGewijzigd(
+  live: ToekomstScenarioStand,
+  stand: ToekomstScenarioStand | null | undefined,
+): boolean {
+  if (!stand) return false
+
+  if (!slidersGelijk(live.sliders, stand.sliders)) return true
+  if (!deltaMapGelijk(live.returnDeltaByCategorie, stand.returnDeltaByCategorie)) return true
+
+  const koppelLive = live.stopKoppel ?? false
+  const koppelStand = stand.stopKoppel ?? false
+  if (koppelLive !== koppelStand) return true
+  if (koppelStand) {
+    // Koppel aan in beide: marge is de bewaarde waarheid; de afgeleide stopAge negeren.
+    if (!numGelijk(live.stopMarge, stand.stopMarge)) return true
+  } else {
+    // Koppel uit in beide: de absolute stopAge is de waarheid.
+    if (normStopAge(live.stopAge) !== normStopAge(stand.stopAge)) return true
+  }
+
+  return false
 }
 
 // ── Categorie → asset_type rendement-delta-expansie ──────────────────────────

@@ -14,7 +14,10 @@ export interface SanitizedCashSettings {
   estimated_monthly_expenses?: number
   retirement_expense_method?: RetirementExpenseMethod
   retirement_expense_custom_amount?: number
-  target_savings_rate?: number | null
+  // `target_savings_rate` valt hier BEWUST buiten (ronde 4, besluit 3): het
+  // spaarquote-doel woont voortaan in de goals-bron (parameter-doel via het
+  // /toekomst-lab). De profielkolom is DEPRECATED en wordt niet meer via PUT
+  // geschreven; de sanitizer negeert het veld stilzwijgend.
   income_source?: string
   expenses_source?: string
 }
@@ -45,14 +48,8 @@ export function sanitizeCashSettingsInput(body: Record<string, unknown>): Saniti
     const n = Number(body.retirement_expense_custom_amount)
     if (Number.isFinite(n) && n >= 0 && n <= 10_000_000) out.retirement_expense_custom_amount = n
   }
-  if (body.target_savings_rate !== undefined) {
-    if (body.target_savings_rate === null) {
-      out.target_savings_rate = null
-    } else {
-      const n = Number(body.target_savings_rate)
-      if (Number.isFinite(n) && n >= 0 && n <= 100) out.target_savings_rate = n
-    }
-  }
+  // target_savings_rate wordt bewust NIET meer gelezen/geschreven (ronde 4,
+  // besluit 3 — de goals-bron is dé bron). Een meegestuurd veld wordt genegeerd.
 
   for (const key of ['income_source', 'expenses_source'] as const) {
     if (body[key] !== undefined) {

@@ -25,6 +25,7 @@
 // per se de getoonde volgorde.
 
 import { formatCurrency } from '@/lib/format'
+import { formatGoalValue, type GoalType } from '@/lib/goal-data'
 import type { HealthScore } from '@/lib/financial-health'
 import type { LifeEvent } from '@/lib/horizon-data'
 import type { Recommendation } from '@/lib/recommendation-data'
@@ -172,6 +173,12 @@ export interface BriefingEngineInput {
   /** Doelen + bijbehorende voortgang. Indices moeten parallel zijn. */
   goalNames: string[]
   goalProgresses: GoalProgressInput[]
+  /** Doel-types parallel aan `goalNames`/`goalProgresses` (optioneel, backward-
+   *  compatible). Voedt de goal-heads-up: parameter-`fire_age`-doelen (marge-/
+   *  live-only in het lab) worden uitgesloten, en de overige doelen worden met
+   *  de juiste eenheid geformatteerd (%/jaar i.p.v. altijd EUR). Afwezig ⇒
+   *  gedraag als voorheen (EUR-format, geen exclusie). */
+  goalTypes?: GoalType[]
   /** Optionele financiële context — voedt de verrijkte briefing-bronnen.
    *  Wanneer afwezig blijft de engine-output identiek aan voorheen. */
   finance?: BriefingFinanceInput
@@ -258,18 +265,29 @@ export function buildBriefingEntries(input: BriefingEngineInput): BriefingEntry[
   // 3b. Goal heads-up — meest off-track-doel (pct < 50 én niet onTrack).
   //     Vult de health-pillar-heads_up aan: een gebruiker met groene
   //     pillars maar achterblijvende doelen ziet hier toch een nudge.
+  //     CR-M1: fire_age-doelen (parameter-/marge-doelen, live-only in het lab)
+  //     worden uitgesloten — hun "off-track" is een marge-status die alleen op
+  //     /toekomst zin heeft (spiegelt DoelenView + toekomst-nav-cards).
   const worstGoalIdx = input.goalProgresses
     .map((p, i) => ({ p, i }))
-    .filter(({ p }) => !p.onTrack && p.pct < 50 && p.pct > 0)
+    .filter(({ p, i }) => {
+      if (input.goalTypes?.[i] === 'fire_age') return false
+      return !p.onTrack && p.pct < 50 && p.pct > 0
+    })
     .sort((a, b) => a.p.pct - b.p.pct)[0]?.i
   if (worstGoalIdx != null) {
     const goalName = input.goalNames[worstGoalIdx]
     const progress = input.goalProgresses[worstGoalIdx]
+    const goalType = input.goalTypes?.[worstGoalIdx]
     if (goalName && progress) {
+      // Parameter-doelen zijn %/jaar/EUR — format met de doel-eenheid i.p.v.
+      // altijd EUR (m1). Ontbrekend goalType (oude callers) → EUR-fallback.
+      const fmt = (v: number) =>
+        goalType ? formatGoalValue(v, goalType) : formatCurrency(v)
       entries.push({
         id: `heads_up:goal:${worstGoalIdx}`,
         category: 'heads_up',
-        text: `${goalName} ligt achter op planning: ${formatCurrency(progress.current)} van ${formatCurrency(progress.target)} (${Math.round(progress.pct)}%) — extra inleg deze maand?`,
+        text: `${goalName} ligt achter op planning: ${fmt(progress.current)} van ${fmt(progress.target)} (${Math.round(progress.pct)}%) — extra inleg deze maand?`,
         href: '/toekomst/doelen',
       })
     }

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-11T07:26:27.745Z",
+  "generatedAt": "2026-07-11T16:17:08.085Z",
   "generatedDate": "2026-07-11",
   "repo": {
     "name": "fin",
@@ -189,11 +189,11 @@
   "stats": {
     "routes": 139,
     "routesProduction": 98,
-    "api": 243,
+    "api": 244,
     "tables": 58,
-    "migrations": 122,
+    "migrations": 125,
     "integrations": 25,
-    "components": 797,
+    "components": 804,
     "providers": 11,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -3847,6 +3847,14 @@
       ]
     },
     {
+      "url": "/api/toekomst-doel",
+      "file": "app/api/toekomst-doel/route.ts",
+      "domain": "toekomst-doel",
+      "methods": [
+        "PUT"
+      ]
+    },
+    {
       "url": "/api/toekomst-scenario",
       "file": "app/api/toekomst-scenario/route.ts",
       "domain": "toekomst-scenario",
@@ -6479,6 +6487,21 @@
       ]
     },
     {
+      "domain": "toekomst-doel",
+      "label": "toekomst-doel",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/toekomst-doel",
+          "file": "app/api/toekomst-doel/route.ts",
+          "domain": "toekomst-doel",
+          "methods": [
+            "PUT"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "toekomst-scenario",
       "label": "toekomst-scenario",
       "count": 1,
@@ -6884,7 +6907,7 @@
         "migration": "supabase/migrations/20260501000001_create_external_connections.sql"
       }
     ],
-    "migrationCount": 122
+    "migrationCount": 125
   },
   "tablesByDomain": [
     {
@@ -7222,11 +7245,11 @@
     }
   ],
   "components": {
-    "total": 797,
+    "total": 804,
     "groups": [
       {
         "group": "app",
-        "count": 336,
+        "count": 340,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -7330,6 +7353,8 @@
           "desktop-sidebar-shell",
           "discover-carousel",
           "dividend-tracker",
+          "doel-vastleg-sheet",
+          "doel-vastleg-sheet.test",
           "domain-card",
           "dream-transition-context",
           "eerder-stoppen",
@@ -7364,6 +7389,7 @@
           "gap-analyse",
           "goal-detail-modal",
           "goal-form",
+          "goal-form.test",
           "goal-progress-timeline",
           "grafiek-uitleg-walkthrough",
           "guardrail-kompas",
@@ -7381,6 +7407,7 @@
           "hide-in-simple.test",
           "holding-alerts",
           "holding-transaction-log",
+          "holding-transaction-log.test",
           "holdings-heatmap",
           "horizon-cashflow-sankey",
           "horizon-client",
@@ -7699,6 +7726,78 @@
         ]
       },
       {
+        "group": "widgets",
+        "count": 66,
+        "items": [
+          "abonnementen-widget",
+          "acties-widget",
+          "agenda-widget",
+          "ai-inzicht-widget",
+          "assets-widget",
+          "auto-dashboard-wizard",
+          "backtesting-score-widget",
+          "belasting-box3-widget",
+          "beleggingsrendement-widget",
+          "berichten-widget",
+          "beslissingspatronen-widget",
+          "box3-drag-widget",
+          "budget-fav-widget",
+          "budget-heatmap-widget",
+          "budget-trend-widget",
+          "budgetten-widget",
+          "budgetten-widget.test",
+          "cash-flow-widget",
+          "category-app-nav-bar",
+          "doelen-widget",
+          "draggable-widget-grid",
+          "draggable-widget-grid.test",
+          "fee-analyzer-widget",
+          "fee-detail-modal",
+          "fire-prognose-widget",
+          "fire-prognose-widget.test",
+          "gezondheids-score-widget",
+          "holding-fav-widget",
+          "holdings-widget",
+          "huishouden-activiteit-widget",
+          "huishouden-vergelijking-widget",
+          "hypotheek-vs-beleggen-widget",
+          "inflatie-impact-widget",
+          "jouw-pad-widget-wrapper",
+          "levensgebeurtenissen-widget",
+          "maandoverzicht-widget",
+          "meldingen-widget",
+          "monte-carlo-widget",
+          "netto-vermogen-widget",
+          "nibud-benchmark-widget",
+          "noodfonds-widget",
+          "pensioen-aow-widget",
+          "rebalancing-widget",
+          "schulden-widget",
+          "sim-vermogenspad-widget",
+          "spaarquote-widget",
+          "spaarquote-widget.test",
+          "surplus-gap-widget",
+          "swr-monitor-widget",
+          "vaste-lasten-widget",
+          "volgende-stap-widget",
+          "voorstellen-widget",
+          "vrijheidsdagen-maand-widget",
+          "vrijheidsmijlpalen-widget",
+          "vrijheidsmijlpalen-widget.test",
+          "vrijheidsscenario-widget",
+          "vrijheidsvoortgang-widget",
+          "vrijheidsvoortgang-widget.test",
+          "weekoverzicht-widget",
+          "widget-dnd-grid",
+          "widget-empty",
+          "widget-empty.test",
+          "widget-grid-helpers",
+          "widget-renderer",
+          "widget-shell",
+          "wilskracht-widget"
+        ]
+      },
+      {
         "group": "core",
         "count": 64,
         "items": [
@@ -7766,76 +7865,6 @@
           "vermogen-debt-card",
           "vermogen-wealth-group",
           "waardestijging-slider"
-        ]
-      },
-      {
-        "group": "widgets",
-        "count": 64,
-        "items": [
-          "abonnementen-widget",
-          "acties-widget",
-          "agenda-widget",
-          "ai-inzicht-widget",
-          "assets-widget",
-          "auto-dashboard-wizard",
-          "backtesting-score-widget",
-          "belasting-box3-widget",
-          "beleggingsrendement-widget",
-          "berichten-widget",
-          "beslissingspatronen-widget",
-          "box3-drag-widget",
-          "budget-fav-widget",
-          "budget-heatmap-widget",
-          "budget-trend-widget",
-          "budgetten-widget",
-          "budgetten-widget.test",
-          "cash-flow-widget",
-          "category-app-nav-bar",
-          "doelen-widget",
-          "draggable-widget-grid",
-          "draggable-widget-grid.test",
-          "fee-analyzer-widget",
-          "fee-detail-modal",
-          "fire-prognose-widget",
-          "fire-prognose-widget.test",
-          "gezondheids-score-widget",
-          "holding-fav-widget",
-          "holdings-widget",
-          "huishouden-activiteit-widget",
-          "huishouden-vergelijking-widget",
-          "hypotheek-vs-beleggen-widget",
-          "inflatie-impact-widget",
-          "jouw-pad-widget-wrapper",
-          "levensgebeurtenissen-widget",
-          "maandoverzicht-widget",
-          "meldingen-widget",
-          "monte-carlo-widget",
-          "netto-vermogen-widget",
-          "nibud-benchmark-widget",
-          "noodfonds-widget",
-          "pensioen-aow-widget",
-          "rebalancing-widget",
-          "schulden-widget",
-          "sim-vermogenspad-widget",
-          "spaarquote-widget",
-          "spaarquote-widget.test",
-          "surplus-gap-widget",
-          "swr-monitor-widget",
-          "vaste-lasten-widget",
-          "volgende-stap-widget",
-          "voorstellen-widget",
-          "vrijheidsdagen-maand-widget",
-          "vrijheidsmijlpalen-widget",
-          "vrijheidsmijlpalen-widget.test",
-          "vrijheidsscenario-widget",
-          "vrijheidsvoortgang-widget",
-          "vrijheidsvoortgang-widget.test",
-          "weekoverzicht-widget",
-          "widget-empty",
-          "widget-empty.test",
-          "widget-renderer",
-          "widget-shell",
-          "wilskracht-widget"
         ]
       },
       {
@@ -8025,11 +8054,12 @@
       },
       {
         "group": "editorial",
-        "count": 11,
+        "count": 12,
         "items": [
           "chart-tips",
           "glossary-term",
           "index",
+          "inline-info-disclosure",
           "insight-toggle-button",
           "insight-toggle-button.test",
           "page-blueprints",
@@ -9526,6 +9556,16 @@
           "write": false
         }
       ],
+      "toekomst-doel": [
+        {
+          "name": "goals",
+          "write": true
+        },
+        {
+          "name": "profiles",
+          "write": true
+        }
+      ],
       "toekomst-scenario": [
         {
           "name": "profiles",
@@ -9836,6 +9876,14 @@
             "/api/snapshots",
             "/api/snapshots/auto",
             "/api/snapshots/cron"
+          ]
+        },
+        {
+          "domain": "toekomst-doel",
+          "label": "toekomst-doel",
+          "write": true,
+          "routes": [
+            "/api/toekomst-doel"
           ]
         },
         {
@@ -11590,6 +11638,14 @@
           ]
         },
         {
+          "domain": "toekomst-doel",
+          "label": "toekomst-doel",
+          "write": true,
+          "routes": [
+            "/api/toekomst-doel"
+          ]
+        },
+        {
           "domain": "checkin",
           "label": "checkin",
           "write": false,
@@ -12107,6 +12163,11 @@
         "column": "linked_debt_id"
       },
       {
+        "from": "goals",
+        "to": "households",
+        "column": "household_id"
+      },
+      {
         "from": "holding_alerts",
         "to": "crypto_holdings",
         "column": "crypto_holding_id"
@@ -12305,7 +12366,7 @@
       },
       "goals": {
         "user": true,
-        "household": false,
+        "household": true,
         "rls": true
       },
       "life_events": {
@@ -12989,6 +13050,18 @@
       ],
       "summary": "Elke AI-callsite minimaliseert data vóór verzending naar de provider (`sanitizeForAI`/`sanitizeTransactions`), maskeert PII in vrije AI-tekst die naar de gebruiker teruggaat (`maskPIIInOutput`/`maskPIIInObject`), en faalt veilig: kan er niet gesanitized/gescreend worden, dan blok",
       "file": "docs/adr/0035-ai-privacy-consent.md"
+    },
+    {
+      "id": "0036-partner-privacy-in-db-functie",
+      "title": "Partner-privacy wordt in de SECURITY DEFINER-functie zelf afgedwongen",
+      "status": "aanvaard",
+      "date": "2026-07-11",
+      "elements": [
+        "as-huishouden",
+        "do-huishouden"
+      ],
+      "summary": "De partner-privacy-instelling `hidden` wordt afgedwongen **in de SECURITY DEFINER-DB-functies zelf**, niet bij elke afnemer apart. Concreet: `household_partner_totals()` gate't sinds migratie `20260711160000` de assets/debts-totalen per categorie via `get_partner_privacy_level` (",
+      "file": "docs/adr/0036-partner-privacy-in-db-functie.md"
     }
   ],
   "churn": {
@@ -13038,17 +13111,17 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 7896,
-        "commits": 75
+        "loc": 8211,
+        "commits": 76
       },
       {
         "file": "components/app/budgets-client.tsx",
-        "loc": 4987,
+        "loc": 5053,
         "commits": 27
       },
       {
         "file": "components/core/assets-client.tsx",
-        "loc": 4300,
+        "loc": 4312,
         "commits": 41
       },
       {
@@ -13058,7 +13131,7 @@
       },
       {
         "file": "components/app/cash-account-view.tsx",
-        "loc": 2614,
+        "loc": 2650,
         "commits": 11
       },
       {
@@ -13857,17 +13930,9 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-07-10",
-    "hasChanges": true,
-    "sections": [
-      {
-        "label": "Componenten (aantal)",
-        "added": [
-          "+8"
-        ],
-        "removed": []
-      }
-    ]
+    "previousDate": "2026-07-11",
+    "hasChanges": false,
+    "sections": []
   },
   "statsHistory": [
     {
@@ -14012,8 +14077,8 @@
     },
     {
       "date": "2026-07-11",
-      "api": 243,
-      "components": 797,
+      "api": 244,
+      "components": 804,
       "tables": 58,
       "routesProduction": 98
     }

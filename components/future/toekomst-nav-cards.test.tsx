@@ -448,6 +448,64 @@ describe('deriveDoelenStatus', () => {
     expect(r.status).toBe('neutral')
     expect(r.activeCount).toBe(0)
   })
+
+  // CR-M1 (ronde 4): marge-/fire-status is live-only in het lab. Een parameter-
+  // fire_age-doel of een ongemeten parameter-doel telt WEL mee in het aantal,
+  // maar mag de nav-kaart NIET rood/oranje kleuren. Beleidswijziging t.o.v. de
+  // vorige test ("telt automatisch mee") die het fire_age-doel nog als 'bad' zag.
+  it('telt een parameter-fire_age-doel mee, maar houdt het buiten attention/status', () => {
+    const r = deriveDoelenStatus(
+      [
+        mockGoal({
+          id: 'pf',
+          goal_type: 'fire_age',
+          metadata: { bron: 'parameter', oorsprong: 'lab', margeDoelJaren: 5 },
+        } as Partial<GoalWithBudget>),
+      ],
+      // Lijkt off-track (pct 20, !onTrack) maar is een marge-doel → geen 'bad'.
+      [mockProgress({ pct: 20, onTrack: false })],
+    )
+    expect(r.activeCount).toBe(1) // telt wél mee in "N doelen"
+    expect(r.attentionCount).toBe(0)
+    expect(r.status).toBe('good') // géén rode/oranje dot
+  })
+
+  it('houdt een ongemeten (pct 0) parameter-doel buiten status (geen "bad")', () => {
+    const r = deriveDoelenStatus(
+      [
+        mockGoal({
+          id: 'ps',
+          goal_type: 'savings_rate',
+          metadata: { bron: 'parameter', oorsprong: 'lab' },
+        } as Partial<GoalWithBudget>),
+      ],
+      [mockProgress({ pct: 0, onTrack: false })],
+    )
+    expect(r.activeCount).toBe(1)
+    expect(r.attentionCount).toBe(0)
+    expect(r.status).not.toBe('bad')
+  })
+
+  it('laat een handmatig off-track doel de status bepalen, ook náást een parameter-doel', () => {
+    // Regressie: handmatige doelen (géén bron-tag) blijven volledig meetellen.
+    const r = deriveDoelenStatus(
+      [
+        mockGoal({ id: 'manual', goal_type: 'savings' }),
+        mockGoal({
+          id: 'pf',
+          goal_type: 'fire_age',
+          metadata: { bron: 'parameter', oorsprong: 'lab' },
+        } as Partial<GoalWithBudget>),
+      ],
+      [
+        mockProgress({ pct: 20, onTrack: false }), // handmatig → bepaalt status
+        mockProgress({ pct: 20, onTrack: false }), // parameter fire_age → uitgesloten
+      ],
+    )
+    expect(r.activeCount).toBe(2) // beide tellen mee in het aantal
+    expect(r.attentionCount).toBe(1) // alleen het handmatige doel
+    expect(r.status).toBe('bad')
+  })
 })
 
 describe('nextEventLabel', () => {

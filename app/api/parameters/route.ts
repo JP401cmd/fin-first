@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { sanitizeCashSettingsInput } from '@/lib/cashflow-settings'
+import { loadParameterSavingsRateTarget } from '@/lib/cashflow-settings-data'
 
 // ── GET — Lees berekeningsparameters uit profiles ─────────────────────
 
@@ -35,6 +36,11 @@ export async function GET() {
     data = d2 as Record<string, unknown>
   }
 
+  // Spaarquote-doel leest voortaan uit de goals-bron (ronde 4, besluit 3): het
+  // door het /toekomst-lab gegenereerde parameter-doel wint; de (DEPRECATED)
+  // profielkolom `target_savings_rate` is enkel nog fallback.
+  const goalTargetSavingsRate = await loadParameterSavingsRateTarget(supabase, user.id)
+
   return NextResponse.json({
     expected_return: data?.expected_return ?? 0.07,
     inflation_rate: data?.inflation_rate ?? 0.02,
@@ -46,7 +52,7 @@ export async function GET() {
     estimated_monthly_expenses: Number(data?.estimated_monthly_expenses ?? 0),
     retirement_expense_method: data?.retirement_expense_method ?? 'essential_budgets',
     retirement_expense_custom_amount: Number(data?.retirement_expense_custom_amount ?? 0),
-    target_savings_rate: data?.target_savings_rate ?? null,
+    target_savings_rate: goalTargetSavingsRate ?? data?.target_savings_rate ?? null,
     income_source: data?.income_source ?? 'auto',
     expenses_source: data?.expenses_source ?? 'auto',
   })

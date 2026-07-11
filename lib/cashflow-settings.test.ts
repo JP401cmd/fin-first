@@ -9,7 +9,7 @@ describe('sanitizeCashSettingsInput', () => {
       estimated_monthly_expenses: 2800,
       retirement_expense_method: 'custom_amount',
       retirement_expense_custom_amount: 30000,
-      target_savings_rate: 30,
+      target_savings_rate: 30, // ronde 4, besluit 3: bewust GEDROPT (goals is dé bron)
       hack: 'DROP TABLE', // onbekend veld wordt genegeerd (Record<string, unknown> accepteert het)
     })
     expect(out).toEqual({
@@ -17,7 +17,8 @@ describe('sanitizeCashSettingsInput', () => {
       estimated_monthly_expenses: 2800,
       retirement_expense_method: 'custom_amount',
       retirement_expense_custom_amount: 30000,
-      target_savings_rate: 30,
+      // target_savings_rate valt bewust weg — PUT /api/parameters schrijft de
+      // (DEPRECATED) profielkolom niet meer.
     })
   })
 
@@ -30,10 +31,11 @@ describe('sanitizeCashSettingsInput', () => {
     expect(out).toEqual({})
   })
 
-  it('staat target_savings_rate = null toe (doel wissen)', () => {
-    expect(sanitizeCashSettingsInput({ target_savings_rate: null })).toEqual({
-      target_savings_rate: null,
-    })
+  it('negeert target_savings_rate volledig (goals is dé bron — ronde 4, besluit 3)', () => {
+    // Zowel een geldige waarde als een null (voorheen "doel wissen") worden nu
+    // stilzwijgend genegeerd; de kolom is DEPRECATED en wordt niet meer geschreven.
+    expect(sanitizeCashSettingsInput({ target_savings_rate: 30 })).toEqual({})
+    expect(sanitizeCashSettingsInput({ target_savings_rate: null })).toEqual({})
   })
 })
 

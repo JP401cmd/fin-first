@@ -45,6 +45,39 @@ export interface CashflowSettingsData {
 }
 
 /**
+ * Leest het spaarquote-doel (doel-%) uit de goals-bron: de door het /toekomst-lab
+ * gegenereerde parameter-rij (`goal_type='savings_rate'`, `metadata.bron='parameter'`,
+ * nog niet afgerond). Ronde 4 (besluit 3): de goals-rij is dé bron voor het
+ * spaarquote-doel; `profiles.target_savings_rate` is DEPRECATED en dient enkel nog
+ * als fallback zolang er geen parameter-rij bestaat.
+ *
+ * Eén gerichte, kolom-scoped query (hergebruikt door `loadCashflowSettingsData` én
+ * de `GET /api/parameters`-route — geen duplicatie). Tolerant: elke fout (bv. de
+ * `metadata`-kolom ontbreekt nog op een legacy-DB) → `null`, zodat de caller
+ * terugvalt op de profielkolom en het bestaande default-gedrag intact blijft.
+ *
+ * @returns het doel-% uit de goals-rij, of `null` als er geen (open) parameter-rij is.
+ */
+export async function loadParameterSavingsRateTarget(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<number | null> {
+  const { data, error } = await supabase
+    .from('goals')
+    .select('target_value')
+    .eq('user_id', userId)
+    .eq('goal_type', 'savings_rate')
+    .eq('metadata->>bron', 'parameter')
+    .eq('is_completed', false)
+    .limit(1)
+    .maybeSingle()
+
+  if (error || !data) return null
+  const v = Number((data as { target_value: unknown }).target_value)
+  return Number.isFinite(v) ? v : null
+}
+
+/**
  * Assembles a serializable props-bundle for the cashflow-instellingen-blok.
  * Reuses the request-level cached `loadCoreData` call — within a single
  * server render this is a no-op if the loader has already run.
@@ -73,6 +106,9 @@ export async function loadCashflowSettingsData(
     .eq('id', user.id)
     .maybeSingle()
 
+  // Spaarquote-doel: goals-bron wint, profielkolom is fallback (ronde 4, besluit 3).
+  const goalTargetSavingsRate = await loadParameterSavingsRateTarget(supabase, user.id)
+
   const rf = core.rawFinancials
 
   // Build the FinancialInput bundle that recomputeFireFromSettings expects.
@@ -98,7 +134,7 @@ export async function loadCashflowSettingsData(
     estimatedAnnualIncome: rf.extrapolatedIncome,
     netMonthlyIncome: Number(profile?.net_monthly_income ?? 0),
     savingsRate6m: core.savingsRate6m,
-    targetSavingsRate: profile?.target_savings_rate ?? null,
+    targetSavingsRate: goalTargetSavingsRate ?? profile?.target_savings_rate ?? null,
     estimatedMonthlyExpenses: Number(profile?.estimated_monthly_expenses ?? 0),
     retirementExpenseMethod:
       (profile?.retirement_expense_method as RetirementExpenseMethod) ??

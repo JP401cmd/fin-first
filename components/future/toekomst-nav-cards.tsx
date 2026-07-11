@@ -113,6 +113,13 @@ const WITHDRAWAL_NAMES: Record<string, string> = {
  *  - good  als alle actieve doelen op koers zijn
  *  - neutral als er geen actieve doelen zijn
  *
+ * CR-M1 — marge-/fire-status is live-only in het lab; spiegelt DoelenView:
+ * lab-parameter-doelen (metadata.bron === 'parameter') die (i) een fire_age-doel
+ * zijn (marge-status hoort op /toekomst) óf (ii) nog geen meting hebben (pct ≤ 0)
+ * tellen WEL mee in het aantal ("2 doelen") maar NIET in attention/status —
+ * anders zou een ongemeten of marge-doel de nav-kaart onterecht rood/oranje
+ * kleuren. Handmatige doelen (géén bron-tag) blijven volledig meetellen.
+ *
  * Geeft naast de status ook het aantal aandacht-vragende doelen terug zodat de
  * substext ("X vraagt aandacht") consistent met de status berekend wordt.
  */
@@ -124,11 +131,18 @@ export function deriveDoelenStatus(
   let attentionCount = 0
   let worst: LeverageStatus = 'good'
 
-  goals.forEach((_, i) => {
+  goals.forEach((goal, i) => {
     const p = goalProgresses[i]
     if (!p) return
     if (p.pct >= 100) return // voltooid → negeren
-    activeCount += 1
+    activeCount += 1 // fire_age-/ongemeten parameter-doel telt WEL mee in het aantal
+
+    // Defensieve parameter-herkenning (metadata kan ontbreken/null/{} zijn).
+    const isParameter = goal.metadata?.bron === 'parameter'
+    // Parameter-doel zonder betekenisvolle stoplicht-status: fire_age (marge)
+    // of nog geen meting (pct ≤ 0) → buiten attention/status houden.
+    if (isParameter && (goal.goal_type === 'fire_age' || p.pct <= 0)) return
+
     if (!p.onTrack) {
       attentionCount += 1
       if (p.pct < 50) {

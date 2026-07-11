@@ -112,6 +112,9 @@ export function buildOverviewBriefingInput(
     health: horizonData?.healthScore ?? null,
     goalNames: willData.goals.map((g) => g.name),
     goalProgresses: willData.goalProgresses,
+    // Parallel aan goalNames/goalProgresses — voedt de goal-heads-up-format +
+    // fire_age-exclusie (CR-M1). Zie BriefingEngineInput.goalTypes.
+    goalTypes: willData.goals.map((g) => g.goal_type),
     finance: {
       netWorthHistory: dashboardData.netWorthHistory,
       monthlyExpenses: dashboardData.monthlyExpenses,

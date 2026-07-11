@@ -81,6 +81,12 @@ export function GoalForm({
     setForm((prev) => ({ ...prev, [key]: value }))
   }
 
+  // viaLab-doelen (verwacht rendement, vrijheidsleeftijd) worden via het
+  // /toekomst-lab beheerd. Ze zijn niet vrij aanmaakbaar; bij een onverhoopte
+  // edit van zo'n rij staat de type-select vast (defensief — DoelenView routeert
+  // parameter-doelen normaal naar het lab, niet naar GoalForm).
+  const isViaLabGoal = isEdit && GOAL_TYPE_META[form.goal_type].viaLab === true
+
   // Auto-fill current value when linking an asset or debt
   function handleAssetLink(assetId: string) {
     update('linked_asset_id', assetId)
@@ -239,16 +245,22 @@ export function GoalForm({
                 <select
                   id="goal-type"
                   value={form.goal_type}
+                  disabled={isViaLabGoal}
                   onChange={(e) => {
                     const newType = e.target.value as GoalType
                     update('goal_type', newType)
                     update('icon', GOAL_TYPE_ICONS[newType])
                   }}
-                  className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
+                  className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500 disabled:cursor-not-allowed disabled:bg-[var(--subtle)] disabled:text-[var(--ink-3)]"
                 >
                   <optgroup label="Financieel">
                     {(Object.keys(GOAL_TYPE_META) as GoalType[])
+                      // viaLab-types (verwacht rendement, vrijheidsleeftijd) worden
+                      // via het /toekomst-lab beheerd — niet vrij aanmaakbaar in
+                      // GoalForm. Ze verschijnen alleen als het bestaande doel dat
+                      // je bewerkt zelf van dat type is (select staat dan disabled).
                       .filter((t) => GOAL_TYPE_META[t].group === 'Financieel')
+                      .filter((t) => !GOAL_TYPE_META[t].viaLab || t === form.goal_type)
                       .map((type) => (
                         <option key={type} value={type}>{GOAL_TYPE_LABELS[type]}</option>
                       ))}
@@ -256,11 +268,17 @@ export function GoalForm({
                   <optgroup label="Persoonlijk">
                     {(Object.keys(GOAL_TYPE_META) as GoalType[])
                       .filter((t) => GOAL_TYPE_META[t].group === 'Persoonlijk')
+                      .filter((t) => !GOAL_TYPE_META[t].viaLab || t === form.goal_type)
                       .map((type) => (
                         <option key={type} value={type}>{GOAL_TYPE_LABELS[type]}</option>
                       ))}
                   </optgroup>
                 </select>
+                {isViaLabGoal && (
+                  <p className="mt-1.5 text-xs text-[var(--ink-3)]">
+                    Wordt beheerd via je doelsituatie op de tijdas.
+                  </p>
+                )}
               </div>
             )}
 

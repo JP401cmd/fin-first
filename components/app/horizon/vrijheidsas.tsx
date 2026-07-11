@@ -125,6 +125,8 @@ export interface VrijheidsasProps {
   zone: StopMargeZone | null
   /** stopAge − verwacht (jaren); null = verwacht onbereikbaar. */
   margeJaren: number | null
+  /** Er is een doel vastgelegd — de i-uitleg krijgt één extra doel-zin. */
+  doelActief?: boolean
 }
 
 function formatAge(v: number | null): string {
@@ -147,6 +149,7 @@ export function Vrijheidsas({
   onStopKoppelChange,
   zone,
   margeJaren,
+  doelActief = false,
 }: VrijheidsasProps) {
   // ── As-schaal (jaren, lineair, min-span 20 jr) ──
   const minAge = Math.floor(currentAge)
@@ -213,6 +216,11 @@ export function Vrijheidsas({
           <b className="text-[var(--ink)]">stopkeuze</b> is jouw keuze. De blokken hieronder rekenen met je stopkeuze zodra
           je die zet.
         </p>
+        {doelActief && (
+          <p className="m-0 mt-2">
+            Dit is je <b className="text-[var(--ink)]">vastgelegde doel</b>.
+          </p>
+        )}
       </InlineInfoDisclosure>
 
       {/* ── Track 1 — FIRE-uitkomst ── */}

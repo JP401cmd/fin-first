@@ -388,6 +388,52 @@ describe('buildBriefingEntries — goal heads_up (3b)', () => {
     const headsUp = entries.find((e) => e.id.startsWith('heads_up:goal'))
     expect(headsUp?.text).toMatch(/Doel B/)
   })
+
+  it('sluit een fire_age-doel uit de goal-heads-up (marge-status is live-only in het lab)', () => {
+    // CR-M1: fire_age is een parameter-/marge-doel; ook al "lijkt" het off-track
+    // (pct < 50, !onTrack) verschijnt het niet als briefing-heads-up.
+    const entries = buildBriefingEntries(
+      emptyInput({
+        goalNames: ['Vrijheidsleeftijd'],
+        goalTypes: ['fire_age'],
+        goalProgresses: [
+          { current: 60, target: 55, pct: 30, onTrack: false, eta: null },
+        ],
+      }),
+    )
+    expect(entries.find((e) => e.id.startsWith('heads_up:goal'))).toBeUndefined()
+  })
+
+  it('formatteert een parameter-savings_rate-doel met %-eenheid (niet als €)', () => {
+    // CR-m1: parameter-doelen zijn %/jaar — formatGoalValue i.p.v. formatCurrency.
+    const entries = buildBriefingEntries(
+      emptyInput({
+        goalNames: ['Spaarquote'],
+        goalTypes: ['savings_rate'],
+        goalProgresses: [
+          { current: 28, target: 35, pct: 40, onTrack: false, eta: null },
+        ],
+      }),
+    )
+    const headsUp = entries.find((e) => e.id.startsWith('heads_up:goal'))
+    expect(headsUp).toBeTruthy()
+    expect(headsUp?.text).toContain('28,0%')
+    expect(headsUp?.text).toContain('van 35,0%')
+    expect(headsUp?.text).not.toContain('€')
+  })
+
+  it('gebruikt de EUR-fallback wanneer goalTypes ontbreekt (backward-compatible)', () => {
+    const entries = buildBriefingEntries(
+      emptyInput({
+        goalNames: ['Noodfonds'],
+        goalProgresses: [
+          { current: 1000, target: 10000, pct: 10, onTrack: false, eta: null },
+        ],
+      }),
+    )
+    const headsUp = entries.find((e) => e.id.startsWith('heads_up:goal'))
+    expect(headsUp?.text).toContain('€')
+  })
 })
 
 describe('buildBriefingEntries — seasonal entries (T-1)', () => {

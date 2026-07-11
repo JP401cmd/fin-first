@@ -96,8 +96,22 @@ import { ScenarioKaarten } from '@/components/app/horizon/scenario-kaarten'
 import { computeDekkingsradar, type RadarAs } from '@/lib/horizon/dekkingsradar'
 import { runScenarioPresets, type ScenarioPresetResult } from '@/lib/horizon/scenario-presets'
 import { computeStopMarge } from '@/lib/horizon/stop-marge'
-import { scenarioMonthlySpendDelta, buildCategorieReturnGroups, type ToekomstScenarioPrefs } from '@/lib/horizon/toekomst-scenario'
+import {
+  scenarioMonthlySpendDelta,
+  buildCategorieReturnGroups,
+  isDoelConceptGewijzigd,
+  type DoelParameter,
+  type ToekomstScenarioDoel,
+} from '@/lib/horizon/toekomst-scenario'
+import { doelGewogenRendement } from '@/lib/horizon/toekomst-doel'
+import {
+  DoelVastlegSheet,
+  buildLiveStand,
+  buildScenarioPersistPayload,
+  type DoelParameterPreview,
+} from '@/components/app/horizon/doel-vastleg-sheet'
 import { WhatIfMarketAssumptions } from '@/components/app/horizon/whatif-market-assumptions'
+import { DoelLoslatenConfirm } from '@/components/future/doel-loslaten-confirm'
 import { buildSliderEvent, readSliderValueFromEvents, type SliderKey } from '@/lib/scenario-events'
 import type { HorizonScenarioOverrides } from '@/lib/hooks/use-horizon-fire-sim'
 import type { AssetCategorie } from '@/lib/horizon-kernel/types'
@@ -491,6 +505,19 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   )
   const verkenSectionRef = useRef<HTMLElement | null>(null)
 
+  // ── Vastgelegd doelscenario ("verkennen wordt richten", ronde 4) ─────────────
+  // Client-state, gehydrateerd uit de pref. GEEN her-read na de route-respons: het blok
+  // blijft leidend in de UI én gaat via `buildScenarioPersistPayload` in ELKE scenario-PUT
+  // mee (anders wist de volledige-overwrite-route het bij de eerste sliderbeweging).
+  const [doelBlok, setDoelBlok] = useState<ToekomstScenarioDoel | null>(
+    () => initialData.toekomstScenarioPrefs?.doel ?? null,
+  )
+  // Vastleg-/bijwerk-sheet + PUT-in-flight.
+  const [doelSheetOpen, setDoelSheetOpen] = useState(false)
+  const [doelSaving, setDoelSaving] = useState(false)
+  // "Doel loslaten"-bevestiging (gedeelde ShellOverlay-confirm i.p.v. window.confirm).
+  const [doelLoslatenOpen, setDoelLoslatenOpen] = useState(false)
+
   // Saved scenario overlay state (multi-select)
   const [savedScenarios, setSavedScenarios] = useState<SavedScenario[]>([])
   const [selectedScenarioIds, setSelectedScenarioIds] = useState<Set<string>>(new Set())
@@ -624,6 +651,8 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   // Afgeleid: is er een actief wat-als-scenario? (≥1 afwijkende slider of rendement-delta;
   // stopAge telt bewust NIET mee — dat verschuift alleen de marge-marker, niet de projectie.)
   const hasScenario = scenarioSliderEvents.length > 0 || Object.keys(scenarioReturnDeltas).length > 0
+  // Is er een doel vastgelegd? Stuurt de doel-taal (kop/chip/as/legenda) en de sectie-states.
+  const doelActief = doelBlok != null
   // Overrides voor de gescheiden 2e run in de hook; null ⇒ geen scenario-run.
   const scenarioOverrides = useMemo<HorizonScenarioOverrides | null>(() => {
     if (!hasScenario) return null
@@ -2360,7 +2389,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     if (!(showScenarioLine && hasScenario && scenario != null)) return null
     return {
       name: 'wat-als',
-      label: 'Jouw wat-als',
+      label: doelActief ? 'Jouw doel' : 'Jouw wat-als',
       color: 'var(--ink-2)',
       // Clip op dezelfde `displayEndAge` als de hoofdlijn (zie displaySimRows) — anders
       // loopt de gestippelde wat-als-lijn een jaar verder door dan de basislijn.
@@ -2370,7 +2399,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       variant: 'scenario',
       fireAgeFractional: scenario.result.fireAgeFractional,
     }
-  }, [showScenarioLine, hasScenario, scenario, displayEndAge])
+  }, [showScenarioLine, hasScenario, scenario, displayEndAge, doelActief])
 
   // Gememoized samenstelling voor de SimChart-prop: een inline spread op de
   // callsite gaf per render een verse array-identiteit, waardoor de memo() van
@@ -2466,6 +2495,193 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     setScenarioReturnDeltas({})
   }, [])
 
+  // ── Doel: één stand-bouwer (gedeeld met persist), concept-detectie, previews ──────
+  // EXACT dezelfde inclusie-/afrondingsregels als het (oude) persist-effect — nu via de
+  // pure `buildLiveStand`-helper, zodat het vastgelegde `doel.stand`, de concept-detectie
+  // én de PUT-payload één vorm delen.
+  const buildLiveStandNow = useCallback(
+    () =>
+      buildLiveStand({
+        baseline: whatIfBaseline,
+        sliderEvents: scenarioSliderEvents,
+        returnDeltas: scenarioReturnDeltas,
+        stopAge: scenarioStopAge,
+        stopKoppel: scenarioStopKoppel,
+        lockedMarge: lockedMargeRef.current,
+      }),
+    [whatIfBaseline, scenarioSliderEvents, scenarioReturnDeltas, scenarioStopAge, scenarioStopKoppel],
+  )
+
+  // "Je draait aan je doel"-banner: wijkt de live-stand af van het vastgelegde doel?
+  const conceptGewijzigd = useMemo(
+    () => doelActief && isDoelConceptGewijzigd(buildLiveStandNow(), doelBlok?.stand),
+    [doelActief, doelBlok, buildLiveStandNow],
+  )
+
+  // Doel-gewogen totaalrendement (%) uit de live rendement-delta's; null → geen rendement-doel.
+  const doelRendementPct = useMemo(
+    () =>
+      doelGewogenRendement(
+        initialData.assets,
+        scenarioReturnDeltas as Partial<Record<AssetCategorie, number>>,
+      ),
+    [initialData.assets, scenarioReturnDeltas],
+  )
+  // FIRE-doelwaarden: L = gekozen stop, anders verwacht-FIRE naar boven op 0,5; M = marge op 0,5, ≥ 0.
+  const doelFireLeeftijd =
+    scenarioStopAge ??
+    (scenarioVerwachtFireAge !== null ? Math.ceil(scenarioVerwachtFireAge * 2) / 2 : null)
+  const doelMargeJaren = Math.max(0, Math.round((stopMarge.margeJaren ?? 0) * 2) / 2)
+
+  // De afwijkende parameters → sheet-previews (label + waarde-string). Rendement verdwijnt
+  // als het doel-rendement null is (geen bezittingen); FIRE verschijnt zodra er een stopkeuze
+  // (expliciet of gekoppeld) ligt. Alleen wanneer de bijbehorende live-stand afwijkt.
+  const doelPreviews = useMemo<DoelParameterPreview[]>(() => {
+    const stand = buildLiveStandNow()
+    const previews: DoelParameterPreview[] = []
+    if (whatIfBaseline && stand.sliders?.savings !== undefined) {
+      const savings = readSliderValueFromEvents('savings', scenarioSliderEvents, whatIfBaseline)
+      previews.push({ parameter: 'spaarquote', label: 'Spaarquote', waarde: `${Math.round(savings)}%` })
+    }
+    if (whatIfBaseline && stand.sliders?.income !== undefined) {
+      const income = readSliderValueFromEvents('income', scenarioSliderEvents, whatIfBaseline)
+      previews.push({ parameter: 'salaris', label: 'Salaris', waarde: `${formatCurrency(income)}/mnd` })
+    }
+    if (stand.returnDeltaByCategorie !== undefined && doelRendementPct !== null) {
+      previews.push({
+        parameter: 'rendement',
+        label: 'Verwacht rendement',
+        waarde: `${doelRendementPct.toLocaleString('nl-NL', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`,
+      })
+    }
+    if ((stand.stopAge != null || stand.stopKoppel) && doelFireLeeftijd !== null) {
+      const fmt = (v: number) => v.toLocaleString('nl-NL', { maximumFractionDigits: 1 })
+      previews.push({
+        parameter: 'fire',
+        label: 'Vrijheidsleeftijd',
+        waarde: `Vrij op ${fmt(doelFireLeeftijd)} jr · ≥ ${fmt(doelMargeJaren)} jr marge`,
+      })
+    }
+    return previews
+  }, [
+    buildLiveStandNow,
+    whatIfBaseline,
+    scenarioSliderEvents,
+    doelRendementPct,
+    doelFireLeeftijd,
+    doelMargeJaren,
+  ])
+
+  // Vastleggen/bijwerken: bouw de doelwaarden voor de aangevinkte parameters en promoveer via
+  // de dunne server-route. Bij ok → doel-blok lokaal zetten (server-gezette `gezetOp` komt niet
+  // terug → client-ISO), lijn default aan, sheet dicht, toast. Foutpad muteert niets lokaal.
+  const handleDoelVastleggen = useCallback(
+    async (gekozen: Partial<Record<DoelParameter, true>>) => {
+      const stand = buildLiveStandNow()
+      const doelwaarden = {
+        spaarquotePct:
+          gekozen.spaarquote && whatIfBaseline
+            ? readSliderValueFromEvents('savings', scenarioSliderEvents, whatIfBaseline)
+            : undefined,
+        salarisMnd:
+          gekozen.salaris && whatIfBaseline
+            ? readSliderValueFromEvents('income', scenarioSliderEvents, whatIfBaseline)
+            : undefined,
+        rendementPct: gekozen.rendement ? doelRendementPct ?? undefined : undefined,
+        fireLeeftijd: gekozen.fire ? doelFireLeeftijd ?? undefined : undefined,
+        margeJaren: gekozen.fire ? doelMargeJaren : undefined,
+      }
+      setDoelSaving(true)
+      try {
+        const res = await fetch('/api/toekomst-doel', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'vastleggen', parameters: gekozen, stand, doelwaarden }),
+        })
+        const json = (await res.json().catch(() => null)) as { ok?: boolean; goalIds?: Partial<Record<DoelParameter, string>> } | null
+        if (!res.ok || !json?.ok) {
+          addToast({ type: 'error', title: 'Doel niet vastgelegd', message: 'Probeer het zo nog eens.' })
+          return
+        }
+        setDoelBlok({
+          gezetOp: new Date().toISOString(),
+          parameters: gekozen,
+          stand,
+          ...(json.goalIds ? { goalIds: json.goalIds } : {}),
+        })
+        setShowScenarioLine(true)
+        setDoelSheetOpen(false)
+        addToast({
+          type: 'success',
+          title: doelActief ? 'Doel bijgewerkt' : 'Doel vastgelegd',
+          message: 'Je verkenning is nu je doel.',
+        })
+      } catch {
+        addToast({ type: 'error', title: 'Doel niet vastgelegd', message: 'Probeer het zo nog eens.' })
+      } finally {
+        setDoelSaving(false)
+      }
+    },
+    [buildLiveStandNow, whatIfBaseline, scenarioSliderEvents, doelRendementPct, doelFireLeeftijd, doelMargeJaren, doelActief, addToast],
+  )
+
+  // Loslaten: verwijder de parameter-doelen + het doel-blok (server-route) en wis de client-state.
+  // De bevestiging loopt via de gedeelde DoelLoslatenConfirm (ShellOverlay); deze handler is
+  // de bevestig-actie zelf. Fouten worden via toast gemeld (de confirm blijft dan open voor
+  // een retry); bij succes sluiten we de confirm.
+  const handleDoelLoslaten = useCallback(async () => {
+    setDoelSaving(true)
+    try {
+      const res = await fetch('/api/toekomst-doel', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'loslaten' }),
+      })
+      const json = (await res.json().catch(() => null)) as { ok?: boolean } | null
+      if (!res.ok || !json?.ok) {
+        addToast({ type: 'error', title: 'Doel niet losgelaten', message: 'Probeer het zo nog eens.' })
+        return
+      }
+      setDoelBlok(null)
+      setDoelLoslatenOpen(false)
+      addToast({ type: 'success', title: 'Doel losgelaten', message: 'Je verkent weer vrij.' })
+    } catch {
+      addToast({ type: 'error', title: 'Doel niet losgelaten', message: 'Probeer het zo nog eens.' })
+    } finally {
+      setDoelSaving(false)
+    }
+  }, [addToast])
+
+  // "Herstel mijn doel": kopieer de vastgelegde `doel.stand` terug naar de live-states.
+  // Sliders reconstrueren zoals de pref-hydratie (buildSliderEvent per key); rendement-delta's,
+  // stopAge/koppel en de koppel-marge direct terugzetten.
+  const handleDoelHerstellen = useCallback(() => {
+    const stand = doelBlok?.stand
+    if (!stand) return
+    if (whatIfBaseline && currentAge !== null) {
+      const KEY_MAP: Record<string, SliderKey> = {
+        income: 'income',
+        workdays: 'workdays',
+        savings: 'savings',
+        extraInleg: 'extra_inleg',
+      }
+      const evs: WhatIfEvent[] = []
+      for (const [prefKey, sliderKey] of Object.entries(KEY_MAP)) {
+        const val = stand.sliders?.[prefKey as keyof NonNullable<typeof stand.sliders>]
+        if (val === undefined) continue
+        const ev = buildSliderEvent(sliderKey, val, whatIfBaseline, currentAge)
+        if (ev) evs.push(ev)
+      }
+      setScenarioSliderEvents(evs)
+    } else {
+      setScenarioSliderEvents([])
+    }
+    setScenarioReturnDeltas({ ...(stand.returnDeltaByCategorie ?? {}) })
+    setScenarioStopAge(stand.stopAge ?? null)
+    setScenarioStopKoppel(stand.stopKoppel ?? false)
+    lockedMargeRef.current = stand.stopMarge ?? null
+  }, [doelBlok, whatIfBaseline, currentAge])
+
   // Compacte FIRE-delta voor de toggle-pill ("−30 mnd" = eerder vrij; beslishulp-conventie).
   const scenarioFireDeltaMonths =
     scenarioVerwachtFireAge !== null && scenarioBaseFireAge !== null
@@ -2490,33 +2706,28 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     // een perspectiefwissel of late baseline). Wél schrijven zodra de staat van de
     // defaults afwijkt (defaults: geen scenario, geen stopAge, koppel uit, toggle aan),
     // óf er eerder iets bewaard was — dan moet een reset die ene keer nog wissen.
+    // Ook schrijven zodra er een doel ligt (dat moet in elke PUT mee — anders wist de
+    // volledige-overwrite-route het bij de eerstvolgende sliderbeweging).
     const deviatesFromDefaults =
-      hasScenario || scenarioStopAge !== null || scenarioStopKoppel || !showScenarioLine
+      hasScenario || scenarioStopAge !== null || scenarioStopKoppel || !showScenarioLine || doelBlok != null
     if (!deviatesFromDefaults && initialData.toekomstScenarioPrefs == null) return
     const handle = setTimeout(() => {
-      const sliders: NonNullable<ToekomstScenarioPrefs['sliders']> = {}
-      const income = readSliderValueFromEvents('income', scenarioSliderEvents, whatIfBaseline)
-      const workdays = readSliderValueFromEvents('workdays', scenarioSliderEvents, whatIfBaseline)
-      const savings = readSliderValueFromEvents('savings', scenarioSliderEvents, whatIfBaseline)
-      const extraInleg = readSliderValueFromEvents('extra_inleg', scenarioSliderEvents, whatIfBaseline)
-      if (Math.round(income) !== Math.round(whatIfBaseline.monthlyIncome)) sliders.income = income
-      if (workdays !== whatIfBaseline.workDaysPerWeek) sliders.workdays = workdays
-      if (Math.round(savings) !== Math.round(whatIfBaseline.savingsRate)) sliders.savings = savings
-      if (extraInleg !== 0) sliders.extraInleg = extraInleg
-      const payload = {
-        v: 1 as const,
-        ...(Object.keys(sliders).length > 0 ? { sliders } : {}),
-        ...(Object.keys(scenarioReturnDeltas).length > 0 ? { returnDeltaByCategorie: scenarioReturnDeltas } : {}),
-        stopAge: scenarioStopAge,
-        stopKoppel: scenarioStopKoppel,
-        // Bij koppelmodus is de marge de bewaarde waarheid (zie lockedMargeRef-doc);
-        // ref lezen op schrijfmoment — elke marge-wijziging loopt via een handler die
-        // ook state zet, dus dit effect vuurt dan sowieso.
-        ...(scenarioStopKoppel && lockedMargeRef.current !== null
-          ? { stopMarge: lockedMargeRef.current }
-          : {}),
+      // KRITIEK: het doel-blok gaat via `buildScenarioPersistPayload` in ELKE PUT mee.
+      const payload = buildScenarioPersistPayload({
+        stand: buildLiveStand({
+          baseline: whatIfBaseline,
+          sliderEvents: scenarioSliderEvents,
+          returnDeltas: scenarioReturnDeltas,
+          stopAge: scenarioStopAge,
+          stopKoppel: scenarioStopKoppel,
+          // Bij koppelmodus is de marge de bewaarde waarheid (zie lockedMargeRef-doc);
+          // ref lezen op schrijfmoment — elke marge-wijziging loopt via een handler die
+          // ook state zet, dus dit effect vuurt dan sowieso.
+          lockedMarge: lockedMargeRef.current,
+        }),
         showScenarioLine,
-      }
+        doel: doelBlok,
+      })
       fetch('/api/toekomst-scenario', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -2526,7 +2737,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       })
     }, 600)
     return () => clearTimeout(handle)
-  }, [scenarioSliderEvents, scenarioReturnDeltas, scenarioStopAge, scenarioStopKoppel, showScenarioLine, whatIfBaseline, currentAge, hasScenario, initialData.toekomstScenarioPrefs])
+  }, [scenarioSliderEvents, scenarioReturnDeltas, scenarioStopAge, scenarioStopKoppel, showScenarioLine, whatIfBaseline, currentAge, hasScenario, doelBlok, initialData.toekomstScenarioPrefs])
 
   async function handleActionStatusChange(id: string, status: ActionStatus, data?: Record<string, unknown>) {
     const res = await fetch(`/api/ai/actions/${id}`, {
@@ -4703,33 +4914,105 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       )}
 
       {/* === KATERN II — Verken je aannames (wat-als slider-lab) ===
-          Alleen in de solo-weergave: het scenario is een persoonlijke verkenning tegen
-          de eigen baseline. Spiegelt de perspectief-gate van de chart-overlay
-          (usePartnerMainLine || useHouseholdMainLine → géén wat-als-lijn). */}
-      {!(usePartnerMainLine || useHouseholdMainLine) && (
-      <HideInSimple>
+          Perspectief-gate blijft intact: alleen solo (géén partner/household —
+          spiegelt de chart-overlay: usePartnerMainLine || useHouseholdMainLine
+          → géén wat-als-lijn). Weergave: in Volledig altijd; in Eenvoudig
+          alléén met een vastgelegd doel (doelActief) — een vástgelegd doel is
+          kernfunctionaliteit waar de Doelen-tab naartoe deep-linkt, pure
+          verkenning blijft volledig-weergave-diepte. */}
+      {!(usePartnerMainLine || useHouseholdMainLine) && (displayMode === 'full' || doelActief) && (
+      <>
         <section
           id={VERKEN_SECTION_ID}
           ref={verkenSectionRef}
           className="mt-8 scroll-mt-24 sm:mt-10"
         >
-          <SectionLabel num="II">Wat als je draait</SectionLabel>
-          <div className="mb-1 flex items-start justify-between gap-3">
-            <h2 className="label-editorial text-[var(--ink-2)]">Verken je aannames</h2>
-            {hasScenario && (
-              <button
-                type="button"
-                onClick={handleScenarioReset}
-                className="shrink-0 rounded-[var(--r)] border border-dashed border-[var(--border-md)] px-2.5 py-1 font-sans text-[11px] font-medium text-[var(--ink-3)] transition-colors hover:border-horizon-300 hover:text-horizon-700"
-              >
-                Terug naar basis
-              </button>
-            )}
+          <SectionLabel num="II">{doelActief ? 'Jouw doel' : 'Wat als je draait'}</SectionLabel>
+          <div className="mb-1 flex flex-wrap items-start justify-between gap-3">
+            <h2 className="label-editorial text-[var(--ink-2)]">
+              {doelActief ? 'Jouw doelsituatie' : 'Verken je aannames'}
+            </h2>
+            <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+              {doelActief ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setDoelSheetOpen(true)}
+                    disabled={doelSaving}
+                    className="rounded-[var(--r)] border border-horizon-300 px-2.5 py-1 font-sans text-[11px] font-medium text-horizon-700 transition-colors hover:bg-horizon-50 disabled:opacity-50"
+                  >
+                    Doel bijwerken
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDoelLoslatenOpen(true)}
+                    disabled={doelSaving}
+                    className="rounded-[var(--r)] border border-dashed border-[var(--border-md)] px-2.5 py-1 font-sans text-[11px] font-medium text-[var(--ink-3)] transition-colors hover:border-[var(--ink-3)] hover:text-[var(--ink-2)] disabled:opacity-50"
+                  >
+                    Doel loslaten
+                  </button>
+                </>
+              ) : (
+                <>
+                  {hasScenario && (
+                    <button
+                      type="button"
+                      onClick={() => setDoelSheetOpen(true)}
+                      className="rounded-[var(--r)] border border-horizon-300 px-2.5 py-1 font-sans text-[11px] font-medium text-horizon-700 transition-colors hover:bg-horizon-50"
+                    >
+                      Maak dit mijn doel
+                    </button>
+                  )}
+                  {hasScenario && (
+                    <button
+                      type="button"
+                      onClick={handleScenarioReset}
+                      className="rounded-[var(--r)] border border-dashed border-[var(--border-md)] px-2.5 py-1 font-sans text-[11px] font-medium text-[var(--ink-3)] transition-colors hover:border-horizon-300 hover:text-horizon-700"
+                    >
+                      Terug naar basis
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
           </div>
           <p className="mb-3 font-sans text-[12px] text-[var(--ink-3)]">
-            Draai aan je aannames — je basislijn blijft staan; je wat-als verschijnt als
-            gestippelde lijn in de grafiek en kleurt de blokken hieronder.
+            {doelActief
+              ? 'Dit is je vastgelegde doel — de gestippelde lijn in de grafiek is Jouw doel. Draai gerust verder; leg opnieuw vast of herstel je doel wanneer je klaar bent.'
+              : 'Draai aan je aannames — je basislijn blijft staan; je wat-als verschijnt als gestippelde lijn in de grafiek en kleurt de blokken hieronder.'}
           </p>
+
+          {/* (c) Concept gewijzigd — smalle banner boven de sectie-inhoud.
+              role="status" + aria-live="polite" zodat de wijziging voor
+              screenreaders wordt aangekondigd zonder de focus te stelen. */}
+          {conceptGewijzigd && (
+            <div
+              role="status"
+              aria-live="polite"
+              className="mb-3 flex flex-wrap items-center justify-between gap-2 border border-[var(--ink-2)] border-l-4 border-l-horizon-500 bg-[var(--paper)] px-3 py-2"
+            >
+              <p className="font-serif text-[12px] leading-snug text-[var(--ink-2)]">
+                Je draait aan je doel — leg opnieuw vast of herstel je doel.
+              </p>
+              <div className="flex shrink-0 items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setDoelSheetOpen(true)}
+                  disabled={doelSaving}
+                  className="rounded-[var(--r)] bg-[var(--ink)] px-2.5 py-1 font-sans text-[11px] font-semibold text-[var(--paper)] transition-opacity hover:opacity-90 disabled:opacity-50"
+                >
+                  Leg opnieuw vast
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDoelHerstellen}
+                  className="rounded-[var(--r)] border border-[var(--border-md)] px-2.5 py-1 font-sans text-[11px] font-medium text-[var(--ink-2)] transition-colors hover:border-[var(--ink-3)]"
+                >
+                  Herstel mijn doel
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Dichtgeklapte-kop-afwijkingssamenvatting (DeltaBadge-hergebruik). */}
           {hasScenario && whatIfBaseline && (
@@ -4773,6 +5056,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                 onStopKoppelChange={handleStopKoppelChange}
                 zone={stopMarge.zone}
                 margeJaren={stopMarge.margeJaren}
+                doelActief={doelActief}
               />
             )}
 
@@ -4812,7 +5096,27 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
             </div>
           </div>
         </section>
-      </HideInSimple>
+
+        {/* Vastleg-/bijwerk-sheet (BottomSheet, boven de nav-pill). */}
+        <DoelVastlegSheet
+          open={doelSheetOpen}
+          onClose={() => setDoelSheetOpen(false)}
+          previews={doelPreviews}
+          bijwerken={doelActief}
+          saving={doelSaving}
+          onSubmit={handleDoelVastleggen}
+        />
+
+        {/* Gedeelde "Doel loslaten"-bevestiging — zelfde ShellOverlay-confirm
+            als /toekomst/doelen. Horizon meldt fouten via toast, dus error="". */}
+        <DoelLoslatenConfirm
+          open={doelLoslatenOpen}
+          busy={doelSaving}
+          error=""
+          onConfirm={handleDoelLoslaten}
+          onClose={() => setDoelLoslatenOpen(false)}
+        />
+      </>
       )}
 
       {/* === KATERN III — Wat het betekent === */}
@@ -4828,7 +5132,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           <section className="mt-6 sm:mt-8">
             <div className="mb-1 flex items-center gap-2">
               <h2 className="label-editorial text-[var(--ink-2)]">Levensinkomenstrook</h2>
-              {hasScenario && !(usePartnerMainLine || useHouseholdMainLine) && <ScenarioChip />}
+              {hasScenario && !(usePartnerMainLine || useHouseholdMainLine) && <ScenarioChip doelActief={doelActief} />}
             </div>
             <p className="mb-3 font-sans text-[12px] text-[var(--ink-3)]">
               Dekkingsgraad per leeftijd — rekent met je gekozen stopleeftijd zodra je die zet.
@@ -4866,7 +5170,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           <section className="mt-6 sm:mt-8">
             <div className="mb-1 flex items-center gap-2">
               <h2 className="label-editorial text-[var(--ink-2)]">Guardrail-kompas</h2>
-              {hasScenario && !(usePartnerMainLine || useHouseholdMainLine) && <ScenarioChip />}
+              {hasScenario && !(usePartnerMainLine || useHouseholdMainLine) && <ScenarioChip doelActief={doelActief} />}
             </div>
             <p className="mb-3 font-sans text-[12px] text-[var(--ink-3)]">
               Bij welk maandbedrag je meer of minder kunt uitgeven.
@@ -4892,7 +5196,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           <section className="mt-6 sm:mt-8">
             <div className="mb-1 flex items-center gap-2">
               <h2 className="label-editorial text-[var(--ink-2)]">Dekkingsradar</h2>
-              {hasScenario && !(usePartnerMainLine || useHouseholdMainLine) && <ScenarioChip />}
+              {hasScenario && !(usePartnerMainLine || useHouseholdMainLine) && <ScenarioChip doelActief={doelActief} />}
             </div>
             <p className="mb-3 font-sans text-[12px] text-[var(--ink-3)]">
               Vijf dekkingsratio&apos;s — hoe stevig je plan op elk front staat.
