@@ -23,6 +23,7 @@ import { KoopkrachtErosie } from '@/components/app/horizon/phase-analysis/opbouw
 import { HypotheekVsBeleggenOpbouw } from '@/components/app/horizon/phase-analysis/opbouw/hypotheek-vs-beleggen-opbouw'
 import { PhaseIntro } from '@/components/app/horizon/phase-analysis/phase-intro'
 import { PhaseDiscussButton } from '@/components/app/horizon/phase-analysis/phase-discuss-button'
+import { RegimeKaart } from '@/components/app/horizon/phase-analysis/regime-kaart'
 import { ReceiptRow } from '@/components/app/horizon/phase-analysis/receipt-row'
 import { formatCurrency } from '@/lib/format'
 import { DEFAULT_VOLATILITY } from '@/lib/constants'
@@ -224,6 +225,25 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
           title="Geld is opgeslagen tijd"
           body="In deze fase groeit je vermogen door wat je inlegt én door het rendement daarop — elke euro die je nu opzij zet, koop je later vrijheid mee. Hieronder zie je hoe inleg en rendement samen je vermogen richting volledige vrijheid stuwen."
           infoDescription="De opbouwfase loopt van nu tot je FIRE-leeftijd: de jaren waarin je actief vermogen opbouwt. De analyses hieronder laten zien hoe inleg, rendement en Box 3-belasting je vermogen vormen, en welke keuzes (extra sparen, schulden aflossen, hypotheek vs. beleggen) je vrijheid versnellen."
+        />
+
+        {/* 0b. Regime-kaart — de hefbomen van deze fase (kwalitatief) */}
+        <RegimeKaart
+          kicker="OPBOUW · REGIME"
+          title="De hefbomen van deze fase"
+          rows={[
+            { label: 'Werk / inkomen', weight: 1, value: 'Hoog', tone: 'income' },
+            { label: 'Sparen', weight: 0.8, value: 'Sterk', tone: 'income' },
+            {
+              label: 'Rendement',
+              weight: 0.65,
+              value: `Belangrijk · ~${(expectedReturn * 100).toFixed(0)}%/jr`,
+              tone: 'wealth',
+            },
+            { label: 'Kosten', weight: 0.3, value: 'Laag', tone: 'neutral' },
+          ]}
+          footnote="Vrijheid wordt hier bepaald door je spaarquote, het rendement en hoeveel je liquide beschikbaar houdt."
+          infoDescription="Per fase zie je de belangrijkste hefbomen en hun relatieve gewicht. In de opbouwfase wordt je vrijheid vooral bepaald door je spaarquote, het rendement op je vermogen en hoe laag je kosten zijn. De balklengte toont het relatieve gewicht van elke hefboom — géén euro's, maar hoe zwaar elke knop meeweegt in dit regime. Alleen de rendement-aanname is een concreet getal (jouw verwachte rendement); de rest is kwalitatief."
         />
 
         {/* 1. Phase Chart Zoom — full trajectory with accumulation phase highlighted */}

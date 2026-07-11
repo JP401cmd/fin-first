@@ -117,7 +117,10 @@ const ChartForeground = memo(function ChartForeground({
     minAge,
     maxAge,
     mainStrokeAcc,
+    mainStrokeDec,
     splitFractionalAge,
+    threeBandFire,
+    aowAgeFractional,
     xScale,
     PAD,
     COLOR_OPBOUW,
@@ -145,23 +148,60 @@ const ChartForeground = memo(function ChartForeground({
         </>
       )}
 
-      {/* Phase label: OPBOUW / VERMOGENSGROEI */}
-      {splitFractionalAge !== null && splitFractionalAge > minAge + 3 && (
-        <text x={PAD.left + xScale((minAge + splitFractionalAge) / 2)} y={PAD.top + 14}
-          textAnchor="middle" fontSize={10} fill={COLOR_OPBOUW}
-          fontFamily="var(--font-inter, sans-serif)" fontWeight={600}>
-          {isPensioenMode ? 'VERMOGENSGROEI' : 'OPBOUW'}
-        </text>
+      {/* Fase-labels — 2-segment (byte-identiek voor alle bestaande callers).
+          Actief zolang er GEEN derde band is (geen AOW ná FIRE in FIRE-modus). */}
+      {!threeBandFire && (
+        <>
+          {/* Phase label: OPBOUW / VERMOGENSGROEI */}
+          {splitFractionalAge !== null && splitFractionalAge > minAge + 3 && (
+            <text x={PAD.left + xScale((minAge + splitFractionalAge) / 2)} y={PAD.top + 14}
+              textAnchor="middle" fontSize={10} fill={COLOR_OPBOUW}
+              fontFamily="var(--font-inter, sans-serif)" fontWeight={600}>
+              {isPensioenMode ? 'VERMOGENSGROEI' : 'OPBOUW'}
+            </text>
+          )}
+
+          {/* Phase label: AFBOUW / BEHOUD / PENSIOEN */}
+          {splitFractionalAge !== null && splitFractionalAge < maxAge - 3 && (
+            <text x={PAD.left + xScale((splitFractionalAge + maxAge) / 2)} y={PAD.top + 14}
+              textAnchor="middle" fontSize={10}
+              fill={!isPensioenMode && strategy === 'perpetual' ? COLOR_OPBOUW : COLOR_AFBOUW}
+              fontFamily="var(--font-inter, sans-serif)" fontWeight={600}>
+              {isPensioenMode ? 'PENSIOEN' : strategy === 'perpetual' ? 'BEHOUD' : 'AFBOUW'}
+            </text>
+          )}
+        </>
       )}
 
-      {/* Phase label: AFBOUW / BEHOUD / PENSIOEN */}
-      {splitFractionalAge !== null && splitFractionalAge < maxAge - 3 && (
-        <text x={PAD.left + xScale((splitFractionalAge + maxAge) / 2)} y={PAD.top + 14}
-          textAnchor="middle" fontSize={10}
-          fill={!isPensioenMode && strategy === 'perpetual' ? COLOR_OPBOUW : COLOR_AFBOUW}
-          fontFamily="var(--font-inter, sans-serif)" fontWeight={600}>
-          {isPensioenMode ? 'PENSIOEN' : strategy === 'perpetual' ? 'BEHOUD' : 'AFBOUW'}
-        </text>
+      {/* Fase-labels — 3-segment (Opbouw → FIRE · Overgang FIRE→AOW · Onttrekking
+          vanaf AOW). Zelfde stijl/plaatsing; middens per segment, kleur = de lijn
+          van dat segment. Alleen wanneer de banden breed genoeg zijn voor een label. */}
+      {threeBandFire && splitFractionalAge !== null && aowAgeFractional != null && (
+        <>
+          {splitFractionalAge > minAge + 3 && (
+            <text x={PAD.left + xScale((minAge + splitFractionalAge) / 2)} y={PAD.top + 14}
+              textAnchor="middle" fontSize={10} fill={COLOR_OPBOUW}
+              fontFamily="var(--font-inter, sans-serif)" fontWeight={600}>
+              OPBOUW
+            </text>
+          )}
+          {aowAgeFractional - splitFractionalAge > 3 && (
+            // Label = tekst (contrastdrempel 4,5:1) → donkere horizon-700 (COLOR_OPBOUW),
+            // niet de lichtere overgangslíjn (bridgeStroke = horizon-600, 3:1-grafiekdrempel).
+            <text x={PAD.left + xScale((splitFractionalAge + aowAgeFractional) / 2)} y={PAD.top + 14}
+              textAnchor="middle" fontSize={10} fill={COLOR_OPBOUW}
+              fontFamily="var(--font-inter, sans-serif)" fontWeight={600}>
+              OVERGANG
+            </text>
+          )}
+          {aowAgeFractional < maxAge - 3 && (
+            <text x={PAD.left + xScale((aowAgeFractional + maxAge) / 2)} y={PAD.top + 14}
+              textAnchor="middle" fontSize={10} fill={mainStrokeDec}
+              fontFamily="var(--font-inter, sans-serif)" fontWeight={600}>
+              ONTTREKKING
+            </text>
+          )}
+        </>
       )}
 
       {/* FIRE age label (hidden in pensioen mode). y geclampt onder de
@@ -444,6 +484,13 @@ export const SimChart = memo(function SimChart({
     return hoveredRow.phase === 'retirement' ? mainStrokeDec : mainStrokeAcc
   }, [hoveredRow, mainStrokeAcc, mainStrokeDec])
 
+  // De live "wat-als"-lijn (gestippelde ink-lijn met eigen legenda + tooltip-
+  // delta) wordt uit de scenario-overlays gelicht; de rest zijn saved-scenario-
+  // ghosts. Zonder een variant:'scenario'-overlay blijft `ghostScenarios` gelijk
+  // aan `scenarioOverlays` → alle bestaande callers renderen byte-identiek.
+  const scenarioVariant = scenarioOverlays?.find(o => o.variant === 'scenario') ?? null
+  const ghostScenarios = scenarioOverlays?.filter(o => o.variant !== 'scenario') ?? []
+
   return (
     <div ref={ref} className="relative">
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" overflow="hidden" aria-hidden="true">
@@ -614,9 +661,9 @@ export const SimChart = memo(function SimChart({
                 const overlayValues = scenarioOverlays
                   .map(o => {
                     const pt = o.points.find(([age]) => Math.round(age) === hoveredAge)
-                    return pt ? { label: o.label, color: o.color, value: pt[1] } : null
+                    return pt ? { label: o.label, color: o.color, value: pt[1], variant: o.variant } : null
                   })
-                  .filter((v): v is { label: string; color: string; value: number } => v !== null)
+                  .filter((v): v is { label: string; color: string; value: number; variant: ScenarioOverlay['variant'] } => v !== null)
                 if (overlayValues.length === 0) return null
                 return (
                   <>
@@ -624,17 +671,32 @@ export const SimChart = memo(function SimChart({
                     <div className="mt-1" style={{ fontSize: 8, color: 'var(--ink-4, #bbb8b0)', fontWeight: 600, letterSpacing: '0.04em' }}>
                       SCENARIO&apos;S
                     </div>
-                    {overlayValues.map(v => (
-                      <div key={v.label} className="flex items-baseline justify-between mt-0.5" style={{ fontSize: 9 }}>
-                        <span className="flex items-center gap-1" style={{ color: v.color }}>
-                          <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: v.color }} />
-                          <span className="truncate max-w-[80px]">{v.label}</span>
-                        </span>
-                        <span className="font-mono tabular-nums" style={{ color: 'var(--paper)' }}>
-                          {fmtAbs(v.value)}
-                        </span>
-                      </div>
-                    ))}
+                    {overlayValues.map(v => {
+                      // De wat-als-lijn rendert in inkt (geen ghost-kleur) én toont
+                      // het €-verschil t.o.v. de hoofdlijn op dezelfde leeftijd
+                      // (hoveredRow.startPortfolio = het "Vermogen"-getal hierboven).
+                      const isWatals = v.variant === 'scenario'
+                      const delta = v.value - hoveredRow.startPortfolio
+                      return (
+                        <div key={v.label} className="flex items-baseline justify-between mt-0.5" style={{ fontSize: 9 }}>
+                          <span className="flex items-center gap-1" style={{ color: isWatals ? 'var(--ink-4, #bbb8b0)' : v.color }}>
+                            <span
+                              className="inline-block h-1.5 w-1.5 rounded-full"
+                              style={{ background: isWatals ? 'var(--ink-2)' : v.color }}
+                            />
+                            <span className="truncate max-w-[80px]">{v.label}</span>
+                          </span>
+                          <span className="font-mono tabular-nums" style={{ color: 'var(--paper)' }}>
+                            {fmtAbs(v.value)}
+                            {isWatals && Math.abs(delta) >= 1 && (
+                              <span className="ml-1" style={{ color: delta >= 0 ? '#6ee7b7' : '#fca5a5' }}>
+                                {delta >= 0 ? '+' : '−'}{fmtAbs(delta)}
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                      )
+                    })}
                   </>
                 )
               })()}
@@ -642,6 +704,41 @@ export const SimChart = memo(function SimChart({
           </div>
         )
       })()}
+
+      {/* Wat-als-legenda — "Jouw pad" (hoofdlijn) + de gestippelde ink-wat-als-
+          lijn, met optioneel FIRE-leeftijdssuffix. Staat bewust bovenaan (direct
+          onder de grafiek), vóór de ghost-/household-rijen. Alleen zichtbaar bij
+          een variant:'scenario'-overlay → byte-identiek voor bestaande callers. */}
+      {scenarioVariant && (
+        <div className="mt-1.5 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 px-4">
+          <div className="flex items-center gap-1.5">
+            <svg width="20" height="8" className="shrink-0">
+              <line x1="0" y1="4" x2="20" y2="4" stroke={mainStrokeAcc} strokeWidth={2.5} strokeLinecap="round" />
+            </svg>
+            <span className="text-[10px] font-medium text-[var(--ink-3)]">
+              Jouw pad
+              {(fireAgeFractional ?? fireAge) !== null && (
+                <span className="ml-1 font-mono text-[var(--ink-4)]">
+                  ({Math.round((fireAgeFractional ?? fireAge) as number)}j)
+                </span>
+              )}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <svg width="20" height="8" className="shrink-0">
+              <line x1="0" y1="4" x2="20" y2="4" stroke="var(--ink-2)" strokeWidth={2.25} strokeDasharray="6 4" strokeLinecap="round" />
+            </svg>
+            <span className="text-[10px] font-medium text-[var(--ink-3)]">
+              {scenarioVariant.label}
+              {scenarioVariant.fireAgeFractional != null && (
+                <span className="ml-1 font-mono text-[var(--ink-4)]">
+                  ({Math.round(scenarioVariant.fireAgeFractional)}j)
+                </span>
+              )}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Hoofdlijn- + household-legenda: maakt duidelijk welke lijn wat is. */}
       {(mainLineLabel || (householdOverlays && householdOverlays.length > 0)) && (
@@ -685,10 +782,11 @@ export const SimChart = memo(function SimChart({
         </div>
       )}
 
-      {/* Scenario overlay legend — shows label + color for each active saved scenario */}
-      {scenarioOverlays && scenarioOverlays.length > 0 && !householdOverlays?.length && (
+      {/* Scenario overlay legend — shows label + color for each active saved scenario.
+          De wat-als-variant is hierboven al gelegendeerd; hier alleen de ghosts. */}
+      {ghostScenarios.length > 0 && !householdOverlays?.length && (
         <div className="mt-1.5 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 px-4">
-          {scenarioOverlays.map(overlay => (
+          {ghostScenarios.map(overlay => (
             <div key={overlay.name} className="flex items-center gap-1.5">
               <svg width="20" height="8" className="shrink-0">
                 <line

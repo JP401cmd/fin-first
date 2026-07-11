@@ -10,8 +10,8 @@
  * niet het module-accent. "Jij"-marker in het horizon-accent.
  */
 
-import { useState } from 'react'
 import { formatCurrency } from '@/lib/format'
+import { InlineInfoDisclosure } from '@/components/editorial'
 
 const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
 
@@ -35,7 +35,6 @@ const TICKS = [
 const EDGE_PAD = 8
 
 export function GuardrailKompas({ levels, you, referenceAgeLabel }: GuardrailKompasProps) {
-  const [info, setInfo] = useState(false)
   const vals = [levels.teWeinig, levels.veilig, levels.gepland, levels.meevaller, you]
   const min = Math.min(...vals)
   const max = Math.max(...vals)
@@ -44,34 +43,19 @@ export function GuardrailKompas({ levels, you, referenceAgeLabel }: GuardrailKom
 
   return (
     <div>
-      <div className="mb-2 flex justify-end">
-        <button
-          type="button"
-          onClick={() => setInfo(v => !v)}
-          aria-label="Uitleg guardrail-kompas"
-          aria-expanded={info}
-          className="flex h-7 w-7 items-center justify-center rounded-full border border-[var(--border-ed)] bg-[var(--paper)] text-[12px] italic text-[var(--ink-3)] transition hover:border-[var(--color-horizon-500)] hover:text-[var(--color-horizon-600)]"
-          style={{ fontFamily: PLAYFAIR }}
-        >
-          i
-        </button>
-      </div>
-
-      {info && (
-        <div className="mb-4 rounded-md border border-[var(--border-ed)] border-l-[3px] border-l-[var(--color-horizon-500)] bg-[var(--subtle)] px-4 py-3 text-[12.5px] leading-relaxed text-[var(--ink-3)]">
-          <div className="mb-1.5 font-semibold text-[var(--ink)]" style={{ fontFamily: PLAYFAIR }}>
-            De data achter de grenzen
-          </div>
-          <p className="m-0">
-            Je besteding wordt dynamisch begrensd op basis van je vermogen t.o.v. het pad (guardrail-methode).{' '}
-            <b className="text-[var(--ink)]">Gepland</b> = je basis-bestedingsdoel.{' '}
-            <b className="text-[var(--ink)]">Veilig</b> = hoogste niveau dat óók in een pessimistisch marktpad houdbaar
-            blijft. <b className="text-[var(--ink)]">Te weinig</b> = hieronder geef je minder uit dan hoeft (over-sparen).{' '}
-            <b className="text-[var(--ink)]">Meevaller</b> = komt je vermogen boven het pad uit, dan mag je tot hier
-            opschalen — of eerder stoppen/schenken.
-          </p>
+      <InlineInfoDisclosure label="Uitleg guardrail-kompas">
+        <div className="mb-1.5 font-semibold text-[var(--ink)]" style={{ fontFamily: PLAYFAIR }}>
+          De data achter de grenzen
         </div>
-      )}
+        <p className="m-0">
+          Je besteding wordt dynamisch begrensd op basis van je vermogen t.o.v. het pad (guardrail-methode).{' '}
+          <b className="text-[var(--ink)]">Gepland</b> = je basis-bestedingsdoel.{' '}
+          <b className="text-[var(--ink)]">Veilig</b> = hoogste niveau dat óók in een pessimistisch marktpad houdbaar
+          blijft. <b className="text-[var(--ink)]">Te weinig</b> = hieronder geef je minder uit dan hoeft (over-sparen).{' '}
+          <b className="text-[var(--ink)]">Meevaller</b> = komt je vermogen boven het pad uit, dan mag je tot hier
+          opschalen — of eerder stoppen/schenken.
+        </p>
+      </InlineInfoDisclosure>
 
       <div className="relative mb-2 mt-9">
         {/* Gekleurde balk: te weinig (rood) → veilig (amber) → ruimte (groen) */}

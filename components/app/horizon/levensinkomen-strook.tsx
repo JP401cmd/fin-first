@@ -10,7 +10,7 @@
  * module-accent — consistent met lib/leverage-status.ts.
  */
 
-import { useState } from 'react'
+import { InlineInfoDisclosure } from '@/components/editorial'
 
 export interface CoverageNodeView {
   age: number
@@ -52,39 +52,23 @@ function nearestAge(nodes: CoverageNodeView[], age: number): number | null {
 }
 
 export function LevensinkomenStrook({ nodes, activeAge, segments }: LevensinkomenStrookProps) {
-  const [info, setInfo] = useState(false)
   const activeNode = activeAge == null ? null : nearestAge(nodes, activeAge)
 
   return (
     <div>
-      <div className="mb-2 flex justify-end">
-        <button
-          type="button"
-          onClick={() => setInfo(v => !v)}
-          aria-label="Uitleg dekkingsgraad"
-          aria-expanded={info}
-          className="flex h-7 w-7 items-center justify-center rounded-full border border-[var(--border-ed)] bg-[var(--paper)] text-[12px] italic text-[var(--ink-3)] transition hover:border-[var(--color-horizon-500)] hover:text-[var(--color-horizon-600)]"
-          style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
-        >
-          i
-        </button>
-      </div>
-
-      {info && (
-        <div className="mb-4 rounded-md border border-[var(--border-ed)] border-l-[3px] border-l-[var(--color-horizon-500)] bg-[var(--subtle)] px-4 py-3 text-[12.5px] leading-relaxed text-[var(--ink-3)]">
-          <div className="mb-1.5 font-semibold text-[var(--ink)]" style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}>
-            Zo werkt de dekkingsgraad
-          </div>
-          <p className="m-0">
-            dekkingsgraad = (vaste inkomsten + veilige onttrekking) ÷ gewenste besteding × 100%. 100% = volledig gedekt
-            zonder extra in te teren. <b className="text-[var(--ink)]">Groen ≥ 100%</b> — inkomen + veilige onttrekking
-            dekken je besteding. <b className="text-[var(--ink)]">Amber 90–99%</b> — klein tekort, je teert licht in.{' '}
-            <b className="text-[var(--ink)]">Rood &lt; 90%</b> — structureel tekort dat jaar; bijsturen. Waarom het dipt:
-            in de brugjaren (tussen FIRE en AOW) is er nog geen AOW/pensioen, dus alles komt uit vermogen → onder 100%.
-            Vanaf AOW tillen AOW + pensioen je er weer boven.
-          </p>
+      <InlineInfoDisclosure label="Uitleg dekkingsgraad">
+        <div className="mb-1.5 font-semibold text-[var(--ink)]" style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}>
+          Zo werkt de dekkingsgraad
         </div>
-      )}
+        <p className="m-0">
+          dekkingsgraad = (vaste inkomsten + veilige onttrekking) ÷ gewenste besteding × 100%. 100% = volledig gedekt
+          zonder extra in te teren. <b className="text-[var(--ink)]">Groen ≥ 100%</b> — inkomen + veilige onttrekking
+          dekken je besteding. <b className="text-[var(--ink)]">Amber 90–99%</b> — klein tekort, je teert licht in.{' '}
+          <b className="text-[var(--ink)]">Rood &lt; 90%</b> — structureel tekort dat jaar; bijsturen. Waarom het dipt:
+          in de brugjaren (tussen FIRE en AOW) is er nog geen AOW/pensioen, dus alles komt uit vermogen → onder 100%.
+          Vanaf AOW tillen AOW + pensioen je er weer boven.
+        </p>
+      </InlineInfoDisclosure>
 
       <div className="flex gap-1">
         {nodes.map(n => {

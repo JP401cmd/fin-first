@@ -22,6 +22,7 @@ import { EerderStoppen } from '@/components/app/horizon/phase-analysis/overgang/
 import { DeeltijdwerkImpact } from '@/components/app/horizon/phase-analysis/overgang/deeltijdwerk-impact'
 import { PhaseIntro } from '@/components/app/horizon/phase-analysis/phase-intro'
 import { PhaseDiscussButton } from '@/components/app/horizon/phase-analysis/phase-discuss-button'
+import { RegimeKaart, sumIncomeBySource } from '@/components/app/horizon/phase-analysis/regime-kaart'
 import { InfoTooltip } from '@/components/overview/belasting/info-tooltip'
 import type { UnifiedProjectionRow } from '@/lib/unified-projection'
 import type { Debt } from '@/lib/debt-data'
@@ -148,6 +149,13 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
     ? transitionRows[transitionRows.length - 1].netWorth
     : Math.max(portfolioAtTransitionStart - totalOnttrekking + totalRendement, 0)
 
+  // ── Exacte dekkingsbronnen (regime-kaart ⑧) ──────────────────────────────
+  // AOW/pensioen uit de EXACTE grossIncomeBySource-pool (niet grossIncome), zodat
+  // salaris niet in de vaste-inkomsten lekt. In de brug (gap) horen beide ~€0 te
+  // zijn — alles komt dan uit de vermogens-onttrekking.
+  const bridgeIncome = sumIncomeBySource(transitionRows, yearlyAowIncome)
+  const bridgeVasteInkomsten = bridgeIncome.aow + bridgeIncome.pensioen
+
   // ── Canonieke FIRE-maatstaf (uitgelijnd met resolveFireParams) ───────────
   // horizon-client geeft geen fireTarget aan deze modal door; we leiden hem af
   // uit dezelfde formule als resolveFireParams zodat "eerder stoppen" en de
@@ -261,6 +269,39 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
             yearlyExpenses={yearlyExpenses}
           />
         )}
+
+        {/* 3b. Regime-kaart — waar de dekking van de brug vandaan komt (€) */}
+        <RegimeKaart
+          kicker="OVERGANG · DEKKING"
+          title="Waar de dekking vandaan komt"
+          rows={[
+            {
+              label: 'Vermogen',
+              hint: 'geoormerkt bruggeld',
+              weight: Math.max(totalOnttrekking, 0),
+              value: <MaskedAmount value={Math.round(totalOnttrekking)} tone="horizon" />,
+              tone: 'wealth',
+            },
+            {
+              label: 'AOW',
+              weight: Math.max(bridgeIncome.aow, 0),
+              value: <MaskedAmount value={Math.round(bridgeIncome.aow)} tone="horizon" />,
+              tone: bridgeIncome.aow > 0.5 ? 'income' : 'zero',
+            },
+            {
+              label: 'Pensioen',
+              weight: Math.max(bridgeIncome.pensioen, 0),
+              value: <MaskedAmount value={Math.round(bridgeIncome.pensioen)} tone="horizon" />,
+              tone: bridgeIncome.pensioen > 0.5 ? 'income' : 'zero',
+            },
+          ]}
+          footnote={
+            bridgeVasteInkomsten < 1
+              ? 'Dit is de smalste brug: AOW en pensioen dragen nog niets bij — alles moet uit je vermogen komen.'
+              : 'AOW en pensioen vullen al aan; het restant van de brug financier je uit je vermogen.'
+          }
+          infoDescription="In de overgangsfase zie je waar de dekking van je uitgaven vandaan komt. De balk toont het relatieve gewicht van elke bron t.o.v. de zwaarste. Vermogen is het geoormerkte bruggeld dat je onttrekt; AOW en pensioen zijn je vaste inkomsten. AOW en pensioen komen exact uit de projectie (grossIncomeBySource) — in de brug tussen stoppen en je AOW dragen ze vaak nog €0 bij, waardoor het gewicht volledig op je vermogen rust."
+        />
 
         {/* 4. Life Events in this phase */}
         {events && events.length > 0 && (

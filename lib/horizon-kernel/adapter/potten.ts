@@ -65,7 +65,7 @@ const TEKORT_SLOT = 6 // bens rij 23 — tekort-lening (rol 'tekortLening', alti
  *    'pensioen'); Box 3-type blijft belegging via `classifyAsset`.
  *  - `eigen_huis` → **Eigen huis** (eigen kern-categorie, niet 'Vastgoed').
  */
-const ASSET_TYPE_TO_CATEGORIE: Record<AssetType, AssetCategorie> = {
+export const ASSET_TYPE_TO_CATEGORIE: Record<AssetType, AssetCategorie> = {
   cash: 'Spaargeld',
   savings: 'Spaargeld',
   investment: 'Beleggingen',

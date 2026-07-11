@@ -174,6 +174,46 @@ describe('buildSimChartGeometry — what-if (MC + scenario + baseline)', () => {
   })
 })
 
+// ── Wat-als-scenario-variant (live wat-als-lijn + FIRE-stip) ─────────────────
+
+describe('buildSimChartGeometry — wat-als-variant', () => {
+  const g = buildSimChartGeometry({
+    ...baseInput,
+    scenarioOverlays: [
+      // Ghost (bestaand pad): geen variant → geen fireDot/variant-velden.
+      { name: 'pessimist', label: 'Voorzichtig', color: '#9e6b50', points: [[40, 100000], [50, 300000], [60, 700000], [65, 500000]] },
+      // Live wat-als-lijn: variant + fractionele FIRE-leeftijd → FIRE-stip.
+      {
+        name: 'watals',
+        label: 'Jouw wat-als',
+        color: '#9e6b50',
+        variant: 'scenario',
+        fireAgeFractional: 54.5,
+        points: [[40, 100000], [54, 600000], [55, 650000], [65, 1200000]],
+      },
+    ],
+  })
+
+  it('ghost houdt het oude shape (geen fireDot/variant-velden)', () => {
+    const ghost = g.scenarioPaths.find(s => s.name === 'pessimist')!
+    expect(Object.keys(ghost).sort()).toEqual(['color', 'd', 'name'])
+    expect(ghost.fireDot).toBeUndefined()
+    expect(ghost.variant).toBeUndefined()
+  })
+
+  it('wat-als-lijn draagt variant + FIRE-stip op de fractionele leeftijd', () => {
+    const watals = g.scenarioPaths.find(s => s.name === 'watals')!
+    expect(watals.variant).toBe('scenario')
+    expect(watals.d).not.toBeNull()
+    expect(watals.fireDot).not.toBeNull()
+    // fa=54.5 → cx = PAD.left(60) + ((54.5−40)/25)×innerW(524) = 363.92.
+    expect(watals.fireDot!.cx).toBeCloseTo(363.92, 2)
+    // y-waarde geïnterpoleerd tussen 54 (600k) en 55 (650k) = 625k; met maxVal =
+    // 1.2M×1.08 → cy = 16 + (176 − (625000/1296000)×176) ≈ 107.123.
+    expect(watals.fireDot!.cy).toBeCloseTo(107.123, 2)
+  })
+})
+
 // ── Household ────────────────────────────────────────────────────────────────
 
 describe('buildSimChartGeometry — household', () => {
@@ -226,6 +266,63 @@ describe('buildSimChartGeometry — household', () => {
         },
       ]
     `)
+  })
+})
+
+// ── Derde band (FIRE-modus: Opbouw → FIRE · Overgang FIRE→AOW · Onttrekking) ──
+
+describe('buildSimChartGeometry — derde band (AOW ná FIRE, FIRE-modus)', () => {
+  const g = buildSimChartGeometry({
+    ...baseInput,
+    endAge: 90,
+    rows: buildRows(40, 90, { retireAge: 58, withdrawal: 30000 }),
+    aowAgeFractional: 67.25,
+  })
+
+  it('activeert de derde band en levert 3 paden (acc + brug + onttrekking, geen dec)', () => {
+    expect(g.threeBandFire).toBe(true)
+    expect(g.accPath).not.toBeNull()
+    expect(g.bridgePath).not.toBeNull()
+    expect(g.withdrawalPath).not.toBeNull()
+    // decPath vervalt: de doorlopende afbouwlijn wordt vervangen door brug + onttrekking.
+    expect(g.decPath).toBeNull()
+  })
+
+  it('de brug loopt van de FIRE-junction naar de AOW-junction; onttrekking vanaf AOW', () => {
+    // Brug start = fireFractionalPt (zelfde x/y als het begin van de oude decPath),
+    // brug eind = AOW-junction = start van de onttrekking (continu).
+    expect(g.aowFractionalPt).not.toBeNull()
+    expect(g.bridgePath).toMatchInlineSnapshot(`"M 251.8 69.3 L 259.1 71.2 L 269.6 70.7 L 280.1 70.0 L 290.6 69.4 L 301.0 68.7 L 311.5 68.0 L 322.0 67.2 L 332.5 66.4 L 343.0 65.6 L 345.6 65.3"`)
+    expect(g.withdrawalPath).toMatchInlineSnapshot(`"M 345.6 65.3 L 353.4 64.7 L 363.9 63.7 L 374.4 62.8 L 384.9 61.8 L 395.4 60.7 L 405.8 59.6 L 416.3 58.4 L 426.8 57.1 L 437.3 55.8 L 447.8 54.5 L 458.2 53.0 L 468.7 51.5 L 479.2 49.9 L 489.7 48.3 L 500.2 46.5 L 510.6 44.7 L 521.1 42.8 L 531.6 40.8 L 542.1 38.6 L 552.6 36.4 L 563.0 34.1 L 573.5 31.6 L 584.0 29.0"`)
+  })
+
+  it('de brug krijgt een leesbare horizon-tussentint (token, geen kale hex)', () => {
+    expect(g.bridgeStroke).toBe('var(--color-horizon-600, #ab8449)')
+  })
+})
+
+describe('buildSimChartGeometry — geen derde band (guard) blijft byte-identiek', () => {
+  const baseNoAow = buildSimChartGeometry(baseInput)
+  // AOW ≤ FIRE → guard grijpt in → exact de 2-segment-uitvoer.
+  const lowAow = buildSimChartGeometry({ ...baseInput, aowAgeFractional: 50 })
+  // Pensioen-modus → nooit de FIRE-derde-band (eigen AOW-split).
+  const pensioen = buildSimChartGeometry({
+    ...baseInput, planningMode: 'pensioen', aowAgeFractional: 67.25,
+    fireTarget: undefined, endAge: 90, rows: buildRows(40, 90, { retireAge: 67, withdrawal: 45000 }),
+  })
+
+  it('AOW ≤ FIRE: geen derde band, acc/dec byte-identiek aan de aow-loze uitvoer', () => {
+    expect(lowAow.threeBandFire).toBe(false)
+    expect(lowAow.bridgePath).toBeNull()
+    expect(lowAow.withdrawalPath).toBeNull()
+    expect(lowAow.accPath).toBe(baseNoAow.accPath)
+    expect(lowAow.decPath).toBe(baseNoAow.decPath)
+  })
+
+  it('pensioen-modus zet threeBandFire nooit aan', () => {
+    expect(pensioen.threeBandFire).toBe(false)
+    expect(pensioen.bridgePath).toBeNull()
+    expect(pensioen.withdrawalPath).toBeNull()
   })
 })
 

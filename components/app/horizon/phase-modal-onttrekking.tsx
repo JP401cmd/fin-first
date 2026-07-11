@@ -10,10 +10,10 @@ import { memo, useMemo, useState } from 'react'
 import { ChevronRight, ChevronDown } from 'lucide-react'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { KassabonShell } from '@/components/app/kassabon-shell'
-import { formatCurrency, formatMaskedCurrency } from '@/lib/format'
-import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+import { formatCurrency } from '@/lib/format'
 import { PhaseIntro } from '@/components/app/horizon/phase-analysis/phase-intro'
 import { PhaseDiscussButton } from '@/components/app/horizon/phase-analysis/phase-discuss-button'
+import { RegimeKaart, sumIncomeBySource } from '@/components/app/horizon/phase-analysis/regime-kaart'
 import type { UnifiedProjectionRow } from '@/lib/unified-projection'
 import type { FireEndStrategy } from '@/lib/fire-strategy'
 import { STRATEGY_LABELS } from '@/lib/fire-strategy'
@@ -75,65 +75,6 @@ interface PhaseModalOnttrekkingProps {
   currentAge?: number
 }
 
-// ── Income Source Bar ────────────────────────────────────────────────────────
-
-function IncomeSourceBar({
-  aowTotal,
-  pensioenTotal,
-  portfolioTotal,
-}: {
-  aowTotal: number
-  pensioenTotal: number
-  portfolioTotal: number
-}) {
-  const { masked } = useMaskedAmounts()
-  const total = aowTotal + pensioenTotal + portfolioTotal
-  if (total <= 0) return null
-
-  const aowPct = (aowTotal / total) * 100
-  const pensioenPct = (pensioenTotal / total) * 100
-  const portfolioPct = (portfolioTotal / total) * 100
-
-  const segments = [
-    { label: 'AOW', pct: aowPct, value: aowTotal, color: 'var(--color-horizon-400, #a07840)' },
-    { label: 'Pensioen', pct: pensioenPct, value: pensioenTotal, color: 'var(--color-horizon-600, #6b5030)' },
-    { label: 'Portfolio', pct: portfolioPct, value: portfolioTotal, color: 'var(--color-kern-500, #8b6914)' },
-  ].filter(s => s.pct > 0.5)
-
-  return (
-    <div className="mt-4">
-      <p className="mb-2 font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
-        Inkomstenbronnen
-      </p>
-      {/* Stacked bar */}
-      <div className="flex h-3 w-full overflow-hidden rounded-full">
-        {segments.map(s => (
-          <div
-            key={s.label}
-            className="h-full transition-all duration-300"
-            style={{ width: `${s.pct}%`, backgroundColor: s.color }}
-            title={`${s.label}: ${formatMaskedCurrency(Math.round(s.value), masked)}`}
-          />
-        ))}
-      </div>
-      {/* Legend */}
-      <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
-        {segments.map(s => (
-          <div key={s.label} className="flex items-center gap-1.5">
-            <div className="h-2 w-2 rounded-full" style={{ backgroundColor: s.color }} />
-            <span className="font-sans text-[10px] text-[var(--ink-3)]">
-              {s.label}
-            </span>
-            <span className="font-mono text-[10px] tabular-nums text-[var(--ink-2)]">
-              {s.pct.toFixed(0)}%
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
 // ── Modal Component ──────────────────────────────────────────────────────────
 
 export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
@@ -188,12 +129,10 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
   // net portfolio outflow with AOW already netted out exactly once. Showing AOW
   // as a positive "vermogensaanwas" row while also folding it into a gross
   // "Levensonderhoud" cancels arithmetically but reads as if AOW grows your
-  // wealth — so we keep income sources in the IncomeSourceBar (coverage) and
-  // out of the receipt (C2).
+  // wealth — so we keep income sources in the jaarinkomen-regime-kaart
+  // (coverage) and out of the receipt (C2).
   const aggregates = useMemo(() => {
     let totalGrowth = 0
-    let totalAow = 0
-    let totalPensioen = 0
     let totalWithdrawal = 0
     let totalBox3 = 0
     let totalOneTimeCashflows = 0
@@ -203,21 +142,47 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
       totalBox3 += row.totalBox3
       totalWithdrawal += row.withdrawal
       totalOneTimeCashflows += (row.oneTimeNet || 0)
-
-      // grossIncome includes AOW + pensioen in withdrawal phase. Split for the
-      // IncomeSourceBar only: AOW is a known fixed amount; remainder is pensioen.
-      const rowAow = Math.min(row.grossIncome, yearlyAowIncome)
-      const rowPensioen = Math.max(row.grossIncome - yearlyAowIncome, 0)
-      totalAow += rowAow
-      totalPensioen += rowPensioen
     }
+
+    // Exacte inkomstensplitsing via `grossIncomeBySource` (kwaliteits-fix): de
+    // oude heuristiek `min(row.grossIncome, aow)` telde óók een eventueel
+    // salaris-/partnerdeel (CF!D) mee in AOW/pensioen. Nu splitsen we de EXACTE
+    // gebeurtenisBaten-pool (CF!H = AOW + pensioen) en houden salaris apart, met
+    // een veilige fallback op de oude heuristiek als het exacte veld ontbreekt.
+    const income = sumIncomeBySource(withdrawalRows, yearlyAowIncome)
 
     // Portfolio withdrawal = the net amount drawn from the portfolio (AOW/pensioen
     // already netted out). This IS the "Levensonderhoud (uit portfolio)" line.
     const portfolioWithdrawal = totalWithdrawal
 
-    return { totalGrowth, totalAow, totalPensioen, totalWithdrawal, totalBox3, portfolioWithdrawal, totalOneTimeCashflows }
+    return {
+      totalGrowth,
+      totalAow: income.aow,
+      totalPensioen: income.pensioen,
+      totalSalaris: income.salaris,
+      totalWithdrawal,
+      totalBox3,
+      portfolioWithdrawal,
+      totalOneTimeCashflows,
+    }
   }, [withdrawalRows, yearlyAowIncome])
+
+  // ── Jaarinkomen-opbouw voor de regime-kaart (per-jaar-gemiddelden) ────────
+  const perYear = durationYears > 0 ? durationYears : 1
+  const aowPerYear = aggregates.totalAow / perYear
+  const pensioenPerYear = aggregates.totalPensioen / perYear
+  const salarisPerYear = aggregates.totalSalaris / perYear
+  const withdrawalPerYear = aggregates.portfolioWithdrawal / perYear
+  const jaarInkomenTotaal = aowPerYear + pensioenPerYear + salarisPerYear + withdrawalPerYear
+  const vasteShare = jaarInkomenTotaal > 0
+    ? (aowPerYear + pensioenPerYear + salarisPerYear) / jaarInkomenTotaal
+    : 0
+  const incomeStatusPill: { label: string; tone: 'good' | 'warn' | 'bad' } | undefined =
+    vasteShare >= 0.4
+      ? { label: 'Vaste basis', tone: 'good' }
+      : vasteShare > 0
+        ? { label: 'Deels vast', tone: 'warn' }
+        : undefined
 
   // Reconcile the receipt against the actual eindvermogen. Any residual (e.g.
   // from debt-principal effects on net worth) surfaces as an explicit
@@ -372,11 +337,42 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
           )}
         </KassabonShell>
 
-        {/* 4. Income source breakdown — stacked bar */}
-        <IncomeSourceBar
-          aowTotal={aggregates.totalAow}
-          pensioenTotal={aggregates.totalPensioen}
-          portfolioTotal={aggregates.portfolioWithdrawal}
+        {/* 4. Regime-kaart — waar je jaarinkomen vandaan komt (exact, per jaar) */}
+        <RegimeKaart
+          kicker="AFBOUW · JAARINKOMEN"
+          title="Waar je jaarinkomen vandaan komt"
+          statusPill={incomeStatusPill}
+          rows={[
+            {
+              label: 'AOW',
+              weight: Math.max(aowPerYear, 0),
+              value: <MaskedAmount value={Math.round(aowPerYear)} tone="horizon" />,
+              tone: aowPerYear > 0.5 ? 'income' : 'zero',
+            },
+            {
+              label: 'Pensioen',
+              weight: Math.max(pensioenPerYear, 0),
+              value: <MaskedAmount value={Math.round(pensioenPerYear)} tone="horizon" />,
+              tone: pensioenPerYear > 0.5 ? 'income' : 'zero',
+            },
+            ...(salarisPerYear > 100
+              ? [{
+                  label: 'Werk / overig',
+                  weight: Math.max(salarisPerYear, 0),
+                  value: <MaskedAmount value={Math.round(salarisPerYear)} tone="horizon" />,
+                  tone: 'income' as const,
+                }]
+              : []),
+            {
+              label: 'Vermogen',
+              hint: 'onttrekking',
+              weight: Math.max(withdrawalPerYear, 0),
+              value: <MaskedAmount value={Math.round(withdrawalPerYear)} tone="horizon" />,
+              tone: 'wealth',
+            },
+          ]}
+          footnote="Vaste inkomsten nemen de druk weg bij je vermogen: hoe groter hun aandeel, hoe minder je hoeft te onttrekken."
+          infoDescription="Hier zie je hoe je jaarinkomen in de afbouwfase is opgebouwd (gemiddeld per jaar). AOW en pensioen zijn vaste inkomsten; het restant haal je uit je vermogen (onttrekking). De balk toont het relatieve gewicht van elke bron. Deze cijfers komen exact uit de projectie (grossIncomeBySource) in plaats van een schatting — hoe meer vaste inkomsten, hoe minder druk op je vermogen."
         />
 
         {/* 5. Life Events in this phase */}

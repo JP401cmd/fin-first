@@ -4738,22 +4738,22 @@ Scope: /toekomst (tijdas-landing), /toekomst/doelen, /toekomst/gebeurtenissen, /
 - **Cross-module effecten:** scenario's worden aangemaakt in de wat-als-omgeving (/toekomst/whatif, buiten dit deelgebied).
 
 #### WF-TOEK-10 — Wat-als-sliders: inkomen, werkdagen, spaarquote en extra inleg live aanpassen
-- **Doel:** De gebruiker verkent direct op de tijdas wat er met zijn vrijheidsleeftijd gebeurt als hij meer/minder verdient, minder dagen werkt, meer spaart of extra inlegt.
-- **Trigger/startpunt:** Klik op het blok "Wat als...? Pas je scenario aan" onder de grafiek op /toekomst (ook te openen via deeplink ?whatif=open).
-- **Eindresultaat:** Het sliderpaneel staat open; elke slider-wijziging maakt/actualiseert een tijdelijk scenario-event en de projectielijn erboven past zich direct aan.
+- **Doel:** De gebruiker verkent direct op de tijdas wat er met zijn vrijheidsleeftijd gebeurt als hij meer/minder verdient, minder dagen werkt, meer spaart of extra inlegt — zónder dat zijn basislijn verandert.
+- **Trigger/startpunt:** De sectie "Verken je aannames" (katern II) onder de grafiek op /toekomst; deeplink ?whatif=open scrollt ernaartoe.
+- **Eindresultaat:** Elke slider-afwijking vormt een wat-als-scenario: een gestippelde inkt-lijn "Jouw wat-als" (met FIRE-stip) naast de ónveranderde basislijn, een "Wat-als"-toggle-pill boven de grafiek met FIRE-delta, en duidingsblokken (levensinkomenstrook, guardrail-kompas) die met een "Jouw wat-als"-chip op de scenario-cijfers schakelen.
 - **Stappen:**
-  1. Klik het "Wat als...?"-blok open.
-  2. Verschuif "Maandinkomen" (€0–€15.000), "Werkdagen per week" (1–5), "Spaarquote" (0–80%) of "Extra inleg" (€0–€5.000).
-  3. Zie de projectielijn en de vrijheidsleeftijd direct herrekenen.
-  4. Klik "Volledig scenario →" om via de droom-overgang naar de volledige wat-als-pagina te gaan.
-- **Schermen/componenten:** components/app/horizon/whatif-sliders.tsx (WhatIfSlidersCollapsible, buildSliderEvent/applySliderEvent); horizon-client.tsx (whatIfInlineOpen); lib/whatif-overrides.ts.
+  1. Scroll naar de sectie "Verken je aannames" onder de grafiek.
+  2. Verschuif "Maandinkomen" (€0–€15.000), "Werkdagen per week" (1–5), "Spaarquote" (0–80%) of "Extra inleg" (€0–€5.000); optioneel het ingeklapte "Rendement"-blok: master-slider + verfijning per vermogenscategorie.
+  3. Zie de gestippelde wat-als-lijn in de grafiek en de Vrijheidsas (FIRE-markers basis + wat-als, stopleeftijd-slider met driezone-marge-band "verwacht"/"laatst", koppel-checkbox) meebewegen; de basislijn en hero-KPI's blijven staan.
+  4. Toggle de "Wat-als"-pill om de tweede lijn te tonen/verbergen (de duidingsblokken blijven het scenario volgen); "Terug naar basis" in de sectiekop wist het scenario; de footer-link "Scenario's vergelijken →" gaat via de droom-overgang naar de volledige wat-als-pagina.
+- **Schermen/componenten:** components/app/horizon/horizon-client.tsx (sectie "Verken je aannames", scenario-state); whatif-sliders.tsx (bare SliderGrid); whatif-market-assumptions.tsx; vrijheidsas.tsx; scenario-chip.tsx; lib/hooks/use-horizon-fire-sim.ts (scenarioOverrides); lib/horizon/toekomst-scenario.ts; lib/horizon/stop-marge.ts.
 - **Kriticiteit:** KERN
-- **Rekenend:** ja — de herrekende vrijheidsleeftijd/projectielijn per sliderstand; sliders vertalen naar scenario-events (scenario_origin 'slider:*') die door dezelfde kernel-run gaan (use-horizon-fire-sim).
+- **Rekenend:** ja — het wat-als-pad is een tweede run van exact dezelfde kernel (computeConvergentieProjection) met alleen aangepaste assets/events; nul afwijkingen ≡ basislijn (golden-test scenario-baseline-parity); marge-zones uit computeStopMarge, met "laatst" uit de bestaande Voorzichtig-variant (buildScenarioPathsFromSim).
 - **Varianten & randgevallen:**
-  - Slider terug naar baseline: het slider-event wordt weer opgeruimd (clearScenarioEvents).
-  - Eenvoudig-modus: het hele blok is verborgen.
-  - Sliders zijn niet-persistent (verkenning, geen opslag).
-- **Cross-module effecten:** geen opslag; "Volledig scenario" navigeert naar de wat-als-pagina.
+  - Alle sliders terug naar baseline: het scenario verdwijnt (pill, lijn en chips weg); de basislijn stond al die tijd onveranderd.
+  - Eenvoudig-modus: sectie, pill, chips en katern-markeringen zijn verborgen.
+  - Slider-standen, rendement-delta's, stopleeftijd en pill-stand worden server-side bewaard (profiles.toekomst_scenario_prefs, cross-device) — bij herbezoek staat het scenario er weer.
+- **Cross-module effecten:** opslag alleen in profiles.toekomst_scenario_prefs (eigen rij); footer-link "Scenario's vergelijken →" navigeert via de droom-overgang naar de wat-als-pagina.
 
 #### WF-TOEK-11 — AOW-stop-simulatie: doorwerken tot AOW vergelijken
 - **Doel:** De gebruiker met een FIRE-leeftijd ná zijn AOW-leeftijd (shortfall) ziet wat er gebeurt als hij tot AOW doorwerkt en daarna pas onttrekt.
@@ -5384,14 +5384,14 @@ Vooraf, over bereikbaarheid: `/toekomst/rekenhulp` en `/toekomst/whatif` staan i
 
 #### WF-REKEN-12 — De Wat-Als bereiken: deeplink, inline sliders en dream gate
 - **Doel:** Als gebruiker wil ik vanaf de tijdas snel "wat als"-aanpassingen doen, en desgewenst doorklikken naar de volledige Wat-Als-ervaring.
-- **Trigger/startpunt:** Drie ingangen: (a) deeplink /toekomst/whatif zónder ?via=dreamgate, (b) deeplink /toekomst?whatif=open, (c) op de tijdas (/toekomst) de kaart "Wat als...? Pas je scenario aan".
-- **Eindresultaat:** (a) en (b) landen op de tijdas met het inline slider-paneel opengeklapt; vanuit dat paneel voert "Volledig scenario →" een dream-transitie uit naar de volledige Wat-Als-pagina (/toekomst/whatif?via=dreamgate).
+- **Trigger/startpunt:** Drie ingangen: (a) deeplink /toekomst/whatif zónder ?via=dreamgate, (b) deeplink /toekomst?whatif=open, (c) op de tijdas (/toekomst) de sectie "Verken je aannames".
+- **Eindresultaat:** (a) en (b) landen op de tijdas, gescrold naar de sectie "Verken je aannames"; vanuit de sectie-footer voert "Scenario's vergelijken →" een dream-transitie uit naar de volledige Wat-Als-pagina (/toekomst/whatif?via=dreamgate).
 - **Stappen:**
-  1. Navigeer naar /toekomst/whatif in de adresbalk — je wordt geredirect naar /toekomst?whatif=open; het inline "Wat als...?"-paneel op de tijdas klapt open (URL wordt daarna opgeschoond).
-  2. Verschuif een inline slider (inkomen, werkdagen, spaarquote, extra inleg) — de projectielijn op de tijdas hierboven past zich direct aan.
-  3. Klik "Volledig scenario →" — na de overgangsanimatie opent de volledige Wat-Als-pagina met kop "Jouw toekomst, jouw keuze".
+  1. Navigeer naar /toekomst/whatif in de adresbalk — je wordt geredirect naar /toekomst?whatif=open; de pagina scrollt naar de sectie "Verken je aannames" (URL wordt daarna opgeschoond).
+  2. Verschuif een inline slider (inkomen, werkdagen, spaarquote, extra inleg) — er verschijnt een gestippelde wat-als-lijn naast de onveranderde basislijn (diepte-toets: WF-TOEK-10).
+  3. Klik in de sectie-footer "Scenario's vergelijken →" — na de overgangsanimatie opent de volledige Wat-Als-pagina met kop "Jouw toekomst, jouw keuze".
   4. Controleer dat "Terug naar Toekomst" (linksboven) naar /toekomst gaat.
-- **Schermen/componenten:** `app/(app)/toekomst/whatif/page.tsx` (redirect-guard op ?via=dreamgate), `components/app/horizon/horizon-client.tsx` (param-handling ?whatif=open, inline `WhatIfSlidersCollapsible`, triggerDream), `app/(app)/horizon/whatif/whatif-page-client.tsx`, `components/app/horizon/whatif-header.tsx`.
+- **Schermen/componenten:** `app/(app)/toekomst/whatif/page.tsx` (redirect-guard op ?via=dreamgate), `components/app/horizon/horizon-client.tsx` (param-handling ?whatif=open → scroll, sectie "Verken je aannames", triggerDream via footer-link), `app/(app)/horizon/whatif/whatif-page-client.tsx`, `components/app/horizon/whatif-header.tsx`.
 - **Kriticiteit:** BELANGRIJK
 - **Rekenend:** ja — de inline sliders sturen de tijdas-projectie (horizon-kernel via `lib/horizon-kernel`), zelfde motor als de hoofd-grafiek.
 - **Varianten & randgevallen:**
@@ -11082,14 +11082,16 @@ Wél altijd exact narekenbaar, ook in dit deelgebied: invoer-echo's (een gebeurt
 - **c. Foutpad — geen scenario's:** verwijder (of laad een verse persona zonder) opgeslagen scenario's → *verwacht:* de picker rendert helemaal niet (geen lege staat, geen knop).
 
 #### UAT-TOEK-10 — Wat-als-sliders inline op de tijdas (scope: alléén het inline-gedrag; de volledige pagina → UAT-REKEN-12/13/14) (dekt WF-TOEK-10)
-- **Kriticiteit:** KERN · **Platform:** webapp · **Rooktest:** nee · **Duur:** ~4 min
+- **Kriticiteit:** KERN · **Platform:** webapp · **Rooktest:** nee · **Duur:** ~6 min
 - **Preconditie:** persona `willem` geladen (huidig maandinkomen €6.500)
-- **a. Happy path:** klik het blok "Wat als...? Pas je scenario aan" onder de grafiek → *verwacht:* sliderpaneel klapt open (Maandinkomen/Werkdagen/Spaarquote/Extra inleg) → verschuif "Spaarquote" omhoog → *verwacht:* de projectielijn en de vrijheidsleeftijd-KPI passen zich **direct** aan (geen page-reload, geen opslaan-knop nodig).
-  **Berekening verwachting (toetsvorm a — delta/richting):** een hogere spaarquote-slider moet de vrijheidsleeftijd gelijk-of-lager maken, nooit hoger.
-- **b. Randgeval — terug naar baseline:** schuif de slider terug naar zijn oorspronkelijke stand → *verwacht:* het tijdelijke slider-scenario-event wordt opgeruimd (`clearScenarioEvents`), de grafiek keert exact terug naar de baseline-lijn van vóór het slepen.
-- **c. Foutpad/randgeval — Eenvoudig-modus:** zet weergavemodus op "Eenvoudig" → *verwacht:* het hele "Wat als...?"-blok is verborgen.
-- **d. Persistentie:** herlaad de pagina na het verschuiven van een slider → *verwacht:* geen enkele sliderwaarde is onthouden — de tijdas start weer op de echte baseline (sliders zijn bewust niet-persistent, puur verkenning).
-- *Verwijzing: de volledige wat-af-omgeving (na klik "Volledig scenario →") wordt getoetst onder UAT-REKEN-12/13/14.*
+- **a. Happy path:** scroll naar de sectie "Verken je aannames" (katern II) onder de grafiek → *verwacht:* Vrijheidsas + vier sliders zichtbaar, "Rendement"-blok ingeklapt → verschuif "Spaarquote" omhoog → *verwacht:* de **basislijn blijft exact staan**; er verschijnt een gestippelde inkt-lijn "Jouw wat-als" mét FIRE-stip, de "Wat-als"-pill boven de grafiek toont een FIRE-delta (bv. "−X mnd"), de Vrijheidsas-cijferrij toont basis → wat-als, en levensinkomenstrook + guardrail-kompas dragen een "Jouw wat-als"-chip en tonen scenario-cijfers.
+  **Berekening verwachting (toetsvorm a — delta/richting):** een hogere spaarquote moet de wat-als-vrijheidsleeftijd gelijk-of-lager maken dan de basis, nooit hoger; de hero-KPI (basis) verandert NIET mee.
+- **b. Randgeval — terug naar baseline:** schuif de slider terug naar zijn oorspronkelijke stand (of klik "Terug naar basis" in de sectiekop) → *verwacht:* pill, wat-als-lijn en chips verdwijnen; de duidingsblokken tonen weer de basiscijfers.
+- **c. Foutpad/randgeval — Eenvoudig-modus:** zet weergavemodus op "Eenvoudig" → *verwacht:* sectie, pill, chips en katern-markeringen zijn allemaal verborgen; het beeld is identiek aan vóór deze feature.
+- **d. Persistentie (cross-device):** verschuif een slider en zet een stopleeftijd, herlaad de pagina (of open incognito met dezelfde login) → *verwacht:* sliderstanden, stopleeftijd, koppel-checkbox en pill-stand staan er weer (server-side in `profiles.toekomst_scenario_prefs`).
+- **e. Vrijheidsas/marge:** sleep de stopleeftijd-slider door de band → *verwacht:* zones rood (vóór "verwacht") → amber (tussen "verwacht" en "laatst") → groen (na "laatst"), marge-getal en `aria-valuetext` bewegen mee; vink "stopkeuze schuift mee met de streep" aan en wijzig daarna een aanname-slider → *verwacht:* de stopkeuze schuift mee met de verwacht-streep, de marge blijft gelijk.
+- **f. Perspectief:** wissel naar partner- of huishoudweergave → *verwacht:* de sectie "Verken je aannames", de chips en de wat-als-lijn zijn verborgen (het scenario is een persoonlijke verkenning tegen de eigen baseline).
+- *Verwijzing: de volledige wat-als-omgeving (via footer-link "Scenario's vergelijken →") wordt getoetst onder UAT-REKEN-12/13/14.*
 
 #### UAT-TOEK-11 — AOW-stop-simulatie: doorwerken tot AOW vergelijken (dekt WF-TOEK-11)
 - **Kriticiteit:** BELANGRIJK · **Platform:** webapp · **Rooktest:** nee · **Duur:** ~4 min
@@ -11409,7 +11411,7 @@ Dekking volgt de kriticiteit uit fase 1: **KERN** = a+b+c+d, **BELANGRIJK** = a+
 #### UAT-REKEN-12 — De Wat-Als bereiken: deeplink, inline sliders en dream gate (dekt WF-REKEN-12)
 - **Kriticiteit:** BELANGRIJK · **Platform:** webapp · **Rooktest:** nee · **Duur:** ~6 min
 - **Preconditie:** persona **Tessa Compleet**. Het inline-slider-gedrag zélf (op de tijdas) is diepgetest in **UAT-TOEK-10** — hier toets ik alleen de drie ingangen en de dream-transitie.
-- **a. Happy path:** typ `/toekomst/whatif` rechtstreeks in de adresbalk → *verwacht:* redirect naar `/toekomst?whatif=open`, het inline "Wat als...?"-paneel op de tijdas klapt open, de URL wordt daarna opgeschoond. Verschuif één slider kort (bv. inkomen) → *verwacht:* de projectielijn past zich direct aan (richting: hoger inkomen → lijn eindigt hoger/eerder FIRE — zie UAT-TOEK-10 voor de diepte-toets). Klik "Volledig scenario →" → *verwacht:* na de overgangsanimatie opent `/toekomst/whatif?via=dreamgate` met kop "Jouw toekomst, jouw keuze". Klik "Terug naar Toekomst" linksboven → *verwacht:* je landt op /toekomst.
+- **a. Happy path:** typ `/toekomst/whatif` rechtstreeks in de adresbalk → *verwacht:* redirect naar `/toekomst?whatif=open`, de pagina scrollt naar de sectie "Verken je aannames", de URL wordt daarna opgeschoond. Verschuif één slider kort (bv. inkomen) → *verwacht:* er verschijnt een gestippelde wat-als-lijn naast de onveranderde basislijn (richting: hoger inkomen → wat-als eerder FIRE — zie UAT-TOEK-10 voor de diepte-toets). Klik in de sectie-footer "Scenario's vergelijken →" → *verwacht:* na de overgangsanimatie opent `/toekomst/whatif?via=dreamgate` met kop "Jouw toekomst, jouw keuze". Klik "Terug naar Toekomst" linksboven → *verwacht:* je landt op /toekomst.
 - **c. Randgevallen:** zet de weergavemodus op "Eenvoudig" (via /mijn/uiterlijk of het instellingenmenu) → *verwacht:* /toekomst/whatif en /toekomst/rekenhulp ontbreken in de navigatie, maar de deeplink `/toekomst/whatif` werkt nog steeds identiek (bevestigd/bewust gedrag). Test ook de tweede ingang `/horizon/whatif` (legacy) → *verwacht:* redirect naar `/toekomst?whatif=open` (zonder `?via=dreamgate`) of naar `/toekomst/whatif?via=dreamgate` (mét de param). Test zonder basisgegevens (account zonder bezittingen) → *verwacht:* lege staat "De Wat-Als simulator heeft basisgegevens nodig" met CTA "Vermogen toevoegen" naar /overzicht/bezittingen.
 
 ---

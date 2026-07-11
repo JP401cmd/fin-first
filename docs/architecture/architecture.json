@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-07T16:36:13.445Z",
-  "generatedDate": "2026-07-07",
+  "generatedAt": "2026-07-11T07:26:27.745Z",
+  "generatedDate": "2026-07-11",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -189,11 +189,11 @@
   "stats": {
     "routes": 139,
     "routesProduction": 98,
-    "api": 242,
+    "api": 243,
     "tables": 58,
-    "migrations": 121,
-    "integrations": 24,
-    "components": 781,
+    "migrations": 122,
+    "integrations": 25,
+    "components": 797,
     "providers": 11,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -3847,6 +3847,14 @@
       ]
     },
     {
+      "url": "/api/toekomst-scenario",
+      "file": "app/api/toekomst-scenario/route.ts",
+      "domain": "toekomst-scenario",
+      "methods": [
+        "PUT"
+      ]
+    },
+    {
       "url": "/api/uitgaven-na-pensioen/context",
       "file": "app/api/uitgaven-na-pensioen/context/route.ts",
       "domain": "uitgaven-na-pensioen",
@@ -6471,6 +6479,21 @@
       ]
     },
     {
+      "domain": "toekomst-scenario",
+      "label": "toekomst-scenario",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/toekomst-scenario",
+          "file": "app/api/toekomst-scenario/route.ts",
+          "domain": "toekomst-scenario",
+          "methods": [
+            "PUT"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "uitgaven-na-pensioen",
       "label": "uitgaven-na-pensioen",
       "count": 1,
@@ -6861,7 +6884,7 @@
         "migration": "supabase/migrations/20260501000001_create_external_connections.sql"
       }
     ],
-    "migrationCount": 121
+    "migrationCount": 122
   },
   "tablesByDomain": [
     {
@@ -7199,11 +7222,11 @@
     }
   ],
   "components": {
-    "total": 781,
+    "total": 797,
     "groups": [
       {
         "group": "app",
-        "count": 322,
+        "count": 336,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -7216,6 +7239,8 @@
           "ai-categorize-sheet",
           "ai-categorize-sheet.test",
           "ai-privacy-indicator",
+          "ai-subscription-upsell",
+          "ai-subscription-upsell.test",
           "ai-vaste-kosten-sheet",
           "analysis-section",
           "animated-progress-bar",
@@ -7298,6 +7323,8 @@
           "debt-valuation-history",
           "debt-valuation-modal",
           "deeltijdwerk-impact",
+          "dekkingsradar",
+          "dekkingsradar.test",
           "depth-section",
           "depth-section.test",
           "desktop-sidebar-shell",
@@ -7339,6 +7366,7 @@
           "goal-form",
           "goal-progress-timeline",
           "grafiek-uitleg-walkthrough",
+          "guardrail-kompas",
           "guide-faq",
           "guide-horizon-uitleg",
           "guide-how-to",
@@ -7377,8 +7405,10 @@
           "kassabon-shell",
           "koopkracht-erosie",
           "koopkracht-erosie-onttrekken",
+          "levensinkomen-strook",
           "lever-compass",
           "life-events-in-phase",
+          "lifeline-readout",
           "log-timeline",
           "manual-transfer-sheet",
           "markdown-helpers",
@@ -7449,10 +7479,15 @@
           "recommendation-card",
           "recurring-classify-sheet",
           "recurring-edit-sheet",
+          "regime-kaart",
+          "regime-kaart.test",
           "reis-stap-section",
           "responsive-shell",
           "roadmap-modal",
           "sankey-diagram",
+          "scenario-chip",
+          "scenario-kaarten",
+          "scenario-kaarten.test",
           "scenario-overlay-picker",
           "scenarios-modal",
           "schulden-samenvatting",
@@ -7509,6 +7544,8 @@
           "use-app-setup-state",
           "use-is-setup-completed",
           "verhuurrendement.config",
+          "vrijheidsas",
+          "vrijheidsas.test",
           "wealth-composition-chart",
           "wealth-composition-chart.test",
           "whatif-actions",
@@ -7733,7 +7770,7 @@
       },
       {
         "group": "widgets",
-        "count": 62,
+        "count": 64,
         "items": [
           "abonnementen-widget",
           "acties-widget",
@@ -7760,6 +7797,7 @@
           "fee-analyzer-widget",
           "fee-detail-modal",
           "fire-prognose-widget",
+          "fire-prognose-widget.test",
           "gezondheids-score-widget",
           "holding-fav-widget",
           "holdings-widget",
@@ -7780,6 +7818,7 @@
           "schulden-widget",
           "sim-vermogenspad-widget",
           "spaarquote-widget",
+          "spaarquote-widget.test",
           "surplus-gap-widget",
           "swr-monitor-widget",
           "vaste-lasten-widget",
@@ -8121,6 +8160,10 @@
     },
     {
       "name": "OpenAI",
+      "category": "AI"
+    },
+    {
+      "name": "OpenRouter",
       "category": "AI"
     },
     {
@@ -9483,6 +9526,12 @@
           "write": false
         }
       ],
+      "toekomst-scenario": [
+        {
+          "name": "profiles",
+          "write": true
+        }
+      ],
       "uitgaven-na-pensioen": [
         {
           "name": "budgets",
@@ -9531,6 +9580,12 @@
         {
           "name": "profiles",
           "write": true
+        }
+      ],
+      "whatif": [
+        {
+          "name": "profiles",
+          "write": false
         }
       ],
       "widget-presets": [
@@ -9718,6 +9773,7 @@
           "label": "Onboarding",
           "write": true,
           "routes": [
+            "/api/onboarding/aangifte-extract",
             "/api/onboarding/aangifte-import",
             "/api/onboarding/reset",
             "/api/onboarding/save-own-data",
@@ -9780,6 +9836,14 @@
             "/api/snapshots",
             "/api/snapshots/auto",
             "/api/snapshots/cron"
+          ]
+        },
+        {
+          "domain": "toekomst-scenario",
+          "label": "toekomst-scenario",
+          "write": true,
+          "routes": [
+            "/api/toekomst-scenario"
           ]
         },
         {
@@ -9950,7 +10014,9 @@
           "label": "subscriptions",
           "write": false,
           "routes": [
-            "/api/subscriptions/advice"
+            "/api/subscriptions/advice",
+            "/api/subscriptions/analyse-ai",
+            "/api/subscriptions/detect-ai"
           ]
         },
         {
@@ -9959,6 +10025,14 @@
           "write": false,
           "routes": [
             "/api/uitgaven-na-pensioen/context"
+          ]
+        },
+        {
+          "domain": "whatif",
+          "label": "whatif",
+          "write": false,
+          "routes": [
+            "/api/whatif/suggest"
           ]
         },
         {
@@ -12902,6 +12976,19 @@
       ],
       "summary": "Vrijheidsvoortgang (freedomPct) staat vanaf nu STANDAARD op de INCL.-woning grondslag: teller = volledig netto vermogen (incl. eigen woning + overige niet-liquide bezit), noemer = `requiredFireNetWorth` (Prognose!I@FIRE, resp. `inclHomeTargetFromScalar` waar alleen een scalar-doe",
       "file": "docs/adr/0034-vrijheidsvoortgang-grondslag-incl-woning.md"
+    },
+    {
+      "id": "0035-ai-privacy-consent",
+      "title": "AI-dataminimalisatie sanitize-in/mask-out + expliciete consent voor de pensioen-PDF",
+      "status": "aanvaard",
+      "date": "2026-07-10",
+      "elements": [
+        "t-aigateway",
+        "as-coach",
+        "as-planning"
+      ],
+      "summary": "Elke AI-callsite minimaliseert data vóór verzending naar de provider (`sanitizeForAI`/`sanitizeTransactions`), maskeert PII in vrije AI-tekst die naar de gebruiker teruggaat (`maskPIIInOutput`/`maskPIIInObject`), en faalt veilig: kan er niet gesanitized/gescreend worden, dan blok",
+      "file": "docs/adr/0035-ai-privacy-consent.md"
     }
   ],
   "churn": {
@@ -12917,7 +13004,7 @@
       },
       {
         "path": "lib/ai",
-        "commits": 33
+        "commits": 34
       },
       {
         "path": "app/api/ai",
@@ -12951,8 +13038,8 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 7170,
-        "commits": 73
+        "loc": 7896,
+        "commits": 75
       },
       {
         "file": "components/app/budgets-client.tsx",
@@ -13770,20 +13857,13 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-07-06",
+    "previousDate": "2026-07-10",
     "hasChanges": true,
     "sections": [
       {
-        "label": "Integraties",
-        "added": [],
-        "removed": [
-          "OpenRouter"
-        ]
-      },
-      {
         "label": "Componenten (aantal)",
         "added": [
-          "+3"
+          "+8"
         ],
         "removed": []
       }
@@ -13920,6 +14000,20 @@
       "date": "2026-07-07",
       "api": 242,
       "components": 781,
+      "tables": 58,
+      "routesProduction": 98
+    },
+    {
+      "date": "2026-07-10",
+      "api": 243,
+      "components": 789,
+      "tables": 58,
+      "routesProduction": 98
+    },
+    {
+      "date": "2026-07-11",
+      "api": 243,
+      "components": 797,
       "tables": 58,
       "routesProduction": 98
     }

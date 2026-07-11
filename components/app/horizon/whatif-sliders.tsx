@@ -42,7 +42,7 @@ interface SlidersProps {
   developmentNotice?: boolean
 }
 
-function DeltaBadge({ current, base, format }: { current: number; base: number; format: (v: number) => string }) {
+export function DeltaBadge({ current, base, format }: { current: number; base: number; format: (v: number) => string }) {
   const diff = current - base
   if (Math.abs(diff) < 0.001) return null
   const isPositive = diff > 0
@@ -118,7 +118,17 @@ function SliderRow({
   )
 }
 
-function SliderGrid({ baseline, events, setEvents, currentAge }: SlidersProps) {
+function SliderGrid({
+  baseline,
+  events,
+  setEvents,
+  currentAge,
+  hideResetAndHint = false,
+}: SlidersProps & {
+  /** Verbergt de interne "Verfijn-events wissen"-knop + hint. Gebruikt door de
+   *  /toekomst-sectie "Verken je aannames" waar een globale reset + eigen tekst leeft. */
+  hideResetAndHint?: boolean
+}) {
   const incomeValue = readSliderValueFromEvents('income', events, baseline)
   const workdaysValue = readSliderValueFromEvents('workdays', events, baseline)
   const savingsValue = readSliderValueFromEvents('savings', events, baseline)
@@ -207,7 +217,7 @@ function SliderGrid({ baseline, events, setEvents, currentAge }: SlidersProps) {
         </div>
       </div>
 
-      {hasSliderEvent && (
+      {!hideResetAndHint && hasSliderEvent && (
         <button
           type="button"
           onClick={resetAll}
@@ -217,10 +227,12 @@ function SliderGrid({ baseline, events, setEvents, currentAge }: SlidersProps) {
         </button>
       )}
 
-      <p className="mt-3 font-sans text-[10px] leading-snug text-[var(--ink-4)]">
-        Elke slider maakt of bewerkt een levensgebeurtenis in je scenario. Open
-        het paneel Levensgebeurtenissen onderaan om ze handmatig aan te passen.
-      </p>
+      {!hideResetAndHint && (
+        <p className="mt-3 font-sans text-[10px] leading-snug text-[var(--ink-4)]">
+          Elke slider maakt of bewerkt een levensgebeurtenis in je scenario. Open
+          het paneel Levensgebeurtenissen onderaan om ze handmatig aan te passen.
+        </p>
+      )}
     </>
   )
 }
@@ -229,7 +241,15 @@ export function WhatIfSliders({ baseline, events, setEvents, currentAge, bare = 
   const [expanded, setExpanded] = useState(true)
 
   if (bare) {
-    return <SliderGrid baseline={baseline} events={events} setEvents={setEvents} currentAge={currentAge} />
+    return (
+      <SliderGrid
+        baseline={baseline}
+        events={events}
+        setEvents={setEvents}
+        currentAge={currentAge}
+        hideResetAndHint
+      />
+    )
   }
 
   const incomeValue = readSliderValueFromEvents('income', events, baseline)

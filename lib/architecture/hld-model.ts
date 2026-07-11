@@ -106,6 +106,8 @@ export function buildHldModel(): HldModel {
           { title: 'Je vermogen jaren vooruit zien groeien', desc: 'Simulaties en een toets tegen echte beurshistorie.' },
           { title: 'Snappen hoe je vrijheidsgrafiek is opgebouwd', desc: 'In vier stappen met je eigen cijfers: opbouw, benodigd vermogen, het vrijheidsmoment en onttrekking.' },
           { title: 'Je loopbaan en inkomen meenemen', desc: 'Salarisgroei, een plafond of minder werken — zie wat het met je vrijheidsdatum doet.' },
+          { title: 'Zien hoe stevig je plan staat, op elk front', desc: 'Een radar met vijf sterktepunten — de brug tot je AOW, je pensioeninkomen, wonen, marktrisico en je eindstrategie — die meebeweegt met de stopleeftijd die jij kiest.' },
+          { title: 'Kant-en-klare paden naast elkaar zien', desc: 'Vijf voorgerekende scenario\'s naast je basispad, met een seintje bij het pad dat de minste buffer overhoudt.' },
         ],
       },
       {

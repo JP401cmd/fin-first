@@ -17,6 +17,9 @@ import type { ReactNode } from 'react'
 // Re-export GlossaryTerm (lives in own file due to state/effects)
 export { GlossaryTerm } from './glossary-term'
 export type { GlossaryTermProps } from './glossary-term'
+// Re-export InlineInfoDisclosure (i-knop + inline uitleg-paneel; eigen file wegens state)
+export { InlineInfoDisclosure } from './inline-info-disclosure'
+export type { InlineInfoDisclosureProps } from './inline-info-disclosure'
 // Re-export PageInfoButton (page context popover)
 export { PageInfoButton } from './page-info-button'
 // Re-export PageOpening (canonieke editorial pagina-aanhef — standaard-aanhef)

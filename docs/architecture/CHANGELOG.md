@@ -368,3 +368,13 @@
 
 - **Integraties** verwijderd: OpenRouter
 - **Componenten (aantal)** toegevoegd: +3
+
+## 2026-07-10
+
+- **API-routes** toegevoegd: /api/toekomst-scenario
+- **Integraties** toegevoegd: OpenRouter
+- **Componenten (aantal)** toegevoegd: +8
+
+## 2026-07-11
+
+- **Componenten (aantal)** toegevoegd: +8

@@ -86,9 +86,12 @@ export function ChartStaticLayersInner({
     COLOR_OPBOUW,
     mainStrokeAcc,
     mainStrokeDec,
+    bridgeStroke,
     baselinePath,
     accPath,
     decPath,
+    bridgePath,
+    withdrawalPath,
     allPath,
     scenarioPaths,
     householdPaths,
@@ -389,8 +392,46 @@ export function ChartStaticLayersInner({
       )}
 
       {/* Scenario overlay paths (behind main line) */}
-      {scenarioPaths.map((s, i) =>
-        s.d && (
+      {scenarioPaths.map((s, i) => {
+        if (!s.d) return null
+        // Live "wat-als"-lijn: bewust in inkt (geen module-accent/stoplicht),
+        // zwaarder gestippeld dan de ghost-lijnen, met een FIRE-stip als
+        // gestippelde ink-ring op de scenario-FIRE-leeftijd.
+        // Reveal via opacity-fade i.p.v. het canonieke pathLength/strokeDasharray="1"-
+        // reveal: dat kan niet samengaan met de zichtbare "6 4"-dash (één
+        // strokeDasharray-attribuut kan niet én de reveal-lengte én het streepje zijn).
+        if (s.variant === 'scenario') {
+          return (
+            <g key={s.name}>
+              <path
+                d={s.d}
+                fill="none"
+                stroke="var(--ink-2)"
+                strokeWidth={2.25}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeDasharray="6 4"
+                opacity={hasEntered ? 0.85 : 0}
+                style={{ transition: hasEntered ? 'opacity 0.6s ease 0.3s' : 'none' }}
+              />
+              {s.fireDot && (
+                <circle
+                  cx={s.fireDot.cx}
+                  cy={s.fireDot.cy}
+                  r={4}
+                  fill="var(--paper)"
+                  stroke="var(--ink-2)"
+                  strokeWidth={1.5}
+                  strokeDasharray="2 1.5"
+                  opacity={hasEntered ? 0.85 : 0}
+                  style={{ transition: 'opacity 0.4s ease 0.9s' }}
+                />
+              )}
+            </g>
+          )
+        }
+        // Bestaand ghost-renderpad (saved scenario's) — letterlijk ongewijzigd.
+        return (
           <path
             key={s.name}
             d={s.d}
@@ -406,7 +447,7 @@ export function ChartStaticLayersInner({
             style={{ transition: hasEntered ? `stroke-dashoffset 1s cubic-bezier(.22,1,.36,1) ${0.3 + i * 0.1}s` : 'none' }}
           />
         )
-      )}
+      })}
 
       {/* Household partner overlay paths */}
       {householdPaths.map((hp, i) =>
@@ -475,6 +516,42 @@ export function ChartStaticLayersInner({
           strokeDashoffset={hasEntered ? 0 : 1}
           opacity={decOpacity}
           style={{ transition: hasEntered ? 'stroke-dashoffset 1.2s cubic-bezier(.22,1,.36,1) 0.15s, opacity 0.4s ease' : 'opacity 0.4s ease' }}
+        />
+      )}
+
+      {/* Overgang FIRE→AOW — horizon-tussentint. Alleen in de derde-band-modus
+          (decPath is dan null); vervangt samen met de onttrekkingslijn de
+          doorlopende afbouwlijn. Dimt met de afbouw tijdens de walkthrough. */}
+      {bridgePath && (
+        <path
+          d={bridgePath}
+          fill="none"
+          stroke={bridgeStroke}
+          strokeWidth={2.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          pathLength={1}
+          strokeDasharray="1"
+          strokeDashoffset={hasEntered ? 0 : 1}
+          opacity={decOpacity}
+          style={{ transition: hasEntered ? 'stroke-dashoffset 1.2s cubic-bezier(.22,1,.36,1) 0.15s, opacity 0.4s ease' : 'opacity 0.4s ease' }}
+        />
+      )}
+
+      {/* Onttrekking vanaf AOW — kern bruin (derde band). */}
+      {withdrawalPath && (
+        <path
+          d={withdrawalPath}
+          fill="none"
+          stroke={mainStrokeDec}
+          strokeWidth={emphasis === 'withdrawal' ? 3.25 : 2.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          pathLength={1}
+          strokeDasharray="1"
+          strokeDashoffset={hasEntered ? 0 : 1}
+          opacity={decOpacity}
+          style={{ transition: hasEntered ? 'stroke-dashoffset 1.2s cubic-bezier(.22,1,.36,1) 0.3s, opacity 0.4s ease' : 'opacity 0.4s ease' }}
         />
       )}
 

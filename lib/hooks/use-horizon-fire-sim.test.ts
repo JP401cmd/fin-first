@@ -1,11 +1,15 @@
 import { describe, it, expect, vi } from 'vitest'
-import { renderHook } from '@testing-library/react'
+import { renderHook, act } from '@testing-library/react'
 import type { Asset } from '@/lib/asset-data'
-import type { FinancialInput } from '@/lib/horizon-data'
+import { ageAtDate, type FinancialInput } from '@/lib/horizon-data'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
 import { WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
 import { toSimResult } from '@/lib/unified-projection'
 import { computeConvergentieProjection, type ConvergentieRawProfileRow } from '@/lib/horizon-kernel/convergentie-router'
+import { runForcedStopPath } from '@/lib/horizon/scenario-presets'
+import { buildSliderEvent } from '@/lib/scenario-events'
+import type { WhatIfEvent } from '@/components/app/horizon/whatif-events'
+import type { WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
 
 /**
  * FASE 6, stap 5A — use-horizon-fire-sim: kernel-only contract-tests.
@@ -15,18 +19,30 @@ import { computeConvergentieProjection, type ConvergentieRawProfileRow } from '@
  * verplicht en de kernel is de enige motor (`computeConvergentieProjection`). Deze tests
  * bouwen de verwachte uitkomst met dezelfde router-aanroep (geen mock van de kernel zelf,
  * enkel van de Supabase-client voor het debounced snapshot-effect).
+ *
+ * De Supabase-mock is configureerbaar: `getUserImpl.current` staat standaard op een
+ * NOOIT-resolvende promise (identiek aan de originele mock → bestaande tests schrijven
+ * nooit), en `updatePayloads` legt elke `net_worth_snapshots`-update vast zodat de
+ * scenario-tests kunnen bewijzen dát/wát er geschreven wordt (of niet).
  */
+const { getUserImpl, updatePayloads } = vi.hoisted(() => ({
+  getUserImpl: { current: (): Promise<{ data: { user: { id: string } | null } }> => new Promise(() => {}) },
+  updatePayloads: [] as Array<Record<string, unknown>>,
+}))
 
 vi.mock('@/lib/supabase/client', () => ({
   createClient: () => ({
-    auth: { getUser: () => new Promise(() => {}) },
+    auth: { getUser: () => getUserImpl.current() },
     from: () => ({
-      update: () => ({ eq: () => ({ eq: () => Promise.resolve({ error: null }) }) }),
+      update: (payload: Record<string, unknown>) => {
+        updatePayloads.push(payload)
+        return { eq: () => ({ eq: () => Promise.resolve({ error: null }) }) }
+      },
     }),
   }),
 }))
 
-import { useHorizonFireSim } from './use-horizon-fire-sim'
+import { useHorizonFireSim, type HorizonScenarioOverrides } from './use-horizon-fire-sim'
 
 const DOB = '1986-01-01'
 const FIRE_STRATEGY: FireStrategyConfig = { strategy: 'perpetual', endAge: 90, legacyAmount: 0 }
@@ -161,6 +177,223 @@ describe('useHorizonFireSim — geen horizonInput', () => {
     expect(result.current.isLoading).toBe(true)
     expect(result.current.result).toBeNull()
     expect(result.current.unifiedRows).toBeNull()
+    expect(result.current.scenario).toBeNull()
     unmount()
+  })
+})
+
+// ── Stap 2: wat-als-scenario-laag (2e, gescheiden run) ──────────────────────
+//
+// De hook krijgt een optionele `scenarioOverrides`-input en een `scenario`-veld dat in
+// een TWEEDE useMemo draait (zelfde motorpad als de hoofdlijn, plan §A/§B). Deze suite
+// bewijst: geen/neutrale overrides ⇒ geen 2e run; een afwijkende slider of rendement-delta
+// ⇒ afwijkend scenario terwijl de hoofdrun referentie-stabiel blijft; en de scenario-run
+// schrijft NOOIT een eigen snapshot.
+
+const CURRENT_AGE = ageAtDate(DOB) // reëel (real Date) — consistent met de kernel-leeftijd
+const BASELINE_OVERRIDES: WhatIfOverrides = {
+  monthlyIncome: 4000,
+  workDaysPerWeek: 5,
+  savingsRate: 20,
+  expectedReturn: 7,
+  extraContribution: 0,
+}
+// Echte slider-eventbouwer (de stap-4 wiring gebruikt exact deze): +€1.500/mnd extra inleg.
+const extraInlegEvent = buildSliderEvent('extra_inleg', 1500, BASELINE_OVERRIDES, CURRENT_AGE) as WhatIfEvent
+
+describe('useHorizonFireSim — wat-als-scenario (2e run)', () => {
+  it('zonder scenarioOverrides ⇒ scenario === null (hoofdgedrag ongewijzigd)', () => {
+    const params = makeParams()
+    const { result, unmount } = renderHook(() => useHorizonFireSim(params))
+    expect(result.current.scenario).toBeNull()
+    // Hoofdrun draait onveranderd.
+    expect(result.current.result).not.toBeNull()
+    expect(result.current.unifiedRows).not.toBeNull()
+    unmount()
+  })
+
+  it('neutrale overrides (lege events + lege delta) ⇒ scenario === null (geen 2e run)', () => {
+    const overrides: HorizonScenarioOverrides = { extraLifeEvents: [], returnDeltaByCategorie: {} }
+    const params = makeParams({ scenarioOverrides: overrides })
+    const { result, unmount } = renderHook(() => useHorizonFireSim(params))
+    expect(result.current.scenario).toBeNull()
+    expect(result.current.result).not.toBeNull()
+    unmount()
+  })
+
+  it('extra_inleg-slider-event ⇒ scenario wijkt af van de hoofdlijn (eerder vrij óf hoger eindvermogen)', () => {
+    const params = makeParams({ scenarioOverrides: { extraLifeEvents: [extraInlegEvent] } })
+    const { result, unmount } = renderHook(() => useHorizonFireSim(params))
+    const main = result.current.result
+    const mainRows = result.current.unifiedRows
+    const scenario = result.current.scenario
+    expect(main).not.toBeNull()
+    expect(scenario).not.toBeNull()
+    if (!main || !mainRows || !scenario) return
+
+    // De projectie verschilt hoe dan ook (meer inleg ⇒ andere vermogensopbouw)…
+    expect(scenario.unifiedRows).not.toEqual(mainRows)
+    // …in de juiste richting: eerdere FIRE-leeftijd óf hoger eindvermogen.
+    const scRows = scenario.unifiedRows
+    const higherEnd = scRows[scRows.length - 1].netWorth > mainRows[mainRows.length - 1].netWorth
+    const earlier =
+      scenario.result.fireAgeFractional != null &&
+      main.fireAgeFractional != null &&
+      scenario.result.fireAgeFractional < main.fireAgeFractional
+    expect(earlier || higherEnd).toBe(true)
+    unmount()
+  })
+
+  it('alleen returnDeltaByCategorie {Beleggingen:+2pp} ⇒ scenario wijkt af; hoofdresultaat referentie-stabiel over een override-only rerender', () => {
+    const params = makeParams({
+      scenarioOverrides: { extraLifeEvents: [], returnDeltaByCategorie: { Beleggingen: 0.02 } },
+    })
+    const { result, rerender, unmount } = renderHook(
+      (props: HookParams) => useHorizonFireSim(props),
+      { initialProps: params },
+    )
+
+    const mainResultRef = result.current.result
+    const mainRows = result.current.unifiedRows
+    expect(mainResultRef).not.toBeNull()
+    expect(result.current.scenario).not.toBeNull()
+    // +2 pp rendement op de (enige) beleggings-asset ⇒ afwijkende vermogensopbouw.
+    expect(result.current.scenario?.unifiedRows).not.toEqual(mainRows)
+
+    // Rerender met ALLEEN een andere override (zelfde kernel-input-referenties): de
+    // hoofd-memo mag NIET herrekenen ⇒ identiek result-object (identity-assert).
+    rerender({ ...params, scenarioOverrides: { extraLifeEvents: [], returnDeltaByCategorie: { Beleggingen: 0.03 } } })
+    expect(result.current.result).toBe(mainResultRef)
+    expect(result.current.unifiedRows).toBe(mainRows)
+    unmount()
+  })
+
+  it('een scenario-run schrijft NOOIT een eigen snapshot: precies één write, met de HOOFDrun-waarden', async () => {
+    // Hoofdrun direct (voor de verwachte write-payload).
+    const mainOut = computeConvergentieProjection({
+      rawContext: { profile: PROFILE, assets: makeAssets(), debts: [], lifeEvents: [], aowRows: [], yearlyExpenses: 30_000 },
+    })
+    if (!mainOut.ok) throw new Error('kernel-outcome was niet ok — fixture ongeldig')
+    const mainResult = toSimResult(mainOut.result)
+
+    getUserImpl.current = () => Promise.resolve({ data: { user: { id: 'u1' } } })
+    updatePayloads.length = 0
+    // Alléén setTimeout/clearTimeout faken — Date blijft reëel zodat de kernel-leeftijd
+    // consistent blijft met de bovenstaande directe run.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      const params = makeParams({ scenarioOverrides: { extraLifeEvents: [extraInlegEvent] } })
+      const { result, unmount } = renderHook(() => useHorizonFireSim(params))
+
+      // Scenario is ACTIEF en afwijkend van de hoofdlijn…
+      expect(result.current.scenario).not.toBeNull()
+      expect(result.current.scenario?.unifiedRows).not.toEqual(result.current.unifiedRows)
+
+      // …maar het debounced write-effect keyt uitsluitend op de hoofdrun.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(600)
+      })
+
+      // Precies ÉÉN write (de hoofdrun); een eigen scenario-write zou er twee opleveren.
+      expect(updatePayloads).toHaveLength(1)
+      expect(updatePayloads[0]).toEqual({
+        fire_age: mainResult.fireAgeFractional,
+        fire_portfolio_required: mainResult.requiredFirePortfolio,
+        engine_bron: 'kernel',
+      })
+      unmount()
+    } finally {
+      getUserImpl.current = () => new Promise(() => {})
+      vi.useRealTimers()
+    }
+  })
+})
+
+// ── Ronde 3: gekozen-stop-pad (3e, gescheiden run) ──────────────────────────
+//
+// De hook krijgt een optionele `stopPadAge`-input en een `stopPad`-veld dat in een DERDE
+// useMemo draait (het geforceerde-stop-recept, gedeeld met scenario-presets). Deze suite
+// bewijst: geen stopPadAge ⇒ geen 3e run; met stopPadAge ⇒ deep-equal met een directe
+// runForcedStopPath; een stopPadAge-wijziging laat de hoofd- én scenario-run referentie-
+// stabiel; en het stop-pad schrijft NOOIT een eigen snapshot.
+
+describe('useHorizonFireSim — gekozen-stop-pad (3e run)', () => {
+  it('zonder stopPadAge ⇒ stopPad === null (hoofdgedrag ongewijzigd)', () => {
+    const { result, unmount } = renderHook(() => useHorizonFireSim(makeParams()))
+    expect(result.current.stopPad).toBeNull()
+    expect(result.current.result).not.toBeNull()
+    unmount()
+  })
+
+  it('stopPadAge gezet ⇒ stopPad deep-equals een directe runForcedStopPath op dezelfde context', () => {
+    const stopAge = 60
+    const expected = runForcedStopPath({
+      profile: PROFILE,
+      assets: makeAssets(),
+      debts: [],
+      lifeEvents: [],
+      aowRows: [],
+      yearlyExpenses: 30_000, // zoals buildHorizonInput 'm afleidt (yearlyMustExpenses)
+      stopAge,
+      fireEndAge: FIRE_STRATEGY.endAge,
+    })
+    expect(expected).not.toBeNull()
+
+    const { result, unmount } = renderHook(() => useHorizonFireSim(makeParams({ stopPadAge: stopAge })))
+    expect(result.current.stopPad).toEqual(expected)
+    unmount()
+  })
+
+  it('een stopPadAge-wijziging laat de hoofd- én scenario-run referentie-stabiel', () => {
+    const params = makeParams({ scenarioOverrides: { extraLifeEvents: [extraInlegEvent] }, stopPadAge: 60 })
+    const { result, rerender, unmount } = renderHook(
+      (props: HookParams) => useHorizonFireSim(props),
+      { initialProps: params },
+    )
+    const mainRef = result.current.result
+    const rowsRef = result.current.unifiedRows
+    const scenarioRef = result.current.scenario
+    expect(mainRef).not.toBeNull()
+    expect(scenarioRef).not.toBeNull()
+    expect(result.current.stopPad).not.toBeNull()
+
+    // Alléén de stopleeftijd wijzigt (zelfde kernel-input- én override-referenties): de
+    // hoofd- en scenario-memo mogen NIET herrekenen ⇒ identieke objecten (identity-assert).
+    rerender({ ...params, stopPadAge: 61 })
+    expect(result.current.result).toBe(mainRef)
+    expect(result.current.unifiedRows).toBe(rowsRef)
+    expect(result.current.scenario).toBe(scenarioRef)
+    unmount()
+  })
+
+  it('een stop-pad-run schrijft NOOIT een eigen snapshot: precies één write, met de HOOFDrun-waarden', async () => {
+    const mainOut = computeConvergentieProjection({
+      rawContext: { profile: PROFILE, assets: makeAssets(), debts: [], lifeEvents: [], aowRows: [], yearlyExpenses: 30_000 },
+    })
+    if (!mainOut.ok) throw new Error('kernel-outcome was niet ok — fixture ongeldig')
+    const mainResult = toSimResult(mainOut.result)
+
+    getUserImpl.current = () => Promise.resolve({ data: { user: { id: 'u1' } } })
+    updatePayloads.length = 0
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      const { result, unmount } = renderHook(() => useHorizonFireSim(makeParams({ stopPadAge: 60 })))
+      expect(result.current.stopPad).not.toBeNull()
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(600)
+      })
+
+      expect(updatePayloads).toHaveLength(1)
+      expect(updatePayloads[0]).toEqual({
+        fire_age: mainResult.fireAgeFractional,
+        fire_portfolio_required: mainResult.requiredFirePortfolio,
+        engine_bron: 'kernel',
+      })
+      unmount()
+    } finally {
+      getUserImpl.current = () => new Promise(() => {})
+      vi.useRealTimers()
+    }
   })
 })

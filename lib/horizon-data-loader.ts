@@ -44,6 +44,7 @@ import { hasPartner } from '@/lib/household-type'
 import { resolvePensionFactorA } from '@/lib/jaarruimte'
 import type { ConvergentieRawProfileRow } from '@/lib/horizon-kernel/convergentie-router'
 import { resolvePotRules, type PotRulesConfig } from '@/lib/pot-rules'
+import { parseToekomstScenarioPrefs, type ToekomstScenarioPrefs } from '@/lib/horizon/toekomst-scenario'
 import { loadPerspectiveDataServer } from '@/lib/household/perspective-loader-server'
 import type { Perspective } from '@/lib/household-data'
 import { resolveEffectiveIncomeExpenses } from './effective-financials'
@@ -132,6 +133,11 @@ export interface HorizonPageData {
    *  tips-overlay. True → toon de exit-melding niet meer; de overlay sluit dan
    *  direct bij verlaten. */
   exitNoticeDismissed: boolean
+  /** Of de gebruiker de tips-overlay op /toekomst al één keer heeft gesloten
+   *  (marker HORIZON_TIPS_FIRST_CLOSE_NAVIGATED_SLUG aanwezig). False → de
+   *  eerstvolgende sluiting navigeert eenmalig naar /overzicht (post-onboarding
+   *  stappenplan) en zet de marker. True → geen automatische navigatie meer. */
+  tipsFirstCloseNavigated: boolean
   /** Maandelijks spaar-override uit profiles.monthly_savings_override.
    *  NULL = gebruik asset-aggregaat (monthlyContributionFromAssets). */
   monthlySavingsOverride: number | null
@@ -177,6 +183,13 @@ export interface HorizonPageData {
    * basis niet kon worden gebouwd.
    */
   housingSimBasis: HousingTriggerSimBasis | null
+  /**
+   * Wat-als-scenariovoorkeuren uit profiles.toekomst_scenario_prefs (versioned
+   * JSONB), defensief geparsed met parseToekomstScenarioPrefs — DB-inhoud nooit
+   * vertrouwen. NULL = geen scenario gezet (client valt op de defaults terug).
+   * Voedt de hydratie van de scenariolaag op /toekomst (stap 4-wiring).
+   */
+  toekomstScenarioPrefs: ToekomstScenarioPrefs | null
 }
 
 /**
@@ -231,6 +244,14 @@ export const HORIZON_WELCOME_SHOWN_SLUG = 'horizon_welcome_shown'
  *  dan direct. */
 export const HORIZON_EXIT_NOTICE_DISMISSED_SLUG = 'horizon_exit_notice_dismissed'
 
+/** Feature slug die bijhoudt of de gebruiker de tips-overlay op /toekomst al
+ *  één keer heeft gesloten. Stored in user_feature_visits (zelfde cross-device-
+ *  patroon als HORIZON_EXIT_NOTICE_DISMISSED_SLUG). Afwezig → de EERSTE keer dat
+ *  de gebruiker de tips-overlay sluit navigeert de app naar /overzicht (waar het
+ *  post-onboarding stappenplan staat) en wordt deze marker gezet; daarna nooit
+ *  meer. Eén keer, cross-device — géén re-navigatie per apparaat. */
+export const HORIZON_TIPS_FIRST_CLOSE_NAVIGATED_SLUG = 'horizon_tips_first_close_navigated'
+
 /** Default profile fallback values when profile query fails */
 const PROFILE_DEFAULTS = {
   date_of_birth: null as string | null,
@@ -281,6 +302,7 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
     horizonSetupVisitResult,
     horizonWelcomeVisitResult,
     exitNoticeDismissedResult,
+    tipsFirstCloseNavigatedResult,
     savingsOverrideResult,
   ] = await Promise.all([
     supabase.from('transactions').select('amount, budget_id').gte('date', monthStart).lt('date', monthEnd),
@@ -289,7 +311,7 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
     // unified projection. Replaces the previous trimmed-select + full-select
     // duplicate pair on the same table.
     supabase.from('assets').select('*').eq('is_active', true).limit(500),
-    supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, marginaal_tarief, pension_factor_a, pension_factor_a_source, net_monthly_income, estimated_monthly_expenses, budgeting_active, feature_preferences, household_type, number_of_children, housing_strategy_config, housing_strategy_dismissed_at, income_source, expenses_source, pot_rules, box3_method, deficit_loan_rate, withdrawal_profile_config').single(),
+    supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, marginaal_tarief, pension_factor_a, pension_factor_a_source, net_monthly_income, estimated_monthly_expenses, budgeting_active, feature_preferences, household_type, number_of_children, housing_strategy_config, housing_strategy_dismissed_at, income_source, expenses_source, pot_rules, box3_method, deficit_loan_rate, withdrawal_profile_config, toekomst_scenario_prefs').single(),
     // Single budget query (all budgets) — replaces separate essential + child queries
     supabase.from('budgets').select('id, name, default_limit, interval, budget_type, is_essential, parent_id'),
     supabase.from('life_events').select('id, name, event_type, target_age, target_date, one_time_cost, monthly_cost_change, monthly_income_change, duration_months, icon, is_active, sort_order, is_indexed, linked_asset_id, metadata').eq('is_active', true).order('sort_order', { ascending: true }),
@@ -345,6 +367,15 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
       .from('user_feature_visits')
       .select('feature_slug')
       .eq('feature_slug', HORIZON_EXIT_NOTICE_DISMISSED_SLUG)
+      .maybeSingle(),
+    // Eerste-sluiting-navigatie-marker. Zelfde patroon als de exit-melding-
+    // marker hierboven; bepaalt of de EERSTE sluiting van de tips-overlay naar
+    // /overzicht navigeert. .maybeSingle() + null-fallback zodat een ontbrekende
+    // tabel op legacy DBs niet de hele loader laat falen.
+    supabase
+      .from('user_feature_visits')
+      .select('feature_slug')
+      .eq('feature_slug', HORIZON_TIPS_FIRST_CLOSE_NAVIGATED_SLUG)
       .maybeSingle(),
     // monthly_savings_override profile-kolom. Aparte .maybeSingle()-query
     // zodat een ontbrekende kolom op legacy DBs (migratie 20260513000001
@@ -817,6 +848,13 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
   const exitNoticeDismissed = !exitNoticeDismissedResult.error
     && exitNoticeDismissedResult.data?.feature_slug === HORIZON_EXIT_NOTICE_DISMISSED_SLUG
 
+  // tipsFirstCloseNavigated: true zodra de eerste-sluiting-navigatie-marker
+  // bestaat. Bij een ontbrekende tabel (error) → behandel als "nog niet
+  // genavigeerd" zodat de eenmalige navigatie minstens kan plaatsvinden
+  // (graceful degrade, zelfde keuze als exitNoticeDismissed / hasSeenWelcome).
+  const tipsFirstCloseNavigated = !tipsFirstCloseNavigatedResult.error
+    && tipsFirstCloseNavigatedResult.data?.feature_slug === HORIZON_TIPS_FIRST_CLOSE_NAVIGATED_SLUG
+
   // monthlySavingsOverride: handmatige override uit profiles. Null = geen
   // override, simulator gebruikt monthlyContributionFromAssets.
   const overrideRaw = savingsOverrideResult.error
@@ -827,6 +865,14 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
   // monthlyContributionFromAssets: raw asset-aggregaat (identiek aan
   // monthlyContributions hierboven, geëxporteerd voor de setup-pane).
   const monthlyContributionFromAssets = monthlyContributions
+
+  // toekomstScenarioPrefs: wat-als-scenariovoorkeuren uit de eigen profielrij.
+  // Defensief geparsed (clamps/whitelist/versiecheck) — DB-inhoud nooit vertrouwen;
+  // ongeldig/afwezig → null (client gebruikt de defaults). Zelfde schrijf-poort als
+  // PUT /api/toekomst-scenario, zodat lezen en schrijven identiek gevalideerd zijn.
+  const toekomstScenarioPrefs = parseToekomstScenarioPrefs(
+    (profile as { toekomst_scenario_prefs?: unknown }).toekomst_scenario_prefs,
+  )
 
   // monthlySurplusFromBudget: surplus uit 6m gemiddelde transacties als
   // Budgetteren-module actief is. Null als module uit of geen surplus.
@@ -877,6 +923,7 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
     hasCompletedHorizonSetup,
     hasSeenWelcome,
     exitNoticeDismissed,
+    tipsFirstCloseNavigated,
     monthlySavingsOverride,
     monthlyContributionFromAssets,
     monthlySurplusFromBudget,
@@ -890,6 +937,7 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
     showDualHousingBasis,
     housingStrategyDismissedAt,
     housingSimBasis,
+    toekomstScenarioPrefs,
   }
 })
 

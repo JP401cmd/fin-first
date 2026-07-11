@@ -5,6 +5,7 @@ import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { useDreamTransition } from '@/components/app/horizon/dream-transition-context'
 import type { HorizonPageData } from '@/lib/horizon-data-loader'
 import { HORIZON_EXIT_NOTICE_DISMISSED_SLUG } from '@/lib/horizon-data-loader'
+import { useTipsFirstCloseNavigation } from '@/lib/hooks/use-tips-first-close-navigation'
 import { useHorizonFireSim } from '@/lib/hooks/use-horizon-fire-sim'
 import { type SimRow, type SimResult } from '@/lib/fire-simulation'
 import { createClient } from '@/lib/supabase/client'
@@ -46,7 +47,6 @@ import {
   type ChartEventOverlay,
 } from '@/lib/chart-event-overlay'
 import { NaturalMilestoneSheet } from '@/components/app/horizon/natural-milestone-sheet'
-import { HorizonYearDetailsSheet } from '@/components/app/horizon/horizon-year-details-sheet'
 import { ActionCard } from '@/components/app/action-card'
 import dynamic from 'next/dynamic'
 import {
@@ -54,7 +54,7 @@ import {
   AlertTriangle, Calendar, BarChart3, FlaskConical, Landmark,
   X, Edit3, Zap, Target, Sparkles,
   TableProperties, GitBranch,
-  ChevronDown, ChevronUp, Compass, SlidersHorizontal,
+  ChevronDown, ChevronUp, Compass,
   Home, Lightbulb,
   Play,
   Pause,
@@ -77,7 +77,6 @@ import { GuardrailKompas } from '@/components/app/horizon/guardrail-kompas'
 import { buildCoverageStrip } from '@/lib/horizon/coverage-strip'
 import { computeGuardrailBounds } from '@/lib/horizon/guardrail-bounds'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
-import { HouseholdFireSection } from '@/components/app/household-fire-section'
 import {
   buildHouseholdProjectionInput,
   type HouseholdProjectionResult,
@@ -89,7 +88,19 @@ import { PerspectiveContextLabel } from '@/components/app/perspective-context-la
 import { PensionParseSummaryCard, PensionInstructionPanel, computeCumulativeImpacts, type SnapshotForTrend } from '@/components/app/horizon/horizon-helpers'
 import { HealthScoreReceipt } from '@/components/app/horizon/health-score-receipt'
 import { MaskedAmount } from '@/components/app/masked-amount'
-import { PageInfoButton, GlossaryTerm } from '@/components/editorial'
+import { PageInfoButton, GlossaryTerm, SectionLabel } from '@/components/editorial'
+import { Vrijheidsas, computeCoupledStopAge } from '@/components/app/horizon/vrijheidsas'
+import { ScenarioChip, VERKEN_SECTION_ID } from '@/components/app/horizon/scenario-chip'
+import { Dekkingsradar } from '@/components/app/horizon/dekkingsradar'
+import { ScenarioKaarten } from '@/components/app/horizon/scenario-kaarten'
+import { computeDekkingsradar, type RadarAs } from '@/lib/horizon/dekkingsradar'
+import { runScenarioPresets, type ScenarioPresetResult } from '@/lib/horizon/scenario-presets'
+import { computeStopMarge } from '@/lib/horizon/stop-marge'
+import { scenarioMonthlySpendDelta, buildCategorieReturnGroups, type ToekomstScenarioPrefs } from '@/lib/horizon/toekomst-scenario'
+import { WhatIfMarketAssumptions } from '@/components/app/horizon/whatif-market-assumptions'
+import { buildSliderEvent, readSliderValueFromEvents, type SliderKey } from '@/lib/scenario-events'
+import type { HorizonScenarioOverrides } from '@/lib/hooks/use-horizon-fire-sim'
+import type { AssetCategorie } from '@/lib/horizon-kernel/types'
 import { PAGE_INFO } from '@/lib/page-info-content'
 
 const ScenariosModal = dynamic(() =>
@@ -136,14 +147,33 @@ const SimChartModal = dynamic(() =>
   import('@/components/app/horizon/sim-chart-widget').then(m => ({ default: m.SimChartModal })),
   { ssr: false }
 )
+// Zwaar-maar-conditionele sub-componenten uit de first-load JS van /toekomst
+// gehaald (bundle ronde 2). Mount-condities blijven ONGEWIJZIGD zodat gedrag +
+// animaties identiek blijven — dynamic({ssr:false}) haalt de code enkel uit de
+// synchrone first-load-bundle en laadt de chunk na hydratatie. Bewust géén
+// mount-gate: de year-details-sheet (BottomSheet) heeft een intern open→exit-
+// animatie-statemachine die alleen speelt als het gemount blijft, en
+// HouseholdFireSection rendert vaak null (solo-gebruiker) + beheert z'n eigen
+// laadstaat, dus een skeleton-fallback zou flitsen. `loading` = null (default).
+const HorizonYearDetailsSheet = dynamic(() =>
+  import('@/components/app/horizon/horizon-year-details-sheet').then(m => ({ default: m.HorizonYearDetailsSheet })),
+  { ssr: false }
+)
+const HouseholdFireSection = dynamic(() =>
+  import('@/components/app/household-fire-section').then(m => ({ default: m.HouseholdFireSection })),
+  { ssr: false }
+)
+const IncomeExpenseChart = dynamic(() =>
+  import('@/components/app/horizon/income-expense-chart').then(m => ({ default: m.IncomeExpenseChart })),
+  { ssr: false }
+)
 import { PensionPdfUpload, uploadPensionPdfToStorage } from '@/components/app/horizon/pension-pdf-upload'
-import { SimChart, buildScenarioVariants, SCENARIO_VARIANTS, type ScenarioOverlay, type MonteCarloOverlay, type HouseholdPartnerOverlay } from '@/components/app/horizon/sim-chart'
+import { SimChart, buildScenarioVariants, buildScenarioPathsFromSim, SCENARIO_VARIANTS, type ScenarioOverlay, type MonteCarloOverlay, type HouseholdPartnerOverlay } from '@/components/app/horizon/sim-chart'
 import { ZoomableChartContainer } from '@/components/app/horizon/zoomable-chart-container'
 import { EventsTimeline } from '@/components/app/horizon/events-timeline'
 import { EventClusterSheet } from '@/components/app/horizon/event-cluster-sheet'
 import { PhaseBar } from '@/components/app/horizon/phase-bar'
 import { CHART_PAD } from '@/lib/chart-constants'
-import { IncomeExpenseChart } from '@/components/app/horizon/income-expense-chart'
 import { buildBreakdown } from '@/lib/income-expense-breakdown'
 import { WealthCompositionChart } from '@/components/app/horizon/wealth-composition-chart'
 import { unifiedRowsToStackedRows, type StackedRow } from '@/lib/wealth-composition'
@@ -155,7 +185,7 @@ import type { PreviewBaseline } from '@/lib/strategy-preview'
 import { ScenarioOverlayPicker } from '@/components/app/horizon/scenario-overlay-picker'
 import { WHATIF_SCENARIO_COLORS, type SavedScenario } from '@/lib/scenario-types'
 import { applyWhatIfOverrides, buildBaselineOverrides } from '@/lib/whatif-overrides'
-import { WhatIfSlidersCollapsible, type WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
+import { WhatIfSliders, DeltaBadge, type WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
 import type { WhatIfEvent } from '@/components/app/horizon/whatif-events'
 import { ChartOverlayExplainer } from '@/components/app/horizon/chart-overlay-explainer'
 import { ChartTips } from '@/components/editorial/chart-tips'
@@ -293,6 +323,12 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   // Monte Carlo overlay state
   const [mcExpanded, setMcExpanded] = useState(false)
   const [mcData, setMcData] = useState<MonteCarloResult | null>(null)
+  // Lichte MC-run (500 sims) puur voor de dekkingsradar-marktrisico-as; null zolang de
+  // volledige MC-overlay al draait (mcExpanded) — dan hergebruikt de radar mcData.
+  const [radarMc, setRadarMc] = useState<MonteCarloResult | null>(null)
+  // Scenario's-naast-elkaar (5 preset-kaarten) — deferred doorgerekend op de BASIS-grondslag.
+  const [scenarioPresets, setScenarioPresets] = useState<ScenarioPresetResult[] | null>(null)
+  const [scenarioPresetsLoading, setScenarioPresetsLoading] = useState(false)
   const [incomeExpenseExpanded, setIncomeExpenseExpanded] = useState(false)
   const [ieViewMode, setIeViewMode] = useState<'lines' | 'breakdown'>('lines')
   const [chartMode, setChartMode] = useState<'vermogenspad' | 'vermogensopbouw'>('vermogenspad')
@@ -352,6 +388,13 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const [exitNoticeDismissed, setExitNoticeDismissed] = useState<boolean>(
     initialData.exitNoticeDismissed,
   )
+  // Eenmalige navigatie naar het post-onboarding stappenplan op /overzicht bij
+  // de EERSTE sluiting van de tips-overlay. De hook gate't cross-device (server-
+  // marker) én binnen de sessie (ref-guard) tegen dubbele navigatie. Alleen een
+  // ECHTE sluiting roept dit aan — onViewChart/persistOverlayVisible(true) nooit.
+  const maybeNavigateAfterFirstTipsClose = useTipsFirstCloseNavigation(
+    initialData.tipsFirstCloseNavigated,
+  )
   const [exitNoticeOpen, setExitNoticeOpen] = useState(false)
   const handleOverlayExit = useCallback(() => {
     if (exitNoticeDismissed) {
@@ -363,14 +406,17 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     setExitNoticeOpen(true)
   }, [exitNoticeDismissed, persistOverlayVisible])
   // "Sluiten" (en Escape/achtergrond): modal dicht + overlay sluit. Niet-
-  // persistent — de melding komt bij een volgende exit terug.
+  // persistent — de melding komt bij een volgende exit terug. Bij de EERSTE
+  // sluiting navigeren we eenmalig naar het overzicht (post-onboarding stappenplan).
   const handleExitNoticeClose = useCallback(() => {
     setExitNoticeOpen(false)
     persistOverlayVisible(false)
-  }, [persistOverlayVisible])
+    maybeNavigateAfterFirstTipsClose()
+  }, [persistOverlayVisible, maybeNavigateAfterFirstTipsClose])
   // "Niet meer weergeven": modal dicht + overlay sluit + persistent verbergen
   // (cross-device via user_feature_visits, zelfde fire-and-forget-stijl als de
-  // welkomstkaart). De melding verschijnt nooit meer bij toekomstige exits.
+  // welkomstkaart). De melding verschijnt nooit meer bij toekomstige exits. Ook
+  // dit telt als een eerste sluiting → eenmalige navigatie naar het overzicht.
   const handleExitNoticeDismissForever = useCallback(() => {
     setExitNoticeDismissed(true)
     setExitNoticeOpen(false)
@@ -380,7 +426,8 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ feature_slug: HORIZON_EXIT_NOTICE_DISMISSED_SLUG }),
     }).catch(() => {})
-  }, [persistOverlayVisible])
+    maybeNavigateAfterFirstTipsClose()
+  }, [persistOverlayVisible, maybeNavigateAfterFirstTipsClose])
   const persistNaturalMilestones = useCallback((val: boolean) => {
     setShowNaturalMilestones(val)
     try { localStorage.setItem('horizon_show_natural_milestones', String(val)) } catch { /* noop */ }
@@ -413,6 +460,36 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
 
   // ── Inline what-if sliders state (feature #795) ──────────────
   const [whatIfInlineOpen, setWhatIfInlineOpen] = useState(false)
+
+  // ── Wat-als-scenariolaag (2e projectielijn, plan §B — stap 4) ─────────────
+  // Slider-events leven hier GESCHEIDEN van de DB-events (`events`, :257) zodat de
+  // hoofdlijn ongemoeid blijft; ze voeden uitsluitend de scenario-run. Hydratie uit
+  // `initialData.toekomstScenarioPrefs` (sliders reconstrueren via `buildSliderEvent`
+  // zodra `whatIfBaseline` + `currentAge` beschikbaar zijn — zie hydratie-effect).
+  const [scenarioSliderEvents, setScenarioSliderEvents] = useState<WhatIfEvent[]>([])
+  const [scenarioReturnDeltas, setScenarioReturnDeltas] = useState<Record<string, number>>(
+    () => ({ ...(initialData.toekomstScenarioPrefs?.returnDeltaByCategorie ?? {}) }),
+  )
+  const [scenarioStopAge, setScenarioStopAge] = useState<number | null>(
+    () => initialData.toekomstScenarioPrefs?.stopAge ?? null,
+  )
+  const [scenarioStopKoppel, setScenarioStopKoppel] = useState<boolean>(
+    () => initialData.toekomstScenarioPrefs?.stopKoppel ?? false,
+  )
+  const [showScenarioLine, setShowScenarioLine] = useState<boolean>(
+    () => initialData.toekomstScenarioPrefs?.showScenarioLine ?? true,
+  )
+  const scenarioHydratedRef = useRef(false)
+  // Vastgehouden koppel-marge — bij koppelmodus is DIT de bewaarde waarheid (pref
+  // `stopMarge`); de stopleeftijd is dan afgeleid (verwacht + marge). Direct uit de
+  // pref initialiseren: herleiden uit een nog niet bezonken scenario-run is onmogelijk
+  // (twee-fasen-hydratie) en joeg de stopleeftijd weg.
+  const lockedMargeRef = useRef<number | null>(
+    initialData.toekomstScenarioPrefs?.stopKoppel
+      ? (initialData.toekomstScenarioPrefs?.stopMarge ?? null)
+      : null,
+  )
+  const verkenSectionRef = useRef<HTMLElement | null>(null)
 
   // Saved scenario overlay state (multi-select)
   const [savedScenarios, setSavedScenarios] = useState<SavedScenario[]>([])
@@ -544,9 +621,21 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const [formCashflows, setFormCashflows] = useState<UserDefinedCashflow[]>([])
   const [editingCashflowId, setEditingCashflowId] = useState<string | null>(null)
 
+  // Afgeleid: is er een actief wat-als-scenario? (≥1 afwijkende slider of rendement-delta;
+  // stopAge telt bewust NIET mee — dat verschuift alleen de marge-marker, niet de projectie.)
+  const hasScenario = scenarioSliderEvents.length > 0 || Object.keys(scenarioReturnDeltas).length > 0
+  // Overrides voor de gescheiden 2e run in de hook; null ⇒ geen scenario-run.
+  const scenarioOverrides = useMemo<HorizonScenarioOverrides | null>(() => {
+    if (!hasScenario) return null
+    return {
+      extraLifeEvents: scenarioSliderEvents,
+      returnDeltaByCategorie: scenarioReturnDeltas as Partial<Record<AssetCategorie, number>>,
+    }
+  }, [hasScenario, scenarioSliderEvents, scenarioReturnDeltas])
+
   // Simulatie-engine met echte app-data (fractionele FIRE-leeftijd + kasstromen)
   // Fase 2b (#495): gemigreerd naar runUnifiedProjection() met per-asset-type rendement
-  const { result: simResult, cashflows: simCashflows, error: simError, unifiedRows, effectiveLifeEvents, kernelStatus, kernelMaandHint, kernelHousingSale } = useHorizonFireSim(
+  const { result: simResult, cashflows: simCashflows, error: simError, unifiedRows, effectiveLifeEvents, kernelStatus, kernelMaandHint, kernelHousingSale, scenario, stopPad } = useHorizonFireSim(
     input
       ? {
           horizonInput: input,
@@ -567,6 +656,9 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           housingStrategy: initialData.housingStrategy,
           kernelRawProfile,
           aowRows,
+          scenarioOverrides,
+          // Alleen de expliciet gezette stop voedt het duiding-stop-pad; null = geen stop-pad.
+          stopPadAge: scenarioStopAge,
         }
       : null,
   )
@@ -1211,13 +1303,125 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     return buildBaselineOverrides(effectiveInput, fireParams.grossReturn, initialData.healthScoreInput.savingsRate6m)
   }, [effectiveInput, fireParams.grossReturn, initialData.healthScoreInput.savingsRate6m])
 
-  // Typed event setter that accepts WhatIfEvent updaters (structural superset of LifeEvent)
-  const setEventsForSliders = useCallback(
-    (updater: (prev: WhatIfEvent[]) => WhatIfEvent[]) => {
-      setEvents(prev => updater(prev as WhatIfEvent[]) as LifeEvent[])
-    },
-    [setEvents],
-  )
+  // ── Wat-als-hydratie + koppel-semantiek (stap 4) ──────────────────────────
+  // Slider-standen reconstrueren uit de bewaarde pref zodra de baseline + leeftijd
+  // bekend zijn (pref-keys camelCase → kernel-`SliderKey` snake_case). Eén keer.
+  useEffect(() => {
+    if (scenarioHydratedRef.current) return
+    if (!whatIfBaseline || currentAge === null) return
+    scenarioHydratedRef.current = true
+    const prefs = initialData.toekomstScenarioPrefs
+    if (!prefs?.sliders) return
+    const KEY_MAP: Record<string, SliderKey> = {
+      income: 'income',
+      workdays: 'workdays',
+      savings: 'savings',
+      extraInleg: 'extra_inleg',
+    }
+    const evs: WhatIfEvent[] = []
+    for (const [prefKey, sliderKey] of Object.entries(KEY_MAP)) {
+      const val = prefs.sliders[prefKey as keyof typeof prefs.sliders]
+      if (val === undefined) continue
+      const ev = buildSliderEvent(sliderKey, val, whatIfBaseline, currentAge)
+      if (ev) evs.push(ev)
+    }
+    if (evs.length > 0) setScenarioSliderEvents(evs)
+  }, [whatIfBaseline, currentAge, initialData.toekomstScenarioPrefs])
+
+  // Verwacht-FIRE van het actieve pad (scenario indien actief, anders basis).
+  // `Settled` is null zolang de scenario-run nog onderweg is: de koppel-machinerie
+  // (marge vergrendelen/corrigeren) mag nooit tegen de tijdelijke basis-fallback
+  // rekenen — die joeg na een herlaad de stopleeftijd weg (marge vergrendeld op
+  // basis-FIRE, daarna "gecorrigeerd" tegen scenario-FIRE). Weergave gebruikt de
+  // fallback wél (kort basis tonen tot de run landt is prima).
+  const scenarioVerwachtSettled = hasScenario
+    ? (scenario != null ? scenario.result.fireAgeFractional : null)
+    : (simResult?.fireAgeFractional ?? null)
+  const scenarioVerwachtFireAge = scenarioVerwachtSettled ?? simResult?.fireAgeFractional ?? null
+
+  // Koppelmodus: als de verwacht-FIRE verschuift terwijl "schuift mee" aan staat, beweegt
+  // de stopleeftijd zó dat de vastgehouden marge (`lockedMargeRef`) constant blijft.
+  useEffect(() => {
+    if (!scenarioStopKoppel) return
+    if (scenarioVerwachtSettled === null || lockedMargeRef.current === null) return
+    const next = computeCoupledStopAge(scenarioVerwachtSettled, lockedMargeRef.current)
+    if (next === null) return
+    setScenarioStopAge(prev => (prev !== next ? next : prev))
+  }, [scenarioVerwachtSettled, scenarioStopKoppel])
+
+  // ── Dekkingsradar: lichte MC-run (500 sims), deferred na idle ──────────────────
+  // Enkel wanneer de volledige weergave actief is én de zware MC-overlay NIET al draait
+  // (dan hergebruikt de radar-memo `mcData`). Draait in idle (of setTimeout-fallback) zodat
+  // de eerste paint niet blokkeert; opgeruimd bij unmount/dep-wissel.
+  useEffect(() => {
+    if (displayMode !== 'full' || mcData) { setRadarMc(null); return }
+    if (!effectiveInput || !simResult || currentAge == null) return
+    const years = Math.max(simResult.displayEndAge - currentAge, 10)
+    let cancelled = false
+    const run = () => { if (!cancelled) setRadarMc(runMonteCarlo(effectiveInput, 500, years)) }
+    const ric = typeof requestIdleCallback === 'function' ? requestIdleCallback(run) : null
+    const timer = ric === null ? setTimeout(run, 1) : null
+    return () => {
+      cancelled = true
+      if (ric !== null && typeof cancelIdleCallback === 'function') cancelIdleCallback(ric)
+      if (timer !== null) clearTimeout(timer)
+    }
+    // effectiveInput is een stabiele state-ref (=input via useState) — muteert alleen bij een
+    // data-herlaad, niet per render, dus geen re-runstorm. Daarmee zijn alle deps compleet.
+  }, [displayMode, mcData, simResult, currentAge, effectiveInput])
+
+  // ── Scenario's naast elkaar: 5 preset-kaarten, deferred na idle ────────────────
+  // De context hangt UITSLUITEND van de basis-data af (geen scenario-overrides): profiel +
+  // basis-lifeEvents + basis-jaaruitgaven, verwachtFireAge = basis-FIRE. De vijf volle
+  // kernel-solves (~1s samen) draaien daarom nooit per slider-tick, maar één keer in idle.
+  // Leunt erop dat de sliders de hoofd-input niet muteren (het scenario loopt via het
+  // gescheiden scenario-veld) — anders zouden deze presets wél per tick herrekenen.
+  useEffect(() => {
+    if (displayMode !== 'full') { setScenarioPresets(null); setScenarioPresetsLoading(false); return }
+    if (!kernelRawProfile || !effectiveInput || currentAge == null) return
+    const yearlyExp = effectiveInput.yearlyMustExpenses > 0 ? effectiveInput.yearlyMustExpenses : 0
+    if (yearlyExp <= 0) return
+    const strat = fireStrategy ?? DEFAULT_FIRE_STRATEGY
+    const downsizeActief =
+      initialData.housingStrategy.mode === 'downsize' || initialData.housingStrategy.mode === 'reverse_mortgage'
+    setScenarioPresetsLoading(true)
+    let cancelled = false
+    const run = () => {
+      if (cancelled) return
+      const results = runScenarioPresets({
+        profile: kernelRawProfile,
+        assets: initialData.assets ?? [],
+        debts,
+        lifeEvents: events,
+        aowRows,
+        yearlyExpenses: yearlyExp,
+        currentAge,
+        verwachtFireAge: simResult?.fireAgeFractional ?? null,
+        fireEndAge: strat.endAge,
+        hasEigenHuis: initialData.housingContext.hasEigenHuis,
+        downsizeStrategyActief: downsizeActief,
+      })
+      if (!cancelled) { setScenarioPresets(results); setScenarioPresetsLoading(false) }
+    }
+    const ric = typeof requestIdleCallback === 'function' ? requestIdleCallback(run) : null
+    const timer = ric === null ? setTimeout(run, 1) : null
+    return () => {
+      cancelled = true
+      if (ric !== null && typeof cancelIdleCallback === 'function') cancelIdleCallback(ric)
+      if (timer !== null) clearTimeout(timer)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayMode, kernelRawProfile, simResult?.fireAgeFractional, currentAge, debts, events, aowRows, fireStrategy, initialData])
+
+  // Deeplink `?whatif=open` (en ScenarioChip-klik) → scroll naar de slider-lab.
+  useEffect(() => {
+    if (!whatIfInlineOpen) return
+    const t = setTimeout(
+      () => verkenSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+      120,
+    )
+    return () => clearTimeout(t)
+  }, [whatIfInlineOpen])
 
   // ── Natuurlijke mijlpalen ───────────────────────────────────────────────
   // Afgeleide events op de tijdlijn — hypotheek afgelost, autolening
@@ -1644,16 +1848,79 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     [unifiedRows, displayEndAge],
   )
 
+  // ── Doorwerking wat-als in de duidingsblokken (plan §F) ─────────────────────
+  // De scenario-rijen worden identiek geclipt als de basisrijen; bij een actief
+  // scenario voeden ze de strook + het kompas i.p.v. de basisrijen (chip + reset
+  // maken dat zichtbaar). Cijferbar, PhaseBar en hero-KPI's blijven basis.
+  const scenarioDisplayRows = useMemo(
+    () => (scenario != null ? clipRowsToPlanEnd(scenario.unifiedRows, displayEndAge) : null),
+    [scenario, displayEndAge],
+  )
+  const activeUnifiedRows =
+    hasScenario && scenario != null ? (scenarioDisplayRows ?? displayUnifiedRows) : displayUnifiedRows
+
+  // ── Duiding-rijen (ronde 3): het gekozen-stop-pad wint zodra een expliciete stopleeftijd
+  // gezet is, zodat de dekkingsblokken (strook + radar) de éChte dekking van dat gekozen
+  // stopmoment tonen (bv. <100% in de rode zone) i.p.v. altijd het volledig-gedekte basispad.
+  // Geen stop gezet ⇒ de gewone actieve rijen (basis of scenario). Zelfde clip als de basis.
+  const duidingUnifiedRows = useMemo(
+    () => (stopPad != null ? clipRowsToPlanEnd(stopPad.unifiedRows, displayEndAge) : activeUnifiedRows),
+    [stopPad, displayEndAge, activeUnifiedRows],
+  )
+
   // ── Uitgebreide-view blokken (levensinkomenstrook + guardrail-kompas + cijferbar) ──
   // Alles consumeert de bestaande unified-rijen / config — geen herberekening.
   const coverageNodes = useMemo(
-    () => buildCoverageStrip(displayUnifiedRows ?? []),
-    [displayUnifiedRows],
+    () => buildCoverageStrip(duidingUnifiedRows ?? []),
+    [duidingUnifiedRows],
   )
+  // Bij een actief scenario schuift de bestedingsgrondslag mee met de spaarquote-slider
+  // (`lifestyle_adjustment`-event → `monthly_cost_change`), zodat het kompas het scenario
+  // volgt. Basis zonder scenario.
+  const activeMonthlySpend =
+    (effectiveInput?.monthlyExpenses ?? 0) + (hasScenario ? scenarioMonthlySpendDelta(scenarioSliderEvents) : 0)
   const guardrailBounds = useMemo(
-    () => computeGuardrailBounds({ plannedMonthlySpend: effectiveInput?.monthlyExpenses ?? 0 }),
-    [effectiveInput?.monthlyExpenses],
+    () => computeGuardrailBounds({ plannedMonthlySpend: activeMonthlySpend }),
+    [activeMonthlySpend],
   )
+  // ── Dekkingsradar-assen (ronde 3) — pure consume-laag over de duiding-rijen ──────
+  // Alle grootheden komen elders vandaan: de duiding-rijen (stop-pad wint), de actieve-pad
+  // FIRE/benodigd-vermogen/doel-eindvermogen, de lichte MC-run (of de volle als die draait),
+  // en de canonieke bestedingsgrondslag (activeMonthlySpend×12, zoals het kompas). null =
+  // nog geen leeftijd/rijen → blok blijft verborgen. Bij een expliciete stop meet de radar
+  // vanaf jouw stopleeftijd: stopPad wint dan óók voor de FIRE-leeftijd (= scenarioStopAge)
+  // en het benodigd-/doel-eindvermogen (uit stopPad.result), zodat de assen bij het gekozen
+  // stopmoment horen i.p.v. bij het verwacht-FIRE-moment.
+  const radarAssen = useMemo<RadarAs[] | null>(() => {
+    if (currentAge == null) return null
+    const rows = duidingUnifiedRows ?? []
+    if (rows.length === 0) return null
+    const strat = fireStrategy ?? DEFAULT_FIRE_STRATEGY
+    const requiredFire = stopPad != null
+      ? stopPad.result.requiredFirePortfolio
+      : hasScenario && scenario != null
+        ? scenario.result.requiredFirePortfolio
+        : (simResult?.requiredFirePortfolio ?? 0)
+    const targetEnd = stopPad != null
+      ? stopPad.result.targetEndPortfolio
+      : hasScenario && scenario != null
+        ? scenario.result.targetEndPortfolio
+        : (simResult?.targetEndPortfolio ?? null)
+    return computeDekkingsradar({
+      rows,
+      mcResult: radarMc ?? mcData,
+      currentAge,
+      fireAgeFractional: stopPad != null ? scenarioStopAge : scenarioVerwachtFireAge,
+      aowAgeFractional: userAowAge.fractional,
+      requiredFirePortfolio: requiredFire,
+      targetEndPortfolio: targetEnd,
+      endStrategy: strat.strategy,
+      housingStrategy: initialData.housingStrategy,
+      hasEigenHuis: initialData.housingContext.hasEigenHuis,
+      kernelHousingSale,
+      jaarBesteding: activeMonthlySpend * 12,
+    })
+  }, [duidingUnifiedRows, radarMc, mcData, currentAge, scenarioVerwachtFireAge, stopPad, scenarioStopAge, userAowAge.fractional, hasScenario, scenario, simResult, fireStrategy, initialData.housingStrategy, initialData.housingContext.hasEigenHuis, kernelHousingSale, activeMonthlySpend])
   // Cijferbar-waarden bij de actieve leeftijd (hover/playback); consumeert de
   // unified-rij + format-helpers, herberekent niets.
   const readoutData = useMemo(() => {
@@ -2085,13 +2352,181 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     return results
   }, [selectedScenarioIds, savedScenarios, initialData, kernelRawProfile, debts, aowRows])
 
+  // ── Wat-als-lijn (2e projectielijn, plan §E) ────────────────────────────────
+  // Gebouwd uit de gescheiden scenario-run; gestippelde ink-lijn + FIRE-stip via
+  // `variant: 'scenario'` (chart-static-layers). Kleur wordt genegeerd (inkt vast).
+  // Alleen wanneer de toggle aan staat én er een actief scenario is.
+  const scenarioLineOverlay = useMemo<ScenarioOverlay | null>(() => {
+    if (!(showScenarioLine && hasScenario && scenario != null)) return null
+    return {
+      name: 'wat-als',
+      label: 'Jouw wat-als',
+      color: 'var(--ink-2)',
+      // Clip op dezelfde `displayEndAge` als de hoofdlijn (zie displaySimRows) — anders
+      // loopt de gestippelde wat-als-lijn een jaar verder door dan de basislijn.
+      points: clipRowsToPlanEnd(scenario.result.rows, displayEndAge).map(
+        r => [r.age, r.endPortfolio] as [number, number],
+      ),
+      variant: 'scenario',
+      fireAgeFractional: scenario.result.fireAgeFractional,
+    }
+  }, [showScenarioLine, hasScenario, scenario, displayEndAge])
+
   // Gememoized samenstelling voor de SimChart-prop: een inline spread op de
   // callsite gaf per render een verse array-identiteit, waardoor de memo() van
   // SimChart bij élke monoliet-setState bail-de en de volledige SVG herbouwde.
+  // De wat-als-lijn staat vooraan (bovenop de saved-ghosts).
   const combinedScenarioOverlays = useMemo(() => [
+    ...(scenarioLineOverlay ? [scenarioLineOverlay] : []),
     ...(scenarioOverlays ?? []),
     ...scenarioOverlayDataList.map(d => d.overlay),
-  ], [scenarioOverlays, scenarioOverlayDataList])
+  ], [scenarioLineOverlay, scenarioOverlays, scenarioOverlayDataList])
+
+  // Gewogen baseline-rendement per bezeten categorie (Marktbias-UI). Gememoized zodat
+  // de inline-call in de JSX niet elke render een verse array-identiteit oplevert.
+  const categorieReturnGroups = useMemo(
+    () => buildCategorieReturnGroups(initialData.assets),
+    [initialData.assets],
+  )
+
+  // ── Vrijheidsas + stop-marge (plan §D) ──────────────────────────────────────
+  // "laatst" = FIRE-leeftijd van de VOORZICHTIGE variant (pessimist, −0,02) van het
+  // ACTIEVE pad — consume uit `buildScenarioPathsFromSim` (géén extra kernel-run).
+  const scenarioBaseFireAge = simResult?.fireAgeFractional ?? null
+  const laatstFireAge = useMemo(() => {
+    const rows = hasScenario && scenario != null ? scenario.result.rows : (simResult?.rows ?? [])
+    const fireTarget = hasScenario && scenario != null
+      ? scenario.result.requiredFirePortfolio
+      : (simResult?.requiredFirePortfolio ?? 0)
+    if (rows.length === 0 || !(fireTarget > 0)) return null
+    const paths = buildScenarioPathsFromSim(rows, fireParams.grossReturn, fireTarget)
+    return paths[0]?.fireAge ?? null // index 0 = 'pessimist' (Voorzichtig)
+  }, [hasScenario, scenario, simResult, fireParams.grossReturn])
+
+  // "vroegst" = FIRE-leeftijd van de OPTIMISTISCHE variant (+0,02) van het ACTIEVE pad —
+  // spiegelt `laatstFireAge`, maar dan de andere rand van de verwachtingsband (index 2 =
+  // 'optimist'; buildScenarioPathsFromSim → [pessimist, baseline, optimist]).
+  const vroegstFireAge = useMemo(() => {
+    const rows = hasScenario && scenario != null ? scenario.result.rows : (simResult?.rows ?? [])
+    const fireTarget = hasScenario && scenario != null
+      ? scenario.result.requiredFirePortfolio
+      : (simResult?.requiredFirePortfolio ?? 0)
+    if (rows.length === 0 || !(fireTarget > 0)) return null
+    const paths = buildScenarioPathsFromSim(rows, fireParams.grossReturn, fireTarget)
+    return paths[2]?.fireAge ?? null // index 2 = 'optimist' (Optimistisch)
+  }, [hasScenario, scenario, simResult, fireParams.grossReturn])
+
+  // Effectieve stopleeftijd — de slider werkt controlled op dit getal; is er nog niets
+  // gekozen dan default naar de (afgeronde) verwacht-FIRE, anders currentAge+1.
+  const effectiveStopAge =
+    scenarioStopAge ??
+    (scenarioVerwachtFireAge !== null
+      ? Math.round(scenarioVerwachtFireAge)
+      : currentAge !== null
+        ? Math.round(currentAge) + 1
+        : 60)
+
+  const stopMarge = useMemo(
+    () =>
+      computeStopMarge({
+        stopAge: effectiveStopAge,
+        verwachtFireAgeFractional: scenarioVerwachtFireAge,
+        laatstFireAgeFractional: laatstFireAge,
+        baseFireAgeFractional: scenarioBaseFireAge,
+      }),
+    [effectiveStopAge, scenarioVerwachtFireAge, laatstFireAge, scenarioBaseFireAge],
+  )
+
+  // Slepen aan de stop-slider legt (bij koppel aan) een nieuwe vast te houden marge vast.
+  // Vergrendelen alléén tegen de bezonken verwacht-waarde (nooit de basis-fallback).
+  const handleStopAgeChange = useCallback(
+    (v: number) => {
+      setScenarioStopAge(v)
+      if (scenarioStopKoppel && scenarioVerwachtSettled !== null) {
+        lockedMargeRef.current = v - scenarioVerwachtSettled
+      }
+    },
+    [scenarioStopKoppel, scenarioVerwachtSettled],
+  )
+  // Aanzetten van de koppeling legt de HUIDIGE marge vast; uitzetten laat de stop staan.
+  const handleStopKoppelChange = useCallback(
+    (v: boolean) => {
+      setScenarioStopKoppel(v)
+      if (v && scenarioVerwachtSettled !== null) {
+        lockedMargeRef.current = effectiveStopAge - scenarioVerwachtSettled
+      }
+    },
+    [effectiveStopAge, scenarioVerwachtSettled],
+  )
+
+  // Globale reset "Terug naar basis": wist sliders + rendement-delta's (stopAge/koppel/
+  // toggle blijven bewust staan).
+  const handleScenarioReset = useCallback(() => {
+    setScenarioSliderEvents([])
+    setScenarioReturnDeltas({})
+  }, [])
+
+  // Compacte FIRE-delta voor de toggle-pill ("−30 mnd" = eerder vrij; beslishulp-conventie).
+  const scenarioFireDeltaMonths =
+    scenarioVerwachtFireAge !== null && scenarioBaseFireAge !== null
+      ? Math.round((scenarioVerwachtFireAge - scenarioBaseFireAge) * 12)
+      : null
+  const scenarioFireDeltaLabel =
+    scenarioFireDeltaMonths === null
+      ? null
+      : Math.abs(scenarioFireDeltaMonths) < 1
+        ? 'gelijk'
+        : `${scenarioFireDeltaMonths > 0 ? '+' : '−'}${Math.abs(scenarioFireDeltaMonths)} mnd`
+
+  // ── Persistentie (plan §H): debounced fire-and-forget PUT; eerste render overslaan ──
+  const scenarioSaveSkipRef = useRef(true)
+  useEffect(() => {
+    if (scenarioSaveSkipRef.current) {
+      scenarioSaveSkipRef.current = false
+      return
+    }
+    if (!whatIfBaseline || currentAge === null) return
+    // Persist-gate: schrijf geen default-blob voor gebruikers die niets deden (bv. na
+    // een perspectiefwissel of late baseline). Wél schrijven zodra de staat van de
+    // defaults afwijkt (defaults: geen scenario, geen stopAge, koppel uit, toggle aan),
+    // óf er eerder iets bewaard was — dan moet een reset die ene keer nog wissen.
+    const deviatesFromDefaults =
+      hasScenario || scenarioStopAge !== null || scenarioStopKoppel || !showScenarioLine
+    if (!deviatesFromDefaults && initialData.toekomstScenarioPrefs == null) return
+    const handle = setTimeout(() => {
+      const sliders: NonNullable<ToekomstScenarioPrefs['sliders']> = {}
+      const income = readSliderValueFromEvents('income', scenarioSliderEvents, whatIfBaseline)
+      const workdays = readSliderValueFromEvents('workdays', scenarioSliderEvents, whatIfBaseline)
+      const savings = readSliderValueFromEvents('savings', scenarioSliderEvents, whatIfBaseline)
+      const extraInleg = readSliderValueFromEvents('extra_inleg', scenarioSliderEvents, whatIfBaseline)
+      if (Math.round(income) !== Math.round(whatIfBaseline.monthlyIncome)) sliders.income = income
+      if (workdays !== whatIfBaseline.workDaysPerWeek) sliders.workdays = workdays
+      if (Math.round(savings) !== Math.round(whatIfBaseline.savingsRate)) sliders.savings = savings
+      if (extraInleg !== 0) sliders.extraInleg = extraInleg
+      const payload = {
+        v: 1 as const,
+        ...(Object.keys(sliders).length > 0 ? { sliders } : {}),
+        ...(Object.keys(scenarioReturnDeltas).length > 0 ? { returnDeltaByCategorie: scenarioReturnDeltas } : {}),
+        stopAge: scenarioStopAge,
+        stopKoppel: scenarioStopKoppel,
+        // Bij koppelmodus is de marge de bewaarde waarheid (zie lockedMargeRef-doc);
+        // ref lezen op schrijfmoment — elke marge-wijziging loopt via een handler die
+        // ook state zet, dus dit effect vuurt dan sowieso.
+        ...(scenarioStopKoppel && lockedMargeRef.current !== null
+          ? { stopMarge: lockedMargeRef.current }
+          : {}),
+        showScenarioLine,
+      }
+      fetch('/api/toekomst-scenario', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }).catch(() => {
+        /* stil — persistentie is niet kritisch */
+      })
+    }, 600)
+    return () => clearTimeout(handle)
+  }, [scenarioSliderEvents, scenarioReturnDeltas, scenarioStopAge, scenarioStopKoppel, showScenarioLine, whatIfBaseline, currentAge, hasScenario, initialData.toekomstScenarioPrefs])
 
   async function handleActionStatusChange(id: string, status: ActionStatus, data?: Record<string, unknown>) {
     const res = await fetch(`/api/ai/actions/${id}`, {
@@ -2972,6 +3407,11 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
         onDismissForever={handleExitNoticeDismissForever}
       />
 
+      {/* === KATERN I — Waar je staat === */}
+      <HideInSimple>
+        <SectionLabel num="I">Waar je staat</SectionLabel>
+      </HideInSimple>
+
       {/* === 1. Hero + Simulatie (één gecombineerd blok) === */}
       <section data-testid="horizon-hero" className={`card-editorial overflow-hidden ${overlayVisible && chartMode === 'vermogenspad' ? 'no-hover-lift' : ''}`}>
         {/* Module-active accent (Horizon-500 op /horizon/**) */}
@@ -3640,6 +4080,33 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                         </span>
                       )}
                     </button>
+                    {/* ── Wat-als-lijn toggle (alleen bij actief scenario) ── */}
+                    {hasScenario && (
+                      <button
+                        type="button"
+                        onClick={() => setShowScenarioLine(prev => !prev)}
+                        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                          showScenarioLine
+                            ? 'border-horizon-300 bg-horizon-50 text-horizon-700'
+                            : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
+                        }`}
+                        aria-pressed={showScenarioLine}
+                        aria-label="Wat-als-lijn tonen"
+                        title="Wat-als-lijn"
+                      >
+                        {/* Ink-dash-swatch (zelfde SVG als legenda/ScenarioChip) draagt de
+                            wat-als-identiteit; de pill volgt verder de horizon-chroom van de rij. */}
+                        <svg width="20" height="8" viewBox="0 0 20 8" aria-hidden className="shrink-0">
+                          <line x1="0" y1="4" x2="20" y2="4" stroke="var(--ink-2)" strokeWidth="2" strokeDasharray="6 4" />
+                        </svg>
+                        <span className="hidden sm:inline">Wat-als</span>
+                        {scenarioFireDeltaLabel && (
+                          <span className="ml-0.5 font-mono text-[10px] tabular-nums opacity-75">
+                            {scenarioFireDeltaLabel}
+                          </span>
+                        )}
+                      </button>
+                    )}
                   </HideInSimple>
                 )}
 
@@ -4214,62 +4681,8 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                   : <>Berekend als FIRE-pad &middot; <span className="ml-0.5 underline underline-offset-2">Pensioen-modus beschikbaar &rarr;</span></>}
               </button>
 
-              {/* ── What-If inline sliders (feature #795) ──
-                  Secundaire diepte → verborgen in Eenvoudig-modus (hard-hide,
-                  button + panel samen). */}
-              <HideInSimple>
-              <button
-                type="button"
-                onClick={() => setWhatIfInlineOpen(prev => !prev)}
-                aria-expanded={whatIfInlineOpen}
-                className={`mt-4 flex w-full items-center gap-3 rounded-[var(--r)] border px-4 py-3 text-left transition-all ${
-                  whatIfInlineOpen
-                    ? 'border-horizon-400 bg-horizon-50/60 shadow-[0_0_20px_rgba(196,160,107,0.15)]'
-                    : 'border-dashed border-horizon-300 bg-horizon-50/30 hover:border-horizon-400 hover:bg-horizon-50/60 hover:shadow-[0_0_20px_rgba(196,160,107,0.15)]'
-                }`}
-              >
-                <SlidersHorizontal className="h-5 w-5 shrink-0 text-horizon-600" />
-                <div className="min-w-0 flex-1">
-                  <span className="font-serif text-sm italic text-horizon-700">
-                    Wat als...? Pas je scenario aan
-                  </span>
-                  {!whatIfInlineOpen && (
-                    <p className="mt-1 font-sans text-[11px] leading-relaxed text-horizon-700/70">
-                      Pas inkomen, werkdagen, spaarquote of extra inleg aan — de projectie past zich direct aan.
-                    </p>
-                  )}
-                </div>
-                {whatIfInlineOpen ? (
-                  <ChevronUp className="h-4 w-4 shrink-0 text-horizon-600" />
-                ) : (
-                  <ChevronDown className="h-4 w-4 shrink-0 text-horizon-600" />
-                )}
-              </button>
-
-              {/* Inline sliders panel — no navigation to /whatif needed */}
-              {whatIfInlineOpen && whatIfBaseline && currentAge !== null && (
-                <div className="mt-2 rounded-[var(--r)] border border-horizon-200 bg-[var(--paper)] px-4 pb-4 pt-3">
-                  <WhatIfSlidersCollapsible
-                    baseline={whatIfBaseline}
-                    events={events as WhatIfEvent[]}
-                    setEvents={setEventsForSliders}
-                    currentAge={currentAge}
-                  />
-                  <div className="mt-3 flex items-center justify-between">
-                    <p className="font-sans text-[10px] text-[var(--ink-4)]">
-                      Elke slider bewerkt je scenario. De projectielijn hierboven past zich direct aan.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => triggerDream('/horizon/whatif')}
-                      className="shrink-0 ml-3 font-sans text-[11px] font-medium text-horizon-600 transition-colors hover:text-horizon-700"
-                    >
-                      Volledig scenario &rarr;
-                    </button>
-                  </div>
-                </div>
-              )}
-              </HideInSimple>
+              {/* De wat-als-slider-lab is verplaatst naar de eigen sectie
+                  "Verken je aannames" (katern II) onder de grafiek — zie hieronder. */}
             </>
           ) : null}
         </div>
@@ -4289,20 +4702,150 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
         />
       )}
 
+      {/* === KATERN II — Verken je aannames (wat-als slider-lab) ===
+          Alleen in de solo-weergave: het scenario is een persoonlijke verkenning tegen
+          de eigen baseline. Spiegelt de perspectief-gate van de chart-overlay
+          (usePartnerMainLine || useHouseholdMainLine → géén wat-als-lijn). */}
+      {!(usePartnerMainLine || useHouseholdMainLine) && (
+      <HideInSimple>
+        <section
+          id={VERKEN_SECTION_ID}
+          ref={verkenSectionRef}
+          className="mt-8 scroll-mt-24 sm:mt-10"
+        >
+          <SectionLabel num="II">Wat als je draait</SectionLabel>
+          <div className="mb-1 flex items-start justify-between gap-3">
+            <h2 className="label-editorial text-[var(--ink-2)]">Verken je aannames</h2>
+            {hasScenario && (
+              <button
+                type="button"
+                onClick={handleScenarioReset}
+                className="shrink-0 rounded-[var(--r)] border border-dashed border-[var(--border-md)] px-2.5 py-1 font-sans text-[11px] font-medium text-[var(--ink-3)] transition-colors hover:border-horizon-300 hover:text-horizon-700"
+              >
+                Terug naar basis
+              </button>
+            )}
+          </div>
+          <p className="mb-3 font-sans text-[12px] text-[var(--ink-3)]">
+            Draai aan je aannames — je basislijn blijft staan; je wat-als verschijnt als
+            gestippelde lijn in de grafiek en kleurt de blokken hieronder.
+          </p>
+
+          {/* Dichtgeklapte-kop-afwijkingssamenvatting (DeltaBadge-hergebruik). */}
+          {hasScenario && whatIfBaseline && (
+            <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+              <DeltaBadge
+                current={readSliderValueFromEvents('income', scenarioSliderEvents, whatIfBaseline)}
+                base={whatIfBaseline.monthlyIncome}
+                format={v => formatCurrency(v) + '/mnd'}
+              />
+              <DeltaBadge
+                current={readSliderValueFromEvents('savings', scenarioSliderEvents, whatIfBaseline)}
+                base={whatIfBaseline.savingsRate}
+                format={v => `${Math.round(v)}%`}
+              />
+              <DeltaBadge
+                current={readSliderValueFromEvents('extra_inleg', scenarioSliderEvents, whatIfBaseline)}
+                base={0}
+                format={v => formatCurrency(v) + '/mnd'}
+              />
+            </div>
+          )}
+
+          <div
+            className={`card-editorial space-y-6 p-4 sm:p-5 ${
+              hasScenario ? 'border-dashed border-[var(--ink-2)]' : ''
+            }`}
+          >
+            {/* ① Vrijheidsas (uitkomst bovenaan) */}
+            {currentAge !== null && (
+              <Vrijheidsas
+                currentAge={currentAge}
+                aowAge={userAowAge?.fractional ?? null}
+                baseFireAge={scenarioBaseFireAge}
+                verwachtFireAge={scenarioVerwachtFireAge}
+                laatstFireAge={laatstFireAge}
+                vroegstFireAgeFractional={vroegstFireAge}
+                hasScenario={hasScenario}
+                stopAge={effectiveStopAge}
+                onStopAgeChange={handleStopAgeChange}
+                stopKoppel={scenarioStopKoppel}
+                onStopKoppelChange={handleStopKoppelChange}
+                zone={stopMarge.zone}
+                margeJaren={stopMarge.margeJaren}
+              />
+            )}
+
+            {/* ② De vier bestaande sliders (platgeslagen via `bare`) */}
+            {whatIfBaseline && currentAge !== null && (
+              <div className="border-t border-[var(--border-ed)] pt-5">
+                <p className="mb-2 label-editorial text-[var(--ink-3)]">Draaiknoppen</p>
+                <WhatIfSliders
+                  bare
+                  baseline={whatIfBaseline}
+                  events={scenarioSliderEvents}
+                  setEvents={setScenarioSliderEvents}
+                  currentAge={currentAge}
+                />
+              </div>
+            )}
+
+            {/* ③ Rendement per groep (genest collapsible; default dicht) */}
+            <div className="border-t border-[var(--border-ed)] pt-5">
+              <p className="mb-2 label-editorial text-[var(--ink-3)]">Rendement per groep</p>
+              <WhatIfMarketAssumptions
+                value={scenarioReturnDeltas}
+                onChange={setScenarioReturnDeltas}
+                assetGroups={categorieReturnGroups}
+              />
+            </div>
+
+            {/* Footer — draaien hier, archiveren daar */}
+            <div className="border-t border-[var(--border-ed)] pt-3">
+              <button
+                type="button"
+                onClick={() => triggerDream('/horizon/whatif')}
+                className="font-serif text-[11px] italic text-horizon-600 transition-colors hover:text-horizon-700"
+              >
+                Scenario&apos;s vergelijken &rarr;
+              </button>
+            </div>
+          </div>
+        </section>
+      </HideInSimple>
+      )}
+
+      {/* === KATERN III — Wat het betekent === */}
+      {(coverageNodes.length > 0 || (effectiveInput?.monthlyExpenses ?? 0) > 0) && (
+        <HideInSimple>
+          <SectionLabel className="mt-8 sm:mt-10" num="III">Wat het betekent</SectionLabel>
+        </HideInSimple>
+      )}
+
       {/* === 4b. Levensinkomenstrook (dekkingsgraad per leeftijd) === */}
       {coverageNodes.length > 0 && (
         <HideInSimple>
           <section className="mt-6 sm:mt-8">
-            <h2 className="mb-1 label-editorial text-[var(--ink-2)]">Levensinkomenstrook</h2>
+            <div className="mb-1 flex items-center gap-2">
+              <h2 className="label-editorial text-[var(--ink-2)]">Levensinkomenstrook</h2>
+              {hasScenario && !(usePartnerMainLine || useHouseholdMainLine) && <ScenarioChip />}
+            </div>
             <p className="mb-3 font-sans text-[12px] text-[var(--ink-3)]">
-              Dekkingsgraad per leeftijd — beweegt mee met de levenslijn hierboven.
+              Dekkingsgraad per leeftijd — rekent met je gekozen stopleeftijd zodra je die zet.
             </p>
             <div className="card-editorial p-4 sm:p-5">
               {(() => {
                 const first = coverageNodes[0].age
                 const last = coverageNodes[coverageNodes.length - 1].age
                 const span = Math.max(1, last - first)
-                const fire = Math.round(simResult?.fireAgeFractional ?? simResult?.fireAge ?? first)
+                // Fasegrens = het gekozen stopmoment zodra een expliciete stop gezet is (stopPad),
+                // zodat de opbouw/brug-grens én de dekkingsdip in de strook op dezelfde leeftijd
+                // vallen; anders het verwacht-FIRE-moment.
+                const fire = Math.round(
+                  stopPad != null && scenarioStopAge != null
+                    ? scenarioStopAge
+                    : (simResult?.fireAgeFractional ?? simResult?.fireAge ?? first),
+                )
                 const aow = Math.round(userAowAge?.fractional ?? fire)
                 const pct = (a: number) => Math.max(0, Math.min(100, ((a - first) / span) * 100))
                 const segments = [
@@ -4321,7 +4864,10 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       {(effectiveInput?.monthlyExpenses ?? 0) > 0 && (
         <HideInSimple>
           <section className="mt-6 sm:mt-8">
-            <h2 className="mb-1 label-editorial text-[var(--ink-2)]">Guardrail-kompas</h2>
+            <div className="mb-1 flex items-center gap-2">
+              <h2 className="label-editorial text-[var(--ink-2)]">Guardrail-kompas</h2>
+              {hasScenario && !(usePartnerMainLine || useHouseholdMainLine) && <ScenarioChip />}
+            </div>
             <p className="mb-3 font-sans text-[12px] text-[var(--ink-3)]">
               Bij welk maandbedrag je meer of minder kunt uitgeven.
             </p>
@@ -4335,6 +4881,41 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                 }}
                 you={guardrailBounds.you}
               />
+            </div>
+          </section>
+        </HideInSimple>
+      )}
+
+      {/* === 4d. Dekkingsradar (vijf dekkingsratio's) === */}
+      {radarAssen !== null && (
+        <HideInSimple>
+          <section className="mt-6 sm:mt-8">
+            <div className="mb-1 flex items-center gap-2">
+              <h2 className="label-editorial text-[var(--ink-2)]">Dekkingsradar</h2>
+              {hasScenario && !(usePartnerMainLine || useHouseholdMainLine) && <ScenarioChip />}
+            </div>
+            <p className="mb-3 font-sans text-[12px] text-[var(--ink-3)]">
+              Vijf dekkingsratio&apos;s — hoe stevig je plan op elk front staat.
+            </p>
+            <div className="card-editorial p-4 sm:p-5">
+              <Dekkingsradar assen={radarAssen} />
+            </div>
+          </section>
+        </HideInSimple>
+      )}
+
+      {/* === 4e. Scenario's naast elkaar (5 preset-kaarten, tegen je basispad) === */}
+      {(scenarioPresets !== null || scenarioPresetsLoading) && (
+        <HideInSimple>
+          <section className="mt-6 sm:mt-8">
+            <div className="mb-1 flex items-center gap-2">
+              <h2 className="label-editorial text-[var(--ink-2)]">Scenario&apos;s naast elkaar</h2>
+            </div>
+            <p className="mb-3 font-sans text-[12px] text-[var(--ink-3)]">
+              Vijf paden — één basispad, verbeteringen en één waarschuwing; elk pad wordt afgezet tegen je basispad.
+            </p>
+            <div className="card-editorial p-4 sm:p-5">
+              <ScenarioKaarten kaarten={scenarioPresets ?? []} isLoading={scenarioPresetsLoading} />
             </div>
           </section>
         </HideInSimple>

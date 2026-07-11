@@ -77,8 +77,16 @@ const NON_SPENDABLE_ASSET_TYPES = new Set<string>([
   'retirement',
 ])
 
-/** Belegbaar (duurzaam opneembaar) vermogen aan het eind van het jaar. */
-function spendablePortfolio(row: UnifiedProjectionRow): number {
+/**
+ * Belegbaar (duurzaam opneembaar) vermogen aan het eind van het jaar.
+ *
+ * Geëxporteerd (ronde 3): de dekkingsradar (`lib/horizon/dekkingsradar.ts`) en de
+ * laagste-buffer-afleiding (`lib/horizon/laagste-buffer.ts`) CONSUMEREN deze functie —
+ * zodat de "belegbaar per rij"-grondslag single-sourced blijft (één home). Gedrag
+ * byte-identiek t.o.v. de module-private versie; `buildCoverageStrip` blijft de andere
+ * consument.
+ */
+export function spendablePortfolio(row: UnifiedProjectionRow): number {
   const buckets = row.assetBuckets ?? {}
   let sum = 0
   for (const [type, detail] of Object.entries(buckets)) {
@@ -101,8 +109,12 @@ function spendablePortfolio(row: UnifiedProjectionRow): number {
  *   niet verzilverd) valt SWR×belegbaar < besteding → onder 100% (interen);
  *   ná AOW + downsizing tillen inkomen + vrijgekomen vermogen de dekking terug.
  * - guard: totaalNeed ≤ 0 (geen gevulde behoefte-decompositie) → 100.
+ *
+ * Geëxporteerd (ronde 3): de dekkingsradar (`lib/horizon/dekkingsradar.ts`) consumeert
+ * deze formule voor de pensioeninkomen-as — dezelfde veilige-onttrekkings-dekkingsgraad
+ * als de levensinkomenstrook, single-sourced (één home). Gedrag byte-identiek.
  */
-function coveragePctForRow(row: UnifiedProjectionRow): number {
+export function coveragePctForRow(row: UnifiedProjectionRow): number {
   if (row.phase === 'accumulation') return 100
 
   const totaalNeed = row.withdrawalNeed?.totaalNeed ?? 0

@@ -27,6 +27,15 @@ export type ScenarioOverlay = {
   label: string
   color: string
   points: [number, number][]  // [age, netWorth]
+  /** Fractionele FIRE-leeftijd (bv. 54.5). Alleen zinvol samen met
+   *  `variant: 'scenario'`: plaatst een FIRE-stip op de wat-als-lijn (exact op
+   *  de lijn via interpolatie, net als de hoofd-/household-lijn). */
+  fireAgeFractional?: number | null
+  /** `'scenario'` = de live "wat-als"-lijn: zwaarder gestippeld, in inkt, met
+   *  FIRE-stip en eigen legenda-/tooltip-presentatie. Zonder dit veld
+   *  (undefined) rendert de overlay byte-identiek als de bestaande dunne
+   *  saved-scenario-ghost. */
+  variant?: 'scenario'
 }
 
 export type HouseholdPartnerOverlay = {
@@ -87,6 +96,12 @@ export type ScenarioPathGeometry = {
   name: string
   color: string
   d: string | null
+  /** Alleen bij `variant: 'scenario'`: SVG-coördinaat voor de FIRE-stip
+   *  (gestippelde ink-ring) op de fractionele FIRE-leeftijd. */
+  fireDot?: { cx: number; cy: number } | null
+  /** Doorgegeven vanaf de overlay zodat de render-laag de wat-als-lijn (inkt,
+   *  zwaardere dash) van de ghost-lijnen onderscheidt. */
+  variant?: 'scenario'
 }
 
 export type HouseholdPathGeometry = {
@@ -144,18 +159,29 @@ export type SimChartGeometry = {
   aowAgeFractional?: number
   aowFractionalPt: [number, number] | null
   splitFractionalAge: number | null
+  /** True in FIRE-modus zodra er een derde band bestaat (AOW ná FIRE): de afbouw
+   *  is dan gesplitst in brug (FIRE→AOW) + onttrekking (AOW→eind). In alle andere
+   *  gevallen false → de klassieke 2-segment-uitvoer (byte-identiek). */
+  threeBandFire: boolean
   xFire: number | null
   yFireDot: number | null
   labelSafeTopY: number
   // Kleuren
   mainStrokeAcc: string
   mainStrokeDec: string
+  /** Kleur van de derde band (Overgang FIRE→AOW): een horizon-tussentint die
+   *  leesbaar afsteekt tegen de donkere opbouw- en afbouwlijnen op `--paper`. */
+  bridgeStroke: string
   COLOR_OPBOUW: string
   COLOR_AFBOUW: string
   // Voorberekende paden (d-strings)
   baselinePath: string | null
   accPath: string | null
   decPath: string | null
+  /** Overgang FIRE→AOW (alleen in `threeBandFire`; anders null). */
+  bridgePath: string | null
+  /** Onttrekking vanaf AOW (alleen in `threeBandFire`; anders null). */
+  withdrawalPath: string | null
   allPath: string | null
   scenarioPaths: ScenarioPathGeometry[]
   householdPaths: HouseholdPathGeometry[]
@@ -304,10 +330,12 @@ export function buildSimChartGeometry(input: SimChartGeometryInput): SimChartGeo
     }
   }
 
-  // In pensioen mode, compute AOW junction point for path splitting
+  // AOW junction point for path splitting. Berekend zodra een AOW-leeftijd bekend
+  // is — in pensioen-modus als hoofd-split, in FIRE-modus voor de derde band
+  // (Overgang FIRE→AOW). Formule identiek aan voorheen (byte-identiek voor pensioen).
   const isPensioenMode = planningMode === 'pensioen'
   let aowFractionalPt: [number, number] | null = null
-  if (isPensioenMode && aowAgeFractional != null) {
+  if (aowAgeFractional != null) {
     const aowFloor = Math.floor(aowAgeFractional)
     if (aowFloor > currentAge) {
       const t = aowAgeFractional - aowFloor
@@ -344,6 +372,36 @@ export function buildSimChartGeometry(input: SimChartGeometryInput): SimChartGeo
     ? allPts.filter(([age]) => age >= splitAge)
     : []
 
+  // Derde band (FIRE-modus): zodra de AOW ná FIRE valt, splitsen we de afbouw op de
+  // AOW-leeftijd in een BRUG (FIRE→AOW) en ONTTREKKING (AOW→eind). Guard (hard):
+  // pensioen-modus, geen AOW, of AOW ≤ FIRE → géén derde band → exact de bestaande
+  // 2-segment-uitvoer (accPts/decPts ongemoeid, byte-identiek).
+  const threeBandFire =
+    !isPensioenMode &&
+    aowAgeFractional != null &&
+    fireAgeFractional !== null &&
+    aowAgeFractional > fireAgeFractional &&
+    fireFractionalPt !== null &&
+    aowFractionalPt !== null
+  let bridgePts: [number, number][] = []
+  let withdrawalPts: [number, number][] = []
+  if (threeBandFire) {
+    const fireSplit = Math.ceil(fireAgeFractional as number)
+    const aowSplit = Math.ceil(aowAgeFractional as number)
+    // Brug: van de FIRE-junction, langs de hele jaren tot AOW, eindigend op de
+    // AOW-junction (spiegelt de decPts-opbouw + de pensioen-modus-split).
+    bridgePts = [
+      fireFractionalPt as [number, number],
+      ...allPts.filter(([age]) => age >= fireSplit && age < aowSplit),
+      aowFractionalPt as [number, number],
+    ]
+    // Onttrekking: van de AOW-junction tot het einde.
+    withdrawalPts = [
+      aowFractionalPt as [number, number],
+      ...allPts.filter(([age]) => age >= aowSplit),
+    ]
+  }
+
   // Use fractional position for the FIRE vertical line
   const xFire = fireAgeFractional !== null ? PAD.left + xScale(fireAgeFractional) : null
   const yZero = PAD.top + yScale(0)
@@ -377,6 +435,13 @@ export function buildSimChartGeometry(input: SimChartGeometryInput): SimChartGeo
   // cashflow-/event-markers houden hun eigen kleur.
   const mainStrokeAcc = mainLineColor ?? COLOR_OPBOUW
   const mainStrokeDec = mainLineColor ?? (!isPensioenMode && strategy === 'perpetual' ? COLOR_OPBOUW : COLOR_AFBOUW)
+  // Overgangsband (FIRE→AOW): horizon mid-tint (horizon-600). Lichter dan de donkere
+  // opbouwlijn (horizon-700 = --hor-t) én een andere hue dan de bruine onttrekking
+  // (kern-700), in lijn met PhaseBar (overgang = lichtere horizon dan opbouw).
+  // Leesbaar op --paper: als LIJN haalt horizon-600 3,2:1 (≥3:1-grafiekdrempel voor
+  // niet-tekst) — horizon-500 haalde maar 2,3:1. Het OVERGANG-tekstlabel heeft een
+  // hógere drempel (4,5:1) en gebruikt daarom apart horizon-700 (zie sim-chart.tsx).
+  const bridgeStroke = 'var(--color-horizon-600, #ab8449)'
 
   // Veilige bovengrens voor in-plot labels (doellijn-/FIRE-label) zodat ze niet
   // omhoog in de gereserveerde icoon-marge boven het plot kruipen en daar met de
@@ -493,11 +558,32 @@ export function buildSimChartGeometry(input: SimChartGeometryInput): SimChartGeo
   // Scenario-overlay-paden (achter de hoofdlijn). Index-volgorde blijft gelijk
   // aan `scenarioOverlays` zodat de intreek-animatie-vertraging (`i * 0.1s`) in
   // de render-laag identiek blijft.
-  const scenarioPaths: ScenarioPathGeometry[] = (scenarioOverlays ?? []).map(overlay => ({
-    name: overlay.name,
-    color: overlay.color,
-    d: overlay.points.length > 1 ? pointsToPath(overlay.points) : null,
-  }))
+  const scenarioPaths: ScenarioPathGeometry[] = (scenarioOverlays ?? []).map(overlay => {
+    const base = {
+      name: overlay.name,
+      color: overlay.color,
+      d: overlay.points.length > 1 ? pointsToPath(overlay.points) : null,
+    }
+    // Ghost-overlays (saved scenario's) blijven exact het oude shape houden —
+    // geen extra velden → snapshots byte-identiek. Alleen de wat-als-lijn krijgt
+    // een FIRE-stip, geïnterpoleerd op de fractionele leeftijd (spiegelt de
+    // householdPaths-stip hieronder).
+    if (overlay.variant !== 'scenario') return base
+    let fireDot: { cx: number; cy: number } | null = null
+    const fa = overlay.fireAgeFractional
+    if (fa != null && fa >= currentAge && fa <= endAge) {
+      const lo = Math.floor(fa)
+      const hi = Math.ceil(fa)
+      const frac = fa - lo
+      const yLo = overlay.points.find(([a]) => a === lo)?.[1]
+      const yHi = overlay.points.find(([a]) => a === hi)?.[1]
+      const yVal = yLo != null && yHi != null
+        ? yLo + frac * (yHi - yLo)
+        : (overlay.points.find(([a]) => Math.abs(a - fa) < 1)?.[1] ?? 0)
+      fireDot = { cx: PAD.left + xScale(fa), cy: PAD.top + yScale(yVal) }
+    }
+    return { ...base, fireDot, variant: 'scenario' as const }
+  })
 
   // Household-partner-overlay-paden + FIRE-stip. De stip valt op de fractionele
   // leeftijd (geïnterpoleerde y), net als de hoofdlijn.
@@ -526,7 +612,11 @@ export function buildSimChartGeometry(input: SimChartGeometryInput): SimChartGeo
 
   const baselinePath = baselinePts.length > 1 ? pointsToPath(baselinePts) : null
   const accPath = accPts.length > 1 ? pointsToPath(accPts) : null
-  const decPath = decPts.length > 1 ? pointsToPath(decPts) : null
+  // In de derde-band-modus vervalt de doorlopende afbouwlijn (decPath) — die wordt
+  // vervangen door brug + onttrekking. In alle andere gevallen ongewijzigd.
+  const decPath = !threeBandFire && decPts.length > 1 ? pointsToPath(decPts) : null
+  const bridgePath = threeBandFire && bridgePts.length > 1 ? pointsToPath(bridgePts) : null
+  const withdrawalPath = threeBandFire && withdrawalPts.length > 1 ? pointsToPath(withdrawalPts) : null
   const allPath = fireAge === null && allPts.length > 1 ? pointsToPath(allPts) : null
 
   // Depletion-zone (AOW-stop-modus): eerste leeftijd waarop het portfolio ≤ 0.
@@ -567,16 +657,20 @@ export function buildSimChartGeometry(input: SimChartGeometryInput): SimChartGeo
     aowAgeFractional,
     aowFractionalPt,
     splitFractionalAge,
+    threeBandFire,
     xFire,
     yFireDot,
     labelSafeTopY,
     mainStrokeAcc,
     mainStrokeDec,
+    bridgeStroke,
     COLOR_OPBOUW,
     COLOR_AFBOUW,
     baselinePath,
     accPath,
     decPath,
+    bridgePath,
+    withdrawalPath,
     allPath,
     scenarioPaths,
     householdPaths,

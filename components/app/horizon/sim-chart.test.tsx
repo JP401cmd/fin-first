@@ -168,6 +168,60 @@ describe('SimChart — hover raakt de projectie-paden niet (AC-1)', () => {
   })
 })
 
+// ── Wat-als-variant: gestippelde ink-lijn + FIRE-stip + legenda ─────────────
+
+/** richProps + een live wat-als-lijn (variant:'scenario') met FIRE-stip. */
+function watalsProps() {
+  return {
+    ...richProps(),
+    scenarioOverlays: [
+      ...richProps().scenarioOverlays,
+      {
+        name: 'watals',
+        label: 'Jouw wat-als',
+        color: '#9e6b50',
+        variant: 'scenario' as const,
+        fireAgeFractional: 54.5,
+        points: [[40, 100000], [54, 600000], [55, 650000], [65, 1200000]] as [number, number][],
+      },
+    ],
+  }
+}
+
+describe('SimChart — wat-als-variant rendert dashed ink-lijn + stip + legenda', () => {
+  it('gestippelde ink-lijn (var(--ink-2), dash 6 4) aanwezig', () => {
+    const { container } = render(<SimChart {...watalsProps()} />)
+    const inkPath = Array.from(container.querySelectorAll('path')).find(
+      p => p.getAttribute('stroke') === 'var(--ink-2)' && p.getAttribute('stroke-dasharray') === '6 4',
+    )
+    expect(inkPath).toBeTruthy()
+    expect(inkPath!.getAttribute('d')).toBeTruthy()
+  })
+
+  it('FIRE-stip als gestippelde ink-ring (paper-fill, ink-2-stroke) gerenderd', () => {
+    const { container } = render(<SimChart {...watalsProps()} />)
+    const fireRing = Array.from(container.querySelectorAll('circle')).find(
+      c => c.getAttribute('fill') === 'var(--paper)' && c.getAttribute('stroke') === 'var(--ink-2)',
+    )
+    expect(fireRing).toBeTruthy()
+  })
+
+  it('legenda toont "Jouw pad" + de wat-als-rij met leeftijdssuffix', () => {
+    const { getByText } = render(<SimChart {...watalsProps()} />)
+    expect(getByText('Jouw pad')).toBeTruthy()
+    expect(getByText('Jouw wat-als')).toBeTruthy()
+    expect(getByText('(55j)')).toBeTruthy() // Math.round(54.5) = 55
+  })
+
+  it('zonder variant blijft de ink-wat-als-lijn afwezig (byte-identiek pad)', () => {
+    const { container } = render(<SimChart {...richProps()} />)
+    const inkPath = Array.from(container.querySelectorAll('path')).find(
+      p => p.getAttribute('stroke') === 'var(--ink-2)' && p.getAttribute('stroke-dasharray') === '6 4',
+    )
+    expect(inkPath).toBeUndefined()
+  })
+})
+
 // ── AC-2: alleen de crosshair-laag reageert ─────────────────────────────────
 
 describe('SimChart — hover herbouwt geometrie noch statische laag (AC-2)', () => {
