@@ -42,6 +42,53 @@ interface SlidersProps {
   developmentNotice?: boolean
 }
 
+/**
+ * Zichtbaar (UI-)bereik per slidertype — puur & geëxporteerd zodat de tester 'm kan pinnen.
+ * Dit is UITSLUITEND de zichtbare schaal; de validatie-clamps (`SLIDER_RANGES` in
+ * lib/horizon/toekomst-scenario.ts), de parser en de API blijven ongewijzigd.
+ *
+ * De marge is ±20% rond de huidige basisstand (`base`), per type afgerond/geclampt:
+ *  - `income`     : [base×0,8 op €100 omlaag, base×1,2 op €100 omhoog]; base 0 ⇒ [0, 1000].
+ *  - `workdays`   : [floor(base×0,8), ceil(base×1,2)], geclampt op domein 1–5.
+ *  - `savings`    : [round(base×0,8), round(base×1,2)] procentpunten, geclampt 0–80;
+ *                   base < 10 ⇒ [0, max(10, round(base×1,2))] zodat het bereik nooit degenereert.
+ *  - `extra_inleg`: basis is per definitie 0 (extra bóvenop je inleg); `base` = basis-maandinkomen ⇒
+ *                   [0, 20% daarvan op €50]; zonder inkomen ⇒ [0, 500].
+ *
+ * Verbreding-vangnet (overal): ligt de opgeslagen waarde buiten [min,max], dan verbreedt de band
+ * tot die waarde (min omlaag óf max omhoog) — niets clampt.
+ */
+export function computeSliderUiRange(
+  type: 'income' | 'workdays' | 'savings' | 'extra_inleg',
+  base: number,
+  saved: number,
+): { min: number; max: number } {
+  let min: number
+  let max: number
+  switch (type) {
+    case 'income':
+      if (base <= 0) { min = 0; max = 1000 }
+      else { min = Math.floor((base * 0.8) / 100) * 100; max = Math.ceil((base * 1.2) / 100) * 100 }
+      break
+    case 'workdays':
+      min = Math.max(1, Math.min(5, Math.floor(base * 0.8)))
+      max = Math.max(1, Math.min(5, Math.ceil(base * 1.2)))
+      break
+    case 'savings':
+      if (base < 10) { min = 0; max = Math.max(10, Math.round(base * 1.2)) }
+      else { min = Math.round(base * 0.8); max = Math.round(base * 1.2) }
+      min = Math.max(0, Math.min(80, min))
+      max = Math.max(0, Math.min(80, max))
+      break
+    case 'extra_inleg':
+      min = 0
+      max = base > 0 ? Math.round((base * 0.2) / 50) * 50 : 500
+      break
+  }
+  // Vangnet: een opgeslagen waarde buiten [min,max] verbreedt de band tot die waarde.
+  return { min: Math.min(min, saved), max: Math.max(max, saved) }
+}
+
 export function DeltaBadge({ current, base, format }: { current: number; base: number; format: (v: number) => string }) {
   const diff = current - base
   if (Math.abs(diff) < 0.001) return null
@@ -83,6 +130,11 @@ function SliderRow({
   /** Optional micro-hint shown right of the label, e.g. event-event link. */
   hint?: string
 }) {
+  // Basislijn-anker "nu": vaste notch op de positie van de werkelijke waarde (baseValue).
+  // Decoratief/aria-hidden; het micro-label wordt verborgen als het te dicht bij een
+  // rand-label zit (eenvoudige %-drempel) zodat het niet botst met min/max.
+  const notchPct = max > min ? Math.max(0, Math.min(100, ((baseValue - min) / (max - min)) * 100)) : 0
+  const showNuLabel = notchPct > 12 && notchPct < 88
   return (
     <div className="py-1.5">
       <div className="mb-1 flex items-center justify-between">
@@ -101,17 +153,33 @@ function SliderRow({
           <DeltaBadge current={value} base={baseValue} format={formatDelta} />
         </span>
       </div>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={e => onChange(Number(e.target.value))}
-        className="mt-1 w-full accent-horizon-600"
-      />
-      <div className="flex justify-between font-sans text-[10px] text-[var(--ink-4)]">
+      <div className="relative mt-1">
+        <span
+          aria-hidden
+          className="pointer-events-none absolute top-1/2 z-20 h-3 w-0.5 -translate-x-1/2 -translate-y-1/2 bg-[var(--ink-3)]"
+          style={{ left: `${notchPct}%` }}
+        />
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          onChange={e => onChange(Number(e.target.value))}
+          className="relative z-10 w-full accent-horizon-600"
+        />
+      </div>
+      <div className="relative flex justify-between font-sans text-[10px] text-[var(--ink-4)]">
         <span>{minLabel}</span>
+        {showNuLabel && (
+          <span
+            aria-hidden
+            className="absolute -translate-x-1/2 font-mono text-[10px] text-[var(--ink-3)]"
+            style={{ left: `${notchPct}%` }}
+          >
+            nu
+          </span>
+        )}
         <span>{maxLabel}</span>
       </div>
     </div>
@@ -134,6 +202,15 @@ function SliderGrid({
   const savingsValue = readSliderValueFromEvents('savings', events, baseline)
   const extraValue = readSliderValueFromEvents('extra_inleg', events, baseline)
 
+  // Zichtbaar UI-bereik (±20% rond de basisstand) — met verbreding-vangnet zodat een opgeslagen
+  // waarde buiten de band niet clampt. Validatie-clamps blijven ongewijzigd.
+  const incomeRange = computeSliderUiRange('income', baseline.monthlyIncome, incomeValue)
+  const workdaysRange = computeSliderUiRange('workdays', baseline.workDaysPerWeek, workdaysValue)
+  const savingsRange = computeSliderUiRange('savings', baseline.savingsRate, savingsValue)
+  // Extra inleg = bóvenop je huidige inleg (basis 0); het bereik hangt aan het maandinkomen.
+  const extraRange = computeSliderUiRange('extra_inleg', baseline.monthlyIncome, extraValue)
+  const dayLabel = (n: number) => `${n} dag${n === 1 ? '' : 'en'}`
+
   const setSliderValue = (key: SliderKey, value: number) => {
     const newEvent = buildSliderEvent(key, value, baseline, currentAge)
     setEvents(prev => applySliderEvent(prev, key, newEvent))
@@ -154,14 +231,14 @@ function SliderGrid({
             hint="→ Inkomenswijziging-event"
             value={incomeValue}
             baseValue={baseline.monthlyIncome}
-            min={0}
-            max={15000}
+            min={incomeRange.min}
+            max={incomeRange.max}
             step={100}
             formatValue={formatCurrency}
             formatDelta={v => formatCurrency(v) + '/mnd'}
             onChange={v => setSliderValue('income', v)}
-            minLabel="€ 0"
-            maxLabel="€ 15.000"
+            minLabel={formatCurrency(incomeRange.min)}
+            maxLabel={formatCurrency(incomeRange.max)}
           />
         </div>
 
@@ -171,14 +248,14 @@ function SliderGrid({
             hint="→ Part-time-event"
             value={workdaysValue}
             baseValue={baseline.workDaysPerWeek}
-            min={1}
-            max={5}
+            min={workdaysRange.min}
+            max={workdaysRange.max}
             step={1}
             formatValue={v => `${v} dagen`}
             formatDelta={v => `${v} dag${Math.abs(v) !== 1 ? 'en' : ''}`}
             onChange={v => setSliderValue('workdays', v)}
-            minLabel="1 dag"
-            maxLabel="5 dagen"
+            minLabel={dayLabel(workdaysRange.min)}
+            maxLabel={dayLabel(workdaysRange.max)}
           />
         </div>
 
@@ -188,14 +265,14 @@ function SliderGrid({
             hint="→ Lifestyle-event"
             value={savingsValue}
             baseValue={baseline.savingsRate}
-            min={0}
-            max={80}
+            min={savingsRange.min}
+            max={savingsRange.max}
             step={1}
             formatValue={v => `${Math.round(v)}%`}
             formatDelta={v => `${Math.round(v)}%`}
             onChange={v => setSliderValue('savings', v)}
-            minLabel="0%"
-            maxLabel="80%"
+            minLabel={`${savingsRange.min}%`}
+            maxLabel={`${savingsRange.max}%`}
           />
         </div>
 
@@ -205,14 +282,14 @@ function SliderGrid({
             hint="→ Extra-inleg-event"
             value={extraValue}
             baseValue={0}
-            min={0}
-            max={5000}
+            min={extraRange.min}
+            max={extraRange.max}
             step={50}
             formatValue={formatCurrency}
             formatDelta={v => formatCurrency(v) + '/mnd'}
             onChange={v => setSliderValue('extra_inleg', v)}
-            minLabel="€ 0"
-            maxLabel="€ 5.000"
+            minLabel={formatCurrency(extraRange.min)}
+            maxLabel={formatCurrency(extraRange.max)}
           />
         </div>
       </div>

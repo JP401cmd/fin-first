@@ -191,12 +191,25 @@ export function Vrijheidsas({
       ? `band ${formatAge1(vroegstFireAgeFractional)} – ${formatAge1(laatstFireAge)} jr`
       : undefined
 
+  // Gewone-taal-onzekerheidszin (altijd zichtbaar zodra de band-randen bekend zijn). Consumeert
+  // exact dezelfde vroegst/laatst-waarden als de band — niets herrekend. Leeftijden op halve
+  // jaren afgerond (zoals de stop-slider-stap); ontbreekt een rand ⇒ geen zin.
+  const onzekerheid =
+    vroegstFireAgeFractional != null &&
+    Number.isFinite(vroegstFireAgeFractional) &&
+    laatstFireAge !== null
+      ? {
+          vroegst: formatAge(Math.round(vroegstFireAgeFractional * 2) / 2),
+          laatst: formatAge(Math.round(laatstFireAge * 2) / 2),
+        }
+      : null
+
   return (
     <div>
       {/* i-uitleg (patroon LevensinkomenStrook/GuardrailKompas) */}
       <InlineInfoDisclosure label="Uitleg vrijheidsas">
         <div className="mb-1.5 font-semibold text-[var(--ink)]" style={{ fontFamily: PLAYFAIR }}>
-          Wanneer ben je vrij — en hoe stevig?
+          Zo lees je deze as
         </div>
         <p className="m-0">
           De bovenste stip is je <b className="text-[var(--ink)]">verwachte vrijheidsleeftijd</b>. Verschuif je scenario,
@@ -379,6 +392,14 @@ export function Vrijheidsas({
           </div>
         )}
       </div>
+
+      {/* Onzekerheidszin (gewone taal) — altijd zichtbaar zodra de band-randen bekend zijn. */}
+      {onzekerheid && (
+        <p className="mt-3 font-sans text-[12px] leading-snug text-[var(--ink-3)]">
+          Waarschijnlijk ben je vrij tussen <b className="text-[var(--ink-2)]">{onzekerheid.vroegst}</b> en{' '}
+          <b className="text-[var(--ink-2)]">{onzekerheid.laatst}</b> — afhankelijk van hoe de markten lopen.
+        </p>
+      )}
 
       {/* checkbox: stopkeuze schuift mee */}
       <label className="mt-8 flex min-h-11 cursor-pointer items-center gap-2 font-sans text-[12px] leading-snug text-[var(--ink-2)]">

@@ -18,13 +18,28 @@ interface Props {
   assetGroups?: AssetGroupReturn[]
 }
 
-const MIN = -0.05
-const MAX = 0.05
+// Zichtbaar UI-bereik: ±0,03 (±3 pp). De parser-clamp (±0,05, toekomst-scenario.ts) blijft
+// staan zodat opgeslagen deltas geldig blijven; een opgeslagen delta buiten ±0,03 verbreedt de
+// UI-band tot die waarde (vangnet-principe, gelijk aan de slider-schaal in whatif-sliders.tsx).
+const UI_MIN = -0.03
+const UI_MAX = 0.03
 const STEP = 0.005
 const EPSILON = 0.0001
 
 function formatPp(v: number): string {
   return `${v >= 0 ? '+' : ''}${(v * 100).toFixed(1)} pp`
+}
+
+/** Randlabel voor de rendement-track (typografische min-teken, pp zonder overbodige decimaal). */
+function formatPpEdge(v: number): string {
+  const abs = Math.abs(v * 100)
+  const num = abs % 1 === 0 ? abs.toFixed(0) : abs.toFixed(1)
+  return `${v < 0 ? '−' : v > 0 ? '+' : ''}${num} pp`
+}
+
+/** UI-bereik dat een opgeslagen waarde buiten ±0,03 tot die waarde verbreedt (niets clampt). */
+function uiRange(...values: number[]): { min: number; max: number } {
+  return { min: Math.min(UI_MIN, ...values), max: Math.max(UI_MAX, ...values) }
 }
 
 /**
@@ -41,6 +56,8 @@ export function WhatIfMarketAssumptions({ value, onChange, assetGroups = [] }: P
     && groupValues.every(v => Math.abs(v - groupValues[0]) < EPSILON)
   const masterValue = allSame ? groupValues[0] : 0
   const isMixed = !allSame && groupValues.some(v => Math.abs(v) > EPSILON)
+  // Master-track dekt ±3 pp én elke opgeslagen groepswaarde daarbuiten (vangnet).
+  const masterRange = uiRange(...groupValues, masterValue)
 
   const setMaster = (delta: number) => {
     if (Math.abs(delta) < EPSILON) {
@@ -126,8 +143,8 @@ export function WhatIfMarketAssumptions({ value, onChange, assetGroups = [] }: P
                 </div>
                 <input
                   type="range"
-                  min={MIN}
-                  max={MAX}
+                  min={masterRange.min}
+                  max={masterRange.max}
                   step={STEP}
                   value={isMixed ? 0 : masterValue}
                   onChange={e => setMaster(Number(e.target.value))}
@@ -135,9 +152,9 @@ export function WhatIfMarketAssumptions({ value, onChange, assetGroups = [] }: P
                   aria-label="Master rendement-delta voor alle asset-groepen"
                 />
                 <div className="flex justify-between font-sans text-[10px] text-[var(--ink-4)]">
-                  <span>−5 pp</span>
+                  <span>{formatPpEdge(masterRange.min)}</span>
                   <span>0</span>
-                  <span>+5 pp</span>
+                  <span>{formatPpEdge(masterRange.max)}</span>
                 </div>
               </div>
 
@@ -162,8 +179,8 @@ export function WhatIfMarketAssumptions({ value, onChange, assetGroups = [] }: P
                         </span>
                         <input
                           type="range"
-                          min={MIN}
-                          max={MAX}
+                          min={uiRange(delta).min}
+                          max={uiRange(delta).max}
                           step={STEP}
                           value={delta}
                           onChange={e => setGroupDelta(g.assetType, Number(e.target.value))}

@@ -44,6 +44,19 @@ function makeEvent(p: Partial<LifeEvent> & { id: string; event_type: string }): 
   }
 }
 
+/**
+ * Zoals `makeEvent`, maar hangt een client-only `scenario_origin` aan het runtime-object
+ * (zoals `WhatIfEvent extends LifeEvent` dat draagt). `LifeEvent` kent het veld niet in het
+ * TYPE — via `Object.assign` (geen fresh literal, dus geen excess-property-check) landt het
+ * wél op het object dat de guard/events-laag op `scenario_origin` leest.
+ */
+function makeSliderEvent(
+  scenario_origin: string,
+  p: Partial<LifeEvent> & { id: string; event_type: string },
+): LifeEvent {
+  return Object.assign(makeEvent(p), { scenario_origin })
+}
+
 /** Standaard mapping-context: startleeftijd 45, inflatie 2% (onafhankelijk van "vandaag"). */
 const CTX: EventMappingContext = { startLeeftijd: 45, inflatie: 0.02 }
 
@@ -337,6 +350,120 @@ describe('events — handmatige Geb-rijen', () => {
     expect(gebeurtenissen).toHaveLength(10)
     expect(gebeurtenissen.map((r) => r.rij)).toEqual([4, 5, 6, 7, 8, 9, 10, 11, 12, 13])
     expect(notices.some((n) => n.kind === 'overflow' && /handmatige/.test(n.message))).toBe(true)
+  })
+})
+
+// ── Slider-werk-gate: inkomen/werkdagen → salaris-kanaal (FIRE-gegate), niet Geb ──────
+//
+// Modellek-regressie: een `slider:income`/`slider:workdays`-event droeg een PERMANENTE
+// inkomens-delta (`duration_months: 0`) die als doorlopende Geb-baat CF!H voedde — élke
+// maand, óók ná FIRE (CF!I telt H onvoorwaardelijk). Het basissalaris (CF!D → F sparen) is
+// wél FIRE-gegate. De fix routeert de delta naar het salaris-kanaal (`nettoJaarinkomen`),
+// waar de bestaande dynamische FIRE-gate automatisch geldt.
+describe('events — slider-werk-gate (modellek)', () => {
+  // (1) slider:income → salaris-kanaal ────────────────────────────────────────────────
+  it('slider:income → GEEN Geb-rij; permanente delta gesommeerd op salarisDeltaPerMaand', () => {
+    const ev = makeSliderEvent('slider:income', {
+      id: 'whatif-slider-income',
+      event_type: 'income_change',
+      target_age: 45,
+      monthly_income_change: 1000,
+      duration_months: 0,
+    })
+    const { gebeurtenissen, salarisDeltaPerMaand } = buildEventInputs([ev], CTX)
+    // Pre-fix: 1 doorlopende Geb-baat-rij (→ inkomen lekt de onttrekkingsfase in).
+    expect(gebeurtenissen).toHaveLength(0)
+    expect(salarisDeltaPerMaand).toBe(1000)
+  })
+
+  // (2) slider:workdays → zelfde gate-behandeling (negatief inkomensverlies) ────────────
+  it('slider:workdays → GEEN Geb-rij; negatieve delta op salarisDeltaPerMaand', () => {
+    const ev = makeSliderEvent('slider:workdays', {
+      id: 'whatif-slider-workdays',
+      event_type: 'part_time',
+      target_age: 45,
+      monthly_income_change: -800,
+      duration_months: 0,
+    })
+    const { gebeurtenissen, salarisDeltaPerMaand } = buildEventInputs([ev], CTX)
+    expect(gebeurtenissen).toHaveLength(0)
+    expect(salarisDeltaPerMaand).toBe(-800)
+  })
+
+  it('income + workdays samen → delta gesommeerd (netto salaris-effect)', () => {
+    const inc = makeSliderEvent('slider:income', { id: 'whatif-slider-income', event_type: 'income_change', target_age: 45, monthly_income_change: 1000 })
+    const wd = makeSliderEvent('slider:workdays', { id: 'whatif-slider-workdays', event_type: 'part_time', target_age: 45, monthly_income_change: -400 })
+    const { gebeurtenissen, salarisDeltaPerMaand } = buildEventInputs([inc, wd], CTX)
+    expect(gebeurtenissen).toHaveLength(0)
+    expect(salarisDeltaPerMaand).toBe(600)
+  })
+
+  it('delta landt op het salaris-kanaal (nettoJaarinkomen), niet op een Geb-rij; uitgave-na-pensioen ongemoeid', () => {
+    const profile = pinnedProfile({ net_monthly_income: 4500 })
+    const inc = makeSliderEvent('slider:income', { id: 'whatif-slider-income', event_type: 'income_change', target_age: 45, monthly_income_change: 1000 })
+    const withDelta = buildKernelInputFromApp({ profile, assets: [], debts: [], lifeEvents: [inc] })
+    const baseline = buildKernelInputFromApp({ profile, assets: [], debts: [], lifeEvents: [] })
+    // Basissalaris draagt de delta (12 × 1000); geen Geb-rij.
+    expect(withDelta.inkomenUitgaven.nettoJaarinkomen).toBe(baseline.inkomenUitgaven.nettoJaarinkomen + 12_000)
+    expect(withDelta.gebeurtenissen).toHaveLength(0)
+    // De uitgave-na-pensioen-aanname blijft op het ONgewijzigde basisinkomen (minimale blast radius).
+    expect(withDelta.inkomenUitgaven.uitgaveNaPensioenPerJaar).toBe(baseline.inkomenUitgaven.uitgaveNaPensioenPerJaar)
+    // Verder byte-identiek: alleen nettoJaarinkomen wijkt af.
+    expect({ ...withDelta.inkomenUitgaven, nettoJaarinkomen: 0 }).toStrictEqual({ ...baseline.inkomenUitgaven, nettoJaarinkomen: 0 })
+  })
+
+  // (3) slider:savings (kosten-delta) → BEWUST ONGEWIJZIGD ──────────────────────────────
+  it('slider:savings (lifestyle) BLIJFT een vrije Geb-rij — kosten lopen door, geen salaris-delta', () => {
+    const ev = makeSliderEvent('slider:savings', {
+      id: 'whatif-slider-savings',
+      event_type: 'lifestyle_adjustment',
+      target_age: 45,
+      monthly_cost_change: -300,
+      duration_months: 0,
+    })
+    const { gebeurtenissen, salarisDeltaPerMaand } = buildEventInputs([ev], CTX)
+    expect(salarisDeltaPerMaand).toBe(0)
+    expect(gebeurtenissen).toHaveLength(1)
+    expect(gebeurtenissen[0].posten[0].eindLeeftijd).toBeNull() // doorlopend (bewust behouden)
+  })
+
+  // (4) slider:extra_inleg → BEVINDING: lekt levenslang, buiten scope → huidig gedrag gepind ─
+  it('slider:extra_inleg BLIJFT een vrije Geb-rij (BEVINDING: doorlopende baat, lekt ná FIRE — buiten scope)', () => {
+    const ev = makeSliderEvent('slider:extra_inleg', {
+      id: 'whatif-slider-extra-inleg',
+      event_type: 'extra_inleg',
+      target_age: 45,
+      monthly_income_change: 500,
+      duration_months: 0,
+    })
+    const { gebeurtenissen, salarisDeltaPerMaand } = buildEventInputs([ev], CTX)
+    expect(salarisDeltaPerMaand).toBe(0)
+    expect(gebeurtenissen).toHaveLength(1)
+    const [post] = gebeurtenissen[0].posten
+    expect(post.type).toBe('Periodiek')
+    expect(post.eindLeeftijd).toBeNull() // doorlopend → telt óók ná FIRE mee (bekende leak, follow-up)
+    expect(post.bedrag).toBe(500)
+  })
+
+  // (5) Vrije gebruikers-events zonder slider-origin → byte-identiek (regressie) ──────────
+  it('vrij inkomens-event ZONDER slider-origin → ongewijzigd (levenslange Geb-baat, geen salaris-delta)', () => {
+    const ev = makeEvent({ id: 'manual-income', event_type: 'income_change', target_age: 45, monthly_income_change: 1000, duration_months: 0, is_indexed: true })
+    const { gebeurtenissen, salarisDeltaPerMaand } = buildEventInputs([ev], CTX)
+    expect(salarisDeltaPerMaand).toBe(0)
+    expect(gebeurtenissen).toHaveLength(1)
+    expect(gebeurtenissen[0].posten[0].eindLeeftijd).toBeNull() // doorlopend — bewust behouden (vrij event)
+  })
+
+  // (6) Whatif-presets (preset:*, geen slider-origin) → ongewijzigd ──────────────────────
+  it('preset-origin (geen slider) → ongewijzigd Geb-event (nog niet FIRE-gegate — follow-up)', () => {
+    const ev = makeSliderEvent('preset:raise', { id: 'whatif-preset-raise', event_type: 'income_change', target_age: 45, monthly_income_change: 1000, duration_months: 0 })
+    const { gebeurtenissen, salarisDeltaPerMaand } = buildEventInputs([ev], CTX)
+    expect(salarisDeltaPerMaand).toBe(0)
+    expect(gebeurtenissen).toHaveLength(1)
+  })
+
+  it('geen slider-events → salarisDeltaPerMaand 0 (byte-identiek aan snede 1)', () => {
+    expect(buildEventInputs([], CTX).salarisDeltaPerMaand).toBe(0)
   })
 })
 

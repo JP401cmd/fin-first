@@ -96,6 +96,32 @@ describe('Vrijheidsas rendering', () => {
     expect(screen.queryByText(/^band /)).not.toBeInTheDocument()
   })
 
+  it('toont de onzekerheidszin met op halve jaren afgeronde randen wanneer beide bekend zijn', () => {
+    render(
+      <Vrijheidsas {...baseProps} vroegstFireAgeFractional={48.2} laatstFireAge={51.3} />,
+    )
+    // vroegst 48.2 → 48 (hele jaren), laatst 51.3 → 51,5 (halve-jaar-afronding zichtbaar).
+    const zin = screen.getByText(/Waarschijnlijk ben je vrij tussen/)
+    expect(zin.textContent).toBe(
+      'Waarschijnlijk ben je vrij tussen 48 en 51,5 — afhankelijk van hoe de markten lopen.',
+    )
+  })
+
+  it('toont GEEN onzekerheidszin wanneer laatstFireAge ontbreekt', () => {
+    render(
+      <Vrijheidsas {...baseProps} vroegstFireAgeFractional={48.2} laatstFireAge={null} />,
+    )
+    expect(screen.queryByText(/Waarschijnlijk ben je vrij tussen/)).not.toBeInTheDocument()
+  })
+
+  it('toont GEEN onzekerheidszin wanneer vroegstFireAgeFractional ontbreekt of niet eindig is', () => {
+    const { rerender } = render(<Vrijheidsas {...baseProps} />)
+    expect(screen.queryByText(/Waarschijnlijk ben je vrij tussen/)).not.toBeInTheDocument()
+
+    rerender(<Vrijheidsas {...baseProps} vroegstFireAgeFractional={Infinity} />)
+    expect(screen.queryByText(/Waarschijnlijk ben je vrij tussen/)).not.toBeInTheDocument()
+  })
+
   it('toont de zone-duidende zin onder het zone-woord', () => {
     render(<Vrijheidsas {...baseProps} zone="stevig" />)
     expect(screen.getByText('ruim voorbij de voorzichtige rand — robuust')).toBeInTheDocument()

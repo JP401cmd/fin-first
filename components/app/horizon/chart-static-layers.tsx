@@ -27,6 +27,8 @@ export type ChartStaticLayersProps = {
   emphasis: 'accumulation' | 'withdrawal' | 'fire' | null
   baselineEmphasis: 'ghost' | 'compare'
   showDepletionWarning?: boolean
+  /** Wat-als-run loopt achter op de live input → de scenario-lijn wordt gedempt met puls. */
+  scenarioPending?: boolean
   eventOverlay?: ChartEventOverlay[]
   onEventClick?: (id: string, kind: ChartEventKind, sourceId?: string) => void
   onEventDragEnd?: (
@@ -54,6 +56,7 @@ export function ChartStaticLayersInner({
   emphasis,
   baselineEmphasis,
   showDepletionWarning,
+  scenarioPending,
   eventOverlay,
   onEventClick,
   onEventDragEnd,
@@ -402,7 +405,7 @@ export function ChartStaticLayersInner({
         // strokeDasharray-attribuut kan niet én de reveal-lengte én het streepje zijn).
         if (s.variant === 'scenario') {
           return (
-            <g key={s.name}>
+            <g key={s.name} className={scenarioPending && hasEntered ? 'animate-scenario-pending' : undefined}>
               <path
                 d={s.d}
                 fill="none"

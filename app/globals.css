@@ -737,6 +737,22 @@ body {
   to   { opacity: 1; }
 }
 
+/* Wat-als-lijn "bijwerken": subtiele opacity-puls op de gestippelde scenario-groep
+   zolang de deferred scenario-run achterloopt. Reduced motion → statisch gedempt (0.4). */
+@keyframes scenario-pending-pulse {
+  0%, 100% { opacity: 0.5; }
+  50%      { opacity: 0.25; }
+}
+.animate-scenario-pending {
+  animation: scenario-pending-pulse 1.1s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-scenario-pending {
+    animation: none;
+    opacity: 0.4;
+  }
+}
+
 /* ── Sleepmodus (drag-&-drop toewijzen) ─────────────────── */
 /* Volgende transactie draait het midden binnen. */
 @keyframes sleep-bol-enter {

@@ -131,6 +131,13 @@ export interface HorizonFireSimResult {
    * dezelfde context-assemblage als de scenario-memo). Optioneel/additief in het TYPE.
    */
   stopPad?: HorizonStopPadResult | null
+  /**
+   * True zolang de deferred scenario-/hoofd-input achterloopt op de live input (de
+   * `useDeferredValue`-vergelijking die er al is). Consumenten dempen hiermee de wat-als-
+   * lijn tijdens het slepen ("bijwerken…"). Additief/optioneel in het TYPE — de hook zet
+   * altijd een concrete `boolean`; `?` houdt bestaande volledige result-literals compileerbaar.
+   */
+  scenarioPending?: boolean
 }
 
 interface HorizonFireSimInput {
@@ -230,6 +237,13 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
   // stop-pad-run in een onderbreekbare achtergrond-render. Initieel gelijk aan de huidige
   // waarde → eerste run synchroon (contract-tests stabiel).
   const deferredStopPadAge = useDeferredValue(stopPadAge)
+
+  // Scenario-/hoofd-input loopt achter zolang een deferred waarde nog niet is ingelopen
+  // (React's standaard stale-pattern: `input !== deferredInput`). Op de initiële render en
+  // in rust zijn ze referentie-gelijk ⇒ false. Alleen een additief afgeleid veld — de
+  // memo-deps en het bestaande retour-contract blijven ongemoeid.
+  const scenarioPending =
+    deferredKernelInput !== kernelInput || deferredScenarioOverrides !== scenarioOverrides
 
   // Synchrone berekening via useMemo — geen async nodig want data is al geladen. Keyt op
   // het deferred input-object (referentie-stabiel zolang de 16 deps ongewijzigd blijven).
@@ -455,7 +469,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
   }, [simResult])
 
   if (!params || !horizonInput) {
-    return { result: null, cashflows: [], isLoading: true, error: profileError ?? null, unifiedRows: null, effectiveLifeEvents: [], kernelStatus: null, kernelMaandHint: null, kernelHousingSale: null, kernelPensionPots: null, scenario: null, stopPad: null }
+    return { result: null, cashflows: [], isLoading: true, error: profileError ?? null, unifiedRows: null, effectiveLifeEvents: [], kernelStatus: null, kernelMaandHint: null, kernelHousingSale: null, kernelPensionPots: null, scenario: null, stopPad: null, scenarioPending: false }
   }
 
   return {
@@ -471,5 +485,6 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
     kernelPensionPots: simResult?.kernelPensionPots ?? null,
     scenario: scenario ?? null,
     stopPad: stopPad ?? null,
+    scenarioPending,
   }
 }

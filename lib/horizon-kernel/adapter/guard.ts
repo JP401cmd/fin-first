@@ -15,6 +15,14 @@
  *   `inheritance` → erfenis-params. `isStrategyManagedEvent` kent deze bewust NIET
  *   (ze dragen geen "Beheerd via …"-badge in de UI), maar `events.ts` consumeert ze
  *   wél als domein-invoer — dus mogen ze evenmin als vrije Geb-rij dubbeltellen.
+ * - **Slider-werk-flows** (`isSliderWorkEvent`, wat-als/scenariolaag): een
+ *   `scenario_origin`-event `slider:income` (income_change) of `slider:workdays`
+ *   (part_time) draagt een PERMANENTE inkomens-delta. Die hoort NIET als doorlopende
+ *   Geb-baat (die CF!H onvoorwaardelijk telt — óók ná FIRE = modellek), maar via het
+ *   salaris-kanaal (`nettoJaarinkomen`), waar de kern-FIRE-gate dynamisch geldt. De
+ *   partitie houdt ze dus óók uit `vrij`; `events.ts` sommeert hun delta apart. De
+ *   kósten-sliders (`slider:savings` = lifestyle_adjustment) en `slider:extra_inleg`
+ *   blijven BEWUST vrije Geb-events (lifestyle/inleg lopen door — gedocumenteerde keuze).
  *
  * ## Verplichte eigenschap (plan-doc §9)
  * Met een strategie actief bevat de kern-input de afgeleide stroom precies ÉÉN keer,
@@ -34,6 +42,30 @@ import { isStrategyManagedEvent, type ManagedStrategy } from '@/lib/strategy-eve
 export interface GuardEvent {
   readonly id: string
   readonly event_type: string
+  /**
+   * Client-only scenario-herkomst (`WhatIfEvent extends LifeEvent`); bv. `slider:income`.
+   * Afwezig op DB-events en op `LifeEvent` zelf — optioneel zodat `LifeEvent` toewijsbaar
+   * blijft aan `GuardEvent` en de guard het runtime-veld tóch veilig kan lezen.
+   */
+  readonly scenario_origin?: string | null
+}
+
+/**
+ * `scenario_origin`-waarden die een SLIDER-WERK-flow markeren: de inkomens- en de
+ * werkdagen-slider. Beide dragen een permanente inkomens-delta die via het salaris-kanaal
+ * (FIRE-gegate) hoort te lopen i.p.v. als levenslange Geb-baat. BEWUST NIET erin:
+ * `slider:savings` (kósten-delta, loopt door in de onttrekking) en `slider:extra_inleg`.
+ */
+export const SLIDER_WORK_ORIGINS: ReadonlySet<string> = new Set(['slider:income', 'slider:workdays'])
+
+/**
+ * True als dit event een slider-werk-flow is (inkomen- of werkdagen-slider). Herkenning via
+ * `scenario_origin` (robuust; geen naam- of id-string-matching). Deze events worden noch aan
+ * een strategie/expander, noch aan een vrije Geb-rij toegewezen — hun inkomens-delta gaat via
+ * het salaris-kanaal (`buildEventInputs.salarisDeltaPerMaand`).
+ */
+export function isSliderWorkEvent(event: GuardEvent): boolean {
+  return event.scenario_origin != null && SLIDER_WORK_ORIGINS.has(event.scenario_origin)
 }
 
 /**

@@ -252,6 +252,7 @@ export const SimChart = memo(function SimChart({
   targetEndPortfolio,
   baselineRows,
   scenarioOverlays,
+  scenarioPending,
   monteCarloOverlay,
   baselineFireAge,
   dailyExpenseRate,
@@ -292,6 +293,8 @@ export const SimChart = memo(function SimChart({
   /** Optional baseline rows for ghost-line overlay (what-if mode) */
   baselineRows?: SimRow[]
   scenarioOverlays?: ScenarioOverlay[]
+  /** Wat-als-run loopt achter op de live input → de scenario-lijn wordt gedempt met puls. */
+  scenarioPending?: boolean
   monteCarloOverlay?: MonteCarloOverlay
   /** Optional baseline FIRE age for delta annotation (what-if mode) */
   baselineFireAge?: number | null
@@ -502,6 +505,7 @@ export const SimChart = memo(function SimChart({
           emphasis={emphasis}
           baselineEmphasis={baselineEmphasis}
           showDepletionWarning={showDepletionWarning}
+          scenarioPending={scenarioPending}
           eventOverlay={eventOverlay}
           onEventClick={onEventClick}
           onEventDragEnd={onEventDragEnd}

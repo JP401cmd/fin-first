@@ -88,7 +88,7 @@ import { PerspectiveContextLabel } from '@/components/app/perspective-context-la
 import { PensionParseSummaryCard, PensionInstructionPanel, computeCumulativeImpacts, type SnapshotForTrend } from '@/components/app/horizon/horizon-helpers'
 import { HealthScoreReceipt } from '@/components/app/horizon/health-score-receipt'
 import { MaskedAmount } from '@/components/app/masked-amount'
-import { PageInfoButton, GlossaryTerm, SectionLabel } from '@/components/editorial'
+import { PageInfoButton, GlossaryTerm, SectionLabel, Kicker } from '@/components/editorial'
 import { Vrijheidsas, computeCoupledStopAge } from '@/components/app/horizon/vrijheidsas'
 import { ScenarioChip, VERKEN_SECTION_ID } from '@/components/app/horizon/scenario-chip'
 import { Dekkingsradar } from '@/components/app/horizon/dekkingsradar'
@@ -648,6 +648,37 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const [formCashflows, setFormCashflows] = useState<UserDefinedCashflow[]>([])
   const [editingCashflowId, setEditingCashflowId] = useState<string | null>(null)
 
+  // Eerste-sleep-hint: éénmalig (per apparaat) een aanwijzer naar de gestippelde grafieklijn
+  // bij de allereerste sliderbeweging. "Even niet meer tonen"-klasse → localStorage (patroon
+  // use-insight-visibility), géén server-pref.
+  const [firstDragHintVisible, setFirstDragHintVisible] = useState(false)
+  const firstDragHandledRef = useRef(false)
+  const markFirstSliderDrag = useCallback(() => {
+    if (firstDragHandledRef.current) return
+    firstDragHandledRef.current = true
+    let seen = false
+    try { seen = !!window.localStorage.getItem('trifinity:whatif-first-drag-hint') } catch { /* private mode */ }
+    if (seen) return
+    try { window.localStorage.setItem('trifinity:whatif-first-drag-hint', '1') } catch { /* private mode */ }
+    setFirstDragHintVisible(true)
+  }, [])
+  const dismissFirstDragHint = useCallback(() => setFirstDragHintVisible(false), [])
+  // Wrapper om de scenario-slider-setter: markeert de eerste sleep zonder het setEvents-contract
+  // te wijzigen (WhatIfSliders bare krijgt deze i.p.v. de kale setter).
+  const handleScenarioSliderEvents = useCallback(
+    (updater: (prev: WhatIfEvent[]) => WhatIfEvent[]) => {
+      markFirstSliderDrag()
+      setScenarioSliderEvents(updater)
+    },
+    [markFirstSliderDrag],
+  )
+  // Auto-verdwijnen: de hint sluit vanzelf na een korte tijd (de dismissal is al persistent).
+  useEffect(() => {
+    if (!firstDragHintVisible) return
+    const t = setTimeout(() => setFirstDragHintVisible(false), 7000)
+    return () => clearTimeout(t)
+  }, [firstDragHintVisible])
+
   // Afgeleid: is er een actief wat-als-scenario? (≥1 afwijkende slider of rendement-delta;
   // stopAge telt bewust NIET mee — dat verschuift alleen de marge-marker, niet de projectie.)
   const hasScenario = scenarioSliderEvents.length > 0 || Object.keys(scenarioReturnDeltas).length > 0
@@ -664,7 +695,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
 
   // Simulatie-engine met echte app-data (fractionele FIRE-leeftijd + kasstromen)
   // Fase 2b (#495): gemigreerd naar runUnifiedProjection() met per-asset-type rendement
-  const { result: simResult, cashflows: simCashflows, error: simError, unifiedRows, effectiveLifeEvents, kernelStatus, kernelMaandHint, kernelHousingSale, scenario, stopPad } = useHorizonFireSim(
+  const { result: simResult, cashflows: simCashflows, error: simError, unifiedRows, effectiveLifeEvents, kernelStatus, kernelMaandHint, kernelHousingSale, scenario, stopPad, scenarioPending } = useHorizonFireSim(
     input
       ? {
           horizonInput: input,
@@ -4293,6 +4324,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                     </button>
                     {/* ── Wat-als-lijn toggle (alleen bij actief scenario) ── */}
                     {hasScenario && (
+                      <>
                       <button
                         type="button"
                         onClick={() => setShowScenarioLine(prev => !prev)}
@@ -4317,6 +4349,10 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                           </span>
                         )}
                       </button>
+                      <span aria-live="polite" className="font-mono text-[10px] text-[var(--ink-3)]">
+                        {showScenarioLine && scenarioPending ? 'bijwerken…' : ''}
+                      </span>
+                      </>
                     )}
                   </HideInSimple>
                 )}
@@ -4640,6 +4676,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                             // visueel bij elkaar horen. FIRE-annotaties blijven goud (COLOR_OPBOUW).
                             mainLineColor={(usePartnerMainLine || useHouseholdMainLine) ? COLOR_PARTNER_EVENT : undefined}
                             scenarioOverlays={(isAowStopActive || usePartnerMainLine || useHouseholdMainLine) ? undefined : combinedScenarioOverlays}
+                            scenarioPending={scenarioPending}
                             monteCarloOverlay={(isAowStopActive || usePartnerMainLine || useHouseholdMainLine) ? undefined : monteCarloOverlay}
                             dailyExpenseRate={(effectiveInput?.yearlyMustExpenses ?? 0) / 365}
                             householdOverlays={householdOverlays ?? undefined}
@@ -5040,10 +5077,15 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
               hasScenario ? 'border-dashed border-[var(--ink-2)]' : ''
             }`}
           >
-            {/* ① Vrijheidsas (uitkomst bovenaan) */}
+            {/* ① Vrijheidsas (uitkomst bovenaan) — vraag-kop met jargon-kicker */}
             {currentAge !== null && (
-              <Vrijheidsas
-                currentAge={currentAge}
+              <div>
+                <div className="mb-3">
+                  <Kicker className="mb-1">Vrijheidsas</Kicker>
+                  <h2 className="font-display text-[14px] font-semibold leading-snug text-[var(--ink)]">Wanneer ben je vrij?</h2>
+                </div>
+                <Vrijheidsas
+                  currentAge={currentAge}
                 aowAge={userAowAge?.fractional ?? null}
                 baseFireAge={scenarioBaseFireAge}
                 verwachtFireAge={scenarioVerwachtFireAge}
@@ -5057,18 +5099,38 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                 zone={stopMarge.zone}
                 margeJaren={stopMarge.margeJaren}
                 doelActief={doelActief}
-              />
+                />
+              </div>
             )}
 
             {/* ② De vier bestaande sliders (platgeslagen via `bare`) */}
             {whatIfBaseline && currentAge !== null && (
               <div className="border-t border-[var(--border-ed)] pt-5">
                 <p className="mb-2 label-editorial text-[var(--ink-3)]">Draaiknoppen</p>
+                {/* Eerste-sleep-hint — wijst naar de gestippelde grafieklijn (boven). */}
+                {firstDragHintVisible && (
+                  <div
+                    role="status"
+                    className="animate-fade-in mb-3 flex items-start justify-between gap-2 border border-[var(--ink-2)] border-l-4 border-l-horizon-500 bg-[var(--paper)] px-3 py-2"
+                  >
+                    <p className="font-sans text-[11px] leading-snug text-[var(--ink-2)]">
+                      Kijk naar de gestippelde lijn in de grafiek ↑ — dat is jouw wat-als.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={dismissFirstDragHint}
+                      aria-label="Tip sluiten"
+                      className="-m-2 shrink-0 p-2 text-[var(--ink-4)] transition-colors hover:text-[var(--ink-2)]"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )}
                 <WhatIfSliders
                   bare
                   baseline={whatIfBaseline}
                   events={scenarioSliderEvents}
-                  setEvents={setScenarioSliderEvents}
+                  setEvents={handleScenarioSliderEvents}
                   currentAge={currentAge}
                 />
               </div>
@@ -5119,111 +5181,125 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       </>
       )}
 
-      {/* === KATERN III — Wat het betekent === */}
-      {(coverageNodes.length > 0 || (effectiveInput?.monthlyExpenses ?? 0) > 0) && (
-        <HideInSimple>
-          <SectionLabel className="mt-8 sm:mt-10" num="III">Wat het betekent</SectionLabel>
-        </HideInSimple>
-      )}
+      {/* === KATERN III — Wat het betekent ===
+          Eén katern-kaart: SectionLabel + één card-editorial met de vier delen
+          (Levensinkomenstrook / Guardrail-kompas / Dekkingsradar / Scenario's) als
+          interne segmenten, gescheiden door hairlines. Label én kaart renderen zodra
+          ten minste één segment rendert (per-segment-condities blijven ongewijzigd). */}
+      {(() => {
+        const heeftKaternIII =
+          coverageNodes.length > 0 ||
+          (effectiveInput?.monthlyExpenses ?? 0) > 0 ||
+          radarAssen !== null ||
+          scenarioPresets !== null ||
+          scenarioPresetsLoading
+        if (!heeftKaternIII) return null
+        return (
+          <>
+            <HideInSimple>
+              <SectionLabel className="mt-8 sm:mt-10" num="III">Wat het betekent</SectionLabel>
+            </HideInSimple>
+            <HideInSimple>
+              <section className="mt-6 sm:mt-8">
+                <div className="card-editorial no-hover-lift divide-y divide-[var(--border-ed)]">
+                  {/* === 4b. Levensinkomenstrook (dekkingsgraad per leeftijd) === */}
+                  {coverageNodes.length > 0 && (
+                    <div className="p-4 sm:p-5">
+                      <div className="mb-1">
+                        <Kicker className="mb-1">Levensinkomenstrook</Kicker>
+                        <div className="flex items-center gap-2">
+                          <h2 className="font-display text-[14px] font-semibold leading-snug text-[var(--ink)]">Dekt je inkomen straks je uitgaven?</h2>
+                          {hasScenario && !(usePartnerMainLine || useHouseholdMainLine) && <ScenarioChip doelActief={doelActief} />}
+                        </div>
+                      </div>
+                      <p className="mb-3 font-sans text-[12px] text-[var(--ink-3)]">
+                        Dekkingsgraad per leeftijd — rekent met je gekozen stopleeftijd zodra je die zet.
+                      </p>
+                      {(() => {
+                        const first = coverageNodes[0].age
+                        const last = coverageNodes[coverageNodes.length - 1].age
+                        const span = Math.max(1, last - first)
+                        // Fasegrens = het gekozen stopmoment zodra een expliciete stop gezet is (stopPad),
+                        // zodat de opbouw/brug-grens én de dekkingsdip in de strook op dezelfde leeftijd
+                        // vallen; anders het verwacht-FIRE-moment.
+                        const fire = Math.round(
+                          stopPad != null && scenarioStopAge != null
+                            ? scenarioStopAge
+                            : (simResult?.fireAgeFractional ?? simResult?.fireAge ?? first),
+                        )
+                        const aow = Math.round(userAowAge?.fractional ?? fire)
+                        const pct = (a: number) => Math.max(0, Math.min(100, ((a - first) / span) * 100))
+                        const segments = [
+                          { label: 'Opbouw', color: 'var(--hor-t, #8a6e42)', widthPct: pct(fire) },
+                          { label: 'Brug FIRE → AOW', color: 'var(--color-horizon-500)', widthPct: Math.max(0, pct(aow) - pct(fire)) },
+                          { label: 'Onttrekking', color: 'var(--kern-t, #58362d)', widthPct: Math.max(0, 100 - pct(aow)) },
+                        ]
+                        return <LevensinkomenStrook nodes={coverageNodes} activeAge={lifelineAge} segments={segments} />
+                      })()}
+                    </div>
+                  )}
 
-      {/* === 4b. Levensinkomenstrook (dekkingsgraad per leeftijd) === */}
-      {coverageNodes.length > 0 && (
-        <HideInSimple>
-          <section className="mt-6 sm:mt-8">
-            <div className="mb-1 flex items-center gap-2">
-              <h2 className="label-editorial text-[var(--ink-2)]">Levensinkomenstrook</h2>
-              {hasScenario && !(usePartnerMainLine || useHouseholdMainLine) && <ScenarioChip doelActief={doelActief} />}
-            </div>
-            <p className="mb-3 font-sans text-[12px] text-[var(--ink-3)]">
-              Dekkingsgraad per leeftijd — rekent met je gekozen stopleeftijd zodra je die zet.
-            </p>
-            <div className="card-editorial p-4 sm:p-5">
-              {(() => {
-                const first = coverageNodes[0].age
-                const last = coverageNodes[coverageNodes.length - 1].age
-                const span = Math.max(1, last - first)
-                // Fasegrens = het gekozen stopmoment zodra een expliciete stop gezet is (stopPad),
-                // zodat de opbouw/brug-grens én de dekkingsdip in de strook op dezelfde leeftijd
-                // vallen; anders het verwacht-FIRE-moment.
-                const fire = Math.round(
-                  stopPad != null && scenarioStopAge != null
-                    ? scenarioStopAge
-                    : (simResult?.fireAgeFractional ?? simResult?.fireAge ?? first),
-                )
-                const aow = Math.round(userAowAge?.fractional ?? fire)
-                const pct = (a: number) => Math.max(0, Math.min(100, ((a - first) / span) * 100))
-                const segments = [
-                  { label: 'Opbouw', color: 'var(--hor-t, #8a6e42)', widthPct: pct(fire) },
-                  { label: 'Brug FIRE → AOW', color: 'var(--color-horizon-500)', widthPct: Math.max(0, pct(aow) - pct(fire)) },
-                  { label: 'Onttrekking', color: 'var(--kern-t, #58362d)', widthPct: Math.max(0, 100 - pct(aow)) },
-                ]
-                return <LevensinkomenStrook nodes={coverageNodes} activeAge={lifelineAge} segments={segments} />
-              })()}
-            </div>
-          </section>
-        </HideInSimple>
-      )}
+                  {/* === 4c. Guardrail-kompas (bestedingsgrenzen) === */}
+                  {(effectiveInput?.monthlyExpenses ?? 0) > 0 && (
+                    <div className="p-4 sm:p-5">
+                      <div className="mb-1">
+                        <Kicker className="mb-1">Guardrail-kompas</Kicker>
+                        <div className="flex items-center gap-2">
+                          <h2 className="font-display text-[14px] font-semibold leading-snug text-[var(--ink)]">Hoeveel kun je veilig uitgeven?</h2>
+                          {hasScenario && !(usePartnerMainLine || useHouseholdMainLine) && <ScenarioChip doelActief={doelActief} />}
+                        </div>
+                      </div>
+                      <p className="mb-3 font-sans text-[12px] text-[var(--ink-3)]">
+                        Bij welk maandbedrag je meer of minder kunt uitgeven.
+                      </p>
+                      <GuardrailKompas
+                        levels={{
+                          teWeinig: guardrailBounds.teWeinig,
+                          veilig: guardrailBounds.veilig,
+                          gepland: guardrailBounds.gepland,
+                          meevaller: guardrailBounds.meevaller,
+                        }}
+                        you={guardrailBounds.you}
+                      />
+                    </div>
+                  )}
 
-      {/* === 4c. Guardrail-kompas (bestedingsgrenzen) === */}
-      {(effectiveInput?.monthlyExpenses ?? 0) > 0 && (
-        <HideInSimple>
-          <section className="mt-6 sm:mt-8">
-            <div className="mb-1 flex items-center gap-2">
-              <h2 className="label-editorial text-[var(--ink-2)]">Guardrail-kompas</h2>
-              {hasScenario && !(usePartnerMainLine || useHouseholdMainLine) && <ScenarioChip doelActief={doelActief} />}
-            </div>
-            <p className="mb-3 font-sans text-[12px] text-[var(--ink-3)]">
-              Bij welk maandbedrag je meer of minder kunt uitgeven.
-            </p>
-            <div className="card-editorial p-4 sm:p-5">
-              <GuardrailKompas
-                levels={{
-                  teWeinig: guardrailBounds.teWeinig,
-                  veilig: guardrailBounds.veilig,
-                  gepland: guardrailBounds.gepland,
-                  meevaller: guardrailBounds.meevaller,
-                }}
-                you={guardrailBounds.you}
-              />
-            </div>
-          </section>
-        </HideInSimple>
-      )}
+                  {/* === 4d. Dekkingsradar (vijf dekkingsratio's) === */}
+                  {radarAssen !== null && (
+                    <div className="p-4 sm:p-5">
+                      <div className="mb-1">
+                        <Kicker className="mb-1">Dekkingsradar</Kicker>
+                        <div className="flex items-center gap-2">
+                          <h2 className="font-display text-[14px] font-semibold leading-snug text-[var(--ink)]">Hoe stevig staat je plan?</h2>
+                          {hasScenario && !(usePartnerMainLine || useHouseholdMainLine) && <ScenarioChip doelActief={doelActief} />}
+                        </div>
+                      </div>
+                      <p className="mb-3 font-sans text-[12px] text-[var(--ink-3)]">
+                        Vijf dekkingsratio&apos;s — op elk front.
+                      </p>
+                      <Dekkingsradar assen={radarAssen} />
+                    </div>
+                  )}
 
-      {/* === 4d. Dekkingsradar (vijf dekkingsratio's) === */}
-      {radarAssen !== null && (
-        <HideInSimple>
-          <section className="mt-6 sm:mt-8">
-            <div className="mb-1 flex items-center gap-2">
-              <h2 className="label-editorial text-[var(--ink-2)]">Dekkingsradar</h2>
-              {hasScenario && !(usePartnerMainLine || useHouseholdMainLine) && <ScenarioChip doelActief={doelActief} />}
-            </div>
-            <p className="mb-3 font-sans text-[12px] text-[var(--ink-3)]">
-              Vijf dekkingsratio&apos;s — hoe stevig je plan op elk front staat.
-            </p>
-            <div className="card-editorial p-4 sm:p-5">
-              <Dekkingsradar assen={radarAssen} />
-            </div>
-          </section>
-        </HideInSimple>
-      )}
-
-      {/* === 4e. Scenario's naast elkaar (5 preset-kaarten, tegen je basispad) === */}
-      {(scenarioPresets !== null || scenarioPresetsLoading) && (
-        <HideInSimple>
-          <section className="mt-6 sm:mt-8">
-            <div className="mb-1 flex items-center gap-2">
-              <h2 className="label-editorial text-[var(--ink-2)]">Scenario&apos;s naast elkaar</h2>
-            </div>
-            <p className="mb-3 font-sans text-[12px] text-[var(--ink-3)]">
-              Vijf paden — één basispad, verbeteringen en één waarschuwing; elk pad wordt afgezet tegen je basispad.
-            </p>
-            <div className="card-editorial p-4 sm:p-5">
-              <ScenarioKaarten kaarten={scenarioPresets ?? []} isLoading={scenarioPresetsLoading} />
-            </div>
-          </section>
-        </HideInSimple>
-      )}
+                  {/* === 4e. Scenario's naast elkaar (5 preset-kaarten, tegen je basispad) === */}
+                  {(scenarioPresets !== null || scenarioPresetsLoading) && (
+                    <div className="p-4 sm:p-5">
+                      <div className="mb-1">
+                        <Kicker className="mb-1">Scenario&apos;s naast elkaar</Kicker>
+                        <h2 className="font-display text-[14px] font-semibold leading-snug text-[var(--ink)]">Wat als het anders loopt?</h2>
+                      </div>
+                      <p className="mb-3 font-sans text-[12px] text-[var(--ink-3)]">
+                        Vijf paden — één basispad, verbeteringen en één waarschuwing; elk pad wordt afgezet tegen je basispad.
+                      </p>
+                      <ScenarioKaarten kaarten={scenarioPresets ?? []} isLoading={scenarioPresetsLoading} />
+                    </div>
+                  )}
+                </div>
+              </section>
+            </HideInSimple>
+          </>
+        )
+      })()}
 
       {/* === 5. Household FIRE Projections === */}
       <HideInSimple>

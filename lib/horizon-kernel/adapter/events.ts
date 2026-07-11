@@ -9,9 +9,17 @@
  *    adapter geeft pot-parameters door, geen uitkeringsbedragen, behalve bij direct-
  *    bruto-metadata, zie `mapPensionPots`);
  *  - **werk** → `WerkStrategieParams` (de kern bouwt de salarisladder → CF!D-delta);
+ *  - **slider-werk** (`scenario_origin` `slider:income`/`slider:workdays`) → een
+ *    PERMANENTE inkomens-delta die als één bedrag (`salarisDeltaPerMaand`) op het
+ *    salaris-kanaal (`nettoJaarinkomen`, snede 1) landt i.p.v. als Geb-rij. Daar geldt de
+ *    dynamische FIRE-gate van de kern automatisch (CF!D → F sparen, 0 ná FIRE), zodat de
+ *    delta — anders dan een doorlopende Geb-baat in CF!H — NIET de onttrekkingsfase in lekt.
+ *    Sliders starten altijd op `currentAge` (= maand 0), dus een vlakke delta op het basis-
+ *    salaris heeft dezelfde start-semantiek. De kósten-slider (`slider:savings`) en
+ *    `slider:extra_inleg` blijven BEWUST vrije Geb-events (lifestyle/inleg lopen door);
  *  - **alle overige (vrije) typen** → handmatige `GebeurtenisRij[]` (Geb rij 4-13),
  *    via hergebruik van de app-expander `lifeEventsToCashflows` (children/inheritance/
- *    aow/pension/werk/huis worden dáár NIET meegeteld — die zijn hier al gerouteerd).
+ *    aow/pension/werk/huis/slider-werk worden dáár NIET meegeteld — die zijn hier al gerouteerd).
  *
  * **Dubbeltelling-guard:** de partitie (beheerd vs. vrij) komt uit `guard.ts`; alleen
  * de vrije partitie wordt naar Geb-rijen gemapt. Huis-events (`housing-strategy:`)
@@ -50,7 +58,7 @@ import type {
 } from '../types'
 import { HORIZON_MONTHS } from '../types'
 import { NEUTRAL_AUTO_GEBEURTENISSEN, NEUTRAL_WERK_STRATEGIE } from './params'
-import { dedupeById, expanderFor, partitionEvents } from './guard'
+import { dedupeById, expanderFor, isSliderWorkEvent, partitionEvents } from './guard'
 
 // ── Diagnostiek ──────────────────────────────────────────────────────────────────
 
@@ -69,6 +77,13 @@ export interface EventInputs {
   readonly autoGebeurtenissen: AutoGebeurtenisParams
   readonly werkStrategie: WerkStrategieParams
   readonly gebeurtenissen: readonly GebeurtenisRij[]
+  /**
+   * Permanente netto-inkomens-delta per maand (€) uit de slider-werk-flows
+   * (`slider:income`/`slider:workdays`), gesommeerd. De barrel telt dit op bij
+   * `nettoJaarinkomen` (× 12) zodat het via het FIRE-gegate salaris-kanaal loopt i.p.v. als
+   * levenslange Geb-baat. 0 wanneer er geen slider-werk-events zijn (byte-identiek aan snede 1).
+   */
+  readonly salarisDeltaPerMaand: number
   /**
    * Generieke pot-mutaties uit `market_shock`-events (buiten oracle-domein, V9).
    * Leeg wanneer er geen portfolio-schokken zijn. Voedt `KernelInput.potMutaties`.
@@ -113,7 +128,15 @@ export function buildEventInputs(
   ctx: EventMappingContext,
 ): EventInputs {
   const active = dedupeById(events).filter((e) => e.is_active)
-  const { strategieGestuurd, vrij } = partitionEvents(active)
+
+  // Slider-werk-flows (inkomen/werkdagen) worden eerst afgevangen: hun permanente inkomens-
+  // delta gaat via het salaris-kanaal (FIRE-gegate), niet via een Geb-rij. Wat overblijft
+  // partitioneert de guard als vanouds (beheerd → param-blokken, vrij → Geb-rijen).
+  const salarisDeltaEvents = active.filter(isSliderWorkEvent)
+  const rest = active.filter((e) => !isSliderWorkEvent(e))
+  const salarisDeltaPerMaand = sumSalarisDeltaPerMaand(salarisDeltaEvents)
+
+  const { strategieGestuurd, vrij } = partitionEvents(rest)
 
   const notices: EventMappingNotice[] = []
   const potMutaties: PotMutatie[] = []
@@ -121,7 +144,23 @@ export function buildEventInputs(
   const werkStrategie = buildWerkStrategie(strategieGestuurd, notices)
   const gebeurtenissen = buildManualGebeurtenissen(vrij, ctx, notices, potMutaties)
 
-  return { autoGebeurtenissen, werkStrategie, gebeurtenissen, potMutaties, notices }
+  return { autoGebeurtenissen, werkStrategie, gebeurtenissen, potMutaties, notices, salarisDeltaPerMaand }
+}
+
+/**
+ * Som de permanente maandelijkse inkomens-delta over de slider-werk-events. Beide bronnen
+ * dragen de delta op `monthly_income_change` (income-slider: raise/verlaging; werkdagen-slider:
+ * het inkomensverlies, negatief). Sliders zetten `target_age = currentAge` (= maand 0), dus de
+ * delta start synchroon met het basissalaris — een vlakke optelling op `nettoJaarinkomen`
+ * heeft dezelfde start-semantiek. Geen delta / lege lijst → 0 (byte-identiek aan snede 1).
+ */
+function sumSalarisDeltaPerMaand(events: readonly LifeEvent[]): number {
+  let som = 0
+  for (const ev of events) {
+    const delta = Number(ev.monthly_income_change ?? 0)
+    if (Number.isFinite(delta)) som += delta
+  }
+  return som
 }
 
 // ── Auto-gebeurtenissen (AOW + pensioen + kinderen + erfenis) ───────────────────────
