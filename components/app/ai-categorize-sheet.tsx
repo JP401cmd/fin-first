@@ -1314,20 +1314,11 @@ function TransactionRow({ row, budgetGroups, onAcceptSuggestion, onManualBudget,
         </div>
       )}
 
-      {/* Manual selection for rows with AI suggestion (override) */}
-      {hasSuggestion && !accepted && (
-        <div className="mt-2 flex justify-end">
-          <button
-            type="button"
-            onClick={() => {
-              // Show the select by setting a flag — handled via manual select appearing below
-            }}
-            className="font-[var(--font-source-serif)] text-[11px] italic text-kern-600 hover:underline"
-          >
-            Andere categorie kiezen →
-          </button>
-        </div>
-      )}
+      {/* B-06: de losse "Andere categorie kiezen →"-knop is verwijderd. Hij had een
+          lege onClick (no-op) terwijl de keuzelijst hieronder al zichtbaar is onder
+          exact dezelfde conditie (hasSuggestion && !accepted). De knop was dus puur
+          verwarrend; de select met eigen label "— Andere categorie kiezen —" is de
+          enige, duidelijke ingang voor een handmatige override. */}
 
       {/* Manual override dropdown for rows that had AI suggestions */}
       {hasSuggestion && (

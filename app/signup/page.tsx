@@ -146,6 +146,21 @@ export default function SignupPage() {
           >
             {loading ? 'Account aanmaken...' : 'Registreren'}
           </button>
+
+          {/* Consent-zin (besluit 17): akkoord via registratie zelf, geen los
+              vinkje — de links maken de voorwaarden en privacyverklaring
+              expliciet vindbaar. */}
+          <p className="text-center text-xs text-zinc-500">
+            Door te registreren ga je akkoord met de{' '}
+            <Link href="/voorwaarden" className="underline hover:text-zinc-700">
+              voorwaarden
+            </Link>{' '}
+            en de{' '}
+            <Link href="/privacy" className="underline hover:text-zinc-700">
+              privacyverklaring
+            </Link>
+            .
+          </p>
         </form>
 
         <p className="mt-6 text-center text-sm text-zinc-600">

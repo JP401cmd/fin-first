@@ -840,26 +840,6 @@ export function ChatPanel() {
     return 'Er ging iets mis bij het genereren van een antwoord. Probeer het opnieuw.'
   }
 
-  /**
-   * Extract server-side error detail uit de raw err.message. De chat-route
-   * returnt {error, detail} JSON; useChat()'s error.message bevat de raw body.
-   * Toon dat detail als debug-helper zodat productie-bugs zonder log-toegang
-   * diagnoseerbaar zijn.
-   */
-  function getErrorDetail(err: Error | undefined): string | null {
-    if (!err?.message) return null
-    try {
-      const parsed = JSON.parse(err.message) as { error?: string; detail?: string }
-      if (parsed.detail && parsed.detail !== parsed.error) return parsed.detail
-    } catch {
-      // Niet-JSON message; toon de raw text als deze afwijkt van de standaard
-      if (err.message.length > 0 && err.message.length < 280 && !err.message.startsWith('Er ging')) {
-        return err.message
-      }
-    }
-    return null
-  }
-
   const handleRetry = useCallback(() => {
     clearError()
     regenerate()
@@ -1009,19 +989,11 @@ export function ChatPanel() {
                   <p className="text-sm font-medium text-red-800">
                     {getErrorMessage(error)}
                   </p>
-                  {!isSubscriptionError(error) && (() => {
-                    const detail = getErrorDetail(error)
-                    return detail ? (
-                      <details className="mt-1.5">
-                        <summary className="cursor-pointer text-[11px] text-red-700 hover:text-red-900">
-                          Technische details
-                        </summary>
-                        <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap rounded bg-red-100/60 px-2 py-1 text-[11px] font-mono text-red-900">
-                          {detail}
-                        </pre>
-                      </details>
-                    ) : null
-                  })()}
+                  {/* Rauwe serverfout (was: <details> "Technische details") is
+                      bewust verwijderd: er is geen schoon client-side admin-
+                      signaal in de chat-context, dus tonen we die nooit aan
+                      gewone gebruikers. Alleen de nette NL-melding + retry
+                      blijven (E-09). */}
                   {isSubscriptionError(error) ? (
                     // Geen retry-lus bij een abonnement-fout — die kan nooit
                     // slagen. Toon de upsell + CTA naar /mijn/account.

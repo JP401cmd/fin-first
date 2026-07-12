@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { Upload, FileText, X, Check, Loader2, AlertCircle, Download } from 'lucide-react'
+import { Upload, FileText, X, Check, Loader2, AlertCircle, Download, RefreshCw } from 'lucide-react'
 import {
   parseMijnpensioenJson,
   mijnpensioenJsonToParseResult,
@@ -208,6 +208,15 @@ export function PensionPdfUpload({
     onFileRemoved?.()
   }, [onFileRemoved])
 
+  /**
+   * Opnieuw proberen na een verwerkingsfout — herhaalt de upload/validatie met
+   * het reeds gekozen bestand (nog in `file`-state), zónder dat de gebruiker
+   * opnieuw hoeft te slepen of te kiezen.
+   */
+  const handleRetry = useCallback(() => {
+    if (file) validateAndSet(file)
+  }, [file, validateAndSet])
+
   const handleDownload = useCallback(async () => {
     if (!lifeEventId) return
     setDownloading(true)
@@ -345,11 +354,21 @@ export function PensionPdfUpload({
             type="button"
             onClick={handleRemove}
             className="shrink-0 rounded-md p-1.5 text-[var(--ink-4)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] transition-colors"
-            title="Verwijder en probeer opnieuw"
+            title="Verwijder bestand"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
+        {/* Echte retry: herhaalt de verwerking met hetzelfde bestand. De X
+            hierboven blijft het secundaire pad (bestand weggooien). */}
+        <button
+          type="button"
+          onClick={handleRetry}
+          className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-[var(--r)] border border-red-200 bg-red-100/50 px-3 py-1.5 text-xs font-medium text-red-700 transition-colors hover:bg-red-100"
+        >
+          <RefreshCw className="h-3.5 w-3.5" />
+          Opnieuw proberen
+        </button>
       </div>
     )
   }

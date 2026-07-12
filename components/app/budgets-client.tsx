@@ -41,6 +41,7 @@ import { BudgetTree } from '@/components/app/budget-tree'
 import { BudgetPillTree } from '@/components/app/budget-pill-tree'
 import { BudgetDonut } from '@/components/app/budget-donut'
 import { BudgetHeatmap, type HeatmapSection } from '@/components/app/budget-heatmap'
+import { WidgetEmpty } from '@/components/widgets/widget-empty'
 import { useDailyExpenseRate, eurToFreedomTime } from '@/components/app/freedom-time-label'
 import { BudgetSparkline, SparklineWithLabel, type SparklineDataPoint } from '@/components/app/budget-sparkline'
 import { computeBudgetForecast, getConfidenceLabel, getConfidenceColors, type BudgetForecast } from '@/lib/budget-forecast'
@@ -974,6 +975,9 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
   const [partnerBudgets, setPartnerBudgets] = useState<PartnerBudgetRow[]>([])
   const [loading, setLoading] = useState(!initialData)
   const [error, setError] = useState<string | null>(null)
+  // Pas ná de eerste volledige load (incl. eventueel auto-seeden) waar — de
+  // first-use lege staat mag niet flitsen terwijl de seed-cyclus nog loopt.
+  const [initialLoadDone, setInitialLoadDone] = useState(false)
 
   // Pane-state komt rechtstreeks uit `searchParams` (één bron-of-truth, plan §2.7).
   // Geen lokale `selectedBudgetId` meer; openen/sluiten gebeurt via router.replace
@@ -1446,7 +1450,10 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
       console.error('Error loading budgets:', err)
       if (!signal?.aborted) setError('Kon budgetten niet laden. Probeer het opnieuw.')
     } finally {
-      if (!signal?.aborted) setLoading(false)
+      if (!signal?.aborted) {
+        setLoading(false)
+        setInitialLoadDone(true)
+      }
     }
   }, [perspective, partnerPrivacy, mySharePct, budgetModel])
 
@@ -2377,7 +2384,28 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
       </div>
 
       {/* Budget groups */}
-      {effectiveViewMode === 'tree' || effectiveViewMode === 'pill' ? (
+      {initialLoadDone && budgets.length === 0 && partnerBudgets.length === 0 ? (
+        // First-use: geen enkel budget (eigen, gedeeld of van partner). Alle
+        // type-secties zijn `.length > 0`-gated, dus zonder deze tak toont de
+        // lijst niets — een doodlopende lege staat. CTA opent de bestaande
+        // "Nieuw budget"-pane via `?newBudget=true` (hergebruikt closeNewBudgetPane-pad).
+        <div className="mt-4 sm:mt-8 border border-dashed border-[var(--border-ed)] bg-[var(--paper)] py-10">
+          <WidgetEmpty
+            variant="first-use"
+            icon={LayoutGrid}
+            title="Nog geen budgetten"
+            description="Maak je eerste budget om je uitgaven per categorie te volgen — elke euro is opgeslagen tijd."
+            action={{
+              label: 'Maak je eerste budget',
+              onClick: () => {
+                const next = new URLSearchParams(searchParams.toString())
+                next.set(OVERLAY_QUERY_KEYS.newBudget, 'true')
+                router.replace(`${pathname}?${next.toString()}`, { scroll: false })
+              },
+            }}
+          />
+        </div>
+      ) : effectiveViewMode === 'tree' || effectiveViewMode === 'pill' ? (
         <>
           {householdSectioned ? (
             // Drie secties op herkomst: Gezamenlijk (gedeeld, vol) / Mijn potjes

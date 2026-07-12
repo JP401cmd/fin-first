@@ -24,7 +24,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { formatMaskedCurrency } from '@/lib/format'
@@ -141,6 +141,7 @@ export function CategoryHistoryChart({
 }: CategoryHistoryChartProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const pathname = usePathname()
   const { masked } = useMaskedAmounts()
   const fc = useCallback((v: number) => formatMaskedCurrency(v, masked), [masked])
 
@@ -419,7 +420,9 @@ export function CategoryHistoryChart({
   // ── Empty / sparse state ────────────────────────────────────
   // Placed AFTER all hook calls so React's hook-order invariant holds.
   if (initialData.months.length < 2) {
-    const cta = variant === 'asset' ? '/core/assets/revalue' : '/core/debts'
+    const cta = variant === 'asset'
+      ? `/core/assets/revalue${pathname ? `?returnTo=${encodeURIComponent(pathname)}` : ''}`
+      : '/core/debts'
     return (
       <div ref={ref} className="space-y-4">
         <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6 text-center">

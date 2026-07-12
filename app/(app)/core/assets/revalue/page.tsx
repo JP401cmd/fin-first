@@ -1,9 +1,10 @@
 'use client'
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { RefreshCw, Loader2, AlertCircle, Lock, Check } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { safeRelativePath } from '@/lib/safe-redirect'
 import { BudgetIcon } from '@/components/app/budget-shared'
 import { calculateFreedomTime, formatFreedomTimeString, formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
@@ -21,8 +22,25 @@ import {
 type HoldingsMap = Record<string, boolean>
 type LinkedBankMap = Set<string>
 
+/** Legacy bezittingen-route — de terugval wanneer geen (geldige) `returnTo` meekomt. */
+const DEFAULT_REVALUE_RETURN = '/core/assets'
+
+/**
+ * Resolveer de veilige terug-bestemming na een bulk-herwaardering. De
+ * `returnTo`-queryparam (bv. `/overzicht/bezittingen`, meegegeven door de
+ * Herwaarderen-knop) mag uitsluitend een relatief in-app pad zijn —
+ * `safeRelativePath` weert open-redirects (`//evil.com`, `https://…`, `\`, …).
+ * Zonder geldige param val je terug op de legacy bezittingen-route, zodat wie
+ * vanaf /overzicht/bezittingen herwaardeert daar ook weer terugkomt.
+ */
+export function resolveRevalueReturnTo(param: string | null | undefined): string {
+  return safeRelativePath(param, DEFAULT_REVALUE_RETURN)
+}
+
 export default function RevaluePage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const returnTo = resolveRevalueReturnTo(searchParams.get('returnTo'))
   const { masked } = useMaskedAmounts()
   const fc = useCallback((v: number) => formatMaskedCurrency(v, masked), [masked])
   const [assets, setAssets] = useState<Asset[]>([])
@@ -246,7 +264,7 @@ export default function RevaluePage() {
       )
 
       setSaved(true)
-      setTimeout(() => router.push('/core/assets'), 1200)
+      setTimeout(() => router.push(returnTo), 1200)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Opslaan mislukt')
     } finally {

@@ -2520,11 +2520,41 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   )
 
   // Globale reset "Terug naar basis": wist sliders + rendement-delta's (stopAge/koppel/
-  // toggle blijven bewust staan).
+  // toggle blijven bewust staan). Reset blijft één klik (geen bevestigingsvraag),
+  // maar een snapshot + undo-toast (5s) maakt 'm binnen dat venster exact
+  // terugdraaibaar. De debounced persist pikt zowel het wissen als het herstel
+  // vanzelf op (beide zetten scenario-state).
   const handleScenarioReset = useCallback(() => {
+    // Snapshot beperkt tot wat de reset daadwerkelijk wist — stopAge/stopKoppel
+    // blijven staan bij reset, dus undo mag ze ook niet terugzetten (dat zou
+    // een tussentijdse stop-wijziging binnen het undo-venster overschrijven).
+    const snapshot = {
+      sliderEvents: scenarioSliderEvents,
+      returnDeltas: scenarioReturnDeltas,
+    }
+    const hadSomething =
+      snapshot.sliderEvents.length > 0 || Object.keys(snapshot.returnDeltas).length > 0
+
     setScenarioSliderEvents([])
     setScenarioReturnDeltas({})
-  }, [])
+
+    // Niets te wissen → geen undo-toast (voorkomt een misleidende "Ongedaan maken").
+    if (!hadSomething) return
+
+    addToast({
+      type: 'info',
+      title: 'Scenario gewist',
+      duration: 5000,
+      action: {
+        label: 'Ongedaan maken',
+        onClick: () => {
+          // Exact terug wat de reset wiste: sliders + rendement-delta's.
+          setScenarioSliderEvents(snapshot.sliderEvents)
+          setScenarioReturnDeltas(snapshot.returnDeltas)
+        },
+      },
+    })
+  }, [scenarioSliderEvents, scenarioReturnDeltas, addToast])
 
   // ── Doel: één stand-bouwer (gedeeld met persist), concept-detectie, previews ──────
   // EXACT dezelfde inclusie-/afrondingsregels als het (oude) persist-effect — nu via de

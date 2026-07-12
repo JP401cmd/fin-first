@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import {
   Upload, FileText, Check, AlertTriangle,
-  ChevronRight, Loader2, WifiOff, RefreshCw, Sparkles, Lightbulb,
+  ChevronRight, ChevronLeft, Loader2, WifiOff, RefreshCw, Sparkles, Lightbulb,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { parseMT940 } from '@/lib/parsers/mt940'
@@ -20,6 +20,7 @@ import { linkUnmatchedTransfers } from '@/lib/transfer-matching'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { Kicker, EditorialHeadline, EditorialDeck } from '@/components/editorial'
 import { AICategorizeSheet } from '@/components/app/ai-categorize-sheet'
+import { selectAllState, withAllSkip } from './select-all'
 
 /**
  * Minimale transactievorm voor het post-import categoriseer-scherm
@@ -333,7 +334,10 @@ export default function ImportPage() {
           setIsNetworkError(true)
           setError('Geen internetverbinding. Controleer je netwerk en probeer het opnieuw.')
         } else {
-          setError(`Fout bij het controleren van duplicaten: ${queryError.message}`)
+          // Technische (Postgres/PostgREST-)details alleen naar de log; de UI
+          // krijgt een vaste NL-melding zonder rauwe database-strings.
+          console.error('Duplicaatcontrole mislukt:', queryError)
+          setError('Het controleren op dubbele transacties is niet gelukt — probeer het opnieuw.')
         }
         setCheckingDups(false)
         return
@@ -618,6 +622,12 @@ export default function ImportPage() {
     setRows((prev) => prev.map((r, i) =>
       i === index ? { ...r, skipImport: !r.skipImport } : r
     ))
+  }
+
+  // Kop-checkbox in de duplicatenstap: markeer álle rijen als wel/niet-importeren
+  // in één klik (skip=true = alles deselecteren, false = alles selecteren).
+  function toggleSkipAll(skip: boolean) {
+    setRows((prev) => withAllSkip(prev, skip))
   }
 
   async function handleImport(retryFromBatch?: number) {
@@ -1155,6 +1165,31 @@ export default function ImportPage() {
             </select>
           </div>
 
+          {/* Al ingelezen bestand — verschijnt na "Terug" vanuit de duplicatenstap.
+              De geparsede rijen blijven in state; hier kun je de rekening wijzigen
+              en weer vooruit, of hierboven een nieuw bestand kiezen (dat vervangt
+              de rijen bewust). */}
+          {rows.length > 0 && !showColumnMapping && (
+            <div className="flex flex-col gap-3 rounded-lg border border-kern-200 bg-kern-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-sm">
+                <p className="font-medium text-kern-800">Bestand al ingelezen</p>
+                <p className="mt-0.5 text-xs text-kern-600">
+                  <strong>{fileName || 'Bankbestand'}</strong> — {rows.length}{' '}
+                  {rows.length === 1 ? 'transactie' : 'transacties'} klaar. Wijzig hierboven
+                  eventueel de rekening en ga verder, of kies een nieuw bestand.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setError(''); setIsNetworkError(false); setStep(2) }}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700"
+              >
+                Verder naar dubbelingen
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+
           {/* Geen rekeningen: upload geblokkeerd tot er een rekening is */}
           {!loading && accounts.length === 0 && (
             <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
@@ -1190,7 +1225,7 @@ export default function ImportPage() {
               <>
                 <FileText className="h-10 w-10 text-[var(--ink-3)]" />
                 <p className="mt-4 text-sm font-medium text-[var(--ink-2)]">
-                  Sleep een MT940-bestand hierheen
+                  Sleep je bankbestand hierheen (MT940, CSV of OFX)
                 </p>
                 <p className="mt-1 text-xs text-[var(--ink-3)]">of</p>
                 <label className={`mt-3 rounded-lg px-4 py-2 text-sm font-medium text-white ${selectedAccountId ? 'cursor-pointer bg-kern-600 hover:bg-kern-700' : 'cursor-not-allowed bg-[var(--ink-4)]'}`}>
@@ -1380,6 +1415,20 @@ export default function ImportPage() {
               {csvPreview.length > 0 && (
                 <div>
                   <p className="mb-2 text-xs font-medium text-[var(--ink-3)]">Preview (eerste {csvPreview.length} regels)</p>
+                  {/* Legenda bij de kolombadges in de tabelkop hieronder. */}
+                  <p className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-[var(--ink-3)]">
+                    <span><span className="font-semibold text-kern-500">D</span> = Datum</span>
+                    <span aria-hidden className="text-[var(--ink-4)]">·</span>
+                    <span><span className="font-semibold text-kern-500">B</span> = Bedrag</span>
+                    <span aria-hidden className="text-[var(--ink-4)]">·</span>
+                    <span><span className="font-semibold text-kern-500">O</span> = Omschrijving</span>
+                    <span aria-hidden className="text-[var(--ink-4)]">·</span>
+                    <span><span className="font-semibold text-[var(--ink-3)]">T</span> = Tegenpartij</span>
+                    <span aria-hidden className="text-[var(--ink-4)]">·</span>
+                    <span><span className="font-semibold text-[var(--ink-3)]">I</span> = IBAN</span>
+                    <span aria-hidden className="text-[var(--ink-4)]">·</span>
+                    <span><span className="font-semibold text-[var(--ink-3)]">R</span> = Referentie</span>
+                  </p>
                   <div className="overflow-x-auto rounded-lg border border-[var(--border-ed)]">
                     <table className="w-full text-xs">
                       <thead className="bg-[var(--subtle)]">
@@ -1390,9 +1439,9 @@ export default function ImportPage() {
                               {i === csvPreset.dateColumn && <span className="ml-1 text-kern-500">[D]</span>}
                               {i === csvPreset.amountColumn && <span className="ml-1 text-kern-500">[B]</span>}
                               {i === csvPreset.descriptionColumn && <span className="ml-1 text-kern-500">[O]</span>}
-                              {i === csvPreset.counterpartyColumn && <span className="ml-1 text-teal-500">[T]</span>}
-                              {i === csvPreset.ibanColumn && <span className="ml-1 text-teal-500">[I]</span>}
-                              {i === csvPreset.referenceColumn && <span className="ml-1 text-teal-500">[R]</span>}
+                              {i === csvPreset.counterpartyColumn && <span className="ml-1 text-[var(--ink-3)]">[T]</span>}
+                              {i === csvPreset.ibanColumn && <span className="ml-1 text-[var(--ink-3)]">[I]</span>}
+                              {i === csvPreset.referenceColumn && <span className="ml-1 text-[var(--ink-3)]">[R]</span>}
                             </th>
                           ))}
                         </tr>
@@ -1442,6 +1491,17 @@ export default function ImportPage() {
             </div>
           ) : (
             <>
+              {/* Terug naar upload — de geparsede rijen blijven behouden, zodat je
+                  van rekening of bestand kunt wisselen zonder opnieuw te uploaden. */}
+              <button
+                type="button"
+                onClick={() => { setError(''); setIsNetworkError(false); setStep(1) }}
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--ink-3)] hover:text-kern-600"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Terug naar upload
+              </button>
+
               <div className="flex items-center justify-between">
                 <div className="flex gap-4 text-sm">
                   <span className="text-emerald-600"><strong>{newCount}</strong> nieuw</span>
@@ -1492,12 +1552,27 @@ export default function ImportPage() {
                 const step2TotalPages = Math.ceil(rows.length / PAGE_SIZE)
                 const step2PageRows = rows.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE)
                 const step2Offset = currentPage * PAGE_SIZE
+                // Kop-checkbox: staat afgeleid over ÁLLE rijen (niet enkel de pagina),
+                // zodat "alles importeren / niets importeren" wizard-breed werkt.
+                const { allSelected, indeterminate } = selectAllState(rows)
                 return (
                   <div className="overflow-x-auto rounded-xl border border-[var(--border-ed)]">
                     <table className="w-full text-sm">
                       <thead className="bg-[var(--subtle)] text-left">
                         <tr>
-                          <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Importeer</th>
+                          <th className="px-4 py-2 font-medium text-[var(--ink-3)]">
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                aria-label={allSelected ? 'Alle transacties deselecteren' : 'Alle transacties selecteren'}
+                                checked={allSelected}
+                                ref={(el) => { if (el) el.indeterminate = indeterminate }}
+                                onChange={() => toggleSkipAll(allSelected)}
+                                className="h-4 w-4 rounded border-[var(--border-md)] text-kern-600 focus:ring-kern-500"
+                              />
+                              <span>Importeer</span>
+                            </div>
+                          </th>
                           <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Datum</th>
                           <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Beschrijving</th>
                           <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Bedrag</th>

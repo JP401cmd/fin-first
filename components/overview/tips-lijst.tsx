@@ -1,8 +1,8 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Sparkles, Check, Clock, ThumbsDown, Loader2, MessageCircle, ArrowRight, ExternalLink } from 'lucide-react'
+import { Sparkles, Check, Clock, ThumbsDown, MessageCircle, ArrowRight, ExternalLink } from 'lucide-react'
 import Link from 'next/link'
 import type { Recommendation } from '@/lib/recommendation-data'
 import { deepLinkForRecommendation } from '@/lib/recommendation-deep-link'
@@ -37,6 +37,19 @@ type DecisionKind = 'accept' | 'postpone' | 'reject'
 
 const POSTPONE_DAYS = 14
 
+/**
+ * Zichtbaar undo-venster (ms). De keuze wordt direct optimistisch verwerkt,
+ * maar de server-mutatie (POST) volgt pas ná dit venster — zo kost
+ * "Ongedaan maken" geen server-roundtrip. Geëxporteerd zodat de test 'm pint.
+ */
+export const TIP_UNDO_DELAY_MS = 5500
+
+const DECISION_TOAST_TITLE: Record<DecisionKind, string> = {
+  accept: 'Tip geaccepteerd',
+  postpone: 'Tip uitgesteld',
+  reject: 'Tip genegeerd',
+}
+
 function sortTips(recs: Recommendation[]): Recommendation[] {
   const now = new Date()
   const isReady = (r: Recommendation) =>
@@ -53,8 +66,14 @@ export function TipsLijst({ recommendations, onChanged, onAccepted }: TipsLijstP
   const router = useRouter()
   const chat = useChatContextOptional()
   const { addToast } = useOptionalToast()
-  const [loadingId, setLoadingId] = useState<{ id: string; kind: DecisionKind } | null>(null)
   const [dismissed, setDismissed] = useState<Set<string>>(new Set())
+
+  // Openstaande, nog niet doorgevoerde keuzes (delayed-commit). Per tip houden we
+  // de keuze + timer vast zodat "Ongedaan maken" de timer kan annuleren en een
+  // unmount de POST alsnog direct kan flushen — de keuze gaat nooit verloren.
+  const pendingRef = useRef<
+    Map<string, { rec: Recommendation; kind: DecisionKind; timer: ReturnType<typeof setTimeout> }>
+  >(new Map())
 
   // Filter alleen pending + postponed-ready; expired/rejected/accepted horen
   // hier niet thuis. Postponed-niet-ready slaan we ook over (wachttijd loopt).
@@ -72,44 +91,111 @@ export function TipsLijst({ recommendations, onChanged, onAccepted }: TipsLijstP
     )
   }, [recommendations, dismissed])
 
-  async function decide(rec: Recommendation, kind: DecisionKind) {
-    if (loadingId) return
-    setLoadingId({ id: rec.id, kind })
+  const restoreTip = useCallback((id: string) => {
+    setDismissed((prev) => {
+      if (!prev.has(id)) return prev
+      const next = new Set(prev)
+      next.delete(id)
+      return next
+    })
+  }, [])
 
-    const body: Record<string, unknown> = { action: kind }
-    if (kind === 'postpone') {
-      body.postponed_until = new Date(Date.now() + POSTPONE_DAYS * 86400 * 1000).toISOString()
-    }
-
-    try {
-      const res = await fetch(`/api/ai/recommendations/${rec.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-      if (!res.ok) throw new Error('decision failed')
-
-      // Optimistisch UI: tip uit lijst halen. router.refresh haalt de
-      // canonieke server-data op (incl. nieuwe actions bij accept).
-      setDismissed((prev) => new Set(prev).add(rec.id))
-      onChanged?.()
-      if (kind === 'accept') {
-        onAccepted?.()
-      } else {
-        router.refresh()
+  // De echte server-mutatie. Draait pas ná het undo-venster (of direct bij
+  // unmount). Pas ná een geslaagde POST verversen we de canonieke server-data.
+  const commitDecision = useCallback(
+    async (rec: Recommendation, kind: DecisionKind) => {
+      const body: Record<string, unknown> = { action: kind }
+      if (kind === 'postpone') {
+        body.postponed_until = new Date(Date.now() + POSTPONE_DAYS * 86400 * 1000).toISOString()
       }
-    } catch {
-      // De tip blijft in de lijst staan (dismissed niet gezet) zodat de
-      // gebruiker opnieuw kan klikken; een toast maakt het falen zichtbaar.
-      addToast({
-        type: 'error',
-        title: 'Niet opgeslagen',
-        message: 'Je keuze is niet opgeslagen — probeer het opnieuw.',
-      })
-    } finally {
-      setLoadingId(null)
+
+      try {
+        const res = await fetch(`/api/ai/recommendations/${rec.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+        if (!res.ok) throw new Error('decision failed')
+
+        onChanged?.()
+        if (kind === 'accept') {
+          onAccepted?.()
+        } else {
+          router.refresh()
+        }
+      } catch {
+        // Mislukt: tip terug in de lijst zodat de gebruiker opnieuw kan kiezen;
+        // een toast maakt het falen zichtbaar.
+        restoreTip(rec.id)
+        addToast({
+          type: 'error',
+          title: 'Niet opgeslagen',
+          message: 'Je keuze is niet opgeslagen — probeer het opnieuw.',
+        })
+      }
+    },
+    [onChanged, onAccepted, router, addToast, restoreTip],
+  )
+
+  // Ref met de laatste commit zodat het unmount-effect kan flushen zonder de
+  // pending-keuzes bij elke re-render (nieuwe commit-identiteit) prematuur te
+  // triggeren — de cleanup mag ALLEEN bij echte unmount lopen.
+  const commitRef = useRef(commitDecision)
+  useEffect(() => {
+    commitRef.current = commitDecision
+  }, [commitDecision])
+
+  // Bij unmount (bv. wegnavigeren): alle nog niet verlopen keuzes alsnog direct
+  // doorvoeren zodat een keuze nooit verloren gaat.
+  useEffect(() => {
+    const pending = pendingRef.current
+    return () => {
+      for (const { rec, kind, timer } of pending.values()) {
+        clearTimeout(timer)
+        void commitRef.current(rec, kind)
+      }
+      pending.clear()
     }
-  }
+  }, [])
+
+  const decide = useCallback(
+    (rec: Recommendation, kind: DecisionKind) => {
+      // Al een openstaande keuze voor deze tip? Negeer dubbelklikken.
+      if (pendingRef.current.has(rec.id)) return
+
+      // 1) Direct optimistisch verbergen zodat de UI meteen reageert.
+      setDismissed((prev) => new Set(prev).add(rec.id))
+
+      // 2) POST plannen ná het undo-venster.
+      const timer = setTimeout(() => {
+        pendingRef.current.delete(rec.id)
+        void commitDecision(rec, kind)
+      }, TIP_UNDO_DELAY_MS)
+      pendingRef.current.set(rec.id, { rec, kind, timer })
+
+      // 3) Toast met "Ongedaan maken" — annuleert de timer (geen server-call)
+      //    en toont de tip weer.
+      addToast({
+        type: 'info',
+        title: DECISION_TOAST_TITLE[kind],
+        // Iets korter dan de commit-delay: de undo-knop verdwijnt gegarandeerd
+        // vóórdat de POST vuurt (geen "ongedaan"-klik op een al-verstuurde keuze).
+        duration: TIP_UNDO_DELAY_MS - 300,
+        action: {
+          label: 'Ongedaan maken',
+          onClick: () => {
+            const entry = pendingRef.current.get(rec.id)
+            if (entry) {
+              clearTimeout(entry.timer)
+              pendingRef.current.delete(rec.id)
+            }
+            restoreTip(rec.id)
+          },
+        },
+      })
+    },
+    [addToast, commitDecision, restoreTip],
+  )
 
   if (visible.length === 0) {
     return (
@@ -149,12 +235,7 @@ export function TipsLijst({ recommendations, onChanged, onAccepted }: TipsLijstP
 
       <ul className="space-y-2.5" role="list">
         {visible.map((rec) => (
-          <TipCard
-            key={rec.id}
-            rec={rec}
-            loading={loadingId?.id === rec.id ? loadingId.kind : null}
-            onDecide={decide}
-          />
+          <TipCard key={rec.id} rec={rec} onDecide={decide} />
         ))}
       </ul>
     </section>
@@ -163,11 +244,9 @@ export function TipsLijst({ recommendations, onChanged, onAccepted }: TipsLijstP
 
 function TipCard({
   rec,
-  loading,
   onDecide,
 }: {
   rec: Recommendation
-  loading: DecisionKind | null
   onDecide: (rec: Recommendation, kind: DecisionKind) => void
 }) {
   const days = rec.freedom_days_per_year ?? 0
@@ -209,40 +288,25 @@ function TipCard({
         <button
           type="button"
           onClick={() => onDecide(rec, 'accept')}
-          disabled={loading !== null}
-          className="inline-flex items-center gap-1 rounded-full bg-wil-500 px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-wil-600 disabled:opacity-50"
+          className="inline-flex items-center gap-1 rounded-full bg-wil-500 px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-wil-600"
         >
-          {loading === 'accept' ? (
-            <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
-          ) : (
-            <Check className="h-3 w-3" aria-hidden="true" />
-          )}
+          <Check className="h-3 w-3" aria-hidden="true" />
           Doe nu
         </button>
         <button
           type="button"
           onClick={() => onDecide(rec, 'postpone')}
-          disabled={loading !== null}
-          className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800 transition-colors hover:bg-amber-100 disabled:opacity-50"
+          className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800 transition-colors hover:bg-amber-100"
         >
-          {loading === 'postpone' ? (
-            <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
-          ) : (
-            <Clock className="h-3 w-3" aria-hidden="true" />
-          )}
+          <Clock className="h-3 w-3" aria-hidden="true" />
           Later
         </button>
         <button
           type="button"
           onClick={() => onDecide(rec, 'reject')}
-          disabled={loading !== null}
-          className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-[var(--paper)] px-3 py-1 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-50 disabled:opacity-50"
+          className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-[var(--paper)] px-3 py-1 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-50"
         >
-          {loading === 'reject' ? (
-            <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
-          ) : (
-            <ThumbsDown className="h-3 w-3" aria-hidden="true" />
-          )}
+          <ThumbsDown className="h-3 w-3" aria-hidden="true" />
           Negeren
         </button>
       </div>

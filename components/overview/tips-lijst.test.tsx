@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { TipsLijst } from './tips-lijst'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, fireEvent, act } from '@testing-library/react'
+import { TipsLijst, TIP_UNDO_DELAY_MS } from './tips-lijst'
 import { ToastProvider } from '@/components/app/toast-provider'
 import type { Recommendation } from '@/lib/recommendation-data'
 
@@ -27,6 +27,12 @@ beforeEach(() => {
   mockRefresh.mockReset()
   mockOpenWithMessage.mockReset()
   fetchMock.mockReset()
+})
+
+// Delayed-commit (E-05) draait op timers; wie fake timers opzet in een test,
+// wordt hier weer op echte timers gezet zodat de niet-timer-tests ongemoeid blijven.
+afterEach(() => {
+  vi.useRealTimers()
 })
 
 const baseRec = (overrides: Partial<Recommendation>): Recommendation =>
@@ -120,50 +126,88 @@ describe('TipsLijst', () => {
     expect(titles).toEqual(['Medium ready', 'High prio', 'Low prio'])
   })
 
-  it('calls PATCH with action:accept and removes the tip on success', async () => {
+  it('accept: verbergt de tip direct maar POST pas ná het undo-venster (E-05)', async () => {
+    vi.useFakeTimers()
     fetchMock.mockResolvedValue({ ok: true })
     const onChanged = vi.fn()
     const onAccepted = vi.fn()
 
     render(
-      <TipsLijst
-        recommendations={[baseRec({ id: 'r1', title: 'Click me' })]}
-        onChanged={onChanged}
-        onAccepted={onAccepted}
-      />,
+      <ToastProvider>
+        <TipsLijst
+          recommendations={[baseRec({ id: 'r1', title: 'Click me' })]}
+          onChanged={onChanged}
+          onAccepted={onAccepted}
+        />
+      </ToastProvider>,
     )
 
     fireEvent.click(screen.getByRole('button', { name: /Doe nu/i }))
 
-    await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith(
-        '/api/ai/recommendations/r1',
-        expect.objectContaining({ method: 'PATCH' }),
-      )
+    // Optimistisch: tip meteen weg, maar nog GEEN server-call en geen refresh.
+    expect(screen.queryByText('Click me')).not.toBeInTheDocument()
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(onChanged).not.toHaveBeenCalled()
+
+    // Undo-venster verloopt → de echte POST volgt.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(TIP_UNDO_DELAY_MS + 10)
     })
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/ai/recommendations/r1',
+      expect.objectContaining({ method: 'PATCH' }),
+    )
     const call = fetchMock.mock.calls[0][1] as { body: string }
     expect(JSON.parse(call.body)).toEqual({ action: 'accept' })
-
-    await waitFor(() => {
-      expect(screen.queryByText('Click me')).not.toBeInTheDocument()
-    })
+    // Refresh/callbacks pas ná de echte POST.
     expect(onChanged).toHaveBeenCalled()
-    // Bij accept delegeert TipsLijst de refresh aan de parent zodat
-    // die ook kan scrollen naar de nieuwe actie.
     expect(onAccepted).toHaveBeenCalled()
     expect(mockRefresh).not.toHaveBeenCalled()
   })
 
-  it('sends postponed_until ~14 days ahead on Later', async () => {
+  it('undo binnen het venster annuleert de POST zonder server-call en toont de tip weer (E-05)', async () => {
+    vi.useFakeTimers()
     fetchMock.mockResolvedValue({ ok: true })
 
     render(
-      <TipsLijst recommendations={[baseRec({ id: 'r1', title: 'Click me' })]} />,
+      <ToastProvider>
+        <TipsLijst recommendations={[baseRec({ id: 'r1', title: 'Click me' })]} />
+      </ToastProvider>,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Negeren/i }))
+    // Tip weg + undo-toast verschenen.
+    expect(screen.queryByText('Click me')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /Ongedaan maken/i }))
+    // Tip meteen terug, zonder enige server-call.
+    expect(screen.getByText('Click me')).toBeInTheDocument()
+
+    // Ook nadat het venster ruim verstreken is: geen POST — undo was gratis.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(TIP_UNDO_DELAY_MS + 1000)
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(mockRefresh).not.toHaveBeenCalled()
+  })
+
+  it('sends postponed_until ~14 days ahead on Later (ná het venster)', async () => {
+    vi.useFakeTimers()
+    fetchMock.mockResolvedValue({ ok: true })
+
+    render(
+      <ToastProvider>
+        <TipsLijst recommendations={[baseRec({ id: 'r1', title: 'Click me' })]} />
+      </ToastProvider>,
     )
 
     fireEvent.click(screen.getByRole('button', { name: /Later/i }))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(TIP_UNDO_DELAY_MS + 10)
+    })
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalled())
+    expect(fetchMock).toHaveBeenCalled()
     const call = fetchMock.mock.calls[0][1] as { body: string }
     const body = JSON.parse(call.body) as { action: string; postponed_until: string }
     expect(body.action).toBe('postpone')
@@ -172,7 +216,8 @@ describe('TipsLijst', () => {
     expect(ahead).toBeLessThan(14.5)
   })
 
-  it('toont een foutmelding en laat de tip staan als het opslaan faalt (E-04)', async () => {
+  it('toont een foutmelding en zet de tip terug als het opslaan faalt (E-04)', async () => {
+    vi.useFakeTimers()
     fetchMock.mockResolvedValue({ ok: false, status: 500 })
 
     render(
@@ -182,25 +227,63 @@ describe('TipsLijst', () => {
     )
 
     fireEvent.click(screen.getByRole('button', { name: /Doe nu/i }))
+    // Commit draait pas ná het venster; dán faalt de POST.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(TIP_UNDO_DELAY_MS + 10)
+    })
 
     // Foutmelding zichtbaar...
     expect(
-      await screen.findByText('Je keuze is niet opgeslagen — probeer het opnieuw.'),
+      screen.getByText('Je keuze is niet opgeslagen — probeer het opnieuw.'),
     ).toBeInTheDocument()
-    // ...en de tip blijft in de lijst zodat de gebruiker opnieuw kan klikken.
+    // ...en de tip komt terug zodat de gebruiker opnieuw kan klikken.
     expect(screen.getByText('Click me')).toBeInTheDocument()
   })
 
-  it('sends action:reject on Negeren', async () => {
+  it('sends action:reject on Negeren (ná het venster)', async () => {
+    vi.useFakeTimers()
     fetchMock.mockResolvedValue({ ok: true })
 
     render(
-      <TipsLijst recommendations={[baseRec({ id: 'r1', title: 'Click me' })]} />,
+      <ToastProvider>
+        <TipsLijst recommendations={[baseRec({ id: 'r1', title: 'Click me' })]} />
+      </ToastProvider>,
     )
 
     fireEvent.click(screen.getByRole('button', { name: /Negeren/i }))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(TIP_UNDO_DELAY_MS + 10)
+    })
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalled())
+    expect(fetchMock).toHaveBeenCalled()
+    const call = fetchMock.mock.calls[0][1] as { body: string }
+    expect(JSON.parse(call.body)).toEqual({ action: 'reject' })
+  })
+
+  it('flush bij unmount: wegnavigeren vóór het venster voert de POST alsnog direct uit (E-05)', async () => {
+    vi.useFakeTimers()
+    fetchMock.mockResolvedValue({ ok: true })
+
+    const { unmount } = render(
+      <ToastProvider>
+        <TipsLijst recommendations={[baseRec({ id: 'r1', title: 'Click me' })]} />
+      </ToastProvider>,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Negeren/i }))
+    expect(fetchMock).not.toHaveBeenCalled()
+
+    // Unmount (wegnavigeren) vóór het venster verloopt → pending keuze wordt
+    // direct geflusht, dus de keuze gaat niet verloren.
+    unmount()
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0)
+    })
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/ai/recommendations/r1',
+      expect.objectContaining({ method: 'PATCH' }),
+    )
     const call = fetchMock.mock.calls[0][1] as { body: string }
     expect(JSON.parse(call.body)).toEqual({ action: 'reject' })
   })

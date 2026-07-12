@@ -50,12 +50,12 @@ describe('EmptyStateCard (generic)', () => {
     expect(link).toBeTruthy()
   })
 
-  it('CTA heeft min-h-[44px] (WCAG tap-target)', () => {
+  it('CTA heeft min-h-11 (WCAG tap-target = 44px)', () => {
     const { container } = render(
       <EmptyStateCard
         icon={Activity}
-        iconColor="text-amber-700"
-        iconBg="bg-amber-50"
+        iconColor="text-kern-700"
+        iconBg="bg-kern-50"
         kicker="K"
         title="T"
         body="B"
@@ -64,15 +64,15 @@ describe('EmptyStateCard (generic)', () => {
       />,
     )
     const link = container.querySelector('a[href="/x"]')
-    expect(link?.className).toContain('min-h-[44px]')
+    expect(link?.className).toContain('min-h-11')
   })
 
   it('article heeft dashed border (visuele empty-state marker)', () => {
     const { container } = render(
       <EmptyStateCard
         icon={Target}
-        iconColor="text-violet-700"
-        iconBg="bg-violet-50"
+        iconColor="text-horizon-700"
+        iconBg="bg-horizon-50"
         kicker="K"
         title="T"
         body="B"
@@ -82,6 +82,43 @@ describe('EmptyStateCard (generic)', () => {
     )
     const article = container.querySelector('article')
     expect(article?.className).toContain('border-dashed')
+  })
+
+  it('bevat geen rounded-classes (scherpe hoeken, krant-esthetiek) (P-03)', () => {
+    const { container } = render(
+      <EmptyStateCard
+        icon={Activity}
+        iconColor="text-kern-700"
+        iconBg="bg-kern-50"
+        kicker="K"
+        title="T"
+        body="B"
+        ctaHref="/x"
+        ctaLabel="L"
+      />,
+    )
+    // Geen enkel element mag een rounded-* class dragen (behalve rounded-full,
+    // dat hier niet voorkomt). Bewaakt de scherpe-hoeken-conventie.
+    const rounded = container.querySelectorAll('[class*="rounded-"]')
+    expect(rounded.length).toBe(0)
+  })
+
+  it('CTA gebruikt de ink/paper-tokens, geen stone-hardcode (P-03)', () => {
+    const { container } = render(
+      <EmptyStateCard
+        icon={Activity}
+        iconColor="text-kern-700"
+        iconBg="bg-kern-50"
+        kicker="K"
+        title="T"
+        body="B"
+        ctaHref="/x"
+        ctaLabel="L"
+      />,
+    )
+    const link = container.querySelector('a[href="/x"]')
+    expect(link?.className).toContain('bg-[var(--ink)]')
+    expect(link?.className).not.toContain('stone')
   })
 })
 

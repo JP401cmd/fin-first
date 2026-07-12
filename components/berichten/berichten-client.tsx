@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useNotifications } from '@/components/app/notifications/notification-provider'
 import { NotificationItem } from '@/components/app/notifications/notification-item'
-import { Bell, ChevronRight, CheckCheck } from 'lucide-react'
+import { Bell, ChevronRight, CheckCheck, Newspaper } from 'lucide-react'
 import { Masthead } from './masthead'
 import { NewspaperFooter } from './newspaper-footer'
 import type { Notification } from '@/app/api/notifications/route'
@@ -289,10 +290,18 @@ export function BerichtenClient() {
         ) : totalCount === 0 ? (
           <div className="flex flex-col items-center gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] px-8 py-16 text-center shadow-[var(--s0)]">
             <Bell className="h-8 w-8 text-[var(--ink-4)]" />
-            <p className="font-inter text-sm text-[var(--ink-3)]">Geen berichten.</p>
+            <p className="font-inter text-sm text-[var(--ink-3)]">Geen meldingen</p>
             <p className="font-source-serif text-[13px] italic text-[var(--ink-4)]">
-              &ldquo;Stilte is ook een vorm van rijkdom.&rdquo;
+              Je bent helemaal bij — geen openstaande berichten.
             </p>
+            {/* CTA — user-cleared empty state hoort een uitweg te bieden. */}
+            <Link
+              href="/nieuws"
+              className="mt-1 inline-flex min-h-11 items-center justify-center gap-1.5 border border-[var(--ink)] bg-[var(--ink)] px-4 py-2.5 text-sm font-medium text-[var(--paper)] transition-opacity hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+            >
+              <Newspaper className="h-4 w-4" />
+              Lees de krant
+            </Link>
           </div>
         ) : (
           <div className="overflow-hidden rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s0)]">

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Plus } from 'lucide-react'
 import {
   type Asset,
@@ -241,6 +241,15 @@ interface AssetCategoryPageProps {
    * een lege reeks → chart wordt niet gerenderd.
    */
   historyData?: CategoryHistoryData
+  /**
+   * Basis-URL van deze categorie-pagina, ínclusief het type-segment (bv.
+   * `/overzicht/bezittingen/investment`). Bepaalt waar tab- en pane-navigatie
+   * (`router.replace`) naartoe schrijft. Zo blijft wie via de canonieke
+   * /overzicht-route binnenkomt daar ook staan i.p.v. stilzwijgend naar de
+   * legacy /core-boom te bouncen. Wanneer weggelaten leiden we het pad af uit
+   * `usePathname()`; als laatste terugval de legacy `/core/assets/<type>`-route.
+   */
+  basePath?: string
 }
 
 // ── Component ────────────────────────────────────────────────
@@ -293,10 +302,18 @@ export function AssetCategoryPage({
   initialInvestmentHoldings,
   initialAssetSparklines,
   historyData,
+  basePath,
 }: AssetCategoryPageProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const pathname = usePathname()
   const { activeModules } = useFeatureAccess()
+
+  // Canonieke basis-URL van deze categorie-pagina (incl. type-segment). Tab-
+  // en pane-navigatie schrijft naar dít pad zodat wie via /overzicht/bezittingen
+  // binnenkomt daar blijft — niet stilzwijgend naar de legacy /core-boom bounct.
+  // Expliciete prop wint; anders het live pad; anders de legacy-route.
+  const categoryBasePath = basePath ?? pathname ?? `/core/assets/${type}`
 
   // Assets zijn server-geladen; client houdt geen Supabase-poll. Mutaties
   // vinden plaats via de QuickAddWizard en sturen `router.refresh()` zodat
@@ -324,11 +341,11 @@ export function AssetCategoryPage({
       }
       const queryString = params.toString()
       router.replace(
-        `/core/assets/${type}${queryString ? `?${queryString}` : ''}`,
+        `${categoryBasePath}${queryString ? `?${queryString}` : ''}`,
         { scroll: false },
       )
     },
-    [router, searchParams, type],
+    [router, searchParams, categoryBasePath],
   )
 
   // ── Deepening-resolutie ───────────────────────────────────
@@ -386,11 +403,11 @@ export function AssetCategoryPage({
       }
       const queryString = params.toString()
       router.replace(
-        `/core/assets/${type}${queryString ? `?${queryString}` : ''}`,
+        `${categoryBasePath}${queryString ? `?${queryString}` : ''}`,
         { scroll: false },
       )
     },
-    [router, searchParams, type],
+    [router, searchParams, categoryBasePath],
   )
 
   // Wanneer de deepening verdwijnt (module wordt extern uitgezet en het

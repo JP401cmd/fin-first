@@ -41,6 +41,9 @@ export default function ConnectBankPage() {
     setConnecting(true)
     setConnectError(null)
 
+    // Vaste NL-fallback: de UI toont nooit een rauwe fetch-/SDK-/database-string.
+    const GENERIC_ERROR = 'Verbinding maken is niet gelukt — probeer het later opnieuw.'
+
     try {
       const res = await fetch('/api/bank-connect/auth-link', {
         method: 'POST',
@@ -52,17 +55,25 @@ export default function ConnectBankPage() {
         }),
       })
 
-      const data = await res.json()
+      const data = await res.json().catch(() => null)
 
-      if (!res.ok) {
-        throw new Error(data.error || 'Verbinding maken mislukt')
+      if (!res.ok || !data?.auth_url) {
+        // De server levert al een NL-melding (zie toDutchAuthLinkError); die tonen
+        // we, met de vaste NL-fallback als er geen bruikbare tekst is. Technische
+        // details blijven in de console.
+        console.error('Bank-connect auth-link mislukt', { status: res.status, error: data?.error })
+        setConnectError(typeof data?.error === 'string' ? data.error : GENERIC_ERROR)
+        setConnecting(false)
+        return
       }
 
       // Redirect to bank authorization
       setStep('redirect')
       window.location.href = data.auth_url
     } catch (err) {
-      setConnectError(err instanceof Error ? err.message : 'Verbinding maken mislukt')
+      // Netwerk-/parse-fouten (bv. "Failed to fetch") nooit rauw tonen.
+      console.error('Bank-connect verzoek mislukt', err)
+      setConnectError(GENERIC_ERROR)
       setConnecting(false)
     }
   }

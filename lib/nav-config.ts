@@ -187,6 +187,24 @@ export const EXTRA_ROUTE_TITLES: Record<string, string> = {
   '/toekomst/uitgaven-na-pensioen': 'Uitgaven na pensioen',
   '/mijn/checkins': 'Check-ins',
   '/mijn/feedback': 'Feedback',
+  // Rapportages-familie — eigen routes buiten de nav-structuur. De titels
+  // spiegelen exact de `<NavStackMeta title>` van elke pagina, zodat de
+  // SSoT-fallback en de pagina niet uiteenlopen. De dynamische
+  // /rapportages/[id] hoort hier bewust NIET: die levert een runtime-titel
+  // via <NavStackMeta>.
+  '/rapportages': 'Rapportages',
+  '/rapportages/balans': 'Balans-rapportage',
+  '/rapportages/vermogen': 'Vermogensoverzicht',
+  '/rapportages/budget': 'Budget-rapportage',
+  '/rapportages/benchmark': 'Benchmark',
+  '/rapportages/persoonlijk-plan': 'Persoonlijk plan',
+  // Cashflow-verdiepingen onder /overzicht/cashflow. /overzicht/cashflow zelf
+  // en .../budget zitten al in de nav (navGroups resp. OVERVIEW_APP_SUBROUTES);
+  // deze drie + /overzicht/tips niet. Titels = de `<NavStackMeta title>` per pagina.
+  '/overzicht/cashflow/forecast': 'Forecast',
+  '/overzicht/cashflow/transacties': 'Transacties',
+  '/overzicht/cashflow/vaste-lasten': 'Vaste lasten',
+  '/overzicht/tips': 'Tips & acties',
 }
 
 /**
@@ -211,7 +229,10 @@ function buildRouteTitleMap(): Map<string, string> {
   const add = (href: string | undefined, label: string) => {
     if (!href) return
     const key = normalizePathname(href)
-    // Eerste winnaar behouden — mainNav/navGroups gaan vóór EXTRA's.
+    // Eerste winnaar behouden — mainNav/navGroups gaan vóór EXTRA's. Zo wint
+    // voor /toekomst bewust de mainNav-titel ("Toekomst") boven het navGroups-
+    // item met hetzelfde href ("Tijdas"): dat item is zichtbare menu-structuur,
+    // de dubbele titel-registratie is onschuldig — de eerste winnaar telt.
     if (!map.has(key)) map.set(key, label)
   }
 

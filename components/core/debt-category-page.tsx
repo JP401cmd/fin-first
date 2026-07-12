@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Plus } from 'lucide-react'
 import {
   type Debt,
@@ -132,6 +132,15 @@ interface DebtCategoryPageProps {
    * vervangen wanneer de client her-laadt op een perspectief-switch.
    */
   initialContext?: PerspectiveContext
+  /**
+   * Basis-URL van deze categorie-pagina, ínclusief het type-segment (bv.
+   * `/overzicht/schulden/mortgage`). Bepaalt waar tab- en pane-navigatie
+   * (`router.replace`) naartoe schrijft. Zo blijft wie via de canonieke
+   * /overzicht-route binnenkomt daar ook staan i.p.v. stilzwijgend naar de
+   * legacy /core-boom te bouncen. Wanneer weggelaten leiden we het pad af uit
+   * `usePathname()`; als laatste terugval de legacy `/core/debts/<type>`-route.
+   */
+  basePath?: string
 }
 
 /** Schuldrij met perspectief-stempels (rij + provenance + aandeel). */
@@ -169,10 +178,18 @@ export function DebtCategoryPage({
   initialHistoryData,
   initialPerspective = 'personal',
   initialContext,
+  basePath,
 }: DebtCategoryPageProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const pathname = usePathname()
   const { activeModules } = useFeatureAccess()
+
+  // Canonieke basis-URL van deze categorie-pagina (incl. type-segment). Tab-
+  // en pane-navigatie schrijft naar dít pad zodat wie via /overzicht/schulden
+  // binnenkomt daar blijft — niet stilzwijgend naar de legacy /core-boom bounct.
+  // Expliciete prop wint; anders het live pad; anders de legacy-route.
+  const categoryBasePath = basePath ?? pathname ?? `/core/debts/${type}`
 
   // ── Perspectief-bewuste schuldenlijst ──────────────────────
   // Eerste paint komt van de server (initialDebts, in het server-perspectief).
@@ -238,11 +255,11 @@ export function DebtCategoryPage({
       }
       const queryString = params.toString()
       router.replace(
-        `/core/debts/${type}${queryString ? `?${queryString}` : ''}`,
+        `${categoryBasePath}${queryString ? `?${queryString}` : ''}`,
         { scroll: false },
       )
     },
-    [router, searchParams, type],
+    [router, searchParams, categoryBasePath],
   )
 
   // Side-data voor de pane: valuations (lazy per geselecteerde debt) en
@@ -326,11 +343,11 @@ export function DebtCategoryPage({
       }
       const queryString = params.toString()
       router.replace(
-        `/core/debts/${type}${queryString ? `?${queryString}` : ''}`,
+        `${categoryBasePath}${queryString ? `?${queryString}` : ''}`,
         { scroll: false },
       )
     },
-    [router, searchParams, type],
+    [router, searchParams, categoryBasePath],
   )
 
   useEffect(() => {

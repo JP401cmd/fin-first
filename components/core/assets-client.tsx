@@ -809,7 +809,7 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
           <div className="mr-auto">{toolbarFilter}</div>
         )}
         <Link
-          href="/core/assets/revalue"
+          href={`/core/assets/revalue${pathname ? `?returnTo=${encodeURIComponent(pathname)}` : ''}`}
           aria-label="Herwaarderen"
           className="inline-flex min-h-[40px] items-center gap-2 border border-[var(--border-md)] bg-[var(--paper)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
         >

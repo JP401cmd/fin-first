@@ -4,12 +4,26 @@ import { isTrueLayerEnabled } from '@/lib/truelayer/feature-flag'
 import { buildAuthLink } from '@/lib/truelayer/client'
 import { encryptField } from '@/lib/crypto/field-encryption'
 
+/**
+ * Vertaalt een (mogelijk technische, Engelse of SDK-)fout naar een vaste,
+ * Nederlandse gebruikersmelding. De rauwe details blijven in de serverlog
+ * (console.error) en bereiken nooit de UI — zie bug B-04.
+ */
+function toDutchAuthLinkError(err: unknown): string {
+  const raw = err instanceof Error ? err.message : ''
+  // Bekende, herkenbare oorzaak: de bankkoppeling is (nog) niet ingericht.
+  if (raw.includes('credentials niet geconfigureerd')) {
+    return 'De bankkoppeling is nog niet volledig ingesteld. Probeer het later opnieuw of neem contact op met de beheerder.'
+  }
+  return 'Verbinding maken is niet gelukt — probeer het later opnieuw.'
+}
+
 export async function POST(req: Request) {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ error: 'Je bent niet ingelogd.' }, { status: 401 })
   }
 
   if (!(await isTrueLayerEnabled(supabase))) {
@@ -59,7 +73,7 @@ export async function POST(req: Request) {
   } catch (err) {
     console.error('TrueLayer auth-link error:', err)
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Verbinding maken mislukt' },
+      { error: toDutchAuthLinkError(err) },
       { status: 500 }
     )
   }

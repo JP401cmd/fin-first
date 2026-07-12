@@ -28,10 +28,10 @@ export function EmptyStateCard({
   ctaLabel: string
 }) {
   return (
-    <article className="flex flex-col rounded-2xl border border-dashed border-[var(--border-md)] bg-[var(--paper)] p-5 sm:p-6">
+    <article className="flex flex-col border border-dashed border-[var(--border-md)] bg-[var(--paper)] p-5 sm:p-6">
       <div className="flex items-center gap-2 mb-3">
         <div
-          className={`w-9 h-9 rounded-lg ${iconBg} flex items-center justify-center`}
+          className={`w-9 h-9 ${iconBg} flex items-center justify-center`}
         >
           <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${iconColor}`} />
         </div>
@@ -45,7 +45,7 @@ export function EmptyStateCard({
       <p className="text-sm text-[var(--ink-2)] leading-relaxed mb-4">{body}</p>
       <Link
         href={ctaHref}
-        className="self-start inline-flex items-center gap-2 bg-stone-900 text-white px-4 py-2.5 rounded-lg text-sm font-semibold min-h-[44px] hover:bg-stone-800 transition-colors"
+        className="self-start inline-flex items-center gap-2 bg-[var(--ink)] text-[var(--paper)] px-4 py-2.5 text-sm font-semibold min-h-11 hover:opacity-80 transition-opacity"
       >
         {ctaLabel}
       </Link>
@@ -57,8 +57,8 @@ export function HealthScoreEmptyState() {
   return (
     <EmptyStateCard
       icon={Activity}
-      iconColor="text-amber-700"
-      iconBg="bg-amber-50"
+      iconColor="text-kern-700"
+      iconBg="bg-kern-50"
       kicker="Gezondheid"
       title="Nog geen score"
       body="Voeg bezittingen of een schuld toe en je financiële gezondheid verschijnt — vier pijlers (buffer, schuld, sparen, vrijheid) die samen één cijfer vormen."
@@ -72,8 +72,8 @@ export function DoelenEmptyState() {
   return (
     <EmptyStateCard
       icon={Target}
-      iconColor="text-violet-700"
-      iconBg="bg-violet-50"
+      iconColor="text-horizon-700"
+      iconBg="bg-horizon-50"
       kicker="Doelen"
       title="Stel je eerste doel"
       body="Een doel maakt zichtbaar waar je naar toe werkt — vrijheid op je 62e, kind in 2027, of een ander mijlpaal. Voortgang zie je dan elke keer dat je inlogt."

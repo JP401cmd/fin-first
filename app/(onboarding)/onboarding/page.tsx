@@ -1186,36 +1186,32 @@ export default function OnboardingPage() {
       {/* ── Sticky error banner ─────────────────────────────────── */}
       {saveError && (
         <div
-          className="fixed inset-x-0 top-0 z-50 border-b border-red-200 bg-red-50 px-4 py-3 shadow-sm"
+          className="fixed inset-x-0 top-0 z-50 border-b-2 border-[var(--negative)] bg-[var(--paper)] px-4 py-3 shadow-sm"
           role="alert"
           aria-live="assertive"
         >
-          <div className="mx-auto flex max-w-[640px] items-start gap-3">
-            <div className="mt-0.5 flex-shrink-0">
-              <svg className="h-5 w-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-              </svg>
-            </div>
+          <div className="mx-auto flex max-w-[640px] flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-red-800">Er ging iets mis</p>
-              <p className="mt-0.5 text-sm text-red-600">{saveError}</p>
+              <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-negative">
+                Opslaan mislukt
+              </p>
+              <p className="mt-0.5 text-sm text-[var(--ink-2)]">
+                Het opslaan is niet gelukt. Je antwoorden staan nog hier &mdash; probeer het opnieuw.
+              </p>
             </div>
-            <div className="flex flex-shrink-0 items-center gap-2">
+            <div className="flex flex-shrink-0 items-center gap-4">
               <button
                 onClick={handleSaveOwnData}
                 disabled={saving}
-                className="min-h-[36px] rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                className="inline-flex min-h-11 items-center justify-center bg-[var(--ink)] px-5 text-sm font-medium text-[var(--paper)] transition-colors hover:bg-[var(--ink-2)] disabled:opacity-50"
               >
-                {saving ? 'Bezig...' : 'Opnieuw proberen'}
+                {saving ? 'Bezig …' : 'Opnieuw proberen'}
               </button>
               <button
                 onClick={dismissError}
-                className="rounded-lg p-1.5 text-red-400 hover:bg-red-100 hover:text-red-600"
-                aria-label="Sluiten"
+                className="text-sm text-[var(--ink-3)] underline-offset-2 hover:text-[var(--ink)] hover:underline"
               >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                Sluiten
               </button>
             </div>
           </div>

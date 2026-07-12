@@ -1,6 +1,7 @@
 'use client'
 
 import { memo } from 'react'
+import Link from 'next/link'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData, TopGoal } from './widget-renderer'
@@ -91,15 +92,22 @@ function EmptyState({ full }: { full?: boolean }) {
   return (
     <div className={`flex flex-col items-center justify-center text-center ${full ? 'py-8' : 'py-4'}`}>
       {full && (
-        <div className="h-12 w-12 rounded-full bg-wil-50 flex items-center justify-center mb-2">
-          <Target className="h-6 w-6 text-wil-200" />
+        <div className="h-12 w-12 rounded-full bg-horizon-50 flex items-center justify-center mb-2">
+          <Target className="h-6 w-6 text-horizon-200" />
         </div>
       )}
-      {!full && <Target className="h-7 w-7 text-wil-200 mb-2" />}
+      {!full && <Target className="h-7 w-7 text-horizon-200 mb-2" />}
       <p className="text-sm text-[var(--ink-3)]">Nog geen doelen ingesteld</p>
       <p className="font-serif italic text-[11px] text-[var(--ink-4)] mt-0.5">
-        Stel je eerste doel in om te starten
+        Een doel maakt zichtbaar waar je vrijheid opbouwt.
       </p>
+      {/* CTA — "Geen CTA = doodlopend". Werkwoord-eerst, scherpe hoeken, ink-mini. */}
+      <Link
+        href="/toekomst/doelen"
+        className="mt-3 inline-flex min-h-11 items-center justify-center border border-[var(--ink)] bg-[var(--ink)] px-4 py-2.5 text-sm font-medium text-[var(--paper)] transition-opacity hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+      >
+        Stel je eerste doel
+      </Link>
     </div>
   )
 }

@@ -9,6 +9,7 @@ import { calculateHoldingBox3 } from '@/lib/box3-holdings'
 import HoldingAlertsClient from './alerts-client'
 import { resolveHolding } from '@/lib/holdings-table-resolver'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
+import { FreshnessLabel } from '@/components/app/freshness-label'
 
 // UUID v4 regex for validation
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -16,6 +17,9 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 function formatCurrency(value: number, cur: string = 'EUR'): string {
   return new Intl.NumberFormat('nl-NL', { style: 'currency', currency: cur }).format(value)
 }
+
+// Versheid van de prijs loopt via de canonieke FreshnessLabel-component
+// (drietraps krant-notatie + VEROUDERD-marker) — geen eigen formatter.
 
 export default async function HoldingDetailPage({
   params,
@@ -65,6 +69,10 @@ export default async function HoldingDetailPage({
   const returnPct = costBasis > 0 ? ((holdingValue - costBasis) / costBasis) * 100 : 0
   const returnValue = holdingValue - costBasis
   const terAnnualCost = ter != null ? ter * holdingValue : null
+  // Versheid van de huidige prijs — laatste automatische/handmatige koers-
+  // update. Alleen tonen wanneer bekend; anders vervalt de regel stil.
+  const lastPriceUpdate =
+    (holdingData.last_price_update as string | null | undefined) ?? null
 
   // Box 3: portfolio-totaal over BEIDE typed-tabellen — een gebruiker kan
   // zowel investment- als crypto-holdings hebben en die tellen samen onder
@@ -135,6 +143,15 @@ export default async function HoldingDetailPage({
             <p className="text-xs text-[var(--ink-3)]">
               @ {formatCurrency(currentPrice, currency)} per eenheid
             </p>
+            {lastPriceUpdate && (
+              <p className="mt-0.5" data-testid="holding-price-updated">
+                <FreshnessLabel
+                  timestamp={lastPriceUpdate}
+                  prefix="Bijgewerkt"
+                  budgetMinutes={24 * 60}
+                />
+              </p>
+            )}
           </div>
           <div>
             <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase">Gem. aankoopprijs</p>

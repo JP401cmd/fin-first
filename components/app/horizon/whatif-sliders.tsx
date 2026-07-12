@@ -12,6 +12,7 @@ import {
 } from '@/lib/scenario-events'
 import type { WhatIfEvent } from '@/components/app/horizon/whatif-events'
 import { WhatIfDevelopmentNotice } from '@/components/app/horizon/whatif-development-notice'
+import { useOptionalToast } from '@/components/app/toast-provider'
 
 /**
  * WhatIfOverrides is now a derived view, but kept as a public type for
@@ -199,6 +200,7 @@ function SliderGrid({
    *  /toekomst-sectie "Verken je aannames" waar een globale reset + eigen tekst leeft. */
   hideResetAndHint?: boolean
 }) {
+  const { addToast } = useOptionalToast()
   const incomeValue = readSliderValueFromEvents('income', events, baseline)
   const workdaysValue = readSliderValueFromEvents('workdays', events, baseline)
   const savingsValue = readSliderValueFromEvents('savings', events, baseline)
@@ -221,7 +223,25 @@ function SliderGrid({
   const hasSliderEvent = events.some(e => e.scenario_origin?.startsWith('slider:'))
 
   const resetAll = () => {
+    // Snapshot van alléén de slider-events (dat is wat de reset wist) zodat
+    // "Ongedaan maken" (5s) ze exact terugzet zónder events te overschrijven
+    // die binnen het venster via een ander pad zijn toegevoegd.
+    const snapshot = events.filter(e => e.scenario_origin?.startsWith('slider:'))
     setEvents(prev => clearScenarioEvents(prev, 'slider:'))
+    if (!hasSliderEvent) return
+    addToast({
+      type: 'info',
+      title: 'Verfijn-events gewist',
+      duration: 5000,
+      action: {
+        label: 'Ongedaan maken',
+        onClick: () =>
+          setEvents(prev => [
+            ...prev.filter(e => !e.scenario_origin?.startsWith('slider:')),
+            ...snapshot,
+          ]),
+      },
+    })
   }
 
   return (

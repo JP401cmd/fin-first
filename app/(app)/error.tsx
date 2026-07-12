@@ -2,6 +2,34 @@
 
 import { useEffect } from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { Kicker, EditorialHeadline } from '@/components/editorial'
+
+/**
+ * Module-bewuste terugkeer-bestemming op basis van de huidige route.
+ * De foutmelding zelf blijft generiek; alleen de "terug"-link volgt de module
+ * waar de gebruiker vandaan kwam, zodat de terugkeer natuurlijk aanvoelt.
+ */
+export function resolveReturnTarget(pathname: string | null): {
+  label: string
+  href: string
+} {
+  const path = pathname ?? ''
+  if (path.startsWith('/toekomst')) {
+    return { label: 'Terug naar Toekomst', href: '/toekomst' }
+  }
+  if (
+    path.startsWith('/mijn') ||
+    path.startsWith('/berichten') ||
+    path.startsWith('/nieuws')
+  ) {
+    return { label: 'Terug naar Mijn', href: '/mijn' }
+  }
+  if (path.startsWith('/rapportages')) {
+    return { label: 'Terug naar Rapportages', href: '/rapportages' }
+  }
+  return { label: 'Naar Overzicht', href: '/overzicht' }
+}
 
 export default function AppError({
   error,
@@ -10,58 +38,40 @@ export default function AppError({
   error: Error & { digest?: string }
   reset: () => void
 }) {
+  const pathname = usePathname()
+  const back = resolveReturnTarget(pathname)
+
   useEffect(() => {
-    // Log error for debugging (server-side only, not exposed to user)
+    // Technische details alleen in de console — nooit aan de gebruiker tonen.
     console.error('[AppError]', error)
   }, [error])
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col items-center justify-center px-6 py-20">
-      <div className="mx-auto max-w-md text-center">
-        <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-red-100">
-          <svg
-            className="h-8 w-8 text-red-600"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={1.5}
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"
-            />
-          </svg>
-        </div>
-
-        <h1 className="text-2xl font-bold text-zinc-900">
-          Er ging iets mis
-        </h1>
-        <p className="mt-3 text-base text-zinc-600">
-          Er is een onverwachte fout opgetreden. Onze excuses voor het ongemak.
-          Probeer het opnieuw of ga terug naar Overzicht.
-        </p>
-
-        <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
-          <button
-            onClick={reset}
-            className="inline-flex items-center justify-center rounded-lg bg-zinc-900 px-6 py-2.5 text-sm font-medium text-white hover:bg-zinc-800 transition-colors"
-          >
-            Opnieuw proberen
-          </button>
-          <Link
-            href="/overzicht"
-            className="inline-flex items-center justify-center rounded-lg border border-zinc-300 bg-white px-6 py-2.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors"
-          >
-            Naar Overzicht
-          </Link>
-        </div>
-
-        {error.digest && (
-          <p className="mt-6 text-xs text-zinc-400">
-            Foutcode: {error.digest}
-          </p>
-        )}
+    <div className="mx-auto flex min-h-[60vh] max-w-2xl flex-col justify-center px-6 py-20">
+      <Kicker>Er ging iets mis</Kicker>
+      <EditorialHeadline emphasis="veilig" className="mt-4 text-[var(--ink)]">
+        Je gegevens zijn veilig
+      </EditorialHeadline>
+      <p
+        className="mt-5 max-w-[52ch] text-[15px] leading-relaxed text-[var(--ink-2)]"
+        style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+      >
+        Er trad een onverwachte fout op. Er is niets kwijtgeraakt — probeer het
+        opnieuw, of keer terug en pak de draad zo weer op.
+      </p>
+      <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+        <button
+          onClick={reset}
+          className="inline-flex min-h-11 items-center justify-center bg-[var(--ink)] px-5 text-sm font-medium text-[var(--paper)] transition-colors hover:bg-[var(--ink-2)]"
+        >
+          Probeer opnieuw
+        </button>
+        <Link
+          href={back.href}
+          className="inline-flex min-h-11 items-center justify-center border-2 border-[var(--ink)] bg-[var(--paper)] px-5 text-sm font-medium text-[var(--ink)] transition-colors hover:bg-[var(--subtle)]"
+        >
+          {back.label}
+        </Link>
       </div>
     </div>
   )

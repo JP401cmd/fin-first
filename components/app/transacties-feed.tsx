@@ -85,6 +85,14 @@ export function TransactiesFeed({
   const [accountFilter, setAccountFilter] = useState<string>('all')
   const [budgetFilter, setBudgetFilter] = useState<BudgetFilter>('all')
 
+  // Reset alle actieve filters/zoek → gebruikt door de no-results-CTA.
+  function resetFilters() {
+    setFilter('all')
+    setQuery('')
+    setAccountFilter('all')
+    setBudgetFilter('all')
+  }
+
   // Verzamel unieke rekening-namen voor de rekening-filter.
   const accounts = useMemo(() => {
     const set = new Set<string>()
@@ -268,18 +276,38 @@ export function TransactiesFeed({
       {filtered.length === 0 ? (
         <div className="py-12 flex flex-col items-center text-center text-[var(--ink-3)] max-w-md mx-auto">
           <Search className="w-8 h-8 mb-2 text-[var(--ink-4)]" />
-          {query.trim() ? (
-            <p className="text-sm">Geen transactie gevonden voor je zoekopdracht.</p>
-          ) : transactions.length === 0 ? (
+          {transactions.length === 0 ? (
+            // First-use: er zijn helemaal geen transacties → import/koppel-CTA.
             <>
               <p className="text-sm font-medium text-[var(--ink-2)] mb-1">Nog geen transacties.</p>
-              <p className="text-xs">
+              <p className="text-xs mb-4">
                 Koppel een bankrekening of importeer een MT940/CSV-bestand om je
                 transacties hier te zien.
               </p>
+              <Link
+                href="/overzicht/cashflow"
+                className="inline-flex min-h-11 items-center justify-center border border-[var(--ink)] bg-[var(--ink)] px-4 py-2.5 text-sm font-medium text-[var(--paper)] transition-opacity hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+              >
+                Koppel een rekening
+              </Link>
             </>
           ) : (
-            <p className="text-sm">Geen transacties met dit filter.</p>
+            // No-results: er zijn wél transacties, maar de actieve filters/zoek
+            // leveren niets → wis-filters-CTA hergebruikt de bestaande reset-state.
+            <>
+              <p className="text-sm mb-4">
+                {query.trim()
+                  ? 'Geen transactie gevonden voor je zoekopdracht.'
+                  : 'Geen transacties gevonden.'}
+              </p>
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="inline-flex min-h-11 items-center justify-center border border-[var(--ink)] bg-[var(--paper)] px-4 py-2.5 text-sm font-medium text-[var(--ink)] transition-opacity hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+              >
+                Wis filters
+              </button>
+            </>
           )}
         </div>
       ) : (

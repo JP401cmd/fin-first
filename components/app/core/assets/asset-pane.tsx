@@ -462,7 +462,7 @@ export function AssetPane({ asset, onClose, onChanged }: AssetPaneProps) {
               className="border border-red-600 bg-red-600 px-4 py-3 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
               style={{ minHeight: 44 }}
             >
-              {deleting ? 'Verwijderen…' : 'Definitief verwijderen'}
+              {deleting ? 'Verwijderen…' : 'Verwijderen'}
             </button>
           </div>
         </div>
