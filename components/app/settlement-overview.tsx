@@ -76,7 +76,7 @@ export function SettlementOverview({ householdId, currentUserId, members }: Sett
   if (entries.length === 0) {
     return (
       <div className="rounded-[var(--r-lg)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)] p-6 text-center">
-        <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-400" />
+        <CheckCircle2 className="mx-auto h-8 w-8 text-positive" />
         <p className="mt-2 text-sm font-medium text-[var(--ink-2)]">Alles verrekend</p>
         <p className="mt-0.5 text-xs text-[var(--ink-3)]">Geen openstaande verrekenposten</p>
       </div>
@@ -88,31 +88,31 @@ export function SettlementOverview({ householdId, currentUserId, members }: Sett
       {/* Net balance summary */}
       <div className={`rounded-[var(--r-lg)] border px-4 py-3 ${
         netAmount > 0
-          ? 'border-emerald-200 bg-emerald-50'
+          ? 'border-positive/30 bg-positive-bg'
           : netAmount < 0
-          ? 'border-red-200 bg-red-50'
+          ? 'border-negative/30 bg-negative-bg'
           : 'border-[var(--border-ed)] bg-[var(--subtle)]'
       }`}>
         <div className="flex items-center gap-2">
-          <Users className={`h-4 w-4 ${netAmount > 0 ? 'text-emerald-600' : netAmount < 0 ? 'text-red-600' : 'text-[var(--ink-3)]'}`} />
+          <Users className={`h-4 w-4 ${netAmount > 0 ? 'text-positive' : netAmount < 0 ? 'text-negative' : 'text-[var(--ink-3)]'}`} />
           <p className={`text-[10px] font-semibold uppercase tracking-wider ${
-            netAmount > 0 ? 'text-emerald-700' : netAmount < 0 ? 'text-red-700' : 'text-[var(--ink-3)]'
+            netAmount > 0 ? 'text-positive' : netAmount < 0 ? 'text-negative' : 'text-[var(--ink-3)]'
           }`}>
             Netto saldo
           </p>
           <span className={`ml-auto font-mono text-base font-bold ${
-            netAmount > 0 ? 'text-emerald-700' : netAmount < 0 ? 'text-red-700' : 'text-[var(--ink)]'
+            netAmount > 0 ? 'text-positive' : netAmount < 0 ? 'text-negative' : 'text-[var(--ink)]'
           }`}>
             {netAmount >= 0 ? '+' : ''}{<MaskedAmount value={netAmount} tone="wil" />}
           </span>
         </div>
         {netAmount > 0 && owedBy.length > 0 && (
-          <p className="mt-1 text-xs text-emerald-600">
+          <p className="mt-1 text-xs text-positive">
             {owedBy.map(o => `${getMemberName(o.userId)} (${formatMaskedCurrency(o.amount, masked)})`).join(', ')} {owedBy.length === 1 ? 'is je' : 'zijn je'} nog iets verschuldigd
           </p>
         )}
         {netAmount < 0 && owedTo.length > 0 && (
-          <p className="mt-1 text-xs text-red-600">
+          <p className="mt-1 text-xs text-negative">
             Je bent nog {owedTo.map(o => `${formatMaskedCurrency(o.amount, masked)} aan ${getMemberName(o.userId)}`).join(' en ')} verschuldigd
           </p>
         )}
@@ -144,7 +144,7 @@ export function SettlementOverview({ householdId, currentUserId, members }: Sett
                     </div>
                     <div>
                       <p className="text-sm font-medium text-[var(--ink)]">{getMemberName(otherId)}</p>
-                      <p className={`text-xs ${netWithOther > 0 ? 'text-emerald-600' : netWithOther < 0 ? 'text-red-600' : 'text-[var(--ink-3)]'}`}>
+                      <p className={`text-xs ${netWithOther > 0 ? 'text-positive' : netWithOther < 0 ? 'text-negative' : 'text-[var(--ink-3)]'}`}>
                         {netWithOther > 0
                           ? `Je krijgt ${formatMaskedCurrency(netWithOther, masked)}`
                           : netWithOther < 0

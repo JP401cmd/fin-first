@@ -1636,13 +1636,13 @@ function CashflowChart({
       <div className="mt-3 grid grid-cols-2 gap-3 border-t border-[var(--border-ed)] pt-3 sm:grid-cols-4">
         <div>
           <div className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)]">Inkomsten</div>
-          <div className="font-mono text-sm font-semibold tabular-nums text-emerald-600">
+          <div className="font-mono text-sm font-semibold tabular-nums text-positive">
             {<MaskedAmount value={totalIncome} tone="kern" decimals />}
           </div>
         </div>
         <div>
           <div className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)]">Uitgaven</div>
-          <div className="font-mono text-sm font-semibold tabular-nums text-red-600">
+          <div className="font-mono text-sm font-semibold tabular-nums text-negative">
             {<MaskedAmount value={totalExpenses} tone="kern" decimals />}
           </div>
           {totalMonthlyBudget > 0 && (

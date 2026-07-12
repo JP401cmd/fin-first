@@ -236,7 +236,7 @@ export const DeeltijdwerkImpact = memo(function DeeltijdwerkImpact(
 
   return (
     <AnalysisSection
-      title="Deeltijdwerk Flex Impact"
+      title="Deeltijdwerk flex-impact"
       icon={Briefcase}
       loading={loading}
       willContext={

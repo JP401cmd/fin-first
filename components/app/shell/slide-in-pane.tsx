@@ -29,6 +29,7 @@ import {
 import { createPortal } from 'react-dom'
 import { ArrowLeft, X } from 'lucide-react'
 import { useFocusTrap } from '@/lib/hooks/use-focus-trap'
+import { acquireOverlay } from '@/lib/overlay-signal'
 
 /**
  * Pane-actie voor primaire / secundaire knop in de standaard footer-bar.
@@ -175,6 +176,17 @@ export function SlideInPane({
 
   // ── Focus-trap (canonieke hook, zelfde als BottomSheet) ──────
   useFocusTrap({ active: mounted && entered, containerRef: paneRef })
+
+  // ── FloatingNavButton verbergen zolang de pane open is ───────
+  // Gehaakt op de `open`-prop (niet `mounted`), zodat het signaal DIRECT bij
+  // close-start vrijkomt en de pill soepel terugkomt tijdens de slide-out.
+  // De pane is desktop-only (`hidden lg:flex`) waar de pill al `lg:hidden` is,
+  // dus dit is vooral consistentie met BottomSheet — geen zichtbaar effect op
+  // desktop. Zie lib/overlay-signal.ts.
+  useEffect(() => {
+    if (!open) return
+    return acquireOverlay()
+  }, [open])
 
   const handleClose = useCallback(() => {
     onCloseRef.current()

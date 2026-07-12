@@ -89,7 +89,7 @@ const COLOR_MODE_LABELS: Record<ColorMode, string> = {
 
 /** Dutch labels for the grouping toggle */
 const GROUPING_LABELS: Record<AllocationViewMode, string> = {
-  asset_class: 'Assetklasse',
+  asset_class: 'Bezittingscategorie',
   sector: 'Sector',
   geography: 'Geografie',
 }

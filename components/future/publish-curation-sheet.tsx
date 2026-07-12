@@ -9,6 +9,7 @@ import type {
   CalculatorInput,
   InputKind,
 } from '@/lib/calculator/types'
+import { Button } from '@/components/editorial'
 
 /**
  * PublishCurationSheet — laat de auteur per input een neutrale publieke
@@ -222,18 +223,14 @@ export function PublishCurationSheet({
           >
             Annuleer
           </button>
-          <button
-            type="submit"
-            disabled={submitting}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-horizon-700 px-4 py-2 text-sm font-semibold text-white hover:bg-horizon-800 transition-colors disabled:opacity-50"
-          >
+          <Button type="submit" disabled={submitting} className="gap-1.5">
             {submitting ? (
               <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
             ) : (
               <Globe2 className="w-4 h-4" aria-hidden="true" />
             )}
             Publiceren
-          </button>
+          </Button>
         </div>
       </form>
     </div>

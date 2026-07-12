@@ -149,7 +149,7 @@ export function WhatIfMarketAssumptions({ value, onChange, assetGroups = [] }: P
                   value={isMixed ? 0 : masterValue}
                   onChange={e => setMaster(Number(e.target.value))}
                   className="w-full accent-horizon-600"
-                  aria-label="Master rendement-delta voor alle asset-groepen"
+                  aria-label="Master rendement-delta voor alle vermogensgroepen"
                 />
                 <div className="flex justify-between font-sans text-[10px] text-[var(--ink-4)]">
                   <span>{formatPpEdge(masterRange.min)}</span>

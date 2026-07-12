@@ -7,6 +7,7 @@ import { useOverlayOpen } from '@/lib/hooks/use-scroll-lock'
 
 import type { FeatureAccessData } from '@/lib/compute-feature-access'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { Button } from '@/components/editorial'
 
 const PHASE_GRADIENT_STYLE: Record<string, React.CSSProperties> = {
   recovery:  { background: 'linear-gradient(to right, var(--color-phase-recovery-500), var(--color-phase-recovery-600))' },
@@ -134,20 +135,12 @@ export function ActivationButton({ data }: { data: FeatureAccessData }) {
 
             {/* Footer */}
             <div className="border-t border-[var(--border-ed)] px-6 py-4 flex justify-end gap-3">
-              <button
-                onClick={() => setShowModal(false)}
-                className="rounded-lg border border-[var(--border-md)] px-4 py-2.5 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] transition-colors"
-              >
+              <Button variant="secondary" onClick={() => setShowModal(false)}>
                 Later
-              </button>
-              <button
-                onClick={handleActivate}
-                disabled={activating}
-                className="rounded-lg px-5 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-                style={gradientStyle}
-              >
+              </Button>
+              <Button variant="moment" onClick={handleActivate} disabled={activating}>
                 {activating ? 'Activeren...' : 'Activeer mijn routekaart'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

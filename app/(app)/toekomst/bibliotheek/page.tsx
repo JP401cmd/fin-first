@@ -18,6 +18,7 @@ import {
 import { LibraryCard } from '@/components/future/library-card'
 import { LibraryFilter } from '@/components/future/library-filter'
 import { DisclaimerStrip } from '@/components/future/disclaimer-strip'
+import { Button } from '@/components/editorial/button'
 import { PageOpening } from '@/components/editorial'
 
 /**
@@ -250,12 +251,9 @@ function EmptyState({ showOnlyUsable }: { showOnlyUsable: boolean }) {
           Vul je profiel verder aan of zet de filter uit om alle publieke
           rekenhulpen te zien.
         </p>
-        <Link
-          href="/toekomst/bibliotheek"
-          className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-2.5 text-sm font-semibold text-[var(--ink-2)] hover:border-[var(--ink-3)] transition-colors"
-        >
+        <Button href="/toekomst/bibliotheek" variant="secondary">
           Toon alles
-        </Link>
+        </Button>
       </article>
     )
   }
@@ -275,13 +273,10 @@ function EmptyState({ showOnlyUsable }: { showOnlyUsable: boolean }) {
         Word de eerste die een rekenhulp deelt. Maak er een met Will, en
         publiceer &apos;m zodat anderen op jouw inzicht kunnen voortbouwen.
       </p>
-      <Link
-        href="/toekomst?tab=rekenhulp"
-        className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--ink)] text-[var(--paper)] px-4 py-2.5 text-sm font-semibold hover:bg-[var(--ink-2)] transition-colors"
-      >
+      <Button href="/toekomst?tab=rekenhulp" variant="primary" className="gap-1.5">
         <Sparkles className="w-4 h-4" aria-hidden="true" />
         Maak je eerste rekenhulp
-      </Link>
+      </Button>
     </article>
   )
 }

@@ -320,7 +320,7 @@ export function ResilienceContextMessage({ snapshots }: { snapshots: SnapshotFor
       <p className="text-sm text-horizon-800">
         {diff > 0 ? (
           <>
-            <span className="font-semibold text-emerald-700">
+            <span className="font-semibold text-positive">
               Je gezondheidsscore is gestegen van {firstScore} naar {lastScore} in {monthLabel}
             </span>
             {' — '}
@@ -374,7 +374,7 @@ export function FireAgeContextMessage({ snapshots }: { snapshots: SnapshotForTre
       <p className="text-sm text-horizon-800">
         {diff > 0 ? (
           <>
-            <span className="font-semibold text-emerald-700">
+            <span className="font-semibold text-positive">
               Je FIRE-leeftijd is gedaald van {Math.round(firstAge)} naar {Math.round(lastAge)} in {monthLabel}
             </span>
             {' — '}
@@ -678,7 +678,7 @@ export function FireAgeTrendChart({ snapshots }: { snapshots: SnapshotForTrend[]
             x={x(i)}
             y={y(age) - 10}
             textAnchor="middle"
-            className={improving ? 'fill-emerald-700' : 'fill-red-700'}
+            className={improving ? 'fill-positive' : 'fill-negative'}
             style={{ fontSize: 10, fontWeight: 600 }}
           >
             {Math.round(age * 10) / 10}
@@ -692,7 +692,7 @@ export function FireAgeTrendChart({ snapshots }: { snapshots: SnapshotForTrend[]
           <text
             x={W - PAD + 5}
             y={y(lastAge) + 4}
-            className={improving ? 'fill-emerald-600' : 'fill-red-600'}
+            className={improving ? 'fill-positive' : 'fill-negative'}
             style={{ fontSize: 14, fontWeight: 700 }}
           >
             {improving ? '\u2193' : '\u2191'}

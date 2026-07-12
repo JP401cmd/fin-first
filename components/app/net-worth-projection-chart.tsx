@@ -103,19 +103,19 @@ export const NetWorthProjectionChart = memo(function NetWorthProjectionChart({
             ? 'border-kern-200 bg-kern-50/60'
             : current === projection.year5
               ? 'border-[var(--border-ed)] bg-[var(--subtle)]/60'
-              : 'border-red-200 bg-red-50/60'
+              : 'border-negative/30 bg-negative-bg'
         }`}
         data-testid="projection-context-message"
       >
         {isGrowing ? (
           <TrendingUp className="mt-0.5 h-4 w-4 shrink-0 text-kern-600" />
         ) : projection.year5 < current ? (
-          <TrendingDown className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+          <TrendingDown className="mt-0.5 h-4 w-4 shrink-0 text-negative" />
         ) : (
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-[var(--ink-3)]" />
         )}
         <p className={`text-sm font-medium ${
-          isGrowing ? 'text-kern-800' : projection.year5 < current ? 'text-red-800' : 'text-[var(--ink-2)]'
+          isGrowing ? 'text-kern-800' : projection.year5 < current ? 'text-negative' : 'text-[var(--ink-2)]'
         }`}>
           {message}
         </p>
@@ -396,7 +396,7 @@ function ProjectionBadge({
     <div className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-ed)] bg-[var(--paper)] px-2.5 py-1 text-xs">
       <span className="text-[var(--ink-3)]">{label}:</span>
       <span className="font-medium text-zinc-800">{value}</span>
-      <span className={`font-medium ${isPositive ? 'text-emerald-600' : isNegative ? 'text-red-600' : 'text-[var(--ink-3)]'}`}>
+      <span className={`font-medium ${isPositive ? 'text-positive' : isNegative ? 'text-negative' : 'text-[var(--ink-3)]'}`}>
         ({isPositive ? '+' : ''}{formatProjectedValue(delta)})
       </span>
     </div>

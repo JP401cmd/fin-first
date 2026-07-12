@@ -26,11 +26,11 @@ const SEVERITY_STYLES: Record<string, { bg: string; border: string; iconBg: stri
   },
   positive: {
     bg: 'bg-[var(--paper)]',
-    border: 'border-emerald-100',
-    iconBg: 'bg-emerald-50',
-    iconColor: 'text-emerald-600',
-    badge: 'text-emerald-700',
-    badgeBg: 'bg-emerald-50',
+    border: 'border-positive/30',
+    iconBg: 'bg-positive-bg',
+    iconColor: 'text-positive',
+    badge: 'text-positive',
+    badgeBg: 'bg-positive-bg',
   },
   warning: {
     bg: 'bg-[var(--paper)]',
@@ -156,7 +156,7 @@ export function SpendingInsightsSection({
   if (insights.length === 0) {
     return (
       <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)] p-6 text-center" data-testid="spending-insights-none">
-        <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-400" />
+        <CheckCircle2 className="mx-auto h-8 w-8 text-positive" />
         <p className="mt-2 text-sm font-medium text-[var(--ink-2)]">Geen opvallende patronen</p>
         <p className="mt-1 text-xs text-[var(--ink-3)]">
           Je uitgaven zijn consistent — geen seizoenspieken of trends gedetecteerd.

@@ -4204,8 +4204,8 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                   als de gevonden FIRE-leeftijd (echte solver-waarde) ~ je huidige leeftijd is;
                   anders krijgt /toekomst gewoon de normale grafiek/countdown (reached_at). */}
               {kernelStatus === 'reached_now' && isKernelReachedNowDisplay(simResult.fireAgeFractional, currentAge) && (
-                <div className="mb-4 flex items-start gap-2.5 rounded-[var(--r)] border border-emerald-200 bg-emerald-50/50 px-3 py-2.5">
-                  <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                <div className="mb-4 flex items-start gap-2.5 rounded-[var(--r)] border border-positive/30 bg-positive-bg px-3 py-2.5">
+                  <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-positive" />
                   <p className="font-sans text-[12px] text-[var(--ink-2)]">
                     Volgens je huidige cijfers kun je nu al stoppen met werken.
                   </p>
@@ -5660,8 +5660,8 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                               : `${userAowAge.years} jaar`}
                             <span className={`ml-1.5 inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-medium ${
                               userAowAge.isDefinitive
-                                ? 'bg-green-100 text-green-700'
-                                : 'bg-amber-100 text-amber-700'
+                                ? 'bg-positive-bg text-positive'
+                                : 'bg-warning-bg text-warning'
                             }`}>
                               {userAowAge.isDefinitive ? 'Definitief' : 'Verwacht'}
                             </span>
@@ -5699,7 +5699,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                         onClick={() => setFormDirection('income')}
                         className={`px-3 py-2 text-xs font-medium transition-colors ${
                           formDirection === 'income'
-                            ? 'bg-emerald-500 text-white'
+                            ? 'bg-positive text-white'
                             : 'bg-[var(--paper)] text-[var(--ink-3)] hover:bg-[var(--subtle)]'
                         }`}
                       >
@@ -5710,7 +5710,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                         onClick={() => setFormDirection('expense')}
                         className={`px-3 py-2 text-xs font-medium transition-colors ${
                           formDirection === 'expense'
-                            ? 'bg-red-500 text-white'
+                            ? 'bg-negative text-white'
                             : 'bg-[var(--paper)] text-[var(--ink-3)] hover:bg-[var(--subtle)]'
                         }`}
                       >
@@ -7045,7 +7045,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                             </div>
                             {/* Levensverzekering one-time */}
                             {verzekering > 0 && (
-                              <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3">
+                              <div className="rounded-lg border border-positive/30 bg-positive-bg p-3">
                                 <div className="flex justify-between text-xs text-[var(--ink-2)]">
                                   <span className="font-semibold">Eenmalige uitkering levensverzekering</span>
                                   <span className="font-mono tabular-nums text-positive font-semibold">+{<MaskedAmount value={verzekering} tone="horizon" />}</span>
@@ -7381,14 +7381,14 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                             <button
                               type="button"
                               onClick={() => setFormCashflows(prev => prev.map(c => c.id === cf.id ? { ...c, direction: 'income' } : c))}
-                              className={`flex-1 py-2 text-xs font-medium transition ${cf.direction === 'income' ? 'bg-emerald-50 text-emerald-700' : 'text-[var(--ink-3)] hover:bg-[var(--subtle)]'}`}
+                              className={`flex-1 py-2 text-xs font-medium transition ${cf.direction === 'income' ? 'bg-positive-bg text-positive' : 'text-[var(--ink-3)] hover:bg-[var(--subtle)]'}`}
                             >
                               Inkomen
                             </button>
                             <button
                               type="button"
                               onClick={() => setFormCashflows(prev => prev.map(c => c.id === cf.id ? { ...c, direction: 'expense' } : c))}
-                              className={`flex-1 py-2 text-xs font-medium transition ${cf.direction === 'expense' ? 'bg-red-50 text-red-700' : 'text-[var(--ink-3)] hover:bg-[var(--subtle)]'}`}
+                              className={`flex-1 py-2 text-xs font-medium transition ${cf.direction === 'expense' ? 'bg-negative-bg text-negative' : 'text-[var(--ink-3)] hover:bg-[var(--subtle)]'}`}
                             >
                               Kosten
                             </button>

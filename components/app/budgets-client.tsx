@@ -903,7 +903,7 @@ function PartnerBudgetSection({ rows }: { rows: PartnerBudgetRow[] }) {
             <p className="truncate text-sm font-medium text-[var(--ink-2)]">{row.name}</p>
             {row._aggregated && row._aggregatedCount != null && (
               <p className="font-serif text-[11px] italic text-[var(--ink-4)]">
-                {row._aggregatedCount} {row._aggregatedCount === 1 ? 'potje' : 'potjes'} — privacy: alleen totaal
+                {row._aggregatedCount} {row._aggregatedCount === 1 ? 'budget' : 'budgetten'} — privacy: alleen totaal
               </p>
             )}
           </div>
@@ -2419,14 +2419,14 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
               )}
               {budgets.some((b) => b.ownership !== 'shared') && (
                 <div>
-                  {sectionHeader('Mijn potjes')}
+                  {sectionHeader('Mijn budgetten')}
                   {renderTypeTrees(budgets.filter((b) => b.ownership !== 'shared'), false)}
                 </div>
               )}
               {partnerBudgets.length > 0 && (
                 <HideInSimple>
                   <div>
-                    {sectionHeader(`Potjes van ${partnerName ?? 'partner'}`)}
+                    {sectionHeader(`Budgetten van ${partnerName ?? 'partner'}`)}
                     <PartnerBudgetSection rows={partnerBudgets} />
                   </div>
                 </HideInSimple>
@@ -4176,7 +4176,7 @@ function BudgetDetailModal({
             type="button"
             onClick={() => openWithMessage(`Analyseer mijn ${budget.name} budget`)}
             className="inline-flex flex-shrink-0 items-center justify-center gap-1.5 rounded-lg border border-wil-200 bg-wil-50 px-3 py-2 text-xs font-medium text-wil-700 transition-colors hover:bg-wil-100 hover:border-wil-300"
-            title="Vraag Will om advies over dit budget"
+            title="Vraag Will om tips over dit budget"
           >
             <MessageCircle className="h-3.5 w-3.5" />
             Vraag Will

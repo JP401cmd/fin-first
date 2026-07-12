@@ -1255,7 +1255,7 @@ export function CashAccountView({
                     </div>
                   </div>
                   <span className={`shrink-0 font-mono text-sm font-semibold tabular-nums ${
-                    Number(acc.balance) >= 0 ? 'text-[var(--ink)]' : 'text-red-600'
+                    Number(acc.balance) >= 0 ? 'text-[var(--ink)]' : 'text-negative'
                   }`}>
                     {<MaskedAmount value={Number(acc.balance)} tone="kern" />}
                   </span>
@@ -1485,7 +1485,7 @@ export function CashAccountView({
               <p className="mt-0.5 text-sm font-semibold font-mono tabular-nums text-[var(--ink)]">
                 {formatCurrencyShort(partnerExpenseBreakdown.myShareAmount + partnerExpenseBreakdown.personalExpenses)}
               </p>
-              <p className="text-[10px] text-red-400/70">
+              <p className="text-[10px] text-negative/70">
                 {partnerExpenseBreakdown.myFreedomDays.totalDays.toFixed(1)} dagen
               </p>
               <p className="text-[9px] text-[var(--ink-4)]">{partnerExpenseBreakdown.mySharePct}% gedeeld</p>
@@ -1495,7 +1495,7 @@ export function CashAccountView({
               <p className="mt-0.5 text-sm font-semibold font-mono tabular-nums text-[var(--ink)]">
                 {formatCurrencyShort(partnerExpenseBreakdown.partnerShareAmount)}
               </p>
-              <p className="text-[10px] text-red-400/70">
+              <p className="text-[10px] text-negative/70">
                 {partnerExpenseBreakdown.partnerFreedomDays.totalDays.toFixed(1)} dagen
               </p>
               <p className="text-[9px] text-[var(--ink-4)]">{100 - partnerExpenseBreakdown.mySharePct}% gedeeld</p>
@@ -1896,9 +1896,9 @@ export function CashAccountView({
               Je partner deelt alleen totalen. Individuele transacties zijn niet zichtbaar.
             </p>
             <div className="grid grid-cols-2 gap-3 mb-3">
-              <div className="rounded-[var(--r)] border border-emerald-200 bg-emerald-50 px-3 py-2">
-                <p className="text-[10px] font-medium uppercase tracking-wide text-emerald-600">Inkomsten</p>
-                <p className="text-sm font-semibold text-emerald-700 font-mono tabular-nums">
+              <div className="rounded-[var(--r)] border border-positive/30 bg-positive-bg px-3 py-2">
+                <p className="text-[10px] font-medium uppercase tracking-wide text-positive">Inkomsten</p>
+                <p className="text-sm font-semibold text-positive font-mono tabular-nums">
                   {partnerCategorySummary.totalIncome > 0 ? (
                     <span className="flex items-center gap-1">
                       <TrendingUp className="h-3.5 w-3.5" />
@@ -1912,9 +1912,9 @@ export function CashAccountView({
                   )}
                 </p>
               </div>
-              <div className="rounded-[var(--r)] border border-red-200 bg-red-50 px-3 py-2">
-                <p className="text-[10px] font-medium uppercase tracking-wide text-red-600">Uitgaven</p>
-                <p className="text-sm font-semibold text-red-700 font-mono tabular-nums">
+              <div className="rounded-[var(--r)] border border-negative/30 bg-negative-bg px-3 py-2">
+                <p className="text-[10px] font-medium uppercase tracking-wide text-negative">Uitgaven</p>
+                <p className="text-sm font-semibold text-negative font-mono tabular-nums">
                   {partnerCategorySummary.totalExpenses > 0 ? (
                     <span className="flex items-center gap-1">
                       <TrendingDown className="h-3.5 w-3.5" />
@@ -1945,7 +1945,7 @@ export function CashAccountView({
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       {isNeg && pct > 0 && (
-                        <div className="h-1 rounded-full bg-red-200" style={{ width: `${Math.max(pct * 0.6, 4)}px` }} />
+                        <div className="h-1 rounded-full bg-negative/30" style={{ width: `${Math.max(pct * 0.6, 4)}px` }} />
                       )}
                       <span className={`text-xs font-medium font-mono tabular-nums ${isNeg ? 'text-negative' : 'text-positive'}`}>
                         {isNeg ? '−' : '+'}{formatCurrencyShort(Math.abs(cat.total))}
@@ -2061,12 +2061,12 @@ export function CashAccountView({
                           <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--r)] ${
                             isTransfer ? 'bg-[var(--subtle)] border border-[var(--border-ed)]'
                             : isPendingTransfer ? 'bg-[var(--hor-l)] border border-[var(--hor-m)]'
-                            : isPositive ? 'bg-emerald-50' : 'bg-zinc-100'
+                            : isPositive ? 'bg-positive-bg' : 'bg-zinc-100'
                           }`}>
                             {isTransfer ? <ArrowLeftRight className="h-4 w-4 text-[var(--ink-3)]" />
                             : isPendingTransfer ? <HelpCircle className="h-4 w-4 text-[var(--hor-t)]" />
-                            : budget ? <BudgetIcon name={budget.icon} className={`h-4 w-4 ${isPositive ? 'text-emerald-500' : 'text-[var(--ink-3)]'}`} />
-                            : <Tag className={`h-4 w-4 ${isPositive ? 'text-emerald-500' : 'text-[var(--ink-3)]'}`} />}
+                            : budget ? <BudgetIcon name={budget.icon} className={`h-4 w-4 ${isPositive ? 'text-positive' : 'text-[var(--ink-3)]'}`} />
+                            : <Tag className={`h-4 w-4 ${isPositive ? 'text-positive' : 'text-[var(--ink-3)]'}`} />}
                           </div>
 
                           <div className="min-w-0 flex-1">
@@ -2154,13 +2154,13 @@ export function CashAccountView({
 
                           <div className="shrink-0 text-right">
                             <span className={`font-mono text-sm font-semibold tabular-nums ${
-                              isTransfer || isPendingTransfer ? 'text-[var(--ink-2)]' : isPositive ? 'text-emerald-600' : 'text-[var(--ink)]'
+                              isTransfer || isPendingTransfer ? 'text-[var(--ink-2)]' : isPositive ? 'text-positive' : 'text-[var(--ink)]'
                             }`}>
                               {!isTransfer && !isPendingTransfer && (isPositive ? '+' : '')}{<MaskedAmount value={amount} tone="kern" />}
                             </span>
                             {!isTransfer && !isPendingTransfer && dailyExpenses > 0 && (
                               <>
-                                <p className={`text-[10px] leading-tight ${isPositive ? 'text-emerald-500/60' : 'text-[var(--ink-3)]'}`} data-testid="tx-freedom-time">
+                                <p className={`text-[10px] leading-tight ${isPositive ? 'text-positive/60' : 'text-[var(--ink-3)]'}`} data-testid="tx-freedom-time">
                                   {(() => {
                                     const fd = calculateFreedomTime(Math.abs(amount), dailyExpenses)
                                     const fdStr = fd.totalDays < 1

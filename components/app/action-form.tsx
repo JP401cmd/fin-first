@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Plus, X } from 'lucide-react'
+import { Button } from '@/components/editorial'
 
 type ActionFormProps = {
   onSubmit: (data: {
@@ -151,14 +152,15 @@ export function ActionForm({ onSubmit, onCancel }: ActionFormProps) {
       </div>
 
       <div className="mt-4 flex gap-2">
-        <button
+        <Button
+          variant="primary"
           type="submit"
           disabled={isSubmitting || !title.trim() || !freedomDays}
-          className="flex items-center gap-1.5 rounded-lg bg-wil-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-wil-600 disabled:opacity-50"
+          className="gap-1.5"
         >
           <Plus className="h-4 w-4" />
           Toevoegen
-        </button>
+        </Button>
         <button
           type="button"
           onClick={onCancel}

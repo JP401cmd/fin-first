@@ -453,13 +453,13 @@ const PortfolioAllocationVisualization = memo(function PortfolioAllocationVisual
                 key={s.category}
                 className={`flex items-center gap-3 rounded-lg border p-2.5 ${
                   s.action === 'buy'
-                    ? 'border-emerald-200 bg-emerald-50/50'
-                    : 'border-red-200 bg-red-50/50'
+                    ? 'border-positive/30 bg-positive-bg'
+                    : 'border-negative/30 bg-negative-bg'
                 }`}
                 data-testid={`rebalance-${s.category}`}
               >
                 <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${
-                  s.action === 'buy' ? 'bg-emerald-100' : 'bg-red-100'
+                  s.action === 'buy' ? 'bg-positive-bg' : 'bg-negative-bg'
                 }`}>
                   <ArrowRightLeft className={`h-3.5 w-3.5 ${
                     s.action === 'buy' ? 'text-positive' : 'text-negative'

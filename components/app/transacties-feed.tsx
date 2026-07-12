@@ -339,7 +339,7 @@ export function TransactiesFeed({
           </span>
           <span>
             In:{' '}
-            <strong className="font-semibold text-emerald-700">{formatCurrency(totals.incomes)}</strong>
+            <strong className="font-semibold text-positive">{formatCurrency(totals.incomes)}</strong>
           </span>
         </footer>
       )}
@@ -370,7 +370,7 @@ function TransactionListRow({
       <span
         className={[
           'shrink-0 w-7 h-7 rounded-lg flex items-center justify-center',
-          tx.amount < 0 ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700',
+          tx.amount < 0 ? 'bg-amber-50 text-amber-700' : 'bg-positive-bg text-positive',
         ].join(' ')}
         aria-hidden
       >
@@ -398,7 +398,7 @@ function TransactionListRow({
       <span
         className={[
           'font-mono text-sm font-semibold shrink-0',
-          tx.amount < 0 ? 'text-[var(--ink)]' : 'text-emerald-700',
+          tx.amount < 0 ? 'text-[var(--ink)]' : 'text-positive',
         ].join(' ')}
       >
         {tx.amount < 0 ? '−' : '+'}

@@ -304,6 +304,17 @@
   --positive: oklch(0.50 0.09 162);
   --negative: oklch(0.50 0.09 25);
   --neutral-change: oklch(0.67 0.005 88);
+  /* Waarschuwing/aandacht in dezelfde sobere ladder als positive/negative
+     (amber-familie, hue 80). Bedoeld voor waarde-semantiek die géén
+     stoplicht-status is; stoplicht/score houdt zijn eigen fellere tokens. */
+  --warning: oklch(0.55 0.11 80);
+  /* Zachte achtergrond-tinten bij bovenstaande drie — heel licht, lage
+     chroma, zelfde hue. Vervangen geïmproviseerde bg-emerald-50/bg-red-50/
+     bg-amber-50-vlakken zodat een gekleurd vlak bij een positief/negatief/
+     waarschuwings-bedrag uit de tokens komt i.p.v. Tailwind-standaard. */
+  --positive-bg: oklch(0.965 0.018 162);
+  --negative-bg: oklch(0.965 0.018 25);
+  --warning-bg: oklch(0.968 0.02 80);
 
   /* ── Score-tier tokens (gezondheidsscore, performance, ...) ──
      Feller dan de editorial value-change-tokens: hogere chroma voor
@@ -518,6 +529,11 @@
   --color-positive: var(--positive);
   --color-negative: var(--negative);
   --color-neutral-change: var(--neutral-change);
+  --color-warning: var(--warning);
+  /* Zachte tint-varianten: text-positive-bg / bg-negative-bg / border-warning-bg … */
+  --color-positive-bg: var(--positive-bg);
+  --color-negative-bg: var(--negative-bg);
+  --color-warning-bg: var(--warning-bg);
 
   /* ── Score-tier tokens (text-score-good, bg-score-bad, etc.) ── */
   --color-score-good: var(--score-good);

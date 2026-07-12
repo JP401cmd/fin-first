@@ -263,7 +263,7 @@ export function computeKernNextStep(data: {
     return {
       key: 'connect_bank_psd2',
       title: 'Koppel je bank voor automatisch inzicht',
-      description: 'Verbind je bankrekening via PSD2 en je transacties worden automatisch geïmporteerd.',
+      description: 'Koppel je bankrekening via PSD2 en je transacties worden automatisch geïmporteerd.',
       href: '/core/cash/connect',
       icon: 'zap',
       moduleColor: 'amber',
@@ -407,7 +407,7 @@ export function computeAllKernSteps(data: {
     steps.push({
       key: 'connect_bank_psd2',
       title: 'Koppel je bank voor automatisch inzicht',
-      description: 'Verbind je bankrekening via PSD2 en je transacties worden automatisch geïmporteerd.',
+      description: 'Koppel je bankrekening via PSD2 en je transacties worden automatisch geïmporteerd.',
       href: '/core/cash/connect',
       icon: 'zap',
       moduleColor: 'amber',
@@ -535,9 +535,9 @@ export function computeAllWilSteps(data: {
   if (data.pendingRecommendations > 0) {
     steps.push({
       key: 'review_recommendations',
-      title: 'Bekijk je aanbevelingen',
+      title: 'Bekijk je tips',
       description: `Je hebt ${data.pendingRecommendations} openstaande aanbeveling${data.pendingRecommendations > 1 ? 'en' : ''}. Neem een beslissing.`,
-      href: '/will',
+      href: '/overzicht/tips',
       icon: 'lightbulb',
       moduleColor: 'teal',
     })
@@ -633,9 +633,9 @@ export function computeWilNextStep(data: {
   if (data.pendingRecommendations > 0) {
     return {
       key: 'review_recommendations',
-      title: 'Bekijk je aanbevelingen',
+      title: 'Bekijk je tips',
       description: `Je hebt ${data.pendingRecommendations} openstaande aanbeveling${data.pendingRecommendations > 1 ? 'en' : ''}. Neem een beslissing.`,
-      href: '/will',
+      href: '/overzicht/tips',
       icon: 'lightbulb',
       moduleColor: 'teal',
     }

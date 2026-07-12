@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { useScrollLock } from '@/lib/hooks/use-scroll-lock'
 import { useFocusTrap } from '@/lib/hooks/use-focus-trap'
+import { acquireOverlay } from '@/lib/overlay-signal'
 
 type BottomSheetProps = {
   open: boolean
@@ -16,11 +17,17 @@ type BottomSheetProps = {
   /** Initial mobile height (e.g. '60vh'). Drag up expands to full 92vh. Desktop ignores this. */
   initialMobileHeight?: string
   /**
-   * Optionele sticky footer-slot, gerenderd buiten de scroll-content. Gebruikt
-   * door `<ShellOverlay kind="pane">` voor de mobile-fallback om dezelfde
-   * primary/secondary action-bar te tonen als de desktop SlideInPane-footer.
-   * Slot leeft binnen de tray (niet `position: fixed`), zodat detent-strategie
-   * (peek/mid/full) intact blijft. Wanneer leeggelaten: geen footer.
+   * Optionele sticky footer-slot, gerenderd buiten de scroll-content als
+   * niet-scrollend blok met bovenrand en safe-area-padding — de canonieke
+   * plek voor primaire acties (Opslaan/Annuleren e.d.), ook op klein scherm.
+   * De content-container blijft scrollen; de footer blijft altijd zichtbaar.
+   *
+   * Gebruikt door `<ShellOverlay>`: kind="pane" voor de mobile-fallback (zelfde
+   * primary/secondary action-bar als de desktop SlideInPane-footer) én
+   * kind="sheet"/"confirm" via de `footer`-prop. Slot leeft binnen de tray
+   * (niet `position: fixed`), zodat de detent-strategie (peek/mid/full) intact
+   * blijft. Wanneer leeggelaten: geen footer (backwards-compatible — niets
+   * verandert voor bestaande sheets zonder footer).
    */
   footerSlot?: ReactNode
   /**
@@ -268,6 +275,17 @@ export function BottomSheet({ open, onClose, title, children, size = 'md', initi
   // ── Body scroll lock (tied to visible) ─────────────────────
 
   useScrollLock(visible)
+
+  // ── FloatingNavButton verbergen zolang deze modal open is ──
+  // We haken op de `open`-prop (niet `visible`): het signaal komt zo DIRECT bij
+  // close-start vrij, waardoor de pill soepel terugkomt tijdens de exit-animatie
+  // i.p.v. pas ná de unmount. NavMenuSheet (`belowFloatingNav`) is de bewuste
+  // uitzondering — dáár IS de pill de toggle en mag die niet verdwijnen; we
+  // gaten het acquire daarom op `!belowFloatingNav`. Zie lib/overlay-signal.ts.
+  useEffect(() => {
+    if (belowFloatingNav || !open) return
+    return acquireOverlay()
+  }, [open, belowFloatingNav])
 
   // ── Focus management + trap ────────────────────────────────
 

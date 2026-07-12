@@ -14,6 +14,9 @@
 
 import type { ReactNode } from 'react'
 
+// Re-export Button (gesanctioneerde CTA-primitive — ink/secondary/moment; ADR 0038)
+export { Button } from './button'
+export type { ButtonProps, ButtonVariant, ButtonSize } from './button'
 // Re-export GlossaryTerm (lives in own file due to state/effects)
 export { GlossaryTerm } from './glossary-term'
 export type { GlossaryTermProps } from './glossary-term'

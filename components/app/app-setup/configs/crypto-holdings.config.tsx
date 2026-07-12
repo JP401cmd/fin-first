@@ -71,7 +71,7 @@ function CryptoAssetSelector({
         setRows((data ?? []) as CryptoAssetRow[])
       } catch (err) {
         if (aborted) return
-        setErrorMsg(err instanceof Error ? err.message : 'Kon crypto-assets niet laden')
+        setErrorMsg(err instanceof Error ? err.message : 'Kon crypto-bezittingen niet laden')
       }
     })()
     return () => {
@@ -93,7 +93,7 @@ function CryptoAssetSelector({
     return (
       <div className="border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/40 px-4 py-5">
         <p className="font-serif italic text-sm leading-relaxed text-[var(--ink-2)]">
-          Je hebt nog geen crypto-asset geregistreerd. Voeg een crypto-asset toe via{' '}
+          Je hebt nog geen crypto-bezitting geregistreerd. Voeg een crypto-bezitting toe via{' '}
           <Link
             href="/core/assets/crypto"
             className="underline decoration-[var(--ink-3)] underline-offset-2 hover:decoration-[var(--ink)]"
@@ -371,9 +371,9 @@ export const cryptoHoldingsSetupConfig: AppSetupConfig<CryptoHoldingsState> = {
   sections: [
     {
       id: 'assets',
-      kicker: '1. Assets',
-      title: 'Welke crypto-assets wil je volgen?',
-      hint: 'Selecteer alleen de crypto-assets die je daadwerkelijk wilt bijhouden.',
+      kicker: '1. Bezittingen',
+      title: 'Welke crypto-bezittingen wil je volgen?',
+      hint: 'Selecteer alleen de crypto-bezittingen die je daadwerkelijk wilt bijhouden.',
       render: CryptoAssetSelector,
     },
     {
@@ -398,7 +398,7 @@ export const cryptoHoldingsSetupConfig: AppSetupConfig<CryptoHoldingsState> = {
   ],
   validate: (state) => {
     if (state.selectedAssetIds.length === 0) {
-      return { ok: false, reason: 'Kies minstens één crypto-asset.' }
+      return { ok: false, reason: 'Kies minstens één crypto-bezitting.' }
     }
     if (state.sources.length === 0) {
       return { ok: false, reason: 'Geef minstens één bron op.' }

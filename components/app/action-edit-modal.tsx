@@ -9,6 +9,7 @@ import {
   ACTION_SOURCE_LABELS,
 } from '@/lib/recommendation-data'
 import { getWeekLabel, getWeekDates } from '@/lib/week-utils'
+import { Button } from '@/components/editorial'
 
 type ActionEditModalProps = {
   action: Action
@@ -231,14 +232,14 @@ export function ActionEditModal({ action, onClose, onSave, onStatusChange }: Act
             Sluiten
           </button>
           {isEditable && (
-            <button
+            <Button
+              variant="primary"
               type="button"
               onClick={handleSave}
               disabled={saving || !title.trim()}
-              className="bg-wil-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-wil-600 disabled:opacity-50"
             >
               {saving ? 'Opslaan...' : 'Opslaan'}
-            </button>
+            </Button>
           )}
         </div>
       </div>

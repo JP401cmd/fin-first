@@ -12,6 +12,7 @@ import {
   Banknote,
   type LucideIcon,
 } from 'lucide-react'
+import { Button } from '@/components/editorial'
 
 /**
  * HouseholdPrivacySettings — per-categorie zichtbaarheid voor je partner
@@ -245,13 +246,9 @@ export function HouseholdPrivacySettings() {
       </div>
 
       <div className="flex items-center gap-4 pt-4">
-        <button
-          onClick={save}
-          disabled={saving || !dirty}
-          className="rounded-lg bg-wil-600 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-wil-700 disabled:opacity-50"
-        >
+        <Button variant="primary" onClick={save} disabled={saving || !dirty}>
           {saving ? 'Opslaan...' : 'Opslaan'}
-        </button>
+        </Button>
         {message && (
           <p className={`text-sm ${message.type === 'success' ? 'text-wil-600' : 'text-negative'}`}>
             {message.text}

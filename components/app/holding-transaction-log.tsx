@@ -55,19 +55,19 @@ const typeConfig = {
   buy: {
     label: 'Koop',
     icon: ArrowDownRight,
-    color: 'text-emerald-600',
-    bg: 'bg-emerald-50',
-    border: 'border-emerald-200',
-    badgeBg: 'bg-emerald-100',
+    color: 'text-positive',
+    bg: 'bg-positive-bg',
+    border: 'border-positive/30',
+    badgeBg: 'bg-positive-bg',
     sign: '+',
   },
   sell: {
     label: 'Verkoop',
     icon: ArrowUpRight,
-    color: 'text-red-600',
-    bg: 'bg-red-50',
-    border: 'border-red-200',
-    badgeBg: 'bg-red-100',
+    color: 'text-negative',
+    bg: 'bg-negative-bg',
+    border: 'border-negative/30',
+    badgeBg: 'bg-negative-bg',
     sign: '-',
   },
   dividend: {
@@ -477,9 +477,9 @@ function SummaryCard({
 }) {
   const valueColor = colored
     ? value > 0
-      ? 'text-emerald-600'
+      ? 'text-positive'
       : value < 0
-        ? 'text-red-600'
+        ? 'text-negative'
         : 'text-[var(--ink-2)]'
     : 'text-[var(--ink)]'
 
@@ -511,9 +511,9 @@ function MiniStat({
 }) {
   const color = colored !== undefined
     ? colored > 0
-      ? 'text-emerald-600'
+      ? 'text-positive'
       : colored < 0
-        ? 'text-red-600'
+        ? 'text-negative'
         : 'text-[var(--ink-2)]'
     : 'text-[var(--ink)]'
 
@@ -762,8 +762,8 @@ function InlineTransactionForm({
           onClick={handleSave}
           disabled={saving || !units || !date || (txType !== 'split' && !pricePerUnit) || sellExceedsOwned || sellFromZero || (txType === 'split' && splitInvalid)}
           className={`rounded-lg px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50 ${
-            txType === 'buy' ? 'bg-emerald-600 hover:bg-emerald-700' :
-            txType === 'sell' ? 'bg-red-600 hover:bg-red-700' :
+            txType === 'buy' ? 'bg-positive hover:bg-positive/90' :
+            txType === 'sell' ? 'bg-negative hover:bg-negative/90' :
             txType === 'split' ? 'bg-violet-600 hover:bg-violet-700' :
             'bg-kern-600 hover:bg-kern-700'
           }`}

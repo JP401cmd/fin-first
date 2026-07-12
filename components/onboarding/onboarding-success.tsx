@@ -1,5 +1,6 @@
 import { WillDots } from '@/components/app/will-dots'
 import { Wallet, Compass, type LucideIcon } from 'lucide-react'
+import { Button } from '@/components/editorial'
 
 export function OnboardingSuccess({
   onDashboard,
@@ -83,12 +84,13 @@ export function OnboardingSuccess({
       </div>
 
       {/* CTA — opent de Toekomst-grafiek (pre-configured door onboarding) */}
-      <button
+      <Button
+        variant="moment"
         onClick={onDashboard}
-        className="mt-6 min-h-[48px] w-full max-w-xs rounded-xl bg-horizon-600 px-8 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-horizon-700 hover:shadow-md active:bg-horizon-800 active:shadow-none sm:w-auto sm:min-w-[200px]"
+        className="mt-6 w-full max-w-xs sm:w-auto sm:min-w-[200px]"
       >
         Ga naar je toekomst
-      </button>
+      </Button>
     </div>
   )
 }

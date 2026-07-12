@@ -70,7 +70,7 @@ describe('cryptoHoldingsSetupConfig — validate', () => {
   it('faalt wanneer selectedAssetIds leeg is', () => {
     const result = validate({ ...validState(), selectedAssetIds: [] })
     expect(result.ok).toBe(false)
-    expect(result.reason?.toLowerCase()).toMatch(/asset/)
+    expect(result.reason?.toLowerCase()).toMatch(/bezitting/)
   })
 
   it('faalt wanneer sources leeg is', () => {

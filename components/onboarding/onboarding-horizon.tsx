@@ -9,6 +9,7 @@ import type { RetirementExpenseMethod } from '@/lib/budget-utils'
 import type { FireEndStrategy } from '@/lib/fire-strategy'
 import type { ModuleId } from '@/lib/module-registry'
 import { NL_AOW_MONTHLY } from '@/lib/constants'
+import { Button } from '@/components/editorial'
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -485,12 +486,9 @@ export function OnboardingHorizon({
         >
           Terug
         </button>
-        <button
-          onClick={onNext}
-          className="flex-1 min-h-[44px] rounded-xl bg-horizon-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-horizon-700 active:bg-horizon-800"
-        >
+        <Button variant="primary" onClick={onNext} className="flex-1">
           Verder
-        </button>
+        </Button>
       </div>
     </div>
   )

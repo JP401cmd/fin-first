@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Search, LayoutGrid, X } from 'lucide-react'
 import { useCommandPalette } from '@/components/command-palette/command-palette-provider'
+import { useOverlayOpen } from '@/lib/overlay-signal'
 import { NavMenuSheet } from './nav-menu-sheet'
 
 /**
@@ -20,14 +21,21 @@ import { NavMenuSheet } from './nav-menu-sheet'
  * leven in het sheet-menu (Vercel-stijl).
  *
  * Visueel: ~33% schermbreed, midden-gecentreerd, 12px boven safe-area.
- * Altijd zichtbaar — óók wanneer het sheet open is, zodat de toggle-knop
- * blijft staan en het menu eenvoudig dicht kan. z-index boven de sheet's
- * portal-content om dat te garanderen.
+ * Zichtbaar zolang het eigen NavMenuSheet open is (z-index boven die sheet,
+ * zodat de toggle-knop blijft staan en het menu eenvoudig dicht kan). Maar
+ * VERBORGEN zodra er een andere overlay open is (BottomSheet/SlideInPane
+ * melden zich via lib/overlay-signal.ts) — een modale overlay dekt de pill
+ * niet langer af, hij verdwijnt eronder vandaan. Zie CLAUDE.md §Modal-conventie.
  */
 export function FloatingNavButton() {
   const [menuOpen, setMenuOpen] = useState(false)
   const cmd = useCommandPalette()
   const router = useRouter()
+  // Verberg de pill zodra er een overlay open is (BottomSheet/SlideInPane melden
+  // zich via lib/overlay-signal.ts). NavMenuSheet meldt zich bewust NIET
+  // (`belowFloatingNav`) — de pill is dáár de toggle — dus `menuOpen` houdt de
+  // pill zichtbaar. Zie CLAUDE.md §Modal-conventie.
+  const overlayOpen = useOverlayOpen()
 
   const handleAction = (action: 'open-chat' | 'open-account' | 'open-search') => {
     if (action === 'open-search') {
@@ -58,7 +66,13 @@ export function FloatingNavButton() {
         className="fixed left-1/2 -translate-x-1/2 z-[60] lg:hidden"
         style={{
           bottom: `calc(var(--safe-area-bottom, 0px) + 12px)`,
+          // `visibility: hidden` (niet unmount): de pill is `position: fixed`,
+          // dus verbergen geeft géén layout-sprong, en de knop verdwijnt netjes
+          // uit tab-order + pointer-events zolang een overlay open is. NavMenu
+          // (belowFloatingNav) meldt zich niet aan, dus blijft de pill zichtbaar.
+          visibility: overlayOpen ? 'hidden' : undefined,
         }}
+        aria-hidden={overlayOpen || undefined}
         data-mobile-floating-nav="true"
       >
         <div className="flex items-stretch gap-px rounded-full bg-stone-900 p-1 shadow-[0_8px_24px_rgba(0,0,0,0.25),0_2px_8px_rgba(0,0,0,0.15)]">

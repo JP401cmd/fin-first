@@ -269,15 +269,15 @@ function Kpi({
 }) {
   const valueColor =
     tone === 'positive'
-      ? 'text-emerald-700'
+      ? 'text-positive'
       : tone === 'negative'
-        ? 'text-red-700'
+        ? 'text-negative'
         : 'text-[var(--ink)]'
   const labelColor =
     tone === 'positive'
-      ? 'text-emerald-700'
+      ? 'text-positive'
       : tone === 'negative'
-        ? 'text-red-700'
+        ? 'text-negative'
         : 'text-[var(--ink-3)]'
 
   return (

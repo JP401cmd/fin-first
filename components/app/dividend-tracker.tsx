@@ -100,11 +100,11 @@ export default function DividendTracker() {
     return (
       <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6" data-testid="dividend-tracker-loading">
         <div className="flex items-center gap-2 mb-4">
-          <DollarSign className="h-4 w-4 text-emerald-600" />
+          <DollarSign className="h-4 w-4 text-positive" />
           <h2 className="text-sm font-semibold text-[var(--ink-2)]">Dividend Tracker</h2>
         </div>
         <div className="flex items-center justify-center py-8">
-          <Loader2 className="h-6 w-6 animate-spin text-emerald-500" />
+          <Loader2 className="h-6 w-6 animate-spin text-positive" />
         </div>
       </div>
     )
@@ -132,7 +132,7 @@ export default function DividendTracker() {
     return (
       <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6" data-testid="dividend-tracker-empty">
         <div className="flex items-center gap-2 mb-4">
-          <DollarSign className="h-4 w-4 text-emerald-600" />
+          <DollarSign className="h-4 w-4 text-positive" />
           <h2 className="text-sm font-semibold text-[var(--ink-2)]">Dividend Tracker</h2>
         </div>
         <div className="text-center py-6">
@@ -150,11 +150,11 @@ export default function DividendTracker() {
   const freedomDays = aggregate.freedom_days_per_year
 
   return (
-    <div className="rounded-[var(--r-lg)] border border-emerald-200 bg-[var(--paper)] p-6" data-testid="dividend-tracker">
+    <div className="rounded-[var(--r-lg)] border border-positive/30 bg-[var(--paper)] p-6" data-testid="dividend-tracker">
       {/* Header */}
       <div className="flex items-center gap-2 mb-5">
-        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-100">
-          <DollarSign className="h-4 w-4 text-emerald-600" />
+        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-positive-bg">
+          <DollarSign className="h-4 w-4 text-positive" />
         </div>
         <div>
           <h2 className="text-sm font-semibold text-[var(--ink-2)]">Dividend Tracker</h2>
@@ -164,12 +164,12 @@ export default function DividendTracker() {
 
       {/* Freedom-time banner */}
       <div
-        className="mb-5 rounded-[var(--r-lg)] bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 p-4"
+        className="mb-5 rounded-[var(--r-lg)] bg-positive-bg border border-positive/30 p-4"
         data-testid="dividend-freedom-banner"
       >
         <div className="flex items-center gap-2 mb-1">
-          <Sun className="h-4 w-4 text-emerald-600" />
-          <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">Vrijheid door dividenden</p>
+          <Sun className="h-4 w-4 text-positive" />
+          <p className="text-xs font-semibold text-positive uppercase tracking-wider">Vrijheid door dividenden</p>
         </div>
         <p className="text-lg font-bold text-[var(--ink)]" data-testid="dividend-freedom-days">
           {freedomDays >= 1
@@ -180,7 +180,7 @@ export default function DividendTracker() {
           }
         </p>
         {freedomDays >= 1 && (
-          <p className="mt-1 text-xs text-emerald-600">
+          <p className="mt-1 text-xs text-positive">
             {formatCurrency(aggregate.total_projected_annual_income)} per jaar ÷ {formatCurrencyDecimals(aggregate.daily_expenses)} per dag
           </p>
         )}
@@ -197,7 +197,7 @@ export default function DividendTracker() {
         </div>
         <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)] p-3">
           <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase">Verwacht per jaar</p>
-          <p className="mt-1 text-lg font-bold text-emerald-600" data-testid="dividend-projected-annual">
+          <p className="mt-1 text-lg font-bold text-positive" data-testid="dividend-projected-annual">
             {formatCurrency(aggregate.total_projected_annual_income)}
           </p>
           <p className="text-[10px] text-[var(--ink-3)]">{formatCurrency(aggregate.monthly_dividend_income)} / maand</p>
@@ -211,7 +211,7 @@ export default function DividendTracker() {
         </div>
         <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)] p-3">
           <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase">Vrijheidsdagen</p>
-          <p className="mt-1 text-lg font-bold text-emerald-600" data-testid="dividend-freedom-days-kpi">
+          <p className="mt-1 text-lg font-bold text-positive" data-testid="dividend-freedom-days-kpi">
             {Math.round(freedomDays)}
           </p>
           <p className="text-[10px] text-[var(--ink-3)]">per jaar</p>
@@ -233,13 +233,13 @@ export default function DividendTracker() {
                 className="w-full flex items-center gap-3 p-3 hover:bg-[var(--subtle)] transition-colors text-left"
                 data-testid={`dividend-holding-${holding.holding_id}`}
               >
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-50">
-                  <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-positive-bg">
+                  <TrendingUp className="h-3.5 w-3.5 text-positive" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-[var(--ink)] truncate">{holding.holding_name}</p>
                   <p className="text-[11px] text-[var(--ink-3)]">
-                    {holding.ticker && <span className="font-medium text-emerald-600">{holding.ticker}</span>}
+                    {holding.ticker && <span className="font-medium text-positive">{holding.ticker}</span>}
                     {holding.ticker && ' · '}
                     {holding.dividend_count} uitkering{holding.dividend_count !== 1 ? 'en' : ''}
                     {holding.dividend_yield > 0 && ` · ${holding.dividend_yield.toFixed(2)}% yield`}
@@ -249,7 +249,7 @@ export default function DividendTracker() {
                   <p className="text-sm font-semibold text-[var(--ink)]">
                     {formatCurrency(holding.total_dividend_income)}
                   </p>
-                  <p className="text-[10px] text-emerald-600">
+                  <p className="text-[10px] text-positive">
                     {formatCurrency(holding.projected_annual_income)} / jaar
                   </p>
                 </div>
@@ -298,7 +298,7 @@ export default function DividendTracker() {
                               <span className="text-[var(--ink-3)] truncate max-w-[150px]">— {div.notes}</span>
                             )}
                           </div>
-                          <span className="font-semibold text-emerald-600">
+                          <span className="font-semibold text-positive">
                             +{formatCurrencyDecimals(div.amount)}
                           </span>
                         </div>

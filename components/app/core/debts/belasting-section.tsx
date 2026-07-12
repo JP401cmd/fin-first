@@ -690,7 +690,7 @@ export function BelastingSection({ dailyExpenses: parentDailyExpenses }: Belasti
       {/* === Modals === */}
 
       {/* KPI: Totale Belasting */}
-      <BottomSheet open={showBelastingKassabon} title="Totale Belasting" onClose={() => setShowBelastingKassabon(false)}>
+      <BottomSheet open={showBelastingKassabon} title="Totale belasting" onClose={() => setShowBelastingKassabon(false)}>
         <KassabonShell>
           <div className="mb-3 text-center">
             <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
@@ -739,7 +739,7 @@ export function BelastingSection({ dailyExpenses: parentDailyExpenses }: Belasti
       </BottomSheet>
 
       {/* KPI: Effectief Tarief */}
-      <BottomSheet open={showTariefKassabon} title="Effectief Tarief" onClose={() => setShowTariefKassabon(false)}>
+      <BottomSheet open={showTariefKassabon} title="Effectief tarief" onClose={() => setShowTariefKassabon(false)}>
         <KassabonShell>
           <div className="mb-3 text-center">
             <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
@@ -823,7 +823,7 @@ export function BelastingSection({ dailyExpenses: parentDailyExpenses }: Belasti
       </BottomSheet>
 
       {/* KPI: Heffingsvrij Benut */}
-      <BottomSheet open={showHeffingsvrijKassabon} title="Heffingsvrij Benut" onClose={() => setShowHeffingsvrijKassabon(false)}>
+      <BottomSheet open={showHeffingsvrijKassabon} title="Heffingsvrij benut" onClose={() => setShowHeffingsvrijKassabon(false)}>
         <KassabonShell>
           <div className="mb-3 text-center">
             <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">

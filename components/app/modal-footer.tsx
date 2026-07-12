@@ -12,13 +12,20 @@
  * `slide-in-pane.tsx`, `shell-overlay.tsx` en `page-action-bar.tsx`:
  * "zodat alle drie de varianten dezelfde visuele taal spreken").
  *
- * ── Het canonieke patroon (verbatim overgenomen, niet opnieuw bedacht) ────
- * - **Primary**: solid `bg-[var(--ink)]` met `text-[var(--paper)]`,
- *   `min-h-11` (44px touch-target), Inter-font, loading → label + " …".
- * - **Secondary**: outline `border-2 border-[var(--ink)]` op
- *   `bg-[var(--paper)]`, zelfde maatvoering.
+ * ── Het canonieke patroon (nu via de `Button`-primitive — ADR 0038) ───────
+ * - **Primary**: `<Button variant="primary">` — solid `bg-[var(--ink)]` met
+ *   `text-[var(--paper)]`, `min-h-11` (44px touch-target), Inter-font,
+ *   loading → label + " …".
+ * - **Secondary**: `<Button variant="secondary">` — outline
+ *   `border-2 border-[var(--ink)]` op `bg-[var(--paper)]`, zelfde maatvoering.
  * - Geen module-/accentkleur: bewust ink/paper (module-neutraal), gelijk
  *   aan de bestaande pane-/page-action-bar.
+ *
+ * Sinds ADR 0038 delegeert dit component de knop-markup aan `Button`; de
+ * layout-logica (inline/stacked, uitlijning, `flex-1`, loading, volgorde)
+ * blijft hier. Verschil met de oude hand-gerolde footer: `px-4 → px-5`
+ * (canoniek recept), plus `active:scale-[0.98]` press-feedback en een
+ * `focus-visible` outline — beide bewuste uniformeringen naar de primitive.
  *
  * ── Twee layouts (één props-API) ──────────────────────────────────────────
  * - `layout="inline"` (default): knoppen naast elkaar. Volgorde primary
@@ -34,6 +41,8 @@
  * De class-strings zijn byte-identiek aan de bestaande hand-gerolde
  * footers, zodat adoptie gedrag- en pixel-behoudend is.
  */
+
+import { Button } from '@/components/editorial/button'
 
 type ModalFooterAction = {
   label: string
@@ -67,9 +76,6 @@ export type ModalFooterProps = {
   align?: 'start' | 'end'
 }
 
-// Inter voor UI-chrome, identiek aan slide-in-pane / page-action-bar.
-const FONT_STYLE = { fontFamily: 'var(--font-inter, system-ui, sans-serif)' } as const
-
 export function ModalFooter({
   primary,
   secondary,
@@ -78,16 +84,10 @@ export function ModalFooter({
 }: ModalFooterProps) {
   const stacked = layout === 'stacked'
 
-  // Class-strings verbatim uit de canonieke footers. `flex-1` wordt alleen
-  // in stacked-modus toegevoegd, op exact de positie die shell-overlay.tsx
-  // gebruikt (`inline-flex flex-1 min-h-11 …`).
-  const primaryClass = stacked
-    ? 'inline-flex flex-1 min-h-11 items-center justify-center bg-[var(--ink)] px-4 text-sm font-medium leading-none text-[var(--paper)] transition-colors hover:bg-[var(--ink-2)] disabled:cursor-not-allowed disabled:opacity-50'
-    : 'inline-flex min-h-11 items-center justify-center bg-[var(--ink)] px-4 text-sm font-medium leading-none text-[var(--paper)] transition-colors hover:bg-[var(--ink-2)] disabled:cursor-not-allowed disabled:opacity-50'
-
-  const secondaryClass = stacked
-    ? 'inline-flex flex-1 min-h-11 items-center justify-center border-2 border-[var(--ink)] bg-[var(--paper)] px-4 text-sm font-medium leading-none text-[var(--ink)] transition-colors hover:bg-[var(--subtle)] disabled:cursor-not-allowed disabled:opacity-50'
-    : 'inline-flex min-h-11 items-center justify-center border-2 border-[var(--ink)] bg-[var(--paper)] px-4 text-sm font-medium leading-none text-[var(--ink)] transition-colors hover:bg-[var(--subtle)] disabled:cursor-not-allowed disabled:opacity-50'
+  // In stacked-modus vullen beide knoppen samen de volle breedte (`flex-1`);
+  // de rest van de look (ink/outline, min-h-11, Inter, hover, disabled) komt
+  // uit de `Button`-primitive.
+  const growClass = stacked ? 'flex-1' : ''
 
   const rowClass = stacked
     ? 'flex items-center gap-2'
@@ -95,25 +95,25 @@ export function ModalFooter({
 
   return (
     <div className={rowClass}>
-      <button
+      <Button
+        variant="primary"
         type={primary.type ?? 'button'}
         onClick={primary.onClick}
         disabled={primary.disabled || primary.loading}
-        className={primaryClass}
-        style={FONT_STYLE}
+        className={growClass}
       >
         {primary.loading ? `${primary.label} …` : primary.label}
-      </button>
+      </Button>
       {secondary && (
-        <button
+        <Button
+          variant="secondary"
           type="button"
           onClick={secondary.onClick}
           disabled={secondary.disabled}
-          className={secondaryClass}
-          style={FONT_STYLE}
+          className={growClass}
         >
           {secondary.label}
-        </button>
+        </Button>
       )}
     </div>
   )

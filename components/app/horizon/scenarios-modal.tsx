@@ -133,7 +133,7 @@ export function ScenariosModal({ input, debts = [], open, onClose, simRows, simF
             )}
             {current && (
               <ScenarioCard
-                title="Huidige Koers"
+                title="Huidige koers"
                 subtitle={`${(baseReturn * 100).toFixed(1)}% rendement`}
                 color="purple"
                 fireAge={current.fireAge}
@@ -543,7 +543,7 @@ function DebtStrategyComparison({ debts }: { debts: Debt[] }) {
           isSelected={selectedStrategy === 'avalanche'}
         />
         <StrategyCard
-          title="Huidige Aflossing"
+          title="Huidige aflossing"
           subtitle="Zonder aanpassing"
           color="gray"
           icon={<TrendingDown className="h-4 w-4" />}

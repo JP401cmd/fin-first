@@ -496,7 +496,7 @@ export function TransactionForm({
                   onClick={() => update('is_income', false)}
                   className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
                     !form.is_income
-                      ? 'border-red-300 bg-red-50 text-red-700'
+                      ? 'border-negative/30 bg-negative-bg text-negative'
                       : 'border-[var(--border-ed)] text-[var(--ink-3)] hover:bg-[var(--subtle)]'
                   }`}
                 >
@@ -507,7 +507,7 @@ export function TransactionForm({
                   onClick={() => update('is_income', true)}
                   className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
                     form.is_income
-                      ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                      ? 'border-positive/30 bg-positive-bg text-positive'
                       : 'border-[var(--border-ed)] text-[var(--ink-3)] hover:bg-[var(--subtle)]'
                   }`}
                 >

@@ -64,6 +64,14 @@ type ShellOverlayProps = {
    *  boven de knoppen-rij zodat de info altijd zichtbaar blijft naast de
    *  primaire actie. Gebruikt voor live-preview-bedragen e.d. */
   footerInfo?: ReactNode
+  /** Sticky footer met primaire acties — voor kind="sheet" en kind="confirm".
+   *  Wordt doorgegeven aan BottomSheet's `footerSlot` en rendert als
+   *  niet-scrollend blok onderin de sheet (bovenrand + safe-area-padding),
+   *  óók op klein scherm. Dit is de nieuwe standaard: sheets zetten hun
+   *  Opslaan/Annuleren e.d. hier neer i.p.v. onderaan de scroll-content.
+   *  Voor kind="pane" gebruik je in plaats hiervan `primaryAction`/
+   *  `secondaryAction` (die genereren zelf de footer op desktop én mobiel). */
+  footer?: ReactNode
   children: ReactNode
 }
 
@@ -83,6 +91,7 @@ export function ShellOverlay({
   primaryAction,
   secondaryAction,
   footerInfo,
+  footer,
   children,
 }: ShellOverlayProps) {
   // SSR-safe matchMedia hook — bepaalt voor `kind="pane"` of we de SlideInPane
@@ -184,7 +193,7 @@ export function ShellOverlay({
     // `actions` worden in de sticky title-bar gerendered — handig voor
     // bv. pijl-navigatie of share-icons binnen een sheet.
     return (
-      <BottomSheet open={open} onClose={onClose} title={title} size={size} actions={actions}>
+      <BottomSheet open={open} onClose={onClose} title={title} size={size} actions={actions} footerSlot={footer}>
         {children}
       </BottomSheet>
     )
@@ -202,7 +211,7 @@ export function ShellOverlay({
   // attributen kan zetten zoals `aria-describedby` op een waarschuwingsblok).
   // Voor nu: we forwarden `data-destructive` voor styling-hooks in children.
   return (
-    <BottomSheet open={open} onClose={onClose} title={title} size="sm">
+    <BottomSheet open={open} onClose={onClose} title={title} size="sm" footerSlot={footer}>
       <div data-destructive={destructive ? 'true' : undefined}>{children}</div>
     </BottomSheet>
   )

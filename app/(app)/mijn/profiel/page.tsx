@@ -6,7 +6,7 @@ import { HouseholdSection } from '@/components/app/household-section'
 import { HouseholdPrivacySettings } from '@/components/mijn/household-privacy-settings'
 import { HouseholdBudgetModelSection } from '@/components/mijn/household-budget-model-section'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
-import { PageOpening } from '@/components/editorial'
+import { PageOpening, Button } from '@/components/editorial'
 
 type HouseholdType = 'solo' | 'samen' | 'gezin'
 
@@ -252,13 +252,9 @@ export default function ProfielPage() {
         </div>
 
         <div className="mt-3 sm:mt-6 flex items-center gap-3">
-          <button
-            onClick={saveProfile}
-            disabled={saving}
-            className="rounded-lg bg-zinc-900 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50"
-          >
+          <Button variant="primary" onClick={saveProfile} disabled={saving}>
             {saving ? 'Opslaan...' : 'Opslaan'}
-          </button>
+          </Button>
           {saveMessage && (
             <span className={`text-sm ${saveMessage.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
               {saveMessage.text}
@@ -430,13 +426,9 @@ export default function ProfielPage() {
         </div>
 
         <div className="mt-3 sm:mt-6 flex items-center gap-3">
-          <button
-            onClick={saveProfile}
-            disabled={saving}
-            className="rounded-lg bg-zinc-900 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50"
-          >
+          <Button variant="primary" onClick={saveProfile} disabled={saving}>
             {saving ? 'Opslaan...' : 'Opslaan'}
-          </button>
+          </Button>
           {saveMessage && (
             <span className={`text-sm ${saveMessage.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
               {saveMessage.text}
