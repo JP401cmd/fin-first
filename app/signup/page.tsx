@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { translateAuthError } from '@/lib/auth-errors'
 
 export default function SignupPage() {
   const [email, setEmail] = useState('')
@@ -16,29 +17,35 @@ export default function SignupPage() {
     setLoading(true)
     setError(null)
 
-    const supabase = createClient()
-    // Vrijheidscheck-conversie: draagt het check-token door de e-mailbevestiging
-    // heen, zodat de gebruiker na inloggen op /check/activeren landt en de intake
-    // wordt overgezet naar het nieuwe account.
-    const checkToken = new URLSearchParams(window.location.search).get('check')
-    const next = checkToken
-      ? `/check/activeren?token=${encodeURIComponent(checkToken)}`
-      : null
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: next
-          ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
-          : `${window.location.origin}/auth/callback`,
-      },
-    })
+    try {
+      const supabase = createClient()
+      // Vrijheidscheck-conversie: draagt het check-token door de e-mailbevestiging
+      // heen, zodat de gebruiker na inloggen op /check/activeren landt en de intake
+      // wordt overgezet naar het nieuwe account.
+      const checkToken = new URLSearchParams(window.location.search).get('check')
+      const next = checkToken
+        ? `/check/activeren?token=${encodeURIComponent(checkToken)}`
+        : null
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: next
+            ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
+            : `${window.location.origin}/auth/callback`,
+        },
+      })
 
-    if (error) {
-      setError(error.message)
-      setLoading(false)
-    } else {
-      setSuccess(true)
+      if (error) {
+        setError(translateAuthError(error))
+      } else {
+        setSuccess(true)
+      }
+    } catch (err) {
+      // Netwerkfout/timeout: zonder deze catch bleef `loading` eeuwig true.
+      // translateAuthError herkent de fetch-fout en geeft de offline-copy.
+      setError(translateAuthError(err))
+    } finally {
       setLoading(false)
     }
   }
@@ -103,7 +110,7 @@ export default function SignupPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+              className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500"
             />
           </div>
 
@@ -118,18 +125,24 @@ export default function SignupPage() {
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={6}
-              className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+              aria-describedby="password-hint"
+              className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500"
             />
+            {/* Wachtwoordeisen vooraf tonen (A-05): permanente hint, geen
+                placeholder — blijft leesbaar terwijl de gebruiker typt. */}
+            <p id="password-hint" className="mt-1 text-xs text-zinc-400">
+              Minimaal 6 tekens
+            </p>
           </div>
 
           {error && (
-            <p className="text-sm text-red-600">{error}</p>
+            <p className="text-sm text-red-600" role="alert">{error}</p>
           )}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
+            className="min-h-11 w-full rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
           >
             {loading ? 'Account aanmaken...' : 'Registreren'}
           </button>

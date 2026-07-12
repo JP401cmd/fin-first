@@ -16,5 +16,8 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.redirect(`${origin}/login`)
+  // Geen code of mislukte uitwisseling: de bevestigings-/resetlink is verlopen
+  // of al gebruikt. Stuur naar /login met een vlag zodat de loginpagina een
+  // duidelijke banner toont i.p.v. een kale loginpagina (A-01).
+  return NextResponse.redirect(`${origin}/login?confirm_error=1`)
 }

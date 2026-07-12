@@ -1,12 +1,18 @@
 import { describe, it, expect, vi } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import type { Asset } from '@/lib/asset-data'
+import type { Debt } from '@/lib/debt-data'
 import { ageAtDate, type FinancialInput } from '@/lib/horizon-data'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
 import { WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
 import { toSimResult } from '@/lib/unified-projection'
 import { computeConvergentieProjection, type ConvergentieRawProfileRow } from '@/lib/horizon-kernel/convergentie-router'
 import { runForcedStopPath } from '@/lib/horizon/scenario-presets'
+import { buildCoverageStrip } from '@/lib/horizon/coverage-strip'
+import {
+  buildCompleetHorizonFixture,
+  buildCompleetKernelProfileBase,
+} from '@/lib/regression-tests/horizon-strategie/persona-fixture'
 import { buildSliderEvent } from '@/lib/scenario-events'
 import type { WhatIfEvent } from '@/components/app/horizon/whatif-events'
 import type { WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
@@ -395,5 +401,95 @@ describe('useHorizonFireSim — gekozen-stop-pad (3e run)', () => {
       getUserImpl.current = () => new Promise(() => {})
       vi.useRealTimers()
     }
+  })
+})
+
+// ── Variantenmatrix-item (bug-fix stap 6): hook-stopPad-rijen delen de salaris-gate ──
+//
+// `stopPad` is een dunne wrapper om `runForcedStopPath` (al gedekt in
+// coverage-strip-forced-stop.test.ts); dit bewijst dat het GEDRAG ook via de hook zelf
+// klopt — mét dezelfde 20x-verkleinde persona-fixture (brugperiode tussen de geforceerde
+// stopleeftijd en de AOW-fallback zonder salaris die de portefeuille niet volledig dekt).
+
+const HOOK_PINNED_AGE = 42
+const HOOK_SCALE = 20
+const HOOK_AOW_FALLBACK_AGE = 67
+const HOOK_STOP_AGE = 43
+
+function scaleHookAsset(a: Asset): Asset {
+  return {
+    ...a,
+    current_value: a.current_value / HOOK_SCALE,
+    purchase_value: a.purchase_value != null ? a.purchase_value / HOOK_SCALE : a.purchase_value,
+    woz_value: a.woz_value != null ? a.woz_value / HOOK_SCALE : a.woz_value,
+    rental_income: a.rental_income != null ? a.rental_income / HOOK_SCALE : a.rental_income,
+  }
+}
+function scaleHookDebt(d: Debt): Debt {
+  return {
+    ...d,
+    current_balance: d.current_balance / HOOK_SCALE,
+    original_amount: d.original_amount / HOOK_SCALE,
+    monthly_payment: d.monthly_payment != null ? d.monthly_payment / HOOK_SCALE : d.monthly_payment,
+    minimum_payment: d.minimum_payment != null ? d.minimum_payment / HOOK_SCALE : d.minimum_payment,
+  }
+}
+
+const hookFx = buildCompleetHorizonFixture(HOOK_PINNED_AGE)
+const hookAssets = hookFx.assets.map(scaleHookAsset)
+const hookDebts = hookFx.debts.map(scaleHookDebt)
+const hookProfile: ConvergentieRawProfileRow = {
+  ...buildCompleetKernelProfileBase(HOOK_PINNED_AGE),
+  yearly_essential_expenses: 30_000,
+  retirement_expense_method: 'essential_budgets',
+  fire_end_strategy: 'perpetual',
+  fire_end_age: 90,
+  fire_legacy_amount: 0,
+  housing_strategy_config: { mode: 'include_full' },
+}
+// Alleen dateOfBirth + yearlyMustExpenses zijn load-bearing voor buildHorizonInput se
+// guard/yearlyExpenses-afleiding; de overige velden zijn ongebruikte vulling.
+const hookHorizonInput: FinancialInput = { ...hookFx.financialInput, yearlyMustExpenses: 30_000 }
+
+describe('useHorizonFireSim — stopPad deelt de post-FIRE-salaris-gate (variantenmatrix)', () => {
+  it('stopPad-rijen in de brugjaren (vóór AOW) hebben geen salaris meer', () => {
+    const params = makeParams({
+      horizonInput: hookHorizonInput,
+      lifeEvents: hookFx.lifeEvents,
+      assets: hookAssets,
+      debts: hookDebts,
+      kernelRawProfile: hookProfile,
+      aowRows: [],
+      stopPadAge: HOOK_STOP_AGE,
+    })
+    const { result, unmount } = renderHook(() => useHorizonFireSim(params))
+    expect(result.current.stopPad).not.toBeNull()
+
+    const postStopPreAow = result.current.stopPad!.unifiedRows.filter(
+      (r) => r.phase !== 'accumulation' && r.age < HOOK_AOW_FALLBACK_AGE,
+    )
+    expect(postStopPreAow.length).toBeGreaterThan(0)
+    for (const row of postStopPreAow) {
+      expect(row.grossIncomeBySource?.salaris ?? 0).toBeCloseTo(0, 0)
+    }
+    unmount()
+  })
+
+  it('de coverage-strip op die stopPad-rijen toont het dekkingsgat (<100%) in de brugperiode', () => {
+    const params = makeParams({
+      horizonInput: hookHorizonInput,
+      lifeEvents: hookFx.lifeEvents,
+      assets: hookAssets,
+      debts: hookDebts,
+      kernelRawProfile: hookProfile,
+      aowRows: [],
+      stopPadAge: HOOK_STOP_AGE,
+    })
+    const { result, unmount } = renderHook(() => useHorizonFireSim(params))
+    expect(result.current.stopPad).not.toBeNull()
+
+    const nodes = buildCoverageStrip(result.current.stopPad!.unifiedRows)
+    expect(nodes.some((n) => n.coveragePct < 100)).toBe(true)
+    unmount()
   })
 })

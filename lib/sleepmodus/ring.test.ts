@@ -153,6 +153,32 @@ describe('isInsideCluster', () => {
     expect(isInsideCluster({ x: 50, y: 90 }, slot)).toBe(false)
     expect(isInsideCluster({ x: 6, y: 90 }, slot)).toBe(false)
   })
+
+  // Regressie: bij >6 deelbudgetten waaieren de children over een 2e ring. Die
+  // buitenste rij MOET binnen de sluitgrens vallen met marge — anders sluit de
+  // waaier precies op de 2e-rij-bollen en zijn ze met slepen onbereikbaar
+  // (de oorspronkelijke bug: CLUSTER_RADIUS_OUTER === sluitgrens, nul marge).
+  it('houdt óók de 2e-rij-deelbudgetten (count > 6) ruim binnen de sluitgrens', () => {
+    for (const count of [7, 8, 10, 12]) {
+      for (let slot = 0; slot < RING_SLOTS.length; slot++) {
+        const parent = RING_SLOTS[slot]
+        const cluster = childClusterFor(slot, count)
+        cluster.forEach((pos, i) => {
+          const label = `child ${i} (count ${count}, slot ${slot})`
+          // elke child (incl. de buitenste ring) valt binnen de sluitgrens …
+          expect(isInsideCluster(pos, slot), `${label} valt buiten de sluitgrens`).toBe(true)
+          // … én met een reële marge: een punt 4% veld verder dan de child valt
+          // nog steeds binnen de sluitgrens, zodat een kleine overshoot of
+          // floating-point-afronding de waaier niet meteen dichtklapt.
+          const dist = Math.hypot(pos.x - parent.x, pos.y - parent.y)
+          expect(
+            isInsideCluster({ x: parent.x + dist + 4, y: parent.y }, slot),
+            `${label} heeft <4% sluitmarge`,
+          ).toBe(true)
+        })
+      }
+    }
+  })
 })
 
 describe('MAX_RING_BUDGETS', () => {

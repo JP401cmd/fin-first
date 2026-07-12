@@ -105,6 +105,15 @@ export interface CFComputedRow {
   readonly totaalExtraGeld: number // I
   readonly gebeurtenisNetto: number // J
   readonly box3VorigeMaand: number // K
+  /**
+   * D-subterm — het geïndexeerde user-basissalaris `(nettoJaarinkomen/12)·idx`,
+   * de eerste term van kolom D (vóór partnerbijdrage + werk-strategie-delta).
+   * GEEN eigen Excel-kolom (staat niet in de parity-CF_COLUMNS); enige bron voor
+   * de post-FIRE-salaris-gate in `bridge.ts` (ADR 0037) zodat die de term niet
+   * zelf hoeft te herberekenen. `inkomen = basissalaris + partnerbijdrage +
+   * werkStrategieDelta`.
+   */
+  readonly basissalaris: number
 }
 
 /**
@@ -143,7 +152,10 @@ export function computeCF(input: KernelInput, dep: CFDep, m: MonthIndex): CFRow 
   const K = m === 0 ? 0 : dep.canoniekeHeffingVorigeMaand
 
   // D — inkomen: geïndexeerd netto-inkomen + partnerbijdrage + werk-strategie-delta.
-  const D = (nettoJaarinkomen / 12) * idx + dep.partnerBijdrage + dep.werkStrategieDelta
+  // basissalaris = de eerste D-subterm (single-source voor de bridge-salaris-gate);
+  // D telt exact zoals voorheen op (float-identiek: zelfde operanden, zelfde volgorde).
+  const basissalaris = (nettoJaarinkomen / 12) * idx
+  const D = basissalaris + dep.partnerBijdrage + dep.werkStrategieDelta
 
   // E — uitgaven: geïndexeerde netto-uitgaven + huur na verkoop − vervallen hypotheeklast.
   const E = (nettoJaaruitgaven / 12) * idx + dep.huurNaVerkoop - dep.vervallenHypotheeklast
@@ -193,5 +205,6 @@ export function computeCF(input: KernelInput, dep: CFDep, m: MonthIndex): CFRow 
     totaalExtraGeld: I,
     gebeurtenisNetto: J,
     box3VorigeMaand: K,
+    basissalaris,
   }
 }

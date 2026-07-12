@@ -4,6 +4,7 @@ import { getModel } from '@/lib/ai/config'
 import { generateObject } from 'ai'
 import { z } from 'zod'
 import { PENSION_PARSE_PROMPT } from '@/lib/ai/pension-parse-prompt'
+import { checkTierGate } from '@/lib/require-tier'
 
 // ── Rate limiting (in-memory, per user) ──
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
@@ -57,6 +58,13 @@ export async function POST(req: Request) {
     return Response.json({ error: 'Niet ingelogd' }, { status: 401 })
   }
 
+  // AI-add-on vereist: pensioen-PDF-extractie draait op het AI-model. Voorheen
+  // enkel auth — nu gegate zoals de overige AI-routes (kostenbeheersing).
+  const gate = await checkTierGate(supabase, user.id, 'ai')
+  if (gate) {
+    return Response.json({ error: gate.error }, { status: 403 })
+  }
+
   // Rate limit check
   if (!checkRateLimit(user.id)) {
     return Response.json(
@@ -72,6 +80,24 @@ export async function POST(req: Request) {
   } catch {
     return Response.json({ error: 'Ongeldig verzoek. Verwacht multipart/form-data.' }, { status: 400 })
   }
+
+  // Explicit AVG-consent gate (ADR 0035). A pension PDF is a binary document
+  // that cannot be reliably PII-stripped, so instead of sending it silently we
+  // require the client to record the user's explicit consent for one-time AI
+  // processing. Absent consent → reject. The JSON-route is client-side and
+  // never reaches this endpoint. We log the consent event (user + token +
+  // timestamp) as an audit trail — never any file content.
+  const consent = formData.get('consent')
+  if (consent !== 'pension_pdf_ai_v1') {
+    return Response.json(
+      { error: 'Toestemming voor AI-verwerking van de PDF ontbreekt. Upload opnieuw of gebruik de JSON-export.' },
+      { status: 400 },
+    )
+  }
+  console.log(
+    '[pension/parse] AVG-consent geregistreerd:',
+    JSON.stringify({ userId: user.id, consent: 'pension_pdf_ai_v1', at: new Date().toISOString() }),
+  )
 
   const file = formData.get('file')
   if (!file || !(file instanceof File)) {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo, useRef, type ReactNode } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef, memo, type ReactNode } from 'react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import {
   Plus, Trash2, Edit3, X, TrendingUp, RefreshCw, Loader2, BarChart3, ChevronDown, ChevronUp, Briefcase, AlertCircle, AlertTriangle, LinkIcon, ExternalLink, Users,
@@ -13,6 +13,7 @@ import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { AssetPane } from '@/components/app/core/assets/asset-pane'
 import { createClient } from '@/lib/supabase/client'
 import { syncBudgetingActive } from '@/lib/budgeting-active'
+import { syncBankAccountCompanion } from '@/lib/bank-account-companion'
 import { upsertSingleBalanceSnapshot } from '@/lib/balance-snapshot'
 import { DGA_LENING_DREMPEL } from '@/lib/box2-data'
 import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
@@ -465,6 +466,25 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
     [activeAssets],
   )
 
+  // Klik op een bezitting (kaart of Eenvoudig-pill). In useCallback (stabiele
+  // referentie) zodat de gememoiseerde <VermogenAssetCard> niet meeherrenderd
+  // bij ongerelateerde state-wijzigingen. Bewust bóven de `assetPillItems`-
+  // useMemo geplaatst: die gebruikt 'm in z'n closure, dus een const-vorm hier
+  // moet vóór dat gebruik staan (voorheen een gehoiste function-declaratie).
+  const handleAssetClick = useCallback(
+    (asset: Asset) => {
+      // Cash-rekeningen wonen op de cashflow-pagina: open daar met focus op de
+      // gekozen rekening (#rekening-<assetId>). Andere asset-types openen de
+      // detail-pane op hun categoriepagina zoals voorheen.
+      if (asset.asset_type === 'cash') {
+        router.push(`/overzicht/cashflow#rekening-${asset.id}`)
+        return
+      }
+      router.push(`/core/assets/${asset.asset_type}?asset=${asset.id}`)
+    },
+    [router],
+  )
+
   // ── Pill-items voor de Eenvoudig-weergave ────────────────────
   // Eén PLATTE lijst over alle categorieën heen: géén CategoryGroupHeader-
   // koppen meer; categorie loopt uitsluitend via het pill-icoon (type-naam +
@@ -640,17 +660,6 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
       setSelectedAssetId(initialAssetId)
     }
   }, [initialAssetId, loading, assets, requestedAssetId, setSelectedAssetId])
-
-  function handleAssetClick(asset: Asset) {
-    // Cash-rekeningen wonen op de cashflow-pagina: open daar met focus op de
-    // gekozen rekening (#rekening-<assetId>). Andere asset-types openen de
-    // detail-pane op hun categoriepagina zoals voorheen.
-    if (asset.asset_type === 'cash') {
-      router.push(`/overzicht/cashflow#rekening-${asset.id}`)
-      return
-    }
-    router.push(`/core/assets/${asset.asset_type}?asset=${asset.id}`)
-  }
 
   // Snelle acties vanuit de kaart-actie-rij. Bewerken opent de detail-pane
   // in edit-mode op de huidige pagina (geen cash-deeplink — de gebruiker
@@ -2635,7 +2644,10 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
 
 // ── Allocation pie chart (SVG donut) ─────────────────────────
 
-function AllocationPie({
+// memo(): props (byType via useMemo, total/dailyExpenses primitieven) zijn al
+// stabiel, dus deze SVG-donut hoeft niet mee te herrenderen bij ongerelateerde
+// state-wijzigingen van de host-pagina.
+const AllocationPie = memo(function AllocationPie({
   byType,
   total,
   dailyExpenses,
@@ -2706,11 +2718,12 @@ function AllocationPie({
     </svg>
     </div>
   )
-}
+})
 
 // ── Projection chart ─────────────────────────────────────────
 
-function ProjectionChart({
+// memo(): props (data via useMemo, currentValue primitief) zijn al stabiel.
+const ProjectionChart = memo(function ProjectionChart({
   data,
   currentValue,
 }: {
@@ -2779,7 +2792,7 @@ function ProjectionChart({
     </svg>
     </div>
   )
-}
+})
 
 // ── Asset form modal ─────────────────────────────────────────
 
@@ -3166,61 +3179,28 @@ export function AssetForm({
       assetId = inserted?.id
     }
 
-    // Create or sync linked bank_account for cash with budget tracking
-    if (isCashType && hasBudgetTracking && assetId) {
-      const { data: existingBA } = await supabase
-        .from('bank_accounts')
-        .select('id')
-        .eq('linked_asset_id', assetId)
-        .maybeSingle()
-
-      if (!existingBA) {
-        await supabase.from('bank_accounts').insert({
-          user_id: user.id,
+    // Create/sync/cleanup de gekoppelde bank_accounts-companion voor cash-assets.
+    // Zelfde gedeelde helper als de Budgetteren-setupwizard, zodat de rekening
+    // meteen zichtbaar is op /core/cash/import en de twee vlaggen nooit
+    // uiteenlopen. Alleen relevant wanneer we aan- of uitzetten:
+    //  - aanzetten (hasBudgetTracking) → companion aan/bijwerken;
+    //  - uitzetten op een asset die het eerder aan had → companion opruimen.
+    if (isCashType && assetId && (hasBudgetTracking || (isEdit && asset?.has_budget_tracking))) {
+      await syncBankAccountCompanion(
+        supabase,
+        user.id,
+        {
+          id: assetId,
           name,
           iban: iban || null,
-          bank_name: institution || null,
-          account_type: subtype || 'checking',
-          balance: Number(currentValue) || 0,
-          linked_asset_id: assetId,
+          institution: institution || null,
+          subtype: subtype || null,
           ownership,
           household_id: ownership === 'shared' ? householdId : null,
-        })
-      } else {
-        await supabase.from('bank_accounts').update({
-          name,
-          iban: iban || null,
-          bank_name: institution || null,
-          account_type: subtype || 'checking',
-          balance: Number(currentValue) || 0,
-          // Sync eigendom mee: een eigendomswijziging op het cash-bezit moet
-          // doorwerken naar de gekoppelde bankrekening (DB-trigger herstempelt
-          // household_id). Geen backfill-dialoog hier — alleen de rekeningrij.
-          ownership,
-        }).eq('id', existingBA.id)
-      }
-    }
-
-    // Cleanup linked bank_account when budget tracking is turned OFF
-    if (isCashType && !hasBudgetTracking && isEdit && asset?.has_budget_tracking && assetId) {
-      const { data: linkedBA } = await supabase
-        .from('bank_accounts')
-        .select('id')
-        .eq('linked_asset_id', assetId)
-        .maybeSingle()
-
-      if (linkedBA) {
-        const { count } = await supabase
-          .from('transactions')
-          .select('id', { count: 'exact', head: true })
-          .eq('account_id', linkedBA.id)
-
-        if (count === 0) {
-          await supabase.from('bank_accounts').delete().eq('id', linkedBA.id)
-        } else {
-          await supabase.from('bank_accounts').update({ linked_asset_id: null }).eq('id', linkedBA.id)
-        }
-      }
+          current_value: Number(currentValue) || 0,
+        },
+        hasBudgetTracking,
+      )
     }
 
     // After save: sync budgeting_active with has_budget_tracking status.
@@ -3446,7 +3426,7 @@ export function AssetForm({
               <div className={`grid ${assetType === 'eigen_huis' ? 'grid-cols-2' : 'grid-cols-3'} gap-3`}>
                 {!(visibleFields.includes('depreciation_rate') && depreciationRate && Number(depreciationRate) > 0) && (
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">{assetType === 'vordering' ? 'Rente (% p.j.)' : 'Rendement (% p.j.)'}</label>
+                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">{assetType === 'vordering' || assetType === 'savings' ? 'Rente (% p.j.)' : 'Rendement (% p.j.)'}</label>
                   <input
                     type="number"
                     step="0.1"

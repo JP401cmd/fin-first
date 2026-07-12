@@ -5,6 +5,7 @@ import { getModel, AIConfigError } from '@/lib/ai/config'
 import { RECOMMENDATIONS_SYSTEM_PROMPT } from '@/lib/ai/dna/recommendations'
 import { buildRecommendationContext } from '@/lib/ai/context/recommendation-context'
 import { maskPIIInOutput } from '@/lib/ai/pii-output-filter'
+import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
 import { checkTierGate } from '@/lib/require-tier'
 
 // ── Schema (same as main recommendations endpoint) ─────────
@@ -57,7 +58,7 @@ export async function POST() {
 
   const [{ data: budgets }, { data: profile }] = await Promise.all([
     supabase.from('budgets').select('slug, is_essential'),
-    supabase.from('profiles').select('retirement_expense_method, budgeting_active').eq('id', user.id).single(),
+    supabase.from('profiles').select('retirement_expense_method, budgeting_active, full_name, date_of_birth').eq('id', user.id).single(),
   ])
   const budgetMap = new Map((budgets ?? []).map(b => [b.slug, b.is_essential]))
   const usesEssentialBudgets = (profile?.retirement_expense_method ?? 'essential_budgets') === 'essential_budgets'
@@ -65,7 +66,15 @@ export async function POST() {
 
   let context: string
   try {
-    context = await buildRecommendationContext(supabase, budgetingActive)
+    const rawContext = await buildRecommendationContext(supabase, budgetingActive)
+    // Sanitize PII before the context reaches the AI provider (chat/categorize
+    // contract). A sanitize failure blocks the call (fail-safe): raw context
+    // must never leave unfiltered. Merchant/asset names stay by design.
+    const sanitizeOpts: SanitizeOptions = {}
+    const names = [profile?.full_name].filter(Boolean) as string[]
+    if (names.length > 0) sanitizeOpts.names = names
+    if (profile?.date_of_birth) sanitizeOpts.dateOfBirth = profile.date_of_birth
+    context = sanitizeForAI(rawContext, sanitizeOpts)
   } catch {
     return Response.json({ error: 'Context kon niet worden opgebouwd.' }, { status: 500 })
   }

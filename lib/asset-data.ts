@@ -139,7 +139,7 @@ export interface Asset {
 export type AssetSource = 'manual' | 'aangifte_import' | 'broker_csv' | 'bank_psd2'
 
 export const ASSET_TYPE_LABELS: Record<AssetType, string> = {
-  cash: 'Cash / Bankrekeningen',
+  cash: 'Cash / Betaalrekeningen',
   savings: 'Spaargeld',
   investment: 'Beleggingen',
   retirement: 'Pensioen',
@@ -584,7 +584,7 @@ import type { DebtType } from './debt-data'
 /** Kortere NL-labels voor de quick-add wizard (minder formeel dan ASSET_TYPE_LABELS). */
 export const ASSET_QUICK_ADD_LABELS: Record<AssetType, string> = {
   savings: 'Spaargeld',
-  cash: 'Bankrekening',
+  cash: 'Betaalrekening',
   eigen_huis: 'Eigen woning',
   investment: 'Beleggingen',
   retirement: 'Pensioen',

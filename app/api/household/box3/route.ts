@@ -83,17 +83,17 @@ export async function GET(request: NextRequest) {
   const dailyExpenses = monthlyExpenses > 0 ? dailyExpenseRate(monthlyExpenses) : 100
 
   // Separate assets/debts by user
-  const myAssets = allAssets.filter(a => a.user_id === user.id || (a as any).ownership === 'shared')
-  const myPersonalAssets = allAssets.filter(a => a.user_id === user.id && (a as any).ownership !== 'shared')
-  const sharedAssets = allAssets.filter(a => (a as any).ownership === 'shared')
+  const myAssets = allAssets.filter(a => a.user_id === user.id || a.ownership === 'shared')
+  const myPersonalAssets = allAssets.filter(a => a.user_id === user.id && a.ownership !== 'shared')
+  const sharedAssets = allAssets.filter(a => a.ownership === 'shared')
   const partnerPersonalAssets = partnerId
-    ? allAssets.filter(a => a.user_id === partnerId && (a as any).ownership !== 'shared')
+    ? allAssets.filter(a => a.user_id === partnerId && a.ownership !== 'shared')
     : []
 
-  const myPersonalDebts = allDebts.filter(d => d.user_id === user.id && (d as any).ownership !== 'shared')
-  const sharedDebts = allDebts.filter(d => (d as any).ownership === 'shared')
+  const myPersonalDebts = allDebts.filter(d => d.user_id === user.id && d.ownership !== 'shared')
+  const sharedDebts = allDebts.filter(d => d.ownership === 'shared')
   const partnerPersonalDebts = partnerId
-    ? allDebts.filter(d => d.user_id === partnerId && (d as any).ownership !== 'shared')
+    ? allDebts.filter(d => d.user_id === partnerId && d.ownership !== 'shared')
     : []
 
   // Privacy gate: when the partner hides their vermogen, drop their personal
@@ -138,10 +138,11 @@ export async function GET(request: NextRequest) {
         .from('household_members')
         .select('user_id, profiles:user_id(full_name)')
         .eq('household_id', householdStatus.household_id)
+        .returns<{ user_id: string; profiles: { full_name: string | null } | null }[]>()
 
       const partner = allMembers?.find(m => m.user_id !== user.id)
-      if (partner && (partner as any).profiles?.full_name) {
-        partnerName = (partner as any).profiles.full_name
+      if (partner && partner.profiles?.full_name) {
+        partnerName = partner.profiles.full_name
       }
     }
   } catch {

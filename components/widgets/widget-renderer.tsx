@@ -560,6 +560,13 @@ export interface DashboardData {
   topLifeEvents: TopLifeEvent[]
   // 6-month rolling average savings rate (%)
   savingsRate6m: number
+  // Canoniek maandspaarbedrag (€) op DEZELFDE grondslag als savingsRate6m
+  // (6m-geëxtrapoleerd, incl. spaarbudgetten + schuldaflossing): bedrag / inkomen
+  // == savingsRate6m. De spaarquote-widget consumeert dit i.p.v. zelf een afwijkend
+  // huidige-maand-bedrag te berekenen (consume-don't-recompute).
+  monthlySavingsAmount: number
+  // De 6m-quote is een schatting (profiel/net-worth-delta-fallback i.p.v. transacties).
+  savingsRateIsEstimate: boolean
   // Savings-budget amounts (for spaarquote correction)
   monthlySavingsBudgetSpent: number
   savingsBudgetSpent6m: number
@@ -575,6 +582,11 @@ export interface DashboardData {
     totalDebts: number
     monthlyExpenses: number
     monthlyIncome: number
+    // Canonieke huishoud-spaarquote (%) via savingsRateFromAggregates + het
+    // bijbehorende €-maandspaarbedrag (bedrag / inkomen == savingsRate) — de
+    // spaarquote-widget consumeert deze i.p.v. inline een afwijkende formule.
+    savingsRate: number
+    monthlySavings: number
     freedomPct?: number
     fireTarget?: number
     fireAge?: number | null
@@ -590,6 +602,10 @@ export interface DashboardData {
     totalDebts: number
     monthlyExpenses: number
     monthlyIncome: number
+    // Canonieke partner-spaarquote (%) via savingsRateFromAggregates + het
+    // bijbehorende €-maandspaarbedrag (bedrag / inkomen == savingsRate).
+    savingsRate: number
+    monthlySavings: number
     freedomPct?: number
     fireTarget?: number
     fireAge?: number | null

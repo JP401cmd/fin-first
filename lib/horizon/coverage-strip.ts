@@ -97,8 +97,8 @@ export function spendablePortfolio(row: UnifiedProjectionRow): number {
 }
 
 /**
- * Dekkingspercentage voor één projectierij — mockup-getrouw:
- *   dekking = (vaste inkomsten + veilige onttrekking) ÷ gewenste besteding × 100.
+ * Dekkingspercentage voor één projectierij — mockup-getrouw, op BRUTO-behoefte:
+ *   dekking = (vaste inkomsten + veilige onttrekking) ÷ bruto besteding × 100.
  *
  * - accumulation: 100 (er wordt nog gespaard, geen onttrekkingsbehoefte).
  * - transition/withdrawal: vaste inkomsten (salaris + AOW/pensioen) plus een
@@ -108,7 +108,32 @@ export function spendablePortfolio(row: UnifiedProjectionRow): number {
  *   maskeert dat je vermogen opeet). In de brugjaren (geen AOW/pensioen, huis nog
  *   niet verzilverd) valt SWR×belegbaar < besteding → onder 100% (interen);
  *   ná AOW + downsizing tillen inkomen + vrijgekomen vermogen de dekking terug.
- * - guard: totaalNeed ≤ 0 (geen gevulde behoefte-decompositie) → 100.
+ *
+ * PARTNER TELT EXACT ÉÉN KEER (bruto-semantiek). `withdrawalNeed.totaalNeed` is al
+ * partner-NETTO — Ont!D trekt de partnerbijdrage (PT!K, geëxposed als
+ * `withdrawalNeed.partnerBijdrage`) per maand van de behoefte af — terwijl diezelfde
+ * partnerbijdrage óók als inkomen in `grossIncomeBySource.salaris` (CF!D) zit. Delen
+ * door de al-genette `totaalNeed` zou de partner-euro's dus dubbel crediteren
+ * (behoefte-verlagend én inkomen-verhogend). Daarom herstellen we de BRUTO-behoefte
+ * (`brutoNeed = totaalNeed + partnerBijdrage`) als noemer en als basis voor `restNeed`:
+ * de partner verlaagt de behoefte dan niet meer, en telt alleen nog als inkomen mee.
+ * Bij `partnerBijdrage = 0` (alleenstaanden / partner-loze fixtures) is `brutoNeed`
+ * identiek aan `totaalNeed` → exact dezelfde uitkomst als voorheen (non-regressie).
+ * Benadering: exact in normale maanden; in maanden waar de partner de maandbehoefte
+ * óverdekt (per-maand `MAX(0,·)`-clamp in Ont!D bijt) overschat `brutoNeed` de echte
+ * bruto-behoefte met het `restMaandClamp`-aandeel — conservatief (grotere noemer →
+ * lagere dekking), nooit inflaterend.
+ *
+ * - guard: brutoNeed ≤ 0 (geen bruto-behoefte: lege behoefte-decompositie, en geen
+ *   partner die de netto-behoefte tot 0 drukt) → 100. Bewust op brutoNeed (de nieuwe
+ *   noemer) i.p.v. totaalNeed: dekt een partner de volledige netto-behoefte af
+ *   (totaalNeed = 0, partnerBijdrage > 0), dan is brutoNeed > 0 en laten we de formule
+ *   spreken — die geeft dan 100 via het (partner-)inkomen, semantisch juist, i.p.v.
+ *   een kortsluiting die toevallig óók 100 oplevert. Op partnerBijdrage = 0 valt de
+ *   guard byte-identiek samen met de oude `totaalNeed ≤ 0`-guard. NB: via de echte
+ *   bridge is (totaalNeed = 0, partnerBijdrage > 0) onbereikbaar — `withdrawalNeed`
+ *   wordt alleen gespread bij totaalNeed > 0 — dus die tak is defensief/test-only;
+ *   "versimpel" de guard niet op grond van dit gedachte-experiment.
  *
  * Geëxporteerd (ronde 3): de dekkingsradar (`lib/horizon/dekkingsradar.ts`) consumeert
  * deze formule voor de pensioeninkomen-as — dezelfde veilige-onttrekkings-dekkingsgraad
@@ -118,16 +143,20 @@ export function coveragePctForRow(row: UnifiedProjectionRow): number {
   if (row.phase === 'accumulation') return 100
 
   const totaalNeed = row.withdrawalNeed?.totaalNeed ?? 0
-  if (totaalNeed <= 0) return 100
+  const partnerBijdrage = row.withdrawalNeed?.partnerBijdrage ?? 0
+  // Bruto-behoefte: draai de partner-nettering terug zodat de partner niet ook via
+  // de behoefte meetelt — hij telt zo alleen nog als inkomen (exact één keer).
+  const brutoNeed = totaalNeed + partnerBijdrage
+  if (brutoNeed <= 0) return 100
 
   const salaris = row.grossIncomeBySource?.salaris ?? 0
   const gebeurtenisBaten = row.grossIncomeBySource?.gebeurtenisBaten ?? 0
   const vasteInkomsten = salaris + gebeurtenisBaten
 
-  const restNeed = Math.max(0, totaalNeed - vasteInkomsten)
+  const restNeed = Math.max(0, brutoNeed - vasteInkomsten)
   const veiligeOnttrekking = Math.min(NL_SWR * spendablePortfolio(row), restNeed)
 
-  return Math.round(((vasteInkomsten + veiligeOnttrekking) / totaalNeed) * 100)
+  return Math.round(((vasteInkomsten + veiligeOnttrekking) / brutoNeed) * 100)
 }
 
 /**

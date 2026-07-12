@@ -12,11 +12,14 @@ import {
   RefreshCw,
   ArrowUpRight,
   Share2,
+  Lock,
   type LucideIcon,
 } from 'lucide-react'
 import { HEFBOOM_CONFIG, type Hefboom } from '@/lib/hefboom-config'
 import { formatTimestamp } from '@/lib/format'
 import { ShareDialog, type ShareContent } from '@/components/app/share-dialog'
+import { useModuleAccess } from '@/components/app/feature-access-provider'
+import { AiSubscriptionUpsell } from '@/components/app/ai-subscription-upsell'
 import { VrijheidsbriefingHero } from './vrijheidsbriefing-hero'
 import type { FreedomHeroProps } from '@/lib/briefing/overview-briefing'
 import type { FreedomCardData } from '@/components/app/freedom-card'
@@ -173,6 +176,15 @@ export function BriefingPanel({
   const [usedToday, setUsedToday] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  // Defensieve upsell-vlag: getoond wanneer een ververs-POST alsnog 403 geeft
+  // (stale client-subscriptions) — geen retry-lus, wél de AI-propositie.
+  const [showUpsell, setShowUpsell] = useState(false)
+
+  // AI-redactie van de briefing (de Ververs-knop → Will's stem + AI-kop) is een
+  // betaalde functie; de deterministische briefing eronder blijft gratis. Spiegel
+  // de server-gate (checkTierGate 'ai') op active_subscriptions, niet op een module.
+  const { subscriptions } = useModuleAccess()
+  const hasAi = subscriptions.includes('ai')
 
   // Deel-state: de canvas-renderer wordt dynamisch geïmporteerd bij de eerste
   // klik zodat de tekencode buiten de initiële /overzicht-bundle blijft.
@@ -219,6 +231,13 @@ export function BriefingPanel({
     try {
       const res = await fetch('/api/briefing/refresh', { method: 'POST' })
       const data = await res.json()
+      if (res.status === 403) {
+        // AI-abonnement vereist (defense-in-depth): geen foutmelding of retry,
+        // maar de upsell tonen. De knop wordt hierna niet meer aangeboden.
+        setShowUpsell(true)
+        setUsedToday(true)
+        return
+      }
       if (!res.ok) throw new Error(data?.error ?? 'Verversen mislukt')
       if (data.allowed && Array.isArray(data.entries)) {
         setOverride({
@@ -252,6 +271,7 @@ export function BriefingPanel({
         refreshable={refreshable}
         refreshing={refreshing}
         showRefresh={canRefresh || usedToday}
+        hasAi={hasAi}
         onRefresh={handleRefresh}
         onShare={handleShare}
         sharing={sharing}
@@ -266,6 +286,11 @@ export function BriefingPanel({
         <p className="mb-3 text-[11px] text-[var(--ink-3)]" role="status">
           {notice}
         </p>
+      )}
+      {showUpsell && (
+        <div className="mb-3">
+          <AiSubscriptionUpsell variant="inline" />
+        </div>
       )}
 
       {shownEntries.length === 0 ? (
@@ -377,6 +402,7 @@ function BriefingHeader({
   refreshable,
   refreshing,
   showRefresh,
+  hasAi,
   onRefresh,
   onShare,
   sharing,
@@ -387,6 +413,8 @@ function BriefingHeader({
   refreshable: boolean
   refreshing: boolean
   showRefresh: boolean
+  /** Heeft de gebruiker het AI-abonnement? Zo niet: Ververs wordt een upsell. */
+  hasAi: boolean
   onRefresh: () => void
   onShare: () => void
   sharing: boolean
@@ -431,30 +459,44 @@ function BriefingHeader({
           {sharing ? 'Even…' : 'Deel'}
         </button>
 
-        {showRefresh && (
-          <button
-            type="button"
-            onClick={onRefresh}
-            disabled={!refreshable}
-            title={
-              refreshable
-                ? 'Ververs je briefing (1× per dag)'
-                : 'Je hebt vandaag al ververst — morgen weer'
-            }
-            aria-label={
-              refreshable
-                ? 'Ververs je briefing'
-                : 'Briefing verversen — vandaag al gebruikt, morgen weer'
-            }
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-1.5 text-[11px] font-semibold text-[var(--ink-2)] transition-colors hover:border-[var(--ink-3)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-45"
-          >
-            <RefreshCw
-              className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`}
-              aria-hidden="true"
-            />
-            {refreshing ? 'Verversen…' : 'Ververs'}
-          </button>
-        )}
+        {showRefresh &&
+          (!hasAi ? (
+            // Zonder AI-abonnement: de ververs herschrijft de briefing door Will
+            // (een betaalde AI-functie). Toon op dezelfde plek een upsell-affordance
+            // i.p.v. de POST — de deterministische briefing eronder blijft gratis.
+            <Link
+              href="/mijn/account"
+              title="Laat Will je briefing herschrijven — met AI-abonnement"
+              aria-label="Ververs met Will — vereist een AI-abonnement, bekijk het abonnement"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-wil-200 bg-wil-50/70 px-3 py-1.5 text-[11px] font-semibold text-wil-700 transition-colors hover:border-wil-300 hover:bg-wil-100"
+            >
+              <Lock className="h-3.5 w-3.5" aria-hidden="true" />
+              Ververs met Will (AI)
+            </Link>
+          ) : (
+            <button
+              type="button"
+              onClick={onRefresh}
+              disabled={!refreshable}
+              title={
+                refreshable
+                  ? 'Ververs je briefing (1× per dag)'
+                  : 'Je hebt vandaag al ververst — morgen weer'
+              }
+              aria-label={
+                refreshable
+                  ? 'Ververs je briefing'
+                  : 'Briefing verversen — vandaag al gebruikt, morgen weer'
+              }
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-1.5 text-[11px] font-semibold text-[var(--ink-2)] transition-colors hover:border-[var(--ink-3)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              <RefreshCw
+                className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`}
+                aria-hidden="true"
+              />
+              {refreshing ? 'Verversen…' : 'Ververs'}
+            </button>
+          ))}
       </div>
     </div>
   )

@@ -1,41 +1,37 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { getServiceClient } from '@/lib/supabase/service'
 import { isSuperAdmin } from '@/lib/admin'
 import { logAdminAction } from '@/lib/admin-audit'
 
-function getServiceClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-  return createServiceClient(url, serviceKey)
+type ServiceClient = ReturnType<typeof getServiceClient>
+
+interface AuthUserLite {
+  id: string
+  email: string | null
+  created_at: string | null
+  last_sign_in_at: string | null
 }
 
-type ServiceClient = ReturnType<typeof getServiceClient>
-type AuthUser = Awaited<
-  ReturnType<ServiceClient['auth']['admin']['listUsers']>
->['data']['users'][number]
-
 /**
- * Zoek een auth-gebruiker op e-mail, gepagineerd. `listUsers()` levert
- * standaard maar 50 gebruikers per pagina — zonder pagineren zou een lookup
- * boven 50 accounts stil falen ("niet gevonden" terwijl ze bestaan).
+ * Zoek een auth-gebruiker op e-mail via de SECURITY DEFINER-RPC
+ * `admin_lookup_user_by_email` (service-role only). Deze SELECT raakt de
+ * fragiele token-kolommen van auth.users niet aan en is daarmee immuun voor de
+ * auth-datacorruptie die GoTrue's admin.listUsers() liet falen met "Database
+ * error finding users" — en O(1) i.p.v. door alle accounts pagineren.
  */
 async function findAuthUserByEmail(
   service: ServiceClient,
   email: string,
-): Promise<AuthUser | null> {
-  const target = email.trim().toLowerCase()
+): Promise<AuthUserLite | null> {
+  const target = email.trim()
   if (!target) return null
-  const perPage = 200
-  for (let page = 1; page <= 50; page += 1) {
-    const { data, error } = await service.auth.admin.listUsers({ page, perPage })
-    if (error) throw error
-    const users = data?.users ?? []
-    const found = users.find((u) => u.email?.toLowerCase() === target)
-    if (found) return found
-    if (users.length < perPage) return null
-  }
-  return null
+  const { data, error } = await service.rpc('admin_lookup_user_by_email', {
+    p_email: target,
+  })
+  if (error) throw error
+  const row = (data as AuthUserLite[] | null)?.[0]
+  return row ?? null
 }
 
 /** POST — assign subscriptions to a user */
@@ -159,13 +155,16 @@ export async function GET(req: Request) {
   const service = getServiceClient()
 
   if (email) {
-    // Look up user by email via auth.users (gepagineerd)
-    let authUser: AuthUser | null
+    // Look up user by email via de service-role-RPC
+    let authUser: AuthUserLite | null
     try {
       authUser = await findAuthUserByEmail(service, email)
     } catch (err) {
+      // Lek de rauwe GoTrue/Postgres-fout niet aan de client — log server-side
+      // en toon een generieke melding.
+      console.error('[tier-assign] user lookup failed:', err)
       return NextResponse.json(
-        { error: err instanceof Error ? err.message : 'Zoeken mislukt' },
+        { error: 'Zoeken mislukt door een serverfout. Probeer het later opnieuw.' },
         { status: 500 },
       )
     }

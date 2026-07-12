@@ -43,6 +43,19 @@ type BottomSheetProps = {
    * laat je dit `false` — dat is de app-brede standaard.
    */
   belowFloatingNav?: boolean
+  /**
+   * STANDAARD sluit een klik op de gedimde achtergrond (backdrop) de modal
+   * NIET (`false`). Dit is bewust de app-brede modal-standaard: een onbedoelde
+   * klik naast een modal — zeker in een modal met een invulformulier — mag geen
+   * getypte invoer wissen zonder waarschuwing. Sluiten blijft altijd mogelijk
+   * via de X-knop, de Escape-toets en (mobiel) de swipe-down-gebaar; er is dus
+   * altijd een expliciete, opzettelijke exit.
+   *
+   * Zet `closeOnBackdropClick` ALLEEN op `true` voor lichte, read-only modals
+   * (bv. een puur informatief overzicht) waar een klik-buiten-om als snelle,
+   * onschadelijke dismiss gewenst is en er niets verloren kan gaan.
+   */
+  closeOnBackdropClick?: boolean
 }
 
 const sizeClasses = {
@@ -58,7 +71,7 @@ const DISMISS_PERCENT = 0.3    // 30% of sheet height
 const SPRING_CURVE = 'cubic-bezier(0.32, 0.72, 0, 1)'
 const VELOCITY_SAMPLES = 5
 
-export function BottomSheet({ open, onClose, title, children, size = 'md', initialMobileHeight, footerSlot, actions, belowFloatingNav = false }: BottomSheetProps) {
+export function BottomSheet({ open, onClose, title, children, size = 'md', initialMobileHeight, footerSlot, actions, belowFloatingNav = false, closeOnBackdropClick = false }: BottomSheetProps) {
   const [visible, setVisible] = useState(false)
   const [expandedToFull, setExpandedToFull] = useState(false)
   const sheetRef = useRef<HTMLDivElement>(null)
@@ -413,8 +426,8 @@ export function BottomSheet({ open, onClose, title, children, size = 'md', initi
   }, [getSheetHeight, animateDismiss, animateSnapBack])
 
   const handleBackdrop = useCallback((e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) handleProgrammaticClose()
-  }, [handleProgrammaticClose])
+    if (closeOnBackdropClick && e.target === e.currentTarget) handleProgrammaticClose()
+  }, [closeOnBackdropClick, handleProgrammaticClose])
 
   if (!visible) return null
 

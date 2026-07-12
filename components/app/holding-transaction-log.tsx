@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { memo, useEffect, useState, useCallback, useId } from 'react'
 import {
   ArrowUpRight, ArrowDownRight, DollarSign, Receipt,
   TrendingUp, TrendingDown, Loader2, AlertTriangle,
@@ -46,6 +46,10 @@ type HoldingTransactionLogProps = {
   holdingTicker?: string | null
   onTransactionAdded?: () => void
 }
+
+// Aantal transactierijen dat het log per keer toont; "Toon meer" voegt telkens
+// een pagina toe. Een actieve belegger kan >100 rijen hebben.
+const ROW_PAGE = 100
 
 const typeConfig = {
   buy: {
@@ -100,6 +104,8 @@ export default function HoldingTransactionLog({
   const [showNewTxForm, setShowNewTxForm] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<string | null>(null)
+  // Paginering — begrenst de gerenderde rijen tot ROW_PAGE.
+  const [visibleCount, setVisibleCount] = useState(ROW_PAGE)
 
   const loadTransactions = useCallback(async () => {
     try {
@@ -111,6 +117,7 @@ export default function HoldingTransactionLog({
       }
       const data = await res.json()
       setTransactions(data.transactions || [])
+      setVisibleCount(ROW_PAGE)
       setSummary(data.summary || null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Kon transacties niet laden')
@@ -139,6 +146,14 @@ export default function HoldingTransactionLog({
       setDeleting(null)
     }
   }, [deleting, loadTransactions, onTransactionAdded])
+
+  // Stabiele callbacks zodat de gememoiseerde rij (TxRow) alleen re-rendert
+  // wanneer zijn eigen props (isExpanded/confirm/deleting) wijzigen.
+  const handleToggleExpand = useCallback((txId: string) => {
+    setExpandedTx((prev) => (prev === txId ? null : txId))
+  }, [])
+  const handleDeleteTrigger = useCallback((txId: string) => setDeleteConfirm(txId), [])
+  const handleDeleteCancel = useCallback(() => setDeleteConfirm(null), [])
 
   useEffect(() => {
     loadTransactions()
@@ -255,150 +270,195 @@ export default function HoldingTransactionLog({
         </div>
       ) : (
         <div className="space-y-1.5" data-testid="transaction-list">
-          {transactions.map((tx) => {
-            const cfg = typeConfig[tx.type] || typeConfig.buy
-            const Icon = cfg.icon
-            const isExpanded = expandedTx === tx.id
-
-            return (
-              <div
-                key={tx.id}
-                className={`rounded-[var(--r-lg)] border bg-[var(--paper)] transition-colors ${isExpanded ? 'border-kern-200' : 'border-[var(--border-ed)]'}`}
-                data-testid={`transaction-item-${tx.id}`}
-              >
-                {/* Transaction row */}
-                <button
-                  className="flex w-full items-center gap-3 p-3 text-left"
-                  onClick={() => setExpandedTx(isExpanded ? null : tx.id)}
-                >
-                  <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${cfg.bg}`}>
-                    <Icon className={`h-4 w-4 ${cfg.color}`} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className={`text-xs font-semibold ${cfg.color}`}>{cfg.label}</span>
-                      <span className="text-xs text-[var(--ink-3)]">
-                        {new Date(tx.date).toLocaleDateString('nl-NL', {
-                          day: 'numeric',
-                          month: 'short',
-                          year: 'numeric',
-                        })}
-                      </span>
-                      {tx.notes && (
-                        <span className="truncate text-xs text-[var(--ink-3)] italic">
-                          {tx.notes}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-[var(--ink-3)]">
-                      {tx.type === 'split'
-                        ? `${tx.units}:1 split`
-                        : `${tx.units} eenhe${tx.units === 1 ? 'id' : 'den'} @ ${formatCurrency(tx.price_per_unit)}`
-                      }
-                    </p>
-                  </div>
-
-                  {/* Transaction amount */}
-                  <div className="shrink-0 text-right">
-                    {tx.type === 'split' ? (
-                      <p className={`text-sm font-semibold ${cfg.color}`}>
-                        {tx.units}:1
-                      </p>
-                    ) : (
-                      <>
-                        <p className={`text-sm font-semibold ${cfg.color}`}>
-                          {cfg.sign}{<MaskedAmount value={tx.total_amount} tone="kern" />}
-                        </p>
-                        <FreedomTimeBadge amount={tx.total_amount} className="mt-0.5 justify-end text-[10px]" />
-                        {tx.type === 'sell' && tx.realized_pnl !== 0 && (
-                          <p className={`text-xs font-medium ${tx.realized_pnl >= 0 ? 'text-positive' : 'text-negative'}`}
-                             data-testid="tx-realized-pnl"
-                          >
-                            W/V: {tx.realized_pnl >= 0 ? '+' : ''}{<MaskedAmount value={tx.realized_pnl} tone="kern" />}
-                          </p>
-                        )}
-                      </>
-                    )}
-                  </div>
-
-                  {/* Expand indicator */}
-                  <div className="shrink-0">
-                    {isExpanded ? (
-                      <ChevronUp className="h-4 w-4 text-[var(--ink-3)]" />
-                    ) : (
-                      <ChevronDown className="h-4 w-4 text-[var(--ink-3)]" />
-                    )}
-                  </div>
-                </button>
-
-                {/* Expanded detail: running P&L */}
-                {isExpanded && (
-                  <div className="border-t border-[var(--border-ed)] px-3 py-3" data-testid="tx-detail">
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                      <MiniStat label="Eenheden na tx" value={tx.running_units.toString()} />
-                      <MiniStat label="Gem. kosten" value={<MaskedAmount value={tx.running_avg_price} tone="kern" />} />
-                      <MiniStat label="Kostenbasis" value={<MaskedAmount value={tx.running_cost_basis} tone="kern" />} />
-                      {tx.type === 'sell' && (
-                        <MiniStat
-                          label="Gerealiseerde W/V"
-                          value={<MaskedAmount value={tx.realized_pnl} signPrefix={tx.realized_pnl >= 0 ? '+' : ''} tone="kern" />}
-                          colored={tx.realized_pnl}
-                        />
-                      )}
-                      <MiniStat
-                        label="Cumulatieve W/V"
-                        value={<MaskedAmount value={tx.cumulative_realized_pnl} signPrefix={tx.cumulative_realized_pnl >= 0 ? '+' : ''} tone="kern" />}
-                        colored={tx.cumulative_realized_pnl}
-                      />
-                      {tx.cumulative_dividends > 0 && (
-                        <MiniStat
-                          label="Cum. dividenden"
-                          value={<MaskedAmount value={tx.cumulative_dividends} tone="kern" />}
-                          colored={tx.cumulative_dividends}
-                        />
-                      )}
-                    </div>
-                    {/* Delete transaction button */}
-                    <div className="mt-3 flex justify-end border-t border-[var(--border-ed)] pt-3">
-                      {deleteConfirm === tx.id ? (
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-[var(--ink-3)]">Transactie verwijderen?</span>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleDeleteTransaction(tx.id) }}
-                            disabled={deleting === tx.id}
-                            className="rounded-lg bg-red-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50"
-                            data-testid={`tx-delete-confirm-${tx.id}`}
-                          >
-                            {deleting === tx.id ? 'Bezig...' : 'Ja, verwijder'}
-                          </button>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setDeleteConfirm(null) }}
-                            className="rounded-lg border border-[var(--border-ed)] px-2.5 py-1 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
-                          >
-                            Annuleren
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setDeleteConfirm(tx.id) }}
-                          className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
-                          data-testid={`tx-delete-trigger-${tx.id}`}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                          Verwijderen
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )
-          })}
+          {transactions.slice(0, visibleCount).map((tx) => (
+            <TxRow
+              key={tx.id}
+              tx={tx}
+              isExpanded={expandedTx === tx.id}
+              isConfirmingDelete={deleteConfirm === tx.id}
+              isDeleting={deleting === tx.id}
+              onToggle={handleToggleExpand}
+              onDeleteTrigger={handleDeleteTrigger}
+              onDeleteConfirm={handleDeleteTransaction}
+              onDeleteCancel={handleDeleteCancel}
+            />
+          ))}
+          {transactions.length > visibleCount && (
+            <button
+              onClick={() => setVisibleCount((c) => c + ROW_PAGE)}
+              className="w-full rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] py-2.5 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+              data-testid="show-more-transactions"
+            >
+              Toon meer ({Math.min(ROW_PAGE, transactions.length - visibleCount)})
+            </button>
+          )}
         </div>
       )}
     </div>
   )
 }
+
+// ── Transactierij (gememoiseerd) ───────────────────────────────
+// Top-level memo-component met stabiele props/callbacks: uitklappen of een
+// delete-bevestiging op één rij re-rendert alléén die rij, niet de hele lijst.
+
+type TxRowProps = {
+  tx: TransactionWithPnL
+  isExpanded: boolean
+  isConfirmingDelete: boolean
+  isDeleting: boolean
+  onToggle: (txId: string) => void
+  onDeleteTrigger: (txId: string) => void
+  onDeleteConfirm: (txId: string) => void
+  onDeleteCancel: () => void
+}
+
+const TxRow = memo(function TxRow({
+  tx,
+  isExpanded,
+  isConfirmingDelete,
+  isDeleting,
+  onToggle,
+  onDeleteTrigger,
+  onDeleteConfirm,
+  onDeleteCancel,
+}: TxRowProps) {
+  const cfg = typeConfig[tx.type] || typeConfig.buy
+  const Icon = cfg.icon
+
+  return (
+    <div
+      className={`rounded-[var(--r-lg)] border bg-[var(--paper)] transition-colors ${isExpanded ? 'border-kern-200' : 'border-[var(--border-ed)]'}`}
+      data-testid={`transaction-item-${tx.id}`}
+    >
+      {/* Transaction row */}
+      <button
+        className="flex w-full items-center gap-3 p-3 text-left"
+        onClick={() => onToggle(tx.id)}
+      >
+        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${cfg.bg}`}>
+          <Icon className={`h-4 w-4 ${cfg.color}`} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className={`text-xs font-semibold ${cfg.color}`}>{cfg.label}</span>
+            <span className="text-xs text-[var(--ink-3)]">
+              {new Date(tx.date).toLocaleDateString('nl-NL', {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric',
+              })}
+            </span>
+            {tx.notes && (
+              <span className="truncate text-xs text-[var(--ink-3)] italic">
+                {tx.notes}
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-[var(--ink-3)]">
+            {tx.type === 'split'
+              ? `${tx.units}:1 split`
+              : `${tx.units} eenhe${tx.units === 1 ? 'id' : 'den'} @ ${formatCurrency(tx.price_per_unit)}`
+            }
+          </p>
+        </div>
+
+        {/* Transaction amount */}
+        <div className="shrink-0 text-right">
+          {tx.type === 'split' ? (
+            <p className={`text-sm font-semibold ${cfg.color}`}>
+              {tx.units}:1
+            </p>
+          ) : (
+            <>
+              <p className={`text-sm font-semibold ${cfg.color}`}>
+                {cfg.sign}{<MaskedAmount value={tx.total_amount} tone="kern" />}
+              </p>
+              <FreedomTimeBadge amount={tx.total_amount} className="mt-0.5 justify-end text-[10px]" />
+              {tx.type === 'sell' && tx.realized_pnl !== 0 && (
+                <p className={`text-xs font-medium ${tx.realized_pnl >= 0 ? 'text-positive' : 'text-negative'}`}
+                   data-testid="tx-realized-pnl"
+                >
+                  W/V: {tx.realized_pnl >= 0 ? '+' : ''}{<MaskedAmount value={tx.realized_pnl} tone="kern" />}
+                </p>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Expand indicator */}
+        <div className="shrink-0">
+          {isExpanded ? (
+            <ChevronUp className="h-4 w-4 text-[var(--ink-3)]" />
+          ) : (
+            <ChevronDown className="h-4 w-4 text-[var(--ink-3)]" />
+          )}
+        </div>
+      </button>
+
+      {/* Expanded detail: running P&L */}
+      {isExpanded && (
+        <div className="border-t border-[var(--border-ed)] px-3 py-3" data-testid="tx-detail">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <MiniStat label="Eenheden na tx" value={tx.running_units.toString()} />
+            <MiniStat label="Gem. kosten" value={<MaskedAmount value={tx.running_avg_price} tone="kern" />} />
+            <MiniStat label="Kostenbasis" value={<MaskedAmount value={tx.running_cost_basis} tone="kern" />} />
+            {tx.type === 'sell' && (
+              <MiniStat
+                label="Gerealiseerde W/V"
+                value={<MaskedAmount value={tx.realized_pnl} signPrefix={tx.realized_pnl >= 0 ? '+' : ''} tone="kern" />}
+                colored={tx.realized_pnl}
+              />
+            )}
+            <MiniStat
+              label="Cumulatieve W/V"
+              value={<MaskedAmount value={tx.cumulative_realized_pnl} signPrefix={tx.cumulative_realized_pnl >= 0 ? '+' : ''} tone="kern" />}
+              colored={tx.cumulative_realized_pnl}
+            />
+            {tx.cumulative_dividends > 0 && (
+              <MiniStat
+                label="Cum. dividenden"
+                value={<MaskedAmount value={tx.cumulative_dividends} tone="kern" />}
+                colored={tx.cumulative_dividends}
+              />
+            )}
+          </div>
+          {/* Delete transaction button */}
+          <div className="mt-3 flex justify-end border-t border-[var(--border-ed)] pt-3">
+            {isConfirmingDelete ? (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-[var(--ink-3)]">Transactie verwijderen?</span>
+                <button
+                  onClick={(e) => { e.stopPropagation(); onDeleteConfirm(tx.id) }}
+                  disabled={isDeleting}
+                  className="rounded-lg bg-red-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                  data-testid={`tx-delete-confirm-${tx.id}`}
+                >
+                  {isDeleting ? 'Bezig...' : 'Ja, verwijder'}
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); onDeleteCancel() }}
+                  className="rounded-lg border border-[var(--border-ed)] px-2.5 py-1 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+                >
+                  Annuleren
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={(e) => { e.stopPropagation(); onDeleteTrigger(tx.id) }}
+                className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
+                data-testid={`tx-delete-trigger-${tx.id}`}
+              >
+                <Trash2 className="h-3 w-3" />
+                Verwijderen
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+})
 
 // ── Helper components ──────────────────────────────────────────
 
@@ -482,6 +542,7 @@ function InlineTransactionForm({
   onSaved: () => void
   onCancel: () => void
 }) {
+  const fieldId = useId()
   const [txType, setTxType] = useState<'buy' | 'sell' | 'dividend' | 'split'>('buy')
   const [units, setUnits] = useState('')
   const [pricePerUnit, setPricePerUnit] = useState(String(currentPrice || ''))
@@ -564,10 +625,11 @@ function InlineTransactionForm({
       {txType === 'split' ? (
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1 block text-[10px] font-medium text-[var(--ink-3)]">
+            <label htmlFor={`${fieldId}-split-ratio`} className="mb-1 block text-[10px] font-medium text-[var(--ink-3)]">
               Split ratio (bijv. 2 voor 2:1) *
             </label>
             <input
+              id={`${fieldId}-split-ratio`}
               type="number"
               step="1"
               min="2"
@@ -587,8 +649,9 @@ function InlineTransactionForm({
             )}
           </div>
           <div>
-            <label className="mb-1 block text-[10px] font-medium text-[var(--ink-3)]">Datum *</label>
+            <label htmlFor={`${fieldId}-split-date`} className="mb-1 block text-[10px] font-medium text-[var(--ink-3)]">Datum *</label>
             <input
+              id={`${fieldId}-split-date`}
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
@@ -600,11 +663,12 @@ function InlineTransactionForm({
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div>
-            <label className="mb-1 block text-[10px] font-medium text-[var(--ink-3)]">
+            <label htmlFor={`${fieldId}-units`} className="mb-1 block text-[10px] font-medium text-[var(--ink-3)]">
               {txType === 'dividend' ? 'Bedrag per eenheid' : 'Eenheden'} *
             </label>
             <div className="relative">
               <input
+                id={`${fieldId}-units`}
                 type="number"
                 step="0.001"
                 value={units}
@@ -629,8 +693,9 @@ function InlineTransactionForm({
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-[10px] font-medium text-[var(--ink-3)]">Prijs *</label>
+            <label htmlFor={`${fieldId}-price`} className="mb-1 block text-[10px] font-medium text-[var(--ink-3)]">Prijs *</label>
             <input
+              id={`${fieldId}-price`}
               type="number"
               step="0.01"
               value={pricePerUnit}
@@ -641,8 +706,9 @@ function InlineTransactionForm({
             />
           </div>
           <div>
-            <label className="mb-1 block text-[10px] font-medium text-[var(--ink-3)]">Datum *</label>
+            <label htmlFor={`${fieldId}-date`} className="mb-1 block text-[10px] font-medium text-[var(--ink-3)]">Datum *</label>
             <input
+              id={`${fieldId}-date`}
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}

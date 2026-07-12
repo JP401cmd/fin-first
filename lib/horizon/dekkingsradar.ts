@@ -137,6 +137,11 @@ function axisBrugTotAow(input: DekkingsradarInput): RadarAs {
   let sumNeed = 0
   for (const row of input.rows) {
     if (row.age >= input.fireAgeFractional && row.age < input.aowAgeFractional) {
+      // Bewust de NETTO totaalNeed (partner al afgetrokken): deze as is een pure
+      // pot/behoefte-ratio en crediteert géén salaris-/partnerinkomen in de teller —
+      // anders dan coveragePctForRow, die dat wél doet en dáárom door brutoNeed
+      // (totaalNeed + partnerBijdrage) deelt. "Harmoniseren" naar bruto zou de
+      // partner hier dubbel bestraffen.
       sumNeed += row.withdrawalNeed?.totaalNeed ?? 0
     }
   }

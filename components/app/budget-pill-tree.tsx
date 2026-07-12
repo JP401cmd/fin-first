@@ -23,7 +23,7 @@
  * alternatief is in dezelfde render-takken.
  */
 
-import { useState, type MouseEvent } from 'react'
+import { useState, memo, type MouseEvent } from 'react'
 import { ChevronDown } from 'lucide-react'
 import {
   BudgetIcon,
@@ -343,7 +343,9 @@ function PillGroup({
 
 /* ── BudgetPillTree (top-level) ────────────────────────────────────────── */
 
-export function BudgetPillTree({
+// memo(): identiek aan BudgetTree — props zijn host-gestabiliseerd, dus de
+// pil-boom slaat re-renders over die niets aan zijn eigen props veranderen.
+export const BudgetPillTree = memo(function BudgetPillTree({
   groups,
   spending,
   budgetType,
@@ -368,4 +370,4 @@ export function BudgetPillTree({
       ))}
     </div>
   )
-}
+})

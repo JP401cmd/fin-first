@@ -81,6 +81,35 @@ describe('OnboardingSchulden — begeleide ja/nee met altijd-uitgang', () => {
     expect(container.textContent).toContain('Nog een')
   })
 
+  it('toont een gekoppelde schuld (hypotheek via de woning) óók in deze stap', () => {
+    // Regressie voor de kaart: gekoppelde schulden (hypotheek/RC/autolening)
+    // werden hier weggefilterd, waardoor de gebruiker ze miste.
+    const linkedMortgage: DebtQuickInput = {
+      debt_type: 'mortgage',
+      name: 'Hypotheek — Mijn woning',
+      current_balance: 250_000,
+      linked_asset_id: null,
+      linked_client_ref: 'ref-1',
+    }
+    const { container } = render(<Host initialDebts={[linkedMortgage]} />)
+    expect(container.textContent).toContain('Hypotheek — Mijn woning')
+    expect(container.textContent).toContain('via je woning')
+    expect(container.textContent).toContain('Al opgegeven bij je bezittingen')
+  })
+
+  it('een gekoppelde DGA-schuld toont de herkomst "via je BV"', () => {
+    const dga: DebtQuickInput = {
+      debt_type: 'dga_schuld',
+      name: 'RC-schuld aan BV',
+      current_balance: 40_000,
+      linked_asset_id: null,
+      linked_client_ref: 'ref-bv',
+    }
+    const { container } = render(<Host initialDebts={[dga]} />)
+    expect(container.textContent).toContain('RC-schuld aan BV')
+    expect(container.textContent).toContain('via je BV')
+  })
+
   it('slaat de hypotheek-vraag over wanneer al een hypotheek aan het huis gekoppeld is', () => {
     const linkedMortgage: DebtQuickInput = {
       debt_type: 'mortgage',
@@ -115,8 +144,8 @@ describe('OnboardingSchulden — afsluitend overzicht', () => {
     fireEvent.click(screen.getByTestId('wizard-collect'))
     fireEvent.click(footerButton('Nee')) // verlaat hypotheek-more
     advanceToOtherAsk(container)
-    // "Nee" op de catch-all → review-scherm (nog NIET onNext).
-    fireEvent.click(footerButton('Nee'))
+    // "Nee, klaar" op de catch-all → review-scherm (nog NIET onNext).
+    fireEvent.click(footerButton(/Nee, klaar/))
     expect(container.textContent).toContain('Dit zijn je schulden')
     expect(onNext).not.toHaveBeenCalled()
     fireEvent.click(footerButton(/Klopt het/))
@@ -127,7 +156,7 @@ describe('OnboardingSchulden — afsluitend overzicht', () => {
     const onNext = vi.fn()
     const { container } = render(<Host onNext={onNext} />)
     advanceToOtherAsk(container)
-    fireEvent.click(footerButton('Nee'))
+    fireEvent.click(footerButton(/Nee, klaar/))
     expect(onNext).toHaveBeenCalledOnce()
     expect(container.textContent).not.toContain('Dit zijn je schulden')
   })
@@ -151,9 +180,31 @@ describe('OnboardingSchulden — afsluitend overzicht', () => {
     fireEvent.click(screen.getByTestId('wizard-collect'))
     fireEvent.click(footerButton('Nee')) // verlaat hypotheek-more
     advanceToOtherAsk(container)
-    fireEvent.click(footerButton('Nee')) // → review
+    fireEvent.click(footerButton(/Nee, klaar/)) // → review
     expect(container.textContent).toContain('Dit zijn je schulden')
     fireEvent.click(footerButton(/Voeg nog iets toe/))
     expect(container.textContent).toContain('Wat voor schuld?')
+  })
+})
+
+// ── Catch-all picker toont de volledige catalogus (zelfde format als bezit) ──
+
+describe('OnboardingSchulden — catch-all "andere schuld?"-picker', () => {
+  function advanceToOtherAsk(container: HTMLElement) {
+    for (let i = 0; i < 20 && !container.textContent?.includes('Heb je nog een andere schuld?'); i++) {
+      fireEvent.click(footerButton('Nee'))
+    }
+    expect(container.textContent).toContain('Heb je nog een andere schuld?')
+  }
+
+  it('toont ook al-gevraagde types (bv. "Hypotheek") als losse kaartjes', () => {
+    const { container } = render(<Host />)
+    // De volledige type-keuzelijst staat nu direct inline op "andere schuld?".
+    advanceToOtherAsk(container)
+    // Alle QUICK_ADD_DEBT_ORDER-types verschijnen als kaartje — óók de types
+    // die al via een gerichte ja/nee-vraag langskwamen (spiegelt bezittingen).
+    expect(screen.getByRole('button', { name: 'Hypotheek' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Studielening (DUO)' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Belastingschuld' })).toBeInTheDocument()
   })
 })

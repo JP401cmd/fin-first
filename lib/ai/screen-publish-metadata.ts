@@ -8,9 +8,11 @@
  *   (b) bevat de tekst persoonlijke bedragen / leveranciers-namen die
  *       niet thuishoren in een publieke template?
  *
- * Faalt gracieus: bij AI-error retourneren we `ok: true` (we willen de
- * publish niet blokkeren op een transient LLM-outage; reports en
- * moderatie vangen het anders alsnog op).
+ * Faalt CLOSED: bij AI-error retourneren we `ok: false` met een nette
+ * melding. Een rekenhulp kan persoonlijke bedragen/leveranciers bevatten;
+ * die mogen niet publiek worden zonder dat de screener draaide. Een
+ * LLM-outage blokkeert dus tijdelijk het publiceren (bewuste tradeoff —
+ * de gebruiker kan het later opnieuw proberen of om handmatige review vragen).
  */
 
 import { generateObject } from 'ai'
@@ -77,8 +79,8 @@ Antwoord met:
 
 /**
  * Roep de LLM aan om de publicatie-metadata te beoordelen. Gooit nooit;
- * faalt gracieus naar `{ ok: true }` zodat een AI-uitval geen
- * publish-blocker wordt.
+ * faalt CLOSED naar `{ ok: false }` zodat een AI-uitval geen ongescreende
+ * rekenhulp publiek laat worden.
  */
 export async function screenPublishMetadata(
   supabase: SupabaseClient,
@@ -120,8 +122,13 @@ export async function screenPublishMetadata(
       suggestion: object.suggestion,
     }
   } catch (err) {
-    // Don't block publish on LLM-outage. We loggen voor diagnostiek.
-    console.error('[screen-publish-metadata] LLM-call mislukt:', err)
-    return { ok: true }
+    // Fail-CLOSED: een rekenhulp met mogelijk persoonlijke bedragen/leveranciers
+    // mag niet publiek worden zonder screening. Loggen voor diagnostiek.
+    console.error('[screen-publish-metadata] LLM-call mislukt — fail-closed:', err)
+    return {
+      ok: false,
+      issue:
+        'De publicatie-controle kon niet automatisch worden uitgevoerd. Probeer het later opnieuw.',
+    }
   }
 }

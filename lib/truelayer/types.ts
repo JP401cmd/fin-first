@@ -6,7 +6,7 @@
 export type TLProvider = {
   provider_id: string
   display_name: string
-  logo_uri: string
+  logo_url: string
   country: string
 }
 

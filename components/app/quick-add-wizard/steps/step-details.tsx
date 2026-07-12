@@ -5,15 +5,19 @@ import {
   ASSET_DEFAULT_NAMES,
   ASSET_QUICK_ADD_FIELD3,
   ASSET_QUICK_ADD_LABELS,
+  TYPICAL_RETURNS,
   type AssetField3Kind,
   type AssetType,
 } from '@/lib/asset-data'
 import {
   DEBT_DEFAULT_NAMES,
+  DEBT_DEFAULT_REPAYMENT_TYPE,
   DEBT_QUICK_ADD_FIELD3,
   DEBT_QUICK_ADD_LABELS,
+  REPAYMENT_TYPE_LABELS,
   type DebtField3Kind,
   type DebtType,
+  type RepaymentType,
 } from '@/lib/debt-data'
 import {
   ASSET_NAME_SUGGESTIONS,
@@ -390,6 +394,33 @@ export function StepDetails(props: StepDetailsProps) {
         />
       )}
 
+      {/* Spaarrekening-only: rente (%). Staat NAAST het bank/instelling-veld
+          (field3), zodat de gebruiker bij het toevoegen zowel de bank als de
+          werkelijke spaarrente kwijt kan i.p.v. de stille 2,5%-default. Leeg
+          laten ⇒ buildAssetDraft valt terug op TYPICAL_RETURNS.savings. */}
+      {isAsset && typeKey === 'savings' && (
+        <SavingsRenteField
+          idBase={nameListId}
+          value={(props.draft as AssetDraftState).expected_return ?? undefined}
+          onChange={(props as AssetProps).onChange}
+          palette={palette}
+        />
+      )}
+
+      {/* Hypotheek-only: aflossingsvorm + ingangsdatum. Vult de bestaande
+          debts.repayment_type / debts.start_date-kolommen zodat de eerste-
+          invoer meteen een correcte aflossingsprognose oplevert i.p.v. de
+          annuïteit/vandaag-default. */}
+      {!isAsset && typeKey === 'mortgage' && (
+        <MortgageExtraFields
+          idBase={nameListId}
+          repaymentType={(props.draft as DebtDraftState).repayment_type ?? undefined}
+          startDate={(props.draft as DebtDraftState).start_date ?? undefined}
+          onChange={(props as DebtProps).onChange}
+          palette={palette}
+        />
+      )}
+
       {/* Hint */}
       <p className="text-center text-[11px] text-[var(--ink-4)] leading-relaxed">
         Alleen het minimum — je kunt de rest later aanvullen.
@@ -544,5 +575,149 @@ function Field3Input({
         </p>
       )}
     </div>
+  )
+}
+
+// ── Spaarrekening-extra: rente ────────────────────────────────────
+//
+// Eén extra veld dat alleen bij `asset_type='savings'` verschijnt: de
+// spaarrente (%). Schrijft rechtstreeks naar het `AssetQuickInput.expected_return`-
+// veld. Blijft leeg ⇒ `buildAssetDraft` valt terug op TYPICAL_RETURNS.savings
+// (2,5%). We tonen die default expliciet als voorinvulling zodat de gebruiker
+// ziet wat er wordt opgeslagen als hij niets wijzigt. Negatieve rente is
+// toegestaan (historisch reëel op grote saldi) — geen client-side blokkade.
+
+interface SavingsRenteFieldProps {
+  idBase: string
+  value: number | undefined
+  onChange: (patch: Partial<AssetQuickInput>) => void
+  palette: (typeof PALETTE)['asset'] | (typeof PALETTE)['debt']
+}
+
+function SavingsRenteField({ idBase, value, onChange, palette }: SavingsRenteFieldProps) {
+  const renteId = `${idBase}-savings-rente`
+  // Lokale raw-string zodat "2." / "1,5" tijdens typen niet wegspringt. Init op
+  // de draft-waarde of de zichtbare default (TYPICAL_RETURNS.savings).
+  const [raw, setRaw] = useState<string>(() =>
+    typeof value === 'number' ? String(value) : String(TYPICAL_RETURNS.savings),
+  )
+
+  return (
+    <div>
+      <label
+        htmlFor={renteId}
+        className="mb-1.5 block text-xs font-medium text-[var(--ink-2)]"
+      >
+        Rente (%)
+      </label>
+      <div className="relative">
+        <input
+          id={renteId}
+          type="number"
+          inputMode="decimal"
+          step={0.1}
+          value={raw}
+          onChange={(e) => {
+            setRaw(e.target.value)
+            onChange({ expected_return: parseNumberInput(e.target.value) ?? null })
+          }}
+          className={`w-full border bg-[var(--paper)] py-2.5 pl-3 pr-8 font-mono text-base tabular-nums text-[var(--ink)] outline-none transition-colors focus:ring-1 border-[var(--border-ed)] ${palette.focusBorder}`}
+        />
+        <span
+          className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-[var(--ink-4)]"
+          aria-hidden="true"
+        >
+          %
+        </span>
+      </div>
+      <p className="mt-1 text-[11px] text-[var(--ink-4)] leading-relaxed">
+        De werkelijke spaarrente van je bank. Laat staan als je het niet weet.
+      </p>
+    </div>
+  )
+}
+
+// ── Hypotheek-extra's ─────────────────────────────────────────────
+//
+// Twee extra velden die alleen bij `debt_type='mortgage'` verschijnen:
+// aflossingsvorm (select) + ingangsdatum (date). Ze schrijven rechtstreeks
+// naar de bestaande DebtQuickInput-velden `repayment_type` / `start_date`.
+// Blijft leeg ⇒ `buildDebtDraft` valt terug op de type-defaults, dus het is
+// geen verplicht veld — het corrigeert alleen de stille annuïteit/vandaag-
+// aanname wanneer de gebruiker het invult.
+
+/** Volgorde van de aflossingsvormen in de select — meest gekozen eerst. */
+const MORTGAGE_REPAYMENT_ORDER: readonly RepaymentType[] = [
+  'annuiteit',
+  'lineair',
+  'aflossingsvrij',
+]
+
+interface MortgageExtraFieldsProps {
+  idBase: string
+  repaymentType: RepaymentType | undefined
+  startDate: string | undefined
+  onChange: (patch: Partial<DebtQuickInput>) => void
+  palette: (typeof PALETTE)['asset'] | (typeof PALETTE)['debt']
+}
+
+function MortgageExtraFields({
+  idBase,
+  repaymentType,
+  startDate,
+  onChange,
+  palette,
+}: MortgageExtraFieldsProps) {
+  const repaymentId = `${idBase}-repayment`
+  const startDateId = `${idBase}-startdate`
+  // Toon de default expliciet zodat de user ziet wat er wordt opgeslagen als
+  // hij niets wijzigt (draft blijft leeg → buildDebtDraft vult dezelfde default).
+  const selectValue = repaymentType ?? DEBT_DEFAULT_REPAYMENT_TYPE.mortgage ?? 'annuiteit'
+
+  return (
+    <>
+      <div>
+        <label
+          htmlFor={repaymentId}
+          className="mb-1.5 block text-xs font-medium text-[var(--ink-2)]"
+        >
+          Aflossingsvorm
+        </label>
+        <select
+          id={repaymentId}
+          value={selectValue}
+          onChange={(e) =>
+            onChange({ repayment_type: e.target.value as RepaymentType })
+          }
+          className={`w-full border bg-[var(--paper)] px-3 py-2.5 text-base text-[var(--ink)] outline-none transition-colors focus:ring-1 border-[var(--border-ed)] ${palette.focusBorder}`}
+        >
+          {MORTGAGE_REPAYMENT_ORDER.map((rt) => (
+            <option key={rt} value={rt}>
+              {REPAYMENT_TYPE_LABELS[rt]}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <label
+          htmlFor={startDateId}
+          className="mb-1.5 block text-xs font-medium text-[var(--ink-2)]"
+        >
+          Ingangsdatum
+        </label>
+        <input
+          id={startDateId}
+          type="date"
+          value={startDate ?? ''}
+          onChange={(e) => onChange({ start_date: e.target.value || null })}
+          className={`w-full border bg-[var(--paper)] px-3 py-2.5 text-base text-[var(--ink)] outline-none transition-colors focus:ring-1 border-[var(--border-ed)] ${palette.focusBorder}`}
+        />
+        <p className="mt-1 text-[11px] text-[var(--ink-4)] leading-relaxed">
+          Loopt de hypotheek al? Vul de echte startdatum in voor een kloppende
+          aflossing.
+        </p>
+      </div>
+    </>
   )
 }

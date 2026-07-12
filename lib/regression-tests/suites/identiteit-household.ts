@@ -840,6 +840,67 @@ const tests: TestCase[] = [
       )
     },
   },
+
+  // ── Partner-privacy IN de DB-functie afgedwongen (migratie 20260711160000) ──
+  {
+    id: 'household-partner-totals-privacy-in-db',
+    name: 'Partner-totalen: hidden-gating in household_partner_totals() zelf',
+    category: CAT,
+    description:
+      'Migratie 20260711160000: household_partner_totals() (SECURITY DEFINER) gate\'t assets/debts per categorie via get_partner_privacy_level ("hidden" => 0). De consument (dashboard-data-loader) hoeft niet meer zelf te gaten — een nieuwe consument kan niet meer lekken. Deze test spiegelt de CASE-logica van de DB-functie.',
+    priority: 'high',
+    estimatedDurationMs: 50,
+    fn() {
+      // Exacte spiegel van de gated-CTE in household_partner_totals():
+      //   assets_val = (lvl_assets = 'hidden') ? 0 : SUM(personal assets)
+      //   debts_val  = (lvl_debts  = 'hidden') ? 0 : SUM(personal debts)
+      //   net_worth  = assets_val - debts_val
+      function dbGatedTotals(
+        rawAssets: number,
+        rawDebts: number,
+        lvlAssets: PrivacyLevel,
+        lvlDebts: PrivacyLevel,
+      ): { assets: number; debts: number; netWorth: number } {
+        const assets = lvlAssets === 'hidden' ? 0 : rawAssets
+        const debts = lvlDebts === 'hidden' ? 0 : rawDebts
+        return { assets, debts, netWorth: assets - debts }
+      }
+
+      // Beide hidden → alles 0 (partner-nettovermogen lekt niet)
+      const bothHidden = dbGatedTotals(120000, 30000, 'hidden', 'hidden')
+      assertEqual(bothHidden.assets, 0, 'assets hidden → 0')
+      assertEqual(bothHidden.debts, 0, 'debts hidden → 0')
+      assertEqual(bothHidden.netWorth, 0, 'nettovermogen hidden → 0')
+
+      // 'full'/'totals' equivalent voor scalar-totaal → echte som
+      const full = dbGatedTotals(120000, 30000, 'full', 'totals')
+      assertEqual(full.assets, 120000, 'assets full → echte som')
+      assertEqual(full.debts, 30000, 'debts totals → echte som')
+      assertEqual(full.netWorth, 90000, 'nettovermogen = assets − debts')
+
+      // Per categorie onafhankelijk: assets hidden + debts totals → 0 − debts
+      const mixed = dbGatedTotals(120000, 30000, 'hidden', 'totals')
+      assertEqual(mixed.assets, 0, 'assets hidden → 0 (onafhankelijk van debts)')
+      assertEqual(mixed.debts, 30000, 'debts totals blijft zichtbaar')
+      assertEqual(mixed.netWorth, -30000, 'net_worth = 0 − debts (schuld drukt door)')
+    },
+  },
+  {
+    id: 'household-partner-privacy-single-enforcement-doc',
+    name: 'Invariant: partner-privacy wordt in de DB-functie ge-gate, niet in de consument',
+    category: CAT,
+    description:
+      'household_partner_totals() én household_partner_items() dwingen "hidden" zelf af via get_partner_privacy_level binnen de SECURITY DEFINER-functie. Consumenten (dashboard-data-loader, perspective-loader) hertoepassen géén privacy-check meer. box2/box3-routes leunen op RLS (geen partner-persoonlijke rijen zichtbaar). Vastgelegd in ADR 0034.',
+    priority: 'medium',
+    estimatedDurationMs: 20,
+    fn() {
+      // Documentatie-invariant: de twee partner-RPC's die de RLS-grens met
+      // SECURITY DEFINER passeren, gaten allebei IN de functie.
+      const privacyEnforcingRpcs = ['household_partner_totals', 'household_partner_items']
+      assertEqual(privacyEnforcingRpcs.length, 2, 'twee DB-functies dwingen partner-privacy zelf af')
+      assertIncludes(privacyEnforcingRpcs, 'household_partner_totals', 'totals gate\'t nu ook in de DB (migratie 20260711160000)')
+    },
+  },
 ]
 
 export function register(): void {

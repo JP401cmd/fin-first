@@ -166,6 +166,8 @@ function SliderRow({
           step={step}
           value={value}
           onChange={e => onChange(Number(e.target.value))}
+          aria-label={label}
+          aria-valuetext={formatValue(value)}
           className="relative z-10 w-full accent-horizon-600"
         />
       </div>

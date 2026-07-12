@@ -1,7 +1,8 @@
 'use client'
 
 import { type ReactNode } from 'react'
-import { Lock, Settings } from 'lucide-react'
+import Link from 'next/link'
+import { ArrowRight, Lock, Settings } from 'lucide-react'
 import { useFeatureAccess, useModuleAccess } from '@/components/app/feature-access-provider'
 import { FEATURES } from '@/lib/feature-phases'
 import { isFeatureAccessible, getFeatureAccess } from '@/lib/compute-feature-access'
@@ -110,6 +111,16 @@ export function TierLockedCard({ featureId, requiredTier }: { featureId: string;
           <Lock className="h-3 w-3" />
           Vereist {tierLabel} abonnement
         </span>
+        {/* Echte CTA naar de abonnementspagina — voorheen alleen een badge, dus
+            een doodlopende lock. Nu kan de gebruiker direct het abonnement
+            bekijken/afsluiten. */}
+        <Link
+          href="/mijn/account"
+          className={`mt-1 inline-flex items-center gap-1 rounded-[var(--r-lg)] border ${accent.border} ${accent.bg} px-3 py-1.5 text-xs font-semibold ${accent.text} transition-colors hover:brightness-95`}
+        >
+          Bekijk {tierLabel}-abonnement
+          <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+        </Link>
       </div>
     </div>
   )

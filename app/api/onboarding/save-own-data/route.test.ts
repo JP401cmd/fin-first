@@ -122,3 +122,37 @@ describe('onboarding save-own-data — eindstrategie-keuze (FIRE vs. pensioen)',
     )
   })
 })
+
+/**
+ * Borgt dat aandelen-holdings-tracking NIET stilzwijgend aangaat bij onboarding
+ * (Notion-bugkaart "Aandelen holdings — zet deze standaard uit"). De setup-
+ * wizard (/api/aandelen-holdings/setup) is de ENIGE bewuste opt-in; de
+ * onboarding-insert moet `has_holdings_tracking` altijd op false zetten,
+ * consistent met de DB-default. Budget-tracking blijft WEL module-gestuurd
+ * (bewust gewenst gedrag) — die contrast-assertie bewaakt dat we niet te veel
+ * hebben uitgezet.
+ */
+describe('onboarding save-own-data — holdings-tracking standaard uit', () => {
+  const routePath = path.resolve(__dirname, 'route.ts')
+  const source = readFileSync(routePath, 'utf8')
+  const codeOnly = source
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n')
+    .map((line) => line.replace(/\/\/.*$/, ''))
+    .join('\n')
+
+  it('zet has_holdings_tracking bij onboarding-insert altijd op false', () => {
+    expect(codeOnly).toContain('has_holdings_tracking: false')
+  })
+
+  it('koppelt has_holdings_tracking NIET meer aan de aandelenregistratie-module', () => {
+    expect(codeOnly).not.toMatch(/has_holdings_tracking:\s*hasAandelenregistratie/)
+    expect(codeOnly).not.toContain('const hasAandelenregistratie')
+  })
+
+  it('laat has_budget_tracking wél module-gestuurd (contrast, ongewijzigd gedrag)', () => {
+    expect(codeOnly).toMatch(
+      /has_budget_tracking:\s*hasBudgetteren\s*&&\s*draft\.asset_type\s*===\s*'cash'/,
+    )
+  })
+})

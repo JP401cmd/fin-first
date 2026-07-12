@@ -131,6 +131,8 @@ const mockData: DashboardData = {
   topRecommendations: [],
   topLifeEvents: [],
   savingsRate6m: 27,
+  monthlySavingsAmount: 810,
+  savingsRateIsEstimate: false,
   monthlySavingsBudgetSpent: 0,
   savingsBudgetSpent6m: 0,
   prevMonthSavingsBudgetSpent: 0,
@@ -269,9 +271,11 @@ describe('DraggableWidgetGrid', () => {
     expect(screen.queryByTestId('auto-dashboard-btn')).not.toBeInTheDocument()
   })
 
-  it('rendert gemengde-grootte widgets in edit-mode zonder te crashen (live-reorder dnd-wiring)', () => {
+  it('rendert gemengde-grootte widgets in edit-mode zonder te crashen (live-reorder dnd-wiring)', async () => {
     // Bewaakt de heterogene-grid dnd-herschikking: no-transform-strategie +
     // MeasuringStrategy.Always + onDragOver-reorder mogen de render niet breken.
+    // De edit-grid (@dnd-kit) laadt sinds bundle ronde 2 uit een eigen
+    // dynamic({ssr:false})-chunk → await de async load via findBy*.
     const prefs = makePrefs(['netto_vermogen', 'fire_prognose', 'maandoverzicht'], ['half', 'full', 'xl'])
     render(
       <DraggableWidgetGrid
@@ -282,7 +286,7 @@ describe('DraggableWidgetGrid', () => {
         onEditModeChange={() => {}}
       />
     )
-    expect(screen.getByTestId('widget-item-netto_vermogen')).toBeInTheDocument()
+    expect(await screen.findByTestId('widget-item-netto_vermogen')).toBeInTheDocument()
     expect(screen.getByTestId('drag-handle-fire_prognose')).toBeInTheDocument()
     // Double (xl) behoudt zijn volle-breedte span in de herschikbare grid.
     expect(screen.getByTestId('widget-item-maandoverzicht').className).toContain('lg:col-span-4')
@@ -318,7 +322,7 @@ describe('DraggableWidgetGrid — Double (xl) size', () => {
     expect(item.className).toContain('row-span-2')
   })
 
-  it('toont de Double-optie alleen voor widgets met xl in hun catalog-sizes', () => {
+  it('toont de Double-optie alleen voor widgets met xl in hun catalog-sizes', async () => {
     const prefs = makePrefs(['maandoverzicht', 'netto_vermogen'])
     render(
       <DraggableWidgetGrid
@@ -329,9 +333,10 @@ describe('DraggableWidgetGrid — Double (xl) size', () => {
         onEditModeChange={() => {}}
       />
     )
-    // maandoverzicht ondersteunt xl → Double aanwezig
+    // maandoverzicht ondersteunt xl → Double aanwezig (findBy* wacht de
+    // edit-only dnd-chunk af, zie bundle ronde 2)
     expect(
-      screen.getByRole('button', { name: 'maandoverzicht widget Double' })
+      await screen.findByRole('button', { name: 'maandoverzicht widget Double' })
     ).toBeInTheDocument()
     // netto_vermogen ondersteunt xl niet → geen Double
     expect(
@@ -339,7 +344,7 @@ describe('DraggableWidgetGrid — Double (xl) size', () => {
     ).not.toBeInTheDocument()
   })
 
-  it('biedt Double NIET aan op mobiel, ook niet voor xl-widgets', () => {
+  it('biedt Double NIET aan op mobiel, ook niet voor xl-widgets', async () => {
     mockIsMobile = true
     const prefs = makePrefs(['maandoverzicht'])
     render(
@@ -351,13 +356,15 @@ describe('DraggableWidgetGrid — Double (xl) size', () => {
         onEditModeChange={() => {}}
       />
     )
+    // Eerst de aanwezige S/M/L-knop afwachten (edit-chunk geladen), pas dán de
+    // Double-afwezigheid asserten — anders zou de assert vóór chunk-load al
+    // 'slagen' omdat er nog niets gerenderd is.
+    expect(
+      await screen.findByRole('button', { name: 'maandoverzicht widget 100%' })
+    ).toBeInTheDocument()
     expect(
       screen.queryByRole('button', { name: 'maandoverzicht widget Double' })
     ).not.toBeInTheDocument()
-    // De gewone S/M/L blijven wél beschikbaar
-    expect(
-      screen.getByRole('button', { name: 'maandoverzicht widget 100%' })
-    ).toBeInTheDocument()
   })
 })
 

@@ -395,8 +395,23 @@ function buildRow(
     //  grossIncome  = CF!D (salaris+partner+werk) + CF!H (Geb-baten incl. AOW/pensioen).
     //  oneTimeNet   = Bez!AZ (eenmalige woningverkoop-opbrengst).
     //  cashflowNet  = Bez!BE (opeethypotheek-opname) − Af!D (gebeurtenis-kosten).
+    //
+    // POST-FIRE-SALARIS-GATE (rapportage-fix, GEEN kern-wijziging). CF!D bundelt
+    // user-basissalaris `(nettoJaarinkomen/12)·idx` (= `cf.basissalaris`, single-
+    // sourced in cf.ts) + partnerbijdrage PT!K (`proj.pt[m].totaal`) + werk-
+    // strategie-delta. Vanaf de FIRE-maand is het user-basissalaris een PHANTOM:
+    // CF!F (sparen) = 0 ná FIRE en Ont!D trekt dit "inkomen" NIET van de
+    // onttrekkingsbehoefte af — de kern-trajectorie (potten/netWorth) draagt het
+    // dus niet, maar als vaste-inkomsten-bron zou het de brugjaren-dekking
+    // (coverage-strip / dekkingsradar / income-breakdown) kunstmatig op ≥100%
+    // houden, óók bij een stopleeftijd ruim vóór de veilige marge. Verwijder daarom
+    // ALLEEN het user-basissalaris voor m ≥ fireMonth; partnerinkomen (partner werkt
+    // legitiem door) én de werk-delta (al kern-FIRE-gegate op 0 ná FIRE) blijven
+    // behouden via `cf.inkomen −`. Consumeert `cf.basissalaris` i.p.v. de term zelf
+    // te herberekenen (single-source by construction). Puur rapportage: dit veld
+    // voedt geen enkele pot-mutatie, dus de netWorth-/rij-trajectorie is ONgewijzigd.
     if (cf !== undefined && !cf.beyondHorizon) {
-      incomeSalaris += cf.inkomen
+      incomeSalaris += cf.inkomen - (m >= fireMonth ? cf.basissalaris : 0)
       incomeGebeurtenisBaten += cf.gebeurtenisBaten
     }
     oneTimeNet += bez.woning.verkoopopbrengst

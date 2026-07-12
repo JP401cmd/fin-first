@@ -52,6 +52,29 @@ function todayIso(): string {
   return new Date().toISOString().split('T')[0]
 }
 
+/**
+ * Type-guard voor een geldige `yyyy-mm-dd`-datum. Weert lege strings, foute
+ * formaten en niet-bestaande kalenderdata (bv. `2026-02-31`) zodat een
+ * ongeldige user-invoer nooit als `start_date` de DB in gaat.
+ */
+function isValidDateIso(v: string | null | undefined): v is string {
+  if (typeof v !== 'string') return false
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v)
+  if (!m) return false
+  const year = Number(m[1])
+  const month = Number(m[2])
+  const day = Number(m[3])
+  // UTC-constructie + component-vergelijking: timezone-veilig (geen
+  // toISOString/local-shift) en vangt niet-bestaande data zoals 2026-02-31,
+  // die JS anders stil naar de volgende maand zou rollen.
+  const d = new Date(Date.UTC(year, month - 1, day))
+  return (
+    d.getUTCFullYear() === year &&
+    d.getUTCMonth() === month - 1 &&
+    d.getUTCDate() === day
+  )
+}
+
 /** `end_date` als ISO-datum op basis van `start_date` + looptijd in jaren. */
 function addYearsIso(startIso: string, years: number): string {
   const d = new Date(startIso)
@@ -92,6 +115,15 @@ export function buildAssetDraft(input: AssetQuickInput): AssetDraft {
   const { asset_type, name, current_value, field3 } = input
   const today = todayIso()
 
+  // Expliciet meegegeven jaarrendement/rente (%) wint van de type-default.
+  // Nu alleen door de wizard geleverd voor savings (naast de bank in field3);
+  // generiek toegepast zodat een toekomstig type dat óók een eigen rente-veld
+  // krijgt hier niet opnieuw hoeft in te haken. `null`/`undefined` ⇒ default.
+  const explicitReturn =
+    typeof input.expected_return === 'number' && Number.isFinite(input.expected_return)
+      ? input.expected_return
+      : null
+
   // Type-specifieke velden initialiseren op null; per type hieronder selectief vullen.
   let institution: string | null = null
   let woz_value: number | null = null
@@ -110,6 +142,8 @@ export function buildAssetDraft(input: AssetQuickInput): AssetDraft {
     case 'retirement':
       institution = asString(field3)
       break
+    // NB: savings vult daarnaast — via het aparte `expected_return`-veld
+    // hieronder — de spaarrente in. field3 blijft de bank/instelling.
     case 'eigen_huis':
       woz_value = asNumber(field3)
       break
@@ -147,6 +181,12 @@ export function buildAssetDraft(input: AssetQuickInput): AssetDraft {
       // Overige types: physical, crypto, other — geen veld 3 gedefinieerd.
       break
   }
+
+  // Savings (en toekomstige types met een eigen rente-veld): een expliciet
+  // opgegeven rendement overschrijft de TYPICAL_RETURNS-default. Bij vordering
+  // is de rente al via field3 verwerkt hierboven; die stuurt geen
+  // expected_return mee, dus geen dubbele override.
+  if (explicitReturn != null) expected_return = explicitReturn
 
   const is_liquid: boolean | null =
     asset_type === 'cash' || asset_type === 'savings' ? true : null
@@ -208,11 +248,26 @@ function defaultInterestRate(debt_type: DebtType): number {
  * `lib/debt-data.ts` zodat de full-form logica later niet verschilt.
  */
 export function buildDebtDraft(input: DebtQuickInput): DebtDraft {
-  const { debt_type, name, current_balance, field3, linked_asset_id } = input
-  const today = todayIso()
+  const {
+    debt_type,
+    name,
+    current_balance,
+    field3,
+    linked_asset_id,
+    repayment_type: inputRepayment,
+    start_date: inputStartDate,
+  } = input
+
+  // Startdatum: user-invoer (hypotheek) wint van "vandaag". Een ongeldige of
+  // ontbrekende waarde valt veilig terug op vandaag zodat de rij nooit zonder
+  // start_date de DB in gaat.
+  const start_date = isValidDateIso(inputStartDate) ? inputStartDate : todayIso()
 
   const years = DEFAULT_TERM_YEARS_PER_TYPE[debt_type]
-  const repayment: RepaymentType | null = DEBT_DEFAULT_REPAYMENT_TYPE[debt_type]
+  // Aflossingsvorm: user-invoer (hypotheek) wint van de type-default. Andere
+  // schuldtypes leveren dit nooit aan → default blijft leidend.
+  const repayment: RepaymentType | null =
+    inputRepayment ?? DEBT_DEFAULT_REPAYMENT_TYPE[debt_type]
 
   // Per type kan field3 een andere betekenis hebben dan rente.
   let interest_rate = defaultInterestRate(debt_type)
@@ -248,7 +303,9 @@ export function buildDebtDraft(input: DebtQuickInput): DebtDraft {
     )
   }
 
-  const end_date = years != null && years > 0 ? addYearsIso(today, years) : null
+  // Einddatum leidt af uit de (echte) ingangsdatum + looptijd; voor het
+  // default-pad (start_date=vandaag) is dit identiek aan het oude gedrag.
+  const end_date = years != null && years > 0 ? addYearsIso(start_date, years) : null
 
   // Hypotheek met annuiteit/lineair = fiscaal aftrekbaar (box 1 eigen woning).
   const is_tax_deductible =
@@ -265,7 +322,7 @@ export function buildDebtDraft(input: DebtQuickInput): DebtDraft {
     interest_rate,
     minimum_payment: monthly_payment,
     monthly_payment,
-    start_date: today,
+    start_date,
     end_date,
     creditor: null,
     notes: null,

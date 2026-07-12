@@ -6,6 +6,8 @@ import { DefaultChatTransport } from 'ai'
 import { useRouter, usePathname } from 'next/navigation'
 import { useChatContext } from './chat-provider'
 import { useModuleAccess } from '@/components/app/feature-access-provider'
+import { hasSubscription } from '@/lib/feature-registry'
+import { AiSubscriptionUpsell } from '@/components/app/ai-subscription-upsell'
 import { WillDots } from '@/components/app/will-dots'
 import { ActionEditModal } from '@/components/app/action-edit-modal'
 import type { Action, ActionStatus } from '@/lib/recommendation-data'
@@ -114,11 +116,13 @@ function ActionSuggestionCard({
   data,
   added,
   loading,
+  error,
   onClick,
 }: {
   data: SuggestActionResult
   added: boolean
   loading: boolean
+  error?: boolean
   onClick: () => void
 }) {
   return (
@@ -161,6 +165,9 @@ function ActionSuggestionCard({
             <span>&euro;{data.euro_impact_monthly}/mnd</span>
           )}
         </div>
+        {error && (
+          <p className="mt-1.5 text-[11px] text-negative">Kon niet opslaan — probeer het opnieuw.</p>
+        )}
       </div>
     </button>
   )
@@ -174,11 +181,13 @@ function RecommendationSuggestionCard({
   data,
   decision,
   loading,
+  error,
   onDecision,
 }: {
   data: SuggestRecommendationResult
   decision: RecommendationDecision | null
   loading: 'accept' | 'postpone' | 'reject' | null
+  error?: boolean
   onDecision: (action: 'accept' | 'postpone' | 'reject') => void
 }) {
   const resolved = decision !== null
@@ -250,6 +259,7 @@ function RecommendationSuggestionCard({
             )}
           </div>
         ) : (
+          <>
           <div className="mt-3 flex flex-wrap gap-1.5">
             <button
               type="button"
@@ -291,6 +301,10 @@ function RecommendationSuggestionCard({
               Wijs af
             </button>
           </div>
+          {error && (
+            <p className="mt-1.5 text-[11px] text-negative">Kon niet opslaan — probeer het opnieuw.</p>
+          )}
+          </>
         )}
       </div>
     </div>
@@ -391,8 +405,12 @@ export function ChatPanel() {
       const accepted = localStorage.getItem(WFT_ACCEPTED_KEY)
       setWftAccepted(accepted === 'true')
     } catch {
-      // localStorage not available — allow through
-      setWftAccepted(true)
+      // localStorage niet beschikbaar (incognito/strikt opslagbeleid, TWA-wrapper,
+      // storage-blokkerende extensies). Fail-closed: toon het Wft-scherm alsnog
+      // i.p.v. de compliance-gate stil over te slaan. Acceptatie geldt dan alleen
+      // voor deze sessie (de setItem in handleWftAccept faalt eveneens, maar de
+      // in-memory wftAccepted=true opent de chat wél).
+      setWftAccepted(false)
     }
   }, [])
 
@@ -407,6 +425,11 @@ export function ChatPanel() {
   // Track which suggestions have been added (by toolInvocationId)
   const [addedActions, setAddedActions] = useState<Set<string>>(new Set())
   const [loadingAction, setLoadingAction] = useState<string | null>(null)
+  // E-03: per-kaart faalstatus (by toolCallId). Toont een inline
+  // "Kon niet opslaan"-melding op de kaart tot de volgende poging — de kaart
+  // is hier de context, dus geen globale toast.
+  const [actionErrors, setActionErrors] = useState<Set<string>>(new Set())
+  const [recErrors, setRecErrors] = useState<Set<string>>(new Set())
 
   // Voorstel-beslissingen: per toolCallId welk antwoord de gebruiker gaf
   // (accepted/postponed/rejected). Onbesliste voorstellen blijven na
@@ -420,7 +443,13 @@ export function ChatPanel() {
 
   // Dynamic domain: route-aware and gated by active modules
   const pathname = usePathname()
-  const { activeModules } = useModuleAccess()
+  const { activeModules, subscriptions } = useModuleAccess()
+
+  // AI is a paid add-on. Zonder 'ai'-abonnement tonen we in de chat een upsell
+  // i.p.v. het invoerveld — spiegelt exact de server-gate (checkTierGate 'ai').
+  // Zo krijgt de gebruiker "dit is een betaalde functie" i.p.v. een verwarrende
+  // 403 achter een retry-loop.
+  const hasAi = hasSubscription(subscriptions, 'ai')
 
   const domain = useMemo(() => {
     // Route-based domain selection, gated by active modules.
@@ -491,22 +520,30 @@ export function ChatPanel() {
       dispatchedPendingRef.current = null
       return
     }
-    if (isOpen && !isStreaming && dispatchedPendingRef.current !== pendingMessage) {
+    // Wacht op Wft-acceptatie voordat we een vooraf-ingevulde vraag versturen.
+    // Zonder deze gate zou een openWithMessage-pad (tips-teaser, BesprekMetWill,
+    // ?prompt=-deeplink, WillHome-bubbel) de AI-aanroep afvuren terwijl het
+    // akkoordscherm nog getoond wordt — de disclaimer zou de UI blokkeren maar
+    // niet het daadwerkelijke versturen. De vraag blijft in pendingMessage staan
+    // tot wftAccepted===true; na 'Ik begrijp het' vuurt dit effect opnieuw en
+    // wordt de vraag alsnog verstuurd (de vraag gaat dus niet verloren).
+    if (isOpen && hasAi && wftAccepted === true && !isStreaming && dispatchedPendingRef.current !== pendingMessage) {
       dispatchedPendingRef.current = pendingMessage
       sendMessage({ text: pendingMessage })
       clearPendingMessage()
     }
-  }, [isOpen, pendingMessage, isStreaming, sendMessage, clearPendingMessage])
+  }, [isOpen, hasAi, wftAccepted, pendingMessage, isStreaming, sendMessage, clearPendingMessage])
 
-  // Auto-send scenario context message when chat opens from whatif page (first open only)
+  // Auto-send scenario context message when chat opens from whatif page (first open only).
+  // Zelfde Wft-gate als het pendingMessage-effect: pas versturen ná acceptatie.
   const autoSentRef = useRef(false)
   useEffect(() => {
-    if (isOpen && autoOpenMessage && !isStreaming && messages.length === 0 && !autoSentRef.current) {
+    if (isOpen && hasAi && wftAccepted === true && autoOpenMessage && !isStreaming && messages.length === 0 && !autoSentRef.current) {
       autoSentRef.current = true
       sendMessage({ text: autoOpenMessage })
       setAutoOpenMessage(null)
     }
-  }, [isOpen, autoOpenMessage, isStreaming, messages.length, sendMessage, setAutoOpenMessage])
+  }, [isOpen, hasAi, wftAccepted, autoOpenMessage, isStreaming, messages.length, sendMessage, setAutoOpenMessage])
 
   const submit = () => {
     const text = input.trim()
@@ -527,6 +564,13 @@ export function ChatPanel() {
   const handleAddAction = useCallback(async (invocationId: string, data: SuggestActionResult) => {
     if (addedActions.has(invocationId)) return
     setLoadingAction(invocationId)
+    // Vorige faalstatus wissen bij een nieuwe poging.
+    setActionErrors((prev) => {
+      if (!prev.has(invocationId)) return prev
+      const next = new Set(prev)
+      next.delete(invocationId)
+      return next
+    })
 
     try {
       const res = await fetch('/api/ai/actions', {
@@ -548,7 +592,9 @@ export function ChatPanel() {
       setAddedActions((prev) => new Set(prev).add(invocationId))
       setEditAction(action)
     } catch {
-      // silently fail — user can retry
+      // De kaart toont de fout inline (zie ActionSuggestionCard `error`); de
+      // gebruiker kan opnieuw op de knop klikken.
+      setActionErrors((prev) => new Set(prev).add(invocationId))
     } finally {
       setLoadingAction(null)
     }
@@ -564,6 +610,13 @@ export function ChatPanel() {
     ) => {
       if (recDecisions.has(toolCallId)) return
       setLoadingRec({ id: toolCallId, kind })
+      // Vorige faalstatus wissen bij een nieuwe poging.
+      setRecErrors((prev) => {
+        if (!prev.has(toolCallId)) return prev
+        const next = new Set(prev)
+        next.delete(toolCallId)
+        return next
+      })
 
       // Postponed-voorstellen krijgen een terugkomdatum mee — na 14 dagen
       // mag Will ze opnieuw aandragen (zie recommendation-context sectie
@@ -592,7 +645,9 @@ export function ChatPanel() {
           return next
         })
       } catch {
-        // silently fail — user can retry
+        // De kaart toont de fout inline (zie RecommendationSuggestionCard
+        // `error`); de gebruiker kan opnieuw op een knop klikken.
+        setRecErrors((prev) => new Set(prev).add(toolCallId))
       } finally {
         setLoadingRec(null)
       }
@@ -668,6 +723,7 @@ export function ChatPanel() {
               data={data}
               added={addedActions.has(action.toolCallId)}
               loading={loadingAction === action.toolCallId}
+              error={actionErrors.has(action.toolCallId)}
               onClick={() => handleAddAction(action.toolCallId, data)}
             />
           )
@@ -710,6 +766,7 @@ export function ChatPanel() {
                 data={data}
                 decision={recDecisions.get(rec.toolCallId) ?? null}
                 loading={loadingRec?.id === rec.toolCallId ? loadingRec.kind : null}
+                error={recErrors.has(rec.toolCallId)}
                 onDecision={(kind) => handleRecDecision(rec.toolCallId, data.id, kind)}
               />
             )
@@ -750,9 +807,24 @@ export function ChatPanel() {
 
   /* ── Error helpers ────────────────────────────────────────────── */
 
+  /**
+   * Herkent de subscription-gate (403 uit checkTierGate). Defense-in-depth:
+   * normaliter blokkeert de client-side upsell het versturen al, maar als het
+   * abonnement mid-sessie vervalt kan de server alsnog 403 geven. Dan tonen we
+   * de upsell i.p.v. de "opnieuw proberen"-lus die nooit kan slagen.
+   */
+  function isSubscriptionError(err: Error | undefined): boolean {
+    if (!err?.message) return false
+    const msg = err.message.toLowerCase()
+    return msg.includes('abonnement') || msg.includes('403')
+  }
+
   function getErrorMessage(err: Error | undefined): string {
     if (!err) return 'Er ging iets mis. Probeer het opnieuw.'
     const msg = err.message?.toLowerCase() ?? ''
+    if (isSubscriptionError(err)) {
+      return 'Will is een betaalde functie. Sluit het AI-abonnement af om verder te chatten.'
+    }
     if (msg.includes('timeout') || msg.includes('duurde te lang') || msg.includes('504')) {
       return 'Het AI-antwoord duurde te lang. Probeer het opnieuw met een kortere vraag.'
     }
@@ -841,15 +913,23 @@ export function ChatPanel() {
           </div>
         </div>
 
+        {/* Geen AI-abonnement → upsell i.p.v. chat. Bewust vóór de Wft-gate en
+            het invoerveld: een non-abonnee kan niets versturen (spiegelt de
+            server-403) en ziet meteen "dit is een betaalde functie" + CTA. */}
+        {!hasAi && <AiSubscriptionUpsell onNavigate={close} />}
+
         {/* Wft Disclaimer (first-time only) */}
-        {wftAccepted === false && (
+        {hasAi && wftAccepted === false && (
           <WftDisclaimer onAccept={handleWftAccept} />
         )}
 
         {/* Messages */}
-        {wftAccepted !== false && (
+        {hasAi && wftAccepted !== false && (
         <>
         <div className="flex-1 overflow-y-auto px-4 py-3">
+          {/* Polite live-regio alléén om de berichten — de assertive foutbanner
+              staat er bewust buiten (geen geneste live-regio's). */}
+          <div aria-live="polite" aria-relevant="additions">
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center py-10 text-center">
               {config.fabAvatar(64)}
@@ -918,16 +998,18 @@ export function ChatPanel() {
             </div>
           )}
 
+          </div>
+
           {/* Error banner with retry */}
           {hasError && (
-            <div className="mb-3 rounded-[var(--r-lg)] border border-red-200 bg-red-50 px-3 py-3" data-testid="chat-error-banner">
+            <div className="mb-3 rounded-[var(--r-lg)] border border-red-200 bg-red-50 px-3 py-3" data-testid="chat-error-banner" role="alert" aria-live="assertive">
               <div className="flex items-start gap-2">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
                 <div className="flex-1">
                   <p className="text-sm font-medium text-red-800">
                     {getErrorMessage(error)}
                   </p>
-                  {(() => {
+                  {!isSubscriptionError(error) && (() => {
                     const detail = getErrorDetail(error)
                     return detail ? (
                       <details className="mt-1.5">
@@ -940,25 +1022,33 @@ export function ChatPanel() {
                       </details>
                     ) : null
                   })()}
-                  <div className="mt-2 flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={handleRetry}
-                      className="inline-flex items-center gap-1 rounded-lg bg-red-100 px-3 py-1.5 text-xs font-medium text-red-700 transition-colors hover:bg-red-200"
-                      data-testid="chat-retry-button"
-                    >
-                      <RefreshCw className="h-3 w-3" />
-                      Opnieuw proberen
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleDismissError}
-                      className="rounded-lg px-3 py-1.5 text-xs text-red-500 transition-colors hover:bg-red-100"
-                      data-testid="chat-dismiss-error"
-                    >
-                      Sluiten
-                    </button>
-                  </div>
+                  {isSubscriptionError(error) ? (
+                    // Geen retry-lus bij een abonnement-fout — die kan nooit
+                    // slagen. Toon de upsell + CTA naar /mijn/account.
+                    <div className="mt-2.5">
+                      <AiSubscriptionUpsell variant="inline" onNavigate={handleDismissError} />
+                    </div>
+                  ) : (
+                    <div className="mt-2 flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleRetry}
+                        className="inline-flex items-center gap-1 rounded-lg bg-red-100 px-3 py-1.5 text-xs font-medium text-red-700 transition-colors hover:bg-red-200"
+                        data-testid="chat-retry-button"
+                      >
+                        <RefreshCw className="h-3 w-3" />
+                        Opnieuw proberen
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleDismissError}
+                        className="rounded-lg px-3 py-1.5 text-xs text-red-500 transition-colors hover:bg-red-100"
+                        data-testid="chat-dismiss-error"
+                      >
+                        Sluiten
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

@@ -1,13 +1,10 @@
 'use client'
 
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import dynamic from 'next/dynamic'
 import {
-  Upload, FileText, Check, AlertTriangle, X,
-  ChevronRight, Loader2, WifiOff, RefreshCw, ArrowLeftRight, Sparkles,
-  Users, User, Hand, Lightbulb,
+  Upload, FileText, Check, AlertTriangle,
+  ChevronRight, Loader2, WifiOff, RefreshCw, Sparkles, Lightbulb,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { parseMT940 } from '@/lib/parsers/mt940'
@@ -17,24 +14,30 @@ import { detectFormat, CSV_PRESETS, type CSVPreset } from '@/lib/parsers/index'
 import type { ParsedTransaction } from '@/lib/parsers/shared'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { categorizeTransaction, isOwnAccountTransfer, isWalletTransferType, buildFrequencyMap, type CategoryCorrection, type FrequencyMatch } from '@/lib/parsers/categorize'
-import { runCombinedCategorization, type AutoCatContext, type CombinedAiBatchItem, type CombinedAiResult } from '@/lib/auto-categorize'
-import { type Budget, resolveEigenRekeningBudgetId, budgetOptionLabel } from '@/lib/budget-data'
+import { type Budget, resolveEigenRekeningBudgetId } from '@/lib/budget-data'
 import { buildOwnAccountIdentifiers } from '@/lib/own-accounts'
 import { linkUnmatchedTransfers } from '@/lib/transfer-matching'
-import { useToast } from '@/components/app/toast-provider'
-import { BottomSheet } from '@/components/app/bottom-sheet'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { Kicker, EditorialHeadline, EditorialDeck } from '@/components/editorial'
-import { importRowKey, applyAssignmentToImportRows } from '@/lib/sleepmodus/import-assign'
-import type { QueueTx } from '@/lib/sleepmodus/queue'
-import type { SleepmodusApplyRequest, SleepmodusApplyResult } from '@/components/app/sleepmodus/sleepmodus-overlay'
+import { AICategorizeSheet } from '@/components/app/ai-categorize-sheet'
 
-// Sleepmodus (drag-&-drop) in een eigen chunk — laadt pas wanneer de gebruiker
-// de modus opent vanaf de categoriseer-stap.
-const SleepmodusOverlay = dynamic(
-  () => import('@/components/app/sleepmodus/sleepmodus-overlay').then((m) => ({ default: m.SleepmodusOverlay })),
-  { ssr: false },
-)
+/**
+ * Minimale transactievorm voor het post-import categoriseer-scherm
+ * (AICategorizeSheet). Structureel compatibel met de interne Transaction van de
+ * sheet; wordt gevuld uit de zojuist weggeschreven, nog ongecategoriseerde rijen.
+ */
+type PostImportTx = {
+  id: string
+  date: string
+  description: string
+  counterparty_name: string | null
+  counterparty_iban: string | null
+  amount: number
+  import_hash: string | null
+  budget_id: string | null
+  reference?: string | null
+  account_id?: string | null
+}
 
 type Account = {
   id: string
@@ -57,14 +60,6 @@ function deriveRowOwnership(
   if (manualOverride) return manualOverride
   if (budgetOwnership === 'shared' && accountOwnership === 'personal') return 'shared'
   return accountOwnership
-}
-
-type AISuggestion = {
-  import_hash: string
-  budget_slug: string | null
-  budget_id: string | null
-  confidence: number
-  reasoning: string
 }
 
 type ImportRow = ParsedTransaction & {
@@ -93,17 +88,6 @@ type ImportRow = ParsedTransaction & {
  */
 function rowDedupKey(r: { import_hash: string; bank_seq: string | null }): string {
   return `${r.import_hash}|${r.bank_seq ?? ''}`
-}
-
-type BulkApplyPrompt = {
-  targetIndex: number
-  matchField: 'counterparty_iban' | 'counterparty_name' | 'description'
-  matchValue: string
-  budgetId: string
-  budgetName: string
-  siblingCount: number
-  siblingIndices: number[]
-  rememberRule: boolean
 }
 
 // --- Import session persistence (localStorage) ---
@@ -162,18 +146,7 @@ function isNetworkFailure(err: unknown): boolean {
   return false
 }
 
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('nl-NL', {
-    style: 'currency',
-    currency: 'EUR',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value)
-}
-
 export default function ImportPage() {
-  const router = useRouter()
-  const { addToast } = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [step, setStep] = useState(1)
   const [accounts, setAccounts] = useState<Account[]>([])
@@ -205,20 +178,16 @@ export default function ImportPage() {
   const [freqMap, setFreqMap] = useState<Map<string, FrequencyMatch>>(new Map())
   const [ownIbans, setOwnIbans] = useState<Set<string>>(new Set())
   const [ownNamePatterns, setOwnNamePatterns] = useState<string[]>([])
-  const [aiSuggestions, setAiSuggestions] = useState<Map<string, AISuggestion>>(new Map())
-  const [aiLoading, setAiLoading] = useState(false)
-  const [aiReady, setAiReady] = useState(false)
-  const [aiError, setAiError] = useState(false)
-  const [aiProgress, setAiProgress] = useState({ current: 0, total: 0, skippedHighConf: 0, autoMatched: 0 })
-  const [aiFailedBatches, setAiFailedBatches] = useState<Array<{ index: number; payload: Array<{ import_hash: string; description: string; counterparty_name: string | null; amount: number; reference: string | null }> }>>([])
-  const [aiRetrying, setAiRetrying] = useState(false)
-  const [bulkApplyPrompt, setBulkApplyPrompt] = useState<BulkApplyPrompt | null>(null)
-  const [showSleepmodus, setShowSleepmodus] = useState(false)
   const [checkingDups, setCheckingDups] = useState(false)
   const [pendingSession, setPendingSession] = useState<ImportSession | null>(null)
+  // Post-import categoriseren: de zojuist weggeschreven, nog ongecategoriseerde
+  // rijen (budget_id null, geen overboeking) worden hier vastgehouden en aan de
+  // canonieke AICategorizeSheet gevoerd — categoriseren gebeurt dus op rijen die
+  // ÁL in de DB staan, zodat een onderbroken categorisatie geen import verliest.
+  const [postImportRows, setPostImportRows] = useState<PostImportTx[]>([])
+  const [showCategorizeSheet, setShowCategorizeSheet] = useState(false)
   const PAGE_SIZE = 50
   const [currentPage, setCurrentPage] = useState(0)
-  const [confidenceFilter, setConfidenceFilter] = useState<'all' | 'low' | 'none'>('all')
 
   const loadInitialData = useCallback(async () => {
     setLoading(true)
@@ -302,214 +271,6 @@ export default function ImportPage() {
       setPendingSession(session)
     }
   }, [])
-
-  // Semaphore for limiting concurrent AI requests
-  async function runWithConcurrency<T>(
-    tasks: (() => Promise<T>)[],
-    maxConcurrent: number,
-    onComplete: (index: number) => void,
-  ): Promise<PromiseSettledResult<T>[]> {
-    const results: PromiseSettledResult<T>[] = new Array(tasks.length)
-    let nextIndex = 0
-
-    async function runNext(): Promise<void> {
-      while (nextIndex < tasks.length) {
-        const idx = nextIndex++
-        try {
-          const value = await tasks[idx]()
-          results[idx] = { status: 'fulfilled', value }
-        } catch (reason) {
-          results[idx] = { status: 'rejected', reason }
-        }
-        onComplete(idx)
-      }
-    }
-
-    const workers = Array.from({ length: Math.min(maxConcurrent, tasks.length) }, () => runNext())
-    await Promise.all(workers)
-    return results
-  }
-
-  async function enrichWithAI(importRows: ImportRow[], retryPayloads?: typeof aiFailedBatches) {
-    // Feature #101: Skip AI for high-confidence rule matches (>= 0.8)
-    const allNonTransfer = importRows.filter((r) => !r.isTransfer)
-    const highConfidence = allNonTransfer.filter((r) => r.confidence >= 0.8)
-    const toEnrich = retryPayloads
-      ? [] // when retrying, we use retryPayloads directly
-      : allNonTransfer.filter((r) => r.confidence < 0.8)
-
-    if (!retryPayloads && toEnrich.length === 0) return
-
-    setAiLoading(true)
-    setAiReady(false)
-    setAiError(false)
-    if (!retryPayloads) {
-      setAiSuggestions(new Map())
-      setAiFailedBatches([])
-    }
-    setAiRetrying(!!retryPayloads)
-
-    try {
-      type BatchPayloadItem = { import_hash: string; description: string; counterparty_name: string | null; amount: number; reference: string | null }
-      type Batch = { index: number; payload: BatchPayloadItem[] }
-
-      if (retryPayloads) {
-        // Retry flow: use parallel concurrency (no auto-assignment needed)
-        const batches: Batch[] = retryPayloads.map((b, i) => ({ index: i, payload: b.payload }))
-        const totalTxCount = batches.reduce((sum, b) => sum + b.payload.length, 0)
-        setAiProgress({ current: 0, total: totalTxCount, skippedHighConf: 0, autoMatched: 0 })
-
-        let completedTxCount = 0
-        const tasks = batches.map((batch) => async () => {
-          const res = await fetch('/api/ai/categorize', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ transactions: batch.payload }),
-          })
-          if (!res.ok) throw new Error('AI niet beschikbaar')
-          return await res.json() as { results: AISuggestion[] }
-        })
-
-        const results = await runWithConcurrency(tasks, 3, (idx) => {
-          completedTxCount += batches[idx].payload.length
-          setAiProgress((prev) => ({ ...prev, current: completedTxCount }))
-        })
-
-        const allResults: AISuggestion[] = []
-        const failed: typeof aiFailedBatches = []
-        results.forEach((result, idx) => {
-          if (result.status === 'fulfilled') {
-            allResults.push(...result.value.results)
-          } else {
-            failed.push(batches[idx])
-          }
-        })
-
-        const map = new Map<string, AISuggestion>(aiSuggestions)
-        for (const s of allResults) {
-          if (s.budget_id && s.confidence >= 0.5) {
-            map.set(s.import_hash, s)
-          }
-        }
-        setAiSuggestions(map)
-        setAiFailedBatches(failed)
-        setAiReady(true)
-        if (allResults.length === 0 && failed.length > 0) setAiError(true)
-      } else {
-        // Features #101/#190 — sinds jul 2026 via de GEDEELDE combined pass
-        // (lib/auto-categorize.ts#runCombinedCategorization), dezelfde motor als
-        // de "Vraag Will"-flow op het categoriseer-scherm. Per ronde gaat één
-        // representant per GENORMALISEERDE tegenpartij (PSP-/terminal-ruis
-        // gestript — "CCV*BAKKER 12" ↔ "Bakker", de oude inline-code matchte
-        // alleen exact) per ≤20 naar de AI, waarna het oordeel naar de overige
-        // rijen van die tegenpartij propageert; dat herhaalt tot alles behandeld
-        // is. De regel-stap van de pass is hier een bewuste no-op: rijen met
-        // regel-confidence ≥ 0.8 zijn al bij parse ingedeeld (highConfidence),
-        // en `minRuleConfidence: 0.8` stuurt de zwakkere hits alsnog naar de AI
-        // — exact het oude #101-gedrag.
-        setAiProgress({ current: 0, total: toEnrich.length, skippedHighConf: highConfidence.length, autoMatched: 0 })
-
-        const combinedCtx: AutoCatContext = {
-          budgets,
-          corrections,
-          freqMap,
-          // Eigen-rekening-transfers zijn al bij parse gedetecteerd (isTransfer-
-          // rijen zitten niet in toEnrich); geen transfer-/spiegelpaar-detectie
-          // meer nodig in deze fase.
-          ownIbans: new Set<string>(),
-          ownNamePatterns: [],
-          eigenRekeningBudgetId: null,
-        }
-
-        // Resolver: één POST = één batch representanten. Resultaten onder de
-        // oude drempel (confidence < 0.5) tellen als "onbekend" — zelfde filter
-        // als de vorige inline-lus.
-        const aiResolver = async (batch: CombinedAiBatchItem[]): Promise<CombinedAiResult[]> => {
-          const res = await fetch('/api/ai/categorize', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              transactions: batch.map((t) => ({
-                import_hash: t.id,
-                description: t.description,
-                counterparty_name: t.counterparty_name,
-                amount: t.amount,
-                reference: t.reference,
-              })),
-            }),
-          })
-          if (!res.ok) throw new Error('AI niet beschikbaar')
-          const data = await res.json() as { results: AISuggestion[] }
-          return data.results.map((s) => ({
-            id: s.import_hash,
-            budget_id: s.budget_id && s.confidence >= 0.5 ? s.budget_id : null,
-            confidence: s.confidence,
-            reasoning: s.reasoning,
-          }))
-        }
-
-        // Incrementeel de review-tabel voeden (zoals de oude lus deed): elk
-        // AI-/propagatie-voorstel meteen in aiSuggestions zetten.
-        const suggestionMap = new Map<string, AISuggestion>()
-        const result = await runCombinedCategorization(
-          toEnrich.map((r) => ({
-            id: r.import_hash,
-            description: r.description,
-            counterparty_name: r.counterparty_name,
-            counterparty_iban: r.counterparty_iban,
-            amount: r.amount,
-            date: r.date,
-            reference: r.reference,
-          })),
-          combinedCtx,
-          aiResolver,
-          {
-            minRuleConfidence: 0.8,
-            onProposal: (p) => {
-              if (p.source !== 'ai' && p.source !== 'propagated') return
-              suggestionMap.set(p.id, {
-                import_hash: p.id,
-                budget_slug: null,
-                budget_id: p.budget_id,
-                confidence: p.confidence,
-                reasoning: p.reasoning ?? 'afgeleid via tegenpartij',
-              })
-              setAiSuggestions(new Map(suggestionMap))
-            },
-            onProgress: (prog) => {
-              setAiProgress({
-                current: Math.min(prog.processed, prog.total),
-                total: prog.total,
-                skippedHighConf: highConfidence.length,
-                autoMatched: prog.propagated,
-              })
-            },
-          },
-        )
-
-        const failed: typeof aiFailedBatches = result.failedBatches.map((batch, i) => ({
-          index: i,
-          payload: batch.map((b) => ({
-            import_hash: b.id,
-            description: b.description,
-            counterparty_name: b.counterparty_name,
-            amount: b.amount,
-            reference: b.reference,
-          })),
-        }))
-
-        setAiSuggestions(suggestionMap)
-        setAiFailedBatches(failed)
-        setAiReady(true)
-        if (suggestionMap.size === 0 && failed.length > 0) setAiError(true)
-      }
-    } catch {
-      setAiError(true)
-    } finally {
-      setAiLoading(false)
-      setAiRetrying(false)
-    }
-  }
 
   // Maximum file size: 10 MB
   const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024
@@ -853,295 +614,11 @@ export default function ImportPage() {
     }
   }
 
-  function updateRowBudget(index: number, budgetId: string, source: 'user' | 'ai' = 'user') {
-    const row = rows[index]
-    const budget = budgets.find((b) => b.id === budgetId)
-    const isUserChange = source === 'user'
-
-    // Always update the target row
-    setRows((prev) => prev.map((r, i) =>
-      i === index ? {
-        ...r,
-        budget_id: budgetId || null,
-        budgetName: budget?.name ?? null,
-        confidence: budgetId ? 1.0 : 0,
-        category_source: budgetId ? (isUserChange ? 'manual' : source) : null,
-        aiAccepted: source === 'ai',
-        userManuallyChanged: isUserChange,
-      } : r
-    ))
-
-    if (!isUserChange || !budgetId || !row) return
-
-    // Determine match criteria — prefer IBAN, then counterparty_name, then description
-    let matchField: 'counterparty_iban' | 'counterparty_name' | 'description'
-    let matchValue: string
-
-    if (row.counterparty_iban) {
-      matchField = 'counterparty_iban'
-      matchValue = row.counterparty_iban.replace(/\s/g, '').toUpperCase()
-    } else if (row.counterparty_name) {
-      matchField = 'counterparty_name'
-      matchValue = row.counterparty_name
-    } else {
-      matchField = 'description'
-      matchValue = row.description || ''
-    }
-
-    if (!matchValue) {
-      // No match value available — save correction with best available field
-      saveCorrectionRule(
-        row.counterparty_name ? 'counterparty_name' : 'description',
-        row.counterparty_name || row.description || '',
-        budgetId,
-      )
-      return
-    }
-
-    // Find matching sibling indices
-    const siblingIndices: number[] = []
-    rows.forEach((r, i) => {
-      if (i === index) return
-      if (r.userManuallyChanged || r.isTransfer || r.skipImport) return
-
-      let matches = false
-      if (matchField === 'counterparty_iban') {
-        matches = r.counterparty_iban?.replace(/\s/g, '').toUpperCase() === matchValue
-      } else if (matchField === 'counterparty_name') {
-        matches = r.counterparty_name?.toLowerCase() === matchValue.toLowerCase()
-      } else {
-        matches = !!r.description?.toLowerCase().includes(matchValue.toLowerCase())
-      }
-
-      if (matches) siblingIndices.push(i)
-    })
-
-    if (siblingIndices.length === 0) {
-      // No siblings — save correction silently
-      saveCorrectionRule(
-        matchField,
-        matchField === 'counterparty_iban' ? matchValue : (row.counterparty_name || row.description || ''),
-        budgetId,
-      )
-      return
-    }
-
-    // Show bulk apply dialog
-    setBulkApplyPrompt({
-      targetIndex: index,
-      matchField,
-      matchValue,
-      budgetId,
-      budgetName: budget?.name ?? '',
-      siblingCount: siblingIndices.length,
-      siblingIndices,
-      rememberRule: true,
-    })
-  }
-
-  // Markeer alle rijen van dezelfde eigen rekening als verschuiving + onthoud de regel.
-  // Match op IBAN als die er is, anders op tegenpartij-naam (bv. PayPal zonder IBAN).
-  function markRowsAsTransfer(triggerIndex: number) {
-    const triggerRow = rows[triggerIndex]
-    if (!triggerRow) return
-
-    const iban = triggerRow.counterparty_iban?.replace(/\s/g, '').toUpperCase() || ''
-    const nameKey = (triggerRow.counterparty_name ?? '').trim().toLowerCase()
-    const matchByName = !iban && !!nameKey
-
-    // Count matching rows (including the trigger row)
-    let matchCount = 0
-    setRows((prev) => prev.map((r, i) => {
-      const rowIban = r.counterparty_iban?.replace(/\s/g, '').toUpperCase() || ''
-      const rowName = (r.counterparty_name ?? '').trim().toLowerCase()
-      const matches = i === triggerIndex
-        || (!r.isTransfer && (matchByName ? rowName === nameKey : (!!iban && rowIban === iban)))
-      if (matches) {
-        matchCount++
-        return { ...r, isTransfer: true, transaction_type: 'transfer', budget_id: eigenRekeningBudgetId, budgetName: 'Eigen rekening', category_source: 'transfer' }
-      }
-      return r
-    }))
-
-    // Show toast with count
-    if (matchCount > 1) {
-      addToast({ type: 'success', title: `${matchCount} transacties gemarkeerd als eigen overboeking`, duration: 3000 })
-    } else {
-      addToast({ type: 'success', title: 'Transactie gemarkeerd als eigen overboeking', duration: 3000 })
-    }
-
-    // Onthoud de regel voor toekomstige imports: op IBAN indien aanwezig, anders op naam.
-    rememberOwnAccountRule(iban, nameKey, triggerRow.counterparty_name)
-  }
-
-  /** Sla een eigen-rekening-herkenning op (user_own_ibans) — IBAN indien aanwezig,
-   *  anders tegenpartij-naam. Gedeeld door markRowsAsTransfer en de Sleepmodus. */
-  function rememberOwnAccountRule(iban: string, nameKey: string, label: string | null) {
-    void (async () => {
-      try {
-        const supabase = createClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
-        const matchType = iban ? 'iban' : 'name'
-        const matchValue = iban || nameKey
-        if (!matchValue) return
-        const { data: existing } = await supabase
-          .from('user_own_ibans')
-          .select('id')
-          .eq('user_id', user.id)
-          .eq('match_type', matchType)
-          .eq('match_value', matchValue)
-          .maybeSingle()
-        if (!existing) {
-          await supabase.from('user_own_ibans').insert({
-            user_id: user.id,
-            iban: iban || null,
-            match_type: matchType,
-            match_value: matchValue,
-            label: label || null,
-          })
-          // Lokale set/patterns direct bijwerken voor hergebruik binnen dezelfde sessie.
-          if (matchType === 'iban') {
-            setOwnIbans((prev) => new Set([...prev, matchValue]))
-          } else {
-            setOwnNamePatterns((prev) => (prev.includes(matchValue) ? prev : [...prev, matchValue]))
-          }
-        }
-      } catch {
-        // Silent fail — markering blijft lokaal behouden
-      }
-    })()
-  }
-
-  function saveCorrectionRule(matchField: CategoryCorrection['match_field'], matchValue: string, budgetId: string) {
-    void (async () => {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      await supabase.from('category_corrections')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('match_field', matchField)
-        .ilike('match_value', matchValue)
-      await supabase.from('category_corrections')
-        .insert({ user_id: user.id, match_field: matchField, match_value: matchValue, budget_id: budgetId })
-      setCorrections(prev => {
-        const filtered = prev.filter(c => !(c.match_field === matchField && c.match_value.toLowerCase() === matchValue.toLowerCase()))
-        return [...filtered, { match_field: matchField, match_value: matchValue, budget_id: budgetId }]
-      })
-    })()
-  }
-
-  function handleBulkApplyConfirm() {
-    if (!bulkApplyPrompt) return
-    const { siblingIndices, budgetId, budgetName, matchField, matchValue, rememberRule } = bulkApplyPrompt
-
-    // Apply budget to all matching siblings
-    setRows((prev) => prev.map((r, i) => {
-      if (!siblingIndices.includes(i)) return r
-      return {
-        ...r,
-        budget_id: budgetId,
-        budgetName: budgetName,
-        confidence: 1.0,
-        category_source: 'manual',
-        aiAccepted: false,
-      }
-    }))
-
-    // Save correction rule if checkbox is checked
-    if (rememberRule) {
-      saveCorrectionRule(matchField, matchValue, budgetId)
-    }
-
-    // Toast with result count (target + siblings)
-    setTimeout(() => {
-      addToast({
-        type: 'success',
-        title: `Budget toegekend aan ${siblingIndices.length + 1} transactie${siblingIndices.length + 1 === 1 ? '' : 's'}`,
-        message: `${budgetName} → ${matchValue}`,
-        duration: 3000,
-      })
-    }, 0)
-
-    setBulkApplyPrompt(null)
-  }
-
-  function handleBulkApplyDecline() {
-    if (!bulkApplyPrompt) return
-    const { matchField, matchValue, budgetId, rememberRule } = bulkApplyPrompt
-
-    // Still save correction if checkbox was checked (even when declining bulk)
-    if (rememberRule) {
-      saveCorrectionRule(matchField, matchValue, budgetId)
-    }
-
-    setBulkApplyPrompt(null)
-  }
-
   function toggleSkip(index: number) {
     setRows((prev) => prev.map((r, i) =>
       i === index ? { ...r, skipImport: !r.skipImport } : r
     ))
   }
-
-  // ── Sleepmodus (drag-&-drop) over de nog ongecategoriseerde import-rijen ────
-  // De rijen staan nog niet in de DB: een drop werkt de lokale lijst bij via
-  // applyAssignmentToImportRows; alleen regels (category_corrections /
-  // user_own_ibans) worden direct opgeslagen, net als bij de dropdown-flow.
-  const sleepQueue = useMemo<QueueTx[]>(
-    () => rows
-      .filter((r) => !r.skipImport && !r.isTransfer && !r.budget_id)
-      .map((r) => ({
-        id: importRowKey(r),
-        date: r.date,
-        description: r.description ?? '',
-        counterparty_name: r.counterparty_name ?? null,
-        counterparty_iban: r.counterparty_iban ?? null,
-        amount: r.amount,
-        import_hash: r.import_hash,
-        budget_id: null,
-        reference: r.reference ?? null,
-      })),
-    [rows],
-  )
-
-  const handleSleepmodusAssign = useCallback(async (req: SleepmodusApplyRequest): Promise<SleepmodusApplyResult> => {
-    const keys = req.scope === 'one' ? [req.tx.id] : [req.tx.id, ...req.siblingIds]
-    const budgetName = req.isTransfer
-      ? 'Eigen rekening'
-      : budgets.find((b) => b.id === req.budgetId)?.name ?? null
-    setRows((prev) => applyAssignmentToImportRows(prev, {
-      keys,
-      budgetId: req.budgetId,
-      budgetName,
-      isTransfer: req.isTransfer,
-    }))
-
-    let ruleCreated = false
-    if (req.scope === 'rule') {
-      if (req.isTransfer) {
-        const iban = req.tx.counterparty_iban?.replace(/\s/g, '').toUpperCase() || ''
-        const nameKey = (req.tx.counterparty_name ?? '').trim().toLowerCase()
-        if (iban || nameKey) {
-          rememberOwnAccountRule(iban, nameKey, req.tx.counterparty_name)
-          ruleCreated = true
-        }
-      } else {
-        const matchField = req.tx.counterparty_name ? ('counterparty_name' as const) : ('description' as const)
-        const matchValue = req.tx.counterparty_name || req.tx.description
-        if (matchValue) {
-          saveCorrectionRule(matchField, matchValue, req.budgetId)
-          ruleCreated = true
-        }
-        if (req.tx.counterparty_iban) {
-          saveCorrectionRule('counterparty_iban', req.tx.counterparty_iban.replace(/\s/g, '').toUpperCase(), req.budgetId)
-        }
-      }
-    }
-    return { ruleCreated, bulkUpdated: 0 }
-     
-  }, [budgets])
 
   async function handleImport(retryFromBatch?: number) {
     setImporting(true)
@@ -1179,6 +656,10 @@ export default function ImportPage() {
       setImporting(false)
       return
     }
+
+    // Ga naar de import-/klaar-stap zodra de import daadwerkelijk begint (na de
+    // validaties): de voortgangsbalk en straks het resultaat leven op stap 3.
+    if (retryFromBatch === undefined) setStep(3)
 
     const toImport = rows.filter((r) => !r.skipImport)
 
@@ -1236,7 +717,7 @@ export default function ImportPage() {
       counterparty_name: r.counterparty_name,
       counterparty_iban: r.counterparty_iban,
       // Transfers landen op de "Eigen rekening"-post (archive → telt niet mee); de
-      // map-blokken/markRowsAsTransfer hebben budget_id al op die post gezet.
+      // parse-stap heeft budget_id al op die post gezet voor herkende overboekingen.
       budget_id: r.budget_id,
       is_income: r.amount > 0,
       category_source: r.isTransfer ? 'transfer' : (r.category_source ?? (r.aiAccepted ? 'ai' : r.budget_id ? 'rule' : 'import')),
@@ -1278,18 +759,38 @@ export default function ImportPage() {
     })
 
     const newFailedBatches: typeof failedBatches = []
+    // Zojuist weggeschreven, nog ongecategoriseerde rijen (budget_id null, geen
+    // overboeking) — het werk voor het post-import categoriseer-scherm. We halen
+    // de gegenereerde id's terug via `.select()` zodat de AICategorizeSheet ze per
+    // id kan bijwerken.
+    const importedUncategorized: PostImportTx[] = []
 
     for (let batchIdx = startBatch; batchIdx < batches.length; batchIdx++) {
       let batchFailed = false
       let batchError = ""
+      let insertedRows: {
+        id: string
+        date: string
+        description: string
+        counterparty_name: string | null
+        counterparty_iban: string | null
+        amount: number | string
+        import_hash: string | null
+        budget_id: string | null
+        reference: string | null
+        transaction_type: string | null
+      }[] = []
 
       try {
-        const { error: insertError } = await supabase
+        const { data: inserted, error: insertError } = await supabase
           .from("transactions")
           .insert(batches[batchIdx])
+          .select('id, date, description, counterparty_name, counterparty_iban, amount, import_hash, budget_id, reference, transaction_type')
         if (insertError) {
           batchFailed = true
           batchError = insertError.message
+        } else if (inserted) {
+          insertedRows = inserted as typeof insertedRows
         }
       } catch (err) {
         batchFailed = true
@@ -1303,6 +804,24 @@ export default function ImportPage() {
         // Track successfully imported hashes for crash recovery
         for (const row of batches[batchIdx]) {
           importedHashesSoFar.push((row as { import_hash: string }).import_hash)
+        }
+        // Verzamel de rijen die nog géén budget hebben (en geen overboeking zijn)
+        // voor het post-import categoriseer-scherm.
+        for (const r of insertedRows) {
+          if (r.budget_id === null && r.transaction_type !== 'transfer') {
+            importedUncategorized.push({
+              id: r.id,
+              date: r.date,
+              description: r.description,
+              counterparty_name: r.counterparty_name,
+              counterparty_iban: r.counterparty_iban,
+              amount: Number(r.amount),
+              import_hash: r.import_hash,
+              budget_id: null,
+              reference: r.reference,
+              account_id: selectedAccountId,
+            })
+          }
         }
       }
 
@@ -1329,7 +848,10 @@ export default function ImportPage() {
     setFailedBatches(newFailedBatches)
     setImportedBatchIndex(0)
     setImportStartTime(null)
-    setStep(4)
+    // De zojuist geïmporteerde, nog ongecategoriseerde rijen klaarzetten voor het
+    // post-import categoriseer-scherm (AICategorizeSheet).
+    setPostImportRows(importedUncategorized)
+    setStep(3)
     setImporting(false)
 
     // Link transfer pairs in background (non-blocking)
@@ -1495,7 +1017,7 @@ export default function ImportPage() {
 
       {/* Steps indicator */}
       <div className="mb-5 sm:mb-8 flex items-center gap-2 text-sm">
-        {['Upload', 'Dubbelingen', 'Categoriseer', 'Klaar'].map((label, i) => {
+        {['Upload', 'Dubbelingen', 'Importeren', 'Categoriseren'].map((label, i) => {
           const stepNum = i + 1
           const isActive = step === stepNum
           const isDone = step > stepNum
@@ -1638,16 +1160,18 @@ export default function ImportPage() {
             <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
               <div className="text-sm">
-                <p className="font-medium text-amber-800">Eerst een bankrekening toevoegen</p>
+                <p className="font-medium text-amber-800">Eerst een bankrekening koppelen</p>
                 <p className="mt-1 text-xs text-amber-700">
-                  Transacties worden altijd aan een rekening gekoppeld. Voeg eerst een
-                  bankrekening toe, daarna kun je hier een bestand importeren.
+                  Transacties worden altijd aan een rekening gekoppeld. Heb je al een
+                  betaalrekening als bezitting? Bewerk die bezitting en zet het vinkje aan
+                  bij <strong>&ldquo;Budgetten &amp; transacties&rdquo;</strong> — daarna
+                  kun je hier importeren. Heb je nog geen rekening, voeg er dan eerst een toe.
                 </p>
                 <Link
                   href="/core/cash"
                   className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-amber-800 underline hover:text-amber-900"
                 >
-                  Rekening toevoegen
+                  Naar rekeningen
                   <ChevronRight className="h-3 w-3" />
                 </Link>
               </div>
@@ -1926,11 +1450,21 @@ export default function ImportPage() {
                   )}
                 </div>
                 <button
-                  onClick={() => { setCurrentPage(0); setStep(3) }}
-                  className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700"
+                  onClick={() => handleImport()}
+                  disabled={importing || toImportCount === 0}
+                  className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
                 >
-                  Volgende: categoriseren
-                  <ChevronRight className="h-4 w-4" />
+                  {importing ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Importeren…
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-4 w-4" />
+                      {toImportCount} transacties importeren
+                    </>
+                  )}
                 </button>
               </div>
 
@@ -1939,6 +1473,20 @@ export default function ImportPage() {
                   <strong>{dupCount}</strong> transactie(s) bestaan al in de database en worden overgeslagen. Je kunt ze hieronder aan- of uitvinken.
                 </div>
               )}
+
+              {/* Geruststelling: categoriseren gebeurt ná het importeren, op de
+                  al-opgeslagen rijen — je raakt dus nooit een import kwijt. */}
+              <div className="flex items-start gap-3 rounded-lg border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/50 p-4">
+                <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-kern-600" />
+                <div className="text-sm">
+                  <p className="font-medium text-[var(--ink-2)]">Eerst importeren, dan categoriseren</p>
+                  <p className="mt-1 text-xs text-[var(--ink-3)]">
+                    Je transacties worden eerst veilig opgeslagen. Daarna kun je ze
+                    meteen indelen — of dat rustig later doen op het rekeningdetail.
+                    Er gaat onderweg niets verloren.
+                  </p>
+                </div>
+              </div>
 
               {(() => {
                 const step2TotalPages = Math.ceil(rows.length / PAGE_SIZE)
@@ -2008,59 +1556,14 @@ export default function ImportPage() {
         </div>
       )}
 
-      {/* Step 3: Categoriseer + Importeer */}
-      {step === 3 && (
+      {/* Step 3: Importeren (voortgang) — de transacties worden nu vastgezet in
+          de DB; categoriseren gebeurt daarna op de opgeslagen rijen (stap 4). */}
+      {step === 3 && importing && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-[var(--ink-2)]">
-              <strong>{toImportCount}</strong> transacties om te importeren uit <strong>{fileName}</strong>
-            </p>
-            <div className="flex items-center gap-2">
-              {/* Sleepmodus — drag-&-drop over de nog ongecategoriseerde rijen */}
-              {sleepQueue.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setShowSleepmodus(true)}
-                  className="inline-flex items-center gap-1.5 rounded-[var(--r)] border border-kern-300 px-3 py-1.5 text-xs font-medium text-kern-700 hover:bg-kern-50"
-                >
-                  <Hand className="h-3.5 w-3.5" />
-                  Sleepmodus
-                  <span className="font-mono tabular-nums text-kern-600">({sleepQueue.length})</span>
-                </button>
-              )}
-              {/* Ask Will button — only show when AI hasn't been triggered yet */}
-              {!aiLoading && !aiReady && !aiError && (
-                <button
-                  type="button"
-                  onClick={() => void enrichWithAI(rows.filter(r => !r.skipImport))}
-                  className="inline-flex items-center gap-1.5 rounded-[var(--r)] border border-kern-300 px-3 py-1.5 text-xs font-medium text-kern-700 hover:bg-kern-50"
-                >
-                  <Sparkles className="h-3.5 w-3.5" />
-                  Vraag Will
-                </button>
-              )}
-              <button
-                onClick={() => handleImport()}
-                disabled={importing || toImportCount === 0}
-                className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
-              >
-                {importing ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Importeren...
-                  </>
-                ) : (
-                  <>
-                    <Upload className="h-4 w-4" />
-                    {toImportCount} transacties importeren
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-
-          {/* Import progress */}
-          {importing && importProgress.total > 0 && (() => {
+          <p className="text-sm text-[var(--ink-2)]">
+            <strong>{toImportCount}</strong> transacties uit <strong>{fileName}</strong> worden opgeslagen…
+          </p>
+          {importProgress.total > 0 ? (() => {
             const pct = Math.round((importProgress.current / importProgress.total) * 100)
             const batchNum = Math.ceil(importProgress.current / 100) || 1
             const totalBatches = Math.ceil(importProgress.total / 100)
@@ -2095,311 +1598,59 @@ export default function ImportPage() {
                 )}
               </div>
             )
-          })()}
-
-          {/* AI loading banner with batch progress */}
-          {aiLoading && (
-            <div className="rounded-[var(--r-lg)] border border-dashed border-kern-200 bg-kern-50/50 px-4 py-3 space-y-2">
-              <div className="flex items-center gap-3">
-                <Loader2 className="h-4 w-4 animate-spin text-kern-500 shrink-0" />
-                <p className="text-sm text-kern-700">
-                  {aiRetrying ? 'Will herprobeert gefaalde batches…' : (
-                    aiProgress.total > 0
-                      ? <>Will categoriseert… <span className="font-mono tabular-nums font-medium">{aiProgress.current}</span> van <span className="font-mono tabular-nums font-medium">{aiProgress.total}</span> transacties</>
-                      : <>Will analyseert…</>
-                  )}
-                </p>
-              </div>
-              {aiProgress.total > 0 && (
-                <div className="h-1.5 rounded-full bg-kern-200 overflow-hidden">
-                  <div
-                    className="h-1.5 rounded-full bg-kern-500"
-                    style={{
-                      width: `${(aiProgress.current / aiProgress.total) * 100}%`,
-                      transition: 'width 0.4s ease-out',
-                    }}
-                  />
-                </div>
-              )}
-              {(aiProgress.skippedHighConf > 0 || aiProgress.autoMatched > 0) && (
-                <p className="text-[11px] text-[var(--ink-4)]">
-                  {aiProgress.skippedHighConf > 0 && <>{aiProgress.skippedHighConf} transacties automatisch herkend (overgeslagen)</>}
-                  {aiProgress.skippedHighConf > 0 && aiProgress.autoMatched > 0 && ' · '}
-                  {aiProgress.autoMatched > 0 && <>{aiProgress.autoMatched} extra gematcht via counterparty</>}
-                </p>
-              )}
+          })() : (
+            <div className="flex items-center gap-3 rounded-lg border border-kern-200 bg-kern-50 p-4">
+              <Loader2 className="h-5 w-5 animate-spin text-kern-500" />
+              <p className="text-sm text-kern-700">Importeren voorbereiden…</p>
             </div>
           )}
-
-          {/* AI ready banner */}
-          {aiReady && aiSuggestions.size > 0 && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between gap-3 rounded-[var(--r-lg)] border border-kern-300 bg-kern-50 px-4 py-3">
-                <div className="flex items-center gap-3">
-                  <Sparkles className="h-4 w-4 text-kern-600 shrink-0" />
-                  <p className="text-sm font-medium text-kern-700">
-                    Will heeft {aiSuggestions.size} {aiSuggestions.size === 1 ? 'voorstel' : 'voorstellen'}
-                    {(aiProgress.skippedHighConf > 0 || aiProgress.autoMatched > 0) && (
-                      <span className="text-[var(--ink-3)] font-normal ml-1">
-                        {aiProgress.skippedHighConf > 0 && <>· {aiProgress.skippedHighConf} automatisch herkend</>}
-                        {aiProgress.autoMatched > 0 && <> · {aiProgress.autoMatched} auto-gematcht</>}
-                      </span>
-                    )}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setRows((prev) => prev.map((r) => {
-                      const s = aiSuggestions.get(r.import_hash)
-                      if (!s || !s.budget_id) return r
-                      const budget = budgets.find((b) => b.id === s.budget_id)
-                      return { ...r, budget_id: s.budget_id, budgetName: budget?.name ?? null, confidence: s.confidence, category_source: 'ai', aiAccepted: true }
-                    }))
-                  }}
-                  className="inline-flex items-center gap-1.5 rounded-[var(--r)] bg-kern-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-kern-700"
-                >
-                  <Check className="h-3.5 w-3.5" />
-                  Alles goedkeuren
-                </button>
-              </div>
-              {/* Failed batches retry button */}
-              {aiFailedBatches.length > 0 && (
-                <div className="flex items-center justify-between gap-3 rounded-[var(--r-lg)] border border-orange-200 bg-orange-50 px-4 py-3">
-                  <p className="text-sm text-orange-700">
-                    {aiFailedBatches.reduce((sum, b) => sum + b.payload.length, 0)} transacties konden niet gecategoriseerd worden
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => void enrichWithAI(rows.filter(r => !r.skipImport), aiFailedBatches)}
-                    className="inline-flex items-center gap-1.5 rounded-[var(--r)] border border-orange-300 px-3 py-1.5 text-xs font-medium text-orange-700 hover:bg-orange-100"
-                  >
-                    <RefreshCw className="h-3.5 w-3.5" />
-                    Opnieuw proberen
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* AI error banner */}
-          {aiError && (
-            <div className="rounded-[var(--r-lg)] border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-700">
-              Will is even niet beschikbaar — categoriseer handmatig.
-            </div>
-          )}
-
-          {/* Bulk-apply is now automatic — see updateRowBudget auto-propagation + toast */}
-
-          {/* Transfer banner */}
-          {rows.some((r) => r.isTransfer && !r.skipImport) && (
-            <div className="rounded-[var(--r-lg)] border border-[var(--hor-m)] bg-[var(--hor-l)] px-4 py-3 flex items-start gap-3">
-              <ArrowLeftRight className="h-4 w-4 text-[var(--hor-t)] mt-0.5 shrink-0" />
-              <div>
-                <p className="text-sm font-medium text-[var(--ink-2)]">
-                  {rows.filter((r) => r.isTransfer && !r.skipImport).length} eigen {rows.filter((r) => r.isTransfer && !r.skipImport).length === 1 ? 'overboeking' : 'overboekingen'} herkend
-                </p>
-                <p className="text-xs italic text-[var(--ink-3)] font-[var(--font-source-serif)]">
-                  Deze transacties worden geïmporteerd maar tellen niet mee in budgetten of geldstroom.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Confidence filter buttons */}
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-medium text-[var(--ink-3)]">Filter:</span>
-            {([['all', 'Alles'], ['low', 'Lage confidence'], ['none', 'Zonder budget']] as const).map(([key, label]) => {
-              const count = key === 'all'
-                ? rows.filter((r) => !r.skipImport).length
-                : key === 'low'
-                  ? rows.filter((r) => !r.skipImport && !r.isTransfer && r.confidence > 0 && r.confidence < 0.9).length
-                  : rows.filter((r) => !r.skipImport && !r.isTransfer && !r.budget_id).length
-              return (
-                <button key={key} type="button"
-                  onClick={() => { setConfidenceFilter(key); setCurrentPage(0) }}
-                  className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${confidenceFilter === key ? 'bg-kern-600 text-white' : 'border border-[var(--border-ed)] text-[var(--ink-3)] hover:bg-[var(--subtle)]'}`}
-                >{label} ({count})</button>
-              )
-            })}
-          </div>
-
-          {/* Categorization table — filtered, sorted by confidence, paginated */}
-          {(() => {
-            const allVisible = rows.map((row, idx) => ({ row, realIdx: idx })).filter(({ row }) => !row.skipImport)
-            const filteredRows = confidenceFilter === 'all' ? allVisible : confidenceFilter === 'low' ? allVisible.filter(({ row }) => !row.isTransfer && row.confidence > 0 && row.confidence < 0.9) : allVisible.filter(({ row }) => !row.isTransfer && !row.budget_id)
-            const sortedRows = [...filteredRows].sort((a, b) => { if (a.row.isTransfer !== b.row.isTransfer) return a.row.isTransfer ? 1 : -1; return a.row.confidence - b.row.confidence })
-            const step3TotalPages = Math.ceil(sortedRows.length / PAGE_SIZE)
-            const step3PageRows = sortedRows.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE)
-            const SRC: Record<string, string> = { manual: 'Correctieregel', frequency: 'Frequentie', rule: 'Trefwoord', ai: 'AI (Will)', user: 'Handmatig', transfer: 'Eigen rekening' }
-            return (
-              <div className="overflow-x-auto rounded-xl border border-[var(--border-ed)]">
-                <table className="w-full text-sm">
-                  <thead className="bg-[var(--subtle)] text-left">
-                    <tr>
-                      <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Datum</th>
-                      <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Beschrijving</th>
-                      <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Bedrag</th>
-                      <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Budget</th>
-                      <th className="px-4 py-2 font-medium text-[var(--ink-3)] text-center">Bron</th>
-                      <th className="px-4 py-2 font-medium text-[var(--ink-3)] text-center">Match</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-100">
-                    {step3PageRows.map(({ row, realIdx }) => (
-                      <tr key={realIdx} className={row.isTransfer ? 'bg-[var(--subtle)]/50' : 'hover:bg-[var(--subtle)]'}>
-                        <td className="whitespace-nowrap px-4 py-2 text-[var(--ink-2)]">
-                          {new Date(row.date + 'T00:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
-                        </td>
-                        <td className="max-w-[300px] truncate px-4 py-2 text-[var(--ink)]">
-                          {row.description}
-                          {row.counterparty_name && (
-                            <span className="ml-1 text-xs text-[var(--ink-3)]">({row.counterparty_name})</span>
-                          )}
-                        </td>
-                        <td className={`whitespace-nowrap px-4 py-2 font-medium ${
-                          row.isTransfer ? 'text-[var(--ink-2)]' : row.amount > 0 ? 'text-emerald-600' : 'text-[var(--ink)]'
-                        }`}>
-                          <MaskedAmount value={row.amount} signPrefix={!row.isTransfer && row.amount > 0 ? '+' : ''} tone="kern" decimals />
-                        </td>
-                        <td className="px-4 py-2">
-                          {row.isTransfer ? (
-                            <div className="flex items-center gap-2">
-                              <span className="rounded-full bg-[var(--subtle)] border border-[var(--border-ed)] px-2 py-0.5 text-[9px] font-medium uppercase tracking-[.06em] text-[var(--ink-3)]">
-                                Eigen rekening
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => setRows((prev) => prev.map((r, i) =>
-                                  i === realIdx ? { ...r, isTransfer: false, transaction_type: null } : r
-                                ))}
-                                className="text-[11px] italic text-[var(--ink-4)] hover:text-kern-600 font-[var(--font-source-serif)]"
-                              >
-                                Toch als uitgave?
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="space-y-1.5">
-                              {/* AI proposal block */}
-                              {(() => {
-                                const s = aiSuggestions.get(row.import_hash)
-                                if (!s?.budget_id) return null
-                                if (row.aiAccepted) {
-                                  return (
-                                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[9px] font-medium text-emerald-700">
-                                      <Check className="h-2.5 w-2.5" />
-                                      Gekeurd
-                                    </span>
-                                  )
-                                }
-                                return (
-                                  <div className="rounded border border-dashed border-kern-200 bg-kern-50/50 px-2 py-1.5">
-                                    <p className="font-[var(--font-source-serif)] text-[10px] italic text-[var(--ink-3)] line-clamp-1">{s.reasoning}</p>
-                                    <div className="mt-1 flex items-center gap-1.5 flex-wrap">
-                                      <span className="inline-flex items-center gap-0.5 rounded-full bg-kern-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[.06em] text-kern-700">
-                                        <Sparkles className="h-2.5 w-2.5" />
-                                        Will
-                                      </span>
-                                      <span className="text-[10px] font-medium text-[var(--ink-2)]">
-                                        {budgets.find((b) => b.id === s.budget_id)?.name}
-                                      </span>
-                                      <button
-                                        type="button"
-                                        onClick={() => updateRowBudget(realIdx, s.budget_id!, 'ai')}
-                                        className="rounded-full bg-kern-600 px-2 py-0.5 text-[9px] font-medium text-white hover:bg-kern-700"
-                                      >
-                                        OK?
-                                      </button>
-                                    </div>
-                                  </div>
-                                )
-                              })()}
-                              <select
-                                value={row.budget_id ?? ''}
-                                onChange={(e) => {
-                                  if (e.target.value === '__transfer__') {
-                                    markRowsAsTransfer(realIdx)
-                                  } else {
-                                    updateRowBudget(realIdx, e.target.value, 'user')
-                                  }
-                                }}
-                                className="w-full max-w-[200px] rounded border border-[var(--border-ed)] px-2 py-1 text-xs outline-none focus:border-kern-500"
-                              >
-                                <option value="">Niet gecategoriseerd</option>
-                                <option value="__transfer__">↔ Eigen overboeking</option>
-                                {budgetGroups
-                                  .filter((group) => group.children.length > 0)
-                                  .map((group) => (
-                                  <optgroup key={group.parent.id} label={group.parent.name}>
-                                    {group.children.map((child) => (
-                                      <option key={child.id} value={child.id}>{budgetOptionLabel(child)}</option>
-                                    ))}
-                                  </optgroup>
-                                ))}
-                              </select>
-                              {(() => {
-                                // Hint: gedeeld budget op een persoonlijke rekening → de
-                                // transactie wordt gezamenlijk geïmporteerd. Klik om dat
-                                // per rij terug te zetten (manualOwnership = 'personal').
-                                const acc = accounts.find((a) => a.id === selectedAccountId)
-                                const accOwn: 'personal' | 'shared' = acc?.ownership ?? 'personal'
-                                const budgetOwn = budgets.find((b) => b.id === row.budget_id)?.ownership
-                                const resolved = deriveRowOwnership(accOwn, budgetOwn, row.manualOwnership)
-                                const wouldBeShared = budgetOwn === 'shared' && accOwn === 'personal'
-                                if (!wouldBeShared) return null
-                                return resolved === 'shared' ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => setRows((prev) => prev.map((r, i) =>
-                                      i === realIdx ? { ...r, manualOwnership: 'personal' } : r
-                                    ))}
-                                    title="Klik om deze transactie toch persoonlijk te importeren"
-                                    className="mt-1 inline-flex items-center gap-0.5 rounded-full bg-kern-50 border border-kern-200 px-1.5 py-0.5 text-[9px] font-medium text-kern-700 hover:bg-kern-100"
-                                  >
-                                    <Users className="h-2.5 w-2.5" />
-                                    Gezamenlijk budget → transactie wordt gezamenlijk geïmporteerd
-                                  </button>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={() => setRows((prev) => prev.map((r, i) =>
-                                      i === realIdx ? { ...r, manualOwnership: undefined } : r
-                                    ))}
-                                    title="Toch gezamenlijk importeren"
-                                    className="mt-1 inline-flex items-center gap-0.5 rounded-full bg-[var(--subtle)] border border-[var(--border-ed)] px-1.5 py-0.5 text-[9px] font-medium text-[var(--ink-3)] hover:bg-[var(--border-ed)]"
-                                  >
-                                    <User className="h-2.5 w-2.5" />
-                                    Persoonlijk geïmporteerd
-                                  </button>
-                                )
-                              })()}
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-4 py-2 text-center">
-                          {row.isTransfer ? (
-                            <ArrowLeftRight className="mx-auto h-4 w-4 text-[var(--ink-3)]" />
-                          ) : row.confidence >= 0.9 ? (
-                            <Check className="mx-auto h-4 w-4 text-emerald-500" />
-                          ) : row.confidence >= 0.5 ? (
-                            <AlertTriangle className="mx-auto h-4 w-4 text-orange-500" />
-                          ) : (
-                            <X className="mx-auto h-4 w-4 text-red-400" />
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <PaginationBar page={currentPage} totalPages={step3TotalPages} onPageChange={setCurrentPage} />
-              </div>
-            )
-          })()}
         </div>
       )}
 
-      {/* Step 4: Success */}
-      {step === 4 &&
+      {/* Step 4: Categoriseren (post-import, op de reeds opgeslagen rijen) */}
+      {step === 4 && (
+        <div className="space-y-4">
+          <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6 text-center">
+            <p className="text-sm text-[var(--ink-2)]">
+              Je transacties zijn <strong>opgeslagen</strong>. Deel de nog ongecategoriseerde rijen nu in — of doe dat rustig later.
+            </p>
+            <div className="mt-4 flex flex-col items-center gap-3">
+              {postImportRows.length > 0 && !showCategorizeSheet && (
+                <button
+                  type="button"
+                  onClick={() => setShowCategorizeSheet(true)}
+                  className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-6 py-2 text-sm font-medium text-white hover:bg-kern-700"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  {postImportRows.length} {postImportRows.length === 1 ? 'transactie categoriseren' : 'transacties categoriseren'}
+                </button>
+              )}
+              <Link
+                href={selectedAccountId && importedMinMonth ? `/core/assets/cash/${selectedAccountId}?month=${importedMinMonth}` : '/core/cash'}
+                className="text-xs font-medium text-[var(--ink-3)] underline hover:text-kern-600"
+              >
+                {selectedAccountId ? 'Naar rekeningdetail' : 'Naar Cash overzicht'}
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Post-import categoriseer-scherm — canonieke AICategorizeSheet, geseed op
+          de zojuist opgeslagen ongecategoriseerde rijen (werkt op DB-id's, doet
+          zelf de combined pass / sleepmodus / handmatige indeling). */}
+      {step === 4 && showCategorizeSheet && postImportRows.length > 0 && (
+        <AICategorizeSheet
+          transactions={postImportRows}
+          budgets={budgets}
+          budgetGroups={budgetGroups}
+          onClose={() => setShowCategorizeSheet(false)}
+          onSaved={() => setShowCategorizeSheet(false)}
+        />
+      )}
+
+      {/* Step 3 (vervolg): resultaat + doorstart naar categoriseren */}
+      {step === 3 && !importing &&
         (() => {
           const skippedCount = rows.filter((r) => r.skipImport).length
           // Race-vrije bron van waarheid: importProgress.total = insertRows.length (synchroon
@@ -2518,79 +1769,46 @@ export default function ImportPage() {
                   </strong>
                 </span>
               </div>
-              <div className="mt-3 sm:mt-6">
-                <Link
-                  href={
-                    selectedAccountId && importedMinMonth
-                      ? `/core/assets/cash/${selectedAccountId}?month=${importedMinMonth}`
-                      : '/core/cash'
-                  }
-                  className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-6 py-2 text-sm font-medium text-white hover:bg-kern-700"
-                >
-                  {selectedAccountId ? 'Naar rekeningdetail' : 'Naar Cash overzicht'}
-                </Link>
+              {/* Doorstart: eerst categoriseren (post-import, veilig want de rijen
+                  staan al in de DB), anders meteen naar het rekeningdetail. */}
+              <div className="mt-4 sm:mt-6 flex flex-col items-center gap-3">
+                {postImportRows.length > 0 ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => { setShowCategorizeSheet(true); setStep(4) }}
+                      className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-6 py-2 text-sm font-medium text-white hover:bg-kern-700"
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      {postImportRows.length} {postImportRows.length === 1 ? 'transactie categoriseren' : 'transacties categoriseren'}
+                    </button>
+                    <Link
+                      href={
+                        selectedAccountId && importedMinMonth
+                          ? `/core/assets/cash/${selectedAccountId}?month=${importedMinMonth}`
+                          : '/core/cash'
+                      }
+                      className="text-xs font-medium text-[var(--ink-3)] underline hover:text-kern-600"
+                    >
+                      Later — {selectedAccountId ? 'naar rekeningdetail' : 'naar Cash overzicht'}
+                    </Link>
+                  </>
+                ) : (
+                  <Link
+                    href={
+                      selectedAccountId && importedMinMonth
+                        ? `/core/assets/cash/${selectedAccountId}?month=${importedMinMonth}`
+                        : '/core/cash'
+                    }
+                    className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-6 py-2 text-sm font-medium text-white hover:bg-kern-700"
+                  >
+                    {selectedAccountId ? 'Naar rekeningdetail' : 'Naar Cash overzicht'}
+                  </Link>
+                )}
               </div>
             </div>
           )
         })()}
-
-      {/* Bulk Apply Dialog — shown when user assigns a budget with matching siblings */}
-      {bulkApplyPrompt && (
-        <BottomSheet open onClose={() => setBulkApplyPrompt(null)} size="sm">
-          <div className="p-6 space-y-4">
-            <h3 className="text-base font-semibold text-[var(--ink)]">
-              Vergelijkbare transacties gevonden
-            </h3>
-            <p className="text-sm text-[var(--ink-2)]">
-              Er {bulkApplyPrompt.siblingCount === 1 ? 'is' : 'zijn'} nog{' '}
-              <span className="font-semibold text-[var(--ink)]">{bulkApplyPrompt.siblingCount}</span>{' '}
-              {bulkApplyPrompt.siblingCount === 1 ? 'transactie' : 'transacties'} van{' '}
-              <span className="font-semibold text-[var(--ink)]">{bulkApplyPrompt.matchValue}</span>.
-              {' '}Wil je <span className="font-semibold text-[var(--ink)]">{bulkApplyPrompt.budgetName}</span> ook
-              aan deze transacties toekennen?
-            </p>
-            <label className="flex items-center gap-2 text-sm text-[var(--ink-2)] cursor-pointer">
-              <input
-                type="checkbox"
-                checked={bulkApplyPrompt.rememberRule}
-                onChange={(e) => setBulkApplyPrompt(prev => prev ? { ...prev, rememberRule: e.target.checked } : null)}
-                className="rounded border-[var(--border-ed)] accent-kern-500"
-              />
-              Onthoud voor toekomstige imports
-            </label>
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={handleBulkApplyConfirm}
-                className="flex-1 rounded-lg bg-kern-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-kern-600 transition-colors"
-              >
-                Ja, pas toe op alle
-              </button>
-              <button
-                onClick={handleBulkApplyDecline}
-                className="flex-1 rounded-lg border border-[var(--border-ed)] px-4 py-2.5 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] transition-colors"
-              >
-                Nee, alleen deze
-              </button>
-            </div>
-          </div>
-        </BottomSheet>
-      )}
-
-      {/* Sleepmodus — drag-&-drop toewijzen over de lokale import-rijen */}
-      {showSleepmodus && (
-        <SleepmodusOverlay
-          transactions={sleepQueue}
-          budgets={budgets}
-          budgetGroups={budgetGroups}
-          /* Eigendom wordt bij het importeren afgeleid van het budget
-             (deriveRowOwnership) — geen aparte toggle in de overlay nodig. */
-          hasHousehold={false}
-          onExit={() => setShowSleepmodus(false)}
-          onDone={() => setShowSleepmodus(false)}
-          applyAssignment={handleSleepmodusAssign}
-          doneLabel="Terug naar import"
-        />
-      )}
     </div>
   )
 }

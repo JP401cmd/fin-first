@@ -213,7 +213,11 @@ export function ToekomstWelcome({
           <span className="not-italic font-semibold text-[var(--ink)]">schatting</span> op
           basis van je gegevens en een paar slimme aannames — je instellingen staan
           al klaar, je hoeft niets te configureren. Wil je 'm scherper maken? Volg
-          de tips bij de grafiek.
+          het korte stappenplan op je{' '}
+          <span className="not-italic font-semibold text-[var(--module-active-800)]">
+            Overzicht
+          </span>
+          .
         </p>
 
         {/* Primaire knop — sluit de kaart én onthult de grafiek + tip-markers.

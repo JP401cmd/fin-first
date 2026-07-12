@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, memo } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { BudgetIcon, getTypeColors, isOverPositive, computeBarSegments, anyChildOverBudget, BudgetOverWarningIcon, type BudgetType } from '@/components/app/budget-shared'
 import type { Budget, BudgetWithChildren } from '@/lib/budget-data'
@@ -362,7 +362,10 @@ function TreeGroup({
 
 /* ── BudgetTree (top-level) ──────────────────────────────────── */
 
-export function BudgetTree({ groups, spending, budgetType, onNavigate, beschikbaarMap }: BudgetTreeProps) {
+// memo(): props worden door budgets-client gestabiliseerd (groups/beschikbaarMap
+// via useMemo, spending is state, onNavigate is een stabiele useCallback). Zo
+// slaat de boom zijn render over bij ONgerelateerde re-renders van de host.
+export const BudgetTree = memo(function BudgetTree({ groups, spending, budgetType, onNavigate, beschikbaarMap }: BudgetTreeProps) {
   if (groups.length === 0) return null
 
   return (
@@ -379,4 +382,4 @@ export function BudgetTree({ groups, spending, budgetType, onNavigate, beschikba
       ))}
     </div>
   )
-}
+})

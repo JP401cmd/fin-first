@@ -31,17 +31,31 @@ export async function GET() {
   try {
     const service = getServiceClient()
 
-    // List all users via admin API
-    const { data: { users }, error: listError } = await service.auth.admin.listUsers({ perPage: 200 })
+    // Gerichte lookup via de SECURITY DEFINER-RPC i.p.v. admin.listUsers() te
+    // pagineren: die lijst-call breekt zodra één auth.users-rij NULL-tokens
+    // bevat ("Database error finding users"). De RPC SELECT raakt die kolommen
+    // niet aan en is robuust tegen die auth-datacorruptie.
+    interface AuthUserRow {
+      id: string
+      email: string | null
+      last_sign_in_at: string | null
+      raw_user_meta_data: { test_persona_key?: string } | null
+    }
+    const { data: rows, error: listError } = await service.rpc('admin_lookup_users_by_emails', {
+      p_emails: TEST_EMAILS,
+    })
 
     if (listError) {
-      return NextResponse.json({ error: listError.message }, { status: 500 })
+      console.error('[test-users] lookup failed:', listError)
+      return NextResponse.json(
+        { error: 'Testgebruikers ophalen mislukt door een serverfout.' },
+        { status: 500 },
+      )
     }
 
-    const testUsers = (users ?? [])
-      .filter((u) => TEST_EMAILS.includes(u.email ?? ''))
+    const testUsers = ((rows as AuthUserRow[] | null) ?? [])
       .map((u) => {
-        const personaKey = u.user_metadata?.test_persona_key as string | undefined
+        const personaKey = u.raw_user_meta_data?.test_persona_key
         const persona = personaKey ? PERSONAS[personaKey as PersonaKey] : null
         return {
           id: u.id,

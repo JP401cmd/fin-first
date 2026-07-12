@@ -1,5 +1,5 @@
 /**
- * Unit-tests voor `linkOnboardingMortgages` — de twee-fasen koppeling van een
+ * Unit-tests voor `linkOnboardingAssetDebtPairs` — de twee-fasen koppeling van een
  * eigen woning aan haar hypotheek tijdens onboarding.
  *
  * Kernbewijs (de échte deliverable van de hypotheek-vervolgvraag-kaart):
@@ -10,7 +10,7 @@
  *   - geen koppeling zonder ref / verkeerd type.
  */
 import { describe, it, expect } from 'vitest'
-import { linkOnboardingMortgages } from './route'
+import { linkOnboardingAssetDebtPairs } from './route'
 import type { AssetQuickInput, DebtQuickInput } from '@/lib/quick-add/types'
 
 type AssetRow = { id: string; sort_order: number; asset_type: string }
@@ -69,8 +69,34 @@ function mortgage(ref: string | null, overrides: Partial<DebtQuickInput> = {}): 
     ...overrides,
   }
 }
+function bv(ref: string, overrides: Partial<AssetQuickInput> = {}): AssetQuickInput {
+  return { asset_type: 'deelneming', name: 'Eigen BV', current_value: 100_000, client_ref: ref, ...overrides }
+}
+function dgaDebt(ref: string | null, overrides: Partial<DebtQuickInput> = {}): DebtQuickInput {
+  return {
+    debt_type: 'dga_schuld',
+    name: 'RC-schuld aan BV',
+    current_balance: 40_000,
+    linked_asset_id: null,
+    linked_client_ref: ref,
+    ...overrides,
+  }
+}
+function vehicle(ref: string, overrides: Partial<AssetQuickInput> = {}): AssetQuickInput {
+  return { asset_type: 'vehicle', name: 'Auto', current_value: 20_000, client_ref: ref, ...overrides }
+}
+function carLoan(ref: string | null, overrides: Partial<DebtQuickInput> = {}): DebtQuickInput {
+  return {
+    debt_type: 'car_loan',
+    name: 'Autolening',
+    current_balance: 12_000,
+    linked_asset_id: null,
+    linked_client_ref: ref,
+    ...overrides,
+  }
+}
 
-describe('linkOnboardingMortgages', () => {
+describe('linkOnboardingAssetDebtPairs', () => {
   it('koppelt een huis aan zijn hypotheek via linked_asset_id (= vers huis-id)', async () => {
     const updates: UpdateCall[] = []
     const supabase = makeSupabase(
@@ -78,7 +104,7 @@ describe('linkOnboardingMortgages', () => {
       [{ id: 'mort-1', sort_order: 0, debt_type: 'mortgage' }],
       updates,
     )
-    await linkOnboardingMortgages(supabase as never, 'user-1', [house('r1')], [mortgage('r1')])
+    await linkOnboardingAssetDebtPairs(supabase as never, 'user-1', [house('r1')], [mortgage('r1')])
 
     expect(updates).toHaveLength(1)
     expect(updates[0]).toEqual({
@@ -95,7 +121,7 @@ describe('linkOnboardingMortgages', () => {
       [{ id: 'mort-9', sort_order: 0, debt_type: 'mortgage' }],
       updates,
     )
-    await linkOnboardingMortgages(supabase as never, 'owner-42', [house('x')], [mortgage('x')])
+    await linkOnboardingAssetDebtPairs(supabase as never, 'owner-42', [house('x')], [mortgage('x')])
     expect(updates[0].user_id).toBe('owner-42')
   })
 
@@ -106,7 +132,7 @@ describe('linkOnboardingMortgages', () => {
       [{ id: 'mort-1', sort_order: 0, debt_type: 'mortgage' }],
       updates,
     )
-    await linkOnboardingMortgages(supabase as never, 'user-1', [house('r1')], [mortgage(null)])
+    await linkOnboardingAssetDebtPairs(supabase as never, 'user-1', [house('r1')], [mortgage(null)])
     expect(updates).toHaveLength(0)
   })
 
@@ -117,7 +143,7 @@ describe('linkOnboardingMortgages', () => {
       [{ id: 'loan-1', sort_order: 0, debt_type: 'personal_loan' }],
       updates,
     )
-    await linkOnboardingMortgages(
+    await linkOnboardingAssetDebtPairs(
       supabase as never,
       'user-1',
       [house('r1')],
@@ -148,9 +174,70 @@ describe('linkOnboardingMortgages', () => {
       ],
       updates,
     )
-    await linkOnboardingMortgages(supabase as never, 'user-1', assets, debts)
+    await linkOnboardingAssetDebtPairs(supabase as never, 'user-1', assets, debts)
     expect(updates).toHaveLength(1)
     expect(updates[0]).toEqual({ linked_asset_id: 'house-1', id: 'mort-1', user_id: 'user-1' })
+  })
+
+  // Regressie voor de gemelde bug: vroeger koppelde deze stap ALLEEN mortgage,
+  // waardoor een tijdens onboarding gekoppelde RC-aan-BV / autolening als LOSSE
+  // schuld (linked_asset_id = null) achterbleef.
+  it('koppelt een DGA-schuld aan de eigen BV (deelneming)', async () => {
+    const updates: UpdateCall[] = []
+    const supabase = makeSupabase(
+      [{ id: 'bv-1', sort_order: 0, asset_type: 'deelneming' }],
+      [{ id: 'dga-1', sort_order: 0, debt_type: 'dga_schuld' }],
+      updates,
+    )
+    await linkOnboardingAssetDebtPairs(supabase as never, 'user-1', [bv('r1')], [dgaDebt('r1')])
+    expect(updates).toEqual([{ linked_asset_id: 'bv-1', id: 'dga-1', user_id: 'user-1' }])
+  })
+
+  it('koppelt een autolening aan het voertuig', async () => {
+    const updates: UpdateCall[] = []
+    const supabase = makeSupabase(
+      [{ id: 'car-1', sort_order: 0, asset_type: 'vehicle' }],
+      [{ id: 'loan-1', sort_order: 0, debt_type: 'car_loan' }],
+      updates,
+    )
+    await linkOnboardingAssetDebtPairs(supabase as never, 'user-1', [vehicle('r1')], [carLoan('r1')])
+    expect(updates).toEqual([{ linked_asset_id: 'car-1', id: 'loan-1', user_id: 'user-1' }])
+  })
+
+  it('koppelt een verkeerd paar niet (DGA-schuld met huis-ref)', async () => {
+    const updates: UpdateCall[] = []
+    const supabase = makeSupabase(
+      [{ id: 'house-1', sort_order: 0, asset_type: 'eigen_huis' }],
+      [{ id: 'dga-1', sort_order: 0, debt_type: 'dga_schuld' }],
+      updates,
+    )
+    await linkOnboardingAssetDebtPairs(supabase as never, 'user-1', [house('r1')], [dgaDebt('r1')])
+    expect(updates).toHaveLength(0)
+  })
+
+  it('koppelt gemengde paren in één run (huis+hypotheek, BV+RC, auto+lening)', async () => {
+    const updates: UpdateCall[] = []
+    const assets: AssetQuickInput[] = [house('h'), bv('b'), vehicle('v')]
+    const debts: DebtQuickInput[] = [mortgage('h'), dgaDebt('b'), carLoan('v')]
+    const supabase = makeSupabase(
+      [
+        { id: 'house-1', sort_order: 0, asset_type: 'eigen_huis' },
+        { id: 'bv-1', sort_order: 1, asset_type: 'deelneming' },
+        { id: 'car-1', sort_order: 2, asset_type: 'vehicle' },
+      ],
+      [
+        { id: 'mort-1', sort_order: 0, debt_type: 'mortgage' },
+        { id: 'dga-1', sort_order: 1, debt_type: 'dga_schuld' },
+        { id: 'loan-1', sort_order: 2, debt_type: 'car_loan' },
+      ],
+      updates,
+    )
+    await linkOnboardingAssetDebtPairs(supabase as never, 'user-1', assets, debts)
+    expect(updates).toEqual([
+      { linked_asset_id: 'house-1', id: 'mort-1', user_id: 'user-1' },
+      { linked_asset_id: 'bv-1', id: 'dga-1', user_id: 'user-1' },
+      { linked_asset_id: 'car-1', id: 'loan-1', user_id: 'user-1' },
+    ])
   })
 
   it('is idempotent — twee runs zetten exact dezelfde koppeling', async () => {
@@ -161,7 +248,7 @@ describe('linkOnboardingMortgages', () => {
         [{ id: 'mort-1', sort_order: 0, debt_type: 'mortgage' }],
         updates,
       )
-      await linkOnboardingMortgages(supabase as never, 'user-1', [house('r1')], [mortgage('r1')])
+      await linkOnboardingAssetDebtPairs(supabase as never, 'user-1', [house('r1')], [mortgage('r1')])
       return updates
     }
     expect(await run()).toEqual(await run())

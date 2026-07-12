@@ -7,7 +7,7 @@
  */
 
 import type { AssetType } from '@/lib/asset-data'
-import type { DebtType } from '@/lib/debt-data'
+import type { DebtType, RepaymentType } from '@/lib/debt-data'
 
 export type QuickAddIntent = 'asset' | 'debt'
 
@@ -22,6 +22,15 @@ export interface AssetQuickInput {
   name: string
   current_value: number
   field3?: string | number | null
+  /**
+   * Verwacht jaarrendement / rente (%) — alleen door de wizard uitgevraagd voor
+   * spaarrekeningen (`asset_type='savings'`), naast het bank/instelling-veld
+   * (`field3`). Vult `assets.expected_return`; overschrijft de TYPICAL_RETURNS-
+   * default (savings = 2,5%). `undefined`/`null` ⇒ `buildAssetDraft` valt terug
+   * op die default. Andere asset-types laten dit leeg (hun rendement volgt uit
+   * TYPICAL_RETURNS of, bij vordering, uit `field3`).
+   */
+  expected_return?: number | null
   /**
    * Onboarding-only koppel-token. Tijdens onboarding heeft een asset nog geen
    * DB-id, dus een gekoppelde schuld (bv. hypotheek bij een huis) verwijst via
@@ -44,6 +53,21 @@ export interface DebtQuickInput {
   current_balance: number
   field3?: number | string | null
   linked_asset_id?: string | null
+  /**
+   * Aflossingsvorm — alleen door de wizard uitgevraagd voor hypotheken
+   * (`debt_type='mortgage'`). Vult de bestaande `debts.repayment_type`-kolom;
+   * bepaalt de aflossingsprognose én (samen met het type) de box 1-
+   * aftrekbaarheid. `undefined`/`null` ⇒ `buildDebtDraft` valt terug op
+   * `DEBT_DEFAULT_REPAYMENT_TYPE`. Andere schuldtypes laten dit leeg.
+   */
+  repayment_type?: RepaymentType | null
+  /**
+   * Ingangsdatum (yyyy-mm-dd) — alleen uitgevraagd voor hypotheken, zodat een
+   * al lopende hypotheek niet als "gestart vandaag" wordt vastgelegd. Vult de
+   * bestaande `debts.start_date`-kolom en bepaalt daarmee `end_date`.
+   * `undefined`/`null` ⇒ `buildDebtDraft` valt terug op vandaag.
+   */
+  start_date?: string | null
   /**
    * Onboarding-only koppel-token dat matcht met `AssetQuickInput.client_ref`
    * van de bijbehorende asset. Wordt door de onboarding-server na asset-insert

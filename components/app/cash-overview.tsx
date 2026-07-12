@@ -21,6 +21,7 @@ import { Kicker } from '@/components/editorial'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { AssetPane } from '@/components/app/core/assets/asset-pane'
 import { ValuationModal } from '@/components/core/assets-client'
+import { QuickAddWizard } from '@/components/app/quick-add-wizard/quick-add-wizard'
 import { VermogenAssetCard } from '@/components/core/vermogen-asset-card'
 import { loadPerspectiveData } from '@/lib/household/perspective-loader'
 import { loadEntitySparklines } from '@/lib/load-entity-sparklines'
@@ -93,6 +94,10 @@ export function CashOverview({
   const [cashSparklines, setCashSparklines] = useState<Record<string, number[]>>({})
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null)
   const [revalueAsset, setRevalueAsset] = useState<Asset | null>(null)
+  // Handmatig een betaalrekening toevoegen vanaf de cashflow-pagina — opent de
+  // bestaande QuickAddWizard voor-geselecteerd op asset_type='cash', zodat de
+  // rekening als cash-bezitting wordt aangemaakt (zelfde pad als /core/assets).
+  const [showAddAccount, setShowAddAccount] = useState(false)
   const [budgets, setBudgets] = useState<BudgetRow[]>([])
   const [transactions, setTransactions] = useState<TxAgg[]>([])
   const [loading, setLoading] = useState(true)
@@ -1125,6 +1130,14 @@ export function CashOverview({
         <HideInSimple>
           <section className="mt-5 sm:mt-8">
             <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowAddAccount(true)}
+                className="inline-flex items-center gap-2 rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+              >
+                <Wallet className="h-4 w-4" />
+                Betaalrekening toevoegen
+              </button>
               <Link
                 href="/core/cash/import"
                 className="inline-flex items-center gap-2 rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
@@ -1281,6 +1294,14 @@ export function CashOverview({
       )}
 
       {/* === Edit-pane voor handmatige cash-assets (brede modus) === */}
+      <QuickAddWizard
+        open={showAddAccount}
+        onClose={() => setShowAddAccount(false)}
+        initialIntent="asset"
+        initialAssetType="cash"
+        onSaved={() => { void loadAllCashRekeningen() }}
+      />
+
       {editingAsset && (
         <AssetPane
           asset={editingAsset}

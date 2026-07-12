@@ -17,7 +17,7 @@ import { describe, expect, it } from 'vitest'
 import type { Asset, AssetType } from '@/lib/asset-data'
 import type { Debt, DebtType } from '@/lib/debt-data'
 import type { UnifiedProjectionResult } from '@/lib/unified-projection'
-import { solveFire } from './solver'
+import { solveFire, evaluateFireAt } from './solver'
 import type { KernelProjection } from './engine'
 import { buildKernelInput } from './input-from-fixture'
 import { listFixtures, loadFixture } from './oracle/fixture-load'
@@ -257,12 +257,19 @@ function assertRowContinuityAndSums(solve: ReturnType<typeof solveFire>, ctx: Ke
     }
 
     // ── Veld 2: bruto-inkomen-splitsing (recompute-asserties) ───────────────────
+    // Mirror de bridge-post-FIRE-salaris-gate: vanaf de FIRE-maand valt het user-
+    // basissalaris (= `cf.basissalaris`, de single-source D-subterm; phantom ná FIRE)
+    // weg uit de salaris-bron; partnerbijdrage PT!K + werk-delta blijven in
+    // `cf.inkomen` behouden. Bewust GEEN eigen herberekening van de subterm: de
+    // mirror leest hetzelfde `cf.basissalaris` als de bridge, zodat een toekomstige
+    // cf-indexeringswijziging deze test rood maakt bij bridge-drift (i.p.v. dat twee
+    // parallelle recomputes elkaar bevestigen).
     let salaris = 0
     let gebBaten = 0
     for (const m of months) {
       const cf = proj.cf[m]
       if (cf !== undefined && !cf.beyondHorizon) {
-        salaris += cf.inkomen
+        salaris += cf.inkomen - (m >= fireMonth ? cf.basissalaris : 0)
         gebBaten += cf.gebeurtenisBaten
       }
     }
@@ -482,6 +489,78 @@ describe('bridge — kernelHousingSale (verkoopmoment eigen woning)', () => {
     expect(result.kernelHousingSale).toBeNull()
   })
 })
+
+// ── Geforceerde stop via evaluateFireAt BUITEN runForcedStopPath ─────────────
+//
+// Variantenmatrix-item (bug-fix stap 6): `horizon-client.tsx`'s AOW-stop-sim inlinet
+// exact hetzelfde geforceerde-stop-recept (deplete-override + `evaluateFireAt` + bridge)
+// als `runForcedStopPath` (lib/horizon/scenario-presets.ts), maar roept die gedeelde
+// helper NIET aan — dit dekt dat de salaris-gate-fix ook op déze losstaande call-site
+// (rechtstreeks via de solver, geen bisectie) correct toepast.
+
+describe('bridge — geforceerde stop via evaluateFireAt buiten runForcedStopPath (AOW-stop-sim-recept)', () => {
+  it('user-basissalaris = 0 in rijen ruim ná de geforceerde stopmaand', () => {
+    const STOP_AGE = 55 // ruim binnen de horizon, en ruim voor leeftijd 100
+    const input = buildKernelInputFromApp({
+      profile: synthProfile({ fire_end_strategy: 'deplete', fire_end_age: 90 }),
+      assets: SYNTH_ASSETS,
+      debts: SYNTH_DEBTS,
+    })
+    const solve = evaluateFireAt(input, STOP_AGE)
+    const { assetSlotMeta, debtSlotMeta } = buildKernelSlotMeta(SYNTH_ASSETS, SYNTH_DEBTS, SYNTH_EIGEN_HUIS)
+    const ctx: KernelBridgeContext = { input, yearlyExpenses: 2600 * 12, assetSlotMeta, debtSlotMeta }
+    const result = kernelToUnifiedResult(solve, ctx)
+
+    const fireMonth = solve.projection.summary.fireMonth
+    expect(fireMonth).toBeGreaterThan(0)
+
+    // Rijen een vol jaar ná de geforceerde stopmaand horen geen user-basissalaris meer te
+    // dragen — zelfde recept als runForcedStopPath, hier via een directe evaluateFireAt-
+    // aanroep zoals horizon-client.tsx's AOW-stop-sim 'm gebruikt (buiten de gedeelde helper).
+    const postStopRows = result.rows.filter((r) => r.age >= Math.ceil(STOP_AGE) + 1)
+    expect(postStopRows.length).toBeGreaterThan(0)
+    for (const row of postStopRows) {
+      expect(row.grossIncomeBySource?.salaris ?? 0).toBeCloseTo(0, 0)
+    }
+  })
+})
+
+// ── Partner-behoud ná FIRE (oracle-fixture "partner-aan"/"gezin") ────────────
+//
+// Variantenmatrix-item: de post-FIRE-salaris-gate mag ALLEEN het user-basissalaris
+// wegnemen; partnerbijdrage (PT!K, `proj.pt[m].totaal`) blijft behouden via
+// `cf.inkomen − userBasissalaris`. De synthetische SYNTH-fixture hierboven heeft geen
+// partner-blok; dit bewijst de kritische ontwerpconstraint expliciet op een ECHTE
+// partner-fixture (oracle, geen white-box-mirror-only dekking).
+
+if (hasFixtures) {
+  describe('bridge — partner-behoud ná FIRE (oracle-fixture partner-aan/gezin)', () => {
+    it('grossIncomeBySource.salaris blijft > 0 ná FIRE dankzij de partnerbijdrage', () => {
+      const files = listFixtures(FIXTURE_DIR)
+      const fx = files.map(loadFixture).find((f) => f.meta.scenario === 'partner-aan' || f.meta.scenario === 'gezin')
+      expect(fx).toBeDefined()
+      if (fx === undefined) return
+
+      const input = buildKernelInput(fx)
+      const solve = solveFire(input)
+      const ctx: KernelBridgeContext = { input, yearlyExpenses: input.inkomenUitgaven.uitgaveNaPensioenPerJaar }
+      const result = kernelToUnifiedResult(solve, ctx)
+
+      const fireMonth = solve.projection.summary.fireMonth
+      expect(fireMonth).toBeGreaterThan(0)
+
+      // Rijen ruim (≥2 jaar) ná FIRE, zodat de user-basissalaris-gate voor de hele rij
+      // actief is: de partnerbijdrage moet de salaris-bron nog altijd > 0 houden, en die
+      // wordt door coveragePctForRow (coverage-strip.ts) meegeteld als vaste dekking.
+      const postFireAge = Math.round(input.startLeeftijd) + fireMonth / 12 + 2
+      const postFireRows = result.rows.filter((r) => r.age >= postFireAge)
+      expect(postFireRows.length).toBeGreaterThan(0)
+      for (const row of postFireRows) {
+        expect(row.grossIncomeBySource?.salaris ?? 0).toBeGreaterThan(0)
+      }
+    })
+  })
+}
 
 // ── Fixture-route (skip tot de extractor fixtures schreef) ────────────────────
 

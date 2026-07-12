@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { syncBudgetingActive } from '@/lib/budgeting-active'
+import { syncBankAccountCompanion } from '@/lib/bank-account-companion'
 
 /**
  * POST `/api/assets/toggle-budget`
@@ -39,12 +41,19 @@ export async function POST(request: Request) {
     .update({ has_budget_tracking: body.enabled })
     .eq('id', body.id)
     .eq('user_id', user.id)
-    .select('id, has_budget_tracking, name')
+    .select('id, has_budget_tracking, name, iban, institution, subtype, ownership, household_id, current_value')
     .single()
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  return NextResponse.json({ ok: true, asset: data })
+  // Companion bank_accounts-rij + globale gate meesyncen via dezelfde gedeelde
+  // helpers als de andere schrijfpaden (bewerkscherm, setupwizard), zodat de
+  // rekening zichtbaar is op /core/cash/import en de twee vlaggen niet
+  // uiteenlopen. Best-effort: de toggle zelf is al doorgevoerd.
+  await syncBankAccountCompanion(supabase, user.id, data, body.enabled).catch(() => undefined)
+  await syncBudgetingActive(supabase, user.id).catch(() => undefined)
+
+  return NextResponse.json({ ok: true, asset: { id: data.id, has_budget_tracking: data.has_budget_tracking, name: data.name } })
 }

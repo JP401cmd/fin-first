@@ -273,6 +273,9 @@ export function QuickAddWizard({
         name: draft.name.trim(),
         current_value: draft.current_value,
         field3: draft.field3 ?? null,
+        // Savings-only rente-veld; leeg voor andere types (buildAssetDraft
+        // valt dan terug op de TYPICAL_RETURNS-default).
+        expected_return: draft.expected_return ?? null,
       }
 
       // Beide modi tonen de gekoppelde-schuld-prompt voor asset-types met een
@@ -335,6 +338,10 @@ export function QuickAddWizard({
         name: draft.name.trim(),
         current_balance: draft.current_balance,
         field3: draft.field3 ?? null,
+        // Hypotheek-only extra's; leeg voor andere types (buildDebtDraft
+        // valt dan terug op de type-defaults).
+        repayment_type: draft.repayment_type ?? null,
+        start_date: draft.start_date ?? null,
         linked_asset_id: linkedAssetId ?? draft.linked_asset_id ?? null,
       }
       void submitQuickAdd({ kind: 'debt', debt: complete })
@@ -414,6 +421,10 @@ export function QuickAddWizard({
           name: debtDraft.name.trim(),
           current_balance: debtDraft.current_balance,
           field3: debtDraft.field3 ?? null,
+          // Hypotheek-only extra's — een gekoppelde hypotheek (bv. bij een
+          // eigen woning) krijgt dezelfde aflossingsvorm/ingangsdatum-velden.
+          repayment_type: debtDraft.repayment_type ?? null,
+          start_date: debtDraft.start_date ?? null,
         },
       })
     }

@@ -6,6 +6,7 @@ import { getModel, AIConfigError } from '@/lib/ai/config'
 import { checkTierGate } from '@/lib/require-tier'
 import { detectRecurringTransactions, CATEGORY_LABELS } from '@/lib/recurring-detection'
 import { VASTE_KOSTEN_ANALYSE_PROMPT } from '@/lib/ai/dna/wil'
+import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
 
 /** Maximum number of candidates to send to the AI model to avoid token waste. */
 const MAX_AI_CANDIDATES = 50
@@ -129,10 +130,22 @@ export async function POST() {
       return NextResponse.json({ error: 'AI model kon niet worden geladen.' }, { status: 500 })
     }
 
+    // Sanitize counterparty/description names before they reach the AI provider
+    // (chat/categorize contract): own name + generic PII stripped, merchant
+    // names kept (needed for classification; business identifier, not PII).
+    const { data: sanitizeProfile } = await supabase
+      .from('profiles')
+      .select('full_name, date_of_birth')
+      .eq('id', user.id)
+      .single()
+    const sanitizeOpts: SanitizeOptions = {}
+    if (sanitizeProfile?.full_name) sanitizeOpts.names = [sanitizeProfile.full_name]
+    if (sanitizeProfile?.date_of_birth) sanitizeOpts.dateOfBirth = sanitizeProfile.date_of_birth
+
     // Build the pattern list with auto-detected category as context for the AI
     const patternList = cappedCandidates
       .map((d, i) => {
-        const name = d.counterpartyName || d.commonDescription
+        const name = sanitizeForAI(d.counterpartyName || d.commonDescription, sanitizeOpts)
         const categoryLabel = CATEGORY_LABELS[d.suggestedCategory]
         return `${i}: ${name} | ${d.frequency} | €${Math.abs(d.averageAmount).toFixed(2)}/keer | ${d.occurrences}x gezien | auto-categorie: ${categoryLabel}`
       })

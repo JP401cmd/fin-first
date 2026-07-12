@@ -76,3 +76,64 @@ export function stripSensitiveData(text: string): StripResult {
 
   return { clean, strippedCount }
 }
+
+// ── Household-name strip — surgical name removal for the aangifte path ──
+//
+// The aangifte path deliberately does NOT run the full `sanitizeForAI`
+// filter (its POSTCODE/STREET heuristics would clobber legitimate
+// aangifte headers — see the file header). But the fiscal-partner name,
+// the applicant name and their income/asset lines DO identify a person,
+// so before the (already-BSN-stripped) text crosses to the AI provider
+// we replace the known household names with a neutral `[NAAM]` marker.
+//
+// Only the names we KNOW (from `profiles.full_name` of the user + their
+// household partner) are stripped — we never guess at arbitrary
+// capitalised words, so aangifte terminology stays intact. Full name is
+// replaced first, then individual parts (≥3 chars, minus Dutch
+// tussenvoegsels) so "J. de Vries" and "Vries" both disappear.
+
+/** Dutch tussenvoegsels that are too generic to strip as a name part. */
+const DUTCH_NAME_PARTICLES = new Set([
+  'de', 'het', 'van', 'der', 'den', 'ter', 'ten', 'te', 'op', 'in', 'aan',
+])
+
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/**
+ * Replace every occurrence of the supplied household names (and their
+ * significant parts) with `[NAAM]`. Returns the cleaned text plus a
+ * count of replacements. Pure function — safe to call on the aangifte
+ * text after `stripSensitiveData`.
+ *
+ * @param text  Free-form text (typically already BSN-stripped).
+ * @param names Known household full names, e.g. ['Jan de Vries', 'Maria de Vries'].
+ */
+export function stripHouseholdNames(text: string, names: string[]): StripResult {
+  if (!text) return { clean: '', strippedCount: 0 }
+
+  const cleanNames = [...new Set(names.filter((n): n is string => typeof n === 'string' && n.trim().length >= 3))]
+    .sort((a, b) => b.length - a.length)
+  if (cleanNames.length === 0) return { clean: text, strippedCount: 0 }
+
+  let strippedCount = 0
+  let result = text
+  for (const name of cleanNames) {
+    result = result.replace(new RegExp(escapeRegex(name.trim()), 'gi'), () => {
+      strippedCount += 1
+      return '[NAAM]'
+    })
+    const parts = name
+      .split(/\s+/)
+      .filter((p) => p.length >= 3 && !DUTCH_NAME_PARTICLES.has(p.toLowerCase()))
+    for (const part of parts) {
+      result = result.replace(new RegExp(`\\b${escapeRegex(part)}\\b`, 'gi'), () => {
+        strippedCount += 1
+        return '[NAAM]'
+      })
+    }
+  }
+
+  return { clean: result, strippedCount }
+}

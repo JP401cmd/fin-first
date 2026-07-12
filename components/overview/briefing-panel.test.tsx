@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import type { ReactElement } from 'react'
+import { FeatureAccessProvider } from '@/components/app/feature-access-provider'
+import type { ActiveSubscriptions } from '@/lib/feature-registry'
 import { BriefingPanel, MAX_BRIEFING_ENTRIES, type BriefingEntry } from './briefing-panel'
 
 /**
@@ -13,6 +16,30 @@ function makeEntry(
   overrides: Partial<BriefingEntry> = {},
 ): BriefingEntry {
   return { id: category + ':' + text.slice(0, 5), category, text, ...overrides }
+}
+
+/**
+ * Render binnen een FeatureAccessProvider zodat useModuleAccess() de opgegeven
+ * abonnementen ziet. De AI-redactie-ververs zit achter het 'ai'-abonnement;
+ * zonder provider valt subscriptions terug op [] (= geen AI).
+ */
+function renderWithSubs(ui: ReactElement, subscriptions: ActiveSubscriptions) {
+  return render(
+    <FeatureAccessProvider
+      data={{
+        features: {},
+        phase: 'recovery',
+        level: 0,
+        subscriptions,
+        netWorth: 0,
+        monthlyExpenses: 0,
+        freedomPct: 0,
+        tier: subscriptions.includes('ai') ? 'ai' : 'gratis',
+      }}
+    >
+      {ui}
+    </FeatureAccessProvider>,
+  )
 }
 
 describe('BriefingPanel — basis-render', () => {
@@ -230,18 +257,43 @@ describe('BriefingPanel — wekelijkse-briefing header + ververs', () => {
     expect(screen.getByRole('button', { name: /deel je vrijheidsweek/i })).toBeTruthy()
   })
 
-  it('toont een actieve Ververs-knop wanneer canRefresh true is', () => {
-    render(
+  it('toont een actieve Ververs-knop wanneer canRefresh true is (AI-abonnee)', () => {
+    renderWithSubs(
       <BriefingPanel entries={[makeEntry('observation', 'X')]} canRefresh />,
+      ['ai'],
     )
-    const btn = screen.getByRole('button', { name: /ververs/i })
+    const btn = screen.getByRole('button', { name: /ververs je briefing/i })
     expect(btn).toBeTruthy()
     expect((btn as HTMLButtonElement).disabled).toBe(false)
   })
 
-  it('toont geen Ververs-knop wanneer canRefresh false en nog niet gebruikt', () => {
-    render(<BriefingPanel entries={[makeEntry('observation', 'X')]} />)
+  it('toont geen Ververs-knop wanneer canRefresh false en nog niet gebruikt (AI-abonnee)', () => {
+    renderWithSubs(<BriefingPanel entries={[makeEntry('observation', 'X')]} />, ['ai'])
     expect(screen.queryByRole('button', { name: /ververs/i })).toBeNull()
+  })
+})
+
+describe('BriefingPanel — AI-abonnementspoort op de ververs', () => {
+  const entry = [makeEntry('observation', 'Vermogen +1.2%')]
+
+  it('non-AI-gebruiker: Ververs wordt een upsell-affordance (link → /mijn/account), geen POST-knop', () => {
+    const { container } = renderWithSubs(
+      <BriefingPanel entries={entry} canRefresh />,
+      [],
+    )
+    // Geen ververs-button (POST) — wel een upsell-link naar het account
+    expect(screen.queryByRole('button', { name: /ververs je briefing/i })).toBeNull()
+    const link = screen.getByRole('link', { name: /ververs met will/i })
+    expect(link).toBeTruthy()
+    expect(link.getAttribute('href')).toBe('/mijn/account')
+    // De deterministische briefing eronder blijft gewoon zichtbaar (gratis)
+    expect(container.textContent).toContain('Vermogen +1.2%')
+  })
+
+  it('AI-abonnee: geen upsell-link, wél de echte Ververs-knop', () => {
+    renderWithSubs(<BriefingPanel entries={entry} canRefresh />, ['ai'])
+    expect(screen.queryByRole('link', { name: /ververs met will/i })).toBeNull()
+    expect(screen.getByRole('button', { name: /ververs je briefing/i })).toBeTruthy()
   })
 })
 

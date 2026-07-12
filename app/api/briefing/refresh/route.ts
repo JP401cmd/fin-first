@@ -13,6 +13,7 @@ import {
   redactBriefing,
   applyRedactie,
 } from '@/lib/briefing/redactie'
+import { checkTierGate } from '@/lib/require-tier'
 
 /**
  * POST /api/briefing/refresh
@@ -35,6 +36,16 @@ export async function POST() {
   } = await supabase.auth.getUser()
   if (!user) {
     return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+  }
+
+  // AI-abonnementspoort: de ververs herschrijft de briefjes in Will's stem via
+  // een model-call (getModel(supabase, 'briefing')) — een betaalde AI-functie.
+  // Afdwingen vóór het dure werk zodat een gebruiker zonder 'ai' de model-call
+  // niet 1×/dag kan afvuren. De deterministische briefing op /overzicht blijft
+  // gratis en ongemoeid (dit pad is enkel de handmatige AI-redactie-ververs).
+  const gate = await checkTierGate(supabase, user.id, 'ai')
+  if (gate) {
+    return NextResponse.json({ error: gate.error }, { status: 403 })
   }
 
   try {

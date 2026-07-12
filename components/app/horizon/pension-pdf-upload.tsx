@@ -133,9 +133,13 @@ export function PensionPdfUpload({
     pendingFileRef.current = f
     onFileSelected?.(f)
 
-    // Upload to parse API
+    // Upload to parse API. The PDF is sent to an AI provider for one-time
+    // extraction (documented in ADR 0035). By choosing to upload the PDF the
+    // user gives explicit, logged AVG-consent; the token below records it
+    // server-side. The JSON-route (above) never sends data to the AI provider.
     const formData = new FormData()
     formData.append('file', f)
+    formData.append('consent', 'pension_pdf_ai_v1')
     fetch('/api/pension/parse', { method: 'POST', body: formData })
       .then(async res => {
         if (!res.ok) {
@@ -389,6 +393,11 @@ export function PensionPdfUpload({
           </div>
         </div>
       </div>
+      {/* AVG-notice: a PDF is processed once by an AI service; JSON stays local. */}
+      <p className="mt-1.5 text-[11px] leading-snug text-[var(--ink-4)]">
+        Een PDF wordt eenmalig door een AI-dienst gelezen om de bedragen over te nemen en niet bewaard.
+        Liever niet? Gebruik de JSON-export van mijnpensioen.nl — die verwerken we volledig op je eigen apparaat.
+      </p>
       {/* Inline error (no file selected yet) */}
       {error && !file && (
         <p className="mt-1.5 flex items-center gap-1 text-xs text-red-600">

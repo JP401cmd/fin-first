@@ -203,6 +203,24 @@ export const BenchmarkComparisonChart = memo(function BenchmarkComparisonChart({
     setTooltipData({ x, y: padding.top, date, values })
   }
 
+  // Memoize the SVG line paths on the data inputs. Without this, every
+  // mouse-move (which calls setTooltipData → re-render) rebuilt each benchmark
+  // path string + its benchmarkByDate record and the portfolio path. Placed
+  // after the dimension consts + buildPath so getX/getY are initialized when
+  // the factory runs; aligned by index with comparison.benchmarks so the render
+  // map is a plain lookup. Called unconditionally before any early return.
+  const linePaths = useMemo(() => {
+    if (!chartData || !comparison) return null
+    const benchmarkPaths = comparison.benchmarks.map((b) => {
+      const benchmarkByDate: Record<string, number> = {}
+      for (const p of b.dataPoints) benchmarkByDate[p.date] = p.value
+      return { id: b.id, path: buildPath(chartData.dates, benchmarkByDate) }
+    })
+    const portfolioPath = buildPath(chartData.dates, chartData.portfolioByDate)
+    return { benchmarkPaths, portfolioPath }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- buildPath/getX/getY are pure w.r.t. these inputs (mirrors yTicks/xLabels); keyed on the data
+  }, [chartData, comparison?.benchmarks])
+
   if (loading) {
     return (
       <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6" data-testid="benchmark-comparison-section">
@@ -219,7 +237,7 @@ export const BenchmarkComparisonChart = memo(function BenchmarkComparisonChart({
     )
   }
 
-  if (!comparison || !chartData) {
+  if (!comparison || !chartData || !linePaths) {
     return (
       <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6" data-testid="benchmark-comparison-section">
         <div className="flex items-center gap-2 mb-4">
@@ -358,10 +376,8 @@ export const BenchmarkComparisonChart = memo(function BenchmarkComparisonChart({
           })}
 
           {/* Benchmark lines */}
-          {comparison.benchmarks.map((b) => {
-            const benchmarkByDate: Record<string, number> = {}
-            for (const p of b.dataPoints) benchmarkByDate[p.date] = p.value
-            const path = buildPath(chartData.dates, benchmarkByDate)
+          {comparison.benchmarks.map((b, bi) => {
+            const path = linePaths.benchmarkPaths[bi].path
             if (!path) return null
             return (
               <path
@@ -382,22 +398,18 @@ export const BenchmarkComparisonChart = memo(function BenchmarkComparisonChart({
           })}
 
           {/* Portfolio line (solid, on top) */}
-          {(() => {
-            const path = buildPath(chartData.dates, chartData.portfolioByDate)
-            if (!path) return null
-            return (
-              <path
-                d={path}
-                fill="none"
-                stroke={PORTFOLIO_COLOR}
-                strokeWidth={2.5}
-                opacity={hoveredBenchmark ? 0.5 : 1}
-                className="transition-opacity"
-                pathLength={1}
-                style={{ strokeDashoffset: hasEntered ? undefined : 1, animation: lineAnim }}
-              />
-            )
-          })()}
+          {linePaths.portfolioPath && (
+            <path
+              d={linePaths.portfolioPath}
+              fill="none"
+              stroke={PORTFOLIO_COLOR}
+              strokeWidth={2.5}
+              opacity={hoveredBenchmark ? 0.5 : 1}
+              className="transition-opacity"
+              pathLength={1}
+              style={{ strokeDashoffset: hasEntered ? undefined : 1, animation: lineAnim }}
+            />
+          )}
 
           {/* Tooltip vertical line */}
           {tooltipData && (

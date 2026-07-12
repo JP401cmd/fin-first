@@ -21,6 +21,8 @@ import { generateObject } from 'ai'
 import { z } from 'zod'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getModel } from '@/lib/ai/config'
+import { sanitizeForAI } from '@/lib/ai/sanitize'
+import { maskPIIInObject } from '@/lib/ai/pii-output-filter'
 import type { BriefingEntry } from '@/components/overview/briefing-panel'
 import { sanitizeAiHeadline } from './overview-briefing'
 import {
@@ -188,7 +190,12 @@ export interface RedactieResult {
 }
 
 function buildRedactiePrompt(entries: BriefingEntry[]): string {
-  const lines = entries.map((e) => `[${e.id}] (${e.category}) ${e.text}`)
+  // Sanitize each briefje's free text before it reaches the AI provider.
+  // The numbers are deterministic (engine-sourced), but a user-defined budget
+  // name in the text could carry PII (IBAN/e-mail/address). sanitizeForAI
+  // leaves amounts/percentages untouched, so the number-guard still matches
+  // the original tokens downstream.
+  const lines = entries.map((e) => `[${e.id}] (${e.category}) ${sanitizeForAI(e.text)}`)
   return (
     'Redigeer deze briefjes en schrijf de kop-zin. Geef per briefje hetzelfde id terug.\n\n' +
     `Briefjes:\n${lines.join('\n')}`
@@ -219,15 +226,19 @@ export async function redactBriefing(
       temperature: 0.6,
     })
 
+    // Output-masking (defence-in-depth): mask any IBAN/BSN the model may have
+    // echoed into the free text before it reaches the user.
+    const masked = maskPIIInObject(object)
+
     const byId = new Map(entries.map((e) => [e.id, e]))
     const texts = new Map<string, string>()
-    for (const item of object.entries) {
+    for (const item of masked.entries) {
       const original = byId.get(item.id)
       if (!original) continue
       const approved = sanitizeRedactedText(item.text, original.text)
       if (approved) texts.set(item.id, approved)
     }
-    return { headline: sanitizeAiHeadline(object.headline), texts }
+    return { headline: sanitizeAiHeadline(masked.headline), texts }
   } catch (err) {
     console.warn('[briefing/redactie] AI-redactie mislukt, deterministische teksten blijven:', err)
     return { headline: null, texts: new Map() }

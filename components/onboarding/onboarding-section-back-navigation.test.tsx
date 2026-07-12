@@ -172,7 +172,7 @@ describe('Onboarding-terugknop — tussen groepen (gelifte fase-stack)', () => {
     fireEvent.click(footerButton('Nee')) // eigen huis
     fireEvent.click(footerButton('Nee')) // beleggingen
     fireEvent.click(footerButton('Nee')) // → andere bezittingen?
-    fireEvent.click(footerButton('Nee')) // → review
+    fireEvent.click(footerButton(/Nee, ik ben klaar/)) // → review
     expect(container.textContent).toContain('Dit zijn je bezittingen')
 
     // Ga door naar Schulden (remount van de sectie-boom).

@@ -6,6 +6,7 @@ import { ActionCard } from '@/components/app/action-card'
 import { ActionForm } from '@/components/app/action-form'
 import { ActionListModal } from '@/components/app/action-list-modal'
 import { useFreedomDaysAnimation } from '@/components/app/freedom-days-animation'
+import { useToast } from '@/components/app/toast-provider'
 import type { Action, ActionStatus } from '@/lib/recommendation-data'
 import type { CancellationMetadata } from '@/lib/cancellation-types'
 import { Kicker } from '@/components/editorial'
@@ -31,6 +32,7 @@ export function ActionBoard({ initialActions, onCancellationOpen, partnerInfo, c
   const [showForm, setShowForm] = useState(false)
   const [showAll, setShowAll] = useState(false)
   const { triggerAnimation } = useFreedomDaysAnimation()
+  const { addToast } = useToast()
 
   // Allow parent to trigger showing the add form via counter prop
   useEffect(() => {
@@ -40,12 +42,21 @@ export function ActionBoard({ initialActions, onCancellationOpen, partnerInfo, c
   }, [addTrigger])
 
   async function handleAssign(actionId: string, partnerId: string | null) {
-    const res = await fetch(`/api/ai/actions/${actionId}/assign`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ partner_id: partnerId }),
-    })
-    if (!res.ok) return
+    let res: Response
+    try {
+      res = await fetch(`/api/ai/actions/${actionId}/assign`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ partner_id: partnerId }),
+      })
+    } catch {
+      addToast({ type: 'error', title: 'Toewijzen mislukt', message: 'De actie toewijzen is niet gelukt — probeer het opnieuw.' })
+      return
+    }
+    if (!res.ok) {
+      addToast({ type: 'error', title: 'Toewijzen mislukt', message: 'De actie toewijzen is niet gelukt — probeer het opnieuw.' })
+      return
+    }
     const data = await res.json()
     setActions((prev) =>
       prev.map((a) =>
@@ -96,12 +107,14 @@ export function ActionBoard({ initialActions, onCancellationOpen, partnerInfo, c
       })
     } catch (err) {
       console.error('[ActionBoard] Fetch failed:', err)
+      addToast({ type: 'error', title: 'Bijwerken mislukt', message: 'De actie bijwerken is niet gelukt — probeer het opnieuw.' })
       return
     }
 
     if (!res.ok) {
       const text = await res.text().catch(() => '')
       console.error(`[ActionBoard] PATCH /api/ai/actions/${id} → ${res.status}:`, text)
+      addToast({ type: 'error', title: 'Bijwerken mislukt', message: 'De actie bijwerken is niet gelukt — probeer het opnieuw.' })
       return
     }
 
@@ -138,13 +151,22 @@ export function ActionBoard({ initialActions, onCancellationOpen, partnerInfo, c
   }
 
   async function handleUpdateAction(id: string, data: Record<string, unknown>) {
-    const res = await fetch(`/api/ai/actions/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    })
+    let res: Response
+    try {
+      res = await fetch(`/api/ai/actions/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+    } catch {
+      addToast({ type: 'error', title: 'Opslaan mislukt', message: 'De wijziging opslaan is niet gelukt — probeer het opnieuw.' })
+      return
+    }
 
-    if (!res.ok) return
+    if (!res.ok) {
+      addToast({ type: 'error', title: 'Opslaan mislukt', message: 'De wijziging opslaan is niet gelukt — probeer het opnieuw.' })
+      return
+    }
 
     const { action: updated } = await res.json()
     setActions((prev) =>
@@ -160,13 +182,22 @@ export function ActionBoard({ initialActions, onCancellationOpen, partnerInfo, c
     due_date?: string
     priority_score?: number
   }) {
-    const res = await fetch('/api/ai/actions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    })
+    let res: Response
+    try {
+      res = await fetch('/api/ai/actions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+    } catch {
+      addToast({ type: 'error', title: 'Aanmaken mislukt', message: 'De actie aanmaken is niet gelukt — probeer het opnieuw.' })
+      return
+    }
 
-    if (!res.ok) return
+    if (!res.ok) {
+      addToast({ type: 'error', title: 'Aanmaken mislukt', message: 'De actie aanmaken is niet gelukt — probeer het opnieuw.' })
+      return
+    }
 
     const { action } = await res.json()
     setActions((prev) => [{ ...action, source: 'manual', recommendation: null }, ...prev])

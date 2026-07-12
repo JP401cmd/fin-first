@@ -164,7 +164,7 @@ function TopBarUtilities({ email, role }: { email: string; role?: string }) {
           setMenuOpen(false)
           openModal()
         }}
-        aria-label="Meldingen"
+        aria-label={unreadCount > 0 ? `Meldingen, ${unreadCount > 9 ? 'meer dan 9' : unreadCount} ongelezen` : 'Meldingen'}
         className="relative flex h-9 w-9 items-center justify-center text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink-2)]"
       >
         <Bell className="h-4 w-4" aria-hidden="true" />

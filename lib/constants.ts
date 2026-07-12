@@ -37,6 +37,15 @@ export const SWR = 0.04
 /** Classic FIRE multiplier — 1 / SWR = 25× annual expenses. */
 export const CLASSIC_MULTIPLIER = 1 / SWR // = 25
 
+/**
+ * Referentie-spaarquote (%) die als "FIRE-optimaal" wordt getoond op de
+ * spaarquote-widget (benchmark-lijn + label). Puur een UI-oriëntatiepunt (bij een
+ * ~50% spaarquote halveert de opbouwtijd t.o.v. lagere quotes), GEEN afgeleide of
+ * fiscale waarde — daarom een vaste, benoemde constante i.p.v. een magic number
+ * verspreid over de widget.
+ */
+export const FIRE_SAVINGS_RATE_BENCHMARK_PCT = 50
+
 // ── Inflation ───────────────────────────────────────────────────
 
 /** Default annual inflation rate — 2% (ECB target). */

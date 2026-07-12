@@ -9,6 +9,7 @@ import { WHATIF_PROMPT } from '@/lib/ai/dna/wil'
 import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
 import { maskPIIInOutput } from '@/lib/ai/pii-output-filter'
 import { checkTierGate } from '@/lib/require-tier'
+import { checkCreditBudget, creditLimitMessage } from '@/lib/ai/credit-gate'
 
 /* AI response timeout in milliseconds (60 seconds) */
 const AI_TIMEOUT_MS = 60_000
@@ -24,6 +25,16 @@ export async function POST(req: Request) {
   const tierGate = await checkTierGate(supabase, user.id, 'ai')
   if (tierGate) {
     return new Response(JSON.stringify({ error: tierGate.error }), { status: 403, headers: { 'Content-Type': 'application/json' } })
+  }
+
+  // Per-gebruiker rate-limit: dwing het maand-creditbudget af (één gedeelde
+  // bucket over alle AI-features) vóór de dure LLM-call.
+  const creditGate = await checkCreditBudget(supabase, user.id, 'chat')
+  if (!creditGate.allowed) {
+    return new Response(JSON.stringify({ error: creditLimitMessage(creditGate) }), {
+      status: 429,
+      headers: { 'Content-Type': 'application/json', 'Retry-After': String(creditGate.retryAfterSeconds) },
+    })
   }
 
   const { messages, domain = 'wil', context: chatContext, scenarioContext } = await req.json() as {

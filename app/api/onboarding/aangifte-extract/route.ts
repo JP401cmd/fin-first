@@ -42,7 +42,8 @@ import { createClient } from '@/lib/supabase/server'
 import { recordAiUsage } from '@/lib/ai-credits'
 import { extractAangifteData } from '@/lib/aangifte/extract-aangifte-data'
 import { extractionSchema } from '@/lib/aangifte/extraction-schema'
-import { stripSensitiveData } from '@/lib/aangifte/strip-bsn'
+import { stripSensitiveData, stripHouseholdNames } from '@/lib/aangifte/strip-bsn'
+import { checkTierGate } from '@/lib/require-tier'
 
 // ── Body validation ─────────────────────────────────────────────────
 
@@ -80,6 +81,13 @@ export async function POST(req: Request) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  // AI-add-on vereist: aangifte-extractie draait op het AI-model. Spiegelt de
+  // reeds-gegate onboarding/suggest-budgets — voorheen enkel auth-check.
+  const gate = await checkTierGate(supabase, user.id, 'ai')
+  if (gate) {
+    return Response.json({ error: gate.error }, { status: 403 })
+  }
+
   let raw: unknown
   try {
     raw = await req.json()
@@ -97,13 +105,35 @@ export async function POST(req: Request) {
   // but if a client bug or a malicious caller sends raw text we cannot
   // silently let BSNs cross into the AI provider. We log the count
   // only — the cleaned text is never logged.
-  const { clean, strippedCount } = stripSensitiveData(parsed.data.text)
+  const { clean: bsnClean, strippedCount } = stripSensitiveData(parsed.data.text)
   if (strippedCount > 0) {
     // Counts-only audit log — see privacy section in the file header.
     console.warn(
       '[onboarding/aangifte-extract] Server-side BSN strip caught',
       strippedCount,
       'instances; client should have stripped these',
+    )
+  }
+
+  // Household-name minimisation: strip the applicant's and (if visible via
+  // household RLS) the fiscal partner's name before the aangifte text
+  // crosses to the AI provider. We deliberately use the surgical
+  // `stripHouseholdNames` here — not the full `sanitizeForAI` filter, whose
+  // postcode/street heuristics would clobber legitimate aangifte headers
+  // (see lib/aangifte/strip-bsn.ts). BSN + household-name is the aangifte
+  // minimisation contract; amounts stay so the extraction still works.
+  // No id-filter: RLS surfaces the own profile plus any household-shared
+  // rows the session may read. Counts-only logging, never the names.
+  const { data: profileNames } = await supabase.from('profiles').select('full_name')
+  const householdNames = (profileNames ?? [])
+    .map((p) => p.full_name)
+    .filter((n): n is string => typeof n === 'string' && n.trim().length > 0)
+  const { clean, strippedCount: nameStrippedCount } = stripHouseholdNames(bsnClean, householdNames)
+  if (nameStrippedCount > 0) {
+    console.log(
+      '[onboarding/aangifte-extract] Household-name strip replaced',
+      nameStrippedCount,
+      'occurrence(s) before AI extraction',
     )
   }
 

@@ -40,6 +40,11 @@ import { CompoundInsightCard } from './compound-insight-card'
 import { PrintOverzichtButton } from './print-overzicht-button'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 
+// Stabiele lege-array-referentie voor de mini-vermogen-grafiek. Voorkomt dat
+// `netWorthHistory ?? []` bij ontbrekende historie elke render een verse
+// array-ref maakt — die zou de memo op MiniNetWorthChart telkens breken.
+const EMPTY_NET_WORTH_HISTORY: { month: string; value: number }[] = []
+
 type OverzichtHeroProps = {
   userName?: string
   health: HealthScore | null
@@ -214,27 +219,35 @@ export function OverzichtHero({
     )
   }
 
-  // Telling die we REFEREREN — moet exact gelijk zijn aan /toekomst/doelen.
-  // DoelenView telt alle doelen met progress (loader filtert al op
-  // niet-voltooid + capt op 5). De cap van 3 hieronder geldt ALLEEN voor de
-  // getoonde kaarten, niet voor dit getal; anders zou /overzicht "3" tonen
-  // terwijl de Doelen-pagina er "4" laat zien.
-  const activeGoalCount = (goals ?? []).filter(
-    (_, i) => (goalProgresses?.[i] ?? null) != null,
-  ).length
+  // Telling + doelen-display in één memo op [goals, goalProgresses]. Een verse
+  // `goalDisplay`-array bij elke render zou de memo op VoortgangDoelenCard
+  // breken; deze memo houdt de referentie stabiel zolang de bron-props gelijk
+  // blijven.
+  //  - activeGoalCount: telling die we REFEREREN — moet exact gelijk zijn aan
+  //    /toekomst/doelen. DoelenView telt alle doelen met progress (loader
+  //    filtert al op niet-voltooid + capt op 5). De cap van 3 hieronder geldt
+  //    ALLEEN voor de getoonde kaarten, niet voor dit getal; anders zou
+  //    /overzicht "3" tonen terwijl de Doelen-pagina er "4" laat zien.
+  //  - goalDisplay: koppel goals met hun progress op index, sorteer achterop-
+  //    achter doelen eerst, skip voltooide. Type-guard predicate narrowt zodat
+  //    we daarna geen non-null assertions nodig hebben. Gecapt op de 3
+  //    belangrijkste kaarten — activeGoalCount blijft het wáre totaal.
+  const { goalDisplay, activeGoalCount } = useMemo(() => {
+    const activeGoalCount = (goals ?? []).filter(
+      (_, i) => (goalProgresses?.[i] ?? null) != null,
+    ).length
 
-  // Bouw doelen-display: koppel goals met hun progress op index, sorteer
-  // achterop-achter doelen eerst, skip voltooide. Type-guard predicate
-  // narrowt zodat we daarna geen non-null assertions nodig hebben. Gecapt op
-  // de 3 belangrijkste kaarten — het getal hierboven blijft het wáre totaal.
-  const goalDisplay = (goals ?? [])
-    .map((g, i) => ({ goal: g, progress: goalProgresses?.[i] ?? null }))
-    .filter(
-      (g): g is { goal: GoalWithBudget; progress: GoalProgress } =>
-        g.progress != null && g.progress.pct < 100,
-    )
-    .sort((a, b) => Number(!a.progress.onTrack) - Number(!b.progress.onTrack))
-    .slice(0, 3)
+    const goalDisplay = (goals ?? [])
+      .map((g, i) => ({ goal: g, progress: goalProgresses?.[i] ?? null }))
+      .filter(
+        (g): g is { goal: GoalWithBudget; progress: GoalProgress } =>
+          g.progress != null && g.progress.pct < 100,
+      )
+      .sort((a, b) => Number(!a.progress.onTrack) - Number(!b.progress.onTrack))
+      .slice(0, 3)
+
+    return { goalDisplay, activeGoalCount }
+  }, [goals, goalProgresses])
 
   return (
     <section className="relative mx-auto max-w-6xl px-4 sm:px-6 pt-6 pb-2 md:pt-8 md:pb-4">
@@ -298,7 +311,7 @@ export function OverzichtHero({
         <div className="lg:col-span-3">
           <div className="h-full">
             <MiniNetWorthChart
-              netWorthHistory={netWorthHistory ?? []}
+              netWorthHistory={netWorthHistory ?? EMPTY_NET_WORTH_HISTORY}
               currentNetWorth={currentNetWorth ?? 0}
               currentAge={currentAge ?? null}
               fireAge={fireAge ?? null}

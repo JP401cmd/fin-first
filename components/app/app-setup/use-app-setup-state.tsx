@@ -1,7 +1,8 @@
 'use client'
 
 import { useCallback, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
+import { OVERLAY_TRIGGER_PARAMS } from '@/lib/navigation'
 import type { AppSetupConfig, AppSetupValidation } from './types'
 
 /**
@@ -20,6 +21,8 @@ import type { AppSetupConfig, AppSetupValidation } from './types'
  */
 export function useAppSetupState<TState>(config: AppSetupConfig<TState>) {
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const [state, setStateRaw] = useState<TState>(() => config.initialState())
   const [saving, setSaving] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
@@ -47,6 +50,25 @@ export function useAppSetupState<TState>(config: AppSetupConfig<TState>) {
         throw new Error(data.error ?? 'Opslaan van setup mislukt')
       }
       // Server zet zelf de feature-visit-marker (zie `app/api/<app>/setup/route.ts`).
+      // Ruim eerst binnengekomen overlay-trigger-params op (bv. `?newBudget=true`
+      // uit de welkomstgids-CTA of de legacy /core/budgets/new-redirect): anders
+      // zou `router.refresh()` de zojuist ontgrendelde pagina laden met de param
+      // nog in de URL, waarna de content-client die param leest en per ongeluk de
+      // "Nieuw budget"-pane opent i.p.v. de kale budgetpagina te tonen.
+      // Whitelist-based: alléén overlay-openers strippen — `?tab=budgetteren`
+      // (embed op /core/assets/cash) en andere non-overlay-params blijven staan.
+      const params = new URLSearchParams(searchParams.toString())
+      let strippedOverlayParam = false
+      for (const param of OVERLAY_TRIGGER_PARAMS) {
+        if (params.has(param)) {
+          params.delete(param)
+          strippedOverlayParam = true
+        }
+      }
+      if (strippedOverlayParam) {
+        const qs = params.toString()
+        router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+      }
       // `router.refresh()` re-runt de server-pagina; die ziet de marker en
       // rendert de echte content-tab.
       router.refresh()
@@ -55,7 +77,7 @@ export function useAppSetupState<TState>(config: AppSetupConfig<TState>) {
     } finally {
       setSaving(false)
     }
-  }, [config, state, validation.ok, saving, router])
+  }, [config, state, validation.ok, saving, router, pathname, searchParams])
 
   return {
     state,

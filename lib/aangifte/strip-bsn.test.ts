@@ -12,7 +12,7 @@
 // Test framework matches the rest of the repo: Vitest with describe/it/expect.
 
 import { describe, it, expect } from 'vitest'
-import { stripSensitiveData } from './strip-bsn'
+import { stripSensitiveData, stripHouseholdNames } from './strip-bsn'
 
 describe('stripSensitiveData — replaces BSN patterns', () => {
   it('replaces a single 9-digit BSN', () => {
@@ -91,6 +91,44 @@ describe('stripSensitiveData — IBANs survive intact', () => {
       'BSN [BSN] — rekening NL91ABNA0417164300 en NL12INGB9876543210',
     )
     expect(result.strippedCount).toBe(1)
+  })
+})
+
+describe('stripHouseholdNames — replaces known household names', () => {
+  it('replaces the full applicant name', () => {
+    const r = stripHouseholdNames('Aanvrager Jan de Vries, inkomen €40.000', ['Jan de Vries'])
+    expect(r.clean).toContain('[NAAM]')
+    expect(r.clean).not.toContain('Jan')
+    expect(r.clean).toContain('€40.000')
+    expect(r.strippedCount).toBeGreaterThan(0)
+  })
+
+  it('replaces the fiscal partner name and its parts', () => {
+    const r = stripHouseholdNames(
+      'Fiscale partner: Maria de Vries, inkomen. Ook Vries alleen.',
+      ['Jan de Vries', 'Maria de Vries'],
+    )
+    expect(r.clean).not.toContain('Maria')
+    expect(r.clean).not.toContain('Vries')
+  })
+
+  it('does not strip Dutch particles alone', () => {
+    const r = stripHouseholdNames('de aangifte van het jaar', ['Jan de Vries'])
+    // "de", "van", "het" are particles → must stay
+    expect(r.clean).toBe('de aangifte van het jaar')
+    expect(r.strippedCount).toBe(0)
+  })
+
+  it('returns text unchanged when no names supplied', () => {
+    const r = stripHouseholdNames('Aangiftetekst zonder namen', [])
+    expect(r.clean).toBe('Aangiftetekst zonder namen')
+    expect(r.strippedCount).toBe(0)
+  })
+
+  it('ignores names shorter than 3 chars', () => {
+    const r = stripHouseholdNames('Jo werkt hier', ['Jo'])
+    expect(r.clean).toBe('Jo werkt hier')
+    expect(r.strippedCount).toBe(0)
   })
 })
 

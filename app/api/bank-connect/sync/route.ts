@@ -178,6 +178,7 @@ export async function POST(req: Request) {
           counterparty_iban: tx.counterparty_iban,
           reference: tx.reference,
           transaction_type: tx.transaction_type,
+          bank_code: tx.bank_code,
           import_hash: tx.import_hash,
           is_income: tx.amount > 0,
           budget_id: cat.budget_id,

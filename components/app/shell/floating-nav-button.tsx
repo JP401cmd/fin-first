@@ -66,7 +66,7 @@ export function FloatingNavButton() {
             type="button"
             onClick={() => cmd.open()}
             aria-label="Zoeken"
-            className="flex items-center justify-center rounded-full px-5 py-2.5 text-white/90 hover:bg-white/10 active:bg-white/15 transition-colors"
+            className="flex items-center justify-center rounded-full px-5 py-2.5 text-white/90 hover:bg-white/10 active:bg-white/15 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--paper)]"
           >
             <Search size={18} strokeWidth={2.25} />
           </button>
@@ -76,7 +76,7 @@ export function FloatingNavButton() {
             onClick={() => setMenuOpen((prev) => !prev)}
             aria-label={menuOpen ? 'Menu sluiten' : 'Menu openen'}
             aria-expanded={menuOpen}
-            className="flex items-center justify-center rounded-full px-5 py-2.5 text-white/90 hover:bg-white/10 active:bg-white/15 transition-colors"
+            className="flex items-center justify-center rounded-full px-5 py-2.5 text-white/90 hover:bg-white/10 active:bg-white/15 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--paper)]"
           >
             {menuOpen ? (
               <X size={18} strokeWidth={2.5} />

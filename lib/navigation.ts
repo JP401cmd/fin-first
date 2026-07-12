@@ -92,3 +92,21 @@ export type OverlayQueryKey = keyof typeof OVERLAY_QUERY_KEYS
 
 /** Welke keys daadwerkelijk een pane-overlay openen. `tab` is in-page; `edit/via/month` zijn modifier/transient. */
 export const PANE_QUERY_KEYS = ['budget', 'debt', 'asset', 'cryptoHolding', 'holding', 'strategie', 'uitgaven', 'event', 'horizonSetup'] as const satisfies readonly OverlayQueryKey[]
+
+/**
+ * Keys die bij binnenkomst op een pagina AUTOMATISCH een overlay/pane/sheet
+ * openen: de pane-keys plus de sheet-triggers (`planEditor`, `newBudget`).
+ * Bewust NIET meegenomen: `tab` (in-page, moet behouden blijven op embed-
+ * routes zoals `/core/assets/cash?tab=budgetteren`) en de modifier/transient-
+ * keys `edit/via/month`.
+ *
+ * Gebruikt om na een setup-completion (AppSetupGate → router.refresh()) de
+ * binnengekomen trigger-param(s) op te ruimen, zodat de zojuist ontgrendelde
+ * pagina kaal opent i.p.v. per ongeluk de overlay te openen.
+ */
+export const OVERLAY_TRIGGER_KEYS = [...PANE_QUERY_KEYS, 'planEditor', 'newBudget'] as const satisfies readonly OverlayQueryKey[]
+
+/** De actuele URL-param-namen (values) die een overlay auto-openen — voor whitelist-based strippen uit een query-string. */
+export const OVERLAY_TRIGGER_PARAMS: readonly string[] = OVERLAY_TRIGGER_KEYS.map(
+  (key) => OVERLAY_QUERY_KEYS[key],
+)

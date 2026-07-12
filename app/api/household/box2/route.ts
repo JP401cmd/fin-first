@@ -123,17 +123,17 @@ export async function GET(request: NextRequest) {
   // Helper: convert Asset to Box2Deelneming
   function assetToDeelneming(a: Asset): Box2Deelneming {
     return {
-      name: (a as any).institution || a.name || 'Deelneming',
-      annual_dividend: Number((a as any).annual_dividend) || 0,
+      name: a.institution || a.name || 'Deelneming',
+      annual_dividend: Number(a.annual_dividend) || 0,
       disposal_gain: 0, // no disposal by default; could be extended
     }
   }
 
   // Separate assets by ownership
-  const myAssets = allAssets.filter(a => a.user_id === user.id && (a as any).ownership !== 'shared')
-  const sharedAssets = allAssets.filter(a => (a as any).ownership === 'shared')
+  const myAssets = allAssets.filter(a => a.user_id === user.id && a.ownership !== 'shared')
+  const sharedAssets = allAssets.filter(a => a.ownership === 'shared')
   const partnerAssets = partnerId
-    ? allAssets.filter(a => a.user_id === partnerId && (a as any).ownership !== 'shared')
+    ? allAssets.filter(a => a.user_id === partnerId && a.ownership !== 'shared')
     : []
   // Drop the partner's personal deelnemingen from every calculation when hidden.
   const visiblePartnerAssets = partnerHidesVermogen ? [] : partnerAssets
@@ -166,7 +166,7 @@ export async function GET(request: NextRequest) {
         ...d,
         assetId: [...myAssets, ...sharedAssets][i]?.id,
         currentValue: [...myAssets, ...sharedAssets][i]?.current_value,
-        ownershipPct: Number(([...myAssets, ...sharedAssets][i] as any)?.ownership_percentage) || 100,
+        ownershipPct: Number([...myAssets, ...sharedAssets][i]?.ownership_percentage) || 100,
       })),
     })
   }
@@ -185,10 +185,11 @@ export async function GET(request: NextRequest) {
         .from('household_members')
         .select('user_id, profiles:user_id(full_name)')
         .eq('household_id', householdStatus.household_id)
+        .returns<{ user_id: string; profiles: { full_name: string | null } | null }[]>()
 
       const partner = allMembers?.find(m => m.user_id !== user.id)
-      if (partner && (partner as any).profiles?.full_name) {
-        partnerName = (partner as any).profiles.full_name
+      if (partner && partner.profiles?.full_name) {
+        partnerName = partner.profiles.full_name
       }
     }
   } catch {
@@ -226,9 +227,9 @@ export async function GET(request: NextRequest) {
     ...d,
     assetId: allAssetsForDetails[i]?.id,
     currentValue: allAssetsForDetails[i]?.current_value,
-    ownershipPct: Number((allAssetsForDetails[i] as any)?.ownership_percentage) || 100,
+    ownershipPct: Number(allAssetsForDetails[i]?.ownership_percentage) || 100,
     ownerId: allAssetsForDetails[i]?.user_id,
-    isShared: (allAssetsForDetails[i] as any)?.ownership === 'shared',
+    isShared: allAssetsForDetails[i]?.ownership === 'shared',
   }))
 
   // Itemised partner holdings are only exposed at privacy level 'full'. At

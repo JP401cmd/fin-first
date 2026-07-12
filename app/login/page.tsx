@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { safeRelativePath } from '@/lib/safe-redirect'
+import { translateAuthError } from '@/lib/auth-errors'
 
 function LoginForm() {
   const router = useRouter()
@@ -16,6 +17,9 @@ function LoginForm() {
 
   const isExpired = searchParams.get('expired') === '1'
   const isBlocked = searchParams.get('blocked') === '1'
+  // Auth-callback stuurt hierheen als de bevestigings-/resetlink verlopen of al
+  // gebruikt is (A-01) — dan tonen we een banner i.p.v. een kale /login.
+  const isConfirmError = searchParams.get('confirm_error') === '1'
   const redirectTo = searchParams.get('redirectTo')
 
   async function handleSubmit(e: React.FormEvent) {
@@ -23,19 +27,25 @@ function LoginForm() {
     setLoading(true)
     setError(null)
 
-    const supabase = createClient()
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
 
-    if (error) {
-      setError(error.message)
+      if (error) {
+        setError(translateAuthError(error))
+      } else {
+        // Redirect to the originally requested page or the app home.
+        // safeRelativePath weigert open-redirect-patronen (//evil.com, /\evil.com, absolute URLs).
+        router.push(safeRelativePath(redirectTo))
+      }
+    } catch (err) {
+      // Netwerkfout/timeout: zonder deze catch bleef `loading` eeuwig true.
+      setError(translateAuthError(err))
+    } finally {
       setLoading(false)
-    } else {
-      // Redirect to the originally requested page or the app home.
-      // safeRelativePath weigert open-redirect-patronen (//evil.com, /\evil.com, absolute URLs).
-      router.push(safeRelativePath(redirectTo))
     }
   }
 
@@ -57,6 +67,17 @@ function LoginForm() {
       <p className="mb-6 text-center text-sm italic text-zinc-600">
         Welkom terug bij je vrijheid in tijd.
       </p>
+
+      {isConfirmError && (
+        <div className="mb-4 rounded-lg bg-amber-50 border border-amber-200 px-4 py-3" data-testid="confirm-error-banner">
+          <p className="text-sm font-medium text-amber-800">
+            Bevestigingslink werkte niet
+          </p>
+          <p className="mt-1 text-xs text-amber-600">
+            Deze link is verlopen of al gebruikt. Vraag een nieuwe aan of log in.
+          </p>
+        </div>
+      )}
 
       {isExpired && (
         <div className="mb-4 rounded-lg bg-amber-50 border border-amber-200 px-4 py-3" data-testid="session-expired-banner">
@@ -91,7 +112,7 @@ function LoginForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500"
           />
         </div>
 
@@ -105,18 +126,18 @@ function LoginForm() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500"
           />
         </div>
 
         {error && (
-          <p className="text-sm text-red-600">{error}</p>
+          <p className="text-sm text-red-600" role="alert">{error}</p>
         )}
 
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
+          className="min-h-11 w-full rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
         >
           {loading ? 'Bezig met inloggen...' : 'Inloggen'}
         </button>

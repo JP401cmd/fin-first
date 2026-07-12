@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, memo } from 'react'
 import { type BudgetWithChildren } from '@/lib/budget-data'
 import { BudgetIcon, isOverPositive, type BudgetType } from '@/components/app/budget-shared'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
@@ -716,7 +716,10 @@ export function MiniDonut({ slices, size = 56, strokeWidth = 7, className }: Min
 
 /* ── BudgetDonut (orchestrator) ──────────────────────────────── */
 
-export function BudgetDonut({ groups, spending, onNavigate }: BudgetDonutProps) {
+// memo(): `groups` komt nu als gememoiseerde `donutGroups`-referentie binnen en
+// `spending` is state, dus de interne buildSegments-useMemo cachet weer echt en
+// de hele donut slaat re-renders over die niets aan de props veranderen.
+export const BudgetDonut = memo(function BudgetDonut({ groups, spending, onNavigate }: BudgetDonutProps) {
   const segments = useMemo(() => buildSegments(groups, spending), [groups, spending])
   const [hiddenBudgets, setHiddenBudgets] = useState<Set<string>>(() => loadHiddenBudgets())
   const [collapsedTypes, setCollapsedTypes] = useState<Set<string>>(() => loadCollapsedTypes())
@@ -799,4 +802,4 @@ export function BudgetDonut({ groups, spending, onNavigate }: BudgetDonutProps) 
       )}
     </div>
   )
-}
+})

@@ -8,6 +8,7 @@ import type { Recommendation } from '@/lib/recommendation-data'
 import { deepLinkForRecommendation } from '@/lib/recommendation-deep-link'
 import { useChatContextOptional } from '@/components/app/chat/chat-provider'
 import { ANALYSE_FINANCIEN_PROMPT } from '@/components/app/chat/chat-prompt-deeplink'
+import { useOptionalToast } from '@/components/app/toast-provider'
 
 /**
  * TipsLijst — toptips bovenaan /overzicht/tips. Toont pending +
@@ -51,6 +52,7 @@ function sortTips(recs: Recommendation[]): Recommendation[] {
 export function TipsLijst({ recommendations, onChanged, onAccepted }: TipsLijstProps) {
   const router = useRouter()
   const chat = useChatContextOptional()
+  const { addToast } = useOptionalToast()
   const [loadingId, setLoadingId] = useState<{ id: string; kind: DecisionKind } | null>(null)
   const [dismissed, setDismissed] = useState<Set<string>>(new Set())
 
@@ -97,7 +99,13 @@ export function TipsLijst({ recommendations, onChanged, onAccepted }: TipsLijstP
         router.refresh()
       }
     } catch {
-      // niets — gebruiker kan opnieuw klikken
+      // De tip blijft in de lijst staan (dismissed niet gezet) zodat de
+      // gebruiker opnieuw kan klikken; een toast maakt het falen zichtbaar.
+      addToast({
+        type: 'error',
+        title: 'Niet opgeslagen',
+        message: 'Je keuze is niet opgeslagen — probeer het opnieuw.',
+      })
     } finally {
       setLoadingId(null)
     }

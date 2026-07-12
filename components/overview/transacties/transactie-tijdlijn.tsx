@@ -1,6 +1,5 @@
 'use client'
 import { memo, useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
 import { Repeat, Link2, FileText, CreditCard, RefreshCw, Smartphone, ArrowLeftRight, ArrowDownLeft, Landmark, Search, SlidersHorizontal, X } from 'lucide-react'
 import {
   cleanMerchantName, deriveType, parseLocationTime, avgDailyExpense,
@@ -334,18 +333,16 @@ function ActiveChip({ label, onRemove }: { label: string; onRemove: () => void }
 }
 
 function FirstUseEmpty() {
+  // Bewust géén eigen CTA-knop: de KoppelRekeningBanner bovenaan de pagina
+  // (/overzicht/cashflow/transacties) toont al de canonieke acties
+  // "Bank koppelen" (/core/cash/connect) en "Importeer" (/core/cash/import).
+  // Een tweede knop hier was redundant én linkte naar een omweg-pagina.
   return (
     <div className="flex flex-col items-center gap-2 py-12 text-center">
       <h3 className="font-serif text-[18px] font-semibold text-[var(--ink)]">Nog geen transacties.</h3>
       <p className="max-w-xs font-serif text-[13px] italic text-[var(--ink-3)]">
         Koppel je bank of importeer een bestand om je geldstroom als opgeslagen tijd te zien.
       </p>
-      <Link
-        href="/overzicht/bezittingen/cash"
-        className="mt-1 min-h-[44px] inline-flex items-center px-3 py-1 font-mono text-[11px] uppercase tracking-[0.06em] text-[var(--ink-2)] border border-[var(--border-ed)] hover:bg-[var(--subtle)] focus-visible:outline-2 focus-visible:outline-[var(--ink)]"
-      >
-        Koppel of importeer
-      </Link>
     </div>
   )
 }

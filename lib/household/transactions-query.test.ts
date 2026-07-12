@@ -5,8 +5,11 @@
  *
  *  1) lib/household/perspective-loader.ts — de paginatie-loop haalt een
  *     EXPLICIETE kolomlijst op i.p.v. select('*'). Regressie-tripwire tegen
- *     opnieuw sluipend select('*') of het laten vallen van een van de 14 velden
- *     die de consumers + stamp() nodig hebben. Tevens een gedrags-check dat de
+ *     opnieuw sluipend select('*') of het laten vallen van een van de 13 velden
+ *     die de consumers + stamp() nodig hebben, én tegen het opnieuw meenemen van
+ *     een kolom die NIET op `transactions` bestaat (zoals partner_split_pct —
+ *     die staat alleen op `debts`; meenemen gaf een PostgREST 400 → stille lege
+ *     lijst, kaart "Transacties niet zichtbaar"). Tevens een gedrags-check dat de
  *     loop bij >1000 rijen ALLE pagina's ophaalt (deterministisch, niet stil
  *     afgekapt op de PostgREST-cap van 1000).
  *
@@ -27,9 +30,26 @@ import {
   type PerspectiveContext,
 } from './perspective-loader'
 
-// De exacte 14-velden-lijst die het perspective-loader-pad MOET ophalen.
+// De exacte 13-velden-lijst die het perspective-loader-pad MOET ophalen.
+// BELANGRIJK: partner_split_pct staat hier bewust NIET in — die kolom bestaat
+// alleen op `debts`, niet op `transactions`. Zie SCHEMA_TRANSACTION_COLUMNS
+// hieronder: de contract-check borgt dat elke gevraagde kolom echt bestaat.
 const EXPECTED_PERSPECTIVE_COLUMNS =
-  'id, date, amount, description, counterparty_name, counterparty_iban, budget_id, account_id, is_income, transaction_type, ownership, user_id, partner_split_pct, is_split'
+  'id, date, amount, description, counterparty_name, counterparty_iban, budget_id, account_id, is_income, transaction_type, ownership, user_id, is_split'
+
+// De echte kolommen van public.transactions (geverifieerd via
+// information_schema.columns op de live Supabase-DB, 2026-07-11). Dient als
+// schema-contract zodat een toekomstige refactor van de select-lijst niet
+// opnieuw een non-existente kolom kan opvragen (→ PostgREST 400 → stille lege
+// lijst). Houd deze lijst gelijk aan het migratie-schema van `transactions`.
+const SCHEMA_TRANSACTION_COLUMNS = new Set([
+  'id', 'user_id', 'account_id', 'budget_id', 'date', 'amount', 'currency',
+  'description', 'counterparty_name', 'counterparty_iban', 'category_source',
+  'is_income', 'import_hash', 'reference', 'transaction_type', 'notes',
+  'created_at', 'updated_at', 'ownership', 'household_id', 'is_split',
+  'linked_transfer_id', 'running_balance', 'creditor_id', 'fx_amount',
+  'fx_currency', 'fx_rate', 'bank_code', 'bank_seq',
+])
 
 // Minimale solo-context zodat loadPerspectiveTransactions het 'personal'-pad
 // neemt (alleen de transactie-paginatie-loop draait, geen partner-RPC).
@@ -96,11 +116,21 @@ function makeTxMock(totalRows: number) {
 }
 
 describe('perspective-loader transactie-query', () => {
-  it('haalt de exacte 14-velden-kolomlijst op (geen select("*"))', async () => {
+  it('haalt de exacte 13-velden-kolomlijst op (geen select("*"))', async () => {
     const { supabase, captured } = makeTxMock(3)
     await loadPerspectiveTransactions(supabase, 'personal', undefined, soloContext)
     expect(captured.columns).toBe(EXPECTED_PERSPECTIVE_COLUMNS)
     expect(captured.columns).not.toContain('*')
+  })
+
+  it('vraagt alleen kolommen op die echt op `transactions` bestaan (schema-contract)', async () => {
+    const { supabase, captured } = makeTxMock(1)
+    await loadPerspectiveTransactions(supabase, 'personal', undefined, soloContext)
+    const requested = (captured.columns ?? '').split(',').map((c) => c.trim())
+    const unknown = requested.filter((c) => !SCHEMA_TRANSACTION_COLUMNS.has(c))
+    // Vangt de regressie 95bafeb53 (partner_split_pct bestaat alleen op debts):
+    // een non-existente kolom gaf een PostgREST 400 → stille lege lijst.
+    expect(unknown).toEqual([])
   })
 
   it('pagineert volledig door bij >1000 rijen (geen stille afkap)', async () => {

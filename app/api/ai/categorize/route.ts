@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { recordAiUsage } from '@/lib/ai-credits'
 import { getModel, AIConfigError } from '@/lib/ai/config'
 import { checkTierGate } from '@/lib/require-tier'
+import { checkCreditBudget, creditLimitMessage } from '@/lib/ai/credit-gate'
 import { sanitizeForAI } from '@/lib/ai/sanitize'
 import {
   buildCategorizeSystemPrompt,
@@ -42,6 +43,16 @@ export async function POST(req: Request) {
   const tierGate = await checkTierGate(supabase, user.id, 'ai')
   if (tierGate) {
     return new Response(JSON.stringify({ error: tierGate.error }), { status: 403, headers: { 'Content-Type': 'application/json' } })
+  }
+
+  // Per-gebruiker rate-limit: dwing het maand-creditbudget af (gedeelde bucket)
+  // vóór de dure LLM-call. Categorisatie kost 1 credit per batch (max 20 tx).
+  const creditGate = await checkCreditBudget(supabase, user.id, 'categorize')
+  if (!creditGate.allowed) {
+    return new Response(JSON.stringify({ error: creditLimitMessage(creditGate) }), {
+      status: 429,
+      headers: { 'Content-Type': 'application/json', 'Retry-After': String(creditGate.retryAfterSeconds) },
+    })
   }
 
   let body: { transactions: RequestTransaction[] }

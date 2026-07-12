@@ -656,6 +656,50 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
     loadHoldings()
   }, [loadHoldings])
 
+  // Heatmap-projectie: map de holdings één keer per holdings-wijziging naar de
+  // HeatmapHolding-vorm. Een verse array + objecten per render versloeg de
+  // memo() op <HoldingsHeatmap> (elke ouder-render leverde een nieuwe
+  // prop-referentie). Nu stabiel zolang `holdings` niet wijzigt.
+  const heatmapHoldings = useMemo(
+    () =>
+      holdings.map((h) => ({
+        id: h.id,
+        name: h.name,
+        ticker: h.ticker,
+        isin: h.isin,
+        units: h.units,
+        avg_purchase_price: h.avg_purchase_price,
+        current_price: h.current_price,
+        last_price_update: h.last_price_update,
+        currency: h.currency,
+        daily_change_percent: h.daily_change_percent,
+        asset_class: h.asset_class,
+        sector: h.sector,
+        geography: h.geography,
+      })),
+    [holdings],
+  )
+
+  // Stabiele klik-handler voor de heatmap-cellen — in useCallback zodat de
+  // prop-referentie stabiel blijft en de memo() op de heatmap effectief is.
+  const handleHeatmapClick = useCallback(
+    (id: string) => {
+      // Heatmap-cel openen schakelt naar de detail-pane via URL-state —
+      // symmetrisch met de lijst-rij. Crypto-rijen ontstaan in de heatmap niet
+      // (heatmap krijgt alle rows en filtert op `asset_class`/`sector`/
+      // `geography`); voor de zekerheid valt het pane-open terug op de full-page
+      // route wanneer de holding niet in de lokale array zit.
+      const target = holdings.find((h) => h.id === id)
+      const bucket = target && (target as Holding & { bucket?: string }).bucket
+      if (target && bucket !== 'crypto') {
+        openHoldingPane(id)
+      } else {
+        router.push(`/core/assets/holdings/${id}`)
+      }
+    },
+    [holdings, openHoldingPane, router],
+  )
+
   if (loading) {
     return (
       <div className="py-5 sm:py-12">
@@ -913,39 +957,9 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
           data-testid="holdings-heatmap-section"
         >
           <HoldingsHeatmap
-            holdings={holdings.map(h => ({
-              id: h.id,
-              name: h.name,
-              ticker: h.ticker,
-              isin: h.isin,
-              units: h.units,
-              avg_purchase_price: h.avg_purchase_price,
-              current_price: h.current_price,
-              last_price_update: h.last_price_update,
-              currency: h.currency,
-              daily_change_percent: h.daily_change_percent,
-              asset_class: h.asset_class,
-              sector: h.sector,
-              geography: h.geography,
-            }))}
+            holdings={heatmapHoldings}
             dividendData={dividendData}
-            onHoldingClick={(id) => {
-              // Heatmap-cel openen schakelt naar de detail-pane via
-              // URL-state — symmetrisch met de lijst-rij. Crypto-rijen
-              // ontstaan in de heatmap niet (heatmap krijgt alle rows en
-              // filtert op `asset_class`/`sector`/`geography`); voor de
-              // zekerheid valt het pane-open terug op de full-page route
-              // wanneer de holding niet in de lokale array zit.
-              const target = holdings.find((h) => h.id === id)
-              const bucket =
-                target &&
-                (target as Holding & { bucket?: string }).bucket
-              if (target && bucket !== 'crypto') {
-                openHoldingPane(id)
-              } else {
-                router.push(`/core/assets/holdings/${id}`)
-              }
-            }}
+            onHoldingClick={handleHeatmapClick}
           />
         </section>
       )}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { memo, useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useFlashChange } from '@/lib/hooks/use-flash-change'
 import { MaskedAmount } from '@/components/app/masked-amount'
@@ -117,7 +117,12 @@ interface VermogenAssetCardProps {
 
 // ── Component ───────────────────────────────────────────────
 
-export function VermogenAssetCard({
+// memo(): de kaart wordt per lijst in grote aantallen gerenderd. Alle props uit
+// de host (assets-client / asset-category-page) zijn stabiel — asset uit een
+// useMemo-groepering, kpiPair uit een Map-lookup, onClick/onEditClick/
+// onRevalueClick via useCallback, rest primitieven/keyed-lookups — dus de memo
+// slaat ongerelateerde host-herrenders effectief over.
+export const VermogenAssetCard = memo(function VermogenAssetCard({
   asset,
   kpiPair,
   onClick,
@@ -361,4 +366,4 @@ export function VermogenAssetCard({
       ) : null}
     </div>
   )
-}
+})

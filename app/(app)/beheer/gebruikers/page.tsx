@@ -132,8 +132,10 @@ export default function BeheerGebruikersPage() {
       setDeleteConfirm('')
       setSearched(true)
     } catch (err) {
+      // Bij een echte fout tonen we alléén de rode statusbanner — niet óók de
+      // "geen gebruiker gevonden"-lege staat (searched blijft false).
       setUser(null)
-      setSearched(true)
+      setSearched(false)
       setStatus({ type: 'error', message: err instanceof Error ? err.message : 'Zoeken mislukt' })
     } finally {
       setSearching(false)

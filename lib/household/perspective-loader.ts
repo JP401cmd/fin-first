@@ -363,18 +363,28 @@ export async function loadPerspectiveTransactions(
       .from('transactions')
       // Expliciete kolomlijst i.p.v. select('*'): alleen de velden die de
       // consumers (cashflow-data-loader, transacties-analyse, box1) én stamp()
-      // (ownership/user_id/partner_split_pct/is_split) gebruiken. Scheelt op het
-      // drukste egress-pad (13 mnd transacties) alle ongebruikte kolommen
-      // (metadata, import_hash, running_balance, fx_*, notes, …). RLS/ownership
-      // blijft ongewijzigd — kolomselectie raakt de row-filtering niet.
+      // (ownership/user_id/is_split) gebruiken. Scheelt op het drukste
+      // egress-pad (13 mnd transacties) alle ongebruikte kolommen (metadata,
+      // import_hash, running_balance, fx_*, notes, …). RLS/ownership blijft
+      // ongewijzigd — kolomselectie raakt de row-filtering niet.
+      // LET OP: geen `partner_split_pct` — die kolom bestaat alleen op `debts`,
+      // niet op `transactions`. Meenemen gaf een PostgREST 400 → stille lege
+      // lijst (regressie 95bafeb53, kaart "Transacties niet zichtbaar").
       .select(
-        'id, date, amount, description, counterparty_name, counterparty_iban, budget_id, account_id, is_income, transaction_type, ownership, user_id, partner_split_pct, is_split',
+        'id, date, amount, description, counterparty_name, counterparty_iban, budget_id, account_id, is_income, transaction_type, ownership, user_id, is_split',
       )
       .order('date', { ascending: false })
       .range(from, from + 999)
     if (opts?.since) query = query.gte('date', opts.since)
     if (opts?.until) query = query.lte('date', opts.until)
-    const { data } = await query
+    const { data, error } = await query
+    // Niet stilzwijgend negeren: een echte PostgREST-fout (bv. een ongeldige
+    // kolom) leverde eerder een foutloze lege lijst op — de consumers toonden
+    // dan "Geen transacties" i.p.v. een echte fout. Surface de fout zodat de
+    // catch-blocks in de consumers een echte foutmelding kunnen tonen.
+    if (error) {
+      throw new Error(`Kon transacties niet laden: ${error.message}`)
+    }
     const page = (data ?? []) as Record<string, unknown>[]
     base.push(...page)
     if (page.length < 1000) break

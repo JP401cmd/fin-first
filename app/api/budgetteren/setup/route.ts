@@ -12,6 +12,7 @@ import {
 } from '@/lib/budget-templates/onboarding-presets'
 import { APP_SETUP_SLUGS } from '@/lib/app-setup-status'
 import { syncBudgetingActive } from '@/lib/budgeting-active'
+import { syncBankAccountCompanion } from '@/lib/bank-account-companion'
 
 /**
  * POST /api/budgetteren/setup — Eerste-keer setup van de Budgetteren-app.
@@ -94,6 +95,25 @@ export async function POST(req: Request) {
       .eq('user_id', user.id)
       .in('id', selectedCashAssetIds)
     if (markErr) throw new Error(`Cash-rekeningen markeren mislukt: ${markErr.message}`)
+
+    // ── 1b. Gekoppelde bank_accounts-companion sync ────────────
+    // Dé fix voor de sync-bug: alleen has_budget_tracking zetten maakt de
+    // rekening NIET zichtbaar op /core/cash/import (die leest uitsluitend uit
+    // bank_accounts). Via dezelfde gedeelde helper als het bewerkscherm
+    // (assets-client) borgen we hier de companion-rij per cash-asset — aan voor
+    // de aangevinkte, opgeruimd voor de rest. Idempotent, dus veilig bij retry.
+    const { data: cashAssets, error: cashErr } = await supabase
+      .from('assets')
+      .select('id, name, iban, institution, subtype, ownership, household_id, current_value')
+      .eq('user_id', user.id)
+      .eq('asset_type', 'cash')
+      .eq('is_active', true)
+    if (cashErr) throw new Error(`Cash-rekeningen ophalen mislukt: ${cashErr.message}`)
+
+    const selectedSet = new Set(selectedCashAssetIds)
+    for (const a of cashAssets ?? []) {
+      await syncBankAccountCompanion(supabase, user.id, a, selectedSet.has(a.id))
+    }
 
     // ── 2. Budgetten seeden ────────────────────────────────────
     // Net-inkomen uit het profiel voor template-amounts. Bij 'empty'-keuze

@@ -3,12 +3,50 @@ import { tool } from 'ai'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { localMonthBounds } from '@/lib/month-range'
 import { buildBudgetSpendingMap, spentForBudget } from '@/lib/budget-spending'
+import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
 
 /**
  * Creates a lookup tool that queries real financial data from Supabase.
  * Allows the AI to query specific transactions, budgets, assets, or debts.
+ *
+ * PRIVACY: the tool-result is re-injected into the model in the multi-step
+ * loop AFTER the one-time context sanitize in the chat route, so every free
+ * string it returns (transaction description/counterparty, asset/debt/budget
+ * name) is run through `sanitizeForAI` here — otherwise IBANs, e-mails and the
+ * user's own name would reach the provider unfiltered. Merchant names are kept
+ * (accepted residual: needed for the answer, and a business identifier).
  */
 export function createLookupTool(supabase: SupabaseClient) {
+  // Load the sanitize options (own name + date of birth) once per request and
+  // memoise — `execute` can run multiple times within a single step-loop.
+  let sanitizeOptsPromise: Promise<SanitizeOptions> | null = null
+  const loadSanitizeOpts = (): Promise<SanitizeOptions> => {
+    if (!sanitizeOptsPromise) {
+      sanitizeOptsPromise = (async () => {
+        try {
+          const { data: { user } } = await supabase.auth.getUser()
+          if (!user) return {}
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('full_name, date_of_birth')
+            .eq('id', user.id)
+            .single()
+          const opts: SanitizeOptions = {}
+          if (profile?.full_name) opts.names = [profile.full_name]
+          if (profile?.date_of_birth) opts.dateOfBirth = profile.date_of_birth
+          return opts
+        } catch {
+          // Fail-safe: if we cannot resolve the profile we still sanitize
+          // with generic PII patterns (IBAN/BSN/e-mail/phone/address).
+          return {}
+        }
+      })()
+    }
+    return sanitizeOptsPromise
+  }
+  const clean = (value: string | null | undefined, opts: SanitizeOptions): string | null =>
+    value ? sanitizeForAI(value, opts) : (value ?? null)
+
   return tool({
     description: 'Zoek specifieke financiële gegevens op: transacties, budgetten, assets of schulden. Gebruik dit wanneer de gebruiker vraagt naar details die niet in de context staan.',
     inputSchema: z.object({
@@ -41,12 +79,13 @@ export function createLookupTool(supabase: SupabaseClient) {
             )
           }
 
+          const opts = await loadSanitizeOpts()
           return txs.slice(0, maxResults).map((t) => ({
             date: t.date,
             amount: t.amount,
-            description: t.description,
-            counterparty: t.counterparty_name,
-            category: (t.budget as { name?: string } | null)?.name ?? 'onbekend',
+            description: clean(t.description, opts),
+            counterparty: clean(t.counterparty_name, opts),
+            category: clean((t.budget as { name?: string } | null)?.name, opts) ?? 'onbekend',
           }))
         }
         case 'budgets': {
@@ -110,7 +149,11 @@ export function createLookupTool(supabase: SupabaseClient) {
             )
           }
 
-          return results.slice(0, maxResults)
+          const opts = await loadSanitizeOpts()
+          return results.slice(0, maxResults).map((r) => ({
+            ...r,
+            name: clean(r.name, opts) ?? r.name,
+          }))
         }
         case 'assets': {
           const queryBuilder = supabase
@@ -131,8 +174,9 @@ export function createLookupTool(supabase: SupabaseClient) {
             )
           }
 
+          const opts = await loadSanitizeOpts()
           return assets.slice(0, maxResults).map((a) => ({
-            name: a.name,
+            name: clean(a.name, opts) ?? a.name,
             type: a.asset_type,
             value: a.current_value,
             return: a.expected_return,
@@ -158,8 +202,9 @@ export function createLookupTool(supabase: SupabaseClient) {
             )
           }
 
+          const opts = await loadSanitizeOpts()
           return debts.slice(0, maxResults).map((d) => ({
-            name: d.name,
+            name: clean(d.name, opts) ?? d.name,
             type: d.debt_type,
             balance: d.current_balance,
             rate: d.interest_rate,

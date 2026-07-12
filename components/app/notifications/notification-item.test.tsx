@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { NotificationItem } from './notification-item'
 import type { Notification, NotificationType } from '@/app/api/notifications/route'
 
@@ -51,5 +51,21 @@ describe('NotificationItem — onbekende/legacy bericht-types', () => {
     render(<NotificationItem notification={known} onRead={vi.fn()} onClose={vi.fn()} />)
 
     expect(screen.getByText('Budget')).toBeInTheDocument()
+  })
+
+  // E-07: de rij is een role="button"-div (bevat een geneste knop). De globale
+  // focus-ring pakt hem niet, dus verifiëren we een expliciete focus-visible-
+  // outline én dat Enter de klik-handler nog steeds triggert.
+  it('heeft een zichtbare focus-ring en reageert op Enter (E-07)', () => {
+    const onRead = vi.fn()
+    const n = makeNotification({ type: 'budget' })
+
+    render(<NotificationItem notification={n} onRead={onRead} onClose={vi.fn()} />)
+
+    const item = screen.getByRole('button')
+    expect(item.className).toMatch(/focus-visible:outline/)
+
+    fireEvent.keyDown(item, { key: 'Enter' })
+    expect(onRead).toHaveBeenCalledWith('n1')
   })
 })

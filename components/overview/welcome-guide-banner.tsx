@@ -144,7 +144,7 @@ export function WelcomeGuideBanner() {
 
   return (
     <section aria-label="Welkomstgids" className="mx-auto max-w-6xl px-4 pt-4 sm:px-6">
-      <div className="overflow-hidden rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)]">
+      <div className="overflow-hidden rounded-2xl border border-[var(--border-ed)] bg-[var(--color-kern-50)]/40">
         <div aria-hidden className="h-[3px] w-full" style={{ background: 'var(--color-kern-500)' }} />
         <div className="p-4 sm:p-5">
           {/* Kop: kicker + scherm-positie + sluiten */}

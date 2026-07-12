@@ -1,32 +1,12 @@
 'use client'
 
-import { useState, useCallback, useRef, useEffect, useTransition } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
-import {
-  DndContext,
-  closestCenter,
-  MeasuringStrategy,
-  MouseSensor,
-  TouchSensor,
-  KeyboardSensor,
-  useSensor,
-  useSensors,
-  DragOverlay,
-  type DragStartEvent,
-  type DragOverEvent,
-} from '@dnd-kit/core'
-import {
-  SortableContext,
-  sortableKeyboardCoordinates,
-  useSortable,
-  arrayMove,
-  type SortingStrategy,
-} from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, X, Plus, Lock, Wand2, ChevronRight, Layers, CalendarClock, PieChart, Wallet, Flame, LayoutDashboard, Compass, Trash2 } from 'lucide-react'
-import { WidgetRenderer, type DashboardData } from './widget-renderer'
+import { X, Plus, Lock, Wand2, ChevronRight, Layers, CalendarClock, PieChart, Wallet, Flame, LayoutDashboard, Compass, Trash2 } from 'lucide-react'
+import type { DashboardData } from './widget-renderer'
+import { StaticWidgetItem, sizeLabel } from './widget-grid-helpers'
 import { CategoryAppNavBar } from './category-app-nav-bar'
 import {
   readCategoryNavBarVisible,
@@ -41,184 +21,31 @@ const AutoDashboardWizard = dynamic(
   () => import('./auto-dashboard-wizard').then(m => ({ default: m.AutoDashboardWizard })),
   { ssr: false },
 )
-import { useDisplaySize, useIsMobile } from '@/lib/hooks/use-display-size'
+// De sleep-machinerie (@dnd-kit, ~18kB gz) laadt pas in EDIT-modus via een
+// eigen chunk. In kijk-modus rendert de statische `StaticWidgetItem`-grid —
+// @dnd-kit blijft zo volledig buiten de first-load JS van /overzicht (bundle
+// ronde 2).
+const WidgetDndGrid = dynamic(
+  () => import('./widget-dnd-grid').then(m => ({ default: m.WidgetDndGrid })),
+  { ssr: false },
+)
 import type { WidgetPref, WidgetSize, WidgetModule } from '@/lib/widget-catalog'
-import { WIDGET_CATALOG, WIDGET_FEATURE_MAP, BUDGET_WIDGETS, getWidgetDef, downsizeForMobile } from '@/lib/widget-catalog'
+import { WIDGET_CATALOG, WIDGET_FEATURE_MAP, BUDGET_WIDGETS, getWidgetDef } from '@/lib/widget-catalog'
 import { WIDGET_PRESETS, type WidgetPreset } from '@/lib/widget-presets'
 import { isFeatureAccessible, type FeatureAccessMap } from '@/lib/compute-feature-access'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
 
-/** Human-readable size label */
-function sizeLabel(size: WidgetSize): string {
-  switch (size) {
-    case 'mini': return 'XS'
-    case 'quarter': return '25%'
-    case 'half': return '50%'
-    case 'full': return '100%'
-    case 'xl': return 'Double'
-  }
-}
-
-// Bewust GEEN transform-strategie. rectSortingStrategy (en de list-strategieën)
-// berekenen per item een transform alsof de lijst lineair herschikt — maar een
-// CSS-grid met heterogene spans (quarter 1×1, half 2×1, full 2×2, Double 4×2)
-// herpakt anders, waardoor items over elkaar schuiven en de "dropplek" niet
-// klopt. In plaats daarvan herschikken we de array live in `onDragOver` en laat
-// de browser het grid natuurlijk herstromen (geen transforms). De actieve widget
-// staat als dashed placeholder op zijn nieuwe plek → een drop-indicator op exact
-// het formaat van de widget. Zie handleDragOver + het commentaar bij DndContext.
-const noTransformStrategy: SortingStrategy = () => null
-
-// ── SortableWidgetItem ─────────────────────────────────────────
-
-interface SortableWidgetItemProps {
-  pref: WidgetPref
-  data: DashboardData
-  features: FeatureAccessMap
-  isEditMode: boolean
-  isDragging: boolean
-  onResize?: (id: string, size: WidgetSize) => void
-  onHide?: (id: string) => void
-  /** Verberg de "Verbergen"-X-knop op deze widget in edit-mode. Bedoeld
-   *  voor host-context (hero-rail) waar de user widgets via de
-   *  add-picker beheert i.p.v. per stuk. */
-  hideHideButton?: boolean
-}
-
-function SortableWidgetItem({ pref, data, features, isEditMode, isDragging, onResize, onHide, hideHideButton }: SortableWidgetItemProps) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging: isSelfDragging,
-  } = useSortable({ id: pref.id })
-
-  const displaySize = useDisplaySize(pref.size)
-  // Double (xl) is niet selecteerbaar op mobiel: niet elke widget heeft een
-  // xl-variant en op mobiel rendert een xl-widget toch als L (full).
-  const isMobile = useIsMobile()
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  }
-
-  // Responsive span classes based on stored size
-  // On mobile (<640px): quarter→mini(1col×1row), half→quarter(1col×2row), full→half(2col×2row), xl→full(2col×2row)
-  // On desktop (sm+): quarter(1col×1row), half(2col×1row), full(2col×2row), xl(4col×2row op lg)
-  const spanClass =
-    pref.size === 'xl'      ? 'col-span-2 lg:col-span-4 row-span-2'
-    : pref.size === 'full'    ? 'col-span-2 row-span-2'
-    : pref.size === 'half'  ? 'row-span-2 sm:row-span-1 col-span-1 sm:col-span-2'
-    : pref.size === 'quarter' ? 'row-span-1'
-    : ''
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={spanClass}
-      data-testid={`widget-item-${pref.id}`}
-    >
-      {/* Drop placeholder — visible where the widget was */}
-      {isSelfDragging ? (
-        <div className="h-full rounded-[var(--r-lg)] border-2 border-dashed border-[var(--border-md)] bg-[var(--subtle)]/50" />
-      ) : (
-      <div className="relative">
-        {/* Edit controls — only visible in edit mode */}
-        {isEditMode && (
-          <div className="absolute top-2.5 right-2.5 z-10 flex items-center gap-1">
-            {/* Hide button — verborgen in host-context (hideHideButton).
-                Host beheert widgets via add-picker zelf. */}
-            {!hideHideButton && (
-              <button
-                type="button"
-                onClick={() => onHide?.(pref.id)}
-                aria-label={`Verberg ${pref.id} widget`}
-                title="Verbergen"
-                className="flex h-7 w-7 sm:h-9 sm:w-9 items-center justify-center rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-4)] shadow-[var(--s0)] transition-all hover:text-negative hover:border-negative/40 hover:bg-negative/10 active:scale-95 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            )}
-            {/* Size selector buttons — S/M/L (+ Double bij xl-support), mini is auto.
-                Double verschijnt alleen op desktop én alleen voor widgets met
-                'xl' in hun catalog-sizes (opt-in bouwblok). */}
-            {(() => {
-              const def = getWidgetDef(pref.id)
-              const allowed = def?.sizes ?? (['quarter', 'half', 'full'] as WidgetSize[])
-              const allSizes: { key: WidgetSize; label: string }[] = [
-                { key: 'quarter' as WidgetSize, label: 'S' },
-                { key: 'half' as WidgetSize, label: 'M' },
-                { key: 'full' as WidgetSize, label: 'L' },
-                { key: 'xl' as WidgetSize, label: 'Double' },
-              ]
-              const sizes = allSizes.filter(s =>
-                allowed.includes(s.key) && !(s.key === 'xl' && isMobile)
-              )
-              if (sizes.length <= 1) return null
-              return (
-                <div
-                  className="flex rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s0)] overflow-hidden"
-                  data-testid={`resize-btn-${pref.id}`}
-                >
-                  {sizes.map(s => (
-                    <button
-                      key={s.key}
-                      type="button"
-                      onClick={() => onResize?.(pref.id, s.key)}
-                      aria-label={`${pref.id} widget ${sizeLabel(s.key)}`}
-                      aria-pressed={pref.size === s.key}
-                      title={sizeLabel(s.key)}
-                      className={`flex items-center justify-center px-1.5 min-h-[44px] min-w-[32px] sm:min-h-0 sm:min-w-7 sm:h-9 text-[10px] font-semibold transition-colors ${
-                        pref.size === s.key
-                          ? 'bg-[var(--ink)] text-white'
-                          : 'text-[var(--ink-4)] hover:text-[var(--ink-2)] hover:bg-[var(--subtle)]'
-                      }`}
-                    >
-                      {s.label}
-                    </button>
-                  ))}
-                </div>
-              )
-            })()}
-            {/* Drag handle */}
-            <button
-              type="button"
-              {...attributes}
-              {...listeners}
-              aria-label={`Versleep ${pref.id} widget`}
-              data-testid={`drag-handle-${pref.id}`}
-              className="flex h-7 w-7 sm:h-9 sm:w-9 items-center justify-center rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-4)] shadow-[var(--s0)] transition-shadow hover:text-[var(--ink-3)] hover:shadow-[var(--s1)] cursor-grab active:cursor-grabbing min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0"
-            >
-              <GripVertical className="h-4 w-4" />
-            </button>
-          </div>
-        )}
-        <WidgetRenderer id={pref.id} size={displaySize} data={data} features={features} />
-      </div>
-      )}
-    </div>
-  )
-}
-
-// ── Drag overlay (follows cursor) ─────────────────────────────
-
-// De zwevende sleep-representatie. dnd-kit geeft de DragOverlay-wrapper exact
-// de afmetingen van de opgepakte cel; wij renderen de widget op de EFFECTIEVE
-// weergavegrootte (`size` = displaySize, dus mobiel gedownsized) zodat de
-// preview 1:1 op de bron past en onder het handje/de cursor blijft. Bewust géén
-// scale/rotate: die verschuiven de zichtbare box t.o.v. de cursor.
-function DragPreview({ pref, size, data, features }: { pref: WidgetPref; size: WidgetSize; data: DashboardData; features: FeatureAccessMap }) {
-  return (
-    <div
-      className="h-full w-full opacity-95 shadow-[var(--s3)] cursor-grabbing ring-2 ring-kern-300 rounded-[var(--r-lg)] overflow-hidden"
-    >
-      <WidgetRenderer id={pref.id} size={size} data={data} features={features} />
-    </div>
-  )
+/**
+ * Verplaats een element binnen een array (immutabel) — lokale replica van
+ * @dnd-kit's `arrayMove` zodat de parent zelf géén @dnd-kit importeert. De
+ * sleep-chunk (`widget-dnd-grid.tsx`) meldt de `over`-wissel terug; deze helper
+ * doet de daadwerkelijke herschikking op de door de parent beheerde volgorde.
+ */
+function moveInArray<T>(array: T[], from: number, to: number): T[] {
+  const next = array.slice()
+  const [item] = next.splice(from, 1)
+  next.splice(to, 0, item)
+  return next
 }
 
 // ── DraggableWidgetGrid ────────────────────────────────────────
@@ -287,10 +114,12 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, categoryAppL
   const router = useRouter()
   const { features } = useFeatureAccess()
 
-  // Filter out inaccessible, budget-gated, and stale-favorite widgets
-  const accessibleInitialPrefs = initialPrefs.filter(p => isWidgetVisible(p, features, data))
-
-  const [activeWidgets, setActiveWidgets] = useState<WidgetPref[]>(accessibleInitialPrefs)
+  // Filter out inaccessible, budget-gated, and stale-favorite widgets.
+  // Lazy init: dit seedt enkel de useState en wordt na de eerste render toch
+  // genegeerd — zo draait de filter niet meer bij elke re-render.
+  const [activeWidgets, setActiveWidgets] = useState<WidgetPref[]>(
+    () => initialPrefs.filter(p => isWidgetVisible(p, features, data)),
+  )
   const [internalEditMode, setInternalEditMode] = useState(false)
   // Controlled edit-mode: host (zoals /overzicht hero) levert eigen state.
   // Wanneer beide controlled-props aanwezig → gebruik die. Anders → intern.
@@ -306,7 +135,6 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, categoryAppL
       setInternalEditMode(resolved)
     }
   }
-  const [activeId, setActiveId] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [showAddPicker, setShowAddPicker] = useState(false)
   const [showAutoWizard, setShowAutoWizard] = useState(false)
@@ -346,16 +174,6 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, categoryAppL
     })
   }, [])
 
-  // Mobiel? Bepaalt de effectieve weergavegrootte van de zwevende sleep-preview
-  // (die moet matchen met de gedownsizede cel in het grid).
-  const isMobile = useIsMobile()
-
-  // Client-mount-vlag: de DragOverlay wordt via createPortal naar document.body
-  // gehangen (zie DragOverlay hieronder). Portalen mag pas ná mount omdat
-  // document.body tijdens SSR niet bestaat.
-  const [mounted, setMounted] = useState(false)
-  useEffect(() => { setMounted(true) }, [])
-
   // Store previous state for rollback on error
   const previousWidgets = useRef<WidgetPref[]>(initialPrefs)
   // Snapshot van de volgorde bij drag-start — voor rollback bij annuleren.
@@ -364,21 +182,6 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, categoryAppL
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Track pending debounced save for flush on unload/unmount
   const pendingWidgets = useRef<WidgetPref[] | null>(null)
-
-  // Gescheiden sensors i.p.v. één PointerSensor: muis start pas na een kleine
-  // afstand (voorkomt accidentele drags bij klikken op de handle), touch pas
-  // na een korte long-press (voorkomt conflict met scrollen op mobiel).
-  const sensors = useSensors(
-    useSensor(MouseSensor, {
-      activationConstraint: { distance: 4 },
-    }),
-    useSensor(TouchSensor, {
-      activationConstraint: { delay: 200, tolerance: 8 },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    }),
-  )
 
   const performSave = useCallback(async (widgets: WidgetPref[]) => {
     setSaveError(null)
@@ -542,9 +345,15 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, categoryAppL
     router.refresh()
   }, [performSave, router])
 
-  const handleDragStart = useCallback((event: DragStartEvent) => {
+  // ── Sleep-lifecycle (aangeroepen vanuit de edit-only WidgetDndGrid-chunk) ──
+  // De @dnd-kit-wiring + `activeId` + de DragOverlay wonen in de dynamische
+  // `widget-dnd-grid.tsx`-chunk; die meldt de lifecycle terug via primitieve
+  // callbacks. De volgorde (`activeWidgets`), de rollback-snapshot en de save-
+  // flow blijven hier — het gedrag is 1:1 gelijk aan de vorige inline-versie.
+
+  // Snapshot van de begin-volgorde bij drag-start (voor rollback bij annuleren).
+  const dragStartSnapshot = useCallback(() => {
     dragStartOrder.current = activeWidgets
-    setActiveId(event.active.id as string)
   }, [activeWidgets])
 
   // Live herschikken tijdens het slepen: verplaats de actieve widget in de array
@@ -552,19 +361,17 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, categoryAppL
   // transforms), zodat de dashed placeholder op de nieuwe plek een drop-indicator
   // op exact het widget-formaat vormt — ook voor hoge (row-span) widgets. Nog
   // NIET opslaan; dat gebeurt één keer bij drag-end.
-  const handleDragOver = useCallback((event: DragOverEvent) => {
-    const { active, over } = event
-    if (!over || active.id === over.id) return
+  const reorderOver = useCallback((activeId: string, overId: string | null) => {
+    if (!overId || activeId === overId) return
     setActiveWidgets(prev => {
-      const oldIndex = prev.findIndex(p => p.id === active.id)
-      const newIndex = prev.findIndex(p => p.id === over.id)
+      const oldIndex = prev.findIndex(p => p.id === activeId)
+      const newIndex = prev.findIndex(p => p.id === overId)
       if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return prev
-      return arrayMove(prev, oldIndex, newIndex)
+      return moveInArray(prev, oldIndex, newIndex)
     })
   }, [])
 
-  const handleDragEnd = useCallback(() => {
-    setActiveId(null)
+  const dragEndCommit = useCallback(() => {
     const startOrder = dragStartOrder.current
     dragStartOrder.current = null
     // De array is al live herschikt via onDragOver. Hier alleen de orders
@@ -582,20 +389,11 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, categoryAppL
   }, [scheduleSave])
 
   // Slepen geannuleerd (Esc / drop buiten) → herstel de begin-volgorde.
-  const handleDragCancel = useCallback(() => {
-    setActiveId(null)
+  const dragCancel = useCallback(() => {
     const startOrder = dragStartOrder.current
     dragStartOrder.current = null
     if (startOrder) setActiveWidgets(startOrder)
   }, [])
-
-  const activePref = activeId ? activeWidgets.find(p => p.id === activeId) ?? null : null
-  // Effectieve grootte van de sleep-preview: op mobiel gedownsized, zodat de
-  // DragOverlay 1:1 op de (gedownsizede) cel in het grid past.
-  const activeDisplaySize: WidgetSize | null = activePref
-    ? (isMobile ? downsizeForMobile(activePref.size) : activePref.size)
-    : null
-  const ids = activeWidgets.map(p => p.id)
 
   // De balk verschijnt bovenaan het grid zodra:
   //   • er data is (`categoryAppLinks` met >0 entries),
@@ -741,80 +539,32 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, categoryAppL
         </div>
       )}
 
-      {/* Heterogene spans (S 1×1, M 2×1, L 2×2, Double 4×2) → we herschikken de
-          array live in onDragOver en laten het grid native herstromen (geen
-          sorteer-transforms; zie noTransformStrategy op SortableContext).
-          closestCenter kiest het item waarvan het midden het dichtst bij de
-          cursor ligt — passend bij het reorder-on-over-patroon. MeasuringStrategy
-          .Always hermeet de droppables na elke herstroming zodat de volgende
-          `over`-inschatting klopt. */}
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
-        onDragStart={handleDragStart}
-        onDragOver={handleDragOver}
-        onDragEnd={handleDragEnd}
-        onDragCancel={handleDragCancel}
-        accessibility={{
-          announcements: {
-            onDragStart({ active }) {
-              return `Widget ${active.id} opgepakt.`
-            },
-            onDragOver({ active, over }) {
-              if (over) return `Widget ${active.id} wordt boven ${over.id} gehouden.`
-              return `Widget ${active.id} wordt gesleept.`
-            },
-            onDragEnd({ active, over }) {
-              if (over) return `Widget ${active.id} neergelegd op positie van ${over.id}.`
-              return `Widget ${active.id} neergelegd.`
-            },
-            onDragCancel({ active }) {
-              return `Slepen van ${active.id} geannuleerd.`
-            },
-          },
-        }}
-      >
-        <SortableContext items={ids} strategy={noTransformStrategy} disabled={!isEditMode}>
-          <div className="grid grid-cols-2 lg:grid-cols-4 auto-rows-[64px] sm:auto-rows-[160px] gap-3 sm:gap-4">
-            {activeWidgets.map(pref => (
-              <SortableWidgetItem
-                key={pref.id}
-                pref={pref}
-                data={data}
-                features={features}
-                isEditMode={isEditMode}
-                isDragging={pref.id === activeId}
-                onResize={handleResize}
-                onHide={handleHide}
-                hideHideButton={hideRemoveButton}
-              />
-            ))}
-          </div>
-        </SortableContext>
-
-        {/* ── Sleep-preview MOET naar document.body geportald worden ──────────
-            De app-shell-scrollcontainer is `position: fixed; inset:0;
-            overflow-y-auto` mét `contain: layout`. `contain: layout` maakt dat
-            element tot containing-block voor `position: fixed`-nakomelingen —
-            dnd-kit's <DragOverlay> is zo'n fixed-element. Zonder portal wordt de
-            overlay dus t.o.v. de GESCROLLDE container geplaatst i.p.v. de
-            viewport, waardoor de preview exact `scrollTop` pixels boven de
-            cursor zweeft (empirisch: overlay op y=-422 bij scrollTop 914 → 913px
-            te hoog). Dat is de "blijft niet onder het handje"-bug. document.body
-            valt buiten de contained container, dus daar lost `fixed` weer op
-            tegen de viewport en volgt de preview de cursor 1:1 — ook voor hoge
-            (row-span) widgets en diep op een lange pagina. Portalen pas ná mount
-            (SSR heeft geen document.body). */}
-        {mounted && createPortal(
-          <DragOverlay>
-            {activePref && activeDisplaySize ? (
-              <DragPreview pref={activePref} size={activeDisplaySize} data={data} features={features} />
-            ) : null}
-          </DragOverlay>,
-          document.body,
-        )}
-      </DndContext>
+      {/* Grid met heterogene spans (S 1×1, M 2×1, L 2×2, Double 4×2).
+          KIJK-modus: een statische, @dnd-kit-vrije grid (StaticWidgetItem) —
+          zo blijft de ~18kB sleep-code buiten de first-load JS van /overzicht.
+          EDIT-modus: WidgetDndGrid laadt de sleep-machinerie uit een aparte
+          chunk (dynamic, ssr:false) en herbergt DndContext + de live reorder-
+          on-over + de DragOverlay-portal. De volgorde/save-flow blijft hier. */}
+      {isEditMode ? (
+        <WidgetDndGrid
+          widgets={activeWidgets}
+          data={data}
+          features={features}
+          hideRemoveButton={hideRemoveButton}
+          onResize={handleResize}
+          onHide={handleHide}
+          onReorderOver={reorderOver}
+          onDragStartSnapshot={dragStartSnapshot}
+          onDragEndCommit={dragEndCommit}
+          onDragCancel={dragCancel}
+        />
+      ) : (
+        <div className="grid grid-cols-2 lg:grid-cols-4 auto-rows-[64px] sm:auto-rows-[160px] gap-3 sm:gap-4">
+          {activeWidgets.map(pref => (
+            <StaticWidgetItem key={pref.id} pref={pref} data={data} features={features} />
+          ))}
+        </div>
+      )}
 
       {/* Add widget picker + AI dashboard — only in edit mode */}
       {isEditMode && (

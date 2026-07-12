@@ -3,6 +3,15 @@ import { assertEqual, assert } from '../assert'
 import type { TestCase } from '../test-types'
 import { sanitizeForAI } from '@/lib/ai/sanitize'
 import { maskPIIInOutput } from '@/lib/ai/pii-output-filter'
+import {
+  scanAiCallsites,
+  importsGenerationFn,
+  importsSanitizeHelper,
+  AI_CALLSITE_ALLOWLIST,
+  collectScannedFiles,
+} from '@/lib/ai/ai-callsite-scan'
+import * as fs from 'fs'
+import * as path from 'path'
 
 const CAT = 'security.ai-beveiliging'
 
@@ -61,6 +70,55 @@ const tests: TestCase[] = [
       const text = 'Gewone tekst zonder gevoelige data'
       assertEqual(sanitizeForAI(text), text, 'ongewijzigd')
       assertEqual(maskPIIInOutput(text), text, 'output ongewijzigd')
+    },
+  },
+
+  // ── Guardrail: statische sanitize-scan over alle AI-callsites (ADR 0035) ──
+  {
+    id: 'ai-callsite-guardrail', name: 'AI-callsites sanitizen input', category: CAT,
+    description: 'Elke generatie-callsite importeert sanitizeForAI/sanitizeTransactions of staat op de gemotiveerde allowlist',
+    priority: 'critical', estimatedDurationMs: 40,
+    fn() {
+      const violations = scanAiCallsites()
+      assert(
+        violations.length === 0,
+        `Ongesanitizede AI-callsite(s) gevonden: ${violations.map((v) => v.file).join(', ')}. ` +
+          'Voeg sanitizeForAI/sanitizeTransactions toe of motiveer in AI_CALLSITE_ALLOWLIST.',
+      )
+    },
+  },
+  {
+    id: 'ai-callsite-detector', name: 'Scanner detecteert ongesanitizede callsite', category: CAT,
+    description: 'importsGenerationFn/importsSanitizeHelper herkennen een dummy correct (vangnet tegen een stille scanner)',
+    priority: 'high', estimatedDurationMs: 5,
+    fn() {
+      const bad = "import { generateObject } from 'ai'\nconst x = 1"
+      const good = "import { generateObject } from 'ai'\nimport { sanitizeForAI } from '@/lib/ai/sanitize'"
+      assert(importsGenerationFn(bad), 'generatie-import niet herkend')
+      assert(!importsSanitizeHelper(bad), 'sanitize ten onrechte herkend')
+      assert(importsSanitizeHelper(good), 'sanitize-import niet herkend')
+      // Een dummy zonder sanitize-import zou een violation zijn als het gescand werd.
+      assert(importsGenerationFn(bad) && !importsSanitizeHelper(bad), 'dummy zou violation moeten zijn')
+    },
+  },
+  {
+    id: 'ai-callsite-allowlist-integrity', name: 'Allowlist blijft actueel', category: CAT,
+    description: 'Elke allowlist-entry bestaat nog én is nog een generatie-callsite (voorkomt rot)',
+    priority: 'medium', estimatedDurationMs: 20,
+    fn() {
+      const root = process.cwd()
+      for (const entry of AI_CALLSITE_ALLOWLIST) {
+        const abs = path.join(root, ...entry.file.split('/'))
+        assert(fs.existsSync(abs), `Allowlist-bestand bestaat niet meer: ${entry.file}`)
+        const src = fs.readFileSync(abs, 'utf-8')
+        assert(
+          importsGenerationFn(src),
+          `Allowlist-bestand ${entry.file} is geen generatie-callsite meer — verwijder de entry.`,
+        )
+        assert(entry.reason.trim().length > 10, `Allowlist-entry ${entry.file} mist een motivatie.`)
+      }
+      // Sanity: de scan vindt daadwerkelijk bestanden (anders is de scope stuk).
+      assert(collectScannedFiles(root).length > 10, 'AI-callsite-scan vond te weinig bestanden — scope kapot?')
     },
   },
 ]

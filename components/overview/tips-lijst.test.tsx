@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { TipsLijst } from './tips-lijst'
+import { ToastProvider } from '@/components/app/toast-provider'
 import type { Recommendation } from '@/lib/recommendation-data'
 
 /**
@@ -169,6 +170,25 @@ describe('TipsLijst', () => {
     const ahead = (new Date(body.postponed_until).getTime() - Date.now()) / 86400_000
     expect(ahead).toBeGreaterThan(13.5)
     expect(ahead).toBeLessThan(14.5)
+  })
+
+  it('toont een foutmelding en laat de tip staan als het opslaan faalt (E-04)', async () => {
+    fetchMock.mockResolvedValue({ ok: false, status: 500 })
+
+    render(
+      <ToastProvider>
+        <TipsLijst recommendations={[baseRec({ id: 'r1', title: 'Click me' })]} />
+      </ToastProvider>,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Doe nu/i }))
+
+    // Foutmelding zichtbaar...
+    expect(
+      await screen.findByText('Je keuze is niet opgeslagen — probeer het opnieuw.'),
+    ).toBeInTheDocument()
+    // ...en de tip blijft in de lijst zodat de gebruiker opnieuw kan klikken.
+    expect(screen.getByText('Click me')).toBeInTheDocument()
   })
 
   it('sends action:reject on Negeren', async () => {

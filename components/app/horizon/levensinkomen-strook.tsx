@@ -64,9 +64,12 @@ export function LevensinkomenStrook({ nodes, activeAge, segments }: Levensinkome
           dekkingsgraad = (vaste inkomsten + veilige onttrekking) ÷ gewenste besteding × 100%. 100% = volledig gedekt
           zonder extra in te teren. <b className="text-[var(--ink)]">Groen ≥ 100%</b> — inkomen + veilige onttrekking
           dekken je besteding. <b className="text-[var(--ink)]">Amber 90–99%</b> — klein tekort, je teert licht in.{' '}
-          <b className="text-[var(--ink)]">Rood &lt; 90%</b> — structureel tekort dat jaar; bijsturen. Waarom het dipt:
-          in de brugjaren (tussen FIRE en AOW) is er nog geen AOW/pensioen, dus alles komt uit vermogen → onder 100%.
-          Vanaf AOW tillen AOW + pensioen je er weer boven.
+          <b className="text-[var(--ink)]">Rood &lt; 90%</b> — vaste inkomsten + veilige onttrekking dekken je
+          besteding dat jaar niet; de rest komt uit interen op je vermogen. Waarom het dipt: in de brugjaren (tussen
+          FIRE en AOW) is er nog geen AOW/pensioen, dus alles komt uit vermogen → onder 100%. Vanaf AOW tillen AOW +
+          pensioen je er weer boven. <b className="text-[var(--ink)]">Belangrijk:</b> rood betekent hier niet dat je
+          plan niet haalbaar is — deze strook rekent bewust geen interen mee. Wil je weten of dit binnen je doel past?
+          Check de dekkingsradar of de scenariokaarten.
         </p>
       </InlineInfoDisclosure>
 

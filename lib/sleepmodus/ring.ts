@@ -120,8 +120,17 @@ export function childPreviewFor(parentSlot: number, count: number): RingSlot[] {
  * Valt een punt (veld-%) binnen de deelbudget-ring van een geopende parent?
  * Gebruikt voor de directe (timer-loze) sluiting tijdens het slepen: buiten
  * deze cirkel → cluster dicht.
+ *
+ * De sluitgrens MOET ruim buiten de buitenste (2e) ring liggen, anders sluit de
+ * waaier precies op de plek waar de 2e-rij-deelbudgetten staan en zijn die met
+ * slepen vrijwel onbereikbaar. Daarom: CLUSTER_RADIUS_OUTER + marge (niet de
+ * voormalige, toevallig samenvallende CLUSTER_RADIUS + 12 === CLUSTER_RADIUS_OUTER).
+ * De marge geeft de buitenste bollen (incl. hun eigen straal) een reële hover/
+ * drop-zone. Een andere geopende parent wordt los hiervan getriggerd door de
+ * DOM-rect-collision van dnd-kit, dus een royalere sluitgrens sluit geen buur af.
  */
-const CLUSTER_EXIT_RADIUS = CLUSTER_RADIUS + 12
+const CLUSTER_EXIT_MARGIN = 10
+const CLUSTER_EXIT_RADIUS = CLUSTER_RADIUS_OUTER + CLUSTER_EXIT_MARGIN
 
 export function isInsideCluster(point: RingSlot, parentSlot: number): boolean {
   const parent = RING_SLOTS[parentSlot] ?? RING_SLOTS[0]

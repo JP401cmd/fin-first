@@ -387,3 +387,7 @@
 ## 2026-07-11
 
 - Geen wijzigingen.
+
+## 2026-07-12
+
+- **Componenten (aantal)** toegevoegd: +6

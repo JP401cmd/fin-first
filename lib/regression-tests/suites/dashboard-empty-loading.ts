@@ -124,6 +124,8 @@ function makeEmptyDashboardData(): DashboardData {
     topLifeEvents: [],
     // Savings & Budgeting
     savingsRate6m: 0,
+    monthlySavingsAmount: 0,
+    savingsRateIsEstimate: false,
     monthlySavingsBudgetSpent: 0,
     savingsBudgetSpent6m: 0,
     prevMonthSavingsBudgetSpent: 0,

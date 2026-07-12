@@ -187,7 +187,18 @@ export async function loadAllTests(): Promise<void> {
     import('@/lib/regression-tests/suites/uat-bezit').then(m => m.register()).catch(e => { console.warn('[test-registry] uat-bezit failed:', e) }),
     import('@/lib/regression-tests/suites/uat-toek').then(m => m.register()).catch(e => { console.warn('[test-registry] uat-toek failed:', e) }),
     import('@/lib/regression-tests/suites/uat-schuld').then(m => m.register()).catch(e => { console.warn('[test-registry] uat-schuld failed:', e) }),
+    import('@/lib/regression-tests/suites/uat-budget').then(m => m.register()).catch(e => { console.warn('[test-registry] uat-budget failed:', e) }),
     import('@/lib/regression-tests/suites/uat-kruis').then(m => m.register()).catch(e => { console.warn('[test-registry] uat-kruis failed:', e) }),
+    import('@/lib/regression-tests/suites/uat-start').then(m => m.register()).catch(e => { console.warn('[test-registry] uat-start failed:', e) }),
+    import('@/lib/regression-tests/suites/uat-will').then(m => m.register()).catch(e => { console.warn('[test-registry] uat-will failed:', e) }),
+    import('@/lib/regression-tests/suites/uat-cash').then(m => m.register()).catch(e => { console.warn('[test-registry] uat-cash failed:', e) }),
+    import('@/lib/regression-tests/suites/uat-belast').then(m => m.register()).catch(e => { console.warn('[test-registry] uat-belast failed:', e) }),
+    import('@/lib/regression-tests/suites/uat-ovz').then(m => m.register()).catch(e => { console.warn('[test-registry] uat-ovz failed:', e) }),
+    import('@/lib/regression-tests/suites/uat-nav').then(m => m.register()).catch(e => { console.warn('[test-registry] uat-nav failed:', e) }),
+    import('@/lib/regression-tests/suites/uat-rapp').then(m => m.register()).catch(e => { console.warn('[test-registry] uat-rapp failed:', e) }),
+    import('@/lib/regression-tests/suites/uat-reken').then(m => m.register()).catch(e => { console.warn('[test-registry] uat-reken failed:', e) }),
+    import('@/lib/regression-tests/suites/uat-mijn').then(m => m.register()).catch(e => { console.warn('[test-registry] uat-mijn failed:', e) }),
+    import('@/lib/regression-tests/suites/uat-beheer').then(m => m.register()).catch(e => { console.warn('[test-registry] uat-beheer failed:', e) }),
   ])
 
   // Log any rejected promises (shouldn't happen due to .catch, but just in case)

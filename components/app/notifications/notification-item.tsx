@@ -88,7 +88,11 @@ export const NotificationItem = memo(function NotificationItem({ notification, o
       tabIndex={0}
       onClick={handleClick}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick() } }}
-      className="w-full cursor-pointer text-left transition-all hover:bg-[var(--subtle)]"
+      // Deze rij bevat een genest interactief element (de "Vraag Will"-knop),
+      // dus blijft het een role="button"-div i.p.v. een echte <button>. De
+      // globale focus-ring scopet alleen op echte a/button, daarom hier expliciet
+      // een zichtbare focus-visible-outline zodat toetsenbordnavigatie leesbaar is.
+      className="w-full cursor-pointer text-left transition-all hover:bg-[var(--subtle)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--ink)] focus-visible:-outline-offset-2"
       style={{
         borderLeft: `3px solid ${moduleInfo.colorVar}`,
       }}

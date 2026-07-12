@@ -5,7 +5,7 @@ import { OnboardingShell } from './onboarding-shell'
 import { FactsPanel } from './facts-panel'
 import { OnboardingVraag } from './onboarding-vraag'
 import { SectionReview } from './section-review'
-import { DebtRow, DebtTypePicker } from './onboarding-posten'
+import { DebtRow, DebtTypePicker, LinkedDebtRow } from './onboarding-posten'
 import { QuickAddWizard } from '@/components/app/quick-add-wizard/quick-add-wizard'
 import {
   DEBT_QUICK_ADD_LABELS,
@@ -82,17 +82,19 @@ const DEBT_QUESTIONS: DebtQuestion[] = [
   { type: 'car_loan', question: 'Heb je een autolening of private lease?' },
 ]
 
-/** Types die via een gerichte vraag aan bod kwamen — uit de catch-all-picker. */
-const ASKED_DEBT_TYPES: DebtType[] = [
-  'mortgage',
-  'student_loan',
-  'personal_loan',
-  'revolving_credit',
-  'credit_card',
-  'car_loan',
-]
-
 const SECTION_EXIT_LABEL = 'Ik heb (verder) geen schulden'
+
+/**
+ * Herkomst-label per gekoppeld schuld-type — spiegelt LINKED_DEBT_SUGGESTIONS
+ * (asset→schuld). Toont de gebruiker wáár de schuld vandaan komt zodat het geen
+ * dubbeltelling lijkt maar transparantie is.
+ */
+const DEBT_ORIGIN_LABEL: Partial<Record<DebtType, string>> = {
+  mortgage: 'via je woning',
+  car_loan: 'via je voertuig',
+  dga_schuld: 'via je BV',
+}
+const debtOrigin = (type: DebtType) => DEBT_ORIGIN_LABEL[type] ?? 'via je bezittingen'
 
 // ── Component ──────────────────────────────────────────────────────────
 
@@ -121,8 +123,7 @@ export function OnboardingSchulden({
   const { phase, push, back } = useSectionPhaseNav(phases, onPhasesChange, onBack)
   const [wizardType, setWizardType] = useState<DebtType | null>(null)
 
-  // Losse schulden = zonder koppeling (gekoppelde hypotheken horen onder het
-  // huis in de bezittingen-stap, niet hier).
+  // Losse schulden = zonder koppeling; deze beheer je hier (toevoegen/verwijderen).
   const standaloneDebts = useMemo(
     () =>
       quickDebts
@@ -135,6 +136,24 @@ export function OnboardingSchulden({
     [standaloneDebts],
   )
 
+  // Gekoppelde schulden = eerder bij een bezitting opgegeven (hypotheek bij je
+  // woning, RC bij je BV, autolening bij je voertuig). Die horen óók thuis in
+  // "dit zijn je schulden" — anders mist de gebruiker ze (de melding bij deze
+  // kaart). Read-only hier: verwijderen/wijzigen hoort bij de bezitting, en het
+  // achterliggende netto-vermogen telt elke schuld precies één keer.
+  const linkedDebts = useMemo(
+    () =>
+      quickDebts
+        .map((debt, index) => ({ debt, index }))
+        .filter(({ debt }) => Boolean(debt.linked_client_ref)),
+    [quickDebts],
+  )
+  const linkedTotal = useMemo(
+    () => linkedDebts.reduce((s, { debt }) => s + (Number(debt.current_balance) || 0), 0),
+    [linkedDebts],
+  )
+  const hasAnyDebt = standaloneDebts.length > 0 || linkedDebts.length > 0
+
   // ── Wizard-collect ──────────────────────────────────────────────────
   function handleWizardCollect(item: QuickAddInput) {
     if (item.kind === 'debt') {
@@ -143,7 +162,8 @@ export function OnboardingSchulden({
     // 'asset' / 'asset_with_debt' kunnen in de schuld-sectie niet voorkomen.
     setWizardType(null)
     if (phase.kind === 'ask') push({ kind: 'more', qIndex: phase.qIndex })
-    else if (phase.kind === 'other-pick') push({ kind: 'other-more' })
+    else if (phase.kind === 'other-ask' || phase.kind === 'other-pick')
+      push({ kind: 'other-more' })
     // 'more' / 'other-more' → geen push, de "nog een?"-fase blijft staan.
   }
 
@@ -159,42 +179,57 @@ export function OnboardingSchulden({
     }
   }
 
-  // Sectie afronden: bij gevulde lijst eerst een bevestigend overzicht,
-  // bij lege lijst direct door. De altijd-zichtbare drempelloze uitgang
-  // (`SECTION_EXIT_LABEL`) blijft bewust direct-naar-onNext.
+  // Sectie afronden: zodra er íets te tonen is (losse óf gekoppelde schuld)
+  // eerst een bevestigend overzicht, anders direct door. De altijd-zichtbare
+  // drempelloze uitgang (`SECTION_EXIT_LABEL`) blijft bewust direct-naar-onNext.
   function finishSection() {
-    if (standaloneDebts.length > 0) push({ kind: 'review' })
+    if (hasAnyDebt) push({ kind: 'review' })
     else onNext()
   }
 
   // ── Lopend overzicht ────────────────────────────────────────────────
-  const runningList =
-    standaloneDebts.length > 0 ? (
-      <div className="space-y-2">
-        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--ink-3)]">
-          Toegevoegd · &minus;{formatCurrency(standaloneTotal)}
-        </p>
-        <ul className="space-y-2">
-          {standaloneDebts.map(({ debt, index }) => (
-            <li key={`debt-${index}`}>
-              <DebtRow item={debt} onRemove={() => removeDebt(index)} />
-            </li>
-          ))}
-        </ul>
-      </div>
-    ) : null
+  const runningList = hasAnyDebt ? (
+    <div className="space-y-4">
+      {linkedDebts.length > 0 && (
+        <div className="space-y-2">
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--ink-3)]">
+            Al opgegeven bij je bezittingen · &minus;{formatCurrency(linkedTotal)}
+          </p>
+          <ul className="space-y-2">
+            {linkedDebts.map(({ debt, index }) => (
+              <li key={`linked-debt-${index}`}>
+                <LinkedDebtRow item={debt} origin={debtOrigin(debt.debt_type)} />
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {standaloneDebts.length > 0 && (
+        <div className="space-y-2">
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--ink-3)]">
+            Toegevoegd · &minus;{formatCurrency(standaloneTotal)}
+          </p>
+          <ul className="space-y-2">
+            {standaloneDebts.map(({ debt, index }) => (
+              <li key={`debt-${index}`}>
+                <DebtRow item={debt} onRemove={() => removeDebt(index)} />
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  ) : null
 
+  const totalDebtCount = standaloneDebts.length + linkedDebts.length
+  const totalDebt = standaloneTotal + linkedTotal
   const factsPanel = (
     <FactsPanel
-      stat={standaloneDebts.length > 0 ? `−${formatCurrency(standaloneTotal)}` : '€3.700'}
-      sub={
-        standaloneDebts.length > 0
-          ? 'vrijheid die je terugkoopt'
-          : 'gemiddelde consumptieve schuld per huishouden'
-      }
+      stat={hasAnyDebt ? `−${formatCurrency(totalDebt)}` : '€3.700'}
+      sub={hasAnyDebt ? 'vrijheid die je terugkoopt' : 'gemiddelde consumptieve schuld per huishouden'}
       source={
-        standaloneDebts.length > 0
-          ? `${standaloneDebts.length} schuld${standaloneDebts.length === 1 ? '' : 'en'}`
+        hasAnyDebt
+          ? `${totalDebtCount} schuld${totalDebtCount === 1 ? '' : 'en'}`
           : 'Indicatief · CBS/AFM'
       }
     />
@@ -234,33 +269,56 @@ export function OnboardingSchulden({
       )
     }
 
-    if (phase.kind === 'other-ask') {
+    // "Heb je nog een andere schuld?" (other-ask) en "Nog een schuld?"
+    // (other-more): geen ja/nee-tussenstap meer — de volledige schuld-catalogus
+    // staat hier direct als aanklikbare kaartjes (spiegelt de bezittingen-stap).
+    // De drempelloze sectie-uitgang blijft bewust altijd bereikbaar. `other-pick`
+    // blijft als apart picker-scherm bestaan voor SectionReview.onAddMore.
+    if (phase.kind === 'other-ask' || phase.kind === 'other-more') {
+      const isFirst = phase.kind === 'other-ask'
       return (
-        <OnboardingVraag
-          {...sharedVraagProps}
-          title={<span>Heb je nog een andere schuld?</span>}
-          deck="Bijvoorbeeld een afbetalingsregeling, belastingschuld of familielening."
-          onYes={() => push({ kind: 'other-pick' })}
-          onNo={finishSection}
+        <OnboardingShell
+          kicker="Schuld"
+          romanNum="iv."
+          title={<span>{isFirst ? 'Heb je nog een andere schuld?' : 'Nog een schuld?'}</span>}
+          deck={
+            isFirst
+              ? 'Kies een categorie om die meteen toe te voegen — denk aan een belastingschuld, afbetalingsregeling of familielening. Of rond de schulden af.'
+              : 'Voeg er gerust nog een toe — of rond de schulden af.'
+          }
+          factsPanel={factsPanel}
+          currentStep={currentStep}
+          totalSteps={totalSteps}
+          onBack={back}
+          footer={
+            <div className="flex w-full flex-col gap-2.5">
+              <button
+                type="button"
+                onClick={finishSection}
+                className="w-full min-h-11 border border-[var(--border-ed)] bg-[var(--paper)] px-6 py-3 text-sm font-medium text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+              >
+                Nee, klaar
+              </button>
+              {/* Drempelloze sectie-uitgang blijft — net als op elke ja/nee-vraag
+                  (slaat het review-overzicht bewust over → direct door). */}
+              <button
+                type="button"
+                onClick={onNext}
+                className="min-h-9 text-xs italic text-[var(--ink-3)] underline-offset-4 transition-colors hover:text-[var(--ink-2)] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+                style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+              >
+                {SECTION_EXIT_LABEL}
+              </button>
+            </div>
+          }
         >
-          {runningList}
-        </OnboardingVraag>
-      )
-    }
-
-    if (phase.kind === 'other-more') {
-      return (
-        <OnboardingVraag
-          {...sharedVraagProps}
-          title={<span>Nog een schuld?</span>}
-          deck="Voeg er gerust meer toe — of rond de schulden af."
-          yesLabel="Ja, nog een"
-          noLabel="Nee, klaar"
-          onYes={() => push({ kind: 'other-pick' })}
-          onNo={finishSection}
-        >
-          {runningList}
-        </OnboardingVraag>
+          <div className="space-y-6">
+            {runningList}
+            {/* Volledige catalogus (geen `exclude`) — geen `onCancel`: de
+                sectie-footer verzorgt de uitgang. */}
+            <DebtTypePicker exclude={[]} onPick={(type) => setWizardType(type)} />
+          </div>
+        </OnboardingShell>
       )
     }
 
@@ -306,8 +364,13 @@ export function OnboardingSchulden({
       >
         <div className="space-y-6">
           {runningList}
+          {/* Catch-all vangnet: toon de vólledige schuld-catalogus (canonieke
+              `QUICK_ADD_DEBT_ORDER`), óók de types die al via een gerichte
+              ja/nee-vraag langskwamen. Wie daar "nee" zei maar een hypotheek,
+              studielening of krediet vergat, kan die hier alsnog toevoegen —
+              identiek aan het bezittingen-format. Geen `exclude`. */}
           <DebtTypePicker
-            exclude={ASKED_DEBT_TYPES}
+            exclude={[]}
             onPick={(type) => setWizardType(type)}
             onCancel={back}
           />

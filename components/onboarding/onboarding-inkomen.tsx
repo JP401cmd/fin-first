@@ -218,7 +218,7 @@ export function OnboardingInkomen({
     )
   const deck =
     field === 'inkomen'
-      ? 'Je netto maandinkomen is het startpunt — het tempo waarin je vrijheid kunt opbouwen. Schat gerust; je past het later aan.'
+      ? 'Je netto maandinkomen is het startpunt — het tempo waarin je vrijheid kunt opbouwen. Schat gerust; je kunt het later aanpassen.'
       : field === 'uitgaven'
         ? 'Je uitgaven bepalen samen met je inkomen je spaarquote. Zo zie je direct hoe snel je vrijheid groeit.'
         : 'Je inkomen en uitgaven bepalen samen je spaarquote — het tempo waarin je vrijheid opbouwt. Schat gerust; je past het later aan.'

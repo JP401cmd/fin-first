@@ -67,6 +67,50 @@ describe('QuickAddWizard — collect-modus, eigen woning', () => {
     }
   })
 
+  it('spaarrekening: geeft de ingevoerde rente mee als asset.expected_return', async () => {
+    const onCollect = vi.fn()
+    render(
+      <QuickAddWizard
+        open
+        onClose={vi.fn()}
+        initialIntent="asset"
+        initialAssetType="savings"
+        mode="collect"
+        onCollect={onCollect}
+      />,
+    )
+
+    fireEvent.change(screen.getByLabelText('Huidige waarde'), { target: { value: '15000' } })
+    // Bank blijft invulbaar (field3) NAAST de rente.
+    fireEvent.change(screen.getByLabelText('Bank / instelling'), { target: { value: 'bunq' } })
+    fireEvent.change(screen.getByLabelText('Rente (%)'), { target: { value: '3.6' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Toevoegen' }))
+
+    await waitFor(() => expect(onCollect).toHaveBeenCalledTimes(1))
+    const arg = onCollect.mock.calls[0][0] as QuickAddInput
+    expect(arg.kind).toBe('asset')
+    if (arg.kind === 'asset') {
+      expect(arg.asset.asset_type).toBe('savings')
+      expect(arg.asset.current_value).toBe(15000)
+      expect(arg.asset.field3).toBe('bunq')
+      expect(arg.asset.expected_return).toBe(3.6)
+    }
+  })
+
+  it('spaarrekening: rente-veld toont de 2,5%-default als voorinvulling', () => {
+    render(
+      <QuickAddWizard
+        open
+        onClose={vi.fn()}
+        initialIntent="asset"
+        initialAssetType="savings"
+        mode="collect"
+        onCollect={vi.fn()}
+      />,
+    )
+    expect((screen.getByLabelText('Rente (%)') as HTMLInputElement).value).toBe('2.5')
+  })
+
   it('"Nee, overslaan" → geeft alleen het huis terug (huis zonder hypotheek blijft geldig)', async () => {
     const onCollect = vi.fn()
     renderCollect(onCollect)

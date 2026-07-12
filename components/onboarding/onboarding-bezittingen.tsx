@@ -78,11 +78,22 @@ export interface OnboardingBezittingenProps {
 interface AssetQuestion {
   type: AssetType
   question: string
+  /**
+   * Optioneel eigen deck voor déze vraag (valt anders terug op het gedeelde
+   * default-deck). Zo staat de spaarrekening-verduidelijking uitsluitend bij de
+   * betaalrekening-vraag en lekt 'die vragen we hierna' niet naar de andere
+   * vragen — die het default-deck delen.
+   */
+  deck?: string
 }
 
 /** Gerichte ja/nee-vragen, in oplopende waarschijnlijkheid. */
 const ASSET_QUESTIONS: AssetQuestion[] = [
-  { type: 'cash', question: 'Heb je een betaalrekening?' },
+  {
+    type: 'cash',
+    question: 'Heb je een betaalrekening?',
+    deck: 'Begin met je betaalrekening — de rekening waar je salaris binnenkomt. Spaargeld staat op een aparte rekening; die vragen we hierna. Elke post toont een stukje opgebouwde vrijheid.',
+  },
   { type: 'savings', question: 'Heb je een spaargeldrekening?' },
   { type: 'eigen_huis', question: 'Heb je een eigen huis?' },
   { type: 'investment', question: 'Heb je beleggingen?' },
@@ -156,7 +167,8 @@ export function OnboardingBezittingen({
     // Sluit de wizard en ga naar de "nog een?"-fase voor het juiste type.
     setWizardType(null)
     if (phase.kind === 'ask') push({ kind: 'more', qIndex: phase.qIndex })
-    else if (phase.kind === 'other-pick') push({ kind: 'other-more' })
+    else if (phase.kind === 'other-ask' || phase.kind === 'other-pick')
+      push({ kind: 'other-more' })
     // 'more' / 'other-more' → geen push, de "nog een?"-fase blijft staan.
   }
 
@@ -299,7 +311,8 @@ export function OnboardingBezittingen({
           deck={
             isMore
               ? 'Voeg er gerust meer toe — of ga door naar de volgende vraag.'
-              : 'Elke post die je toevoegt, toont een stukje opgebouwde vrijheid. Twijfel je? Sla gerust over.'
+              : (q.deck ??
+                'Elke post die je toevoegt, toont een stukje opgebouwde vrijheid. Twijfel je? Sla gerust over.')
           }
           onYes={() => setWizardType(q.type)}
           onNo={() => nextAfterQuestion(phase.qIndex)}
@@ -314,33 +327,42 @@ export function OnboardingBezittingen({
       )
     }
 
-    if (phase.kind === 'other-ask') {
+    // "Heb je nog andere bezittingen?" (other-ask) en "Nog een bezitting?"
+    // (other-more): geen ja/nee-tussenstap meer — de volledige asset-catalogus
+    // staat hier direct als aanklikbare kaartjes (kaartje-klik opent meteen de
+    // wizard). De footer is één drempelloze afsluitknop. `other-pick` blijft als
+    // apart picker-scherm bestaan voor SectionReview.onAddMore + oude fase-stacks.
+    if (phase.kind === 'other-ask' || phase.kind === 'other-more') {
+      const isFirst = phase.kind === 'other-ask'
       return (
-        <OnboardingVraag
+        <OnboardingShell
           {...sharedVraagProps}
-          title={questionHeadline('Heb je nog andere bezittingen?')}
-          deck="Denk aan een auto, pensioen, crypto of een eigen BV — of een woning, spaar- of beleggingsrekening die je eerder oversloeg."
-          onYes={() => push({ kind: 'other-pick' })}
-          onNo={finishSection}
+          title={questionHeadline(
+            isFirst ? 'Heb je nog andere bezittingen?' : 'Nog een bezitting?',
+          )}
+          deck={
+            isFirst
+              ? 'Kies een categorie om die meteen toe te voegen — denk aan een auto, pensioen, crypto of een eigen BV. Of rond je bezittingen af.'
+              : 'Voeg er gerust nog een toe — of rond je bezittingen af.'
+          }
+          footer={
+            <button
+              type="button"
+              onClick={finishSection}
+              className="w-full min-h-11 border border-[var(--border-ed)] bg-[var(--paper)] px-6 py-3 text-sm font-medium text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+            >
+              {isFirst ? 'Nee, ik ben klaar' : 'Nee, klaar'}
+            </button>
+          }
         >
-          {runningList}
-        </OnboardingVraag>
-      )
-    }
-
-    if (phase.kind === 'other-more') {
-      return (
-        <OnboardingVraag
-          {...sharedVraagProps}
-          title={questionHeadline('Nog een bezitting?')}
-          deck="Voeg er gerust meer toe — of rond de bezittingen af."
-          yesLabel="Ja, nog een"
-          noLabel="Nee, klaar"
-          onYes={() => push({ kind: 'other-pick' })}
-          onNo={finishSection}
-        >
-          {runningList}
-        </OnboardingVraag>
+          <div className="space-y-6">
+            {runningList}
+            {/* Volledige catalogus (geen `exclude`) zodat een eerder overgeslagen
+                woning/spaar-/betaalrekening/belegging hier alsnog toe te voegen
+                is. Geen `onCancel`: de sectie-footer verzorgt de uitgang. */}
+            <AssetTypePicker exclude={[]} onPick={(type) => setWizardType(type)} />
+          </div>
+        </OnboardingShell>
       )
     }
 

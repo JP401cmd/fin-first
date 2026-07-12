@@ -1,6 +1,6 @@
 ﻿'use client'
 
-import { useState, memo } from 'react'
+import { useState, useMemo, memo } from 'react'
 import { formatCurrency } from '@/components/app/budget-shared'
 import { AlertTriangle } from 'lucide-react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
@@ -43,7 +43,103 @@ export const CashFlowForecastChart = memo(function CashFlowForecastChart({ forec
   const { ref, hasEntered, animationComplete } = useInViewAnimation({ duration: 700 })
   const { masked } = useMaskedAmounts()
 
-  if (!forecast || forecast.length < 2) {
+  // All chart geometry (dimensions, scales, path strings, grid) depends only
+  // on the data inputs — never on hoveredIndex. Memoize it so hovering a data
+  // point doesn't rebuild every path string + the grid array each render.
+  const geometry = useMemo(() => {
+    if (!forecast || forecast.length < 2) return null
+
+    // Chart dimensions
+    const width = 600
+    const height = 240
+    const paddingLeft = 60
+    const paddingRight = 20
+    const paddingTop = 20
+    const paddingBottom = 40
+    const chartWidth = width - paddingLeft - paddingRight
+    const chartHeight = height - paddingTop - paddingBottom
+
+    // Calculate value bounds
+    const values = forecast.map(p => p.projectedBalance)
+    const minVal = Math.min(...values, 0) // Include 0 in range
+    const maxVal = Math.max(...values, currentBalance)
+    const valueRange = maxVal - minVal || 1
+    const buffer = valueRange * 0.1
+    const yMin = minVal - buffer
+    const yMax = maxVal + buffer
+    const yRange = yMax - yMin || 1
+
+    // Position helpers
+    const xStep = chartWidth / Math.max(1, forecast.length - 1)
+    const getX = (i: number) => paddingLeft + i * xStep
+    const getY = (val: number) => paddingTop + chartHeight - ((val - yMin) / yRange) * chartHeight
+
+    // Build area path (filled below the line)
+    const lineParts: string[] = []
+    for (let i = 0; i < forecast.length; i++) {
+      const x = getX(i)
+      const y = getY(forecast[i].projectedBalance)
+      lineParts.push(`${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`)
+    }
+    const linePath = lineParts.join(' ')
+
+    // Area path: line + bottom closure
+    const areaPath = `${linePath} L${getX(forecast.length - 1).toFixed(1)},${(paddingTop + chartHeight).toFixed(1)} L${getX(0).toFixed(1)},${(paddingTop + chartHeight).toFixed(1)} Z`
+
+    // Red danger zone (below €500)
+    const dangerThreshold = 500
+    const dangerY = getY(dangerThreshold)
+    const showDangerZone = dangerThreshold > yMin
+
+    // Y-axis grid lines (5 lines)
+    const gridCount = 5
+    const gridLines: { value: number; y: number; label: string }[] = []
+    for (let i = 0; i <= gridCount; i++) {
+      const val = yMin + (yRange / gridCount) * i
+      gridLines.push({
+        value: val,
+        y: getY(val),
+        label: formatEurShort(val),
+      })
+    }
+
+    // Find the transition point between current and projected months
+    const currentMonthIndex = forecast.findIndex(p => p.isCurrentMonth)
+    const firstProjectedIndex = currentMonthIndex >= 0 ? currentMonthIndex + 1 : 1
+
+    // Split area: solid for current, semi-transparent for projected.
+    // Build the projected area + its dashed overlay line (from first projected
+    // month onward) from the same point set.
+    let projectedAreaPath = ''
+    let projLinePath = ''
+    if (firstProjectedIndex < forecast.length) {
+      const projParts: string[] = []
+      // Start from the current month point (overlap) for smooth transition
+      const startIdx = Math.max(0, firstProjectedIndex - 1)
+      for (let i = startIdx; i < forecast.length; i++) {
+        const x = getX(i)
+        const y = getY(forecast[i].projectedBalance)
+        projParts.push(`${i === startIdx ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`)
+      }
+      projLinePath = projParts.join(' ')
+      projectedAreaPath = `${projLinePath} L${getX(forecast.length - 1).toFixed(1)},${(paddingTop + chartHeight).toFixed(1)} L${getX(startIdx).toFixed(1)},${(paddingTop + chartHeight).toFixed(1)} Z`
+    }
+
+    // Determine trend color
+    const lastBalance = forecast[forecast.length - 1].projectedBalance
+    const trendPositive = lastBalance >= currentBalance
+    const mainColor = trendPositive ? '#059669' : '#dc2626' // emerald-600 or red-600
+
+    return {
+      width, height, paddingLeft, paddingRight, paddingTop,
+      chartWidth, chartHeight, getX, getY,
+      linePath, areaPath, projectedAreaPath, projLinePath,
+      dangerY, showDangerZone, gridLines,
+      currentMonthIndex, firstProjectedIndex, mainColor,
+    }
+  }, [forecast, currentBalance])
+
+  if (!geometry) {
     return (
       <div className="py-6 text-center text-sm text-[var(--ink-3)]" data-testid="cashflow-forecast-empty">
         Onvoldoende data om een cashflow prognose te maken.
@@ -51,83 +147,14 @@ export const CashFlowForecastChart = memo(function CashFlowForecastChart({ forec
     )
   }
 
-  // Chart dimensions
-  const width = 600
-  const height = 240
-  const paddingLeft = 60
-  const paddingRight = 20
-  const paddingTop = 20
-  const paddingBottom = 40
-  const chartWidth = width - paddingLeft - paddingRight
-  const chartHeight = height - paddingTop - paddingBottom
+  const {
+    width, height, paddingLeft, paddingRight, paddingTop,
+    chartWidth, chartHeight, getX, getY,
+    linePath, areaPath, projectedAreaPath, projLinePath,
+    dangerY, showDangerZone, gridLines,
+    currentMonthIndex, firstProjectedIndex, mainColor,
+  } = geometry
 
-  // Calculate value bounds
-  const values = forecast.map(p => p.projectedBalance)
-  const minVal = Math.min(...values, 0) // Include 0 in range
-  const maxVal = Math.max(...values, currentBalance)
-  const valueRange = maxVal - minVal || 1
-  const buffer = valueRange * 0.1
-  const yMin = minVal - buffer
-  const yMax = maxVal + buffer
-  const yRange = yMax - yMin || 1
-
-  // Position helpers
-  const xStep = chartWidth / Math.max(1, forecast.length - 1)
-  const getX = (i: number) => paddingLeft + i * xStep
-  const getY = (val: number) => paddingTop + chartHeight - ((val - yMin) / yRange) * chartHeight
-
-  // Build area path (filled below the line)
-  const lineParts: string[] = []
-  for (let i = 0; i < forecast.length; i++) {
-    const x = getX(i)
-    const y = getY(forecast[i].projectedBalance)
-    lineParts.push(`${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`)
-  }
-  const linePath = lineParts.join(' ')
-
-  // Area path: line + bottom closure
-  const areaPath = `${linePath} L${getX(forecast.length - 1).toFixed(1)},${(paddingTop + chartHeight).toFixed(1)} L${getX(0).toFixed(1)},${(paddingTop + chartHeight).toFixed(1)} Z`
-
-  // Red danger zone (below €500)
-  const dangerThreshold = 500
-  const dangerY = getY(dangerThreshold)
-  const showDangerZone = dangerThreshold > yMin
-
-  // Y-axis grid lines (5 lines)
-  const gridCount = 5
-  const gridLines: { value: number; y: number; label: string }[] = []
-  for (let i = 0; i <= gridCount; i++) {
-    const val = yMin + (yRange / gridCount) * i
-    gridLines.push({
-      value: val,
-      y: getY(val),
-      label: formatEurShort(val),
-    })
-  }
-
-  // Find the transition point between current and projected months
-  const currentMonthIndex = forecast.findIndex(p => p.isCurrentMonth)
-  const firstProjectedIndex = currentMonthIndex >= 0 ? currentMonthIndex + 1 : 1
-
-  // Split area: solid for current, semi-transparent for projected
-  // Build projected area (from first projected month onward)
-  let projectedAreaPath = ''
-  if (firstProjectedIndex < forecast.length) {
-    const projParts: string[] = []
-    // Start from the current month point (overlap) for smooth transition
-    const startIdx = Math.max(0, firstProjectedIndex - 1)
-    for (let i = startIdx; i < forecast.length; i++) {
-      const x = getX(i)
-      const y = getY(forecast[i].projectedBalance)
-      projParts.push(`${i === startIdx ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`)
-    }
-    projectedAreaPath = `${projParts.join(' ')} L${getX(forecast.length - 1).toFixed(1)},${(paddingTop + chartHeight).toFixed(1)} L${getX(startIdx).toFixed(1)},${(paddingTop + chartHeight).toFixed(1)} Z`
-  }
-
-  // Determine trend color
-  const lastBalance = forecast[forecast.length - 1].projectedBalance
-  const trendPositive = lastBalance >= currentBalance
-  const mainColor = trendPositive ? '#059669' : '#dc2626' // emerald-600 or red-600
   const areaGradientId = 'cashflow-area-gradient'
   const projGradientId = 'cashflow-proj-gradient'
 
@@ -271,14 +298,7 @@ export const CashFlowForecastChart = memo(function CashFlowForecastChart({ forec
         {/* Projected portion: dashed overlay line */}
         {firstProjectedIndex < forecast.length && (
           <path
-            d={(() => {
-              const parts: string[] = []
-              const startIdx = Math.max(0, firstProjectedIndex - 1)
-              for (let i = startIdx; i < forecast.length; i++) {
-                parts.push(`${i === startIdx ? 'M' : 'L'}${getX(i).toFixed(1)},${getY(forecast[i].projectedBalance).toFixed(1)}`)
-              }
-              return parts.join(' ')
-            })()}
+            d={projLinePath}
             fill="none"
             stroke={mainColor}
             strokeWidth="2"

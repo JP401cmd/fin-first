@@ -9,6 +9,8 @@ import { extractFinancialData } from '@/lib/ai/extract-financial-data'
 import { AssetQuickInputSchema, DebtQuickInputSchema } from '@/lib/quick-add/validation'
 import { buildAssetDraft, buildDebtDraft } from '@/lib/quick-add/build-drafts'
 import type { AssetQuickInput, DebtQuickInput } from '@/lib/quick-add/types'
+import { LINKED_DEBT_SUGGESTIONS, type AssetType } from '@/lib/asset-data'
+import type { DebtType } from '@/lib/debt-data'
 import type { GoalSlug } from '@/lib/goals/types'
 import { GOAL_MODULE_PRESETS } from '@/lib/goals/catalog'
 
@@ -32,8 +34,11 @@ const GOAL_TO_INTENT_FALLBACK: Record<GoalSlug, IntentId> = {
  * verwachten:
  *   · `budgetteren` heeft minstens één cash-asset met `has_budget_tracking=true`
  *     nodig (anders kunnen transacties niet aan budgetten gekoppeld worden).
- *   · `aandelenregistratie` heeft minstens één investment-asset met
- *     `has_holdings_tracking=true` nodig (anders is de Holdings-app leeg).
+ *   · `aandelenregistratie` heeft minstens één investment-asset nodig als anker.
+ *     `has_holdings_tracking` wordt bij onboarding NIET automatisch aangezet:
+ *     dat is een bewust selectieve opt-in via de setup-wizard
+ *     (aandelen-holdings.config.tsx + /api/aandelen-holdings/setup). De asset
+ *     wordt dus wél geseed, maar met tracking uit tot de gebruiker kiest.
  *
  * Wanneer de gebruiker de bezittingen-stap heeft overgeslagen of de juiste
  * categorie niet heeft toegevoegd, seedt de server hier een placeholder met
@@ -66,16 +71,34 @@ function applyModuleSeeding(
 // dus een aparte post-insert UPDATE is overbodig.
 
 /**
- * Twee-fasen koppeling huis ↔ hypotheek na de onboarding-insert.
+ * Is `debtType` het schuld-type dat bij `assetType` hoort volgens de canonieke
+ * `LINKED_DEBT_SUGGESTIONS`-bron? Eén plek voor de paar-validatie, gebruikt zowel
+ * bij het bouwen van de paren (client-input) als bij de defensieve DB-guard.
+ */
+function isLinkedAssetDebtPair(assetType: string, debtType: string): boolean {
+  return LINKED_DEBT_SUGGESTIONS[assetType as AssetType] === (debtType as DebtType)
+}
+
+/**
+ * Twee-fasen koppeling bezitting ↔ gekoppelde schuld na de onboarding-insert.
  *
- * Tijdens onboarding heeft een eigen woning nog geen DB-id, dus de client geeft
+ * Tijdens onboarding heeft een bezitting nog geen DB-id, dus de client geeft
  * een opaak koppel-token mee: `client_ref` op de asset en `linked_client_ref`
- * op de bijbehorende hypotheek. Pas ná de insert bestaan de echte id's. Deze
+ * op de bijbehorende schuld. Pas ná de insert bestaan de echte id's. Deze
  * helper resolved beide id's uit de ZOJUIST-INGEVOEGDE rijen van DEZE gebruiker
  * (RLS-scoped op `user_id`) en zet `debts.linked_asset_id`.
  *
+ * Generiek over ALLE gekoppelde paren uit `LINKED_DEBT_SUGGESTIONS` — niet
+ * alleen huis↔hypotheek, maar óók voertuig↔autolening en deelneming (BV)↔
+ * DGA-schuld. Vroeger koppelde deze stap uitsluitend `mortgage`, waardoor een
+ * tijdens onboarding gekoppelde RC-aan-BV of autolening als volledig LOSSE
+ * schuld (linked_asset_id = null) in de database bleef staan — dat schond de
+ * app-invariant dat een `dga_schuld` altijd aan een deelneming gekoppeld is
+ * (verplicht in de reguliere debt-form) en brak de groepering "schuld onder de
+ * bezitting" op /core.
+ *
  * Beveiliging: de client levert nooit een echt asset-id — alleen een opaak
- * token. De huis-id wordt uitsluitend uit onze eigen (RLS-afgeschermde) rijen
+ * token. De asset-id wordt uitsluitend uit onze eigen (RLS-afgeschermde) rijen
  * gehaald en de UPDATE filtert expliciet op `user_id`. Een gebruiker kan dus
  * onmogelijk aan andermans asset koppelen.
  *
@@ -87,22 +110,22 @@ function applyModuleSeeding(
  * strategie (`filterAssetsForFire`) de hypotheek NIET uit de FIRE-pot mee met
  * het huis → vertekend FIRE-doel.
  */
-export async function linkOnboardingMortgages(
+export async function linkOnboardingAssetDebtPairs(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
   quickAssets: AssetQuickInput[],
   quickDebts: DebtQuickInput[],
 ) {
   // Bouw paren: debt-index → asset-index, via de client-refs. Alleen geldige
-  // huis↔hypotheek-combinaties (defensief dubbel-gecheckt op type).
+  // bezitting↔schuld-combinaties uit LINKED_DEBT_SUGGESTIONS (defensief
+  // dubbel-gecheckt op type).
   const pairs: Array<{ assetIndex: number; debtIndex: number }> = []
   quickDebts.forEach((debt, debtIndex) => {
     const ref = debt.linked_client_ref
-    if (!ref || debt.debt_type !== 'mortgage') return
+    if (!ref) return
     const assetIndex = quickAssets.findIndex((a) => a.client_ref === ref)
     if (assetIndex < 0) return
-    const assetType = quickAssets[assetIndex].asset_type
-    if (assetType !== 'eigen_huis' && assetType !== 'real_estate') return
+    if (!isLinkedAssetDebtPair(quickAssets[assetIndex].asset_type, debt.debt_type)) return
     pairs.push({ assetIndex, debtIndex })
   })
   if (pairs.length === 0) return
@@ -119,19 +142,18 @@ export async function linkOnboardingMortgages(
   for (const r of debtRows ?? []) debtBySort.set(Number(r.sort_order), { id: r.id, debt_type: r.debt_type })
 
   for (const { assetIndex, debtIndex } of pairs) {
-    const house = assetBySort.get(assetIndex)
-    const mortgage = debtBySort.get(debtIndex)
-    if (!house || !mortgage) continue
-    // Defensieve type-guards tegen een verkeerde sort_order-match.
-    if (house.asset_type !== 'eigen_huis' && house.asset_type !== 'real_estate') continue
-    if (mortgage.debt_type !== 'mortgage') continue
+    const asset = assetBySort.get(assetIndex)
+    const debt = debtBySort.get(debtIndex)
+    if (!asset || !debt) continue
+    // Defensieve type-guard tegen een verkeerde sort_order-match.
+    if (!isLinkedAssetDebtPair(asset.asset_type, debt.debt_type)) continue
     const { error } = await supabase
       .from('debts')
-      .update({ linked_asset_id: house.id })
-      .eq('id', mortgage.id)
+      .update({ linked_asset_id: asset.id })
+      .eq('id', debt.id)
       .eq('user_id', userId)
     if (error) {
-      console.error('[onboarding-save] hypotheek-koppeling mislukt (non-fatal):', error.message)
+      console.error('[onboarding-save] bezitting↔schuld-koppeling mislukt (non-fatal):', error.message)
     }
   }
 }
@@ -930,7 +952,6 @@ export async function POST(req: Request) {
       await supabase.from('assets').delete().eq('user_id', user.id).neq('asset_type', 'cash')
       const today = new Date().toISOString().split('T')[0]
       const hasBudgetteren = activeModules?.includes('budgetteren') ?? false
-      const hasAandelenregistratie = activeModules?.includes('aandelenregistratie') ?? false
       const rows = quickAssets.map((q, i) => {
         const draft = buildAssetDraft(q)
         return {
@@ -961,11 +982,14 @@ export async function POST(req: Request) {
           ownership: draft.ownership,
           net_worth_inclusion_pct: draft.net_worth_inclusion_pct,
           notes: draft.notes,
-          // Module-tracking-flags inline meegeven (zelfde semantiek als
-          // applyModuleTrackingFlags, maar voor het fallback-pad scheelt
-          // dat een extra UPDATE-roundtrip).
+          // Budget-tracking wordt bij onboarding inline gezet (bewust gewenst:
+          // budgetteren-module → cash-asset trackt direct, wizard pre-selecteert).
           has_budget_tracking: hasBudgetteren && draft.asset_type === 'cash',
-          has_holdings_tracking: hasAandelenregistratie && draft.asset_type === 'investment',
+          // Holdings-tracking bewust ALTIJD uit bij onboarding: dit is een
+          // selectieve opt-in via de setup-wizard (/api/aandelen-holdings/setup).
+          // Automatisch aanzetten zou de wizard overslaan én de backfill-gate
+          // stilzwijgend als "voltooid" markeren — zie CLAUDE.md / bugkaart.
+          has_holdings_tracking: false,
         }
       })
       const { error: assetErr } = await supabase.from('assets').insert(rows)
@@ -975,7 +999,6 @@ export async function POST(req: Request) {
     // 4. Insert debts via QuickAddInput → buildDebtDraft.
     if (quickDebts.length > 0) {
       await supabase.from('debts').delete().eq('user_id', user.id)
-      const today = new Date().toISOString().split('T')[0]
       const rows = quickDebts.map((q, i) => {
         const draft = buildDebtDraft(q)
         return {
@@ -987,7 +1010,10 @@ export async function POST(req: Request) {
           interest_rate: draft.interest_rate,
           minimum_payment: draft.minimum_payment,
           monthly_payment: draft.monthly_payment,
-          start_date: today,
+          // buildDebtDraft leidt start_date af uit de (hypotheek-)invoer of
+          // valt terug op vandaag — niet hardcoden, anders gaat de echte
+          // ingangsdatum van een lopende hypotheek verloren.
+          start_date: draft.start_date,
           end_date: draft.end_date,
           creditor: draft.creditor,
           is_active: true,
@@ -1010,10 +1036,12 @@ export async function POST(req: Request) {
       if (debtErr) throw new Error(`Schulden opslaan mislukt: ${debtErr.message}`)
     }
 
-    // 5. Huis ↔ hypotheek koppelen (fallback-pad). Zelfde twee-fasen-mapping
-    // als het RPC-pad: na de asset+debt-insert zetten we debts.linked_asset_id
-    // op de gekoppelde hypotheken. Non-blocking. Zie linkOnboardingMortgages.
-    await linkOnboardingMortgages(supabase, user.id, quickAssets, quickDebts)
+    // 5. Bezitting ↔ gekoppelde schuld koppelen (fallback-pad). Zelfde twee-
+    // fasen-mapping als het RPC-pad: na de asset+debt-insert zetten we
+    // debts.linked_asset_id op ALLE gekoppelde paren (hypotheek↔woning,
+    // autolening↔voertuig, DGA-schuld↔BV). Non-blocking. Zie
+    // linkOnboardingAssetDebtPairs.
+    await linkOnboardingAssetDebtPairs(supabase, user.id, quickAssets, quickDebts)
 
     // 6. Seed default AOW life event (uses aowTargetAge resolved above)
     // Delete existing AOW event first to prevent duplicates on retry

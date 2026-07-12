@@ -89,6 +89,13 @@ const BudgetPlanEditorSheet = dynamic(() =>
   import('@/components/app/budget-plan-editor-sheet').then(m => ({ default: m.BudgetPlanEditorSheet })),
   { ssr: false }
 )
+// Eenmalige koppel-nudge ná setup — lazy zoals de zuster-modals; render-conditie
+// (`showKoppelNudge`) blijft een platte guard (de component regelt zelf de
+// sluit-animatie via BottomSheet's interne open-state).
+const BudgetKoppelNudge = dynamic(() =>
+  import('@/components/app/budget-koppel-nudge').then(m => ({ default: m.BudgetKoppelNudge })),
+  { ssr: false }
+)
 import { useToast } from '@/components/app/toast-provider'
 import { OVERLAY_QUERY_KEYS } from '@/lib/navigation'
 import { KassabonShell } from '@/components/app/kassabon-shell'
@@ -908,7 +915,7 @@ function PartnerBudgetSection({ rows }: { rows: PartnerBudgetRow[] }) {
   )
 }
 
-export default function BudgetsPage({ initialBudgetId, initialData }: { initialBudgetId?: string; initialData?: BudgetsPageData } = {}) {
+export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNudge = false }: { initialBudgetId?: string; initialData?: BudgetsPageData; showKoppelNudge?: boolean } = {}) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
@@ -1822,11 +1829,20 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
     setCopyingMonth(false)
   }
 
-  const incomeBudgets = budgets.filter((b) => b.budget_type === 'income')
-  const expenseBudgets = budgets.filter((b) => b.budget_type === 'expense')
-  const savingsBudgets = budgets.filter((b) => b.budget_type === 'savings')
-  const debtBudgets = budgets.filter((b) => b.budget_type === 'debt')
-  const archiveBudgets = budgets.filter((b) => b.budget_type === 'archive')
+  // Prop-stabilisatie (perf): de type-gegroepeerde budget-arrays krijgen een
+  // stabiele identiteit zolang `budgets` niet wijzigt. Zo kunnen de
+  // gememoiseerde TreeComp/BudgetDonut-children hun render overslaan wanneer een
+  // ONgerelateerde state van deze pagina verandert (bv. een toggle of hover).
+  const { incomeBudgets, expenseBudgets, savingsBudgets, debtBudgets, archiveBudgets } = useMemo(
+    () => ({
+      incomeBudgets: budgets.filter((b) => b.budget_type === 'income'),
+      expenseBudgets: budgets.filter((b) => b.budget_type === 'expense'),
+      savingsBudgets: budgets.filter((b) => b.budget_type === 'savings'),
+      debtBudgets: budgets.filter((b) => b.budget_type === 'debt'),
+      archiveBudgets: budgets.filter((b) => b.budget_type === 'archive'),
+    }),
+    [budgets],
+  )
   // "Eigen rekening"-post: som van verschuivingen tussen eigen rekeningen deze maand.
   // Telt nergens mee in inkomen/uitgaven (archive), maar maken we wél zichtbaar.
   const eigenRekeningParent = archiveBudgets.find((b) => b.slug === BUDGET_SLUGS.EIGEN_REKENING)
@@ -1853,95 +1869,152 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
     </div>
   )
 
-  const totalIncome = incomeBudgets.reduce((sum, b) => sum + getParentEffectiveLimit(b), 0)
-  const totalIncomeActual = incomeBudgets.reduce((sum, b) => sum + getParentSpent(b), 0)
-  const totalExpenseBudget = expenseBudgets.reduce((sum, b) => sum + getParentEffectiveLimit(b), 0)
-  const totalExpenseSpent = expenseBudgets.reduce((sum, b) => sum + getParentSpent(b), 0)
-  const totalSavingsBudget = savingsBudgets.reduce((sum, b) => sum + getParentEffectiveLimit(b), 0)
-  const totalSavingsActual = savingsBudgets.reduce((sum, b) => sum + getParentSpent(b), 0)
-  const totalDebtBudget = debtBudgets.reduce((sum, b) => sum + getParentEffectiveLimit(b), 0)
-  const totalDebtActual = debtBudgets.reduce((sum, b) => sum + getParentSpent(b), 0)
+  // Perf (stap a): het numerieke afgeleidenblok (type-totalen, dekking,
+  // aandacht-alerts, beschikbaar-per-budget) is puur een functie van de ruwe
+  // inputs in de dep-sleutel. `perspective`/`mySharePct` zitten al gebakken in
+  // `budgets` (stampBudgetShares → `_shareFraction`) en in `spending`
+  // (combineSpending), dus die horen NIET in de sleutel. De helper-closures
+  // (getParentEffectiveLimit/getParentSpent/getEffectiveLimit) en de
+  // type-arrays worden elke render opnieuw gemaakt, maar zijn puur t.o.v. exact
+  // deze inputs; daarom sleutelen we handmatig en negeren we exhaustive-deps.
+  const {
+    totalIncome,
+    totalIncomeActual,
+    totalExpenseBudget,
+    totalExpenseSpent,
+    totalSavingsBudget,
+    totalSavingsActual,
+    totalDebtBudget,
+    totalDebtActual,
+    teVerdelen,
+    dekkingsgraad,
+    hasProRataBudget,
+    parentBudgetsCount,
+    opSchemaCount,
+    hubAlerts,
+    beschikbaarMap,
+    coverageRatio,
+  } = useMemo(() => {
+    const totalIncome = incomeBudgets.reduce((sum, b) => sum + getParentEffectiveLimit(b), 0)
+    const totalIncomeActual = incomeBudgets.reduce((sum, b) => sum + getParentSpent(b), 0)
+    const totalExpenseBudget = expenseBudgets.reduce((sum, b) => sum + getParentEffectiveLimit(b), 0)
+    const totalExpenseSpent = expenseBudgets.reduce((sum, b) => sum + getParentSpent(b), 0)
+    const totalSavingsBudget = savingsBudgets.reduce((sum, b) => sum + getParentEffectiveLimit(b), 0)
+    const totalSavingsActual = savingsBudgets.reduce((sum, b) => sum + getParentSpent(b), 0)
+    const totalDebtBudget = debtBudgets.reduce((sum, b) => sum + getParentEffectiveLimit(b), 0)
+    const totalDebtActual = debtBudgets.reduce((sum, b) => sum + getParentSpent(b), 0)
 
-  const totalAllocated = totalExpenseBudget + totalSavingsBudget + totalDebtBudget
-  const teVerdelen = totalIncome - totalAllocated
-  const dekkingsgraad = totalIncome > 0 ? (totalAllocated / totalIncome) * 100 : 0
+    const totalAllocated = totalExpenseBudget + totalSavingsBudget + totalDebtBudget
+    const teVerdelen = totalIncome - totalAllocated
+    const dekkingsgraad = totalIncome > 0 ? (totalAllocated / totalIncome) * 100 : 0
 
-  // Pro-rata onderschrift: tonen zodra één weergegeven budget op een aandeel
-  // < 100% staat (gedeeld budget in eigen/partner-blik). Dan zijn álle KPI-
-  // totalen geschaald en verdient dat een korte verklaring onder de strip.
-  const hasProRataBudget = budgets.some(
-    (b) =>
-      (b._shareFraction ?? 1) < 1 ||
-      b.children.some((c) => ((c as ShareStamp)._shareFraction ?? 1) < 1),
-  )
+    // Pro-rata onderschrift: tonen zodra één weergegeven budget op een aandeel
+    // < 100% staat (gedeeld budget in eigen/partner-blik). Dan zijn álle KPI-
+    // totalen geschaald en verdient dat een korte verklaring onder de strip.
+    const hasProRataBudget = budgets.some(
+      (b) =>
+        (b._shareFraction ?? 1) < 1 ||
+        b.children.some((c) => ((c as ShareStamp)._shareFraction ?? 1) < 1),
+    )
+
+    // G3: Budget insights voor AI-kaart (overschreden + bijna vol)
+    const childBudgetsFlat = budgets.flatMap(g =>
+      g.children.length > 0 ? g.children : (g.budget_type !== 'income' ? [g as Budget] : [])
+    )
+    const overschredenInzichten = childBudgetsFlat
+      .filter(b => {
+        const lim = getEffectiveLimit(b)
+        return lim > 0 && (spending[b.id] ?? 0) > lim
+      })
+      .map(b => {
+        const lim = getEffectiveLimit(b)
+        const spent = spending[b.id] ?? 0
+        return { id: b.id, name: b.name, spent, limit: lim, pct: Math.round((spent / lim) * 100) }
+      })
+    const bijnaVolInzichten = childBudgetsFlat
+      .filter(b => {
+        const lim = getEffectiveLimit(b)
+        const pct = lim > 0 ? (spending[b.id] ?? 0) / lim : 0
+        return pct >= 0.8 && pct < 1.0
+      })
+      .map(b => {
+        const lim = getEffectiveLimit(b)
+        const spent = spending[b.id] ?? 0
+        return { id: b.id, name: b.name, spent, limit: lim, pct: Math.round((spent / lim) * 100) }
+      })
+
+    // G3-hub: schema-teller over álle hoofdbudgetten (expense, income, savings,
+    // debt), minus archive en de "Eigen rekening"-bucket. Per type verschilt de
+    // definitie van "op schema":
+    //   - expense / debt  → op schema als uitgegeven ≤ limiet (binnen budget blijven)
+    //   - income / savings → op schema als werkelijk ≥ limiet (doel behaald)
+    const schemaParents = budgets.filter(b =>
+      b.budget_type !== 'archive' &&
+      b.slug !== BUDGET_SLUGS.EIGEN_REKENING
+    )
+    const parentBudgetsCount = schemaParents.length
+    const opSchemaCount = schemaParents.filter(b => {
+      const lim = getParentEffectiveLimit(b)
+      if (lim <= 0) return false
+      const actual = getParentSpent(b)
+      if (b.budget_type === 'expense' || b.budget_type === 'debt') {
+        return actual <= lim
+      }
+      // income, savings: doel behalen
+      return actual >= lim
+    }).length
+
+    // G3-hub: combined alert list (overschreden first, then bijna vol);
+    // de hub kapt zelf af op HUB_ALERTS_COLLAPSED_MAX met een toon-meer-knop
+    const hubAlerts = [
+      ...overschredenInzichten.map(i => ({ ...i, severity: 'over' as const })),
+      ...bijnaVolInzichten.map(i => ({ ...i, severity: 'bijna' as const })),
+    ]
+
+    // F2-09: beschikbaar per sub-budget (effectieve limiet incl. rollover − uitgegeven)
+    const beschikbaarMap: Record<string, number> = {}
+    for (const group of budgets) {
+      const items = group.children.length > 0 ? group.children : [group as Budget]
+      for (const b of items) {
+        beschikbaarMap[b.id] = getEffectiveLimit(b) - (spending[b.id] ?? 0)
+      }
+    }
+
+    // F2-10: dekkingsratio werkelijk ontvangen inkomen vs. verwacht inkomen
+    const coverageRatio = totalIncome > 0 ? Math.min(1, totalIncomeActual / totalIncome) : 1
+
+    return {
+      totalIncome,
+      totalIncomeActual,
+      totalExpenseBudget,
+      totalExpenseSpent,
+      totalSavingsBudget,
+      totalSavingsActual,
+      totalDebtBudget,
+      totalDebtActual,
+      teVerdelen,
+      dekkingsgraad,
+      hasProRataBudget,
+      parentBudgetsCount,
+      opSchemaCount,
+      hubAlerts,
+      beschikbaarMap,
+      coverageRatio,
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [budgets, spending, rolloversIndex, budgetAmountsIndex, monthDate, periodMonthCount])
+
+  // Pro-rata onderschrift onder de KPI-strip — cheap, afhankelijk van
+  // `mySharePct` (buiten de numerieke sleutel), dus buiten de memo gehouden.
   const shareCaption = hasProRataBudget ? formatShareCaption(mySharePct) : null
 
-  // G3: Budget insights voor AI-kaart (overschreden + bijna vol)
-  const childBudgetsFlat = budgets.flatMap(g =>
-    g.children.length > 0 ? g.children : (g.budget_type !== 'income' ? [g as Budget] : [])
+  // Prop-stabilisatie (stap b): de donut consumeert alle vier type-groepen als
+  // één array. Zonder memo zou de inline-spread bij de callsite elke render een
+  // nieuwe referentie geven en de gememoiseerde BudgetDonut nutteloos maken.
+  const donutGroups = useMemo(
+    () => [...incomeBudgets, ...expenseBudgets, ...savingsBudgets, ...debtBudgets],
+    [incomeBudgets, expenseBudgets, savingsBudgets, debtBudgets],
   )
-  const overschredenInzichten = childBudgetsFlat
-    .filter(b => {
-      const lim = getEffectiveLimit(b)
-      return lim > 0 && (spending[b.id] ?? 0) > lim
-    })
-    .map(b => {
-      const lim = getEffectiveLimit(b)
-      const spent = spending[b.id] ?? 0
-      return { id: b.id, name: b.name, spent, limit: lim, pct: Math.round((spent / lim) * 100) }
-    })
-  const bijnaVolInzichten = childBudgetsFlat
-    .filter(b => {
-      const lim = getEffectiveLimit(b)
-      const pct = lim > 0 ? (spending[b.id] ?? 0) / lim : 0
-      return pct >= 0.8 && pct < 1.0
-    })
-    .map(b => {
-      const lim = getEffectiveLimit(b)
-      const spent = spending[b.id] ?? 0
-      return { id: b.id, name: b.name, spent, limit: lim, pct: Math.round((spent / lim) * 100) }
-    })
-  const hasAIInsights = overschredenInzichten.length > 0 || bijnaVolInzichten.length > 0
-
-  // G3-hub: schema-teller over álle hoofdbudgetten (expense, income, savings,
-  // debt), minus archive en de "Eigen rekening"-bucket. Per type verschilt de
-  // definitie van "op schema":
-  //   - expense / debt  → op schema als uitgegeven ≤ limiet (binnen budget blijven)
-  //   - income / savings → op schema als werkelijk ≥ limiet (doel behaald)
-  const schemaParents = budgets.filter(b =>
-    b.budget_type !== 'archive' &&
-    b.slug !== BUDGET_SLUGS.EIGEN_REKENING
-  )
-  const parentBudgetsCount = schemaParents.length
-  const opSchemaCount = schemaParents.filter(b => {
-    const lim = getParentEffectiveLimit(b)
-    if (lim <= 0) return false
-    const actual = getParentSpent(b)
-    if (b.budget_type === 'expense' || b.budget_type === 'debt') {
-      return actual <= lim
-    }
-    // income, savings: doel behalen
-    return actual >= lim
-  }).length
-
-  // G3-hub: combined alert list (overschreden first, then bijna vol);
-  // de hub kapt zelf af op HUB_ALERTS_COLLAPSED_MAX met een toon-meer-knop
-  const hubAlerts = [
-    ...overschredenInzichten.map(i => ({ ...i, severity: 'over' as const })),
-    ...bijnaVolInzichten.map(i => ({ ...i, severity: 'bijna' as const })),
-  ]
-
-  // F2-09: beschikbaar per sub-budget (effectieve limiet incl. rollover − uitgegeven)
-  const beschikbaarMap: Record<string, number> = {}
-  for (const group of budgets) {
-    const items = group.children.length > 0 ? group.children : [group as Budget]
-    for (const b of items) {
-      beschikbaarMap[b.id] = getEffectiveLimit(b) - (spending[b.id] ?? 0)
-    }
-  }
-
-  // F2-10: dekkingsratio werkelijk ontvangen inkomen vs. verwacht inkomen
-  const coverageRatio = totalIncome > 0 ? Math.min(1, totalIncomeActual / totalIncome) : 1
 
   const monthLabel = monthDate.toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
 
@@ -1969,25 +2042,25 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
         {inc.length > 0 && (
           <div id={withAnchors ? 'inkomen' : undefined} className="mt-4 sm:mt-8 scroll-mt-20">
             <h3 className="mb-4 label-editorial text-[var(--ink-2)]">Inkomen</h3>
-            <TreeComp groups={inc} spending={spending} budgetType="income" onNavigate={(id) => openBudgetModal(id)} beschikbaarMap={beschikbaarMap} />
+            <TreeComp groups={inc} spending={spending} budgetType="income" onNavigate={openBudgetModal} beschikbaarMap={beschikbaarMap} />
           </div>
         )}
         {exp.length > 0 && (
           <div id={withAnchors ? 'uitgaven' : undefined} className="mt-4 sm:mt-8 scroll-mt-20">
             <h3 className="mb-4 label-editorial text-[var(--ink-2)]">Uitgaven</h3>
-            <TreeComp groups={exp} spending={spending} budgetType="expense" onNavigate={(id) => openBudgetModal(id)} beschikbaarMap={beschikbaarMap} />
+            <TreeComp groups={exp} spending={spending} budgetType="expense" onNavigate={openBudgetModal} beschikbaarMap={beschikbaarMap} />
           </div>
         )}
         {sav.length > 0 && (
           <div id={withAnchors ? 'sparen' : undefined} className="mt-4 sm:mt-8 scroll-mt-20">
             <h3 className="mb-4 label-editorial text-[var(--ink-2)]">Sparen <span className="ml-1 font-normal normal-case tracking-normal text-wil-400/70">— vrijheid opbouwen</span></h3>
-            <TreeComp groups={sav} spending={spending} budgetType="savings" onNavigate={(id) => openBudgetModal(id)} beschikbaarMap={beschikbaarMap} />
+            <TreeComp groups={sav} spending={spending} budgetType="savings" onNavigate={openBudgetModal} beschikbaarMap={beschikbaarMap} />
           </div>
         )}
         {deb.length > 0 && (
           <div id={withAnchors ? 'schulden' : undefined} className="mt-4 sm:mt-8 scroll-mt-20">
             <h3 className="mb-4 label-editorial text-[var(--ink-2)]">Schulden <span className="ml-1 font-normal normal-case tracking-normal text-red-400/70">— vrijheid terugkopen</span></h3>
-            <TreeComp groups={deb} spending={spending} budgetType="debt" onNavigate={(id) => openBudgetModal(id)} beschikbaarMap={beschikbaarMap} />
+            <TreeComp groups={deb} spending={spending} budgetType="debt" onNavigate={openBudgetModal} beschikbaarMap={beschikbaarMap} />
           </div>
         )}
       </>
@@ -2340,7 +2413,7 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
                 groups={incomeBudgets}
                 spending={spending}
                 budgetType="income"
-                onNavigate={(id) => openBudgetModal(id)}
+                onNavigate={openBudgetModal}
                 beschikbaarMap={beschikbaarMap}
               />
             </div>
@@ -2352,7 +2425,7 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
                 groups={expenseBudgets}
                 spending={spending}
                 budgetType="expense"
-                onNavigate={(id) => openBudgetModal(id)}
+                onNavigate={openBudgetModal}
                 beschikbaarMap={beschikbaarMap}
               />
             </div>
@@ -2364,7 +2437,7 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
                 groups={savingsBudgets}
                 spending={spending}
                 budgetType="savings"
-                onNavigate={(id) => openBudgetModal(id)}
+                onNavigate={openBudgetModal}
                 beschikbaarMap={beschikbaarMap}
               />
             </div>
@@ -2376,7 +2449,7 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
                 groups={debtBudgets}
                 spending={spending}
                 budgetType="debt"
-                onNavigate={(id) => openBudgetModal(id)}
+                onNavigate={openBudgetModal}
                 beschikbaarMap={beschikbaarMap}
               />
             </div>
@@ -2392,7 +2465,7 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
                 groups={eigenRekeningParent ? [eigenRekeningParent] : []}
                 spending={spending}
                 budgetType="archive"
-                onNavigate={(id) => openBudgetModal(id)}
+                onNavigate={openBudgetModal}
               />
             </div>
           )}
@@ -2422,7 +2495,7 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
                     groups={verborgenBudgets}
                     spending={spending}
                     budgetType="archive"
-                    onNavigate={(id) => openBudgetModal(id)}
+                    onNavigate={openBudgetModal}
                   />
                 </>
               )}
@@ -2441,15 +2514,15 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
               ...(debtBudgets.length > 0 ? [{ label: 'Schulden', budgetType: 'debt' as const, groups: debtBudgets }] : []),
             ] satisfies HeatmapSection[]}
             spending={spending}
-            onNavigate={(id) => openBudgetModal(id)}
+            onNavigate={openBudgetModal}
             beschikbaarMap={beschikbaarMap}
           />
         </div>
       ) : (
         <BudgetDonut
-          groups={[...incomeBudgets, ...expenseBudgets, ...savingsBudgets, ...debtBudgets]}
+          groups={donutGroups}
           spending={spending}
-          onNavigate={(id) => openBudgetModal(id)}
+          onNavigate={openBudgetModal}
         />
       )}
 
@@ -2602,6 +2675,11 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
           <NibudBenchmarkSection />
         </CollapsibleSection>
       </HideInSimple>
+
+      {/* Eenmalige koppel-nudge — verschijnt alleen bij een net-ingestelde
+          gebruiker (server-afgeleide guard: marker afwezig + 0 rekeningen + 0
+          transacties). Component POST't zelf de marker + regelt de sluit-flow. */}
+      {showKoppelNudge && <BudgetKoppelNudge visible={showKoppelNudge} />}
     </div>
   )
 }

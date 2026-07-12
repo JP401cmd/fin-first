@@ -35,6 +35,13 @@ describe('TransactieTijdlijn', () => {
     expect(screen.getByText('Inkomst')).toBeInTheDocument()
     expect(screen.queryByText('Uitgave')).not.toBeInTheDocument()
   })
+  it('lege staat toont geen eigen koppel/importeer-CTA (banner op de pagina dekt dit al)', () => {
+    render(<TransactieTijdlijn transactions={[]} windowDays={30} accounts={[]} selectedAccountId={null} onSelectAccount={() => {}} />)
+    expect(screen.getByText('Nog geen transacties.')).toBeInTheDocument()
+    // Geen losstaande CTA-knop/link meer, en zeker niet naar de omweg-pagina.
+    expect(screen.queryByText(/koppel of importeer/i)).not.toBeInTheDocument()
+    expect(screen.queryByRole('link')).not.toBeInTheDocument()
+  })
   it('zoekt op naam', () => {
     const txns: AnalysisTransaction[] = [
       { ...base, id: 'x', amount: -10, counterparty_name: 'Hornbach Duiven', description: 'x' },

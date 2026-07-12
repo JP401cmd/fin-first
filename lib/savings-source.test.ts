@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   savingsRateFromAggregates,
+  monthlySavingsFromRate,
   computeDebtAflossingMonthly,
   resolveSavingsSource,
 } from './savings-source'
@@ -47,6 +48,39 @@ describe('savingsRateFromAggregates — equivalent aan de oude inline-formule', 
   it('income ≤ 0 levert 0 (geen deling door nul)', () => {
     expect(savingsRateFromAggregates(0, 100, 0)).toBe(0)
     expect(savingsRateFromAggregates(-100, 100, 0)).toBe(0)
+  })
+})
+
+describe('monthlySavingsFromRate — quote → €-bedrag, één grondslag met de quote', () => {
+  it('bedrag = inkomen × quote%', () => {
+    expect(monthlySavingsFromRate(5200, 27)).toBeCloseTo(1404, 6)
+    expect(monthlySavingsFromRate(4000, 25)).toBeCloseTo(1000, 6)
+  })
+
+  it('invariant: bedrag / inkomen × 100 == de doorgegeven quote', () => {
+    const cases: Array<{ income: number; expenses: number; afl: number }> = [
+      { income: 6000, expenses: 4000, afl: 300 },
+      { income: 18000, expenses: 18000, afl: 600 }, // sparen enkel via aflossing
+      { income: 4200, expenses: 3990, afl: 0 },
+    ]
+    for (const c of cases) {
+      const quote = savingsRateFromAggregates(c.income, c.expenses, c.afl)
+      const bedrag = monthlySavingsFromRate(c.income, quote)
+      // Het getoonde € en % staan zo per definitie op dezelfde grondslag.
+      expect((bedrag / c.income) * 100).toBeCloseTo(quote, 10)
+    }
+  })
+
+  it('tekort (negatieve quote) → negatief bedrag', () => {
+    const quote = savingsRateFromAggregates(12000, 15000, 0) // −25%
+    expect(quote).toBeLessThan(0)
+    expect(monthlySavingsFromRate(12000, quote)).toBeLessThan(0)
+  })
+
+  it('geen inkomen → 0 (quote is dan ook 0)', () => {
+    const quote = savingsRateFromAggregates(0, 4000, 0)
+    expect(quote).toBe(0)
+    expect(monthlySavingsFromRate(0, quote)).toBe(0)
   })
 })
 

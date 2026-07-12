@@ -267,6 +267,9 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
     { id: 'le2', name: 'Erfenis', year: 2035, targetAge: 44, impactType: 'positive', estimatedImpact: 50000 },
   ],
   savingsRate6m: 27,
+  // Canoniek maandspaarbedrag op savingsRate6m-grondslag: 5200 × 27% = 1404.
+  monthlySavingsAmount: 1404,
+  savingsRateIsEstimate: false,
   monthlySavingsBudgetSpent: 1400,
   savingsBudgetSpent6m: 8400,
   prevMonthSavingsBudgetSpent: 1300,
@@ -277,6 +280,8 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
     totalDebts: 97500,
     monthlyExpenses: 5400,
     monthlyIncome: 8800,
+    savingsRate: 38.6,
+    monthlySavings: 3400,
   },
   partnerOverrides: {
     netWorth: 125000,
@@ -284,6 +289,8 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
     totalDebts: 40000,
     monthlyExpenses: 2300,
     monthlyIncome: 3600,
+    savingsRate: 36.1,
+    monthlySavings: 1300,
   },
   householdActivity: [
     { id: 'ha1', description: 'Boodschappen Albert Heijn', amount: 87.50, date: '2026-03-08', category: 'Boodschappen', partnerName: 'Sophie', isCurrentUser: false, ownership: 'shared' },

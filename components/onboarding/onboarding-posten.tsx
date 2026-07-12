@@ -112,16 +112,28 @@ export function DebtRow({
 }
 
 /**
- * Gekoppelde-schuld-subrij — ingesprongen ónder het huis waaraan de hypotheek
+ * Gekoppelde-schuld-subrij — ingesprongen ónder de bezitting waaraan de schuld
  * hangt. Visueel ondergeschikt (insprong + Link2-affordance) zodat de groepering
- * "huis met hypotheek eronder" direct leesbaar is.
+ * "bezitting met schuld eronder" direct leesbaar is.
+ *
+ * Twee gebruikswijzen:
+ *  - Bezittingen-stap: mét `onRemove` (verwijder-knop) — de schuld hangt aan de
+ *    bezitting die je hier beheert.
+ *  - Schulden-stap: zónder `onRemove` (read-only) — de schuld is elders (bij de
+ *    bezitting) toegevoegd en wordt hier alleen tér herkenning getoond, zodat
+ *    "dit zijn je schulden" óók de hypotheek/RC/autolening laat zien. Verwijderen
+ *    hoort dan bij de bezitting, niet hier (voorkomt desync + dubbel opvoeren).
+ * `origin` overschrijft het standaard "· gekoppeld"-label met de herkomst,
+ * bv. "via je woning" / "via je BV".
  */
 export function LinkedDebtRow({
   item,
   onRemove,
+  origin,
 }: {
   item: DebtQuickInput
-  onRemove: () => void
+  onRemove?: () => void
+  origin?: string
 }) {
   const iconName = DEBT_TYPE_ICONS[item.debt_type as DebtType] ?? 'CircleDot'
   const typeLabel = DEBT_QUICK_ADD_LABELS[item.debt_type as DebtType] ?? 'Overig'
@@ -142,20 +154,22 @@ export function LinkedDebtRow({
           className="text-[11px] italic text-[var(--ink-3)]"
           style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
         >
-          {typeLabel} · gekoppeld
+          {typeLabel} · {origin ?? 'gekoppeld'}
         </p>
       </div>
       <span className="shrink-0 font-mono text-sm tabular-nums text-[var(--ink-2)]">
         &minus;{formatCurrency(item.current_balance)}
       </span>
-      <button
-        type="button"
-        onClick={onRemove}
-        className="ml-1 flex h-9 w-9 items-center justify-center text-[var(--ink-4)] transition-colors hover:bg-[var(--paper)] hover:text-[var(--ink-2)]"
-        aria-label={`Verwijder ${item.name}`}
-      >
-        <Trash2 className="h-4 w-4" strokeWidth={1.5} />
-      </button>
+      {onRemove ? (
+        <button
+          type="button"
+          onClick={onRemove}
+          className="ml-1 flex h-9 w-9 items-center justify-center text-[var(--ink-4)] transition-colors hover:bg-[var(--paper)] hover:text-[var(--ink-2)]"
+          aria-label={`Verwijder ${item.name}`}
+        >
+          <Trash2 className="h-4 w-4" strokeWidth={1.5} />
+        </button>
+      ) : null}
     </div>
   )
 }
@@ -166,6 +180,10 @@ export function LinkedDebtRow({
  * Compacte keuzelijst van resterende asset-types voor de "andere bezittingen?"-
  * stap. `exclude` filtert de types die al via gerichte ja/nee-vragen aan bod
  * kwamen (betaalrekening/spaar/huis/beleggingen). Volgt `QUICK_ADD_ASSET_ORDER`.
+ *
+ * `onCancel` is optioneel: laat 'm weg bij *inline* gebruik (de picker staat
+ * dan direct op de "andere bezittingen?"-vraag met een eigen sectie-footer),
+ * geef 'm mee op een eigen picker-scherm om een "Annuleren"-uitgang te tonen.
  */
 export function AssetTypePicker({
   exclude,
@@ -174,7 +192,7 @@ export function AssetTypePicker({
 }: {
   exclude: AssetType[]
   onPick: (type: AssetType) => void
-  onCancel: () => void
+  onCancel?: () => void
 }) {
   const types = QUICK_ADD_ASSET_ORDER.filter((t) => !exclude.includes(t))
   return (
@@ -203,7 +221,7 @@ export function DebtTypePicker({
 }: {
   exclude: DebtType[]
   onPick: (type: DebtType) => void
-  onCancel: () => void
+  onCancel?: () => void
 }) {
   const types = QUICK_ADD_DEBT_ORDER.filter((t) => !exclude.includes(t))
   return (
@@ -225,18 +243,20 @@ function TypePickerGrid({
   onCancel,
 }: {
   children: React.ReactNode
-  onCancel: () => void
+  onCancel?: () => void
 }) {
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{children}</div>
-      <button
-        type="button"
-        onClick={onCancel}
-        className="text-xs text-[var(--ink-3)] underline-offset-4 transition-colors hover:text-[var(--ink)] hover:underline"
-      >
-        Annuleren
-      </button>
+      {onCancel && (
+        <button
+          type="button"
+          onClick={onCancel}
+          className="text-xs text-[var(--ink-3)] underline-offset-4 transition-colors hover:text-[var(--ink)] hover:underline"
+        >
+          Annuleren
+        </button>
+      )}
     </div>
   )
 }

@@ -5,6 +5,7 @@ import { WidgetShell } from './widget-shell'
 import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import { calculateFreedomTime, formatFreedomTimeString, dailyExpenseRate } from '@/lib/format'
+import { FIRE_SAVINGS_RATE_BENCHMARK_PCT } from '@/lib/constants'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import type { DashboardData } from './widget-renderer'
 import { PiggyBank, Users, UserCheck } from 'lucide-react'
@@ -25,21 +26,19 @@ export const SpaarquoteWidget = memo(function SpaarquoteWidget({ size, data, hre
   const overrides = isHouseholdView ? data.householdOverrides! : isPartnerView ? data.partnerOverrides! : null
   const monthlyIncome = overrides ? overrides.monthlyIncome : data.monthlyIncome
   const monthlyExpenses = overrides ? overrides.monthlyExpenses : data.monthlyExpenses
-  const { monthlySavingsBudgetSpent } = data
 
-  // Savings-bedrag: in huishoud-/partnerweergave komt er geen eigen budget-spent bij —
-  // de override-cijfers zijn al de gecombineerde inkomsten/uitgaven.
-  const savings = overrides
-    ? monthlyIncome - monthlyExpenses
-    : monthlyIncome - monthlyExpenses + monthlySavingsBudgetSpent
-
-  // Spaarquote-percentage:
-  // - Eigen perspectief: behoud de bestaande (preciezere) savingsRate6m-berekening.
-  // - Huishoud/partner: bereken het tarief uit de override inkomsten/uitgaven.
-  const rate = overrides
-    ? (monthlyIncome > 0 ? Math.round(((monthlyIncome - monthlyExpenses) / monthlyIncome) * 100) : 0)
-    : data.savingsRate6m
+  // Spaarquote-% én -bedrag: BEIDE uit de canonieke bundel/override — de widget
+  // rekent niets meer zelf uit (consume-don't-recompute). Het €-bedrag staat op
+  // dezelfde grondslag als de %-quote (bedrag / inkomen == quote), dus de twee
+  // getallen op één kaart spreken elkaar niet meer tegen. De loader single-sourcet
+  // beide via savingsRateFromAggregates + monthlySavingsFromRate.
+  const rate = overrides ? overrides.savingsRate : data.savingsRate6m
+  const savings = overrides ? overrides.monthlySavings : data.monthlySavingsAmount
   const isPositive = rate >= 0
+
+  // De eigen 6m-quote kan een schatting zijn (profiel/net-worth-delta-fallback).
+  // Alleen in eigen perspectief markeren; household/partner is een aparte grondslag.
+  const isEstimate = !overrides && data.savingsRateIsEstimate
 
   const kickerLabel = isHouseholdView
     ? 'Spaarquote — Huishouden'
@@ -99,48 +98,43 @@ export const SpaarquoteWidget = memo(function SpaarquoteWidget({ size, data, hre
     : null
   const freedomStr = freedomTime ? formatFreedomTimeString(freedomTime, 'short') : null
 
-  // ── Vorige maand vergelijking ──
-  // Historie en maand-op-maand-delta zijn per-gebruiker — alleen in eigen perspectief tonen.
-  const { prevMonthIncome, prevMonthExpenses, prevMonthSavingsBudgetSpent } = data
-  const prevSavings = prevMonthIncome - prevMonthExpenses + prevMonthSavingsBudgetSpent
-  const prevRate = prevMonthIncome > 0 ? (prevSavings / prevMonthIncome) * 100 : 0
-  const delta = rate - prevRate
-  const hasPrevData = !isHouseholdView && !isPartnerView && prevMonthIncome > 0
+  // ── Eén canonieke historische spaarquote-serie (snapshot savings_rate) ──
+  // Historie/delta zijn per-gebruiker — alleen in eigen perspectief (household/
+  // partner-projecties worden niet per-maand gesnapshot). De live 6m-quote (rate)
+  // wordt als 'nu'-anker toegevoegd ALLEEN als er nog geen snapshot voor de huidige
+  // maand bestaat. Delta, gemiddelden én YoY komen uit DEZELFDE serie — voorheen
+  // mengde de widget drie grondslagen (snapshot + 6m-anker + huidige-maand-delta).
+  const showHistory = !isHouseholdView && !isPartnerView
+  const snapshotSeries = (data.savingsHistory ?? []).map(s => Math.max(-100, Math.min(100, s.value)))
+  const now = new Date()
+  // Lokale maand-key (géén toISOString — zou een dag-shift/maand-shift geven).
+  const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const lastSnapMonth = data.savingsHistory && data.savingsHistory.length > 0
+    ? data.savingsHistory[data.savingsHistory.length - 1].month.slice(0, 7)
+    : null
+  const hasCurrentMonthSnap = lastSnapMonth === currentMonthKey
+  const rateSeries = hasCurrentMonthSnap ? snapshotSeries : [...snapshotSeries, rate]
+
+  // Maand-op-maand-delta uit diezelfde serie (laatste − voorlaatste punt).
+  const hasPrevData = showHistory && rateSeries.length >= 2
+  const delta = hasPrevData ? rateSeries[rateSeries.length - 1] - rateSeries[rateSeries.length - 2] : 0
 
   // ── Full-size: sparkline + averages + FIRE benchmark ──
   if (size === 'full') {
-    // Use actual savings rate history from snapshots (preferred),
-    // fall back to estimated rates from net worth deltas if no snapshot data
-    const snapshotHistory = data.savingsHistory ?? []
-    let historicalRates: number[]
-
-    if (snapshotHistory.length > 0) {
-      // Real savings rate data from net_worth_snapshots.savings_rate
-      historicalRates = snapshotHistory.map(s => Math.max(-100, Math.min(100, s.value)))
-    } else {
-      // Fallback: derive estimated savings rates from net worth deltas
-      const history = data.netWorthHistory ?? []
-      historicalRates = []
-      for (let i = 1; i < history.length; i++) {
-        const monthDelta = history[i].value - history[i - 1].value
-        const estRate = monthlyIncome > 0 ? (monthDelta / monthlyIncome) * 100 : 0
-        historicalRates.push(Math.max(-100, Math.min(100, estRate)))
-      }
-    }
-    // Append current rate as the most recent data point
-    const estimatedRates = [...historicalRates, rate]
-
-    // Take last 12 months for sparkline (showcase full year)
-    const sparkData = estimatedRates.slice(-12)
-    const avg3m = estimatedRates.length >= 3
-      ? estimatedRates.slice(-3).reduce((a, b) => a + b, 0) / 3
+    // Sparkline/gemiddelden/YoY draaien op DEZELFDE serie als de delta (rateSeries):
+    // de snapshot-savings_rate-historie, met de live 6m-quote als 'nu'-anker enkel
+    // wanneer deze maand nog niet gesnapshot is. Eén grondslag — geen net-worth-delta-
+    // afgeleide reeks of losse huidige-maand-vergelijking meer.
+    const sparkData = rateSeries.slice(-12)
+    const avg3m = rateSeries.length >= 3
+      ? rateSeries.slice(-3).reduce((a, b) => a + b, 0) / 3
       : null
-    const avg6m = estimatedRates.length >= 6
-      ? estimatedRates.slice(-6).reduce((a, b) => a + b, 0) / 6
+    const avg6m = rateSeries.length >= 6
+      ? rateSeries.slice(-6).reduce((a, b) => a + b, 0) / 6
       : null
 
-    // FIRE-optimaal benchmark
-    const fireBenchmark = 50
+    // FIRE-optimaal benchmark (benoemde constante — geen magic number in de widget)
+    const fireBenchmark = FIRE_SAVINGS_RATE_BENCHMARK_PCT
 
     // Sparkline SVG
     const svgW = 200
@@ -154,9 +148,6 @@ export const SpaarquoteWidget = memo(function SpaarquoteWidget({ size, data, hre
       return `${x},${y}`
     }).join(' ')
     const benchmarkY = svgH - ((fireBenchmark - minVal) / range) * svgH
-
-    // Sparkline, gemiddelden en YoY zijn per-gebruiker historie — verbergen in huishoud/partner.
-    const showHistory = !isHouseholdView && !isPartnerView
 
     return (
       <WidgetShell module="kern" size={size} kicker={kickerLabel} href={href}>
@@ -206,7 +197,7 @@ export const SpaarquoteWidget = memo(function SpaarquoteWidget({ size, data, hre
                 stroke="var(--ink-4)" strokeWidth={1} strokeDasharray="4 3" opacity={0.5}
               />
               <text x={svgW} y={benchmarkY - 3} textAnchor="end" className="fill-[var(--ink-4)]" fontSize={9}>
-                50%
+                {fireBenchmark}%
               </text>
               {/* Trend lijn */}
               <polyline
@@ -242,11 +233,12 @@ export const SpaarquoteWidget = memo(function SpaarquoteWidget({ size, data, hre
             <span>· 6m: {avg6m.toFixed(1)}%</span>
           )}
           <span className="text-[var(--ink-4)]">{showHistory ? '· ' : ''}FIRE: {fireBenchmark}%+</span>
+          {isEstimate && <span className="text-[var(--ink-4)]">· geschat</span>}
         </div>
         {/* Year-over-year comparison */}
-        {showHistory && estimatedRates.length >= 12 && (() => {
-          const thisYear = estimatedRates.slice(-6).reduce((a, b) => a + b, 0) / 6
-          const lastYear = estimatedRates.slice(-12, -6).reduce((a, b) => a + b, 0) / 6
+        {showHistory && rateSeries.length >= 12 && (() => {
+          const thisYear = rateSeries.slice(-6).reduce((a, b) => a + b, 0) / 6
+          const lastYear = rateSeries.slice(-12, -6).reduce((a, b) => a + b, 0) / 6
           const yoyDelta = thisYear - lastYear
           return (
             <p className={`mt-0.5 text-[11px] font-mono tabular-nums ${yoyDelta >= 0 ? 'text-positive' : 'text-negative'}`}>

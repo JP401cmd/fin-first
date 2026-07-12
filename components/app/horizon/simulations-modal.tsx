@@ -69,11 +69,17 @@ export function SimulationsModal({
     }
 
     setComputing(true)
-    setTimeout(() => {
+    // Keep the timer id so a follow-up run (e.g. a slider tick that reset mc)
+    // cancels this pending compute before it fires. Without this, dragging a
+    // slider stacks timers that each run a full runMonteCarlo on the main
+    // thread; only the last-scheduled run should survive. The converged
+    // outcome is unchanged — the latest settings win either way.
+    const timer = setTimeout(() => {
       const result = runMonteCarlo(input, simCount, projYears)
       setMc(result)
       setComputing(false)
     }, 50)
+    return () => clearTimeout(timer)
   }, [open, input, mc, simCount, projYears, precomputedMc, hasCustomSettings])
 
   // Reset mc when input, settings, or pre-computed data changes

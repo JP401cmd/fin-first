@@ -20,9 +20,12 @@ export async function mapTransaction(tl: TLTransaction): Promise<ParsedTransacti
     counterparty_name,
     counterparty_iban: null,
     reference: tl.transaction_id ?? null,
-    transaction_type: tl.transaction_category ?? tl.transaction_type ?? null,
+    // De DB-CHECK op transaction_type staat alleen semantische types toe
+    // ('transfer'/'salary'/...); rauwe TrueLayer-categorieën ('PURCHASE',
+    // 'DIRECT_DEBIT', ...) horen in bank_code, net als de CSV-import doet.
+    transaction_type: null,
     source_type: null,
-    bank_code: null,
+    bank_code: tl.transaction_category ?? tl.transaction_type ?? null,
     // transaction_id staat al in `reference`; bewust niet als bank_seq omdat een
     // pending→posted id-wissel (zelfde datum/bedrag/omschrijving) anders een valse
     // "nieuwe" rij zou worden in de samengestelde unieke index.

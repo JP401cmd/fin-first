@@ -6,7 +6,9 @@ import { getModel, AIConfigError } from '@/lib/ai/config'
 import { RECOMMENDATIONS_SYSTEM_PROMPT } from '@/lib/ai/dna/recommendations'
 import { buildRecommendationContext } from '@/lib/ai/context/recommendation-context'
 import { maskPIIInOutput } from '@/lib/ai/pii-output-filter'
+import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
 import { checkTierGate } from '@/lib/require-tier'
+import { checkCreditBudget, creditLimitMessage } from '@/lib/ai/credit-gate'
 
 const recommendationSchema = z.object({
   recommendations: z.array(z.object({
@@ -48,16 +50,45 @@ export async function POST() {
     return new Response(JSON.stringify({ error: tierGate.error }), { status: 403, headers: { 'Content-Type': 'application/json' } })
   }
 
+  // Per-gebruiker rate-limit: dwing het maand-creditbudget af (gedeelde bucket)
+  // vóór de dure LLM-call.
+  const creditGate = await checkCreditBudget(supabase, user.id, 'recommendations')
+  if (!creditGate.allowed) {
+    return new Response(JSON.stringify({ error: creditLimitMessage(creditGate) }), {
+      status: 429,
+      headers: { 'Content-Type': 'application/json', 'Retry-After': String(creditGate.retryAfterSeconds) },
+    })
+  }
+
   // Fetch budgets + profile for freedom_days validation and budgeting_active check
   const [{ data: budgets }, { data: profile }] = await Promise.all([
     supabase.from('budgets').select('slug, is_essential'),
-    supabase.from('profiles').select('retirement_expense_method, budgeting_active').eq('id', user.id).single(),
+    supabase.from('profiles').select('retirement_expense_method, budgeting_active, full_name, date_of_birth').eq('id', user.id).single(),
   ])
   const budgetMap = new Map((budgets ?? []).map(b => [b.slug, b.is_essential]))
   const usesEssentialBudgets = (profile?.retirement_expense_method ?? 'essential_budgets') === 'essential_budgets'
   const budgetingActive = profile?.budgeting_active !== false
 
-  const context = await buildRecommendationContext(supabase, budgetingActive)
+  const rawContext = await buildRecommendationContext(supabase, budgetingActive)
+
+  // Sanitize PII before the context reaches the AI provider (same contract as
+  // chat/categorize). FAIL-SAFE: a sanitize failure blocks the call — raw
+  // asset/debt/budget context must never leave unfiltered. Merchant/asset
+  // names stay (needed for the tip; business identifiers, not person-PII).
+  let context: string
+  try {
+    const sanitizeOpts: SanitizeOptions = {}
+    const names = [profile?.full_name].filter(Boolean) as string[]
+    if (names.length > 0) sanitizeOpts.names = names
+    if (profile?.date_of_birth) sanitizeOpts.dateOfBirth = profile.date_of_birth
+    context = sanitizeForAI(rawContext, sanitizeOpts)
+  } catch (err) {
+    console.error('[recommendations] Sanitization failed — AI call blocked (fail-safe):', err)
+    return Response.json(
+      { error: 'De AI-assistent is tijdelijk niet beschikbaar vanwege een beveiligingscontrole. Probeer het later opnieuw.' },
+      { status: 503 },
+    )
+  }
 
   let model
   try {

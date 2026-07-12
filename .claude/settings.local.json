@@ -141,7 +141,14 @@
       "mcp__claude_ai_Notion__notion-update-page",
       "mcp__claude_ai_Notion__notion-fetch",
       "Bash(npx tsc *)",
-      "Bash(echo \"TSC_EXIT=$?\")"
+      "Bash(echo \"TSC_EXIT=$?\")",
+      "mcp__notion__notion-query-database-view",
+      "mcp__notion__notion-fetch",
+      "mcp__notion__notion-update-page",
+      "Bash(head -60 components/app/holding-transaction-log.test.tsx)",
+      "Bash(ls vitest.setup* vitest.config*)",
+      "Bash(ls lib/household/*.test.ts lib/*household*.test.ts)",
+      "Bash(ls lib/household/)"
     ]
   },
   "enableAllProjectMcpServers": true,

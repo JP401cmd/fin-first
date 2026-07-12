@@ -99,7 +99,7 @@ export function VoorkeurBewerkenSheet({
     >
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-sm rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-5 sm:p-6 shadow-xl"
+        className="w-full max-w-sm max-h-[92vh] overflow-y-auto rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-5 sm:p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <header className="flex items-start justify-between gap-3 mb-4">

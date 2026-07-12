@@ -56,9 +56,13 @@ export async function getBaseUrls(supabase: SupabaseClient): Promise<{ authUrl: 
   return { authUrl: SANDBOX_AUTH_URL, dataUrl: SANDBOX_DATA_URL }
 }
 
-async function getCredentials(_supabase: SupabaseClient): Promise<{ clientId: string; clientSecret: string }> {
-  // Credentials zijn secrets: sinds de app_settings-verharding alleen via de
-  // service-role leesbaar (server-only pad), niet via de gebruikerssessie.
+/**
+ * Read the (non-secret) TrueLayer client_id via the service-role client.
+ * Het client_id is geen secret maar staat wél in het via service-role
+ * afgeschermde app_settings; deze losse getter laat call-sites (bv. de
+ * providers-route) het client_id ophalen zonder ook het secret te raken.
+ */
+export async function getClientId(): Promise<string> {
   const service = getServiceClient()
   const { data: clientIdRow } = await service
     .from('app_settings')
@@ -66,17 +70,29 @@ async function getCredentials(_supabase: SupabaseClient): Promise<{ clientId: st
     .eq('key', 'truelayer_client_id')
     .single()
 
+  if (!clientIdRow?.value) {
+    throw new Error('TrueLayer credentials niet geconfigureerd')
+  }
+
+  return clientIdRow.value
+}
+
+async function getCredentials(_supabase: SupabaseClient): Promise<{ clientId: string; clientSecret: string }> {
+  // Credentials zijn secrets: sinds de app_settings-verharding alleen via de
+  // service-role leesbaar (server-only pad), niet via de gebruikerssessie.
+  const clientId = await getClientId()
+  const service = getServiceClient()
   const { data: clientSecretRow } = await service
     .from('app_settings')
     .select('value')
     .eq('key', 'truelayer_client_secret')
     .single()
 
-  if (!clientIdRow?.value || !clientSecretRow?.value) {
+  if (!clientSecretRow?.value) {
     throw new Error('TrueLayer credentials niet geconfigureerd')
   }
 
-  return { clientId: clientIdRow.value, clientSecret: clientSecretRow.value }
+  return { clientId, clientSecret: clientSecretRow.value }
 }
 
 /**
@@ -91,12 +107,6 @@ export async function buildAuthLink(
   const { authUrl } = await getBaseUrls(supabase)
   const { clientId } = await getCredentials(supabase)
 
-  const { data: envData } = await supabase
-    .from('app_settings')
-    .select('value')
-    .eq('key', 'truelayer_environment')
-    .single()
-
   const params = new URLSearchParams({
     response_type: 'code',
     client_id: clientId,
@@ -106,13 +116,16 @@ export async function buildAuthLink(
   })
 
   if (providerId) {
+    // TrueLayer eist dat de bank uit `provider_id` óók in `providers` staat;
+    // een individueel provider-id is zelf een geldige `providers`-waarde
+    // (`nl-all` is geen gedocumenteerde grouping). Geldt zowel in sandbox als
+    // productie.
     params.set('provider_id', providerId)
+    params.set('providers', providerId)
   }
-
-  // Alleen in productie NL-banken filteren
-  if (envData?.value === 'production') {
-    params.set('providers', 'nl-all')
-  }
+  // Zonder providerId zetten we bewust géén `providers`-param: de auth-link-route
+  // dwingt `provider_id` al af (400-guard), dus dit pad is vanuit de app
+  // onbereikbaar.
 
   return `${authUrl}/?${params.toString()}`
 }
@@ -286,16 +299,31 @@ export async function getAccountTransactions(
 
 /**
  * Get available banking providers (institutions).
+ *
+ * TrueLayer's `GET {authUrl}/api/providers` kent GEEN `country`-queryparam
+ * (levert dan 200 + een lege lijst); wél `?clientid=<client_id>`. Landfiltering
+ * doen we daarom client-side op het `country`-veld (lowercase, bv. "nl").
+ * Zonder opts: kale URL, ongefilterde lijst (sandbox / health-probe-pad).
  */
-export async function getProviders(authUrl: string, isSandbox: boolean = false): Promise<TLProvider[]> {
-  const url = isSandbox
-    ? `${authUrl}/api/providers`
-    : `${authUrl}/api/providers?country=NL`
+export async function getProviders(
+  authUrl: string,
+  opts?: { clientId?: string; country?: string }
+): Promise<TLProvider[]> {
+  const url = opts?.clientId
+    ? `${authUrl}/api/providers?clientid=${encodeURIComponent(opts.clientId)}`
+    : `${authUrl}/api/providers`
   const res = await fetch(url)
 
   if (!res.ok) {
     throw new Error(`TrueLayer providers ophalen mislukt: ${res.status}`)
   }
 
-  return res.json()
+  const providers = (await res.json()) as TLProvider[]
+
+  if (opts?.country) {
+    const country = opts.country.toLowerCase()
+    return providers.filter((p) => p.country?.toLowerCase() === country)
+  }
+
+  return providers
 }

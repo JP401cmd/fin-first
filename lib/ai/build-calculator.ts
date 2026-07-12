@@ -12,6 +12,7 @@ import { generateObject, NoObjectGeneratedError, APICallError } from 'ai'
 import { z } from 'zod'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { AIConfigError, getModel } from '@/lib/ai/config'
+import { sanitizeForAI } from '@/lib/ai/sanitize'
 import {
   CalculatorDefinitionSchema,
   type CalculatorDefinition,
@@ -253,7 +254,10 @@ export async function buildCalculator(
       ? `\n\nBestaande definitie om aan te passen (pas alleen aan wat de gebruiker vraagt):\n${JSON.stringify(refineFrom)}`
       : ''
 
-    const basePrompt = `Vraag van de gebruiker:\n${userPrompt}${refineBlock}`
+    // Strip generic PII from the free-text question before it reaches the AI
+    // provider. Numbers/percentages stay so the calc semantics are unaffected.
+    const safePrompt = sanitizeForAI(userPrompt)
+    const basePrompt = `Vraag van de gebruiker:\n${safePrompt}${refineBlock}`
     const system = buildSystemPrompt()
 
     const generate = (prompt: string) =>

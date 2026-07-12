@@ -88,6 +88,19 @@ export function savingsRateFromAggregates(
   return income6m > 0 ? ((income6m - expenses6m + debtAflossing6m) / income6m) * 100 : 0
 }
 
+/**
+ * Inverse van savingsRateFromAggregates: het maandelijkse spaarbedrag (€) dat bij
+ * een gegeven spaarquote (%) en maandinkomen hoort — `inkomen × quote%`.
+ *
+ * Dé canonieke "quote → bedrag"-conversie zodat het getoonde spaarpercentage en
+ * het getoonde €-bedrag ALTIJD op dezelfde grondslag staan (bedrag / inkomen × 100
+ * == quote). Voorkomt dat een oppervlak (bv. de spaarquote-widget) naast de
+ * canonieke quote een tweede, afwijkend huidige-maand-bedrag optelt.
+ */
+export function monthlySavingsFromRate(monthlyIncome: number, savingsRatePct: number): number {
+  return monthlyIncome * (savingsRatePct / 100)
+}
+
 export function resolveSavingsSource(input: SavingsSourceInput): SavingsSource {
   const incomeManual = input.incomeSource === 'manual' && input.netMonthlyIncome > 0
   const effectiveAnnualIncome = incomeManual

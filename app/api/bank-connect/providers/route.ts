@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { isTrueLayerEnabled } from '@/lib/truelayer/feature-flag'
-import { getBaseUrls, getProviders } from '@/lib/truelayer/client'
+import { getBaseUrls, getProviders, getClientId } from '@/lib/truelayer/client'
 
 export async function GET() {
   const supabase = await createClient()
@@ -20,12 +20,16 @@ export async function GET() {
     const { data: envData } = await supabase
       .from('app_settings').select('value').eq('key', 'truelayer_environment').single()
     const isSandbox = envData?.value === 'sandbox'
-    const providers = await getProviders(authUrl, isSandbox)
+    // Productie: filter op NL via het client-id-pad (country wordt client-side
+    // toegepast; TrueLayer kent geen country-queryparam). Sandbox: kale lijst.
+    const providers = isSandbox
+      ? await getProviders(authUrl)
+      : await getProviders(authUrl, { clientId: await getClientId(), country: 'nl' })
 
     const result = providers.map((p) => ({
       id: p.provider_id,
       name: p.display_name,
-      logo: p.logo_uri,
+      logo: p.logo_url,
     }))
 
     return NextResponse.json(result)

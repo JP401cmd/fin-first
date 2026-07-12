@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { computeSliderUiRange } from './whatif-sliders'
+import { render, screen } from '@testing-library/react'
+import { computeSliderUiRange, WhatIfSliders, type WhatIfOverrides } from './whatif-sliders'
+import { formatCurrency } from '@/lib/format'
 
 /**
  * Unit-tests voor `computeSliderUiRange` — het ZICHTBARE (UI-)bereik per slidertype
@@ -67,5 +69,61 @@ describe('computeSliderUiRange — extra inleg (20% van het basis-maandinkomen)'
   })
   it('verbreedt tot een opgeslagen waarde boven de max', () => {
     expect(computeSliderUiRange('extra_inleg', 7600, 2000)).toEqual({ min: 0, max: 2000 })
+  })
+})
+
+/**
+ * D-01 (a11y) — elke range-input in een SliderRow moet een toegankelijke naam
+ * (aria-label = parameter-label) én een aria-valuetext (geformatteerde waarde)
+ * hebben, zodat een screenreader zowel de parameter als de leesbare waarde
+ * benoemt i.p.v. de kale numerieke value. Vergelijk whatif-market-assumptions.tsx
+ * dat dit al doet op de master-slider.
+ */
+describe('WhatIfSliders — a11y: slider heeft naam + valuetext', () => {
+  const baseline: WhatIfOverrides = {
+    monthlyIncome: 3000,
+    workDaysPerWeek: 5,
+    savingsRate: 20,
+    expectedReturn: 6,
+    extraContribution: 0,
+  }
+
+  function renderSliders() {
+    render(
+      <WhatIfSliders
+        baseline={baseline}
+        events={[]}
+        setEvents={() => {}}
+        currentAge={40}
+      />,
+    )
+  }
+
+  it('benoemt elke parameter-slider bij naam (getByRole slider + name)', () => {
+    renderSliders()
+    expect(screen.getByRole('slider', { name: 'Maandinkomen' })).toBeInTheDocument()
+    expect(screen.getByRole('slider', { name: 'Werkdagen per week' })).toBeInTheDocument()
+    expect(screen.getByRole('slider', { name: 'Spaarquote' })).toBeInTheDocument()
+    expect(screen.getByRole('slider', { name: 'Extra inleg' })).toBeInTheDocument()
+  })
+
+  it('zet aria-valuetext op de geformatteerde waarde per slider', () => {
+    renderSliders()
+    expect(screen.getByRole('slider', { name: 'Maandinkomen' })).toHaveAttribute(
+      'aria-valuetext',
+      formatCurrency(3000),
+    )
+    expect(screen.getByRole('slider', { name: 'Werkdagen per week' })).toHaveAttribute(
+      'aria-valuetext',
+      '5 dagen',
+    )
+    expect(screen.getByRole('slider', { name: 'Spaarquote' })).toHaveAttribute(
+      'aria-valuetext',
+      '20%',
+    )
+    expect(screen.getByRole('slider', { name: 'Extra inleg' })).toHaveAttribute(
+      'aria-valuetext',
+      formatCurrency(0),
+    )
   })
 })

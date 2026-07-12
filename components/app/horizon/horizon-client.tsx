@@ -2727,6 +2727,9 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
 
   // ── Persistentie (plan §H): debounced fire-and-forget PUT; eerste render overslaan ──
   const scenarioSaveSkipRef = useRef(true)
+  // D-03: waarschuw hooguit één keer per mount als de scenario-persist faalt.
+  // De 600ms-debounce zou anders bij aanhoudende uitval de gebruiker spammen.
+  const scenarioPersistWarnedRef = useRef(false)
   useEffect(() => {
     if (scenarioSaveSkipRef.current) {
       scenarioSaveSkipRef.current = false
@@ -2763,12 +2766,26 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
+      }).then((r) => {
+        // Geslaagde save reset de guard, zodat een écht nieuwe uitval later
+        // in dezelfde sessie opnieuw één melding geeft.
+        if (r.ok) scenarioPersistWarnedRef.current = false
       }).catch(() => {
-        /* stil — persistentie is niet kritisch */
+        // Persistentie is niet kritisch, maar een aanhoudende uitval moet de
+        // gebruiker niet stil zijn scenario laten verliezen. Eén subtiele
+        // waarschuwing per mount (ref-guard) — de debounce zou anders spammen.
+        if (!scenarioPersistWarnedRef.current) {
+          scenarioPersistWarnedRef.current = true
+          addToast({
+            type: 'warning',
+            title: 'Scenario niet bewaard',
+            message: 'Wijzig iets om het opnieuw te proberen.',
+          })
+        }
       })
     }, 600)
     return () => clearTimeout(handle)
-  }, [scenarioSliderEvents, scenarioReturnDeltas, scenarioStopAge, scenarioStopKoppel, showScenarioLine, whatIfBaseline, currentAge, hasScenario, doelBlok, initialData.toekomstScenarioPrefs])
+  }, [scenarioSliderEvents, scenarioReturnDeltas, scenarioStopAge, scenarioStopKoppel, showScenarioLine, whatIfBaseline, currentAge, hasScenario, doelBlok, initialData.toekomstScenarioPrefs, addToast])
 
   async function handleActionStatusChange(id: string, status: ActionStatus, data?: Record<string, unknown>) {
     const res = await fetch(`/api/ai/actions/${id}`, {

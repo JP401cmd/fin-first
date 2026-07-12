@@ -131,18 +131,29 @@ function ValueChart({ data }: { data: ValueHistoryResponse }) {
   const xScale = (i: number) => padding.left + (i / Math.max(1, history.length - 1)) * chartW
   const yScale = (v: number) => padding.top + chartH - ((v - minVal) / range) * chartH
 
-  // Build SVG paths for value line
-  const valuePath = history
-    .map((p, i) => `${i === 0 ? 'M' : 'L'} ${xScale(i).toFixed(1)} ${yScale(p.value).toFixed(1)}`)
-    .join(' ')
+  // Build SVG paths for value line — memoized on the data inputs so hover
+  // state (hoveredIdx) changes don't rebuild the path strings each render.
+  // Mirrors the yLabels/xLabels memo pattern below.
+  const valuePath = useMemo(
+    () => history
+      .map((p, i) => `${i === 0 ? 'M' : 'L'} ${xScale(i).toFixed(1)} ${yScale(p.value).toFixed(1)}`)
+      .join(' '),
+    [history, minVal, range],
+  )
 
   // Build area fill under value line
-  const valueAreaPath = `${valuePath} L ${xScale(history.length - 1).toFixed(1)} ${yScale(minVal).toFixed(1)} L ${xScale(0).toFixed(1)} ${yScale(minVal).toFixed(1)} Z`
+  const valueAreaPath = useMemo(
+    () => `${valuePath} L ${xScale(history.length - 1).toFixed(1)} ${yScale(minVal).toFixed(1)} L ${xScale(0).toFixed(1)} ${yScale(minVal).toFixed(1)} Z`,
+    [valuePath, history, minVal, range],
+  )
 
   // Build cost basis line (dashed)
-  const costPath = history
-    .map((p, i) => `${i === 0 ? 'M' : 'L'} ${xScale(i).toFixed(1)} ${yScale(p.cost_basis).toFixed(1)}`)
-    .join(' ')
+  const costPath = useMemo(
+    () => history
+      .map((p, i) => `${i === 0 ? 'M' : 'L'} ${xScale(i).toFixed(1)} ${yScale(p.cost_basis).toFixed(1)}`)
+      .join(' '),
+    [history, minVal, range],
+  )
 
   // Y-axis labels (4 steps)
   const yLabels = useMemo(() => {

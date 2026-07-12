@@ -55,6 +55,11 @@ export const AssetQuickInputSchema = z.object({
     .finite()
     .min(0, 'Bedrag mag niet negatief zijn'),
   field3: Field3Schema,
+  // Savings-only: verwacht jaarrendement/rente (%). Nullable-optional zodat
+  // andere asset-types en oudere call-sites ongemoeid blijven. Geen min(0):
+  // een (historisch reële) negatieve spaarrente mag worden vastgelegd —
+  // `buildAssetDraft` valt op null terug op de TYPICAL_RETURNS-default.
+  expected_return: z.number().finite().nullable().optional(),
   // Onboarding-only opaak koppel-token (zie AssetQuickInput.client_ref). Geen
   // UUID-eis: het is een client-gegenereerde string, geen DB-id.
   client_ref: z.string().max(64).optional(),
@@ -77,6 +82,15 @@ export const DebtQuickInputSchema = z.object({
     .finite()
     .min(0, 'Bedrag mag niet negatief zijn'),
   field3: Field3Schema,
+  // Hypotheek-only: aflossingsvorm + ingangsdatum. Optioneel zodat andere
+  // schuldtypes (en oudere call-sites) ongemoeid blijven; `buildDebtDraft`
+  // valt terug op de type-defaults wanneer ze ontbreken.
+  repayment_type: z.enum(['aflossingsvrij', 'annuiteit', 'lineair']).nullable().optional(),
+  start_date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Ongeldige datum')
+    .nullable()
+    .optional(),
   linked_asset_id: z.string().uuid().nullable().optional(),
   // Onboarding-only koppel-token (zie DebtQuickInput.linked_client_ref). Geen
   // UUID — matcht met AssetQuickInput.client_ref, niet met een DB-id.

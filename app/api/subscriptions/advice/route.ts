@@ -3,6 +3,8 @@ import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { getModel, AIConfigError } from '@/lib/ai/config'
 import { checkTierGate } from '@/lib/require-tier'
+import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
+import { maskPIIInObject } from '@/lib/ai/pii-output-filter'
 
 const TEMPORAL_HINTS: Record<number, string> = {
   1: 'De gebruiker is een Levensgenieter (level 1). Wees zacht — adviseer alleen eliminatie bij echte overlappen, niet bij comfortdiensten.',
@@ -80,12 +82,16 @@ export async function POST(req: Request) {
     return Response.json({ error: 'Geen abonnementen om te analyseren' }, { status: 400 })
   }
 
-  // Fetch user profile for Temporal Balance personalisation
+  // Fetch user profile for Temporal Balance personalisation + PII sanitize opts
   const { data: profile } = await supabase
     .from('profiles')
-    .select('temporal_balance')
+    .select('temporal_balance, full_name, date_of_birth')
     .eq('id', user.id)
     .single()
+
+  const sanitizeOpts: SanitizeOptions = {}
+  if (profile?.full_name) sanitizeOpts.names = [profile.full_name]
+  if (profile?.date_of_birth) sanitizeOpts.dateOfBirth = profile.date_of_birth
 
   const temporalBalance = profile?.temporal_balance ?? 3
   const temporalHint = TEMPORAL_HINTS[temporalBalance] ?? TEMPORAL_HINTS[3]
@@ -112,8 +118,10 @@ export async function POST(req: Request) {
     return Response.json({ error: 'AI model kon niet worden geladen.' }, { status: 500 })
   }
 
+  // Sanitize subscription names before they reach the AI provider (own name +
+  // generic PII stripped; merchant names kept — needed for the advice).
   const subList = subscriptions
-    .map(s => `- ${s.name}: €${s.monthlyAmount.toFixed(2)}/maand (${s.frequency}, zekerheid: ${s.confidence})`)
+    .map(s => `- ${sanitizeForAI(s.name, sanitizeOpts)}: €${s.monthlyAmount.toFixed(2)}/maand (${s.frequency}, zekerheid: ${s.confidence})`)
     .join('\n')
 
   const systemPrompt = `Je bent Will, de financiële vrijheidsassistent van TriFinity. Je filosofie: "Geld is opgeslagen tijd — elke euro vertegenwoordigt een stukje levenstijd."
@@ -161,7 +169,9 @@ Stel ook maximaal 3 concrete, direct inplanbare acties voor (suggestedActions):
       })),
     }
 
-    return Response.json(normalized)
+    // Output-masking (defence-in-depth): mask any IBAN/BSN that slipped into
+    // the free AI text before it reaches the user (recommendations does the same).
+    return Response.json(maskPIIInObject(normalized))
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     console.error('[/api/subscriptions/advice] generateObject failed:', message)

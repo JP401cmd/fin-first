@@ -82,17 +82,17 @@ export function OnboardingVraag({
           <div className="grid grid-cols-2 gap-2.5">
             <button
               type="button"
-              onClick={onNo}
-              className="min-h-11 border border-[var(--border-ed)] bg-[var(--paper)] px-6 py-3 text-sm font-medium text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
-            >
-              {noLabel}
-            </button>
-            <button
-              type="button"
               onClick={onYes}
               className="min-h-11 bg-[var(--ink)] px-6 py-3 text-sm font-medium text-[var(--paper)] transition-colors hover:bg-[var(--ink-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
             >
               {yesLabel}
+            </button>
+            <button
+              type="button"
+              onClick={onNo}
+              className="min-h-11 border border-[var(--border-ed)] bg-[var(--paper)] px-6 py-3 text-sm font-medium text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+            >
+              {noLabel}
             </button>
           </div>
 

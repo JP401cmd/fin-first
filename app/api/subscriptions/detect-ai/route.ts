@@ -6,6 +6,7 @@ import { getModel, AIConfigError } from '@/lib/ai/config'
 import { checkTierGate } from '@/lib/require-tier'
 import { detectRecurringTransactions } from '@/lib/recurring-detection'
 import { SUBSCRIPTION_DETECT_PROMPT } from '@/lib/ai/subscription-detect-prompt'
+import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
 
 /**
  * POST /api/subscriptions/detect-ai
@@ -137,8 +138,21 @@ export async function POST() {
       return NextResponse.json({ error: 'AI model kon niet worden geladen.' }, { status: 500 })
     }
 
+    // Sanitize the counterparty/description pattern list before it reaches the
+    // AI provider (chat/categorize contract). The user's own name + generic PII
+    // (IBAN/e-mail/phone/address) are stripped; merchant names stay (needed to
+    // recognise a subscription; a business identifier, not person-PII).
+    const { data: sanitizeProfile } = await supabase
+      .from('profiles')
+      .select('full_name, date_of_birth')
+      .eq('id', user.id)
+      .single()
+    const sanitizeOpts: SanitizeOptions = {}
+    if (sanitizeProfile?.full_name) sanitizeOpts.names = [sanitizeProfile.full_name]
+    if (sanitizeProfile?.date_of_birth) sanitizeOpts.dateOfBirth = sanitizeProfile.date_of_birth
+
     const patternList = candidates
-      .map((d, i) => `${i}: ${d.counterpartyName || d.commonDescription} | ${d.frequency} | €${Math.abs(d.averageAmount).toFixed(2)}/keer | ${d.occurrences}x gezien`)
+      .map((d, i) => `${i}: ${sanitizeForAI(d.counterpartyName || d.commonDescription, sanitizeOpts)} | ${d.frequency} | €${Math.abs(d.averageAmount).toFixed(2)}/keer | ${d.occurrences}x gezien`)
       .join('\n')
 
     const responseSchema = z.object({

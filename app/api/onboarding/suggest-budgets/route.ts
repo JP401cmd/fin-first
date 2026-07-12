@@ -2,6 +2,7 @@ import { generateObject } from 'ai'
 import { createClient } from '@/lib/supabase/server'
 import { getModel, AIConfigError } from '@/lib/ai/config'
 import { checkTierGate } from '@/lib/require-tier'
+import { sanitizeForAI } from '@/lib/ai/sanitize'
 import {
   budgetSuggestionSchema,
   buildBudgetSuggestionPrompt,
@@ -26,6 +27,11 @@ export async function POST(req: Request) {
   if (!netMonthlyIncome || netMonthlyIncome <= 0) {
     return Response.json({ error: 'Netto maandinkomen is verplicht' }, { status: 400 })
   }
+
+  // The free-text `context` is user content — strip generic PII (IBAN/e-mail/
+  // phone/address/BSN) before it reaches the AI provider. Numbers/percentages
+  // stay so the budget maths is unaffected.
+  const safeContext = typeof context === 'string' ? sanitizeForAI(context) : context
 
   let model
   try {
@@ -58,7 +64,7 @@ export async function POST(req: Request) {
         netMonthlyIncome,
         householdType ?? 'solo',
         numberOfChildren ?? 0,
-        context,
+        safeContext,
         planSlugs,
       ),
       prompt: 'Genereer realistische maandelijkse budgetbedragen voor dit huishouden.',

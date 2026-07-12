@@ -13,6 +13,7 @@ import { generateObject } from 'ai'
 import { z } from 'zod'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getModel } from '@/lib/ai/config'
+import { sanitizeForAI } from '@/lib/ai/sanitize'
 import { DEFAULT_EXTRACTION_PROMPT } from '@/lib/ai/extraction-system-prompt'
 
 // ── Zod Schema ──────────────────────────────────────────────────
@@ -172,7 +173,11 @@ export async function extractFinancialData(
         ? `Profielcontext:\n${contextParts.join('\n')}\n\n`
         : ''
 
-    const userPrompt = `${contextBlock}Beschrijving van de financiële situatie:\n${text.trim()}`
+    // Strip generic PII (IBAN/e-mail/phone/address/BSN) from the free-text
+    // description before it reaches the AI provider. Amounts and asset/debt
+    // wording stay intact so the extraction still works.
+    const safeText = sanitizeForAI(text.trim())
+    const userPrompt = `${contextBlock}Beschrijving van de financiële situatie:\n${safeText}`
 
     console.log('[extract-financial-data] Starting extraction, text length:', text.trim().length)
 

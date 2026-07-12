@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo, useDeferredValue } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -24,6 +24,7 @@ import { type Budget } from '@/lib/budget-data'
 import { TransactionForm } from '@/components/app/transaction-form'
 import { BudgetIcon, formatCurrency as formatCurrencyShort, formatCurrencyDecimals as formatCurrency } from '@/components/app/budget-shared'
 import { calculateFreedomTime, formatFreedomTimeString, dailyExpenseRate } from '@/lib/format'
+import { capDateGroups } from '@/lib/transaction-list-cap'
 import { localMonthBounds } from '@/lib/month-range'
 import { SankeyDiagram, type SankeyNode, type SankeyLink } from '@/components/app/sankey-diagram'
 import { type RecurringTransaction, getExpectedMonthlyTotal, getNextOccurrence, formatSchedule } from '@/lib/recurring-data'
@@ -44,6 +45,10 @@ import { useFeatureAccess } from '@/components/app/feature-access-provider'
 import { Kicker } from '@/components/editorial'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { ValuationModal } from '@/components/core/assets-client'
+
+// Aantal rijen dat de transactielijst per keer toont; "Toon meer" voegt telkens
+// een pagina toe. Houdt de DOM klein bij een zware maand (100-400 rijen).
+const ROW_PAGE = 50
 
 type Transaction = {
   id: string
@@ -179,6 +184,8 @@ export function CashAccountView({
   const [filterSearch, setFilterSearch] = useState('')
   const [filterType, setFilterType] = useState<'all' | 'income' | 'expense' | 'transfer'>('all')
   const [filterBudgetId, setFilterBudgetId] = useState<string>('all')
+  // Paginering van de transactielijst — begrenst de gerenderde rijen tot ROW_PAGE.
+  const [visibleCount, setVisibleCount] = useState(ROW_PAGE)
 
   // Uncategorized group section state
   const [showUncatGroup, setShowUncatGroup] = useState(false)
@@ -564,9 +571,12 @@ export function CashAccountView({
     setMonthDate((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1))
   }
 
+  // O(1)-lookup i.p.v. per-rij .find() — scheelt O(n·m) bij honderden rijen.
+  const budgetById = useMemo(() => new Map(budgets.map((b) => [b.id, b])), [budgets])
+
   function getBudgetForId(budgetId: string | null): Budget | undefined {
     if (!budgetId) return undefined
-    return budgets.find((b) => b.id === budgetId)
+    return budgetById.get(budgetId)
   }
 
   /** A transaction has a "suggested" category when it was auto-categorized (AI or rule) but not yet confirmed by the user. */
@@ -674,6 +684,11 @@ export function CashAccountView({
     return { totalExpenses, totalIncome, categories, transactionCount: partnerTxs.length }
   }, [isPartnerTxTotals, currentUserId, transactions])
 
+  // Zoekterm gedeferd: het inputveld blijft aan `filterSearch` (instant typen),
+  // maar de zware filter-pass leest de gedeferde waarde. Live-gevoel, geen vaste
+  // delay op het veld.
+  const deferredSearch = useDeferredValue(filterSearch)
+
   // Apply filters (with privacy filtering for partner transactions)
   const filteredTransactions = useMemo(() => {
     let result = transactions
@@ -685,8 +700,8 @@ export function CashAccountView({
       )
     }
 
-    if (filterSearch.trim()) {
-      const searchLower = filterSearch.trim().toLowerCase()
+    if (deferredSearch.trim()) {
+      const searchLower = deferredSearch.trim().toLowerCase()
       result = result.filter((tx) =>
         (tx.description && tx.description.toLowerCase().includes(searchLower)) ||
         (tx.counterparty_name && tx.counterparty_name.toLowerCase().includes(searchLower)) ||
@@ -711,7 +726,7 @@ export function CashAccountView({
     }
 
     return result
-  }, [transactions, filterSearch, filterType, filterBudgetId, isPartnerTxTotals, isPartnerTxHidden, currentUserId])
+  }, [transactions, deferredSearch, filterType, filterBudgetId, isPartnerTxTotals, isPartnerTxHidden, currentUserId])
 
   const transactionsByDate = filteredTransactions.reduce<Record<string, Transaction[]>>((groups, tx) => {
     const date = tx.date
@@ -721,6 +736,18 @@ export function CashAccountView({
   }, {})
 
   const sortedDates = Object.keys(transactionsByDate).sort((a, b) => b.localeCompare(a))
+
+  // Reset de paginatie wanneer de gefilterde set wijzigt (maandwissel, filter, zoek).
+  useEffect(() => { setVisibleCount(ROW_PAGE) }, [filteredTransactions])
+
+  // Begrens de gerenderde rijen tot `visibleCount`, geteld óver de dag-groepen heen.
+  // Totalen/Sankey/partner-samenvatting rekenen op de VOLLEDIGE set — de cap raakt
+  // alleen wat er in de DOM komt. (transactionsByDate wordt elke render herbouwd,
+  // dus een useMemo hieromheen zou toch elke render herrekenen — directe call.)
+  const { dates: cappedDates, byDate: cappedByDate } = capDateGroups(
+    sortedDates, transactionsByDate, visibleCount,
+  )
+  const hasMoreTx = filteredTransactions.length > visibleCount
 
   // Build Sankey data
   const sankeyData = useMemo(() => {
@@ -1796,10 +1823,19 @@ export function CashAccountView({
                   return (
                     <div
                       key={counterparty}
-                      className="flex items-center gap-3 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-2.5 cursor-pointer hover:bg-[var(--subtle)] transition-colors"
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`${counterparty}, ${txs.length} ${txs.length === 1 ? 'transactie' : 'transacties'} categoriseren`}
+                      className="flex items-center gap-3 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-2.5 cursor-pointer hover:bg-[var(--subtle)] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--ink)] focus-visible:-outline-offset-2"
                       onClick={() => {
                         // Open AI categorize sheet filtered for these transactions
                         setShowAICategorize(true)
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          setShowAICategorize(true)
+                        }
                       }}
                       data-testid="uncategorized-group-row"
                     >
@@ -1978,8 +2014,8 @@ export function CashAccountView({
           </div>
         ) : (
           <div className="space-y-4">
-            {sortedDates.map((dateStr) => {
-              const dateTxs = transactionsByDate[dateStr]
+            {cappedDates.map((dateStr) => {
+              const dateTxs = cappedByDate[dateStr]
               const dateObj = new Date(dateStr + 'T00:00:00')
               const dateLabel = dateObj.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })
 
@@ -1997,18 +2033,30 @@ export function CashAccountView({
                       const isExpanded = expandedSplitId === tx.id
                       const loadedSplits = splitsByTxId[tx.id]
 
+                      const openTx = () => {
+                        if (isPendingTransfer) {
+                          setReviewTransferTxs([tx])
+                        } else if (!isTransfer) {
+                          setEditTransaction(tx)
+                          setShowForm(true)
+                        }
+                      }
+                      const isRowInteractive = !isTransfer
+
                       return (
                         <div key={tx.id} className={idx < dateTxs.length - 1 ? 'border-b border-[var(--border-ed)]' : ''}>
                         <div
-                          onClick={() => {
-                            if (isPendingTransfer) {
-                              setReviewTransferTxs([tx])
-                            } else if (!isTransfer) {
-                              setEditTransaction(tx)
-                              setShowForm(true)
+                          role={isRowInteractive ? 'button' : undefined}
+                          tabIndex={isRowInteractive ? 0 : undefined}
+                          aria-label={isRowInteractive ? `${tx.description}, ${formatCurrency(amount)}` : undefined}
+                          onClick={openTx}
+                          onKeyDown={isRowInteractive ? (e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              openTx()
                             }
-                          }}
-                          className={`flex cursor-pointer items-center gap-3 px-4 py-3 hover:bg-[var(--subtle)] ${isPendingTransfer ? 'border-l-2 border-[var(--hor)]' : ''} ${isSplitTx ? 'border-l-2 border-kern-300' : ''}`}
+                          } : undefined}
+                          className={`flex cursor-pointer items-center gap-3 px-4 py-3 hover:bg-[var(--subtle)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--ink)] focus-visible:-outline-offset-2 ${isPendingTransfer ? 'border-l-2 border-[var(--hor)]' : ''} ${isSplitTx ? 'border-l-2 border-kern-300' : ''}`}
                         >
                           <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--r)] ${
                             isTransfer ? 'bg-[var(--subtle)] border border-[var(--border-ed)]'
@@ -2033,12 +2081,14 @@ export function CashAccountView({
                                   <button
                                     type="button"
                                     onClick={(e) => confirmSuggestedCategory(e, tx.id)}
-                                    className="flex h-4 w-4 items-center justify-center rounded-full border border-emerald-300 bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+                                    className="relative flex h-11 w-11 -m-3.5 items-center justify-center rounded-full"
                                     title="Categorie bevestigen"
                                     aria-label="Categorie bevestigen"
                                     data-testid="confirm-category-btn-mobile"
                                   >
-                                    <Check className="h-2.5 w-2.5" />
+                                    <span className="flex h-4 w-4 items-center justify-center rounded-full border border-emerald-300 bg-emerald-50 text-emerald-600 hover:bg-emerald-100">
+                                      <Check className="h-2.5 w-2.5" />
+                                    </span>
                                   </button>
                                 </span>
                               )}
@@ -2192,6 +2242,15 @@ export function CashAccountView({
                 </div>
               )
             })}
+            {hasMoreTx && (
+              <button
+                onClick={() => setVisibleCount((c) => c + ROW_PAGE)}
+                className="w-full rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] py-2.5 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+                data-testid="show-more-transactions"
+              >
+                Toon meer ({Math.min(ROW_PAGE, filteredTransactions.length - visibleCount)})
+              </button>
+            )}
           </div>
         )}
       </section>

@@ -49,6 +49,49 @@ describe('buildAssetDraft', () => {
     expect(draft.net_worth_inclusion_pct).toBe(100)
   })
 
+  it('savings: expliciete rente (expected_return) overschrijft de default, bank blijft in institution', () => {
+    const draft = buildAssetDraft({
+      asset_type: 'savings',
+      name: 'Spaarrekening bunq',
+      current_value: 12000,
+      field3: 'bunq',
+      expected_return: 3.6,
+    })
+    expect(draft.institution).toBe('bunq')
+    expect(draft.expected_return).toBe(3.6)
+  })
+
+  it('savings: expected_return=0 en negatieve rente worden geaccepteerd (geen terugval op default)', () => {
+    const zero = buildAssetDraft({
+      asset_type: 'savings',
+      name: 'Spaar 0%',
+      current_value: 8000,
+      field3: 'ING',
+      expected_return: 0,
+    })
+    expect(zero.expected_return).toBe(0)
+
+    const negative = buildAssetDraft({
+      asset_type: 'savings',
+      name: 'Groot deposito',
+      current_value: 250000,
+      field3: 'ABN',
+      expected_return: -0.5,
+    })
+    expect(negative.expected_return).toBe(-0.5)
+  })
+
+  it('savings: zonder expected_return valt terug op TYPICAL_RETURNS.savings', () => {
+    const draft = buildAssetDraft({
+      asset_type: 'savings',
+      name: 'Spaar zonder rente',
+      current_value: 5000,
+      field3: 'Rabo',
+      expected_return: null,
+    })
+    expect(draft.expected_return).toBe(TYPICAL_RETURNS.savings)
+  })
+
   it('eigen_huis: parst field3 als WOZ-waarde (currency)', () => {
     const draft = buildAssetDraft({
       asset_type: 'eigen_huis',
@@ -165,6 +208,57 @@ describe('buildDebtDraft', () => {
       linked_asset_id: '00000000-0000-0000-0000-000000000001',
     })
     expect(draft.linked_asset_id).toBe('00000000-0000-0000-0000-000000000001')
+  })
+
+  it('mortgage: expliciete repayment_type wint van de default + stuurt is_tax_deductible aan', () => {
+    // Aflossingsvrije hypotheek is niet aftrekbaar (box 1) — de user-keuze
+    // moet de annuiteit/aftrekbaar-default omkeren.
+    const draft = buildDebtDraft({
+      debt_type: 'mortgage',
+      name: 'Aflossingsvrije hypotheek',
+      current_balance: 250000,
+      field3: 3.0,
+      repayment_type: 'aflossingsvrij',
+    })
+    expect(draft.repayment_type).toBe('aflossingsvrij')
+    expect(draft.is_tax_deductible).toBe(false)
+  })
+
+  it('mortgage: lineair + ingangsdatum in het verleden → start_date/end_date volgen de invoer', () => {
+    const draft = buildDebtDraft({
+      debt_type: 'mortgage',
+      name: 'Lopende hypotheek',
+      current_balance: 300000,
+      field3: 3.5,
+      repayment_type: 'lineair',
+      start_date: '2020-06-01',
+    })
+    expect(draft.repayment_type).toBe('lineair')
+    expect(draft.is_tax_deductible).toBe(true)
+    expect(draft.start_date).toBe('2020-06-01')
+    // end_date = start_date + 30 jaar (looptijd mortgage), niet vandaag + 30.
+    expect(draft.end_date).toBe(addYearsIso('2020-06-01', 30))
+  })
+
+  it('mortgage: ongeldige/ontbrekende start_date valt veilig terug op vandaag', () => {
+    const today = todayIso()
+    const invalid = buildDebtDraft({
+      debt_type: 'mortgage',
+      name: 'Hyp',
+      current_balance: 300000,
+      field3: 3.5,
+      start_date: '2026-02-31', // bestaat niet
+    })
+    expect(invalid.start_date).toBe(today)
+    expect(invalid.end_date).toBe(addYearsIso(today, 30))
+
+    const omitted = buildDebtDraft({
+      debt_type: 'mortgage',
+      name: 'Hyp2',
+      current_balance: 300000,
+      field3: 3.5,
+    })
+    expect(omitted.start_date).toBe(today)
   })
 
   it('gekoppelde hypotheek: debt_type=mortgage + fiscale/aflossing-vlaggen + linked_asset_id samen', () => {

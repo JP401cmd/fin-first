@@ -79,7 +79,7 @@ import {
   type CategoryAppLink,
 } from '@/lib/category-app-nav'
 import { resolveEffectiveIncomeExpenses } from './effective-financials'
-import { resolveSavingsSource, savingsRateFromAggregates, computeDebtAflossingMonthly } from './savings-source'
+import { resolveSavingsSource, savingsRateFromAggregates, computeDebtAflossingMonthly, monthlySavingsFromRate } from './savings-source'
 import { buildHealthScoreInput } from '@/lib/health-score-input'
 import { computeHealthScoreWithTrend, type HealthScore } from '@/lib/financial-health'
 
@@ -574,6 +574,16 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       savingsRate6m = deltaResult.rate
     }
   }
+
+  // Canoniek maandspaarbedrag op DEZELFDE grondslag als savingsRate6m (6m-geëxtra-
+  // poleerd, incl. spaarbudgetten + schuldaflossing). Zo geldt altijd
+  // bedrag / inkomen == savingsRate6m en tonen alle oppervlakken één grondslag —
+  // i.p.v. dat de spaarquote-widget zelf een afwijkend huidige-maand-bedrag optelt
+  // (income − expenses + spaarbudget, zónder aflossing). Het inkomen-anker is de
+  // noemer van savingsRate6m: het 6m-gemiddelde in het normale pad, het
+  // profiel/net-worth-delta-inkomen (effectiveMonthlyIncome) op het fallback-pad.
+  const savingsRate6mIncomeMonthly = savingsRateIsEstimate ? effectiveMonthlyIncome : extIncome6 / 6
+  const monthlySavingsAmount = monthlySavingsFromRate(savingsRate6mIncomeMonthly, savingsRate6m)
 
   const fireParams = resolveFireParams(profileResult.data ?? {})
   const fireSwr = fireParams.effectiveSwr
@@ -1506,10 +1516,11 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
         // row; zero or multiple (which would have errored) → null.
         const nonSelfMembers = (allMembersRes.data ?? []).filter((m) => m.user_id !== authUser!.id)
         const partnerMemberData = nonSelfMembers.length === 1 ? nonSelfMembers[0] : null
-        // Parse partner's privacy settings (Feature #537)
+        // Parse partner's privacy settings (Feature #537). Alleen nog voor de
+        // partnerHiddenCategories-labeling — de daadwerkelijke 'hidden'-gating van
+        // partner-totalen gebeurt IN de DB-functie household_partner_totals()
+        // (migratie 20260711160000), niet meer hier.
         const ppRaw = partnerMemberData?.privacy_settings as Record<string, string> | null
-        const ppAssets = ppRaw?.assets ?? 'totals'
-        const ppDebts = ppRaw?.debts ?? 'totals'
         // Build list of hidden categories
         if (ppRaw) {
           for (const [cat, level] of Object.entries(ppRaw)) {
@@ -1518,11 +1529,12 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
         }
 
         if (pt) {
-          let partnerAssets = Number(pt.partner_total_assets) || 0
-          let partnerDebts = Number(pt.partner_total_debts) || 0
-          // Feature #537: zero out hidden categories
-          if (ppAssets === 'hidden') partnerAssets = 0
-          if (ppDebts === 'hidden') partnerDebts = 0
+          // Privacy-gating ('hidden' => 0) gebeurt sinds migratie
+          // 20260711160000 IN de DB-functie household_partner_totals() zelf
+          // (via get_partner_privacy_level), gelijkgetrokken met
+          // household_partner_items(). De consument hoeft niet meer te gaten.
+          const partnerAssets = Number(pt.partner_total_assets) || 0
+          const partnerDebts = Number(pt.partner_total_debts) || 0
           const partnerNetWorth = partnerAssets - partnerDebts
           const partnerMonthlyIncome = Number(pt.partner_monthly_income) || 0
           const partnerMonthlyExpenses = Number(pt.partner_monthly_expenses) || 0
@@ -1549,6 +1561,17 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
                 }
               : {}
 
+          // Canonieke spaarquote via de gedeelde formule (savingsRateFromAggregates)
+          // i.p.v. inline in de widget herrekenen. Household toont de gebruiker's
+          // eigen inkomen/uitgaven, dus dezelfde correcties als het persoonlijke
+          // pad: spaarbudgetten uit de uitgaven-term, schuldaflossing erbij. Het
+          // €-spaarbedrag komt via monthlySavingsFromRate uit diezelfde quote →
+          // bedrag / inkomen == quote (geen tweede grondslag op één kaart).
+          const householdSavingsRate = savingsRateFromAggregates(
+            effectiveMonthlyIncome,
+            effectiveMonthlyExpenses - monthlySavingsBudgetSpent,
+            debtAflossingMonthly,
+          )
           householdOverrides = {
             netWorth: netWorth + partnerAssets - partnerDebts,
             totalAssets: totalAssets + partnerAssets,
@@ -1557,17 +1580,28 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
             // (these represent the household's tracked expenses from the user's bank accounts)
             monthlyExpenses: effectiveMonthlyExpenses,
             monthlyIncome: effectiveMonthlyIncome,
+            savingsRate: Math.round(householdSavingsRate * 10) / 10,
+            monthlySavings: Math.round(monthlySavingsFromRate(effectiveMonthlyIncome, householdSavingsRate) * 100) / 100,
             ...fireFields(combinedProj),
           }
 
-          // Partner-only perspective: show partner's individual data
+          // Partner-only perspective: show partner's individual data.
+          // Geen betrouwbare partner-level spaarbudget/aflossing-data beschikbaar
+          // (alleen income/expenses uit de RPC), dus zonder correctie — maar wél via
+          // dezelfde canonieke helper + precisie als het persoonlijke pad i.p.v. een
+          // afwijkende inline-formule. Rate en €-bedrag delen dezelfde inkomen-basis.
+          const partnerDisplayIncome = partnerMonthlyIncome > 0 ? partnerMonthlyIncome : effectiveMonthlyIncome
+          const partnerDisplayExpenses = partnerMonthlyExpenses > 0 ? partnerMonthlyExpenses : effectiveMonthlyExpenses
+          const partnerSavingsRate = savingsRateFromAggregates(partnerDisplayIncome, partnerDisplayExpenses, 0)
           partnerOverrides = {
             netWorth: partnerNetWorth,
             totalAssets: partnerAssets,
             totalDebts: partnerDebts,
             // Use partner's tracked income/expenses if available, otherwise approximate
-            monthlyExpenses: partnerMonthlyExpenses > 0 ? partnerMonthlyExpenses : effectiveMonthlyExpenses,
-            monthlyIncome: partnerMonthlyIncome > 0 ? partnerMonthlyIncome : effectiveMonthlyIncome,
+            monthlyExpenses: partnerDisplayExpenses,
+            monthlyIncome: partnerDisplayIncome,
+            savingsRate: Math.round(partnerSavingsRate * 10) / 10,
+            monthlySavings: Math.round(monthlySavingsFromRate(partnerDisplayIncome, partnerSavingsRate) * 100) / 100,
             ...fireFields(partnerProj),
           }
         }
@@ -2041,6 +2075,12 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     topRecommendations,
     topLifeEvents,
     savingsRate6m: Math.round(savingsRate6m * 10) / 10,
+    // Canoniek maandspaarbedrag op savingsRate6m-grondslag (zie berekening boven) —
+    // de spaarquote-widget consumeert dit i.p.v. een eigen huidige-maand-som.
+    monthlySavingsAmount: Math.round(monthlySavingsAmount * 100) / 100,
+    // Transparantie: de 6m-quote viel terug op een profiel/net-worth-delta-schatting
+    // (er was geen transactie-gebaseerde 6m-quote). De widget kan dit markeren.
+    savingsRateIsEstimate,
     monthlySavingsBudgetSpent: Math.round(monthlySavingsBudgetSpent * 100) / 100,
     savingsBudgetSpent6m: Math.round(savingsBudgetSpent6m * 100) / 100,
     prevMonthSavingsBudgetSpent: Math.round(prevMonthSavingsBudgetSpent * 100) / 100,

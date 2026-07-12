@@ -1,10 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { generateObject } from 'ai'
-import { anthropic } from '@ai-sdk/anthropic'
 import { z } from 'zod'
 import { WHATIF_SUGGEST_PROMPT } from '@/lib/ai/whatif-suggest-prompt'
-import { wrapModelWithTokenLogging } from '@/lib/ai/token-usage'
+import { getModel, AIConfigError } from '@/lib/ai/config'
+import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
+import { checkTierGate } from '@/lib/require-tier'
 
 const SuggestedEventSchema = z.object({
   event_type: z.string(),
@@ -28,16 +29,51 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  // AI-add-on vereist (kostenbeheersing) — gaf voorheen alleen auth-check.
+  const gate = await checkTierGate(supabase, user.id, 'ai')
+  if (gate) return NextResponse.json({ error: gate.error }, { status: 403 })
+
   const body = await request.json().catch(() => null)
-  if (!body?.prompt) {
+  if (!body?.prompt || typeof body.prompt !== 'string') {
     return NextResponse.json({ error: 'prompt is required' }, { status: 400 })
+  }
+
+  // Route through getModel so the platform AI kill-switch, provider choice and
+  // token-logging apply (was a hardcoded anthropic() call that bypassed all
+  // three). AIConfigError = provider not configured / AI disabled by beheer.
+  let model
+  try {
+    model = await getModel(supabase, 'whatif_suggesties')
+  } catch (err) {
+    if (err instanceof AIConfigError) {
+      return NextResponse.json({ error: err.message }, { status: 422 })
+    }
+    return NextResponse.json({ error: 'AI model kon niet worden geladen.' }, { status: 500 })
+  }
+
+  // Sanitize the user-supplied prompt before it reaches the AI provider.
+  // FAIL-SAFE: a sanitize failure blocks the call (never send raw).
+  let safePrompt: string
+  try {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name, date_of_birth')
+      .eq('id', user.id)
+      .single()
+    const sanitizeOpts: SanitizeOptions = {}
+    if (profile?.full_name) sanitizeOpts.names = [profile.full_name]
+    if (profile?.date_of_birth) sanitizeOpts.dateOfBirth = profile.date_of_birth
+    safePrompt = sanitizeForAI(body.prompt, sanitizeOpts)
+  } catch (err) {
+    console.error('[whatif/suggest] Sanitization failed — AI call blocked (fail-safe):', err)
+    return NextResponse.json({ error: 'Tijdelijk niet beschikbaar door een beveiligingscontrole.' }, { status: 503 })
   }
 
   try {
     const result = await generateObject({
-      model: wrapModelWithTokenLogging(anthropic('claude-haiku-4-5-20251001'), { supabase, feature: 'whatif_suggesties', provider: 'anthropic', modelId: 'claude-haiku-4-5-20251001' }),
+      model,
       schema: SuggestionsResponseSchema,
-      prompt: body.prompt,
+      prompt: safePrompt,
       system: WHATIF_SUGGEST_PROMPT,
     })
 
