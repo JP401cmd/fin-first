@@ -18,7 +18,7 @@ Choose the right layer: pure logic and component behaviour → Vitest, co-locate
 ## How you work
 
 1. **Reproduce first.** For a bug, write the failing test before the fix is trusted — confirm it goes red for the right reason, then green. For a fix that already landed, add the case that would have caught it.
-2. **Cover the edges, not just the happy path.** Especially for money/calc code: zero/negative income, deficit, infinite freedom, `inclusion_pct` weighting, empty/loading states, role boundaries (user vs. superadmin), RLS-scoped data access.
+2. **Cover the edges, not just the happy path.** Especially for money/calc code: zero/negative income, deficit, infinite freedom, `inclusion_pct` weighting, empty/loading states, role boundaries (user vs. superadmin), RLS-scoped data access. Bij een afgeleide/presentatie-metriek (bv. een conservatieve SWR-proxy naast de echte solver-uitkomst): **meet vóór je assert** — draai de motor eerst en kijk wat er feitelijk uitkomt vóór je een "een gezond plan toont nooit X"-verwachting vastlegt; proxy en kern-waarheid kunnen legitiem uiteenlopen.
 3. **Match the existing test idioms.** Read the nearest sibling test and mirror its structure, naming (`kebab-case` ids), assertions and fixtures (`test-seed.ts`, `test-session.ts`). Keep regression `priority`/`requiredRole` honest. For a dependency-injected helper (one that takes its external resource — e.g. a Supabase client — as an argument), prefer passing an inline stub object over `vi.mock()`: it's deterministic and skips module-resolution overhead.
 4. **Run and read the output.** `npm run test:run` for the file(s) touched (scope to a path for speed), plus `npx tsc --noEmit`. Report the actual pass/fail counts and any failure message — never paraphrase a green you didn't see.
 5. **Diagnose failures honestly.** Decide whether the *code* or the *test* is wrong. If a test encodes a stale expectation, say so and fix it deliberately; if the code regressed, surface it — don't weaken a test to make it pass.
@@ -31,6 +31,7 @@ Choose the right layer: pure logic and component behaviour → Vitest, co-locate
 - Never delete or loosen an assertion just to get to green — fix the cause or flag it.
 - Every bug fix gets a regression test so it can't come back.
 - Financial calculations and RLS/role boundaries always get edge-case coverage.
+- Consume-laag-tests (coverage-strip, dekkingsradar en vergelijkbare puur-afgeleide modules over `UnifiedProjectionRow`): minstens één test draait tegen een **bridge-representatieve rijvorm** (echte kernel/bridge-run via een persona-/oracle-fixture), niet uitsluitend synthetische `mkRow`-fixtures — "formule klopt in isolatie" en "formule krijgt de juiste data" zijn twee verschillende claims.
 - Keep tests fast and deterministic; no flaky time/network dependence.
 
 ## Self-improvement

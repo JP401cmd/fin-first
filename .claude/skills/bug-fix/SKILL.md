@@ -48,6 +48,7 @@ De `senior-developer` routeert naar het juiste domein en integreert:
 - UI/component/scherm → `frontend-ui-builder`
 - Overig/cross-cutting → `coder` of de `senior-developer` zelf
 Fix bij de **bron** (geen symptoombestrijding, geen duplicatie van een berekening). **Bij een rekenmotor- of constante-correctie: grep niet alleen op de canonieke functienaam, maar óók op de rúwe constante-literalen van de oude/foute formule (bv. `0.133`, `17_545`) — een tweede surface die de metric volledig herimplementeert met magic numbers verschijnt nooit in een grep op de geëxporteerde functie, en blijft anders ongecorrigeerd achter.**
+De fixer levert in zijn rapport een **blast-radius-regel** mee: "gewijzigd veld/symbool X wordt gelezen door: [lijst uit de grep]" — die grep doet hij toch al, en stap 7 valideert dan die lijst i.p.v. hem from scratch op te bouwen.
 
 ### 6. Verifiëren — `tester`
 De `tester` draait de test uit stap 4 (nu **groen**) plus de bredere relevante suites, en voegt een **regressiecase** toe zodat de bug niet terugkomt. Draai `npx tsc --noEmit` en relevante `npm run test:run`-paden. Geen groen-theater: rapporteer echte output. Draaien stap 6 en 7 parallel, dan wijzigt de tester geen productiecode: in-scope defecten meldt hij als bevinding aan de orchestrator, zodat de review geen bewegend doel beoordeelt.
@@ -55,7 +56,7 @@ De `tester` draait de test uit stap 4 (nu **groen**) plus de bredere relevante s
 - **Scope-grens bij blootgelegde drift.** Legt een **nieuw toegevoegde CI-wrapper** voor een al-bestaande in-app suite pre-existing drift bloot (asserties die achterlopen op code/types/data), fix dan **alleen** de drift die direct aan de huidige bug verbonden is. Los-staande drift in dezelfde of een ándere suite is een **aparte follow-up** — rek de scope van de bugfix er niet mee op (draai een halve aanzet terug en houd de fix atomair), maar benoem de drift expliciet als aanbeveling in de afronding. Zo voorkom je dat één bug een ongerelateerde suite-opschoning in sleept.
 
 ### 7. Review — `code-review` (+ conditioneel `ux-review-expert` / `security-specialist`)
-`code-review` beoordeelt de fix op correctheid, neveneffecten en kwaliteit. Bij een UI-bug ook `ux-review-expert` voor consistentie/UX. Raakt de fix data-toegang, auth, routes of partner-privacy — of wás de bug zelf een lek — dan draait de `security-specialist` zijn ship-gate-checklist vóór afronding.
+`code-review` beoordeelt de fix op correctheid, neveneffecten en kwaliteit; geef hem de blast-radius-regel uit stap 5 mee (welke consumers het gewijzigde veld/symbool lezen) — valideren is goedkoper dan reconstrueren. Bij een UI-bug ook `ux-review-expert` voor consistentie/UX. Raakt de fix data-toegang, auth, routes of partner-privacy — of wás de bug zelf een lek — dan draait de `security-specialist` zijn ship-gate-checklist vóór afronding.
 
 ### 8. Architectuur-fit & platen — `architect` (+ `architecture-docs-keeper` indien structureel)
 Was stap 3 "structureel"? Dan reviewt de `architect` of de fit klopt en zorgt hij dat de vier views van `/beheer/architectuur` meebewegen — gedelegeerd aan `architecture-docs-keeper` (`npm run arch:diagram`, suites groen), inclusief een ADR/concern-update (concern verwíjderen als het risico is opgelost). Lokale bug zonder impact? Sla over.
