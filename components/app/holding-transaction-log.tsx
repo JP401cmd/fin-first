@@ -444,6 +444,19 @@ const TxRow = memo(function TxRow({
       {isExpanded && (
         <div className="border-t border-[var(--border-ed)] px-3 py-3" data-testid="tx-detail">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {/* Transactie-eigen gegevens: in compact is de "eenheden @ prijs"-regel
+                in de rij verborgen, dus altijd via het uitklappaneel bereikbaar
+                (ook in ruim getoond — geen kwaad, en houdt het paneel consistent). */}
+            <MiniStat
+              label="Deze transactie"
+              value={
+                <span className="tabular-nums" data-testid="tx-units-at-price">
+                  {tx.type === 'split'
+                    ? `${tx.units}:1 split`
+                    : `${tx.units} eenhe${tx.units === 1 ? 'id' : 'den'} @ ${formatCurrency(tx.price_per_unit)}`}
+                </span>
+              }
+            />
             <MiniStat label="Eenheden na tx" value={tx.running_units.toString()} />
             <MiniStat label="Gem. kosten" value={<MaskedAmount value={tx.running_avg_price} tone="kern" />} />
             <MiniStat label="Kostenbasis" value={<MaskedAmount value={tx.running_cost_basis} tone="kern" />} />

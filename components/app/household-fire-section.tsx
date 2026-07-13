@@ -173,7 +173,7 @@ export function HouseholdFireSection({
           {/* Personal FIRE Card */}
           <div className="rounded-[var(--r-lg)] border-2 border-horizon-200 bg-gradient-to-br from-horizon-50 to-white p-6" data-testid="personal-fire-card">
             <div className="mb-4 flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-horizon-100">
+              <div className="flex h-8 w-8 items-center justify-center bg-horizon-100">
                 <User className="h-4 w-4 text-horizon-600" />
               </div>
               <div>
@@ -271,7 +271,7 @@ export function HouseholdFireSection({
       {/* Combined Household Hero Card */}
       <div className="rounded-[var(--r-lg)] border-2 border-horizon-200 bg-gradient-to-br from-horizon-50 to-white p-6" data-testid="household-combined-card">
         <div className="mb-4 flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-horizon-100">
+          <div className="flex h-8 w-8 items-center justify-center bg-horizon-100">
             <Users className="h-4 w-4 text-horizon-600" />
           </div>
           <div>
@@ -899,7 +899,7 @@ function FinancialCard({
   return (
     <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-3" data-testid={testId}>
       <div className="mb-1 flex items-center gap-1.5">
-        <div className="flex h-6 w-6 items-center justify-center rounded-md bg-[var(--subtle)]">
+        <div className="flex h-6 w-6 items-center justify-center bg-[var(--subtle)]">
           {icon}
         </div>
         <p className="text-[10px] font-medium text-[var(--ink-3)]">{label}</p>
@@ -970,12 +970,12 @@ function PartnerCard({
         data-testid={`partner-card-${partner.isCurrentUser ? 'self' : 'other'}`}
       >
         <div className="mb-3 flex items-center gap-2">
-          <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${colors.icon}`}>
+          <div className={`flex h-8 w-8 items-center justify-center ${colors.icon}`}>
             <User className="h-4 w-4" />
           </div>
           <p className={`text-sm font-semibold ${colors.accent}`}>{name}</p>
         </div>
-        <div className="flex items-start gap-2 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-3" data-testid="partner-future-hidden">
+        <div className="flex items-start gap-2 border border-[var(--border-ed)] bg-[var(--paper)] p-3" data-testid="partner-future-hidden">
           <EyeOff className="mt-0.5 h-4 w-4 shrink-0 text-[var(--ink-4)]" aria-hidden />
           <p className="text-xs text-[var(--ink-3)] leading-relaxed">
             {name} deelt geen toekomstgegevens met het huishouden. Instellingen,
@@ -992,7 +992,7 @@ function PartnerCard({
       data-testid={`partner-card-${partner.isCurrentUser ? 'self' : 'other'}`}
     >
       <div className="mb-3 flex items-center gap-2">
-        <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${colors.icon}`}>
+        <div className={`flex h-8 w-8 items-center justify-center ${colors.icon}`}>
           <User className="h-4 w-4" />
         </div>
         <div>
@@ -1141,9 +1141,9 @@ function ComparisonBar({
           return (
             <div key={v.name} className="flex items-center gap-3">
               <span className="w-20 shrink-0 truncate text-xs text-[var(--ink-2)]">{v.name}</span>
-              <div className="relative h-6 flex-1 overflow-hidden rounded-md bg-[var(--subtle)]">
+              <div className="relative h-6 flex-1 overflow-hidden bg-[var(--subtle)]">
                 <div
-                  className={`h-full rounded-md ${barColor} ${isWinner ? '' : 'opacity-50'} transition-[width] duration-700 ease-out`}
+                  className={`h-full ${barColor} ${isWinner ? '' : 'opacity-50'} transition-[width] duration-700 ease-out`}
                   style={{ width: `${pct}%` }}
                 />
               </div>

@@ -26,7 +26,7 @@ export default async function OverzichtCashflowBudgetPage() {
   if (!setupStatus.budgetteren) {
     return (
       <>
-        <NavStackMeta title="Budget" bottomBar={{ kind: 'tabs' }} />
+        <NavStackMeta title="Budgetteren" bottomBar={{ kind: 'tabs' }} />
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <AppSetupGate appKey="budgetteren" />
         </div>
@@ -72,7 +72,7 @@ export default async function OverzichtCashflowBudgetPage() {
 
   return (
     <>
-      <NavStackMeta title="Budget" bottomBar={{ kind: 'tabs' }} />
+      <NavStackMeta title="Budgetteren" bottomBar={{ kind: 'tabs' }} />
       <div className="relative mx-auto max-w-6xl px-4 pt-4 sm:px-6">
         <PageStatusDot className="absolute right-[52px] top-4 sm:right-[60px]" />
         <PageInfoButton

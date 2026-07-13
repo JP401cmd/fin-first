@@ -87,7 +87,7 @@ export function AiPrivacySettings() {
 
   return (
     <section className="mx-auto max-w-3xl px-4 sm:px-6 pb-12">
-      <section className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
+      <section className="border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
         <div className="px-4 sm:px-6 py-6 space-y-6">
           {/* ── Financiële toelichting ── */}
           <div className="space-y-4">
@@ -107,7 +107,7 @@ export function AiPrivacySettings() {
                 }}
                 placeholder="Bijv. ik ben zzp'er in de IT, spaar maandelijks ~€1.500, heb een hypotheek op mijn appartement en beleg via DeGiro..."
                 rows={5}
-                className="w-full rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 text-sm text-[var(--ink)] placeholder:text-[var(--ink-4)] focus:outline-none focus:ring-2 focus:ring-zinc-900/10 resize-y"
+                className="w-full border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 text-sm text-[var(--ink)] placeholder:text-[var(--ink-4)] focus:outline-none focus:ring-2 focus:ring-zinc-900/10 resize-y"
               />
               <div className="mt-1 flex justify-end">
                 <span
@@ -122,7 +122,7 @@ export function AiPrivacySettings() {
               <button
                 onClick={saveFinancialContext}
                 disabled={contextSaving || financialContext === financialContextSaved}
-                className="rounded-lg bg-zinc-900 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50"
+                className="bg-zinc-900 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50"
               >
                 {contextSaving ? 'Opslaan...' : 'Opslaan'}
               </button>
@@ -142,7 +142,7 @@ export function AiPrivacySettings() {
           <div className="border-t border-dashed border-[var(--border-ed)]" />
 
           {/* AI Toggle */}
-          <div className="flex items-center justify-between rounded-xl border border-[var(--border-ed)] p-4">
+          <div className="flex items-center justify-between border border-[var(--border-ed)] p-4">
             <div className="flex-1 pr-4">
               <h3 className="text-sm font-semibold text-[var(--ink)]">AI-features inschakelen</h3>
               <p className="mt-0.5 text-xs text-[var(--ink-3)]">
@@ -167,7 +167,7 @@ export function AiPrivacySettings() {
           </div>
 
           {/* Normalizing intro */}
-          <div className="flex items-start gap-3 rounded-xl bg-wil-50/40 p-4">
+          <div className="flex items-start gap-3 bg-wil-50/40 p-4">
             <Shield className="mt-0.5 h-5 w-5 text-wil-500 shrink-0" aria-hidden="true" />
             <div>
               <p className="text-sm font-medium text-[var(--ink)]">Jij bent eigenaar van je data</p>
@@ -179,9 +179,9 @@ export function AiPrivacySettings() {
           </div>
 
           {/* Wat WEL wordt gedeeld */}
-          <div className="rounded-xl border border-[var(--border-ed)] p-4">
+          <div className="border border-[var(--border-ed)] p-4">
             <div className="flex items-center gap-2 mb-3">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-wil-50">
+              <div className="flex h-7 w-7 items-center justify-center bg-wil-50">
                 <Eye className="h-4 w-4 text-wil-600" aria-hidden="true" />
               </div>
               <h3 className="text-sm font-semibold text-[var(--ink)]">Wat wordt gedeeld</h3>
@@ -206,9 +206,9 @@ export function AiPrivacySettings() {
           </div>
 
           {/* Wat NIET wordt gedeeld */}
-          <div className="rounded-xl border border-[var(--border-ed)] p-4">
+          <div className="border border-[var(--border-ed)] p-4">
             <div className="flex items-center gap-2 mb-3">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-negative/10">
+              <div className="flex h-7 w-7 items-center justify-center bg-negative/10">
                 <EyeOff className="h-4 w-4 text-negative" aria-hidden="true" />
               </div>
               <h3 className="text-sm font-semibold text-[var(--ink)]">Wat wordt gemaskeerd</h3>
@@ -237,9 +237,9 @@ export function AiPrivacySettings() {
           </div>
 
           {/* Dataverwerking */}
-          <div className="rounded-xl border border-[var(--border-ed)] p-4">
+          <div className="border border-[var(--border-ed)] p-4">
             <div className="flex items-center gap-2 mb-3">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-horizon-50">
+              <div className="flex h-7 w-7 items-center justify-center bg-horizon-50">
                 <Server className="h-4 w-4 text-horizon-600" aria-hidden="true" />
               </div>
               <h3 className="text-sm font-semibold text-[var(--ink)]">Hoe je data wordt verwerkt</h3>
@@ -276,7 +276,7 @@ export function AiPrivacySettings() {
           </div>
 
           {/* Shield badge */}
-          <div className="flex items-center gap-2 rounded-lg bg-[var(--subtle)] px-4 py-3">
+          <div className="flex items-center gap-2 bg-[var(--subtle)] px-4 py-3">
             <Shield className="h-4 w-4 shrink-0 text-wil-600" aria-hidden="true" />
             <p className="text-xs text-[var(--ink-3)]">
               Waar het kan maskeren we persoonsgegevens automatisch vóór verzending; bij document-import

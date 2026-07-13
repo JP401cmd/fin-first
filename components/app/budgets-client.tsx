@@ -98,6 +98,7 @@ const BudgetKoppelNudge = dynamic(() =>
   { ssr: false }
 )
 import { useToast } from '@/components/app/toast-provider'
+import { FormError, formErrorId } from '@/components/app/form-error'
 import { OVERLAY_QUERY_KEYS } from '@/lib/navigation'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { FeatureGate } from '@/components/app/feature-gate'
@@ -613,7 +614,7 @@ export function BudgetHub({
   // Collapsed-header preview snippets — max 3 to keep the one-liner scannable
   const previewSnippets: React.ReactNode[] = []
   if (overCount > 0) {
-    previewSnippets.push(<span key="over" className="text-red-600">{overCount} overschreden</span>)
+    previewSnippets.push(<span key="over" className="text-negative">{overCount} overschreden</span>)
   }
   if (bijnaCount > 0) {
     previewSnippets.push(<span key="bijna" className="text-amber-600">{bijnaCount} bijna vol</span>)
@@ -2154,7 +2155,7 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
     return (
       <div className="py-5 sm:py-12">
         <div className="rounded-[var(--r-lg)] border border-red-200 bg-red-50 p-6 text-center">
-          <p className="text-sm font-medium text-red-700">{error}</p>
+          <FormError id={formErrorId('budgets-load')} message={error} />
           <button onClick={() => { setError(null); setLoading(true); loadBudgets() }} className="mt-3 bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">
             Opnieuw proberen
           </button>
@@ -3448,9 +3449,7 @@ function BudgetDetailModal({
                   </>
                 ) : (
                   <div className="space-y-3">
-                    {goalError && (
-                      <p className="text-xs text-red-600">{goalError}</p>
-                    )}
+                    <FormError id={formErrorId('spaardoel')} message={goalError} />
                     <div>
                       <label className="mb-1 block text-[10px] font-medium uppercase tracking-[.06em] text-[var(--ink-3)]">Naam</label>
                       <input
@@ -3955,12 +3954,12 @@ function BudgetDetailModal({
               {/* Alert when predicted exceeds limit — altijd zichtbaar */}
               {forecast.exceedsLimit && forecast.alertMessage && !isOverPositive(budgetType) && (
                 <div className="mt-3 flex items-start gap-2 border border-red-200 bg-red-50 p-3" data-testid="budget-forecast-alert">
-                  <AlertCircle className="h-4 w-4 shrink-0 text-red-500 mt-0.5" />
+                  <AlertCircle className="h-4 w-4 shrink-0 text-negative mt-0.5" />
                   <div>
-                    <p className="text-xs font-medium text-red-700" data-testid="budget-forecast-alert-message">
+                    <p className="text-xs font-medium text-negative" data-testid="budget-forecast-alert-message">
                       {forecast.alertMessage}
                     </p>
-                    <p className="text-[10px] text-red-500 mt-0.5">
+                    <p className="text-[10px] text-negative mt-0.5">
                       Limiet: {<MaskedAmount value={limit} tone="wil" />} — Verwacht: {<MaskedAmount value={forecast.predicted} tone="wil" />}
                     </p>
                   </div>
@@ -4104,9 +4103,7 @@ function BudgetDetailModal({
                     : `Dit archiveert "${budget.name}". Budgetten met gekoppelde transacties kunnen niet worden gearchiveerd.`
                   }
                 </p>
-                {deleteError && (
-                  <p className="mt-1 text-xs font-medium text-red-600">{deleteError}</p>
-                )}
+                <FormError id={formErrorId('budget-archiveren')} message={deleteError} />
                 <div className="mt-2 flex gap-2">
                   <button
                     type="button"

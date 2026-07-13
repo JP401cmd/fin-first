@@ -214,7 +214,7 @@ export function RekenhulpView({
           onChange={(e) => setPrompt(e.target.value)}
           rows={3}
           placeholder="bv. Aflossen op mijn hypotheek vs. beleggen over 15 jaar"
-          className="w-full rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--ink-3)] resize-none"
+          className="w-full border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--ink-3)] resize-none"
         />
 
         {!draft && (
@@ -237,7 +237,7 @@ export function RekenhulpView({
             type="button"
             onClick={() => generate(!!draft)}
             disabled={loading || !prompt.trim()}
-            className="inline-flex items-center gap-2 rounded-xl bg-[var(--ink)] text-[var(--paper)] px-4 py-2.5 text-sm font-semibold hover:bg-[var(--ink-2)] transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-2 bg-[var(--ink)] text-[var(--paper)] px-4 py-2.5 text-sm font-semibold hover:bg-[var(--ink-2)] transition-colors disabled:opacity-50"
           >
             {loading ? (
               <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
@@ -249,7 +249,7 @@ export function RekenhulpView({
         </div>
 
         {error && (
-          <div role="alert" className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <div role="alert" className="mt-3 border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
             {error}
           </div>
         )}
@@ -262,7 +262,7 @@ export function RekenhulpView({
                 type="button"
                 onClick={saveDraft}
                 disabled={saving}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-horizon-700 text-white px-3 py-2 text-sm font-semibold hover:bg-horizon-800 transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 bg-horizon-700 text-white px-3 py-2 text-sm font-semibold hover:bg-horizon-800 transition-colors disabled:opacity-50"
               >
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 Opslaan
@@ -314,7 +314,7 @@ export function RekenhulpView({
                     amount: Math.abs(seedAmount ?? 0),
                   })
                 }
-                className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-2.5 text-sm font-semibold text-[var(--ink-2)] hover:border-[var(--ink-3)] transition-colors"
+                className="inline-flex items-center gap-1.5 border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-2.5 text-sm font-semibold text-[var(--ink-2)] hover:border-[var(--ink-3)] transition-colors"
               >
                 <CalendarPlus className="w-4 h-4" aria-hidden="true" />
                 Maak hier een levensgebeurtenis van
@@ -365,7 +365,7 @@ export function RekenhulpView({
               setDraft(null)
               setError(null)
             }}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--ink)] text-[var(--paper)] px-4 py-2.5 text-sm font-semibold hover:bg-[var(--ink-2)] transition-colors"
+            className="inline-flex items-center gap-1.5 bg-[var(--ink)] text-[var(--paper)] px-4 py-2.5 text-sm font-semibold hover:bg-[var(--ink-2)] transition-colors"
           >
             <Sparkles className="w-4 h-4" aria-hidden="true" />
             Nieuwe met Will
@@ -374,8 +374,8 @@ export function RekenhulpView({
       </header>
 
       {saved.length === 0 ? (
-        <article className="rounded-2xl border border-dashed border-[var(--border-md)] bg-[var(--paper)] p-6 sm:p-8 text-center">
-          <span className="inline-flex w-10 h-10 rounded-xl bg-horizon-50 items-center justify-center mb-3">
+        <article className="border border-dashed border-[var(--border-md)] bg-[var(--paper)] p-6 sm:p-8 text-center">
+          <span className="inline-flex w-10 h-10 bg-horizon-50 items-center justify-center mb-3">
             <Calculator className="w-5 h-5 text-horizon-700" aria-hidden="true" />
           </span>
           <h3 className="font-serif text-lg text-[var(--ink)] mb-2">
@@ -389,7 +389,7 @@ export function RekenhulpView({
           <button
             type="button"
             onClick={() => setMode('build')}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--ink)] text-[var(--paper)] px-4 py-2.5 text-sm font-semibold hover:bg-[var(--ink-2)] transition-colors"
+            className="inline-flex items-center gap-1.5 bg-[var(--ink)] text-[var(--paper)] px-4 py-2.5 text-sm font-semibold hover:bg-[var(--ink-2)] transition-colors"
           >
             <Sparkles className="w-4 h-4" aria-hidden="true" />
             Maak je eerste rekenhulp
@@ -625,16 +625,16 @@ function SavedCalculatorCard({
   }, [menuOpen, onCloseMenu])
 
   return (
-    <article className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 flex flex-col">
+    <article className="border border-[var(--border-ed)] bg-[var(--paper)] p-4 flex flex-col">
       {badge && (
         <span
-          className={`self-start inline-block text-[9px] uppercase tracking-[0.12em] font-bold border px-1.5 py-0.5 rounded mb-2 ${badge.className}`}
+          className={`self-start inline-block text-[9px] uppercase tracking-[0.12em] font-bold border px-1.5 py-0.5 mb-2 ${badge.className}`}
         >
           {badge.label}
         </span>
       )}
       <div className="flex items-start gap-2 mb-2">
-        <span className="inline-flex w-8 h-8 rounded-lg bg-horizon-50 text-horizon-700 items-center justify-center shrink-0">
+        <span className="inline-flex w-8 h-8 bg-horizon-50 text-horizon-700 items-center justify-center shrink-0">
           <Calculator className="w-4 h-4" aria-hidden="true" />
         </span>
         <h3 className="text-sm font-semibold text-[var(--ink)] leading-tight flex-1 min-w-0">
@@ -663,7 +663,7 @@ function SavedCalculatorCard({
         <button
           type="button"
           onClick={onRun}
-          className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg border border-[var(--border-ed)] px-3 py-2 text-xs font-semibold text-[var(--ink-2)] hover:border-[var(--ink-3)] transition-colors"
+          className="flex-1 inline-flex items-center justify-center gap-1.5 border border-[var(--border-ed)] px-3 py-2 text-xs font-semibold text-[var(--ink-2)] hover:border-[var(--ink-3)] transition-colors"
         >
           Openen
         </button>
@@ -675,7 +675,7 @@ function SavedCalculatorCard({
             aria-haspopup="menu"
             aria-expanded={menuOpen}
             aria-label={`Meer acties voor ${calc.name}`}
-            className="inline-flex items-center justify-center w-9 h-9 rounded-lg text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] transition-colors"
+            className="inline-flex items-center justify-center w-9 h-9 text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] transition-colors"
           >
             <MoreHorizontal className="w-4 h-4" aria-hidden="true" />
           </button>
@@ -683,7 +683,7 @@ function SavedCalculatorCard({
           {menuOpen && (
             <div
               role="menu"
-              className="absolute right-0 bottom-full mb-1 z-10 min-w-[180px] rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] shadow-lg overflow-hidden"
+              className="absolute right-0 bottom-full mb-1 z-10 min-w-[180px] border border-[var(--border-ed)] bg-[var(--paper)] shadow-lg overflow-hidden"
             >
               {isPublic ? (
                 <button

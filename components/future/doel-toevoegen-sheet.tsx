@@ -200,7 +200,7 @@ export function DoelToevoegenSheet() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 rounded-xl border border-dashed border-[var(--border-md)] bg-[var(--paper)] px-4 py-2.5 text-sm font-medium text-[var(--ink-2)] hover:border-[var(--ink-3)] hover:bg-[var(--subtle)] transition-colors"
+        className="inline-flex items-center gap-1.5 border border-dashed border-[var(--border-md)] bg-[var(--paper)] px-4 py-2.5 text-sm font-medium text-[var(--ink-2)] hover:border-[var(--ink-3)] hover:bg-[var(--subtle)] transition-colors"
       >
         <Plus className="w-4 h-4" aria-hidden="true" />
         Doel toevoegen
@@ -237,7 +237,7 @@ export function DoelToevoegenSheet() {
             {error && (
               <div
                 role="alert"
-                className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+                className="mb-3 border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
               >
                 {error}
               </div>
@@ -258,7 +258,7 @@ export function DoelToevoegenSheet() {
                       setTargetValue(String(preset.target))
                       setGoalType(preset.goalType)
                     }}
-                    className="flex flex-col items-start gap-0.5 rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-2.5 text-left hover:border-[var(--ink-3)] hover:shadow-sm transition-all"
+                    className="flex flex-col items-start gap-0.5 border border-[var(--border-ed)] bg-[var(--paper)] p-2.5 text-left hover:border-[var(--ink-3)] hover:shadow-sm transition-all"
                   >
                     <span className="text-base leading-none" aria-hidden="true">
                       {preset.emoji}
@@ -285,7 +285,7 @@ export function DoelToevoegenSheet() {
                   onChange={(e) => setName(e.target.value)}
                   placeholder="bv. Spaargeld voor woning"
                   maxLength={100}
-                  className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm focus:outline-none focus:border-[var(--ink-3)]"
+                  className="w-full border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm focus:outline-none focus:border-[var(--ink-3)]"
                   required
                 />
               </label>
@@ -302,7 +302,7 @@ export function DoelToevoegenSheet() {
                   value={targetValue}
                   onChange={(e) => setTargetValue(e.target.value)}
                   placeholder="50000"
-                  className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm focus:outline-none focus:border-[var(--ink-3)]"
+                  className="w-full border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm focus:outline-none focus:border-[var(--ink-3)]"
                   required
                 />
               </label>
@@ -315,7 +315,7 @@ export function DoelToevoegenSheet() {
                   type="date"
                   value={targetDate}
                   onChange={(e) => setTargetDate(e.target.value)}
-                  className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm focus:outline-none focus:border-[var(--ink-3)]"
+                  className="w-full border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm focus:outline-none focus:border-[var(--ink-3)]"
                 />
               </label>
 
@@ -326,7 +326,7 @@ export function DoelToevoegenSheet() {
                 <select
                   value={goalType}
                   onChange={(e) => setGoalType(e.target.value as GoalType)}
-                  className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm focus:outline-none focus:border-[var(--ink-3)]"
+                  className="w-full border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm focus:outline-none focus:border-[var(--ink-3)]"
                 >
                   {(Object.keys(GOAL_TYPE_LABELS) as GoalType[]).map((t) => (
                     <option key={t} value={t}>
@@ -430,7 +430,7 @@ function EtaPreview({
     return (
       <section
         data-testid="eta-preview"
-        className="mt-4 rounded-xl border border-positive/20 bg-positive/5 p-3"
+        className="mt-4 border border-positive/20 bg-positive/5 p-3"
       >
         <header className="flex items-center gap-1.5 mb-1">
           <Calculator className="w-3.5 h-3.5 text-positive" aria-hidden="true" />
@@ -467,7 +467,7 @@ function EtaPreview({
   return (
     <section
       data-testid="eta-preview"
-      className="mt-4 rounded-xl border border-horizon-100 bg-horizon-50/40 p-3"
+      className="mt-4 border border-horizon-100 bg-horizon-50/40 p-3"
     >
       <header className="flex items-center gap-1.5 mb-1">
         <Calculator className="w-3.5 h-3.5 text-horizon-700" aria-hidden="true" />

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useNotifications } from '@/components/app/notifications/notification-provider'
 import { NotificationItem } from '@/components/app/notifications/notification-item'
+import { DensityToggle, useListDensity, type ListDensity } from '@/components/app/density-toggle'
 import { Bell, ChevronRight, CheckCheck, Newspaper } from 'lucide-react'
 import { Masthead } from './masthead'
 import { NewspaperFooter } from './newspaper-footer'
@@ -82,9 +83,11 @@ function GroupBar({ label, tone }: { label: string; tone?: 'urgent' | 'todo' }) 
 function CollapsedDayGroup({
   group,
   markAsRead,
+  density,
 }: {
   group: DayGroup
   markAsRead: (id: string) => void
+  density: ListDensity
 }) {
   const [expanded, setExpanded] = useState(false)
 
@@ -113,6 +116,7 @@ function CollapsedDayGroup({
               notification={notification}
               onRead={markAsRead}
               onClose={() => {}}
+              density={density}
             />
           ))}
         </div>
@@ -132,6 +136,8 @@ export function BerichtenClient() {
   const [history, setHistory] = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<FilterMode>('all')
+  // Ruim/compact-dichtheid (M-08) — per-apparaat bewaard, eigen lijst-key.
+  const { density, setDensity } = useListDensity('berichten-lijst')
 
   // ── Extended (30-day) history — wider window than the bell dropdown ──
   const fetchExtendedHistory = useCallback(async () => {
@@ -257,16 +263,21 @@ export function BerichtenClient() {
             ))}
           </div>
 
-          {historyUnread > 0 && (
-            <button
-              type="button"
-              onClick={handleMarkAllRead}
-              className="flex min-h-[44px] items-center gap-1.5 rounded-[var(--r)] px-2 py-1 font-inter text-[11px] font-medium text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] sm:min-h-0"
-            >
-              <CheckCheck className="h-3.5 w-3.5" />
-              Alles gelezen
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {totalCount > 0 && (
+              <DensityToggle density={density} onChange={setDensity} />
+            )}
+            {historyUnread > 0 && (
+              <button
+                type="button"
+                onClick={handleMarkAllRead}
+                className="flex min-h-[44px] items-center gap-1.5 rounded-[var(--r)] px-2 py-1 font-inter text-[11px] font-medium text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] sm:min-h-0"
+              >
+                <CheckCheck className="h-3.5 w-3.5" />
+                Alles gelezen
+              </button>
+            )}
+          </div>
         </div>
 
         {/* ── Notices column ───────────────────────────────────────── */}
@@ -302,6 +313,7 @@ export function BerichtenClient() {
                     notification={notification}
                     onRead={handleMarkAsRead}
                     onClose={() => {}}
+                    density={density}
                   />
                 ))}
               </div>
@@ -317,6 +329,7 @@ export function BerichtenClient() {
                     notification={notification}
                     onRead={handleMarkAsRead}
                     onClose={() => {}}
+                    density={density}
                   />
                 ))}
               </div>
@@ -331,6 +344,7 @@ export function BerichtenClient() {
                     key={group.key}
                     group={group}
                     markAsRead={handleMarkAsRead}
+                    density={density}
                   />
                 ))}
               </div>

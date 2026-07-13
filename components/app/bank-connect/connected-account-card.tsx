@@ -95,10 +95,10 @@ export function ConnectedAccountCard({ account, onSync, onDisconnect, onReauthor
             <img
               src={conn.provider_logo}
               alt={conn.provider_name}
-              className="h-10 w-10 rounded-lg object-contain"
+              className="h-10 w-10 object-contain"
             />
           ) : (
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-100">
+            <div className="flex h-10 w-10 items-center justify-center bg-zinc-100">
               <Building2 className="h-5 w-5 text-[var(--ink-3)]" />
             </div>
           )}
@@ -120,12 +120,12 @@ export function ConnectedAccountCard({ account, onSync, onDisconnect, onReauthor
 
       {/* Expiry warning */}
       {isExpired && (
-        <div className="mt-3 flex items-center gap-2 rounded-lg px-3 py-2 text-xs bg-red-50 text-red-700">
+        <div className="mt-3 flex items-center gap-2 px-3 py-2 text-xs bg-red-50 text-red-700">
           <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
           <span>Autorisatie verlopen. Vernieuw de verbinding om te blijven synchroniseren.</span>
           <button
             onClick={onReauthorize}
-            className="ml-auto shrink-0 rounded-md bg-[var(--paper)] px-2 py-1 font-medium shadow-[var(--s0)] hover:bg-[var(--subtle)]"
+            className="ml-auto shrink-0 bg-[var(--paper)] px-2 py-1 font-medium shadow-[var(--s0)] hover:bg-[var(--subtle)]"
           >
             Vernieuwen
           </button>
@@ -134,7 +134,7 @@ export function ConnectedAccountCard({ account, onSync, onDisconnect, onReauthor
 
       {/* Sync result */}
       {syncResult && (
-        <div className="mt-3 rounded-lg bg-green-50 px-3 py-2 text-xs text-green-700">
+        <div className="mt-3 bg-green-50 px-3 py-2 text-xs text-green-700">
           {syncResult.new} nieuwe transacties, {syncResult.duplicates} duplicaten overgeslagen
         </div>
       )}
@@ -144,7 +144,7 @@ export function ConnectedAccountCard({ account, onSync, onDisconnect, onReauthor
         <button
           onClick={handleSync}
           disabled={!canSync || syncing}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-kern-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-kern-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 bg-kern-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-kern-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <RefreshCw className={`h-3.5 w-3.5 ${syncing ? 'animate-spin' : ''}`} />
           {syncing ? 'Synchroniseren...' : 'Synchroniseer'}
@@ -156,13 +156,13 @@ export function ConnectedAccountCard({ account, onSync, onDisconnect, onReauthor
             <button
               onClick={handleDisconnect}
               disabled={disconnecting}
-              className="rounded-lg bg-red-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50"
+              className="bg-red-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50"
             >
               Ja, verbreken
             </button>
             <button
               onClick={() => setConfirmDisconnect(false)}
-              className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-[var(--ink-2)] hover:bg-zinc-100"
+              className="px-2.5 py-1.5 text-xs font-medium text-[var(--ink-2)] hover:bg-zinc-100"
             >
               Annuleer
             </button>
@@ -170,7 +170,7 @@ export function ConnectedAccountCard({ account, onSync, onDisconnect, onReauthor
         ) : (
           <button
             onClick={() => setConfirmDisconnect(true)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-ed)] px-3 py-1.5 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+            className="inline-flex items-center gap-1.5 border border-[var(--border-ed)] px-3 py-1.5 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
           >
             <Unlink className="h-3.5 w-3.5" />
             Verbreken

@@ -72,7 +72,7 @@ export function PensionParseSummaryCard({
 
       {/* AOW bedrag */}
       {result.aowBedrag != null && (
-        <div className="flex items-center justify-between rounded-lg bg-white/60 px-3 py-2 border border-horizon-100">
+        <div className="flex items-center justify-between bg-white/60 px-3 py-2 border border-horizon-100">
           <span className="text-xs font-medium text-[var(--ink-3)]">AOW (verwacht)</span>
           <span className="font-mono tabular-nums text-sm font-semibold text-[var(--ink)]">{<MaskedAmount value={result.aowBedrag} tone="horizon" />}/mnd</span>
         </div>
@@ -93,7 +93,7 @@ export function PensionParseSummaryCard({
                 key={idx}
                 type="button"
                 onClick={() => onSelectRegeling(idx)}
-                className={`w-full text-left rounded-lg border px-3 py-2.5 transition-colors ${
+                className={`w-full text-left border px-3 py-2.5 transition-colors ${
                   isSelected
                     ? 'border-horizon-400 bg-white ring-1 ring-horizon-200'
                     : 'border-horizon-100 bg-white/60 hover:border-horizon-300'
@@ -123,7 +123,7 @@ export function PensionParseSummaryCard({
 
       {/* Nabestaandenpensioen */}
       {result.nabestaandenpensioen != null && (
-        <div className="flex items-center justify-between rounded-lg bg-white/60 px-3 py-2 border border-horizon-100">
+        <div className="flex items-center justify-between bg-white/60 px-3 py-2 border border-horizon-100">
           <span className="text-xs font-medium text-[var(--ink-3)]">Nabestaandenpensioen</span>
           <span className="font-mono tabular-nums text-sm font-semibold text-[var(--ink)]">{<MaskedAmount value={result.nabestaandenpensioen} tone="horizon" />}/mnd</span>
         </div>
@@ -174,7 +174,7 @@ export function PensionPdfDownloadLink({ lifeEventId }: { lifeEventId: string })
           type="button"
           onClick={handleDownload}
           disabled={downloading}
-          className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-horizon-700 hover:bg-horizon-100 transition-colors disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-horizon-700 hover:bg-horizon-100 transition-colors disabled:opacity-50"
         >
           {downloading ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -235,7 +235,7 @@ export function PensionInstructionPanel() {
             href="https://www.mijnpensioenoverzicht.nl"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-md bg-horizon-50 px-3 py-1.5 text-[13px] font-medium text-horizon-700 hover:bg-horizon-100 transition-colors"
+            className="inline-flex items-center gap-1.5 bg-horizon-50 px-3 py-1.5 text-[13px] font-medium text-horizon-700 hover:bg-horizon-100 transition-colors"
           >
             <ExternalLink className="h-3.5 w-3.5" />
             Ga naar mijnpensioenoverzicht.nl
@@ -260,7 +260,7 @@ export function KpiTooltip({ text }: { text: string }) {
       >
         <Info className={`h-4 w-4 cursor-help transition-colors ${open ? 'text-horizon-500' : 'text-[var(--ink-4)]'} group-hover:text-horizon-500`} />
       </button>
-      <div className={`absolute right-0 z-10 mt-1 w-56 rounded-lg border border-zinc-200 bg-white p-3 text-xs leading-relaxed text-[var(--ink-2)] shadow-lg transition-opacity ${open ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100'}`}>
+      <div className={`absolute right-0 z-10 mt-1 w-56 border border-zinc-200 bg-white p-3 text-xs leading-relaxed text-[var(--ink-2)] shadow-lg transition-opacity ${open ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100'}`}>
         {text}
       </div>
     </div>
@@ -275,9 +275,9 @@ export function ExploreCard({
   return (
     <button
       onClick={onClick}
-      className="group flex items-center gap-3 rounded-xl border border-zinc-200 bg-[var(--paper)] p-4 text-left transition-colors hover:border-horizon-200 hover:bg-horizon-50/30"
+      className="group flex items-center gap-3 border border-zinc-200 bg-[var(--paper)] p-4 text-left transition-colors hover:border-horizon-200 hover:bg-horizon-50/30"
     >
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--subtle)] group-hover:bg-horizon-50">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center bg-[var(--subtle)] group-hover:bg-horizon-50">
         {icon}
       </div>
       <div className="min-w-0 flex-1">

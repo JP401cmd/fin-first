@@ -40,8 +40,12 @@ export interface ShareDialogProps {
   content: ShareContent
   /** Ref to the DOM element to capture as image (optional) */
   captureRef?: React.RefObject<HTMLElement | null>
-  /** Optional canvas render function for reliable image generation (preferred over captureRef) */
-  renderCanvas?: () => HTMLCanvasElement
+  /**
+   * Optional canvas render function for reliable image generation (preferred over
+   * captureRef). Mag async zijn — de vrijheidskaart laadt eerst web-fonts vóór
+   * het tekenen, dus de download-handler awaitet het resultaat.
+   */
+  renderCanvas?: () => HTMLCanvasElement | Promise<HTMLCanvasElement>
   /** Additional class on the backdrop */
   className?: string
 }
@@ -149,6 +153,10 @@ export function ShareDialog({
   // ── Copy link to clipboard ─────────────────────────────────────
   const handleCopyLink = useCallback(async () => {
     try {
+      // Zonder document-focus gooit writeText een NotAllowedError die Chrome
+      // óók bij een catch in de console rapporteert (ruis in dev/geautomatiseerde
+      // runs) — pre-check en ga dan direct naar de textarea-fallback.
+      if (!document.hasFocus()) throw new DOMException('Document is not focused', 'NotAllowedError')
       await navigator.clipboard.writeText(fullShareText)
       setCopied(true)
       toast.addToast({
@@ -187,7 +195,7 @@ export function ShareDialog({
     try {
       // Prefer renderCanvas (programmatic canvas) over captureRef (SVG foreignObject)
       if (renderCanvas) {
-        const canvas = renderCanvas()
+        const canvas = await renderCanvas()
         const link = document.createElement('a')
         const filePrefix = content.contentType === 'badge' ? 'trifinity-badge' : 'trifinity-vrijheidskaart'
         link.download = `${filePrefix}-${new Date().toISOString().split('T')[0]}.png`

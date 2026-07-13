@@ -67,7 +67,7 @@ function PrefillIndicator({
     return (
       <span
         title={`Voorgevuld uit jouw data; aangepast door jou.`}
-        className="inline-block text-[8.5px] uppercase tracking-[0.1em] font-semibold text-[var(--ink-3)] border border-dashed border-[var(--border-ed)] px-1 py-0.5 rounded"
+        className="inline-block text-[8.5px] uppercase tracking-[0.1em] font-semibold text-[var(--ink-3)] border border-dashed border-[var(--border-ed)] px-1 py-0.5 "
       >
         aangepast
       </span>
@@ -76,7 +76,7 @@ function PrefillIndicator({
   return (
     <span
       title="Voorgevuld uit jouw eigen gegevens. Pas met de slider aan om een aanname te wijzigen."
-      className="inline-block text-[8.5px] uppercase tracking-[0.1em] font-semibold text-positive bg-positive/10 border border-positive/30 px-1 py-0.5 rounded"
+      className="inline-block text-[8.5px] uppercase tracking-[0.1em] font-semibold text-positive bg-positive/10 border border-positive/30 px-1 py-0.5 "
     >
       uit jouw data
     </span>
@@ -110,7 +110,7 @@ function InputField({
             type="button"
             onClick={() => onChange(on ? 0 : 1)}
             aria-pressed={on}
-            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md border text-[10px] uppercase tracking-[0.1em] font-bold transition-colors ${
+            className={`inline-flex items-center gap-1 px-2.5 py-1 border text-[10px] uppercase tracking-[0.1em] font-bold transition-colors ${
               on
                 ? 'bg-[var(--ink)] text-white border-[var(--ink)]'
                 : 'bg-transparent text-[var(--ink-3)] border-[var(--border-ed)]'
@@ -137,7 +137,7 @@ function InputField({
             <PrefillIndicator prefillValue={prefillValue} currentValue={value} />
           </span>
         </div>
-        <div className="inline-flex rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
+        <div className="inline-flex border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
           {input.options.map((opt) => {
             const active = Math.abs(value - opt.value) < 1e-9
             return (
@@ -197,7 +197,7 @@ function InputField({
           value={value}
           onChange={(e) => onChange(Number(e.target.value))}
           aria-label={input.label}
-          className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm focus:outline-none focus:border-[var(--ink-3)]"
+          className="w-full border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm focus:outline-none focus:border-[var(--ink-3)]"
         />
       )}
       {input.hint && (
@@ -218,7 +218,7 @@ function RelevanceBadge({
   if (!input.relevantFor || input.relevantFor.length === 0) return null
   if (input.relevantFor.includes(scenarioKey)) return null
   return (
-    <span className="mt-1 inline-block text-[9px] uppercase tracking-[0.1em] font-semibold text-[var(--ink-3)] border border-dashed border-[var(--border-ed)] px-1.5 py-0.5 rounded">
+    <span className="mt-1 inline-block text-[9px] uppercase tracking-[0.1em] font-semibold text-[var(--ink-3)] border border-dashed border-[var(--border-ed)] px-1.5 py-0.5 ">
       alleen voor: {input.relevantFor.join(', ')}
     </span>
   )
@@ -337,7 +337,7 @@ export function CalculatorRunner({
       {definition.inputs.length > 0 && (
         <section aria-labelledby="calc-sec-uitgangspunten">
           <SectionHeader id="calc-sec-uitgangspunten" label="Uitgangspunten" />
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border border-[var(--border-ed)] bg-[var(--paper)] p-4">
             {definition.inputs.map((input) => (
               <InputField
                 key={input.key}
@@ -360,7 +360,7 @@ export function CalculatorRunner({
       {result.derived.length > 0 && (
         <section aria-labelledby="calc-sec-context">
           <SectionHeader id="calc-sec-context" label="Context" />
-          <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--subtle)]/40 px-4 py-3">
+          <div className="border border-[var(--border-ed)] bg-[var(--subtle)]/40 px-4 py-3">
           <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5">
             {result.derived.map((d) => {
               const row = definition.derived?.find((r) => r.key === d.key)
@@ -423,7 +423,7 @@ export function CalculatorRunner({
           )}
           {result.applicability[activeScenario]?.status === 'no' &&
             result.applicability[activeScenario]?.reason && (
-              <p className="mt-2 flex items-start gap-1.5 text-[11px] text-negative bg-negative/5 border border-negative/30 rounded-md px-2 py-1.5">
+              <p className="mt-2 flex items-start gap-1.5 text-[11px] text-negative bg-negative/5 border border-negative/30 px-2 py-1.5">
                 <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden="true" />
                 <span>{result.applicability[activeScenario]!.reason}</span>
               </p>
@@ -437,7 +437,7 @@ export function CalculatorRunner({
           id="calc-sec-uitkomsten"
           label={definition.scenarios.length > 1 ? "Scenario's & uitkomsten" : 'Uitkomsten'}
         />
-        <div className="overflow-x-auto rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)]">
+        <div className="overflow-x-auto border border-[var(--border-ed)] bg-[var(--paper)]">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-[var(--border-ed)]">
@@ -487,7 +487,7 @@ export function CalculatorRunner({
 
       {/* Keuze-conclusie (alleen tonen als er geen narrative is) */}
       {!result.narrative && result.winner && definition.compare && (
-        <div className="flex items-center gap-2 rounded-xl border border-positive/30 bg-positive/10 px-3 py-2 text-sm text-positive">
+        <div className="flex items-center gap-2 border border-positive/30 bg-positive/10 px-3 py-2 text-sm text-positive">
           <Trophy className="w-4 h-4 shrink-0" aria-hidden="true" />
           <span>
             Op basis van je invoer komt{' '}
@@ -503,7 +503,7 @@ export function CalculatorRunner({
       {result.errors.length > 0 && (
         <div
           role="alert"
-          className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+          className="flex items-start gap-2 border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
         >
           <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
           <div>
@@ -519,7 +519,7 @@ export function CalculatorRunner({
 
       {/* Aannames */}
       {(definition.assumptions?.length ?? 0) > 0 && (
-        <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--subtle)]/40 px-3 py-2.5">
+        <div className="border border-[var(--border-ed)] bg-[var(--subtle)]/40 px-3 py-2.5">
           <div className="flex items-center gap-1.5 mb-1">
             <Info className="w-3.5 h-3.5 text-[var(--ink-3)]" aria-hidden="true" />
             <span className="text-[10px] uppercase tracking-[0.08em] font-semibold text-[var(--ink-3)]">

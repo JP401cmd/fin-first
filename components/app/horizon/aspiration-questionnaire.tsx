@@ -160,7 +160,7 @@ export function AspirationQuestionnaire({
                   manualOverride: v === '' ? null : Math.max(0, Number(v) || 0),
                 })
               }}
-              className="flex-1 px-3 py-2 border border-[var(--border-md)] rounded-lg font-mono tabular-nums text-lg bg-[var(--paper)] focus:border-[var(--module-active-700)] focus:outline-none"
+              className="flex-1 px-3 py-2 border border-[var(--border-md)] font-mono tabular-nums text-lg bg-[var(--paper)] focus:border-[var(--module-active-700)] focus:outline-none"
             />
             <span className="text-sm text-[var(--ink-3)]">/jr</span>
           </div>
@@ -198,7 +198,7 @@ function Section({
     <CardEditorial accent className="p-5 sm:p-7">
       <div className="flex items-start justify-between gap-4 mb-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--module-active-50)] text-[var(--module-active-700)]">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center bg-[var(--module-active-50)] text-[var(--module-active-700)]">
             {icon}
           </div>
           <div>
@@ -256,7 +256,7 @@ function ReisSection({
               key={t.id}
               type="button"
               onClick={() => setAnswers({ ...answers, travel: t.id as TravelTierId, travelCustomWeeks: null })}
-              className={`text-left p-3 border rounded-lg transition-colors ${
+              className={`text-left p-3 border transition-colors ${
                 active
                   ? 'border-[var(--module-active-700)] bg-[var(--module-active-50)]'
                   : 'border-[var(--border-ed)] hover:border-[var(--border-md)]'
@@ -281,7 +281,7 @@ function ReisSection({
           onChange={e =>
             setAnswers({ ...answers, travelersCount: Math.max(1, Number(e.target.value) || 1) })
           }
-          className="w-16 px-2 py-1 border border-[var(--border-md)] rounded font-mono tabular-nums text-center"
+          className="w-16 px-2 py-1 border border-[var(--border-md)] font-mono tabular-nums text-center"
         />
       </div>
     </Section>
@@ -316,7 +316,7 @@ function VervoerSection({
               key={t.id}
               type="button"
               onClick={() => setAnswers({ ...answers, car: t.id as CarTierId })}
-              className={`text-left p-3 border rounded-lg transition-colors ${
+              className={`text-left p-3 border transition-colors ${
                 active
                   ? 'border-[var(--module-active-700)] bg-[var(--module-active-50)]'
                   : 'border-[var(--border-ed)] hover:border-[var(--border-md)]'
@@ -382,7 +382,7 @@ function UitEtenSection({
             onChange={e =>
               setAnswers({ ...answers, diningPersons: Math.max(1, Number(e.target.value) || 1) })
             }
-            className="w-16 px-2 py-1 border border-[var(--border-md)] rounded font-mono tabular-nums text-center"
+            className="w-16 px-2 py-1 border border-[var(--border-md)] font-mono tabular-nums text-center"
           />
         </div>
       </div>
@@ -480,7 +480,7 @@ function HobbySection({
                   step={100}
                   value={h.yearly}
                   onChange={e => updateHobbyAmount(h.id, Number(e.target.value))}
-                  className="w-24 px-2 py-1 border border-[var(--border-md)] rounded font-mono tabular-nums text-right"
+                  className="w-24 px-2 py-1 border border-[var(--border-md)] font-mono tabular-nums text-right"
                 />
                 <span className="text-xs text-[var(--ink-3)]">/jr</span>
               </div>
@@ -515,20 +515,20 @@ function HobbySection({
             placeholder="Bijv. atelier, zeilboot, sabbatical"
             value={newDream}
             onChange={e => setNewDream(e.target.value)}
-            className="flex-1 px-2 py-1.5 border border-[var(--border-md)] rounded text-sm"
+            className="flex-1 px-2 py-1.5 border border-[var(--border-md)] text-sm"
           />
           <input
             type="number"
             placeholder="€/jr"
             value={newAmount}
             onChange={e => setNewAmount(e.target.value)}
-            className="w-24 px-2 py-1.5 border border-[var(--border-md)] rounded text-sm font-mono tabular-nums"
+            className="w-24 px-2 py-1.5 border border-[var(--border-md)] text-sm font-mono tabular-nums"
           />
           <button
             type="button"
             onClick={addDream}
             disabled={!newDream.trim() || !newAmount}
-            className="px-3 py-1.5 bg-[var(--ink)] text-[var(--paper)] rounded text-sm disabled:opacity-50"
+            className="px-3 py-1.5 bg-[var(--ink)] text-[var(--paper)] text-sm disabled:opacity-50"
             aria-label="Voeg droom toe"
           >
             <Plus className="h-4 w-4" />
@@ -567,7 +567,7 @@ function ZorgSection({
               key={t.id}
               type="button"
               onClick={() => setAnswers({ ...answers, care: t.id as CareTierId })}
-              className={`text-left p-3 border rounded-lg transition-colors ${
+              className={`text-left p-3 border transition-colors ${
                 active
                   ? 'border-[var(--module-active-700)] bg-[var(--module-active-50)]'
                   : 'border-[var(--border-ed)] hover:border-[var(--border-md)]'
@@ -582,7 +582,7 @@ function ZorgSection({
           )
         })}
       </div>
-      <label className="flex items-start gap-3 p-3 border border-[var(--border-ed)] rounded-lg cursor-pointer hover:border-[var(--border-md)]">
+      <label className="flex items-start gap-3 p-3 border border-[var(--border-ed)] cursor-pointer hover:border-[var(--border-md)]">
         <input
           type="checkbox"
           checked={answers.nursingTopUp}
@@ -628,7 +628,7 @@ function LifestyleSection({
               key={id}
               type="button"
               onClick={() => setAnswers({ ...answers, lifestyle: id })}
-              className={`text-left p-4 border rounded-lg transition-colors ${
+              className={`text-left p-4 border transition-colors ${
                 active
                   ? 'border-[var(--module-active-700)] bg-[var(--module-active-50)]'
                   : 'border-[var(--border-ed)] hover:border-[var(--border-md)]'
@@ -650,7 +650,7 @@ function LifestyleSection({
           )
         })}
       </div>
-      <label className="mt-5 flex items-start gap-3 p-3 border border-[var(--border-ed)] rounded-lg cursor-pointer hover:border-[var(--border-md)]">
+      <label className="mt-5 flex items-start gap-3 p-3 border border-[var(--border-ed)] cursor-pointer hover:border-[var(--border-md)]">
         <input
           type="checkbox"
           checked={answers.unexpectedBuffer}

@@ -200,7 +200,7 @@ export default function HoldingAlerts({
         </h3>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-kern-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-kern-700"
+          className="inline-flex items-center gap-1.5 bg-kern-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-kern-700"
           data-testid="new-alert-btn"
         >
           {showForm ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
@@ -209,7 +209,7 @@ export default function HoldingAlerts({
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
+        <div className="flex items-center gap-2 border border-red-200 bg-red-50 px-3 py-2">
           <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
           <p className="text-xs text-red-600">{error}</p>
         </div>
@@ -226,7 +226,7 @@ export default function HoldingAlerts({
                 <button
                   key={type}
                   onClick={() => setNewType(type)}
-                  className={`flex items-center justify-center gap-1.5 rounded-lg border px-2.5 py-2 text-[11px] font-medium transition-all ${
+                  className={`flex items-center justify-center gap-1.5 border px-2.5 py-2 text-[11px] font-medium transition-all ${
                     newType === type
                       ? `${cfg.bg} border-current ${cfg.color} ring-1 ring-offset-0`
                       : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:bg-[var(--subtle)]'
@@ -255,7 +255,7 @@ export default function HoldingAlerts({
                 step={newType === 'price_above' || newType === 'price_below' ? '0.01' : '1'}
                 value={newThreshold}
                 onChange={(e) => setNewThreshold(e.target.value)}
-                className="w-full rounded-lg border border-[var(--border-ed)] px-2.5 py-1.5 text-sm"
+                className="w-full border border-[var(--border-ed)] px-2.5 py-1.5 text-sm"
                 placeholder={alertTypeConfig[newType].placeholder}
                 autoFocus
                 data-testid="alert-threshold-input"
@@ -269,7 +269,7 @@ export default function HoldingAlerts({
             <button
               onClick={handleCreate}
               disabled={saving || !newThreshold}
-              className="rounded-lg bg-kern-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-kern-700 disabled:opacity-50"
+              className="bg-kern-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-kern-700 disabled:opacity-50"
               data-testid="alert-save-btn"
             >
               {saving ? 'Opslaan...' : 'Opslaan'}
@@ -305,7 +305,7 @@ export default function HoldingAlerts({
                 data-testid={`alert-item-${alert.id}`}
               >
                 {/* Icon */}
-                <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${cfg.bg}`}>
+                <div className={`flex h-8 w-8 shrink-0 items-center justify-center ${cfg.bg}`}>
                   <Icon className={`h-4 w-4 ${cfg.color}`} />
                 </div>
 
@@ -337,7 +337,7 @@ export default function HoldingAlerts({
                 <div className="flex shrink-0 items-center gap-1">
                   <button
                     onClick={() => handleToggle(alert.id, alert.is_active)}
-                    className={`rounded-lg p-1.5 transition-colors ${
+                    className={`p-1.5 transition-colors ${
                       alert.is_active
                         ? 'text-kern-600 hover:bg-kern-50'
                         : 'text-[var(--ink-4)] hover:bg-[var(--subtle)]'
@@ -350,7 +350,7 @@ export default function HoldingAlerts({
                   <button
                     onClick={() => handleDelete(alert.id)}
                     disabled={deleting === alert.id}
-                    className="rounded-lg p-1.5 text-red-500 hover:bg-red-50 disabled:opacity-50"
+                    className="p-1.5 text-red-500 hover:bg-red-50 disabled:opacity-50"
                     title="Alert verwijderen"
                     data-testid={`alert-delete-${alert.id}`}
                   >

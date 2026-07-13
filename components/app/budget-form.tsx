@@ -522,7 +522,7 @@ export function BudgetForm({
 
       {/* Unsaved changes navigation warning */}
       {showNavWarning && (
-        <div className="mb-6 rounded-lg border border-orange-300 bg-orange-50 p-4" data-testid="unsaved-changes-warning">
+        <div className="mb-6 border border-orange-300 bg-orange-50 p-4" data-testid="unsaved-changes-warning">
           <div className="flex items-start gap-3">
             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-orange-600" />
             <div className="flex-1">
@@ -534,7 +534,7 @@ export function BudgetForm({
                 <button
                   type="button"
                   onClick={confirmNavigation}
-                  className="rounded-md bg-orange-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-orange-700"
+                  className="bg-orange-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-orange-700"
                   data-testid="confirm-nav-btn"
                 >
                   Wijzigingen verwijderen
@@ -542,7 +542,7 @@ export function BudgetForm({
                 <button
                   type="button"
                   onClick={cancelNavigation}
-                  className="rounded-md border border-orange-300 px-3 py-1.5 text-xs font-medium text-orange-700 hover:bg-orange-100"
+                  className="border border-orange-300 px-3 py-1.5 text-xs font-medium text-orange-700 hover:bg-orange-100"
                   data-testid="cancel-nav-btn"
                 >
                   Verder bewerken
@@ -555,7 +555,7 @@ export function BudgetForm({
 
       {/* Draft recovered notice */}
       {showDraftNotice && (
-        <div className="mb-6 rounded-lg border border-blue-300 bg-blue-50 p-4" data-testid="draft-recovered-notice">
+        <div className="mb-6 border border-blue-300 bg-blue-50 p-4" data-testid="draft-recovered-notice">
           <div className="flex items-start gap-3">
             <RefreshCw className="mt-0.5 h-5 w-5 shrink-0 text-blue-600" />
             <div className="flex-1">
@@ -567,7 +567,7 @@ export function BudgetForm({
                 <button
                   type="button"
                   onClick={() => setShowDraftNotice(false)}
-                  className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
+                  className="bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
                   data-testid="accept-draft-btn"
                 >
                   Doorgaan met concept
@@ -575,7 +575,7 @@ export function BudgetForm({
                 <button
                   type="button"
                   onClick={discardDraft}
-                  className="rounded-md border border-blue-300 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
+                  className="border border-blue-300 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
                   data-testid="discard-draft-btn"
                 >
                   Origineel laden
@@ -588,14 +588,14 @@ export function BudgetForm({
 
       {/* Dirty indicator */}
       {isDirty && !showNavWarning && !showDraftNotice && (
-        <div className="mb-4 flex items-center gap-1.5 rounded-md bg-kern-50 px-3 py-1.5 border border-kern-200" data-testid="dirty-indicator">
+        <div className="mb-4 flex items-center gap-1.5 bg-kern-50 px-3 py-1.5 border border-kern-200" data-testid="dirty-indicator">
           <div className="h-2 w-2 rounded-full bg-kern-500 animate-pulse" />
           <span className="text-xs font-medium text-kern-700">Onopgeslagen wijzigingen</span>
         </div>
       )}
 
       {error && (
-        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <div className="mb-6 border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           {error}
         </div>
       )}
@@ -617,7 +617,7 @@ export function BudgetForm({
                 type="text"
                 value={categoryName}
                 onChange={(e) => setCategoryName(e.target.value)}
-                className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+                className="w-full border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                 placeholder="bijv. Abonnementen"
                 required
               />
@@ -637,7 +637,7 @@ export function BudgetForm({
               type="text"
               value={form.name}
               onChange={(e) => update('name', e.target.value)}
-              className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+              className="w-full border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
               placeholder={needsAutoParent ? 'bijv. Streaming' : 'bijv. Boodschappen'}
               required
               data-testid="budget-name-input"
@@ -663,7 +663,7 @@ export function BudgetForm({
                     key={iconName}
                     type="button"
                     onClick={() => update('icon', iconName)}
-                    className={`flex h-9 w-9 items-center justify-center rounded-lg border transition-colors ${
+                    className={`flex h-9 w-9 items-center justify-center border transition-colors ${
                       isSelected
                         ? 'border-kern-500 bg-kern-50 text-kern-600'
                         : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-[var(--border-md)] hover:text-[var(--ink-2)]'
@@ -686,7 +686,7 @@ export function BudgetForm({
               id="description"
               value={form.description}
               onChange={(e) => update('description', e.target.value)}
-              className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+              className="w-full border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
               rows={2}
               placeholder="Optionele beschrijving..."
             />
@@ -721,7 +721,7 @@ export function BudgetForm({
               id="budget_type"
               value={form.budget_type}
               onChange={(e) => update('budget_type', e.target.value)}
-              className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+              className="w-full border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
               data-testid="budget-type-select"
             >
               <option value="expense">Uitgave</option>
@@ -744,7 +744,7 @@ export function BudgetForm({
               step="0.01"
               value={form.default_limit}
               onChange={(e) => update('default_limit', e.target.value)}
-              className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+              className="w-full border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
               placeholder="0"
               data-testid="budget-limit-input"
             />
@@ -759,7 +759,7 @@ export function BudgetForm({
               id="interval"
               value={form.interval}
               onChange={(e) => update('interval', e.target.value)}
-              className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+              className="w-full border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
               data-testid="budget-interval-select"
             >
               <option value="monthly">Maandelijks</option>
@@ -777,7 +777,7 @@ export function BudgetForm({
               id="rollover_type"
               value={form.rollover_type}
               onChange={(e) => update('rollover_type', e.target.value)}
-              className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+              className="w-full border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
               data-testid="budget-rollover-select"
             >
               <option value="reset">Reset</option>
@@ -814,7 +814,7 @@ export function BudgetForm({
                   if (value !== 'spaardoel') { update('goal_date', ''); if (value !== 'periodieke_last') update('goal_amount', '') }
                   if (value !== 'periodieke_last') update('goal_frequency', '')
                 }}
-                className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                className={`border px-3 py-1.5 text-xs font-medium transition-colors ${
                   form.goal_type === value
                     ? 'bg-kern-50 border-kern-200 text-kern-700'
                     : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-[var(--border-md)] hover:text-[var(--ink-2)]'
@@ -826,7 +826,7 @@ export function BudgetForm({
           </div>
 
           {form.goal_type !== '' && (
-            <div className="mt-2 rounded-lg border border-kern-200 bg-kern-50 px-3 py-2.5">
+            <div className="mt-2 border border-kern-200 bg-kern-50 px-3 py-2.5">
               <p className="text-[11px] leading-relaxed text-kern-700">
                 {form.goal_type === 'vaste_maandlast' && 'Een vaste terugkerende uitgave. Je ziet direct of je inkomsten dit dekken of tekortschiet.'}
                 {form.goal_type === 'bestedingslimiet' && 'Maximaal te besteden bedrag. Je ontvangt een melding zodra je de ingestelde drempel nadert.'}
@@ -857,7 +857,7 @@ export function BudgetForm({
                       update('goal_date', '')
                     }
                   }}
-                  className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+                  className="w-full border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                 >
                   <option value="">— Geen koppeling —</option>
                   {availableSavingsGoals.map(g => (
@@ -892,7 +892,7 @@ export function BudgetForm({
                   step="0.01"
                   value={form.goal_amount}
                   onChange={(e) => update('goal_amount', e.target.value)}
-                  className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+                  className="w-full border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                   placeholder="bijv. 600"
                 />
               </div>
@@ -901,7 +901,7 @@ export function BudgetForm({
                 <select
                   value={form.goal_frequency}
                   onChange={(e) => update('goal_frequency', e.target.value)}
-                  className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+                  className="w-full border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                 >
                   <option value="">Kies frequentie</option>
                   <option value="jaarlijks">Jaarlijks</option>
@@ -936,7 +936,7 @@ export function BudgetForm({
                 id="limit_type"
                 value={form.limit_type}
                 onChange={(e) => update('limit_type', e.target.value)}
-                className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+                className="w-full border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                 data-testid="budget-limit-type-select"
               >
                 <option value="soft">Zacht (waarschuwing)</option>
@@ -956,7 +956,7 @@ export function BudgetForm({
                 step="0.01"
                 value={form.max_single_transaction_amount}
                 onChange={(e) => update('max_single_transaction_amount', e.target.value)}
-                className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+                className="w-full border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                 placeholder="0 = geen limiet"
                 data-testid="budget-max-transaction-input"
               />
@@ -994,7 +994,7 @@ export function BudgetForm({
         </legend>
         <div className="space-y-4">
           {/* Essentieel toggle */}
-          <div className="flex items-center justify-between rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3">
+          <div className="flex items-center justify-between border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3">
             <div>
               <p className="text-sm font-medium text-[var(--ink-2)]">Essentieel</p>
               <p className="text-xs text-[var(--ink-3)]">Deze uitgave is noodzakelijk voor het dagelijks leven</p>
@@ -1025,7 +1025,7 @@ export function BudgetForm({
                   key={score}
                   type="button"
                   onClick={() => update('priority_score', score)}
-                  className={`flex h-10 w-10 items-center justify-center rounded-lg border text-sm font-medium transition-colors ${
+                  className={`flex h-10 w-10 items-center justify-center border text-sm font-medium transition-colors ${
                     form.priority_score === score
                       ? 'border-kern-500 bg-kern-50 text-kern-700'
                       : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-[var(--border-md)]'
@@ -1041,7 +1041,7 @@ export function BudgetForm({
           </div>
 
           {/* Inflatie-indexatie toggle */}
-          <div className="flex items-center justify-between rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3">
+          <div className="flex items-center justify-between border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3">
             <div>
               <p className="text-sm font-medium text-[var(--ink-2)]">Inflatie-indexatie</p>
               <p className="text-xs text-[var(--ink-3)]">Limiet jaarlijks automatisch corrigeren voor inflatie</p>
@@ -1076,7 +1076,7 @@ export function BudgetForm({
             id="parent_id"
             value={form.parent_id}
             onChange={(e) => update('parent_id', e.target.value)}
-            className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+            className="w-full border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
             data-testid="budget-parent-select"
           >
             <option value="">Nieuwe categorie aanmaken</option>
@@ -1102,14 +1102,14 @@ export function BudgetForm({
           <Link
             href="/core/budgets"
             onClick={(e) => handleNavClick(e, '/core/budgets')}
-            className="rounded-lg border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+            className="border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
           >
             Annuleren
           </Link>
           <button
             type="submit"
             disabled={saving}
-            className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-5 py-2 text-sm font-medium text-white transition-colors duration-150 hover:bg-kern-700 active:scale-[0.98] disabled:opacity-50"
+            className="inline-flex items-center gap-2 bg-kern-600 px-5 py-2 text-sm font-medium text-white transition-colors duration-150 hover:bg-kern-700 active:scale-[0.98] disabled:opacity-50"
             data-testid="budget-submit-btn"
           >
             <Save className="h-4 w-4" />

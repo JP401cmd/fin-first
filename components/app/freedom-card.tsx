@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { Download, Share2, Shield, Clock, Target, TrendingUp, AlertTriangle } from 'lucide-react'
+import { Download, Share2, AlertTriangle } from 'lucide-react'
 import { ShareDialog, type ShareContent } from '@/components/app/share-dialog'
+import { formatCurrency, formatFreedomTimeString } from '@/lib/format'
 
 export interface FreedomCardData {
   privacyLevel: 'anonymous' | 'named' | 'full'
@@ -33,412 +34,443 @@ export interface FreedomCardData {
   }
 }
 
+// ── Gedeelde afgeleide waarden (canvas + on-screen preview delen dezelfde bron) ──
+
+/**
+ * Narratieve vrijheidszin voor de Playfair-hoofdkop. Precies één accent-woord
+ * (italic, module-accent). De zin wordt gekozen op basis van de aanwezige data
+ * zodat de kop altijd de sterkste beschikbare vrijheidsuitkomst draagt.
+ */
+function buildFreedomNarrative(data: FreedomCardData): { pre: string; accent: string; post: string } {
+  const fY = data.freedomTime?.years ?? 0
+  const fM = data.freedomTime?.months ?? 0
+  const pct = data.freedomPercentage
+  const reached = data.fireCountdown?.label === 'Bereikt!'
+
+  if (reached) return { pre: 'Ik bereikte ', accent: 'volledige vrijheid', post: '.' }
+  if (fY > 0) return { pre: 'Ik kocht al ', accent: `${fY} jaar`, post: ' vrijheid.' }
+  if (fM > 0) return { pre: 'Ik kocht al ', accent: `${fM} ${fM === 1 ? 'maand' : 'maanden'}`, post: ' vrijheid.' }
+  if (pct != null && pct > 0) return { pre: 'Ik ben ', accent: `${pct}%`, post: ' onderweg naar vrijheid.' }
+  return { pre: 'Mijn reis naar ', accent: 'vrijheid', post: ' begint hier.' }
+}
+
+/**
+ * Alle getoonde kerncijfers als kant-en-klare strings. Eén bron voor de canvas-
+ * renderer én de React-preview, zodat beide identiek zijn. Vrijheidstijd loopt
+ * via de canonieke `formatFreedomTimeString` (lib/format) — nooit zelf omrekenen.
+ */
+function deriveCardStats(data: FreedomCardData) {
+  const hasFreedomPct = data.freedomPercentage != null
+  const pctText = hasFreedomPct ? `${data.freedomPercentage!.toFixed(1)}%` : 'N.t.b.'
+  const pctFill = hasFreedomPct ? Math.max(0, Math.min(100, data.freedomPercentage!)) : 0
+
+  const fY = data.freedomTime?.years ?? 0
+  const fM = data.freedomTime?.months ?? 0
+  // Bouw een breakdown uit de al berekende vrijheidsjaren/-maanden en laat de
+  // canonieke helper de Nederlandse string maken (geen eigen dag/jaar-logica).
+  const ftBreakdown = { years: fY, months: fM, days: 0, totalDays: 0, isDeficit: false, isInfinite: false }
+  const freedomTimeLong = (fY > 0 || fM > 0)
+    ? formatFreedomTimeString(ftBreakdown, 'long')
+    : (hasFreedomPct ? '0 dagen' : null)
+  const freedomTimeShort = (fY > 0 || fM > 0)
+    ? formatFreedomTimeString(ftBreakdown, 'short')
+    : (hasFreedomPct ? '0d' : 'N.t.b.')
+
+  const daysWon = data.freedomDaysWonThisMonth ?? data.freedomDaysWon
+  const daysWonText = daysWon > 0 ? `+${daysWon} ${daysWon === 1 ? 'dag' : 'dagen'}` : '0 dagen'
+
+  const cl = data.fireCountdown?.label || ''
+  const countdownText = cl === 'Bereikt!' ? 'Bereikt'
+    : cl === 'Niet haalbaar' ? 'Niet haalbaar'
+    : cl === 'Nog geen data' ? 'N.t.b.'
+    : (data.fireCountdown?.years ?? 0) > 0 ? `${data.fireCountdown.years}j ${data.fireCountdown.months}m`
+    : (data.fireCountdown?.months ?? 0) > 0 ? `${data.fireCountdown.months} mnd`
+    : cl === '' ? 'N.t.b.' : '-'
+
+  const savingsText = data.savingsRate != null ? `${data.savingsRate.toFixed(0)}%` : 'N.t.b.'
+
+  return { hasFreedomPct, pctText, pctFill, freedomTimeLong, freedomTimeShort, daysWonText, countdownText, savingsText }
+}
+
 /**
  * Render the Freedom Card to a Canvas element for reliable PNG download.
- * This draws the card programmatically instead of using unreliable SVG foreignObject.
  *
- * Exported so andere surfaces (zoals de wekelijkse briefing-header) dezelfde
+ * Ontwerp: "vol papier" — warm-cream (`--paper`), ondoorzichtig, scherpe hoeken,
+ * krant-typografie (Playfair-kop, DM Mono-cijfers, Source Serif-meta) en de door
+ * de gebruiker gekozen HORIZON-accentkleur. Geen gradients/glow.
+ *
+ * ASYNC: web-fonts worden vóór het tekenen geladen (`document.fonts.ready` +
+ * gerichte `document.fonts.load`), anders valt canvas terug op een systeem-serif.
+ * De aanroepers (share-dialog `renderCanvas`, briefing-panel) awaiten het canvas.
+ *
+ * Accentkleur-route: de echte kleuren worden op rendermoment uit de al door
+ * `ModuleColorProvider` gezette CSS-vars op `document.documentElement` gelezen
+ * (`--color-horizon-500/600/700/200`, plus `--paper`/`--ink*`/`--subtle`/
+ * `--border-ed`). Canvas kan geen CSS-var lezen én de vars staan in OKLCH, dus
+ * elke waarde wordt via een korte probe-`<span>` (`getComputedStyle(...).color`)
+ * genormaliseerd naar een `rgb(...)`-string die canvas altijd begrijpt. Zo hoeft
+ * de hex niet via `FreedomCardData` doorgegeven te worden en volgt de kaart de
+ * `/mijn/uiterlijk`-keuze automatisch. Ontbreekt de accent-var, dan valt de
+ * accent terug op de neutrale ink-kleur.
+ *
+ * Exported zodat andere surfaces (zoals de wekelijkse briefing) dezelfde
  * deel-kaart kunnen genereren via ShareDialog's `renderCanvas`-prop. Importeer
  * dynamisch om de canvas-tekencode buiten hun initiële bundle te houden.
  */
-export function renderFreedomCardToCanvas(data: FreedomCardData): HTMLCanvasElement {
-  const W = 840   // 420px * 2x retina
-  const H = 580   // card height
-  const S = 2     // scale factor
+export async function renderFreedomCardToCanvas(data: FreedomCardData): Promise<HTMLCanvasElement> {
+  const W = 1080  // social portret 4:5
+  const H = 1350
+  const P = 88    // editorial marge
 
   const canvas = document.createElement('canvas')
   canvas.width = W
   canvas.height = H
   const ctx = canvas.getContext('2d')!
+  const root = document.documentElement
 
-  // Colors
-  const BG_DARK = '#18181b'    // zinc-900
-  const BG_MID = '#27272a'     // zinc-800
-  const TEXT_WHITE = '#ffffff'
-  const TEXT_ZINC_300 = '#d4d4d8'
-  const TEXT_ZINC_400 = '#a1a1aa'
-  const TEXT_ZINC_500 = '#71717a'
-  const AMBER_400 = '#fbbf24'
-  const TEAL_400 = '#2dd4bf'
-  const PURPLE_400 = '#c084fc'
-  const PURPLE_500 = '#a855f7'
-  const EMERALD_400 = '#34d399'
-  const PROGRESS_BG = '#3f3f4680'
-
-  // Background gradient
-  const bgGrad = ctx.createLinearGradient(0, 0, W, H)
-  bgGrad.addColorStop(0, BG_DARK)
-  bgGrad.addColorStop(0.5, BG_MID)
-  bgGrad.addColorStop(1, BG_DARK)
-
-  // Rounded rect helper
-  function roundRect(x: number, y: number, w: number, h: number, r: number) {
-    ctx.beginPath()
-    ctx.moveTo(x + r, y)
-    ctx.lineTo(x + w - r, y)
-    ctx.quadraticCurveTo(x + w, y, x + w, y + r)
-    ctx.lineTo(x + w, y + h - r)
-    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h)
-    ctx.lineTo(x + r, y + h)
-    ctx.quadraticCurveTo(x, y + h, x, y + h - r)
-    ctx.lineTo(x, y + r)
-    ctx.quadraticCurveTo(x, y, x + r, y)
-    ctx.closePath()
+  // ── Kleuren uit CSS-vars → genormaliseerd naar rgb() via probe-span ──
+  const probe = document.createElement('span')
+  probe.style.cssText = 'position:absolute;left:-9999px;top:-9999px'
+  document.body.appendChild(probe)
+  const readColor = (varName: string, fallback: string): string => {
+    const raw = getComputedStyle(root).getPropertyValue(varName).trim()
+    if (!raw) return fallback
+    probe.style.color = 'rgb(0,0,0)'
+    probe.style.color = raw
+    const resolved = getComputedStyle(probe).color
+    return resolved || fallback
   }
 
-  // Main card background
-  roundRect(0, 0, W, H, 0)
-  ctx.fillStyle = bgGrad
-  ctx.fill()
+  const PAPER = readColor('--paper', '#fbf7ec')
+  const INK = readColor('--ink', '#1a1916')
+  const INK2 = readColor('--ink-2', '#4a4840')
+  const INK3 = readColor('--ink-3', '#888070')
+  const INK4 = readColor('--ink-4', '#bbb8b0')
+  const SUBTLE = readColor('--subtle', '#f3ead9')
+  const BORDER = readColor('--border-ed', '#e3dac8')
+  // Accent = HORIZON (vrijheid). Fallback: neutrale ink-accent als de var ontbreekt.
+  const hasAccent = getComputedStyle(root).getPropertyValue('--color-horizon-500').trim() !== ''
+  const ACCENT = hasAccent ? readColor('--color-horizon-600', INK) : INK
+  const ACCENT_BAR = hasAccent ? readColor('--color-horizon-500', INK2) : INK2
 
-  // Background glow effects
-  const glow1 = ctx.createRadialGradient(W - 60, 0, 0, W - 60, 0, 200)
-  glow1.addColorStop(0, 'rgba(251, 191, 36, 0.15)')
-  glow1.addColorStop(0.5, 'rgba(45, 212, 191, 0.08)')
-  glow1.addColorStop(1, 'rgba(0,0,0,0)')
-  ctx.fillStyle = glow1
-  ctx.fillRect(0, 0, W, H)
+  // ── Font-families uit CSS-vars (next/font gehashte namen) + laden ──
+  // De next/font-`variable`s staan op <body> (niet op <html>): CSS-vars erven
+  // omláág, dus lees ze van document.body, anders krijgen we alleen de fallback-
+  // stack en mist canvas de daadwerkelijk geladen (gehashte) font-family.
+  const bodyStyle = getComputedStyle(document.body)
+  const PLAYFAIR = bodyStyle.getPropertyValue('--font-playfair').trim() || '"Playfair Display", Georgia, serif'
+  const MONO = bodyStyle.getPropertyValue('--font-dm-mono').trim() || '"DM Mono", ui-monospace, monospace'
+  const SERIF = bodyStyle.getPropertyValue('--font-source-serif').trim() || '"Source Serif 4", Georgia, serif'
+  if (typeof document !== 'undefined' && document.fonts) {
+    try {
+      await document.fonts.ready
+      await Promise.allSettled([
+        document.fonts.load(`700 64px ${PLAYFAIR}`),
+        document.fonts.load(`italic 400 64px ${PLAYFAIR}`),
+        document.fonts.load(`500 120px ${MONO}`),
+        document.fonts.load(`400 40px ${MONO}`),
+        document.fonts.load(`italic 400 30px ${SERIF}`),
+      ])
+    } catch {
+      // Font-load faalt zacht — canvas valt terug op de meegegeven serif/mono-stack.
+    }
+  }
 
-  const glow2 = ctx.createRadialGradient(60, H, 0, 60, H, 200)
-  glow2.addColorStop(0, 'rgba(168, 85, 247, 0.12)')
-  glow2.addColorStop(0.5, 'rgba(45, 212, 191, 0.06)')
-  glow2.addColorStop(1, 'rgba(0,0,0,0)')
-  ctx.fillStyle = glow2
-  ctx.fillRect(0, 0, W, H)
-
-  const pad = 48
-  let y = pad
-
-  // ── Header ──
-  ctx.font = 'bold 20px system-ui, -apple-system, sans-serif'
-  ctx.letterSpacing = '3px'
-  ctx.fillStyle = TEXT_ZINC_400
   ctx.textBaseline = 'top'
-  ctx.fillText('MIJN VRIJHEIDSKAART', pad, y)
-  ctx.letterSpacing = '0px'
 
-  // Display name (named/full privacy)
+  // ── Achtergrond: vol cream papier + subtiele hairline-rand ──
+  ctx.fillStyle = PAPER
+  ctx.fillRect(0, 0, W, H)
+  ctx.strokeStyle = BORDER
+  ctx.lineWidth = 3
+  ctx.strokeRect(1.5, 1.5, W - 3, H - 3)
+
+  const contentW = W - P * 2
+  let y = P
+
+  // ── Kicker: module-streep + mono-uppercase ──
+  ctx.fillStyle = ACCENT_BAR
+  ctx.fillRect(P, y + 9, 56, 5)
+  ctx.font = `500 26px ${MONO}`
+  ctx.letterSpacing = '4.5px'
+  ctx.fillStyle = INK3
+  ctx.fillText('MIJN VRIJHEIDSKAART', P + 76, y)
+  ctx.letterSpacing = '0px'
+  y += 46
+
+  // Naam (named/full)
   if (data.displayName) {
-    ctx.font = '500 24px system-ui, -apple-system, sans-serif'
-    ctx.fillStyle = TEXT_ZINC_300
-    ctx.fillText(data.displayName, pad, y + 28)
+    ctx.font = `italic 400 32px ${SERIF}`
+    ctx.fillStyle = INK2
+    ctx.fillText(data.displayName, P, y)
+    y += 50
   }
+  y += 22
 
-  // TriFinity branding (right side)
-  const brandX = W - pad - 150
-  const dotSize = 10
-  const dotGap = 16
-  ctx.fillStyle = AMBER_400
-  ctx.beginPath(); ctx.arc(brandX, y + 10, dotSize / 2, 0, Math.PI * 2); ctx.fill()
-  ctx.fillStyle = TEAL_400
-  ctx.beginPath(); ctx.arc(brandX + dotGap, y + 10, dotSize / 2, 0, Math.PI * 2); ctx.fill()
-  ctx.fillStyle = PURPLE_400
-  ctx.beginPath(); ctx.arc(brandX + dotGap * 2, y + 10, dotSize / 2, 0, Math.PI * 2); ctx.fill()
-  ctx.font = 'bold 20px system-ui, -apple-system, sans-serif'
-  ctx.letterSpacing = '2px'
-  ctx.fillStyle = TEXT_ZINC_400
-  ctx.fillText('TriFinity', brandX + dotGap * 3 + 8, y)
-  ctx.letterSpacing = '0px'
+  const stats = deriveCardStats(data)
 
-  y += data.displayName ? 80 : 56
-
-  // ── Main metric: Freedom percentage ──
-  const hasFreedomPct = data.freedomPercentage != null
-  const pctValue = hasFreedomPct ? data.freedomPercentage! : 0
-  ctx.font = 'bold 80px system-ui, -apple-system, sans-serif'
-  ctx.fillStyle = TEXT_WHITE
-  const pctText = hasFreedomPct ? `${pctValue.toFixed(1)}%` : 'N/B'
-  ctx.fillText(pctText, pad, y)
-  const pctWidth = ctx.measureText(pctText).width
-  ctx.font = '400 24px system-ui, -apple-system, sans-serif'
-  ctx.fillStyle = TEXT_ZINC_400
-  ctx.fillText('financiele vrijheid', pad + pctWidth + 12, y + 52)
-  y += 100
-
-  // Progress bar
-  const barW = W - pad * 2
-  const barH = 16
-  roundRect(pad, y, barW, barH, 0)
-  ctx.fillStyle = PROGRESS_BG
-  ctx.fill()
-
-  if (hasFreedomPct && pctValue > 0) {
-    const fillW = Math.max(16, barW * Math.min(pctValue, 100) / 100)
-    const progGrad = ctx.createLinearGradient(pad, y, pad + fillW, y)
-    progGrad.addColorStop(0, AMBER_400)
-    progGrad.addColorStop(0.5, TEAL_400)
-    progGrad.addColorStop(1, PURPLE_500)
-    roundRect(pad, y, fillW, barH, 0)
-    ctx.fillStyle = progGrad
-    ctx.fill()
+  // ── Hoofdkop: narratieve Playfair-zin met één italic accent-woord ──
+  const narrative = buildFreedomNarrative(data)
+  type Seg = { text: string; italic: boolean; color: string }
+  const words: Seg[] = []
+  const pushWords = (text: string, italic: boolean, color: string) => {
+    for (const w of text.split(/\s+/).filter(Boolean)) words.push({ text: w, italic, color })
   }
-
-  // EUR amounts for full privacy only
-  if (data.privacyLevel === 'full' && data.netWorth != null && data.fireTarget != null && data.fireTarget > 0) {
-    y += barH + 8
-    ctx.font = '400 18px system-ui, -apple-system, sans-serif'
-    ctx.fillStyle = TEXT_ZINC_500
-    ctx.fillText(
-      `€${Math.round(data.netWorth).toLocaleString('nl-NL')} / €${Math.round(data.fireTarget).toLocaleString('nl-NL')}`,
-      pad, y
-    )
-    y += 28
-  } else if (!hasFreedomPct) {
-    y += barH + 8
-    ctx.font = '400 18px system-ui, -apple-system, sans-serif'
-    ctx.fillStyle = TEXT_ZINC_500
-    ctx.fillText('Voeg transacties toe om je vrijheidspercentage te berekenen', pad, y)
-    y += 28
+  pushWords(narrative.pre.trim(), false, INK)
+  pushWords(narrative.accent.trim(), true, ACCENT)
+  const post = narrative.post.trim()
+  if (/^[.!?…,]+$/.test(post) && words.length > 0) {
+    // Lone leesteken hoort tegen het laatste (accent-)woord aan, niet los erachter.
+    words[words.length - 1] = { ...words[words.length - 1], text: words[words.length - 1].text + post }
   } else {
-    y += barH + 24
+    pushWords(post, false, INK)
   }
+  const headSize = 64
+  const headLine = 78
+  const fontFor = (s: Seg) => `${s.italic ? 'italic ' : ''}${s.italic ? '400' : '700'} ${headSize}px ${PLAYFAIR}`
+  {
+    let line: Seg[] = []
+    const flush = () => {
+      let cx = P
+      for (const s of line) {
+        ctx.font = fontFor(s)
+        ctx.fillStyle = s.color
+        ctx.fillText(s.text, cx, y)
+        cx += ctx.measureText(s.text).width
+        ctx.font = fontFor(s)
+        cx += ctx.measureText(' ').width
+      }
+      y += headLine
+      line = []
+    }
+    for (const s of words) {
+      const test = [...line, s]
+      let width = 0
+      for (const t of test) {
+        ctx.font = fontFor(t)
+        width += ctx.measureText(t.text + ' ').width
+      }
+      if (width > contentW && line.length > 0) flush()
+      line.push(s)
+    }
+    if (line.length) flush()
+  }
+  y += 26
 
-  y += 16
+  // ── Hoofdcijfer: vrijheids-% (DM Mono, tabular) + voortgangsbalk ──
+  ctx.font = `500 118px ${MONO}`
+  ctx.fillStyle = INK
+  ctx.fillText(stats.pctText, P, y)
+  y += 132
+  ctx.font = `500 24px ${MONO}`
+  ctx.letterSpacing = '2.5px'
+  ctx.fillStyle = INK3
+  ctx.fillText('VAN JE VOLLEDIGE VRIJHEID', P, y)
+  ctx.letterSpacing = '0px'
+  y += 44
+  // balk: lichte track + accent-vulling (highlight-marker-gevoel)
+  const barH = 18
+  ctx.fillStyle = SUBTLE
+  ctx.fillRect(P, y, contentW, barH)
+  if (stats.pctFill > 0) {
+    ctx.fillStyle = ACCENT_BAR
+    ctx.fillRect(P, y, Math.max(barH, (contentW * stats.pctFill) / 100), barH)
+  }
+  y += barH + 52
 
-  // ── Stats grid (2x2) ──
-  const cardW = (W - pad * 2 - 16) / 2
-  const cardH = 80
-  const statsY = y
-
-  // Helper to draw stat card
-  function drawStatCard(x: number, y: number, label: string, value: string, color: string) {
-    roundRect(x, y, cardW, cardH, 0)
-    ctx.fillStyle = 'rgba(39, 39, 42, 0.8)'
-    ctx.fill()
-
-    // Label
-    ctx.font = 'bold 16px system-ui, -apple-system, sans-serif'
-    ctx.letterSpacing = '0.5px'
-    ctx.fillStyle = TEXT_ZINC_400
-    ctx.textBaseline = 'top'
-    ctx.fillText(label.toUpperCase(), x + 16, y + 14)
+  // ── Netto vermogen (alleen volledige privacy) ──
+  if (data.privacyLevel === 'full' && data.netWorth != null) {
+    ctx.strokeStyle = BORDER
+    ctx.lineWidth = 2
+    ctx.beginPath(); ctx.moveTo(P, y); ctx.lineTo(W - P, y); ctx.stroke()
+    y += 28
+    ctx.font = `500 24px ${MONO}`
+    ctx.letterSpacing = '3px'
+    ctx.fillStyle = INK3
+    ctx.fillText('NETTO VERMOGEN', P, y)
     ctx.letterSpacing = '0px'
-
-    // Value
-    ctx.font = 'bold 34px system-ui, -apple-system, sans-serif'
-    ctx.fillStyle = color
-    ctx.fillText(value, x + 16, y + 38)
+    y += 40
+    ctx.font = `500 56px ${MONO}`
+    ctx.fillStyle = INK
+    ctx.fillText(formatCurrency(data.netWorth), P, y)
+    y += 66
+    if (stats.freedomTimeLong) {
+      ctx.font = `italic 400 30px ${SERIF}`
+      ctx.fillStyle = INK3
+      ctx.fillText(`${stats.freedomTimeLong} vrijheid`, P, y)
+      y += 44
+    }
+    y += 20
   }
 
-  // Compute display values
-  const daysWon = data.freedomDaysWonThisMonth ?? data.freedomDaysWon
-  const daysText = daysWon > 0 ? `+${daysWon}` : '0'
+  // ── Kerncijfers: 2×2 figures-strip met hairlines ──
+  const cellCells: { kicker: string; value: string }[] = [
+    { kicker: 'VRIJHEIDSTIJD', value: stats.freedomTimeShort },
+    { kicker: 'DEZE MAAND', value: stats.daysWonText },
+    { kicker: 'VOLLEDIGE VRIJHEID', value: stats.countdownText },
+    { kicker: 'SPAARQUOTE', value: stats.savingsText },
+  ]
+  const colW = contentW / 2
+  const rowH = 132
+  ctx.strokeStyle = BORDER
+  ctx.lineWidth = 2
+  ctx.beginPath(); ctx.moveTo(P, y); ctx.lineTo(W - P, y); ctx.stroke()
+  const gridTop = y
+  // middenscheiding verticaal + horizontaal
+  ctx.beginPath(); ctx.moveTo(P + colW, gridTop); ctx.lineTo(P + colW, gridTop + rowH * 2); ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(P, gridTop + rowH); ctx.lineTo(W - P, gridTop + rowH); ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(P, gridTop + rowH * 2); ctx.lineTo(W - P, gridTop + rowH * 2); ctx.stroke()
+  cellCells.forEach((cell, i) => {
+    const cx = P + (i % 2) * colW + 28
+    const cy = gridTop + Math.floor(i / 2) * rowH + 26
+    ctx.font = `500 22px ${MONO}`
+    ctx.letterSpacing = '2.5px'
+    ctx.fillStyle = INK3
+    ctx.fillText(cell.kicker, cx, cy)
+    ctx.letterSpacing = '0px'
+    ctx.font = `500 42px ${MONO}`
+    ctx.fillStyle = INK
+    ctx.fillText(cell.value, cx, cy + 40)
+  })
+  y = gridTop + rowH * 2
 
-  const countdownLabel = data.fireCountdown?.label || ''
-  const countdownText = countdownLabel === 'Bereikt!'
-    ? 'Bereikt!'
-    : countdownLabel === 'Niet haalbaar'
-      ? 'Niet haalbaar'
-      : countdownLabel === 'Nog geen data'
-        ? 'N/B'
-        : (data.fireCountdown?.years ?? 0) > 0
-          ? `${data.fireCountdown.years}j ${data.fireCountdown.months}mnd`
-          : (data.fireCountdown?.months ?? 0) > 0
-            ? `${data.fireCountdown.months} mnd`
-            : countdownLabel === '' ? 'N/B' : '-'
+  // ── Colofon onderaan ──
+  const footY = H - P - 30
+  ctx.strokeStyle = BORDER
+  ctx.lineWidth = 2
+  ctx.beginPath(); ctx.moveTo(P, footY - 22); ctx.lineTo(W - P, footY - 22); ctx.stroke()
+  // links: Trifinity ✦ vrijheid (ornament in serif zodat het glyph zeker rendert)
+  ctx.font = `500 22px ${MONO}`
+  ctx.letterSpacing = '1.5px'
+  ctx.fillStyle = INK4
+  ctx.fillText('Trifinity', P, footY)
+  const tW = ctx.measureText('Trifinity').width
+  ctx.letterSpacing = '0px'
+  ctx.font = `400 22px ${SERIF}`
+  ctx.fillStyle = ACCENT_BAR
+  ctx.fillText('  ✦  ', P + tW, footY)
+  const oW = ctx.measureText('  ✦  ').width
+  ctx.font = `500 22px ${MONO}`
+  ctx.letterSpacing = '1.5px'
+  ctx.fillStyle = INK4
+  ctx.fillText('vrijheid', P + tW + oW, footY)
+  ctx.letterSpacing = '0px'
+  // rechts: datum
+  const dateText = new Date(data.generatedAt).toLocaleDateString('nl-NL', {
+    day: 'numeric', month: 'short', year: 'numeric',
+  })
+  ctx.font = `400 22px ${MONO}`
+  ctx.fillStyle = INK4
+  const dW = ctx.measureText(dateText).width
+  ctx.fillText(dateText, W - P - dW, footY)
 
-  const fY = data.freedomTime?.years ?? 0
-  const fM = data.freedomTime?.months ?? 0
-  const freedomTimeText = fY > 0
-    ? `${fY}j ${fM}mnd`
-    : fM > 0 ? `${fM} mnd` : (hasFreedomPct ? '0 mnd' : 'N/B')
+  document.body.removeChild(probe)
+  return canvas
+}
 
-  const savingsRateText = data.savingsRate != null
-    ? (data.savingsRate > 0 ? `${data.savingsRate.toFixed(0)}%` : '0%')
-    : 'N/B'
+function FreedomCardVisual({ data }: { data: FreedomCardData }) {
+  const { privacyLevel, displayName, netWorth } = data
+  const stats = deriveCardStats(data)
+  const narrative = buildFreedomNarrative(data)
 
-  // Draw 4 stat cards
-  drawStatCard(pad, statsY, 'Dagen deze maand', daysText, TEAL_400)
-  drawStatCard(pad + cardW + 16, statsY, 'FIRE countdown', countdownText, PURPLE_400)
-  drawStatCard(pad, statsY + cardH + 12, 'Vrijheidstijd', freedomTimeText, AMBER_400)
-  drawStatCard(pad + cardW + 16, statsY + cardH + 12, 'Spaarquote', savingsRateText, EMERALD_400)
-
-  y = statsY + cardH * 2 + 12 + 32
-
-  // ── Footer ──
-  ctx.strokeStyle = 'rgba(63, 63, 70, 0.5)'
-  ctx.lineWidth = 1
-  ctx.beginPath()
-  ctx.moveTo(pad, y)
-  ctx.lineTo(W - pad, y)
-  ctx.stroke()
-  y += 16
-
-  ctx.font = '400 16px system-ui, -apple-system, sans-serif'
-  ctx.fillStyle = TEXT_ZINC_500
-  ctx.fillText('Geld is opgeslagen tijd', pad, y)
+  const cells: { kicker: string; value: string }[] = [
+    { kicker: 'Vrijheidstijd', value: stats.freedomTimeShort },
+    { kicker: 'Deze maand', value: stats.daysWonText },
+    { kicker: 'Volledige vrijheid', value: stats.countdownText },
+    { kicker: 'Spaarquote', value: stats.savingsText },
+  ]
 
   const dateText = new Date(data.generatedAt).toLocaleDateString('nl-NL', {
     day: 'numeric', month: 'short', year: 'numeric',
   })
-  const dateWidth = ctx.measureText(dateText).width
-  ctx.fillText(dateText, W - pad - dateWidth, y)
-
-  return canvas
-}
-
-function formatCurrencyNL(value: number): string {
-  return new Intl.NumberFormat('nl-NL', {
-    style: 'currency',
-    currency: 'EUR',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value)
-}
-
-function FreedomCardVisual({ data }: { data: FreedomCardData }) {
-  const { fireCountdown, freedomTime, freedomPercentage, freedomDaysWon, freedomDaysWonThisMonth, savingsRate, privacyLevel, displayName, netWorth, fireTarget } = data
-  // Use this-month days if available, otherwise fall back to all-time
-  const daysWonDisplay = freedomDaysWonThisMonth ?? freedomDaysWon
-
-  // Handle null/missing freedomPercentage gracefully
-  const hasFreedomPct = freedomPercentage != null
-  const freedomPctDisplay = hasFreedomPct ? freedomPercentage : 0
-
-  // Determine countdown text with graceful fallback for missing data
-  const countdownLabel = fireCountdown?.label || ''
-  const countdownText = countdownLabel === 'Bereikt!'
-    ? 'Bereikt!'
-    : countdownLabel === 'Niet haalbaar'
-      ? 'Niet haalbaar'
-      : countdownLabel === 'Nog geen data'
-        ? 'N/B'
-        : (fireCountdown?.years ?? 0) > 0
-          ? `${fireCountdown.years}j ${fireCountdown.months}mnd`
-          : (fireCountdown?.months ?? 0) > 0
-            ? `${fireCountdown.months} maanden`
-            : countdownLabel === ''
-              ? 'N/B'
-              : '-'
-
-  // Freedom time with graceful fallback
-  const fYears = freedomTime?.years ?? 0
-  const fMonths = freedomTime?.months ?? 0
-  const freedomTimeText = fYears > 0
-    ? `${fYears}j ${fMonths}mnd`
-    : fMonths > 0
-      ? `${fMonths} maanden`
-      : hasFreedomPct ? '0 maanden' : 'N/B'
-
-  // Savings rate with null handling
-  const hasSavingsRate = savingsRate != null
-  const savingsRateDisplay = hasSavingsRate
-    ? (savingsRate > 0 ? `${savingsRate.toFixed(0)}%` : '0%')
-    : 'N/B'
 
   return (
     <div
-      className="relative mx-auto w-full max-w-[420px] overflow-hidden rounded-[var(--r-lg)] bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-900 p-6 text-white shadow-2xl"
+      className="relative mx-auto w-full max-w-[440px] overflow-hidden border border-[var(--border-ed)] bg-[var(--paper)] p-8 text-[var(--ink)]"
       id="freedom-card"
     >
-      {/* Background decorations */}
-      <div className="pointer-events-none absolute -top-16 -right-16 h-48 w-48 rounded-full bg-gradient-to-br from-kern-500/20 to-wil-500/20 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-16 -left-16 h-48 w-48 rounded-full bg-gradient-to-br from-horizon-500/20 to-wil-500/20 blur-3xl" />
-
-      {/* Header */}
-      <div className="relative mb-6 flex items-center justify-between">
-        <div>
-          <p className="text-xs font-semibold tracking-[0.2em] text-[var(--ink-3)] uppercase">
-            Mijn Vrijheidskaart
-          </p>
-          {displayName && (
-            <p className="mt-0.5 text-sm font-medium text-[var(--ink-4)]">{displayName}</p>
-          )}
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="h-2 w-2 rounded-full bg-kern-400" />
-          <div className="h-2 w-2 rounded-full bg-wil-400" />
-          <div className="h-2 w-2 rounded-full bg-horizon-400" />
-          <span className="ml-1 text-xs font-bold tracking-wider text-[var(--ink-3)]">
-            TriFinity
-          </span>
-        </div>
+      {/* Kicker */}
+      <div className="flex items-center gap-3">
+        <span aria-hidden className="inline-block h-[2px] w-7 shrink-0 bg-horizon-500" />
+        <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-[var(--ink-3)]">
+          Mijn vrijheidskaart
+        </span>
       </div>
+      {displayName && (
+        <p className="mt-2 font-serif text-lg italic text-[var(--ink-2)]">{displayName}</p>
+      )}
 
-      {/* Main metric: Freedom percentage */}
-      <div className="relative mb-6">
-        <div className="flex items-end gap-2">
-          <span className="text-5xl font-bold tracking-tight">
-            {hasFreedomPct ? `${freedomPctDisplay.toFixed(1)}%` : 'N/B'}
+      {/* Narratieve Playfair-hoofdkop met één italic accent-woord */}
+      <h2 className="mt-5 font-display text-[30px] font-bold leading-tight tracking-[-0.02em] text-[var(--ink)]">
+        {narrative.pre}
+        <em className="font-normal italic text-horizon-700">{narrative.accent}</em>
+        {narrative.post}
+      </h2>
+
+      {/* Hoofdcijfer: vrijheids-% + voortgangsbalk */}
+      <div className="mt-7">
+        <div className="flex items-baseline gap-3">
+          <span className="font-mono text-[52px] font-medium leading-none tabular-nums text-[var(--ink)]">
+            {stats.pctText}
           </span>
-          <span className="mb-1 text-sm text-[var(--ink-3)]">financiele vrijheid</span>
+          <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--ink-3)]">
+            van je volledige vrijheid
+          </span>
         </div>
-        <div className="mt-3 h-3 w-full overflow-hidden rounded-full bg-zinc-700/60">
+        <div className="mt-4 h-[10px] w-full bg-[var(--subtle)]">
           <div
-            className="h-full rounded-full bg-gradient-to-r from-kern-400 via-wil-400 to-horizon-500 transition-all duration-1000"
-            style={{ width: `${hasFreedomPct ? Math.min(freedomPctDisplay, 100) : 0}%` }}
+            className="h-full bg-horizon-500 transition-all duration-700"
+            style={{ width: `${stats.pctFill}%` }}
           />
         </div>
-        {privacyLevel === 'full' && netWorth != null && fireTarget != null && fireTarget > 0 && (
-          <p className="mt-1.5 text-xs text-[var(--ink-3)]">
-            {formatCurrencyNL(netWorth)} / {formatCurrencyNL(fireTarget)}
-          </p>
-        )}
-        {!hasFreedomPct && (
-          <p className="mt-1.5 text-xs text-[var(--ink-3)]">
-            Voeg transacties toe om je vrijheidspercentage te berekenen
+        {!stats.hasFreedomPct && (
+          <p className="mt-2 font-serif text-[13px] italic text-[var(--ink-3)]">
+            Voeg transacties toe om je vrijheidspercentage te berekenen.
           </p>
         )}
       </div>
 
-      {/* Stats grid */}
-      <div className="grid grid-cols-2 gap-3">
-        {/* Days won this month */}
-        <div className="rounded-[var(--r-lg)] bg-zinc-800/80 p-3">
-          <div className="mb-1 flex items-center gap-1.5">
-            <Target className="h-3.5 w-3.5 text-wil-400" />
-            <span className="text-[10px] font-medium text-[var(--ink-3)] uppercase">Dagen deze maand</span>
-          </div>
-          <p className="text-xl font-bold text-wil-400">
-            {daysWonDisplay > 0 ? `+${daysWonDisplay}` : '0'}
+      {/* Netto vermogen (alleen volledige privacy) */}
+      {privacyLevel === 'full' && netWorth != null && (
+        <div className="mt-6 border-t border-[var(--border-ed)] pt-4">
+          <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--ink-3)]">
+            Netto vermogen
           </p>
+          <p className="mt-1 font-mono text-2xl font-medium tabular-nums text-[var(--ink)]">
+            {formatCurrency(netWorth)}
+          </p>
+          {stats.freedomTimeLong && (
+            <p className="mt-0.5 font-serif text-sm italic text-[var(--ink-3)]">
+              {stats.freedomTimeLong} vrijheid
+            </p>
+          )}
         </div>
+      )}
 
-        {/* FIRE countdown */}
-        <div className="rounded-[var(--r-lg)] bg-zinc-800/80 p-3">
-          <div className="mb-1 flex items-center gap-1.5">
-            <Clock className="h-3.5 w-3.5 text-horizon-400" />
-            <span className="text-[10px] font-medium text-[var(--ink-3)] uppercase">FIRE countdown</span>
+      {/* Kerncijfers: 2×2 figures-strip met hairlines */}
+      <div className="mt-6 grid grid-cols-2 border-t border-[var(--border-ed)]">
+        {cells.map((cell, i) => (
+          <div
+            key={cell.kicker}
+            className={`py-4 ${i % 2 === 0 ? 'border-r border-[var(--border-ed)] pr-4' : 'pl-4'} ${i < 2 ? 'border-b border-[var(--border-ed)]' : ''}`}
+          >
+            <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--ink-3)]">
+              {cell.kicker}
+            </p>
+            <p className="mt-1.5 font-mono text-xl font-medium tabular-nums text-[var(--ink)]">
+              {cell.value}
+            </p>
           </div>
-          <p className="text-xl font-bold text-horizon-400">
-            {countdownText}
-          </p>
-        </div>
-
-        {/* Freedom time */}
-        <div className="rounded-[var(--r-lg)] bg-zinc-800/80 p-3">
-          <div className="mb-1 flex items-center gap-1.5">
-            <Shield className="h-3.5 w-3.5 text-kern-400" />
-            <span className="text-[10px] font-medium text-[var(--ink-3)] uppercase">Vrijheidstijd</span>
-          </div>
-          <p className="text-xl font-bold text-kern-400">
-            {freedomTimeText}
-          </p>
-        </div>
-
-        {/* Savings rate */}
-        <div className="rounded-[var(--r-lg)] bg-zinc-800/80 p-3">
-          <div className="mb-1 flex items-center gap-1.5">
-            <TrendingUp className="h-3.5 w-3.5 text-emerald-400" />
-            <span className="text-[10px] font-medium text-[var(--ink-3)] uppercase">Spaarquote</span>
-          </div>
-          <p className="text-xl font-bold text-emerald-400">
-            {savingsRateDisplay}
-          </p>
-        </div>
+        ))}
       </div>
 
-      {/* Footer */}
-      <div className="mt-5 flex items-center justify-between border-t border-zinc-700/50 pt-3">
-        <p className="text-[10px] text-[var(--ink-3)]">
-          Geld is opgeslagen tijd
+      {/* Colofon */}
+      <div className="mt-6 flex items-center justify-between border-t border-[var(--border-ed)] pt-3">
+        <p className="font-mono text-[10px] tracking-[0.1em] text-[var(--ink-4)]">
+          Trifinity <span className="font-serif not-italic text-horizon-500">✦</span> vrijheid
         </p>
-        <p className="text-[10px] text-[var(--ink-3)]">
-          {new Date(data.generatedAt).toLocaleDateString('nl-NL', {
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric',
-          })}
+        <p className="font-mono text-[10px] tracking-[0.1em] tabular-nums text-[var(--ink-4)]">
+          {dateText}
         </p>
       </div>
     </div>
@@ -537,7 +569,7 @@ export function FreedomCardGenerator() {
     if (!cardData) return
 
     try {
-      const canvas = renderFreedomCardToCanvas(cardData)
+      const canvas = await renderFreedomCardToCanvas(cardData)
       const link = document.createElement('a')
       link.download = `trifinity-vrijheidskaart-${new Date().toISOString().split('T')[0]}.png`
       link.href = canvas.toDataURL('image/png')
@@ -702,7 +734,7 @@ export function FreedomCardGenerator() {
           open={showShareDialog}
           onClose={() => setShowShareDialog(false)}
           content={getShareContent()!}
-          captureRef={cardRef}
+          renderCanvas={() => renderFreedomCardToCanvas(cardData)}
         />
       )}
     </div>

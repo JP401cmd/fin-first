@@ -120,7 +120,7 @@ export function HouseholdPrivacySettings() {
       data-testid="household-privacy-section"
     >
       <div className="flex items-start gap-3 mb-5">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-wil-100 text-wil-700">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center bg-wil-100 text-wil-700">
           <Shield className="h-4 w-4" aria-hidden="true" />
         </div>
         <div>
@@ -132,7 +132,7 @@ export function HouseholdPrivacySettings() {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-4 rounded-lg border border-[var(--border-ed)] p-3 bg-[var(--paper)] mb-4">
+      <div className="flex flex-wrap gap-4 border border-[var(--border-ed)] p-3 bg-[var(--paper)] mb-4">
         <div className="flex items-center gap-1.5">
           <Eye className="h-3.5 w-3.5 text-wil-600" aria-hidden="true" />
           <span className="text-xs text-[var(--ink-2)]">
@@ -154,9 +154,9 @@ export function HouseholdPrivacySettings() {
       </div>
 
       {/* Toekomst-gegevens: transparant of verborgen (hoofdschakelaar voor /toekomst). */}
-      <div className="mb-4 rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-4" data-testid="future-privacy-toggle">
+      <div className="mb-4 border border-[var(--border-ed)] bg-[var(--paper)] p-4" data-testid="future-privacy-toggle">
         <div className="mb-2 flex items-center gap-2.5">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-wil-50">
+          <div className="flex h-7 w-7 items-center justify-center bg-wil-50">
             <Shield className="h-3.5 w-3.5 text-wil-600" aria-hidden="true" />
           </div>
           <div>
@@ -177,7 +177,7 @@ export function HouseholdPrivacySettings() {
                 type="button"
                 aria-pressed={isActive}
                 onClick={() => setFuture(opt.val)}
-                className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
+                className={`flex flex-1 items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors ${
                   isActive
                     ? opt.val === 'transparent'
                       ? 'bg-wil-50 text-wil-700 border border-wil-300'
@@ -202,10 +202,10 @@ export function HouseholdPrivacySettings() {
           const currentLevel = privacy[cat.key] || 'totalen'
           const CatIcon = cat.icon
           return (
-            <div key={cat.key} className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-4">
+            <div key={cat.key} className="border border-[var(--border-ed)] bg-[var(--paper)] p-4">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2.5">
-                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-wil-50">
+                  <div className="flex h-7 w-7 items-center justify-center bg-wil-50">
                     <CatIcon className="h-3.5 w-3.5 text-wil-600" aria-hidden="true" />
                   </div>
                   <div>
@@ -224,7 +224,7 @@ export function HouseholdPrivacySettings() {
                       type="button"
                       aria-pressed={isActive}
                       onClick={() => setPrivacy((prev) => ({ ...prev, [cat.key]: opt.level }))}
-                      className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
+                      className={`flex flex-1 items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors ${
                         isActive
                           ? opt.color === 'wil'
                             ? 'bg-wil-50 text-wil-700 border border-wil-300'

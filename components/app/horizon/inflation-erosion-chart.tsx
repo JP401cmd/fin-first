@@ -258,13 +258,13 @@ export const InflationErosionChart = memo(function InflationErosionChart({
           <label className="block text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--ink-3)] mb-1.5">
             Tijdshorizon
           </label>
-          <div className="flex gap-1 bg-[var(--subtle)] rounded-md p-0.5">
+          <div className="flex gap-1 bg-[var(--subtle)] p-0.5">
             {HORIZON_OPTIONS.map((opt) => (
               <button
                 key={opt}
                 type="button"
                 onClick={() => setHorizon(opt)}
-                className={`px-3 py-1.5 text-sm font-mono rounded-md transition-colors ${
+                className={`px-3 py-1.5 text-sm font-mono transition-colors ${
                   horizon === opt
                     ? 'bg-[var(--ink)] text-[var(--paper)] font-semibold'
                     : 'text-[var(--ink-2)] hover:text-[var(--ink)]'
@@ -297,7 +297,7 @@ export const InflationErosionChart = memo(function InflationErosionChart({
               onChange={(e) =>
                 setStartAmount(Math.max(100, Number(e.target.value)))
               }
-              className="w-[120px] pl-7 pr-3 py-1.5 text-sm font-mono tabular-nums border border-[var(--border-ed)] rounded-md bg-[var(--paper)] text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--module-active-500)]"
+              className="w-[120px] pl-7 pr-3 py-1.5 text-sm font-mono tabular-nums border border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--module-active-500)]"
             />
           </div>
         </div>
@@ -326,7 +326,7 @@ export const InflationErosionChart = memo(function InflationErosionChart({
                   setInflationRate(Math.min(0.15, Math.max(0, pct / 100)))
                 }
               }}
-              className="w-[100px] pl-3 pr-8 py-1.5 text-sm font-mono tabular-nums border border-[var(--border-ed)] rounded-md bg-[var(--paper)] text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--module-active-500)]"
+              className="w-[100px] pl-3 pr-8 py-1.5 text-sm font-mono tabular-nums border border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--module-active-500)]"
             />
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-[var(--ink-3)] font-mono">
               %
@@ -611,7 +611,7 @@ export const InflationErosionChart = memo(function InflationErosionChart({
         {/* Hover tooltip (only after animation) */}
         {hoveredRow && hoverYear !== null && phase >= 5 && (
           <div
-            className="absolute pointer-events-none bg-[var(--paper)] border border-[var(--border-ed)] shadow-sm rounded-md px-3 py-2 text-xs font-mono z-10"
+            className="absolute pointer-events-none bg-[var(--paper)] border border-[var(--border-ed)] shadow-sm px-3 py-2 text-xs font-mono z-10"
             style={{
               left: `${(xScale(hoverYear) / W) * 100}%`,
               top: `${((yScale(hoveredRow.realValue) / H) * 100) - 2}%`,
@@ -674,7 +674,7 @@ export const InflationErosionChart = memo(function InflationErosionChart({
         <div className="flex gap-4">
           <div className="flex items-center gap-1.5">
             <span
-              className="w-3 h-3 rounded-sm"
+              className="w-3 h-3 "
               style={{ background: 'var(--color-horizon-500)', opacity: 0.5 }}
             />
             <span className="text-xs text-[var(--ink-2)]">
@@ -683,7 +683,7 @@ export const InflationErosionChart = memo(function InflationErosionChart({
           </div>
           <div className="flex items-center gap-1.5">
             <span
-              className="w-3 h-3 rounded-sm"
+              className="w-3 h-3 "
               style={{
                 background:
                   'repeating-linear-gradient(45deg, transparent, transparent 2px, var(--negative) 2px, var(--negative) 3px)',
@@ -697,7 +697,7 @@ export const InflationErosionChart = memo(function InflationErosionChart({
         <div className="flex flex-wrap gap-3 ml-auto">
           {/* Freedom days summary */}
           <div
-            className="bg-[var(--subtle)] px-3 py-2 rounded-md"
+            className="bg-[var(--subtle)] px-3 py-2 "
             style={{
               opacity: phase >= 5 ? 1 : 0,
               transform: phase >= 5 ? 'translateY(0)' : 'translateY(8px)',
@@ -712,7 +712,7 @@ export const InflationErosionChart = memo(function InflationErosionChart({
             </div>
           </div>
           <div
-            className="bg-[var(--subtle)] px-3 py-2 rounded-md"
+            className="bg-[var(--subtle)] px-3 py-2 "
             style={{
               opacity: phase >= 5 ? 1 : 0,
               transform: phase >= 5 ? 'translateY(0)' : 'translateY(8px)',
@@ -730,7 +730,7 @@ export const InflationErosionChart = memo(function InflationErosionChart({
             </div>
           </div>
           <div
-            className="bg-[var(--subtle)] px-3 py-2 rounded-md"
+            className="bg-[var(--subtle)] px-3 py-2 "
             style={{
               opacity: phase >= 5 ? 1 : 0,
               transform: phase >= 5 ? 'translateY(0)' : 'translateY(8px)',

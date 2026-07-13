@@ -180,7 +180,7 @@ export function GoalForm({
     <ShellOverlay open={true} onClose={onClose} kind="sheet" size="lg" title={isEdit ? 'Doel bewerken' : 'Nieuw doel'}>
         <form onSubmit={handleSubmit} className="p-6">
           {error && (
-            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            <div className="mb-4 border border-red-200 bg-red-50 p-3 text-sm text-red-700">
               {error}
             </div>
           )}
@@ -196,7 +196,7 @@ export function GoalForm({
                 type="text"
                 value={form.name}
                 onChange={(e) => update('name', e.target.value)}
-                className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
+                className="w-full border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
                 placeholder="bijv. Noodfonds opbouwen"
                 required
               />
@@ -208,7 +208,7 @@ export function GoalForm({
                 <button
                   type="button"
                   onClick={() => setIsShared(!isShared)}
-                  className={`flex w-full items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors ${
+                  className={`flex w-full items-center gap-3 border px-4 py-3 text-left transition-colors ${
                     isShared
                       ? 'border-wil-300 bg-wil-50'
                       : 'border-[var(--border-md)] hover:bg-[var(--subtle)]'
@@ -251,7 +251,7 @@ export function GoalForm({
                     update('goal_type', newType)
                     update('icon', GOAL_TYPE_ICONS[newType])
                   }}
-                  className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500 disabled:cursor-not-allowed disabled:bg-[var(--subtle)] disabled:text-[var(--ink-3)]"
+                  className="w-full border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500 disabled:cursor-not-allowed disabled:bg-[var(--subtle)] disabled:text-[var(--ink-3)]"
                 >
                   <optgroup label="Financieel">
                     {(Object.keys(GOAL_TYPE_META) as GoalType[])
@@ -293,7 +293,7 @@ export function GoalForm({
                   type="text"
                   value={form.custom_unit}
                   onChange={(e) => update('custom_unit', e.target.value)}
-                  className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
+                  className="w-full border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
                   placeholder="bijv. boeken, km, uren"
                 />
               </div>
@@ -317,7 +317,7 @@ export function GoalForm({
                       step={meta.step}
                       value={form.target_value}
                       onChange={(e) => update('target_value', e.target.value)}
-                      className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
+                      className="w-full border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
                       placeholder="0"
                       required
                     />
@@ -335,7 +335,7 @@ export function GoalForm({
                         step={meta.step}
                         value={form.current_value}
                         onChange={(e) => update('current_value', e.target.value)}
-                        className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
+                        className="w-full border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
                         placeholder="0"
                       />
                     </div>
@@ -354,7 +354,7 @@ export function GoalForm({
                 type="date"
                 value={form.target_date}
                 onChange={(e) => update('target_date', e.target.value)}
-                className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
+                className="w-full border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
               />
             </div>
 
@@ -368,7 +368,7 @@ export function GoalForm({
                   id="goal-asset"
                   value={form.linked_asset_id}
                   onChange={(e) => handleAssetLink(e.target.value)}
-                  className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
+                  className="w-full border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
                 >
                   <option value="">Niet gekoppeld</option>
                   {assets.map((a) => (
@@ -388,7 +388,7 @@ export function GoalForm({
                   id="goal-debt"
                   value={form.linked_debt_id}
                   onChange={(e) => handleDebtLink(e.target.value)}
-                  className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
+                  className="w-full border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
                 >
                   <option value="">Selecteer schuld</option>
                   {debts.map((d) => (
@@ -422,7 +422,7 @@ export function GoalForm({
                   id="goal-icon"
                   value={form.icon}
                   onChange={(e) => update('icon', e.target.value)}
-                  className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
+                  className="w-full border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
                 >
                   {iconOptions.map((name) => (
                     <option key={name} value={name}>{name}</option>
@@ -440,7 +440,7 @@ export function GoalForm({
                 id="goal-desc"
                 value={form.description}
                 onChange={(e) => update('description', e.target.value)}
-                className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
+                className="w-full border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
                 rows={2}
                 placeholder="Waarom is dit doel belangrijk?"
               />
@@ -452,14 +452,14 @@ export function GoalForm({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+              className="border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
             >
               Annuleren
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="inline-flex items-center gap-2 rounded-lg bg-wil-600 px-4 py-2 text-sm font-medium text-white hover:bg-wil-700 disabled:opacity-50"
+              className="inline-flex items-center gap-2 bg-wil-600 px-4 py-2 text-sm font-medium text-white hover:bg-wil-700 disabled:opacity-50"
             >
               <Save className="h-4 w-4" />
               {saving ? 'Opslaan...' : 'Opslaan'}

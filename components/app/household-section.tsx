@@ -195,12 +195,29 @@ export function HouseholdSection() {
     const baseUrl = window.location.origin
     const link = `${baseUrl}/api/household/accept?token=${token}`
     try {
+      // Pre-check: writeText zonder document-focus gooit een NotAllowedError
+      // die Chrome ook bij een catch in de console rapporteert.
+      if (!document.hasFocus()) throw new DOMException('Document is not focused', 'NotAllowedError')
       await navigator.clipboard.writeText(link)
       setCopiedToken(token)
       setTimeout(() => setCopiedToken(null), 2000)
     } catch {
-      // Fallback for non-HTTPS
-      setActionMessage({ type: 'error', text: 'Kopiëren niet mogelijk. Gebruik HTTPS.' })
+      // Textarea-fallback (werkt ook zonder clipboard-API/HTTPS/focus) —
+      // zelfde aanpak als share-dialog; pas als ook dát faalt een eerlijke melding.
+      try {
+        const textarea = document.createElement('textarea')
+        textarea.value = link
+        textarea.style.position = 'fixed'
+        textarea.style.opacity = '0'
+        document.body.appendChild(textarea)
+        textarea.select()
+        document.execCommand('copy')
+        document.body.removeChild(textarea)
+        setCopiedToken(token)
+        setTimeout(() => setCopiedToken(null), 2000)
+      } catch {
+        setActionMessage({ type: 'error', text: 'Kopiëren is niet gelukt — selecteer en kopieer de link handmatig.' })
+      }
     }
   }
 

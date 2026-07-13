@@ -57,7 +57,7 @@ export function ActionForm({ onSubmit, onCancel }: ActionFormProps) {
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-md p-1 text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)]"
+          className="p-1 text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)]"
         >
           <X className="h-4 w-4" />
         </button>
@@ -71,7 +71,7 @@ export function ActionForm({ onSubmit, onCancel }: ActionFormProps) {
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Wat ga je doen? *"
             required
-            className="w-full rounded-md border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:border-wil-300 focus:outline-none focus:ring-1 focus:ring-wil-300"
+            className="w-full border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:border-wil-300 focus:outline-none focus:ring-1 focus:ring-wil-300"
           />
         </div>
 
@@ -81,7 +81,7 @@ export function ActionForm({ onSubmit, onCancel }: ActionFormProps) {
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Beschrijving (optioneel)"
-            className="w-full rounded-md border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:border-wil-300 focus:outline-none focus:ring-1 focus:ring-wil-300"
+            className="w-full border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:border-wil-300 focus:outline-none focus:ring-1 focus:ring-wil-300"
           />
         </div>
 
@@ -98,7 +98,7 @@ export function ActionForm({ onSubmit, onCancel }: ActionFormProps) {
               required
               min="0"
               step="0.1"
-              className="w-full rounded-md border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:border-wil-300 focus:outline-none focus:ring-1 focus:ring-wil-300"
+              className="w-full border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:border-wil-300 focus:outline-none focus:ring-1 focus:ring-wil-300"
             />
           </div>
           <div>
@@ -112,7 +112,7 @@ export function ActionForm({ onSubmit, onCancel }: ActionFormProps) {
               placeholder="Bijv. 50"
               min="0"
               step="1"
-              className="w-full rounded-md border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:border-wil-300 focus:outline-none focus:ring-1 focus:ring-wil-300"
+              className="w-full border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:border-wil-300 focus:outline-none focus:ring-1 focus:ring-wil-300"
             />
           </div>
         </div>
@@ -124,7 +124,7 @@ export function ActionForm({ onSubmit, onCancel }: ActionFormProps) {
               type="date"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
-              className="w-full rounded-md border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:border-wil-300 focus:outline-none focus:ring-1 focus:ring-wil-300"
+              className="w-full border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:border-wil-300 focus:outline-none focus:ring-1 focus:ring-wil-300"
             />
           </div>
           <div>
@@ -137,7 +137,7 @@ export function ActionForm({ onSubmit, onCancel }: ActionFormProps) {
                   key={p}
                   type="button"
                   onClick={() => setPriority(p)}
-                  className={`flex-1 rounded-md py-2 text-xs font-medium transition-colors ${
+                  className={`flex-1 py-2 text-xs font-medium transition-colors ${
                     priority >= p
                       ? 'bg-wil-500 text-white'
                       : 'bg-[var(--paper)] text-[var(--ink-3)] ring-1 ring-[var(--border-ed)] hover:bg-wil-50'
@@ -164,7 +164,7 @@ export function ActionForm({ onSubmit, onCancel }: ActionFormProps) {
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-lg px-4 py-2 text-sm font-medium text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)]"
+          className="px-4 py-2 text-sm font-medium text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)]"
         >
           Annuleren
         </button>

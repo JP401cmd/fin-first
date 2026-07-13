@@ -4,6 +4,7 @@ import { useCallback, memo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Lightbulb, Clock } from 'lucide-react'
 import { useChatContext } from '@/components/app/chat/chat-provider'
+import type { ListDensity } from '@/components/app/density-toggle'
 import type { Notification, NotificationType } from '@/app/api/notifications/route'
 
 // ── Module mapping ──────────────────────────────────────────────────
@@ -56,12 +57,19 @@ type Props = {
   notification: Notification
   onRead: (id: string) => void
   onClose: () => void
+  /**
+   * Weergavedichtheid (M-08). 'compact' verkleint de verticale padding en
+   * verbergt de secundaire meta-regels (omschrijving + vrijheidstijd-badge);
+   * 'ruim' is het bestaande uiterlijk (default → geen regressie).
+   */
+  density?: ListDensity
 }
 
-export const NotificationItem = memo(function NotificationItem({ notification, onRead, onClose }: Props) {
+export const NotificationItem = memo(function NotificationItem({ notification, onRead, onClose, density = 'ruim' }: Props) {
   const router = useRouter()
   const { openWithMessage } = useChatContext()
   const moduleInfo = MODULE_MAP[notification.type] ?? FALLBACK_MODULE_INFO
+  const isCompact = density === 'compact'
 
   const handleClick = useCallback(() => {
     onRead(notification.id)
@@ -97,7 +105,7 @@ export const NotificationItem = memo(function NotificationItem({ notification, o
         borderLeft: `3px solid ${moduleInfo.colorVar}`,
       }}
     >
-      <div className="border-b border-dashed border-[var(--border-ed)] px-5 py-3">
+      <div className={`border-b border-dashed border-[var(--border-ed)] px-5 ${isCompact ? 'py-1.5' : 'py-3'}`}>
         {/* Top row: module tag + unread dot + timestamp */}
         <div className="flex items-center gap-2">
           <span
@@ -128,13 +136,15 @@ export const NotificationItem = memo(function NotificationItem({ notification, o
           {notification.title}
         </p>
 
-        {/* Description — max 2 lines */}
-        <p className="mt-0.5 line-clamp-2 font-[family-name:var(--font-source-serif)] text-[13px] leading-snug text-[var(--ink-3)]">
-          {notification.description}
-        </p>
+        {/* Description — max 2 lines (secundaire meta, verborgen in compact) */}
+        {!isCompact && (
+          <p className="mt-0.5 line-clamp-2 font-[family-name:var(--font-source-serif)] text-[13px] leading-snug text-[var(--ink-3)]">
+            {notification.description}
+          </p>
+        )}
 
-        {/* Freedom-time badge for partner transactions */}
-        {notification.type === 'partner_transaction' && notification.metadata?.freedomDays != null && Number(notification.metadata.freedomDays) > 0 && (
+        {/* Freedom-time badge for partner transactions (verborgen in compact) */}
+        {!isCompact && notification.type === 'partner_transaction' && notification.metadata?.freedomDays != null && Number(notification.metadata.freedomDays) > 0 && (
           <div className={`mt-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
             notification.metadata?.isIncome
               ? 'bg-emerald-50 text-emerald-700'

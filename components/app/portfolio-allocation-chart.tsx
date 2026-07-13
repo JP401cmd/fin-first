@@ -223,7 +223,7 @@ function TargetEditor({
                   step="1"
                   value={draft[key] ?? ''}
                   onChange={(e) => setDraft({ ...draft, [key]: e.target.value })}
-                  className="w-16 rounded-lg border border-[var(--border-ed)] px-2 py-1.5 text-right text-sm"
+                  className="w-16 border border-[var(--border-ed)] px-2 py-1.5 text-right text-sm"
                   placeholder="0"
                 />
                 <span className="text-xs text-[var(--ink-3)]">%</span>
@@ -232,7 +232,7 @@ function TargetEditor({
           ))}
         </div>
 
-        <div className={`mt-4 flex items-center justify-between rounded-lg p-2 text-sm ${
+        <div className={`mt-4 flex items-center justify-between p-2 text-sm ${
           // eslint-disable-next-line no-restricted-syntax -- validatie-status (som=100%), geen winst/verlies
           isValid ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
         }`}>
@@ -247,14 +247,14 @@ function TargetEditor({
         <div className="mt-4 flex justify-end gap-2">
           <button
             onClick={onClose}
-            className="rounded-lg border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+            className="border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
           >
             Annuleren
           </button>
           <button
             onClick={handleSave}
             disabled={!isValid}
-            className="rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
+            className="bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
             data-testid="target-save-btn"
           >
             Opslaan
@@ -328,7 +328,7 @@ const PortfolioAllocationVisualization = memo(function PortfolioAllocationVisual
               key={mode}
               onClick={() => setViewMode(mode)}
               data-testid={`view-tab-${mode}`}
-              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors ${
                 viewMode === mode
                   ? 'bg-kern-100 text-kern-700'
                   : 'text-[var(--ink-3)] hover:text-[var(--ink-2)] hover:bg-[var(--subtle)]'
@@ -343,7 +343,7 @@ const PortfolioAllocationVisualization = memo(function PortfolioAllocationVisual
           <button
             onClick={() => setShowTargetComparison(!showTargetComparison)}
             data-testid="toggle-comparison"
-            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+            className={`inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium transition-colors ${
               showTargetComparison
                 ? 'bg-purple-100 text-purple-700'
                 : 'text-[var(--ink-3)] hover:text-[var(--ink-2)] hover:bg-[var(--subtle)]'
@@ -357,7 +357,7 @@ const PortfolioAllocationVisualization = memo(function PortfolioAllocationVisual
 
       {/* No classification data notice */}
       {!hasClassificationData && (
-        <div className="mb-4 flex items-start gap-2 rounded-lg border border-kern-200 bg-kern-50 p-3" data-testid="no-classification-notice">
+        <div className="mb-4 flex items-start gap-2 border border-kern-200 bg-kern-50 p-3" data-testid="no-classification-notice">
           <Info className="h-4 w-4 shrink-0 text-kern-500 mt-0.5" />
           <p className="text-xs text-kern-700">
             Je holdings hebben nog geen {VIEW_MODE_LABELS[viewMode].toLowerCase()}-classificatie.
@@ -373,7 +373,7 @@ const PortfolioAllocationVisualization = memo(function PortfolioAllocationVisual
           {slices.map((slice) => (
             <div key={slice.key} className="flex items-center gap-2" data-testid={`slice-${slice.key}`}>
               <span
-                className="inline-block h-3 w-3 rounded-sm shrink-0"
+                className="inline-block h-3 w-3 shrink-0"
                 style={{ backgroundColor: slice.color }}
               />
               <span className="flex-1 text-xs text-[var(--ink-2)] truncate">
@@ -400,7 +400,7 @@ const PortfolioAllocationVisualization = memo(function PortfolioAllocationVisual
             <button
               onClick={() => setShowTargetEditor(true)}
               data-testid="edit-targets-btn"
-              className="inline-flex items-center gap-1 rounded-lg border border-purple-200 px-2.5 py-1 text-xs font-medium text-purple-600 hover:bg-purple-50"
+              className="inline-flex items-center gap-1 border border-purple-200 px-2.5 py-1 text-xs font-medium text-purple-600 hover:bg-purple-50"
             >
               <Edit3 className="h-3 w-3" />
               Doelen bewerken
@@ -451,14 +451,14 @@ const PortfolioAllocationVisualization = memo(function PortfolioAllocationVisual
             {suggestions.map((s) => (
               <div
                 key={s.category}
-                className={`flex items-center gap-3 rounded-lg border p-2.5 ${
+                className={`flex items-center gap-3 border p-2.5 ${
                   s.action === 'buy'
                     ? 'border-positive/30 bg-positive-bg'
                     : 'border-negative/30 bg-negative-bg'
                 }`}
                 data-testid={`rebalance-${s.category}`}
               >
-                <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${
+                <div className={`flex h-7 w-7 shrink-0 items-center justify-center ${
                   s.action === 'buy' ? 'bg-positive-bg' : 'bg-negative-bg'
                 }`}>
                   <ArrowRightLeft className={`h-3.5 w-3.5 ${

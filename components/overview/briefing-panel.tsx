@@ -192,7 +192,7 @@ export function BriefingPanel({
   const [shareOpen, setShareOpen] = useState(false)
   const [shareData, setShareData] = useState<FreedomCardData | null>(null)
   const [shareRenderer, setShareRenderer] = useState<
-    ((d: FreedomCardData) => HTMLCanvasElement) | null
+    ((d: FreedomCardData) => HTMLCanvasElement | Promise<HTMLCanvasElement>) | null
   >(null)
 
   // In Eenvoudig tonen we alleen het belangrijkste briefje (1, over de volle

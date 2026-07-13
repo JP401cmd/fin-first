@@ -93,6 +93,23 @@ describe('HoldingTransactionLog — paginering', () => {
   })
 })
 
+describe('HoldingTransactionLog — transactie-eigen gegevens in uitklappaneel (M-08)', () => {
+  it('toont "eenheden @ prijs" in het detailpaneel na uitklappen', async () => {
+    // In compact is de "eenheden @ prijs"-regel in de rij verborgen; via het
+    // uitklappaneel moet die info altijd bereikbaar blijven.
+    const tx = [{ ...makeTx(1)[0], units: 12, price_per_unit: 48.2, total_amount: 578.4 }]
+    vi.stubGlobal('fetch', mockFetch(tx))
+    render(<HoldingTransactionLog holdingId="h1" holdingName="Test" />)
+    await waitFor(() => expect(screen.getByTestId('transaction-list')).toBeInTheDocument())
+
+    const item = screen.getByTestId('transaction-item-tx-0')
+    fireEvent.click(within(item).getByRole('button'))
+
+    const detail = within(item).getByTestId('tx-detail')
+    expect(within(detail).getByTestId('tx-units-at-price')).toHaveTextContent(/12 eenheden @/)
+  })
+})
+
 describe('InlineTransactionForm — gekoppelde labels (C-06)', () => {
   async function openForm() {
     vi.stubGlobal('fetch', mockFetch(makeTx(0)))

@@ -14,6 +14,7 @@ import { AssetPane } from '@/components/app/core/assets/asset-pane'
 import { createClient } from '@/lib/supabase/client'
 import { syncBudgetingActive } from '@/lib/budgeting-active'
 import { syncBankAccountCompanion } from '@/lib/bank-account-companion'
+import { buildUnlinkedCashAssets } from '@/lib/unlinked-cash-assets'
 import { upsertSingleBalanceSnapshot } from '@/lib/balance-snapshot'
 import { DGA_LENING_DREMPEL } from '@/lib/box2-data'
 import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
@@ -126,6 +127,9 @@ type PerspectiveAsset = Asset & {
   _myShareFraction?: number
   _aggregated?: boolean
   _aggregatedCount?: number
+  /** Synthetische cash-bezitting voor een ongekoppelde bankrekening
+   *  (linked_asset_id IS NULL) — zie lib/unlinked-cash-assets.ts. */
+  _syntheticCash?: boolean
 }
 
 const SOLO_ASSETS_CONTEXT: AssetsPerspectiveContext = {
@@ -303,10 +307,13 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
         mySharePct: perspectiveData.context.mySharePct,
       })
 
-      const loadedAssets = [...perspectiveData.assets].sort(
+      const sortedLoaded = [...perspectiveData.assets].sort(
         (a, b) => (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0),
       ) as unknown as PerspectiveAsset[]
-      setAssets(loadedAssets)
+      // Basis-set (zonder ongekoppelde cash) — wordt hieronder aangevuld zodra
+      // de gebruiker + bankrekeningen geladen zijn. Onvoorwaardelijk zodat de
+      // lijst ook bij een ontbrekende sessie (edge case) rendert.
+      setAssets(sortedLoaded)
 
       // Load linked mortgages + daily expenses for freedom-time + bank account links
       const { data: { user } } = await supabase.auth.getUser()
@@ -315,7 +322,7 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
         const now = new Date()
         const { start: monthStart, end: monthEnd } = localMonthBounds(now)
 
-        const [mortgageResult, txResult, bankLinksResult, profileBaResult] = await Promise.all([
+        const [mortgageResult, txResult, bankLinksResult, unlinkedBankResult, profileBaResult] = await Promise.all([
           supabase
             .from('debts')
             .select('id, name, current_balance, linked_asset_id')
@@ -332,6 +339,13 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
             .select('id, linked_asset_id, balance')
             .not('linked_asset_id', 'is', null)
             .eq('is_active', true),
+          // Ongekoppelde bankrekeningen als synthetische cash-bezittingen —
+          // zelfde bron/telling als de server-loader (assets-data-loader.ts).
+          supabase
+            .from('bank_accounts')
+            .select('id, name, balance')
+            .is('linked_asset_id', null)
+            .eq('is_active', true),
           supabase
             .from('profiles')
             .select('budgeting_active, housing_strategy_config')
@@ -339,6 +353,15 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
         ])
 
         if (signal?.aborted) return // Discard stale results after parallel queries
+
+        // Voeg de eigen ongekoppelde bankrekeningen toe als cash-bezit (alleen
+        // in eigen-inclusieve perspectieven; in 'partner'-view horen ze er niet
+        // bij). Zonder dit valt het bezittingen-totaal na een client-reload
+        // (perspectiefwissel) terug op de onvolledige assets-only som.
+        const unlinkedCashAssets = (perspective === 'partner'
+          ? []
+          : buildUnlinkedCashAssets(unlinkedBankResult.data ?? [])) as unknown as PerspectiveAsset[]
+        setAssets([...sortedLoaded, ...unlinkedCashAssets])
 
         if (mortgageResult.data) setMortgages(mortgageResult.data as Mortgage[])
         setBudgetingActive(profileBaResult.data?.budgeting_active !== false)
@@ -569,9 +592,12 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
   // Zelfde data als de categorie-pagina laadt zodat `<VermogenAssetCard>`
   // op deze overview identiek rendert als op `/core/assets/[type]`.
   useEffect(() => {
-    // Aggregaatrijen (privacy='totalen') hebben geen echt entity-ID — sla ze
-    // over voor sparkline-/connection-fetches.
-    const ids = activeAssets.filter((a) => a._aggregated !== true).map((a) => a.id)
+    // Aggregaatrijen (privacy='totalen') en synthetische cash-rijen (ongekoppelde
+    // bankrekeningen) hebben geen echt asset-entity-ID — sla ze over voor
+    // sparkline-/connection-fetches (anders 404 op een niet-bestaande asset).
+    const ids = activeAssets
+      .filter((a) => a._aggregated !== true && a._syntheticCash !== true)
+      .map((a) => a.id)
     if (ids.length === 0) {
       setAssetSparklines({})
       setConnectionsByAssetId({})
@@ -878,7 +904,7 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
                     return (
                       <div key={type} className="flex items-center gap-2">
                         <span
-                          className="inline-block h-3 w-3 rounded-sm"
+                          className="inline-block h-3 w-3 "
                           style={{ backgroundColor: ASSET_TYPE_COLORS[type] }}
                         />
                         <span className="flex-1 text-xs text-[var(--ink-2)]">{ASSET_TYPE_LABELS[type]}</span>
@@ -901,7 +927,7 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
                       key={y}
                       onClick={(e) => { e.stopPropagation(); setProjectionYears(y) }}
                       data-testid={`projection-year-${y}`}
-                      className={`rounded-md px-2 py-1 text-xs font-medium ${
+                      className={`px-2 py-1 text-xs font-medium ${
                         projectionYears === y
                           ? 'bg-kern-100 text-kern-700'
                           : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
@@ -1517,7 +1543,7 @@ export function AssetDetailModal({
                         <span className="font-mono tabular-nums text-sm font-medium text-[var(--ink)]">{fc(d.current_balance)}</span>
                         <button
                           onClick={() => unlinkDebt(d.id)}
-                          className="rounded p-0.5 text-[var(--ink-4)] hover:text-negative hover:bg-negative/10 transition-colors"
+                          className="p-0.5 text-[var(--ink-4)] hover:text-negative hover:bg-negative/10 transition-colors"
                           title="Ontkoppel"
                         >
                           <X className="h-3 w-3" />
@@ -2428,12 +2454,12 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
                       <div className="flex items-center gap-1.5">
                         <span className="text-xs font-medium text-[var(--ink)] truncate">{h.name}</span>
                         {h.ticker && (
-                          <span className="shrink-0 rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-mono text-[var(--ink-3)]">
+                          <span className="shrink-0 bg-zinc-100 px-1.5 py-0.5 text-[10px] font-mono text-[var(--ink-3)]">
                             {h.ticker}
                           </span>
                         )}
                         {h.isin && !h.ticker && (
-                          <span className="shrink-0 rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-mono text-[var(--ink-3)]">
+                          <span className="shrink-0 bg-zinc-100 px-1.5 py-0.5 text-[10px] font-mono text-[var(--ink-3)]">
                             {h.isin}
                           </span>
                         )}
@@ -2460,7 +2486,7 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
                       <div className="flex gap-0.5">
                         <button
                           onClick={(e) => { e.stopPropagation(); openEditForm(h) }}
-                          className="rounded p-1 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]"
+                          className="p-1 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]"
                           title="Bewerken"
                           data-testid={`edit-holding-${h.id}`}
                         >
@@ -2469,7 +2495,7 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
                         {deleteConfirm === h.id ? (
                           <button
                             onClick={(e) => { e.stopPropagation(); handleDelete(h.id) }}
-                            className="rounded p-1 text-negative hover:bg-negative/10"
+                            className="p-1 text-negative hover:bg-negative/10"
                             disabled={deleting === h.id}
                             data-testid={`confirm-delete-holding-${h.id}`}
                           >
@@ -2482,7 +2508,7 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
                         ) : (
                           <button
                             onClick={(e) => { e.stopPropagation(); setDeleteConfirm(h.id) }}
-                            className="rounded p-1 text-[var(--ink-3)] hover:bg-negative/10 hover:text-negative"
+                            className="p-1 text-[var(--ink-3)] hover:bg-negative/10 hover:text-negative"
                             title="Verwijderen"
                             data-testid={`delete-holding-${h.id}`}
                           >
@@ -2529,7 +2555,7 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
                 </h4>
                 <button
                   onClick={() => { setShowForm(false); setEditHolding(null); resetForm() }}
-                  className="rounded p-0.5 text-[var(--ink-3)] hover:text-[var(--ink-2)]"
+                  className="p-0.5 text-[var(--ink-3)] hover:text-[var(--ink-2)]"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -2543,7 +2569,7 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
                     value={formName}
                     onChange={(e) => setFormName(e.target.value)}
                     placeholder="bijv. Vanguard FTSE All-World"
-                    className="mt-0.5 w-full rounded border border-[var(--border-ed)] px-2 py-1.5 text-xs text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:border-kern-400 focus:outline-none focus:ring-1 focus:ring-kern-400"
+                    className="mt-0.5 w-full border border-[var(--border-ed)] px-2 py-1.5 text-xs text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:border-kern-400 focus:outline-none focus:ring-1 focus:ring-kern-400"
                     data-testid="holding-name-input"
                     autoFocus
                   />
@@ -2555,7 +2581,7 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
                     value={formTicker}
                     onChange={(e) => setFormTicker(e.target.value.toUpperCase())}
                     placeholder="bijv. VWRL"
-                    className="mt-0.5 w-full rounded border border-[var(--border-ed)] px-2 py-1.5 text-xs text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:border-kern-400 focus:outline-none focus:ring-1 focus:ring-kern-400"
+                    className="mt-0.5 w-full border border-[var(--border-ed)] px-2 py-1.5 text-xs text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:border-kern-400 focus:outline-none focus:ring-1 focus:ring-kern-400"
                     data-testid="holding-ticker-input"
                   />
                 </div>
@@ -2566,7 +2592,7 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
                     value={formIsin}
                     onChange={(e) => setFormIsin(e.target.value.toUpperCase())}
                     placeholder="bijv. IE00B3RBWM25"
-                    className="mt-0.5 w-full rounded border border-[var(--border-ed)] px-2 py-1.5 text-xs text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:border-kern-400 focus:outline-none focus:ring-1 focus:ring-kern-400"
+                    className="mt-0.5 w-full border border-[var(--border-ed)] px-2 py-1.5 text-xs text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:border-kern-400 focus:outline-none focus:ring-1 focus:ring-kern-400"
                     data-testid="holding-isin-input"
                   />
                 </div>
@@ -2579,7 +2605,7 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
                     placeholder="bijv. 50"
                     step="any"
                     min="0"
-                    className="mt-0.5 w-full rounded border border-[var(--border-ed)] px-2 py-1.5 text-xs text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:border-kern-400 focus:outline-none focus:ring-1 focus:ring-kern-400"
+                    className="mt-0.5 w-full border border-[var(--border-ed)] px-2 py-1.5 text-xs text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:border-kern-400 focus:outline-none focus:ring-1 focus:ring-kern-400"
                     data-testid="holding-units-input"
                   />
                 </div>
@@ -2592,7 +2618,7 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
                     placeholder="bijv. 80.00"
                     step="0.01"
                     min="0"
-                    className="mt-0.5 w-full rounded border border-[var(--border-ed)] px-2 py-1.5 text-xs text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:border-kern-400 focus:outline-none focus:ring-1 focus:ring-kern-400"
+                    className="mt-0.5 w-full border border-[var(--border-ed)] px-2 py-1.5 text-xs text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:border-kern-400 focus:outline-none focus:ring-1 focus:ring-kern-400"
                     data-testid="holding-avg-price-input"
                   />
                 </div>
@@ -2603,7 +2629,7 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
                       type="date"
                       value={formPurchaseDate}
                       onChange={(e) => setFormPurchaseDate(e.target.value)}
-                      className="mt-0.5 w-full rounded border border-[var(--border-ed)] px-2 py-1.5 text-xs text-[var(--ink)] focus:border-kern-400 focus:outline-none focus:ring-1 focus:ring-kern-400"
+                      className="mt-0.5 w-full border border-[var(--border-ed)] px-2 py-1.5 text-xs text-[var(--ink)] focus:border-kern-400 focus:outline-none focus:ring-1 focus:ring-kern-400"
                       data-testid="holding-purchase-date-input"
                     />
                   </div>
@@ -2620,14 +2646,14 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
               <div className="flex justify-end gap-2 pt-1">
                 <button
                   onClick={() => { setShowForm(false); setEditHolding(null); resetForm() }}
-                  className="rounded px-3 py-1 text-xs text-[var(--ink-3)] hover:bg-zinc-100"
+                  className="px-3 py-1 text-xs text-[var(--ink-3)] hover:bg-zinc-100"
                 >
                   Annuleren
                 </button>
                 <button
                   onClick={handleSave}
                   disabled={saving || !formName.trim()}
-                  className="inline-flex items-center gap-1 rounded bg-kern-600 px-3 py-1 text-xs font-medium text-white hover:bg-kern-700 disabled:opacity-50"
+                  className="inline-flex items-center gap-1 bg-kern-600 px-3 py-1 text-xs font-medium text-white hover:bg-kern-700 disabled:opacity-50"
                   data-testid="holding-save-btn"
                 >
                   {saving && <Loader2 className="h-3 w-3 animate-spin" />}
@@ -3493,7 +3519,7 @@ export function AssetForm({
                     setShowBudgetConfirm(false)
                     setHasBudgetTracking(e.target.checked)
                   }}
-                  className="mt-0.5 rounded border-[var(--border-md)]"
+                  className="mt-0.5 border-[var(--border-md)]"
                 />
                 <div>
                   <span className="text-sm font-medium text-[var(--ink)]">Budgetten & transacties</span>
@@ -3551,7 +3577,7 @@ export function AssetForm({
                   onChange={(e) => {
                     setHasHoldingsTracking(e.target.checked)
                   }}
-                  className="mt-0.5 rounded border-[var(--border-md)]"
+                  className="mt-0.5 border-[var(--border-md)]"
                 />
                 <div>
                   <span className="text-sm font-medium text-[var(--ink)]">Holdings bijhouden</span>
@@ -3609,7 +3635,7 @@ export function AssetForm({
                 type="checkbox"
                 checked={hasWoonbalansTracking}
                 onChange={(e) => setHasWoonbalansTracking(e.target.checked)}
-                className="mt-0.5 rounded border-[var(--border-md)]"
+                className="mt-0.5 border-[var(--border-md)]"
               />
               <div>
                 <span className="text-sm font-medium text-[var(--ink)]">Hypotheekplanner</span>
@@ -3627,7 +3653,7 @@ export function AssetForm({
                 type="checkbox"
                 checked={hasRentalTracking}
                 onChange={(e) => setHasRentalTracking(e.target.checked)}
-                className="mt-0.5 rounded border-[var(--border-md)]"
+                className="mt-0.5 border-[var(--border-md)]"
               />
               <div>
                 <span className="text-sm font-medium text-[var(--ink)]">Verhuurrendement</span>
@@ -3675,7 +3701,7 @@ export function AssetForm({
                       type="checkbox"
                       checked={isLiquid}
                       onChange={(e) => setIsLiquid(e.target.checked)}
-                      className="rounded border-[var(--border-md)]"
+                      className="border-[var(--border-md)]"
                     />
                     Direct opneembaar
                   </label>
@@ -3697,7 +3723,7 @@ export function AssetForm({
                       type="checkbox"
                       checked={taxBenefit}
                       onChange={(e) => setTaxBenefit(e.target.checked)}
-                      className="rounded border-[var(--border-md)]"
+                      className="border-[var(--border-md)]"
                     />
                     Fiscaal voordeel
                   </label>
@@ -4053,7 +4079,7 @@ export function AssetForm({
                                     e.target.checked ? [...prev, d.id] : prev.filter((id) => id !== d.id)
                                   )
                                 }
-                                className="rounded border-[var(--border-md)] accent-horizon-600"
+                                className="border-[var(--border-md)] accent-horizon-600"
                               />
                               <span className="min-w-0 truncate">{d.name}</span>
                             </label>

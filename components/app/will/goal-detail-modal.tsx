@@ -188,7 +188,7 @@ export function GoalDetailModal({
           </p>
           <button
             onClick={() => { setEditGoal(null); setShowForm(true) }}
-            className="inline-flex items-center gap-2 rounded-lg bg-wil-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-wil-700"
+            className="inline-flex items-center gap-2 bg-wil-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-wil-700"
           >
             <Plus className="h-4 w-4" />
             Nieuw doel
@@ -198,7 +198,7 @@ export function GoalDetailModal({
         {/* Filter tabs */}
         {hasSharedGoals && !loading && goals.length > 0 && (
           <div className="border-b border-[var(--border-ed)] px-5 py-2">
-            <div className="flex gap-1 rounded-lg bg-[var(--subtle)] p-1">
+            <div className="flex gap-1 bg-[var(--subtle)] p-1">
               {([
                 { key: 'all' as const, label: 'Alle' },
                 { key: 'personal' as const, label: 'Persoonlijk' },
@@ -207,7 +207,7 @@ export function GoalDetailModal({
                 <button
                   key={key}
                   onClick={() => setGoalFilter(key)}
-                  className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                  className={`flex-1 px-3 py-1.5 text-xs font-medium transition-colors ${
                     goalFilter === key
                       ? 'bg-[var(--paper)] text-[var(--ink)] shadow-sm'
                       : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
@@ -470,7 +470,7 @@ function GoalCard({
         </button>
 
         {/* Icon */}
-        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${colors.bgLight}`}>
+        <div className={`flex h-10 w-10 shrink-0 items-center justify-center ${colors.bgLight}`}>
           <BudgetIcon name={goal.icon} className={`h-5 w-5 ${colors.text}`} />
         </div>
 
@@ -535,7 +535,7 @@ function GoalCard({
 
           {/* Per-partner contribution breakdown for shared goals */}
           {goal.ownership === 'shared' && householdInfo && !goal.is_completed && (
-            <div className="mt-2.5 rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)]/50 p-3">
+            <div className="mt-2.5 border border-[var(--border-ed)] bg-[var(--subtle)]/50 p-3">
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--ink-3)]">
                   Bijdrage per partner
@@ -609,13 +609,13 @@ function GoalCard({
             <div className="flex items-center gap-1">
               <button
                 onClick={onDelete}
-                className="rounded bg-red-600 px-2 py-1 text-[10px] font-medium text-white hover:bg-red-700"
+                className="bg-red-600 px-2 py-1 text-[10px] font-medium text-white hover:bg-red-700"
               >
                 Verwijder
               </button>
               <button
                 onClick={onCancelDelete}
-                className="rounded px-2 py-1 text-[10px] font-medium text-[var(--ink-3)] hover:bg-zinc-100"
+                className="px-2 py-1 text-[10px] font-medium text-[var(--ink-3)] hover:bg-zinc-100"
               >
                 Annuleer
               </button>
@@ -623,7 +623,7 @@ function GoalCard({
           ) : (
             <button
               onClick={onDelete}
-              className="rounded p-1.5 text-[var(--ink-4)] hover:bg-red-50 hover:text-red-500"
+              className="p-1.5 text-[var(--ink-4)] hover:bg-red-50 hover:text-red-500"
             >
               <Trash2 className="h-3.5 w-3.5" />
             </button>
@@ -683,7 +683,7 @@ function GoalCard({
                   placeholder={meta.unit === 'EUR' || meta.unit === 'EUR/mnd' ? 'Bedrag' : 'Waarde'}
                   value={contribAmount}
                   onChange={(e) => setContribAmount(e.target.value)}
-                  className="w-28 rounded-lg border border-[var(--border-ed)] px-2 py-1.5 text-xs text-[var(--ink)] outline-none focus:border-wil-500"
+                  className="w-28 border border-[var(--border-ed)] px-2 py-1.5 text-xs text-[var(--ink)] outline-none focus:border-wil-500"
                   min="0"
                   step="0.01"
                 />
@@ -692,12 +692,12 @@ function GoalCard({
                   placeholder="Notitie (optioneel)"
                   value={contribNotes}
                   onChange={(e) => setContribNotes(e.target.value)}
-                  className="flex-1 rounded-lg border border-[var(--border-ed)] px-2 py-1.5 text-xs text-[var(--ink)] outline-none focus:border-wil-500"
+                  className="flex-1 border border-[var(--border-ed)] px-2 py-1.5 text-xs text-[var(--ink)] outline-none focus:border-wil-500"
                 />
                 <button
                   onClick={addContribution}
                   disabled={saving || !contribAmount}
-                  className="rounded-lg bg-wil-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-wil-700 disabled:opacity-50"
+                  className="bg-wil-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-wil-700 disabled:opacity-50"
                 >
                   {saving ? '...' : '+'}
                 </button>
@@ -706,7 +706,7 @@ function GoalCard({
               {contributions.length > 0 && (
                 <div className="max-h-24 space-y-1 overflow-y-auto">
                   {contributions.map((c) => (
-                    <div key={c.id} className="flex items-center justify-between rounded px-1 py-0.5 text-[10px] hover:bg-[var(--subtle)]">
+                    <div key={c.id} className="flex items-center justify-between px-1 py-0.5 text-[10px] hover:bg-[var(--subtle)]">
                       <span className="text-[var(--ink-3)]">
                         {new Date(c.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
                         {c.notes && <span className="ml-1 text-[var(--ink-3)]">· {c.notes}</span>}

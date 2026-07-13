@@ -184,7 +184,7 @@ export default function ProfielPage() {
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               placeholder="Je naam"
-              className="w-full rounded-lg border border-[var(--border-md)] bg-[var(--subtle)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+              className="w-full border border-[var(--border-md)] bg-[var(--subtle)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
             />
           </div>
 
@@ -199,7 +199,7 @@ export default function ProfielPage() {
               value={marketplaceDisplayName}
               onChange={(e) => setMarketplaceDisplayName(e.target.value)}
               placeholder="Anoniem"
-              className="w-full rounded-lg border border-[var(--border-md)] bg-[var(--subtle)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+              className="w-full border border-[var(--border-md)] bg-[var(--subtle)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
             />
             <p className="mt-1 text-[11px] text-[var(--ink-3)]">
               Wordt getoond bij door jou gedeelde rekenhulpen. Leeg = &quot;Anoniem&quot;.
@@ -215,7 +215,7 @@ export default function ProfielPage() {
               type="date"
               value={dateOfBirth}
               onChange={(e) => setDateOfBirth(e.target.value)}
-              className="w-full rounded-lg border border-[var(--border-md)] bg-[var(--subtle)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+              className="w-full border border-[var(--border-md)] bg-[var(--subtle)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
             />
           </div>
 
@@ -229,7 +229,7 @@ export default function ProfielPage() {
               value={country}
               onChange={(e) => setCountry(e.target.value)}
               placeholder="NL"
-              className="w-full rounded-lg border border-[var(--border-md)] bg-[var(--subtle)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+              className="w-full border border-[var(--border-md)] bg-[var(--subtle)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
             />
           </div>
 
@@ -242,7 +242,7 @@ export default function ProfielPage() {
                 <button
                   key={type}
                   onClick={() => setHouseholdType(type)}
-                  className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                  className={`flex-1 border px-3 py-2 text-sm font-medium transition-colors ${
                     householdType === type
                       ? 'border-zinc-900 bg-zinc-900 text-white'
                       : 'border-[var(--border-md)] bg-[var(--subtle)] text-[var(--ink-2)] hover:border-zinc-400'
@@ -288,7 +288,7 @@ export default function ProfielPage() {
                 setNumberOfChildren(n)
                 if (n < childrenAges.length) setChildrenAges(childrenAges.slice(0, n))
               }}
-              className="w-full rounded-lg border border-[var(--border-md)] bg-[var(--subtle)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+              className="w-full border border-[var(--border-md)] bg-[var(--subtle)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
             />
           </div>
 
@@ -321,7 +321,7 @@ export default function ProfielPage() {
                   value={childAgeInput}
                   onChange={(e) => setChildAgeInput(e.target.value)}
                   placeholder="Leeftijd"
-                  className="w-24 rounded-lg border border-[var(--border-md)] bg-[var(--subtle)] px-3 py-1.5 text-sm text-[var(--ink)] outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+                  className="w-24 border border-[var(--border-md)] bg-[var(--subtle)] px-3 py-1.5 text-sm text-[var(--ink)] outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && childAgeInput) {
                       e.preventDefault()
@@ -337,7 +337,7 @@ export default function ProfielPage() {
                       setChildAgeInput('')
                     }
                   }}
-                  className="rounded-lg border border-[var(--border-md)] px-3 py-1.5 text-sm text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+                  className="border border-[var(--border-md)] px-3 py-1.5 text-sm text-[var(--ink-2)] hover:bg-[var(--subtle)]"
                 >
                   Toevoegen
                 </button>
@@ -353,7 +353,7 @@ export default function ProfielPage() {
               id="housingType"
               value={housingType ?? ''}
               onChange={(e) => setHousingType(e.target.value || null)}
-              className="w-full rounded-lg border border-[var(--border-md)] bg-[var(--subtle)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+              className="w-full border border-[var(--border-md)] bg-[var(--subtle)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
             >
               <option value="">Selecteer...</option>
               <option value="huur_sociaal">Huur (sociaal)</option>
@@ -370,7 +370,7 @@ export default function ProfielPage() {
               id="energyLabel"
               value={energyLabel ?? ''}
               onChange={(e) => setEnergyLabel(e.target.value || null)}
-              className="w-full rounded-lg border border-[var(--border-md)] bg-[var(--subtle)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+              className="w-full border border-[var(--border-md)] bg-[var(--subtle)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
             >
               <option value="">Selecteer...</option>
               {['A++', 'A+', 'A', 'B', 'C', 'D', 'E', 'F', 'G'].map(label => (
@@ -389,7 +389,7 @@ export default function ProfielPage() {
                 <button
                   key={String(opt.value)}
                   onClick={() => setHasCar(opt.value)}
-                  className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                  className={`flex-1 border px-3 py-2 text-sm font-medium transition-colors ${
                     hasCar === opt.value
                       ? 'border-zinc-900 bg-zinc-900 text-white'
                       : 'border-[var(--border-md)] bg-[var(--subtle)] text-[var(--ink-2)] hover:border-zinc-400'
@@ -416,7 +416,7 @@ export default function ProfielPage() {
                 value={netMonthlyIncome}
                 onChange={(e) => setNetMonthlyIncome(e.target.value)}
                 placeholder="0"
-                className="w-full rounded-lg border border-[var(--border-md)] bg-[var(--subtle)] py-2 pr-3 pl-7 text-sm text-[var(--ink)] outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+                className="w-full border border-[var(--border-md)] bg-[var(--subtle)] py-2 pr-3 pl-7 text-sm text-[var(--ink)] outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
               />
             </div>
             <p className="mt-1 text-[10px] text-[var(--ink-3)]">

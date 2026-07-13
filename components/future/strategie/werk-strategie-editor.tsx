@@ -237,7 +237,7 @@ export function WerkStrategieEditor({
     >
       <div className="space-y-6">
         {currentAge == null && (
-          <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <div className="border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
             Geen geboortedatum bekend — we rekenen vanaf leeftijd {effectiveAge}. Vul je
             geboortedatum in bij Profiel voor een nauwkeurige inkomenslijn.
           </div>
@@ -280,7 +280,7 @@ export function WerkStrategieEditor({
               checked={groeiStop}
               disabled={readOnly}
               onChange={(e) => setGroeiStop(e.target.checked)}
-              className="h-4 w-4 rounded border-[var(--border-md)]"
+              className="h-4 w-4 border-[var(--border-md)]"
             />
             Groei stopt op een bepaalde leeftijd
           </label>
@@ -322,7 +322,7 @@ export function WerkStrategieEditor({
           {faseStappen.map((f, i) => (
             <div
               key={i}
-              className="flex flex-wrap items-end gap-3 rounded-xl border border-[var(--border-ed)] p-3"
+              className="flex flex-wrap items-end gap-3 border border-[var(--border-ed)] p-3"
             >
               <LabeledNumber
                 label="Vanaf leeftijd"
@@ -345,7 +345,7 @@ export function WerkStrategieEditor({
                       type="button"
                       disabled={readOnly}
                       onClick={() => updateFase(i, { pct: p.pct })}
-                      className={`rounded-lg border-2 px-2.5 py-1.5 text-xs transition-all ${
+                      className={`border-2 px-2.5 py-1.5 text-xs transition-all ${
                         f.pct === p.pct
                           ? 'border-[var(--ink)] text-[var(--ink)]'
                           : 'border-[var(--border-ed)] text-[var(--ink-3)] hover:border-[var(--border-md)]'
@@ -372,7 +372,7 @@ export function WerkStrategieEditor({
             <button
               type="button"
               onClick={addFase}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-dashed border-[var(--border-md)] px-3 py-2 text-sm font-semibold text-[var(--ink-2)] transition-colors hover:border-[var(--ink-3)] hover:bg-[var(--subtle)]"
+              className="inline-flex items-center gap-1.5 border border-dashed border-[var(--border-md)] px-3 py-2 text-sm font-semibold text-[var(--ink-2)] transition-colors hover:border-[var(--ink-3)] hover:bg-[var(--subtle)]"
             >
               <Plus className="h-4 w-4" aria-hidden /> Deeltijd-stap toevoegen
             </button>
@@ -392,7 +392,7 @@ export function WerkStrategieEditor({
           {sprongen.map((s, i) => (
             <div
               key={i}
-              className="flex flex-wrap items-end gap-3 rounded-xl border border-[var(--border-ed)] p-3"
+              className="flex flex-wrap items-end gap-3 border border-[var(--border-ed)] p-3"
             >
               <LabeledNumber
                 label="Op leeftijd"
@@ -430,7 +430,7 @@ export function WerkStrategieEditor({
             <button
               type="button"
               onClick={addSprong}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-dashed border-[var(--border-md)] px-3 py-2 text-sm font-semibold text-[var(--ink-2)] transition-colors hover:border-[var(--ink-3)] hover:bg-[var(--subtle)]"
+              className="inline-flex items-center gap-1.5 border border-dashed border-[var(--border-md)] px-3 py-2 text-sm font-semibold text-[var(--ink-2)] transition-colors hover:border-[var(--ink-3)] hover:bg-[var(--subtle)]"
             >
               <Plus className="h-4 w-4" aria-hidden /> Sprong toevoegen
             </button>
@@ -438,7 +438,7 @@ export function WerkStrategieEditor({
         </div>
 
         {/* Live readout: inkomenslijn + vrijheidsleeftijd */}
-        <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--subtle)] p-4">
+        <div className="border border-[var(--border-ed)] bg-[var(--subtle)] p-4">
           <div className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)]">
             Jouw inkomenslijn (reëel, netto/mnd)
           </div>
