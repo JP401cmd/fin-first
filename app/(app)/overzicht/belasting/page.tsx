@@ -1,4 +1,6 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
+import { Sparkles, ArrowRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { loadHorizonData } from '@/lib/horizon-data-loader'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
@@ -6,7 +8,7 @@ import {
   BelastingBoxCards,
   type BelastingBoxCard,
 } from '@/components/overview/belasting-box-cards'
-import { computeJaarruimte, box1JaarruimteStatus } from '@/lib/jaarruimte'
+import { computeJaarruimte, box1JaarruimteStatus, jaarruimteBesparing } from '@/lib/jaarruimte'
 import { dailyExpenseRate } from '@/lib/format'
 import { hasBox2Relevance } from '@/lib/box2-relevance'
 import { computeBox3TaxableInput, box3TaxStatus } from '@/lib/box3-taxable-input'
@@ -16,7 +18,7 @@ import { PAGE_INFO } from '@/lib/page-info-content'
 import { getServerPerspective } from '@/lib/household/server-perspective'
 import { loadPerspectiveBox3 } from '@/lib/household-tax'
 import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
-import { computeBox1Tax } from '@/lib/box1-tax'
+import { computeBox1Tax, deriveMarginaalTarief } from '@/lib/box1-tax'
 import { buildTaxOverview } from '@/lib/tax-overview'
 import { getTaxDeadlines } from '@/lib/tax-calendar'
 import { HubTotaleDruk } from '@/components/overview/belasting/hub-totale-druk'
@@ -133,7 +135,7 @@ export default async function OverzichtBelastingPage() {
   // netto-maandinkomen / (1 − marginaal); we hergebruiken die grossYearly voor de
   // KPI-heffing (computeBox1Tax) zodat er geen tweede afleiding ontstaat.
   const netMonthly = horizonData.effectiveInput?.monthlyIncome ?? 0
-  const marg = horizonData.fireParams?.marginaalTarief ?? 0.3697
+  const marg = horizonData.fireParams?.marginaalTarief ?? deriveMarginaalTarief()
   const { status: box1Status, grossYearly } = box1JaarruimteStatus({
     netMonthly,
     marginaalTarief: marg,
@@ -148,8 +150,13 @@ export default async function OverzichtBelastingPage() {
   // (werkgeverspensioen-aangroei) wordt afgetrokken via dezelfde canonieke bron
   // als de box1-deeppage en de aandachtspunten-tip: `horizonData.pensioenFactorA`
   // (resolvePensionFactorA → 0 bij onbekend, het echte UPO/geschatte getal bij
-  // bekend). Zo toont de hub (C4-besparing + "Benut je jaarruimte"-kans) dezelfde
-  // jaarruimte als de deeppage — één metric, één grondslag over alle oppervlakken.
+  // bekend), en de bespaar-FORMULE is de gedeelde `jaarruimteBesparing`-helper.
+  // LET OP — de bruto-GRONDSLAG divergeert bewust: de hub deelt zijn grossYearly
+  // met de sidebar-Box-1-dot (box1JaarruimteStatus: netto/(1−marg), sync, geen
+  // DB-read), terwijl de box1-deeppage en de optimizer `resolveBox1GrossIncome`
+  // gebruiken (grossFromNet-schijfinversie + handmatige override). Bekende,
+  // gedocumenteerde divergentie (lib/uat/acceptance/belast.ts, WF-BELAST-01);
+  // harmonisatie = open follow-up.
   const jaarruimte = computeJaarruimte(grossYearly, horizonData.pensioenFactorA)
   const box1StatusText = !jaarruimte.hasData
     ? 'Inkomen onbekend'
@@ -178,10 +185,11 @@ export default async function OverzichtBelastingPage() {
           : null
 
   // ── Hub-overzicht (C1/C2/C4/C7) ────────────────────────────────
-  // Jaarruimte-besparing = onbenutte ruimte × marginaal tarief (lijfrente-
-  // aftrek bespaart belasting tegen je marginale tarief).
-  const jaarruimteSavings = jaarruimte.hasData && marg > 0
-    ? Math.round(jaarruimte.jaarruimte * marg)
+  // Jaarruimte-besparing = marginaal-correct Box 1-belastingverschil van de
+  // volledige inleg (schijfovergangen + heffingskorting-afbouw), via de gedeelde
+  // `jaarruimteBesparing`-helper (ADR 0040/0041) — niet de vlakke ruimte × marginaal.
+  const jaarruimteSavings = jaarruimte.hasData
+    ? jaarruimteBesparing(grossYearly, jaarruimte.jaarruimte, 2026)
     : 0
 
   // Box 2 bewust BUITEN het totaal: we laden de echte Box 2-heffing niet op de
@@ -263,6 +271,35 @@ export default async function OverzichtBelastingPage() {
           toont geen totaal meer; "excl. Box 2" staat in de Sectie I-callout. */}
       <div className="mx-auto max-w-6xl">
         <BelastingBoxCards cards={cards} />
+      </div>
+
+      {/* Vierde hub-kaart — de fiscale optimizer. Bewust GÉÉN "Box N": een
+          doel-gedreven Compare-oppervlak bovenop de boxen. Box 3-teal tegel om
+          de MVP-as te duiden. */}
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 pt-3">
+        <Link
+          href="/overzicht/belasting/optimizer"
+          className="group flex items-center gap-4 rounded-2xl border border-[var(--ink)] bg-[var(--paper)] p-4 sm:p-5 transition-colors hover:bg-[var(--subtle)]"
+        >
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--color-box3-50)]">
+            <Sparkles className="h-5 w-5 text-[var(--color-box3-700)]" aria-hidden="true" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="flex items-center gap-2">
+              <span className="text-base font-semibold text-[var(--ink)]">Fiscale optimizer</span>
+              <span className="rounded-full border border-[var(--rule-soft)] px-1.5 py-0.5 text-[9px] uppercase tracking-[0.1em] font-mono text-[var(--ink-3)]">
+                nieuw
+              </span>
+            </span>
+            <span className="mt-0.5 block text-sm leading-snug text-[var(--ink-2)]">
+              Kies een fiscaal doel en vergelijk doorgerekende Box 3-scenario’s — in euro’s en vrijheidsdagen.
+            </span>
+          </span>
+          <ArrowRight
+            className="h-5 w-5 shrink-0 text-[var(--ink-3)] transition-transform group-hover:translate-x-0.5"
+            aria-hidden="true"
+          />
+        </Link>
       </div>
 
       {/* Hub-secties onder de box-kaarten: druk (C1) → verdeling (C2) →

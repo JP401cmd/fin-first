@@ -67,6 +67,11 @@ export const PAGE_INFO: Record<string, string> = {
     'Box 3 belast je vermogen — sparen en beleggen — via een forfaitair (fictief) rendement boven je heffingsvrije vermogen. ' +
     'Vrijstelling, partner-verdeling en de mix spaargeld/beleggingen bepalen je jaarlijkse heffing.',
 
+  '/overzicht/belasting/optimizer':
+    'Al je fiscale doelen onder elkaar, doorgerekend op je eigen gegevens: Box 3-scenario’s (de mix sparen/beleggen en — met een fiscaal partner — de optimale verdeling) en je Box 1-jaarruimte. ' +
+    'Je ziet de impact naast elkaar in euro’s en vrijheidsdagen. ' +
+    'Een indicatie, geen advies.',
+
   '/overzicht/tips':
     'Toptips bovenaan, open acties eronder. ' +
     'Tips komen van Will (chat of analyse); beslis hier per tip met Doe nu, Later of Negeren. ' +
@@ -231,6 +236,11 @@ export const PAGE_INFO: Record<string, string> = {
     'Je financiële plan op één plek: waar je nu staat, waar je heen wilt en de stappen ertussen. ' +
     'Een leesbaar document dat je doelen, projectie en keuzes samenvat. ' +
     'Druk het af of houd het bij de hand.',
+
+  '/rapportages/totaalplan':
+    'Je volledige plan als één deelbaar document: de aannames waarmee gerekend wordt, je vermogensprojectie naar volledige vrijheid, de slagingskans onder marktschommelingen en concrete inzichten. ' +
+    'Alle cijfers komen single-source uit dezelfde rekenmotor als Toekomst en Overzicht — niets wordt hier apart berekend. ' +
+    'Druk af als PDF voor je partner of adviseur.',
 
   '/toekomst/doelen':
     'Je financiële doelen en hun voortgang: hoeveel je al hebt, hoeveel nog te gaan en wanneer je er bent. ' +

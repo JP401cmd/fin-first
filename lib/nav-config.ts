@@ -90,6 +90,7 @@ export const navGroups: NavGroup[] = [
           { label: 'Box 1 · Werk + woning', href: '/overzicht/belasting/box1' },
           { label: 'Box 2 · Aanmerkelijk belang', href: '/overzicht/belasting/box2' },
           { label: 'Box 3 · Sparen + beleggen', href: '/overzicht/belasting/box3' },
+          { label: 'Fiscale optimizer', href: '/overzicht/belasting/optimizer' },
         ],
       },
     ],
@@ -198,6 +199,7 @@ export const EXTRA_ROUTE_TITLES: Record<string, string> = {
   '/rapportages/budget': 'Budget-rapportage',
   '/rapportages/benchmark': 'Benchmark',
   '/rapportages/persoonlijk-plan': 'Persoonlijk plan',
+  '/rapportages/totaalplan': 'Totaalplan',
   // Cashflow-verdiepingen onder /overzicht/cashflow. /overzicht/cashflow zelf
   // en .../budget zitten al in de nav (navGroups resp. OVERVIEW_APP_SUBROUTES);
   // deze drie + /overzicht/tips niet. Titels = de `<NavStackMeta title>` per pagina.
