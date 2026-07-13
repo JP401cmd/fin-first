@@ -29,6 +29,7 @@ import {
   computeRenteAflossingsSplit,
 } from '@/lib/debt-data'
 import type { Asset } from '@/lib/asset-data'
+import { deriveMarginaalTarief } from '@/lib/box1-tax'
 import { computeSharePct, SPLIT_MODE_LABELS, type SplitMode } from '@/lib/household-data'
 import { createClient } from '@/lib/supabase/client'
 import { usePerspective } from '@/components/app/perspective-provider'
@@ -532,7 +533,7 @@ export function DebtDetailModal({
             repaymentType={hvbRepaymentType}
             restLooptijd={proj.monthsToPayoff > 0 ? proj.monthsToPayoff : 360}
             isTaxDeductible={debt.is_tax_deductible ?? false}
-            marginaalTarief={0.3697}
+            marginaalTarief={deriveMarginaalTarief()}
             inflatie={0.02}
             hasPartner={!!partnerSplit}
           />
