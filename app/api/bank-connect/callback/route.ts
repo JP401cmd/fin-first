@@ -45,14 +45,13 @@ export async function GET(req: Request) {
     const now = new Date()
     const tokenExpiresAt = new Date(now.getTime() + tokens.expires_in * 1000)
 
-    // Dual-write: keep plaintext in old columns + encrypted in *_encrypted.
-    // PR2 (a week later) drops the plaintext columns; until then we need both
-    // so a rollback is possible without re-running OAuth for every user.
+    // Encrypted-only write (Stage A / PR2): tokens live solely in the
+    // *_encrypted columns. The plaintext access_token/refresh_token columns are
+    // no longer written and are dropped by a follow-up migration
+    // (see supabase/migrations/*_drop_plaintext_bank_tokens.sql).
     await supabase
       .from('bank_connections')
       .update({
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token ?? null,
         access_token_encrypted: encryptField(tokens.access_token),
         refresh_token_encrypted: encryptField(tokens.refresh_token ?? null),
         token_expires_at: tokenExpiresAt.toISOString(),

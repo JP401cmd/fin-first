@@ -64,30 +64,27 @@ export async function POST(req: Request) {
       }, { status: 429 })
     }
 
-    // Dual-read: prefer the encrypted column, fall back to plaintext for rows
-    // that haven't been backfilled yet. Once PR2 drops the plaintext columns
-    // the `?? connection.access_token` branches become dead code.
-    let accessToken: string = decryptField(connection.access_token_encrypted ?? null) ?? connection.access_token
-    const refreshTokenPlaintext: string | null =
-      decryptField(connection.refresh_token_encrypted ?? null) ?? connection.refresh_token ?? null
+    // Encrypted-only read: decrypt the *_encrypted columns, no plaintext
+    // fallback. Rows must be backfilled (scripts/encrypt-existing-bank-credentials.mjs)
+    // before this deploys — see runbook.
+    let accessToken: string | null = decryptField(connection.access_token_encrypted ?? null)
+    const refreshToken: string | null = decryptField(connection.refresh_token_encrypted ?? null)
     const tokenExpiresAt = connection.token_expires_at ? new Date(connection.token_expires_at) : null
 
     if (tokenExpiresAt && tokenExpiresAt.getTime() < Date.now() + 5 * 60 * 1000) {
-      if (!refreshTokenPlaintext) {
+      if (!refreshToken) {
         return NextResponse.json({ error: 'Token verlopen, verbind opnieuw' }, { status: 401 })
       }
 
       try {
-        const newTokens = await refreshAccessToken(supabase, refreshTokenPlaintext)
+        const newTokens = await refreshAccessToken(supabase, refreshToken)
         accessToken = newTokens.access_token
-        const nextRefreshToken = newTokens.refresh_token ?? refreshTokenPlaintext
+        const nextRefreshToken = newTokens.refresh_token ?? refreshToken
 
-        // Dual-write the refreshed tokens so both columns stay in sync.
+        // Encrypted-only write of the refreshed tokens.
         await supabase
           .from('bank_connections')
           .update({
-            access_token: newTokens.access_token,
-            refresh_token: nextRefreshToken,
             access_token_encrypted: encryptField(newTokens.access_token),
             refresh_token_encrypted: encryptField(nextRefreshToken),
             token_expires_at: new Date(Date.now() + newTokens.expires_in * 1000).toISOString(),
@@ -102,6 +99,11 @@ export async function POST(req: Request) {
 
         return NextResponse.json({ error: 'Token verlopen, verbind opnieuw' }, { status: 401 })
       }
+    }
+
+    if (!accessToken) {
+      // Encrypted token missing/undecryptable and not refreshable — force reconnect.
+      return NextResponse.json({ error: 'Token verlopen, verbind opnieuw' }, { status: 401 })
     }
 
     // Determine date range

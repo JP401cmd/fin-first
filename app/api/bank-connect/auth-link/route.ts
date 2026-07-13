@@ -43,9 +43,11 @@ export async function POST(req: Request) {
 
     // Create pending connection record. The actual tokens are filled in by
     // the OAuth callback (see app/api/bank-connect/callback/route.ts) which
-    // dual-writes both the plaintext and encrypted columns. We still set the
-    // plaintext access_token to '' here because the existing schema has it
-    // marked NOT NULL.
+    // writes the encrypted columns only. The pending row starts with an empty
+    // encrypted token; the plaintext access_token column is no longer written
+    // (its NOT NULL constraint is dropped by
+    // supabase/migrations/*_bank_connections_access_token_drop_notnull.sql,
+    // which MUST be applied to remote before this code deploys — see runbook).
     const { data: connection, error: dbError } = await supabase
       .from('bank_connections')
       .insert({
@@ -53,7 +55,6 @@ export async function POST(req: Request) {
         provider_id,
         provider_name: provider_name || provider_id,
         provider_logo: provider_logo || null,
-        access_token: '', // Will be filled after OAuth callback
         access_token_encrypted: encryptField(''),
         status: 'pending',
       })
