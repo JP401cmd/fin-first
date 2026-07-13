@@ -391,3 +391,15 @@
 ## 2026-07-12
 
 - **Componenten (aantal)** toegevoegd: +6
+
+## 2026-07-13
+
+- **Schermen** toegevoegd: /overzicht/belasting/optimizer
+- **Tabellen** toegevoegd: feedback
+- **Componenten (aantal)** toegevoegd: +13
+
+## 2026-07-13
+
+- **Schermen** toegevoegd: /rapportages/totaalplan
+- **API-routes** toegevoegd: /api/briefing/email/cron, /api/briefing/email/pref, /api/briefing/email/unsubscribe, /api/report/totaalplan
+- **Componenten (aantal)** toegevoegd: +4

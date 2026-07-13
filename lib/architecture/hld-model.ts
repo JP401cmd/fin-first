@@ -109,6 +109,7 @@ export function buildHldModel(): HldModel {
           { title: 'Zien hoe stevig je plan staat, op elk front', desc: 'Een radar met vijf sterktepunten — de brug tot je AOW, je pensioeninkomen, wonen, marktrisico en je eindstrategie — die meebeweegt met de stopleeftijd die jij kiest.' },
           { title: 'Kant-en-klare paden naast elkaar zien', desc: 'Vijf voorgerekende scenario\'s naast je basispad, met een seintje bij het pad dat de minste buffer overhoudt.' },
           { title: 'Mijn doorgerekende toekomst vastleggen als doel', desc: 'Sta je op een "wat als"-stand die klopt? Maak er met één klik je doelsituatie van — spaarquote, salaris, rendement en vrijheidsleeftijd worden echte doelen die meegroeien met je cijfers, terug te vinden bij je doelen.' },
+          { title: 'Je hele plan als één deelbaar document', desc: 'Het totaalplan bundelt je aannames, je vermogensprojectie naar volledige vrijheid, de slagingskans onder marktschommelingen en concrete inzichten in één rapport — deelbaar als PDF met je partner of adviseur, met alle cijfers uit dezelfde rekenmotor als Toekomst en Overzicht.' },
         ],
       },
       {
@@ -119,6 +120,7 @@ export function buildHldModel(): HldModel {
           { title: 'Begrijpen wat je betaalt', desc: 'Box 1, 2 en 3 in gewone taal, met je eigen cijfers.' },
           { title: 'Zien hoeveel je mag inleggen voor je pensioen', desc: 'Je jaarruimte, nauwkeurig berekend — inclusief je eigen UPO-factor A (werkgeverspensioen) als je dat invult.' },
           { title: 'Checken of de tegenbewijsregeling gunstiger is', desc: 'Werkelijk rendement versus het forfait in box 3.' },
+          { title: 'Je fiscale kansen doorgerekend zien', desc: 'De fiscale optimizer zet je mogelijkheden onder elkaar — de mix sparen/beleggen in box 3, de verdeling met je fiscale partner en je jaarruimte — in euro\'s én vrijheidsdagen. Een indicatie, geen advies.' },
         ],
       },
       {
@@ -127,7 +129,7 @@ export function buildHldModel(): HldModel {
         accent: 'wil',
         items: [
           { title: 'Een coach die je cijfers uitlegt', desc: 'Will vertaalt data naar wat het voor jóu betekent.' },
-          { title: 'Een korte wekelijkse update', desc: 'De briefing: wat veranderde, waar je op kunt letten.' },
+          { title: 'Een korte wekelijkse update', desc: 'De briefing: wat veranderde, waar je op kunt letten — desgewenst ook wekelijks in je mailbox (zelf aan te zetten).' },
           { title: 'Tips op het juiste moment', desc: 'Aandachtspunten die je met één tik tot actie maakt.' },
           { title: 'Je vragen beantwoorden', desc: 'Vraag Will alles over je eigen situatie.' },
         ],

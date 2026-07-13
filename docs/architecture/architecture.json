@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-12T16:21:39.040Z",
-  "generatedDate": "2026-07-12",
+  "generatedAt": "2026-07-13T21:19:07.416Z",
+  "generatedDate": "2026-07-13",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -187,13 +187,13 @@
     }
   },
   "stats": {
-    "routes": 139,
-    "routesProduction": 98,
-    "api": 244,
-    "tables": 58,
-    "migrations": 126,
+    "routes": 141,
+    "routesProduction": 100,
+    "api": 248,
+    "tables": 59,
+    "migrations": 132,
     "integrations": 25,
-    "components": 810,
+    "components": 827,
     "providers": 11,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -815,6 +815,12 @@
       "isTest": false
     },
     {
+      "url": "/overzicht/belasting/optimizer",
+      "file": "app/(app)/overzicht/belasting/optimizer/page.tsx",
+      "group": "wil",
+      "isTest": false
+    },
+    {
       "url": "/overzicht/bezittingen",
       "file": "app/(app)/overzicht/bezittingen/page.tsx",
       "group": "wil",
@@ -925,6 +931,12 @@
     {
       "url": "/rapportages/persoonlijk-plan",
       "file": "app/(app)/rapportages/persoonlijk-plan/page.tsx",
+      "group": "persoonlijk",
+      "isTest": false
+    },
+    {
+      "url": "/rapportages/totaalplan",
+      "file": "app/(app)/rapportages/totaalplan/page.tsx",
       "group": "persoonlijk",
       "isTest": false
     },
@@ -1402,6 +1414,12 @@
         "isTest": false
       },
       {
+        "url": "/rapportages/totaalplan",
+        "file": "app/(app)/rapportages/totaalplan/page.tsx",
+        "group": "persoonlijk",
+        "isTest": false
+      },
+      {
         "url": "/rapportages/vermogen",
         "file": "app/(app)/rapportages/vermogen/page.tsx",
         "group": "persoonlijk",
@@ -1824,6 +1842,12 @@
       {
         "url": "/overzicht/belasting/box3",
         "file": "app/(app)/overzicht/belasting/box3/page.tsx",
+        "group": "wil",
+        "isTest": false
+      },
+      {
+        "url": "/overzicht/belasting/optimizer",
+        "file": "app/(app)/overzicht/belasting/optimizer/page.tsx",
         "group": "wil",
         "isTest": false
       },
@@ -2453,6 +2477,32 @@
       "domain": "benchmark-comparison",
       "methods": [
         "GET"
+      ]
+    },
+    {
+      "url": "/api/briefing/email/cron",
+      "file": "app/api/briefing/email/cron/route.ts",
+      "domain": "briefing",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "url": "/api/briefing/email/pref",
+      "file": "app/api/briefing/email/pref/route.ts",
+      "domain": "briefing",
+      "methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "url": "/api/briefing/email/unsubscribe",
+      "file": "app/api/briefing/email/unsubscribe/route.ts",
+      "domain": "briefing",
+      "methods": [
+        "GET",
+        "POST"
       ]
     },
     {
@@ -3678,6 +3728,14 @@
       ]
     },
     {
+      "url": "/api/report/totaalplan",
+      "file": "app/api/report/totaalplan/route.ts",
+      "domain": "report",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
       "url": "/api/report/vermogen",
       "file": "app/api/report/vermogen/route.ts",
       "domain": "report",
@@ -4886,6 +4944,71 @@
       ]
     },
     {
+      "domain": "report",
+      "label": "Rapportages",
+      "count": 7,
+      "routes": [
+        {
+          "url": "/api/report",
+          "file": "app/api/report/route.ts",
+          "domain": "report",
+          "methods": [
+            "GET",
+            "POST",
+            "DELETE"
+          ]
+        },
+        {
+          "url": "/api/report/balans",
+          "file": "app/api/report/balans/route.ts",
+          "domain": "report",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/report/benchmark",
+          "file": "app/api/report/benchmark/route.ts",
+          "domain": "report",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/report/budget",
+          "file": "app/api/report/budget/route.ts",
+          "domain": "report",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/report/persoonlijk-plan",
+          "file": "app/api/report/persoonlijk-plan/route.ts",
+          "domain": "report",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/report/totaalplan",
+          "file": "app/api/report/totaalplan/route.ts",
+          "domain": "report",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/report/vermogen",
+          "file": "app/api/report/vermogen/route.ts",
+          "domain": "report",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "calculators",
       "label": "Calculators",
       "count": 6,
@@ -4990,63 +5113,6 @@
           "url": "/api/checkin/upcoming",
           "file": "app/api/checkin/upcoming/route.ts",
           "domain": "checkin",
-          "methods": [
-            "GET"
-          ]
-        }
-      ]
-    },
-    {
-      "domain": "report",
-      "label": "Rapportages",
-      "count": 6,
-      "routes": [
-        {
-          "url": "/api/report",
-          "file": "app/api/report/route.ts",
-          "domain": "report",
-          "methods": [
-            "GET",
-            "POST",
-            "DELETE"
-          ]
-        },
-        {
-          "url": "/api/report/balans",
-          "file": "app/api/report/balans/route.ts",
-          "domain": "report",
-          "methods": [
-            "GET"
-          ]
-        },
-        {
-          "url": "/api/report/benchmark",
-          "file": "app/api/report/benchmark/route.ts",
-          "domain": "report",
-          "methods": [
-            "GET"
-          ]
-        },
-        {
-          "url": "/api/report/budget",
-          "file": "app/api/report/budget/route.ts",
-          "domain": "report",
-          "methods": [
-            "GET"
-          ]
-        },
-        {
-          "url": "/api/report/persoonlijk-plan",
-          "file": "app/api/report/persoonlijk-plan/route.ts",
-          "domain": "report",
-          "methods": [
-            "GET"
-          ]
-        },
-        {
-          "url": "/api/report/vermogen",
-          "file": "app/api/report/vermogen/route.ts",
-          "domain": "report",
           "methods": [
             "GET"
           ]
@@ -5190,6 +5256,47 @@
           "url": "/api/subscriptions/schedule-action",
           "file": "app/api/subscriptions/schedule-action/route.ts",
           "domain": "subscriptions",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "briefing",
+      "label": "briefing",
+      "count": 4,
+      "routes": [
+        {
+          "url": "/api/briefing/email/cron",
+          "file": "app/api/briefing/email/cron/route.ts",
+          "domain": "briefing",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/briefing/email/pref",
+          "file": "app/api/briefing/email/pref/route.ts",
+          "domain": "briefing",
+          "methods": [
+            "GET",
+            "PUT"
+          ]
+        },
+        {
+          "url": "/api/briefing/email/unsubscribe",
+          "file": "app/api/briefing/email/unsubscribe/route.ts",
+          "domain": "briefing",
+          "methods": [
+            "GET",
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/briefing/refresh",
+          "file": "app/api/briefing/refresh/route.ts",
+          "domain": "briefing",
           "methods": [
             "POST"
           ]
@@ -5736,21 +5843,6 @@
           "domain": "benchmark-comparison",
           "methods": [
             "GET"
-          ]
-        }
-      ]
-    },
-    {
-      "domain": "briefing",
-      "label": "briefing",
-      "count": 1,
-      "routes": [
-        {
-          "url": "/api/briefing/refresh",
-          "file": "app/api/briefing/refresh/route.ts",
-          "domain": "briefing",
-          "methods": [
-            "POST"
           ]
         }
       ]
@@ -6763,6 +6855,10 @@
         "migration": "supabase/migrations/20260501000001_create_external_connections.sql"
       },
       {
+        "name": "feedback",
+        "migration": "supabase/migrations/20260713130000_create_feedback.sql"
+      },
+      {
         "name": "goals",
         "migration": "supabase/migrations/20260215000000_create_base_tables.sql"
       },
@@ -6907,7 +7003,7 @@
         "migration": "supabase/migrations/20260501000001_create_external_connections.sql"
       }
     ],
-    "migrationCount": 126
+    "migrationCount": 132
   },
   "tablesByDomain": [
     {
@@ -6932,6 +7028,10 @@
         {
           "name": "external_data_sources",
           "migration": "supabase/migrations/20260501000001_create_external_connections.sql"
+        },
+        {
+          "name": "feedback",
+          "migration": "supabase/migrations/20260713130000_create_feedback.sql"
         },
         {
           "name": "household_budget_model_proposals",
@@ -7245,15 +7345,16 @@
     }
   ],
   "components": {
-    "total": 810,
+    "total": 827,
     "groups": [
       {
         "group": "app",
-        "count": 345,
+        "count": 351,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
           "action-board",
+          "action-board.test",
           "action-card",
           "action-edit-modal",
           "action-form",
@@ -7311,6 +7412,7 @@
           "budgets-client.test",
           "budgetteren.config",
           "cash-account-view",
+          "cash-account-view.test",
           "cash-overview",
           "cashflow-forecast-chart",
           "category-rules-sheet",
@@ -7352,6 +7454,8 @@
           "deeltijdwerk-impact",
           "dekkingsradar",
           "dekkingsradar.test",
+          "density-toggle",
+          "density-toggle.test",
           "depth-section",
           "depth-section.test",
           "desktop-sidebar-shell",
@@ -7445,6 +7549,8 @@
           "markdown-helpers",
           "masked-amount",
           "masked-amount.test",
+          "milestone-celebration",
+          "milestone-celebration.test",
           "mobile-app-strip",
           "mobile-app-strip-state",
           "mobile-bottom-bar",
@@ -7600,7 +7706,7 @@
       },
       {
         "group": "overview",
-        "count": 126,
+        "count": 128,
         "items": [
           "aandachtspunt-actie-button",
           "atomic-cards",
@@ -7691,6 +7797,8 @@
           "nieuwe-tegenpartijen",
           "off-track-doelen-lijst",
           "off-track-doelen-lijst.test",
+          "optimizer-client",
+          "optimizer-client.test",
           "overzicht-hero",
           "periode-selector",
           "periode-trend",
@@ -7732,7 +7840,7 @@
       },
       {
         "group": "widgets",
-        "count": 66,
+        "count": 68,
         "items": [
           "abonnementen-widget",
           "acties-widget",
@@ -7754,6 +7862,7 @@
           "cash-flow-widget",
           "category-app-nav-bar",
           "doelen-widget",
+          "doelen-widget.test",
           "draggable-widget-grid",
           "draggable-widget-grid.test",
           "fee-analyzer-widget",
@@ -7779,6 +7888,7 @@
           "rebalancing-widget",
           "schulden-widget",
           "sim-vermogenspad-widget",
+          "sim-vermogenspad-widget.test",
           "spaarquote-widget",
           "spaarquote-widget.test",
           "surplus-gap-widget",
@@ -8040,6 +8150,27 @@
         ]
       },
       {
+        "group": "editorial",
+        "count": 15,
+        "items": [
+          "button",
+          "button.test",
+          "chart-tips",
+          "glossary-term",
+          "index",
+          "info-icon-tooltip",
+          "inline-info-disclosure",
+          "insight-toggle-button",
+          "insight-toggle-button.test",
+          "page-blueprints",
+          "page-info-button",
+          "page-opening",
+          "progress-milestones",
+          "subtotal-line",
+          "subtotal-line.test"
+        ]
+      },
+      {
         "group": "landing",
         "count": 13,
         "items": [
@@ -8056,24 +8187,6 @@
           "section-primitives",
           "slot-cta",
           "veiligheid"
-        ]
-      },
-      {
-        "group": "editorial",
-        "count": 12,
-        "items": [
-          "chart-tips",
-          "glossary-term",
-          "index",
-          "inline-info-disclosure",
-          "insight-toggle-button",
-          "insight-toggle-button.test",
-          "page-blueprints",
-          "page-info-button",
-          "page-opening",
-          "progress-milestones",
-          "subtotal-line",
-          "subtotal-line.test"
         ]
       },
       {
@@ -8094,7 +8207,7 @@
       },
       {
         "group": "berichten",
-        "count": 7,
+        "count": 8,
         "items": [
           "archive-edition-card",
           "archive-section",
@@ -8102,7 +8215,8 @@
           "masthead",
           "news-components",
           "newspaper-footer",
-          "nieuws-only-client"
+          "nieuws-only-client",
+          "section-heading"
         ]
       },
       {
@@ -8144,6 +8258,15 @@
           "fire-end-strategy-panel",
           "fire-retirement-expense-panel",
           "fire-savings-panel"
+        ]
+      },
+      {
+        "group": "rapportage",
+        "count": 3,
+        "items": [
+          "persoonlijk-plan-blocks",
+          "totaalplan-blocks",
+          "totaalplan-blocks.test"
         ]
       },
       {
@@ -8510,6 +8633,10 @@
           "write": false
         },
         {
+          "name": "feedback",
+          "write": true
+        },
+        {
           "name": "household_members",
           "write": false
         },
@@ -8638,6 +8765,16 @@
         {
           "name": "valuations",
           "write": false
+        }
+      ],
+      "briefing": [
+        {
+          "name": "app_settings",
+          "write": true
+        },
+        {
+          "name": "profiles",
+          "write": true
         }
       ],
       "budget-trends": [
@@ -8925,6 +9062,12 @@
       "feature-visits": [
         {
           "name": "user_feature_visits",
+          "write": true
+        }
+      ],
+      "feedback": [
+        {
+          "name": "feedback",
           "write": true
         }
       ],
@@ -9738,6 +9881,16 @@
           ]
         },
         {
+          "domain": "briefing",
+          "label": "briefing",
+          "write": true,
+          "routes": [
+            "/api/briefing/email/cron",
+            "/api/briefing/email/pref",
+            "/api/briefing/email/unsubscribe"
+          ]
+        },
+        {
           "domain": "budgeting-active",
           "label": "budgeting-active",
           "write": true,
@@ -10052,6 +10205,7 @@
             "/api/report/benchmark",
             "/api/report/budget",
             "/api/report/persoonlijk-plan",
+            "/api/report/totaalplan",
             "/api/report/vermogen"
           ]
         },
@@ -10750,6 +10904,14 @@
           ]
         },
         {
+          "domain": "briefing",
+          "label": "briefing",
+          "write": true,
+          "routes": [
+            "/api/briefing/email/cron"
+          ]
+        },
+        {
           "domain": "checkin",
           "label": "checkin",
           "write": true,
@@ -10916,7 +11078,8 @@
           "label": "Rapportages",
           "write": false,
           "routes": [
-            "/api/report/persoonlijk-plan"
+            "/api/report/persoonlijk-plan",
+            "/api/report/totaalplan"
           ]
         }
       ],
@@ -10985,6 +11148,24 @@
           "write": false,
           "routes": [
             "/api/perspective"
+          ]
+        }
+      ],
+      "feedback": [
+        {
+          "domain": "admin",
+          "label": "Beheer",
+          "write": true,
+          "routes": [
+            "/api/admin/feedback"
+          ]
+        },
+        {
+          "domain": "feedback",
+          "label": "feedback",
+          "write": true,
+          "routes": [
+            "/api/feedback"
           ]
         }
       ],
@@ -11255,6 +11436,7 @@
             "/api/report",
             "/api/report/budget",
             "/api/report/persoonlijk-plan",
+            "/api/report/totaalplan",
             "/api/report/vermogen"
           ]
         },
@@ -11793,7 +11975,8 @@
           "label": "Rapportages",
           "write": false,
           "routes": [
-            "/api/report/persoonlijk-plan"
+            "/api/report/persoonlijk-plan",
+            "/api/report/totaalplan"
           ]
         }
       ],
@@ -12071,6 +12254,7 @@
       "bank_accounts",
       "budgets",
       "debts",
+      "feedback",
       "goals",
       "investment_holdings",
       "life_events",
@@ -12609,6 +12793,11 @@
         "user": true,
         "household": false,
         "rls": true
+      },
+      "feedback": {
+        "user": false,
+        "household": false,
+        "rls": true
       }
     }
   },
@@ -13080,6 +13269,64 @@
       ],
       "summary": "`lib/horizon-kernel/bridge.ts` vertaalt de rauwe grootboek-rijen (`cf.ts`, de Excel-oracle-implementatie) naar `UnifiedProjectionRow.grossIncomeBySource` voor de app-consumers. De Excel-oracle (`CF!D`, het basissalaris-inkomen) loopt **onvoorwaardelijk door** — ook ná de FIRE-dat",
       "file": "docs/adr/0037-post-fire-basissalaris-fire-gegate-bridge.md"
+    },
+    {
+      "id": "0038-button-primitive-twee-varianten",
+      "title": "Button-primitive met twee gesanctioneerde CTA-varianten (ink-standaard + module-moment)",
+      "status": "accepted",
+      "date": "2026-07-13",
+      "elements": [
+        "app-comp",
+        "m-principes"
+      ],
+      "summary": "De UX-review (`docs/ux-review-jul2026.md` §8, besluit 5) legt het knop-recept van TriFinity vast op **twee gesanctioneerde CTA-varianten** plus een secundaire outline, geïmplementeerd als één primitive `components/editorial/button.tsx`. Nieuwe CTA's lopen voortaan via deze compon",
+      "file": "docs/adr/0038-button-primitive-twee-varianten.md"
+    },
+    {
+      "id": "0039-overlay-standaard-sticky-footer-pill",
+      "title": "Eén overlay-systeem — sticky footer-acties + automatisch verbergen van de nav-pill",
+      "status": "aanvaard",
+      "date": "2026-07-13",
+      "elements": [
+        "app-comp"
+      ],
+      "summary": "De app krijgt één overlay-systeem: alle modale oppervlakken lopen via `<ShellOverlay>` (kinds `pane`/`sheet`/`confirm`, bouwend op `BottomSheet` en `SlideInPane`), met een korte, expliciete uitzonderingslijst. Twee gedragingen worden standaard: primaire acties staan in een **stic",
+      "file": "docs/adr/0039-overlay-standaard-sticky-footer-pill.md"
+    },
+    {
+      "id": "0040-fiscale-strategie-optimizer",
+      "title": "Fiscale-strategie-optimizer = orchestratie over bestaande engines (Box 3-MVP, gesloten-vorm, Wft = illustratie)",
+      "status": "accepted",
+      "date": "2026-07-13",
+      "elements": [
+        "as-belasting"
+      ],
+      "summary": "Roadmap J vraagt de stap van belasting **berekenen** naar **optimaliseren**: de gebruiker kiest een fiscaal doel en TriFinity zet doorgerekende strategieën naast elkaar (in euro's én vrijheidsdagen). Concurrenten (ProjectionLab v4.6, Boldin) doen dit voor het Amerikaanse stelsel ",
+      "file": "docs/adr/0040-fiscale-strategie-optimizer.md"
+    },
+    {
+      "id": "0041-jaarruimte-besparing-single-source",
+      "title": "Jaarruimte-besparing = single source (marginaal-correct via computeBox1Tax × 2)",
+      "status": "accepted",
+      "date": "2026-07-13",
+      "elements": [
+        "as-belasting"
+      ],
+      "summary": "De jaarruimte-belastingbesparing werd op vijf plekken lokaal berekend met dezelfde vlakke benadering: `onbenutte jaarruimte × marginaal tarief`. De plekken: de Box 1-jaarruimtekaart, de belasting-hub (inzicht C4), de aandachtspunten-loader, de AI-tax-context (waar De Wil dit vert",
+      "file": "docs/adr/0041-jaarruimte-besparing-single-source.md"
+    },
+    {
+      "id": "0042-flex-spending-must-nice-split",
+      "title": "Flex-spending: de onttrekkingsprofiel-factor grijpt alléén op het nice-deel — additief, inert-by-default (roadmap M)",
+      "status": "aanvaard",
+      "date": "2026-07-13",
+      "elements": [
+        "as-planning",
+        "fn-toekomstplannen",
+        "as-vermogen"
+      ],
+      "summary": "De horizon-kernel (ADR 0032) is de enige FIRE-rekenmotor en volgt het Excel-oracle `Core calc v5.xlsm` byte-exact. Dit besluit legt de **flex-spending-mechaniek** (roadmap M) vast: een gedragsregel die de flexibele (nice) uitgaven in de projectie laat meebewegen met de portefeuil",
+      "file": "docs/adr/0042-flex-spending-must-nice-split.md"
     }
   ],
   "churn": {
@@ -13087,23 +13334,23 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 89
+        "commits": 93
       },
       {
         "path": "app/(app)/toekomst",
-        "commits": 35
+        "commits": 38
       },
       {
         "path": "lib/ai",
-        "commits": 34
+        "commits": 35
       },
       {
         "path": "app/api/ai",
-        "commits": 12
+        "commits": 13
       },
       {
         "path": "app/api/household",
-        "commits": 10
+        "commits": 11
       },
       {
         "path": "lib/fire-simulation.ts",
@@ -13114,12 +13361,12 @@
         "commits": 8
       },
       {
-        "path": "components/horizon",
+        "path": "app/api/assets",
         "commits": 3
       },
       {
-        "path": "app/api/assets",
-        "commits": 2
+        "path": "components/horizon",
+        "commits": 3
       },
       {
         "path": "app/api/budgets",
@@ -13129,18 +13376,23 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 8310,
-        "commits": 78
+        "loc": 8385,
+        "commits": 83
       },
       {
         "file": "components/app/budgets-client.tsx",
-        "loc": 5065,
-        "commits": 27
+        "loc": 5090,
+        "commits": 32
       },
       {
         "file": "components/core/assets-client.tsx",
-        "loc": 4280,
-        "commits": 41
+        "loc": 4295,
+        "commits": 44
+      },
+      {
+        "file": "components/app/cash-account-view.tsx",
+        "loc": 2780,
+        "commits": 15
       },
       {
         "file": "lib/release-notes.ts",
@@ -13148,24 +13400,19 @@
         "commits": 2
       },
       {
-        "file": "components/app/cash-account-view.tsx",
-        "loc": 2650,
-        "commits": 11
-      },
-      {
         "file": "lib/horizon-data.ts",
         "loc": 2411,
         "commits": 8
       },
       {
+        "file": "lib/dashboard-data-loader.ts",
+        "loc": 2231,
+        "commits": 34
+      },
+      {
         "file": "app/(app)/core/checkin/page.tsx",
         "loc": 2205,
         "commits": 10
-      },
-      {
-        "file": "lib/dashboard-data-loader.ts",
-        "loc": 2171,
-        "commits": 33
       }
     ]
   },
@@ -13948,13 +14195,30 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-07-11",
+    "previousDate": "2026-07-13",
     "hasChanges": true,
     "sections": [
       {
+        "label": "Schermen",
+        "added": [
+          "/rapportages/totaalplan"
+        ],
+        "removed": []
+      },
+      {
+        "label": "API-routes",
+        "added": [
+          "/api/briefing/email/cron",
+          "/api/briefing/email/pref",
+          "/api/briefing/email/unsubscribe",
+          "/api/report/totaalplan"
+        ],
+        "removed": []
+      },
+      {
         "label": "Componenten (aantal)",
         "added": [
-          "+6"
+          "+4"
         ],
         "removed": []
       }
@@ -14114,6 +14378,13 @@
       "components": 810,
       "tables": 58,
       "routesProduction": 98
+    },
+    {
+      "date": "2026-07-13",
+      "api": 248,
+      "components": 827,
+      "tables": 59,
+      "routesProduction": 100
     }
   ]
 }
