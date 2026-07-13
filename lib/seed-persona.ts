@@ -7,7 +7,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { PersonaData, PersonaAsset } from '@/lib/test-personas'
+import type { PersonaData, PersonaAsset, PersonaDebt } from '@/lib/test-personas'
 import {
   blindIndex,
   encryptField,
@@ -66,19 +66,82 @@ export function buildSeedAssetRow(a: PersonaAsset, userId: string, sortOrder: nu
     address_postcode: a.address_postcode || null,
     address_house_number: a.address_house_number || null,
     has_holdings_tracking: a.has_holdings_tracking ?? false,
+    // Woonbalans-app opt-in op eigen_huis-assets. Zonder deze mapping bleef de
+    // vlag NULL bij seeding ondanks dat de persona 'm op true zet, waardoor de
+    // equity-/woonbalans-band in de Hypotheekplanner leeg rendert
+    // (hypotheekplanner-tab.tsx filtert op has_woonbalans_tracking === true).
+    // Spiegelt has_holdings_tracking hierboven.
+    has_woonbalans_tracking: a.has_woonbalans_tracking ?? false,
     sale_config: a.sale_config ?? null,
+    // Deelneming-velden (asset_type='deelneming'): zonder deze mapping bleven
+    // kvk_number/ownership_percentage/annual_dividend bij seeding altijd NULL,
+    // waardoor de Box 2-aanslag geen datapad had (bug WF-BELAST-13).
+    kvk_number: a.kvk_number ?? null,
+    ownership_percentage: a.ownership_percentage ?? null,
+    annual_dividend: a.annual_dividend ?? null,
+  }
+}
+
+// ── Helper: persona-debt → DB insert-rij ──────────────────────
+
+/**
+ * Transformeer één `PersonaDebt` naar de `debts`-insert-rij. Pure functie —
+ * net als `buildSeedAssetRow` — zodat de seed-laag en de regressietest exact
+ * dezelfde mapping delen (geen her-implementatie die kan wegdriften). Borgt
+ * o.a. dat `has_hypotheekplanner_tracking` — de per-schuld opt-in voor de
+ * Hypotheekplanner-app — meegeseed wordt (anders bleef de vlag NULL ondanks
+ * dat de persona 'm op true zet, waardoor de planner leeg rendert;
+ * hypotheekplanner-tab.tsx filtert op has_hypotheekplanner_tracking === true).
+ */
+export function buildSeedDebtRow(d: PersonaDebt, userId: string, sortOrder: number) {
+  return {
+    user_id: userId,
+    name: d.name,
+    debt_type: d.debt_type,
+    original_amount: d.original_amount,
+    current_balance: d.current_balance,
+    interest_rate: d.interest_rate,
+    minimum_payment: d.minimum_payment,
+    monthly_payment: d.monthly_payment,
+    start_date: d.start_date,
+    creditor: d.creditor || null,
+    is_active: true,
+    sort_order: sortOrder,
+    subtype: d.subtype || null,
+    is_tax_deductible: d.is_tax_deductible ?? null,
+    fixed_rate_end_date: d.fixed_rate_end_date || null,
+    nhg: d.nhg ?? null,
+    credit_limit: d.credit_limit ?? null,
+    repayment_type: d.repayment_type || null,
+    draagkrachtmeting_date: d.draagkrachtmeting_date || null,
+    // Hypotheekplanner-app opt-in op mortgage-schulden. Spiegelt
+    // has_woonbalans_tracking op de gekoppelde eigen_huis-asset; samen gaten ze
+    // de equity-/woonbalans-band in de planner (bug: vlaggen werden bij seeding
+    // niet weggeschreven).
+    has_hypotheekplanner_tracking: d.has_hypotheekplanner_tracking ?? false,
   }
 }
 
 // ── Helper: delete from table ─────────────────────────────────
 
+/**
+ * FAIL-FAST: een gefaalde delete gooit en stopt de hele wipe/seed. Stil
+ * doorgaan (voorheen alleen console.warn) betekende dat een seed bovenop
+ * niet-gewiste data inserte — zo bleven persona-bankrekeningen en
+ * -transacties als "echte" bezittingen achter op een account (13 jul 2026).
+ * Elke consumer (onboarding-reset, persona-seeds, account-delete) vangt de
+ * throw al af en meldt de fout aan de gebruiker.
+ */
 async function deleteTable(supabase: SupabaseClient, table: string, userId: string): Promise<number> {
   // budget_amounts has no user_id column; cascade via budgets
   if (table === 'budget_amounts') {
-    const { data: budgetIds } = await supabase
+    const { data: budgetIds, error: lookupError } = await supabase
       .from('budgets')
       .select('id')
       .eq('user_id', userId)
+    if (lookupError) {
+      throw new Error(`[seed] Wissen van budget_amounts mislukt (budgets-lookup): ${lookupError.message}`)
+    }
     const ids = (budgetIds ?? []).map((b) => b.id)
     if (ids.length === 0) return 0
     const { count, error } = await supabase
@@ -86,7 +149,7 @@ async function deleteTable(supabase: SupabaseClient, table: string, userId: stri
       .delete({ count: 'exact' })
       .in('budget_id', ids)
     if (error) {
-      console.warn(`[seed] Delete from budget_amounts failed: ${error.message}`)
+      throw new Error(`[seed] Wissen van budget_amounts mislukt: ${error.message}`)
     }
     return count ?? 0
   }
@@ -96,7 +159,7 @@ async function deleteTable(supabase: SupabaseClient, table: string, userId: stri
     .delete({ count: 'exact' })
     .eq('user_id', userId)
   if (error) {
-    console.warn(`[seed] Delete from ${table} failed: ${error.message}`)
+    throw new Error(`[seed] Wissen van ${table} mislukt: ${error.message}`)
   }
   return count ?? 0
 }
@@ -217,7 +280,7 @@ export async function deleteAllUserData(
     .delete({ count: 'exact' })
     .like('key', `%${userId}%`)
   if (settingsErr) {
-    console.warn(`[seed] Delete from app_settings failed: ${settingsErr.message}`)
+    throw new Error(`[seed] Wissen van app_settings mislukt: ${settingsErr.message}`)
   }
   summary.app_settings = settingsCount ?? 0
   onProgress?.('App-instellingen wissen...', 'batch4', 'delete', settingsCount ?? 0)
@@ -290,6 +353,13 @@ export async function seedPersonaData(
 
   // Active modules (module system)
   profileData.active_modules = persona.profile.active_modules
+
+  // Reset de wekelijkse briefing-snapshot bij (her)seed. Een stale/lage snapshot
+  // van vóór de reseed zou tegen het nieuwe (verse) vrijheidstotaal worden
+  // afgezet en een onmogelijke week-delta tonen ("41261 dagen vrijheid erbij") —
+  // het 'delta ≈ totaal'-lek uit KRUIS-17. Null wist het meetpunt; de eerste
+  // /overzicht-load van de nieuwe persona schrijft een verse week-snapshot.
+  profileData.briefing_snapshot = null
 
   const { error: profileError } = await supabase
     .from('profiles')
@@ -475,27 +545,7 @@ export async function seedPersonaData(
       return
     }
 
-    const debtRows = persona.debts.map((d, i) => ({
-      user_id: userId,
-      name: d.name,
-      debt_type: d.debt_type,
-      original_amount: d.original_amount,
-      current_balance: d.current_balance,
-      interest_rate: d.interest_rate,
-      minimum_payment: d.minimum_payment,
-      monthly_payment: d.monthly_payment,
-      start_date: d.start_date,
-      creditor: d.creditor || null,
-      is_active: true,
-      sort_order: i,
-      subtype: d.subtype || null,
-      is_tax_deductible: d.is_tax_deductible ?? null,
-      fixed_rate_end_date: d.fixed_rate_end_date || null,
-      nhg: d.nhg ?? null,
-      credit_limit: d.credit_limit ?? null,
-      repayment_type: d.repayment_type || null,
-      draagkrachtmeting_date: d.draagkrachtmeting_date || null,
-    }))
+    const debtRows = persona.debts.map((d, i) => buildSeedDebtRow(d, userId, i))
     const { data: insertedDebts, error: debtErr } = await supabase
       .from('debts')
       .insert(debtRows)

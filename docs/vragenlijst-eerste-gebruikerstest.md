@@ -34,6 +34,28 @@
 
 ---
 
+### Vraag 3a — Onboarding afgerond (activatie)
+**Type:** Meerkeuze (ja/nee)
+
+> Heb je de onboarding (de eerste paar stappen na het aanmaken van je account) helemaal afgerond?
+
+- [ ] Ja, helemaal doorlopen
+- [ ] Deels — ergens gestopt
+- [ ] Nee, niet aan begonnen
+
+---
+
+### Vraag 3b — Vrijheids-/FIRE-datum gezien (activatie)
+**Type:** Meerkeuze (ja/nee)
+
+> Heb je je persoonlijke vrijheids- of FIRE-datum in de app gezien (het moment waarop je financieel vrij kunt zijn)?
+
+- [ ] Ja, gezien en begrepen
+- [ ] Ja gezien, maar niet helemaal begrepen
+- [ ] Nee, niet tegengekomen
+
+---
+
 ## Blok 2: Functies & Waarde
 
 ### Vraag 4 — Meest waardevolle onderdeel
@@ -142,3 +164,5 @@
 | 10 | Betaalbereidheid | ≥ 60% "ja" of "misschien" |
 | 11 | NPS | ≥ 7 gemiddeld (promoters ≥ 9) |
 | 6 | Activatie-trigger | ≥ 50% "ja" |
+| 3a | Onboarding-voltooiing | ≥ 70% "ja, helemaal" |
+| 3b | Kernwaarde bereikt (vrijheids-/FIRE-datum gezien) | ≥ 70% "ja" |

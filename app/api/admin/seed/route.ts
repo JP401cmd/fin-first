@@ -49,10 +49,15 @@ export async function POST(req: Request) {
         // Phase 2+3: Insert persona data
         const summary = await seedPersonaData(supabase, userId, persona, progress)
 
-        // Reset last_known_phase so activation FAB appears
+        // Reset last_known_phase so activation FAB appears + markeer als
+        // demo. De demo-vlag is de levenscyclus-marker: elke persona-seed
+        // zet 'm aan (net als /api/onboarding/seed en /api/activate), en
+        // save-own-data wist demo-restanten en zet 'm weer uit. Zonder deze
+        // markering liet een admin-seed op het eigen account persona-data
+        // achter die her-onboarding nooit opruimde (13 jul 2026).
         await supabase
           .from('profiles')
-          .update({ last_known_phase: null })
+          .update({ last_known_phase: null, is_demo_user: true })
           .eq('id', userId)
 
         // Done

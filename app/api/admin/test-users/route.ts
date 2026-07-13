@@ -2,15 +2,8 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { isSuperAdmin } from '@/lib/admin'
-import { PERSONAS, type PersonaKey } from '@/lib/test-personas'
+import { PERSONAS, TEST_EMAILS, type PersonaKey } from '@/lib/test-personas'
 import { deleteAllUserData } from '@/lib/seed-persona'
-
-const TEST_EMAILS = [
-  'ronald@test.trifinity.nl',
-  'bas@test.trifinity.nl',
-  'leo@test.trifinity.nl',
-  'jochen@test.trifinity.nl',
-]
 
 function getServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!

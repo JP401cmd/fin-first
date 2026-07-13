@@ -2,13 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { isSuperAdmin } from '@/lib/admin'
-
-const TEST_USERS = [
-  { email: 'daan@test.trifinity.nl', persona: 'daan', name: 'Daan Bakker' },
-  { email: 'lisa@test.trifinity.nl', persona: 'lisa', name: 'Lisa de Groot' },
-  { email: 'willem@test.trifinity.nl', persona: 'willem', name: 'Willem Jansen' },
-  { email: 'marijke@test.trifinity.nl', persona: 'marijke', name: 'Marijke Vermeer' },
-]
+import { TEST_USER_ACCOUNTS } from '@/lib/test-personas'
 
 /** POST — create test users via Supabase Admin API (GoTrue) */
 export async function POST() {
@@ -33,7 +27,7 @@ export async function POST() {
 
     const results: { email: string; status: string; error?: string }[] = []
 
-    for (const u of TEST_USERS) {
+    for (const u of TEST_USER_ACCOUNTS) {
       try {
         // Create via GoTrue Admin API
         const { data, error } = await service.auth.admin.createUser({

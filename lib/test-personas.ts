@@ -82,7 +82,7 @@ export interface PersonaProfile {
   // Arbitrary feature preferences (JSONB)
   feature_preferences?: Record<string, unknown>
   // Marginaal tarief (IB Box 1)
-  marginaal_tarief?: number | null // 0.3697 or 0.4950, null = auto
+  marginaal_tarief?: number | null // expliciete override (fractie 0–1) of null = auto (jaar-afgeleid)
   // Rebalancing
   rebalance_threshold?: number // drift threshold 1-20%, default 5
   // Widget dashboard
@@ -124,6 +124,15 @@ export interface PersonaAsset {
   address_postcode?: string
   address_house_number?: string
   has_holdings_tracking?: boolean
+  /** Deelneming (asset_type='deelneming'): KvK-nummer van de vennootschap. */
+  kvk_number?: string
+  /** Deelneming: eigendomspercentage in de vennootschap (0-100). */
+  ownership_percentage?: number
+  /**
+   * Deelneming: verwacht jaarlijks dividend in EUR. Voedt de Box 2-aanslag
+   * (aanmerkelijk belang) via app/api/household/box2 → calculateBox2().
+   */
+  annual_dividend?: number
   /** Voor real_estate-assets: verhuur-app tracking actief. */
   has_rental_tracking?: boolean
   /** Voor eigen_huis-assets: woonbalans-app tracking actief. */
@@ -982,7 +991,7 @@ const lisaData: PersonaData = {
     retirement_expense_method: 'essential_budgets',
     // 'bucket' is verwijderd (DB genormaliseerd → static, migratie 20260703115225).
     withdrawal_strategy: 'static',
-    marginaal_tarief: 0.3697, // modaal inkomen — laagste schijf
+    marginaal_tarief: null, // modaal inkomen → auto (laagste schijf, jaar-afgeleid uit BOX1_PARAMS)
     feature_preferences: { _welcome_seen: true },
     widget_prefs: makeWidgetPrefs([
       'netto_vermogen', 'cash_flow', { id: 'fire_prognose', size: 'full' }, 'doelen',
@@ -1994,7 +2003,7 @@ const tessaData: PersonaData = {
     { name: 'Verhuurd appartement Utrecht', asset_type: 'real_estate', current_value: 185000, purchase_value: 150000, purchase_date: '2019-09-01', expected_return: 3, monthly_contribution: 0, institution: '', subtype: 'beleggingspand', rental_income: 950, has_rental_tracking: true },
     { name: 'Auto (elektrisch)', asset_type: 'vehicle', current_value: 28000, purchase_value: 46000, purchase_date: '2023-03-01', expected_return: 0, monthly_contribution: 0, institution: '', subtype: 'auto_eigendom', depreciation_rate: 12 },
     { name: 'Kunst + sieraden', asset_type: 'physical', current_value: 14000, purchase_value: 11000, purchase_date: '2017-08-15', expected_return: 0, monthly_contribution: 0, institution: '', subtype: 'kunst' },
-    { name: 'Belang Volkert Compleet Holding BV', asset_type: 'deelneming', current_value: 180000, purchase_value: 18000, purchase_date: '2012-01-01', expected_return: 6, monthly_contribution: 0, institution: 'Volkert Compleet Holding BV', subtype: 'eigen_bv' },
+    { name: 'Belang Volkert Compleet Holding BV', asset_type: 'deelneming', current_value: 180000, purchase_value: 18000, purchase_date: '2012-01-01', expected_return: 6, monthly_contribution: 0, institution: 'Volkert Compleet Holding BV', subtype: 'eigen_bv', kvk_number: '30112233', ownership_percentage: 100, annual_dividend: 90000 },
     { name: 'Kapitaalverzekering (oud)', asset_type: 'levensverzekering', current_value: 28000, purchase_value: 19000, purchase_date: '2004-09-01', expected_return: 2, monthly_contribution: 0, institution: 'Nationale-Nederlanden', subtype: 'kapitaalverzekering' },
     { name: 'Rekening-courant vordering BV', asset_type: 'vordering', current_value: 35000, purchase_value: 35000, purchase_date: '2023-01-01', expected_return: 3, monthly_contribution: 0, institution: 'Volkert Compleet Holding BV', subtype: 'rekening_courant' },
     { name: 'Aanhangwagen + gereedschap', asset_type: 'other', current_value: 6000, purchase_value: 9000, purchase_date: '2020-05-01', expected_return: 0, monthly_contribution: 0, institution: '' },
@@ -2157,3 +2166,38 @@ export const PERSONAS: Record<PersonaKey, PersonaData> = {
 }
 
 export const PERSONA_KEYS: PersonaKey[] = ['daan', 'lisa', 'willem', 'marijke', 'compleet']
+
+// ══════════════════════════════════════════════════════════════
+// Landing/test-account seed-set (superadmin /beheer/testdata)
+// ══════════════════════════════════════════════════════════════
+//
+// Dé canonieke bron van de beheerbare test-accounts: welke persona's als
+// echte auth.users worden aangemaakt én door de beheerlijst (list/reset/
+// wachtwoord) worden herkend. ALLE admin-routes onder
+// app/api/admin/test-users/** consumeren deze lijst — zo kunnen 'aanmaken'
+// en 'beheren' nooit meer uit elkaar lopen (was de bug: create gebruikte
+// daan/lisa/willem/marijke, list/reset filterde nog op de verwijderde set
+// ronald/bas/leo/jochen).
+//
+// Bewust ZONDER 'compleet' (Tessa): dat is de horizon-strategie-regressie-
+// fixture, geen beheerbaar landing-testaccount. Naam + persona worden uit
+// PERSONAS afgeleid zodat er geen tweede bron van waarheid ontstaat.
+
+/** Persona's die als beheerbaar test-account bestaan (zonder de regressie-fixture 'compleet'). */
+export const TEST_USER_PERSONA_KEYS = ['daan', 'lisa', 'willem', 'marijke'] as const satisfies readonly PersonaKey[]
+
+export interface TestUserAccount {
+  persona: PersonaKey
+  email: string
+  name: string
+}
+
+/** Canonieke lijst van beheerbare test-accounts, afgeleid van PERSONAS. */
+export const TEST_USER_ACCOUNTS: TestUserAccount[] = TEST_USER_PERSONA_KEYS.map((persona) => ({
+  persona,
+  email: `${persona}@test.trifinity.nl`,
+  name: PERSONAS[persona].meta.name,
+}))
+
+/** Afgeleide e-mailadressen — de enige set waarop de beheerlijst filtert. */
+export const TEST_EMAILS: string[] = TEST_USER_ACCOUNTS.map((u) => u.email)

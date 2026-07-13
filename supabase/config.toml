@@ -150,10 +150,21 @@ max_indexes = 5
 [auth]
 enabled = true
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
-# in emails.
-site_url = "http://127.0.0.1:3000"
-# A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["https://127.0.0.1:3000"]
+# in emails. Zet op het productie-domein: e-mailbevestigings-/resetlinks nemen deze basis over
+# wanneer de app geen expliciete redirect meegeeft, en localhost-links zouden voor externe testers
+# kapot zijn. De app zelf geeft bij signup/reset altijd een expliciete emailRedirectTo op basis van
+# window.location.origin door (app/signup + app/forgot-password → /auth/callback), dus lokaal blijft
+# de redirect naar localhost werken zolang die origin in de allow-list hieronder staat.
+site_url = "https://trifinity.app"
+# A list of URLs (wildcards toegestaan met * en **) die auth-providers na authenticatie als redirect
+# mogen gebruiken. Bevat zowel het productie-domein als de lokale dev-origins zodat dezelfde
+# config.toml voor `supabase config push` (remote) én lokaal `supabase start` klopt.
+additional_redirect_urls = [
+  "https://trifinity.app/**",
+  "https://www.trifinity.app/**",
+  "http://127.0.0.1:3000/**",
+  "http://localhost:3000/**",
+]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # JWT issuer URL. If not set, defaults to the local API URL (http://127.0.0.1:<port>/auth/v1).
@@ -179,7 +190,10 @@ password_requirements = ""
 
 [auth.rate_limit]
 # Number of emails that can be sent per hour. Requires auth.email.smtp to be enabled.
-email_sent = 2
+# De ingebouwde Supabase-mailservice cap (~2/uur) is expliciet niet voor productie en trottelt een
+# testcohort van 12–20 aanmeldingen. Na het koppelen van een productie-SMTP (zie [auth.email.smtp]
+# hieronder) mag dit omhoog; 30/uur dekt een beta-cohort ruim.
+email_sent = 30
 # Number of SMS messages that can be sent per hour. Requires auth.sms to be enabled.
 sms_sent = 30
 # Number of anonymous sign-ins that can be made per hour per IP address. Requires enable_anonymous_sign_ins = true.
@@ -216,15 +230,26 @@ otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
 otp_expiry = 3600
 
-# Use a production-ready SMTP server
+# Productie-SMTP voor auth-mails (bevestiging + wachtwoordreset). BEWUST UITGECOMMENTARIEERD:
+# zolang dit blok uit staat gebruikt lokaal `supabase start` de inbucket-testmailbox (geen echte
+# mail). Activeren voor de beta:
+#   1. Maak een Resend-account, verifieer het domein trifinity.app (SPF + DKIM DNS-records) en maak
+#      een API-key aan. (Alternatief: Postmark host=smtp.postmarkapp.com / SendGrid host=smtp.sendgrid.net.)
+#   2. Zet de key als secret in de omgeving die `supabase config push` draait: RESEND_SMTP_PASS=...
+#      (NOOIT de key in dit bestand of in git — env()-substitutie houdt 'm buiten de repo).
+#   3. Verwijder de '#' voor de zes regels hieronder en draai `supabase config push`.
+#   -- OF doe stap 1-3 direct in het Supabase-dashboard (Authentication → Emails → SMTP). Dat is de
+#      snelste 'secret only'-route; laat dit blok dan uit zodat een latere config push het niet
+#      overschrijft naar leeg.
+# Na koppeling: test één echte signup end-to-end vanaf een extern mailadres voordat je testers uitnodigt.
 # [auth.email.smtp]
 # enabled = true
-# host = "smtp.sendgrid.net"
+# host = "smtp.resend.com"
 # port = 587
-# user = "apikey"
-# pass = "env(SENDGRID_API_KEY)"
-# admin_email = "admin@email.com"
-# sender_name = "Admin"
+# user = "resend"
+# pass = "env(RESEND_SMTP_PASS)"
+# admin_email = "support@trifinity.nl"
+# sender_name = "TriFinity"
 
 # Uncomment to customize email template
 # [auth.email.template.invite]

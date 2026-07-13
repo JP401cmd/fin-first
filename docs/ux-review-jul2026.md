@@ -139,6 +139,8 @@ W3.1 Token-uitbreiding `--warning` + `--positive-bg`/`--negative-bg` [besloten] 
 
 **Volgorde:** Spoor 0 ✔ afgerond. Spoor 1 kan direct starten (geen afhankelijkheden), daarna 2 → 3 → 4; binnen elk spoor zijn de werkblokken onafhankelijk en parallel uit te voeren. P3-items meenemen als bijvangst wanneer een sweep het bestand toch al raakt.
 
+**Nazorg ✔ afgerond 13 jul 2026:** (1) Visuele spotcheck 375px (6✅/3❌/2⛔) — de 3 ❌'s direct gefixt in commit 72f5fa1b9: focus-regel naar @layer base (nav-pill-ring nu zichtbaar), PageInfoButton-popover viewport-clamp, root-404 editorial; bonus: 403-guard op news-peek. ⛔-rest: transacties-density + rij-focus niet toetsbaar (testaccount zonder transacties) en toast-positie — bij een account mét data alsnog checken. (2) Migratiedrift: beide 20260711*-migraties staan op remote (naams-drift, geen actie); ⚠ `20260713120000_db_slotwerk_rechten_policies` (parallelle sessie) staat NIET op remote → toepassen vóór deploy + dashboard-punt "Leaked password protection" aanzetten. (3) Enumeratie: neutrale signup-respons in commit bbf991f9d (config-onafhankelijk); dashboard: "Confirm email" aan houden.
+
 **Definition of done per werkblok:** tsc groen · relevante vitest groen · voor zichtbare UI een chromedev-spotcheck op 360px + desktop · bevinding-ID's in de commit-message · dit document bijwerken (status-kolom) zodat het de levende bron blijft.
 
 ---
