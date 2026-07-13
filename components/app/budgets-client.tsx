@@ -471,11 +471,11 @@ export function BudgetViewToggle({
 }) {
   if (simple) return null
   return (
-    <div className="flex items-center gap-0.5 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-0.5">
+    <div className="flex items-center gap-0.5 border border-[var(--border-ed)] bg-[var(--paper)] p-0.5">
       <button
         onClick={() => onSelect('tree')}
         aria-label="Boom"
-        className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+        className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors ${
           viewMode === 'tree'
             ? 'bg-zinc-900 text-white'
             : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
@@ -487,7 +487,7 @@ export function BudgetViewToggle({
       <button
         onClick={() => onSelect('donut')}
         aria-label="Ring"
-        className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+        className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors ${
           viewMode === 'donut'
             ? 'bg-zinc-900 text-white'
             : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
@@ -499,7 +499,7 @@ export function BudgetViewToggle({
       <button
         onClick={() => onSelect('heatmap')}
         aria-label="Heatmap"
-        className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+        className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors ${
           viewMode === 'heatmap'
             ? 'bg-zinc-900 text-white'
             : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
@@ -511,7 +511,7 @@ export function BudgetViewToggle({
       <button
         onClick={() => onSelect('pill')}
         aria-label="Pillen"
-        className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+        className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors ${
           viewMode === 'pill'
             ? 'bg-zinc-900 text-white'
             : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
@@ -2086,19 +2086,19 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
     return (
       <div className="py-3 sm:py-8">
         {/* Month selector skeleton */}
-        <section className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-3 sm:p-6">
+        <section className="border border-[var(--border-ed)] bg-[var(--paper)] p-3 sm:p-6">
           <div className="mb-3 sm:mb-6 flex items-center justify-between gap-2">
-            <div className="h-9 w-9 animate-pulse rounded-lg bg-[var(--subtle)]" />
-            <div className="h-6 w-36 animate-pulse rounded-md bg-[var(--subtle)]" />
-            <div className="h-9 w-9 animate-pulse rounded-lg bg-[var(--subtle)]" />
+            <div className="h-9 w-9 animate-pulse bg-[var(--subtle)]" />
+            <div className="h-6 w-36 animate-pulse bg-[var(--subtle)]" />
+            <div className="h-9 w-9 animate-pulse bg-[var(--subtle)]" />
             <div className="ml-auto hidden h-8 w-36 animate-pulse rounded-[var(--r)] bg-[var(--subtle)] sm:block" />
           </div>
           <div className="grid grid-cols-2 gap-2 sm:gap-4 sm:grid-cols-4">
             {[1,2,3,4].map(i => (
               <div key={i} className="flex flex-col items-center gap-2">
-                <div className="h-3 w-16 animate-pulse rounded bg-[var(--subtle)]" />
-                <div className="h-7 w-24 animate-pulse rounded-md bg-[var(--subtle)]" />
-                <div className="h-3 w-20 animate-pulse rounded bg-[var(--subtle)]" />
+                <div className="h-3 w-16 animate-pulse bg-[var(--subtle)]" />
+                <div className="h-7 w-24 animate-pulse bg-[var(--subtle)]" />
+                <div className="h-3 w-20 animate-pulse bg-[var(--subtle)]" />
               </div>
             ))}
           </div>
@@ -2114,17 +2114,17 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
         {/* Budget tree skeleton */}
         <div className="mt-6 space-y-4">
           {[1,2,3].map(group => (
-            <div key={group} className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
+            <div key={group} className="border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
               {/* Group header */}
               <div className="mb-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="h-9 w-9 animate-pulse rounded-lg bg-[var(--subtle)]" />
+                  <div className="h-9 w-9 animate-pulse bg-[var(--subtle)]" />
                   <div>
-                    <div className="h-4 w-28 animate-pulse rounded bg-[var(--subtle)]" />
-                    <div className="mt-1 h-3 w-20 animate-pulse rounded bg-[var(--subtle)]" />
+                    <div className="h-4 w-28 animate-pulse bg-[var(--subtle)]" />
+                    <div className="mt-1 h-3 w-20 animate-pulse bg-[var(--subtle)]" />
                   </div>
                 </div>
-                <div className="h-5 w-16 animate-pulse rounded bg-[var(--subtle)]" />
+                <div className="h-5 w-16 animate-pulse bg-[var(--subtle)]" />
               </div>
               {/* Progress bar skeleton */}
               <div className="mb-4 h-1.5 w-full animate-pulse rounded-full bg-[var(--subtle)]" />
@@ -2133,12 +2133,12 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
                 {[1,2,3].map(child => (
                   <div key={child} className="flex items-center justify-between py-1">
                     <div className="flex items-center gap-2">
-                      <div className="h-6 w-6 animate-pulse rounded-md bg-[var(--subtle)]" />
-                      <div className="h-4 w-24 animate-pulse rounded bg-[var(--subtle)]" />
+                      <div className="h-6 w-6 animate-pulse bg-[var(--subtle)]" />
+                      <div className="h-4 w-24 animate-pulse bg-[var(--subtle)]" />
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="h-2 w-20 animate-pulse rounded-full bg-[var(--subtle)]" />
-                      <div className="h-4 w-14 animate-pulse rounded bg-[var(--subtle)]" />
+                      <div className="h-4 w-14 animate-pulse bg-[var(--subtle)]" />
                     </div>
                   </div>
                 ))}
@@ -2155,7 +2155,7 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
       <div className="py-5 sm:py-12">
         <div className="rounded-[var(--r-lg)] border border-red-200 bg-red-50 p-6 text-center">
           <p className="text-sm font-medium text-red-700">{error}</p>
-          <button onClick={() => { setError(null); setLoading(true); loadBudgets() }} className="mt-3 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">
+          <button onClick={() => { setError(null); setLoading(true); loadBudgets() }} className="mt-3 bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">
             Opnieuw proberen
           </button>
         </div>
@@ -2328,14 +2328,14 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
         <BudgetViewToggle simple={simple} viewMode={viewMode} onSelect={toggleViewMode} />
 
         {/* Spiegelt de view-toggle pill-group: zelfde wrapper-shape
-            (rounded-lg border bg-paper p-0.5) met daarbinnen één pill in
+            (border bg-paper p-0.5) met daarbinnen één pill in
             de niet-actieve toggle-stijl. ink-2 tekst (tikje feller dan de
             ink-3 op echte toggles) signaleert dat dit een ACTIE is, geen
             toggle-state. Beide groups lezen nu als gelijkwaardige
             control-strips naast elkaar. */}
         {/* gap-1.5 (i.p.v. gap-0.5 van de toggle-group): twee losse acties
             mogen iets meer lucht hebben dan aaneengesloten toggle-segmenten. */}
-        <div className="flex items-center gap-1.5 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-0.5">
+        <div className="flex items-center gap-1.5 border border-[var(--border-ed)] bg-[var(--paper)] p-0.5">
           {/* "Transacties koppelen" opent dezelfde AICategorizeSheet als elders.
               Zodra er over ALLE tijden niets meer ongekoppeld is, tonen we in
               dezelfde slot een gedempte, niet-klikbare "Alles gekoppeld"-status
@@ -2347,7 +2347,7 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
             <span
               role="status"
               aria-label="Alle transacties zijn gekoppeld"
-              className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-[var(--ink-3)]"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[var(--ink-3)]"
             >
               <Check className="h-3.5 w-3.5" aria-hidden="true" />
               <span className="max-sm:hidden">Alles gekoppeld</span>
@@ -2357,7 +2357,7 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
               type="button"
               onClick={() => setShowAICategorize(true)}
               aria-label="Transacties koppelen"
-              className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-[var(--ink-2)] hover:text-[var(--ink)] transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[var(--ink-2)] hover:text-[var(--ink)] transition-colors"
             >
               <Link2 className="h-3.5 w-3.5" />
               <span className="max-sm:hidden">Transacties koppelen</span>
@@ -2375,7 +2375,7 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
             type="button"
             onClick={() => setShowPlanEditor(true)}
             aria-label="Plan bewerken"
-            className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-[var(--ink-2)] hover:text-[var(--ink)] transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[var(--ink-2)] hover:text-[var(--ink)] transition-colors"
           >
             <Pencil className="h-3.5 w-3.5" />
             <span className="max-sm:hidden">Plan bewerken</span>
@@ -3182,7 +3182,7 @@ function BudgetDetailModal({
     <ShellOverlay open={true} onClose={onClose} kind="pane" title={budget.name}>
         {/* Header accent */}
         <div className={`flex items-center gap-3 bg-gradient-to-r ${colors.headerGradient} px-6 py-4`}>
-          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${colors.bgDark}`}>
+          <div className={`flex h-10 w-10 shrink-0 items-center justify-center ${colors.bgDark}`}>
             <BudgetIcon name={budget.icon} className={`h-5 w-5 ${colors.text}`} />
           </div>
           <div className="min-w-0 flex-1">
@@ -3222,7 +3222,7 @@ function BudgetDetailModal({
               (volledig huishoud-bedrag) zodat de × aandeel-split niet dubbel
               schaalt op een al perspectief-geschaalde `spent`. */}
           {budgetPartnerSplit && hasFreedomData && fullSpent >= 100 && (
-            <div className="mt-3 rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] p-3" data-testid="budget-partner-breakdown">
+            <div className="mt-3 border border-[var(--border-ed)] bg-[var(--subtle)] p-3" data-testid="budget-partner-breakdown">
               <div className="flex items-center gap-1.5 mb-2">
                 <Users className="h-3.5 w-3.5 text-kern-500" />
                 <p className="text-xs font-semibold text-[var(--ink-2)]">Impact per partner</p>
@@ -3267,7 +3267,7 @@ function BudgetDetailModal({
           )}
 
           {carry > 0 && (
-            <div className={`mt-2 flex items-center gap-1.5 rounded border px-2 py-1.5 ${colors.bg} ${colors.border}`}>
+            <div className={`mt-2 flex items-center gap-1.5 border px-2 py-1.5 ${colors.bg} ${colors.border}`}>
               <span className={`text-xs font-medium ${colors.text}`}>Doorgeschoven:</span>
               <span className={`font-mono text-xs font-semibold ${colors.text}`}>+{<MaskedAmount value={carry} tone="wil" />}</span>
             </div>
@@ -3326,7 +3326,7 @@ function BudgetDetailModal({
 
           {/* Doeltype — 4a: Vaste Maandlast */}
           {budget.goal_type === 'vaste_maandlast' && (
-            <div className={`mt-2 flex items-center gap-2 rounded border px-2 py-1.5 ${spent <= limit ? 'bg-emerald-50 border-emerald-200' : 'bg-kern-50 border-kern-200'}`}>
+            <div className={`mt-2 flex items-center gap-2 border px-2 py-1.5 ${spent <= limit ? 'bg-emerald-50 border-emerald-200' : 'bg-kern-50 border-kern-200'}`}>
               {spent <= limit
                 ? <><CheckCircle2 className="h-4 w-4 text-emerald-600" /><span className="text-xs font-medium text-emerald-700">Gedekt</span></>
                 : <><AlertTriangle className="h-4 w-4 text-kern-600" /><span className="text-xs font-medium text-kern-700">Tekort: {<MaskedAmount value={spent - limit} tone="wil" />}</span></>
@@ -3343,7 +3343,7 @@ function BudgetDetailModal({
 
           {/* Doeltype — 4d: Maandelijkse Reservering */}
           {budget.goal_type === 'maandelijkse_reservering' && (
-            <div className="mt-2 rounded border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2">
+            <div className="mt-2 border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2">
               <p className="text-[10px] text-[var(--ink-3)] uppercase tracking-[.08em]">Opgebouwd saldo</p>
               <p className="font-mono text-base font-semibold text-[var(--ink)]">{<MaskedAmount value={cumulativeCarry} tone="wil" />}</p>
               <p className="text-[10px] text-[var(--ink-3)] mt-0.5">Rollover staat automatisch aan</p>
@@ -3433,7 +3433,7 @@ function BudgetDetailModal({
                       <button
                         type="button"
                         onClick={() => setShowCreateGoalForm(true)}
-                        className="inline-flex items-center gap-1.5 rounded border border-[var(--border-ed)] bg-[var(--paper)] px-2.5 py-1.5 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+                        className="inline-flex items-center gap-1.5 border border-[var(--border-ed)] bg-[var(--paper)] px-2.5 py-1.5 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
                       >
                         <Plus className="h-3 w-3" />
                         Spaardoel aanmaken
@@ -3580,10 +3580,10 @@ function BudgetDetailModal({
                 return (
                   <div
                     key={child.id}
-                    className={`flex cursor-pointer items-center gap-2 rounded-lg border border-[var(--border-ed)] p-2 transition-colors ${colors.hoverBg}`}
+                    className={`flex cursor-pointer items-center gap-2 border border-[var(--border-ed)] p-2 transition-colors ${colors.hoverBg}`}
                     onClick={() => onSelectChild(child.id)}
                   >
-                    <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${colors.bg}`}>
+                    <div className={`flex h-7 w-7 shrink-0 items-center justify-center ${colors.bg}`}>
                       <BudgetIcon name={child.icon} className={`h-3.5 w-3.5 ${colors.textLight}`} />
                     </div>
                     <div className="min-w-0 flex-1">
@@ -3676,7 +3676,7 @@ function BudgetDetailModal({
                     type="button"
                     disabled={!canOpen}
                     onClick={() => canOpen && openTransaction(tx.id!)}
-                    className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-[var(--subtle)] disabled:cursor-default"
+                    className="flex w-full items-center justify-between px-2 py-1.5 text-left transition-colors hover:bg-[var(--subtle)] disabled:cursor-default"
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
@@ -3753,7 +3753,7 @@ function BudgetDetailModal({
                     {/* Spent bar */}
                     <div className="mt-auto w-full">
                       <div
-                        className="w-full rounded-t transition-opacity"
+                        className="w-full transition-opacity"
                         style={{
                           height: `${Math.max(spentH * 0.8, 2)}px`,
                           backgroundColor: barColor,
@@ -3767,7 +3767,7 @@ function BudgetDetailModal({
                     {/* Month label */}
                     <p className={`mt-1 text-[9px] transition-colors ${isSelected ? 'font-semibold text-[var(--ink-2)]' : isCurrentMonth ? 'italic text-[var(--ink-3)]' : 'text-[var(--ink-3)]'}`}>{h.label}{isCurrentMonth ? '*' : ''}</p>
                     {/* Tooltip */}
-                    <div className="pointer-events-none absolute -top-10 z-10 rounded bg-zinc-800 px-2 py-1 text-[10px] text-white opacity-0 shadow-[var(--s2)] transition-opacity group-hover:opacity-100">
+                    <div className="pointer-events-none absolute -top-10 z-10 bg-zinc-800 px-2 py-1 text-[10px] text-white opacity-0 shadow-[var(--s2)] transition-opacity group-hover:opacity-100">
                       {<MaskedAmount value={h.spent} tone="wil" />} / {<MaskedAmount value={h.limit} tone="wil" />}{isCurrentMonth ? ' ∗' : ''}
                     </div>
                   </button>
@@ -3809,7 +3809,7 @@ function BudgetDetailModal({
                           key={tx.id}
                           type="button"
                           onClick={() => openTransaction(tx.id)}
-                          className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-[var(--subtle)]"
+                          className="flex w-full items-center justify-between px-2 py-1.5 text-left transition-colors hover:bg-[var(--subtle)]"
                         >
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-xs font-medium text-[var(--ink-2)]">
@@ -3944,7 +3944,7 @@ function BudgetDetailModal({
                     <button
                       type="button"
                       onClick={() => setShowForecastModal(true)}
-                      className="mt-3 text-[10px] text-kern-500 transition-opacity hover:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kern-300 rounded"
+                      className="mt-3 text-[10px] text-kern-500 transition-opacity hover:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kern-300"
                     >
                       Hoe berekend? →
                     </button>
@@ -3954,7 +3954,7 @@ function BudgetDetailModal({
 
               {/* Alert when predicted exceeds limit — altijd zichtbaar */}
               {forecast.exceedsLimit && forecast.alertMessage && !isOverPositive(budgetType) && (
-                <div className="mt-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3" data-testid="budget-forecast-alert">
+                <div className="mt-3 flex items-start gap-2 border border-red-200 bg-red-50 p-3" data-testid="budget-forecast-alert">
                   <AlertCircle className="h-4 w-4 shrink-0 text-red-500 mt-0.5" />
                   <div>
                     <p className="text-xs font-medium text-red-700" data-testid="budget-forecast-alert-message">
@@ -4072,7 +4072,7 @@ function BudgetDetailModal({
                 const prev = i > 0 ? limitHistory[i - 1].amount : null
                 const delta = prev != null ? change.amount - prev : null
                 return (
-                  <div key={i} className="flex items-center justify-between rounded-lg px-2 py-1.5 hover:bg-[var(--subtle)]">
+                  <div key={i} className="flex items-center justify-between px-2 py-1.5 hover:bg-[var(--subtle)]">
                     <span className="text-xs text-[var(--ink-3)]">
                       {new Date(change.date).toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })}
                     </span>
@@ -4128,7 +4128,7 @@ function BudgetDetailModal({
                         setDeleting(false)
                       }
                     }}
-                    className="rounded-md bg-orange-600 px-3 py-1 text-xs font-medium text-white hover:bg-orange-700 disabled:opacity-50"
+                    className="bg-orange-600 px-3 py-1 text-xs font-medium text-white hover:bg-orange-700 disabled:opacity-50"
                     data-testid="budget-delete-confirm-btn"
                   >
                     {deleting ? 'Archiveren...' : 'Archiveren'}
@@ -4136,7 +4136,7 @@ function BudgetDetailModal({
                   <button
                     type="button"
                     onClick={() => { setShowDeleteConfirm(false); setDeleteError(null) }}
-                    className="rounded-md border border-orange-300 px-3 py-1 text-xs font-medium text-orange-700 hover:bg-orange-100"
+                    className="border border-orange-300 px-3 py-1 text-xs font-medium text-orange-700 hover:bg-orange-100"
                     data-testid="budget-delete-cancel-btn"
                   >
                     Annuleren
@@ -4157,7 +4157,7 @@ function BudgetDetailModal({
                 disabled={!canMoveUp || reordering}
                 onClick={() => moveBudget('up')}
                 title="Omhoog"
-                className="inline-flex items-center justify-center rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-2 text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] disabled:opacity-30"
+                className="inline-flex items-center justify-center border border-[var(--border-ed)] bg-[var(--paper)] p-2 text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] disabled:opacity-30"
               >
                 <ChevronUp className="h-3.5 w-3.5" />
               </button>
@@ -4166,7 +4166,7 @@ function BudgetDetailModal({
                 disabled={!canMoveDown || reordering}
                 onClick={() => moveBudget('down')}
                 title="Omlaag"
-                className="inline-flex items-center justify-center rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-2 text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] disabled:opacity-30"
+                className="inline-flex items-center justify-center border border-[var(--border-ed)] bg-[var(--paper)] p-2 text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] disabled:opacity-30"
               >
                 <ChevronDown className="h-3.5 w-3.5" />
               </button>
@@ -4175,7 +4175,7 @@ function BudgetDetailModal({
           <button
             type="button"
             onClick={() => openWithMessage(`Analyseer mijn ${budget.name} budget`)}
-            className="inline-flex flex-shrink-0 items-center justify-center gap-1.5 rounded-lg border border-wil-200 bg-wil-50 px-3 py-2 text-xs font-medium text-wil-700 transition-colors hover:bg-wil-100 hover:border-wil-300"
+            className="inline-flex flex-shrink-0 items-center justify-center gap-1.5 border border-wil-200 bg-wil-50 px-3 py-2 text-xs font-medium text-wil-700 transition-colors hover:bg-wil-100 hover:border-wil-300"
             title="Vraag Will om tips over dit budget"
           >
             <MessageCircle className="h-3.5 w-3.5" />
@@ -4184,7 +4184,7 @@ function BudgetDetailModal({
           <button
             type="button"
             onClick={onEdit}
-            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-kern-600 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-kern-700"
+            className="inline-flex flex-1 items-center justify-center gap-1.5 bg-kern-600 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-kern-700"
           >
             <Pencil className="h-3.5 w-3.5" />
             Bewerken
@@ -4192,7 +4192,7 @@ function BudgetDetailModal({
           <button
             type="button"
             onClick={() => setShowDeleteConfirm(true)}
-            className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-orange-200 bg-[var(--paper)] px-3 py-2 text-xs font-medium text-orange-600 transition-colors hover:bg-orange-50 hover:border-orange-300"
+            className="inline-flex items-center justify-center gap-1.5 border border-orange-200 bg-[var(--paper)] px-3 py-2 text-xs font-medium text-orange-600 transition-colors hover:bg-orange-50 hover:border-orange-300"
             data-testid="budget-delete-btn"
           >
             <Trash2 className="h-3.5 w-3.5" />
@@ -4474,7 +4474,7 @@ function BudgetEditModal({
   }
 
   const SelectedIcon = iconMap[icon] ?? iconMap['Circle']
-  const inputCls = 'w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm text-[var(--ink)] focus:border-kern-500 focus:outline-none focus:ring-1 focus:ring-kern-500'
+  const inputCls = 'w-full border border-[var(--border-ed)] px-3 py-2 text-sm text-[var(--ink)] focus:border-kern-500 focus:outline-none focus:ring-1 focus:ring-kern-500'
 
   return (
     <>
@@ -4485,7 +4485,7 @@ function BudgetEditModal({
     <ShellOverlay open={true} onClose={handleClose} kind="pane" title="Budget bewerken">
         <div className="flex justify-end px-6 pt-3">
           <button type="button" onClick={() => setIsFavorite(!isFavorite)}
-            className={`rounded-lg p-1.5 transition-colors ${
+            className={`p-1.5 transition-colors ${
               isFavorite ? 'text-red-500 hover:text-red-600' : 'text-[var(--ink-4)] hover:text-[var(--ink-3)]'
             }`}
             title={isFavorite ? 'Verwijder uit favorieten' : 'Markeer als favoriet'}
@@ -4497,7 +4497,7 @@ function BudgetEditModal({
         <div className="space-y-4 px-6 py-4">
           {/* Unsaved changes close confirmation */}
           {showCloseConfirm && (
-            <div className="rounded-lg border border-orange-300 bg-orange-50 p-3" data-testid="modal-unsaved-changes-warning">
+            <div className="border border-orange-300 bg-orange-50 p-3" data-testid="modal-unsaved-changes-warning">
               <div className="flex items-start gap-2">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-orange-600" />
                 <div className="flex-1">
@@ -4509,7 +4509,7 @@ function BudgetEditModal({
                     <button
                       type="button"
                       onClick={confirmClose}
-                      className="rounded-md bg-orange-600 px-3 py-1 text-xs font-medium text-white hover:bg-orange-700"
+                      className="bg-orange-600 px-3 py-1 text-xs font-medium text-white hover:bg-orange-700"
                       data-testid="modal-confirm-close-btn"
                     >
                       Wijzigingen verwijderen
@@ -4517,7 +4517,7 @@ function BudgetEditModal({
                     <button
                       type="button"
                       onClick={cancelClose}
-                      className="rounded-md border border-orange-300 px-3 py-1 text-xs font-medium text-orange-700 hover:bg-orange-100"
+                      className="border border-orange-300 px-3 py-1 text-xs font-medium text-orange-700 hover:bg-orange-100"
                       data-testid="modal-cancel-close-btn"
                     >
                       Verder bewerken
@@ -4530,7 +4530,7 @@ function BudgetEditModal({
 
           {/* Dirty indicator */}
           {isDirty && !showCloseConfirm && (
-            <div className="flex items-center gap-1.5 rounded-md bg-kern-50 px-3 py-1.5 border border-kern-200" data-testid="modal-dirty-indicator">
+            <div className="flex items-center gap-1.5 bg-kern-50 px-3 py-1.5 border border-kern-200" data-testid="modal-dirty-indicator">
               <div className="h-2 w-2 rounded-full bg-kern-500 animate-pulse" />
               <span className="text-[11px] font-medium text-kern-700">Onopgeslagen wijzigingen</span>
             </div>
@@ -5047,13 +5047,13 @@ function BudgetEditModal({
         </div>
 
         <div className="flex justify-end gap-2 border-t border-[var(--border-ed)] px-6 py-4">
-          <button onClick={handleClose} className="rounded-lg border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]">
+          <button onClick={handleClose} className="border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]">
             Annuleren
           </button>
           <button
             onClick={handleSave}
             disabled={saving || !name.trim()}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
           >
             <Save className="h-4 w-4" />
             {saving ? 'Opslaan...' : 'Opslaan'}

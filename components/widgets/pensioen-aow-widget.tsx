@@ -1,3 +1,5 @@
+'use client'
+
 import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
@@ -5,6 +7,7 @@ import type { DashboardData } from './widget-renderer'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { NL_AOW_AGE, NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND, NL_SWR } from '@/lib/constants'
 import { computeEffectiveSwr } from '@/lib/fire-params'
+import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 
 interface Props {
   size: WidgetSize
@@ -35,6 +38,13 @@ export const PensioenAowWidget = memo(function PensioenAowWidget({ size, data, h
     ? computeEffectiveSwr(data.grossReturn, data.inflationRate)
     : NL_SWR
   const aowFireReduction = aowYearly / swr
+
+  // In-view fill-animatie (700ms bezier, 0% → doel; transition:none pre-entered).
+  // Eén hook bovenaan; per render toont het widget precies één size, dus dezelfde
+  // ref op elke size-track (full + half) is rules-of-hooks-veilig.
+  const { ref: barRef, hasEntered } = useInViewAnimation({ duration: 700 })
+  const barTransition = hasEntered ? 'width 700ms cubic-bezier(.22,1,.36,1)' : 'none'
+  const coverageWidth = hasEntered ? `${Math.min(100, aowCoveragePct)}%` : '0%'
 
   // ── Mini: years to AOW ────────────────────────────────────────
   if (size === 'mini') {
@@ -128,10 +138,10 @@ export const PensioenAowWidget = memo(function PensioenAowWidget({ size, data, h
             AOW dekt {Math.round(aowCoveragePct)}% van je maandelijkse uitgaven
           </p>
           {/* Progress bar */}
-          <div className="mt-1 h-1.5 w-full rounded-full bg-[var(--subtle)]">
+          <div ref={barRef} className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[var(--subtle)]">
             <div
-              className="h-full rounded-full bg-horizon-500 transition-all"
-              style={{ width: `${Math.min(100, aowCoveragePct)}%` }}
+              className="h-full rounded-full bg-horizon-500"
+              style={{ width: coverageWidth, transition: barTransition }}
             />
           </div>
           {selfSupplementMonthly > 0 && (
@@ -196,10 +206,10 @@ export const PensioenAowWidget = memo(function PensioenAowWidget({ size, data, h
           <p className="mt-2 text-xs text-[var(--ink-3)]">
             AOW dekt {Math.round(aowCoveragePct)}% van je uitgaven
           </p>
-          <div className="mt-1 h-2 w-full rounded-full bg-[var(--subtle)]">
+          <div ref={barRef} className="mt-1 h-2 w-full overflow-hidden rounded-full bg-[var(--subtle)]">
             <div
-              className="h-full rounded-full bg-horizon-500 transition-all"
-              style={{ width: `${Math.min(100, aowCoveragePct)}%` }}
+              className="h-full rounded-full bg-horizon-500"
+              style={{ width: coverageWidth, transition: barTransition }}
             />
           </div>
 

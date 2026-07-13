@@ -4934,11 +4934,11 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                 {mcExpanded && mcData && (
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                     <span className="inline-flex items-center gap-1.5 text-[11px] text-[var(--ink-2)]">
-                      <span className="inline-block h-2.5 w-3.5 rounded-sm bg-[var(--hor-t,#8a6e42)] opacity-10" />
+                      <span className="inline-block h-2.5 w-3.5 bg-[var(--hor-t,#8a6e42)] opacity-10" />
                       p10–p90
                     </span>
                     <span className="inline-flex items-center gap-1.5 text-[11px] text-[var(--ink-2)]">
-                      <span className="inline-block h-2.5 w-3.5 rounded-sm bg-[var(--hor-t,#8a6e42)] opacity-[0.18]" />
+                      <span className="inline-block h-2.5 w-3.5 bg-[var(--hor-t,#8a6e42)] opacity-[0.18]" />
                       p25–p75
                     </span>
                     <span className="text-[11px] text-[var(--ink-2)]">
@@ -5573,7 +5573,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                 <label className="text-xs font-medium text-[var(--ink-3)] flex items-center gap-1.5">
                   Naam
                   {autoFilledFields.has('name') && (
-                    <span className="inline-flex items-center rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700">PDF</span>
+                    <span className="inline-flex items-center bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700">PDF</span>
                   )}
                 </label>
                 <input
@@ -5583,7 +5583,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                       setAutoFilledFields(prev => { const next = new Set(prev); next.delete('name'); return next })
                     }
                   }}
-                  className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none ${formErrors.some(e => e.includes('naam')) ? 'border-red-400 bg-red-50/30' : autoFilledFields.has('name') ? 'border-sky-300 bg-sky-50/30' : 'border-[var(--border-ed)]'}`}
+                  className={`mt-1 w-full border px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none ${formErrors.some(e => e.includes('naam')) ? 'border-red-400 bg-red-50/30' : autoFilledFields.has('name') ? 'border-sky-300 bg-sky-50/30' : 'border-[var(--border-ed)]'}`}
                 />
               </div>
 
@@ -5594,7 +5594,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                   value={formDescription}
                   onChange={e => setFormDescription(e.target.value)}
                   rows={2}
-                  className="mt-1 w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none resize-none"
+                  className="mt-1 w-full border border-[var(--border-ed)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none resize-none"
                   placeholder="Optioneel: beschrijf waarom of wat je verwacht"
                 />
               </div>
@@ -5635,7 +5635,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                   <label className="text-xs font-medium text-[var(--ink-3)] flex items-center gap-1.5">
                     Vanaf welke leeftijd?
                     {autoFilledFields.has('ingangLeeftijd') && (
-                      <span className="inline-flex items-center rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700">PDF</span>
+                      <span className="inline-flex items-center bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700">PDF</span>
                     )}
                   </label>
                   <input
@@ -5645,12 +5645,12 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                         setAutoFilledFields(prev => { const next = new Set(prev); next.delete('ingangLeeftijd'); return next })
                       }
                     }}
-                    className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none ${(formErrors.some(e => e.includes('eeftijd')) || formWarnings.some(w => w.includes('AOW'))) ? 'border-amber-400 bg-amber-50/30' : autoFilledFields.has('ingangLeeftijd') ? 'border-sky-300 bg-sky-50/30' : 'border-[var(--border-ed)]'}`}
+                    className={`mt-1 w-full border px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none ${(formErrors.some(e => e.includes('eeftijd')) || formWarnings.some(w => w.includes('AOW'))) ? 'border-amber-400 bg-amber-50/30' : autoFilledFields.has('ingangLeeftijd') ? 'border-sky-300 bg-sky-50/30' : 'border-[var(--border-ed)]'}`}
                     placeholder="bijv. 45"
                   />
                   {/* AOW: voorgestelde leeftijd op basis van geboortedatum */}
                   {formType === 'aow' && (
-                    <div className="mt-1.5 rounded-lg border border-horizon-200 bg-horizon-50/50 px-3 py-2">
+                    <div className="mt-1.5 border border-horizon-200 bg-horizon-50/50 px-3 py-2">
                       <div className="flex items-center justify-between gap-2">
                         <div className="min-w-0">
                           <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Jouw AOW-leeftijd</p>
@@ -5689,7 +5689,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                   <label className="text-xs font-medium text-[var(--ink-3)] flex items-center gap-1.5">
                     {formDurationType === 'one_time' ? 'Bedrag' : 'Maandbedrag'}
                     {autoFilledFields.has('brutoBedrag') && (
-                      <span className="inline-flex items-center rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700">PDF</span>
+                      <span className="inline-flex items-center bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700">PDF</span>
                     )}
                   </label>
                   <div className="mt-1 flex gap-2">
@@ -5727,7 +5727,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                           setAutoFilledFields(prev => { const next = new Set(prev); next.delete('brutoBedrag'); return next })
                         }
                       }}
-                      className={`min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none ${formErrors.some(e => e.includes('edrag')) ? 'border-red-400 bg-red-50/30' : autoFilledFields.has('brutoBedrag') ? 'border-sky-300 bg-sky-50/30' : 'border-[var(--border-ed)]'}`}
+                      className={`min-w-0 flex-1 border px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none ${formErrors.some(e => e.includes('edrag')) ? 'border-red-400 bg-red-50/30' : autoFilledFields.has('brutoBedrag') ? 'border-sky-300 bg-sky-50/30' : 'border-[var(--border-ed)]'}`}
                       placeholder="0"
                     />
                   </div>
@@ -5741,7 +5741,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                       type="number"
                       value={formDuration}
                       onChange={e => { setFormDuration(e.target.value ? Number(e.target.value) : ''); setFormErrors([]) }}
-                      className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none ${formErrors.some(e => e.includes('duur')) ? 'border-red-400 bg-red-50/30' : 'border-[var(--border-ed)]'}`}
+                      className={`mt-1 w-full border px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none ${formErrors.some(e => e.includes('duur')) ? 'border-red-400 bg-red-50/30' : 'border-[var(--border-ed)]'}`}
                       placeholder="bijv. 12"
                     />
                   </div>
@@ -5754,7 +5754,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                       type="checkbox"
                       checked={formIsIndexed}
                       onChange={e => setFormIsIndexed(e.target.checked)}
-                      className="h-4 w-4 rounded border-[var(--border-md)] accent-horizon-600"
+                      className="h-4 w-4 border-[var(--border-md)] accent-horizon-600"
                     />
                     <span className="text-sm text-[var(--ink-2)]">Bedrag groeit mee met inflatie (~2%/jaar)</span>
                   </label>
@@ -5786,7 +5786,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                         setFormMetadata({ ...suggested.metadata })
                       }
                     }}
-                    className="mt-0.5 h-4 w-4 shrink-0 rounded border-[var(--border-md)] accent-horizon-600"
+                    className="mt-0.5 h-4 w-4 shrink-0 border-[var(--border-md)] accent-horizon-600"
                   />
                   <div>
                     <span className="text-sm font-medium text-[var(--ink)]">Gebruik voorgestelde waarden</span>
@@ -5855,7 +5855,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                           <span className="font-normal text-[var(--ink-4)]" title={field.tip}>ⓘ</span>
                         )}
                         {autoFilledFields.has(field.key) && (
-                          <span className="inline-flex items-center rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700">PDF</span>
+                          <span className="inline-flex items-center bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700">PDF</span>
                         )}
                       </label>
                       {field.fieldType === 'number' || field.fieldType === 'percentage' ? (
@@ -6002,7 +6002,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                                 // No need to change formAmount here — save handler combines them
                               }
                             }}
-                            className={`min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none ${autoFilledFields.has(field.key) ? 'border-sky-300 bg-sky-50/30' : 'border-[var(--border-ed)]'}`}
+                            className={`min-w-0 flex-1 border px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none ${autoFilledFields.has(field.key) ? 'border-sky-300 bg-sky-50/30' : 'border-[var(--border-ed)]'}`}
                           />
                           {field.suffix && (
                             <span className="shrink-0 text-xs text-[var(--ink-3)]">{field.suffix}</span>
@@ -6103,7 +6103,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                               }
                             }
                           }}
-                          className={`mt-1 w-full rounded-lg border bg-[var(--paper)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none ${autoFilledFields.has(field.key) ? 'border-sky-300 bg-sky-50/30' : 'border-[var(--border-ed)]'}`}
+                          className={`mt-1 w-full border bg-[var(--paper)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none ${autoFilledFields.has(field.key) ? 'border-sky-300 bg-sky-50/30' : 'border-[var(--border-ed)]'}`}
                         >
                           {field.options?.map(opt => (
                             <option key={String(opt.value)} value={String(opt.value)}>{opt.label}</option>
@@ -6159,7 +6159,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                                 return updated
                               })
                             }}
-                            className="h-4 w-4 rounded border-[var(--border-md)] accent-horizon-600"
+                            className="h-4 w-4 border-[var(--border-md)] accent-horizon-600"
                           />
                           <span className="text-xs text-[var(--ink-2)]">{field.tip ?? ''}</span>
                         </label>
@@ -6171,7 +6171,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                         const baseAmount = leefsituatie === 'samenwonend' ? NL_AOW_MONTHLY_SAMENWONEND : NL_AOW_MONTHLY
                         const gecorrigeerdBedrag = Math.round(baseAmount * opbouwPct / 100)
                         return (
-                          <div className="mt-2 rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
+                          <div className="mt-2 border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
                             <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">AOW-opbouw</p>
                             <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
                               <div className="flex justify-between">
@@ -6212,7 +6212,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                         const nettoMaandlast = bruteMaandlast - huidigeHuur
                         return (
                           <div className="mt-2 space-y-2">
-                            <div className="rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
+                            <div className="border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
                               <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Kosten koper ({pct}%)</p>
                               <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
                                 <div className="flex justify-between">
@@ -6242,7 +6242,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                                 </p>
                               )}
                             </div>
-                            <div className="rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
+                            <div className="border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
                               <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Netto maandlasten</p>
                               <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
                                 <div className="flex justify-between"><span>Hypotheeklasten</span><span className="font-mono tabular-nums">{<MaskedAmount value={hypotheekLasten} tone="horizon" />}/mnd</span></div>
@@ -6275,7 +6275,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                         const nettoOpvang = berekenKinderopvangNetto(opvangDagen, aantalKinderen)
                         const brutoOpvang = opvangDagen * 440 * aantalKinderen
                         return (
-                          <div className="mt-2 rounded-lg border border-horizon-200 bg-horizon-50/30 p-2.5 space-y-1">
+                          <div className="mt-2 border border-horizon-200 bg-horizon-50/30 p-2.5 space-y-1">
                             <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Geschatte opvangkosten</p>
                             <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
                               <div className="flex justify-between"><span>Bruto opvang ({opvangDagen} dgn × {aantalKinderen} {aantalKinderen === 1 ? 'kind' : 'kinderen'})</span><span className="font-mono tabular-nums">{<MaskedAmount value={brutoOpvang} tone="horizon" />}/mnd</span></div>
@@ -6306,7 +6306,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                         const totaalKb = kbPerMaand * duurMaanden
                         const totaal = babyuitzet + totaalBasis + totaalOpvang - totaalKb
                         return (
-                          <div className="mt-2 rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
+                          <div className="mt-2 border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
                             <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Financieel overzicht kinderen</p>
                             <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
                               <p className="text-[10px] font-semibold text-horizon-500 mb-1">Eenmalige kosten</p>
@@ -6345,7 +6345,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                         const ptPensioenReductie = ptBehoudtPensioen ? 0 : Math.min(100, Math.round(ptReductie * 1.65 * 100))
                         return (
                           <div className="mt-2 space-y-3">
-                            <div className="rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
+                            <div className="border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
                               <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Inkomensverlies berekening</p>
                               <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
                                 <div className="flex justify-between">
@@ -6363,7 +6363,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                               </div>
                             </div>
                             {!ptBehoudtPensioen && ptReductie > 0 && (
-                              <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50/50 p-3">
+                              <div className="flex gap-2 border border-amber-200 bg-amber-50/50 p-3">
                                 <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
                                 <div className="text-xs text-amber-800 space-y-1">
                                   <p className="font-semibold">Pensioenimpact (franchise-effect)</p>
@@ -6386,7 +6386,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                         const erf = berekenErfbelasting(bruto, relatie)
                         const tariefLabel: Record<string, string> = { kind: '10–20%', partner: '10–20%', kleinkind: '18–36%', overig: '30–40%' }
                         return (
-                          <div className="mt-2 space-y-1.5 rounded-lg border border-horizon-200 bg-horizon-50/50 p-3">
+                          <div className="mt-2 space-y-1.5 border border-horizon-200 bg-horizon-50/50 p-3">
                             <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Erfbelasting berekening (2026)</p>
                             <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
                               <div className="flex justify-between"><span>Bruto erfenis</span><span className="font-mono tabular-nums">{<MaskedAmount value={bruto} tone="horizon" />}</span></div>
@@ -6411,7 +6411,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                         const durMnd = Number(formDuration) || 6
                         const totaalVerlies = (inkomensverlies * durMnd) + extraKosten
                         return (
-                          <div className="mt-2 space-y-1.5 rounded-lg border border-horizon-200 bg-horizon-50/50 p-3">
+                          <div className="mt-2 space-y-1.5 border border-horizon-200 bg-horizon-50/50 p-3">
                             <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Inkomensverlies berekening</p>
                             <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
                               <div className="flex justify-between"><span>Netto maandinkomen</span><span className="font-mono tabular-nums">{<MaskedAmount value={nettoInkomen} tone="horizon" />}/mnd</span></div>
@@ -6445,7 +6445,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                         const vermogenPct = effectiveNetWorth > 0 ? Math.round((totaalOverbrugging / effectiveNetWorth) * 100) : 0
                         return (
                           <div className="mt-2 space-y-3">
-                            <div className="rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
+                            <div className="border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
                               <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">AOW-gat berekening</p>
                               <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
                                 <div className="flex justify-between">
@@ -6464,7 +6464,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                                 </div>
                               </div>
                             </div>
-                            <div className="rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
+                            <div className="border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
                               <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Geschatte overbruggingskosten</p>
                               <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
                                 <div className="flex justify-between">
@@ -6506,7 +6506,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                               </div>
                             </div>
                             {aowGapJaren > 5 && (
-                              <div className="flex gap-2 rounded-lg border border-red-200 bg-red-50/50 p-3">
+                              <div className="flex gap-2 border border-red-200 bg-red-50/50 p-3">
                                 <AlertTriangle className="h-4 w-4 shrink-0 text-red-600 mt-0.5" />
                                 <p className="text-xs text-red-800">
                                   Een AOW-gat van meer dan 5 jaar is aanzienlijk. Zorg voor voldoende vermogen of overweeg een latere pensioenleeftijd. Je moet {<MaskedAmount value={totaalOverbrugging} tone="horizon" />} overbruggen.
@@ -6514,7 +6514,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                               </div>
                             )}
                             {vermogenPct > 50 && effectiveNetWorth > 0 && (
-                              <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50/50 p-3">
+                              <div className="flex gap-2 border border-amber-200 bg-amber-50/50 p-3">
                                 <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
                                 <p className="text-xs text-amber-800">
                                   De overbruggingskosten beslaan {vermogenPct}% van je vermogen. Dit laat weinig ruimte voor onvoorziene uitgaven na pensionering.
@@ -6533,7 +6533,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                         const netto = breakdown.totaal - huidigeKosten
                         const brandstofLabel: Record<string, string> = { benzine: 'Benzine', diesel: 'Diesel', elektrisch: 'Laden (thuis)', hybride: 'Brandstof/laden' }
                         return (
-                          <div className="mt-2 rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
+                          <div className="mt-2 border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
                             <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Maandkosten breakdown (NIBUD/ANWB)</p>
                             <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
                               <div className="flex justify-between">
@@ -6588,7 +6588,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                         const mkBedrag = Math.round(vp * mkPct / 100)
                         const netto = vp - rh - mkBedrag
                         return (
-                          <div className="mt-2 rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
+                          <div className="mt-2 border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
                             <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Netto overwaarde</p>
                             <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
                               <div className="flex justify-between"><span>Verkoopprijs</span><span className="font-mono tabular-nums">{<MaskedAmount value={vp} tone="horizon" />}</span></div>
@@ -6609,7 +6609,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                         const nieuweLasten = Number(formMetadata.nieuweWoonlasten) || 0
                         const verschil = oudeLasten - nieuweLasten
                         return (
-                          <div className="mt-2 rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
+                          <div className="mt-2 border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
                             <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Verschil maandlasten</p>
                             <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
                               <div className="flex justify-between"><span>Oude hypotheeklasten</span><span className="font-mono tabular-nums">{<MaskedAmount value={oudeLasten} tone="horizon" />}/mnd</span></div>
@@ -6645,7 +6645,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                         const totaleDuur = Math.max(wwDuur, zoektijd)
                         const totaalInkomensVerlies = Math.round(inkomensgat * totaleDuur)
                         return (
-                          <div className="mt-2 rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
+                          <div className="mt-2 border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
                             <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Financieel overzicht werkloosheid</p>
                             <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
                               <div className="flex justify-between">
@@ -6695,7 +6695,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                         const ccTotaalKosten = ccTotaalVerlies + ccOmscholing
                         const ccDelta = ccNieuw - ccHuidig
                         return (
-                          <div className="mt-2 rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
+                          <div className="mt-2 border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
                             <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Financieel overzicht carrière switch</p>
                             <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
                               <p className="text-[10px] font-semibold text-horizon-500 mb-1">Fase 1 — Geen inkomen ({ccGapMnd} mnd)</p>
@@ -6733,7 +6733,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                         const verschilPermanent = formMetadata.verschilPermanent !== undefined ? Boolean(formMetadata.verschilPermanent) : true
                         const eenmaligTotaal = verhuiskosten + inrichtingskosten + dubbeleLastenTotaal
                         return (
-                          <div className="mt-2 rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
+                          <div className="mt-2 border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
                             <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Financieel overzicht verhuizing</p>
                             <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
                               <p className="text-[10px] font-semibold text-horizon-500 mb-1">Eenmalige kosten</p>
@@ -6766,7 +6766,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                         const notariskosten = huwelijksvoorwaarden ? 1200 : 0
                         const totaal = bruiloftBudget + huwelijksreis + notariskosten
                         return (
-                          <div className="mt-2 rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
+                          <div className="mt-2 border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
                             <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Financieel overzicht trouwerij</p>
                             <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
                               <div className="flex justify-between"><span>Bruiloftsbudget</span><span className="font-mono tabular-nums">{<MaskedAmount value={bruiloftBudget} tone="horizon" />}</span></div>
@@ -6796,7 +6796,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                         const jaren = isJaarlijks ? Math.max(1, Number(formMetadata.aantalJaren) || 10) : 1
                         const totaalOverJaren = (bedrag + totaleBelasting) * jaren
                         return (
-                          <div className="mt-2 rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
+                          <div className="mt-2 border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
                             <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Schenkingsoverzicht</p>
                             <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
                               <div className="flex justify-between"><span>Bedrag per ontvanger</span><span className="font-mono tabular-nums">{<MaskedAmount value={bedragPerOntvanger} tone="horizon" />}</span></div>
@@ -6847,7 +6847,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                         const duur = Number(formDuration) || LIFE_EVENT_CATALOG.world_trip?.defaultDuration || 12
                         const totaalKosten = vertrekkosten + (totaalMaandlast * duur)
                         return (
-                          <div className="mt-2 rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
+                          <div className="mt-2 border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
                             <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Kostenopbouw wereldreis</p>
                             <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
                               <div className="flex justify-between">
@@ -6901,7 +6901,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                         const waardevermeerdering = Math.round(kosten * waardePct / 100)
                         const nettoImpact = kosten - waardevermeerdering
                         return (
-                          <div className="mt-2 rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
+                          <div className="mt-2 border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
                             <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Netto impact verbouwing</p>
                             <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
                               <div className="flex justify-between">
@@ -6939,7 +6939,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                         const freedomDaysInvestment = dagKosten > 0 ? Math.round(collegegeld / dagKosten) : 0
                         const freedomDaysPerYear = salarisstijging > 0 && dagKosten > 0 ? Math.round((salarisstijging * 12) / dagKosten) : 0
                         return (
-                          <div className="mt-2 rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
+                          <div className="mt-2 border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
                             <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Rendement studie-investering</p>
                             <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
                               <div className="flex justify-between">
@@ -6997,7 +6997,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                           <div className="mt-2 space-y-3">
                             {/* Reference: current shared monthly costs */}
                             {maandlasten > 0 && (
-                              <div className="rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1">
+                              <div className="border border-horizon-200 bg-horizon-50/50 p-3 space-y-1">
                                 <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Huidige gedeelde maandlasten</p>
                                 <div className="flex justify-between text-xs text-[var(--ink-2)]">
                                   <span>Totale maanduitgaven huishouden</span>
@@ -7010,7 +7010,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                               </div>
                             )}
                             {/* Netto impact breakdown */}
-                            <div className="rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
+                            <div className="border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
                               <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Netto maandelijkse impact</p>
                               <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
                                 <div className="flex justify-between">
@@ -7045,7 +7045,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                             </div>
                             {/* Levensverzekering one-time */}
                             {verzekering > 0 && (
-                              <div className="rounded-lg border border-positive/30 bg-positive-bg p-3">
+                              <div className="border border-positive/30 bg-positive-bg p-3">
                                 <div className="flex justify-between text-xs text-[var(--ink-2)]">
                                   <span className="font-semibold">Eenmalige uitkering levensverzekering</span>
                                   <span className="font-mono tabular-nums text-positive font-semibold">+{<MaskedAmount value={verzekering} tone="horizon" />}</span>
@@ -7054,7 +7054,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                             )}
                             {/* ORV tip */}
                             {nettoMaandImpact < -500 && (
-                              <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50/50 p-3">
+                              <div className="flex gap-2 border border-amber-200 bg-amber-50/50 p-3">
                                 <Info className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
                                 <p className="text-xs text-amber-800">
                                   Het inkomensverlies is aanzienlijk ({<MaskedAmount value={Math.abs(nettoMaandImpact)} tone="horizon" />}/mnd). Overweeg een overlijdensrisicoverzekering (ORV) als buffer. Een ORV van {<MaskedAmount value={Math.abs(nettoMaandImpact) * 120} tone="horizon" />} dekt 10 jaar inkomensverlies.
@@ -7078,7 +7078,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                         const opbouwNetto = opbouwMaanden > 0 ? Math.max(0, Math.round(brutoOmzet * opbouwPct / 100) - kosten) : 0
                         return (
                           <div className="mt-2 space-y-3">
-                            <div className="rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
+                            <div className="border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
                               <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Netto berekening bijverdienste</p>
                               <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
                                 <div className="flex justify-between">
@@ -7105,7 +7105,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                                 )}
                               </div>
                             </div>
-                            <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50/50 p-3">
+                            <div className="flex gap-2 border border-amber-200 bg-amber-50/50 p-3">
                               <Info className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
                               <div className="text-xs text-amber-800 space-y-1">
                                 <p className="font-semibold">Let op: extra inkomen wordt belast tegen je marginale tarief ({marginaalTarief}%)</p>
@@ -7116,7 +7116,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                               </div>
                             </div>
                             {opbouwMaanden > 0 && (
-                              <div className="rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
+                              <div className="border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
                                 <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Opbouwperiode ({opbouwMaanden} maanden)</p>
                                 <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
                                   <div className="flex justify-between">
@@ -7145,7 +7145,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                         const vermogensverlies = Math.round(effectiveNetWorth * (1 - behoudPct / 100))
                         const advocaat = Number(formMetadata.advocaatKosten ?? 7500)
                         return (
-                          <div className="mt-2 rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
+                          <div className="mt-2 border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
                             <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Geschat vermogensverlies</p>
                             <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
                               <div className="flex justify-between"><span>Huidig netto vermogen</span><span className="font-mono tabular-nums">{<MaskedAmount value={effectiveNetWorth} tone="horizon" />}</span></div>
@@ -7214,7 +7214,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
               const partnerDebts = Math.round(totalDebts * partnerPct / 100)
               return (
                 <div className="space-y-3">
-                  <div className="rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-2">
+                  <div className="border border-horizon-200 bg-horizon-50/50 p-3 space-y-2">
                     <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">
                       Huishouden — vermogensverdeling
                     </p>
@@ -7288,7 +7288,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                     })()}
                   </div>
                   {/* Tip about shared items */}
-                  <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50/50 p-3">
+                  <div className="flex gap-2 border border-amber-200 bg-amber-50/50 p-3">
                     <Info className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
                     <p className="text-xs text-amber-800">
                       Bij scheiding worden gedeelde items persoonlijk. Pas daarna je profiel aan: verwijder gedeelde rekeningen, pas schulden aan, en update je vermogen naar je individuele deel.
@@ -7427,7 +7427,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                             type="checkbox"
                             checked={cf.indexed}
                             onChange={(e) => setFormCashflows(prev => prev.map(c => c.id === cf.id ? { ...c, indexed: e.target.checked } : c))}
-                            className="rounded border-[var(--border-ed)]"
+                            className="border-[var(--border-ed)]"
                           />
                           Geïndexeerd
                         </label>
@@ -7460,14 +7460,14 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                         <button
                           type="button"
                           onClick={() => setEditingCashflowId(cf.id)}
-                          className="rounded p-1 text-[var(--ink-4)] hover:text-[var(--ink-2)]"
+                          className="p-1 text-[var(--ink-4)] hover:text-[var(--ink-2)]"
                         >
                           <Edit3 className="h-3.5 w-3.5" />
                         </button>
                         <button
                           type="button"
                           onClick={() => setFormCashflows(prev => prev.filter(c => c.id !== cf.id))}
-                          className="rounded p-1 text-[var(--ink-4)] hover:text-red-600"
+                          className="p-1 text-[var(--ink-4)] hover:text-red-600"
                         >
                           <X className="h-3.5 w-3.5" />
                         </button>

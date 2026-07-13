@@ -3,9 +3,11 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { X, Check, AlertTriangle, Loader2, Plus, ExternalLink } from 'lucide-react'
+import { Check, ExternalLink } from 'lucide-react'
 import type { CustomCalculatorRow } from '@/lib/calculator/types'
 import type { CalculatorRequirementCheck } from '@/lib/calculator/requirements'
+import { ShellOverlay } from '@/components/app/shell/shell-overlay'
+import { ModalFooter } from '@/components/app/modal-footer'
 
 /**
  * DuplicateConfirmSheet — bevestigingsmodaal voor "Voeg toe aan mijn
@@ -61,8 +63,6 @@ export function DuplicateConfirmSheet({
   const allMet = requirementsChecks.every((c) => c.met)
   const firstMissing = requirementsChecks.find((c) => !c.met)
 
-  if (!open) return null
-
   async function handleDuplicate() {
     setSubmitting(true)
     setError(null)
@@ -95,40 +95,27 @@ export function DuplicateConfirmSheet({
   }
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={`Voeg ${calculator.name} toe`}
-      className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/30 backdrop-blur-sm p-4 pb-[calc(1rem+var(--safe-area-bottom,0px))]"
-      onClick={onClose}
+    <ShellOverlay
+      open={open}
+      onClose={onClose}
+      kind="sheet"
+      size="md"
+      title="Toevoegen aan jouw rekenhulpen"
+      footer={
+        <ModalFooter
+          primary={{
+            label: allMet ? 'Toevoegen aan mijn lijst' : 'Toch toevoegen',
+            onClick: handleDuplicate,
+            loading: submitting,
+          }}
+          secondary={{ label: 'Annuleer', onClick: onClose }}
+        />
+      }
     >
-      <div
-        className="w-full max-w-md max-h-[92vh] overflow-y-auto rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-5 sm:p-6 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <header className="flex items-start justify-between gap-3 mb-4">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="w-9 h-9 rounded-lg bg-horizon-50 flex items-center justify-center shrink-0">
-              <Plus className="w-4 h-4 text-horizon-700" aria-hidden="true" />
-            </span>
-            <div className="min-w-0">
-              <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
-                Toevoegen aan jouw rekenhulpen
-              </div>
-              <h2 className="font-serif text-lg text-[var(--ink)] mt-0.5 truncate">
-                {calculator.name}
-              </h2>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Sluiten"
-            className="inline-flex items-center justify-center w-8 h-8 rounded-full text-[var(--ink-3)] hover:bg-[var(--subtle)] transition-colors shrink-0"
-          >
-            <X className="w-4 h-4" aria-hidden="true" />
-          </button>
-        </header>
+      <div className="p-5 sm:p-6">
+        <h2 className="font-serif text-lg text-[var(--ink)] mb-4 truncate">
+          {calculator.name}
+        </h2>
 
         {calculator.description && (
           <p className="text-xs text-[var(--ink-2)] leading-relaxed mb-4">
@@ -185,56 +172,27 @@ export function DuplicateConfirmSheet({
           </div>
         ) : (
           firstMissing && (
-            <div
-              role="note"
-              className="rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2.5 text-xs text-amber-900"
-            >
-              Je hebt nog geen{' '}
-              <strong className="font-semibold">{firstMissing.label.toLowerCase()}</strong>{' '}
-              in je profiel. De rekenhulp werkt wel, maar je vult{' '}
-              {firstMissing.label.toLowerCase()} handmatig in.
-            </div>
+            <>
+              <div
+                role="note"
+                className="rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2.5 text-xs text-amber-900"
+              >
+                Je hebt nog geen{' '}
+                <strong className="font-semibold">{firstMissing.label.toLowerCase()}</strong>{' '}
+                in je profiel. De rekenhulp werkt wel, maar je vult{' '}
+                {firstMissing.label.toLowerCase()} handmatig in.
+              </div>
+              <Link
+                href={firstMissing.deepLink}
+                className="mt-3 inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm font-semibold text-[var(--ink-2)] hover:border-[var(--ink-3)] transition-colors"
+              >
+                <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
+                Eerst toevoegen aan profiel
+              </Link>
+            </>
           )
         )}
-
-        <div className="mt-5 flex items-center justify-end gap-2 flex-wrap">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--ink-3)] hover:text-[var(--ink-2)] transition-colors"
-          >
-            Annuleer
-          </button>
-          {!allMet && firstMissing && (
-            <Link
-              href={firstMissing.deepLink}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm font-semibold text-[var(--ink-2)] hover:border-[var(--ink-3)] transition-colors"
-            >
-              <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
-              Eerst toevoegen aan profiel
-            </Link>
-          )}
-          <button
-            type="button"
-            onClick={handleDuplicate}
-            disabled={submitting}
-            className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold text-white transition-colors disabled:opacity-50 ${
-              allMet
-                ? 'bg-positive hover:bg-positive/90'
-                : 'bg-[var(--ink)] hover:bg-[var(--ink-2)]'
-            }`}
-          >
-            {submitting ? (
-              <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
-            ) : allMet ? (
-              <Plus className="w-4 h-4" aria-hidden="true" />
-            ) : (
-              <AlertTriangle className="w-4 h-4" aria-hidden="true" />
-            )}
-            {allMet ? 'Toevoegen aan mijn lijst' : 'Toch toevoegen'}
-          </button>
-        </div>
       </div>
-    </div>
+    </ShellOverlay>
   )
 }

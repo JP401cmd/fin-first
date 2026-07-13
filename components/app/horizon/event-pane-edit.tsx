@@ -388,7 +388,7 @@ export function EventPaneEdit({
             <ArrowLeft className="h-4 w-4" />
           </button>
         )}
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--module-active-50)] text-[var(--module-active-700)]">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center bg-[var(--module-active-50)] text-[var(--module-active-700)]">
           {EVENT_ICONS[eventIcon] ?? EVENT_ICONS['Calendar']}
         </span>
         <div className="flex-1 min-w-0">
@@ -412,7 +412,7 @@ export function EventPaneEdit({
             type="text"
             value={state.name}
             onChange={e => setState({ ...state, name: e.target.value })}
-            className="mt-1 w-full px-3 py-2 border border-[var(--border-md)] rounded-lg bg-[var(--paper)] focus:border-[var(--module-active-700)] focus:outline-none"
+            className="mt-1 w-full px-3 py-2 border border-[var(--border-md)] bg-[var(--paper)] focus:border-[var(--module-active-700)] focus:outline-none"
           />
         </div>
         <div>
@@ -427,7 +427,7 @@ export function EventPaneEdit({
             onChange={e =>
               setState({ ...state, shared_age: Math.max(currentAge, Number(e.target.value) || currentAge) })
             }
-            className="mt-1 w-24 px-3 py-2 border border-[var(--border-md)] rounded-lg bg-[var(--paper)] font-mono tabular-nums focus:border-[var(--module-active-700)] focus:outline-none"
+            className="mt-1 w-24 px-3 py-2 border border-[var(--border-md)] bg-[var(--paper)] font-mono tabular-nums focus:border-[var(--module-active-700)] focus:outline-none"
           />
         </div>
       </div>
@@ -444,7 +444,7 @@ export function EventPaneEdit({
       {/* Block 1: Eenmalig */}
       <CardEditorial accent className="p-5 mb-4">
         <header className="flex items-center gap-3 mb-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[var(--module-active-50)] text-[var(--module-active-700)]">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center bg-[var(--module-active-50)] text-[var(--module-active-700)]">
             <Sparkles className="h-4 w-4" aria-hidden />
           </span>
           <div>
@@ -477,7 +477,7 @@ export function EventPaneEdit({
                 onChange={e =>
                   setState({ ...state, oneTimeAmount: Math.max(0, Number(e.target.value) || 0) })
                 }
-                className="w-36 px-3 py-2 border border-[var(--border-md)] rounded-lg bg-[var(--paper)] font-mono tabular-nums focus:border-[var(--module-active-700)] focus:outline-none"
+                className="w-36 px-3 py-2 border border-[var(--border-md)] bg-[var(--paper)] font-mono tabular-nums focus:border-[var(--module-active-700)] focus:outline-none"
               />
             </div>
           </div>
@@ -491,7 +491,7 @@ export function EventPaneEdit({
       {/* Block 2: Tijdelijk */}
       <CardEditorial accent={state.tempEnabled} className="p-5 mb-4">
         <header className="flex items-start gap-3 mb-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[var(--module-active-50)] text-[var(--module-active-700)]">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center bg-[var(--module-active-50)] text-[var(--module-active-700)]">
             <Hourglass className="h-4 w-4" aria-hidden />
           </span>
           <div className="flex-1 min-w-0">
@@ -536,7 +536,7 @@ export function EventPaneEdit({
                   onChange={e =>
                     setState({ ...state, tempAmount: Math.max(0, Number(e.target.value) || 0) })
                   }
-                  className="mt-1 w-36 px-3 py-2 border border-[var(--border-md)] rounded-lg bg-[var(--paper)] font-mono tabular-nums focus:border-[var(--module-active-700)] focus:outline-none"
+                  className="mt-1 w-36 px-3 py-2 border border-[var(--border-md)] bg-[var(--paper)] font-mono tabular-nums focus:border-[var(--module-active-700)] focus:outline-none"
                 />
               </div>
               <DirectionToggle
@@ -558,7 +558,7 @@ export function EventPaneEdit({
                       tempDurationYears: Math.max(1, Math.min(30, Number(e.target.value) || 1)),
                     })
                   }
-                  className="mt-1 w-24 px-3 py-2 border border-[var(--border-md)] rounded-lg bg-[var(--paper)] font-mono tabular-nums focus:border-[var(--module-active-700)] focus:outline-none"
+                  className="mt-1 w-24 px-3 py-2 border border-[var(--border-md)] bg-[var(--paper)] font-mono tabular-nums focus:border-[var(--module-active-700)] focus:outline-none"
                 />
               </div>
             </div>
@@ -577,7 +577,7 @@ export function EventPaneEdit({
       {/* Block 3: Continu */}
       <CardEditorial accent={state.contEnabled} className="p-5 mb-4">
         <header className="flex items-start gap-3 mb-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[var(--module-active-50)] text-[var(--module-active-700)]">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center bg-[var(--module-active-50)] text-[var(--module-active-700)]">
             <Repeat className="h-4 w-4" aria-hidden />
           </span>
           <div className="flex-1 min-w-0">
@@ -622,7 +622,7 @@ export function EventPaneEdit({
                   onChange={e =>
                     setState({ ...state, contAmount: Math.max(0, Number(e.target.value) || 0) })
                   }
-                  className="mt-1 w-36 px-3 py-2 border border-[var(--border-md)] rounded-lg bg-[var(--paper)] font-mono tabular-nums focus:border-[var(--module-active-700)] focus:outline-none"
+                  className="mt-1 w-36 px-3 py-2 border border-[var(--border-md)] bg-[var(--paper)] font-mono tabular-nums focus:border-[var(--module-active-700)] focus:outline-none"
                 />
               </div>
               <DirectionToggle
@@ -666,7 +666,7 @@ export function EventPaneEdit({
           alleen een compacte FIRE-vertraging-card + delete-knop, en blijft de
           save-CTA in de pane-footer. */}
       {showInlineSaveBlock ? (
-        <div className="mt-6 rounded-xl bg-[var(--ink)] text-[var(--paper)] px-5 py-4 sm:px-6 sm:py-5 flex flex-col sm:flex-row sm:items-center gap-4">
+        <div className="mt-6 bg-[var(--ink)] text-[var(--paper)] px-5 py-4 sm:px-6 sm:py-5 flex flex-col sm:flex-row sm:items-center gap-4">
           <div className="flex-1 min-w-0" aria-live="polite">
             <div className="text-[9px] uppercase tracking-[0.18em] font-mono opacity-70">
               FIRE-vertraging
@@ -687,7 +687,7 @@ export function EventPaneEdit({
               <button
                 type="button"
                 onClick={onDelete}
-                className="px-3 py-3 rounded-lg bg-transparent border border-white/30 text-white/80 hover:bg-white/10"
+                className="px-3 py-3 bg-transparent border border-white/30 text-white/80 hover:bg-white/10"
                 aria-label="Verwijderen"
                 title="Verwijderen"
               >
@@ -698,7 +698,7 @@ export function EventPaneEdit({
               type="button"
               onClick={() => onSave(buildDraftEvent(state, existingEvent))}
               disabled={saving || !hasAnyImpact || !state.name.trim()}
-              className="shrink-0 px-5 py-3 rounded-lg bg-[var(--paper)] text-[var(--ink)] font-semibold text-sm hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="shrink-0 px-5 py-3 bg-[var(--paper)] text-[var(--ink)] font-semibold text-sm hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {saving ? 'Opslaan…' : existingEvent ? 'Opslaan' : 'Toevoegen'}
             </button>
@@ -707,7 +707,7 @@ export function EventPaneEdit({
       ) : (
         // Pane-footer-variant: behoud de FIRE-vertraging-samenvatting en delete-
         // affordance, maar zonder save-CTA (die zit nu in de footer).
-        <div className="mt-6 rounded-xl bg-[var(--ink)] text-[var(--paper)] px-5 py-4 sm:px-6 sm:py-5 flex items-center gap-4">
+        <div className="mt-6 bg-[var(--ink)] text-[var(--paper)] px-5 py-4 sm:px-6 sm:py-5 flex items-center gap-4">
           <div className="flex-1 min-w-0" aria-live="polite">
             <div className="text-[9px] uppercase tracking-[0.18em] font-mono opacity-70">
               FIRE-vertraging
@@ -727,7 +727,7 @@ export function EventPaneEdit({
             <button
               type="button"
               onClick={onDelete}
-              className="shrink-0 px-3 py-3 rounded-lg bg-transparent border border-white/30 text-white/80 hover:bg-white/10"
+              className="shrink-0 px-3 py-3 bg-transparent border border-white/30 text-white/80 hover:bg-white/10"
               aria-label="Verwijderen"
               title="Verwijderen"
             >
@@ -737,7 +737,7 @@ export function EventPaneEdit({
         </div>
       )}
       {saveError && (
-        <div className="mt-3 text-xs text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">
+        <div className="mt-3 text-xs text-red-700 bg-red-50 border border-red-200 px-3 py-2">
           {saveError}
         </div>
       )}
@@ -868,7 +868,7 @@ function StoryQuestionInput({
               key={String(opt.value)}
               type="button"
               onClick={() => onChange(opt.value)}
-              className={`text-left p-3 border-2 rounded-lg transition-all ${
+              className={`text-left p-3 border-2 transition-all ${
                 active
                   ? 'border-[var(--module-active-700)] bg-[var(--module-active-50)]'
                   : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-[var(--border-md)] hover:-translate-y-px'
@@ -887,7 +887,7 @@ function StoryQuestionInput({
   }
   if (question.type === 'segmented') {
     return (
-      <div className="inline-flex border border-[var(--border-md)] rounded-lg overflow-hidden flex-wrap">
+      <div className="inline-flex border border-[var(--border-md)] overflow-hidden flex-wrap">
         {question.options.map(opt => {
           const active = value === opt.value
           return (
@@ -941,7 +941,7 @@ function StoryQuestionInput({
           step={question.step ?? 1}
           value={num}
           onChange={e => onChange(Number(e.target.value) || 0)}
-          className="w-40 px-3 py-2 border border-[var(--border-md)] rounded-lg bg-[var(--paper)] font-mono tabular-nums focus:border-[var(--module-active-700)] focus:outline-none"
+          className="w-40 px-3 py-2 border border-[var(--border-md)] bg-[var(--paper)] font-mono tabular-nums focus:border-[var(--module-active-700)] focus:outline-none"
         />
         {question.suffix && (
           <span className="text-sm text-[var(--ink-3)]">{question.suffix}</span>
@@ -986,7 +986,7 @@ function DirectionToggle({
       <label className="text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--ink-3)]">
         Type
       </label>
-      <div className="mt-1 inline-flex border border-[var(--border-md)] rounded-lg overflow-hidden">
+      <div className="mt-1 inline-flex border border-[var(--border-md)] overflow-hidden">
         {(['expense', 'income'] as const).map(opt => (
           <button
             key={opt}

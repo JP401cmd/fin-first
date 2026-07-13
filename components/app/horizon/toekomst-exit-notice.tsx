@@ -26,6 +26,7 @@ import { createPortal } from 'react-dom'
 import { X, Lightbulb } from 'lucide-react'
 import { EditorialHeadline } from '@/components/editorial'
 import { useFocusTrap } from '@/lib/hooks/use-focus-trap'
+import { acquireOverlay } from '@/lib/overlay-signal'
 
 export interface ToekomstExitNoticeProps {
   /** Of de modal zichtbaar is (door de parent bepaald per exit). */
@@ -54,6 +55,14 @@ export function ToekomstExitNotice({ visible, onClose, onDismissForever }: Toeko
   const cardRef = useRef<HTMLDivElement>(null)
   const primaryRef = useRef<HTMLButtonElement>(null)
   useFocusTrap({ active: visible && mounted, containerRef: cardRef, initialFocusRef: primaryRef })
+
+  // Verberg de zwevende nav-pill zolang deze modal open is (ADR 0039). Bewust
+  // géén BottomSheet-migratie: bespoke editorial kaart met eigen
+  // backdrop-dismiss; alleen het pill-signaal wordt gedeeld. Zie overlay-signal.ts.
+  useEffect(() => {
+    if (!visible) return
+    return acquireOverlay()
+  }, [visible])
 
   // Body-scroll-lock + Escape (= niet-persistent sluiten) zolang de modal open is.
   useEffect(() => {

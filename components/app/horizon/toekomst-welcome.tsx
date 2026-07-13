@@ -33,6 +33,7 @@ import { formatWithFreedom } from '@/lib/format'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { EditorialHeadline } from '@/components/editorial'
 import { useFocusTrap } from '@/lib/hooks/use-focus-trap'
+import { acquireOverlay } from '@/lib/overlay-signal'
 
 export interface ToekomstWelcomeProps {
   /** Of de overlay zichtbaar is (first-visit-only, door parent bepaald). */
@@ -96,6 +97,15 @@ export function ToekomstWelcome({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ feature_slug: 'horizon_welcome_shown' }),
     }).catch(() => {})
+  }, [visible])
+
+  // Verberg de zwevende nav-pill zolang deze full-page overlay open is
+  // (ADR 0039). Bewust géén BottomSheet-migratie: dit is een bespoke editorial
+  // welkomstkaart met eigen backdrop-dismiss en border-left-accent; alleen het
+  // pill-signaal wordt gedeeld met het overlay-systeem. Zie overlay-signal.ts.
+  useEffect(() => {
+    if (!visible) return
+    return acquireOverlay()
   }, [visible])
 
   // Body-scroll-lock + Escape-to-dismiss zolang de overlay open is.

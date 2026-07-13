@@ -218,7 +218,7 @@ export default function MijnNotificatiesPage() {
           User-feedback (mei 2026): "het is mij niet duidelijk welke
           notificaties dit zijn, die van de coach of die in het meldingen
           scherm terecht komen?". */}
-      <div className="mb-4 rounded-2xl border border-[var(--border-ed)] bg-[var(--subtle)] p-3 sm:p-4 text-xs sm:text-sm text-[var(--ink-2)]">
+      <div className="mb-4 border border-[var(--border-ed)] bg-[var(--subtle)] p-3 sm:p-4 text-xs sm:text-sm text-[var(--ink-2)]">
         <p className="leading-relaxed">
           <span className="font-semibold text-[var(--ink)]">Push-meldingen</span>{' '}
           die je op je apparaat ontvangt — ook bekend onder het{' '}
@@ -229,7 +229,7 @@ export default function MijnNotificatiesPage() {
         </p>
       </div>
 
-      <section className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
+      <section className="border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
         <div className="px-4 sm:px-8 py-6">
           {notifLoading ? (
             <div className="flex items-center justify-center py-8">
@@ -237,7 +237,7 @@ export default function MijnNotificatiesPage() {
             </div>
           ) : (
             <>
-              <div className="divide-y divide-zinc-100 rounded-xl border border-[var(--border-ed)]">
+              <div className="divide-y divide-zinc-100 border border-[var(--border-ed)]">
                 {NOTIFICATION_TYPES.map(({ type, label, description, icon: Icon }) => {
                   const enabled = notifPrefs[type] !== false
                   return (
@@ -269,7 +269,7 @@ export default function MijnNotificatiesPage() {
               </div>
 
               {/* Monthly check-in toggle */}
-              <div className="mt-4 rounded-xl border border-[var(--border-ed)]">
+              <div className="mt-4 border border-[var(--border-ed)]">
                 <div className="flex items-center justify-between gap-4 px-4 py-3">
                   <div className="flex items-center gap-3 min-w-0">
                     <CalendarCheck className="h-4 w-4 shrink-0 text-[var(--ink-3)]" />
@@ -298,7 +298,7 @@ export default function MijnNotificatiesPage() {
 
               {/* Partner transacties — only when user has a household */}
               {hasHousehold && (
-                <div id="partner-transacties" className="mt-5 rounded-xl border border-[var(--border-ed)] overflow-hidden scroll-mt-4">
+                <div id="partner-transacties" className="mt-5 border border-[var(--border-ed)] overflow-hidden scroll-mt-4">
                   <div className="flex items-center gap-3 px-4 py-3 bg-[var(--subtle)] border-b border-[var(--border-ed)]">
                     <HandCoins className="h-4 w-4 shrink-0 text-wil-600" />
                     <div>
@@ -320,7 +320,7 @@ export default function MijnNotificatiesPage() {
                           key={opt.mode}
                           type="button"
                           onClick={() => setPartnerNotifMode(opt.mode)}
-                          className={`flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition-colors ${
+                          className={`flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors ${
                             partnerNotifMode === opt.mode
                               ? 'bg-wil-50 border border-wil-300'
                               : 'border border-[var(--border-ed)] hover:bg-[var(--subtle)]'
@@ -342,7 +342,7 @@ export default function MijnNotificatiesPage() {
                     </div>
 
                     {partnerNotifMode === 'threshold' && (
-                      <div className="rounded-lg border border-[var(--border-ed)] p-3 bg-[var(--subtle)]">
+                      <div className="border border-[var(--border-ed)] p-3 bg-[var(--subtle)]">
                         <label className="block text-xs font-medium text-[var(--ink-2)] mb-1.5">Drempelbedrag</label>
                         <div className="flex items-center gap-2">
                           <span className="text-sm text-[var(--ink-3)]">€</span>
@@ -352,7 +352,7 @@ export default function MijnNotificatiesPage() {
                             step="10"
                             value={partnerNotifThreshold}
                             onChange={(e) => setPartnerNotifThreshold(e.target.value)}
-                            className="w-28 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-1.5 text-sm font-mono tabular-nums text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-wil-400"
+                            className="w-28 border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-1.5 text-sm font-mono tabular-nums text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-wil-400"
                           />
                           <span className="text-xs text-[var(--ink-3)]">of hoger</span>
                         </div>
@@ -360,7 +360,7 @@ export default function MijnNotificatiesPage() {
                     )}
 
                     {partnerNotifMode === 'categories' && (
-                      <div className="rounded-lg border border-[var(--border-ed)] p-3 bg-[var(--subtle)]">
+                      <div className="border border-[var(--border-ed)] p-3 bg-[var(--subtle)]">
                         <label className="block text-xs font-medium text-[var(--ink-2)] mb-2">Selecteer categorieën</label>
                         {userBudgetCategories.length > 0 ? (
                           <div className="space-y-1.5">
@@ -371,12 +371,12 @@ export default function MijnNotificatiesPage() {
                                   key={cat.id}
                                   type="button"
                                   onClick={() => togglePartnerCategory(cat.id)}
-                                  className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left transition-colors ${
+                                  className={`flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors ${
                                     checked ? 'bg-wil-50 border border-wil-200' : 'border border-transparent hover:bg-[var(--paper)]'
                                   }`}
                                 >
                                   <div
-                                    className={`h-4 w-4 rounded border shrink-0 flex items-center justify-center ${
+                                    className={`h-4 w-4 border shrink-0 flex items-center justify-center ${
                                       checked ? 'bg-wil-600 border-wil-600' : 'border-[var(--border-md)] bg-[var(--paper)]'
                                     }`}
                                   >
@@ -407,7 +407,7 @@ export default function MijnNotificatiesPage() {
                       <button
                         onClick={() => void savePartnerNotifPrefs()}
                         disabled={partnerNotifSaving || !partnerNotifChanged}
-                        className="rounded-lg bg-wil-600 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-wil-700 disabled:opacity-50"
+                        className="bg-wil-600 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-wil-700 disabled:opacity-50"
                       >
                         {partnerNotifSaving ? 'Opslaan...' : 'Opslaan'}
                       </button>
@@ -428,7 +428,7 @@ export default function MijnNotificatiesPage() {
                 <button
                   onClick={() => void saveNotifPrefs()}
                   disabled={notifSaving}
-                  className="rounded-lg bg-zinc-900 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50"
+                  className="bg-zinc-900 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50"
                 >
                   {notifSaving ? 'Opslaan...' : 'Opslaan'}
                 </button>

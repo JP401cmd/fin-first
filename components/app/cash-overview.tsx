@@ -5,13 +5,14 @@ import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import {
   ChevronLeft, ChevronRight, Wallet,
-  Upload, Link2, ArrowRight, X, ExternalLink,
+  Upload, Link2, ArrowRight, ExternalLink,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { type Account } from '@/components/app/account-form-modal'
 import { formatCurrency as formatCurrencyShort } from '@/components/app/budget-shared'
 import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
 import { BottomSheet } from '@/components/app/bottom-sheet'
+import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { usePerspective } from '@/components/app/perspective-provider'
 import { HideInSimple } from '@/components/app/hide-in-simple'
@@ -1260,37 +1261,32 @@ export function CashOverview({
       </BottomSheet>
 
       {/* === Nested account detail modal (embedded mode) === */}
-      {embedded && detailAccountId && (
-        <div
-          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4"
-          onClick={(e) => { if (e.target === e.currentTarget) setDetailAccountId(null) }}
+      {/* Gemigreerd naar <ShellOverlay kind="sheet"> (ADR 0039). De
+          "Open volledig"-deeplink staat als header-action naast de titel; de
+          X-sluitknop levert de shell zelf. */}
+      {embedded && (
+        <ShellOverlay
+          open={Boolean(detailAccountId)}
+          onClose={() => setDetailAccountId(null)}
+          kind="sheet"
+          size="full"
+          title={accounts.find((a) => a.id === detailAccountId)?.name ?? 'Rekening'}
+          actions={
+            detailAccountId ? (
+              <Link
+                href={`/core/assets/cash/${detailAccountId}`}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-ed)] px-3 py-1.5 text-xs font-medium text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)]"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                Open volledig
+              </Link>
+            ) : undefined
+          }
         >
-          <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-[var(--r-lg)] bg-[var(--paper)] shadow-2xl">
-            <div className="flex items-center justify-between border-b border-[var(--border-ed)] px-5 py-4">
-              <h3 className="font-semibold text-[var(--ink)]">
-                {accounts.find((a) => a.id === detailAccountId)?.name ?? 'Rekening'}
-              </h3>
-              <div className="flex items-center gap-2">
-                <Link
-                  href={`/core/assets/cash/${detailAccountId}`}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-ed)] px-3 py-1.5 text-xs font-medium text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)]"
-                >
-                  <ExternalLink className="h-3.5 w-3.5" />
-                  Open volledig
-                </Link>
-                <button
-                  onClick={() => setDetailAccountId(null)}
-                  className="touch-target rounded-md text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-            </div>
-            <div className="flex-1 overflow-y-auto">
-              <DynCashAccountView accountId={detailAccountId} embedded />
-            </div>
-          </div>
-        </div>
+          {detailAccountId && (
+            <DynCashAccountView accountId={detailAccountId} embedded />
+          )}
+        </ShellOverlay>
       )}
 
       {/* === Edit-pane voor handmatige cash-assets (brede modus) === */}

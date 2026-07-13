@@ -2,14 +2,15 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { X, Globe2, Loader2, Info } from 'lucide-react'
+import { Info } from 'lucide-react'
 import { suggestPublicDefault } from '@/lib/calculator/suggest-public-default'
 import type {
   CustomCalculatorRow,
   CalculatorInput,
   InputKind,
 } from '@/lib/calculator/types'
-import { Button } from '@/components/editorial'
+import { ShellOverlay } from '@/components/app/shell/shell-overlay'
+import { ModalFooter } from '@/components/app/modal-footer'
 
 /**
  * PublishCurationSheet — laat de auteur per input een neutrale publieke
@@ -91,8 +92,6 @@ export function PublishCurationSheet({
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  if (!open) return null
-
   function updateDefault(key: string, raw: string) {
     const parsed = Number(raw)
     setDefaults((prev) => ({
@@ -105,8 +104,8 @@ export function PublishCurationSheet({
     setPrefillOverrides((prev) => ({ ...prev, [key]: !prev[key] }))
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+  async function handleSubmit(e?: React.FormEvent) {
+    e?.preventDefault()
     setSubmitting(true)
     setError(null)
     try {
@@ -142,41 +141,23 @@ export function PublishCurationSheet({
   }
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={`Publiceer ${calculator.name}`}
-      className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/30 backdrop-blur-sm p-4 pb-[calc(1rem+var(--safe-area-bottom,0px))]"
-      onClick={onClose}
+    <ShellOverlay
+      open={open}
+      onClose={onClose}
+      kind="sheet"
+      size="md"
+      title="Publiceer in de bibliotheek"
+      footer={
+        <ModalFooter
+          primary={{ label: 'Publiceren', onClick: () => handleSubmit(), loading: submitting }}
+          secondary={{ label: 'Annuleer', onClick: onClose }}
+        />
+      }
     >
-      <form
-        onSubmit={handleSubmit}
-        className="w-full max-w-lg max-h-[92vh] overflow-y-auto rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-5 sm:p-6 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <header className="flex items-start justify-between gap-3 mb-4">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="w-9 h-9 rounded-lg bg-horizon-50 flex items-center justify-center shrink-0">
-              <Globe2 className="w-4 h-4 text-horizon-700" aria-hidden="true" />
-            </span>
-            <div className="min-w-0">
-              <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
-                Publiceer in de bibliotheek
-              </div>
-              <h2 className="font-serif text-lg text-[var(--ink)] mt-0.5 truncate">
-                {calculator.name}
-              </h2>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Sluiten"
-            className="inline-flex items-center justify-center w-8 h-8 rounded-full text-[var(--ink-3)] hover:bg-[var(--subtle)] transition-colors shrink-0"
-          >
-            <X className="w-4 h-4" aria-hidden="true" />
-          </button>
-        </header>
+      <form onSubmit={handleSubmit} className="p-5 sm:p-6">
+        <h2 className="font-serif text-lg text-[var(--ink)] mb-4 truncate">
+          {calculator.name}
+        </h2>
 
         <p className="text-xs text-[var(--ink-2)] leading-relaxed mb-4">
           Anderen zien deze rekenhulp met de waarden die jij hieronder
@@ -214,26 +195,8 @@ export function PublishCurationSheet({
             planner.
           </p>
         </aside>
-
-        <div className="mt-5 flex items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--ink-3)] hover:text-[var(--ink-2)] transition-colors"
-          >
-            Annuleer
-          </button>
-          <Button type="submit" disabled={submitting} className="gap-1.5">
-            {submitting ? (
-              <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
-            ) : (
-              <Globe2 className="w-4 h-4" aria-hidden="true" />
-            )}
-            Publiceren
-          </Button>
-        </div>
       </form>
-    </div>
+    </ShellOverlay>
   )
 }
 

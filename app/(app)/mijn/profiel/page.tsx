@@ -7,11 +7,14 @@ import { HouseholdPrivacySettings } from '@/components/mijn/household-privacy-se
 import { HouseholdBudgetModelSection } from '@/components/mijn/household-budget-model-section'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { PageOpening, Button } from '@/components/editorial'
+import { FormError, formErrorId } from '@/components/app/form-error'
+import { useToast } from '@/components/app/toast-provider'
 
 type HouseholdType = 'solo' | 'samen' | 'gezin'
 
 export default function ProfielPage() {
   const supabase = createClient()
+  const { addToast } = useToast()
   // NB: kleuren (module/budget/phase) worden al server-side door de
   // app-layout in de ModuleColorProvider gezet (zie app/(app)/layout.tsx).
   // Deze pagina laadt ze daarom NIET opnieuw via de provider-setters — dat zou
@@ -37,7 +40,8 @@ export default function ProfielPage() {
   // UI state
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  // I-02 / besluit 3: fouten inline via FormError, succes via een toast.
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   useEffect(() => {
     async function loadProfile() {
@@ -74,11 +78,11 @@ export default function ProfielPage() {
 
   const saveProfile = useCallback(async () => {
     setSaving(true)
-    setSaveMessage(null)
+    setSaveError(null)
 
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
-      setSaveMessage({ type: 'error', text: 'Niet ingelogd.' })
+      setSaveError('Je bent niet ingelogd. Log opnieuw in en probeer het nog eens.')
       setSaving(false)
       return
     }
@@ -102,10 +106,10 @@ export default function ProfielPage() {
       })
 
     if (error) {
-      setSaveMessage({ type: 'error', text: 'Opslaan mislukt. Probeer opnieuw.' })
+      setSaveError('Opslaan is mislukt. Probeer het opnieuw.')
     } else {
-      setSaveMessage({ type: 'success', text: 'Opgeslagen!' })
-      setTimeout(() => setSaveMessage(null), 3000)
+      setSaveError(null)
+      addToast({ type: 'success', title: 'Je profiel is opgeslagen.' })
 
       // Feature #830: clear 'income' from deferred onboarding fields when
       // the user has now filled in their income. This removes the coach-bubble
@@ -135,7 +139,7 @@ export default function ProfielPage() {
       }
     }
     setSaving(false)
-  }, [supabase, fullName, dateOfBirth, country, householdType, marketplaceDisplayName, numberOfChildren, childrenAges, housingType, energyLabel, hasCar, netMonthlyIncome])
+  }, [supabase, addToast, fullName, dateOfBirth, country, householdType, marketplaceDisplayName, numberOfChildren, childrenAges, housingType, energyLabel, hasCar, netMonthlyIncome])
 
   if (loading) {
     return (
@@ -161,7 +165,7 @@ export default function ProfielPage() {
       />
 
       {/* ── Persoonlijke Gegevens ─────────────────────────────────── */}
-      <section className="mb-5 sm:mb-8 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-8">
+      <section className="mb-5 sm:mb-8 border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-8">
         <h2 className="label-editorial text-[var(--ink-2)]">
           Persoonlijke Gegevens
         </h2>
@@ -251,20 +255,16 @@ export default function ProfielPage() {
           </div>
         </div>
 
-        <div className="mt-3 sm:mt-6 flex items-center gap-3">
+        <div className="mt-3 sm:mt-6">
           <Button variant="primary" onClick={saveProfile} disabled={saving}>
             {saving ? 'Opslaan...' : 'Opslaan'}
           </Button>
-          {saveMessage && (
-            <span className={`text-sm ${saveMessage.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
-              {saveMessage.text}
-            </span>
-          )}
+          <FormError id={formErrorId('profiel-persoonlijk')} message={saveError} />
         </div>
       </section>
 
       {/* ── Huishoudprofiel (NIBUD matching) ─────────────────────── */}
-      <section className="mb-5 sm:mb-8 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-8">
+      <section className="mb-5 sm:mb-8 border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-8">
         <h2 className="label-editorial text-[var(--ink-2)]">
           Huishoudprofiel
         </h2>
@@ -425,15 +425,11 @@ export default function ProfielPage() {
           </div>
         </div>
 
-        <div className="mt-3 sm:mt-6 flex items-center gap-3">
+        <div className="mt-3 sm:mt-6">
           <Button variant="primary" onClick={saveProfile} disabled={saving}>
             {saving ? 'Opslaan...' : 'Opslaan'}
           </Button>
-          {saveMessage && (
-            <span className={`text-sm ${saveMessage.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
-              {saveMessage.text}
-            </span>
-          )}
+          <FormError id={formErrorId('profiel-huishouden')} message={saveError} />
         </div>
       </section>
 

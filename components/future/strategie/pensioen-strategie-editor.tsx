@@ -520,7 +520,7 @@ export function PensioenStrategieEditor({
       >
         <div className="space-y-3">
           {pensionEvents.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-[var(--border-md)] bg-[var(--paper)] p-6 text-center">
+            <div className="border border-dashed border-[var(--border-md)] bg-[var(--paper)] p-6 text-center">
               <p className="mb-3 text-sm leading-relaxed text-[var(--ink-2)]">
                 Nog geen pensioenpotten. Voeg je werknemerspensioen of lijfrente toe — je vindt de
                 bedragen op{' '}
@@ -538,9 +538,9 @@ export function PensioenStrategieEditor({
                   type="button"
                   disabled={readOnly}
                   onClick={() => openEdit(ev)}
-                  className="flex w-full items-center gap-3 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 text-left transition-all hover:border-[var(--ink-3)] disabled:opacity-60"
+                  className="flex w-full items-center gap-3 border border-[var(--border-ed)] bg-[var(--paper)] p-4 text-left transition-all hover:border-[var(--ink-3)] disabled:opacity-60"
                 >
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--subtle)] text-[var(--ink-2)]">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center bg-[var(--subtle)] text-[var(--ink-2)]">
                     <Icon className="h-4 w-4" aria-hidden />
                   </span>
                   <div className="min-w-0 flex-1">
@@ -561,7 +561,7 @@ export function PensioenStrategieEditor({
 
           {/* Uitleg: huidige vs. verwachte ("te bereiken") waarde */}
           {pensionEvents.length > 0 && (
-            <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--subtle)] p-4">
+            <div className="border border-[var(--border-ed)] bg-[var(--subtle)] p-4">
               <div className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)]">
                 Wat betekenen deze bedragen?
               </div>
@@ -578,7 +578,7 @@ export function PensioenStrategieEditor({
           {/* Projectiegrafiek (leeftijd × verwacht jaarbedrag, 3 lijnen) + rode
               melding + detail-tabel. Module-accent horizon. */}
           {pensionEvents.length > 0 && (
-            <div className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4">
+            <div className="border border-[var(--border-ed)] bg-[var(--paper)] p-4">
               <div className="mb-3 text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)]">
                 Verwacht pensioen per leeftijd
               </div>
@@ -592,7 +592,7 @@ export function PensioenStrategieEditor({
           )}
 
           {!readOnly && (
-            <div className="rounded-2xl border border-[var(--border-ed)] bg-horizon-50/30 p-4">
+            <div className="border border-[var(--border-ed)] bg-horizon-50/30 p-4">
               <div className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)]">
                 Pensioenoverzicht uploaden
               </div>
@@ -614,7 +614,7 @@ export function PensioenStrategieEditor({
 
           {/* Unified review-paneel — wordt getoond na een upload. */}
           {!readOnly && pendingReview && (
-            <div className="rounded-2xl border border-horizon-200 bg-horizon-50/40 p-4 space-y-4">
+            <div className="border border-horizon-200 bg-horizon-50/40 p-4 space-y-4">
               <div>
                 <div className="text-[10px] font-medium uppercase tracking-[0.08em] text-horizon-700">
                   Dit vonden we — wat wil je overnemen?
@@ -650,9 +650,9 @@ export function PensioenStrategieEditor({
                     return (
                       <div
                         key={entry.regeling.fondsNaam || idx}
-                        className="flex w-full items-start gap-3 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4"
+                        className="flex w-full items-start gap-3 border border-[var(--border-ed)] bg-[var(--paper)] p-4"
                       >
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--subtle)] text-[var(--ink-2)]">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center bg-[var(--subtle)] text-[var(--ink-2)]">
                           <Icon className="h-4 w-4" aria-hidden />
                         </span>
                         <div className="min-w-0 flex-1 space-y-2">
@@ -660,7 +660,7 @@ export function PensioenStrategieEditor({
                             <div className="flex items-start gap-2">
                               <span
                                 className={[
-                                  'mt-0.5 inline-block shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em]',
+                                  'mt-0.5 inline-block shrink-0 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em]',
                                   hasMatch
                                     ? 'bg-[var(--subtle)] text-[var(--ink-3)]'
                                     : 'bg-horizon-100 text-horizon-700',
@@ -715,7 +715,7 @@ export function PensioenStrategieEditor({
                                 aria-pressed={chosenAction === 'update'}
                                 onClick={() => setChosenAction('update')}
                                 className={[
-                                  'rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--ink-3)]',
+                                  'px-2.5 py-1 text-[11px] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--ink-3)]',
                                   chosenAction === 'update'
                                     ? 'bg-[var(--ink)] text-[var(--paper)]'
                                     : 'border border-[var(--border-md)] text-[var(--ink-2)] hover:border-[var(--ink-3)]',
@@ -729,7 +729,7 @@ export function PensioenStrategieEditor({
                               aria-pressed={chosenAction === 'add'}
                               onClick={() => setChosenAction('add')}
                               className={[
-                                'rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--ink-3)]',
+                                'px-2.5 py-1 text-[11px] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--ink-3)]',
                                 chosenAction === 'add'
                                   ? 'bg-[var(--ink)] text-[var(--paper)]'
                                   : 'border border-[var(--border-md)] text-[var(--ink-2)] hover:border-[var(--ink-3)]',
@@ -743,7 +743,7 @@ export function PensioenStrategieEditor({
                               onClick={() => setChosenAction('skip')}
                               title="Niet overnemen — je kunt deze pot later altijd handmatig toevoegen"
                               className={[
-                                'rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--ink-3)]',
+                                'px-2.5 py-1 text-[11px] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--ink-3)]',
                                 chosenAction === 'skip'
                                   ? 'bg-[var(--ink)] text-[var(--paper)]'
                                   : 'border border-[var(--border-md)] text-[var(--ink-2)] hover:border-[var(--ink-3)]',
@@ -761,7 +761,7 @@ export function PensioenStrategieEditor({
 
               {/* AOW-rij — geïntegreerd in hetzelfde paneel */}
               {pendingReview.kanAow && (
-                <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-4">
+                <div className="border border-[var(--border-ed)] bg-[var(--paper)] p-4">
                   <label htmlFor="aow-overnemen-checkbox" className="flex items-start gap-3 cursor-pointer">
                     <input
                       id="aow-overnemen-checkbox"
@@ -773,7 +773,7 @@ export function PensioenStrategieEditor({
                           prev ? { ...prev, aowIncluded: e.target.checked } : prev,
                         )
                       }
-                      className="mt-0.5 h-4 w-4 shrink-0 rounded border-[var(--border-md)] accent-[var(--ink)]"
+                      className="mt-0.5 h-4 w-4 shrink-0 border-[var(--border-md)] accent-[var(--ink)]"
                     />
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-semibold text-[var(--ink)]">AOW overnemen</div>
@@ -820,7 +820,7 @@ export function PensioenStrategieEditor({
                   onClick={applyPendingReview}
                   disabled={reviewApplying}
                   aria-busy={reviewApplying}
-                  className="rounded-lg bg-[var(--ink)] px-4 py-2 text-xs font-semibold text-[var(--paper)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="bg-[var(--ink)] px-4 py-2 text-xs font-semibold text-[var(--paper)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {reviewApplying ? 'Bezig…' : 'Toepassen'}
                 </button>
@@ -828,7 +828,7 @@ export function PensioenStrategieEditor({
                   type="button"
                   onClick={cancelPendingReview}
                   disabled={reviewApplying}
-                  className="rounded-lg border border-[var(--border-md)] px-4 py-2 text-xs font-semibold text-[var(--ink-2)] transition-colors hover:border-[var(--ink-3)] disabled:opacity-50"
+                  className="border border-[var(--border-md)] px-4 py-2 text-xs font-semibold text-[var(--ink-2)] transition-colors hover:border-[var(--ink-3)] disabled:opacity-50"
                 >
                   Annuleren
                 </button>
@@ -840,14 +840,14 @@ export function PensioenStrategieEditor({
             <button
               type="button"
               onClick={openNew}
-              className="flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-[var(--border-md)] px-4 py-3 text-sm font-semibold text-[var(--ink-2)] transition-colors hover:border-[var(--ink-3)] hover:bg-[var(--subtle)]"
+              className="flex w-full items-center justify-center gap-1.5 border border-dashed border-[var(--border-md)] px-4 py-3 text-sm font-semibold text-[var(--ink-2)] transition-colors hover:border-[var(--ink-3)] hover:bg-[var(--subtle)]"
             >
               <Plus className="h-4 w-4" aria-hidden /> Pensioenpot toevoegen
             </button>
           )}
 
           {pensionEvents.length > 0 && (
-            <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--subtle)] p-4">
+            <div className="border border-[var(--border-ed)] bg-[var(--subtle)] p-4">
               <div className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)]">
                 Samen — totaal bruto pensioen
               </div>
@@ -864,15 +864,15 @@ export function PensioenStrategieEditor({
           )}
 
           {grossYearlyIncome > 0 && (
-            <div className="rounded-xl border border-[var(--border-ed)] text-xs text-[var(--ink-2)]">
+            <div className="border border-[var(--border-ed)] text-xs text-[var(--ink-2)]">
               <button
                 type="button"
                 onClick={() => setShowJaarruimte((s) => !s)}
                 aria-expanded={showJaarruimte}
                 aria-controls="jaarruimte-section"
-                className="flex w-full items-start gap-3 rounded-xl p-3 text-left transition-colors hover:bg-[var(--subtle)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink-3)]"
+                className="flex w-full items-start gap-3 p-3 text-left transition-colors hover:bg-[var(--subtle)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink-3)]"
               >
-                <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] text-[var(--ink-2)]">
+                <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center border border-[var(--border-ed)] bg-[var(--subtle)] text-[var(--ink-2)]">
                   <Calculator className="h-4 w-4" aria-hidden />
                 </span>
                 <span className="min-w-0 flex-1">
@@ -895,13 +895,13 @@ export function PensioenStrategieEditor({
               {showJaarruimte && (
                 <div id="jaarruimte-section" className="space-y-4 px-3 pb-3">
                   {/* 0 — Inline uitleg "Wat is jaarruimte?" */}
-                  <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--subtle)] p-3">
+                  <div className="border border-[var(--border-ed)] bg-[var(--subtle)] p-3">
                     <button
                       type="button"
                       onClick={() => setShowJaarruimteUitleg((s) => !s)}
                       aria-expanded={showJaarruimteUitleg}
                       aria-controls="jaarruimte-uitleg-inline"
-                      className="flex w-full items-center justify-between gap-2 text-left font-medium text-[var(--ink-2)] hover:underline focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink-3)]"
+                      className="flex w-full items-center justify-between gap-2 text-left font-medium text-[var(--ink-2)] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink-3)]"
                     >
                       <span>Wat is jaarruimte?</span>
                       {showJaarruimteUitleg ? (
@@ -926,7 +926,7 @@ export function PensioenStrategieEditor({
                   </div>
 
                   {/* 1 — Jaarruimte tonen */}
-                  <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--subtle)] p-3">
+                  <div className="border border-[var(--border-ed)] bg-[var(--subtle)] p-3">
                     <div className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)]">
                       {isUpperBound
                         ? 'Bovengrens vóór aftrek werkgeverspensioen'
@@ -973,7 +973,7 @@ export function PensioenStrategieEditor({
                           setFactorASource('upo')
                           setFactorAMsg(null)
                         }}
-                        className="w-32 rounded-lg border border-[var(--border-md)] bg-[var(--paper)] px-3 py-2 text-sm font-mono tabular-nums text-[var(--ink)] outline-none focus:border-[var(--ink)]"
+                        className="w-32 border border-[var(--border-md)] bg-[var(--paper)] px-3 py-2 text-sm font-mono tabular-nums text-[var(--ink)] outline-none focus:border-[var(--ink)]"
                       />
                       <span className="text-xs text-[var(--ink-3)]">/ jaar</span>
                     </div>
@@ -997,12 +997,12 @@ export function PensioenStrategieEditor({
                       onClick={() => setSalaryMode((s) => !s)}
                       aria-expanded={salaryMode}
                       aria-controls="salary-mode-section"
-                      className="font-medium text-[var(--ink-2)] underline-offset-2 hover:underline focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink-3)]"
+                      className="font-medium text-[var(--ink-2)] underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink-3)]"
                     >
                       Weet je het niet? Schat &apos;m uit je salaris {salaryMode ? '−' : '→'}
                     </button>
                     {salaryMode && (
-                      <div id="salary-mode-section" className="mt-2 rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] p-3">
+                      <div id="salary-mode-section" className="mt-2 border border-[var(--border-ed)] bg-[var(--subtle)] p-3">
                         <label
                           htmlFor="salary-input"
                           className="block text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)]"
@@ -1020,7 +1020,7 @@ export function PensioenStrategieEditor({
                             placeholder="bv. 45000"
                             value={salaryInput}
                             onChange={(e) => setSalaryInput(e.target.value)}
-                            className="w-32 rounded-lg border border-[var(--border-md)] bg-[var(--paper)] px-3 py-2 text-sm font-mono tabular-nums text-[var(--ink)] outline-none focus:border-[var(--ink)]"
+                            className="w-32 border border-[var(--border-md)] bg-[var(--paper)] px-3 py-2 text-sm font-mono tabular-nums text-[var(--ink)] outline-none focus:border-[var(--ink)]"
                           />
                           <span className="text-xs text-[var(--ink-3)]">/ jaar</span>
                         </div>
@@ -1032,7 +1032,7 @@ export function PensioenStrategieEditor({
                           type="button"
                           onClick={applySalaryEstimate}
                           disabled={!(Number(salaryInput) > 0)}
-                          className="mt-2 inline-flex min-h-[44px] items-center rounded-lg border border-[var(--border-md)] bg-[var(--paper)] px-3 py-2.5 text-xs font-semibold text-[var(--ink-2)] transition-colors hover:border-[var(--ink-3)] disabled:cursor-not-allowed disabled:opacity-50"
+                          className="mt-2 inline-flex min-h-[44px] items-center border border-[var(--border-md)] bg-[var(--paper)] px-3 py-2.5 text-xs font-semibold text-[var(--ink-2)] transition-colors hover:border-[var(--ink-3)] disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           Schat factor A
                         </button>
@@ -1046,7 +1046,7 @@ export function PensioenStrategieEditor({
                       type="button"
                       onClick={saveFactorA}
                       disabled={savingFactorA}
-                      className="rounded-lg bg-[var(--ink)] px-4 py-2 text-xs font-semibold text-[var(--paper)] transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="bg-[var(--ink)] px-4 py-2 text-xs font-semibold text-[var(--paper)] transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {savingFactorA ? 'Opslaan…' : 'Factor A opslaan'}
                     </button>
@@ -1147,7 +1147,7 @@ export function PensioenStrategieEditor({
             maxLength={60}
             disabled={readOnly}
             onChange={(e) => setDraft((d) => (d ? { ...d, name: e.target.value } : d))}
-            className="w-full rounded-lg border border-[var(--border-md)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[var(--ink)] disabled:opacity-50"
+            className="w-full border border-[var(--border-md)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[var(--ink)] disabled:opacity-50"
           />
         </label>
 
@@ -1242,7 +1242,7 @@ export function PensioenStrategieEditor({
             onChange={(e) =>
               setDraft((d) => (d ? { ...d, uitkeringsduur: e.target.value as Duur } : d))
             }
-            className="w-full rounded-lg border border-[var(--border-md)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[var(--ink)] disabled:opacity-60"
+            className="w-full border border-[var(--border-md)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[var(--ink)] disabled:opacity-60"
           >
             {allowed.map((d) => (
               <option key={d} value={d}>
@@ -1264,7 +1264,7 @@ export function PensioenStrategieEditor({
             checked={draft.isGeindexeerd}
             disabled={readOnly}
             onChange={(e) => setDraft((d) => (d ? { ...d, isGeindexeerd: e.target.checked } : d))}
-            className="h-4 w-4 rounded border-[var(--border-md)]"
+            className="h-4 w-4 border-[var(--border-md)]"
           />
           Wordt jaarlijks geïndexeerd (koopkracht blijft op peil)
         </label>
@@ -1285,7 +1285,7 @@ export function PensioenStrategieEditor({
         )}
 
         {/* Live impact */}
-        <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--subtle)] p-4">
+        <div className="border border-[var(--border-ed)] bg-[var(--subtle)] p-4">
           <div className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)]">
             Impact op je tijdas
           </div>

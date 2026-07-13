@@ -4,6 +4,7 @@ import { useCallback } from 'react'
 import type { HistoricalPeriodSummary } from '@/lib/report-data'
 import { MASKED_AMOUNT_PLACEHOLDER } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+import { FinTable } from '@/components/app/fin-table'
 
 function DeltaArrow({
   current,
@@ -141,66 +142,49 @@ export function HistoricalComparison({
     },
   ]
 
+  // Gedeelde klasse voor de "huidige periode"-kolom: subtiel gevulde nadruk-kolom.
+  const CURRENT_CELL = 'bg-[var(--subtle)]'
+
   return (
     <div className="report-section mb-8">
       <p className="font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--module-active-700)] mb-3">
         Historisch Perspectief — afgelopen periodes
       </p>
 
-      <div className="overflow-x-auto">
-        <table className="w-full font-dm-mono text-sm">
-          <thead>
-            <tr className="border-b border-dotted border-[var(--rule-soft)]">
-              <th className="py-2.5 pl-4 pr-2 text-left text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)] font-mono">
-                Metriek
-              </th>
+      {/* H-04: gemigreerd naar de canonieke FinTable. */}
+      <FinTable tableClassName="font-dm-mono">
+        <FinTable.Header>
+          <FinTable.Row>
+            <FinTable.Th>Metriek</FinTable.Th>
+            {period1 && <FinTable.Th align="right">{period1.periodLabel}</FinTable.Th>}
+            {period2 && <FinTable.Th align="right">{period2.periodLabel}</FinTable.Th>}
+            <FinTable.Th align="right" className={`${CURRENT_CELL} text-[var(--ink)]`}>
+              {currentPeriodLabel}
+            </FinTable.Th>
+          </FinTable.Row>
+        </FinTable.Header>
+        <FinTable.Body>
+          {rows.map((row) => (
+            <FinTable.Row key={row.label}>
+              <FinTable.Td color="text-[var(--ink-2)]">{row.label}</FinTable.Td>
               {period1 && (
-                <th className="py-2.5 px-2 text-right text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)] font-mono">
-                  {period1.periodLabel}
-                </th>
+                <FinTable.Td numeric color="text-[var(--ink-3)]">{row.p1}</FinTable.Td>
               )}
               {period2 && (
-                <th className="py-2.5 px-2 text-right text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)] font-mono">
-                  {period2.periodLabel}
-                </th>
+                <FinTable.Td numeric color="text-[var(--ink-3)]">{row.p2}</FinTable.Td>
               )}
-              <th className="py-2.5 pl-2 pr-4 text-right text-[10px] uppercase tracking-[0.08em] text-[var(--ink)] font-mono bg-[var(--subtle)]">
-                {currentPeriodLabel}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr
-                key={row.label}
-                className="border-b border-dotted border-[var(--rule-soft)] last:border-b-0"
-              >
-                <td className="py-2 pl-4 pr-2 font-inter text-[11px] text-[var(--ink-2)]">
-                  {row.label}
-                </td>
-                {period1 && (
-                  <td className="py-2 px-2 text-right tabular-nums text-[12px] text-[var(--ink-3)]">
-                    {row.p1}
-                  </td>
-                )}
-                {period2 && (
-                  <td className="py-2 px-2 text-right tabular-nums text-[12px] text-[var(--ink-3)]">
-                    {row.p2}
-                  </td>
-                )}
-                <td className="py-2 pl-2 pr-4 text-right tabular-nums text-[12px] font-medium text-[var(--ink)] bg-[var(--subtle)]">
-                  {row.current}{' '}
-                  <DeltaArrow
-                    current={row.deltaCurrent}
-                    previous={row.deltaBaseline}
-                    invert={row.invertDelta}
-                  />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+              <FinTable.Td numeric bold color="text-[var(--ink)]" className={CURRENT_CELL}>
+                {row.current}{' '}
+                <DeltaArrow
+                  current={row.deltaCurrent}
+                  previous={row.deltaBaseline}
+                  invert={row.invertDelta}
+                />
+              </FinTable.Td>
+            </FinTable.Row>
+          ))}
+        </FinTable.Body>
+      </FinTable>
     </div>
   )
 }

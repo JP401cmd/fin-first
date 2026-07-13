@@ -20,6 +20,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { BottomSheet } from '@/components/app/bottom-sheet'
+import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
@@ -168,6 +169,20 @@ export function BudgetPlanEditorSheet({
   const [draft, setDraft] = useState<DraftBudget[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // I-05: bevestiging bij niet-opgeslagen wijzigingen (vervangt window.confirm).
+  // `message` = de context-copy, `onConfirm` = de door te zetten actie.
+  const [discardConfirm, setDiscardConfirm] = useState<
+    { message: string; onConfirm: () => void } | null
+  >(null)
+  // De X/Esc-route van BottomSheet speelt zijn exit-animatie al vóór onClose.
+  // Kiest de gebruiker daarna "Annuleren" (dóór bewerken), dan is de sheet
+  // visueel weg terwijl `open` true bleef — een key-bump remount haalt 'm
+  // terug; de draft-state leeft in dít component en blijft dus intact.
+  const [editorEpoch, setEditorEpoch] = useState(0)
+  function keepEditing() {
+    setDiscardConfirm(null)
+    setEditorEpoch((e) => e + 1)
+  }
   // IDs where the user clicked "Overnemen" in this session. We track the
   // click explicitly rather than inferring from value-equality, so a user
   // who manually types the same number isn't falsely marked "Overgenomen".
@@ -501,7 +516,13 @@ export function BudgetPlanEditorSheet({
   }
 
   function handleClose() {
-    if (changes > 0 && !confirm('Je hebt nog niet-opgeslagen wijzigingen. Sluiten zonder opslaan?')) return
+    if (changes > 0) {
+      setDiscardConfirm({
+        message: 'Je hebt nog niet-opgeslagen wijzigingen. Sluit je dit scherm zonder ze op te slaan?',
+        onConfirm: onClose,
+      })
+      return
+    }
     onClose()
   }
 
@@ -516,13 +537,20 @@ export function BudgetPlanEditorSheet({
   // want de parent sluit deze sheet (draft gaat dan verloren).
   function handleEditAdvanced(id: string) {
     if (!onEditAdvanced) return
-    if (changes > 0 && !confirm('Je hebt nog niet-opgeslagen plan-wijzigingen. Doorgaan naar het uitgebreide bewerkscherm zonder opslaan?')) return
+    if (changes > 0) {
+      setDiscardConfirm({
+        message: 'Je hebt nog niet-opgeslagen plan-wijzigingen. Ga je naar het uitgebreide bewerkscherm zonder ze op te slaan?',
+        onConfirm: () => onEditAdvanced(id),
+      })
+      return
+    }
     onEditAdvanced(id)
   }
 
   // ── Render ────────────────────────────────────────────────────
   return (
-    <BottomSheet open={open} onClose={handleClose} title="Plan bewerken" size="full">
+    <>
+    <BottomSheet key={editorEpoch} open={open} onClose={handleClose} title="Plan bewerken" size="full">
       {/* Editorial intro — kicker-met-streep + deck (italic Source Serif).
           BottomSheet levert al de Playfair-titel in zijn header-bar; deze
           intro geeft context (welke maand, wat je hier doet) zonder dubbele
@@ -741,6 +769,45 @@ export function BudgetPlanEditorSheet({
         </div>
       )}
     </BottomSheet>
+
+    {/* I-05: bevestiging bij niet-opgeslagen wijzigingen — ShellOverlay
+        kind="confirm" (focus-trap + Esc) i.p.v. de kale window.confirm.
+        Sibling van de sheet (beide portalen naar body), zodat de confirm
+        boven de sheet stapelt zonder de scroll-content te nesten. */}
+    <ShellOverlay
+      open={!!discardConfirm}
+      onClose={keepEditing}
+      kind="confirm"
+      destructive
+      title="Niet-opgeslagen wijzigingen"
+    >
+      <div className="p-6">
+        <p className="text-sm leading-relaxed text-[var(--ink-2)]">
+          {discardConfirm?.message}
+        </p>
+        <div className="mt-6 flex items-center justify-end gap-3">
+          <button
+            type="button"
+            onClick={keepEditing}
+            className="border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+          >
+            Annuleren
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const c = discardConfirm
+              setDiscardConfirm(null)
+              c?.onConfirm()
+            }}
+            className="bg-negative px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+          >
+            Sluiten zonder opslaan
+          </button>
+        </div>
+      </div>
+    </ShellOverlay>
+    </>
   )
 }
 

@@ -8,6 +8,7 @@ import { useOverlayOpen } from '@/lib/hooks/use-scroll-lock'
 import type { FeatureAccessData } from '@/lib/compute-feature-access'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { Button } from '@/components/editorial'
+import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 
 const PHASE_GRADIENT_STYLE: Record<string, React.CSSProperties> = {
   recovery:  { background: 'linear-gradient(to right, var(--color-phase-recovery-500), var(--color-phase-recovery-600))' },
@@ -82,69 +83,73 @@ export function ActivationButton({ data }: { data: FeatureAccessData }) {
       </button>
       )}
 
-      {/* Modal */}
-      {showModal && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50">
-          <div className="mx-4 w-full max-w-lg rounded-[var(--r-lg)] bg-[var(--paper)] shadow-xl overflow-hidden">
-            {/* Header */}
-            <div className="px-6 py-8 text-center text-white" style={gradientStyle}>
-              <div className="mx-auto mb-4 flex justify-center">
-                <FfinAvatar size={72} />
-              </div>
-              <h2 className="text-xl font-bold">Klaar voor actie</h2>
-              <p className="mt-1 text-sm text-white/90">Dit is je financiele startpositie</p>
-              <div className="mt-3 flex justify-center">
-                <span className="rounded-full px-3 py-1 text-sm font-medium" style={badgeStyle}>
-                  {phaseLabel}
-                </span>
-              </div>
+      {/* Modal — gemigreerd naar <ShellOverlay kind="sheet"> (ADR 0039). Geen
+          sheet-titel: de full-bleed fase-gradient-header ís de visuele kop, en
+          een BottomSheet-titelbalk erboven zou dubbel voelen. De primaire acties
+          staan in de sticky footer; de Button-primitives blijven ongewijzigd. */}
+      <ShellOverlay
+        open={showModal}
+        onClose={() => setShowModal(false)}
+        kind="sheet"
+        size="md"
+        footer={
+          <div className="flex justify-end gap-3">
+            <Button variant="secondary" onClick={() => setShowModal(false)}>
+              Later
+            </Button>
+            <Button variant="moment" onClick={handleActivate} disabled={activating}>
+              {activating ? 'Activeren...' : 'Activeer mijn routekaart'}
+            </Button>
+          </div>
+        }
+      >
+        {/* Header */}
+        <div className="px-6 py-8 text-center text-white" style={gradientStyle}>
+          <div className="mx-auto mb-4 flex justify-center">
+            <FfinAvatar size={72} />
+          </div>
+          <h2 className="text-xl font-bold">Klaar voor actie</h2>
+          <p className="mt-1 text-sm text-white/90">Dit is je financiele startpositie</p>
+          <div className="mt-3 flex justify-center">
+            <span className="rounded-full px-3 py-1 text-sm font-medium" style={badgeStyle}>
+              {phaseLabel}
+            </span>
+          </div>
+        </div>
+
+        {/* Body — 2x2 metrics grid */}
+        <div className="px-6 py-5">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] p-4">
+              <p className="text-xs font-medium text-[var(--ink-3)]">Netto vermogen</p>
+              <p className={`mt-1 text-lg font-bold ${data.netWorth >= 0 ? 'text-positive' : 'text-negative'}`}>
+                {<MaskedAmount value={data.netWorth} tone="kern" />}
+              </p>
             </div>
 
-            {/* Body — 2x2 metrics grid */}
-            <div className="px-6 py-5">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] p-4">
-                  <p className="text-xs font-medium text-[var(--ink-3)]">Netto vermogen</p>
-                  <p className={`mt-1 text-lg font-bold ${data.netWorth >= 0 ? 'text-positive' : 'text-negative'}`}>
-                    {<MaskedAmount value={data.netWorth} tone="kern" />}
-                  </p>
-                </div>
-
-                <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] p-4">
-                  <p className="text-xs font-medium text-[var(--ink-3)]">Vrijheid</p>
-                  <p className="mt-1 text-lg font-bold text-horizon-700">
-                    {data.freedomPct.toFixed(1)}%
-                  </p>
-                </div>
-
-                <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] p-4">
-                  <p className="text-xs font-medium text-[var(--ink-3)]">Maandlasten</p>
-                  <p className="mt-1 text-lg font-bold text-[var(--ink-2)]">
-                    {<MaskedAmount value={data.monthlyExpenses} tone="kern" />}
-                  </p>
-                </div>
-
-                <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] p-4">
-                  <p className="text-xs font-medium text-[var(--ink-3)]">Vrijgekochte tijd</p>
-                  <p className="mt-1 text-lg font-bold text-[var(--ink-2)]">
-                    {freedomYears > 0 ? `${freedomYears}j ` : ''}{freedomMonths}m
-                  </p>
-                </div>
-              </div>
+            <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] p-4">
+              <p className="text-xs font-medium text-[var(--ink-3)]">Vrijheid</p>
+              <p className="mt-1 text-lg font-bold text-horizon-700">
+                {data.freedomPct.toFixed(1)}%
+              </p>
             </div>
 
-            {/* Footer */}
-            <div className="border-t border-[var(--border-ed)] px-6 py-4 flex justify-end gap-3">
-              <Button variant="secondary" onClick={() => setShowModal(false)}>
-                Later
-              </Button>
-              <Button variant="moment" onClick={handleActivate} disabled={activating}>
-                {activating ? 'Activeren...' : 'Activeer mijn routekaart'}
-              </Button>
+            <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] p-4">
+              <p className="text-xs font-medium text-[var(--ink-3)]">Maandlasten</p>
+              <p className="mt-1 text-lg font-bold text-[var(--ink-2)]">
+                {<MaskedAmount value={data.monthlyExpenses} tone="kern" />}
+              </p>
+            </div>
+
+            <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] p-4">
+              <p className="text-xs font-medium text-[var(--ink-3)]">Vrijgekochte tijd</p>
+              <p className="mt-1 text-lg font-bold text-[var(--ink-2)]">
+                {freedomYears > 0 ? `${freedomYears}j ` : ''}{freedomMonths}m
+              </p>
             </div>
           </div>
         </div>
-      )}
+      </ShellOverlay>
     </>
   )
 }

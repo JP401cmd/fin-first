@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useFocusTrap } from '@/lib/hooks/use-focus-trap'
+import { acquireOverlay } from '@/lib/overlay-signal'
 
 /**
  * Welkomstpopup vóór stap 1 — een rustig "lees-en-begin"-moment.
@@ -53,6 +54,12 @@ export function WelcomePopup({ onDismiss }: WelcomePopupProps) {
     containerRef,
     initialFocusRef: ctaRef,
   })
+
+  // Verberg de zwevende nav-pill zolang deze popup open is (ADR 0039). Bewust
+  // géén BottomSheet-migratie: gedocumenteerd editorial centered modal (NIET
+  // een bottom-sheet) zonder X-sluitknop — alleen het pill-signaal wordt
+  // gedeeld met het overlay-systeem. Zie overlay-signal.ts.
+  useEffect(() => acquireOverlay(), [])
 
   // ESC sluit de popup — minimale a11y-affordance, ook al is er geen X-knop.
   // We willen niet dat een gebruiker zonder muis vastzit in de dialog. ESC is

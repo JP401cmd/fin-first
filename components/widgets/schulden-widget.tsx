@@ -8,6 +8,7 @@ import { MaskedAmount } from '@/components/app/masked-amount'
 import type { DashboardData } from './widget-renderer'
 import { Users, UserCheck } from 'lucide-react'
 import { usePerspective } from '@/components/app/perspective-provider'
+import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 
 interface Props {
   size: WidgetSize
@@ -32,6 +33,12 @@ export const SchuldenWidget = memo(function SchuldenWidget({ size, data, href }:
     : isPartnerView
       ? `Schulden — ${partnerName ?? 'Partner'}`
       : 'Schulden'
+
+  // In-view fill-animatie (700ms bezier, 0% → doel; transition:none pre-entered).
+  // Eén hook bovenaan; per render toont het widget precies één size, dus dezelfde
+  // ref op elke size-track is rules-of-hooks-veilig.
+  const { ref: barRef, hasEntered } = useInViewAnimation({ duration: 700 })
+  const barTransition = hasEntered ? 'width 700ms cubic-bezier(.22,1,.36,1)' : 'none'
 
   if (size === 'mini') {
     return (
@@ -81,10 +88,10 @@ export const SchuldenWidget = memo(function SchuldenWidget({ size, data, href }:
             </p>
           ) : null}
           {totalDebts > 0 && (
-            <div className="mt-1.5 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
+            <div ref={barRef} className="mt-1.5 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
               <div
                 className="h-full rounded-full bg-negative/70"
-                style={{ width: `${schuldRatio}%` }}
+                style={{ width: hasEntered ? `${schuldRatio}%` : '0%', transition: barTransition }}
               />
             </div>
           )}
@@ -135,10 +142,10 @@ export const SchuldenWidget = memo(function SchuldenWidget({ size, data, href }:
                     <span className="text-[var(--ink-3)]">Schuldratio</span>
                     <span className="font-mono tabular-nums text-negative">{schuldRatio.toFixed(0)}%</span>
                   </div>
-                  <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-[var(--subtle)]">
+                  <div ref={barRef} className="flex h-1.5 w-full overflow-hidden rounded-full bg-[var(--subtle)]">
                     <div
-                      className="h-full rounded-full bg-negative/70 transition-all duration-500"
-                      style={{ width: `${schuldRatio}%` }}
+                      className="h-full rounded-full bg-negative/70"
+                      style={{ width: hasEntered ? `${schuldRatio}%` : '0%', transition: barTransition }}
                     />
                   </div>
                 </div>

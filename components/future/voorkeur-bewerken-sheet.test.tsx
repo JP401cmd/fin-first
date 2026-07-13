@@ -66,9 +66,9 @@ describe('VoorkeurBewerkenSheet — submit', () => {
       currentValuePct: 6,
       onClose,
     })
-    const input = container.querySelector('input[type="number"]')!
+    const input = document.querySelector('input[type="number"]')!
     fireEvent.change(input, { target: { value: '5' } })
-    fireEvent.submit(container.querySelector('form')!)
+    fireEvent.submit(document.querySelector('form')!)
     await new Promise((r) => setTimeout(r, 10))
     expect(mockUpdate).toHaveBeenCalled()
     expect(mockRefresh).toHaveBeenCalled()
@@ -77,18 +77,18 @@ describe('VoorkeurBewerkenSheet — submit', () => {
 
   it('toont fout-melding bij waarde buiten range', async () => {
     const { container } = renderSheet({ minPct: 0, maxPct: 10 })
-    const input = container.querySelector('input[type="number"]')!
+    const input = document.querySelector('input[type="number"]')!
     fireEvent.change(input, { target: { value: '15' } })
-    fireEvent.submit(container.querySelector('form')!)
+    fireEvent.submit(document.querySelector('form')!)
     expect(screen.getByRole('alert').textContent).toMatch(/tussen 0%/i)
     expect(mockUpdate).not.toHaveBeenCalled()
   })
 
   it('toont fout bij waarde onder min', async () => {
     const { container } = renderSheet({ minPct: 1, maxPct: 10 })
-    const input = container.querySelector('input[type="number"]')!
+    const input = document.querySelector('input[type="number"]')!
     fireEvent.change(input, { target: { value: '0' } })
-    fireEvent.submit(container.querySelector('form')!)
+    fireEvent.submit(document.querySelector('form')!)
     expect(screen.getByRole('alert').textContent).toMatch(/tussen 1%/i)
     expect(mockUpdate).not.toHaveBeenCalled()
   })

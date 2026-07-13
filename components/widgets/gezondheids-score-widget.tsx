@@ -9,6 +9,7 @@ import type { DashboardData } from './widget-renderer'
 import type { HealthPillar, HealthScore } from '@/lib/financial-health'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
+import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 
 interface Props {
   size: WidgetSize
@@ -232,11 +233,20 @@ function RadarChart({ pillars, sz }: { pillars: HealthPillar[]; sz: number }) {
 function PillarRow({ pillar }: { pillar: HealthPillar }) {
   const clamp = Math.max(0, Math.min(pillar.score, 100))
 
+  // In-view fill-animatie (700ms bezier, 0% → doel; transition:none pre-entered).
+  const { ref: barRef, hasEntered } = useInViewAnimation({ duration: 700 })
+
   return (
     <div className="flex items-center gap-2">
       <span className="w-[72px] shrink-0 text-[10px] text-[var(--ink-3)] truncate">{pillar.name}</span>
-      <div className="flex-1 h-1.5 rounded-full bg-[var(--subtle)] overflow-hidden">
-        <div className={`h-full rounded-full ${barColorClass(clamp)}`} style={{ width: `${clamp}%` }} />
+      <div ref={barRef} className="flex-1 h-1.5 rounded-full bg-[var(--subtle)] overflow-hidden">
+        <div
+          className={`h-full rounded-full ${barColorClass(clamp)}`}
+          style={{
+            width: hasEntered ? `${clamp}%` : '0%',
+            transition: hasEntered ? 'width 700ms cubic-bezier(.22,1,.36,1)' : 'none',
+          }}
+        />
       </div>
       <span className="w-[32px] shrink-0 text-right font-mono text-[10px] tabular-nums text-[var(--ink-2)]">{pillar.score}</span>
     </div>
@@ -312,13 +322,7 @@ function HealthKassabonSummary({ health }: { health: HealthScore }) {
       <div className="rounded-[var(--r-sm)] border border-[var(--border-ed)] p-3 space-y-1.5">
         <h3 className="text-xs font-semibold text-[var(--ink-2)] mb-2">Pilaren</h3>
         {health.pillars.map(pillar => (
-          <div key={pillar.id} className="flex items-center gap-2">
-            <span className="w-[72px] shrink-0 text-[10px] text-[var(--ink-3)] truncate">{pillar.name}</span>
-            <div className="flex-1 h-1.5 rounded-full bg-[var(--subtle)] overflow-hidden">
-              <div className={`h-full rounded-full ${barColorClass(pillar.score)}`} style={{ width: `${pillar.score}%` }} />
-            </div>
-            <span className="w-[32px] shrink-0 text-right font-mono text-[10px] tabular-nums text-[var(--ink-2)]">{pillar.score}</span>
-          </div>
+          <PillarRow key={pillar.id} pillar={pillar} />
         ))}
       </div>
 

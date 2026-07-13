@@ -5,7 +5,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Link2, ChevronRight } from 'lucide-react'
 import { ExportDropdown } from '@/components/app/export-dropdown'
-import { PageOpening } from '@/components/editorial'
+import { PageOpening, Button } from '@/components/editorial'
+import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 
 /**
  * GeavanceerdSettings — externe koppelingen, data-export en data-reset.
@@ -87,45 +88,54 @@ export function GeavanceerdSettings() {
         </div>
       </section>
 
-      {/* Reset-bevestiging */}
-      {showResetDialog && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-xl bg-[var(--paper)] p-6 shadow-xl">
-            <h3 className="text-lg font-semibold text-[var(--ink)]">Weet je het zeker?</h3>
-            <p className="mt-2 text-sm text-[var(--ink-2)]">
-              Dit wist <span className="font-semibold text-negative">al je financiële data</span> permanent.
-              Je wordt teruggeleid naar de onboarding om opnieuw te beginnen.
-            </p>
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setShowResetDialog(false)}
-                className="rounded-lg border border-[var(--border-md)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] transition-colors"
-              >
-                Annuleren
-              </button>
-              <button
-                type="button"
-                onClick={async () => {
-                  setShowResetDialog(false)
-                  setResetting(true)
-                  try {
-                    const res = await fetch('/api/onboarding/reset', { method: 'POST' })
-                    if (!res.ok) throw new Error('Reset failed')
-                    router.push('/onboarding')
-                  } catch {
-                    setResetting(false)
-                    setResetError('Reset mislukt. Probeer opnieuw.')
-                  }
-                }}
-                className="rounded-lg bg-negative px-4 py-2 text-sm font-medium text-white hover:bg-negative/90 transition-colors"
-              >
-                Alles wissen
-              </button>
-            </div>
+      {/* Reset-bevestiging — onomkeerbaar, dus kind="confirm" + destructive.
+          De rode primaire actie behoudt bewust bg-negative i.p.v. de
+          ink-Button (Button kent geen destructive-variant); de secundaire
+          annuleer-knop loopt via de gedeelde Button-primitive. */}
+      <ShellOverlay
+        open={showResetDialog}
+        onClose={() => setShowResetDialog(false)}
+        kind="confirm"
+        destructive
+        title="Weet je het zeker?"
+        footer={
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={async () => {
+                setShowResetDialog(false)
+                setResetting(true)
+                try {
+                  const res = await fetch('/api/onboarding/reset', { method: 'POST' })
+                  if (!res.ok) throw new Error('Reset failed')
+                  router.push('/onboarding')
+                } catch {
+                  setResetting(false)
+                  setResetError('Reset mislukt. Probeer opnieuw.')
+                }
+              }}
+              className="inline-flex min-h-11 flex-1 items-center justify-center bg-negative px-5 text-sm font-medium text-white transition-colors hover:bg-negative/90"
+              style={{ fontFamily: 'var(--font-inter, system-ui, sans-serif)' }}
+            >
+              Alles wissen
+            </button>
+            <Button
+              variant="secondary"
+              className="flex-1"
+              onClick={() => setShowResetDialog(false)}
+            >
+              Annuleren
+            </Button>
           </div>
+        }
+      >
+        <div className="p-5">
+          <p className="text-sm text-[var(--ink-2)]">
+            Dit wist <span className="font-semibold text-negative">al je financiële data</span> permanent.
+            Je wordt teruggeleid naar de onboarding om opnieuw te beginnen.
+          </p>
         </div>
-      )}
+      </ShellOverlay>
     </div>
   )
 }

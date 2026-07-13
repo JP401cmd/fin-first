@@ -1,8 +1,11 @@
+'use client'
+
 import { memo } from 'react'
 import { Sparkles } from 'lucide-react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
+import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 
 const WILLPOWER_LABELS: Record<string, string> = {
   A: 'uitstekend',
@@ -30,6 +33,12 @@ export const WilskrachtWidget = memo(function WilskrachtWidget({ size, data, hre
 
   const label = WILLPOWER_LABELS[willpowerScore] ?? ''
 
+  // In-view fill-animatie (700ms bezier, 0% → doel; transition:none pre-entered).
+  // Eén hook bovenaan; per render toont het widget precies één size, dus dezelfde
+  // ref op elke size-track is rules-of-hooks-veilig.
+  const { ref: barRef, hasEntered } = useInViewAnimation({ duration: 700 })
+  const barTransition = hasEntered ? 'width 700ms cubic-bezier(.22,1,.36,1)' : 'none'
+
   // ── Mini-size: willpower score letter ────
   if (size === 'mini') {
     return (
@@ -47,10 +56,10 @@ export const WilskrachtWidget = memo(function WilskrachtWidget({ size, data, hre
         <div className="flex flex-col items-center justify-center h-full gap-1">
           <span className="font-display text-3xl font-bold text-[var(--ink)]">{willpowerScore}</span>
           <span className="text-[10px] text-[var(--ink-3)] font-serif italic">{label}</span>
-          <div className="mt-1 h-1.5 w-full max-w-[80px] overflow-hidden rounded-full bg-wil-100">
+          <div ref={barRef} className="mt-1 h-1.5 w-full max-w-[80px] overflow-hidden rounded-full bg-wil-100">
             <div
-              className="h-full rounded-full bg-wil-500 transition-all duration-700"
-              style={{ width: `${Math.min(completionRatio, 100)}%` }}
+              className="h-full rounded-full bg-wil-500"
+              style={{ width: hasEntered ? `${Math.min(completionRatio, 100)}%` : '0%', transition: barTransition }}
             />
           </div>
         </div>
@@ -81,10 +90,10 @@ export const WilskrachtWidget = memo(function WilskrachtWidget({ size, data, hre
                 Deze week: +{weeklyFreedomDaysWon % 1 === 0 ? weeklyFreedomDaysWon : weeklyFreedomDaysWon.toFixed(1)}
               </span>
             </div>
-            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-wil-100">
+            <div ref={barRef} className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-wil-100">
               <div
-                className="h-full rounded-full bg-wil-500 transition-all duration-700"
-                style={{ width: `${Math.min(completionRatio, 100)}%` }}
+                className="h-full rounded-full bg-wil-500"
+                style={{ width: hasEntered ? `${Math.min(completionRatio, 100)}%` : '0%', transition: barTransition }}
               />
             </div>
             <div className="mt-1 flex justify-between text-[10px] text-[var(--ink-4)]">
@@ -123,10 +132,10 @@ export const WilskrachtWidget = memo(function WilskrachtWidget({ size, data, hre
 
       {/* Progress bar */}
       <div className="mb-4">
-        <div className="h-1.5 w-full overflow-hidden rounded-full bg-wil-100">
+        <div ref={barRef} className="h-1.5 w-full overflow-hidden rounded-full bg-wil-100">
           <div
-            className="h-full rounded-full bg-wil-500 transition-all duration-700"
-            style={{ width: `${Math.min(completionRatio, 100)}%` }}
+            className="h-full rounded-full bg-wil-500"
+            style={{ width: hasEntered ? `${Math.min(completionRatio, 100)}%` : '0%', transition: barTransition }}
           />
         </div>
         <div className="mt-1 flex justify-between text-[10px] text-[var(--ink-4)]">

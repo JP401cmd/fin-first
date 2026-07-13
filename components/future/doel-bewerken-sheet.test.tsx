@@ -94,10 +94,10 @@ describe('DoelBewerkenSheet — render', () => {
 
   it('progressbar aria-valuenow update bij input-change', () => {
     const { container } = renderSheet()
-    const input = container.querySelector('input[type="number"]')!
+    const input = document.querySelector('input[type="number"]')!
     fireEvent.change(input, { target: { value: '30000' } })
     // 30k van 50k = 60%
-    const bar = container.querySelector('[role="progressbar"]')
+    const bar = document.querySelector('[role="progressbar"]')
     expect(bar?.getAttribute('aria-valuenow')).toBe('60')
   })
 })
@@ -134,7 +134,7 @@ describe('DoelBewerkenSheet — bijdrage-monitor', () => {
 
   it('toont +bedrag en +pp delta bij verhoging', () => {
     const { container } = renderSheet()
-    const input = container.querySelector('input[type="number"]')!
+    const input = document.querySelector('input[type="number"]')!
     fireEvent.change(input, { target: { value: '25000' } })
     const monitor = screen.getByTestId('bijdrage-monitor')
     // +5000, +10 pp (van 40% naar 50%)
@@ -145,7 +145,7 @@ describe('DoelBewerkenSheet — bijdrage-monitor', () => {
 
   it('toont −bedrag en −pp delta bij verlaging', () => {
     const { container } = renderSheet()
-    const input = container.querySelector('input[type="number"]')!
+    const input = document.querySelector('input[type="number"]')!
     fireEvent.change(input, { target: { value: '15000' } })
     const monitor = screen.getByTestId('bijdrage-monitor')
     expect(monitor.textContent).toMatch(/−/)
@@ -162,7 +162,7 @@ describe('DoelBewerkenSheet — doel-behaald-celebratie', () => {
 
   it('toont banner zodra waarde = target', () => {
     const { container } = renderSheet()
-    const input = container.querySelector('input[type="number"]')!
+    const input = document.querySelector('input[type="number"]')!
     fireEvent.change(input, { target: { value: '50000' } })
     expect(screen.getByTestId('doel-behaald').textContent).toMatch(
       /Doel behaald/i,
@@ -171,7 +171,7 @@ describe('DoelBewerkenSheet — doel-behaald-celebratie', () => {
 
   it('toont banner ook bij waarde > target', () => {
     const { container } = renderSheet()
-    const input = container.querySelector('input[type="number"]')!
+    const input = document.querySelector('input[type="number"]')!
     fireEvent.change(input, { target: { value: '60000' } })
     expect(screen.getByTestId('doel-behaald')).toBeTruthy()
   })
@@ -179,9 +179,9 @@ describe('DoelBewerkenSheet — doel-behaald-celebratie', () => {
   it('submit markeert is_completed=true bij target bereikt', async () => {
     const onClose = vi.fn()
     const { container } = renderSheet(onClose)
-    const input = container.querySelector('input[type="number"]')!
+    const input = document.querySelector('input[type="number"]')!
     fireEvent.change(input, { target: { value: '50000' } })
-    fireEvent.submit(container.querySelector('form')!)
+    fireEvent.submit(document.querySelector('form')!)
     await new Promise((r) => setTimeout(r, 10))
     expect(mockUpdate).toHaveBeenCalled()
   })
@@ -191,9 +191,9 @@ describe('DoelBewerkenSheet — submit', () => {
   it('roept supabase.update met current_value', async () => {
     const onClose = vi.fn()
     const { container } = renderSheet(onClose)
-    const input = container.querySelector('input[type="number"]')!
+    const input = document.querySelector('input[type="number"]')!
     fireEvent.change(input, { target: { value: '35000' } })
-    fireEvent.submit(container.querySelector('form')!)
+    fireEvent.submit(document.querySelector('form')!)
     await new Promise((r) => setTimeout(r, 10))
     expect(mockUpdate).toHaveBeenCalled()
     expect(mockRefresh).toHaveBeenCalled()
@@ -202,9 +202,9 @@ describe('DoelBewerkenSheet — submit', () => {
 
   it('toont fout-melding bij negatieve waarde', async () => {
     const { container } = renderSheet()
-    const input = container.querySelector('input[type="number"]')!
+    const input = document.querySelector('input[type="number"]')!
     fireEvent.change(input, { target: { value: '-100' } })
-    fireEvent.submit(container.querySelector('form')!)
+    fireEvent.submit(document.querySelector('form')!)
     expect(screen.getByRole('alert').textContent).toMatch(/getal ≥ 0/i)
     expect(mockUpdate).not.toHaveBeenCalled()
   })
@@ -268,8 +268,12 @@ describe('DoelBewerkenSheet — volledig bewerken (GoalForm) sluit de sheet niet
     // nu gemount — quick-update backdrop én GoalForm-BottomSheet — dus we
     // selecteren de quick-update-dialog gericht op zijn aria-label.)
     expect(onClose).not.toHaveBeenCalled()
+    // De quick-update-sheet loopt sinds ADR 0039 via <ShellOverlay kind="sheet">;
+    // de toegankelijke naam komt nu van de sheet-titel ("Voortgang bijwerken")
+    // i.p.v. de oude custom aria-label. GoalForm's eigen dialog heet
+    // "Doel bewerken", dus beide dialogen blijven uniek selecteerbaar.
     expect(
-      screen.getByRole('dialog', { name: /Doel bewerken: Spaargeld voor woning/i }),
+      screen.getByRole('dialog', { name: /Voortgang bijwerken/i }),
     ).toBeTruthy()
     expect(screen.getByText('Doel bewerken')).toBeTruthy()
   })

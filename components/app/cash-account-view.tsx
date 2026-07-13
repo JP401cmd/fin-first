@@ -41,6 +41,7 @@ import { UncategorizedTransactionsBanner } from '@/components/app/uncategorized-
 import { AICategorizeSheet } from '@/components/app/ai-categorize-sheet'
 import { AccountFormModal, ACCOUNT_TYPES, type Account } from '@/components/app/account-form-modal'
 import { BottomSheet } from '@/components/app/bottom-sheet'
+import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
 import { Kicker } from '@/components/editorial'
 import { MaskedAmount } from '@/components/app/masked-amount'
@@ -223,6 +224,16 @@ export function CashAccountView({
   } | null>(null)
   const [assetSaving, setAssetSaving] = useState(false)
   const [showRevalue, setShowRevalue] = useState(false)
+  // I-05: confirms i.p.v. kale window.confirm.
+  //  - `showDisconnectConfirm`: bevestig loskoppelen van transactie-tracking.
+  //  - `ownershipMigration`: na een eigendomswissel de opt-in of ook de
+  //    bestaande transacties mee omgezet moeten worden (mid-flow → modal i.p.v.
+  //    een synchrone confirm midden in de opslag-flow).
+  const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false)
+  const [ownershipMigration, setOwnershipMigration] = useState<{
+    count: number
+    newOwnership: 'personal' | 'shared'
+  } | null>(null)
 
   const hasActiveFilters = filterSearch !== '' || filterType !== 'all' || filterBudgetId !== 'all'
 
@@ -933,7 +944,10 @@ export function CashAccountView({
       ownership: formData.ownership,
     }).eq('id', account.id)
     // Eigendom gewijzigd? Bied opt-in aan om bestaande transacties mee om te
-    // zetten — default is historie ongemoeid laten.
+    // zetten — default is historie ongemoeid laten. De opt-in loopt nu via een
+    // ShellOverlay-confirm (I-05): we sluiten het bewerkscherm en openen de
+    // vraag als losse modal, i.p.v. een synchrone window.confirm midden in deze
+    // async flow.
     if (formData.ownership !== prevOwnership) {
       const { count } = await supabase
         .from('transactions')
@@ -941,10 +955,7 @@ export function CashAccountView({
         .eq('account_id', account.id)
         .eq('ownership', prevOwnership)
       if ((count ?? 0) > 0) {
-        const label = formData.ownership === 'shared' ? 'gezamenlijk' : 'persoonlijk'
-        if (confirm(`Ook ${count} bestaande transactie${count === 1 ? '' : 's'} van deze rekening op ${label} zetten? Kies Annuleren om de historie ongemoeid te laten.`)) {
-          await supabase.from('transactions').update({ ownership: formData.ownership }).eq('account_id', account.id)
-        }
+        setOwnershipMigration({ count: count ?? 0, newOwnership: formData.ownership })
       }
     }
     setAssetSaving(false)
@@ -953,9 +964,23 @@ export function CashAccountView({
     loadLinkedAsset()
   }
 
+  /** Zet, na akkoord in de ownership-migratie-confirm, ook de bestaande
+   *  transacties van deze rekening op het nieuwe eigendom. */
+  async function confirmOwnershipMigration() {
+    const migration = ownershipMigration
+    if (!account || !migration) return
+    // Sluit de modal direct (voorkomt dubbele submit) en voer de update daarna uit.
+    setOwnershipMigration(null)
+    const supabase = createClient()
+    await supabase
+      .from('transactions')
+      .update({ ownership: migration.newOwnership })
+      .eq('account_id', account.id)
+    loadTransactions()
+  }
+
   async function handleDisconnectTracking() {
     if (!linkedAsset || !account) return
-    if (!confirm('Weet je zeker dat je transacties wilt loskoppelen? De rekening wordt weer een gewone asset.')) return
     const supabase = createClient()
     // 1. Update asset: has_budget_tracking = false
     await supabase.from('assets').update({ has_budget_tracking: false }).eq('id', linkedAsset.id)
@@ -2328,10 +2353,81 @@ export function CashAccountView({
               onRevalue={() => setShowRevalue(true)}
               onSave={handleSaveAsset}
               onCancel={() => setShowAssetEdit(false)}
-              onDisconnect={() => { setShowAssetEdit(false); handleDisconnectTracking() }}
+              onDisconnect={() => { setShowAssetEdit(false); setShowDisconnectConfirm(true) }}
             />
           </div>
         </BottomSheet>
+      )}
+
+      {/* I-05: bevestig loskoppelen van transactie-tracking — ShellOverlay
+          kind="confirm" (focus-trap + Esc) i.p.v. window.confirm. */}
+      <ShellOverlay
+        open={showDisconnectConfirm}
+        onClose={() => setShowDisconnectConfirm(false)}
+        kind="confirm"
+        destructive
+        title="Transacties loskoppelen?"
+      >
+        <div className="p-6">
+          <p className="text-sm leading-relaxed text-[var(--ink-2)]">
+            Je koppelt de transactie-tracking los. De rekening wordt weer een
+            gewone bezitting; je overzicht en budgetten krijgen geen boekingen
+            meer van deze rekening.
+          </p>
+          <div className="mt-6 flex items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => setShowDisconnectConfirm(false)}
+              className="rounded-lg border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+            >
+              Annuleren
+            </button>
+            <button
+              type="button"
+              onClick={() => { setShowDisconnectConfirm(false); void handleDisconnectTracking() }}
+              className="rounded-lg bg-negative px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+            >
+              Loskoppelen
+            </button>
+          </div>
+        </div>
+      </ShellOverlay>
+
+      {/* I-05: opt-in om ook bestaande transacties op het nieuwe eigendom te
+          zetten (na een eigendomswissel). Niet destructief — het is een
+          verrijking; Annuleren laat de historie ongemoeid. */}
+      {ownershipMigration && (
+        <ShellOverlay
+          open={!!ownershipMigration}
+          onClose={() => setOwnershipMigration(null)}
+          kind="confirm"
+          title="Bestaande transacties meenemen?"
+        >
+          <div className="p-6">
+            <p className="text-sm leading-relaxed text-[var(--ink-2)]">
+              Wil je ook de {ownershipMigration.count} bestaande transactie
+              {ownershipMigration.count === 1 ? '' : 's'} van deze rekening op{' '}
+              {ownershipMigration.newOwnership === 'shared' ? 'gezamenlijk' : 'persoonlijk'}{' '}
+              zetten? Kies Annuleren om de historie ongemoeid te laten.
+            </p>
+            <div className="mt-6 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setOwnershipMigration(null)}
+                className="rounded-lg border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+              >
+                Annuleren
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmOwnershipMigration()}
+                className="rounded-lg bg-[var(--ink)] px-4 py-2 text-sm font-medium text-[var(--paper)] hover:bg-[var(--ink-2)]"
+              >
+                Ja, meenemen
+              </button>
+            </div>
+          </div>
+        </ShellOverlay>
       )}
 
       {/* Herwaardeer-modal voor het gekoppelde saldo */}

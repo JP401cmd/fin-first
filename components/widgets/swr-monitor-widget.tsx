@@ -8,6 +8,7 @@ import { computeEffectiveSwr } from '@/lib/fire-params'
 import { Users, UserCheck } from 'lucide-react'
 import { usePerspective } from '@/components/app/perspective-provider'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 
 interface Props {
   size: WidgetSize
@@ -56,6 +57,13 @@ export const SwrMonitorWidget = memo(function SwrMonitorWidget({ size, data, hre
   const actualWithdrawal = netWorth > 0 ? yearlyExpenses / netWorth : 0
 
   const status = swrStatus(effectiveSwr)
+
+  // In-view fill-animatie (700ms bezier, 0% → doel; transition:none pre-entered).
+  // De gauge-markers (Trinity/NL) blijven statisch; alleen de fill animeert.
+  // Eén hook bovenaan; per render toont het widget precies één size, dus dezelfde
+  // ref op elke size-track (half + full) is rules-of-hooks-veilig.
+  const { ref: barRef, hasEntered } = useInViewAnimation({ duration: 700 })
+  const barTransition = hasEntered ? 'width 700ms cubic-bezier(.22,1,.36,1)' : 'none'
 
   const baseKicker = 'SWR Monitor'
   const kicker = isHouseholdView
@@ -128,10 +136,10 @@ export const SwrMonitorWidget = memo(function SwrMonitorWidget({ size, data, hre
         </div>
 
         {/* Gauge bar */}
-        <div className="relative h-2.5 w-full rounded-full bg-[var(--subtle)] overflow-visible mb-3">
+        <div ref={barRef} className="relative h-2.5 w-full rounded-full bg-[var(--subtle)] overflow-visible mb-3">
           <div
             className={`h-full rounded-full ${effectiveSwr >= 0.03 ? 'bg-positive' : effectiveSwr >= 0.02 ? 'bg-[var(--ink-3)]' : 'bg-negative'}`}
-            style={{ width: `${swrPct}%` }}
+            style={{ width: hasEntered ? `${swrPct}%` : '0%', transition: barTransition }}
           />
           {/* Trinity Study marker */}
           <div
@@ -218,10 +226,10 @@ export const SwrMonitorWidget = memo(function SwrMonitorWidget({ size, data, hre
         </div>
 
         {/* Gauge bar with markers */}
-        <div className="relative h-3 w-full rounded-full bg-[var(--subtle)] overflow-visible">
+        <div ref={barRef} className="relative h-3 w-full rounded-full bg-[var(--subtle)] overflow-visible">
           <div
             className={`h-full rounded-full ${effectiveSwr >= 0.03 ? 'bg-positive' : effectiveSwr >= 0.02 ? 'bg-[var(--ink-3)]' : 'bg-negative'}`}
-            style={{ width: `${swrPct}%` }}
+            style={{ width: hasEntered ? `${swrPct}%` : '0%', transition: barTransition }}
           />
           <div className="absolute top-0 h-3 w-px bg-[var(--ink-3)]" style={{ left: `${classicPct}%` }} />
           <div className="absolute top-0 h-3 w-px bg-horizon-400" style={{ left: `${nlSwrPct}%` }} />

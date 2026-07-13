@@ -359,7 +359,7 @@ function ModuleHeader({ info, label, inDevelopment }: { info: ModuleInfo; label:
   return (
     <div className="flex items-center gap-3">
       <div
-        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${info.circleBg}`}
+        className={`flex h-11 w-11 shrink-0 items-center justify-center ${info.circleBg}`}
       >
         <Icon className={`h-5 w-5 ${info.iconColor}`} />
       </div>
@@ -828,7 +828,7 @@ function StepForms({
 
       {/* Error message */}
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700">
+        <div className="border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700">
           {error}
         </div>
       )}
@@ -839,7 +839,7 @@ function StepForms({
           type="button"
           onClick={handleSkip}
           disabled={saving}
-          className="flex-1 min-h-[44px] rounded-xl border border-[var(--border-ed)] px-4 py-2.5 text-sm font-medium text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] disabled:opacity-50"
+          className="flex-1 min-h-[44px] border border-[var(--border-ed)] px-4 py-2.5 text-sm font-medium text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] disabled:opacity-50"
         >
           Later instellen
         </button>
@@ -847,7 +847,7 @@ function StepForms({
           type="button"
           onClick={handleSave}
           disabled={saving}
-          className={`flex-1 min-h-[44px] rounded-xl px-4 py-2.5 text-sm font-medium text-white transition-colors ${buttonColors} disabled:opacity-50`}
+          className={`flex-1 min-h-[44px] px-4 py-2.5 text-sm font-medium text-white transition-colors ${buttonColors} disabled:opacity-50`}
         >
           {saving ? 'Opslaan\u2026' : 'Opslaan & activeren'}
         </button>
@@ -913,7 +913,7 @@ function BezittingenStep({
                     key={acc.id}
                     type="button"
                     onClick={() => onSelectAccount?.(acc.id)}
-                    className={`w-full flex items-center gap-3 rounded-xl border p-3 text-left transition-colors ${
+                    className={`w-full flex items-center gap-3 border p-3 text-left transition-colors ${
                       selected
                         ? 'border-kern-500 bg-kern-50 ring-1 ring-kern-500'
                         : 'border-[var(--border-ed)] hover:border-[var(--border-md)]'
@@ -946,7 +946,7 @@ function BezittingenStep({
                   onSelectAccount?.(null)
                   onSetCreatingNew?.(true)
                 }}
-                className="flex w-full min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-dashed border-[var(--border-ed)] py-2 text-xs font-medium text-[var(--ink-3)] hover:border-[var(--border-md)] hover:text-[var(--ink-2)] active:bg-[var(--subtle)] transition-colors"
+                className="flex w-full min-h-[44px] items-center justify-center gap-1.5 border border-dashed border-[var(--border-ed)] py-2 text-xs font-medium text-[var(--ink-3)] hover:border-[var(--border-md)] hover:text-[var(--ink-2)] active:bg-[var(--subtle)] transition-colors"
               >
                 <Plus className="h-3.5 w-3.5" />
                 Nieuwe rekening aanmaken
@@ -1154,7 +1154,7 @@ function BudgetsStep({
               key={tmpl.id}
               type="button"
               onClick={() => onSelectTemplate(tmpl.id)}
-              className={`flex flex-col items-start gap-2 rounded-xl border p-3 text-left transition-all min-h-[44px] ${
+              className={`flex flex-col items-start gap-2 border p-3 text-left transition-all min-h-[44px] ${
                 isSelected
                   ? 'border-kern-400 bg-kern-50 ring-1 ring-kern-400'
                   : 'border-[var(--border-ed)] hover:border-[var(--border-md)] hover:bg-[var(--subtle)]/50'
@@ -1259,7 +1259,7 @@ function HorizonStep({
                   key={key}
                   type="button"
                   onClick={() => updateField('fire_end_strategy', key)}
-                  className={`flex flex-col items-start gap-1 rounded-xl border p-3 text-left transition-all min-h-[44px] ${
+                  className={`flex flex-col items-start gap-1 border p-3 text-left transition-all min-h-[44px] ${
                     isSelected
                       ? 'border-horizon-400 bg-horizon-50 ring-1 ring-horizon-400'
                       : 'border-[var(--border-ed)] hover:border-[var(--border-md)] hover:bg-[var(--subtle)]/50'
@@ -1293,7 +1293,7 @@ function HorizonStep({
                 max={120}
                 value={horizon.fire_end_age}
                 onChange={(e) => updateField('fire_end_age', e.target.value)}
-                className="w-full min-h-[44px] rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-horizon-400"
+                className="w-full min-h-[44px] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-horizon-400"
               />
             </FormField>
           )}
@@ -1306,7 +1306,7 @@ function HorizonStep({
                 placeholder="0"
                 value={horizon.fire_legacy_amount}
                 onChange={(e) => updateField('fire_legacy_amount', e.target.value)}
-                className="w-full min-h-[44px] rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-horizon-400"
+                className="w-full min-h-[44px] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-horizon-400"
               />
             </FormField>
           )}
@@ -1327,7 +1327,7 @@ function HorizonStep({
         {horizon.life_events.map((evt, i) => (
           <div
             key={i}
-            className="rounded-xl border border-[var(--border-ed)] p-3 space-y-2 relative"
+            className="border border-[var(--border-ed)] p-3 space-y-2 relative"
           >
             <button
               type="button"
@@ -1344,14 +1344,14 @@ function HorizonStep({
                   placeholder="bijv. Kind krijgen"
                   value={evt.name}
                   onChange={(e) => updateLifeEvent(i, { ...evt, name: e.target.value })}
-                  className="w-full min-h-[44px] rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-horizon-400"
+                  className="w-full min-h-[44px] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-horizon-400"
                 />
               </FormField>
               <FormField label="Type">
                 <select
                   value={evt.event_type}
                   onChange={(e) => updateLifeEvent(i, { ...evt, event_type: e.target.value })}
-                  className="w-full min-h-[44px] rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-horizon-400"
+                  className="w-full min-h-[44px] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-horizon-400"
                 >
                   {LIFE_EVENT_TYPES.map((t) => (
                     <option key={t.value} value={t.value}>
@@ -1370,7 +1370,7 @@ function HorizonStep({
                   placeholder="35"
                   value={evt.target_age}
                   onChange={(e) => updateLifeEvent(i, { ...evt, target_age: e.target.value })}
-                  className="w-full min-h-[44px] rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-horizon-400"
+                  className="w-full min-h-[44px] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-horizon-400"
                 />
               </FormField>
               <FormField label="Inkomen \u0394/mnd">
@@ -1382,7 +1382,7 @@ function HorizonStep({
                   onChange={(e) =>
                     updateLifeEvent(i, { ...evt, monthly_income_change: e.target.value })
                   }
-                  className="w-full min-h-[44px] rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-horizon-400"
+                  className="w-full min-h-[44px] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-horizon-400"
                 />
               </FormField>
             </div>
@@ -1419,7 +1419,7 @@ function AccordionSection({
   children: React.ReactNode
 }) {
   return (
-    <div className="rounded-xl border border-[var(--border-ed)] overflow-hidden">
+    <div className="border border-[var(--border-ed)] overflow-hidden">
       <button
         type="button"
         onClick={onToggle}
@@ -1450,7 +1450,7 @@ function MiniBankForm({
 }) {
   const uid = useId()
   return (
-    <div className="rounded-xl border border-[var(--border-ed)] p-3 space-y-2">
+    <div className="border border-[var(--border-ed)] p-3 space-y-2">
       <div className="grid grid-cols-2 gap-2">
         <FormField label="Naam rekening" htmlFor={`${uid}-name`}>
           <input
@@ -1459,7 +1459,7 @@ function MiniBankForm({
             placeholder="bijv. ING Betaalrekening"
             value={value.name}
             onChange={(e) => onChange({ ...value, name: e.target.value })}
-            className="w-full min-h-[44px] rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-kern-400"
+            className="w-full min-h-[44px] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-kern-400"
           />
         </FormField>
         <FormField label="Bank" htmlFor={`${uid}-bank`}>
@@ -1469,7 +1469,7 @@ function MiniBankForm({
             placeholder="bijv. ING"
             value={value.bank_name}
             onChange={(e) => onChange({ ...value, bank_name: e.target.value })}
-            className="w-full min-h-[44px] rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-kern-400"
+            className="w-full min-h-[44px] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-kern-400"
           />
         </FormField>
       </div>
@@ -1479,7 +1479,7 @@ function MiniBankForm({
             id={`${uid}-type`}
             value={value.account_type}
             onChange={(e) => onChange({ ...value, account_type: e.target.value })}
-            className="w-full min-h-[44px] rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-kern-400"
+            className="w-full min-h-[44px] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-kern-400"
           >
             <option value="checking">Betaalrekening</option>
             <option value="savings">Spaarrekening</option>
@@ -1494,7 +1494,7 @@ function MiniBankForm({
             placeholder="0.00"
             value={value.balance}
             onChange={(e) => onChange({ ...value, balance: e.target.value })}
-            className="w-full min-h-[44px] rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-kern-400"
+            className="w-full min-h-[44px] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-kern-400"
           />
         </FormField>
       </div>
@@ -1504,7 +1504,7 @@ function MiniBankForm({
             type="checkbox"
             checked={value.has_budget_tracking}
             onChange={(e) => onChange({ ...value, has_budget_tracking: e.target.checked })}
-            className="h-4 w-4 rounded border-[var(--border-ed)] accent-kern-600"
+            className="h-4 w-4 border-[var(--border-ed)] accent-kern-600"
           />
           Budgettracking inschakelen
         </label>
@@ -1525,7 +1525,7 @@ function MiniAssetForm({
 }) {
   const uid = useId()
   return (
-    <div className="rounded-xl border border-[var(--border-ed)] p-3 space-y-2">
+    <div className="border border-[var(--border-ed)] p-3 space-y-2">
       <div className="grid grid-cols-2 gap-2">
         <FormField label="Naam">
           <input
@@ -1533,7 +1533,7 @@ function MiniAssetForm({
             placeholder="bijv. DeGiro"
             value={value.name}
             onChange={(e) => onChange({ ...value, name: e.target.value })}
-            className="w-full min-h-[44px] rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-kern-400"
+            className="w-full min-h-[44px] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-kern-400"
           />
         </FormField>
         <FormField label="Type">
@@ -1541,7 +1541,7 @@ function MiniAssetForm({
             value={lockType ?? value.asset_type}
             disabled={!!lockType}
             onChange={(e) => onChange({ ...value, asset_type: e.target.value })}
-            className="w-full min-h-[44px] rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-kern-400 disabled:opacity-60"
+            className="w-full min-h-[44px] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-kern-400 disabled:opacity-60"
           >
             <option value="savings">Spaargeld</option>
             <option value="investment">Belegging</option>
@@ -1560,7 +1560,7 @@ function MiniAssetForm({
             placeholder="0"
             value={value.current_value}
             onChange={(e) => onChange({ ...value, current_value: e.target.value })}
-            className="w-full min-h-[44px] rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-kern-400"
+            className="w-full min-h-[44px] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-kern-400"
           />
         </FormField>
         <FormField label="Aankoopwaarde">
@@ -1570,7 +1570,7 @@ function MiniAssetForm({
             placeholder="0"
             value={value.purchase_value}
             onChange={(e) => onChange({ ...value, purchase_value: e.target.value })}
-            className="w-full min-h-[44px] rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-kern-400"
+            className="w-full min-h-[44px] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-kern-400"
           />
         </FormField>
       </div>
@@ -1582,7 +1582,7 @@ function MiniAssetForm({
             placeholder="7.0"
             value={value.expected_return}
             onChange={(e) => onChange({ ...value, expected_return: e.target.value })}
-            className="w-full min-h-[44px] rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-kern-400"
+            className="w-full min-h-[44px] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-kern-400"
           />
         </FormField>
         <FormField label="Maandelijkse inleg">
@@ -1592,7 +1592,7 @@ function MiniAssetForm({
             placeholder="0"
             value={value.monthly_contribution}
             onChange={(e) => onChange({ ...value, monthly_contribution: e.target.value })}
-            className="w-full min-h-[44px] rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-kern-400"
+            className="w-full min-h-[44px] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-kern-400"
           />
         </FormField>
       </div>
@@ -1602,7 +1602,7 @@ function MiniAssetForm({
           placeholder="bijv. DeGiro, Meesman"
           value={value.institution}
           onChange={(e) => onChange({ ...value, institution: e.target.value })}
-          className="w-full min-h-[44px] rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-kern-400"
+          className="w-full min-h-[44px] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-kern-400"
         />
       </FormField>
     </div>
@@ -1618,7 +1618,7 @@ function MiniDebtForm({
 }) {
   const uid = useId()
   return (
-    <div className="rounded-xl border border-[var(--border-ed)] p-3 space-y-2">
+    <div className="border border-[var(--border-ed)] p-3 space-y-2">
       <div className="grid grid-cols-2 gap-2">
         <FormField label="Naam">
           <input
@@ -1626,14 +1626,14 @@ function MiniDebtForm({
             placeholder="bijv. Studielening"
             value={value.name}
             onChange={(e) => onChange({ ...value, name: e.target.value })}
-            className="w-full min-h-[44px] rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-kern-400"
+            className="w-full min-h-[44px] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-kern-400"
           />
         </FormField>
         <FormField label="Type">
           <select
             value={value.debt_type}
             onChange={(e) => onChange({ ...value, debt_type: e.target.value })}
-            className="w-full min-h-[44px] rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-kern-400"
+            className="w-full min-h-[44px] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-kern-400"
           >
             <option value="personal_loan">Persoonlijke lening</option>
             <option value="student_loan">Studielening</option>
@@ -1652,7 +1652,7 @@ function MiniDebtForm({
             placeholder="0"
             value={value.original_amount}
             onChange={(e) => onChange({ ...value, original_amount: e.target.value })}
-            className="w-full min-h-[44px] rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-kern-400"
+            className="w-full min-h-[44px] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-kern-400"
           />
         </FormField>
         <FormField label="Huidig saldo">
@@ -1662,7 +1662,7 @@ function MiniDebtForm({
             placeholder="0"
             value={value.current_balance}
             onChange={(e) => onChange({ ...value, current_balance: e.target.value })}
-            className="w-full min-h-[44px] rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-kern-400"
+            className="w-full min-h-[44px] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-kern-400"
           />
         </FormField>
       </div>
@@ -1674,7 +1674,7 @@ function MiniDebtForm({
             placeholder="0.0"
             value={value.interest_rate}
             onChange={(e) => onChange({ ...value, interest_rate: e.target.value })}
-            className="w-full min-h-[44px] rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-kern-400"
+            className="w-full min-h-[44px] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-kern-400"
           />
         </FormField>
         <FormField label="Maandelijkse aflossing">
@@ -1684,7 +1684,7 @@ function MiniDebtForm({
             placeholder="0"
             value={value.monthly_payment}
             onChange={(e) => onChange({ ...value, monthly_payment: e.target.value })}
-            className="w-full min-h-[44px] rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-kern-400"
+            className="w-full min-h-[44px] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-kern-400"
           />
         </FormField>
       </div>

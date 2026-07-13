@@ -1,3 +1,5 @@
+'use client'
+
 import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
@@ -5,6 +7,7 @@ import { calculateFreedomTime, formatFreedomTimeString, dailyExpenseRate } from 
 import { MaskedAmount } from '@/components/app/masked-amount'
 import type { DashboardData } from './widget-renderer'
 import { ShieldCheck, Lightbulb } from 'lucide-react'
+import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 
 interface Props {
   size: WidgetSize
@@ -33,6 +36,12 @@ export const NoodfondsWidget = memo(function NoodfondsWidget({ size, data, href 
     : null
   const freedomStr = freedomTime ? formatFreedomTimeString(freedomTime, 'short') : null
 
+  // In-view fill-animatie (700ms bezier, 0% → doel; transition:none pre-entered).
+  // Eén hook bovenaan; per render toont het widget precies één size, dus dezelfde
+  // ref op elke size-track is rules-of-hooks-veilig.
+  const { ref: barRef, hasEntered } = useInViewAnimation({ duration: 700 })
+  const barTransition = hasEntered ? 'width 700ms cubic-bezier(.22,1,.36,1)' : 'none'
+
   // ── Mini-size ────────────────────────────────────────────
   if (size === 'mini') {
     return (
@@ -52,10 +61,10 @@ export const NoodfondsWidget = memo(function NoodfondsWidget({ size, data, href 
           {monthsCovered.toFixed(1)} <span className="text-xs text-[var(--ink-3)]">van {targetMonths} maanden</span>
         </p>
         {/* Mini progress bar */}
-        <div className="mt-2 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
+        <div ref={barRef} className="mt-2 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
           <div
-            className={`h-full rounded-full transition-all ${colors.bar}`}
-            style={{ width: `${pct}%` }}
+            className={`h-full rounded-full ${colors.bar}`}
+            style={{ width: hasEntered ? `${pct}%` : '0%', transition: barTransition }}
           />
         </div>
         {isComplete && (
@@ -80,10 +89,10 @@ export const NoodfondsWidget = memo(function NoodfondsWidget({ size, data, href 
         </div>
 
         {/* Progress bar */}
-        <div className="mt-2 h-[5px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
+        <div ref={barRef} className="mt-2 h-[5px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
           <div
-            className={`h-full rounded-full transition-all ${colors.bar}`}
-            style={{ width: `${pct}%` }}
+            className={`h-full rounded-full ${colors.bar}`}
+            style={{ width: hasEntered ? `${pct}%` : '0%', transition: barTransition }}
           />
         </div>
 
@@ -139,10 +148,10 @@ export const NoodfondsWidget = memo(function NoodfondsWidget({ size, data, href 
 
       {/* Progress bar with milestone markers */}
       <div className="mt-3 relative">
-        <div className="h-[8px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
+        <div ref={barRef} className="h-[8px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
           <div
-            className={`h-full rounded-full transition-all ${colors.bar}`}
-            style={{ width: `${pct}%` }}
+            className={`h-full rounded-full ${colors.bar}`}
+            style={{ width: hasEntered ? `${pct}%` : '0%', transition: barTransition }}
           />
         </div>
         {/* Milestone markers */}

@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, X, Target, Calculator, Settings2 } from 'lucide-react'
+import { Plus, Calculator, Settings2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/lib/format'
 import { GoalForm } from '@/components/app/goal-form'
+import { ShellOverlay } from '@/components/app/shell/shell-overlay'
+import { ModalFooter } from '@/components/app/modal-footer'
 
 type AssetLite = { id: string; name: string; current_value: number }
 type DebtLite = { id: string; name: string; current_balance: number }
@@ -149,8 +151,8 @@ export function DoelToevoegenSheet() {
     setError(null)
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+  async function handleSubmit(e?: React.FormEvent) {
+    e?.preventDefault()
     if (!name.trim()) {
       setError('Naam is verplicht.')
       return
@@ -205,48 +207,33 @@ export function DoelToevoegenSheet() {
       </button>
 
       {open && (
-        <div
-          role="dialog"
-          aria-label="Doel toevoegen"
-          aria-modal="true"
-          className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/30 backdrop-blur-sm p-4 pb-[calc(1rem+var(--safe-area-bottom,0px))]"
-          onClick={() => {
+        <ShellOverlay
+          open
+          onClose={() => {
             setOpen(false)
             reset()
           }}
-        >
-          <form
-            onSubmit={handleSubmit}
-            className="w-full max-w-md max-h-[92vh] overflow-y-auto rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-5 sm:p-6 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <header className="flex items-start justify-between gap-3 mb-4">
-              <div className="flex items-center gap-2">
-                <span className="w-9 h-9 rounded-lg bg-teal-50 flex items-center justify-center">
-                  <Target className="w-4 h-4 text-teal-700" aria-hidden="true" />
-                </span>
-                <div>
-                  <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
-                    Toekomst — nieuw doel
-                  </div>
-                  <h2 className="font-serif text-lg text-[var(--ink)] mt-0.5">
-                    Doel toevoegen
-                  </h2>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
+          kind="sheet"
+          size="md"
+          title="Doel toevoegen"
+          footer={
+            <ModalFooter
+              primary={{
+                label: 'Doel toevoegen',
+                onClick: () => handleSubmit(),
+                loading: saving,
+              }}
+              secondary={{
+                label: 'Annuleer',
+                onClick: () => {
                   setOpen(false)
                   reset()
-                }}
-                aria-label="Sluiten"
-                className="inline-flex items-center justify-center w-8 h-8 rounded-full text-[var(--ink-3)] hover:bg-[var(--subtle)] transition-colors"
-              >
-                <X className="w-4 h-4" aria-hidden="true" />
-              </button>
-            </header>
-
+                },
+              }}
+            />
+          }
+        >
+          <form onSubmit={handleSubmit} className="p-5 sm:p-6">
             {error && (
               <div
                 role="alert"
@@ -360,26 +347,6 @@ export function DoelToevoegenSheet() {
               goalType={goalType}
             />
 
-            <div className="mt-5 flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setOpen(false)
-                  reset()
-                }}
-                className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--ink-3)] hover:text-[var(--ink-2)] transition-colors"
-              >
-                Annuleer
-              </button>
-              <button
-                type="submit"
-                disabled={saving}
-                className="rounded-xl bg-[var(--ink)] px-4 py-2 text-sm font-semibold text-[var(--paper)] hover:bg-[var(--ink-2)] transition-colors disabled:opacity-50"
-              >
-                {saving ? 'Opslaan…' : 'Doel toevoegen'}
-              </button>
-            </div>
-
             {/* Geavanceerd: alle goal_types (netto vermogen, spaarquote,
                 noodfonds, vrijheidsdagen, passief inkomen, vrij doel),
                 asset/debt-koppeling, en optionele velden. */}
@@ -395,7 +362,7 @@ export function DoelToevoegenSheet() {
               Geavanceerd (meer doel-types + koppelingen)
             </button>
           </form>
-        </div>
+        </ShellOverlay>
       )}
 
       {/* GoalForm overlay (geavanceerde modus). Gebruikt initialValues

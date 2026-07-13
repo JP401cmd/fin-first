@@ -1249,7 +1249,7 @@ function ManualPriceOverrideModal({
         </p>
 
         {/* Stale price notice */}
-        <div className="mb-4 flex items-start gap-2 rounded-lg border border-kern-200 bg-kern-50 p-3">
+        <div className="mb-4 flex items-start gap-2 border border-kern-200 bg-kern-50 p-3">
           <AlertTriangle className="h-4 w-4 shrink-0 text-kern-500 mt-0.5" />
           <div>
             <p className="text-xs font-medium text-kern-700">Prijsfeed niet beschikbaar</p>
@@ -1268,7 +1268,7 @@ function ManualPriceOverrideModal({
         </div>
 
         {error && (
-          <div className="mb-4 rounded-lg border border-negative/30 bg-negative/10 p-3">
+          <div className="mb-4 border border-negative/30 bg-negative/10 p-3">
             <p className="text-xs text-negative">{error}</p>
           </div>
         )}
@@ -1283,7 +1283,7 @@ function ManualPriceOverrideModal({
               step="0.01"
               value={price}
               onChange={(e) => setPrice(e.target.value)}
-              className="w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm"
+              className="w-full border border-[var(--border-ed)] px-3 py-2 text-sm"
               placeholder="0.00"
               autoFocus
               data-testid="override-price-input"
@@ -1291,7 +1291,7 @@ function ManualPriceOverrideModal({
           </div>
 
           {/* Value preview */}
-          <div className="rounded-lg border border-kern-200 bg-kern-50/50 p-3">
+          <div className="border border-kern-200 bg-kern-50/50 p-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-kern-700">
                 Nieuwe waarde ({holding.units} eenheden)
@@ -1305,7 +1305,7 @@ function ManualPriceOverrideModal({
             )}
           </div>
 
-          <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] p-2.5">
+          <div className="border border-[var(--border-ed)] bg-[var(--subtle)] p-2.5">
             <p className="text-[10px] text-[var(--ink-3)]">
               Vorige prijs: {holding.current_price != null ? fc(holding.current_price) : 'Niet ingesteld'}
               {' · '}Aankoopprijs: {fc(holding.avg_purchase_price)}
@@ -1316,14 +1316,14 @@ function ManualPriceOverrideModal({
         <div className="mt-5 flex justify-end gap-2">
           <button
             onClick={onClose}
-            className="rounded-lg border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+            className="border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
           >
             Annuleren
           </button>
           <button
             onClick={handleSave}
             disabled={saving || !price}
-            className="rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
+            className="bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
             data-testid="override-save-btn"
           >
             {saving ? 'Bijwerken...' : 'Prijs bijwerken'}
@@ -1479,13 +1479,13 @@ function HoldingForm({
     <BottomSheet open={true} onClose={onClose} title="Nieuwe holding" size="md">
       <div className="p-5">
         {error && (
-          <div className="mb-4 rounded-lg border border-negative/30 bg-negative/10 p-3">
+          <div className="mb-4 border border-negative/30 bg-negative/10 p-3">
             <p className="text-xs text-negative">{error}</p>
           </div>
         )}
 
         {duplicateWarning && (
-          <div className="mb-4 rounded-lg border border-kern-300 bg-kern-50 p-3" data-testid="duplicate-warning">
+          <div className="mb-4 border border-kern-300 bg-kern-50 p-3" data-testid="duplicate-warning">
             <div className="flex items-start gap-2">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-kern-600" />
               <div className="flex-1">
@@ -1504,14 +1504,14 @@ function HoldingForm({
                   <button
                     onClick={() => handleSave(true)}
                     disabled={saving}
-                    className="rounded-md bg-kern-600 px-3 py-1 text-xs font-medium text-white hover:bg-kern-700 disabled:opacity-50"
+                    className="bg-kern-600 px-3 py-1 text-xs font-medium text-white hover:bg-kern-700 disabled:opacity-50"
                     data-testid="force-duplicate-btn"
                   >
                     {saving ? 'Opslaan...' : 'Toch toevoegen'}
                   </button>
                   <button
                     onClick={() => setDuplicateWarning(null)}
-                    className="rounded-md border border-kern-300 px-3 py-1 text-xs font-medium text-kern-700 hover:bg-kern-100"
+                    className="border border-kern-300 px-3 py-1 text-xs font-medium text-kern-700 hover:bg-kern-100"
                     data-testid="cancel-duplicate-btn"
                   >
                     Annuleren
@@ -1542,7 +1542,7 @@ function HoldingForm({
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm"
+                className="w-full border border-[var(--border-ed)] px-3 py-2 text-sm"
                 placeholder="VWRL ETF"
                 autoFocus
               />
@@ -1555,7 +1555,7 @@ function HoldingForm({
                   setTicker(e.target.value)
                   validateTicker(e.target.value)
                 }}
-                className="w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm"
+                className="w-full border border-[var(--border-ed)] px-3 py-2 text-sm"
                 placeholder="VWRL"
               />
               {tickerStatus === 'checking' && (
@@ -1587,7 +1587,7 @@ function HoldingForm({
                 step="0.001"
                 value={units}
                 onChange={(e) => setUnits(e.target.value)}
-                className="w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm"
+                className="w-full border border-[var(--border-ed)] px-3 py-2 text-sm"
                 placeholder="0"
                 data-testid="holding-units-input"
               />
@@ -1599,7 +1599,7 @@ function HoldingForm({
                 step="0.01"
                 value={avgPrice}
                 onChange={(e) => setAvgPrice(e.target.value)}
-                className="w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm"
+                className="w-full border border-[var(--border-ed)] px-3 py-2 text-sm"
                 placeholder="0.00"
               />
             </div>
@@ -1610,7 +1610,7 @@ function HoldingForm({
                 step="0.01"
                 value={currentPrice}
                 onChange={(e) => setCurrentPrice(e.target.value)}
-                className="w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm"
+                className="w-full border border-[var(--border-ed)] px-3 py-2 text-sm"
                 placeholder="0.00"
               />
             </div>
@@ -1623,14 +1623,14 @@ function HoldingForm({
                 type="date"
                 value={purchaseDate}
                 onChange={(e) => setPurchaseDate(e.target.value)}
-                className="w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm"
+                className="w-full border border-[var(--border-ed)] px-3 py-2 text-sm"
                 data-testid="holding-purchase-date-input"
               />
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Valuta</label>
               <div
-                className="flex items-center rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2 text-sm text-[var(--ink-2)]"
+                className="flex items-center border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2 text-sm text-[var(--ink-2)]"
                 data-testid="holding-currency-display"
               >
                 {currency}
@@ -1639,7 +1639,7 @@ function HoldingForm({
             <div>
               <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Status</label>
               <div
-                className="flex items-center gap-1.5 rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2 text-sm text-[var(--ink-2)]"
+                className="flex items-center gap-1.5 border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2 text-sm text-[var(--ink-2)]"
                 data-testid="holding-is-active-display"
               >
                 <span className="inline-block h-2 w-2 rounded-full bg-positive" />
@@ -1660,7 +1660,7 @@ function HoldingForm({
                 inputMode="decimal"
                 value={ter}
                 onChange={(e) => setTer(e.target.value)}
-                className="w-32 rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm"
+                className="w-32 border border-[var(--border-ed)] px-3 py-2 text-sm"
                 placeholder="0.22"
                 data-testid="holding-ter-input"
               />
@@ -1685,13 +1685,13 @@ function HoldingForm({
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
-              className="w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm"
+              className="w-full border border-[var(--border-ed)] px-3 py-2 text-sm"
             />
           </div>
 
           {/* Progressive disclosure: hint when ticker/ISIN present but no TER */}
           {!ter && ticker && (
-            <div className="rounded-lg border border-kern-100 bg-kern-50/50 px-3 py-2" data-testid="ter-hint">
+            <div className="border border-kern-100 bg-kern-50/50 px-3 py-2" data-testid="ter-hint">
               <p className="text-[11px] text-kern-600">
                 💡 Tip: voeg de TER toe om jaarlijkse fondskosten inzichtelijk te maken
               </p>
@@ -1702,14 +1702,14 @@ function HoldingForm({
         <div className="mt-5 flex justify-end gap-2">
           <button
             onClick={onClose}
-            className="rounded-lg border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+            className="border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
           >
             Annuleren
           </button>
           <button
             onClick={() => handleSave()}
             disabled={saving || submitted || !name}
-            className="rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
+            className="bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
             data-testid="holding-submit-btn"
           >
             {submitted ? 'Opgeslagen ✓' : saving ? 'Opslaan...' : 'Toevoegen'}
@@ -1861,7 +1861,7 @@ function HoldingTransactionForm({
           {tab === 'new' && (
             <>
               {error && (
-                <div className="mb-4 rounded-lg border border-negative/30 bg-negative/10 p-3">
+                <div className="mb-4 border border-negative/30 bg-negative/10 p-3">
                   <p className="text-xs text-negative">{error}</p>
                 </div>
               )}
@@ -1877,7 +1877,7 @@ function HoldingTransactionForm({
                       <button
                         key={t}
                         onClick={() => setTxType(t)}
-                        className={`flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-all ${
+                        className={`flex items-center justify-center gap-1.5 border px-3 py-2 text-sm font-medium transition-all ${
                           txType === t
                             ? `${cfg.bg} ${cfg.border} ${cfg.color} ring-1 ${cfg.ring}`
                             : 'border-[var(--border-ed)] text-[var(--ink-3)] hover:bg-[var(--subtle)]'
@@ -1916,7 +1916,7 @@ function HoldingTransactionForm({
                       max={txType === 'sell' ? currentUnits : undefined}
                       value={units}
                       onChange={(e) => setUnits(e.target.value)}
-                      className={`w-full rounded-lg border px-3 py-2 text-sm ${
+                      className={`w-full border px-3 py-2 text-sm ${
                         sellExceedsOwned || sellFromZero ? 'border-negative/40 bg-negative/5' : 'border-[var(--border-ed)]'
                       }`}
                       placeholder={txType === 'dividend' ? '1' : '10'}
@@ -1930,7 +1930,7 @@ function HoldingTransactionForm({
                       step="0.01"
                       value={pricePerUnit}
                       onChange={(e) => setPricePerUnit(e.target.value)}
-                      className="w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm"
+                      className="w-full border border-[var(--border-ed)] px-3 py-2 text-sm"
                       placeholder="50.00"
                     />
                   </div>
@@ -1943,12 +1943,12 @@ function HoldingTransactionForm({
                       type="date"
                       value={date}
                       onChange={(e) => setDate(e.target.value)}
-                      className="w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm"
+                      className="w-full border border-[var(--border-ed)] px-3 py-2 text-sm"
                     />
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Totaal bedrag</label>
-                    <div className="flex items-center rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2 text-sm font-medium text-[var(--ink-2)]">
+                    <div className="flex items-center border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2 text-sm font-medium text-[var(--ink-2)]">
                       {fc(totalAmount)}
                     </div>
                   </div>
@@ -1959,7 +1959,7 @@ function HoldingTransactionForm({
                   <input
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
-                    className="w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm"
+                    className="w-full border border-[var(--border-ed)] px-3 py-2 text-sm"
                     placeholder="Maandelijkse aankoop..."
                   />
                 </div>
@@ -1967,7 +1967,7 @@ function HoldingTransactionForm({
 
               {/* Sell validation warning */}
               {sellFromZero && (
-                <div className="mt-4 rounded-lg border border-negative/30 bg-negative/10 p-3" data-testid="sell-from-zero-warning">
+                <div className="mt-4 border border-negative/30 bg-negative/10 p-3" data-testid="sell-from-zero-warning">
                   <p className="text-xs font-medium text-negative">
                     <AlertTriangle className="inline h-3 w-3 mr-1" />
                     Deze holding heeft 0 eenheden. Je kunt niet verkopen.
@@ -1975,7 +1975,7 @@ function HoldingTransactionForm({
                 </div>
               )}
               {sellExceedsOwned && !sellFromZero && (
-                <div className="mt-4 rounded-lg border border-negative/30 bg-negative/10 p-3" data-testid="sell-exceeds-warning">
+                <div className="mt-4 border border-negative/30 bg-negative/10 p-3" data-testid="sell-exceeds-warning">
                   <p className="text-xs font-medium text-negative">
                     <AlertTriangle className="inline h-3 w-3 mr-1" />
                     Je hebt maar {currentUnits} eenheden. Je kunt niet meer verkopen dan je bezit.
@@ -1985,7 +1985,7 @@ function HoldingTransactionForm({
 
               {/* Preview: holding after transaction */}
               {Number(units) > 0 && txType !== 'dividend' && !sellExceedsOwned && !sellFromZero && (
-                <div className="mt-4 rounded-lg border border-kern-200 bg-kern-50/50 p-3">
+                <div className="mt-4 border border-kern-200 bg-kern-50/50 p-3">
                   <p className="text-xs font-medium text-kern-700 mb-1">Na transactie:</p>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-[var(--ink-2)]">
@@ -2005,14 +2005,14 @@ function HoldingTransactionForm({
               <div className="mt-5 flex justify-end gap-2">
                 <button
                   onClick={onClose}
-                  className="rounded-lg border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+                  className="border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
                 >
                   Annuleren
                 </button>
                 <button
                   onClick={handleSave}
                   disabled={saving || !units || !pricePerUnit || !date || sellExceedsOwned || sellFromZero}
-                  className={`rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50 ${
+                  className={`px-4 py-2 text-sm font-medium text-white disabled:opacity-50 ${
                     txType === 'buy' ? 'bg-positive hover:bg-positive/90' :
                     txType === 'sell' ? 'bg-negative hover:bg-negative/90' :
                     'bg-kern-600 hover:bg-kern-700'
@@ -2047,7 +2047,7 @@ function HoldingTransactionForm({
                     const totalDividendIncome = dividendTxs.reduce((sum, tx) => sum + tx.total_amount, 0)
                     if (dividendTxs.length > 0) {
                       return (
-                        <div className="mb-3 rounded-lg border border-kern-200 bg-kern-50/50 p-3" data-testid="dividend-summary">
+                        <div className="mb-3 border border-kern-200 bg-kern-50/50 p-3" data-testid="dividend-summary">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                               <DollarSign className="h-4 w-4 text-kern-600" />
@@ -2069,8 +2069,8 @@ function HoldingTransactionForm({
                       const cfg = typeConfig[tx.type] || typeConfig.buy
                       const Icon = cfg.icon
                       return (
-                        <div key={tx.id} className="flex items-center gap-3 rounded-lg border border-[var(--border-ed)] p-2.5">
-                          <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${cfg.bg}`}>
+                        <div key={tx.id} className="flex items-center gap-3 border border-[var(--border-ed)] p-2.5">
+                          <div className={`flex h-7 w-7 shrink-0 items-center justify-center ${cfg.bg}`}>
                             <Icon className={`h-3.5 w-3.5 ${cfg.color}`} />
                           </div>
                           <div className="min-w-0 flex-1">

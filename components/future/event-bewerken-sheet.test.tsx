@@ -58,9 +58,9 @@ describe('EventBewerkenSheet — render', () => {
     const { container } = render(
       <EventBewerkenSheet event={mockEvent()} onClose={() => {}} />,
     )
-    const nameInput = container.querySelector('input[type="text"]') as HTMLInputElement
+    const nameInput = document.querySelector('input[type="text"]') as HTMLInputElement
     expect(nameInput.value).toBe('Tweede kind')
-    const numInputs = container.querySelectorAll('input[type="number"]')
+    const numInputs = document.querySelectorAll('input[type="number"]')
     expect((numInputs[0] as HTMLInputElement).value).toBe('35')
     expect((numInputs[1] as HTMLInputElement).value).toBe('5000')
   })
@@ -72,9 +72,9 @@ describe('EventBewerkenSheet — submit', () => {
     const { container } = render(
       <EventBewerkenSheet event={mockEvent()} onClose={onClose} />,
     )
-    const nameInput = container.querySelector('input[type="text"]')!
+    const nameInput = document.querySelector('input[type="text"]')!
     fireEvent.change(nameInput, { target: { value: 'Eerste kind' } })
-    fireEvent.submit(container.querySelector('form')!)
+    fireEvent.submit(document.querySelector('form')!)
     await new Promise((r) => setTimeout(r, 10))
     expect(mockUpdate).toHaveBeenCalled()
     expect(mockRefresh).toHaveBeenCalled()
@@ -85,9 +85,9 @@ describe('EventBewerkenSheet — submit', () => {
     const { container } = render(
       <EventBewerkenSheet event={mockEvent()} onClose={() => {}} />,
     )
-    const nameInput = container.querySelector('input[type="text"]')!
+    const nameInput = document.querySelector('input[type="text"]')!
     fireEvent.change(nameInput, { target: { value: '   ' } })
-    fireEvent.submit(container.querySelector('form')!)
+    fireEvent.submit(document.querySelector('form')!)
     expect(screen.getByRole('alert').textContent).toMatch(/Naam is verplicht/i)
     expect(mockUpdate).not.toHaveBeenCalled()
   })
@@ -96,9 +96,9 @@ describe('EventBewerkenSheet — submit', () => {
     const { container } = render(
       <EventBewerkenSheet event={mockEvent()} onClose={() => {}} />,
     )
-    const numInputs = container.querySelectorAll('input[type="number"]')
+    const numInputs = document.querySelectorAll('input[type="number"]')
     fireEvent.change(numInputs[0]!, { target: { value: '10' } })
-    fireEvent.submit(container.querySelector('form')!)
+    fireEvent.submit(document.querySelector('form')!)
     expect(screen.getByRole('alert').textContent).toMatch(/tussen 18 en 120/i)
     expect(mockUpdate).not.toHaveBeenCalled()
   })

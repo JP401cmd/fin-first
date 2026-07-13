@@ -5,6 +5,7 @@ import type { ReportMonthRow } from '@/lib/report-data'
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { useResolvedModuleColor } from '@/lib/hooks/use-resolved-module-color'
+import { FinTable } from '@/components/app/fin-table'
 import { ReportSparkline } from './report-sparkline'
 
 export function MonthlyTable({
@@ -47,11 +48,10 @@ export function MonthlyTable({
       )}
 
       {/*
-        Sleep-hint: tabel kan op <640px horizontaal scrollen. UI/UX skill
-        vraagt een mono UPPERCASE 'sleep →' hint top-right. We tonen hem altijd
-        onder 640px (geen onScroll-handler — een tone-it-always-when-mobile is
-        voldoende voor de eerste poll van de skill). De hint zit absolute
-        binnen de relative container en knipt niet uit de tabel.
+        H-04: gemigreerd naar de canonieke FinTable. Sleep-hint blijft behouden —
+        de tabel kan op <640px horizontaal scrollen. UI/UX skill vraagt een mono
+        UPPERCASE 'sleep →' hint top-right; die zit absolute binnen de relative
+        container, náást (niet in) de overflow-scroller van FinTableRoot.
       */}
       <div className="relative">
         <span
@@ -60,95 +60,62 @@ export function MonthlyTable({
         >
           sleep →
         </span>
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs font-dm-mono">
-            <thead>
-              <tr>
-                <th className="px-2 first:pl-0 last:pr-0 pb-2 text-left text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)] font-mono">
-                  Maand
-                </th>
-                <th className="px-2 first:pl-0 last:pr-0 pb-2 text-right text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)] font-mono">
-                  Inkomen
-                </th>
-                <th className="px-2 first:pl-0 last:pr-0 pb-2 text-right text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)] font-mono">
-                  Uitgaven
-                </th>
-                <th className="px-2 first:pl-0 last:pr-0 pb-2 text-right text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)] font-mono">
-                  Gespaard
-                </th>
-                <th className="px-2 first:pl-0 last:pr-0 pb-2 text-right text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)] font-mono">
-                  Quote
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => {
-                const rate =
-                  row.income > 0
-                    ? Math.round((row.savings / row.income) * 100 * 10) / 10
-                    : 0
-                return (
-                  <tr
-                    key={row.month}
-                    className="border-b border-dotted border-[var(--rule-soft)] transition-colors hover:bg-[var(--subtle)]/50"
+        <FinTable tableClassName="font-dm-mono">
+          <FinTable.Header>
+            <FinTable.Row dashed={false}>
+              <FinTable.Th>Maand</FinTable.Th>
+              <FinTable.Th align="right">Inkomen</FinTable.Th>
+              <FinTable.Th align="right">Uitgaven</FinTable.Th>
+              <FinTable.Th align="right">Gespaard</FinTable.Th>
+              <FinTable.Th align="right">Quote</FinTable.Th>
+            </FinTable.Row>
+          </FinTable.Header>
+          <FinTable.Body>
+            {rows.map((row) => {
+              const rate =
+                row.income > 0
+                  ? Math.round((row.savings / row.income) * 100 * 10) / 10
+                  : 0
+              return (
+                <FinTable.Row key={row.month}>
+                  <FinTable.Td color="text-[var(--ink-2)]">{row.label}</FinTable.Td>
+                  <FinTable.Td numeric color="text-[var(--ink-3)]">{fc(row.income)}</FinTable.Td>
+                  <FinTable.Td numeric color="text-[var(--ink-3)]">{fc(row.expenses)}</FinTable.Td>
+                  <FinTable.Td
+                    numeric
+                    color={row.savings >= 0 ? 'text-[var(--positive)]' : 'text-[var(--negative)]'}
                   >
-                    <td className="px-2 first:pl-0 last:pr-0 py-2 font-inter text-[var(--ink-2)]">
-                      {row.label}
-                    </td>
-                    <td className="px-2 first:pl-0 last:pr-0 py-2 text-right tabular-nums text-[var(--ink-3)]">
-                      {fc(row.income)}
-                    </td>
-                    <td className="px-2 first:pl-0 last:pr-0 py-2 text-right tabular-nums text-[var(--ink-3)]">
-                      {fc(row.expenses)}
-                    </td>
-                    <td
-                      className={`px-2 first:pl-0 last:pr-0 py-2 text-right tabular-nums ${
-                        row.savings >= 0
-                          ? 'text-[var(--positive)]'
-                          : 'text-[var(--negative)]'
-                      }`}
-                    >
-                      {fc(row.savings)}
-                    </td>
-                    <td className="px-2 first:pl-0 last:pr-0 py-2 text-right tabular-nums text-[var(--ink-3)]">
-                      {rate}%
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-            <tfoot>
-              {/*
-                Boekhoudkundige sluitstreep: border-b-4 + border-double op de
-                eindrij — eenmalig per tabel. Vervangt de FinTable border-t-2
-                bovenkant zodat de eindstreep onder, niet boven, staat.
-              */}
-              <tr className="border-b-4 border-double border-[var(--ink)] font-semibold">
-                <td className="px-2 first:pl-0 last:pr-0 py-2 font-inter text-[var(--ink)]">
-                  Totaal
-                </td>
-                <td className="px-2 first:pl-0 last:pr-0 py-2 text-right tabular-nums text-[var(--ink)]">
-                  {fc(totalIncome)}
-                </td>
-                <td className="px-2 first:pl-0 last:pr-0 py-2 text-right tabular-nums text-[var(--ink)]">
-                  {fc(totalExpenses)}
-                </td>
-                <td
-                  className={`px-2 first:pl-0 last:pr-0 py-2 text-right tabular-nums ${
-                    totalSaved >= 0
-                      ? 'text-[var(--positive)]'
-                      : 'text-[var(--negative)]'
-                  }`}
-                >
-                  {fc(totalSaved)}
-                </td>
-                <td className="px-2 first:pl-0 last:pr-0 py-2 text-right tabular-nums text-[var(--ink)]">
-                  {savingsRate != null ? `${savingsRate}%` : '–'}
-                </td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
+                    {fc(row.savings)}
+                  </FinTable.Td>
+                  <FinTable.Td numeric color="text-[var(--ink-3)]">{rate}%</FinTable.Td>
+                </FinTable.Row>
+              )
+            })}
+          </FinTable.Body>
+          <FinTable.Footer>
+            {/*
+              Boekhoudkundige sluitstreep: border-b-4 + border-double op de
+              eindrij — eenmalig per tabel, de eindstreep staat ONDER het totaal.
+              Daarom bewust NIET FinTable's `total`-variant (die tekent border-t-2
+              bóven de rij); we zetten `dashed={false}` zodat de default rij-border
+              wegvalt en de dubbele accounting-lijn onderaan overblijft.
+            */}
+            <FinTable.Row dashed={false} className="border-b-4 border-double border-[var(--ink)] font-semibold">
+              <FinTable.Td color="text-[var(--ink)]">Totaal</FinTable.Td>
+              <FinTable.Td numeric color="text-[var(--ink)]">{fc(totalIncome)}</FinTable.Td>
+              <FinTable.Td numeric color="text-[var(--ink)]">{fc(totalExpenses)}</FinTable.Td>
+              <FinTable.Td
+                numeric
+                color={totalSaved >= 0 ? 'text-[var(--positive)]' : 'text-[var(--negative)]'}
+              >
+                {fc(totalSaved)}
+              </FinTable.Td>
+              <FinTable.Td numeric color="text-[var(--ink)]">
+                {savingsRate != null ? `${savingsRate}%` : '–'}
+              </FinTable.Td>
+            </FinTable.Row>
+          </FinTable.Footer>
+        </FinTable>
       </div>
     </div>
   )

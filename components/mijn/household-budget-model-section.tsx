@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { Wallet, Users, ArrowLeftRight, Check, Clock } from 'lucide-react'
 import { BudgetMergeWizard } from '@/components/app/budget-merge-wizard'
+import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 
 /**
  * HouseholdBudgetModelSection — beheer van het budget-model van het huishouden:
@@ -67,6 +68,9 @@ export function HouseholdBudgetModelSection() {
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [accepted, setAccepted] = useState(false)
+  // I-05: bevestiging bij terugdraaien naar gescheiden budgetten (vervangt
+  // window.confirm door een toegankelijke ShellOverlay-confirm).
+  const [showSeparateConfirm, setShowSeparateConfirm] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -91,14 +95,10 @@ export function HouseholdBudgetModelSection() {
   const partnerName = data?.partnerName ?? null
   const partnerLabel = partnerName ?? 'je partner'
 
-  /** Stelt voor terug te gaan naar gescheiden budgetten (POST separate). */
-  const proposeSeparate = useCallback(async () => {
-    const ok = window.confirm(
-      'Terug naar gescheiden budgetten? De historie gaat per eigenaar terug. ' +
-        'Nieuwe gezamenlijke boekingen van je partner op nog niet-samengevoegde ' +
-        'gedeelde budgetten worden ongecategoriseerd. Doorgaan?',
-    )
-    if (!ok) return
+  /** Stelt voor terug te gaan naar gescheiden budgetten (POST separate).
+   *  De bevestiging draait nu via de ShellOverlay-confirm; deze functie voert
+   *  na akkoord de call uit. */
+  const doProposeSeparate = useCallback(async () => {
     setBusy(true)
     setMessage(null)
     try {
@@ -111,6 +111,7 @@ export function HouseholdBudgetModelSection() {
         const j = await res.json().catch(() => ({}))
         throw new Error(j.error ?? 'Voorstel versturen mislukt.')
       }
+      setShowSeparateConfirm(false)
       await load()
     } catch (e) {
       setMessage({ type: 'error', text: e instanceof Error ? e.message : 'Onbekende fout.' })
@@ -291,7 +292,7 @@ export function HouseholdBudgetModelSection() {
           <div>
             <button
               type="button"
-              onClick={() => void proposeSeparate()}
+              onClick={() => setShowSeparateConfirm(true)}
               disabled={busy}
               className="px-4 py-2 text-sm font-medium text-[var(--ink-2)] border border-[var(--border-ed)] hover:bg-[var(--subtle)] disabled:opacity-50"
             >
@@ -322,6 +323,47 @@ export function HouseholdBudgetModelSection() {
           }}
         />
       )}
+
+      {/* I-05: bevestiging "terug naar gescheiden budgetten" — toegankelijke
+          ShellOverlay-confirm (focus-trap + Esc) i.p.v. window.confirm. */}
+      <ShellOverlay
+        open={showSeparateConfirm}
+        onClose={() => {
+          if (!busy) setShowSeparateConfirm(false)
+        }}
+        kind="confirm"
+        destructive
+        title="Terug naar gescheiden budgetten?"
+      >
+        <div className="p-6">
+          <p className="text-sm leading-relaxed text-[var(--ink-2)]">
+            De historie gaat per eigenaar terug. Nieuwe gezamenlijke boekingen van{' '}
+            {partnerLabel} op nog niet-samengevoegde gedeelde budgetten worden
+            ongecategoriseerd.
+          </p>
+          {message?.type === 'error' && (
+            <p className="mt-3 text-sm text-negative">{message.text}</p>
+          )}
+          <div className="mt-6 flex items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => setShowSeparateConfirm(false)}
+              disabled={busy}
+              className="rounded-lg border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] disabled:opacity-50"
+            >
+              Annuleren
+            </button>
+            <button
+              type="button"
+              onClick={() => void doProposeSeparate()}
+              disabled={busy}
+              className="rounded-lg bg-negative px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+            >
+              {busy ? 'Versturen…' : 'Voorstel versturen'}
+            </button>
+          </div>
+        </div>
+      </ShellOverlay>
     </section>
   )
 }

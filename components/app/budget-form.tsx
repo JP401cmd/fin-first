@@ -1109,7 +1109,7 @@ export function BudgetForm({
           <button
             type="submit"
             disabled={saving}
-            className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-5 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-5 py-2 text-sm font-medium text-white transition-colors duration-150 hover:bg-kern-700 active:scale-[0.98] disabled:opacity-50"
             data-testid="budget-submit-btn"
           >
             <Save className="h-4 w-4" />

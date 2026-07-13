@@ -39,12 +39,12 @@ export default function MijnUiterlijkPage() {
         />
 
         {/* Essentieel — Palet wisselt het complete token-systeem in één klik. */}
-        <div className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
+        <div className="border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
           <PalettePicker />
         </div>
 
         {/* Essentieel — Typografie stuurt leesbaarheid van de hele app. */}
-        <div className="mt-4 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
+        <div className="mt-4 border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
           <FontPicker />
         </div>
 
@@ -55,7 +55,7 @@ export default function MijnUiterlijkPage() {
           Elke onderliggende picker behoudt zijn eigen standaard-knop.
         */}
         <details className="group mt-4">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 transition-colors hover:bg-[var(--subtle)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)] sm:px-6">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 transition-colors hover:bg-[var(--subtle)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)] sm:px-6">
             <span>
               <span className="block text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
                 Geavanceerd
@@ -75,15 +75,15 @@ export default function MijnUiterlijkPage() {
             </span>
           </summary>
 
-          <div className="mt-4 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
+          <div className="mt-4 border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
             <ModuleAccentPicker />
           </div>
 
-          <div className="mt-4 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
+          <div className="mt-4 border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
             <BudgetTintPicker />
           </div>
 
-          <div className="mt-4 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
+          <div className="mt-4 border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
             <CategoryTintPicker />
           </div>
         </details>

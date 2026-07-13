@@ -456,7 +456,7 @@ export function TransactionForm({
           </p>
 
           {error && (
-            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            <div className="border border-red-200 bg-red-50 p-3 text-sm text-red-700">
               {error}
             </div>
           )}
@@ -481,7 +481,7 @@ export function TransactionForm({
       {phase === 'form' && (
         <form onSubmit={handleSubmit} className="p-6">
           {error && (
-            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            <div className="mb-4 border border-red-200 bg-red-50 p-3 text-sm text-red-700">
               {error}
             </div>
           )}
@@ -494,7 +494,7 @@ export function TransactionForm({
                 <button
                   type="button"
                   onClick={() => update('is_income', false)}
-                  className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                  className={`flex-1 border px-3 py-2 text-sm font-medium transition-colors ${
                     !form.is_income
                       ? 'border-negative/30 bg-negative-bg text-negative'
                       : 'border-[var(--border-ed)] text-[var(--ink-3)] hover:bg-[var(--subtle)]'
@@ -505,7 +505,7 @@ export function TransactionForm({
                 <button
                   type="button"
                   onClick={() => update('is_income', true)}
-                  className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                  className={`flex-1 border px-3 py-2 text-sm font-medium transition-colors ${
                     form.is_income
                       ? 'border-positive/30 bg-positive-bg text-positive'
                       : 'border-[var(--border-ed)] text-[var(--ink-3)] hover:bg-[var(--subtle)]'
@@ -527,7 +527,7 @@ export function TransactionForm({
                   type="date"
                   value={form.date}
                   onChange={(e) => update('date', e.target.value)}
-                  className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+                  className="w-full border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                   required
                 />
               </div>
@@ -542,7 +542,7 @@ export function TransactionForm({
                   step="0.01"
                   value={form.amount}
                   onChange={(e) => update('amount', e.target.value)}
-                  className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+                  className="w-full border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                   placeholder="0,00"
                   required
                 />
@@ -559,7 +559,7 @@ export function TransactionForm({
                 type="text"
                 value={form.description}
                 onChange={(e) => update('description', e.target.value)}
-                className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+                className="w-full border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                 placeholder="bijv. Albert Heijn boodschappen"
                 required
               />
@@ -575,7 +575,7 @@ export function TransactionForm({
                 type="text"
                 value={form.counterparty_name}
                 onChange={(e) => update('counterparty_name', e.target.value)}
-                className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+                className="w-full border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                 placeholder="bijv. Albert Heijn"
               />
             </div>
@@ -590,7 +590,7 @@ export function TransactionForm({
                   id="tx-budget"
                   value={form.budget_id}
                   onChange={(e) => update('budget_id', e.target.value)}
-                  className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+                  className="w-full border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                 >
                   <option value="">Niet gecategoriseerd</option>
                   {buildBudgetSelectEntries(budgetGroups).map((entry) =>
@@ -641,7 +641,7 @@ export function TransactionForm({
             )}
 
             {/* Split toggle — available for both new and edit */}
-            <div className="rounded-lg border border-[var(--border-ed)] p-3">
+            <div className="border border-[var(--border-ed)] p-3">
               <label className="flex cursor-pointer items-center gap-2">
                 <input
                   type="checkbox"
@@ -650,7 +650,7 @@ export function TransactionForm({
                     setIsSplit(e.target.checked)
                     if (e.target.checked) update('budget_id', '')
                   }}
-                  className="h-4 w-4 rounded border-[var(--border-md)] text-kern-600 focus:ring-kern-500"
+                  className="h-4 w-4 border-[var(--border-md)] text-kern-600 focus:ring-kern-500"
                 />
                 <GitFork className="h-4 w-4 text-[var(--ink-3)]" />
                 <span className="text-sm font-medium text-[var(--ink-2)]">Verdeel over meerdere budgetten</span>
@@ -747,7 +747,7 @@ export function TransactionForm({
                             <button
                               type="button"
                               onClick={() => setSplitRows(prev => prev.filter(r => r.id !== row.id))}
-                              className="mt-1 rounded p-1 text-[var(--ink-4)] hover:text-red-600"
+                              className="mt-1 p-1 text-[var(--ink-4)] hover:text-red-600"
                             >
                               <X className="h-3.5 w-3.5" />
                             </button>
@@ -776,13 +776,13 @@ export function TransactionForm({
 
             {/* Recurring toggle — only for new transactions */}
             {!isEdit && (
-              <div className="rounded-lg border border-[var(--border-ed)] p-3">
+              <div className="border border-[var(--border-ed)] p-3">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={form.is_recurring}
                     onChange={(e) => update('is_recurring', e.target.checked)}
-                    className="h-4 w-4 rounded border-[var(--border-md)] text-kern-600 focus:ring-kern-500"
+                    className="h-4 w-4 border-[var(--border-md)] text-kern-600 focus:ring-kern-500"
                   />
                   <Repeat className="h-4 w-4 text-[var(--ink-3)]" />
                   <span className="text-sm font-medium text-[var(--ink-2)]">Terugkerende transactie</span>
@@ -799,7 +799,7 @@ export function TransactionForm({
                           id="tx-frequency"
                           value={form.frequency}
                           onChange={(e) => update('frequency', e.target.value)}
-                          className="w-full rounded-lg border border-[var(--border-md)] px-2 py-1.5 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+                          className="w-full border border-[var(--border-md)] px-2 py-1.5 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                         >
                           {Object.entries(FREQUENCY_LABELS).map(([value, label]) => (
                             <option key={value} value={value}>{label}</option>
@@ -815,7 +815,7 @@ export function TransactionForm({
                             id="tx-dow"
                             value={form.day_of_week}
                             onChange={(e) => update('day_of_week', e.target.value)}
-                            className="w-full rounded-lg border border-[var(--border-md)] px-2 py-1.5 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+                            className="w-full border border-[var(--border-md)] px-2 py-1.5 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                           >
                             {['Zondag','Maandag','Dinsdag','Woensdag','Donderdag','Vrijdag','Zaterdag'].map((d, i) => (
                               <option key={i} value={i}>{d}</option>
@@ -834,7 +834,7 @@ export function TransactionForm({
                             max="31"
                             value={form.day_of_month}
                             onChange={(e) => update('day_of_month', e.target.value)}
-                            className="w-full rounded-lg border border-[var(--border-md)] px-2 py-1.5 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+                            className="w-full border border-[var(--border-md)] px-2 py-1.5 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                           />
                         </div>
                       )}
@@ -848,7 +848,7 @@ export function TransactionForm({
                         type="date"
                         value={form.end_date}
                         onChange={(e) => update('end_date', e.target.value)}
-                        className="w-full rounded-lg border border-[var(--border-md)] px-2 py-1.5 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+                        className="w-full border border-[var(--border-md)] px-2 py-1.5 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                       />
                     </div>
                   </div>
@@ -865,7 +865,7 @@ export function TransactionForm({
                 id="tx-notes"
                 value={form.notes}
                 onChange={(e) => update('notes', e.target.value)}
-                className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+                className="w-full border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                 rows={2}
                 placeholder="Optionele notities..."
               />
@@ -878,7 +878,7 @@ export function TransactionForm({
               <button
                 type="button"
                 onClick={() => setPhase('analyse')}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink-2)]"
+                className="inline-flex w-full items-center justify-center gap-2 border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink-2)]"
               >
                 <BarChart3 className="h-4 w-4" />
                 Analyseer tegenpartij
@@ -894,7 +894,7 @@ export function TransactionForm({
                   type="button"
                   onClick={handleDelete}
                   disabled={deleting}
-                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                  className={`inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors ${
                     confirmDelete
                       ? 'bg-red-600 text-white hover:bg-red-700'
                       : 'text-red-600 hover:bg-red-50'
@@ -909,14 +909,14 @@ export function TransactionForm({
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-lg border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+                className="border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
               >
                 Annuleren
               </button>
               <button
                 type="submit"
                 disabled={saving}
-                className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
+                className="inline-flex items-center gap-2 bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
               >
                 <Save className="h-4 w-4" />
                 {saving ? 'Opslaan...' : 'Opslaan'}

@@ -163,7 +163,7 @@ export function HorizonFireParamsPanel({
               <input
                 type="range" min={1} max={15} step={0.1} value={localReturn}
                 onChange={e => handleReturnChange(Number(e.target.value))}
-                className="w-full cursor-pointer accent-horizon-600"
+                className="slider-module w-full"
               />
               <div className="mt-1.5 flex justify-between text-[10px] text-[var(--ink-4)]">
                 <span>1% conservatief</span><span>7% historisch gem.</span><span>15% optimistisch</span>
@@ -181,7 +181,7 @@ export function HorizonFireParamsPanel({
               <input
                 type="range" min={0} max={8} step={0.1} value={localInflation}
                 onChange={e => handleInflationChange(Number(e.target.value))}
-                className="w-full cursor-pointer accent-horizon-600"
+                className="slider-module w-full"
               />
               <div className="mt-1.5 flex justify-between text-[10px] text-[var(--ink-4)]">
                 <span>0% deflatie</span><span>2% NL-gemiddelde</span><span>8% hoog</span>

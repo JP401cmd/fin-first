@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useScrollLock } from '@/lib/hooks/use-scroll-lock'
+import { acquireOverlay } from '@/lib/overlay-signal'
 import { useNotifications } from './notification-provider'
 import { NotificationItem } from './notification-item'
 import { X, ChevronRight } from 'lucide-react'
@@ -124,6 +125,16 @@ export function NotificationModal() {
 
   // Lock body scroll when modal is open
   useScrollLock(isModalOpen)
+
+  // Verberg de zwevende nav-pill zolang de meldingen-modal open is (ADR 0039).
+  // Bewust géén BottomSheet-migratie: bespoke krant-masthead met chat-sidebar-
+  // offset (`right: var(--chat-sidebar-width)`), top-verankerd op mobiel en
+  // read-only backdrop-dismiss — een sheet zou dat gedrag wijzigen. Alleen het
+  // pill-signaal wordt gedeeld met het overlay-systeem.
+  useEffect(() => {
+    if (!isModalOpen) return
+    return acquireOverlay()
+  }, [isModalOpen])
 
   // Verse data bij openen — de achtergrond-poll loopt op 10 min (egress-
   // reductie), dus het moment van openen is hét moment om te verversen.

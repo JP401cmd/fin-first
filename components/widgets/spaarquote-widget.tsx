@@ -10,6 +10,7 @@ import { MaskedAmount } from '@/components/app/masked-amount'
 import type { DashboardData } from './widget-renderer'
 import { PiggyBank, Users, UserCheck } from 'lucide-react'
 import { usePerspective } from '@/components/app/perspective-provider'
+import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 
 interface Props {
   size: WidgetSize
@@ -36,6 +37,13 @@ export const SpaarquoteWidget = memo(function SpaarquoteWidget({ size, data, hre
   const savings = overrides ? overrides.monthlySavings : data.monthlySavingsAmount
   const isPositive = rate >= 0
 
+  // In-view fill-animatie (700ms bezier, 0% → doel; transition:none pre-entered).
+  // Eén hook bovenaan; per render toont het widget precies één size, dus dezelfde
+  // ref op elke size-track is rules-of-hooks-veilig.
+  const { ref: barRef, hasEntered } = useInViewAnimation({ duration: 700 })
+  const barTransition = hasEntered ? 'width 700ms cubic-bezier(.22,1,.36,1)' : 'none'
+  const barWidth = hasEntered ? `${Math.min(Math.abs(rate), 100)}%` : '0%'
+
   // De eigen 6m-quote kan een schatting zijn (profiel/net-worth-delta-fallback).
   // Alleen in eigen perspectief markeren; household/partner is een aparte grondslag.
   const isEstimate = !overrides && data.savingsRateIsEstimate
@@ -61,8 +69,8 @@ export const SpaarquoteWidget = memo(function SpaarquoteWidget({ size, data, hre
           <p className={`font-mono text-[15px] font-semibold tabular-nums leading-none truncate ${isPositive ? 'text-positive' : 'text-negative'}`}>
             {rate.toFixed(1)}%
           </p>
-          <div className="mt-0.5 h-[2px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
-            <div className={`h-full rounded-full ${isPositive ? 'bg-positive' : 'bg-negative'}`} style={{ width: `${Math.min(Math.abs(rate), 100)}%` }} />
+          <div ref={barRef} className="mt-0.5 h-[2px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
+            <div className={`h-full rounded-full ${isPositive ? 'bg-positive' : 'bg-negative'}`} style={{ width: barWidth, transition: barTransition }} />
           </div>
         </>
       </WidgetShell>
@@ -82,10 +90,10 @@ export const SpaarquoteWidget = memo(function SpaarquoteWidget({ size, data, hre
         <p className={`font-mono text-lg font-semibold tabular-nums ${isPositive ? 'text-positive' : 'text-negative'}`}>
           {rate.toFixed(1)}%
         </p>
-        <div className="mt-1.5 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
+        <div ref={barRef} className="mt-1.5 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
           <div
             className={`h-full rounded-full ${isPositive ? 'bg-positive' : 'bg-negative'}`}
-            style={{ width: `${Math.min(Math.abs(rate), 100)}%` }}
+            style={{ width: barWidth, transition: barTransition }}
           />
         </div>
       </WidgetShell>
@@ -163,10 +171,10 @@ export const SpaarquoteWidget = memo(function SpaarquoteWidget({ size, data, hre
             {rate.toFixed(1)}%
           </p>
 
-          <div className="mt-2 h-[4px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
+          <div ref={barRef} className="mt-2 h-[4px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
             <div
-              className={`h-full rounded-full transition-all ${isPositive ? 'bg-positive' : 'bg-negative'}`}
-              style={{ width: `${Math.min(Math.abs(rate), 100)}%` }}
+              className={`h-full rounded-full ${isPositive ? 'bg-positive' : 'bg-negative'}`}
+              style={{ width: barWidth, transition: barTransition }}
             />
           </div>
 
@@ -264,10 +272,10 @@ export const SpaarquoteWidget = memo(function SpaarquoteWidget({ size, data, hre
           <p className={`font-mono text-xl font-semibold tabular-nums ${isPositive ? 'text-[var(--ink)]' : 'text-negative'}`}>
             {rate.toFixed(1)}%
           </p>
-          <div className="mt-1.5 h-[4px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
+          <div ref={barRef} className="mt-1.5 h-[4px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
             <div
-              className={`h-full rounded-full transition-all ${isPositive ? 'bg-positive' : 'bg-negative'}`}
-              style={{ width: `${Math.min(Math.abs(rate), 100)}%` }}
+              className={`h-full rounded-full ${isPositive ? 'bg-positive' : 'bg-negative'}`}
+              style={{ width: barWidth, transition: barTransition }}
             />
           </div>
           <p className="mt-1.5 text-[11px] text-[var(--ink-3)]">

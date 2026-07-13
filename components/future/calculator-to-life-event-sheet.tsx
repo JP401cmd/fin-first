@@ -2,12 +2,13 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { X, CalendarPlus, Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import {
   buildLifeEventDraft,
   type LifeEventImpactKind,
 } from '@/lib/calculator/to-life-event'
+import { ShellOverlay } from '@/components/app/shell/shell-overlay'
+import { ModalFooter } from '@/components/app/modal-footer'
 
 /**
  * CalculatorToLifeEventSheet — optionele eindstap: destilleer de
@@ -89,36 +90,20 @@ export function CalculatorToLifeEventSheet({
   }
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Levensgebeurtenis maken"
-      className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/30 backdrop-blur-sm p-4 pb-[calc(1rem+var(--safe-area-bottom,0px))]"
-      onClick={onClose}
+    <ShellOverlay
+      open
+      onClose={onClose}
+      kind="sheet"
+      size="md"
+      title="Maak een levensgebeurtenis"
+      footer={
+        <ModalFooter
+          primary={{ label: 'Naar tijdas', onClick: handleSave, loading: saving }}
+          secondary={{ label: 'Annuleer', onClick: onClose }}
+        />
+      }
     >
-      <div
-        className="w-full max-w-md max-h-[92vh] overflow-y-auto rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-5 sm:p-6 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <header className="flex items-start justify-between gap-3 mb-4">
-          <div>
-            <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
-              Naar de tijdas
-            </div>
-            <h2 className="font-serif text-lg text-[var(--ink)] mt-0.5">
-              Maak een levensgebeurtenis
-            </h2>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Sluiten"
-            className="inline-flex items-center justify-center w-8 h-8 rounded-full text-[var(--ink-3)] hover:bg-[var(--subtle)] transition-colors"
-          >
-            <X className="w-4 h-4" aria-hidden="true" />
-          </button>
-        </header>
-
+      <div className="p-5 sm:p-6">
         {error && (
           <div role="alert" className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
             {error}
@@ -193,26 +178,7 @@ export function CalculatorToLifeEventSheet({
             </label>
           )}
         </div>
-
-        <div className="mt-5 flex items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--ink-3)] hover:text-[var(--ink-2)] transition-colors"
-          >
-            Annuleer
-          </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--ink)] text-[var(--paper)] px-4 py-2 text-sm font-semibold hover:bg-[var(--ink-2)] transition-colors disabled:opacity-50"
-          >
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CalendarPlus className="w-4 h-4" />}
-            Naar tijdas
-          </button>
-        </div>
       </div>
-    </div>
+    </ShellOverlay>
   )
 }

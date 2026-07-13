@@ -3,11 +3,13 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { X, Trash2, TrendingUp, TrendingDown, Minus, Sparkles, ArrowRight, Settings2 } from 'lucide-react'
+import { Trash2, TrendingUp, TrendingDown, Minus, Sparkles, ArrowRight, Settings2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/lib/format'
 import { getGoalSuggestions } from '@/lib/goal-suggestions'
 import { GoalForm } from '@/components/app/goal-form'
+import { ShellOverlay } from '@/components/app/shell/shell-overlay'
+import { ModalFooter } from '@/components/app/modal-footer'
 import type { Goal } from '@/lib/goal-data'
 
 type AssetLite = { id: string; name: string; current_value: number }
@@ -74,8 +76,8 @@ export function DoelBewerkenSheet({
     }
   }, [fullEditOpen])
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+  async function handleSubmit(e?: React.FormEvent) {
+    e?.preventDefault()
     const numeric = Number(newValue)
     if (!Number.isFinite(numeric) || numeric < 0) {
       setError('Waarde moet een getal ≥ 0 zijn.')
@@ -137,36 +139,23 @@ export function DoelBewerkenSheet({
 
   return (
     <>
-    <div
-      role="dialog"
-      aria-label={`Doel bewerken: ${goalName}`}
-      aria-modal="true"
-      className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/30 backdrop-blur-sm p-4 pb-[calc(1rem+var(--safe-area-bottom,0px))]"
-      onClick={onClose}
+    <ShellOverlay
+      open
+      onClose={onClose}
+      kind="sheet"
+      size="md"
+      title="Voortgang bijwerken"
+      footer={
+        <ModalFooter
+          primary={{ label: 'Opslaan', onClick: () => handleSubmit(), loading: saving }}
+          secondary={{ label: 'Annuleer', onClick: onClose }}
+        />
+      }
     >
-      <form
-        onSubmit={handleSubmit}
-        className="w-full max-w-md max-h-[92vh] overflow-y-auto rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-5 sm:p-6 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <header className="flex items-start justify-between gap-3 mb-4">
-          <div>
-            <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
-              Voortgang bijwerken
-            </div>
-            <h2 className="font-serif text-lg text-[var(--ink)] mt-0.5 truncate">
-              {goalName}
-            </h2>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Sluiten"
-            className="inline-flex items-center justify-center w-8 h-8 rounded-full text-[var(--ink-3)] hover:bg-[var(--subtle)] transition-colors"
-          >
-            <X className="w-4 h-4" aria-hidden="true" />
-          </button>
-        </header>
+      <form onSubmit={handleSubmit} className="p-5 sm:p-6">
+        <h2 className="font-serif text-lg text-[var(--ink)] mb-4 truncate">
+          {goalName}
+        </h2>
 
         {error && (
           <div
@@ -350,36 +339,18 @@ export function DoelBewerkenSheet({
           Volledig bewerken (naam, bedrag, datum, koppeling…)
         </button>
 
-        <div className="flex items-center justify-between gap-2">
-          {!confirmDelete && (
-            <button
-              type="button"
-              onClick={() => setConfirmDelete(true)}
-              className="inline-flex items-center gap-1 text-xs text-negative hover:underline"
-            >
-              <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
-              Verwijder doel
-            </button>
-          )}
-          <div className="ml-auto flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-xl px-3 py-2 text-sm font-medium text-[var(--ink-3)] hover:text-[var(--ink-2)] transition-colors"
-            >
-              Annuleer
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="rounded-xl bg-[var(--ink)] px-4 py-2 text-sm font-semibold text-[var(--paper)] hover:bg-[var(--ink-2)] transition-colors disabled:opacity-50"
-            >
-              {saving ? 'Opslaan…' : 'Opslaan'}
-            </button>
-          </div>
-        </div>
+        {!confirmDelete && (
+          <button
+            type="button"
+            onClick={() => setConfirmDelete(true)}
+            className="inline-flex items-center gap-1 text-xs text-negative hover:underline"
+          >
+            <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
+            Verwijder doel
+          </button>
+        )}
       </form>
-    </div>
+    </ShellOverlay>
 
       {/* GoalForm sheet — verschijnt boven de quick-update dialog. BEWUST
           buiten de backdrop-<div onClick={onClose}> gerenderd: GoalForm is

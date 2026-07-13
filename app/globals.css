@@ -1532,6 +1532,26 @@ body.sleepmodus-dragging * {
   animation: flash-down 1s ease-out forwards;
 }
 
+/* ── Reduced-motion vangnet: in-view fill-transities ──────────────
+   De progress-/gauge-balken (widgets, budget-tree, animated-progress-bar)
+   animeren hun breedte via een inline `transition: width <dur> cubic-bezier`
+   die door `useInViewAnimation` wordt aangezet zodra het element in beeld komt.
+   De hook zet bij reduced-motion `hasEntered` direct op true (eindstaat wordt
+   bereikt), maar de inline transitie zelf zou dan alsnog 500–900ms groeien.
+   Dit blok dempt uitsluitend díe width-transities — géén brede
+   transition-killer (die zou layout-/JS-transitionend-gedrag breken). Spiegelt
+   het bestaande `[style*="animation: …"]`-idioom; matcht op `width <dur>ms`
+   zodat de bezier-serialisatie (.22→0.22) niet uitmaakt.
+   De named keyframes zijn elders al per media-blok gedekt. */
+@media (prefers-reduced-motion: reduce) {
+  [style*="width 500ms"],
+  [style*="width 700ms"],
+  [style*="width 800ms"],
+  [style*="width 900ms"] {
+    transition: none !important;
+  }
+}
+
 /* FinTable — zebra striping for financial data tables */
 .fin-table-zebra > tr:nth-child(even) {
   background-color: color-mix(in srgb, var(--subtle) 30%, transparent);

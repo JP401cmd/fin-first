@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { Compass, Sparkles } from 'lucide-react'
 import { ProgressMilestones } from '@/components/editorial/progress-milestones'
+import { useFlashChange } from '@/lib/hooks/use-flash-change'
 import type { FreedomFraming } from '@/lib/fire-strategy'
 
 /**
@@ -49,6 +50,10 @@ export function VrijheidStrip({
    */
   framing?: FreedomFraming
 }) {
+  // Flash-puls op het hoofdpercentage bij waardeverandering (flash-up/flash-down,
+  // respecteert prefers-reduced-motion). Hook vóór de early returns — rules-of-hooks.
+  const { flashClass } = useFlashChange(freedomPct)
+
   if (freedomPct == null) {
     return (
       <Link
@@ -140,7 +145,7 @@ export function VrijheidStrip({
           </div>
           <div className="mt-0.5 text-sm sm:text-base text-[var(--ink)]">
             Je bent{' '}
-            <strong className="font-serif text-lg sm:text-xl text-horizon-700">
+            <strong className={`font-serif text-lg sm:text-xl text-horizon-700 ${flashClass}`}>
               {Math.round(freedomPct)}%
             </strong>{' '}
             op weg naar het moment dat je niet meer hoeft te werken voor geld.

@@ -5,6 +5,7 @@ import { ChevronDown } from 'lucide-react'
 import { BudgetIcon, getTypeColors, isOverPositive, computeBarSegments, anyChildOverBudget, BudgetOverWarningIcon, type BudgetType } from '@/components/app/budget-shared'
 import type { Budget, BudgetWithChildren } from '@/lib/budget-data'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
+import { useFlashChange } from '@/lib/hooks/use-flash-change'
 import { MaskedAmount } from '@/components/app/masked-amount'
 
 interface BudgetTreeProps {
@@ -42,6 +43,11 @@ function ChildBar({
   const overPositive = isOverPositive(budgetType)
   const seg = computeBarSegments(spent, limit, alertThreshold, colors, overPositive)
 
+  // Flash-puls op het rest-bedrag (resterend budget = limit − spent) bij
+  // waardeverandering: minder over → flash-down (rood), meer over → flash-up
+  // (groen). Respecteert prefers-reduced-motion via de hook.
+  const { flashClass } = useFlashChange(limit - spent)
+
   return (
     <div
       className="group cursor-pointer rounded-lg px-3 py-2.5 transition-colors hover:bg-[var(--subtle)]"
@@ -61,7 +67,7 @@ function ChildBar({
           {child.name}
         </span>
         <span className="shrink-0 font-mono text-xs tabular-nums">
-          <span className={overBudget ? (overPositive ? 'text-positive' : 'text-negative') : 'text-[var(--ink-2)]'}>
+          <span className={`${overBudget ? (overPositive ? 'text-positive' : 'text-negative') : 'text-[var(--ink-2)]'} ${flashClass}`}>
             {<MaskedAmount value={spent} tone="wil" />}
           </span>
           <span className="text-[var(--ink-3)]"> / {<MaskedAmount value={limit} tone="wil" />}</span>
@@ -181,6 +187,9 @@ function TreeGroup({
   const overPositive = isOverPositive(budgetType)
   const seg = computeBarSegments(totalSpent, totalLimit, 80, colors, overPositive)
 
+  // Flash-puls op het rest-bedrag (totaal resterend = totalLimit − totalSpent).
+  const { flashClass } = useFlashChange(totalLimit - totalSpent)
+
   // No children — show single compact card (no expand)
   if (parent.children.length === 0) {
     return (
@@ -207,7 +216,7 @@ function TreeGroup({
             {pct}%
           </span>
           <span className="shrink-0 font-mono text-xs tabular-nums text-[var(--ink-3)]">
-            <span className={overBudget ? (overPositive ? 'text-positive' : 'text-negative') : 'text-[var(--ink-2)]'}>{<MaskedAmount value={totalSpent} tone="wil" />}</span>
+            <span className={`${overBudget ? (overPositive ? 'text-positive' : 'text-negative') : 'text-[var(--ink-2)]'} ${flashClass}`}>{<MaskedAmount value={totalSpent} tone="wil" />}</span>
             {' / '}{<MaskedAmount value={totalLimit} tone="wil" />}
           </span>
         </div>
@@ -288,7 +297,7 @@ function TreeGroup({
         </span>
         {/* Amount */}
         <span className="shrink-0 font-mono text-xs tabular-nums text-[var(--ink-3)]">
-          <span className={overBudget ? (overPositive ? 'text-positive' : 'text-negative') : 'text-[var(--ink-2)]'}>{<MaskedAmount value={totalSpent} tone="wil" />}</span>
+          <span className={`${overBudget ? (overPositive ? 'text-positive' : 'text-negative') : 'text-[var(--ink-2)]'} ${flashClass}`}>{<MaskedAmount value={totalSpent} tone="wil" />}</span>
           {' / '}{<MaskedAmount value={totalLimit} tone="wil" />}
         </span>
         {/* Chevron */}

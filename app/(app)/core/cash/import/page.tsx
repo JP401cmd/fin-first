@@ -957,7 +957,7 @@ export default function ImportPage() {
             type="button"
             disabled={page === 0}
             onClick={() => onPageChange(page - 1)}
-            className="rounded border border-[var(--border-md)] px-3 py-1 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--paper)] disabled:opacity-40"
+            className="border border-[var(--border-md)] px-3 py-1 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--paper)] disabled:opacity-40"
           >
             Vorige
           </button>
@@ -965,7 +965,7 @@ export default function ImportPage() {
             type="button"
             disabled={page >= totalPages - 1}
             onClick={() => onPageChange(page + 1)}
-            className="rounded border border-[var(--border-md)] px-3 py-1 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--paper)] disabled:opacity-40"
+            className="border border-[var(--border-md)] px-3 py-1 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--paper)] disabled:opacity-40"
           >
             Volgende
           </button>
@@ -988,7 +988,7 @@ export default function ImportPage() {
     return (
       <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-12">
         <div className="flex flex-col items-center justify-center py-20">
-          <div className={`rounded-lg border p-6 text-center ${
+          <div className={`border p-6 text-center ${
             isNetworkError
               ? 'border-orange-200 bg-orange-50'
               : 'border-red-200 bg-red-50'
@@ -999,7 +999,7 @@ export default function ImportPage() {
             </p>
             <button
               onClick={loadInitialData}
-              className={`mt-4 inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white ${
+              className={`mt-4 inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white ${
                 isNetworkError ? 'bg-orange-600 hover:bg-orange-700' : 'bg-red-600 hover:bg-red-700'
               }`}
             >
@@ -1049,7 +1049,7 @@ export default function ImportPage() {
       </div>
 
       {error && (
-        <div className={`mb-3 sm:mb-6 rounded-lg border p-4 text-sm ${
+        <div className={`mb-3 sm:mb-6 border p-4 text-sm ${
           isNetworkError
             ? 'border-orange-200 bg-orange-50 text-orange-800'
             : 'border-red-200 bg-red-50 text-red-700'
@@ -1072,7 +1072,7 @@ export default function ImportPage() {
                       setIsNetworkError(false)
                     }
                   }}
-                  className="mt-3 inline-flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700"
+                  className="mt-3 inline-flex items-center gap-2 bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700"
                 >
                   <RefreshCw className="h-4 w-4" />
                   Opnieuw proberen
@@ -1099,7 +1099,7 @@ export default function ImportPage() {
 
       {/* Pending import session banner */}
       {pendingSession && step === 1 && (
-        <div className="mb-4 rounded-lg border border-kern-300 bg-kern-50 p-4">
+        <div className="mb-4 border border-kern-300 bg-kern-50 p-4">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-sm font-medium text-kern-800">
@@ -1119,7 +1119,7 @@ export default function ImportPage() {
                   clearImportSession()
                   setPendingSession(null)
                 }}
-                className="rounded border border-[var(--border-md)] px-3 py-1.5 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+                className="border border-[var(--border-md)] px-3 py-1.5 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
               >
                 Verwijderen
               </button>
@@ -1157,7 +1157,7 @@ export default function ImportPage() {
               id="import-account"
               value={selectedAccountId}
               onChange={(e) => setSelectedAccountId(e.target.value)}
-              className="w-full max-w-sm rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+              className="w-full max-w-sm border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
             >
               {accounts.map((a) => (
                 <option key={a.id} value={a.id}>{a.name}{a.iban ? ` (${a.iban})` : ''}</option>
@@ -1170,7 +1170,7 @@ export default function ImportPage() {
               en weer vooruit, of hierboven een nieuw bestand kiezen (dat vervangt
               de rijen bewust). */}
           {rows.length > 0 && !showColumnMapping && (
-            <div className="flex flex-col gap-3 rounded-lg border border-kern-200 bg-kern-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-3 border border-kern-200 bg-kern-50 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="text-sm">
                 <p className="font-medium text-kern-800">Bestand al ingelezen</p>
                 <p className="mt-0.5 text-xs text-kern-600">
@@ -1182,7 +1182,7 @@ export default function ImportPage() {
               <button
                 type="button"
                 onClick={() => { setError(''); setIsNetworkError(false); setStep(2) }}
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700"
+                className="inline-flex shrink-0 items-center gap-1.5 bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700"
               >
                 Verder naar dubbelingen
                 <ChevronRight className="h-4 w-4" />
@@ -1192,7 +1192,7 @@ export default function ImportPage() {
 
           {/* Geen rekeningen: upload geblokkeerd tot er een rekening is */}
           {!loading && accounts.length === 0 && (
-            <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
+            <div className="flex items-start gap-3 border border-amber-200 bg-amber-50 p-4">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
               <div className="text-sm">
                 <p className="font-medium text-amber-800">Eerst een bankrekening koppelen</p>
@@ -1217,7 +1217,7 @@ export default function ImportPage() {
           <div
             onDragOver={(e) => e.preventDefault()}
             onDrop={handleDrop}
-            className={`flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[var(--border-md)] bg-[var(--subtle)] p-12 ${selectedAccountId ? 'hover:border-kern-400 hover:bg-kern-50/30' : 'opacity-60'}`}
+            className={`flex flex-col items-center justify-center border-2 border-dashed border-[var(--border-md)] bg-[var(--subtle)] p-12 ${selectedAccountId ? 'hover:border-kern-400 hover:bg-kern-50/30' : 'opacity-60'}`}
           >
             {parsing ? (
               <Loader2 className="h-8 w-8 animate-spin text-kern-500" />
@@ -1228,7 +1228,7 @@ export default function ImportPage() {
                   Sleep je bankbestand hierheen (MT940, CSV of OFX)
                 </p>
                 <p className="mt-1 text-xs text-[var(--ink-3)]">of</p>
-                <label className={`mt-3 rounded-lg px-4 py-2 text-sm font-medium text-white ${selectedAccountId ? 'cursor-pointer bg-kern-600 hover:bg-kern-700' : 'cursor-not-allowed bg-[var(--ink-4)]'}`}>
+                <label className={`mt-3 px-4 py-2 text-sm font-medium text-white ${selectedAccountId ? 'cursor-pointer bg-kern-600 hover:bg-kern-700' : 'cursor-not-allowed bg-[var(--ink-4)]'}`}>
                   <Upload className="mr-2 inline h-4 w-4" />
                   Bestand kiezen
                   <input
@@ -1253,7 +1253,7 @@ export default function ImportPage() {
 
           {/* Tip: begin klein — één maand importeren */}
           {!showColumnMapping && (
-            <div className="flex items-start gap-3 rounded-lg border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/50 p-4">
+            <div className="flex items-start gap-3 border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/50 p-4">
               <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-kern-600" />
               <div className="text-sm">
                 <p className="font-medium text-[var(--ink-2)]">Tip: begin met één maand</p>
@@ -1270,7 +1270,7 @@ export default function ImportPage() {
           {/* CSV Column Mapping */}
           {showColumnMapping && (
             <div className="space-y-4">
-              <div className="rounded-lg border border-kern-200 bg-kern-50 p-4">
+              <div className="border border-kern-200 bg-kern-50 p-4">
                 <p className="text-sm font-medium text-kern-800">
                   CSV-bestand gedetecteerd: <strong>{fileName}</strong>
                 </p>
@@ -1282,7 +1282,7 @@ export default function ImportPage() {
                 <select
                   value={csvPreset.id}
                   onChange={(e) => updateCSVPreset(e.target.value)}
-                  className="w-full max-w-sm rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+                  className="w-full max-w-sm border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                 >
                   {CSV_PRESETS.map((p) => (
                     <option key={p.id} value={p.id}>{p.label}</option>
@@ -1291,7 +1291,7 @@ export default function ImportPage() {
               </div>
 
               {csvPreset.id === 'paypal' && (
-                <div className="rounded-lg border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/50 p-4 text-sm">
+                <div className="border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/50 p-4 text-sm">
                   <p className="font-medium text-[var(--ink-2)]">Hoe exporteer je een PayPal CSV?</p>
                   <ol className="mt-2 space-y-1 text-xs text-[var(--ink-3)] list-decimal list-inside">
                     <li>Log in op paypal.com</li>
@@ -1313,7 +1313,7 @@ export default function ImportPage() {
                       <select
                         value={csvPreset.dateColumn}
                         onChange={(e) => setCsvPreset(prev => ({ ...prev, dateColumn: parseInt(e.target.value) }))}
-                        className="w-full rounded-lg border border-[var(--border-md)] px-2 py-1.5 text-xs text-[var(--ink)] outline-none focus:border-kern-500"
+                        className="w-full border border-[var(--border-md)] px-2 py-1.5 text-xs text-[var(--ink)] outline-none focus:border-kern-500"
                       >
                         {csvHeaders.map((h, i) => (
                           <option key={i} value={i}>{h || `Kolom ${i + 1}`}</option>
@@ -1325,7 +1325,7 @@ export default function ImportPage() {
                       <select
                         value={csvPreset.amountColumn}
                         onChange={(e) => setCsvPreset(prev => ({ ...prev, amountColumn: parseInt(e.target.value) }))}
-                        className="w-full rounded-lg border border-[var(--border-md)] px-2 py-1.5 text-xs text-[var(--ink)] outline-none focus:border-kern-500"
+                        className="w-full border border-[var(--border-md)] px-2 py-1.5 text-xs text-[var(--ink)] outline-none focus:border-kern-500"
                       >
                         {csvHeaders.map((h, i) => (
                           <option key={i} value={i}>{h || `Kolom ${i + 1}`}</option>
@@ -1337,7 +1337,7 @@ export default function ImportPage() {
                       <select
                         value={csvPreset.descriptionColumn}
                         onChange={(e) => setCsvPreset(prev => ({ ...prev, descriptionColumn: parseInt(e.target.value) }))}
-                        className="w-full rounded-lg border border-[var(--border-md)] px-2 py-1.5 text-xs text-[var(--ink)] outline-none focus:border-kern-500"
+                        className="w-full border border-[var(--border-md)] px-2 py-1.5 text-xs text-[var(--ink)] outline-none focus:border-kern-500"
                       >
                         {csvHeaders.map((h, i) => (
                           <option key={i} value={i}>{h || `Kolom ${i + 1}`}</option>
@@ -1349,7 +1349,7 @@ export default function ImportPage() {
                       <select
                         value={csvPreset.dateFormat}
                         onChange={(e) => setCsvPreset(prev => ({ ...prev, dateFormat: e.target.value }))}
-                        className="w-full rounded-lg border border-[var(--border-md)] px-2 py-1.5 text-xs text-[var(--ink)] outline-none focus:border-kern-500"
+                        className="w-full border border-[var(--border-md)] px-2 py-1.5 text-xs text-[var(--ink)] outline-none focus:border-kern-500"
                       >
                         <option value="YYYY-MM-DD">YYYY-MM-DD</option>
                         <option value="YYYYMMDD">YYYYMMDD</option>
@@ -1367,7 +1367,7 @@ export default function ImportPage() {
                           const v = parseInt(e.target.value)
                           setCsvPreset(prev => ({ ...prev, counterpartyColumn: v === -1 ? null : v }))
                         }}
-                        className="w-full rounded-lg border border-[var(--border-md)] px-2 py-1.5 text-xs text-[var(--ink)] outline-none focus:border-kern-500"
+                        className="w-full border border-[var(--border-md)] px-2 py-1.5 text-xs text-[var(--ink)] outline-none focus:border-kern-500"
                       >
                         <option value={-1}>-- Niet beschikbaar --</option>
                         {csvHeaders.map((h, i) => (
@@ -1383,7 +1383,7 @@ export default function ImportPage() {
                           const v = parseInt(e.target.value)
                           setCsvPreset(prev => ({ ...prev, ibanColumn: v === -1 ? null : v }))
                         }}
-                        className="w-full rounded-lg border border-[var(--border-md)] px-2 py-1.5 text-xs text-[var(--ink)] outline-none focus:border-kern-500"
+                        className="w-full border border-[var(--border-md)] px-2 py-1.5 text-xs text-[var(--ink)] outline-none focus:border-kern-500"
                       >
                         <option value={-1}>-- Niet beschikbaar --</option>
                         {csvHeaders.map((h, i) => (
@@ -1399,7 +1399,7 @@ export default function ImportPage() {
                           const v = parseInt(e.target.value)
                           setCsvPreset(prev => ({ ...prev, referenceColumn: v === -1 ? null : v }))
                         }}
-                        className="w-full rounded-lg border border-[var(--border-md)] px-2 py-1.5 text-xs text-[var(--ink)] outline-none focus:border-kern-500"
+                        className="w-full border border-[var(--border-md)] px-2 py-1.5 text-xs text-[var(--ink)] outline-none focus:border-kern-500"
                       >
                         <option value={-1}>-- Niet beschikbaar --</option>
                         {csvHeaders.map((h, i) => (
@@ -1429,7 +1429,7 @@ export default function ImportPage() {
                     <span aria-hidden className="text-[var(--ink-4)]">·</span>
                     <span><span className="font-semibold text-[var(--ink-3)]">R</span> = Referentie</span>
                   </p>
-                  <div className="overflow-x-auto rounded-lg border border-[var(--border-ed)]">
+                  <div className="overflow-x-auto border border-[var(--border-ed)]">
                     <table className="w-full text-xs">
                       <thead className="bg-[var(--subtle)]">
                         <tr>
@@ -1471,7 +1471,7 @@ export default function ImportPage() {
               <button
                 onClick={handleCSVParse}
                 disabled={parsing}
-                className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
+                className="inline-flex items-center gap-2 bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
               >
                 {parsing ? <Loader2 className="h-4 w-4 animate-spin" /> : <ChevronRight className="h-4 w-4" />}
                 Transacties importeren
@@ -1512,7 +1512,7 @@ export default function ImportPage() {
                 <button
                   onClick={() => handleImport()}
                   disabled={importing || toImportCount === 0}
-                  className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
+                  className="inline-flex items-center gap-2 bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
                 >
                   {importing ? (
                     <>
@@ -1529,14 +1529,14 @@ export default function ImportPage() {
               </div>
 
               {dupCount > 0 && (
-                <div className="rounded-lg border border-orange-200 bg-orange-50 p-4 text-sm text-orange-700">
+                <div className="border border-orange-200 bg-orange-50 p-4 text-sm text-orange-700">
                   <strong>{dupCount}</strong> transactie(s) bestaan al in de database en worden overgeslagen. Je kunt ze hieronder aan- of uitvinken.
                 </div>
               )}
 
               {/* Geruststelling: categoriseren gebeurt ná het importeren, op de
                   al-opgeslagen rijen — je raakt dus nooit een import kwijt. */}
-              <div className="flex items-start gap-3 rounded-lg border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/50 p-4">
+              <div className="flex items-start gap-3 border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/50 p-4">
                 <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-kern-600" />
                 <div className="text-sm">
                   <p className="font-medium text-[var(--ink-2)]">Eerst importeren, dan categoriseren</p>
@@ -1556,7 +1556,7 @@ export default function ImportPage() {
                 // zodat "alles importeren / niets importeren" wizard-breed werkt.
                 const { allSelected, indeterminate } = selectAllState(rows)
                 return (
-                  <div className="overflow-x-auto rounded-xl border border-[var(--border-ed)]">
+                  <div className="overflow-x-auto border border-[var(--border-ed)]">
                     <table className="w-full text-sm">
                       <thead className="bg-[var(--subtle)] text-left">
                         <tr>
@@ -1568,7 +1568,7 @@ export default function ImportPage() {
                                 checked={allSelected}
                                 ref={(el) => { if (el) el.indeterminate = indeterminate }}
                                 onChange={() => toggleSkipAll(allSelected)}
-                                className="h-4 w-4 rounded border-[var(--border-md)] text-kern-600 focus:ring-kern-500"
+                                className="h-4 w-4 border-[var(--border-md)] text-kern-600 focus:ring-kern-500"
                               />
                               <span>Importeer</span>
                             </div>
@@ -1589,7 +1589,7 @@ export default function ImportPage() {
                                   type="checkbox"
                                   checked={!row.skipImport}
                                   onChange={() => toggleSkip(realIdx)}
-                                  className="h-4 w-4 rounded border-[var(--border-md)] text-kern-600 focus:ring-kern-500"
+                                  className="h-4 w-4 border-[var(--border-md)] text-kern-600 focus:ring-kern-500"
                                 />
                               </td>
                               <td className="whitespace-nowrap px-4 py-2 text-[var(--ink-2)]">
@@ -1651,7 +1651,7 @@ export default function ImportPage() {
                 : `~${remaining}s resterend`
               : null
             return (
-              <div className="rounded-lg border border-kern-200 bg-kern-50 p-4">
+              <div className="border border-kern-200 bg-kern-50 p-4">
                 <div className="flex justify-between text-xs text-kern-700 mb-1.5">
                   <span className="font-medium">
                     Importeren: {importProgress.current} van {importProgress.total} transacties
@@ -1674,7 +1674,7 @@ export default function ImportPage() {
               </div>
             )
           })() : (
-            <div className="flex items-center gap-3 rounded-lg border border-kern-200 bg-kern-50 p-4">
+            <div className="flex items-center gap-3 border border-kern-200 bg-kern-50 p-4">
               <Loader2 className="h-5 w-5 animate-spin text-kern-500" />
               <p className="text-sm text-kern-700">Importeren voorbereiden…</p>
             </div>
@@ -1694,7 +1694,7 @@ export default function ImportPage() {
                 <button
                   type="button"
                   onClick={() => setShowCategorizeSheet(true)}
-                  className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-6 py-2 text-sm font-medium text-white hover:bg-kern-700"
+                  className="inline-flex items-center gap-2 bg-kern-600 px-6 py-2 text-sm font-medium text-white hover:bg-kern-700"
                 >
                   <Sparkles className="h-4 w-4" />
                   {postImportRows.length} {postImportRows.length === 1 ? 'transactie categoriseren' : 'transacties categoriseren'}
@@ -1770,7 +1770,7 @@ export default function ImportPage() {
               </div>
               {/* Retry failed batches */}
               {failedBatches.length > 0 && (
-                <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-4 text-left">
+                <div className="mt-4 border border-red-200 bg-red-50 p-4 text-left">
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-medium text-red-800">
                       {failedBatches.reduce((s, fb) => s + fb.rows.length, 0)} transacties in{" "}
@@ -1782,7 +1782,7 @@ export default function ImportPage() {
                           type="button"
                           onClick={() => void retryFailedBatches()}
                           disabled={retrying}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                          className="inline-flex items-center gap-1.5 bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50"
                         >
                           {retrying ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -1811,7 +1811,7 @@ export default function ImportPage() {
                       {failedBatches.map((fb, i) => (
                         <div
                           key={i}
-                          className="rounded border border-red-200 bg-white p-2 text-xs"
+                          className="border border-red-200 bg-white p-2 text-xs"
                         >
                           <div className="flex items-center justify-between">
                             <span className="font-medium text-red-800">
@@ -1852,7 +1852,7 @@ export default function ImportPage() {
                     <button
                       type="button"
                       onClick={() => { setShowCategorizeSheet(true); setStep(4) }}
-                      className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-6 py-2 text-sm font-medium text-white hover:bg-kern-700"
+                      className="inline-flex items-center gap-2 bg-kern-600 px-6 py-2 text-sm font-medium text-white hover:bg-kern-700"
                     >
                       <Sparkles className="h-4 w-4" />
                       {postImportRows.length} {postImportRows.length === 1 ? 'transactie categoriseren' : 'transacties categoriseren'}
@@ -1875,7 +1875,7 @@ export default function ImportPage() {
                         ? `/core/assets/cash/${selectedAccountId}?month=${importedMinMonth}`
                         : '/core/cash'
                     }
-                    className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-6 py-2 text-sm font-medium text-white hover:bg-kern-700"
+                    className="inline-flex items-center gap-2 bg-kern-600 px-6 py-2 text-sm font-medium text-white hover:bg-kern-700"
                   >
                     {selectedAccountId ? 'Naar rekeningdetail' : 'Naar Cash overzicht'}
                   </Link>

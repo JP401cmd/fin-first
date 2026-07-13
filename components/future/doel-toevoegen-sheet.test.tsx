@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { DoelToevoegenSheet } from './doel-toevoegen-sheet'
 
 /**
@@ -38,11 +38,14 @@ describe('DoelToevoegenSheet — UI-flow', () => {
     expect(screen.getByRole('dialog')).toBeTruthy()
   })
 
-  it('sluit sheet bij X-knop', () => {
+  it('sluit sheet bij X-knop', async () => {
     render(<DoelToevoegenSheet />)
     fireEvent.click(screen.getByText('Doel toevoegen'))
     fireEvent.click(screen.getByLabelText('Sluiten'))
-    expect(screen.queryByRole('dialog')).toBeNull()
+    // Sinds de migratie naar <ShellOverlay kind="sheet"> (ADR 0039) speelt de
+    // gedeelde BottomSheet een exit-animatie af vóór unmount; het dialog
+    // verdwijnt daardoor asynchroon (na transitionend/timeout) i.p.v. direct.
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   })
 
   it('rendert verplichte velden + type-select', () => {
