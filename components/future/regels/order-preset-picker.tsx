@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import type { WealthGroup } from '@/lib/wealth-composition'
 import { detectOrderPreset, type OrderPreset, type OrderPresetId } from '@/lib/pot-rules'
-import { RegelOptionCard, RegelSectionLabel } from './shared'
+import { SubsectionLabel } from '@/components/editorial'
+import { RegelOptionCard } from './shared'
 import { GroupOrderEditor } from './pot-flow-diagram'
 
 /**
@@ -85,7 +86,7 @@ export function OrderPresetPicker({
 
       {showEditor && (
         <div className="pt-1">
-          <RegelSectionLabel>{editorLabel}</RegelSectionLabel>
+          <SubsectionLabel>{editorLabel}</SubsectionLabel>
           <GroupOrderEditor groups={order} balances={balances} onChange={onChange} />
         </div>
       )}

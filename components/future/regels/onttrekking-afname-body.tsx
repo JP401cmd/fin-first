@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react'
 import type { WealthGroup } from '@/lib/wealth-composition'
 import { POT_RULES_DEFAULTS, DEFICIT_ORDER_PRESETS } from '@/lib/pot-rules'
-import { RegelIntro, RegelSectionLabel, PrioUitlegBlok } from './shared'
+import { SubsectionLabel } from '@/components/editorial'
+import { RegelIntro, PrioUitlegBlok } from './shared'
 import { PotFlowDiagram, usePotRulesSave } from './pot-flow-diagram'
 import { OrderPresetPicker } from './order-preset-picker'
 import { CategoriePrioEditor, useCategoriePrioState } from './categorie-prio-editor'
@@ -58,7 +59,7 @@ export function OnttrekkingAfnameBody({
         </div>
       )}
 
-      <RegelSectionLabel>Volgorde bij een tegenvaller</RegelSectionLabel>
+      <SubsectionLabel>Volgorde bij een tegenvaller</SubsectionLabel>
       <OrderPresetPicker
         presets={DEFICIT_ORDER_PRESETS}
         order={order}
@@ -77,7 +78,7 @@ export function OnttrekkingAfnameBody({
       />
 
       <div className="mt-6">
-        <RegelSectionLabel>Zo werkt het bij een eenmalige uitgave</RegelSectionLabel>
+        <SubsectionLabel>Zo werkt het bij een eenmalige uitgave</SubsectionLabel>
         <PotFlowDiagram balances={balances} mode="order" orderedGroups={order} oneYearExpense={shockAmount} />
       </div>
 

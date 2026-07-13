@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react'
 import type { WealthGroup } from '@/lib/wealth-composition'
 import { POT_RULES_DEFAULTS, WITHDRAWAL_ORDER_PRESETS } from '@/lib/pot-rules'
-import { RegelIntro, RegelSectionLabel, PrioUitlegBlok } from './shared'
+import { SubsectionLabel } from '@/components/editorial'
+import { RegelIntro, PrioUitlegBlok } from './shared'
 import { PotFlowDiagram, usePotRulesSave } from './pot-flow-diagram'
 import { OrderPresetPicker } from './order-preset-picker'
 import { CategoriePrioEditor, useCategoriePrioState } from './categorie-prio-editor'
@@ -56,7 +57,7 @@ export function OnttrekkingsvolgordeBody({
         </div>
       )}
 
-      <RegelSectionLabel>Volgorde van leegtrekken</RegelSectionLabel>
+      <SubsectionLabel>Volgorde van leegtrekken</SubsectionLabel>
       <OrderPresetPicker
         presets={WITHDRAWAL_ORDER_PRESETS}
         order={order}
@@ -74,7 +75,7 @@ export function OnttrekkingsvolgordeBody({
       />
 
       <div className="mt-6">
-        <RegelSectionLabel>Zo werkt het op je potten</RegelSectionLabel>
+        <SubsectionLabel>Zo werkt het op je potten</SubsectionLabel>
         <PotFlowDiagram balances={balances} mode="order" orderedGroups={order} oneYearExpense={oneYearExpense} />
       </div>
 

@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react'
 import type { WealthGroup } from '@/lib/wealth-composition'
 import { POT_RULES_DEFAULTS, type SurplusGroup } from '@/lib/pot-rules'
-import { RegelIntro, RegelSectionLabel, RegelOptionCard, PrioUitlegBlok } from './shared'
+import { SubsectionLabel } from '@/components/editorial'
+import { RegelIntro, RegelOptionCard, PrioUitlegBlok } from './shared'
 import { PotFlowDiagram, usePotRulesSave } from './pot-flow-diagram'
 import { CategoriePrioEditor, useCategoriePrioState } from './categorie-prio-editor'
 import type { RegelBodyProps } from './types'
@@ -61,7 +62,7 @@ export function VerdelingToenameBody({
         </div>
       )}
 
-      <RegelSectionLabel>Waar gaat extra geld heen?</RegelSectionLabel>
+      <SubsectionLabel>Waar gaat extra geld heen?</SubsectionLabel>
       <div className="space-y-2">
         {SURPLUS_OPTIONS.map((opt) => (
           <RegelOptionCard
@@ -76,7 +77,7 @@ export function VerdelingToenameBody({
 
       {target !== 'schuld_aflossen' && (
         <div className="mt-6">
-          <RegelSectionLabel>Naar welke pot</RegelSectionLabel>
+          <SubsectionLabel>Naar welke pot</SubsectionLabel>
           <PotFlowDiagram balances={balances} mode="target" targetGroup={target} />
         </div>
       )}

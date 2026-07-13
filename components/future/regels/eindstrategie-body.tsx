@@ -4,9 +4,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { STRATEGY_LABELS, type FireEndStrategy } from '@/lib/fire-strategy'
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value'
 import { runRegelProjection, type RegelProjection } from '@/lib/future/regel-sim'
+import { SubsectionLabel } from '@/components/editorial'
 import {
   RegelIntro,
-  RegelSectionLabel,
   RegelOptionCard,
   LiveSimImpact,
   FireDeltaFooter,
@@ -163,7 +163,7 @@ export function EindstrategieBody({
         </div>
       )}
 
-      <RegelSectionLabel>Kies je eindstrategie</RegelSectionLabel>
+      <SubsectionLabel>Kies je eindstrategie</SubsectionLabel>
       <div className="space-y-2">
         {STRATEGY_ORDER.map((key) => {
           const meta = STRATEGY_LABELS[key]
@@ -233,7 +233,7 @@ export function EindstrategieBody({
         aria-busy={!deficitLoaded}
         className={`mt-5 transition-opacity duration-300 ${deficitLoaded ? 'opacity-100' : 'opacity-60'}`}
       >
-        <RegelSectionLabel>Rente tekort-lening</RegelSectionLabel>
+        <SubsectionLabel>Rente tekort-lening</SubsectionLabel>
         <label className="block">
           <div className="flex items-center gap-2">
             <input
@@ -260,7 +260,7 @@ export function EindstrategieBody({
 
       {/* Live impact */}
       <div className="mt-6">
-        <RegelSectionLabel>Impact op je vrijheidspad</RegelSectionLabel>
+        <SubsectionLabel>Impact op je vrijheidspad</SubsectionLabel>
         <LiveSimImpact baseline={baseline} draft={draftProj} />
       </div>
     </div>

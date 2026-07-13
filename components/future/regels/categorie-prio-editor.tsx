@@ -2,7 +2,7 @@
 
 import { useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import type { CategoriePrios, PotRulesConfig, PrioSubject } from '@/lib/pot-rules'
-import { RegelSectionLabel } from './shared'
+import { SubsectionLabel } from '@/components/editorial'
 
 /**
  * V5 (horizon-kernel) — compacte per-categorie-prio-instelling (1..5) voor één
@@ -168,7 +168,7 @@ export function CategoriePrioEditor({
   return (
     <div className="mt-6">
       <div className="flex items-center justify-between gap-3">
-        <RegelSectionLabel>Prioriteit per categorie</RegelSectionLabel>
+        <SubsectionLabel>Prioriteit per categorie</SubsectionLabel>
         <button
           type="button"
           role="switch"

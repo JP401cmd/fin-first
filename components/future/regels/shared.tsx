@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react'
 import { Check } from 'lucide-react'
-import { EditorialDeck } from '@/components/editorial'
+import { EditorialDeck, SubsectionLabel } from '@/components/editorial'
 import { EventImpactPreview } from '@/components/app/horizon/event-impact-preview'
 import { REGEL_META, type RegelId } from '@/lib/future/regel-registry'
 import type { RegelProjection } from '@/lib/future/regel-sim'
@@ -12,15 +12,6 @@ export function RegelIntro({ regelId }: { regelId: RegelId }) {
   return (
     <div className="mb-6">
       <EditorialDeck>{REGEL_META[regelId].intro}</EditorialDeck>
-    </div>
-  )
-}
-
-/** Sectiekop binnen een body (bv. "Kies je strategie" / "Verfijn"). */
-export function RegelSectionLabel({ children }: { children: ReactNode }) {
-  return (
-    <div className="text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--ink-3)] mb-2">
-      {children}
     </div>
   )
 }
@@ -85,7 +76,7 @@ export function RegelOptionCard({
 export function PrioUitlegBlok({ variant = 'order' }: { variant?: 'order' | 'target' }) {
   return (
     <div className="mt-6 rounded-xl border border-[var(--border-ed)] bg-[var(--subtle)]/40 px-3 py-3">
-      <RegelSectionLabel>Zo werkt de prioriteit</RegelSectionLabel>
+      <SubsectionLabel>Zo werkt de prioriteit</SubsectionLabel>
       {variant === 'order' ? (
         <p className="text-[11px] text-[var(--ink-2)] leading-snug">
           Een <span className="font-semibold">preset</span> is een snelkeuze: hij zet in één klik

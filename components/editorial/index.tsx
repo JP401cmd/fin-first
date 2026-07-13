@@ -23,6 +23,8 @@ export type { GlossaryTermProps } from './glossary-term'
 // Re-export InlineInfoDisclosure (i-knop + inline uitleg-paneel; eigen file wegens state)
 export { InlineInfoDisclosure } from './inline-info-disclosure'
 export type { InlineInfoDisclosureProps } from './inline-info-disclosure'
+// Re-export InfoIconTooltip (scherpe inline i + zwevende popover; derde info-affordance; eigen file wegens state)
+export { InfoIconTooltip, InfoTooltip } from './info-icon-tooltip'
 // Re-export PageInfoButton (page context popover)
 export { PageInfoButton } from './page-info-button'
 // Re-export PageOpening (canonieke editorial pagina-aanhef — standaard-aanhef)
@@ -548,6 +550,27 @@ export function SectionLabel({
           {num}
         </span>
       )}
+    </div>
+  )
+}
+
+/** Compacte, gedempte mono sub-label bínnen een sectie- of pane-body (bv. "Kies je
+ *  strategie", "Verfijn", "Zo werkt de prioriteit"). Bewust lichter dan
+ *  `SectionLabel`: geen scheidingsrule, geen module-accent en geen romeins nummer —
+ *  enkel een `--ink-3` mono-kicker. Eén bron voor het compacte-sublabel-patroon;
+ *  eerder de lokale `RegelSectionLabel` in components/future/regels (K-06-consolidatie). */
+export function SubsectionLabel({
+  children,
+  className = '',
+}: {
+  children: ReactNode
+  className?: string
+}) {
+  return (
+    <div
+      className={`text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--ink-3)] mb-2 ${className}`}
+    >
+      {children}
     </div>
   )
 }

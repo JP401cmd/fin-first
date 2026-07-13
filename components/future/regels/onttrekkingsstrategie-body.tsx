@@ -5,9 +5,9 @@ import type { WithdrawalProfiel, WithdrawalStrategyConfig } from '@/lib/withdraw
 import { WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value'
 import { runRegelProjection, type RegelProjection } from '@/lib/future/regel-sim'
+import { SubsectionLabel } from '@/components/editorial'
 import {
   RegelIntro,
-  RegelSectionLabel,
   RegelOptionCard,
   LiveSimImpact,
   FireDeltaFooter,
@@ -327,7 +327,7 @@ export function OnttrekkingsstrategieBody({
         </div>
       )}
 
-      <RegelSectionLabel>Kies je onttrekkingsprofiel</RegelSectionLabel>
+      <SubsectionLabel>Kies je onttrekkingsprofiel</SubsectionLabel>
       <div className="space-y-2">
         {PROFIEL_ORDER.map((key) => {
           const info = PROFIEL_INFO[key]
@@ -349,7 +349,7 @@ export function OnttrekkingsstrategieBody({
       {showsCurve && (
         <div className="mt-5 rounded-xl border border-[var(--border-ed)] bg-[var(--subtle)]/30 p-4">
           <div className="flex items-center justify-between gap-3">
-            <RegelSectionLabel>Verdeel je uitgaven over drie fasen</RegelSectionLabel>
+            <SubsectionLabel>Verdeel je uitgaven over drie fasen</SubsectionLabel>
             <button
               type="button"
               onClick={() => setCurve({ ...EXCEL_CURVE })}
@@ -420,7 +420,7 @@ export function OnttrekkingsstrategieBody({
       {/* Guardrail-verfijning */}
       {isGuardrails && (
         <div className="mt-5 rounded-xl border border-[var(--border-ed)] bg-[var(--subtle)]/30 p-4 space-y-4">
-          <RegelSectionLabel>Verfijn je guardrails</RegelSectionLabel>
+          <SubsectionLabel>Verfijn je guardrails</SubsectionLabel>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <GuardrailSlider
               label="Ondergrens (floor)"
@@ -464,7 +464,7 @@ export function OnttrekkingsstrategieBody({
       {/* Live impact */}
       <div className="mt-6">
         <div className="flex items-center justify-between gap-2">
-          <RegelSectionLabel>Impact op je vrijheidspad</RegelSectionLabel>
+          <SubsectionLabel>Impact op je vrijheidspad</SubsectionLabel>
           {/* Eerlijke disclosure óók bij de grafiek zelf: bij Afnemend/Oplopend
               toont de v2-engine nog het vaste profiel (zie de curve-uitleg boven). */}
           {showsCurve && (
