@@ -149,10 +149,10 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'KERN',
     given: 'Persona Willem: bruto rendement 6,00%, inflatie 2,00%, `net_monthly_income` NULL (hij gebruikt budgetten, geen profiel-inkomensveld), DOB 1968-11-30, cohort-rij [1966-10-01, 1970-06-30] → 67 jaar/6 mnd, niet definitief. Persona Marijke: `marginaal_tarief` expliciet 0,4950. AL-GEDOCUMENTEERDE BUGS (reeds gelogd): "Uitgaven nu" telt Inkomen+Sparen ten onrechte mee (€127.140 i.p.v. €13.140, ontbrekende `budget_type===\'expense\'`-filter); `HOUSEHOLD_TYPE_LABELS` mist solo/samen/gezin → toont ruwe waarde "samen".',
     when: 'AOW-leeftijd (`lookupAowAge`) en effectieve SWR + marginaal tarief (`resolveFireParams`) worden berekend.',
-    then: 'Willem: AOW-leeftijd = 67 jaar/6 mnd, niet-definitief ("CBS-prognose"); effectieve SWR = 6,00−2,16−2,00 = 1,84%; marginaal tarief = 36,97% (fallback-tak, want `net_monthly_income` is NULL — dit is exact de root cause van de al-gelogde "eerste schijf"-bevinding, hier bevestigd via de échte productiefunctie). Marijke: marginaal tarief = 49,50% (expliciet ingesteld, geen fallback).',
+    then: 'Willem: AOW-leeftijd = 67 jaar/6 mnd, niet-definitief ("CBS-prognose"); effectieve SWR = 6,00−2,16−2,00 = 1,84%; marginaal tarief = 35,75% (fallback-tak, want `net_monthly_income` is NULL — sinds de tax-optimizer-refactor (lib/box1-tax.ts#deriveMarginaalTarief) jaar-afgeleid uit BOX1_PARAMS i.p.v. de vroegere 2024/2025-hardcode 36,97%; voor belastingjaar 2026 is schijf-1-tarief 35,75%). Marijke: marginaal tarief = 49,50% (expliciet ingesteld, geen fallback).',
     assertion: {
       kind: 'exact',
-      expected: 'willemAowJaren=67; willemAowMaanden=6; willemAowDefinitief=false; effectieveSwr=1.84; willemMarginaalTarief=36.97; marijkeMarginaalTarief=49.5',
+      expected: 'willemAowJaren=67; willemAowMaanden=6; willemAowDefinitief=false; effectieveSwr=1.84; willemMarginaalTarief=35.75; marijkeMarginaalTarief=49.5',
       source: 'lib/aow-leeftijd.ts#lookupAowAge + lib/fire-params.ts#resolveFireParams/computeEffectiveSwr — échte productiefuncties, geen mirror',
     },
   },

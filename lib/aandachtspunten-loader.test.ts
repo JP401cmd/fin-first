@@ -152,7 +152,15 @@ function jaarruimtePunt(result: Aandachtspunt[]) {
 describe('collectTaxAandachtspunten — jaarruimte-demping', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    computeBox1TaxMock.mockReturnValue({ tax: 12345 })
+    // Variabele (niet-vlakke) mock: `jaarruimteBesparing` (ADR 0040/0041) roept
+    // `computeBox1Tax` intern TWEE keer aan (bruto en bruto − inleg) en neemt het
+    // verschil. Een vlakke `mockReturnValue` gaf voor beide calls hetzelfde getal
+    // → delta 0 → savings 0 → buildTaxOverview's `savings > 0`-gate hield het
+    // jaarruimte-aandachtspunt overal buiten. Deze mock is monotoon in het bruto-
+    // inkomen (net als de echte motor) zodat een positieve besparing overblijft.
+    computeBox1TaxMock.mockImplementation((input: { grossYearlyIncome: number }) => ({
+      tax: Math.round(input.grossYearlyIncome * 0.3697),
+    }))
     loadPerspectiveBox3Mock.mockResolvedValue({ personal: { tax: 0 } })
   })
 
@@ -220,7 +228,12 @@ describe('collectTaxAandachtspunten — jaarruimte-demping', () => {
 describe('collectAandachtspunten — actie-kruising (suppressie)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    computeBox1TaxMock.mockReturnValue({ tax: 12345 })
+    // Zie toelichting in de eerste describe-block: monotone mock nodig zodat
+    // jaarruimteBesparing() (twee interne computeBox1Tax-calls) een positieve
+    // besparing oplevert i.p.v. een vlakke 0-delta.
+    computeBox1TaxMock.mockImplementation((input: { grossYearlyIncome: number }) => ({
+      tax: Math.round(input.grossYearlyIncome * 0.3697),
+    }))
     loadPerspectiveBox3Mock.mockResolvedValue({ personal: { tax: 0 } })
     // Gezond inkomen + bekende factor A → tax:jaarruimte verschijnt normaal.
     loadHorizonDataMock.mockResolvedValue(

@@ -40,6 +40,7 @@ import {
 } from '@/lib/debt-data'
 import type { AssetType } from '@/lib/asset-data'
 import type { RepaymentType as HvBRepaymentType } from '@/lib/hypotheek-vs-beleggen'
+import { deriveMarginaalTarief } from '@/lib/box1-tax'
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import type { DeepeningTabProps } from '../category-deepening-registry'
@@ -420,11 +421,11 @@ function ActivePlanner({ mortgage, house, otherTrackedDebts }: ActivePlannerProp
             repaymentType={toHvBRepaymentType(repaymentType)}
             restLooptijd={months}
             isTaxDeductible={mortgage.is_tax_deductible ?? false}
-            // Marginaal IB-tarief: hardcoded conservatief (37%) zodat we
-            // de planner zonder profile-fetch werken. Het advies blijft
-            // valide; gebruikers met hoger inkomen krijgen een lichte
-            // onderschatting van de aftrek-besparing.
-            marginaalTarief={0.3697}
+            // Marginaal IB-tarief: schijf-1-tarief per belastingjaar afgeleid uit
+            // BOX1_PARAMS (canonieke helper), zodat de planner zonder profile-fetch
+            // werkt. Het advies blijft valide; gebruikers met hoger inkomen krijgen
+            // een lichte onderschatting van de aftrek-besparing.
+            marginaalTarief={deriveMarginaalTarief()}
             // Inflatie als decimaal — 2% conservatief.
             inflatie={0.02}
             hasPartner={mortgage.ownership === 'shared'}

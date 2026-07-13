@@ -125,7 +125,11 @@ export async function GET(request: NextRequest) {
     return {
       name: a.institution || a.name || 'Deelneming',
       annual_dividend: Number(a.annual_dividend) || 0,
-      disposal_gain: 0, // no disposal by default; could be extended
+      // WF-BELAST-13 is bewust dividend-only (scope-down, productbesluit optie C):
+      // vervreemdingswinst heeft géén backing kolom/UI/afleiding en valt buiten
+      // scope als aparte, latere feature. calculateBox2() verwerkt disposal_gain
+      // wél zodra er ooit een datapad voor komt; tot dan blijft het 0.
+      disposal_gain: 0,
     }
   }
 

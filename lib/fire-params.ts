@@ -18,27 +18,22 @@
  *    Altijd gebruiken wanneer profiel beschikbaar is.
  */
 import { DEFAULT_RETURN, INFLATION, BOX3_DRAG } from '@/lib/horizon-data'
+import { deriveMarginaalTarief, schijfGrensVoor } from './box1-tax'
 import type { Box3Method } from './bucket-projection'
 
-/** Grens Box 1 IB-tarief 2025 (bruto jaarinkomen) */
-export const IB_SCHIJFGRENS = 75_518
+/**
+ * Grens Box 1 topschijf-tarief (bruto jaarinkomen) — afgeleid uit BOX1_PARAMS
+ * voor het lopende belastingjaar. Vervangt de vroegere 2024-hardcode (€75.518);
+ * beweegt nu automatisch mee met de jaarlijks vernieuwde beheer-parameters.
+ */
+export const IB_SCHIJFGRENS = schijfGrensVoor()
 
 export interface FireParams {
   grossReturn: number    // bijv. 0.07
   inflationRate: number  // bijv. 0.02
   effectiveSwr: number   // grossReturn - BOX3_DRAG - inflationRate
   box3Method: Box3Method // 'forfaitair' | 'werkelijk'
-  marginaalTarief: number // 0.3697 of 0.4950
-}
-
-/**
- * Leid marginaal IB-tarief af uit netto maandinkomen als er geen
- * expliciete keuze is opgeslagen. Vuistregel: netto > €4 200/mnd ≈
- * bruto > €75 518 → hoogste schijf.
- */
-function deriveMarginaalTarief(netMonthlyIncome?: number | null): number {
-  if (netMonthlyIncome != null && netMonthlyIncome > 4200) return 0.4950
-  return 0.3697
+  marginaalTarief: number // schijf-1- of topschijf-tarief (jaar-afgeleid via BOX1_PARAMS)
 }
 
 /**
@@ -75,6 +70,6 @@ export function resolveFireParams(profile: {
   const inflationRate = profile.inflation_rate ?? INFLATION
   const effectiveSwr = computeEffectiveSwr(grossReturn, inflationRate)
   const box3Method: Box3Method = (profile.box3_method === 'werkelijk') ? 'werkelijk' : 'forfaitair'
-  const marginaalTarief = profile.marginaal_tarief ?? deriveMarginaalTarief(profile.net_monthly_income)
+  const marginaalTarief = profile.marginaal_tarief ?? deriveMarginaalTarief({ netMonthlyIncome: profile.net_monthly_income })
   return { grossReturn, inflationRate, effectiveSwr, box3Method, marginaalTarief }
 }

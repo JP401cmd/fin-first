@@ -18,7 +18,7 @@
 // (en eventueel de notes) hier bij in dezelfde PR.
 
 import { BOX3_PARAMS, CURRENT_TAX_YEAR } from './box3-data'
-import { BOX1_PARAMS } from './box1-tax'
+import { BOX1_PARAMS, deriveMarginaalTarief, schijfGrensVoor, type Box1TaxYear } from './box1-tax'
 import { BOX2_PARAMS, DGA_LENING_DREMPEL } from './box2-data'
 import {
   JAARRUIMTE_PARAMS,
@@ -44,7 +44,6 @@ import {
   NL_AOW_MONTHLY,
   NL_AOW_MONTHLY_SAMENWONEND,
 } from './constants'
-import { IB_SCHIJFGRENS } from './fire-params'
 import { TAX_DEADLINES } from './tax-calendar'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -214,24 +213,26 @@ export const FISCALE_KERNGETALLEN: FiscaalKerngetal[] = [
     title: 'Marginale IB-vuistregel (FIRE)',
     domain: 'Box 1',
     summary:
-      'De vuistregel waarmee FIRE-oppervlakken het marginale IB-tarief afleiden uit netto maandinkomen, plus de bijbehorende schijfgrens.',
-    jaargelaagd: false,
-    years: [],
-    valuesByYear: [
-      {
-        year: null,
+      'De vuistregel waarmee FIRE-oppervlakken het marginale IB-tarief afleiden uit netto maandinkomen. Laag = schijf-1-tarief, hoog = topschijf-tarief; per belastingjaar afgeleid uit BOX1_PARAMS (geen losse hardcode meer).',
+    jaargelaagd: true,
+    years: jarenVan(BOX1_PARAMS),
+    valuesByYear: jarenVan(BOX1_PARAMS).map((year) => {
+      const schijven = BOX1_PARAMS[year as keyof typeof BOX1_PARAMS].schijven
+      return {
+        year,
         values: [
-          { label: 'Schijfgrens (IB_SCHIJFGRENS)', value: `${eur(IB_SCHIJFGRENS)} (2025-waarde)` },
-          { label: 'Marginaal laag / hoog', value: '36,97% / 49,50% (hardcoded in deriveMarginaalTarief)' },
+          { label: 'Marginaal laag (schijf 1)', value: pct(deriveMarginaalTarief({ year: year as Box1TaxYear })) },
+          { label: 'Marginaal hoog (topschijf)', value: pct(schijven[schijven.length - 1].tarief) },
+          { label: 'Topschijf-grens', value: eur(schijfGrensVoor(year as Box1TaxYear)) },
         ],
-      },
-    ],
-    file: 'lib/fire-params.ts',
-    exportName: 'IB_SCHIJFGRENS',
+      }
+    }),
+    file: 'lib/box1-tax.ts',
+    exportName: 'deriveMarginaalTarief',
     source: 'Belastingdienst',
     updateFrequency: 'jaarlijks',
-    lastVerified: '2025-01-01',
-    note: 'Staat op 2025-waarden en leeft buiten BOX1_PARAMS — zie drift-punt "marginale-tarieven-verspreid". Kandidaat om in Fase 2 uit BOX1_PARAMS af te leiden.',
+    lastVerified: '2026-07-13',
+    note: 'Afgeleid uit BOX1_PARAMS[jaar]: laag = schijven[0].tarief, hoog = topschijf, grens = bovengrens één-na-laatste schijf (schijfGrensVoor). fire-params.ts delegeert naar deze helper en IB_SCHIJFGRENS is nu een afgeleide re-export. De laag/hoog-keuze volgt een netto-maandinkomen-drempel (MARGINAAL_TARIEF_NETTO_DREMPEL) — bewust behouden heuristiek, alleen de tarieven zijn per jaar gecorrigeerd.',
   },
 
   // ── Box 2 ──
@@ -520,10 +521,10 @@ export const FISCALE_DRIFT_PUNTEN: DriftPunt[] = [
   {
     id: 'marginale-tarieven-verspreid',
     title: 'Marginale IB-tarieven & schijfgrens buiten BOX1_PARAMS',
-    status: 'open',
+    status: 'opgelost',
     description:
-      'De tarieven 36,97%/49,50% en de schijfgrens €75.518 (2025-waarde) leven hardcoded in fire-params.ts (deriveMarginaalTarief, IB_SCHIJFGRENS) met losse 0,3697-fallbacks in aandachtspunten-loader.ts en dashboard-data-loader.ts — buiten de jaargelaagde BOX1_PARAMS. Jaarwissel vereist nu een handmatige zoekactie.',
-    files: ['lib/fire-params.ts', 'lib/aandachtspunten-loader.ts', 'lib/dashboard-data-loader.ts', 'lib/box1-tax.ts'],
+      'De tarieven 36,97%/49,50% en de schijfgrens €75.518 waren 2024-hardcodes in fire-params.ts (deriveMarginaalTarief, IB_SCHIJFGRENS) met losse 0,3697-fallbacks en whitelist-checks door de hele app. Opgelost (Arch F1): het marginale tarief wordt nu per belastingjaar afgeleid uit BOX1_PARAMS via deriveMarginaalTarief/schijfGrensVoor (lib/box1-tax.ts). fire-params.ts delegeert, IB_SCHIJFGRENS is een afgeleide re-export, de /api/parameters-whitelist is vervangen door range-validatie en alle fallbacks/UI-hardcodes (belasting-pagina\'s, horizon-client side-hustle, hypotheek-vs-beleggen, debt/hypotheekplanner) consumeren de helper. Jaarwissel schuift automatisch mee met de beheerpagina (fiscale-kerngetallen ← BOX1_PARAMS).',
+    files: ['lib/box1-tax.ts', 'lib/fire-params.ts', 'app/api/parameters/route.ts', 'lib/aandachtspunten-loader.ts', 'lib/dashboard-data-loader.ts'],
   },
 ]
 

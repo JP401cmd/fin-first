@@ -102,15 +102,20 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: 'Box 3 methode moet "forfaitair" of "werkelijk" zijn' }, { status: 400 })
   }
 
-  // Validate marginaal_tarief if provided — null means "automatic"
+  // Validate marginaal_tarief if provided — null means "automatic".
+  // Range-validatie i.p.v. een exacte whitelist: het marginale tarief wordt per
+  // belastingjaar uit BOX1_PARAMS afgeleid (schijf-1 t/m topschijf), dus elke
+  // fractie binnen [0,30; 0,60] is een geldige expliciete override. null = auto
+  // (blijft jaar-afgeleid). Een vaste whitelist weigerde eerder elk niet-2024-
+  // tarief, waardoor 2026-tarieven (35,75%) niet opslaanbaar waren.
   const rawMT = body.marginaal_tarief
   let marginaalTarief: number | null | undefined
   if (rawMT === null) {
     marginaalTarief = null // explicitly set to automatic
   } else if (rawMT !== undefined) {
     const mt = Number(rawMT)
-    if (mt !== 0.3697 && mt !== 0.4950) {
-      return NextResponse.json({ error: 'Marginaal tarief moet 36,97% of 49,50% zijn' }, { status: 400 })
+    if (isNaN(mt) || mt < 0.30 || mt > 0.60) {
+      return NextResponse.json({ error: 'Marginaal tarief moet tussen 30% en 60% liggen' }, { status: 400 })
     }
     marginaalTarief = mt
   }

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   computeJaarruimte,
+  jaarruimteBesparing,
   estimateFactorAFromSalary,
   resolvePensionFactorA,
   JAARRUIMTE_OPBOUW_PCT,
@@ -12,6 +13,7 @@ import {
   JAARRUIMTE_FRANCHISE_2026,
   JAARRUIMTE_MAX_2026,
 } from './jaarruimte'
+import { computeBox1Tax } from './box1-tax'
 
 // ── FISCALE-CORRECTIE REGRESSIECASES (ADR 0023, jun 2026) ──────────────────────
 // Pinnen de specifieke getallen die gewijzigd zijn bij de WTP-correctie
@@ -159,6 +161,74 @@ describe('computeJaarruimte — edge-cases', () => {
   it('inkomen exact op franchise = 0 jaarruimte (2026)', () => {
     const result = computeJaarruimte(JAARRUIMTE_FRANCHISE_2026, 0)
     expect(result.jaarruimte).toBe(0)
+  })
+})
+
+// ── jaarruimteBesparing — marginaal-correcte Box 1-besparing (ADR 0040/0041) ──
+describe('jaarruimteBesparing — marginaal-correcte Box 1-besparing', () => {
+  it('= round(computeBox1Tax(bruto) − computeBox1Tax(bruto − inleg))', () => {
+    const gross = 50_000
+    const inleg = 9_248
+    const expected = Math.round(
+      computeBox1Tax({ grossYearlyIncome: gross, year: 2026 }).tax -
+        computeBox1Tax({ grossYearlyIncome: gross - inleg, year: 2026 }).tax,
+    )
+    expect(jaarruimteBesparing(gross, inleg, 2026)).toBe(expected)
+  })
+
+  it('bruto ≤ 0 → 0 (geen inkomen, geen besparing)', () => {
+    expect(jaarruimteBesparing(0, 5_000)).toBe(0)
+    expect(jaarruimteBesparing(-1_000, 5_000)).toBe(0)
+  })
+
+  it('inleg ≤ 0 → 0', () => {
+    expect(jaarruimteBesparing(50_000, 0)).toBe(0)
+    expect(jaarruimteBesparing(50_000, -500)).toBe(0)
+  })
+
+  it('inleg wordt geclampt op [0, bruto] — inleg > bruto telt als bruto', () => {
+    const clampedAtGross = jaarruimteBesparing(50_000, 50_000, 2026)
+    const overGross = jaarruimteBesparing(50_000, 60_000, 2026)
+    expect(overGross).toBe(clampedAtGross)
+  })
+
+  it('besparing is nooit negatief (tax is monotoon in inkomen)', () => {
+    const combos: ReadonlyArray<readonly [number, number]> = [
+      [30_000, 5_000],
+      [50_000, 9_248],
+      [160_658, 35_588],
+    ]
+    for (const [g, i] of combos) {
+      expect(jaarruimteBesparing(g, i, 2026)).toBeGreaterThanOrEqual(0)
+    }
+  })
+
+  it('vangt heffingskorting-afbouw: effectief tarief > vlak schijf-1-tarief in de afbouwzone', () => {
+    // €50k inkomen: de inleg valt boven de arbeidskorting-afbouwstart (€45.592) →
+    // de marginaal-correcte besparing ligt hoger dan de vlakke schijf-1-benadering
+    // (35,75%). Regressiepin (2026-params): €50k / €9.248 → €4.258.
+    const b = jaarruimteBesparing(50_000, 9_248, 2026)
+    expect(b).toBe(4_258)
+    expect(b / 9_248).toBeGreaterThan(0.3575)
+  })
+
+  it('kan LAGER liggen dan het vlakke tarief in de arbeidskorting-opbouwzone', () => {
+    // €30k: de inleg verlaagt het inkomen naar de opbouwzone → lager marginaal
+    // effect dan het vlakke 36,97%. Regressiepin (2026-params): €30k / €5.000 → €1.461.
+    expect(jaarruimteBesparing(30_000, 5_000, 2026)).toBe(1_461)
+    expect(jaarruimteBesparing(30_000, 5_000, 2026)).toBeLessThan(Math.round(5_000 * 0.3697))
+  })
+
+  it('respecteert het jaar-argument (2025 ≠ 2026 door andere schijven/kortingen)', () => {
+    expect(jaarruimteBesparing(50_000, 9_248, 2025)).not.toBe(
+      jaarruimteBesparing(50_000, 9_248, 2026),
+    )
+  })
+
+  it('AOW-variant (opts.aow) geeft lagere besparing (geen AOW-premiedeel)', () => {
+    const regulier = jaarruimteBesparing(50_000, 9_248, 2026)
+    const aow = jaarruimteBesparing(50_000, 9_248, 2026, { aow: true })
+    expect(aow).toBeLessThan(regulier)
   })
 })
 

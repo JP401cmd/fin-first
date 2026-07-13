@@ -48,9 +48,11 @@ describe('resolveFireParams — defaults + overrides', () => {
     expect(params.marginaalTarief).toBe(0.4950)
   })
 
-  it('marginaalTarief leidt af uit laag inkomen', () => {
+  it('marginaalTarief leidt af uit laag inkomen (schijf-1-tarief lopend jaar)', () => {
+    // Per Arch F1 jaar-afgeleid uit BOX1_PARAMS[CURRENT_TAX_YEAR] i.p.v. de oude
+    // 2024-hardcode 0,3697. 2026 schijf 1 = 35,75%.
     const params = resolveFireParams({ net_monthly_income: 3000 })
-    expect(params.marginaalTarief).toBe(0.3697)
+    expect(params.marginaalTarief).toBe(0.3575)
   })
 
   it('hand-ingevuld marginaal_tarief wint over inkomen-afleiding', () => {

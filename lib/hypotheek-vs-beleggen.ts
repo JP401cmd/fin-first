@@ -41,7 +41,7 @@ export interface HvBParams {
   restLooptijd: number
   /** Is de rente fiscaal aftrekbaar? */
   isTaxDeductible: boolean
-  /** Marginaal IB-tarief (bijv. 0.3697 of 0.4950) */
+  /** Marginaal IB-tarief (0–1; schijf-1- of topschijf-tarief, jaar-afgeleid) */
   marginaalTarief: number
   /** Verwacht bruto rendement op beleggingen (decimaal, bijv. 0.07) */
   verwachtRendement: number

@@ -38,7 +38,7 @@ import {
 } from '@/lib/box3-data'
 import type { Asset, AssetType } from '@/lib/asset-data'
 import { compareForfaitairVsWerkelijk } from '@/lib/box3-tegenbewijs'
-import { computeJaarruimte } from '@/lib/jaarruimte'
+import { computeJaarruimte, jaarruimteBesparing } from '@/lib/jaarruimte'
 import { BELAST_ACCEPTANCE } from './belast'
 import type { AcceptanceCriterion } from './types'
 
@@ -146,7 +146,6 @@ function box3AssetsFromPersona(p: PersonaData): Asset[] {
 
 const tessaNetYearly = Number(compleet.profile.net_monthly_income ?? 0) * 12 // 91.200
 const tessaGross = grossFromNet(tessaNetYearly, 2026) // subpagina-bron
-const tessaMarg = Number(compleet.profile.marginaal_tarief ?? 0.495)
 const eigenHuis = compleet.assets.find((a) => a.asset_type === 'eigen_huis' && (a.woz_value ?? 0) > 0)!
 const woz = Number(eigenHuis.woz_value)
 const eigenHuisHypotheek = compleet.debts.find(
@@ -209,9 +208,13 @@ export const BELAST_ENGINE_CHECKS: BelastEngineCheck[] = [
     run: () => {
       criterion('WF-BELAST-10')
       const jr = computeJaarruimte(tessaGross, 0, 2026)
-      const besparing = Math.round(jr.jaarruimte * tessaMarg)
+      // Marginaal-correcte besparing (ADR 0040/0041) i.p.v. de oude vlakke
+      // jaarruimte × marginaal-benadering — spiegelt de canonieke helper die
+      // ook JaarruimteCard/belasting-hub/aandachtspunten-loader/AI-tax-context
+      // gebruiken (single source, lib/jaarruimte.ts).
+      const besparing = jaarruimteBesparing(tessaGross, jr.jaarruimte, 2026)
       return {
-        expected: 'jaarruimte=35588; franchise=19172; max=35589; besparing=17616',
+        expected: 'jaarruimte=35588; franchise=19172; max=35589; besparing=18127',
         actual: `jaarruimte=${jr.jaarruimte}; franchise=${jr.franchise}; max=${jr.max}; besparing=${besparing}`,
       }
     },

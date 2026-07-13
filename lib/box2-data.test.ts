@@ -3,8 +3,11 @@ import {
   BOX2_PARAMS,
   DGA_LENING_DREMPEL,
   calculateBox2,
+  type Box2Deelneming,
   type Box2Input,
 } from './box2-data'
+import { PERSONAS } from './test-personas'
+import { buildSeedAssetRow } from './seed-persona'
 
 /**
  * Snapshot- en sanity-tests voor de Box 2 aanmerkelijk-belang motor.
@@ -92,6 +95,51 @@ describe('calculateBox2 — staffeltarief sanity', () => {
     expect(metPartner.taxHigh).toBe(0)
     expect(single.taxHigh).toBeGreaterThan(0)
     expect(metPartner.totalTax).toBeLessThan(single.totalTax)
+  })
+})
+
+describe('WF-BELAST-13 — DGA-persona krijgt een niet-nul Box 2-aanslag (datapad-regressie)', () => {
+  // Borgt het end-to-end datapad seed-fixture → buildSeedAssetRow → route-mapping
+  // → calculateBox2 voor Tessa's ('compleet') deelneming. Voorheen bleef de
+  // aanslag structureel €0 omdat annual_dividend niet in het PersonaAsset-type
+  // en niet in de seed-mapping zat (bug WF-BELAST-13, dividend-gat).
+  const deelneming = PERSONAS.compleet.assets.find(
+    (a) => a.asset_type === 'deelneming',
+  )
+
+  it('de compleet-persona heeft een deelneming met een geconfigureerd dividend', () => {
+    expect(deelneming).toBeDefined()
+    expect(deelneming!.annual_dividend).toBeGreaterThan(0)
+  })
+
+  it('buildSeedAssetRow mapt annual_dividend naar de insert-rij (was NULL)', () => {
+    const row = buildSeedAssetRow(deelneming!, 'user-test', 0) as {
+      annual_dividend: number | null
+      ownership_percentage: number | null
+      kvk_number: string | null
+    }
+    expect(row.annual_dividend).toBe(deelneming!.annual_dividend)
+    expect(row.ownership_percentage).toBe(deelneming!.ownership_percentage ?? null)
+    expect(row.kvk_number).toBe(deelneming!.kvk_number ?? null)
+  })
+
+  it('geeft via het route-datapad een aanslag > €0 met schijfopbouw', () => {
+    // Spiegelt app/api/household/box2 assetToDeelneming(): dividend uit de
+    // (geseede) rij, disposal_gain bewust 0 (scope-down optie C).
+    const row = buildSeedAssetRow(deelneming!, 'user-test', 0) as {
+      annual_dividend: number | null
+    }
+    const d: Box2Deelneming = {
+      name: deelneming!.institution || deelneming!.name,
+      annual_dividend: Number(row.annual_dividend) || 0,
+      disposal_gain: 0,
+    }
+    const r = calculateBox2(makeInput({ deelnemingen: [d] }))
+    expect(r.totalIncome).toBe(deelneming!.annual_dividend)
+    expect(r.totalTaxInclDga).toBeGreaterThan(0)
+    // Dividend ligt boven de schijfgrens → beide schijven gevuld.
+    expect(r.taxLow).toBeGreaterThan(0)
+    expect(r.taxHigh).toBeGreaterThan(0)
   })
 })
 

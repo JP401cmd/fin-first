@@ -36,13 +36,16 @@ describe('fiscale kerngetallen — catalogus', () => {
   it('dekt de kernbestanden uit het inventarisatie-onderzoek', () => {
     const files = new Set(FISCALE_KERNGETALLEN.map((k) => k.file))
     for (const expected of [
+      // De marginale-IB-vuistregel is per Arch F1 verplaatst van fire-params.ts
+      // naar box1-tax.ts (deriveMarginaalTarief/schijfGrensVoor, afgeleid uit
+      // BOX1_PARAMS); fire-params.ts delegeert nu enkel en host geen los
+      // fiscaal kerngetal meer.
       'lib/box1-tax.ts',
       'lib/box2-data.ts',
       'lib/box3-data.ts',
       'lib/jaarruimte.ts',
       'lib/horizon-data.ts',
       'lib/constants.ts',
-      'lib/fire-params.ts',
       'lib/tax-calendar.ts',
     ]) {
       expect(files.has(expected), `inventaris mist bronbestand ${expected}`).toBe(true)

@@ -89,7 +89,13 @@ duplicaat-implementatie (`schatJaarruimte`) met nóg afwijkende, verouderde cons
   / `_source` bestaan al, maar zijn in deze golf bewust nog niet bedraad — geen UI/DB-wiring).
 - De grondslag-cap levert bij zeer hoog inkomen 2026 een uitkomst van €35.588, één euro onder de
   gepubliceerde €35.589 door afronding van de franchise-afgeleide; dit is inherent en gedocumenteerd
-  in de motor-JSDoc en in de tests.
+  in de motor-JSDoc en in de tests. **Bevestigd als by-design** (UAT-bevinding WF-BELAST-10,
+  cosmetisch, juli 2026): het €1-verschil tussen de gauge (de exact berekende, op de euro afgeronde
+  ruimte) en de voetregel (de gepubliceerde referentie `JAARRUIMTE_MAX_2026`) blijft bewust staan —
+  de rekenmotor en de constante wijzigen niet. Wel is aan beide voetregels
+  (`components/overview/jaarruimte-card.tsx` en `box1/page.tsx#JaarruimteUitleg`) een korte
+  toelichting toegevoegd ("de gepubliceerde referentiewaarde; je exact berekende ruimte kan er door
+  afronding een euro onder liggen") zodat het verschil als afronding leest en niet als fout.
 
 
 ## Addendum golf 2 — factor A-persistentie (juni 2026)

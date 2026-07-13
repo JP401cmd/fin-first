@@ -49,6 +49,7 @@
  */
 
 import type { LeverageStatus } from '@/lib/leverage-status'
+import { computeBox1Tax, type Box1TaxYear } from '@/lib/box1-tax'
 
 /**
  * Opbouwpercentage in de jaarruimteformule: 30% sinds Wet toekomst pensioenen
@@ -173,6 +174,47 @@ export function computeJaarruimte(
 }
 
 /**
+ * Marginaal-correcte belastingbesparing van een lijfrente-/pensioeninleg in Box 1.
+ * = computeBox1Tax(gross).tax − computeBox1Tax(gross − inleg).tax
+ * Vangt schijfovergangen én heffingskorting-afbouw — i.t.t. de oude vlakke
+ * `inleg × marginaal`-benadering (ADR 0040 / ADR 0041).
+ *
+ * Bewuste vereenvoudiging: marginaal-correct op BRUTO-grondslag; eigen-woning-
+ * band-shift buiten scope (Indicatie). aow default false (jaarruimte is een
+ * pre-AOW/werkende-levensfase-concept).
+ *
+ * SINGLE SOURCE: alle vier de runtime-oppervlakken (JaarruimteCard, belasting-hub,
+ * aandachtspunten-loader, AI-tax-context) consumeren deze helper i.p.v. elk een
+ * eigen `Math.round(ruimte × marginaal)` te doen — één metric, één grondslag.
+ *
+ * @param grossYearlyIncome  Bruto jaarinkomen (Box 1). ≤ 0 → besparing 0.
+ * @param inleg              Lijfrente-/pensioeninleg (€). Geclampt op [0, gross].
+ * @param year              Belastingjaar (2025 | 2026). Default 2026.
+ * @param opts.aow          AOW-gerechtigd (default false — pre-AOW-levensfase).
+ * @returns Belastingbesparing in € (≥ 0, afgerond op hele euro's).
+ */
+export function jaarruimteBesparing(
+  grossYearlyIncome: number,
+  inleg: number,
+  year: Box1TaxYear = 2026,
+  opts: { aow?: boolean } = {},
+): number {
+  if (!(grossYearlyIncome > 0)) return 0
+  const aow = opts.aow ?? false
+  const clampedInleg = Math.min(Math.max(0, inleg), grossYearlyIncome)
+  if (clampedInleg <= 0) return 0
+
+  const taxNow = computeBox1Tax({ grossYearlyIncome, year, aow }).tax
+  const taxAfter = computeBox1Tax({
+    grossYearlyIncome: grossYearlyIncome - clampedInleg,
+    year,
+    aow,
+  }).tax
+  // tax is monotoon stijgend in inkomen → delta ≥ 0; Math.max is defensief.
+  return Math.round(Math.max(0, taxNow - taxAfter))
+}
+
+/**
  * Schat **factor A** uit het (pensioengevend) jaarsalaris — de "alternatieve
  * route" voor wie het UPO-getal niet bij de hand heeft.
  *
@@ -294,7 +336,7 @@ export function resolvePensionFactorA(
 export function box1JaarruimteStatus(input: {
   /** Netto maandinkomen (effectief — manual of transactie-afgeleid). */
   netMonthly: number
-  /** Marginaal IB-tarief (0–1), bv. 0.3697 of 0.4950. */
+  /** Marginaal IB-tarief (0–1; schijf-1- of topschijf-tarief, jaar-afgeleid). */
   marginaalTarief: number
 }): { status: LeverageStatus; grossYearly: number } {
   const { netMonthly, marginaalTarief } = input

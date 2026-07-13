@@ -197,11 +197,11 @@ const criteria: AcceptanceCriterion[] = [
     persona: 'compleet',
     given: 'Persona Tessa geladen; bruto €160.658 (subpagina-bron), factor A onbekend (geen pension_factor_a in het profiel → resolvePensionFactorA → 0).',
     when: 'De gebruiker leest de jaarruimte-gauge en simuleert een lijfrente-inleg tot de volledige ruimte.',
-    then: 'Jaarruimte 2026 = 30% × min(160.658 − 19.172, 137.800 − 19.172) − 6,27×0 = 30% × 118.628 = €35.588 (gecapt op de grondslag-cap; JAARRUIMTE_MAX_2026 €35.589 is de afgeronde referentie). Franchise €19.172. Geschatte belastingbesparing bij volledige benutting = round(35.588 × 49,5% marginaal) = €17.616.',
+    then: 'Jaarruimte 2026 = 30% × min(160.658 − 19.172, 137.800 − 19.172) − 6,27×0 = 30% × 118.628 = €35.588 (gecapt op de grondslag-cap; JAARRUIMTE_MAX_2026 €35.589 is de afgeronde referentie). Franchise €19.172. Geschatte belastingbesparing bij volledige benutting (marginaal-correct = computeBox1Tax(160.658).tax − computeBox1Tax(160.658 − 35.588).tax, ADR 0040/0041 — vangt schijfovergangen én heffingskorting-afbouw, i.t.t. de oude vlakke inleg × marginaal-benadering) = €18.127.',
     assertion: {
       kind: 'exact',
-      expected: 'jaarruimte=35588; franchise=19172; max=35589; besparing=17616',
-      source: 'lib/jaarruimte.ts#computeJaarruimte(160658, 0, 2026) — grondslag-cap 137.800−19.172, OPBOUW_PCT 0,3, FACTOR_A_IMPUTATIE 6,27; besparing = round(jaarruimte × marginaal_tarief 0,495)',
+      expected: 'jaarruimte=35588; franchise=19172; max=35589; besparing=18127',
+      source: 'lib/jaarruimte.ts#computeJaarruimte(160658, 0, 2026) — grondslag-cap 137.800−19.172, OPBOUW_PCT 0,3, FACTOR_A_IMPUTATIE 6,27; besparing = jaarruimteBesparing(160658, 35588, 2026) = marginaal-correcte som via computeBox1Tax(gross) − computeBox1Tax(gross − inleg), ADR 0041',
     },
   },
   {

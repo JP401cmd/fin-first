@@ -108,6 +108,27 @@ describe('GET /api/parameters — spaarquote-doel resolutie', () => {
   })
 })
 
+describe('PUT /api/parameters — marginaal_tarief range-validatie (Arch F1)', () => {
+  it('accepteert het jaar-afgeleide 2026-tarief (0.3575) — vroeger door de whitelist geweigerd', async () => {
+    const res = await PUT(putRequest({ marginaal_tarief: 0.3575 }))
+    expect(res.status).toBe(200)
+    const upsert = upserted.find((u) => u.table === 'profiles')
+    expect(upsert!.payload.marginaal_tarief).toBe(0.3575)
+  })
+
+  it('weigert een tarief buiten [0,30; 0,60]', async () => {
+    const res = await PUT(putRequest({ marginaal_tarief: 0.9 }))
+    expect(res.status).toBe(400)
+  })
+
+  it('null blijft "automatisch" (jaar-afgeleid)', async () => {
+    const res = await PUT(putRequest({ marginaal_tarief: null }))
+    expect(res.status).toBe(200)
+    const upsert = upserted.find((u) => u.table === 'profiles')
+    expect(upsert!.payload.marginaal_tarief).toBeNull()
+  })
+})
+
 describe('PUT /api/parameters — schrijfpad dicht', () => {
   it('target_savings_rate in de body muteert de kolom NIET meer', async () => {
     const res = await PUT(putRequest({ net_monthly_income: 3500, target_savings_rate: 30 }))

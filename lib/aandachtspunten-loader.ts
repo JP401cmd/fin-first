@@ -31,9 +31,9 @@ import {
 } from './aandachtspunten'
 import { dailyExpenseRate } from './format'
 import { buildTaxOverview } from './tax-overview'
-import { computeBox1Tax } from './box1-tax'
+import { computeBox1Tax, deriveMarginaalTarief } from './box1-tax'
 import { loadPerspectiveBox3 } from './household-tax'
-import { computeJaarruimte } from './jaarruimte'
+import { computeJaarruimte, jaarruimteBesparing } from './jaarruimte'
 import { loadHorizonData } from './horizon-data-loader'
 import {
   getNibudHouseholdType,
@@ -63,7 +63,7 @@ async function collectTaxAandachtspunten(supabase: SupabaseClient): Promise<Aand
   let box1Tax: number | null = null
   let grossYearly = 0
   const netMonthly = horizonData.effectiveInput?.monthlyIncome ?? 0
-  const marg = horizonData.fireParams?.marginaalTarief ?? 0.3697
+  const marg = horizonData.fireParams?.marginaalTarief ?? deriveMarginaalTarief()
   if (netMonthly > 0 && marg > 0 && marg < 1) {
     grossYearly = (netMonthly * 12) / (1 - marg)
     const box1 = computeBox1Tax({ grossYearlyIncome: grossYearly, year: 2026, dailyExpenses })
@@ -79,11 +79,14 @@ async function collectTaxAandachtspunten(supabase: SupabaseClient): Promise<Aand
     // Box 3-perspectief faalt → behoud de health-proxy-waarde.
   }
 
-  // Jaarruimte-besparing = onbenutte ruimte × marginaal tarief. Factor A komt
-  // uit de loader-bundel (profiles.pension_factor_a via resolvePensionFactorA).
+  // Jaarruimte-besparing = marginaal-correct Box 1-belastingverschil van de inleg
+  // (schijfovergangen + heffingskorting-afbouw) via de gedeelde `jaarruimteBesparing`-
+  // helper (ADR 0040/0041), niet de vlakke ruimte × marginaal. Factor A komt uit de
+  // loader-bundel (profiles.pension_factor_a via resolvePensionFactorA).
   const jaarruimte = computeJaarruimte(grossYearly, horizonData.pensioenFactorA)
-  const jaarruimteSavings =
-    jaarruimte.hasData && marg > 0 ? Math.round(jaarruimte.jaarruimte * marg) : 0
+  const jaarruimteSavings = jaarruimte.hasData
+    ? jaarruimteBesparing(grossYearly, jaarruimte.jaarruimte, 2026)
+    : 0
 
   // Demping: werknemer mét bedrijfspensioen + ONBEKENDE factor A.
   // Bij onbekende factor A rekent de loader met 0 → de jaarruimte komt op de

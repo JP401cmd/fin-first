@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { RotateCcw, Clock } from 'lucide-react'
+import { Clock } from 'lucide-react'
 import {
   formatCurrency,
   calculateFreedomTime,
@@ -10,6 +10,7 @@ import {
 } from '@/lib/format'
 import {
   computeJaarruimte,
+  jaarruimteBesparing,
   JAARRUIMTE_OPBOUW_PCT,
   JAARRUIMTE_FACTOR_A_IMPUTATIE,
   type JaarruimteJaar,
@@ -18,7 +19,7 @@ import { TaxGauge } from '@/components/overview/belasting/tax-gauge'
 import { Kicker, SectionLabel } from '@/components/editorial'
 import { AandachtspuntActieButton } from '@/components/overview/belasting/aandachtspunt-actie-button'
 
-const BOX1_COLOR = 'var(--color-kern-700)'
+const BOX1_COLOR = 'var(--color-box1-700)'
 const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
 const SOURCE_SERIF = 'var(--font-source-serif, Georgia, serif)'
 
@@ -26,10 +27,14 @@ const SOURCE_SERIF = 'var(--font-source-serif, Georgia, serif)'
  * JaarruimteCard — toont onbenutte pensioen-aftrekruimte (Box 1) plus een
  * SIMULATOR waarmee de gebruiker live ziet wat een lijfrente-inleg oplevert.
  *
- * Plan-context: Box 1-surface inzicht 1.5. Upgrade van de statische kaart:
- *  - pensioenaangroei-input (bestaand) → bepaalt de onbenutte jaarruimte
- *  - lijfrente-inleg-slider (nieuw) → 0 … jaarruimte, toont live de
- *    belastingbesparing (inleg × marginaal tarief) + vrijheidstijd
+ * Plan-context: Box 1-surface inzicht 1.5. Zuivere SIMULATOR op basis van de
+ * al opgeslagen factor A (prop `pensioenAangroei`) — factor A zelf bewerk je
+ * uitsluitend bij de pensioen-strategie:
+ *  - pensioenAangroei (prop) → bepaalt de onbenutte jaarruimte
+ *  - lijfrente-inleg-slider → 0 … jaarruimte, toont live de
+ *    belastingbesparing (marginaal-correct via `jaarruimteBesparing` =
+ *    computeBox1Tax(bruto) − computeBox1Tax(bruto − inleg); ADR 0040/0041) +
+ *    vrijheidstijd
  *  - TaxGauge (nieuw) → benutting (benut vs onbenut)
  *
  * Berekening via `lib/jaarruimte.ts`:
@@ -40,16 +45,17 @@ const SOURCE_SERIF = 'var(--font-source-serif, Georgia, serif)'
  *
  * Vormgeving: editorial — papier + ink-hiërarchie, scherpe hoeken, Playfair
  * voor het onbenut-bedrag + de live besparing, mono labels, amber slider-accent
- * en vrijheidstijd-subregel. Alle simulator-functionaliteit + prop-signaturen
- * blijven ongewijzigd.
+ * en vrijheidstijd-subregel. Simulator-functionaliteit + prop-signaturen
+ * blijven ongewijzigd; de kaart rekent met de opgeslagen factor A (geen lokale
+ * factor-A-invoer meer).
  */
 export function JaarruimteCard({
   grossYearlyIncome,
   pensioenAangroei = 0,
-  marginaalTarief,
   year = 2026,
   /** Dagelijkse uitgaven voor de vrijheidstijd-vertaling; 0 → geen regel. */
   dailyExpenses = 0,
+  factorAEditable = true,
 }: {
   /** Bruto-jaarinkomen voor Box 1 (loon + winst + eigen-woning-forfait). */
   grossYearlyIncome: number
@@ -57,17 +63,26 @@ export function JaarruimteCard({
    *  pensioenuitkering). De motor trekt dit × 6,27 af. Default 0 (geen
    *  werkgeverspensioen). Prop-naam blijft `pensioenAangroei` voor compat. */
   pensioenAangroei?: number
-  /** Marginaal Box 1-tarief (0.3697 of 0.495). Voor besparings-schatting. */
+  /**
+   * @deprecated Niet langer gebruikt voor de besparing — die is nu marginaal-
+   * correct (`jaarruimteBesparing` via de Box 1-engine, ADR 0040/0041) en leidt
+   * het effectieve tarief zelf uit het inkomen af. Prop blijft bestaan zodat de
+   * box1-pagina-call-sites (`marginaalTarief={marg}`) niet breken.
+   */
   marginaalTarief?: number
   /** Belastingjaar voor franchise + cap. Default 2026 (actief jaar). */
   year?: JaarruimteJaar
   dailyExpenses?: number
+  /** Of factor A door de eigenaar van deze kaart beheerd kan worden. false →
+   *  partnerkaart in de huishoud-view (bewust `pensioenAangroei={0}`, geen eigen
+   *  factor-A-bron): de footer verwijst dan NIET naar de eigen pensioen-strategie
+   *  (die beheert niets van de partner). Default true. */
+  factorAEditable?: boolean
 }) {
-  // Interactieve factor A: user vult zijn UPO-factor-A in (jaarlijkse
-  // pensioenaangroei in €) zodat de berekening accuraat wordt. De motor trekt
-  // dit × 6,27 af. Default = prop-waarde (0 als niets bekend).
-  const [factorA, setFactorA] = useState(pensioenAangroei)
-  const result = computeJaarruimte(grossYearlyIncome, factorA, year)
+  // Factor A komt rechtstreeks uit de prop `pensioenAangroei` (de al opgeslagen
+  // UPO-factor-A). Bewerken gebeurt uitsluitend bij de pensioen-strategie; de
+  // kaart is hier een zuivere simulator. De motor trekt factor A × 6,27 af.
+  const result = computeJaarruimte(grossYearlyIncome, pensioenAangroei, year)
 
   // Lijfrente-inleg-simulator: hoeveel stort je dit jaar? Default = volledige
   // onbenutte ruimte (de optimale benutting). Slider clampt op [0, jaarruimte].
@@ -75,8 +90,15 @@ export function JaarruimteCard({
   // Houd de inleg geclampt wanneer de jaarruimte verandert (aangroei-input).
   const clampedInleg = Math.min(Math.max(inleg, 0), result.jaarruimte)
 
-  const marginaal = marginaalTarief && marginaalTarief > 0 ? marginaalTarief : null
-  const besparing = marginaal != null ? Math.round(clampedInleg * marginaal) : null
+  // Marginaal-correcte besparing: het echte Box 1-belastingverschil van de inleg
+  // (schijfovergangen + heffingskorting-afbouw), niet de vlakke inleg × marginaal.
+  // Eén bron: `jaarruimteBesparing` (ADR 0040/0041), gedeeld met hub + aandachts-
+  // punten + AI-context. `null` alleen bij ontbrekend inkomen (dan toont de kaart
+  // de empty-state en returnt hieronder al vroeg).
+  const besparing =
+    grossYearlyIncome > 0
+      ? jaarruimteBesparing(grossYearlyIncome, clampedInleg, year)
+      : null
 
   const freedom =
     dailyExpenses > 0 && besparing != null && besparing > 0
@@ -99,7 +121,7 @@ export function JaarruimteCard({
   }
 
   return (
-    <article className="bg-[var(--paper)] border border-[var(--border-ed)] border-l-[3px] border-l-kern-700 p-5 sm:p-6">
+    <article className="bg-[var(--paper)] border border-[var(--border-ed)] border-l-[3px] border-l-[var(--color-box1-700)] p-5 sm:p-6">
       <Kicker>Jaarruimte {year} · pensioen-aftrekruimte</Kicker>
 
       {result.jaarruimte > 0 ? (
@@ -179,7 +201,7 @@ export function JaarruimteCard({
               step={Math.max(50, Math.round(result.jaarruimte / 100))}
               value={clampedInleg}
               onChange={(e) => setInleg(Number(e.target.value) || 0)}
-              className="w-full accent-[var(--module-active-500)]"
+              className="w-full accent-[var(--color-box1-500)]"
               aria-label="Lijfrente-inleg dit jaar"
             />
             {besparing != null && (
@@ -191,9 +213,11 @@ export function JaarruimteCard({
                 >
                   {formatCurrency(besparing)}
                 </span>{' '}
-                <span className="text-[var(--ink-3)] text-xs">
-                  (inleg × marginaal {(marginaal! * 100).toFixed(1)}%)
-                </span>
+                {clampedInleg > 0 && (
+                  <span className="text-[var(--ink-3)] text-xs">
+                    (≈ {Math.round((besparing / clampedInleg) * 100)}% effectief)
+                  </span>
+                )}
               </div>
             )}
             {freedom && (
@@ -244,52 +268,17 @@ export function JaarruimteCard({
         </div>
       )}
 
-      {/* Interactieve factor A input — user vult zijn factor A (jaarlijkse
-          pensioenaangroei uit UPO, in €) in voor accurate jaarruimte. De motor
-          trekt dit × 6,27 af. Default 0. Ontnest: sectie binnen het ene kader. */}
-      <div className="mt-5 border-t border-[var(--rule-soft)] pt-5">
-        <SectionLabel>Factor A (werkgeverspensioen)</SectionLabel>
-        <label
-          htmlFor="jaarruimte-factor-a"
-          className="block text-[10px] uppercase tracking-[0.12em] font-mono font-semibold text-[var(--ink-3)] mb-1.5"
-        >
-          Jaarlijkse pensioenaangroei (UPO)
-        </label>
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-[var(--ink-3)]">€</span>
-          <input
-            id="jaarruimte-factor-a"
-            type="number"
-            inputMode="decimal"
-            min={0}
-            step={50}
-            value={factorA}
-            onChange={(e) => setFactorA(Number(e.target.value) || 0)}
-            className="flex-1 border border-[var(--border-ed)] bg-[var(--paper)] px-2.5 py-1.5 text-sm tabular-nums focus:outline-none focus:border-[var(--ink-3)]"
-            aria-label="Factor A — jaarlijkse pensioenaangroei UPO per jaar"
-          />
-          {factorA > 0 && (
-            <button
-              type="button"
-              onClick={() => setFactorA(0)}
-              aria-label="Reset naar 0"
-              title="Reset"
-              className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] text-[var(--ink-3)] hover:bg-[var(--paper)] transition-colors"
-            >
-              <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
-            </button>
-          )}
-        </div>
-        <p
-          className="mt-2 text-[11px] italic text-[var(--ink-3)] leading-snug"
-          style={{ fontFamily: SOURCE_SERIF }}
-        >
-          Factor A staat op je UPO (Mijnpensioenoverzicht.nl): de toename van je
-          jaarlijkse pensioenuitkering. Telt × {JAARRUIMTE_FACTOR_A_IMPUTATIE}{' '}
-          mee in de aftrek. Geen werkgeverspensioen? Vul 0 in.
-        </p>
-        <p className="mt-2 text-[11px] leading-snug text-[var(--ink-3)]">
-          Dit is een lokale simulatie — sla je factor A blijvend op via je{' '}
+      {/* Factor A wordt hier niet meer bewerkt — de kaart rekent met de al
+          opgeslagen factor A (prop `pensioenAangroei`). Bewerken gebeurt
+          uitsluitend bij de pensioen-strategie. Op de partnerkaart
+          (factorAEditable=false) verwijzen we NIET naar de eigen pensioen-
+          strategie: die beheert niets van de partner (privacy-guardrail). */}
+      {factorAEditable ? (
+        <p className="mt-5 border-t border-[var(--rule-soft)] pt-4 text-[11px] leading-snug text-[var(--ink-3)]">
+          Berekend met je opgeslagen factor A
+          {pensioenAangroei > 0 ? ` van ${formatCurrency(pensioenAangroei)}` : ''}
+          {' '}(telt × {JAARRUIMTE_FACTOR_A_IMPUTATIE} mee in de aftrek). Je factor
+          A beheer je bij je{' '}
           <Link
             href="/toekomst/gebeurtenissen?strategie=pensioen"
             className="font-medium text-[var(--ink-2)] underline underline-offset-2 hover:text-[var(--ink)]"
@@ -298,7 +287,12 @@ export function JaarruimteCard({
           </Link>
           .
         </p>
-      </div>
+      ) : (
+        <p className="mt-5 border-t border-[var(--rule-soft)] pt-4 text-[11px] leading-snug text-[var(--ink-3)]">
+          Berekend zonder factor A (werkgeverspensioen) — er is voor deze persoon
+          nog geen eigen pensioenaangroei-bron in TriFinity.
+        </p>
+      )}
 
       <p
         className="mt-3 text-[12px] italic text-[var(--ink-3)] leading-snug max-w-[60ch]"
@@ -307,7 +301,9 @@ export function JaarruimteCard({
         Indicatie, geen advies — berekening {year}:{' '}
         {(JAARRUIMTE_OPBOUW_PCT * 100).toFixed(0)}% × (inkomen −{' '}
         {formatCurrency(result.franchise)}) − {JAARRUIMTE_FACTOR_A_IMPUTATIE} ×
-        factor A. Max {formatCurrency(result.max)} per persoon.
+        factor A. Max {formatCurrency(result.max)} per persoon — dat is de
+        gepubliceerde referentiewaarde; je exact berekende ruimte kan er door
+        afronding een euro onder liggen.
       </p>
     </article>
   )

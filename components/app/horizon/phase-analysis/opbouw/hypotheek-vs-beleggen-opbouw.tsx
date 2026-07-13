@@ -10,6 +10,7 @@ import {
   type HvBParams,
   type HvBResult,
 } from '@/lib/hypotheek-vs-beleggen'
+import { deriveMarginaalTarief } from '@/lib/box1-tax'
 import type { Debt } from '@/lib/debt-data'
 import type { SimCashflow } from '@/lib/fire-simulation'
 import { MaskedAmount } from '@/components/app/masked-amount'
@@ -29,7 +30,7 @@ interface HypotheekVsBeleggenOpbouwProps {
   cashflows?: SimCashflow[]
   /** Has partner — affects Box 3 heffingsvrij and marginaalTarief */
   hasPartner?: boolean
-  /** Marginaal IB-tarief (e.g. 0.3697 or 0.4950), overrides default */
+  /** Marginaal IB-tarief (0–1; jaar-afgeleid), overrides default */
   marginaalTarief?: number
   /**
    * FASE 6 stap 5A — de horizon-kernel is de enige motor; deze vlag doet niets meer
@@ -57,8 +58,11 @@ const MIN_DEFAULT_EXTRA = 50
 /** Upper bound for the default derived from surplus (€). */
 const MAX_DEFAULT_EXTRA = 1000
 
-/** Default marginal income tax rate for NL (schijf 1, 2025/2026). */
-const DEFAULT_MARGINAAL_TARIEF = 0.3697
+/**
+ * Default marginaal IB-tarief (schijf 1) — per belastingjaar afgeleid uit
+ * BOX1_PARAMS via de canonieke helper i.p.v. een 2024-hardcode (0,3697).
+ */
+const DEFAULT_MARGINAAL_TARIEF = deriveMarginaalTarief()
 
 /** Comparison horizon in years. */
 const HORIZON_JAREN = 10

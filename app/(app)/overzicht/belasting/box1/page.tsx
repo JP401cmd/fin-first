@@ -14,7 +14,7 @@ import {
 } from '@/lib/jaarruimte'
 import { BelastingBoxPageHeader } from '@/components/overview/belasting-box-page-header'
 import { formatCurrency, calculateFreedomTime, formatFreedomTimeString, dailyExpenseRate } from '@/lib/format'
-import { computeBox1Tax, grossFromNet, type Box1Result } from '@/lib/box1-tax'
+import { computeBox1Tax, grossFromNet, deriveMarginaalTarief, type Box1Result } from '@/lib/box1-tax'
 import { resolveBox1GrossIncome, type Box1IncomeResolution } from '@/lib/box1-income'
 import { Box1GrossIncomeEditor } from '@/components/overview/belasting/box1-gross-income-editor'
 import { Box1Waterfall } from '@/components/overview/belasting/box1-waterfall'
@@ -78,7 +78,7 @@ export default async function BelastingBox1Page() {
     ? await resolveBox1GrossIncome(supabase, user.id, 2026)
     : { grossYearly: 0, estimateGross: 0, estimateNetYearly: 0, isManual: false }
   const grossYearly = income.grossYearly
-  const marg = horizonData.fireParams?.marginaalTarief ?? 0.3697
+  const marg = horizonData.fireParams?.marginaalTarief ?? deriveMarginaalTarief()
 
   // Factor A (jaarlijkse werkgeverspensioen-aangroei) — single source uit het
   // profiel (profiles.pension_factor_a), geconsumeerd uit de loader-bundel via
@@ -252,6 +252,7 @@ export default async function BelastingBox1Page() {
                   marginaalTarief={marg}
                   year={2026}
                   dailyExpenses={dailyExpenses}
+                  factorAEditable={false}
                 />
               ) : (
                 <div className="flex items-start gap-2.5 border border-[var(--border-ed)] border-l-[3px] border-l-[var(--ink-3)] bg-[var(--paper)] p-4 sm:p-5 text-sm leading-snug text-[var(--ink-2)]">
@@ -430,7 +431,9 @@ function JaarruimteUitleg() {
             {opbouwPct}% × (inkomen − {formatCurrency(JAARRUIMTE_FRANCHISE_2026)})
             − {JAARRUIMTE_FACTOR_A_IMPUTATIE} × factor A
           </span>
-          , afgetopt op {formatCurrency(JAARRUIMTE_MAX_2026)} per persoon.
+          , afgetopt op {formatCurrency(JAARRUIMTE_MAX_2026)} per persoon. Dat
+          maximum is de gepubliceerde referentiewaarde; je exact berekende ruimte
+          kan er door afronding een euro onder liggen.
         </p>
 
         <p className="mt-4 mb-1 font-mono text-[10px] uppercase tracking-[0.18em] not-italic text-[var(--ink-3)]">

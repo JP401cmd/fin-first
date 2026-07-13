@@ -16,6 +16,8 @@
  * triviaal te corrigeren zijn zonder de rekenlogica aan te raken.
  */
 
+import { CURRENT_TAX_YEAR } from './box3-data'
+
 // ── Types ────────────────────────────────────────────────────
 
 export type Box1TaxYear = 2025 | 2026
@@ -444,6 +446,49 @@ export function schijftariefOp(income: number, year: Box1TaxYear, aow?: boolean)
   const params = BOX1_PARAMS[year]
   const schijven = aow ? params.schijvenAow : params.schijven
   return schijftariefBij(income, schijven)
+}
+
+// ── Marginaal-tarief vuistregel (FIRE / netto→bruto-schattingen) ──────────────
+
+/**
+ * Netto-maandinkomen-drempel waarboven de FIRE-vuistregel het topschijf-tarief
+ * kiest. Historische proxy voor "bruto boven de één-na-laatste schijfgrens"
+ * (≈ €75.518 bruto, 2024). Bewust behouden als heuristiek — deze kaart corrigeert
+ * de tarieven per jaar, niet de heuristiek zelf. De exacte netto→bruto-inversie
+ * (grossFromNet) is een losse vervolgverbetering.
+ */
+export const MARGINAAL_TARIEF_NETTO_DREMPEL = 4200
+
+/**
+ * Bruto-jaarinkomensgrens waarboven het topschijf-tarief geldt, per belastingjaar
+ * uit BOX1_PARAMS: de bovengrens van de één-na-laatste schijf. Enige bron —
+ * vervangt de vroegere 2024-hardcode IB_SCHIJFGRENS (€75.518).
+ */
+export function schijfGrensVoor(year: Box1TaxYear = CURRENT_TAX_YEAR): number {
+  const schijven = BOX1_PARAMS[year].schijven
+  return schijven[schijven.length - 2]?.tot ?? 0
+}
+
+/**
+ * Marginaal IB-tarief via de FIRE-vuistregel, per belastingjaar afgeleid uit
+ * BOX1_PARAMS[year]. Laag = schijf-1-tarief, hoog = topschijf-tarief; de keuze
+ * volgt de netto-maandinkomen-drempel (MARGINAAL_TARIEF_NETTO_DREMPEL).
+ *
+ * Eén bron: vervangt de vroegere losse 2024-hardcodes 0,3697/0,4950 die door de
+ * hele app verspreid stonden. `year` default = CURRENT_TAX_YEAR (box3-data), zodat
+ * het tarief in lockstep beweegt met de jaarlijks vernieuwde beheer-parameters.
+ */
+export function deriveMarginaalTarief(opts: {
+  netMonthlyIncome?: number | null
+  year?: Box1TaxYear
+} = {}): number {
+  const schijven = BOX1_PARAMS[opts.year ?? CURRENT_TAX_YEAR].schijven
+  const laag = schijven[0].tarief
+  const hoog = schijven[schijven.length - 1].tarief
+  if (opts.netMonthlyIncome != null && opts.netMonthlyIncome > MARGINAAL_TARIEF_NETTO_DREMPEL) {
+    return hoog
+  }
+  return laag
 }
 
 // ── Netto → bruto inversie ───────────────────────────────────

@@ -3,7 +3,7 @@ import { section, formatCurrency, formatFreedomTime, formatPercentage } from './
 import { calculateFreedomTime } from '@/lib/format'
 import { computeBox1Tax, marginalRateAt } from '@/lib/box1-tax'
 import { loadPerspectiveBox3 } from '@/lib/household-tax'
-import { computeJaarruimte, resolvePensionFactorA } from '@/lib/jaarruimte'
+import { computeJaarruimte, resolvePensionFactorA, jaarruimteBesparing } from '@/lib/jaarruimte'
 import { getTaxDeadlines } from '@/lib/tax-calendar'
 import { hasBox2Relevance } from '@/lib/box2-relevance'
 
@@ -118,7 +118,6 @@ export async function buildTaxContext(supabase: SupabaseClient): Promise<string>
 
     // Box 1 — schat de heffing over het bruto inkomen.
     let box1Lines: string[] = []
-    let marginalRate = 0
     try {
       if (grossYearly > 0) {
         const box1 = computeBox1Tax({
@@ -126,7 +125,6 @@ export async function buildTaxContext(supabase: SupabaseClient): Promise<string>
           year: TAX_YEAR,
           dailyExpenses: dailyExpenses > 0 ? dailyExpenses : undefined,
         })
-        marginalRate = box1.marginalRate
         box1Lines = [
           'Box 1 (inkomen uit werk en woning):',
           `- Geschat bruto jaarinkomen: ${formatCurrency(grossYearly)} (afgeleid uit netto maandinkomen)`,
@@ -154,10 +152,11 @@ export async function buildTaxContext(supabase: SupabaseClient): Promise<string>
       if (grossYearly > 0) {
         const jr = computeJaarruimte(grossYearly, factorA, TAX_YEAR)
         if (jr.hasData && jr.jaarruimte > 0) {
-          // Besparing ≈ onbenutte ruimte × marginaal tarief (aftrek in Box 1).
-          const besparing = marginalRate > 0
-            ? Math.round(jr.jaarruimte * marginalRate)
-            : 0
+          // Besparing = marginaal-correct Box 1-belastingverschil van de volledige
+          // inleg (schijfovergangen + heffingskorting-afbouw) via de gedeelde
+          // `jaarruimteBesparing`-helper (ADR 0040/0041) — één bron met de schermen,
+          // niet de vlakke ruimte × marginaal.
+          const besparing = jaarruimteBesparing(grossYearly, jr.jaarruimte, TAX_YEAR)
           jaarruimteLines = [
             'Jaarruimte (aftrekbare lijfrente-/pensioeninleg):',
             `- Onbenutte ruimte ${TAX_YEAR}: ${formatCurrency(jr.jaarruimte)}`,

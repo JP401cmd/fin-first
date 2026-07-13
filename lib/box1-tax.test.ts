@@ -5,8 +5,12 @@ import {
   effectiveRateAt,
   schijftariefOp,
   grossFromNet,
+  deriveMarginaalTarief,
+  schijfGrensVoor,
+  MARGINAAL_TARIEF_NETTO_DREMPEL,
   BOX1_PARAMS,
 } from './box1-tax'
+import { CURRENT_TAX_YEAR } from './box3-data'
 
 describe('BOX1_PARAMS — constants', () => {
   it('heeft schijven voor 2025 en 2026', () => {
@@ -405,5 +409,52 @@ describe('BOX1_PARAMS 2025 — regressie (2024-waarden waren doorgeschoven)', ()
   it('AOW-korting-varianten 2025 aanwezig (AHK max €1.536, arbeidskorting max €2.802)', () => {
     expect(BOX1_PARAMS[2025].algemeneHeffingskortingAow.max).toBe(1_536)
     expect(BOX1_PARAMS[2025].arbeidskortingAow.max).toBe(2_802)
+  })
+})
+
+// ── Arch F1: marginaal-tarief vuistregel afgeleid uit BOX1_PARAMS ─────────────
+// Vervangt de vroegere 2024-hardcodes 0,3697/0,4950 en €75.518. De tarieven
+// worden per belastingjaar uit de schijven afgeleid; de laag/hoog-keuze volgt
+// de netto-maandinkomen-drempel.
+
+describe('schijfGrensVoor — topschijf-grens uit BOX1_PARAMS', () => {
+  it('2026 = €78.426 (bovengrens één-na-laatste schijf)', () => {
+    expect(schijfGrensVoor(2026)).toBe(78_426)
+  })
+  it('2025 = €76.817', () => {
+    expect(schijfGrensVoor(2025)).toBe(76_817)
+  })
+  it('default = lopend belastingjaar (CURRENT_TAX_YEAR)', () => {
+    expect(schijfGrensVoor()).toBe(schijfGrensVoor(CURRENT_TAX_YEAR))
+  })
+  it('is nooit de oude 2024-hardcode €75.518', () => {
+    expect(schijfGrensVoor(2026)).not.toBe(75_518)
+  })
+})
+
+describe('deriveMarginaalTarief — per jaar uit BOX1_PARAMS', () => {
+  it('2026 laag = schijf-1-tarief 35,75% (geen inkomen)', () => {
+    expect(deriveMarginaalTarief({ year: 2026 })).toBeCloseTo(0.3575, 4)
+  })
+  it('2026 hoog = topschijf 49,5% (netto boven de drempel)', () => {
+    expect(deriveMarginaalTarief({ year: 2026, netMonthlyIncome: 5000 })).toBeCloseTo(0.495, 4)
+  })
+  it('2025 laag = schijf-1-tarief 35,82%', () => {
+    expect(deriveMarginaalTarief({ year: 2025 })).toBeCloseTo(0.3582, 4)
+  })
+  it('laag ≠ de oude 2024-hardcode 0,3697', () => {
+    expect(deriveMarginaalTarief({ year: 2026 })).not.toBe(0.3697)
+  })
+  it('drempel: precies op de grens telt als laag, erboven als hoog', () => {
+    expect(deriveMarginaalTarief({ year: 2026, netMonthlyIncome: MARGINAAL_TARIEF_NETTO_DREMPEL })).toBeCloseTo(0.3575, 4)
+    expect(deriveMarginaalTarief({ year: 2026, netMonthlyIncome: MARGINAAL_TARIEF_NETTO_DREMPEL + 1 })).toBeCloseTo(0.495, 4)
+  })
+  it('null/0 inkomen → laag tarief (geen crash)', () => {
+    expect(deriveMarginaalTarief({ year: 2026, netMonthlyIncome: null })).toBeCloseTo(0.3575, 4)
+    expect(deriveMarginaalTarief({ year: 2026, netMonthlyIncome: 0 })).toBeCloseTo(0.3575, 4)
+  })
+  it('default jaar = CURRENT_TAX_YEAR', () => {
+    expect(deriveMarginaalTarief()).toBe(deriveMarginaalTarief({ year: CURRENT_TAX_YEAR }))
+    expect(deriveMarginaalTarief()).toBeCloseTo(BOX1_PARAMS[CURRENT_TAX_YEAR].schijven[0].tarief, 6)
   })
 })
