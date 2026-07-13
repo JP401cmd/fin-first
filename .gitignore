@@ -77,6 +77,9 @@ signin2.yaml
 # superpowers brainstorm visual-companion working dir (generated)
 .superpowers/
 
+# autoforge spec-tooling working dir (lokale assistent-settings/prompts) — nooit committen
+.autoforge/
+
 # ad-hoc root debug/probe scripts (login/signup probes, port killers, one-off
 # migration runners) — never commit; these have leaked service-role keys before.
 /.*.mjs
