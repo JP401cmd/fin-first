@@ -12,6 +12,8 @@ Eindigt een subagent voortijdig (limiet/fout) of zonder bruikbaar rapport: inven
 
 Verifieer bestandspad- en symboolverwijzingen in een agent-briefing vóór dispatch met een snelle Glob/grep — een stale pad kost de agent een zoekronde en kan een verificatie-opdracht ongeldig maken.
 
+Bouwt een agent-briefing op **statische review-bevindingen** (een eerder rapport, een audit-snapshot), formuleer elke fix dan als **verifieer-eerst** ("controleer of X nog ontbreekt; fix alleen dan") in plaats van "doe dit" — de codebase kan sinds de review veranderd zijn, en een blind uitgevoerde stale opdracht bouwt het defect juist ín (bv. een tweede hero stapelen op een pagina die de kop inmiddels al heeft).
+
 ## Voortgangsrapportage (verplicht)
 
 Houd de gebruiker doorlopend op de hoogte. Meld vóór elke stap in één à twee zinnen wat je gaat doen en welke agent(s) je inzet; meld na elke stap kort het resultaat (klaar / kernbevinding / blokkade) voordat je doorgaat. Duurt een stap naar verwachting langer dan ~5 minuten: draai de agent(s) met `run_in_background: true` en rapporteer tussentijds zodra een deelresultaat binnenkomt — laat nooit langer dan ~5 minuten stilte vallen. Stil doorwerken zonder updates is een fout, ook als het eindresultaat goed is.
