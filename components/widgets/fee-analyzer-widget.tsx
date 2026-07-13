@@ -75,7 +75,7 @@ export const FeeAnalyzerWidget = memo(function FeeAnalyzerWidget({ size, data, h
             </span>
           </div>
         </WidgetShell>
-        <FeeDetailModal open={showDetail} onClose={() => setShowDetail(false)} feeAnalysis={feeAnalysis} feeImpactMonths={feeImpactMonths} grossReturn={data.grossReturn} dailyExpenses={data.monthlyExpenses > 0 ? dailyExpenseRate(data.monthlyExpenses) : undefined} />
+        <FeeDetailModal open={showDetail} onClose={() => setShowDetail(false)} feeAnalysis={feeAnalysis} feeImpactMonths={feeImpactMonths} grossReturn={data.grossReturn} dailyExpenses={(data.dailyExpenseRate ?? (data.monthlyExpenses > 0 ? dailyExpenseRate(data.monthlyExpenses) : 0)) || undefined} />
       </>
     )
   }
@@ -104,7 +104,7 @@ export const FeeAnalyzerWidget = memo(function FeeAnalyzerWidget({ size, data, h
             </p>
           )}
         </WidgetShell>
-        <FeeDetailModal open={showDetail} onClose={() => setShowDetail(false)} feeAnalysis={feeAnalysis} feeImpactMonths={feeImpactMonths} grossReturn={data.grossReturn} dailyExpenses={data.monthlyExpenses > 0 ? dailyExpenseRate(data.monthlyExpenses) : undefined} />
+        <FeeDetailModal open={showDetail} onClose={() => setShowDetail(false)} feeAnalysis={feeAnalysis} feeImpactMonths={feeImpactMonths} grossReturn={data.grossReturn} dailyExpenses={(data.dailyExpenseRate ?? (data.monthlyExpenses > 0 ? dailyExpenseRate(data.monthlyExpenses) : 0)) || undefined} />
       </>
     )
   }
@@ -181,7 +181,7 @@ export const FeeAnalyzerWidget = memo(function FeeAnalyzerWidget({ size, data, h
             )}
           </div>
         </WidgetShell>
-        <FeeDetailModal open={showDetail} onClose={() => setShowDetail(false)} feeAnalysis={feeAnalysis} feeImpactMonths={feeImpactMonths} grossReturn={data.grossReturn} dailyExpenses={data.monthlyExpenses > 0 ? dailyExpenseRate(data.monthlyExpenses) : undefined} />
+        <FeeDetailModal open={showDetail} onClose={() => setShowDetail(false)} feeAnalysis={feeAnalysis} feeImpactMonths={feeImpactMonths} grossReturn={data.grossReturn} dailyExpenses={(data.dailyExpenseRate ?? (data.monthlyExpenses > 0 ? dailyExpenseRate(data.monthlyExpenses) : 0)) || undefined} />
       </>
     )
   }
@@ -267,7 +267,7 @@ export const FeeAnalyzerWidget = memo(function FeeAnalyzerWidget({ size, data, h
           </div>
         </div>
       </WidgetShell>
-      <FeeDetailModal open={showDetail} onClose={() => setShowDetail(false)} feeAnalysis={feeAnalysis} feeImpactMonths={feeImpactMonths} grossReturn={data.grossReturn} dailyExpenses={data.monthlyExpenses > 0 ? dailyExpenseRate(data.monthlyExpenses) : undefined} />
+      <FeeDetailModal open={showDetail} onClose={() => setShowDetail(false)} feeAnalysis={feeAnalysis} feeImpactMonths={feeImpactMonths} grossReturn={data.grossReturn} dailyExpenses={(data.dailyExpenseRate ?? (data.monthlyExpenses > 0 ? dailyExpenseRate(data.monthlyExpenses) : 0)) || undefined} />
     </>
   )
 })

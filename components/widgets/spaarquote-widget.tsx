@@ -100,7 +100,11 @@ export const SpaarquoteWidget = memo(function SpaarquoteWidget({ size, data, hre
     )
   }
 
-  const dailyExp = dailyExpenseRate(monthlyExpenses)
+  // Personal view: canoniek 12-mnd rolling dagtarief uit de bundel (KRUIS-20);
+  // override-perspectief houdt zijn eigen (perspectief-eigen) uitgavenniveau.
+  const dailyExp = overrides
+    ? dailyExpenseRate(monthlyExpenses)
+    : data.dailyExpenseRate ?? dailyExpenseRate(monthlyExpenses)
   const freedomTime = dailyExp > 0 && savings > 0
     ? calculateFreedomTime(savings, dailyExp)
     : null

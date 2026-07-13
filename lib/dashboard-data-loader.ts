@@ -43,6 +43,7 @@ import { computeConvergentieProjection, type ConvergentieRawProfileRow, type Con
 import { computeScalarFireProjection, computeScalarFireRange, computeScalarFreedomMilestones, type ScalarFireParams } from '@/lib/horizon-kernel/scalar-router'
 import { buildHorizonInput } from '@/lib/horizon/build-input'
 import { buildSimNetWorthRows } from '@/lib/horizon/networth-rows'
+import { clipRowsToPlanEnd } from '@/lib/horizon/clip-rows-to-plan-end'
 import type { RegelSimSnapshot } from '@/lib/future/regel-sim'
 import { resolvePotRules, POT_RULES_DEFAULTS, type PotRulesConfig } from '@/lib/pot-rules'
 import { computeRetirementExpenses, computeYearlyMustExpenses, type RetirementExpenseMethod, type BudgetRow, type ChildBudgetRow } from '@/lib/budget-utils'
@@ -63,6 +64,7 @@ import {
   type HousingStrategyConfig,
 } from '@/lib/housing-strategy'
 import { formatCurrency, calculateFreedomTime, formatFreedomTimeString, dailyExpenseRate } from '@/lib/format'
+import { recentDailyExpenseRateFromRows } from '@/lib/expense-rate'
 import { computeSovereigntyLevel, levelToPhaseId } from '@/lib/feature-phases'
 import { mergeWidgetPrefs, type WidgetSize } from '@/lib/widget-catalog'
 import { computePortfolioFees, computeFeeImpactOnFire } from '@/lib/fee-analysis'
@@ -79,7 +81,7 @@ import {
   type CategoryAppLink,
 } from '@/lib/category-app-nav'
 import { resolveEffectiveIncomeExpenses } from './effective-financials'
-import { resolveSavingsSource, savingsRateFromAggregates, computeDebtAflossingMonthly, monthlySavingsFromRate } from './savings-source'
+import { resolveSavingsSource, savingsRateFromAggregates, computeSavingsRate6m, computeDebtAflossingMonthly, monthlySavingsFromRate } from './savings-source'
 import { buildHealthScoreInput } from '@/lib/health-score-input'
 import { computeHealthScoreWithTrend, type HealthScore } from '@/lib/financial-health'
 
@@ -207,7 +209,18 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // lookupAowAge altijd naar 67 fallbackte en de FIRE-projectie fout was voor iedereen met
   // AOW ≠ 67. Log expliciet zodat een volgende naamfout niet onopgemerkt blijft.
   if (aowResult.error) {
-    console.error('[dashboard-data-loader] AOW-leeftijd query faalde — projectie valt terug op standaard AOW-leeftijd:', aowResult.error)
+    // Expliciete velden loggen: een fetch-TypeError serialiseert als '{}' en
+    // maakte de log onbruikbaar (transient netwerk/HMR vs. echte query-fout
+    // niet te onderscheiden). Tabel + RLS live geverifieerd gezond (13 jul
+    // 2026, 15 rijen, authenticated-select ok) — een lege message duidt op
+    // een transient fetch-abort, geen schema-/policy-fout.
+    const e = aowResult.error as { message?: string; code?: string; details?: string }
+    console.error(
+      '[dashboard-data-loader] AOW-leeftijd query faalde — projectie valt terug op standaard AOW-leeftijd:',
+      e.message || String(aowResult.error),
+      e.code ?? '',
+      e.details ?? '',
+    )
   }
 
   // ── Derive budget subsets from single query (was 4 queries) ──
@@ -538,25 +551,31 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       (now.getMonth() - earliest.getMonth())
     ))
   }
-  const extIncome6 = dataMonths6 < 6 ? (income6m / dataMonths6) * 6 : income6m
-  const extExpenses6 = dataMonths6 < 6 ? (expenses6m / dataMonths6) * 6 : expenses6m
-  const extSavingsBudget6 = dataMonths6 < 6 ? (savingsBudgetSpent6m / dataMonths6) * 6 : savingsBudgetSpent6m
 
   // Compute debt aflossing total (only active debts with include_aflossing_in_savings,
   // weighted by net_worth_inclusion_pct) — gedeelde canonieke helper.
   const debtAflossingMonthly = computeDebtAflossingMonthly((debtsResult.data ?? []) as unknown as Debt[])
   const debtAflossing6m = debtAflossingMonthly * 6
 
-  // Spaarbudgetten tellen als sparen (niet als uitgave) → uit de uitgaven-term
-  // halen zodat de gedeelde formule (income − expenses + aflossing) byte-gelijk
-  // blijft aan de oude inline-versie (income − expenses + savingsBudget + aflossing).
-  let savingsRate6m = savingsRateFromAggregates(extIncome6, extExpenses6 - extSavingsBudget6, debtAflossing6m)
-
-  // Fallback savings rate from profile estimates for users without transactions
-  const savingsRateIsEstimate = savingsRate6m === 0
-  if (savingsRate6m === 0 && effectiveMonthlyIncome > 0 && effectiveMonthlyExpenses > 0) {
-    savingsRate6m = Math.round(((effectiveMonthlyIncome - effectiveMonthlyExpenses) / effectiveMonthlyIncome) * 100)
-  }
+  // Canonieke 6-maands spaarquote — gedeelde helper (extrapolatie <6m data +
+  // savingsRateFromAggregates + profiel-fallback). Spaarbudgetten tellen als sparen
+  // (uit de uitgaven-term), schuldaflossing erbij. Byte-identiek aan de vroegere
+  // inline-versie; nu single-sourced met horizon/core/lever-scores. `isEstimate`
+  // = aggregaat gaf 0 (vóór profiel-fallback) → stuurt de net-worth-delta-fallback
+  // + het inkomen-anker (extIncome6/6 vs. effectiveMonthlyIncome).
+  const savings6m = computeSavingsRate6m({
+    income6m,
+    expenses6m,
+    savingsBudgetSpent6m,
+    debtAflossing6m,
+    dataMonths: dataMonths6,
+    fallbackMonthlyIncome: effectiveMonthlyIncome,
+    fallbackMonthlyExpenses: effectiveMonthlyExpenses,
+  })
+  const extIncome6 = savings6m.extIncome6
+  const extSavingsBudget6 = savings6m.extSavingsBudget6
+  const savingsRateIsEstimate = savings6m.isEstimate
+  let savingsRate6m = savings6m.savingsRate6m
 
   // Try net-worth-delta method when still on estimate and snapshots are available
   // (matches core-data-loader fallback for consistency)
@@ -717,6 +736,10 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // Prognose!J@FIRE). Puur uit de sim (requiredFireNetWorth via de kernel-bridge), geen eigen som.
   let simRequiredNetWorth: number | null = null
   let simFireAgeFractional: number | null = null
+  // Kernel-eindleeftijd (SimResult.displayEndAge = solve.eindleeftijd): bij deplete/legacy
+  // = plan-eindleeftijd (fire_end_age), bij perpetual/pensioen = horizon-cap 100. Dit is de
+  // leeftijd die /horizon als aslabel toont; widgets consumeren 'm i.p.v. een hardcoded 90.
+  let simDisplayEndAge: number | null = null
   // Snapshot voor de /toekomst Voorkeuren-bewerkschermen (regel-sim baseline = Tijdas-curve).
   let regelSimSnapshot: RegelSimSnapshot | null = null
   if (dob && netWorth > 0) {
@@ -784,7 +807,14 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
         if (outcome.ok) {
           const unifiedResult = outcome.result
           const simResult = toSimResult(unifiedResult)
-          simRows = simResult.rows.map(r => ({
+          // Kernel-eindleeftijd voor het weergavelabel + clip-grens (spiegel van
+          // horizon-client.tsx `displaySimRows`).
+          simDisplayEndAge = simResult.displayEndAge
+          // Weergave-clip t/m eindleeftijd − 1 (besluit 4 juli 2026: het laatste levensjaar
+          // is terminale modelmarge en hoort niet in beeld). Zonder deze clip toonde de
+          // /overzicht-widget één jaar méér dan de canonieke /horizon-pagina. clipRowsToPlanEnd
+          // is puur/idempotent; simNetWorthRows erft de clip (bouwt hierop voort).
+          simRows = clipRowsToPlanEnd(simResult.rows, simResult.displayEndAge).map(r => ({
             age: r.age,
             endPortfolio: r.endPortfolio,
             phase: r.phase,
@@ -823,6 +853,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       simRequiredPortfolio = null
       simRequiredNetWorth = null
       simFireAgeFractional = null
+      simDisplayEndAge = null
     }
   }
 
@@ -925,10 +956,27 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       }
     })
 
-  // Daily expenses for freedom-time calculations (canonieke jaar/365-dagbasis
-  // via dailyExpenseRate). Widgets rekenen ditzelfde tarief af met de gedeelde
-  // helper op hun in-scope maanduitgaven (personal of perspectief-override).
-  const dailyExpenses = dailyExpenseRate(effectiveMonthlyExpenses)
+  // Canoniek dagtarief (€/dag) voor de €→vrijheidstijd-conversies. Grondslag =
+  // 12-mnd rolling gemiddelde van de RUWE negatieve transacties (zelfde basis als
+  // balans/budget/vermogen-rapport en de sidebar), via de gedeelde bron
+  // `lib/expense-rate.ts` — NIET langer de losse huidige kalendermaand, die per
+  // maand kon uitschieten en hetzelfde bedrag een andere vrijheidstijd gaf dan de
+  // rapporten (KRUIS-20). `expenseTx12Result` is al het 12-mnd venster; bewust
+  // ZONDER isRealTx-filter zodat de basis identiek is aan de rapport-routes.
+  // Fallback naar de maand-schatting voor gebruikers zonder transacties.
+  const recentExpenseRate = recentDailyExpenseRateFromRows(
+    (expenseTx12Result.data ?? []) as { amount: number; date: string }[],
+    now,
+    effectiveMonthlyExpenses,
+  )
+  const dailyExpenses = recentExpenseRate.dailyRate
+  // Canoniek 12-mnd rolling MAANDbedrag uit exact dezelfde bron/berekening als
+  // dailyExpenses (recentExpenseRate) — één berekening, twee eenheden (€/dag én
+  // €/mnd), dus per constructie dailyExpenses === dailyExpenseRate(recentMonthlyExpenses).
+  // De briefing-hero rekent op maandbasis en consumeert dít i.p.v. de losse
+  // huidige-kalendermaand-som (`monthlyExpenses`), die vroeg in de maand naar ~0
+  // kon uitschieten en een absurd hoog vrijheidstotaal gaf (KRUIS-17).
+  const recentMonthlyExpenses = recentExpenseRate.monthlyExpenses
 
   // Vermogensgroei deze maand (net cash flow this month: income - expenses)
   const monthlyGrowth = effectiveMonthlyIncome - effectiveMonthlyExpenses
@@ -1904,7 +1952,10 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       const balance = Number(mortgageDebt.current_balance)
       const rente = Number((mortgageDebt as { interest_rate?: number | null }).interest_rate ?? 0)
       const isTaxDeductible = (mortgageDebt as { is_tax_deductible?: boolean }).is_tax_deductible ?? false
-      const marginaalTarief = Number((profileResult.data as Record<string, unknown> | null)?.marginaal_tarief ?? 0.3697)
+      // Canonieke bundelwaarde (resolveFireParams): respecteert een expliciete
+      // profiel-override én leidt anders per belastingjaar af uit BOX1_PARAMS —
+      // geen losse 2024-hardcode meer, geen tweede afleiding uit de ruwe kolom.
+      const marginaalTarief = fireParams.marginaalTarief
       const rawRepType = (mortgageDebt as { repayment_type?: string | null }).repayment_type
       const repaymentType: RepaymentType = rawRepType === 'lineair' ? 'linear'
         : rawRepType === 'aflossingsvrij' ? 'interest_only'
@@ -1987,6 +2038,14 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     totalDebts,
     monthlyIncome: effectiveMonthlyIncome,
     monthlyExpenses: effectiveMonthlyExpenses,
+    // Canoniek 12-mnd rolling dagtarief (€/dag) — widgets consumeren dit i.p.v.
+    // zelf dailyExpenseRate(monthlyExpenses) op de losse maand te rekenen, zodat
+    // hetzelfde bedrag overal dezelfde vrijheidstijd geeft (KRUIS-20).
+    dailyExpenseRate: dailyExpenses,
+    // Zelfde canonieke rolling-bron, maar in €/mnd — de briefing-hero (maand-
+    // gebaseerd) consumeert dit i.p.v. de losse huidige-kalendermaand-som,
+    // zodat het weektotaal overeenkomt met sidebar/balans (KRUIS-17).
+    recentMonthlyExpenses,
     monthlyContributions,
     yearlyMustExpenses,
     budgetTotals,
@@ -2045,6 +2104,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     // bron voor mijlpaal-datums in de widgets.
     freedomMilestones,
     simRows,
+    displayEndAge: simDisplayEndAge,
     simNetWorthRows,
     simRequiredPortfolio,
     simRequiredNetWorth,

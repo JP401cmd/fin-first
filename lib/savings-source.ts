@@ -101,6 +101,87 @@ export function monthlySavingsFromRate(monthlyIncome: number, savingsRatePct: nu
   return monthlyIncome * (savingsRatePct / 100)
 }
 
+/**
+ * Ruwe 6-maands aggregaten waaruit de canonieke spaarquote volgt. De loaders
+ * (dashboard/horizon/core/lever-scores) leveren deze uit hun eigen queries; de
+ * extrapolatie + `savingsRateFromAggregates` + profiel-fallback wonen HIER, zodat
+ * er niet vier onderling-driftende kopieën van dat staartstuk bestaan.
+ */
+export interface SavingsRate6mAggregates {
+  /** Ruwe (of <6m) inkomsten uit transacties — transfer-gefilterd. */
+  income6m: number
+  /** Ruwe (of <6m) uitgaven, absoluut — transfer-gefilterd. */
+  expenses6m: number
+  /** 6-maands stortingen op spaarbudgetten (telt als sparen, niet als uitgave). */
+  savingsBudgetSpent6m: number
+  /** 6-maands schuldaflossing (`computeDebtAflossingMonthly` × 6). */
+  debtAflossing6m: number
+  /** Aantal maanden werkelijke data (1–6) voor extrapolatie bij <6m historie. */
+  dataMonths: number
+  /**
+   * Profiel-fallback bij een transactieloze gebruiker (aggregaat-quote = 0):
+   * `(inkomen − uitgaven) / inkomen`, afgerond. Beide moeten > 0 zijn, anders
+   * geen fallback. Optioneel — laat weg om GEEN profiel-fallback toe te passen
+   * (dan blijft de quote de aggregaat-uitkomst, bv. de lichte sidebar-loader die
+   * bij ontbrekende transactie-inkomsten bewust `null` toont).
+   */
+  fallbackMonthlyIncome?: number
+  fallbackMonthlyExpenses?: number
+}
+
+export interface SavingsRate6mResult {
+  /** Spaarquote (%) — 6-maands, incl. spaarbudget/aflossing-correctie + fallback. */
+  savingsRate6m: number
+  /**
+   * De aggregaat-formule gaf 0 (geen bruikbare transactie-inkomsten) → true. Callers
+   * gebruiken dit om een verdere fallback (net-worth-delta) te triggeren én om te
+   * weten of het inkomen-anker het 6m-gemiddelde of het profiel-inkomen is.
+   */
+  isEstimate: boolean
+  /** Geëxtrapoleerde 6m-inkomsten (= income6m bij ≥6m data). */
+  extIncome6: number
+  /** Geëxtrapoleerde 6m-uitgaven. */
+  extExpenses6: number
+  /** Geëxtrapoleerde 6m-spaarbudget-stortingen. */
+  extSavingsBudget6: number
+}
+
+/**
+ * Canonieke 6-maands spaarquote (%). Ééns geëxtraheerd uit de vier loaders die
+ * dit staartstuk inline dupliceerden (dashboard/horizon/core/lever-scores):
+ *   1. extrapoleer <6m data naar een 6-maands basis,
+ *   2. `savingsRateFromAggregates(extInkomen, extUitgaven − extSpaarbudget, extAflossing)`,
+ *   3. optionele profiel-fallback bij aggregaat = 0.
+ *
+ * Byte-identiek aan de vroegere inline-versies; verving GEEN semantiek, alleen de
+ * plaats waar de formule woont ("consume, don't recompute").
+ */
+export function computeSavingsRate6m(agg: SavingsRate6mAggregates): SavingsRate6mResult {
+  const dataMonths = Math.max(1, Math.min(6, agg.dataMonths))
+  const extIncome6 = dataMonths < 6 ? (agg.income6m / dataMonths) * 6 : agg.income6m
+  const extExpenses6 = dataMonths < 6 ? (agg.expenses6m / dataMonths) * 6 : agg.expenses6m
+  const extSavingsBudget6 =
+    dataMonths < 6 ? (agg.savingsBudgetSpent6m / dataMonths) * 6 : agg.savingsBudgetSpent6m
+
+  const rate = savingsRateFromAggregates(extIncome6, extExpenses6 - extSavingsBudget6, agg.debtAflossing6m)
+  const isEstimate = rate === 0
+
+  let savingsRate6m = rate
+  if (
+    rate === 0 &&
+    agg.fallbackMonthlyIncome != null &&
+    agg.fallbackMonthlyIncome > 0 &&
+    agg.fallbackMonthlyExpenses != null &&
+    agg.fallbackMonthlyExpenses > 0
+  ) {
+    savingsRate6m = Math.round(
+      ((agg.fallbackMonthlyIncome - agg.fallbackMonthlyExpenses) / agg.fallbackMonthlyIncome) * 100,
+    )
+  }
+
+  return { savingsRate6m, isEstimate, extIncome6, extExpenses6, extSavingsBudget6 }
+}
+
 export function resolveSavingsSource(input: SavingsSourceInput): SavingsSource {
   const incomeManual = input.incomeSource === 'manual' && input.netMonthlyIncome > 0
   const effectiveAnnualIncome = incomeManual

@@ -32,7 +32,8 @@ export const HoldingsWidget = memo(function HoldingsWidget({ size, data, href }:
   const investmentProportion = totalAllAssets > 0 ? totalInvestments / totalAllAssets : 0
   const investmentContributions = Math.round(monthlyContributions * investmentProportion)
 
-  const dailyExp = dailyExpenseRate(monthlyExpenses)
+  // Canoniek 12-mnd rolling dagtarief uit de bundel (KRUIS-20); fallback voor mocks.
+  const dailyExp = data.dailyExpenseRate ?? dailyExpenseRate(monthlyExpenses)
   const ft = dailyExp > 0 && totalInvestments > 0 ? calculateFreedomTime(totalInvestments, dailyExp) : null
   const ftStr = ft ? formatFreedomTimeString(ft, 'short') : null
 

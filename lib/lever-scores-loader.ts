@@ -31,9 +31,16 @@ import {
 import { box1JaarruimteStatus } from '@/lib/jaarruimte'
 import { resolveEffectiveIncomeExpenses } from '@/lib/effective-financials'
 import { resolveFireParams } from '@/lib/fire-params'
+import { computeSavingsRate6m, computeDebtAflossingMonthly } from '@/lib/savings-source'
+import { localMonthStartMonthsAgo } from '@/lib/month-range'
+import type { Debt } from '@/lib/debt-data'
 import type { LeverageStatus } from '@/lib/leverage-status'
 import type { Perspective } from '@/lib/household-data'
 import { loadPerspectiveDataServer } from '@/lib/household/perspective-loader-server'
+
+/** Filter own-account transfers uit inkomen/uitgaven (spiegelt de dashboard-loader). */
+const isRealTx = (t: { transaction_type?: string | null }) =>
+  t.transaction_type !== 'transfer' && t.transaction_type !== 'joint_transfer'
 
 /** Resultaat van de gedeelde lever-scores-loader. */
 export interface LeverScoresResult {
@@ -95,15 +102,29 @@ type DebtRow = {
   original_amount?: number | string | null
   net_worth_inclusion_pct?: number | null
 }
-type BudgetHealthRow = { id: string; default_limit: number; budget_type: string }
+type BudgetRow = {
+  id: string
+  default_limit: number
+  budget_type: string
+  parent_id: string | null
+  is_archived: boolean
+}
 type BudgetTxRow = { budget_id: string; amount: number | string }
+type Tx6mRow = {
+  amount: number | string
+  budget_id?: string | null
+  transaction_type?: string | null
+  date: string
+}
 
 /**
  * Laad de vier-hefbomen-scores + de Box 1/3-statussen voor de huidige gebruiker.
  *
- * Behaviour-preserving t.o.v. de oude inline-berekening in app/(app)/layout.tsx:
- * dezelfde queries (assets/debts/3m-transacties/budget-health/maand-budget-tx +
- * maand-inkomen), dezelfde input-assemblage en dezelfde pure helpers
+ * Queries: assets/debts/6m-transacties (canonieke spaarquote)/alle-budgetten/
+ * maand-budget-tx/maand-inkomen + vroegste-inkomen (extrapolatie). De cashflow-
+ * hefboom consumeert de canonieke 6-maands spaarquote (`computeSavingsRate6m` →
+ * `savingsRateFromAggregates`), identiek aan het cashflow-instellingenblok en de
+ * gezondheidsscore; de overige velden gebruiken dezelfde pure helpers
  * (`computeLeverScores`, `box3TaxStatus`, `box1JaarruimteStatus`).
  *
  * @param supabase    Server-client (RLS-gescoped op de ingelogde gebruiker).
@@ -136,11 +157,6 @@ export const loadLeverScores = cache(async function loadLeverScores(
     return { scores: empty, taxInput, box3Status: 'neutral', box1Status: 'neutral', netWorth: 0, budgetsOver: 0 }
   }
 
-  // 3-maands-venster voor de spaarquote (identiek aan de shell).
-  const threeMonthsAgo = new Date()
-  threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
-  const txWindowStart = threeMonthsAgo.toISOString().split('T')[0]
-
   // Huidige-maand-grenzen (UTC) voor budget-health en het maand-inkomen — exact
   // dezelfde grenzen als de shell, zodat de afgeleide statussen 1-op-1 matchen.
   const now = new Date()
@@ -151,15 +167,25 @@ export const loadLeverScores = cache(async function loadLeverScores(
     .toISOString()
     .split('T')[0]
 
+  // 6-maands-venster voor de CANONIEKE spaarquote (identiek aan de dashboard-loader:
+  // `localMonthStartMonthsAgo(now, 5)` = de 1e van 5 maanden terug ⇒ 6 kalendermaanden
+  // incl. de huidige). Het 12-maands-venster levert de vroegste inkomens-datum voor
+  // de extrapolatie bij <6 maanden historie. Voorheen rekende deze loader een eigen
+  // 3-maands quote met een tekenfout (uitgaven negatief zonder Math.abs) → 164%
+  // i.p.v. de canonieke ~50% (KRUIS-06).
+  const sixMonthsAgo = localMonthStartMonthsAgo(now, 5)
+  const twelveMonthsAgo = localMonthStartMonthsAgo(now, 11)
+
   const [
     profileRes,
     assetsRes,
     debtsRes,
-    txRes,
-    budgetHealthRes,
+    tx6mRes,
+    budgetsRes,
     budgetTxRes,
     monthIncomeTxRes,
     bankAccountsRes,
+    earliestIncomeRes,
   ] = await Promise.all([
     supabase
       .from('profiles')
@@ -173,23 +199,30 @@ export const loadLeverScores = cache(async function loadLeverScores(
       .select('current_value, asset_type, net_worth_inclusion_pct')
       .eq('user_id', user.id)
       .eq('is_active', true),
+    // select('*') zodat computeDebtAflossingMonthly de aflossing-velden
+    // (include_aflossing_in_savings, custom_aflossing_amount, rente/looptijd) heeft —
+    // de spaarquote telt schuldaflossing als sparen (identiek aan dashboard/core).
     supabase
       .from('debts')
-      .select('current_balance, original_amount, net_worth_inclusion_pct')
+      .select('*')
       .eq('user_id', user.id)
       .eq('is_active', true),
+    // 6-maands transacties voor de canonieke spaarquote (transfer-gefilterd via
+    // transaction_type; spaarbudget-correctie via budget_id). Vervangt de vroegere
+    // 3-maands `amount, is_income`-query met de tekenfout.
     supabase
       .from('transactions')
-      .select('amount, is_income')
+      .select('amount, budget_id, transaction_type, date')
       .eq('user_id', user.id)
-      .gte('date', txWindowStart),
+      .gte('date', sixMonthsAgo)
+      .lt('date', monthEnd),
+    // Alle budgetten (parent + child) — de budget-health-subset (budgetsOver) filtert
+    // hieruit de top-level expense/savings-budgetten; de spaarbudget-ID-set (incl.
+    // kinderen) voedt de spaarquote-correctie.
     supabase
       .from('budgets')
-      .select('id, default_limit, budget_type')
-      .eq('user_id', user.id)
-      .is('parent_id', null)
-      .in('budget_type', ['expense', 'savings'])
-      .eq('is_archived', false),
+      .select('id, default_limit, budget_type, parent_id, is_archived')
+      .eq('user_id', user.id),
     supabase
       .from('transactions')
       .select('budget_id, amount')
@@ -212,6 +245,16 @@ export const loadLeverScores = cache(async function loadLeverScores(
       .select('balance')
       .eq('is_active', true)
       .is('linked_asset_id', null),
+    // Vroegste inkomens-transactie in het 12-maands venster → aantal maanden data
+    // voor de spaarquote-extrapolatie bij <6 maanden historie (identiek aan dashboard).
+    supabase
+      .from('transactions')
+      .select('date')
+      .eq('user_id', user.id)
+      .gt('amount', 0)
+      .gte('date', twelveMonthsAgo)
+      .order('date', { ascending: true })
+      .limit(1),
   ])
 
   const profile = (profileRes.data ?? {}) as LeverScoresProfile
@@ -272,22 +315,83 @@ export const loadLeverScores = cache(async function loadLeverScores(
   }
   const netWorth = perspectiveTotalAssets - perspectiveTotalDebts
 
-  // ── Spaarquote (3 maanden) ──
-  const txData = (txRes.data ?? []) as Array<{ amount: number | string; is_income: boolean }>
-  const txIncome = txData
-    .filter((t) => t.is_income)
-    .reduce((s, t) => s + Number(t.amount), 0)
-  const txExpense = txData
-    .filter((t) => !t.is_income)
-    .reduce((s, t) => s + Number(t.amount), 0)
-  const savingsRate3m = txIncome > 0 ? ((txIncome - txExpense) / txIncome) * 100 : null
+  // ── Budgetten: type-map (parent+child) + spaarbudget-ID-set ──
+  // Transacties hangen aan child-budgetten, dus de spaarbudget-correctie op de
+  // spaarquote heeft de child-IDs nodig (child erft het type van zijn parent).
+  const allBudgets = (budgetsRes.data ?? []) as BudgetRow[]
+  const budgetTypeById = new Map<string, string>()
+  for (const b of allBudgets) if (b.parent_id === null) budgetTypeById.set(b.id, b.budget_type)
+  for (const b of allBudgets) {
+    if (b.parent_id !== null) {
+      const parentType = budgetTypeById.get(b.parent_id)
+      if (parentType) budgetTypeById.set(b.id, parentType)
+    }
+  }
+  const savingsBudgetIds = new Set<string>()
+  for (const [id, type] of budgetTypeById) if (type === 'savings') savingsBudgetIds.add(id)
+
+  // ── Spaarquote (canoniek 6-maands — gedeelde helper) ──
+  // Consume, don't recompute: dezelfde grondslag als het cashflow-instellingenblok
+  // en de gezondheidsscore (savingsRateFromAggregates via computeSavingsRate6m):
+  // transfer-gefilterd, spaarbudget-stortingen + schuldaflossing tellen als sparen,
+  // <6m data geëxtrapoleerd. GEEN profiel-fallback hier (net als de oude 3-maands
+  // variant): zonder transactie-inkomen blijft de quote `null` zodat de cashflow-
+  // hefboom "onvoldoende data" toont i.p.v. een getal.
+  const tx6m = (tx6mRes.data ?? []) as Tx6mRow[]
+  let income6m = 0
+  let expenses6m = 0
+  let savingsBudgetSpent6m = 0
+  for (const t of tx6m) {
+    if (!isRealTx(t)) continue
+    const amt = Number(t.amount)
+    if (amt > 0) {
+      income6m += amt
+      continue
+    }
+    const abs = Math.abs(amt)
+    expenses6m += abs
+    if (t.budget_id && savingsBudgetIds.has(t.budget_id)) savingsBudgetSpent6m += abs
+  }
+  const debtAflossing6m = computeDebtAflossingMonthly(debtRows as unknown as Debt[]) * 6
+
+  let savingsDataMonths = 6
+  const earliestIncomeDate = earliestIncomeRes.data?.[0]?.date
+  if (earliestIncomeDate) {
+    const earliest = new Date(earliestIncomeDate)
+    savingsDataMonths = Math.max(
+      1,
+      Math.min(
+        6,
+        (now.getFullYear() - earliest.getFullYear()) * 12 + (now.getMonth() - earliest.getMonth()),
+      ),
+    )
+  }
+
+  const savingsRate: number | null =
+    income6m > 0
+      ? computeSavingsRate6m({
+          income6m,
+          expenses6m,
+          savingsBudgetSpent6m,
+          debtAflossing6m,
+          dataMonths: savingsDataMonths,
+        }).savingsRate6m
+      : null
 
   // ── Box 3-belast-vermogen-signaal (gedeelde helper) ──
   const householdType = (profile.household_type as string | undefined) ?? undefined
   const taxInput = computeBox3TaxableInput(assetRows, debtRows, householdType)
 
   // ── Budget-health (kompas cashflow-indicator) ──
-  const healthBudgets = (budgetHealthRes.data ?? []) as BudgetHealthRow[]
+  // Top-level expense/savings-budgetten die deze maand OVER de limiet zitten. Filter
+  // byte-identiek aan de vroegere query (parent_id IS NULL · budget_type ∈
+  // {expense,savings} · is_archived = false).
+  const healthBudgets = allBudgets.filter(
+    (b) =>
+      b.parent_id === null &&
+      (b.budget_type === 'expense' || b.budget_type === 'savings') &&
+      b.is_archived === false,
+  )
   const budgetTxRows = (budgetTxRes.data ?? []) as BudgetTxRow[]
   const spendPerBudget = new Map<string, number>()
   for (const tx of budgetTxRows) {
@@ -310,7 +414,7 @@ export const loadLeverScores = cache(async function loadLeverScores(
     totalOriginalDebts,
     debtCount: debtRows.length,
     assetTypeCount: assetTypeSet.size,
-    savingsRate: savingsRate3m,
+    savingsRate,
     box3TaxableAboveThreshold: taxInput.box3TaxableAboveThreshold,
     hasBox3Assets: taxInput.hasBox3Assets,
     householdType,

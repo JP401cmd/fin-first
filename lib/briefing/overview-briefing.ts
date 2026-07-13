@@ -225,9 +225,15 @@ export async function loadAndComposeOverviewBriefing(
   const currentNetWorth =
     (horizonData?.healthScoreInput?.totalAssets ?? 0) -
     (horizonData?.healthScoreInput?.totalDebts ?? 0)
+  // Canoniek 12-mnd rolling maandbedrag (zelfde bron als het app-brede dagtarief),
+  // NIET de losse huidige-kalendermaand-som — die gaf een onmogelijk hoog
+  // vrijheidstotaal in de handmatige ververs (KRUIS-17). Fallback op
+  // monthlyExpenses voor bundels zonder het veld.
   const total = computeFreedomTotal(
     currentNetWorth,
-    dashboardResult.dashboardData.monthlyExpenses ?? 0,
+    dashboardResult.dashboardData.recentMonthlyExpenses ??
+      dashboardResult.dashboardData.monthlyExpenses ??
+      0,
   )
   return {
     entries,

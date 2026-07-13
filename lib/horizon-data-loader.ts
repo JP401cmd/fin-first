@@ -48,7 +48,7 @@ import { parseToekomstScenarioPrefs, type ToekomstScenarioPrefs } from '@/lib/ho
 import { loadPerspectiveDataServer } from '@/lib/household/perspective-loader-server'
 import type { Perspective } from '@/lib/household-data'
 import { resolveEffectiveIncomeExpenses } from './effective-financials'
-import { resolveSavingsSource, savingsRateFromAggregates, computeDebtAflossingMonthly } from './savings-source'
+import { resolveSavingsSource, computeSavingsRate6m, computeDebtAflossingMonthly } from './savings-source'
 import {
   buildHealthScoreInput,
   type HealthScoreAsset,
@@ -608,7 +608,10 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
   const debtAflossingMonthly = computeDebtAflossingMonthly((fullDebtsResult.data ?? []) as unknown as Debt[])
   const debtAflossing6m = debtAflossingMonthly * 6
 
-  // Extrapolate when < 6 months of data
+  // Canonieke 6-maands spaarquote — gedeelde helper (extrapolatie <6m data +
+  // savingsRateFromAggregates + profiel-fallback). Spaarbudgetten tellen als sparen
+  // (uit de uitgaven-term), schuldaflossing erbij. Byte-identiek aan de vroegere
+  // inline-versie; nu single-sourced met dashboard/core/lever-scores.
   let dataMonths6 = 6
   const earliestIncomeDateH = earliestIncomeResult.data?.[0]?.date
   if (earliestIncomeDateH) {
@@ -618,19 +621,15 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
       (now.getMonth() - earliest.getMonth())
     ))
   }
-  const extIncome6 = dataMonths6 < 6 ? (income6m / dataMonths6) * 6 : income6m
-  const extExpenses6 = dataMonths6 < 6 ? (expenses6m / dataMonths6) * 6 : expenses6m
-  const extSavingsBudget6 = dataMonths6 < 6 ? (savingsBudgetSpent6m / dataMonths6) * 6 : savingsBudgetSpent6m
-
-  // Spaarbudgetten tellen als sparen → uit de uitgaven-term halen zodat de
-  // gedeelde formule (income − expenses + aflossing) byte-gelijk blijft aan de
-  // oude inline-versie (income − expenses + savingsBudget + aflossing).
-  let savingsRate6m = savingsRateFromAggregates(extIncome6, extExpenses6 - extSavingsBudget6, debtAflossing6m)
-
-  // Fallback savings rate from profile estimates for users without transactions
-  if (savingsRate6m === 0 && effectiveMonthlyIncome > 0 && effectiveMonthlyExpenses > 0) {
-    savingsRate6m = Math.round(((effectiveMonthlyIncome - effectiveMonthlyExpenses) / effectiveMonthlyIncome) * 100)
-  }
+  const { savingsRate6m, extSavingsBudget6 } = computeSavingsRate6m({
+    income6m,
+    expenses6m,
+    savingsBudgetSpent6m,
+    debtAflossing6m,
+    dataMonths: dataMonths6,
+    fallbackMonthlyIncome: effectiveMonthlyIncome,
+    fallbackMonthlyExpenses: effectiveMonthlyExpenses,
+  })
 
   // Canonieke spaarbron voor de FIRE-prognose: inkomen × spaarquote, exact zoals
   // het instellingenblok onderaan /overzicht/cashflow het toont (berekend óf

@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { localMonthStartMonthsAgo } from '@/lib/month-range'
+import { recentDailyExpenseRateFromRows } from '@/lib/expense-rate'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -134,7 +135,12 @@ export async function GET(request: Request) {
       supabase
         .from('bank_accounts')
         .select('id, name, account_type, balance, is_active')
-        .eq('is_active', true),
+        .eq('is_active', true)
+        // Sluit companion-rekeningen uit die al als cash-asset (asset_type
+        // 'cash', via linked_asset_id) in de activa-telling zitten — anders
+        // dubbelt elke gekoppelde bankrekening. Spiegelt de canonieke loaders
+        // (dashboard-data-loader / core-data-loader).
+        .is('linked_asset_id', null),
       supabase
         .from('profiles')
         .select('full_name')
@@ -275,21 +281,11 @@ export async function GET(request: Request) {
       : null
 
     // ── Daily expense rate ───────────────────────────────────────────────────
-
-    let dailyExpenseRate = 0
-    if (expenses.length > 0) {
-      const totalExpenses = expenses.reduce((sum, tx) => sum + Math.abs(Number(tx.amount)), 0)
-      const dates = expenses.map(tx => new Date(tx.date).getTime())
-      const earliest = new Date(Math.min(...dates))
-      const refDate = new Date(date)
-      let dataMonths = Math.max(1,
-        (refDate.getFullYear() - earliest.getFullYear()) * 12 +
-        (refDate.getMonth() - earliest.getMonth()) + 1
-      )
-      dataMonths = Math.min(dataMonths, 12)
-      const monthlyExpenses = totalExpenses / dataMonths
-      dailyExpenseRate = (monthlyExpenses * 12) / 365
-    }
+    // Canoniek dagtarief (€/dag) via de gedeelde bron `lib/expense-rate.ts` —
+    // `expenses` is al het 12-mnd rolling venster. Balans, budget-, vermogen- en
+    // cashflow-rapport, dashboard-widgets en de sidebar delen zo één grondslag,
+    // zodat hetzelfde bedrag overal dezelfde vrijheidstijd geeft (KRUIS-20).
+    const dailyExpenseRate = recentDailyExpenseRateFromRows(expenses, new Date(date)).dailyRate
 
     // ── Response ─────────────────────────────────────────────────────────────
 

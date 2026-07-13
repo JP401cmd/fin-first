@@ -26,7 +26,7 @@ export type LeverScores = {
   assets: LeverEntry
   /** Schulden: schuld-vermogen-ratio. */
   debts: LeverEntry
-  /** Cashflow: spaarquote (3-maands). */
+  /** Cashflow: spaarquote (canoniek 6-maands) + budget-health. */
   cashflow: LeverEntry
   /** Belasting: box3-exposure. */
   tax: LeverEntry
@@ -73,7 +73,8 @@ export function computeLeverScores(input: {
   /** Aantal actieve schulden. */
   debtCount?: number
   assetTypeCount: number
-  /** (income − expenses) / income × 100 over 3 maanden. null = geen transacties. */
+  /** Canonieke 6-maands spaarquote (%) uit savingsRateFromAggregates (incl.
+   *  spaarbudget- + aflossing-correctie). null = onvoldoende transactiedata. */
   savingsRate: number | null
   /** Totaal box3-belast vermogen boven vrijstelling. */
   box3TaxableAboveThreshold: number

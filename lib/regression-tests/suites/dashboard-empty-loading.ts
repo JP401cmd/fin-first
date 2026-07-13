@@ -67,6 +67,7 @@ function makeEmptyDashboardData(): DashboardData {
     fireRange: null,
     freedomMilestones: null,
     simRows: null,
+    displayEndAge: null,
     simNetWorthRows: null,
     simRequiredPortfolio: null,
     backtestSuccessRate: null,

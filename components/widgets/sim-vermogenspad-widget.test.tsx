@@ -1,0 +1,100 @@
+import { describe, it, expect, beforeAll } from 'vitest'
+import { render, screen } from '@testing-library/react'
+import { SimVermogenspadWidget } from './sim-vermogenspad-widget'
+import type { DashboardData } from './widget-renderer'
+
+// jsdom mist ResizeObserver (WidgetShell), IntersectionObserver + matchMedia
+// (useInViewAnimation). De as-labels renderen los van de animatie, maar de
+// hook-effecten mogen niet gooien.
+beforeAll(() => {
+  class MockObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+  global.ResizeObserver = MockObserver as unknown as typeof ResizeObserver
+  global.IntersectionObserver = MockObserver as unknown as typeof IntersectionObserver
+  if (!window.matchMedia) {
+    window.matchMedia = ((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    })) as unknown as typeof window.matchMedia
+  }
+})
+
+type SimRow = NonNullable<DashboardData['simRows']>[number]
+
+/**
+ * Bouwt een geclipte simRows-reeks van `startAge` t/m `lastAge`, met een FIRE-
+ * omslag halverwege (accumulation → retirement). `lastAge` spiegelt de
+ * clip-grens (displayEndAge − 1) uit de loader.
+ */
+function makeSimRows(startAge: number, lastAge: number, fireAge: number): SimRow[] {
+  const rows: SimRow[] = []
+  for (let age = startAge; age <= lastAge; age++) {
+    const isAcc = age < fireAge
+    rows.push({
+      age,
+      endPortfolio: 200_000 + (age - startAge) * 15_000,
+      phase: isAcc ? 'accumulation' : 'retirement',
+      flowIn: isAcc ? 24_000 : 0,
+      flowOut: isAcc ? 0 : 30_000,
+      oneTimeNet: 0,
+    })
+  }
+  return rows
+}
+
+// De widget leest enkel simRows, fireAgeFractional en displayEndAge (+ masking).
+// Rest van DashboardData is voor deze test niet relevant → smalle cast.
+function makeData(overrides: Partial<DashboardData> = {}): DashboardData {
+  return {
+    simRows: makeSimRows(46, 92, 60),
+    displayEndAge: 93,
+    fireAgeFractional: 59.5,
+    ...overrides,
+  } as unknown as DashboardData
+}
+
+describe('SimVermogenspadWidget — eind-aslabel consumeert kernel-displayEndAge (geen hardcoded 90)', () => {
+  it('full-size deplete (displayEndAge 93): toont 93j + Eindvermogen (93j), nooit 90', () => {
+    const data = makeData({ simRows: makeSimRows(46, 92, 60), displayEndAge: 93, fireAgeFractional: 59.5 })
+    render(<SimVermogenspadWidget size="full" data={data} />)
+
+    expect(screen.getByText('93j')).toBeInTheDocument()
+    expect(screen.getByText('Eindvermogen (93j)')).toBeInTheDocument()
+    expect(screen.queryByText('90j')).not.toBeInTheDocument()
+    expect(screen.queryByText('Eindvermogen (90j)')).not.toBeInTheDocument()
+  })
+
+  it('half-size deplete (displayEndAge 93): as-label toont 93j, niet 90j', () => {
+    const data = makeData({ simRows: makeSimRows(46, 92, 60), displayEndAge: 93, fireAgeFractional: 59.5 })
+    render(<SimVermogenspadWidget size="half" data={data} />)
+
+    expect(screen.getByText('93j')).toBeInTheDocument()
+    expect(screen.queryByText('90j')).not.toBeInTheDocument()
+  })
+
+  it('perpetual/pensioen (displayEndAge 100): toont 100j', () => {
+    const data = makeData({ simRows: makeSimRows(46, 99, 60), displayEndAge: 100, fireAgeFractional: 59.5 })
+    render(<SimVermogenspadWidget size="full" data={data} />)
+
+    expect(screen.getByText('100j')).toBeInTheDocument()
+    expect(screen.getByText('Eindvermogen (100j)')).toBeInTheDocument()
+    expect(screen.queryByText('90j')).not.toBeInTheDocument()
+  })
+
+  it('fallback: zonder displayEndAge valt het label terug op de laatste simRow-leeftijd', () => {
+    const data = makeData({ simRows: makeSimRows(46, 88, 60), displayEndAge: null, fireAgeFractional: 59.5 })
+    render(<SimVermogenspadWidget size="full" data={data} />)
+
+    expect(screen.getByText('88j')).toBeInTheDocument()
+    expect(screen.queryByText('90j')).not.toBeInTheDocument()
+  })
+})

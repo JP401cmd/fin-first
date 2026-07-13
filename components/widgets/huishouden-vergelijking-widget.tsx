@@ -19,7 +19,8 @@ interface Props {
 export const HuishoudenVergelijkingWidget = memo(function HuishoudenVergelijkingWidget({ size, data, href }: Props) {
   const { perspective, isHousehold, partnerName } = usePerspective()
 
-  const dailyExp = dailyExpenseRate(data.monthlyExpenses)
+  // Canoniek 12-mnd rolling dagtarief uit de bundel (KRUIS-20); fallback voor mocks.
+  const dailyExp = data.dailyExpenseRate ?? dailyExpenseRate(data.monthlyExpenses)
   const ho = data.householdOverrides
 
   // Solo users: hide widget completely (no empty state)

@@ -227,7 +227,8 @@ export const BudgetTrendWidget = memo(function BudgetTrendWidget({ budgetType, s
   const avg6m = avg(history.slice(-6))
 
   // Freedom time for full size
-  const dailyExp = dailyExpenseRate(data.monthlyExpenses)
+  // Canoniek 12-mnd rolling dagtarief uit de bundel (KRUIS-20); fallback voor mocks.
+  const dailyExp = data.dailyExpenseRate ?? dailyExpenseRate(data.monthlyExpenses)
   const monthAvg = avg(history)
   const freedomTime = dailyExp > 0 && monthAvg > 0
     ? calculateFreedomTime(monthAvg, dailyExp)

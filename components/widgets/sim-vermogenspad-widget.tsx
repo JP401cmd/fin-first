@@ -16,7 +16,7 @@ interface Props {
 }
 
 export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size, data, href }: Props) {
-  const { simRows, fireAgeFractional } = data
+  const { simRows, fireAgeFractional, displayEndAge } = data
   const { masked } = useMaskedAmounts()
   const { ref, hasEntered } = useInViewAnimation({ duration: 600 })
 
@@ -134,6 +134,10 @@ export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size,
   const minAge = simRows[0].age
   const maxAge = simRows[simRows.length - 1].age
   const ageSpan = maxAge - minAge || 1
+  // Eind-aslabel = kernel-eindleeftijd (SimResult.displayEndAge, wat /horizon toont),
+  // niet de hardcoded 90. Fallback op de laatste (reeds geclipte) simRow-leeftijd voor
+  // oudere/mock-bundels zonder displayEndAge. Consume-don't-recompute: geen eigen aanname.
+  const endAgeLabel = Math.round(displayEndAge ?? maxAge)
 
   const toX = (age: number) => pad + ((age - minAge) / ageSpan) * (W - pad * 2)
   const toY = (val: number) => H - pad - (Math.max(val, 0) / maxVal) * (H - pad * 2)
@@ -230,7 +234,7 @@ export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size,
             </svg>
             <div className="flex items-center justify-between mt-0.5">
               <p className="text-[9px] text-[var(--ink-4)] font-mono">{minAge}j</p>
-              <p className="text-[9px] text-[var(--ink-4)] font-mono">90j</p>
+              <p className="text-[9px] text-[var(--ink-4)] font-mono">{endAgeLabel}j</p>
             </div>
           </div>
         </div>
@@ -381,14 +385,14 @@ export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size,
               FIRE {fireAgeFractional.toFixed(1)}j
             </p>
           )}
-          <p className="text-[10px] text-[var(--ink-4)] font-mono">90j</p>
+          <p className="text-[10px] text-[var(--ink-4)] font-mono">{endAgeLabel}j</p>
         </div>
 
         {/* Full-size: eindvermogen + risico badge */}
         {size === 'full' && (
           <div className="mt-2 flex items-center justify-between">
             <div>
-              <p className="text-[10px] text-[var(--ink-3)]">Eindvermogen (90j)</p>
+              <p className="text-[10px] text-[var(--ink-3)]">Eindvermogen ({endAgeLabel}j)</p>
               <p className="text-[var(--ink)]">
                 <MaskedAmount value={endRow?.endPortfolio ?? 0} tone="horizon" className="text-sm font-semibold" />
               </p>

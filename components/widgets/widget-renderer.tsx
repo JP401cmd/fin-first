@@ -412,6 +412,24 @@ export interface DashboardData {
   totalDebts: number
   monthlyIncome: number
   monthlyExpenses: number
+  /**
+   * Canoniek dagtarief (€/dag) — 12-mnd rolling grondslag via `lib/expense-rate.ts`,
+   * gedeeld met balans/budget/vermogen-rapport en de sidebar. Widgets consumeren dit
+   * i.p.v. zelf `dailyExpenseRate(monthlyExpenses)` op de losse maand te rekenen, zodat
+   * hetzelfde bedrag overal dezelfde vrijheidstijd geeft (KRUIS-20). Optioneel/additief:
+   * mock-/empty-bundels zonder dit veld vallen terug op de maand-conversie.
+   */
+  dailyExpenseRate?: number
+  /**
+   * Canoniek 12-mnd rolling MAANDbedrag (€/mnd) — zelfde bron/berekening als
+   * `dailyExpenseRate` (recentDailyExpenseRateFromRows), alleen in maand-eenheid.
+   * De briefing-hero op /overzicht rekent op maandbasis en consumeert dit i.p.v.
+   * de losse huidige-kalendermaand-som `monthlyExpenses` (die vroeg in de maand
+   * naar ~0 kon uitschieten → onmogelijk hoog vrijheidstotaal), zodat het
+   * weektotaal overeenkomt met sidebar/balans (KRUIS-17). Optioneel/additief:
+   * mock-/empty-bundels zonder dit veld vallen terug op `monthlyExpenses`.
+   */
+  recentMonthlyExpenses?: number
   monthlyContributions: number
   yearlyMustExpenses: number
   budgetTotals: {
@@ -484,8 +502,14 @@ export interface DashboardData {
   // mijlpaal-datums — géén eigen datum-sommen (consume-don't-recompute).
   // Per-user projectie: in huishouden/partner-perspectief onderdrukken.
   freedomMilestones: FreedomMilestoneResult | null
-  // Horizon: simplified sim rows for vermogenspad chart (age + portfolio + phase)
+  // Horizon: simplified sim rows for vermogenspad chart (age + portfolio + phase).
+  // Reeds weergave-geclipt t/m eindleeftijd − 1 (clipRowsToPlanEnd), spiegel van /horizon.
   simRows: { age: number; endPortfolio: number; phase: string; flowIn: number; flowOut: number; oneTimeNet: number }[] | null
+  // Horizon: kernel-eindleeftijd (SimResult.displayEndAge) — de leeftijd die /horizon als
+  // aslabel toont (deplete/legacy = fire_end_age, perpetual/pensioen = horizon-cap 100).
+  // Widgets tonen dit i.p.v. een hardcoded '90j'. null als de sim niet kon draaien of bij
+  // oudere/mock-bundels (widgets vallen dan terug op de laatste simRow-leeftijd).
+  displayEndAge: number | null
   // Horizon: geprojecteerd VOLLEDIG netto vermogen per jaar (FIRE-pot + meegroeiende
   // niet-liquide assets die uit de FIRE-pot zijn gefilterd). Náást simRows/endPortfolio,
   // zodat de /overzicht-vermogensgrafiek de projectielijn continu houdt met het

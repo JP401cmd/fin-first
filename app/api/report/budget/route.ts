@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { localMonthStartMonthsAgo } from '@/lib/month-range'
+import { recentDailyExpenseRateFromRows } from '@/lib/expense-rate'
 import type {
   BudgetReportData,
   BudgetReportCategory,
@@ -207,19 +208,10 @@ export async function GET(request: Request) {
 
     // ── Daily expense rate ───────────────────────────────────────────────────
 
-    let dailyExpenseRate = 0
-    if (expenseTx.length > 0) {
-      const totalExpenses = expenseTx.reduce((sum, tx) => sum + Math.abs(Number(tx.amount)), 0)
-      const dates = expenseTx.map(tx => new Date(tx.date).getTime())
-      const earliest = new Date(Math.min(...dates))
-      let dataMonths = Math.max(1,
-        (now.getFullYear() - earliest.getFullYear()) * 12 +
-        (now.getMonth() - earliest.getMonth()) + 1
-      )
-      dataMonths = Math.min(dataMonths, 12)
-      const monthlyExpenses = totalExpenses / dataMonths
-      dailyExpenseRate = (monthlyExpenses * 12) / 365
-    }
+    // Canoniek dagtarief (€/dag) via de gedeelde bron `lib/expense-rate.ts` —
+    // `expenseTx` is al het 12-mnd rolling venster. Zelfde grondslag als de
+    // andere rapporten en de dashboard-widgets (KRUIS-20).
+    const dailyExpenseRate = recentDailyExpenseRateFromRows(expenseTx, now).dailyRate
 
     // ── Build parent-child hierarchy ─────────────────────────────────────────
 

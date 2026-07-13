@@ -317,7 +317,8 @@ export const BudgettenWidget = memo(function BudgettenWidget({ size, data, href 
     - budgetTotals.debt.spent
 
   const isNettoPositief = nettoBalans >= 0
-  const dailyExp = dailyExpenseRate(monthlyExpenses)
+  // Canoniek 12-mnd rolling dagtarief uit de bundel (KRUIS-20); fallback voor mocks.
+  const dailyExp = data.dailyExpenseRate ?? dailyExpenseRate(monthlyExpenses)
   const freedomTime = dailyExp > 0 && Math.abs(nettoBalans) > 0
     ? calculateFreedomTime(Math.abs(nettoBalans), dailyExp)
     : null

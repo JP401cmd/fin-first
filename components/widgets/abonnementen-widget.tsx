@@ -15,7 +15,8 @@ interface Props {
 export const AbonnementenWidget = memo(function AbonnementenWidget({ size, data, href }: Props) {
   const { recurringTransactions, totalRecurringAmount, topRecurringTransactions, monthlyExpenses, monthlyIncome } = data
 
-  const dailyExp = dailyExpenseRate(monthlyExpenses)
+  // Canoniek 12-mnd rolling dagtarief uit de bundel (KRUIS-20); fallback voor mocks.
+  const dailyExp = data.dailyExpenseRate ?? dailyExpenseRate(monthlyExpenses)
   const freedomTime = dailyExp > 0 && totalRecurringAmount > 0
     ? calculateFreedomTime(totalRecurringAmount, dailyExp)
     : null

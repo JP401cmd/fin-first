@@ -148,6 +148,8 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
       oneTimeNet: 0,
     }
   }),
+  // Kernel-eindleeftijd (SimResult.displayEndAge) — spiegelt fireEndAge in deze mock.
+  displayEndAge: 90,
   // include_full-achtige mock: geprojecteerd VOLLEDIG netto vermogen ≡ endPortfolio.
   simNetWorthRows: Array.from({ length: 10 }, (_, i) => ({
     age: 35 + i * 3,

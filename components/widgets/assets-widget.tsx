@@ -46,7 +46,8 @@ export const AssetsWidget = memo(function AssetsWidget({ size, data, href }: Pro
     )
   }
 
-  const dailyExp = dailyExpenseRate(monthlyExpenses)
+  // Canoniek 12-mnd rolling dagtarief uit de bundel (KRUIS-20); fallback voor mocks.
+  const dailyExp = data.dailyExpenseRate ?? dailyExpenseRate(monthlyExpenses)
   const ft = dailyExp > 0 && totalAssets > 0 ? calculateFreedomTime(totalAssets, dailyExp) : null
   const ftStr = ft ? formatFreedomTimeString(ft, 'short') : null
 

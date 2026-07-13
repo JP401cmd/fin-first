@@ -46,6 +46,19 @@ export const CLASSIC_MULTIPLIER = 1 / SWR // = 25
  */
 export const FIRE_SAVINGS_RATE_BENCHMARK_PCT = 50
 
+// ── Uitgaven-tarief (vrijheidstijd) ─────────────────────────────
+
+/**
+ * Rolling-venster (maanden) waarover het canonieke dagtarief (€/dag) de
+ * werkelijke uitgaven middelt vóór de €→vrijheidstijd-conversie. 12 maanden =
+ * één vol jaar, zodat seizoenspieken (vakantie, feestdagen, jaarlijkse premies)
+ * niet één losse maand onevenredig laten doorwegen. Gedeelde bron voor
+ * `lib/expense-rate.ts`: élk oppervlak (balans/budget/vermogen-rapport,
+ * dashboard-widgets, bezittingen, freedom-time-badges, sidebar) middelt over
+ * exact dit venster zodat hetzelfde bedrag overal dezelfde vrijheidstijd geeft.
+ */
+export const EXPENSE_RATE_ROLLING_MONTHS = 12
+
 // ── Inflation ───────────────────────────────────────────────────
 
 /** Default annual inflation rate — 2% (ECB target). */

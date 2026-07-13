@@ -185,8 +185,16 @@ export default async function OverzichtPage() {
     checkinForBriefing,
   )
   // Freedom-time: netto vermogen (perspectief-correct) ÷ dagelijkse uitgaven.
-  // In huishoud-/partnerweergave de bijbehorende maanduitgaven gebruiken.
-  const freedomMonthlyExpenses = perspectiveOverride?.monthlyExpenses ?? dashboardData.monthlyExpenses ?? 0
+  // Personal: het canonieke 12-mnd rolling maandbedrag (zelfde bron als het
+  // app-brede dagtarief), NIET de losse huidige-kalendermaand-som — die kon
+  // vroeg in de maand naar ~0 uitschieten en gaf een absurd hoog vrijheids-
+  // totaal ("113 jaar") dat botste met sidebar/balans (KRUIS-17). Huishoud-/
+  // partnerweergave houdt zijn perspectief-eigen maanduitgaven.
+  const freedomMonthlyExpenses =
+    perspectiveOverride?.monthlyExpenses ??
+    dashboardData.recentMonthlyExpenses ??
+    dashboardData.monthlyExpenses ??
+    0
   const freedomTotal = computeFreedomTotal(currentNetWorth, freedomMonthlyExpenses)
   let briefingEntries = composedBriefing
   let briefingRefreshedAt: string | null = null

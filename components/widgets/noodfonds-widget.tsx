@@ -30,7 +30,8 @@ export const NoodfondsWidget = memo(function NoodfondsWidget({ size, data, href 
   const monthlyExpenses = targetMonths > 0 ? targetAmount / targetMonths : 0
 
   // Freedom time framing
-  const dailyExp = dailyExpenseRate(data.monthlyExpenses)
+  // Canoniek 12-mnd rolling dagtarief uit de bundel (KRUIS-20); fallback voor mocks.
+  const dailyExp = data.dailyExpenseRate ?? dailyExpenseRate(data.monthlyExpenses)
   const freedomTime = dailyExp > 0 && currentAmount > 0
     ? calculateFreedomTime(currentAmount, dailyExp)
     : null

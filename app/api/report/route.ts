@@ -10,6 +10,7 @@ import { checkTierGate } from '@/lib/require-tier'
 import { resolveFireParams } from '@/lib/fire-params'
 import { computeFreedomProgressWithBasis, inclHomeTargetFromScalar } from '@/lib/core-metrics'
 import { resolveSavingsSource, savingsRateFromAggregates, computeDebtAflossingMonthly } from '@/lib/savings-source'
+import { getRecentDailyExpenseRate } from '@/lib/expense-rate'
 import {
   deriveHousingContext,
   getFireEligibleNetWorth,
@@ -299,9 +300,12 @@ export async function GET(request: Request) {
       ? monthsWithData.reduce((worst, m) => m.savings < worst.savings ? m : worst)
       : null
 
-    // Daily expense rate for freedom time calculations
-    const totalDays = Math.max(1, Math.round((to.getTime() - from.getTime()) / (24 * 60 * 60 * 1000)))
-    const dailyExpenseRate = totalExpenses / totalDays
+    // Daily expense rate for freedom time calculations.
+    // Canoniek 12-mnd rolling dagtarief via de gedeelde bron — NIET
+    // totaalUitgaven/rapportperiode (dat verdunde de rate bij lange/custom
+    // periodes tot bijna nul → absurde "X eeuwen vrijheid", KRUIS-17). Zelfde
+    // grondslag als balans/budget/vermogen-rapport en de dashboard-widgets.
+    const { dailyRate: dailyExpenseRate } = await getRecentDailyExpenseRate(supabase, to)
 
     // Gepersonaliseerde FIRE-parameters (effectiveSwr/return/inflatie) i.p.v.
     // de vaste NL_SWR — exact dezelfde bron als /toekomst, dashboard en de

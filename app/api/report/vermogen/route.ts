@@ -13,7 +13,7 @@
  * Spec: docs/superpowers/specs/2026-05-11-kern-rapport-en-instellingen-rapport-design.md
  */
 import { createClient } from '@/lib/supabase/server'
-import { localMonthStartMonthsAgo } from '@/lib/month-range'
+import { getRecentDailyExpenseRate } from '@/lib/expense-rate'
 import {
   ASSET_GROUP_FOR_TYPE,
   ASSET_TYPE_LABELS,
@@ -93,11 +93,11 @@ function buildAssetItem(a: Asset, linkedAssetsById: Map<string, Asset>): Vermoge
   const subtypeMap = ASSET_SUBTYPE_LABELS[a.asset_type as AssetType] ?? {}
   const subtypeLabel = a.subtype ? subtypeMap[a.subtype] ?? null : null
 
-  // Rental income wordt in DB als jaarlijks bedrag bijgehouden (zie
-  // ASSET_QUICK_ADD_FIELD3 — real_estate verwacht "huurinkomsten per maand"
-  // maar het opgeslagen veld is jaarlijks per asset-form-conventie).
-  // Voor verhuur-tracking is dat consistent met `Verhuurrendement` tab.
-  const rentalIncomeRaw = a.rental_income == null ? null : Number(a.rental_income)
+  // Rental income wordt in DB als MAANDbedrag bijgehouden — bevestigd door
+  // assets-client.tsx (label "Huurinkomsten p/m"), verhuurrendement/calc.ts
+  // (monthlyRent) en asset-kpi.ts (rentalMonthly * 12). Hier vermenigvuldigen
+  // we met 12 naar een jaarbedrag, conform het `rentalIncomeYearly`-contract.
+  const rentalIncomeRaw = a.rental_income == null ? null : Number(a.rental_income) * 12
   // Linked asset alleen ophalen voor vordering — daar bepaalt de spec
   // dat we de gekoppelde-asset-naam in de details-regel tonen.
   const linkedAssetName = a.asset_type === 'vordering' && a.linked_asset_id
@@ -527,7 +527,8 @@ function buildVerhuurSection(trackedRentals: Asset[]): VermogenVerhuurSection | 
   if (trackedRentals.length === 0) return null
   const items: VermogenVerhuurItem[] = trackedRentals.map((a) => {
     const marketValue = Math.round(Number(a.current_value) || 0)
-    const rentalIncomeYearly = Math.round(Number(a.rental_income) || 0)
+    // rental_income is een MAANDbedrag (zie buildAssetItem) → ×12 naar jaar.
+    const rentalIncomeYearly = Math.round((Number(a.rental_income) || 0) * 12)
     const monthlyMaintenanceCost = Math.round(Number(a.monthly_maintenance_cost) || 0)
     const vvaFee = Math.round(Number(a.vva_fee) || 0)
     // Fallback op 1%-schatting wanneer geen monthly_maintenance_cost ingevuld
@@ -614,37 +615,16 @@ function buildHypotheekSection(trackedMortgages: Debt[]): VermogenHypotheekSecti
 // ── Daily expense rate ───────────────────────────────────────────────
 
 /**
- * Zelfde dagelijkse-uitgaven-berekening als in `app/api/report/balans/route.ts`.
- * 12-mnd rolling window, gemiddeld over de aanwezige maanden, gemarkeerd op
- * 365 dagen om een /dag rate te geven.
+ * Canoniek dagtarief (€/dag) via de gedeelde bron `lib/expense-rate.ts` —
+ * zelfde 12-mnd rolling grondslag als balans/budget-rapport, dashboard-widgets
+ * en de sidebar (KRUIS-20). Op 2 decimalen afgerond voor de rapport-weergave.
  */
 async function computeDailyExpenseRate(
   supabase: Awaited<ReturnType<typeof createClient>>,
   referenceDate: Date,
 ): Promise<number> {
-  // 12-maands rolling window, tijdzone-veilige ondergrens (lib/month-range).
-  const startWindow = localMonthStartMonthsAgo(referenceDate, 11)
-  const refIso = referenceDate.toISOString().split('T')[0]
-  const { data } = await supabase
-    .from('transactions')
-    .select('amount, date')
-    .lt('amount', 0)
-    .gte('date', startWindow)
-    .lte('date', refIso)
-  const expenses = (data ?? []) as Array<{ amount: number; date: string }>
-  if (expenses.length === 0) return 0
-  const totalExpenses = expenses.reduce((sum, tx) => sum + Math.abs(Number(tx.amount)), 0)
-  const dates = expenses.map((tx) => new Date(tx.date).getTime())
-  const earliest = new Date(Math.min(...dates))
-  let dataMonths = Math.max(
-    1,
-    (referenceDate.getFullYear() - earliest.getFullYear()) * 12 +
-      (referenceDate.getMonth() - earliest.getMonth()) +
-      1,
-  )
-  dataMonths = Math.min(dataMonths, 12)
-  const monthlyExpenses = totalExpenses / dataMonths
-  return Math.round(((monthlyExpenses * 12) / 365) * 100) / 100
+  const { dailyRate } = await getRecentDailyExpenseRate(supabase, referenceDate)
+  return Math.round(dailyRate * 100) / 100
 }
 
 // ── Main handler ─────────────────────────────────────────────────────

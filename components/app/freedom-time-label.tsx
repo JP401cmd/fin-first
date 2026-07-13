@@ -1,10 +1,8 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { Clock } from 'lucide-react'
 import { formatWithFreedom } from '@/lib/format'
-import { localMonthBounds, localMonthStart } from '@/lib/month-range'
 import { MaskedAmount } from '@/components/app/masked-amount'
 
 /**
@@ -39,59 +37,31 @@ export function DailyExpenseProvider({ children }: { children: ReactNode }) {
 
   const loadExpenseRate = useCallback(async () => {
     try {
-      const supabase = createClient()
-
-      const now = new Date()
-      const monthEnd = localMonthBounds(now).end
-      const twelveMonthsAgo = localMonthStart(new Date(now.getFullYear(), now.getMonth() - 11, 1))
-
-      // Fetch expense transactions from the last 12 months
-      const [expenseResult, earliestTxResult] = await Promise.all([
-        supabase
-          .from('transactions')
-          .select('amount, date')
-          .lt('amount', 0)
-          .gte('date', twelveMonthsAgo)
-          .lt('date', monthEnd),
-        supabase
-          .from('transactions')
-          .select('date')
-          .lt('amount', 0)
-          .gte('date', twelveMonthsAgo)
-          .order('date', { ascending: true })
-          .limit(1),
-      ])
-
-      if (expenseResult.error || earliestTxResult.error) {
+      // Canoniek dagtarief via de gedeelde server-bron (`lib/expense-rate.ts`,
+      // achter GET /api/daily-expense-rate), zodat de client-badges/sidebar exact
+      // hetzelfde €/dag tonen als de balans/budget/vermogen-rapporten en de
+      // dashboard-widgets (KRUIS-20). Eén codepad: geen losse client-query met een
+      // net ander venster meer.
+      const res = await fetch('/api/daily-expense-rate')
+      if (!res.ok) {
         setValue(prev => ({ ...prev, loading: false }))
         return
       }
-
-      const expenses = expenseResult.data ?? []
-      const earliestDate = earliestTxResult.data?.[0]?.date
-
-      if (expenses.length > 0 && earliestDate) {
-        const earliest = new Date(earliestDate)
-        let dataMonths = Math.max(1,
-          (now.getFullYear() - earliest.getFullYear()) * 12 +
-          (now.getMonth() - earliest.getMonth()) + 1
-        )
-        dataMonths = Math.min(dataMonths, 12)
-
-        const totalExpenses = expenses.reduce((sum, tx) => sum + Math.abs(Number(tx.amount)), 0)
-        const monthlyExpenses = totalExpenses / dataMonths
-        const yearlyExpenses = monthlyExpenses * 12
-        const dailyExpenseRate = yearlyExpenses / 365
-
-        setValue({
-          dailyExpenseRate,
-          loading: false,
-          source: 'transactions',
-          dataMonths,
-        })
-      } else {
-        setValue(prev => ({ ...prev, loading: false, source: 'none' }))
+      const data = (await res.json()) as {
+        dailyExpenseRate?: number
+        dataMonths?: number
       }
+      const rate =
+        typeof data.dailyExpenseRate === 'number' && isFinite(data.dailyExpenseRate) && data.dailyExpenseRate > 0
+          ? data.dailyExpenseRate
+          : 0
+
+      setValue({
+        dailyExpenseRate: rate,
+        loading: false,
+        source: rate > 0 ? 'transactions' : 'none',
+        dataMonths: typeof data.dataMonths === 'number' ? data.dataMonths : 0,
+      })
     } catch {
       setValue(prev => ({ ...prev, loading: false }))
     }

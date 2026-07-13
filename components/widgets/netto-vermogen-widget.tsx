@@ -38,7 +38,14 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
   // Empty state: no assets or income data at all
   const isEmpty = netWorth === 0 && monthlyIncome === 0 && netWorthHistory.length === 0
 
-  const dailyExp = dailyExpenseRate(monthlyExpenses)
+  // Personal view: consumeer het canonieke 12-mnd rolling dagtarief uit de bundel
+  // (KRUIS-20) i.p.v. zelf op de losse huidige maand te rekenen — zo geeft hetzelfde
+  // netto vermogen dezelfde vrijheidstijd als op balans/bezittingen/sidebar.
+  // Household/partner-override tonen een perspectief-eigen uitgavenniveau en houden
+  // hun eigen conversie; mock-bundels zonder veld vallen terug op de maand-conversie.
+  const dailyExp = overrides
+    ? dailyExpenseRate(monthlyExpenses)
+    : data.dailyExpenseRate ?? dailyExpenseRate(monthlyExpenses)
   const freedomTime = dailyExp > 0 ? calculateFreedomTime(Math.abs(netWorth), dailyExp) : null
   const freedomStr = freedomTime ? formatFreedomTimeString(freedomTime, 'short') : null
 

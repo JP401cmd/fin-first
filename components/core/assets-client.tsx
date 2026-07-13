@@ -18,8 +18,7 @@ import { buildUnlinkedCashAssets } from '@/lib/unlinked-cash-assets'
 import { upsertSingleBalanceSnapshot } from '@/lib/balance-snapshot'
 import { DGA_LENING_DREMPEL } from '@/lib/box2-data'
 import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
-import { calculateFreedomTime, formatFreedomTimeString, formatMaskedCurrency, dailyExpenseRate } from '@/lib/format'
-import { localMonthBounds } from '@/lib/month-range'
+import { calculateFreedomTime, formatFreedomTimeString, formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 
 /**
@@ -275,7 +274,11 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
     setInsightOpen(next)
     try { localStorage.setItem('collapsible_assets-insight', String(next)) } catch { /* */ }
   }
-  const [dailyExpenses, setDailyExpenses] = useState(initialData?.dailyExpenses ?? 0)
+  // Canoniek dagtarief (€/dag) uit de server-loader (12-mnd rolling, KRUIS-20).
+  // GEEN client-side herberekening meer op de losse huidige maand — anders toonde
+  // deze pagina een ander €/dag (en dus andere "jaren vrijheid") dan de
+  // balans/vermogen-rapporten en de dashboard-widgets voor hetzelfde bedrag.
+  const dailyExpenses = initialData?.dailyExpenses ?? 0
   const [budgetingActive, setBudgetingActive] = useState(initialData?.budgetingActive ?? true)
   // Cards-decoraties (sparklines + connections) — client-side fetch zodra
   // assets geladen zijn. Failure is non-fataal: lege maps → cards renderen
@@ -319,21 +322,13 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
       const { data: { user } } = await supabase.auth.getUser()
       if (signal?.aborted) return
       if (user) {
-        const now = new Date()
-        const { start: monthStart, end: monthEnd } = localMonthBounds(now)
-
-        const [mortgageResult, txResult, bankLinksResult, unlinkedBankResult, profileBaResult] = await Promise.all([
+        const [mortgageResult, bankLinksResult, unlinkedBankResult, profileBaResult] = await Promise.all([
           supabase
             .from('debts')
             .select('id, name, current_balance, linked_asset_id')
             .eq('user_id', user.id)
             .eq('debt_type', 'mortgage')
             .eq('is_active', true),
-          supabase
-            .from('transactions')
-            .select('amount')
-            .gte('date', monthStart)
-            .lt('date', monthEnd),
           supabase
             .from('bank_accounts')
             .select('id, linked_asset_id, balance')
@@ -390,12 +385,6 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
           }))
         }
 
-        // Calculate daily expenses from current month transactions
-        const monthlyExpenses = (txResult.data ?? []).reduce((sum, t) => {
-          const amt = Number(t.amount)
-          return amt < 0 ? sum + Math.abs(amt) : sum
-        }, 0)
-        setDailyExpenses(dailyExpenseRate(monthlyExpenses))
       }
     } catch (err) {
       console.error('Error loading assets:', err)

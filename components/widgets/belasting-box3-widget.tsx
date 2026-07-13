@@ -4,6 +4,7 @@ import type { WidgetSize } from '@/lib/widget-catalog'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { Receipt } from 'lucide-react'
 import type { DashboardData } from './widget-renderer'
+import { dailyExpenseRate } from '@/lib/format'
 import { NL_FICTIEF_BELEGGINGEN, BOX3_TARIEF } from '@/lib/constants'
 import { BOX3_PARAMS } from '@/lib/box3-data'
 
@@ -34,8 +35,8 @@ export const BelastingBox3Widget = memo(function BelastingBox3Widget({ size, dat
   const effectiefTarief = totalAssets > 0
     ? (estimatedTax / totalAssets) * 100
     : 0
-  // Dagtarief op de canonieke jaar/365-basis (niet maand/30 = jaar/360).
-  const dailyExp = (monthlyExpenses * 12) / 365
+  // Canoniek 12-mnd rolling dagtarief uit de bundel (KRUIS-20); fallback voor mocks.
+  const dailyExp = data.dailyExpenseRate ?? dailyExpenseRate(monthlyExpenses)
   const vrijheidsdagen = dailyExp > 0
     ? Math.round(estimatedTax / dailyExp)
     : 0
