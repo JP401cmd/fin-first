@@ -310,12 +310,21 @@ function Box1DrukHero({
     dailyExpenses > 0
       ? formatFreedomTimeString(calculateFreedomTime(result.tax, dailyExpenses))
       : null
+  // K-01a: zelfde kerncijfer-kaart-behandeling als Box2Detail/Box3Detail
+  // (ink-border + 3px module-accent-strip + kerncijfer op 34/44px). Zo openen
+  // de drie boxpagina's onder de gedeelde BelastingBoxPageHeader visueel als
+  // één familie — geen tweede, groter hero-getal meer dat met de familie-kop
+  // concurreert.
   return (
-    <div>
+    <div className="border border-[var(--ink)] bg-[var(--paper)]">
+      {/* Box-accent: 3px strip ter onderscheiding van de drie boxen (amber op
+          Box 1 via --module-active-*), identiek aan box2/box3. */}
+      <div aria-hidden className="h-[3px] w-full" style={{ background: 'var(--module-active-500)' }} />
+      <div className="p-5 sm:p-6">
       <Kicker>Box 1-druk {result.year} · per jaar</Kicker>
       <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <span
-          className="text-[44px] sm:text-[60px] font-black leading-[0.9] tracking-[-0.03em] tabular-nums text-[var(--ink)]"
+          className="text-[34px] sm:text-[44px] font-black leading-none tracking-[-0.02em] tabular-nums text-[var(--ink)]"
           style={{ fontFamily: PLAYFAIR }}
         >
           {formatCurrency(result.tax)}
@@ -371,6 +380,7 @@ function Box1DrukHero({
         Indicatie, geen advies — berekend met de Box 1-schijven en
         heffingskortingen {result.year} over je geschatte bruto-inkomen.
       </p>
+      </div>
     </div>
   )
 }
@@ -394,9 +404,15 @@ function JaarruimteUitleg() {
     >
       <Kicker>Wat is jaarruimte?</Kicker>
       <div
-        className="mt-2 space-y-3 text-sm leading-relaxed text-[var(--ink-2)]"
+        className="mt-2 text-sm leading-relaxed text-[var(--ink-2)]"
         style={{ fontFamily: SOURCE_SERIF }}
       >
+        {/* M-12: de vijf platte alinea's opgesplitst met korte hairline-
+            subkopjes zodat de uitleg scanbaar wordt i.p.v. één tekstmuur.
+            Bewuste keuze voor subkopjes (niet een uitklap zoals box2-detail):
+            de pagina is een async server-component en dit blok is óók het
+            deeplink-doel (#jaarruimte-uitleg) — dan moet de inhoud altijd
+            open/vindbaar staan, geen client-state-uitklap. */}
         <p>
           Jaarruimte is het bedrag dat je dit jaar fiscaal voordelig opzij mag
           zetten voor extra pensioen, via een <strong>lijfrente</strong>. Je
@@ -404,18 +420,26 @@ function JaarruimteUitleg() {
           betaal je belasting over de uitkering, meestal tegen een lager tarief.
           Slim belasting-uitstel dus.
         </p>
+
+        <p className="mt-4 mb-1 font-mono text-[10px] uppercase tracking-[0.18em] not-italic text-[var(--ink-3)]">
+          De rekensom
+        </p>
         <p>
-          De rekensom (2026):{' '}
+          Voor 2026:{' '}
           <span className="font-mono not-italic tabular-nums text-[var(--ink)]">
             {opbouwPct}% × (inkomen − {formatCurrency(JAARRUIMTE_FRANCHISE_2026)})
             − {JAARRUIMTE_FACTOR_A_IMPUTATIE} × factor A
           </span>
           , afgetopt op {formatCurrency(JAARRUIMTE_MAX_2026)} per persoon.
         </p>
+
+        <p className="mt-4 mb-1 font-mono text-[10px] uppercase tracking-[0.18em] not-italic text-[var(--ink-3)]">
+          De adder: factor A
+        </p>
         <p>
-          <strong>De adder: factor A.</strong> Bouw je pensioen op via je
-          werkgever, dan verlaagt dat je jaarruimte fors — vaak tot bijna niets.
-          Factor A is je jaarlijkse pensioenaangroei; je vindt &apos;m op je UPO of{' '}
+          Bouw je pensioen op via je werkgever, dan verlaagt dat je jaarruimte
+          fors — vaak tot bijna niets. Factor A is je jaarlijkse
+          pensioenaangroei; je vindt &apos;m op je UPO of{' '}
           <a
             href="https://www.mijnpensioenoverzicht.nl"
             target="_blank"
@@ -427,16 +451,20 @@ function JaarruimteUitleg() {
           . Zzp&apos;er zonder pensioenregeling? Dan heb je meestal (bijna) je
           volle ruimte.
         </p>
+
+        <p className="mt-4 mb-1 font-mono text-[10px] uppercase tracking-[0.18em] not-italic text-[var(--ink-3)]">
+          Wat je hieronder ziet
+        </p>
         <p>
-          Wat we hieronder tonen is een{' '}
-          <strong>bovengrens vóór aftrek van je werkgeverspensioen</strong>. Vul
-          je factor A in — hieronder of bij je{' '}
+          Een <strong>bovengrens vóór aftrek van je werkgeverspensioen</strong>.
+          Vul je factor A in — hieronder of bij je{' '}
           <Link href="/toekomst/gebeurtenissen?strategie=pensioen" className={linkCls}>
             pensioen-strategie
           </Link>{' '}
           — voor een scherpere schatting.
         </p>
-        <p className="text-[12px] italic text-[var(--ink-3)]">
+
+        <p className="mt-3 text-[12px] italic text-[var(--ink-3)]">
           Indicatie, geen advies — het bindende bedrag bereken je met de{' '}
           <a
             href="https://www.belastingdienst.nl/wps/wcm/connect/nl/aftrek-en-kortingen/content/hoe-bereken-ik-mijn-jaarruimte"

@@ -3,9 +3,10 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
-import { PageOpening } from '@/components/editorial'
+import { PageOpening, PageInfoButton } from '@/components/editorial'
 import {
   CalendarCheck,
+  CalendarClock,
   Loader2,
   User,
   Users,
@@ -13,10 +14,16 @@ import {
   TrendingDown,
   ChevronDown,
   ChevronRight,
+  ArrowRight,
 } from 'lucide-react'
 import { useCallback } from 'react'
 import { formatMaskedCurrency, calculateFreedomTime, formatFreedomTimeString, dailyExpenseRate } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+import { useModuleHex } from '@/components/app/module-color-provider'
+import { ReportSparkline } from '@/app/(app)/rapportages/[id]/components/report-sparkline'
+import { monthKeyFromDate, daysUntilNextCheckin, describeNextCheckin } from './cadence'
+
+const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
 
 /**
  * Masked-aware currency formatter hook. Returns a stable callback that
@@ -110,8 +117,12 @@ export default function CheckinHistoriePage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-6 sm:py-10">
+    <div className="relative mx-auto max-w-2xl px-4 py-6 sm:py-10">
       <NavStackMeta title="Check-in historie" />
+      <PageInfoButton
+        className="absolute top-4 right-4 sm:right-6"
+        description="Hier vind je al je maandelijkse geldcheck-ins terug — een tijdlijn van je vermogen, sparen en reflecties. Bovenaan zie je de trend en wanneer je volgende check-in klaarstaat; klik een maand open voor de details."
+      />
       {/* Editorial pagina-opening */}
       <PageOpening
         className="mb-6"
@@ -131,30 +142,136 @@ export default function CheckinHistoriePage() {
       )}
 
       {checkins.length === 0 ? (
-        <div className="card-editorial p-6 text-center">
-          <CalendarCheck className="h-10 w-10 text-[var(--ink-4)] mx-auto mb-3" />
-          <p className="text-sm text-[var(--ink-3)] font-serif italic">
-            Nog geen check-ins afgerond.
+        <CheckinEmptyState />
+      ) : (
+        <>
+          {/* Additieve samenvatting boven de (ongewijzigde) historie —
+              alleen bij ≥2 check-ins, zodat de trendlijn iets te zeggen heeft. */}
+          {checkins.length >= 2 && (
+            <CheckinSummary checkins={checkins} hasHousehold={hasHousehold} />
+          )}
+          <div className="space-y-3">
+            {checkins.map((checkin, idx) => (
+              <CheckinHistoryCard
+                key={`${checkin.userId}-${checkin.savedAt}`}
+                checkin={checkin}
+                isExpanded={expandedIdx === idx}
+                onToggle={() => setExpandedIdx(expandedIdx === idx ? null : idx)}
+                previousCheckin={checkins[idx + 1] || null}
+                hasHousehold={hasHousehold}
+              />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+/* ── Empty state (0 check-ins) ─────────────────────────────────────────── */
+/**
+ * Krant-toon lege staat: kicker + serif-belofte + ink-CTA (empty-state-
+ * drieluik). Vervangt de kale "icoon + 1 zin + link" — een eerste check-in
+ * staat immers altijd klaar, dus nodigen we daar expliciet toe uit.
+ */
+function CheckinEmptyState() {
+  return (
+    <div className="card-editorial p-6 sm:p-8 text-center">
+      <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-[var(--r)] bg-wil-50">
+        <CalendarCheck className="h-6 w-6 text-wil-600" />
+      </div>
+      <p className="text-[10px] uppercase tracking-[0.20em] font-mono text-wil-700 mb-3">
+        Geldcheck-in
+      </p>
+      <p
+        className="mx-auto max-w-[34ch] text-lg sm:text-xl italic leading-snug text-[var(--ink)]"
+        style={{ fontFamily: PLAYFAIR }}
+      >
+        Je eerste check-in staat klaar — een maandelijks moment om je vrijheid
+        in tijd te meten.
+      </p>
+      <Link
+        href="/core/checkin"
+        className="mt-5 inline-flex items-center gap-2 bg-[var(--ink)] text-[var(--paper)] px-5 py-2.5 text-sm font-semibold min-h-11 hover:opacity-80 transition-opacity"
+      >
+        Start je eerste check-in
+        <ArrowRight className="h-4 w-4" />
+      </Link>
+    </div>
+  )
+}
+
+/* ── Samenvatting (≥2 check-ins) ───────────────────────────────────────── */
+/**
+ * Compacte samenvatting boven de historie: mini-trendlijn van het netto
+ * vermogen over de check-ins + een "volgende check-in"-teaser (afgeleid uit
+ * de laatste check-in en de maandcadans, zie ./cadence).
+ *
+ * De trendlijn toont alleen solo: in een huishouden mengt de lijst de
+ * snapshots van beide partners, en één vermogenslijn over twee grondslagen
+ * zou misleiden. De cadans-teaser (maand-gebaseerd) is wél veilig te tonen.
+ */
+function CheckinSummary({
+  checkins,
+  hasHousehold,
+}: {
+  checkins: CheckinSnapshot[]
+  hasHousehold: boolean
+}) {
+  const wilHex = useModuleHex('wil', 600)
+
+  // Chronologisch oplopend voor de sparkline (lijst komt aflopend binnen).
+  const chrono = [...checkins].sort(
+    (a, b) => new Date(a.savedAt).getTime() - new Date(b.savedAt).getTime()
+  )
+  const latest = chrono[chrono.length - 1]
+  const netWorthSeries = chrono.map((c) => c.metrics.netWorth)
+
+  // Laatste check-in-maand uit savedAt (altijd aanwezig) → cadans-teaser.
+  const lastMonthKey = monthKeyFromDate(new Date(latest.savedAt))
+  const teaser = describeNextCheckin(daysUntilNextCheckin(lastMonthKey, new Date()))
+
+  return (
+    <div className="card-editorial p-4 sm:p-5 mb-4">
+      <div className="mb-3 flex items-center justify-between">
+        {/* wil-700 (niet --module-active): de rest van dit blok is wil-getint en
+            de backing-route /core/checkin valt buiten de wil-route-override. */}
+        <span className="text-[10px] uppercase tracking-[0.18em] font-mono text-wil-700">
+          Jouw check-ins
+        </span>
+        <span className="font-mono tabular-nums text-xs text-[var(--ink-3)]">
+          {checkins.length} totaal
+        </span>
+      </div>
+
+      {!hasHousehold && netWorthSeries.length >= 2 && (
+        <>
+          <ReportSparkline
+            values={netWorthSeries}
+            color={wilHex}
+            width={260}
+            height={44}
+            className="mb-1"
+          />
+          <p
+            className="text-[11px] italic text-[var(--ink-3)]"
+            style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+          >
+            Netto vermogen over je check-ins — opgeslagen tijd die groeit.
           </p>
+        </>
+      )}
+
+      {teaser && (
+        <div className="mt-3 flex items-center gap-2 rounded-xl bg-wil-50 px-3 py-2">
+          <CalendarClock className="h-4 w-4 shrink-0 text-wil-600" />
+          <span className="flex-1 text-xs text-wil-700">{teaser}</span>
           <Link
             href="/core/checkin"
-            className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-wil-600 hover:text-wil-700"
+            className="shrink-0 text-xs font-medium text-wil-700 underline underline-offset-2 hover:text-wil-800"
           >
-            Start je eerste check-in
+            Nieuwe check-in
           </Link>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {checkins.map((checkin, idx) => (
-            <CheckinHistoryCard
-              key={`${checkin.userId}-${checkin.savedAt}`}
-              checkin={checkin}
-              isExpanded={expandedIdx === idx}
-              onToggle={() => setExpandedIdx(expandedIdx === idx ? null : idx)}
-              previousCheckin={checkins[idx + 1] || null}
-              hasHousehold={hasHousehold}
-            />
-          ))}
         </div>
       )}
     </div>

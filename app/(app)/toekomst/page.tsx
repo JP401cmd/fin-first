@@ -143,7 +143,10 @@ export default async function ToekomstPage({
         />
       </section>
 
-      <HorizonPage initialData={horizonData} />
+      {/* embedded: de tijdas leeft ónder de paginakop ("Je tijdas") — degradeer
+          de horizon-client-kop tot sectie-niveau (geen tweede H1, geen eigen
+          PageInfoButton). Zie K-02 (dubbele-hero-ontstapeling). */}
+      <HorizonPage initialData={horizonData} embedded />
 
       {/* Krant-stijl colophon als landing-footer. print:hidden zodat de
           tijdas-print (PrintTijdasButton) ongewijzigd blijft. */}

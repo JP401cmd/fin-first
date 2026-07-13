@@ -32,10 +32,18 @@ type DebtLite = { id: string; name: string; current_balance: number }
 export function DoelBewerkenSheet({
   goal,
   onClose,
+  onCompleted,
 }: {
   /** Volledig Goal-object — nodig voor GoalForm (volledig-bewerken-flow). */
   goal: Goal
   onClose: () => void
+  /**
+   * Aangeroepen wanneer dit doel bij deze save de 100%-overgang maakt (van
+   * niet-voltooid naar voltooid). De parent viert de mijlpaal ingetogen
+   * (MilestoneCelebration). Wordt niet aangeroepen bij een re-save van een al
+   * voltooid doel.
+   */
+  onCompleted?: (goal: { id: string; name: string }) => void
 }) {
   const goalId = goal.id
   const goalName = goal.name
@@ -104,6 +112,12 @@ export function DoelBewerkenSheet({
       return
     }
     setSaving(false)
+    // Mijlpaal: alleen bij de échte 100%-overgang (niet bij re-save van een al
+    // voltooid doel). De parent viert 'm ingetogen; de once-guard per doel-id
+    // voorkomt herhaling.
+    if (willBeCompleted && !goal.is_completed) {
+      onCompleted?.({ id: goalId, name: goalName })
+    }
     onClose()
     router.refresh()
   }
@@ -243,17 +257,18 @@ export function DoelBewerkenSheet({
           </div>
         )}
 
-        {/* Doel-behaald-celebratie: zichtbaar zodra de gebruiker een
-            waarde invoert die ≥ target is. Vóór submit zodat 't voelt
-            als bevestiging tijdens typen. */}
+        {/* Doel-behaald-bevestiging: zichtbaar zodra de gebruiker een waarde
+            invoert die ≥ target is. Vóór submit zodat 't voelt als bevestiging
+            tijdens typen. Ingetogen en feitelijk (geen emoji/confetti — de
+            échte viering volgt ná opslaan via MilestoneCelebration). */}
         {targetValue > 0 && validNew >= targetValue && (
           <div
             data-testid="doel-behaald"
-            className="mb-4 rounded-xl border border-positive/30 bg-positive/10 px-3 py-2 text-xs text-positive flex items-center gap-2"
+            className="mb-4 flex items-center gap-2 border-l-[3px] border-positive bg-positive/10 px-3 py-2 text-xs text-positive"
           >
-            <span className="text-base" aria-hidden="true">🎉</span>
+            <span aria-hidden="true" className="text-[13px] leading-none">✦</span>
             <span>
-              <strong>Doel behaald!</strong> Opslaan markeert dit doel als
+              <strong>Doel behaald.</strong> Opslaan markeert dit doel als
               voltooid.
             </span>
           </div>

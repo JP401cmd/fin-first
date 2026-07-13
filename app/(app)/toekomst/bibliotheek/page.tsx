@@ -19,7 +19,8 @@ import { LibraryCard } from '@/components/future/library-card'
 import { LibraryFilter } from '@/components/future/library-filter'
 import { DisclaimerStrip } from '@/components/future/disclaimer-strip'
 import { Button } from '@/components/editorial/button'
-import { PageOpening } from '@/components/editorial'
+import { PageOpening, PageInfoButton } from '@/components/editorial'
+import { PAGE_INFO } from '@/lib/page-info-content'
 
 /**
  * /toekomst/bibliotheek — publieke Rekenhulp-bibliotheek.
@@ -171,7 +172,11 @@ export default async function BibliotheekPage({
   const nonEmptyGroups = groups.filter((g) => g.items.length > 0)
 
   return (
-    <section className="mx-auto max-w-6xl px-4 sm:px-6 pb-12 pt-4">
+    <section className="relative mx-auto max-w-6xl px-4 sm:px-6 pb-12 pt-4">
+      <PageInfoButton
+        description={PAGE_INFO['/toekomst/bibliotheek'] ?? ''}
+        className="absolute right-4 top-4 sm:right-6"
+      />
       {/* Breadcrumb terug — geen tab-balk; bibliotheek is een aparte route. */}
       <Link
         href="/toekomst?tab=rekenhulp"

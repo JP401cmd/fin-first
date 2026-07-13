@@ -16,7 +16,9 @@ import {
   ScenarioCallout,
   SectionLabel,
   OrnamentColophon,
+  PageInfoButton,
 } from '@/components/editorial'
+import { PAGE_INFO } from '@/lib/page-info-content'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 
 /**
@@ -215,7 +217,8 @@ export default function BalansPage() {
            shell levert deze nu via TopBar (mobile) of pane-header (desktop).
            Print-actie blijft hier — het is een page-eigen content-actie, geen
            navigatie-chrome. */}
-      <div data-print-hide className="mb-6 flex items-center justify-end">
+      <div data-print-hide className="mb-6 flex items-center justify-end gap-3">
+        <PageInfoButton description={PAGE_INFO['/rapportages/balans'] ?? ''} />
         <button
           type="button"
           onClick={() => window.print()}

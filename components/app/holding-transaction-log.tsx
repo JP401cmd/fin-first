@@ -9,6 +9,7 @@ import {
 import { formatCurrency } from '@/components/app/budget-shared'
 import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { DensityToggle, useListDensity, type ListDensity } from '@/components/app/density-toggle'
 
 type TransactionWithPnL = {
   id: string
@@ -90,6 +91,30 @@ const typeConfig = {
   },
 }
 
+/** Dag-kop-label voor de transactielijst — spiegelt cash-account-view. */
+function formatDayHeader(iso: string): string {
+  return new Date(iso + 'T00:00:00').toLocaleDateString('nl-NL', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  })
+}
+
+/**
+ * Groepeert de (reeds op datum aflopend gesorteerde) transacties per datum,
+ * met behoud van volgorde. Groepeert alléén de meegegeven set — de aanroeper
+ * geeft de gepagineerde slice door zodat de "Toon meer"-paginering intact blijft.
+ */
+function groupByDate(txs: TransactionWithPnL[]): [string, TransactionWithPnL[]][] {
+  const map = new Map<string, TransactionWithPnL[]>()
+  for (const tx of txs) {
+    const existing = map.get(tx.date)
+    if (existing) existing.push(tx)
+    else map.set(tx.date, [tx])
+  }
+  return Array.from(map.entries())
+}
+
 export default function HoldingTransactionLog({
   holdingId,
   holdingName,
@@ -104,6 +129,8 @@ export default function HoldingTransactionLog({
   const [showNewTxForm, setShowNewTxForm] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<string | null>(null)
+  // Ruim/compact-dichtheid (M-08) — per-apparaat bewaard.
+  const { density, setDensity } = useListDensity('holding-transaction-log')
   // Paginering — begrenst de gerenderde rijen tot ROW_PAGE.
   const [visibleCount, setVisibleCount] = useState(ROW_PAGE)
 
@@ -232,14 +259,19 @@ export default function HoldingTransactionLog({
             </span>
           )}
         </h3>
-        <button
-          onClick={() => setShowNewTxForm(!showNewTxForm)}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-kern-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-kern-700"
-          data-testid="new-transaction-btn"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          Transactie toevoegen
-        </button>
+        <div className="flex items-center gap-2">
+          {transactions.length > 0 && (
+            <DensityToggle density={density} onChange={setDensity} />
+          )}
+          <button
+            onClick={() => setShowNewTxForm(!showNewTxForm)}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-kern-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-kern-700"
+            data-testid="new-transaction-btn"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Transactie toevoegen
+          </button>
+        </div>
       </div>
 
       {/* Inline new transaction form */}
@@ -269,19 +301,29 @@ export default function HoldingTransactionLog({
           </p>
         </div>
       ) : (
-        <div className="space-y-1.5" data-testid="transaction-list">
-          {transactions.slice(0, visibleCount).map((tx) => (
-            <TxRow
-              key={tx.id}
-              tx={tx}
-              isExpanded={expandedTx === tx.id}
-              isConfirmingDelete={deleteConfirm === tx.id}
-              isDeleting={deleting === tx.id}
-              onToggle={handleToggleExpand}
-              onDeleteTrigger={handleDeleteTrigger}
-              onDeleteConfirm={handleDeleteTransaction}
-              onDeleteCancel={handleDeleteCancel}
-            />
+        <div className="space-y-4" data-testid="transaction-list">
+          {groupByDate(transactions.slice(0, visibleCount)).map(([date, rows]) => (
+            <div key={date}>
+              <h4 className="mb-1.5 text-xs font-semibold uppercase text-[var(--ink-3)]">
+                {formatDayHeader(date)}
+              </h4>
+              <div className="space-y-1.5">
+                {rows.map((tx) => (
+                  <TxRow
+                    key={tx.id}
+                    tx={tx}
+                    density={density}
+                    isExpanded={expandedTx === tx.id}
+                    isConfirmingDelete={deleteConfirm === tx.id}
+                    isDeleting={deleting === tx.id}
+                    onToggle={handleToggleExpand}
+                    onDeleteTrigger={handleDeleteTrigger}
+                    onDeleteConfirm={handleDeleteTransaction}
+                    onDeleteCancel={handleDeleteCancel}
+                  />
+                ))}
+              </div>
+            </div>
           ))}
           {transactions.length > visibleCount && (
             <button
@@ -304,6 +346,7 @@ export default function HoldingTransactionLog({
 
 type TxRowProps = {
   tx: TransactionWithPnL
+  density?: ListDensity
   isExpanded: boolean
   isConfirmingDelete: boolean
   isDeleting: boolean
@@ -315,6 +358,7 @@ type TxRowProps = {
 
 const TxRow = memo(function TxRow({
   tx,
+  density = 'ruim',
   isExpanded,
   isConfirmingDelete,
   isDeleting,
@@ -325,6 +369,9 @@ const TxRow = memo(function TxRow({
 }: TxRowProps) {
   const cfg = typeConfig[tx.type] || typeConfig.buy
   const Icon = cfg.icon
+  // Compact: kleinere padding + secundaire meta-regels verborgen; bedrag blijft
+  // volledig leesbaar. De datum staat sinds M-10 in de dag-kop, niet meer in de rij.
+  const isCompact = density === 'compact'
 
   return (
     <div
@@ -333,50 +380,47 @@ const TxRow = memo(function TxRow({
     >
       {/* Transaction row */}
       <button
-        className="flex w-full items-center gap-3 p-3 text-left"
+        className={`flex w-full items-center gap-3 px-3 text-left ${isCompact ? 'py-1.5' : 'py-3'}`}
         onClick={() => onToggle(tx.id)}
       >
-        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${cfg.bg}`}>
+        <div className={`flex ${isCompact ? 'h-7 w-7' : 'h-8 w-8'} shrink-0 items-center justify-center rounded-lg ${cfg.bg}`}>
           <Icon className={`h-4 w-4 ${cfg.color}`} />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className={`text-xs font-semibold ${cfg.color}`}>{cfg.label}</span>
-            <span className="text-xs text-[var(--ink-3)]">
-              {new Date(tx.date).toLocaleDateString('nl-NL', {
-                day: 'numeric',
-                month: 'short',
-                year: 'numeric',
-              })}
-            </span>
             {tx.notes && (
               <span className="truncate text-xs text-[var(--ink-3)] italic">
                 {tx.notes}
               </span>
             )}
           </div>
-          <p className="text-xs text-[var(--ink-3)]">
-            {tx.type === 'split'
-              ? `${tx.units}:1 split`
-              : `${tx.units} eenhe${tx.units === 1 ? 'id' : 'den'} @ ${formatCurrency(tx.price_per_unit)}`
-            }
-          </p>
+          {!isCompact && (
+            <p className="text-xs text-[var(--ink-3)]">
+              {tx.type === 'split'
+                ? `${tx.units}:1 split`
+                : `${tx.units} eenhe${tx.units === 1 ? 'id' : 'den'} @ ${formatCurrency(tx.price_per_unit)}`
+              }
+            </p>
+          )}
         </div>
 
         {/* Transaction amount */}
         <div className="shrink-0 text-right">
           {tx.type === 'split' ? (
-            <p className={`text-sm font-semibold ${cfg.color}`}>
+            <p className={`text-sm font-semibold tabular-nums ${cfg.color}`}>
               {tx.units}:1
             </p>
           ) : (
             <>
-              <p className={`text-sm font-semibold ${cfg.color}`}>
+              <p className={`text-sm font-semibold tabular-nums ${cfg.color}`}>
                 {cfg.sign}{<MaskedAmount value={tx.total_amount} tone="kern" />}
               </p>
-              <FreedomTimeBadge amount={tx.total_amount} className="mt-0.5 justify-end text-[10px]" />
+              {!isCompact && (
+                <FreedomTimeBadge amount={tx.total_amount} className="mt-0.5 justify-end text-[10px]" />
+              )}
               {tx.type === 'sell' && tx.realized_pnl !== 0 && (
-                <p className={`text-xs font-medium ${tx.realized_pnl >= 0 ? 'text-positive' : 'text-negative'}`}
+                <p className={`text-xs font-medium tabular-nums ${tx.realized_pnl >= 0 ? 'text-positive' : 'text-negative'}`}
                    data-testid="tx-realized-pnl"
                 >
                   W/V: {tx.realized_pnl >= 0 ? '+' : ''}{<MaskedAmount value={tx.realized_pnl} tone="kern" />}

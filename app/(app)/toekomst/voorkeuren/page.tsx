@@ -52,6 +52,7 @@ export default async function ToekomstVoorkeurenPage() {
         emphasis="aannames"
         titleAfter=" reken je?"
         deck="Eindstrategie, onttrekking, pot-regels en markt-aannames die over je hele tijdas gelden."
+        infoKey="/toekomst/voorkeuren"
       />
       <VoorkeurenView
         fireParams={horizonData.fireParams}

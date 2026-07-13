@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Newspaper, Loader2, RefreshCw, AlertCircle } from 'lucide-react'
 import { AiPrivacyIndicator } from '@/components/app/ai-privacy-indicator'
 import { Masthead } from './masthead'
+import { SectionHeading } from './section-heading'
 import { PageInfoButton } from '@/components/editorial'
 import { PAGE_INFO } from '@/lib/page-info-content'
 import { NewspaperFooter } from './newspaper-footer'
@@ -45,20 +46,6 @@ function setLocalNewsCache(items: NewsItem[], generatedAt?: string, sourceCount?
   } catch {
     // Silent fail — localStorage might be full
   }
-}
-
-// ── Newspaper section heading ────────────────────────────────────────
-
-function SectionHeading({ label }: { label: string }) {
-  return (
-    <div className="flex items-center gap-4 pb-4 pt-2">
-      <div className="h-px flex-1 bg-[var(--border-ed)]" />
-      <span className="font-inter text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink-4)]">
-        {label}
-      </span>
-      <div className="h-px flex-1 bg-[var(--border-ed)]" />
-    </div>
-  )
 }
 
 // ── News-only client component ───────────────────────────────────────

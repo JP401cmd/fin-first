@@ -232,7 +232,20 @@ interface HouseholdHeroData {
   retirementExpense: number
 }
 
-export default function HorizonPage({ initialData }: { initialData: HorizonPageData }) {
+export default function HorizonPage({
+  initialData,
+  embedded = false,
+}: {
+  initialData: HorizonPageData
+  /**
+   * K-02 — dubbele-hero-ontstapeling. Op /toekomst rendert de pagina al een
+   * eigen `PageOpening` ("Je tijdas") + PageInfoButton; dan degradeert de
+   * horizon-client-kop tot sectie-niveau (kicker + Tips-toggle, géén tweede
+   * H1-formaat, géén eigen PageInfoButton). Op de legacy-route /horizon staat
+   * geen paginakop, dus daar blijft `embedded={false}` de volle hero renderen.
+   */
+  embedded?: boolean
+}) {
   const { triggerDream } = useDreamTransition()
   const { masked } = useMaskedAmounts()
   const { addToast } = useToast()
@@ -3657,10 +3670,13 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
             <Lightbulb className="h-3.5 w-3.5" aria-hidden />
             <span className="hidden sm:inline">Tips</span>
           </button>
-          <PageInfoButton description={pageInfoText} />
+          {/* Embedded (op /toekomst): geen eigen PageInfoButton — de paginakop
+              (PageOpening "Je tijdas") levert 'm al. Alleen op de legacy-route
+              /horizon (standalone) rendert de i-knop hier. */}
+          {!embedded && <PageInfoButton description={pageInfoText} />}
         </div>
         {/* Kicker met 28×1px Horizon-streep */}
-        <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
+        <div className="flex items-center gap-2.5 pr-20 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)] sm:pr-24">
           <span
             aria-hidden
             className="inline-block h-px w-7 shrink-0"
@@ -3669,20 +3685,24 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           Horizon · jouw vrijheidshorizon
           <PerspectiveContextLabel className="normal-case tracking-normal" />
         </div>
-        {/* Headline met italic-em "vrij" in Horizon-700 */}
-        <h1
-          className="font-bold leading-tight tracking-[-0.02em] text-[28px] sm:text-[36px]"
-          style={{ fontFamily: 'var(--font-playfair, serif)' }}
-        >
-          Wanneer ben je{' '}
-          <em
-            className="font-normal italic"
-            style={{ color: 'var(--module-active-700)' }}
+        {/* Headline met italic-em "vrij" — alleen als volwaardige pagina-kop.
+            Embedded op /toekomst zou dit een tweede H1 náást "Je tijdas" geven
+            (dubbele hero, K-02); dan blijft de kop op kicker/sectie-niveau. */}
+        {!embedded && (
+          <h1
+            className="font-bold leading-tight tracking-[-0.02em] text-[28px] sm:text-[36px]"
+            style={{ fontFamily: 'var(--font-playfair, serif)' }}
           >
-            vrij
-          </em>
-          ?
-        </h1>
+            Wanneer ben je{' '}
+            <em
+              className="font-normal italic"
+              style={{ color: 'var(--module-active-700)' }}
+            >
+              vrij
+            </em>
+            ?
+          </h1>
+        )}
       </header>
 
       {/* Exit-melding: gecentreerde modal die verschijnt zodra de gebruiker de

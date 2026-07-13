@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Search, ArrowDown, ArrowUp } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import type { AnalysisTransaction } from '@/lib/transaction-insights'
+import { DensityToggle, useListDensity, type ListDensity } from '@/components/app/density-toggle'
 
 /**
  * Smalle rij-vorm die de cashflow-Sankey + geldstroom-weergaven gebruiken.
@@ -84,6 +85,7 @@ export function TransactiesFeed({
   const [query, setQuery] = useState('')
   const [accountFilter, setAccountFilter] = useState<string>('all')
   const [budgetFilter, setBudgetFilter] = useState<BudgetFilter>('all')
+  const { density, setDensity } = useListDensity('transacties-feed')
 
   // Reset alle actieve filters/zoek → gebruikt door de no-results-CTA.
   function resetFilters() {
@@ -147,15 +149,20 @@ export function TransactiesFeed({
   return (
     <section className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
       <header className="mb-4 flex flex-col gap-3">
-        <div className="flex items-baseline justify-between gap-3">
+        <div className="flex items-center justify-between gap-3">
           <h2 className="text-lg sm:text-xl font-semibold text-[var(--ink)]">
             Transacties
           </h2>
-          {periodLabel && (
-            <span className="text-[10px] uppercase tracking-[0.12em] font-mono text-[var(--ink-3)]">
-              {periodLabel}
-            </span>
-          )}
+          <div className="flex items-center gap-3">
+            {periodLabel && (
+              <span className="text-[10px] uppercase tracking-[0.12em] font-mono text-[var(--ink-3)]">
+                {periodLabel}
+              </span>
+            )}
+            {transactions.length > 0 && (
+              <DensityToggle density={density} onChange={setDensity} />
+            )}
+          </div>
         </div>
 
         {transactions.length > 0 && (
@@ -319,7 +326,7 @@ export function TransactiesFeed({
               </div>
               <ul className="divide-y divide-[var(--border-ed)]">
                 {rows.map((tx) => (
-                  <TransactionListRow key={tx.id} tx={tx} onSelect={onSelect} />
+                  <TransactionListRow key={tx.id} tx={tx} onSelect={onSelect} density={density} />
                 ))}
               </ul>
             </div>
@@ -356,20 +363,28 @@ export function TransactiesFeed({
 function TransactionListRow({
   tx,
   onSelect,
+  density = 'ruim',
 }: {
   tx: AnalysisTransaction
   onSelect?: (tx: AnalysisTransaction) => void
+  density?: ListDensity
 }) {
   // Tegenpartij alleen tonen als die afwijkt van de omschrijving — anders ruis.
   const counterparty = tx.counterparty_name?.trim()
   const showCounterparty =
     Boolean(counterparty) && counterparty!.toLowerCase() !== tx.description.trim().toLowerCase()
 
+  // Compact: kleinere verticale padding + secundaire meta-regels verborgen.
+  // Het bedrag blijft volledig leesbaar.
+  const isCompact = density === 'compact'
+  const padY = isCompact ? 'py-1.5' : 'py-2.5'
+
   const content = (
     <>
       <span
         className={[
-          'shrink-0 w-7 h-7 rounded-lg flex items-center justify-center',
+          'shrink-0 rounded-lg flex items-center justify-center',
+          isCompact ? 'w-6 h-6' : 'w-7 h-7',
           tx.amount < 0 ? 'bg-amber-50 text-amber-700' : 'bg-positive-bg text-positive',
         ].join(' ')}
         aria-hidden
@@ -380,24 +395,26 @@ function TransactionListRow({
         <div className="text-sm font-medium text-[var(--ink)] truncate">
           {tx.description}
         </div>
-        {showCounterparty && (
+        {!isCompact && showCounterparty && (
           <div className="text-[11px] text-[var(--ink-3)] truncate">{counterparty}</div>
         )}
-        <div className="text-[11px] text-[var(--ink-3)] truncate flex items-center gap-1.5">
-          {tx.account_name && (
-            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--subtle)] text-[var(--ink-2)] font-medium">
-              {tx.account_name}
-            </span>
-          )}
-          {tx.category && <span>{tx.category}</span>}
-          {!tx.account_name && !tx.category && (
-            <span className="italic">Geen rekening</span>
-          )}
-        </div>
+        {!isCompact && (
+          <div className="text-[11px] text-[var(--ink-3)] truncate flex items-center gap-1.5">
+            {tx.account_name && (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--subtle)] text-[var(--ink-2)] font-medium">
+                {tx.account_name}
+              </span>
+            )}
+            {tx.category && <span>{tx.category}</span>}
+            {!tx.account_name && !tx.category && (
+              <span className="italic">Geen rekening</span>
+            )}
+          </div>
+        )}
       </div>
       <span
         className={[
-          'font-mono text-sm font-semibold shrink-0',
+          'font-mono tabular-nums text-right text-sm font-semibold shrink-0',
           tx.amount < 0 ? 'text-[var(--ink)]' : 'text-positive',
         ].join(' ')}
       >
@@ -413,7 +430,7 @@ function TransactionListRow({
         <button
           type="button"
           onClick={() => onSelect(tx)}
-          className="w-full flex items-center gap-3 py-2.5 text-left rounded-lg hover:bg-[var(--subtle)] focus:outline-2 focus:outline-[var(--ink)] focus:outline-offset-1 transition-colors"
+          className={`w-full flex items-center gap-3 ${padY} text-left rounded-lg hover:bg-[var(--subtle)] focus:outline-2 focus:outline-[var(--ink)] focus:outline-offset-1 transition-colors`}
         >
           {content}
         </button>
@@ -422,7 +439,7 @@ function TransactionListRow({
   }
 
   return (
-    <li role="listitem" className="flex items-center gap-3 py-2.5">
+    <li role="listitem" className={`flex items-center gap-3 ${padY}`}>
       {content}
     </li>
   )

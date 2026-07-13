@@ -46,6 +46,7 @@ import { useFeatureAccess } from '@/components/app/feature-access-provider'
 import { Kicker } from '@/components/editorial'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { ValuationModal } from '@/components/core/assets-client'
+import { DensityToggle, useListDensity } from '@/components/app/density-toggle'
 
 // Aantal rijen dat de transactielijst per keer toont; "Toon meer" voegt telkens
 // een pagina toe. Houdt de DOM klein bij een zware maand (100-400 rijen).
@@ -185,6 +186,9 @@ export function CashAccountView({
   const [filterSearch, setFilterSearch] = useState('')
   const [filterType, setFilterType] = useState<'all' | 'income' | 'expense' | 'transfer'>('all')
   const [filterBudgetId, setFilterBudgetId] = useState<string>('all')
+  // Ruim/compact-dichtheid van de transactielijst (M-08) — per-apparaat bewaard.
+  const { density: listDensity, setDensity: setListDensity } = useListDensity('cash-account-transacties')
+  const isCompactList = listDensity === 'compact'
   // Paginering van de transactielijst — begrenst de gerenderde rijen tot ROW_PAGE.
   const [visibleCount, setVisibleCount] = useState(ROW_PAGE)
 
@@ -1789,6 +1793,11 @@ export function CashAccountView({
               Reset filters
             </button>
           )}
+          <DensityToggle
+            density={listDensity}
+            onChange={setListDensity}
+            className="sm:ml-auto"
+          />
         </div>
         {hasActiveFilters && (
           <div className="mt-2 flex items-center gap-2 text-xs text-[var(--ink-3)]" data-testid="filter-summary">
@@ -2081,7 +2090,7 @@ export function CashAccountView({
                               openTx()
                             }
                           } : undefined}
-                          className={`flex cursor-pointer items-center gap-3 px-4 py-3 hover:bg-[var(--subtle)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--ink)] focus-visible:-outline-offset-2 ${isPendingTransfer ? 'border-l-2 border-[var(--hor)]' : ''} ${isSplitTx ? 'border-l-2 border-kern-300' : ''}`}
+                          className={`flex cursor-pointer items-center gap-3 px-4 ${isCompactList ? 'py-1.5' : 'py-3'} hover:bg-[var(--subtle)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--ink)] focus-visible:-outline-offset-2 ${isPendingTransfer ? 'border-l-2 border-[var(--hor)]' : ''} ${isSplitTx ? 'border-l-2 border-kern-300' : ''}`}
                         >
                           <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--r)] ${
                             isTransfer ? 'bg-[var(--subtle)] border border-[var(--border-ed)]'
@@ -2118,19 +2127,21 @@ export function CashAccountView({
                                 </span>
                               )}
                             </div>
-                            <p className="truncate text-xs text-[var(--ink-3)]">
-                              {isTransfer && tx.counterparty_name
-                                ? `${tx.counterparty_name}${tx.counterparty_iban ? ' \u00B7 ' + tx.counterparty_iban.slice(-4) : ''}`
-                                : tx.counterparty_name ?? ''}
-                              {isCombined && (() => {
-                                const acctName = allAccounts.find(a => a.id === tx.account_id)?.name
-                                return acctName ? (
-                                  <span className="ml-1.5 inline-flex rounded bg-kern-50 border border-kern-200 px-1.5 py-px text-[9px] font-medium text-kern-600 align-middle">
-                                    {acctName}
-                                  </span>
-                                ) : null
-                              })()}
-                            </p>
+                            {!isCompactList && (
+                              <p className="truncate text-xs text-[var(--ink-3)]">
+                                {isTransfer && tx.counterparty_name
+                                  ? `${tx.counterparty_name}${tx.counterparty_iban ? ' \u00B7 ' + tx.counterparty_iban.slice(-4) : ''}`
+                                  : tx.counterparty_name ?? ''}
+                                {isCombined && (() => {
+                                  const acctName = allAccounts.find(a => a.id === tx.account_id)?.name
+                                  return acctName ? (
+                                    <span className="ml-1.5 inline-flex rounded bg-kern-50 border border-kern-200 px-1.5 py-px text-[9px] font-medium text-kern-600 align-middle">
+                                      {acctName}
+                                    </span>
+                                  ) : null
+                                })()}
+                              </p>
+                            )}
                           </div>
 
                           {isTransfer ? (
@@ -2183,7 +2194,7 @@ export function CashAccountView({
                             }`}>
                               {!isTransfer && !isPendingTransfer && (isPositive ? '+' : '')}{<MaskedAmount value={amount} tone="kern" />}
                             </span>
-                            {!isTransfer && !isPendingTransfer && dailyExpenses > 0 && (
+                            {!isTransfer && !isPendingTransfer && dailyExpenses > 0 && !isCompactList && (
                               <>
                                 <p className={`text-[10px] leading-tight ${isPositive ? 'text-positive/60' : 'text-[var(--ink-3)]'}`} data-testid="tx-freedom-time">
                                   {(() => {

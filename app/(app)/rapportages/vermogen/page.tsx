@@ -25,7 +25,9 @@ import {
   ScenarioCallout,
   SectionLabel,
   OrnamentColophon,
+  PageInfoButton,
 } from '@/components/editorial'
+import { PAGE_INFO } from '@/lib/page-info-content'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import type {
   VermogenReportData,
@@ -688,7 +690,8 @@ export default function VermogenReportPage() {
       <NavStackMeta title="Vermogensoverzicht" bottomBar={{ kind: 'tabs' }} />
 
       {/* ── Toolbar — print-knop ── */}
-      <div data-print-hide className="mb-6 flex items-center justify-end">
+      <div data-print-hide className="mb-6 flex items-center justify-end gap-3">
+        <PageInfoButton description={PAGE_INFO['/rapportages/vermogen'] ?? ''} />
         <button
           type="button"
           onClick={() => window.print()}

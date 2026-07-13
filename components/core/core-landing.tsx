@@ -622,6 +622,7 @@ export function CoreLanding({ initialData }: CoreLandingProps) {
         open={quickAddIntent !== null}
         onClose={() => setQuickAddIntent(null)}
         initialIntent={quickAddIntent ?? undefined}
+        assetCountBefore={assetCount}
       />
 
       {/* Netto-vermogen kassabon */}

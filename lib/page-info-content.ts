@@ -207,4 +207,48 @@ export const PAGE_INFO: Record<string, string> = {
     'Overzicht van je financiële rapportages: balans, budget-analyse en vermogensverloop. ' +
     'Genereer rapporten voor een specifieke periode of bekijk trends over tijd. ' +
     'Exporteer als PDF voor je administratie.',
+
+  '/rapportages/balans':
+    'Je vermogensbalans op één peildatum: activa links, passiva rechts, eigen vermogen als sluitstuk. ' +
+    'Plus kengetallen zoals solvabiliteit en liquiditeit, en je eigen vermogen vertaald naar vrijheidstijd. ' +
+    'Druk af als PDF voor je administratie.',
+
+  '/rapportages/vermogen':
+    'Een volledige inventaris van wat je bezit en wat je schuldig bent, per categorie uitgesplitst. ' +
+    'Inclusief verdieping op holdings, woonbalans, verhuur en hypotheek. ' +
+    'Onderaan zie je je netto vermogen omgerekend naar vrijheidstijd.',
+
+  '/rapportages/budget':
+    'Hoe je begroting zich verhoudt tot wat je werkelijk uitgaf deze periode, per categorie. ' +
+    'Zie waar je onder of over budget zit en wat dat met je spaarquote — de vrijheid die je opbouwt — doet. ' +
+    'Afdrukbaar als PDF.',
+
+  '/rapportages/benchmark':
+    'Hoe jouw cijfers zich verhouden tot vergelijkbare huishoudens: spaarquote, vermogen en woonlasten. ' +
+    'Een spiegel, geen oordeel — bedoeld om van te leren, niet om te scoren.',
+
+  '/rapportages/persoonlijk-plan':
+    'Je financiële plan op één plek: waar je nu staat, waar je heen wilt en de stappen ertussen. ' +
+    'Een leesbaar document dat je doelen, projectie en keuzes samenvat. ' +
+    'Druk het af of houd het bij de hand.',
+
+  '/toekomst/doelen':
+    'Je financiële doelen en hun voortgang: hoeveel je al hebt, hoeveel nog te gaan en wanneer je er bent. ' +
+    'Elk doel is een stuk vrijheid dat je opbouwt. ' +
+    'Voeg een doel toe of stel een bestaande bij.',
+
+  '/toekomst/gebeurtenissen':
+    'De levensgebeurtenissen op je tijdas: pensioen, AOW, een huis kopen of verkopen, een erfenis. ' +
+    'Elk event verschuift je vrijheidsmoment. ' +
+    'Voeg er een toe of sleep \'m naar een ander jaar en zie meteen het effect.',
+
+  '/toekomst/voorkeuren':
+    'De aannames achter je projectie: verwacht rendement, inflatie, je uitgaven na pensioen en je gekozen eindleeftijd. ' +
+    'Klein draaien aan deze knoppen verschuift jaren vrijheid. ' +
+    'Hier stel je ze in.',
+
+  '/toekomst/bibliotheek':
+    'Je opgeslagen wat-als-scenario\'s en berekeningen op één plek. ' +
+    'Open er een om verder te verkennen of vergelijk \'m met je huidige plan. ' +
+    'Zo houd je grip op de keuzes die je onderzocht.',
 }

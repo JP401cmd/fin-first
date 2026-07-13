@@ -8,6 +8,7 @@ import { NotificationItem } from '@/components/app/notifications/notification-it
 import { Bell, ChevronRight, CheckCheck, Newspaper } from 'lucide-react'
 import { Masthead } from './masthead'
 import { NewspaperFooter } from './newspaper-footer'
+import { SectionHeading } from './section-heading'
 import type { Notification } from '@/app/api/notifications/route'
 import { PageInfoButton } from '@/components/editorial'
 import { PAGE_INFO } from '@/lib/page-info-content'
@@ -54,20 +55,6 @@ type DayGroup = {
 }
 
 type FilterMode = 'all' | 'unread'
-
-// ── Newspaper section heading (rule · label · rule) ──────────────────
-
-function SectionHeading({ label }: { label: string }) {
-  return (
-    <div className="flex items-center gap-4 pb-4 pt-2">
-      <div className="h-px flex-1 bg-[var(--border-ed)]" />
-      <span className="font-inter text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink-4)]">
-        {label}
-      </span>
-      <div className="h-px flex-1 bg-[var(--border-ed)]" />
-    </div>
-  )
-}
 
 // ── Sub-section bar inside the notices column ────────────────────────
 

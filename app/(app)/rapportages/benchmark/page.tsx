@@ -22,7 +22,8 @@ import { Printer, Globe } from 'lucide-react'
 import { formatMaskedCurrency, formatTimestamp } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { formatFireAge } from '@/lib/horizon-data'
-import { ScenarioCallout, SectionLabel, OrnamentColophon } from '@/components/editorial'
+import { ScenarioCallout, SectionLabel, OrnamentColophon, PageInfoButton } from '@/components/editorial'
+import { PAGE_INFO } from '@/lib/page-info-content'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import type {
   BenchmarkReportData,
@@ -181,7 +182,8 @@ export default function BenchmarkPage() {
       <NavStackMeta title="Benchmark" bottomBar={{ kind: 'tabs' }} />
 
       {/* ── Toolbar — page-eigen print-actie ── */}
-      <div data-print-hide className="mb-4 flex items-center justify-end">
+      <div data-print-hide className="mb-4 flex items-center justify-end gap-3">
+        <PageInfoButton description={PAGE_INFO['/rapportages/benchmark'] ?? ''} />
         <button
           type="button"
           onClick={() => window.print()}

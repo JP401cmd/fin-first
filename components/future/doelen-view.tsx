@@ -11,6 +11,7 @@ import { DoelToevoegenSheet } from './doel-toevoegen-sheet'
 import { DoelBewerkenSheet } from './doel-bewerken-sheet'
 import { DoelLoslatenConfirm } from './doel-loslaten-confirm'
 import { ProgressMilestones } from '@/components/editorial/progress-milestones'
+import { MilestoneCelebration } from '@/components/app/milestone-celebration'
 
 /**
  * DoelenView — content voor de Doelen-tab op /toekomst.
@@ -82,6 +83,11 @@ export function DoelenView({
   // de bewerken-sheet een GoalForm (volledig edit met asset/debt-link)
   // kan openen zonder extra DB-fetch.
   const [editingGoal, setEditingGoal] = useState<GoalWithBudget | null>(null)
+
+  // Mijlpaal "doel behaald" — gezet zodra een doel bij het bijwerken de
+  // 100%-overgang maakt. De viering zelf (once-guard per doel-id) zit in
+  // MilestoneCelebration.
+  const [reachedGoal, setReachedGoal] = useState<{ id: string; name: string } | null>(null)
 
   // Doelsituatie-groep: overflow-menu + loslaten-bevestiging.
   const [menuOpen, setMenuOpen] = useState(false)
@@ -425,6 +431,20 @@ export function DoelenView({
         <DoelBewerkenSheet
           goal={editingGoal}
           onClose={() => setEditingGoal(null)}
+          onCompleted={(g) => setReachedGoal(g)}
+        />
+      )}
+
+      {reachedGoal && (
+        <MilestoneCelebration
+          celebrationKey={`goal-reached:${reachedGoal.id}`}
+          title={
+            <>
+              Doel behaald: <em>{reachedGoal.name}</em>.
+            </>
+          }
+          meaning="Je hebt gehaald wat je jezelf voornam — een stuk vrijheid dat nu vaststaat."
+          onDismiss={() => setReachedGoal(null)}
         />
       )}
 

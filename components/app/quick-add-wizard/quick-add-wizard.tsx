@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useReducer, useState } from 'react'
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
@@ -40,6 +40,7 @@ import { StepType } from './steps/step-type'
 import { StepDetails } from './steps/step-details'
 import { StepLinkDebt } from './steps/step-link-debt'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { MilestoneCelebration } from '@/components/app/milestone-celebration'
 
 /**
  * QuickAddWizard — 4-staps flow in een BottomSheet.
@@ -94,6 +95,15 @@ export interface QuickAddWizardProps {
   mode?: 'commit' | 'collect'
   onCollect?: (item: QuickAddInput) => void
   onSaved?: (result: { assetId?: string; debtId?: string }) => void
+  /**
+   * Aantal bezittingen dat de gebruiker had vóór deze wizard-sessie. Wanneer dit
+   * exact 0 is en er hier een bezitting bijkomt (commit-mode), viert de wizard
+   * eenmalig de mijlpaal "je eerste bezitting". De waarde wordt bij openen
+   * bevroren, zodat een `router.refresh()` ná de insert het signaal niet vertroebelt.
+   * Optioneel: consumers die geen betrouwbare telling hebben laten 'm weg — dan
+   * viert de wizard niet (liever geen viering dan een onterechte).
+   */
+  assetCountBefore?: number
 }
 
 /**
@@ -133,10 +143,15 @@ export function QuickAddWizard({
   mode = 'commit',
   onCollect,
   onSaved,
+  assetCountBefore,
 }: QuickAddWizardProps) {
   const [state, dispatch] = useReducer(wizardReducer, initialWizardState)
   const [isSaving, setIsSaving] = useState(false)
   const [linkDebtCtx, setLinkDebtCtx] = useState<LinkDebtContext>(null)
+  // Mijlpaal "eerste bezitting": bevries de telling bij openen (zie prop-doc) en
+  // toon de viering zodra er in commit-mode een bezitting bijkomt vanaf nul.
+  const assetCountAtOpenRef = useRef<number | undefined>(assetCountBefore)
+  const [celebrateFirstAsset, setCelebrateFirstAsset] = useState(false)
   // Optionele toast: wizard wordt ook in onboarding-layout gebruikt waar geen
   // ToastProvider zit. In collect-mode roepen we addToast toch niet aan; in
   // commit-mode is de provider altijd aanwezig (app-shell).
@@ -151,6 +166,14 @@ export function QuickAddWizard({
     (initialIntent === 'asset' && Boolean(initialAssetType)) ||
     (initialIntent === 'debt' && Boolean(initialDebtType))
 
+  // Spiegel de prop in een render-ref zodat het open-effect 'm kan lezen
+  // zónder erop te dependeren: na een succesvolle save streamt router.refresh()
+  // een nieuwe telling het component in, en mét de prop in de dep-array zou
+  // dat het open-effect her-triggeren — OPEN-reset wist dan het success-scherm
+  // en kapt de viering af.
+  const assetCountBeforeRef = useRef(assetCountBefore)
+  assetCountBeforeRef.current = assetCountBefore
+
   // Open/reset — sync met de `open`-prop uit de parent. Bij heropening
   // starten we schoon (OPEN action met optionele intent + type-prefill).
   useEffect(() => {
@@ -164,12 +187,30 @@ export function QuickAddWizard({
       })
       setLinkDebtCtx(null)
       setIsSaving(false)
+      setCelebrateFirstAsset(false)
+      // Bevries de bezittings-telling zoals die was bij openen — de bron van het
+      // "eerste bezitting"-signaal, immuun voor de latere router.refresh().
+      assetCountAtOpenRef.current = assetCountBeforeRef.current
     } else {
       dispatch({ type: 'RESET' })
       setLinkDebtCtx(null)
       setIsSaving(false)
+      setCelebrateFirstAsset(false)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- assetCountBefore bewust via ref (zie boven)
   }, [open, initialIntent, initialAssetType, initialDebtType, initialLinkedAssetId])
+
+  // Mijlpaal-detectie op één plek: zodra we een success-scherm tonen met een
+  // nieuw toegevoegde bezitting (asset of asset_with_debt), commit-mode, en de
+  // bevroren telling exact 0 was, markeren we de viering. De MilestoneCelebration
+  // zelf bewaakt de once-guard (localStorage), dus dit vlagje mag ruim staan.
+  useEffect(() => {
+    if (state.step !== 'success' || isCollectMode) return
+    if (assetCountAtOpenRef.current !== 0) return
+    if (state.kind === 'asset' || state.kind === 'asset_with_debt') {
+      setCelebrateFirstAsset(true)
+    }
+  }, [state, isCollectMode])
 
   // Stappen-totaal: choice + type + details + linkDebt = 4. Skip choice
   // bij `initialIntent` (-1), skip ook type bij type-prefill (-1).
@@ -511,47 +552,64 @@ export function QuickAddWizard({
   const sheetHeight = deriveSheetHeight(state, linkDebtCtx)
 
   return (
-    <BottomSheet
-      open={open}
-      onClose={handleClose}
-      title={sheetTitle}
-      size="md"
-      initialMobileHeight={sheetHeight}
-    >
-      <div className="p-5 sm:p-6">
-        <WizardContent
-          state={state}
-          linkDebtCtx={linkDebtCtx}
-          totalSteps={totalSteps}
-          initialIntent={initialIntent}
-          hasTypePrefill={hasTypePrefill}
-          isSaving={isSaving}
-          onBack={handleBack}
-          onSelectIntent={selectIntent}
-          onSelectType={selectType}
-          onUpdateAsset={updateAsset}
-          onUpdateDebt={updateDebt}
-          onProceedAssetDetails={() => {
-            if (state.step === 'details' && state.intent === 'asset') {
-              void proceedFromAssetDetails(state.assetDraft)
-            }
-          }}
-          onProceedDebtDetails={() => {
-            if (state.step === 'details' && state.intent === 'debt') {
-              // `linkedAssetId` is gezet wanneer de wizard met een voor-ingevuld
-              // koppel-id is geopend (hypotheek-vervolg-CTA op een nieuwe woning).
-              proceedFromDebtDetails(state.debtDraft, state.linkedAssetId)
-            }
-          }}
-          onLinkDebtYes={handleLinkDebtYes}
-          onLinkDebtNo={handleLinkDebtNo}
-          onLinkDebtFormUpdate={handleLinkDebtFormUpdate}
-          onLinkDebtFormSubmit={handleLinkDebtFormSubmit}
-          onAddAnother={handleAddAnother}
-          onClose={handleClose}
+    <>
+      <BottomSheet
+        open={open}
+        onClose={handleClose}
+        title={sheetTitle}
+        size="md"
+        initialMobileHeight={sheetHeight}
+      >
+        <div className="p-5 sm:p-6">
+          <WizardContent
+            state={state}
+            linkDebtCtx={linkDebtCtx}
+            totalSteps={totalSteps}
+            initialIntent={initialIntent}
+            hasTypePrefill={hasTypePrefill}
+            isSaving={isSaving}
+            onBack={handleBack}
+            onSelectIntent={selectIntent}
+            onSelectType={selectType}
+            onUpdateAsset={updateAsset}
+            onUpdateDebt={updateDebt}
+            onProceedAssetDetails={() => {
+              if (state.step === 'details' && state.intent === 'asset') {
+                void proceedFromAssetDetails(state.assetDraft)
+              }
+            }}
+            onProceedDebtDetails={() => {
+              if (state.step === 'details' && state.intent === 'debt') {
+                // `linkedAssetId` is gezet wanneer de wizard met een voor-ingevuld
+                // koppel-id is geopend (hypotheek-vervolg-CTA op een nieuwe woning).
+                proceedFromDebtDetails(state.debtDraft, state.linkedAssetId)
+              }
+            }}
+            onLinkDebtYes={handleLinkDebtYes}
+            onLinkDebtNo={handleLinkDebtNo}
+            onLinkDebtFormUpdate={handleLinkDebtFormUpdate}
+            onLinkDebtFormSubmit={handleLinkDebtFormSubmit}
+            onAddAnother={handleAddAnother}
+            onClose={handleClose}
+          />
+        </div>
+      </BottomSheet>
+
+      {/* Mijlpaal "eerste bezitting" — ingetogen, zelf-sluitend; zweeft boven het
+          success-scherm en verdwijnt vanzelf. Once-guard zit in de component. */}
+      {celebrateFirstAsset && (
+        <MilestoneCelebration
+          celebrationKey="first-asset"
+          title={
+            <>
+              Je eerste <em>bezitting</em> staat.
+            </>
+          }
+          meaning="Vanaf hier maak je zichtbaar hoeveel vrijheid je al hebt opgebouwd."
+          onDismiss={() => setCelebrateFirstAsset(false)}
         />
-      </div>
-    </BottomSheet>
+      )}
+    </>
   )
 }
 

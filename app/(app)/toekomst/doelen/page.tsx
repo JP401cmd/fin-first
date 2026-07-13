@@ -33,6 +33,7 @@ export default async function ToekomstDoelenPage() {
         emphasis="vrijheid"
         titleAfter=" voor?"
         deck="Je doelen met status — sparen, aflossen en groeien richting je vrijheidsgetal."
+        infoKey="/toekomst/doelen"
       />
       <DoelenView
         goals={willData.goals}

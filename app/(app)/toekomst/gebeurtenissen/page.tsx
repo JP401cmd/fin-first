@@ -191,6 +191,7 @@ export default async function ToekomstGebeurtenissenPage() {
         emphasis="vrijheid"
         titleAfter="?"
         deck="Kind, erfenis, AOW, pensioen en je huis — momenten die je tijdas naar voren of naar achteren duwen."
+        infoKey="/toekomst/gebeurtenissen"
       />
       <GebeurtenissenView
         events={horizonData.events}

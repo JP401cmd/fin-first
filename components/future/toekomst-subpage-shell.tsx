@@ -14,7 +14,8 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
-import { PageOpening } from '@/components/editorial'
+import { PageOpening, PageInfoButton } from '@/components/editorial'
+import { PAGE_INFO } from '@/lib/page-info-content'
 
 export function ToekomstSubpageShell({
   kicker,
@@ -22,6 +23,7 @@ export function ToekomstSubpageShell({
   emphasis,
   titleAfter,
   deck,
+  infoKey,
   children,
 }: {
   /** Hairline-kicker boven de kop (tekst of nodes). */
@@ -34,11 +36,23 @@ export function ToekomstSubpageShell({
   titleAfter: string
   /** Optionele redactionele deck onder de kop. */
   deck?: ReactNode
+  /**
+   * Optionele PAGE_INFO-sleutel (bv. '/toekomst/doelen') — rendert de
+   * "Wat zie ik hier?"-i-knop rechtsboven, op de canonieke offsets
+   * (right-4 top-4 sm:right-6). Zonder sleutel geen knop (K-04).
+   */
+  infoKey?: string
   /** Optioneel blok onder de kop (extra rijen / acties). */
   children?: ReactNode
 }) {
   return (
-    <div className="mx-auto max-w-6xl px-4 sm:px-6 pt-4">
+    <div className="relative mx-auto max-w-6xl px-4 sm:px-6 pt-4">
+      {infoKey && (
+        <PageInfoButton
+          description={PAGE_INFO[infoKey] ?? ''}
+          className="absolute right-4 top-4 sm:right-6"
+        />
+      )}
       <Link
         href="/toekomst"
         className="inline-flex items-center gap-1.5 text-[11px] font-medium text-[var(--ink-3)] hover:text-[var(--ink-2)] transition-colors"
@@ -48,7 +62,7 @@ export function ToekomstSubpageShell({
       </Link>
 
       <PageOpening
-        className="mt-3"
+        className="mt-3 pr-12 sm:pr-14"
         kicker={kicker}
         titleBefore={titleBefore}
         emphasis={emphasis}
