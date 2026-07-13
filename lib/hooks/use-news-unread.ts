@@ -19,10 +19,16 @@ import { useEffect, useState } from 'react'
  * Geen polling. Defensief: bij loading/fout retourneert hij `false` zodat de
  * dot grijs blijft i.p.v. ten onrechte groen.
  */
+// Module-scoped: krijgt dit account een 403 (abonnement-gating), dan is elke
+// volgende mount-fetch deze sessie zinloos — zonder guard hamert de hook bij
+// elke navigatie opnieuw op het endpoint (8× 403 gezien in de spotcheck).
+let newsPeekForbidden = false
+
 export function useNewsUnread(): boolean {
   const [hasUnread, setHasUnread] = useState(false)
 
   useEffect(() => {
+    if (newsPeekForbidden) return
     let cancelled = false
     ;(async () => {
       try {
@@ -30,6 +36,10 @@ export function useNewsUnread(): boolean {
           fetch('/api/news?peek=1'),
           fetch('/api/news/read'),
         ])
+        if (newsRes.status === 403 || readRes.status === 403) {
+          newsPeekForbidden = true
+          return
+        }
         if (!newsRes.ok || !readRes.ok) return
         const newsData = (await newsRes.json()) as { ids?: Array<string | undefined> }
         const readData = (await readRes.json()) as { readIds?: string[] }

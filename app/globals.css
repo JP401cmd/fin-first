@@ -1612,9 +1612,15 @@ body.sleepmodus-dragging * {
    Conservatief: alleen :focus-visible (keyboard/programmatic), niet
    bij muisklik. Bestaande component-specifieke focus-regels blijven
    intact — dit is een vangnet voor links/knoppen zonder eigen stijl. */
-a:focus-visible,
-button:focus-visible {
-  outline: 2px solid var(--ink);
-  outline-offset: 2px;
-  border-radius: 2px;
+/* In @layer base zodat Tailwind-utilities (bv. focus-visible:outline-[var(--paper)]
+   op de donkere nav-pill) deze globale default kúnnen overschrijven — een
+   ongelaagde regel wint anders altijd van @layer utilities, ongeacht
+   specificiteit. */
+@layer base {
+  a:focus-visible,
+  button:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
 }

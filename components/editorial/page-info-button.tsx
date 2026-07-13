@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { Info } from 'lucide-react'
 
 /**
@@ -36,6 +36,26 @@ export function PageInfoButton({
 }: PageInfoButtonProps) {
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+  // Viewport-clamp: het panel ankert right-0 aan de knop, maar de knop staat
+  // niet altijd tegen de schermrand (bv. rapportages-toolbar) — zonder clamp
+  // valt 280px panel dan links buiten beeld op mobiel.
+  const [shiftX, setShiftX] = useState(0)
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setShiftX(0)
+      return
+    }
+    const panel = panelRef.current
+    if (!panel) return
+    const rect = panel.getBoundingClientRect()
+    const margin = 8
+    let shift = 0
+    if (rect.left < margin) shift = margin - rect.left
+    else if (rect.right > window.innerWidth - margin) shift = window.innerWidth - margin - rect.right
+    if (shift !== 0) setShiftX(shift)
+  }, [open])
 
   // Close on outside click/touch
   useEffect(() => {
@@ -81,8 +101,10 @@ export function PageInfoButton({
 
         {open && (
           <div
+            ref={panelRef}
             role="tooltip"
-            className="absolute right-0 top-full z-50 mt-2 w-[280px] sm:w-[320px] rounded border border-[var(--border-ed)] bg-[var(--paper)] shadow-md"
+            className="absolute right-0 top-full z-50 mt-2 w-[min(280px,calc(100vw-1rem))] sm:w-[320px] rounded border border-[var(--border-ed)] bg-[var(--paper)] shadow-md"
+            style={shiftX ? { transform: `translateX(${shiftX}px)` } : undefined}
           >
             {/* Header */}
             <div className="border-b border-[var(--border-ed)] px-3 py-2">
