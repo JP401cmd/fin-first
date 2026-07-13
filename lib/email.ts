@@ -1,9 +1,14 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
+import { getServiceClient } from '@/lib/supabase/service'
 
 // Transactionele e-mail via Resend (REST, geen SDK nodig). Versturen gebeurt
 // alleen als RESEND_API_KEY is gezet; anders wordt de poging als 'skipped'
 // gelogd zodat de flow (bv. huishouden-invite) blijft werken (link-fallback).
 // Elke poging landt in mail_log → zichtbaar op /beheer/email.
+//
+// mail_log wordt bewust via de service-role-client geschreven (systeem-log,
+// geen user_id-kolom). Zo hoeft er geen authenticated INSERT-policy op de
+// tabel te staan die een ingelogde gebruiker zou laten spoofen (to_email/
+// subject). Zie migratie 20260713*_db_slotwerk_rechten_policies.sql, punt 4.
 
 const RESEND_ENDPOINT = 'https://api.resend.com/emails'
 
@@ -12,7 +17,6 @@ export function isEmailConfigured(): boolean {
 }
 
 async function recordMail(
-  client: SupabaseClient,
   toEmail: string,
   subject: string,
   status: 'sent' | 'failed' | 'skipped',
@@ -20,39 +24,61 @@ async function recordMail(
   error: string | null,
 ): Promise<void> {
   try {
-    await client.from('mail_log').insert({ to_email: toEmail, subject, status, provider, error })
+    await getServiceClient()
+      .from('mail_log')
+      .insert({ to_email: toEmail, subject, status, provider, error })
   } catch {
     // mail_log-fout mag de flow nooit breken.
   }
 }
 
 export async function sendEmail(
-  client: SupabaseClient,
-  opts: { to: string; subject: string; html: string },
+  opts: {
+    to: string
+    subject: string
+    html: string
+    /**
+     * Optionele extra e-mailheaders. Bedoeld voor RFC 8058 one-click
+     * unsubscribe (`List-Unsubscribe` + `List-Unsubscribe-Post`) op
+     * engagement-mail zoals de weekbriefing. Resend geeft deze door aan de
+     * uitgaande SMTP-headers. Transactionele mail (huishouden-invite) laat dit
+     * bewust leeg.
+     */
+    headers?: Record<string, string>
+  },
 ): Promise<{ ok: boolean; skipped?: boolean }> {
   const apiKey = process.env.RESEND_API_KEY
   const from = process.env.EMAIL_FROM || 'TriFinity <noreply@trifinity.app>'
 
   if (!apiKey) {
-    await recordMail(client, opts.to, opts.subject, 'skipped', 'resend', 'RESEND_API_KEY niet ingesteld')
+    await recordMail(opts.to, opts.subject, 'skipped', 'resend', 'RESEND_API_KEY niet ingesteld')
     return { ok: false, skipped: true }
   }
 
   try {
+    const payload: Record<string, unknown> = {
+      from,
+      to: [opts.to],
+      subject: opts.subject,
+      html: opts.html,
+    }
+    if (opts.headers && Object.keys(opts.headers).length > 0) {
+      payload.headers = opts.headers
+    }
     const res = await fetch(RESEND_ENDPOINT, {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from, to: [opts.to], subject: opts.subject, html: opts.html }),
+      body: JSON.stringify(payload),
     })
     if (!res.ok) {
       const t = await res.text().catch(() => '')
-      await recordMail(client, opts.to, opts.subject, 'failed', 'resend', t.slice(0, 500))
+      await recordMail(opts.to, opts.subject, 'failed', 'resend', t.slice(0, 500))
       return { ok: false }
     }
-    await recordMail(client, opts.to, opts.subject, 'sent', 'resend', null)
+    await recordMail(opts.to, opts.subject, 'sent', 'resend', null)
     return { ok: true }
   } catch (err) {
-    await recordMail(client, opts.to, opts.subject, 'failed', 'resend', err instanceof Error ? err.message : 'onbekend')
+    await recordMail(opts.to, opts.subject, 'failed', 'resend', err instanceof Error ? err.message : 'onbekend')
     return { ok: false }
   }
 }

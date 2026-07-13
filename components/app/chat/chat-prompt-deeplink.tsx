@@ -14,6 +14,8 @@ import { useChatContext } from './chat-provider'
  *   - `analyseer-mijn-financien`  — algemeen "doorlicht me"-startpunt
  *   - `herbekijk-uitgesteld`      — kick-off voor postponed-ready
  *                                   recommendations (FAB-badge route)
+ *   - `briefing-week`             — brug vanuit de wekelijkse briefing-e-mail
+ *                                   ("Bespreek met Will"): bespreek de weekbriefing
  *
  * Na trigger wordt de query-string opgeschoond zodat refresh / back niet
  * dezelfde prompt opnieuw afvuurt.
@@ -31,6 +33,8 @@ const PROMPTS: Record<string, (params: URLSearchParams) => string> = {
   'analyseer-mijn-financien': () => ANALYSE_FINANCIEN_PROMPT,
   'herbekijk-uitgesteld': () =>
     'Ik wil opnieuw kijken naar tips die ik eerder heb uitgesteld en waarvan de wachttijd voorbij is. Begin met de belangrijkste.',
+  'briefing-week': () =>
+    'Ik kom net uit mijn wekelijkse briefing. Bespreek met me wat er deze week is veranderd aan mijn vrijheidstijd en wat de belangrijkste actie is die ik nu kan nemen.',
 }
 
 export function ChatPromptDeeplink() {

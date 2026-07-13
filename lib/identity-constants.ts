@@ -1,4 +1,4 @@
-import { Wallet, RefreshCw, Compass, Bell, CheckCircle2, Sparkles } from 'lucide-react'
+import { Wallet, RefreshCw, Compass, Bell, CheckCircle2, Sparkles, Mail } from 'lucide-react'
 
 // ── Temporal Balance levels ──────────────────────────────────────────
 
@@ -159,3 +159,18 @@ export const NOTIFICATION_TYPES = [
   { type: 'holding_alert', label: 'Prijs-alerts', description: 'Holdings prijs- en allocatie-alerts', icon: Bell },
   { type: 'briefing', label: 'Briefing', description: 'Je wekelijkse briefing met je vrijheidswinst', icon: Sparkles },
 ] as const
+
+/**
+ * Opt-in voor de wekelijkse briefing PER E-MAIL — bewust LOS van
+ * NOTIFICATION_TYPES: die voeden de push-voorkeuren-blob in app_settings (die
+ * naar default-true coerced = opt-out). Een e-mail-kanaal moet opt-IN zijn
+ * (AVG/e-Privacy), dus dit hangt aan een eigen profiles-kolom
+ * (weekly_briefing_email, DEFAULT FALSE) via /api/briefing/email/pref. Deze
+ * constante beschrijft alleen de UI-copy van de aparte toggle op
+ * /mijn/notificaties.
+ */
+export const WEEKLY_BRIEFING_EMAIL_TOGGLE = {
+  label: 'Briefing per e-mail',
+  description: 'Ontvang je wekelijkse briefing ook per e-mail (opt-in, zonder bedragen)',
+  icon: Mail,
+} as const

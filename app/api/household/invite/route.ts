@@ -157,7 +157,7 @@ export async function POST(request: Request) {
   // Verstuur de uitnodiging per e-mail (best-effort). Zonder RESEND_API_KEY
   // wordt dit als 'skipped' gelogd en blijft de link-fallback hieronder werken.
   const { subject, html } = householdInviteEmail(user.email, inviteLink)
-  const mail = await sendEmail(supabase, { to: trimmedEmail, subject, html })
+  const mail = await sendEmail({ to: trimmedEmail, subject, html })
 
   return NextResponse.json({
     success: true,

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { NOTIFICATION_TYPES } from '@/lib/identity-constants'
+import { NOTIFICATION_TYPES, WEEKLY_BRIEFING_EMAIL_TOGGLE } from '@/lib/identity-constants'
 import { CalendarCheck, HandCoins } from 'lucide-react'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { PageInfoButton, PageOpening } from '@/components/editorial'
@@ -47,6 +47,10 @@ export default function MijnNotificatiesPage() {
   const [checkinEnabled, setCheckinEnabled] = useState(true)
   const [checkinSaving, setCheckinSaving] = useState(false)
 
+  // Briefing-per-e-mail opt-in (aparte profiles-kolom, default UIT).
+  const [briefingEmailEnabled, setBriefingEmailEnabled] = useState(false)
+  const [briefingEmailSaving, setBriefingEmailSaving] = useState(false)
+
   // ─ Load alle data parallel ────────────────────────────────────────────────
   useEffect(() => {
     async function load() {
@@ -56,7 +60,7 @@ export default function MijnNotificatiesPage() {
         return
       }
 
-      const [notifData, checkinRes, privacyRes] = await Promise.all([
+      const [notifData, checkinRes, privacyRes, briefingEmailRes] = await Promise.all([
         supabase
           .from('app_settings')
           .select('value')
@@ -64,6 +68,7 @@ export default function MijnNotificatiesPage() {
           .maybeSingle(),
         fetch('/api/monthly-checkin'),
         fetch('/api/household/privacy'),
+        fetch('/api/briefing/email/pref'),
       ])
 
       // Notif prefs
@@ -83,6 +88,14 @@ export default function MijnNotificatiesPage() {
           const data = await checkinRes.json()
           if (typeof data.enabled === 'boolean') setCheckinEnabled(data.enabled)
         } catch { /* default true */ }
+      }
+
+      // Briefing-per-e-mail opt-in
+      if (briefingEmailRes.ok) {
+        try {
+          const data = await briefingEmailRes.json()
+          if (typeof data.enabled === 'boolean') setBriefingEmailEnabled(data.enabled)
+        } catch { /* default false */ }
       }
 
       // Partner-notif: alleen voor huishoudens
@@ -196,6 +209,23 @@ export default function MijnNotificatiesPage() {
     setCheckinSaving(false)
   }, [checkinEnabled])
 
+  const toggleBriefingEmail = useCallback(async () => {
+    const newVal = !briefingEmailEnabled
+    setBriefingEmailEnabled(newVal)
+    setBriefingEmailSaving(true)
+    try {
+      const res = await fetch('/api/briefing/email/pref', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: newVal }),
+      })
+      if (!res.ok) throw new Error('save failed')
+    } catch {
+      setBriefingEmailEnabled(!newVal) // revert
+    }
+    setBriefingEmailSaving(false)
+  }, [briefingEmailEnabled])
+
   return (
     <div className="mx-auto max-w-4xl px-4 py-5 sm:px-6 sm:py-8">
       <NavStackMeta title="Notificaties" bottomBar={{ kind: 'tabs' }} />
@@ -290,6 +320,34 @@ export default function MijnNotificatiesPage() {
                     <span
                       className={`inline-block h-3.5 w-3.5 rounded-full bg-[var(--paper)] transition-transform ${
                         checkinEnabled ? 'translate-x-4' : 'translate-x-0.5'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+
+              {/* Briefing per e-mail — aparte opt-in (profiles-kolom, default UIT) */}
+              <div className="mt-4 border border-[var(--border-ed)]">
+                <div className="flex items-center justify-between gap-4 px-4 py-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <WEEKLY_BRIEFING_EMAIL_TOGGLE.icon className="h-4 w-4 shrink-0 text-[var(--ink-3)]" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-[var(--ink-2)]">{WEEKLY_BRIEFING_EMAIL_TOGGLE.label}</p>
+                      <p className="text-xs text-[var(--ink-3)]">{WEEKLY_BRIEFING_EMAIL_TOGGLE.description}</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void toggleBriefingEmail()}
+                    disabled={briefingEmailSaving}
+                    className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
+                      briefingEmailEnabled ? 'bg-zinc-900' : 'bg-zinc-300'
+                    } ${briefingEmailSaving ? 'opacity-50' : ''}`}
+                    aria-label={briefingEmailEnabled ? 'Schakel briefing per e-mail uit' : 'Schakel briefing per e-mail in'}
+                  >
+                    <span
+                      className={`inline-block h-3.5 w-3.5 rounded-full bg-[var(--paper)] transition-transform ${
+                        briefingEmailEnabled ? 'translate-x-4' : 'translate-x-0.5'
                       }`}
                     />
                   </button>

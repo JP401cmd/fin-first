@@ -44,6 +44,13 @@ const JOB_CATALOG = [
     path: '/api/holdings/refresh-prices/cron',
     description: 'Publieke health-probes van externe koppelingen (Bitvavo, Kraken, Coinbase, CoinGecko, Blockchair, TrueLayer).',
   },
+  {
+    key: 'briefing-email',
+    label: 'Briefing-e-mail',
+    schedule: 'Maandag 07:00',
+    path: '/api/briefing/email/cron',
+    description: 'Wekelijkse briefing-e-mail (opt-in) van de bevroren weeksnapshot — vrijheidstijd-first, euro-vrij, met brug terug naar Will.',
+  },
 ] as const
 
 const dateTimeFmt = new Intl.DateTimeFormat('nl-NL', {
