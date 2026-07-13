@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { translateAuthError } from '@/lib/auth-errors'
+import { translateAuthError, isUserAlreadyRegisteredError } from '@/lib/auth-errors'
 
 export default function SignupPage() {
   const [email, setEmail] = useState('')
@@ -36,7 +36,18 @@ export default function SignupPage() {
         },
       })
 
-      if (error) {
+      // ANTI-ENUMERATIE: een al-geregistreerd e-mailadres behandelen we
+      // IDENTIEK aan een geslaagde registratie — hetzelfde "Controleer je
+      // e-mail"-scherm, nooit de onthullende "dit adres is al geregistreerd"-
+      // melding. Anders verklapt de UI of een adres al een account heeft
+      // (account-enumeratie). Met e-mailbevestiging aan doet Supabase dit deels
+      // zelf: voor een bestaand bevestigd adres komt er GEEN error terug maar
+      // een obfuscated user (lege identities) → dat valt vanzelf in de else.
+      // Mocht Supabase tóch een expliciete "user already registered"-fout geven
+      // (bv. bevestiging uit, of een SDK-/versiewissel), dan vangen we die hier
+      // af zodat de neutrale respons niet van de dashboard-config afhangt.
+      // Zie lib/auth-errors.ts#isUserAlreadyRegisteredError.
+      if (error && !isUserAlreadyRegisteredError(error)) {
         setError(translateAuthError(error))
       } else {
         setSuccess(true)
@@ -63,6 +74,13 @@ export default function SignupPage() {
           <h1 className="mb-4 text-2xl font-bold text-zinc-900">Controleer je e-mail</h1>
           <p className="text-zinc-600">
             We hebben je een bevestigingslink gestuurd. Controleer je e-mail om je account te activeren.
+          </p>
+          {/* Neutrale voetnoot (anti-enumeratie): dit scherm verschijnt óók als
+              het adres al een account had. De zin klopt dan nog steeds en
+              verwijst naar inloggen — zonder te verklappen of er een account
+              bestaat. Sober gehouden, in lijn met de coach-stem. */}
+          <p className="mt-3 text-xs text-zinc-500">
+            Heb je al een account? Dan kun je hieronder gewoon inloggen.
           </p>
           <Link
             href="/login"

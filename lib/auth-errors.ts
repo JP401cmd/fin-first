@@ -46,6 +46,23 @@ function extractAuthErrorFields(error: unknown): AuthErrorFields {
   return { message: '', code: '', name: '' }
 }
 
+/**
+ * Herkent de "e-mailadres is al geregistreerd"-fout van Supabase `signUp`.
+ *
+ * ANTI-ENUMERATIE: de signup-pagina gebruikt deze predicate om het
+ * al-geregistreerd-geval IDENTIEK aan succes te behandelen (zelfde
+ * "Controleer je e-mail"-scherm, geen onthullende melding), zodat een
+ * aanvaller niet uit de UI kan afleiden of een adres al een account heeft.
+ * De NL-vertaling in `translateAuthError` hieronder blijft bestaan voor andere
+ * consumers (waar onthulling geen lek is), maar signup mag 'm niet tonen —
+ * zie `app/signup/page.tsx`.
+ */
+export function isUserAlreadyRegisteredError(error: unknown): boolean {
+  const { message, code } = extractAuthErrorFields(error)
+  const haystack = `${code} ${message}`.toLowerCase()
+  return haystack.includes('user already registered') || code === 'user_already_exists'
+}
+
 export function translateAuthError(error: unknown): string {
   const { message, code, name } = extractAuthErrorFields(error)
   // Case-insensitief matchen op zowel de message als de code, zodat we niet
@@ -65,7 +82,7 @@ export function translateAuthError(error: unknown): string {
     return AUTH_NETWORK_MESSAGE
   }
 
-  if (haystack.includes('user already registered') || code === 'user_already_exists') {
+  if (isUserAlreadyRegisteredError(error)) {
     return "Dit e-mailadres is al geregistreerd — log in of gebruik 'wachtwoord vergeten'."
   }
 
