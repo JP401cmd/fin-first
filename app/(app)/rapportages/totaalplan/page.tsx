@@ -1,17 +1,15 @@
 'use client'
 
 /**
- * Persoonlijk plan — client page.
+ * Totaalplan — client page.
  *
- * Editorial-rapport rond `GET /api/report/persoonlijk-plan`. Patroon spiegelt
- * `app/(app)/rapportages/balans/page.tsx`. Toont alleen de input-zijde van de
- * FIRE/horizon-berekeningen: demografie, inkomen, AOW/pensioen, uitgaven,
- * FIRE-rekenparameters, eindstrategie, onttrekkingsstrategie.
+ * Het gecomponeerde "plan-als-document" (roadmap K): de aannames-blokken van
+ * het persoonlijk-plan-rapport (byte-identiek hergebruikt) PLUS een
+ * vermogensprojectie, een plan-brede slagingskans en deterministische inzichten.
+ * Deelbaar via `window.print()` → PDF. Alle cijfers single-source uit de
+ * horizon-kernel (CONSUME DON'T RECOMPUTE).
  *
- * Geen prognose-cijfers — die staan in andere rapporten. Doel hier:
- * "klopt dit nog?" voor de gebruiker zelf, partner, of adviseur.
- *
- * Spec: docs/superpowers/specs/2026-05-11-kern-rapport-en-instellingen-rapport-design.md
+ * Patroon spiegelt `app/(app)/rapportages/persoonlijk-plan/page.tsx`.
  */
 
 import { useEffect, useState } from 'react'
@@ -34,26 +32,29 @@ import {
   EindstrategieBlock,
   OnttrekkingBlock,
 } from '@/components/rapportage/persoonlijk-plan-blocks'
-import type { PersoonlijkPlanData } from '@/lib/persoonlijk-plan-data'
+import {
+  ProjectieBlock,
+  SlagingskansBlock,
+  InzichtenBlock,
+} from '@/components/rapportage/totaalplan-blocks'
+import type { TotaalplanData } from '@/lib/totaalplan-data'
 
-// ── Main page ───────────────────────────────────────────────────────
-
-export default function PersoonlijkPlanPage() {
-  const [data, setData] = useState<PersoonlijkPlanData | null>(null)
+export default function TotaalplanPage() {
+  const [data, setData] = useState<TotaalplanData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     async function fetchPlan() {
       try {
-        const res = await fetch('/api/report/persoonlijk-plan')
+        const res = await fetch('/api/report/totaalplan')
         if (!res.ok) {
           const err = await res.json()
-          throw new Error(err.error || 'Persoonlijk plan laden mislukt')
+          throw new Error(err.error || 'Totaalplan laden mislukt')
         }
         setData(await res.json())
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Persoonlijk plan laden mislukt')
+        setError(err instanceof Error ? err.message : 'Totaalplan laden mislukt')
       } finally {
         setLoading(false)
       }
@@ -66,7 +67,7 @@ export default function PersoonlijkPlanPage() {
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="text-center">
           <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-[var(--module-active-500)] border-t-transparent" />
-          <p className="font-inter text-sm text-[var(--ink-3)]">Persoonlijk plan wordt opgesteld...</p>
+          <p className="font-inter text-sm text-[var(--ink-3)]">Totaalplan wordt opgesteld...</p>
         </div>
       </div>
     )
@@ -76,7 +77,7 @@ export default function PersoonlijkPlanPage() {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="text-center">
-          <p className="font-playfair text-xl text-[var(--ink)]">Persoonlijk plan niet beschikbaar</p>
+          <p className="font-playfair text-xl text-[var(--ink)]">Totaalplan niet beschikbaar</p>
           <p className="mt-2 font-inter text-sm text-[var(--ink-3)]">{error || 'Geen data gevonden'}</p>
         </div>
       </div>
@@ -85,8 +86,8 @@ export default function PersoonlijkPlanPage() {
 
   const generatedDate = formatTimestamp(data.generatedAt)
   const titlePerson = data.demografie.fullName
-    ? `${data.demografie.fullName} — uitgangspunten en strategie`
-    : 'Uitgangspunten en strategie'
+    ? `${data.demografie.fullName} — je volledige plan`
+    : 'Je volledige plan'
 
   const subline = [
     data.demografie.householdTypeLabel,
@@ -101,11 +102,11 @@ export default function PersoonlijkPlanPage() {
       className="report-pdf-root mx-auto max-w-[900px] px-4 py-6 md:px-8"
       data-report-module="horizon"
     >
-      <NavStackMeta title="Persoonlijk plan" bottomBar={{ kind: 'tabs' }} />
+      <NavStackMeta title="Totaalplan" bottomBar={{ kind: 'tabs' }} />
 
       {/* ── Toolbar ── */}
       <div data-print-hide className="mb-6 flex items-center justify-end gap-3">
-        <PageInfoButton description={PAGE_INFO['/rapportages/persoonlijk-plan'] ?? ''} />
+        <PageInfoButton description={PAGE_INFO['/rapportages/totaalplan'] ?? ''} />
         <button
           type="button"
           onClick={() => window.print()}
@@ -128,7 +129,7 @@ export default function PersoonlijkPlanPage() {
             className="inline-block h-px w-7 shrink-0"
             style={{ background: 'var(--module-active-500)' }}
           />
-          Persoonlijk plan
+          Totaalplan
           <span
             aria-hidden
             className="inline-block h-px w-7 shrink-0"
@@ -141,6 +142,9 @@ export default function PersoonlijkPlanPage() {
         >
           {titlePerson}
         </h1>
+        <p className="mt-2 text-center font-source-serif text-[15px] italic text-[var(--ink-2)]">
+          Je volledige plan — aannames, projectie en slagingskans op één plek.
+        </p>
         <div className="mt-3 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[13px] font-source-serif italic text-[var(--ink-3)]">
           {subline.map((part, idx) => (
             <span key={idx}>
@@ -168,15 +172,21 @@ export default function PersoonlijkPlanPage() {
             variant: 'neutral',
           },
           {
-            kicker: 'Eindleeftijd',
-            amount: String(data.hero.fireEndAge),
-            sub: 'uit strategie',
+            kicker: 'Vrijheidsleeftijd',
+            amount: data.projectie.ok && data.projectie.fireReachable && data.projectie.fireAge != null
+              ? `${Math.floor(data.projectie.fireAgeFractional ?? data.projectie.fireAge)}`
+              : '—',
+            sub: data.projectie.ok && data.projectie.fireReachable && data.projectie.fireCalendarYear != null
+              ? `in ${data.projectie.fireCalendarYear}`
+              : 'FIRE',
             variant: 'winner',
           },
           {
-            kicker: 'Levensverwachting',
-            amount: String(data.hero.lifeExpectancyProxy),
-            sub: 'proxy via eindleeftijd',
+            kicker: 'Slagingskans',
+            amount: data.slagingskans.ok && data.slagingskans.successProbability != null
+              ? `${Math.round(data.slagingskans.successProbability * 100)}%`
+              : '—',
+            sub: 'plan houdt stand',
             variant: 'neutral',
           },
         ]}
@@ -185,14 +195,15 @@ export default function PersoonlijkPlanPage() {
       {/* ── Methodologie-callout ── */}
       <section className="report-section">
         <ScenarioCallout title="Wat staat hier in?">
-          Dit rapport toont de aannames waarmee TriFinity je FIRE-, horizon- en pensioenberekeningen
-          opstelt — geen prognoses, alleen de input-zijde. Lees het door om te controleren of de
-          parameters nog kloppen met je situatie. Wijzig waardes in <em>Identiteit → Instellingen</em>.
+          Dit rapport bundelt je hele plan: eerst de <em>aannames</em> waarmee TriFinity rekent
+          (demografie, inkomen, AOW, uitgaven, rendement, eindstrategie), daarna de <em>projectie</em> van
+          je vermogen naar volledige vrijheid, de <em>slagingskans</em> onder marktschommelingen en concrete{' '}
+          <em>inzichten</em>. Alle cijfers komen uit dezelfde rekenmotor als Toekomst en Overzicht — niets
+          wordt hier apart berekend. Deelbaar als PDF met je partner of adviseur.
         </ScenarioCallout>
       </section>
 
-      {/* Secties iii. t/m ix. — elke block-component zet z'n eigen
-         `.report-section` op de outer `<section>` voor page-break-control. */}
+      {/* Aannames — secties iii. t/m ix. (hergebruikt uit persoonlijk-plan). */}
       <DemografieBlock data={data.demografie} aowMonths={data.hero.aowAgeMonths} />
       <InkomenBlock data={data.inkomen} />
       <CashflowBlock cashflows={data.cashflows} />
@@ -200,6 +211,11 @@ export default function PersoonlijkPlanPage() {
       <FireParamsBlock data={data.fireParams} />
       <EindstrategieBlock data={data.eindstrategie} />
       <OnttrekkingBlock data={data.onttrekking} />
+
+      {/* Projectie, slagingskans en inzichten — secties x. t/m xii. */}
+      <ProjectieBlock projectie={data.projectie} dailyExpenseRate={data.dailyExpenseRate} num="x." />
+      <SlagingskansBlock slagingskans={data.slagingskans} num="xi." />
+      <InzichtenBlock inzichten={data.inzichten} num="xii." />
 
       {/* Colophon */}
       <section className="report-section">
@@ -212,7 +228,7 @@ export default function PersoonlijkPlanPage() {
             &ldquo;Geld is opgeslagen tijd&rdquo;
           </p>
         </div>
-        <OrnamentColophon module="Persoonlijk plan" text={generatedDate} />
+        <OrnamentColophon module="Totaalplan" text={generatedDate} />
       </section>
     </div>
   )

@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { ReportConfig } from '@/lib/report-data'
-import { FileText, Trash2, Eye, Sparkles, Scale, BarChart3, Layers, Compass, Users } from 'lucide-react'
+import { FileText, Trash2, Eye, Sparkles, Scale, BarChart3, Layers, Compass, Users, FileStack } from 'lucide-react'
 import {
   Kicker,
   EditorialHeadline,
@@ -592,6 +592,51 @@ export default function RapportagesPage() {
               style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
             >
               Op basis van officiële NL-statistiek voor jouw leeftijd en huishoudtype. Geen data van andere gebruikers.
+            </p>
+          </div>
+        </div>
+      </CardEditorial>
+
+      {/* === VII. Totaalplan — het plan-als-document === */}
+      <CardEditorial accent className="flex flex-col">
+        <div className="flex flex-1 flex-col p-6 sm:p-8">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <Kicker size="small">
+              <FileStack className="h-3 w-3" aria-hidden />
+              <span>Totaalplan</span>
+            </Kicker>
+            <span
+              className="italic text-sm text-[var(--module-active-700)]"
+              style={{ fontFamily: 'var(--font-playfair, serif)' }}
+              aria-hidden
+            >
+              vii.
+            </span>
+          </div>
+
+          <EditorialHeadline level="h2" size="sm" emphasis="volledige plan" className="mb-2">
+            Je volledige plan als document
+          </EditorialHeadline>
+
+          <EditorialDeck className="mb-5">
+            Aannames, vermogensprojectie én slagingskans in één deelbaar rapport — met je vermogenspad naar volledige vrijheid en concrete inzichten.
+          </EditorialDeck>
+
+          <div className="mt-auto">
+            <button
+              type="button"
+              onClick={() => router.push('/rapportages/totaalplan')}
+              className="flex w-full items-center justify-center gap-2 bg-[var(--ink)] px-4 py-3 font-inter text-sm font-medium text-[var(--paper)] transition-all hover:bg-[var(--ink-2)]"
+            >
+              <FileStack className="h-4 w-4" />
+              Genereer totaalplan
+            </button>
+
+            <p
+              className="mt-4 italic text-[12px] leading-snug text-[var(--ink-3)]"
+              style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+            >
+              Alle cijfers uit dezelfde rekenmotor als Toekomst en Overzicht. Druk af als PDF voor partner of adviseur.
             </p>
           </div>
         </div>

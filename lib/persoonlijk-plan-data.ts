@@ -70,7 +70,7 @@ export interface PersoonlijkPlanInkomen {
   netMonthlyIncome: number
   /** Bruto/jaar ≈ netto × 12 / 0.65 — ruwe schatting (open vraag 3 default a). */
   estimatedGrossAnnualIncome: number | null
-  /** Marginaal IB-tarief (0.3697 / 0.4950) — kan ook afgeleid worden uit netto. */
+  /** Marginaal IB-tarief (0–1; jaar-afgeleid) — kan ook afgeleid worden uit netto. */
   marginaalTarief: number
   /** Box 3 methode (`forfaitair` of `werkelijk`). */
   box3Method: 'forfaitair' | 'werkelijk'
