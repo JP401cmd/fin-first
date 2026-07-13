@@ -226,6 +226,36 @@ export interface InkomenUitgavenParams {
   readonly nettoJaaruitgaven: number
   /** P!B15 — uitgave na pensioen per jaar (→ Ont!D). */
   readonly uitgaveNaPensioenPerJaar: number
+
+  // ── Roadmap M — flex-spending (buiten oracle-domein; inert-by-default, ADR 0042) ──
+  /**
+   * **Buiten oracle-domein (roadmap M).** Zet de must/nice-split van de post-FIRE
+   * uitgave-term AAN: de onttrekkingsprofiel-factor (Ont!I) grijpt dan alléén op het
+   * NICE-deel — `uitgaveTerm = mustTerm + niceTerm·factor` i.p.v. `uitgaveTerm·factor`
+   * — zodat je essentiële (must) uitgaven onaangetast blijven terwijl je flexibele
+   * uitgaven meebewegen met de portefeuille. Weggelaten/`false` → factor op de HELE
+   * term, exact zoals het Excel-oracle (byte-identiek; `input-from-fixture` zet 'm
+   * níet, dus alle parity-fixtures blijven groen). Alleen de app-adapter zet 'm AAN,
+   * en alleen als de gebruiker de flex-regel activeert.
+   */
+  readonly flexNiceOnly?: boolean
+  /**
+   * Fractie (0..1) van de post-FIRE uitgave die 'nice' (discretionair) is. Alléén
+   * gebruikt als `flexNiceOnly`. Default (weggelaten) → 1: dan is `mustTerm = 0` en
+   * `uitgaveTerm = niceTerm·factor = baseTerm·factor` → identiek aan het huidige
+   * hele-term-gedrag, dus ook mét de vlag AAN blijft de split dan inert. 0 → must-only
+   * (de factor raakt de uitgave nooit).
+   */
+  readonly flexNiceFractiePerJaar?: number
+  /**
+   * Optionele grotere neerwaartse stap op het NICE-deel bij een guardrails-dip
+   * (0..1; ProjectionLab-conventie ≈0,6). Alléén actief als `flexNiceOnly` én het
+   * profiel 'Guardrails' is én de guardrail in de cut-stand staat (H < 1); dan wordt
+   * het nice-deel met `MAX(0, 1−flexNiceCutStep)` geschaald i.p.v. de op
+   * `guardrailFloor` gevloerde reguliere factor. Weggelaten → de reguliere
+   * guardrail-/fase-factor op nice.
+   */
+  readonly flexNiceCutStep?: number
 }
 
 /** P!B28 — Toename-strategie (mapt op TS-toename-prio's). */

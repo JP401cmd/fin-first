@@ -106,4 +106,48 @@ describe('scenario slider-werk-gate — run-niveau (modellek-fingerprint)', () =
     // ⇒ FIRE niet later dan de basislijn.
     expect(scenario.result.fireAgeFractional!).toBeLessThanOrEqual(baseline.result.fireAgeFractional!)
   })
+
+  // ── Extra-inleg-slider: per 13-jul mee-gegate (kaart "Doel lijn grafiek vragen") ──────────
+  it('een écht buildSliderEvent(extra_inleg,+€900) verschijnt NOOIT als gebeurtenis-baat (CF!H) — ook niet ná FIRE', () => {
+    const baseline = computeConvergentieProjection({ rawContext: baseContext })
+    expect(baseline.ok).toBe(true)
+    if (!baseline.ok) return
+    expect(baseline.result.fireReachable).toBe(true)
+    expect(baseline.result.fireAgeFractional).not.toBeNull()
+
+    // Écht event uit de builder — draagt `scenario_origin: 'slider:extra_inleg'`.
+    const inlegEvent = buildSliderEvent('extra_inleg', 900, whatIfBaseline, PINNED_AGE)
+    expect(inlegEvent).not.toBeNull()
+    expect(inlegEvent!.scenario_origin).toBe('slider:extra_inleg')
+    expect(inlegEvent!.monthly_income_change).toBe(900)
+    expect(inlegEvent!.duration_months).toBe(0)
+
+    const scenario = computeConvergentieProjection({
+      rawContext: { ...baseContext, lifeEvents: [...fx.lifeEvents, inlegEvent!] },
+    })
+    expect(scenario.ok).toBe(true)
+    if (!scenario.ok) return
+
+    // ── FINGERPRINT: extra inleg mag NOOIT als doorlopende Geb-baat (CF!H) landen. ──
+    // Deed het dat wél (oude leak), dan stond +€900×12 élk jaar in `gebeurtenisBaten`, óók in
+    // de onttrekkingsfase → deze gelijkheid brak. Nu loopt de delta via CF!D (salaris) en stopt
+    // die ná FIRE, precies als income/workdays.
+    let comparedWithdrawalRows = 0
+    for (const scRow of scenario.result.rows) {
+      const baseRow = baseline.result.rows.find((r) => r.year === scRow.year)
+      if (!baseRow) continue
+      const scBaten = scRow.grossIncomeBySource?.gebeurtenisBaten ?? 0
+      const baseBaten = baseRow.grossIncomeBySource?.gebeurtenisBaten ?? 0
+      expect(scBaten).toBeCloseTo(baseBaten, 2)
+      if (scRow.phase === 'withdrawal') comparedWithdrawalRows++
+    }
+    expect(comparedWithdrawalRows).toBeGreaterThan(0)
+
+    // ── POSITIEVE CONTROLE: de extra inleg dóét wél iets via het salaris-kanaal (CF!D). ──
+    const scEarlySalaris = scenario.result.rows[0].grossIncomeBySource?.salaris ?? 0
+    const baseEarlySalaris = baseline.result.rows[0].grossIncomeBySource?.salaris ?? 0
+    expect(scEarlySalaris).toBeGreaterThan(baseEarlySalaris)
+    // Meer sparen vóór FIRE ⇒ FIRE niet later dan de basislijn.
+    expect(scenario.result.fireAgeFractional!).toBeLessThanOrEqual(baseline.result.fireAgeFractional!)
+  })
 })

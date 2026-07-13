@@ -187,6 +187,24 @@ export interface WithdrawalProfileConfig {
   slowgoPct: number | null
   /** P!B75 — no-go factor (%) daarna. */
   nogoPct: number | null
+
+  // ── Roadmap M — flex-spending (must/nice, inert-by-default) ──
+  /**
+   * Pas de onttrekkingsprofiel-factor alléén op het NICE-deel van de post-FIRE uitgave
+   * toe (must blijft onaangetast). `false`/ontbrekend → factor op de hele term (Excel-
+   * oracle-gedrag; de kernel-adapter zet `flexNiceOnly` dan níet).
+   */
+  flexNiceOnly: boolean
+  /**
+   * Expliciete nice-%-override als fractie (0..1). `null` → de adapter leidt de
+   * nice-fractie af uit de budgetten ((uitgave − must)/uitgave).
+   */
+  flexNiceFractie: number | null
+  /**
+   * Grotere neerwaartse stap op nice bij een guardrails-dip (0..1). `null` → de
+   * reguliere guardrail-/fase-factor op nice.
+   */
+  flexCutStep: number | null
 }
 
 function finiteOrNull(raw: unknown): number | null {
@@ -225,6 +243,11 @@ export function parseWithdrawalProfileConfig(profile: {
     slowgoTotLeeftijd: finiteOrNull(o.slowgo_tot_leeftijd),
     slowgoPct: finiteOrNull(o.slowgo_pct),
     nogoPct: finiteOrNull(o.nogo_pct),
+    // Roadmap M — flex-spending. `flex_nice_only` alleen `true` bij een expliciete boolean;
+    // fractie/cut-step blijven `null` (→ afgeleid/regulier) tenzij een geldig getal.
+    flexNiceOnly: o.flex_nice_only === true,
+    flexNiceFractie: finiteOrNull(o.flex_nice_fractie),
+    flexCutStep: finiteOrNull(o.flex_cut_step),
   }
 }
 

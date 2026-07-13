@@ -11,6 +11,11 @@
  *     I grijpt ALLEEN op die uitgave-term** — huur (BA), vervallen hypotheeklast
  *     (BB), Box3 (CF!K) en partnerbijdrage (PT!K) blijven ongefactord (Ont!J1).
  *     Partner-overschot boven de behoefte valt weg door de MAX(0;…).
+ *     **Roadmap M (buiten oracle-domein, inert-by-default — ADR 0042):** met
+ *     `inkomenUitgaven.flexNiceOnly` grijpt de factor I alléén op het NICE-deel van
+ *     de uitgave-term (`mustTerm + niceTerm·I`), zodat essentiële uitgaven onaangetast
+ *     blijven. Zonder de vlag is D byte-identiek aan het Excel-oracle; de fixtures
+ *     zetten 'm nooit. Zie `uitgaveTermMetFlex`.
  *   - **F** fase-factor (go-go/slow-go/no-go): leeftijd ≤ B71 → B72%; ≤ B73 →
  *     B74%; anders B75% (procenten → factor via /100).
  *   - **G** liquide netto vorige maand: passthrough van Prognose!J(m−1)
@@ -137,6 +142,49 @@ function actieveFactor(profiel: Onttrekkingsprofiel, faseFactor: number, guardra
   }
 }
 
+/** Clamp naar [0,1] (NaN → 0; het neutrale must-only-punt). */
+function clamp01(x: number): number {
+  if (!Number.isFinite(x)) return 0
+  return x < 0 ? 0 : x > 1 ? 1 : x
+}
+
+/**
+ * Roadmap M — de factor op het NICE-deel. Standaard = de actieve profielfactor (I).
+ * Bij een guardrails-DIP (`guardrailsFactor < 1`) én een expliciete grotere nice-cut-
+ * step snijdt het nice-deel dieper: `MAX(0, 1 − flexNiceCutStep)` i.p.v. de (op
+ * `guardrailFloor` gevloerde) reguliere factor — must blijft altijd ongefactord.
+ */
+function flexNiceFactor(input: KernelInput, actieveFactorVal: number, guardrailsFactor: number): number {
+  const cut = input.inkomenUitgaven.flexNiceCutStep
+  if (cut != null && input.onttrekkingsprofiel.profiel === 'Guardrails' && guardrailsFactor < 1) {
+    return Math.max(0, 1 - clamp01(cut))
+  }
+  return actieveFactorVal
+}
+
+/**
+ * Roadmap M — post-FIRE uitgave-term (Ont!D-tak). **Default (`flexNiceOnly` weg/false)
+ * is byte-identiek aan het Excel-oracle**: de hele term × de actieve profielfactor.
+ * Met de vlag AAN grijpt de factor alléén op het nice-deel:
+ * `uitgaveTerm = mustTerm + niceTerm·flexFactor` (must ongefactord, net als huur/
+ * hypotheek/Box3/partner). Bij `niceFractie = 1` → `mustTerm = 0` → identiek aan de
+ * hele-term-factor (ook mét de vlag AAN dus inert); bij `niceFractie = 0` → must-only.
+ */
+function uitgaveTermMetFlex(
+  input: KernelInput,
+  baseTerm: number,
+  actieveFactorVal: number,
+  guardrailsFactor: number,
+): number {
+  const iu = input.inkomenUitgaven
+  // Default-pad: exact het Excel-oracle (associatie identiek aan de oude expressie).
+  if (!iu.flexNiceOnly) return baseTerm * actieveFactorVal
+  const niceFractie = clamp01(iu.flexNiceFractiePerJaar ?? 1)
+  const mustTerm = baseTerm * (1 - niceFractie)
+  const niceTerm = baseTerm * niceFractie * flexNiceFactor(input, actieveFactorVal, guardrailsFactor)
+  return mustTerm + niceTerm
+}
+
 /**
  * Bereken de Ont-rij voor maand m uit de statische parameters en de upstream
  * DepView. Zie de module-doc voor de kolom-formules en de (kolom-specifieke)
@@ -169,8 +217,11 @@ export function computeOnt(input: KernelInput, dep: OntDep, m: MonthIndex): OntR
   // ── D (onttrekkingsbehoefte) ────────────────────────────────────────────────
   let onttrekking = 0
   if (!beyond && m >= dep.fireMaand) {
-    const uitgaveTerm =
-      (input.inkomenUitgaven.uitgaveNaPensioenPerJaar / 12) * inflationIndex(input, m) * actieveFactorVal
+    // Base-term = geïndexeerde jaaruitgave-na-pensioen/maand (P!B15/12 · index). De
+    // profielfactor grijpt op de hele term (Excel-oracle) óf — met de roadmap-M-vlag —
+    // alléén op het nice-deel (must ongefactord). Zie `uitgaveTermMetFlex`.
+    const baseTerm = (input.inkomenUitgaven.uitgaveNaPensioenPerJaar / 12) * inflationIndex(input, m)
+    const uitgaveTerm = uitgaveTermMetFlex(input, baseTerm, actieveFactorVal, guardrailsFactor)
     onttrekking = Math.max(
       0,
       uitgaveTerm +

@@ -223,6 +223,44 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
           infoDescription="Deze analyses laten zien hoelang je vermogen meegaat en welke risico's de afbouwfase bepalen: een Monte Carlo-slagingskans, het volgorde-risico (SORR) van de eerste jaren, koopkrachterosie door inflatie, de keuze huis behouden of verkopen, en je nalatenschap aan het einde."
         />
 
+        {/* 0b. Regime-kaart — waar je jaarinkomen vandaan komt (exact, per jaar) */}
+        <RegimeKaart
+          kicker="AFBOUW · JAARINKOMEN"
+          title="Waar je jaarinkomen vandaan komt"
+          statusPill={incomeStatusPill}
+          rows={[
+            {
+              label: 'AOW',
+              weight: Math.max(aowPerYear, 0),
+              value: <MaskedAmount value={Math.round(aowPerYear)} tone="horizon" />,
+              tone: aowPerYear > 0.5 ? 'income' : 'zero',
+            },
+            {
+              label: 'Pensioen',
+              weight: Math.max(pensioenPerYear, 0),
+              value: <MaskedAmount value={Math.round(pensioenPerYear)} tone="horizon" />,
+              tone: pensioenPerYear > 0.5 ? 'income' : 'zero',
+            },
+            ...(salarisPerYear > 100
+              ? [{
+                  label: 'Werk / overig',
+                  weight: Math.max(salarisPerYear, 0),
+                  value: <MaskedAmount value={Math.round(salarisPerYear)} tone="horizon" />,
+                  tone: 'income' as const,
+                }]
+              : []),
+            {
+              label: 'Vermogen',
+              hint: 'onttrekking',
+              weight: Math.max(withdrawalPerYear, 0),
+              value: <MaskedAmount value={Math.round(withdrawalPerYear)} tone="horizon" />,
+              tone: 'wealth',
+            },
+          ]}
+          footnote="Vaste inkomsten nemen de druk weg bij je vermogen: hoe groter hun aandeel, hoe minder je hoeft te onttrekken."
+          infoDescription="Hier zie je hoe je jaarinkomen in de afbouwfase is opgebouwd (gemiddeld per jaar). AOW en pensioen zijn vaste inkomsten; het restant haal je uit je vermogen (onttrekking). De balk toont het relatieve gewicht van elke bron. Deze cijfers komen exact uit de projectie (grossIncomeBySource) in plaats van een schatting — hoe meer vaste inkomsten, hoe minder druk op je vermogen."
+        />
+
         {/* 1. PhaseChartZoom — full trajectory with withdrawal phase highlighted */}
         {allRows && allRows.length > 2 && (
           <>
@@ -248,11 +286,13 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
         )}
 
         {/* 2. Fase-header */}
-        <div className="flex flex-col items-center gap-2 text-center">
+        <div className="text-center">
           <p className="font-sans text-sm font-bold text-[var(--ink)] sm:text-base">
             Onttrekken &middot; {<MaskedAmount value={Math.round(startPortfolio)} tone="horizon" />} &rarr; {<MaskedAmount value={Math.round(endPortfolio)} tone="horizon" />} &middot; {durationYears} jaar
           </p>
-          <PhaseDiscussButton onderwerp="Mijn afbouwfase" summary={phaseSummary} />
+          <div className="mt-2 flex justify-center">
+            <PhaseDiscussButton onderwerp="Mijn afbouwfase" summary={phaseSummary} />
+          </div>
         </div>
 
         {/* 3. Kassabon — cashflow receipt */}
@@ -337,45 +377,7 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
           )}
         </KassabonShell>
 
-        {/* 4. Regime-kaart — waar je jaarinkomen vandaan komt (exact, per jaar) */}
-        <RegimeKaart
-          kicker="AFBOUW · JAARINKOMEN"
-          title="Waar je jaarinkomen vandaan komt"
-          statusPill={incomeStatusPill}
-          rows={[
-            {
-              label: 'AOW',
-              weight: Math.max(aowPerYear, 0),
-              value: <MaskedAmount value={Math.round(aowPerYear)} tone="horizon" />,
-              tone: aowPerYear > 0.5 ? 'income' : 'zero',
-            },
-            {
-              label: 'Pensioen',
-              weight: Math.max(pensioenPerYear, 0),
-              value: <MaskedAmount value={Math.round(pensioenPerYear)} tone="horizon" />,
-              tone: pensioenPerYear > 0.5 ? 'income' : 'zero',
-            },
-            ...(salarisPerYear > 100
-              ? [{
-                  label: 'Werk / overig',
-                  weight: Math.max(salarisPerYear, 0),
-                  value: <MaskedAmount value={Math.round(salarisPerYear)} tone="horizon" />,
-                  tone: 'income' as const,
-                }]
-              : []),
-            {
-              label: 'Vermogen',
-              hint: 'onttrekking',
-              weight: Math.max(withdrawalPerYear, 0),
-              value: <MaskedAmount value={Math.round(withdrawalPerYear)} tone="horizon" />,
-              tone: 'wealth',
-            },
-          ]}
-          footnote="Vaste inkomsten nemen de druk weg bij je vermogen: hoe groter hun aandeel, hoe minder je hoeft te onttrekken."
-          infoDescription="Hier zie je hoe je jaarinkomen in de afbouwfase is opgebouwd (gemiddeld per jaar). AOW en pensioen zijn vaste inkomsten; het restant haal je uit je vermogen (onttrekking). De balk toont het relatieve gewicht van elke bron. Deze cijfers komen exact uit de projectie (grossIncomeBySource) in plaats van een schatting — hoe meer vaste inkomsten, hoe minder druk op je vermogen."
-        />
-
-        {/* 5. Life Events in this phase */}
+        {/* 4. Life Events in this phase */}
         {events && (
           <LifeEventsInPhase
             events={events}

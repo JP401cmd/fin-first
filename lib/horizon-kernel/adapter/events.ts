@@ -9,14 +9,16 @@
  *    adapter geeft pot-parameters door, geen uitkeringsbedragen, behalve bij direct-
  *    bruto-metadata, zie `mapPensionPots`);
  *  - **werk** → `WerkStrategieParams` (de kern bouwt de salarisladder → CF!D-delta);
- *  - **slider-werk** (`scenario_origin` `slider:income`/`slider:workdays`) → een
- *    PERMANENTE inkomens-delta die als één bedrag (`salarisDeltaPerMaand`) op het
+ *  - **slider-werk** (`scenario_origin` `slider:income`/`slider:workdays`/`slider:extra_inleg`)
+ *    → een PERMANENTE inkomens-delta die als één bedrag (`salarisDeltaPerMaand`) op het
  *    salaris-kanaal (`nettoJaarinkomen`, snede 1) landt i.p.v. als Geb-rij. Daar geldt de
  *    dynamische FIRE-gate van de kern automatisch (CF!D → F sparen, 0 ná FIRE), zodat de
  *    delta — anders dan een doorlopende Geb-baat in CF!H — NIET de onttrekkingsfase in lekt.
  *    Sliders starten altijd op `currentAge` (= maand 0), dus een vlakke delta op het basis-
- *    salaris heeft dezelfde start-semantiek. De kósten-slider (`slider:savings`) en
- *    `slider:extra_inleg` blijven BEWUST vrije Geb-events (lifestyle/inleg lopen door);
+ *    salaris heeft dezelfde start-semantiek. `slider:extra_inleg` is per 13-jul mee-gegate
+ *    (kaart "Doel lijn grafiek vragen"): extra inleg vervalt logisch zodra je stopt met werken.
+ *    Alleen de kósten-slider (`slider:savings`) blijft BEWUST een vrije Geb-event (een
+ *    permanente uitgavenwijziging loopt door in de onttrekking);
  *  - **alle overige (vrije) typen** → handmatige `GebeurtenisRij[]` (Geb rij 4-13),
  *    via hergebruik van de app-expander `lifeEventsToCashflows` (children/inheritance/
  *    aow/pension/werk/huis/slider-werk worden dáár NIET meegeteld — die zijn hier al gerouteerd).

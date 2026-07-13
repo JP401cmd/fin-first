@@ -47,6 +47,19 @@ export interface RegelProjection {
 }
 
 /**
+ * Draft-override voor `runRegelProjection`. Naast de eind-/onttrekkingsstrategie kan een
+ * volledige `withdrawal_profile_config`-draft (JSONB) meegegeven worden — zo reflecteert
+ * de live-sim óók het onttrekkingsprofiel (V4) én de roadmap-M flex-spending-config
+ * (`flex_nice_only`/`flex_nice_fractie`/`flex_cut_step`), die de kernel-adapter uit die
+ * kolom leest. `null` wist de kolom (→ adapter-defaults).
+ */
+export interface RegelSimOverride {
+  fireStrategy?: FireStrategyConfig
+  withdrawalStrategy?: WithdrawalStrategyConfig
+  withdrawalProfileConfig?: Record<string, unknown> | null
+}
+
+/**
  * Draai de projectie voor een gegeven (eventueel overschreven) strategie-config via de
  * horizon-kernel. Bij een kern-fout: lege rijen.
  *
@@ -54,10 +67,7 @@ export interface RegelProjection {
  */
 export function runRegelProjection(
   snapshot: RegelSimSnapshot,
-  override?: {
-    fireStrategy?: FireStrategyConfig
-    withdrawalStrategy?: WithdrawalStrategyConfig
-  },
+  override?: RegelSimOverride,
 ): RegelProjection {
   const outcome = computeConvergentieProjection({
     rawContext: applyDraftToRawContext(snapshot.rawContext, override),
@@ -76,12 +86,15 @@ export function runRegelProjection(
  */
 function applyDraftToRawContext(
   base: ConvergentieRawContext,
-  override?: {
-    fireStrategy?: FireStrategyConfig
-    withdrawalStrategy?: WithdrawalStrategyConfig
-  },
+  override?: RegelSimOverride,
 ): ConvergentieRawContext {
-  if (!override?.fireStrategy && !override?.withdrawalStrategy) return base
+  if (
+    !override?.fireStrategy &&
+    !override?.withdrawalStrategy &&
+    override?.withdrawalProfileConfig === undefined
+  ) {
+    return base
+  }
   const profile = { ...base.profile }
   if (override.fireStrategy) {
     profile.fire_end_strategy = override.fireStrategy.strategy
@@ -94,6 +107,11 @@ function applyDraftToRawContext(
     profile.guardrail_ceiling = override.withdrawalStrategy.guardrailCeiling
     profile.guardrail_cut_step = override.withdrawalStrategy.guardrailCutStep
     profile.guardrail_raise_step = override.withdrawalStrategy.guardrailRaiseStep
+  }
+  // Roadmap M / V4 — volledige withdrawal_profile_config-draft (profiel + curve + flex).
+  // `undefined` = niet meegegeven (kolom ongewijzigd); `null` = expliciet wissen.
+  if (override.withdrawalProfileConfig !== undefined) {
+    profile.withdrawal_profile_config = override.withdrawalProfileConfig
   }
   return { ...base, profile }
 }

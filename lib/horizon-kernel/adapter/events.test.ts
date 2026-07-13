@@ -427,8 +427,8 @@ describe('events — slider-werk-gate (modellek)', () => {
     expect(gebeurtenissen[0].posten[0].eindLeeftijd).toBeNull() // doorlopend (bewust behouden)
   })
 
-  // (4) slider:extra_inleg → BEVINDING: lekt levenslang, buiten scope → huidig gedrag gepind ─
-  it('slider:extra_inleg BLIJFT een vrije Geb-rij (BEVINDING: doorlopende baat, lekt ná FIRE — buiten scope)', () => {
+  // (4) slider:extra_inleg → FIRE-gegate (kaart "Doel lijn grafiek vragen", 13-jul) ──────────
+  it('slider:extra_inleg → GEEN Geb-rij; delta op salarisDeltaPerMaand (FIRE-gegate, lekt niet ná FIRE)', () => {
     const ev = makeSliderEvent('slider:extra_inleg', {
       id: 'whatif-slider-extra-inleg',
       event_type: 'extra_inleg',
@@ -437,12 +437,19 @@ describe('events — slider-werk-gate (modellek)', () => {
       duration_months: 0,
     })
     const { gebeurtenissen, salarisDeltaPerMaand } = buildEventInputs([ev], CTX)
-    expect(salarisDeltaPerMaand).toBe(0)
-    expect(gebeurtenissen).toHaveLength(1)
-    const [post] = gebeurtenissen[0].posten
-    expect(post.type).toBe('Periodiek')
-    expect(post.eindLeeftijd).toBeNull() // doorlopend → telt óók ná FIRE mee (bekende leak, follow-up)
-    expect(post.bedrag).toBe(500)
+    // Extra inleg loopt nu via het salaris-kanaal (net als income/workdays): geen doorlopende
+    // Geb-baat meer die CF!H óók ná FIRE zou tellen.
+    expect(salarisDeltaPerMaand).toBe(500)
+    expect(gebeurtenissen).toHaveLength(0)
+  })
+
+  // (4b) income + extra_inleg samen → beide origins gesommeerd op het salaris-kanaal ─────────
+  it('income + extra_inleg samen → delta gesommeerd op salarisDeltaPerMaand', () => {
+    const inc = makeSliderEvent('slider:income', { id: 'whatif-slider-income', event_type: 'income_change', target_age: 45, monthly_income_change: 1000 })
+    const inleg = makeSliderEvent('slider:extra_inleg', { id: 'whatif-slider-extra-inleg', event_type: 'extra_inleg', target_age: 45, monthly_income_change: 500 })
+    const { gebeurtenissen, salarisDeltaPerMaand } = buildEventInputs([inc, inleg], CTX)
+    expect(gebeurtenissen).toHaveLength(0)
+    expect(salarisDeltaPerMaand).toBe(1500)
   })
 
   // (5) Vrije gebruikers-events zonder slider-origin → byte-identiek (regressie) ──────────

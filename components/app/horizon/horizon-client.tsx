@@ -36,6 +36,7 @@ import { buildConvergentieAdapterProfile, computeConvergentieProjection, type Co
 import { buildKernelInputFromApp, deriveEigenHuisIds, type KernelAdapterInput } from '@/lib/horizon-kernel/adapter'
 import { evaluateFireAt } from '@/lib/horizon-kernel/solver'
 import { resolveFireParams, type FireParams } from '@/lib/fire-params'
+import { deriveMarginaalTarief } from '@/lib/box1-tax'
 import { type WithdrawalStrategyType, type WithdrawalStrategyConfig, WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
 import type { Action, ActionStatus } from '@/lib/recommendation-data'
 import { computeYearlyMustExpenses, computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
@@ -5144,7 +5145,9 @@ export default function HorizonPage({
               hasScenario ? 'border-dashed border-[var(--ink-2)]' : ''
             }`}
           >
-            {/* ① Vrijheidsas (uitkomst bovenaan) — vraag-kop met jargon-kicker */}
+            {/* Vrijheidsas — twee vragen (streep + marge), netjes gescheiden.
+                De draaiknoppen + rendement-per-groep vullen het linker vlak via de
+                `draaiknoppen`-slot; de stop-slider/marge het rechter vlak. */}
             {currentAge !== null && (
               <div>
                 <div className="mb-3">
@@ -5153,65 +5156,67 @@ export default function HorizonPage({
                 </div>
                 <Vrijheidsas
                   currentAge={currentAge}
-                aowAge={userAowAge?.fractional ?? null}
-                baseFireAge={scenarioBaseFireAge}
-                verwachtFireAge={scenarioVerwachtFireAge}
-                laatstFireAge={laatstFireAge}
-                vroegstFireAgeFractional={vroegstFireAge}
-                hasScenario={hasScenario}
-                stopAge={effectiveStopAge}
-                onStopAgeChange={handleStopAgeChange}
-                stopKoppel={scenarioStopKoppel}
-                onStopKoppelChange={handleStopKoppelChange}
-                zone={stopMarge.zone}
-                margeJaren={stopMarge.margeJaren}
-                doelActief={doelActief}
+                  baseFireAge={scenarioBaseFireAge}
+                  verwachtFireAge={scenarioVerwachtFireAge}
+                  laatstFireAge={laatstFireAge}
+                  vroegstFireAgeFractional={vroegstFireAge}
+                  hasScenario={hasScenario}
+                  stopAge={effectiveStopAge}
+                  onStopAgeChange={handleStopAgeChange}
+                  stopKoppel={scenarioStopKoppel}
+                  onStopKoppelChange={handleStopKoppelChange}
+                  zone={stopMarge.zone}
+                  margeJaren={stopMarge.margeJaren}
+                  doelActief={doelActief}
+                  draaiknoppen={
+                    <>
+                      {/* De vier bestaande sliders (platgeslagen via `bare`) */}
+                      {whatIfBaseline && (
+                        <div>
+                          <p className="mb-2 label-editorial text-[var(--ink-3)]">Draaiknoppen</p>
+                          {/* Eerste-sleep-hint — wijst naar de gestippelde grafieklijn (boven). */}
+                          {firstDragHintVisible && (
+                            <div
+                              role="status"
+                              className="animate-fade-in mb-3 flex items-start justify-between gap-2 border border-[var(--ink-2)] border-l-4 border-l-horizon-500 bg-[var(--paper)] px-3 py-2"
+                            >
+                              <p className="font-sans text-[11px] leading-snug text-[var(--ink-2)]">
+                                Kijk naar de gestippelde lijn in de grafiek ↑ — dat is jouw wat-als.
+                              </p>
+                              <button
+                                type="button"
+                                onClick={dismissFirstDragHint}
+                                aria-label="Tip sluiten"
+                                className="-m-2 shrink-0 p-2 text-[var(--ink-4)] transition-colors hover:text-[var(--ink-2)]"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          )}
+                          <WhatIfSliders
+                            bare
+                            baseline={whatIfBaseline}
+                            events={scenarioSliderEvents}
+                            setEvents={handleScenarioSliderEvents}
+                            currentAge={currentAge}
+                          />
+                        </div>
+                      )}
+
+                      {/* Rendement per groep (genest collapsible; default dicht) */}
+                      <div className="border-t border-[var(--border-ed)] pt-5">
+                        <p className="mb-2 label-editorial text-[var(--ink-3)]">Rendement per groep</p>
+                        <WhatIfMarketAssumptions
+                          value={scenarioReturnDeltas}
+                          onChange={setScenarioReturnDeltas}
+                          assetGroups={categorieReturnGroups}
+                        />
+                      </div>
+                    </>
+                  }
                 />
               </div>
             )}
-
-            {/* ② De vier bestaande sliders (platgeslagen via `bare`) */}
-            {whatIfBaseline && currentAge !== null && (
-              <div className="border-t border-[var(--border-ed)] pt-5">
-                <p className="mb-2 label-editorial text-[var(--ink-3)]">Draaiknoppen</p>
-                {/* Eerste-sleep-hint — wijst naar de gestippelde grafieklijn (boven). */}
-                {firstDragHintVisible && (
-                  <div
-                    role="status"
-                    className="animate-fade-in mb-3 flex items-start justify-between gap-2 border border-[var(--ink-2)] border-l-4 border-l-horizon-500 bg-[var(--paper)] px-3 py-2"
-                  >
-                    <p className="font-sans text-[11px] leading-snug text-[var(--ink-2)]">
-                      Kijk naar de gestippelde lijn in de grafiek ↑ — dat is jouw wat-als.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={dismissFirstDragHint}
-                      aria-label="Tip sluiten"
-                      className="-m-2 shrink-0 p-2 text-[var(--ink-4)] transition-colors hover:text-[var(--ink-2)]"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                )}
-                <WhatIfSliders
-                  bare
-                  baseline={whatIfBaseline}
-                  events={scenarioSliderEvents}
-                  setEvents={handleScenarioSliderEvents}
-                  currentAge={currentAge}
-                />
-              </div>
-            )}
-
-            {/* ③ Rendement per groep (genest collapsible; default dicht) */}
-            <div className="border-t border-[var(--border-ed)] pt-5">
-              <p className="mb-2 label-editorial text-[var(--ink-3)]">Rendement per groep</p>
-              <WhatIfMarketAssumptions
-                value={scenarioReturnDeltas}
-                onChange={setScenarioReturnDeltas}
-                assetGroups={categorieReturnGroups}
-              />
-            </div>
 
             {/* Footer — draaien hier, archiveren daar */}
             <div className="border-t border-[var(--border-ed)] pt-3">
@@ -7092,8 +7097,11 @@ export default function HorizonPage({
                         const opbouwPct = Number(formMetadata.opbouwOmzetPct ?? 30)
                         const nettoPM = Math.max(0, brutoOmzet - kosten)
                         const jaarResultaat = nettoPM * 12
-                        const marginaalTarief = jaarResultaat > 75518 ? 49.5 : 37.07
-                        const geschatteBelasting = Math.round(nettoPM * marginaalTarief / 100)
+                        // Marginaal tarief (fractie) per belastingjaar uit BOX1_PARAMS
+                        // via de canonieke vuistregel — vervangt de losse 2024-hardcode
+                        // 49,5/37,07 (37,07 was bovendien een typefout voor 36,97).
+                        const marginaalTarief = deriveMarginaalTarief({ netMonthlyIncome: nettoPM })
+                        const geschatteBelasting = Math.round(nettoPM * marginaalTarief)
                         const nettoNaBelasting = nettoPM - geschatteBelasting
                         const opbouwNetto = opbouwMaanden > 0 ? Math.max(0, Math.round(brutoOmzet * opbouwPct / 100) - kosten) : 0
                         return (

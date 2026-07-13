@@ -18,9 +18,11 @@ export interface CoverageNode {
   age: number
   /**
    * Dekkingspercentage — RUWE afronding (Math.round), niet geclampt. In
-   * accumulatie-jaren altijd 100 (inkomen dekt + er wordt gespaard, geen
-   * onttrekkingsbehoefte). Consumenten die de weergave willen begrenzen
-   * (bv. 0–120 voor een balkje) doen dat zelf op basis van deze ruwe waarde.
+   * accumulatie-jaren > 100 zodra er wordt gespaard: het inkomen dekt de
+   * besteding én de inleg, dus dekking = inkomen ÷ besteding × 100 stijgt
+   * boven 100 met het spaarquote-effect (1 ÷ (1 − spaarquote)). Consumenten
+   * die de weergave willen begrenzen (bv. 0–120 voor een balkje) doen dat zelf
+   * op basis van deze ruwe waarde.
    */
   coveragePct: number
   /** Stoplichtstatus, afgeleid van coveragePct (zie COVERAGE_STATUS_*-drempels). */
@@ -100,7 +102,11 @@ export function spendablePortfolio(row: UnifiedProjectionRow): number {
  * Dekkingspercentage voor één projectierij — mockup-getrouw, op BRUTO-behoefte:
  *   dekking = (vaste inkomsten + veilige onttrekking) ÷ bruto besteding × 100.
  *
- * - accumulation: 100 (er wordt nog gespaard, geen onttrekkingsbehoefte).
+ * - accumulation: inkomen ÷ besteding × 100, met besteding = grossIncome − savings
+ *   (de inleg). Omdat je in opbouwjaren spaart (savings > 0) ligt de dekking bóven
+ *   100% — het spaargeld tilt 'm op (1 ÷ (1 − spaarquote)). Puur afgeleid uit het
+ *   rij-contract (grossIncome/savings), geen eigen rekenmotor. Geen besteding
+ *   (besteding ≤ 0: geen inleg, of inleg ≥ inkomen door externe kasstromen) → 100.
  * - transition/withdrawal: vaste inkomsten (salaris + AOW/pensioen) plus een
  *   VEILIGE onttrekking (NL_SWR × belegbaar vermogen), begrensd op de resterende
  *   behoefte zodat je niet méér "dekt" dan je uitgeeft. Bewust NIET de feitelijke
@@ -140,7 +146,18 @@ export function spendablePortfolio(row: UnifiedProjectionRow): number {
  * als de levensinkomenstrook, single-sourced (één home). Gedrag byte-identiek.
  */
 export function coveragePctForRow(row: UnifiedProjectionRow): number {
-  if (row.phase === 'accumulation') return 100
+  if (row.phase === 'accumulation') {
+    // Opbouwjaren: je spaart, dus je inkomen dekt méér dan je besteding. Dekking
+    // = inkomen ÷ besteding × 100, met besteding = inkomen − inleg (savings). Het
+    // gespaarde deel tilt de dekking bewust boven 100% (spaarquote-effect). Geen
+    // besteding (≤ 0) → 100, zodat rijen zonder inkomens-/inleg-data (bv. synthetische
+    // fixtures) hun 100%-vorm houden.
+    const inkomen = row.grossIncome ?? 0
+    const inleg = row.savings ?? 0
+    const besteding = inkomen - inleg
+    if (besteding <= 0) return 100
+    return Math.round((inkomen / besteding) * 100)
+  }
 
   const totaalNeed = row.withdrawalNeed?.totaalNeed ?? 0
   const partnerBijdrage = row.withdrawalNeed?.partnerBijdrage ?? 0

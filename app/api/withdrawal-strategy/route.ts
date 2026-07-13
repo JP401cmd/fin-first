@@ -48,11 +48,11 @@ export async function GET() {
  */
 function validateProfileConfig(
   raw: unknown,
-): { value: Record<string, number | string> | null } | { error: string } {
+): { value: Record<string, number | string | boolean> | null } | { error: string } {
   if (raw === null) return { value: null }
   if (typeof raw !== 'object') return { error: 'withdrawal_profile_config moet een object of null zijn' }
   const o = raw as Record<string, unknown>
-  const out: Record<string, number | string> = {}
+  const out: Record<string, number | string | boolean> = {}
   // V4 — expliciet gekozen profiel (optioneel). Alleen de vier geldige waarden.
   if (o.profiel != null) {
     if (
@@ -78,6 +78,22 @@ function validateProfileConfig(
     const n = Number(o[f])
     if (!Number.isFinite(n) || n < 0 || n > 200) {
       return { error: `${f} moet tussen 0 en 200 liggen` }
+    }
+    out[f] = n
+  }
+  // Roadmap M — flex-spending (must/nice). Rijdt mee op dezelfde JSONB-kolom (geen migratie).
+  if (o.flex_nice_only != null) {
+    if (typeof o.flex_nice_only !== 'boolean') {
+      return { error: 'flex_nice_only moet true of false zijn' }
+    }
+    out.flex_nice_only = o.flex_nice_only
+  }
+  const flexFractieFields = ['flex_nice_fractie', 'flex_cut_step'] as const
+  for (const f of flexFractieFields) {
+    if (o[f] == null) continue
+    const n = Number(o[f])
+    if (!Number.isFinite(n) || n < 0 || n > 1) {
+      return { error: `${f} moet tussen 0 en 1 liggen` }
     }
     out[f] = n
   }
@@ -145,8 +161,8 @@ export async function PUT(request: NextRequest) {
     }
   }
 
-  // ── Validate onttrekkingsprofiel-curve (V4, optioneel) ─────────────
-  let profileConfig: Record<string, number | string> | null | undefined
+  // ── Validate onttrekkingsprofiel-curve (V4) + flex-spending (roadmap M), optioneel ──
+  let profileConfig: Record<string, number | string | boolean> | null | undefined
   if ('withdrawal_profile_config' in body) {
     const validated = validateProfileConfig(body.withdrawal_profile_config)
     if ('error' in validated) {

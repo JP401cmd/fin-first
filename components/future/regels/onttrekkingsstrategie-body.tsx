@@ -175,6 +175,15 @@ export function OnttrekkingsstrategieBody({
   const [grCut, setGrCut] = useState(ws.guardrailCutStep)
   const [grRaise, setGrRaise] = useState(ws.guardrailRaiseStep)
 
+  // Roadmap M — flex-spending (must/nice) als verfijning ván het guardrails-profiel:
+  // laat de guardrail alléén op je flexibele (nice) uitgaven grijpen; essentiële
+  // (must) uitgaven blijven vast. `flexNicePct` = welk deel van je uitgaven flexibel is;
+  // `flexCutPct` = hoeveel dieper je op dat deel snijdt bij een dip.
+  const [flexNiceOnly, setFlexNiceOnly] = useState(false)
+  const [flexNicePct, setFlexNicePct] = useState(40)
+  const [flexCutPct, setFlexCutPct] = useState(50)
+  const [savedFlex, setSavedFlex] = useState({ on: false, nicePct: 40, cutPct: 50 })
+
   // 3-fasen-curve (Afnemend/Oplopend). Excel-defaults als startwaarde/reset.
   const [curve, setCurve] = useState<Curve>({ ...EXCEL_CURVE })
   const [savedCurve, setSavedCurve] = useState<Curve>({ ...EXCEL_CURVE })
@@ -213,6 +222,14 @@ export function OnttrekkingsstrategieBody({
           }
           setCurve(next)
           setSavedCurve(next)
+          // Roadmap M — flex-spending (must/nice).
+          const flexOn = cfg.flex_nice_only === true
+          const nicePct = Math.round(num(cfg.flex_nice_fractie, 0.4) * 100)
+          const cutPct = Math.round(num(cfg.flex_cut_step, 0.5) * 100)
+          setFlexNiceOnly(flexOn)
+          setFlexNicePct(nicePct)
+          setFlexCutPct(cutPct)
+          setSavedFlex({ on: flexOn, nicePct, cutPct })
         }
       })
       .catch(() => {})
@@ -242,12 +259,29 @@ export function OnttrekkingsstrategieBody({
   )
   const debounced = useDebouncedValue(simConfig, 200)
 
+  // Roadmap M — flex-spending draft: alléén als guardrails + flex aan. De kernel-adapter
+  // leest deze `withdrawal_profile_config`-draft (profiel + flex) zodat de live-sim de
+  // must/nice-split reflecteert; `undefined` = kolom ongewijzigd → gedrag als vandaag.
+  const flexDraftConfig = useMemo<Record<string, unknown> | undefined>(() => {
+    if (!isGuardrails || !flexNiceOnly) return undefined
+    return {
+      profiel: 'guardrails',
+      flex_nice_only: true,
+      flex_nice_fractie: flexNicePct / 100,
+      flex_cut_step: flexCutPct / 100,
+    }
+  }, [isGuardrails, flexNiceOnly, flexNicePct, flexCutPct])
+  const debouncedFlex = useDebouncedValue(flexDraftConfig, 200)
+
   const { baseline, draftProj } = useMemo(() => {
     if (!simSnapshot) return { baseline: EMPTY_PROJ, draftProj: EMPTY_PROJ }
     const baseline = runRegelProjection(simSnapshot)
-    const draftProj = runRegelProjection(simSnapshot, { withdrawalStrategy: { ...debounced } })
+    const draftProj = runRegelProjection(simSnapshot, {
+      withdrawalStrategy: { ...debounced },
+      withdrawalProfileConfig: debouncedFlex,
+    })
     return { baseline, draftProj }
-  }, [simSnapshot, debounced])
+  }, [simSnapshot, debounced, debouncedFlex])
 
   const curveChanged =
     showsCurve && JSON.stringify(curve) !== JSON.stringify(savedCurve)
@@ -257,7 +291,11 @@ export function OnttrekkingsstrategieBody({
       grCeiling !== ws.guardrailCeiling ||
       grCut !== ws.guardrailCutStep ||
       grRaise !== ws.guardrailRaiseStep)
-  const changed = profiel !== savedProfiel || curveChanged || guardrailChanged
+  const flexChanged =
+    isGuardrails &&
+    (flexNiceOnly !== savedFlex.on ||
+      (flexNiceOnly && (flexNicePct !== savedFlex.nicePct || flexCutPct !== savedFlex.cutPct)))
+  const changed = profiel !== savedProfiel || curveChanged || guardrailChanged || flexChanged
   const canSave = !saving && floorCeilingValid && changed
 
   const saveRef = useRef(async () => {})
@@ -266,14 +304,24 @@ export function OnttrekkingsstrategieBody({
       setSaving(true)
       setError(null)
       try {
-        // withdrawal_profile_config: profiel altijd; curve alleen bij afnemend/oplopend.
-        const profileConfig: Record<string, string | number> = { profiel }
+        // withdrawal_profile_config: profiel altijd; curve alleen bij afnemend/oplopend;
+        // flex-spending (must/nice) alleen bij guardrails.
+        const profileConfig: Record<string, string | number | boolean> = { profiel }
         if (showsCurve) {
           profileConfig.gogo_tot_leeftijd = curve.gogoTotLeeftijd
           profileConfig.gogo_pct = curve.gogoPct
           profileConfig.slowgo_tot_leeftijd = curve.slowgoTotLeeftijd
           profileConfig.slowgo_pct = curve.slowgoPct
           profileConfig.nogo_pct = curve.nogoPct
+        }
+        if (isGuardrails) {
+          // Roadmap M — must/nice. Vlag altijd meeschrijven (ook 'uit' expliciet wissen);
+          // fractie/cut-step alleen als de vlag aan staat.
+          profileConfig.flex_nice_only = flexNiceOnly
+          if (flexNiceOnly) {
+            profileConfig.flex_nice_fractie = flexNicePct / 100
+            profileConfig.flex_cut_step = flexCutPct / 100
+          }
         }
         const res = await fetch('/api/withdrawal-strategy', {
           method: 'PUT',
@@ -301,7 +349,21 @@ export function OnttrekkingsstrategieBody({
         setSaving(false)
       }
     }
-  }, [profiel, showsCurve, curve, grFloor, grCeiling, grCut, grRaise, onClose, onSaved])
+  }, [
+    profiel,
+    showsCurve,
+    curve,
+    grFloor,
+    grCeiling,
+    grCut,
+    grRaise,
+    isGuardrails,
+    flexNiceOnly,
+    flexNicePct,
+    flexCutPct,
+    onClose,
+    onSaved,
+  ])
 
   const deltaMonths = fireDeltaMonths(baseline, draftProj)
   useEffect(() => {
@@ -458,6 +520,68 @@ export function OnttrekkingsstrategieBody({
           {!floorCeilingValid && (
             <p className="text-[11px] text-amber-700">Ondergrens moet lager zijn dan de bovengrens.</p>
           )}
+
+          {/* Roadmap M — flex-spending (must/nice) */}
+          <div className="border-t border-[var(--border-ed)] pt-4">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={flexNiceOnly}
+              onClick={() => setFlexNiceOnly((v) => !v)}
+              className="flex w-full items-start gap-3 text-left"
+            >
+              <span
+                className={`mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors ${
+                  flexNiceOnly
+                    ? 'border-[var(--module-active-700)] bg-[var(--module-active-700)]'
+                    : 'border-[var(--border-md)] bg-[var(--paper)]'
+                }`}
+                aria-hidden="true"
+              >
+                <span
+                  className={`inline-block h-3.5 w-3.5 rounded-full bg-[var(--paper)] shadow transition-transform ${
+                    flexNiceOnly ? 'translate-x-4' : 'translate-x-0.5'
+                  }`}
+                />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold text-[var(--ink)]">
+                  Pas alleen op mijn flexibele uitgaven toe
+                </span>
+                <span className="mt-0.5 block text-[11px] leading-snug text-[var(--ink-2)]">
+                  Bij een dip knijpt de guardrail dan alléén je <span className="font-semibold">nice</span>-uitgaven
+                  (reizen, extra&apos;s) — je <span className="font-semibold">must</span>-lasten (huur, boodschappen,
+                  verzekeringen) blijven vast. Zo koop je veerkracht zonder je bestaanszekerheid te raken.
+                </span>
+              </span>
+            </button>
+
+            {flexNiceOnly && (
+              <div className="mt-4 space-y-4">
+                <GuardrailSlider
+                  label="Flexibel (nice) deel van je uitgaven"
+                  value={flexNicePct / 100}
+                  min={0}
+                  max={1}
+                  onChange={(v) => setFlexNicePct(Math.round(v * 100))}
+                  hint="Welk deel van je pensioenuitgaven discretionair is. De rest is must en blijft altijd vast."
+                />
+                <GuardrailSlider
+                  label="Extra korting op nice bij een dip"
+                  value={flexCutPct / 100}
+                  min={0}
+                  max={1}
+                  onChange={(v) => setFlexCutPct(Math.round(v * 100))}
+                  hint="Hoeveel je je nice-uitgaven terugschroeft zodra je vermogen onder de ondergrens zakt."
+                />
+                <p className="text-[10px] leading-snug text-[var(--ink-3)] italic">
+                  Let op: de regel reageert op je vermogen t.o.v. het ijkpunt op je vrijheidsdatum
+                  (anker-ratio), niet op een daling vanaf de hoogste stand ooit. Zakt je vermogen onder de
+                  ondergrens, dan gaat je nice-deel omlaag; herstelt het, dan komt het weer terug.
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

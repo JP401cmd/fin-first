@@ -205,6 +205,39 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
           infoDescription="De overgangsfase is de periode tussen stoppen met werken en het bereiken van je AOW én volledige vrijheid. Omdat AOW en FIRE niet altijd op hetzelfde moment vallen, ontstaat er een brug die je vermogen moet financieren. Hier zie je de kassabon van die jaren, een Monte Carlo simulatie van het risico, strategie-opties, de impact van deeltijdwerk, en wat er nodig is om eerder te stoppen."
         />
 
+        {/* 0b. Regime-kaart — waar de dekking van de brug vandaan komt (€) */}
+        <RegimeKaart
+          kicker="OVERGANG · DEKKING"
+          title="Waar de dekking vandaan komt"
+          rows={[
+            {
+              label: 'Vermogen',
+              hint: 'geoormerkt bruggeld',
+              weight: Math.max(totalOnttrekking, 0),
+              value: <MaskedAmount value={Math.round(totalOnttrekking)} tone="horizon" />,
+              tone: 'wealth',
+            },
+            {
+              label: 'AOW',
+              weight: Math.max(bridgeIncome.aow, 0),
+              value: <MaskedAmount value={Math.round(bridgeIncome.aow)} tone="horizon" />,
+              tone: bridgeIncome.aow > 0.5 ? 'income' : 'zero',
+            },
+            {
+              label: 'Pensioen',
+              weight: Math.max(bridgeIncome.pensioen, 0),
+              value: <MaskedAmount value={Math.round(bridgeIncome.pensioen)} tone="horizon" />,
+              tone: bridgeIncome.pensioen > 0.5 ? 'income' : 'zero',
+            },
+          ]}
+          footnote={
+            bridgeVasteInkomsten < 1
+              ? 'Dit is de smalste brug: AOW en pensioen dragen nog niets bij — alles moet uit je vermogen komen.'
+              : 'AOW en pensioen vullen al aan; het restant van de brug financier je uit je vermogen.'
+          }
+          infoDescription="In de overgangsfase zie je waar de dekking van je uitgaven vandaan komt. De balk toont het relatieve gewicht van elke bron t.o.v. de zwaarste. Vermogen is het geoormerkte bruggeld dat je onttrekt; AOW en pensioen zijn je vaste inkomsten. AOW en pensioen komen exact uit de projectie (grossIncomeBySource) — in de brug tussen stoppen en je AOW dragen ze vaak nog €0 bij, waardoor het gewicht volledig op je vermogen rust."
+        />
+
         {/* 1. PhaseChartZoom — full trajectory with transition phase highlighted */}
         {allRows && allRows.length > 2 && (
           <>
@@ -231,11 +264,13 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
         )}
 
         {/* 2. Fase-header — compact summary line + top-level discuss button */}
-        <div className="flex flex-col items-center gap-2">
-          <p className="text-center font-sans text-sm font-bold text-[var(--ink)] sm:text-base">
+        <div className="text-center">
+          <p className="font-sans text-sm font-bold text-[var(--ink)] sm:text-base">
             Overgang &middot; {<MaskedAmount value={Math.round(startVermogen)} tone="horizon" />} &rarr; {<MaskedAmount value={Math.round(eindVermogen)} tone="horizon" />} &middot; {durationYears} jaar
           </p>
-          <PhaseDiscussButton onderwerp="Mijn overgangsfase" summary={faseSummary} />
+          <div className="mt-2 flex justify-center">
+            <PhaseDiscussButton onderwerp="Mijn overgangsfase" summary={faseSummary} />
+          </div>
         </div>
 
         {/* 3. Kassabon — existing GapAnalysis / ShortfallAnalysis */}
@@ -269,39 +304,6 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
             yearlyExpenses={yearlyExpenses}
           />
         )}
-
-        {/* 3b. Regime-kaart — waar de dekking van de brug vandaan komt (€) */}
-        <RegimeKaart
-          kicker="OVERGANG · DEKKING"
-          title="Waar de dekking vandaan komt"
-          rows={[
-            {
-              label: 'Vermogen',
-              hint: 'geoormerkt bruggeld',
-              weight: Math.max(totalOnttrekking, 0),
-              value: <MaskedAmount value={Math.round(totalOnttrekking)} tone="horizon" />,
-              tone: 'wealth',
-            },
-            {
-              label: 'AOW',
-              weight: Math.max(bridgeIncome.aow, 0),
-              value: <MaskedAmount value={Math.round(bridgeIncome.aow)} tone="horizon" />,
-              tone: bridgeIncome.aow > 0.5 ? 'income' : 'zero',
-            },
-            {
-              label: 'Pensioen',
-              weight: Math.max(bridgeIncome.pensioen, 0),
-              value: <MaskedAmount value={Math.round(bridgeIncome.pensioen)} tone="horizon" />,
-              tone: bridgeIncome.pensioen > 0.5 ? 'income' : 'zero',
-            },
-          ]}
-          footnote={
-            bridgeVasteInkomsten < 1
-              ? 'Dit is de smalste brug: AOW en pensioen dragen nog niets bij — alles moet uit je vermogen komen.'
-              : 'AOW en pensioen vullen al aan; het restant van de brug financier je uit je vermogen.'
-          }
-          infoDescription="In de overgangsfase zie je waar de dekking van je uitgaven vandaan komt. De balk toont het relatieve gewicht van elke bron t.o.v. de zwaarste. Vermogen is het geoormerkte bruggeld dat je onttrekt; AOW en pensioen zijn je vaste inkomsten. AOW en pensioen komen exact uit de projectie (grossIncomeBySource) — in de brug tussen stoppen en je AOW dragen ze vaak nog €0 bij, waardoor het gewicht volledig op je vermogen rust."
-        />
 
         {/* 4. Life Events in this phase */}
         {events && events.length > 0 && (

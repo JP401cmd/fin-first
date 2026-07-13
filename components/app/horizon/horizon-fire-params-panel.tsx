@@ -90,13 +90,15 @@ export function HorizonFireParamsPanel({
       const paramRes = await fetch('/api/parameters', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
+        // marginaal_tarief bewust NIET meegestuurd: dit paneel heeft er geen
+        // invoercontrole voor. De PUT-route laat weggelaten velden ongemoeid,
+        // zodat een expliciete profiel-override behouden blijft en een 'auto'-
+        // waarde per belastingjaar vers uit BOX1_PARAMS afgeleid blijft worden
+        // (i.p.v. een 2024-tarief te bevriezen via de oude whitelist-guard).
         body: JSON.stringify({
           expected_return: localReturn / 100,
           inflation_rate: localInflation / 100,
           box3_method: fireParams.box3Method,
-          marginaal_tarief: fireParams.marginaalTarief === 0.3697 || fireParams.marginaalTarief === 0.4950
-            ? fireParams.marginaalTarief
-            : null,
         }),
       })
       if (!paramRes.ok) {

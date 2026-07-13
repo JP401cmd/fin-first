@@ -62,8 +62,9 @@ export function LevensinkomenStrook({ nodes, activeAge, segments }: Levensinkome
         </div>
         <p className="m-0">
           dekkingsgraad = (vaste inkomsten + veilige onttrekking) ÷ gewenste besteding × 100%. 100% = volledig gedekt
-          zonder extra in te teren. <b className="text-[var(--ink)]">Groen ≥ 100%</b> — inkomen + veilige onttrekking
-          dekken je besteding. <b className="text-[var(--ink)]">Amber 90–99%</b> — klein tekort, je teert licht in.{' '}
+          zonder extra in te teren. In je <b className="text-[var(--ink)]">opbouwjaren</b> ligt de dekking bóven 100%:
+          je spaart, dus je inkomen dekt je besteding én de inleg. <b className="text-[var(--ink)]">Groen ≥ 100%</b> —
+          inkomen + veilige onttrekking dekken je besteding. <b className="text-[var(--ink)]">Amber 90–99%</b> — klein tekort, je teert licht in.{' '}
           <b className="text-[var(--ink)]">Rood &lt; 90%</b> — vaste inkomsten + veilige onttrekking dekken je
           besteding dat jaar niet; de rest komt uit interen op je vermogen. Waarom het dipt: in de brugjaren (tussen
           FIRE en AOW) is er nog geen AOW/pensioen, dus alles komt uit vermogen → onder 100%. Vanaf AOW tillen AOW +

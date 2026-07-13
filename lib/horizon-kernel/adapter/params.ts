@@ -115,9 +115,37 @@ export function buildPersoonTijdas(dateOfBirth: string, aowRows: readonly AowLee
 }
 
 /**
+ * Roadmap M — leid de nice-fractie (0..1) af uit de budgetten: het deel van de
+ * POST-FIRE uitgave (de term die Ont!D flexet) dat bóven de must-euro's uitkomt.
+ * `(uitgaveNaPensioen − must)/uitgaveNaPensioen`, geclampt. Bij methode
+ * `essential_budgets` is de uitgave al must-only (`uitgave == must`) → nice = 0 →
+ * niets te flexen (de regel is dan informatief). We ijken bewust op
+ * `uitgaveNaPensioenPerJaar` (de exact gesplitste term), niet op de huidige totale
+ * leefuitgaven, zodat must/nice op dezelfde grondslag zit als waar de kernel op rekent.
+ */
+function deriveNiceFractie(uitgaveNaPensioenPerJaar: number, yearlyMust: number): number {
+  if (!(uitgaveNaPensioenPerJaar > 0)) return 0
+  const nice = (uitgaveNaPensioenPerJaar - Math.max(0, yearlyMust)) / uitgaveNaPensioenPerJaar
+  return Math.min(1, Math.max(0, nice))
+}
+
+/** Clamp een optionele fractie naar [0,1]; `null`/ongeldig → `undefined` (val terug op afgeleid). */
+function clampFractieOrUndefined(raw: number | null): number | undefined {
+  if (raw == null || !Number.isFinite(raw)) return undefined
+  return Math.min(1, Math.max(0, raw))
+}
+
+/**
  * Inkomen & uitgaven. `nettoJaaruitgaven` = huidige leefuitgaven; `uitgaveNaPensioen`
  * via de canonieke `computeRetirementExpenses` (methode + custom-bedrag), met de
  * huidige uitgaven als schatting-fallback.
+ *
+ * Roadmap M — flex-spending (must/nice): wanneer de gebruiker de flex-regel activeert
+ * (`withdrawal_profile_config.flex_nice_only`) draagt dit blok de nice-fractie +
+ * optionele grotere cut-step mee. Nice-fractie: expliciete override wint, anders
+ * afgeleid uit de budgetten (`is_essential` → `yearly_essential_expenses`). Zonder de
+ * vlag zijn de flex-velden weggelaten → `InkomenUitgavenParams` byte-identiek aan vóór
+ * roadmap M (parity intact).
  */
 export function buildInkomenUitgaven(profile: KernelAdapterProfile): InkomenUitgavenParams {
   const nettoJaarinkomen = Number(profile.net_monthly_income ?? 0) * 12
@@ -130,7 +158,23 @@ export function buildInkomenUitgaven(profile: KernelAdapterProfile): InkomenUitg
     profile.retirement_custom_amount ?? null,
     nettoJaaruitgaven,
   )
-  return { nettoJaarinkomen, nettoJaaruitgaven, uitgaveNaPensioenPerJaar }
+  const base: InkomenUitgavenParams = { nettoJaarinkomen, nettoJaaruitgaven, uitgaveNaPensioenPerJaar }
+
+  // Roadmap M — flex-spending-config (JSONB `withdrawal_profile_config`). Weggelaten/UIT
+  // → base ongewijzigd (inert; byte-identiek aan vóór roadmap M).
+  const flex = parseWithdrawalProfileConfig(profile)
+  if (!flex?.flexNiceOnly) return base
+
+  const override = clampFractieOrUndefined(flex.flexNiceFractie)
+  const flexNiceFractiePerJaar =
+    override ?? deriveNiceFractie(uitgaveNaPensioenPerJaar, yearlyEssential)
+  const flexNiceCutStep = clampFractieOrUndefined(flex.flexCutStep)
+  return {
+    ...base,
+    flexNiceOnly: true,
+    flexNiceFractiePerJaar,
+    ...(flexNiceCutStep != null ? { flexNiceCutStep } : {}),
+  }
 }
 
 /**

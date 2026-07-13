@@ -14,10 +14,28 @@ function mkRow(p: Partial<UnifiedProjectionRow> & { age: number; phase: UnifiedP
 }
 
 describe('buildCoverageStrip', () => {
-  it('accumulatie-jaren zijn 100% (groen)', () => {
+  it('accumulatie-jaren zonder inkomens-/inleg-data vallen terug op 100% (groen)', () => {
+    // besteding = grossIncome − savings ≤ 0 (beide ontbreken) → guard → 100.
     const rows = [40, 45, 50].map(age => mkRow({ age, phase: 'accumulation' }))
     const nodes = buildCoverageStrip(rows, { sampleEveryYears: 5 })
     expect(nodes.every(n => n.coveragePct === 100 && n.status === 'green')).toBe(true)
+  })
+
+  it('accumulatie-jaren met inleg komen bóven 100%: het spaargeld tilt de dekking op (spaarquote-effect)', () => {
+    // Inkomen 50k, inleg 15k → besteding 35k → dekking = 50/35 ≈ 143% (groen).
+    const rows = [
+      mkRow({ age: 40, phase: 'accumulation', grossIncome: 50_000, savings: 15_000 }),
+      mkRow({ age: 45, phase: 'accumulation', grossIncome: 60_000, savings: 30_000 }), // 50% spaarquote → 200%
+    ]
+    const nodes = buildCoverageStrip(rows, { sampleEveryYears: 5 })
+    const n40 = nodes.find(n => n.age === 40)!
+    const n45 = nodes.find(n => n.age === 45)!
+    expect(n40.coveragePct).toBe(Math.round((50_000 / 35_000) * 100)) // 143
+    expect(n40.coveragePct).toBeGreaterThan(100)
+    expect(n40.status).toBe('green')
+    expect(n45.coveragePct).toBe(200) // besteding 30k, inkomen 60k
+    // Meer sparen ⇒ hogere dekking (monotoon in spaarquote).
+    expect(n45.coveragePct).toBeGreaterThan(n40.coveragePct)
   })
 
   it('brug leunt op VEILIGE onttrekking (SWR×belegbaar); huis + feitelijke withdrawal tellen niet', () => {

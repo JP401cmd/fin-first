@@ -1,22 +1,29 @@
 import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
-import { Vrijheidsas, computeCoupledStopAge, fireDeltaLabel, formatMargeShort } from './vrijheidsas'
+import {
+  Vrijheidsas,
+  computeCoupledStopAge,
+  fireDeltaLabel,
+  formatMargeShort,
+  computeMargeBandPct,
+  MARGE_BAND_MIN_AMBER_PCT,
+} from './vrijheidsas'
 
 /**
- * Unit-tests voor de Vrijheidsas (mockup-blok ⑤ van de wat-als-scenariolaag).
+ * Unit-tests voor de Vrijheidsas (mockup-blok ⑤ van de wat-als-scenariolaag — twee
+ * vlakken: streep links, marge rechts).
  *
  * Puur presentational component → geen DisplayModeProvider nodig (tests draaien in
  * "full"). Gedekt:
  *   A. computeCoupledStopAge — koppel-semantiek als pure helper (marge constant, 0,5-stap,
  *      onbereikbaar → null).
  *   B. fireDeltaLabel — beslushulp-conventie (eerder/later/gelijk/onbereikbaar).
- *   C. Rendering — cijferrij, stopleeftijd-slider (aria), driezone-labels, AOW-hairline,
- *      wat-als-marker alleen bij actief scenario, marge-zonekleur.
+ *   C. computeMargeBandPct — strakke amber-buffer zodat VERWACHT/LAATST nooit botsen.
+ *   D. Rendering — cijferrij, stopleeftijd-slider (aria), driezone-labels, marge-zonekleur.
  */
 
 const baseProps = {
   currentAge: 40,
-  aowAge: 67,
   baseFireAge: 55,
   verwachtFireAge: 55,
   laatstFireAge: 58,
@@ -75,6 +82,29 @@ describe('formatMargeShort (adaptieve marge-eenheid)', () => {
     expect(formatMargeShort(2.5)).toBe('+2,5 jr')
     expect(formatMargeShort(-1)).toBe('−1,0 jr')
     expect(formatMargeShort(5)).toBe('+5,0 jr')
+  })
+})
+
+describe('computeMargeBandPct (strakke amber-buffer)', () => {
+  it('houdt VERWACHT en LAATST minstens de buffer-breedte uit elkaar bij (bijna) samenvallende randen', () => {
+    // vroegst≈laatst≈verwacht (het 47-47-defect): amber mag niet dichtklappen.
+    const { amberStartPct, amberEndPct } = computeMargeBandPct(30, 30)
+    expect(amberStartPct).toBe(30)
+    expect(amberEndPct - amberStartPct).toBeGreaterThanOrEqual(MARGE_BAND_MIN_AMBER_PCT)
+    // De twee label-posities vallen dus niet meer samen.
+    expect(amberEndPct).not.toBe(amberStartPct)
+  })
+
+  it('volgt de echte voorzichtige rand wanneer die verder ligt dan de minimum-buffer', () => {
+    const { amberStartPct, amberEndPct } = computeMargeBandPct(20, 55)
+    expect(amberStartPct).toBe(20)
+    expect(amberEndPct).toBe(55)
+  })
+
+  it('klemt de grenzen binnen 0–100 en behandelt een ontbrekende laatst-rand', () => {
+    const { amberStartPct, amberEndPct } = computeMargeBandPct(98, null)
+    expect(amberStartPct).toBe(98)
+    expect(amberEndPct).toBe(100)
   })
 })
 
@@ -142,17 +172,12 @@ describe('Vrijheidsas rendering', () => {
     expect(screen.getByText(/^stop\s/)).toBeInTheDocument()
   })
 
-  it('toont de AOW-hairline met leeftijd-label', () => {
-    render(<Vrijheidsas {...baseProps} />)
-    expect(screen.getByText('AOW 67')).toBeInTheDocument()
-  })
-
-  it('toont GEEN wat-als-marker zonder actief scenario', () => {
+  it('toont GEEN afwijking-duiding zonder actief scenario', () => {
     render(<Vrijheidsas {...baseProps} hasScenario={false} />)
-    expect(screen.queryByLabelText(/Wat-als-vrijheidsleeftijd/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/mnd (eerder|later) vrij/)).not.toBeInTheDocument()
   })
 
-  it('toont de wat-als-marker + delta bij een actief scenario', () => {
+  it('toont de eerder/later-vrij-duiding bij een actief scenario (stopregel + cijferrij)', () => {
     render(
       <Vrijheidsas
         {...baseProps}
@@ -162,8 +187,7 @@ describe('Vrijheidsas rendering', () => {
         zone="stevig"
       />,
     )
-    // verwacht 52.5 vs basis 55 = 30 mnd eerder → label verschijnt (marker + cijferrij).
-    expect(screen.getByLabelText(/Wat-als-vrijheidsleeftijd/)).toBeInTheDocument()
+    // verwacht 52.5 vs basis 55 = 30 mnd eerder → verschijnt op de stopleeftijd-regel én in de cijferrij.
     expect(screen.getAllByText('30 mnd eerder vrij').length).toBeGreaterThan(0)
   })
 

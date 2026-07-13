@@ -69,7 +69,7 @@ interface PhaseModalOpbouwProps {
   fireTarget?: number
   /** Has partner — affects Box 3 heffingsvrij and marginaalTarief */
   hasPartner?: boolean
-  /** Marginaal IB-tarief (e.g. 0.3697 or 0.4950) */
+  /** Marginaal IB-tarief (0–1; schijf-1- of topschijf-tarief, jaar-afgeleid) */
   marginaalTarief?: number
   /** FASE 6, stap 2 — convergentie-vlag (`horizon_kernel_convergentie`) + geboortedatum
    *  voor de HvB-FIRE-impact-routing. Vlag uit / geen dob → v2 (byte-identiek). */
