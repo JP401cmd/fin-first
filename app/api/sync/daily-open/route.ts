@@ -15,6 +15,13 @@ import { NextResponse } from 'next/server'
  * antwoordt de route `{ due: false }`. Zo synct maar één opener per dag, zonder
  * race tussen tabs/apparaten.
  *
+ * LET OP — geen `.select()` achter deze update (productie-incident 17 jul 2026):
+ * PostgREST past bij `Prefer: return=representation` de `or=`-filter toe op de
+ * teruggave-projectie; met `select=id` bestaat de filterkolom daar niet en faalt
+ * de hele claim met 42703 ("column … does not exist" — misleidend, de kolom
+ * bestaat wél). Daarom `{ count: 'exact' }` zonder representation: de count van
+ * geraakte rijen vertelt of wíj de dag claimden, zonder het kapotte pad.
+ *
  * Eigen-rij only — RLS op profiles dwingt af dat een gebruiker alleen de eigen rij
  * leest/schrijft (auth.uid() = id). Geen service-role. Spiegelt app/api/appearance.
  *
@@ -36,17 +43,16 @@ export async function POST() {
   const todayStart = `${now.toISOString().split('T')[0]}T00:00:00.000Z`
 
   // Atomische claim: zet last_price_sync_at alleen als 'ie null is of vóór
-  // vandaag ligt. Geraakte rij (SELECT terug) ⇒ wij claimden de dag ⇒ due.
-  const { data: claimed, error } = await supabase
+  // vandaag ligt. count > 0 ⇒ wij raakten de rij ⇒ wij claimden de dag ⇒ due.
+  const { count, error } = await supabase
     .from('profiles')
-    .update({ last_price_sync_at: now.toISOString() })
+    .update({ last_price_sync_at: now.toISOString() }, { count: 'exact' })
     .eq('id', user.id)
     .or(`last_price_sync_at.is.null,last_price_sync_at.lt.${todayStart}`)
-    .select('id')
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  return NextResponse.json({ due: (claimed?.length ?? 0) > 0 })
+  return NextResponse.json({ due: (count ?? 0) > 0 })
 }
