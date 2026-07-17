@@ -4,3 +4,6 @@ node_modules/
 # van een door de eigenaar aangewezen bron-account. Bewust nooit committen —
 # regenereer lokaal met `npm run build:goud` (zie scripts/build-goud-set.ts).
 dataset/goud-*.json
+
+# Log-artefacten van de dev-server horen niet in het repo (security-review jul 2026).
+*.log

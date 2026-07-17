@@ -1,6 +1,6 @@
 // Bouwt de GOUDEN TESTSET(s) (fase-0-POC, lokale transactie-categorisatie) uit
 // de stage-1-residustaart van één, door de eigenaar aangewezen bron-account
-// (janpaul050486@gmail.com). Leest RUWE (niet-geanonimiseerde) exports uit de
+// (user-id via env GOUD_USER_ID). Leest RUWE (niet-geanonimiseerde) exports uit de
 // scratchpad — NOOIT uit de repo — en schrijft uitsluitend GEANONIMISEERDE
 // output naar dataset/goud-set.json, dataset/goud-set-replay.json en
 // dataset/goud-budgets.json.
@@ -52,7 +52,14 @@ const OUT_SET = resolve(here, '../dataset/goud-set.json')
 const OUT_SET_REPLAY = resolve(here, '../dataset/goud-set-replay.json')
 const OUT_BUDGETS = resolve(here, '../dataset/goud-budgets.json')
 
-const USER_ID = 'b177271d-ac6b-4942-a864-4b4b2d807ec4' // janpaul050486@gmail.com — expliciet aangewezen bron-account
+// Bron-account via env — geen hardcoded user-id/e-mail in het repo (security-
+// review jul 2026): `GOUD_USER_ID=<uuid> npm run build:goud`. Fail-fast zodat
+// een vergeten env-var niet stilletjes een lege set bouwt.
+const USER_ID = process.env.GOUD_USER_ID ?? ''
+if (!USER_ID) {
+  console.error('GOUD_USER_ID ontbreekt — zet de user-uuid van het bron-account als env-var.')
+  process.exit(1)
+}
 const MIN_TARGET = 150
 const MAX_TARGET = 250
 const DEDUPE_CAP = 3
