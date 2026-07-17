@@ -57,6 +57,7 @@ export async function GET(
         holding_name: holding.name,
         ticker: (holding.ticker as string | undefined) ?? (holding.symbol as string | undefined) ?? null,
         history: priceHistory,
+        // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
         current_value: parseFloat((currentPrice * currentUnits).toFixed(2)),
         current_units: currentUnits,
         current_price: currentPrice,
@@ -84,6 +85,7 @@ export async function GET(
       holding_name: holding.name,
       ticker: ticker ?? (holding.symbol as string | undefined) ?? null,
       history: txHistory,
+      // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
       current_value: parseFloat((currentPrice * currentUnits).toFixed(2)),
       current_units: currentUnits,
       current_price: currentPrice,
@@ -204,10 +206,13 @@ async function buildPriceBasedHistory(supabase: any, holding: any, tables: Holdi
 
       history.push({
         date: p.date,
+        // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
         value: parseFloat((units * closePrice).toFixed(2)),
+        // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
         units: parseFloat(units.toFixed(6)),
         price: closePrice,
         event: 'Koers',
+        // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
         cost_basis: parseFloat(costBasis.toFixed(2)),
       })
     }
@@ -220,10 +225,13 @@ async function buildPriceBasedHistory(supabase: any, holding: any, tables: Holdi
       if (units > 0) {
         history.push({
           date: lastPrice.date,
+          // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
           value: parseFloat((units * closePrice).toFixed(2)),
+          // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
           units: parseFloat(units.toFixed(6)),
           price: closePrice,
           event: 'Koers',
+          // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
           cost_basis: parseFloat(costBasis.toFixed(2)),
         })
       }
@@ -236,10 +244,12 @@ async function buildPriceBasedHistory(supabase: any, holding: any, tables: Holdi
     if (currentUnits > 0 && (!lastInHistory || lastInHistory.date !== today)) {
       history.push({
         date: today,
+        // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
         value: parseFloat((currentUnits * currentPrice).toFixed(2)),
         units: currentUnits,
         price: currentPrice,
         event: 'Huidig',
+        // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
         cost_basis: parseFloat((currentUnits * (Number(holding.avg_purchase_price) || 0)).toFixed(2)),
       })
     }
@@ -310,10 +320,13 @@ async function buildTransactionBasedHistory(supabase: any, holding: any, tables:
 
     history.push({
       date: tx.date,
+      // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
       value: parseFloat(valueAtEvent.toFixed(2)),
+      // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
       units: parseFloat(runningUnits.toFixed(6)),
       price: pricePerUnit,
       event: eventLabel,
+      // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
       cost_basis: parseFloat(runningCostBasis.toFixed(2)),
     })
   }
@@ -327,10 +340,12 @@ async function buildTransactionBasedHistory(supabase: any, holding: any, tables:
   if (!lastEntry || lastEntry.date !== today) {
     history.push({
       date: today,
+      // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
       value: parseFloat(currentValue.toFixed(2)),
       units: currentUnits,
       price: currentPrice,
       event: 'Huidig',
+      // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
       cost_basis: parseFloat((currentUnits * (Number(holding.avg_purchase_price) || 0)).toFixed(2)),
     })
   }

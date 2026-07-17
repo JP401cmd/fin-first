@@ -128,8 +128,17 @@ const tests: TestCase[] = [
     priority: 'high',
     estimatedDurationMs: 50,
     fn() {
-      // No essential parents → orphan essential children should be counted
-      const { yearlyMustExpenses, expenseItems } = computeYearlyMustExpenses([], ALL_CHILDREN)
+      // No essential parents → orphan essential children should be counted.
+      // Isolate the true orphans (parent_id not among Wonen/Vervoer/Verzekeringen)
+      // — passing ALL_CHILDREN here would also turn Wonen/Verzekeringen's own
+      // essential children (Huur, Energie, Zorgverzekering) into "orphans",
+      // since essentialParents=[] clears their parent from the essential-set
+      // too. That's correct function behavior (each call is self-contained),
+      // but it isn't what this specific test intends to isolate.
+      const trueOrphans = ALL_CHILDREN.filter(c =>
+        ['p-other', 'p-archive', 'p-income', 'p-savings'].includes(c.parent_id ?? ''),
+      )
+      const { yearlyMustExpenses, expenseItems } = computeYearlyMustExpenses([], trueOrphans)
 
       // Only c-orphan qualifies (400 monthly = 4800 annual)
       // c-orphan-archive (budget_type='archive'), c-orphan-income ('income'), c-orphan-savings ('savings') are excluded
@@ -333,8 +342,14 @@ const tests: TestCase[] = [
 
       assertFinite(dailyRate, 'Daily rate is finite')
       assertFinite(projected, 'Projected is finite')
-      assertEqual(projected, 1000, 'Linear extrapolation')
-      assertEqual(pctUsed, 100, 'Exactly 100% projected usage')
+      // Ronden op de floating-point-onzuiverheid: 500/15*30 is wiskundig
+      // exact 1000, maar 500/15 is een repeterende breuk in IEEE-754
+      // (33.333333333333336), waardoor *30 → 1000.0000000000001 oplevert.
+      // Dit is geen productiecode-bug (het is inline concept-aritmetiek,
+      // geen budget-utils-functie) — strikte === op het ongeronde resultaat
+      // zou hier permanent falen zodra deze test daadwerkelijk draait.
+      assertEqual(Math.round(projected), 1000, 'Linear extrapolation')
+      assertEqual(Math.round(pctUsed), 100, 'Exactly 100% projected usage')
     },
   },
   {

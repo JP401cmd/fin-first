@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-16T22:34:10.831Z",
-  "generatedDate": "2026-07-16",
+  "generatedAt": "2026-07-17T21:58:09.771Z",
+  "generatedDate": "2026-07-17",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -187,13 +187,13 @@
     }
   },
   "stats": {
-    "routes": 141,
+    "routes": 142,
     "routesProduction": 100,
-    "api": 250,
-    "tables": 60,
-    "migrations": 134,
-    "integrations": 24,
-    "components": 836,
+    "api": 253,
+    "tables": 84,
+    "migrations": 142,
+    "integrations": 25,
+    "components": 855,
     "providers": 11,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -223,6 +223,12 @@
     {
       "url": "/beheer/ai-verbruik",
       "file": "app/(app)/beheer/ai-verbruik/page.tsx",
+      "group": "beheer",
+      "isTest": false
+    },
+    {
+      "url": "/beheer/allowlist",
+      "file": "app/(app)/beheer/allowlist/page.tsx",
       "group": "beheer",
       "isTest": false
     },
@@ -1072,6 +1078,12 @@
       {
         "url": "/beheer/ai-verbruik",
         "file": "app/(app)/beheer/ai-verbruik/page.tsx",
+        "group": "beheer",
+        "isTest": false
+      },
+      {
+        "url": "/beheer/allowlist",
+        "file": "app/(app)/beheer/allowlist/page.tsx",
         "group": "beheer",
         "isTest": false
       },
@@ -2141,6 +2153,16 @@
       "methods": [
         "GET",
         "PUT"
+      ]
+    },
+    {
+      "url": "/api/admin/signup-allowlist",
+      "file": "app/api/admin/signup-allowlist/route.ts",
+      "domain": "admin",
+      "methods": [
+        "GET",
+        "POST",
+        "DELETE"
       ]
     },
     {
@@ -3847,6 +3869,23 @@
       ]
     },
     {
+      "url": "/api/snapshots/entity-backfill",
+      "file": "app/api/snapshots/entity-backfill/route.ts",
+      "domain": "snapshots",
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "url": "/api/snapshots/group-history",
+      "file": "app/api/snapshots/group-history/route.ts",
+      "domain": "snapshots",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
       "url": "/api/snapshots/history",
       "file": "app/api/snapshots/history/route.ts",
       "domain": "snapshots",
@@ -4027,7 +4066,7 @@
     {
       "domain": "admin",
       "label": "Beheer",
-      "count": 38,
+      "count": 39,
       "routes": [
         {
           "url": "/api/admin/ai-features",
@@ -4232,6 +4271,16 @@
           "methods": [
             "GET",
             "PUT"
+          ]
+        },
+        {
+          "url": "/api/admin/signup-allowlist",
+          "file": "app/api/admin/signup-allowlist/route.ts",
+          "domain": "admin",
+          "methods": [
+            "GET",
+            "POST",
+            "DELETE"
           ]
         },
         {
@@ -5026,6 +5075,72 @@
       ]
     },
     {
+      "domain": "snapshots",
+      "label": "Snapshots",
+      "count": 7,
+      "routes": [
+        {
+          "url": "/api/snapshots",
+          "file": "app/api/snapshots/route.ts",
+          "domain": "snapshots",
+          "methods": [
+            "GET",
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/snapshots/auto",
+          "file": "app/api/snapshots/auto/route.ts",
+          "domain": "snapshots",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/snapshots/balances",
+          "file": "app/api/snapshots/balances/route.ts",
+          "domain": "snapshots",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/snapshots/cron",
+          "file": "app/api/snapshots/cron/route.ts",
+          "domain": "snapshots",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/snapshots/entity-backfill",
+          "file": "app/api/snapshots/entity-backfill/route.ts",
+          "domain": "snapshots",
+          "methods": [
+            "GET",
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/snapshots/group-history",
+          "file": "app/api/snapshots/group-history/route.ts",
+          "domain": "snapshots",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/snapshots/history",
+          "file": "app/api/snapshots/history/route.ts",
+          "domain": "snapshots",
+          "methods": [
+            "GET",
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "calculators",
       "label": "Calculators",
       "count": 6,
@@ -5178,55 +5293,6 @@
           "file": "app/api/assets/toggle-woonbalans/route.ts",
           "domain": "assets",
           "methods": [
-            "POST"
-          ]
-        }
-      ]
-    },
-    {
-      "domain": "snapshots",
-      "label": "Snapshots",
-      "count": 5,
-      "routes": [
-        {
-          "url": "/api/snapshots",
-          "file": "app/api/snapshots/route.ts",
-          "domain": "snapshots",
-          "methods": [
-            "GET",
-            "POST"
-          ]
-        },
-        {
-          "url": "/api/snapshots/auto",
-          "file": "app/api/snapshots/auto/route.ts",
-          "domain": "snapshots",
-          "methods": [
-            "GET"
-          ]
-        },
-        {
-          "url": "/api/snapshots/balances",
-          "file": "app/api/snapshots/balances/route.ts",
-          "domain": "snapshots",
-          "methods": [
-            "GET"
-          ]
-        },
-        {
-          "url": "/api/snapshots/cron",
-          "file": "app/api/snapshots/cron/route.ts",
-          "domain": "snapshots",
-          "methods": [
-            "GET"
-          ]
-        },
-        {
-          "url": "/api/snapshots/history",
-          "file": "app/api/snapshots/history/route.ts",
-          "domain": "snapshots",
-          "methods": [
-            "GET",
             "POST"
           ]
         }
@@ -6815,12 +6881,36 @@
   "tables": {
     "list": [
       {
+        "name": "_legacy_holding_prices",
+        "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
+      },
+      {
+        "name": "_legacy_holding_transactions",
+        "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
+      },
+      {
+        "name": "_legacy_holdings",
+        "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
+      },
+      {
+        "name": "actions",
+        "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
+      },
+      {
+        "name": "admin_actions_log",
+        "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
+      },
+      {
         "name": "ai_calculator_usage",
         "migration": "supabase/migrations/20260529100000_create_calculator_library.sql"
       },
       {
         "name": "ai_token_usage",
         "migration": "supabase/migrations/20260611140000_create_ai_token_usage.sql"
+      },
+      {
+        "name": "ai_usage",
+        "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
       },
       {
         "name": "aow_leeftijd",
@@ -6847,12 +6937,32 @@
         "migration": "supabase/migrations/20260215000000_create_base_tables.sql"
       },
       {
+        "name": "bank_connection_accounts",
+        "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
+      },
+      {
+        "name": "bank_connections",
+        "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
+      },
+      {
+        "name": "bank_sync_log",
+        "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
+      },
+      {
         "name": "briefing_history",
         "migration": "supabase/migrations/20260518000001_create_briefing_history.sql"
       },
       {
         "name": "broker_connections",
         "migration": "supabase/migrations/20260616010000_create_broker_connections.sql"
+      },
+      {
+        "name": "budget_amounts",
+        "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
+      },
+      {
+        "name": "budget_rollovers",
+        "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
       },
       {
         "name": "budgets",
@@ -6895,6 +7005,10 @@
         "migration": "supabase/migrations/20260215000000_create_base_tables.sql"
       },
       {
+        "name": "error_logs",
+        "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
+      },
+      {
         "name": "exchange_connections",
         "migration": "supabase/migrations/20260501000001_create_external_connections.sql"
       },
@@ -6905,6 +7019,10 @@
       {
         "name": "feedback",
         "migration": "supabase/migrations/20260713130000_create_feedback.sql"
+      },
+      {
+        "name": "goal_contributions",
+        "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
       },
       {
         "name": "goals",
@@ -6971,6 +7089,10 @@
         "migration": "supabase/migrations/20260215000000_create_base_tables.sql"
       },
       {
+        "name": "mail_log",
+        "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
+      },
+      {
         "name": "net_worth_history",
         "migration": "supabase/migrations/20260716160000_add_networth_history_and_price_sync_gate.sql"
       },
@@ -6983,12 +7105,20 @@
         "migration": "supabase/migrations/20260324000001_create_news_articles.sql"
       },
       {
+        "name": "news_editions",
+        "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
+      },
+      {
         "name": "news_feedback",
         "migration": "supabase/migrations/20260611140000_create_news_feedback.sql"
       },
       {
         "name": "next_step_completions",
         "migration": "supabase/migrations/20260215000001_create_new_tables.sql"
+      },
+      {
+        "name": "nibud_reference_data",
+        "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
       },
       {
         "name": "profiles",
@@ -7011,16 +7141,44 @@
         "migration": "supabase/migrations/20260326000001_create_questionnaire_tables.sql"
       },
       {
+        "name": "recommendation_feedback",
+        "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
+      },
+      {
+        "name": "recommendations",
+        "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
+      },
+      {
         "name": "recurring_transactions",
         "migration": "supabase/migrations/20260215000000_create_base_tables.sql"
+      },
+      {
+        "name": "report_configs",
+        "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
       },
       {
         "name": "roadmap_features",
         "migration": "supabase/migrations/20260319000004_create_roadmap_features.sql"
       },
       {
+        "name": "settlement_entries",
+        "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
+      },
+      {
+        "name": "signup_email_allowlist",
+        "migration": "supabase/migrations/20260717140000_signup_email_allowlist.sql"
+      },
+      {
         "name": "target_allocations",
         "migration": "supabase/migrations/20260316100001_add_holdings_classification_and_target_allocations.sql"
+      },
+      {
+        "name": "tier_assignments_log",
+        "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
+      },
+      {
+        "name": "transaction_splits",
+        "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
       },
       {
         "name": "transactions",
@@ -7043,6 +7201,10 @@
         "migration": "supabase/migrations/20260215000001_create_new_tables.sql"
       },
       {
+        "name": "user_own_ibans",
+        "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
+      },
+      {
         "name": "user_streaks",
         "migration": "supabase/migrations/20260215000001_create_new_tables.sql"
       },
@@ -7055,19 +7217,51 @@
         "migration": "supabase/migrations/20260501000001_create_external_connections.sql"
       }
     ],
-    "migrationCount": 134
+    "migrationCount": 142
   },
   "tablesByDomain": [
     {
       "domain": "Overig",
       "tables": [
         {
+          "name": "actions",
+          "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
+        },
+        {
+          "name": "admin_actions_log",
+          "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
+        },
+        {
           "name": "ai_token_usage",
           "migration": "supabase/migrations/20260611140000_create_ai_token_usage.sql"
         },
         {
+          "name": "ai_usage",
+          "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
+        },
+        {
           "name": "badges",
           "migration": "supabase/migrations/20260215000001_create_new_tables.sql"
+        },
+        {
+          "name": "bank_connection_accounts",
+          "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
+        },
+        {
+          "name": "bank_connections",
+          "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
+        },
+        {
+          "name": "bank_sync_log",
+          "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
+        },
+        {
+          "name": "budget_amounts",
+          "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
+        },
+        {
+          "name": "budget_rollovers",
+          "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
         },
         {
           "name": "category_corrections",
@@ -7078,12 +7272,20 @@
           "migration": "supabase/migrations/20260617190000_create_contract_events.sql"
         },
         {
+          "name": "error_logs",
+          "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
+        },
+        {
           "name": "external_data_sources",
           "migration": "supabase/migrations/20260501000001_create_external_connections.sql"
         },
         {
           "name": "feedback",
           "migration": "supabase/migrations/20260713130000_create_feedback.sql"
+        },
+        {
+          "name": "goal_contributions",
+          "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
         },
         {
           "name": "household_budget_model_proposals",
@@ -7102,8 +7304,44 @@
           "migration": "supabase/migrations/20260617000000_lead_intakes.sql"
         },
         {
+          "name": "mail_log",
+          "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
+        },
+        {
           "name": "net_worth_history",
           "migration": "supabase/migrations/20260716160000_add_networth_history_and_price_sync_gate.sql"
+        },
+        {
+          "name": "nibud_reference_data",
+          "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
+        },
+        {
+          "name": "recommendation_feedback",
+          "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
+        },
+        {
+          "name": "recommendations",
+          "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
+        },
+        {
+          "name": "report_configs",
+          "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
+        },
+        {
+          "name": "settlement_entries",
+          "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
+        },
+        {
+          "name": "signup_email_allowlist",
+          "migration": "supabase/migrations/20260717140000_signup_email_allowlist.sql"
+        },
+        {
+          "name": "tier_assignments_log",
+          "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
+        },
+        {
+          "name": "transaction_splits",
+          "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
         },
         {
           "name": "uat_results",
@@ -7112,12 +7350,20 @@
         {
           "name": "uat_rounds",
           "migration": "supabase/migrations/20260705120000_create_uat_tables.sql"
+        },
+        {
+          "name": "user_own_ibans",
+          "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
         }
       ]
     },
     {
       "domain": "Kern / financieel",
       "tables": [
+        {
+          "name": "_legacy_holding_transactions",
+          "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
+        },
         {
           "name": "assets",
           "migration": "supabase/migrations/20260215000000_create_base_tables.sql"
@@ -7163,6 +7409,14 @@
     {
       "domain": "Beleggingen",
       "tables": [
+        {
+          "name": "_legacy_holding_prices",
+          "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
+        },
+        {
+          "name": "_legacy_holdings",
+          "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
+        },
         {
           "name": "crypto_holding_prices",
           "migration": "supabase/migrations/20260502000003_split_holdings_tables.sql"
@@ -7248,6 +7502,27 @@
       ]
     },
     {
+      "domain": "Nieuws & briefing",
+      "tables": [
+        {
+          "name": "briefing_history",
+          "migration": "supabase/migrations/20260518000001_create_briefing_history.sql"
+        },
+        {
+          "name": "news_articles",
+          "migration": "supabase/migrations/20260324000001_create_news_articles.sql"
+        },
+        {
+          "name": "news_editions",
+          "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
+        },
+        {
+          "name": "news_feedback",
+          "migration": "supabase/migrations/20260611140000_create_news_feedback.sql"
+        }
+      ]
+    },
+    {
       "domain": "Vragenlijsten",
       "tables": [
         {
@@ -7299,23 +7574,6 @@
         {
           "name": "valuations",
           "migration": "supabase/migrations/20260215000000_create_base_tables.sql"
-        }
-      ]
-    },
-    {
-      "domain": "Nieuws & briefing",
-      "tables": [
-        {
-          "name": "briefing_history",
-          "migration": "supabase/migrations/20260518000001_create_briefing_history.sql"
-        },
-        {
-          "name": "news_articles",
-          "migration": "supabase/migrations/20260324000001_create_news_articles.sql"
-        },
-        {
-          "name": "news_feedback",
-          "migration": "supabase/migrations/20260611140000_create_news_feedback.sql"
         }
       ]
     },
@@ -7401,11 +7659,11 @@
     }
   ],
   "components": {
-    "total": 836,
+    "total": 855,
     "groups": [
       {
         "group": "app",
-        "count": 352,
+        "count": 356,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -7509,6 +7767,7 @@
           "debt-trajectory-chart",
           "debt-valuation-history",
           "debt-valuation-modal",
+          "debt-valuation-modal.test",
           "deeltijdwerk-impact",
           "dekkingsradar",
           "dekkingsradar.test",
@@ -7599,6 +7858,7 @@
           "koopkracht-erosie-onttrekken",
           "levensinkomen-strook",
           "lever-compass",
+          "lever-compass.deeplinks.test",
           "life-events-in-phase",
           "lifeline-readout",
           "log-timeline",
@@ -7694,12 +7954,14 @@
           "sidebar",
           "sim-chart",
           "sim-chart-widget",
+          "sim-chart-widget.test",
           "sim-chart.test",
           "simulations-modal",
           "sleepmodus-bollen",
           "sleepmodus-overlay",
           "sleepmodus-overlay.test",
           "slide-in-pane",
+          "slide-in-pane.test",
           "snapshot-comparison-view",
           "sorr-analyse",
           "spaarquote-gevoeligheid",
@@ -7763,7 +8025,7 @@
       },
       {
         "group": "overview",
-        "count": 128,
+        "count": 132,
         "items": [
           "aandachtspunt-actie-button",
           "atomic-cards",
@@ -7814,6 +8076,8 @@
           "eenvoudig-pill-list",
           "empty-states",
           "empty-states.test",
+          "entity-backfill-editor",
+          "entity-backfill-editor.test",
           "fee-impact-card",
           "fee-impact-card.test",
           "filter-dropdown",
@@ -7849,6 +8113,8 @@
           "mini-networth-chart.test",
           "mini-timeline-strip",
           "mini-timeline-strip.test",
+          "networth-groups-chart",
+          "networth-groups-chart.test",
           "networth-history-sheet",
           "networth-history-sheet.test",
           "nieuwe-tegenpartijen",
@@ -7897,10 +8163,11 @@
       },
       {
         "group": "widgets",
-        "count": 73,
+        "count": 84,
         "items": [
           "abonnementen-widget",
           "acties-widget",
+          "acties-widget.test",
           "agenda-widget",
           "ai-inzicht-widget",
           "assets-widget",
@@ -7911,11 +8178,15 @@
           "belasting-box3-widget.test",
           "beleggingsrendement-widget",
           "berichten-widget",
+          "berichten-widget.test",
           "beslissingspatronen-widget",
+          "beslissingspatronen-widget.test",
           "box3-drag-widget",
           "budget-fav-widget",
+          "budget-fav-widget.test",
           "budget-heatmap-widget",
           "budget-trend-widget",
+          "budget-trend-widget.test",
           "budgetten-widget",
           "budgetten-widget.test",
           "cash-flow-widget",
@@ -7932,10 +8203,13 @@
           "gezondheids-score-widget",
           "gezondheids-score-widget.test",
           "holding-fav-widget",
+          "holding-fav-widget.test",
           "holdings-widget",
+          "holdings-widget.test",
           "huishouden-activiteit-widget",
           "huishouden-vergelijking-widget",
           "hypotheek-vs-beleggen-widget",
+          "hypotheek-vs-beleggen-widget.test",
           "inflatie-impact-widget",
           "jouw-pad-widget-wrapper",
           "levensgebeurtenissen-widget",
@@ -7958,13 +8232,16 @@
           "vaste-lasten-widget",
           "volgende-stap-widget",
           "voorstellen-widget",
+          "voorstellen-widget.test",
           "vrijheidsdagen-maand-widget",
           "vrijheidsmijlpalen-widget",
           "vrijheidsmijlpalen-widget.test",
           "vrijheidsscenario-widget",
+          "vrijheidsscenario-widget.test",
           "vrijheidsvoortgang-widget",
           "vrijheidsvoortgang-widget.test",
           "weekoverzicht-widget",
+          "weekoverzicht-widget.test",
           "widget-dnd-grid",
           "widget-empty",
           "widget-empty.test",
@@ -8393,6 +8670,10 @@
       "category": "AI"
     },
     {
+      "name": "OpenRouter",
+      "category": "AI"
+    },
+    {
       "name": "Vercel AI SDK",
       "category": "AI"
     },
@@ -8684,6 +8965,10 @@
       ],
       "admin": [
         {
+          "name": "ai_usage",
+          "write": false
+        },
+        {
           "name": "aow_leeftijd",
           "write": true
         },
@@ -8732,6 +9017,14 @@
           "write": true
         },
         {
+          "name": "signup_email_allowlist",
+          "write": true
+        },
+        {
+          "name": "tier_assignments_log",
+          "write": true
+        },
+        {
           "name": "transactions",
           "write": false
         },
@@ -8745,6 +9038,10 @@
         }
       ],
       "ai": [
+        {
+          "name": "actions",
+          "write": true
+        },
         {
           "name": "app_settings",
           "write": true
@@ -8760,9 +9057,21 @@
         {
           "name": "profiles",
           "write": false
+        },
+        {
+          "name": "recommendation_feedback",
+          "write": true
+        },
+        {
+          "name": "recommendations",
+          "write": true
         }
       ],
       "ai-credits": [
+        {
+          "name": "ai_usage",
+          "write": false
+        },
         {
           "name": "app_settings",
           "write": false
@@ -8795,6 +9104,18 @@
         },
         {
           "name": "bank_accounts",
+          "write": true
+        },
+        {
+          "name": "bank_connection_accounts",
+          "write": true
+        },
+        {
+          "name": "bank_connections",
+          "write": true
+        },
+        {
+          "name": "bank_sync_log",
           "write": true
         },
         {
@@ -8856,6 +9177,10 @@
       ],
       "budget-variance": [
         {
+          "name": "budget_amounts",
+          "write": false
+        },
+        {
           "name": "budgets",
           "write": false
         },
@@ -8871,6 +9196,14 @@
         }
       ],
       "budgets": [
+        {
+          "name": "budget_amounts",
+          "write": true
+        },
+        {
+          "name": "budget_rollovers",
+          "write": true
+        },
         {
           "name": "budgets",
           "write": true
@@ -8946,6 +9279,10 @@
       ],
       "checkin": [
         {
+          "name": "actions",
+          "write": false
+        },
+        {
           "name": "app_settings",
           "write": true
         },
@@ -8955,6 +9292,10 @@
         },
         {
           "name": "bank_accounts",
+          "write": false
+        },
+        {
+          "name": "budget_amounts",
           "write": false
         },
         {
@@ -9146,6 +9487,10 @@
       ],
       "goals": [
         {
+          "name": "goal_contributions",
+          "write": false
+        },
+        {
           "name": "goals",
           "write": true
         },
@@ -9172,6 +9517,10 @@
       ],
       "guide-progress": [
         {
+          "name": "actions",
+          "write": false
+        },
+        {
           "name": "assets",
           "write": false
         },
@@ -9189,6 +9538,10 @@
         },
         {
           "name": "profiles",
+          "write": false
+        },
+        {
+          "name": "recommendations",
           "write": false
         },
         {
@@ -9332,6 +9685,12 @@
           "write": false
         }
       ],
+      "log-error": [
+        {
+          "name": "error_logs",
+          "write": true
+        }
+      ],
       "module-guide": [
         {
           "name": "app_settings",
@@ -9358,6 +9717,10 @@
           "write": true
         },
         {
+          "name": "news_editions",
+          "write": true
+        },
+        {
           "name": "news_feedback",
           "write": true
         },
@@ -9369,6 +9732,10 @@
       "next-steps": [
         {
           "name": "assets",
+          "write": false
+        },
+        {
+          "name": "bank_connections",
           "write": false
         },
         {
@@ -9417,6 +9784,18 @@
         },
         {
           "name": "assets",
+          "write": false
+        },
+        {
+          "name": "bank_connection_accounts",
+          "write": false
+        },
+        {
+          "name": "budget_amounts",
+          "write": false
+        },
+        {
+          "name": "budget_rollovers",
           "write": false
         },
         {
@@ -9522,6 +9901,10 @@
         {
           "name": "transactions",
           "write": true
+        },
+        {
+          "name": "user_own_ibans",
+          "write": false
         }
       ],
       "parameters": [
@@ -9614,6 +9997,10 @@
       ],
       "report": [
         {
+          "name": "actions",
+          "write": false
+        },
+        {
           "name": "aow_leeftijd",
           "write": false
         },
@@ -9623,6 +10010,14 @@
         },
         {
           "name": "bank_accounts",
+          "write": false
+        },
+        {
+          "name": "budget_amounts",
+          "write": false
+        },
+        {
+          "name": "budget_rollovers",
           "write": false
         },
         {
@@ -9658,6 +10053,14 @@
           "write": false
         },
         {
+          "name": "report_configs",
+          "write": true
+        },
+        {
+          "name": "transaction_splits",
+          "write": false
+        },
+        {
           "name": "transactions",
           "write": false
         }
@@ -9685,6 +10088,10 @@
         }
       ],
       "share": [
+        {
+          "name": "actions",
+          "write": false
+        },
         {
           "name": "assets",
           "write": false
@@ -9742,6 +10149,10 @@
         {
           "name": "transactions",
           "write": false
+        },
+        {
+          "name": "valuations",
+          "write": true
         }
       ],
       "spending-patterns": [
@@ -9761,6 +10172,10 @@
         }
       ],
       "subscriptions": [
+        {
+          "name": "actions",
+          "write": true
+        },
         {
           "name": "budgets",
           "write": false
@@ -9875,6 +10290,10 @@
         }
       ],
       "year-in-review": [
+        {
+          "name": "actions",
+          "write": false
+        },
         {
           "name": "assets",
           "write": false
@@ -11152,6 +11571,24 @@
           ]
         }
       ],
+      "ai_usage": [
+        {
+          "domain": "admin",
+          "label": "Beheer",
+          "write": false,
+          "routes": [
+            "/api/admin/ai-features"
+          ]
+        },
+        {
+          "domain": "ai-credits",
+          "label": "ai-credits",
+          "write": false,
+          "routes": [
+            "/api/ai-credits"
+          ]
+        }
+      ],
       "aow_leeftijd": [
         {
           "domain": "admin",
@@ -11344,6 +11781,26 @@
           ]
         }
       ],
+      "signup_email_allowlist": [
+        {
+          "domain": "admin",
+          "label": "Beheer",
+          "write": true,
+          "routes": [
+            "/api/admin/signup-allowlist"
+          ]
+        }
+      ],
+      "tier_assignments_log": [
+        {
+          "domain": "admin",
+          "label": "Beheer",
+          "write": true,
+          "routes": [
+            "/api/admin/tier-assign"
+          ]
+        }
+      ],
       "uat_results": [
         {
           "domain": "admin",
@@ -11365,6 +11822,79 @@
             "/api/admin/uat/results",
             "/api/admin/uat/rounds",
             "/api/admin/uat/rounds/[id]"
+          ]
+        }
+      ],
+      "actions": [
+        {
+          "domain": "ai",
+          "label": "AI & Coach",
+          "write": true,
+          "routes": [
+            "/api/ai/actions",
+            "/api/ai/actions/[id]",
+            "/api/ai/actions/[id]/assign",
+            "/api/ai/recommendations/[id]"
+          ]
+        },
+        {
+          "domain": "subscriptions",
+          "label": "subscriptions",
+          "write": true,
+          "routes": [
+            "/api/subscriptions/schedule-action"
+          ]
+        },
+        {
+          "domain": "checkin",
+          "label": "checkin",
+          "write": false,
+          "routes": [
+            "/api/checkin/gespreksstarters",
+            "/api/checkin/overview"
+          ]
+        },
+        {
+          "domain": "guide-progress",
+          "label": "guide-progress",
+          "write": false,
+          "routes": [
+            "/api/guide-progress"
+          ]
+        },
+        {
+          "domain": "report",
+          "label": "Rapportages",
+          "write": false,
+          "routes": [
+            "/api/report"
+          ]
+        },
+        {
+          "domain": "share",
+          "label": "share",
+          "write": false,
+          "routes": [
+            "/api/share/freedom-card"
+          ]
+        },
+        {
+          "domain": "year-in-review",
+          "label": "year-in-review",
+          "write": false,
+          "routes": [
+            "/api/year-in-review"
+          ]
+        }
+      ],
+      "recommendation_feedback": [
+        {
+          "domain": "ai",
+          "label": "AI & Coach",
+          "write": true,
+          "routes": [
+            "/api/ai/actions/[id]",
+            "/api/ai/recommendations/[id]"
           ]
         }
       ],
@@ -11588,6 +12118,69 @@
           ]
         }
       ],
+      "recommendations": [
+        {
+          "domain": "ai",
+          "label": "AI & Coach",
+          "write": true,
+          "routes": [
+            "/api/ai/recommendations",
+            "/api/ai/recommendations/[id]",
+            "/api/ai/recommendations/initial",
+            "/api/ai/recommendations/postponed-ready"
+          ]
+        },
+        {
+          "domain": "guide-progress",
+          "label": "guide-progress",
+          "write": false,
+          "routes": [
+            "/api/guide-progress"
+          ]
+        }
+      ],
+      "bank_connections": [
+        {
+          "domain": "bank-connect",
+          "label": "Bank-connect",
+          "write": true,
+          "routes": [
+            "/api/bank-connect/auth-link",
+            "/api/bank-connect/balances",
+            "/api/bank-connect/callback",
+            "/api/bank-connect/sync"
+          ]
+        },
+        {
+          "domain": "next-steps",
+          "label": "next-steps",
+          "write": false,
+          "routes": [
+            "/api/next-steps"
+          ]
+        }
+      ],
+      "bank_connection_accounts": [
+        {
+          "domain": "bank-connect",
+          "label": "Bank-connect",
+          "write": true,
+          "routes": [
+            "/api/bank-connect/balances",
+            "/api/bank-connect/callback",
+            "/api/bank-connect/disconnect",
+            "/api/bank-connect/sync"
+          ]
+        },
+        {
+          "domain": "notifications",
+          "label": "notifications",
+          "write": false,
+          "routes": [
+            "/api/notifications"
+          ]
+        }
+      ],
       "bank_accounts": [
         {
           "domain": "bank-connect",
@@ -11663,6 +12256,16 @@
             "/api/snapshots",
             "/api/snapshots/auto",
             "/api/snapshots/cron"
+          ]
+        }
+      ],
+      "bank_sync_log": [
+        {
+          "domain": "bank-connect",
+          "label": "Bank-connect",
+          "write": true,
+          "routes": [
+            "/api/bank-connect/sync"
           ]
         }
       ],
@@ -11756,6 +12359,14 @@
       ],
       "valuations": [
         {
+          "domain": "snapshots",
+          "label": "Snapshots",
+          "write": true,
+          "routes": [
+            "/api/snapshots/entity-backfill"
+          ]
+        },
+        {
           "domain": "benchmark-comparison",
           "label": "benchmark-comparison",
           "write": false,
@@ -11819,6 +12430,74 @@
           "write": false,
           "routes": [
             "/api/investment/holdings/[id]/detail"
+          ]
+        }
+      ],
+      "budget_amounts": [
+        {
+          "domain": "budgets",
+          "label": "Budgetten",
+          "write": true,
+          "routes": [
+            "/api/budgets/[id]"
+          ]
+        },
+        {
+          "domain": "budget-variance",
+          "label": "budget-variance",
+          "write": false,
+          "routes": [
+            "/api/budget-variance"
+          ]
+        },
+        {
+          "domain": "checkin",
+          "label": "checkin",
+          "write": false,
+          "routes": [
+            "/api/checkin/budgets"
+          ]
+        },
+        {
+          "domain": "notifications",
+          "label": "notifications",
+          "write": false,
+          "routes": [
+            "/api/notifications"
+          ]
+        },
+        {
+          "domain": "report",
+          "label": "Rapportages",
+          "write": false,
+          "routes": [
+            "/api/report/budget"
+          ]
+        }
+      ],
+      "budget_rollovers": [
+        {
+          "domain": "budgets",
+          "label": "Budgetten",
+          "write": true,
+          "routes": [
+            "/api/budgets/[id]"
+          ]
+        },
+        {
+          "domain": "notifications",
+          "label": "notifications",
+          "write": false,
+          "routes": [
+            "/api/notifications"
+          ]
+        },
+        {
+          "domain": "report",
+          "label": "Rapportages",
+          "write": false,
+          "routes": [
+            "/api/report/budget"
           ]
         }
       ],
@@ -11980,6 +12659,7 @@
             "/api/snapshots",
             "/api/snapshots/auto",
             "/api/snapshots/cron",
+            "/api/snapshots/group-history",
             "/api/snapshots/history"
           ]
         },
@@ -12111,6 +12791,16 @@
           "write": false,
           "routes": [
             "/api/crypto/holdings/[id]/detail"
+          ]
+        }
+      ],
+      "goal_contributions": [
+        {
+          "domain": "goals",
+          "label": "Doelen",
+          "write": false,
+          "routes": [
+            "/api/goals/history"
           ]
         }
       ],
@@ -12256,6 +12946,27 @@
           ]
         }
       ],
+      "error_logs": [
+        {
+          "domain": "log-error",
+          "label": "log-error",
+          "write": true,
+          "routes": [
+            "/api/log-error"
+          ]
+        }
+      ],
+      "news_editions": [
+        {
+          "domain": "news",
+          "label": "news",
+          "write": true,
+          "routes": [
+            "/api/news",
+            "/api/news/archive"
+          ]
+        }
+      ],
       "news_feedback": [
         {
           "domain": "news",
@@ -12319,7 +13030,19 @@
           "label": "Snapshots",
           "write": false,
           "routes": [
-            "/api/snapshots/balances"
+            "/api/snapshots/balances",
+            "/api/snapshots/entity-backfill",
+            "/api/snapshots/group-history"
+          ]
+        }
+      ],
+      "user_own_ibans": [
+        {
+          "domain": "own-accounts",
+          "label": "own-accounts",
+          "write": false,
+          "routes": [
+            "/api/own-accounts/reclassify"
           ]
         }
       ],
@@ -12330,6 +13053,26 @@
           "write": true,
           "routes": [
             "/api/questionnaires/[id]/respond"
+          ]
+        }
+      ],
+      "transaction_splits": [
+        {
+          "domain": "report",
+          "label": "Rapportages",
+          "write": false,
+          "routes": [
+            "/api/report/budget"
+          ]
+        }
+      ],
+      "report_configs": [
+        {
+          "domain": "report",
+          "label": "Rapportages",
+          "write": true,
+          "routes": [
+            "/api/report"
           ]
         }
       ],
@@ -12345,6 +13088,7 @@
       ]
     },
     "multiWriter": [
+      "actions",
       "app_settings",
       "assets",
       "bank_accounts",
@@ -12364,6 +13108,26 @@
   "tableRelations": {
     "relations": [
       {
+        "from": "_legacy_holding_prices",
+        "to": "_legacy_holdings",
+        "column": "holding_id"
+      },
+      {
+        "from": "_legacy_holding_transactions",
+        "to": "_legacy_holdings",
+        "column": "holding_id"
+      },
+      {
+        "from": "_legacy_holdings",
+        "to": "assets",
+        "column": "asset_id"
+      },
+      {
+        "from": "actions",
+        "to": "recommendations",
+        "column": "recommendation_id"
+      },
+      {
         "from": "assets",
         "to": "households",
         "column": "household_id"
@@ -12379,9 +13143,34 @@
         "column": "household_id"
       },
       {
+        "from": "bank_connection_accounts",
+        "to": "bank_accounts",
+        "column": "bank_account_id"
+      },
+      {
+        "from": "bank_connection_accounts",
+        "to": "bank_connections",
+        "column": "connection_id"
+      },
+      {
+        "from": "bank_sync_log",
+        "to": "bank_connection_accounts",
+        "column": "connection_account_id"
+      },
+      {
         "from": "broker_connections",
         "to": "assets",
         "column": "linked_asset_id"
+      },
+      {
+        "from": "budget_amounts",
+        "to": "budgets",
+        "column": "budget_id"
+      },
+      {
+        "from": "budget_rollovers",
+        "to": "budgets",
+        "column": "budget_id"
       },
       {
         "from": "budgets",
@@ -12432,6 +13221,11 @@
         "from": "debts",
         "to": "households",
         "column": "household_id"
+      },
+      {
+        "from": "goal_contributions",
+        "to": "goals",
+        "column": "goal_id"
       },
       {
         "from": "goals",
@@ -12549,6 +13343,21 @@
         "column": "questionnaire_id"
       },
       {
+        "from": "recommendation_feedback",
+        "to": "recommendations",
+        "column": "recommendation_id"
+      },
+      {
+        "from": "recommendations",
+        "to": "assets",
+        "column": "related_asset_id"
+      },
+      {
+        "from": "recommendations",
+        "to": "debts",
+        "column": "related_debt_id"
+      },
+      {
         "from": "recurring_transactions",
         "to": "bank_accounts",
         "column": "account_id"
@@ -12562,6 +13371,26 @@
         "from": "recurring_transactions",
         "to": "households",
         "column": "household_id"
+      },
+      {
+        "from": "settlement_entries",
+        "to": "households",
+        "column": "household_id"
+      },
+      {
+        "from": "settlement_entries",
+        "to": "transactions",
+        "column": "related_transaction_id"
+      },
+      {
+        "from": "transaction_splits",
+        "to": "budgets",
+        "column": "budget_id"
+      },
+      {
+        "from": "transaction_splits",
+        "to": "transactions",
+        "column": "transaction_id"
       },
       {
         "from": "transactions",
@@ -12720,6 +13549,11 @@
         "household": false,
         "rls": true
       },
+      "actions": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
       "aow_leeftijd": {
         "user": false,
         "household": false,
@@ -12845,6 +13679,21 @@
         "household": false,
         "rls": true
       },
+      "budget_amounts": {
+        "user": false,
+        "household": false,
+        "rls": true
+      },
+      "transaction_splits": {
+        "user": false,
+        "household": false,
+        "rls": true
+      },
+      "budget_rollovers": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
       "household_budget_model_proposals": {
         "user": false,
         "household": true,
@@ -12896,6 +13745,106 @@
         "rls": true
       },
       "net_worth_history": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "recommendations": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "recommendation_feedback": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "goal_contributions": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "nibud_reference_data": {
+        "user": false,
+        "household": false,
+        "rls": true
+      },
+      "report_configs": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "settlement_entries": {
+        "user": true,
+        "household": true,
+        "rls": true
+      },
+      "tier_assignments_log": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "admin_actions_log": {
+        "user": false,
+        "household": false,
+        "rls": true
+      },
+      "ai_usage": {
+        "user": false,
+        "household": false,
+        "rls": true
+      },
+      "error_logs": {
+        "user": false,
+        "household": false,
+        "rls": true
+      },
+      "mail_log": {
+        "user": false,
+        "household": false,
+        "rls": true
+      },
+      "bank_connections": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "bank_connection_accounts": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "bank_sync_log": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "user_own_ibans": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "news_editions": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "_legacy_holdings": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "_legacy_holding_transactions": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "_legacy_holding_prices": {
+        "user": false,
+        "household": false,
+        "rls": true
+      },
+      "signup_email_allowlist": {
         "user": true,
         "household": false,
         "rls": true
@@ -13442,6 +14391,53 @@
       ],
       "summary": "Fase 0 (POC, `spikes/lokale-categorisatie/meetrapport-v1.md`) meet in-browser Gemma 4 E2B (Transformers.js/WebGPU) op de échte stage-1-residustaart uit op **~39% precisie bij ~52% dekking** (57% bij drempel ≥0,9, dan 12% dekking), 21% tegen menselijke labels, ~6,5 tok/s decode, ~",
       "file": "docs/adr/0043-lokale-transactiecategorisatie-desktop-assistief.md"
+    },
+    {
+      "id": "0044-api-error-envelope-respond-helper",
+      "title": "Gedeelde API-error-envelope + respond-helper als single source voor de HTTP-foutvorm; zod-conventie op nieuwe mutatie-routes",
+      "status": "aanvaard",
+      "date": "2026-07-17",
+      "elements": [
+        "t-platform",
+        "t-supabase"
+      ],
+      "summary": "Over ~250 route-handlers onder `app/api/*` was er geen gedeelde foutvorm (enterprise-architectuurreview 3 jul 2026, bevinding #9 · fase F4):",
+      "file": "docs/adr/0044-api-error-envelope-respond-helper.md"
+    },
+    {
+      "id": "0045-migratie-baseline-resync-en-drift-hek",
+      "title": "Documentaire baseline-migratie voor remote-only tabellen; werkwijze-hek tegen migratie-drift",
+      "status": "aanvaard",
+      "date": "2026-07-17",
+      "elements": [
+        "t-supabase"
+      ],
+      "summary": "De live (remote) Supabase telde 74+ tabellen; de repo-migraties beschreven er ~56. 23 LIVE tabellen hadden geen tabeldefinitie in `supabase/migrations/*` (o.a. `recommendations`, `actions`, `budget_amounts`, `transaction_splits`, `bank_connections`, `user_own_ibans`, `error_logs`",
+      "file": "docs/adr/0045-migratie-baseline-resync-en-drift-hek.md"
+    },
+    {
+      "id": "0046-netto-vermogen-historie-uitsplitsing-en-backfill",
+      "title": "Netto vermogen — verloop: bron-scheiding uitsplitsing vs. totaallijn, één gelabelde restband en twee onafhankelijke bewerkingsniveaus",
+      "status": "aanvaard",
+      "date": "2026-07-17",
+      "elements": [
+        "as-vermogen",
+        "fn-vermogensregistratie"
+      ],
+      "summary": "De \"Netto vermogen — verloop\"-grafiek splitst het historische netto vermogen uit in vermogens- en schuldgroepen. Bindend besluit: de per-entiteit/-groep-uitsplitsing komt UITSLUITEND uit `balance_snapshots`, de totaallijn blijft de canonieke `net_worth_snapshots`, en het verschil",
+      "file": "docs/adr/0046-netto-vermogen-historie-uitsplitsing-en-backfill.md"
+    },
+    {
+      "id": "0047-email-whitelist-testfase",
+      "title": "Registratie-allowlist voor besloten testfase via before_user_created auth-hook",
+      "status": "aanvaard",
+      "date": "2026-07-17",
+      "elements": [
+        "t-supabase",
+        "app-comp"
+      ],
+      "summary": "Tijdens de besloten testfase mag alleen wie is uitgenodigd een account aanmaken. Elke nieuwe registratie (e-mail/wachtwoord én Google-OAuth) wordt geweigerd tenzij het genormaliseerde adres (`lower(trim(email))`, exacte match) op `public.signup_email_allowlist` staat. Bestaande a",
+      "file": "docs/adr/0047-email-whitelist-testfase.md"
     }
   ],
   "churn": {
@@ -13449,7 +14445,7 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 97
+        "commits": 98
       },
       {
         "path": "app/(app)/toekomst",
@@ -13457,11 +14453,11 @@
       },
       {
         "path": "lib/ai",
-        "commits": 36
+        "commits": 37
       },
       {
         "path": "app/api/ai",
-        "commits": 13
+        "commits": 14
       },
       {
         "path": "app/api/household",
@@ -13491,17 +14487,17 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 8385,
+        "loc": 8386,
         "commits": 83
       },
       {
         "file": "components/app/budgets-client.tsx",
         "loc": 5081,
-        "commits": 32
+        "commits": 33
       },
       {
         "file": "components/core/assets-client.tsx",
-        "loc": 4295,
+        "loc": 4302,
         "commits": 44
       },
       {
@@ -13516,13 +14512,13 @@
       },
       {
         "file": "lib/horizon-data.ts",
-        "loc": 2411,
+        "loc": 2461,
         "commits": 8
       },
       {
         "file": "lib/dashboard-data-loader.ts",
-        "loc": 2307,
-        "commits": 33
+        "loc": 2384,
+        "commits": 34
       },
       {
         "file": "app/(app)/core/checkin/page.tsx",
@@ -14310,20 +15306,13 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-07-16",
+    "previousDate": "2026-07-17",
     "hasChanges": true,
     "sections": [
       {
-        "label": "API-routes",
-        "added": [
-          "/api/privacy-mode"
-        ],
-        "removed": []
-      },
-      {
         "label": "Componenten (aantal)",
         "added": [
-          "+3"
+          "+9"
         ],
         "removed": []
       }
@@ -14496,6 +15485,13 @@
       "api": 250,
       "components": 836,
       "tables": 60,
+      "routesProduction": 100
+    },
+    {
+      "date": "2026-07-17",
+      "api": 253,
+      "components": 855,
+      "tables": 84,
       "routesProduction": 100
     }
   ]

@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server'
+import { forbidden, serverError } from '@/lib/api/respond'
 import { createClient } from '@/lib/supabase/server'
 import { isSuperAdmin } from '@/lib/admin'
 
 export async function GET() {
   const supabase = await createClient()
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
   const { data } = await supabase
     .from('feedback')
@@ -18,7 +19,7 @@ export async function GET() {
 export async function PATCH(req: Request) {
   const supabase = await createClient()
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
   const body = await req.json().catch(() => ({}))
   const id = body.id as string | undefined
@@ -28,7 +29,7 @@ export async function PATCH(req: Request) {
   }
   const { error } = await supabase.from('feedback').update({ status }).eq('id', id)
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverError(error, 'admin-feedback:PATCH')
   }
   return NextResponse.json({ ok: true, status })
 }

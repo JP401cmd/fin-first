@@ -40,9 +40,16 @@ export const HoldingsWidget = memo(function HoldingsWidget({ size, data, href }:
   // Count of investment-type asset entries (approximated as number of types present)
   const positionCount = investmentAssets.length
 
-  // Weighted average expected return
-  const weightedReturn = totalInvestments > 0
-    ? investmentAssets.reduce((s, a) => s + a.value * (a.expectedReturn ?? 0), 0) / totalInvestments
+  // Werkelijk rendement tot nu toe (vervangt de `expected_return`-aanname):
+  // (huidige waarde − aankoopwaarde) / aankoopwaarde over de belegde subset.
+  // `purchaseValue` komt al inclusion-gewogen uit de canonieke assetsByType
+  // (computeAssetsByType) — consumeren, niet herberekenen. Zelfde formule/veld
+  // als de zuster-widget Vermogen ("Ongerealiseerde winst"), zodat er geen
+  // tweede rendementsdefinitie op het dashboard ontstaat.
+  const totalPurchase = investmentAssets.reduce((s, a) => s + a.purchaseValue, 0)
+  const realizedGain = totalPurchase > 0 ? totalInvestments - totalPurchase : null
+  const realizedPct = realizedGain != null && totalPurchase > 0
+    ? (realizedGain / totalPurchase) * 100
     : null
 
   if (size === 'mini') {
@@ -73,9 +80,9 @@ export const HoldingsWidget = memo(function HoldingsWidget({ size, data, href }:
               ≈ {ftStr} vrijheid
             </p>
           )}
-          {weightedReturn != null && weightedReturn > 0 && (
+          {realizedPct != null && (
             <p className="mt-1 font-mono text-[10px] tabular-nums text-[var(--ink-4)]">
-              Verwacht {(weightedReturn * 100).toFixed(1)}%/j
+              Rendement {realizedPct >= 0 ? '+' : ''}{realizedPct.toFixed(1)}%
             </p>
           )}
         </div>
@@ -119,9 +126,9 @@ export const HoldingsWidget = memo(function HoldingsWidget({ size, data, href }:
                 </div>
               )
             })}
-            {weightedReturn != null && weightedReturn > 0 && (
+            {realizedPct != null && (
               <p className="font-mono text-[11px] tabular-nums text-[var(--ink-3)]">
-                Rendement: {(weightedReturn * 100).toFixed(1)}% p.j.
+                Rendement: {realizedPct >= 0 ? '+' : ''}{realizedPct.toFixed(1)}%
               </p>
             )}
             {investmentContributions > 0 && (
@@ -165,7 +172,7 @@ export const HoldingsWidget = memo(function HoldingsWidget({ size, data, href }:
         const rest = sorted.slice(3)
         const overigValue = rest.reduce((s, a) => s + a.value, 0)
         const displayRows = overigValue > 0
-          ? [...top3, { type: 'overig' as string, value: overigValue, expectedReturn: undefined }]
+          ? [...top3, { type: 'overig' as string, value: overigValue }]
           : top3
 
         return (
@@ -205,12 +212,22 @@ export const HoldingsWidget = memo(function HoldingsWidget({ size, data, href }:
               )
             })}
 
-            {/* Weighted expected return */}
-            {weightedReturn != null && weightedReturn > 0 && (
+            {/* Werkelijk rendement tot nu toe (waarde − aankoopwaarde) */}
+            {realizedGain != null && (
               <div className="mt-1 flex items-baseline justify-between border-t border-dashed border-[var(--border-ed)] pt-2 text-[11px]">
-                <span className="text-[var(--ink-3)]">Verwacht rendement</span>
-                <span className="font-mono tabular-nums text-[var(--ink-2)]">
-                  {(weightedReturn * 100).toFixed(1)}% p.j.
+                <span className="text-[var(--ink-3)]">Rendement</span>
+                <span className={realizedGain >= 0 ? 'text-positive' : 'text-negative'}>
+                  <MaskedAmount
+                    value={realizedGain}
+                    signPrefix={realizedGain >= 0 ? '+' : ''}
+                    tone="kern"
+                    className="font-semibold"
+                  />
+                  {realizedPct != null && (
+                    <span className="ml-1 font-normal text-[var(--ink-3)]">
+                      ({realizedPct >= 0 ? '+' : ''}{realizedPct.toFixed(1)}%)
+                    </span>
+                  )}
                 </span>
               </div>
             )}

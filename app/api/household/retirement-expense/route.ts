@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { unauthorized, serverError } from '@/lib/api/respond'
 
 /**
  * Huishoud-brede "uitgave na pensioen" — aanpasbaar door BEIDE partners.
@@ -20,7 +21,7 @@ type Method = (typeof METHODS)[number]
 export async function GET() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+  if (!user) return unauthorized()
 
   const { data: membership } = await supabase
     .from('household_members')
@@ -46,7 +47,7 @@ export async function GET() {
 export async function PUT(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+  if (!user) return unauthorized()
 
   const body = await request.json().catch(() => ({}))
   const method = body.method as string | undefined
@@ -67,7 +68,7 @@ export async function PUT(request: NextRequest) {
     p_amount: customAmount,
     p_aspirations: aspirations,
   })
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(error, 'household-retirement-expense:PUT')
 
   const result = data as { success?: boolean; error?: string } | null
   if (!result?.success) {

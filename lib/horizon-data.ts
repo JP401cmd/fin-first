@@ -88,6 +88,13 @@ export interface FireProjection {
   monthlyPassiveIncome: number
   monthlySavings: number
   savingsRate: number
+  /**
+   * Het bruto jaarrendement waarmee deze projectie is doorgerekend (bv. 0.07).
+   * Canoniek doorgegeven zodat oppervlakken het scenario-rendement kunnen tonen
+   * i.p.v. een hardcoded label — bij de band (`computeFireRange`) draagt elk
+   * scenario zijn eigen offset-rendement (`base+0.02` / `base` / `base−0.03`).
+   */
+  annualReturn: number
 }
 
 export interface FireRange {
@@ -844,6 +851,48 @@ export function splitLifeEvents(events: LifeEvent[]): { opbouwen: LifeEvent[]; i
     }
   }
   return { opbouwen, investeren }
+}
+
+const MS_PER_YEAR = 365.25 * 24 * 60 * 60 * 1000
+
+/**
+ * Sorteersleutel voor een levensgebeurtenis op de tijdlijn: het aantal jaren
+ * vanaf nu tot de gebeurtenis (oplopend = eerstvolgende eerst).
+ *
+ * - `target_date` gezet → jaren tussen nu en die datum.
+ * - anders `target_age` gezet → jaren tot die leeftijd (met `currentAge`), of de
+ *   leeftijd zelf als fallback wanneer de huidige leeftijd onbekend is.
+ * - geen temporeel anker → `+Infinity`, zodat het achteraan sorteert.
+ *
+ * `now` is injecteerbaar voor deterministische tests.
+ */
+export function lifeEventYearsFromNow(
+  event: Pick<LifeEvent, 'target_date' | 'target_age'>,
+  currentAge: number | null = null,
+  now: number = Date.now(),
+): number {
+  if (event.target_date) {
+    const t = new Date(event.target_date).getTime()
+    if (!Number.isNaN(t)) return (t - now) / MS_PER_YEAR
+  }
+  if (event.target_age != null) {
+    return currentAge != null ? event.target_age - currentAge : event.target_age
+  }
+  return Number.POSITIVE_INFINITY
+}
+
+/**
+ * Sorteert levensgebeurtenissen chronologisch (eerstvolgende eerst) op basis van
+ * {@link lifeEventYearsFromNow}. Pure, non-mutating.
+ */
+export function sortLifeEventsChronologically<T extends Pick<LifeEvent, 'target_date' | 'target_age'>>(
+  events: T[],
+  currentAge: number | null = null,
+  now: number = Date.now(),
+): T[] {
+  return events
+    .slice()
+    .sort((a, b) => lifeEventYearsFromNow(a, currentAge, now) - lifeEventYearsFromNow(b, currentAge, now))
 }
 
 export interface ResilienceBreakdown {
@@ -1747,6 +1796,7 @@ export function computeFireProjection(
     monthlyPassiveIncome,
     monthlySavings,
     savingsRate,
+    annualReturn,
   }
 }
 

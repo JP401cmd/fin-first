@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { unauthorized, serverError } from '@/lib/api/respond'
 
 export async function GET() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user) return unauthorized()
 
   const { data: questionnaires, error } = await supabase
     .from('questionnaires')
@@ -15,7 +16,7 @@ export async function GET() {
     .eq('is_active', true)
     .order('created_at', { ascending: false })
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(error, 'questionnaires:GET')
 
   const { data: sessions } = await supabase
     .from('questionnaire_sessions')

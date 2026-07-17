@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { unauthorized, serverError } from '@/lib/api/respond'
 
 export type HoldingAlertType = 'price_above' | 'price_below' | 'return_threshold' | 'rebalance_drift'
 
@@ -30,7 +31,7 @@ export async function GET(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   const { searchParams } = new URL(request.url)
@@ -49,7 +50,7 @@ export async function GET(request: NextRequest) {
   const { data: alerts, error } = await query
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverError(error, 'holding-alerts:GET')
   }
 
   return NextResponse.json({ alerts: alerts || [] })
@@ -65,7 +66,7 @@ export async function POST(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   try {
@@ -101,13 +102,12 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return serverError(error, 'holding-alerts:POST')
     }
 
     return NextResponse.json({ alert }, { status: 201 })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Onbekende fout'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return serverError(err, 'holding-alerts:POST')
   }
 }
 
@@ -121,7 +121,7 @@ export async function PATCH(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   try {
@@ -145,13 +145,12 @@ export async function PATCH(request: NextRequest) {
       .single()
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return serverError(error, 'holding-alerts:PATCH')
     }
 
     return NextResponse.json({ alert })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Onbekende fout'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return serverError(err, 'holding-alerts:PATCH')
   }
 }
 
@@ -164,7 +163,7 @@ export async function DELETE(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   const { searchParams } = new URL(request.url)
@@ -181,7 +180,7 @@ export async function DELETE(request: NextRequest) {
     .eq('user_id', user.id)
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverError(error, 'holding-alerts:DELETE')
   }
 
   return NextResponse.json({ success: true })

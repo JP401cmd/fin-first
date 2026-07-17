@@ -31,8 +31,12 @@ function ActionRow({ action, index, hasEntered }: { action: TopAction; index: nu
       <span className="font-mono text-[10px] text-[var(--ink-4)] w-4 shrink-0 tabular-nums">
         {index + 1}
       </span>
-      <span className={`shrink-0 font-mono text-[10px] tabular-nums font-bold ${priorityDotClass(action.priority_score).replace('bg-', 'text-')}`}>
-        ˜…{action.priority_score ?? 0}
+      <span
+        className={`shrink-0 font-mono text-[10px] tabular-nums font-bold ${priorityDotClass(action.priority_score).replace('bg-', 'text-')}`}
+        aria-label={`Prioriteit ${action.priority_score ?? 0} van 5`}
+        title={`Prioriteit ${action.priority_score ?? 0} van 5`}
+      >
+        ★{action.priority_score ?? 0}
       </span>
       <span className="flex-1 min-w-0 text-sm text-[var(--ink)] truncate">
         {action.title}

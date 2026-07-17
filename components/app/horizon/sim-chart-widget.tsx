@@ -21,11 +21,6 @@ import { formatFireAge } from '@/lib/horizon-data'
 import type { SimResult, SimCashflow } from '@/lib/fire-simulation'
 import type { UnifiedProjectionRow } from '@/lib/unified-projection'
 import { type FireEndStrategy, STRATEGY_LABELS } from '@/lib/fire-strategy'
-import { DEFAULT_RETURN } from '@/lib/constants'
-
-// ── Constants ────────────────────────────────────────────────────────────────
-
-const GROSS_RETURN = DEFAULT_RETURN
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -102,6 +97,12 @@ export interface SimChartModalProps {
   currentAge: number | null
   retirementExpenseMethod: string | null
   yearlyExpenses: number
+  /**
+   * Bruto rendement van het profiel (uit `resolveFireParams(profile).grossReturn`).
+   * Verplicht — de "Onder de motorkap"-uitleg toont exact het rendement waarmee de
+   * projectie is doorgerekend; nooit een hardcoded constante (voorkomt display-drift).
+   */
+  grossReturn: number
   /** Optioneel: de rijkere grootboek-rijen voor extra detail (graceful degradation). */
   unifiedRows?: UnifiedProjectionRow[]
 }
@@ -114,6 +115,7 @@ export const SimChartModal = memo(function SimChartModal({
   currentAge,
   retirementExpenseMethod,
   yearlyExpenses,
+  grossReturn,
   unifiedRows,
 }: SimChartModalProps) {
   // Derive strategy from simResult
@@ -261,7 +263,7 @@ export const SimChartModal = memo(function SimChartModal({
             <KassabonRow label="Jaarlijkse inleg (assets)" amount={annualSavingsFromRows} dailyRate={dailyRate} freedomSuffix="/jaar" />
             <div className="flex justify-between py-0.5">
               <span className="font-sans text-sm text-[var(--ink-2)]">Bruto rendement</span>
-              <span className="font-mono tabular-nums text-[var(--ink)]">{(GROSS_RETURN * 100).toFixed(0)}% per jaar</span>
+              <span className="font-mono tabular-nums text-[var(--ink)]">{(grossReturn * 100).toFixed(0)}% per jaar</span>
             </div>
             <div className="flex justify-between py-0.5">
               <span className="font-sans text-sm text-[var(--ink-2)]">Inflatie</span>
@@ -534,6 +536,8 @@ export interface SimChartWidgetProps {
   currentAge: number | null
   retirementExpenseMethod: string | null
   yearlyExpenses: number
+  /** Bruto profielrendement — doorgegeven aan de interne SimChartModal (zie SimChartModalProps). */
+  grossReturn: number
   className?: string
 }
 
@@ -543,6 +547,7 @@ export const SimChartWidget = memo(function SimChartWidget({
   currentAge,
   retirementExpenseMethod,
   yearlyExpenses,
+  grossReturn,
   className,
 }: SimChartWidgetProps) {
   const [modalOpen, setModalOpen] = useState(false)
@@ -688,6 +693,7 @@ export const SimChartWidget = memo(function SimChartWidget({
         currentAge={currentAge}
         retirementExpenseMethod={retirementExpenseMethod}
         yearlyExpenses={yearlyExpenses}
+        grossReturn={grossReturn}
       />
     </>
   )

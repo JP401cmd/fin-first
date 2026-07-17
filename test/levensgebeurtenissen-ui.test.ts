@@ -2,11 +2,14 @@
  * Standalone vitest wrapper for the levensgebeurtenissen-ui regression suite.
  * Imports each regression test and runs it as a vitest case.
  */
+import { readFileSync } from 'node:fs'
 import { describe, it, expect } from 'vitest'
 import {
   splitLifeEvents,
   classifyLifeEvent,
   computeLifeEventNetImpact,
+  sortLifeEventsChronologically,
+  lifeEventYearsFromNow,
   type LifeEvent,
 } from '@/lib/horizon-data'
 
@@ -119,5 +122,54 @@ describe('Levensgebeurtenissen UI — twee-kolommen rendering', () => {
     const { opbouwen, investeren } = splitLifeEvents([zeroImpact])
     expect(opbouwen.length).toBe(0)
     expect(investeren.length).toBe(1)
+  })
+})
+
+describe('Levensgebeurtenissen — chronologische tijdlijn-ordening (loader)', () => {
+  // De widget/loader tonen de EERSTVOLGENDE 5 op de tijdlijn, niet op sort_order.
+  it('sorteert op target_age oplopend (eerstvolgende eerst)', () => {
+    const sorted = sortLifeEventsChronologically(
+      [aow, erfenis, huisVerkoop, wereldreis, kinderen, verbouwing],
+      30,
+    )
+    expect(sorted.map(e => e.name)).toEqual([
+      'Kinderen',   // 35
+      'Verbouwing', // 40
+      'Wereldreis', // 45
+      'Erfenis',    // 55
+      'Huis verkoop', // 60
+      'AOW',        // 67
+    ])
+  })
+
+  it('events zonder temporeel anker sorteren achteraan', () => {
+    const noAnchor = makeEvent({ name: 'Ongedateerd', one_time_cost: 10_000, target_age: null })
+    const sorted = sortLifeEventsChronologically([noAnchor, kinderen, erfenis], 30)
+    expect(sorted[sorted.length - 1].name).toBe('Ongedateerd')
+    expect(lifeEventYearsFromNow(noAnchor)).toBe(Number.POSITIVE_INFINITY)
+  })
+
+  it('target_date wint van target_age en is deterministisch met injecteerbare now', () => {
+    const now = new Date('2026-01-01T00:00:00Z').getTime()
+    const nabij = makeEvent({ name: 'Nabij', one_time_cost: 5_000, target_date: '2027-01-01' })
+    const ver = makeEvent({ name: 'Ver', one_time_cost: 5_000, target_date: '2035-01-01' })
+    const sorted = sortLifeEventsChronologically([ver, nabij], null, now)
+    expect(sorted.map(e => e.name)).toEqual(['Nabij', 'Ver'])
+    expect(lifeEventYearsFromNow(nabij, null, now)).toBeCloseTo(1, 1)
+  })
+})
+
+describe('Levensgebeurtenissen-widget — correcte minteken-glyph (geen mojibake)', () => {
+  const src = readFileSync('components/widgets/levensgebeurtenissen-widget.tsx', 'utf8')
+
+  it('bevat geen kapotte mojibake-glyph voor negatieve bedragen', () => {
+    // Regressie: 'ˆ’' (U+02C6 U+2019) was een corrupte '−'/'-' vóór het bedrag.
+    expect(src).not.toContain('ˆ’')
+    expect(src).not.toContain('ˆ')
+  })
+
+  it('gebruikt een echt minteken vóór het compacte investeren-bedrag', () => {
+    expect(src).toContain('-{fmtCompact(evt.estimatedImpact)}')
+    expect(src).toContain('-{fmtCompact(invTotal)}')
   })
 })

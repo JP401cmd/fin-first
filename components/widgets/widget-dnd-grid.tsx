@@ -46,7 +46,7 @@ import { GripVertical, X } from 'lucide-react'
 import { WidgetRenderer, type DashboardData } from './widget-renderer'
 import { sizeLabel, widgetSpanClass } from './widget-grid-helpers'
 import type { WidgetPref, WidgetSize } from '@/lib/widget-catalog'
-import { getWidgetDef, downsizeForMobile } from '@/lib/widget-catalog'
+import { getWidgetSizes, downsizeForMobile } from '@/lib/widget-catalog'
 import { useDisplaySize, useIsMobile } from '@/lib/hooks/use-display-size'
 import type { FeatureAccessMap } from '@/lib/compute-feature-access'
 
@@ -134,8 +134,7 @@ const SortableWidgetItem = memo(function SortableWidgetItem({ pref, data, featur
                 Double verschijnt alleen op desktop én alleen voor widgets met
                 'xl' in hun catalog-sizes (opt-in bouwblok). */}
             {(() => {
-              const def = getWidgetDef(pref.id)
-              const allowed = def?.sizes ?? (['quarter', 'half', 'full'] as WidgetSize[])
+              const allowed = getWidgetSizes(pref.id)
               const allSizes: { key: WidgetSize; label: string }[] = [
                 { key: 'quarter' as WidgetSize, label: 'S' },
                 { key: 'half' as WidgetSize, label: 'M' },

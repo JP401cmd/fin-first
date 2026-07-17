@@ -1,12 +1,13 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { unauthorized, serverError } from '@/lib/api/respond'
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return new Response('Unauthorized', { status: 401 })
+    return unauthorized()
   }
 
   const body = await req.json() as {
@@ -62,7 +63,7 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (error) {
-    return Response.json({ error: error.message }, { status: 500 })
+    return serverError(error, 'ai-actions-create:POST')
   }
 
   return Response.json({ action: data })

@@ -56,13 +56,15 @@ export const WEALTH_GROUP_LABELS: Record<WealthGroup, string> = {
 
 /**
  * Derived from ASSET_TYPE_COLORS — pick representative colour per group.
+ * Waarden zijn accent-aware `var(--color-kern-N)` (monochrome kern-ladder langs
+ * de liquiditeits-as), niet de losse regenboog die deze comments ooit suggereerden.
  */
 export const WEALTH_GROUP_COLORS: Record<WealthGroup, string> = {
-  spaargeld: ASSET_TYPE_COLORS.savings,     // #3b82f6  blue
-  beleggingen: ASSET_TYPE_COLORS.investment, // #10b981  emerald
-  pensioen: ASSET_TYPE_COLORS.retirement,    // #8b5cf6  violet
-  vastgoed: ASSET_TYPE_COLORS.real_estate,   // #f59e0b  amber
-  overig: ASSET_TYPE_COLORS.other,           // #71717a  zinc
+  spaargeld: ASSET_TYPE_COLORS.savings,      // kern-700
+  beleggingen: ASSET_TYPE_COLORS.investment, // kern-500
+  pensioen: ASSET_TYPE_COLORS.retirement,    // kern-500
+  vastgoed: ASSET_TYPE_COLORS.real_estate,   // kern-400
+  overig: ASSET_TYPE_COLORS.other,           // kern-200
 }
 
 /** Colour for the debt (negative) layer */

@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { unauthorized } from '@/lib/api/respond'
 import { localMonthBounds } from '@/lib/month-range'
 import { resolveFireParams } from '@/lib/fire-params'
 
@@ -27,7 +28,7 @@ export async function GET() {
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   try {

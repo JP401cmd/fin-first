@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { unauthorized, serverError } from '@/lib/api/respond'
 
 const CATEGORIES = ['bug', 'idea', 'question', 'other']
 
@@ -10,7 +11,7 @@ export async function POST(req: Request) {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   const body = await req.json().catch(() => ({}))
@@ -27,7 +28,7 @@ export async function POST(req: Request) {
     message,
   })
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverError(error, 'feedback:POST')
   }
 
   return NextResponse.json({ ok: true })

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { unauthorized, serverError } from '@/lib/api/respond'
 
 /**
  * GET /api/onboarding-steps
@@ -10,7 +11,7 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return unauthorized()
   }
 
   const { data: profile, error } = await supabase
@@ -20,7 +21,7 @@ export async function GET() {
     .single()
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverError(error, 'onboarding-steps:GET')
   }
 
   const steps = (profile?.completed_onboarding_steps as string[] | null) ?? []
@@ -38,7 +39,7 @@ export async function PUT(req: Request) {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return unauthorized()
   }
 
   const body = await req.json() as { steps?: unknown }
@@ -57,7 +58,7 @@ export async function PUT(req: Request) {
     .single()
 
   if (fetchError) {
-    return NextResponse.json({ error: fetchError.message }, { status: 500 })
+    return serverError(fetchError, 'onboarding-steps:PUT')
   }
 
   const existing = (profile?.completed_onboarding_steps as string[] | null) ?? []
@@ -69,7 +70,7 @@ export async function PUT(req: Request) {
     .eq('id', user.id)
 
   if (updateError) {
-    return NextResponse.json({ error: updateError.message }, { status: 500 })
+    return serverError(updateError, 'onboarding-steps:PUT')
   }
 
   return NextResponse.json({ steps: merged })

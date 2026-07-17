@@ -14,7 +14,7 @@
  * dezelfde behaviour, alleen via één centrale wrapper.
  */
 
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { createClient } from '@/lib/supabase/client'
 import { upsertSingleBalanceSnapshot } from '@/lib/balance-snapshot'
@@ -44,6 +44,10 @@ export function ValuationModal({
   const [value, setValue] = useState(String(currentValue))
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
+  const uid = useId()
+  const dateId = `${uid}-date`
+  const valueId = `${uid}-value`
+  const notesId = `${uid}-notes`
 
   async function handleSave() {
     if (!value) return
@@ -103,8 +107,9 @@ export function ValuationModal({
 
         <div className="space-y-3">
           <div>
-            <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Datum</label>
+            <label htmlFor={dateId} className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Datum</label>
             <input
+              id={dateId}
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
@@ -112,10 +117,11 @@ export function ValuationModal({
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
+            <label htmlFor={valueId} className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
               {entityType === 'asset' ? 'Nieuwe waarde' : 'Nieuw saldo'}
             </label>
             <input
+              id={valueId}
               type="number"
               step="0.01"
               value={value}
@@ -127,8 +133,9 @@ export function ValuationModal({
             </p>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Notitie (optioneel)</label>
+            <label htmlFor={notesId} className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Notitie (optioneel)</label>
             <input
+              id={notesId}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"

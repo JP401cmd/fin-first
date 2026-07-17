@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { forbidden } from '@/lib/api/respond'
 
 /**
  * Dev-only login endpoint for automated testing.
@@ -8,7 +9,7 @@ import { NextResponse } from 'next/server'
  */
 export async function POST(request: Request) {
   if (process.env.NODE_ENV !== 'development') {
-    return NextResponse.json({ error: 'Not available in production' }, { status: 403 })
+    return forbidden('Not available in production')
   }
 
   const { email, password } = await request.json()
@@ -21,6 +22,7 @@ export async function POST(request: Request) {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
   if (error) {
+    // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
     return NextResponse.json({ error: error.message }, { status: 401 })
   }
 
@@ -32,7 +34,7 @@ export async function POST(request: Request) {
 
 export async function GET() {
   if (process.env.NODE_ENV !== 'development') {
-    return NextResponse.json({ error: 'Not available in production' }, { status: 403 })
+    return forbidden('Not available in production')
   }
 
   return NextResponse.json({

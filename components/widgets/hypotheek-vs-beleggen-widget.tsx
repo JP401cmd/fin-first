@@ -28,7 +28,11 @@ export const HypotheekVsBeleggenWidget = memo(function HypotheekVsBeleggenWidget
     )
   }
 
-  const { restschuld, rente, breakevenRendement, aanbeveling, isTaxDeductible } = hvb
+  const {
+    restschuld, rente, breakevenRendement, aanbeveling, isTaxDeductible,
+    beleggenVoordeel, aflossenVoordeel, verschil, extraBedragMaand, horizonJaren,
+    fireImpactMaanden,
+  } = hvb
 
   const breakevenPctStr = (breakevenRendement * 100).toFixed(1).replace('.', ',')
   const rentePctStr = rente.toFixed(2).replace('.', ',')
@@ -172,17 +176,20 @@ export const HypotheekVsBeleggenWidget = memo(function HypotheekVsBeleggenWidget
     )
   }
 
-  // ── Full (default): complete comparison with 10-year scenario ──
-  // Simple 10-year projection: invest restschuld at expected return vs pay off at rente
-  const years = 10
-  // Assume breakevenRendement approximates the after-tax cost of the mortgage;
-  // use a reasonable expected return of breakeven + 2% for beleggen scenario,
-  // but cap it to show realistic numbers based on available data
-  const expectedReturn = breakevenRendement + 0.02
-  const beleggenWaarde = restschuld * Math.pow(1 + expectedReturn, years)
-  const aflossenBesparing = restschuld * rente / 100 * years // Total interest saved over 10 years (simplified linear)
-  const beleggenWinst = beleggenWaarde - restschuld
-  const verschil = beleggenWinst - aflossenBesparing
+  // ── Full (default): complete comparison — consumeert de canonieke engine ──
+  // De horizon-scenario's (netto voordeel beleggen/aflossen + verschil) komen
+  // rechtstreeks uit `compareMortgageVsInvest` via de loader; niets wordt hier
+  // herberekend (consume-don't-recompute). Premisse: `extraBedragMaand`/`horizonJaren`.
+  const premisse = `o.b.v. €${extraBedragMaand}/mnd extra · ${horizonJaren} jaar`
+
+  // Vrijheidstijd-framing: `fireImpactMaanden` > 0 = beleggen brengt je eerder vrij.
+  const impactMaanden = fireImpactMaanden ?? 0
+  const impactJaren = Math.floor(Math.abs(impactMaanden) / 12)
+  const impactRestMaanden = Math.abs(impactMaanden) % 12
+  const impactParts: string[] = []
+  if (impactJaren > 0) impactParts.push(`${impactJaren} jaar`)
+  if (impactRestMaanden > 0) impactParts.push(`${impactRestMaanden} maand${impactRestMaanden > 1 ? 'en' : ''}`)
+  const impactStr = impactParts.length > 0 ? impactParts.join(' en ') : null
 
   return (
     <WidgetShell module="kern" size={size} kicker="Hypotheek vs Beleggen" href={href}>
@@ -236,7 +243,7 @@ export const HypotheekVsBeleggenWidget = memo(function HypotheekVsBeleggenWidget
           </p>
         </div>
 
-        {/* 10-year scenario comparison */}
+        {/* Horizon scenario comparison — engine-outputs (consume, don't recompute) */}
         <div
           className="border border-[var(--border-ed)] rounded-md overflow-hidden mb-2"
           style={{
@@ -244,34 +251,39 @@ export const HypotheekVsBeleggenWidget = memo(function HypotheekVsBeleggenWidget
             transition: 'opacity 400ms 400ms ease',
           }}
         >
-          <div className="text-[10px] uppercase tracking-wider font-medium text-[var(--ink-3)] bg-[var(--subtle)] px-2 py-1 border-b border-[var(--border-ed)]">
-            10-jaar scenario
+          <div className="flex items-baseline justify-between gap-2 bg-[var(--subtle)] px-2 py-1 border-b border-[var(--border-ed)]">
+            <span className="text-[10px] uppercase tracking-wider font-medium text-[var(--ink-3)]">
+              Netto voordeel
+            </span>
+            <span className="text-[10px] text-[var(--ink-3)]">{premisse}</span>
           </div>
           <div className="px-2 py-1.5 space-y-1">
             <div className="flex items-baseline justify-between text-[11px]">
               <span className="text-[var(--ink-2)] flex items-center gap-1">
-                <TrendingUp className="h-3 w-3 text-positive" />
+                <TrendingUp className="h-3 w-3 text-[var(--ink-3)]" />
                 Beleggen
               </span>
-              <span className="text-positive">
-                <MaskedAmount value={beleggenWinst} signPrefix="+" tone="kern" className="font-medium" />
+              <span className={aanbeveling === 'beleggen' ? 'text-[var(--ink)] font-semibold' : 'text-[var(--ink-2)]'}>
+                <MaskedAmount value={beleggenVoordeel} signPrefix="+" tone="kern" className="font-medium" />
               </span>
             </div>
             <div className="flex items-baseline justify-between text-[11px]">
               <span className="text-[var(--ink-2)] flex items-center gap-1">
-                <Home className="h-3 w-3 text-amber-500" />
+                <Home className="h-3 w-3 text-[var(--ink-3)]" />
                 Aflossen
               </span>
-              <span className="text-[var(--ink-2)]">
-                <MaskedAmount value={aflossenBesparing} signPrefix="+" tone="kern" className="font-medium" />
+              <span className={aanbeveling === 'aflossen' ? 'text-[var(--ink)] font-semibold' : 'text-[var(--ink-2)]'}>
+                <MaskedAmount value={aflossenVoordeel} signPrefix="+" tone="kern" className="font-medium" />
               </span>
             </div>
             <div className="border-t border-[var(--border-ed)] pt-1 flex items-baseline justify-between text-[11px]">
-              <span className="text-[var(--ink-3)]">Verschil</span>
-              <span className={verschil >= 0 ? 'text-positive' : 'text-[var(--ink-2)]'}>
+              <span className="text-[var(--ink-3)]">
+                {verschil >= 0 ? 'Beleggen voordeliger' : 'Aflossen voordeliger'}
+              </span>
+              <span className={`font-semibold ${adviesColor}`}>
                 <MaskedAmount
-                  value={verschil}
-                  signPrefix={verschil >= 0 ? '+' : ''}
+                  value={Math.abs(verschil)}
+                  signPrefix="+"
                   tone="kern"
                   className="font-semibold"
                 />
@@ -279,6 +291,21 @@ export const HypotheekVsBeleggenWidget = memo(function HypotheekVsBeleggenWidget
             </div>
           </div>
         </div>
+
+        {/* Vrijheidstijd-framing: FIRE-impact van de aanbevolen keuze */}
+        {impactStr && impactMaanden !== 0 && (
+          <p
+            className="text-[11px] text-[var(--ink-2)] italic leading-snug mb-1.5"
+            style={{
+              opacity: hasEntered ? 1 : 0,
+              transition: 'opacity 400ms 450ms ease',
+            }}
+          >
+            {impactMaanden > 0
+              ? `Beleggen brengt je ± ${impactStr} eerder vrij.`
+              : `Aflossen brengt je ± ${impactStr} eerder vrij.`}
+          </p>
+        )}
 
         {/* Tax deductibility note */}
         {isTaxDeductible && (

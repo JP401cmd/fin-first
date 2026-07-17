@@ -12,10 +12,10 @@ import { Reveal } from '../reveal'
 
 /**
  * Home-secties van de marketing-site, opgehangen aan de merkbelofte:
- * "De vrijheid om met inzicht en grip keuzes te maken voor nu en de
- * toekomst." De hero draagt de belofte; de vier pijler-secties hieronder
- * (Inzicht → Grip → Nu → Toekomst, de zinsvolgorde) lossen haar
- * woord-voor-woord in, elk met een demo-visual en een deeplink naar de
+ * "Ontdek waar je staat, plan waar je heen gaat." De hero draagt de
+ * belofte; de vier pijler-secties hieronder (Inzicht → Grip → Nu →
+ * Toekomst) werken haar uit — van weten waar je staat naar sturen en
+ * vooruitkijken — elk met een demo-visual en een deeplink naar de
  * gespiegelde sectie op /functies.
  *
  * Eén primaire CTA ("Begin gratis" → /signup) leeft in de Hero en de
@@ -43,7 +43,7 @@ const PIJLERS: Pijler[] = [
   {
     id: 'inzicht',
     naam: 'Inzicht',
-    deel: 'Deel 1 van de belofte',
+    deel: 'Pijler 1 van 4',
     titel: 'Inzicht',
     italics: 'in elke euro',
     body:
@@ -63,7 +63,7 @@ const PIJLERS: Pijler[] = [
   {
     id: 'grip',
     naam: 'Grip',
-    deel: 'Deel 2 van de belofte',
+    deel: 'Pijler 2 van 4',
     titel: 'Grip',
     italics: 'zonder spreadsheet-avonden',
     body:
@@ -83,7 +83,7 @@ const PIJLERS: Pijler[] = [
   {
     id: 'nu',
     naam: 'Nu',
-    deel: 'Deel 3 van de belofte',
+    deel: 'Pijler 3 van 4',
     titel: 'Het nu',
     italics: 'scherp in beeld',
     body:
@@ -102,7 +102,7 @@ const PIJLERS: Pijler[] = [
   {
     id: 'toekomst',
     naam: 'Toekomst',
-    deel: 'Deel 4 van de belofte',
+    deel: 'Pijler 4 van 4',
     titel: 'De toekomst',
     italics: 'eerlijk doorgerekend',
     body:

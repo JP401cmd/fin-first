@@ -27,6 +27,7 @@ export async function GET() {
       .eq('user_id', user.id)
 
     if (budgetError) {
+      // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
       return NextResponse.json({ error: 'Fout bij laden budgetten', detail: budgetError.message }, { status: 500 })
     }
 
@@ -58,6 +59,7 @@ export async function GET() {
       .not('budget_id', 'is', null)
 
     if (txError) {
+      // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
       return NextResponse.json({ error: 'Fout bij laden transacties', detail: txError.message }, { status: 500 })
     }
 

@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { unauthorized, serverError } from '@/lib/api/respond'
 import { fetchPriceData, type PriceData } from '@/lib/price-feed'
 
 /**
@@ -28,7 +29,7 @@ export async function GET(
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   const { ticker } = await params
@@ -71,7 +72,6 @@ export async function GET(
       source: priceData.source,
     })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Onbekende fout'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return serverError(err, 'prices:GET')
   }
 }

@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { unauthorized, serverError } from '@/lib/api/respond'
 import type { BudgetPlanDiff } from '@/lib/budget-plan-diff'
 
 /**
@@ -14,7 +15,7 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   const diff = (await request.json()) as BudgetPlanDiff
@@ -31,10 +32,7 @@ export async function POST(request: NextRequest) {
   const { data, error } = await supabase.rpc('save_budget_plan', { p_plan: diff })
 
   if (error) {
-    return NextResponse.json(
-      { error: `Opslaan mislukt: ${error.message}` },
-      { status: 500 },
-    )
+    return serverError(error, 'budgets-plan:POST')
   }
 
   const result = data as { success?: boolean; error?: string; status?: number; counts?: Record<string, number>; id_map?: Record<string, string> }

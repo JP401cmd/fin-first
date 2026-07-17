@@ -259,6 +259,7 @@ const BudgetHeatmapWidget = dynamic(
   { loading: WidgetLoadingFallback }
 )
 import { getWidgetDef, WIDGET_HREFS, WIDGET_FEATURE_MAP, BUDGET_WIDGETS } from '@/lib/widget-catalog'
+import { dailyExpenseRate } from '@/lib/format'
 import { isFeatureAccessible } from '@/lib/compute-feature-access'
 import type { FeatureAccessMap } from '@/lib/compute-feature-access'
 import { isWidgetVisible } from '@/lib/compute-module-access'
@@ -269,6 +270,7 @@ import type { FreedomMilestoneResult } from '@/lib/freedom-milestones'
 import type { FeeAnalysis } from '@/lib/fee-analysis'
 import type { FireEndStrategy } from '@/lib/fire-strategy'
 import type { HealthScore } from '@/lib/financial-health'
+import type { NewsPreview } from '@/lib/news-preview'
 
 // ── DashboardData bundle ──────────────────────────────────────
 // All data the dashboard page fetches and passes down to widgets.
@@ -662,7 +664,7 @@ export interface DashboardData {
   // Partner privacy: categories the partner has hidden (Feature #537)
   partnerHiddenCategories: string[]
   // Will: decision patterns — freedom days per recommendation type
-  decisionPatterns: { type: string; days: number }[]
+  decisionPatterns: { type: string; days: number; count: number }[]
   // Will: 12-month freedom days trend (monthly aggregation of completed actions)
   freedomDaysMonthly: { month: string; days: number }[]
   // Wilskracht widget data
@@ -690,6 +692,11 @@ export interface DashboardData {
   heatmapBeschikbaarMap: Record<string, number>
   /** Vorige-maand spending per budget — voedt de trend-pijl in de heatmap-tooltip */
   heatmapPreviousSpending: Record<string, number>
+  /**
+   * Laatste nieuws-editie (server-veld, device-onafhankelijk) voor de
+   * Nieuws-widget (id `berichten`). Null als er geen (verse) editie is.
+   */
+  newsPreview: NewsPreview | null
 }
 
 /** Compact mortgage-vs-invest summary for briefing context */
@@ -704,6 +711,22 @@ export interface HvbSummary {
   aanbeveling: 'aflossen' | 'beleggen' | 'gelijk'
   /** Is de rente fiscaal aftrekbaar */
   isTaxDeductible: boolean
+  /**
+   * Engine-outputs (consume-don't-recompute): het netto voordeel van beleggen
+   * resp. aflossen over de horizon, en het verschil (beleggen − aflossen; positief
+   * = beleggen wint). Alle drie komen rechtstreeks uit `compareMortgageVsInvest`.
+   */
+  beleggenVoordeel: number
+  aflossenVoordeel: number
+  verschil: number
+  /** Premisse die de engine voedt: maandelijks extra bedrag (€) en horizon (jaren). */
+  extraBedragMaand: number
+  horizonJaren: number
+  /**
+   * FIRE-impact in maanden (positief = beleggen brengt je eerder vrij). Null als de
+   * loader geen FIRE-params kon meegeven (bijv. geen geboortedatum). Vrijheidstijd.
+   */
+  fireImpactMaanden: number | null
 }
 
 export interface WeekOverviewData {
@@ -743,6 +766,10 @@ export function WidgetRenderer({ id, size, data, features }: WidgetRendererProps
   // gated here: they only show when the budgetteren module is active.
   const { activeModules, subscriptions } = useModuleAccess()
   if (id.startsWith('budget_fav:') && !activeModules.includes('budgetteren')) return null
+  // Dynamische holding-favorieten volgen de aandelenregistratie-module (spiegel
+  // van de statische `holdings`-widget): een favoriet blijft in de bundel staan
+  // ook als de module gedeactiveerd is, dus hier expliciet gaten.
+  if (id.startsWith('holding_fav:') && !activeModules.includes('aandelenregistratie')) return null
   const moduleAccess = isWidgetVisible(id, activeModules, subscriptions)
   if (!moduleAccess.visible) return null
 
@@ -751,9 +778,12 @@ export function WidgetRenderer({ id, size, data, features }: WidgetRendererProps
     const budgetId = id.slice('budget_fav:'.length)
     const fav = data.favoriteBudgets.find(b => b.id === budgetId)
     if (!fav) return null
+    // Canoniek 12-mnd rolling dagtarief uit de bundel (consume-don't-recompute) voor
+    // het vrijheidstijd-kader; fallback op de maand-conversie voor mock-/empty-bundels.
+    const dailyExp = data.dailyExpenseRate ?? dailyExpenseRate(data.monthlyExpenses)
     return (
       <WidgetErrorBoundary widgetId={id}>
-        <BudgetFavWidget size={size} budget={fav} />
+        <BudgetFavWidget size={size} budget={fav} dailyExp={dailyExp} />
       </WidgetErrorBoundary>
     )
   }
@@ -763,9 +793,12 @@ export function WidgetRenderer({ id, size, data, features }: WidgetRendererProps
     const holdingId = id.slice('holding_fav:'.length)
     const holding = data.favoriteHoldings.find(h => h.id === holdingId)
     if (!holding) return null
+    // Canoniek 12-mnd rolling dagtarief uit de bundel (consume-don't-recompute);
+    // fallback op de maand-conversie voor mock-/empty-bundels.
+    const dailyExp = data.dailyExpenseRate ?? dailyExpenseRate(data.monthlyExpenses)
     return (
       <WidgetErrorBoundary widgetId={id}>
-        <HoldingFavWidget size={size} holding={holding} />
+        <HoldingFavWidget size={size} holding={holding} dailyExp={dailyExp} />
       </WidgetErrorBoundary>
     )
   }
@@ -880,7 +913,7 @@ function renderWidgetById(
     case 'wilskracht':
       return <WilskrachtWidget size={size} data={data} href={href} />
     case 'berichten':
-      return <BerichtenWidget size={size} href={href} />
+      return <BerichtenWidget size={size} data={data} href={href} />
     case 'trend_inkomen':
       return <BudgetTrendWidget budgetType="income" size={size} data={data} href={href} />
     case 'trend_uitgaven':

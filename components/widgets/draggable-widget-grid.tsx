@@ -30,7 +30,7 @@ const WidgetDndGrid = dynamic(
   { ssr: false },
 )
 import type { WidgetPref, WidgetSize, WidgetModule } from '@/lib/widget-catalog'
-import { WIDGET_CATALOG, WIDGET_FEATURE_MAP, BUDGET_WIDGETS, getWidgetDef } from '@/lib/widget-catalog'
+import { WIDGET_CATALOG, WIDGET_FEATURE_MAP, BUDGET_WIDGETS, getWidgetDef, getWidgetSizes } from '@/lib/widget-catalog'
 import { WIDGET_PRESETS, type WidgetPreset } from '@/lib/widget-presets'
 import { isFeatureAccessible, type FeatureAccessMap } from '@/lib/compute-feature-access'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
@@ -323,7 +323,11 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, categoryAppL
     }))
     for (const w of activeWidgets) {
       if (w.id.startsWith('budget_fav:') || w.id.startsWith('holding_fav:')) {
-        newPrefs.push({ ...w, size, order: newPrefs.length })
+        // Clamp naar de toegestane maten van deze favoriet — voorkomt dat een
+        // niet-ondersteunde fill-size (bv. mini) in de fallback-render valt.
+        const favSizes = getWidgetSizes(w.id)
+        const clamped = favSizes.includes(size) ? size : 'quarter'
+        newPrefs.push({ ...w, size: clamped, order: newPrefs.length })
       }
     }
     setActiveWidgets(newPrefs)

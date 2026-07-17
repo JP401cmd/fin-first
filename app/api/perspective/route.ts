@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { unauthorized, serverError } from '@/lib/api/respond'
 
 export type Perspective = 'personal' | 'household' | 'partner'
 
@@ -12,7 +13,7 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   let selectedPerspective: Perspective = 'personal'
@@ -115,7 +116,7 @@ export async function PATCH(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   const body = await request.json()
@@ -147,7 +148,7 @@ export async function PATCH(request: NextRequest) {
         message: 'Perspectief voorkeurskolom bestaat nog niet. Voorkeur wordt lokaal opgeslagen.',
       })
     }
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverError(error, 'perspective:PATCH')
   }
 
   return NextResponse.json({

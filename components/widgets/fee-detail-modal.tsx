@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { findAlternatives, FUND_ALTERNATIVES_DISCLAIMER, berekenJaarlijkseBesparing, type FindAlternativesResult } from '@/lib/fund-alternatives'
-import type { FeeAnalysis, HoldingFee } from '@/lib/fee-analysis'
+import { terSeverity, LOW_TER_BENCHMARK, type FeeAnalysis, type TerSeverity } from '@/lib/fee-analysis'
 import { AlertTriangle, ArrowRight, Info, TrendingDown } from 'lucide-react'
 import { FinTable } from '@/components/app/fin-table'
 import { FeeErosionChart } from '@/components/app/core/fee-erosion-chart'
@@ -20,15 +20,6 @@ interface Props {
   dailyExpenses?: number
 }
 
-type TerSeverity = 'green' | 'orange' | 'red'
-
-function getTerSeverity(ter: number): TerSeverity {
-  const pct = ter * 100
-  if (pct < 0.3) return 'green'
-  if (pct <= 0.8) return 'orange'
-  return 'red'
-}
-
 const SEVERITY_TEXT: Record<TerSeverity, string> = {
   green: 'text-positive',
   orange: 'text-[var(--ink-2)]',
@@ -38,7 +29,7 @@ const SEVERITY_TEXT: Record<TerSeverity, string> = {
 export function FeeDetailModal({ open, onClose, feeAnalysis, feeImpactMonths, grossReturn, dailyExpenses }: Props) {
   const { weightedTER, totalAnnualFee, perHoldingBreakdown, totalPortfolioValue, holdingsWithTER, holdingsWithoutTER } = feeAnalysis
   const terPctStr = (weightedTER * 100).toFixed(2).replace('.', ',')
-  const severity = getTerSeverity(weightedTER)
+  const severity = terSeverity(weightedTER)
 
   // Separate holdings with and without TER
   const holdingsWithFees = perHoldingBreakdown.filter(h => h.ter > 0)
@@ -98,7 +89,7 @@ export function FeeDetailModal({ open, onClose, feeAnalysis, feeImpactMonths, gr
             portfolioValue={totalPortfolioValue}
             grossReturn={grossReturn}
             currentTER={weightedTER}
-            lowTER={0.002}
+            lowTER={LOW_TER_BENCHMARK}
             years={30}
             dailyExpenses={dailyExpenses}
           />
@@ -122,7 +113,7 @@ export function FeeDetailModal({ open, onClose, feeAnalysis, feeImpactMonths, gr
               </FinTable.Header>
               <FinTable.Body>
                 {holdingsWithFees.map((h, i) => {
-                  const holdingSeverity = getTerSeverity(h.ter)
+                  const holdingSeverity = terSeverity(h.ter)
                   return (
                     <FinTable.Row key={h.name + i}>
                       <FinTable.Td>

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { forbidden, serverError } from '@/lib/api/respond'
 import { createClient } from '@/lib/supabase/server'
 import { isSuperAdmin } from '@/lib/admin'
 
@@ -6,7 +7,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params
   const supabase = await createClient()
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   const { data: sessions, error: sError } = await supabase
@@ -29,7 +30,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     .eq('questionnaire_id', id)
     .order('started_at', { ascending: false })
 
-  if (sError) return NextResponse.json({ error: sError.message }, { status: 500 })
+  if (sError) return serverError(sError, 'admin-questionnaire-responses:GET')
 
   const { data: questions } = await supabase
     .from('questionnaire_questions')
@@ -79,7 +80,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   const { id } = await params
   const supabase = await createClient()
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   const { searchParams } = new URL(req.url)
@@ -96,7 +97,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     .eq('id', sessionId)
     .eq('questionnaire_id', id)
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(error, 'admin-questionnaire-responses:DELETE')
 
   return NextResponse.json({ success: true })
 }

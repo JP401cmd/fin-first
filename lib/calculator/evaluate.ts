@@ -22,7 +22,22 @@ import type { PrefillValues } from './user-data-keys'
 // Eén Parser-instance volstaat; parse() is stateless.
 const parser = new Parser()
 
-/** Whitelisted financiële + wiskundige helperfuncties. */
+/**
+ * Whitelisted financiële + wiskundige helperfuncties.
+ *
+ * LET OP — dit is NIET de volledige set beschikbare functies. De safe-eval
+ * parser kent een tweede, altijd-actieve laag `BUILTINS` (zie
+ * `lib/calculator/safe-eval.ts`): een vaste tabel generieke numerieke
+ * functies (log/ln/log2/exp/sin/…/pow/min/max/…), 1-op-1 geport uit
+ * expr-eval 2.0.2. `resolveFn()` zoekt eerst hier (scope, WHITELIST_FNS) en
+ * valt dan terug op die BUILTINS-tabel; `validateFormulas` filtert diezelfde
+ * namen uit `variables()` (via safe-eval's EXCLUDED_NAMES), zodat bv.
+ * `log(...)` in een prefab NIET als "onbekende variabele" wordt gezien.
+ * Een formule die alleen BUILTINS gebruikt (zoals de prefab
+ * `eerder-met-pensioen`, die `log` aanroept) is dus geldig en veilig zonder
+ * hier iets toe te voegen. WHITELIST_FNS bevat enkel de TriFinity-specifieke
+ * financiële helpers die expr-eval niet kent.
+ */
 const WHITELIST_FNS: Record<string, (...args: number[]) => number> = {
   /** Samengestelde groei: principal × (1+rate)^years. */
   compound: (principal, rate, years) => principal * Math.pow(1 + rate, years),

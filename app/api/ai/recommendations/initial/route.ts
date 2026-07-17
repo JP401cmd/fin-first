@@ -7,6 +7,7 @@ import { buildRecommendationContext } from '@/lib/ai/context/recommendation-cont
 import { maskPIIInOutput } from '@/lib/ai/pii-output-filter'
 import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
 import { checkTierGate } from '@/lib/require-tier'
+import { unauthorized, serverError } from '@/lib/api/respond'
 
 // ── Schema (same as main recommendations endpoint) ─────────
 
@@ -48,7 +49,7 @@ export async function POST() {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 })
+    return unauthorized()
   }
 
   const tierGate = await checkTierGate(supabase, user.id, 'ai')
@@ -84,6 +85,7 @@ export async function POST() {
     model = await getModel(supabase, 'aanbevelingen_initieel')
   } catch (err) {
     if (err instanceof AIConfigError) {
+      // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
       return Response.json({ error: err.message }, { status: 422 })
     }
     return Response.json({ error: 'AI model kon niet worden geladen.' }, { status: 500 })
@@ -140,10 +142,7 @@ export async function POST() {
 
     return Response.json({ recommendations })
   } catch (err) {
-    console.error('[initial-recs] Generation failed:', err)
-    return Response.json({
-      error: err instanceof Error ? err.message : 'AI-generatie mislukt',
-    }, { status: 500 })
+    return serverError(err, 'ai-recommendations-initial:POST')
   }
 }
 
@@ -156,7 +155,7 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 })
+    return unauthorized()
   }
 
   const tierGateGet = await checkTierGate(supabase, user.id, 'ai')

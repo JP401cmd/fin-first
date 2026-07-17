@@ -7,6 +7,7 @@ import { checkTierGate } from '@/lib/require-tier'
 import { detectRecurringTransactions } from '@/lib/recurring-detection'
 import { SUBSCRIPTION_DETECT_PROMPT } from '@/lib/ai/subscription-detect-prompt'
 import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
+import { unauthorized } from '@/lib/api/respond'
 
 /**
  * POST /api/subscriptions/detect-ai
@@ -23,7 +24,7 @@ export async function POST() {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
-      return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+      return unauthorized()
     }
 
     const tierGate = await checkTierGate(supabase, user.id, 'ai')
@@ -133,6 +134,7 @@ export async function POST() {
       model = await getModel(supabase, 'abonnementen_detectie')
     } catch (err) {
       if (err instanceof AIConfigError) {
+        // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
         return NextResponse.json({ error: err.message }, { status: 422 })
       }
       return NextResponse.json({ error: 'AI model kon niet worden geladen.' }, { status: 500 })

@@ -15,10 +15,10 @@ describe('KoppelRekeningBanner', () => {
       expect(links).toContain('/core/cash/import')
     })
 
-    it('vermeldt PSD2 + GoCardless privacy-context', () => {
+    it('vermeldt PSD2 + TrueLayer privacy-context', () => {
       const { container } = render(<KoppelRekeningBanner accountCount={0} />)
       expect(container.textContent).toMatch(/PSD2/)
-      expect(container.textContent).toMatch(/GoCardless/)
+      expect(container.textContent).toMatch(/TrueLayer/)
     })
   })
 

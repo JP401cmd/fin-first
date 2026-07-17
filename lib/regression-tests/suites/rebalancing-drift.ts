@@ -562,6 +562,46 @@ const tests: TestCase[] = [
       assert(msg.includes('verkopen') || msg.includes('Verkopen') || msg.includes('verkoop'), 'bericht suggereert verkopen bij overweight')
     },
   },
+
+  // ════════════════════════════════════════════════════════════════════
+  // Ingestelde drempel is load-bearing: 3% vs 12% verandert de meldingen
+  // (regressie op de HIGH-fix — loader/widget lazen voorheen hard 5%).
+  // ════════════════════════════════════════════════════════════════════
+  {
+    id: 'rebalancing-drift-threshold-fixtures-3-vs-12',
+    name: 'generateRebalanceNotifications: drempel 3% vs 12% geeft andere meldingen',
+    category: CAT,
+    description: 'Dezelfde drifts leveren bij drempel 3% méér/zwaardere meldingen dan bij 12% — de ingestelde drempel is bepalend, niet een hardcoded 5%',
+    priority: 'critical',
+    estimatedDurationMs: 200,
+    fn() {
+      // Vaste drifts: +4% (klein), +10% (fors), -2% (binnen elke drempel)
+      const drifts: DriftResult[] = [
+        { category: 'aandelen', label: 'Aandelen', current_pct: 54, target_pct: 50, drift_pct: 4, drift_amount: 400, holding_count: 2 },
+        { category: 'obligaties', label: 'Obligaties', current_pct: 35, target_pct: 25, drift_pct: 10, drift_amount: 1000, holding_count: 1 },
+        { category: 'crypto', label: 'Crypto', current_pct: 3, target_pct: 5, drift_pct: -2, drift_amount: 200, holding_count: 1 },
+      ]
+
+      // Drempel 3%: 4% en 10% overschrijden → 2 meldingen.
+      // 4% (<2×3=6) = warning; 10% (>=2×3=6) = critical.
+      const at3 = generateRebalanceNotifications(drifts, 3, false)
+      assertEqual(at3.length, 2, 'drempel 3%: 2 meldingen (4% en 10%)')
+      assertEqual(at3.find(n => n.id.includes('aandelen'))!.severity, 'warning', '4% bij drempel 3% → warning')
+      assertEqual(at3.find(n => n.id.includes('obligaties'))!.severity, 'critical', '10% bij drempel 3% → critical (>=2×)')
+
+      // Drempel 12%: niets overschrijdt → 0 meldingen.
+      const at12 = generateRebalanceNotifications(drifts, 12, false)
+      assertEqual(at12.length, 0, 'drempel 12%: geen meldingen (alle drift < 12%)')
+
+      // Bewijs dat de drempel bepalend is: 3% ≠ 12%.
+      assertGreaterThan(at3.length, at12.length, 'lagere drempel → meer meldingen (drempel is load-bearing)')
+
+      // Regressie tegen de oude hardcode 5%: 4% mag bij 5% GEEN melding geven,
+      // maar bij de ingestelde 3% wél — dus de bron mag geen literal 5 zijn.
+      const at5 = generateRebalanceNotifications(drifts, 5, false)
+      assertEqual(at5.find(n => n.id.includes('aandelen')), undefined, '4% bij drempel 5% → geen melding (verschilt van 3%)')
+    },
+  },
 ]
 
 export function register() {

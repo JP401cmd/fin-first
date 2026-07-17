@@ -13,6 +13,7 @@ import {
 import { APP_SETUP_SLUGS } from '@/lib/app-setup-status'
 import { syncBudgetingActive } from '@/lib/budgeting-active'
 import { syncBankAccountCompanion } from '@/lib/bank-account-companion'
+import { unauthorized, serverError } from '@/lib/api/respond'
 
 /**
  * POST /api/budgetteren/setup — Eerste-keer setup van de Budgetteren-app.
@@ -58,7 +59,7 @@ export async function POST(req: Request) {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) {
-    return Response.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   let parsed
@@ -235,8 +236,6 @@ export async function POST(req: Request) {
 
     return Response.json({ success: true })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Onbekende fout'
-    console.error('[budgetteren-setup] error:', message)
-    return Response.json({ error: message }, { status: 500 })
+    return serverError(err, 'budgetteren-setup:POST')
   }
 }

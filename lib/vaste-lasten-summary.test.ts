@@ -18,6 +18,7 @@ type RecurringRow = {
   name: string
   frequency: string
   category_override: string | null
+  end_date?: string | null
 }
 
 // Minimal thenable query-builder mock. Met < 3 transacties slaat de summary de
@@ -61,6 +62,27 @@ describe('loadVasteLastenSummary — bundel/widget-contract', () => {
     expect(summary.count).toBe(2)
     expect(summary.totalMonthlySubscriptions).toBe(14)
     expect(summary.totalMonthlyVasteKosten).toBe(100)
+  })
+
+  it('sluit een actieve regel met verstreken einddatum uit (regressie: bonus finding UAT §2.7 A.9)', async () => {
+    const supabase = makeSupabase([
+      { id: 'r1', counterparty_name: 'Verhuurder', amount: -100, name: 'Huur', frequency: 'monthly', category_override: 'vaste_kosten', end_date: null },
+      // Verlopen tijdelijk abonnement: is_active blijft true, einddatum ver in het verleden.
+      { id: 'r2', counterparty_name: 'Sportschool', amount: -40, name: 'Tijdelijk lidmaatschap', frequency: 'monthly', category_override: 'vaste_kosten', end_date: '2020-01-01' },
+    ])
+    const summary = await loadVasteLastenSummary(supabase)
+    // Alleen de lopende huur (100) telt mee; het verlopen lidmaatschap (40) niet.
+    expect(summary.totalMonthly).toBe(100)
+    expect(summary.count).toBe(1)
+  })
+
+  it('einddatum ver in de toekomst blijft meetellen', async () => {
+    const supabase = makeSupabase([
+      { id: 'r1', counterparty_name: 'Verzekeraar', amount: -50, name: 'Polis', frequency: 'monthly', category_override: 'vaste_kosten', end_date: '2099-12-31' },
+    ])
+    const summary = await loadVasteLastenSummary(supabase)
+    expect(summary.totalMonthly).toBe(50)
+    expect(summary.count).toBe(1)
   })
 
   it('normaliseert frequenties naar maandbedrag', async () => {

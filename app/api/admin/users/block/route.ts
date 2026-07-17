@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { unauthorized, forbidden, serverError } from '@/lib/api/respond'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { isSuperAdmin } from '@/lib/admin'
@@ -15,12 +16,12 @@ export async function POST(req: Request) {
   const supabase = await createClient()
 
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   const { data: { user: adminUser } } = await supabase.auth.getUser()
   if (!adminUser) {
-    return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
+    return unauthorized()
   }
 
   const body = await req.json().catch(() => ({}))
@@ -61,7 +62,7 @@ export async function POST(req: Request) {
     .eq('id', userId)
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverError(error, 'admin-users-block:POST')
   }
 
   await logAdminAction(service, {

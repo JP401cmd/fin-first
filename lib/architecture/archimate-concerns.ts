@@ -87,6 +87,22 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
     elementIds: ['as-planning', 'fn-toekomstplannen'],
   },
   {
+    id: 'vermogenshistorie-persoonlijk-only',
+    title: 'Vermogenshistorie-laag is persoonlijk-only',
+    detail:
+      'De "Netto vermogen — verloop"-uitsplitsing draait op balance_snapshots, en die tabel heeft (anders dan assets/debts) nog geen household-model — dus de per-groep-historie toont alleen het persoonlijke perspectief, terwijl de rest van Kern het huishoud-perspectief kan tonen. loadWealthGroupHistory is perspectief-agnostisch gebouwd (ownership-parameter aanwezig, nog niet vertakt), maar tot balance_snapshots een huishoud-eigenaarschap kent divergeert deze laag stil van het gedeelde perspectief. Verwijder dit punt zodra de household-variant (ownership: "all") is uitgerold. Zie ADR 0046.',
+    severity: 'debt',
+    elementIds: ['as-vermogen', 'fn-vermogensregistratie'],
+  },
+  {
+    id: 'signup-email-allowlist',
+    title: 'Registratie-allowlist actief (besloten testfase)',
+    detail:
+      'Een Supabase auth-hook (signup_email_allowlist, ADR 0047) blokkeert registraties waarvan het e-mailadres niet op de allowlist staat — bedoeld om de app tijdens de besloten testfase gesloten te houden. Dit moet vóór publieke lancering weer uit, anders blijft de app onbereikbaar voor nieuwe gebruikers.',
+    severity: 'debt',
+    elementIds: ['t-supabase'],
+  },
+  {
     id: 'fragiele-webgpu-lokaal-ai',
     title: 'Fragiele WebGPU-runtime in het lokale AI-pad',
     detail:

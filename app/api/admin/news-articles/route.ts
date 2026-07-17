@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { forbidden, serverError } from '@/lib/api/respond'
 import { createClient } from '@/lib/supabase/server'
 import { isSuperAdmin } from '@/lib/admin'
 
@@ -8,7 +9,7 @@ export async function GET(request: Request) {
   const supabase = await createClient()
 
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   const url = new URL(request.url)
@@ -34,7 +35,7 @@ export async function GET(request: Request) {
   const { data, error, count } = await query
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverError(error, 'admin-news-articles:GET')
   }
 
   return NextResponse.json({ articles: data || [], total: count || 0 })
@@ -46,7 +47,7 @@ export async function DELETE(request: Request) {
   const supabase = await createClient()
 
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   const { id } = await request.json()
@@ -56,7 +57,7 @@ export async function DELETE(request: Request) {
 
   const { error } = await supabase.from('news_articles').delete().eq('id', id)
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverError(error, 'admin-news-articles:DELETE')
   }
 
   return NextResponse.json({ success: true })

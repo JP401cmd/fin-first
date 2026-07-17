@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { unauthorized, serverError } from '@/lib/api/respond'
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user) return unauthorized()
 
   const { data: session } = await supabase
     .from('questionnaire_sessions')
@@ -39,7 +40,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user) return unauthorized()
 
   const { data: session, error } = await supabase
     .from('questionnaire_sessions')
@@ -47,7 +48,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     .select('id')
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(error, 'questionnaire-session:POST')
 
   return NextResponse.json({ session: { id: session.id, answered_question_ids: [] } }, { status: 201 })
 }

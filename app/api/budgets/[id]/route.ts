@@ -118,6 +118,7 @@ export async function DELETE(
 
     if (deleteError) {
       return NextResponse.json(
+        // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
         { error: `Kon budget niet verwijderen: ${deleteError.message}` },
         { status: 500 }
       )

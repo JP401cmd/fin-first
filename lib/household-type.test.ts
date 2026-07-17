@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { hasPartner, VALID_HOUSEHOLD_TYPES, type HouseholdType } from '@/lib/household-type'
+import {
+  hasPartner,
+  householdTypeLabel,
+  HOUSEHOLD_TYPE_LABELS,
+  VALID_HOUSEHOLD_TYPES,
+  type HouseholdType,
+} from '@/lib/household-type'
 
 describe('lib/household-type — hasPartner (canonieke fiscaal-partner-afleiding)', () => {
   describe('canonieke woordenschat (solo | samen | gezin)', () => {
@@ -63,5 +69,62 @@ describe('lib/household-type — hasPartner (canonieke fiscaal-partner-afleiding
   it('HouseholdType-type is bruikbaar als index', () => {
     const t: HouseholdType = 'gezin'
     expect(hasPartner(t)).toBe(true)
+  })
+})
+
+describe('lib/household-type — householdTypeLabel (NL-labelweergave)', () => {
+  // De kern van de bug: de vorige labelmap in de rapportagelaag was gekeyd op
+  // single/partner/family/single_parent en matchte dus NOOIT een echte
+  // DB-waarde → de ruwe string ("samen") werd getoond.
+  describe('canonieke waarden (solo | samen | gezin) → net NL-label', () => {
+    it('solo → Alleenstaand', () => {
+      expect(householdTypeLabel('solo')).toBe('Alleenstaand')
+    })
+    it('samen → Samenwonend / getrouwd', () => {
+      expect(householdTypeLabel('samen')).toBe('Samenwonend / getrouwd')
+    })
+    it('gezin → Gezin met kinderen', () => {
+      expect(householdTypeLabel('gezin')).toBe('Gezin met kinderen')
+    })
+
+    it('regressie: elke canonieke waarde levert een echt label, nooit de ruwe string', () => {
+      for (const t of VALID_HOUSEHOLD_TYPES) {
+        const label = householdTypeLabel(t)
+        expect(label, `${t}`).toBe(HOUSEHOLD_TYPE_LABELS[t])
+        // Het label mag nooit gelijk zijn aan de ruwe DB-waarde (= het defect).
+        expect(label, `${t} niet ruw`).not.toBe(t)
+      }
+    })
+  })
+
+  describe('back-compat: verouderde woordenschat → zelfde label als samen', () => {
+    it('samenwonend → Samenwonend / getrouwd', () => {
+      expect(householdTypeLabel('samenwonend')).toBe('Samenwonend / getrouwd')
+    })
+    it('getrouwd → Samenwonend / getrouwd', () => {
+      expect(householdTypeLabel('getrouwd')).toBe('Samenwonend / getrouwd')
+    })
+  })
+
+  describe('veilige fallback — onbekend/ontbrekend → nette default, nooit ruwe string', () => {
+    it('null → Alleenstaand', () => {
+      expect(householdTypeLabel(null)).toBe('Alleenstaand')
+    })
+    it('undefined → Alleenstaand', () => {
+      expect(householdTypeLabel(undefined)).toBe('Alleenstaand')
+    })
+    it('lege string → Alleenstaand', () => {
+      expect(householdTypeLabel('')).toBe('Alleenstaand')
+    })
+    it('dode legacy kolom-default "single" → Alleenstaand (geen ruwe "single")', () => {
+      expect(householdTypeLabel('single')).toBe('Alleenstaand')
+    })
+    it('volledig onbekende waarde → Alleenstaand (geen ruwe string)', () => {
+      expect(householdTypeLabel('iets-anders')).toBe('Alleenstaand')
+    })
+  })
+
+  it('HOUSEHOLD_TYPE_LABELS dekt exact de canonieke set', () => {
+    expect(Object.keys(HOUSEHOLD_TYPE_LABELS).sort()).toEqual(['gezin', 'samen', 'solo'])
   })
 })

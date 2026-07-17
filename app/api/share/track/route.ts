@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { unauthorized, serverError } from '@/lib/api/respond'
 
 /**
  * POST /api/share/track — Track a share event for analytics.
@@ -36,7 +37,7 @@ export async function POST(req: Request) {
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   try {
@@ -88,8 +89,7 @@ export async function POST(req: Request) {
       event,
     })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Onbekende fout'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return serverError(err, 'share-track:POST')
   }
 }
 
@@ -98,7 +98,7 @@ export async function GET() {
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   try {

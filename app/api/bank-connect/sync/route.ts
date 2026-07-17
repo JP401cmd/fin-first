@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { unauthorized, serverError } from '@/lib/api/respond'
 import { isTrueLayerEnabled } from '@/lib/truelayer/feature-flag'
 import { getBaseUrls, getAccountTransactions, refreshAccessToken } from '@/lib/truelayer/client'
 import { mapTransactions } from '@/lib/truelayer/mapper'
@@ -12,7 +13,7 @@ export async function POST(req: Request) {
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return unauthorized()
   }
 
   if (!(await isTrueLayerEnabled(supabase))) {
@@ -254,9 +255,6 @@ export async function POST(req: Request) {
       // Ignore logging errors
     }
 
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Synchronisatie mislukt' },
-      { status: 500 }
-    )
+    return serverError(err, 'bankconnect-sync:POST')
   }
 }

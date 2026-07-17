@@ -167,6 +167,7 @@ function makeEmptyDashboardData(): DashboardData {
     heatmapSpending: {},
     heatmapBeschikbaarMap: {},
     heatmapPreviousSpending: {},
+    newsPreview: null,
   }
 }
 

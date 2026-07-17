@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { unauthorized, forbidden, serverError } from '@/lib/api/respond'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { isSuperAdmin } from '@/lib/admin'
@@ -23,13 +24,13 @@ function getServiceClient() {
 export async function POST(req: Request) {
   const supabase = await createClient()
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
   const {
     data: { user: admin },
   } = await supabase.auth.getUser()
   if (!admin) {
-    return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
+    return unauthorized()
   }
 
   const body = await req.json().catch(() => ({}))
@@ -82,13 +83,10 @@ export async function POST(req: Request) {
     const deletionSummary = await deleteAllUserData(service, userId)
     const { error: authErr } = await service.auth.admin.deleteUser(userId)
     if (authErr) {
-      return NextResponse.json({ error: authErr.message }, { status: 500 })
+      return serverError(authErr, 'admin-user-delete:POST')
     }
     return NextResponse.json({ success: true, deletionSummary })
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Verwijderen mislukt' },
-      { status: 500 },
-    )
+    return serverError(err, 'admin-user-delete:POST')
   }
 }

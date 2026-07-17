@@ -4,11 +4,19 @@ import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { localDateStr } from '@/lib/budget-period'
 
 interface Props {
   size: WidgetSize
   data: DashboardData
   href?: string
+}
+
+function nlNum(value: number, decimals = 0): string {
+  return value.toLocaleString('nl-NL', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  })
 }
 
 // Day labels in Dutch: ma, di, wo, do, vr, za, zo
@@ -35,7 +43,7 @@ function DeltaIndicator({ current, previous, compact = false }: { current: numbe
 
 export const WeekoverzichtWidget = memo(function WeekoverzichtWidget({ size, data, href }: Props) {
   const { weekOverview } = data
-  const { weekExpenses, weekBudget, dailyExpenses, prevWeekExpenses, topCategories } = weekOverview
+  const { weekExpenses, weekIncome, weekBudget, dailyExpenses, prevWeekExpenses, topCategories } = weekOverview
 
   // Budget comparison
   const budgetPct = weekBudget > 0 ? (weekExpenses / weekBudget) * 100 : 0
@@ -46,6 +54,15 @@ export const WeekoverzichtWidget = memo(function WeekoverzichtWidget({ size, dat
   // Daily average
   const daysWithData = dailyExpenses.filter(d => d.amount > 0).length
   const dailyAvg = daysWithData > 0 ? weekExpenses / daysWithData : 0
+
+  // Vrijheidstijd-vertaling (Geld is opgeslagen tijd): weekuitgaven → vrijheidsdagen
+  // via het canonieke dagtarief uit de bundel (geen eigen herberekening). 0 = niet tonen.
+  const dagtarief = data.dailyExpenseRate ?? 0
+  const weekFreedomDays = dagtarief > 0 ? weekExpenses / dagtarief : 0
+
+  // Lokaal "vandaag" (nooit toISOString(): dat schuift de dag in NL) — moet in
+  // hetzelfde lokale-datumframe staan als de dag-buckets uit de loader.
+  const todayStr = localDateStr(new Date())
 
   // For the bar chart
   const maxDaily = Math.max(...dailyExpenses.map(d => d.amount), weekBudget / 7 || 1)
@@ -101,6 +118,11 @@ export const WeekoverzichtWidget = memo(function WeekoverzichtWidget({ size, dat
               <MaskedAmount value={weekExpenses} tone="kern" className="text-xl font-semibold" />
             </p>
             <DeltaIndicator current={weekExpenses} previous={prevWeekExpenses} compact />
+            {weekFreedomDays > 0 && (
+              <p className="mt-0.5 font-serif italic text-[11px] text-[var(--ink-3)]">
+                ≈ {nlNum(weekFreedomDays, 1)} vrijheidsdagen
+              </p>
+            )}
             {weekBudget > 0 && (
               <p className="mt-1.5 text-[10px] text-[var(--ink-3)]">
                 Budget: <MaskedAmount value={weekBudget} tone="kern" />
@@ -115,8 +137,10 @@ export const WeekoverzichtWidget = memo(function WeekoverzichtWidget({ size, dat
               {dailyExpenses.map((d, i) => {
                 const barH = maxDaily > 0 ? (d.amount / maxDaily) * CHART_H : 0
                 const x = i * (BAR_W + GAP)
-                const isToday = d.day === new Date().toISOString().split('T')[0]
-                const barColor = d.amount > (weekBudget / 7) ? 'var(--kern-500)' : 'var(--kern-300)'
+                const isToday = d.day === todayStr
+                // Neutrale staafkleur als er geen weekbudget-basislijn is (anders
+                // krijgt elke dag met uitgaven onterecht de "over budget"-kleur).
+                const barColor = weekBudget > 0 && d.amount > (weekBudget / 7) ? 'var(--kern-500)' : 'var(--kern-300)'
                 return (
                   <g key={d.day}>
                     <rect x={x} y={CHART_H - barH} width={BAR_W} height={Math.max(barH, 1)} rx={2} fill={barColor} opacity={isToday ? 1 : 0.7} />
@@ -155,6 +179,16 @@ export const WeekoverzichtWidget = memo(function WeekoverzichtWidget({ size, dat
             <p className="text-[10px] text-[var(--ink-3)]">
               gem. <MaskedAmount value={dailyAvg} tone="kern" />/dag
             </p>
+            {weekFreedomDays > 0 && (
+              <p className="mt-0.5 font-serif italic text-[11px] text-[var(--ink-3)]">
+                ≈ {nlNum(weekFreedomDays, 1)} vrijheidsdagen deze week
+              </p>
+            )}
+            {weekIncome > 0 && (
+              <p className="text-[10px] text-[var(--ink-3)]">
+                + <MaskedAmount value={weekIncome} tone="kern" /> inkomsten
+              </p>
+            )}
           </div>
           {weekBudget > 0 && (
             <div className="text-right">
@@ -174,8 +208,9 @@ export const WeekoverzichtWidget = memo(function WeekoverzichtWidget({ size, dat
           {dailyExpenses.map((d, i) => {
             const barH = maxDaily > 0 ? (d.amount / maxDaily) * CHART_H : 0
             const x = i * (BAR_W + GAP)
-            const isToday = d.day === new Date().toISOString().split('T')[0]
-            const barColor = d.amount > (weekBudget / 7) ? 'var(--kern-500)' : 'var(--kern-300)'
+            const isToday = d.day === todayStr
+            // Neutrale staafkleur als er geen weekbudget-basislijn is.
+            const barColor = weekBudget > 0 && d.amount > (weekBudget / 7) ? 'var(--kern-500)' : 'var(--kern-300)'
             return (
               <g key={d.day}>
                 <rect x={x} y={CHART_H - barH} width={BAR_W} height={Math.max(barH, 1)} rx={3} fill={barColor} opacity={isToday ? 1 : 0.7} />
@@ -228,7 +263,7 @@ export const WeekoverzichtWidget = memo(function WeekoverzichtWidget({ size, dat
 
         {/* Previous week total comparison */}
         <div className="flex items-center justify-between">
-          <p className="text-xs text-[var(--ink-3)]">vs. vorige week totaal</p>
+          <p className="text-xs text-[var(--ink-3)]">vs. vorige week (t/m vandaag)</p>
           <div className="flex items-center gap-1">
             {weekDelta > 0 ? <TrendingUp className="h-3 w-3 text-negative" /> : weekDelta < 0 ? <TrendingDown className="h-3 w-3 text-positive" /> : <Minus className="h-3 w-3 text-[var(--ink-4)]" />}
             <p className={`font-mono text-sm tabular-nums ${weekDelta > 0 ? 'text-negative' : weekDelta < 0 ? 'text-positive' : 'text-[var(--ink-3)]'}`}>

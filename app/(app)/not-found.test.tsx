@@ -12,12 +12,19 @@ vi.mock('next/link', () => ({
 }))
 
 describe('AppNotFound', () => {
-  it('toont precies één CTA naar het Overzicht', () => {
+  it('toont twee onderscheidende CTAs met verschillende labels en bestemmingen', () => {
     render(<AppNotFound />)
     const links = screen.getAllByRole('link')
-    expect(links).toHaveLength(1)
-    expect(links[0]).toHaveAttribute('href', '/overzicht')
-    expect(links[0]).toHaveTextContent('Naar Overzicht')
+    expect(links).toHaveLength(2)
+
+    const overzicht = screen.getByRole('link', { name: 'Naar Overzicht' })
+    const start = screen.getByRole('link', { name: 'Naar startpagina' })
+    expect(overzicht).toHaveAttribute('href', '/overzicht')
+    expect(start).toHaveAttribute('href', '/')
+
+    // Geen duplicaat: de twee knoppen wijzen naar verschillende bestemmingen.
+    const hrefs = links.map((l) => l.getAttribute('href'))
+    expect(new Set(hrefs).size).toBe(2)
   })
 
   it('toont de 404-kicker', () => {

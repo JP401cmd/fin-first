@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { unauthorized, serverError } from '@/lib/api/respond'
 import type { BalanceSnapshot, EntityBalanceHistory } from '@/lib/net-worth-data'
 
 /**
@@ -17,7 +18,7 @@ export async function GET(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   const url = new URL(request.url)
@@ -49,7 +50,7 @@ export async function GET(request: Request) {
     if (error.message.includes('relation') || error.code === '42P01') {
       return NextResponse.json({ entities: [], count: 0, note: 'balance_snapshots table not yet available' })
     }
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverError(error, 'snapshots-balances:GET')
   }
 
   const rows = (data ?? []) as Pick<

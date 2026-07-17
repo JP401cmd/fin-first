@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { unauthorized } from '@/lib/api/respond'
 
 const VALID_STRATEGIES = ['perpetual', 'legacy', 'deplete', 'pensioen'] as const
 const VALID_RETIREMENT_METHODS = ['essential_budgets', 'custom_amount', 'current_income'] as const
@@ -15,7 +16,7 @@ const FP_KEY = 'fire_strategy_override'
 export async function GET() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+  if (!user) return unauthorized()
 
   const { data, error } = await supabase
     .from('profiles')
@@ -66,7 +67,7 @@ export async function GET() {
 export async function PUT(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+  if (!user) return unauthorized()
 
   let body: Record<string, unknown>
   try {
@@ -172,6 +173,7 @@ export async function PUT(request: NextRequest) {
     const safePayload = { ...updatePayload, fire_end_strategy: 'deplete' }
     const { error: safeError } = await supabase.from('profiles').update(safePayload).eq('id', user.id)
     if (safeError) {
+      // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
       return NextResponse.json({ error: 'Opslaan mislukt', details: safeError.message }, { status: 500 })
     }
 
@@ -182,6 +184,7 @@ export async function PUT(request: NextRequest) {
     const { error: fpError } = await supabase.from('profiles').update({ feature_preferences: fp }).eq('id', user.id)
     if (fpError) {
       console.error('[fire-settings] feature_preferences update failed:', fpError.message)
+      // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
       return NextResponse.json({ error: 'Override opslaan mislukt', details: fpError.message }, { status: 500 })
     }
 
@@ -190,5 +193,6 @@ export async function PUT(request: NextRequest) {
   }
 
   // Other errors
+  // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
   return NextResponse.json({ error: 'Opslaan mislukt', details: error.message }, { status: 500 })
 }

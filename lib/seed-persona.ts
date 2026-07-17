@@ -2,8 +2,9 @@
  * Shared seeding logic for persona data.
  * Used by both admin seed endpoint and onboarding flow.
  *
- * Optimized with batched parallel deletes (3 batches) and
- * phased parallel inserts (3 phases) to minimize DB round-trips.
+ * Optimized with batched parallel deletes (5 progress-stappen, batch0..batch4)
+ * en phased parallel inserts (4 vaste phases + 2 conditionele) om DB-round-trips
+ * te minimaliseren.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -15,6 +16,34 @@ import {
 } from '@/lib/crypto/field-encryption'
 
 type ProgressCallback = (step: string, table: string, action: string, count?: number) => void
+
+/**
+ * Aantal voortgangsstappen (`onProgress`-aanroepen) dat één seed-run doorloopt.
+ * De voortgangsbalk deelt `currentStep / totalSteps`, dus dit getal MOET exact
+ * gelijk zijn aan het werkelijke aantal `onProgress`-aanroepen — anders schiet
+ * de balk boven 100% (te laag total) of blijft die te vroeg op 100% hangen.
+ *
+ * Was hardgecodeerd als 6 (admin) / 7 (onboarding) terwijl er feitelijk 9-11
+ * stappen zijn → balk liep tot ~183%. Nu afgeleid uit dezelfde conditionals die
+ * de code hieronder ook gebruikt, zodat teller en aanroepen niet wegdriften.
+ *
+ * MOET in sync blijven met de `onProgress`-aanroepen verderop:
+ *  - `deleteAllUserData` → {@link SEED_DELETE_STEPS} vaste stappen (batch0..batch4)
+ *  - `seedPersonaData`   → {@link SEED_INSERT_BASE_STEPS} vaste stappen (phase1..phase4)
+ *                          + 1 als de persona `balance_snapshots` heeft (phase4b)
+ *                          + 1 als de persona `appSettings` heeft        (phase5)
+ */
+export const SEED_DELETE_STEPS = 5
+export const SEED_INSERT_BASE_STEPS = 4
+
+export function countSeedSteps(persona: PersonaData): number {
+  let steps = SEED_DELETE_STEPS + SEED_INSERT_BASE_STEPS
+  // Spiegelt exact de `if`-guards rond de conditionele onProgress-aanroepen in
+  // seedPersonaData (phase4b / phase5). Bij wijziging dáár: ook hier bijwerken.
+  if (persona.balance_snapshots && persona.balance_snapshots.length > 0) steps++
+  if (persona.appSettings) steps++
+  return steps
+}
 
 // ── Helper: relative date from today ──────────────────────────
 

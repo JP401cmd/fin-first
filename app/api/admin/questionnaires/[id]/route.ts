@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { forbidden, notFound, serverError } from '@/lib/api/respond'
 import { createClient } from '@/lib/supabase/server'
 import { isSuperAdmin } from '@/lib/admin'
 
@@ -6,7 +7,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params
   const supabase = await createClient()
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   const { data, error } = await supabase
@@ -19,7 +20,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     .order('sort_order', { referencedTable: 'questionnaire_questions', ascending: true })
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 404 })
+  if (error) return notFound()
 
   return NextResponse.json({ questionnaire: data })
 }
@@ -28,7 +29,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   const { id } = await params
   const supabase = await createClient()
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   const body = await req.json()
@@ -58,7 +59,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       .from('questionnaires')
       .update(updates)
       .eq('id', id)
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return serverError(error, 'admin-questionnaire:PUT')
   }
 
   if (questions) {
@@ -122,7 +123,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         .from('questionnaire_questions')
         .insert(rows)
 
-      if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 })
+      if (insertError) return serverError(insertError, 'admin-questionnaire:PUT')
     }
   }
 

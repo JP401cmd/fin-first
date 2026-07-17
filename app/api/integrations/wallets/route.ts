@@ -9,6 +9,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { unauthorized } from '@/lib/api/respond'
 import { isValidWalletAddress, normalizeWalletAddress } from '@/lib/integrations/wallet-validation'
 import { syncWalletBalance } from '@/lib/integrations/wallet-sync'
 import { classifyWalletError } from '@/lib/integrations/blockchair-client'
@@ -42,7 +43,7 @@ export async function POST(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   let body: CreateBody

@@ -98,6 +98,13 @@ export const RECOMMENDATION_TYPE_LABELS: Record<RecommendationType, string> = {
   savings_boost: 'Sparen versnellen',
 }
 
+/**
+ * Label voor afgeronde acties die niet aan een getypeerd advies hangen
+ * (bron `manual`/`chat`, geen `recommendation_id`). De loader groepeert die
+ * onder de bucket `'overig'`.
+ */
+export const OVERIG_TYPE_LABEL = 'Overig / handmatig'
+
 export const RECOMMENDATION_TYPE_ICONS: Record<RecommendationType, string> = {
   budget_optimization: 'Sliders',
   asset_reallocation: 'ArrowRightLeft',

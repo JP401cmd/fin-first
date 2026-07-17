@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { forbidden, serverError } from '@/lib/api/respond'
 import { createClient } from '@/lib/supabase/server'
 import { isSuperAdmin } from '@/lib/admin'
 import { parsePlatformStatus } from '@/lib/platform-status'
@@ -7,7 +8,7 @@ import { logAdminAction } from '@/lib/admin-audit'
 export async function GET() {
   const supabase = await createClient()
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   const { data } = await supabase
@@ -22,7 +23,7 @@ export async function GET() {
 export async function PUT(req: Request) {
   const supabase = await createClient()
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   const {
@@ -45,7 +46,7 @@ export async function PUT(req: Request) {
   )
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverError(error, 'admin-platform:PUT')
   }
 
   if (user) {

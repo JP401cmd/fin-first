@@ -79,6 +79,7 @@ const mockData: DashboardData = {
     monthlyPassiveIncome: 0,
     monthlySavings: 1000,
     savingsRate: 33,
+    annualReturn: 0.07,
   },
   openActions: 2,
   totalFreedomDaysOpen: 15,
@@ -169,6 +170,7 @@ const mockData: DashboardData = {
   heatmapSpending: {},
   heatmapBeschikbaarMap: {},
   heatmapPreviousSpending: {},
+  newsPreview: null,
 }
 
 const makePrefs = (ids: string[], sizes: ('half' | 'full' | 'xl')[] = []): WidgetPref[] =>

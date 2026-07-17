@@ -1,7 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { isSuperAdmin } from '@/lib/admin'
 import { PERSONAS, type PersonaKey } from '@/lib/test-personas'
-import { deleteAllUserData, seedPersonaData } from '@/lib/seed-persona'
+import { deleteAllUserData, seedPersonaData, countSeedSteps } from '@/lib/seed-persona'
+import { unauthorized, forbidden, badRequest } from '@/lib/api/respond'
 
 
 export async function POST(req: Request) {
@@ -9,18 +10,18 @@ export async function POST(req: Request) {
 
   // Step 1: Verify superadmin
   if (!(await isSuperAdmin(supabase))) {
-    return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 })
+    return forbidden('Forbidden')
   }
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
+    return unauthorized()
   }
 
   const body = await req.json()
   const personaKey = body.persona as PersonaKey
   if (!personaKey || !PERSONAS[personaKey]) {
-    return new Response(JSON.stringify({ error: 'Ongeldige persona' }), { status: 400 })
+    return badRequest('Ongeldige persona')
   }
 
   const persona = PERSONAS[personaKey]
@@ -33,12 +34,16 @@ export async function POST(req: Request) {
         controller.enqueue(encoder.encode(JSON.stringify(data) + '\n'))
       }
 
-      const totalSteps = 6 // delete (3 batches) + insert (3 phases)
+      // Dynamisch: 5 delete-stappen + 4 vaste insert-stappen + evt. 2 conditionele
+      // (balance_snapshots / appSettings). Nooit hardcoden — dan driftte de balk >100%.
+      const totalSteps = countSeedSteps(persona)
       let currentStep = 0
 
       function progress(step: string, table: string, action: string, count?: number) {
         currentStep++
-        const pct = Math.round((currentStep / totalSteps) * 100)
+        // Clamp als extra vangnet: mocht een nieuwe onProgress-aanroep ooit vergeten
+        // worden mee te tellen in countSeedSteps, dan toont de balk nooit >100%.
+        const pct = Math.min(100, Math.round((currentStep / totalSteps) * 100))
         send({ step, progress: pct, table, action, ...(count !== undefined ? { count } : {}) })
       }
 
@@ -63,8 +68,11 @@ export async function POST(req: Request) {
         // Done
         send({ done: true, summary })
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Onbekende fout'
-        send({ error: message })
+        // Geen rauwe error.message de stream in (AVG/ADR 0044): log server-side
+        // met tag, stuur een generieke tekst naar de client. serverError() geeft
+        // een NextResponse terug en is hier binnen de ReadableStream niet bruikbaar.
+        console.error(`[admin-seed:POST] ${err instanceof Error ? err.message : String(err)}`, err instanceof Error ? (err.stack ?? '') : '')
+        send({ error: 'Er ging iets mis. Probeer het later opnieuw.' })
       } finally {
         controller.close()
       }

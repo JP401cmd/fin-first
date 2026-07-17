@@ -7,18 +7,19 @@ import {
   budgetSuggestionSchema,
   buildBudgetSuggestionPrompt,
 } from '@/lib/ai/schemas/budget-suggestion-schema'
+import { unauthorized, forbidden, serverError } from '@/lib/api/respond'
 
 export async function POST(req: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 })
+    return unauthorized()
   }
 
   const tierGate = await checkTierGate(supabase, user.id, 'ai')
   if (tierGate) {
-    return Response.json({ error: tierGate.error }, { status: 403 })
+    return forbidden(tierGate.error)
   }
 
   const body = await req.json()
@@ -38,6 +39,7 @@ export async function POST(req: Request) {
     model = await getModel(supabase, 'budget_suggesties')
   } catch (err) {
     if (err instanceof AIConfigError) {
+      // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
       return Response.json({ error: `AI niet geconfigureerd: ${err.message}` }, { status: 503 })
     }
     return Response.json({ error: 'AI model kon niet worden geladen' }, { status: 500 })
@@ -85,8 +87,6 @@ export async function POST(req: Request) {
       },
     })
   } catch (err) {
-    console.error('Budget suggestion AI failed:', err)
-    const message = err instanceof Error ? err.message : 'Onbekende fout'
-    return Response.json({ error: `AI-suggestie mislukt: ${message}` }, { status: 500 })
+    return serverError(err, 'suggest-budgets:POST')
   }
 }

@@ -44,3 +44,39 @@ export function hasPartner(householdType: string | null | undefined): boolean {
     householdType === 'samenwonend' || householdType === 'getrouwd'
   )
 }
+
+/**
+ * NL-labels voor de canonieke huishoudtypen. Bewust `Record<HouseholdType, …>`
+ * (geen losse `Record<string, string>`): breidt de canonieke set ooit uit, dan
+ * geeft dit een COMPILE-fout i.p.v. stilzwijgend opnieuw te divergeren — exact
+ * het defect dat de vorige (los in de rapportagelaag gedefinieerde) map had:
+ * sleutels `single/partner/family/single_parent` matchten nooit de echte
+ * waarden `solo/samen/gezin`, waardoor de ruwe string werd getoond.
+ */
+export const HOUSEHOLD_TYPE_LABELS: Record<HouseholdType, string> = {
+  solo: 'Alleenstaand',
+  samen: 'Samenwonend / getrouwd',
+  gezin: 'Gezin met kinderen',
+}
+
+/**
+ * Nette NL-labelweergave voor een (mogelijk ontbrekende of legacy)
+ * `household_type`-waarde. Canonieke waarden → hun label; de verouderde
+ * woordenschat `'samenwonend'`/`'getrouwd'` → hetzelfde label als `'samen'`
+ * (dezelfde back-compat als `hasPartner()`); elke andere/ontbrekende waarde
+ * (incl. de dode kolom-default `'single'` van vóór het 3-waardenschema) valt
+ * veilig terug op `'Alleenstaand'` — nooit meer de ruwe databasewaarde.
+ */
+export function householdTypeLabel(householdType: string | null | undefined): string {
+  if (householdType === 'solo' || householdType === 'samen' || householdType === 'gezin') {
+    return HOUSEHOLD_TYPE_LABELS[householdType]
+  }
+  // Back-compat: verouderde woordenschat (zie hasPartner()). Enige toegestane
+  // plek voor deze legacy-vocabulaire; de no-restricted-syntax-guard verbiedt
+  // 'm overal elders (zie eslint.config.mjs).
+  // eslint-disable-next-line no-restricted-syntax -- legacy back-compat, enkel hier toegestaan
+  if (householdType === 'samenwonend' || householdType === 'getrouwd') {
+    return HOUSEHOLD_TYPE_LABELS.samen
+  }
+  return HOUSEHOLD_TYPE_LABELS.solo
+}

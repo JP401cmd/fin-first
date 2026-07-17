@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { unauthorized, notFound, serverError } from '@/lib/api/respond'
 
 /**
  * Goals API - CRUD operations for financial goals.
@@ -24,7 +25,7 @@ export async function GET(request: Request) {
   const { data: { user }, error: authError } = await supabase.auth.getUser()
 
   if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return unauthorized()
   }
 
   const { searchParams } = new URL(request.url)
@@ -49,7 +50,7 @@ export async function GET(request: Request) {
     const { data, error } = await query.single()
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 404 })
+      return notFound()
     }
     return NextResponse.json(data)
   }
@@ -68,7 +69,7 @@ export async function GET(request: Request) {
   const { data, error } = await query.order('sort_order', { ascending: true })
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverError(error, 'goals:GET')
   }
 
   return NextResponse.json(data)
@@ -79,7 +80,7 @@ export async function POST(request: Request) {
   const { data: { user }, error: authError } = await supabase.auth.getUser()
 
   if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return unauthorized()
   }
 
   const body = await request.json()
@@ -121,7 +122,7 @@ export async function POST(request: Request) {
     .single()
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverError(error, 'goals:POST')
   }
 
   return NextResponse.json(data, { status: 201 })
@@ -132,7 +133,7 @@ export async function PATCH(request: Request) {
   const { data: { user }, error: authError } = await supabase.auth.getUser()
 
   if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return unauthorized()
   }
 
   const body = await request.json()
@@ -172,11 +173,11 @@ export async function PATCH(request: Request) {
       .maybeSingle()
 
     if (sharedData) return NextResponse.json(sharedData)
-    if (sharedError) return NextResponse.json({ error: sharedError.message }, { status: 500 })
+    if (sharedError) return serverError(sharedError, 'goals:PATCH')
   }
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverError(error, 'goals:PATCH')
   }
 
   return NextResponse.json({ error: 'Goal not found or access denied' }, { status: 404 })
@@ -187,7 +188,7 @@ export async function DELETE(request: Request) {
   const { data: { user }, error: authError } = await supabase.auth.getUser()
 
   if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return unauthorized()
   }
 
   const { searchParams } = new URL(request.url)
@@ -219,7 +220,7 @@ export async function DELETE(request: Request) {
       .eq('household_id', householdId)
 
     if (sharedError) {
-      return NextResponse.json({ error: sharedError.message }, { status: 500 })
+      return serverError(sharedError, 'goals:DELETE')
     }
     return NextResponse.json({ success: true })
   }

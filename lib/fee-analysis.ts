@@ -93,6 +93,36 @@ export const DEFAULT_FEE_CONSTRAINTS: FeeConstraints = {
   maxTER: 0.10,  // 10% max
 }
 
+// ── TER severity (single source) ───────────────────────────────
+// Canonieke drempels voor de stoplicht-duiding van een (gewogen) TER.
+// Waarden zijn decimaal (0,003 = 0,30% · 0,008 = 0,80%). Eén bron zodat de
+// widget, de detail-modal en toekomstige oppervlakken niet uit elkaar lopen.
+
+export type TerSeverity = 'green' | 'orange' | 'red'
+
+export const TER_SEVERITY_THRESHOLDS = {
+  /** < 0,30% TER → groen (goedkope indextracker-range) */
+  green: 0.003,
+  /** ≤ 0,80% TER → oranje; daarboven rood */
+  orange: 0.008,
+} as const
+
+/**
+ * Duid een TER (decimaal) als groen/oranje/rood.
+ * < 0,30% groen · 0,30–0,80% oranje · > 0,80% rood.
+ */
+export function terSeverity(ter: number): TerSeverity {
+  if (ter < TER_SEVERITY_THRESHOLDS.green) return 'green'
+  if (ter <= TER_SEVERITY_THRESHOLDS.orange) return 'orange'
+  return 'red'
+}
+
+/**
+ * Benchmark-TER voor een goedkoop alternatief (0,20%) — gebruikt als
+ * referentielijn in de fee-erosie-vergelijking. Eén bron i.p.v. losse 0.002.
+ */
+export const LOW_TER_BENCHMARK = 0.002
+
 // ── Minimal holding type for fee calculations ──────────────────
 
 interface HoldingForFees {

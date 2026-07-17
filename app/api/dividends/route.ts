@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { unauthorized, serverError } from '@/lib/api/respond'
 
 /**
  * Check if a table exists by probing it.
@@ -50,7 +51,7 @@ export async function GET(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   const holdingIdFilter = request.nextUrl.searchParams.get('holding_id')
@@ -242,12 +243,16 @@ export async function GET(request: NextRequest) {
         ticker: holding.ticker,
         current_price: currentPrice,
         units: holding.units,
+        // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
         total_dividend_income: parseFloat(totalDividendIncome.toFixed(2)),
         dividend_count: dividendCount,
         last_dividend_date: lastDividend?.date ?? null,
         last_dividend_amount: lastDividend?.amount ?? 0,
+        // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
         projected_annual_income: parseFloat(projectedAnnualIncome.toFixed(2)),
+        // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
         dividend_yield: parseFloat(dividendYield.toFixed(2)),
+        // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
         holding_value: parseFloat(holdingValue.toFixed(2)),
         dividends: holdingDividends.map(d => ({
           holding_id: d.holding_id,
@@ -279,18 +284,24 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       holdings: holdingSummaries.sort((a, b) => b.total_dividend_income - a.total_dividend_income),
       aggregate: {
+        // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
         total_dividend_income: parseFloat(totalDividendIncome.toFixed(2)),
+        // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
         total_projected_annual_income: parseFloat(totalProjectedAnnualIncome.toFixed(2)),
+        // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
         monthly_dividend_income: parseFloat(monthlyDividendIncome.toFixed(2)),
+        // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
         total_portfolio_value: parseFloat(totalPortfolioValue.toFixed(2)),
+        // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
         weighted_dividend_yield: parseFloat(weightedDividendYield.toFixed(2)),
+        // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
         freedom_days_per_year: parseFloat(freedomDaysPerYear.toFixed(1)),
+        // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
         daily_expenses: parseFloat(dailyExpenses.toFixed(2)),
         total_dividend_count: allDividends.length,
       },
     })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Onbekende fout'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return serverError(err, 'dividends:GET')
   }
 }

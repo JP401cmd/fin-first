@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { forbidden, serverError } from '@/lib/api/respond'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { isSuperAdmin } from '@/lib/admin'
@@ -9,7 +10,7 @@ export async function POST() {
   try {
     const supabase = await createClient()
     if (!(await isSuperAdmin(supabase))) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      return forbidden()
     }
 
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -24,6 +25,24 @@ export async function POST() {
     const service = createServiceClient(url, serviceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     })
+
+    // Besloten testfase (ADR 0047, AC6): borg dat elk testpersona-adres op de
+    // allowlist staat vóór aanmaak. Mocht de before_user_created-hook óók bij
+    // admin-createUser vuren, dan is het adres al gelijst en wordt de aanmaak
+    // niet geweigerd; vuurt de hook niet, dan is dit een goedaardige no-op.
+    // Genormaliseerd identiek aan de hook (lower(trim)); on conflict do nothing.
+    const allowlistRows = TEST_USER_ACCOUNTS.map((u) => ({
+      email_normalized: u.email.toLowerCase(),
+      label: 'Test-persona (auto)',
+    }))
+    const { error: allowlistError } = await service
+      .from('signup_email_allowlist')
+      .upsert(allowlistRows, { onConflict: 'email_normalized', ignoreDuplicates: true })
+    if (allowlistError) {
+      // Niet fataal: ontbreekt de tabel (bv. lokale dev zonder migratie), dan
+      // gaat de aanmaak gewoon door — de allowlist-hook is daar toch niet actief.
+      console.error('[admin-test-users-create:allowlist]', allowlistError.message)
+    }
 
     const results: { email: string; status: string; error?: string }[] = []
 
@@ -70,7 +89,6 @@ export async function POST() {
 
     return NextResponse.json({ results })
   } catch (e) {
-    const msg = e instanceof Error ? e.message : 'Onbekende fout'
-    return NextResponse.json({ error: msg }, { status: 500 })
+    return serverError(e, 'admin-test-users-create:POST')
   }
 }

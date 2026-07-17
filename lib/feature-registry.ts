@@ -28,7 +28,7 @@ export const UNIFIED_FEATURES: UnifiedFeature[] = [
     description: 'Vermogen bijhouden, verloop, snapshots, allocatie, prognose',
     module: 'kern',
     requiredTier: 'gratis',
-    widgets: ['assets', 'holdings'],
+    widgets: ['assets', 'holdings', 'fee_analyzer', 'rebalancing'],
     legacyIds: [
       'widget_assets', 'widget_holdings',
       'vermogensverloop', 'snapshot_vergelijking',

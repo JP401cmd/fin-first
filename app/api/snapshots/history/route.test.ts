@@ -86,7 +86,11 @@ describe('GET /api/snapshots/history', () => {
     mockSelectChain(null, { message: 'boom' })
     const res = await GET(getRequest())
     expect(res.status).toBe(500)
-    expect((await res.json()).error).toBe('boom')
+    // Error-envelope (ADR 0044): rauwe DB-boodschap ('boom') mag NOOIT naar de
+    // client lekken — serverError() stuurt een generieke tekst, logt server-side.
+    const body = await res.json()
+    expect(body.error).not.toBe('boom')
+    expect(body.error).toBe('Er ging iets mis. Probeer het later opnieuw.')
   })
 })
 

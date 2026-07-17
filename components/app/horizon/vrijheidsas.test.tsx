@@ -7,6 +7,7 @@ import {
   formatMargeShort,
   computeMargeBandPct,
   MARGE_BAND_MIN_AMBER_PCT,
+  clampLabelPct,
 } from './vrijheidsas'
 
 /**
@@ -108,6 +109,17 @@ describe('computeMargeBandPct (strakke amber-buffer)', () => {
   })
 })
 
+describe('clampLabelPct (zwevende band-labels binnen het vlak)', () => {
+  it('laat posities binnen de marge ongemoeid', () => {
+    expect(clampLabelPct(50, 11)).toBe(50)
+  })
+
+  it('clampt extreme randposities naar binnen (links én rechts)', () => {
+    expect(clampLabelPct(0.3, 11)).toBe(11)
+    expect(clampLabelPct(99.7, 11)).toBe(89)
+  })
+})
+
 describe('Vrijheidsas rendering', () => {
   it('toont de marge in maanden wanneer < 1 jaar (cijferrij + aria)', () => {
     render(<Vrijheidsas {...baseProps} margeJaren={0.5} zone="krap" />)
@@ -116,14 +128,45 @@ describe('Vrijheidsas rendering', () => {
     expect(slider).toHaveAttribute('aria-valuetext', expect.stringContaining('+6 mnd'))
   })
 
-  it('toont de vroegst–laatst-bandregel onder Wat-als-vrijheid wanneer beide randen bekend zijn', () => {
-    render(<Vrijheidsas {...baseProps} vroegstFireAgeFractional={52.3} laatstFireAge={58} />)
-    expect(screen.getByText('band 52,3 – 58,0 jr')).toBeInTheDocument()
+  it('toont de drie hernoemde grootheden in de cijferrij en NIET meer de verwijderde figures', () => {
+    render(<Vrijheidsas {...baseProps} />)
+    // De drieslag blijft over…
+    expect(screen.getByText('Basis-vrijheid')).toBeInTheDocument()
+    expect(screen.getByText('Wat-als-vrijheid')).toBeInTheDocument()
+    expect(screen.getByText('Geambieerde vrijheid')).toBeInTheDocument()
+    // …en de gedupliceerde figures zijn weg.
+    expect(screen.queryByText('FIRE-leeftijd · verwacht')).not.toBeInTheDocument()
+    expect(screen.queryByText('Marge · buffer')).not.toBeInTheDocument()
+    expect(screen.queryByText('Stopleeftijd')).not.toBeInTheDocument()
   })
 
-  it('toont GEEN bandregel wanneer de vroegste rand ontbreekt', () => {
-    render(<Vrijheidsas {...baseProps} vroegstFireAgeFractional={null} />)
-    expect(screen.queryByText(/^band /)).not.toBeInTheDocument()
+  it('hernoemt de middelste grootheid naar "Doel-vrijheid" wanneer er een doel actief is', () => {
+    render(<Vrijheidsas {...baseProps} doelActief />)
+    expect(screen.getByText('Doel-vrijheid')).toBeInTheDocument()
+    expect(screen.queryByText('Wat-als-vrijheid')).not.toBeInTheDocument()
+  })
+
+  it('toont de basis-marker op de band wanneer de basis merkbaar los ligt van de verwacht-streep', () => {
+    render(<Vrijheidsas {...baseProps} baseFireAge={48} verwachtFireAge={55} />)
+    expect(screen.getByText('basis')).toBeInTheDocument()
+  })
+
+  it('verbergt de basis-marker wanneer basis en verwacht (bijna) samenvallen', () => {
+    // baseProps: baseFireAge === verwachtFireAge === 55 → geen aparte basis-marker.
+    render(<Vrijheidsas {...baseProps} />)
+    expect(screen.queryByText('basis')).not.toBeInTheDocument()
+  })
+
+  it('verbergt de basis-marker óók bij een kleine-maar-echte gap (label-botsing met "verwacht")', () => {
+    // Gap 1,5 jr op een as-span van 23 jr ≈ 6,5pp — kleiner dan BASIS_MARKER_MIN_GAP_PCT (12):
+    // het gecentreerde basis-label zou dwars door het rechts-uitgelijnde verwacht-label lopen.
+    render(<Vrijheidsas {...baseProps} baseFireAge={53.5} verwachtFireAge={55} />)
+    expect(screen.queryByText('basis')).not.toBeInTheDocument()
+  })
+
+  it('toont de marge als overspanning-label met zone-woord (bracket op de band)', () => {
+    render(<Vrijheidsas {...baseProps} margeJaren={7.9} zone="stevig" />)
+    expect(screen.getByText('marge +7,9 jr · stevig')).toBeInTheDocument()
   })
 
   it('toont de onzekerheidszin met op halve jaren afgeronde randen wanneer beide bekend zijn', () => {
@@ -152,7 +195,15 @@ describe('Vrijheidsas rendering', () => {
     expect(screen.queryByText(/Waarschijnlijk ben je vrij tussen/)).not.toBeInTheDocument()
   })
 
-  it('toont de zone-duidende zin onder het zone-woord', () => {
+  it('degeneratie-guard: vroegst≈laatst na afronding → enkelvoudige zin i.p.v. "tussen X en X"', () => {
+    render(<Vrijheidsas {...baseProps} vroegstFireAgeFractional={50} laatstFireAge={50} />)
+    // De betekenisloze "tussen 50 en 50" komt niet meer voor…
+    expect(screen.queryByText(/Waarschijnlijk ben je vrij tussen/)).not.toBeInTheDocument()
+    // …maar er staat wel een enkelvoudige duiding.
+    expect(screen.getByText(/rond je 50e/)).toBeInTheDocument()
+  })
+
+  it('toont de zone-duidende zin onder de band', () => {
     render(<Vrijheidsas {...baseProps} zone="stevig" />)
     expect(screen.getByText('ruim voorbij de voorzichtige rand — robuust')).toBeInTheDocument()
   })
@@ -177,7 +228,7 @@ describe('Vrijheidsas rendering', () => {
     expect(screen.queryByText(/mnd (eerder|later) vrij/)).not.toBeInTheDocument()
   })
 
-  it('toont de eerder/later-vrij-duiding bij een actief scenario (stopregel + cijferrij)', () => {
+  it('toont de eerder/later-vrij-duiding bij een actief scenario nog PRECIES ÉÉN keer (cijferrij)', () => {
     render(
       <Vrijheidsas
         {...baseProps}
@@ -187,14 +238,18 @@ describe('Vrijheidsas rendering', () => {
         zone="stevig"
       />,
     )
-    // verwacht 52.5 vs basis 55 = 30 mnd eerder → verschijnt op de stopleeftijd-regel én in de cijferrij.
-    expect(screen.getAllByText('30 mnd eerder vrij').length).toBeGreaterThan(0)
+    // verwacht 52.5 vs basis 55 = 30 mnd eerder → na de deduplicatie enkel nog in de cijferrij,
+    // niet meer óók naast de stopleeftijd-slider.
+    expect(screen.getAllByText('30 mnd eerder vrij')).toHaveLength(1)
   })
 
-  it('kleurt het marge-getal per zone (tekort = rood)', () => {
+  it('kleurt het marge-getal per zone (tekort = rood), zowel bracket als cijferrij-sub', () => {
     render(<Vrijheidsas {...baseProps} zone="tekort" margeJaren={-2} />)
-    const marge = screen.getByText(/^marge/)
-    expect(marge.className).toContain('text-red-700')
+    // Het marge-getal staat nu op twee semantisch onderscheiden plekken: de bracket op de
+    // band en de cijferrij-sub. Beide dragen de zone-kleur.
+    const margeNodes = screen.getAllByText(/^marge/)
+    expect(margeNodes.length).toBeGreaterThanOrEqual(1)
+    for (const node of margeNodes) expect(node.className).toContain('text-red-700')
   })
 
   it('koppel-checkbox roept onStopKoppelChange aan', () => {

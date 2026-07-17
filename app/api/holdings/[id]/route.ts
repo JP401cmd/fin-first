@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { resolveHolding } from '@/lib/holdings-table-resolver'
+import { unauthorized, serverError } from '@/lib/api/respond'
 
 /**
  * GET /api/holdings/[id] — Fetch a single holding by its UUID.
@@ -17,7 +18,7 @@ export async function GET(
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   const { id } = await params
@@ -76,7 +77,7 @@ export async function PATCH(
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   const { id } = await params
@@ -202,7 +203,7 @@ export async function PATCH(
       .maybeSingle()
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return serverError(error, 'holdings-id:PATCH')
     }
 
     if (!holding) {

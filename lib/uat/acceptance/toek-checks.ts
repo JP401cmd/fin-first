@@ -25,6 +25,8 @@
  *   - `lib/goal-data.ts`      — pure helpers.
  *   - `lib/horizon-kernel/adapter/defaults.ts` — alleen een `TaxYear`-type-import.
  *   - `lib/constants.ts`      — pure constanten.
+ *   - `lib/budget-utils.ts`   — pure rekenhelpers (o.a. computeRetirementExpenses;
+ *                                al client-gebundeld via reken-checks.ts).
  *   - `lib/test-personas.ts`  — al elders in de browser-runtime gebruikt.
  */
 
@@ -32,6 +34,7 @@ import { PERSONAS } from '@/lib/test-personas'
 import { STRATEGY_LABELS, parseFireStrategy } from '@/lib/fire-strategy'
 import { computeAowMonthly } from '@/lib/horizon-data'
 import { computeGoalProgress, type Goal } from '@/lib/goal-data'
+import { computeRetirementExpenses } from '@/lib/budget-utils'
 import { EXCEL_TEKORT_LENING_RENTE } from '@/lib/horizon-kernel/adapter/defaults'
 import { TOEK_ACCEPTANCE } from './toek'
 import type { AcceptanceCriterion } from './types'
@@ -128,11 +131,17 @@ export const TOEK_ENGINE_CHECKS: ToekEngineCheck[] = [
   {
     workflow: 'WF-TOEK-02',
     scenarioId: 'UAT-TOEK-02',
-    label: 'Jaarlijkse pensioenuitgave €3.000×12 en rendement-echo (Willem)',
+    label: 'Jaarlijkse pensioenuitgave €36.000/jaar (= €3.000/mnd) en rendement-echo (Willem)',
     run: () => {
       criterion('WF-TOEK-02')
-      const pensioenMaand = willem.profile.retirement_expense_custom_amount ?? 0
-      const jaaruitgaven = pensioenMaand * 12
+      // custom_amount is canoniek een JAARbedrag: computeRetirementExpenses geeft
+      // het veld ongewijzigd terug als jaaruitgave (geen ×12). De maandweergave
+      // leidt de UI af via /12 (uitgaven-na-pensioen-scherm). Zo blijft deze check
+      // op één grondslag met de kernel i.p.v. het seedveld als maandbedrag te lezen.
+      const jaaruitgaven = computeRetirementExpenses(
+        'custom_amount', 0, 0, willem.profile.retirement_expense_custom_amount ?? null,
+      )
+      const pensioenMaand = Math.round(jaaruitgaven / 12)
       const rendementPct = (willem.profile.expected_return ?? 0) * 100
       return {
         expected: 'pensioenMaand=3000; jaaruitgaven=36000; rendementPct=6',

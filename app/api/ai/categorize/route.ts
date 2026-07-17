@@ -12,6 +12,7 @@ import {
   type CategorizeBudgetOption,
 } from '@/lib/ai/categorize-system-prompt'
 import { buildBudgetOptions, resolveSlug, type BudgetRow } from './budget-options'
+import { unauthorized } from '@/lib/api/respond'
 
 const categorizationSchema = z.object({
   categorizations: z.array(z.object({
@@ -38,7 +39,7 @@ export async function POST(req: Request) {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return new Response('Unauthorized', { status: 401 })
+    return unauthorized()
   }
 
   // ── Privé-modus gate (laag 3 uit het plan — server-side, beslissend) ───────
@@ -143,6 +144,7 @@ export async function POST(req: Request) {
     model = await getModel(supabase, 'categorisatie')
   } catch (err) {
     if (err instanceof AIConfigError) {
+      // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
       return Response.json({ error: err.message }, { status: 422 })
     }
     return Response.json({ error: 'AI model kon niet worden geladen.' }, { status: 500 })

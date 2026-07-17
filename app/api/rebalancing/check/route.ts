@@ -114,6 +114,7 @@ export async function GET(request: NextRequest) {
         unclassifiedHoldings: getUnclassifiedHoldings(holdings, viewMode),
         isBox3Window: isBox3Window(),
         hasTargets: false,
+        threshold,
         unclassifiedCount: getUnclassifiedHoldings(holdings, viewMode).length,
         lastCheckedAt: new Date().toISOString(),
       })
@@ -126,6 +127,7 @@ export async function GET(request: NextRequest) {
 
     const report: RebalancingReport & {
       hasTargets: boolean
+      threshold: number
       unclassifiedCount: number
       lastCheckedAt: string
     } = {
@@ -138,6 +140,9 @@ export async function GET(request: NextRequest) {
       generatedAt: new Date().toISOString(),
       // Additional metadata
       hasTargets: true,
+      // Effectieve drempel (pref of query-param) — consumers zoals de widget lezen
+      // deze i.p.v. lokaal 5% te hardcoden (single-source-of-truth).
+      threshold,
       unclassifiedCount: unclassified.length,
       lastCheckedAt: new Date().toISOString(),
     }

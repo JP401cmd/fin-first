@@ -614,7 +614,8 @@ const tests: TestCase[] = [
 
       if (res.status === 401) {
         const data = await res.json()
-        assert(data.error === 'Unauthorized', 'Ongeauthenticeerd \u2192 Unauthorized')
+        // App-brede 401-tekst is gestandaardiseerd naar 'Niet ingelogd' (ADR 0044).
+        assert(data.error === 'Niet ingelogd', 'Ongeauthenticeerd \u2192 Niet ingelogd')
       }
 
       const validPhases = ['recovery', 'stability', 'momentum', 'mastery']

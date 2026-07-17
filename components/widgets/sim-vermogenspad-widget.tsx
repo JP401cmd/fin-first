@@ -16,9 +16,27 @@ interface Props {
 }
 
 export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size, data, href }: Props) {
-  const { simRows, fireAgeFractional, displayEndAge } = data
+  const { simRows, fireAgeFractional, displayEndAge, backtestSuccessRate } = data
   const { masked } = useMaskedAmounts()
   const { ref, hasEntered } = useInViewAnimation({ duration: 600 })
+
+  // Slaagkans-badge — consumeert het canonieke backtest-signaal (`data.backtestSuccessRate`,
+  // dezelfde bron als de `backtesting_score`-widget), NIET een lokaal afgeleide drawdown.
+  // Bij een deplete/opmaak-strategie is een hoge drawdown het gekozen plan, geen risico;
+  // de historische slaagkans is wél een betekenisvol, single-sourced signaal.
+  const renderSlaagkansBadge = (extraClass = '') => {
+    if (backtestSuccessRate == null) return null
+    const tone = backtestSuccessRate >= 85
+      ? 'bg-positive/10 text-positive'
+      : backtestSuccessRate >= 65
+        ? 'bg-[var(--subtle)] text-[var(--ink-2)]'
+        : 'bg-negative/10 text-negative'
+    return (
+      <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full w-fit ${tone} ${extraClass}`}>
+        Slaagkans {backtestSuccessRate}%
+      </span>
+    )
+  }
 
   // ── Mini-size: FIRE portfolio amount ────────────────────
   if (size === 'mini') {
@@ -48,7 +66,7 @@ export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size,
     }
     return (
       <WidgetShell module="horizon" size={size} kicker="Vermogenspad" href={href}>
-        <p className="text-xs text-[var(--ink-3)]">Bezoek /horizon om simulatie te activeren</p>
+        <p className="text-xs text-[var(--ink-3)]">Bezoek /toekomst om simulatie te activeren</p>
       </WidgetShell>
     )
   }
@@ -175,18 +193,7 @@ export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size,
               <MaskedAmount value={endRow?.endPortfolio ?? 0} tone="horizon" className="text-sm font-semibold" />
             </p>
             <p className="text-[10px] text-[var(--ink-3)]">eindvermogen</p>
-            {(() => {
-              const endVal = endRow?.endPortfolio ?? 0
-              const peakVal = peakRow?.endPortfolio ?? 1
-              const drawdown = peakVal > 0 ? ((peakVal - endVal) / peakVal) * 100 : 0
-              const riskLabel = drawdown < 20 ? 'Laag risico' : drawdown < 50 ? 'Matig' : 'Hoog'
-              const riskColor = drawdown < 20 ? 'bg-positive/10 text-positive' : drawdown < 50 ? 'bg-[var(--subtle)] text-[var(--ink-2)]' : 'bg-negative/10 text-negative'
-              return (
-                <span className={`mt-1.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full w-fit ${riskColor}`}>
-                  {riskLabel}
-                </span>
-              )
-            })()}
+            {renderSlaagkansBadge('mt-1.5')}
           </div>
           <div className="flex-1 min-w-0 flex flex-col justify-center">
             <svg
@@ -397,18 +404,7 @@ export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size,
                 <MaskedAmount value={endRow?.endPortfolio ?? 0} tone="horizon" className="text-sm font-semibold" />
               </p>
             </div>
-            {(() => {
-              const endVal = endRow?.endPortfolio ?? 0
-              const peakVal = peakRow?.endPortfolio ?? 1
-              const drawdown = peakVal > 0 ? ((peakVal - endVal) / peakVal) * 100 : 0
-              const riskLabel = drawdown < 20 ? 'Laag risico' : drawdown < 50 ? 'Matig risico' : 'Hoog risico'
-              const riskColor = drawdown < 20 ? 'bg-positive/10 text-positive' : drawdown < 50 ? 'bg-[var(--subtle)] text-[var(--ink-2)]' : 'bg-negative/10 text-negative'
-              return (
-                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${riskColor}`}>
-                  {riskLabel}
-                </span>
-              )
-            })()}
+            {renderSlaagkansBadge()}
           </div>
         )}
       </div>

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { forbidden, serverError } from '@/lib/api/respond'
 import { createClient } from '@/lib/supabase/server'
 import { isSuperAdmin } from '@/lib/admin'
 import {
@@ -13,7 +14,7 @@ export async function GET() {
   const supabase = await createClient()
 
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   const { data: settingsRows } = await supabase
@@ -76,7 +77,7 @@ export async function PUT(req: Request) {
   const supabase = await createClient()
 
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   const body = await req.json()
@@ -96,7 +97,7 @@ export async function PUT(req: Request) {
       { onConflict: 'key' },
     )
     if (error) {
-      return NextResponse.json({ error: `Failed to update news setting: ${error.message}` }, { status: 500 })
+      return serverError(error, 'admin-ai-features:PUT')
     }
   }
 
@@ -118,7 +119,7 @@ export async function PUT(req: Request) {
       { onConflict: 'key' },
     )
     if (error) {
-      return NextResponse.json({ error: `Failed to update credit budgets: ${error.message}` }, { status: 500 })
+      return serverError(error, 'admin-ai-features:PUT')
     }
   }
 

@@ -1,12 +1,13 @@
 import { createClient } from '@/lib/supabase/server'
 import { deleteAllUserData } from '@/lib/seed-persona'
+import { unauthorized, serverError } from '@/lib/api/respond'
 
 export async function POST() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 })
+    return unauthorized()
   }
 
   try {
@@ -83,7 +84,6 @@ export async function POST() {
 
     return Response.json({ success: true })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Onbekende fout'
-    return Response.json({ error: message }, { status: 500 })
+    return serverError(err, 'onboarding-reset:POST')
   }
 }

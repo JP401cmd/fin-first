@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { unauthorized, serverError } from '@/lib/api/respond'
 
 /**
  * POST /api/subscriptions/schedule-action
@@ -12,7 +13,7 @@ export async function POST(req: Request) {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return new Response('Unauthorized', { status: 401 })
+    return unauthorized()
   }
 
   const body = await req.json() as {
@@ -49,8 +50,7 @@ export async function POST(req: Request) {
     .single()
 
   if (error) {
-    console.error('[/api/subscriptions/schedule-action]', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverError(error, 'subscriptions-schedule-action:POST')
   }
 
   return NextResponse.json({ actionId: data.id, scheduledWeek: data.scheduled_week })

@@ -21,6 +21,9 @@ function LoginForm() {
   // Auth-callback stuurt hierheen als de bevestigings-/resetlink verlopen of al
   // gebruikt is (A-01) — dan tonen we een banner i.p.v. een kale /login.
   const isConfirmError = searchParams.get('confirm_error') === '1'
+  // Besloten testfase (ADR 0047): de OAuth-callback stuurt hierheen wanneer de
+  // allowlist-hook een niet-uitgenodigd adres weigerde.
+  const isNotInvited = searchParams.get('not_invited') === '1'
   const redirectTo = searchParams.get('redirectTo')
 
   async function handleSubmit(e: React.FormEvent) {
@@ -98,6 +101,19 @@ function LoginForm() {
           </p>
           <p className="mt-1 text-xs text-red-600">
             Neem contact op met de beheerder als je denkt dat dit niet klopt.
+          </p>
+        </div>
+      )}
+
+      {/* Besloten testfase (ADR 0047): de allowlist-hook weigerde dit adres bij
+          een Google-OAuth-poging. Dezelfde rode stijl als de blokkade-banner. */}
+      {isNotInvited && (
+        <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3" data-testid="not-invited-banner">
+          <p className="text-sm font-medium text-red-800">
+            Besloten testfase
+          </p>
+          <p className="mt-1 text-xs text-red-600">
+            TriFinity zit in een besloten testfase. Je hebt met dit e-mailadres nog geen toegang.
           </p>
         </div>
       )}

@@ -8,7 +8,7 @@
  * dezelfde URL. Dat "na het doorlopen"-moment is precies waar deze nudge de
  * gebruiker de volgende stap wijst: om te zien hoeveel vrijheid elke euro kost,
  * heeft TriFinity transacties nodig. Twee directe wegen:
- *   • Bank koppelen (PSD2/GoCardless, alleen-lezen)  → /core/cash/connect
+ *   • Bank koppelen (PSD2/TrueLayer, alleen-lezen)  → /core/cash/connect
  *   • Transacties importeren (CSV/MT940/OFX)          → /core/cash/import
  * Deze twee routes zijn de canonieke bestemmingen — identiek aan
  * components/overview/koppel-rekening-banner.tsx.
@@ -89,7 +89,7 @@ export function BudgetKoppelNudge({ visible }: { visible: boolean }) {
             <span className="flex-1 min-w-0">
               <span className="block font-sans text-sm font-semibold">Bank koppelen</span>
               <span className="block text-xs text-[var(--paper)]/75">
-                Transacties komen automatisch binnen — veilig en alleen-lezen via GoCardless
+                Transacties komen automatisch binnen — veilig en alleen-lezen via TrueLayer
               </span>
             </span>
             <ArrowRight className="h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5" aria-hidden />

@@ -233,6 +233,7 @@ export async function PATCH(request: NextRequest) {
       }, { onConflict: 'key' })
 
     if (settingsError) {
+      // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
       return NextResponse.json({ error: settingsError.message }, { status: 500 })
     }
   }

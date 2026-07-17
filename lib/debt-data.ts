@@ -118,6 +118,45 @@ export const DEBT_TYPE_LABELS: Record<DebtType, string> = {
   other: 'Overig',
 }
 
+// ── Debt Groups ──────────────────────────────────────────────
+//
+// Schulden groeperen langs de looptijd/aard-as, parallel aan de asset-groepen
+// (`ASSET_GROUP_FOR_TYPE` in lib/asset-data.ts):
+// - 'wonen'       = hypotheek (gekoppeld aan de eigen woning)
+// - 'consumptief' = kortlopend / persoonlijk krediet (lening, studie, auto,
+//                   creditcard, doorlopend krediet, afbetalingsregeling)
+// - 'overig'      = formeel/onderhands (fiscaal, DGA, familie, restcategorie)
+//
+// Hergebruikt door de netto-vermogen-verloop-grafiek (groepsbanden onder de
+// nullijn) via lib/load-category-history.ts. `DEBT_TYPE_COLORS` blijft de bron
+// voor de per-type tint; dit is puur de groep-indeling.
+
+export type DebtGroup = 'wonen' | 'consumptief' | 'overig'
+
+export const DEBT_GROUP_LABELS: Record<DebtGroup, string> = {
+  wonen: 'Wonen',
+  consumptief: 'Consumptief',
+  overig: 'Overig',
+}
+
+export const DEBT_GROUP_FOR_TYPE: Record<DebtType, DebtGroup> = {
+  mortgage: 'wonen',
+  personal_loan: 'consumptief',
+  student_loan: 'consumptief',
+  car_loan: 'consumptief',
+  credit_card: 'consumptief',
+  revolving_credit: 'consumptief',
+  payment_plan: 'consumptief',
+  belastingschuld: 'overig',
+  dga_schuld: 'overig',
+  familielening: 'overig',
+  other: 'overig',
+}
+
+export function getDebtGroup(t: DebtType): DebtGroup {
+  return DEBT_GROUP_FOR_TYPE[t] ?? 'overig'
+}
+
 export const DEBT_TYPE_ICONS: Record<DebtType, string> = {
   mortgage: 'Building',
   personal_loan: 'Banknote',
@@ -144,7 +183,7 @@ export const DEBT_TYPE_ICONS: Record<DebtType, string> = {
  * pagina visueel rustig en consistent. De kleur volgt het bestaande
  * `--negative` token (oklch 0.50 0.09 25); we variëren alleen de lightness.
  *
- * Wordt hergebruikt in `opbouw-composition-chart.tsx` voor de negatieve
+ * Wordt hergebruikt in `wealth-composition-chart.tsx` voor de negatieve
  * gestapelde bars onder de nullijn.
  */
 export const DEBT_TYPE_COLORS: Record<DebtType, string> = {

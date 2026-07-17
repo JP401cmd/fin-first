@@ -8,6 +8,11 @@ import {
 import type { Asset } from '@/lib/asset-data'
 import { normalisePrivacySettings } from '@/lib/household-data'
 import { dailyExpenseRate } from '@/lib/format'
+import {
+  dgaLeningTotalForUser,
+  dgaLeningTotalCombined,
+  type DgaLeningSources,
+} from '@/lib/box2-dga-lening'
 
 /**
  * GET /api/household/box2?year=2025|2026
@@ -73,40 +78,31 @@ export async function GET(request: NextRequest) {
   const dgaVorderingen = (vorderingenRaw ?? []) as { id: string; name: string; current_value: number; user_id: string; subtype: string; ownership: string; linked_asset_id: string | null }[]
   const dgaSchulden = (dgaSchuldenRaw ?? []) as { id: string; name: string; current_balance: number; user_id: string; debt_type: string; ownership: string }[]
 
-  // Calculate netto DGA-leningen per perspective
-  // Netto = DGA-vorderingen (BV owes you) - DGA-schulden (you owe BV)
-  // Wet excessief lenen applies when netto > €500.000
-  function calcDgaForUser(userId: string) {
-    const vorderingenOwn = dgaVorderingen
-      .filter(v => v.user_id === userId && v.ownership !== 'shared')
-      .reduce((s, v) => s + Number(v.current_value), 0)
-    const vorderingenShared = dgaVorderingen
-      .filter(v => v.ownership === 'shared')
-      .reduce((s, v) => s + Number(v.current_value), 0)
-    const schuldenOwn = dgaSchulden
-      .filter(d => d.user_id === userId && d.ownership !== 'shared')
-      .reduce((s, d) => s + Number(d.current_balance), 0)
-    const schuldenShared = dgaSchulden
-      .filter(d => d.ownership === 'shared')
-      .reduce((s, d) => s + Number(d.current_balance), 0)
-    return Math.max(0, (vorderingenOwn + vorderingenShared) - (schuldenOwn + schuldenShared))
+  // DGA-leentotaal voor de Wet excessief lenen (Optie B, kaart 39bf9e8d):
+  // som(DGA-schulden `dga_schuld`) + som(DGA-vorderingen subtype `dga_lening`),
+  // OPGETELD. Aggregatie-logica leeft in `lib/box2-dga-lening.ts` (gedeeld met
+  // de UAT/regressietests); de drempel/excess-motor blijft `calculateBox2`.
+  const dgaSources: DgaLeningSources = {
+    schulden: dgaSchulden.map(d => ({
+      userId: d.user_id,
+      ownership: d.ownership,
+      amount: Number(d.current_balance),
+    })),
+    vorderingen: dgaVorderingen.map(v => ({
+      userId: v.user_id,
+      ownership: v.ownership,
+      amount: Number(v.current_value),
+    })),
   }
 
-  const myDgaTotal = calcDgaForUser(user.id)
+  const myDgaTotal = dgaLeningTotalForUser(dgaSources, user.id)
 
-  const partnerDgaTotal = partnerId && !partnerHidesVermogen ? calcDgaForUser(partnerId) : 0
+  const partnerDgaTotal =
+    partnerId && !partnerHidesVermogen ? dgaLeningTotalForUser(dgaSources, partnerId) : 0
 
   // Combined DGA over the VISIBLE set — exclude the partner's personal
   // vorderingen/schulden when they hide their vermogen (shared stays).
-  const visibleVorderingen = partnerHidesVermogen
-    ? dgaVorderingen.filter(v => v.user_id === user.id || v.ownership === 'shared')
-    : dgaVorderingen
-  const visibleSchulden = partnerHidesVermogen
-    ? dgaSchulden.filter(d => d.user_id === user.id || d.ownership === 'shared')
-    : dgaSchulden
-  const totalVorderingen = visibleVorderingen.reduce((s, v) => s + Number(v.current_value), 0)
-  const totalSchulden = visibleSchulden.reduce((s, d) => s + Number(d.current_balance), 0)
-  const combinedDgaTotal = Math.max(0, totalVorderingen - totalSchulden)
+  const combinedDgaTotal = dgaLeningTotalCombined(dgaSources, user.id, partnerHidesVermogen)
 
   // Get monthly expenses for freedom days calculation
   const { data: budgets } = await supabase

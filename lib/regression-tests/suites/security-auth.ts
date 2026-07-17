@@ -333,6 +333,50 @@ const tests: TestCase[] = [
       assert(status === 401 || status === 403, `Admin PUT ai-features → ${status} (expected 401 or 403)`)
     },
   },
+  {
+    id: 'admin-signup-allowlist-get-requires-admin',
+    name: 'Admin: GET /api/admin/signup-allowlist requires superadmin (403)',
+    category: CAT,
+    description:
+      'De registratie-allowlist-beheer-UI (ADR 0047) mag alleen door een superadmin gelezen worden',
+    priority: 'critical',
+    estimatedDurationMs: 500,
+    async fn() {
+      const { status } = await fetchAPI('/api/admin/signup-allowlist')
+      assert(
+        status === 401 || status === 403,
+        `Admin GET signup-allowlist → ${status} (expected 401 or 403)`,
+      )
+    },
+  },
+  {
+    id: 'admin-signup-allowlist-mutations-require-admin',
+    name: 'Admin: POST/DELETE /api/admin/signup-allowlist requires superadmin (403)',
+    category: CAT,
+    description:
+      'Toevoegen/verwijderen van een allowlist-adres (ADR 0047) checkt superadmin, niet alleen sessie',
+    priority: 'critical',
+    estimatedDurationMs: 500,
+    async fn() {
+      const { status: postStatus } = await fetchAPI('/api/admin/signup-allowlist', {
+        method: 'POST',
+        body: JSON.stringify({ email: 'onbevoegd@test.trifinity.nl' }),
+      })
+      assert(
+        postStatus === 401 || postStatus === 403,
+        `Admin POST signup-allowlist → ${postStatus} (expected 401 or 403)`,
+      )
+
+      const { status: deleteStatus } = await fetchAPI('/api/admin/signup-allowlist', {
+        method: 'DELETE',
+        body: JSON.stringify({ id: '00000000-0000-0000-0000-000000000000' }),
+      })
+      assert(
+        deleteStatus === 401 || deleteStatus === 403,
+        `Admin DELETE signup-allowlist → ${deleteStatus} (expected 401 or 403)`,
+      )
+    },
+  },
 
   // ── Step 4: Session-info endpoint ─────────────────────────────────
   {

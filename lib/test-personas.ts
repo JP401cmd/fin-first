@@ -747,7 +747,7 @@ const daanData: PersonaData = {
   ],
   assets: [
     { name: 'Meesman Wereldwijd Totaal', asset_type: 'investment', current_value: 2350, purchase_value: 2100, purchase_date: '2024-09-01', expected_return: 7, monthly_contribution: 100, institution: 'Meesman', subtype: 'indexfonds', risk_profile: 'middel', ticker_symbol: 'MEESMAN-WWT', has_holdings_tracking: true },
-    { name: 'Brand New Day Pensioen', asset_type: 'retirement', current_value: 4500, purchase_value: 4141, purchase_date: '2024-06-01', expected_return: 5, monthly_contribution: 125, institution: 'Brand New Day', subtype: 'pensioen', risk_profile: 'middel', retirement_provider_type: 'premiepensioeninstelling', has_holdings_tracking: true },
+    { name: 'Brand New Day Pensioen', asset_type: 'retirement', current_value: 4500, purchase_value: 4141, purchase_date: '2024-06-01', expected_return: 5, monthly_contribution: 125, institution: 'Brand New Day', subtype: 'pensioen', risk_profile: 'middel', retirement_provider_type: 'ppi', has_holdings_tracking: true },
   ],
   debts: [
     { name: 'Studielening DUO', debt_type: 'student_loan', original_amount: 14000, current_balance: 13900, interest_rate: 0.46, minimum_payment: 0, monthly_payment: 100, start_date: '2024-01-01', creditor: 'DUO', subtype: 'nieuw_stelsel', draagkrachtmeting_date: '2026-09-01', repayment_type: 'annuiteit' },
@@ -1357,7 +1357,7 @@ const willemData: PersonaData = {
     fire_end_strategy: 'deplete',
     fire_end_age: 95,
     retirement_expense_method: 'custom_amount',
-    retirement_expense_custom_amount: 3000,
+    retirement_expense_custom_amount: 36000, // JAARbedrag (€3.000/mnd x 12); canoniek jaarbasis, zie computeRetirementExpenses (lib/budget-utils.ts)
     // 'vpw' is verwijderd (DB genormaliseerd → static, migratie 20260703115225).
     withdrawal_strategy: 'guardrails',
     rebalance_threshold: 10, // agressief — hoge tolerantie, minder herbalanceren
@@ -1690,7 +1690,7 @@ const marijkeData: PersonaData = {
     fire_end_strategy: 'pensioen',
     fire_legacy_amount: 200000,
     retirement_expense_method: 'custom_amount',
-    retirement_expense_custom_amount: 2800,
+    retirement_expense_custom_amount: 33600, // JAARbedrag (€2.800/mnd x 12); canoniek jaarbasis, zie computeRetirementExpenses (lib/budget-utils.ts)
     withdrawal_strategy: 'guardrails',
     guardrail_floor: 0.80,
     guardrail_ceiling: 1.20,
@@ -2005,7 +2005,7 @@ const tessaData: PersonaData = {
     { name: 'Kunst + sieraden', asset_type: 'physical', current_value: 14000, purchase_value: 11000, purchase_date: '2017-08-15', expected_return: 0, monthly_contribution: 0, institution: '', subtype: 'kunst' },
     { name: 'Belang Volkert Compleet Holding BV', asset_type: 'deelneming', current_value: 180000, purchase_value: 18000, purchase_date: '2012-01-01', expected_return: 6, monthly_contribution: 0, institution: 'Volkert Compleet Holding BV', subtype: 'eigen_bv', kvk_number: '30112233', ownership_percentage: 100, annual_dividend: 90000 },
     { name: 'Kapitaalverzekering (oud)', asset_type: 'levensverzekering', current_value: 28000, purchase_value: 19000, purchase_date: '2004-09-01', expected_return: 2, monthly_contribution: 0, institution: 'Nationale-Nederlanden', subtype: 'kapitaalverzekering' },
-    { name: 'Rekening-courant vordering BV', asset_type: 'vordering', current_value: 35000, purchase_value: 35000, purchase_date: '2023-01-01', expected_return: 3, monthly_contribution: 0, institution: 'Volkert Compleet Holding BV', subtype: 'rekening_courant' },
+    { name: 'Rekening-courant vordering BV', asset_type: 'vordering', current_value: 35000, purchase_value: 35000, purchase_date: '2023-01-01', expected_return: 3, monthly_contribution: 0, institution: 'Volkert Compleet Holding BV', subtype: 'dga_lening' },
     { name: 'Aanhangwagen + gereedschap', asset_type: 'other', current_value: 6000, purchase_value: 9000, purchase_date: '2020-05-01', expected_return: 0, monthly_contribution: 0, institution: '' },
   ],
   debts: [

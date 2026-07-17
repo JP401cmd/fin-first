@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { unauthorized, serverError } from '@/lib/api/respond'
+import { dedupeNetWorthByMonth } from '../month-dedupe'
 
 /**
  * /api/snapshots/history — handmatige historische netto-vermogen-invoer.
@@ -57,7 +59,7 @@ export async function GET(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   const url = new URL(request.url)
@@ -81,20 +83,16 @@ export async function GET(request: Request) {
     .order('snapshot_date', { ascending: true })
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverError(error, 'snapshots-history:GET')
   }
 
-  // Dedupe per kalendermaand: laatste snapshot_date in de maand wint (rijen zijn
-  // oplopend gesorteerd, dus de laatste overschrijft eerdere). Identiek aan de
-  // byMonth-dedupe die de chart-loader hanteert.
-  const byMonth = new Map<string, number>()
-  for (const row of data ?? []) {
-    const month = String(row.snapshot_date).slice(0, 7)
-    byMonth.set(month, Number(row.net_worth))
-  }
+  // Dedupe per kalendermaand: laatste snapshot_date in de maand wint. Gedeeld
+  // idioom (`dedupeNetWorthByMonth`) zodat /api/snapshots/group-history exact
+  // dezelfde maandlogica gebruikt en er geen tweede maand-dedupe kan ontstaan.
+  const byMonth = dedupeNetWorthByMonth(data ?? [])
 
   const entries: HistoryEntry[] = Array.from(byMonth.entries())
-    .map(([month, netWorth]) => ({ month, netWorth }))
+    .map(([month, winner]) => ({ month, netWorth: winner.netWorth }))
     .sort((a, b) => (a.month < b.month ? -1 : a.month > b.month ? 1 : 0))
 
   return NextResponse.json({ entries })
@@ -111,7 +109,7 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   let body: unknown
@@ -187,7 +185,7 @@ export async function POST(request: Request) {
       .lt('snapshot_date', nextStart)
 
     if (delError) {
-      return NextResponse.json({ error: delError.message }, { status: 500 })
+      return serverError(delError, 'snapshots-history:POST')
     }
 
     const { error: upsertError } = await supabase
@@ -204,7 +202,7 @@ export async function POST(request: Request) {
       )
 
     if (upsertError) {
-      return NextResponse.json({ error: upsertError.message }, { status: 500 })
+      return serverError(upsertError, 'snapshots-history:POST')
     }
   }
 

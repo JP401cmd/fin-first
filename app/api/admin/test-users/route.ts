@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { forbidden, serverError } from '@/lib/api/respond'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { isSuperAdmin } from '@/lib/admin'
@@ -18,7 +19,7 @@ function getServiceClient() {
 export async function GET() {
   const supabase = await createClient()
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   try {
@@ -85,9 +86,7 @@ export async function GET() {
 
     return NextResponse.json({ users: enriched })
   } catch (e) {
-    const msg = e instanceof Error ? e.message : 'Onbekende fout'
-    console.error('[test-users] GET error:', msg)
-    return NextResponse.json({ error: msg }, { status: 500 })
+    return serverError(e, 'admin-test-users:GET')
   }
 }
 
@@ -95,7 +94,7 @@ export async function GET() {
 export async function POST(req: Request) {
   const supabase = await createClient()
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   const body = await req.json()
@@ -152,7 +151,7 @@ export async function POST(req: Request) {
       })
 
       if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 })
+        return serverError(error, 'admin-test-users:POST')
       }
 
       return NextResponse.json({
@@ -163,7 +162,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ error: 'Ongeldige actie' }, { status: 400 })
   } catch (e) {
-    const msg = e instanceof Error ? e.message : 'Onbekende fout'
-    return NextResponse.json({ error: msg }, { status: 500 })
+    return serverError(e, 'admin-test-users:POST')
   }
 }

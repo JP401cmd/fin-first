@@ -371,7 +371,7 @@ export default function RevaluePage() {
                         <div className="flex items-center gap-3 sm:w-56 shrink-0">
                           <div
                             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--r)]"
-                            style={{ backgroundColor: ASSET_TYPE_COLORS[asset.asset_type] + '15' }}
+                            style={{ backgroundColor: `color-mix(in oklch, ${ASSET_TYPE_COLORS[asset.asset_type]} 8%, transparent)` }}
                           >
                             <span style={{ color: ASSET_TYPE_COLORS[asset.asset_type] }}>
                               <BudgetIcon name={ASSET_TYPE_ICONS[asset.asset_type]} className="h-4 w-4" />

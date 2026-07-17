@@ -51,3 +51,17 @@ if (typeof globalThis !== 'undefined' && !globalThis.IntersectionObserver) {
   ;(globalThis as { IntersectionObserver: typeof IntersectionObserver }).IntersectionObserver =
     MockIntersectionObserver as unknown as typeof IntersectionObserver
 }
+
+// ResizeObserver — gebruikt door o.a. widget-shell (overflow/scroll-detectie).
+// jsdom levert 'm niet; een no-op mock volstaat (tests hoeven geen echte
+// resize-callbacks). Zonder deze mock crasht elke test die een component met
+// een ResizeObserver mount met "ResizeObserver is not defined".
+if (typeof globalThis !== 'undefined' && !globalThis.ResizeObserver) {
+  class MockResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+  ;(globalThis as { ResizeObserver: typeof ResizeObserver }).ResizeObserver =
+    MockResizeObserver as unknown as typeof ResizeObserver
+}

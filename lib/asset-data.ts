@@ -2,6 +2,8 @@
  * Asset types, default seed data, and projection calculations.
  */
 
+import type { Shade } from './color-palette'
+
 // ── Types ────────────────────────────────────────────────────
 
 export type AssetType =
@@ -207,37 +209,57 @@ export const ASSET_TYPE_ICONS: Record<AssetType, string> = {
 }
 
 /**
- * Kleur-palet voor asset-typen — monochroom kern-bruin met intensiteit-laddertje.
+ * Kleur-ladder voor asset-typen — monochroom kern met intensiteit-laddertje
+ * langs de **liquiditeits-as**: hoe donkerder (hogere shade), hoe directer
+ * beschikbaar. Cash/savings staan op kern-700, beleggingen/pensioen op kern-500,
+ * vastgoed/levensverzekering op kern-400, kortdurende/overige bezittingen lopen
+ * af naar kern-300/200.
  *
- * Differentiatie loopt langs de **liquiditeits-as**: hoe donkerder, hoe meer
- * direct beschikbaar het vermogen is. Cash en savings staan op kern-700,
- * beleggingen en pensioen op kern-500, vastgoed/levensverzekering op kern-400,
- * en kortdurende of overige bezittingen lopen af naar kern-200/300.
- *
- * Eén module-tint familie houdt de Kern-pagina visueel rustig en in lijn met
- * de krant-esthetiek (zie `CLAUDE.md` Design Language). Differentiatie tussen
- * categorieën gebeurt verder via icon, label en bedrag — niet via een
- * regenboog van willekeurige Tailwind hex-waardes.
+ * Dit is de ENIGE bron voor de per-type shade. `ASSET_TYPE_COLORS` wordt eruit
+ * afgeleid; wijzig hier, niet daar.
  */
-export const ASSET_TYPE_COLORS: Record<AssetType, string> = {
+export const ASSET_TYPE_SHADE: Record<AssetType, Shade> = {
   // Klasse I — direct liquide
-  cash: 'oklch(0.345 0.0571 34.7)', // kern-700
-  savings: 'oklch(0.345 0.0571 34.7)', // kern-700
+  cash: 700,
+  savings: 700,
   // Klasse II — belegd / groei
-  investment: 'oklch(0.427 0.0584 34.7)', // kern-500
-  crypto: 'oklch(0.427 0.0584 34.7)', // kern-500
-  retirement: 'oklch(0.427 0.0584 34.7)', // kern-500
+  investment: 500,
+  crypto: 500,
+  retirement: 500,
   // Klasse III — vast / illiquide
-  eigen_huis: 'oklch(0.538 0.0467 34.7)', // kern-400
-  real_estate: 'oklch(0.538 0.0467 34.7)', // kern-400
-  levensverzekering: 'oklch(0.538 0.0467 34.7)', // kern-400
-  deelneming: 'oklch(0.538 0.0467 34.7)', // kern-400
+  eigen_huis: 400,
+  real_estate: 400,
+  levensverzekering: 400,
+  deelneming: 400,
   // Klasse IV — kortdurend / persoonlijk
-  vehicle: 'oklch(0.666 0.0311 34.7)', // kern-300
-  physical: 'oklch(0.666 0.0311 34.7)', // kern-300
-  vordering: 'oklch(0.666 0.0311 34.7)', // kern-300
-  other: 'oklch(0.771 0.0175 34.7)', // kern-200
+  vehicle: 300,
+  physical: 300,
+  vordering: 300,
+  other: 200,
 }
+
+/**
+ * Kleur-palet voor asset-typen — monochrome kern-familie langs de
+ * liquiditeits-as (zie `ASSET_TYPE_SHADE`). Één module-tint houdt de Kern-pagina
+ * visueel rustig en in lijn met de krant-esthetiek; differentiatie tussen
+ * categorieën gebeurt via icon, label en bedrag — niet via een regenboog.
+ *
+ * ACCENT-AWARE (CLAUDE.md kleurconventie): elke waarde is `var(--color-kern-N)`
+ * i.p.v. een vaste oklch-literal. De `--color-kern-*`-vars worden app-breed
+ * gezet door `ModuleColorProvider` (en server-side in de app-layout), zodat deze
+ * dots/balken automatisch de op `/mijn/uiterlijk` gekozen kern-accentkleur
+ * volgen. Dit is de gesanctioneerde `var(--color-<module>-*)`-route voor
+ * module-identiteit — geen hardcoded hex/oklch meer.
+ *
+ * NB: bruikbaar in élke CSS-context (style/SVG-fill/`color-mix`), maar NIET voor
+ * hex-rekenwerk (`color + '15'` opacity-suffix) of canvas-`fillStyle` — gebruik
+ * daar `color-mix(in oklch, <var> N%, transparent)` resp. `useModuleHex('kern', shade)`.
+ */
+export const ASSET_TYPE_COLORS: Record<AssetType, string> = Object.fromEntries(
+  (Object.keys(ASSET_TYPE_SHADE) as AssetType[]).map(
+    (t) => [t, `var(--color-kern-${ASSET_TYPE_SHADE[t]})`],
+  ),
+) as Record<AssetType, string>
 
 /** Typical annual return expectations per asset type (for default suggestions) */
 export const TYPICAL_RETURNS: Record<AssetType, number> = {

@@ -38,6 +38,56 @@ const RESTRICTED_SYNTAX_BASE = [
 //    ternary) matchen bewust niet, en ternaries op een success-conditie
 //    (`x === 'success'`, `path.success`) evenmin — dat zijn statusbanners
 //    (gelukt/mislukt), geen winst/verlies.
+// ── Arch F2 — lint-vangrails tegen drift (architectuurreview 3 jul 2026,
+// bevinding #22) ─────────────────────────────────────────────────────────
+//
+// Klasse (2) — AFRONDINGSIDIOOM. `parseFloat(x.toFixed(n))` rondt af via een
+// string-omweg: het verliest precisie en omzeilt de (nog te bouwen) centrale
+// afrondingshelper. Gescoped op app/**+components/** (de engines in lib/ mogen
+// afronden). Zeer schone AST-signatuur → nagenoeg nul false positives. De
+// bestaande treffers (36 in 3 holdings/dividends-routes) dragen een gerichte
+// eslint-disable met verwijzing naar de F4-kaart 'centrale afrondingshelpers'
+// tot die helper (roundCents/roundEuro) bestaat.
+const RESTRICTED_SYNTAX_ROUND = [
+  {
+    selector:
+      'CallExpression[callee.name="parseFloat"] > CallExpression[callee.property.name="toFixed"]',
+    message:
+      "parseFloat(x.toFixed(n)) rondt af via een string-omweg (precisieverlies) en omzeilt de centrale afronding. Gebruik de centrale helper (roundCents/roundEuro, [Arch F4] centrale afrondingshelpers). Tijdelijk bewust? // eslint-disable-next-line no-restricted-syntax -- zie [Arch F4] centrale afrondingshelpers.",
+  },
+];
+
+// Klasse (1) — ERROR.MESSAGE-LEK. Een rauwe `error.message`/`err.message` in de
+// body van een `NextResponse.json(...)`/`Response.json(...)`-call lekt interne
+// DB-/driverdetails naar de client (AVG/security). Gescoped op app/api/**.
+// Canoniek alternatief: `serverError(err, 'domein:METHOD')` uit
+// lib/api/respond.ts (ADR 0044) — logt server-side, stuurt een generieke tekst.
+// Selector: een `.message`-access op een error-identifier (err/error/e, of een
+// naam die op 'Error' eindigt) ergens binnen een `.json(...)`-call. Curated,
+// client-veilige `.message`-velden (linkCheck.message, RPC body.error.message)
+// matchen bewust NIET (object is geen error-identifier). Vanwege de resterende
+// false-positive-ruis start dit als error MÉT gerichte suppressions op de
+// bestaande sites tot de F4-envelope-kaart ze migreert.
+const API_MSG_LEAK =
+  "Rauwe error.message naar de client lekt interne (DB-/driver)details (AVG). Gebruik serverError(err, 'domein:METHOD') uit lib/api/respond.ts (ADR 0044). Echt een curated, client-veilige melding? // eslint-disable-next-line no-restricted-syntax -- zie [Arch F4] API-error-envelope.";
+const RESTRICTED_SYNTAX_API_MSG = [
+  {
+    // Directe identifier: `{ error: err.message }` / `error.message` / `e.message`
+    // of een naam die op 'Error' eindigt.
+    selector:
+      'CallExpression[callee.property.name="json"] MemberExpression[property.name="message"][object.name=/^(err|error|e)$|Error$/]',
+    message: API_MSG_LEAK,
+  },
+  {
+    // Cast-vorm: `(err as Error).message` — het object is dan een TSAsExpression,
+    // geen Identifier, dus de bovenstaande selector mist 'm. Matcht een cast van
+    // een error-identifier (err/error/e).
+    selector:
+      'CallExpression[callee.property.name="json"] MemberExpression[property.name="message"][object.type="TSAsExpression"][object.expression.name=/^(err|error|e)$/]',
+    message: API_MSG_LEAK,
+  },
+];
+
 const RESTRICTED_SYNTAX_PNL = [
   {
     selector:
@@ -126,15 +176,45 @@ const eslintConfig = defineConfig([
     },
   },
   {
+    // Arch F2 klasse (2) — afrondingsidioom: heel app/** + components/** (de
+    // app-UI én de API-routes; lib/-engines mogen afronden). Flat config: dit
+    // object VERVANGT `no-restricted-syntax` voor deze bestanden, dus de basis-
+    // selectors moeten opnieuw mee (anders vallen TZ/household-vangrails weg).
+    files: ["app/**/*.{ts,tsx}", "components/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        ...RESTRICTED_SYNTAX_BASE,
+        ...RESTRICTED_SYNTAX_ROUND,
+      ],
+    },
+  },
+  {
     // Winst/verlies-kleur-vangrails: alleen echte app-UI (components/ +
     // app/(app)/). De wegwerp-testpagina's (app/test-*) en losse libs vallen
-    // bewust buiten scope. Basis-selectors opnieuw meespreiden (zie boven).
+    // bewust buiten scope. Staat NA het afrondings-object zodat het voor deze
+    // engere scope wint; alle eerdere selectors opnieuw meespreiden (zie boven).
     files: ["components/**/*.{ts,tsx}", "app/(app)/**/*.{ts,tsx}"],
     rules: {
       "no-restricted-syntax": [
         "error",
         ...RESTRICTED_SYNTAX_BASE,
+        ...RESTRICTED_SYNTAX_ROUND,
         ...RESTRICTED_SYNTAX_PNL,
+      ],
+    },
+  },
+  {
+    // Arch F2 klasse (1) — error.message-lek: alleen API-routes (app/api/**).
+    // Staat als laatste zodat het voor deze scope wint; basis- én afrondings-
+    // selectors opnieuw meespreiden zodat die hier óók blijven gelden.
+    files: ["app/api/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        ...RESTRICTED_SYNTAX_BASE,
+        ...RESTRICTED_SYNTAX_ROUND,
+        ...RESTRICTED_SYNTAX_API_MSG,
       ],
     },
   },

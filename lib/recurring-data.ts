@@ -36,12 +36,31 @@ export const FREQUENCY_LABELS: Record<string, string> = {
 const DAY_NAMES = ['Zo', 'Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za']
 
 /**
+ * Whether a recurring rule's end_date has already passed relative to
+ * `referenceDate` (default: local today). A rule zonder end_date (NULL) is NOOIT
+ * verlopen. Eén gedeelde grens zodat elke consument van "telt deze regel nog mee?"
+ * (maandtotaal, kalender, vaste-lasten) dezelfde beslissing neemt — consume,
+ * don't recompute.
+ */
+export function isRecurringExpired(
+  r: Pick<RecurringTransaction, 'end_date'>,
+  referenceDate?: Date,
+): boolean {
+  if (!r.end_date) return false
+  const now = referenceDate ?? new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  return new Date(r.end_date) < today
+}
+
+/**
  * Get the expected monthly cost/income from a set of recurring transactions.
  */
 export function getExpectedMonthlyTotal(recurrings: RecurringTransaction[]): number {
   let total = 0
+  const now = new Date()
   for (const r of recurrings) {
     if (!r.is_active) continue
+    if (isRecurringExpired(r, now)) continue
     const amount = Number(r.amount)
     switch (r.frequency) {
       case 'weekly':
@@ -70,7 +89,7 @@ export function getNextOccurrence(r: RecurringTransaction): Date | null {
   const now = new Date()
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
 
-  if (r.end_date && new Date(r.end_date) < today) return null
+  if (isRecurringExpired(r, now)) return null
 
   if (r.frequency === 'weekly' && r.day_of_week != null) {
     const currentDay = today.getDay()

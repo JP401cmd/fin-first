@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { unauthorized, forbidden, serverError } from '@/lib/api/respond'
 
 const VALID_SPLIT_MODES = ['equal', 'income_ratio', 'custom', 'one_carries_all'] as const
 
@@ -12,7 +13,7 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   // Find user's household
@@ -57,7 +58,7 @@ export async function PATCH(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   const body = await request.json()
@@ -75,7 +76,7 @@ export async function PATCH(request: NextRequest) {
   }
 
   if (membership.role !== 'owner') {
-    return NextResponse.json({ error: 'Alleen de eigenaar kan instellingen wijzigen' }, { status: 403 })
+    return forbidden('Alleen de eigenaar kan instellingen wijzigen')
   }
 
   // Validate split mode
@@ -119,7 +120,7 @@ export async function PATCH(request: NextRequest) {
     .eq('id', membership.household_id)
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverError(error, 'household-settings:PATCH')
   }
 
   return NextResponse.json({

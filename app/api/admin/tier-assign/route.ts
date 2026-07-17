@@ -116,6 +116,7 @@ export async function POST(req: Request) {
     .eq('id', targetUserId)
 
   if (updateError) {
+    // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
     return NextResponse.json({ error: updateError.message }, { status: 500 })
   }
 

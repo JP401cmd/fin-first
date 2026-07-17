@@ -4,6 +4,7 @@ import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
+import { RECOMMENDATION_TYPE_LABELS, OVERIG_TYPE_LABEL } from '@/lib/recommendation-data'
 
 interface Props {
   size: WidgetSize
@@ -11,17 +12,11 @@ interface Props {
   href?: string
 }
 
-const TYPE_LABELS: Record<string, string> = {
-  budget_optimization: 'Budgetoptimalisatie',
-  asset_reallocation: 'Vermogensherordening',
-  debt_acceleration: 'Schuldversnelling',
-  income_increase: 'Inkomensverhoging',
-  savings_boost: 'Spaarversnelling',
-  manual: 'Handmatig',
-}
-
+// Eén bron van waarheid: consumeer de canonieke advies-labels (gelijk aan
+// Tips/Briefing). Niet-gekoppelde acties komen uit de loader op bucket 'overig'.
 function typeLabel(type: string): string {
-  return TYPE_LABELS[type] ?? type
+  if (type === 'overig') return OVERIG_TYPE_LABEL
+  return (RECOMMENDATION_TYPE_LABELS as Record<string, string>)[type] ?? OVERIG_TYPE_LABEL
 }
 
 export const BeslissingspatronenWidget = memo(function BeslissingspatronenWidget({ size, data, href }: Props) {
@@ -87,11 +82,16 @@ export const BeslissingspatronenWidget = memo(function BeslissingspatronenWidget
           const pct = maxDays > 0 ? (pattern.days / maxDays) * 100 : 0
           return (
             <div key={pattern.type}>
-              <div className="flex items-center justify-between mb-0.5">
-                <span className="text-xs text-[var(--ink-2)] truncate">
+              <div className="flex items-baseline justify-between mb-0.5 gap-2">
+                <span className="text-xs text-[var(--ink-2)] truncate min-w-0">
                   {typeLabel(pattern.type)}
+                  {size === 'full' && pattern.count > 0 && (
+                    <span className="ml-1.5 text-[10px] tabular-nums text-[var(--ink-4)]">
+                      {pattern.count} {pattern.count === 1 ? 'actie' : 'acties'}
+                    </span>
+                  )}
                 </span>
-                <span className="font-mono text-xs tabular-nums text-wil-700 shrink-0 ml-2">
+                <span className="font-mono text-xs tabular-nums text-wil-700 shrink-0">
                   +{Math.round(pattern.days)}d
                 </span>
               </div>

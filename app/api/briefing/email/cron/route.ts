@@ -5,6 +5,7 @@ import { readBriefingSnapshot, amsterdamWeekKey } from '@/lib/briefing/snapshot'
 import { buildBriefingEmail } from '@/lib/briefing/email-template'
 import { signUnsubscribeToken } from '@/lib/briefing/email-token'
 import { sendEmail } from '@/lib/email'
+import { unauthorized, serverError } from '@/lib/api/respond'
 
 /**
  * GET /api/briefing/email/cron
@@ -73,7 +74,7 @@ export async function GET(request: Request) {
     querySecret === cronSecret
 
   if (!isAuthorized) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return unauthorized()
   }
 
   if (!service) {
@@ -126,7 +127,7 @@ export async function GET(request: Request) {
         startedAt,
         error: profilesError.message,
       })
-      return NextResponse.json({ error: profilesError.message }, { status: 500 })
+      return serverError(profilesError, 'briefing-email-cron:GET')
     }
 
     counters.candidates = profiles?.length ?? 0
@@ -220,6 +221,6 @@ export async function GET(request: Request) {
       summary: counters,
       error: message,
     })
-    return NextResponse.json({ error: message }, { status: 500 })
+    return serverError(err, 'briefing-email-cron:GET')
   }
 }

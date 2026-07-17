@@ -195,16 +195,10 @@ export interface PersoonlijkPlanData {
 
 // ── Label-maps ────────────────────────────────────────────────────────
 
-/**
- * NL-labels voor `profile.household_type`. Niet alle keys staan zeker in de
- * DB — onbekende waarden vallen terug op de raw key (zie loader).
- */
-export const HOUSEHOLD_TYPE_LABELS: Record<string, string> = {
-  single: 'Alleenstaand',
-  partner: 'Samenwonend / getrouwd',
-  family: 'Gezin met kinderen',
-  single_parent: 'Alleenstaande ouder',
-}
+// NL-labels voor `household_type` staan bij de canonieke bron
+// (`HOUSEHOLD_TYPE_LABELS`/`householdTypeLabel` in lib/household-type.ts) i.p.v.
+// hier — een losse kopie in de rapportagelaag divergeerde ooit stil van de
+// echte DB-waarden en toonde de ruwe string. De assembly consumeert de helper.
 
 /**
  * Labels voor onttrekkingsstrategieën. Spiegelt `WITHDRAWAL_DEFAULTS.strategy`.

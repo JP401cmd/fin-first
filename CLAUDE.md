@@ -120,6 +120,15 @@ Status-meldingen die niet meteen op te lossen zijn (bv. de status-duiding-banner
 
 Houd ~4–8px tussenruimte, gebruik dezelfde `h-7 w-7 rounded-full border-[var(--border-ed)] bg-[var(--paper)]` als de `i` zodat de controls één visuele familie vormen, en **stoplichtkleuren (geen module-accent)** voor de statussemantiek.
 
+## API-conventies — error-envelope + zod op mutatie-routes (verplicht bij backend-werk)
+
+Alle route-handlers onder `app/api/*` gebruiken één gedeelde foutvorm (ADR 0044, `lib/api/respond.ts`). Regels:
+
+- **Foutvorm = de helpers, nooit met de hand.** Gebruik `unauthorized()`, `forbidden()`, `badRequest(msg)`, `notFound()`, `conflict(msg)`, `serverError(err, tag)` uit `lib/api/respond.ts`. Envelope is **plat**: `{ error: string }` (+ optioneel `code?`). **Nooit** een geneste `{ ok, error: { code, message } }` — de frontend leest `data.error` als string op ~59 plekken.
+- **Nooit een rauwe `error.message`/stack naar de client.** In `catch`-blokken en bij DB-fouten: `return serverError(err, 'domein:METHOD')`. Die logt de echte fout server-side met een grep-bare tag en stuurt een generieke tekst naar de client (AVG/security). `error.message` mag alleen server-side gelezen worden (bv. `error.message?.includes(...)` voor control-flow), nooit in de response-body.
+- **Eén 401-tekst app-breed: `'Niet ingelogd'`** — via `unauthorized()`. Match nooit in frontend/tests op de exacte 401-string.
+- **Zod op nieuwe mutatie-routes.** Nieuwe POST/PUT/PATCH/DELETE-met-body valideert de body met een zod-schema via `parseBody(schema, req)` uit `lib/api/parse-body.ts` (geeft bij falen een client-veilige 400). Bestaande handlers worden niet massaal geretrofit — zod komt erbij waar de migratie er toch al langskomt.
+
 ## Project Specification
 
 <project_specification>
@@ -159,7 +168,7 @@ Houd ~4–8px tussenruimte, gebruik dezelfde `h-7 w-7 rounded-full border-[var(-
       <runtime>Node.js (Next.js API routes)</runtime>
       <database>Supabase (PostgreSQL 17)</database>
       <auth>Supabase Auth (email/password, JWT)</auth>
-      <edge_functions>Supabase Edge Functions (Deno)</edge_functions>
+      <edge_functions>geen — niet in gebruik (potentieel gepland)</edge_functions>
     </backend>
     <ai>
       <primary>Anthropic Claude (claude-sonnet-4-5-20250929)</primary>

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { forbidden } from '@/lib/api/respond'
 import { createClient } from '@/lib/supabase/server'
 import { isSuperAdmin } from '@/lib/admin'
 import { probeIntegrations } from '@/lib/integrations/health-probe'
@@ -7,7 +8,7 @@ export async function POST(request: Request) {
   const supabase = await createClient()
 
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   try {
@@ -42,6 +43,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         success: false,
+        // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
         message: err instanceof Error ? err.message : 'Health-probe mislukt',
       },
       { status: 500 }

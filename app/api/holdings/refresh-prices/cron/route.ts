@@ -6,6 +6,7 @@ import { syncAllExchangeConnections } from '@/lib/integrations/exchange-cron'
 import { syncAllWalletAddresses } from '@/lib/integrations/wallet-cron'
 import { recordJobRun } from '@/lib/job-runs'
 import { probeIntegrations } from '@/lib/integrations/health-probe'
+import { unauthorized } from '@/lib/api/respond'
 
 /**
  * GET /api/holdings/refresh-prices/cron
@@ -60,7 +61,7 @@ export async function GET(request: Request) {
     querySecret === cronSecret
 
   if (!isAuthorized) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return unauthorized()
   }
 
   // ── Supabase service role client ──────────────────────────────

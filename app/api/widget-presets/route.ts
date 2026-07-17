@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { isSuperAdmin } from '@/lib/admin'
 import { WIDGET_PRESETS, type WidgetPreset } from '@/lib/widget-presets'
 import { WIDGET_CATALOG } from '@/lib/widget-catalog'
+import { unauthorized, forbidden, serverError } from '@/lib/api/respond'
 
 const SETTINGS_KEY = 'widget_presets'
 
@@ -20,7 +21,7 @@ export async function GET() {
   // Any authenticated user can read presets (used by dashboard dropdown)
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return unauthorized()
   }
 
   const { data: row } = await supabase
@@ -63,7 +64,7 @@ export async function PUT(req: Request) {
   const supabase = await createClient()
 
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   let body: unknown
@@ -170,7 +171,7 @@ export async function PUT(req: Request) {
     )
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverError(error, 'widget-presets:PUT')
   }
 
   return NextResponse.json({ presets })

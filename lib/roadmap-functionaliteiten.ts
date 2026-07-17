@@ -5,9 +5,10 @@
 // docs/marktonderzoek-functionaliteiten-jul2026.md. Single source of truth voor
 // de beheerpagina /beheer/roadmap. Read-only naslag; geen runtime-effecten elders.
 //
-// De belofte van TriFinity — "Vrijheid door met inzicht en grip keuzes te maken
-// voor nu en de toekomst" — valt uiteen in vier toetsstenen (PromisePillar).
-// Elke roadmap-kandidaat is gekoppeld aan de pijler(s) waaraan hij bijdraagt.
+// De belofte van TriFinity — "Ontdek waar je staat, plan waar je heen gaat" —
+// wordt getoetst aan vier pijlers (PromisePillar): inzicht, grip, keuzes en
+// toekomst. Elke roadmap-kandidaat is gekoppeld aan de pijler(s) waaraan hij
+// bijdraagt.
 
 export type PromisePillar = 'inzicht' | 'grip' | 'keuzes' | 'toekomst'
 
@@ -81,7 +82,7 @@ export const ROADMAP_EFFORT_LABEL: Record<RoadmapEffort, string> = {
 }
 
 export const ROADMAP_PROMISE =
-  'Vrijheid door met inzicht en grip keuzes te maken voor nu en de toekomst.'
+  'Ontdek waar je staat, plan waar je heen gaat.'
 
 export const ROADMAP_RESEARCH_META = {
   period: 'Juli 2026 (refresh van juni 2026)',

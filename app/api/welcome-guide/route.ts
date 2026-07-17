@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { unauthorized } from '@/lib/api/respond'
 import {
   WELCOME_GUIDE_SETTINGS_KEY,
   WELCOME_GUIDE_MODULE_KEY,
@@ -72,7 +73,7 @@ export async function GET() {
   const {
     data: { user },
   } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user) return unauthorized()
 
   const config = await loadConfig(supabase)
   const { raw } = await loadRawState(supabase, user.id)
@@ -159,7 +160,7 @@ export async function PUT(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user) return unauthorized()
 
   let body: unknown
   try {

@@ -415,3 +415,33 @@
 
 - **API-routes** toegevoegd: /api/privacy-mode
 - **Componenten (aantal)** toegevoegd: +3
+
+## 2026-07-17
+
+- **Tabellen** toegevoegd: _legacy_holding_prices, _legacy_holding_transactions, _legacy_holdings, actions, admin_actions_log, ai_usage, bank_connection_accounts, bank_connections, bank_sync_log, budget_amounts, budget_rollovers, error_logs, goal_contributions, if, in, mail_log, news_editions, nibud_reference_data, recommendation_feedback, recommendations, report_configs, settlement_entries, tier_assignments_log, transaction_splits, user_own_ibans
+- **Integraties** toegevoegd: OpenRouter
+- **Componenten (aantal)** toegevoegd: +4
+
+## 2026-07-17
+
+- **Tabellen** verwijderd: if, in
+
+## 2026-07-17
+
+- Geen wijzigingen.
+
+## 2026-07-17
+
+- **API-routes** toegevoegd: /api/snapshots/entity-backfill, /api/snapshots/group-history
+- **Componenten (aantal)** toegevoegd: +5
+
+## 2026-07-17
+
+- **Schermen** toegevoegd: /beheer/allowlist
+- **API-routes** toegevoegd: /api/admin/signup-allowlist
+- **Tabellen** toegevoegd: signup_email_allowlist
+- **Componenten (aantal)** toegevoegd: +1
+
+## 2026-07-17
+
+- **Componenten (aantal)** toegevoegd: +9

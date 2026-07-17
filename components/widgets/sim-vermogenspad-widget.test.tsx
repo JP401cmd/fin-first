@@ -98,3 +98,54 @@ describe('SimVermogenspadWidget — eind-aslabel consumeert kernel-displayEndAge
     expect(screen.queryByText('90j')).not.toBeInTheDocument()
   })
 })
+
+/**
+ * Borgt dat de badge de historische SLAAGKANS toont uit het canonieke
+ * `data.backtestSuccessRate`-signaal (consume-don't-recompute) en NIET langer
+ * een lokaal verzonnen drawdown-heuristiek die een bewuste opmaakstrategie
+ * misleidend als "Hoog risico" bestempelt.
+ */
+describe('SimVermogenspadWidget — slaagkans-badge consumeert data.backtestSuccessRate', () => {
+  // Deplete/opmaak: pot stijgt en wordt daarna bewust naar ~0 afgebouwd.
+  // Onder de oude drawdown-heuristiek gaf dit altijd misleidend "Hoog risico".
+  function makeDepleteRows(): SimRow[] {
+    const acc: SimRow[] = Array.from({ length: 15 }, (_, i) => ({
+      age: 45 + i,
+      endPortfolio: 100_000 + i * 50_000,
+      phase: 'accumulation',
+      flowIn: 24_000,
+      flowOut: 0,
+      oneTimeNet: 0,
+    }))
+    const ret: SimRow[] = Array.from({ length: 30 }, (_, i) => ({
+      age: 60 + i,
+      endPortfolio: Math.max(800_000 - i * 27_000, 1_000),
+      phase: 'retirement',
+      flowIn: 0,
+      flowOut: 30_000,
+      oneTimeNet: 0,
+    }))
+    return [...acc, ...ret]
+  }
+
+  it('full-size deplete: toont "Slaagkans 92%", nooit een risico-label', () => {
+    const data = makeData({ simRows: makeDepleteRows(), backtestSuccessRate: 92 } as Partial<DashboardData>)
+    render(<SimVermogenspadWidget size="full" data={data} />)
+    expect(screen.getByText('Slaagkans 92%')).toBeInTheDocument()
+    expect(screen.queryByText(/risico/i)).not.toBeInTheDocument()
+  })
+
+  it('half-size: toont de canonieke slaagkans, niet de drawdown', () => {
+    const data = makeData({ simRows: makeDepleteRows(), backtestSuccessRate: 64 } as Partial<DashboardData>)
+    render(<SimVermogenspadWidget size="half" data={data} />)
+    expect(screen.getByText('Slaagkans 64%')).toBeInTheDocument()
+    expect(screen.queryByText(/risico/i)).not.toBeInTheDocument()
+  })
+
+  it('rendert geen badge wanneer het backtest-signaal ontbreekt', () => {
+    const data = makeData({ simRows: makeDepleteRows(), backtestSuccessRate: null } as Partial<DashboardData>)
+    render(<SimVermogenspadWidget size="full" data={data} />)
+    expect(screen.queryByText(/Slaagkans/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/risico/i)).not.toBeInTheDocument()
+  })
+})

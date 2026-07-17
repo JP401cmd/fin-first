@@ -4,6 +4,7 @@ import { syncAssetValueFromInvestmentHoldings } from '@/lib/holdings-sync'
 import { fingerprintHeaders, diffHeaders, type FormatId } from '@/lib/parsers/format-contracts'
 import { recordContractEvent } from '@/lib/contract-events'
 import { getServiceClient } from '@/lib/supabase/service'
+import { unauthorized, serverError } from '@/lib/api/respond'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -141,7 +142,7 @@ export async function POST(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   try {
@@ -377,9 +378,7 @@ export async function POST(request: NextRequest) {
           .eq('user_id', user.id)
 
         if (updateError) {
-          return NextResponse.json({
-            error: `Fout bij bijwerken holding "${h.name}": ${updateError.message}`,
-          }, { status: 500 })
+          return serverError(updateError, 'holdings-import:POST')
         }
 
         holdingIdMap.set(i, existing.id)
@@ -436,9 +435,7 @@ export async function POST(request: NextRequest) {
           .single()
 
         if (insertError || !created) {
-          return NextResponse.json({
-            error: `Fout bij aanmaken holding "${h.name}": ${insertError?.message || 'Onbekende fout'}`,
-          }, { status: 500 })
+          return serverError(insertError, 'holdings-import:POST')
         }
 
         holdingIdMap.set(i, created.id)
@@ -478,9 +475,7 @@ export async function POST(request: NextRequest) {
           .eq('user_id', user.id)
 
         if (deactivateError) {
-          return NextResponse.json({
-            error: `Fout bij deactiveren verkochte holdings: ${deactivateError.message}`,
-          }, { status: 500 })
+          return serverError(deactivateError, 'holdings-import:POST')
         }
         holdingsDeactivated = soldIds.length
         assetIdsToSync.add(snapshotAssetId)
@@ -535,9 +530,7 @@ export async function POST(request: NextRequest) {
           .from('investment_transactions')
           .upsert(upsertRows, { onConflict: 'external_source,external_trade_id', ignoreDuplicates: true })
         if (upsertErr) {
-          return NextResponse.json({
-            error: `Fout bij upserten transacties: ${upsertErr.message}`,
-          }, { status: 500 })
+          return serverError(upsertErr, 'holdings-import:POST')
         }
       }
       if (insertRows.length > 0) {
@@ -545,9 +538,7 @@ export async function POST(request: NextRequest) {
           .from('investment_transactions')
           .insert(insertRows)
         if (insertErr) {
-          return NextResponse.json({
-            error: `Fout bij aanmaken transacties: ${insertErr.message}`,
-          }, { status: 500 })
+          return serverError(insertErr, 'holdings-import:POST')
         }
       }
 
@@ -580,7 +571,6 @@ export async function POST(request: NextRequest) {
       },
     }, { status: 201 })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Onbekende fout bij importeren'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return serverError(err, 'holdings-import:POST')
   }
 }

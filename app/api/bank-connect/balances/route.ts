@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { unauthorized, serverError } from '@/lib/api/respond'
 import { isTrueLayerEnabled } from '@/lib/truelayer/feature-flag'
 import { getBaseUrls, getAccountBalance, refreshAccessToken } from '@/lib/truelayer/client'
 import { decryptField, encryptField } from '@/lib/crypto/field-encryption'
@@ -9,7 +10,7 @@ export async function POST(req: Request) {
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return unauthorized()
   }
 
   if (!(await isTrueLayerEnabled(supabase))) {
@@ -104,10 +105,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ balance: null, balances })
   } catch (err) {
-    console.error('TrueLayer balances error:', err)
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Saldo ophalen mislukt' },
-      { status: 500 }
-    )
+    return serverError(err, 'bankconnect-balances:POST')
   }
 }

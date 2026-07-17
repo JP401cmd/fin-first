@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { unauthorized } from '@/lib/api/respond'
 
 // ── GET handler ──────────────────────────────────────────────────────
 // GET /api/news/archive         → list editions (without articles)
@@ -10,7 +11,7 @@ export async function GET(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   const url = new URL(request.url)

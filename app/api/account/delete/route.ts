@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { deleteAllUserData } from '@/lib/seed-persona'
+import { unauthorized, serverError } from '@/lib/api/respond'
 
 /**
  * POST /api/account/delete
@@ -29,7 +30,7 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 })
+    return unauthorized()
   }
 
   const body = (await request.json().catch(() => ({}))) as
@@ -58,8 +59,7 @@ export async function POST(request: Request) {
       const service = getServiceClient()
       const { error: authDeleteError } = await service.auth.admin.deleteUser(user.id)
       if (authDeleteError) {
-        console.error('Auth user delete error:', authDeleteError)
-        return Response.json({ error: authDeleteError.message }, { status: 500 })
+        return serverError(authDeleteError, 'account-delete:POST')
       }
       // Best-effort sign-out of the current session cookies.
       await supabase.auth.signOut().catch(() => {})
@@ -101,7 +101,6 @@ export async function POST(request: Request) {
       deletionSummary,
     })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error'
-    return Response.json({ error: message }, { status: 500 })
+    return serverError(err, 'account-delete:POST')
   }
 }

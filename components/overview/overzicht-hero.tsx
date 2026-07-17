@@ -39,6 +39,7 @@ import { PerspectiveContextLabel } from '@/components/app/perspective-context-la
 import { CompoundInsightCard } from './compound-insight-card'
 import { PrintOverzichtButton } from './print-overzicht-button'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
+import { dailyExpenseRate } from '@/lib/format'
 
 // Stabiele lege-array-referentie voor de mini-vermogen-grafiek. Voorkomt dat
 // `netWorthHistory ?? []` bij ontbrekende historie elke render een verse
@@ -199,6 +200,15 @@ export function OverzichtHero({
   const { mode } = useDisplayMode()
   const simple = mode === 'simple'
 
+  // Canoniek dagtarief (EUR/dag) uit de dashboard-bundel — puur doorgegeven aan
+  // de mini-vermogen-grafiek (en van daaruit de verloop-sheet) voor de
+  // vrijheidstijd-equivalent. Consume-don't-recompute: neem het bundel-veld
+  // `dailyExpenseRate` (KRUIS-20); alleen als dat ontbreekt vertaalt de
+  // canonieke helper de maanduitgaven. Afwezige bundel -> undefined.
+  const dailyExpense = dashboardData
+    ? dashboardData.dailyExpenseRate ?? dailyExpenseRate(dashboardData.monthlyExpenses)
+    : undefined
+
   // Memoize once per mount — datum + groet wisselen zelden tijdens een
   // sessie. Voorkomt onnodige Intl-formatter-instances bij elke re-render.
   const dateLabel = useMemo(() => formatDateNL(), [])
@@ -322,6 +332,7 @@ export function OverzichtHero({
               monthlySavings={monthlySavings ?? null}
               netWorthExclHome={netWorthExclHome ?? null}
               showExclHome={housingSplit != null}
+              dailyExpense={dailyExpense}
             />
           </div>
         </div>

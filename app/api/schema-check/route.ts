@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { serverError } from '@/lib/api/respond'
 
 // ============================================================
 // Comprehensive Database Schema Verification
@@ -246,7 +247,6 @@ export async function GET() {
       timestamp: new Date().toISOString(),
     })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error'
-    return NextResponse.json({ status: 'error', error: message }, { status: 500 })
+    return serverError(err, 'schema-check:GET')
   }
 }

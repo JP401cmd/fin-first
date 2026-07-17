@@ -9,6 +9,7 @@ import { getCachedUser } from '@/lib/supabase/cached-user'
 import type {
   DashboardData,
   TopAction,
+  CompletedAction,
   TopGoal,
   TopRecurringTransaction,
   TopRecommendation,
@@ -23,14 +24,17 @@ import type {
 } from '@/components/widgets/widget-renderer'
 import type { WidgetPref, WidgetPrefs } from '@/lib/widget-catalog'
 import type { FireProjection, FireCountdown } from '@/lib/horizon-data'
+import { loadNewsPreview } from '@/lib/news-preview'
 
 import { computeEffectiveExpenses, computeFireTarget, computeFreedomProgressWithBasis, inclHomeTargetFromScalar, computeSavingsRateFromNetWorthDelta } from '@/lib/core-metrics'
 import { localMonthStartMonthsAgo } from '@/lib/month-range'
+import { localDateStr } from '@/lib/budget-period'
 import {
   runBacktest,
   ageAtDate,
   deriveCountdown,
   computeLifeEventNetImpact,
+  sortLifeEventsChronologically,
   type FinancialInput,
   type LifeEvent,
 } from '@/lib/horizon-data'
@@ -74,6 +78,7 @@ import {
   computeDrift,
   isBox3Window as isRebalanceBox3Window,
   generateRebalanceNotifications,
+  DEFAULT_CONSTRAINTS as REBAL_DEFAULT_CONSTRAINTS,
 } from '@/lib/rebalancing'
 import type { HoldingForAllocation, TargetAllocation } from '@/lib/portfolio-allocation'
 import { compareMortgageVsInvest, type RepaymentType } from '@/lib/hypotheek-vs-beleggen'
@@ -180,7 +185,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     supabase.from('transactions').select('amount, budget_id, transaction_type').gte('date', monthStart).lt('date', monthEnd),
     supabase.from('assets').select('*').eq('is_active', true),
     supabase.from('debts').select('*').eq('is_active', true),
-    supabase.from('profiles').select('full_name, date_of_birth, last_known_phase, widget_prefs, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, budgeting_active, marginaal_tarief, feature_preferences, active_modules, household_type, box3_method, ai_enabled, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step, housing_strategy_config, income_source, expenses_source, monthly_savings_override, pot_rules, deficit_loan_rate, withdrawal_profile_config').single(),
+    supabase.from('profiles').select('full_name, date_of_birth, last_known_phase, widget_prefs, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, budgeting_active, marginaal_tarief, feature_preferences, active_modules, household_type, box3_method, ai_enabled, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step, housing_strategy_config, income_source, expenses_source, monthly_savings_override, pot_rules, deficit_loan_rate, withdrawal_profile_config, rebalance_threshold').single(),
     // Single budget query replaces 4 separate queries (essential, allParent, children, favorites)
     supabase.from('budgets').select('id, name, icon, default_limit, interval, budget_type, alert_threshold, parent_id, is_favorite, is_essential'),
     supabase.from('actions')
@@ -970,6 +975,33 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     return completedAt >= monthStart && completedAt < monthEnd
   }).length
 
+  // Recent afgeronde acties (laatste 30 dagen), voor de "RECENT AFGEROND"-sectie
+  // van de full-size Acties-widget. Consumeert dezelfde reeds geladen `allActions`
+  // (geen extra query, geen herberekening); `completed_at` is een ISO-string, dus
+  // lexicografische vergelijking = chronologisch.
+  const thirtyDaysAgoIso = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString()
+  const recentCompletedActions: CompletedAction[] = allActions
+    .filter(a => {
+      if (a.status !== 'completed') return false
+      const completedAt = (a as { completed_at?: string | null }).completed_at
+      return !!completedAt && completedAt >= thirtyDaysAgoIso
+    })
+    .sort((a, b) => {
+      const ca = (a as { completed_at?: string | null }).completed_at ?? ''
+      const cb = (b as { completed_at?: string | null }).completed_at ?? ''
+      return cb.localeCompare(ca)
+    })
+    .slice(0, 5)
+    .map(a => {
+      const act = a as { id: string; title: string; freedom_days_impact?: number | null; completed_at?: string | null }
+      return {
+        id: act.id,
+        title: act.title,
+        freedomDaysImpact: act.freedom_days_impact != null ? Number(act.freedom_days_impact) : null,
+        completedAt: act.completed_at!,
+      }
+    })
+
   // Top 5 open acties gesorteerd op prioriteit
   const topOpenActions: TopAction[] = openActions
     .sort((a, b) => (Number((b as { priority_score?: number | null }).priority_score) || 0) - (Number((a as { priority_score?: number | null }).priority_score) || 0))
@@ -1086,6 +1118,13 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   const activeWidgets = allWidgetPrefs
     .filter(w => w.enabled)
     .sort((a, b) => a.order - b.order)
+
+  // Nieuws-widget (id `berichten`): laad het server-veld alleen als de widget
+  // daadwerkelijk actief is — device-onafhankelijke bron i.p.v. localStorage.
+  const newsPreview =
+    currentUserId && activeWidgets.some(w => w.id === 'berichten')
+      ? await loadNewsPreview(supabase, currentUserId)
+      : null
 
   // Net worth history: monthly snapshots for the sparkline
   const snapshotRows = netWorthSnapshotsResult.data ?? []
@@ -1254,16 +1293,19 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       category: r.recommendation_type ?? 'general',
     }))
 
-  // Top life events: top 5 active by impact
+  // Top life events: eerstvolgende 5 op de tijdlijn (chronologisch oplopend).
+  // De widget heet "gebeurtenissen op de tijdlijn", dus we sorteren op aankomend
+  // (target_date/target_age oplopend) via de canonieke sorteersleutel i.p.v. op
+  // gebruikers-sort_order; events zonder temporeel anker komen achteraan.
   const allLifeEvents = (eventsResult.data ?? []) as LifeEvent[]
-  const topLifeEvents: TopLifeEvent[] = allLifeEvents
+  const topLifeEvents: TopLifeEvent[] = sortLifeEventsChronologically(allLifeEvents, currentAge)
     .slice(0, 5)
     .map(e => {
       const netImpact = computeLifeEventNetImpact(e)
       return {
         id: e.id,
         name: e.name,
-        year: e.target_date ? new Date(e.target_date).getFullYear() : (e.target_age != null ? null : null),
+        year: e.target_date ? new Date(e.target_date).getFullYear() : null,
         targetAge: e.target_age ?? null,
         impactType: (netImpact > 0 ? 'positive' : 'negative') as 'positive' | 'negative',
         estimatedImpact: netImpact !== 0 ? Math.abs(netImpact) : null,
@@ -1390,7 +1432,14 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     if (rebalTargets.length > 0 && rebalHoldings.length > 0) {
       const drifts = computeDrift(rebalHoldings, rebalTargets, 'asset_class')
       const box3Window = isRebalanceBox3Window()
-      const rebalNotifs = generateRebalanceNotifications(drifts, 5, box3Window)
+      // Één bron van waarheid: de door de gebruiker ingestelde drift-drempel
+      // (profiles.rebalance_threshold), fallback op DEFAULT_CONSTRAINTS.threshold —
+      // niet langer een losse literal 5 (dode instelling; zie widgetreview 2026-07-17).
+      const rebalThreshold = Number(
+        (profileResult.data as { rebalance_threshold?: number | null } | null)?.rebalance_threshold
+          ?? REBAL_DEFAULT_CONSTRAINTS.threshold,
+      )
+      const rebalNotifs = generateRebalanceNotifications(drifts, rebalThreshold, box3Window)
       for (const n of rebalNotifs) {
         notifications.push(n)
       }
@@ -1805,14 +1854,15 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
 
   // ── Decision Patterns: group completed actions by recommendation_type ──
   const completedActions = allActions.filter(a => a.status === 'completed')
-  const patternMap = new Map<string, number>()
+  const patternMap = new Map<string, { days: number; count: number }>()
   for (const a of completedActions) {
     const recType = (a as { recommendation?: { recommendation_type?: string } | null }).recommendation?.recommendation_type ?? 'overig'
     const days = Number(a.freedom_days_impact) || 0
-    patternMap.set(recType, (patternMap.get(recType) ?? 0) + days)
+    const prev = patternMap.get(recType) ?? { days: 0, count: 0 }
+    patternMap.set(recType, { days: prev.days + days, count: prev.count + 1 })
   }
   const decisionPatterns = Array.from(patternMap.entries())
-    .map(([type, days]) => ({ type, days }))
+    .map(([type, agg]) => ({ type, days: agg.days, count: agg.count }))
     .sort((a, b) => b.days - a.days)
 
   // ── Freedom Days Monthly: group completed actions by month (last 12 months) ──
@@ -1877,9 +1927,19 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     ...((income12Result.data ?? []) as { amount: number; date: string; budget_id?: string | null; transaction_type?: string | null }[]),
   ].filter(isRealTx)
 
-  const weekStartStr = weekStart.toISOString().split('T')[0]
-  const weekEndStr = weekEndDate.toISOString().split('T')[0]
-  const prevWeekStartStr = prevWeekStart.toISOString().split('T')[0]
+  // Weekgrenzen als LOKALE datumstrings — nooit toISOString() (dat rekent in UTC
+  // en schuift in NL het hele Ma–Zo-venster + de dag-buckets een dag terug).
+  const weekStartStr = localDateStr(weekStart)
+  const weekEndStr = localDateStr(weekEndDate)
+  const prevWeekStartStr = localDateStr(prevWeekStart)
+
+  // Appels-met-appels-vergelijking: zet de vorige week af tegen dezelfde verstreken
+  // dagen (vorige week Ma..t/m vandaag) i.p.v. de volle vorige week, zodat een
+  // lopend weektotaal niet vroeg in de week een schijndaling toont.
+  const elapsedDays = ((now.getDay() + 6) % 7) + 1 // Ma=1 .. Zo=7
+  const prevWeekPartialEnd = new Date(prevWeekStart)
+  prevWeekPartialEnd.setDate(prevWeekStart.getDate() + elapsedDays)
+  const prevWeekPartialEndStr = localDateStr(prevWeekPartialEnd)
 
   for (const tx of allWeekTx) {
     const d = tx.date as string
@@ -1900,8 +1960,9 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
         weekIncomeTotal += amt
       }
     }
-    // Previous week (expenses only for comparison)
-    if (d >= prevWeekStartStr && d < weekStartStr && amt < 0) {
+    // Previous week — alleen dezelfde verstreken dagen (Ma..t/m vandaag) voor
+    // een eerlijke vergelijking (expenses only).
+    if (d >= prevWeekStartStr && d < prevWeekPartialEndStr && amt < 0) {
       const absAmt = Math.abs(amt)
       prevWeekExpensesTotal += absAmt
       if (tx.budget_id) {
@@ -1916,7 +1977,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   for (let i = 0; i < 7; i++) {
     const day = new Date(weekStart)
     day.setDate(weekStart.getDate() + i)
-    const dayStr = day.toISOString().split('T')[0]
+    const dayStr = localDateStr(day)
     weekDailyExpenses.push({
       day: dayStr,
       label: DAY_LABELS[i],
@@ -2003,12 +2064,15 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       const remainingTermMonths = Number((mortgageDebt as { remaining_term_months?: number | null }).remaining_term_months ?? 360)
 
       if (rente > 0) {
-        // Kernel-only (FASE 6 stap 5A). NB: dit summary-blok geeft géén FIRE-impact-params
-        // mee, dus `computeFireImpact` retourneert hier sowieso `null` — `hvbSummary` leest
-        // enkel breakeven + aanbeveling (deterministische schema's). De routing (dob) reist
-        // mee voor consistentie zodra een caller wél FIRE-params meegeeft.
+        const HVB_EXTRA_MAAND = 200 // standaard €200/maand extra
+        const HVB_HORIZON_JAREN = 10
+        // Kernel-only (FASE 6 stap 5A). We geven nu wél de FIRE-impact-params mee (leeftijd,
+        // portefeuille, uitgaven, spaarruimte + cashflows) zodat `computeFireImpact` de twee
+        // scenario's via de horizon-kernel draait en `fireImpactMaanden` (vrijheidstijd) oplevert.
+        // Zonder geboortedatum (dob) kan de kernel geen tijdas bouwen → dan blijft de impact null.
+        const hvbCurrentAge = dob ? ageAtDate(dob) : undefined
         const hvbResult = compareMortgageVsInvest({
-          extraBedrag: 200, // standaard €200/maand extra
+          extraBedrag: HVB_EXTRA_MAAND,
           hypotheekBalance: balance,
           rente,
           repaymentType,
@@ -2018,7 +2082,12 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
           verwachtRendement: fireParams.grossReturn,
           inflatie: fireParams.inflationRate,
           hasPartner: false,
-          horizonJaren: 10,
+          horizonJaren: HVB_HORIZON_JAREN,
+          currentAge: hvbCurrentAge,
+          currentPortfolio: totalAssets,
+          yearlyExpenses: effectiveMonthlyExpenses * 12,
+          annualSavings: Math.max(0, (effectiveMonthlyIncome - effectiveMonthlyExpenses)) * 12,
+          cashflows: lifeEventsToCashflows(((eventsResult.data ?? []) as LifeEvent[])),
         }, { dateOfBirth: dob })
         hvbSummary = {
           restschuld: balance,
@@ -2026,6 +2095,13 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
           breakevenRendement: hvbResult.breakevenRendement,
           aanbeveling: hvbResult.aanbeveling,
           isTaxDeductible,
+          // Engine-outputs consumeren i.p.v. in de widget herberekenen.
+          beleggenVoordeel: hvbResult.beleggen.nettoVoordeel,
+          aflossenVoordeel: hvbResult.aflossing.nettoVoordeel,
+          verschil: hvbResult.verschil,
+          extraBedragMaand: HVB_EXTRA_MAAND,
+          horizonJaren: HVB_HORIZON_JAREN,
+          fireImpactMaanden: hvbResult.fireImpactMaanden,
         }
       }
     }
@@ -2142,7 +2218,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     totalFreedomDaysOpen,
     completedActionsThisMonth,
     topOpenActions,
-    recentCompletedActions: [],
+    recentCompletedActions,
     recentRejectedActions: [],
     sovereigntyLevel,
     currentPhaseId,
@@ -2243,6 +2319,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     heatmapSpending,
     heatmapBeschikbaarMap,
     heatmapPreviousSpending,
+    newsPreview,
   }
 
   // Pot-regels — defensieve aparte fetch zodat een ontbrekende kolom (DB zonder

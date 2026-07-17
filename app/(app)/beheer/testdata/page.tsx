@@ -214,7 +214,8 @@ export default function BeheerTestdataPage() {
           }
 
           if ('step' in event && 'progress' in event) {
-            setSeedProgress(event.progress)
+            // Vangnet tegen een eventuele backend-drift: de balk toont nooit >100%.
+            setSeedProgress(Math.min(100, event.progress))
             setSeedStep(event.step)
             setSeedSteps((prev) => [...prev, event as SeedStep])
           }

@@ -5,6 +5,7 @@ import { getModel, AIConfigError } from '@/lib/ai/config'
 import { checkTierGate } from '@/lib/require-tier'
 import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
 import { maskPIIInObject } from '@/lib/ai/pii-output-filter'
+import { unauthorized, serverError } from '@/lib/api/respond'
 
 const TEMPORAL_HINTS: Record<number, string> = {
   1: 'De gebruiker is een Levensgenieter (level 1). Wees zacht — adviseer alleen eliminatie bij echte overlappen, niet bij comfortdiensten.',
@@ -63,7 +64,7 @@ export async function POST(req: Request) {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return new Response('Unauthorized', { status: 401 })
+    return unauthorized()
   }
 
   const tierGate = await checkTierGate(supabase, user.id, 'ai')
@@ -113,6 +114,7 @@ export async function POST(req: Request) {
     model = await getModel(supabase, 'abonnementen_advies')
   } catch (err) {
     if (err instanceof AIConfigError) {
+      // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
       return Response.json({ error: err.message }, { status: 422 })
     }
     return Response.json({ error: 'AI model kon niet worden geladen.' }, { status: 500 })
@@ -173,11 +175,6 @@ Stel ook maximaal 3 concrete, direct inplanbare acties voor (suggestedActions):
     // the free AI text before it reaches the user (recommendations does the same).
     return Response.json(maskPIIInObject(normalized))
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    console.error('[/api/subscriptions/advice] generateObject failed:', message)
-    return Response.json(
-      { error: `Will kon de abonnementen niet analyseren: ${message}` },
-      { status: 500 },
-    )
+    return serverError(err, 'subscriptions-advice:POST')
   }
 }

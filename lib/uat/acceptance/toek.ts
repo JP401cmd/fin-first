@@ -57,7 +57,7 @@ const criteria: AcceptanceCriterion[] = [
     assertion: {
       kind: 'exact',
       expected: 'pensioenMaand=3000; jaaruitgaven=36000; rendementPct=6',
-      source: 'PERSONAS.willem.profile.retirement_expense_custom_amount (×12) en .expected_return (×100). Totalen = kernel/oracle.',
+      source: 'PERSONAS.willem.profile.retirement_expense_custom_amount (jaarbedrag, via computeRetirementExpenses; maandweergave = /12) en .expected_return (×100). Totalen = kernel/oracle.',
     },
   },
   {

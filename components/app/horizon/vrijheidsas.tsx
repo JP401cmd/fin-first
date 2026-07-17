@@ -8,16 +8,20 @@
  *
  * Opzet (twee vragen, netjes gescheiden — grid-cols-1 sm:grid-cols-2, mobiel gestapeld):
  *   LINKS  "Wanneer kun je stoppen? — de streep": de draaiknoppen + rendement-per-groep
- *          (via de `draaiknoppen`-slot uit horizon-client) + de verwacht-FIRE-uitkomst
- *          met vroegst–laatst-band.
+ *          (via de `draaiknoppen`-slot uit horizon-client).
  *   RECHTS "Hoe stevig is dat? — de marge": de gewenste-stopleeftijd-slider + driezone-
- *          marge-band + stopkeuze-checkbox + de marge/zone-uitkomst.
- *   ONDER  volle-breedte cijferrij (Basis-vrijheid / Wat-als-vrijheid / Stopleeftijd).
+ *          band waarop je de héle reis afleest — basis → verwacht → laatst als markers,
+ *          de stop-marker als jouw ambitie, en de marge als overspanning tussen verwacht
+ *          en stop (bracket + zone-woord) + de onzekerheidszin.
+ *   ONDER  volle-breedte cijferrij met de drie grootheden (Basis- / Doel- of Wat-als- /
+ *          Geambieerde vrijheid). Dit is de énige Figure-gestileerde plek voor de leeftijd-
+ *          en marge-getallen; de band toont het marge-getal daarnaast als ruimtelijk
+ *          bracket-label (datalabel op de visualisatie, geen tweede figure).
  *
  * Kleur-conventie:
  *   - module-identiteit (paneel-badges, stop-slider, accentwaarden) via horizon-tokens;
- *   - de driezone-marge-band (tekort · krap · stevig) in STOPLICHT-status (red/amber/
- *     emerald), nooit het module-accent.
+ *   - de driezone-marge-band + marge-bracket (tekort · krap · stevig) in STOPLICHT-status
+ *     (red/amber/emerald), nooit het module-accent.
  */
 
 import type { ReactNode } from 'react'
@@ -71,7 +75,14 @@ const ZONE_TEXT: Record<StopMargeZone, string> = {
   stevig: 'text-emerald-700',
 }
 
-/** Eén korte duidende zin per zone (mockup-toon), getoond onder het zone-woord. */
+/** Border-tint voor de marge-bracket, in dezelfde stoplicht-familie als de band-vlakken. */
+const ZONE_BORDER: Record<StopMargeZone, string> = {
+  tekort: 'border-red-400',
+  krap: 'border-amber-400',
+  stevig: 'border-emerald-400',
+}
+
+/** Eén korte duidende zin per zone (mockup-toon), getoond onder de band. */
 const ZONE_NOTE: Record<StopMargeZone, string> = {
   tekort: 'je stopt vóór de streep — dit plan komt geld tekort',
   krap: 'net na de streep — houdbaar, maar dun',
@@ -83,7 +94,7 @@ const ZONE_NOTE: Record<StopMargeZone, string> = {
 /**
  * Signed marge-weergave met adaptieve eenheid: |marge| < 1 jaar → maanden
  * ("+8 mnd" / "−4 mnd"), anders 1-decimaal jaren ("+2,5 jr" / "−1,0 jr").
- * Gebruikt overal waar het marge-getal staat (cijferrij + aria-valuetext), zodat
+ * Gebruikt overal waar het marge-getal staat (cijferrij + bracket + aria-valuetext), zodat
  * kleine marges niet als "+0,1 jr" verdwijnen. `−` = U+2212 (typografische min).
  */
 export function formatMargeShort(margeJaren: number): string {
@@ -91,11 +102,6 @@ export function formatMargeShort(margeJaren: number): string {
   const abs = Math.abs(margeJaren)
   if (abs < 1) return `${sign}${Math.round(abs * 12)} mnd`
   return `${sign}${abs.toFixed(1).replace('.', ',')} jr`
-}
-
-/** 1-decimaal jaartal met NL-komma (voor de vroegst–laatst-bandregel). */
-function formatAge1(v: number): string {
-  return (Math.round(v * 10) / 10).toFixed(1).replace('.', ',')
 }
 
 // ── Driezone-marge-band-breedtes (getest) ─────────────────────────────────────
@@ -130,6 +136,40 @@ export function computeMargeBandPct(
   return { amberStartPct: start, amberEndPct: end }
 }
 
+/**
+ * Minimale afstand (percentpunten) die de basis-marker van de verwacht-streep moet
+ * houden om apart getoond te worden. Ligt de basis er dichterbij (bv. zonder actief
+ * scenario, waar basis == verwacht), dan valt-ie samen met verwacht → weglaten.
+ * Ondergrens = LABEL_WIDTH_PCT + halve "basis"-labelbreedte: het rechts-uitgelijnde
+ * verwacht-label beslaat ~9pp links van de streep, dus een kleinere gap laat de
+ * gecentreerde basis-tekst daar dwars doorheen lopen.
+ */
+export const BASIS_MARKER_MIN_GAP_PCT = 12
+
+/**
+ * Houd een zwevend (gecentreerd, nowrap) band-label binnen het band-vlak: bij extreme
+ * slider-standen (stop op de as-rand) zou het label anders buiten beeld knippen of het
+ * buurpaneel inlopen. `margin` = halve labelbreedte in percentpunten van de as-span.
+ */
+export function clampLabelPct(pct: number, margin: number): number {
+  return Math.max(margin, Math.min(100 - margin, pct))
+}
+
+/**
+ * Benaderde breedte (percentpunten van de as-span) van de VERWACHT/LAATST-band-labels.
+ * Ondergrens voor het rechts-uitgelijnde verwacht-label: zit de amber-zone tegen de
+ * linkerrand van de as (extreme slider-stand), dan schuift het label net genoeg naar
+ * rechts om binnen het vlak te blijven; laatst schuift dan mee zodat ze nooit botsen.
+ */
+export const LABEL_WIDTH_PCT = 9
+
+/** Halve breedte (pp) van het marge-bracket-label ("marge +X jr · zone", gecentreerd). */
+const MARGE_LABEL_CLAMP_PCT = 11
+/** Halve breedte (pp) van het "stop X"-label (gecentreerd boven de band). */
+const STOP_LABEL_CLAMP_PCT = 5
+/** Halve breedte (pp) van het "basis"-label (gecentreerd onder de band). */
+const BASIS_LABEL_CLAMP_PCT = 4
+
 // ── Props ────────────────────────────────────────────────────────────────────
 
 export interface VrijheidsasProps {
@@ -143,8 +183,7 @@ export interface VrijheidsasProps {
    *  Vormt samen met `vroegstFireAgeFractional` de "band" van de verwachting (laatst = rand). */
   laatstFireAge: number | null
   /** FIRE-uitkomst van de OPTIMISTISCHE variant (+2 pp-rendement) — de vroegste rand van de
-   *  verwachtingsband. Samen met `laatstFireAge` toont dit "band X – Y jr" onder de verwacht-
-   *  uitkomst. Optioneel: null/undefined → geen bandregel. */
+   *  verwachtingsband. Samen met `laatstFireAge` voedt dit de onzekerheidszin. Optioneel. */
   vroegstFireAgeFractional?: number | null
   /** Actief scenario aanwezig? Zonder scenario geen wat-als-accent/delta. */
   hasScenario: boolean
@@ -158,7 +197,7 @@ export interface VrijheidsasProps {
   zone: StopMargeZone | null
   /** stopAge − verwacht (jaren); null = verwacht onbereikbaar. */
   margeJaren: number | null
-  /** Er is een doel vastgelegd — de i-uitleg krijgt één extra doel-zin. */
+  /** Er is een doel vastgelegd — kicker "Doel-vrijheid" i.p.v. "Wat-als-vrijheid" + i-zin. */
   doelActief?: boolean
   /** Linker-vlak-inhoud (draaiknoppen + rendement-per-groep) uit horizon-client. */
   draaiknoppen?: ReactNode
@@ -204,29 +243,42 @@ export function Vrijheidsas({
   const delta = fireDeltaLabel(deltaMonths, reachable)
 
   // Marge-band-grenzen (rood/amber/groen), met strakke amber-buffer rond de verwacht-streep.
-  const bandVerwachtPct = verwachtFireAge !== null ? posOf(verwachtFireAge) : null
+  const verwachtPos = verwachtFireAge !== null ? posOf(verwachtFireAge) : null
   const bandLaatstPct =
     laatstFireAge !== null && verwachtFireAge !== null
       ? posOf(Math.max(laatstFireAge, verwachtFireAge))
       : null
   const band =
-    reachable && bandVerwachtPct !== null
-      ? computeMargeBandPct(bandVerwachtPct, bandLaatstPct)
+    reachable && verwachtPos !== null
+      ? computeMargeBandPct(verwachtPos, bandLaatstPct)
       : null
+
+  const stopPos = posOf(stopAge)
+
+  // Basis-marker op de band — alleen als de basis merkbaar los ligt van de verwacht-streep
+  // (anders vallen ze samen, bv. zonder actief scenario).
+  const basisPos = baseFireAge !== null ? posOf(baseFireAge) : null
+  const showBasisMarker =
+    reachable &&
+    basisPos !== null &&
+    verwachtPos !== null &&
+    Math.abs(basisPos - verwachtPos) >= BASIS_MARKER_MIN_GAP_PCT
+
+  // Marge als overspanning: bracket tussen de verwacht-streep en de stop-marker.
+  const showMargeBracket = reachable && verwachtPos !== null && margeJaren !== null
+  const margeSpanLeft = verwachtPos !== null ? Math.min(stopPos, verwachtPos) : stopPos
+  const margeSpanWidth = verwachtPos !== null ? Math.abs(stopPos - verwachtPos) : 0
+  const margeSpanMid = verwachtPos !== null ? (stopPos + verwachtPos) / 2 : stopPos
+  const margeBracketLabel =
+    margeJaren !== null ? `marge ${formatMargeShort(margeJaren)}${zone ? ` · ${zone}` : ''}` : ''
 
   const margeText =
     margeJaren === null ? 'marge onbekend' : `marge ${formatMargeShort(margeJaren)}`
 
-  // Vroegst–laatst-band: de optimistische én voorzichtige rand van de verwachting.
-  const bandNote =
-    vroegstFireAgeFractional != null &&
-    Number.isFinite(vroegstFireAgeFractional) &&
-    laatstFireAge !== null
-      ? `band ${formatAge1(vroegstFireAgeFractional)} – ${formatAge1(laatstFireAge)} jr`
-      : undefined
-
   // Gewone-taal-onzekerheidszin (zichtbaar zodra de band-randen bekend zijn). Consumeert
-  // exact dezelfde vroegst/laatst-waarden als de band — niets herrekend.
+  // exact dezelfde vroegst/laatst-waarden als de band — niets herrekend. Degeneratie-guard:
+  // vallen vroegst en laatst na afronding samen, dan is "tussen X en Y" betekenisloos →
+  // enkelvoudige formulering ("rond de X").
   const onzekerheid =
     vroegstFireAgeFractional != null &&
     Number.isFinite(vroegstFireAgeFractional) &&
@@ -236,6 +288,9 @@ export function Vrijheidsas({
           laatst: formatAge(Math.round(laatstFireAge * 2) / 2),
         }
       : null
+  const onzekerheidDegenereert = onzekerheid !== null && onzekerheid.vroegst === onzekerheid.laatst
+
+  const watAlsKicker = doelActief ? 'Doel-vrijheid' : 'Wat-als-vrijheid'
 
   return (
     <div>
@@ -255,9 +310,12 @@ export function Vrijheidsas({
           gedekt.
         </p>
         <p className="m-0 mt-2">
-          De <b className="text-[var(--ink)]">band</b> onder de verwacht-uitkomst toont de breedte van
-          de verwachting: <b className="text-[var(--ink)]">vroegst</b> = +2 pp-variant ·{' '}
-          <b className="text-[var(--ink)]">laatst</b> = −2 pp-variant — de aannames bepalen de breedte.
+          Op de <b className="text-[var(--ink)]">band</b> lees je de hele reis af:{' '}
+          <b className="text-[var(--ink)]">basis</b> → <b className="text-[var(--ink)]">verwacht</b> →{' '}
+          <b className="text-[var(--ink)]">laatst</b> zijn de FIRE-leeftijden (van je basislijn, je
+          actieve pad en de voorzichtige variant). De <b className="text-[var(--ink)]">stop-marker</b> is
+          jouw ambitie; de <b className="text-[var(--ink)]">marge</b> is de overspanning tussen verwacht
+          en stop.
         </p>
         {doelActief && (
           <p className="m-0 mt-2">
@@ -280,37 +338,20 @@ export function Vrijheidsas({
           <PanelHeader num="1" title="Wanneer kun je stoppen?" tag="de streep" />
 
           {draaiknoppen && <div className="mt-4 space-y-5">{draaiknoppen}</div>}
-
-          <div className="mt-5 border-t border-[var(--border-ed)] pt-4">
-            <Figure
-              kicker="FIRE-leeftijd · verwacht"
-              value={formatAge(hasScenario ? verwachtFireAge : baseFireAge)}
-              unit="jr"
-              highlight={hasScenario}
-              // Vroegst–laatst-band: de optimistische én voorzichtige rand van de verwachting.
-              band={bandNote}
-            />
-          </div>
         </section>
 
         {/* RECHTS — Hoe stevig is dat? (de marge) */}
         <section className="min-w-0">
           <PanelHeader num="2" title="Hoe stevig is dat?" tag="de marge" />
 
-          {/* Gewenste stopleeftijd + afwijking + leeftijd op één regel */}
+          {/* Gewenste stopleeftijd + leeftijd op één regel (de delta staat alleen nog
+              onder in de cijferrij, niet meer hier). */}
           <div className="mt-4 mb-1.5 flex items-center justify-between gap-2">
             <span className="font-sans text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
               Gewenste stopleeftijd
             </span>
-            <span className="flex items-baseline gap-2">
-              {hasScenario && reachable && delta.tone !== 'none' && (
-                <span className={`font-mono text-[10px] tabular-nums ${DELTA_TONE_CLASS[delta.tone]}`}>
-                  {delta.text}
-                </span>
-              )}
-              <span className="font-mono text-sm tabular-nums text-[var(--ink)]">
-                {formatAge(stopAge)}
-              </span>
+            <span className="font-mono text-sm tabular-nums text-[var(--ink)]">
+              {formatAge(stopAge)}
             </span>
           </div>
 
@@ -330,15 +371,48 @@ export function Vrijheidsas({
             }`}
           />
 
-          {/* driezone-band (stoplicht) + stop-marker */}
-          <div className="relative mt-4">
-            {/* stop-label boven de band */}
+          {/* driezone-band (stoplicht) met basis/verwacht/laatst-markers, stop-marker
+              (ambitie) en de marge als overspanning. */}
+          <div className="relative mt-12">
+            {/* marge-overspanning-label (bovenste rij) */}
+            {showMargeBracket && margeSpanWidth > 0 && (
+              <div
+                className={`absolute -translate-x-1/2 whitespace-nowrap font-mono text-[10px] font-semibold tabular-nums ${
+                  zone ? ZONE_TEXT[zone] : 'text-[var(--ink-3)]'
+                }`}
+                style={{ top: '-42px', left: `${clampLabelPct(margeSpanMid, MARGE_LABEL_CLAMP_PCT)}%` }}
+              >
+                {margeBracketLabel}
+              </div>
+            )}
+
+            {/* stop-label (tweede rij, altijd boven de marge-bracket) */}
             <div
-              className="absolute -top-4 -translate-x-1/2 whitespace-nowrap font-mono text-[10px] font-semibold tabular-nums text-horizon-700"
-              style={{ left: `${posOf(stopAge)}%` }}
+              className="absolute -translate-x-1/2 whitespace-nowrap font-mono text-[10px] font-semibold tabular-nums text-horizon-700"
+              style={{ top: '-24px', left: `${clampLabelPct(stopPos, STOP_LABEL_CLAMP_PCT)}%` }}
             >
               stop {formatAge(stopAge)}
             </div>
+
+            {/* marge-bracket (⊓ boven de band, opent naar de band toe) */}
+            {showMargeBracket && margeSpanWidth > 0 && (
+              <div
+                className={`absolute h-2 border-t border-l border-r ${
+                  zone ? ZONE_BORDER[zone] : 'border-[var(--border-ed)]'
+                }`}
+                style={{ top: '-8px', left: `${margeSpanLeft}%`, width: `${margeSpanWidth}%` }}
+                aria-hidden
+              />
+            )}
+
+            {/* basis-marker (dun streepje over de band) */}
+            {showBasisMarker && basisPos !== null && (
+              <div
+                className="absolute top-0 h-2.5 w-px -translate-x-1/2 bg-[var(--ink-3)]"
+                style={{ left: `${basisPos}%` }}
+                aria-hidden
+              />
+            )}
 
             <div className="flex h-2.5 overflow-hidden rounded-full">
               {reachable && band ? (
@@ -361,24 +435,35 @@ export function Vrijheidsas({
             {/* stop-marker (verticaal) */}
             <div
               className="absolute -top-1 h-[18px] w-px -translate-x-1/2 bg-[var(--ink)]"
-              style={{ left: `${posOf(stopAge)}%` }}
+              style={{ left: `${stopPos}%` }}
               aria-hidden
             />
 
-            {/* verwacht/laatst-labels onder de band — naar buiten uitgelijnd zodat ze,
-                dankzij de strakke amber-buffer, nooit botsen. */}
+            {/* markers-labels onder de band — basis / verwacht / laatst. Verwacht en laatst
+                staan naar buiten uitgelijnd zodat ze, dankzij de strakke amber-buffer, nooit
+                botsen; basis krijgt (dankzij de gap-guard) zijn eigen ruimte. */}
             {reachable && band && (
               <div className="relative mt-1 h-3">
+                {showBasisMarker && basisPos !== null && (
+                  <span
+                    className="absolute -translate-x-1/2 whitespace-nowrap font-mono text-[9px] uppercase tracking-[0.05em] text-[var(--ink-4)]"
+                    style={{ left: `${clampLabelPct(basisPos, BASIS_LABEL_CLAMP_PCT)}%` }}
+                  >
+                    basis
+                  </span>
+                )}
                 <span
                   className="absolute -translate-x-full whitespace-nowrap pr-1 font-mono text-[9px] uppercase tracking-[0.05em] text-[var(--ink-4)]"
-                  style={{ left: `${band.amberStartPct}%` }}
+                  style={{ left: `${Math.max(band.amberStartPct, LABEL_WIDTH_PCT)}%` }}
                 >
                   verwacht
                 </span>
                 {laatstFireAge !== null && (
                   <span
                     className="absolute whitespace-nowrap pl-1 font-mono text-[9px] uppercase tracking-[0.05em] text-[var(--ink-4)]"
-                    style={{ left: `${band.amberEndPct}%` }}
+                    style={{
+                      left: `${Math.max(band.amberEndPct, Math.max(band.amberStartPct, LABEL_WIDTH_PCT))}%`,
+                    }}
                   >
                     laatst
                   </span>
@@ -387,11 +472,27 @@ export function Vrijheidsas({
             )}
           </div>
 
-          {/* Onzekerheidszin (gewone taal) */}
+          {/* zone-duidende zin — vervangt de verwijderde Marge-figure als duiding onder de band */}
+          {zone && (
+            <p className={`mt-3 font-mono text-[10px] leading-snug ${ZONE_TEXT[zone]}`}>
+              {ZONE_NOTE[zone]}
+            </p>
+          )}
+
+          {/* Onzekerheidszin (gewone taal) — met degeneratie-guard */}
           {onzekerheid && (
-            <p className="mt-3 font-sans text-[12px] leading-snug text-[var(--ink-3)]">
-              Waarschijnlijk ben je vrij tussen <b className="text-[var(--ink-2)]">{onzekerheid.vroegst}</b> en{' '}
-              <b className="text-[var(--ink-2)]">{onzekerheid.laatst}</b> — afhankelijk van hoe de markten lopen.
+            <p className="mt-2 font-sans text-[12px] leading-snug text-[var(--ink-3)]">
+              {onzekerheidDegenereert ? (
+                <>
+                  Je bent naar verwachting <b className="text-[var(--ink-2)]">rond je {onzekerheid.vroegst}e</b>{' '}
+                  vrij — de scenario’s liggen hier dicht op elkaar.
+                </>
+              ) : (
+                <>
+                  Waarschijnlijk ben je vrij tussen <b className="text-[var(--ink-2)]">{onzekerheid.vroegst}</b> en{' '}
+                  <b className="text-[var(--ink-2)]">{onzekerheid.laatst}</b> — afhankelijk van hoe de markten lopen.
+                </>
+              )}
             </p>
           )}
 
@@ -408,28 +509,14 @@ export function Vrijheidsas({
               <span className="text-[var(--ink-4)]">(dan blijft je marge gelijk)</span>
             </span>
           </label>
-
-          {/* marge/zone-uitkomst */}
-          <div className="mt-5 border-t border-[var(--border-ed)] pt-4">
-            <Figure
-              kicker="Marge · buffer"
-              value={margeJaren === null ? '—' : formatMargeShort(margeJaren)}
-              unit=""
-              valueClass={zone ? ZONE_TEXT[zone] : undefined}
-              // Zone als woord (tekort/krap/stevig) + één duidende zin, zelfde kleurtoon.
-              zoneWord={zone ?? undefined}
-              zoneWordClass={zone ? ZONE_TEXT[zone] : undefined}
-              zoneNote={zone ? ZONE_NOTE[zone] : undefined}
-            />
-          </div>
         </section>
       </div>
 
-      {/* ── Cijferrij (volle breedte, onder de twee vlakken) ── */}
+      {/* ── Cijferrij (volle breedte, onder de twee vlakken) — de drieslag ── */}
       <div className="mt-6 grid grid-cols-3 gap-3 border-t border-[var(--border-ed)] pt-4">
         <Figure kicker="Basis-vrijheid" value={formatAge(baseFireAge)} unit="jr" />
         <Figure
-          kicker="Wat-als-vrijheid"
+          kicker={watAlsKicker}
           value={formatAge(hasScenario ? verwachtFireAge : baseFireAge)}
           unit="jr"
           highlight={hasScenario}
@@ -437,7 +524,7 @@ export function Vrijheidsas({
           subClass={hasScenario ? DELTA_TONE_CLASS[delta.tone] : undefined}
         />
         <Figure
-          kicker="Stopleeftijd"
+          kicker="Geambieerde vrijheid"
           value={formatAge(stopAge)}
           unit="jr"
           sub={margeText}
@@ -475,10 +562,6 @@ function Figure({
   valueClass,
   sub,
   subClass,
-  band,
-  zoneWord,
-  zoneWordClass,
-  zoneNote,
 }: {
   kicker: string
   value: string
@@ -488,12 +571,6 @@ function Figure({
   valueClass?: string
   sub?: string
   subClass?: string
-  /** Vroegst–laatst-bandregel (ink-3, mono), onder de sub. */
-  band?: string
-  zoneWord?: string
-  zoneWordClass?: string
-  /** Duidende zin onder het zone-woord (zelfde kleurtoon). */
-  zoneNote?: string
 }) {
   return (
     <div>
@@ -519,21 +596,6 @@ function Figure({
       {sub && (
         <div className={`mt-1 font-mono text-[10px] tabular-nums ${subClass ?? 'text-[var(--ink-3)]'}`}>
           {sub}
-        </div>
-      )}
-      {band && (
-        <div className="mt-0.5 font-mono text-[10px] tabular-nums text-[var(--ink-3)]">
-          {band}
-        </div>
-      )}
-      {zoneWord && (
-        <div className={`mt-0.5 font-mono text-[9px] uppercase tracking-[0.12em] ${zoneWordClass ?? 'text-[var(--ink-3)]'}`}>
-          {zoneWord}
-        </div>
-      )}
-      {zoneNote && (
-        <div className={`mt-0.5 font-mono text-[10px] leading-snug ${zoneWordClass ?? 'text-[var(--ink-3)]'}`}>
-          {zoneNote}
         </div>
       )}
     </div>

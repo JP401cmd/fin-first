@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { forbidden } from '@/lib/api/respond'
 import { isSuperAdmin } from '@/lib/admin'
 import { runKernelProjection } from '@/lib/horizon-kernel'
 import { buildKernelInputFromApp } from '@/lib/horizon-kernel/adapter'
@@ -20,7 +21,7 @@ import { findKernelTableMeta, type KernelTableId } from '@/lib/horizon-kernel-re
 export async function GET(req: NextRequest) {
   const supabase = await createClient()
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Geen toegang' }, { status: 403 })
+    return forbidden()
   }
 
   const sp = req.nextUrl.searchParams
@@ -48,6 +49,7 @@ export async function GET(req: NextRequest) {
   } catch (err) {
     return NextResponse.json({
       ok: false,
+      // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
       reason: err instanceof Error ? err.message : 'Kon de invoer niet laden.',
     })
   }

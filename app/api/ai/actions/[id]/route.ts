@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/supabase/service'
+import { unauthorized, serverError } from '@/lib/api/respond'
 
 export async function PATCH(
   req: NextRequest,
@@ -10,7 +11,7 @@ export async function PATCH(
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return new Response('Unauthorized', { status: 401 })
+    return unauthorized()
   }
 
   const { id } = await params
@@ -59,7 +60,7 @@ export async function PATCH(
       .single()
 
     if (error) {
-      return Response.json({ error: error.message }, { status: 500 })
+      return serverError(error, 'ai-action-update:PATCH')
     }
 
     return Response.json({ action: updated })
@@ -77,7 +78,7 @@ export async function PATCH(
       .eq('id', id)
 
     if (error) {
-      return Response.json({ error: error.message }, { status: 500 })
+      return serverError(error, 'ai-action-complete:PATCH')
     }
 
     // Log feedback if linked to a recommendation
@@ -166,7 +167,7 @@ export async function PATCH(
       .eq('id', id)
 
     if (error) {
-      return Response.json({ error: error.message }, { status: 500 })
+      return serverError(error, 'ai-action-postpone:PATCH')
     }
 
     return Response.json({ status: 'postponed' })
@@ -184,7 +185,7 @@ export async function PATCH(
       .eq('id', id)
 
     if (error) {
-      return Response.json({ error: error.message }, { status: 500 })
+      return serverError(error, 'ai-action-reject:PATCH')
     }
 
     if (action.recommendation_id) {
@@ -215,7 +216,7 @@ export async function PATCH(
       .eq('id', id)
 
     if (error) {
-      return Response.json({ error: error.message }, { status: 500 })
+      return serverError(error, 'ai-action-reopen:PATCH')
     }
 
     return Response.json({ status: 'open' })

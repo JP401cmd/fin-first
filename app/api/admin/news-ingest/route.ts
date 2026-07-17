@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { forbidden, serverError } from '@/lib/api/respond'
 import { createClient } from '@/lib/supabase/server'
 import { isSuperAdmin } from '@/lib/admin'
 import { getModel } from '@/lib/ai/config'
@@ -13,7 +14,7 @@ export async function POST() {
   const supabase = await createClient()
 
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   try {
@@ -30,9 +31,7 @@ export async function POST() {
 
     return NextResponse.json({ success: true, summary })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Onbekende fout'
-    console.error('[news-ingest] Manual ingestion failed:', message)
-    return NextResponse.json({ error: message }, { status: 500 })
+    return serverError(err, 'admin-news-ingest:POST')
   }
 }
 
@@ -42,7 +41,7 @@ export async function GET() {
   const supabase = await createClient()
 
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   const [runsRes, healthRes] = await Promise.all([

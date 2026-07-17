@@ -45,6 +45,7 @@ export async function GET() {
 
   if (settingsError) {
     return NextResponse.json(
+      // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
       { error: 'Fout bij laden roadmap data', detail: settingsError.message },
       { status: 500 },
     )
@@ -193,6 +194,7 @@ export async function PUT(request: NextRequest) {
 
   if (upsertError) {
     return NextResponse.json(
+      // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
       { error: 'Fout bij opslaan', detail: upsertError.message },
       { status: 500 },
     )

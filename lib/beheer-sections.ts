@@ -27,6 +27,7 @@ import {
   LineChart,
   ListChecks,
   Mail,
+  MailCheck,
   MessageSquare,
   MessageCircle,
   Milestone,
@@ -140,6 +141,13 @@ export const BEHEER_GROUPS: BeheerGroup[] = [
         href: '/beheer/gebruikers',
         description: 'Zoek een gebruiker en ken AI- of Connected-abonnementen toe.',
         icon: Users,
+      },
+      {
+        label: 'Registratie-toegang',
+        href: '/beheer/allowlist',
+        description:
+          'Wie mag zich registreren tijdens de besloten testfase — de e-mail-uitnodigingslijst.',
+        icon: MailCheck,
       },
       {
         label: 'Welkomstgids',

@@ -8,6 +8,7 @@ import { buildSharedContext } from '@/lib/ai/context/shared-context'
 import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
 import { maskPIIInObject } from '@/lib/ai/pii-output-filter'
 import { NextResponse } from 'next/server'
+import { unauthorized, forbidden, serverError } from '@/lib/api/respond'
 import { checkTierGate } from '@/lib/require-tier'
 import { NEWS_SYSTEM_PROMPT } from '@/lib/news-system-prompt'
 import {
@@ -386,12 +387,12 @@ export async function GET(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   const tierGate = await checkTierGate(supabase, user.id, 'ai')
   if (tierGate) {
-    return NextResponse.json({ error: tierGate.error }, { status: 403 })
+    return forbidden(tierGate.error)
   }
 
   const url = new URL(request.url)
@@ -427,9 +428,10 @@ export async function GET(request: Request) {
   if (existingState) {
     if (existingState.error) {
       await clearGenerationState(supabase, user.id)
-      return NextResponse.json(
-        { error: `Nieuws kon niet worden gegenereerd: ${existingState.error}` },
-        { status: 500 },
+      return serverError(
+        new Error(existingState.error),
+        'news:GET',
+        'Nieuws kon niet worden gegenereerd. Probeer het later opnieuw.',
       )
     }
 
@@ -531,6 +533,7 @@ export async function GET(request: Request) {
     model = await getModel(supabase, 'nieuws')
   } catch (err) {
     if (err instanceof AIConfigError) {
+      // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
       return NextResponse.json({ error: err.message }, { status: 422 })
     }
     return NextResponse.json({ error: 'AI model kon niet worden geladen.' }, { status: 500 })

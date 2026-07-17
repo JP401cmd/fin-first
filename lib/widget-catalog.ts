@@ -215,7 +215,10 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     name: "Vrijheidsscenario's",
     description: 'Pessimistisch / verwacht / optimistisch FIRE-leeftijd',
     module: 'horizon',
-    sizes: ['mini', 'quarter', 'half', 'full'],
+    // 'xl' (Double): dubbele breedte → een echte vrijheidstijd-as (jaren vanaf nu)
+    // met de drie scenario-markers + dynamisch scenario-rendement, i.p.v. de
+    // statische voetregel van de full-variant.
+    sizes: ['mini', 'quarter', 'half', 'full', 'xl'],
     defaultSize: 'half',
   },
   {
@@ -239,7 +242,10 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     name: 'Vrijheidsmijlpalen',
     description: 'Voortgang naar de 4 vrijheidsmijlpalen met datums',
     module: 'horizon',
-    sizes: ['mini', 'quarter', 'half', 'full'],
+    // 'xl' (Double): dubbele breedte → de mijlpaal-tijdlijn met eronder een
+    // mini-vermogenspad-sparkline (uit data.simRows) waarop de vier mijlpalen
+    // in de tijd geprojecteerd staan. Zie de xl-rendertak in de widget zelf.
+    sizes: ['mini', 'quarter', 'half', 'full', 'xl'],
     defaultSize: 'half',
   },
   {
@@ -389,8 +395,11 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     defaultSize: 'half',
   },
   {
+    // NB: id blijft `berichten` (bestaande layouts/widget_prefs ongewijzigd) —
+    // alleen het label wijzigt van "Berichten" naar "Nieuws" zodat naam,
+    // inhoud en bestemming (/nieuws) samenvallen. Zie widgetreview 2026-07-17.
     id: 'berichten',
-    name: 'Berichten',
+    name: 'Nieuws',
     description: 'Laatste nieuws uit je persoonlijke editie',
     module: 'cross',
     sizes: ['mini', 'quarter', 'half', 'full'],
@@ -401,7 +410,10 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     name: 'Inkomentrend',
     description: 'Maandelijkse inkomstentrend',
     module: 'kern',
-    sizes: ['mini', 'quarter', 'half', 'full'],
+    // 'xl' (Double): dubbele breedte → staafhistogram tot 24 maanden (waar de
+    // bundel historie levert) met maandlabels + streeflijn + cijferstrip. Zie de
+    // xl-rendertak in components/widgets/budget-trend-widget.tsx.
+    sizes: ['mini', 'quarter', 'half', 'full', 'xl'],
     defaultSize: 'half',
   },
   {
@@ -409,7 +421,10 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     name: 'Uitgaventrend',
     description: 'Maandelijkse uitgaventrend',
     module: 'kern',
-    sizes: ['mini', 'quarter', 'half', 'full'],
+    // 'xl' (Double): dubbele breedte → 12-maands staafhistogram met budgetband
+    // (per maand over/onder budget) + cijferstrip. Zie de xl-rendertak in
+    // components/widgets/budget-trend-widget.tsx.
+    sizes: ['mini', 'quarter', 'half', 'full', 'xl'],
     defaultSize: 'half',
   },
   {
@@ -417,7 +432,10 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     name: 'Spaartrend',
     description: 'Maandelijkse spaartrend',
     module: 'kern',
-    sizes: ['mini', 'quarter', 'half', 'full'],
+    // 'xl' (Double): dubbele breedte → staafhistogram met per-maand waarde-labels
+    // op de staven (sparen = vrijheid opbouwen) + doel-referentielijn + cijferstrip.
+    // Zie de xl-rendertak in components/widgets/budget-trend-widget.tsx.
+    sizes: ['mini', 'quarter', 'half', 'full', 'xl'],
     defaultSize: 'half',
   },
   {
@@ -433,7 +451,9 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     name: 'Rebalancing',
     description: 'Portfolio drift analyse met target vs actuele allocatie',
     module: 'kern',
-    sizes: ['mini', 'quarter', 'half', 'full'],
+    // 'xl' (Double): dubbele breedte → links de allocatie-diagnose (dumbbell
+    // current ↔ target), rechts de concrete trade-lijst + Box 3-peildatumbanner.
+    sizes: ['mini', 'quarter', 'half', 'full', 'xl'],
     defaultSize: 'half',
   },
   {
@@ -565,15 +585,26 @@ export const BUDGET_WIDGETS = new Set([
   'huishouden_activiteit',
 ])
 
-/** Allowed sizes for dynamic budget_fav:* widgets */
-export const BUDGET_FAV_SIZES: WidgetSize[] = ['quarter', 'half', 'full']
+/** Allowed sizes for dynamic budget_fav:* widgets (geen mini; xl = Double, desktop-only) */
+export const BUDGET_FAV_SIZES: WidgetSize[] = ['quarter', 'half', 'full', 'xl']
 
-/** Allowed sizes for dynamic holding_fav:* widgets (geen mini) */
-export const HOLDING_FAV_SIZES: WidgetSize[] = ['quarter', 'half', 'full']
+/** Allowed sizes for dynamic holding_fav:* widgets (geen mini; xl = Double, desktop-only) */
+export const HOLDING_FAV_SIZES: WidgetSize[] = ['quarter', 'half', 'full', 'xl']
 
 /** Get the widget definition by id */
 export function getWidgetDef(id: string): WidgetDef | undefined {
   return WIDGET_CATALOG.find(w => w.id === id)
+}
+
+/**
+ * Canonieke toegestane maten voor een widget-id — inclusief de dynamische
+ * favorieten (`budget_fav:*`, `holding_fav:*`) die geen catalog-entry hebben.
+ * Eén bron zodat de maatkiezer, fill-all-clamp en auto-builder niet driften.
+ */
+export function getWidgetSizes(id: string): WidgetSize[] {
+  if (id.startsWith('budget_fav:')) return BUDGET_FAV_SIZES
+  if (id.startsWith('holding_fav:')) return HOLDING_FAV_SIZES
+  return getWidgetDef(id)?.sizes ?? ['quarter', 'half', 'full']
 }
 
 /** Merge saved prefs with catalog defaults (adds new widgets, removes stale ones).

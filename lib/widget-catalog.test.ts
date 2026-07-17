@@ -17,6 +17,9 @@ import {
   WIDGET_CATALOG,
   downsizeForMobile,
   mergeWidgetPrefs,
+  getWidgetSizes,
+  HOLDING_FAV_SIZES,
+  BUDGET_FAV_SIZES,
   type WidgetPrefs,
 } from './widget-catalog'
 
@@ -155,6 +158,36 @@ describe('mergeWidgetPrefs — favoriet-prefs (budget_fav: / holding_fav:)', () 
    * mergeWidgetPrefs de ingespoten prefs bewaart; de loader-injectie zelf
    * is enkel afdekbaar via een integratietest of de in-app regressiesuite.
    */
+})
+
+// ── 4a2. getWidgetSizes — canonieke maten incl. dynamische favorieten ─────────
+
+describe('getWidgetSizes — dynamische favorieten', () => {
+  it('holding_fav:* én budget_fav:* bieden beide xl (Double) aan', () => {
+    expect(getWidgetSizes('holding_fav:abc')).toEqual(HOLDING_FAV_SIZES)
+    expect(HOLDING_FAV_SIZES).toContain('xl')
+    expect(getWidgetSizes('budget_fav:xyz')).toEqual(BUDGET_FAV_SIZES)
+    expect(BUDGET_FAV_SIZES).toContain('xl')
+  })
+
+  it('statische catalog-widget levert zijn eigen sizes', () => {
+    const def = WIDGET_CATALOG[0]
+    expect(getWidgetSizes(def.id)).toEqual(def.sizes)
+  })
+
+  it('onbekend id valt terug op quarter/half/full', () => {
+    expect(getWidgetSizes('bestaat_niet')).toEqual(['quarter', 'half', 'full'])
+  })
+
+  it('fill-all-clamp: niet-ondersteunde maat zakt naar quarter (LOW-2)', () => {
+    // Spiegelt de clamp in draggable-widget-grid.handleFillAll.
+    const clamp = (id: string, size: 'mini' | 'quarter' | 'half' | 'full' | 'xl') =>
+      getWidgetSizes(id).includes(size) ? size : 'quarter'
+    expect(clamp('holding_fav:abc', 'mini')).toBe('quarter')
+    expect(clamp('holding_fav:abc', 'xl')).toBe('xl')
+    expect(clamp('budget_fav:xyz', 'xl')).toBe('xl')
+    expect(clamp('budget_fav:xyz', 'mini')).toBe('quarter')
+  })
 })
 
 // ── 4b. downsizeForMobile — xl (Double) zakt naar full ────────────────────────

@@ -26,12 +26,13 @@ const fireProjBase = {
   monthlyPassiveIncome: 468,
   monthlySavings: 1400,
   savingsRate: 27,
+  annualReturn: 0.07,
 }
 
 const fireRange: FireRange = {
-  optimistic: { ...fireProjBase, fireAge: 48, fireDate: 'jan 2039', countdownDays: 4748, countdownYears: 13, freedomPercentage: 35 },
+  optimistic: { ...fireProjBase, fireAge: 48, fireDate: 'jan 2039', countdownDays: 4748, countdownYears: 13, freedomPercentage: 35, annualReturn: 0.09 },
   expected: fireProjBase,
-  pessimistic: { ...fireProjBase, fireAge: 58, fireDate: 'sep 2049', countdownDays: 8583, countdownYears: 23, freedomPercentage: 24 },
+  pessimistic: { ...fireProjBase, fireAge: 58, fireDate: 'sep 2049', countdownDays: 8583, countdownYears: 23, freedomPercentage: 24, annualReturn: 0.04 },
 }
 
 // Canonieke mijlpaal-motor-uitkomst (lib/freedom-milestones.ts) — consistent
@@ -319,10 +320,10 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
   ],
   partnerHiddenCategories: [],
   decisionPatterns: [
-    { type: 'energieleverancier', days: 12 },
-    { type: 'verzekering',        days: 8 },
-    { type: 'abonnement',         days: 5 },
-    { type: 'aflossing',          days: 22 },
+    { type: 'debt_acceleration',   days: 22, count: 3 },
+    { type: 'budget_optimization', days: 12, count: 5 },
+    { type: 'savings_boost',       days: 8,  count: 2 },
+    { type: 'overig',              days: 5,  count: 4 },
   ],
   freedomDaysMonthly: [
     { month: '2025-04', days: 5 },
@@ -424,6 +425,12 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
     breakevenRendement: 0.032,
     aanbeveling: 'beleggen',
     isTaxDeductible: true,
+    beleggenVoordeel: 8200,
+    aflossenVoordeel: 5400,
+    verschil: 2800,
+    extraBedragMaand: 200,
+    horizonJaren: 10,
+    fireImpactMaanden: 7,
   },
   heatmapExpenseGroups: [
     { id: 'hm_wonen', name: 'Wonen', icon: 'home', default_limit: 1400, children: [
@@ -495,5 +502,15 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
     hm_verzekeringen_zorg: 145,
     hm_verzekeringen_inboedel: 35,
     hm_verzekeringen_overig: 88,
+  },
+  newsPreview: {
+    editionNr: 3,
+    count: 3,
+    generatedAt: new Date().toISOString(),
+    items: [
+      { id: 'news-1', headline: 'Box 3-tarief stijgt in 2026', summary: 'Het forfaitaire rendement gaat omhoog.', category: 'fiscaal', impactDirection: 'negatief' },
+      { id: 'news-2', headline: 'Hypotheekrente daalt licht', summary: 'Gemiddelde rentes zakken deze week.', category: 'woningmarkt', impactDirection: 'positief' },
+      { id: 'news-3', headline: 'ECB houdt rente gelijk', summary: 'Geen renteverandering aangekondigd.', category: 'macro', impactDirection: 'neutraal' },
+    ],
   },
 }

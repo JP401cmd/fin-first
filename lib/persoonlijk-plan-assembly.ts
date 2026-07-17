@@ -40,7 +40,8 @@ import type {
   PersoonlijkPlanEindstrategie,
   PersoonlijkPlanOnttrekking,
 } from '@/lib/persoonlijk-plan-data'
-import { HOUSEHOLD_TYPE_LABELS, WITHDRAWAL_LABELS } from '@/lib/persoonlijk-plan-data'
+import { WITHDRAWAL_LABELS } from '@/lib/persoonlijk-plan-data'
+import { householdTypeLabel } from '@/lib/household-type'
 
 // ── Rauwe rij-vormen ─────────────────────────────────────────────────
 
@@ -156,13 +157,12 @@ export function buildPersoonlijkPlanSections(
     lifeExpectancyProxy: fireEndAge,
   }
 
-  const householdType = profile.household_type ?? 'single'
   const demografie: PersoonlijkPlanDemografie = {
     fullName: profile.full_name ?? null,
     dateOfBirth: profile.date_of_birth ?? null,
     currentAge,
     householdType: profile.household_type ?? null,
-    householdTypeLabel: HOUSEHOLD_TYPE_LABELS[householdType] ?? householdType,
+    householdTypeLabel: householdTypeLabel(profile.household_type),
     numberOfChildren: profile.number_of_children ?? 0,
     fireEndAge,
     aowAgeYears: aowAge.years,

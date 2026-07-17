@@ -7,6 +7,8 @@ export type AdminActionName =
   | 'user.block'
   | 'user.unblock'
   | 'config.update'
+  | 'allowlist.add'
+  | 'allowlist.remove'
 
 /**
  * Schrijf één beheeractie weg in `admin_actions_log`.

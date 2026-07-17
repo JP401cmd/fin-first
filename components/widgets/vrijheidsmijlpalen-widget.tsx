@@ -6,6 +6,20 @@ import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
 import { CheckCircle2, Circle, Flag, Users, UserCheck } from 'lucide-react'
 import { usePerspective } from '@/components/app/perspective-provider'
+import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
+
+// Zuivere weergave-formattering van een door de motor geleverd aantal maanden
+// (FreedomMilestone.monthsAway) → vrijheidstijd. Geen financiële herberekening:
+// het aantal maanden komt 1:1 uit lib/freedom-milestones.ts.
+function monthsToFreedomStr(months: number): string {
+  const y = Math.floor(months / 12)
+  const m = months % 12
+  const parts: string[] = []
+  if (y > 0) parts.push(`${y} jaar`)
+  if (m > 0) parts.push(`${m} ${m === 1 ? 'maand' : 'maanden'}`)
+  if (parts.length === 0) return 'binnenkort'
+  return parts.length === 1 ? parts[0] : `${parts[0]} en ${parts[1]}`
+}
 
 interface Props {
   size: WidgetSize
@@ -25,6 +39,8 @@ export const VrijheidsMijlpalenWidget = memo(function VrijheidsMijlpalenWidget({
   // Milestones are fractions of the FIRE target — override netWorth +
   // fireTarget only when the persisted FIRE summary exists.
   const { perspective, partnerName } = usePerspective()
+  // Sparkline-reveal (alleen XL) — canonieke in-view-animatie i.p.v. kale setTimeout.
+  const { ref: sparkRef, hasEntered } = useInViewAnimation({ duration: 600 })
   const isHouseholdView = perspective === 'household' && data.householdOverrides?.fireTarget != null
   const isPartnerView = perspective === 'partner' && data.partnerOverrides?.fireTarget != null
   const ov = isHouseholdView ? data.householdOverrides! : isPartnerView ? data.partnerOverrides! : null
@@ -97,6 +113,255 @@ export const VrijheidsMijlpalenWidget = memo(function VrijheidsMijlpalenWidget({
             Volgende: {nextMilestone.pct}%{nextDate ? ` — ${nextDate}` : ''}
           </p>
         ) : null}
+      </WidgetShell>
+    )
+  }
+
+  // ── XL (Double): mijlpaal-tijdlijn + vermogenspad-sparkline met projectie ──
+  if (size === 'xl') {
+    const fullyFree = effectivePct >= 100
+    // Vrijheidstijd voor de volgende mijlpaal (filosofie: tijd i.p.v. kale datum).
+    const nextMotor = !isShared && nextMilestone && data.freedomMilestones
+      ? data.freedomMilestones.milestones.find(m => m.percent === nextMilestone.pct) ?? null
+      : null
+    const nextTime = nextMotor && nextMotor.monthsAway != null && nextMotor.monthsAway > 0
+      ? monthsToFreedomStr(nextMotor.monthsAway)
+      : null
+
+    // ── Sparkline-projectie ──────────────────────────────────────
+    // De markers worden op de TIJD-as geplaatst (monthsAway → leeftijd) en op het
+    // bestaande vermogenspad (data.simRows.endPortfolio) neergezet. We plotten
+    // NIET het scalar mijlpaal-doelbedrag op de vermogens-as: het netto-
+    // vermogenspad en het scalar FIRE-doel hebben een verschillende grondslag —
+    // die mag niet op één as/marker gemengd worden. De marker markeert louter
+    // WANNEER de mijlpaal langs je vermogenspad valt. Per-user cadans → in
+    // huishouden/partner-perspectief geen markers (net als de datums).
+    const rows = data.simRows
+    const showSparkline = rows != null && rows.length > 1
+    const W = 620
+    const SPARK_H = 96
+    const padX = 8
+    const padTop = 16
+    const padBottom = 8
+    const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v))
+    let sparkPathAcc = ''
+    let sparkPathRet = ''
+    let markers: { pct: number; x: number; y: number; state: 'reached' | 'upcoming' | 'unreachable' }[] = []
+    let minAge = 0
+    let endAgeLabel = 0
+
+    if (rows && showSparkline) {
+      const maxVal = Math.max(...rows.map(r => r.endPortfolio), 1)
+      minAge = rows[0].age
+      const maxAge = rows[rows.length - 1].age
+      endAgeLabel = Math.round(data.displayEndAge ?? maxAge)
+      const ageSpan = maxAge - minAge || 1
+      const currentAge = rows[0].age
+      const toX = (age: number) => padX + ((clamp(age, minAge, maxAge) - minAge) / ageSpan) * (W - padX * 2)
+      const toY = (val: number) => (SPARK_H - padBottom) - (Math.max(val, 0) / maxVal) * (SPARK_H - padTop - padBottom)
+      const interpAt = (age: number): number => {
+        if (age <= rows[0].age) return rows[0].endPortfolio
+        if (age >= rows[rows.length - 1].age) return rows[rows.length - 1].endPortfolio
+        for (let i = 1; i < rows.length; i++) {
+          if (rows[i].age >= age) {
+            const a0 = rows[i - 1]
+            const a1 = rows[i]
+            const t = (age - a0.age) / ((a1.age - a0.age) || 1)
+            return a0.endPortfolio + t * (a1.endPortfolio - a0.endPortfolio)
+          }
+        }
+        return rows[rows.length - 1].endPortfolio
+      }
+      const buildPath = (rs: typeof rows) =>
+        rs.length === 0
+          ? ''
+          : rs.map((r, i) => `${i === 0 ? 'M' : 'L'}${toX(r.age).toFixed(1)},${toY(r.endPortfolio).toFixed(1)}`).join(' ')
+      sparkPathAcc = buildPath(rows.filter(r => r.phase === 'accumulation'))
+      sparkPathRet = buildPath(rows.filter(r => r.phase === 'retirement'))
+      if (!isShared && data.freedomMilestones) {
+        markers = data.freedomMilestones.milestones.map(m => {
+          const state: 'reached' | 'upcoming' | 'unreachable' =
+            m.reached ? 'reached' : m.monthsAway != null ? 'upcoming' : 'unreachable'
+          const markerAge = m.reached
+            ? currentAge
+            : m.monthsAway != null
+              ? currentAge + m.monthsAway / 12
+              : maxAge
+          const clampedAge = clamp(markerAge, minAge, maxAge)
+          return { pct: m.percent, x: toX(clampedAge), y: toY(interpAt(clampedAge)), state }
+        })
+      }
+    }
+
+    const markerColor = (state: 'reached' | 'upcoming' | 'unreachable') =>
+      state === 'reached'
+        ? 'var(--color-horizon-600)'
+        : state === 'upcoming'
+          ? 'var(--color-horizon-500)'
+          : 'var(--ink-4)'
+
+    return (
+      <WidgetShell module="horizon" size={size} kicker={kicker} href={href}>
+        <div className="flex h-full flex-col gap-2.5">
+          {isShared && (
+            <div className="flex items-center gap-1 text-[11px] text-horizon-600">
+              {isPartnerView ? <UserCheck className="h-3.5 w-3.5" /> : <Users className="h-3.5 w-3.5" />}
+              {isPartnerView ? (partnerName ?? 'Partner') : 'Gecombineerd huishouden'}
+            </div>
+          )}
+
+          {/* Header: huidige vrijheid-% + volgende mijlpaal (vrijheidstijd) */}
+          <div className="flex items-baseline justify-between gap-3">
+            <div className="flex items-baseline gap-2">
+              <Flag className="h-4 w-4 self-center shrink-0 text-horizon-500" />
+              <span className="font-mono text-2xl font-semibold tabular-nums text-[var(--ink)]">
+                {Math.round(effectivePct)}%
+              </span>
+              <span className="text-sm text-[var(--ink-3)]">vrijheid</span>
+            </div>
+            {fullyFree ? (
+              <span className="text-[11px] font-medium text-horizon-600">Volledige vrijheid bereikt</span>
+            ) : nextMilestone ? (
+              <p className="text-right font-serif text-[11px] italic text-[var(--ink-3)]">
+                Volgende: {nextMilestone.label}
+                {nextTime ? ` — over ${nextTime}` : nextDate ? ` — ${nextDate}` : ''}
+              </p>
+            ) : null}
+          </div>
+
+          {/* Horizontale mijlpaal-tijdlijn (proportioneel op de vrijheid-%-as) */}
+          <div className="relative h-12 shrink-0 px-1.5">
+            <div className="absolute left-1.5 right-1.5 top-[26px] h-[3px] rounded-full bg-[var(--subtle)]" />
+            <div
+              className="absolute left-1.5 top-[26px] h-[3px] rounded-full bg-gradient-to-r from-horizon-400 to-horizon-600 transition-all duration-500"
+              style={{ width: `calc((100% - 12px) * ${Math.min(effectivePct, 100) / 100})` }}
+            />
+            {!fullyFree && (
+              <div
+                className="absolute top-0 -translate-x-1/2"
+                style={{ left: `calc(6px + (100% - 12px) * ${Math.min(effectivePct, 100) / 100})` }}
+              >
+                <span className="whitespace-nowrap rounded-full bg-horizon-600 px-1.5 py-px text-[9px] font-semibold leading-none text-white">
+                  jij
+                </span>
+              </div>
+            )}
+            {MILESTONES.map((m, i) => {
+              const reached = effectivePct >= m.pct
+              const isActive = i === activeMilestoneIdx
+              return (
+                <div
+                  key={m.pct}
+                  className="absolute top-[18px] flex -translate-x-1/2 flex-col items-center"
+                  style={{ left: `calc(6px + (100% - 12px) * ${m.pct / 100})` }}
+                >
+                  {reached ? (
+                    <CheckCircle2 className="h-4 w-4 rounded-full bg-[var(--paper)] text-horizon-600" />
+                  ) : (
+                    <Circle
+                      className={`h-4 w-4 rounded-full bg-[var(--paper)] ${isActive ? 'text-horizon-500' : 'text-[var(--border-md)]'}`}
+                    />
+                  )}
+                  <span
+                    className={`mt-0.5 font-mono text-[9px] tabular-nums ${isActive ? 'font-semibold text-[var(--ink)]' : reached ? 'text-horizon-600' : 'text-[var(--ink-4)]'}`}
+                  >
+                    {m.pct}%
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+
+          <div className="border-t border-dashed border-[var(--border-ed)]" />
+
+          {/* Vermogenspad-sparkline met de vier mijlpalen in de tijd geprojecteerd */}
+          <div ref={sparkRef} className="flex min-h-0 flex-1 flex-col">
+            <div className="flex items-baseline justify-between">
+              <p className="label-editorial text-horizon-600">Vermogenspad</p>
+              <p className="text-[9px] text-[var(--ink-4)]">mijlpalen geprojecteerd in de tijd</p>
+            </div>
+            {showSparkline ? (
+              <>
+                <svg
+                  width="100%"
+                  viewBox={`0 0 ${W} ${SPARK_H}`}
+                  className="mt-1 overflow-visible"
+                  data-testid="mijlpaal-sparkline"
+                  aria-label="Vermogenspad naar vrijheid met de vier mijlpalen geprojecteerd in de tijd"
+                >
+                  {sparkPathAcc && (
+                    <path
+                      d={sparkPathAcc}
+                      fill="none"
+                      stroke="var(--color-horizon-500)"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      pathLength={1}
+                      style={{
+                        strokeDasharray: '1',
+                        strokeDashoffset: hasEntered ? '0' : '1',
+                        transition: hasEntered ? 'stroke-dashoffset 600ms cubic-bezier(.22,1,.36,1)' : 'none',
+                      }}
+                    />
+                  )}
+                  {sparkPathRet && (
+                    <path
+                      d={sparkPathRet}
+                      fill="none"
+                      stroke="var(--ink-4)"
+                      strokeWidth="1.2"
+                      strokeDasharray="3 2"
+                      strokeLinecap="round"
+                      style={{ opacity: hasEntered ? 1 : 0, transition: hasEntered ? 'opacity 300ms ease 500ms' : 'none' }}
+                    />
+                  )}
+                  {markers.map((mk, i) => (
+                    <g
+                      key={mk.pct}
+                      data-testid="mijlpaal-marker"
+                      style={{
+                        opacity: hasEntered ? 1 : 0,
+                        transition: hasEntered ? `opacity 300ms ease ${600 + i * 90}ms` : 'none',
+                      }}
+                    >
+                      <line
+                        x1={mk.x}
+                        y1={12}
+                        x2={mk.x}
+                        y2={mk.y}
+                        stroke={markerColor(mk.state)}
+                        strokeWidth="0.6"
+                        strokeDasharray="2 2"
+                        opacity={0.6}
+                      />
+                      <circle cx={mk.x} cy={mk.y} r="3" fill={markerColor(mk.state)} />
+                      <text
+                        x={mk.x}
+                        y={8}
+                        textAnchor="middle"
+                        fontSize="7"
+                        fontFamily="monospace"
+                        fontWeight="600"
+                        fill={markerColor(mk.state)}
+                      >
+                        {mk.pct}%
+                      </text>
+                    </g>
+                  ))}
+                </svg>
+                <div className="mt-0.5 flex items-center justify-between">
+                  <span className="font-mono text-[9px] text-[var(--ink-4)]">{minAge}j</span>
+                  <span className="font-mono text-[9px] text-[var(--ink-4)]">{endAgeLabel}j</span>
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-1 items-center justify-center">
+                <p className="text-[11px] text-[var(--ink-3)]">Geen simulatie beschikbaar voor de sparkline</p>
+              </div>
+            )}
+          </div>
+        </div>
       </WidgetShell>
     )
   }

@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { unauthorized, serverError } from '@/lib/api/respond'
 import { syncAssetValueFromHoldings } from '@/lib/holdings-sync'
 import { getEURRateSync } from '@/lib/forex'
 import { resolveHolding } from '@/lib/holdings-table-resolver'
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   const { searchParams } = new URL(request.url)
@@ -43,13 +44,9 @@ export async function GET(request: NextRequest) {
     const { data: rawHoldings, error } = await query
 
     if (error) {
-      return NextResponse.json({
-        holdings: [],
-        total_value: 0,
-        total_cost: 0,
-        source: 'empty',
-        message: 'Kon holdings niet laden',
-      })
+      // Een DB-fout NIET maskeren als lege 200 — anders toont de UI "geen
+      // holdings" bij een storing. Geef 500 zodat de consumer een foutstate toont.
+      return serverError(error, 'holdings:GET')
     }
 
     const baseHoldings = (rawHoldings ?? [])
@@ -97,13 +94,8 @@ export async function GET(request: NextRequest) {
       total_cost: totalCost,
       source: 'investment_holdings_table',
     })
-  } catch {
-    return NextResponse.json({
-      holdings: [],
-      total_value: 0,
-      total_cost: 0,
-      source: 'empty',
-    })
+  } catch (err) {
+    return serverError(err, 'holdings:GET')
   }
 }
 
@@ -133,7 +125,7 @@ export async function POST(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   // Idempotency key check: if the same key is submitted twice,
@@ -304,7 +296,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return serverError(error, 'holdings:POST')
     }
 
     // Sync parent asset's current_value from all holdings
@@ -320,8 +312,7 @@ export async function POST(request: NextRequest) {
     }
     return NextResponse.json(responseBody, { status: 201 })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Onbekende fout'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return serverError(err, 'holdings:POST')
   }
 }
 
@@ -342,7 +333,7 @@ export async function PATCH(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   try {
@@ -459,7 +450,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return serverError(error, 'holdings:PATCH')
     }
 
     // Sync linked asset's current_value from holdings (alleen voor investment;
@@ -475,8 +466,7 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ holding, source: `${tableName}_table`, bucket: resolved.bucket })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Onbekende fout'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return serverError(err, 'holdings:PATCH')
   }
 }
 
@@ -490,7 +480,7 @@ export async function DELETE(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   const { searchParams } = new URL(request.url)
@@ -513,7 +503,7 @@ export async function DELETE(request: NextRequest) {
       .eq('user_id', user.id)
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return serverError(error, 'holdings:DELETE')
     }
 
     // Sync parent asset alleen voor investment — crypto loopt via de
@@ -525,7 +515,6 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true, bucket: resolved.bucket })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Onbekende fout'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return serverError(err, 'holdings:DELETE')
   }
 }

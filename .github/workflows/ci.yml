@@ -50,9 +50,24 @@ jobs:
       - name: Typecheck (tsc --noEmit)
         run: npx tsc --noEmit
 
+      # Lint-vangrails tegen drift (Arch F2, bevinding #22). De ESLint-
+      # `no-restricted-syntax`-regels vangen klasse (1) error.message-lek in
+      # API-responses en klasse (2) het parseFloat(toFixed)-afrondingsidioom;
+      # klasse (3) hardcoded-constante-drift draait als vitest-scan mee in de
+      # rekenmotor-stap hieronder (lib/architecture/formula-drift-scan.test.ts).
+      # `--max-warnings` staat los: alleen errors blokkeren de gate, de vele
+      # advisory react-compiler/any-warnings niet.
+      - name: Lint-vangrails (eslint)
+        run: npm run lint
+
       # Eén gerichte vitest-run over de rekenkern (FIRE/Horizon-kernel), de
       # Excel-oracle-pariteit (draait tegen de in-git fixtures onder
       # test/fixtures/horizon-oracle), de fiscale motoren (box1/box3/
       # fiscale-kerngetallen) en de architectuur-curatie. ~1.240 tests.
+      #
+      # lib/budget-utils.test.ts + de budget-berekeningen-suite-check dekken
+      # de FIRE-uitgavenbasis (computeYearlyMustExpenses/
+      # computeRetirementExpenses) die tot Arch F2 bevinding #17 alleen via de
+      # dev-only in-app regressiesuite draaide — nu ook in deze CI-gate.
       - name: Rekenmotor- & pariteitstests (vitest)
-        run: npx vitest run lib/horizon-kernel test/horizon-oracle lib/box1-tax lib/box3 lib/fiscale-kerngetallen lib/architecture
+        run: npx vitest run lib/horizon-kernel test/horizon-oracle lib/box1-tax lib/box3 lib/fiscale-kerngetallen lib/architecture lib/budget-utils.test.ts test/budget-berekeningen-suite-check.test.ts

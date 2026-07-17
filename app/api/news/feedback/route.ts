@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { unauthorized, serverError } from '@/lib/api/respond'
 
 // ── POST — Feedback op een nieuwsitem ("Minder hierover") ────────────
 //
@@ -11,7 +12,7 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   const body = await request.json().catch(() => null) as {
@@ -40,7 +41,7 @@ export async function POST(request: Request) {
   )
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverError(error, 'news-feedback:POST')
   }
 
   return NextResponse.json({ success: true })
@@ -53,7 +54,7 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   const ninetyDaysAgo = new Date()
@@ -66,7 +67,7 @@ export async function GET() {
     .gte('created_at', ninetyDaysAgo.toISOString())
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverError(error, 'news-feedback:GET')
   }
 
   return NextResponse.json({ feedback: data || [] })

@@ -281,6 +281,21 @@ describe('kernel-tak', () => {
     )
   })
 
+  it('band: elk scenario draagt zijn eigen offset-rendement [base+0.02, base, base−0.03] (geklemd)', () => {
+    const outcome = computeScalarFireRange(makeParams({ annualReturn: 0.07 }))
+    expect(outcome.result.optimistic.annualReturn).toBeCloseTo(0.09, 10)
+    expect(outcome.result.expected.annualReturn).toBeCloseTo(0.07, 10)
+    expect(outcome.result.pessimistic.annualReturn).toBeCloseTo(0.04, 10)
+  })
+
+  it('band: pessimistisch rendement wordt geklemd op ondergrens 0.01', () => {
+    const outcome = computeScalarFireRange(makeParams({ annualReturn: 0.02 }))
+    // 0.02 − 0.03 = −0.01 → geklemd naar 0.01.
+    expect(outcome.result.pessimistic.annualReturn).toBeCloseTo(0.01, 10)
+    expect(outcome.result.expected.annualReturn).toBeCloseTo(0.02, 10)
+    expect(outcome.result.optimistic.annualReturn).toBeCloseTo(0.04, 10)
+  })
+
   it('mijlpalen op de kernel: zelfde doel-/weergavesemantiek, monotone maanden', () => {
     const params = {
       netWorth: 100_000,

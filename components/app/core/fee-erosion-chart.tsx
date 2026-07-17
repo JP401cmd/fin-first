@@ -2,7 +2,9 @@
 
 import { memo, useMemo, useState, useEffect } from 'react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
+import { useModuleHex } from '@/components/app/module-color-provider'
 import { formatCurrency } from '@/lib/format'
+import { LOW_TER_BENCHMARK } from '@/lib/fee-analysis'
 import { TrendingDown } from 'lucide-react'
 
 // ── Types ──────────────────────────────────────────────────────
@@ -14,7 +16,7 @@ export interface FeeErosionChartProps {
   grossReturn: number
   /** Current weighted TER (decimal, e.g. 0.0045 = 0.45%) */
   currentTER: number
-  /** Low-cost alternative TER (decimal, e.g. 0.002 = 0.20%) — defaults to 0.002 */
+  /** Low-cost alternative TER (decimal, e.g. 0.002 = 0.20%) — defaults to LOW_TER_BENCHMARK */
   lowTER?: number
   /** Projection horizon in years — defaults to 30 */
   years?: number
@@ -120,13 +122,17 @@ export const FeeErosionChart = memo(function FeeErosionChart({
   portfolioValue,
   grossReturn,
   currentTER,
-  lowTER = 0.002,
+  lowTER = LOW_TER_BENCHMARK,
   years = 30,
   annualContribution = 0,
   dailyExpenses,
 }: FeeErosionChartProps) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 2800 })
   const phase = useProgressiveReveal(hasEntered)
+  // Beleggingen = kern/Overzicht: de "huidige kosten"-lijn volgt de gekozen
+  // kern-accentkleur (chart-hex via useModuleHex), niet een vaste amber-hex.
+  const kernHex500 = useModuleHex('kern', 500)
+  const kernHex600 = useModuleHex('kern', 600)
 
   const { highCostPoints, lowCostPoints, maxValue, difference, differenceFormatted, freedomTimeStr } = useMemo(() => {
     const high = projectGrowth(portfolioValue, grossReturn, currentTER, years, annualContribution)
@@ -235,10 +241,10 @@ export const FeeErosionChart = memo(function FeeErosionChart({
             <stop offset="0%" stopColor="var(--positive)" />
             <stop offset="100%" stopColor="var(--positive)" />
           </linearGradient>
-          {/* High cost line gradient */}
+          {/* High cost line gradient — kern-accent */}
           <linearGradient id="fee-high-line" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="#f59e0b" />
-            <stop offset="100%" stopColor="#d97706" />
+            <stop offset="0%" stopColor={kernHex500} />
+            <stop offset="100%" stopColor={kernHex600} />
           </linearGradient>
         </defs>
 
@@ -361,7 +367,7 @@ export const FeeErosionChart = memo(function FeeErosionChart({
           cx={x(years)}
           cy={y(endHighValue)}
           r="4"
-          fill="#d97706"
+          fill={kernHex600}
           style={{
             opacity: phase >= 5 ? 1 : 0,
             transform: phase >= 5 ? 'scale(1)' : 'scale(0)',
@@ -403,11 +409,11 @@ export const FeeErosionChart = memo(function FeeErosionChart({
         <text
           x={x(years) + 10}
           y={y(endHighValue) + 4}
-          className="fill-[#d97706]"
           fontSize="11"
           fontFamily="var(--font-mono)"
           fontWeight="600"
           style={{
+            fill: kernHex600,
             opacity: phase >= 5 ? 1 : 0,
             transform: phase >= 5 ? 'translateX(0)' : 'translateX(-8px)',
             transition: 'opacity 400ms ease-out, transform 400ms ease-out',
@@ -465,7 +471,10 @@ export const FeeErosionChart = memo(function FeeErosionChart({
           <span className="text-[var(--ink-2)]">Lage kosten ({lowTERpct}% TER)</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="inline-block h-2.5 w-5 rounded-sm bg-gradient-to-r from-[#f59e0b] to-[#d97706]" />
+          <span
+            className="inline-block h-2.5 w-5 rounded-sm"
+            style={{ background: `linear-gradient(to right, ${kernHex500}, ${kernHex600})` }}
+          />
           <span className="text-[var(--ink-2)]">Huidige kosten ({currentTERpct}% TER)</span>
         </div>
         <div className="flex items-center gap-1.5">

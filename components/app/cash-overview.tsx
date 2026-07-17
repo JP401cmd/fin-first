@@ -27,7 +27,7 @@ import { VermogenAssetCard } from '@/components/core/vermogen-asset-card'
 import { loadPerspectiveData } from '@/lib/household/perspective-loader'
 import { loadEntitySparklines } from '@/lib/load-entity-sparklines'
 import { localMonthBounds, localMonthStart } from '@/lib/month-range'
-import type { Asset } from '@/lib/asset-data'
+import { type Asset, ASSET_TYPE_COLORS } from '@/lib/asset-data'
 import type { Provenance } from '@/lib/household-data'
 
 const DynCashAccountView = dynamic(
@@ -451,7 +451,7 @@ export function CashOverview({
   // alleen compacter. Kies de bron die in deze modus zou renderen:
   // showAllCashAccounts → cashAssets (mét sparklines), anders accounts.
   // Icoon + accentkleur = cash (Wallet / kern-700), conform de kaart.
-  const CASH_ICON_COLOR = 'oklch(0.345 0.0571 34.7)' // kern-700, = ASSET_TYPE_COLORS.cash
+  const CASH_ICON_COLOR = ASSET_TYPE_COLORS.cash // kern-700, accent-aware var(--color-kern-700)
   const accountPillItems = useMemo<PillItem[]>(() => {
     if (showAllCashAccounts) {
       const total = cashAssets.reduce((s, a) => {

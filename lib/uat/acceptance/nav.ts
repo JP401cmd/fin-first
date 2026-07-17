@@ -25,8 +25,10 @@
  *
  * AL-GEDOCUMENTEERDE BEVINDINGEN (uit het UAT-plan zelf, GEEN nieuwe bugs van
  * deze sessie — expliciet vermeld in de betreffende criteria hieronder):
- *  - UAT-NAV-06/c: mobiele kompas-deeplinks wijzen naar legacy-routes
- *    (/core/assets, /core/debts, /will#cashflow — ankerverlies).
+ *  - UAT-NAV-06/c: OPGELOST — de mobiele kompas-deeplinks wijzen nu naar de
+ *    canonieke /overzicht/*-routes (was: /core/assets, /core/debts,
+ *    /will#cashflow met ankerverlies); regressie geborgd in
+ *    components/app/shell/lever-compass.deeplinks.test.tsx.
  *  - UAT-NAV-24: `MobileBottomBar`/`MobileAppStrip` zijn dode code (renderen
  *    altijd niets), ondanks dat pagina's er nog naar verwijzen.
  *  - UAT-NAV-26: de ingelogde 404-pagina toont twee IDENTIEKE knoppen "Naar
@@ -110,10 +112,10 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'BELANGRIJK',
     given: 'Mobiele TopBar-utility-cluster op een tab-root; kompas-deeplinks in `lever-compass.tsx`.',
     when: 'De gebruiker tikt door het kompas-paneel naar "Bezittingen"/"Schulden"/"Cashflow".',
-    then: 'AL-GEDOCUMENTEERDE BEVINDING (geen nieuwe bug): de kompas-deeplinks wijzen naar de legacy-routes /core/assets en /core/debts (niet naar /overzicht/bezittingen|schulden); "Cashflow" gaat via /will → /overzicht, waarbij het #cashflow-anker verloren gaat. Functioneel bereikbaar, via het oude pad.',
+    then: 'De kompas-deeplinks wijzen naar de canonieke /overzicht/*-routes: Bezittingen → /overzicht/bezittingen, Schulden → /overzicht/schulden, Cashflow → /overzicht/cashflow (geen legacy /core/* of /will#cashflow-ankerverlies meer). Geborgd in lever-compass.deeplinks.test.tsx.',
     assertion: {
       kind: 'ui-only',
-      source: 'components/app/shell/lever-compass.tsx (LEVERS-config) — reeds bekend technisch-schuld-punt, geen eigen berekening',
+      source: 'components/app/shell/lever-compass.tsx (LEVERS-config) — canonieke routes; regressietest lever-compass.deeplinks.test.tsx',
     },
   },
   {

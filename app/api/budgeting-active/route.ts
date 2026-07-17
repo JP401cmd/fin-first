@@ -1,9 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
+import { unauthorized, serverError } from '@/lib/api/respond'
 
 export async function GET() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user) return unauthorized()
 
   try {
     const { data, error } = await supabase
@@ -17,7 +18,7 @@ export async function GET() {
       if (error.message.includes('does not exist')) {
         return Response.json({ budgeting_active: true })
       }
-      return Response.json({ error: error.message }, { status: 500 })
+      return serverError(error, 'budgeting-active:GET')
     }
     return Response.json({ budgeting_active: (data as Record<string, unknown>)?.budgeting_active ?? true })
   } catch {
@@ -28,7 +29,7 @@ export async function GET() {
 export async function PUT(req: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user) return unauthorized()
 
   const body = await req.json()
   const active = body.budgeting_active === true
@@ -38,6 +39,6 @@ export async function PUT(req: Request) {
     .update({ budgeting_active: active })
     .eq('id', user.id)
 
-  if (error) return Response.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(error, 'budgeting-active:PUT')
   return Response.json({ success: true, budgeting_active: active })
 }

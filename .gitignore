@@ -74,6 +74,15 @@ signin2.yaml
 # local debug screenshots / scratch
 .tmp/
 
+# dev-/test-server logs in de projectroot (nooit committen)
+/server-*.log
+/dev-server*.log
+# root screenshot- / regressietest-artefacten (alleen root; public/ + docs/ blijven getrackt)
+/*.png
+/claude-progress.txt
+# curl cookie-jars
+cookies*.txt
+
 # superpowers brainstorm visual-companion working dir (generated)
 .superpowers/
 

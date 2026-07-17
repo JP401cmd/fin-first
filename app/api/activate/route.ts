@@ -2,13 +2,14 @@ import { createClient } from '@/lib/supabase/server'
 import { computeFeatureAccess } from '@/lib/compute-feature-access'
 import { PERSONAS, type PersonaKey } from '@/lib/test-personas'
 import { deleteAllUserData, seedPersonaData } from '@/lib/seed-persona'
+import { unauthorized, serverError } from '@/lib/api/respond'
 
 export async function POST() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 })
+    return unauthorized()
   }
 
   // Verify last_known_phase is NULL (prevent double activation)
@@ -59,7 +60,7 @@ export async function POST() {
     .eq('id', user.id)
 
   if (error) {
-    return Response.json({ error: error.message }, { status: 500 })
+    return serverError(error, 'activate:POST')
   }
 
   return Response.json({ success: true, phase, seeded: !!personaKey })

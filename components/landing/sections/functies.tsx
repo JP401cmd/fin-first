@@ -31,20 +31,19 @@ import { Reveal } from '@/components/landing/reveal'
 
 /**
  * FunctiesSecties — de "hoe"-pagina, gespiegeld op de merkbelofte:
- * "De vrijheid om met inzicht en grip keuzes te maken voor nu en de
- * toekomst." Vier pijler-secties in zinsvolgorde (#inzicht, #grip, #nu,
- * #toekomst) + #voor-wie. De section-ids zijn deeplink-doelen vanaf de
- * home-pijlers, header en footer.
+ * "Ontdek waar je staat, plan waar je heen gaat." Vier pijler-secties
+ * (#inzicht, #grip, #nu, #toekomst) + #voor-wie. De section-ids zijn
+ * deeplink-doelen vanaf de home-pijlers, header en footer.
  */
 export function FunctiesSecties() {
   return (
     <>
-      {/* ── DEEL 1 — INZICHT ─────────────────────────────────────── */}
+      {/* ── PIJLER 1 — INZICHT ───────────────────────────────────── */}
       <SectionRule label="Inzicht" />
       <section id="inzicht" className="bg-[var(--subtle)] px-6 py-20 md:px-12 md:py-24">
         <Reveal className="mx-auto max-w-6xl">
           <SectionTitle
-            kicker="Deel 1 — Inzicht"
+            kicker="Pijler 1 — Inzicht"
             title="Zie wat er"
             italics="werkelijk gebeurt"
             intro="Transacties, budgetten, vermogen en groei — bijgehouden zonder dat jij hoeft te boekhouden, en altijd vertaald naar wat het betekent voor jouw vrijheid."
@@ -80,12 +79,12 @@ export function FunctiesSecties() {
         </Reveal>
       </section>
 
-      {/* ── DEEL 2 — GRIP (Will, nieuws & notificaties) ──────────── */}
+      {/* ── PIJLER 2 — GRIP (Will, nieuws & notificaties) ────────── */}
       <SectionRule label="Grip" />
       <section id="grip" className="px-6 py-20 md:px-12 md:py-24">
         <Reveal className="mx-auto max-w-5xl">
           <SectionTitle
-            kicker="Deel 2 — Grip · Will, je AI-coach"
+            kicker="Pijler 2 — Grip · Will, je AI-coach"
             title="Niet een chatbot."
             italics="Een tweede paar ogen."
             intro="Will leeft door je hele app heen — als constatering in je briefing, als suggestie naast een doel, als signaal bij een afwijkende transactie. Altijd in dezelfde stem, altijd op basis van jóuw cijfers."
@@ -122,12 +121,12 @@ export function FunctiesSecties() {
         </Reveal>
       </section>
 
-      {/* ── DEEL 3 — NU ──────────────────────────────────────────── */}
+      {/* ── PIJLER 3 — NU ────────────────────────────────────────── */}
       <SectionRule label="Nu" />
       <section id="nu" className="bg-[var(--subtle)] px-6 py-20 md:px-12 md:py-24">
         <Reveal className="mx-auto max-w-6xl">
           <SectionTitle
-            kicker="Deel 3 — Nu"
+            kicker="Pijler 3 — Nu"
             title="Vandaag"
             italics="op orde"
             intro="Wat heb ik, en wat geef ik uit? Je huidige vermogen en je cashflow in één rustig beeld — het fundament onder elke keuze."
@@ -157,12 +156,12 @@ export function FunctiesSecties() {
         </Reveal>
       </section>
 
-      {/* ── DEEL 4 — TOEKOMST ────────────────────────────────────── */}
+      {/* ── PIJLER 4 — TOEKOMST ──────────────────────────────────── */}
       <SectionRule label="Toekomst" />
       <section id="toekomst" className="px-6 py-20 md:px-12 md:py-24">
         <Reveal className="mx-auto max-w-6xl">
           <SectionTitle
-            kicker="Deel 4 — Toekomst"
+            kicker="Pijler 4 — Toekomst"
             title="Morgen"
             italics="eerlijk in beeld"
             intro="Een prognose is zo goed als de aannames eronder. Daarom rekenen we tegen echte marktdata, tonen we een bandbreedte in plaats van één gladde lijn — en rekenen je wensen én end-of-life voorkeuren gewoon mee."

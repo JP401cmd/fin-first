@@ -1,5 +1,4 @@
-import Link from 'next/link'
-import { Kicker, EditorialHeadline } from '@/components/editorial'
+import { Kicker, EditorialHeadline, Button } from '@/components/editorial'
 
 export default function AppNotFound() {
   return (
@@ -16,13 +15,13 @@ export default function AppNotFound() {
         gegevens zijn veilig. Keer terug naar je Overzicht en pak de draad weer
         op.
       </p>
-      <div className="mt-8">
-        <Link
-          href="/overzicht"
-          className="inline-flex min-h-11 items-center justify-center bg-[var(--ink)] px-5 text-sm font-medium text-[var(--paper)] transition-colors hover:bg-[var(--ink-2)]"
-        >
+      <div className="mt-8 flex flex-wrap gap-3">
+        <Button href="/overzicht" variant="primary">
           Naar Overzicht
-        </Link>
+        </Button>
+        <Button href="/" variant="secondary">
+          Naar startpagina
+        </Button>
       </div>
     </div>
   )

@@ -66,6 +66,7 @@ function MiniNetWorthChartComponent({
   monthlySavings,
   netWorthExclHome,
   showExclHome = false,
+  dailyExpense,
 }: {
   netWorthHistory: { month: string; value: number }[]
   currentNetWorth: number
@@ -107,6 +108,12 @@ function MiniNetWorthChartComponent({
    * (byte-identiek aan voorheen).
    */
   showExclHome?: boolean
+  /**
+   * Canoniek dagtarief (EUR/dag) uit de dashboard-bundel — doorgegeven aan de
+   * NetWorthHistorySheet voor de vrijheidstijd-equivalent van de periode-delta.
+   * Afwezig -> sheet toont alleen het EUR-bedrag. Nooit lokaal herrekenen.
+   */
+  dailyExpense?: number
 }) {
   // Netto vermogen + eindbedrag zijn saldi → honoreren de privacy-toggle.
   // Hooks vóór elke early-return aangeroepen (rules-of-hooks). De numerieke
@@ -799,6 +806,7 @@ function MiniNetWorthChartComponent({
         onClose={() => setHistoryOpen(false)}
         history={historyPoints}
         currentNetWorth={currentNetWorth}
+        dailyExpense={dailyExpense}
       />
     </div>
   )

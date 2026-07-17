@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { unauthorized, serverError } from '@/lib/api/respond'
 import { computeFireProjection, type FinancialInput } from '@/lib/horizon-data'
 import { computeHealthScoreFromInputs } from '@/lib/financial-health'
 import {
@@ -32,7 +33,7 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   // Fetch snapshots
@@ -43,7 +44,7 @@ export async function GET() {
     .order('snapshot_date', { ascending: true })
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverError(error, 'snapshots:GET')
   }
 
   // Fetch essential budgets + profile to compute freedom_percentage for each
@@ -114,7 +115,7 @@ export async function POST() {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   // Fetch real asset, debt, transaction, and profile data in parallel
@@ -187,10 +188,10 @@ export async function POST() {
   ])
 
   if (assetsResult.error) {
-    return NextResponse.json({ error: assetsResult.error.message }, { status: 500 })
+    return serverError(assetsResult.error, 'snapshots:POST')
   }
   if (debtsResult.error) {
-    return NextResponse.json({ error: debtsResult.error.message }, { status: 500 })
+    return serverError(debtsResult.error, 'snapshots:POST')
   }
 
   const assets = assetsResult.data ?? []
@@ -342,7 +343,7 @@ export async function POST() {
       .single()
 
     if (basicError) {
-      return NextResponse.json({ error: basicError.message }, { status: 500 })
+      return serverError(basicError, 'snapshots:POST')
     }
     snapshot = basicSnapshot
     upsertError = 'Extended columns not available (migration pending). Basic snapshot saved.'

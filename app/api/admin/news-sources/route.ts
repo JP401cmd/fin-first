@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { forbidden, serverError } from '@/lib/api/respond'
 import { createClient } from '@/lib/supabase/server'
 import { isSuperAdmin } from '@/lib/admin'
 
@@ -8,7 +9,7 @@ export async function GET() {
   const supabase = await createClient()
 
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   const [webRes, rssRes] = await Promise.all([
@@ -17,10 +18,10 @@ export async function GET() {
   ])
 
   if (webRes.error) {
-    return NextResponse.json({ error: webRes.error.message }, { status: 500 })
+    return serverError(webRes.error, 'admin-news-sources:GET')
   }
   if (rssRes.error) {
-    return NextResponse.json({ error: rssRes.error.message }, { status: 500 })
+    return serverError(rssRes.error, 'admin-news-sources:GET')
   }
 
   // Parse stored values — they may be strings or already-parsed objects
@@ -52,7 +53,7 @@ export async function PUT(req: Request) {
   const supabase = await createClient()
 
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   const body = await req.json()
@@ -90,10 +91,10 @@ export async function PUT(req: Request) {
   ])
 
   if (webErr.error) {
-    return NextResponse.json({ error: webErr.error.message }, { status: 500 })
+    return serverError(webErr.error, 'admin-news-sources:PUT')
   }
   if (rssErr.error) {
-    return NextResponse.json({ error: rssErr.error.message }, { status: 500 })
+    return serverError(rssErr.error, 'admin-news-sources:PUT')
   }
 
   return NextResponse.json({ success: true })
@@ -105,7 +106,7 @@ export async function DELETE() {
   const supabase = await createClient()
 
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   const { error } = await supabase
@@ -114,7 +115,7 @@ export async function DELETE() {
     .in('key', ['news_web_sources', 'news_rss_feeds'])
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverError(error, 'admin-news-sources:DELETE')
   }
 
   return NextResponse.json({ success: true })

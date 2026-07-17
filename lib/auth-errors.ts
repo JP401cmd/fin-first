@@ -20,6 +20,15 @@ export const AUTH_NETWORK_MESSAGE =
 /** Generieke fallback voor onbekende fouten. */
 export const AUTH_GENERIC_MESSAGE = 'Er ging iets mis. Probeer het opnieuw.'
 
+/**
+ * Load-bearing sentinel-substring uit de `before_user_created`-hook-melding
+ * (ADR 0047). De hook weigert een niet-uitgenodigd adres met deze stabiele,
+ * hoofdletter-token in de foutmelding; front-end en OAuth-callback herkennen 'm
+ * hieraan. Bewust een sentinel i.p.v. de NL-copy zelf, zodat de melding kan
+ * wijzigen zonder de match te breken.
+ */
+export const SIGNUP_NOT_INVITED_SENTINEL = 'TRIFINITY_NOT_INVITED'
+
 type AuthErrorFields = {
   message: string
   code: string
@@ -80,6 +89,18 @@ export function translateAuthError(error: unknown): string {
     haystack.includes('network request failed')
   ) {
     return AUTH_NETWORK_MESSAGE
+  }
+
+  // Besloten testfase (ADR 0047): de before_user_created-hook weigert een niet-
+  // uitgenodigd adres met de sentinel in de melding. `haystack` is al
+  // ge-lowercased, dus we vergelijken tegen de lowercase sentinel.
+  //
+  // Bewust GEEN account-enumeratie: dit signaleert alleen allowlist-membership
+  // (staat je adres op de uitnodigingslijst) — het onthult NIET of er al een
+  // account bestaat op dat adres. De "al geregistreerd"-afhandeling hieronder
+  // blijft los daarvan (signup toont die bewust niet — anti-enumeratie).
+  if (haystack.includes(SIGNUP_NOT_INVITED_SENTINEL.toLowerCase())) {
+    return 'TriFinity zit in een besloten testfase. Dit e-mailadres heeft nog geen toegang.'
   }
 
   if (isUserAlreadyRegisteredError(error)) {

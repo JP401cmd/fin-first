@@ -5,7 +5,8 @@ import { WidgetShell } from './widget-shell'
 import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
-import { dailyExpenseRate } from '@/lib/format'
+import { dailyExpenseRate, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { terSeverity, type TerSeverity } from '@/lib/fee-analysis'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { TrendingDown, AlertTriangle, ArrowRight } from 'lucide-react'
@@ -15,15 +16,6 @@ interface Props {
   size: WidgetSize
   data: DashboardData
   href?: string
-}
-
-type TerSeverity = 'green' | 'orange' | 'red'
-
-function getTerSeverity(weightedTER: number): TerSeverity {
-  const pct = weightedTER * 100
-  if (pct < 0.3) return 'green'
-  if (pct <= 0.8) return 'orange'
-  return 'red'
 }
 
 const SEVERITY_COLORS: Record<TerSeverity, { dot: string; text: string }> = {
@@ -49,8 +41,20 @@ export const FeeAnalyzerWidget = memo(function FeeAnalyzerWidget({ size, data, h
   const { weightedTER, totalAnnualFee, perHoldingBreakdown, holdingsWithTER, holdingsWithoutTER } = feeAnalysis
   const totalHoldings = holdingsWithTER + holdingsWithoutTER
   const terCoverage = totalHoldings > 0 ? holdingsWithTER / totalHoldings : 0
-  const severity = getTerSeverity(weightedTER)
+  const severity = terSeverity(weightedTER)
   const terPctStr = (weightedTER * 100).toFixed(2).replace('.', ',')
+
+  // Canoniek dagtarief (consume, don't recompute): primair uit de bundel,
+  // fallback op de geannualiseerde maanduitgaven alleen als het bundelveld ontbreekt.
+  const dailyExpenses =
+    (data.dailyExpenseRate ?? (data.monthlyExpenses > 0 ? dailyExpenseRate(data.monthlyExpenses) : 0)) || 0
+
+  // Kosten = verloren vrijheid, óók zonder geboortedatum: jaarkosten omgerekend
+  // naar vrijheidstijd via de canonieke helper (los van de FIRE-maand-impact).
+  const annualFeeFreedomStr =
+    dailyExpenses > 0 && totalAnnualFee > 0
+      ? formatFreedomTimeString(calculateFreedomTime(totalAnnualFee, dailyExpenses), 'long')
+      : null
 
   // FIRE impact sentence
   const feeImpactMonths = data.feeImpactMonths ?? 0
@@ -75,7 +79,7 @@ export const FeeAnalyzerWidget = memo(function FeeAnalyzerWidget({ size, data, h
             </span>
           </div>
         </WidgetShell>
-        <FeeDetailModal open={showDetail} onClose={() => setShowDetail(false)} feeAnalysis={feeAnalysis} feeImpactMonths={feeImpactMonths} grossReturn={data.grossReturn} dailyExpenses={(data.dailyExpenseRate ?? (data.monthlyExpenses > 0 ? dailyExpenseRate(data.monthlyExpenses) : 0)) || undefined} />
+        <FeeDetailModal open={showDetail} onClose={() => setShowDetail(false)} feeAnalysis={feeAnalysis} feeImpactMonths={feeImpactMonths} grossReturn={data.grossReturn} dailyExpenses={dailyExpenses || undefined} />
       </>
     )
   }
@@ -96,6 +100,9 @@ export const FeeAnalyzerWidget = memo(function FeeAnalyzerWidget({ size, data, h
             <p className="text-[var(--ink)] mt-0.5">
               <MaskedAmount value={totalAnnualFee} tone="kern" className="text-sm font-semibold" />
             </p>
+            {annualFeeFreedomStr && (
+              <p className="text-[11px] text-[var(--ink-3)] mt-0.5">≈ {annualFeeFreedomStr} vrijheid per jaar</p>
+            )}
           </div>
           {terCoverage < 0.5 && (
             <p className="text-[11px] text-[var(--ink-2)] mt-1.5 flex items-center gap-1">
@@ -104,7 +111,7 @@ export const FeeAnalyzerWidget = memo(function FeeAnalyzerWidget({ size, data, h
             </p>
           )}
         </WidgetShell>
-        <FeeDetailModal open={showDetail} onClose={() => setShowDetail(false)} feeAnalysis={feeAnalysis} feeImpactMonths={feeImpactMonths} grossReturn={data.grossReturn} dailyExpenses={(data.dailyExpenseRate ?? (data.monthlyExpenses > 0 ? dailyExpenseRate(data.monthlyExpenses) : 0)) || undefined} />
+        <FeeDetailModal open={showDetail} onClose={() => setShowDetail(false)} feeAnalysis={feeAnalysis} feeImpactMonths={feeImpactMonths} grossReturn={data.grossReturn} dailyExpenses={dailyExpenses || undefined} />
       </>
     )
   }
@@ -133,6 +140,9 @@ export const FeeAnalyzerWidget = memo(function FeeAnalyzerWidget({ size, data, h
               <p className="text-[var(--ink)] mt-0.5">
                 <MaskedAmount value={totalAnnualFee} tone="kern" className="text-lg font-semibold" />
               </p>
+              {annualFeeFreedomStr && (
+                <p className="text-[11px] text-[var(--ink-3)] mt-0.5">≈ {annualFeeFreedomStr} vrijheid per jaar</p>
+              )}
             </div>
 
             {/* FIRE impact sentence */}
@@ -147,7 +157,7 @@ export const FeeAnalyzerWidget = memo(function FeeAnalyzerWidget({ size, data, h
               <div className="space-y-1 mt-2">
                 <p className="text-[11px] text-[var(--ink-3)] uppercase tracking-wider font-medium">Duurste holdings</p>
                 {displayHoldings.map((h, i) => {
-                  const holdingSeverity = getTerSeverity(h.ter)
+                  const holdingSeverity = terSeverity(h.ter)
                   return (
                     <div
                       key={h.name + i}
@@ -181,7 +191,7 @@ export const FeeAnalyzerWidget = memo(function FeeAnalyzerWidget({ size, data, h
             )}
           </div>
         </WidgetShell>
-        <FeeDetailModal open={showDetail} onClose={() => setShowDetail(false)} feeAnalysis={feeAnalysis} feeImpactMonths={feeImpactMonths} grossReturn={data.grossReturn} dailyExpenses={(data.dailyExpenseRate ?? (data.monthlyExpenses > 0 ? dailyExpenseRate(data.monthlyExpenses) : 0)) || undefined} />
+        <FeeDetailModal open={showDetail} onClose={() => setShowDetail(false)} feeAnalysis={feeAnalysis} feeImpactMonths={feeImpactMonths} grossReturn={data.grossReturn} dailyExpenses={dailyExpenses || undefined} />
       </>
     )
   }
@@ -221,7 +231,7 @@ export const FeeAnalyzerWidget = memo(function FeeAnalyzerWidget({ size, data, h
             <div className="space-y-1 mb-2">
               <p className="text-[11px] text-[var(--ink-3)] uppercase tracking-wider font-medium">Duurste holdings</p>
               {displayHoldings.map((h, i) => {
-                const holdingSeverity = getTerSeverity(h.ter)
+                const holdingSeverity = terSeverity(h.ter)
                 return (
                   <div
                     key={h.name + i}
@@ -267,7 +277,7 @@ export const FeeAnalyzerWidget = memo(function FeeAnalyzerWidget({ size, data, h
           </div>
         </div>
       </WidgetShell>
-      <FeeDetailModal open={showDetail} onClose={() => setShowDetail(false)} feeAnalysis={feeAnalysis} feeImpactMonths={feeImpactMonths} grossReturn={data.grossReturn} dailyExpenses={(data.dailyExpenseRate ?? (data.monthlyExpenses > 0 ? dailyExpenseRate(data.monthlyExpenses) : 0)) || undefined} />
+      <FeeDetailModal open={showDetail} onClose={() => setShowDetail(false)} feeAnalysis={feeAnalysis} feeImpactMonths={feeImpactMonths} grossReturn={data.grossReturn} dailyExpenses={dailyExpenses || undefined} />
     </>
   )
 })

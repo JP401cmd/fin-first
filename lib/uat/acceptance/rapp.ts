@@ -17,9 +17,11 @@
  *    categorieën ten onrechte mee als "essentiële uitgave" (ontbrekende
  *    `budget_type === 'expense'`-filter, WF-RAPP-09) → "Uitgaven nu" toont
  *    €127.140 i.p.v. de correcte €13.140.
- *  - `HOUSEHOLD_TYPE_LABELS`-mismatch: kent alleen single/partner/family/
- *    single_parent, terwijl `profiles.household_type` overal elders
- *    solo/samen/gezin gebruikt → toont de ruwe waarde "samen" (WF-RAPP-09).
+ *  - `HOUSEHOLD_TYPE_LABELS`-mismatch (WF-RAPP-09): kende alleen single/partner/
+ *    family/single_parent, terwijl `profiles.household_type` overal elders
+ *    solo/samen/gezin gebruikt → toonde de ruwe waarde "samen". GEFIXT (jul
+ *    2026): labelmap + `householdTypeLabel()` verhuisd naar de canonieke bron
+ *    lib/household-type.ts, gekeyd op solo/samen/gezin met veilige fallback.
  *
  * KERN-BEVINDING (bepaalt exact/consistency/ui-only): balans-/budget-/
  * vermogen-/persoonlijk-plan-cijfers zijn op de vaste (niet-gejitterde)
@@ -147,7 +149,7 @@ const criteria: AcceptanceCriterion[] = [
     scenarioId: 'UAT-RAPP-09',
     titel: 'Persoonlijk plan genereren en aannames controleren',
     kriticiteit: 'KERN',
-    given: 'Persona Willem: bruto rendement 6,00%, inflatie 2,00%, `net_monthly_income` NULL (hij gebruikt budgetten, geen profiel-inkomensveld), DOB 1968-11-30, cohort-rij [1966-10-01, 1970-06-30] → 67 jaar/6 mnd, niet definitief. Persona Marijke: `marginaal_tarief` expliciet 0,4950. AL-GEDOCUMENTEERDE BUGS (reeds gelogd): "Uitgaven nu" telt Inkomen+Sparen ten onrechte mee (€127.140 i.p.v. €13.140, ontbrekende `budget_type===\'expense\'`-filter); `HOUSEHOLD_TYPE_LABELS` mist solo/samen/gezin → toont ruwe waarde "samen".',
+    given: 'Persona Willem: bruto rendement 6,00%, inflatie 2,00%, `net_monthly_income` NULL (hij gebruikt budgetten, geen profiel-inkomensveld), DOB 1968-11-30, cohort-rij [1966-10-01, 1970-06-30] → 67 jaar/6 mnd, niet definitief. Persona Marijke: `marginaal_tarief` expliciet 0,4950. AL-GEDOCUMENTEERDE BUGS (reeds gelogd): "Uitgaven nu" telt Inkomen+Sparen ten onrechte mee (€127.140 i.p.v. €13.140, ontbrekende `budget_type===\'expense\'`-filter); `HOUSEHOLD_TYPE_LABELS` miste solo/samen/gezin → toonde ruwe waarde "samen" (GEFIXT jul 2026: canonieke `householdTypeLabel()` in lib/household-type.ts).',
     when: 'AOW-leeftijd (`lookupAowAge`) en effectieve SWR + marginaal tarief (`resolveFireParams`) worden berekend.',
     then: 'Willem: AOW-leeftijd = 67 jaar/6 mnd, niet-definitief ("CBS-prognose"); effectieve SWR = 6,00−2,16−2,00 = 1,84%; marginaal tarief = 35,75% (fallback-tak, want `net_monthly_income` is NULL — sinds de tax-optimizer-refactor (lib/box1-tax.ts#deriveMarginaalTarief) jaar-afgeleid uit BOX1_PARAMS i.p.v. de vroegere 2024/2025-hardcode 36,97%; voor belastingjaar 2026 is schijf-1-tarief 35,75%). Marijke: marginaal tarief = 49,50% (expliciet ingesteld, geen fallback).',
     assertion: {

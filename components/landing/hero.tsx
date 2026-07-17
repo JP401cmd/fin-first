@@ -1,11 +1,11 @@
 import Link from 'next/link'
 
 /**
- * Hero van de marketing-home. Draagt de merkbelofte als kop — "De
- * vrijheid om met inzicht en grip keuzes te maken voor nu en de
- * toekomst" — waarvan de vier kernwoorden de pijler-secties eronder
- * ankeren. Rechts de VrijheidsPadKaart: een illustratieve projectie
- * die laat zien dat jouw keuzes het vrijheidsmoment verschuiven.
+ * Hero van de marketing-home. Draagt de merkbelofte als kop — "Ontdek
+ * waar je staat, plan waar je heen gaat" — een tweeledige belofte die de
+ * vier pijler-secties eronder (Inzicht, Grip, Nu, Toekomst) uitwerken.
+ * Rechts de VrijheidsPadKaart: een illustratieve projectie die laat zien
+ * dat jouw keuzes het vrijheidsmoment verschuiven.
  */
 
 // ── Vrijheidspad — illustratieve projectie-grafiek ───────────────────
@@ -119,11 +119,8 @@ export function Hero() {
           </p>
 
           <h1 className="mb-6 font-display text-[2rem] font-bold leading-[1.15] tracking-[-0.02em] text-[var(--ink)] sm:text-[2.4rem] md:text-[2.7rem] lg:text-[3.1rem]">
-            De vrijheid om met{' '}
-            <em className="italic text-kern-600">inzicht</em> en{' '}
-            <em className="italic text-kern-600">grip</em> keuzes te maken
-            voor <em className="italic text-kern-600">nu</em> en{' '}
-            <em className="italic text-kern-600">de toekomst</em>.
+            Ontdek waar je staat, plan{' '}
+            <em className="italic text-kern-600">waar je heen gaat</em>.
           </h1>
 
           <p className="mb-8 max-w-[520px] font-serif text-lg leading-relaxed text-[var(--ink-2)]">

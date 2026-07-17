@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { forbidden, serverError } from '@/lib/api/respond'
 import { createClient } from '@/lib/supabase/server'
 import { isSuperAdmin } from '@/lib/admin'
 import type { BriefingDirective, FunctionalDirective } from '@/lib/briefing/directives'
@@ -12,7 +13,7 @@ export async function GET() {
   const supabase = await createClient()
 
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   const { data, error } = await supabase
@@ -21,7 +22,7 @@ export async function GET() {
     .in('key', ['briefing_directives', 'briefing_functional_directives'])
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverError(error, 'admin-briefing-directives:GET')
   }
 
   const map = Object.fromEntries((data ?? []).map((r) => [r.key, r.value]))
@@ -36,7 +37,7 @@ export async function PUT(req: Request) {
   const supabase = await createClient()
 
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   const body = await req.json()
@@ -54,7 +55,7 @@ export async function PUT(req: Request) {
         { key: 'briefing_directives', value: JSON.stringify(body.directives), updated_at: ts, updated_by: user?.id },
         { onConflict: 'key' },
       )
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return serverError(error, 'admin-briefing-directives:PUT')
   }
 
   // Save functional directives
@@ -68,7 +69,7 @@ export async function PUT(req: Request) {
         { key: 'briefing_functional_directives', value: JSON.stringify(body.functionalDirectives), updated_at: ts, updated_by: user?.id },
         { onConflict: 'key' },
       )
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return serverError(error, 'admin-briefing-directives:PUT')
   }
 
   return NextResponse.json({ success: true })

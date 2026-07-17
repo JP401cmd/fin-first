@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { assetHasActiveHoldings, assetsWithActiveHoldings } from '@/lib/holdings-sync'
+import { unauthorized, serverError } from '@/lib/api/respond'
 
 /** Max aantal asset-ids per batch-call (URL-lengte + query-veiligheid). */
 const MAX_BATCH_IDS = 200
@@ -23,7 +24,7 @@ export async function GET(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   const { searchParams } = new URL(request.url)
@@ -58,8 +59,7 @@ export async function GET(request: NextRequest) {
       }
       return NextResponse.json({ holdings })
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Onbekende fout'
-      return NextResponse.json({ error: message }, { status: 500 })
+      return serverError(err, 'assets-has-holdings:GET')
     }
   }
 
@@ -79,7 +79,6 @@ export async function GET(request: NextRequest) {
       total_value: result.totalValue,
     })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Onbekende fout'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return serverError(err, 'assets-has-holdings:GET')
   }
 }

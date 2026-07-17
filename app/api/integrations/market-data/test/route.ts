@@ -11,6 +11,7 @@
 
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { unauthorized } from '@/lib/api/respond'
 import { fetchPriceData } from '@/lib/price-feed'
 import { fetchEurPrices } from '@/lib/integrations/coingecko-client'
 
@@ -63,7 +64,7 @@ export async function GET() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   const [yahoo, coingecko] = await Promise.all([pingYahoo(), pingCoinGecko()])

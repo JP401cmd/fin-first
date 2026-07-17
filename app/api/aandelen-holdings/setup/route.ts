@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { APP_SETUP_SLUGS } from '@/lib/app-setup-status'
+import { unauthorized, serverError } from '@/lib/api/respond'
 
 /**
  * POST /api/aandelen-holdings/setup — Eerste-keer setup voor de
@@ -35,7 +36,7 @@ export async function POST(req: Request) {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) {
-    return Response.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   let parsed
@@ -107,8 +108,6 @@ export async function POST(req: Request) {
 
     return Response.json({ success: true })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Onbekende fout'
-    console.error('[aandelen-holdings-setup] error:', message)
-    return Response.json({ error: message }, { status: 500 })
+    return serverError(err, 'aandelen-holdings-setup:POST')
   }
 }

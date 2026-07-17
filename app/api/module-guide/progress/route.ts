@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { unauthorized } from '@/lib/api/respond'
 
 // ── Types ──────────────────────────────────────────────────────
 // { [moduleId]: { completedSteps: string[], dismissedAt: string | null } }
@@ -23,7 +24,7 @@ function isColumnMissing(error: { code?: string; message?: string } | null): boo
 export async function GET() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user) return unauthorized()
 
   // Try primary column first
   const { data, error } = await supabase
@@ -127,7 +128,7 @@ function isValidAction(body: unknown): body is ProgressAction {
 export async function PUT(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user) return unauthorized()
 
   let body: unknown
   try {

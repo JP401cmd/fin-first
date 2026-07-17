@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { forbidden } from '@/lib/api/respond'
 import { createClient } from '@/lib/supabase/server'
 import { isSuperAdmin } from '@/lib/admin'
 import { getBaseUrls, getProviders, getClientId } from '@/lib/truelayer/client'
@@ -7,7 +8,7 @@ export async function POST() {
   const supabase = await createClient()
 
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   try {
@@ -30,6 +31,7 @@ export async function POST() {
     console.error('TrueLayer test connection error:', err)
     return NextResponse.json({
       success: false,
+      // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
       message: err instanceof Error ? err.message : 'Verbinding mislukt',
     }, { status: 500 })
   }

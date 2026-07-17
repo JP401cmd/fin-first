@@ -30,7 +30,8 @@
 
 import { PERSONAS, type PersonaData } from '@/lib/test-personas'
 import { computeBox1Tax, grossFromNet } from '@/lib/box1-tax'
-import { calculateBox2, VPB_PARAMS, BOX2_PARAMS } from '@/lib/box2-data'
+import { calculateBox2, VPB_PARAMS, BOX2_PARAMS, DGA_LENING_DREMPEL } from '@/lib/box2-data'
+import { dgaLeningTotalForUser } from '@/lib/box2-dga-lening'
 import {
   calculateBox3,
   calculatePartnerSplit,
@@ -254,15 +255,46 @@ export const BELAST_ENGINE_CHECKS: BelastEngineCheck[] = [
   {
     workflow: 'WF-BELAST-14',
     scenarioId: 'UAT-BELAST-14',
-    label: 'Wet excessief lenen DGA: drempel €500k + bovenmatig deel (calculateBox2)',
+    label: 'Wet excessief lenen DGA: aggregatie (schuld+vordering) → drempel/excess (box2-dga-lening + calculateBox2)',
     run: () => {
       criterion('WF-BELAST-14')
-      const base = { deelnemingen: [], year: 2026 as const, hasPartner: false, dailyExpenses: 0 }
-      const onder = calculateBox2({ ...base, dgaLeningenTotal: 200 })
-      const boven = calculateBox2({ ...base, dgaLeningenTotal: 550000 })
+      const excessFor = (dgaLeningenTotal: number) =>
+        calculateBox2({ deelnemingen: [], year: 2026, hasPartner: false, dailyExpenses: 0, dgaLeningenTotal })
+          .dgaLeningenExcess
+
+      // (a) Kernbug: alleen een dga_schuld €600k, geen vordering. Vroeger trok de
+      //     route de vordering (0) van de schuld af → netto −600k → excess €0.
+      //     Optie B: totaal = €600k → bovenmatig deel €100k.
+      const totaalA = dgaLeningTotalForUser(
+        { schulden: [{ userId: 'u', ownership: 'personal', amount: 600000 }], vorderingen: [] },
+        'u',
+      )
+      // (b) Som van beide bronnen kruist de drempel waar geen enkele bron dat
+      //     alleen doet: €400k schuld + €200k vordering = €600k.
+      const totaalB = dgaLeningTotalForUser(
+        {
+          schulden: [{ userId: 'u', ownership: 'personal', amount: 400000 }],
+          vorderingen: [{ userId: 'u', ownership: 'personal', amount: 200000 }],
+        },
+        'u',
+      )
+      // (c) Persona 'compleet' (Tessa) na de subtype-fix: €9k schuld + €35k
+      //     vordering (subtype dga_lening) = €44k → onder de drempel, excess €0.
+      const tessaSchulden = compleet.debts
+        .filter((d) => d.debt_type === 'dga_schuld')
+        .map((d) => ({ userId: 'tessa', ownership: 'personal', amount: Number(d.current_balance) }))
+      const tessaVorderingen = compleet.assets
+        .filter((a) => a.asset_type === 'vordering' && a.subtype === 'dga_lening')
+        .map((a) => ({ userId: 'tessa', ownership: 'personal', amount: Number(a.current_value) }))
+      const tessaTotaal = dgaLeningTotalForUser(
+        { schulden: tessaSchulden, vorderingen: tessaVorderingen },
+        'tessa',
+      )
+
       return {
-        expected: 'drempel=500000; excessOnder=0; excessBoven=50000',
-        actual: `drempel=${onder.dgaLeningenDrempel}; excessOnder=${onder.dgaLeningenExcess}; excessBoven=${boven.dgaLeningenExcess}`,
+        expected:
+          'drempel=500000; totaalA=600000; excessA=100000; totaalB=600000; excessB=100000; tessaTotaal=44000; tessaExcess=0',
+        actual: `drempel=${DGA_LENING_DREMPEL}; totaalA=${totaalA}; excessA=${excessFor(totaalA)}; totaalB=${totaalB}; excessB=${excessFor(totaalB)}; tessaTotaal=${tessaTotaal}; tessaExcess=${excessFor(tessaTotaal)}`,
       }
     },
   },

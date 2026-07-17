@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { UNIFIED_FEATURES, hasSubscription, type ActiveSubscriptions } from '@/lib/feature-registry'
+import { unauthorized, serverError } from '@/lib/api/respond'
 
 export async function GET() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return unauthorized()
   }
 
   const { data: profile } = await supabase
@@ -26,7 +27,7 @@ export async function PUT(req: Request) {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return unauthorized()
   }
 
   const body = await req.json()
@@ -65,7 +66,7 @@ export async function PUT(req: Request) {
     .eq('id', user.id)
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverError(error, 'feature-preferences:PUT')
   }
 
   return NextResponse.json({ success: true, preferences: validatedPrefs })

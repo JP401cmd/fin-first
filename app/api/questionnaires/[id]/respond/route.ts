@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { unauthorized, forbidden, serverError } from '@/lib/api/respond'
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user) return unauthorized()
 
   const body = await req.json()
   const { session_id, question_id, question_text, answer_text, answer_scale, answer_choice } = body as {
@@ -31,7 +32,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     .single()
 
   if (!session) {
-    return NextResponse.json({ error: 'Invalid or completed session' }, { status: 403 })
+    return forbidden('Invalid or completed session')
   }
 
   const { error } = await supabase
@@ -48,7 +49,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       { onConflict: 'session_id,question_id' }
     )
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(error, 'questionnaire-respond:POST')
 
   return NextResponse.json({ success: true })
 }
@@ -57,7 +58,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user) return unauthorized()
 
   const body = await req.json()
   const { session_id } = body as { session_id: string }
@@ -69,7 +70,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     .eq('user_id', user.id)
     .eq('questionnaire_id', id)
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(error, 'questionnaire-respond:PATCH')
 
   return NextResponse.json({ success: true })
 }

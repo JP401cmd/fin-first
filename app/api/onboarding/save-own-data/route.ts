@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { unauthorized, serverError } from '@/lib/api/respond'
 import { NL_AOW_AGE, NL_AOW_MONTHLY } from '@/lib/horizon-data'
 import { HORIZON_SETUP_COMPLETED_SLUG } from '@/lib/horizon-data-loader'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
@@ -518,7 +519,7 @@ export async function POST(req: Request) {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 })
+    return unauthorized()
   }
 
   // Parse and validate
@@ -1227,8 +1228,6 @@ export async function POST(req: Request) {
 
     return Response.json({ success: true })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Onbekende fout'
-    console.error('save-own-data error:', message)
-    return Response.json({ error: message }, { status: 500 })
+    return serverError(err, 'onboarding-save-own-data:POST')
   }
 }

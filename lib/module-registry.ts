@@ -160,9 +160,12 @@ export const WIDGET_MODULE_MAP: Record<string, ModuleId> = {
   box3_drag: 'vermogensregistratie',
   netto_vermogen: 'vermogensregistratie',
   schulden: 'vermogensregistratie',
+  hypotheek_vs_beleggen: 'vermogensregistratie',
 
   // Aandelenregistratie
   holdings: 'aandelenregistratie',
+  fee_analyzer: 'aandelenregistratie',
+  rebalancing: 'aandelenregistratie',
 
   // Inzicht & Acties
   doelen: 'inzicht_acties',
@@ -175,6 +178,10 @@ export const WIDGET_MODULE_MAP: Record<string, ModuleId> = {
   beslissingspatronen: 'inzicht_acties',
   gezondheids_score: 'inzicht_acties',
   ai_inzicht: 'inzicht_acties',
+
+  // Nieuws — de Nieuws-widget (id `berichten`) vereist de nieuws-module.
+  // Bestaande layouts blijven renderen; dit gate't alleen de picker-zichtbaarheid.
+  berichten: 'nieuws',
 
   // Toekomstplannen
   fire_prognose: 'toekomstplannen',

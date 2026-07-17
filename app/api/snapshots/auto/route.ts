@@ -278,6 +278,7 @@ export async function GET(request: Request) {
       .single()
 
     if (basicError) {
+      // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
       return NextResponse.json({ error: basicError.message }, { status: 500 })
     }
     snapshot = basicSnapshot

@@ -19,6 +19,7 @@ export async function GET(request: Request) {
           status: 'error',
           database: 'disconnected',
           supabase: 'error',
+          // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
           error: error.message,
           timestamp: new Date().toISOString(),
         },

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { forbidden, serverError } from '@/lib/api/respond'
 import { createClient } from '@/lib/supabase/server'
 import { isSuperAdmin } from '@/lib/admin'
 
@@ -6,7 +7,7 @@ export async function GET() {
   const supabase = await createClient()
 
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   const { data, error } = await supabase
@@ -16,7 +17,7 @@ export async function GET() {
     .maybeSingle()
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverError(error, 'admin-news-prompt:GET')
   }
 
   return NextResponse.json({ prompt: data?.value ?? null })
@@ -26,7 +27,7 @@ export async function PUT(req: Request) {
   const supabase = await createClient()
 
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   const body = await req.json()
@@ -49,7 +50,7 @@ export async function PUT(req: Request) {
     )
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverError(error, 'admin-news-prompt:PUT')
   }
 
   return NextResponse.json({ success: true })
@@ -59,7 +60,7 @@ export async function DELETE() {
   const supabase = await createClient()
 
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   const { error } = await supabase
@@ -68,7 +69,7 @@ export async function DELETE() {
     .eq('key', 'news_system_prompt')
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverError(error, 'admin-news-prompt:DELETE')
   }
 
   return NextResponse.json({ success: true })

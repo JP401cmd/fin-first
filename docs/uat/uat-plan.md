@@ -511,7 +511,7 @@ Scope: de publieke marketing-site (landing + subpagina's), de publieke Vrijheids
 - **Trigger/startpunt:** Bezoeker opent `/` (uitgelogd; een ingelogde gebruiker wordt door de proxy direct naar /overzicht gestuurd).
 - **Eindresultaat:** De bezoeker heeft de belofte-structuur gezien (hero met illustratieve Vrijheidspad-grafiek, vier pijler-secties Inzicht/Grip/Nu/Toekomst, filosofie-sectie, trust-strip, prijsteaser) en is doorgeklikt naar /signup, /functies, /check, /prijzen of /veiligheid.
 - **Stappen:**
-  1. Open de homepagina en lees de hero: kop "De vrijheid om met inzicht en grip keuzes te maken voor nu en de toekomst" en rechts de kaart "Jouw pad naar vrijheid" (gemarkeerd als "illustratief").
+  1. Open de homepagina en lees de hero: kop "Ontdek waar je staat, plan waar je heen gaat" en rechts de kaart "Jouw pad naar vrijheid" (gemarkeerd als "illustratief").
   2. Klik op één van de drie hero-knoppen: "Begin gratis" (→ /signup), "Ontdek hoe het werkt" (→ /functies) of "Maak je eerste Vrijheidsrapport in 5 minuten" (→ /check).
   3. Scroll door de vier pijler-secties en klik in een pijler op "Zo werkt … in de app" (→ /functies#inzicht, #grip, #nu of #toekomst).
   4. Klik in de filosofie-sectie op "Lees hoe we rekenen" (→ /veiligheid#methodologie) en in de trust-strip op "Lees hoe we met je data omgaan" (→ /veiligheid).
@@ -8722,7 +8722,7 @@ Alle scenario's, per deelgebied in uitvoervolgorde. Formaat en registratie: zie 
 - **Kriticiteit:** BELANGRIJK · **Platform:** webapp · **Rooktest:** nee · **Duur:** ~3 min
 - **Preconditie:** uitgelogde browser (geen sessie), open `https://<omgeving>/`
 - **a. Happy path:**
-  1. Open de homepagina → *verwacht:* hero met kop "De vrijheid om met inzicht en grip keuzes te maken voor nu en de toekomst" en rechts de kaart "Jouw pad naar vrijheid" (met een klein label "illustratief").
+  1. Open de homepagina → *verwacht:* hero met kop "Ontdek waar je staat, plan waar je heen gaat" en rechts de kaart "Jouw pad naar vrijheid" (met een klein label "illustratief").
   2. Klik de knop "Maak je eerste Vrijheidsrapport in 5 minuten" → *verwacht:* je landt op `/check`.
   3. Ga terug, klik "Ontdek hoe het werkt" → *verwacht:* je landt op `/functies`.
   4. Ga terug, klik "Begin gratis" → *verwacht:* je landt op `/signup`.

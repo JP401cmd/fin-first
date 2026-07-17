@@ -1,7 +1,16 @@
 import { describe, it, expect } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { deleteAllUserData, buildSeedAssetRow, buildSeedDebtRow } from './seed-persona'
+import {
+  deleteAllUserData,
+  buildSeedAssetRow,
+  buildSeedDebtRow,
+  countSeedSteps,
+  SEED_DELETE_STEPS,
+  SEED_INSERT_BASE_STEPS,
+} from './seed-persona'
 import { PERSONAS } from './test-personas'
+import type { PersonaData } from './test-personas'
+import { RETIREMENT_PROVIDER_LABELS } from './asset-data'
 
 /**
  * Borgt dat de wipe-laag NIET stilzwijgend doorgaat wanneer een tabel-delete
@@ -77,6 +86,53 @@ describe('deleteAllUserData — fail-fast bij delete-fouten', () => {
 })
 
 /**
+ * Regressie voor de seed-voortgangsbalk die boven 100% liep (bonus finding
+ * UAT-plan §2.7 A.4): de admin-/onboarding-seed-routes hardcodeerden
+ * `totalSteps` op 6/7 terwijl er feitelijk 9-11 `onProgress`-aanroepen zijn,
+ * waardoor de balk tot ~183% schoot en bij afronding terugsprong naar 100%.
+ * De fix leidt `totalSteps` af uit `countSeedSteps(persona)`. Deze tests borgen
+ * dat de teller klopt met de ECHTE stappen (geen los magic number dat wegdrift).
+ */
+describe('countSeedSteps — voortgangsteller klopt met de echte seed-stappen', () => {
+  it('deleteAllUserData roept onProgress precies SEED_DELETE_STEPS keer aan (echte code)', async () => {
+    const { client } = makeSupabaseMock()
+    let calls = 0
+    await deleteAllUserData(client, 'user-123', () => {
+      calls++
+    })
+    // Drift-guard: verandert het aantal delete-fasen, dan wordt deze test rood
+    // vóórdat een gebruiker een balk >100% ziet.
+    expect(calls).toBe(SEED_DELETE_STEPS)
+  })
+
+  it('basis = 9 stappen zonder balance_snapshots en zonder appSettings', () => {
+    const persona = { balance_snapshots: undefined, appSettings: undefined } as unknown as PersonaData
+    expect(countSeedSteps(persona)).toBe(SEED_DELETE_STEPS + SEED_INSERT_BASE_STEPS)
+    expect(countSeedSteps(persona)).toBe(9)
+  })
+
+  it('+1 per aanwezig conditioneel blok (balance_snapshots, appSettings) → max 11', () => {
+    const snapshotsOnly = { balance_snapshots: [{}], appSettings: undefined } as unknown as PersonaData
+    const appSettingsOnly = { balance_snapshots: [], appSettings: { key: 'value' } } as unknown as PersonaData
+    const both = { balance_snapshots: [{}], appSettings: { key: 'value' } } as unknown as PersonaData
+    expect(countSeedSteps(snapshotsOnly)).toBe(10)
+    expect(countSeedSteps(appSettingsOnly)).toBe(10)
+    expect(countSeedSteps(both)).toBe(11)
+  })
+
+  it('elke echte persona: total binnen 9..11 én de laatste stap is exact 100% (nooit >100%)', () => {
+    for (const [key, persona] of Object.entries(PERSONAS)) {
+      const total = countSeedSteps(persona)
+      expect(total, `persona '${key}'`).toBeGreaterThanOrEqual(9)
+      expect(total, `persona '${key}'`).toBeLessThanOrEqual(11)
+      // Bij de laatste stap geldt currentStep === total → exact 100%, geen overflow.
+      const finalPct = Math.round((total / total) * 100)
+      expect(finalPct, `persona '${key}' eindpercentage`).toBe(100)
+    }
+  })
+})
+
+/**
  * Regressie voor het seed-mapping-gat: de tracking-vlaggen voor de
  * Hypotheekplanner-app (`has_woonbalans_tracking` op de eigen_huis-asset en
  * `has_hypotheekplanner_tracking` op de mortgage-schuld) werden bij het seeden
@@ -114,6 +170,33 @@ describe('Seed: has_woonbalans_tracking wordt naar de assets-rij geseed', () => 
       has_woonbalans_tracking: boolean
     }
     expect(row.has_woonbalans_tracking).toBe(false)
+  })
+})
+
+/**
+ * Regressie voor de Daan-seed-crash (5 jul 2026): persona Daan's
+ * 'Brand New Day Pensioen' zette `retirement_provider_type: 'premiepensioeninstelling'`
+ * — geen lid van de canonieke `RetirementProviderType`-enum en dus geweigerd door
+ * de DB-CHECK `assets_retirement_provider_type_check` (bedrijfspensioenfonds |
+ * verzekeraar | ppi | NULL). De seed brak rond 83% af, waardoor de Daan-persona
+ * niet als UAT-basis bruikbaar was. Deze test borgt dat GEEN enkele persona-asset
+ * een ongeldige provider-type meegeeft, zodat een nieuwe typo direct rood wordt
+ * i.p.v. pas live op /beheer/testdata.
+ */
+describe('Seed: retirement_provider_type is constraint-valide voor alle personas', () => {
+  const validProviders = new Set(Object.keys(RETIREMENT_PROVIDER_LABELS))
+
+  it('elke asset gebruikt ppi | bedrijfspensioenfonds | verzekeraar (of leeg)', () => {
+    for (const [key, persona] of Object.entries(PERSONAS)) {
+      for (const asset of persona.assets) {
+        const providerType = asset.retirement_provider_type
+        if (providerType == null) continue
+        expect(
+          validProviders.has(providerType),
+          `Persona '${key}' asset '${asset.name}' heeft ongeldige retirement_provider_type '${providerType}'`,
+        ).toBe(true)
+      }
+    }
   })
 })
 

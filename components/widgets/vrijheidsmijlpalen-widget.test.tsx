@@ -218,6 +218,47 @@ describe('VrijheidsMijlpalenWidget — mijlpaal-datums uit de canonieke motor', 
     expect(screen.getByText('75%')).toBeInTheDocument()
   })
 
+  it('XL: projecteert de vier mijlpaal-markers op de vermogenspad-sparkline', () => {
+    const simRows = []
+    for (let age = 40; age <= 66; age += 2) {
+      simRows.push({
+        age,
+        endPortfolio: 100_000 + (age - 40) * 20_000,
+        phase: age < 60 ? 'accumulation' : 'retirement',
+        flowIn: 0,
+        flowOut: 0,
+        oneTimeNet: 0,
+      })
+    }
+    const data = makeData({
+      netWorth: 300_000,
+      fireEligibleNetWorth: 300_000,
+      simRequiredPortfolio: 500_000,
+      fireTarget: 500_000,
+      freedomPct: 60,
+      freedomMilestones: motorResult,
+      simRows,
+    })
+    render(<VrijheidsMijlpalenWidget size="xl" data={data} />)
+    // Sparkline aanwezig + exact vier geprojecteerde markers (25/50/75/100%).
+    expect(screen.getByTestId('mijlpaal-sparkline')).toBeInTheDocument()
+    expect(screen.getAllByTestId('mijlpaal-marker')).toHaveLength(4)
+    // Filosofie: vrijheidstijd i.p.v. kale datum voor de volgende mijlpaal (44 mnd).
+    expect(screen.getByText(/over 3 jaar en 8 maanden/)).toBeInTheDocument()
+  })
+
+  it('XL zonder simulatie: geen sparkline, wel de mijlpaal-tijdlijn', () => {
+    const data = makeData({
+      freedomPct: 60,
+      fireTarget: 500_000,
+      freedomMilestones: motorResult,
+      simRows: null,
+    })
+    render(<VrijheidsMijlpalenWidget size="xl" data={data} />)
+    expect(screen.queryByTestId('mijlpaal-sparkline')).not.toBeInTheDocument()
+    expect(screen.getByText('Geen simulatie beschikbaar voor de sparkline')).toBeInTheDocument()
+  })
+
   it('huishouden-perspectief onderdrukt de per-user datums', () => {
     mockPerspective.perspective = 'household'
     const data = makeData({

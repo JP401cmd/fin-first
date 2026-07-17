@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { unauthorized, forbidden } from '@/lib/api/respond'
 import { recordAiUsage } from '@/lib/ai-credits'
 import { getModel } from '@/lib/ai/config'
 import { generateObject } from 'ai'
@@ -55,14 +56,14 @@ export async function POST(req: Request) {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return Response.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   // AI-add-on vereist: pensioen-PDF-extractie draait op het AI-model. Voorheen
   // enkel auth — nu gegate zoals de overige AI-routes (kostenbeheersing).
   const gate = await checkTierGate(supabase, user.id, 'ai')
   if (gate) {
-    return Response.json({ error: gate.error }, { status: 403 })
+    return forbidden(gate.error)
   }
 
   // Rate limit check

@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { unauthorized, serverError } from '@/lib/api/respond'
 import { getModel } from '@/lib/ai/config'
 import { runNewsIngest } from '@/lib/news-ingest'
 import { recordJobRun } from '@/lib/job-runs'
@@ -73,7 +74,7 @@ export async function GET(request: Request) {
         error: 'Unauthorized — CRON_SECRET kwam niet overeen',
       })
     }
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return unauthorized()
   }
 
   // ── Supabase service role client ──────────────────────────────
@@ -109,8 +110,7 @@ export async function GET(request: Request) {
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Onbekende fout'
-    console.error('[news-ingest/cron] Ingestion failed:', message)
     await recordJobRun(service, { job: 'news-ingest', status: 'error', startedAt, error: message })
-    return NextResponse.json({ error: message }, { status: 500 })
+    return serverError(err, 'news-ingest:GET')
   }
 }

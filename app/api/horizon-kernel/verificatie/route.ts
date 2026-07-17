@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import path from 'node:path'
 import { createClient } from '@/lib/supabase/server'
+import { forbidden } from '@/lib/api/respond'
 import { isSuperAdmin } from '@/lib/admin'
 import { runVerification } from '@/lib/horizon-kernel-report/engine-parity'
 
@@ -21,7 +22,7 @@ export const dynamic = 'force-dynamic'
 export async function GET() {
   const supabase = await createClient()
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Geen toegang' }, { status: 403 })
+    return forbidden()
   }
 
   const fixtureDir = path.resolve(process.cwd(), 'test', 'fixtures', 'horizon-oracle')
@@ -40,6 +41,7 @@ export async function GET() {
   } catch (err) {
     return NextResponse.json({
       ok: false,
+      // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
       reason: err instanceof Error ? err.message : 'Verificatie kon niet draaien.',
     })
   }

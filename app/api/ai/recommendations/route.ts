@@ -9,6 +9,7 @@ import { maskPIIInOutput } from '@/lib/ai/pii-output-filter'
 import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
 import { checkTierGate } from '@/lib/require-tier'
 import { checkCreditBudget, creditLimitMessage } from '@/lib/ai/credit-gate'
+import { unauthorized, serverError } from '@/lib/api/respond'
 
 const recommendationSchema = z.object({
   recommendations: z.array(z.object({
@@ -42,7 +43,7 @@ export async function POST() {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return new Response('Unauthorized', { status: 401 })
+    return unauthorized()
   }
 
   const tierGate = await checkTierGate(supabase, user.id, 'ai')
@@ -95,6 +96,7 @@ export async function POST() {
     model = await getModel(supabase, 'aanbevelingen')
   } catch (err) {
     if (err instanceof AIConfigError) {
+      // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
       return Response.json({ error: err.message }, { status: 422 })
     }
     return Response.json({ error: 'AI model kon niet worden geladen.' }, { status: 500 })
@@ -112,12 +114,7 @@ export async function POST() {
     object = result.object
     await recordAiUsage(supabase, user.id, 'recommendations')
   } catch (err) {
-    console.error('AI generation failed:', err)
-    const message = err instanceof Error ? err.message : 'Onbekende fout'
-    return Response.json(
-      { error: `AI-generatie mislukt: ${message}` },
-      { status: 500 },
-    )
+    return serverError(err, 'ai-recommendations:POST')
   }
 
   // Insert recommendations into database

@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { unauthorized, serverError } from '@/lib/api/respond'
 
 /**
  * GET /api/feature-visits — Get user's feature visit records.
@@ -15,7 +16,7 @@ export async function GET() {
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   try {
@@ -62,7 +63,7 @@ export async function POST(req: Request) {
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   try {
@@ -103,10 +104,7 @@ export async function POST(req: Request) {
         .single()
 
       if (updateError) {
-        return NextResponse.json(
-          { error: 'Kon bezoek niet bijwerken: ' + updateError.message },
-          { status: 500 }
-        )
+        return serverError(updateError, 'feature-visits:POST')
       }
 
       return NextResponse.json({
@@ -126,10 +124,7 @@ export async function POST(req: Request) {
         .single()
 
       if (insertError) {
-        return NextResponse.json(
-          { error: 'Kon bezoek niet opslaan: ' + insertError.message },
-          { status: 500 }
-        )
+        return serverError(insertError, 'feature-visits:POST')
       }
 
       return NextResponse.json({
@@ -139,10 +134,6 @@ export async function POST(req: Request) {
       })
     }
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error'
-    return NextResponse.json(
-      { error: message },
-      { status: 500 }
-    )
+    return serverError(err, 'feature-visits:POST')
   }
 }

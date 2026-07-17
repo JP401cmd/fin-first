@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { unauthorized, forbidden } from '@/lib/api/respond'
 import { runServerTestSuite } from '@/lib/regression-tests/server-runner'
 import type { TestResult } from '@/lib/regression-tests/test-types'
 
@@ -18,10 +19,7 @@ import type { TestResult } from '@/lib/regression-tests/test-types'
 export async function POST(request: Request) {
   // ── Guard: development only ────────────────────────────────────────────
   if (process.env.NODE_ENV !== 'development') {
-    return NextResponse.json(
-      { error: 'Regressietests zijn alleen beschikbaar in development modus.' },
-      { status: 403 },
-    )
+    return forbidden('Regressietests zijn alleen beschikbaar in development modus.')
   }
 
   // ── Guard: caller must be authenticated ────────────────────────────────
@@ -29,10 +27,7 @@ export async function POST(request: Request) {
     const supabase = await createClient()
     const { data: { user }, error } = await supabase.auth.getUser()
     if (error || !user) {
-      return NextResponse.json(
-        { error: 'Niet ingelogd. Log eerst in om regressietests uit te voeren.' },
-        { status: 401 },
-      )
+      return unauthorized('Niet ingelogd. Log eerst in om regressietests uit te voeren.')
     }
   } catch {
     return NextResponse.json(

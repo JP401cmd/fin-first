@@ -135,9 +135,10 @@ export const WidgetShell = memo(function WidgetShell({ module, size, kicker, hre
       <div className={`h-[3px] w-full ${accent}`} />
 
       <div className="flex h-[calc(100%-3px)]">
-        {/* Vertical kicker on the left */}
-        <div className="flex shrink-0 items-center justify-center border-r border-[var(--border-ed)] px-1.5">
-          <p className={`label-editorial ${kickerColor} [writing-mode:vertical-rl] rotate-180`}>
+        {/* Vertical kicker on the left — max-h + overflow zodat een lange
+            (favoriet)naam de tegel niet oprekt of hard wegknipt */}
+        <div className="flex min-h-0 shrink-0 items-center justify-center border-r border-[var(--border-ed)] px-1.5">
+          <p className={`label-editorial ${kickerColor} [writing-mode:vertical-rl] rotate-180 max-h-full overflow-hidden text-ellipsis whitespace-nowrap`}>
             {kicker}
           </p>
         </div>
@@ -163,8 +164,8 @@ export const WidgetShell = memo(function WidgetShell({ module, size, kicker, hre
       <div className={`h-[3px] w-full ${accent}`} />
 
       <div className={`${isQuarter || size === 'half' ? 'p-3' : 'p-4'} flex flex-col h-full overflow-hidden`}>
-        {/* Kicker */}
-        <p className={`label-editorial ${kickerColor} ${isQuarter ? 'mb-0.5 !text-[9px]' : size === 'half' ? 'mb-1' : 'mb-2'}`}>{kicker}</p>
+        {/* Kicker — op één regel geklemd zodat lange (favoriet)namen de tegel niet oprekken */}
+        <p className={`label-editorial truncate ${kickerColor} ${isQuarter ? 'mb-0.5 !text-[9px]' : size === 'half' ? 'mb-1' : 'mb-2'}`}>{kicker}</p>
 
         {/* Widget content */}
         {size === 'full' ? (

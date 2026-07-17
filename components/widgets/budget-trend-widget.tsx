@@ -28,6 +28,17 @@ interface TypeConfig {
   iconBg: string
   iconText: string
   emptyMessage: string
+  /** Is een STIJGING gunstig? income/savings = ja, expense/debt = nee.
+   *  Bepaalt de kleur (positief/negatief) van de MoM-indicator; méér uitgeven
+   *  hoort rood, niet groen. Alleen de kleur draait — de pijl volgt de richting. */
+  goodWhenUp: boolean
+  /** Aantal maanden dat de XL-histogram probeert te tonen. Degradeert netjes naar
+   *  de beschikbare bundelhistorie (nu ~12 mnd) als er minder is. Inkomen krijgt
+   *  een breder venster (24) omdat de dubbele breedte daar ruimte voor biedt. */
+  xlHistoryMonths: number
+  /** Woord voor de referentielijn/streefwaarde. Inkomen heeft geen "budget" maar
+   *  een streven → per type een passend label i.p.v. het generieke "budget". */
+  limitLabel: string
 }
 
 const TYPE_CONFIGS: Record<BudgetType, TypeConfig> = {
@@ -39,6 +50,9 @@ const TYPE_CONFIGS: Record<BudgetType, TypeConfig> = {
     iconBg: 'bg-income-50',
     iconText: 'text-income-600',
     emptyMessage: 'Nog geen inkomsten geregistreerd.',
+    goodWhenUp: true,
+    xlHistoryMonths: 24,
+    limitLabel: 'streven',
   },
   expense: {
     kicker: 'Uitgaventrend',
@@ -48,6 +62,9 @@ const TYPE_CONFIGS: Record<BudgetType, TypeConfig> = {
     iconBg: 'bg-expense-50',
     iconText: 'text-expense-600',
     emptyMessage: 'Nog geen uitgaven geregistreerd.',
+    goodWhenUp: false,
+    xlHistoryMonths: 12,
+    limitLabel: 'budget',
   },
   savings: {
     kicker: 'Spaartrend',
@@ -57,6 +74,9 @@ const TYPE_CONFIGS: Record<BudgetType, TypeConfig> = {
     iconBg: 'bg-savings-50',
     iconText: 'text-savings-600',
     emptyMessage: 'Nog geen spaartransacties geregistreerd.',
+    goodWhenUp: true,
+    xlHistoryMonths: 12,
+    limitLabel: 'doel',
   },
   debt: {
     kicker: 'Schuldtrend',
@@ -66,7 +86,17 @@ const TYPE_CONFIGS: Record<BudgetType, TypeConfig> = {
     iconBg: 'bg-debt-50',
     iconText: 'text-debt-600',
     emptyMessage: 'Nog geen schuldaflossingen geregistreerd.',
+    goodWhenUp: false,
+    xlHistoryMonths: 12,
+    limitLabel: 'plan',
   },
+}
+
+// ── Maandlabels (YYYY-MM → NL-afkorting) ─────────────────────
+const NL_MONTHS_SHORT = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec']
+function monthShort(m: string): string {
+  const mm = parseInt(m.slice(5, 7), 10)
+  return NL_MONTHS_SHORT[mm - 1] ?? ''
 }
 
 // ── Sparkline SVG ────────────────────────────────────────────
@@ -86,6 +116,7 @@ function Sparkline({
   limitValue,
   hasEntered,
   showLabels = false,
+  ariaLabel,
 }: {
   points: { month: string; value: number }[]
   width: number
@@ -95,6 +126,7 @@ function Sparkline({
   limitValue?: number
   hasEntered: boolean
   showLabels?: boolean
+  ariaLabel?: string
 }) {
   if (points.length < 2) return null
 
@@ -124,7 +156,14 @@ function Sparkline({
   const endLabelY = Math.max(fontSize + 1, Math.min(lastY + 3, height - 2))
 
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} width="100%" height={height} className="block">
+    <svg
+      viewBox={`0 0 ${width} ${height}`}
+      width="100%"
+      height={height}
+      className="block"
+      role="img"
+      aria-label={ariaLabel}
+    >
       {/* Gradient fill under line */}
       <path
         d={areaPath}
@@ -189,6 +228,152 @@ function Sparkline({
   )
 }
 
+// ── Budget-histogram (XL) ────────────────────────────────────
+// 12-maands staafhistogram met budgetband: per maand een staaf, de
+// gestreepte lijn = de budgetlimiet. Maanden bóven de limiet krijgen
+// een vollere staaf zodat "over budget" in één oogopslag leest.
+function BudgetHistogram({
+  points,
+  width,
+  height,
+  barColor,
+  limitValue,
+  limitLabel = 'budget',
+  hasEntered,
+  showValueLabels = false,
+  ariaLabel,
+}: {
+  points: { month: string; value: number }[]
+  width: number
+  height: number
+  barColor: string
+  limitValue?: number
+  limitLabel?: string
+  hasEntered: boolean
+  /** Toont per maand het waarde-bedrag boven de staaf (compact, bv. "1.2k").
+   *  Opt-in zodat de andere trend-varianten (inkomen/uitgaven/schuld) ongewijzigd
+   *  blijven tenzij ze het bewust aanzetten. */
+  showValueLabels?: boolean
+  ariaLabel?: string
+}) {
+  if (points.length === 0) return null
+
+  const values = points.map(p => p.value)
+  const hasLimit = limitValue != null && limitValue > 0
+  const max = Math.max(...values, hasLimit ? limitValue! : 0, 1)
+  // Extra kopruimte wanneer waarde-labels boven de staven staan.
+  const padTop = showValueLabels ? 16 : 8
+  const padBottom = 16
+  const padX = 2
+  const innerH = height - padTop - padBottom
+  const baseY = padTop + innerH
+  const n = points.length
+  const step = (width - padX * 2) / n
+  const barW = Math.min(step * 0.6, 20)
+  const toX = (i: number) => padX + step * i + (step - barW) / 2
+  const toY = (v: number) => padTop + innerH - (Math.max(0, v) / max) * innerH
+  const limitY = hasLimit ? toY(limitValue!) : null
+  // Toon niet elke maandlabel bij veel maanden — anders overlappen ze.
+  // Bij 24 mnd (inkomen-XL) elke 3e, bij 9-16 mnd elke 2e, daaronder alle.
+  const labelEvery = n > 16 ? 3 : n > 8 ? 2 : 1
+
+  return (
+    <svg
+      viewBox={`0 0 ${width} ${height}`}
+      width="100%"
+      height={height}
+      className="block"
+      role="img"
+      aria-label={ariaLabel}
+    >
+      {points.map((p, i) => {
+        const over = hasLimit && p.value > limitValue!
+        const y = toY(p.value)
+        const h = Math.max(0, baseY - y)
+        return (
+          <rect
+            key={p.month}
+            x={toX(i)}
+            y={y}
+            width={barW}
+            height={h}
+            rx={1}
+            fill={barColor}
+            opacity={hasEntered ? (over ? 0.95 : 0.55) : 0}
+            style={{ transition: `opacity 500ms ease ${i * 40}ms` }}
+          />
+        )
+      })}
+
+      {/* Per-maand waarde-labels boven de staven (opt-in) */}
+      {showValueLabels &&
+        points.map((p, i) =>
+          i % labelEvery === 0 ? (
+            <text
+              key={`val-${p.month}`}
+              x={toX(i) + barW / 2}
+              y={Math.max(7, toY(p.value) - 3)}
+              fontSize={7}
+              fill="var(--ink-3)"
+              fontFamily="var(--font-mono)"
+              textAnchor="middle"
+              opacity={hasEntered ? 0.9 : 0}
+              style={{ transition: `opacity 500ms ease ${i * 40 + 200}ms` }}
+            >
+              {formatCompact(p.value)}
+            </text>
+          ) : null,
+        )}
+
+      {/* Budgetband */}
+      {limitY != null && (
+        <>
+          <line
+            x1={padX}
+            y1={limitY}
+            x2={width - padX}
+            y2={limitY}
+            stroke="var(--ink-3)"
+            strokeWidth={0.75}
+            strokeDasharray="3 2"
+            opacity={hasEntered ? 0.7 : 0}
+            style={{ transition: 'opacity 600ms ease 300ms' }}
+          />
+          <text
+            x={width - padX}
+            y={Math.max(7, limitY - 3)}
+            fontSize={7}
+            fill="var(--ink-3)"
+            fontFamily="var(--font-mono)"
+            textAnchor="end"
+            opacity={hasEntered ? 0.8 : 0}
+            style={{ transition: 'opacity 600ms ease 300ms' }}
+          >
+            {limitLabel}
+          </text>
+        </>
+      )}
+
+      {/* Maandlabels */}
+      {points.map((p, i) =>
+        i % labelEvery === 0 ? (
+          <text
+            key={`lbl-${p.month}`}
+            x={toX(i) + barW / 2}
+            y={height - 4}
+            fontSize={7}
+            fill="var(--ink-4)"
+            fontFamily="var(--font-mono)"
+            textAnchor="middle"
+          >
+            {monthShort(p.month)}
+          </text>
+        ) : null,
+      )}
+    </svg>
+  )
+}
+
 // ── Main component ───────────────────────────────────────────
 
 export const BudgetTrendWidget = memo(function BudgetTrendWidget({ budgetType, size, data, href }: Props) {
@@ -212,6 +397,14 @@ export const BudgetTrendWidget = memo(function BudgetTrendWidget({ budgetType, s
     ? ((current.value - prev.value) / prev.value) * 100
     : null
   const isUp = momDelta != null && momDelta > 0
+  // Kleur volgt de betekenis, niet de richting: méér uitgeven/schuld = rood,
+  // méér inkomen/sparen = groen. De pijl blijft de feitelijke richting tonen.
+  const isGood = momDelta != null && isUp === config.goodWhenUp
+  const trendToneClass = momDelta == null ? '' : isGood ? 'text-positive' : 'text-negative'
+  const trendWord = momDelta == null ? 'stabiel' : isUp ? 'gestegen' : 'gedaald'
+  const sparkAria = momDelta != null
+    ? `${config.kicker}: ${trendWord} ${Math.abs(momDelta).toFixed(0)}% t.o.v. vorige maand`
+    : `${config.kicker}: verloop laatste maanden`
 
   // Budget limit for this type (for reference line in full)
   const budgetLimit = data.budgetTotals[budgetType].limit
@@ -237,9 +430,7 @@ export const BudgetTrendWidget = memo(function BudgetTrendWidget({ budgetType, s
 
   // ── Mini ─────────────────────────────────────────────────
   if (size === 'mini') {
-    const trendColor = momDelta != null
-      ? (isUp ? 'text-positive' : 'text-negative')
-      : 'text-[var(--ink)]'
+    const trendColor = momDelta != null ? trendToneClass : 'text-[var(--ink)]'
     const trendArrow = momDelta != null ? (isUp ? '↑ ' : '↓ ') : ''
 
     return (
@@ -268,7 +459,7 @@ export const BudgetTrendWidget = memo(function BudgetTrendWidget({ budgetType, s
 
           {/* Trend indicator */}
           {momDelta != null && (
-            <p className={`text-[11px] font-medium ${isUp ? 'text-positive' : 'text-negative'}`}>
+            <p className={`text-[11px] font-medium ${trendToneClass}`}>
               {isUp ? '↑' : '↓'} {Math.abs(momDelta).toFixed(0)}% vs vorige maand
             </p>
           )}
@@ -284,6 +475,7 @@ export const BudgetTrendWidget = memo(function BudgetTrendWidget({ budgetType, s
                 fillColor={config.fillColor}
                 hasEntered={hasEntered}
                 showLabels
+                ariaLabel={sparkAria}
               />
             </div>
           )}
@@ -303,7 +495,7 @@ export const BudgetTrendWidget = memo(function BudgetTrendWidget({ budgetType, s
               <MaskedAmount value={current.value} tone="kern" className="text-lg font-semibold" />
             </span>
             {momDelta != null && (
-              <span className={`text-[11px] font-medium ${isUp ? 'text-positive' : 'text-negative'}`}>
+              <span className={`text-[11px] font-medium ${trendToneClass}`}>
                 {isUp ? '↑' : '↓'} {Math.abs(momDelta).toFixed(0)}%
               </span>
             )}
@@ -320,6 +512,7 @@ export const BudgetTrendWidget = memo(function BudgetTrendWidget({ budgetType, s
                 fillColor={config.fillColor}
                 hasEntered={hasEntered}
                 showLabels
+                ariaLabel={sparkAria}
               />
             </div>
           )}
@@ -328,6 +521,110 @@ export const BudgetTrendWidget = memo(function BudgetTrendWidget({ budgetType, s
           <p className="font-serif italic text-[11px] text-[var(--ink-3)]">
             Gem. <MaskedAmount value={avg6m} tone="kern" />/maand
           </p>
+        </div>
+      </WidgetShell>
+    )
+  }
+
+  // ── XL (Double): breed 12-maands staafhistogram met budgetband ────────────
+  // Wat de kleinere maten niet kunnen: per-maand over/onder-budget zichtbaar
+  // maken + een compacte cijferstrip. Alleen op desktop (Double is opt-in en
+  // zakt op mobiel via downsizeForMobile terug naar full).
+  if (size === 'xl') {
+    // Tot 24 mnd waar de bundel historie levert; degradeert netjes naar minder.
+    const xlData = history.slice(-config.xlHistoryMonths)
+    const hasLimit = budgetLimit > 0
+    // "Goede" maanden t.o.v. de referentie: inkomen/sparen = op of boven het
+    // streven/doel, uitgaven/schuld = binnen het budget/plan.
+    const goodMonths = hasLimit
+      ? xlData.filter(p => (config.goodWhenUp ? p.value >= budgetLimit : p.value <= budgetLimit)).length
+      : null
+    const countHeader = config.goodWhenUp ? `Boven ${config.limitLabel}` : `Binnen ${config.limitLabel}`
+    const limitStripHeader = hasLimit
+      ? `${config.limitLabel.charAt(0).toUpperCase()}${config.limitLabel.slice(1)}/maand`
+      : 'Gem./maand'
+    const histAria = `${config.kicker} per maand, laatste ${xlData.length} maanden${
+      hasLimit ? `, met ${config.limitLabel}lijn` : ''
+    }`
+    return (
+      <WidgetShell module="kern" size={size} kicker={config.kicker} href={href}>
+        <div ref={inViewRef} className="flex h-full flex-col gap-3">
+          {/* Header: huidige waarde + MoM + vrijheidstijd */}
+          <div className="flex items-baseline justify-between gap-3">
+            <div className="flex items-baseline gap-2">
+              <span className="text-[var(--ink)]">
+                <MaskedAmount value={current.value} tone="kern" className="text-2xl font-semibold" />
+              </span>
+              {momDelta != null && (
+                <span className={`text-xs font-medium ${trendToneClass}`}>
+                  {isUp ? '↑' : '↓'} {Math.abs(momDelta).toFixed(0)}% vs vorige maand
+                </span>
+              )}
+            </div>
+            {freedomStr && (
+              <p className="font-serif italic text-[11px] text-[var(--ink-3)] text-right">
+                ≈ {freedomStr}/maand
+              </p>
+            )}
+          </div>
+
+          {/* Staafhistogram (tot 24 mnd) met streef-/budgetband + maandlabels */}
+          {xlData.length >= 1 && (
+            <div className="flex-1 min-h-0">
+              <BudgetHistogram
+                points={xlData}
+                width={620}
+                height={150}
+                barColor={config.strokeColor}
+                limitValue={hasLimit ? budgetLimit : undefined}
+                limitLabel={config.limitLabel}
+                hasEntered={hasEntered}
+                showValueLabels={budgetType === 'savings'}
+                ariaLabel={histAria}
+              />
+            </div>
+          )}
+
+          {/* Divider */}
+          <div className="border-t border-dashed border-[var(--border-ed)]" />
+
+          {/* Cijferstrip */}
+          <div className="grid grid-cols-4 gap-4">
+            <div>
+              <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)]">3-maands gem.</p>
+              <p className="text-[var(--ink)]">
+                <MaskedAmount value={avg3m} tone="kern" className="text-base font-semibold" />
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)]">6-maands gem.</p>
+              <p className="text-[var(--ink)]">
+                <MaskedAmount value={avg6m} tone="kern" className="text-base font-semibold" />
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)]">
+                {limitStripHeader}
+              </p>
+              <p className="text-[var(--ink)]">
+                <MaskedAmount
+                  value={hasLimit ? budgetLimit : avg(history)}
+                  tone="kern"
+                  className="text-base font-semibold"
+                />
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)]">{countHeader}</p>
+              {goodMonths != null ? (
+                <p className="font-mono text-base font-semibold tabular-nums text-[var(--ink)]">
+                  {goodMonths}<span className="text-xs text-[var(--ink-3)]">/{xlData.length} mnd</span>
+                </p>
+              ) : (
+                <p className="font-mono text-base font-semibold tabular-nums text-[var(--ink-4)]">—</p>
+              )}
+            </div>
+          </div>
         </div>
       </WidgetShell>
     )
@@ -343,7 +640,7 @@ export const BudgetTrendWidget = memo(function BudgetTrendWidget({ budgetType, s
             <MaskedAmount value={current.value} tone="kern" className="text-xl font-semibold" />
           </span>
           {momDelta != null && (
-            <span className={`text-xs font-medium ${isUp ? 'text-positive' : 'text-negative'}`}>
+            <span className={`text-xs font-medium ${trendToneClass}`}>
               {isUp ? '↑' : '↓'} {Math.abs(momDelta).toFixed(0)}% vs vorige maand
             </span>
           )}
@@ -361,6 +658,7 @@ export const BudgetTrendWidget = memo(function BudgetTrendWidget({ budgetType, s
               limitValue={budgetLimit > 0 ? budgetLimit : undefined}
               hasEntered={hasEntered}
               showLabels
+              ariaLabel={sparkAria}
             />
           </div>
         )}
@@ -384,7 +682,7 @@ export const BudgetTrendWidget = memo(function BudgetTrendWidget({ budgetType, s
           </div>
           {freedomStr && (
             <p className="font-serif italic text-[11px] text-[var(--ink-3)] text-right">
-              ‰ˆ {freedomStr}/maand
+              ≈ {freedomStr}/maand
             </p>
           )}
         </div>

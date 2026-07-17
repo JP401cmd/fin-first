@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { unauthorized, serverError } from '@/lib/api/respond'
 
 const WELCOME_KEY = '_welcome_seen'
 
@@ -13,7 +14,7 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   const { data: profile } = await supabase
@@ -38,7 +39,7 @@ export async function PUT(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   let body: { seen?: boolean }
@@ -68,7 +69,7 @@ export async function PUT(request: Request) {
     .eq('id', user.id)
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverError(error, 'welcome:PUT')
   }
 
   return NextResponse.json({ seen: body.seen })

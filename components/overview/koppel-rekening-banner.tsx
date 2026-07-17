@@ -6,7 +6,7 @@ import { Link2, Plus, Settings, CheckCircle2 } from 'lucide-react'
  * TransactiesFeed twee mogelijke states:
  *
  *  - 0 actieve bank-accounts: invite-banner "Koppel je bank in 2 min"
- *    met grote CTA naar /core/cash/connect (PSD2 GoCardless flow).
+ *    met grote CTA naar /core/cash/connect (PSD2 TrueLayer flow).
  *  - ≥ 1 account: compact statusje "X rekeningen gekoppeld" met
  *    secundair link naar /core/cash om te beheren + import-link voor
  *    handmatige MT940/CSV/OFX-upload.
@@ -37,7 +37,7 @@ export function KoppelRekeningBanner({
             </h2>
             <p className="text-xs text-[var(--ink-2)] mt-1 leading-snug">
               Met PSD2 worden transacties automatisch geïmporteerd en
-              gecategoriseerd. Veilig via GoCardless — geen
+              gecategoriseerd. Veilig via TrueLayer — geen
               inloggegevens bij TriFinity.
             </p>
           </div>

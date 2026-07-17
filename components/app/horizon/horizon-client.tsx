@@ -5014,6 +5014,7 @@ export default function HorizonPage({
           currentAge={currentAge}
           retirementExpenseMethod={null}
           yearlyExpenses={effectiveInput?.yearlyMustExpenses ?? 0}
+          grossReturn={fireParams.grossReturn}
           unifiedRows={unifiedRows ?? undefined}
         />
       )}

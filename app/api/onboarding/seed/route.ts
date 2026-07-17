@@ -1,13 +1,14 @@
 import { createClient } from '@/lib/supabase/server'
 import { PERSONAS, type PersonaKey } from '@/lib/test-personas'
-import { deleteAllUserData, seedPersonaData } from '@/lib/seed-persona'
+import { deleteAllUserData, seedPersonaData, countSeedSteps } from '@/lib/seed-persona'
+import { unauthorized, forbidden } from '@/lib/api/respond'
 
 export async function POST(req: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
+    return unauthorized()
   }
 
   // Check not already completed
@@ -18,7 +19,7 @@ export async function POST(req: Request) {
     .single()
 
   if (profile?.onboarding_completed) {
-    return new Response(JSON.stringify({ error: 'Onboarding already completed' }), { status: 403 })
+    return forbidden('Onboarding already completed')
   }
 
   const body = await req.json()
@@ -40,12 +41,16 @@ export async function POST(req: Request) {
         controller.enqueue(encoder.encode(JSON.stringify(data) + '\n'))
       }
 
-      const totalSteps = 7 // delete (3 batches) + insert (4 phases)
+      // Dynamisch: 5 delete-stappen + 4 vaste insert-stappen + evt. 2 conditionele
+      // (balance_snapshots / appSettings). Nooit hardcoden — dan driftte de balk >100%.
+      const totalSteps = countSeedSteps(PERSONAS[personaKey])
       let currentStep = 0
 
       function progress(step: string, table: string, action: string, count?: number) {
         currentStep++
-        const pct = Math.round((currentStep / totalSteps) * 100)
+        // Clamp als extra vangnet: mocht een nieuwe onProgress-aanroep ooit vergeten
+        // worden mee te tellen in countSeedSteps, dan toont de balk nooit >100%.
+        const pct = Math.min(100, Math.round((currentStep / totalSteps) * 100))
         send({ step, progress: pct, table, action, ...(count !== undefined ? { count } : {}) })
       }
 

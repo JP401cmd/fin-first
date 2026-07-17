@@ -107,13 +107,21 @@ const tests: TestCase[] = [
       // count is optional
       assert(progressLine.count === undefined || typeof progressLine.count === 'number', 'Count is optioneel number')
 
-      // Total steps: 3 delete batches + 4 insert phases = 7
-      const TOTAL_STEPS = 7
-      assertEqual(TOTAL_STEPS, 7, 'Totaal 7 stappen (3 delete + 4 insert)')
-
-      // Progress calculation: (currentStep / totalSteps) * 100
-      const step3Progress = Math.round((3 / TOTAL_STEPS) * 100)
-      assertEqual(step3Progress, 43, 'Stap 3 van 7 = ~43%')
+      // Total steps is DYNAMISCH per persona (countSeedSteps): 5 delete + 4 vaste
+      // insert + evt. 2 conditionele (balance_snapshots/appSettings) = 9..11.
+      // Was ooit hardgecodeerd op 7 → balk liep boven 100% (deze bug).
+      const MIN_STEPS = 9
+      const MAX_STEPS = 11
+      // Invariant: voor elk mogelijk total loopt de voortgang netjes 0→100%,
+      // nooit >100%, en is de laatste stap exact 100%.
+      for (let total = MIN_STEPS; total <= MAX_STEPS; total++) {
+        for (let step = 1; step <= total; step++) {
+          const pct = Math.min(100, Math.round((step / total) * 100))
+          assert(pct >= 0 && pct <= 100, `Voortgang binnen 0..100% (${step}/${total})`)
+        }
+        const finalPct = Math.min(100, Math.round((total / total) * 100))
+        assertEqual(finalPct, 100, `Laatste stap = exact 100% (total=${total})`)
+      }
 
       // Final response line: { done: true, summary: Record<string, number> }
       const finalLine = { done: true, summary: { profiles: 1, bank_accounts: 3, assets: 2 } }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo, useRef, memo, type ReactNode } from 'react'
+import { useEffect, useId, useState, useCallback, useMemo, useRef, memo, type ReactNode } from 'react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import {
   Plus, Trash2, Edit3, X, TrendingUp, RefreshCw, Loader2, BarChart3, ChevronDown, ChevronUp, Briefcase, AlertCircle, AlertTriangle, LinkIcon, ExternalLink, Users,
@@ -1347,7 +1347,7 @@ export function AssetDetailModal({
         <div className="flex items-center gap-3 px-6 pb-2">
           <div
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--r)]"
-            style={{ backgroundColor: color + '15' }}
+            style={{ backgroundColor: `color-mix(in oklch, ${color} 8%, transparent)` }}
           >
             <BudgetIcon name={icon} className="h-5 w-5" />
           </div>
@@ -4162,6 +4162,10 @@ export function ValuationModal({
   const [saving, setSaving] = useState(false)
   const [hasActiveHoldings, setHasActiveHoldings] = useState(false)
   const [holdingsCount, setHoldingsCount] = useState(0)
+  const uid = useId()
+  const dateId = `${uid}-date`
+  const valueId = `${uid}-value`
+  const notesId = `${uid}-notes`
 
   // Check if asset has active holdings (blocks manual revaluation)
   useEffect(() => {
@@ -4238,8 +4242,9 @@ export function ValuationModal({
 
         <div className="space-y-3">
           <div>
-            <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Datum</label>
+            <label htmlFor={dateId} className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Datum</label>
             <input
+              id={dateId}
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
@@ -4247,10 +4252,11 @@ export function ValuationModal({
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
+            <label htmlFor={valueId} className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
               {entityType === 'asset' ? 'Nieuwe waarde' : 'Nieuw saldo'}
             </label>
             <input
+              id={valueId}
               type="number"
               step="0.01"
               value={value}
@@ -4262,8 +4268,9 @@ export function ValuationModal({
             </p>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Notitie (optioneel)</label>
+            <label htmlFor={notesId} className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Notitie (optioneel)</label>
             <input
+              id={notesId}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"

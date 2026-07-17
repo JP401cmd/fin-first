@@ -10,6 +10,7 @@ import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
 import { maskPIIInOutput } from '@/lib/ai/pii-output-filter'
 import { checkTierGate } from '@/lib/require-tier'
 import { checkCreditBudget, creditLimitMessage } from '@/lib/ai/credit-gate'
+import { unauthorized, serverError } from '@/lib/api/respond'
 
 /* AI response timeout in milliseconds (60 seconds) */
 const AI_TIMEOUT_MS = 60_000
@@ -19,7 +20,7 @@ export async function POST(req: Request) {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return new Response('Unauthorized', { status: 401 })
+    return unauthorized()
   }
 
   const tierGate = await checkTierGate(supabase, user.id, 'ai')
@@ -66,6 +67,7 @@ export async function POST(req: Request) {
     model = await getModel(supabase, 'chat')
   } catch (err) {
     if (err instanceof AIConfigError) {
+      // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
       return Response.json({ error: err.message }, { status: 422 })
     }
     return Response.json({ error: 'AI model kon niet worden geladen.' }, { status: 500 })
@@ -217,23 +219,19 @@ export async function POST(req: Request) {
   } catch (err) {
     clearTimeout(timeoutId)
     const isTimeout = err instanceof DOMException && err.name === 'AbortError'
-    const baseMessage = isTimeout
-      ? 'Het AI-antwoord duurde te lang. Probeer het opnieuw met een kortere vraag.'
-      : 'Er ging iets mis bij het genereren van een antwoord. Probeer het opnieuw.'
 
-    // Geef de gebruiker de daadwerkelijke error-detail mee zodat productie-
-    // bugs zichtbaar worden zonder Vercel-log-toegang. PII-gevoelige delen
-    // (stacktraces, paden) blijven achterwege; alleen de error-message zelf.
-    const rawDetail = err instanceof Error ? err.message : String(err)
-    const detail = isTimeout
-      ? null
-      : rawDetail.slice(0, 240).replace(/\s+/g, ' ').trim() || null
+    if (isTimeout) {
+      console.error('[AI Chat] Stream error: TIMEOUT')
+      return Response.json(
+        { error: 'Het AI-antwoord duurde te lang. Probeer het opnieuw met een kortere vraag.', detail: null },
+        { status: 504 },
+      )
+    }
 
-    console.error('[AI Chat] Stream error:', isTimeout ? 'TIMEOUT' : err)
-    return Response.json(
-      { error: baseMessage, detail },
-      { status: isTimeout ? 504 : 500 },
-    )
+    // Rauwe error.message hoort niet meer in de response (ADR 0044): serverError
+    // logt de echte fout server-side (met stack + tag) en stuurt een generieke
+    // tekst naar de client — geen `detail`-lek meer.
+    return serverError(err, 'ai-chat:POST', 'Er ging iets mis bij het genereren van een antwoord. Probeer het opnieuw.')
   } finally {
     clearTimeout(timeoutId)
   }

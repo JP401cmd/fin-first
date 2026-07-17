@@ -10,6 +10,7 @@
 
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { unauthorized, serverError } from '@/lib/api/respond'
 import { loadConnectionsData } from '@/lib/connections-data'
 
 export async function GET() {
@@ -17,7 +18,7 @@ export async function GET() {
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   try {
@@ -30,7 +31,6 @@ export async function GET() {
       },
     })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Onbekende fout'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return serverError(err, 'integrations-connections:GET')
   }
 }

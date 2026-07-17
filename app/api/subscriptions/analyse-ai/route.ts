@@ -7,6 +7,7 @@ import { checkTierGate } from '@/lib/require-tier'
 import { detectRecurringTransactions, CATEGORY_LABELS } from '@/lib/recurring-detection'
 import { VASTE_KOSTEN_ANALYSE_PROMPT } from '@/lib/ai/dna/wil'
 import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
+import { unauthorized } from '@/lib/api/respond'
 
 /** Maximum number of candidates to send to the AI model to avoid token waste. */
 const MAX_AI_CANDIDATES = 50
@@ -26,7 +27,7 @@ export async function POST() {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
-      return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+      return unauthorized()
     }
 
     const tierGate = await checkTierGate(supabase, user.id, 'ai')
@@ -125,6 +126,7 @@ export async function POST() {
       model = await getModel(supabase, 'abonnementen_analyse')
     } catch (err) {
       if (err instanceof AIConfigError) {
+        // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
         return NextResponse.json({ error: err.message }, { status: 422 })
       }
       return NextResponse.json({ error: 'AI model kon niet worden geladen.' }, { status: 500 })

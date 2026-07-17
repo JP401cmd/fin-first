@@ -110,6 +110,7 @@ export async function GET(request: Request) {
 
   if (profilesError) {
     await recordJobRun(supabase, { job: 'snapshots', status: 'error', startedAt, error: profilesError.message })
+    // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
     return NextResponse.json({ error: profilesError.message }, { status: 500 })
   }
 

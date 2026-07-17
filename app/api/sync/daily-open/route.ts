@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { unauthorized, serverError } from '@/lib/api/respond'
 
 /**
  * POST /api/sync/daily-open
@@ -35,7 +36,7 @@ export async function POST() {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   const now = new Date()
@@ -51,7 +52,7 @@ export async function POST() {
     .or(`last_price_sync_at.is.null,last_price_sync_at.lt.${todayStart}`)
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverError(error, 'sync-daily-open:POST')
   }
 
   return NextResponse.json({ due: (count ?? 0) > 0 })

@@ -37,7 +37,7 @@ export default function BeheerRoadmapPage() {
         <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--ink-4)]">De belofte</p>
         <p className="mt-1 font-serif text-lg leading-snug text-[var(--ink)]">{ROADMAP_PROMISE}</p>
         <p className="mt-2 text-xs text-[var(--ink-3)]">
-          De belofte valt uiteen in vier toetsstenen. Elke kandidaat is gekoppeld aan de pijler(s) waaraan hij bijdraagt.
+          We toetsen de belofte aan vier pijlers. Elke kandidaat is gekoppeld aan de pijler(s) waaraan hij bijdraagt.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           {(Object.keys(PROMISE_PILLARS) as PromisePillar[]).map((key) => {

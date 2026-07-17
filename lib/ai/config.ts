@@ -5,6 +5,20 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { getServiceClient } from '@/lib/supabase/service'
 import { wrapModelWithTokenLogging, type WrappableModel } from '@/lib/ai/token-usage'
 import { parsePlatformStatus } from '@/lib/platform-status'
+import { decryptField } from '@/lib/crypto/field-encryption'
+
+// AI-provider-keys worden versleuteld opgeslagen in app_settings (zie
+// app/api/admin/settings/route.ts). Dual-read: een `v1:`-prefixte waarde wordt
+// gedecrypt, een nog-plaintext waarde (backfill nog niet gedaan) gaat
+// ongewijzigd door. De prefix-check voorkomt dat decryptField throwt op
+// plaintext → AI blijft werken tijdens de overgang. Ontbreekt de env-sleutel
+// (ENCRYPTION_KEY_V1) terwijl de waarde wél versleuteld is, dan throwt
+// decryptField bewust — dat is een harde config-afhankelijkheid, geen
+// stille degradatie naar een kapotte key.
+function readSecret(raw: string | undefined): string | undefined {
+  if (!raw) return raw
+  return raw.startsWith('v1:') ? (decryptField(raw) ?? undefined) : raw
+}
 
 export class AIConfigError extends Error {
   constructor(
@@ -49,7 +63,7 @@ export async function getModel(supabase: SupabaseClient, feature?: string) {
 
   switch (provider) {
     case 'openai': {
-      const apiKey = settings.openai_api_key || process.env.OPENAI_API_KEY
+      const apiKey = readSecret(settings.openai_api_key) || process.env.OPENAI_API_KEY
       if (!apiKey) {
         throw new AIConfigError('OpenAI API key is niet geconfigureerd. Stel deze in via Admin > API Keys of de OPENAI_API_KEY environment variable.', 'openai')
       }
@@ -58,7 +72,7 @@ export async function getModel(supabase: SupabaseClient, feature?: string) {
       break
     }
     case 'mistral': {
-      const apiKey = settings.mistral_api_key || process.env.MISTRAL_API_KEY
+      const apiKey = readSecret(settings.mistral_api_key) || process.env.MISTRAL_API_KEY
       if (!apiKey) {
         throw new AIConfigError('Mistral API key is niet geconfigureerd. Stel deze in via Admin > API Keys of de MISTRAL_API_KEY environment variable.', 'mistral')
       }
@@ -74,7 +88,7 @@ export async function getModel(supabase: SupabaseClient, feature?: string) {
     }
     case 'anthropic':
     default: {
-      const apiKey = settings.anthropic_api_key || process.env.ANTHROPIC_API_KEY
+      const apiKey = readSecret(settings.anthropic_api_key) || process.env.ANTHROPIC_API_KEY
       if (!apiKey) {
         throw new AIConfigError('Anthropic API key is niet geconfigureerd. Stel deze in via Admin > API Keys of de ANTHROPIC_API_KEY environment variable.', 'anthropic')
       }

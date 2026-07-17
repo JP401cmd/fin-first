@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { unauthorized, forbidden } from '@/lib/api/respond'
 import { generateObject } from 'ai'
 import { z } from 'zod'
 import { WHATIF_SUGGEST_PROMPT } from '@/lib/ai/whatif-suggest-prompt'
@@ -27,11 +28,11 @@ export type SuggestedEvent = z.infer<typeof SuggestedEventSchema>
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user) return unauthorized()
 
   // AI-add-on vereist (kostenbeheersing) — gaf voorheen alleen auth-check.
   const gate = await checkTierGate(supabase, user.id, 'ai')
-  if (gate) return NextResponse.json({ error: gate.error }, { status: 403 })
+  if (gate) return forbidden(gate.error)
 
   const body = await request.json().catch(() => null)
   if (!body?.prompt || typeof body.prompt !== 'string') {
@@ -46,6 +47,7 @@ export async function POST(request: NextRequest) {
     model = await getModel(supabase, 'whatif_suggesties')
   } catch (err) {
     if (err instanceof AIConfigError) {
+      // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
       return NextResponse.json({ error: err.message }, { status: 422 })
     }
     return NextResponse.json({ error: 'AI model kon niet worden geladen.' }, { status: 500 })

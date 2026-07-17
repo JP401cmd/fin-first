@@ -7,6 +7,7 @@ import {
   type MergeCandidate,
   type MergePair,
 } from '@/lib/budget-merge'
+import { unauthorized, serverError } from '@/lib/api/respond'
 
 /**
  * Budgetmodel van het huishouden: 'separate' (ieder een eigen budgetboom,
@@ -60,7 +61,7 @@ export async function GET() {
   const {
     data: { user },
   } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+  if (!user) return unauthorized()
 
   const ctx = await loadPerspectiveContext(supabase)
 
@@ -172,7 +173,7 @@ export async function POST(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+  if (!user) return unauthorized()
 
   const body = await request.json().catch(() => ({}))
   const targetModel = body.targetModel as string | undefined
@@ -200,7 +201,7 @@ export async function POST(request: NextRequest) {
     p_target_model: targetModel,
     p_merge_mapping: (mergeMapping ?? []) as MergePair[],
   })
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(error, 'budget-model:POST')
 
   const result = data as RpcResult | null
   if (!result?.success) {
@@ -221,7 +222,7 @@ export async function PATCH(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+  if (!user) return unauthorized()
 
   const body = await request.json().catch(() => ({}))
   const proposalId = body.proposalId as string | undefined
@@ -237,7 +238,7 @@ export async function PATCH(request: NextRequest) {
     p_proposal_id: proposalId,
     p_action: action,
   })
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(error, 'budget-model:PATCH')
 
   const result = data as RpcResult | null
   if (!result?.success) {

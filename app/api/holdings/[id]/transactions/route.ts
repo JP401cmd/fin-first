@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { syncAssetValueFromHoldings } from '@/lib/holdings-sync'
+import { unauthorized, serverError } from '@/lib/api/respond'
 import {
   resolveHolding,
   type HoldingTables,
@@ -90,11 +91,17 @@ function computeRunningPnL(transactions: TransactionRow[]) {
 
     return {
       ...tx,
+      // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
       running_units: parseFloat(runningUnits.toFixed(6)),
+      // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
       running_cost_basis: parseFloat(runningCostBasis.toFixed(2)),
+      // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
       running_avg_price: parseFloat(newRunningAvgPrice.toFixed(4)),
+      // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
       realized_pnl: parseFloat(realizedPnl.toFixed(2)),
+      // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
       cumulative_realized_pnl: parseFloat(cumulativeRealizedPnL.toFixed(2)),
+      // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
       cumulative_dividends: parseFloat(cumulativeDividends.toFixed(2)),
     }
   })
@@ -116,7 +123,7 @@ export async function GET(
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   const { id: holdingId } = await params
@@ -186,11 +193,17 @@ export async function GET(
       transactions: transactions.reverse(),
       source,
       summary: {
+        // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
         total_invested: parseFloat(totalInvested.toFixed(2)),
+        // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
         total_sold: parseFloat(totalSold.toFixed(2)),
+        // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
         realized_pnl: parseFloat(realizedPnl.toFixed(2)),
+        // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
         unrealized_pnl: parseFloat(unrealizedPnl.toFixed(2)),
+        // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
         dividend_income: parseFloat(dividendIncome.toFixed(2)),
+        // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
         total_return: parseFloat(totalReturn.toFixed(2)),
         current_units: holdingUnits,
         current_avg_price: holdingAvgPrice,
@@ -198,8 +211,7 @@ export async function GET(
       },
     })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Onbekende fout'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return serverError(err, 'holdings-transactions:GET')
   }
 }
 
@@ -219,7 +231,7 @@ export async function POST(
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   const { id: holdingId } = await params
@@ -276,7 +288,7 @@ export async function POST(
       .single()
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return serverError(error, 'holdings-transactions:POST')
     }
 
     const source = `${resolved.tables.transactions}_table`
@@ -309,6 +321,7 @@ export async function POST(
       .from(resolved.tables.holdings)
       .update({
         units: newUnits,
+        // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
         avg_purchase_price: parseFloat(newAvg.toFixed(4)),
         updated_at: new Date().toISOString(),
       })
@@ -330,12 +343,13 @@ export async function POST(
       bucket: resolved.bucket,
       holding_updated: true,
       new_units: newUnits,
+      // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
       new_avg_price: parseFloat(newAvg.toFixed(4)),
+      // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
       realized_pnl: type === 'sell' ? parseFloat(realizedPnl.toFixed(2)) : undefined,
     }, { status: 201 })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Onbekende fout'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return serverError(err, 'holdings-transactions:POST')
   }
 }
 
@@ -381,7 +395,9 @@ function replayTransactions(
   }
 
   return {
+    // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
     units: parseFloat(units.toFixed(6)),
+    // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
     avgPurchasePrice: parseFloat(avgPrice.toFixed(4)),
   }
 }
@@ -400,7 +416,7 @@ export async function DELETE(
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   const { id: holdingId } = await params
@@ -428,7 +444,7 @@ export async function DELETE(
       .eq('user_id', user.id)
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return serverError(error, 'holdings-transactions:DELETE')
     }
 
     const { data: remaining } = await supabase
@@ -475,7 +491,6 @@ export async function DELETE(
       asset_synced: assetSynced,
     })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Onbekende fout'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return serverError(err, 'holdings-transactions:DELETE')
   }
 }

@@ -7,6 +7,7 @@ import {
   syncAssetValueFromCryptoHoldings,
 } from '@/lib/holdings-sync'
 import { fetchCoinPricesEurBatch } from '@/lib/integrations/coingecko-client'
+import { unauthorized, serverError } from '@/lib/api/respond'
 
 // Deze route doet externe Yahoo/CoinGecko/forex-calls per holding. Op Vercel
 // Hobby is 60s de max toegestane functieduur; zonder deze regel valt de
@@ -86,7 +87,7 @@ export async function POST(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   try {
@@ -115,7 +116,7 @@ export async function POST(request: NextRequest) {
 
       const { data: invHoldings, error: invErr } = await invQuery
       if (invErr) {
-        return NextResponse.json({ error: invErr.message }, { status: 500 })
+        return serverError(invErr, 'holdings-refresh-prices:POST')
       }
 
       // Parallelliseer per holding met gebonden concurrency (zie
@@ -173,7 +174,7 @@ export async function POST(request: NextRequest) {
 
       const { data: cryHoldings, error: cryErr } = await cryQuery
       if (cryErr) {
-        return NextResponse.json({ error: cryErr.message }, { status: 500 })
+        return serverError(cryErr, 'holdings-refresh-prices:POST')
       }
 
       // Pre-resolve CoinGecko prices for the symbols Yahoo can't price so we
@@ -279,8 +280,7 @@ export async function POST(request: NextRequest) {
           : 'Geen holdings met ticker gevonden',
     })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Onbekende fout'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return serverError(err, 'holdings-refresh-prices:POST')
   }
 }
 
@@ -544,7 +544,7 @@ export async function PATCH(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   try {
@@ -580,7 +580,7 @@ export async function PATCH(request: NextRequest) {
       .single()
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return serverError(error, 'holdings-refresh-prices:PATCH')
     }
 
     if (!holding) {
@@ -600,7 +600,6 @@ export async function PATCH(request: NextRequest) {
       message: 'Prijs handmatig bijgewerkt',
     })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Onbekende fout'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return serverError(err, 'holdings-refresh-prices:PATCH')
   }
 }

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { syncBudgetingActive } from '@/lib/budgeting-active'
 import { syncBankAccountCompanion } from '@/lib/bank-account-companion'
+import { unauthorized, serverError } from '@/lib/api/respond'
 
 /**
  * POST `/api/assets/toggle-budget`
@@ -23,7 +24,7 @@ export async function POST(request: Request) {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   const body = (await request.json().catch(() => null)) as
@@ -45,7 +46,7 @@ export async function POST(request: Request) {
     .single()
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverError(error, 'assets-toggle-budget:POST')
   }
 
   // Companion bank_accounts-rij + globale gate meesyncen via dezelfde gedeelde

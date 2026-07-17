@@ -14,6 +14,7 @@ import {
   CATEGORY_LABELS,
   type RecurringCategory,
 } from '@/lib/recurring-detection'
+import { isRecurringExpired } from '@/lib/recurring-data'
 
 const SUBSCRIPTION_CATEGORIES: RecurringCategory[] = ['subscription']
 const VASTE_KOSTEN_CATEGORIES: RecurringCategory[] = [
@@ -93,7 +94,7 @@ export const loadVasteLastenSummary = cache(
         .order('date', { ascending: true }),
       supabase
         .from('recurring_transactions')
-        .select('id, counterparty_name, amount, name, frequency, category_override')
+        .select('id, counterparty_name, amount, name, frequency, category_override, end_date')
         .eq('is_active', true),
       supabase
         .from('budgets')
@@ -108,7 +109,12 @@ export const loadVasteLastenSummary = cache(
     // Confirmed recurring items uit DB (alleen uitgaven: amount < 0), exclusief
     // door de gebruiker als 'excluded' gemarkeerde items.
     const confirmedItems: VasteLastenItem[] = existingRecurrings
-      .filter((r) => Number(r.amount) < 0 && r.category_override !== 'excluded')
+      .filter(
+        (r) =>
+          Number(r.amount) < 0 &&
+          r.category_override !== 'excluded' &&
+          !isRecurringExpired({ end_date: r.end_date ?? null }),
+      )
       .map((r) => {
         const name = r.name || r.counterparty_name || 'Onbekend'
         const autoCategory = detectCategory(r.counterparty_name ?? '', name, false)

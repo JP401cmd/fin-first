@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { unauthorized, forbidden, serverError } from '@/lib/api/respond'
 import { recordAiUsage } from '@/lib/ai-credits'
 import { computeFireProjection, type FinancialInput } from '@/lib/horizon-data'
 import { computeNetWorthProjection } from '@/lib/net-worth-projection'
@@ -94,12 +95,12 @@ export async function GET(request: Request) {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return Response.json({ error: 'Niet ingelogd' }, { status: 401 })
+      return unauthorized()
     }
 
     const tierGate = await checkTierGate(supabase, user.id, 'ai')
     if (tierGate) {
-      return Response.json({ error: tierGate.error }, { status: 403 })
+      return forbidden(tierGate.error)
     }
 
     const url = new URL(request.url)
@@ -793,12 +794,12 @@ export async function POST(request: Request) {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return Response.json({ error: 'Niet ingelogd' }, { status: 401 })
+      return unauthorized()
     }
 
     const tierGate = await checkTierGate(supabase, user.id, 'ai')
     if (tierGate) {
-      return Response.json({ error: tierGate.error }, { status: 403 })
+      return forbidden(tierGate.error)
     }
 
     const body = await request.json()
@@ -823,7 +824,7 @@ export async function POST(request: Request) {
       .single()
 
     if (error) {
-      return Response.json({ error: error.message }, { status: 500 })
+      return serverError(error, 'report:POST')
     }
 
     return Response.json(data, { status: 201 })
@@ -839,12 +840,12 @@ export async function DELETE(request: Request) {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return Response.json({ error: 'Niet ingelogd' }, { status: 401 })
+      return unauthorized()
     }
 
     const tierGate = await checkTierGate(supabase, user.id, 'ai')
     if (tierGate) {
-      return Response.json({ error: tierGate.error }, { status: 403 })
+      return forbidden(tierGate.error)
     }
 
     const url = new URL(request.url)
@@ -861,7 +862,7 @@ export async function DELETE(request: Request) {
       .eq('user_id', user.id)
 
     if (error) {
-      return Response.json({ error: error.message }, { status: 500 })
+      return serverError(error, 'report:DELETE')
     }
 
     return Response.json({ success: true })

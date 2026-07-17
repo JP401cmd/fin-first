@@ -163,7 +163,7 @@ export const LevensgebeurtenissenWidget = memo(function LevensgebeurtenissenWidg
                   cy={toY(portfolio)}
                   r="2.5"
                   fill={evt.impactType === 'positive' ? COLOR_POS : COLOR_NEG}
-                  stroke="white"
+                  stroke="var(--paper)"
                   strokeWidth="0.8"
                   style={{
                     opacity: hasEntered ? 1 : 0,
@@ -179,14 +179,14 @@ export const LevensgebeurtenissenWidget = memo(function LevensgebeurtenissenWidg
                 cy={toY(interpAt(simRows, fireAgeFractional) ?? 0)}
                 r="3"
                 fill={COLOR_OPBOUW}
-                stroke="white"
+                stroke="var(--paper)"
                 strokeWidth="1"
                 style={{ opacity: hasEntered ? 1 : 0, transition: 'opacity 300ms ease 500ms' }}
               />
             )}
           </svg>
           <p className="text-[10px] text-[var(--ink-3)] mt-0.5">
-            {events.length} {events.length === 1 ? 'event' : 'events'}
+            {events.length} {events.length === 1 ? 'gebeurtenis' : 'gebeurtenissen'}
           </p>
         </div>
       </WidgetShell>
@@ -250,7 +250,7 @@ export const LevensgebeurtenissenWidget = memo(function LevensgebeurtenissenWidg
                     <span className="text-[11px] text-[var(--ink-2)] truncate">{evt.name}</span>
                     {evt.estimatedImpact != null && evt.estimatedImpact > 0 && (
                       <span className="shrink-0 font-mono text-[11px] sm:text-xs tabular-nums text-negative">
-                        ˆ’{fmtCompact(evt.estimatedImpact)}
+                        -{fmtCompact(evt.estimatedImpact)}
                       </span>
                     )}
                   </div>
@@ -258,7 +258,7 @@ export const LevensgebeurtenissenWidget = memo(function LevensgebeurtenissenWidg
                 {invTotal > 0 && (
                   <div className="pt-1 border-t border-negative/40">
                     <span className="font-mono text-[11px] sm:text-xs tabular-nums font-semibold text-negative">
-                      ˆ’{fmtCompact(invTotal)}
+                      -{fmtCompact(invTotal)}
                     </span>
                   </div>
                 )}
@@ -349,7 +349,7 @@ export const LevensgebeurtenissenWidget = memo(function LevensgebeurtenissenWidg
                     </div>
                     {evt.estimatedImpact != null && evt.estimatedImpact > 0 && (
                       <p className="font-mono text-[11px] sm:text-xs tabular-nums text-negative">
-                        ˆ’{fmtCompact(evt.estimatedImpact)}
+                        -{fmtCompact(evt.estimatedImpact)}
                       </p>
                     )}
                   </div>
@@ -392,7 +392,7 @@ function TextFallback({
           <p className="font-mono text-lg font-semibold tabular-nums text-[var(--ink)]">{lifeEvents}</p>
         </div>
         <p className="mt-0.5 text-[11px] text-[var(--ink-3)]">
-          {lifeEvents === 1 ? 'life event' : 'life events'} gepland
+          {lifeEvents === 1 ? 'gebeurtenis' : 'gebeurtenissen'} gepland
         </p>
         {topLifeEvents?.[0] && (
           <p className="mt-1 text-[11px] font-medium text-[var(--ink-2)] truncate">
@@ -444,7 +444,7 @@ function TextFallback({
           </div>
         )}
         <p className="mt-1 text-[10px] text-[var(--ink-3)]">
-          {lifeEvents} {lifeEvents === 1 ? 'life event' : 'life events'} totaal
+          {lifeEvents} {lifeEvents === 1 ? 'gebeurtenis' : 'gebeurtenissen'} totaal
         </p>
       </WidgetShell>
     )
@@ -463,7 +463,7 @@ function TextFallback({
         <Calendar className="h-4 w-4 text-horizon-500 shrink-0" />
         <p className="font-mono text-2xl font-semibold tabular-nums text-[var(--ink)]">{lifeEvents}</p>
         <p className="text-sm text-[var(--ink-3)]">
-          {lifeEvents === 1 ? 'life event' : 'life events'} gepland
+          {lifeEvents === 1 ? 'gebeurtenis' : 'gebeurtenissen'} gepland
         </p>
       </div>
       {allEvents.length > 0 ? (

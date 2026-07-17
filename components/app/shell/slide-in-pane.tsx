@@ -239,7 +239,12 @@ export function SlideInPane({
         <button
           type="button"
           onClick={onBack ?? handleClose}
-          aria-label={onBack ? 'Terug' : 'Sluiten'}
+          // Label is ALTIJD 'Terug' — ook in de fallback zonder `onBack`. De
+          // knop blijft functioneel sluiten (onClick-fallback op handleClose),
+          // maar mag níet 'Sluiten' heten: dat botste met de ✕-knop hieronder
+          // (identieke accessible name → niet uniek selecteerbaar voor
+          // screenreaders/testtooling). 'Terug' houdt de ←-affordance uniek.
+          aria-label="Terug"
           className="touch-target text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] shrink-0"
         >
           <ArrowLeft className="h-5 w-5" />

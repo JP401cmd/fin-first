@@ -44,11 +44,15 @@
  *   niet) → de ÉCHTE Box 2-aanslag van Tessa is €0. `/api/household/box2` zet
  *   bovendien `disposal_gain: 0` hard. We toetsen de staffel-motor daarom met
  *   een REPRESENTATIEF dividend; de €0-realiteit staat in het rapport als gap.
- * - WF-BELAST-14 — Tessa's "Rekening-courant vordering BV" heeft subtype
- *   'rekening_courant' (niet 'dga_lening'), dus de DGA-leen-query in
- *   `/api/household/box2` (`.eq('subtype','dga_lening')`) pikt 'm niet op;
- *   netto DGA = max(0, 0 − 9.000 schuld) = 0 → geen excess. We toetsen de pure
- *   `calculateBox2`-drempel/excess-logica (mirrort WF-SCHULD-20).
+ * - WF-BELAST-14 — DGA-leentotaal (Wet excessief lenen). GEFIXT (kaart 39bf9e8d,
+ *   optie B): de route bouwt `dgaLeningenTotal` nu op als som(dga_schuld) +
+ *   som(dga_lening-vorderingen) via `lib/box2-dga-lening.ts` (was: vorderingen −
+ *   schulden, teken omgekeerd). Tessa's "Rekening-courant vordering BV" heeft nu
+ *   het geldige subtype 'dga_lening' (was seed-drift 'rekening_courant') → telt
+ *   mee: totaal €35.000 vordering + €9.000 schuld = €44.000 (< €500k → excess 0).
+ *   We toetsen zowel de aggregatie (`box2-dga-lening.ts`) als de drempel/excess
+ *   (`calculateBox2`) — incl. de kernbug-regressie (pure dga_schuld €600k → €100k
+ *   bovenmatig, vroeger foutief €0).
  * - WF-BELAST-17/box3-kaart — de box3-KAART-status volgt een heuristiek
  *   (`box3TaxStatus` op `computeBox3TaxableInput`) die van de PURE heffing kan
  *   afwijken (bekend/verwacht). Wij toetsen de pure `calculateBox3`-heffing.
@@ -254,13 +258,13 @@ const criteria: AcceptanceCriterion[] = [
     titel: 'DGA-leengrens bewaken (Wet excessief lenen)',
     kriticiteit: 'KERN',
     persona: 'compleet',
-    given: 'Persona Tessa geladen (DGA-schuld "Rekening-courant schuld BV" €9.000). ⚠ De DGA-vordering "Rekening-courant vordering BV" heeft subtype \'rekening_courant\' (niet \'dga_lening\') → valt buiten de leen-query in /api/household/box2 (zie kop). We toetsen de pure drempel/excess-logica.',
-    when: 'De gebruiker verhoogt (randgeval) het DGA-leentotaal richting/over de €500.000-drempel.',
-    then: 'Drempel = DGA_LENING_DREMPEL = €500.000. Bij totaal €200: bovenmatig deel €0. Bij totaal €550.000: bovenmatig deel = 550.000 − 500.000 = €50.000 (rode waarschuwing, belast als fictief regulier voordeel in Box 2).',
+    given: 'Persona Tessa geladen: DGA-schuld "Rekening-courant schuld BV" €9.000 + DGA-vordering "Rekening-courant vordering BV" €35.000 (subtype dga_lening). Het DGA-leentotaal = som(dga_schuld) + som(dga_lening-vorderingen) (optie B, box2-dga-lening.ts); de route voedt dat aan calculateBox2.',
+    when: 'De gebruiker registreert DGA-leningen richting/over de €500.000-drempel; getoetst worden de aggregatie én de drempel/excess.',
+    then: 'Drempel = DGA_LENING_DREMPEL = €500.000. (a) Alleen een dga_schuld €600.000 (geen vordering) → totaal €600.000 → bovenmatig deel €100.000 (de kernbug: vroeger foutief €0 door omgekeerd teken). (b) dga_schuld €400.000 + dga_lening-vordering €200.000 → totaal €600.000 → bovenmatig deel €100.000 (som kruist de drempel). (c) Tessa: €9.000 schuld + €35.000 vordering = totaal €44.000 → bovenmatig deel €0.',
     assertion: {
       kind: 'exact',
-      expected: 'drempel=500000; excessOnder=0; excessBoven=50000',
-      source: 'lib/box2-data.ts#calculateBox2 → dgaLeningenDrempel (DGA_LENING_DREMPEL) + dgaLeningenExcess = max(0, totaal − drempel) (year 2026; mirrort WF-SCHULD-20)',
+      expected: 'drempel=500000; totaalA=600000; excessA=100000; totaalB=600000; excessB=100000; tessaTotaal=44000; tessaExcess=0',
+      source: 'lib/box2-dga-lening.ts#dgaLeningTotalForUser (aggregatie: som dga_schuld + som dga_lening-vorderingen) → lib/box2-data.ts#calculateBox2 dgaLeningenExcess = max(0, totaal − DGA_LENING_DREMPEL) (year 2026; mirrort de route /api/household/box2)',
     },
   },
   {

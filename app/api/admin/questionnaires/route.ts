@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server'
+import { forbidden, serverError } from '@/lib/api/respond'
 import { createClient } from '@/lib/supabase/server'
 import { isSuperAdmin } from '@/lib/admin'
 
 export async function GET() {
   const supabase = await createClient()
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   const { data: questionnaires, error } = await supabase
@@ -17,7 +18,7 @@ export async function GET() {
     `)
     .order('created_at', { ascending: false })
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(error, 'admin-questionnaires:GET')
 
   const result = (questionnaires ?? []).map(q => ({
     id: q.id,
@@ -37,7 +38,7 @@ export async function GET() {
 export async function POST(req: Request) {
   const supabase = await createClient()
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   const body = await req.json()
@@ -66,7 +67,7 @@ export async function POST(req: Request) {
     .single()
 
   if (qError || !questionnaire) {
-    return NextResponse.json({ error: qError?.message ?? 'Failed to create' }, { status: 500 })
+    return serverError(qError, 'admin-questionnaires:POST')
   }
 
   const questionRows = questions.map((q, i) => ({
@@ -86,7 +87,7 @@ export async function POST(req: Request) {
     .insert(questionRows)
 
   if (questionsError) {
-    return NextResponse.json({ error: questionsError.message }, { status: 500 })
+    return serverError(questionsError, 'admin-questionnaires:POST')
   }
 
   return NextResponse.json({ id: questionnaire.id }, { status: 201 })
