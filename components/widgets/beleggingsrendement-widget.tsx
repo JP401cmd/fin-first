@@ -5,6 +5,7 @@ import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { calculateFreedomTime, formatFreedomTimeString, dailyExpenseRate } from '@/lib/format'
+import { DEFAULT_RETURN } from '@/lib/constants'
 import { TrendingUp } from 'lucide-react'
 
 interface Props {
@@ -43,7 +44,9 @@ export const BeleggingsrendementWidget = memo(function BeleggingsrendementWidget
   const weightedExpectedReturn = totalInvestmentValue > 0
     ? investmentAssets.reduce((s, a) => s + a.value * (a.expectedReturn ?? 0), 0) / totalInvestmentValue
     : 0
-  const expectedReturnPct = (weightedExpectedReturn > 0 ? weightedExpectedReturn : (data.grossReturn || 0.07)) * 100
+  // Fallback via de canonieke constante (lib/constants.ts) — geen magic number;
+  // data.grossReturn komt normaliter per gebruiker uit resolveFireParams.
+  const expectedReturnPct = (weightedExpectedReturn > 0 ? weightedExpectedReturn : (data.grossReturn || DEFAULT_RETURN)) * 100
 
   // Vrijheidstijd-framing van de absolute winst/verlies ("Geld is opgeslagen tijd").
   const dailyExp = data.dailyExpenseRate ?? dailyExpenseRate(data.monthlyExpenses)
