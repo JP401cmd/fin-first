@@ -2,13 +2,16 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { getCachedUser } from '@/lib/supabase/cached-user'
+import { checkTierGate } from '@/lib/require-tier'
 
 /**
  * /api/privacy-mode — de per-gebruiker privé-modus voor lokale
  * transactie-categorisatie (`profiles.privacy_mode`, scope A, ADR 0043 / FR-2.x).
  *
- * GET  → leest de EIGEN waarde: `{ privacyMode: boolean }`.
+ * GET  → leest de EIGEN waarde: `{ privacyMode: boolean }` (lezen is altijd vrij).
  * POST → zet de boolean: body `{ enabled: boolean }` → `{ ok: true, privacyMode }`.
+ *        AANzetten is gated achter het 'ai'-abonnement (403 `tier_required`);
+ *        UITzetten blijft altijd vrij (eigenaarsbesluit, requirements §5 optie 2).
  *
  * SINGLE SOURCE / SECURITY: own-row read-modify-write via de anon RLS-client
  * (`.eq('id', user.id)`), NOOIT service-role. De bestaande eigen-rij policy op
@@ -63,6 +66,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Ongeldige waarde' }, { status: 400 })
     }
     const privacyMode = body.enabled
+
+    // TIER-GATE (eigenaarsbesluit 17 jul 2026 — requirements §5, optie 2): AANzetten
+    // van lokale categorisatie vereist het 'ai'-abonnement, consistent met de rest
+    // van de AI-functies. UITzetten blijft bewust altijd vrij, zodat een verlopen
+    // abonnement niemand in privé-modus opsluit — daarom gate-t deze check
+    // uitsluitend bij `privacyMode === true`. Dit is de autoritatieve laag; de
+    // toggle-UI spiegelt hem alleen.
+    if (privacyMode === true) {
+      const tierGate = await checkTierGate(supabase, user.id, 'ai')
+      if (tierGate) {
+        return NextResponse.json({ error: tierGate.error, code: 'tier_required' }, { status: 403 })
+      }
+    }
 
     // Own-row scalar update — uitsluitend de eigen rij (RLS), geen service-role.
     const { error } = await supabase

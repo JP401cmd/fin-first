@@ -8,6 +8,11 @@ import { LocalCategorizationSettings } from './local-categorization-settings'
  *     geen download.
  *  2. happy path → capability ok → consent → download-progress → POST true.
  *  3. verwijderen → deleteLocalModel + POST false.
+ *  4. tier-gate (eigenaarsbesluit, requirements §5 optie 2): zonder 'ai'-abonnement
+ *     is aanzetten geblokkeerd + de gedeelde AiSubscriptionUpsell is zichtbaar en
+ *     via aria-describedby aan de toggle gekoppeld; met privé-modus al aan blijft
+ *     uitzetten mogelijk (niemand opgesloten) en meldt het beheer-blok eerlijk dat
+ *     het abonnement verlopen is.
  *
  * De lib/ai/local-primitieven (parallel gebouwd tegen het gedeelde contract)
  * worden gemockt; POST /api/privacy-mode wordt via een fetch-mock afgevangen.
@@ -30,8 +35,13 @@ vi.mock('@/lib/ai/local/model-manager', () => ({
   LOCAL_MODEL_DOWNLOAD_GB: 3.2,
 }))
 
-// Profiel-load: ai_enabled + privacy_mode via één select. Per test instelbaar.
-let profileRow: { ai_enabled: boolean; privacy_mode: boolean } = { ai_enabled: true, privacy_mode: false }
+// Profiel-load: ai_enabled + privacy_mode + active_subscriptions via één select.
+// Per test instelbaar; default bevat de 'ai'-tier zodat bestaande cases groen blijven.
+let profileRow: { ai_enabled: boolean; privacy_mode: boolean; active_subscriptions: string[] } = {
+  ai_enabled: true,
+  privacy_mode: false,
+  active_subscriptions: ['ai'],
+}
 vi.mock('@/lib/supabase/client', () => ({
   createClient: () => ({
     from: () => ({
@@ -54,7 +64,7 @@ beforeEach(() => {
   mocks.getLocalModelState.mockReset()
   mocks.downloadLocalModel.mockReset()
   mocks.deleteLocalModel.mockReset()
-  profileRow = { ai_enabled: true, privacy_mode: false }
+  profileRow = { ai_enabled: true, privacy_mode: false, active_subscriptions: ['ai'] }
   fetchMock = vi.fn().mockResolvedValue({ ok: true })
   vi.stubGlobal('fetch', fetchMock)
 })
@@ -117,7 +127,7 @@ describe('LocalCategorizationSettings', () => {
   })
 
   it('verwijderen: deleteLocalModel + POST false', async () => {
-    profileRow = { ai_enabled: true, privacy_mode: true }
+    profileRow = { ai_enabled: true, privacy_mode: true, active_subscriptions: ['ai'] }
     mocks.getLocalModelState.mockResolvedValue({ state: 'klaar', bytes: 3.2e9 })
     mocks.deleteLocalModel.mockResolvedValue(undefined)
 
@@ -140,12 +150,50 @@ describe('LocalCategorizationSettings', () => {
   })
 
   it('AI uit: toggle is niet bedienbaar', async () => {
-    profileRow = { ai_enabled: false, privacy_mode: false }
+    profileRow = { ai_enabled: false, privacy_mode: false, active_subscriptions: ['ai'] }
     mocks.getLocalModelState.mockResolvedValue({ state: 'niet-gedownload', bytes: null })
 
     render(<LocalCategorizationSettings />)
     const toggle = await screen.findByRole('switch', { name: /Lokale transactiecategorisatie/i })
     await waitFor(() => expect(toggle).toBeDisabled())
     expect(screen.getByText(/Schakel eerst/i)).toBeTruthy()
+  })
+
+  it('zonder AI-tier: toggle disabled + canonieke AiSubscriptionUpsell met aria-koppeling', async () => {
+    profileRow = { ai_enabled: true, privacy_mode: false, active_subscriptions: [] }
+    mocks.getLocalModelState.mockResolvedValue({ state: 'niet-gedownload', bytes: null })
+
+    render(<LocalCategorizationSettings />)
+    const toggle = await screen.findByRole('switch', { name: /Lokale transactiecategorisatie/i })
+    // AANzetten vereist het 'ai'-abonnement → toggle uitgegrijsd.
+    await waitFor(() => expect(toggle).toBeDisabled())
+    // De gedeelde upsell (inline-variant) is zichtbaar met CTA naar het abonnement.
+    const cta = screen.getByRole('link', { name: /Bekijk AI-abonnement/i })
+    expect(cta.getAttribute('href')).toBe('/mijn/account')
+    // A11Y: de disabled-reden hangt via aria-describedby aan de toggle.
+    expect(toggle.getAttribute('aria-describedby')).toBe('lokale-cat-reden-tier')
+  })
+
+  it('zonder AI-tier maar privé-modus al aan: uitzetten blijft mogelijk (toggle niet disabled)', async () => {
+    profileRow = { ai_enabled: true, privacy_mode: true, active_subscriptions: [] }
+    mocks.getLocalModelState.mockResolvedValue({ state: 'klaar', bytes: 3.2e9 })
+
+    render(<LocalCategorizationSettings />)
+    const toggle = await screen.findByRole('switch', { name: /Lokale transactiecategorisatie/i })
+    // Wacht tot de mount-load de opgeslagen 'aan'-stand heeft toegepast.
+    await waitFor(() => expect(toggle.getAttribute('aria-checked')).toBe('true'))
+    // Niemand blijft opgesloten in privé-modus: uitzetten mag zonder tier.
+    expect(toggle).not.toBeDisabled()
+    // Geen upsell-blok (privé-modus staat immers al aan) → geen aria-describedby.
+    expect(toggle.getAttribute('aria-describedby')).toBeNull()
+  })
+
+  it('verlopen abonnement met privé-modus aan: eerlijke verlopen-notice in het beheer-blok', async () => {
+    profileRow = { ai_enabled: true, privacy_mode: true, active_subscriptions: [] }
+    mocks.getLocalModelState.mockResolvedValue({ state: 'klaar', bytes: 3.2e9 })
+
+    render(<LocalCategorizationSettings />)
+    // Beheer-blok verschijnt (model klaar); de subtiele verlopen-melding staat erin.
+    await screen.findByText(/Je AI-abonnement is verlopen/i)
   })
 })

@@ -340,6 +340,12 @@ geconstrueerd, laag 1 uit het plan §2); uit → ongewijzigd huidig gedrag.
 
 ### Open productvraag: moet lokale categorisatie achter een tier zitten?
 
+> **Beslecht — 17 juli 2026, eigenaar: optie 2.** Lokale categorisatie zit achter de
+> bestaande 'ai'-tier. AANzetten gate-t server-side in `POST /api/privacy-mode`
+> (`checkTierGate(..., 'ai')`, alleen bij `enabled === true`); UITzetten blijft altijd
+> vrij, zodat een verlopen abonnement niemand in privé-modus opsluit. De opties
+> hieronder blijven staan als vastlegging van de afweging.
+
 Er zijn geen API-kosten (geen `recordAiUsage`/credit-budget nodig), maar wel
 support-/complexiteitskosten (download-grootte, capability-verschillen, devicebugs). Opties
 voor de business-owner:
@@ -470,4 +476,6 @@ DoD-vinkje bij oplevering.
 2. **TTFT-drempel** (§2.3) — welk seconden-getal voor batch-van-20 op mid-range Android is
    nog acceptabel? Nodig om fase 0 zelfstandig te laten beslissen.
 3. **Tier-gate op de toggle** (§5, open productvraag) — gratis, achter de bestaande 'ai'-tier,
-   of een nieuw eigen gate?
+   of een nieuw eigen gate? → **Beslecht 17 juli 2026 (eigenaar): optie 2** — achter de
+   bestaande 'ai'-tier. Aanzetten gate-t server-side in `POST /api/privacy-mode`; uitzetten
+   blijft vrij.

@@ -12,6 +12,8 @@ import {
   Loader2,
   MonitorSmartphone,
 } from 'lucide-react'
+import { hasSubscription } from '@/lib/feature-registry'
+import { AiSubscriptionUpsell } from '@/components/app/ai-subscription-upsell'
 import { checkLocalAiCapability, type LocalAiCapability } from '@/lib/ai/local/webgpu-capability'
 import {
   getLocalModelState,
@@ -44,10 +46,22 @@ import {
  * bij de bestaande inline transparantie-blokken van AiPrivacySettings.
  *
  * SINGLE SOURCE / SECURITY: schrijven van `privacy_mode` gaat via de own-row
- * POST-route (/api/privacy-mode); lezen van ai_enabled + privacy_mode gebeurt
- * op mount via één supabase-select (spiegelt AiPrivacySettings, geen flash).
- * De lokale-AI-primitieven komen uit lib/ai/local (parallel gebouwd tegen het
- * gedeelde contract).
+ * POST-route (/api/privacy-mode); lezen van ai_enabled + privacy_mode +
+ * active_subscriptions gebeurt op mount via één supabase-select (spiegelt
+ * AiPrivacySettings, geen flash). De lokale-AI-primitieven komen uit lib/ai/local
+ * (parallel gebouwd tegen het gedeelde contract).
+ *
+ * TIER-GATE (eigenaarsbesluit 17 jul 2026, requirements §5 optie 2): AANzetten
+ * vereist het 'ai'-abonnement. De server-route (/api/privacy-mode) is de
+ * autoritatieve laag; deze UI spiegelt hem alleen (voorkomt een 403-verrassing)
+ * en toont bij aanzet-poging zonder tier de gedeelde `AiSubscriptionUpsell`
+ * (single source voor prijs/tagline uit lib/subscription-catalog.ts). UITzetten
+ * blijft altijd vrij; staat privé-modus al aan terwijl de tier verliep, dan meldt
+ * het beheer-blok dat eerlijk (uitzetten kan niet meer ongedaan zonder abonnement).
+ *
+ * A11Y: elk reden-blok (AI uit / tier / mobiel) heeft een id; de toggle-button
+ * verwijst via `aria-describedby` naar het momenteel zichtbare blok, zodat de
+ * disabled-reden ook voor screenreaders aan de schakelaar hangt.
  */
 
 type Phase = 'loading' | 'idle' | 'checking' | 'consent' | 'downloading' | 'error'
@@ -97,6 +111,9 @@ export function LocalCategorizationSettings() {
 
   const [phase, setPhase] = useState<Phase>('loading')
   const [aiEnabled, setAiEnabled] = useState(true)
+  // Default `true` (net als aiEnabled) → voorkomt een flash-of-upsell tijdens de
+  // mount-load. De werkelijke tier komt uit de select hieronder.
+  const [hasAiTier, setHasAiTier] = useState(true)
   const [privacyMode, setPrivacyMode] = useState(false)
   const [modelReady, setModelReady] = useState(false)
   const [capabilityReasons, setCapabilityReasons] = useState<string[] | null>(null)
@@ -132,7 +149,7 @@ export function LocalCategorizationSettings() {
       }
       const { data } = await supabase
         .from('profiles')
-        .select('ai_enabled, privacy_mode')
+        .select('ai_enabled, privacy_mode, active_subscriptions')
         .eq('id', user.id)
         .single()
 
@@ -147,6 +164,9 @@ export function LocalCategorizationSettings() {
       if (!active) return
       if (data?.ai_enabled != null) setAiEnabled(data.ai_enabled as boolean)
       setPrivacyMode(Boolean(data?.privacy_mode))
+      // Tier-afleiding via de canonieke helper — geen eigen array-includes.
+      const subs = (data?.active_subscriptions as string[]) ?? []
+      setHasAiTier(hasSubscription(subs, 'ai'))
       setModelReady(ready)
       setPhase('idle')
     })()
@@ -186,7 +206,11 @@ export function LocalCategorizationSettings() {
   }, [])
 
   const onToggle = useCallback(async () => {
-    if (!aiEnabled || likelyMobile || busy) return
+    // Spiegelt `toggleDisabled`: AANzetten (privacyMode=false) vereist tier +
+    // desktop; UITzetten (privacyMode=true) blijft altijd toegestaan zolang AI aan
+    // staat en er niets bezig is — zo raakt niemand opgesloten in privé-modus als
+    // de tier of het toestel wegvalt (zelfde niemand-opgesloten-principe).
+    if (!aiEnabled || busy || (!privacyMode && (likelyMobile || !hasAiTier))) return
 
     // Uitzetten: model blijft lokaal staan, alleen de voorkeur gaat uit.
     if (privacyMode) {
@@ -214,7 +238,7 @@ export function LocalCategorizationSettings() {
       return
     }
     setPhase('consent')
-  }, [aiEnabled, likelyMobile, busy, privacyMode, modelReady])
+  }, [aiEnabled, likelyMobile, busy, privacyMode, modelReady, hasAiTier])
 
   const onDeleteModel = useCallback(async () => {
     try {
@@ -230,9 +254,27 @@ export function LocalCategorizationSettings() {
     setPhase('idle')
   }, [])
 
-  const toggleDisabled = !aiEnabled || likelyMobile || busy
+  // AANzetten (privacyMode=false) vereist het 'ai'-abonnement én een desktop;
+  // UITzetten (privacyMode=true) mag altijd (ook op mobiel/zonder tier) — dit
+  // versoepelt bewust het eerdere mobiel-gedrag voor uitzetten, zodat een verlopen
+  // abonnement of coarse-pointer-toestel niemand in privé-modus opsluit.
+  const toggleDisabled = !aiEnabled || busy || (!privacyMode && (likelyMobile || !hasAiTier))
   const showBeheer = phase === 'idle' && modelReady
   const showPending = phase === 'idle' && privacyMode && !modelReady
+
+  // A11Y: koppel de op dit moment zichtbare reden-melding aan de toggle. De
+  // takken spiegelen exact de render-condities van de drie reden-blokken (die
+  // elkaar uitsluiten); geen zichtbaar blok → geen aria-describedby.
+  const describedById = !aiEnabled
+    ? 'lokale-cat-reden-ai-uit'
+    : !hasAiTier && !privacyMode
+      ? 'lokale-cat-reden-tier'
+      : hasAiTier && likelyMobile
+        ? 'lokale-cat-reden-mobiel'
+        : undefined
+
+  // Eerlijke verlopen-staat: privé-modus staat aan terwijl het abonnement weg is.
+  const subscriptionExpired = privacyMode && !hasAiTier
 
   return (
     <section className="mx-auto max-w-3xl px-4 sm:px-6 pb-16">
@@ -279,6 +321,7 @@ export function LocalCategorizationSettings() {
               role="switch"
               aria-checked={privacyMode}
               aria-label={`Lokale transactiecategorisatie ${privacyMode ? 'uitschakelen' : 'inschakelen'}`}
+              aria-describedby={describedById}
               disabled={toggleDisabled}
               onClick={onToggle}
               className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-wil-500 disabled:cursor-not-allowed disabled:opacity-50 ${privacyMode ? 'bg-wil-500' : 'bg-zinc-300'}`}
@@ -299,7 +342,7 @@ export function LocalCategorizationSettings() {
 
           {/* ── Niet bedienbaar: AI uit ── */}
           {!aiEnabled && (
-            <div className="flex items-start gap-3 bg-[var(--subtle)] p-4">
+            <div id="lokale-cat-reden-ai-uit" className="flex items-start gap-3 bg-[var(--subtle)] p-4">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--ink-3)]" aria-hidden="true" />
               <p className="text-sm text-[var(--ink-2)] leading-relaxed">
                 Schakel eerst <strong>AI-features</strong> hierboven in. Lokale categorisatie is een
@@ -308,9 +351,22 @@ export function LocalCategorizationSettings() {
             </div>
           )}
 
+          {/* ── AI-abonnement vereist voor aanzetten ── */}
+          {/* Alleen tonen bij aanzet-poging zonder tier: als privé-modus al aan
+              staat blijft uitzetten vrij en is dit blok misplaatst. Canonieke
+              upsell (AiSubscriptionUpsell) — één patroon met prijs/tagline uit
+              de abonnementscatalogus, gedeeld met chat/briefing. De wrapper draagt
+              het id voor de aria-describedby-koppeling op de toggle. */}
+          {aiEnabled && !hasAiTier && !privacyMode && (
+            <div id="lokale-cat-reden-tier">
+              <AiSubscriptionUpsell variant="inline" />
+            </div>
+          )}
+
           {/* ── Proactieve desktop-only hint ── */}
-          {aiEnabled && likelyMobile && (
-            <div className="flex items-start gap-3 bg-[var(--subtle)] p-4">
+          {/* Alleen als de tier er wél is — anders stapelt dit op het upsell-blok. */}
+          {aiEnabled && hasAiTier && likelyMobile && (
+            <div id="lokale-cat-reden-mobiel" className="flex items-start gap-3 bg-[var(--subtle)] p-4">
               <MonitorSmartphone className="mt-0.5 h-4 w-4 shrink-0 text-[var(--ink-3)]" aria-hidden="true" />
               <p className="text-sm text-[var(--ink-2)] leading-relaxed">
                 Lokale categorisatie is <strong>alleen op desktop</strong> beschikbaar — een telefoon of
@@ -475,6 +531,14 @@ export function LocalCategorizationSettings() {
                       ? 'Lokale categorisatie staat aan.'
                       : 'Lokale categorisatie staat uit — het model blijft bewaard voor later.'}
                   </p>
+                  {/* Eerlijke verlopen-staat: geen alarm, wel transparant over het
+                      gevolg van uitzetten zonder abonnement. */}
+                  {subscriptionExpired && (
+                    <p className="mt-1.5 text-xs text-[var(--ink-3)] leading-relaxed">
+                      Je AI-abonnement is verlopen — lokale categorisatie blijft werken, maar zet je
+                      &apos;m uit dan kun je &apos;m zonder abonnement niet opnieuw aanzetten.
+                    </p>
+                  )}
                 </div>
               </div>
 
