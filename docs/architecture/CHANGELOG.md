@@ -403,3 +403,15 @@
 - **Schermen** toegevoegd: /rapportages/totaalplan
 - **API-routes** toegevoegd: /api/briefing/email/cron, /api/briefing/email/pref, /api/briefing/email/unsubscribe, /api/report/totaalplan
 - **Componenten (aantal)** toegevoegd: +4
+
+## 2026-07-16
+
+- **API-routes** toegevoegd: /api/sync/daily-open
+- **Tabellen** toegevoegd: net_worth_history
+- **Integraties** verwijderd: OpenRouter
+- **Componenten (aantal)** toegevoegd: +6
+
+## 2026-07-16
+
+- **API-routes** toegevoegd: /api/privacy-mode
+- **Componenten (aantal)** toegevoegd: +3

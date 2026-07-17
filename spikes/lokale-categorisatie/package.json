@@ -1,0 +1,27 @@
+{
+  "name": "trifinity-spike-lokale-categorisatie",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Fase-0 wegwerp-spike: meetharnas voor lokale transactie-categorisatie in de browser (Gemma via Transformers.js + WebGPU). Los van de TriFinity-app.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "check:dataset": "node scripts/check-dataset.ts",
+    "build:goud": "node --import ./scripts/register-alias-loader.mjs scripts/build-goud-set.ts",
+    "check:goud": "node scripts/check-goud.ts",
+    "check:goud:replay": "node scripts/check-goud.ts dataset/goud-set-replay.json",
+    "smoke": "node scripts/smoke-run.ts"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^4.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@webgpu/types": "^0.1.40",
+    "typescript": "^7.0.2",
+    "vite": "^8.1.5"
+  }
+}

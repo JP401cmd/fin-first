@@ -1,3 +1,5 @@
+'use client'
+
 import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import { WidgetEmpty } from './widget-empty'
@@ -7,7 +9,8 @@ import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { ASSET_TYPE_COLORS, ASSET_TYPE_LABELS, type AssetType } from '@/lib/asset-data'
 import type { DashboardData } from './widget-renderer'
-import { Landmark } from 'lucide-react'
+import { Landmark, Users, UserCheck } from 'lucide-react'
+import { usePerspective } from '@/components/app/perspective-provider'
 
 // Onderscheid tussen klasses gebeurt via labels naast kleur-dots — kleur-as is
 // luminantie binnen kern-bruin (zie lib/asset-data.ts). 'overig' is geen
@@ -24,13 +27,34 @@ interface Props {
 }
 
 export const AssetsWidget = memo(function AssetsWidget({ size, data, href }: Props) {
-  const { totalAssets, monthlyContributions, monthlyExpenses, assetsByType, totalPurchaseValue } = data
-  // Privacy-toggle proof-of-concept — mini hero amount respects the masking flag.
+  // Privacy-toggle proof-of-concept — hero amount respects the masking flag.
   const { masked } = useMaskedAmounts()
+  const { perspective, partnerName } = usePerspective()
+  const isHouseholdView = perspective === 'household' && data.householdOverrides != null
+  const isPartnerView = perspective === 'partner' && data.partnerOverrides != null
+
+  // Optie A (productbesluit kaartje 392f9e8d — "Antwoord gebruiker: A"): alleen het
+  // SCALAIRE totaal beweegt mee met de perspectiefwissel, net als de zuster-widgets
+  // Netto Vermogen/Schulden. De type-breakdown (assetsByType), ongerealiseerde winst en
+  // maandbijdrage blijven PERSOONLIJK: de overrides bevatten daar bewust géén
+  // huishoud/partner-variant van (privacy-arm — alleen scalaire totalAssets/totalDebts/
+  // netWorth). In huishoud-/partnerperspectief verbergen we die breakdown dus i.p.v. een
+  // persoonlijke uitsplitsing onder een huishoud-totaal te tonen (dat zou misleiden:
+  // de segmenten zouden niet naar het getoonde totaal optellen).
+  const overrides = isHouseholdView ? data.householdOverrides! : isPartnerView ? data.partnerOverrides! : null
+  const totalAssets = overrides ? overrides.totalAssets : data.totalAssets
+  const monthlyExpenses = overrides ? overrides.monthlyExpenses : data.monthlyExpenses
+  const { monthlyContributions, assetsByType, totalPurchaseValue } = data
+
+  const kickerLabel = isHouseholdView
+    ? 'Vermogen — Huishouden'
+    : isPartnerView
+      ? `Vermogen — ${partnerName ?? 'Partner'}`
+      : 'Vermogen'
 
   if (totalAssets === 0 && assetsByType.length === 0) {
     return (
-      <WidgetShell module="kern" size={size} kicker="Vermogen" href={href}>
+      <WidgetShell module="kern" size={size} kicker={kickerLabel} href={href}>
         <WidgetEmpty icon={Landmark} message="Voeg je eerste bezitting toe om je vermogensverdeling te zien." />
       </WidgetShell>
     )
@@ -38,7 +62,7 @@ export const AssetsWidget = memo(function AssetsWidget({ size, data, href }: Pro
 
   if (size === 'mini') {
     return (
-      <WidgetShell module="kern" size="mini" kicker="Vermogen" href={href}>
+      <WidgetShell module="kern" size="mini" kicker={kickerLabel} href={href}>
         <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
           {formatMaskedCurrency(totalAssets, masked)}
         </p>
@@ -46,29 +70,84 @@ export const AssetsWidget = memo(function AssetsWidget({ size, data, href }: Pro
     )
   }
 
-  // Canoniek 12-mnd rolling dagtarief uit de bundel (KRUIS-20); fallback voor mocks.
-  const dailyExp = data.dailyExpenseRate ?? dailyExpenseRate(monthlyExpenses)
+  // Canoniek 12-mnd rolling dagtarief uit de bundel (KRUIS-20); override-perspectief
+  // houdt zijn eigen (perspectief-eigen) uitgavenniveau. Fallback voor mocks.
+  const dailyExp = overrides
+    ? dailyExpenseRate(monthlyExpenses)
+    : data.dailyExpenseRate ?? dailyExpenseRate(monthlyExpenses)
   const ft = dailyExp > 0 && totalAssets > 0 ? calculateFreedomTime(totalAssets, dailyExp) : null
   const ftStr = ft ? formatFreedomTimeString(ft, 'short') : null
+  // Grondslag-duiding (bevinding 3): deze vrijheidstijd staat op het BRUTO bezit, terwijl
+  // de zuster-widget Netto Vermogen 'm op het GETEKENDE netto vermogen (bezit − schulden)
+  // rekent. "vrijheid in bezit" maakt expliciet dat dit het bruto-bezit-cijfer is, zodat
+  // twee verschillende "vrijheid"-getallen op één dashboard niet als tegenstrijdig lezen.
+
+  // ── Huishoud-/partnerperspectief (Optie A): alleen het scalaire totaal + badge ──
+  // Eén compacte, eerlijke layout voor quarter/half/full — geen persoonlijke breakdown.
+  if (overrides) {
+    const amountClass =
+      size === 'quarter' ? 'text-lg font-semibold'
+      : size === 'half' ? 'text-xl font-semibold'
+      : 'text-2xl font-semibold'
+    return (
+      <WidgetShell module="kern" size={size} kicker={kickerLabel} href={href}>
+        <div className="mb-1 flex items-center gap-1 text-[11px] text-kern-600">
+          {isPartnerView ? <UserCheck className="h-3.5 w-3.5" /> : <Users className="h-3.5 w-3.5" />}
+          {isPartnerView
+            ? (partnerName ?? 'Partner')
+            : size === 'full' ? 'Gecombineerd huishouden' : 'Huishouden'}
+        </div>
+        <p className="text-[var(--ink)]">
+          <MaskedAmount value={totalAssets} tone="kern" className={amountClass} />
+        </p>
+        {ftStr && (
+          <p className="mt-0.5 font-serif italic text-[11px] text-[var(--ink-3)]">
+            ≈ {ftStr} vrijheid in bezit
+          </p>
+        )}
+        <p className="mt-1.5 text-[11px] text-[var(--ink-3)]">
+          Totaal actief vermogen
+        </p>
+      </WidgetShell>
+    )
+  }
+
+  // Toegankelijkheid (bevinding 2): de allocatie-balk is een MEER-segment verdeling, geen
+  // enkelvoudige voortgang. Daarom role="img" + een samenvattend aria-label (de hele
+  // verdeling) i.p.v. role="progressbar"/aria-valuenow — dat past bij de één-waarde
+  // schuldratio-balk in schulden-widget, niet bij een portefeuilleverdeling. Percentages
+  // i.p.v. bedragen zodat gemaskeerde bedragen niet naar assistive tech lekken. Dit geeft
+  // ook op quarter-size (waar geen tekstuele uitsplitsing staat) toegang tot de verdeling.
+  const allocationLabel = assetsByType.length > 0 && totalAssets > 0
+    ? `Vermogensverdeling: ${[...assetsByType]
+        .sort((a, b) => b.value - a.value)
+        .map(a => `${getAssetLabel(a.type)} ${Math.round((a.value / totalAssets) * 100)}%`)
+        .join(', ')}`
+    : undefined
 
   // ── Quarter-size: compact total + freedom time + stacked bar ──
   if (size === 'quarter') {
     return (
-      <WidgetShell module="kern" size={size} kicker="Vermogen" href={href}>
+      <WidgetShell module="kern" size={size} kicker={kickerLabel} href={href}>
         <p className="text-[var(--ink)]">
           <MaskedAmount value={totalAssets} tone="kern" className="text-lg font-semibold" />
         </p>
         {ftStr && (
           <p className="mt-0.5 font-serif italic text-[11px] text-[var(--ink-3)]">
-            {ftStr} vrijheid
+            {ftStr} vrijheid in bezit
           </p>
         )}
         {/* Compact stacked bar */}
         {assetsByType.length > 0 && totalAssets > 0 && (
-          <div className="mt-1.5 h-[4px] w-full flex overflow-hidden rounded-full bg-[var(--border-ed)]">
+          <div
+            role="img"
+            aria-label={allocationLabel}
+            className="mt-1.5 h-[4px] w-full flex overflow-hidden rounded-full bg-[var(--border-ed)]"
+          >
             {assetsByType.map(a => (
               <div
                 key={a.type}
+                aria-hidden="true"
                 style={{
                   width: `${(a.value / totalAssets) * 100}%`,
                   backgroundColor: getAssetColor(a.type),
@@ -92,7 +171,7 @@ export const AssetsWidget = memo(function AssetsWidget({ size, data, href }: Pro
     const sorted = [...assetsByType].sort((a, b) => b.value - a.value)
     const top2 = sorted.slice(0, 2)
     return (
-      <WidgetShell module="kern" size={size} kicker="Vermogen" href={href}>
+      <WidgetShell module="kern" size={size} kicker={kickerLabel} href={href}>
         <div className="flex gap-3 h-full">
           <div className="flex-1 min-w-0 flex flex-col justify-center">
             <p className="text-[var(--ink)]">
@@ -100,7 +179,7 @@ export const AssetsWidget = memo(function AssetsWidget({ size, data, href }: Pro
             </p>
             {ftStr && (
               <p className="mt-0.5 font-serif italic text-[11px] text-[var(--ink-3)]">
-                ≈ {ftStr} vrijheid
+                ≈ {ftStr} vrijheid in bezit
               </p>
             )}
             <p className="mt-1.5 text-[11px] text-[var(--ink-3)]">
@@ -115,10 +194,15 @@ export const AssetsWidget = memo(function AssetsWidget({ size, data, href }: Pro
           <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
             {/* Stacked bar */}
             {assetsByType.length > 0 && totalAssets > 0 && (
-              <div className="h-[5px] w-full flex overflow-hidden rounded-full border border-[var(--border-ed)] bg-[var(--subtle)]">
+              <div
+                role="img"
+                aria-label={allocationLabel}
+                className="h-[5px] w-full flex overflow-hidden rounded-full border border-[var(--border-ed)] bg-[var(--subtle)]"
+              >
                 {assetsByType.map(a => (
                   <div
                     key={a.type}
+                    aria-hidden="true"
                     style={{
                       width: `${(a.value / totalAssets) * 100}%`,
                       backgroundColor: getAssetColor(a.type),
@@ -148,23 +232,28 @@ export const AssetsWidget = memo(function AssetsWidget({ size, data, href }: Pro
   }
 
   return (
-    <WidgetShell module="kern" size={size} kicker="Vermogen" href={href}>
+    <WidgetShell module="kern" size={size} kicker={kickerLabel} href={href}>
       {/* Primary value */}
       <p className="text-[var(--ink)]">
         <MaskedAmount value={totalAssets} tone="kern" className="text-2xl font-semibold" />
       </p>
       {ftStr && (
         <p className="mt-0.5 font-serif italic text-[12px] text-[var(--ink-3)]">
-          ≈ {ftStr} vrijheid
+          ≈ {ftStr} vrijheid in bezit
         </p>
       )}
 
       {/* Stacked bar */}
       {assetsByType.length > 0 && totalAssets > 0 && (
-        <div className="mt-3 h-[5px] w-full flex overflow-hidden rounded-full border border-[var(--border-ed)] bg-[var(--subtle)]">
+        <div
+          role="img"
+          aria-label={allocationLabel}
+          className="mt-3 h-[5px] w-full flex overflow-hidden rounded-full border border-[var(--border-ed)] bg-[var(--subtle)]"
+        >
           {assetsByType.map(a => (
             <div
               key={a.type}
+              aria-hidden="true"
               style={{
                 width: `${(a.value / totalAssets) * 100}%`,
                 backgroundColor: getAssetColor(a.type),

@@ -46,8 +46,16 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
   const dailyExp = overrides
     ? dailyExpenseRate(monthlyExpenses)
     : data.dailyExpenseRate ?? dailyExpenseRate(monthlyExpenses)
-  const freedomTime = dailyExp > 0 ? calculateFreedomTime(Math.abs(netWorth), dailyExp) : null
+  // Geef het GETEKENDE netto vermogen door (niet Math.abs): calculateFreedomTime zet dan
+  // de isDeficit-flag, zodat een negatief vermogen niet misleidend als "vrijheid" maar als
+  // "vrijheid terug te kopen" wordt geframed (filosofie: schuld = vrijheid die je terugkoopt).
+  const freedomTime = dailyExp > 0 ? calculateFreedomTime(netWorth, dailyExp) : null
   const freedomStr = freedomTime ? formatFreedomTimeString(freedomTime, 'short') : null
+  const freedomLabel = freedomStr
+    ? freedomTime!.isDeficit
+      ? `${freedomStr} vrijheid terug te kopen`
+      : `${freedomStr} vrijheid`
+    : null
 
   // SVG height varies by widget size: taller for full, roomier for half to prevent clipping
   const SVG_H = size === 'full' ? 48 : 44
@@ -133,14 +141,17 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
   // Show axis labels for half and full sizes where sparkline is visible
   const showAxisLabels = (size === 'full' || size === 'half') && sparkline !== null
 
-  // MoM delta: compare current netWorth with last month's snapshot
+  // MoM delta: consumeer het canonieke netWorthDelta uit de bundel (de loader vergelijkt
+  // met de vóórlaatste snapshot, niet de huidige-dag-rij). Zelf history[last] pakken gaf
+  // ~€0 omdat de auto-snapshot elke dashboard-load een current-day-rij ≈ live netWorth
+  // schrijft. Consume-don't-recompute. Alleen personal-view (household/partner rendert dit niet).
   const momDelta = useMemo(() => {
-    if (netWorthHistory.length === 0) return null
-    const prevValue = netWorthHistory[netWorthHistory.length - 1].value
-    const delta = netWorth - prevValue
+    const delta = data.netWorthDelta
+    if (delta == null) return null
+    const prevValue = netWorth - delta
     const pct = prevValue !== 0 ? (delta / Math.abs(prevValue)) * 100 : 0
     return { delta, pct }
-  }, [netWorthHistory, netWorth])
+  }, [data.netWorthDelta, netWorth])
 
   // Assets vs debts bar proportions (for full-size breakdown)
   const assetDebtBar = useMemo(() => {
@@ -189,16 +200,16 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
           <p className="text-[var(--ink)]">
             <MaskedAmount value={netWorth} tone="kern" className="text-lg font-semibold" />
           </p>
-          {freedomStr && (
+          {freedomLabel && (
             <p className="mt-0.5 font-serif italic text-[11px] text-[var(--ink-3)]">
-              ‰ˆ {freedomStr} vrijheid
+              ≈ {freedomLabel}
             </p>
           )}
           {momDelta && !isHouseholdView && !isPartnerView && (
             <p className={`mt-1 ${
               momDelta.delta >= 0 ? 'text-positive' : 'text-negative'
             }`}>
-              <span className="font-mono">{momDelta.delta >= 0 ? '–²' : '–¼'}{' '}</span>
+              <span className="font-mono" aria-hidden="true">{momDelta.delta >= 0 ? '▲' : '▼'}{' '}</span>
               <MaskedAmount
                 value={momDelta.delta}
                 signPrefix={momDelta.delta >= 0 ? '+' : ''}
@@ -227,14 +238,14 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
             <p className="text-[var(--ink)]">
               <MaskedAmount value={netWorth} tone="kern" className="text-xl font-bold" />
             </p>
-            {freedomStr && (
+            {freedomLabel && (
               <p className="mt-0.5 font-serif italic text-[11px] text-[var(--ink-3)]">
-                ‰ˆ {freedomStr} vrijheid
+                ≈ {freedomLabel}
               </p>
             )}
             {momDelta && !isHouseholdView && !isPartnerView && (
               <p className={`mt-1 ${momDelta.delta >= 0 ? 'text-positive' : 'text-negative'}`}>
-                <span className="font-mono">{momDelta.delta >= 0 ? '–²' : '–¼'}{' '}</span>
+                <span className="font-mono" aria-hidden="true">{momDelta.delta >= 0 ? '▲' : '▼'}{' '}</span>
                 <MaskedAmount
                   value={momDelta.delta}
                   signPrefix={momDelta.delta >= 0 ? '+' : ''}
@@ -261,14 +272,14 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
                   <path d={sparkline.histFill} fill="var(--kern-t)" fillOpacity={hasEntered ? 0.08 : 0} style={{ transition: hasEntered ? 'fill-opacity 200ms ease-out 325ms' : 'none' }} />
                   <path d={sparkline.histPath} fill="none" stroke="var(--kern-t)" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" pathLength={1} strokeDasharray={1} strokeDashoffset={hasEntered ? undefined : 1} style={{ animation: hasEntered ? 'drawPath 500ms cubic-bezier(.22,1,.36,1) both' : 'none' }} />
                   <line x1={sparkline.currentX} y1={sparkline.pad.top} x2={sparkline.currentX} y2={sparkline.pad.top + sparkline.chartH} stroke="var(--border-md)" strokeWidth={1} strokeDasharray="2 2" strokeOpacity={hasEntered ? 1 : 0} style={{ transition: hasEntered ? 'stroke-opacity 80ms ease-out 455ms' : 'none' }} />
-                  <path d={sparkline.forecastPath} fill="none" stroke="var(--hor-t)" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" strokeDasharray="4 3" strokeOpacity={hasEntered ? 0.7 : 0} style={{ transition: hasEntered ? 'stroke-opacity 400ms ease-out 550ms' : 'none' }} />
+                  <path d={sparkline.forecastPath} fill="none" stroke="var(--ink-4)" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" strokeDasharray="4 3" strokeOpacity={hasEntered ? 0.7 : 0} style={{ transition: hasEntered ? 'stroke-opacity 400ms ease-out 550ms' : 'none' }} />
                   <circle cx={sparkline.currentDotX} cy={sparkline.currentDotY} r={3} fill="var(--kern-t)" opacity={hasEntered ? 1 : 0} style={{ transition: hasEntered ? 'opacity 80ms ease-out 500ms' : 'none' }} />
                   <text x={sparkline.pad.left + 1} y={Math.max(sparkline.startY - 4, sparkline.pad.top + 6)} fill="var(--ink-4)" fontSize="7" fontFamily="var(--font-mono), ui-monospace, monospace" opacity={hasEntered ? 1 : 0} style={{ transition: hasEntered ? 'opacity 200ms ease-out 550ms' : 'none' }}>{formatMaskedCurrency(sparkline.startValue, masked)}</text>
-                  <text x={sparkline.forecastEndX - 1} y={Math.max(sparkline.forecastEndY - 4, sparkline.pad.top + 6)} fill="var(--hor-t)" fontSize="7" fontFamily="var(--font-mono), ui-monospace, monospace" textAnchor="end" opacity={hasEntered ? 0.7 : 0} style={{ transition: hasEntered ? 'opacity 400ms ease-out 600ms' : 'none' }}>{formatMaskedCurrency(sparkline.forecastEndValue, masked)}</text>
+                  <text x={sparkline.forecastEndX - 1} y={Math.max(sparkline.forecastEndY - 4, sparkline.pad.top + 6)} fill="var(--ink-4)" fontSize="7" fontFamily="var(--font-mono), ui-monospace, monospace" textAnchor="end" opacity={hasEntered ? 0.7 : 0} style={{ transition: hasEntered ? 'opacity 400ms ease-out 600ms' : 'none' }}>{formatMaskedCurrency(sparkline.forecastEndValue, masked)}</text>
                 </svg>
                 <div className="flex justify-between mt-0.5">
                   <span className="font-mono text-[9px] tabular-nums" style={{ color: 'var(--ink-4)' }}>12m geleden</span>
-                  <span className="font-mono text-[9px] tabular-nums" style={{ color: 'var(--hor-t)' }}>+6m prognose</span>
+                  <span className="font-mono text-[9px] tabular-nums" style={{ color: 'var(--ink-4)' }}>+6m indicatief</span>
                 </div>
               </div>
             )}
@@ -312,9 +323,9 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
             </span>
           )}
         </div>
-        {freedomStr && (
+        {freedomLabel && (
           <p className="mt-1 font-serif italic text-[12px] text-[var(--ink-3)]">
-            ‰ˆ {freedomStr} vrijheid
+            ≈ {freedomLabel}
           </p>
         )}
 
@@ -369,11 +380,12 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
                 }}
               />
 
-              {/* Forecast line — fades in as dashed hor-t path */}
+              {/* Forecast line — dashed, neutrale ink-4 (bewust GEEN horizon-paars: dit is
+                  een lokale, indicatieve extrapolatie, geen canonieke /toekomst-projectie) */}
               <path
                 d={sparkline.forecastPath}
                 fill="none"
-                stroke="var(--hor-t)"
+                stroke="var(--ink-4)"
                 strokeWidth={1.5}
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -432,7 +444,7 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
               <text
                 x={sparkline.forecastEndX - 1}
                 y={Math.max(sparkline.forecastEndY - 4, sparkline.pad.top + 6)}
-                fill="var(--hor-t)"
+                fill="var(--ink-4)"
                 fontSize="7"
                 fontFamily="var(--font-mono), ui-monospace, monospace"
                 textAnchor="end"
@@ -450,8 +462,8 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
                 <span className="font-mono text-[9px] tabular-nums" style={{ color: 'var(--ink-4)' }}>
                   12m geleden
                 </span>
-                <span className="font-mono text-[9px] tabular-nums" style={{ color: 'var(--hor-t)' }}>
-                  +6m prognose
+                <span className="font-mono text-[9px] tabular-nums" style={{ color: 'var(--ink-4)' }}>
+                  +6m indicatief
                 </span>
               </div>
             )}
@@ -484,7 +496,7 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
             {/* MoM delta row — prominent */}
             {momDelta && (
               <div className="flex items-center justify-between rounded-[var(--r-sm)] bg-[var(--subtle)] px-2 py-1">
-                <span className="text-[11px] text-[var(--ink-3)]">Î” deze maand</span>
+                <span className="text-[11px] text-[var(--ink-3)]">Δ deze maand</span>
                 <span className={momDelta.delta >= 0 ? 'text-positive' : 'text-negative'}>
                   <MaskedAmount
                     value={momDelta.delta}

@@ -4,7 +4,7 @@ import type { TestCase } from '../test-types'
 import { frequencyMatch, categorizeTransaction, type FrequencyMatch } from '@/lib/parsers/categorize'
 import type { Budget } from '@/lib/budget-data'
 import { buildBudgetOptions, resolveSlug, type BudgetRow } from '@/app/api/ai/categorize/budget-options'
-import { buildCategorizeSystemPrompt } from '@/lib/ai/categorize-system-prompt'
+import { buildCategorizeSystemPrompt, batchItemId } from '@/lib/ai/categorize-system-prompt'
 import {
   runCombinedCategorization,
   type AutoCatContext,
@@ -12,6 +12,14 @@ import {
   type CombinedAiResult,
   type CombinedTx,
 } from '@/lib/auto-categorize'
+// Lokale privé-modus-resolver (ADR 0043) — uitsluitend de PURE helpers.
+// local-categorize-resolver.ts importeert transformers-runtime.ts statisch,
+// maar díe laadt @huggingface/transformers pas lazy binnen loadModelSession()
+// (dynamic import in buildSession) — mapLocalChunkResults aanroepen triggert
+// dus GEEN zware runtime-import. createLocalAiResolver()(...) NIET aanroepen
+// hier (dat roept loadModelSession() wél aan).
+import { mapLocalChunkResults, LOCAL_MIN_CONFIDENCE } from '@/lib/ai/local/local-categorize-resolver'
+import { parseLocalCategorizations } from '@/lib/ai/local/parse'
 
 const CAT = 'kern.categorisatie'
 
@@ -138,13 +146,17 @@ const tests: TestCase[] = [
   },
   {
     id: 'cat-freq-match', name: 'Frequentie match', category: CAT,
-    description: 'frequencyMatch vindt bekende tegenpartijen',
+    description:
+      'frequencyMatch vindt bekende tegenpartijen na kassanummer-normalisatie ' +
+      '(TRAILING_STORE_RE strip "Albert Heijn 1032" → "albert heijn" — een kaal ' +
+      'stadsnaam-achtervoegsel zónder cijfers wordt bewust NIET gestript, zie ' +
+      'counterparty-normalize.ts).',
     priority: 'high', estimatedDurationMs: 10,
     fn() {
       const freqMap = new Map<string, FrequencyMatch>([
         ['name:albert heijn', { budget_id: 'b1', count: 15, total: 16, confidence: 0.94 }],
       ])
-      const r = frequencyMatch('Albert Heijn Amsterdam', null, freqMap)
+      const r = frequencyMatch('Albert Heijn 1032', null, freqMap)
       assertNotNull(r, 'match gevonden')
       assertEqual(r!.budget_id, 'b1', 'budget_id')
       assertGreaterThanOrEqual(r!.confidence, 0.90, 'confidence')
@@ -305,6 +317,127 @@ const tests: TestCase[] = [
       assertEqual(r.proposals.size, 3, 'drie voorstellen, elk precies één')
       assertEqual(r.proposals.get('r1')!.source, 'rule', 'regel-hit behoudt bron rule')
       assertEqual(r.counts.unresolved, 0, 'niets onbehandeld')
+    },
+  },
+  // ── Lokale privé-modus-resolver (ADR 0043 / FR-1.3-flankerend) ─────────────
+  // Pure delen van het lokale pad vergrendeld in het regressieframework, naast
+  // de vitest-dekking in lib/ai/local/*.test.ts: id-echo-mapping, de
+  // confidence-drempel en salvage-parse van afgekapte modeloutput.
+  {
+    id: 'cat-local-id-echo-duplicate-first-wins',
+    name: 'Lokale resolver: duplicaat-id → eerste telt',
+    category: CAT,
+    description:
+      'ADR 0043: het model echoot t1..tN terug; bij een dubbel teruggegeven id moet het ' +
+      'EERSTE voorkomen tellen, latere duplicaten worden genegeerd.',
+    priority: 'high',
+    estimatedDurationMs: 10,
+    requiredRole: 'any',
+    fn() {
+      const chunk: CombinedAiBatchItem[] = [
+        { id: 'tx-a', description: 'a', counterparty_name: null, amount: -10, reference: null, date: null },
+      ]
+      const validSlugs = new Set(['boodschappen', 'ov'])
+      const slugToId = new Map([['boodschappen', 'b-1'], ['ov', 'b-2']])
+      const raw = JSON.stringify([
+        { id: 't1', budget_slug: 'boodschappen', confidence: 0.95 }, // eerste → telt
+        { id: 't1', budget_slug: 'ov', confidence: 0.95 }, // duplicaat → genegeerd
+      ])
+      const out = mapLocalChunkResults(chunk, parseLocalCategorizations(raw), validSlugs, slugToId)
+      assertEqual(out[0].budget_id, 'b-1', 'eerste duplicaat-id wint (boodschappen, niet ov)')
+    },
+  },
+  {
+    id: 'cat-local-id-echo-unknown-id-ignored',
+    name: 'Lokale resolver: onbekend teruggeecho’d id → genegeerd, transactie blijft onbekend',
+    category: CAT,
+    description:
+      'ADR 0043: een teruggegeven id dat niet in de aangeboden batch voorkomt (bv. "t9" bij ' +
+      'een batch van 2) mag geen resultaat toekennen — de bijbehorende transactie blijft null.',
+    priority: 'high',
+    estimatedDurationMs: 10,
+    requiredRole: 'any',
+    fn() {
+      const chunk: CombinedAiBatchItem[] = [
+        { id: 'tx-a', description: 'a', counterparty_name: null, amount: -10, reference: null, date: null },
+        { id: 'tx-b', description: 'b', counterparty_name: null, amount: -10, reference: null, date: null },
+      ]
+      const validSlugs = new Set(['ov'])
+      const slugToId = new Map([['ov', 'b-2']])
+      const raw = JSON.stringify([
+        { id: 't9', budget_slug: 'ov', confidence: 0.95 }, // onbekend id → genegeerd
+      ])
+      const out = mapLocalChunkResults(chunk, parseLocalCategorizations(raw), validSlugs, slugToId)
+      assertEqual(out.length, 2, 'exact één resultaat per aangeboden transactie')
+      assertEqual(out[0].id, 'tx-a', 'resultaat 1 hoort bij tx-a')
+      assertEqual(out[1].id, 'tx-b', 'resultaat 2 hoort bij tx-b')
+      assertEqual(out[0].budget_id, null, 'tx-a kreeg geen geldig teruggeecho’d id → onbekend')
+      assertEqual(out[1].budget_id, null, 'tx-b kreeg geen geldig teruggeecho’d id → onbekend')
+    },
+  },
+  {
+    id: 'cat-local-confidence-threshold-cutoff',
+    name: 'Lokale resolver: confidence-afkap op LOCAL_MIN_CONFIDENCE (0,9)',
+    category: CAT,
+    description:
+      'ADR 0043: het lokale pad hanteert een strengere drempel dan de cloud-conventie (0,5) — ' +
+      'onder LOCAL_MIN_CONFIDENCE → budget_id null (assistief: liever niets dan ruis), op/boven de drempel → toegewezen.',
+    priority: 'critical',
+    estimatedDurationMs: 10,
+    requiredRole: 'any',
+    fn() {
+      assertEqual(LOCAL_MIN_CONFIDENCE, 0.9, 'single-source drempelconstante ongewijzigd (ADR 0043)')
+      const chunk: CombinedAiBatchItem[] = [
+        { id: 'tx-a', description: 'a', counterparty_name: null, amount: -10, reference: null, date: null },
+      ]
+      const validSlugs = new Set(['boodschappen'])
+      const slugToId = new Map([['boodschappen', 'b-1']])
+
+      const belowRaw = JSON.stringify([
+        { id: batchItemId(0), budget_slug: 'boodschappen', confidence: LOCAL_MIN_CONFIDENCE - 0.01 },
+      ])
+      const belowOut = mapLocalChunkResults(chunk, parseLocalCategorizations(belowRaw), validSlugs, slugToId)
+      assertEqual(belowOut[0].budget_id, null, 'net onder de drempel → geen voorstel')
+
+      const atRaw = JSON.stringify([
+        { id: batchItemId(0), budget_slug: 'boodschappen', confidence: LOCAL_MIN_CONFIDENCE },
+      ])
+      const atOut = mapLocalChunkResults(chunk, parseLocalCategorizations(atRaw), validSlugs, slugToId)
+      assertEqual(atOut[0].budget_id, 'b-1', 'exact op de drempel → wél toegewezen')
+    },
+  },
+  {
+    id: 'cat-local-salvage-truncated-array',
+    name: 'Lokale resolver: salvage-parse bergt complete objecten uit een afgekapte array',
+    category: CAT,
+    description:
+      'ADR 0043 / fase-0-les: max_new_tokens te laag kapt de JSON-array af (unclosed). ' +
+      'De parser moet de reeds complete objecten alsnog bergen i.p.v. de hele interne batch te verliezen.',
+    priority: 'high',
+    estimatedDurationMs: 10,
+    requiredRole: 'any',
+    fn() {
+      // Tweede object is afgekapt (geen sluithaak/vierkante haak) → alleen het
+      // eerste, complete object mag geborgen worden.
+      const truncated = '[{"id":"t1","budget_slug":"boodschappen","confidence":0.95},{"id":"t2","budget_slug":"ov"'
+      const parsed = parseLocalCategorizations(truncated)
+      assertEqual(parsed.truncated, true, 'markeert de output als afgekapt')
+      assertEqual(parsed.salvaged, true, 'salvage-pad geactiveerd')
+      assertNotNull(parsed.items, 'geborgen items aanwezig')
+      assertEqual(parsed.items!.length, 1, 'alleen het complete object geborgen')
+      assertEqual(parsed.items![0].id, 't1', 'het geborgen object is t1')
+
+      // De geborgen items moeten alsnog correct mappen op de aangeboden batch
+      // (t2 blijft onbekend, geen crash op de ontbrekende tweede helft).
+      const chunk: CombinedAiBatchItem[] = [
+        { id: 'tx-a', description: 'a', counterparty_name: null, amount: -10, reference: null, date: null },
+        { id: 'tx-b', description: 'b', counterparty_name: null, amount: -10, reference: null, date: null },
+      ]
+      const validSlugs = new Set(['boodschappen', 'ov'])
+      const slugToId = new Map([['boodschappen', 'b-1'], ['ov', 'b-2']])
+      const out = mapLocalChunkResults(chunk, parsed, validSlugs, slugToId)
+      assertEqual(out[0].budget_id, 'b-1', 'geborgen t1 (confidence 0,95 ≥ drempel) mapt correct naar budget_id')
+      assertEqual(out[1].budget_id, null, 'tx-b (t2) is niet geborgen — blijft onbekend, geen crash')
     },
   },
 ]

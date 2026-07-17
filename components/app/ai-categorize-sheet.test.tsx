@@ -35,6 +35,10 @@ let allTimeError: { message: string } | null = null
 type UpdatePayload = Record<string, unknown>
 let transactionUpdates: { ids: string[]; payload: UpdatePayload }[] = []
 
+// Privé-modus: de sheet leest profiles.privacy_mode via een own-row
+// .select().eq('id').maybeSingle(). Per test in te stellen.
+let profilePrivacyMode: boolean | null = false
+
 // The fetch now pages with `.range(offset, ...)` (PostgREST capt één query op
 // 1000 rijen, dus de fetch lust door in chunks van 1000). Elke `.from()` maakt
 // een verse builder; we leveren `allTimeData` op de eerste pagina (offset 0) en
@@ -91,6 +95,14 @@ function makeQueryBuilder(table: string) {
     // pagineer-loop stopt. (Een error op pagina 0 propageert direct.)
     const data = offset === 0 ? allTimeData : []
     return Promise.resolve({ data, error: offset === 0 ? allTimeError : null })
+  }
+  // Own-row scalar-select terminal: de sheet leest profiles.privacy_mode zo.
+  builder.maybeSingle = (...args: unknown[]) => {
+    supabaseCalls.push({ method: 'maybeSingle', args })
+    return Promise.resolve({
+      data: table === 'profiles' ? { privacy_mode: profilePrivacyMode } : null,
+      error: null,
+    })
   }
   // Thenable: an `await`-ed builder without an explicit terminal. handleSave does
   // `await supabase.from('transactions').update(...).eq('id', id)` — capture that
@@ -161,6 +173,37 @@ vi.mock('@/lib/auto-categorize-context', () => ({
   },
 }))
 
+// ── Lokale privé-modus-mocks (geen WebGPU/model-download in de test) ──────────
+// Per test instelbaar: geschiktheid, modelstaat en het resolver-resultaat. De
+// factory-arrows lezen de vars lui (bij aanroep), zelfde patroon als de
+// auto-cat-context-mock hierboven.
+import type { CombinedAiBatchItem as LocalBatchItem, CombinedAiResult as LocalResult } from '@/lib/auto-categorize'
+
+let localCapabilityOk = true
+let localModelReady = true
+const localResolverSpy = vi.fn((batch: LocalBatchItem[]): Promise<LocalResult[]> =>
+  Promise.resolve(batch.map((t) => ({ id: t.id, budget_id: 'b-boodschappen', confidence: 0.95, reasoning: 'lokaal' }))),
+)
+const createLocalResolverSpy = vi.fn((..._args: unknown[]) => localResolverSpy)
+
+vi.mock('@/lib/ai/local/webgpu-capability', () => ({
+  checkLocalAiCapability: () =>
+    Promise.resolve({
+      ok: localCapabilityOk,
+      reasons: localCapabilityOk ? [] : ['Je browser ondersteunt WebGPU niet.'],
+      shaderF16: localCapabilityOk,
+      deviceMemoryGb: 8,
+    }),
+}))
+vi.mock('@/lib/ai/local/model-manager', () => ({
+  getLocalModelState: () =>
+    Promise.resolve({ state: localModelReady ? 'klaar' : 'niet-gedownload', bytes: null }),
+}))
+vi.mock('@/lib/ai/local/local-categorize-resolver', () => ({
+  createLocalAiResolver: (...args: unknown[]) => createLocalResolverSpy(...args),
+  LOCAL_INTERNAL_BATCH_SIZE: 10,
+}))
+
 // ── Fixtures ──────────────────────────────────────────────────
 
 const mockBudgets: Budget[] = []
@@ -197,6 +240,11 @@ beforeEach(() => {
   allTimeError = null
   transactionUpdates = []
   autoCatContextCalls = []
+  profilePrivacyMode = false
+  localCapabilityOk = true
+  localModelReady = true
+  localResolverSpy.mockClear()
+  createLocalResolverSpy.mockClear()
   // Default: AI-context met een eigen-rekening-budget, geen IBAN/naam/spiegelparen.
   autoCatContext = {
     budgets: [],
@@ -800,5 +848,106 @@ describe('AICategorizeSheet — budget-boom flatten', () => {
     const ids = passed.map((b) => b.id)
     expect(ids).toEqual(expect.arrayContaining(['b-inkomen', 'b-salaris']))
     expect(ids.filter((id) => id === 'b-salaris').length).toBe(1)
+  })
+})
+
+// ── Privé-modus: lokale vs. cloud resolver-keuze (ADR 0043, fase 3) ────────────
+//
+// De sheet leest profiles.privacy_mode bij "Vraag Will" en kiest de resolver:
+//  - uit (default) → exact bestaand cloud-gedrag (fetch /api/ai/categorize).
+//  - aan + klaar → uitsluitend de lokale on-device resolver, GEEN cloud-call.
+//  - aan + niet klaar → AI-fase geblokkeerd met eerlijke melding; regelmotor-
+//    voorstellen (stap 1) blijven werken; NOOIT een stille cloud-fallback.
+
+function aiCategorizeFetches() {
+  return vi.mocked(fetch).mock.calls.filter((c) => String(c[0]).includes('/api/ai/categorize'))
+}
+
+describe('AICategorizeSheet — privé-modus resolver-keuze', () => {
+  it('privacy_mode UIT: gebruikt de cloud-resolver, niet de lokale', async () => {
+    profilePrivacyMode = false
+    autoCatContext = { ...autoCatContext, budgets: [boodschappenBudget] }
+    const txs = [makeTx('u1', { description: 'Betaling', counterparty_name: 'Onbekende Zaak' })]
+
+    render(
+      <AICategorizeSheet
+        transactions={txs}
+        budgets={[boodschappenBudget]}
+        budgetGroups={[{ parent: boodschappenBudget, children: [boodschappenBudget] }]}
+        onClose={() => {}}
+        onSaved={() => {}}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Vraag Will/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText(/nog te beoordelen/i)).toBeInTheDocument()
+    })
+    // Cloud-pad gebruikt (één AI-call), lokale resolver niet aangeraakt.
+    expect(aiCategorizeFetches().length).toBe(1)
+    expect(createLocalResolverSpy).not.toHaveBeenCalled()
+  })
+
+  it('privacy_mode AAN + klaar: gebruikt de lokale resolver, GEEN cloud-call', async () => {
+    profilePrivacyMode = true
+    localCapabilityOk = true
+    localModelReady = true
+    autoCatContext = { ...autoCatContext, budgets: [boodschappenBudget] }
+    const txs = [makeTx('l1', { description: 'Betaling', counterparty_name: 'Onbekende Zaak' })]
+
+    render(
+      <AICategorizeSheet
+        transactions={txs}
+        budgets={[boodschappenBudget]}
+        budgetGroups={[{ parent: boodschappenBudget, children: [boodschappenBudget] }]}
+        onClose={() => {}}
+        onSaved={() => {}}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Vraag Will/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText(/^Will$/)).toBeInTheDocument()
+    })
+    // Lokale resolver gebruikt met het onbekende item; geen enkele cloud-call.
+    expect(createLocalResolverSpy).toHaveBeenCalledTimes(1)
+    expect(localResolverSpy).toHaveBeenCalled()
+    expect(aiCategorizeFetches().length).toBe(0)
+    // Het lokale voorstel landt als "Will" op het boodschappen-budget.
+    expect(screen.getAllByText('Boodschappen').length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('privacy_mode AAN + NIET klaar: blokkeert de AI-fase eerlijk, geen cloud-fallback', async () => {
+    profilePrivacyMode = true
+    localCapabilityOk = false // geen geschikte WebGPU → niet klaar
+    autoCatContext = { ...autoCatContext, budgets: [boodschappenBudget] }
+    // Eén regel-zekere (Albert Heijn → Regel) + één onbekende (dwingt de AI-fase).
+    const txs = [
+      makeTx('r1', { description: 'Albert Heijn 1', counterparty_name: 'Albert Heijn' }),
+      makeTx('x1', { description: 'Betaling', counterparty_name: 'Onbekende Zaak' }),
+    ]
+
+    render(
+      <AICategorizeSheet
+        transactions={txs}
+        budgets={[boodschappenBudget]}
+        budgetGroups={[{ parent: boodschappenBudget, children: [boodschappenBudget] }]}
+        onClose={() => {}}
+        onSaved={() => {}}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Vraag Will/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText(/Lokale AI is niet beschikbaar of nog niet gedownload/i)).toBeInTheDocument()
+    })
+    // Regelmotor-voorstel blijft werken (stap 1).
+    expect(screen.getByText(/^Regel$/)).toBeInTheDocument()
+    // Fail-closed: geen lokale resolver gebouwd én géén cloud-fallback.
+    expect(createLocalResolverSpy).not.toHaveBeenCalled()
+    expect(aiCategorizeFetches().length).toBe(0)
   })
 })

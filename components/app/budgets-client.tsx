@@ -35,7 +35,7 @@ import type { BudgetsPageData, BudgetGoal } from '@/lib/budgets-data-loader'
 import { BudgetIcon, formatCurrency, getTypeColors, isOverPositive, computeBarSegments, iconMap, iconOptions, type BudgetType } from '@/components/app/budget-shared'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { buildSegments, typeColors, childTypeColors } from '@/components/app/budget-donut'
-import { type BudgetRollover, formatPeriod, getCarriedAmount, getPreviousPeriod, computeRollover } from '@/lib/budget-rollover'
+import { type BudgetRollover, formatPeriod, getCarriedAmount, getPreviousPeriod, computeRollover, computeEffectiveLimit } from '@/lib/budget-rollover'
 import { computeBudgetPeriod, localDateStr } from '@/lib/budget-period'
 import { BudgetTree } from '@/components/app/budget-tree'
 import { BudgetPillTree } from '@/components/app/budget-pill-tree'
@@ -1766,29 +1766,20 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
   }
 
   function getEffectiveLimit(budget: Budget): number {
-    const budgetRollovers = rolloversIndex[budget.id] ?? []
-    const carry = getCarriedAmount(budgetRollovers, currentPeriodLabel)
-
-    // Check budget_amounts for period-specific limit override
-    const applicable = (budgetAmountsIndex[budget.id] ?? [])
-      .filter(a => a.effective_from <= displayDate)
-      .sort((a, b) => b.effective_from.localeCompare(a.effective_from))
-
-    const baseLimit = applicable.length > 0
-      ? Number(applicable[0].amount)
-      : Number(budget.default_limit)
-
-    // Pro-rata weergave: in eigen/partner-blik tonen we het aandeel van een
-    // gedeeld budget. Editing leest altijd de volledige bedragen (apart pad).
-    const fraction = shareOf(budget)
-
-    // For multi-month modes, scale the base limit by the number of months.
-    // Rollovers only apply to single-month view — they don't make sense across periods.
-    if (periodMonthCount > 1) {
-      return baseLimit * periodMonthCount * fraction
-    }
-
-    return (baseLimit + carry) * fraction
+    // Consumeer de canonieke effectieve-limiet (carry-over + periode-override +
+    // pro-rata aandeel). Zelfde bron die de heatmap-widget op het dashboard
+    // gebruikt, zodat "beschikbaar" niet tussen de twee schermen uiteenloopt.
+    return computeEffectiveLimit({
+      defaultLimit: Number(budget.default_limit),
+      rollovers: rolloversIndex[budget.id] ?? [],
+      amountOverrides: budgetAmountsIndex[budget.id] ?? [],
+      period: currentPeriodLabel,
+      displayDate,
+      periodMonthCount,
+      // Pro-rata weergave: in eigen/partner-blik tonen we het aandeel van een
+      // gedeeld budget. Editing leest altijd de volledige bedragen (apart pad).
+      shareFraction: shareOf(budget),
+    })
   }
 
   function getParentEffectiveLimit(parent: BudgetWithChildren): number {

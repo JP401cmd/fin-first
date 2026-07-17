@@ -20,6 +20,10 @@ import {
   type CombinedAiResult,
   type CombinedProposalSource,
 } from '@/lib/auto-categorize'
+import { buildBudgetOptions, type BudgetRow } from '@/lib/ai/categorize-budget-options'
+import { createLocalAiResolver, LOCAL_INTERNAL_BATCH_SIZE } from '@/lib/ai/local/local-categorize-resolver'
+import { checkLocalAiCapability } from '@/lib/ai/local/webgpu-capability'
+import { getLocalModelState } from '@/lib/ai/local/model-manager'
 
 // De Sleepmodus (drag-&-drop) sleept dnd-kit mee — eigen chunk, laadt pas
 // wanneer de gebruiker de modus opent.
@@ -172,6 +176,10 @@ export function AICategorizeSheet({
   const [bulkUpdated, setBulkUpdated] = useState(0)
   const [bulkApplyPrompt, setBulkApplyPrompt] = useState<BulkApplyPrompt | null>(null)
   const [aiBatchProgress, setAiBatchProgress] = useState({ current: 0, total: 0, round: 0, propagated: 0 })
+  // Privé-modus: draait de AI-fase on-device (Gemma 4 E2B/WebGPU) i.p.v. cloud.
+  // Alleen een UI-hint-vlag ("experimenteel — lokaal op dit apparaat"); de
+  // resolver-keuze zelf gebeurt in fetchSuggestions op basis van profiles.privacy_mode.
+  const [localMode, setLocalMode] = useState(false)
   // Annuleren van de combined pass: abort tussen AI-rondes; de al-gedane
   // voorstellen blijven staan en landen gewoon in de review (niets toegepast).
   const abortRef = useRef<AbortController | null>(null)
@@ -372,11 +380,11 @@ export function AICategorizeSheet({
     }
     setEigenRekeningBudgetId(ctx.eigenRekeningBudgetId)
 
-    // AI-resolver voor de combined pass: één POST = één batch van ≤20
-    // representanten. Bewust GEEN counterparty_iban in de payload: sanitizeForAI
-    // maskeert elk IBAN naar de constante "[IBAN]" vóór het de provider bereikt —
-    // privacy-correct maar nul signaal. IBAN-matching gebeurt lokaal (regelmotor).
-    const aiResolver = async (batch: CombinedAiBatchItem[]): Promise<CombinedAiResult[]> => {
+    // Cloud-resolver (default): één POST = één batch van ≤20 representanten.
+    // Bewust GEEN counterparty_iban in de payload: sanitizeForAI maskeert elk
+    // IBAN naar de constante "[IBAN]" vóór het de provider bereikt — privacy-
+    // correct maar nul signaal. IBAN-matching gebeurt lokaal (regelmotor).
+    const cloudResolver = async (batch: CombinedAiBatchItem[]): Promise<CombinedAiResult[]> => {
       const res = await fetch('/api/ai/categorize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -404,12 +412,70 @@ export function AICategorizeSheet({
       }))
     }
 
+    // ── Privé-modus: kies de lokale on-device resolver i.p.v. de cloud ────────
+    // We lezen profiles.privacy_mode client-side op de lichtste manier: één
+    // own-row scalar-select bij het starten van de AI-fase (RLS dekt de rij;
+    // nooit service-role — spiegelt app/api/display-mode). Dit is de plek waar de
+    // keuze telt: categorisatie is de enige functie die privé-modus in scope A
+    // raakt (ADR 0043). Categorisatie is fail-closed: nooit een stille cloud-
+    // fallback bij privacy_mode=true.
+    const supabase = createClient()
+    let aiResolver = cloudResolver
+    let aiBatchSize: number | undefined
+    let localNotReady = false
+    let privacyMode = false
+    {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: profileRow } = await supabase
+          .from('profiles')
+          .select('privacy_mode')
+          .eq('id', user.id)
+          .maybeSingle()
+        privacyMode = (profileRow as { privacy_mode?: boolean | null } | null)?.privacy_mode ?? false
+      }
+    }
+    setLocalMode(privacyMode)
+
+    if (privacyMode) {
+      // Toestelgeschiktheid + modelstaat: niet klaar → blokkeer de AI-fase
+      // eerlijk. De regel-/transfer-/spiegelvoorstellen (stap 1) blijven werken.
+      const [cap, modelState] = await Promise.all([checkLocalAiCapability(), getLocalModelState()])
+      const ready = cap.ok && modelState.state === 'klaar'
+      if (!ready) {
+        localNotReady = true
+        // Elke batch laten falen → de bestaande failedBatches-flow vangt het op;
+        // NOOIT een stille cloud-fallback (privacy fail-closed, FR-3.6).
+        aiResolver = async () => {
+          throw new Error('lokale-ai-niet-beschikbaar')
+        }
+      } else {
+        // Lokale opties mét budget_id via dezelfde leaf/slug-logica als het
+        // cloud-pad (buildBudgetOptions), zodat de resolver de teruggegeven slug
+        // naar een budget_id kan mappen.
+        const rows: BudgetRow[] = flatBudgets.map((b) => ({
+          id: b.id,
+          parent_id: b.parent_id,
+          name: b.name,
+          slug: b.slug,
+          budget_type: b.budget_type,
+          description: b.description,
+          ownership: b.ownership,
+        }))
+        const { options, slugToId } = buildBudgetOptions(rows)
+        const localOptions = options.map((o) => ({ ...o, id: slugToId.get(o.slug) ?? null }))
+        aiResolver = createLocalAiResolver(localOptions)
+        aiBatchSize = LOCAL_INTERNAL_BATCH_SIZE
+      }
+    }
+
     try {
       const result = await runCombinedCategorization(
         sourceTx.map(toAutoCatTx),
         ctx,
         aiResolver,
         {
+          batchSize: aiBatchSize,
           onProgress: (p) => setAiBatchProgress({ current: p.processed, total: p.total, round: p.round, propagated: p.propagated }),
           signal: abortRef.current.signal,
         },
@@ -418,7 +484,13 @@ export function AICategorizeSheet({
       // Alle AI-rondes mislukt en géén enkel AI-voorstel → meld het; de lokale
       // (regel/transfer/spiegel-)voorstellen staan wél gewoon in de review.
       if (result.failedBatches.length > 0 && result.counts.ai === 0) {
-        setAiError('AI-analyse is nu niet beschikbaar — de voorstellen van je regels staan wel klaar.')
+        setAiError(
+          localNotReady
+            ? 'Lokale AI is niet beschikbaar of nog niet gedownload — beheer dit via Mijn > Privacy. Je regels en eerdere keuzes staan wel klaar.'
+            : privacyMode
+              ? 'Lokale categorisatie is niet gelukt. Probeer het opnieuw of categoriseer handmatig. Je regels staan wel klaar.'
+              : 'AI-analyse is nu niet beschikbaar — de voorstellen van je regels staan wel klaar.',
+        )
       }
 
       const budgetNameById = new Map(flatBudgets.map((b) => [b.id, b.name] as const))
@@ -932,6 +1004,11 @@ export function AICategorizeSheet({
             {aiBatchProgress.propagated > 0 && (
               <p className="text-[11px] text-[var(--ink-3)]">
                 <span className="font-mono tabular-nums">{aiBatchProgress.propagated}</span> afgeleid van eerdere Will-oordelen (zonder extra AI-ronde)
+              </p>
+            )}
+            {localMode && (
+              <p className="rounded-full border border-dashed border-wil-300 bg-wil-50/60 px-2.5 py-1 text-[10px] font-medium text-wil-700">
+                Experimenteel — lokaal op dit apparaat, je transactiedata verlaat je toestel niet
               </p>
             )}
           </div>

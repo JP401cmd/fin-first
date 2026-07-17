@@ -9,7 +9,12 @@ import type { DashboardData } from './widget-renderer'
 import type { HealthPillar, HealthScore } from '@/lib/financial-health'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
+import { WidgetEmpty } from './widget-empty'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
+
+// Starter/low-data — waar een lege gebruiker naartoe kan om gegevens toe te
+// voegen (bezittingen zijn het startpunt van de meeste pijlers).
+const STARTER_HREF = '/overzicht/bezittingen'
 
 interface Props {
   size: WidgetSize
@@ -60,7 +65,14 @@ function HealthGauge({ score, sz }: { score: number; sz: number }) {
   const color = scoreColor(score)
 
   return (
-    <svg width={sz} height={sz} viewBox={`0 0 ${sz} ${sz}`} className="mx-auto">
+    <svg
+      width={sz}
+      height={sz}
+      viewBox={`0 0 ${sz} ${sz}`}
+      className="mx-auto"
+      role="img"
+      aria-label={`Gezondheidsscore ${score} van 100`}
+    >
       {/* Background track (full circle) */}
       <circle
         cx={cx}
@@ -131,22 +143,15 @@ function RadarChart({ pillars, sz }: { pillars: HealthPillar[]; sz: number }) {
   })
   const dataPath = dataPoints.map((pt, i) => `${i === 0 ? 'M' : 'L'} ${pt.x.toFixed(1)} ${pt.y.toFixed(1)}`).join(' ') + ' Z'
 
-  // Korte labels per indicator-id (ADR 0010 / v2). Id-based i.p.v. positioneel,
-  // zodat volgorde of aantal actieve indicatoren de labels niet kan ontkoppelen.
-  const SHORT_LABELS: Record<string, string> = {
-    savings_rate: 'Spaar',
-    budget_discipline: 'Budget',
-    emergency_fund: 'Nood',
-    debt_service_ratio: 'Lasten',
-    debt_ratio: 'Schuld',
-    fire_progress: 'Vrij',
-    asset_concentration: 'Spreid',
-  }
-  const shortLabelFor = (p: HealthPillar): string =>
-    SHORT_LABELS[p.id] ?? (p.name.length > 6 ? p.name.slice(0, 5) + '…' : p.name)
+  // A11y: het radardiagram is puur visueel; de leesbare legenda zijn de
+  // pijlerbalken ernaast (naam + score). Daarom `role="img"` met een volledige
+  // aria-label i.p.v. onleesbaar kleine SVG-aslabels — spiegelt Dekkingsradar.
+  const radarLabel = `Radardiagram van je gezondheidspijlers: ${pillars
+    .map(p => `${p.name} ${p.score} van 100`)
+    .join(', ')}.`
 
   return (
-    <svg width={sz} height={sz} viewBox={`0 0 ${sz} ${sz}`}>
+    <svg width={sz} height={sz} viewBox={`0 0 ${sz} ${sz}`} role="img" aria-label={radarLabel}>
       {/* Background rings */}
       {rings.map(pct => {
         const r = pct * maxR
@@ -204,26 +209,6 @@ function RadarChart({ pillars, sz }: { pillars: HealthPillar[]; sz: number }) {
           fill="var(--color-horizon-500)"
         />
       ))}
-
-      {/* Labels */}
-      {pillars.map((p, i) => {
-        const angle = startOffset + i * angleStep
-        const labelR = maxR + 10
-        const pos = polarToCart(angle, labelR)
-        const anchor = pos.x < cx - 2 ? 'end' : pos.x > cx + 2 ? 'start' : 'middle'
-        return (
-          <text
-            key={p.id}
-            x={pos.x}
-            y={pos.y}
-            textAnchor={anchor}
-            dominantBaseline="central"
-            className="text-[8px] fill-[var(--ink-3)]"
-          >
-            {shortLabelFor(p)}
-          </text>
-        )
-      })}
     </svg>
   )
 }
@@ -348,6 +333,51 @@ export const GezondheidScoreWidget = memo(function GezondheidScoreWidget({ size,
   const health = data.healthScore
   const color = scoreColorClass(health.total)
 
+  // ── Starter / low-data ───────────────────────────────────
+  // Een lege gebruiker (geen bezittingen, schulden of inkomsten/uitgaven) krijgt
+  // via het engine-no-data-beleid een laag "rood" cijfer (~21) dat niets over
+  // gezondheid zegt maar wél alarmerend oogt. Detecteer die kale staat op de
+  // ráw bundelvelden (geen herberekening) en toon duiding i.p.v. het cijfer.
+  const isStarter =
+    data.totalAssets <= 0 &&
+    data.totalDebts <= 0 &&
+    data.monthlyIncome <= 0 &&
+    data.monthlyExpenses <= 0
+
+  if (isStarter) {
+    if (size === 'mini') {
+      return (
+        <WidgetShell module="horizon" size="mini" kicker="Gezondheid" href={href}>
+          <p className="font-mono text-[15px] font-semibold tabular-nums leading-none text-[var(--ink-3)]">–</p>
+        </WidgetShell>
+      )
+    }
+    if (size === 'quarter') {
+      return (
+        <WidgetShell module="horizon" size={size} kicker="Gezondheid" href={STARTER_HREF}>
+          <Activity className="h-4 w-4 text-horizon-500" />
+          <div className="mt-1 flex items-baseline gap-0.5">
+            <p className="font-mono text-lg font-semibold tabular-nums leading-none text-[var(--ink-3)]">–</p>
+            <span className="text-sm text-[var(--ink-4)]">/100</span>
+          </div>
+          <p className="mt-1 text-[10px] leading-snug text-[var(--ink-3)]">Nog te weinig gegevens</p>
+        </WidgetShell>
+      )
+    }
+    // half & full — volledige duiding met CTA (WidgetEmpty first-use).
+    return (
+      <WidgetShell module="horizon" size={size} kicker="Gezondheid">
+        <WidgetEmpty
+          variant="first-use"
+          icon={Activity}
+          title="Te weinig gegevens"
+          description="Voeg je bezittingen, schulden en inkomsten toe voor een betrouwbaar gezondheidscijfer."
+          action={{ label: 'Voeg je gegevens toe', href: STARTER_HREF }}
+        />
+      </WidgetShell>
+    )
+  }
+
   // ── Mini ─────────────────────────────────────────────────
   if (size === 'mini') {
     return (
@@ -384,12 +414,15 @@ export const GezondheidScoreWidget = memo(function GezondheidScoreWidget({ size,
 
   // ── Half ─────────────────────────────────────────────────
   if (size === 'half') {
+    // Toon de ZWAKSTE 3 pijlers (meest actiegericht) i.p.v. de eerste 3 op
+    // volgorde — sluit aan op de "verbeterpunten"-filosofie van de full-size.
+    const weakestThree = [...health.pillars].sort((a, b) => a.score - b.score).slice(0, 3)
     return (
       <WidgetShell module="horizon" size={size} kicker="Gezondheid" onClick={() => setShowKassabon(true)}>
         <div className="flex items-start gap-3">
           <HealthGauge score={health.total} sz={64} />
           <div className="flex-1 min-w-0 space-y-1">
-            {health.pillars.slice(0, 3).map(p => (
+            {weakestThree.map(p => (
               <PillarRow key={p.id} pillar={p} />
             ))}
             <div className="flex items-center justify-between pt-0.5">

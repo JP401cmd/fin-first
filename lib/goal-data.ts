@@ -196,6 +196,18 @@ export const GOAL_COLORS = [
 const DOWN_GOAL_ONTRACK_TOLERANCE = 0.25
 
 /**
+ * Minimale velden die `computeGoalProgress` daadwerkelijk leest. Een volledig
+ * `Goal` voldoet hieraan, maar ook lichtere projecties (bv. `TopGoal` in de
+ * dashboard-widget) kunnen zo de CANONIEKE voortgangsberekening consumeren
+ * i.p.v. lokaal te herrekenen. `created_at` is optioneel: alleen de 'up'-tak
+ * gebruikt het voor de ETA/on-track-schatting en gaat er defensief mee om.
+ */
+export type GoalProgressInput = Pick<
+  Goal,
+  'goal_type' | 'current_value' | 'target_value' | 'target_date'
+> & { created_at?: string }
+
+/**
  * Compute goal progress.
  * For debt_payoff, progress = how much has been paid off.
  * For freedom_days, current value is free days per year.
@@ -204,7 +216,7 @@ const DOWN_GOAL_ONTRACK_TOLERANCE = 0.25
  * het doel een LAGERE waarde dan de huidige; voortgang = target / current. Alle
  * bestaande types zijn 'up' (default) en behouden exact hun gedrag.
  */
-export function computeGoalProgress(goal: Goal): {
+export function computeGoalProgress(goal: GoalProgressInput): {
   current: number
   target: number
   pct: number
@@ -240,7 +252,8 @@ export function computeGoalProgress(goal: Goal): {
     const targetDate = new Date(goal.target_date)
     const now = new Date()
     const daysLeft = Math.max(0, (targetDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-    const totalDays = (targetDate.getTime() - new Date(goal.created_at).getTime()) / (1000 * 60 * 60 * 24)
+    const createdMs = goal.created_at ? new Date(goal.created_at).getTime() : NaN
+    const totalDays = (targetDate.getTime() - createdMs) / (1000 * 60 * 60 * 24)
 
     if (totalDays > 0 && daysLeft > 0) {
       const expectedPct = ((totalDays - daysLeft) / totalDays) * 100

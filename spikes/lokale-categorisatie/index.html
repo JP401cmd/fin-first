@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Spike — Lokale categorisatie (Gemma · Transformers.js · WebGPU)</title>
+    <style>
+      :root {
+        --bg: #0f1115;
+        --panel: #171a21;
+        --border: #2a2f3a;
+        --text: #e6e8ec;
+        --muted: #9aa3b2;
+        --pass: #3fb950;
+        --warn: #d29922;
+        --fail: #f85149;
+        --accent: #4c8dff;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        background: var(--bg);
+        color: var(--text);
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      header {
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border);
+      }
+      header h1 { font-size: 15px; margin: 0 0 4px; }
+      header p { margin: 0; color: var(--muted); font-size: 12px; }
+      main { padding: 16px 20px; display: flex; flex-direction: column; gap: 16px; max-width: 1200px; }
+      section {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 14px 16px;
+      }
+      section h2 { font-size: 13px; margin: 0 0 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+      label { display: inline-flex; align-items: center; gap: 6px; margin-right: 14px; color: var(--muted); }
+      select, input, button {
+        font-family: inherit;
+        font-size: 12px;
+        background: #0c0e13;
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 6px 10px;
+      }
+      button {
+        cursor: pointer;
+        background: var(--accent);
+        color: #fff;
+        border-color: transparent;
+      }
+      button.secondary { background: #21262d; color: var(--text); }
+      button:disabled { opacity: 0.5; cursor: not-allowed; }
+      .row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 10px; }
+      table { width: 100%; border-collapse: collapse; font-size: 12px; }
+      th, td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+      th { color: var(--muted); font-weight: 600; }
+      .pass { color: var(--pass); }
+      .warn { color: var(--warn); }
+      .fail { color: var(--fail); }
+      .muted { color: var(--muted); }
+      .mono-wrap { white-space: pre-wrap; word-break: break-word; }
+      .bar { height: 8px; background: #0c0e13; border-radius: 4px; overflow: hidden; border: 1px solid var(--border); }
+      .bar > div { height: 100%; background: var(--accent); width: 0%; transition: width 0.15s; }
+      .kpi { display: inline-block; margin-right: 18px; }
+      .kpi b { display: block; font-size: 16px; color: var(--text); }
+      .kpi span { color: var(--muted); font-size: 11px; }
+      details { margin-top: 8px; }
+      summary { cursor: pointer; color: var(--muted); }
+      .scroll { overflow-x: auto; }
+      code { background: #0c0e13; padding: 1px 4px; border-radius: 3px; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Spike — Lokale transactie-categorisatie · meetharnas</h1>
+      <p>Gemma via @huggingface/transformers + WebGPU. Wegwerp-spikecode, los van de TriFinity-app. Meet: accuracy, kalibratie, download/laadtijd, doorvoer, stabiliteit, capability, output-validiteit.</p>
+    </header>
+    <main>
+      <section id="capability">
+        <h2>1 · Capability-check (metriek 8)</h2>
+        <div id="capability-body" class="muted">Bezig met detecteren…</div>
+      </section>
+
+      <section id="loader">
+        <h2>2 · Model laden (metriek 4 · 5)</h2>
+        <div class="row">
+          <label>Model <select id="model-select"></select></label>
+          <button id="load-btn">Laad model</button>
+          <button id="clear-cache-btn" class="secondary">Cache wissen</button>
+        </div>
+        <div id="load-warning" class="warn"></div>
+        <div class="bar" style="margin:8px 0;"><div id="load-bar"></div></div>
+        <div id="load-status" class="muted">Nog geen model geladen.</div>
+        <details id="download-details" style="display:none;">
+          <summary>Download-uitsplitsing per bestand (dieet-diagnose)</summary>
+          <div id="download-body" class="scroll"></div>
+        </details>
+      </section>
+
+      <section id="runner">
+        <h2>3 · Dataset draaien (metriek 1 · 3 · 6 · 9)</h2>
+        <div class="row">
+          <label>Dataset <select id="dataset-select"></select></label>
+        </div>
+        <div id="dataset-status" class="muted" style="margin-bottom:8px;">Dataset laden…</div>
+        <div class="row">
+          <label>Batchgrootte <input id="batch-size" type="number" min="1" max="100" value="20" style="width:64px" /></label>
+          <label>Promptvariant (systeem-as)
+            <select id="variant-select">
+              <option value="full">full (echte app-prompt)</option>
+              <option value="compact">compact</option>
+            </select>
+          </label>
+          <label>Uitvoer (output-as)
+            <select id="output-select">
+              <option value="reasoning">met reasoning</option>
+              <option value="kort">kort (geen reasoning)</option>
+            </select>
+          </label>
+          <label>max_new_tokens <input id="max-tokens" type="number" min="128" max="4096" value="1728" style="width:80px" /> <span id="max-tokens-auto" class="muted" style="font-size:11px"></span></label>
+          <button id="run-btn" disabled>Draai dataset</button>
+        </div>
+        <div class="bar" style="margin:8px 0;"><div id="run-bar"></div></div>
+        <div id="run-status" class="muted">Laad eerst een model.</div>
+      </section>
+
+      <section id="report">
+        <h2>4 · Meetrapport</h2>
+        <div id="stability" class="muted" style="margin-bottom:10px;"></div>
+        <div id="metrics" class="muted">Nog geen run.</div>
+        <div class="row" style="margin-top:12px;">
+          <button id="export-btn" class="secondary" disabled>Export meetrapport (JSON)</button>
+          <span id="export-status" class="muted"></span>
+        </div>
+        <details id="batches-details" style="display:none;">
+          <summary>Per-batch-timings + ruwe output</summary>
+          <div id="batches-body" class="scroll"></div>
+        </details>
+        <details id="tx-details" style="display:none;">
+          <summary>Per-transactie-uitkomsten</summary>
+          <div id="tx-body" class="scroll"></div>
+        </details>
+      </section>
+    </main>
+    <script type="module" src="/main.ts"></script>
+  </body>
+</html>

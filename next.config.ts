@@ -10,6 +10,14 @@ import type { NextConfig } from "next";
  *   - connect *.supabase.co (REST/auth) + wss (Realtime); img data:/blob:/https:
  *     dekt Supabase-storage-avatars.
  *   - connect vitals.vercel-insights.com → Vercel Speed Insights (beacon).
+ *   - connect huggingface.co + *.hf.co → lokale privé-modus (ADR 0043): de
+ *     on-device Gemma 4 E2B-modeldownload haalt de config/tokenizer van
+ *     huggingface.co en de grote ONNX-shards van de LFS-/Xet-CDN's
+ *     (cdn-lfs*.huggingface.co en cas-bridge/transfer.xethub.hf.co →
+ *     afgedekt door de host-families *.huggingface.co / *.hf.co). Alleen nodig
+ *     wanneer een gebruiker de privé-modus aanzet. NB: self-hosten van de
+ *     modelgewichten onder onze eigen origin is de nettere eindoplossing (dan
+ *     kunnen deze HF-hosts wéér uit de CSP) — dat volgt in een latere fase.
  *   - worker blob: → PWA service worker; JSON-LD (faq) is data, geen script.
  * frame-ancestors 'self' i.c.m. X-Frame-Options SAMEORIGIN houdt de beheer-
  * mobielpreview-iframe (components/app/beheer/mobile-preview-frame.tsx) heel.
@@ -24,7 +32,7 @@ const CONTENT_SECURITY_POLICY = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data:",
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://challenges.cloudflare.com https://vitals.vercel-insights.com",
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://challenges.cloudflare.com https://vitals.vercel-insights.com https://huggingface.co https://*.huggingface.co https://*.hf.co",
   "frame-src https://challenges.cloudflare.com",
   "frame-ancestors 'self'",
   "worker-src 'self' blob:",

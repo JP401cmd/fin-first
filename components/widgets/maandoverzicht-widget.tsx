@@ -3,6 +3,7 @@ import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { formatWithFreedom } from '@/lib/format'
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
 
 interface Props {
@@ -11,13 +12,26 @@ interface Props {
   href?: string
 }
 
-function TrendArrow({ value }: { value: number }) {
-  if (value > 0) return <TrendingUp className="h-3 w-3 text-positive shrink-0" />
-  if (value < 0) return <TrendingDown className="h-3 w-3 text-negative shrink-0" />
-  return <Minus className="h-3 w-3 text-[var(--ink-4)] shrink-0" />
+// nl-NL getalnotatie (komma-decimaal) voor de weergaven in deze widget.
+function nlNum(value: number, decimals = 0): string {
+  return value.toLocaleString('nl-NL', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  })
 }
 
-function MiniSparkline({ data, color }: { data: number[]; color: string }) {
+// Trendpijl — alléén te gebruiken waar `value` een ECHTE maand-op-maand-Δ is
+// (Vermogen, Vrijheidsdagen). Niet voeden met een absoluut niveau of een vaste
+// drempel: dan suggereert de pijl een ontwikkeling die er niet is.
+function TrendArrow({ value, label }: { value: number; label: string }) {
+  const direction = value > 0 ? 'stijgt' : value < 0 ? 'daalt' : 'ongewijzigd'
+  const aria = `${label}: ${direction} t.o.v. vorige maand`
+  if (value > 0) return <TrendingUp className="h-3 w-3 text-positive shrink-0" role="img" aria-label={aria} />
+  if (value < 0) return <TrendingDown className="h-3 w-3 text-negative shrink-0" role="img" aria-label={aria} />
+  return <Minus className="h-3 w-3 text-[var(--ink-4)] shrink-0" role="img" aria-label={aria} />
+}
+
+function MiniSparkline({ data, color, label }: { data: number[]; color: string; label: string }) {
   if (data.length < 2) return null
   const min = Math.min(...data)
   const max = Math.max(...data)
@@ -31,7 +45,7 @@ function MiniSparkline({ data, color }: { data: number[]; color: string }) {
   }).join(' ')
 
   return (
-    <svg width={W} height={H} className="shrink-0" viewBox={`0 0 ${W} ${H}`}>
+    <svg width={W} height={H} className="shrink-0" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={label}>
       <polyline
         points={points}
         fill="none"
@@ -48,6 +62,9 @@ export const MaandoverzichtWidget = memo(function MaandoverzichtWidget({ size, d
   const { monthSummary, netWorthHistory } = data
   const { netWorthDelta, freedomDaysWon, savingsRate, budgetScore, prevMonthComparison } = monthSummary
   const deltaPositive = netWorthDelta >= 0
+  // Canoniek dagtarief uit de bundel — voor de "Geld is opgeslagen tijd"-vertaling
+  // van €-bedragen (geen eigen herberekening). 0 = geen vertaling tonen.
+  const dagtarief = data.dailyExpenseRate ?? 0
 
   // ── Mini: net month balance with color ──────────────
   if (size === 'mini') {
@@ -78,7 +95,7 @@ export const MaandoverzichtWidget = memo(function MaandoverzichtWidget({ size, d
           />
         </p>
         <p className={`mt-0.5 font-serif italic text-[11px] ${freedomDaysWon >= 0 ? 'text-positive' : 'text-negative'}`}>
-          {freedomDaysWon >= 0 ? '+' : ''}{freedomDaysWon} vrijheidsdagen
+          {freedomDaysWon >= 0 ? '+' : ''}{nlNum(freedomDaysWon)} vrijheidsdagen
         </p>
       </WidgetShell>
     )
@@ -93,7 +110,7 @@ export const MaandoverzichtWidget = memo(function MaandoverzichtWidget({ size, d
           <div>
             <div className="flex items-center gap-1">
               <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)]">Vermogen</p>
-              <TrendArrow value={netWorthDelta} />
+              <TrendArrow value={netWorthDelta} label="Vermogen" />
             </div>
             <p className={deltaPositive ? 'text-positive' : 'text-negative'}>
               <MaskedAmount
@@ -109,30 +126,24 @@ export const MaandoverzichtWidget = memo(function MaandoverzichtWidget({ size, d
           <div>
             <div className="flex items-center gap-1">
               <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)]">Vrijheidsdagen</p>
-              <TrendArrow value={freedomDaysWon} />
+              <TrendArrow value={freedomDaysWon} label="Vrijheidsdagen" />
             </div>
             <p className={`font-mono text-base font-semibold tabular-nums ${freedomDaysWon >= 0 ? 'text-positive' : 'text-negative'}`}>
-              {freedomDaysWon >= 0 ? '+' : ''}{freedomDaysWon}d
+              {freedomDaysWon >= 0 ? '+' : ''}{nlNum(freedomDaysWon)}d
             </p>
           </div>
 
-          {/* Spaarquote */}
+          {/* Spaarquote — absoluut niveau (6-mnd gemiddelde), geen maand-Δ: geen trendpijl */}
           <div>
-            <div className="flex items-center gap-1">
-              <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)]">Spaarquote · 6 mnd</p>
-              <TrendArrow value={savingsRate} />
-            </div>
+            <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)]">Spaarquote · 6 mnd</p>
             <p className="font-mono text-base font-semibold tabular-nums text-[var(--ink)]">
-              {savingsRate.toFixed(1)}%
+              {nlNum(savingsRate, 1)}%
             </p>
           </div>
 
-          {/* Budgetscore */}
+          {/* Budgetscore — absoluut niveau (0-100), geen maand-Δ: geen trendpijl */}
           <div>
-            <div className="flex items-center gap-1">
-              <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)]">Budgetscore</p>
-              <TrendArrow value={budgetScore - 50} />
-            </div>
+            <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)]">Budgetscore</p>
             <p className="font-mono text-base font-semibold tabular-nums text-[var(--ink)]">
               {budgetScore}<span className="text-xs text-[var(--ink-3)]">/100</span>
             </p>
@@ -187,7 +198,7 @@ export const MaandoverzichtWidget = memo(function MaandoverzichtWidget({ size, d
             <div>
               <div className="flex items-center justify-between">
                 <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)]">Vermogen</p>
-                <MiniSparkline data={histValues.slice(-6)} color={deltaPositive ? 'var(--positive)' : 'var(--negative)'} />
+                <MiniSparkline data={histValues.slice(-6)} color={deltaPositive ? 'var(--positive)' : 'var(--negative)'} label="Vermogensverloop laatste 6 maanden" />
               </div>
               <p className={deltaPositive ? 'text-positive' : 'text-negative'}>
                 <MaskedAmount
@@ -197,30 +208,29 @@ export const MaandoverzichtWidget = memo(function MaandoverzichtWidget({ size, d
                   className="text-2xl font-semibold"
                 />
               </p>
+              {dagtarief > 0 && (
+                <p className="mt-0.5 font-serif italic text-[11px] text-[var(--ink-3)]">
+                  {formatWithFreedom(netWorthDelta, dagtarief, { includeCurrency: false })}
+                </p>
+              )}
             </div>
             <div>
               <div className="flex items-center gap-1.5">
                 <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)]">Vrijheidsdagen</p>
-                <TrendArrow value={freedomDaysWon} />
+                <TrendArrow value={freedomDaysWon} label="Vrijheidsdagen" />
               </div>
               <p className={`font-mono text-2xl font-semibold tabular-nums ${freedomDaysWon >= 0 ? 'text-positive' : 'text-negative'}`}>
-                {freedomDaysWon >= 0 ? '+' : ''}{freedomDaysWon}d
+                {freedomDaysWon >= 0 ? '+' : ''}{nlNum(freedomDaysWon)}d
               </p>
             </div>
             <div>
-              <div className="flex items-center gap-1.5">
-                <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)]">Spaarquote · 6 mnd</p>
-                <TrendArrow value={savingsRate} />
-              </div>
+              <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)]">Spaarquote · 6 mnd</p>
               <p className="font-mono text-2xl font-semibold tabular-nums text-[var(--ink)]">
-                {savingsRate.toFixed(1)}%
+                {nlNum(savingsRate, 1)}%
               </p>
             </div>
             <div>
-              <div className="flex items-center gap-1.5">
-                <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)]">Budgetscore</p>
-                <TrendArrow value={budgetScore - 50} />
-              </div>
+              <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)]">Budgetscore</p>
               <p className="font-mono text-2xl font-semibold tabular-nums text-[var(--ink)]">
                 {budgetScore}<span className="text-sm text-[var(--ink-3)]">/100</span>
               </p>
@@ -233,7 +243,7 @@ export const MaandoverzichtWidget = memo(function MaandoverzichtWidget({ size, d
           <div className="grid grid-cols-4 gap-6">
             {bestBudget && (
               <div>
-                <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)] mb-1">Beste budget</p>
+                <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)] mb-1">Beste groep</p>
                 <p className="text-sm font-medium text-positive">{bestBudget.label}</p>
                 <p className="text-[var(--ink-3)]">
                   <MaskedAmount value={bestBudget.spent} tone="kern" className="text-xs" /> / <MaskedAmount value={bestBudget.limit} tone="kern" className="text-xs" />
@@ -242,7 +252,7 @@ export const MaandoverzichtWidget = memo(function MaandoverzichtWidget({ size, d
             )}
             {worstBudget && (
               <div>
-                <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)] mb-1">Aandachtspunt</p>
+                <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)] mb-1">Aandachtsgroep</p>
                 <p className="text-sm font-medium text-[var(--ink-2)]">{worstBudget.label}</p>
                 <p className="text-[var(--ink-3)]">
                   <MaskedAmount value={worstBudget.spent} tone="kern" className="text-xs" /> / <MaskedAmount value={worstBudget.limit} tone="kern" className="text-xs" />
@@ -263,7 +273,7 @@ export const MaandoverzichtWidget = memo(function MaandoverzichtWidget({ size, d
             <div>
               <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)] mb-1">vs. vorige maand</p>
               <p className={`font-mono text-sm font-semibold tabular-nums ${prevMonthComparison >= 0 ? 'text-positive' : 'text-negative'}`}>
-                {prevMonthComparison >= 0 ? '+' : ''}{prevMonthComparison.toFixed(1)}%
+                {prevMonthComparison >= 0 ? '+' : ''}{nlNum(prevMonthComparison, 1)}%
               </p>
             </div>
           </div>
@@ -280,7 +290,7 @@ export const MaandoverzichtWidget = memo(function MaandoverzichtWidget({ size, d
           <div>
             <div className="flex items-center justify-between">
               <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)]">Vermogen</p>
-              <MiniSparkline data={histValues.slice(-6)} color={deltaPositive ? 'var(--positive)' : 'var(--negative)'} />
+              <MiniSparkline data={histValues.slice(-6)} color={deltaPositive ? 'var(--positive)' : 'var(--negative)'} label="Vermogensverloop laatste 6 maanden" />
             </div>
             <p className={deltaPositive ? 'text-positive' : 'text-negative'}>
               <MaskedAmount
@@ -290,60 +300,60 @@ export const MaandoverzichtWidget = memo(function MaandoverzichtWidget({ size, d
                 className="text-lg font-semibold"
               />
             </p>
+            {dagtarief > 0 && (
+              <p className="mt-0.5 font-serif italic text-[10px] text-[var(--ink-3)]">
+                {formatWithFreedom(netWorthDelta, dagtarief, { includeCurrency: false })}
+              </p>
+            )}
           </div>
 
           <div>
             <div className="flex items-center justify-between">
               <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)]">Vrijheidsdagen</p>
-              <TrendArrow value={freedomDaysWon} />
+              <TrendArrow value={freedomDaysWon} label="Vrijheidsdagen" />
             </div>
             <p className={`font-mono text-lg font-semibold tabular-nums ${freedomDaysWon >= 0 ? 'text-positive' : 'text-negative'}`}>
-              {freedomDaysWon >= 0 ? '+' : ''}{freedomDaysWon}d
+              {freedomDaysWon >= 0 ? '+' : ''}{nlNum(freedomDaysWon)}d
             </p>
           </div>
 
           <div>
-            <div className="flex items-center justify-between">
-              <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)]">Spaarquote · 6 mnd</p>
-              <TrendArrow value={savingsRate} />
-            </div>
+            <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)]">Spaarquote · 6 mnd</p>
             <p className="font-mono text-lg font-semibold tabular-nums text-[var(--ink)]">
-              {savingsRate.toFixed(1)}%
+              {nlNum(savingsRate, 1)}%
             </p>
           </div>
 
           <div>
-            <div className="flex items-center justify-between">
-              <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)]">Budgetscore</p>
-              <TrendArrow value={budgetScore - 50} />
-            </div>
+            <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)]">Budgetscore</p>
             <p className="font-mono text-lg font-semibold tabular-nums text-[var(--ink)]">
               {budgetScore}<span className="text-xs text-[var(--ink-3)]">/100</span>
             </p>
           </div>
         </div>
 
-        {/* Separator */}
-        <div className="border-t border-dashed border-[var(--border-ed)]" />
-
-        {/* Best & Worst budget */}
+        {/* Best & Worst budget — leidende separator hoort binnen de conditie, zodat
+            zonder budgetten geen dubbele streep ontstaat. */}
         {bestBudget && worstBudget && (
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)] mb-1">Beste budget</p>
-              <p className="text-sm font-medium text-positive">{bestBudget.label}</p>
-              <p className="text-[var(--ink-3)]">
-                <MaskedAmount value={bestBudget.spent} tone="kern" className="text-xs" /> / <MaskedAmount value={bestBudget.limit} tone="kern" className="text-xs" />
-              </p>
+          <>
+            <div className="border-t border-dashed border-[var(--border-ed)]" />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)] mb-1">Beste groep</p>
+                <p className="text-sm font-medium text-positive">{bestBudget.label}</p>
+                <p className="text-[var(--ink-3)]">
+                  <MaskedAmount value={bestBudget.spent} tone="kern" className="text-xs" /> / <MaskedAmount value={bestBudget.limit} tone="kern" className="text-xs" />
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)] mb-1">Aandachtsgroep</p>
+                <p className="text-sm font-medium text-[var(--ink-2)]">{worstBudget.label}</p>
+                <p className="text-[var(--ink-3)]">
+                  <MaskedAmount value={worstBudget.spent} tone="kern" className="text-xs" /> / <MaskedAmount value={worstBudget.limit} tone="kern" className="text-xs" />
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)] mb-1">Aandachtspunt</p>
-              <p className="text-sm font-medium text-[var(--ink-2)]">{worstBudget.label}</p>
-              <p className="text-[var(--ink-3)]">
-                <MaskedAmount value={worstBudget.spent} tone="kern" className="text-xs" /> / <MaskedAmount value={worstBudget.limit} tone="kern" className="text-xs" />
-              </p>
-            </div>
-          </div>
+          </>
         )}
 
         {/* Separator */}
@@ -366,7 +376,7 @@ export const MaandoverzichtWidget = memo(function MaandoverzichtWidget({ size, d
         <div className="flex items-center justify-between">
           <p className="text-xs text-[var(--ink-3)]">vs. vorige maand</p>
           <p className={`font-mono text-sm tabular-nums ${prevMonthComparison >= 0 ? 'text-positive' : 'text-negative'}`}>
-            {prevMonthComparison >= 0 ? '+' : ''}{prevMonthComparison.toFixed(1)}%
+            {prevMonthComparison >= 0 ? '+' : ''}{nlNum(prevMonthComparison, 1)}%
           </p>
         </div>
       </div>

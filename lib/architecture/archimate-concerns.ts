@@ -86,6 +86,14 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
     severity: 'debt',
     elementIds: ['as-planning', 'fn-toekomstplannen'],
   },
+  {
+    id: 'fragiele-webgpu-lokaal-ai',
+    title: 'Fragiele WebGPU-runtime in het lokale AI-pad',
+    detail:
+      'Reproduceerbare unaligned accesses-crash op echte data (batch 20) in het Gemma-4-PLE-pad (Transformers.js/WebGPU), met sessievergiftiging tot een paginaherlaad. Gemitigeerd met batch 10 + per-batch-vangnet + automatisch sessieherstel + geen-cloud-fallback (fail-closed) + review-UI-only (ADR 0043). Verwijder dit punt zodra de runtime gehard of vervangen is (bv. LiteRT-LM-migratie of upstream-fix).',
+    severity: 'debt',
+    elementIds: ['t-lokale-ai', 'as-import'],
+  },
 ]
 
 /** Aandachtspunten die een specifiek element raken. */

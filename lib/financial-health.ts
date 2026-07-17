@@ -150,6 +150,16 @@ function scoreSavingsRate(ratePercent: number): number {
   return Math.round(80 + ((ratePercent - 20) / 10) * 20)
 }
 
+/**
+ * Schuldratio als percentage (schuld / totaal vermogen × 100). Canonieke bron
+ * voor het schuld-aandeel-getal; consumenten (health-score, widgets) ronden of
+ * clampen zelf naar behoefte. Geen vermogen → 100% als er schuld is, anders 0%.
+ */
+export function debtRatioPercent(totalAssets: number, totalDebts: number): number {
+  if (totalAssets > 0) return (totalDebts / totalAssets) * 100
+  return totalDebts > 0 ? 100 : 0
+}
+
 /** Schuldratio: debt-to-asset ratio. 0% = 100, 50% = 50, 100%+ = 0 */
 function scoreDebtRatio(totalAssets: number, totalDebts: number): number {
   if (totalAssets <= 0) return totalDebts > 0 ? 0 : 50 // no assets no debts = neutral
@@ -524,9 +534,7 @@ export function computeHealthScoreFromInputs(
 
   // Schuldratio — always has a value.
   const debtRatioScore = scoreDebtRatio(input.totalAssets, input.totalDebts)
-  const debtRatio = input.totalAssets > 0
-    ? Math.round((input.totalDebts / input.totalAssets) * 100)
-    : (input.totalDebts > 0 ? 100 : 0)
+  const debtRatio = Math.round(debtRatioPercent(input.totalAssets, input.totalDebts))
 
   // FIRE-voortgang — always has a value.
   const fireScore = scoreFireProgress(input.freedomPct)

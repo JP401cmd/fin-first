@@ -89,6 +89,7 @@ const mockData: DashboardData = {
   sovereigntyLevel: 2,
   currentPhaseId: 'stability',
   monthsCovered: 25,
+  sovereigntyMonthsCovered: 25,
   hasConsumerDebt: false,
   recommendations: 3,
   goals: 1,
@@ -167,6 +168,7 @@ const mockData: DashboardData = {
   heatmapExpenseGroups: [],
   heatmapSpending: {},
   heatmapBeschikbaarMap: {},
+  heatmapPreviousSpending: {},
 }
 
 const makePrefs = (ids: string[], sizes: ('half' | 'full' | 'xl')[] = []): WidgetPref[] =>

@@ -79,12 +79,18 @@ interface HeatmapConstants {
 
 function getHeatmapConstants(size?: WidgetSize): HeatmapConstants {
   switch (size) {
-    case 'mini':
-      return { VB_W: 200, VB_H: 100, CELL_GAP: 1, CELL_RADIUS: 3, SECTION_LABEL_H: 0 }
+    // NB: 'mini' rendert BudgetHeatmap niet — de widget toont daar bewust een
+    // categorie-telling i.p.v. een kleur-only mini-treemap (na de overflow-fix,
+    // commit edd7ca08). Er is daarom geen 'mini'-constantenpad meer.
     case 'quarter':
       return { VB_W: 400, VB_H: 300, CELL_GAP: 2, CELL_RADIUS: 4, SECTION_LABEL_H: 12 }
     case 'half':
       return { VB_W: 800, VB_H: 250, CELL_GAP: 2, CELL_RADIUS: 5, SECTION_LABEL_H: 14 }
+    case 'xl':
+      // Double (lg: 4 kolommen × 2 rijen) = dubbele breedte t.o.v. full bij
+      // gelijke hoogte → bredere viewBox (aspect ~3.2) zodat de cellen groter en
+      // labelrijker worden i.p.v. verticaal te stapelen.
+      return { VB_W: 1600, VB_H: 500, CELL_GAP: 3, CELL_RADIUS: 6, SECTION_LABEL_H: 18 }
     case 'full':
     default:
       return { VB_W: 800, VB_H: 500, CELL_GAP: 3, CELL_RADIUS: 6, SECTION_LABEL_H: 18 }
@@ -677,28 +683,40 @@ function TreemapCell({
   const overPositive = isOverPositive(budgetType)
   const isOver = rect.spent > rect.limit && rect.limit > 0
 
-  // Determine what text fits inside the cell — adjusted per widget size
-  const isMini = size === 'mini'
+  // Determine what text fits inside the cell — adjusted per widget size.
+  // xl deelt de label-rijkdom van full (grotere cellen, dus icoon + bedrag).
   const isQuarter = size === 'quarter'
-  const isFull = size === 'full'
+  const isFull = size === 'full' || size === 'xl'
 
-  const canFitIcon = !isMini && !isQuarter && rect.w > 50 && rect.h > 50
-  const canFitName = !isMini && (isQuarter ? rect.w > 25 && rect.h > 18 : rect.w > 40 && rect.h > 30)
-  const canFitPct = !isMini && (isQuarter ? rect.w > 20 && rect.h > 14 : rect.w > 30 && rect.h > 20)
+  const canFitIcon = !isQuarter && rect.w > 50 && rect.h > 50
+  const canFitName = isQuarter ? rect.w > 25 && rect.h > 18 : rect.w > 40 && rect.h > 30
+  const canFitPct = isQuarter ? rect.w > 20 && rect.h > 14 : rect.w > 30 && rect.h > 20
   const canFitAmount = isFull && rect.w > 70 && rect.h > 55
 
   // Text color: use white with shadow for readability on colored backgrounds
   const textShadow = '0 1px 2px rgba(0,0,0,0.3)'
 
-  // Mini: faster stagger (15ms vs 40ms), no hover/interaction
-  const staggerDelay = isMini ? rect.index * 15 : rect.index * 40
+  const staggerDelay = rect.index * 40
+
+  // Desktop treemap-cellen zijn volwaardig toetsenbord-bedienbaar (parity met de
+  // mobiele <button>-variant): role/tabIndex/aria-label + Enter/Space.
+  const ariaLabel = `${rect.name}, ${pct}% van budget besteed`
 
   return (
     <g
       className="cursor-pointer"
-      onMouseEnter={isMini ? undefined : onMouseEnter}
-      onMouseLeave={isMini ? undefined : onMouseLeave}
+      role="button"
+      tabIndex={0}
+      aria-label={ariaLabel}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
       onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onClick()
+        }
+      }}
     >
       {/* Background rect */}
       <rect
@@ -709,8 +727,8 @@ function TreemapCell({
         rx={cellRadius}
         ry={cellRadius}
         fill={color}
-        stroke={isMini ? 'rgba(255,255,255,0.3)' : (isHovered ? 'var(--ink)' : 'rgba(255,255,255,0.4)')}
-        strokeWidth={isMini ? 0.3 : (isHovered ? 2 : 0.5)}
+        stroke={isHovered ? 'var(--ink)' : 'rgba(255,255,255,0.4)'}
+        strokeWidth={isHovered ? 2 : 0.5}
         style={{
           opacity: hasEntered ? 1 : 0,
           transform: hasEntered ? 'scale(1)' : 'scale(0.92)',
@@ -719,20 +737,19 @@ function TreemapCell({
         }}
       />
 
-      {/* Cell content via foreignObject — skip entirely at mini for clean color-only blocks */}
-      {!isMini && (
-        <foreignObject
-          x={rect.x}
-          y={rect.y}
-          width={rect.w}
-          height={rect.h}
-          style={{
-            opacity: hasEntered ? 1 : 0,
-            transition: `opacity 0.4s ease-out ${staggerDelay + 100}ms`,
-            pointerEvents: 'none',
-          }}
-        >
-          <div
+      {/* Cell content via foreignObject */}
+      <foreignObject
+        x={rect.x}
+        y={rect.y}
+        width={rect.w}
+        height={rect.h}
+        style={{
+          opacity: hasEntered ? 1 : 0,
+          transition: `opacity 0.4s ease-out ${staggerDelay + 100}ms`,
+          pointerEvents: 'none',
+        }}
+      >
+        <div
             // @ts-expect-error xmlns required for foreignObject but not in React types
             xmlns="http://www.w3.org/1999/xhtml"
             className="flex h-full w-full flex-col items-center justify-center overflow-hidden px-1 py-0.5"
@@ -778,7 +795,6 @@ function TreemapCell({
             )}
           </div>
         </foreignObject>
-      )}
     </g>
   )
 }
@@ -861,8 +877,8 @@ export const BudgetHeatmap = memo(function BudgetHeatmap({
     setTooltip(null)
   }, [])
 
-  const isMini = size === 'mini'
-  const isCompact = size === 'mini' || size === 'quarter'
+  // 'quarter' is te krap voor de hover-tooltip/mousemove (kleine cellen).
+  const isCompact = size === 'quarter'
 
   // Edge case: no sections with data
   const hasData = sections.some((s) => s.groups.length > 0)
@@ -883,8 +899,8 @@ export const BudgetHeatmap = memo(function BudgetHeatmap({
               opacity: hasEntered ? undefined : 0,
             }}
           >
-            {/* Section labels — hidden at mini, compact at quarter */}
-            {size !== 'mini' && labels.map((label) => (
+            {/* Section labels — compact at quarter */}
+            {labels.map((label) => (
               <text
                 key={`section-${label.budgetType}`}
                 x={label.x + 4}
@@ -897,8 +913,8 @@ export const BudgetHeatmap = memo(function BudgetHeatmap({
               </text>
             ))}
 
-            {/* Parent group outlines — only at half/full where there's room */}
-            {(size === 'half' || size === 'full' || !size) && parentOutlines.map(([pid, outline]) => (
+            {/* Parent group outlines — only at half/full/xl where there's room */}
+            {(size === 'half' || size === 'full' || size === 'xl' || !size) && parentOutlines.map(([pid, outline]) => (
               <g key={`outline-${pid}`}>
                 <rect
                   x={outline.minX - 1}
@@ -977,8 +993,8 @@ export const BudgetHeatmap = memo(function BudgetHeatmap({
         )}
       </div>
 
-      {/* Combined legend — only at full size where there's room (hidden at half — too compact) */}
-      {(size === 'full' || !size) && <CombinedHeatmapLegend />}
+      {/* Combined legend — only at full/xl size where there's room (hidden at half — too compact) */}
+      {(size === 'full' || size === 'xl' || !size) && <CombinedHeatmapLegend />}
     </div>
   )
 })

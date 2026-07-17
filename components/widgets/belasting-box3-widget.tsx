@@ -6,7 +6,7 @@ import { Receipt } from 'lucide-react'
 import type { DashboardData } from './widget-renderer'
 import { dailyExpenseRate } from '@/lib/format'
 import { NL_FICTIEF_BELEGGINGEN, BOX3_TARIEF } from '@/lib/constants'
-import { BOX3_PARAMS } from '@/lib/box3-data'
+import { BOX3_PARAMS, CURRENT_TAX_YEAR } from '@/lib/box3-data'
 
 interface Props {
   size: WidgetSize
@@ -14,40 +14,66 @@ interface Props {
   href?: string
 }
 
-// Heffingsvrij vermogen — single, zonder fiscaal partner. Single-sourced uit de
-// canonieke BOX3_PARAMS, op hetzelfde belastingjaar (2025) als waarmee de bundel
-// `box3Tax` wordt berekend (dashboard-data-loader gebruikt year: 2025).
-const BOX3_YEAR = 2025 as const
-const VRIJSTELLING = BOX3_PARAMS[BOX3_YEAR].heffingsvrijSingle
+// Heffingsvrij vermogen — single, zonder fiscaal partner, uit de canonieke
+// BOX3_PARAMS op het lopende belastingjaar (CURRENT_TAX_YEAR). Alleen gebruikt in
+// de fallback-(enkel-forfait) kassabon; wanneer de bundel `box3Breakdown` levert
+// consumeren we het echte heffingsvrije vermogen uit calculateBox3.
+const VRIJSTELLING = BOX3_PARAMS[CURRENT_TAX_YEAR].heffingsvrijSingle
 
 export const BelastingBox3Widget = memo(function BelastingBox3Widget({ size, data, href }: Props) {
-  const { totalAssets, monthlyExpenses, box3Tax } = data
+  const { totalAssets, monthlyExpenses, box3Tax, box3Breakdown } = data
 
-  // ── Box 3 breakdown calculation ──────────────────────────
-  // De HEADLINE (`estimatedTax`) komt uit de bundel-`box3Tax` (dual-forfait
-  // calculateBox3) wanneer beschikbaar — dat is het canonieke getal. De kassabon
-  // hieronder is een INDICATIEVE enkel-forfait-benadering (alles als beleggingen,
-  // geen spaargeld/schulden-splitsing); de Box 3-pagina toont de volledige
-  // dual-forfait-berekening. Het fallback-getal gebruikt dezelfde benadering.
-  const belastbaarVermogen = Math.max(totalAssets - VRIJSTELLING, 0)
-  const fictiefRendement = belastbaarVermogen * NL_FICTIEF_BELEGGINGEN
-  const estimatedTax = box3Tax ?? fictiefRendement * BOX3_TARIEF
-  const effectiefTarief = totalAssets > 0
-    ? (estimatedTax / totalAssets) * 100
-    : 0
+  // De HEADLINE komt uit de canonieke bundel-`box3Tax` (dual-forfait calculateBox3),
+  // identiek aan wat /overzicht/belasting/box3 toont. De kassabon consumeert waar
+  // mogelijk de dual-forfait breakdown (box3Breakdown) zodat de tussenrijen exact
+  // sluiten op dit getal; zonder breakdown (mock/fallback) tonen we een expliciete
+  // indicatie zonder misleidende ×-afleiding.
+  const bd = box3Breakdown ?? null
+
+  // Fallback enkel-forfait benadering (alleen als er geen breakdown beschikbaar is).
+  const fbBelastbaar = Math.max(totalAssets - VRIJSTELLING, 0)
+  const fbTax = fbBelastbaar * NL_FICTIEF_BELEGGINGEN * BOX3_TARIEF
+
+  const estimatedTax = box3Tax ?? bd?.tax ?? fbTax
+  const belastbaar = bd ? bd.grondslagSparen : fbBelastbaar
+  const effectiefTarief = totalAssets > 0 ? (estimatedTax / totalAssets) * 100 : 0
   // Canoniek 12-mnd rolling dagtarief uit de bundel (KRUIS-20); fallback voor mocks.
   const dailyExp = data.dailyExpenseRate ?? dailyExpenseRate(monthlyExpenses)
-  const vrijheidsdagen = dailyExp > 0
-    ? Math.round(estimatedTax / dailyExp)
-    : 0
+  const vrijheidsdagen = dailyExp > 0 ? Math.round(estimatedTax / dailyExp) : 0
+
+  // Lege staat: vermogen onder de vrijstelling (of geen vermogen) → geen Box 3.
+  const hasBox3 = estimatedTax > 0 && belastbaar > 0
 
   // ── Mini-size ────────────────────────────────────────────
   if (size === 'mini') {
     return (
       <WidgetShell module="kern" size="mini" kicker="Box 3 Belasting" href={href}>
         <p className="text-[var(--ink)] leading-none truncate">
-          <MaskedAmount value={estimatedTax} tone="kern" className="text-[15px] font-semibold" />
+          {hasBox3 ? (
+            <MaskedAmount value={estimatedTax} tone="kern" className="text-[15px] font-semibold" />
+          ) : (
+            <span className="text-[13px] font-medium text-[var(--ink-3)]">Geen Box 3</span>
+          )}
         </p>
+      </WidgetShell>
+    )
+  }
+
+  // ── Empty state (quarter/half/full) ──────────────────────
+  if (!hasBox3) {
+    return (
+      <WidgetShell module="kern" size={size} kicker="Box 3 Belasting" href={href}>
+        <div className="flex h-full flex-col items-center justify-center text-center gap-1.5 py-2">
+          <Receipt className="h-5 w-5 text-[var(--ink-4)] shrink-0" />
+          <p className="text-[13px] font-medium text-[var(--ink-2)]">Geen Box 3-belasting</p>
+          <p className="text-[11px] text-[var(--ink-3)] max-w-[22ch]">
+            Je vermogen blijft onder de vrijstelling van{' '}
+            <span className="font-mono tabular-nums">
+              <MaskedAmount value={VRIJSTELLING} tone="kern" />
+            </span>
+            .
+          </p>
+        </div>
       </WidgetShell>
     )
   }
@@ -103,16 +129,29 @@ export const BelastingBox3Widget = memo(function BelastingBox3Widget({ size, dat
   }
 
   // ── Full-size: kassabon-stijl breakdown ───────────────────
-  const breakdownRows: { label: string; value: ReactNode; accent?: boolean; bold?: boolean; separator?: boolean }[] = [
-    { label: 'Totaal vermogen', value: <MaskedAmount value={totalAssets} tone="kern" /> },
-    { label: 'Vrijstelling', value: <MaskedAmount value={VRIJSTELLING} signPrefix="-" tone="kern" /> },
-    { label: '', value: '', separator: true },
-    { label: 'Belastbaar vermogen', value: <MaskedAmount value={belastbaarVermogen} tone="kern" />, bold: true },
-    { label: `Fictief rendement (${(NL_FICTIEF_BELEGGINGEN * 100).toFixed(2)}%)`, value: <MaskedAmount value={fictiefRendement} tone="kern" /> },
-    { label: `Tarief (${(BOX3_TARIEF * 100).toFixed(0)}%)`, value: `× ${(BOX3_TARIEF * 100).toFixed(0)}%` },
-    { label: '', value: '', separator: true },
-    { label: 'Netto belasting', value: <MaskedAmount value={estimatedTax} tone="kern" />, bold: true, accent: true },
-  ]
+  // Consumeert de canonieke dual-forfait breakdown zodat de rijen exact sluiten op
+  // de getoonde Box 3-belasting: grondslagSparen × effectiefForfait × tarief == tax.
+  // Zonder breakdown (mock/fallback) tonen we een expliciete indicatie zonder de
+  // misleidende ×forfait/×tarief-afleiding.
+  const breakdownRows: { label: string; value: ReactNode; accent?: boolean; bold?: boolean; separator?: boolean }[] = bd
+    ? [
+        { label: 'Box 3-vermogen', value: <MaskedAmount value={bd.rendementsgrondslag} tone="kern" /> },
+        { label: 'Vrijstelling', value: <MaskedAmount value={bd.heffingsvrij} signPrefix="-" tone="kern" /> },
+        { label: '', value: '', separator: true },
+        { label: 'Belastbaar vermogen', value: <MaskedAmount value={bd.grondslagSparen} tone="kern" />, bold: true },
+        { label: `Fictief rendement (${(bd.effectiefForfait * 100).toFixed(2)}%)`, value: <MaskedAmount value={bd.box3Income} tone="kern" /> },
+        { label: `Tarief (${(bd.tarief * 100).toFixed(0)}%)`, value: `× ${(bd.tarief * 100).toFixed(0)}%` },
+        { label: '', value: '', separator: true },
+        { label: 'Box 3 belasting', value: <MaskedAmount value={bd.tax} tone="kern" />, bold: true, accent: true },
+      ]
+    : [
+        { label: 'Totaal vermogen', value: <MaskedAmount value={totalAssets} tone="kern" /> },
+        { label: 'Vrijstelling', value: <MaskedAmount value={VRIJSTELLING} signPrefix="-" tone="kern" /> },
+        { label: '', value: '', separator: true },
+        { label: 'Belastbaar vermogen', value: <MaskedAmount value={fbBelastbaar} tone="kern" />, bold: true },
+        { label: '', value: '', separator: true },
+        { label: 'Box 3 belasting (indicatie)', value: <MaskedAmount value={estimatedTax} tone="kern" />, bold: true, accent: true },
+      ]
 
   return (
     <WidgetShell module="kern" size={size} kicker="Box 3 Belasting" href={href}>
@@ -159,7 +198,9 @@ export const BelastingBox3Widget = memo(function BelastingBox3Widget({ size, dat
       </div>
 
       <p className="mt-2 text-[10px] text-[var(--ink-4)]">
-        Indicatieve benadering (enkel forfait). Bekijk de volledige Box 3-berekening voor de exacte heffing.
+        {bd
+          ? 'Dual-forfait berekening (spaargeld/beleggingen/schulden). Bekijk de volledige Box 3-berekening voor de details.'
+          : 'Indicatieve benadering. Bekijk de volledige Box 3-berekening voor de exacte heffing.'}
       </p>
       <p className="mt-1 font-serif italic text-[12px] text-[var(--ink-3)]">
         Bekijk volledige Box 3 berekening &rarr;
@@ -167,4 +208,3 @@ export const BelastingBox3Widget = memo(function BelastingBox3Widget({ size, dat
     </WidgetShell>
   )
 })
-

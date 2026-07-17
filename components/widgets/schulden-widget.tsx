@@ -4,6 +4,7 @@ import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import { calculateFreedomTime, formatFreedomTimeString, dailyExpenseRate } from '@/lib/format'
+import { debtRatioPercent } from '@/lib/financial-health'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import type { DashboardData } from './widget-renderer'
 import { Users, UserCheck } from 'lucide-react'
@@ -43,8 +44,13 @@ export const SchuldenWidget = memo(function SchuldenWidget({ size, data, href }:
   if (size === 'mini') {
     return (
       <WidgetShell module="kern" size="mini" kicker={kickerLabel} href={href}>
-        <p className="text-negative leading-none truncate">
-          <MaskedAmount value={totalDebts} tone="kern" className="text-[15px] font-semibold" />
+        <p className={`${totalDebts > 0 ? 'text-negative' : 'text-positive'} leading-none truncate`}>
+          <MaskedAmount
+            value={totalDebts}
+            signPrefix={totalDebts > 0 ? '-' : ''}
+            tone="kern"
+            className="text-[15px] font-semibold"
+          />
         </p>
       </WidgetShell>
     )
@@ -60,8 +66,11 @@ export const SchuldenWidget = memo(function SchuldenWidget({ size, data, href }:
     : null
   const freedomStr = freedomTime ? formatFreedomTimeString(freedomTime, 'short') : null
 
-  // Schuldratio: debt as proportion of total assets
-  const schuldRatio = totalAssets > 0 ? Math.min((totalDebts / totalAssets) * 100, 100) : (totalDebts > 0 ? 100 : 0)
+  // Schuldratio: schuld als aandeel van totaal vermogen — canonieke bron
+  // (debtRatioPercent, gedeeld met de gezondheidsscore om drift te voorkomen).
+  // Clamp op 100% voor balkbreedte + label.
+  const schuldRatio = Math.min(debtRatioPercent(totalAssets, totalDebts), 100)
+  const ratioLabel = `Schuldratio ${schuldRatio.toFixed(0)} procent`
 
   // ── Quarter-size: compact amount + freedom time + ratio bar ────
   if (size === 'quarter') {
@@ -92,12 +101,26 @@ export const SchuldenWidget = memo(function SchuldenWidget({ size, data, href }:
             </p>
           ) : null}
           {totalDebts > 0 && (
-            <div ref={barRef} className="mt-1.5 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
+            <>
+              <div className="mt-1.5 flex items-center justify-between text-[10px]">
+                <span className="text-[var(--ink-3)]">Schuldratio</span>
+                <span className="font-mono tabular-nums text-negative">{schuldRatio.toFixed(0)}%</span>
+              </div>
               <div
-                className="h-full rounded-full bg-negative/70"
-                style={{ width: hasEntered ? `${schuldRatio}%` : '0%', transition: barTransition }}
-              />
-            </div>
+                ref={barRef}
+                role="progressbar"
+                aria-label={ratioLabel}
+                aria-valuenow={Math.round(schuldRatio)}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                className="mt-0.5 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)]"
+              >
+                <div
+                  className="h-full rounded-full bg-negative/70"
+                  style={{ width: hasEntered ? `${schuldRatio}%` : '0%', transition: barTransition }}
+                />
+              </div>
+            </>
           )}
         </div>
       </WidgetShell>
@@ -146,7 +169,15 @@ export const SchuldenWidget = memo(function SchuldenWidget({ size, data, href }:
                     <span className="text-[var(--ink-3)]">Schuldratio</span>
                     <span className="font-mono tabular-nums text-negative">{schuldRatio.toFixed(0)}%</span>
                   </div>
-                  <div ref={barRef} className="flex h-1.5 w-full overflow-hidden rounded-full bg-[var(--subtle)]">
+                  <div
+                    ref={barRef}
+                    role="progressbar"
+                    aria-label={ratioLabel}
+                    aria-valuenow={Math.round(schuldRatio)}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    className="flex h-1.5 w-full overflow-hidden rounded-full bg-[var(--subtle)]"
+                  >
                     <div
                       className="h-full rounded-full bg-negative/70"
                       style={{ width: hasEntered ? `${schuldRatio}%` : '0%', transition: barTransition }}
@@ -203,7 +234,14 @@ export const SchuldenWidget = memo(function SchuldenWidget({ size, data, href }:
               <span className="text-[var(--ink-3)]">Schuldratio</span>
               <span className="font-mono tabular-nums text-negative">{schuldRatio.toFixed(0)}%</span>
             </div>
-            <div className="flex h-2 w-full overflow-hidden rounded-full bg-[var(--subtle)]">
+            <div
+              role="progressbar"
+              aria-label={ratioLabel}
+              aria-valuenow={Math.round(schuldRatio)}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              className="flex h-2 w-full overflow-hidden rounded-full bg-[var(--subtle)]"
+            >
               <div
                 className="h-full rounded-full bg-negative/70 transition-all duration-500"
                 style={{ width: `${schuldRatio}%` }}
@@ -228,14 +266,6 @@ export const SchuldenWidget = memo(function SchuldenWidget({ size, data, href }:
               )}
             </div>
           )}
-
-          {/* Net worth impact */}
-          <div className="flex justify-between text-[11px]">
-            <span className="text-[var(--ink-3)]">Na aflossing</span>
-            <span className="font-medium text-positive">
-              <MaskedAmount value={totalDebts} signPrefix="+" tone="kern" /> netto vermogen
-            </span>
-          </div>
 
           <p className="text-[11px] text-[var(--ink-3)]">
             Vrijheid die je terugkoopt

@@ -121,21 +121,36 @@ interface ComparisonBarProps {
   previous: number
   color: string
   hasEntered: boolean
+  /**
+   * Semantiek van de richting van het delta-%. Default `false` (omhoog = rood),
+   * correct voor Uitgaven. Zet `true` voor grootheden waar méér beter is
+   * (Inkomen, Netto): dan wordt omhoog groen/positief getoond.
+   */
+  higherIsBetter?: boolean
 }
 
-function ComparisonBar({ label, current, previous, color, hasEntered }: ComparisonBarProps) {
-  const maxVal = Math.max(current, previous, 1)
-  const currentPct = (current / maxVal) * 100
-  const previousPct = (previous / maxVal) * 100
-  const delta = previous > 0 ? ((current - previous) / previous) * 100 : 0
+function ComparisonBar({ label, current, previous, color, hasEntered, higherIsBetter = false }: ComparisonBarProps) {
+  // Grondslag op magnitude zodat een negatieve (tekort-)waarde een zichtbare balk
+  // krijgt i.p.v. te verdwijnen; het teken sturen we via kleur + het bedrag-label.
+  const maxVal = Math.max(Math.abs(current), Math.abs(previous), 1)
+  const currentPct = (Math.abs(current) / maxVal) * 100
+  const previousPct = (Math.abs(previous) / maxVal) * 100
+  const delta = previous !== 0 ? ((current - previous) / Math.abs(previous)) * 100 : 0
+  // Richting duiden: default omhoog = negatief (Uitgaven); higherIsBetter draait om.
+  const deltaUp = delta > 0
+  const deltaGood = higherIsBetter ? deltaUp : delta < 0
+  const deltaClass = delta === 0 ? 'text-[var(--ink-4)]' : deltaGood ? 'text-positive' : 'text-negative'
+  // Een negatieve waarde (tekortmaand) leest als rood, ongeacht de reekskleur.
+  const currentColor = current < 0 ? 'var(--color-negative)' : color
+  const previousColor = previous < 0 ? 'var(--color-negative)' : color
 
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between">
         <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">{label}</span>
-        {previous > 0 && (
-          <span className={`text-[10px] font-mono tabular-nums ${delta > 0 ? 'text-negative' : delta < 0 ? 'text-positive' : 'text-[var(--ink-4)]'}`}>
-            {delta > 0 ? '+' : ''}{Math.round(delta)}%
+        {previous !== 0 && (
+          <span className={`text-[10px] font-mono tabular-nums ${deltaClass}`}>
+            {deltaUp ? '+' : ''}{Math.round(delta)}%
           </span>
         )}
       </div>
@@ -146,9 +161,9 @@ function ComparisonBar({ label, current, previous, color, hasEntered }: Comparis
             className="w-full rounded-sm"
             style={{
               height: hasEntered ? `${currentPct}%` : '0%',
-              backgroundColor: color,
+              backgroundColor: currentColor,
               transition: hasEntered ? 'height 500ms cubic-bezier(.22,1,.36,1)' : 'none',
-              minHeight: current > 0 ? '2px' : '0',
+              minHeight: current !== 0 ? '2px' : '0',
             }}
           />
         </div>
@@ -158,9 +173,9 @@ function ComparisonBar({ label, current, previous, color, hasEntered }: Comparis
             className="w-full rounded-sm opacity-40"
             style={{
               height: hasEntered ? `${previousPct}%` : '0%',
-              backgroundColor: color,
+              backgroundColor: previousColor,
               transition: hasEntered ? 'height 500ms cubic-bezier(.22,1,.36,1) 100ms' : 'none',
-              minHeight: previous > 0 ? '2px' : '0',
+              minHeight: previous !== 0 ? '2px' : '0',
             }}
           />
         </div>
@@ -381,7 +396,7 @@ export const CashFlowWidget = memo(function CashFlowWidget({ size, data, href }:
             <span className="text-positive">
               <MaskedAmount value={monthlyIncome} signPrefix="+" tone="kern" />
             </span>
-            <span className="text-[var(--ink-4)]">ˆ’</span>
+            <span className="text-[var(--ink-4)]">−</span>
             <span className="text-negative">
               <MaskedAmount value={monthlyExpenses} tone="kern" />
             </span>
@@ -411,6 +426,7 @@ export const CashFlowWidget = memo(function CashFlowWidget({ size, data, href }:
                   previous={prevMonthIncome}
                   color="var(--color-income-400)"
                   hasEntered={hasEntered}
+                  higherIsBetter
                 />
                 <ComparisonBar
                   label="Uitgaven"
@@ -421,10 +437,11 @@ export const CashFlowWidget = memo(function CashFlowWidget({ size, data, href }:
                 />
                 <ComparisonBar
                   label="Netto"
-                  current={Math.max(cashFlow, 0)}
-                  previous={Math.max(prevCashFlow, 0)}
+                  current={cashFlow}
+                  previous={prevCashFlow}
                   color="var(--color-savings-400)"
                   hasEntered={hasEntered}
+                  higherIsBetter
                 />
               </div>
               {/* Legend */}

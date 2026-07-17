@@ -8,6 +8,7 @@ import { checkCreditBudget, creditLimitMessage } from '@/lib/ai/credit-gate'
 import { sanitizeForAI } from '@/lib/ai/sanitize'
 import {
   buildCategorizeSystemPrompt,
+  buildCategorizeUserPrompt,
   type CategorizeBudgetOption,
 } from '@/lib/ai/categorize-system-prompt'
 import { buildBudgetOptions, resolveSlug, type BudgetRow } from './budget-options'
@@ -38,6 +39,50 @@ export async function POST(req: Request) {
 
   if (!user) {
     return new Response('Unauthorized', { status: 401 })
+  }
+
+  // ── Privé-modus gate (laag 3 uit het plan — server-side, beslissend) ───────
+  // FR-1.2: staat privé-modus aan, dan mag transactiedata dit toestel niet
+  // richting een externe AI-provider verlaten. We blokkeren hier — direct ná
+  // de auth-check en VÓÓR de tier-/credit-gate en getModel/promptopbouw.
+  //
+  // Volgorde-beslissing (privé-modus eerst, vóór tier én credit):
+  //  1. Privé-modus is de meest fundamentele, expliciete data-soevereiniteits-
+  //     keuze van de gebruiker ("mijn data verlaat dit toestel niet"). Die hoort
+  //     vóór commerciële gating te komen: de eerlijke, actiegerichte reden is
+  //     "privé-modus staat aan", niet "je mist een tier" of "je credits zijn op".
+  //  2. Geen credits verbruiken voor een call die het model per definitie nooit
+  //     bereikt (checkCreditBudget staat ná de tier-gate; door hiervóór te
+  //     blokkeren raken we geen credit-bucket aan).
+  //  3. Geen tier-/credit-fout die de werkelijke oorzaak maskeert: we geven een
+  //     eigen, stabiele code `privacy_mode_active` (niet de generieke tier-403),
+  //     zodat de client de privé-blokkade eenduidig kan herkennen.
+  //  4. Garandeert FR-1.2 letterlijk: retour vóórdat enige transactiedata de
+  //     promptopbouw of getModel() bereikt (die stappen komen pas later).
+  //
+  // Own-row read via de anon/RLS-client (auth.uid() = id), NOOIT service-role —
+  // spiegelt app/api/display-mode. Eén minimale scalar-select (`privacy_mode`).
+  // Defensief: de kolom kan in oudere omgevingen nog ontbreken (de migratie
+  // loopt parallel). Bij een leesfout (kolom bestaat nog niet) of ontbrekende
+  // waarde vallen we terug op `false` — bestaand cloud-gedrag — zodat de route
+  // niet breekt vóór de migratie is toegepast (zelfde defensieve default als
+  // `ai_enabled` in lib/dashboard-data-loader.ts). Pre-migratie kán geen enkele
+  // gebruiker privacy_mode=true hebben, dus deze fail-open honoreert geen
+  // bestaande privacy-voorkeur ten onrechte.
+  const { data: privacyRow } = await supabase
+    .from('profiles')
+    .select('privacy_mode')
+    .eq('id', user.id)
+    .maybeSingle()
+  const privacyMode = (privacyRow as { privacy_mode?: boolean | null } | null)?.privacy_mode ?? false
+  if (privacyMode) {
+    return Response.json(
+      {
+        error: 'Privé-modus actief: categorisatie draait lokaal op je apparaat.',
+        code: 'privacy_mode_active',
+      },
+      { status: 403 },
+    )
   }
 
   const tierGate = await checkTierGate(supabase, user.id, 'ai')
@@ -114,16 +159,22 @@ export async function POST(req: Request) {
   }))
   const system = buildCategorizeSystemPrompt(sanitizedOptions)
 
-  const prompt = `Categoriseer de volgende ${batch.length} transacties.\nRetourneer een array van exact ${batch.length} items in dezelfde volgorde.\n\n${batch.map((tx, i) => {
-    const parts = [
-      `beschrijving: ${sanitizeForAI(tx.description ?? '')}`,
-      tx.counterparty_name ? `tegenpartij: ${sanitizeForAI(tx.counterparty_name)}` : null,
-      `bedrag: ${tx.amount > 0 ? '+' : ''}${tx.amount}`,
-      tx.date ? `datum: ${tx.date}` : null,
-      tx.reference ? `referentie: ${sanitizeForAI(tx.reference)}` : null,
-    ].filter(Boolean)
-    return `${i + 1}. ${parts.join('\n   ')}`
-  }).join('\n\n')}`
+  // Transactievelden zijn user-content → sanitizen vóór ze het model bereiken
+  // (zelfde discipline als de budgetnamen hierboven). De opbouw van de
+  // user-message zelf leeft nu in buildCategorizeUserPrompt (single source of
+  // truth, gedeeld met het lokale privé-modus-pad); we voeden 'm de AL
+  // gesaniteerde velden zodat de prompt byte-voor-byte gelijk blijft aan de
+  // oude inline-opbouw (cloud-gedrag ongewijzigd — geborgd door een
+  // equivalentietest).
+  const prompt = buildCategorizeUserPrompt(
+    batch.map((tx) => ({
+      description: sanitizeForAI(tx.description ?? ''),
+      counterparty_name: tx.counterparty_name ? sanitizeForAI(tx.counterparty_name) : null,
+      amount: tx.amount,
+      date: tx.date ?? null,
+      reference: tx.reference ? sanitizeForAI(tx.reference) : null,
+    })),
+  )
 
   let object: z.infer<typeof categorizationSchema>
   try {

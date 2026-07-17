@@ -3,7 +3,7 @@ import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import { calculateFreedomTime, formatFreedomTimeString, dailyExpenseRate } from '@/lib/format'
 import { MaskedAmount } from '@/components/app/masked-amount'
-import { RefreshCcw, Home, ShoppingCart, Car, Zap, Heart, Smartphone, CreditCard, HelpCircle } from 'lucide-react'
+import { RefreshCcw, Home, Car, Zap, Heart, CreditCard } from 'lucide-react'
 import type { DashboardData, TopRecurringTransaction } from './widget-renderer'
 
 interface Props {
@@ -12,36 +12,23 @@ interface Props {
   href?: string
 }
 
-// ── Category classification ──────────────────────────────────
-// Subscriptions: digital/recurring services
-const ABONNEMENT_CATEGORIES = ['abonnement', 'telecom', 'streaming', 'software', 'app']
-// Fixed costs: housing, insurance, utilities, transport, groceries, and everything else
-const VASTE_LASTEN_CATEGORIES = ['wonen', 'verzekering', 'energie', 'vervoer', 'boodschappen']
-
-function isAbonnement(category: string | null): boolean {
-  if (!category) return false
-  const key = category.toLowerCase()
-  return ABONNEMENT_CATEGORIES.some(c => key.includes(c))
-}
-
 // ── Category icons ───────────────────────────────────────────
+// Gemapt op de canonieke RecurringCategory (lib/recurring-detection.ts), niet op
+// budgetnaam — zelfde grondslag als de vaste-lasten-pagina.
 
 const CATEGORY_ICONS: Record<string, React.ReactNode> = {
-  wonen: <Home className="h-3.5 w-3.5 text-kern-500" />,
-  boodschappen: <ShoppingCart className="h-3.5 w-3.5 text-kern-500" />,
-  vervoer: <Car className="h-3.5 w-3.5 text-kern-500" />,
-  energie: <Zap className="h-3.5 w-3.5 text-kern-500" />,
-  verzekering: <Heart className="h-3.5 w-3.5 text-kern-500" />,
-  telecom: <Smartphone className="h-3.5 w-3.5 text-kern-500" />,
-  abonnement: <CreditCard className="h-3.5 w-3.5 text-kern-500" />,
+  rent: <Home className="h-3.5 w-3.5 text-kern-500" />,
+  mortgage: <Home className="h-3.5 w-3.5 text-kern-500" />,
+  housing_other: <Home className="h-3.5 w-3.5 text-kern-500" />,
+  utility: <Zap className="h-3.5 w-3.5 text-kern-500" />,
+  transport: <Car className="h-3.5 w-3.5 text-kern-500" />,
+  insurance: <Heart className="h-3.5 w-3.5 text-kern-500" />,
+  healthcare: <Heart className="h-3.5 w-3.5 text-kern-500" />,
+  subscription: <CreditCard className="h-3.5 w-3.5 text-kern-500" />,
 }
 
 function getCategoryIcon(category: string | null) {
-  if (!category) return <HelpCircle className="h-3.5 w-3.5 text-[var(--ink-4)]" />
-  const key = category.toLowerCase()
-  for (const [k, icon] of Object.entries(CATEGORY_ICONS)) {
-    if (key.includes(k)) return icon
-  }
+  if (category && CATEGORY_ICONS[category]) return CATEGORY_ICONS[category]
   return <RefreshCcw className="h-3.5 w-3.5 text-[var(--ink-4)]" />
 }
 
@@ -79,9 +66,9 @@ export const VasteLastenWidget = memo(function VasteLastenWidget({ size, data, h
     ? Math.round(totalRecurringAmount / dailyExp)
     : 0
 
-  // Split transactions into two groups
-  const abonnementen = topRecurringTransactions.filter(t => isAbonnement(t.category))
-  const overigeVasteLasten = topRecurringTransactions.filter(t => !isAbonnement(t.category))
+  // Canonieke split: abonnement vs. overige vaste last (bron: loadVasteLastenSummary).
+  const abonnementen = topRecurringTransactions.filter(t => t.isSubscription)
+  const overigeVasteLasten = topRecurringTransactions.filter(t => !t.isSubscription)
 
   // ── Mini-size ────────────────────────────────────────────
   if (size === 'mini') {
@@ -94,19 +81,33 @@ export const VasteLastenWidget = memo(function VasteLastenWidget({ size, data, h
     )
   }
 
-  // ── Quarter-size: compact count + icon ────
+  // ── Quarter-size: bedrag (geen metric-sprong t.o.v. mini) + aantal als context ────
   if (size === 'quarter') {
     return (
       <WidgetShell module="kern" size={size} kicker="Vaste Lasten" href={href}>
-        <div className="flex items-center gap-1.5">
-          <RefreshCcw className="h-3.5 w-3.5 text-kern-500 shrink-0" />
-          <p className="font-mono text-lg font-semibold tabular-nums text-[var(--ink)]">
-            {recurringTransactions}
+        <p className="text-[var(--ink)] leading-none">
+          <MaskedAmount value={totalRecurringAmount} tone="kern" className="text-lg font-semibold" />
+        </p>
+        <p className="mt-0.5 text-[11px] text-[var(--ink-3)]">
+          per maand
+          {recurringTransactions > 0 && (
+            <> &middot; {recurringTransactions} {recurringTransactions === 1 ? 'post' : 'posten'}</>
+          )}
+        </p>
+      </WidgetShell>
+    )
+  }
+
+  // ── Lege staat (half & full) ─────────────────────────────
+  if (topRecurringTransactions.length === 0 && totalRecurringAmount === 0) {
+    return (
+      <WidgetShell module="kern" size={size} kicker="Vaste Lasten" href={href}>
+        <div className="flex h-full flex-col justify-center">
+          <p className="text-sm text-[var(--ink-2)]">Nog geen vaste lasten herkend.</p>
+          <p className="mt-1 text-[11px] text-[var(--ink-4)]">
+            Zodra terugkerende betalingen zijn gedetecteerd, verschijnen ze hier.
           </p>
         </div>
-        <p className="mt-0.5 text-[11px] text-[var(--ink-3)]">
-          {recurringTransactions === 1 ? 'vaste last' : 'vaste lasten'}
-        </p>
       </WidgetShell>
     )
   }
@@ -156,8 +157,8 @@ export const VasteLastenWidget = memo(function VasteLastenWidget({ size, data, h
     ? Math.round((totalRecurringAmount / monthlyIncome) * 100)
     : null
 
-  const abonnementenItems = abonnementen.slice(0, 5)
-  const overigeItems = overigeVasteLasten.slice(0, 6)
+  const abonnementenItems = abonnementen.slice(0, 6)
+  const overigeItems = overigeVasteLasten.slice(0, 8)
 
   return (
     <WidgetShell module="kern" size={size} kicker="Vaste Lasten" href={href}>

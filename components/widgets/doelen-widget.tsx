@@ -6,7 +6,7 @@ import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData, TopGoal } from './widget-renderer'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
-import { getGoalColorClasses } from '@/lib/goal-data'
+import { getGoalColorClasses, computeGoalProgress, type GoalType } from '@/lib/goal-data'
 import { Target } from 'lucide-react'
 
 interface Props {
@@ -15,10 +15,21 @@ interface Props {
   href?: string
 }
 
+/**
+ * Consume-don't-recompute: de doelvoortgang komt uit de CANONIEKE, richting-
+ * bewuste `computeGoalProgress()` (`lib/goal-data.ts`) — niet uit een lokale
+ * som. Cruciaal voor `direction:'down'`-types (bv. `fire_age`), waar hoger NIET
+ * beter is; een naïeve `current/target` zou daar structureel op 100% klemmen en
+ * afwijken van het doel-scherm (`/toekomst`). `TopGoal` draagt alle velden die
+ * de canonieke functie leest.
+ */
 function goalPct(goal: TopGoal): number {
-  return goal.target_value > 0
-    ? Math.min(Math.round((goal.current_value / goal.target_value) * 100), 100)
-    : 0
+  return computeGoalProgress({
+    goal_type: goal.goal_type as GoalType,
+    current_value: goal.current_value,
+    target_value: goal.target_value,
+    target_date: goal.target_date,
+  }).pct
 }
 
 function isOverdue(goal: TopGoal): boolean {
@@ -64,7 +75,14 @@ function GoalProgressRow({ goal, index, hasEntered }: { goal: TopGoal; index: nu
       </div>
 
       {/* Voortgangsbalk */}
-      <div className="h-[5px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
+      <div
+        role="progressbar"
+        aria-label={`Voortgang ${goal.name}`}
+        aria-valuenow={pct}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        className="h-[5px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]"
+      >
         <div
           className={`h-full rounded-full ${overdue ? 'bg-negative' : colors.bar}`}
           style={{
@@ -88,15 +106,12 @@ function GoalProgressRow({ goal, index, hasEntered }: { goal: TopGoal; index: nu
 
 // ── Lege staat ────────────────────────────────────────────────
 
-function EmptyState({ full }: { full?: boolean }) {
+function EmptyState() {
   return (
-    <div className={`flex flex-col items-center justify-center text-center ${full ? 'py-8' : 'py-4'}`}>
-      {full && (
-        <div className="h-12 w-12 rounded-full bg-horizon-50 flex items-center justify-center mb-2">
-          <Target className="h-6 w-6 text-horizon-200" />
-        </div>
-      )}
-      {!full && <Target className="h-7 w-7 text-horizon-200 mb-2" />}
+    <div className="flex flex-col items-center justify-center text-center py-8">
+      <div className="h-12 w-12 rounded-full bg-wil-50 flex items-center justify-center mb-2">
+        <Target className="h-6 w-6 text-wil-200" />
+      </div>
       <p className="text-sm text-[var(--ink-3)]">Nog geen doelen ingesteld</p>
       <p className="font-serif italic text-[11px] text-[var(--ink-4)] mt-0.5">
         Een doel maakt zichtbaar waar je vrijheid opbouwt.
@@ -158,7 +173,14 @@ export const DoelenWidget = memo(function DoelenWidget({ size, data, href }: Pro
           <p className={`mt-0.5 font-mono text-lg font-semibold tabular-nums ${pctColor}`}>
             {pct}%
           </p>
-          <div className="mt-1 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
+          <div
+            role="progressbar"
+            aria-label={`Voortgang ${goal.name}`}
+            aria-valuenow={pct}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            className="mt-1 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]"
+          >
             <div
               className={`h-full rounded-full ${overdue ? 'bg-negative' : colors.bar}`}
               style={{
@@ -212,7 +234,14 @@ export const DoelenWidget = memo(function DoelenWidget({ size, data, href }: Pro
                           {pct}%
                         </span>
                       </div>
-                      <div className="mt-0.5 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
+                      <div
+                        role="progressbar"
+                        aria-label={`Voortgang ${goal.name}`}
+                        aria-valuenow={pct}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        className="mt-0.5 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]"
+                      >
                         <div
                           className={`h-full rounded-full ${overdue ? 'bg-negative' : colors.bar}`}
                           style={{
@@ -250,7 +279,7 @@ export const DoelenWidget = memo(function DoelenWidget({ size, data, href }: Pro
     <WidgetShell module="wil" size={size} kicker="Doelen" href={href}>
       <div ref={containerRef}>
         {topGoals.length === 0 ? (
-          <EmptyState full />
+          <EmptyState />
         ) : (
           <>
             {/* Summary row — compact */}

@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { translateAuthError, isUserAlreadyRegisteredError } from '@/lib/auth-errors'
+import { GoogleAuthButton } from '@/components/auth/google-auth-button'
 
 export default function SignupPage() {
   const [email, setEmail] = useState('')
@@ -11,6 +12,18 @@ export default function SignupPage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
+  // Vrijheidscheck-conversie: draagt het check-token door de aanmaakflow heen
+  // (e-mailbevestiging óf Google-OAuth), zodat de gebruiker na inloggen op
+  // /check/activeren landt en de intake wordt overgezet naar het nieuwe account.
+  // In een effect gelezen (niet tijdens render) om hydration-mismatch te
+  // vermijden; OAuth/submit gebeuren pas ná mount, dus de waarde staat er dan.
+  const [checkNext, setCheckNext] = useState<string | null>(null)
+  useEffect(() => {
+    const checkToken = new URLSearchParams(window.location.search).get('check')
+    if (checkToken) {
+      setCheckNext(`/check/activeren?token=${encodeURIComponent(checkToken)}`)
+    }
+  }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -19,13 +32,7 @@ export default function SignupPage() {
 
     try {
       const supabase = createClient()
-      // Vrijheidscheck-conversie: draagt het check-token door de e-mailbevestiging
-      // heen, zodat de gebruiker na inloggen op /check/activeren landt en de intake
-      // wordt overgezet naar het nieuwe account.
-      const checkToken = new URLSearchParams(window.location.search).get('check')
-      const next = checkToken
-        ? `/check/activeren?token=${encodeURIComponent(checkToken)}`
-        : null
+      const next = checkNext
       const { error } = await supabase.auth.signUp({
         email,
         password,
@@ -113,9 +120,42 @@ export default function SignupPage() {
         <p className="mb-1 text-center text-sm italic text-zinc-600">
           Geld is opgeslagen tijd &mdash; we vertalen je geld naar jaren vrijheid.
         </p>
-        <p className="mb-6 text-center text-xs text-zinc-400">
+        <p className="mb-4 text-center text-xs text-zinc-400">
           Account aanmaken duurt een minuut, je profiel klaar in ~5 minuten.
         </p>
+
+        {/* Consent-zin (besluit 17) — dekt bewust BEIDE aanmaakpaden (e-mail én
+            Google). BOVEN beide knoppen geplaatst: de Google-knop is het eerste
+            interactieve element, dus in de leesvolgorde moet consent vóór élke
+            aanmaak-actie staan, niet erna. De links maken voorwaarden en
+            privacyverklaring expliciet vindbaar. */}
+        <p className="mb-5 text-center text-xs text-zinc-500">
+          Door een account aan te maken &mdash; met e-mail of via Google &mdash; ga
+          je akkoord met de{' '}
+          <Link href="/voorwaarden" className="underline hover:text-zinc-700">
+            voorwaarden
+          </Link>{' '}
+          en de{' '}
+          <Link href="/privacy" className="underline hover:text-zinc-700">
+            privacyverklaring
+          </Link>
+          .
+        </p>
+
+        {/* Aanmaken met Google boven het formulier — signInWithOAuth maakt bij
+            een onbekend account vanzelf een user aan (en logt een bestaand in).
+            checkNext draagt een lopende vrijheidscheck door de OAuth-flow heen. */}
+        <GoogleAuthButton
+          label="Aanmaken met Google"
+          loadingLabel="Account aanmaken…"
+          next={checkNext}
+        />
+
+        <div className="my-5 flex items-center gap-3">
+          <span className="h-px flex-1 bg-zinc-200" />
+          <span className="text-xs uppercase tracking-[0.08em] text-zinc-400">of</span>
+          <span className="h-px flex-1 bg-zinc-200" />
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -164,21 +204,6 @@ export default function SignupPage() {
           >
             {loading ? 'Account aanmaken...' : 'Registreren'}
           </button>
-
-          {/* Consent-zin (besluit 17): akkoord via registratie zelf, geen los
-              vinkje — de links maken de voorwaarden en privacyverklaring
-              expliciet vindbaar. */}
-          <p className="text-center text-xs text-zinc-500">
-            Door te registreren ga je akkoord met de{' '}
-            <Link href="/voorwaarden" className="underline hover:text-zinc-700">
-              voorwaarden
-            </Link>{' '}
-            en de{' '}
-            <Link href="/privacy" className="underline hover:text-zinc-700">
-              privacyverklaring
-            </Link>
-            .
-          </p>
         </form>
 
         <p className="mt-6 text-center text-sm text-zinc-600">

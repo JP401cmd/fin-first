@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-13T21:19:07.416Z",
-  "generatedDate": "2026-07-13",
+  "generatedAt": "2026-07-16T22:34:10.831Z",
+  "generatedDate": "2026-07-16",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -189,11 +189,11 @@
   "stats": {
     "routes": 141,
     "routesProduction": 100,
-    "api": 248,
-    "tables": 59,
-    "migrations": 132,
-    "integrations": 25,
-    "components": 827,
+    "api": 250,
+    "tables": 60,
+    "migrations": 134,
+    "integrations": 24,
+    "components": 836,
     "providers": 11,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -3620,6 +3620,15 @@
       ]
     },
     {
+      "url": "/api/privacy-mode",
+      "file": "app/api/privacy-mode/route.ts",
+      "domain": "privacy-mode",
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
       "url": "/api/questionnaires",
       "file": "app/api/questionnaires/route.ts",
       "domain": "questionnaires",
@@ -3900,6 +3909,14 @@
       "url": "/api/subscriptions/schedule-action",
       "file": "app/api/subscriptions/schedule-action/route.ts",
       "domain": "subscriptions",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "url": "/api/sync/daily-open",
+      "file": "app/api/sync/daily-open/route.ts",
+      "domain": "sync",
       "methods": [
         "POST"
       ]
@@ -6453,6 +6470,22 @@
       ]
     },
     {
+      "domain": "privacy-mode",
+      "label": "privacy-mode",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/privacy-mode",
+          "file": "app/api/privacy-mode/route.ts",
+          "domain": "privacy-mode",
+          "methods": [
+            "GET",
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "rebalancing",
       "label": "rebalancing",
       "count": 1,
@@ -6574,6 +6607,21 @@
             "GET",
             "PUT",
             "DELETE"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "sync",
+      "label": "sync",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/sync/daily-open",
+          "file": "app/api/sync/daily-open/route.ts",
+          "domain": "sync",
+          "methods": [
+            "POST"
           ]
         }
       ]
@@ -6923,6 +6971,10 @@
         "migration": "supabase/migrations/20260215000000_create_base_tables.sql"
       },
       {
+        "name": "net_worth_history",
+        "migration": "supabase/migrations/20260716160000_add_networth_history_and_price_sync_gate.sql"
+      },
+      {
         "name": "net_worth_snapshots",
         "migration": "supabase/migrations/20260215000000_create_base_tables.sql"
       },
@@ -7003,7 +7055,7 @@
         "migration": "supabase/migrations/20260501000001_create_external_connections.sql"
       }
     ],
-    "migrationCount": 132
+    "migrationCount": 134
   },
   "tablesByDomain": [
     {
@@ -7048,6 +7100,10 @@
         {
           "name": "lead_intakes",
           "migration": "supabase/migrations/20260617000000_lead_intakes.sql"
+        },
+        {
+          "name": "net_worth_history",
+          "migration": "supabase/migrations/20260716160000_add_networth_history_and_price_sync_gate.sql"
         },
         {
           "name": "uat_results",
@@ -7345,11 +7401,11 @@
     }
   ],
   "components": {
-    "total": 827,
+    "total": 836,
     "groups": [
       {
         "group": "app",
-        "count": 351,
+        "count": 352,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -7422,6 +7478,7 @@
           "chart-static-layers",
           "chat-layout-wrapper",
           "chat-panel",
+          "chat-panel-access.test",
           "chat-panel-lazy",
           "chat-panel.test",
           "chat-prompt-deeplink",
@@ -7442,6 +7499,7 @@
           "cost-split-calculator",
           "counterparty-analysis-panel",
           "crypto-holdings.config",
+          "daily-price-sync-trigger",
           "debt-comparison-chart",
           "debt-detail-modal",
           "debt-form",
@@ -7536,7 +7594,6 @@
           "income-expense-chart",
           "income-expense-chart.test",
           "inflation-erosion-chart",
-          "jouw-pad-widget",
           "kassabon-shell",
           "koopkracht-erosie",
           "koopkracht-erosie-onttrekken",
@@ -7840,16 +7897,18 @@
       },
       {
         "group": "widgets",
-        "count": 68,
+        "count": 73,
         "items": [
           "abonnementen-widget",
           "acties-widget",
           "agenda-widget",
           "ai-inzicht-widget",
           "assets-widget",
+          "assets-widget.test",
           "auto-dashboard-wizard",
           "backtesting-score-widget",
           "belasting-box3-widget",
+          "belasting-box3-widget.test",
           "beleggingsrendement-widget",
           "berichten-widget",
           "beslissingspatronen-widget",
@@ -7860,6 +7919,7 @@
           "budgetten-widget",
           "budgetten-widget.test",
           "cash-flow-widget",
+          "cash-flow-widget.test",
           "category-app-nav-bar",
           "doelen-widget",
           "doelen-widget.test",
@@ -7870,6 +7930,7 @@
           "fire-prognose-widget",
           "fire-prognose-widget.test",
           "gezondheids-score-widget",
+          "gezondheids-score-widget.test",
           "holding-fav-widget",
           "holdings-widget",
           "huishouden-activiteit-widget",
@@ -7882,6 +7943,7 @@
           "meldingen-widget",
           "monte-carlo-widget",
           "netto-vermogen-widget",
+          "netto-vermogen-widget.test",
           "nibud-benchmark-widget",
           "noodfonds-widget",
           "pensioen-aow-widget",
@@ -8119,7 +8181,7 @@
       },
       {
         "group": "mijn",
-        "count": 26,
+        "count": 28,
         "items": [
           "abonnement-section",
           "account-basis-section",
@@ -8139,6 +8201,8 @@
           "household-budget-model-section.test",
           "household-privacy-settings",
           "household-privacy-settings.test",
+          "local-categorization-settings",
+          "local-categorization-settings.test",
           "mijn-overview",
           "mijn-overview.test",
           "module-accent-picker",
@@ -8286,6 +8350,13 @@
         ]
       },
       {
+        "group": "auth",
+        "count": 1,
+        "items": [
+          "google-auth-button"
+        ]
+      },
+      {
         "group": "beheer",
         "count": 1,
         "items": [
@@ -8319,10 +8390,6 @@
     },
     {
       "name": "OpenAI",
-      "category": "AI"
-    },
-    {
-      "name": "OpenRouter",
       "category": "AI"
     },
     {
@@ -9501,6 +9568,12 @@
           "write": true
         }
       ],
+      "privacy-mode": [
+        {
+          "name": "profiles",
+          "write": true
+        }
+      ],
       "questionnaires": [
         {
           "name": "questionnaire_responses",
@@ -9703,6 +9776,12 @@
         {
           "name": "transactions",
           "write": false
+        }
+      ],
+      "sync": [
+        {
+          "name": "profiles",
+          "write": true
         }
       ],
       "toekomst-doel": [
@@ -10020,6 +10099,14 @@
           ]
         },
         {
+          "domain": "privacy-mode",
+          "label": "privacy-mode",
+          "write": true,
+          "routes": [
+            "/api/privacy-mode"
+          ]
+        },
+        {
           "domain": "retirement-aspirations",
           "label": "retirement-aspirations",
           "write": true,
@@ -10035,6 +10122,14 @@
             "/api/snapshots",
             "/api/snapshots/auto",
             "/api/snapshots/cron"
+          ]
+        },
+        {
+          "domain": "sync",
+          "label": "sync",
+          "write": true,
+          "routes": [
+            "/api/sync/daily-open"
           ]
         },
         {
@@ -10100,6 +10195,7 @@
           "routes": [
             "/api/ai/actions/[id]",
             "/api/ai/actions/[id]/assign",
+            "/api/ai/categorize",
             "/api/ai/chat",
             "/api/ai/recommendations",
             "/api/ai/recommendations/initial"
@@ -12798,6 +12894,11 @@
         "user": false,
         "household": false,
         "rls": true
+      },
+      "net_worth_history": {
+        "user": true,
+        "household": false,
+        "rls": true
       }
     }
   },
@@ -13327,6 +13428,20 @@
       ],
       "summary": "De horizon-kernel (ADR 0032) is de enige FIRE-rekenmotor en volgt het Excel-oracle `Core calc v5.xlsm` byte-exact. Dit besluit legt de **flex-spending-mechaniek** (roadmap M) vast: een gedragsregel die de flexibele (nice) uitgaven in de projectie laat meebewegen met de portefeuil",
       "file": "docs/adr/0042-flex-spending-must-nice-split.md"
+    },
+    {
+      "id": "0043-lokale-transactiecategorisatie",
+      "title": "Lokale transactiecategorisatie (Gemma 4 E2B / WebGPU) — desktop-only assistief, ondanks NO-GO op de eigen ladder",
+      "status": "aanvaard",
+      "date": "2026-07-16",
+      "elements": [
+        "t-aigateway",
+        "as-import",
+        "do-meta",
+        "t-lokale-ai"
+      ],
+      "summary": "Fase 0 (POC, `spikes/lokale-categorisatie/meetrapport-v1.md`) meet in-browser Gemma 4 E2B (Transformers.js/WebGPU) op de échte stage-1-residustaart uit op **~39% precisie bij ~52% dekking** (57% bij drempel ≥0,9, dan 12% dekking), 21% tegen menselijke labels, ~6,5 tok/s decode, ~",
+      "file": "docs/adr/0043-lokale-transactiecategorisatie-desktop-assistief.md"
     }
   ],
   "churn": {
@@ -13334,7 +13449,7 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 93
+        "commits": 97
       },
       {
         "path": "app/(app)/toekomst",
@@ -13342,7 +13457,7 @@
       },
       {
         "path": "lib/ai",
-        "commits": 35
+        "commits": 36
       },
       {
         "path": "app/api/ai",
@@ -13350,7 +13465,7 @@
       },
       {
         "path": "app/api/household",
-        "commits": 11
+        "commits": 13
       },
       {
         "path": "lib/fire-simulation.ts",
@@ -13381,7 +13496,7 @@
       },
       {
         "file": "components/app/budgets-client.tsx",
-        "loc": 5090,
+        "loc": 5081,
         "commits": 32
       },
       {
@@ -13406,8 +13521,8 @@
       },
       {
         "file": "lib/dashboard-data-loader.ts",
-        "loc": 2231,
-        "commits": 34
+        "loc": 2307,
+        "commits": 33
       },
       {
         "file": "app/(app)/core/checkin/page.tsx",
@@ -14195,30 +14310,20 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-07-13",
+    "previousDate": "2026-07-16",
     "hasChanges": true,
     "sections": [
       {
-        "label": "Schermen",
-        "added": [
-          "/rapportages/totaalplan"
-        ],
-        "removed": []
-      },
-      {
         "label": "API-routes",
         "added": [
-          "/api/briefing/email/cron",
-          "/api/briefing/email/pref",
-          "/api/briefing/email/unsubscribe",
-          "/api/report/totaalplan"
+          "/api/privacy-mode"
         ],
         "removed": []
       },
       {
         "label": "Componenten (aantal)",
         "added": [
-          "+4"
+          "+3"
         ],
         "removed": []
       }
@@ -14384,6 +14489,13 @@
       "api": 248,
       "components": 827,
       "tables": 59,
+      "routesProduction": 100
+    },
+    {
+      "date": "2026-07-16",
+      "api": 250,
+      "components": 836,
+      "tables": 60,
       "routesProduction": 100
     }
   ]

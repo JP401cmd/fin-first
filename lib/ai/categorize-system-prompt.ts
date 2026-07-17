@@ -30,6 +30,15 @@ export type CategorizeBudgetOption = {
   type: 'income' | 'expense' | 'savings' | 'debt'
   /** Optionele toelichting van de gebruiker bij dit budget. */
   description?: string | null
+  /**
+   * Budget-id. Optioneel en ALLEEN gebruikt door het lokale privé-modus-pad
+   * (createLocalAiResolver), dat de door het model teruggegeven slug direct naar
+   * een budget_id moet mappen zonder een aparte slugToId-map. Het cloud-pad
+   * bewaart de id juist buiten deze optie (in slugToId, zie
+   * categorize-budget-options.ts) en negeert dit veld — de systeemprompt gebruikt
+   * het nooit, dus de prompt-output verandert er niet door.
+   */
+  id?: string | null
 }
 
 // ── Gedeelde domeinkennis & regels ────────────────────────────────────────────
@@ -126,3 +135,99 @@ ${DOMEINKENNIS}
 ${PROJECTIE_VOORBEELDEN}
 
 ${REGELS}`
+
+// ── User-message (single source of truth) ─────────────────────────────────────
+//
+// De opbouw van de user-message (de transactieregels + instructie) leefde inline
+// in app/api/ai/categorize/route.ts. Ze is hierheen verplaatst zodat het lokale
+// privé-modus-pad exact dezelfde opbouw hergebruikt in plaats van een tweede,
+// verwaterende variant. Twee takken:
+//
+//   1. DEFAULT (geen opts) — byte-voor-byte identiek aan wat de route altijd
+//      deed. De route levert de velden AL gesaniteerd aan (sanitizeForAI
+//      gebeurt in de route, niet hier), zodat het cloud-gedrag ongewijzigd is en
+//      deze functie zelf géén PII-afhankelijkheid heeft.
+//   2. LOKAAL (opts.idEcho / opts.kort) — de id-echo-variant voor on-device
+//      inferentie: elke transactie krijgt een kort batch-id (t1..tN) dat het
+//      model per item terugecho't (mappen op id i.p.v. positie), plus een
+//      expliciete JSON-output-instructie (het lokale pad heeft geen zod-schema
+//      dat de vorm afdwingt). `kort` laat het reasoning-veld weg (grootste
+//      decode-snelheidshefboom). Het lokale pad saniteert bewust NIET (FR-3.5).
+
+/** Minimale transactievorm voor de user-message. Velden zijn al in weergavevorm. */
+export type CategorizeUserPromptTx = {
+  description?: string | null
+  counterparty_name?: string | null
+  amount: number
+  date?: string | null
+  reference?: string | null
+}
+
+export type CategorizeUserPromptOpts = {
+  /** Elke transactie krijgt een batch-id (t1..tN) dat het model terugecho't. */
+  idEcho?: boolean
+  /** Laat het reasoning-veld weg uit het gevraagde output-schema (sneller). */
+  kort?: boolean
+}
+
+/** Batch-lokaal id voor de transactie op index i (t1-based). Gedeeld tussen de
+ *  prompt-opbouw en de resolver-id-mapping zodat het schema één bron heeft. */
+export function batchItemId(i: number): string {
+  return `t${i + 1}`
+}
+
+function formatTxParts(tx: CategorizeUserPromptTx): string[] {
+  return [
+    `beschrijving: ${tx.description ?? ''}`,
+    tx.counterparty_name ? `tegenpartij: ${tx.counterparty_name}` : null,
+    `bedrag: ${tx.amount > 0 ? '+' : ''}${tx.amount}`,
+    tx.date ? `datum: ${tx.date}` : null,
+    tx.reference ? `referentie: ${tx.reference}` : null,
+  ].filter(Boolean) as string[]
+}
+
+/**
+ * Bouwt de user-message voor de categorisatie-call.
+ *
+ * Zonder opts: exact het gedrag van de route (positioneel, geen expliciete
+ * JSON-instructie — dat doet het zod-schema in de cloud). Met opts.idEcho/kort:
+ * de lokale id-echo-variant.
+ */
+export function buildCategorizeUserPrompt(
+  transactions: CategorizeUserPromptTx[],
+  opts: CategorizeUserPromptOpts = {},
+): string {
+  const n = transactions.length
+  const local = !!(opts.idEcho || opts.kort)
+
+  if (!local) {
+    // ── DEFAULT (cloud) — byte-voor-byte de bestaande route-opbouw ──
+    return `Categoriseer de volgende ${n} transacties.\nRetourneer een array van exact ${n} items in dezelfde volgorde.\n\n${transactions
+      .map((tx, i) => `${i + 1}. ${formatTxParts(tx).join('\n   ')}`)
+      .join('\n\n')}`
+  }
+
+  // ── LOKAAL — id-echo + expliciete JSON-instructie ──
+  const kort = !!opts.kort
+  const body = transactions
+    .map((tx, i) => `${batchItemId(i)}:\n   ${formatTxParts(tx).join('\n   ')}`)
+    .join('\n\n')
+
+  const schema = kort
+    ? '[{"id": "t1", "budget_slug": "<slug-uit-de-lijst-of-null>", "confidence": <getal 0..1>}]'
+    : '[{"id": "t1", "budget_slug": "<slug-uit-de-lijst-of-null>", "confidence": <getal 0..1>, "reasoning": "<max 1 NL-zin>"}]'
+
+  const kortHint = kort
+    ? '\nGeef GEEN reasoning-veld — alleen id, budget_slug en confidence per item.'
+    : ''
+
+  return `Categoriseer de volgende ${n} transacties.
+Geef bij ELK item exact het meegegeven "id" terug (bv. "t3"). Retourneer exact ${n} items; volgorde maakt niet uit, het id koppelt.
+
+${body}
+
+Antwoord UITSLUITEND met een geldige JSON-array van exact ${n} objecten, zonder extra tekst en zonder markdown-fences:
+${schema}${kortHint}
+BELANGRIJK: past geen enkel budget uit de lijst écht, gebruik dan "budget_slug": null met confidence onder 0.5 — een onzekere gok met hoge confidence is fout. Wees streng op confidence: alleen >= 0.5 wanneer je de tegenpartij of het bestedingsdoel echt herkent.
+Begin je antwoord direct met '[' en eindig met ']'.`
+}

@@ -1,0 +1,6 @@
+node_modules/
+
+# Gouden testset (fase-0 POC): gebouwd uit échte, geanonimiseerde transacties
+# van een door de eigenaar aangewezen bron-account. Bewust nooit committen —
+# regenereer lokaal met `npm run build:goud` (zie scripts/build-goud-set.ts).
+dataset/goud-*.json

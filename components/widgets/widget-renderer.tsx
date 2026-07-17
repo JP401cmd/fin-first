@@ -312,7 +312,10 @@ export interface TopRecurringTransaction {
   name: string
   amount: number
   frequency: string
+  /** Canonieke RecurringCategory (bv. 'rent', 'subscription', 'insurance') — niet de budgetnaam. */
   category: string | null
+  /** Canonieke split: abonnement (true) vs. overige vaste last (false). Bron: loadVasteLastenSummary. */
+  isSubscription: boolean
 }
 
 export interface TopRecommendation {
@@ -469,6 +472,9 @@ export interface DashboardData {
   sovereigntyLevel: number
   currentPhaseId: string
   monthsCovered: number
+  // Runway op de soevereiniteits-grondslag (liquide pot ÷ 3-maands tx-gemiddelde) —
+  // dezelfde noemer als computeSovereigntyLevel. De Jouw Pad-criteria consumeren dit.
+  sovereigntyMonthsCovered: number
   hasConsumerDebt: boolean
   // Extra fetches
   recommendations: number
@@ -526,6 +532,20 @@ export interface DashboardData {
   backtestNamedPaths: { label: string; success: boolean }[] | null
   // Box 3: pre-computed tax from full calculateBox3() (null if no assets)
   box3Tax: number | null
+  // Box 3: canonieke dual-forfait breakdown uit calculateBox3() zodat de
+  // kassabon-widget de tussenrijen consumeert i.p.v. zelf herberekent en
+  // rekenkundig sluit op box3Tax. Optioneel/additief: mock-/empty-bundels
+  // zonder dit veld blijven geldig (widget valt terug op enkel-forfait-indicatie).
+  box3Breakdown?: {
+    year: number
+    rendementsgrondslag: number // Box 3-bezittingen − aftrekbare schulden
+    heffingsvrij: number
+    grondslagSparen: number // belastbaar boven de vrijstelling
+    effectiefForfait: number // gemengd (spaargeld/beleggingen/schulden) forfait als fractie
+    box3Income: number // grondslagSparen × effectiefForfait
+    tarief: number
+    tax: number // === box3Tax
+  } | null
   // Simulatie-afgeleide countdown (null als simulatie niet beschikbaar)
   simFireCountdown: FireCountdown | null
   // FIRE end strategy
@@ -668,6 +688,8 @@ export interface DashboardData {
   heatmapExpenseGroups: HeatmapBudgetGroup[]
   heatmapSpending: Record<string, number>
   heatmapBeschikbaarMap: Record<string, number>
+  /** Vorige-maand spending per budget — voedt de trend-pijl in de heatmap-tooltip */
+  heatmapPreviousSpending: Record<string, number>
 }
 
 /** Compact mortgage-vs-invest summary for briefing context */

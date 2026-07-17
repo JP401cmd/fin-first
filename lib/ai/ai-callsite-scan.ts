@@ -65,9 +65,32 @@ export const AI_CALLSITE_ALLOWLIST: CallsiteAllowlistEntry[] = [
     reason:
       'Server-side nieuwsbronnen (RSS/webpagina-tekst), geen gebruikers-PII in de prompt.',
   },
+  {
+    file: 'lib/ai/local/local-categorize-resolver.ts',
+    reason:
+      'On-device inferentie (Gemma 4 E2B/WebGPU), geen egress; sanitize zou legitiem on-device-signaal strippen (ADR 0043, FR-3.5).',
+  },
 ]
 
-/** True if the source imports a generation function from the `ai` package. */
+/**
+ * True if the source imports the on-device generation session
+ * (`loadModelSession` from the local Transformers.js runtime). This is the
+ * WebGPU/Gemma privacy-modus generation callsite (ADR 0043): it builds a prompt
+ * from transaction data and runs inference locally. It uses @huggingface/
+ * transformers instead of the `ai` package, so the cloud-detector above misses
+ * it — this marker brings it under the same guardrail net (it belongs on the
+ * allowlist: on-device, no egress, sanitize would strip legitimate signal).
+ */
+export function importsLocalGeneration(source: string): boolean {
+  const re = /import\s*(?:type\s+)?\{([^}]*)\}\s*from\s*['"][^'"]*transformers-runtime['"]/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(source)) !== null) {
+    if (/\bloadModelSession\b/.test(m[1])) return true
+  }
+  return false
+}
+
+/** True if the source imports a generation function (cloud `ai`-SDK or on-device). */
 export function importsGenerationFn(source: string): boolean {
   const re = /import\s*(?:type\s+)?\{([^}]*)\}\s*from\s*['"]ai['"]/g
   let m: RegExpExecArray | null
@@ -75,7 +98,7 @@ export function importsGenerationFn(source: string): boolean {
     const names = m[1]
     if (GENERATION_FNS.some((fn) => new RegExp(`\\b${fn}\\b`).test(names))) return true
   }
-  return false
+  return importsLocalGeneration(source)
 }
 
 /** True if the source imports sanitizeForAI/sanitizeTransactions from the sanitize helper. */

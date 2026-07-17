@@ -290,7 +290,7 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     {
       id: 'as-import', x: 560, y: row(0), w: 220, h: 66, kind: 'appsvc',
       title: 'Import- & koppeldienst',
-      lead: 'Import en synchronisatie van transacties, saldi en holdings uit banken, exchanges en bestanden. Fundament-dienst, module-onafhankelijk.',
+      lead: 'Import en synchronisatie van transacties, saldi en holdings uit banken, exchanges en bestanden. Fundament-dienst, module-onafhankelijk. Categorisatie kan optioneel lokaal (desktop, WebGPU) i.p.v. via de cloud-AI-gateway lopen — review-UI-only, fail-closed zonder cloud-fallback (ADR 0043).',
       items: ['/api/bank-connect', '/api/import', '/api/recurring', 'lib/parsers'],
     },
     {
@@ -376,7 +376,7 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     {
       id: 't-aigateway', x: 1250, y: row(1), w: 185, h: 66, kind: 'tech',
       title: 'AI-gateway (Vercel AI SDK)',
-      lead: 'Provider-agnostische AI-laag; model omschakelbaar tussen Anthropic, OpenAI en Mistral via beheer.',
+      lead: 'Provider-agnostische AI-laag; model omschakelbaar tussen Anthropic, OpenAI en Mistral via beheer. Optioneel pad naast — niet vervangen door — de lokale AI-runtime (t-lokale-ai): bij privacy_mode=true blokkeert een server-side 403 op /api/ai/categorize vóór modelaanroep (ADR 0043).',
       items: ['streaming + tools', 'Zod tool-schemas', 'PII-filter'],
     },
     {
@@ -402,6 +402,12 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
       title: 'Platform (Vercel + PWA)',
       lead: 'Hosting en Speed Insights op Vercel; offline-laag via Serwist service worker.',
       items: ['Vercel', 'Serwist PWA', 'Speed Insights'],
+    },
+    {
+      id: 't-lokale-ai', x: 1250, y: row(6), w: 185, h: 66, kind: 'tech',
+      title: 'Lokale AI-runtime — in-browser, WebGPU',
+      lead: 'Transformers.js + Gemma 4 E2B, volledig on-device: categorisatie-voorstellen verlaten het toestel niet. Desktop-only, assistief (review-UI-only, geen automatische toepassing) — bewust géén externe-partij-relatie, in tegenstelling tot ext-claude → t-aigateway. Dat ontbreken ís de privacygarantie (ADR 0043).',
+      items: ['Transformers.js', 'Gemma 4 E2B', 'WebGPU', 'privacy_mode'],
     },
 
     // ── Data ──
@@ -451,8 +457,8 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     {
       id: 'do-meta', x: 1081, y: 1186, w: 138, h: 56, kind: 'data',
       title: 'Profiel & snapshots',
-      lead: 'Profielen, vermogens-snapshots en app-instellingen.',
-      items: ['profiles', 'net_worth_snapshots', 'app_settings'],
+      lead: 'Profielen, vermogens-snapshots (dag-cadans) en de tijdstempel-vermogenshistorie per sync.',
+      items: ['profiles', 'net_worth_snapshots', 'net_worth_history', 'app_settings'],
     },
     {
       id: 'do-lead', x: 716, y: 1252, w: 180, h: 56, kind: 'data',
@@ -530,6 +536,7 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     't-bankimport->app-comp': { payload: 'Geparste MT940/CSV/OFX-boekingen met dedup-hash', mechanism: 'import', cadence: 'on-demand' },
     't-marktdata->app-comp': { payload: 'Koersen, fundamentals en wallet-/exchange-saldi', mechanism: 'rest', cadence: 'daily', contractDomains: ['integrations', 'prices'] },
     't-platform->app-comp': { payload: 'Hosting, edge-rendering en offline service-worker-cache', mechanism: 'build', cadence: 'build' },
+    't-lokale-ai->app-comp': { payload: 'Lokale categorisatie-voorstellen die het toestel niet verlaten', mechanism: 'compute', cadence: 'on-demand' },
     // Applicatieservice → bedrijfsproces
     'as-import->sp-registreren': { payload: 'Transacties, saldi en terugkerende lasten', mechanism: 'rest', cadence: 'on-demand', contractDomains: ['bank-connect', 'recurring', 'detect-recurring', 'own-accounts'] },
     'as-budget->sp-budget': { payload: 'Budgetten, varianties, trends en dagtempo', mechanism: 'rest', cadence: 'on-demand', contractDomains: ['budgets', 'budget-trends', 'budget-variance', 'daily-expense-rate', 'cashflow-forecast'] },
@@ -628,7 +635,7 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
   addEdge({ from: 'app-comp', to: 'm-soeverein', type: 'realization', fromSide: 'T', toSide: 'B', fromOffset: 1100, toOffset: 1220 })
 
   // Technologie bedient de applicatie
-  const techs = ['t-supabase', 't-aigateway', 't-bankconnect', 't-bankimport', 't-marktdata', 't-platform']
+  const techs = ['t-supabase', 't-aigateway', 't-bankconnect', 't-bankimport', 't-marktdata', 't-platform', 't-lokale-ai']
   techs.forEach((t, i) => {
     const n = nodes.find((x) => x.id === t)!
     addEdge({ from: t, to: 'app-comp', type: 'serving', fromSide: 'L', toSide: 'R', toOffset: n.y + n.h / 2, label: i === 0 ? 'Bedient' : undefined })

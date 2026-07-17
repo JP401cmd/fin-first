@@ -202,6 +202,16 @@ export function GlobalSyncProvider({ children }: { children: ReactNode }) {
         const finishedAt = new Date().toISOString()
         dispatch({ type: 'sync-end', aggregate, finishedAt })
 
+        // Elke handmatige sync waarbij de prijzen daadwerkelijk ververst zijn,
+        // legt een tijdstempel-punt vast in net_worth_history (intraday
+        // vermogenscurve). De snapshot-route herberekent net_worth canoniek uit
+        // de zojuist bijgewerkte assets.current_value. Fire-and-forget: mag de
+        // sync-UX nooit blokkeren of laten falen.
+        const pricesResult = aggregate.results.find((r) => r.job.kind === 'prices')
+        if (pricesResult && pricesResult.outcome !== 'error') {
+          fetch('/api/snapshots/auto?source=manual', { credentials: 'include' }).catch(() => {})
+        }
+
         // End-toast — vertel de gebruiker wat er is gebeurd.
         if (aggregate.errorCount === 0 && aggregate.partialCount === 0) {
           const updatedItems = aggregate.results.reduce((acc, r) => acc + (r.itemsSynced ?? 0), 0)

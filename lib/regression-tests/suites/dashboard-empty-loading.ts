@@ -55,6 +55,7 @@ function makeEmptyDashboardData(): DashboardData {
     sovereigntyLevel: 0,
     currentPhaseId: 'start',
     monthsCovered: 0,
+    sovereigntyMonthsCovered: 0,
     hasConsumerDebt: false,
     // Extra fetches
     recommendations: 0,
@@ -165,6 +166,7 @@ function makeEmptyDashboardData(): DashboardData {
     heatmapExpenseGroups: [],
     heatmapSpending: {},
     heatmapBeschikbaarMap: {},
+    heatmapPreviousSpending: {},
   }
 }
 

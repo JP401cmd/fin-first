@@ -75,7 +75,9 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     name: 'Uitgaven Heatmap',
     description: 'Treemap-visualisatie van uitgaven per hoofdcategorie',
     module: 'kern',
-    sizes: ['mini', 'quarter', 'half', 'full'],
+    // 'xl' (Double): dubbele breedte → grotere cellen met icoon + bedrag +
+    // maand-op-maand-trend, i.p.v. de smallere full-treemap.
+    sizes: ['mini', 'quarter', 'half', 'full', 'xl'],
     defaultSize: 'half',
   },
   {
@@ -107,7 +109,9 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     name: 'Tips',
     description: 'Persoonlijke tips van Will',
     module: 'wil',
-    sizes: ['mini', 'quarter', 'half', 'full'],
+    // 'xl' (Double): horizontale impactvergelijking van de top-tips' jaarlijkse
+    // vrijheidsdagen — benut de dubbele breedte i.p.v. dezelfde lijst rekken.
+    sizes: ['mini', 'quarter', 'half', 'full', 'xl'],
     defaultSize: 'half',
   },
   {
@@ -265,7 +269,7 @@ export const WIDGET_CATALOG: WidgetDef[] = [
   {
     id: 'beleggingsrendement',
     name: 'Beleggingsrendement',
-    description: 'Portfolio return performance: YTD, 1-jaar en totaal',
+    description: 'Totaalrendement sinds aankoop, per beleggingstype',
     module: 'kern',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',

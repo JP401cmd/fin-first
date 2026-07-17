@@ -5,18 +5,12 @@ import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData, TopAction } from './widget-renderer'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
+import { priorityDotClass } from './priority-dot'
 
 interface Props {
   size: WidgetSize
   data: DashboardData
   href?: string
-}
-
-function priorityDotClass(score: number | null): string {
-  if (score === 5) return 'bg-wil-600'
-  if (score === 4) return 'bg-wil-400'
-  if (score === 3) return 'bg-[var(--ink-3)]'
-  return 'bg-[var(--ink-4)]'
 }
 
 function ActionRow({ action, index, hasEntered }: { action: TopAction; index: number; hasEntered: boolean }) {
@@ -45,7 +39,7 @@ function ActionRow({ action, index, hasEntered }: { action: TopAction; index: nu
       </span>
       {days !== null && (
         <span className="shrink-0 font-mono text-xs tabular-nums text-wil-700 bg-wil-50 rounded-full px-2 py-px">
-          +{days}d
+          +{days}d/jr
         </span>
       )}
     </div>
@@ -82,7 +76,7 @@ export const ActiesWidget = memo(function ActiesWidget({ size, data, href }: Pro
         </p>
         {roundedDays > 0 && (
           <p className="mt-1 font-serif italic text-[11px] text-[var(--ink-3)]">
-            +{roundedDays}d vrijheid te winnen
+            +{roundedDays}d/jr vrijheid te winnen
           </p>
         )}
       </WidgetShell>
@@ -100,7 +94,7 @@ export const ActiesWidget = memo(function ActiesWidget({ size, data, href }: Pro
             <span className="text-[11px] text-[var(--ink-3)]">open acties</span>
             {roundedDays > 0 && (
               <span className="mt-1.5 font-mono text-xs tabular-nums text-wil-700 bg-wil-50 rounded-full px-2 py-px w-fit">
-                +{roundedDays}d vrijheid
+                +{roundedDays}d/jr vrijheid
               </span>
             )}
           </div>
@@ -136,14 +130,14 @@ export const ActiesWidget = memo(function ActiesWidget({ size, data, href }: Pro
           </div>
           <div className="flex flex-col items-center pl-3">
             <span className="font-mono text-2xl font-semibold tabular-nums text-[var(--ink)]">{roundedDays}</span>
-            <span className="text-[10px] uppercase tracking-wide text-[var(--ink-3)] font-sans mt-0.5 text-center leading-tight">DAGEN TE WINNEN</span>
+            <span className="text-[10px] uppercase tracking-wide text-[var(--ink-3)] font-sans mt-0.5 text-center leading-tight">DAGEN/JAAR TE WINNEN</span>
           </div>
         </div>
 
         {/* Freedom days potential highlight */}
         {roundedDays > 0 && (
           <div className="mt-2 flex items-center justify-center gap-1.5 rounded-[var(--r)] bg-wil-50 border border-wil-200 px-3 py-1.5">
-            <span className="font-mono text-lg font-bold tabular-nums text-wil-700">+{roundedDays}d</span>
+            <span className="font-mono text-lg font-bold tabular-nums text-wil-700">+{roundedDays}d/jr</span>
             <span className="text-[11px] text-wil-600">vrijheid te winnen</span>
           </div>
         )}
@@ -173,7 +167,7 @@ export const ActiesWidget = memo(function ActiesWidget({ size, data, href }: Pro
                 <span className="h-2 w-2 rounded-full shrink-0 bg-positive" />
                 <span className="flex-1 min-w-0 text-xs truncate line-through decoration-[var(--ink-4)]">{a.title}</span>
                 {a.freedomDaysImpact != null && a.freedomDaysImpact > 0 && (
-                  <span className="shrink-0 font-mono text-[10px] tabular-nums text-positive">+{Math.round(a.freedomDaysImpact)}d</span>
+                  <span className="shrink-0 font-mono text-[10px] tabular-nums text-positive">+{Math.round(a.freedomDaysImpact)}d/jr</span>
                 )}
               </div>
             ))}

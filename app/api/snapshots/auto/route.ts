@@ -12,6 +12,7 @@ import {
 import { resolveFireParams } from '@/lib/fire-params'
 import { computeSovereigntyLevel, levelToPhaseId } from '@/lib/feature-phases'
 import { captureBalanceSnapshots } from '@/lib/balance-snapshot'
+import { captureNetWorthHistory, type NetWorthHistorySource } from '@/lib/networth-history'
 import { type Debt, computeRenteAflossingsSplit } from '@/lib/debt-data'
 import { localMonthBounds, localMonthStart } from '@/lib/month-range'
 import {
@@ -44,14 +45,33 @@ import {
  * at most once per page load.
  *
  * Returns: { updated: true, snapshot: {...}, metrics: {...} }
+ *
+ * Query `?source=`: wanneer de aanroep bij een PRIJS-SYNC hoort (eerste-open-van-
+ * de-dag 'daily-open' of de handmatige sync-knop 'manual'), leggen we naast de
+ * DATE-gekeyde dag-snapshot óók een APPEND-ONLY tijdstempel-punt vast in
+ * net_worth_history (intraday vermogenscurve). Zonder `source` (de kale
+ * AutoSnapshotTrigger die bij élke page-load draait) NIET — anders spammen we
+ * de historie op elke navigatie.
  */
-export async function GET() {
+const HISTORY_SOURCES: ReadonlySet<string> = new Set<NetWorthHistorySource>([
+  'daily-open',
+  'manual',
+  'sync',
+])
+
+export async function GET(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
     return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
   }
+
+  const sourceParam = new URL(request.url).searchParams.get('source')
+  const historySource: NetWorthHistorySource | null =
+    sourceParam && HISTORY_SOURCES.has(sourceParam)
+      ? (sourceParam as NetWorthHistorySource)
+      : null
 
   const now = new Date()
   const today = now.toISOString().split('T')[0]
@@ -268,6 +288,18 @@ export async function GET() {
 
   // Capture per-entity balance snapshots (fire-and-forget, non-critical)
   captureBalanceSnapshots(supabase, user.id, today, assets, debts).catch(() => {})
+
+  // Bij een prijs-sync (daily-open / manual): leg een tijdstempel-punt vast in
+  // net_worth_history (intraday vermogenscurve). Consumeert het reeds canoniek
+  // berekende net_worth + totalen — geen herberekening. Fire-and-forget.
+  if (historySource) {
+    captureNetWorthHistory(supabase, user.id, {
+      netWorth,
+      totalAssets,
+      totalDebts,
+      source: historySource,
+    }).catch(() => {})
+  }
 
   // Sync last_known_phase to profiles (fire-and-forget — layout also handles this on page load,
   // but cron-triggered snapshots would otherwise leave profiles stale).

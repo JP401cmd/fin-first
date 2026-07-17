@@ -122,6 +122,7 @@ export const BudgetHeatmapWidget = memo(function BudgetHeatmapWidget({ size, dat
           spending={data.heatmapSpending ?? {}}
           onNavigate={handleNavigate}
           beschikbaarMap={data.heatmapBeschikbaarMap}
+          previousSpending={data.heatmapPreviousSpending}
           size={size}
         />
       </div>

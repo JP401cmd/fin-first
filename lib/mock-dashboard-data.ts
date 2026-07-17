@@ -56,6 +56,8 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
   totalDebts: 57500,
   monthlyIncome: 5200,
   monthlyExpenses: 3100,
+  // Canoniek dagtarief (€/dag) — voedt de "Geld is opgeslagen tijd"-vertaling in widgets.
+  dailyExpenseRate: 100,
   monthlyContributions: 1400,
   yearlyMustExpenses: 28800,
   budgetTotals: {
@@ -101,6 +103,7 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
   sovereigntyLevel: 99,
   currentPhaseId: 'mastery',
   monthsCovered: 4.2,
+  sovereigntyMonthsCovered: 4.2,
   hasConsumerDebt: false,
 
   // Extra fetches
@@ -164,6 +167,18 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
     { label: 'Stagflatie (1970s)', success: false },
   ],
   box3Tax: 1842,
+  // Dual-forfait breakdown die exact sluit op box3Tax (grondslagSparen ×
+  // effectiefForfait × tarief ≈ 1842): 93.030 × 5,50% × 36%.
+  box3Breakdown: {
+    year: 2026,
+    rendementsgrondslag: 152_387,
+    heffingsvrij: 59_357,
+    grondslagSparen: 93_030,
+    effectiefForfait: 0.055,
+    box3Income: 5_116.65,
+    tarief: 0.36,
+    tax: 1842,
+  },
   simFireCountdown: {
     countdownYears: 17,
     countdownMonths: 0,
@@ -229,7 +244,9 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
   // Month summary
   monthSummary: {
     netWorthDelta: 4200,
-    freedomDaysWon: 8,
+    // Zelfde grondslag als netWorthDelta (vermogensmutatie / canoniek dagtarief):
+    // 4200 / ~100 ≈ 42 hele vrijheidsdagen — deelt teken met de Vermogen-tegel.
+    freedomDaysWon: 42,
     savingsRate: 27,
     budgetScore: 89,
     prevMonthComparison: 3.5,
@@ -253,9 +270,9 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
 
   // Enriched data
   topRecurringTransactions: [
-    { id: 'rt1', name: 'Huur', amount: 1250, frequency: 'monthly', category: 'Wonen' },
-    { id: 'rt2', name: 'Zorgverzekering', amount: 145, frequency: 'monthly', category: 'Verzekeringen' },
-    { id: 'rt3', name: 'Internet & TV', amount: 65, frequency: 'monthly', category: 'Abonnementen' },
+    { id: 'rt1', name: 'Huur', amount: -1250, frequency: 'monthly', category: 'rent', isSubscription: false },
+    { id: 'rt2', name: 'Zorgverzekering', amount: -145, frequency: 'monthly', category: 'insurance', isSubscription: false },
+    { id: 'rt3', name: 'Internet & TV', amount: -65, frequency: 'monthly', category: 'subscription', isSubscription: true },
   ],
   totalRecurringAmount: 1860,
 
@@ -462,5 +479,21 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
     hm_verzekeringen_zorg: 0,
     hm_verzekeringen_inboedel: 0,
     hm_verzekeringen_overig: 5,
+  },
+  // Vorige maand — voedt de trend-pijl in de heatmap-tooltip (mix stijgt/daalt/gelijk).
+  heatmapPreviousSpending: {
+    hm_wonen_huur: 1250,
+    hm_wonen_nuts: 128,
+    hm_boodschappen_super: 430,
+    hm_boodschappen_overig: 52,
+    hm_vervoer_brandstof: 140,
+    hm_vervoer_ov: 62,
+    hm_vervoer_onderhoud: 210,
+    hm_vrijetijd_horeca: 180,
+    hm_vrijetijd_streaming: 48,
+    hm_vrijetijd_hobby: 25,
+    hm_verzekeringen_zorg: 145,
+    hm_verzekeringen_inboedel: 35,
+    hm_verzekeringen_overig: 88,
   },
 }

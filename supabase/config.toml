@@ -220,7 +220,13 @@ enable_signup = true
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
 # If enabled, users need to confirm their email address before signing in.
-enable_confirmations = false
+# AAN houden zolang een OAuth-provider (Google) aanstaat: met bevestiging úit
+# markeert Supabase elk e-mail/wachtwoord-account meteen als "confirmed", waarna
+# automatische identity-linking op gelijk e-mailadres een account-takeover-vector
+# wordt (aanvaller registreert vooraf, slachtoffer koppelt via Google). Prod
+# draait hier feitelijk al op (dashboard); deze waarde houdt de repo consistent
+# zodat een `config push` het gat niet heropent.
+enable_confirmations = true
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
 secure_password_change = false
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
@@ -341,6 +347,24 @@ url = ""
 skip_nonce_check = false
 # If enabled, it will allow the user to successfully authenticate when the provider does not return an email address.
 email_optional = false
+
+# Google OAuth — "Inloggen/Aanmaken met Google" (app/login + app/signup via
+# supabase.auth.signInWithOAuth({ provider: 'google' }) → /auth/callback).
+# Vul client_id + secret via de Supabase-projectomgeving; commit NOOIT het
+# secret. Zet in Google Cloud Console de geautoriseerde redirect-URI op
+# https://<project-ref>.supabase.co/auth/v1/callback.
+[auth.external.google]
+enabled = true
+client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
+# DO NOT commit your OAuth provider secret to git. Use environment variable substitution instead:
+secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
+# Overrides the default auth redirectUrl.
+redirect_uri = ""
+# Overrides the default auth provider URL.
+url = ""
+# skip_nonce_check is alleen nodig voor lokale (native) Google-signin; bij de
+# web-OAuth-flow (die wij gebruiken) niet aanzetten.
+skip_nonce_check = false
 
 # Allow Solana wallet holders to sign in to your project via the Sign in with Solana (SIWS, EIP-4361) standard.
 # You can configure "web3" rate limit in the [auth.rate_limit] section and set up [auth.captcha] if self-hosting.

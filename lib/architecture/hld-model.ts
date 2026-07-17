@@ -93,6 +93,7 @@ export function buildHldModel(): HldModel {
           { title: 'Zien wat je beleggingen je hebben opgeleverd', desc: 'Per belegging je totale opbrengst — koerswinst, dividend én verkochte (gesloten) posities samen — afgeleid uit je eigen transacties.' },
           { title: 'Jezelf spiegelen aan Nederland en de wereld', desc: 'Zie hoe je gezondheid, spaarquote, vermogen en vrijheidsleeftijd zich verhouden tot een vergelijkbare doelgroep — en waar je staat wereldwijd.' },
           { title: 'Meteen begrijpen waaróm iets je aandacht vraagt en wat je kunt doen', desc: 'Als een overzichtspagina oranje of rood kleurt, legt een banner in gewone taal uit wat er speelt en wat je concreet kunt aanpakken — met een directe link naar de juiste plek of een gesprek met Will.' },
+          { title: 'Transacties lokaal laten categoriseren, zonder dat je gegevens je toestel verlaten', desc: 'Experimenteel en alleen op desktop: zet je AI-categorisatie lokaal aan en je transactiegegevens gaan niet naar een cloud-AI-provider — elk voorstel controleer je zelf voor je het overneemt.' },
         ],
       },
       {

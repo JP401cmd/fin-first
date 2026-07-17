@@ -5,6 +5,12 @@ import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
 import { Check, Circle, Shield } from 'lucide-react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
+import {
+  LEVEL_NAMES,
+  NEXT_LEVEL_MOTIVATION,
+  NEXT_LEVEL_CRITERIA,
+  type SovereigntyCriterionInput,
+} from '@/lib/sovereignty-journey'
 
 interface Props {
   size: WidgetSize
@@ -46,55 +52,9 @@ const PHASE_STYLES: Record<PhaseColor, { bar: string; text: string; badge: strin
   },
 }
 
-// ── Level names ───────────────────────────────────────────────
-const LEVEL_NAMES: Record<number, string> = {
-  [-2]: 'Tijdtekort',
-  [-1]: 'Tijdverlies',
-  0:    'Het Reset-punt',
-  1:    'Tijdbuffer',
-  2:    'Tijdschild',
-  3:    'Tijdinvesteerder',
-  4:    'Tijdvermenigvuldiger',
-  5:    'Tijdssoeverein',
-  6:    'Tijdloos',
-}
-
-// ── What the next level unlocks ───────────────────────────────
-const NEXT_LEVEL_UNLOCKS: Record<number, string> = {
-  [-2]: 'Basis budgettering',
-  [-1]: 'NIBUD vergelijking',
-  0:    'Vermogensopbouw tracking',
-  1:    'Snapshot vergelijking',
-  2:    'FIRE projecties',
-  3:    'Monte Carlo simulaties',
-  4:    'Geavanceerde scenario analyse',
-  5:    'Opnamestrategieën',
-  6:    'Volledige vrijheid bereikt!',
-}
-
-// ── Criteria to reach the NEXT level ─────────────────────────
-type CriterionData = {
-  netWorth: number
-  monthsCovered: number
-  freedomPct: number
-  hasConsumerDebt: boolean
-}
-
-type Criterion = { label: string; check: (d: CriterionData) => boolean }
-
-const NEXT_LEVEL_CRITERIA: Record<number, Criterion[]> = {
-  [-2]: [{ label: 'Consumptieve schulden afgelost', check: (d) => !d.hasConsumerDebt }],
-  [-1]: [{ label: 'Vermogen \u2265 \u20AC0',         check: (d) => d.netWorth >= 0 }],
-  [0]:  [{ label: 'Minimaal 1 maand buffer',          check: (d) => d.monthsCovered >= 1 }],
-  [1]:  [{ label: 'Minimaal 3 maanden noodfonds',     check: (d) => d.monthsCovered >= 3 }],
-  [2]:  [
-    { label: 'Minimaal 6 maanden buffer',             check: (d) => d.monthsCovered >= 6 },
-    { label: 'Vrijheidspercentage \u2265 10%',         check: (d) => d.freedomPct >= 10 },
-  ],
-  [3]: [{ label: 'Vrijheidspercentage \u2265 25%',    check: (d) => d.freedomPct >= 25 }],
-  [4]: [{ label: 'Vrijheidspercentage \u2265 75%',    check: (d) => d.freedomPct >= 75 }],
-  [5]: [{ label: 'Vrijheidspercentage \u2265 100%',   check: (d) => d.freedomPct >= 100 }],
-}
+// Niveau-namen, motivatie en criteria komen uit lib/sovereignty-journey.ts
+// (single source, gedeeld met de rest van de reis-metadata). Fasekleuren
+// hierboven blijven lokaal — dat is pure UI-presentatie.
 
 // ── Component ─────────────────────────────────────────────────
 export function JouwPadWidgetWrapper({ size, data, href }: Props) {
@@ -103,13 +63,13 @@ export function JouwPadWidgetWrapper({ size, data, href }: Props) {
     currentPhaseId,
     freedomPct,
     netWorth,
-    monthsCovered,
+    sovereigntyMonthsCovered,
     hasConsumerDebt,
   } = data
 
-  const levelName     = LEVEL_NAMES[sovereigntyLevel] ?? 'Onbekend'
-  const nextLevelName = LEVEL_NAMES[sovereigntyLevel + 1]
-  const nextUnlock    = NEXT_LEVEL_UNLOCKS[sovereigntyLevel]
+  const levelName      = LEVEL_NAMES[sovereigntyLevel] ?? 'Onbekend'
+  const nextLevelName  = LEVEL_NAMES[sovereigntyLevel + 1]
+  const nextMotivation = NEXT_LEVEL_MOTIVATION[sovereigntyLevel]
 
   const currentPhase = PHASES.find((p) => p.id === currentPhaseId) ?? PHASES[0]
   const colors       = PHASE_STYLES[currentPhase.color]
@@ -123,7 +83,17 @@ export function JouwPadWidgetWrapper({ size, data, href }: Props) {
     100
   )
 
-  const criteriaData: CriterionData = { netWorth, monthsCovered, freedomPct, hasConsumerDebt }
+  // Criteria toetsen op de soevereiniteits-grondslag: sovereigntyMonthsCovered
+  // (liquide pot ÷ 3-maands tx-gemiddelde) is dezelfde noemer als
+  // computeSovereigntyLevel gebruikte, zodat de checklist het niveau nooit
+  // tegenspreekt (drift-fix; niet het effectiveMonthlyExpenses-gebaseerde
+  // top-level monthsCovered gebruiken).
+  const criteriaData: SovereigntyCriterionInput = {
+    netWorth,
+    monthsCovered: sovereigntyMonthsCovered,
+    freedomPct,
+    hasConsumerDebt,
+  }
   const nextCriteria = NEXT_LEVEL_CRITERIA[sovereigntyLevel] ?? []
 
   const levelDisplay = sovereigntyLevel < 0 ? `${sovereigntyLevel}` : `+${sovereigntyLevel}`
@@ -339,9 +309,9 @@ export function JouwPadWidgetWrapper({ size, data, href }: Props) {
         </div>
       )}
 
-      {/* ── Full-size: volgend niveau preview ── */}
-      {nextLevelName && nextUnlock && (
-        <div className="mt-auto pt-4">
+      {/* ── Full-size: volgend niveau — motivatie (geen feature-gate; ADR 0001) ── */}
+      {nextLevelName && nextMotivation && (
+        <div className="mt-4">
           <div className="rounded-[var(--r)] border border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/60 px-3 py-2.5">
             <p className="text-[9px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
               Volgend niveau
@@ -350,15 +320,14 @@ export function JouwPadWidgetWrapper({ size, data, href }: Props) {
               {sovereigntyLevel + 1 < 0 ? sovereigntyLevel + 1 : `+${sovereigntyLevel + 1}`}
               {' — '}{nextLevelName}
             </p>
-            <p className="mt-1 text-[10px] text-[var(--ink-3)]">
-              Ontgrendelt:{' '}
-              <span className="font-medium text-[var(--ink-2)]">{nextUnlock}</span>
+            <p className="mt-1 text-[10px] text-[var(--ink-2)]">
+              {nextMotivation}
             </p>
-            {/* 2nd upcoming unlock preview */}
-            {LEVEL_NAMES[sovereigntyLevel + 2] && NEXT_LEVEL_UNLOCKS[sovereigntyLevel + 1] && (
+            {/* Stap daarna op de reis */}
+            {LEVEL_NAMES[sovereigntyLevel + 2] && NEXT_LEVEL_MOTIVATION[sovereigntyLevel + 1] && (
               <p className="mt-1.5 text-[9px] text-[var(--ink-4)]">
                 Daarna: {sovereigntyLevel + 2 < 0 ? sovereigntyLevel + 2 : `+${sovereigntyLevel + 2}`}
-                {' — '}{LEVEL_NAMES[sovereigntyLevel + 2]} → {NEXT_LEVEL_UNLOCKS[sovereigntyLevel + 1]}
+                {' — '}{LEVEL_NAMES[sovereigntyLevel + 2]}
               </p>
             )}
           </div>

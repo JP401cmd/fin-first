@@ -47,12 +47,14 @@ import { clipRowsToPlanEnd } from '@/lib/horizon/clip-rows-to-plan-end'
 import type { RegelSimSnapshot } from '@/lib/future/regel-sim'
 import { resolvePotRules, POT_RULES_DEFAULTS, type PotRulesConfig } from '@/lib/pot-rules'
 import { computeRetirementExpenses, computeYearlyMustExpenses, type RetirementExpenseMethod, type BudgetRow, type ChildBudgetRow } from '@/lib/budget-utils'
-import { calculateBox3, type TaxYear } from '@/lib/box3-data'
+import { computeEffectiveLimit, type BudgetRollover, type BudgetAmountOverride } from '@/lib/budget-rollover'
+import { calculateBox3, CURRENT_TAX_YEAR, type TaxYear } from '@/lib/box3-data'
 import { NL_AOW_AGE } from '@/lib/constants'
 import { hasPartner } from '@/lib/household-type'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import { computeExpectedAnnualAppreciation, type Asset } from '@/lib/asset-data'
 import { computeAssetsByType, computeLiquidPot, monthsCoveredFrom } from '@/lib/dashboard-wealth-weighting'
+import { loadVasteLastenSummary } from '@/lib/vaste-lasten-summary'
 import { type Debt } from '@/lib/debt-data'
 import {
   parseHousingStrategy,
@@ -164,7 +166,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     txResult, assetsResult, debtsResult, profileResult,
     allBudgetsRawResult, actionsResult, eventsResult,
     recsResult,
-    goalsResult, recurringResult, netWorthSnapshotsResult,
+    goalsResult, netWorthSnapshotsResult,
     income12Result, earliestIncomeResult, sovereigntyTxResult,
     bankAccountsResult, prevMonthTxResult,
     nextStepCompletionsResult,
@@ -173,6 +175,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     allHoldingsResult,
     aowResult,
     bankConnectionsResult,
+    budgetRolloversResult, budgetAmountsResult,
   ] = await Promise.all([
     supabase.from('transactions').select('amount, budget_id, transaction_type').gte('date', monthStart).lt('date', monthEnd),
     supabase.from('assets').select('*').eq('is_active', true),
@@ -186,7 +189,6 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     supabase.from('life_events').select('id, name, event_type, target_age, target_date, one_time_cost, monthly_cost_change, monthly_income_change, duration_months, icon, is_active, sort_order, is_indexed, linked_asset_id, metadata').eq('is_active', true).order('sort_order', { ascending: true }).limit(50),
     supabase.from('recommendations').select('id, title, freedom_days_per_year, priority_score, recommendation_type, status').in('status', ['pending', 'postponed']),
     supabase.from('goals').select('id, name, goal_type, current_value, target_value, target_date, color, icon').eq('is_completed', false).order('sort_order', { ascending: true }),
-    supabase.from('recurring_transactions').select('id, name, amount, frequency, budget_id').eq('is_active', true),
     supabase.from('net_worth_snapshots').select('snapshot_date, net_worth, fire_age, savings_rate').gte('snapshot_date', twelveMonthsAgo).order('snapshot_date', { ascending: true }).limit(12),
     supabase.from('transactions').select('amount, date, budget_id, transaction_type').gt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd),
     supabase.from('transactions').select('date').gt('amount', 0).gte('date', twelveMonthsAgo).order('date', { ascending: true }).limit(1),
@@ -202,7 +204,19 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     supabase.from('aow_leeftijd').select('id, birth_date_from, birth_date_through, aow_years, aow_months, is_definitive, source'),
     // PSD2 bank connection check (#813) — active bank connections for next-step suggestion
     supabase.from('bank_connections').select('id').eq('status', 'active').limit(1),
+    // Heatmap-widget "beschikbaar": rollover-carry (huidige periode) + periode-
+    // overrides uit budget_amounts, zodat de widget dezelfde effectieve limiet
+    // consumeert als /overzicht/cashflow/budget (getEffectiveLimit) i.p.v. een
+    // eigen som op enkel default_limit — één bron van waarheid.
+    supabase.from('budget_rollovers').select('id, user_id, budget_id, period, carried_amount, rollover_type, created_at').eq('period', monthStart.slice(0, 7)),
+    supabase.from('budget_amounts').select('budget_id, effective_from, amount').lte('effective_from', monthStart),
   ])
+
+  // Vaste lasten: consumeer de canonieke bron (dezelfde die /overzicht/cashflow?view=vaste-lasten
+  // voedt) zodat het widgettotaal EXACT gelijk is aan het paginatotaal — filtert amount<0,
+  // sluit 'excluded' uit én telt auto-gedetecteerde vaste lasten mee. Start hier zodat de
+  // detectie parallel loopt met de FIRE-berekening hieronder; cache() dedupt per request.
+  const vasteLastenSummaryPromise = loadVasteLastenSummary(supabase)
 
   // AOW-referentietabel (gedeeld, RLS: authenticated read all). Val bij een leesfout NIET
   // stil op [] terug: dat maskeerde eerder een tabelnaamfout ('aow_leeftijden'), waardoor
@@ -906,8 +920,13 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     }
   }
 
-  // Box 3 tax — same calculation as /core/belasting (default: 2025, no partner)
+  // Box 3 tax — same calculation as /overzicht/belasting/box3: the canonieke
+  // CURRENT_TAX_YEAR (single source of truth in lib/box3-data.ts), no partner.
+  // We keep box3Tax (het headline-getal, ook geconsumeerd door box3_drag) én
+  // exposen de volledige dual-forfait-breakdown zodat de kassabon-widget de
+  // tussenrijen NIET zelf herberekent maar rekenkundig sluit op dit getal.
   let box3Tax: number | null = null
+  let box3Breakdown: DashboardData['box3Breakdown'] = null
   const rawAssets = assetsResult.data ?? []
   const rawDebts = debtsResult.data ?? []
   if (rawAssets.length > 0) {
@@ -918,11 +937,22 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
         debts: rawDebts as unknown as Debt[],
         hasPartner: false,
         dailyExpenses: dailyExp,
-        year: 2025,
+        year: CURRENT_TAX_YEAR,
       })
       box3Tax = box3Result.tax
+      box3Breakdown = {
+        year: box3Result.year,
+        rendementsgrondslag: box3Result.rendementsgrondslag,
+        heffingsvrij: box3Result.heffingsvrijVermogen,
+        grondslagSparen: box3Result.grondslagSparen,
+        effectiefForfait: box3Result.effectiefRendement,
+        box3Income: box3Result.box3Income,
+        tarief: box3Result.params.tarief,
+        tax: box3Result.tax,
+      }
     } catch {
       box3Tax = null
+      box3Breakdown = null
     }
   }
 
@@ -1009,6 +1039,11 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   })
   const sovMonthlyExp = (sovereigntyTxResult.data ?? []).filter(isRealTx).reduce((s, t) => s + Math.abs(Number(t.amount)), 0) / 3
   const sovereigntyLevel = computeSovereigntyLevel(netWorth, sovMonthlyExp, freedomPct, hasConsumerDebt, liquidPotWeighted)
+  // Runway op de EXACTE grondslag die computeSovereigntyLevel gebruikte (liquide
+  // pot ÷ 3-maands tx-gemiddelde). De Jouw Pad-criteria-checklist consumeert dit
+  // i.p.v. het top-level `monthsCovered` (dat op effectiveMonthlyExpenses rekent):
+  // zelfde noemer als de motor, zodat de checklist het niveau nooit tegenspreekt.
+  const sovereigntyMonthsCovered = monthsCoveredFrom(liquidPotWeighted, sovMonthlyExp)
   const currentPhaseId = levelToPhaseId(sovereigntyLevel)
 
   // Widget prefs
@@ -1181,31 +1216,29 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     : null
   const fireAgeFractional = simFireAgeFractional ?? snapshotFireAge
 
-  // Top recurring transactions (vaste lasten): top 5 by absolute amount
-  const allRecurring = (recurringResult.data ?? []) as { id: string; name: string; amount: number; frequency: string; budget_id: string | null }[]
+  // Vaste lasten (widgets): consumeer de canonieke bron zodat widgettotaal == paginatotaal.
+  // Bevat confirmed uitgaven-recurrings (amount<0, excl. 'excluded') + auto-detectie; recurring
+  // INKOMEN telt niet mee. Split op de canonieke RecurringCategory i.p.v. budgetnaam.
+  const vasteLastenSummary = await vasteLastenSummaryPromise
   const budgetNameMap = new Map<string, string>()
   for (const b of allParentBudgets) budgetNameMap.set(b.id, (b as unknown as { name: string }).name ?? '')
-  const topRecurringTransactions: TopRecurringTransaction[] = [...allRecurring]
-    .sort((a, b) => Math.abs(Number(b.amount)) - Math.abs(Number(a.amount)))
-    .slice(0, 5)
-    .map(r => ({
-      id: r.id,
-      name: r.name,
-      amount: Number(r.amount),
-      frequency: r.frequency,
-      category: r.budget_id ? (budgetNameMap.get(r.budget_id) ?? null) : null,
+  const vasteLastenItems = [
+    ...vasteLastenSummary.subscriptions.map(i => ({ item: i, isSubscription: true })),
+    ...vasteLastenSummary.vasteKosten.map(i => ({ item: i, isSubscription: false })),
+  ]
+  const topRecurringTransactions: TopRecurringTransaction[] = vasteLastenItems
+    .sort((a, b) => b.item.monthlyAmount - a.item.monthlyAmount)
+    .slice(0, 12)
+    .map(({ item, isSubscription }) => ({
+      id: item.id,
+      name: item.name,
+      // Negatief teken behouden (consistent met eerdere bundelsemantiek; uitgave).
+      amount: -item.averageAmount,
+      frequency: item.frequency,
+      category: item.category,
+      isSubscription,
     }))
-  // Monthly total for all recurring
-  const totalRecurringAmount = allRecurring.reduce((sum, r) => {
-    const amt = Math.abs(Number(r.amount))
-    switch (r.frequency) {
-      case 'weekly': return sum + amt * (52 / 12)
-      case 'monthly': return sum + amt
-      case 'quarterly': return sum + amt / 3
-      case 'yearly': return sum + amt / 12
-      default: return sum + amt
-    }
-  }, 0)
+  const totalRecurringAmount = vasteLastenSummary.totalMonthly
 
   // Top recommendations: top 5 pending by priority
   const allRecs = (recsResult.data ?? []) as { id: string; title: string; freedom_days_per_year: number | null; priority_score: number | null; recommendation_type: string; status: string }[]
@@ -1456,13 +1489,20 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // Net worth delta from snapshots
   const prevSnapshot = snapshotRows.length >= 2 ? snapshotRows[snapshotRows.length - 2] : null
   const netWorthDeltaComputed = prevSnapshot ? netWorth - Number(prevSnapshot.net_worth) : null
-  const freedomDaysWon = dailyExpenses > 0 && monthlyGrowth > 0 ? monthlyGrowth / dailyExpenses : 0
+  // Grondslag-consistentie (widgetreview Maandoverzicht): de "Vrijheidsdagen"-tegel
+  // staat op DEZELFDE vermogensmutatie als de "Vermogen"-tegel (snapshot-Δ, met
+  // cashflow-fallback), niet op losse cashflow (monthlyGrowth). Zo kunnen beide
+  // tegels in dezelfde rapportkaart nooit een tegengesteld teken tonen. dailyExpenses
+  // is het canonieke 12-mnd rolling dagtarief (geen eigen herberekening). Afgerond op
+  // hele dagen — halve vrijheidsdagen ogen vreemd.
+  const netWorthDeltaForCard = netWorthDeltaComputed ?? monthlyGrowth
+  const freedomDaysWon = dailyExpenses > 0 ? netWorthDeltaForCard / dailyExpenses : 0
   const prevExpenseComparison = prevMonthExpenses > 0
     ? Math.round(((monthlyExpenses - prevMonthExpenses) / prevMonthExpenses) * 100)
     : 0
   const monthSummary = {
-    netWorthDelta: netWorthDeltaComputed ?? monthlyGrowth,
-    freedomDaysWon: Math.round(freedomDaysWon * 10) / 10,
+    netWorthDelta: netWorthDeltaForCard,
+    freedomDaysWon: Math.round(freedomDaysWon),
     savingsRate: Math.round(savingsRate * 10) / 10,
     budgetScore,
     prevMonthComparison: prevExpenseComparison,
@@ -2020,14 +2060,47 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     heatmapSpending[bid] = (heatmapSpending[bid] ?? 0) + amt
   }
 
-  // Beschikbaar map: effective limit - spent for each budget
+  // Vorige-maand spending per budget — voedt de maand-op-maand trend-pijl in de
+  // heatmap-tooltip (was dode code: geen enkele caller gaf `previousSpending`).
+  // Zelfde grondslag als heatmapSpending (abs. bedrag per budget), maar over de
+  // vorige kalendermaand (hergebruikt de al opgehaalde prevMonthTx-query).
+  const heatmapPreviousSpending: Record<string, number> = {}
+  for (const tx of prevMonthTxResult.data ?? []) {
+    const bid = (tx as { budget_id?: string | null }).budget_id
+    if (!bid) continue
+    heatmapPreviousSpending[bid] = (heatmapPreviousSpending[bid] ?? 0) + Math.abs(Number(tx.amount))
+  }
+
+  // Beschikbaar map: effectieve limiet − besteed per budget. De effectieve
+  // limiet komt uit de canonieke `computeEffectiveLimit` (rollover-carry +
+  // periode-override), dezelfde bron als de budgetten-pagina — zo tonen widget
+  // en pagina exact dezelfde vulling/kleur (geen "twee schermen, twee sommen").
+  const currentPeriod = monthStart.slice(0, 7) // 'YYYY-MM'
+  const rolloversByBudget: Record<string, BudgetRollover[]> = {}
+  for (const r of (budgetRolloversResult.data ?? []) as BudgetRollover[]) {
+    ;(rolloversByBudget[r.budget_id] ??= []).push(r)
+  }
+  const amountsByBudget: Record<string, BudgetAmountOverride[]> = {}
+  for (const a of (budgetAmountsResult.data ?? []) as BudgetAmountOverride[]) {
+    ;(amountsByBudget[a.budget_id] ??= []).push(a)
+  }
+
   const heatmapBeschikbaarMap: Record<string, number> = {}
   for (const group of heatmapExpenseGroups) {
     const items = group.children.length > 0 ? group.children : [group]
     for (const b of items) {
-      const limit = Number(b.default_limit)
       const spent = heatmapSpending[b.id] ?? 0
-      heatmapBeschikbaarMap[b.id] = limit - spent
+      // Dashboard = personal-perspective, huidige maand: geen periode-schaling
+      // (periodMonthCount = 1) en geen household-aandeel — heatmapSpending is
+      // hier óók ongeschaald, dus limiet en besteding blijven consistent.
+      const effectiveLimit = computeEffectiveLimit({
+        defaultLimit: Number(b.default_limit),
+        rollovers: rolloversByBudget[b.id] ?? [],
+        amountOverrides: amountsByBudget[b.id] ?? [],
+        period: currentPeriod,
+        displayDate: monthStart,
+      })
+      heatmapBeschikbaarMap[b.id] = effectiveLimit - spent
     }
   }
 
@@ -2077,6 +2150,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     // totale netto vermogen — een huis is geen direct besteedbare buffer. Zelfde
     // grondslag als emergencyFund.monthsCovered en de Jouw Pad-buffer-mijlpalen.
     monthsCovered: monthsCoveredFrom(liquidPotWeighted, effectiveMonthlyExpenses),
+    sovereigntyMonthsCovered,
     hasConsumerDebt,
     recommendations: (recsResult.data ?? []).filter(r => (r as { status: string }).status === 'pending').length,
     goals: (goalsResult.data ?? []).length,
@@ -2091,7 +2165,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       icon: (g as { icon?: string }).icon ?? 'Target',
       custom_unit: (g as { custom_unit?: string | null }).custom_unit ?? null,
     })) satisfies TopGoal[],
-    recurringTransactions: (recurringResult.data ?? []).length,
+    recurringTransactions: vasteLastenSummary.count,
     lifeEvents: (eventsResult.data ?? []).length,
     netWorthHistory,
     savingsHistory,
@@ -2111,6 +2185,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     backtestSuccessRate,
     backtestNamedPaths,
     box3Tax,
+    box3Breakdown,
     simFireCountdown,
     fireEndStrategy: fireStrategy.strategy,
     fireEndAge: fireStrategy.endAge,
@@ -2167,6 +2242,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     heatmapExpenseGroups,
     heatmapSpending,
     heatmapBeschikbaarMap,
+    heatmapPreviousSpending,
   }
 
   // Pot-regels — defensieve aparte fetch zodat een ontbrekende kolom (DB zonder

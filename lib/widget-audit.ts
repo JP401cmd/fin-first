@@ -64,7 +64,7 @@ export const WIDGET_CLASSIFICATION: Record<string, WidgetClassification> = {
   // ── Insights (actionable — must link to relevant page) ──────
   cash_flow:                'insight',       // → /core/cash (view transactions, adjust)
   budgetten:                'insight',       // → /core/budgets (manage budgets)
-  uitgaven_heatmap:         'insight',       // → /core/budgets (drill into spending)
+  uitgaven_heatmap:         'insight',       // → /overzicht/cashflow/budget (drill into spending)
   assets:                   'insight',       // → /core/assets (manage allocations)
   schulden:                 'insight',       // → /core/debts (manage payoff)
   holdings:                 'insight',       // → /core/assets (manage investments)

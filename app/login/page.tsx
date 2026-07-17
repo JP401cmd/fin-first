@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { safeRelativePath } from '@/lib/safe-redirect'
 import { translateAuthError } from '@/lib/auth-errors'
+import { GoogleAuthButton } from '@/components/auth/google-auth-button'
 
 function LoginForm() {
   const router = useRouter()
@@ -100,6 +101,21 @@ function LoginForm() {
           </p>
         </div>
       )}
+
+      {/* Google-login boven het e-mailformulier — zelfde flow (PKCE →
+          /auth/callback), alleen een ander startpunt. redirectTo wordt rauw
+          doorgegeven; de callback saneert 'm nog eens via safeRelativePath. */}
+      <GoogleAuthButton
+        label="Inloggen met Google"
+        loadingLabel="Bezig met inloggen…"
+        next={redirectTo}
+      />
+
+      <div className="my-5 flex items-center gap-3">
+        <span className="h-px flex-1 bg-zinc-200" />
+        <span className="text-xs uppercase tracking-[0.08em] text-zinc-400">of</span>
+        <span className="h-px flex-1 bg-zinc-200" />
+      </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>

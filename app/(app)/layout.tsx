@@ -14,6 +14,7 @@ import { DisplayModeProvider, type DisplayMode } from '@/lib/hooks/use-display-m
 import { SessionMonitor } from '@/components/app/session-monitor'
 import { ErrorReporter } from '@/components/app/error-reporter'
 import { AutoSnapshotTrigger } from '@/components/app/auto-snapshot-trigger'
+import { DailyPriceSyncTrigger } from '@/components/app/daily-price-sync-trigger'
 import { PerspectiveProvider } from '@/components/app/perspective-provider'
 import { NotificationProvider } from '@/components/app/notifications/notification-provider'
 import { NotificationModal } from '@/components/app/notifications/notification-panel'
@@ -428,6 +429,7 @@ export default async function AppLayout({
           <SessionMonitor />
           <ErrorReporter />
           <AutoSnapshotTrigger />
+          <DailyPriceSyncTrigger />
           <PerspectiveProvider>
             <ChatProvider>
               <NotificationProvider>
@@ -463,8 +465,13 @@ export default async function AppLayout({
                             {children}
                           </ResponsiveShell>
                         </CommandPaletteProvider>
+                        {/* ChatPanel MOET binnen FeatureAccessProvider blijven:
+                            het leest de AI-abonnementsstatus via useModuleAccess()
+                            (hasAi-gate). Buiten de provider valt useFeatureAccess
+                            terug op subscriptions:[] → hasAi=false → elke
+                            AI-abonnee ziet de upsell i.p.v. de chat. */}
+                        <ChatPanelLazy />
                       </FeatureAccessProvider>
-                      <ChatPanelLazy />
                       <Suspense fallback={null}>
                         <ChatPromptDeeplink />
                       </Suspense>

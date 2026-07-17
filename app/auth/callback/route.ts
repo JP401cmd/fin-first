@@ -5,6 +5,9 @@ import { safeRelativePath } from '@/lib/safe-redirect'
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
+  // OAuth-providers (Google) sturen bij annulering/fout terug met ?error=…
+  // i.p.v. een code. Dan is de "verlopen bevestigingslink"-banner misleidend.
+  const oauthError = searchParams.get('error')
   // safeRelativePath weigert open-redirect-patronen (//evil.com, @evil.com, .evil.com, absolute URLs)
   const next = safeRelativePath(searchParams.get('next'))
 
@@ -14,6 +17,13 @@ export async function GET(request: Request) {
     if (!error) {
       return NextResponse.redirect(`${origin}${next}`)
     }
+  }
+
+  // Google-login geannuleerd of geweigerd (geen code, wel ?error=access_denied):
+  // stuur terug naar een kale /login zónder de e-mailbevestigings-banner — die
+  // copy slaat nergens op bij een afgebroken OAuth-poging.
+  if (oauthError) {
+    return NextResponse.redirect(`${origin}/login`)
   }
 
   // Geen code of mislukte uitwisseling: de bevestigings-/resetlink is verlopen

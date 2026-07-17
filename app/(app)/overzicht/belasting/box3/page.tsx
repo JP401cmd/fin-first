@@ -5,13 +5,14 @@ import { BelastingBoxPageHeader } from '@/components/overview/belasting-box-page
 import { createClient } from '@/lib/supabase/server'
 import { getServerPerspective } from '@/lib/household/server-perspective'
 import { loadPerspectiveBox3 } from '@/lib/household-tax'
+import { CURRENT_TAX_YEAR } from '@/lib/box3-data'
 
 export const metadata: Metadata = {
   title: 'Box 3 · Sparen + beleggen — TriFinity',
   description: 'Vermogensheffing over sparen en beleggen — forfaitair rendement.',
 }
 
-const YEAR = 2026
+const YEAR = CURRENT_TAX_YEAR
 
 /**
  * /overzicht/belasting/box3 — Box 3-subpagina (sparen + beleggen).
