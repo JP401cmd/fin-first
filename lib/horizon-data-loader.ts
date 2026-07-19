@@ -189,6 +189,19 @@ export interface HorizonPageData {
   /** Belegbaar vermogen voor pensioen — totaal vermogen minus equity bij relevante strategieën. */
   fireEligibleNetWorth: number
   /**
+   * Canonieke vrijheidsvoortgang (0..100), server-side berekend met dezelfde grondslag als het
+   * dashboard (`computeFreedomProgressWithBasis`). Server-SCALAR voor de PROGRESSIEVE first paint
+   * van /toekomst (Task 4.2): tonen zolang de client-side kernel-worker de exacte projectie nog
+   * berekent. Consume, don't recompute — géén nieuwe som in de client.
+   */
+  freedomPct: number
+  /**
+   * Strategie-bewust FIRE-doel (benodigde LIQUIDE portefeuille excl. eigen woning), server-side
+   * berekend (`computeFireTarget`). Server-SCALAR voor de first paint (Task 4.2). `null` wanneer
+   * er (nog) geen doel te berekenen is. Consume, don't recompute.
+   */
+  requiredPortfolioExclHome: number | null
+  /**
    * Netto vermogen EXCLUSIEF eigen woning = netto vermogen − overwaarde (ZUIVER, ook bij
    * reverse_mortgage). Aparte weergave-grondslag (dubbele grondslag incl./excl. woning) —
    * NIET de FIRE-pot (`fireEligibleNetWorth`) en NIET het volledige netto vermogen; nooit op
@@ -980,6 +993,10 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
     housingStrategy,
     housingContext,
     fireEligibleNetWorth,
+    // Server-scalars voor de progressieve first paint van /toekomst (Task 4.2) — al berekend
+    // hierboven, nu doorgegeven (geen nieuwe som). `fire_age` zit al in `resilienceSnapshots`.
+    freedomPct,
+    requiredPortfolioExclHome,
     netWorthExclHome,
     showDualHousingBasis,
     housingStrategyDismissedAt,

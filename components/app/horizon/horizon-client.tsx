@@ -1,6 +1,6 @@
 ﻿'use client'
 
-import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo, type RefObject } from 'react'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { useDreamTransition } from '@/components/app/horizon/dream-transition-context'
 import type { HorizonPageData } from '@/lib/horizon-data-loader'
@@ -18,7 +18,6 @@ import {
   computeFireProjection, computeFireRange,
   formatFireAge,
   ageAtDate, deriveCountdown,
-  runMonteCarlo,
   LIFE_EVENT_CATALOG, nibudChildrenCost, berekenSchenkbelasting, berekenAutoMaandkosten, berekenErfbelasting, berekenKinderopvangNetto, kinderbijslagPerMaand, WERELDREIS_STIJL_PRESETS, VERBOUWING_TYPE_KOSTEN, STUDIE_TYPE_KOSTEN, BRUILOFT_BUDGET_PRESETS,
   type FinancialInput, type FireProjection, type FireRange,
   type LifeEvent, type LifeEventImpact,
@@ -95,7 +94,7 @@ import { ScenarioChip, VERKEN_SECTION_ID } from '@/components/app/horizon/scenar
 import { Dekkingsradar } from '@/components/app/horizon/dekkingsradar'
 import { ScenarioKaarten } from '@/components/app/horizon/scenario-kaarten'
 import { computeDekkingsradar, type RadarAs } from '@/lib/horizon/dekkingsradar'
-import { runScenarioPresets, type ScenarioPresetResult } from '@/lib/horizon/scenario-presets'
+import { type ScenarioPresetResult } from '@/lib/horizon/scenario-presets'
 import { computeStopMarge } from '@/lib/horizon/stop-marge'
 import {
   scenarioMonthlySpendDelta,
@@ -116,6 +115,7 @@ import { DoelLoslatenConfirm } from '@/components/future/doel-loslaten-confirm'
 import { buildSliderEvent, readSliderValueFromEvents, type SliderKey } from '@/lib/scenario-events'
 import type { HorizonScenarioOverrides } from '@/lib/hooks/use-horizon-fire-sim'
 import type { AssetCategorie } from '@/lib/horizon-kernel/types'
+import { runMonteCarloAsync, runScenarioPresetsAsync } from '@/lib/horizon-kernel/worker/run-in-worker'
 import { PAGE_INFO } from '@/lib/page-info-content'
 
 const ScenariosModal = dynamic(() =>
@@ -240,6 +240,36 @@ interface HouseholdHeroData {
   /** Jaarlijkse uitgave ná pensioen voor dit perspectief (huishouden = gecombineerd,
    *  methode-afhankelijk; partner = diens eigen bedrag). Voedt de "Na pensioen"-KPI. */
   retirementExpense: number
+}
+
+/**
+ * Zichtbaarheids-gate (Task 4.2): `true` zodra het gegeven element (bijna) in beeld komt.
+ * Gebruikt om de zware duiding-secties (dekkingsradar-MC + scenario-presets) pas te laten
+ * rekenen wanneer de gebruiker er (dreigt te) scrollen — niet meer eager in idle. Blijft
+ * `true` na de eerste keer (unobserve): een eenmaal-berekende sectie hoeft niet te herrekenen
+ * op scroll-terug. SSR-veilig: `IntersectionObserver` ontbreekt server-side → `true`
+ * (degradeert naar het oude altijd-berekenen-gedrag, geen regressie).
+ */
+function useInViewOnce(ref: RefObject<HTMLElement | null>, rootMargin = '600px'): boolean {
+  const [inView, setInView] = useState(false)
+  useEffect(() => {
+    if (inView) return
+    const el = ref.current
+    if (!el) return
+    if (typeof IntersectionObserver === 'undefined') { setInView(true); return }
+    const obs = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setInView(true)
+          obs.disconnect()
+        }
+      },
+      { rootMargin },
+    )
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [ref, rootMargin, inView])
+  return inView
 }
 
 export default function HorizonPage({
@@ -529,6 +559,12 @@ export default function HorizonPage({
       : null,
   )
   const verkenSectionRef = useRef<HTMLElement | null>(null)
+  // Zichtbaarheids-gate voor de zware duiding-secties (dekkingsradar-MC + scenario-presets):
+  // die rekenen pas via de worker wanneer de "Wat het betekent"-sectie (bijna) in beeld komt
+  // (Task 4.2), i.p.v. eager in idle. Ref hangt aan de altijd-gemounte sectie in volledige
+  // weergave.
+  const duidingSectionRef = useRef<HTMLElement | null>(null)
+  const duidingInView = useInViewOnce(duidingSectionRef)
 
   // ── Vastgelegd doelscenario ("verkennen wordt richten", ronde 4) ─────────────
   // Client-state, gehydrateerd uit de pref. GEEN her-read na de route-respons: het blok
@@ -718,9 +754,24 @@ export default function HorizonPage({
     }
   }, [hasScenario, scenarioSliderEvents, scenarioReturnDeltas])
 
+  // Server-scalar FIRE-leeftijd voor de progressieve first paint (Task 4.2): de laatst door de
+  // kernel weggeschreven `fire_age` uit net_worth_snapshots (consume, don't recompute). Voedt —
+  // samen met `initialData.freedomPct`/`requiredPortfolioExclHome` — de hero-eerste-paint zolang
+  // de client-side kernel-worker de exacte projectie nog berekent.
+  const serverFireAge = useMemo<number | null>(() => {
+    const snaps = initialData.resilienceSnapshots
+    for (let i = snaps.length - 1; i >= 0; i--) {
+      const fa = snaps[i].fire_age
+      if (fa != null) return fa
+    }
+    return null
+  }, [initialData.resilienceSnapshots])
+
   // Simulatie-engine met echte app-data (fractionele FIRE-leeftijd + kasstromen)
   // Fase 2b (#495): gemigreerd naar runUnifiedProjection() met per-asset-type rendement
-  const { result: simResult, cashflows: simCashflows, error: simError, unifiedRows, effectiveLifeEvents, kernelStatus, kernelMaandHint, kernelHousingSale, scenario, stopPad, scenarioPending } = useHorizonFireSim(
+  // Task 4.2: de kernel-runs draaien in een web worker (met synchrone jsdom/SSR-fallback);
+  // `firstPaint*` levert de server-scalars zolang de worker-run nog niet geland is.
+  const { result: simResult, cashflows: simCashflows, error: simError, unifiedRows, effectiveLifeEvents, kernelStatus, kernelMaandHint, kernelHousingSale, scenario, stopPad, scenarioPending, firstPaintFireAge, firstPaintFreedomPct, firstPaintRequiredPortfolio } = useHorizonFireSim(
     input
       ? {
           horizonInput: input,
@@ -744,6 +795,10 @@ export default function HorizonPage({
           scenarioOverrides,
           // Alleen de expliciet gezette stop voedt het duiding-stop-pad; null = geen stop-pad.
           stopPadAge: scenarioStopAge,
+          // Server-scalars voor de progressieve first paint (Task 4.2).
+          initialFireAge: serverFireAge,
+          initialFreedomPct: initialData.freedomPct,
+          initialRequiredPortfolio: initialData.requiredPortfolioExclHome,
         }
       : null,
   )
@@ -1366,14 +1421,20 @@ export default function HorizonPage({
     setScenarioData(buildScenarioVariants(simResult.rows, fireParams.grossReturn))
   }, [scenariosExpanded, simResult, fireParams.grossReturn])
 
-  // Lazy Monte Carlo computation — only when expanded
+  // Monte-Carlo-overlay — alleen bij expand (de expand-klik is de zichtbaarheids-gate). Task
+  // 4.2: de 1000-sim-run draait via de web worker (of synchrone fallback), niet op de main
+  // thread; race-guard via de `cancelled`-closure (cleanup vóór re-run negeert stale resolves).
   useEffect(() => {
     if (!mcExpanded) { setMcData(null); return }
     if (!effectiveInput || !simResult) return
     const age = effectiveInput.dateOfBirth ? ageAtDate(effectiveInput.dateOfBirth) : null
     if (age == null) return
     const years = Math.max(simResult.displayEndAge - age, 10)
-    setMcData(runMonteCarlo(effectiveInput, 1000, years))
+    let cancelled = false
+    runMonteCarloAsync(effectiveInput, 1000, years)
+      .then((res) => { if (!cancelled) setMcData(res) })
+      .catch((err) => console.warn('[horizon-worker] MC-run faalde', err))
+    return () => { cancelled = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mcExpanded, simResult, input])
 
@@ -1433,35 +1494,33 @@ export default function HorizonPage({
     setScenarioStopAge(prev => (prev !== next ? next : prev))
   }, [scenarioVerwachtSettled, scenarioStopKoppel])
 
-  // ── Dekkingsradar: lichte MC-run (500 sims), deferred na idle ──────────────────
-  // Enkel wanneer de volledige weergave actief is én de zware MC-overlay NIET al draait
-  // (dan hergebruikt de radar-memo `mcData`). Draait in idle (of setTimeout-fallback) zodat
-  // de eerste paint niet blokkeert; opgeruimd bij unmount/dep-wissel.
+  // ── Dekkingsradar: lichte MC-run (500 sims), via de worker bij zichtbaarheid ──────────
+  // Enkel wanneer de volledige weergave actief is, de duiding-sectie (bijna) in beeld komt
+  // (`duidingInView`, Task 4.2) én de zware MC-overlay NIET al draait (dan hergebruikt de
+  // radar-memo `mcData`). Draait via de web worker (of synchrone fallback), niet op de main
+  // thread; opgeruimd bij unmount/dep-wissel.
   useEffect(() => {
-    if (displayMode !== 'full' || mcData) { setRadarMc(null); return }
+    if (displayMode !== 'full' || mcData || !duidingInView) { setRadarMc(null); return }
     if (!effectiveInput || !simResult || currentAge == null) return
     const years = Math.max(simResult.displayEndAge - currentAge, 10)
     let cancelled = false
-    const run = () => { if (!cancelled) setRadarMc(runMonteCarlo(effectiveInput, 500, years)) }
-    const ric = typeof requestIdleCallback === 'function' ? requestIdleCallback(run) : null
-    const timer = ric === null ? setTimeout(run, 1) : null
-    return () => {
-      cancelled = true
-      if (ric !== null && typeof cancelIdleCallback === 'function') cancelIdleCallback(ric)
-      if (timer !== null) clearTimeout(timer)
-    }
+    runMonteCarloAsync(effectiveInput, 500, years)
+      .then((res) => { if (!cancelled) setRadarMc(res) })
+      .catch((err) => console.warn('[horizon-worker] radar-run faalde', err))
+    return () => { cancelled = true }
     // effectiveInput is een stabiele state-ref (=input via useState) — muteert alleen bij een
     // data-herlaad, niet per render, dus geen re-runstorm. Daarmee zijn alle deps compleet.
-  }, [displayMode, mcData, simResult, currentAge, effectiveInput])
+  }, [displayMode, mcData, duidingInView, simResult, currentAge, effectiveInput])
 
-  // ── Scenario's naast elkaar: 5 preset-kaarten, deferred na idle ────────────────
+  // ── Scenario's naast elkaar: 5 preset-kaarten, via de worker bij zichtbaarheid ─────────
   // De context hangt UITSLUITEND van de basis-data af (geen scenario-overrides): profiel +
   // basis-lifeEvents + basis-jaaruitgaven, verwachtFireAge = basis-FIRE. De vijf volle
-  // kernel-solves (~1s samen) draaien daarom nooit per slider-tick, maar één keer in idle.
-  // Leunt erop dat de sliders de hoofd-input niet muteren (het scenario loopt via het
-  // gescheiden scenario-veld) — anders zouden deze presets wél per tick herrekenen.
+  // kernel-solves (~1s samen) draaien nooit per slider-tick, en Task 4.2: pas wanneer de
+  // duiding-sectie (bijna) in beeld komt (`duidingInView`) én via de web worker (of synchrone
+  // fallback) — niet meer eager in idle op de main thread. Leunt erop dat de sliders de
+  // hoofd-input niet muteren (het scenario loopt via het gescheiden scenario-veld).
   useEffect(() => {
-    if (displayMode !== 'full') { setScenarioPresets(null); setScenarioPresetsLoading(false); return }
+    if (displayMode !== 'full' || !duidingInView) { setScenarioPresets(null); setScenarioPresetsLoading(false); return }
     if (!kernelRawProfile || !effectiveInput || currentAge == null) return
     const yearlyExp = effectiveInput.yearlyMustExpenses > 0 ? effectiveInput.yearlyMustExpenses : 0
     if (yearlyExp <= 0) return
@@ -1470,32 +1529,27 @@ export default function HorizonPage({
       initialData.housingStrategy.mode === 'downsize' || initialData.housingStrategy.mode === 'reverse_mortgage'
     setScenarioPresetsLoading(true)
     let cancelled = false
-    const run = () => {
-      if (cancelled) return
-      const results = runScenarioPresets({
-        profile: kernelRawProfile,
-        assets: initialData.assets ?? [],
-        debts,
-        lifeEvents: events,
-        aowRows,
-        yearlyExpenses: yearlyExp,
-        currentAge,
-        verwachtFireAge: simResult?.fireAgeFractional ?? null,
-        fireEndAge: strat.endAge,
-        hasEigenHuis: initialData.housingContext.hasEigenHuis,
-        downsizeStrategyActief: downsizeActief,
+    runScenarioPresetsAsync({
+      profile: kernelRawProfile,
+      assets: initialData.assets ?? [],
+      debts,
+      lifeEvents: events,
+      aowRows,
+      yearlyExpenses: yearlyExp,
+      currentAge,
+      verwachtFireAge: simResult?.fireAgeFractional ?? null,
+      fireEndAge: strat.endAge,
+      hasEigenHuis: initialData.housingContext.hasEigenHuis,
+      downsizeStrategyActief: downsizeActief,
+    })
+      .then((results) => { if (!cancelled) { setScenarioPresets(results); setScenarioPresetsLoading(false) } })
+      .catch((err) => {
+        console.warn('[horizon-worker] preset-run faalde', err)
+        if (!cancelled) setScenarioPresetsLoading(false)
       })
-      if (!cancelled) { setScenarioPresets(results); setScenarioPresetsLoading(false) }
-    }
-    const ric = typeof requestIdleCallback === 'function' ? requestIdleCallback(run) : null
-    const timer = ric === null ? setTimeout(run, 1) : null
-    return () => {
-      cancelled = true
-      if (ric !== null && typeof cancelIdleCallback === 'function') cancelIdleCallback(ric)
-      if (timer !== null) clearTimeout(timer)
-    }
+    return () => { cancelled = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [displayMode, kernelRawProfile, simResult?.fireAgeFractional, currentAge, debts, events, aowRows, fireStrategy, initialData])
+  }, [displayMode, duidingInView, kernelRawProfile, simResult?.fireAgeFractional, currentAge, debts, events, aowRows, fireStrategy, initialData])
 
   // Deeplink `?whatif=open` (en ScenarioChip-klik) → scroll naar de slider-lab.
   useEffect(() => {
@@ -1780,8 +1834,11 @@ export default function HorizonPage({
   const totalDelayMonths = impacts.reduce((s, i) => s + i.fireDelayMonths, 0)
   const adjustedFireAge = baseFire?.fireAge != null ? baseFire.fireAge + totalDelayMonths / 12 : null
 
-  // Gebruik simulatie-FIRE-bedrag als authoritative vrijheidspercentage wanneer beschikbaar
-  const effectiveFireTarget = simResult?.requiredFirePortfolio ?? fire?.fireTarget ?? 0
+  // Gebruik simulatie-FIRE-bedrag als authoritative vrijheidspercentage wanneer beschikbaar.
+  // Task 4.2 (progressieve first paint): zolang de worker-run nog niet geland is, wint de
+  // server-scalar (`firstPaintRequiredPortfolio`) boven de client-side `fire`-fallback, zodat
+  // de hero meteen het canonieke doelbedrag toont (consume, don't recompute) i.p.v. te flitsen.
+  const effectiveFireTarget = simResult?.requiredFirePortfolio ?? firstPaintRequiredPortfolio ?? fire?.fireTarget ?? 0
   const effectiveNetWorth = (effectiveInput?.totalAssets ?? 0) - (effectiveInput?.totalDebts ?? 0)
   // Canonieke grondslag (ADR 0009): FIRE-eligible vermogen (huis gefilterd via
   // de housing-strategie) ÷ benodigde portfolio via computeFreedomProgress —
@@ -1818,7 +1875,7 @@ export default function HorizonPage({
         requiredNetWorthInclHome: effectiveRequiredNetWorthInclHome,
         requiredPortfolioExclHome: effectiveFireTarget,
       })
-    : (fire?.freedomPercentage ?? 0)
+    : (firstPaintFreedomPct ?? fire?.freedomPercentage ?? 0)
 
   // ── Pensioen-modus afgeleid ──────────────────────────────────────────────
   const isPensioenMode = simResult?.strategy === 'pensioen'
@@ -2260,11 +2317,15 @@ export default function HorizonPage({
   const isKernelDepleteRate =
     fireStrategy?.strategy === 'deplete' && !isPensioenMode
 
-  // Countdown afgeleid uit simulatie-engine (consistent met fireAgeFractional)
+  // Countdown afgeleid uit simulatie-engine (consistent met fireAgeFractional). Task 4.2:
+  // zolang de worker-run nog niet geland is, telt de server-scalar FIRE-leeftijd
+  // (`firstPaintFireAge` uit net_worth_snapshots) — daarna wint de verse projectie.
   const effectiveCountdown = simResult?.fireAgeFractional != null && currentAge != null
     ? deriveCountdown(simResult.fireAgeFractional, currentAge)
-    : { countdownYears: fire?.countdownYears ?? 0, countdownMonths: fire?.countdownMonths ?? 0,
-        countdownDays: fire?.countdownDays ?? 0, fireDate: fire?.fireDate ?? 'Niet haalbaar' }
+    : firstPaintFireAge != null && currentAge != null
+      ? deriveCountdown(firstPaintFireAge, currentAge)
+      : { countdownYears: fire?.countdownYears ?? 0, countdownMonths: fire?.countdownMonths ?? 0,
+          countdownDays: fire?.countdownDays ?? 0, fireDate: fire?.fireDate ?? 'Niet haalbaar' }
 
   // Eén bron van waarheid voor de PERSOONLIJKE FIRE: de hero-projectie (deze
   // pagina, runUnifiedProjection) is leidend. We geven 'm door aan de
@@ -3634,7 +3695,7 @@ export default function HorizonPage({
   const heroFreedomFraming = resolveFreedomFraming({
     freedomPct: effectiveFreedomPct,
     currentAge,
-    fireAge: simResult?.fireAgeFractional ?? simResult?.fireAge ?? fire?.fireAge ?? null,
+    fireAge: simResult?.fireAgeFractional ?? simResult?.fireAge ?? firstPaintFireAge ?? fire?.fireAge ?? null,
     strategy: fireStrategy?.strategy,
     aowAge: userAowAge.fractional,
   })
@@ -5283,7 +5344,7 @@ export default function HorizonPage({
               <SectionLabel className="mt-8 sm:mt-10" num="III">Wat het betekent</SectionLabel>
             </HideInSimple>
             <HideInSimple>
-              <section className="mt-6 sm:mt-8">
+              <section ref={duidingSectionRef} className="mt-6 sm:mt-8">
                 <div className="card-editorial no-hover-lift divide-y divide-[var(--border-ed)]">
                   {/* === 4b. Levensinkomenstrook (dekkingsgraad per leeftijd) === */}
                   {coverageNodes.length > 0 && (

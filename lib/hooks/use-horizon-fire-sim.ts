@@ -9,7 +9,7 @@
  * Schrijft de FIRE-velden weg naar net_worth_snapshots.
  */
 
-import { useMemo, useEffect, useRef, useDeferredValue } from 'react'
+import { useMemo, useEffect, useRef, useState, useDeferredValue } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { type FinancialInput, type LifeEvent } from '@/lib/horizon-data'
 import { type SimResult, type SimCashflow } from '@/lib/fire-simulation'
@@ -19,12 +19,19 @@ import { toSimResult, type UnifiedProjectionRow } from '@/lib/unified-projection
 import { buildHorizonInput } from '@/lib/horizon/build-input'
 import {
   computeConvergentieProjection,
+  type ConvergentieRawContext,
+  type ConvergentieProjectionOutcome,
   type ConvergentieRawProfileRow,
 } from '@/lib/horizon-kernel/convergentie-router'
 import { dedupeById } from '@/lib/horizon-kernel/adapter'
 import { applyReturnDeltasToAssets } from '@/lib/horizon-kernel/adapter/whatif-varianten'
 import { expandCategorieReturnDeltas } from '@/lib/horizon/toekomst-scenario'
-import { runForcedStopPath, type ForcedStopPathResult } from '@/lib/horizon/scenario-presets'
+import { runForcedStopPath, type ForcedStopPathInput, type ForcedStopPathResult } from '@/lib/horizon/scenario-presets'
+import {
+  isKernelWorkerAvailable,
+  runKernelAsync,
+  runForcedStopPathAsync,
+} from '@/lib/horizon-kernel/worker/run-in-worker'
 import { applyKernelHousingSaleToEvents } from '@/lib/horizon/kernel-display-events'
 import type { SolverStatus } from '@/lib/horizon-kernel/solver'
 import type { KernelHousingSale, KernelPensionPotView } from '@/lib/horizon-kernel/bridge'
@@ -138,6 +145,22 @@ export interface HorizonFireSimResult {
    * altijd een concrete `boolean`; `?` houdt bestaande volledige result-literals compileerbaar.
    */
   scenarioPending?: boolean
+  /**
+   * True zolang de worker de hoofd-run nog niet heeft opgeleverd (progressieve first paint,
+   * Task 4.2). In de synchrone tak (jsdom/SSR — geen Worker) altijd `false` (de kernel draait
+   * meteen in `useMemo`). Consumenten tonen hiermee een subtiele "bijwerken…"-staat terwijl de
+   * server-scalar-first-paint zichtbaar is. Additief/optioneel in het TYPE.
+   */
+  isRefining?: boolean
+  /**
+   * Server-scalar-first-paint-doorgifte (Task 4.2). Zolang de worker-hoofd-run nog niet geland
+   * is (`result === null` in de worker-tak) geeft de hook deze al-server-berekende scalars terug
+   * — daarna `null` (dan wint `result`). In de synchrone tak zijn ze `null` (de echte waarden
+   * staan meteen in `result`). Additief/optioneel; puur doorgegeven, geen herberekening.
+   */
+  firstPaintFireAge?: number | null
+  firstPaintFreedomPct?: number | null
+  firstPaintRequiredPortfolio?: number | null
 }
 
 interface HorizonFireSimInput {
@@ -185,6 +208,126 @@ interface HorizonFireSimInput {
    * een eigen useMemo. Wanneer gezet forceert de hook een deplete-stop op deze leeftijd.
    */
   stopPadAge?: number | null
+  /**
+   * Server-scalars voor de PROGRESSIEVE first paint (Task 4.2 — "eerst tonen, dan verfijnen").
+   * In de worker-tak is `result` `null` tot de kernel-run landt; de hook geeft dan deze al-
+   * server-berekende scalars terug (`firstPaint*`) zodat de FIRE-leeftijd, vrijheids-% en het
+   * doelbedrag direct tonen. Consume, don't recompute: deze komen uit de loader/`net_worth_snapshots`
+   * (via `initialData`), NIET uit een nieuwe som in de hook. Optioneel/additief.
+   */
+  initialFireAge?: number | null
+  initialFreedomPct?: number | null
+  initialRequiredPortfolio?: number | null
+}
+
+/**
+ * De gebundelde kernel-inputs (deferred-gekeyd). Eén home zodat de synchrone `useMemo`-tak
+ * (jsdom/SSR) én de worker-effect-tak (browser) de kernel-context BYTE-IDENTIEK assembleren —
+ * cruciaal voor de parity-garantie. Getypeerd zodat tsc een drift tussen beide paden afvangt.
+ */
+interface KernelInputBundle {
+  horizonInput: FinancialInput | null | undefined
+  lifeEvents: LifeEvent[] | undefined
+  fireStrategy: FireStrategyConfig | undefined
+  withdrawalStrategy: WithdrawalStrategyConfig | undefined
+  grossReturnParam: number | undefined
+  inflationParam: number | undefined
+  aowAgeFractionalParam: number | undefined
+  assets: Asset[] | undefined
+  debts: Debt[] | undefined
+  box3Method: Box3Method | undefined
+  hasPartner: boolean | undefined
+  bankAccountCash: number | undefined
+  monthlySavingsOverride: number | null | undefined
+  baseAnnualSavingsFromCashflow: number | null | undefined
+  housingStrategy: HousingStrategyConfig | undefined
+  kernelRawProfile: ConvergentieRawProfileRow | null | undefined
+  aowRows: AowLeeftijdRow[] | undefined
+}
+
+/**
+ * Metadata-assemblage via de gedeelde builder (yearlyExpenses + guards). Zie
+ * `lib/horizon/build-input.ts`. Gedeeld door alle drie de run-vormen (hoofd/scenario/stop) en
+ * door zowel de synchrone als de worker-tak, zodat de `yearlyExpenses`-grondslag overal gelijk is.
+ */
+function buildInputFromBundle(p: KernelInputBundle) {
+  return buildHorizonInput({
+    horizonInput: p.horizonInput ?? null,
+    lifeEvents: p.lifeEvents ?? [],
+    fireStrategy: p.fireStrategy,
+    withdrawalStrategy: p.withdrawalStrategy,
+    grossReturn: p.grossReturnParam,
+    inflation: p.inflationParam,
+    aowAgeFractional: p.aowAgeFractionalParam,
+    assets: p.assets,
+    debts: p.debts,
+    box3Method: p.box3Method,
+    hasPartner: p.hasPartner,
+    bankAccountCash: p.bankAccountCash,
+    monthlySavingsOverride: p.monthlySavingsOverride,
+    baseAnnualSavingsFromCashflow: p.baseAnnualSavingsFromCashflow,
+    housingStrategy: p.housingStrategy,
+  })
+}
+
+/**
+ * Assembleert de `ForcedStopPathInput` voor het gekozen-stop-pad — gedeeld door de synchrone
+ * en de worker-tak zodat beide exact dezelfde ACTIEVE context (incl. scenario-overrides) en
+ * eindstrategie gebruiken. `profile` wordt expliciet doorgegeven (caller heeft 'm al geguard).
+ */
+function buildStopPadInput(
+  p: KernelInputBundle,
+  profile: ConvergentieRawProfileRow,
+  ov: HorizonScenarioOverrides | null,
+  stopAge: number,
+  yearlyExpenses: number,
+): ForcedStopPathInput {
+  const { assets, lifeEvents } = resolveScenarioAssetsAndEvents(p.assets, p.lifeEvents, ov)
+  return {
+    profile,
+    assets,
+    debts: p.debts ?? [],
+    lifeEvents,
+    aowRows: p.aowRows,
+    yearlyExpenses,
+    stopAge,
+    fireEndAge: p.fireStrategy?.endAge ?? DEFAULT_FIRE_STRATEGY.endAge,
+  }
+}
+
+/** Resultaat-vorm van de hoofd-run (identiek voor de synchrone en de worker-tak). */
+interface HorizonMainSimResult {
+  result: SimResult
+  cashflows: SimCashflow[]
+  unifiedRows: UnifiedProjectionRow[]
+  effectiveLifeEvents: LifeEvent[]
+  kernelStatus: SolverStatus | null
+  kernelMaandHint: number | null
+  kernelHousingSale: KernelHousingSale | null
+  kernelPensionPots: readonly KernelPensionPotView[]
+}
+
+/** Mapt een geslaagde convergentie-outcome naar de hoofd-run-resultaatvorm (één home). */
+function mapMainOutcome(
+  outcome: ConvergentieProjectionOutcome,
+  lifeEvents: LifeEvent[],
+  cashflows: SimCashflow[],
+): HorizonMainSimResult | null {
+  if (!outcome.ok) return null
+  const unifiedResult = outcome.result
+  return {
+    result: toSimResult(unifiedResult),
+    cashflows,
+    unifiedRows: unifiedResult.rows,
+    effectiveLifeEvents: applyKernelHousingSaleToEvents(
+      dedupeById(lifeEvents),
+      outcome.kernelHousingSale ?? null,
+    ),
+    kernelStatus: outcome.kernelStatus ?? null,
+    kernelMaandHint: outcome.kernelMaandHint ?? null,
+    kernelHousingSale: outcome.kernelHousingSale ?? null,
+    kernelPensionPots: unifiedResult.kernelPensionPots,
+  }
 }
 
 export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFireSimResult {
@@ -196,6 +339,24 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
   // worden (die herrekenen nooit op een stop-pad-wijziging).
   const stopPadAge = params?.stopPadAge ?? null
 
+  // Server-scalars voor de progressieve first paint (Task 4.2) — puur doorgegeven, geen som.
+  const initialFireAge = params?.initialFireAge ?? null
+  const initialFreedomPct = params?.initialFreedomPct ?? null
+  const initialRequiredPortfolio = params?.initialRequiredPortfolio ?? null
+
+  // Drie runtimes, drie takken (constant per omgeving → stabiele hook-volgorde):
+  //  • BROWSER (`window` + `Worker`): `useWorker` — de `useMemo`'s leveren `null` (geen
+  //    main-thread-solve) en effecten vullen de state via `runKernelAsync`.
+  //  • JSDOM-TEST (`window`, geen `Worker`): `runSyncKernel` — de `useMemo`'s rekenen
+  //    synchroon (parity heilig; de contract-tests lezen `result` meteen ná `renderHook`).
+  //  • SSR (geen `window`): BEIDE false → de `useMemo`'s leveren `null` → de server rendert
+  //    de first-paint-staat (server-scalar), NIET de kernel. Zo (a) draait er geen kernel in
+  //    de SSR-render (Task 4.2-eis) én (b) matcht de eerste CLIENT-render (worker nog niet
+  //    geland → `null`) exact de server-HTML → geen hydration-mismatch.
+  const hasWindow = typeof window !== 'undefined'
+  const useWorker = hasWindow && isKernelWorkerAvailable()
+  const runSyncKernel = hasWindow && !isKernelWorkerAvailable()
+
   // ── Slider-defer (alléén scheduling; geen formule/parameter-wijziging) ─────
   // Bundel de kernel-inputs in één object dat exact op dezelfde 16 waarden keyt als de
   // kernel-useMemo hiervóór (bankAccountCash bleef — net als voorheen — bewust géén key:
@@ -205,7 +366,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
   // onderbreekbare achtergrond-render draait die bij continu schuiven coalesced. Op de
   // initiële render is de deferred waarde gelijk aan de huidige → de eerste kernel-run
   // blijft synchroon (contract-tests van deze hook ongewijzigd).
-  const kernelInput = useMemo(() => ({
+  const kernelInput = useMemo<KernelInputBundle>(() => ({
     horizonInput,
     lifeEvents,
     fireStrategy,
@@ -238,36 +399,15 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
   // waarde → eerste run synchroon (contract-tests stabiel).
   const deferredStopPadAge = useDeferredValue(stopPadAge)
 
-  // Scenario-/hoofd-input loopt achter zolang een deferred waarde nog niet is ingelopen
-  // (React's standaard stale-pattern: `input !== deferredInput`). Op de initiële render en
-  // in rust zijn ze referentie-gelijk ⇒ false. Alleen een additief afgeleid veld — de
-  // memo-deps en het bestaande retour-contract blijven ongemoeid.
-  const scenarioPending =
-    deferredKernelInput !== kernelInput || deferredScenarioOverrides !== scenarioOverrides
-
-  // Synchrone berekening via useMemo — geen async nodig want data is al geladen. Keyt op
-  // het deferred input-object (referentie-stabiel zolang de 16 deps ongewijzigd blijven).
-  const simResult = useMemo<{ result: SimResult; cashflows: SimCashflow[]; unifiedRows: UnifiedProjectionRow[]; effectiveLifeEvents: LifeEvent[]; kernelStatus: SolverStatus | null; kernelMaandHint: number | null; kernelHousingSale: KernelHousingSale | null; kernelPensionPots: readonly KernelPensionPotView[] } | null>(() => {
+  // Synchrone berekening via useMemo — de tak voor jsdom/SSR (geen Worker). Keyt op het
+  // deferred input-object (referentie-stabiel zolang de 16 deps ongewijzigd blijven). In de
+  // worker-tak (`useWorker`) levert deze memo `null`: geen main-thread-solve — het effect
+  // hieronder vult `asyncSimMain` via `runKernelAsync`. Byte-identiek pad blijft dus intact
+  // wanneer er geen Worker is (parity heilig).
+  const syncSimMain = useMemo<HorizonMainSimResult | null>(() => {
+    if (!runSyncKernel) return null
     const p = deferredKernelInput
-    // Metadata-assemblage via de gedeelde builder (yearlyExpenses + guards). Zie
-    // lib/horizon/build-input.ts.
-    const built = buildHorizonInput({
-      horizonInput: p.horizonInput ?? null,
-      lifeEvents: p.lifeEvents ?? [],
-      fireStrategy: p.fireStrategy,
-      withdrawalStrategy: p.withdrawalStrategy,
-      grossReturn: p.grossReturnParam,
-      inflation: p.inflationParam,
-      aowAgeFractional: p.aowAgeFractionalParam,
-      assets: p.assets,
-      debts: p.debts,
-      box3Method: p.box3Method,
-      hasPartner: p.hasPartner,
-      bankAccountCash: p.bankAccountCash,
-      monthlySavingsOverride: p.monthlySavingsOverride,
-      baseAnnualSavingsFromCashflow: p.baseAnnualSavingsFromCashflow,
-      housingStrategy: p.housingStrategy,
-    })
+    const built = buildInputFromBundle(p)
     if (!built) return null
     // Zonder rauwe profiel-rij kan de kernel-invoer niet worden samengesteld.
     if (!p.kernelRawProfile) return null
@@ -284,28 +424,11 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
         yearlyExpenses: unifiedInput.yearlyExpenses,
       },
     })
-    if (!outcome.ok) return null
-    const unifiedResult = outcome.result
-    const result = toSimResult(unifiedResult)
-
     // De kernel doet de AOW-kortsluiting zélf via de pensioen-eindstrategie in de solver.
     // effectiveLifeEvents = de gededupliceerde rauwe app-events, met — als de kernel binnen
-    // de horizon verkoopt — één kernel-afgeleid verkoop-event op `kernelHousingSale.age`
-    // (`applyKernelHousingSaleToEvents`).
-    return {
-      result,
-      cashflows,
-      unifiedRows: unifiedResult.rows,
-      effectiveLifeEvents: applyKernelHousingSaleToEvents(
-        dedupeById(p.lifeEvents ?? []),
-        outcome.kernelHousingSale ?? null,
-      ),
-      kernelStatus: outcome.kernelStatus ?? null,
-      kernelMaandHint: outcome.kernelMaandHint ?? null,
-      kernelHousingSale: outcome.kernelHousingSale ?? null,
-      kernelPensionPots: outcome.result.kernelPensionPots,
-    }
-  }, [deferredKernelInput])
+    // de horizon verkoopt — één kernel-afgeleid verkoop-event (`applyKernelHousingSaleToEvents`).
+    return mapMainOutcome(outcome, p.lifeEvents ?? [], cashflows)
+  }, [runSyncKernel, deferredKernelInput])
 
   // ── Wat-als-scenario-run — TWEEDE, GESCHEIDEN useMemo (plan §A/§B) ──────────
   // Keyt op het deferred hoofd-input-object ÉN de deferred overrides. De hoofd-memo
@@ -317,7 +440,8 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
   // (b) de scenario-events bovenop de hoofd-`lifeEvents`. `yearlyExpenses` is puur afgeleid
   // van `horizonInput` (niet van assets/events) → identiek aan de basislijn; nul overrides
   // ⇒ identieke context ⇒ identieke uitkomst (golden: scenario-baseline-parity.test.ts).
-  const scenario = useMemo<HorizonScenarioResult | null>(() => {
+  const syncScenario = useMemo<HorizonScenarioResult | null>(() => {
+    if (!runSyncKernel) return null
     const ov = deferredScenarioOverrides
     const extraEvents = ov?.extraLifeEvents ?? []
     const returnDeltas = ov?.returnDeltaByCategorie
@@ -328,23 +452,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
     const p = deferredKernelInput
     // Zelfde metadata-assemblage als de hoofdrun (yearlyExpenses + guards) — met de
     // BASELINE-inputs, want yearlyExpenses hangt niet van assets/events af.
-    const built = buildHorizonInput({
-      horizonInput: p.horizonInput ?? null,
-      lifeEvents: p.lifeEvents ?? [],
-      fireStrategy: p.fireStrategy,
-      withdrawalStrategy: p.withdrawalStrategy,
-      grossReturn: p.grossReturnParam,
-      inflation: p.inflationParam,
-      aowAgeFractional: p.aowAgeFractionalParam,
-      assets: p.assets,
-      debts: p.debts,
-      box3Method: p.box3Method,
-      hasPartner: p.hasPartner,
-      bankAccountCash: p.bankAccountCash,
-      monthlySavingsOverride: p.monthlySavingsOverride,
-      baseAnnualSavingsFromCashflow: p.baseAnnualSavingsFromCashflow,
-      housingStrategy: p.housingStrategy,
-    })
+    const built = buildInputFromBundle(p)
     if (!built) return null
     if (!p.kernelRawProfile) return null
     const { input: unifiedInput } = built
@@ -369,7 +477,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
       result: toSimResult(outcome.result),
       unifiedRows: outcome.result.rows,
     }
-  }, [deferredKernelInput, deferredScenarioOverrides])
+  }, [runSyncKernel, deferredKernelInput, deferredScenarioOverrides])
 
   // ── Gekozen-stop-pad — DERDE, GESCHEIDEN useMemo (ronde 3) ──────────────────
   // Keyt op het deferred hoofd-input-object, de deferred overrides ÉN de deferred
@@ -381,50 +489,133 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
   // de eerlijke "wat als je dan echt stopt en je vermogen opeet"-vorm. `yearlyExpenses` komt
   // — net als de hoofd-/scenario-run — uit buildHorizonInput (baseline; hangt niet van
   // assets/events af). Kern-context ontbreekt of kern-fout ⇒ null (zichtbare degradatie).
-  const stopPad = useMemo<HorizonStopPadResult | null>(() => {
+  const syncStopPad = useMemo<HorizonStopPadResult | null>(() => {
+    if (!runSyncKernel) return null
     const stopAge = deferredStopPadAge
     if (stopAge == null || !Number.isFinite(stopAge)) return null
 
     const p = deferredKernelInput
     if (!p.horizonInput || !p.kernelRawProfile) return null
 
-    const built = buildHorizonInput({
-      horizonInput: p.horizonInput ?? null,
-      lifeEvents: p.lifeEvents ?? [],
-      fireStrategy: p.fireStrategy,
-      withdrawalStrategy: p.withdrawalStrategy,
-      grossReturn: p.grossReturnParam,
-      inflation: p.inflationParam,
-      aowAgeFractional: p.aowAgeFractionalParam,
-      assets: p.assets,
-      debts: p.debts,
-      box3Method: p.box3Method,
-      hasPartner: p.hasPartner,
-      bankAccountCash: p.bankAccountCash,
-      monthlySavingsOverride: p.monthlySavingsOverride,
-      baseAnnualSavingsFromCashflow: p.baseAnnualSavingsFromCashflow,
-      housingStrategy: p.housingStrategy,
-    })
+    const built = buildInputFromBundle(p)
     if (!built) return null
 
-    // Actieve context: scenario-overrides indien aanwezig (gedeelde assemblage).
-    const { assets: ctxAssets, lifeEvents: ctxLifeEvents } = resolveScenarioAssetsAndEvents(
-      p.assets,
-      p.lifeEvents,
-      deferredScenarioOverrides,
+    // Actieve context: scenario-overrides indien aanwezig (gedeelde assemblage, één home).
+    return runForcedStopPath(
+      buildStopPadInput(p, p.kernelRawProfile, deferredScenarioOverrides, stopAge, built.input.yearlyExpenses),
     )
+  }, [runSyncKernel, deferredKernelInput, deferredScenarioOverrides, deferredStopPadAge])
 
-    return runForcedStopPath({
+  // ── Worker-tak: drie async-runs die de synchrone useMemo's vervangen ────────
+  // Alléén actief wanneer `useWorker` (browser met Worker). Elke run keyt op dezelfde
+  // deferred deps als zijn synchrone tegenhanger, met een monotone request-id race-guard
+  // (laatste wint) + cleanup bij dep-wissel. `runKernelAsync`/`runForcedStopPathAsync`
+  // multiplexen over één worker-instance; de POST-processing (toSimResult / housing-events)
+  // is licht en blijft op de main thread ná landing.
+  const [asyncSimMain, setAsyncSimMain] = useState<HorizonMainSimResult | null>(null)
+  const [asyncScenario, setAsyncScenario] = useState<HorizonScenarioResult | null>(null)
+  const [asyncStopPad, setAsyncStopPad] = useState<HorizonStopPadResult | null>(null)
+  const mainReqIdRef = useRef(0)
+  const scenarioReqIdRef = useRef(0)
+  const stopPadReqIdRef = useRef(0)
+
+  // Hoofd-run (worker).
+  useEffect(() => {
+    if (!useWorker) return
+    const reqId = (mainReqIdRef.current += 1)
+    const p = deferredKernelInput
+    const built = buildInputFromBundle(p)
+    if (!built || !p.kernelRawProfile) { setAsyncSimMain(null); return }
+    const { input: unifiedInput, cashflows } = built
+    const rawContext: ConvergentieRawContext = {
       profile: p.kernelRawProfile,
-      assets: ctxAssets,
+      assets: p.assets ?? [],
       debts: p.debts ?? [],
-      lifeEvents: ctxLifeEvents,
+      lifeEvents: p.lifeEvents ?? [],
+      aowRows: p.aowRows,
+      yearlyExpenses: unifiedInput.yearlyExpenses,
+    }
+    let cancelled = false
+    runKernelAsync(rawContext).then((outcome) => {
+      if (cancelled || reqId !== mainReqIdRef.current) return
+      setAsyncSimMain(mapMainOutcome(outcome, p.lifeEvents ?? [], cashflows))
+    })
+    return () => { cancelled = true }
+  }, [useWorker, deferredKernelInput])
+
+  // Wat-als-scenario-run (worker).
+  useEffect(() => {
+    if (!useWorker) return
+    const reqId = (scenarioReqIdRef.current += 1)
+    const ov = deferredScenarioOverrides
+    const extraEvents = ov?.extraLifeEvents ?? []
+    const returnDeltas = ov?.returnDeltaByCategorie
+    const hasReturnDeltas = returnDeltas != null && Object.keys(returnDeltas).length > 0
+    if (extraEvents.length === 0 && !hasReturnDeltas) { setAsyncScenario(null); return }
+
+    const p = deferredKernelInput
+    const built = buildInputFromBundle(p)
+    if (!built || !p.kernelRawProfile) { setAsyncScenario(null); return }
+    const { assets: scenarioAssets, lifeEvents: scenarioLifeEvents } =
+      resolveScenarioAssetsAndEvents(p.assets, p.lifeEvents, ov)
+    const rawContext: ConvergentieRawContext = {
+      profile: p.kernelRawProfile,
+      assets: scenarioAssets,
+      debts: p.debts ?? [],
+      lifeEvents: scenarioLifeEvents,
       aowRows: p.aowRows,
       yearlyExpenses: built.input.yearlyExpenses,
-      stopAge,
-      fireEndAge: p.fireStrategy?.endAge ?? DEFAULT_FIRE_STRATEGY.endAge,
+    }
+    let cancelled = false
+    runKernelAsync(rawContext).then((outcome) => {
+      if (cancelled || reqId !== scenarioReqIdRef.current) return
+      setAsyncScenario(
+        outcome.ok ? { result: toSimResult(outcome.result), unifiedRows: outcome.result.rows } : null,
+      )
     })
-  }, [deferredKernelInput, deferredScenarioOverrides, deferredStopPadAge])
+    return () => { cancelled = true }
+  }, [useWorker, deferredKernelInput, deferredScenarioOverrides])
+
+  // Gekozen-stop-pad-run (worker).
+  useEffect(() => {
+    if (!useWorker) return
+    const reqId = (stopPadReqIdRef.current += 1)
+    const stopAge = deferredStopPadAge
+    if (stopAge == null || !Number.isFinite(stopAge)) { setAsyncStopPad(null); return }
+    const p = deferredKernelInput
+    if (!p.horizonInput || !p.kernelRawProfile) { setAsyncStopPad(null); return }
+    const built = buildInputFromBundle(p)
+    if (!built) { setAsyncStopPad(null); return }
+    const stopInput = buildStopPadInput(p, p.kernelRawProfile, deferredScenarioOverrides, stopAge, built.input.yearlyExpenses)
+    let cancelled = false
+    runForcedStopPathAsync(stopInput).then((res) => {
+      if (cancelled || reqId !== stopPadReqIdRef.current) return
+      setAsyncStopPad(res)
+    })
+    return () => { cancelled = true }
+  }, [useWorker, deferredKernelInput, deferredScenarioOverrides, deferredStopPadAge])
+
+  // ── Actieve resultaten: worker-state óf synchrone memo (parity-identiek) ─────
+  const simResult = useWorker ? asyncSimMain : syncSimMain
+  const scenario = useWorker ? asyncScenario : syncScenario
+  const stopPad = useWorker ? asyncStopPad : syncStopPad
+
+  // Scenario-/hoofd-input loopt achter zolang een deferred waarde nog niet is ingelopen
+  // (React's standaard stale-pattern: `input !== deferredInput`), of — in de worker-tak —
+  // zolang de scenario-run nog niet geland is terwijl er een actieve override is ("verfijnen
+  // bezig"). In rust/synchroon zonder override ⇒ false. Additief afgeleid veld.
+  const scenarioActive =
+    (deferredScenarioOverrides?.extraLifeEvents.length ?? 0) > 0 ||
+    (deferredScenarioOverrides?.returnDeltaByCategorie != null &&
+      Object.keys(deferredScenarioOverrides.returnDeltaByCategorie).length > 0)
+  const scenarioPending =
+    deferredKernelInput !== kernelInput ||
+    deferredScenarioOverrides !== scenarioOverrides ||
+    (useWorker && scenarioActive && scenario == null)
+
+  // Verfijnstaat: de worker heeft de hoofd-run nog niet opgeleverd terwijl er wél een
+  // berekenbare invoer is (progressieve first paint). In de synchrone tak nooit true.
+  const isRefining = useWorker && simResult == null && horizonInput != null && kernelRawProfile != null
 
   // Snapshot persistentie — debounced upsert naar net_worth_snapshots
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -469,13 +660,13 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
   }, [simResult])
 
   if (!params || !horizonInput) {
-    return { result: null, cashflows: [], isLoading: true, error: profileError ?? null, unifiedRows: null, effectiveLifeEvents: [], kernelStatus: null, kernelMaandHint: null, kernelHousingSale: null, kernelPensionPots: null, scenario: null, stopPad: null, scenarioPending: false }
+    return { result: null, cashflows: [], isLoading: true, error: profileError ?? null, unifiedRows: null, effectiveLifeEvents: [], kernelStatus: null, kernelMaandHint: null, kernelHousingSale: null, kernelPensionPots: null, scenario: null, stopPad: null, scenarioPending: false, isRefining: false, firstPaintFireAge: null, firstPaintFreedomPct: null, firstPaintRequiredPortfolio: null }
   }
 
   return {
     result: simResult?.result ?? null,
     cashflows: simResult?.cashflows ?? [],
-    isLoading: false,
+    isLoading: isRefining,
     error: profileError ?? null,
     unifiedRows: simResult?.unifiedRows ?? null,
     effectiveLifeEvents: simResult?.effectiveLifeEvents ?? lifeEvents ?? [],
@@ -486,5 +677,11 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
     scenario: scenario ?? null,
     stopPad: stopPad ?? null,
     scenarioPending,
+    isRefining,
+    // First-paint-scalars alléén zolang de worker-run nog niet geland is (`result === null`);
+    // daarna wint `result`. In de synchrone tak is `result` er meteen → altijd null.
+    firstPaintFireAge: simResult ? null : initialFireAge,
+    firstPaintFreedomPct: simResult ? null : initialFreedomPct,
+    firstPaintRequiredPortfolio: simResult ? null : initialRequiredPortfolio,
   }
 }
