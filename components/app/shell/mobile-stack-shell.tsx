@@ -1,43 +1,48 @@
 'use client'
 
 /**
- * SANDBOX / Fase 0 v3 — onderdeel van new-navigation-shell migratie.
- * Plan: docs/navigatie-redesign-plan.md §4
- * Achter feature-flag in productie. Voor nu: alleen sandbox-test.
+ * ShellFrame (historisch: MobileStackShell) — de ENE persistente render van
+ * de pagina-content, met de mobiele chrome (TopBar/BottomBar) als CSS-gegate
+ * siblings.
  *
- * Bitvavo-pure tray-of-three: TopBar + Content + BottomBar zitten in ÉÉN
- * animation-layer. Bij push/pop schuift de hele tray als één geheel mee
- * (plan §4.1 cruciaal verschil met v2).
+ * ── Enkelvoudige render (ADR 0053) ─────────────────────────────────
+ * Vroeger rendered ResponsiveShell pré-hydratie BEIDE breakpoint-takken
+ * (desktop `<main>` + deze mobiele tray), elk met een eigen kopie van
+ * `children` → dubbele SSR-HTML + dubbele hydratie op élke pagina. Nu draagt
+ * één `<main>` de content exact één keer:
+ *  - Mobiel (<lg): de tray-of-three (TopBar + content + BottomBar) in één
+ *    flex-column met interne scroll; schuift bij push/pop als één blok.
+ *  - Desktop (≥lg): het frame collabeert via `lg:contents`; TopBar/BottomBar
+ *    zijn `lg:hidden`; de `<main>` valt terug op document-scroll met
+ *    `lg:pl-[264px]` naast de (via portal gerenderde) Sidebar.
+ * Er zit GEEN JS-breakpoint-branch in het content-render-pad — server- en
+ * client-render produceren identieke, breakpoint-onafhankelijke HTML; het
+ * verschil zit puur in Tailwind `lg:`-classes. `useIsLgUp` wordt alléén
+ * gelezen om de mobiele push/pop-overlay op desktop te onderdrukken, en dat
+ * hangt af van `transition.phase` die bij SSR/first paint altijd 'idle' is —
+ * dus geen hydration-mismatch.
  *
- * Architectuur tijdens transitie:
- *
- *   tray-container (relative, overflow-hidden)
- *     ├── outgoing-tray (alleen tijdens transitie; aria-hidden=true)
- *     │   ├── TopBar    (uit transition.outgoing.title)
- *     │   ├── content   (snapshot van vorige children — zie outgoing-snapshot-mechanica)
- *     │   └── BottomBar (uit transition.outgoing.bottomBar)
- *     └── incoming-tray (altijd aanwezig; tijdens transitie animeert deze in)
- *         ├── TopBar    (uit huidige top-entry)
- *         ├── content   (children prop = nieuwe pagina-content)
- *         └── BottomBar (uit huidige top-entry.bottomBar)
+ * ── Tray-transitie: persistente content + outgoing-overlay ──────────
+ * (Bitvavo-pure tray-of-three, plan §4.1). Bij push/pop schuift de hele tray
+ * als één geheel mee. De single-render-variant (ADR 0053, optie 1) houdt
+ * `children` gegarandeerd enkelvoudig:
+ *  - De PERSISTENTE tray (`key="persistent"`) draagt altijd de live `children`
+ *    en fungeert als de INCOMING laag; tijdens een transitie krijgt hij de
+ *    `tray-incoming-*`-animatieklasse. Hij unmount NOOIT bij een transitie —
+ *    dus `children` remount niet halverwege de slide.
+ *  - De OUTGOING laag is een tijdelijke overlay bovenop, die de vorige pagina
+ *    (`previousChildren`-snapshot) uit-animeert met `tray-outgoing-*`. Alleen
+ *    aanwezig tijdens de 240ms-transitie, en alleen op mobiel.
  *
  * ── Outgoing-snapshot-mechanica ────────────────────────────────────
- * Bij push komen NIEUWE children binnen via React-tree. De OUDE children zijn
- * de vorige render — die bewaren we via `useState` + commit-phase `useEffect`,
- * zodat we ze tijdens de 240ms-transitie nog kunnen renderen in de outgoing-
- * tray. Dit voldoet aan React 19 lint-regels (`react-hooks/refs` verbiedt
- * ref-mutatie of -access tijdens render; state + effect is canonical).
- *
- * Werking:
+ * Bij push/pop komen NIEUWE children binnen via de React-tree. De OUDE
+ * children bewaren we via `useState` + commit-phase `useEffect`, zodat we ze
+ * tijdens de transitie nog in de outgoing-overlay kunnen renderen. Dit voldoet
+ * aan React 19 lint-regels (state + effect i.p.v. ref-mutatie tijdens render).
  *   - State `previousChildren` start met de eerste children.
  *   - `useEffect` synchroniseert state met `children` NA paint.
  *   - Bij phase='pushing'/'popping' bevat de render `children` = nieuw,
  *     `previousChildren` (state) = vorige — precies onze snapshot.
- *
- * View Transitions API (Chrome 111+ / Safari 18+ / Firefox 129+) regelt dit
- * automatisch via `view-transition-name` CSS-properties op TopBar/Content/
- * BottomBar — geen handmatige snapshot nodig. Custom fallback hieronder
- * gebruikt de previousChildren-state.
  *
  * ── Animatie-curves (plan §4.2) ────────────────────────────────────
  * Push:  outgoing translateX(0 → -30%) + opacity 1 → 0.5
@@ -46,11 +51,14 @@
  *        incoming translateX(-30% → 0) + opacity 0.5 → 1
  * Duur:  240ms cubic-bezier(0.32, 0.72, 0, 1) (iOS-spring-curve)
  * RM:    prefers-reduced-motion → instant-swap (geen translate of fade)
+ * (Keyframes leven in app/globals.css onder `.tray-{in,out}going-{push,pop}`.)
  */
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode, type Ref } from 'react'
+import { usePathname } from 'next/navigation'
 import { useNavStack, type StackEntry, type BottomBarConfig, type TopBarKind } from './nav-stack-provider'
 import { resolveRouteTitle } from '@/lib/nav-config'
+import { useIsLgUp } from '@/lib/hooks/use-media-query'
 import { TopBar } from './top-bar'
 import { MobileBottomBar } from './mobile-bottom-bar'
 
@@ -58,11 +66,14 @@ type MobileStackShellProps = {
   /** Optionele custom actions in de TopBar (rechts). Default = utility-cluster
    *  (PrivacyToggle + News + Bell + Avatar) wanneer `email` aanwezig is. */
   topBarActions?: ReactNode
-  /** Pagina-content. Wordt gerenderd in de incoming-tray. */
+  /** Pagina-content. Wordt in de persistente tray (incoming-laag) gerenderd. */
   children: ReactNode
   /**
-   * Override de `lg:hidden` breakpoint-gating. Bedoeld voor sandbox-device-
-   * frames die de mobile-shell op desktop tonen. Default = false.
+   * Override de `lg:`-collaps + `lg:hidden`-chrome-gating. Bedoeld voor
+   * sandbox-device-frames die de mobiele shell op desktop tonen: bij
+   * `forceVisible` blijft het frame een 100vh-tray-of-three (met interne
+   * scroll) én tonen TopBar/BottomBar óók ≥lg. Default = false (productie:
+   * frame collabeert naar één document-scroll-`<main>` op desktop).
    */
   forceVisible?: boolean
   /** Email van de ingelogde user — door TopBar's utility-cluster gebruikt
@@ -79,25 +90,37 @@ type MobileStackShellProps = {
 
 /**
  * Render één tray-of-three: TopBar + content + BottomBar.
- * `entryTitle` overruled de TopBar-titel — nodig voor de outgoing-tray omdat
- * useNavStack daar al de NIEUWE top-entry teruggeeft.
+ *
+ * Op mobiel is de tray `absolute inset-0` binnen een 100vh-clip-box en scrollt
+ * de content intern (`flex-1 overflow-y-auto`). Op desktop (`!forceVisible`)
+ * collabeert de tray naar normale document-flow (`lg:static lg:block`): de
+ * TopBar/BottomBar zijn `lg:hidden` en de `<main>` krijgt `lg:pl-[264px]`
+ * naast de portal-Sidebar.
+ *
+ * `entryTitle`/`topBarKind`/`showBack` overrulen de TopBar-afleiding — nodig
+ * voor de outgoing-overlay, die de OUDE entry moet blijven tonen tijdens een
+ * transitie (useNavStack geeft daar al de NIEUWE top-entry terug).
+ *
+ * `animClass` (optioneel) hangt de `tray-{in,out}going-*`-animatieklasse op de
+ * tray-root; `mainRef` geeft de parent toegang tot het scroll-element van de
+ * persistente tray (scroll-reset bij route-wissel).
  */
 type TrayProps = {
+  animClass?: string
   entryTitle?: string
   bottomBar?: BottomBarConfig
   topBarActions?: ReactNode
   /**
    * Default = afgeleid uit `currentStack.length > 1` binnen TopBar.
-   * Voor outgoing-tray: expliciet doorgeven omdat de huidige stack al de
-   * NIEUWE top-entry bevat — anders zou de outgoing onmiddellijk de
-   * nieuwe back-knop-state aannemen.
+   * Voor outgoing-overlay: expliciet doorgeven omdat de huidige stack al de
+   * NIEUWE top-entry bevat — anders zou de outgoing onmiddellijk de nieuwe
+   * back-knop-state aannemen.
    */
   showBack: boolean
   /**
-   * Default = afgeleid uit `top.topBar.kind` binnen TopBar.
-   * Voor outgoing-tray: expliciet doorgeven met de OUDE entry's kind zodat
-   * de visuele transitie consistent is (rich → simple bij push naar sub-
-   * page; simple → rich bij pop terug naar tab-root).
+   * Default = afgeleid uit `top.topBar.kind` binnen TopBar. Voor outgoing-
+   * overlay: expliciet met de OUDE entry's kind zodat de visuele transitie
+   * consistent is (rich → simple bij push; simple → rich bij pop).
    */
   topBarKind?: TopBarKind
   children: ReactNode
@@ -105,9 +128,12 @@ type TrayProps = {
   ariaHidden?: boolean
   email?: string
   role?: string
+  /** Ref naar het scroll-`<main>` (alleen de persistente tray gebruikt dit). */
+  mainRef?: Ref<HTMLElement>
 }
 
 function Tray({
+  animClass,
   entryTitle,
   bottomBar,
   topBarActions,
@@ -118,14 +144,21 @@ function Tray({
   ariaHidden = false,
   email,
   role,
+  mainRef,
 }: TrayProps) {
+  // Desktop-collaps: alleen in productie (niet in een forceVisible-sandbox-
+  // frame). De tray valt terug op document-flow; TopBar/BottomBar zijn hidden.
+  const trayDesktop = forceVisible ? '' : ' lg:static lg:block lg:bg-transparent'
+  const mainDesktop = forceVisible ? '' : ' lg:flex-none lg:overflow-visible lg:pl-[264px]'
+
   return (
     <div
       aria-hidden={ariaHidden || undefined}
-      className="absolute inset-0 flex flex-col bg-[var(--bg)]"
+      className={`absolute inset-0 flex flex-col bg-[var(--bg)]${trayDesktop}${animClass ? ` ${animClass}` : ''}`}
     >
       {/* TopBar binnen de tray — niet sticky t.o.v. viewport, wel binnen de
-          tray-flex-column zodat hij meeschuift bij push/pop. */}
+          tray-flex-column zodat hij meeschuift bij push/pop. Zelf `lg:hidden`
+          (tenzij forceVisible) via zijn eigen visibility-class. */}
       <TopBar
         actions={topBarActions}
         forceVisible={forceVisible}
@@ -136,18 +169,25 @@ function Tray({
         role={role}
       />
 
-      {/* Content scrollt binnen de tray. flex-1 vult de ruimte tussen
-          TopBar en BottomBar; overflow-y-auto zodat lange pagina's scrollen
-          terwijl TopBar+BottomBar visueel "vast" lijken (binnen de tray).
-          `pb-[var(--mobile-nav-clearance)]` reserveert onderaan ruimte voor de
-          zwevende FloatingNavButton (zie globals.css) zodat de laatste content
-          en knoppen er niet onder verdwijnen; de var is 0 boven 768px waar de
-          pill verborgen is. */}
-      <main className="flex-1 overflow-y-auto pb-[var(--mobile-nav-clearance)]">{children}</main>
+      {/* Content. Mobiel: `flex-1 overflow-y-auto` (interne scroll), TopBar +
+          BottomBar lijken "vast" binnen de tray. Desktop: normale document-
+          flow (`lg:flex-none lg:overflow-visible`) met `lg:pl-[264px]` naast
+          de Sidebar. `pb-[var(--mobile-nav-clearance)]` reserveert onderaan
+          ruimte voor de zwevende FloatingNavButton; die var is 0 boven 1024px,
+          dus op desktop is de padding automatisch 0. */}
+      <main
+        ref={mainRef}
+        className={`flex-1 overflow-y-auto pb-[var(--mobile-nav-clearance)]${mainDesktop}`}
+      >
+        {children}
+      </main>
 
-      {/* BottomBar slot — config bepaalt of het tabs / action-bar /
-          context-actions / hidden wordt. */}
-      <MobileBottomBar config={bottomBar} />
+      {/* BottomBar slot — `lg:hidden` (tenzij forceVisible) zodat de mobiele
+          bar niet op desktop verschijnt. De wrapper is 0px hoog wanneer
+          MobileBottomBar `null` rendert (tabs/hidden). */}
+      <div className={forceVisible ? undefined : 'lg:hidden'}>
+        <MobileBottomBar config={bottomBar} />
+      </div>
     </div>
   )
 }
@@ -163,90 +203,72 @@ export function MobileStackShell({
   const top: StackEntry | undefined = currentStack[currentStack.length - 1]
   const stackDepth = currentStack.length
 
-  // ── Outgoing-snapshot via state + commit-effect ────────────────
-  // We bewaren de "vorige render"-children in state, die we ALLEEN in een
-  // commit-phase useEffect updaten — niet tijdens render. Dat voldoet aan
-  // de React 19 lint-regels (geen ref-mutatie + geen ref-access tijdens
-  // render).
-  //
-  // Werking:
-  //   - State `previousChildren` start gelijk aan de eerste children.
-  //   - Een useEffect synchroniseert state met de huidige children NA paint.
-  //   - Wanneer de provider phase='pushing'/'popping' zet, triggert dat een
-  //     re-render. In die render is `children` al de NIEUWE pagina-content,
-  //     maar `previousChildren` (state) bevat nog de WAARDE van de vorige
-  //     render — precies onze outgoing-snapshot. We renderen 'm uit, en de
-  //     useEffect overschrijft 'm vervolgens met de nieuwe children (klaar
-  //     voor de volgende cyclus).
-  //
-  // Trade-off: één extra re-render per stack-mutatie (state-update via effect),
-  // maar het houdt de render-functie zuiver volgens React 19 regels — geen
-  // refs lezen/schrijven in render. Bij de huidige scope (sandbox + max
-  // 5 stack-entries) is de impact verwaarloosbaar.
-  //
-  // View Transitions API (Chrome 111+) regelt dit automatisch via DOM-snapshots
-  // — we hoeven geen handmatige snapshot te onderhouden. Onze custom-fallback
-  // gebruikt deze state. Beide paden lopen parallel zonder visuele tegenstrijdigheid.
+  // ── Outgoing-snapshot via state + commit-effect (zie header-doc) ──
   const [previousChildren, setPreviousChildren] = useState<ReactNode>(children)
   const isTransitioning = transition.phase === 'pushing' || transition.phase === 'popping'
 
   useEffect(() => {
-    // Update snapshot na commit. Bij het volgende renderpad (bv. wanneer
-    // phase naar 'pushing' overgaat) is deze waarde de "vorige" render.
+    // Update snapshot na commit. Bij het volgende renderpad (bv. wanneer phase
+    // naar 'pushing' overgaat) is deze waarde de "vorige" render.
     setPreviousChildren(children)
   }, [children])
 
-  const visibilityClass = forceVisible ? '' : 'lg:hidden'
+  // ── Scroll-reset bij route-wissel ──────────────────────────────
+  // De persistente `<main>` unmount niet bij navigatie (single-mount), dus
+  // moeten we z'n interne scrollpositie zelf terugzetten bij een route-wissel
+  // — anders erft een nieuwe pagina de scroll van de vorige. Dit spiegelt
+  // ChatLayoutWrapper's scroll-to-top (die reset de desktop-document-scroll;
+  // deze reset de mobiele interne tray-scroll). Op desktop is `<main>` geen
+  // scroll-container (`lg:overflow-visible`), dus daar is dit een no-op.
+  const mainScrollRef = useRef<HTMLElement>(null)
+  const pathname = usePathname()
+  useEffect(() => {
+    mainScrollRef.current?.scrollTo(0, 0)
+  }, [pathname])
 
-  // ── Idle: enkele tray, geen dual-render ────────────────────────
-  if (!isTransitioning) {
-    return (
-      <div
-        className={`${visibilityClass} relative flex flex-col bg-[var(--bg)]`}
-        style={{ minHeight: '100vh' }}
-      >
-        <div className="relative flex-1 overflow-hidden" style={{ minHeight: '100vh' }}>
-          <Tray
-            bottomBar={top?.bottomBar}
-            topBarActions={topBarActions}
-            showBack={stackDepth > 1}
-            forceVisible={forceVisible}
-            email={email}
-            role={role}
-          >
-            {children}
-          </Tray>
-        </div>
-      </div>
-    )
-  }
+  // ── Tray-transitie: mobiel-only ────────────────────────────────
+  // Op desktop navigeert Next.js/router zonder tray-of-three-slide (de chrome
+  // is daar `lg:hidden`). We lezen de breakpoint puur om de outgoing-overlay +
+  // slide op desktop te onderdrukken. Veilig t.o.v. hydratie: `isTransitioning`
+  // is bij SSR/first paint altijd false (SERVER_SNAPSHOT = idle), dus `isLgUp`
+  // beïnvloedt de eerste render niet en het single-mount van `children` hangt
+  // er niet van af.
+  const isLgUp = useIsLgUp()
+  const showTransition = isTransitioning && !isLgUp
 
-  // ── Transitie: dual-render outgoing + incoming ─────────────────
-  // View Transitions API regelt animaties zelf via view-transition-name CSS;
-  // onze custom-fallback gebruikt aria-hidden + CSS-keyframes. Beide paden
-  // renderen dezelfde DOM (geen feature-detect-branch in JSX) — alleen de
-  // animatie-bron verschilt. Voor browsers met view-transitions wordt onze
-  // keyframes-CSS naast de browser-animatie gedraaid; geeft geen visuele
-  // tegenstrijdigheid omdat beide dezelfde duur hebben.
   const isPush = transition.phase === 'pushing'
   const outgoingClass = isPush ? 'tray-outgoing-push' : 'tray-outgoing-pop'
   const incomingClass = isPush ? 'tray-incoming-push' : 'tray-incoming-pop'
 
+  // Desktop-collaps van het frame (100vh-flex-column → display:contents) —
+  // alleen in productie; een forceVisible-sandbox houdt de mobiele tray.
+  const frameCollapse = forceVisible ? '' : ' lg:contents'
+
   return (
+    // Buitenste frame: mobiel een 100vh-flex-column; desktop collabeert
+    // (`lg:contents`) zodat alleen de `<main>` in de document-flow overblijft.
     <div
-      className={`${visibilityClass} relative flex flex-col bg-[var(--bg)]`}
+      className={`relative flex flex-col bg-[var(--bg)]${frameCollapse}`}
       style={{ minHeight: '100vh' }}
     >
-      <div className="relative flex-1 overflow-hidden" style={{ minHeight: '100vh' }}>
-        {/* Outgoing tray — vorige pagina, animeert OUT.
-            Krijgt aria-hidden=true zodra animatie start (plan §4.2 a11y). */}
-        <div className={outgoingClass} style={{ position: 'absolute', inset: 0 }}>
+      {/* Clip-box: bindt de `absolute inset-0`-trays aan 100vh (mobiel) en
+          knipt de uit-schuivende overlay af. Collabeert mee op desktop. */}
+      <div
+        className={`relative flex-1 overflow-hidden${frameCollapse}`}
+        style={{ minHeight: '100vh' }}
+      >
+        {/* Outgoing-overlay — alleen tijdens een mobiele transitie. Toont de
+            vorige pagina (snapshot) die uit-animeert. DOM-vóór de persistente
+            tray zodat de incoming (persistent) er bovenop ligt. */}
+        {showTransition && (
           <Tray
+            key="outgoing"
+            animClass={outgoingClass}
             // Outgoing-titel: de OUDE entry's eigen titel. Viel die leeg (een
-            // subpagina zonder NavStackMeta), val dan tijdens de transitie óók
-            // terug op de nav-config-resolver via de OUDE pathname — anders zou
-            // de outgoing-TopBar de fallback van de NIEUWE top-entry pakken.
-            // Alleen voor 'simple'-subpagina's; tab-roots ('rich') blijven leeg.
+            // subpagina zonder NavStackMeta), val dan óók terug op de nav-
+            // config-resolver via de OUDE pathname — anders zou de outgoing-
+            // TopBar de fallback van de NIEUWE top-entry pakken. Alleen voor
+            // 'simple'-subpagina's; tab-roots ('rich') blijven leeg.
             entryTitle={
               transition.outgoing?.title ||
               (transition.outgoing?.topBar?.kind === 'simple'
@@ -256,10 +278,8 @@ export function MobileStackShell({
             bottomBar={transition.outgoing?.bottomBar}
             topBarActions={topBarActions}
             // Outgoing toont back-knop alsof het nog op zijn diepte zat —
-            // visuele continuiteit. Stack-diepte vóór de pop = na de pop + 1.
+            // visuele continuïteit. Stack-diepte vóór de pop = na de pop + 1.
             showBack={isPush ? stackDepth - 1 > 1 : stackDepth + 1 > 1}
-            // Outgoing krijgt OUDE TopBar-kind expliciet door — anders neemt
-            // hij de huidige top-entry's kind aan (visueel "te vroeg" wisselen).
             topBarKind={transition.outgoing?.topBar?.kind}
             forceVisible={forceVisible}
             ariaHidden
@@ -268,25 +288,26 @@ export function MobileStackShell({
           >
             {previousChildren}
           </Tray>
-        </div>
+        )}
 
-        {/* Incoming tray — nieuwe pagina, animeert IN.
-            aria-live='polite' op de TopBar binnen Tray voorkomt dat
-            screen-readers de oude én nieuwe titel tegelijk announceren. */}
-        <div className={incomingClass} style={{ position: 'absolute', inset: 0 }}>
-          <Tray
-            bottomBar={top?.bottomBar}
-            topBarActions={topBarActions}
-            showBack={stackDepth > 1}
-            forceVisible={forceVisible}
-            email={email}
-            role={role}
-          >
-            {children}
-          </Tray>
-        </div>
+        {/* Persistente tray = de ENE render van `children` (incoming-laag).
+            Altijd aanwezig (keyed) zodat `children` niet remount bij het
+            starten/stoppen van een transitie. Krijgt tijdens een mobiele
+            transitie de incoming-animatieklasse. */}
+        <Tray
+          key="persistent"
+          animClass={showTransition ? incomingClass : undefined}
+          bottomBar={top?.bottomBar}
+          topBarActions={topBarActions}
+          showBack={stackDepth > 1}
+          forceVisible={forceVisible}
+          email={email}
+          role={role}
+          mainRef={mainScrollRef}
+        >
+          {children}
+        </Tray>
       </div>
-
     </div>
   )
 }

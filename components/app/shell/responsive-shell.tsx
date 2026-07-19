@@ -1,20 +1,22 @@
 /**
- * ResponsiveShell — wrapper rond de pagina-content die de nieuwe shell
- * rendert: Sidebar (desktop, via portal) + MobileStackShell (mobile,
- * tray-of-three) + ChatLayoutWrapper voor de Will-chat-sidebar.
+ * ResponsiveShell — wrapper rond de pagina-content die de shell rendert:
+ * Sidebar (desktop, via portal) + de enkelvoudige ShellFrame (MobileStackShell)
+ * voor de content + mobiele chrome, binnen ChatLayoutWrapper voor de Will-chat-
+ * sidebar.
  *
- * Layout-strategie:
+ * Layout-strategie (ADR 0053 — enkelvoudige render):
  *  - Sidebar via portal naar `document.body` — omzeilt ChatLayoutWrapper's
  *    `contain: layout` zodat de fixed-positioned sidebar t.o.v. de viewport
- *    blijft (niet de wrapper).
+ *    blijft (niet de wrapper). Zelf `hidden lg:flex`, dus mobiel onzichtbaar.
  *  - Content blijft binnen ChatLayoutWrapper voor de right-side chat-panel
  *    (`--chat-sidebar-width` resize).
- *  - Op desktop (≥lg) krijgt content `lg:pl-[264px]` ruimte naast de sidebar.
- *  - Op mobile (<lg) wrapt MobileStackShell de content in TopBar + Content +
- *    BottomBar — schuift als één blok bij push/pop.
- *  - Pre-hydratie staan beide breakpoint-takken in de DOM (Tailwind hide/show)
- *    voor identieke SSR-HTML; post-hydratie kiest `useIsLgUp` welke tak in
- *    de React-tree blijft zodat zware pagina-content niet dubbel draait.
+ *  - `children` wordt EXACT ÉÉN keer gerenderd: de ShellFrame draagt één
+ *    persistente `<main>` en gate de mobiele chrome (TopBar/BottomBar) puur via
+ *    Tailwind `lg:`-classes. Mobiel (<lg) is dat een tray-of-three met interne
+ *    scroll; desktop (≥lg) collabeert het frame en valt de `<main>` terug op
+ *    document-scroll met `lg:pl-[264px]` naast de Sidebar. Geen JS-breakpoint-
+ *    branch in het content-pad → geen dubbele SSR-HTML, geen post-hydratie-
+ *    unmount, geen hydration-mismatch.
  *
  * Auth/onboarding/phase-transition/sovereignty/color-vars/font-vars blijven
  * verantwoordelijkheid van `app/(app)/layout.tsx`. Alle providers daar
@@ -23,7 +25,7 @@
  */
 'use client'
 
-import { createContext, useContext, useEffect, useState, useMemo, useSyncExternalStore, type ReactNode } from 'react'
+import { createContext, useContext, useMemo, useSyncExternalStore, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { ChatLayoutWrapper } from '@/components/app/chat/chat-layout-wrapper'
 import { FloatingNavButton } from '@/components/app/shell/floating-nav-button'
@@ -32,7 +34,6 @@ import { Sidebar } from '@/components/app/shell/sidebar'
 import { MobileStackShell } from '@/components/app/shell/mobile-stack-shell'
 import { NavStackProvider } from '@/components/app/shell/nav-stack-provider'
 import { MobileAppStripProvider } from '@/components/app/shell/mobile-app-strip-state'
-import { useIsLgUp } from '@/lib/hooks/use-media-query'
 import type { CategoryAppLink } from '@/lib/category-app-nav'
 import type { LeverScores } from '@/components/app/shell/lever-compass'
 import type { LeverageStatus } from '@/lib/leverage-status'
@@ -235,17 +236,6 @@ function ShellContent({
   )
   const sidebarSignals = sidebarMetrics?.sidebarSignals
 
-  // Media-query-gated single-mount: pre-hydratie blijven beide shells in de
-  // boom (SSR-output matcht, geen flash op eerste paint). Direct na de eerste
-  // commit zet `hydrated` op true en kiest `useIsLgUp` welke shell levend
-  // blijft. De inactieve tak unmount, met al haar effects/intervals/fetches,
-  // zodat we in stabiele toestand precies één kopie van `children` mounten.
-  const isLgUp = useIsLgUp()
-  const [hydrated, setHydrated] = useState(false)
-  useEffect(() => {
-    setHydrated(true)
-  }, [])
-
   return (
     <NavStackProvider>
      <LeverScoresContext.Provider value={leverScores}>
@@ -270,34 +260,13 @@ function ShellContent({
 
       <ChatLayoutWrapper>
         <DailyExpenseProvider>
-          {/* Single-mount strategie: pre-hydratie (`hydrated=false`) rendert
-              Next.js beide branches met de oude Tailwind hide/show-classes —
-              dat houdt de SSR-HTML identiek aan de eerdere implementatie en
-              voorkomt hydratie-mismatches en visuele flash. Zodra de eerste
-              `useEffect` heeft gecommit, kiest `useIsLgUp` welke tak in de
-              React-tree blijft; de andere unmount volledig en zijn effects/
-              intervals/fetches cleanen op. Hierdoor draait de zware
-              pagina-content (widgets, charts, FIRE-sims) niet langer dubbel.
-              `{cond && <Comp />}` per positie zorgt dat React's
-              reconciliation de child-instantie binnen elke tak behoudt zolang
-              de breakpoint niet over lg-grenze springt — bij een resize over
-              de breakpoint volgt wel een unmount/remount, wat een acceptabele
-              edge-case is omdat gebruikers zelden tijdens een sessie de
-              viewport over 1024px schalen. */}
-          {/* Wrapper met id="main-content" — skip-link target voor BEIDE
-              breakpoint-takken. tabIndex={-1} maakt 'm focus-bestemming via
-              JS (skip-link click) maar niet bereikbaar via gewone Tab. Eén
-              wrapper-div omdat HTML niet twee elementen met dezelfde id
-              tolereert; pre-hydratie zijn beide takken in de DOM. */}
+          {/* Skip-link target (WCAG Bypass Blocks) + focus-bestemming.
+              tabIndex={-1} maakt 'm focusbaar via de skip-link-click maar niet
+              via gewone Tab. De ShellFrame hieronder draagt `children` exact
+              één keer; de mobiele chrome hangt als CSS-gegate siblings in
+              dezelfde boom, dus er is geen tweede breakpoint-tak meer. */}
           <div id="main-content" tabIndex={-1} className="outline-none">
-            {(!hydrated || isLgUp) && (
-              <main className={hydrated ? 'lg:pl-[264px]' : 'hidden lg:block lg:pl-[264px]'}>
-                {children}
-              </main>
-            )}
-            {(!hydrated || !isLgUp) && (
-              <MobileStackShell email={email} role={role}>{children}</MobileStackShell>
-            )}
+            <MobileStackShell email={email} role={role}>{children}</MobileStackShell>
           </div>
         </DailyExpenseProvider>
       </ChatLayoutWrapper>
