@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-19T14:44:05.844Z",
+  "generatedAt": "2026-07-19T15:51:43.514Z",
   "generatedDate": "2026-07-19",
   "repo": {
     "name": "fin",
@@ -191,9 +191,9 @@
     "routesProduction": 101,
     "api": 255,
     "tables": 84,
-    "migrations": 146,
+    "migrations": 147,
     "integrations": 24,
-    "components": 857,
+    "components": 860,
     "providers": 11,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -7282,7 +7282,7 @@
         "migration": "supabase/migrations/20260501000001_create_external_connections.sql"
       }
     ],
-    "migrationCount": 146
+    "migrationCount": 147
   },
   "tablesByDomain": [
     {
@@ -7724,7 +7724,7 @@
     }
   ],
   "components": {
-    "total": 857,
+    "total": 860,
     "groups": [
       {
         "group": "app",
@@ -8090,7 +8090,7 @@
       },
       {
         "group": "overview",
-        "count": 132,
+        "count": 135,
         "items": [
           "aandachtspunt-actie-button",
           "atomic-cards",
@@ -8188,6 +8188,9 @@
           "optimizer-client",
           "optimizer-client.test",
           "overzicht-hero",
+          "overzicht-secondary",
+          "overzicht-secondary-loader",
+          "overzicht-streaming.test",
           "periode-selector",
           "periode-trend",
           "print-overzicht-button",
@@ -14477,6 +14480,18 @@
       ],
       "summary": "De security-audit bij de RLS-performance-sanering (ADR 0048) markeerde een plausibel escalatie-gat: de own-row-policies op `profiles` en `household_members` beperken alleen de rij, niet de kolommen — een ingelogde gebruiker zou in theorie zijn eigen `role` naar `superadmin` (prof",
       "file": "docs/adr/0049-role-kolom-hardening-guard-triggers.md"
+    },
+    {
+      "id": "0050-transactie-maandaggregaat-rpc",
+      "title": "Transactie-maandaggregaat via SECURITY INVOKER RPC + fix stille PostgREST-afkap (max_rows=1000)",
+      "status": "aanvaard",
+      "date": "2026-07-19",
+      "elements": [
+        "t-supabase",
+        "t-platform"
+      ],
+      "summary": "De server-loaders (`dashboard-`, `horizon-`, `lever-scores-data-loader`) haalden per request DUIZENDEN ruwe transactie-rijen op om er in JS SUM/GROUP-BY op te doen (12-/6-maands inkomen, uitgaven, spaarquote, dagtarief, maand-histories).",
+      "file": "docs/adr/0050-transactie-maandaggregaat-rpc.md"
     }
   ],
   "churn": {
@@ -14484,11 +14499,11 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 101
+        "commits": 102
       },
       {
         "path": "lib/ai",
-        "commits": 43
+        "commits": 44
       },
       {
         "path": "app/(app)/toekomst",
@@ -14550,14 +14565,14 @@
         "commits": 2
       },
       {
+        "file": "lib/dashboard-data-loader.ts",
+        "loc": 2530,
+        "commits": 40
+      },
+      {
         "file": "lib/horizon-data.ts",
         "loc": 2461,
         "commits": 9
-      },
-      {
-        "file": "lib/dashboard-data-loader.ts",
-        "loc": 2392,
-        "commits": 36
       },
       {
         "file": "app/(app)/core/checkin/page.tsx",
@@ -15349,25 +15364,9 @@
     "hasChanges": true,
     "sections": [
       {
-        "label": "Schermen",
-        "added": [
-          "/beheer/kennisbank",
-          "/mijn/lokale-chat"
-        ],
-        "removed": []
-      },
-      {
-        "label": "API-routes",
-        "added": [
-          "/api/admin/local-knowledge",
-          "/api/local-knowledge"
-        ],
-        "removed": []
-      },
-      {
         "label": "Componenten (aantal)",
         "added": [
-          "+2"
+          "+3"
         ],
         "removed": []
       }
@@ -15552,7 +15551,7 @@
     {
       "date": "2026-07-19",
       "api": 255,
-      "components": 857,
+      "components": 860,
       "tables": 84,
       "routesProduction": 101
     }
