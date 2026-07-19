@@ -22,37 +22,51 @@ import {
  * - Stappen handmatig afvinken → groen, blijven staan.
  * - Sluiten (X / "sluit gids") → twee-keuze-dialoog: voorgoed verbergen of
  *   volgende keer verder (sessie-flag verbergt 'm alleen deze sessie).
+ *
+ * SERVER-SEED (perf fase 1): geeft de /overzicht-pagina een `seed`
+ * ({ config, state }) mee, dan gebruikt de banner die en slaat de eerste
+ * client-fetch naar /api/welcome-guide over. Interacties (afvinken/navigeren/
+ * sluiten) blijven via de bestaande PUT-route lopen.
  */
 
 const SESSION_CLOSED_KEY = 'welcome_guide_closed'
 
 type Payload = { config: WelcomeGuideConfig; state: WelcomeGuideState }
 
-export function WelcomeGuideBanner() {
+export function WelcomeGuideBanner({ seed }: { seed?: Payload | null }) {
   const [data, setData] = useState<Payload | null>(null)
   const [hidden, setHidden] = useState(false)
   const [confirming, setConfirming] = useState(false)
 
   // ── Mount: sessie-flag → niet fetchen (data blijft null → render niets);
-  // anders config + staat ophalen. Alleen de `cancelled`-flag gebruiken (geen
-  // fetchedRef-guard) zodat de dubbele StrictMode-mount in dev de tweede fetch
-  // gewoon laat winnen — setState gebeurt enkel async in callbacks. ──
+  // anders de server-seed gebruiken (geen fetch) of config + staat ophalen.
+  // Alleen de `cancelled`-flag gebruiken (geen fetchedRef-guard) zodat de dubbele
+  // StrictMode-mount in dev de tweede fetch gewoon laat winnen — setState gebeurt
+  // enkel async in callbacks. ──
   useEffect(() => {
     try {
       if (sessionStorage.getItem(SESSION_CLOSED_KEY) === '1') return
     } catch {
       /* sessionStorage onbeschikbaar — ga door */
     }
+    const applyPayload = (d: Payload) => {
+      if (!d.config?.enabled || d.state?.status === 'dismissed') {
+        setHidden(true)
+        return
+      }
+      setData(d)
+    }
+    // Server-seed aanwezig → geen fetch; zelfde visibility-logica als de fetch.
+    if (seed) {
+      applyPayload(seed)
+      return
+    }
     let cancelled = false
     fetch('/api/welcome-guide')
       .then((r) => (r.ok ? r.json() : null))
       .then((d: Payload | null) => {
         if (cancelled || !d) return
-        if (!d.config?.enabled || d.state?.status === 'dismissed') {
-          setHidden(true)
-          return
-        }
-        setData(d)
+        applyPayload(d)
       })
       .catch(() => {
         if (!cancelled) setHidden(true)
@@ -60,7 +74,7 @@ export function WelcomeGuideBanner() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [seed])
 
   // ── Optimistische mutatie + server-sync ──
   const mutate = useCallback(

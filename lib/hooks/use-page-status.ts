@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import type { PageStatusInfo } from '@/lib/page-status/types'
 import type { MinimizedLevel } from '@/lib/page-status/display'
+import { inflight } from '@/lib/inflight'
 
 /**
  * usePageStatus — haalt de status-duiding (PageStatusInfo) ÉN de per-gebruiker
@@ -83,15 +84,21 @@ export function usePageStatus(
     setResult({ info: null, minimized: null })
     ;(async () => {
       try {
-        const res = await fetch(
-          `/api/overzicht/page-status?route=${encodeURIComponent(route)}`,
-        )
-        if (!res.ok) return
-        const data = (await res.json()) as {
-          info?: PageStatusInfo | null
-          minimized?: unknown
-        }
-        if (cancelled) return
+        // Dedupe (perf fase 1): de PageStatusProvider staat in de /overzicht-
+        // layout, die pre-hydratie in BEIDE shell-takken (desktop + mobiel)
+        // mount → 2 gelijktijdige fetches per route. `inflight` per-route vouwt
+        // die samen tot één roundtrip. Wist na settle → geen cross-account-lek.
+        const data = await inflight(`page-status:${route}`, async () => {
+          const res = await fetch(
+            `/api/overzicht/page-status?route=${encodeURIComponent(route)}`,
+          )
+          if (!res.ok) return null
+          return (await res.json()) as {
+            info?: PageStatusInfo | null
+            minimized?: unknown
+          }
+        })
+        if (cancelled || !data) return
         setResult({
           info: data.info ?? null,
           minimized: asMinimizedLevel(data.minimized),

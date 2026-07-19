@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import { WillHome } from './will-home'
 import type { CoachDataGaps } from '@/lib/coach-suggestions'
+import { __resetInflight } from '@/lib/inflight'
 
 const open = vi.fn()
 const toggle = vi.fn()
@@ -28,7 +29,7 @@ beforeEach(() => {
   open.mockReset(); toggle.mockReset(); openWithMessage.mockReset()
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ count: 0 }) }))
 })
-afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks() })
+afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); __resetInflight() })
 
 describe('WillHome', () => {
   it('toont de bubbel-launcher en opent de chat bij klik', () => {

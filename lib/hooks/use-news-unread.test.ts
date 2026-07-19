@@ -1,6 +1,7 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useNewsUnread } from './use-news-unread'
+import { __resetInflight } from '@/lib/inflight'
 
 /**
  * useNewsUnread voedt de freshness-dot op de "Nieuws"-rij in de sidebar.
@@ -26,9 +27,21 @@ function makeFetch(responses: Array<{ ok: boolean; json?: object }>) {
 
 afterEach(() => {
   vi.restoreAllMocks()
+  // In-flight dedupe-registratie wissen zodat een hangende/lopende fetch uit de
+  // vorige test niet naar de volgende lekt (gedeelde module-state).
+  __resetInflight()
 })
 
 describe('useNewsUnread', () => {
+  it('slaat de fetch over wanneer entitlement ontbreekt (enabled=false)', async () => {
+    const fetchSpy = vi.fn()
+    global.fetch = fetchSpy as unknown as typeof fetch
+    const { result } = renderHook(() => useNewsUnread(false))
+    await act(async () => {})
+    expect(result.current).toBe(false)
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
   it('begint op false (loading-state)', async () => {
     // Laat fetch hangen zodat er nooit een state-update volgt — zuivere
     // test van de initiële waarde zonder act-warning.

@@ -15,6 +15,7 @@ import {
   type CoachDataGaps, type DeferredField, type CoachOverrides,
 } from '@/lib/coach-suggestions'
 import type { ModuleId } from '@/lib/module-registry'
+import { inflight } from '@/lib/inflight'
 
 const THINK_MS = 400
 const POSTPONED_PROMPT =
@@ -81,10 +82,16 @@ export function WillHome({
   const [postponedReady, setPostponedReady] = useState(0)
   const fetchPostponedReady = useCallback(async () => {
     try {
-      const res = await fetch('/api/ai/recommendations/postponed-ready', { cache: 'no-store' })
-      if (!res.ok) return
-      const { count } = (await res.json()) as { count: number }
-      setPostponedReady(count)
+      // Dedupe (perf fase 1): op mount vuren BEIDE effecten hieronder (de
+      // onvoorwaardelijke + de `!isOpen`-variant, want isOpen start false) →
+      // 2× dezelfde fetch. `inflight` vouwt gelijktijdige calls samen tot één
+      // roundtrip; een latere ververs (bij chat-sluiten) fetcht gewoon vers.
+      const count = await inflight('postponed-ready', async () => {
+        const res = await fetch('/api/ai/recommendations/postponed-ready', { cache: 'no-store' })
+        if (!res.ok) return null
+        return ((await res.json()) as { count: number }).count
+      })
+      if (count != null) setPostponedReady(count)
     } catch { /* informatief — stil falen */ }
   }, [])
   useEffect(() => { void fetchPostponedReady() }, [fetchPostponedReady])

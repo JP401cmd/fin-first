@@ -76,6 +76,36 @@ export async function GET(request: Request) {
   const now = new Date()
   const today = now.toISOString().split('T')[0]
 
+  // ── Server-side dag-gate (besluit: 1×/dag is akkoord) ──────────────────────
+  // De kale AutoSnapshotTrigger (zónder `source`) vuurt bij ELKE page-load. Als
+  // er voor (user, vandaag) al een snapshot is, antwoorden we direct met een
+  // goedkope no-op — geen 8-query-batch, geen FIRE-projectie, geen upsert.
+  //
+  // Alleen voor de kale trigger: prijs-sync-aanroepen (`?source=daily-open|manual|
+  // sync`) MOETEN wél herberekenen (verse waarden + history-punt) en zijn zelf al
+  // gegate (daily-open-claim / gebruikersactie). Dit dekt óók de "dubbele PATCH op
+  // net_worth_snapshots" op /toekomst: latere same-day mounts worden een no-op.
+  //
+  // Een simpele head+count SELECT op de eigen rij (RLS) — GEEN `update().or().
+  // select()`, dus de bekende PostgREST-42703-val (representation-filter) speelt
+  // hier niet.
+  if (!historySource) {
+    const { count: existingToday, error: gateError } = await supabase
+      .from('net_worth_snapshots')
+      .select('snapshot_date', { head: true, count: 'exact' })
+      .eq('user_id', user.id)
+      .eq('snapshot_date', today)
+
+    if (!gateError && (existingToday ?? 0) > 0) {
+      return NextResponse.json({
+        updated: false,
+        created: false,
+        skipped: true,
+        message: 'Snapshot voor vandaag bestaat al — geen herberekening.',
+      })
+    }
+  }
+
   // Fetch all required data in parallel
   const twelveMonthsAgo = localMonthStart(new Date(now.getFullYear(), now.getMonth() - 11, 1))
   const sixMonthsAgo = localMonthStart(new Date(now.getFullYear(), now.getMonth() - 5, 1))
@@ -346,6 +376,7 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     updated: true,
+    created: true,
     snapshot: {
       ...snapshot,
       freedom_percentage: Math.round(freedomPercentage * 10) / 10,

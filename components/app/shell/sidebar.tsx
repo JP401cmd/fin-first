@@ -58,6 +58,7 @@ import {
 } from '@/lib/leverage-status'
 import { useNotifications } from '@/components/app/notifications/notification-provider'
 import { useNewsUnread } from '@/lib/hooks/use-news-unread'
+import { hasSubscription } from '@/lib/feature-registry'
 import {
   useCashflowCardStatuses,
   type CashflowCardStatuses,
@@ -1116,9 +1117,15 @@ function OverigeSection({
   collapsed: boolean
   sidebarSignals?: SidebarSignals
 }) {
-  // Live bronnen leven in OverigeRow (useNotifications/useNewsUnread) zodat de
-  // badge + freshness-dot consistent en actueel zijn. Hier alleen de statische
-  // entries doorgeven; de dynamiek per rij wordt in OverigeRow afgehandeld.
+  // Nieuws-freshness: ÉÉN gedeelde bron (perf fase 1). Voorheen riep elke
+  // OverigeRow `useNewsUnread()` aan (Rules of Hooks: onvoorwaardelijk) →
+  // ~4 rijen × 1 peek-fetch = 4× `/api/news?peek=1` per pageload. Hier één keer,
+  // entitlement-gated: zonder AI-abonnement raakt de peek de 403-gate → we slaan
+  // 'm over (`enabled=false`). Het resultaat gaat als prop naar de Nieuws-rij.
+  const { subscriptions } = useModuleAccess()
+  const hasAi = hasSubscription(subscriptions, 'ai')
+  const newsUnread = useNewsUnread(hasAi)
+
   return (
     <div className="flex flex-col px-2 py-3">
       {!collapsed && <OverigeSectionLabel />}
@@ -1129,6 +1136,7 @@ function OverigeSection({
             entry={entry}
             collapsed={collapsed}
             sidebarSignals={sidebarSignals}
+            newsUnread={newsUnread}
           />
         ))}
       </div>
@@ -1153,18 +1161,20 @@ function OverigeRow({
   entry,
   collapsed,
   sidebarSignals,
+  newsUnread,
 }: {
   entry: OverigeEntry
   collapsed: boolean
   sidebarSignals?: SidebarSignals
+  /** Nieuws-freshness: gedeelde bron uit OverigeSection (één fetch, gated). */
+  newsUnread: boolean
 }) {
   const Icon = entry.Icon
 
-  // Live bronnen — onvoorwaardelijk (Rules of Hooks). Berichten consumeert het
-  // ongelezen-aantal uit de notificatie-provider (badge + dot consistent en
-  // live); Nieuws via een eenmalige cache-fetch.
+  // Berichten consumeert het ongelezen-aantal uit de notificatie-provider
+  // (context-read, geen fetch — badge + dot consistent en live). De Nieuws-
+  // freshness komt als prop uit OverigeSection (één gedeelde peek-fetch).
   const { unreadCount } = useNotifications()
-  const newsUnread = useNewsUnread()
 
   // Bepaal per rij: numerieke badge (alleen Berichten) + freshness-dot.
   const isBerichten = entry.label === 'Berichten'

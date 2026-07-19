@@ -69,4 +69,25 @@ describe('CheckinBanner', () => {
     await vi.advanceTimersByTimeAsync(10)
     expect(container.firstChild).toBeNull()
   })
+
+  it('seed aanwezig → toont banner ZONDER fetch', async () => {
+    vi.setSystemTime(new Date('2026-05-03T12:00:00Z')) // eerste week
+    const fetchSpy = vi.fn()
+    global.fetch = fetchSpy as unknown as typeof fetch
+    render(<CheckinBanner seed={{ enabled: true, completed: false }} />)
+    await vi.waitFor(() => {
+      expect(screen.getByText(/Check-in mei/i)).toBeTruthy()
+    })
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('seed completed → geen banner, geen fetch', async () => {
+    vi.setSystemTime(new Date('2026-05-03T12:00:00Z'))
+    const fetchSpy = vi.fn()
+    global.fetch = fetchSpy as unknown as typeof fetch
+    const { container } = render(<CheckinBanner seed={{ enabled: true, completed: true }} />)
+    await vi.advanceTimersByTimeAsync(10)
+    expect(container.firstChild).toBeNull()
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
 })

@@ -16,6 +16,11 @@ import Link from 'next/link'
  *
  * Bewust los van de uitgebreidere MonthlyCheckinCard (die ook een
  * placeholder/uitleg-staat heeft); dit is puur de top-of-page nudge.
+ *
+ * SERVER-SEED (perf fase 1): geeft de /overzicht-pagina een `seed`
+ * ({ enabled, completed }) mee, dan gebruikt de banner die en slaat de eerste
+ * client-fetch naar /api/monthly-checkin over. De eerste-week- en sessie-dismiss-
+ * gates blijven client-side; interacties lopen nog via de bestaande route.
  */
 
 const DISMISS_KEY = 'checkin_banner_dismissed'
@@ -34,7 +39,12 @@ const MONTH_NAMES = [
   'juli', 'augustus', 'september', 'oktober', 'november', 'december',
 ]
 
-export function CheckinBanner() {
+export function CheckinBanner({
+  seed,
+}: {
+  /** Server-seed ({ enabled, completed }); aanwezig → geen eerste client-fetch. */
+  seed?: { enabled: boolean; completed: boolean }
+}) {
   const [visible, setVisible] = useState(false)
 
   useEffect(() => {
@@ -46,12 +56,20 @@ export function CheckinBanner() {
     } catch {
       /* sessionStorage onbeschikbaar — ga door */
     }
+    const apply = (d: { enabled?: boolean; completed?: boolean } | null) => {
+      if (d?.enabled && !d?.completed) setVisible(true)
+    }
+    // Server-seed aanwezig → geen fetch, gebruik direct de reeds bekende status.
+    if (seed) {
+      apply(seed)
+      return
+    }
     let cancelled = false
     fetch('/api/monthly-checkin')
       .then((r) => r.json())
       .then((data) => {
         if (cancelled) return
-        if (data?.enabled && !data?.completed) setVisible(true)
+        apply(data)
       })
       .catch(() => {
         /* stil falen — geen banner */
@@ -59,7 +77,7 @@ export function CheckinBanner() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [seed])
 
   function dismiss() {
     setVisible(false)

@@ -83,4 +83,34 @@ describe('WelcomeGuideBanner', () => {
     expect(screen.queryByText('Welkom bij TriFinity')).not.toBeInTheDocument()
     expect(fn).not.toHaveBeenCalled()
   })
+
+  it('seed aanwezig → toont scherm 1 ZONDER fetch', async () => {
+    const fn = vi.fn()
+    vi.stubGlobal('fetch', fn)
+    render(
+      <WelcomeGuideBanner
+        seed={{ config: DEFAULT_WELCOME_GUIDE, state: DEFAULT_WELCOME_GUIDE_STATE }}
+      />,
+    )
+    expect(await screen.findByText('Zijn al je bezittingen geregistreerd?')).toBeInTheDocument()
+    expect(fn).not.toHaveBeenCalled()
+  })
+
+  it('seed met uitgeschakelde config → niets, geen fetch', async () => {
+    const fn = vi.fn()
+    vi.stubGlobal('fetch', fn)
+    render(
+      <WelcomeGuideBanner
+        seed={{
+          config: { ...DEFAULT_WELCOME_GUIDE, enabled: false },
+          state: DEFAULT_WELCOME_GUIDE_STATE,
+        }}
+      />,
+    )
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0))
+    })
+    expect(screen.queryByText('Welkom bij TriFinity')).not.toBeInTheDocument()
+    expect(fn).not.toHaveBeenCalled()
+  })
 })

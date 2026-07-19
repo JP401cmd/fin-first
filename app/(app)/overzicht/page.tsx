@@ -27,6 +27,7 @@ import { resolveFreedomFraming } from '@/lib/fire-strategy'
 import { loadLeverScores } from '@/lib/lever-scores-loader'
 import { PageStatusSeed } from '@/components/app/page-status-provider'
 import { computePageStatusInfo, readMinimizedLevel } from '@/lib/page-status/compute'
+import { loadCheckinBannerSeed, loadWelcomeGuideSeed } from '@/lib/overview/banner-seeds'
 
 export const metadata: Metadata = {
   title: 'Overzicht — TriFinity',
@@ -78,6 +79,8 @@ export default async function OverzichtPage() {
     checkinForBriefing,
     pageStatusInfo,
     pageStatusMinimized,
+    checkinBannerSeed,
+    welcomeGuideSeed,
   ] = await Promise.all([
     loadDashboardData(supabase),
     loadWillData(supabase),
@@ -102,6 +105,11 @@ export default async function OverzichtPage() {
     // Meelopen in deze batch scheelt twee seriële round-trips aan het eind.
     computePageStatusInfo(supabase, '/overzicht'),
     userId ? readMinimizedLevel(supabase, userId, '/overzicht') : Promise.resolve(null),
+    // Banner-seeds (perf fase 1): checkin + welkomstgids server-side berekenen
+    // zodat de banners hun eerste client-fetch (/api/monthly-checkin,
+    // /api/welcome-guide) overslaan. Hangen alleen van de user-id af → parallel.
+    userId ? loadCheckinBannerSeed(supabase, userId) : Promise.resolve(undefined),
+    userId ? loadWelcomeGuideSeed(supabase, userId) : Promise.resolve(null),
   ])
 
   const {
@@ -338,8 +346,8 @@ export default async function OverzichtPage() {
           bovenbalk, gelijk aan /toekomst en /mijn. Zonder expliciete topBar
           valt NavStackMeta terug op 'simple' en verdwijnt de cluster. */}
       <NavStackMeta title="Overzicht" topBar={{ kind: 'rich' }} bottomBar={{ kind: 'tabs' }} />
-      <WelcomeGuideBanner />
-      <CheckinBanner />
+      <WelcomeGuideBanner seed={welcomeGuideSeed} />
+      <CheckinBanner seed={checkinBannerSeed} />
       <OverzichtHero
         userName={userName ?? undefined}
         health={health}
