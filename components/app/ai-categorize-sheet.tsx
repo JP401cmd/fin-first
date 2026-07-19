@@ -1031,7 +1031,7 @@ export function AICategorizeSheet({
             )}
             {localMode && localSessionState === 'starten' && (
               <p className="text-[11px] leading-relaxed text-wil-700">
-                Lokale AI wordt gestart — dit duurt ongeveer een minuut (eenmalig per browsersessie)…
+                Lokale AI wordt gestart — een paar seconden…
               </p>
             )}
           </div>

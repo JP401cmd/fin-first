@@ -13,11 +13,11 @@ import {
   type CombinedTx,
 } from '@/lib/auto-categorize'
 // Lokale privé-modus-resolver (ADR 0043) — uitsluitend de PURE helpers.
-// local-categorize-resolver.ts importeert transformers-runtime.ts statisch,
-// maar díe laadt @huggingface/transformers pas lazy binnen loadModelSession()
-// (dynamic import in buildSession) — mapLocalChunkResults aanroepen triggert
-// dus GEEN zware runtime-import. createLocalAiResolver()(...) NIET aanroepen
-// hier (dat roept loadModelSession() wél aan).
+// local-categorize-resolver.ts importeert litert-runtime.ts statisch, maar díe
+// laadt @litert-lm/core (WASM) pas lazy binnen loadModelSession() (dynamic import
+// in buildSession) — mapLocalChunkResults aanroepen triggert dus GEEN zware
+// runtime-import. createLocalAiResolver()(...) NIET aanroepen hier (dat roept
+// loadModelSession() wél aan).
 import { mapLocalChunkResults, LOCAL_MIN_CONFIDENCE } from '@/lib/ai/local/local-categorize-resolver'
 import { parseLocalCategorizations } from '@/lib/ai/local/parse'
 

@@ -1,0 +1,8 @@
+node_modules/
+dist/
+
+# Log-artefacten van de dev-server horen niet in het repo.
+*.log
+
+# Gouden set (echte, geanonimiseerde data) — lokaal gegenereerd, nooit committen.
+public/dataset/goud-*.json

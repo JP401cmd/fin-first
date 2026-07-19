@@ -7,7 +7,8 @@
 // (ADR 0043, scope A).
 //
 // Kernafspraken (ADR 0043 / POC-lessen):
-//  - Model = Gemma 4 E2B (Transformers.js/WebGPU), dynamisch geladen.
+//  - Model = Gemma 4 E2B (LiteRT-LM/WebGPU, runtime lib/ai/local/litert-runtime.ts;
+//    zie het L1-meetrapport spikes/litert-lm/meetrapport-v1.md), dynamisch geladen.
 //  - Interne batchgrootte 10: de `unaligned accesses`-crash trad op bij batch 20;
 //    de sheet levert batches ≤20 via het contract → we splitsen intern in ≤10.
 //  - Sessieherstel: per interne batch vangen we runtime-fouten; bij een crash →
@@ -29,11 +30,11 @@ import {
 import { resolveSlug } from '@/lib/ai/categorize-budget-options'
 import type { CombinedAiBatchItem, CombinedAiResult } from '@/lib/auto-categorize'
 import { parseLocalCategorizations, type LocalParseResult, type RawLocalCategorization } from './parse'
-// Statische import: transformers-runtime laadt de zware @huggingface/transformers-
-// bundel pas lazy in zijn eigen functies, dus dit trekt die bundel NIET eager
-// mee. De statische import maakt de generatie-callsite bovendien expliciet zodat
-// de sanitize-scan ('m op de allowlist) 'm herkent (ADR 0035/0043).
-import { loadModelSession, disposeSession } from './transformers-runtime'
+// Statische import: litert-runtime laadt de zware @litert-lm/core-WASM-bundel pas
+// lazy in zijn eigen functies (dynamic import), dus dit trekt die bundel NIET
+// eager mee. De statische import maakt de generatie-callsite bovendien expliciet
+// zodat de sanitize-scan ('m op de allowlist) 'm herkent (ADR 0035/0043).
+import { loadModelSession, disposeSession } from './litert-runtime'
 
 /**
  * Confidence-drempel voor het lokale pad — architect-besluit (ADR 0043): dít is

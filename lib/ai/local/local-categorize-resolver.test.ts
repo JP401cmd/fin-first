@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import type { LocalChatMessage } from './transformers-runtime'
+import type { LocalChatMessage } from './litert-runtime'
 
-// ── Mock de Transformers.js-laag ──────────────────────────────────────────────
+// ── Mock de LiteRT-LM-laag ────────────────────────────────────────────────────
 // De pure delen (id-mapping, drempel, parse) testen we direct; de resolver-
 // integratie (interne batchsplitsing 10, sessieherstel) met een gemockte
 // generate/dispose. Geen model-download.
@@ -10,7 +10,7 @@ let generateImpl: (messages: LocalChatMessage[], maxNewTokens: number) => Promis
 const disposeSpy = vi.fn(async () => {})
 const generateSpy = vi.fn((messages: LocalChatMessage[], maxNewTokens: number) => generateImpl(messages, maxNewTokens))
 
-vi.mock('./transformers-runtime', () => ({
+vi.mock('./litert-runtime', () => ({
   loadModelSession: async () => ({
     generate: (messages: LocalChatMessage[], maxNewTokens: number) => generateSpy(messages, maxNewTokens),
   }),

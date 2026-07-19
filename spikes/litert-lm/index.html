@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Spike — LiteRT-LM · lokale categorisatie · meetharnas</title>
+    <style>
+      :root {
+        --bg: #0f1115;
+        --panel: #171a21;
+        --border: #2a2f3a;
+        --text: #e6e8ec;
+        --muted: #9aa3b2;
+        --pass: #3fb950;
+        --warn: #d29922;
+        --fail: #f85149;
+        --accent: #4c8dff;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        background: var(--bg);
+        color: var(--text);
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      header { padding: 16px 20px; border-bottom: 1px solid var(--border); }
+      header h1 { font-size: 15px; margin: 0 0 4px; }
+      header p { margin: 0; color: var(--muted); font-size: 12px; }
+      main { padding: 16px 20px; display: flex; flex-direction: column; gap: 16px; max-width: 1100px; }
+      section { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; }
+      section h2 { font-size: 13px; margin: 0 0 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+      label { display: inline-flex; align-items: center; gap: 6px; margin-right: 14px; color: var(--muted); }
+      input, button {
+        font-family: inherit; font-size: 12px; background: #0c0e13; color: var(--text);
+        border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px;
+      }
+      button { cursor: pointer; background: var(--accent); color: #fff; border-color: transparent; }
+      button.secondary { background: #21262d; color: var(--text); }
+      button:disabled { opacity: 0.5; cursor: not-allowed; }
+      .row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 10px; }
+      table { width: 100%; border-collapse: collapse; font-size: 12px; }
+      th, td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+      th { color: var(--muted); font-weight: 600; }
+      .pass { color: var(--pass); }
+      .warn { color: var(--warn); }
+      .fail { color: var(--fail); }
+      .muted { color: var(--muted); }
+      .bar { height: 8px; background: #0c0e13; border-radius: 4px; overflow: hidden; border: 1px solid var(--border); }
+      .bar > div { height: 100%; background: var(--accent); width: 0%; transition: width 0.15s; }
+      code { background: #0c0e13; padding: 1px 4px; border-radius: 3px; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Spike — LiteRT-LM · lokale transactie-categorisatie · meetharnas</h1>
+      <p>Gemma 4 E2B-it (.litertlm) via @litert-lm/core + WebGPU. Wegwerp-spikecode, los van de TriFinity-app. Meet: download/init (cold/warm), doorvoer (TTFT/tok/s), accuracy, output-validiteit en stabiliteit. Alle meetdata verschijnt in de console als <code>[metric] …</code>-regels.</p>
+    </header>
+    <main>
+      <section id="capability">
+        <h2>1 · Capability (WebGPU)</h2>
+        <div id="capability-body" class="muted">Bezig met detecteren…</div>
+      </section>
+
+      <section id="loader">
+        <h2>2 · Model laden (download/init · cold/warm)</h2>
+        <div class="row">
+          <button id="init-btn">Download / Init</button>
+          <button id="clear-cache-btn" class="secondary">Cache wissen</button>
+        </div>
+        <div class="bar" style="margin:8px 0;"><div id="load-bar"></div></div>
+        <div id="load-status" class="muted">Nog geen model geladen. ~2 GB bij de eerste (cold) run.</div>
+      </section>
+
+      <section id="runner">
+        <h2>3 · Dataset draaien (batch · accuracy · doorvoer)</h2>
+        <div id="dataset-status" class="muted" style="margin-bottom:8px;">Dataset laden…</div>
+        <div class="row">
+          <label>Aantal runs <input id="runs-input" type="number" min="1" max="50" value="1" style="width:64px" /></label>
+          <label>Batchgrootte <input id="batch-input" type="number" min="1" max="100" value="10" style="width:64px" /></label>
+          <button id="run-btn" disabled>Draai dataset</button>
+        </div>
+        <div class="bar" style="margin:8px 0;"><div id="run-bar"></div></div>
+        <div id="run-status" class="muted">Laad eerst een model.</div>
+      </section>
+
+      <section id="report">
+        <h2>4 · Resultaten per run</h2>
+        <div id="results" class="muted">Nog geen run.</div>
+      </section>
+    </main>
+    <script type="module" src="/main.ts"></script>
+  </body>
+</html>

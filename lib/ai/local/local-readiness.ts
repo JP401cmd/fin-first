@@ -9,7 +9,7 @@
 //       'high-performance') geeft soms null bij een GPU-proces-herstart of
 //       driver-update. Juiste actie: opnieuw proberen / browser herstarten.
 //   (b) getLocalModelState() ≠ 'klaar' — bv. Cache-Storage-eviction van de
-//       ~3,2 GB shards. Juiste actie: opnieuw downloaden via Mijn → Privacy.
+//       ~2,0 GB bundel. Juiste actie: opnieuw downloaden via Mijn → Privacy.
 //
 // Deze pure helper kiest de juiste, concrete boodschap per oorzaak. Geen React,
 // geen I/O — puur zodat 'm eenvoudig te testen en te hergebruiken is (ADR 0043).

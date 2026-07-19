@@ -406,8 +406,8 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     {
       id: 't-lokale-ai', x: 1250, y: row(6), w: 185, h: 66, kind: 'tech',
       title: 'Lokale AI-runtime — in-browser, WebGPU',
-      lead: 'Transformers.js + Gemma 4 E2B, volledig on-device: categorisatie-voorstellen verlaten het toestel niet. Desktop-only, assistief (review-UI-only, geen automatische toepassing) — bewust géén externe-partij-relatie, in tegenstelling tot ext-claude → t-aigateway. Dat ontbreken ís de privacygarantie (ADR 0043).',
-      items: ['Transformers.js', 'Gemma 4 E2B', 'WebGPU', 'privacy_mode'],
+      lead: 'LiteRT-LM (@litert-lm/core, Early Preview) + Gemma 4 E2B web-bundel, volledig on-device: categorisatie-voorstellen verlaten het toestel niet. Sinds 19 jul 2026 runtime-swap vanaf Transformers.js/ONNX (L1-meting: betrouwbaarder + sneller op dezelfde iGPU-realiteit) — desktop-only, assistief (review-UI-only, geen automatische toepassing) blijft ongewijzigd. Dezelfde runtime bedient sinds C1b ook een experimentele lokale Will-chat (/mijn/lokale-chat): vragen over eigen cijfers, antwoord blijft on-device. Bewust géén externe-partij-relatie, in tegenstelling tot ext-claude → t-aigateway. Dat ontbreken ís de privacygarantie (ADR 0043).',
+      items: ['LiteRT-LM (@litert-lm/core 0.14.0)', 'Gemma 4 E2B web-bundel', 'WebGPU', 'privacy_mode'],
     },
 
     // ── Data ──
@@ -536,7 +536,7 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     't-bankimport->app-comp': { payload: 'Geparste MT940/CSV/OFX-boekingen met dedup-hash', mechanism: 'import', cadence: 'on-demand' },
     't-marktdata->app-comp': { payload: 'Koersen, fundamentals en wallet-/exchange-saldi', mechanism: 'rest', cadence: 'daily', contractDomains: ['integrations', 'prices'] },
     't-platform->app-comp': { payload: 'Hosting, edge-rendering en offline service-worker-cache', mechanism: 'build', cadence: 'build' },
-    't-lokale-ai->app-comp': { payload: 'Lokale categorisatie-voorstellen die het toestel niet verlaten', mechanism: 'compute', cadence: 'on-demand' },
+    't-lokale-ai->app-comp': { payload: 'Lokale categorisatie-voorstellen én chat-antwoorden die het toestel niet verlaten', mechanism: 'compute', cadence: 'on-demand' },
     // Applicatieservice → bedrijfsproces
     'as-import->sp-registreren': { payload: 'Transacties, saldi en terugkerende lasten', mechanism: 'rest', cadence: 'on-demand', contractDomains: ['bank-connect', 'recurring', 'detect-recurring', 'own-accounts'] },
     'as-budget->sp-budget': { payload: 'Budgetten, varianties, trends en dagtempo', mechanism: 'rest', cadence: 'on-demand', contractDomains: ['budgets', 'budget-trends', 'budget-variance', 'daily-expense-rate', 'cashflow-forecast'] },

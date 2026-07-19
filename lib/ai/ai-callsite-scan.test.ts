@@ -8,6 +8,7 @@ import { describe, it, expect } from 'vitest'
 import {
   scanAiCallsites,
   importsGenerationFn,
+  importsLocalGeneration,
   importsSanitizeHelper,
   collectScannedFiles,
   AI_CALLSITE_ALLOWLIST,
@@ -43,6 +44,15 @@ describe('detector primitives', () => {
       importsSanitizeHelper("import { sanitizeTransactions, type SanitizeOptions } from '@/lib/ai/sanitize'"),
     ).toBe(true)
     expect(importsSanitizeHelper("import { maskPIIInOutput } from '@/lib/ai/pii-output-filter'")).toBe(false)
+  })
+
+  it('detects the on-device generation entrypoints from the litert-runtime', () => {
+    // Categorisatie (loadModelSession) én de lokale chat (createChatSession).
+    expect(importsLocalGeneration("import { loadModelSession } from './litert-runtime'")).toBe(true)
+    expect(importsLocalGeneration("import { createChatSession } from '@/lib/ai/local/litert-runtime'")).toBe(true)
+    expect(importsGenerationFn("import { createChatSession } from '@/lib/ai/local/litert-runtime'")).toBe(true)
+    // Alleen de cache-helpers importeren is GEEN generatie-callsite.
+    expect(importsLocalGeneration("import { isModelCached } from './litert-runtime'")).toBe(false)
   })
 
   it('would flag a dummy callsite that imports a generation fn but not sanitize', () => {
