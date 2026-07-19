@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-19T19:29:31.158Z",
+  "generatedAt": "2026-07-19T21:52:32.812Z",
   "generatedDate": "2026-07-19",
   "repo": {
     "name": "fin",
@@ -192,8 +192,8 @@
     "api": 255,
     "tables": 84,
     "migrations": 148,
-    "integrations": 24,
-    "components": 863,
+    "integrations": 25,
+    "components": 864,
     "providers": 11,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -7724,11 +7724,11 @@
     }
   ],
   "components": {
-    "total": 863,
+    "total": 864,
     "groups": [
       {
         "group": "app",
-        "count": 359,
+        "count": 360,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -8005,6 +8005,7 @@
           "regime-kaart.test",
           "reis-stap-section",
           "responsive-shell",
+          "responsive-shell.characterization.test",
           "roadmap-modal",
           "sankey-diagram",
           "scenario-chip",
@@ -8740,6 +8741,10 @@
     },
     {
       "name": "OpenAI",
+      "category": "AI"
+    },
+    {
+      "name": "OpenRouter",
       "category": "AI"
     },
     {
@@ -14518,6 +14523,29 @@
       ],
       "summary": "Alle ~220 API-routes deden per request een `auth.getUser()`-roundtrip naar de Supabase Auth-server, puur om de identiteit vast te stellen. `getClaims()` verifieert het JWT lokaal en elimineert die roundtrip. Bevestigd op prod (19 jul 2026): de JWT's zijn asymmetrisch getekend (`a",
       "file": "docs/adr/0052-getclaims-read-routes-revocatievenster.md"
+    },
+    {
+      "id": "0053-responsive-shell-enkelvoudig",
+      "title": "ResponsiveShell enkelvoudig — één render van children, CSS-gestuurde chrome",
+      "status": "aanvaard",
+      "date": "2026-07-19",
+      "elements": [
+        "app-comp"
+      ],
+      "summary": "`components/app/shell/responsive-shell.tsx` rendered pré-hydratie BEIDE breakpoint-takken naast elkaar:",
+      "file": "docs/adr/0053-responsive-shell-enkelvoudig.md"
+    },
+    {
+      "id": "0054-horizon-kernel-web-worker",
+      "title": "Horizon-kernel draait client-side in een web worker, met progressieve first paint op server-scalars",
+      "status": "aanvaard",
+      "date": "2026-07-19",
+      "elements": [
+        "as-planning",
+        "fn-toekomstplannen"
+      ],
+      "summary": "`/toekomst` draaide de FIRE-kernel **synchroon op de main thread**. In `use-horizon-fire-sim.ts` deden drie `useMemo`'s elk een volledige kernel-run: de hoofd-projectie (`computeConvergentieProjection` — gemeten 173–419 ms), de wat-als-scenario-run en het gekozen-stop-pad (`runFo",
+      "file": "docs/adr/0054-horizon-kernel-web-worker.md"
     }
   ],
   "churn": {
@@ -14567,8 +14595,8 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 8396,
-        "commits": 87
+        "loc": 8457,
+        "commits": 88
       },
       {
         "file": "components/app/budgets-client.tsx",
@@ -15390,9 +15418,16 @@
     "hasChanges": true,
     "sections": [
       {
+        "label": "Integraties",
+        "added": [
+          "OpenRouter"
+        ],
+        "removed": []
+      },
+      {
         "label": "Componenten (aantal)",
         "added": [
-          "+3"
+          "+1"
         ],
         "removed": []
       }
@@ -15577,7 +15612,7 @@
     {
       "date": "2026-07-19",
       "api": 255,
-      "components": 863,
+      "components": 864,
       "tables": 84,
       "routesProduction": 101
     }
