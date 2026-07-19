@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { unauthorized, serverError } from '@/lib/api/respond'
 import { fetchPriceData, type PriceData } from '@/lib/price-feed'
@@ -27,8 +27,8 @@ export async function GET(
 ) {
   const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
+  const claims = await getAuthClaims(supabase)
+  if (!claims) {
     return unauthorized()
   }
 
