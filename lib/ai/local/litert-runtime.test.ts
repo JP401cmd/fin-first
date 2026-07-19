@@ -42,6 +42,7 @@ import {
   clearModelCache,
   loadModelSession,
   disposeSession,
+  createChatSession,
   LOCAL_MODEL_URL,
 } from './litert-runtime'
 
@@ -232,6 +233,99 @@ describe('init-fout — loadModelSession reject, tweede poging slaagt', () => {
     const out = await session.generate(SAMPLE_MESSAGES, 64)
     expect(out).toBe('ok')
     expect(engineCreateSpy).toHaveBeenCalledTimes(2)
+
+    errorSpy.mockRestore()
+  })
+})
+
+// ── createChatSession: native multi-turn chat (fase C1b) ───────────────────────
+// Injecteert per test een eigen conversation-mock via engineCreateSpy.mock-
+// ImplementationOnce; het warme cache-pad voorkomt een download.
+function chatStreamOf(chunks: unknown[]): ReadableStream {
+  return new ReadableStream({
+    start(controller) {
+      for (const c of chunks) controller.enqueue(c)
+      controller.close()
+    },
+  })
+}
+/** Eén streaming-Message met parts-content (de productievorm). */
+function textMsg(text: string) {
+  return { role: 'assistant', content: [{ type: 'text', text }] }
+}
+/** Zet een custom engine (met configureerbare conversation) klaar voor de volgende create. */
+function injectConversation(sendImpl: (text: string) => ReadableStream, convDelete?: () => Promise<void>) {
+  const sendSpy = vi.fn(sendImpl)
+  const createConversationSpy = vi.fn(async () => ({ sendMessageStreaming: sendSpy, delete: convDelete }))
+  // Cast: de basis-engineCreateSpy heeft een engere afgeleide vorm (no-arg
+  // sendMessageStreaming, geen conversation.delete). Deze test injecteert een
+  // rijkere conversation; `as never` omzeilt de mock-signatuur-mismatch.
+  engineCreateSpy.mockImplementationOnce(
+    async () => ({ createConversation: createConversationSpy, delete: engineDeleteSpy }) as never,
+  )
+  return { sendSpy, createConversationSpy }
+}
+
+describe('createChatSession — streaming, geschiedenis, dispose, fail-closed', () => {
+  it('streamt deltas, levert de volledige tekst en zet de systeem-preface', async () => {
+    stubWarmCache()
+    const { sendSpy, createConversationSpy } = injectConversation(() =>
+      chatStreamOf([textMsg('Hal'), textMsg('lo '), textMsg('wereld')]),
+    )
+
+    const session = await createChatSession('SYSTEEM-PROMPT')
+    const deltas: string[] = []
+    const full = await session.send('vraag', (d) => deltas.push(d))
+
+    expect(deltas).toEqual(['Hal', 'lo ', 'wereld'])
+    expect(full).toBe('Hallo wereld')
+    expect(createConversationSpy).toHaveBeenCalledWith({
+      preface: { messages: [{ role: 'system', content: 'SYSTEEM-PROMPT' }] },
+    })
+    expect(sendSpy).toHaveBeenCalledWith('vraag')
+  })
+
+  it('houdt de geschiedenis in ÉÉN conversation (createConversation 1×, meerdere sends)', async () => {
+    stubWarmCache()
+    const { sendSpy, createConversationSpy } = injectConversation(() => chatStreamOf([textMsg('ok')]))
+
+    const session = await createChatSession('S')
+    await session.send('a', () => {})
+    await session.send('b', () => {})
+
+    expect(createConversationSpy).toHaveBeenCalledTimes(1)
+    expect(sendSpy).toHaveBeenCalledTimes(2)
+    expect(sendSpy).toHaveBeenNthCalledWith(1, 'a')
+    expect(sendSpy).toHaveBeenNthCalledWith(2, 'b')
+  })
+
+  it('dispose sluit de sessie: send werpt, conversation.delete wordt best-effort aangeroepen, engine blijft', async () => {
+    stubWarmCache()
+    const convDeleteSpy = vi.fn(async () => {})
+    injectConversation(() => chatStreamOf([textMsg('ok')]), convDeleteSpy)
+
+    const session = await createChatSession('S')
+    session.dispose()
+
+    await expect(session.send('x', () => {})).rejects.toThrow(/afgesloten/i)
+    // Best-effort (fire-and-forget) — flush de microtasks/timer.
+    await new Promise((r) => setTimeout(r, 0))
+    expect(convDeleteSpy).toHaveBeenCalledTimes(1)
+    // De GEDEELDE engine wordt door dispose NIET verwijderd (kan categorisatie bedienen).
+    expect(engineDeleteSpy).not.toHaveBeenCalled()
+  })
+
+  it('een inferentiefout werpt (fail-closed) en logt de [lokale-ai]-kanarie', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    stubWarmCache()
+    injectConversation(() => {
+      throw new Error('inferentie boom')
+    })
+
+    const session = await createChatSession('S')
+    await expect(session.send('x', () => {})).rejects.toThrow('inferentie boom')
+    expect(errorSpy).toHaveBeenCalled()
+    expect(String(errorSpy.mock.calls[0][0])).toContain('[lokale-ai]')
 
     errorSpy.mockRestore()
   })

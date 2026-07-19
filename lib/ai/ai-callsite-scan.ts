@@ -73,19 +73,22 @@ export const AI_CALLSITE_ALLOWLIST: CallsiteAllowlistEntry[] = [
 ]
 
 /**
- * True if the source imports the on-device generation session
- * (`loadModelSession` from the local LiteRT-LM runtime). This is the
- * WebGPU/Gemma privacy-modus generation callsite (ADR 0043): it builds a prompt
- * from transaction data and runs inference locally. It uses @litert-lm/core
- * instead of the `ai` package, so the cloud-detector above misses it — this
- * marker brings it under the same guardrail net (it belongs on the allowlist:
- * on-device, no egress, sanitize would strip legitimate signal).
+ * True if the source imports an on-device generation entrypoint from the local
+ * LiteRT-LM runtime: `loadModelSession` (transaction categorisation, ADR 0043)
+ * or `createChatSession` (local Will-chat, ADR 0043 §C1b). Both build a prompt
+ * from application data and run inference locally on WebGPU/Gemma. They use
+ * @litert-lm/core instead of the `ai` package, so the cloud-detector above
+ * misses them — this marker brings such callsites under the same guardrail net.
+ * On-device generation has no egress, so a matching lib/ai callsite belongs on
+ * the allowlist (sanitize would strip legitimate signal). The generation itself
+ * lives INSIDE litert-runtime.ts (which imports neither name), so the runtime
+ * file is not flagged; this catches any future lib/ai consumer of that path.
  */
 export function importsLocalGeneration(source: string): boolean {
   const re = /import\s*(?:type\s+)?\{([^}]*)\}\s*from\s*['"][^'"]*litert-runtime['"]/g
   let m: RegExpExecArray | null
   while ((m = re.exec(source)) !== null) {
-    if (/\bloadModelSession\b/.test(m[1])) return true
+    if (/\bloadModelSession\b|\bcreateChatSession\b/.test(m[1])) return true
   }
   return false
 }

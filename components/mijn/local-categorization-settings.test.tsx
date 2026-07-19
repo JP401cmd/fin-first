@@ -90,7 +90,8 @@ describe('LocalCategorizationSettings', () => {
     mocks.getLocalModelState.mockResolvedValue({ state: 'niet-gedownload', bytes: null })
     render(<LocalCategorizationSettings />)
     expect(await screen.findByText('Categoriseer transacties lokaal')).toBeTruthy()
-    expect(screen.getByText('Experimenteel')).toBeTruthy()
+    // De sectie-badge én de lokale-chat-linkkaart dragen beide 'Experimenteel' — assert ≥1.
+    expect(screen.getAllByText('Experimenteel').length).toBeGreaterThanOrEqual(1)
   })
 
   it('capability-fail: toggle blijft uit en toont de reasons, geen download', async () => {

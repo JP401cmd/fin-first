@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import {
   Cpu,
@@ -11,6 +12,8 @@ import {
   ShieldCheck,
   Loader2,
   MonitorSmartphone,
+  MessageSquare,
+  ArrowRight,
 } from 'lucide-react'
 import { hasSubscription } from '@/lib/feature-registry'
 import { AiSubscriptionUpsell } from '@/components/app/ai-subscription-upsell'
@@ -628,6 +631,34 @@ export function LocalCategorizationSettings() {
                 </div>
               )}
             </div>
+          )}
+          {/* ── Bescheiden ingang naar de lokale chat (experimenteel) ── */}
+          {/* Alleen tonen als deze lokale-AI-sectie bruikbaar is: AI aan, tier
+              aanwezig en op een desktop (de chat is net als de categorisatie
+              desktop-only). De chatpagina her-checkt capability + model zelf. */}
+          {phase === 'idle' && aiEnabled && hasAiTier && !likelyMobile && (
+            <Link
+              href="/mijn/lokale-chat"
+              className="flex items-center justify-between gap-3 border border-[var(--border-ed)] bg-[var(--paper)] p-4 transition-colors hover:bg-[var(--subtle)]"
+            >
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center bg-wil-50">
+                  <MessageSquare className="h-4 w-4 text-wil-600" aria-hidden="true" />
+                </div>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-sm font-semibold text-[var(--ink)]">Probeer de lokale chat</h3>
+                    <span className="inline-flex items-center border border-amber-500/40 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-700">
+                      Experimenteel
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-xs text-[var(--ink-3)] leading-relaxed">
+                    Praat met Will volledig op dit apparaat — je financiële gegevens verlaten je toestel niet.
+                  </p>
+                </div>
+              </div>
+              <ArrowRight className="h-4 w-4 shrink-0 text-[var(--ink-3)]" aria-hidden="true" />
+            </Link>
           )}
         </div>
       </section>

@@ -68,6 +68,49 @@ export type LocalSession = {
   generate(messages: LocalChatMessage[], maxNewTokens: number): Promise<string>
 }
 
+/**
+ * Een lopende, ON-DEVICE chatsessie (fase C1b — lokale Will-chat). Wrapt één
+ * LiteRT-`Conversation` met een vaste systeem-preface, zodat de meerdere beurten
+ * hun geschiedenis NATIEF in die ene conversatie bijhouden (geen handmatige
+ * historie-heropbouw per bericht, geen tweede promptvariant).
+ *
+ * NO-EGRESS / GEEN CLOUD-GUARDRAILS: net als de categorisatie-resolver draait
+ * dit volledig op het toestel (WebGPU/Gemma). De cloud-guardrails uit ADR 0035
+ * (`sanitizeForAI` in, `maskPIIInOutput` uit, token-logging) zijn hier N.V.T. —
+ * er is geen externe provider, geen egress en geen kosten. Faalt de inferentie,
+ * dan werpt `send` (fail-closed): de UI toont een eerlijke melding en valt NOOIT
+ * stil terug op /api/ai/chat.
+ */
+export type LocalChatSession = {
+  /**
+   * Stuur één gebruikersbericht en stream het antwoord. `onDelta` krijgt elk
+   * tekst-fragment zodra het binnenkomt (streaming-UX); de Promise levert de
+   * volledige, getrimde tekst. Werpt bij een inferentiefout (fail-closed).
+   */
+  send(text: string, onDelta: (delta: string) => void): Promise<string>
+  /** Sluit de sessie af — verdere `send`-aanroepen werpen. Laat de gedeelde engine intact. */
+  dispose(): void
+}
+
+/**
+ * Extraheer de tekst-delta('s) uit één streaming-`Message` en geef ze door aan
+ * `onDelta`. Dezelfde vorm-afhandeling als `generate` (string- of parts-content),
+ * maar per fragment i.p.v. accumulerend — dat maakt de streaming-UX mogelijk.
+ */
+function emitMessageText(value: unknown, onDelta: (delta: string) => void): void {
+  const content = (value as { content?: unknown } | undefined)?.content
+  if (typeof content === 'string') {
+    if (content) onDelta(content)
+    return
+  }
+  if (Array.isArray(content)) {
+    for (const part of content) {
+      const p = part as { type?: unknown; text?: unknown }
+      if (p?.type === 'text' && typeof p.text === 'string' && p.text) onDelta(p.text)
+    }
+  }
+}
+
 // ── Dynamische, lui geladen core-import (WASM komt hier pas binnen) ────────────
 // De facade IS het echte module-type: `typeof import(...)` geeft volledige,
 // correcte typing (Engine.create/getOrLoadGlobalLiteRtLm/Conversation/Message)
@@ -266,6 +309,75 @@ export async function disposeSession(): Promise<void> {
       console.error('[lokale-ai] engine.delete mislukt (genegeerd):', err)
     }
   }
+}
+
+/**
+ * Open een ON-DEVICE chatsessie met een vaste systeem-preface (fase C1b).
+ *
+ * Hergebruikt de GEDEELDE, dure engine (via `loadModelSession` — idempotent, pint
+ * ook de WASM op de eigen origin) en maakt daarbinnen één eigen `Conversation`
+ * aan. De conversatie houdt de beurten natief bij; `send` kan er meerdere keren
+ * op worden aangeroepen. `dispose` laat de gedeelde engine intact (die kan ook de
+ * categorisatie bedienen) en sluit alleen deze conversatie af.
+ *
+ * Streaming loopt via `sendMessageStreaming().getReader()` — exact het patroon
+ * van `generate` (getReader i.p.v. `for await`, expliciete lock-release). Fouten
+ * worden met de '[lokale-ai]'-kanarie gelogd en doorgeworpen (fail-closed).
+ */
+export async function createChatSession(systemPrompt: string): Promise<LocalChatSession> {
+  // Zorgt dat de engine geladen is én de WASM op de eigen origin is gepind.
+  await loadModelSession()
+  const engine = loadedEngine
+  if (!engine) {
+    // Defensief: loadModelSession zou de engine gezet moeten hebben. Zonder
+    // engine kan er geen conversatie starten — fail-closed.
+    throw new Error('[lokale-ai] engine niet beschikbaar na loadModelSession')
+  }
+
+  const conversation = await engine.createConversation({
+    preface: { messages: [{ role: 'system', content: systemPrompt }] },
+  })
+
+  let disposed = false
+
+  const send = async (text: string, onDelta: (delta: string) => void): Promise<string> => {
+    if (disposed) throw new Error('[lokale-ai] chatsessie is al afgesloten')
+    let full = ''
+    try {
+      const stream = conversation.sendMessageStreaming(text)
+      const reader = stream.getReader()
+      try {
+        for (;;) {
+          const { done, value } = await reader.read()
+          if (done) break
+          emitMessageText(value, (delta) => {
+            full += delta
+            onDelta(delta)
+          })
+        }
+      } finally {
+        reader.releaseLock()
+      }
+      return full.trim()
+    } catch (err) {
+      console.error('[lokale-ai] chat-inferentie mislukt:', err)
+      throw err
+    }
+  }
+
+  const dispose = (): void => {
+    disposed = true
+    // Best-effort: geef de conversatie-resources vrij als de Early-Preview-API
+    // dat ondersteunt. Nooit awaiten of laten werpen — de gedeelde engine blijft.
+    const closable = conversation as { delete?: () => Promise<void> }
+    if (typeof closable.delete === 'function') {
+      void Promise.resolve()
+        .then(() => closable.delete?.())
+        .catch((err) => console.error('[lokale-ai] conversation.delete mislukt (genegeerd):', err))
+    }
+  }
+
+  return { send, dispose }
 }
 
 /**

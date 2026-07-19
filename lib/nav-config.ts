@@ -187,6 +187,7 @@ export const EXTRA_ROUTE_TITLES: Record<string, string> = {
   '/toekomst/samengestelde-interest': 'Samengestelde interest',
   '/toekomst/uitgaven-na-pensioen': 'Uitgaven na pensioen',
   '/mijn/checkins': 'Check-ins',
+  '/mijn/lokale-chat': 'Lokale chat',
   '/mijn/feedback': 'Feedback',
   // Rapportages-familie — eigen routes buiten de nav-structuur. De titels
   // spiegelen exact de `<NavStackMeta title>` van elke pagina, zodat de
