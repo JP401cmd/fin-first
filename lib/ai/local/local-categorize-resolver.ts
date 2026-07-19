@@ -43,11 +43,15 @@ import { loadModelSession, disposeSession } from './transformers-runtime'
  *
  * Drempelcurve uit het fase-0-meetrapport (residu-gouden-set): precisie stijgt
  * van ~39% @ confidence 0,5 naar ~57% @ 0,9, maar de dekking daalt navenant
- * (≥0,9 dekt nog ~12% van de staart). Assistief kiezen we kwaliteit boven
- * dekking: liever niets voorstellen dan ruis. Resultaten onder deze drempel →
- * budget_id null ("onbekend"), geen gok.
+ * (≥0,9 dekt nog ~12% van de staart; ≥0,8 ≈ 39% precisie bij ~28% dekking).
+ * Resultaten onder deze drempel → budget_id null ("onbekend"), geen gok.
+ *
+ * Eigenaarsbesluit 19 jul 2026 (na eerste live-gebruik): verlaagd van de
+ * startwaarde 0,9 naar 0,8 — de ~12%-dekking voelde als "te weinig voorstellen";
+ * dekking weegt nu zwaarder dan maximale precisie. Blijft ruim strenger dan de
+ * cloud-conventie (0,5) en alles blijft assistief via de review-UI.
  */
-export const LOCAL_MIN_CONFIDENCE = 0.9
+export const LOCAL_MIN_CONFIDENCE = 0.8
 
 /**
  * Interne batchgrootte. De crash-vrije waarde uit de POC (batch 20 gaf de
@@ -138,7 +142,19 @@ export function mapLocalChunkResults(
  */
 export function createLocalAiResolver(
   budgets: CategorizeBudgetOption[],
+  opts?: {
+    /**
+     * Wordt aangeroepen rond het laden van de on-device sessie: 'starten' vlak
+     * vóór loadModelSession(), 'klaar' zodra die resolved. De eerste (koude)
+     * sessie-load is de trage GPU-warmup (~45-60s, volledig stil); dit signaal
+     * laat de UI daar feedback op tonen zodat het niet als een hang voelt.
+     * loadModelSession cachet, dus na de eerste chunk is starten→klaar vrijwel
+     * instant — dat is prima.
+     */
+    onSessionState?: (s: 'starten' | 'klaar') => void
+  },
 ): (batch: CombinedAiBatchItem[]) => Promise<CombinedAiResult[]> {
+  const onSessionState = opts?.onSessionState
   const validSlugs = new Set(budgets.map((b) => b.slug))
   const slugToId = new Map<string, string>()
   for (const b of budgets) {
@@ -147,7 +163,9 @@ export function createLocalAiResolver(
   const system = buildCategorizeSystemPrompt(budgets)
 
   const runChunk = async (chunkItems: CombinedAiBatchItem[]): Promise<LocalParseResult> => {
+    onSessionState?.('starten')
     const session = await loadModelSession()
+    onSessionState?.('klaar')
     const user = buildCategorizeUserPrompt(chunkItems.map(toPromptTx), { idEcho: true, kort: true })
     const text = await session.generate(
       [

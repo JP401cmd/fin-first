@@ -377,16 +377,17 @@ const tests: TestCase[] = [
   },
   {
     id: 'cat-local-confidence-threshold-cutoff',
-    name: 'Lokale resolver: confidence-afkap op LOCAL_MIN_CONFIDENCE (0,9)',
+    name: 'Lokale resolver: confidence-afkap op LOCAL_MIN_CONFIDENCE (0,8)',
     category: CAT,
     description:
       'ADR 0043: het lokale pad hanteert een strengere drempel dan de cloud-conventie (0,5) — ' +
-      'onder LOCAL_MIN_CONFIDENCE → budget_id null (assistief: liever niets dan ruis), op/boven de drempel → toegewezen.',
+      'onder LOCAL_MIN_CONFIDENCE → budget_id null (assistief: liever niets dan ruis), op/boven de drempel → toegewezen. ' +
+      'Eigenaarsbesluit 19 jul 2026: 0,8 (was startwaarde 0,9 — dekking woog zwaarder na eerste live-gebruik).',
     priority: 'critical',
     estimatedDurationMs: 10,
     requiredRole: 'any',
     fn() {
-      assertEqual(LOCAL_MIN_CONFIDENCE, 0.9, 'single-source drempelconstante ongewijzigd (ADR 0043)')
+      assertEqual(LOCAL_MIN_CONFIDENCE, 0.8, 'single-source drempelconstante (eigenaarsbesluit 19 jul 2026)')
       const chunk: CombinedAiBatchItem[] = [
         { id: 'tx-a', description: 'a', counterparty_name: null, amount: -10, reference: null, date: null },
       ]
