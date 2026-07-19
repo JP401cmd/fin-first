@@ -309,6 +309,7 @@ interface SupaConfig {
   debts?: unknown[]
   assets?: unknown[]
   snapshots?: { fire_age: number | string | null }[]
+  actions?: unknown[]
   profileFinancials?: unknown
   fullName?: string | null
 }
@@ -323,6 +324,7 @@ function makeSupabase(cfg: SupaConfig): { supabase: never; called: string[] } {
       case 'debts': return cfg.debts ?? []
       case 'assets': return cfg.assets ?? []
       case 'net_worth_snapshots': return cfg.snapshots ?? []
+      case 'actions': return cfg.actions ?? []
       default: return []
     }
   }
@@ -430,5 +432,41 @@ describe('loadWillData — cap-split + lazy injectie (integratie)', () => {
     expect(called).not.toContain('transactions')
     expect(data.goals.find(g => g.goal_type === 'savings_rate')?.current_value).toBe(33)
     expect(data.goals.find(g => g.goal_type === 'salary')?.current_value).toBe(1234)
+  })
+})
+
+// ── actions-KPI-totalen: geen kunstmatige afkap onder de cap (Task 2.5) ─────────
+
+describe('loadWillData — actions-KPI-totalen kappen niet af onder de PostgREST-cap', () => {
+  it('sommeert over ALLE teruggegeven actie-rijen (fixture > cap van 1000)', async () => {
+    // 1200 acties > max_rows (config.toml = 1000). De fake-client negeert `.limit()`,
+    // dus alle 1200 komen door — dit bewijst dat de loader-JS zelf GEEN kunstmatige
+    // cap legt: elke completed-rij telt mee in de KPI-afleiding.
+    const COMPLETED = 800
+    const OPEN = 400
+    const actions = [
+      ...Array.from({ length: COMPLETED }, (_, i) => ({
+        id: `c${i}`, status: 'completed', freedom_days_impact: 2,
+        source: 'manual', completed_at: '2026-05-01T00:00:00.000Z',
+        due_date: null, created_at: '2026-01-01T00:00:00.000Z', recommendation: null,
+      })),
+      ...Array.from({ length: OPEN }, (_, i) => ({
+        id: `o${i}`, status: 'open', freedom_days_impact: 5,
+        source: 'manual', completed_at: null, due_date: null,
+        created_at: '2026-01-01T00:00:00.000Z', recommendation: null,
+      })),
+    ]
+    const { supabase } = makeSupabase({ actions })
+    const data = await loadWillData(supabase)
+
+    // Geen afkap: alle 1200 rijen aanwezig, splitsing per status compleet.
+    expect(data.kpiData.allActions).toHaveLength(COMPLETED + OPEN)
+    expect(data.kpiData.completedActions).toHaveLength(COMPLETED)
+    expect(data.kpiData.openActions).toHaveLength(OPEN)
+    // Totaal sommeert over álle 800 completed-rijen (niet afgekapt).
+    const totalCompletedFreedomDays = data.kpiData.completedActions.reduce(
+      (s, a) => s + a.freedom_days_impact, 0,
+    )
+    expect(totalCompletedFreedomDays).toBe(COMPLETED * 2)
   })
 })

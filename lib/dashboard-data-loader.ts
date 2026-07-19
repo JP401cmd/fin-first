@@ -217,6 +217,8 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     bankConnectionsResult,
     budgetRolloversResult, budgetAmountsResult,
     weekTxResult,
+    membershipResult,
+    rebalHoldingsResult, rebalTargetsResult,
   ] = await Promise.all([
     // Gedeelde basisdata-laag (lib/server-data/base.ts): huidige-maand-tx, actieve
     // assets/schulden, eigen profiel, alle budgetten, het 12-maands transactie-
@@ -227,9 +229,18 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     getActiveDebts(supabase),
     getOwnProfile(supabase),
     getBudgets(supabase),
+    // Expliciete `.limit(1000)` = de PostgREST-cap (supabase/config.toml
+    // max_rows = 1000): een client-`.limit()` boven die grens is een no-op, dus dit
+    // maakt de bestaande stille afkap zichtbaar i.p.v. impliciet. Byte-identiek aan
+    // de vroegere ongelimiteerde query (die óók op 1000 werd afgekapt). De KPI-
+    // afleiding (totalFreedomDaysWon/completionRatio, ±r1948) sommeert over ALLE
+    // teruggegeven rijen. Volledige afkap-vrijheid bij >1000 acties zou — net als
+    // T2.2 voor transacties (ADR 0050) — een SECURITY-INVOKER aggregaat-RPC vergen
+    // (buiten scope T2.5, geen migratie).
     supabase.from('actions')
       .select('id, title, status, freedom_days_impact, priority_score, due_date, source, completed_at, recommendation:recommendations(recommendation_type)')
-      .in('status', ['open', 'postponed', 'completed']),
+      .in('status', ['open', 'postponed', 'completed'])
+      .limit(1000),
     supabase.from('life_events').select('id, name, event_type, target_age, target_date, one_time_cost, monthly_cost_change, monthly_income_change, duration_months, icon, is_active, sort_order, is_indexed, linked_asset_id, metadata').eq('is_active', true).order('sort_order', { ascending: true }).limit(50),
     supabase.from('recommendations').select('id, title, freedom_days_per_year, priority_score, recommendation_type, status').in('status', ['pending', 'postponed']),
     supabase.from('goals').select('id, name, goal_type, current_value, target_value, target_date, color, icon').eq('is_completed', false).order('sort_order', { ascending: true }),
@@ -271,6 +282,26 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     // granulariteit die het maandaggregaat niet levert. Klein venster ⇒ geen stille
     // max_rows-afkap. Vervangt het week-deel van de vroegere 12-mnd expense/income-fetch.
     supabase.from('transactions').select('amount, date, budget_id, transaction_type').gte('date', weekFetchStart).lt('date', weekFetchEnd),
+    // ── Waterval-consolidatie (Task 2.5): drie voorheen losse na-stadia die alleen
+    //    van de user afhangen, nu parallel in de hoofd-batch. De notif-/override-
+    //    berekening blijft ná de batch; alleen de FETCH is verplaatst. De
+    //    `.then(ok, err)`-adapter (spiegelt aowResult) bewaart de graceful degradation
+    //    van de household-/rebalance-try-blokken: een netwerkfout geeft { data: null }
+    //    i.p.v. de hele loader te laten falen.
+    // Household-lidmaatschap → hergebruikt in het overrides-blok hieronder.
+    authUser
+      ? supabase.from('household_members').select('household_id').eq('user_id', authUser.id).maybeSingle()
+          .then((r) => r, () => ({ data: null }))
+      : Promise.resolve({ data: null }),
+    // Rebalance-drift: holdings + streefallocatie (voedt de rebalance-notificaties).
+    supabase.from('investment_holdings')
+      .select('id, name, ticker, units, avg_purchase_price, current_price, asset_class, sector, geography')
+      .eq('is_active', true)
+      .then((r) => r, () => ({ data: null })),
+    supabase.from('target_allocations')
+      .select('category, target_pct')
+      .eq('view_mode', 'asset_class')
+      .then((r) => r, () => ({ data: null })),
   ])
 
   // Vaste lasten: consumeer de canonieke bron (dezelfde die /overzicht/cashflow?view=vaste-lasten
@@ -1326,6 +1357,13 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   const vasteLastenSummary = await vasteLastenSummaryPromise
   const budgetNameMap = new Map<string, string>()
   for (const b of allParentBudgets) budgetNameMap.set(b.id, (b as unknown as { name: string }).name ?? '')
+  // Child-inclusieve naam-map (parents + children) uit de reeds geladen allBudgetsRaw.
+  // Voedt de household-activity-categorienamen ZONDER een aparte budgets-lookup-query
+  // (Task 2.5): de shared-tx-budget-ids kunnen child-budgetten zijn, die budgetNameMap
+  // (parent-only, voor het weekoverzicht hieronder) niet dekt. RLS-scope identiek aan
+  // de vroegere `.in('id', budgetIds)`-lookup, dus byte-identieke namen.
+  const budgetNameMapAll = new Map<string, string>()
+  for (const b of allBudgetsRaw) budgetNameMapAll.set(b.id, b.name)
   const vasteLastenItems = [
     ...vasteLastenSummary.subscriptions.map(i => ({ item: i, isSubscription: true })),
     ...vasteLastenSummary.vasteKosten.map(i => ({ item: i, isSubscription: false })),
@@ -1459,19 +1497,11 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   }
 
   // ── Rebalance notifications: drift alerts + Box 3 peildatum ──
+  // De FETCH (holdings + streefallocatie) draait nu parallel in de hoofd-batch
+  // (Task 2.5); alleen de drift-/notif-BEREKENING blijft hier, in het try-blok
+  // voor graceful degradation.
   try {
-    const [rebalHoldingsRes, rebalTargetsRes] = await Promise.all([
-      supabase
-        .from('investment_holdings')
-        .select('id, name, ticker, units, avg_purchase_price, current_price, asset_class, sector, geography')
-        .eq('is_active', true),
-      supabase
-        .from('target_allocations')
-        .select('category, target_pct')
-        .eq('view_mode', 'asset_class'),
-    ])
-
-    const rebalHoldings: HoldingForAllocation[] = (rebalHoldingsRes.data ?? [])
+    const rebalHoldings: HoldingForAllocation[] = ((rebalHoldingsResult?.data ?? []) as Record<string, unknown>[])
       .map((h: Record<string, unknown>) => {
         const price = Number(h.current_price ?? h.avg_purchase_price ?? 0)
         const value = price * Math.max(0, Number(h.units ?? 0))
@@ -1487,7 +1517,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       })
       .filter((h: HoldingForAllocation) => h.value > 0)
 
-    const rebalTargets: TargetAllocation[] = (rebalTargetsRes.data ?? []).map(
+    const rebalTargets: TargetAllocation[] = ((rebalTargetsResult?.data ?? []) as Record<string, unknown>[]).map(
       (t: Record<string, unknown>) => ({
         category: t.category as string,
         target_pct: Number(t.target_pct),
@@ -1684,13 +1714,10 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // overrides block and reused by the activity-feed block to avoid a duplicate query.
   let cachedAllMembers: Array<{ user_id: string; privacy_settings: unknown }> | null = null
   try {
-    // Check if user has a household (reuse authUser from above)
+    // Check if user has a household — membership is pre-fetched in de hoofd-batch
+    // (Task 2.5) i.p.v. een losse round-trip hier.
     if (authUser) {
-      const { data: membership } = await supabase
-        .from('household_members')
-        .select('household_id')
-        .eq('user_id', authUser.id)
-        .maybeSingle()
+      const membership = (membershipResult?.data ?? null) as { household_id?: string | null } | null
 
       if (membership?.household_id) {
         cachedHouseholdId = membership.household_id
@@ -1864,18 +1891,8 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
           const sharedTxs = sharedTxsResult.data
 
           if (sharedTxs && sharedTxs.length > 0) {
-            // Get budget names
-            const budgetIds = [...new Set(sharedTxs.map(t => t.budget_id).filter(Boolean))]
-            let budgetMap: Record<string, string> = {}
-            if (budgetIds.length > 0) {
-              const { data: budgets } = await supabase
-                .from('budgets')
-                .select('id, name')
-                .in('id', budgetIds)
-              if (budgets) {
-                budgetMap = Object.fromEntries(budgets.map(b => [b.id, b.name]))
-              }
-            }
+            // Budgetnamen uit de child-inclusieve naam-map (Task 2.5) i.p.v. een
+            // aparte `budgets`-lookup-query — zelfde RLS-scope, byte-identieke namen.
 
             // Check partner's privacy settings for transactions
             let partnerTxPrivacy = 'totalen'  // default
@@ -1902,7 +1919,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
                 description: tx.description || 'Transactie',
                 amount: Number(tx.amount),
                 date: tx.date,
-                category: tx.budget_id ? budgetMap[tx.budget_id] ?? null : null,
+                category: tx.budget_id ? budgetNameMapAll.get(tx.budget_id) ?? null : null,
                 partnerName: tx.user_id === authUser!.id ? myDisplayName : partnerDisplayName,
                 isCurrentUser: tx.user_id === authUser!.id,
                 ownership: tx.ownership || 'personal',

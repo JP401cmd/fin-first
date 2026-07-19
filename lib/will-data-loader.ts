@@ -1,9 +1,12 @@
 /**
  * Server-side data loader for the Will (Overzicht) landing page.
  *
- * Optimized to accept shared data from loadDashboardData to avoid
- * duplicate Supabase queries (assets, debts, auth, profile).
- * Internal queries are consolidated: actions 2→1, recommendations 2→1, goals 3→1.
+ * Assets/debts/profile komen uit de gedeelde basisdata-laag
+ * (lib/server-data/base.ts, Task 2.1): React `cache()` dedupliceert die
+ * queries binnen één request met dashboard/horizon/lever/shell, dus een
+ * expliciete `shared`-parameter is niet meer nodig — de dedupe gebeurt op
+ * cache-niveau. Interne queries zijn geconsolideerd: actions 2→1,
+ * recommendations 2→1, goals 3→1.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -78,38 +81,18 @@ export interface WillPageData {
 }
 
 // ---------------------------------------------------------------------------
-// Shared data from dashboard loader (avoids duplicate queries)
-// ---------------------------------------------------------------------------
-
-export interface WillSharedData {
-  /** Authenticated user ID (from dashboard's auth.getUser) */
-  userId: string | null
-  /** Active assets with id+name+current_value */
-  assets: { id: string; name: string; current_value: number }[]
-  /** Active debts with id+name+current_balance */
-  debts: { id: string; name: string; current_balance: number }[]
-  /** User's full_name from profile */
-  fullName: string | null
-}
-
-// ---------------------------------------------------------------------------
 // Loader
 // ---------------------------------------------------------------------------
 
 export async function loadWillData(
   supabase: SupabaseClient,
-  shared?: WillSharedData,
 ): Promise<WillPageData> {
   const today = new Date().toISOString().split('T')[0]
 
-  // 1. Get authenticated user (reuse from shared data if available)
-  let currentUserId: string | null
-  if (shared) {
-    currentUserId = shared.userId
-  } else {
-    const authUser = await getCachedUser(supabase)
-    currentUserId = authUser?.id ?? null
-  }
+  // 1. Get authenticated user. getCachedUser is React `cache()`-gewrapt, dus dit
+  //    deelt de auth-round-trip met de andere loaders binnen hetzelfde request.
+  const authUser = await getCachedUser(supabase)
+  const currentUserId: string | null = authUser?.id ?? null
 
   // 2. Household membership + partner-name resolution.
   //    Started as a single chained promise so it runs in parallel with the
@@ -162,15 +145,27 @@ export async function loadWillData(
   // - Actions: 1 broad query (was 2) — derive KPI + board data from same result
   // - Recommendations: 1 broad query (was 2) — derive KPI + list from same result
   // - Goals: 1 query for all goals (was 3) — derive active/counts in JS
-  // - Assets/debts/profile: skip when shared data provided (was 3 queries)
+  // - Assets/debts/profile: uit de gedeelde basisdata-laag (lib/server-data/base.ts,
+  //   Task 2.1). React cache() dedupliceert die met dashboard/horizon/lever/shell
+  //   binnen hetzelfde request; de consumers lezen subsets (id/name/current_value ·
+  //   id/name/current_balance · full_name) van select('*').
   const queries: PromiseLike<unknown>[] = [
-    // [0] All actions with full fields + recommendation join (covers KPI + board)
+    // [0] All actions with full fields + recommendation join (covers KPI + board).
+    //     Expliciete `.limit(1000)` = de PostgREST-cap (supabase/config.toml
+    //     max_rows = 1000); een client-`.limit()` boven die grens is een no-op, dus
+    //     dit maakt de afkap zichtbaar i.p.v. impliciet. De board-modal (ActionList-
+    //     Modal) toont álle statussen, dus de rijen zijn hier bewust nodig; de KPI-
+    //     afleiding hieronder sommeert over ALLE teruggegeven rijen (geen kunstmatige
+    //     JS-cap). Echte afkap-vrijheid voor tellingen bij >1000 acties zou — net als
+    //     T2.2 voor transacties (ADR 0050) — een SECURITY-INVOKER aggregaat-RPC vergen
+    //     (buiten scope T2.5, geen migratie).
     supabase
       .from('actions')
       .select('*, recommendation:recommendations(title, recommendation_type)')
       .order('status', { ascending: true })
       .order('priority_score', { ascending: false })
-      .order('sort_order', { ascending: true }),
+      .order('sort_order', { ascending: true })
+      .limit(1000),
     // [1] All pending/postponed recommendations with full fields (covers KPI + list)
     supabase
       .from('recommendations')
@@ -181,24 +176,15 @@ export async function loadWillData(
     // [2] All goals (derive active list + counts in JS) — runs in parallel
     //     with [0] and [1], gated on household resolution.
     goalsPromise,
+    // [3] Assets for GoalForm auto-link (gedeelde basisdata-laag)
+    getActiveAssets(supabase),
+    // [4] Debts for GoalForm auto-link (gedeelde basisdata-laag)
+    getActiveDebts(supabase),
+    // [5] User profile (RLS → eigen rij; gedeelde basisdata-laag)
+    currentUserId
+      ? getOwnProfile(supabase)
+      : Promise.resolve({ data: null }),
   ]
-
-  // Only query assets/debts/profile if not provided via shared data.
-  // Gedeelde basisdata-laag (lib/server-data/base.ts): dedupt met dashboard/
-  // horizon/lever/shell binnen hetzelfde request. De consumers lezen subsets
-  // (id/name/current_value · id/name/current_balance · full_name) van select('*').
-  if (!shared) {
-    queries.push(
-      // [3] Assets for GoalForm auto-link
-      getActiveAssets(supabase),
-      // [4] Debts for GoalForm auto-link
-      getActiveDebts(supabase),
-      // [5] User profile (RLS → eigen rij)
-      currentUserId
-        ? getOwnProfile(supabase)
-        : Promise.resolve({ data: null }),
-    )
-  }
 
   const [results, household] = await Promise.all([
     Promise.all(queries),
@@ -211,16 +197,12 @@ export async function loadWillData(
   const recsResult = results[1] as { data: unknown[] | null }
   const goalsResult = results[2] as { data: unknown[] | null }
 
-  // Assets, debts, profile: from shared data or query results
-  const loadedAssets: { id: string; name: string; current_value: number }[] = shared
-    ? shared.assets
-    : ((results[3] as { data: unknown[] | null })?.data ?? []) as { id: string; name: string; current_value: number }[]
-  const loadedDebts: { id: string; name: string; current_balance: number }[] = shared
-    ? shared.debts
-    : ((results[4] as { data: unknown[] | null })?.data ?? []) as { id: string; name: string; current_balance: number }[]
-  const userProfile: { full_name: string | null } = shared
-    ? { full_name: shared.fullName }
-    : { full_name: ((results[5] as { data: { full_name: string | null } | null })?.data as { full_name: string | null } | null)?.full_name ?? null }
+  // Assets, debts, profile: uit de gedeelde basisdata-laag (results[3..5]).
+  const loadedAssets = (((results[3] as { data: unknown[] | null })?.data ?? []) as { id: string; name: string; current_value: number }[])
+  const loadedDebts = (((results[4] as { data: unknown[] | null })?.data ?? []) as { id: string; name: string; current_balance: number }[])
+  const userProfile: { full_name: string | null } = {
+    full_name: ((results[5] as { data: { full_name: string | null } | null })?.data as { full_name: string | null } | null)?.full_name ?? null,
+  }
 
   // ── Actions: derive KPI + board data from single query ──
   const allActionsRaw = (actionsResult.data ?? []) as (Action & { created_at: string; source: string; completed_at: string | null; recommendation: { title?: string; recommendation_type: string }[] | null })[]
