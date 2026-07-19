@@ -88,7 +88,6 @@ import { HouseholdRetirementPane } from '@/components/app/horizon/household-reti
 import { usePerspective } from '@/components/app/perspective-provider'
 import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
 import { PensionParseSummaryCard, PensionInstructionPanel, computeCumulativeImpacts, type SnapshotForTrend } from '@/components/app/horizon/horizon-helpers'
-import { HealthScoreReceipt } from '@/components/app/horizon/health-score-receipt'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { PageInfoButton, GlossaryTerm, SectionLabel, Kicker } from '@/components/editorial'
 import { Vrijheidsas, computeCoupledStopAge } from '@/components/app/horizon/vrijheidsas'
@@ -181,6 +180,14 @@ const HouseholdFireSection = dynamic(() =>
 )
 const IncomeExpenseChart = dynamic(() =>
   import('@/components/app/horizon/income-expense-chart').then(m => ({ default: m.IncomeExpenseChart })),
+  { ssr: false }
+)
+// HealthScoreReceipt (1011 r) uit het first-load-chunk van /toekomst (perf Task
+// 3.2) — hij zit alleen in een BottomSheet die pas opent na een klik op de
+// gezondheidsscore-kaart. `loading: null` (default) omdat een skeleton hier
+// zou flitsen — zelfde afweging als de andere dynamics hierboven.
+const HealthScoreReceipt = dynamic(() =>
+  import('@/components/app/horizon/health-score-receipt').then(m => ({ default: m.HealthScoreReceipt })),
   { ssr: false }
 )
 import { PensionPdfUpload, uploadPensionPdfToStorage } from '@/components/app/horizon/pension-pdf-upload'

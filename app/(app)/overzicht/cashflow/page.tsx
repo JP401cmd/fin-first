@@ -9,9 +9,8 @@ import { CashflowLandingCards } from '@/components/overview/cashflow-landing-car
 import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { InflationImpactCard, INFLATION_IMPACT_ID } from '@/components/overview/inflation-impact-card'
-import { CashOverview } from '@/components/app/cash-overview'
 import { loadCashflowSettingsData } from '@/lib/cashflow-settings-data'
-import { CashflowInstellingenBlok } from '@/components/overview/cashflow-instellingen-blok'
+import { CashOverviewLazy, CashflowInstellingenBlokLazy } from './cashflow-below-fold'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { InsightToggleButton } from '@/components/editorial/insight-toggle-button'
 import { PageStatusDot } from '@/components/app/page-status-dot'
@@ -91,14 +90,14 @@ export default async function OverzichtCashflowPage() {
         </HideInSimple>
       )}
 
-      <CashOverview embedded showAllCashAccounts showMonthLinks />
+      <CashOverviewLazy embedded showAllCashAccounts showMonthLinks />
 
       {settings && (
         // Instellingen (inkomen, spaarquote, uitgaven) zijn óók in Eenvoudig
         // zichtbaar — bewust géén HideInSimple. Het blok bevat alleen die drie
         // kern-instellingen, die de gebruiker in beide modi wil kunnen zien.
         <section className="mx-auto max-w-6xl px-4 pb-8 pt-2 sm:px-6">
-          <CashflowInstellingenBlok data={settings} />
+          <CashflowInstellingenBlokLazy data={settings} />
         </section>
       )}
     </>
