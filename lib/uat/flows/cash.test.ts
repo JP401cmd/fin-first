@@ -47,15 +47,15 @@ describe('CASH_FLOW — curatie-integriteit', () => {
     }
   })
 
-  it('dekt alle 31 WF-CASH-scenario\'s (01..31, aaneengesloten — geen verwijsregel-gaten)', () => {
+  it('dekt alle 32 WF-CASH-scenario\'s (01..32, aaneengesloten — geen verwijsregel-gaten)', () => {
     const covered = new Set(
       CASH_FLOW.nodes.map((n) => n.scenarioId).filter((id): id is string => Boolean(id)),
     )
-    const expected = Array.from({ length: 31 }, (_, i) => `UAT-CASH-${String(i + 1).padStart(2, '0')}`)
+    const expected = Array.from({ length: 32 }, (_, i) => `UAT-CASH-${String(i + 1).padStart(2, '0')}`)
     for (const id of expected) {
       expect(covered.has(id), `${id} moet als flow-knoop voorkomen`).toBe(true)
     }
-    expect(covered.size).toBe(31)
+    expect(covered.size).toBe(32)
   })
 
   it('de domeinoverschrijdende cross-knopen dekken BUDGET/OVZ/TOEK/WILL/BEZIT/MIJN', () => {

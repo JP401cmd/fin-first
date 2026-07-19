@@ -8,9 +8,11 @@
 // WF-nummer, spiegelt lib/uat/flows/budget.ts + start.ts + will.ts.
 //
 // CASH is — net als BUDGET/START — een AANEENGESLOTEN catalogus: alle
-// WF-CASH-01..31 hebben een eigen UAT-scenario en dus een eigen knoop
+// WF-CASH-01..32 hebben een eigen UAT-scenario en dus een eigen knoop
 // hieronder (drie daarvan — UAT-CASH-25/26/28 — dragen de WF-code in hun naam
-// i.p.v. het `wf`-veld, zie cash.engine.test.ts-normalisatie).
+// i.p.v. het `wf`-veld, zie cash.engine.test.ts-normalisatie). WF-CASH-32
+// ("Vraag Will"-wizard: bulk-kaart + groepskeuzes + verliesvrij stoppen,
+// feature #881) is een latere dekkingscontrole-toevoeging, net als WF-CASH-31.
 //
 // Het proces leest links→rechts: landing (4 hefboom-kaarten) → verkennen
 // (maand-geldstroom/kassabon/rekeningen/instellingen/inflatie/status) →
@@ -73,7 +75,8 @@ export const CASH_FLOW: UatFlow = {
     { id: 'importbeslis', label: 'Bankbestand-formaat (MT940/OFX/CSV) of open banking?', kind: 'decision', stage: 5 },
     { id: 'mt940', scenarioId: 'UAT-CASH-23', label: 'WF-CASH-23 · MT940/OFX importeren', kind: 'action', stage: 5, lane: 'import' },
     { id: 'csv', scenarioId: 'UAT-CASH-24', label: 'WF-CASH-24 · CSV importeren (preset + kolom-toewijzing)', kind: 'action', stage: 5, lane: 'import' },
-    { id: 'aicat', scenarioId: 'UAT-CASH-25', label: 'WF-CASH-25 · AI-categorisering ("Vraag Will")', kind: 'action', stage: 5, lane: 'import', subOf: 'mt940' },
+    { id: 'aicat', scenarioId: 'UAT-CASH-25', label: 'WF-CASH-25 · AI-categorisering ("Vraag Will"-wizard, groepsvolgorde)', kind: 'action', stage: 5, lane: 'import', subOf: 'mt940' },
+    { id: 'aiwizard', scenarioId: 'UAT-CASH-32', label: 'WF-CASH-32 · Wizard: bulk-kaart, groepskeuzes en verliesvrij stoppen', kind: 'action', stage: 5, lane: 'import', subOf: 'aicat' },
     { id: 'handmatigcat', scenarioId: 'UAT-CASH-26', label: 'WF-CASH-26 · Handmatig categoriseren (bulk + regels onthouden)', kind: 'action', stage: 5, lane: 'import', subOf: 'mt940' },
     { id: 'eigenrekening', scenarioId: 'UAT-CASH-27', label: 'WF-CASH-27 · Eigen-overboekingen herkennen/markeren', kind: 'action', stage: 5, lane: 'import', subOf: 'mt940' },
     { id: 'sleepmodus', scenarioId: 'UAT-CASH-28', label: 'WF-CASH-28 · Sleepmodus (drag-and-drop categoriseren)', kind: 'action', stage: 5, lane: 'import', subOf: 'mt940' },
@@ -130,6 +133,7 @@ export const CASH_FLOW: UatFlow = {
     { from: 'importbeslis', to: 'csv', kind: 'branch', label: 'CSV' },
     { from: 'importbeslis', to: 'bankkoppelen', kind: 'branch', label: 'open banking' },
     { from: 'mt940', to: 'aicat' },
+    { from: 'aicat', to: 'aiwizard' },
     { from: 'mt940', to: 'handmatigcat' },
     { from: 'mt940', to: 'eigenrekening' },
     { from: 'mt940', to: 'sleepmodus' },
@@ -149,6 +153,7 @@ export const CASH_FLOW: UatFlow = {
     { from: 'forecast', to: 'uitkomst' },
     { from: 'regelbeheer', to: 'uitkomst' },
     { from: 'aicat', to: 'uitkomst' },
+    { from: 'aiwizard', to: 'uitkomst' },
     { from: 'handmatigcat', to: 'uitkomst' },
     { from: 'eigenrekening', to: 'uitkomst' },
     { from: 'sleepmodus', to: 'uitkomst' },

@@ -7,8 +7,10 @@
  * er alleen overheen en toetst `expect(actual).toBe(expected)` — één bron van
  * waarheid voor de rekenlogica, twee draaimomenten (CI + /beheer/regressietest).
  *
- * CASH is aaneengesloten 01..31 (31 catalogus-scenario's, geen verwijsregel-
- * gaten) — de grootste UAT-zone tot nu toe.
+ * CASH is aaneengesloten 01..32 (32 catalogus-scenario's, geen verwijsregel-
+ * gaten) — de grootste UAT-zone tot nu toe. WF-CASH-32 is een latere
+ * dekkingscontrole-toevoeging (feature #881, "Vraag Will"-wizard), net als
+ * WF-CASH-31.
  */
 
 import { describe, it, expect } from 'vitest'
@@ -32,11 +34,11 @@ function criterion(workflow: string): AcceptanceCriterion {
 }
 
 describe('UAT Cash — acceptatiecriteria dekking', () => {
-  it('heeft precies één criterium per catalogus-CASH-scenario (01..31, geen gaten)', () => {
+  it('heeft precies één criterium per catalogus-CASH-scenario (01..32, geen gaten)', () => {
     const workflows = CASH_ACCEPTANCE.criteria.map((c) => c.workflow).sort()
     expect(workflows).toEqual(catalogCashWorkflows)
     expect(new Set(workflows).size).toBe(catalogCashWorkflows.length)
-    expect(workflows.length).toBe(31)
+    expect(workflows.length).toBe(32)
   })
 
   it('elk criterium heeft een geldige assertion.kind', () => {
@@ -71,7 +73,7 @@ describe('UAT Cash — acceptatiecriteria dekking', () => {
       expect(criterion(wf).assertion.kind, `${wf} moet consistency zijn`).toBe('consistency')
     }
     // ui-only (AI, verwijsregels, DB-bulk-workflows, TrueLayer-sandbox)
-    for (const wf of ['WF-CASH-06', 'WF-CASH-07', 'WF-CASH-12', 'WF-CASH-17', 'WF-CASH-19', 'WF-CASH-29', 'WF-CASH-30']) {
+    for (const wf of ['WF-CASH-06', 'WF-CASH-07', 'WF-CASH-12', 'WF-CASH-17', 'WF-CASH-19', 'WF-CASH-29', 'WF-CASH-30', 'WF-CASH-32']) {
       expect(criterion(wf).assertion.kind, `${wf} moet ui-only zijn`).toBe('ui-only')
     }
   })

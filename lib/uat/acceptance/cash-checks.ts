@@ -13,8 +13,11 @@
  *  - aandeel-% per rekening (components/app/cash-overview.tsx)
  *  - split-som-validatie (components/app/transaction-form.tsx)
  *  - euro_impact_monthly-negatie bij opzeggen (components/app/opzeg-modal.tsx)
- *  - AI-categorisatie-confidence-drempels 0,8/0,5 (app/(app)/core/cash/import/page.tsx)
  *  - sibling-matching op genormaliseerde tegenpartijnaam (lib/parsers/categorize.ts-conventie)
+ *
+ * WF-CASH-25 roept sinds feature #881 de ÉCHTE `orderGroupsLargestFirst` +
+ * `buildCombinedGroups` aan (lib/auto-categorize.ts) — geen mirror meer van de
+ * vervallen import-pagina-confidence-drempels.
  *  - eerstvolgende-voorkomst-arithmetiek (lib/recurring-data.ts#getNextOccurrence
  *    gebruikt intern `new Date()`, niet injecteerbaar — hier met expliciete `now`).
  *
@@ -45,6 +48,7 @@ import { parseCSV } from '@/lib/parsers/csv'
 import { CSV_PRESETS } from '@/lib/parsers/index'
 import { isOwnAccountTransfer } from '@/lib/parsers/categorize'
 import { applyAssignmentToImportRows, type AssignableImportRow } from '@/lib/sleepmodus/import-assign'
+import { buildCombinedGroups, orderGroupsLargestFirst, type CombinedTx } from '@/lib/auto-categorize'
 import { CASH_ACCEPTANCE } from './cash'
 import type { AcceptanceCriterion } from './types'
 
@@ -150,15 +154,16 @@ function euroImpactMonthly(monthlyAmount: number): number {
   return -monthlyAmount
 }
 
-/** Mirror van de AI-categorisatie-confidence-drempels
- *  (app/(app)/core/cash/import/page.tsx): ≥0,8 slaat de AI-aanroep over, <0,5 = "onbekend". */
-const CONFIDENCE_SKIP_AI = 0.8
-const CONFIDENCE_UNKNOWN = 0.5
-function skipsAiCall(ruleConfidence: number): boolean {
-  return ruleConfidence >= CONFIDENCE_SKIP_AI
-}
-function isUnknownConfidence(confidence: number): boolean {
-  return confidence < CONFIDENCE_UNKNOWN
+/** Minimale CombinedTx met sensible defaults, voor de groepsvolgorde-check (WF-CASH-25). */
+function makeCombinedTx(overrides: Partial<CombinedTx> & { id: string; counterparty_name: string; date: string }): CombinedTx {
+  return {
+    description: overrides.counterparty_name,
+    counterparty_iban: null,
+    amount: -10,
+    account_id: null,
+    reference: null,
+    ...overrides,
+  }
 }
 
 /** Mirror van sibling-matching op genormaliseerde tegenpartijnaam
@@ -522,12 +527,24 @@ NEWFILEUID:NONE
   {
     workflow: 'WF-CASH-25',
     scenarioId: 'UAT-CASH-25',
-    label: 'AI-categorisatie-confidence-drempels (mirror): skip-AI ≥0,8, onbekend <0,5',
+    label: 'AI-tegenpartijgroepen-volgorde (orderGroupsLargestFirst): grootste eerst, recentste-datum-tiebreak',
     run: () => {
       criterion('WF-CASH-25')
+      const txs: CombinedTx[] = [
+        makeCombinedTx({ id: 'ah1', counterparty_name: 'Albert Heijn', date: '2026-06-01' }),
+        makeCombinedTx({ id: 'ah2', counterparty_name: 'Albert Heijn', date: '2026-06-10' }),
+        makeCombinedTx({ id: 'ah3', counterparty_name: 'Albert Heijn', date: '2026-06-20' }),
+        makeCombinedTx({ id: 'bol1', counterparty_name: 'Bol.com', date: '2026-06-05' }),
+        makeCombinedTx({ id: 'bol2', counterparty_name: 'Bol.com', date: '2026-06-15' }),
+        makeCombinedTx({ id: 'bol3', counterparty_name: 'Bol.com', date: '2026-06-25' }),
+        makeCombinedTx({ id: 'uniek1', counterparty_name: 'Uniek Winkeltje', date: '2026-06-10' }),
+      ]
+      const groups = buildCombinedGroups(txs)
+      const ordered = orderGroupsLargestFirst(Array.from(groups.keys()), groups)
+      const namen = ordered.map((k) => groups.get(k)![0].counterparty_name).join(',')
       return {
-        expected: 'slaatAiOver09=true; slaatAiOver06=false; onbekend03=true; onbekend06=false',
-        actual: `slaatAiOver09=${skipsAiCall(0.9)}; slaatAiOver06=${skipsAiCall(0.6)}; onbekend03=${isUnknownConfidence(0.3)}; onbekend06=${isUnknownConfidence(0.6)}`,
+        expected: 'volgorde=Bol.com,Albert Heijn,Uniek Winkeltje',
+        actual: `volgorde=${namen}`,
       }
     },
   },

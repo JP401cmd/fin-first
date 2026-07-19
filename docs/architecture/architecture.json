@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-19T15:51:43.514Z",
+  "generatedAt": "2026-07-19T16:49:01.851Z",
   "generatedDate": "2026-07-19",
   "repo": {
     "name": "fin",
@@ -193,7 +193,7 @@
     "tables": 84,
     "migrations": 147,
     "integrations": 24,
-    "components": 860,
+    "components": 863,
     "providers": 11,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -7724,11 +7724,11 @@
     }
   ],
   "components": {
-    "total": 860,
+    "total": 863,
     "groups": [
       {
         "group": "app",
-        "count": 356,
+        "count": 359,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -7794,6 +7794,9 @@
           "cash-account-view.test",
           "cash-overview",
           "cashflow-forecast-chart",
+          "categorize-row",
+          "categorize-wizard",
+          "categorize-wizard.test",
           "category-rules-sheet",
           "chart-event-markers",
           "chart-event-markers.test",
@@ -14492,6 +14495,18 @@
       ],
       "summary": "De server-loaders (`dashboard-`, `horizon-`, `lever-scores-data-loader`) haalden per request DUIZENDEN ruwe transactie-rijen op om er in JS SUM/GROUP-BY op te doen (12-/6-maands inkomen, uitgaven, spaarquote, dagtarief, maand-histories).",
       "file": "docs/adr/0050-transactie-maandaggregaat-rpc.md"
+    },
+    {
+      "id": "0051-incrementele-wizard-consumptie-categorisatiemotor",
+      "title": "Incrementele per-tegenpartij-wizard consumeert de categorisatiemotor — geen tweede motor",
+      "status": "aanvaard",
+      "date": "2026-07-19",
+      "elements": [
+        "as-import",
+        "t-lokale-ai"
+      ],
+      "summary": "De \"Vraag Will\"-categoriseerflow wordt een per-tegenpartij-groep-wizard met adaptieve aanvoer (lokaal 2-3 representanten/ronde + prefetch-venster 1-2 via back-pressure; cloud 20/ronde, presentatie kaart-voor-kaart) — eigenaarsbesluit 19 juli 2026. `runCombinedCategorization` blij",
+      "file": "docs/adr/0051-incrementele-wizard-consumptie-categorisatiemotor.md"
     }
   ],
   "churn": {
@@ -14503,7 +14518,7 @@
       },
       {
         "path": "lib/ai",
-        "commits": 44
+        "commits": 45
       },
       {
         "path": "app/(app)/toekomst",
@@ -15551,7 +15566,7 @@
     {
       "date": "2026-07-19",
       "api": 255,
-      "components": 860,
+      "components": 863,
       "tables": 84,
       "routesProduction": 101
     }
