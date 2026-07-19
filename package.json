@@ -16,6 +16,7 @@
     "lint": "eslint",
     "audit:kpi-actions": "node scripts/audit-kpi-actions.mjs",
     "arch:diagram": "node scripts/architecture/generate.mjs",
+    "perf:route-sizes": "node scripts/perf/route-sizes.mjs",
     "db:pull": "npx supabase db pull",
     "db:push": "npx supabase db push",
     "db:diff": "npx supabase db diff",

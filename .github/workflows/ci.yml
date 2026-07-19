@@ -71,3 +71,70 @@ jobs:
       # dev-only in-app regressiesuite draaide — nu ook in deze CI-gate.
       - name: Rekenmotor- & pariteitstests (vitest)
         run: npx vitest run lib/horizon-kernel test/horizon-oracle lib/box1-tax lib/box3 lib/fiscale-kerngetallen lib/architecture lib/budget-utils.test.ts test/budget-berekeningen-suite-check.test.ts
+
+  # Bundle-budget (performance-programma fase 3, Task 3.4). Een volledige
+  # `next build` is zwaar (~146 App-Router-routes) — draait daarom alleen op
+  # pull_request (niet op elke branch-push zoals quality-gate) zodat gewone
+  # commits tussendoor niet steeds een volledige build betalen. Eigen
+  # concurrency-group zodat een nieuwe push op dezelfde PR de vorige
+  # bundle-budget-run annuleert i.p.v. ernaast te blijven draaien.
+  bundle-budget:
+    name: Bundle-budget (per-route first-load JS, gzip)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    env:
+      HUSKY: 0
+      # `next build` embedt NEXT_PUBLIC_*-vars in de client-bundels, dus de
+      # build heeft ZE nodig om te compileren — maar deze CI-job draait geen
+      # echte backend-verificatie (alleen bundle-grootte meten), dus een
+      # duidelijk-nep Supabase-project is voldoende en voorkomt dat een echte
+      # sleutel in een PR-only workflow hoeft te lekken. Lokaal geverifieerd
+      # (19-07-2026, review-fix Task 3.4): `next build` met ALLEEN deze twee
+      # placeholders (geen enkele andere env-var) slaagt voor alle 145 routes,
+      # geen enkele SSG-route faalt.
+      NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key-for-ci-build
+    concurrency:
+      group: ci-bundle-budget-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node (versie uit .nvmrc)
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies (npm ci)
+        run: npm ci
+
+      # Alleen de Next-build (geen serwist/service-worker-stap) — dat is alles
+      # wat scripts/perf/route-sizes.mjs nodig heeft (.next/-manifesten).
+      - name: Production build (next build)
+        run: npm run build:next-only
+
+      # Leest de zojuist gebouwde .next/-manifesten, print de per-route
+      # gzip-tabel, schrijft .next/route-sizes.json en faalt (exit 1) ALLEEN
+      # als een route boven zijn eigen RATCHET-baseline × 1.04 komt (zie
+      # RATCHET_TOLERANCE/BASELINE_PATH/BUDGET_OVERRIDES in het script). De
+      # 300 kB-drempel blijft een gerapporteerde, niet-gatende "boven
+      # target"-kolom.
+      #
+      # EENMALIGE SETUP (nog te doen door de eerste maintainer die dit
+      # activeert): dit script draait REPORT-ONLY (exit 0, geen gate) zolang
+      # scripts/perf/route-sizes.baseline.json ontbreekt — dat bestand MOET
+      # hier op Linux-CI gegenereerd worden (gzip-bytes zijn platform-
+      # gevoelig, dus een lokaal/Windows-gegenereerde baseline is geen
+      # geldige ground truth voor deze runner). Procedure:
+      #   1. Draai deze workflow eenmalig extra met
+      #      `npm run perf:route-sizes -- --update-baseline` i.p.v.
+      #      `npm run perf:route-sizes` (bv. via een tijdelijke workflow_dispatch-
+      #      of debug-run), of genereer 'm lokaal op een Linux-runner/container.
+      #   2. Commit het resulterende `scripts/perf/route-sizes.baseline.json`.
+      #   3. Vanaf dan gate't deze stap normaal tegen die baseline; een latere
+      #      `--update-baseline`-run mag de waarden alleen verlagen (monotone
+      #      convergentie richting 300 kB), nooit optrekken.
+      - name: Bundle-budget meten (route-sizes.mjs)
+        run: npm run perf:route-sizes
