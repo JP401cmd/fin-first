@@ -22,6 +22,10 @@ Lees en volg `.claude/skills/_shared/pijplijn-conventies.md`: orchestrator-rol (
 
 **Achtergrond-exitcodes liegen:** draai je een check als `cmd | tail; echo EXIT=$?` in de achtergrond, dan rapporteert de task-notificatie de exitcode van het hele *compound* commando (de laatste `echo` = altijd 0), níet die van het commando dat je toetst. Lees daarom bij elke poort de echte uitvoer en controleer de eigen exitcode (`PIPESTATUS[0]`), nooit alleen de wrapper-melding. Voorbeeld waar dit misging: `next build` faalde op een type-error terwijl de notificatie "exit code 0" meldde — alleen het lezen van de output ving het.
 
+**Pipes beslissen nooit een poort:** een poort-commando dat direct een vervolgstap gate't (zeker de ship-push) draait KAAL, met zijn eigen exitcode als beslisser; filteren/grep-en doe je daarna op de bewaarde output. Les 19 jul 2026: `npm run test:run … | grep "Tests"` gaf exit 0 van de grep terwijl 1 test faalde — de push in dezelfde `&&`-keten ging door.
+
+**Deploy-verificatie = `npx vercel ls`** (Status ● Ready / ● Error van de nieuwste Production-deploy), niet URL-/chunk-polling: die bleek blind voor server-only releases (client-chunks identiek) en gevoelig voor tekens-encoding in filters (les 19 jul 2026, 2×).
+
 ### 1. Scope & hygiëne
 `git status` + `git diff master...HEAD --stat`: gaan alleen bedoelde bestanden mee? Geen debug-rommel, geen vergeten bestanden. Nieuwe env-variabelen ⇒ placeholder in `env.example` én de echte waarde in de productie-omgeving gezet vóór deploy.
 
