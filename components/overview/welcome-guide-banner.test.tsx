@@ -19,7 +19,7 @@ const SESSION_CLOSED_KEY = 'welcome_guide_closed'
 function mockGuideFetch(payload?: { configEnabled?: boolean; status?: 'active' | 'dismissed' }) {
   const config = { ...DEFAULT_WELCOME_GUIDE, enabled: payload?.configEnabled ?? true }
   const state = { ...DEFAULT_WELCOME_GUIDE_STATE, status: payload?.status ?? 'active' }
-  const fn = vi.fn((url: string, opts?: { method?: string }) => {
+  const fn = vi.fn((_url: string, opts?: { method?: string }) => {
     if (opts?.method === 'PUT') {
       return Promise.resolve({ ok: true, json: () => Promise.resolve({ state }) })
     }

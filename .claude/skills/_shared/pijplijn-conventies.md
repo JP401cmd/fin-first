@@ -22,6 +22,10 @@ Houd de gebruiker doorlopend op de hoogte. Meld vóór elke stap in één à twe
 
 Een gedispatchte sub-agent draait zijn eigen verificatie- en review-gates (bv. `npx tsc --noEmit`, een `ux-review-expert`- of `security-specialist`-aanroep) **synchroon af** en rapporteert pas als alles klaar is. Eindig je beurt NOOIT met "ik wacht op de review/notificatie" — spawn je zelf een sub-agent voor een gate, wacht dan op diens resultaat en verwerk het vóór je terugrapporteert. Reden: de orchestrator behandelt een halve afronding als onbetrouwbaar en moet de agent hervatten, wat tokens en tijd kost.
 
+## Leak-checks — altijd óók de anon-rol
+
+Een RLS-leak-check die alleen eigenaar-isolatie test (gebruiker A ziet geen rijen van gebruiker B) is onvolledig: test voortaan ALTIJD ook de `anon`-rol — verwacht 0 rijen én géén fout. Een policy-fout in plaats van een lege set duidt op een rolset-/execute-rechten-regressie, niet op correcte afscherming (zo gevangen bij ADR 0048, waar een SECURITY DEFINER-helper zonder anon-execute-recht anders per ongeluk een harde fout had kunnen geven i.p.v. stil 0 rijen).
+
 ## Git-hygiëne in de gedeelde werkboom
 
 Subagents en hoofdchat werken in dezelfde working tree, vaak náást parallelle sessies van de gebruiker. Daarom: nooit `git stash`, `git checkout -- <pad>`, `git reset` of andere tree-brede operaties als onderdeel van bouwen of testen — die vernietigen andermans ongecommitte werk. Alleen gerichte edits binnen de opdracht-scope. De oude staat van een bestand vergelijk je met `git show HEAD:<pad>` of `git diff -- <pad>`, niet door de tree terug te zetten. Bestanden die je niet zelf hebt gewijzigd blijven onaangeraakt.

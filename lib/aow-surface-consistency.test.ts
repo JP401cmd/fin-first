@@ -115,6 +115,20 @@ function delegatesToSharedAowCache(relPath: string): boolean {
 }
 
 /**
+ * Detecteert een DIRECTE `.from('aow_leeftijd')`-aanroep in een bronbestand —
+ * het randgat dat de delegatie-test hierboven niet dekt: een oppervlak kan
+ * delegeren ÉN daarnaast nog een eigen losse query laten staan (bv. een rest
+ * van vóór de Task 1.7-refactor, of een nieuw geïntroduceerde regressie).
+ * Alleen `lib/reference-cache.ts` (de gedeelde cache-functie zelf) en
+ * `lib/horizon-data-loader.ts` (bewust een eigen query, zie de module-comment
+ * aldaar) mogen deze aanroep bevatten.
+ */
+function hasOwnAowTableQuery(relPath: string): boolean {
+  const src = readFileSync(path.resolve(process.cwd(), relPath), 'utf8')
+  return /\.from\(\s*['"]aow_leeftijd['"]\s*\)/.test(src)
+}
+
+/**
  * Leest de tabelnaam die de gedeelde cache-functie `getAowLeeftijden` ECHT queryt,
  * rechtstreeks uit `lib/reference-cache.ts` — zodat deze test breekt zodra de ENE
  * canonieke query terugvalt op de foute naam (of wordt hernoemd/verplaatst).
@@ -143,6 +157,12 @@ describe('AOW-leeftijd — één tabel, drie oppervlakken (regressie stille fall
   it('alle drie oppervlakken delegeren naar de gedeelde cache-functie getAowLeeftijden (lib/reference-cache.ts) — geen eigen losse query meer', () => {
     for (const [label, rel] of Object.entries(SURFACES)) {
       expect(delegatesToSharedAowCache(rel), label).toBe(true)
+    }
+  })
+
+  it('geen van de drie oppervlakken bevat naast de delegatie nog een eigen directe .from(\'aow_leeftijd\')-query (randgat: delegeert-én-doet-óók-eigen-query)', () => {
+    for (const [label, rel] of Object.entries(SURFACES)) {
+      expect(hasOwnAowTableQuery(rel), label).toBe(false)
     }
   })
 

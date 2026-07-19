@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { headers } from 'next/headers'
+import { unauthorized, serverError } from '@/lib/api/respond'
 import { computeFireProjection, type FinancialInput } from '@/lib/horizon-data'
 import { computeHealthScoreFromInputs } from '@/lib/financial-health'
 import {
@@ -64,7 +65,7 @@ export async function GET(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   const sourceParam = new URL(request.url).searchParams.get('source')
@@ -172,9 +173,7 @@ export async function GET(request: Request) {
   ])
 
   if (assetsResult.error || debtsResult.error) {
-    return NextResponse.json({
-      error: (assetsResult.error || debtsResult.error)?.message,
-    }, { status: 500 })
+    return serverError(assetsResult.error || debtsResult.error, 'snapshots-auto:GET')
   }
 
   const assets = assetsResult.data ?? []

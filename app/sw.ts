@@ -15,8 +15,12 @@
 //   - navigations      → NetworkFirst with a 3s timeout, so the user sees
 //                        cached HTML when offline / on flaky 4G but always
 //                        prefers fresh markup when the server responds.
-//   - static assets    → CacheFirst (images, fonts, CSS, JS). Hashed by
-//                        Next.js so cache-busting is automatic on deploy.
+//   - static assets    → CacheFirst (images, fonts, CSS, and JS but only
+//                        under `/_next/static/**`, which Next.js
+//                        content-hashes so cache-busting is automatic on
+//                        deploy). Other scripts served from a stable URL
+//                        (e.g. Speed Insights) are NOT CacheFirst — they
+//                        fall through to the network / defaultCache below.
 //   - default fallback → Serwist's defaultCache for anything else.
 //
 import { defaultCache } from "@serwist/next/worker";
