@@ -1,5 +1,5 @@
 /**
- * Kernel-worker entry (Task 4.2, ADR 0055) — draait de zware horizon-kernel-runs
+ * Kernel-worker entry (Task 4.2, ADR 0054) — draait de zware horizon-kernel-runs
  * (hoofd/scenario-projectie, gekozen-stop-pad, scenario-presets, Monte-Carlo) op
  * een aparte thread, weg van de main thread van /toekomst.
  *

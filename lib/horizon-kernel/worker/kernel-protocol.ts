@@ -1,5 +1,5 @@
 /**
- * Horizon-kernel worker — GEDEELD protocol (Task 4.2, ADR 0055).
+ * Horizon-kernel worker — GEDEELD protocol (Task 4.2, ADR 0054).
  *
  * Eén bestand dat zowel de client-side abstractie (`run-in-worker.ts`) als de
  * worker-entry (`kernel.worker.ts`) importeren, zodat het bericht-contract

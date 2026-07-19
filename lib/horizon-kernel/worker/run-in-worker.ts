@@ -1,6 +1,6 @@
 /**
  * `runKernelAsync` & co — de dunne aanroep-abstractie die de zware horizon-kernel-
- * runs van de main thread haalt (Task 4.2, ADR 0055). Publiek:
+ * runs van de main thread haalt (Task 4.2, ADR 0054). Publiek:
  *
  *  - `runKernelAsync(rawContext)`   → hoofd- én scenario-projectie
  *  - `runForcedStopPathAsync(input)`→ het gekozen-stop-pad
