@@ -40,6 +40,11 @@ import {
   orderGroupsLargestFirst,
   type CombinedTx,
 } from '@/lib/auto-categorize'
+// "Zeker"-grens die de UI gebruikt om een voorstel met lage confidence als
+// "minder zeker" te labelen. Blijft de single source in de resolver (0,8); de
+// resolver zet budget_id vanaf 0,5 maar behoudt de confidence, zodat de kaart
+// zelf kan bepalen of een voorstel onder de zekerheidsgrens valt.
+import { LOCAL_MIN_CONFIDENCE } from '@/lib/ai/local/local-categorize-resolver'
 import {
   TransactionRow,
   SOURCE_LABELS,
@@ -281,6 +286,17 @@ export function CategorizeWizard({
   const progressN = Math.max(1, totalGroups - pendingGroups.length + 1)
   // Hoeveel van de wachtende groepen hebben nú al een voorstel klaar.
   const readyCount = pendingGroups.filter((g) => !!rowsById.get(g[0].id)?.suggestion?.budget_id).length
+  // Hoeveel daarvan zijn "minder zeker" (dezelfde tweede-trap-grens als de kaart).
+  // Transparantie-telling op de bulk-knop; het knopgedrag verandert hier niet.
+  const lessConfidentCount = pendingGroups.filter((g) => {
+    const s = rowsById.get(g[0].id)?.suggestion
+    return (
+      !!s?.budget_id &&
+      (s.source === 'ai' || s.source === 'propagated') &&
+      s.confidence != null &&
+      s.confidence < LOCAL_MIN_CONFIDENCE
+    )
+  }).length
 
   // Prefetch-gate: meld na elke afhandeling tot welke AI-ronde de wizard staat.
   const advancesRef = useRef(0)
@@ -502,14 +518,24 @@ export function CategorizeWizard({
           </div>
         )}
         {readyCount > 0 && (
-          <button
-            type="button"
-            onClick={acceptAllProposals}
-            className="inline-flex w-full items-center justify-center gap-1.5 rounded-[var(--r)] border border-wil-300 px-3 py-2 min-h-[44px] text-xs font-medium text-wil-700 hover:bg-wil-50"
-          >
-            <CheckCheck className="h-3.5 w-3.5" />
-            Alle AI-voorstellen goedkeuren
-          </button>
+          <div className="flex flex-col gap-1">
+            <button
+              type="button"
+              onClick={acceptAllProposals}
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-[var(--r)] border border-wil-300 px-3 py-2 min-h-[44px] text-xs font-medium text-wil-700 hover:bg-wil-50"
+            >
+              <CheckCheck className="h-3.5 w-3.5" />
+              Alle AI-voorstellen goedkeuren
+            </button>
+            {/* Transparantie: bulk pakt óók de minder-zekere voorstellen mee. */}
+            {lessConfidentCount > 0 && (
+              <p className="text-center text-[10px] text-[var(--ink-3)]">
+                waarvan{' '}
+                <span className="font-[var(--font-dm-mono)] tabular-nums">{lessConfidentCount}</span>{' '}
+                minder zeker
+              </p>
+            )}
+          </div>
         )}
         <button
           type="button"
@@ -822,9 +848,43 @@ function AiGroupCard({
   // No-match: door de motor beoordeeld zonder bruikbaar voorstel → meteen de
   // handmatige fallback (niet wachten op het einde van de run). Eén lid volstaat.
   const noMatch = group.some((t) => rowsById.get(t.id)?.aiNoMatch)
+  // "Minder zeker": Will heeft wél een voorstel, maar met een confidence onder de
+  // zekerheidsgrens (de tweede trap, 0,5–0,8). Path-agnostisch — geldt óók voor
+  // cloud-voorstellen met lage confidence en voor gepropageerde voorstellen (een
+  // zustergroep die hetzelfde AI-oordeel erft mét dezelfde geërfde confidence);
+  // rule/transfer/mirror blijven uitgesloten (die dragen geen onzekerheid).
+  const isLessConfident =
+    hasProposal &&
+    (suggestion!.source === 'ai' || suggestion!.source === 'propagated') &&
+    suggestion!.confidence != null &&
+    suggestion!.confidence < LOCAL_MIN_CONFIDENCE
   const total = group.reduce((s, t) => s + t.amount, 0)
   const name = rep.counterparty_name || rep.description
-  const [membersOpen, setMembersOpen] = useState(false)
+  // Ledenlijst standaard uitklappen wanneer de gebruiker zélf moet beslissen: bij
+  // een no-match heeft 'ie de transactiedetails nodig om te kiezen. Een "minder
+  // zeker"-voorstel blijft ingeklapt, maar met een uitnodigende affordance.
+  const [membersOpen, setMembersOpen] = useState(noMatch)
+  // Auto-uitgeklapte ledenlijst (no-match) capt op de eerste MEMBER_CAP leden zodat
+  // een grote groep de sheet niet volloopt. Een handmatige toggle (of "toon nog")
+  // toont alles — dan zet de gebruiker de cap bewust af.
+  const [membersCapped, setMembersCapped] = useState(true)
+  // sr-only aankondiging bij de automatische onthulling (één keer, niet storend).
+  const [revealAnnounce, setRevealAnnounce] = useState('')
+  // No-match kan ook mid-run arriveren (dezelfde kaart blijft gemount): klap de
+  // ledenlijst dan éénmalig open. Een handmatige inklap daarna respecteren we
+  // (autoExpandedRef), en we openen alleen — nooit dwingend sluiten.
+  const autoExpandedRef = useRef(false)
+  useEffect(() => {
+    if (noMatch && !autoExpandedRef.current) {
+      autoExpandedRef.current = true
+      setMembersOpen(true)
+      setRevealAnnounce('Transacties van deze groep getoond zodat je zelf kunt kiezen.')
+    }
+  }, [noMatch])
+
+  const MEMBER_CAP = 6
+  const membersCapActive = membersCapped && group.length > MEMBER_CAP
+  const visibleMembers = membersCapActive ? group.slice(0, MEMBER_CAP) : group
 
   const budgetName =
     (suggestion
@@ -836,6 +896,8 @@ function AiGroupCard({
     // bg-kern-50-familie) — de kaart "hoort bij" het categoriseer-overzicht. Will's
     // stem blijft wil: de WILL-badge, de reasoning en de primaire actieknoppen.
     <div className="rounded-[var(--r-lg)] border border-kern-200 bg-kern-50/40 shadow-[var(--s1)]">
+      {/* Kondigt de automatische onthulling van de ledenlijst (no-match) één keer aan. */}
+      <div aria-live="polite" className="sr-only">{revealAnnounce}</div>
       {/* Kop: tegenpartij + aantal (uitklapbaar) + totaal */}
       <div className="flex items-start justify-between gap-3 px-4 pt-4">
         <div className="min-w-0 flex-1">
@@ -847,12 +909,24 @@ function AiGroupCard({
           {group.length > 1 ? (
             <button
               type="button"
-              onClick={() => setMembersOpen((v) => !v)}
+              // Handmatig openen = de cap bewust afzetten (toon alles).
+              onClick={() => { setMembersCapped(false); setMembersOpen((v) => !v) }}
               aria-expanded={membersOpen}
-              className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-[var(--ink-3)] hover:text-[var(--ink-2)]"
+              className={`mt-0.5 inline-flex min-h-[44px] items-center gap-1 py-1 text-[11px] ${
+                isLessConfident && !membersOpen
+                  ? 'font-medium text-[var(--ink-2)] hover:text-[var(--ink)]'
+                  : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
+              }`}
             >
+              {/* Bij een "minder zeker"-voorstel nodigen we uit om te verifiëren
+                  vóór akkoord ("Bekijk N transacties"); anders de neutrale teller.
+                  De tekst blijft op een contrastrijk ink-token; het wil-accent zit
+                  alléén op het chevron-icoon (niet-tekst-kritisch). */}
+              {isLessConfident && !membersOpen && <span>Bekijk</span>}
               <span className="font-[var(--font-dm-mono)] tabular-nums">{group.length}</span> transacties
-              {membersOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+              {membersOpen
+                ? <ChevronUp className="h-3 w-3" />
+                : <ChevronDown className={`h-3 w-3 ${isLessConfident ? 'text-wil-600' : ''}`} />}
             </button>
           ) : (
             <p className="mt-0.5 text-[11px] text-[var(--ink-3)]">
@@ -869,34 +943,55 @@ function AiGroupCard({
         </p>
       </div>
 
-      {/* Uitgeklapte ledenlijst (read-only) — hergebruikt de formatters uit categorize-row */}
+      {/* Uitgeklapte ledenlijst (read-only) — hergebruikt de formatters uit categorize-row.
+          Bij de auto-onthulling (no-match) tonen we eerst MEMBER_CAP leden met een
+          "toon nog N"-knop, zodat een grote groep de sheet niet volloopt. */}
       {group.length > 1 && membersOpen && (
-        <ul className="mt-2 divide-y divide-[var(--border-ed)] border-y border-[var(--border-ed)]">
-          {group.map((m) => (
-            <li key={m.id} className="flex items-start justify-between gap-2 px-4 py-2">
-              <div className="min-w-0 flex-1">
-                {m.date && <p className="text-[10px] text-[var(--ink-4)]">{formatDate(m.date)}</p>}
-                <p className="truncate text-xs text-[var(--ink-2)]">{m.description}</p>
-              </div>
-              <p className={`shrink-0 font-[var(--font-dm-mono)] text-xs tabular-nums ${
-                m.amount > 0 ? 'text-positive' : 'text-[var(--ink)]'
-              }`}>
-                {m.amount > 0 ? '+' : ''}<MaskedAmount value={m.amount} tone="wil" />
-              </p>
-            </li>
-          ))}
-        </ul>
+        <>
+          <ul className="mt-2 divide-y divide-[var(--border-ed)] border-t border-[var(--border-ed)]">
+            {visibleMembers.map((m) => (
+              <li key={m.id} className="flex items-start justify-between gap-2 px-4 py-2">
+                <div className="min-w-0 flex-1">
+                  {m.date && <p className="text-[10px] text-[var(--ink-4)]">{formatDate(m.date)}</p>}
+                  <p className="truncate text-xs text-[var(--ink-2)]">{m.description}</p>
+                </div>
+                <p className={`shrink-0 font-[var(--font-dm-mono)] text-xs tabular-nums ${
+                  m.amount > 0 ? 'text-positive' : 'text-[var(--ink)]'
+                }`}>
+                  {m.amount > 0 ? '+' : ''}<MaskedAmount value={m.amount} tone="wil" />
+                </p>
+              </li>
+            ))}
+          </ul>
+          {membersCapActive ? (
+            <button
+              type="button"
+              onClick={() => setMembersCapped(false)}
+              className="flex w-full items-center justify-center gap-1 border-b border-[var(--border-ed)] px-4 py-2 min-h-[44px] text-[11px] font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+            >
+              <ChevronDown className="h-3 w-3" />
+              Toon nog <span className="font-[var(--font-dm-mono)] tabular-nums">{group.length - MEMBER_CAP}</span>
+            </button>
+          ) : (
+            <div className="border-b border-[var(--border-ed)]" />
+          )}
+        </>
       )}
 
       {/* Voorstel / no-match / laadstatus / fallback */}
       <div className="px-4 pt-3">
         {hasProposal ? (
           <div className="rounded-[var(--r-sm)] border border-dashed border-kern-200 bg-[var(--paper)] px-3 py-3">
-            <div className="flex items-center gap-1.5">
+            <div className="flex flex-wrap items-center gap-1.5">
               <Sparkles className="h-3 w-3 shrink-0 text-wil-500" />
               <span className="shrink-0 rounded-full border border-wil-200 bg-[var(--paper)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-2)]">
                 {SOURCE_LABELS[suggestion!.source]}
               </span>
+              {/* Subtiele duiding wanneer Will minder zeker is (tweede trap). Ink-
+                  token, dezelfde familie als de badge — bewust niet alarmerend. */}
+              {isLessConfident && (
+                <span className="shrink-0 text-[10px] text-[var(--ink-3)]">· minder zeker</span>
+              )}
               <span className="text-xs text-[var(--ink-3)]">voorstel:</span>
               <span className="text-xs font-medium text-[var(--ink)]">{budgetName}</span>
             </div>

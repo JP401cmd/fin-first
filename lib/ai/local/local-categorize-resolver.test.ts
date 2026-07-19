@@ -63,13 +63,20 @@ describe('mapLocalChunkResults — id-mapping, drempel, slug-validatie', () => {
     ])
   })
 
-  it('onder de drempel → budget_id null (assistief: liever niets dan ruis)', () => {
+  it('onder de vloer (ruim onder 0,5) → budget_id null (assistief: liever niets dan ruis)', () => {
+    // LET OP — herschreven i.h.k.v. de tweetraps-drempel (bug-fix stap 4, P0):
+    // deze test gebruikte voorheen `LOCAL_MIN_CONFIDENCE - 0.01` (0,79) als
+    // "onder de drempel"-waarde. Dat kantelt met het tweetraps-contract: 0,79
+    // ligt tussen de nieuwe vloer (0,5, straks LOCAL_MIN_PROPOSAL_CONFIDENCE) en
+    // de "zeker"-grens (LOCAL_MIN_CONFIDENCE = 0,8), en wordt dus straks een
+    // toegewezen (minder zeker) voorstel i.p.v. null. Een vaste waarde ruim
+    // onder de vloer (0,3) is een invariant die vóór én ná de coder-fix klopt.
     const chunk = [item('tx-a')]
-    const below = LOCAL_MIN_CONFIDENCE - 0.01
-    const raw = JSON.stringify([{ id: 't1', budget_slug: 'boodschappen', confidence: below }])
+    const belowFloor = 0.3
+    const raw = JSON.stringify([{ id: 't1', budget_slug: 'boodschappen', confidence: belowFloor }])
     const out = mapLocalChunkResults(chunk, parseLocalCategorizations(raw), validSlugs, slugToId)
     expect(out[0].budget_id).toBeNull()
-    expect(out[0].confidence).toBe(below)
+    expect(out[0].confidence).toBe(belowFloor)
   })
 
   it('op de drempel (=LOCAL_MIN_CONFIDENCE) → wél toegewezen', () => {
@@ -96,6 +103,48 @@ describe('mapLocalChunkResults — id-mapping, drempel, slug-validatie', () => {
     const out = mapLocalChunkResults(chunk, parseLocalCategorizations('geen json'), validSlugs, slugToId)
     expect(out.map((r) => r.id)).toEqual(['tx-a', 'tx-b', 'tx-c'])
     expect(out.every((r) => r.budget_id === null)).toBe(true)
+  })
+})
+
+// ── Bug-fix stap 4 (P0): tweetraps-drempelgedrag ──────────────────────────────
+// Bug: mapLocalChunkResults wijst vandaag alleen toe vanaf LOCAL_MIN_CONFIDENCE
+// (0,8), terwijl de prompt het model instrueert op ≥0,5 — alles tussen 0,5 en
+// 0,8 valt nu stilzwijgend weg naar budget_id null.
+//
+// Eigenaarsbesluit: twee traps. Coder-contract (nog NIET geïmplementeerd):
+//  - Nieuwe constante LOCAL_MIN_PROPOSAL_CONFIDENCE = 0.5 = de VLOER: confidence
+//    < 0,5 → budget_id null ("kon niet plaatsen").
+//  - LOCAL_MIN_CONFIDENCE (0,8) blijft bestaan als de "zeker"-labelgrens voor de
+//    UI (0,5–0,8 = voorstel mét 'minder zeker', ≥0,8 = zeker). mapLocalChunkResults
+//    moet budget_id zetten vanaf de VLOER (0,5), niet meer vanaf 0,8. De
+//    confidence-waarde blijft in het resultaat behouden zodat de UI kan labelen.
+//
+// De eerste test hieronder is VANDAAG rood (0,6 → null i.p.v. gezet) — dat is de
+// bedoeling: hij pint het ontbrekende gedrag vast totdat de coder het contract
+// implementeert. Geen import van LOCAL_MIN_PROPOSAL_CONFIDENCE (bestaat nog
+// niet) — puur gedrags-assertie via mapLocalChunkResults, zodat dit bestand
+// schoon compileert en de test uitsluitend runtime-rood is.
+describe('mapLocalChunkResults — tweetraps-drempel (vloer 0,5 / "zeker"-grens 0,8 blijft)', () => {
+  it('confidence 0,6 (tussen vloer 0,5 en zeker-grens 0,8) → budget_id WÉL gezet, confidence behouden', () => {
+    const chunk = [item('tx-a')]
+    const raw = JSON.stringify([{ id: 't1', budget_slug: 'boodschappen', confidence: 0.6 }])
+    const out = mapLocalChunkResults(chunk, parseLocalCategorizations(raw), validSlugs, slugToId)
+    expect(out[0].budget_id).toBe('b-1')
+    expect(out[0].confidence).toBe(0.6)
+  })
+
+  it('onder de vloer (0,4) → budget_id null ("kon niet plaatsen")', () => {
+    const chunk = [item('tx-a')]
+    const raw = JSON.stringify([{ id: 't1', budget_slug: 'boodschappen', confidence: 0.4 }])
+    const out = mapLocalChunkResults(chunk, parseLocalCategorizations(raw), validSlugs, slugToId)
+    expect(out[0].budget_id).toBeNull()
+  })
+
+  it('ruim boven de zeker-grens (0,9) → budget_id gezet', () => {
+    const chunk = [item('tx-a')]
+    const raw = JSON.stringify([{ id: 't1', budget_slug: 'boodschappen', confidence: 0.9 }])
+    const out = mapLocalChunkResults(chunk, parseLocalCategorizations(raw), validSlugs, slugToId)
+    expect(out[0].budget_id).toBe('b-1')
   })
 })
 
