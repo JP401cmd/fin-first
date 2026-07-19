@@ -395,8 +395,12 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
     // 12-maands maandaggregaat (som pos/neg per maand/budget/type) voor de SUM-
     // consumers (last12Income + 6-maands inkomen/uitgaven/spaarbudget). SQL-aggregaat
     // i.p.v. de income12/6m-slices uit getTx12m: kan niet stil afkappen op
-    // max_rows=1000 (correctheid). Horizon telt transfers BEWUST mee (geen isRealTx),
-    // dus de reducties gebruiken realOnly:false. RLS-breed, identiek aan getTx12m.
+    // max_rows=1000 (correctheid). GEMENGDE grondslag per reductie: de spaarquote- én
+    // gezondheidsscore-sommen (income6m/expenses6m/savingsBudgetSpent6m + de 6-maands
+    // avg income/expenses) draaien transfer-EXCLUSIEF (realOnly:true — app-brede
+    // spaarquote/health-grondslag, eigen-rekening-overboekingen tellen NERGENS mee);
+    // alleen de FIRE-projectie-som last12Income telt transfers BEWUST mee
+    // (realOnly:false). RLS-breed, identiek aan getTx12m.
     fetchTxMonthAggregate(supabase, {
       from: localMonthStartMonthsAgo(now, 11),
       to: localMonthBounds(now).end,
@@ -418,9 +422,11 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
   }>
   const income12Rows = tx12mRows.filter((t) => Number(t.amount) > 0)
 
-  // Gedeeld 12-maands maandaggregaat — voedt last12Income + de 6-maands sommen
-  // (transfers BEWUST meegeteld: realOnly:false). Kan niet stil afkappen op 1000
-  // rijen. earliestIncomeDate blijft op de income12Rows-slice hierboven.
+  // Gedeeld 12-maands maandaggregaat — voedt last12Income + de 6-maands sommen.
+  // Per-reductie grondslag: de spaarquote/health-sommen transfer-EXCLUSIEF
+  // (realOnly:true), de FIRE-som last12Income transfer-INCLUSIEF (realOnly:false).
+  // Kan niet stil afkappen op 1000 rijen. earliestIncomeDate blijft op de
+  // income12Rows-slice hierboven.
   const txAgg12 = (txAgg12Result.data ?? []) as TxMonthAggregateRow[]
   // 6-maands sub-venster op maand-niveau ('YYYY-MM'); sixMonthsAgo is de 1e van de
   // maand ⇒ `date >= sixMonthsAgo` == `maand >= sixMonthsAgoMonth` (exact).
@@ -486,9 +492,15 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
     resolveEffectiveIncomeExpenses(profile ?? {}, monthlyIncome, monthlyExpenses)
 
   // 6-month average income/expenses for stable resilience calculation — uit het
-  // maandaggregaat (transfers BEWUST meegeteld: realOnly:false).
-  const totalIncome6m = aggSumPositief(txAgg12, { realOnly: false, sinceMonth: sixMonthsAgoMonth })
-  const totalExpenses6m = aggSumNegatiefAbs(txAgg12, { realOnly: false, sinceMonth: sixMonthsAgoMonth })
+  // maandaggregaat, TRANSFER-EXCLUSIEF (realOnly:true). avgIncome6m/avgExpenses6m voeden
+  // de gezondheidsscore-input (netMonthlyIncome = DSTI-noemer, avgMonthlyExpenses =
+  // noodfonds-dekking). health-score-input.ts eist expliciet dat netMonthlyIncome
+  // DEZELFDE bron is als savingsRate6m — dus dezelfde transfer-exclusieve grondslag als
+  // income6m hieronder (spiegelt dashboard-data-loader's health-inkomensanker
+  // extIncome6/6, óók transfer-exclusief). Transfers tellen NERGENS mee in de
+  // spaarquote/health-grondslag; alleen de FIRE-projectie-sommen zien alle kasstromen.
+  const totalIncome6m = aggSumPositief(txAgg12, { realOnly: true, sinceMonth: sixMonthsAgoMonth })
+  const totalExpenses6m = aggSumNegatiefAbs(txAgg12, { realOnly: true, sinceMonth: sixMonthsAgoMonth })
   const avgIncome6m = totalIncome6m > 0 ? totalIncome6m / 6 : effectiveMonthlyIncome
   const avgExpenses6m = totalExpenses6m > 0 ? totalExpenses6m / 6 : effectiveMonthlyExpenses
 
@@ -503,7 +515,13 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
     s + Number(d.current_balance) * ((d.net_worth_inclusion_pct ?? 100) / 100), 0)
   const monthlyContributions = (assetsResult.data ?? []).reduce((s, a) => s + Number(a.monthly_contribution), 0)
 
-  // Extrapolated 12-month income (uit de gedeelde 12-maands slice; positieve rijen)
+  // Extrapolated 12-month income — TRANSFER-INCLUSIEF (realOnly:false), BEWUST NIET
+  // gelijkgetrokken. extrapolatedIncome voedt NIET computeSavingsRate6m of de
+  // gezondheidsscore-input, maar computeRetirementExpenses (FIRE-pensioenuitgave,
+  // income-based) én de income-basis van baseAnnualSavingsFromCashflow (inkomen ×
+  // spaarquote). Dat zijn FIRE-projectie-inputs die bewust alle kasstromen zien (buiten
+  // de spaarquote-gelijktrekking); die raakt alleen de spaarquote-RATE (savingsRate6m,
+  // nu transfer-exclusief), niet deze income-multiplier.
   const last12Income = aggSumPositief(txAgg12, { realOnly: false })
   let extrapolatedIncome = last12Income
   // Vroegste inkomens-datum = laagste datum onder de positieve rijen (spiegelt
@@ -617,20 +635,26 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
   // Detect budgetingActive from profile (defaults to true if column doesn't exist)
   const budgetingActive = (profile as Record<string, unknown>).budgeting_active !== false
 
-  // ── savingsRate6m (same formula as dashboard-data-loader) ────
+  // ── savingsRate6m (zelfde formule ÉN zelfde transfer-exclusieve grondslag als
+  //    dashboard-data-loader) ────
   // Savings-budget IDs: transactions mapped to savings budgets are saving, not spending
   const savingsBudgetIds = new Set<string>()
   for (const [id, type] of budgetTypeMap) {
     if (type === 'savings') savingsBudgetIds.add(id)
   }
 
-  // 6-maands inkomen/uitgaven + spaarbudget-correctie uit het maandaggregaat
-  // (transfers BEWUST meegeteld: realOnly:false). income6m/expenses6m zijn per
-  // constructie gelijk aan totalIncome6m/totalExpenses6m hierboven.
-  const income6m = aggSumPositief(txAgg12, { realOnly: false, sinceMonth: sixMonthsAgoMonth })
-  const expenses6m = aggSumNegatiefAbs(txAgg12, { realOnly: false, sinceMonth: sixMonthsAgoMonth })
+  // 6-maands inkomen/uitgaven + spaarbudget-correctie uit het maandaggregaat,
+  // TRANSFER-EXCLUSIEF (realOnly:true) — spiegelt dashboard-data-loader (r757-763),
+  // lever-scores-loader en core-data-loader (isRealTx): de spaarquote heeft app-breed
+  // ÉÉN grondslag waarin eigen-rekening-overboekingen NERGENS meetellen. Vroeger stond
+  // dit op realOnly:false, waardoor savingsRate6m — en dus de savings-pijler van de
+  // gezondheidsscore + het cashflow-hefboompercentage — bij transfer-zware gebruikers
+  // afweek van statusdot/briefing/cashflow-pagina. income6m/expenses6m zijn hierdoor
+  // (weer) per constructie gelijk aan totalIncome6m/totalExpenses6m hierboven.
+  const income6m = aggSumPositief(txAgg12, { realOnly: true, sinceMonth: sixMonthsAgoMonth })
+  const expenses6m = aggSumNegatiefAbs(txAgg12, { realOnly: true, sinceMonth: sixMonthsAgoMonth })
   const savingsBudgetSpent6m = aggSumNegatiefAbs(txAgg12, {
-    realOnly: false,
+    realOnly: true,
     sinceMonth: sixMonthsAgoMonth,
     budgetIds: savingsBudgetIds,
   })
