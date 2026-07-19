@@ -40,8 +40,14 @@ import {
   getNibudReferences,
   calculateBenchmarks,
 } from './nibud/reference-data'
-import { localMonthBounds } from './month-range'
 import { getCachedUser } from './supabase/cached-user'
+import {
+  getActiveAssets,
+  getActiveDebts,
+  getOwnProfile,
+  getBudgets,
+  getCurrentMonthTx,
+} from './server-data/base'
 import type { Debt } from './debt-data'
 import type { Asset } from './asset-data'
 
@@ -133,21 +139,13 @@ async function collectBudgetAandachtspunten(supabase: SupabaseClient): Promise<A
   } = await supabase.auth.getUser()
   if (!user) return []
 
-  const now = new Date()
-  const { start: monthStart, end: monthEnd } = localMonthBounds(now)
-
+  // Gedeelde basisdata-laag: profiel/budgetten/huidige-maand-transacties draaien
+  // als ÉÉN query per tabel per request (gedeeld met dashboard/lever/shell). De
+  // huidige-maand-tx heeft exact hetzelfde localMonthBounds-venster als voorheen.
   const [profileRes, budgetsRes, txRes] = await Promise.all([
-    supabase
-      .from('profiles')
-      .select('household_type, number_of_children, children_ages, estimated_monthly_expenses')
-      .eq('id', user.id)
-      .single(),
-    supabase.from('budgets').select('id, slug, parent_id').order('sort_order', { ascending: true }),
-    supabase
-      .from('transactions')
-      .select('budget_id, amount, transaction_type')
-      .gte('date', monthStart)
-      .lt('date', monthEnd),
+    getOwnProfile(supabase),
+    getBudgets(supabase),
+    getCurrentMonthTx(supabase),
   ])
 
   const profile = profileRes.data
@@ -204,13 +202,9 @@ async function collectDebtAandachtspunten(supabase: SupabaseClient): Promise<Aan
   const monthlyExpenses = horizonData.effectiveInput?.monthlyExpenses ?? 0
   const dailyExpenses = monthlyExpenses > 0 ? dailyExpenseRate(monthlyExpenses) : 100
 
-  // Egress-trim: de adapter gebruikt alleen id/name/current_balance/
-  // interest_rate/is_active.
-  const { data } = await supabase
-    .from('debts')
-    .select('id, name, current_balance, interest_rate, is_active')
-    .eq('is_active', true)
-    .limit(200)
+  // Gedeelde actieve-schulden-fetch (adapter gebruikt alleen id/name/
+  // current_balance/interest_rate/is_active — een subset van select('*')).
+  const { data } = await getActiveDebts(supabase)
   const debts = (data ?? []) as Debt[]
   return debtsToAandachtspunten(debts, dailyExpenses)
 }
@@ -229,12 +223,9 @@ async function collectAssetAandachtspunten(supabase: SupabaseClient): Promise<Aa
   const dailyExpenses = dailyExpenseRate(monthlyExpenses)
   const inflationRate = horizonData.fireParams?.inflationRate ?? 0
 
-  // Egress-trim: de adapter gebruikt alleen asset_type/current_value/is_active.
-  const { data } = await supabase
-    .from('assets')
-    .select('asset_type, current_value, is_active')
-    .eq('is_active', true)
-    .limit(500)
+  // Gedeelde actieve-assets-fetch (adapter gebruikt alleen asset_type/
+  // current_value/is_active — een subset van select('*')).
+  const { data } = await getActiveAssets(supabase)
   const assets = (data ?? []) as Asset[]
   return assetsToAandachtspunten(assets, dailyExpenses, inflationRate)
 }

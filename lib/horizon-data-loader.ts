@@ -51,6 +51,15 @@ import type { Perspective } from '@/lib/household-data'
 import { resolveEffectiveIncomeExpenses } from './effective-financials'
 import { resolveSavingsSource, computeSavingsRate6m, computeDebtAflossingMonthly } from './savings-source'
 import {
+  getActiveAssets,
+  getActiveDebts,
+  getOwnProfile,
+  getBudgets,
+  getUnlinkedBankAccounts,
+  getCurrentMonthTx,
+  getTx12m,
+} from './server-data/base'
+import {
   buildHealthScoreInput,
   type HealthScoreAsset,
   type HealthScoreBudget,
@@ -288,11 +297,10 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
   perspective: Perspective,
 ): Promise<HorizonPageData> {
   const now = new Date()
-  const monthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1)).toISOString().split('T')[0]
-  const monthEnd = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 1)).toISOString().split('T')[0]
   const oneYearFromNow = new Date(Date.UTC(now.getFullYear() + 1, now.getMonth(), now.getDate())).toISOString().split('T')[0]
   const today = now.toISOString().split('T')[0]
-  const twelveMonthsAgo = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 11, 1)).toISOString().split('T')[0]
+  // 6-maands ondergrens voor de 6m-slice uit de gedeelde 12-maands tx-fetch
+  // (byte-identiek aan het vroegere aparte [sixMonthsAgo, monthEnd)-venster).
   const sixMonthsAgo = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 5, 1)).toISOString().split('T')[0]
 
   const [
@@ -304,27 +312,24 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
     actionsResult,
     fullDebtsResult,
     snapshotsResult,
-    income12Result,
-    earliestIncomeResult,
-    tx6mResult,
+    tx12mResult,
     bankAccountsResult,
-    wsResult,
     horizonSetupVisitResult,
     horizonWelcomeVisitResult,
     exitNoticeDismissedResult,
     tipsFirstCloseNavigatedResult,
-    savingsOverrideResult,
     aowRowsResult,
   ] = await Promise.all([
-    supabase.from('transactions').select('amount, budget_id').gte('date', monthStart).lt('date', monthEnd),
-    // Single assets query: returns full rows (typed as Asset[]) used for both
-    // aggregations (totalAssets, monthlyContributions, asset-type set) and the
-    // unified projection. Replaces the previous trimmed-select + full-select
-    // duplicate pair on the same table.
-    supabase.from('assets').select('*').eq('is_active', true).limit(500),
-    supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, marginaal_tarief, pension_factor_a, pension_factor_a_source, net_monthly_income, estimated_monthly_expenses, budgeting_active, feature_preferences, household_type, number_of_children, housing_strategy_config, housing_strategy_dismissed_at, income_source, expenses_source, pot_rules, box3_method, deficit_loan_rate, withdrawal_profile_config, toekomst_scenario_prefs').single(),
-    // Single budget query (all budgets) — replaces separate essential + child queries
-    supabase.from('budgets').select('id, name, default_limit, interval, budget_type, is_essential, parent_id'),
+    // Gedeelde basisdata-laag (lib/server-data/base.ts): huidige-maand-tx,
+    // actieve assets, eigen profiel (select('*') dekt óók de withdrawal/guardrail-
+    // én monthly_savings_override-kolommen — de twee vroegere legacy-.maybeSingle()-
+    // probes vervallen daarmee), alle budgetten, het 12-maands transactievenster
+    // en de niet-gekoppelde bankrekeningen draaien nu als ÉÉN query per tabel per
+    // request, gedeeld met de andere loaders + de shell.
+    getCurrentMonthTx(supabase),
+    getActiveAssets(supabase),
+    getOwnProfile(supabase),
+    getBudgets(supabase),
     supabase.from('life_events').select('id, name, event_type, target_age, target_date, one_time_cost, monthly_cost_change, monthly_income_change, duration_months, icon, is_active, sort_order, is_indexed, linked_asset_id, metadata').eq('is_active', true).order('sort_order', { ascending: true }),
     supabase
       .from('actions')
@@ -334,25 +339,16 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
       .gte('scheduled_week', today)
       .lte('scheduled_week', oneYearFromNow)
       .order('scheduled_week', { ascending: true }),
-    supabase.from('debts').select('*').eq('is_active', true).limit(200),
+    getActiveDebts(supabase),
     supabase
       .from('net_worth_snapshots')
       .select('snapshot_date, resilience_score, net_worth, freedom_percentage, fire_age, score_version, engine_bron')
       .order('snapshot_date', { ascending: true })
       .limit(60),
-    supabase.from('transactions').select('amount, date').gt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd),
-    supabase.from('transactions').select('date').gt('amount', 0).gte('date', twelveMonthsAgo).order('date', { ascending: true }).limit(1),
-    // 6-month transactions for stable health score calculation (budget_id for savings-budget correction)
-    supabase.from('transactions').select('amount, budget_id, date').gte('date', sixMonthsAgo).lt('date', monthEnd),
-    supabase.from('bank_accounts').select('id, name, balance').eq('is_active', true).is('linked_asset_id', null),
-    // Withdrawal-strategy profile columns. Folded into the main batch via
-    // .maybeSingle() so a missing-column error on legacy DBs (migration
-    // 20260318000001 still pending) returns null data instead of throwing —
-    // saving the previous post-batch waterfall round-trip.
-    supabase
-      .from('profiles')
-      .select('withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step')
-      .maybeSingle(),
+    // 12-maands transactievenster → income12 / 6-maands / vroegste-inkomen via
+    // JS-slicing hieronder (byte-identiek; die vensters zijn subsets).
+    getTx12m(supabase),
+    getUnlinkedBankAccounts(supabase),
     // Legacy setup-marker (de setup-pane is verwijderd — zie STEP 2). Nog
     // gelezen voor achterwaartse compatibiliteit; bepaalt geen weergave meer.
     // .maybeSingle() + null-fallback downstream — table kan ontbreken op legacy DBs.
@@ -363,38 +359,22 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
       .maybeSingle(),
     // Welkomsttekst-marker. Gespiegeld aan de setup-marker hierboven; bepaalt
     // of de eenmalige welkomstbanner bovenaan de grafiek nog wordt getoond.
-    // .maybeSingle() + null-fallback zodat een ontbrekende tabel op legacy DBs
-    // niet de hele loader laat falen.
     supabase
       .from('user_feature_visits')
       .select('feature_slug')
       .eq('feature_slug', HORIZON_WELCOME_SHOWN_SLUG)
       .maybeSingle(),
-    // Exit-melding-dismiss-marker ("Niet meer weergeven"). Zelfde patroon als
-    // de welkomst-marker hierboven; bepaalt of de exit-melding nog verschijnt
-    // bij het verlaten van de tips-overlay. .maybeSingle() + null-fallback zodat
-    // een ontbrekende tabel op legacy DBs niet de hele loader laat falen.
+    // Exit-melding-dismiss-marker ("Niet meer weergeven"). Zelfde patroon.
     supabase
       .from('user_feature_visits')
       .select('feature_slug')
       .eq('feature_slug', HORIZON_EXIT_NOTICE_DISMISSED_SLUG)
       .maybeSingle(),
-    // Eerste-sluiting-navigatie-marker. Zelfde patroon als de exit-melding-
-    // marker hierboven; bepaalt of de EERSTE sluiting van de tips-overlay naar
-    // /overzicht navigeert. .maybeSingle() + null-fallback zodat een ontbrekende
-    // tabel op legacy DBs niet de hele loader laat falen.
+    // Eerste-sluiting-navigatie-marker. Zelfde patroon.
     supabase
       .from('user_feature_visits')
       .select('feature_slug')
       .eq('feature_slug', HORIZON_TIPS_FIRST_CLOSE_NAVIGATED_SLUG)
-      .maybeSingle(),
-    // monthly_savings_override profile-kolom. Aparte .maybeSingle()-query
-    // zodat een ontbrekende kolom op legacy DBs (migratie 20260513000001
-    // nog niet gerund) graceful null returnt ipv het hele profile-query
-    // te laten falen.
-    supabase
-      .from('profiles')
-      .select('monthly_savings_override')
       .maybeSingle(),
     // AOW-leeftijd-referentietabel (publiek, geen user-filter) — dezelfde query-
     // vorm die de client tot nu toe op mount deed (loadKernelContext / loadData).
@@ -409,6 +389,19 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
   // Same row both consumers want: alias instead of re-querying.
   const assetsResult = fullAssetsResult
 
+  // ── Gedeelde 12-maands transactie-fetch → JS-slices ──────────────────────
+  // Byte-identiek aan de vroegere aparte income12- / earliest-income- / 6-maands-
+  // queries (die vensters/tekens zijn subsets van het 12-maands venster). Geen
+  // isRealTx-filtering hier — de horizon-aggregaties deden dat óók niet.
+  const tx12mRows = (tx12mResult.data ?? []) as Array<{
+    amount: number | string
+    date: string
+    budget_id?: string | null
+    transaction_type?: string | null
+  }>
+  const income12Rows = tx12mRows.filter((t) => Number(t.amount) > 0)
+  const tx6mRows = tx12mRows.filter((t) => t.date >= sixMonthsAgo)
+
   // AOW-rijen voor de client-kernel-context (rawProfile + aowRows). Leeg bij een
   // ontbrekende tabel (legacy DB) → de client valt terug op de mount-fetch.
   const aowRows = (aowRowsResult.data ?? []) as AowLeeftijdRow[]
@@ -422,20 +415,16 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
   }
   const baseProfile = profileResult.data ?? PROFILE_DEFAULTS
 
-  let wsData: {
+  // Withdrawal-strategy + guardrail-kolommen komen nu uit de gedeelde select('*')
+  // (baseProfile) i.p.v. een aparte .maybeSingle()-probe. Op de huidige DB byte-
+  // identiek; op een legacy-DB zonder deze kolommen levert select('*') ze simpelweg
+  // niet op → de ?? PROFILE_DEFAULTS grijpen in (zelfde uitkomst, zonder kolom-warn).
+  const wsData = baseProfile as {
     withdrawal_strategy?: string | null
     guardrail_floor?: number | null
     guardrail_ceiling?: number | null
     guardrail_cut_step?: number | null
     guardrail_raise_step?: number | null
-  } = {}
-  if (wsResult.error) {
-    // Columns likely don't exist yet — use defaults silently
-    console.warn(
-      `[horizon-data-loader] Withdrawal strategy columns not available (migration pending): ${wsResult.error.code}`,
-    )
-  } else {
-    wsData = wsResult.data ?? {}
   }
 
   const profile = {
@@ -475,7 +464,7 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
   // 6-month average income/expenses for stable resilience calculation
   let totalIncome6m = 0
   let totalExpenses6m = 0
-  for (const tx of tx6mResult.data ?? []) {
+  for (const tx of tx6mRows) {
     const amt = Number(tx.amount)
     if (amt > 0) totalIncome6m += amt
     else totalExpenses6m += Math.abs(amt)
@@ -488,18 +477,21 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
     s + Number(a.current_value) * ((a.net_worth_inclusion_pct ?? 100) / 100), 0)
   const unlinkedCash = (bankAccountsResult.data ?? []).reduce((s, a) => s + Number(a.balance), 0)
   const totalAssets = totalAssetsOnly + unlinkedCash
-  // totalDebts uit fullDebtsResult (select *) — vervangt de eerdere trimmed
-  // duplicate-query op dezelfde tabel (zelfde dedupe als assets hierboven).
-  // Bewuste keuze: fullDebtsResult heeft .limit(200); >200 actieve schulden
-  // is onrealistisch, dus dat limiet-verschil is geaccepteerd.
+  // totalDebts uit de gedeelde getActiveDebts (select('*')) — dezelfde rijen die
+  // computeDebtAflossingMonthly + de health-score consumeren, één fetch per request.
   const totalDebts = (fullDebtsResult.data ?? []).reduce((s, d) =>
     s + Number(d.current_balance) * ((d.net_worth_inclusion_pct ?? 100) / 100), 0)
   const monthlyContributions = (assetsResult.data ?? []).reduce((s, a) => s + Number(a.monthly_contribution), 0)
 
-  // Extrapolated 12-month income
-  const last12Income = income12Result.data?.reduce((s, t) => s + Number(t.amount), 0) ?? 0
+  // Extrapolated 12-month income (uit de gedeelde 12-maands slice; positieve rijen)
+  const last12Income = income12Rows.reduce((s, t) => s + Number(t.amount), 0)
   let extrapolatedIncome = last12Income
-  const earliestIncomeDate = earliestIncomeResult.data?.[0]?.date
+  // Vroegste inkomens-datum = laagste datum onder de positieve rijen (spiegelt
+  // .gt('amount',0).order('date',asc).limit(1)).
+  const earliestIncomeDate = income12Rows.reduce<string | undefined>(
+    (min, t) => (min === undefined || t.date < min ? t.date : min),
+    undefined,
+  )
   if (earliestIncomeDate && last12Income > 0) {
     const earliest = new Date(earliestIncomeDate)
     const incomeMonths = Math.max(1, Math.min(12,
@@ -614,10 +606,10 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
 
   // 6-month savings-budget spend (add-back for spaarquote correction)
   let savingsBudgetSpent6m = 0
-  // 6-month income/expenses split from tx6mResult (now has budget_id + date)
+  // 6-month income/expenses split from tx6mRows (gedeelde 12-maands slice, has budget_id + date)
   let income6m = 0
   let expenses6m = 0
-  for (const tx of tx6mResult.data ?? []) {
+  for (const tx of tx6mRows) {
     const amt = Number(tx.amount)
     if (amt > 0) { income6m += amt; continue }
     expenses6m += Math.abs(amt)
@@ -636,7 +628,8 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
   // (uit de uitgaven-term), schuldaflossing erbij. Byte-identiek aan de vroegere
   // inline-versie; nu single-sourced met dashboard/core/lever-scores.
   let dataMonths6 = 6
-  const earliestIncomeDateH = earliestIncomeResult.data?.[0]?.date
+  // Zelfde vroegste-inkomens-datum als hierboven (uit de gedeelde 12-maands slice).
+  const earliestIncomeDateH = earliestIncomeDate
   if (earliestIncomeDateH) {
     const earliest = new Date(earliestIncomeDateH)
     dataMonths6 = Math.max(1, Math.min(6,
@@ -795,9 +788,8 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
   const housingHasPartner = hasPartner(housingHouseholdType)
   // Annual savings: zelfde bron als de client-sim (override > cashflow-
   // spaarquote > asset-contributies), zodat het trigger-moment overeenkomt.
-  const housingOverrideRaw = savingsOverrideResult.error
-    ? null
-    : (savingsOverrideResult.data as { monthly_savings_override?: number | string | null } | null)?.monthly_savings_override ?? null
+  const housingOverrideRaw =
+    (profile as { monthly_savings_override?: number | string | null }).monthly_savings_override ?? null
   const housingMonthlyOverride = housingOverrideRaw == null ? null : Number(housingOverrideRaw)
   const annualSavingsForHousing =
     housingMonthlyOverride != null && housingMonthlyOverride >= 0
@@ -879,9 +871,8 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
 
   // monthlySavingsOverride: handmatige override uit profiles. Null = geen
   // override, simulator gebruikt monthlyContributionFromAssets.
-  const overrideRaw = savingsOverrideResult.error
-    ? null
-    : (savingsOverrideResult.data as { monthly_savings_override?: number | string | null } | null)?.monthly_savings_override ?? null
+  const overrideRaw =
+    (profile as { monthly_savings_override?: number | string | null }).monthly_savings_override ?? null
   const monthlySavingsOverride = overrideRaw == null ? null : Number(overrideRaw)
 
   // monthlyContributionFromAssets: raw asset-aggregaat (identiek aan

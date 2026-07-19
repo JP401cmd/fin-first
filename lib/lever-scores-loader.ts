@@ -33,6 +33,15 @@ import { resolveEffectiveIncomeExpenses } from '@/lib/effective-financials'
 import { resolveFireParams } from '@/lib/fire-params'
 import { computeSavingsRate6m, computeDebtAflossingMonthly } from '@/lib/savings-source'
 import { localMonthStartMonthsAgo } from '@/lib/month-range'
+import {
+  getActiveAssets,
+  getActiveDebts,
+  getOwnProfile,
+  getBudgets,
+  getUnlinkedBankAccounts,
+  getCurrentMonthTx,
+  getTx12m,
+} from '@/lib/server-data/base'
 import type { Debt } from '@/lib/debt-data'
 import type { LeverageStatus } from '@/lib/leverage-status'
 import type { Perspective } from '@/lib/household-data'
@@ -157,104 +166,38 @@ export const loadLeverScores = cache(async function loadLeverScores(
     return { scores: empty, taxInput, box3Status: 'neutral', box1Status: 'neutral', netWorth: 0, budgetsOver: 0 }
   }
 
-  // Huidige-maand-grenzen (UTC) voor budget-health en het maand-inkomen — exact
-  // dezelfde grenzen als de shell, zodat de afgeleide statussen 1-op-1 matchen.
   const now = new Date()
-  const monthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1))
-    .toISOString()
-    .split('T')[0]
-  const monthEnd = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 1))
-    .toISOString()
-    .split('T')[0]
 
   // 6-maands-venster voor de CANONIEKE spaarquote (identiek aan de dashboard-loader:
   // `localMonthStartMonthsAgo(now, 5)` = de 1e van 5 maanden terug ⇒ 6 kalendermaanden
-  // incl. de huidige). Het 12-maands-venster levert de vroegste inkomens-datum voor
-  // de extrapolatie bij <6 maanden historie. Voorheen rekende deze loader een eigen
-  // 3-maands quote met een tekenfout (uitgaven negatief zonder Math.abs) → 164%
-  // i.p.v. de canonieke ~50% (KRUIS-06).
+  // incl. de huidige). Voorheen rekende deze loader een eigen 3-maands quote met een
+  // tekenfout (uitgaven negatief zonder Math.abs) → 164% i.p.v. de canonieke ~50%
+  // (KRUIS-06).
   const sixMonthsAgo = localMonthStartMonthsAgo(now, 5)
-  const twelveMonthsAgo = localMonthStartMonthsAgo(now, 11)
 
+  // Gedeelde basisdata-laag (lib/server-data/base.ts): assets/debts/profiel/
+  // budgetten/bank + de twee transactie-vensters draaien als ÉÉN query per tabel
+  // per request, gedeeld met de andere loaders + de shell-layout. De vroegere
+  // per-venster/per-teken tx-queries (6-maands, huidige-maand budget-tx, maand-
+  // inkomen, vroegste inkomen) worden hieronder in JS uit deze twee vensters
+  // geslicet — byte-identiek, want die vensters zijn subsets. RLS scopet al op de
+  // gebruiker, dus de expliciete .eq('user_id') is vervallen.
   const [
     profileRes,
     assetsRes,
     debtsRes,
-    tx6mRes,
     budgetsRes,
-    budgetTxRes,
-    monthIncomeTxRes,
     bankAccountsRes,
-    earliestIncomeRes,
+    currentMonthTxRes,
+    tx12mRes,
   ] = await Promise.all([
-    supabase
-      .from('profiles')
-      .select(
-        'household_type, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source, marginaal_tarief, expected_return, inflation_rate, box3_method',
-      )
-      .eq('id', user.id)
-      .single(),
-    supabase
-      .from('assets')
-      .select('current_value, asset_type, net_worth_inclusion_pct')
-      .eq('user_id', user.id)
-      .eq('is_active', true),
-    // select('*') zodat computeDebtAflossingMonthly de aflossing-velden
-    // (include_aflossing_in_savings, custom_aflossing_amount, rente/looptijd) heeft —
-    // de spaarquote telt schuldaflossing als sparen (identiek aan dashboard/core).
-    supabase
-      .from('debts')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('is_active', true),
-    // 6-maands transacties voor de canonieke spaarquote (transfer-gefilterd via
-    // transaction_type; spaarbudget-correctie via budget_id). Vervangt de vroegere
-    // 3-maands `amount, is_income`-query met de tekenfout.
-    supabase
-      .from('transactions')
-      .select('amount, budget_id, transaction_type, date')
-      .eq('user_id', user.id)
-      .gte('date', sixMonthsAgo)
-      .lt('date', monthEnd),
-    // Alle budgetten (parent + child) — de budget-health-subset (budgetsOver) filtert
-    // hieruit de top-level expense/savings-budgetten; de spaarbudget-ID-set (incl.
-    // kinderen) voedt de spaarquote-correctie.
-    supabase
-      .from('budgets')
-      .select('id, default_limit, budget_type, parent_id, is_archived')
-      .eq('user_id', user.id),
-    supabase
-      .from('transactions')
-      .select('budget_id, amount')
-      .eq('user_id', user.id)
-      .not('budget_id', 'is', null)
-      .gte('date', monthStart)
-      .lt('date', monthEnd),
-    supabase
-      .from('transactions')
-      .select('amount')
-      .eq('user_id', user.id)
-      .gte('date', monthStart)
-      .lt('date', monthEnd),
-    // Niet-gekoppelde bankrekeningen (linked_asset_id IS NULL) — RLS-gescoped op
-    // de gebruiker. Identiek aan lib/horizon-data-loader.ts:298 zodat de
-    // netto-vermogen-grondslag byte-gelijk is aan de hero. unlinkedCash is altijd
-    // de eigen liquiditeit (geen perspectief-split — net als in de horizon-loader).
-    supabase
-      .from('bank_accounts')
-      .select('balance')
-      .eq('is_active', true)
-      .is('linked_asset_id', null),
-    // Vroegste inkomens-transactie in het 12-maands venster → aantal maanden data
-    // voor de spaarquote-extrapolatie bij <6 maanden historie (identiek aan dashboard).
-    supabase
-      .from('transactions')
-      .select('date')
-      .eq('user_id', user.id)
-      .gt('amount', 0)
-      .gte('date', twelveMonthsAgo)
-      .order('date', { ascending: true })
-      .limit(1),
+    getOwnProfile(supabase),
+    getActiveAssets(supabase),
+    getActiveDebts(supabase),
+    getBudgets(supabase),
+    getUnlinkedBankAccounts(supabase),
+    getCurrentMonthTx(supabase),
+    getTx12m(supabase),
   ])
 
   const profile = (profileRes.data ?? {}) as LeverScoresProfile
@@ -337,7 +280,9 @@ export const loadLeverScores = cache(async function loadLeverScores(
   // <6m data geëxtrapoleerd. GEEN profiel-fallback hier (net als de oude 3-maands
   // variant): zonder transactie-inkomen blijft de quote `null` zodat de cashflow-
   // hefboom "onvoldoende data" toont i.p.v. een getal.
-  const tx6m = (tx6mRes.data ?? []) as Tx6mRow[]
+  // 6-maands venster [sixMonthsAgo, monthEnd): geslicet uit de gedeelde 12-maands
+  // fetch (byte-identiek aan de vroegere aparte [sixMonthsAgo, monthEnd)-query).
+  const tx6m = ((tx12mRes.data ?? []) as Tx6mRow[]).filter((t) => t.date >= sixMonthsAgo)
   let income6m = 0
   let expenses6m = 0
   let savingsBudgetSpent6m = 0
@@ -355,7 +300,14 @@ export const loadLeverScores = cache(async function loadLeverScores(
   const debtAflossing6m = computeDebtAflossingMonthly(debtRows as unknown as Debt[]) * 6
 
   let savingsDataMonths = 6
-  const earliestIncomeDate = earliestIncomeRes.data?.[0]?.date
+  // Vroegste inkomens-transactie (amount>0) in het 12-maands venster = de laagste
+  // datum onder de positieve rijen (spiegelt .gt('amount',0).order('date',asc).limit(1)).
+  const earliestIncomeDate = ((tx12mRes.data ?? []) as Array<{ amount: number | string; date: string }>).reduce<
+    string | undefined
+  >((min, t) => {
+    if (!(Number(t.amount) > 0)) return min
+    return min === undefined || t.date < min ? t.date : min
+  }, undefined)
   if (earliestIncomeDate) {
     const earliest = new Date(earliestIncomeDate)
     savingsDataMonths = Math.max(
@@ -392,7 +344,11 @@ export const loadLeverScores = cache(async function loadLeverScores(
       (b.budget_type === 'expense' || b.budget_type === 'savings') &&
       b.is_archived === false,
   )
-  const budgetTxRows = (budgetTxRes.data ?? []) as BudgetTxRow[]
+  // Huidige-maand budget-transacties (budget_id NOT NULL) — geslicet uit de
+  // gedeelde huidige-maand fetch (byte-identiek aan .not('budget_id','is',null)).
+  const budgetTxRows: BudgetTxRow[] = ((currentMonthTxRes.data ?? []) as Tx6mRow[]).flatMap((t) =>
+    t.budget_id != null ? [{ budget_id: t.budget_id, amount: t.amount }] : [],
+  )
   const spendPerBudget = new Map<string, number>()
   for (const tx of budgetTxRows) {
     spendPerBudget.set(
@@ -427,7 +383,9 @@ export const loadLeverScores = cache(async function loadLeverScores(
   const box3Status = box3TaxStatus(taxInput)
 
   // ── Box 1-status (onbenutte jaarruimte) ──
-  const monthTxRows = (monthIncomeTxRes.data ?? []) as Array<{ amount: number | string }>
+  // Huidige-maand transacties (alle) voor het Box 1-maandinkomen — dezelfde
+  // gedeelde huidige-maand fetch (de vroegere query had geen budget_id-filter).
+  const monthTxRows = (currentMonthTxRes.data ?? []) as Array<{ amount: number | string }>
   let monthTxIncome = 0
   let monthTxExpenses = 0
   for (const t of monthTxRows) {

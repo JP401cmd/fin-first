@@ -28,6 +28,15 @@ import { loadNewsPreview } from '@/lib/news-preview'
 
 import { computeEffectiveExpenses, computeFireTarget, computeFreedomProgressWithBasis, inclHomeTargetFromScalar, computeSavingsRateFromNetWorthDelta } from '@/lib/core-metrics'
 import { localMonthStartMonthsAgo } from '@/lib/month-range'
+import {
+  getActiveAssets,
+  getActiveDebts,
+  getOwnProfile,
+  getBudgets,
+  getUnlinkedBankAccounts,
+  getCurrentMonthTx,
+  getTx12m,
+} from '@/lib/server-data/base'
 import { localDateStr } from '@/lib/budget-period'
 import {
   runBacktest,
@@ -173,8 +182,8 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     allBudgetsRawResult, actionsResult, eventsResult,
     recsResult,
     goalsResult, netWorthSnapshotsResult,
-    income12Result, earliestIncomeResult, sovereigntyTxResult,
-    bankAccountsResult, prevMonthTxResult,
+    tx12mResult,
+    bankAccountsResult,
     nextStepCompletionsResult,
     expenseTx12Result,
     favHoldingsResult,
@@ -183,12 +192,15 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     bankConnectionsResult,
     budgetRolloversResult, budgetAmountsResult,
   ] = await Promise.all([
-    supabase.from('transactions').select('amount, budget_id, transaction_type').gte('date', monthStart).lt('date', monthEnd),
-    supabase.from('assets').select('*').eq('is_active', true),
-    supabase.from('debts').select('*').eq('is_active', true),
-    supabase.from('profiles').select('full_name, date_of_birth, last_known_phase, widget_prefs, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, budgeting_active, marginaal_tarief, feature_preferences, active_modules, household_type, box3_method, ai_enabled, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step, housing_strategy_config, income_source, expenses_source, monthly_savings_override, pot_rules, deficit_loan_rate, withdrawal_profile_config, rebalance_threshold').single(),
-    // Single budget query replaces 4 separate queries (essential, allParent, children, favorites)
-    supabase.from('budgets').select('id, name, icon, default_limit, interval, budget_type, alert_threshold, parent_id, is_favorite, is_essential'),
+    // Gedeelde basisdata-laag (lib/server-data/base.ts): huidige-maand-tx, actieve
+    // assets/schulden, eigen profiel, alle budgetten, het 12-maands transactie-
+    // venster en de niet-gekoppelde bankrekeningen draaien als ÉÉN query per tabel
+    // per request, gedeeld met horizon/lever/will/aandachtspunten + de shell.
+    getCurrentMonthTx(supabase),
+    getActiveAssets(supabase),
+    getActiveDebts(supabase),
+    getOwnProfile(supabase),
+    getBudgets(supabase),
     supabase.from('actions')
       .select('id, title, status, freedom_days_impact, priority_score, due_date, source, completed_at, recommendation:recommendations(recommendation_type)')
       .in('status', ['open', 'postponed', 'completed']),
@@ -196,12 +208,15 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     supabase.from('recommendations').select('id, title, freedom_days_per_year, priority_score, recommendation_type, status').in('status', ['pending', 'postponed']),
     supabase.from('goals').select('id, name, goal_type, current_value, target_value, target_date, color, icon').eq('is_completed', false).order('sort_order', { ascending: true }),
     supabase.from('net_worth_snapshots').select('snapshot_date, net_worth, fire_age, savings_rate').gte('snapshot_date', twelveMonthsAgo).order('snapshot_date', { ascending: true }).limit(12),
-    supabase.from('transactions').select('amount, date, budget_id, transaction_type').gt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd),
-    supabase.from('transactions').select('date').gt('amount', 0).gte('date', twelveMonthsAgo).order('date', { ascending: true }).limit(1),
-    supabase.from('transactions').select('amount, transaction_type').lt('amount', 0).gte('date', prev3MonthStart).lt('date', monthStart),
-    supabase.from('bank_accounts').select('id, balance').eq('is_active', true).is('linked_asset_id', null),
-    supabase.from('transactions').select('amount, transaction_type, budget_id').gte('date', prevMonthStart).lt('date', monthStart),
+    // 12-maands transactievenster → income12 / vroegste-inkomen / 6-maands /
+    // sovereignty / vorige-maand via JS-slicing hieronder (byte-identiek; die
+    // vensters zijn subsets van [twelveMonthsAgo, monthEnd)).
+    getTx12m(supabase),
+    getUnlinkedBankAccounts(supabase),
     supabase.from('next_step_completions').select('step_key, dismissed'),
+    // Uitgaven-12m mét .limit(2000): BEWUST een aparte fetch (niet uit getTx12m
+    // geslicet) zodat de afkap-grens byte-identiek behouden blijft. T2.2 heft 'm
+    // samen met de SQL-aggregatie op (max_rows-afkap-fix).
     supabase.from('transactions').select('amount, date, budget_id, transaction_type').lt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd).limit(2000),
     // Tabel-split (migratie 20260502000003): dashboard-widgets tonen
     // investment-tracker data; crypto loopt via de exchange-sync.
@@ -250,6 +265,31 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     )
   }
 
+  // ── Gedeelde 12-maands transactie-fetch → JS-slices ─────────────────────────
+  // Byte-identiek aan de vroegere aparte income12- / earliest-income- /
+  // sovereignty- / vorige-maand-queries: die vensters (en tekens) zijn subsets
+  // van [twelveMonthsAgo, monthEnd). income12Rows behoudt bewust GEEN isRealTx-
+  // filter (de consumers filteren dat zelf, net als voorheen op income12Result).
+  const tx12mRows = (tx12mResult.data ?? []) as {
+    amount: number | string
+    date: string
+    budget_id?: string | null
+    transaction_type?: string | null
+  }[]
+  const income12Rows = tx12mRows.filter((t) => Number(t.amount) > 0)
+  // Vroegste inkomens-datum = laagste datum onder de positieve rijen (spiegelt
+  // .gt('amount',0).order('date',asc).limit(1)).
+  const earliestIncomeDateD = income12Rows.reduce<string | undefined>(
+    (min, t) => (min === undefined || t.date < min ? t.date : min),
+    undefined,
+  )
+  // Sovereignty-venster [prev3MonthStart, monthStart), uitgaven (amount<0).
+  const sovereigntyTxRows = tx12mRows.filter(
+    (t) => Number(t.amount) < 0 && t.date >= prev3MonthStart && t.date < monthStart,
+  )
+  // Vorige-maand-venster [prevMonthStart, monthStart) (alle tekens).
+  const prevMonthTxRows = tx12mRows.filter((t) => t.date >= prevMonthStart && t.date < monthStart)
+
   // ── Derive budget subsets from single query (was 4 queries) ──
   const allBudgetsRaw = (allBudgetsRawResult.data ?? []) as { id: string; name: string; icon: string; default_limit: number; interval: string; budget_type: string; alert_threshold: number; parent_id: string | null; is_favorite: boolean; is_essential: boolean }[]
   const essentialBudgetsData = allBudgetsRaw.filter(b => b.is_essential && b.budget_type === 'expense' && b.parent_id === null)
@@ -287,7 +327,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // Previous month income/expenses for cashflow comparison widget
   let prevMonthIncome = 0
   let prevMonthExpenses = 0
-  for (const tx of prevMonthTxResult.data ?? []) {
+  for (const tx of prevMonthTxRows) {
     if (!isRealTx(tx)) continue
     const amt = Number(tx.amount)
     if (amt > 0) prevMonthIncome += amt
@@ -390,7 +430,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
 
   // Previous month: savings-budget spend (absolute)
   let prevMonthSavingsBudgetSpent = 0
-  for (const tx of prevMonthTxResult.data ?? []) {
+  for (const tx of prevMonthTxRows) {
     const bid = (tx as { budget_id?: string | null }).budget_id
     if (bid && savingsBudgetIds.has(bid)) {
       prevMonthSavingsBudgetSpent += Math.abs(Number(tx.amount))
@@ -530,9 +570,9 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       })),
   ]
 
-  const last12Income = (income12Result.data ?? []).filter(isRealTx).reduce((s, t) => s + Number(t.amount), 0)
+  const last12Income = income12Rows.filter(isRealTx).reduce((s, t) => s + Number(t.amount), 0)
   let extrapolatedIncome = last12Income
-  const earliestIncomeDateD = earliestIncomeResult.data?.[0]?.date
+  // earliestIncomeDateD is hierboven al afgeleid uit de gedeelde 12-maands slice.
   if (earliestIncomeDateD && last12Income > 0) {
     const earliest = new Date(earliestIncomeDateD)
     const incomeMonths = Math.max(1, Math.min(12,
@@ -548,7 +588,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // 6 kalendermaanden incl. de huidige = 5 maanden terug (getMonth()-6 telde 7 maanden — off-by-one)
   const sixMonthsAgo = localMonthStartMonthsAgo(now, 5)
 
-  const income6m = (income12Result.data ?? [])
+  const income6m = income12Rows
     .filter(t => isRealTx(t) && (t as { date: string }).date >= sixMonthsAgo)
     .reduce((s, t) => s + Number(t.amount), 0)
 
@@ -1077,7 +1117,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     const dt = (d as { debt_type?: string }).debt_type
     return dt != null && consumerDebtTypes.includes(dt) && Number(d.current_balance) > 0
   })
-  const sovMonthlyExp = (sovereigntyTxResult.data ?? []).filter(isRealTx).reduce((s, t) => s + Math.abs(Number(t.amount)), 0) / 3
+  const sovMonthlyExp = sovereigntyTxRows.filter(isRealTx).reduce((s, t) => s + Math.abs(Number(t.amount)), 0) / 3
   const sovereigntyLevel = computeSovereigntyLevel(netWorth, sovMonthlyExp, freedomPct, hasConsumerDebt, liquidPotWeighted)
   // Runway op de EXACTE grondslag die computeSovereigntyLevel gebruikte (liquide
   // pot ÷ 3-maands tx-gemiddelde). De Jouw Pad-criteria-checklist consumeert dit
@@ -1213,7 +1253,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // Budget type history: use ALL transactions (not just budget-linked) for accurate trends
   // Income history: all positive transactions per month
   const incomeByMonth = new Map<string, number>()
-  for (const tx of ((income12Result.data ?? []) as { amount: number; date: string; transaction_type?: string | null }[]).filter(isRealTx)) {
+  for (const tx of (income12Rows as { amount: number; date: string; transaction_type?: string | null }[]).filter(isRealTx)) {
     const month = (tx.date as string).slice(0, 7)
     incomeByMonth.set(month, (incomeByMonth.get(month) ?? 0) + Number(tx.amount))
   }
@@ -1230,7 +1270,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // Debt history: budget-linked debt transactions (fallback)
   const debtMonthAgg = new Map<string, number>()
   const allHistTx = [
-    ...((income12Result.data ?? []) as { amount: number; date: string; budget_id?: string | null; transaction_type?: string | null }[]).filter(isRealTx),
+    ...(income12Rows as { amount: number; date: string; budget_id?: string | null; transaction_type?: string | null }[]).filter(isRealTx),
     ...((expenseTx12Result.data ?? []) as { amount: number; date: string; budget_id?: string | null; transaction_type?: string | null }[]).filter(isRealTx),
   ]
   for (const tx of allHistTx) {
@@ -1932,7 +1972,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // Combine expense + income transactions for the week range
   const allWeekTx = [
     ...((expenseTx12Result.data ?? []) as { amount: number; date: string; budget_id?: string | null; transaction_type?: string | null }[]),
-    ...((income12Result.data ?? []) as { amount: number; date: string; budget_id?: string | null; transaction_type?: string | null }[]),
+    ...(income12Rows as { amount: number; date: string; budget_id?: string | null; transaction_type?: string | null }[]),
   ].filter(isRealTx)
 
   // Weekgrenzen als LOKALE datumstrings — nooit toISOString() (dat rekent in UTC
@@ -2149,7 +2189,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // Zelfde grondslag als heatmapSpending (abs. bedrag per budget), maar over de
   // vorige kalendermaand (hergebruikt de al opgehaalde prevMonthTx-query).
   const heatmapPreviousSpending: Record<string, number> = {}
-  for (const tx of prevMonthTxResult.data ?? []) {
+  for (const tx of prevMonthTxRows) {
     const bid = (tx as { budget_id?: string | null }).budget_id
     if (!bid) continue
     heatmapPreviousSpending[bid] = (heatmapPreviousSpending[bid] ?? 0) + Math.abs(Number(tx.amount))
@@ -2330,18 +2370,11 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     newsPreview,
   }
 
-  // Pot-regels — defensieve aparte fetch zodat een ontbrekende kolom (DB zonder
-  // migratie 20260601000000_add_pot_rules) de hele dashboard-load niet laat falen.
-  // resolvePotRules valt terug op defaults bij missing/lege waarde.
+  // Pot-regels uit de gedeelde eigen-profiel fetch (getOwnProfile → select('*')
+  // bevat pot_rules; geen aparte round-trip meer). resolvePotRules valt terug op
+  // defaults bij een missing/lege waarde.
   let regelVoorkeuren: PotRulesConfig = POT_RULES_DEFAULTS
-  if (currentUserId) {
-    const { data: potData, error: potErr } = await supabase
-      .from('profiles')
-      .select('pot_rules')
-      .eq('id', currentUserId)
-      .maybeSingle()
-    if (!potErr && potData) regelVoorkeuren = resolvePotRules(potData)
-  }
+  if (profileResult.data) regelVoorkeuren = resolvePotRules(profileResult.data)
 
   return {
     dashboardData,

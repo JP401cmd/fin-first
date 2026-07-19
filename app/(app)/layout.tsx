@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { getCachedUser } from '@/lib/supabase/cached-user'
+import { getActiveAssets, getActiveDebts, getOwnProfile } from '@/lib/server-data/base'
 import { ChatProvider } from '@/components/app/chat/chat-provider'
 import { ChatPanelLazy } from '@/components/app/chat/chat-panel-lazy'
 import { ChatPromptDeeplink } from '@/components/app/chat/chat-prompt-deeplink'
@@ -130,18 +131,26 @@ export default async function AppLayout({
     // — meegenomen in deze bestaande query i.p.v. een extra round-trip.
     // feature_preferences bevat óók deferred_onboarding_fields (coach) — geen
     // aparte round-trip meer nodig.
-    supabase.from('profiles').select('role, blocked_at, onboarding_completed, last_known_phase, module_colors, budget_colors, phase_colors, typography_theme, active_subscriptions, feature_preferences, active_modules, household_type, expected_return, inflation_rate, display_mode').eq('id', user.id).single(),
+    // Gedeelde eigen-profiel fetch (lib/server-data/base.ts): select('*') dekt de
+    // sidebar/feature-access/theming-kolommen en dedupt met loadLeverScores + de
+    // /overzicht-loaders binnen hetzelfde request (RLS → eigen rij).
+    getOwnProfile(supabase),
     // assets: `asset_type, net_worth_inclusion_pct` voor sidebar netWorth
     // (weighted). De tracking-flags voeden `getActiveAppKeys()` voor de
     // sidebar apps-strip: een app verschijnt alleen als minstens één
     // gekoppeld asset/debt de vlag aan heeft staan (zie
     // components/core/category-deepening-registry.ts).
-    supabase.from('assets').select('current_value, asset_type, net_worth_inclusion_pct, has_budget_tracking, has_holdings_tracking, has_woonbalans_tracking, has_rental_tracking, rental_income').eq('user_id', user.id).eq('is_active', true),
+    // Gedeelde actieve-assets fetch: select('*') dekt de sidebar-netWorth-weging
+    // + de tracking-flags voor getActiveAppKeys (RLS → eigen rijen; de expliciete
+    // .eq('user_id') is daarmee vervallen).
+    getActiveAssets(supabase),
     // debts: `net_worth_inclusion_pct` voor netto-vermogen-weging,
     // `has_hypotheekplanner_tracking` voor de Hypotheekplanner-app
     // (mortgage-only). Aflosstrategie is sinds de v2-refactor globaal en
     // kent geen per-debt opt-in meer.
-    supabase.from('debts').select('current_balance, original_amount, debt_type, net_worth_inclusion_pct, has_hypotheekplanner_tracking, fixed_rate_end_date').eq('user_id', user.id).eq('is_active', true),
+    // Gedeelde actieve-schulden fetch: select('*') dekt de netto-vermogen-weging
+    // + has_hypotheekplanner_tracking/fixed_rate_end_date voor de sidebar-dots.
+    getActiveDebts(supabase),
     // transactions: 3-maand-window voor `computeFeatureAccess` (income/expense
     // signalen voor phase-detectie).
     supabase.from('transactions').select('amount, is_income').eq('user_id', user.id).gte('date', dateStr),

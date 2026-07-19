@@ -14,6 +14,7 @@ import type { Debt } from '@/lib/debt-data'
 import { savingsRateFromAggregates, computeDebtAflossingMonthly } from '@/lib/savings-source'
 import { resolveEffectiveIncomeExpenses, type IncomeExpenseSources } from '@/lib/effective-financials'
 import { localMonthStart, localMonthBounds, localMonthStartMonthsAgo } from '@/lib/month-range'
+import { getActiveAssets, getActiveDebts, getOwnProfile } from '@/lib/server-data/base'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -182,16 +183,19 @@ export async function loadWillData(
     goalsPromise,
   ]
 
-  // Only query assets/debts/profile if not provided via shared data
+  // Only query assets/debts/profile if not provided via shared data.
+  // Gedeelde basisdata-laag (lib/server-data/base.ts): dedupt met dashboard/
+  // horizon/lever/shell binnen hetzelfde request. De consumers lezen subsets
+  // (id/name/current_value · id/name/current_balance · full_name) van select('*').
   if (!shared) {
     queries.push(
       // [3] Assets for GoalForm auto-link
-      supabase.from('assets').select('id, name, current_value').eq('is_active', true),
+      getActiveAssets(supabase),
       // [4] Debts for GoalForm auto-link
-      supabase.from('debts').select('id, name, current_balance').eq('is_active', true),
-      // [5] User profile
+      getActiveDebts(supabase),
+      // [5] User profile (RLS → eigen rij)
       currentUserId
-        ? supabase.from('profiles').select('full_name').eq('id', currentUserId).single()
+        ? getOwnProfile(supabase)
         : Promise.resolve({ data: null }),
     )
   }
