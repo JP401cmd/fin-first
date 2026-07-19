@@ -61,9 +61,19 @@ const serwist = new Serwist({
       }),
     },
     // Static assets — Next.js fingerprints filenames, so cache-first is safe.
+    // Scripts are the exception: only `/_next/static/**` chunks are
+    // content-hashed by Next.js. Other scripts (e.g. Speed Insights'
+    // `/_vercel/speed-insights/script.js`, or its v2 per-project unique
+    // path) are served from a stable URL that CacheFirst would never
+    // revalidate — a returning PWA user would be stuck on the old script
+    // forever. Those fall through to the network (or defaultCache) instead.
     {
-      matcher: ({ request }: { request: Request }) =>
-        ["image", "font", "style", "script"].includes(request.destination),
+      matcher: ({ request, url }: { request: Request; url: URL }) => {
+        if (request.destination === "script") {
+          return url.pathname.startsWith("/_next/static/");
+        }
+        return ["image", "font", "style"].includes(request.destination);
+      },
       handler: new CacheFirst({
         cacheName: "static-assets",
       }),
