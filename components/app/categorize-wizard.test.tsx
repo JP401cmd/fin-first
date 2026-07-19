@@ -100,6 +100,9 @@ function makeProps(overrides: Partial<WizardProps> = {}): WizardProps {
     localMode: false,
     localSessionState: 'idle',
     repBatchSize: 3,
+    // Zonder step/onStepChange beheert de wizard z'n eigen stap (uncontrolled);
+    // stage1Resolved default true zodat de wizard direct de stap-structuur pint.
+    stage1Resolved: true,
     onAcceptSuggestion: vi.fn(),
     onManualBudget: vi.fn(),
     onToggleMakeRule: vi.fn(),
@@ -109,6 +112,7 @@ function makeProps(overrides: Partial<WizardProps> = {}): WizardProps {
     onAcceptOne: vi.fn(),
     onSplitGroup: vi.fn(),
     onStop: vi.fn(),
+    onSave: vi.fn(),
     onAdvanceRound: vi.fn(),
     ...overrides,
   }
@@ -130,19 +134,31 @@ function progressLabel(): string {
   return (el.textContent ?? '').replace(/\s+/g, ' ').trim()
 }
 
+/** Leest de StepIndicator-kicker "Stap N van M" als genormaliseerde string. */
+function stepHeaderLabel(): string {
+  const el = screen.getByText((_content, node) => {
+    const text = (node?.textContent ?? '').replace(/\s+/g, ' ').trim()
+    if (!/^Stap \d+ van \d+$/.test(text)) return false
+    return Array.from(node?.children ?? []).every((c) => (c.textContent ?? '') !== text)
+  })
+  return (el.textContent ?? '').replace(/\s+/g, ' ').trim()
+}
+
 // ── Bulk-kaart (stage-1) ────────────────────────────────────────────────────
 
-describe('CategorizeWizard — bulk-kaart (stage-1)', () => {
-  it('verschijnt bij ≥1 stage-1-voorstel en "Akkoord, allemaal" accepteert alle stage-1-rijen', () => {
+describe('CategorizeWizard — stap 1 · bulk-kaart (stage-1)', () => {
+  it('verschijnt bij ≥1 stage-1-voorstel en "Alle X toepassen" accepteert alle stage-1-rijen', () => {
+    // Flow-revisie #881: de bulk-actie heet nu "Alle X toepassen" (i.p.v. het oude
+    // "Akkoord, allemaal") en staat in de stap-1-footer.
     const rows = [makeRuleRow('r1'), makeRuleRow('r2')]
     const props = renderWizard({ rows })
 
     expect(screen.getByText(/Will herkende/i)).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /Akkoord, allemaal/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Alle 2 toepassen/i }))
     expect(props.onBulkAcceptStage1).toHaveBeenCalledTimes(1)
   })
 
-  it('"Bekijk stuk voor stuk" toont de rijenlijst (boven de auto-expand-drempel)', () => {
+  it('"Stuk voor stuk bekijken" toont de rijenlijst (boven de auto-expand-drempel)', () => {
     // > BULK_AUTO_EXPAND_MAX (8) zodat de kaart standaard ingeklapt is en de
     // toggle-knop verschijnt — anders is de test triviaal (auto-open).
     const rows = Array.from({ length: 9 }, (_, i) => makeRuleRow(`r${i}`))
@@ -151,7 +167,7 @@ describe('CategorizeWizard — bulk-kaart (stage-1)', () => {
     // Ingeklapt: geen enkele rij-content ("OK"-knoppen van TransactionRow) zichtbaar.
     expect(screen.queryByRole('button', { name: /^OK$/i })).toBeNull()
 
-    fireEvent.click(screen.getByRole('button', { name: /Bekijk stuk voor stuk/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Stuk voor stuk bekijken/i }))
 
     // Uitgeklapt: elke stage-1-rij toont zijn eigen "OK"-knop (TransactionRow).
     expect(screen.getAllByRole('button', { name: /^OK$/i })).toHaveLength(9)
@@ -240,12 +256,15 @@ describe('CategorizeWizard — de vier keuzes routeren correct', () => {
 // ── Randgevallen ─────────────────────────────────────────────────────────────
 
 describe('CategorizeWizard — randgevallen', () => {
-  it('0 AI-groepen: alleen de bulk-kaart, met een rustige afsluitregel', () => {
+  it('0 AI-groepen: alleen stap 1 + stap 3 (geen "Will\'s voorstellen"-stap)', () => {
     renderWizard({ rows: [makeRuleRow('r1')] })
 
     expect(screen.getByText(/Will herkende/i)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Akkoord & verder/i })).toBeNull()
-    expect(screen.getByText(/Geen onbekende tegenpartijen meer/i)).toBeInTheDocument()
+    // Zonder AI-rijen bestaat stap 2 niet: de stap-indicator toont 'm niet.
+    expect(screen.queryByText(/Will's voorstellen/i)).toBeNull()
+    expect(screen.getByText('Automatisch')).toBeInTheDocument()
+    expect(screen.getByText('Controle')).toBeInTheDocument()
   })
 
   it('singleton-groep: GEEN "Alleen deze ene"-knop', () => {
@@ -259,7 +278,7 @@ describe('CategorizeWizard — randgevallen', () => {
     expect(screen.getByRole('button', { name: /Akkoord & verder/i })).toBeInTheDocument()
   })
 
-  it('groep zonder voorstel + AI actief: laadstatus, wizard blokkeert niet', () => {
+  it('lokale opstart (localSessionState=starten): het opstartblok, niet de gewone laadregel', () => {
     renderWizard({
       rows: [makeRow(makeTx('p1', { counterparty_name: 'Pending Winkel' }), null)],
       aiPhaseActive: true,
@@ -267,10 +286,40 @@ describe('CategorizeWizard — randgevallen', () => {
       localSessionState: 'starten',
     })
 
-    expect(screen.getByText(/Will denkt na over/i)).toBeInTheDocument()
+    // Eén-malige GPU-warmup: een visueel onderscheiden opstartblok (geen subregel).
     expect(screen.getByText(/Lokale AI wordt gestart/i)).toBeInTheDocument()
-    // Zonder voorstel zijn de vier keuzes (nog) niet zinvol — geen "Akkoord & verder".
+    // Tijdens 'starten' NIET de gewone "Will beoordeelt groep…"-status.
+    expect(screen.queryByText(/Will beoordeelt groep/i)).toBeNull()
     expect(screen.queryByRole('button', { name: /Akkoord & verder/i })).toBeNull()
+  })
+
+  it('groep zonder voorstel + AI actief (sessie klaar): de gewone laadregel', () => {
+    renderWizard({
+      rows: [makeRow(makeTx('p2', { counterparty_name: 'Pending Twee' }), null)],
+      aiPhaseActive: true,
+      localMode: true,
+      localSessionState: 'klaar',
+    })
+
+    expect(screen.getByText(/Will beoordeelt groep/i)).toBeInTheDocument()
+    expect(screen.queryByText(/Lokale AI wordt gestart/i)).toBeNull()
+  })
+
+  it('no-match (aiNoMatch): meteen de handmatige fallback, óók terwijl de AI nog draait', () => {
+    // De kern-bugfix: een no-match-rij hoeft niet op het einde van de run te
+    // wachten — de kaart springt direct naar de handmatige keuze.
+    const props = renderWizard({
+      rows: [makeRow(makeTx('nm1', { counterparty_name: 'No-Match Winkel' }), null, { aiNoMatch: true })],
+      aiPhaseActive: true,
+    })
+
+    expect(screen.getByText(/Will kon dit niet zeker plaatsen/i)).toBeInTheDocument()
+    // Geen laadstatus meer voor deze groep.
+    expect(screen.queryByText(/Will beoordeelt groep/i)).toBeNull()
+    const select = screen.getByRole('combobox', { name: /Categorie kiezen voor deze groep/i })
+    fireEvent.change(select, { target: { value: boodschappenBudget.id } })
+    fireEvent.click(screen.getByRole('button', { name: /Deze groep indelen/i }))
+    expect(props.onSetGroupBudget).toHaveBeenCalledWith(['nm1'], boodschappenBudget.id, false)
   })
 
   it('groep zonder voorstel + AI niet (meer) actief: fallback-indeling, wizard blokkeert niet', () => {
@@ -279,23 +328,97 @@ describe('CategorizeWizard — randgevallen', () => {
       aiPhaseActive: false,
     })
 
-    expect(screen.getByText(/Will wist het niet zeker/i)).toBeInTheDocument()
+    // Eén no-match-bewoording app-breed (UX-5): ook het "AI klaar zonder
+    // voorstel"-pad gebruikt exact dezelfde tekst als het aiNoMatch-pad.
+    expect(screen.getByText(/Will kon dit niet zeker plaatsen/i)).toBeInTheDocument()
     const select = screen.getByRole('combobox', { name: /Categorie kiezen voor deze groep/i })
     fireEvent.change(select, { target: { value: boodschappenBudget.id } })
     fireEvent.click(screen.getByRole('button', { name: /Deze groep indelen/i }))
 
     expect(props.onSetGroupBudget).toHaveBeenCalledWith(['f1'], boodschappenBudget.id, false)
   })
+
+  it('"Alle AI-voorstellen goedkeuren" accepteert elke groep-met-voorstel (advance per groep)', () => {
+    const rows = [
+      makeRow(makeTx('a1', { counterparty_name: 'Winkel A' }), makeSuggestion()),
+      makeRow(makeTx('b1', { counterparty_name: 'Winkel B' }), makeSuggestion()),
+      makeRow(makeTx('c1', { counterparty_name: 'Winkel C' }), null), // geen voorstel → blijft in wachtrij
+    ]
+    const props = renderWizard({ rows, aiPhaseActive: true })
+
+    fireEvent.click(screen.getByRole('button', { name: /Alle AI-voorstellen goedkeuren/i }))
+
+    // Twee groepen met voorstel geaccepteerd; de derde (zonder) niet.
+    expect(props.onAcceptGroup).toHaveBeenCalledTimes(2)
+    expect(props.onAcceptGroup).toHaveBeenCalledWith(['a1'])
+    expect(props.onAcceptGroup).toHaveBeenCalledWith(['b1'])
+    // advance() per geaccepteerde groep (prefetch-telling blijft kloppen).
+    expect(props.onAdvanceRound).toHaveBeenCalledTimes(2)
+  })
+})
+
+// ── Uitklapbare ledenlijst (stap 2) ──────────────────────────────────────────
+
+describe('CategorizeWizard — uitklapbare ledenlijst', () => {
+  it('"N transacties" is een toggle die de leden (datum/omschrijving/bedrag) read-only toont', () => {
+    const rows = [
+      makeRow(makeTx('m1', { counterparty_name: 'Multi Winkel', description: 'Aankoop een' }), makeSuggestion()),
+      makeRow(makeTx('m2', { counterparty_name: 'Multi Winkel', description: 'Aankoop twee' }), null),
+    ]
+    renderWizard({ rows })
+
+    // Ingeklapt: de omschrijvingen van de leden zijn nog niet zichtbaar.
+    expect(screen.queryByText('Aankoop twee')).toBeNull()
+
+    const toggle = screen.getByRole('button', { expanded: false, name: /2\s*transacties/i })
+    fireEvent.click(toggle)
+
+    // Uitgeklapt: elke lid-omschrijving verschijnt (read-only).
+    expect(screen.getByText('Aankoop een')).toBeInTheDocument()
+    expect(screen.getByText('Aankoop twee')).toBeInTheDocument()
+  })
+})
+
+// ── Stap 3 · Controle & opslaan ──────────────────────────────────────────────
+
+describe('CategorizeWizard — stap 3 · controle & opslaan', () => {
+  it('groepeert per doelcategorie en Opslaan is enabled met ≥1 geaccepteerde rij', () => {
+    const rows = [
+      makeRow(makeTx('x1', { counterparty_name: 'Winkel X' }), makeSuggestion(), {
+        accepted: true,
+        acceptedBudgetId: boodschappenBudget.id,
+        acceptedBudgetName: boodschappenBudget.name,
+        acceptedCategorySource: 'ai',
+      }),
+      makeRow(makeTx('x2', { counterparty_name: 'Winkel X' }), makeSuggestion()), // openstaand voorstel
+    ]
+    const props = renderWizard({ rows, step: 3 })
+
+    // De doelcategorie verschijnt in het overzicht.
+    expect(screen.getAllByText(/Boodschappen/).length).toBeGreaterThan(0)
+
+    const opslaan = screen.getByRole('button', { name: /^Opslaan$/i })
+    expect(opslaan).not.toBeDisabled()
+    fireEvent.click(opslaan)
+    expect(props.onSave).toHaveBeenCalledTimes(1)
+  })
+
+  it('Opslaan is uitgeschakeld zonder geaccepteerde rijen', () => {
+    const rows = [makeRow(makeTx('y1', { counterparty_name: 'Winkel Y' }), makeSuggestion())]
+    renderWizard({ rows, step: 3 })
+
+    expect(screen.getByRole('button', { name: /^Opslaan$/i })).toBeDisabled()
+  })
 })
 
 // ── Afronden ─────────────────────────────────────────────────────────────────
 
 describe('CategorizeWizard — afronden', () => {
-  it('"Stoppen en tot hier bewaren" roept onStop aan', () => {
+  it('"Stoppen en controleren" roept onStop aan', () => {
     const props = renderWizard({
       rows: [makeRow(makeTx('z1', { counterparty_name: 'Zet Winkel' }), makeSuggestion())],
     })
-    fireEvent.click(screen.getByRole('button', { name: /Stoppen en tot hier bewaren/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Stoppen en controleren/i }))
     expect(props.onStop).toHaveBeenCalledTimes(1)
   })
 })
@@ -360,9 +483,190 @@ describe('CategorizeWizard — footer-portal', () => {
       const footer = within(container)
       expect(footer.getByRole('button', { name: /Akkoord & verder/i })).toBeInTheDocument()
       expect(footer.getByRole('button', { name: /Alleen deze ene/i })).toBeInTheDocument()
-      expect(footer.getByRole('button', { name: /Stoppen en tot hier bewaren/i })).toBeInTheDocument()
+      expect(footer.getByRole('button', { name: /Stoppen en controleren/i })).toBeInTheDocument()
     } finally {
       document.body.removeChild(container)
     }
+  })
+})
+
+// ── GWT-1: stepper toont alle 3 stappen ──────────────────────────────────────
+
+describe('CategorizeWizard — GWT-1 · stepper met alle 3 stappen', () => {
+  it('toont "Automatisch" › "Will\'s voorstellen" › "Controle" wanneer stage-1 én AI-rijen bestaan', () => {
+    const rows = [
+      makeRuleRow('r1'),
+      makeRow(makeTx('a1', { counterparty_name: 'AI Winkel' }), makeSuggestion()),
+    ]
+    renderWizard({ rows })
+
+    expect(screen.getByText('Automatisch')).toBeInTheDocument()
+    expect(screen.getByText("Will's voorstellen")).toBeInTheDocument()
+    expect(screen.getByText('Controle')).toBeInTheDocument()
+    expect(stepHeaderLabel()).toBe('Stap 1 van 3')
+  })
+})
+
+// ── GWT-2: 0 stage-1-rijen → stap 1 bestaat niet, start direct op stap 2 ─────
+
+describe('CategorizeWizard — GWT-2 · 0 stage-1-voorstellen slaat stap 1 over', () => {
+  it('start direct op "Will\'s voorstellen" (stap 1 van 2) zonder enige stage-1-bulk-kaart', () => {
+    const rows = [makeRow(makeTx('a1', { counterparty_name: 'AI Alleen' }), makeSuggestion())]
+    renderWizard({ rows })
+
+    expect(screen.queryByText('Automatisch')).toBeNull()
+    expect(screen.queryByText(/Will herkende/i)).toBeNull()
+    expect(screen.getByText("Will's voorstellen")).toBeInTheDocument()
+    expect(screen.getByText('AI Alleen')).toBeInTheDocument()
+    expect(stepHeaderLabel()).toBe('Stap 1 van 2')
+  })
+})
+
+// ── GWT-4: "Alle X toepassen" navigeert door naar stap 2 ─────────────────────
+
+describe('CategorizeWizard — GWT-4 · "Alle X toepassen" gaat door naar stap 2', () => {
+  it('toont de AI-groepkaart van stap 2 na klikken, óók al is onBulkAcceptStage1 een mock', () => {
+    const rows = [
+      makeRuleRow('r1'),
+      makeRow(makeTx('a1', { counterparty_name: 'AI Winkel' }), makeSuggestion()),
+    ]
+    const props = renderWizard({ rows })
+
+    fireEvent.click(screen.getByRole('button', { name: /Alle 1 toepassen/i }))
+
+    expect(props.onBulkAcceptStage1).toHaveBeenCalledTimes(1)
+    // De wizard navigeert zelf door (goNext), onafhankelijk van of de parent de
+    // rijen al heeft bijgewerkt — dat is precies het in-memory→stap-2-contract.
+    expect(screen.getByText('AI Winkel')).toBeInTheDocument()
+    expect(screen.queryByText(/Will herkende/i)).toBeNull()
+  })
+})
+
+// ── GWT-5: "Verder zonder toepassen" laat stage-1-rijen openstaand in stap 3 ─
+
+describe('CategorizeWizard — GWT-5 · "Verder zonder toepassen"', () => {
+  it('roept onBulkAcceptStage1 NIET aan en toont de stage-1-rijen openstaand (niet-geaccepteerd) in stap 3', () => {
+    const rows = [makeRuleRow('r1'), makeRuleRow('r2')]
+    const props = renderWizard({ rows })
+
+    fireEvent.click(screen.getByRole('button', { name: /Verder zonder toepassen/i }))
+
+    expect(props.onBulkAcceptStage1).not.toHaveBeenCalled()
+    // Zonder AI-rijen bestaat stap 2 niet: direct naar stap 3 (Controle).
+    expect(screen.getByText('Controleer en sla op')).toBeInTheDocument()
+    // De rijen staan open (badge "Regel", niet "Gekeurd") en Opslaan is uit — er
+    // is niets geaccepteerd, alleen "verder gegaan zonder toepassen".
+    expect(screen.getAllByText('Regel').length).toBeGreaterThan(0)
+    expect(screen.getByRole('button', { name: /^Opslaan$/i })).toBeDisabled()
+  })
+})
+
+// ── GWT-7 (randgeval): later gearriveerde voorstellen tijdens een lopende ronde ──
+
+describe('CategorizeWizard — GWT-7 (randgeval) · later gearriveerde voorstellen', () => {
+  it('"Alle AI-voorstellen goedkeuren" werkt opnieuw zodra een eerder wachtende groep alsnog een voorstel krijgt', () => {
+    const initialRows: RowState[] = [
+      makeRow(makeTx('a1', { counterparty_name: 'Winkel A' }), makeSuggestion()),
+      makeRow(makeTx('b1', { counterparty_name: 'Winkel B' }), makeSuggestion({ budget_id: overigBudget.id, budget_name: overigBudget.name })),
+      makeRow(makeTx('c1', { counterparty_name: 'Winkel C' }), null), // nog geen voorstel — AI draait nog
+    ]
+    const props = makeProps({ rows: initialRows, aiPhaseActive: true })
+    const { rerender } = render(<CategorizeWizard {...props} />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Alle AI-voorstellen goedkeuren/i }))
+    expect(props.onAcceptGroup).toHaveBeenCalledTimes(2)
+    expect(props.onAcceptGroup).toHaveBeenCalledWith(['a1'])
+    expect(props.onAcceptGroup).toHaveBeenCalledWith(['b1'])
+    ;(props.onAcceptGroup as ReturnType<typeof vi.fn>).mockClear()
+    ;(props.onAdvanceRound as ReturnType<typeof vi.fn>).mockClear()
+
+    // Simuleer: de sheet verwerkt de twee acceptaties én de derde groep krijgt
+    // alsnog een voorstel — de AI-fase draait nog steeds.
+    const updatedRows: RowState[] = [
+      { ...initialRows[0], accepted: true, acceptedBudgetId: boodschappenBudget.id },
+      { ...initialRows[1], accepted: true, acceptedBudgetId: overigBudget.id },
+      { ...initialRows[2], suggestion: makeSuggestion({ budget_id: boodschappenBudget.id }) },
+    ]
+    rerender(<CategorizeWizard {...props} rows={updatedRows} />)
+
+    // Precies 1 wachtende groep mét voorstel → de knop verschijnt weer en
+    // accepteert alléén die derde groep — de eerdere twee blijven met rust.
+    fireEvent.click(screen.getByRole('button', { name: /Alle AI-voorstellen goedkeuren/i }))
+    expect(props.onAcceptGroup).toHaveBeenCalledTimes(1)
+    expect(props.onAcceptGroup).toHaveBeenCalledWith(['c1'])
+  })
+})
+
+// ── GWT-9: cloud-pad toont nooit het lokale opstartblok ──────────────────────
+
+describe('CategorizeWizard — GWT-9 · cloud-pad zonder opstartblok', () => {
+  it('localMode=false: altijd de gewone laadregel, nooit "Lokale AI wordt gestart" — ook niet als localSessionState toevallig "starten" is', () => {
+    renderWizard({
+      rows: [makeRow(makeTx('c1', { counterparty_name: 'Cloud Winkel' }), null)],
+      aiPhaseActive: true,
+      localMode: false,
+      localSessionState: 'starten',
+    })
+
+    expect(screen.getByText(/Will beoordeelt groep/i)).toBeInTheDocument()
+    expect(screen.queryByText(/Lokale AI wordt gestart/i)).toBeNull()
+  })
+})
+
+// ── GWT-12: een rij in stap 3 blijft aanpasbaar ──────────────────────────────
+
+describe('CategorizeWizard — GWT-12 · rij in stap 3 nog aanpasbaar', () => {
+  it('een openstaande rij (met voorstel, nog niet geaccepteerd) kan in stap 3 alsnog een andere categorie krijgen', () => {
+    const rows = [makeRow(makeTx('p1', { counterparty_name: 'Pending Rij' }), makeSuggestion())]
+    const props = renderWizard({ rows, step: 3 })
+
+    // TransactionRow's "andere categorie"-select voor een rij met voorstel.
+    const select = screen.getByRole('combobox', { name: /Andere categorie kiezen/i })
+    fireEvent.change(select, { target: { value: overigBudget.id } })
+
+    // idx 0 (enige rij) + de nieuw gekozen budget-id landen in het save-payload-pad.
+    expect(props.onManualBudget).toHaveBeenCalledWith(0, overigBudget.id)
+  })
+
+  it('een reeds GEACCEPTEERDE rij houdt in stap 3 de "andere categorie"-select en kan alsnog wijzigen (editableWhenAccepted)', () => {
+    // UX-2: buiten stap 3 verbergt een geaccepteerde rij de select; in de controle-
+    // stap moet wijzigen kunnen. De wizard geeft daar editableWhenAccepted mee.
+    const rows = [
+      makeRow(makeTx('acc1', { counterparty_name: 'Gekeurde Rij' }), makeSuggestion(), {
+        accepted: true,
+        acceptedBudgetId: boodschappenBudget.id,
+        acceptedBudgetName: boodschappenBudget.name,
+        acceptedCategorySource: 'ai',
+      }),
+    ]
+    const props = renderWizard({ rows, step: 3 })
+
+    // Een volledig gekeurde groep staat standaard ingeklapt — klap 'm open.
+    fireEvent.click(screen.getByRole('button', { expanded: false }))
+
+    // De select is zichtbaar ondanks accepted=true → wijzigen loopt via onManualBudget.
+    const select = screen.getByRole('combobox', { name: /Andere categorie kiezen/i })
+    fireEvent.change(select, { target: { value: overigBudget.id } })
+    expect(props.onManualBudget).toHaveBeenCalledWith(0, overigBudget.id)
+  })
+})
+
+// ── GWT-13: automatische overgang stap 2 → 3 bij lege wachtrij ───────────────
+
+describe('CategorizeWizard — GWT-13 · auto-overgang 2 → 3', () => {
+  it('springt automatisch naar stap 3 (onStepChange(3)) zodra de laatste wachtende groep geaccepteerd is', () => {
+    const onStepChange = vi.fn()
+    const rows: RowState[] = [makeRow(makeTx('g1', { counterparty_name: 'Laatste Groep' }), makeSuggestion())]
+    const props = makeProps({ rows, step: 2, onStepChange })
+    const { rerender } = render(<CategorizeWizard {...props} />)
+
+    expect(screen.getByText('Laatste Groep')).toBeInTheDocument()
+    onStepChange.mockClear()
+
+    // De laatste groep wordt geaccepteerd → pendingGroups wordt leeg.
+    const acceptedRows = rows.map((r) => ({ ...r, accepted: true }))
+    rerender(<CategorizeWizard {...props} rows={acceptedRows} step={2} />)
+
+    expect(onStepChange).toHaveBeenCalledWith(3)
   })
 })

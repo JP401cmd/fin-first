@@ -163,9 +163,19 @@ export function AICategorizeSheet({
     abortRef.current?.abort()
     gateRef.current?.abort()
   }, [])
-  // Vroegtijdig gestopt ("Stoppen en tot hier bewaren")? Stuurt het afsluitscherm:
-  // een beschrijvende "wat nu"-duiding i.p.v. de generieke afrond-copy.
-  const [stoppedEarly, setStoppedEarly] = useState(false)
+  // Actieve wizard-stap (1 Automatisch · 2 Will's voorstellen · 3 Controle). Leeft
+  // in de sheet zodat 'ie een sleepmodus-uitstapje (phase 'sleep' → 'review')
+  // overleeft; de wizard is gecontroleerd via step/onStepChange. null = nog niet
+  // bepaald (de wizard init 'm op de eerste bestaande stap zodra stap-1 klaar is).
+  const [wizardStep, setWizardStep] = useState<1 | 2 | 3 | null>(null)
+  // Vastgepind aantal AI-groepen (M) voor de "Groep N van M"-teller. Leeft — net
+  // als wizardStep — in de sheet zodat de teller een sleepmodus-uitstapje (waarbij
+  // de wizard even unmount) overleeft en niet herpint op de kleiner geworden set.
+  const [pinnedTotalGroups, setPinnedTotalGroups] = useState<number | null>(null)
+  // Is de gratis stap-1 (regels/overboekingen) al geflusht? Pas dán weet de wizard
+  // of stap 1 bestaat en waar 'ie moet starten (voorkomt een flikkering waarbij
+  // stap 1 na de context-laad alsnog "verschijnt").
+  const [stage1Resolved, setStage1Resolved] = useState(false)
   // Budget-id van de "Eigen rekening"-post, geresolved bij de auto-context-laad.
   // Nodig zodat handleSave bij een geaccepteerd eigen-rekening-budget óók
   // transaction_type='transfer' meeschrijft (de cijfer-filtering hangt aan die
@@ -338,8 +348,10 @@ export function AICategorizeSheet({
   const fetchSuggestions = useCallback(async () => {
     setAiError(null)
     setLocalSessionState('idle')
-    setStoppedEarly(false)
     setReviewMode('wizard')
+    setWizardStep(null)
+    setPinnedTotalGroups(null)
+    setStage1Resolved(false)
     setAiRunning(true)
     proposalsRef.current = new Map()
     gateRef.current = null
@@ -360,6 +372,7 @@ export function AICategorizeSheet({
       acceptedBudgetName: null,
       acceptedCategorySource: null,
       makeRule: false,
+      aiNoMatch: false,
     })))
     setPhase('review')
 
@@ -512,6 +525,19 @@ export function AICategorizeSheet({
       )
     }
 
+    // Markeer de gegeven ids als "Will kon dit niet plaatsen" (aiNoMatch) zodat de
+    // wizard-kaart meteen de handmatige fallback toont. Rijen die (alsnog) een
+    // voorstel kregen laten we ongemoeid — een voorstel wint van no-match.
+    const markNoMatch = (ids: string[]) => {
+      if (ids.length === 0) return
+      const set = new Set(ids)
+      setRows((prev) =>
+        prev.map((r) =>
+          set.has(r.tx.id) && !r.suggestion?.budget_id && !r.accepted ? { ...r, aiNoMatch: true } : r,
+        ),
+      )
+    }
+
     try {
       const result = await runCombinedCategorization(
         sourceTx.map(toAutoCatTx),
@@ -526,13 +552,24 @@ export function AICategorizeSheet({
           onProposal: (p) => proposalsRef.current.set(p.id, p),
           // Per ronde: flush de tot nu toe binnengekomen voorstellen naar de rijen
           // (bulk-kaart + AI-groepkaarten updaten). Nooit per individueel voorstel.
-          onProgress: () => flushRows(),
+          // De eerste flush (na de gratis stap-1) markeert stage-1 als bepaald zodat
+          // de wizard z'n stappen kan vastpinnen.
+          onProgress: () => {
+            flushRows()
+            setStage1Resolved(true)
+          },
+          // No-match per ronde: markeer die rijen zodat de wizard-kaart meteen naar
+          // de handmatige fallback springt i.p.v. eindeloos te blijven laden.
+          onNoMatch: (txIds) => markNoMatch(txIds),
           signal: abortRef.current.signal,
         },
       )
 
       // Definitieve flush (vangt een eventuele laatste, niet-geëmitte ronde af).
       flushRows()
+      // Vangnet: markeer álle no-match-ids uit het resultaat (voor het geval de
+      // per-ronde-hook er een miste). Alleen rijen zonder voorstel.
+      if (result.noMatchIds.length > 0) markNoMatch(result.noMatchIds)
 
       // Alle AI-rondes mislukt en géén enkel AI-voorstel → meld het; de lokale
       // (regel/transfer/spiegel-)voorstellen staan wél gewoon in de review.
@@ -554,6 +591,13 @@ export function AICategorizeSheet({
       setAiError(msg)
       flushRows()
     } finally {
+      // Vangnet: zodra de run eindigt is stap 1 hoe dan ook bepaald. onProgress
+      // vuurt normaal minstens één keer (emitProgress vóór de AI-rondes) en zet
+      // stage1Resolved al, maar bij 0 AI-rondes of een vroege fout in de opzet-
+      // fase (context/capability) kan die hook uitblijven. Hier pinnen we 'm
+      // gegarandeerd zodat structPinned in de wizard nooit blijft hangen op
+      // "Will bekijkt je transacties…".
+      setStage1Resolved(true)
       setAiRunning(false)
     }
   }, [activeTransactions, loadAutoCatContext, flatBudgets])
@@ -799,23 +843,13 @@ export function AICategorizeSheet({
     setPhase('review')
   }
 
-  /** "Stoppen en tot hier bewaren": breek de nog lopende motor + gate af (zodat
-   *  prefetched-maar-ongetoonde voorstellen niet meer binnenkomen) en bewaar
-   *  wat er is geaccepteerd via het bestaande handleSave-pad. */
+  /** "Stoppen en controleren": breek de nog lopende motor + gate af (zodat
+   *  prefetched-maar-ongetoonde voorstellen niet meer binnenkomen). De wizard
+   *  routeert zelf naar stap 3 (Controle & opslaan) — hier wordt NIET meer direct
+   *  opgeslagen; dat gebeurt bewust pas via de "Opslaan"-knop in stap 3. */
   function handleStop() {
     abortRef.current?.abort()
     gateRef.current?.abort()
-    setStoppedEarly(true)
-    // Niets geaccepteerd → niet opslaan (voorkomt een misleidend "0 opgeslagen"-
-    // succesje). Toon direct het afsluitscherm met passende "wat nu"-copy.
-    if (acceptedCount === 0) {
-      setSavedCount(0)
-      setRuleCount(0)
-      setBulkUpdated(0)
-      setPhase('success')
-      return
-    }
-    void handleSave()
   }
 
   // ── Save ─────────────────────────────────────────────────────────────────
@@ -1140,41 +1174,45 @@ export function AICategorizeSheet({
             </div>
           )}
 
-          {/* Sticky header */}
-          <div className="sticky top-0 z-10 bg-[var(--paper)] border-b border-[var(--border-ed)] px-0 py-4 flex flex-wrap items-center justify-between gap-2 mb-4">
-            <div className="flex items-center gap-3 text-sm text-[var(--ink-2)]">
-              <span>
-                <strong className="text-[var(--ink)]">{pendingCount}</strong> van {rows.length} nog te beoordelen
-              </span>
-              {aiSuggestionCount > 0 && (
-                <span className="flex items-center gap-1 text-kern-600 text-xs font-medium">
-                  <Sparkles className="h-3 w-3" />
-                  {aiSuggestionCount} {aiSuggestionCount === 1 ? 'voorstel' : 'voorstellen'}
+          {/* Sticky header — alléén in het handmatige (list) pad. De wizard geeft
+              elke stap zijn eigen kloppende teller + acties (in de sticky footer),
+              dus deze globale header wordt in wizard-modus bewust NIET gerenderd. */}
+          {reviewMode === 'list' && (
+            <div className="sticky top-0 z-10 bg-[var(--paper)] border-b border-[var(--border-ed)] px-0 py-4 flex flex-wrap items-center justify-between gap-2 mb-4">
+              <div className="flex items-center gap-3 text-sm text-[var(--ink-2)]">
+                <span>
+                  <strong className="text-[var(--ink)]">{pendingCount}</strong> van {rows.length} nog te beoordelen
                 </span>
-              )}
-            </div>
-            <div className="flex gap-2">
-              {aiSuggestionCount > 0 && (
+                {aiSuggestionCount > 0 && (
+                  <span className="flex items-center gap-1 text-kern-600 text-xs font-medium">
+                    <Sparkles className="h-3 w-3" />
+                    {aiSuggestionCount} {aiSuggestionCount === 1 ? 'voorstel' : 'voorstellen'}
+                  </span>
+                )}
+              </div>
+              <div className="flex gap-2">
+                {aiSuggestionCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={acceptAll}
+                    className="inline-flex items-center gap-1.5 rounded-[var(--r)] border border-kern-300 px-3 py-2 min-h-[44px] text-xs font-medium text-kern-700 hover:bg-kern-50"
+                  >
+                    <Check className="h-3.5 w-3.5" />
+                    Alles goedkeuren
+                  </button>
+                )}
                 <button
                   type="button"
-                  onClick={acceptAll}
-                  className="inline-flex items-center gap-1.5 rounded-[var(--r)] border border-kern-300 px-3 py-2 min-h-[44px] text-xs font-medium text-kern-700 hover:bg-kern-50"
+                  onClick={() => void handleSave()}
+                  disabled={acceptedCount === 0}
+                  className="inline-flex items-center gap-1.5 rounded-[var(--r)] bg-kern-600 px-3 py-2 min-h-[44px] text-xs font-medium text-white hover:bg-kern-700 disabled:opacity-40"
                 >
                   <Check className="h-3.5 w-3.5" />
-                  Alles goedkeuren
+                  Opslaan
                 </button>
-              )}
-              <button
-                type="button"
-                onClick={() => void handleSave()}
-                disabled={acceptedCount === 0}
-                className="inline-flex items-center gap-1.5 rounded-[var(--r)] bg-kern-600 px-3 py-2 min-h-[44px] text-xs font-medium text-white hover:bg-kern-700 disabled:opacity-40"
-              >
-                <Check className="h-3.5 w-3.5" />
-                Opslaan
-              </button>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Gedeeld-budget → gezamenlijke transactie (alleen met huishouden + gedeeld budget) */}
           {showShareToggle && (
@@ -1227,6 +1265,11 @@ export function AICategorizeSheet({
               localSessionState={localSessionState}
               repBatchSize={LOCAL_REP_BATCH_SIZE}
               footerContainer={wizardFooterNode}
+              step={wizardStep}
+              onStepChange={setWizardStep}
+              pinnedTotalGroups={pinnedTotalGroups}
+              onPinTotalGroups={setPinnedTotalGroups}
+              stage1Resolved={stage1Resolved}
               onAcceptSuggestion={acceptSuggestion}
               onManualBudget={setManualBudget}
               onToggleMakeRule={toggleMakeRule}
@@ -1236,6 +1279,7 @@ export function AICategorizeSheet({
               onAcceptOne={acceptOne}
               onSplitGroup={splitGroup}
               onStop={handleStop}
+              onSave={() => void handleSave()}
               onAdvanceRound={(n) => gateRef.current?.releaseUpTo(n)}
             />
           ) : (
@@ -1294,21 +1338,7 @@ export function AICategorizeSheet({
           </div>
           <div>
             <p className="text-lg font-bold font-[var(--font-playfair)] text-[var(--ink)]">Klaar</p>
-            {stoppedEarly ? (
-              // Vroegtijdig gestopt → beschrijvende "wat nu"-duiding (Will-toon):
-              // wat is bewaard en hoeveel staat er nog open. Y = nog niet
-              // beoordeelde (niet-geaccepteerde) transacties.
-              savedCount === 0 ? (
-                <p className="mt-2 text-sm text-[var(--ink-2)]">
-                  Niets opgeslagen · {pendingCount} {pendingCount === 1 ? 'transactie' : 'transacties'} nog open.
-                </p>
-              ) : (
-                <p className="mt-2 text-sm text-[var(--ink-2)]">
-                  {savedCount} {savedCount === 1 ? 'voorstel' : 'voorstellen'} opgeslagen · {pendingCount}{' '}
-                  {pendingCount === 1 ? 'transactie' : 'transacties'} nog niet beoordeeld — start &lsquo;Vraag Will&rsquo; opnieuw wanneer je wilt.
-                </p>
-              )
-            ) : autoSummary ? (
+            {autoSummary ? (
               <>
                 <p className="mt-2 text-sm text-[var(--ink-2)]">
                   {savedCount === 0
