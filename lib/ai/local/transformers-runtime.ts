@@ -206,15 +206,39 @@ export async function disposeSession(): Promise<void> {
   }
 }
 
-/** Zit het model al in de Cache Storage (transformers.js cachet shards daar)? */
+/**
+ * Kernbestanden die aanwezig MOETEN zijn om het model als 'klaar' te tellen.
+ * Les productie 19 jul 2026: Cache Storage-eviction verwijdert shards
+ * selectief; een any-match telde een half ge-evict model als 'klaar', waarna
+ * de sessie-opbouw crashte met een nietszeggende "niet gelukt"-melding.
+ * Completeness = beide grote shards (embed_tokens ~1,5 GB + decoder ~1,4 GB)
+ * én de tokenizer; kleine config-bestanden refetcht transformers.js snel en
+ * transparant, die eisen we bewust niet.
+ */
+const REQUIRED_CACHE_MARKERS = ['embed_tokens', 'decoder_model_merged', 'tokenizer'] as const
+
+/**
+ * Zit het model COMPLEET in de Cache Storage (transformers.js cachet shards
+ * daar)? Vereist alle REQUIRED_CACHE_MARKERS binnen dit model-repo — een
+ * gedeeltelijk ge-evict model telt als niet-gedownload, zodat de UI direct de
+ * (her)download-flow toont in plaats van een crashende inferentie-poging.
+ */
 export async function isModelCached(): Promise<boolean> {
   try {
     if (typeof caches === 'undefined') return false
+    const found = new Set<string>()
     for (const k of await caches.keys()) {
       const c = await caches.open(k)
       const reqs = await c.keys()
-      if (reqs.some((r) => r.url.includes(LOCAL_MODEL_REPO))) return true
+      for (const r of reqs) {
+        if (!r.url.includes(LOCAL_MODEL_REPO)) continue
+        for (const marker of REQUIRED_CACHE_MARKERS) {
+          if (r.url.includes(marker)) found.add(marker)
+        }
+      }
+      if (found.size === REQUIRED_CACHE_MARKERS.length) return true
     }
+    return found.size === REQUIRED_CACHE_MARKERS.length
   } catch {
     /* geen cache-toegang → behandel als niet-gecacht */
   }

@@ -180,11 +180,20 @@ export function createLocalAiResolver(
   const runChunkWithRecovery = async (chunkItems: CombinedAiBatchItem[]): Promise<LocalParseResult> => {
     try {
       return await runChunk(chunkItems)
-    } catch {
+    } catch (err) {
       // Mogelijke device-loss/poisoned session → dispose + verse sessie, één
       // keer opnieuw. Faalt het weer, propageer de fout (→ failedBatches).
+      // ALTIJD loggen (les 19 jul): zonder deze regels is een lokale-AI-fout
+      // voor gebruiker én support volstrekt onzichtbaar — de UI toont alleen
+      // een generieke melding.
+      console.error('[lokale-ai] chunk-fout — sessieherstel + één retry volgt:', err)
       await disposeSession()
-      return await runChunk(chunkItems)
+      try {
+        return await runChunk(chunkItems)
+      } catch (err2) {
+        console.error('[lokale-ai] chunk-fout ná sessieherstel — batch faalt definitief:', err2)
+        throw err2
+      }
     }
   }
 
