@@ -31,6 +31,7 @@ import { computeEmergencyFundMonths } from '@/lib/health-score-input'
 import { NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND, STARTERSVRIJSTELLING_MAX } from '@/lib/constants'
 import { computeKostenKoper } from '@/lib/kosten-koper'
 import { lookupAowAge, type AowLeeftijdRow, type AowAge } from '@/lib/aow-leeftijd'
+import { shouldSkipKernelContextFetch, keepRefIfEqual } from '@/lib/horizon/kernel-context-sync'
 import { isKernelReachedNowDisplay, kernelToUnifiedResult, buildKernelSlotMeta } from '@/lib/horizon-kernel/bridge'
 import { buildConvergentieAdapterProfile, computeConvergentieProjection, type ConvergentieRawProfileRow } from '@/lib/horizon-kernel/convergentie-router'
 import { buildKernelInputFromApp, deriveEigenHuisIds, type KernelAdapterInput } from '@/lib/horizon-kernel/adapter'
@@ -331,8 +332,11 @@ export default function HorizonPage({
   const [kernelRawProfile, setKernelRawProfile] = useState<ConvergentieRawProfileRow | null>(
     initialData.rawProfile ?? null,
   )
-  /** Rauwe AOW-tabel — voor de kern-tijdas (lookupAowAge) in de adapter. */
-  const [aowRows, setAowRows] = useState<AowLeeftijdRow[]>([])
+  /** Rauwe AOW-tabel — voor de kern-tijdas (lookupAowAge) in de adapter. Server-
+   *  side voorgeladen via `initialData.aowRows` zodat de kernel-context (samen met
+   *  `kernelRawProfile`) al bij de EERSTE render compleet is en de mount-fetch kan
+   *  worden overgeslagen — geen tweede solve. Leeg = legacy DB / tabel ontbreekt. */
+  const [aowRows, setAowRows] = useState<AowLeeftijdRow[]>(() => initialData.aowRows ?? [])
   const [loading] = useState(true)
   const [activeModal, setActiveModal] = useState<ActiveModal>(null)
   // Voorkeurs-tab bij het openen van de StrategieModal (bv. direct naar 'woning'
@@ -814,12 +818,19 @@ export default function HorizonPage({
   }, [])
 
   // ── Kernel-context laden op mount ─────────────────────────────────────────
-  // `loadData` draait op deze route alléén na CRUD/pane-close, niet op mount.
-  // Zonder deze aparte mount-fetch zou de kernel-projectie pas ná een interactie
-  // beschikbaar zijn. Daarom laden we de kern-context hier ook op de eerste render
-  // — zelfde patroon als de dividend-/scenario-mount-fetches hierboven. Tot deze
-  // fetch klaar is, blijft kernelRawProfile null → de hook levert null (laadstaat).
+  // De kernel-context (`kernelRawProfile` + `aowRows`) is server-side voorgeladen
+  // via `initialData` (rawProfile + aowRows). Zijn beide compleet, dan is de eerste
+  // render al volledig en slaan we deze mount-fetch VOLLEDIG over — anders levert
+  // de tweede `setKernelRawProfile`/`setAowRows` (verse referenties) een
+  // gegarandeerde TWEEDE volledige kernel-solve op (beide zijn deps van de
+  // kernel-input-memo in use-horizon-fire-sim).
+  //
+  // Fallback-pad (profiel-query faalde server-side → rawProfile null, óf lege
+  // AOW-tabel op legacy DB): we halen de context alsnog client-side op, maar
+  // schrijven de state via een structurele-gelijkheidsguard (`keepRefIfEqual`) —
+  // identieke data behoudt de vorige referentie → geen re-solve.
   useEffect(() => {
+    if (shouldSkipKernelContextFetch(initialData)) return
     let cancelled = false
     async function loadKernelContext() {
       try {
@@ -842,12 +853,17 @@ export default function HorizonPage({
           essentialBudgetsResult.data ?? [],
           childBudgetsResult.data ?? [],
         )
-        setKernelRawProfile({
+        // Gelijkheidsguard: is de verse context deep-equal aan de al-geseedde
+        // state, dan behoudt keepRefIfEqual de vorige referentie → de kernel-memo
+        // herrekent niet (geen re-solve). Anders is het een echte wijziging.
+        const nextProfile: ConvergentieRawProfileRow = {
           ...(profileData as ConvergentieRawProfileRow),
           yearly_essential_expenses: yearlyMustExpenses,
-        })
+        }
+        setKernelRawProfile(prev => keepRefIfEqual(prev, nextProfile))
         if (aowResult.data && aowResult.data.length > 0) {
-          setAowRows(aowResult.data as AowLeeftijdRow[])
+          const nextRows = aowResult.data as AowLeeftijdRow[]
+          setAowRows(prev => keepRefIfEqual(prev, nextRows))
         }
       } catch {
         // Non-critical — zonder kern-context rekent de hook byte-identiek v2.
@@ -855,7 +871,7 @@ export default function HorizonPage({
     }
     loadKernelContext()
     return () => { cancelled = true }
-  }, [])
+  }, [initialData])
 
   // Client-side data reload (used after event CRUD operations)
   const loadData = useCallback(async () => {

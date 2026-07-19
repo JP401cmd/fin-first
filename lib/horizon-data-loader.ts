@@ -39,6 +39,7 @@ import {
 } from '@/lib/housing-strategy'
 import { type HousingTriggerSimBasis } from '@/lib/housing-trigger'
 import { lifeEventsToCashflows } from '@/lib/fire-simulation'
+import { type AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import { NL_AOW_AGE } from '@/lib/constants'
 import { hasPartner } from '@/lib/household-type'
 import { resolvePensionFactorA } from '@/lib/jaarruimte'
@@ -114,6 +115,15 @@ export interface HorizonPageData {
    * Null wanneer de profiel-query faalde.
    */
   rawProfile: ConvergentieRawProfileRow | null
+  /**
+   * Volledige `aow_leeftijd`-tabel (publieke referentietabel), server-side
+   * meegeleverd zodat de kernel-context (rawProfile + aowRows) al bij de EERSTE
+   * render compleet is en de mount-fetch (`loadKernelContext`) volledig kan
+   * worden overgeslagen — dat elimineert de gegarandeerde TWEEDE kernel-solve.
+   * Leeg = tabel niet beschikbaar (legacy DB); de client valt dan terug op de
+   * mount-fetch met een structurele-gelijkheidsguard.
+   */
+  aowRows: AowLeeftijdRow[]
   /** Pot-regels (profiles.pot_rules) — verdeling/onttrekkingsvolgorde voor v2. */
   potRules: PotRulesConfig
   /** Error message from profile query, null if successful */
@@ -304,6 +314,7 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
     exitNoticeDismissedResult,
     tipsFirstCloseNavigatedResult,
     savingsOverrideResult,
+    aowRowsResult,
   ] = await Promise.all([
     supabase.from('transactions').select('amount, budget_id').gte('date', monthStart).lt('date', monthEnd),
     // Single assets query: returns full rows (typed as Asset[]) used for both
@@ -385,10 +396,22 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
       .from('profiles')
       .select('monthly_savings_override')
       .maybeSingle(),
+    // AOW-leeftijd-referentietabel (publiek, geen user-filter) — dezelfde query-
+    // vorm die de client tot nu toe op mount deed (loadKernelContext / loadData).
+    // Server-side meegeleverd zodat de kernel-context al bij de eerste render
+    // compleet is en de mount-fetch overgeslagen kan worden (geen tweede solve).
+    supabase
+      .from('aow_leeftijd')
+      .select('id, birth_date_from, birth_date_through, aow_years, aow_months, is_definitive, source')
+      .order('birth_date_from', { ascending: true }),
   ])
 
   // Same row both consumers want: alias instead of re-querying.
   const assetsResult = fullAssetsResult
+
+  // AOW-rijen voor de client-kernel-context (rawProfile + aowRows). Leeg bij een
+  // ontbrekende tabel (legacy DB) → de client valt terug op de mount-fetch.
+  const aowRows = (aowRowsResult.data ?? []) as AowLeeftijdRow[]
 
   // Check profile query for errors and use fallback if needed
   if (profileResult.error) {
@@ -913,6 +936,7 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
     pensioenFactorA,
     pensioenFactorAKnown,
     rawProfile,
+    aowRows,
     potRules,
     profileError: profileResult.error
       ? `Profile query failed: ${profileResult.error.code} — ${profileResult.error.message}`
@@ -943,7 +967,7 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
 /**
  * Server-side loader voor de Horizon-bundel, request-gededuped via React
  * `cache()` — meerdere aanroepen binnen één RSC-render (page + aandachtspunten-
- * producenten + briefing) draaien de 18 queries maar één keer per
+ * producenten + briefing) draaien de queries maar één keer per
  * (client, perspective)-combinatie.
  *
  * Perspectief (eigen / huishouden / partner). Optioneel + default 'personal'
