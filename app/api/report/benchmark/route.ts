@@ -8,7 +8,7 @@
  * Privacy: louter het eigen profiel + statische referentie. Geen cross-user reads.
  */
 
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { dailyExpenseRate } from '@/lib/format'
 import { loadDashboardData } from '@/lib/dashboard-data-loader'
 import { loadHorizonData } from '@/lib/horizon-data-loader'
@@ -19,8 +19,8 @@ import { buildBenchmarkReport, type BenchmarkUserMetrics } from '@/lib/benchmark
 export async function GET() {
   try {
     const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
+    const claims = await getAuthClaims(supabase)
+    if (!claims) {
       return Response.json({ error: 'Niet ingelogd' }, { status: 401 })
     }
 

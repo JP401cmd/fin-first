@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { unauthorized } from '@/lib/api/respond'
 
@@ -23,21 +23,21 @@ function isColumnMissing(error: { code?: string; message?: string } | null): boo
 
 export async function GET() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return unauthorized()
+  const claims = await getAuthClaims(supabase)
+  if (!claims) return unauthorized()
 
   // Try primary column first
   const { data, error } = await supabase
     .from('profiles')
     .select('module_guide_state')
-    .eq('id', user.id)
+    .eq('id', claims.sub)
     .single()
 
   // Also try onboarding_intent separately (may not exist yet)
   const { data: intentData, error: intentError } = await supabase
     .from('profiles')
     .select('onboarding_intent')
-    .eq('id', user.id)
+    .eq('id', claims.sub)
     .single()
   // Default to true when column doesn't exist (pre-migration users still see guide cards)
   const hasIntent = isColumnMissing(intentError)
@@ -49,7 +49,7 @@ export async function GET() {
   const { data: goalData, error: goalError } = await supabase
     .from('profiles')
     .select('primary_goal_slug')
-    .eq('id', user.id)
+    .eq('id', claims.sub)
     .single()
   const primaryGoalSlug = isColumnMissing(goalError)
     ? null
@@ -62,7 +62,7 @@ export async function GET() {
   const { data: slugsData, error: slugsError } = await supabase
     .from('profiles')
     .select('selected_goal_slugs')
-    .eq('id', user.id)
+    .eq('id', claims.sub)
     .single()
   const rawSlugs = isColumnMissing(slugsError)
     ? null
@@ -88,7 +88,7 @@ export async function GET() {
     const { data: fbData, error: fbError } = await supabase
       .from('profiles')
       .select('feature_preferences')
-      .eq('id', user.id)
+      .eq('id', claims.sub)
       .single()
 
     if (fbError) {

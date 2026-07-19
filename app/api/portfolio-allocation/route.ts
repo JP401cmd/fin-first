@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { unauthorized } from '@/lib/api/respond'
 
@@ -13,9 +13,9 @@ import { unauthorized } from '@/lib/api/respond'
  */
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const claims = await getAuthClaims(supabase)
 
-  if (!user) {
+  if (!claims) {
     return unauthorized()
   }
 
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabase
       .from('investment_holdings')
       .select('id, name, ticker, units, avg_purchase_price, current_price, is_active, asset_class, sector, geography')
-      .eq('user_id', user.id)
+      .eq('user_id', claims.sub)
       .eq('is_active', true)
       .order('created_at', { ascending: false })
 
@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
       const { data } = await supabase
         .from('target_allocations')
         .select('category, target_pct')
-        .eq('user_id', user.id)
+        .eq('user_id', claims.sub)
         .eq('view_mode', viewMode)
 
       targets = (data || []).map(t => ({

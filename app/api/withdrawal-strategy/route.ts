@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import {
   WITHDRAWAL_DEFAULTS,
@@ -12,16 +12,16 @@ const VALID_STRATEGIES: WithdrawalStrategyType[] = ['static', 'guardrails']
 
 export async function GET() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const claims = await getAuthClaims(supabase)
 
-  if (!user) {
+  if (!claims) {
     return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
   }
 
   const { data, error } = await supabase
     .from('profiles')
     .select('withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step, withdrawal_profile_config')
-    .eq('id', user.id)
+    .eq('id', claims.sub)
     .single()
 
   if (error) {

@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { computeFireAge } from '@/lib/checkin/fire-age'
 import { resolveFireParams } from '@/lib/fire-params'
@@ -11,8 +11,8 @@ const MONTH_NAMES = [
 
 export async function GET() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+  const claims = await getAuthClaims(supabase)
+  if (!claims) return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
 
   const now = new Date()
   const currentMonth = now.getMonth()
@@ -33,26 +33,26 @@ export async function GET() {
     supabase
       .from('assets')
       .select('current_value, net_worth_inclusion_pct')
-      .eq('user_id', user.id)
+      .eq('user_id', claims.sub)
       .eq('is_active', true),
     // Total debts (actief, met net-worth-weging)
     supabase
       .from('debts')
       .select('current_balance, net_worth_inclusion_pct')
-      .eq('user_id', user.id)
+      .eq('user_id', claims.sub)
       .eq('is_active', true),
     // Losse bankrekeningen tellen als cash mee in netto vermogen
     supabase
       .from('bank_accounts')
       .select('balance')
-      .eq('user_id', user.id)
+      .eq('user_id', claims.sub)
       .eq('is_active', true)
       .is('linked_asset_id', null),
     // Current month income
     supabase
       .from('transactions')
       .select('amount')
-      .eq('user_id', user.id)
+      .eq('user_id', claims.sub)
       .eq('is_income', true)
       .gte('date', monthStart)
       .lt('date', monthEnd),
@@ -60,7 +60,7 @@ export async function GET() {
     supabase
       .from('transactions')
       .select('amount')
-      .eq('user_id', user.id)
+      .eq('user_id', claims.sub)
       .eq('is_income', false)
       .gte('date', monthStart)
       .lt('date', monthEnd),
@@ -68,7 +68,7 @@ export async function GET() {
     supabase
       .from('transactions')
       .select('amount')
-      .eq('user_id', user.id)
+      .eq('user_id', claims.sub)
       .eq('is_income', false)
       .gte('date', prevMonthStart)
       .lt('date', prevMonthEnd),
@@ -76,14 +76,14 @@ export async function GET() {
     supabase
       .from('transactions')
       .select('amount, transaction_type, date')
-      .eq('user_id', user.id)
+      .eq('user_id', claims.sub)
       .eq('is_income', true)
       .gte('date', sixMonthsAgo)
       .lt('date', monthEnd),
     supabase
       .from('transactions')
       .select('amount, transaction_type, date')
-      .eq('user_id', user.id)
+      .eq('user_id', claims.sub)
       .eq('is_income', false)
       .gte('date', sixMonthsAgo)
       .lt('date', monthEnd),
@@ -91,14 +91,14 @@ export async function GET() {
     supabase
       .from('net_worth_snapshots')
       .select('value, snapshot_date')
-      .eq('user_id', user.id)
+      .eq('user_id', claims.sub)
       .order('snapshot_date', { ascending: false })
       .limit(2),
     // Completed actions this month
     supabase
       .from('actions')
       .select('id, freedom_days')
-      .eq('user_id', user.id)
+      .eq('user_id', claims.sub)
       .eq('is_completed', true)
       .gte('completed_at', monthStart)
       .lt('completed_at', monthEnd),
@@ -106,7 +106,7 @@ export async function GET() {
     supabase
       .from('profiles')
       .select('date_of_birth, expected_return, inflation_rate, fire_end_strategy, fire_end_age')
-      .eq('id', user.id)
+      .eq('id', claims.sub)
       .maybeSingle(),
   ])
 

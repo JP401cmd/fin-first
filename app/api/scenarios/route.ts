@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { WHATIF_SCENARIO_COLORS, type SavedScenario } from '@/lib/scenario-types'
 
@@ -23,13 +23,13 @@ function parseValue(raw: string | null | undefined): Record<string, unknown> {
 
 export async function GET() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const claims = await getAuthClaims(supabase)
+  if (!claims) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { data } = await supabase
     .from('app_settings')
     .select('value')
-    .eq('key', settingsKey(user.id))
+    .eq('key', settingsKey(claims.sub))
     .maybeSingle()
 
   const parsed = parseValue(data?.value)

@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { type Debt } from '@/lib/debt-data'
 import { loadPerspectiveContext } from '@/lib/household/perspective-loader'
@@ -13,8 +13,8 @@ import {
 
 export async function GET() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+  const claims = await getAuthClaims(supabase)
+  if (!claims) return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
 
   const now = new Date()
   const currentMonth = now.getMonth()
@@ -34,23 +34,23 @@ export async function GET() {
     curCatRes, prevCatRes, recurringRes, perspective,
     prevFireAge,
   ] = await Promise.all([
-    supabase.from('assets').select('name, current_value, net_worth_inclusion_pct').eq('user_id', user.id).eq('is_active', true),
-    supabase.from('debts').select('current_balance, name, debt_type, interest_rate, monthly_payment, repayment_type, end_date, start_date, net_worth_inclusion_pct, include_aflossing_in_savings, custom_aflossing_amount, is_active').eq('user_id', user.id),
-    supabase.from('transactions').select('amount').eq('user_id', user.id).eq('is_income', true).gte('date', monthStart).lt('date', monthEnd),
-    supabase.from('transactions').select('amount').eq('user_id', user.id).eq('is_income', true).gte('date', prevMonthStart).lt('date', prevMonthEnd),
-    supabase.from('goals').select('name, current_value, target_value, is_completed, target_date').eq('user_id', user.id),
-    supabase.from('budgets').select('name, monthly_limit, budget_type').eq('user_id', user.id).eq('budget_type', 'expense'),
-    supabase.from('actions').select('id, freedom_days, is_completed, completed_at').eq('user_id', user.id),
-    supabase.from('net_worth_snapshots').select('value, snapshot_date').eq('user_id', user.id).order('snapshot_date', { ascending: false }).limit(6),
-    supabase.from('transactions').select('amount, transaction_type, date').eq('user_id', user.id).eq('is_income', true).gte('date', sixMonthsAgo).lt('date', monthEnd),
-    supabase.from('transactions').select('amount, transaction_type, date').eq('user_id', user.id).eq('is_income', false).gte('date', sixMonthsAgo).lt('date', monthEnd),
-    supabase.from('profiles').select('date_of_birth, expected_return, inflation_rate').eq('id', user.id).maybeSingle(),
-    supabase.from('bank_accounts').select('balance').eq('user_id', user.id).eq('is_active', true).is('linked_asset_id', null),
-    supabase.from('transactions').select('amount, category').eq('user_id', user.id).eq('is_income', false).gte('date', monthStart).lt('date', monthEnd),
-    supabase.from('transactions').select('amount, category').eq('user_id', user.id).eq('is_income', false).gte('date', prevMonthStart).lt('date', monthStart),
-    supabase.from('transactions').select('amount, counterparty_name, description, date').eq('user_id', user.id).eq('is_income', false).gte('date', threeMonthsAgo).lt('date', monthEnd),
+    supabase.from('assets').select('name, current_value, net_worth_inclusion_pct').eq('user_id', claims.sub).eq('is_active', true),
+    supabase.from('debts').select('current_balance, name, debt_type, interest_rate, monthly_payment, repayment_type, end_date, start_date, net_worth_inclusion_pct, include_aflossing_in_savings, custom_aflossing_amount, is_active').eq('user_id', claims.sub),
+    supabase.from('transactions').select('amount').eq('user_id', claims.sub).eq('is_income', true).gte('date', monthStart).lt('date', monthEnd),
+    supabase.from('transactions').select('amount').eq('user_id', claims.sub).eq('is_income', true).gte('date', prevMonthStart).lt('date', prevMonthEnd),
+    supabase.from('goals').select('name, current_value, target_value, is_completed, target_date').eq('user_id', claims.sub),
+    supabase.from('budgets').select('name, monthly_limit, budget_type').eq('user_id', claims.sub).eq('budget_type', 'expense'),
+    supabase.from('actions').select('id, freedom_days, is_completed, completed_at').eq('user_id', claims.sub),
+    supabase.from('net_worth_snapshots').select('value, snapshot_date').eq('user_id', claims.sub).order('snapshot_date', { ascending: false }).limit(6),
+    supabase.from('transactions').select('amount, transaction_type, date').eq('user_id', claims.sub).eq('is_income', true).gte('date', sixMonthsAgo).lt('date', monthEnd),
+    supabase.from('transactions').select('amount, transaction_type, date').eq('user_id', claims.sub).eq('is_income', false).gte('date', sixMonthsAgo).lt('date', monthEnd),
+    supabase.from('profiles').select('date_of_birth, expected_return, inflation_rate').eq('id', claims.sub).maybeSingle(),
+    supabase.from('bank_accounts').select('balance').eq('user_id', claims.sub).eq('is_active', true).is('linked_asset_id', null),
+    supabase.from('transactions').select('amount, category').eq('user_id', claims.sub).eq('is_income', false).gte('date', monthStart).lt('date', monthEnd),
+    supabase.from('transactions').select('amount, category').eq('user_id', claims.sub).eq('is_income', false).gte('date', prevMonthStart).lt('date', monthStart),
+    supabase.from('transactions').select('amount, counterparty_name, description, date').eq('user_id', claims.sub).eq('is_income', false).gte('date', threeMonthsAgo).lt('date', monthEnd),
     loadPerspectiveContext(supabase),
-    loadPrevFireAge(supabase, user.id, currentYear, currentMonth),
+    loadPrevFireAge(supabase, claims.sub, currentYear, currentMonth),
   ])
 
   // ── Kernmetrics ──────────────────────────────────────────────────────

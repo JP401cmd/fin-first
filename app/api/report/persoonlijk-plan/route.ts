@@ -18,7 +18,7 @@
  *
  * Spec: docs/superpowers/specs/2026-05-11-kern-rapport-en-instellingen-rapport-design.md
  */
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import type { AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import {
   buildPersoonlijkPlanSections,
@@ -33,9 +33,9 @@ import type { PersoonlijkPlanData } from '@/lib/persoonlijk-plan-data'
 export async function GET() {
   try {
     const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const claims = await getAuthClaims(supabase)
 
-    if (authError || !user) {
+    if (!claims) {
       return Response.json({ error: 'Niet ingelogd' }, { status: 401 })
     }
 

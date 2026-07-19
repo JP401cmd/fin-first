@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { unauthorized, serverError } from '@/lib/api/respond'
 import { dedupeNetWorthByMonth } from '../month-dedupe'
@@ -56,9 +56,9 @@ function parseMonthOrdinal(month: string): number | null {
  */
 export async function GET(request: Request) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const claims = await getAuthClaims(supabase)
 
-  if (!user) {
+  if (!claims) {
     return unauthorized()
   }
 
@@ -78,7 +78,7 @@ export async function GET(request: Request) {
   const { data, error } = await supabase
     .from('net_worth_snapshots')
     .select('snapshot_date, net_worth')
-    .eq('user_id', user.id)
+    .eq('user_id', claims.sub)
     .gte('snapshot_date', fromIso)
     .order('snapshot_date', { ascending: true })
 

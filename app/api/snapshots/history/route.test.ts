@@ -11,22 +11,28 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
  *          idempotent); 400/401/500-paden.
  */
 
-const mockAuthGetUser = vi.fn()
-const mockFrom = vi.fn()
+const { mockAuthGetUser, mockGetAuthClaims, mockFrom } = vi.hoisted(() => ({
+  mockAuthGetUser: vi.fn(),
+  mockGetAuthClaims: vi.fn(),
+  mockFrom: vi.fn(),
+}))
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(async () => ({
     auth: { getUser: mockAuthGetUser },
     from: mockFrom,
   })),
+  getAuthClaims: mockGetAuthClaims,
 }))
 
 import { GET, POST } from './route'
 
 const USER = { id: 'user-1' }
+const CLAIMS = { sub: USER.id }
 
 beforeEach(() => {
   mockAuthGetUser.mockReset()
+  mockGetAuthClaims.mockReset()
   mockFrom.mockReset()
 })
 
@@ -52,13 +58,13 @@ function mockSelectChain(rows: { snapshot_date: string; net_worth: number }[] | 
 
 describe('GET /api/snapshots/history', () => {
   it('401 zonder sessie', async () => {
-    mockAuthGetUser.mockResolvedValue({ data: { user: null } })
+    mockGetAuthClaims.mockResolvedValue(null)
     const res = await GET(getRequest())
     expect(res.status).toBe(401)
   })
 
   it('dedupe per kalendermaand (laatste snapshot_date wint), oplopend', async () => {
-    mockAuthGetUser.mockResolvedValue({ data: { user: USER } })
+    mockGetAuthClaims.mockResolvedValue(CLAIMS)
     mockSelectChain([
       { snapshot_date: '2026-04-10', net_worth: 100 },
       { snapshot_date: '2026-04-28', net_worth: 150 }, // wint binnen april
@@ -73,7 +79,7 @@ describe('GET /api/snapshots/history', () => {
   })
 
   it('clamp: months wordt begrensd op 1..24 (gte-grens gezet)', async () => {
-    mockAuthGetUser.mockResolvedValue({ data: { user: USER } })
+    mockGetAuthClaims.mockResolvedValue(CLAIMS)
     const chain = mockSelectChain([])
     await GET(getRequest('999'))
     // gte-ondergrens = eerste dag van 23 maanden terug (24 mnd incl. nu).
@@ -82,7 +88,7 @@ describe('GET /api/snapshots/history', () => {
   })
 
   it('500 bij DB-fout', async () => {
-    mockAuthGetUser.mockResolvedValue({ data: { user: USER } })
+    mockGetAuthClaims.mockResolvedValue(CLAIMS)
     mockSelectChain(null, { message: 'boom' })
     const res = await GET(getRequest())
     expect(res.status).toBe(500)

@@ -20,7 +20,7 @@
  * Roadmap-item K. Fase 2 (publieke deelbare token-link) is bewust UITGESTELD naar
  * een vervolgkaart — deze route is pure read + client-side PDF.
  */
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { dailyExpenseRate } from '@/lib/format'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import { NL_AOW_AGE } from '@/lib/constants'
@@ -41,9 +41,9 @@ import type {
 export async function GET() {
   try {
     const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const claims = await getAuthClaims(supabase)
 
-    if (authError || !user) {
+    if (!claims) {
       return Response.json({ error: 'Niet ingelogd' }, { status: 401 })
     }
 

@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import {
   getUsage,
   MAX_GENERATIONS_PER_WEEK,
@@ -24,14 +24,12 @@ import {
  */
 export async function GET() {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) {
+  const claims = await getAuthClaims(supabase)
+  if (!claims) {
     return new Response('Unauthorized', { status: 401 })
   }
 
-  const usage = await getUsage(supabase, user.id)
+  const usage = await getUsage(supabase, claims.sub)
 
   return Response.json(
     {

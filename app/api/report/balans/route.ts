@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { localMonthStartMonthsAgo } from '@/lib/month-range'
 import { recentDailyExpenseRateFromRows } from '@/lib/expense-rate'
 
@@ -113,9 +113,9 @@ function buildSubGroups(items: BalansItem[], labelMap: Record<string, string>): 
 export async function GET(request: Request) {
   try {
     const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const claims = await getAuthClaims(supabase)
 
-    if (authError || !user) {
+    if (!claims) {
       return Response.json({ error: 'Niet ingelogd' }, { status: 401 })
     }
 

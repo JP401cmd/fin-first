@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { unauthorized, serverError } from '@/lib/api/respond'
 import { syncAssetValueFromHoldings } from '@/lib/holdings-sync'
@@ -20,8 +20,8 @@ import { loadHoldingsPnL, attachPnLToHoldings } from '@/lib/holdings-pnl-enrichm
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
+  const claims = await getAuthClaims(supabase)
+  if (!claims) {
     return unauthorized()
   }
 
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from('investment_holdings')
       .select('*, asset:assets!asset_id(id, name, has_holdings_tracking)')
-      .eq('user_id', user.id)
+      .eq('user_id', claims.sub)
       .eq('is_active', true)
       .eq('assets.has_holdings_tracking', true)
       .order('created_at', { ascending: false })
@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
         id: h.id as string,
         current_price: h.current_price as number | string | null | undefined,
       })),
-      user.id,
+      claims.sub,
     )
     const holdings = attachPnLToHoldings(
       baseHoldings as unknown as Array<Record<string, unknown> & { id: string }>,

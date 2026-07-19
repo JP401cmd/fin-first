@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { localMonthBounds, localMonthStart } from '@/lib/month-range'
 
@@ -9,8 +9,8 @@ const MONTH_NAMES = [
 
 export async function GET() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+  const claims = await getAuthClaims(supabase)
+  if (!claims) return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
 
   const now = new Date()
   const nextMonth = now.getMonth() + 1
@@ -24,7 +24,7 @@ export async function GET() {
   const { data: recentTransactions } = await supabase
     .from('transactions')
     .select('amount, description, counterparty_name, date')
-    .eq('user_id', user.id)
+    .eq('user_id', claims.sub)
     .gte('date', threeMonthsAgo)
     .lt('date', currentMonthEnd)
     .order('amount', { ascending: true })
@@ -61,7 +61,7 @@ export async function GET() {
   const { data: lifeEvents } = await supabase
     .from('life_events')
     .select('name, annual_amount, start_year')
-    .eq('user_id', user.id)
+    .eq('user_id', claims.sub)
     .eq('is_active', true)
     .gte('start_year', now.getFullYear())
     .lte('start_year', now.getFullYear() + 1)

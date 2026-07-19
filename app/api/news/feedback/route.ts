@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { unauthorized, serverError } from '@/lib/api/respond'
 
 // ── POST — Feedback op een nieuwsitem ("Minder hierover") ────────────
@@ -51,9 +51,9 @@ export async function POST(request: Request) {
 
 export async function GET() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const claims = await getAuthClaims(supabase)
 
-  if (!user) {
+  if (!claims) {
     return unauthorized()
   }
 
@@ -63,7 +63,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from('news_feedback')
     .select('article_id, verdict')
-    .eq('user_id', user.id)
+    .eq('user_id', claims.sub)
     .gte('created_at', ninetyDaysAgo.toISOString())
 
   if (error) {

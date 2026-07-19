@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
 // ── Key helper ───────────────────────────────────────────────────────
@@ -11,13 +11,13 @@ function readKey(userId: string) {
 
 export async function GET() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const claims = await getAuthClaims(supabase)
+  if (!claims) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { data } = await supabase
     .from('app_settings')
     .select('value')
-    .eq('key', readKey(user.id))
+    .eq('key', readKey(claims.sub))
     .maybeSingle()
 
   const readIds: string[] = data?.value?.ids ?? []

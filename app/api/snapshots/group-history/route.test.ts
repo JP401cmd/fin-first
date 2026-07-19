@@ -18,15 +18,17 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
  * worden via de gemockte Supabase-client geleverd.
  */
 
-const mockAuthGetUser = vi.fn()
-const mockFrom = vi.fn()
-const mockLoadWealthGroupHistory = vi.fn()
+const { mockGetAuthClaims, mockFrom, mockLoadWealthGroupHistory } = vi.hoisted(() => ({
+  mockGetAuthClaims: vi.fn(),
+  mockFrom: vi.fn(),
+  mockLoadWealthGroupHistory: vi.fn(),
+}))
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(async () => ({
-    auth: { getUser: mockAuthGetUser },
     from: mockFrom,
   })),
+  getAuthClaims: mockGetAuthClaims,
 }))
 
 vi.mock('@/lib/load-category-history', () => ({
@@ -36,9 +38,10 @@ vi.mock('@/lib/load-category-history', () => ({
 import { GET } from './route'
 
 const USER = { id: 'user-1' }
+const CLAIMS = { sub: USER.id }
 
 beforeEach(() => {
-  mockAuthGetUser.mockReset()
+  mockGetAuthClaims.mockReset()
   mockFrom.mockReset()
   mockLoadWealthGroupHistory.mockReset()
 })
@@ -103,14 +106,14 @@ function configureFrom(opts: {
 
 describe('GET /api/snapshots/group-history', () => {
   it('401 zonder sessie', async () => {
-    mockAuthGetUser.mockResolvedValue({ data: { user: null } })
+    mockGetAuthClaims.mockResolvedValue(null)
     const res = await GET(getRequest())
     expect(res.status).toBe(401)
     expect(mockLoadWealthGroupHistory).not.toHaveBeenCalled()
   })
 
   it('happy path: vorm, as-uitlijning, restband (incl. negatief), net-null-maand', async () => {
-    mockAuthGetUser.mockResolvedValue({ data: { user: USER } })
+    mockGetAuthClaims.mockResolvedValue(CLAIMS)
     mockLoadWealthGroupHistory.mockResolvedValue(
       buildGroups({
         months: ['2026-03', '2026-04', '2026-05'],
@@ -157,7 +160,7 @@ describe('GET /api/snapshots/group-history', () => {
   })
 
   it("net-provenance: 'manual' bij een stand op de 1e, anders 'measured'", async () => {
-    mockAuthGetUser.mockResolvedValue({ data: { user: USER } })
+    mockGetAuthClaims.mockResolvedValue(CLAIMS)
     mockLoadWealthGroupHistory.mockResolvedValue(buildGroups({ months: ['2026-03', '2026-04', '2026-05'] }))
     configureFrom({
       netRows: [
@@ -174,7 +177,7 @@ describe('GET /api/snapshots/group-history', () => {
   })
 
   it('hasData=false bij lege balance_snapshots-bron', async () => {
-    mockAuthGetUser.mockResolvedValue({ data: { user: USER } })
+    mockGetAuthClaims.mockResolvedValue(CLAIMS)
     mockLoadWealthGroupHistory.mockResolvedValue(buildGroups({ months: ['2026-04', '2026-05'] }))
     configureFrom({ netRows: [], balanceCount: 0 })
 
@@ -188,7 +191,7 @@ describe('GET /api/snapshots/group-history', () => {
   })
 
   it('clamp: months wordt naar 1..24 begrensd voor de loader', async () => {
-    mockAuthGetUser.mockResolvedValue({ data: { user: USER } })
+    mockGetAuthClaims.mockResolvedValue(CLAIMS)
     mockLoadWealthGroupHistory.mockResolvedValue(buildGroups({ months: ['2026-05'] }))
     configureFrom({ netRows: [], balanceCount: 0 })
 
@@ -197,7 +200,7 @@ describe('GET /api/snapshots/group-history', () => {
   })
 
   it('500 bij DB-fout op de net-query (geen rauwe error naar client)', async () => {
-    mockAuthGetUser.mockResolvedValue({ data: { user: USER } })
+    mockGetAuthClaims.mockResolvedValue(CLAIMS)
     mockLoadWealthGroupHistory.mockResolvedValue(buildGroups({ months: ['2026-05'] }))
     configureFrom({ netError: { message: 'boom' }, balanceCount: 0 })
 

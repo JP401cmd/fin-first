@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
 export interface CheckinSnapshot {
@@ -101,20 +101,20 @@ export async function POST(request: NextRequest) {
 // GET — Load previous check-in snapshot for deltas, and optionally full history
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+  const claims = await getAuthClaims(supabase)
+  if (!claims) return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
 
   const { searchParams } = new URL(request.url)
   const mode = searchParams.get('mode') // 'history' returns all check-ins for both partners
 
   if (mode === 'history') {
-    return handleHistory(supabase, user.id)
+    return handleHistory(supabase, claims.sub)
   }
 
   // Single month snapshot lookup (for read-only view)
   const month = searchParams.get('month')
   if (month) {
-    const snapshotKey = `checkin_snapshot_${user.id}_${month}`
+    const snapshotKey = `checkin_snapshot_${claims.sub}_${month}`
     const { data: snapshot } = await supabase
       .from('app_settings')
       .select('value')
@@ -131,14 +131,14 @@ export async function GET(request: NextRequest) {
   // Default: find previous snapshot for delta display
   const now = new Date()
   const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  const currentKey = `checkin_snapshot_${user.id}_${currentMonthStr}`
+  const currentKey = `checkin_snapshot_${claims.sub}_${currentMonthStr}`
 
   // Fetch all snapshots for this user (up to 12)
   const { data: snapshots } = await supabase
     .from('app_settings')
     .select('key, value')
-    .eq('updated_by', user.id)
-    .like('key', `checkin_snapshot_${user.id}_%`)
+    .eq('updated_by', claims.sub)
+    .like('key', `checkin_snapshot_${claims.sub}_%`)
     .order('key', { ascending: false })
     .limit(12)
 

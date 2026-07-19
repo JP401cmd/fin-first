@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { ageAtDate, NL_SWR } from '@/lib/horizon-data'
 import { calculateFreedomTime } from '@/lib/format'
 import { localMonthBounds, localMonthStartMonthsAgo } from '@/lib/month-range'
@@ -13,9 +13,9 @@ import { localMonthBounds, localMonthStartMonthsAgo } from '@/lib/month-range'
 export async function GET() {
   try {
     const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const claims = await getAuthClaims(supabase)
 
-    if (authError || !user) {
+    if (!claims) {
       return Response.json({ error: 'Niet ingelogd' }, { status: 401 })
     }
 
@@ -34,43 +34,43 @@ export async function GET() {
       supabase
         .from('assets')
         .select('current_value', { count: 'exact', head: false })
-        .eq('user_id', user.id),
+        .eq('user_id', claims.sub),
       supabase
         .from('transactions')
         .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id),
+        .eq('user_id', claims.sub),
       supabase
         .from('actions')
         .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id)
+        .eq('user_id', claims.sub)
         .eq('status', 'done'),
       supabase
         .from('actions')
         .select('freedom_days_impact')
-        .eq('user_id', user.id)
+        .eq('user_id', claims.sub)
         .eq('status', 'done'),
       supabase
         .from('life_events')
         .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id)
+        .eq('user_id', claims.sub)
         .eq('is_active', true),
       supabase
         .from('debts')
         .select('current_balance, debt_type')
-        .eq('user_id', user.id),
+        .eq('user_id', claims.sub),
       supabase
         .from('profiles')
         .select('date_of_birth, expected_return, inflation_rate, active_modules')
-        .eq('id', user.id)
+        .eq('id', claims.sub)
         .single(),
       supabase
         .from('budgets')
         .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id),
+        .eq('user_id', claims.sub),
       supabase
         .from('recommendations')
         .select('id, status', { count: 'exact', head: false })
-        .eq('user_id', user.id)
+        .eq('user_id', claims.sub)
         .eq('status', 'pending'),
     ])
 
@@ -95,7 +95,7 @@ export async function GET() {
     const expenseResult = await supabase
       .from('transactions')
       .select('amount, date')
-      .eq('user_id', user.id)
+      .eq('user_id', claims.sub)
       .lt('amount', 0)
       .gte('date', twelveMonthsAgo)
       .lt('date', monthEnd)

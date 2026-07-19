@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import {
   buildPortfolioHistory,
@@ -17,8 +17,8 @@ import {
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
+  const claims = await getAuthClaims(supabase)
+  if (!claims) {
     return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
   }
 
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
     const { data: holdings, error: holdingsError } = await supabase
       .from('investment_holdings')
       .select('id, units, avg_purchase_price, current_price, purchase_date, created_at')
-      .eq('user_id', user.id)
+      .eq('user_id', claims.sub)
       .eq('is_active', true)
 
     if (holdingsError) {

@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { localMonthBounds, localMonthStart } from '@/lib/month-range'
 
@@ -27,8 +27,8 @@ function formatEUR(n: number): string {
 /* ── Main handler ────────────────────────────────────────────────────── */
 export async function GET() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+  const claims = await getAuthClaims(supabase)
+  if (!claims) return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
 
   const now = new Date()
   const currentMonth = now.getMonth()
@@ -47,14 +47,14 @@ export async function GET() {
     supabase
       .from('budgets')
       .select('id, name, monthly_limit, budget_type, icon')
-      .eq('user_id', user.id)
+      .eq('user_id', claims.sub)
       .eq('budget_type', 'expense')
       .gt('monthly_limit', 0),
     // Current month expenses per category
     supabase
       .from('transactions')
       .select('amount, category')
-      .eq('user_id', user.id)
+      .eq('user_id', claims.sub)
       .eq('is_income', false)
       .gte('date', monthStart)
       .lt('date', monthEnd),
@@ -62,7 +62,7 @@ export async function GET() {
     supabase
       .from('transactions')
       .select('amount, category')
-      .eq('user_id', user.id)
+      .eq('user_id', claims.sub)
       .eq('is_income', false)
       .gte('date', prevMonthStart)
       .lt('date', monthStart),
@@ -70,13 +70,13 @@ export async function GET() {
     supabase
       .from('goals')
       .select('id, name, current_value, target_value, target_date, is_completed, icon')
-      .eq('user_id', user.id)
+      .eq('user_id', claims.sub)
       .eq('is_completed', false),
     // All current month expenses (for daily expense calculation)
     supabase
       .from('transactions')
       .select('amount')
-      .eq('user_id', user.id)
+      .eq('user_id', claims.sub)
       .eq('is_income', false)
       .gte('date', monthStart)
       .lt('date', monthEnd),

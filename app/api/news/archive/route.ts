@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { unauthorized } from '@/lib/api/respond'
 
@@ -8,9 +8,9 @@ import { unauthorized } from '@/lib/api/respond'
 
 export async function GET(request: Request) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const claims = await getAuthClaims(supabase)
 
-  if (!user) {
+  if (!claims) {
     return unauthorized()
   }
 
@@ -27,7 +27,7 @@ export async function GET(request: Request) {
     const { data, error } = await supabase
       .from('news_editions')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', claims.sub)
       .eq('edition_nr', editionNr)
       .maybeSingle()
 
@@ -47,7 +47,7 @@ export async function GET(request: Request) {
   const { data, error } = await supabase
     .from('news_editions')
     .select('id, edition_nr, jaargang, article_count, hero_headline, created_at')
-    .eq('user_id', user.id)
+    .eq('user_id', claims.sub)
     .order('edition_nr', { ascending: false })
 
   if (error) {

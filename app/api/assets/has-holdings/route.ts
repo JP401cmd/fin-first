@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { assetHasActiveHoldings, assetsWithActiveHoldings } from '@/lib/holdings-sync'
 import { unauthorized, serverError } from '@/lib/api/respond'
@@ -22,8 +22,8 @@ const MAX_BATCH_IDS = 200
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
+  const claims = await getAuthClaims(supabase)
+  if (!claims) {
     return unauthorized()
   }
 
@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
     }
 
     try {
-      const withHoldings = await assetsWithActiveHoldings(supabase, ids, user.id)
+      const withHoldings = await assetsWithActiveHoldings(supabase, ids, claims.sub)
       const holdings: Record<string, boolean> = {}
       for (const id of ids) {
         holdings[id] = withHoldings.has(id)
@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const result = await assetHasActiveHoldings(supabase, assetId, user.id)
+    const result = await assetHasActiveHoldings(supabase, assetId, claims.sub)
 
     return NextResponse.json({
       has_holdings: result.hasHoldings,
