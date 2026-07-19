@@ -607,6 +607,8 @@ describe('AICategorizeSheet — AI-flow transfer-behandeling', () => {
     )
 
     fireEvent.click(screen.getByRole('button', { name: /Vraag Will/i }))
+    // Spiegelparen zijn stage-1 → de wizard opent op stap 1 (bulk-kaart,
+    // auto-uitgeklapt want ≤8 rijen) met per rij de "Spiegelboeking"-reasoning.
     await waitFor(() => {
       expect(screen.getAllByText(/Spiegelboeking/i).length).toBe(2)
     })
@@ -616,8 +618,10 @@ describe('AICategorizeSheet — AI-flow transfer-behandeling', () => {
     expect(okButtons.length).toBe(2)
     okButtons.forEach((b) => fireEvent.click(b))
 
-    // Opslaan.
-    fireEvent.click(screen.getByRole('button', { name: /Opslaan/i }))
+    // Flow-revisie #881: Opslaan zit in stap 3 (Controle). Alleen stage-1 →
+    // "Verder zonder toepassen" gaat direct naar stap 3, daarna Opslaan.
+    fireEvent.click(screen.getByRole('button', { name: /Verder zonder toepassen/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^Opslaan$/i }))
 
     await waitFor(() => {
       expect(screen.getByText(/Klaar/i)).toBeInTheDocument()
@@ -677,7 +681,8 @@ describe('AICategorizeSheet — AI-flow transfer-behandeling', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Vraag Will/i }))
 
-    // Het sterke signaal verschijnt als review-voorstel met herkomst-label.
+    // Het sterke signaal is stage-1 → stap 1 (bulk-kaart) toont het als
+    // review-voorstel met herkomst-label.
     await waitFor(() => {
       expect(screen.getByText(/Overboeking tussen eigen rekeningen/i)).toBeInTheDocument()
     })
@@ -686,9 +691,15 @@ describe('AICategorizeSheet — AI-flow transfer-behandeling', () => {
     // Cruciaal (eis 2): NIETS is stil toegepast vóór de gebruiker iets deed.
     expect(transactionUpdates).toHaveLength(0)
 
-    // Accepteren + opslaan schrijft de transfer alsnog — mét vlag.
+    // Accepteer de transfer in stap 1 (OK) en loop door naar de controle-stap:
+    // stap 1 → stap 2 (de gewone tx wacht op Will) → "Stoppen" naar stap 3 → Opslaan.
     fireEvent.click(screen.getByRole('button', { name: /^OK$/i }))
-    fireEvent.click(screen.getByRole('button', { name: /Opslaan/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Verder zonder toepassen/i }))
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Stoppen en controleren/i })).toBeInTheDocument()
+    })
+    fireEvent.click(screen.getByRole('button', { name: /Stoppen en controleren/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^Opslaan$/i }))
     await waitFor(() => {
       expect(screen.getByText(/Klaar/i)).toBeInTheDocument()
     })
@@ -843,17 +854,17 @@ describe('AICategorizeSheet — combined pass (regels → AI → propagatie)', (
   })
 })
 
-// ── "Stoppen en tot hier bewaren" (WP-E2, feature #881) ───────────────────────
+// ── "Stoppen en controleren" (WP-E2, feature #881) ───────────────────────
 //
 // De wizard toont de AI-groepen één tegelijk, maar de motor kan al meerdere
 // groepen tegelijk hebben beantwoord binnen dezelfde AI-ronde (cloud-pad: tot
-// 20 representanten per call). Deze suite vergrendelt dat "Stoppen en tot hier
-// bewaren" NOOIT een voorstel opslaat dat wel al binnen is (in `rows` staat)
+// 20 representanten per call). Deze suite vergrendelt dat "Stoppen en
+// controleren" NOOIT een voorstel opslaat dat wel al binnen is (in `rows` staat)
 // maar niet expliciet is geaccepteerd — ook al is de tweede groep na acceptatie
 // van de eerste meteen zichtbaar (en dus "prefetched-ongetoond" op het moment
 // van stoppen).
 
-describe('AICategorizeSheet — Stoppen en tot hier bewaren slaat alleen geaccepteerde rijen op', () => {
+describe('AICategorizeSheet — Stoppen en controleren slaat alleen geaccepteerde rijen op', () => {
   it('een niet-geaccepteerd, al binnengekomen groepsvoorstel wordt NIET opgeslagen bij Stoppen', async () => {
     const fetchMock = vi.fn((url: string, init?: { body?: string }) => {
       if (!String(url).includes('/api/ai/categorize')) {
@@ -908,25 +919,32 @@ describe('AICategorizeSheet — Stoppen en tot hier bewaren slaat alleen geaccep
       expect(screen.getByText('Tweede Winkel')).toBeInTheDocument()
     })
 
-    // Stoppen en tot hier bewaren.
-    fireEvent.click(screen.getByRole('button', { name: /Stoppen en tot hier bewaren/i }))
+    // Flow-revisie #881: "Stoppen en controleren" routeert naar stap 3
+    // (Controle) i.p.v. direct op te slaan; daar bevestigt Opslaan de bewaring.
+    fireEvent.click(screen.getByRole('button', { name: /Stoppen en controleren/i }))
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^Opslaan$/i })).toBeInTheDocument()
+    })
+    fireEvent.click(screen.getByRole('button', { name: /^Opslaan$/i }))
 
     await waitFor(() => {
       expect(screen.getByText(/Klaar/i)).toBeInTheDocument()
     })
 
+    // Alleen de geaccepteerde eerste groep is bewaard; het al-binnengekomen,
+    // niet-geaccepteerde tweede voorstel NIET.
     const savedIds = transactionUpdates.flatMap((u) => u.ids)
     expect(savedIds).toContain('grp1')
     expect(savedIds).not.toContain('grp2')
   })
 })
 
-// ── "Stoppen": afsluitscherm-copy (WP-C fix-ronde, feature #881) ──────────────
+// ── "Stoppen" routeert naar de controle-stap (flow-revisie #881) ──────────────
 //
-// Vroegtijdig stoppen toont een beschrijvende "wat nu"-duiding i.p.v. de
-// generieke afrond-copy. Bij 0 geaccepteerde rijen wordt er NIET opgeslagen
-// (geen misleidend "0 opgeslagen"-succesje) en meldt het scherm hoeveel er nog
-// open staat.
+// Gedragswijziging: "Stoppen en controleren" slaat NIET meer direct op maar
+// routeert vanaf stap 1/2 naar stap 3 (Controle & opslaan). Daar bepaalt de
+// gebruiker met "Opslaan" wat er bewaard wordt — en verliesvrij: alleen wat
+// geaccepteerd is landt in de DB.
 
 function stopFetchMock() {
   return vi.fn((url: string, init?: { body?: string }) => {
@@ -949,8 +967,8 @@ function stopFetchMock() {
   })
 }
 
-describe('AICategorizeSheet — Stoppen afsluitscherm-copy', () => {
-  it('0 geaccepteerd → GEEN save-call en de "Niets opgeslagen"-copy met resterende telling', async () => {
+describe('AICategorizeSheet — Stoppen routeert naar de controle-stap', () => {
+  it('0 geaccepteerd → Stoppen toont stap 3 met Opslaan uitgeschakeld en schrijft niets weg', async () => {
     vi.stubGlobal('fetch', stopFetchMock())
     const txs = [
       makeTx('s1', { description: 'Betaling 1', counterparty_name: 'Eerste Winkel' }),
@@ -972,22 +990,18 @@ describe('AICategorizeSheet — Stoppen afsluitscherm-copy', () => {
       expect(screen.getByText('Eerste Winkel')).toBeInTheDocument()
     })
 
-    // Niets accepteren, direct stoppen.
-    fireEvent.click(screen.getByRole('button', { name: /Stoppen en tot hier bewaren/i }))
+    // Niets accepteren, direct stoppen → stap 3 (Controle).
+    fireEvent.click(screen.getByRole('button', { name: /Stoppen en controleren/i }))
 
+    // Opslaan bestaat maar is uitgeschakeld (0 geaccepteerd) → niets kan weggeschreven.
     await waitFor(() => {
-      expect(screen.getByText(/Klaar/i)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /^Opslaan$/i })).toBeDisabled()
     })
-
-    // Geen enkele transactie-update: bij 0 geaccepteerd wordt er niet opgeslagen.
+    expect(screen.getByText('Controle')).toBeInTheDocument()
     expect(transactionUpdates).toHaveLength(0)
-    // Beschrijvende afsluit-copy met de resterende telling (beide nog open).
-    const sheetText = screen.getByTestId('bottom-sheet').textContent ?? ''
-    expect(sheetText).toContain('Niets opgeslagen')
-    expect(sheetText).toContain('2 transacties nog open')
   })
 
-  it('>0 geaccepteerd → "X voorstellen opgeslagen · Y nog niet beoordeeld"-copy', async () => {
+  it('>0 geaccepteerd → Stoppen → Opslaan bewaart alléén de geaccepteerde groep', async () => {
     vi.stubGlobal('fetch', stopFetchMock())
     const txs = [
       makeTx('k1', { description: 'Betaling 1', counterparty_name: 'Eerste Winkel' }),
@@ -1014,15 +1028,25 @@ describe('AICategorizeSheet — Stoppen afsluitscherm-copy', () => {
     await waitFor(() => {
       expect(screen.getByText('Tweede Winkel')).toBeInTheDocument()
     })
-    fireEvent.click(screen.getByRole('button', { name: /Stoppen en tot hier bewaren/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Stoppen en controleren/i }))
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^Opslaan$/i })).toBeInTheDocument()
+    })
+    // GWT-10: vóór de gebruiker "Opslaan" indrukt is er nog GEEN enkele
+    // supabase-update-call gebeurd — "Stoppen" zelf slaat niets op — en de al
+    // geaccepteerde groep staat gewoon zichtbaar in de controle-stap.
+    expect(transactionUpdates).toHaveLength(0)
+    expect(screen.getByText('Eerste Winkel')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /^Opslaan$/i }))
 
     await waitFor(() => {
       expect(screen.getByText(/Klaar/i)).toBeInTheDocument()
     })
 
-    const sheetText = screen.getByTestId('bottom-sheet').textContent ?? ''
-    expect(sheetText).toContain('1 voorstel opgeslagen')
-    expect(sheetText).toContain('1 transactie nog niet beoordeeld')
+    // Verliesvrij: alleen de geaccepteerde eerste groep is bewaard.
+    const savedIds = transactionUpdates.flatMap((u) => u.ids)
+    expect(savedIds).toContain('k1')
+    expect(savedIds).not.toContain('k2')
   })
 })
 
@@ -1108,8 +1132,10 @@ describe('AICategorizeSheet — privé-modus resolver-keuze', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Vraag Will/i }))
 
+    // De wizard toont de onbekende tegenpartij als AI-groepkaart (geen platte
+    // "nog te beoordelen"-header meer in wizard-modus).
     await waitFor(() => {
-      expect(screen.getByText(/nog te beoordelen/i)).toBeInTheDocument()
+      expect(screen.getByText('Onbekende Zaak')).toBeInTheDocument()
     })
     // Cloud-pad gebruikt (één AI-call), lokale resolver niet aangeraakt.
     expect(aiCategorizeFetches().length).toBe(1)
@@ -1207,5 +1233,86 @@ describe('AICategorizeSheet — privé-modus resolver-keuze', () => {
     // Fail-closed blijft gelden: geen lokale resolver, géén cloud-fallback.
     expect(createLocalResolverSpy).not.toHaveBeenCalled()
     expect(aiCategorizeFetches().length).toBe(0)
+  })
+})
+
+// ── GWT-1: wizard-modus rendert nooit de globale lijst-header (regressie) ─────
+//
+// De platte "X van Y nog te beoordelen"-sticky-header + "Alles goedkeuren"
+// hoort uitsluitend bij reviewMode 'list' (het handmatige pad). Elke stap van
+// de wizard toont zijn eigen teller/acties — deze globale header mag in
+// wizard-modus nooit meerenderen (CLAUDE.md-comment in ai-categorize-sheet.tsx
+// regel ~1165: "wordt in wizard-modus bewust NIET gerenderd").
+
+describe('AICategorizeSheet — GWT-1 · wizard-modus zonder globale lijst-header', () => {
+  it('reviewMode "wizard" toont nooit de sticky "nog te beoordelen"-header of "Alles goedkeuren"', async () => {
+    const txs = [makeTx('w1', { description: 'Betaling', counterparty_name: 'Onbekende Zaak' })]
+
+    render(
+      <AICategorizeSheet
+        transactions={txs}
+        budgets={[boodschappenBudget]}
+        budgetGroups={[{ parent: boodschappenBudget, children: [boodschappenBudget] }]}
+        onClose={() => {}}
+        onSaved={() => {}}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Vraag Will/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Onbekende Zaak')).toBeInTheDocument()
+    })
+
+    expect(screen.queryByText(/nog te beoordelen/i)).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Alles goedkeuren$/i })).toBeNull()
+  })
+})
+
+// ── GWT-16: sleepmodus-terugkeer landt weer in de wizard (stap 2), niet het
+//    keuzescherm en niet terug bij stap 1 ─────────────────────────────────────
+//
+// "Zelf indelen (sleepmodus)" vanuit een AI-groepkaart (splitGroup) opent de
+// overlay met exact die groep; bij afsluiten (finishSleepSubset) verwijdert de
+// sheet die rijen uit `rows` en zet phase terug naar 'review' — de wizard-stap
+// (wizardStep) leeft in de sheet en overleeft dat uitstapje ongewijzigd.
+
+describe('AICategorizeSheet — GWT-16 · sleepmodus-terugkeer naar stap 2', () => {
+  it('na "Sluit sleepmodus" verschijnt de volgende wachtende groep in de wizard — niet het keuzescherm, niet stap 1', async () => {
+    vi.stubGlobal('fetch', stopFetchMock())
+    const txs = [
+      makeTx('sm1', { description: 'Betaling 1', counterparty_name: 'Sleep Winkel' }),
+      makeTx('sm2', { description: 'Betaling 2', counterparty_name: 'Tweede Winkel' }),
+    ]
+
+    render(
+      <AICategorizeSheet
+        transactions={txs}
+        budgets={[boodschappenBudget]}
+        budgetGroups={[{ parent: boodschappenBudget, children: [boodschappenBudget] }]}
+        onClose={() => {}}
+        onSaved={() => {}}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Vraag Will/i }))
+    await waitFor(() => {
+      expect(screen.getByText('Sleep Winkel')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /Zelf indelen \(sleepmodus\)/i }))
+    expect(await screen.findByTestId('sleepmodus-overlay')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /Sluit sleepmodus/i }))
+
+    // Terug in de wizard: de volgende groep verschijnt vanzelf (stap 2 blijft
+    // actief) — geen terugval naar het keuzescherm ("Vraag Will") en geen
+    // terugval naar stap 1 ("Will herkende").
+    await waitFor(() => {
+      expect(screen.getByText('Tweede Winkel')).toBeInTheDocument()
+    })
+    expect(screen.queryByTestId('sleepmodus-overlay')).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Vraag Will$/i })).toBeNull()
+    expect(screen.queryByText(/Will herkende/i)).toBeNull()
   })
 })

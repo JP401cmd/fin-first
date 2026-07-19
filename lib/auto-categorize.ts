@@ -400,6 +400,19 @@ export type CombinedRunResult = {
   failedBatches: CombinedAiBatchItem[][]
   /** True wanneer het signaal de run afbrak; de al-gedane voorstellen blijven staan. */
   aborted: boolean
+  /**
+   * Tx-id's van álle leden van groepen die een AI-ronde doorliepen maar géén
+   * bruikbaar voorstel opleverden: de representant kwam zonder resultaat óf
+   * zonder budget_id terug (below-threshold/leeg), óf de hele batch faalde (het
+   * failedBatches-catch-pad). Hiermee kan de wizard-kaart per groep stoppen met
+   * laden i.p.v. te wachten tot de héle run klaar is. Altijd aanwezig — lege
+   * array als elke groep een voorstel kreeg. Groepen die via de propagatie-veeg
+   * (cross-key answered-cache) alsnog een voorstel krijgen tellen NIET mee;
+   * groepen die de veeg juist tegen een eerder als "onbekend" (answered zónder
+   * budget_id) beantwoorde key aanloopt tellen WÉL mee — die krijgen nooit een
+   * voorstel, dus ook zij moeten de handmatige fallback triggeren.
+   */
+  noMatchIds: string[]
 }
 
 /**
@@ -507,12 +520,25 @@ export async function runCombinedCategorization(
      * hook: geen effect.
      */
     onBeforeRound?: () => Promise<void> | void
+    /**
+     * Callback per AI-ronde die één of meer no-match-groepen opleverde: ná de
+     * propagatie-/registratie-afhandeling van díe ronde aangeroepen met de
+     * tx-id's van álle leden van die groepen (representant zonder (bruikbaar)
+     * resultaat óf een gefaalde batch). NIET aangeroepen voor een ronde zónder
+     * no-matches. Laat de wizard per groep incrementeel stoppen met laden i.p.v.
+     * te wachten op het einde van de run; dezelfde ids staan altijd óók in
+     * {@link CombinedRunResult.noMatchIds}. Zonder hook: geen effect.
+     */
+    onNoMatch?: (txIds: string[]) => void
   } = {},
 ): Promise<CombinedRunResult> {
   const batchSize = Math.max(1, Math.min(20, opts.batchSize ?? 20))
   const minRuleConfidence = opts.minRuleConfidence ?? 0
   const proposals = new Map<string, CombinedProposal>()
   const failedBatches: CombinedAiBatchItem[][] = []
+  // No-match-ids over álle rondes heen (contract: representant zonder bruikbaar
+  // voorstel óf gefaalde batch). Blijft leeg wanneer elke groep een voorstel kreeg.
+  const noMatchIds: string[] = []
   let aborted = false
 
   // ── Stap 1: gratis, lokaal — regels/frequentie/correcties/transfers ──
@@ -598,6 +624,11 @@ export async function runCombinedCategorization(
     // Propagatie-veeg vóór elke AI-ronde: groepen waarvan een key al beantwoord
     // is (door een eerdere ronde) krijgen hun voorstel zonder nieuwe AI-call.
     const stillPending: string[] = []
+    // Leden die de veeg tegen een eerder-als-onbekend beantwoorde key aanloopt:
+    // net als een no-match uit een AI-ronde krijgen die nooit een voorstel, dus
+    // moeten ze óók als signaal naar de wizard (anders blijft de kaart laden).
+    // Verzameld tijdens de veeg en er direct ná één keer geëmit.
+    const sweepNoMatch: string[] = []
     for (const key of pendingKeys) {
       const members = groups.get(key)!
       let hit: { result: CombinedAiResult; repName: string | null } | undefined
@@ -612,13 +643,21 @@ export async function runCombinedCategorization(
         if (hit.result.budget_id) {
           for (const m of members) propose(m, hit.result, 'propagated', hit.repName)
         } else {
-          processed += members.length // eerder door de AI als "onbekend" beoordeeld
+          // Eerder door de AI als "onbekend" beoordeeld → geen voorstel mogelijk.
+          // Tel als afgehandeld én meld als no-match (zelfde contract als een
+          // no-match binnen een AI-ronde) zodat de kaart de fallback toont.
+          processed += members.length
+          for (const m of members) sweepNoMatch.push(m.id)
         }
       } else {
         stillPending.push(key)
       }
     }
     pendingKeys = stillPending
+    if (sweepNoMatch.length > 0) {
+      noMatchIds.push(...sweepNoMatch)
+      opts.onNoMatch?.(sweepNoMatch)
+    }
     if (pendingKeys.length === 0) {
       emitProgress()
       break
@@ -649,14 +688,27 @@ export async function runCombinedCategorization(
       }
     })
 
+    // No-match-ids van díe ronde (representant zonder (bruikbaar) resultaat óf
+    // een gefaalde batch) — na afloop van de ronde als signaal doorgegeven.
+    const roundNoMatch: string[] = []
+
     let results: CombinedAiResult[]
     try {
       results = await aiResolver(batch)
     } catch {
       // Mislukte ronde: groepen als afgehandeld-zonder-voorstel tellen zodat de
       // lus nooit blijft hangen; de batch gaat naar failedBatches voor retry.
+      // Álle leden van de gefaalde ronde zijn no-match (contract-pad b).
       failedBatches.push(batch)
-      for (const k of roundKeys) processed += groups.get(k)!.length
+      for (const k of roundKeys) {
+        const members = groups.get(k)!
+        processed += members.length
+        for (const m of members) roundNoMatch.push(m.id)
+      }
+      if (roundNoMatch.length > 0) {
+        noMatchIds.push(...roundNoMatch)
+        opts.onNoMatch?.(roundNoMatch)
+      }
       emitProgress()
       continue
     }
@@ -667,7 +719,10 @@ export async function runCombinedCategorization(
       const rep = members[0]
       const res = resultById.get(rep.id)
       if (!res) {
+        // Representant ontbreekt in de respons (below-threshold/leeg) → no-match
+        // voor de hele groep (contract-pad a).
         processed += members.length
+        for (const m of members) roundNoMatch.push(m.id)
         continue
       }
       // Registreer onder álle keys van de representant (naam + IBAN, per richting).
@@ -678,8 +733,16 @@ export async function runCombinedCategorization(
         propose(rep, res, 'ai', null)
         for (const m of members.slice(1)) propose(m, res, 'propagated', rep.counterparty_name)
       } else {
+        // Representant kwam zónder budget_id terug (below-threshold) → no-match
+        // voor de hele groep (contract-pad a). Blijft wél als answered
+        // geregistreerd (hierboven), dus geen herbezoek.
         processed += members.length
+        for (const m of members) roundNoMatch.push(m.id)
       }
+    }
+    if (roundNoMatch.length > 0) {
+      noMatchIds.push(...roundNoMatch)
+      opts.onNoMatch?.(roundNoMatch)
     }
     emitProgress()
   }
@@ -689,5 +752,5 @@ export async function runCombinedCategorization(
   for (const p of proposals.values()) counts[p.source]++
   counts.unresolved = txs.length - proposals.size
 
-  return { proposals, counts, aiRounds: round, failedBatches, aborted }
+  return { proposals, counts, aiRounds: round, failedBatches, aborted, noMatchIds }
 }

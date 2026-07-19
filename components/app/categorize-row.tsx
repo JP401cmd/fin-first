@@ -61,6 +61,15 @@ export type RowState = {
   /** category_source die handleSave voor deze rij wegschrijft (herkomst-getrouw). */
   acceptedCategorySource: string | null
   makeRule: boolean
+  /**
+   * Will heeft deze rij in een AI-ronde beoordeeld maar géén bruikbaar voorstel
+   * kunnen geven (representant zonder budget_id/leeg resultaat óf een gefaalde
+   * batch). Gevoed door `runCombinedCategorization`'s `onNoMatch` (per ronde) +
+   * `result.noMatchIds` (vangnet). De wizard toont dan meteen de handmatige
+   * fallback i.p.v. eindeloos te blijven laden. Groepen die alsnog via propagatie
+   * een voorstel krijgen worden hier NIET gemarkeerd (motor-contract).
+   */
+  aiNoMatch?: boolean
 }
 
 // ─── Formatters ────────────────────────────────────────────────────────────────
@@ -91,9 +100,16 @@ export type RowProps = {
   onAcceptSuggestion: () => void
   onManualBudget: (budgetId: string) => void
   onToggleMakeRule: () => void
+  /**
+   * Houd de "andere categorie"-select ook op een reeds goedgekeurde rij
+   * zichtbaar. Nodig in de controle-stap (stap 3), waar wijzigen mogelijk moet
+   * blijven; elders (platte lijst, stap 1-bulk) blijft die verborgen zodra
+   * gekeurd. Wijzigen loopt via de bestaande onManualBudget-semantiek.
+   */
+  editableWhenAccepted?: boolean
 }
 
-export function TransactionRow({ row, budgetGroups, onAcceptSuggestion, onManualBudget, onToggleMakeRule }: RowProps) {
+export function TransactionRow({ row, budgetGroups, onAcceptSuggestion, onManualBudget, onToggleMakeRule, editableWhenAccepted = false }: RowProps) {
   const { tx, suggestion, accepted, acceptedBudgetName, makeRule } = row
   const hasSuggestion = !!suggestion?.budget_id
 
@@ -212,7 +228,7 @@ export function TransactionRow({ row, budgetGroups, onAcceptSuggestion, onManual
 
       {/* Manual override dropdown for rows that had suggestions */}
       {hasSuggestion && (
-        <div className={`mt-2 ${accepted ? 'hidden' : ''}`} id={`manual-${row.tx.id}`}>
+        <div className={`mt-2 ${accepted && !editableWhenAccepted ? 'hidden' : ''}`} id={`manual-${row.tx.id}`}>
           <select
             value=""
             onChange={(e) => {

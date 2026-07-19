@@ -712,3 +712,176 @@ describe('runCombinedCategorization — parity met lege opts (pin)', () => {
     expect(result.proposals.size).toBe(7)
   })
 })
+
+// ── no-match-signaal (bug: "Will denkt na…" blijft hangen) ────────────────
+//
+// Bug (bug-reporter): een groep die een AI-ronde doorliep maar géén bruikbaar
+// voorstel kreeg (below-threshold/leeg antwoord voor de representant, óf
+// batch-fout → failedBatches) is in het huidige resultaat ononderscheidbaar
+// van "nog niet verwerkt" — de wizard-kaart blijft daardoor laden tot de héle
+// run klaar is.
+//
+// Beoogd contract (nog NIET geïmplementeerd — deze tests horen ROOD te zijn
+// tot de coder het bouwt):
+//  1. CombinedRunResult krijgt `noMatchIds: string[]` — tx-ids van ALLE leden
+//     van groepen die een AI-ronde doorliepen zonder bruikbaar voorstel.
+//  2. Nieuwe optionele callback `opts.onNoMatch?: (txIds: string[]) => void`,
+//     per ronde aangeroepen (ná de propagatie-registratie van die ronde) met
+//     de no-match-tx-ids van díe ronde; niet aangeroepen zonder no-matches.
+//  3. Default-behoudend: zonder de callback/het veld te lezen is het gedrag
+//     byte-voor-byte gelijk aan vandaag.
+//
+// Het contract bestaat nog niet in de typen — we lezen/geven het daarom via
+// een lokaal verruimd type i.p.v. `as any`/ts-expect-error op productiecode,
+// zodat deze testfile gewoon compileert (`tsc --noEmit` blijft schoon) terwijl
+// de assertions op het ontbrekende gedrag rood gaan.
+type RunOpts = Parameters<typeof runCombinedCategorization>[3]
+type ExtendedOpts = RunOpts & { onNoMatch?: (txIds: string[]) => void }
+type CombinedRunResultExt = Awaited<ReturnType<typeof runCombinedCategorization>> & {
+  noMatchIds: string[]
+}
+
+describe('no-match-signaal', () => {
+  it('(a) groep zonder bruikbaar AI-resultaat (representant ontbreekt in de respons) → noMatchIds bevat al haar leden, proposals niet', async () => {
+    const txs: CombinedTx[] = [
+      unknownTx('a1', 'Bakker'),
+      unknownTx('a2', 'Bakker'),
+      unknownTx('b1', 'Qwerty BV'),
+      unknownTx('b2', 'Qwerty BV'),
+    ]
+    // Alleen een resultaat voor de Bakker-representant (a1); voor de Qwerty-
+    // representant (b1) komt er geen entry terug — below-threshold/leeg
+    // antwoord, precies het scenario uit de bug.
+    const resolver = vi.fn(async (batch: CombinedAiBatchItem[]): Promise<CombinedAiResult[]> => {
+      return batch
+        .filter((b) => b.id === 'a1')
+        .map((b) => ({ id: b.id, budget_id: 'food', confidence: 0.9 }))
+    })
+
+    const result = (await runCombinedCategorization(
+      txs,
+      baseContext(),
+      resolver,
+    )) as CombinedRunResultExt
+
+    // Groep A (Bakker) kreeg wél een voorstel.
+    expect(result.proposals.has('a1')).toBe(true)
+    expect(result.proposals.has('a2')).toBe(true)
+    // Groep B (Qwerty) kreeg geen voorstel — dit deel klopt al vandaag.
+    expect(result.proposals.has('b1')).toBe(false)
+    expect(result.proposals.has('b2')).toBe(false)
+
+    // Het nieuwe contract: noMatchIds moet exact groep B's leden bevatten.
+    expect(result.noMatchIds).toBeDefined()
+    expect(result.noMatchIds.slice().sort()).toEqual(['b1', 'b2'])
+  })
+
+  it('(b) falende AI-ronde (failedBatches-pad) → alle leden van die ronde in noMatchIds', async () => {
+    const txs: CombinedTx[] = [
+      unknownTx('c1', 'Bakker'),
+      unknownTx('c2', 'Bakker'),
+      unknownTx('d1', 'Qwerty BV'),
+    ]
+    const resolver = vi.fn(async (): Promise<CombinedAiResult[]> => {
+      throw new Error('AI niet beschikbaar')
+    })
+
+    const result = (await runCombinedCategorization(
+      txs,
+      baseContext(),
+      resolver,
+    )) as CombinedRunResultExt
+
+    expect(result.failedBatches).toHaveLength(1)
+    expect(result.proposals.size).toBe(0)
+    expect(result.noMatchIds).toBeDefined()
+    expect(result.noMatchIds.slice().sort()).toEqual(['c1', 'c2', 'd1'])
+  })
+
+  it('(c) onNoMatch wordt per ronde aangeroepen met exact de no-match-ids van díe ronde; ronde zonder no-match roept niet aan', async () => {
+    const txs: CombinedTx[] = [
+      unknownTx('e1', 'Bakker'),
+      unknownTx('e2', 'Bakker'),
+      unknownTx('f1', 'Qwerty BV'),
+    ]
+    let call = 0
+    const resolver = vi.fn(async (batch: CombinedAiBatchItem[]): Promise<CombinedAiResult[]> => {
+      call++
+      if (call === 1) return [] // ronde 1 (Bakker-groep): geen resultaat → no-match
+      return batch.map((b) => ({ id: b.id, budget_id: 'food', confidence: 0.9 })) // ronde 2 (Qwerty): wél match
+    })
+    const onNoMatch = vi.fn()
+    const opts: ExtendedOpts = { batchSize: 1, onNoMatch }
+
+    const result = (await runCombinedCategorization(
+      txs,
+      baseContext(),
+      resolver,
+      opts,
+    )) as CombinedRunResultExt
+
+    expect(resolver).toHaveBeenCalledTimes(2)
+    // Ronde 1 had een no-match (Bakker-groep) → precies 1 aanroep, met e1+e2.
+    expect(onNoMatch).toHaveBeenCalledTimes(1)
+    expect(onNoMatch).toHaveBeenCalledWith(['e1', 'e2'])
+    // Ronde 2 (Qwerty) had géén no-match → geen tweede aanroep (al gedekt door
+    // toHaveBeenCalledTimes(1) hierboven, expliciet benoemd voor leesbaarheid).
+    expect(result.noMatchIds.slice().sort()).toEqual(['e1', 'e2'])
+  })
+
+  it('(e) propagatie-veeg tegen een eerder-onbekende gedeelde key → die leden landen óók in noMatchIds + onNoMatch (code-review L2)', async () => {
+    // Twee groepen die een IBAN-key delen maar een andere naam hebben, zodat ze
+    // op naam apart groeperen (primary key = naam) maar via de cross-key-veeg
+    // elkaar raken. Groep A's representant komt als "onbekend" (geen budget_id)
+    // terug → geregistreerd als answered(null) onder naam- én IBAN-key. Groep B
+    // wordt vervolgens NIET door een eigen AI-ronde behandeld maar door de veeg,
+    // die de gedeelde IBAN-key als eerder-onbekend herkent. Vóór de fix telde de
+    // veeg die leden stil als "processed" zonder no-match-signaal → de kaart bleef
+    // laden. Na de fix zitten ze in noMatchIds én wordt onNoMatch ervoor aangeroepen.
+    const txs: CombinedTx[] = [
+      unknownTx('a1', 'Winkel A', -10, { counterparty_iban: 'NL00 SHARED 0000' }),
+      unknownTx('b1', 'Winkel B', -10, { counterparty_iban: 'NL00 SHARED 0000' }),
+    ]
+    // batchSize 1 → groep A gaat eerst als AI-ronde; representant komt zonder
+    // budget_id terug (below-threshold). Groep B raakt de veeg in de volgende iteratie.
+    const resolver = vi.fn(async (batch: CombinedAiBatchItem[]): Promise<CombinedAiResult[]> =>
+      batch.map((b) => ({ id: b.id, budget_id: null, confidence: 0.2 })),
+    )
+    const onNoMatch = vi.fn()
+    const opts: ExtendedOpts = { batchSize: 1, onNoMatch }
+
+    const result = (await runCombinedCategorization(
+      txs,
+      baseContext(),
+      resolver,
+      opts,
+    )) as CombinedRunResultExt
+
+    // Precies één AI-ronde: groep B is via de veeg afgehandeld, niet via de AI.
+    expect(resolver).toHaveBeenCalledTimes(1)
+    // Geen enkel voorstel — beide onbekend.
+    expect(result.proposals.size).toBe(0)
+    // Béíde leden zitten in noMatchIds (a1 uit de AI-ronde, b1 uit de veeg).
+    expect(result.noMatchIds.slice().sort()).toEqual(['a1', 'b1'])
+    // onNoMatch is voor b1 (de veeg) apart aangeroepen — dát was het gat.
+    expect(onNoMatch).toHaveBeenCalledWith(['b1'])
+  })
+
+  it('(d) parity-guard: zonder de callback/het veld te lezen blijft bestaand gedrag op een gemengde set byte-voor-byte gelijk (GROEN — bewijst additiviteit)', async () => {
+    const { resolver } = makeResolver()
+    const txs: CombinedTx[] = [
+      unknownTx('r1', 'Albert Heijn'), // trefwoordregel
+      unknownTx('t1', null, -100, { counterparty_iban: 'NL00 OWN 0000000000' }), // sterke transfer
+      unknownTx('u1', 'Qwerty BV'), // AI-representant
+      unknownTx('u2', 'Qwerty BV'), // propagatie
+    ]
+
+    const result = await runCombinedCategorization(txs, baseContext(), resolver)
+
+    expect(result.counts).toMatchObject({ rule: 1, transfer: 1, ai: 1, propagated: 1, unresolved: 0 })
+    expect(result.proposals.get('r1')).toMatchObject({ source: 'rule' })
+    expect(result.proposals.get('t1')).toMatchObject({ source: 'transfer' })
+    expect(result.proposals.get('u1')).toMatchObject({ source: 'ai' })
+    expect(result.proposals.get('u2')).toMatchObject({ source: 'propagated' })
+  })
+})
