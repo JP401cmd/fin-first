@@ -1,0 +1,22 @@
+{
+  "name": "trifinity-spike-litert-lm",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Fase-0 wegwerp-spike: meetharnas voor lokale transactie-categorisatie in de browser met de LiteRT-LM-runtime (Gemma 4 E2B-it .litertlm via @litert-lm/core + WebGPU). Los van de TriFinity-app; hergebruikt de fase-0-prompt/parse/metrics/dataset.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@litert-lm/core": "0.14.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@webgpu/types": "^0.1.40",
+    "typescript": "^7.0.2",
+    "vite": "^8.1.5"
+  }
+}
