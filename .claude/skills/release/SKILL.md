@@ -44,6 +44,8 @@ Volgorde-regel: migratie **vóór** de code live gaat, anders 500's op de nieuwe
 ### 5. Security-gate — `security-specialist`
 Verplichte poort wanneer de diff data-toegang, auth, routes, AI-context, secrets of admin-paden raakt (bij twijfel: wél draaien). De `security-specialist` loopt zijn ship-gate-checklist: geen secrets/JWT's in de diff, geen dev/test/debug-route bereikbaar in productie, partner-privacy via de perspective-loaders, RLS/RPC-dekking, AI-sanitize/PII-mask, geen lekkende foutmeldingen. Een 🔴-bevinding blokkeert de release tot opgelost.
 
+Diff-aanlevering: zijn onderdelen van de diff al apart en aantoonbaar security-geverifieerd (bv. DB-migraties met een multi-lens-verificatie in stap 4), filter die hunks dan uit de aangeleverde diff en vervang ze door één regel "DB-contract: al geverifieerd (verwijzing)". De agent leest dan alleen wat nog een oordeel nodig heeft — geen honderden regels pre-goedgekeurde DDL herlezen (les 19 jul 2026).
+
 ### 6. Architectuurdocumentatie — `architecture-docs-keeper`
 Per CLAUDE.md verplicht: rekenmotor geraakt ⇒ `lib/architecture/calculations.ts`; nieuw domein/service/datastroom ⇒ ArchiMate-curatie; zichtbare functionaliteit ⇒ HLD. Daarna `npm run arch:diagram` (ERD/feiten regenereren) en de architecture-vitests groen.
 
