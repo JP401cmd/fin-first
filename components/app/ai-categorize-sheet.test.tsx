@@ -211,6 +211,9 @@ vi.mock('@/lib/ai/local/local-categorize-resolver', () => ({
   // dit nu rechtstreeks i.p.v. een inline kopie, dus de mock moet 'm meenemen —
   // anders gooit vitest een fout bij het lezen van een niet-gemockte export.
   LOCAL_REP_BATCH_SIZE: 3,
+  // Zekerheidsgrens die de wizard (via de sheet gerenderd) importeert om een
+  // voorstel met lage confidence als "minder zeker" te labelen — zelfde reden.
+  LOCAL_MIN_CONFIDENCE: 0.8,
 }))
 
 // ── Fixtures ──────────────────────────────────────────────────

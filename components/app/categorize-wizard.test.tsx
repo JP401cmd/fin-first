@@ -357,6 +357,45 @@ describe('CategorizeWizard — randgevallen', () => {
   })
 })
 
+// ── Bulk-transparantie: "waarvan N minder zeker" ────────────────────────────
+//
+// Eigenaarsbesluit: de bulk-knop pakt ÓÓK de minder-zekere voorstellen mee; de
+// knop toont daarom een subtiele telling zodat de gebruiker weet wat 'ie bulk-
+// goedkeurt. Het knopgedrag verandert niet (accepteert alle voorstellen).
+
+describe('CategorizeWizard — bulk-transparantie "waarvan N minder zeker"', () => {
+  it('toont "waarvan 1 minder zeker" bij één 0,6-voorstel naast één 0,95-voorstel', () => {
+    renderWizard({
+      rows: [
+        makeRow(makeTx('lc1', { counterparty_name: 'Onzeker Winkel' }), makeSuggestion({ confidence: 0.6 })),
+        makeRow(makeTx('hc1', { counterparty_name: 'Zekere Winkel' }), makeSuggestion({ confidence: 0.95 })),
+      ],
+    })
+
+    const bulk = screen.getByRole('button', { name: /Alle AI-voorstellen goedkeuren/i })
+    expect(bulk).toBeInTheDocument()
+    // Subtiele telling: één van de twee wachtende voorstellen is minder zeker.
+    expect(
+      screen.getByText((_content, node) => {
+        const text = (node?.textContent ?? '').replace(/\s+/g, ' ').trim()
+        if (!/^waarvan 1 minder zeker$/.test(text)) return false
+        return Array.from(node?.children ?? []).every((c) => (c.textContent ?? '').trim() !== text)
+      }),
+    ).toBeInTheDocument()
+  })
+
+  it('geen telling wanneer alle voorstellen zeker zijn (N=0)', () => {
+    renderWizard({
+      rows: [
+        makeRow(makeTx('h1', { counterparty_name: 'Zeker Een' }), makeSuggestion({ confidence: 0.9 })),
+        makeRow(makeTx('h2', { counterparty_name: 'Zeker Twee' }), makeSuggestion({ confidence: 0.92 })),
+      ],
+    })
+    expect(screen.getByRole('button', { name: /Alle AI-voorstellen goedkeuren/i })).toBeInTheDocument()
+    expect(screen.queryByText(/minder zeker/i)).toBeNull()
+  })
+})
+
 // ── Uitklapbare ledenlijst (stap 2) ──────────────────────────────────────────
 
 describe('CategorizeWizard — uitklapbare ledenlijst', () => {
@@ -376,6 +415,109 @@ describe('CategorizeWizard — uitklapbare ledenlijst', () => {
     // Uitgeklapt: elke lid-omschrijving verschijnt (read-only).
     expect(screen.getByText('Aankoop een')).toBeInTheDocument()
     expect(screen.getByText('Aankoop twee')).toBeInTheDocument()
+  })
+})
+
+// ── Twee traps: "minder zeker"-label + details tonen om zelf te kiezen ───────
+//
+// De resolver zet budget_id vanaf confidence 0,5 maar behoudt de confidence;
+// LOCAL_MIN_CONFIDENCE (0,8) blijft de "zeker"-grens die de UI gebruikt om een
+// voorstel met lage confidence subtiel als "minder zeker" te labelen. Path-
+// agnostisch: geldt ook voor cloud-voorstellen (source 'ai') met lage confidence.
+
+describe('CategorizeWizard — twee traps · "minder zeker"-label', () => {
+  it('(a) ai-voorstel met confidence 0,6 → toont "minder zeker" naast de WILL-badge', () => {
+    renderWizard({
+      rows: [makeRow(makeTx('lc1', { counterparty_name: 'Onzeker Winkel' }), makeSuggestion({ confidence: 0.6 }))],
+    })
+    // Het kaart-label (met middot-prefix); de bulk-telling "waarvan N minder zeker"
+    // is een aparte tekst — daarom scopen we hier op exact het kaart-label.
+    expect(screen.getByText('· minder zeker')).toBeInTheDocument()
+  })
+
+  it('(b) ai-voorstel met confidence 0,95 → GEEN label (gewoon voorstel)', () => {
+    renderWizard({
+      rows: [makeRow(makeTx('hc1', { counterparty_name: 'Zekere Winkel' }), makeSuggestion({ confidence: 0.95 }))],
+    })
+    expect(screen.queryByText(/minder zeker/i)).toBeNull()
+  })
+
+  it('(d) cloud-voorstel (source ai) met lage confidence → óók het label (consistentie)', () => {
+    renderWizard({
+      rows: [
+        makeRow(
+          makeTx('cl1', { counterparty_name: 'Cloud Onzeker' }),
+          makeSuggestion({ source: 'ai', category_source: 'ai', confidence: 0.55, reasoning: 'cloud-oordeel' }),
+        ),
+      ],
+    })
+    expect(screen.getByText('· minder zeker')).toBeInTheDocument()
+  })
+
+  it('(e) gepropageerd voorstel (source propagated) met lage confidence → óók het label', () => {
+    // Een zustergroep erft hetzelfde AI-oordeel via de naam-/IBAN-key (source
+    // 'propagated') mét dezelfde geërfde confidence (0,5–0,8). Dat moet dezelfde
+    // "minder zeker"-duiding krijgen als de AI-twin — anders is de UI inconsistent.
+    renderWizard({
+      rows: [
+        makeRow(
+          makeTx('pr1', { counterparty_name: 'Afgeleide Winkel' }),
+          makeSuggestion({ source: 'propagated', category_source: 'propagated', confidence: 0.6 }),
+        ),
+      ],
+    })
+    expect(screen.getByText('· minder zeker')).toBeInTheDocument()
+  })
+
+  it('een zeker voorstel (≥0,8) toont géén "Bekijk"-affordance; een minder-zeker-groep wel', () => {
+    // Zeker (0,9): neutrale teller, geen "Bekijk".
+    const { unmount } = render(
+      <CategorizeWizard
+        {...makeProps({
+          rows: [
+            makeRow(makeTx('z1', { counterparty_name: 'Zeker', description: 'Aankoop een' }), makeSuggestion({ confidence: 0.9 })),
+            makeRow(makeTx('z2', { counterparty_name: 'Zeker', description: 'Aankoop twee' }), null),
+          ],
+        })}
+      />,
+    )
+    expect(screen.getByRole('button', { expanded: false, name: /2\s*transacties/i })).toBeInTheDocument()
+    expect(screen.queryByText(/^Bekijk$/)).toBeNull()
+    unmount()
+
+    // Minder zeker (0,6): uitnodigende "Bekijk N transacties"-affordance, nog ingeklapt.
+    renderWizard({
+      rows: [
+        makeRow(makeTx('m1', { counterparty_name: 'Onzeker', description: 'Aankoop een' }), makeSuggestion({ confidence: 0.6 })),
+        makeRow(makeTx('m2', { counterparty_name: 'Onzeker', description: 'Aankoop twee' }), null),
+      ],
+    })
+    const toggle = screen.getByRole('button', { expanded: false, name: /Bekijk.*2\s*transacties/i })
+    expect(toggle).toBeInTheDocument()
+    // Verifiëren vóór akkoord: klikken toont de leden (datum/omschrijving/bedrag).
+    fireEvent.click(toggle)
+    expect(screen.getByText('Aankoop een')).toBeInTheDocument()
+    expect(screen.getByText('Aankoop twee')).toBeInTheDocument()
+  })
+})
+
+describe('CategorizeWizard — twee traps · details bij no-match', () => {
+  it('(c) no-match-kaart met meerdere transacties → ledenlijst standaard UITGEKLAPT', () => {
+    renderWizard({
+      rows: [
+        makeRow(makeTx('nm1', { counterparty_name: 'No-Match', description: 'Betaling een' }), null, { aiNoMatch: true }),
+        makeRow(makeTx('nm2', { counterparty_name: 'No-Match', description: 'Betaling twee' }), null),
+      ],
+      aiPhaseActive: true,
+    })
+
+    // Zonder klik zijn de lid-details zichtbaar (de gebruiker moet zelf kiezen).
+    expect(screen.getByText('Betaling een')).toBeInTheDocument()
+    expect(screen.getByText('Betaling twee')).toBeInTheDocument()
+    // De toggle staat op expanded (kan weer inklappen).
+    expect(screen.getByRole('button', { expanded: true, name: /2\s*transacties/i })).toBeInTheDocument()
+    // En de handmatige keuze staat klaar.
+    expect(screen.getByText(/Will kon dit niet zeker plaatsen/i)).toBeInTheDocument()
   })
 })
 

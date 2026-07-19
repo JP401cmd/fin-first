@@ -36,21 +36,53 @@ import { parseLocalCategorizations, type LocalParseResult, type RawLocalCategori
 // zodat de sanitize-scan ('m op de allowlist) 'm herkent (ADR 0035/0043).
 import { loadModelSession, disposeSession } from './litert-runtime'
 
+// ── Tweetraps-drempel voor het lokale (on-device) pad ─────────────────────────
+// Twee grenzen bepalen wat er met een confidence-waarde gebeurt — alles blijft
+// assistief en herzienbaar in de review-UI:
+//
+//   confidence < 0,5        → onbekend: budget_id null, géén gok ("kon niet plaatsen").
+//   0,5 ≤ confidence < 0,8  → voorstel, maar de UI labelt het als 'minder zeker'.
+//   confidence ≥ 0,8        → zeker voorstel.
+//
+// KRUISVERWIJZING (bug-fix jul 2026): de vloer MOET gelijklopen met wat het model
+// geïnstrueerd krijgt. buildCategorizeSystemPrompt in lib/ai/categorize-system-
+// prompt.ts instrueert expliciet "Geef alleen een slug terug bij confidence ≥ 0.5,
+// anders null". De resolver plaatste echter pas vanaf 0,8 — álles tussen 0,5 en 0,8
+// viel stilzwijgend weg naar null (dat was de bug). Prompt en drempel lopen nu
+// aantoonbaar gelijk: LOCAL_MIN_PROPOSAL_CONFIDENCE == de prompt-instructie (0,5).
+// Wijzig je de één, wijzig dan de ander mee.
+
 /**
- * Confidence-drempel voor het lokale pad — architect-besluit (ADR 0043): dít is
- * de single source van deze constante (bewust NIET in lib/constants.ts; het is
- * een AI-/categorisatie-domeinconstante). Strenger dan de cloud-conventie (0,5)
- * omdat het 2B-model op de residustaart zwak is.
+ * VLOER voor het lokale pad. Onder deze confidence plaatst de resolver niets
+ * (budget_id null) — liever niets dan ruis. Gelijk aan de ≥0,5-instructie in
+ * buildCategorizeSystemPrompt (lib/ai/categorize-system-prompt.ts, regel
+ * "Geef alleen een slug terug bij confidence ≥ 0.5"); zie de tweetraps-
+ * toelichting hierboven — prompt en vloer MOETEN gelijk blijven.
+ */
+export const LOCAL_MIN_PROPOSAL_CONFIDENCE = 0.5
+
+/**
+ * "ZEKER"-grens voor het lokale pad — architect-besluit (ADR 0043): dít is de
+ * single source van deze constante (bewust NIET in lib/constants.ts; het is een
+ * AI-/categorisatie-domeinconstante). Sinds de tweetraps-drempel is dit NIET meer
+ * de plaatsingsvloer (dat is {@link LOCAL_MIN_PROPOSAL_CONFIDENCE}) maar de grens
+ * die de review-UI importeert om binnen de geplaatste voorstellen 'minder zeker'
+ * (0,5–0,8) van 'zeker' (≥0,8) te onderscheiden.
  *
  * Drempelcurve uit het fase-0-meetrapport (residu-gouden-set): precisie stijgt
- * van ~39% @ confidence 0,5 naar ~57% @ 0,9, maar de dekking daalt navenant
- * (≥0,9 dekt nog ~12% van de staart; ≥0,8 ≈ 39% precisie bij ~28% dekking).
- * Resultaten onder deze drempel → budget_id null ("onbekend"), geen gok.
+ * van ~39% @ confidence 0,5 naar ~57% @ 0,9, terwijl de dekking daalt (≥0,9 dekt
+ * nog ~12% van de staart; ≥0,8 ≈ 39% precisie bij ~28% dekking). Op deze curve
+ * markeert 0,8 het punt waarop een voorstel gerust als 'zeker' getoond mag worden.
  *
  * Eigenaarsbesluit 19 jul 2026 (na eerste live-gebruik): verlaagd van de
- * startwaarde 0,9 naar 0,8 — de ~12%-dekking voelde als "te weinig voorstellen";
- * dekking weegt nu zwaarder dan maximale precisie. Blijft ruim strenger dan de
- * cloud-conventie (0,5) en alles blijft assistief via de review-UI.
+ * startwaarde 0,9 naar 0,8 — de ~12%-dekking van 0,9 voelde als "te weinig zekere
+ * voorstellen". Blijft ruim boven de vloer (0,5) en alles blijft assistief.
+ *
+ * PAD-AGNOSTISCHE UI-ROL (LOW-1, code-review jul 2026): de review-wizard gebruikt
+ * deze grens óók om cloud-voorstellen te labelen ('minder zeker' < 0,8). De curve
+ * hierboven is op het lokale 2B-model gekalibreerd; voor de sterkere cloud-modellen
+ * is 0,8 een pragmatische, iets conservatieve 'zeker'-grens (bewuste aanname, geen
+ * her-kalibratie). Puur presentatie — raakt geen plaatsing/persist.
  */
 export const LOCAL_MIN_CONFIDENCE = 0.8
 
@@ -103,10 +135,14 @@ function toPromptTx(item: CombinedAiBatchItem): CategorizeUserPromptTx {
  *    niet positioneel. Ontbrekend/onbekend id → die transactie blijft onbekend.
  *    Duplicaat-id → het eerste telt.
  *  - Slug-validatie tegen de aangeboden set (resolveSlug); onbekende slug → null.
- *  - Drempel: confidence < LOCAL_MIN_CONFIDENCE → budget_id null (assistief).
+ *  - Vloer: confidence < LOCAL_MIN_PROPOSAL_CONFIDENCE (0,5) → budget_id null
+ *    (assistief; zie de tweetraps-toelichting bij de constanten). De confidence-
+ *    waarde blijft altijd behouden in het resultaat, zodat de UI 'minder zeker'
+ *    (0,5–0,8) van 'zeker' (≥ LOCAL_MIN_CONFIDENCE) kan labelen.
  *
  * Elke aangeboden transactie krijgt exact één CombinedAiResult terug (budget_id
- * null wanneer onbekend/onzeker), zodat de mapping in de orkestrator eenduidig is.
+ * null wanneer onbekend/onder de vloer), zodat de mapping in de orkestrator
+ * eenduidig is.
  */
 export function mapLocalChunkResults(
   chunkItems: CombinedAiBatchItem[],
@@ -134,8 +170,11 @@ export function mapLocalChunkResults(
     const raw = assigned[i]
     const confidence = raw ? raw.confidence : 0
     const slug = raw ? resolveSlug(raw.budget_slug, validSlugs) : null
-    const belowThreshold = confidence < LOCAL_MIN_CONFIDENCE
-    const budget_id = slug && !belowThreshold ? (slugToId.get(slug) ?? null) : null
+    // Plaats vanaf de VLOER (0,5), niet vanaf de "zeker"-grens (0,8): 0,5–0,8 is
+    // een geldig — maar 'minder zeker' — voorstel; de UI labelt dat via
+    // LOCAL_MIN_CONFIDENCE. confidence blijft hieronder ongewijzigd behouden.
+    const belowFloor = confidence < LOCAL_MIN_PROPOSAL_CONFIDENCE
+    const budget_id = slug && !belowFloor ? (slugToId.get(slug) ?? null) : null
     return {
       id: item.id,
       budget_id,

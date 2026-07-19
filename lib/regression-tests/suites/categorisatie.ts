@@ -18,7 +18,11 @@ import {
 // in buildSession) — mapLocalChunkResults aanroepen triggert dus GEEN zware
 // runtime-import. createLocalAiResolver()(...) NIET aanroepen hier (dat roept
 // loadModelSession() wél aan).
-import { mapLocalChunkResults, LOCAL_MIN_CONFIDENCE } from '@/lib/ai/local/local-categorize-resolver'
+import {
+  mapLocalChunkResults,
+  LOCAL_MIN_CONFIDENCE,
+  LOCAL_MIN_PROPOSAL_CONFIDENCE,
+} from '@/lib/ai/local/local-categorize-resolver'
 import { parseLocalCategorizations } from '@/lib/ai/local/parse'
 
 const CAT = 'kern.categorisatie'
@@ -377,34 +381,53 @@ const tests: TestCase[] = [
   },
   {
     id: 'cat-local-confidence-threshold-cutoff',
-    name: 'Lokale resolver: confidence-afkap op LOCAL_MIN_CONFIDENCE (0,8)',
+    name: 'Lokale resolver: tweetraps-drempel — vloer 0,5 plaatst, 0,8 is enkel de "zeker"-label­grens',
     category: CAT,
     description:
-      'ADR 0043: het lokale pad hanteert een strengere drempel dan de cloud-conventie (0,5) — ' +
-      'onder LOCAL_MIN_CONFIDENCE → budget_id null (assistief: liever niets dan ruis), op/boven de drempel → toegewezen. ' +
-      'Eigenaarsbesluit 19 jul 2026: 0,8 (was startwaarde 0,9 — dekking woog zwaarder na eerste live-gebruik).',
+      'ADR 0043 + bug-fix jul 2026 (Will categoriseert 0): het lokale pad plaatst een voorstel al vanaf de ' +
+      'VLOER (LOCAL_MIN_PROPOSAL_CONFIDENCE = 0,5) — gelijk aan de ≥0,5-instructie in buildCategorizeSystemPrompt. ' +
+      'LOCAL_MIN_CONFIDENCE (0,8, eigenaarsbesluit 19 jul 2026) is GEEN plaatsingsdrempel meer, enkel de grens die ' +
+      'de review-UI gebruikt om "zeker" (≥0,8) van "minder zeker" (0,5–0,8) te onderscheiden. Onder de vloer (< 0,5) ' +
+      'blijft budget_id null (assistief: liever niets dan ruis); daartussen (0,5–0,8) moet WÉL toegewezen worden — ' +
+      'dat middengebied viel vóór de fix stilzwijgend weg naar null.',
     priority: 'critical',
     estimatedDurationMs: 10,
     requiredRole: 'any',
     fn() {
-      assertEqual(LOCAL_MIN_CONFIDENCE, 0.8, 'single-source drempelconstante (eigenaarsbesluit 19 jul 2026)')
+      assertEqual(LOCAL_MIN_PROPOSAL_CONFIDENCE, 0.5, 'single-source vloerconstante (plaatsingsdrempel)')
+      assertEqual(LOCAL_MIN_CONFIDENCE, 0.8, 'single-source "zeker"-labelgrens (eigenaarsbesluit 19 jul 2026)')
       const chunk: CombinedAiBatchItem[] = [
         { id: 'tx-a', description: 'a', counterparty_name: null, amount: -10, reference: null, date: null },
       ]
       const validSlugs = new Set(['boodschappen'])
       const slugToId = new Map([['boodschappen', 'b-1']])
 
-      const belowRaw = JSON.stringify([
-        { id: batchItemId(0), budget_slug: 'boodschappen', confidence: LOCAL_MIN_CONFIDENCE - 0.01 },
+      // Ruim ónder de vloer (0,3): invariant die vóór én ná de tweetraps-fix
+      // klopt — geen voorstel bij lage confidence.
+      const belowFloorRaw = JSON.stringify([
+        { id: batchItemId(0), budget_slug: 'boodschappen', confidence: 0.3 },
       ])
-      const belowOut = mapLocalChunkResults(chunk, parseLocalCategorizations(belowRaw), validSlugs, slugToId)
-      assertEqual(belowOut[0].budget_id, null, 'net onder de drempel → geen voorstel')
+      const belowFloorOut = mapLocalChunkResults(chunk, parseLocalCategorizations(belowFloorRaw), validSlugs, slugToId)
+      assertEqual(belowFloorOut[0].budget_id, null, 'ruim onder de vloer (0,3) → geen voorstel')
 
+      // Kernregressie van de bug-fix: 0,6 zit tussen de vloer (0,5) en de
+      // "zeker"-grens (0,8) — dit voorstel mag NIET meer stilzwijgend
+      // verdwijnen naar null. budget_id wordt gezet, confidence blijft intact
+      // zodat de UI het als "minder zeker" kan labelen.
+      const middleRaw = JSON.stringify([
+        { id: batchItemId(0), budget_slug: 'boodschappen', confidence: 0.6 },
+      ])
+      const middleOut = mapLocalChunkResults(chunk, parseLocalCategorizations(middleRaw), validSlugs, slugToId)
+      assertEqual(middleOut[0].budget_id, 'b-1', '0,6 (vloer < x < zeker-grens) → wél toegewezen')
+      assertEqual(middleOut[0].confidence, 0.6, 'confidence blijft behouden voor de "minder zeker"-label')
+
+      // Op/boven de "zeker"-grens (0,8) blijft toegewezen — dit gedrag was al
+      // waar vóór de fix en moet dat blijven.
       const atRaw = JSON.stringify([
         { id: batchItemId(0), budget_slug: 'boodschappen', confidence: LOCAL_MIN_CONFIDENCE },
       ])
       const atOut = mapLocalChunkResults(chunk, parseLocalCategorizations(atRaw), validSlugs, slugToId)
-      assertEqual(atOut[0].budget_id, 'b-1', 'exact op de drempel → wél toegewezen')
+      assertEqual(atOut[0].budget_id, 'b-1', 'exact op de "zeker"-grens (0,8) → toegewezen')
     },
   },
   {
