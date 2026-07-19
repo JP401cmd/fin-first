@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useCallback, useMemo, useRef } from 'react'
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import {
-  Loader2, CheckCircle, HelpCircle, Check, ChevronDown, GitFork, Sparkles, Wand2, Hand,
+  Loader2, CheckCircle, HelpCircle, Check, ChevronDown, Sparkles, Wand2, Hand,
 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { createClient } from '@/lib/supabase/client'
-import { buildBudgetSelectEntries, budgetOptionLabel, type Budget } from '@/lib/budget-data'
+import { type Budget } from '@/lib/budget-data'
 import { useHouseholdStatus } from '@/components/app/ownership-toggle'
 import { loadAutoCatContext as loadSharedAutoCatContext } from '@/lib/auto-categorize-context'
 import {
@@ -18,14 +18,24 @@ import {
   type AutoAssignment,
   type CombinedAiBatchItem,
   type CombinedAiResult,
-  type CombinedProposalSource,
+  type CombinedProposal,
 } from '@/lib/auto-categorize'
 import { buildBudgetOptions, type BudgetRow } from '@/lib/ai/categorize-budget-options'
-import { createLocalAiResolver, LOCAL_INTERNAL_BATCH_SIZE } from '@/lib/ai/local/local-categorize-resolver'
+import { createLocalAiResolver, LOCAL_REP_BATCH_SIZE } from '@/lib/ai/local/local-categorize-resolver'
 import { checkLocalAiCapability } from '@/lib/ai/local/webgpu-capability'
 import { getLocalModelState } from '@/lib/ai/local/model-manager'
 import { resolveLocalReadiness, type LocalReadiness } from '@/lib/ai/local/local-readiness'
+import { createPrefetchGate, LOCAL_PREFETCH_WINDOW, type PrefetchGate } from '@/lib/categorize/wizard-gate'
+import { CategorizeWizard } from '@/components/app/categorize-wizard'
+import {
+  TransactionRow,
+  type Transaction,
+  type RowState,
+} from '@/components/app/categorize-row'
 
+// Groepen die de gratis stap-1 (regel/eigen-rekening/spiegelpaar) oplevert; deze
+// landen in de wizard-bulk-kaart i.p.v. als losse AI-groepkaart.
+const STAGE1_SOURCES = new Set(['rule', 'transfer', 'mirror'])
 // De Sleepmodus (drag-&-drop) sleept dnd-kit mee — eigen chunk, laadt pas
 // wanneer de gebruiker de modus opent.
 const SleepmodusOverlay = dynamic(
@@ -34,57 +44,11 @@ const SleepmodusOverlay = dynamic(
 )
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-type Transaction = {
-  id: string
-  date: string
-  description: string
-  counterparty_name: string | null
-  counterparty_iban: string | null
-  amount: number
-  import_hash: string | null
-  budget_id: string | null
-  reference?: string | null
-  /** Nodig voor spiegelpaar-detectie (overboekingen tussen eigen rekeningen). */
-  account_id?: string | null
-}
-
-/**
- * Eén voorstel in de review-fase. Sinds de combined pass komen voorstellen uit
- * VIER bronnen — regelmotor ('rule'), eigen-rekening/spiegelpaar ('transfer'/
- * 'mirror'), AI ('ai') en propagatie van een AI-oordeel naar dezelfde
- * tegenpartij ('propagated'). ALLE bronnen worden ter bevestiging voorgelegd;
- * niets wordt in deze flow stil toegepast.
- */
-type SheetSuggestion = {
-  budget_id: string
-  budget_name: string | null
-  confidence: number
-  reasoning: string | null
-  source: CombinedProposalSource
-  /** Waarde voor transactions.category_source bij accepteren. */
-  category_source: string
-}
-
-/** Herkomst-label per voorstel-bron (review-rij + kop). */
-const SOURCE_LABELS: Record<CombinedProposalSource, string> = {
-  rule: 'Regel',
-  transfer: 'Overboeking',
-  mirror: 'Overboeking',
-  ai: 'Will',
-  propagated: 'Afgeleid',
-}
-
-type RowState = {
-  tx: Transaction
-  suggestion: SheetSuggestion | null
-  accepted: boolean
-  acceptedBudgetId: string | null
-  acceptedBudgetName: string | null
-  /** category_source die handleSave voor deze rij wegschrijft (herkomst-getrouw). */
-  acceptedCategorySource: string | null
-  makeRule: boolean
-}
+//
+// Transaction / SheetSuggestion / RowState / SOURCE_LABELS / TransactionRow /
+// formatCurrency / formatDate wonen in components/app/categorize-row.tsx zodat
+// zowel de platte reviewlijst als de "Vraag Will"-wizard exact dezelfde rij
+// hergebruiken (WP-C, feature #881).
 
 type BulkApplyPrompt = {
   matchField: 'counterparty_name' | 'description'
@@ -118,23 +82,6 @@ const ALL_TIME_PAGE_SIZE = 1000
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('nl-NL', {
-    style: 'currency',
-    currency: 'EUR',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value)
-}
-
-function formatDate(dateStr: string): string {
-  return new Date(dateStr + 'T00:00:00').toLocaleDateString('nl-NL', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-  })
-}
-
 const SHOW_MORE_STEP = 20
 
 /** Map een sheet-transactie naar de minimale vorm voor de auto-categorisatie.
@@ -166,6 +113,27 @@ export function AICategorizeSheet({
 }: Props) {
   const [phase, setPhase] = useState<'choice' | 'ai' | 'review' | 'saving' | 'applying' | 'success' | 'sleep'>('choice')
   const [rows, setRows] = useState<RowState[]>([])
+  // Review-weergave: 'wizard' voor het "Vraag Will"-pad (bulk-kaart + AI-
+  // groepkaarten), 'list' voor het handmatige pad (de bestaande platte lijst,
+  // ongewijzigd). fetchSuggestions zet 'wizard', startManual zet 'list'.
+  const [reviewMode, setReviewMode] = useState<'wizard' | 'list'>('list')
+  // DOM-node van de sticky footer-slot van de BottomSheet: de wizard portalt zijn
+  // primaire-actieblok hierin (niet-scrollend), zodat de vier keuzes + "Stoppen"
+  // niet met de kaart-body meescrollen (CLAUDE.md: primaire acties in footerSlot).
+  const [wizardFooterNode, setWizardFooterNode] = useState<HTMLDivElement | null>(null)
+  // Draait de motor nog AI-rondes? Stuurt de "Will denkt na…"-laadstatus en de
+  // wakelock in de wizard.
+  const [aiRunning, setAiRunning] = useState(false)
+  // Deelverzameling voor de sleepmodus vanuit een wizard-groep ("Zelf indelen"):
+  // de tx-id's van die groep. null = de gewone, volledige sleepmodus.
+  const [sleepSubset, setSleepSubset] = useState<string[] | null>(null)
+  // Incrementele voorstellen tijdens de streaming AI-fase: we verzamelen ze in een
+  // ref en flushen per ronde naar `rows` (nooit setState per individueel voorstel —
+  // dat zouden er duizenden zijn bij "Alle tijden").
+  const proposalsRef = useRef<Map<string, CombinedProposal>>(new Map())
+  // Prefetch-gate (alleen lokaal pad): remt de motor af tot een venster vóór de
+  // getoonde groep. De wizard meldt voortgang via gate.releaseUpTo.
+  const gateRef = useRef<PrefetchGate | null>(null)
   const { hasHousehold } = useHouseholdStatus()
   // Standaard aan: een keuze voor een gedeeld budget maakt de transactie ook
   // gezamenlijk. Alleen relevant met een huishouden + minstens één gedeeld budget.
@@ -176,7 +144,6 @@ export function AICategorizeSheet({
   const [ruleCount, setRuleCount] = useState(0)
   const [bulkUpdated, setBulkUpdated] = useState(0)
   const [bulkApplyPrompt, setBulkApplyPrompt] = useState<BulkApplyPrompt | null>(null)
-  const [aiBatchProgress, setAiBatchProgress] = useState({ current: 0, total: 0, round: 0, propagated: 0 })
   // Privé-modus: draait de AI-fase on-device (Gemma 4 E2B/WebGPU) i.p.v. cloud.
   // Alleen een UI-hint-vlag ("experimenteel — lokaal op dit apparaat"); de
   // resolver-keuze zelf gebeurt in fetchSuggestions op basis van profiles.privacy_mode.
@@ -188,6 +155,17 @@ export function AICategorizeSheet({
   // Annuleren van de combined pass: abort tussen AI-rondes; de al-gedane
   // voorstellen blijven staan en landen gewoon in de review (niets toegepast).
   const abortRef = useRef<AbortController | null>(null)
+  // Unmount/sluit-abort: sluit de gebruiker de sheet (X/backdrop/Escape) terwijl
+  // de motor nog draait, dan hangt die op het lokale pad gesuspendeerd op de gate
+  // (`await onBeforeRound`) en blijft de lokale modelsessie hangen. Bij unmount
+  // breken we motor én gate af zodat alles netjes stopt.
+  useEffect(() => () => {
+    abortRef.current?.abort()
+    gateRef.current?.abort()
+  }, [])
+  // Vroegtijdig gestopt ("Stoppen en tot hier bewaren")? Stuurt het afsluitscherm:
+  // een beschrijvende "wat nu"-duiding i.p.v. de generieke afrond-copy.
+  const [stoppedEarly, setStoppedEarly] = useState(false)
   // Budget-id van de "Eigen rekening"-post, geresolved bij de auto-context-laad.
   // Nodig zodat handleSave bij een geaccepteerd eigen-rekening-budget óók
   // transaction_type='transfer' meeschrijft (de cijfer-filtering hangt aan die
@@ -358,15 +336,32 @@ export function AICategorizeSheet({
   // transfer-hits landen als voorstel in de review, met een herkomst-label.
 
   const fetchSuggestions = useCallback(async () => {
-    setPhase('ai')
     setAiError(null)
     setLocalSessionState('idle')
-    setAiBatchProgress({ current: 0, total: 0, round: 0, propagated: 0 })
+    setStoppedEarly(false)
+    setReviewMode('wizard')
+    setAiRunning(true)
+    proposalsRef.current = new Map()
+    gateRef.current = null
     abortRef.current = new AbortController()
 
     // Snapshot the resolved set so async work below can't race with a scope
     // change. Manual / AI flow always operates on the same list.
     const sourceTx = activeTransactions
+
+    // Toon de wizard meteen (streaming): lege rijen die per ronde worden gevuld —
+    // de bulk-kaart is direct zichtbaar zodra stap 1 (regels/overboekingen) klaar
+    // is, de AI-groepkaarten druppelen daarna binnen.
+    setRows(sourceTx.map((tx) => ({
+      tx,
+      suggestion: null,
+      accepted: false,
+      acceptedBudgetId: null,
+      acceptedBudgetName: null,
+      acceptedCategorySource: null,
+      makeRule: false,
+    })))
+    setPhase('review')
 
     // Context laden; mislukt dat, dan degradeert de pass naar "alles onbekend →
     // AI" (lege regels/frequentie, geen eigen-rekening-detectie) — zelfde
@@ -482,8 +477,39 @@ export function AICategorizeSheet({
         aiResolver = createLocalAiResolver(localOptions, {
           onSessionState: (s) => setLocalSessionState(s),
         })
-        aiBatchSize = LOCAL_INTERNAL_BATCH_SIZE
+        // Lokaal pad: kleine groep-rondes (LOCAL_REP_BATCH_SIZE) + prefetch-gate
+        // (LOCAL_PREFETCH_WINDOW) zodat de wizard voorstellen krijgt zodra ze klaar
+        // zijn, zonder de hele batch vooruit te draaien. Cloud houdt de default (20
+        // groepen, geen gate). INVARIANT: aiBatchSize === repBatchSize (== de
+        // wizard-`repBatchSize`, LOCAL_REP_BATCH_SIZE) — de gate rekent rondes ↔
+        // getoonde groepen om via dat gelijke getal (zie wizard-gate.ts).
+        aiBatchSize = LOCAL_REP_BATCH_SIZE
+        gateRef.current = createPrefetchGate(LOCAL_PREFETCH_WINDOW)
       }
+    }
+
+    // Flush: bouw de suggesties opnieuw op uit de ref (per ronde aangeroepen).
+    // Behoudt reeds geaccepteerde rijen; overschrijft nooit een gebruikerskeuze.
+    const budgetNameById = new Map(flatBudgets.map((b) => [b.id, b.name] as const))
+    const flushRows = () => {
+      const map = proposalsRef.current
+      setRows((prev) =>
+        prev.map((r) => {
+          if (r.accepted) return r
+          const p = map.get(r.tx.id)
+          const suggestion = p
+            ? {
+                budget_id: p.budget_id,
+                budget_name: budgetNameById.get(p.budget_id) ?? null,
+                confidence: p.confidence,
+                reasoning: p.reasoning,
+                source: p.source,
+                category_source: p.category_source,
+              }
+            : null
+          return { ...r, suggestion }
+        }),
+      )
     }
 
     try {
@@ -493,10 +519,20 @@ export function AICategorizeSheet({
         aiResolver,
         {
           batchSize: aiBatchSize,
-          onProgress: (p) => setAiBatchProgress({ current: p.processed, total: p.total, round: p.round, propagated: p.propagated }),
+          groupOrder: 'largest-first',
+          onBeforeRound: gateRef.current?.onBeforeRound,
+          // Verzamel elk voorstel in de ref; NIET per voorstel setState (kunnen er
+          // duizenden zijn) — we flushen per ronde in onProgress.
+          onProposal: (p) => proposalsRef.current.set(p.id, p),
+          // Per ronde: flush de tot nu toe binnengekomen voorstellen naar de rijen
+          // (bulk-kaart + AI-groepkaarten updaten). Nooit per individueel voorstel.
+          onProgress: () => flushRows(),
           signal: abortRef.current.signal,
         },
       )
+
+      // Definitieve flush (vangt een eventuele laatste, niet-geëmitte ronde af).
+      flushRows()
 
       // Alle AI-rondes mislukt en géén enkel AI-voorstel → meld het; de lokale
       // (regel/transfer/spiegel-)voorstellen staan wél gewoon in de review.
@@ -510,52 +546,21 @@ export function AICategorizeSheet({
               : 'AI-analyse is nu niet beschikbaar — de voorstellen van je regels staan wel klaar.',
         )
       }
-
-      const budgetNameById = new Map(flatBudgets.map((b) => [b.id, b.name] as const))
-      const initialRows: RowState[] = sourceTx.map((tx) => {
-        const p = result.proposals.get(tx.id)
-        // Voorstellen worden NIET vooraf geaccepteerd; de gebruiker beslist per rij.
-        return {
-          tx,
-          suggestion: p
-            ? {
-                budget_id: p.budget_id,
-                budget_name: budgetNameById.get(p.budget_id) ?? null,
-                confidence: p.confidence,
-                reasoning: p.reasoning,
-                source: p.source,
-                category_source: p.category_source,
-              }
-            : null,
-          accepted: false,
-          acceptedBudgetId: null,
-          acceptedBudgetName: null,
-          acceptedCategorySource: null,
-          makeRule: false,
-        }
-      })
-
-      setRows(initialRows)
-      setPhase('review')
     } catch (err) {
       // Onverwachte fout buiten de AI-rondes om (resolver-fouten worden al per
-      // ronde opgevangen) → review zonder voorstellen, met melding.
+      // ronde opgevangen) → de al-binnengekomen voorstellen staan al in de wizard;
+      // toon enkel een melding.
       const msg = err instanceof Error ? err.message : 'AI-analyse niet beschikbaar'
       setAiError(msg)
-      setRows(sourceTx.map((tx) => ({
-        tx,
-        suggestion: null,
-        accepted: false,
-        acceptedBudgetId: null,
-        acceptedBudgetName: null,
-        acceptedCategorySource: null,
-        makeRule: false,
-      })))
-      setPhase('review')
+      flushRows()
+    } finally {
+      setAiRunning(false)
     }
   }, [activeTransactions, loadAutoCatContext, flatBudgets])
 
   function startManual() {
+    setReviewMode('list')
+    setAiRunning(false)
     setRows(activeTransactions.map((tx) => ({
       tx,
       suggestion: null,
@@ -705,6 +710,114 @@ export function AICategorizeSheet({
     }))
   }
 
+  // ── Wizard-acties ("Vraag Will"-pad) ───────────────────────────────────────
+  // Wrappers om de bestaande accept-semantiek — NIETS herimplementeren. De
+  // wizard werkt op tx-id's; opslaan loopt via het bestaande handleSave-pad.
+
+  /** Accepteer alle stap-1-voorstellen in één keer (bulk-kaart "Akkoord, allemaal"). */
+  function acceptStage1() {
+    setRows((prev) => prev.map((r) => {
+      if (!r.suggestion?.budget_id || r.accepted) return r
+      if (!STAGE1_SOURCES.has(r.suggestion.source)) return r
+      const budget = flatBudgets.find((b) => b.id === r.suggestion!.budget_id)
+      return {
+        ...r,
+        accepted: true,
+        acceptedBudgetId: r.suggestion.budget_id,
+        acceptedBudgetName: budget?.name ?? r.suggestion.budget_name,
+        acceptedCategorySource: r.suggestion.category_source,
+        makeRule: false,
+      }
+    }))
+  }
+
+  /** Accepteer het voorstel voor een hele AI-groep (alle tx-id's samen). */
+  function acceptGroup(txIds: string[]) {
+    const idset = new Set(txIds)
+    setRows((prev) => prev.map((r) => {
+      if (!idset.has(r.tx.id) || !r.suggestion?.budget_id || r.accepted) return r
+      const budget = flatBudgets.find((b) => b.id === r.suggestion!.budget_id)
+      const isEigenRekening = !!eigenRekeningBudgetId && r.suggestion.budget_id === eigenRekeningBudgetId
+      return {
+        ...r,
+        accepted: true,
+        acceptedBudgetId: r.suggestion.budget_id,
+        acceptedBudgetName: budget?.name ?? r.suggestion.budget_name,
+        acceptedCategorySource: r.suggestion.category_source,
+        makeRule: r.suggestion.source === 'ai' && !isEigenRekening,
+      }
+    }))
+  }
+
+  /** Zet een handmatig gekozen budget op een hele AI-groep ("Andere categorie"). */
+  function setGroupBudget(txIds: string[], budgetId: string, makeRule: boolean) {
+    if (!budgetId) return
+    const idset = new Set(txIds)
+    const budget = flatBudgets.find((b) => b.id === budgetId)
+    setRows((prev) => prev.map((r) => {
+      if (!idset.has(r.tx.id)) return r
+      return {
+        ...r,
+        accepted: true,
+        acceptedBudgetId: budgetId,
+        acceptedBudgetName: budget?.name ?? null,
+        acceptedCategorySource: 'manual',
+        makeRule,
+      }
+    }))
+  }
+
+  /** Accepteer het voorstel alléén voor de getoonde transactie ("Alleen deze ene").
+   *  De siblings blijven onbeoordeeld en keren later als kleinere kaart terug. */
+  function acceptOne(txId: string) {
+    setRows((prev) => prev.map((r) => {
+      if (r.tx.id !== txId || !r.suggestion?.budget_id || r.accepted) return r
+      const budget = flatBudgets.find((b) => b.id === r.suggestion!.budget_id)
+      return {
+        ...r,
+        accepted: true,
+        acceptedBudgetId: r.suggestion.budget_id,
+        acceptedBudgetName: budget?.name ?? r.suggestion.budget_name,
+        acceptedCategorySource: r.suggestion.category_source,
+        makeRule: false,
+      }
+    }))
+  }
+
+  /** Open de sleepmodus voor precies de tx-id's van een groep ("Zelf indelen"). */
+  function splitGroup(txIds: string[]) {
+    setSleepSubset(txIds)
+    setPhase('sleep')
+  }
+
+  /** Sluit de wizard-sleepmodus af: haal de behandelde rijen uit de wizard zodat
+   *  de volgende groep verschijnt (niet terug naar het keuzescherm). */
+  function finishSleepSubset() {
+    const idset = new Set(sleepSubset ?? [])
+    setRows((prev) => prev.filter((r) => !idset.has(r.tx.id)))
+    setSleepSubset(null)
+    setPhase('review')
+  }
+
+  /** "Stoppen en tot hier bewaren": breek de nog lopende motor + gate af (zodat
+   *  prefetched-maar-ongetoonde voorstellen niet meer binnenkomen) en bewaar
+   *  wat er is geaccepteerd via het bestaande handleSave-pad. */
+  function handleStop() {
+    abortRef.current?.abort()
+    gateRef.current?.abort()
+    setStoppedEarly(true)
+    // Niets geaccepteerd → niet opslaan (voorkomt een misleidend "0 opgeslagen"-
+    // succesje). Toon direct het afsluitscherm met passende "wat nu"-copy.
+    if (acceptedCount === 0) {
+      setSavedCount(0)
+      setRuleCount(0)
+      setBulkUpdated(0)
+      setPhase('success')
+      return
+    }
+    void handleSave()
+  }
+
   // ── Save ─────────────────────────────────────────────────────────────────
 
   async function handleSave() {
@@ -846,7 +959,16 @@ export function AICategorizeSheet({
     {/* De sheet sluit visueel tijdens de Sleepmodus (open=false) — daarmee
         deactiveren ook zijn document-level Escape-listener en focus-trap,
         zodat die niet vechten met de fullscreen overlay. State blijft staan. */}
-    <BottomSheet open={phase !== 'sleep'} onClose={onClose} title="Transacties categoriseren">
+    <BottomSheet
+      open={phase !== 'sleep'}
+      onClose={onClose}
+      title="Transacties categoriseren"
+      footerSlot={
+        phase === 'review' && reviewMode === 'wizard'
+          ? <div ref={setWizardFooterNode} />
+          : undefined
+      }
+    >
 
       {/* ── Choice ── */}
       {/* BottomSheet's content-area heeft zelf geen horizontale padding —
@@ -1008,93 +1130,6 @@ export function AICategorizeSheet({
         </div>
       )}
 
-      {/* ── AI processing (combined pass: regels → AI-rondes → propagatie) ── */}
-      {phase === 'ai' && (
-        <div className="space-y-5 px-5 py-6 sm:px-6">
-          <div className="flex flex-col items-center gap-3 pb-3">
-            <Loader2 className="h-7 w-7 animate-spin text-wil-500" />
-            <p className="text-sm font-medium text-[var(--ink-2)]">
-              {aiBatchProgress.total > 0
-                ? <>Will categoriseert… <span className="font-mono tabular-nums">{aiBatchProgress.current}</span> van <span className="font-mono tabular-nums">{aiBatchProgress.total}</span> onbekende transacties{aiBatchProgress.round > 0 && <> · ronde <span className="font-mono tabular-nums">{aiBatchProgress.round}</span></>}</>
-                : 'Je regels en eerdere keuzes delen eerst in…'
-              }
-            </p>
-            {aiBatchProgress.propagated > 0 && (
-              <p className="text-[11px] text-[var(--ink-3)]">
-                <span className="font-mono tabular-nums">{aiBatchProgress.propagated}</span> afgeleid van eerdere Will-oordelen (zonder extra AI-ronde)
-              </p>
-            )}
-            {localMode && (
-              <p className="rounded-full border border-dashed border-wil-300 bg-wil-50/60 px-2.5 py-1 text-[10px] font-medium text-wil-700">
-                Experimenteel — lokaal op dit apparaat, je transactiedata verlaat je toestel niet
-              </p>
-            )}
-            {localMode && localSessionState === 'starten' && (
-              <p className="text-[11px] leading-relaxed text-wil-700">
-                Lokale AI wordt gestart — een paar seconden…
-              </p>
-            )}
-          </div>
-
-          {/* Progress bar */}
-          {aiBatchProgress.total > 0 && (
-            <div className="h-1.5 rounded-full bg-wil-100 overflow-hidden mx-4">
-              <div
-                className="h-1.5 rounded-full bg-wil-500"
-                style={{
-                  width: `${(aiBatchProgress.current / aiBatchProgress.total) * 100}%`,
-                  transition: 'width 0.4s ease-out',
-                }}
-              />
-            </div>
-          )}
-
-          {/* Will editorial quote card — toon het WERKELIJKE aantal dat de AI-fase
-              in gaat (aiBatchProgress.total = alles wat de gratis regel-stap NIET
-              kon indelen). Vóór de teller gezet is, val terug op de actieve set. */}
-          <div className="rounded-[var(--r-lg)] border border-dashed border-wil-200 bg-wil-50/50 px-4 py-4">
-            <p className="font-[var(--font-source-serif)] text-[13px] italic leading-relaxed text-[var(--ink-2)] border-l-[3px] border-wil-500 pl-3">
-              {(() => {
-                const n = aiBatchProgress.total > 0 ? aiBatchProgress.total : activeTransactions.length
-                return (
-                  <>
-                    &ldquo;{n} {n === 1 ? 'transactie wordt' : 'transacties worden'} vergeleken met jouw
-                    eerdere gewoonten…&rdquo;
-                  </>
-                )
-              })()}
-            </p>
-            <p className="mt-3 text-[10px] font-semibold uppercase tracking-[0.1em] text-wil-600">— Will</p>
-          </div>
-
-          {/* Annuleren: breekt af tussen AI-rondes; wat al een voorstel heeft
-              blijft staan en landt gewoon in de review (er is niets toegepast). */}
-          <div className="flex justify-center">
-            <button
-              type="button"
-              onClick={() => abortRef.current?.abort()}
-              className="rounded-[var(--r)] border border-[var(--border-md)] px-4 py-2 min-h-[44px] text-xs text-[var(--ink-2)] hover:bg-[var(--subtle)]"
-            >
-              Stoppen en tot hier bekijken
-            </button>
-          </div>
-
-          {/* Skeleton rows */}
-          <div className="space-y-3">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] p-3 animate-pulse">
-                <div className="flex justify-between">
-                  <div className="h-3 w-32 rounded bg-[var(--subtle)]" />
-                  <div className="h-3 w-16 rounded bg-[var(--subtle)]" />
-                </div>
-                <div className="mt-2 h-2.5 w-48 rounded bg-[var(--subtle)]" />
-                <div className="mt-2 h-7 w-full rounded bg-[var(--subtle)]" />
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* ── Review ── */}
       {phase === 'review' && (
         <div className="flex flex-col gap-0 px-5 pb-5 sm:px-6">
@@ -1181,30 +1216,56 @@ export function AICategorizeSheet({
             </div>
           )}
 
-          {/* Transaction rows */}
-          <div className="space-y-3">
-            {rows.slice(0, showCount).map((row, idx) => (
-              <TransactionRow
-                key={row.tx.id}
-                row={row}
-                idx={idx}
-                budgetGroups={budgetGroups}
-                onAcceptSuggestion={() => acceptSuggestion(idx)}
-                onManualBudget={(bId) => setManualBudget(idx, bId)}
-                onToggleMakeRule={() => toggleMakeRule(idx)}
-              />
-            ))}
-          </div>
+          {/* Review-weergave: wizard ("Vraag Will") of platte lijst (handmatig) */}
+          {reviewMode === 'wizard' ? (
+            <CategorizeWizard
+              rows={rows}
+              budgetGroups={budgetGroups}
+              eigenRekeningBudgetId={eigenRekeningBudgetId}
+              aiPhaseActive={aiRunning}
+              localMode={localMode}
+              localSessionState={localSessionState}
+              repBatchSize={LOCAL_REP_BATCH_SIZE}
+              footerContainer={wizardFooterNode}
+              onAcceptSuggestion={acceptSuggestion}
+              onManualBudget={setManualBudget}
+              onToggleMakeRule={toggleMakeRule}
+              onBulkAcceptStage1={acceptStage1}
+              onAcceptGroup={acceptGroup}
+              onSetGroupBudget={setGroupBudget}
+              onAcceptOne={acceptOne}
+              onSplitGroup={splitGroup}
+              onStop={handleStop}
+              onAdvanceRound={(n) => gateRef.current?.releaseUpTo(n)}
+            />
+          ) : (
+            <>
+              {/* Transaction rows (handmatig pad) */}
+              <div className="space-y-3">
+                {rows.slice(0, showCount).map((row, idx) => (
+                  <TransactionRow
+                    key={row.tx.id}
+                    row={row}
+                    idx={idx}
+                    budgetGroups={budgetGroups}
+                    onAcceptSuggestion={() => acceptSuggestion(idx)}
+                    onManualBudget={(bId) => setManualBudget(idx, bId)}
+                    onToggleMakeRule={() => toggleMakeRule(idx)}
+                  />
+                ))}
+              </div>
 
-          {rows.length > showCount && (
-            <button
-              type="button"
-              onClick={() => setShowCount((n) => n + SHOW_MORE_STEP)}
-              className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-[var(--r)] border border-dashed border-[var(--border-md)] py-3 text-xs text-[var(--ink-3)] hover:bg-[var(--subtle)]"
-            >
-              <ChevronDown className="h-3.5 w-3.5" />
-              {rows.length - showCount} meer transacties tonen
-            </button>
+              {rows.length > showCount && (
+                <button
+                  type="button"
+                  onClick={() => setShowCount((n) => n + SHOW_MORE_STEP)}
+                  className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-[var(--r)] border border-dashed border-[var(--border-md)] py-3 text-xs text-[var(--ink-3)] hover:bg-[var(--subtle)]"
+                >
+                  <ChevronDown className="h-3.5 w-3.5" />
+                  {rows.length - showCount} meer transacties tonen
+                </button>
+              )}
+            </>
           )}
         </div>
       )}
@@ -1233,7 +1294,21 @@ export function AICategorizeSheet({
           </div>
           <div>
             <p className="text-lg font-bold font-[var(--font-playfair)] text-[var(--ink)]">Klaar</p>
-            {autoSummary ? (
+            {stoppedEarly ? (
+              // Vroegtijdig gestopt → beschrijvende "wat nu"-duiding (Will-toon):
+              // wat is bewaard en hoeveel staat er nog open. Y = nog niet
+              // beoordeelde (niet-geaccepteerde) transacties.
+              savedCount === 0 ? (
+                <p className="mt-2 text-sm text-[var(--ink-2)]">
+                  Niets opgeslagen · {pendingCount} {pendingCount === 1 ? 'transactie' : 'transacties'} nog open.
+                </p>
+              ) : (
+                <p className="mt-2 text-sm text-[var(--ink-2)]">
+                  {savedCount} {savedCount === 1 ? 'voorstel' : 'voorstellen'} opgeslagen · {pendingCount}{' '}
+                  {pendingCount === 1 ? 'transactie' : 'transacties'} nog niet beoordeeld — start &lsquo;Vraag Will&rsquo; opnieuw wanneer je wilt.
+                </p>
+              )
+            ) : autoSummary ? (
               <>
                 <p className="mt-2 text-sm text-[var(--ink-2)]">
                   {savedCount === 0
@@ -1278,182 +1353,26 @@ export function AICategorizeSheet({
       )}
     </BottomSheet>
 
-    {/* ── Sleepmodus — fullscreen drag-&-drop boven de (gesloten) sheet ── */}
+    {/* ── Sleepmodus — fullscreen drag-&-drop boven de (gesloten) sheet ──
+        Twee ingangen: het keuzescherm (volledige set) én een wizard-groep
+        ("Zelf indelen", sleepSubset = die tx-id's). Bij de wizard-variant keren
+        we ná afloop terug naar de wizard (volgende groep), niet naar het
+        keuzescherm. */}
     {phase === 'sleep' && (
       <SleepmodusOverlay
-        transactions={activeTransactions}
+        transactions={
+          sleepSubset
+            ? rows.filter((r) => sleepSubset.includes(r.tx.id)).map((r) => r.tx)
+            : activeTransactions
+        }
         budgets={budgets}
         budgetGroups={budgetGroups}
         hasHousehold={hasHousehold}
-        monthLabel={scope === 'month' ? monthLabel : undefined}
-        onExit={() => setPhase('choice')}
-        onDone={onSaved}
+        monthLabel={sleepSubset ? undefined : scope === 'month' ? monthLabel : undefined}
+        onExit={() => (sleepSubset ? finishSleepSubset() : setPhase('choice'))}
+        onDone={() => (sleepSubset ? finishSleepSubset() : onSaved())}
       />
     )}
     </>
-  )
-}
-
-// ─── Transaction Row ───────────────────────────────────────────────────────────
-
-type RowProps = {
-  row: RowState
-  idx: number
-  budgetGroups: { parent: Budget; children: Budget[] }[]
-  onAcceptSuggestion: () => void
-  onManualBudget: (budgetId: string) => void
-  onToggleMakeRule: () => void
-}
-
-function TransactionRow({ row, budgetGroups, onAcceptSuggestion, onManualBudget, onToggleMakeRule }: RowProps) {
-  const { tx, suggestion, accepted, acceptedBudgetName, makeRule } = row
-  const hasSuggestion = !!suggestion?.budget_id
-
-  return (
-    <div className={`rounded-[var(--r-lg)] border p-4 transition-colors ${
-      accepted
-        ? 'border-positive/30 bg-positive/5'
-        : 'border-[var(--border-ed)] bg-[var(--paper)]'
-    }`}>
-      {/* Row header */}
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <p className="text-[10px] text-[var(--ink-3)]">{formatDate(tx.date)}</p>
-          <p className="mt-1 truncate text-sm font-medium text-[var(--ink)] line-clamp-2">{tx.description}</p>
-          {tx.counterparty_name && (
-            <p className="mt-1 truncate text-[11px] text-[var(--ink-3)]">{tx.counterparty_name}</p>
-          )}
-        </div>
-        <div className="shrink-0 text-right">
-          <p className={`font-[var(--font-dm-mono)] text-sm font-medium tabular-nums ${
-            tx.amount > 0 ? 'text-positive' : 'text-[var(--ink)]'
-          }`}>
-            {tx.amount > 0 ? '+' : ''}{formatCurrency(tx.amount)}
-          </p>
-          {accepted && (
-            <span className="mt-1 flex items-center justify-end gap-0.5 text-[10px] text-positive">
-              <Check className="h-3 w-3" />
-              Gekeurd
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Voorstel-blok — regel, Will, afgeleid of overboeking (herkomst-label per rij) */}
-      {hasSuggestion && !accepted && (
-        <div className="mt-3 rounded-r-[var(--r-sm)] border border-dashed border-kern-200 bg-kern-50/50 px-3 py-3">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1 mb-2">
-                <Sparkles className="h-3 w-3 text-kern-500 shrink-0" />
-                <span className="shrink-0 rounded-full border border-kern-200 bg-[var(--paper)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-kern-700">
-                  {SOURCE_LABELS[suggestion.source]}
-                </span>
-                {suggestion.reasoning && (
-                  <p className="font-[var(--font-source-serif)] text-[11px] italic text-[var(--ink-2)] line-clamp-2">
-                    {suggestion.reasoning}
-                  </p>
-                )}
-              </div>
-              <p className="text-xs font-medium text-kern-700">
-                {budgetGroups.flatMap((g) => g.children).find((b) => b.id === suggestion.budget_id)?.name ?? suggestion.budget_name}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={onAcceptSuggestion}
-              className="shrink-0 inline-flex items-center gap-1 rounded-[var(--r-sm)] bg-[var(--kern)] px-3 py-2 text-xs font-medium text-white min-h-[44px] hover:opacity-90"
-            >
-              <Check className="h-3 w-3" />
-              OK
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Accepted AI suggestion — show rule toggle */}
-      {accepted && hasSuggestion && (
-        <div className="mt-3 flex items-center gap-2 rounded-[var(--r-sm)] border border-dashed border-[var(--border-ed)] px-3 py-2.5">
-          <GitFork className="h-3.5 w-3.5 text-[var(--ink-3)] shrink-0" />
-          <span className="text-[11px] text-[var(--ink-3)] flex-1">
-            Maak ook een regel
-            <span className="ml-1 text-[var(--ink-4)]">
-              Altijd &ldquo;{tx.counterparty_name || tx.description.slice(0, 30)}&rdquo; → {acceptedBudgetName}
-            </span>
-          </span>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={makeRule}
-            onClick={onToggleMakeRule}
-            className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${
-              makeRule ? 'bg-kern-500' : 'bg-[var(--border-md)]'
-            }`}
-          >
-            <span className={`inline-block h-3 w-3 rounded-full bg-white shadow transition-transform ${
-              makeRule ? 'translate-x-3.5' : 'translate-x-0.5'
-            }`} />
-          </button>
-        </div>
-      )}
-
-      {/* Manual selection — no AI suggestion or manual override */}
-      {!hasSuggestion && (
-        <div className="mt-3 flex items-center gap-2">
-          <HelpCircle className="h-3.5 w-3.5 text-[var(--ink-4)] shrink-0" />
-          <select
-            value={row.acceptedBudgetId ?? ''}
-            onChange={(e) => onManualBudget(e.target.value)}
-            className="flex-1 rounded border border-[var(--border-ed)] px-2 py-2 min-h-[44px] text-xs outline-none focus:border-kern-500"
-          >
-            <option value="">Kies handmatig</option>
-            {buildBudgetSelectEntries(budgetGroups).map((entry) =>
-              entry.kind === 'group' ? (
-                <optgroup key={entry.id} label={entry.label}>
-                  {entry.options.map((c) => (
-                    <option key={c.id} value={c.id}>{budgetOptionLabel(c)}</option>
-                  ))}
-                </optgroup>
-              ) : (
-                <option key={entry.id} value={entry.id}>{budgetOptionLabel(entry)}</option>
-              )
-            )}
-          </select>
-        </div>
-      )}
-
-      {/* B-06: de losse "Andere categorie kiezen →"-knop is verwijderd. Hij had een
-          lege onClick (no-op) terwijl de keuzelijst hieronder al zichtbaar is onder
-          exact dezelfde conditie (hasSuggestion && !accepted). De knop was dus puur
-          verwarrend; de select met eigen label "— Andere categorie kiezen —" is de
-          enige, duidelijke ingang voor een handmatige override. */}
-
-      {/* Manual override dropdown for rows that had AI suggestions */}
-      {hasSuggestion && (
-        <div className={`mt-2 ${accepted ? 'hidden' : ''}`} id={`manual-${row.tx.id}`}>
-          <select
-            value=""
-            onChange={(e) => {
-              if (e.target.value) onManualBudget(e.target.value)
-            }}
-            className="w-full rounded border border-dashed border-[var(--border-ed)] px-2 py-2 min-h-[44px] text-xs text-[var(--ink-3)] outline-none focus:border-kern-500 focus:text-[var(--ink)]"
-            aria-label="Andere categorie kiezen"
-          >
-            <option value="">— Andere categorie kiezen —</option>
-            {buildBudgetSelectEntries(budgetGroups).map((entry) =>
-              entry.kind === 'group' ? (
-                <optgroup key={entry.id} label={entry.label}>
-                  {entry.options.map((c) => (
-                    <option key={c.id} value={c.id}>{budgetOptionLabel(c)}</option>
-                  ))}
-                </optgroup>
-              ) : (
-                <option key={entry.id} value={entry.id}>{budgetOptionLabel(entry)}</option>
-              )
-            )}
-          </select>
-        </div>
-      )}
-    </div>
   )
 }

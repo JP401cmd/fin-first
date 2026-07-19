@@ -22,6 +22,8 @@ import {
   mapLocalChunkResults,
   suggestLocalMaxNewTokens,
   LOCAL_MIN_CONFIDENCE,
+  LOCAL_REP_BATCH_SIZE,
+  LOCAL_INTERNAL_BATCH_SIZE,
 } from './local-categorize-resolver'
 import { parseLocalCategorizations } from './parse'
 import { batchItemId } from '@/lib/ai/categorize-system-prompt'
@@ -185,5 +187,20 @@ describe('suggestLocalMaxNewTokens', () => {
     expect(suggestLocalMaxNewTokens(1)).toBeGreaterThanOrEqual(124)
     expect(suggestLocalMaxNewTokens(10)).toBe(10 * 28 + 96)
     expect(suggestLocalMaxNewTokens(1000)).toBeLessThanOrEqual(4096)
+  })
+})
+
+// ── WP-E1 (feature #881): LOCAL_REP_BATCH_SIZE-pin ────────────────────────────
+// Eigenaarsbesluit 19 jul 2026: 2-3 representanten per AI-ronde in de wizard-
+// aanvoer, LOS van LOCAL_INTERNAL_BATCH_SIZE (de interne chunkgrootte van 10
+// transacties per sessie-call). Deze test vergrendelt dat besluit + de
+// ontkoppeling, zodat een toekomstige wijziging aan de één de ander niet
+// stilzwijgend meesleept.
+describe('LOCAL_REP_BATCH_SIZE', () => {
+  it('ligt tussen 2 en 3 (eigenaarsbesluit) en staat los van LOCAL_INTERNAL_BATCH_SIZE (10)', () => {
+    expect(LOCAL_REP_BATCH_SIZE).toBeGreaterThanOrEqual(2)
+    expect(LOCAL_REP_BATCH_SIZE).toBeLessThanOrEqual(3)
+    expect(LOCAL_INTERNAL_BATCH_SIZE).toBe(10)
+    expect(LOCAL_REP_BATCH_SIZE).not.toBe(LOCAL_INTERNAL_BATCH_SIZE)
   })
 })

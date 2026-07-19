@@ -410,7 +410,7 @@ export type CombinedRunResult = {
  * (terugbetaling ≠ aankoop). Zonder naam én IBAN is er niets om op te
  * propageren → singleton-groep per transactie.
  */
-function combinedGroupKeys(tx: CombinedTx): { primary: string; all: string[] } {
+export function combinedGroupKeys(tx: CombinedTx): { primary: string; all: string[] } {
   const dir = tx.amount > 0 ? 'in' : 'uit'
   const name = normalizeCounterparty(tx.counterparty_name)
   const iban = tx.counterparty_iban ? tx.counterparty_iban.replace(/\s/g, '').toUpperCase() : ''
@@ -419,6 +419,58 @@ function combinedGroupKeys(tx: CombinedTx): { primary: string; all: string[] } {
   if (iban) keys.push(`iban:${iban}:${dir}`)
   if (keys.length === 0) return { primary: `tx:${tx.id}`, all: [] }
   return { primary: keys[0], all: keys }
+}
+
+/**
+ * Groepeer transacties op hun primaire genormaliseerde tegenpartij-key
+ * ({@link combinedGroupKeys}). De Map-insertievolgorde = first-seen: de eerste
+ * transactie die een nieuwe key introduceert bepaalt de positie van die groep —
+ * exact dezelfde volgorde-semantiek als de inline-lus die deze helper verving.
+ * Gedeeld door de combined pass (AI-fase) en de wizard-presentatie zodat beide
+ * op identieke groepen werken.
+ */
+export function buildCombinedGroups(txs: CombinedTx[]): Map<string, CombinedTx[]> {
+  const groups = new Map<string, CombinedTx[]>()
+  for (const tx of txs) {
+    const { primary } = combinedGroupKeys(tx)
+    const list = groups.get(primary)
+    if (list) list.push(tx)
+    else groups.set(primary, [tx])
+  }
+  return groups
+}
+
+/**
+ * Sorteer groep-keys "grootste eerst": primair op aantal leden aflopend
+ * (`members.length` desc), tie-break op de meest recente datum in de groep
+ * aflopend. Datums zijn ISO YYYY-MM-DD en worden lexicaal vergeleken; een groep
+ * zonder enige datum telt als de oudste (lege string sorteert achteraan). Dé
+ * gedeelde comparator voor zowel de motor (`groupOrder: 'largest-first'`) als de
+ * wizard-presentatie, zodat één AI-ronde zoveel mogelijk siblings dekt en beide
+ * kanten dezelfde volgorde tonen. Muteert de meegegeven `keys`-array niet.
+ */
+export function orderGroupsLargestFirst(
+  keys: string[],
+  groups: Map<string, CombinedTx[]>,
+): string[] {
+  // Meest recente datum binnen een groep; leden zonder datum dragen niet bij,
+  // een volledig datumloze groep houdt '' (= oudste bij lexicale vergelijking).
+  const mostRecentDate = (members: CombinedTx[]): string => {
+    let max = ''
+    for (const m of members) {
+      if (m.date && m.date > max) max = m.date
+    }
+    return max
+  }
+  return [...keys].sort((a, b) => {
+    const ga = groups.get(a)!
+    const gb = groups.get(b)!
+    if (gb.length !== ga.length) return gb.length - ga.length
+    const da = mostRecentDate(ga)
+    const db = mostRecentDate(gb)
+    if (da !== db) return da < db ? 1 : -1
+    return 0
+  })
 }
 
 export async function runCombinedCategorization(
@@ -439,6 +491,22 @@ export async function runCombinedCategorization(
     onProposal?: (p: CombinedProposal) => void
     /** Afbreken tussen rondes: al-gedane voorstellen blijven, er wordt niets toegepast. */
     signal?: AbortSignal
+    /**
+     * Volgorde waarin de onbekende groepen de AI-fase in gaan. 'largest-first'
+     * zet de grootste groepen (meeste siblings) voorop via
+     * {@link orderGroupsLargestFirst}, zodat één AI-call zoveel mogelijk
+     * transacties dekt. Default (undefined) = insertievolgorde (first-seen),
+     * exact het bestaande gedrag.
+     */
+    groupOrder?: 'largest-first'
+    /**
+     * Callback vlak vóór elke AI-ronde (bv. het lokale model/de sessie opwarmen).
+     * Direct erna wordt opnieuw op `signal` gecontroleerd, zodat een tijdens de
+     * callback gezet afbreeksignaal de ronde nog stopt (gedane voorstellen
+     * blijven, zelfde semantiek als de afbreek-check tussen de rondes). Zonder
+     * hook: geen effect.
+     */
+    onBeforeRound?: () => Promise<void> | void
   } = {},
 ): Promise<CombinedRunResult> {
   const batchSize = Math.max(1, Math.min(20, opts.batchSize ?? 20))
@@ -489,13 +557,7 @@ export async function runCombinedCategorization(
   let propagated = 0
   let round = 0
 
-  const groups = new Map<string, CombinedTx[]>()
-  for (const tx of aiPhaseTxs) {
-    const { primary } = combinedGroupKeys(tx)
-    const list = groups.get(primary)
-    if (list) list.push(tx)
-    else groups.set(primary, [tx])
-  }
+  const groups = buildCombinedGroups(aiPhaseTxs)
 
   // Eerdere AI-antwoorden, geregistreerd onder ál hun keys (naam én IBAN, per
   // richting) zodat een latere groep met een overlappende key zonder AI-call
@@ -521,7 +583,10 @@ export async function runCombinedCategorization(
 
   const emitProgress = () => opts.onProgress?.({ round, processed, total, propagated })
 
-  let pendingKeys = Array.from(groups.keys())
+  let pendingKeys =
+    opts.groupOrder === 'largest-first'
+      ? orderGroupsLargestFirst(Array.from(groups.keys()), groups)
+      : Array.from(groups.keys())
   emitProgress()
 
   while (pendingKeys.length > 0) {
@@ -556,6 +621,15 @@ export async function runCombinedCategorization(
     pendingKeys = stillPending
     if (pendingKeys.length === 0) {
       emitProgress()
+      break
+    }
+
+    // Vlak vóór de AI-ronde: caller-hook (bv. de lokale sessie opwarmen), daarna
+    // opnieuw op afbreken checken — zelfde semantiek als de check tussen de rondes
+    // (aborted=true, al-gedane voorstellen blijven staan). Zonder hook: geen effect.
+    await opts.onBeforeRound?.()
+    if (opts.signal?.aborted) {
+      aborted = true
       break
     }
 

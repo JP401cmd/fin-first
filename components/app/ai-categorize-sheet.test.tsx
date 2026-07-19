@@ -130,10 +130,15 @@ vi.mock('@/lib/supabase/client', () => ({
 }))
 
 // BottomSheet renders into a portal in real life — render its children
-// inline so testing-library queries can find them in the same root.
+// inline so testing-library queries can find them in the same root. De
+// `footerSlot` (waar de wizard zijn primaire acties in portalt) rendert ook
+// inline, ná de content, zodat de vier keuzes + "Stoppen" vindbaar blijven.
 vi.mock('./bottom-sheet', () => ({
-  BottomSheet: ({ children, title }: { children: React.ReactNode; title?: string }) => (
-    <div data-testid="bottom-sheet" aria-label={title}>{children}</div>
+  BottomSheet: ({ children, title, footerSlot }: { children: React.ReactNode; title?: string; footerSlot?: React.ReactNode }) => (
+    <div data-testid="bottom-sheet" aria-label={title}>
+      {children}
+      {footerSlot}
+    </div>
   ),
 }))
 
@@ -202,6 +207,10 @@ vi.mock('@/lib/ai/local/model-manager', () => ({
 vi.mock('@/lib/ai/local/local-categorize-resolver', () => ({
   createLocalAiResolver: (...args: unknown[]) => createLocalResolverSpy(...args),
   LOCAL_INTERNAL_BATCH_SIZE: 10,
+  // Canonieke waarde uit de resolver (WP-E2, feature #881): de sheet importeert
+  // dit nu rechtstreeks i.p.v. een inline kopie, dus de mock moet 'm meenemen —
+  // anders gooit vitest een fout bij het lezen van een niet-gemockte export.
+  LOCAL_REP_BATCH_SIZE: 3,
 }))
 
 // ── Fixtures ──────────────────────────────────────────────────
@@ -741,9 +750,13 @@ describe('AICategorizeSheet — combined pass (regels → AI → propagatie)', (
     expect(aiCalls).toHaveLength(0)
   })
 
-  it('onbekende tegenpartij: 1 AI-call voor de representant ("Will"), siblings "Afgeleid"', async () => {
+  it('onbekende tegenpartij: 1 AI-call voor de representant, groepkaart toont aantal + Will-voorstel, save propageert naar siblings (WP-E2, feature #881)', async () => {
     // Twee transacties van dezelfde onbekende tegenpartij → de combined pass
-    // stuurt er precies ÉÉN naar de AI en leidt de tweede af.
+    // stuurt er precies ÉÉN naar de AI en leidt de tweede af. Sinds WP-C landt
+    // dit als "Vraag Will"-WIZARD (bulk-kaart + AI-groepkaart), niet meer als
+    // platte lijst — de assertie hieronder toetst dus wizard-gedrag i.p.v. een
+    // losse "Afgeleid"-rij (die bestaat in de wizard niet: de gepropageerde
+    // sibling zit gevouwen in dezelfde groepkaart als de representant).
     const fetchMock = vi.fn((url: string, init?: { body?: string }) => {
       // Andere fetches (o.a. /api/household/status van useHouseholdStatus) → leeg ok.
       if (!String(url).includes('/api/ai/categorize')) {
@@ -782,20 +795,234 @@ describe('AICategorizeSheet — combined pass (regels → AI → propagatie)', (
 
     fireEvent.click(screen.getByRole('button', { name: /Vraag Will/i }))
 
+    // De groepkaart toont de tegenpartij, het aantal transacties in de groep en
+    // het Will-voorstel (label + budgetnaam + reasoning van de representant).
     await waitFor(() => {
-      expect(screen.getByText(/^Will$/)).toBeInTheDocument()
+      expect(screen.getByText('Nieuwe Winkel')).toBeInTheDocument()
     })
-    // De sibling is afgeleid — met herkomst-label en afleidings-reasoning.
-    expect(screen.getByText(/^Afgeleid$/)).toBeInTheDocument()
-    expect(screen.getByText(/Afgeleid van Nieuwe Winkel/i)).toBeInTheDocument()
-    // Precies één AI-call, met precies één representant in de payload.
-    // (useHouseholdStatus fetcht /api/household/status — filter op URL.)
+    expect(screen.getByText(/^Will$/)).toBeInTheDocument()
+    expect(screen.getByText('Boodschappen')).toBeInTheDocument()
+    expect(screen.getByText(/Lijkt op een supermarkt/i)).toBeInTheDocument()
+    // "2 transacties" — de groep bevat beide tx's van dezelfde tegenpartij. De
+    // tekst is over een <span> (count) en een tekstnode (label) verdeeld, dus
+    // een gewone regex-match faalt ("broken up by multiple elements") — een
+    // functie-matcher op het samengevoegde textContent van het leaf-element werkt wel.
+    expect(
+      screen.getByText((_content, node) => {
+        if (!node || !/2\s*transacties/.test(node.textContent ?? '')) return false
+        return Array.from(node.children).every((child) => !/2\s*transacties/.test(child.textContent ?? ''))
+      }),
+    ).toBeInTheDocument()
+
+    // Precies één AI-call, met precies één representant in de payload — de
+    // motor stuurt nooit de hele groep naar de AI.
     const aiCalls = fetchMock.mock.calls.filter((c) => String(c[0]).includes('/api/ai/categorize'))
     expect(aiCalls).toHaveLength(1)
     const sentBody = JSON.parse((aiCalls[0][1] as { body: string }).body) as { transactions: unknown[] }
     expect(sentBody.transactions).toHaveLength(1)
     // Review-only: niets toegepast vóór bevestiging.
     expect(transactionUpdates).toHaveLength(0)
+
+    // Accepteer de hele groep in één keer ("Akkoord & verder") en sla op.
+    fireEvent.click(screen.getByRole('button', { name: /Akkoord & verder/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^Opslaan$/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText(/Klaar/i)).toBeInTheDocument()
+    })
+
+    // Representant én sibling schrijven allebei het voorgestelde budget weg —
+    // dat is de propagatie-belofte van de combined pass. category_source volgt
+    // de motor-semantiek uit lib/auto-categorize.ts (propose(): elk AI-fase-
+    // voorstel — representant én propagated — schrijft category_source 'ai'
+    // weg; de 'ai' vs. 'propagated' onderscheid leeft alleen in het in-memory
+    // `suggestion.source`-veld voor de UI-labels, niet in de DB-kolom.
+    const byId = new Map(transactionUpdates.flatMap((u) => u.ids.map((id) => [id, u.payload])))
+    expect(byId.get('nw1')).toMatchObject({ budget_id: 'b-boodschappen', category_source: 'ai' })
+    expect(byId.get('nw2')).toMatchObject({ budget_id: 'b-boodschappen', category_source: 'ai' })
+  })
+})
+
+// ── "Stoppen en tot hier bewaren" (WP-E2, feature #881) ───────────────────────
+//
+// De wizard toont de AI-groepen één tegelijk, maar de motor kan al meerdere
+// groepen tegelijk hebben beantwoord binnen dezelfde AI-ronde (cloud-pad: tot
+// 20 representanten per call). Deze suite vergrendelt dat "Stoppen en tot hier
+// bewaren" NOOIT een voorstel opslaat dat wel al binnen is (in `rows` staat)
+// maar niet expliciet is geaccepteerd — ook al is de tweede groep na acceptatie
+// van de eerste meteen zichtbaar (en dus "prefetched-ongetoond" op het moment
+// van stoppen).
+
+describe('AICategorizeSheet — Stoppen en tot hier bewaren slaat alleen geaccepteerde rijen op', () => {
+  it('een niet-geaccepteerd, al binnengekomen groepsvoorstel wordt NIET opgeslagen bij Stoppen', async () => {
+    const fetchMock = vi.fn((url: string, init?: { body?: string }) => {
+      if (!String(url).includes('/api/ai/categorize')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) })
+      }
+      const body = JSON.parse(init?.body ?? '{}') as { transactions: { import_hash: string }[] }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({
+          // Beide representanten komen in dezelfde AI-ronde terug (cloud-pad,
+          // geen prefetch-gate) — group2 staat dus al "klaar" in `rows` zodra
+          // group1 als eerste kaart getoond wordt.
+          results: body.transactions.map((t) => ({
+            import_hash: t.import_hash,
+            budget_slug: 'boodschappen',
+            budget_id: 'b-boodschappen',
+            confidence: 0.9,
+            reasoning: 'AI-voorstel',
+          })),
+        }),
+      })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const txs = [
+      makeTx('grp1', { description: 'Betaling 1', counterparty_name: 'Eerste Winkel' }),
+      makeTx('grp2', { description: 'Betaling 2', counterparty_name: 'Tweede Winkel' }),
+    ]
+
+    render(
+      <AICategorizeSheet
+        transactions={txs}
+        budgets={[boodschappenBudget]}
+        budgetGroups={[{ parent: boodschappenBudget, children: [boodschappenBudget] }]}
+        onClose={() => {}}
+        onSaved={() => {}}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Vraag Will/i }))
+
+    // Eerste groepkaart verschijnt (largest-first met gelijke grootte 1 → op
+    // datum; beide txs delen dezelfde datum in makeTx, dus insertievolgorde).
+    await waitFor(() => {
+      expect(screen.getByText('Eerste Winkel')).toBeInTheDocument()
+    })
+    fireEvent.click(screen.getByRole('button', { name: /Akkoord & verder/i }))
+
+    // Tweede groep is nu zichtbaar (het voorstel kwam al binnen in dezelfde
+    // ronde) — maar de gebruiker doet er NIETS mee.
+    await waitFor(() => {
+      expect(screen.getByText('Tweede Winkel')).toBeInTheDocument()
+    })
+
+    // Stoppen en tot hier bewaren.
+    fireEvent.click(screen.getByRole('button', { name: /Stoppen en tot hier bewaren/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText(/Klaar/i)).toBeInTheDocument()
+    })
+
+    const savedIds = transactionUpdates.flatMap((u) => u.ids)
+    expect(savedIds).toContain('grp1')
+    expect(savedIds).not.toContain('grp2')
+  })
+})
+
+// ── "Stoppen": afsluitscherm-copy (WP-C fix-ronde, feature #881) ──────────────
+//
+// Vroegtijdig stoppen toont een beschrijvende "wat nu"-duiding i.p.v. de
+// generieke afrond-copy. Bij 0 geaccepteerde rijen wordt er NIET opgeslagen
+// (geen misleidend "0 opgeslagen"-succesje) en meldt het scherm hoeveel er nog
+// open staat.
+
+function stopFetchMock() {
+  return vi.fn((url: string, init?: { body?: string }) => {
+    if (!String(url).includes('/api/ai/categorize')) {
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) })
+    }
+    const body = JSON.parse(init?.body ?? '{}') as { transactions: { import_hash: string }[] }
+    return Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({
+        results: body.transactions.map((t) => ({
+          import_hash: t.import_hash,
+          budget_slug: 'boodschappen',
+          budget_id: 'b-boodschappen',
+          confidence: 0.9,
+          reasoning: 'AI-voorstel',
+        })),
+      }),
+    })
+  })
+}
+
+describe('AICategorizeSheet — Stoppen afsluitscherm-copy', () => {
+  it('0 geaccepteerd → GEEN save-call en de "Niets opgeslagen"-copy met resterende telling', async () => {
+    vi.stubGlobal('fetch', stopFetchMock())
+    const txs = [
+      makeTx('s1', { description: 'Betaling 1', counterparty_name: 'Eerste Winkel' }),
+      makeTx('s2', { description: 'Betaling 2', counterparty_name: 'Tweede Winkel' }),
+    ]
+
+    render(
+      <AICategorizeSheet
+        transactions={txs}
+        budgets={[boodschappenBudget]}
+        budgetGroups={[{ parent: boodschappenBudget, children: [boodschappenBudget] }]}
+        onClose={() => {}}
+        onSaved={() => {}}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Vraag Will/i }))
+    await waitFor(() => {
+      expect(screen.getByText('Eerste Winkel')).toBeInTheDocument()
+    })
+
+    // Niets accepteren, direct stoppen.
+    fireEvent.click(screen.getByRole('button', { name: /Stoppen en tot hier bewaren/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText(/Klaar/i)).toBeInTheDocument()
+    })
+
+    // Geen enkele transactie-update: bij 0 geaccepteerd wordt er niet opgeslagen.
+    expect(transactionUpdates).toHaveLength(0)
+    // Beschrijvende afsluit-copy met de resterende telling (beide nog open).
+    const sheetText = screen.getByTestId('bottom-sheet').textContent ?? ''
+    expect(sheetText).toContain('Niets opgeslagen')
+    expect(sheetText).toContain('2 transacties nog open')
+  })
+
+  it('>0 geaccepteerd → "X voorstellen opgeslagen · Y nog niet beoordeeld"-copy', async () => {
+    vi.stubGlobal('fetch', stopFetchMock())
+    const txs = [
+      makeTx('k1', { description: 'Betaling 1', counterparty_name: 'Eerste Winkel' }),
+      makeTx('k2', { description: 'Betaling 2', counterparty_name: 'Tweede Winkel' }),
+    ]
+
+    render(
+      <AICategorizeSheet
+        transactions={txs}
+        budgets={[boodschappenBudget]}
+        budgetGroups={[{ parent: boodschappenBudget, children: [boodschappenBudget] }]}
+        onClose={() => {}}
+        onSaved={() => {}}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Vraag Will/i }))
+    await waitFor(() => {
+      expect(screen.getByText('Eerste Winkel')).toBeInTheDocument()
+    })
+
+    // Eén groep accepteren, dan stoppen — de andere blijft onbeoordeeld.
+    fireEvent.click(screen.getByRole('button', { name: /Akkoord & verder/i }))
+    await waitFor(() => {
+      expect(screen.getByText('Tweede Winkel')).toBeInTheDocument()
+    })
+    fireEvent.click(screen.getByRole('button', { name: /Stoppen en tot hier bewaren/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText(/Klaar/i)).toBeInTheDocument()
+    })
+
+    const sheetText = screen.getByTestId('bottom-sheet').textContent ?? ''
+    expect(sheetText).toContain('1 voorstel opgeslagen')
+    expect(sheetText).toContain('1 transactie nog niet beoordeeld')
   })
 })
 

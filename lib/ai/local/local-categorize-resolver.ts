@@ -61,6 +61,16 @@ export const LOCAL_MIN_CONFIDENCE = 0.8
 export const LOCAL_INTERNAL_BATCH_SIZE = 10
 
 /**
+ * Representanten per AI-ronde in de wizard-aanvoer. Eigenaarsbesluit 19 jul 2026:
+ * 2-3 groepen per ronde amortiseren de TTFT (time-to-first-token) van het lokale
+ * model over meer transacties, zonder een hele batch te laten wachten voordat de
+ * eerste voorstellen zichtbaar worden. Staat LOS van {@link LOCAL_INTERNAL_BATCH_SIZE}:
+ * die interne chunk-grootte van 10 stuurt hoeveel transacties één sessie-call
+ * verwerkt; deze waarde stuurt hoeveel gróepen de motor per ronde aanbiedt.
+ */
+export const LOCAL_REP_BATCH_SIZE = 3
+
+/**
  * max_new_tokens-schatting voor de 'kort'-uitvoer (geen reasoning): ~28 tokens
  * per transactie + 96 marge. Ruim genoeg om afkapping te voorkomen zonder
  * onnodig lange decode.

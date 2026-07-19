@@ -4,6 +4,8 @@ import {
   computeOwnAccountDetection,
   detectTransferPairs,
   runCombinedCategorization,
+  buildCombinedGroups,
+  orderGroupsLargestFirst,
   type AutoCatContext,
   type AutoCatTx,
   type CombinedAiBatchItem,
@@ -487,5 +489,226 @@ describe('detectTransferPairs — DST', () => {
       pairTx('b', 100, '2026-10-26', 'acc-2'),
     ])
     expect([...ids].sort()).toEqual(['a', 'b'])
+  })
+})
+
+// ── WP-E1 (feature #881): buildCombinedGroups / orderGroupsLargestFirst / ─────
+// groupOrder / onBeforeRound — motor-scheduling-opties bovenop de bestaande
+// combined pass (WP-A). Bestaande 30 tests hierboven blijven ongewijzigd
+// (parity-pin); dit blok test alleen de nieuwe opties.
+
+describe('buildCombinedGroups', () => {
+  it('groepeert first-seen op genormaliseerde naam+richting, valt terug op IBAN, singleton zonder beide', () => {
+    const txs: CombinedTx[] = [
+      unknownTx('a1', 'Bakker', -10),
+      unknownTx('a2', 'Bakker', -20),
+      unknownTx('b1', null, -5, { counterparty_iban: 'NL11RABO0123456789' }),
+      unknownTx('b2', null, -7, { counterparty_iban: 'NL11 RABO 0123 4567 89' }),
+      unknownTx('c1', null, -3), // geen naam, geen IBAN → singleton
+    ]
+    const groups = buildCombinedGroups(txs)
+
+    // First-seen Map-insertievolgorde: a-groep (eerst gezien) → b-groep → singleton.
+    expect([...groups.keys()]).toEqual([
+      'name:bakker:uit',
+      'iban:NL11RABO0123456789:uit',
+      'tx:c1',
+    ])
+    expect(groups.get('name:bakker:uit')!.map((t) => t.id)).toEqual(['a1', 'a2'])
+    expect(groups.get('iban:NL11RABO0123456789:uit')!.map((t) => t.id)).toEqual(['b1', 'b2'])
+    expect(groups.get('tx:c1')!.map((t) => t.id)).toEqual(['c1'])
+  })
+
+  it('richting zit in de key: een uitgave en een inkomst van dezelfde tegenpartij vormen aparte groepen', () => {
+    const txs: CombinedTx[] = [
+      unknownTx('out1', 'Qwerty BV', -25),
+      unknownTx('in1', 'Qwerty BV', 25),
+    ]
+    const groups = buildCombinedGroups(txs)
+    expect([...groups.keys()]).toEqual(['name:qwerty:uit', 'name:qwerty:in'])
+  })
+})
+
+describe('orderGroupsLargestFirst', () => {
+  it('sorteert grootste groep eerst', () => {
+    const groups = new Map<string, CombinedTx[]>([
+      ['small', [unknownTx('s1', 'A')]],
+      ['big', [unknownTx('b1', 'B'), unknownTx('b2', 'B'), unknownTx('b3', 'B')]],
+      ['medium', [unknownTx('m1', 'C'), unknownTx('m2', 'C')]],
+    ])
+    const ordered = orderGroupsLargestFirst(['small', 'big', 'medium'], groups)
+    expect(ordered).toEqual(['big', 'medium', 'small'])
+  })
+
+  it('tie-break bij gelijke grootte: meest recente datum eerst', () => {
+    const groups = new Map<string, CombinedTx[]>([
+      ['x', [unknownTx('x1', 'X', -10, { date: '2026-06-01' }), unknownTx('x2', 'X', -10, { date: '2026-06-05' })]],
+      ['y', [unknownTx('y1', 'Y', -10, { date: '2026-06-10' }), unknownTx('y2', 'Y', -10, { date: '2026-06-02' })]],
+    ])
+    // Beide groepen tellen 2 leden; y's meest recente datum (06-10) > x's (06-05).
+    const ordered = orderGroupsLargestFirst(['x', 'y'], groups)
+    expect(ordered).toEqual(['y', 'x'])
+  })
+
+  it('een groep zonder datums telt als oudste (lege string) bij de tie-break', () => {
+    const groups = new Map<string, CombinedTx[]>([
+      ['nodate', [unknownTx('n1', 'N'), unknownTx('n2', 'N')]], // geen date-veld
+      ['dated', [unknownTx('d1', 'D', -10, { date: '2026-01-01' }), unknownTx('d2', 'D', -10, { date: '2026-01-02' })]],
+    ])
+    const ordered = orderGroupsLargestFirst(['nodate', 'dated'], groups)
+    expect(ordered).toEqual(['dated', 'nodate'])
+  })
+
+  it('muteert de meegegeven keys-array niet', () => {
+    const groups = new Map<string, CombinedTx[]>([
+      ['a', [unknownTx('a1', 'A'), unknownTx('a2', 'A')]],
+      ['b', [unknownTx('b1', 'B')]],
+    ])
+    const input = ['b', 'a']
+    const inputCopy = [...input]
+    const ordered = orderGroupsLargestFirst(input, groups)
+    expect(input).toEqual(inputCopy) // ongewijzigd
+    expect(ordered).toEqual(['a', 'b']) // wél herordend in de return-waarde
+    expect(ordered).not.toBe(input) // nieuwe array, geen alias
+  })
+})
+
+describe('runCombinedCategorization — groupOrder', () => {
+  // Drie tegenpartij-groepen van verschillende grootte, in first-seen-volgorde
+  // b1(2) → b2(5) → b3(3). batchSize:1 dwingt één representant per AI-ronde af
+  // zodat de batch-volgorde de groep-volgorde 1-op-1 weerspiegelt.
+  function groupedTxs(): CombinedTx[] {
+    return [
+      ...Array.from({ length: 2 }, (_, i) => unknownTx(`b1-${i}`, 'Bedrijf1')),
+      ...Array.from({ length: 5 }, (_, i) => unknownTx(`b2-${i}`, 'Bedrijf2')),
+      ...Array.from({ length: 3 }, (_, i) => unknownTx(`b3-${i}`, 'Bedrijf3')),
+    ]
+  }
+
+  it('default (geen groupOrder) behoudt de first-seen-volgorde', async () => {
+    const { resolver, batches } = makeResolver()
+    await runCombinedCategorization(groupedTxs(), baseContext(), resolver, { batchSize: 1 })
+
+    expect(batches.map((b) => b[0].id)).toEqual(['b1-0', 'b2-0', 'b3-0'])
+  })
+
+  it("groupOrder: 'largest-first' verwerkt de grootste groep (5 leden) eerst, dan 3, dan 2", async () => {
+    const { resolver, batches } = makeResolver()
+    const result = await runCombinedCategorization(groupedTxs(), baseContext(), resolver, {
+      batchSize: 1,
+      groupOrder: 'largest-first',
+    })
+
+    expect(batches.map((b) => b[0].id)).toEqual(['b2-0', 'b3-0', 'b1-0'])
+    // Contentieuze telling blijft kloppen ongeacht de volgorde.
+    expect(result.counts.ai).toBe(3)
+    expect(result.counts.propagated).toBe(1 + 2 + 4) // (2-1)+(3-1)+(5-1)
+  })
+})
+
+describe('runCombinedCategorization — onBeforeRound', () => {
+  it('wordt vóór élke AI-ronde geawait: aanroepen = aantal rondes', async () => {
+    const { resolver } = makeResolver()
+    const txs = [unknownTx('g1', 'Bedrijf1'), unknownTx('g2', 'Bedrijf2')]
+    let calls = 0
+    const onBeforeRound = vi.fn(async () => {
+      calls++
+    })
+    const result = await runCombinedCategorization(txs, baseContext(), resolver, {
+      batchSize: 1, // 2 groepen, batchSize 1 → 2 rondes
+      onBeforeRound,
+    })
+
+    expect(result.aiRounds).toBe(2)
+    expect(onBeforeRound).toHaveBeenCalledTimes(2)
+    expect(calls).toBe(2)
+  })
+
+  it('een hangende onBeforeRound blokkeert de eerstvolgende AI-call totdat hij resolved', async () => {
+    const { resolver } = makeResolver()
+    const txs = [unknownTx('g1', 'Bedrijf1')]
+    let release: () => void = () => {}
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const onBeforeRound = vi.fn(async () => {
+      await gate
+    })
+
+    const runPromise = runCombinedCategorization(txs, baseContext(), resolver, { onBeforeRound })
+
+    // Laat de microtask-queue leeglopen zonder de gate te openen: de resolver
+    // mag nog NIET zijn aangeroepen zolang onBeforeRound hangt.
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(resolver).not.toHaveBeenCalled()
+
+    release()
+    const result = await runPromise
+
+    expect(resolver).toHaveBeenCalledTimes(1)
+    expect(result.proposals.get('g1')?.budget_id).toBe('food')
+  })
+
+  it('abort tijdens de onBeforeRound-wacht → aborted=true, eerdere voorstellen blijven, resolver niet meer aangeroepen', async () => {
+    const controller = new AbortController()
+    const { resolver, batches } = makeResolver()
+    const txs = [unknownTx('g1', 'Bedrijf1'), unknownTx('g2', 'Bedrijf2')]
+    let round = 0
+    const onBeforeRound = vi.fn(async () => {
+      round++
+      if (round === 2) controller.abort() // breek af vlak vóór de 2e AI-ronde
+    })
+
+    const result = await runCombinedCategorization(txs, baseContext(), resolver, {
+      batchSize: 1,
+      onBeforeRound,
+      signal: controller.signal,
+    })
+
+    expect(resolver).toHaveBeenCalledTimes(1) // alleen ronde 1 haalde de resolver
+    expect(batches).toHaveLength(1)
+    expect(result.aborted).toBe(true)
+    // Ronde 1 (g1) is al toegewezen vóór het afbreken.
+    expect(result.proposals.get('g1')).toMatchObject({ source: 'ai', budget_id: 'food' })
+    // Ronde 2 (g2) is nooit aan de AI aangeboden.
+    expect(result.proposals.has('g2')).toBe(false)
+    expect(result.counts.unresolved).toBe(1)
+  })
+})
+
+describe('runCombinedCategorization — parity met lege opts (pin)', () => {
+  it('gemengde set (regel + sterke transfer + spiegelpaar + AI-groep met propagatie) levert een identiek, vastgepind resultaat', async () => {
+    const { resolver } = makeResolver()
+    const txs: CombinedTx[] = [
+      // Regel-hit (trefwoord, blijft lokaal).
+      unknownTx('r1', 'Albert Heijn'),
+      // Sterk signaal: eigen IBAN → transfer.
+      unknownTx('t1', null, -100, { counterparty_iban: 'NL00 OWN 0000000000' }),
+      // Spiegelpaar (fuzzy) → mirror-voorstel, geen AI-call.
+      unknownTx('m1', 'Onbekend A', -250, { date: '2026-06-01', account_id: 'acc-1' }),
+      unknownTx('m2', 'Onbekend B', 250, { date: '2026-06-01', account_id: 'acc-2' }),
+      // Onbekende tegenpartij × 3 → 1 AI-call, 2 propagaties.
+      unknownTx('u1', 'Qwerty BV'),
+      unknownTx('u2', 'Qwerty BV'),
+      unknownTx('u3', 'Qwerty BV'),
+    ]
+
+    const result = await runCombinedCategorization(txs, baseContext(), resolver, {})
+
+    expect(result.aiRounds).toBe(1)
+    expect(result.aborted).toBe(false)
+    expect(result.failedBatches).toEqual([])
+    expect(result.counts).toEqual({ rule: 1, transfer: 1, mirror: 2, ai: 1, propagated: 2, unresolved: 0 })
+
+    expect(result.proposals.get('r1')).toMatchObject({ budget_id: 'food', source: 'rule', category_source: 'rule', isTransfer: false })
+    expect(result.proposals.get('t1')).toMatchObject({ budget_id: 'eigen', source: 'transfer', category_source: 'transfer', isTransfer: true })
+    expect(result.proposals.get('m1')).toMatchObject({ budget_id: 'eigen', source: 'mirror', category_source: 'transfer', isTransfer: true })
+    expect(result.proposals.get('m2')).toMatchObject({ budget_id: 'eigen', source: 'mirror', category_source: 'transfer', isTransfer: true })
+    expect(result.proposals.get('u1')).toMatchObject({ budget_id: 'food', source: 'ai', category_source: 'ai', isTransfer: false })
+    expect(result.proposals.get('u2')).toMatchObject({ budget_id: 'food', source: 'propagated', category_source: 'ai', isTransfer: false })
+    expect(result.proposals.get('u3')).toMatchObject({ budget_id: 'food', source: 'propagated', category_source: 'ai', isTransfer: false })
+    expect(result.proposals.size).toBe(7)
   })
 })
