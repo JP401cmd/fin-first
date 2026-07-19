@@ -168,6 +168,50 @@ export interface DashboardDataResult {
   regelSimSnapshot: RegelSimSnapshot | null
 }
 
+// ── Widget-gated compute (Task 2.3) ────────────────────────────
+// Dure, widget-EXCLUSIEVE DashboardData-velden worden alleen berekend wanneer de
+// bijbehorende widget actief staat. Uitsluitend velden zónder tweede consument
+// worden gegate (gebruikersbesluit optie A, 19 jul): weekOverview / heatmap* /
+// householdActivity. backtest/feeAnalysis/hvbSummary blijven ALTIJD berekend — die
+// voeden óók de altijd-getoonde briefing (lib/briefing/overview-briefing.ts). De
+// gate verandert ALLEEN óf een veld berekend wordt, nooit hoe: bij een uit-staande
+// widget krijgt het veld exact zijn canonieke leeg-vorm (parity met een minimaal
+// account), zodat de DashboardData-shape onveranderd blijft en de widget niets rendert.
+
+/** Widget-IDs waarvan het (dure) DashboardData-veld widget-gated berekend wordt. */
+export const WEEK_OVERVIEW_WIDGET_ID = 'weekoverzicht'
+export const HEATMAP_WIDGET_ID = 'uitgaven_heatmap'
+export const HOUSEHOLD_ACTIVITY_WIDGET_ID = 'huishouden_activiteit'
+
+/** Canonieke leeg-vorm van `weekOverview` (identiek aan een leeg/minimaal account). */
+export const EMPTY_WEEK_OVERVIEW: WeekOverviewData = {
+  weekExpenses: 0,
+  weekIncome: 0,
+  dailyExpenses: [],
+  weekBudget: 0,
+  prevWeekExpenses: 0,
+  topCategories: [],
+}
+
+export interface WidgetComputeFlags {
+  wantWeekOverview: boolean
+  wantHeatmap: boolean
+  wantHouseholdActivity: boolean
+}
+
+/**
+ * Leidt uit de actieve widgets af welke widget-exclusieve velden berekend moeten
+ * worden. Pure functie zodat de gating-beslissing los getest kan worden.
+ */
+export function resolveWidgetComputeFlags(activeWidgets: WidgetPref[]): WidgetComputeFlags {
+  const has = (id: string) => activeWidgets.some(w => w.id === id)
+  return {
+    wantWeekOverview: has(WEEK_OVERVIEW_WIDGET_ID),
+    wantHeatmap: has(HEATMAP_WIDGET_ID),
+    wantHouseholdActivity: has(HOUSEHOLD_ACTIVITY_WIDGET_ID),
+  }
+}
+
 // ── Main loader ────────────────────────────────────────────────
 // Wrapped with React cache() — multiple calls within a single server
 // request return the same promise, avoiding duplicate DB round-trips.
@@ -639,6 +683,53 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
         parentId: c.parent_id,
       })),
   ]
+
+  // ── Widget-prefs + compute-gating (Task 2.3) ─────────────────────────────────
+  // Afgeleid direct na favoriteBudgets/favoriteHoldings (de enige inputs) — dus
+  // vóór de dure, widget-exclusieve blokken (weekOverview/heatmap/householdActivity)
+  // en de bestaande news-gating, die allemaal `activeWidgets` consumeren.
+  const rawWidgetPrefs = profileResult.data?.widget_prefs as WidgetPrefs | null
+  const widgetPrefs = mergeWidgetPrefs(rawWidgetPrefs)
+
+  // Inject dynamic favorite budget widget prefs (merge with saved positions)
+  const savedFavIds = new Set(widgetPrefs.widgets.filter(w => w.id.startsWith('budget_fav:')).map(w => w.id))
+  const currentFavIds = new Set(favoriteBudgets.map(b => `budget_fav:${b.id}`))
+  // Add new favorites that aren't in saved prefs yet (insert at top)
+  const lowestOrder = Math.min(0, ...widgetPrefs.widgets.map(w => w.order))
+  const newFavPrefs: WidgetPref[] = favoriteBudgets
+    .filter(b => !savedFavIds.has(`budget_fav:${b.id}`))
+    .map((b, i) => ({
+      id: `budget_fav:${b.id}`,
+      enabled: true,
+      size: 'quarter' as WidgetSize,
+      order: lowestOrder - 100 + i,
+    }))
+  // Inject dynamic favorite holding widget prefs (merge with saved positions)
+  const savedHoldingFavIds = new Set(widgetPrefs.widgets.filter(w => w.id.startsWith('holding_fav:')).map(w => w.id))
+  const currentHoldingFavIds = new Set(favoriteHoldings.map(h => `holding_fav:${h.id}`))
+  const newHoldingFavPrefs: WidgetPref[] = favoriteHoldings
+    .filter(h => !savedHoldingFavIds.has(`holding_fav:${h.id}`))
+    .map((h, i) => ({
+      id: `holding_fav:${h.id}`,
+      enabled: true,
+      size: 'quarter' as WidgetSize,
+      order: lowestOrder - 200 + i,
+    }))
+
+  // Combine: catalog widgets + saved fav prefs (only if still favorited) + new fav prefs
+  const allWidgetPrefs = [
+    ...widgetPrefs.widgets
+      .filter(w => !w.id.startsWith('budget_fav:') || currentFavIds.has(w.id))
+      .filter(w => !w.id.startsWith('holding_fav:') || currentHoldingFavIds.has(w.id)),
+    ...newFavPrefs,
+    ...newHoldingFavPrefs,
+  ]
+  const activeWidgets = allWidgetPrefs
+    .filter(w => w.enabled)
+    .sort((a, b) => a.order - b.order)
+
+  // Compute-gating vlaggen: welke dure, widget-exclusieve velden moeten draaien.
+  const { wantWeekOverview, wantHeatmap, wantHouseholdActivity } = resolveWidgetComputeFlags(activeWidgets)
 
   const last12Income = aggSumPositief(txAgg12, { realOnly: true })
   let extrapolatedIncome = last12Income
@@ -1189,46 +1280,9 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   const sovereigntyMonthsCovered = monthsCoveredFrom(liquidPotWeighted, sovMonthlyExp)
   const currentPhaseId = levelToPhaseId(sovereigntyLevel)
 
-  // Widget prefs
-  const rawWidgetPrefs = profileResult.data?.widget_prefs as WidgetPrefs | null
-  const widgetPrefs = mergeWidgetPrefs(rawWidgetPrefs)
-
-  // Inject dynamic favorite budget widget prefs (merge with saved positions)
-  const savedFavIds = new Set(widgetPrefs.widgets.filter(w => w.id.startsWith('budget_fav:')).map(w => w.id))
-  const currentFavIds = new Set(favoriteBudgets.map(b => `budget_fav:${b.id}`))
-  // Add new favorites that aren't in saved prefs yet (insert at top)
-  const lowestOrder = Math.min(0, ...widgetPrefs.widgets.map(w => w.order))
-  const newFavPrefs: WidgetPref[] = favoriteBudgets
-    .filter(b => !savedFavIds.has(`budget_fav:${b.id}`))
-    .map((b, i) => ({
-      id: `budget_fav:${b.id}`,
-      enabled: true,
-      size: 'quarter' as WidgetSize,
-      order: lowestOrder - 100 + i,
-    }))
-  // Inject dynamic favorite holding widget prefs (merge with saved positions)
-  const savedHoldingFavIds = new Set(widgetPrefs.widgets.filter(w => w.id.startsWith('holding_fav:')).map(w => w.id))
-  const currentHoldingFavIds = new Set(favoriteHoldings.map(h => `holding_fav:${h.id}`))
-  const newHoldingFavPrefs: WidgetPref[] = favoriteHoldings
-    .filter(h => !savedHoldingFavIds.has(`holding_fav:${h.id}`))
-    .map((h, i) => ({
-      id: `holding_fav:${h.id}`,
-      enabled: true,
-      size: 'quarter' as WidgetSize,
-      order: lowestOrder - 200 + i,
-    }))
-
-  // Combine: catalog widgets + saved fav prefs (only if still favorited) + new fav prefs
-  const allWidgetPrefs = [
-    ...widgetPrefs.widgets
-      .filter(w => !w.id.startsWith('budget_fav:') || currentFavIds.has(w.id))
-      .filter(w => !w.id.startsWith('holding_fav:') || currentHoldingFavIds.has(w.id)),
-    ...newFavPrefs,
-    ...newHoldingFavPrefs,
-  ]
-  const activeWidgets = allWidgetPrefs
-    .filter(w => w.enabled)
-    .sort((a, b) => a.order - b.order)
+  // Widget-prefs (`activeWidgets`/`allWidgetPrefs`) + compute-gating vlaggen zijn
+  // naar boven verplaatst (Task 2.3) — direct na favoriteBudgets/favoriteHoldings —
+  // zodat de dure widget-exclusieve blokken hun `want…`-vlag kunnen consumeren.
 
   // Nieuws-widget (id `berichten`): laad het server-veld alleen als de widget
   // daadwerkelijk actief is — device-onafhankelijke bron i.p.v. localStorage.
@@ -1843,9 +1897,12 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   }
 
   // ── Household activity feed — recent shared transactions from both partners ──
+  // Widget-gated (Task 2.3): de extra shared-tx/partner-profiel-fetches draaien
+  // alleen bij een actieve huishouden_activiteit-widget; anders blijft de feed leeg
+  // (canonieke leeg-vorm `[]`). Geen tweede consument buiten die widget.
   let householdActivity: HouseholdActivityItem[] = []
   try {
-    if (authUser && householdOverrides && cachedHouseholdId) {
+    if (wantHouseholdActivity && authUser && householdOverrides && cachedHouseholdId) {
       // Reuse the household_members rows already fetched in the overrides block
       // above (identical query: select user_id, privacy_settings for this household).
       const allMembers = cachedAllMembers
@@ -1989,6 +2046,11 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     : 'E'
 
   // ── Week Overview: compute weekly expenses from transaction data ──
+  // Widget-gated (Task 2.3): de raw-tx-loop + categorie-aggregatie draaien alleen
+  // bij een actieve weekoverzicht-widget; anders de canonieke leeg-vorm
+  // (EMPTY_WEEK_OVERVIEW). Geen tweede consument — de briefing raakt weekOverview niet.
+  let weekOverview: WeekOverviewData = EMPTY_WEEK_OVERVIEW
+  if (wantWeekOverview) {
   const DAY_LABELS = ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo']
   const weekEndDate = new Date(weekStart)
   weekEndDate.setDate(weekStart.getDate() + 7)
@@ -2080,7 +2142,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       prevAmount: Math.round((prevWeekCategoryMap.get(name) ?? 0) * 100) / 100,
     }))
 
-  const weekOverview: WeekOverviewData = {
+  weekOverview = {
     weekExpenses: Math.round(weekExpensesTotal * 100) / 100,
     weekIncome: Math.round(weekIncomeTotal * 100) / 100,
     dailyExpenses: weekDailyExpenses,
@@ -2088,6 +2150,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     prevWeekExpenses: Math.round(prevWeekExpensesTotal * 100) / 100,
     topCategories: topWeekCategories,
   }
+  } // einde if (wantWeekOverview)
 
   // ── Fee analysis ──────────────────────────────────────────────
   const allHoldings = (allHoldingsResult.data ?? []) as {
@@ -2190,7 +2253,16 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   }
 
   // ── Heatmap widget data: expense groups + per-budget spending ──
-  const heatmapExpenseGroups = allParentBudgets
+  // Widget-gated (Task 2.3): de groep-opbouw + per-budget spending/beschikbaar
+  // (incl. computeEffectiveLimit-loop) draaien alleen bij een actieve
+  // uitgaven_heatmap-widget; anders de canonieke leeg-vorm (`[]`/`{}`). Geen tweede
+  // consument — briefing/page-status raken deze velden niet.
+  let heatmapExpenseGroups: DashboardData['heatmapExpenseGroups'] = []
+  let heatmapSpending: Record<string, number> = {}
+  let heatmapPreviousSpending: Record<string, number> = {}
+  let heatmapBeschikbaarMap: Record<string, number> = {}
+  if (wantHeatmap) {
+  heatmapExpenseGroups = allParentBudgets
     .filter(b => b.budget_type === 'expense')
     .map(parent => ({
       id: parent.id,
@@ -2208,7 +2280,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     }))
 
   // Per-budget spending map (all budget ids → absolute amount spent this month)
-  const heatmapSpending: Record<string, number> = {}
+  heatmapSpending = {}
   for (const tx of txResult.data ?? []) {
     const bid = (tx as { budget_id?: string | null }).budget_id
     if (!bid) continue
@@ -2220,7 +2292,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // heatmap-tooltip (was dode code: geen enkele caller gaf `previousSpending`).
   // Zelfde grondslag als heatmapSpending (abs. bedrag per budget), maar over de
   // vorige kalendermaand (hergebruikt de al opgehaalde prevMonthTx-query).
-  const heatmapPreviousSpending: Record<string, number> = {}
+  heatmapPreviousSpending = {}
   for (const tx of prevMonthTxRows) {
     const bid = (tx as { budget_id?: string | null }).budget_id
     if (!bid) continue
@@ -2241,7 +2313,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     ;(amountsByBudget[a.budget_id] ??= []).push(a)
   }
 
-  const heatmapBeschikbaarMap: Record<string, number> = {}
+  heatmapBeschikbaarMap = {}
   for (const group of heatmapExpenseGroups) {
     const items = group.children.length > 0 ? group.children : [group]
     for (const b of items) {
@@ -2259,6 +2331,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       heatmapBeschikbaarMap[b.id] = effectiveLimit - spent
     }
   }
+  } // einde if (wantHeatmap)
 
   // DashboardData bundle for widgets
   const dashboardData: DashboardData = {

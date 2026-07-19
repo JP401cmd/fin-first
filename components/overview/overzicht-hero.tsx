@@ -126,8 +126,22 @@ type OverzichtHeroProps = {
   /** Doelbedrag bij vrijheid uit de simulatie — toont op de chart als
    *  eindwaarde naast de Vrijheid-marker. */
   simRequiredPortfolio?: number | null
-  /** Volledige DashboardData voor de optionele HeroWidgetRail (power-user
-   *  edit-mode). Wanneer afwezig: edit-toggle wordt niet getoond. */
+  /**
+   * Volledige DashboardData voor de optionele HeroWidgetRail (power-user
+   * edit-mode). Wanneer afwezig: edit-toggle wordt niet getoond.
+   *
+   * Props-grens (Task 2.3 → voorbereiding T2.4-streaming): de hero heeft de
+   * VOLLEDIGE bundel maar op twee smalle plekken —
+   *  (a) `dailyExpense` (dailyExpenseRate + monthlyExpenses), en
+   *  (b) de doorgifte aan `HeroWidgetRail`.
+   * Alle overige hero-onderdelen (health, totals, leverScores, netWorthHistory,
+   * sim-velden) draaien op getrimde props. De widget-gated velden in de bundel
+   * (weekOverview, heatmap-velden, householdActivity) zijn leeg voor een
+   * minimaal-widget-account → kleinere RSC-flight, zónder rendering-breuk: de rail toont alleen
+   * ACTIEVE widgets, die per definitie hun data hebben. Dit is de "blok 2"-grens
+   * (briefing + widgets) die T2.4 achter Suspense kan streamen los van "blok 1"
+   * (de getrimde visuele hero).
+   */
   dashboardData?: DashboardData
   /** Active + all widget-prefs voor de hero-rail. Aanwezig wanneer
    *  dashboardData ook aanwezig is — de DraggableWidgetGrid heeft ze
