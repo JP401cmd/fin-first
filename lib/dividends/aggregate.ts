@@ -2,11 +2,11 @@
  * Dividend-aggregatie — ÉÉN bron van waarheid.
  *
  * De volledige aggregatielogica die voorheen inline in `app/api/dividends/route.ts`
- * stond, is hierheen verhuisd zodat zowel die route ALS de server-side
- * `lib/horizon-data-loader.ts` exact dezelfde cijfers produceren
- * (consume-don't-recompute). De /toekomst-client haalde dit aggregaat voorheen op
- * mount via `fetch('/api/dividends')`; nu levert de loader `monthlyDividendIncome`
- * mee in de HorizonPageData-bundel en vervalt die client-roundtrip.
+ * stond, is hierheen verhuisd (consume-don't-recompute: elke toekomstige consumer
+ * gebruikt deze functie, nooit een eigen som). Enige huidige consumer is de route
+ * zelf. De /toekomst-client haalde dit aggregaat voorheen op mount via
+ * `fetch('/api/dividends')`, maar de gevoede state bleek nergens gelezen te
+ * worden — die dode keten is verwijderd (zie fase-1-review perf-programma).
  *
  * De route blijft bestaan (andere consumers + handmatige refresh) maar delegeert
  * naar deze functie.
