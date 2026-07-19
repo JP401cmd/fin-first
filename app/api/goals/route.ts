@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { unauthorized, notFound, serverError } from '@/lib/api/respond'
 
@@ -22,9 +22,9 @@ async function getUserHouseholdId(supabase: any, userId: string): Promise<string
 
 export async function GET(request: Request) {
   const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  const claims = await getAuthClaims(supabase)
 
-  if (authError || !user) {
+  if (!claims) {
     return unauthorized()
   }
 
@@ -32,7 +32,7 @@ export async function GET(request: Request) {
   const goalId = searchParams.get('id')
 
   // Get user's household for shared goal access
-  const householdId = await getUserHouseholdId(supabase, user.id)
+  const householdId = await getUserHouseholdId(supabase, claims.sub)
 
   if (goalId) {
     // Get single goal (user's own OR shared from same household)
@@ -42,9 +42,9 @@ export async function GET(request: Request) {
       .eq('id', goalId)
 
     if (householdId) {
-      query = query.or(`user_id.eq.${user.id},and(ownership.eq.shared,household_id.eq.${householdId})`)
+      query = query.or(`user_id.eq.${claims.sub},and(ownership.eq.shared,household_id.eq.${householdId})`)
     } else {
-      query = query.eq('user_id', user.id)
+      query = query.eq('user_id', claims.sub)
     }
 
     const { data, error } = await query.single()
@@ -61,9 +61,9 @@ export async function GET(request: Request) {
     .select('*')
 
   if (householdId) {
-    query = query.or(`user_id.eq.${user.id},and(ownership.eq.shared,household_id.eq.${householdId})`)
+    query = query.or(`user_id.eq.${claims.sub},and(ownership.eq.shared,household_id.eq.${householdId})`)
   } else {
-    query = query.eq('user_id', user.id)
+    query = query.eq('user_id', claims.sub)
   }
 
   const { data, error } = await query.order('sort_order', { ascending: true })

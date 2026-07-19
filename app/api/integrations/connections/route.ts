@@ -9,15 +9,19 @@
 // van de ingelogde gebruiker.
 
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { unauthorized, serverError } from '@/lib/api/respond'
 import { loadConnectionsData } from '@/lib/connections-data'
 
 export async function GET() {
   const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
+  // Read-auth via getClaims() — lokale JWKS-verificatie, geen getUser-roundtrip
+  // (ADR 0051). loadConnectionsData() doet zelf nog een interne getUser()-call
+  // om de RLS-scoping op te bouwen — dat is gedeelde code buiten deze route en
+  // blijft ongewijzigd (bespaart alleen de onbevoegde-aanvraag-roundtrip hier).
+  const claims = await getAuthClaims(supabase)
+  if (!claims) {
     return unauthorized()
   }
 

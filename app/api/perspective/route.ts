@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { unauthorized, serverError } from '@/lib/api/respond'
 
 export type Perspective = 'personal' | 'household' | 'partner'
@@ -10,9 +10,10 @@ export type Perspective = 'personal' | 'household' | 'partner'
  */
 export async function GET() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  // Read-auth via getClaims() — lokale JWKS-verificatie, geen getUser-roundtrip (ADR 0051).
+  const claims = await getAuthClaims(supabase)
 
-  if (!user) {
+  if (!claims) {
     return unauthorized()
   }
 
@@ -23,7 +24,7 @@ export async function GET() {
   const { data: profileFull, error: fullError } = await supabase
     .from('profiles')
     .select('household_type, selected_perspective')
-    .eq('id', user.id)
+    .eq('id', claims.sub)
     .single()
 
   if (!fullError && profileFull) {
@@ -37,7 +38,7 @@ export async function GET() {
     const { data: profileBasic } = await supabase
       .from('profiles')
       .select('household_type')
-      .eq('id', user.id)
+      .eq('id', claims.sub)
       .single()
 
     if (profileBasic) {
@@ -59,7 +60,7 @@ export async function GET() {
     hasHousehold = true
 
     // Try to get partner's name
-    const partnerId = members.find((m: { user_id: string }) => m.user_id !== user.id)?.user_id
+    const partnerId = members.find((m: { user_id: string }) => m.user_id !== claims.sub)?.user_id
     if (partnerId) {
       const { data: partnerProfile } = await supabase
         .from('profiles')

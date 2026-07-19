@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { computeFireProjection, type FinancialInput } from '@/lib/horizon-data'
 import { fetchActionsKpiAggregate } from '@/lib/server-data/actions-aggregate'
 import { unauthorized, badRequest, serverError } from '@/lib/api/respond'
@@ -12,9 +12,9 @@ import type { Debt } from '@/lib/debt-data'
 export async function GET(request: Request) {
   try {
     const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const claims = await getAuthClaims(supabase)
 
-    if (authError || !user) {
+    if (!claims) {
       return unauthorized()
     }
 
@@ -223,7 +223,7 @@ export async function GET(request: Request) {
 
     // Named: include user name
     if (privacyLevel === 'named' || privacyLevel === 'full') {
-      cardData.displayName = profileData?.full_name || user.email?.split('@')[0] || 'Gebruiker'
+      cardData.displayName = profileData?.full_name || claims.email?.split('@')[0] || 'Gebruiker'
     }
 
     // Full: include EUR amounts (opt-in)

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { unauthorized, serverError } from '@/lib/api/respond'
 import { isTrueLayerEnabled } from '@/lib/truelayer/feature-flag'
 import { getBaseUrls, getProviders, getClientId } from '@/lib/truelayer/client'
@@ -7,8 +7,8 @@ import { getBaseUrls, getProviders, getClientId } from '@/lib/truelayer/client'
 export async function GET() {
   const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
+  const claims = await getAuthClaims(supabase)
+  if (!claims) {
     return unauthorized()
   }
 

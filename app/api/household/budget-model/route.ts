@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { loadPerspectiveContext } from '@/lib/household/perspective-loader'
 import {
   detectMergeCandidates,
@@ -58,10 +58,8 @@ type RpcResult = {
 
 export async function GET() {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return unauthorized()
+  const claims = await getAuthClaims(supabase)
+  if (!claims) return unauthorized()
 
   const ctx = await loadPerspectiveContext(supabase)
 
@@ -91,7 +89,7 @@ export async function GET() {
         target_model: proposalRow.target_model as string,
         merge_mapping: (proposalRow.merge_mapping as MergePair[] | null) ?? [],
         proposed_by: proposalRow.proposed_by as string,
-        proposedByMe: proposalRow.proposed_by === user.id,
+        proposedByMe: proposalRow.proposed_by === claims.sub,
         created_at: proposalRow.created_at as string,
         expires_at: proposalRow.expires_at as string,
       }
@@ -107,7 +105,7 @@ export async function GET() {
     const { data: ownRows } = await supabase
       .from('budgets')
       .select('id, user_id, parent_id, name, slug, budget_type, ownership, is_archived, merged_into, default_limit, icon')
-      .eq('user_id', user.id)
+      .eq('user_id', claims.sub)
       .eq('is_archived', false)
 
     const ownBudgets = (ownRows ?? []) as BudgetLike[]
@@ -140,7 +138,7 @@ export async function GET() {
         const { data: txRows } = await supabase
           .from('transactions')
           .select('budget_id')
-          .eq('user_id', user.id)
+          .eq('user_id', claims.sub)
           .in('budget_id', ownBudgetIds)
         for (const row of (txRows ?? []) as Array<{ budget_id: string | null }>) {
           if (!row.budget_id) continue

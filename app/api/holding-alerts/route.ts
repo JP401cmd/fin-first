@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { unauthorized, serverError } from '@/lib/api/respond'
 
@@ -29,8 +29,8 @@ export type HoldingAlert = {
  */
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
+  const claims = await getAuthClaims(supabase)
+  if (!claims) {
     return unauthorized()
   }
 
@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
   let query = supabase
     .from('holding_alerts')
     .select('*')
-    .eq('user_id', user.id)
+    .eq('user_id', claims.sub)
     .order('created_at', { ascending: false })
 
   if (holdingId) {

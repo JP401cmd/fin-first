@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import {
   calculateBox2,
   type Box2Deelneming,
@@ -26,9 +26,9 @@ import {
  */
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const claims = await getAuthClaims(supabase)
 
-  if (!user) {
+  if (!claims) {
     return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
   }
 
@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
     .select('user_id, role, privacy_settings')
 
   const hasHousehold = members && members.length > 1
-  const partnerMember = members?.find(m => m.user_id !== user.id)
+  const partnerMember = members?.find(m => m.user_id !== claims.sub)
   const partnerId = partnerMember?.user_id
 
   // What the partner allows the household to see of their vermogen (Box 2
@@ -95,14 +95,14 @@ export async function GET(request: NextRequest) {
     })),
   }
 
-  const myDgaTotal = dgaLeningTotalForUser(dgaSources, user.id)
+  const myDgaTotal = dgaLeningTotalForUser(dgaSources, claims.sub)
 
   const partnerDgaTotal =
     partnerId && !partnerHidesVermogen ? dgaLeningTotalForUser(dgaSources, partnerId) : 0
 
   // Combined DGA over the VISIBLE set — exclude the partner's personal
   // vorderingen/schulden when they hide their vermogen (shared stays).
-  const combinedDgaTotal = dgaLeningTotalCombined(dgaSources, user.id, partnerHidesVermogen)
+  const combinedDgaTotal = dgaLeningTotalCombined(dgaSources, claims.sub, partnerHidesVermogen)
 
   // Get monthly expenses for freedom days calculation
   const { data: budgets } = await supabase
@@ -130,7 +130,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Separate assets by ownership
-  const myAssets = allAssets.filter(a => a.user_id === user.id && a.ownership !== 'shared')
+  const myAssets = allAssets.filter(a => a.user_id === claims.sub && a.ownership !== 'shared')
   const sharedAssets = allAssets.filter(a => a.ownership === 'shared')
   const partnerAssets = partnerId
     ? allAssets.filter(a => a.user_id === partnerId && a.ownership !== 'shared')
@@ -177,7 +177,7 @@ export async function GET(request: NextRequest) {
     const { data: householdStatus } = await supabase
       .from('household_members')
       .select('user_id, household_id')
-      .eq('user_id', user.id)
+      .eq('user_id', claims.sub)
       .single()
 
     if (householdStatus) {
@@ -187,7 +187,7 @@ export async function GET(request: NextRequest) {
         .eq('household_id', householdStatus.household_id)
         .returns<{ user_id: string; profiles: { full_name: string | null } | null }[]>()
 
-      const partner = allMembers?.find(m => m.user_id !== user.id)
+      const partner = allMembers?.find(m => m.user_id !== claims.sub)
       if (partner && partner.profiles?.full_name) {
         partnerName = partner.profiles.full_name
       }
@@ -248,7 +248,7 @@ export async function GET(request: NextRequest) {
     partnerName,
     partners: [
       {
-        userId: user.id,
+        userId: claims.sub,
         fullName: currentUserName,
         isCurrentUser: true,
         result: personalResult,

@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { loadDashboardData } from '@/lib/dashboard-data-loader'
 import { loadCashflowData } from '@/lib/cashflow-data-loader'
@@ -29,10 +29,8 @@ import type { LeverageStatus } from '@/lib/leverage-status'
 export async function GET() {
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) {
+    const claims = await getAuthClaims(supabase)
+    if (!claims) {
       return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
     }
 

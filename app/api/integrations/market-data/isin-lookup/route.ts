@@ -17,7 +17,7 @@
 //   503 — FMP_API_KEY is not configured server-side
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import {
   FmpNotConfiguredError,
   FmpQuotaExhaustedError,
@@ -65,8 +65,10 @@ function decrementUserCounter(userId: string): void {
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
+  // Read-auth via getClaims() — lokale JWKS-verificatie, geen getUser-roundtrip
+  // (ADR 0051). Pure read: claims.sub scoopt alleen de in-memory quota-teller.
+  const claims = await getAuthClaims(supabase)
+  if (!claims) {
     return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
   }
 
@@ -83,7 +85,7 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  const budget = bumpUserCounter(user.id)
+  const budget = bumpUserCounter(claims.sub)
   if (!budget.allowed) {
     return NextResponse.json(
       { error: 'Je dagelijkse ISIN-zoekbudget is bereikt. Vul ticker en naam handmatig in.', reason: 'user_quota' },
@@ -101,7 +103,7 @@ export async function GET(request: NextRequest) {
     const cacheHit = afterCalls === beforeCalls
 
     if (cacheHit) {
-      decrementUserCounter(user.id)
+      decrementUserCounter(claims.sub)
     }
 
     if (!result) {
@@ -115,7 +117,7 @@ export async function GET(request: NextRequest) {
       headers: { 'x-cache': cacheHit ? 'hit' : 'miss' },
     })
   } catch (err) {
-    decrementUserCounter(user.id)
+    decrementUserCounter(claims.sub)
     if (err instanceof FmpNotConfiguredError) {
       return NextResponse.json(
         { error: 'ISIN-resolver is niet geconfigureerd op deze server.', reason: 'not_configured' },

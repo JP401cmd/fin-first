@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { unauthorized, serverError } from '@/lib/api/respond'
 
 /**
@@ -8,16 +8,16 @@ import { unauthorized, serverError } from '@/lib/api/respond'
  */
 export async function GET() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const claims = await getAuthClaims(supabase)
 
-  if (!user) {
+  if (!claims) {
     return unauthorized()
   }
 
   const { data: profile, error } = await supabase
     .from('profiles')
     .select('completed_onboarding_steps')
-    .eq('id', user.id)
+    .eq('id', claims.sub)
     .single()
 
   if (error) {

@@ -23,7 +23,7 @@
  */
 
 import { NextResponse, type NextRequest } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import {
   loadCryptoHoldingPriceHistory,
   loadCryptoHoldingsForUser,
@@ -41,10 +41,8 @@ export async function GET(
 ) {
   const supabase = await createClient()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) {
+  const claims = await getAuthClaims(supabase)
+  if (!claims) {
     return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
   }
 
@@ -79,7 +77,7 @@ export async function GET(
       'id, type, units, price_per_unit, total_amount, fee_native, fee_currency, date, notes, external_source',
     )
     .eq('holding_id', id)
-    .eq('user_id', user.id)
+    .eq('user_id', claims.sub)
     .order('date', { ascending: false })
     .limit(TRANSACTIONS_LIMIT)
 

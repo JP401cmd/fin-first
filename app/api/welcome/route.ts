@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { unauthorized, serverError } from '@/lib/api/respond'
 
@@ -11,16 +11,16 @@ const WELCOME_KEY = '_welcome_seen'
  */
 export async function GET() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const claims = await getAuthClaims(supabase)
 
-  if (!user) {
+  if (!claims) {
     return unauthorized()
   }
 
   const { data: profile } = await supabase
     .from('profiles')
     .select('feature_preferences')
-    .eq('id', user.id)
+    .eq('id', claims.sub)
     .single()
 
   const prefs = (profile?.feature_preferences as Record<string, unknown>) ?? {}

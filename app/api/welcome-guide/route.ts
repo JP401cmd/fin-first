@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { unauthorized } from '@/lib/api/respond'
 import {
@@ -70,13 +70,11 @@ async function loadRawState(
 
 export async function GET() {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return unauthorized()
+  const claims = await getAuthClaims(supabase)
+  if (!claims) return unauthorized()
 
   const config = await loadConfig(supabase)
-  const { raw } = await loadRawState(supabase, user.id)
+  const { raw } = await loadRawState(supabase, claims.sub)
   const state = parseWelcomeGuideState(raw, config)
   // Orphan-cleanup: drop afgevinkte ids van inmiddels verwijderde stappen.
   state.completedStepIds = reconcileCompleted(config, state.completedStepIds)

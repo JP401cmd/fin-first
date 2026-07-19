@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { unauthorized, serverError } from '@/lib/api/respond'
 
 /**
@@ -20,13 +20,13 @@ type Method = (typeof METHODS)[number]
 
 export async function GET() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return unauthorized()
+  const claims = await getAuthClaims(supabase)
+  if (!claims) return unauthorized()
 
   const { data: membership } = await supabase
     .from('household_members')
     .select('household_id')
-    .eq('user_id', user.id)
+    .eq('user_id', claims.sub)
     .single()
   if (!membership) return NextResponse.json({ error: 'Geen huishouden gevonden' }, { status: 404 })
 

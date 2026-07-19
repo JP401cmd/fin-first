@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { normalisePrivacySettings, type PrivacySettings } from '@/lib/household-data'
 
 /**
@@ -11,9 +11,9 @@ import { normalisePrivacySettings, type PrivacySettings } from '@/lib/household-
  */
 export async function GET() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const claims = await getAuthClaims(supabase)
 
-  if (!user) {
+  if (!claims) {
     return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
   }
 
@@ -29,7 +29,7 @@ export async function GET() {
     })
   }
 
-  const partnerMember = members.find(m => m.user_id !== user.id)
+  const partnerMember = members.find(m => m.user_id !== claims.sub)
   if (!partnerMember) {
     return NextResponse.json({
       hasPartner: false,

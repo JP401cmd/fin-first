@@ -4,13 +4,14 @@
 // card. Auth required so we don't leak quota information publicly.
 
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { getFmpQuotaStatus } from '@/lib/integrations/fmp-client'
 
 export async function GET() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
+  // Read-auth via getClaims() — lokale JWKS-verificatie, geen getUser-roundtrip (ADR 0051).
+  const claims = await getAuthClaims(supabase)
+  if (!claims) {
     return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
   }
 

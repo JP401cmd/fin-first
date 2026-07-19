@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { localMonthBounds, localMonthStartMonthsAgo } from '@/lib/month-range'
 
@@ -13,9 +13,9 @@ import { localMonthBounds, localMonthStartMonthsAgo } from '@/lib/month-range'
  */
 export async function GET() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const claims = await getAuthClaims(supabase)
 
-  if (!user) {
+  if (!claims) {
     return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
   }
 
@@ -24,7 +24,7 @@ export async function GET() {
     const { data: budgets, error: budgetError } = await supabase
       .from('budgets')
       .select('id, name, slug, icon, parent_id, budget_type, default_limit, is_essential')
-      .eq('user_id', user.id)
+      .eq('user_id', claims.sub)
 
     if (budgetError) {
       // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
@@ -53,7 +53,7 @@ export async function GET() {
     const { data: transactions, error: txError } = await supabase
       .from('transactions')
       .select('budget_id, amount, date')
-      .eq('user_id', user.id)
+      .eq('user_id', claims.sub)
       .gte('date', startStr)
       .lt('date', endStr)
       .not('budget_id', 'is', null)
@@ -67,7 +67,7 @@ export async function GET() {
     const { data: budgetAmounts } = await supabase
       .from('budget_amounts')
       .select('budget_id, effective_from, amount')
-      .eq('user_id', user.id)
+      .eq('user_id', claims.sub)
 
     // Group budgets: parent -> children
     const parentBudgets = budgets.filter(b => !b.parent_id)

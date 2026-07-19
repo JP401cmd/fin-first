@@ -1,17 +1,18 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 
 const FP_KEY = 'retirement_aspirations'
 
 export async function GET() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+  // Read-auth via getClaims() — lokale JWKS-verificatie, geen getUser-roundtrip (ADR 0051).
+  const claims = await getAuthClaims(supabase)
+  if (!claims) return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
 
   const { data, error } = await supabase
     .from('profiles')
     .select('feature_preferences')
-    .eq('id', user.id)
+    .eq('id', claims.sub)
     .single()
 
   if (error) return NextResponse.json({ error: 'Fout bij laden' }, { status: 500 })

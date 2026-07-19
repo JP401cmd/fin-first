@@ -1,6 +1,6 @@
 import { generateObject } from 'ai'
 import { z } from 'zod'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { getModel, AIConfigError } from '@/lib/ai/config'
 import { RECOMMENDATIONS_SYSTEM_PROMPT } from '@/lib/ai/dna/recommendations'
 import { buildRecommendationContext } from '@/lib/ai/context/recommendation-context'
@@ -152,13 +152,13 @@ const RECENT_WINDOW_MS = 2 * 60 * 1000
 
 export async function GET() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const claims = await getAuthClaims(supabase)
 
-  if (!user) {
+  if (!claims) {
     return unauthorized()
   }
 
-  const tierGateGet = await checkTierGate(supabase, user.id, 'ai')
+  const tierGateGet = await checkTierGate(supabase, claims.sub, 'ai')
   if (tierGateGet) {
     return Response.json({ error: tierGateGet.error }, { status: 403 })
   }
@@ -168,7 +168,7 @@ export async function GET() {
   const { data: recentRecs } = await supabase
     .from('recommendations')
     .select('*')
-    .eq('user_id', user.id)
+    .eq('user_id', claims.sub)
     .eq('status', 'pending')
     .gte('created_at', cutoff)
     .order('created_at', { ascending: false })
