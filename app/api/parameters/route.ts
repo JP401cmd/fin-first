@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { sanitizeCashSettingsInput } from '@/lib/cashflow-settings'
 import { loadParameterSavingsRateTarget } from '@/lib/cashflow-settings-data'
@@ -7,9 +7,10 @@ import { loadParameterSavingsRateTarget } from '@/lib/cashflow-settings-data'
 
 export async function GET() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  // Read-auth via getClaims() — lokale JWKS-verificatie, geen getUser-roundtrip (ADR 0052).
+  const claims = await getAuthClaims(supabase)
 
-  if (!user) {
+  if (!claims) {
     return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
   }
 
@@ -18,7 +19,7 @@ export async function GET() {
   const { data: d1, error: e1 } = await supabase
     .from('profiles')
     .select('expected_return, inflation_rate, box3_method, marginaal_tarief, pension_factor_a, pension_factor_a_source, net_monthly_income, estimated_monthly_expenses, retirement_expense_method, retirement_expense_custom_amount, target_savings_rate, income_source, expenses_source')
-    .eq('id', user.id)
+    .eq('id', claims.sub)
     .single()
 
   if (!e1) {
@@ -28,7 +29,7 @@ export async function GET() {
     const { data: d2, error: e2 } = await supabase
       .from('profiles')
       .select('expected_return, inflation_rate, box3_method, net_monthly_income')
-      .eq('id', user.id)
+      .eq('id', claims.sub)
       .single()
     if (e2) {
       return NextResponse.json({ error: 'Fout bij laden parameters' }, { status: 500 })
@@ -39,7 +40,7 @@ export async function GET() {
   // Spaarquote-doel leest voortaan uit de goals-bron (ronde 4, besluit 3): het
   // door het /toekomst-lab gegenereerde parameter-doel wint; de (DEPRECATED)
   // profielkolom `target_savings_rate` is enkel nog fallback.
-  const goalTargetSavingsRate = await loadParameterSavingsRateTarget(supabase, user.id)
+  const goalTargetSavingsRate = await loadParameterSavingsRateTarget(supabase, claims.sub)
 
   return NextResponse.json({
     expected_return: data?.expected_return ?? 0.07,

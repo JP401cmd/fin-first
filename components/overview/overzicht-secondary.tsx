@@ -2,11 +2,11 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import { ArrowRight } from 'lucide-react'
 import { PageInfoButton } from '@/components/editorial'
 import { PAGE_INFO } from '@/lib/page-info-content'
 import { BottomSheet } from '@/components/app/bottom-sheet'
-import { HealthScoreReceipt } from '@/components/app/horizon/health-score-receipt'
 import type { HealthScore } from '@/lib/financial-health'
 import type { GoalWithBudget } from '@/lib/will-data-loader'
 import type { DashboardData } from '@/components/widgets/widget-renderer'
@@ -41,6 +41,18 @@ import { dailyExpenseRate } from '@/lib/format'
 // `netWorthHistory ?? []` bij ontbrekende historie elke render een verse
 // array-ref maakt — die zou de memo op MiniNetWorthChart telkens breken.
 const EMPTY_NET_WORTH_HISTORY: { month: string; value: number }[] = []
+
+// HealthScoreReceipt (1011 r) uit het first-load client-JS-chunk van /overzicht
+// gehaald (perf Task 3.2) — hij zit alleen in een BottomSheet die pas opent na
+// een klik op de Health-Score-card. `loading: null` is bewust: de BottomSheet
+// mount pas ná die klik, dus een skeleton zou hooguit één frame flitsen.
+const HealthScoreReceipt = dynamic(
+  () =>
+    import('@/components/app/horizon/health-score-receipt').then(m => ({
+      default: m.HealthScoreReceipt,
+    })),
+  { ssr: false, loading: () => null },
+)
 
 /**
  * OverzichtSecondary — het GESTREAMDE tweede blok van /overzicht (perf Task

@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { unauthorized, serverError } from '@/lib/api/respond'
 import { aggregateDividends } from '@/lib/dividends/aggregate'
@@ -21,8 +21,10 @@ import { aggregateDividends } from '@/lib/dividends/aggregate'
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
+  // Read-auth via getClaims() — lokale JWKS-verificatie, geen getUser-roundtrip
+  // (RF-008/C2). Pure read: user.id → claims.sub scoopt de RLS-SELECT identiek.
+  const claims = await getAuthClaims(supabase)
+  if (!claims) {
     return unauthorized()
   }
 
@@ -30,7 +32,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const result = await aggregateDividends(supabase, {
-      userId: user.id,
+      userId: claims.sub,
       holdingIdFilter,
     })
     return NextResponse.json(result)

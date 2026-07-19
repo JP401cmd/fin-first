@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { unauthorized, serverError } from '@/lib/api/respond'
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  // Read-auth via getClaims() — lokale JWKS-verificatie, geen getUser-roundtrip (ADR 0052).
+  const claims = await getAuthClaims(supabase)
 
-  if (authError || !user) {
+  if (!claims) {
     return unauthorized()
   }
 
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
   let query = supabase
     .from('valuations')
     .select('*')
-    .eq('user_id', user.id)
+    .eq('user_id', claims.sub)
     .eq('entity_type', entityType)
     .order('valuation_date', { ascending: false })
     .limit(limit)

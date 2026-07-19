@@ -12,16 +12,21 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
  * upsert-payloads vangt, zodat we kunnen asserten wat er wél/niet naar `profiles` gaat.
  */
 
-const mockGetUser = vi.fn()
-const mockFrom = vi.fn()
+const { mockGetUser, mockGetAuthClaims, mockFrom } = vi.hoisted(() => ({
+  mockGetUser: vi.fn(),
+  mockGetAuthClaims: vi.fn(),
+  mockFrom: vi.fn(),
+}))
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(async () => ({ auth: { getUser: mockGetUser }, from: mockFrom })),
+  getAuthClaims: mockGetAuthClaims,
 }))
 
 import { GET, PUT } from './route'
 
 const USER = { id: 'user-1' }
+const CLAIMS = { sub: USER.id }
 
 const results = {
   profilesSelect: vi.fn(),
@@ -77,6 +82,7 @@ function putRequest(body: unknown) {
 
 beforeEach(() => {
   mockGetUser.mockReset().mockResolvedValue({ data: { user: USER } })
+  mockGetAuthClaims.mockReset().mockResolvedValue(CLAIMS)
   mockFrom.mockReset().mockImplementation((table: string) => builder(table))
   upserted = []
   results.profilesSelect.mockReset().mockReturnValue({ data: {}, error: null })

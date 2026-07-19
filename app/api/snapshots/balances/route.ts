@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { unauthorized, serverError } from '@/lib/api/respond'
 import type { BalanceSnapshot, EntityBalanceHistory } from '@/lib/net-worth-data'
@@ -15,9 +15,9 @@ import type { BalanceSnapshot, EntityBalanceHistory } from '@/lib/net-worth-data
  */
 export async function GET(request: Request) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const claims = await getAuthClaims(supabase)
 
-  if (!user) {
+  if (!claims) {
     return unauthorized()
   }
 
@@ -35,7 +35,7 @@ export async function GET(request: Request) {
   let query = supabase
     .from('balance_snapshots')
     .select('entity_id, entity_name, entity_type, entity_subtype, snapshot_date, balance')
-    .eq('user_id', user.id)
+    .eq('user_id', claims.sub)
     .gte('snapshot_date', windowStartStr)
     .order('snapshot_date', { ascending: true })
 

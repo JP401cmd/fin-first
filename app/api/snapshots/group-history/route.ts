@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { unauthorized, serverError } from '@/lib/api/respond'
 import { loadWealthGroupHistory } from '@/lib/load-category-history'
@@ -33,9 +33,9 @@ type NetProvKind = 'measured' | 'locf' | 'manual'
 
 export async function GET(request: Request) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const claims = await getAuthClaims(supabase)
 
-  if (!user) {
+  if (!claims) {
     return unauthorized()
   }
 
@@ -61,7 +61,7 @@ export async function GET(request: Request) {
     const { data: snapRows, error: snapError } = await supabase
       .from('net_worth_snapshots')
       .select('snapshot_date, net_worth')
-      .eq('user_id', user.id)
+      .eq('user_id', claims.sub)
       .gte('snapshot_date', fromIso)
       .order('snapshot_date', { ascending: true })
 
@@ -80,7 +80,7 @@ export async function GET(request: Request) {
     const { count: balanceCount, error: countError } = await supabase
       .from('balance_snapshots')
       .select('snapshot_date', { count: 'exact', head: true })
-      .eq('user_id', user.id)
+      .eq('user_id', claims.sub)
       .gte('snapshot_date', fromIso)
 
     if (countError) {

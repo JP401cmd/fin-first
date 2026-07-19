@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
 /**
@@ -13,9 +13,9 @@ import { NextRequest, NextResponse } from 'next/server'
  */
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  const claims = await getAuthClaims(supabase)
 
-  if (authError || !user) {
+  if (!claims) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
     .from('goals')
     .select('*')
     .eq('id', goalId)
-    .eq('user_id', user.id)
+    .eq('user_id', claims.sub)
     .single()
 
   if (goalError || !goal) {
@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
       .from('goal_value_history')
       .select('value, recorded_at, source')
       .eq('goal_id', goalId)
-      .eq('user_id', user.id)
+      .eq('user_id', claims.sub)
       .order('recorded_at', { ascending: true })
 
     if (!histError && histData) {

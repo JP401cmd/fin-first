@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { unauthorized } from '@/lib/api/respond'
 
@@ -15,13 +15,13 @@ const FP_KEY = 'fire_strategy_override'
 
 export async function GET() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return unauthorized()
+  const claims = await getAuthClaims(supabase)
+  if (!claims) return unauthorized()
 
   const { data, error } = await supabase
     .from('profiles')
     .select('retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, feature_preferences, deficit_loan_rate')
-    .eq('id', user.id)
+    .eq('id', claims.sub)
     .single()
 
   if (error) return NextResponse.json({ error: 'Fout bij laden' }, { status: 500 })
@@ -43,7 +43,7 @@ export async function GET() {
   const { data: overrideData, error: overrideError } = await supabase
     .from('profiles')
     .select('monthly_savings_override')
-    .eq('id', user.id)
+    .eq('id', claims.sub)
     .maybeSingle()
   if (!overrideError && overrideData) {
     const raw = (overrideData as { monthly_savings_override?: number | string | null }).monthly_savings_override

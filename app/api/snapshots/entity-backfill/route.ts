@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { unauthorized, badRequest, notFound, serverError } from '@/lib/api/respond'
 import { parseBody } from '@/lib/api/parse-body'
 import { upsertSingleBalanceSnapshot } from '@/lib/balance-snapshot'
@@ -98,9 +98,9 @@ type EntityListRow = { id: string; name: string; subtype: string; current: numbe
  */
 export async function GET(request: Request) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const claims = await getAuthClaims(supabase)
 
-  if (!user) {
+  if (!claims) {
     return unauthorized()
   }
 
@@ -119,7 +119,7 @@ export async function GET(request: Request) {
   const { data: entityData, error: entityError } = await supabase
     .from(table)
     .select(selectCols)
-    .eq('user_id', user.id)
+    .eq('user_id', claims.sub)
     .eq('is_active', true)
     .order('sort_order', { ascending: true })
 
@@ -133,7 +133,7 @@ export async function GET(request: Request) {
   const { data: snapData, error: snapError } = await supabase
     .from('balance_snapshots')
     .select('entity_id, snapshot_date, balance')
-    .eq('user_id', user.id)
+    .eq('user_id', claims.sub)
     .eq('entity_type', entityType)
     .gte('snapshot_date', fromIso)
     .order('snapshot_date', { ascending: true })

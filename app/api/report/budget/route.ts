@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { localMonthStartMonthsAgo } from '@/lib/month-range'
 import { recentDailyExpenseRateFromRows } from '@/lib/expense-rate'
 import type {
@@ -98,9 +98,9 @@ function getEffectiveLimit(
 export async function GET(request: Request) {
   try {
     const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const claims = await getAuthClaims(supabase)
 
-    if (authError || !user) {
+    if (!claims) {
       return Response.json({ error: 'Niet ingelogd' }, { status: 401 })
     }
 

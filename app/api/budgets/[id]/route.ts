@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
 /**
@@ -155,9 +155,9 @@ export async function GET(
   const { id } = await params
 
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const claims = await getAuthClaims(supabase)
 
-  if (!user) {
+  if (!claims) {
     return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
   }
 
@@ -165,7 +165,7 @@ export async function GET(
     .from('budgets')
     .select('*')
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('user_id', claims.sub)
     .single()
 
   if (error || !budget) {

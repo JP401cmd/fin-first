@@ -12,7 +12,7 @@
  *
  * Spec: docs/superpowers/specs/2026-05-11-kern-rapport-en-instellingen-rapport-design.md
  */
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { getRecentDailyExpenseRate } from '@/lib/expense-rate'
 import {
   ASSET_GROUP_FOR_TYPE,
@@ -632,9 +632,9 @@ async function computeDailyExpenseRate(
 export async function GET(request: Request) {
   try {
     const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const claims = await getAuthClaims(supabase)
 
-    if (authError || !user) {
+    if (!claims) {
       return Response.json({ error: 'Niet ingelogd' }, { status: 401 })
     }
 

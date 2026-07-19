@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { loadVasteLastenSummary } from '@/lib/vaste-lasten-summary'
 
@@ -15,10 +15,11 @@ import { loadVasteLastenSummary } from '@/lib/vaste-lasten-summary'
 export async function GET() {
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) {
+    // Read-auth via getClaims() — lokale JWKS-verificatie, geen getUser-roundtrip
+    // (ADR 0052). loadVasteLastenSummary() doet zelf nog een interne getUser()-
+    // call (gedeelde lib, buiten deze route) — ongewijzigd.
+    const claims = await getAuthClaims(supabase)
+    if (!claims) {
       return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
     }
 

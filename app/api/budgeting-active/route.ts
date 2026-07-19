@@ -1,16 +1,16 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { unauthorized, serverError } from '@/lib/api/respond'
 
 export async function GET() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return unauthorized()
+  const claims = await getAuthClaims(supabase)
+  if (!claims) return unauthorized()
 
   try {
     const { data, error } = await supabase
       .from('profiles')
       .select('budgeting_active')
-      .eq('id', user.id)
+      .eq('id', claims.sub)
       .single()
 
     if (error) {

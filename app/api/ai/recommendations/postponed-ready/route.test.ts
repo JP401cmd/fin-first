@@ -6,20 +6,22 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
  * chat-FAB-badge.
  */
 
-const mockAuthGetUser = vi.fn()
-const mockSelect = vi.fn()
+const { mockGetAuthClaims, mockSelect } = vi.hoisted(() => ({
+  mockGetAuthClaims: vi.fn(),
+  mockSelect: vi.fn(),
+}))
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(async () => ({
-    auth: { getUser: mockAuthGetUser },
     from: () => ({
       select: mockSelect,
     }),
   })),
+  getAuthClaims: mockGetAuthClaims,
 }))
 
 beforeEach(() => {
-  mockAuthGetUser.mockReset()
+  mockGetAuthClaims.mockReset()
   mockSelect.mockReset()
 })
 
@@ -30,7 +32,7 @@ async function callRoute() {
 
 describe('GET /api/ai/recommendations/postponed-ready', () => {
   it('returns 401 with count:0 when not authenticated', async () => {
-    mockAuthGetUser.mockResolvedValue({ data: { user: null } })
+    mockGetAuthClaims.mockResolvedValue(null)
 
     const res = await callRoute()
     expect(res.status).toBe(401)
@@ -39,7 +41,7 @@ describe('GET /api/ai/recommendations/postponed-ready', () => {
   })
 
   it('returns count of postponed-ready recommendations', async () => {
-    mockAuthGetUser.mockResolvedValue({ data: { user: { id: 'u-1' } } })
+    mockGetAuthClaims.mockResolvedValue({ sub: 'u-1' })
     const chain = {
       eq: vi.fn().mockReturnThis(),
       lte: vi.fn().mockResolvedValue({ count: 3, error: null }),
@@ -62,7 +64,7 @@ describe('GET /api/ai/recommendations/postponed-ready', () => {
   })
 
   it('returns count:0 when supabase errors', async () => {
-    mockAuthGetUser.mockResolvedValue({ data: { user: { id: 'u-1' } } })
+    mockGetAuthClaims.mockResolvedValue({ sub: 'u-1' })
     const chain = {
       eq: vi.fn().mockReturnThis(),
       lte: vi.fn().mockResolvedValue({ count: null, error: { message: 'boom' } }),
@@ -76,7 +78,7 @@ describe('GET /api/ai/recommendations/postponed-ready', () => {
   })
 
   it('handles null count gracefully (no postponed recs found)', async () => {
-    mockAuthGetUser.mockResolvedValue({ data: { user: { id: 'u-1' } } })
+    mockGetAuthClaims.mockResolvedValue({ sub: 'u-1' })
     const chain = {
       eq: vi.fn().mockReturnThis(),
       lte: vi.fn().mockResolvedValue({ count: null, error: null }),

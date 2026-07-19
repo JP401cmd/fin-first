@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { unauthorized, forbidden, serverError } from '@/lib/api/respond'
 
 const VALID_SPLIT_MODES = ['equal', 'income_ratio', 'custom', 'one_carries_all'] as const
@@ -10,9 +10,9 @@ const VALID_SPLIT_MODES = ['equal', 'income_ratio', 'custom', 'one_carries_all']
  */
 export async function GET() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const claims = await getAuthClaims(supabase)
 
-  if (!user) {
+  if (!claims) {
     return unauthorized()
   }
 
@@ -20,7 +20,7 @@ export async function GET() {
   const { data: membership } = await supabase
     .from('household_members')
     .select('household_id, role')
-    .eq('user_id', user.id)
+    .eq('user_id', claims.sub)
     .single()
 
   if (!membership) {

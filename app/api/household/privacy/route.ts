@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 
 /**
  * Privacy categories and valid visibility levels.
@@ -98,9 +98,9 @@ function isDutchFormat(settings: Record<string, string>): boolean {
  */
 export async function GET() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const claims = await getAuthClaims(supabase)
 
-  if (!user) {
+  if (!claims) {
     return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
   }
 
@@ -108,7 +108,7 @@ export async function GET() {
   const { data: membership } = await supabase
     .from('household_members')
     .select('household_id, role, privacy_settings')
-    .eq('user_id', user.id)
+    .eq('user_id', claims.sub)
     .single()
 
   if (!membership) {
@@ -122,7 +122,7 @@ export async function GET() {
     const { data: appSetting } = await supabase
       .from('app_settings')
       .select('value')
-      .eq('key', `household_privacy:${user.id}`)
+      .eq('key', `household_privacy:${claims.sub}`)
       .single()
 
     raw = appSetting?.value ?? null

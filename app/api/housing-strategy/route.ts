@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import {
   parseHousingStrategy,
@@ -13,11 +13,9 @@ import type { Debt } from '@/lib/debt-data'
 
 export async function GET() {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const claims = await getAuthClaims(supabase)
 
-  if (!user) {
+  if (!claims) {
     return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
   }
 
@@ -26,7 +24,7 @@ export async function GET() {
     supabase
       .from('profiles')
       .select('housing_strategy_config, housing_strategy_dismissed_at')
-      .eq('id', user.id)
+      .eq('id', claims.sub)
       .single(),
     supabase.from('assets').select('*').eq('is_active', true),
     supabase.from('debts').select('*').eq('is_active', true),

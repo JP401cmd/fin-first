@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { backfillHoldingPrices } from '@/lib/historical-prices'
 import { resolveHolding, type HoldingTables } from '@/lib/holdings-table-resolver'
@@ -25,8 +25,8 @@ export async function GET(
 ) {
   const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
+  const claims = await getAuthClaims(supabase)
+  if (!claims) {
     return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
   }
 
@@ -37,7 +37,7 @@ export async function GET(
   }
 
   try {
-    const resolved = await resolveHolding(supabase, holdingId, user.id)
+    const resolved = await resolveHolding(supabase, holdingId, claims.sub)
     if (!resolved) {
       return NextResponse.json({ error: 'Holding niet gevonden' }, { status: 404 })
     }
@@ -46,7 +46,7 @@ export async function GET(
     const tables = resolved.tables
 
     // --- Try price-based history first ---
-    const priceHistory = await buildPriceBasedHistory(supabase, holding, tables, user.id)
+    const priceHistory = await buildPriceBasedHistory(supabase, holding, tables, claims.sub)
 
     if (priceHistory && priceHistory.length >= 2) {
       const currentPrice = Number(holding.current_price) || Number(holding.avg_purchase_price) || 0
@@ -66,13 +66,13 @@ export async function GET(
     }
 
     // --- Fallback: transaction-based history ---
-    const txHistory = await buildTransactionBasedHistory(supabase, holding, tables, user.id)
+    const txHistory = await buildTransactionBasedHistory(supabase, holding, tables, claims.sub)
 
     // Backfill alleen voor investment-holdings — crypto-prijzen komen via
     // exchange-sync / coingecko-pad dat (nog) niet via deze backfill loopt.
     const ticker = holding.ticker as string | null | undefined
     if (resolved.bucket === 'investment' && ticker && (!priceHistory || priceHistory.length === 0)) {
-      backfillHoldingPrices(supabase, holdingId, ticker, user.id, '1y').catch(() => {
+      backfillHoldingPrices(supabase, holdingId, ticker, claims.sub, '1y').catch(() => {
         // Silently fail — backfill is best-effort
       })
     }

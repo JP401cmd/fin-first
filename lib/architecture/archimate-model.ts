@@ -406,8 +406,8 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     {
       id: 't-lokale-ai', x: 1250, y: row(6), w: 185, h: 66, kind: 'tech',
       title: 'Lokale AI-runtime — in-browser, WebGPU',
-      lead: 'LiteRT-LM (@litert-lm/core, Early Preview) + Gemma 4 E2B web-bundel, volledig on-device: categorisatie-voorstellen verlaten het toestel niet. Sinds 19 jul 2026 runtime-swap vanaf Transformers.js/ONNX (L1-meting: betrouwbaarder + sneller op dezelfde iGPU-realiteit) — desktop-only, assistief (review-UI-only, geen automatische toepassing) blijft ongewijzigd. Dezelfde runtime bedient sinds C1b ook een experimentele lokale Will-chat (/mijn/lokale-chat): vragen over eigen cijfers, antwoord blijft on-device. Bewust géén externe-partij-relatie, in tegenstelling tot ext-claude → t-aigateway. Dat ontbreken ís de privacygarantie (ADR 0043).',
-      items: ['LiteRT-LM (@litert-lm/core 0.14.0)', 'Gemma 4 E2B web-bundel', 'WebGPU', 'privacy_mode'],
+      lead: 'LiteRT-LM (@litert-lm/core, Early Preview) + Gemma 4 E2B web-bundel, volledig on-device: categorisatie-voorstellen verlaten het toestel niet. Sinds 19 jul 2026 runtime-swap vanaf Transformers.js/ONNX (L1-meting: betrouwbaarder + sneller op dezelfde iGPU-realiteit) — desktop-only, assistief (review-UI-only, geen automatische toepassing) blijft ongewijzigd. Dezelfde runtime bedient sinds C1b ook een experimentele lokale Will-chat (/mijn/lokale-chat): vragen over eigen cijfers, antwoord blijft on-device, gegrond op een door beheer gecureerde kennisbank (categorieën + verloopbewaking, relevantie-ranking met een harde items-cap) die het kleine model NL-begrippenkennis meegeeft zonder het te overladen. Bewust géén externe-partij-relatie, in tegenstelling tot ext-claude → t-aigateway. Dat ontbreken ís de privacygarantie (ADR 0043).',
+      items: ['LiteRT-LM (@litert-lm/core 0.14.0)', 'Gemma 4 E2B web-bundel', 'WebGPU', 'privacy_mode', 'Lokale kennisbank (app_settings.local_knowledge)'],
     },
 
     // ── Data ──

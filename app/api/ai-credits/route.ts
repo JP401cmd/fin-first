@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { hasSubscription } from '@/lib/feature-registry'
 import {
   parseAiCreditConfig,
@@ -12,10 +12,8 @@ import {
 /** GET — AI-creditverbruik van de ingelogde gebruiker voor de huidige periode. */
 export async function GET() {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) {
+  const claims = await getAuthClaims(supabase)
+  if (!claims) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -23,12 +21,12 @@ export async function GET() {
   const { start } = currentPeriod(now)
 
   const [{ data: profile }, { data: configRow }, { data: usage }] = await Promise.all([
-    supabase.from('profiles').select('active_subscriptions').eq('id', user.id).single(),
+    supabase.from('profiles').select('active_subscriptions').eq('id', claims.sub).single(),
     supabase.from('app_settings').select('value').eq('key', 'ai_credit_config').maybeSingle(),
     supabase
       .from('ai_usage')
       .select('feature, credits, created_at')
-      .eq('user_id', user.id)
+      .eq('user_id', claims.sub)
       .gte('created_at', start.toISOString())
       .order('created_at', { ascending: true }),
   ])

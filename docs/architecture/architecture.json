@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-19T16:49:01.851Z",
+  "generatedAt": "2026-07-19T18:44:03.051Z",
   "generatedDate": "2026-07-19",
   "repo": {
     "name": "fin",
@@ -191,9 +191,9 @@
     "routesProduction": 101,
     "api": 255,
     "tables": 84,
-    "migrations": 147,
+    "migrations": 148,
     "integrations": 24,
-    "components": 863,
+    "components": 860,
     "providers": 11,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -7282,7 +7282,7 @@
         "migration": "supabase/migrations/20260501000001_create_external_connections.sql"
       }
     ],
-    "migrationCount": 147
+    "migrationCount": 148
   },
   "tablesByDomain": [
     {
@@ -7724,11 +7724,11 @@
     }
   ],
   "components": {
-    "total": 863,
+    "total": 860,
     "groups": [
       {
         "group": "app",
-        "count": 359,
+        "count": 356,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -7794,9 +7794,6 @@
           "cash-account-view.test",
           "cash-overview",
           "cashflow-forecast-chart",
-          "categorize-row",
-          "categorize-wizard",
-          "categorize-wizard.test",
           "category-rules-sheet",
           "chart-event-markers",
           "chart-event-markers.test",
@@ -14497,16 +14494,15 @@
       "file": "docs/adr/0050-transactie-maandaggregaat-rpc.md"
     },
     {
-      "id": "0051-incrementele-wizard-consumptie-categorisatiemotor",
-      "title": "Incrementele per-tegenpartij-wizard consumeert de categorisatiemotor — geen tweede motor",
+      "id": "0051-getclaims-read-routes-revocatievenster",
+      "title": "getClaims() voor read-routes: lokale JWT-verificatie met geaccepteerd revocatievenster",
       "status": "aanvaard",
       "date": "2026-07-19",
       "elements": [
-        "as-import",
-        "t-lokale-ai"
+        "t-supabase"
       ],
-      "summary": "De \"Vraag Will\"-categoriseerflow wordt een per-tegenpartij-groep-wizard met adaptieve aanvoer (lokaal 2-3 representanten/ronde + prefetch-venster 1-2 via back-pressure; cloud 20/ronde, presentatie kaart-voor-kaart) — eigenaarsbesluit 19 juli 2026. `runCombinedCategorization` blij",
-      "file": "docs/adr/0051-incrementele-wizard-consumptie-categorisatiemotor.md"
+      "summary": "Alle ~220 API-routes deden per request een `auth.getUser()`-roundtrip naar de Supabase Auth-server, puur om de identiteit vast te stellen. `getClaims()` verifieert het JWT lokaal en elimineert die roundtrip. Bevestigd op prod (19 jul 2026): de JWT's zijn asymmetrisch getekend (`a",
+      "file": "docs/adr/0051-getclaims-read-routes-revocatievenster.md"
     }
   ],
   "churn": {
@@ -14518,7 +14514,7 @@
       },
       {
         "path": "lib/ai",
-        "commits": 45
+        "commits": 44
       },
       {
         "path": "app/(app)/toekomst",
@@ -14542,7 +14538,7 @@
       },
       {
         "path": "app/api/assets",
-        "commits": 5
+        "commits": 6
       },
       {
         "path": "components/horizon",
@@ -14556,7 +14552,7 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 8389,
+        "loc": 8396,
         "commits": 86
       },
       {
@@ -14581,8 +14577,8 @@
       },
       {
         "file": "lib/dashboard-data-loader.ts",
-        "loc": 2530,
-        "commits": 40
+        "loc": 2553,
+        "commits": 41
       },
       {
         "file": "lib/horizon-data.ts",
@@ -15376,16 +15372,8 @@
   "diff": {
     "baseline": false,
     "previousDate": "2026-07-19",
-    "hasChanges": true,
-    "sections": [
-      {
-        "label": "Componenten (aantal)",
-        "added": [
-          "+3"
-        ],
-        "removed": []
-      }
-    ]
+    "hasChanges": false,
+    "sections": []
   },
   "statsHistory": [
     {
@@ -15566,7 +15554,7 @@
     {
       "date": "2026-07-19",
       "api": 255,
-      "components": 863,
+      "components": 860,
       "tables": 84,
       "routesProduction": 101
     }

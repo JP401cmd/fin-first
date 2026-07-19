@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 
 /**
  * GET /api/ai/recommendations/postponed-ready
@@ -14,9 +14,9 @@ import { createClient } from '@/lib/supabase/server'
  */
 export async function GET() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const claims = await getAuthClaims(supabase)
 
-  if (!user) {
+  if (!claims) {
     return Response.json({ count: 0 }, { status: 401 })
   }
 
@@ -24,7 +24,7 @@ export async function GET() {
   const { count, error } = await supabase
     .from('recommendations')
     .select('id', { count: 'exact', head: true })
-    .eq('user_id', user.id)
+    .eq('user_id', claims.sub)
     .eq('status', 'postponed')
     .lte('postponed_until', nowIso)
 

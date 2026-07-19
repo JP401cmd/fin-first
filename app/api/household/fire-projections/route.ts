@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { computeFireProjection, computeFireRange, type FinancialInput, type FireProjection, type FireRange } from '@/lib/horizon-data'
 import { computeSharePct, type SplitMode } from '@/lib/household-data'
 import { localMonthBounds } from '@/lib/month-range'
@@ -75,9 +75,9 @@ interface HouseholdFireResponse {
 
 export async function GET() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const claims = await getAuthClaims(supabase)
 
-  if (!user) {
+  if (!claims) {
     return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
   }
 
@@ -85,7 +85,7 @@ export async function GET() {
   const { data: membership } = await supabase
     .from('household_members')
     .select('household_id, role')
-    .eq('user_id', user.id)
+    .eq('user_id', claims.sub)
     .maybeSingle()
 
   if (!membership) {
@@ -279,7 +279,7 @@ export async function GET() {
     return {
       userId: memberId,
       fullName: profile?.full_name ?? null,
-      isCurrentUser: memberId === user.id,
+      isCurrentUser: memberId === claims.sub,
       totalAssets,
       totalDebts,
       monthlyIncome,

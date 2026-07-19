@@ -35,7 +35,7 @@
  */
 
 import { NextResponse, type NextRequest } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { HOLDINGS_TX_AGG_LIMIT } from '@/lib/holdings-aggregation'
 
 const UUID_REGEX =
@@ -47,10 +47,8 @@ export async function GET(
 ) {
   const supabase = await createClient()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) {
+  const claims = await getAuthClaims(supabase)
+  if (!claims) {
     return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
   }
 
@@ -93,7 +91,7 @@ export async function GET(
       `,
     )
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('user_id', claims.sub)
     .maybeSingle()
 
   if (holdingError || !holding) {

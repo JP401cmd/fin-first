@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { syncAssetValueFromHoldings } from '@/lib/holdings-sync'
 import { unauthorized, serverError } from '@/lib/api/respond'
@@ -121,8 +121,8 @@ export async function GET(
 ) {
   const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
+  const claims = await getAuthClaims(supabase)
+  if (!claims) {
     return unauthorized()
   }
 
@@ -137,7 +137,7 @@ export async function GET(
     const resolved = await resolveHolding(
       supabase,
       holdingId,
-      user.id,
+      claims.sub,
       'id, units, avg_purchase_price, current_price',
     )
 
@@ -158,7 +158,7 @@ export async function GET(
       .from(tables.transactions)
       .select('*')
       .eq('holding_id', holdingId)
-      .eq('user_id', user.id)
+      .eq('user_id', claims.sub)
       .order('date', { ascending: true })
       .order('created_at', { ascending: true })
 

@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { localMonthStartMonthsAgo } from '@/lib/month-range'
 import { recentDailyExpenseRateFromRows } from '@/lib/expense-rate'
 import { EXPENSE_RATE_ROLLING_MONTHS } from '@/lib/constants'
@@ -16,9 +16,9 @@ import { EXPENSE_RATE_ROLLING_MONTHS } from '@/lib/constants'
 export async function GET() {
   try {
     const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const claims = await getAuthClaims(supabase)
 
-    if (authError || !user) {
+    if (!claims) {
       return Response.json({ error: 'Niet ingelogd' }, { status: 401 })
     }
 

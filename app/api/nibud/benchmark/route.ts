@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { getNibudHouseholdType, getNibudReferences, calculateBenchmarks } from '@/lib/nibud/reference-data'
 import { fetchNibudApi } from '@/lib/nibud/api-client'
 
 export async function GET() {
   const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
+  const claims = await getAuthClaims(supabase)
+  if (!claims) {
     return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
   }
 
@@ -15,7 +15,7 @@ export async function GET() {
   const { data: profile } = await supabase
     .from('profiles')
     .select('household_type, number_of_children, children_ages, housing_type, net_monthly_income')
-    .eq('id', user.id)
+    .eq('id', claims.sub)
     .single()
 
   if (!profile) {
@@ -48,7 +48,7 @@ export async function GET() {
   const budgetsRes = await supabase
     .from('budgets')
     .select('id, slug, budget_type, default_limit, interval')
-    .eq('user_id', user.id)
+    .eq('user_id', claims.sub)
     .order('sort_order')
 
   const budgets = budgetsRes.data ?? []

@@ -6,20 +6,20 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
  * uit app/api/parameters/route.test.ts en app/api/toekomst-doel/route.test.ts).
  */
 
-const mockGetUser = vi.fn()
-const mockFrom = vi.fn()
+const { mockGetAuthClaims, mockFrom } = vi.hoisted(() => ({
+  mockGetAuthClaims: vi.fn(),
+  mockFrom: vi.fn(),
+}))
 
 vi.mock('@/lib/supabase/server', () => ({
-  createClient: vi.fn(async () => ({ auth: { getUser: mockGetUser }, from: mockFrom })),
+  createClient: vi.fn(async () => ({ from: mockFrom })),
+  getAuthClaims: mockGetAuthClaims,
 }))
 
 import { GET } from './route'
 
 beforeEach(() => {
-  mockGetUser.mockReset().mockResolvedValue({
-    data: { user: null },
-    error: { message: 'not authenticated' },
-  })
+  mockGetAuthClaims.mockReset().mockResolvedValue(null)
   mockFrom.mockReset()
 })
 

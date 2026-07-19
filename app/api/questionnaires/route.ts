@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { unauthorized, serverError } from '@/lib/api/respond'
 
 export async function GET() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return unauthorized()
+  // Read-auth via getClaims() — lokale JWKS-verificatie, geen getUser-roundtrip (ADR 0052).
+  const claims = await getAuthClaims(supabase)
+  if (!claims) return unauthorized()
 
   const { data: questionnaires, error } = await supabase
     .from('questionnaires')
@@ -24,7 +25,7 @@ export async function GET() {
       id, questionnaire_id, completed_at,
       questionnaire_responses(question_id)
     `)
-    .eq('user_id', user.id)
+    .eq('user_id', claims.sub)
 
   const sessionMap: Record<string, {
     session_id: string

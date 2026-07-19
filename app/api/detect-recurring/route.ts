@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import {
   detectRecurringTransactions,
@@ -19,8 +19,8 @@ import {
 export async function GET(request: Request) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
+    const claims = await getAuthClaims(supabase)
+    if (!claims) {
       return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
     }
 

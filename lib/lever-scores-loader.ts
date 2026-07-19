@@ -40,7 +40,7 @@ import {
   getBudgets,
   getUnlinkedBankAccounts,
   getCurrentMonthTx,
-  getTx12m,
+  getEarliestIncomeDate,
 } from '@/lib/server-data/base'
 import {
   fetchTxMonthAggregate,
@@ -178,12 +178,14 @@ export const loadLeverScores = cache(async function loadLeverScores(
   const sixMonthsAgo = localMonthStartMonthsAgo(now, 5)
 
   // Gedeelde basisdata-laag (lib/server-data/base.ts): assets/debts/profiel/
-  // budgetten/bank + de twee transactie-vensters draaien als ÉÉN query per tabel
+  // budgetten/bank + het huidige-maand-tx-venster draaien als ÉÉN query per tabel
   // per request, gedeeld met de andere loaders + de shell-layout. De vroegere
   // per-venster/per-teken tx-queries (6-maands, huidige-maand budget-tx, maand-
-  // inkomen, vroegste inkomen) worden hieronder in JS uit deze twee vensters
-  // geslicet — byte-identiek, want die vensters zijn subsets. RLS scopet al op de
-  // gebruiker, dus de expliciete .eq('user_id') is vervallen.
+  // inkomen) worden hieronder in JS uit dit venster + het 6-maands-aggregaat
+  // geslicet — byte-identiek, want die vensters zijn subsets. Vroegste-inkomen
+  // komt via de aparte all-time `getEarliestIncomeDate` (zie hieronder), niet
+  // meer uit een 12-maands-slice. RLS scopet al op de gebruiker, dus de
+  // expliciete .eq('user_id') is vervallen.
   const [
     profileRes,
     assetsRes,
@@ -191,8 +193,8 @@ export const loadLeverScores = cache(async function loadLeverScores(
     budgetsRes,
     bankAccountsRes,
     currentMonthTxRes,
-    tx12mRes,
     tx6mAggRes,
+    earliestIncomeRes,
   ] = await Promise.all([
     getOwnProfile(supabase),
     getActiveAssets(supabase),
@@ -200,13 +202,18 @@ export const loadLeverScores = cache(async function loadLeverScores(
     getBudgets(supabase),
     getUnlinkedBankAccounts(supabase),
     getCurrentMonthTx(supabase),
-    getTx12m(supabase),
     // 6-maands maandaggregaat voor de canonieke spaarquote (transfer-gefilterd via
-    // realOnly; spaarbudget-correctie via budgetIds). SQL-aggregaat i.p.v. de
-    // 6-maands slice uit getTx12m: kan niet stil afkappen op max_rows=1000
-    // (correctheid). RLS-breed (geen ownOnly) — identiek aan getTx12m's scope,
-    // waar T2.1 de expliciete .eq('user_id') liet vervallen.
+    // realOnly; spaarbudget-correctie via budgetIds). SQL-aggregaat i.p.v. een
+    // 6-maands rijen-slice: kan niet stil afkappen op max_rows=1000
+    // (correctheid). RLS-breed (geen ownOnly) — identiek aan getTx12m's vroegere
+    // scope, waar T2.1 de expliciete .eq('user_id') liet vervallen.
     fetchTxMonthAggregate(supabase, { from: sixMonthsAgo, to: localMonthBounds(now).end }),
+    // Vroegste inkomens-datum (all-time, één rij) — afkap-vrij, i.p.v. de vroegere
+    // reduce over een gecapte 12-maands-slice (die kon bij >1000 positieve rijen
+    // stil afkappen → savingsDataMonths te klein → over-extrapolatie). Zelfde
+    // gedeelde helper als dashboard-data-loader.ts/horizon-data-loader.ts;
+    // cache() dedupliceert met die calls binnen hetzelfde request.
+    getEarliestIncomeDate(supabase),
   ])
 
   const profile = (profileRes.data ?? {}) as LeverScoresProfile
@@ -299,14 +306,12 @@ export const loadLeverScores = cache(async function loadLeverScores(
   const debtAflossing6m = computeDebtAflossingMonthly(debtRows as unknown as Debt[]) * 6
 
   let savingsDataMonths = 6
-  // Vroegste inkomens-transactie (amount>0) in het 12-maands venster = de laagste
-  // datum onder de positieve rijen (spiegelt .gt('amount',0).order('date',asc).limit(1)).
-  const earliestIncomeDate = ((tx12mRes.data ?? []) as Array<{ amount: number | string; date: string }>).reduce<
-    string | undefined
-  >((min, t) => {
-    if (!(Number(t.amount) > 0)) return min
-    return min === undefined || t.date < min ? t.date : min
-  }, undefined)
+  // Vroegste inkomens-datum: all-time via de gedeelde `getEarliestIncomeDate`
+  // (order(date asc).limit(1)) i.p.v. een reduce over een gecapte 12-maands-slice —
+  // die kon bij >1000 positieve rijen stil afkappen (savingsDataMonths te klein →
+  // over-extrapolatie). Spiegelt dashboard-data-loader.ts/horizon-data-loader.ts.
+  const earliestIncomeDate =
+    (earliestIncomeRes.data as { date?: string | null } | null)?.date ?? undefined
   if (earliestIncomeDate) {
     const earliest = new Date(earliestIncomeDate)
     savingsDataMonths = Math.max(

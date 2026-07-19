@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -23,9 +23,10 @@ const VALID_MODES: PartnerNotifMode[] = ['all_shared', 'threshold', 'categories'
 
 export async function GET() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  // Read-auth via getClaims() — lokale JWKS-verificatie, geen getUser-roundtrip (ADR 0052).
+  const claims = await getAuthClaims(supabase)
 
-  if (!user) {
+  if (!claims) {
     return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
   }
 
@@ -33,7 +34,7 @@ export async function GET() {
     const { data } = await supabase
       .from('app_settings')
       .select('value')
-      .eq('key', `partner_notif_prefs_${user.id}`)
+      .eq('key', `partner_notif_prefs_${claims.sub}`)
       .maybeSingle()
 
     if (data?.value) {

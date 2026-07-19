@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { isSuperAdmin } from '@/lib/admin'
 import { WIDGET_PRESETS, type WidgetPreset } from '@/lib/widget-presets'
 import { WIDGET_CATALOG } from '@/lib/widget-catalog'
@@ -18,9 +18,10 @@ const VALID_WIDGET_IDS = new Set(WIDGET_CATALOG.map(w => w.id))
 export async function GET() {
   const supabase = await createClient()
 
-  // Any authenticated user can read presets (used by dashboard dropdown)
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
+  // Any authenticated user can read presets (used by dashboard dropdown).
+  // Read-auth via getClaims() — lokale JWKS-verificatie, geen getUser-roundtrip (ADR 0052).
+  const claims = await getAuthClaims(supabase)
+  if (!claims) {
     return unauthorized()
   }
 

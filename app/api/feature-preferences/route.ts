@@ -1,20 +1,20 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { UNIFIED_FEATURES, hasSubscription, type ActiveSubscriptions } from '@/lib/feature-registry'
 import { unauthorized, serverError } from '@/lib/api/respond'
 
 export async function GET() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const claims = await getAuthClaims(supabase)
 
-  if (!user) {
+  if (!claims) {
     return unauthorized()
   }
 
   const { data: profile } = await supabase
     .from('profiles')
     .select('feature_preferences')
-    .eq('id', user.id)
+    .eq('id', claims.sub)
     .single()
 
   return NextResponse.json({

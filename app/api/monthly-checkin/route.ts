@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
 // ── Key helpers ──────────────────────────────────────────────────────────
@@ -21,8 +21,8 @@ interface CheckinData {
 // ── GET — Check if current month check-in is completed ──────────────────
 export async function GET() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+  const claims = await getAuthClaims(supabase)
+  if (!claims) return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
 
   const monthKey = currentMonthKey()
 
@@ -31,12 +31,12 @@ export async function GET() {
     supabase
       .from('app_settings')
       .select('value')
-      .eq('key', checkinKey(user.id))
+      .eq('key', checkinKey(claims.sub))
       .maybeSingle(),
     supabase
       .from('app_settings')
       .select('value')
-      .eq('key', prefsKey(user.id))
+      .eq('key', prefsKey(claims.sub))
       .maybeSingle(),
   ])
 

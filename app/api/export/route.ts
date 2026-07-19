@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { localMonthBounds } from '@/lib/month-range'
 
 type ExportType = 'transactions' | 'budgets' | 'net_worth' | 'assets' | 'debts' | 'goals'
@@ -22,9 +22,9 @@ function toCSV(headers: string[], rows: (string | number | null | undefined)[][]
 
 export async function GET(req: Request) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const claims = await getAuthClaims(supabase)
 
-  if (!user) {
+  if (!claims) {
     return new Response('Unauthorized', { status: 401 })
   }
 
@@ -45,7 +45,7 @@ export async function GET(req: Request) {
       const { data } = await supabase
         .from('transactions')
         .select('date, amount, description, counterparty_name, counterparty_iban, is_income, reference, budget:budgets(name)')
-        .eq('user_id', user.id)
+        .eq('user_id', claims.sub)
         .order('date', { ascending: false })
         .limit(10000)
 
@@ -73,13 +73,13 @@ export async function GET(req: Request) {
         supabase
           .from('budgets')
           .select('id, name, slug, budget_type, default_limit, is_essential, parent_id')
-          .eq('user_id', user.id)
+          .eq('user_id', claims.sub)
           .not('parent_id', 'is', null)
           .order('sort_order'),
         supabase
           .from('transactions')
           .select('budget_id, amount')
-          .eq('user_id', user.id)
+          .eq('user_id', claims.sub)
           .gte('date', monthStart)
           .lt('date', monthEnd),
       ])
@@ -109,7 +109,7 @@ export async function GET(req: Request) {
       const { data } = await supabase
         .from('net_worth_snapshots')
         .select('snapshot_date, total_assets, total_debts, net_worth')
-        .eq('user_id', user.id)
+        .eq('user_id', claims.sub)
         .order('snapshot_date', { ascending: true })
 
       rows = (data ?? []).map(s => [
@@ -128,7 +128,7 @@ export async function GET(req: Request) {
       const { data } = await supabase
         .from('assets')
         .select('name, asset_type, current_value, purchase_value, expected_return, monthly_contribution, institution, is_active, notes')
-        .eq('user_id', user.id)
+        .eq('user_id', claims.sub)
         .order('sort_order')
 
       rows = (data ?? []).map(a => [
@@ -152,7 +152,7 @@ export async function GET(req: Request) {
       const { data } = await supabase
         .from('debts')
         .select('name, debt_type, original_amount, current_balance, interest_rate, monthly_payment, creditor, start_date, end_date, is_active, notes')
-        .eq('user_id', user.id)
+        .eq('user_id', claims.sub)
         .order('sort_order')
 
       rows = (data ?? []).map(d => [
@@ -178,7 +178,7 @@ export async function GET(req: Request) {
       const { data } = await supabase
         .from('goals')
         .select('name, goal_type, target_value, current_value, target_date, is_completed')
-        .eq('user_id', user.id)
+        .eq('user_id', claims.sub)
         .order('sort_order')
 
       rows = (data ?? []).map(g => [

@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 
 const BUCKET = 'pension-documents'
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
@@ -110,8 +110,8 @@ export async function POST(req: Request) {
 // ── GET: Download PDF (signed URL) ──
 export async function GET(req: Request) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
+  const claims = await getAuthClaims(supabase)
+  if (!claims) {
     return Response.json({ error: 'Niet ingelogd' }, { status: 401 })
   }
 
@@ -132,7 +132,7 @@ export async function GET(req: Request) {
   if (fetchError || !lifeEvent) {
     return Response.json({ error: 'Levensgebeurtenis niet gevonden.' }, { status: 404 })
   }
-  if (lifeEvent.user_id !== user.id) {
+  if (lifeEvent.user_id !== claims.sub) {
     return Response.json({ error: 'Geen toegang.' }, { status: 403 })
   }
 

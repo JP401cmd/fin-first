@@ -178,3 +178,27 @@ export const getTx12m = cache(async (supabase: SupabaseClient) => {
     .gte('date', localMonthStartMonthsAgo(now, 11))
     .lt('date', localMonthBounds(now).end)
 })
+
+/**
+ * Vroegste datum van een positieve (inkomsten-)transactie — ALL-TIME, één rij.
+ *
+ * Voedt de inkomens-extrapolatie in de dashboard-loader (`incomeMonths` /
+ * `dataMonths6`). Vroeger werd deze datum uit de 12-maands-slice (`getTx12m`)
+ * gescand — begrensd door ZOWEL het 12-mnd-venster ALS de stille
+ * `max_rows=1000`-afkap: voor gebruikers met >1000 positieve rijen in het venster
+ * kon de gescande "vroegste" datum te recent zijn → `incomeMonths` te klein →
+ * OVER-extrapolatie. Een `order(date asc).limit(1)`-query geeft per definitie één
+ * rij (nooit afkap-gevoelig) en is door geen van beide begrenzingen geraakt.
+ *
+ * BEWUST géén transfer-filter: spiegelt de vroegere scan over ÁLLE positieve
+ * rijen (`income12Rows` had géén isRealTx-filter). RLS van `transactions` geldt.
+ */
+export const getEarliestIncomeDate = cache(async (supabase: SupabaseClient) => {
+  return supabase
+    .from('transactions')
+    .select('date')
+    .gt('amount', 0)
+    .order('date', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+})

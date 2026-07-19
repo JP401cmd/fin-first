@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { unauthorized } from '@/lib/api/respond'
 import { localMonthBounds } from '@/lib/month-range'
@@ -26,8 +26,8 @@ import { resolveFireParams } from '@/lib/fire-params'
 export async function GET() {
   const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
+  const claims = await getAuthClaims(supabase)
+  if (!claims) {
     return unauthorized()
   }
 
@@ -54,48 +54,48 @@ export async function GET() {
       supabase
         .from('transactions')
         .select('id')
-        .eq('user_id', user.id)
+        .eq('user_id', claims.sub)
         .limit(1),
       supabase
         .from('budgets')
         .select('id, name, default_limit')
-        .eq('user_id', user.id)
+        .eq('user_id', claims.sub)
         .is('parent_id', null),
       supabase
         .from('assets')
         .select('id, current_value, net_worth_inclusion_pct')
-        .eq('user_id', user.id)
+        .eq('user_id', claims.sub)
         .eq('is_active', true),
       supabase
         .from('debts')
         .select('id, current_balance, net_worth_inclusion_pct')
-        .eq('user_id', user.id)
+        .eq('user_id', claims.sub)
         .eq('is_active', true),
       supabase
         .from('net_worth_snapshots')
         .select('id')
-        .eq('user_id', user.id)
+        .eq('user_id', claims.sub)
         .limit(1),
       supabase
         .from('profiles')
         .select('full_name, date_of_birth, household_type, expected_return, inflation_rate, box3_method, marginaal_tarief, net_monthly_income')
-        .eq('id', user.id)
+        .eq('id', claims.sub)
         .maybeSingle(),
       supabase
         .from('goals')
         .select('id')
-        .eq('user_id', user.id)
+        .eq('user_id', claims.sub)
         .limit(1),
       // Try to fetch dismissed steps (table may not exist yet)
       supabase
         .from('next_step_completions')
         .select('step_key, dismissed')
-        .eq('user_id', user.id),
+        .eq('user_id', claims.sub),
       // Budget spending this month (for alert detection)
       supabase
         .from('transactions')
         .select('budget_id, amount')
-        .eq('user_id', user.id)
+        .eq('user_id', claims.sub)
         .gte('date', monthStart)
         .lt('date', monthEnd)
         .lt('amount', 0),
@@ -103,14 +103,14 @@ export async function GET() {
       supabase
         .from('transactions')
         .select('amount')
-        .eq('user_id', user.id)
+        .eq('user_id', claims.sub)
         .gte('date', monthStart)
         .lt('date', monthEnd),
       // PSD2 bank connection check (#813) — active bank connections via TrueLayer/PSD2
       supabase
         .from('bank_connections')
         .select('id')
-        .eq('user_id', user.id)
+        .eq('user_id', claims.sub)
         .eq('status', 'active')
         .limit(1),
     ])

@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { unauthorized, serverError } from '@/lib/api/respond'
 import { computeFireProjection, type FinancialInput } from '@/lib/horizon-data'
@@ -30,9 +30,9 @@ import {
  */
 export async function GET() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const claims = await getAuthClaims(supabase)
 
-  if (!user) {
+  if (!claims) {
     return unauthorized()
   }
 
@@ -40,7 +40,7 @@ export async function GET() {
   const { data: snapshots, error } = await supabase
     .from('net_worth_snapshots')
     .select('*')
-    .eq('user_id', user.id)
+    .eq('user_id', claims.sub)
     .order('snapshot_date', { ascending: true })
 
   if (error) {
@@ -54,14 +54,14 @@ export async function GET() {
     supabase
       .from('budgets')
       .select('default_limit, interval')
-      .eq('user_id', user.id)
+      .eq('user_id', claims.sub)
       .eq('is_essential', true)
       .in('budget_type', ['expense'])
       .is('parent_id', null),
     supabase
       .from('profiles')
       .select('expected_return, inflation_rate')
-      .eq('id', user.id)
+      .eq('id', claims.sub)
       .single(),
   ])
 

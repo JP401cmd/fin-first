@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import {
   resolvePotRules,
@@ -33,16 +33,17 @@ function isValidSurplusGroup(value: unknown): value is SurplusGroup {
 
 export async function GET() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  // Read-auth via getClaims() — lokale JWKS-verificatie, geen getUser-roundtrip (ADR 0052).
+  const claims = await getAuthClaims(supabase)
 
-  if (!user) {
+  if (!claims) {
     return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
   }
 
   const { data, error } = await supabase
     .from('profiles')
     .select('pot_rules')
-    .eq('id', user.id)
+    .eq('id', claims.sub)
     .single()
 
   if (error) {

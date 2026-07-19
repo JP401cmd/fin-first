@@ -1,11 +1,11 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { localMonthBounds } from '@/lib/month-range'
 
 export async function GET() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+  const claims = await getAuthClaims(supabase)
+  if (!claims) return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
 
   const now = new Date()
   const { start: monthStart, end: monthEnd } = localMonthBounds(now)
@@ -15,14 +15,14 @@ export async function GET() {
     supabase
       .from('budgets')
       .select('id, name, icon, budget_type, default_limit, interval')
-      .eq('user_id', user.id)
+      .eq('user_id', claims.sub)
       .is('parent_id', null)
       .neq('budget_type', 'archive')
       .order('sort_order', { ascending: true }),
     supabase
       .from('transactions')
       .select('amount, budget_id')
-      .eq('user_id', user.id)
+      .eq('user_id', claims.sub)
       .gte('date', monthStart)
       .lt('date', monthEnd),
     supabase
@@ -56,7 +56,7 @@ export async function GET() {
   const { data: childBudgets } = await supabase
     .from('budgets')
     .select('id, parent_id')
-    .eq('user_id', user.id)
+    .eq('user_id', claims.sub)
     .not('parent_id', 'is', null)
 
   // Map child spending to parent

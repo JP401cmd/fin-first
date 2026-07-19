@@ -183,3 +183,4 @@
 |---|---|---|---|---|---|
 | Baseline 19 jul | 7,5 s | 3,0 s | 12,5 s | 0,94 | zie audit |
 | Na fase 1 (19 jul, deploy 7977e8cf7) | 5,7 s (−24%) | **0,72 s (−76%)** | **4,1 s (−67%)** | **0,00** | /toekomst render-delay 10,5→1,2 s; /toekomst-waterfall 44→29 req; /overzicht-API-burst ~15+4×403 → 9×200; log-error weg; Speed Insights v2 actief (veld-metrics na dagen zichtbaar) |
+| Na fase 2 (19 jul, deploy b0ae1c331) | **3,5 s (−53% cum.)** | 0,73 s / **LCP 0,82 s** | 4,2 s (stabiel; TTFB 2,0→0,85-2,9 s) | 0,10 mob / 0,03 desk | Streaming: blok 1 flusht vóór de dashboard-batch; gedeelde-tabel-queries 43→8; afkap-bugfix + spaarquote-grondslag-gelijktrekking (gebruikersbesluit); 9,0 s-uitschieter /toekomst = LCP-herpak-variantie (herhaalmeting 4,2 s) |

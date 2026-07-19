@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import {
   computePerspectiveNetWorth,
   computeSharePct,
@@ -25,9 +25,9 @@ import {
  */
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const claims = await getAuthClaims(supabase)
 
-  if (!user) {
+  if (!claims) {
     return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
   }
 
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
     .select('user_id, role, privacy_settings')
 
   const hasHousehold = members && members.length > 0
-  const partnerMember = members?.find(m => m.user_id !== user.id)
+  const partnerMember = members?.find(m => m.user_id !== claims.sub)
   const partnerId = partnerMember?.user_id
 
   // Get partner's privacy settings (what the partner allows us to see)
@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
     const { data: myMembership } = await supabase
       .from('household_members')
       .select('household_id')
-      .eq('user_id', user.id)
+      .eq('user_id', claims.sub)
       .single()
 
     if (myMembership) {
@@ -101,7 +101,7 @@ export async function GET(request: NextRequest) {
 
     if (incomeBudgets) {
       myIncome = incomeBudgets
-        .filter(b => b.user_id === user.id)
+        .filter(b => b.user_id === claims.sub)
         .reduce((sum, b) => sum + b.default_limit, 0)
       if (partnerId) {
         partnerIncome = incomeBudgets
@@ -113,7 +113,7 @@ export async function GET(request: NextRequest) {
 
   const mySharePct = computeSharePct(
     { splitMode, customSplitPct, primaryPayerId },
-    user.id,
+    claims.sub,
     myIncome,
     partnerIncome,
   )
@@ -130,15 +130,15 @@ export async function GET(request: NextRequest) {
   const budgets = budgetsRes.data ?? []
 
   // Separate items by ownership and user
-  const myPersonalAssets = assets.filter(a => a.ownership === 'personal' && a.user_id === user.id)
+  const myPersonalAssets = assets.filter(a => a.ownership === 'personal' && a.user_id === claims.sub)
   const partnerPersonalAssets = assets.filter(a => a.ownership === 'personal' && a.user_id === partnerId)
   const sharedAssets = assets.filter(a => a.ownership === 'shared')
 
-  const myPersonalDebts = debts.filter(d => d.ownership === 'personal' && d.user_id === user.id)
+  const myPersonalDebts = debts.filter(d => d.ownership === 'personal' && d.user_id === claims.sub)
   const partnerPersonalDebts = debts.filter(d => d.ownership === 'personal' && d.user_id === partnerId)
   const sharedDebts = debts.filter(d => d.ownership === 'shared')
 
-  const myPersonalBudgets = budgets.filter(b => b.ownership === 'personal' && b.user_id === user.id)
+  const myPersonalBudgets = budgets.filter(b => b.ownership === 'personal' && b.user_id === claims.sub)
   const partnerPersonalBudgets = budgets.filter(b => b.ownership === 'personal' && b.user_id === partnerId)
   const sharedBudgets = budgets.filter(b => b.ownership === 'shared')
 
@@ -222,7 +222,7 @@ export async function GET(request: NextRequest) {
     netWorthDebts,
     perspective,
     mySharePct,
-    user.id,
+    claims.sub,
   )
 
   return NextResponse.json({

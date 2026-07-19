@@ -13,15 +13,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
  *          balance_snapshots-mirror op `<month>-01`, net_worth_snapshots ONGEMOEID).
  */
 
-const mockAuthGetUser = vi.fn()
-const mockFrom = vi.fn()
-const mockUpsertSingle = vi.fn()
+const { mockAuthGetUser, mockGetAuthClaims, mockFrom, mockUpsertSingle } = vi.hoisted(() => ({
+  mockAuthGetUser: vi.fn(),
+  mockGetAuthClaims: vi.fn(),
+  mockFrom: vi.fn(),
+  mockUpsertSingle: vi.fn(),
+}))
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(async () => ({
     auth: { getUser: mockAuthGetUser },
     from: mockFrom,
   })),
+  getAuthClaims: mockGetAuthClaims,
 }))
 
 vi.mock('@/lib/balance-snapshot', () => ({
@@ -31,10 +35,12 @@ vi.mock('@/lib/balance-snapshot', () => ({
 import { GET, POST } from './route'
 
 const USER = { id: 'user-1' }
+const CLAIMS = { sub: USER.id }
 const ENTITY_ID = '11111111-1111-4111-8111-111111111111'
 
 beforeEach(() => {
   mockAuthGetUser.mockReset()
+  mockGetAuthClaims.mockReset()
   mockFrom.mockReset()
   mockUpsertSingle.mockReset()
   mockUpsertSingle.mockResolvedValue({ ok: true })
@@ -80,19 +86,19 @@ function mockGetChains(
 
 describe('GET /api/snapshots/entity-backfill', () => {
   it('401 zonder sessie', async () => {
-    mockAuthGetUser.mockResolvedValue({ data: { user: null } })
+    mockGetAuthClaims.mockResolvedValue(null)
     const res = await GET(getRequest('asset'))
     expect(res.status).toBe(401)
   })
 
   it('400 bij ontbrekend of verkeerd entityType', async () => {
-    mockAuthGetUser.mockResolvedValue({ data: { user: USER } })
+    mockGetAuthClaims.mockResolvedValue(CLAIMS)
     expect((await GET(getRequest())).status).toBe(400)
     expect((await GET(getRequest('portfolio'))).status).toBe(400)
   })
 
   it('vorm: 24 maanden-as oud→nieuw, group/subtype/currentValue, alleen actieve', async () => {
-    mockAuthGetUser.mockResolvedValue({ data: { user: USER } })
+    mockGetAuthClaims.mockResolvedValue(CLAIMS)
     mockGetChains(
       [{ id: ENTITY_ID, name: 'ETF Wereld', subtype: 'investment', current: 12000 }],
       [],
@@ -119,7 +125,7 @@ describe('GET /api/snapshots/entity-backfill', () => {
   })
 
   it('laatste-per-maand dedupe uit balance_snapshots', async () => {
-    mockAuthGetUser.mockResolvedValue({ data: { user: USER } })
+    mockGetAuthClaims.mockResolvedValue(CLAIMS)
     const m = currentMonth()
     mockGetChains(
       [{ id: ENTITY_ID, name: 'Hypotheek', subtype: 'mortgage', current: 240000 }],
@@ -137,7 +143,7 @@ describe('GET /api/snapshots/entity-backfill', () => {
   })
 
   it('500 bij DB-fout op entiteiten-query', async () => {
-    mockAuthGetUser.mockResolvedValue({ data: { user: USER } })
+    mockGetAuthClaims.mockResolvedValue(CLAIMS)
     mockGetChains(null, [], { entityError: { message: 'boom' } })
     const res = await GET(getRequest('asset'))
     expect(res.status).toBe(500)

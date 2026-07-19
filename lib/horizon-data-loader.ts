@@ -57,7 +57,7 @@ import {
   getBudgets,
   getUnlinkedBankAccounts,
   getCurrentMonthTx,
-  getTx12m,
+  getEarliestIncomeDate,
 } from './server-data/base'
 import {
   fetchTxMonthAggregate,
@@ -319,7 +319,6 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
     actionsResult,
     fullDebtsResult,
     snapshotsResult,
-    tx12mResult,
     bankAccountsResult,
     horizonSetupVisitResult,
     horizonWelcomeVisitResult,
@@ -327,11 +326,12 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
     tipsFirstCloseNavigatedResult,
     aowRowsResult,
     txAgg12Result,
+    earliestIncomeResult,
   ] = await Promise.all([
     // Gedeelde basisdata-laag (lib/server-data/base.ts): huidige-maand-tx,
     // actieve assets, eigen profiel (select('*') dekt óók de withdrawal/guardrail-
     // én monthly_savings_override-kolommen — de twee vroegere legacy-.maybeSingle()-
-    // probes vervallen daarmee), alle budgetten, het 12-maands transactievenster
+    // probes vervallen daarmee), alle budgetten, het 12-maands maandaggregaat
     // en de niet-gekoppelde bankrekeningen draaien nu als ÉÉN query per tabel per
     // request, gedeeld met de andere loaders + de shell.
     getCurrentMonthTx(supabase),
@@ -353,9 +353,6 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
       .select('snapshot_date, resilience_score, net_worth, freedom_percentage, fire_age, score_version, engine_bron')
       .order('snapshot_date', { ascending: true })
       .limit(60),
-    // 12-maands transactievenster → income12 / 6-maands / vroegste-inkomen via
-    // JS-slicing hieronder (byte-identiek; die vensters zijn subsets).
-    getTx12m(supabase),
     getUnlinkedBankAccounts(supabase),
     // Legacy setup-marker (de setup-pane is verwijderd — zie STEP 2). Nog
     // gelezen voor achterwaartse compatibiliteit; bepaalt geen weergave meer.
@@ -394,39 +391,34 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
       .order('birth_date_from', { ascending: true }),
     // 12-maands maandaggregaat (som pos/neg per maand/budget/type) voor de SUM-
     // consumers (last12Income + 6-maands inkomen/uitgaven/spaarbudget). SQL-aggregaat
-    // i.p.v. de income12/6m-slices uit getTx12m: kan niet stil afkappen op
-    // max_rows=1000 (correctheid). GEMENGDE grondslag per reductie: de spaarquote- én
-    // gezondheidsscore-sommen (income6m/expenses6m/savingsBudgetSpent6m + de 6-maands
-    // avg income/expenses) draaien transfer-EXCLUSIEF (realOnly:true — app-brede
-    // spaarquote/health-grondslag, eigen-rekening-overboekingen tellen NERGENS mee);
-    // alleen de FIRE-projectie-som last12Income telt transfers BEWUST mee
-    // (realOnly:false). RLS-breed, identiek aan getTx12m.
+    // i.p.v. een rijen-slice: kan niet stil afkappen op max_rows=1000 (correctheid).
+    // GEMENGDE grondslag per reductie: de spaarquote- én gezondheidsscore-sommen
+    // (income6m/expenses6m/savingsBudgetSpent6m + de 6-maands avg income/expenses)
+    // draaien transfer-EXCLUSIEF (realOnly:true — app-brede spaarquote/health-
+    // grondslag, eigen-rekening-overboekingen tellen NERGENS mee); alleen de
+    // FIRE-projectie-som last12Income telt transfers BEWUST mee (realOnly:false).
+    // RLS-breed.
     fetchTxMonthAggregate(supabase, {
       from: localMonthStartMonthsAgo(now, 11),
       to: localMonthBounds(now).end,
     }),
+    // Vroegste inkomens-datum (all-time, één rij) — afkap-vrij, i.p.v. de vroegere
+    // reduce over een gecapte 12-maands-slice (die kon bij >1000 positieve rijen
+    // stil afkappen → incomeMonths te klein → over-extrapolatie). Zelfde gedeelde
+    // helper als dashboard-data-loader.ts/lever-scores-loader.ts; cache()
+    // dedupliceert met die calls binnen hetzelfde request.
+    getEarliestIncomeDate(supabase),
   ])
 
   // Same row both consumers want: alias instead of re-querying.
   const assetsResult = fullAssetsResult
 
-  // ── Gedeelde 12-maands transactie-fetch → JS-slices ──────────────────────
-  // Byte-identiek aan de vroegere aparte income12- / earliest-income- / 6-maands-
-  // queries (die vensters/tekens zijn subsets van het 12-maands venster). Geen
-  // isRealTx-filtering hier — de horizon-aggregaties deden dat óók niet.
-  const tx12mRows = (tx12mResult.data ?? []) as Array<{
-    amount: number | string
-    date: string
-    budget_id?: string | null
-    transaction_type?: string | null
-  }>
-  const income12Rows = tx12mRows.filter((t) => Number(t.amount) > 0)
-
   // Gedeeld 12-maands maandaggregaat — voedt last12Income + de 6-maands sommen.
   // Per-reductie grondslag: de spaarquote/health-sommen transfer-EXCLUSIEF
   // (realOnly:true), de FIRE-som last12Income transfer-INCLUSIEF (realOnly:false).
-  // Kan niet stil afkappen op 1000 rijen. earliestIncomeDate blijft op de
-  // income12Rows-slice hierboven.
+  // Kan niet stil afkappen op 1000 rijen. earliestIncomeDate komt niet meer uit
+  // een 12-maands-slice maar uit de aparte all-time `getEarliestIncomeDate` (zie
+  // hieronder).
   const txAgg12 = (txAgg12Result.data ?? []) as TxMonthAggregateRow[]
   // 6-maands sub-venster op maand-niveau ('YYYY-MM'); sixMonthsAgo is de 1e van de
   // maand ⇒ `date >= sixMonthsAgo` == `maand >= sixMonthsAgoMonth` (exact).
@@ -524,12 +516,12 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
   // nu transfer-exclusief), niet deze income-multiplier.
   const last12Income = aggSumPositief(txAgg12, { realOnly: false })
   let extrapolatedIncome = last12Income
-  // Vroegste inkomens-datum = laagste datum onder de positieve rijen (spiegelt
-  // .gt('amount',0).order('date',asc).limit(1)).
-  const earliestIncomeDate = income12Rows.reduce<string | undefined>(
-    (min, t) => (min === undefined || t.date < min ? t.date : min),
-    undefined,
-  )
+  // Vroegste inkomens-datum: all-time via de gedeelde `getEarliestIncomeDate`
+  // (order(date asc).limit(1)) i.p.v. een reduce over een gecapte 12-maands-slice —
+  // die kon bij >1000 positieve rijen stil afkappen (incomeMonths te klein →
+  // over-extrapolatie). Spiegelt dashboard-data-loader.ts/lever-scores-loader.ts.
+  const earliestIncomeDate =
+    (earliestIncomeResult.data as { date?: string | null } | null)?.date ?? undefined
   if (earliestIncomeDate && last12Income > 0) {
     const earliest = new Date(earliestIncomeDate)
     const incomeMonths = Math.max(1, Math.min(12,
@@ -668,7 +660,8 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
   // (uit de uitgaven-term), schuldaflossing erbij. Byte-identiek aan de vroegere
   // inline-versie; nu single-sourced met dashboard/core/lever-scores.
   let dataMonths6 = 6
-  // Zelfde vroegste-inkomens-datum als hierboven (uit de gedeelde 12-maands slice).
+  // Zelfde vroegste-inkomens-datum als hierboven (uit de gedeelde all-time
+  // getEarliestIncomeDate).
   const earliestIncomeDateH = earliestIncomeDate
   if (earliestIncomeDateH) {
     const earliest = new Date(earliestIncomeDateH)

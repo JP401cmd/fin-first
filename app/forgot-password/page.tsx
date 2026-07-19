@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
 import { translateAuthError } from '@/lib/auth-errors'
 
 export default function ForgotPasswordPage() {
@@ -17,6 +16,10 @@ export default function ForgotPasswordPage() {
     setError(null)
 
     try {
+      // Dynamische import: houdt de Supabase-browser-SDK (@supabase/ssr →
+      // supabase-js) uit het first-load-chunk van /forgot-password. De factory
+      // laadt pas bij de eerste submit — zelfde createClient(), zelfde gedrag.
+      const { createClient } = await import('@/lib/supabase/client')
       const supabase = createClient()
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,

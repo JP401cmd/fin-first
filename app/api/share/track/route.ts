@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { unauthorized, serverError } from '@/lib/api/respond'
 
@@ -96,8 +96,8 @@ export async function POST(req: Request) {
 export async function GET() {
   const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
+  const claims = await getAuthClaims(supabase)
+  if (!claims) {
     return unauthorized()
   }
 
@@ -105,7 +105,7 @@ export async function GET() {
     const { data: events, error } = await supabase
       .from('share_events')
       .select('id, share_type, content_type, privacy_level, created_at')
-      .eq('user_id', user.id)
+      .eq('user_id', claims.sub)
       .order('created_at', { ascending: false })
       .limit(100)
 

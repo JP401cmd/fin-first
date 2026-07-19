@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 // Scalar-router (FASE 5, stap 2e) — BEWUSTE UITZONDERING: deze route riep
 // computeFireProjection nooit aan (dode import, hier opgeruimd). De FIRE-sectie
 // is historische snapshot-weergave (doel = uitgaven/NL_SWR per snapshot-moment),
@@ -62,9 +62,9 @@ const MONTH_NAMES_NL: Record<number, string> = {
 export async function GET(request: Request) {
   try {
     const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const claims = await getAuthClaims(supabase)
 
-    if (authError || !user) {
+    if (!claims) {
       return Response.json({ error: 'Niet ingelogd' }, { status: 401 })
     }
 
