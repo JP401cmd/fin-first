@@ -16,7 +16,7 @@ export async function GET() {
   try {
     const supabase = await createClient()
     // Read-auth via getClaims() — lokale JWKS-verificatie, geen getUser-roundtrip
-    // (ADR 0051). loadVasteLastenSummary() doet zelf nog een interne getUser()-
+    // (ADR 0052). loadVasteLastenSummary() doet zelf nog een interne getUser()-
     // call (gedeelde lib, buiten deze route) — ongewijzigd.
     const claims = await getAuthClaims(supabase)
     if (!claims) {

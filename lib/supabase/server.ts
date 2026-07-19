@@ -53,10 +53,10 @@ export type AuthClaims = NonNullable<
 >['claims']
 
 /**
- * Read-auth zonder `getUser()`-roundtrip (RF-008/C2, ADR 0051).
+ * Read-auth zonder `getUser()`-roundtrip (RF-008/C2, ADR 0052).
  * Prod tekent asymmetrisch (ES256+kid, geverifieerd 19 jul 2026) — de lokale
  * verificatie is dus echt actief; bij HS*-signing valt getClaims stil terug op
- * getUser (zie ADR 0051, dan is deze helper een no-op qua egress). NB: een
+ * getUser (zie ADR 0052, dan is deze helper een no-op qua egress). NB: een
  * JWKS-netwerkfout op een koude lambda kan hier een niet-AuthError-throw geven.
  *
  * `getUser()` doet ALTIJD een netwerk-roundtrip naar `/auth/v1/user` om de JWT

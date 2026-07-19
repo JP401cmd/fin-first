@@ -9,7 +9,7 @@ import { getFmpQuotaStatus } from '@/lib/integrations/fmp-client'
 
 export async function GET() {
   const supabase = await createClient()
-  // Read-auth via getClaims() — lokale JWKS-verificatie, geen getUser-roundtrip (ADR 0051).
+  // Read-auth via getClaims() — lokale JWKS-verificatie, geen getUser-roundtrip (ADR 0052).
   const claims = await getAuthClaims(supabase)
   if (!claims) {
     return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })

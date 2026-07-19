@@ -1,5 +1,5 @@
 ---
-id: 0051-getclaims-read-routes-revocatievenster
+id: 0052-getclaims-read-routes-revocatievenster
 title: 'getClaims() voor read-routes: lokale JWT-verificatie met geaccepteerd revocatievenster'
 status: aanvaard
 date: 2026-07-19

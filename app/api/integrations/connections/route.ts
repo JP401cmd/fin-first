@@ -17,7 +17,7 @@ export async function GET() {
   const supabase = await createClient()
 
   // Read-auth via getClaims() — lokale JWKS-verificatie, geen getUser-roundtrip
-  // (ADR 0051). loadConnectionsData() doet zelf nog een interne getUser()-call
+  // (ADR 0052). loadConnectionsData() doet zelf nog een interne getUser()-call
   // om de RLS-scoping op te bouwen — dat is gedeelde code buiten deze route en
   // blijft ongewijzigd (bespaart alleen de onbevoegde-aanvraag-roundtrip hier).
   const claims = await getAuthClaims(supabase)

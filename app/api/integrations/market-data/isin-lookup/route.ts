@@ -66,7 +66,7 @@ function decrementUserCounter(userId: string): void {
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
   // Read-auth via getClaims() — lokale JWKS-verificatie, geen getUser-roundtrip
-  // (ADR 0051). Pure read: claims.sub scoopt alleen de in-memory quota-teller.
+  // (ADR 0052). Pure read: claims.sub scoopt alleen de in-memory quota-teller.
   const claims = await getAuthClaims(supabase)
   if (!claims) {
     return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })

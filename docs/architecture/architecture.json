@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-19T15:51:43.514Z",
+  "generatedAt": "2026-07-19T18:44:03.051Z",
   "generatedDate": "2026-07-19",
   "repo": {
     "name": "fin",
@@ -191,7 +191,7 @@
     "routesProduction": 101,
     "api": 255,
     "tables": 84,
-    "migrations": 147,
+    "migrations": 148,
     "integrations": 24,
     "components": 860,
     "providers": 11,
@@ -7282,7 +7282,7 @@
         "migration": "supabase/migrations/20260501000001_create_external_connections.sql"
       }
     ],
-    "migrationCount": 147
+    "migrationCount": 148
   },
   "tablesByDomain": [
     {
@@ -14492,6 +14492,17 @@
       ],
       "summary": "De server-loaders (`dashboard-`, `horizon-`, `lever-scores-data-loader`) haalden per request DUIZENDEN ruwe transactie-rijen op om er in JS SUM/GROUP-BY op te doen (12-/6-maands inkomen, uitgaven, spaarquote, dagtarief, maand-histories).",
       "file": "docs/adr/0050-transactie-maandaggregaat-rpc.md"
+    },
+    {
+      "id": "0051-getclaims-read-routes-revocatievenster",
+      "title": "getClaims() voor read-routes: lokale JWT-verificatie met geaccepteerd revocatievenster",
+      "status": "aanvaard",
+      "date": "2026-07-19",
+      "elements": [
+        "t-supabase"
+      ],
+      "summary": "Alle ~220 API-routes deden per request een `auth.getUser()`-roundtrip naar de Supabase Auth-server, puur om de identiteit vast te stellen. `getClaims()` verifieert het JWT lokaal en elimineert die roundtrip. Bevestigd op prod (19 jul 2026): de JWT's zijn asymmetrisch getekend (`a",
+      "file": "docs/adr/0051-getclaims-read-routes-revocatievenster.md"
     }
   ],
   "churn": {
@@ -14527,7 +14538,7 @@
       },
       {
         "path": "app/api/assets",
-        "commits": 5
+        "commits": 6
       },
       {
         "path": "components/horizon",
@@ -14541,7 +14552,7 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 8389,
+        "loc": 8396,
         "commits": 86
       },
       {
@@ -14566,8 +14577,8 @@
       },
       {
         "file": "lib/dashboard-data-loader.ts",
-        "loc": 2530,
-        "commits": 40
+        "loc": 2553,
+        "commits": 41
       },
       {
         "file": "lib/horizon-data.ts",
@@ -15361,16 +15372,8 @@
   "diff": {
     "baseline": false,
     "previousDate": "2026-07-19",
-    "hasChanges": true,
-    "sections": [
-      {
-        "label": "Componenten (aantal)",
-        "added": [
-          "+3"
-        ],
-        "removed": []
-      }
-    ]
+    "hasChanges": false,
+    "sections": []
   },
   "statsHistory": [
     {

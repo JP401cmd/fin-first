@@ -23,7 +23,7 @@ const VALID_MODES: PartnerNotifMode[] = ['all_shared', 'threshold', 'categories'
 
 export async function GET() {
   const supabase = await createClient()
-  // Read-auth via getClaims() — lokale JWKS-verificatie, geen getUser-roundtrip (ADR 0051).
+  // Read-auth via getClaims() — lokale JWKS-verificatie, geen getUser-roundtrip (ADR 0052).
   const claims = await getAuthClaims(supabase)
 
   if (!claims) {
