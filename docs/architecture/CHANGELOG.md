@@ -453,3 +453,9 @@
 ## 2026-07-19
 
 - Geen wijzigingen.
+
+## 2026-07-19
+
+- **Schermen** toegevoegd: /beheer/kennisbank, /mijn/lokale-chat
+- **API-routes** toegevoegd: /api/admin/local-knowledge, /api/local-knowledge
+- **Componenten (aantal)** toegevoegd: +2

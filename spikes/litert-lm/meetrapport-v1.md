@@ -88,3 +88,19 @@ Tegen de uitkomstladder (requirements §2.3) en de fase-2-plan-criteria:
 - Geen sampling-controle op de web-SDK (Early Preview) — gedraagt zich de facto deterministisch, maar is niet instelbaar.
 
 **Advies: GO voor fase L2 (runtime-swap), desktop-scope** — primair op betrouwbaarheid + frictie + brede kwaliteit; de assistieve belofte (review-UI-only, ADR 0043) blijft ongewijzigd van kracht en dekt de staart-precisie af. Openstaand: L1.5 Android-meting (eigenaars-toestel + latentie-drempel), RTX-best-case (Windows-instellingen, optioneel), Early-Preview-API-risico (versie-pinnen in L2).
+
+## L1.5 — Android-meting (19 juli 2026, eigenaars-toestel)
+
+Toestel: Qualcomm Adreno 7xx (Snapdragon-klasse), Android Chrome, zelfde wifi; secure-context via chrome://flags-workaround (HTTP-LAN-origin — productie draait HTTPS, dus niet-representatief obstakel).
+
+| Metriek | Uitslag |
+|---|---|
+| Capability-check | ✅ PASS — WebGPU + shader-f16 (tegen fase-0-verwachting in) |
+| Model warm-init | 7,5 s (2,01 GB uit Cache Storage) |
+| Doorvoer | 8,7-15,8 tok/s · TTFT 4,5-4,8 s · **2,6 s/tx** (tx=30-run, 76,6 s) |
+| Lange runs (101 tx) | hang na batch 4 (~3 min GPU-last — thermiek/tab-throttling); korte runs (tx=30) voltooien probleemloos |
+| **Output-kwaliteit** | ❌ **0% accuracy / 0% validiteit** — ruwe uitvoer is meertalige token-soep (Engels/Japans/Cyrillisch, herhaallussen, geen JSON) |
+
+**Diagnose:** GPU-rekenfout op het Adreno-WebGPU-pad (f16-precisie/kernel-klasse) — het model genereert snel maar corrupt. Zelfde bundel/prompt haalt op de desktop-iGPU 88% validiteit. Niet app-side fixbaar.
+
+**Verdict L1.5: mobiel-lokaal NO-GO** zolang de LiteRT-LM-web-runtime op Adreno niet rijpt (Early-Preview-concern bevestigd; hermeting ~30 min met dit harnas bij elke runtime-release). Gevolg voor L3: geparkeerd; de mobiele strategie loopt via de import-wizard (#881) met cloud-batches op mobiel (privacy-modus aan ⇒ mobiel eerlijk "niet beschikbaar", eigenaarsbesluit 19 jul). Positief neven-inzicht: snelheid en capability zijn op moderne telefoons ruimschoots voldoende — zodra de kwaliteitsbug upstream gefixt is, ligt mobiel-lokaal open.

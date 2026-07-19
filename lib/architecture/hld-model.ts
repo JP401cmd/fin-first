@@ -133,6 +133,7 @@ export function buildHldModel(): HldModel {
           { title: 'Een korte wekelijkse update', desc: 'De briefing: wat veranderde, waar je op kunt letten — desgewenst ook wekelijks in je mailbox (zelf aan te zetten).' },
           { title: 'Tips op het juiste moment', desc: 'Aandachtspunten die je met één tik tot actie maakt.' },
           { title: 'Je vragen beantwoorden', desc: 'Vraag Will alles over je eigen situatie.' },
+          { title: 'Will lokaal om antwoord vragen, zonder dat je gegevens het toestel verlaten', desc: 'Experimenteel en alleen op desktop: chat met Will via een AI die lokaal draait — je vraag en je cijfers gaan niet naar een cloud-AI-provider.' },
         ],
       },
       {
