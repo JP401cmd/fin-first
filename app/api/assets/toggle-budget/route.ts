@@ -42,7 +42,10 @@ export async function POST(request: Request) {
     .update({ has_budget_tracking: body.enabled })
     .eq('id', body.id)
     .eq('user_id', user.id)
-    .select('id, has_budget_tracking, name, iban, institution, subtype, ownership, household_id, current_value')
+    // PostgREST-alias: de bron-kolom op `assets` heet `account_number` (er
+    // bestaat GEEN `assets.iban`); we exposen 'm als `iban` zodat `data`
+    // ongewijzigd als CompanionAssetInput naar syncBankAccountCompanion gaat.
+    .select('id, has_budget_tracking, name, iban:account_number, institution, subtype, ownership, household_id, current_value')
     .single()
 
   if (error) {
