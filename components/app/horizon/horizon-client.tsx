@@ -200,6 +200,7 @@ import { buildHorizonInput } from '@/lib/horizon/build-input'
 import type { PreviewBaseline } from '@/lib/strategy-preview'
 import { ScenarioOverlayPicker } from '@/components/app/horizon/scenario-overlay-picker'
 import { WHATIF_SCENARIO_COLORS, type SavedScenario } from '@/lib/scenario-types'
+import { inflight } from '@/lib/inflight'
 import { applyWhatIfOverrides, buildBaselineOverrides } from '@/lib/whatif-overrides'
 import { WhatIfSliders, DeltaBadge, type WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
 import type { WhatIfEvent } from '@/components/app/horizon/whatif-events'
@@ -316,7 +317,6 @@ export default function HorizonPage({
   const [impacts, setImpacts] = useState<LifeEventImpact[]>(initialData.impacts)
   const [actions, setActions] = useState<Action[]>(initialData.actions)
   const [debts, setDebts] = useState<Debt[]>(initialData.debts)
-  const [monthlyDividendIncome, setMonthlyDividendIncome] = useState(0)
   // Doorrekening-inline needs raw profile data + extrapolated income
   const [profileRaw, setProfileRaw] = useState<Record<string, unknown> | null>(null)
   const [estimatedYearlyIncome, setEstimatedYearlyIncome] = useState(0)
@@ -793,28 +793,28 @@ export default function HorizonPage({
     }
   }, [input, fireStrategy, withdrawalStrategyConfig, fireParams.grossReturn, fireParams.inflationRate, userAowAge.fractional, debts, monthlySavingsOverride, initialData, kernelRawProfile, aowRows])
 
-  // Fetch dividend income client-side (not available from server loader)
+  // Opgeslagen wat-als-scenario's voor de overlay-picker — deferred na first paint.
+  // De picker rendert null bij een lege lijst en is zélf de open-trigger (bewezen
+  // in review 1.3: lazy-op-open breekt 'm). Daarom niet lazy, maar uitgesteld tot
+  // idle (setTimeout-fallback voor Safari) zodat de fetch niet met hydration/LCP
+  // concurreert maar de picker wél verschijnt zodra de data er is. Dubbele mounts
+  // delen één roundtrip via de inflight-dedupe.
   useEffect(() => {
-    async function fetchDividends() {
-      try {
-        const divRes = await fetch('/api/dividends')
-        if (divRes.ok) {
-          const divData = await divRes.json()
-          setMonthlyDividendIncome(divData.aggregate?.monthly_dividend_income ?? 0)
-        }
-      } catch {
-        // Non-critical
-      }
+    let cancelled = false
+    const run = () => {
+      inflight<{ scenarios?: SavedScenario[] }>('horizon-scenarios', () =>
+        fetch('/api/scenarios').then(r => (r.ok ? r.json() : { scenarios: [] })),
+      )
+        .then(data => { if (!cancelled) setSavedScenarios(data.scenarios ?? []) })
+        .catch(() => {})
     }
-    fetchDividends()
-  }, [])
-
-  // Fetch saved what-if scenarios for overlay picker
-  useEffect(() => {
-    fetch('/api/scenarios')
-      .then(r => r.ok ? r.json() : { scenarios: [] })
-      .then(data => setSavedScenarios(data.scenarios ?? []))
-      .catch(() => {})
+    const ric = typeof requestIdleCallback === 'function' ? requestIdleCallback(run) : null
+    const timer = ric === null ? setTimeout(run, 1) : null
+    return () => {
+      cancelled = true
+      if (ric !== null && typeof cancelIdleCallback === 'function') cancelIdleCallback(ric)
+      if (timer !== null) clearTimeout(timer)
+    }
   }, [])
 
   // ── Kernel-context laden op mount ─────────────────────────────────────────
@@ -1035,19 +1035,6 @@ export default function HorizonPage({
       } catch {
         // Non-critical — fallback to 67
       }
-
-      // Fetch dividend income for FIRE passive income calculations
-      let dividendMonthly = 0
-      try {
-        const divRes = await fetch('/api/dividends')
-        if (divRes.ok) {
-          const divData = await divRes.json()
-          dividendMonthly = divData.aggregate?.monthly_dividend_income ?? 0
-        }
-      } catch {
-        // Non-critical — continue without dividend data
-      }
-      setMonthlyDividendIncome(dividendMonthly)
 
       // Load withdrawal strategy config (refreshes server-side initial data)
       try {

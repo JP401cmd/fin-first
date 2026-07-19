@@ -7,6 +7,7 @@ import { loadWillData } from '@/lib/will-data-loader'
 import { loadHorizonData } from '@/lib/horizon-data-loader'
 import { getServerPerspective } from '@/lib/household/server-perspective'
 import { OverzichtHero } from '@/components/overview/overzicht-hero'
+import { resolveOverviewGreeting } from '@/lib/overview/greeting'
 import type { BriefingWeekHistoryItem } from '@/components/overview/briefing-panel'
 import { CheckinBanner } from '@/components/overview/checkin-banner'
 import { WelcomeGuideBanner } from '@/components/overview/welcome-guide-banner'
@@ -332,6 +333,12 @@ export default async function OverzichtPage() {
   // `pageStatusInfo`/`pageStatusMinimized` komen uit de parallelle batch bovenaan
   // (voorheen een aparte await-stap aan het eind van deze render).
 
+  // Groet + datumlabel SERVER-SIDE berekenen (Europe/Amsterdam) en als prop
+  // doorgeven — één bron van waarheid voor de tijd zodat SSR en de eerste
+  // client-render identiek zijn (geen React #418 hydration-mismatch → geen
+  // POST /api/log-error per pageload). Zie lib/overview/greeting.ts (taak 1.5b).
+  const { greeting, dateLabel } = resolveOverviewGreeting()
+
   return (
     <>
       {/* Seedt de status-duiding-banner met de reeds server-berekende status,
@@ -350,6 +357,8 @@ export default async function OverzichtPage() {
       <CheckinBanner seed={checkinBannerSeed} />
       <OverzichtHero
         userName={userName ?? undefined}
+        greeting={greeting}
+        dateLabel={dateLabel}
         health={health}
         goals={willData.goals}
         goalProgresses={willData.goalProgresses}

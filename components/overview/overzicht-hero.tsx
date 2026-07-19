@@ -48,6 +48,15 @@ const EMPTY_NET_WORTH_HISTORY: { month: string; value: number }[] = []
 
 type OverzichtHeroProps = {
   userName?: string
+  /**
+   * Tijd-van-de-dag-groet ("Goedemorgen" …), server-side berekend in
+   * Europe/Amsterdam (`resolveOverviewGreeting`) en als prop doorgegeven zodat
+   * SSR en de eerste client-render exact gelijk zijn. Voorheen leidde de hero dit
+   * zelf af uit `new Date()` → React #418 hydration-mismatch bij elke pageload.
+   */
+  greeting: string
+  /** NL-datumlabel ("Donderdag 16 juli 2026"), zelfde server-bron/reden als `greeting`. */
+  dateLabel: string
   health: HealthScore | null
   goals?: GoalWithBudget[]
   goalProgresses?: GoalProgress[]
@@ -127,25 +136,6 @@ type OverzichtHeroProps = {
   allWidgetPrefs?: WidgetPref[]
 }
 
-function formatDateNL(): string {
-  const formatter = new Intl.DateTimeFormat('nl-NL', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  })
-  const parts = formatter.format(new Date())
-  return parts.charAt(0).toUpperCase() + parts.slice(1)
-}
-
-function greetingByHour(): string {
-  const h = new Date().getHours()
-  if (h < 6) return 'Goedenacht'
-  if (h < 12) return 'Goedemorgen'
-  if (h < 18) return 'Goedemiddag'
-  return 'Goedenavond'
-}
-
 /**
  * OverzichtHero — visuele hero op /overzicht (Tier-2 #4 + #8).
  *
@@ -158,6 +148,8 @@ function greetingByHour(): string {
  */
 export function OverzichtHero({
   userName,
+  greeting,
+  dateLabel,
   health,
   goals,
   goalProgresses,
@@ -209,10 +201,9 @@ export function OverzichtHero({
     ? dashboardData.dailyExpenseRate ?? dailyExpenseRate(dashboardData.monthlyExpenses)
     : undefined
 
-  // Memoize once per mount — datum + groet wisselen zelden tijdens een
-  // sessie. Voorkomt onnodige Intl-formatter-instances bij elke re-render.
-  const dateLabel = useMemo(() => formatDateNL(), [])
-  const greeting = useMemo(() => greetingByHour(), [])
+  // `dateLabel` + `greeting` komen als props binnen (server-side berekend in
+  // Europe/Amsterdam) — één bron van waarheid voor de tijd, zodat SSR en de
+  // eerste client-render identiek zijn (geen hydration-mismatch #418).
 
   // Defensief: log dev-warning bij mismatch tussen goals + progresses-arrays.
   // Caller zou ze altijd parallel moeten leveren; mismatch wijst op een
