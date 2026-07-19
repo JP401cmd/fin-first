@@ -57,3 +57,24 @@ De functie is geen cloud-vervanger maar een **opt-in privacy-keuze met assistiev
 - **Nieuw aandachtspunt (bij fase 3, samen met `t-lokale-ai`)**: een concern "Fragiele WebGPU-runtime in het lokale AI-pad" zolang de crash-workaround leeft — te verwijderen zodra de runtime gehard/vervangen is (bv. LiteRT-LM-migratie of upstream-fix). Zie de structuurbevindingen bij deze ADR.
 - **Wft/AVG**: categorisatie is geen advies (ongewijzigd); lokale inferentie is strikt AVG-gunstiger (geen provider-egress), de modeldownload bevat geen gebruikersdata.
 - **Tier-gate beslecht (eigenaarsbesluit 17 juli 2026)**: de open tier-vraag uit requirements §5 is beslecht op **optie 2** — de toggle vereist het 'ai'-abonnement, consistent met de rest van de AI-functies. AANzetten wordt server-side afgedwongen met `checkTierGate(supabase, userId, 'ai')` in `POST /api/privacy-mode`, uitsluitend bij `enabled === true`; UITzetten blijft altijd vrij, zodat een verlopen abonnement niemand in privé-modus opsluit. De toggle-UI op `/mijn/privacy` spiegelt de gate (upsell-blok, uitgegrijsde schakelaar) maar de route is de autoritatieve laag.
+
+## Aanvulling — 19 juli 2026: heroverwegings-trigger geactiveerd, runtime-swap naar LiteRT-LM (GO-L2)
+
+De heroverwegings-trigger uit §Besluit-5 ("een nieuwe modelkandidaat of runtime wordt hertoetst tegen dezelfde ladder") is op 19 juli 2026 geactiveerd voor **LiteRT-LM** (`@litert-lm/core`), gemeten in `spikes/litert-lm/meetrapport-v1.md` (fase L1, desktop).
+
+**Kerncijfers (L1, allemaal op de Intel iGPU — het realistische productiescenario op Windows-multi-GPU, zie sleutelvondst hieronder):**
+- **Sessiestart**: cold init 3-5 s vs 46-164 s (Transformers.js/ONNX) — orde van grootte sneller.
+- **Kwaliteit dev-set** (101 tx): accuracy totaal 79,2% vs 42% · accuracy op geldige output 89,9% vs 81% · output-validiteit 88,1% vs 52% — zelfde model (Gemma 4 E2B), officiële web-bundel.
+- **Betrouwbaarheid — de beslissende as**: LiteRT-LM draaide 7 volledige runs (2× gouden set, 5× dev-set) zonder één fout/crash. Het oude Transformers.js/ONNX-pad crashte op dezelfde adapter **3× op 3 pogingen** op de gouden set (`OrtRun → device-/instance-loss onder geheugendruk`) — matcht de live productiefout van de eigenaar op 19 jul ("Lokale categorisatie is niet gelukt"). Na de crashes was het GPU-proces van de héle browser vergiftigd tot een herstart, óók voor LiteRT — de fragiliteit van het oude pad raakte de hele omgeving.
+- **Gouden-staart @0,8-drempel (productie-instelling, indicatief — hergegenereerde set t.o.v. fase-0-referentie)**: 22% dekking · 31,5% precisie (Tfjs-oude-set-referentie: 28% · 39,1%) — nog niet beter; de staart blijft voor élk klein model bruto moeilijk. Null-discipline is wél sterker (70% eerlijke "weet ik niet" tegen 48%).
+- **Sleutelvondst**: Chromium's WebGPU kiest op Windows-multi-GPU-machines de default-adapter (iGPU) en negeert `powerPreference` (crbug 369219127, niet ombuigbaar via registry of vlag) — dit geldt voor élke in-browser runtime op dit type werkstation, niet alleen LiteRT-LM.
+
+**Eigenaarsbesluit: GO voor fase L2 (runtime-swap), desktop-scope.** Gemotiveerd primair door betrouwbaarheid + frictie + brede kwaliteit — niet door de gouden-staart-precisie, die onveranderd zwak blijft. De runtime is **`@litert-lm/core` 0.14.0 (Early Preview), exact gepind** (geen versie-range, i.v.m. het API-breukrisico van een Early-Preview-SDK), met web-bundel `gemma-4-E2B-it-web.litertlm` (2,01 GB, HF litert-community, Apache-2.0, ongegate) — dezelfde Gemma 4 E2B als voorheen, andere runtime.
+
+**Wat ONVERANDERD blijft (expliciet, om scope-kruip te voorkomen):**
+- Het assistieve model: **review-UI-only**, niets wordt automatisch toegepast. De runtime-swap verandert de kwaliteit van het voorstel, niet de garantie dat een mens beslist.
+- **Fail-closed**: geen cloud-fallback bij lokale falen — batch blokkeert eerlijk.
+- Desktop-only capability-gate, "experimenteel"-labeling, de hoge confidence-drempel-constante, en alle overige bouwvoorwaarden uit §Besluit-3.
+- **Autonomie-verruiming is expliciet NIET besloten.** §Besluit-5 stelt die pas in het vooruitzicht bij ≥85% én stabiel/snel op minstens één mobiele klasse — de staart-precisie (22-31,5% @0,8) zit daar nog ver onder. Scope B (brede privé-modus) blijft dus ook buiten beeld.
+
+**Openstaand na deze aanvulling**: L1.5 Android-meting (eigenaars-toestel, latentie-drempel voor mobiel), optionele RTX-best-case-hermeting (Windows-instellingen), en het Early-Preview-API-risico blijft een actief aandachtspunt zolang `@litert-lm/core` niet stabiel is (zie het herschreven concern bij `t-lokale-ai`).

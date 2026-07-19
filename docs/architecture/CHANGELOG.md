@@ -449,3 +449,7 @@
 ## 2026-07-19
 
 - **Integraties** verwijderd: OpenRouter
+
+## 2026-07-19
+
+- Geen wijzigingen.

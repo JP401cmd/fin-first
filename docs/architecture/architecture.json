@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-19T11:21:38.274Z",
+  "generatedAt": "2026-07-19T12:58:44.822Z",
   "generatedDate": "2026-07-19",
   "repo": {
     "name": "fin",
@@ -14406,7 +14406,7 @@
       },
       {
         "path": "lib/ai",
-        "commits": 40
+        "commits": 41
       },
       {
         "path": "app/(app)/toekomst",
@@ -14430,7 +14430,7 @@
       },
       {
         "path": "app/api/assets",
-        "commits": 4
+        "commits": 5
       },
       {
         "path": "components/horizon",
@@ -15263,17 +15263,9 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-07-17",
-    "hasChanges": true,
-    "sections": [
-      {
-        "label": "Integraties",
-        "added": [],
-        "removed": [
-          "OpenRouter"
-        ]
-      }
-    ]
+    "previousDate": "2026-07-19",
+    "hasChanges": false,
+    "sections": []
   },
   "statsHistory": [
     {

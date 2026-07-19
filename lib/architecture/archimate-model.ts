@@ -406,8 +406,8 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     {
       id: 't-lokale-ai', x: 1250, y: row(6), w: 185, h: 66, kind: 'tech',
       title: 'Lokale AI-runtime — in-browser, WebGPU',
-      lead: 'Transformers.js + Gemma 4 E2B, volledig on-device: categorisatie-voorstellen verlaten het toestel niet. Desktop-only, assistief (review-UI-only, geen automatische toepassing) — bewust géén externe-partij-relatie, in tegenstelling tot ext-claude → t-aigateway. Dat ontbreken ís de privacygarantie (ADR 0043).',
-      items: ['Transformers.js', 'Gemma 4 E2B', 'WebGPU', 'privacy_mode'],
+      lead: 'LiteRT-LM (@litert-lm/core, Early Preview) + Gemma 4 E2B web-bundel, volledig on-device: categorisatie-voorstellen verlaten het toestel niet. Sinds 19 jul 2026 runtime-swap vanaf Transformers.js/ONNX (L1-meting: betrouwbaarder + sneller op dezelfde iGPU-realiteit) — desktop-only, assistief (review-UI-only, geen automatische toepassing) blijft ongewijzigd. Bewust géén externe-partij-relatie, in tegenstelling tot ext-claude → t-aigateway. Dat ontbreken ís de privacygarantie (ADR 0043).',
+      items: ['LiteRT-LM (@litert-lm/core 0.14.0)', 'Gemma 4 E2B web-bundel', 'WebGPU', 'privacy_mode'],
     },
 
     // ── Data ──
