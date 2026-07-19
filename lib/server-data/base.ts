@@ -20,8 +20,12 @@
 //     `user_id`/`id`: de authenticated Supabase-client is al door RLS
 //     (auth.uid()) beperkt tot de eigen rijen — exact zoals dashboard-/
 //     horizon-data-loader dat al deden. De vroegere expliciete
-//     `.eq('user_id', …)` in lever-scores/layout is daarmee redundant en
-//     vervalt (byte-identiek onder RLS). Dat betekent: deze fetchers MOGEN
+//     `.eq('user_id', …)` in lever-scores/layout is vervallen. NUANCE (geen
+//     lek, wél gedrag): de RLS-policies zijn owner-OF-household-shared, dus
+//     voor huishoud-accounts met gedeelde entiteiten tellen lever-scores en
+//     sidebar nu ook `ownership='shared'`-rijen mee — exact zoals het
+//     dashboard dat altijd al deed (single-source-alignment; partner-privé
+//     blijft door RLS geblokkeerd). Dat betekent: deze fetchers MOGEN
 //     UITSLUITEND met de anon/authenticated RLS-client (createClient uit
 //     lib/supabase/server.ts) worden aangeroepen — NOOIT met
 //     getServiceClient(): die passeert RLS en zou rijen van álle gebruikers
