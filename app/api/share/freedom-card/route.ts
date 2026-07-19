@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { computeFireProjection, type FinancialInput } from '@/lib/horizon-data'
+import { fetchActionsKpiAggregate } from '@/lib/server-data/actions-aggregate'
+import { unauthorized, badRequest, serverError } from '@/lib/api/respond'
 import { localMonthBounds, localMonthStart } from '@/lib/month-range'
 import { resolveFireParams } from '@/lib/fire-params'
 import { computeFreedomProgressWithBasis, inclHomeTargetFromScalar } from '@/lib/core-metrics'
@@ -13,14 +15,14 @@ export async function GET(request: Request) {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return Response.json({ error: 'Niet ingelogd' }, { status: 401 })
+      return unauthorized()
     }
 
     // Parse privacy level from query params
     const url = new URL(request.url)
     const privacyLevel = url.searchParams.get('privacy') || 'anonymous'
     if (!['anonymous', 'named', 'full'].includes(privacyLevel)) {
-      return Response.json({ error: 'Ongeldig privacy niveau' }, { status: 400 })
+      return badRequest('Ongeldig privacy niveau')
     }
 
     // Fetch all financial data in parallel (same as dashboard)
@@ -31,15 +33,19 @@ export async function GET(request: Request) {
 
     const [
       txResult, assetsResult, debtsResult, profileResult,
-      essentialBudgetsResult, actionsResult, childBudgetsResult,
-      bankResult, expense6mResult,
+      essentialBudgetsResult, actionsThisMonthResult, childBudgetsResult,
+      bankResult, expense6mResult, actionsKpiResult,
     ] = await Promise.allSettled([
       supabase.from('transactions').select('amount').gte('date', monthStart).lt('date', monthEnd),
       supabase.from('assets').select('id, asset_type, current_value, woz_value, monthly_contribution, net_worth_inclusion_pct, is_active').eq('is_active', true),
       supabase.from('debts').select('current_balance, debt_type, linked_asset_id, net_worth_inclusion_pct, is_active').eq('is_active', true),
       supabase.from('profiles').select('full_name, date_of_birth, expected_return, inflation_rate, housing_strategy_config').single(),
       supabase.from('budgets').select('id, default_limit, interval').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
-      supabase.from('actions').select('id, status, freedom_days_impact, completed_at').in('status', ['open', 'completed']),
+      // Alleen DEZE-MAAND afgeronde acties → freedomDaysWonThisMonth (klein venster,
+      // niet afkap-gevoelig). Het all-time totaal komt uit de aggregaat-RPC hieronder,
+      // consistent met de dashboard-bundel. `.gte('completed_at', monthStart)` is een
+      // superset-ondergrens; de exacte JS-maandfilter blijft ongewijzigd.
+      supabase.from('actions').select('freedom_days_impact, completed_at').eq('status', 'completed').gte('completed_at', monthStart),
       supabase.from('budgets').select('id, parent_id, default_limit').not('parent_id', 'is', null),
       // Losse bankrekeningen (niet aan een asset gekoppeld) tellen als cash —
       // zelfde regel als dashboard-data-loader en de check-in.
@@ -48,6 +54,9 @@ export async function GET(request: Request) {
       // zodat het FIRE-doel niet op één maand schommelt — patroon uit
       // app/api/checkin/gespreksstarters/route.ts.
       supabase.from('transactions').select('amount, transaction_type, date').eq('is_income', false).gte('date', sixMonthsAgo).lt('date', monthEnd),
+      // Afkap-vrij all-time totaal (Σ freedom_days_impact over completed) via de
+      // SECURITY-INVOKER-RPC — zelfde bron als de dashboard-bundel.
+      fetchActionsKpiAggregate(supabase),
     ])
 
     // Safely extract data from settled promises (gracefully handle failures)
@@ -56,7 +65,7 @@ export async function GET(request: Request) {
     const debtsData = debtsResult.status === 'fulfilled' ? (debtsResult.value.data ?? []) : []
     const profileData = profileResult.status === 'fulfilled' ? profileResult.value.data : null
     const essentialBudgetsData = essentialBudgetsResult.status === 'fulfilled' ? (essentialBudgetsResult.value.data ?? []) : []
-    const actionsData = actionsResult.status === 'fulfilled' ? (actionsResult.value.data ?? []) : []
+    const actionsThisMonthData = actionsThisMonthResult.status === 'fulfilled' ? (actionsThisMonthResult.value.data ?? []) : []
     const childBudgetsData = childBudgetsResult.status === 'fulfilled' ? (childBudgetsResult.value.data ?? []) : []
     const bankData = bankResult.status === 'fulfilled' ? (bankResult.value.data ?? []) : []
     const expense6mData = expense6mResult.status === 'fulfilled' ? (expense6mResult.value.data ?? []) : []
@@ -155,21 +164,23 @@ export async function GET(request: Request) {
       fireParams.inflationRate,
     )
 
-    // Days won (from completed actions)
-    const completedActions = actionsData.filter((a: { status: string }) => a.status === 'completed')
-    const totalFreedomDaysWon = completedActions.reduce(
-      (s: number, a: { freedom_days_impact?: number }) => s + (Number(a.freedom_days_impact) || 0), 0
-    )
+    // Days won (all-time) — afkap-vrij via de actions_kpi_aggregate-RPC, exact de
+    // bron die de dashboard-bundel gebruikt. `fetchActionsKpiAggregate` normaliseert
+    // een RPC-fout naar 0, dus de allSettled-fallback blijft graceful.
+    const totalFreedomDaysWon =
+      actionsKpiResult.status === 'fulfilled' ? actionsKpiResult.value.data.totalFreedomDaysWon : 0
 
-    // Days won THIS MONTH (completed actions with completed_at in current month)
-    const freedomDaysWonThisMonth = completedActions
-      .filter((a: { completed_at?: string }) => {
+    // Days won THIS MONTH (completed actions with completed_at in current month).
+    // actionsThisMonthData is al op `completed` + `completed_at >= monthStart`
+    // begrensd; de exacte maandfilter blijft ONGEWIJZIGD (byte-identiek gedrag).
+    const freedomDaysWonThisMonth = actionsThisMonthData
+      .filter((a: { completed_at?: string | null }) => {
         if (!a.completed_at) return false
         const completedDate = a.completed_at.split('T')[0]
         return completedDate >= monthStart && completedDate < monthEnd
       })
       .reduce(
-        (s: number, a: { freedom_days_impact?: number }) => s + (Number(a.freedom_days_impact) || 0), 0
+        (s: number, a: { freedom_days_impact?: number | null }) => s + (Number(a.freedom_days_impact) || 0), 0
       )
 
     // Determine if FIRE calculation is possible (requires expense data).
@@ -223,10 +234,6 @@ export async function GET(request: Request) {
 
     return Response.json(cardData)
   } catch (error) {
-    console.error('Freedom card generation error:', error)
-    return Response.json(
-      { error: 'Kaart genereren mislukt. Probeer het later opnieuw.' },
-      { status: 500 }
-    )
+    return serverError(error, 'share:GET', 'Kaart genereren mislukt. Probeer het later opnieuw.')
   }
 }

@@ -36,6 +36,7 @@ import {
   getUnlinkedBankAccounts,
   getCurrentMonthTx,
   getTx12m,
+  getEarliestIncomeDate,
 } from '@/lib/server-data/base'
 import { localDateStr } from '@/lib/budget-period'
 import {
@@ -91,6 +92,7 @@ import {
   aggToExpenseRows,
   type TxMonthAggregateRow,
 } from '@/lib/server-data/tx-aggregates'
+import { fetchActionsKpiAggregate } from '@/lib/server-data/actions-aggregate'
 import { computeSovereigntyLevel, levelToPhaseId } from '@/lib/feature-phases'
 import { mergeWidgetPrefs, type WidgetSize } from '@/lib/widget-catalog'
 import { computePortfolioFees, computeFeeImpactOnFire } from '@/lib/fee-analysis'
@@ -263,6 +265,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     weekTxResult,
     membershipResult,
     rebalHoldingsResult, rebalTargetsResult,
+    earliestIncomeResult, actionsKpiResult,
   ] = await Promise.all([
     // Gedeelde basisdata-laag (lib/server-data/base.ts): huidige-maand-tx, actieve
     // assets/schulden, eigen profiel, alle budgetten, het 12-maands transactie-
@@ -346,6 +349,14 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       .select('category, target_pct')
       .eq('view_mode', 'asset_class')
       .then((r) => r, () => ({ data: null })),
+    // Vroegste inkomens-datum (all-time, één rij) — afkap-vrij, vervangt de scan
+    // over de gecapte 12-maands-slice. Voedt de inkomens-extrapolatie hieronder.
+    getEarliestIncomeDate(supabase),
+    // Actie-KPI-aggregaat (Σ freedom_days_impact over completed + counts) via de
+    // SECURITY-INVOKER-RPC: afkap-vrij, i.p.v. de reduce over de gecapte
+    // .limit(1000)-actie-fetch (totalFreedomDaysWon/completionRatio waren stil te
+    // laag voor >1000-actie-gebruikers). RLS-breed via de authenticated client.
+    fetchActionsKpiAggregate(supabase),
   ])
 
   // Vaste lasten: consumeer de canonieke bron (dezelfde die /overzicht/cashflow?view=vaste-lasten
@@ -384,13 +395,14 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     budget_id?: string | null
     transaction_type?: string | null
   }[]
-  const income12Rows = tx12mRows.filter((t) => Number(t.amount) > 0)
-  // Vroegste inkomens-datum = laagste datum onder de positieve rijen (spiegelt
-  // .gt('amount',0).order('date',asc).limit(1)).
-  const earliestIncomeDateD = income12Rows.reduce<string | undefined>(
-    (min, t) => (min === undefined || t.date < min ? t.date : min),
-    undefined,
-  )
+  // Vroegste inkomens-datum: all-time via een `order(date asc).limit(1)`-query
+  // (getEarliestIncomeDate) i.p.v. een scan over de gecapte 12-maands-slice. Die
+  // scan was door ZOWEL het 12-mnd-venster ALS de stille max_rows=1000-afkap
+  // begrensd → voor >1000-positieve-rijen-gebruikers kon de "vroegste" datum te
+  // recent zijn (incomeMonths te klein → over-extrapolatie). Eén rij kan niet
+  // afkappen. `?? undefined` behoudt het bestaande "geen data"-pad ongewijzigd.
+  const earliestIncomeDateD =
+    (earliestIncomeResult.data as { date?: string | null } | null)?.date ?? undefined
   // Sovereignty-venster [prev3MonthStart, monthStart), uitgaven (amount<0).
   const sovereigntyTxRows = tx12mRows.filter(
     (t) => Number(t.amount) < 0 && t.date >= prev3MonthStart && t.date < monthStart,
@@ -2018,12 +2030,23 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     .map(([month, days]) => ({ month, days }))
     .sort((a, b) => a.month.localeCompare(b.month))
 
-  // ── Wilskracht widget data ──
-  const totalFreedomDaysWon = completedActions.reduce(
-    (sum, a) => sum + (Number(a.freedom_days_impact) || 0), 0,
-  )
-  const totalCompletedActionsCount = completedActions.length
-  const totalActionsCount = allActions.length
+  // ── Wilskracht widget data — afkap-vrij via de actions_kpi_aggregate-RPC ──
+  // totalFreedomDaysWon (Σ freedom_days_impact over completed) + de counts komen
+  // uit het SQL-aggregaat (één rij, kan niet afkappen) i.p.v. een reduce over de
+  // gecapte .limit(1000)-actie-fetch — die was voor >1000-actie-gebruikers stil te
+  // laag (correctheidsbug, zoals de T2.2-afkap-fix). completionRatio +
+  // willpowerScore worden er ONGEWIJZIGD uit afgeleid. decisionPatterns /
+  // freedomDaysMonthly / weeklyFreedomDaysWon blijven bewust op de (lijst-)rijen:
+  // dat zijn tijdvenster-/groeperingsviews, geen headline-totalen.
+  if (actionsKpiResult.error) {
+    console.error(
+      '[dashboard-data-loader] actions_kpi_aggregate faalde — Wilskracht-KPI valt terug op 0:',
+      actionsKpiResult.error,
+    )
+  }
+  const totalFreedomDaysWon = actionsKpiResult.data.totalFreedomDaysWon
+  const totalCompletedActionsCount = actionsKpiResult.data.completedCount
+  const totalActionsCount = actionsKpiResult.data.totalCount
   const completionRatio = totalActionsCount > 0
     ? Math.round((totalCompletedActionsCount / totalActionsCount) * 100)
     : 0
