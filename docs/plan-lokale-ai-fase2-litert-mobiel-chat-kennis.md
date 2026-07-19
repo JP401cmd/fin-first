@@ -65,6 +65,30 @@
 
 ---
 
+## Fase C2 — Lokale Will neemt de chat over (toggle-overname) · vervolgvraag eigenaar 19 jul, ná C1b-ship
+
+**Doel:** privacy-toggle aan ⇒ niet een aparte pagina, maar **dé Will-chat** (WillHome/ChatPanel) draait lokaal — alles wat Will in het gesprek doet, on-device.
+
+- **C2a Chat-overname · ~1 sessie:** WillHome/ChatPanel schakelt bij privacymodus naar de lokale engine via een chat-adapter — zelfde enige-omschakelpunt-principe als de categorisatie-resolver (ADR 0043). Kennisbank-injectie (K1, `selectKnowledgeForQuestion` + fencing) blijft ongewijzigd meedraaien; "experimenteel — lokaal"-labeling blijft zolang de kwaliteitskloof met cloud-Will bestaat. Fail-closed: lokaal-niet-klaar ⇒ nette melding, nooit stille cloud-fallback.
+- **C2b Context-parity · ~0,5 sessie (deels in C2a):** één gedeelde overview-extractor zodat lokaal en cloud dezelfde cijfergrondslag lezen — dicht het gedocumenteerde driftrisico van `local-chat-context` t.o.v. `buildSharedContext`.
+- **C2c Voorstellen & acties · 1-2 sessies:** het lokale model geeft gestructureerde intents ("maak actie X") ⇒ expliciete bevestigings-UI ⇒ client-side write onder de eigen RLS. Bevestiging door de gebruiker is verplicht (Wft/veiligheid) — lokaal geen autonome writes.
+- **C2d Tool-parity: AFGEWEZEN** ten gunste van **alles-in-context** (de extractor stopt alle relevante cijfers vooraf in de prompt). Redenen: LiteRT-LM JS heeft geen tool-API (zelfbouw JSON-protocol), en tool-orkestratie is precies waar een 2B-model onbetrouwbaar wordt (C1a). Herzien zodra een sterker lokaal model beschikbaar is.
+- **Harde grens — parity van bedoeling, geen letterlijke promptkopie:** het lokale venster is 8.192 tokens; de volledige cloud-DNA + context past daar niet in, en C1a mat dat een gecondenseerde prompt dit model *beter* maakt. Zelfde regels/filosofie/cijferdiscipline, andere vorm — zie Fase P.
+
+## Fase P — Prompt-parity: skill op aanvraag + beheer-inzicht · eigenaarsverzoek 19 jul
+
+**P1 — skill `lokale-prompt-parity` · ~0,5-1 sessie bouwen, daarna op aanvraag te draaien.** Een pijplijn-skill die op verzoek van de eigenaar de canonieke cloud-prompts omzet naar de lokale parity-variant:
+
+1. Bron lezen: `lib/ai/dna/*` + relevante taakprompts (single source blijft de cloud-kant).
+2. Condenseren binnen het token-budget met harde invarianten: **Wft-/compliance-regels letterlijk behouden**, filosofie/toon/cijferdiscipline behouden, kennisbank-fencing intact — vorm mag krimpen, bedoeling nooit.
+3. Doelbestand(en) bijwerken (`lib/ai/local/local-chat-prompt.ts`, later evt. meer) + **parity-manifest** schrijven: per lokale prompt de bronbestanden, bronhashes, datum en tokenschatting.
+4. Kwaliteitspoort: prompt-tests draaien + de C1a-proefset (10 vragen incl. Wft-valstrikken); **eigenaar-review verplicht vóór ship** — promptwijziging = gedragswijziging.
+5. Skill indelen in `development-model.ts` (SKILL_CURATION) — verschijnt daarmee automatisch op `/beheer/development`.
+
+**P2 — beheer-inzicht · ~0,5-1 sessie:** blok "Prompt-parity" op `/beheer/kennisbank` (het lokale-AI-beheerhuis): per lokale prompt de bronnen, de laatste parity-run, tokenschatting t.o.v. het 8.192-budget en een **in-sync/drift-badge** (bronprompt gewijzigd sinds de laatste run ⇒ oranje "parity verlopen — draai de skill"). Feiten **gescand build-time** (`npm run parity:scan` → JSON, zelfde patroon als `arch:diagram`; runtime-fs kan niet op Vercel), betekenis gecureerd in het manifest. Registreren in `lib/beheer-sections.ts`.
+
+---
+
 ## Volgorde & beslispoorten (samengevat)
 
 ```
@@ -73,8 +97,10 @@ L1 spike (akkoord) ──desktop-GO──► L2 runtime-swap ──► L3 mobiel
         │ kwaliteits-/latentie-oordeel      └──► heropening autonomie-discussie (ADR 0043 §5)
         ▼
    C1 lokale chat (POC)  ◄── K1 kennisbank (onafhankelijk bouwbaar, waarde mét C1)
+        │
+        └──► C2 chat-overname (C2a/C2b → C2c; C2d afgewezen) ◄── P prompt-parity (P1 skill · P2 beheer-inzicht)
 ```
 
 **Risico's, eerlijk benoemd:** LiteRT-LM JS is Early Preview (API-breuk mogelijk); alle performancecijfers zijn Google's eigen; er bestaat geen NL-kwaliteitsbenchmark voor deze modelklasse — onze gouden set is de enige waarheid; C1-kwaliteit van een 2B-model voor financiële coaching is onbewezen (daarom de expliciete kwaliteitspoort).
 
-**Kosten-samenvatting:** L1 ~1-2 d · L2 ~2-3 d · L3 ~2-4 d · C1 ~3-5 d (POC) · K1 ~1-2 d. Elke fase apart te stoppen; alleen L1 is nu akkoord.
+**Kosten-samenvatting:** L1 ~1-2 d · L2 ~2-3 d · L3 ~2-4 d · C1 ~3-5 d (POC) · K1 ~1-2 d · C2a+C2b ~1,5 sessie · C2c 1-2 sessies · P1+P2 ~1-2 sessies. Elke fase apart te stoppen. Status 19 jul: L1/L2/C1/K1 geshipt, L3 geparkeerd (Adreno), C2/P gepland — nog geen bouw-akkoord.
