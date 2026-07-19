@@ -32,7 +32,7 @@ import { box1JaarruimteStatus } from '@/lib/jaarruimte'
 import { resolveEffectiveIncomeExpenses } from '@/lib/effective-financials'
 import { resolveFireParams } from '@/lib/fire-params'
 import { computeSavingsRate6m, computeDebtAflossingMonthly } from '@/lib/savings-source'
-import { localMonthStartMonthsAgo } from '@/lib/month-range'
+import { localMonthStartMonthsAgo, localMonthBounds } from '@/lib/month-range'
 import {
   getActiveAssets,
   getActiveDebts,
@@ -42,14 +42,16 @@ import {
   getCurrentMonthTx,
   getTx12m,
 } from '@/lib/server-data/base'
+import {
+  fetchTxMonthAggregate,
+  aggSumPositief,
+  aggSumNegatiefAbs,
+  type TxMonthAggregateRow,
+} from '@/lib/server-data/tx-aggregates'
 import type { Debt } from '@/lib/debt-data'
 import type { LeverageStatus } from '@/lib/leverage-status'
 import type { Perspective } from '@/lib/household-data'
 import { loadPerspectiveDataServer } from '@/lib/household/perspective-loader-server'
-
-/** Filter own-account transfers uit inkomen/uitgaven (spiegelt de dashboard-loader). */
-const isRealTx = (t: { transaction_type?: string | null }) =>
-  t.transaction_type !== 'transfer' && t.transaction_type !== 'joint_transfer'
 
 /** Resultaat van de gedeelde lever-scores-loader. */
 export interface LeverScoresResult {
@@ -190,6 +192,7 @@ export const loadLeverScores = cache(async function loadLeverScores(
     bankAccountsRes,
     currentMonthTxRes,
     tx12mRes,
+    tx6mAggRes,
   ] = await Promise.all([
     getOwnProfile(supabase),
     getActiveAssets(supabase),
@@ -198,6 +201,12 @@ export const loadLeverScores = cache(async function loadLeverScores(
     getUnlinkedBankAccounts(supabase),
     getCurrentMonthTx(supabase),
     getTx12m(supabase),
+    // 6-maands maandaggregaat voor de canonieke spaarquote (transfer-gefilterd via
+    // realOnly; spaarbudget-correctie via budgetIds). SQL-aggregaat i.p.v. de
+    // 6-maands slice uit getTx12m: kan niet stil afkappen op max_rows=1000
+    // (correctheid). RLS-breed (geen ownOnly) — identiek aan getTx12m's scope,
+    // waar T2.1 de expliciete .eq('user_id') liet vervallen.
+    fetchTxMonthAggregate(supabase, { from: sixMonthsAgo, to: localMonthBounds(now).end }),
   ])
 
   const profile = (profileRes.data ?? {}) as LeverScoresProfile
@@ -280,23 +289,13 @@ export const loadLeverScores = cache(async function loadLeverScores(
   // <6m data geëxtrapoleerd. GEEN profiel-fallback hier (net als de oude 3-maands
   // variant): zonder transactie-inkomen blijft de quote `null` zodat de cashflow-
   // hefboom "onvoldoende data" toont i.p.v. een getal.
-  // 6-maands venster [sixMonthsAgo, monthEnd): geslicet uit de gedeelde 12-maands
-  // fetch (byte-identiek aan de vroegere aparte [sixMonthsAgo, monthEnd)-query).
-  const tx6m = ((tx12mRes.data ?? []) as Tx6mRow[]).filter((t) => t.date >= sixMonthsAgo)
-  let income6m = 0
-  let expenses6m = 0
-  let savingsBudgetSpent6m = 0
-  for (const t of tx6m) {
-    if (!isRealTx(t)) continue
-    const amt = Number(t.amount)
-    if (amt > 0) {
-      income6m += amt
-      continue
-    }
-    const abs = Math.abs(amt)
-    expenses6m += abs
-    if (t.budget_id && savingsBudgetIds.has(t.budget_id)) savingsBudgetSpent6m += abs
-  }
+  // 6-maands sommen uit het maandaggregaat (transfer-gefilterd via realOnly,
+  // spaarbudget-correctie via budgetIds) — byte-identiek aan de vroegere rij-
+  // reductie, maar zonder de stille max_rows-afkap.
+  const tx6mAgg = (tx6mAggRes.data ?? []) as TxMonthAggregateRow[]
+  const income6m = aggSumPositief(tx6mAgg, { realOnly: true })
+  const expenses6m = aggSumNegatiefAbs(tx6mAgg, { realOnly: true })
+  const savingsBudgetSpent6m = aggSumNegatiefAbs(tx6mAgg, { realOnly: true, budgetIds: savingsBudgetIds })
   const debtAflossing6m = computeDebtAflossingMonthly(debtRows as unknown as Debt[]) * 6
 
   let savingsDataMonths = 6

@@ -60,6 +60,13 @@ import {
   getTx12m,
 } from './server-data/base'
 import {
+  fetchTxMonthAggregate,
+  aggSumPositief,
+  aggSumNegatiefAbs,
+  type TxMonthAggregateRow,
+} from './server-data/tx-aggregates'
+import { localMonthStartMonthsAgo, localMonthBounds } from './month-range'
+import {
   buildHealthScoreInput,
   type HealthScoreAsset,
   type HealthScoreBudget,
@@ -319,6 +326,7 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
     exitNoticeDismissedResult,
     tipsFirstCloseNavigatedResult,
     aowRowsResult,
+    txAgg12Result,
   ] = await Promise.all([
     // Gedeelde basisdata-laag (lib/server-data/base.ts): huidige-maand-tx,
     // actieve assets, eigen profiel (select('*') dekt óók de withdrawal/guardrail-
@@ -384,6 +392,15 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
       .from('aow_leeftijd')
       .select('id, birth_date_from, birth_date_through, aow_years, aow_months, is_definitive, source')
       .order('birth_date_from', { ascending: true }),
+    // 12-maands maandaggregaat (som pos/neg per maand/budget/type) voor de SUM-
+    // consumers (last12Income + 6-maands inkomen/uitgaven/spaarbudget). SQL-aggregaat
+    // i.p.v. de income12/6m-slices uit getTx12m: kan niet stil afkappen op
+    // max_rows=1000 (correctheid). Horizon telt transfers BEWUST mee (geen isRealTx),
+    // dus de reducties gebruiken realOnly:false. RLS-breed, identiek aan getTx12m.
+    fetchTxMonthAggregate(supabase, {
+      from: localMonthStartMonthsAgo(now, 11),
+      to: localMonthBounds(now).end,
+    }),
   ])
 
   // Same row both consumers want: alias instead of re-querying.
@@ -400,7 +417,14 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
     transaction_type?: string | null
   }>
   const income12Rows = tx12mRows.filter((t) => Number(t.amount) > 0)
-  const tx6mRows = tx12mRows.filter((t) => t.date >= sixMonthsAgo)
+
+  // Gedeeld 12-maands maandaggregaat — voedt last12Income + de 6-maands sommen
+  // (transfers BEWUST meegeteld: realOnly:false). Kan niet stil afkappen op 1000
+  // rijen. earliestIncomeDate blijft op de income12Rows-slice hierboven.
+  const txAgg12 = (txAgg12Result.data ?? []) as TxMonthAggregateRow[]
+  // 6-maands sub-venster op maand-niveau ('YYYY-MM'); sixMonthsAgo is de 1e van de
+  // maand ⇒ `date >= sixMonthsAgo` == `maand >= sixMonthsAgoMonth` (exact).
+  const sixMonthsAgoMonth = sixMonthsAgo.slice(0, 7)
 
   // AOW-rijen voor de client-kernel-context (rawProfile + aowRows). Leeg bij een
   // ontbrekende tabel (legacy DB) → de client valt terug op de mount-fetch.
@@ -461,14 +485,10 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
   const { income: effectiveMonthlyIncome, expenses: effectiveMonthlyExpenses } =
     resolveEffectiveIncomeExpenses(profile ?? {}, monthlyIncome, monthlyExpenses)
 
-  // 6-month average income/expenses for stable resilience calculation
-  let totalIncome6m = 0
-  let totalExpenses6m = 0
-  for (const tx of tx6mRows) {
-    const amt = Number(tx.amount)
-    if (amt > 0) totalIncome6m += amt
-    else totalExpenses6m += Math.abs(amt)
-  }
+  // 6-month average income/expenses for stable resilience calculation — uit het
+  // maandaggregaat (transfers BEWUST meegeteld: realOnly:false).
+  const totalIncome6m = aggSumPositief(txAgg12, { realOnly: false, sinceMonth: sixMonthsAgoMonth })
+  const totalExpenses6m = aggSumNegatiefAbs(txAgg12, { realOnly: false, sinceMonth: sixMonthsAgoMonth })
   const avgIncome6m = totalIncome6m > 0 ? totalIncome6m / 6 : effectiveMonthlyIncome
   const avgExpenses6m = totalExpenses6m > 0 ? totalExpenses6m / 6 : effectiveMonthlyExpenses
 
@@ -484,7 +504,7 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
   const monthlyContributions = (assetsResult.data ?? []).reduce((s, a) => s + Number(a.monthly_contribution), 0)
 
   // Extrapolated 12-month income (uit de gedeelde 12-maands slice; positieve rijen)
-  const last12Income = income12Rows.reduce((s, t) => s + Number(t.amount), 0)
+  const last12Income = aggSumPositief(txAgg12, { realOnly: false })
   let extrapolatedIncome = last12Income
   // Vroegste inkomens-datum = laagste datum onder de positieve rijen (spiegelt
   // .gt('amount',0).order('date',asc).limit(1)).
@@ -604,20 +624,16 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
     if (type === 'savings') savingsBudgetIds.add(id)
   }
 
-  // 6-month savings-budget spend (add-back for spaarquote correction)
-  let savingsBudgetSpent6m = 0
-  // 6-month income/expenses split from tx6mRows (gedeelde 12-maands slice, has budget_id + date)
-  let income6m = 0
-  let expenses6m = 0
-  for (const tx of tx6mRows) {
-    const amt = Number(tx.amount)
-    if (amt > 0) { income6m += amt; continue }
-    expenses6m += Math.abs(amt)
-    const bid = (tx as { budget_id?: string | null }).budget_id
-    if (bid && savingsBudgetIds.has(bid)) {
-      savingsBudgetSpent6m += Math.abs(amt)
-    }
-  }
+  // 6-maands inkomen/uitgaven + spaarbudget-correctie uit het maandaggregaat
+  // (transfers BEWUST meegeteld: realOnly:false). income6m/expenses6m zijn per
+  // constructie gelijk aan totalIncome6m/totalExpenses6m hierboven.
+  const income6m = aggSumPositief(txAgg12, { realOnly: false, sinceMonth: sixMonthsAgoMonth })
+  const expenses6m = aggSumNegatiefAbs(txAgg12, { realOnly: false, sinceMonth: sixMonthsAgoMonth })
+  const savingsBudgetSpent6m = aggSumNegatiefAbs(txAgg12, {
+    realOnly: false,
+    sinceMonth: sixMonthsAgoMonth,
+    budgetIds: savingsBudgetIds,
+  })
 
   // Debt aflossing add-back (principal repayments count as saving) — gedeelde helper.
   const debtAflossingMonthly = computeDebtAflossingMonthly((fullDebtsResult.data ?? []) as unknown as Debt[])

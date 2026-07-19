@@ -35,6 +35,9 @@ function makeSupabase(recurrings: RecurringRow[]): SupabaseClient {
       gte: () => b,
       order: () => b,
       eq: () => b,
+      // Paginatie-fetch (fetchAllRecurringTx) eindigt de keten op .range(); één
+      // pagina met de volledige rijenset is genoeg voor deze deterministische mock.
+      range: () => b,
       then: (resolve: (v: { data: unknown[]; error: null }) => unknown) =>
         resolve({ data: rows, error: null }),
     }

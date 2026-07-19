@@ -15,6 +15,49 @@ import {
   type RecurringCategory,
 } from '@/lib/recurring-detection'
 import { isRecurringExpired } from '@/lib/recurring-data'
+import { localMonthStartMonthsAgo } from '@/lib/month-range'
+
+/** Kolomset die `detectRecurringTransactions` nodig heeft (getrimd). */
+type RecurringTxRow = {
+  id: string
+  date: string
+  amount: number | string
+  description: string | null
+  counterparty_name: string | null
+  is_income: boolean | null
+  budget_id: string | null
+  transaction_type: string | null
+}
+
+/**
+ * Haal ALLE 12-maands transactie-rijen op via paginatie. PostgREST kapt elk
+ * antwoord af op `max_rows` (config.toml = 1000) — een enkele `.limit(n)` boven
+ * die grens is een NO-OP. Voor recurring-detectie moeten we élke transactie zien,
+ * anders mist de detectie (en dus het vaste-lasten-totaal) transacties bij
+ * tx-rijke gebruikers. Totale order op (date, id) zodat de paginatie geen rijen
+ * overslaat of dubbel telt op een paginagrens met gelijke datums.
+ */
+async function fetchAllRecurringTx(
+  supabase: SupabaseClient,
+  startDateStr: string,
+): Promise<RecurringTxRow[]> {
+  const PAGE = 1000
+  const rows: RecurringTxRow[] = []
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('id, date, amount, description, counterparty_name, is_income, budget_id, transaction_type')
+      .gte('date', startDateStr)
+      .order('date', { ascending: true })
+      .order('id', { ascending: true })
+      .range(from, from + PAGE - 1)
+    if (error) break
+    const batch = (data ?? []) as RecurringTxRow[]
+    rows.push(...batch)
+    if (batch.length < PAGE) break
+  }
+  return rows
+}
 
 const SUBSCRIPTION_CATEGORIES: RecurringCategory[] = ['subscription']
 const VASTE_KOSTEN_CATEGORIES: RecurringCategory[] = [
@@ -83,15 +126,12 @@ export const loadVasteLastenSummary = cache(
     if (!user) return EMPTY
 
     const now = new Date()
-    const startDate = new Date(now.getFullYear(), now.getMonth() - 11, 1)
-    const startDateStr = startDate.toISOString().split('T')[0]
+    // 12-maands ondergrens, tijdzone-veilig (nooit toISOString() — dat schuift de
+    // grens in NL een dag terug).
+    const startDateStr = localMonthStartMonthsAgo(now, 11)
 
-    const [txResult, recurringResult, budgetResult] = await Promise.all([
-      supabase
-        .from('transactions')
-        .select('id, date, amount, description, counterparty_name, is_income, budget_id, transaction_type')
-        .gte('date', startDateStr)
-        .order('date', { ascending: true }),
+    const [transactions, recurringResult, budgetResult] = await Promise.all([
+      fetchAllRecurringTx(supabase, startDateStr),
       supabase
         .from('recurring_transactions')
         .select('id, counterparty_name, amount, name, frequency, category_override, end_date')
@@ -101,8 +141,6 @@ export const loadVasteLastenSummary = cache(
         .select('id, name, parent_id, budget_type')
         .order('sort_order', { ascending: true }),
     ])
-
-    const transactions = txResult.data ?? []
     const existingRecurrings = recurringResult.data ?? []
     const budgets = budgetResult.data ?? []
 

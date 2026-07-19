@@ -81,6 +81,16 @@ import {
 } from '@/lib/housing-strategy'
 import { formatCurrency, calculateFreedomTime, formatFreedomTimeString, dailyExpenseRate } from '@/lib/format'
 import { recentDailyExpenseRateFromRows } from '@/lib/expense-rate'
+import {
+  fetchTxMonthAggregate,
+  aggSumPositief,
+  aggSumNegatiefAbs,
+  aggIncomeByMonth,
+  aggExpenseByMonthAbs,
+  aggAbsByMonthForBudgets,
+  aggToExpenseRows,
+  type TxMonthAggregateRow,
+} from '@/lib/server-data/tx-aggregates'
 import { computeSovereigntyLevel, levelToPhaseId } from '@/lib/feature-phases'
 import { mergeWidgetPrefs, type WidgetSize } from '@/lib/widget-catalog'
 import { computePortfolioFees, computeFeeImpactOnFire } from '@/lib/fee-analysis'
@@ -173,6 +183,21 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // Previous 3 full months (excl. current month) for stable sovereignty calculation
   const prev3MonthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 3, 1)).toISOString().split('T')[0]
 
+  // Week-venster (vorige week Ma .. einde huidige week Zo) voor de weekoverzicht-
+  // dag/categorie-buckets. Bewust een EIGEN, klein raw-venster (≤ 2 weken → nooit
+  // >1000 rijen, dus geen stille max_rows-afkap): weekOverview heeft dag- en
+  // categorie-granulariteit nodig die het maandaggregaat per definitie niet levert.
+  // Grenzen exact gelijk aan de bucket-logica onderaan (localDateStr, geen UTC-shift).
+  const weekStartForFetch = new Date(now)
+  weekStartForFetch.setDate(now.getDate() - now.getDay() + (now.getDay() === 0 ? -6 : 1))
+  weekStartForFetch.setHours(0, 0, 0, 0)
+  const prevWeekStartForFetch = new Date(weekStartForFetch)
+  prevWeekStartForFetch.setDate(weekStartForFetch.getDate() - 7)
+  const weekEndForFetch = new Date(weekStartForFetch)
+  weekEndForFetch.setDate(weekStartForFetch.getDate() + 7)
+  const weekFetchStart = localDateStr(prevWeekStartForFetch)
+  const weekFetchEnd = localDateStr(weekEndForFetch)
+
   // ── Auth: fetch once, reuse throughout ─────────────────────
   const authUser = await getCachedUser(supabase)
   const currentUserId = authUser?.id ?? null
@@ -185,12 +210,13 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     tx12mResult,
     bankAccountsResult,
     nextStepCompletionsResult,
-    expenseTx12Result,
+    txAgg12Result,
     favHoldingsResult,
     allHoldingsResult,
     aowResult,
     bankConnectionsResult,
     budgetRolloversResult, budgetAmountsResult,
+    weekTxResult,
   ] = await Promise.all([
     // Gedeelde basisdata-laag (lib/server-data/base.ts): huidige-maand-tx, actieve
     // assets/schulden, eigen profiel, alle budgetten, het 12-maands transactie-
@@ -214,10 +240,13 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     getTx12m(supabase),
     getUnlinkedBankAccounts(supabase),
     supabase.from('next_step_completions').select('step_key, dismissed'),
-    // Uitgaven-12m mét .limit(2000): BEWUST een aparte fetch (niet uit getTx12m
-    // geslicet) zodat de afkap-grens byte-identiek behouden blijft. T2.2 heft 'm
-    // samen met de SQL-aggregatie op (max_rows-afkap-fix).
-    supabase.from('transactions').select('amount, date, budget_id, transaction_type').lt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd).limit(2000),
+    // 12-maands maandaggregaat (som pos/neg per maand/budget/type). Vervangt de
+    // vroegere ruwe uitgaven-12m-fetch (én de income12-slices uit getTx12m) voor de
+    // SUM/GROUP-BY-consumers: die kapten STIL af op max_rows=1000 (correctheidsbug —
+    // 12-/6-mnd inkomen/uitgaven/spaarquote/dagtarief te laag voor >1000-tx-gebruikers).
+    // Een aggregaat levert enkele rijen en kan niet afkappen. RLS-breed (eigen +
+    // gedeeld huishouden), identiek aan de vroegere fetches die op RLS leunden.
+    fetchTxMonthAggregate(supabase, { from: twelveMonthsAgo, to: monthEnd }),
     // Tabel-split (migratie 20260502000003): dashboard-widgets tonen
     // investment-tracker data; crypto loopt via de exchange-sync.
     supabase.from('investment_holdings').select('id, name, ticker, units, avg_purchase_price, current_price, previous_close, last_price_update, is_favorite').eq('is_favorite', true),
@@ -238,6 +267,10 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     // eigen som op enkel default_limit — één bron van waarheid.
     supabase.from('budget_rollovers').select('id, user_id, budget_id, period, carried_amount, rollover_type, created_at').eq('period', monthStart.slice(0, 7)),
     supabase.from('budget_amounts').select('budget_id, effective_from, amount').lte('effective_from', monthStart),
+    // Week-venster raw rijen (≤ 2 weken) voor het weekoverzicht — dag/categorie-
+    // granulariteit die het maandaggregaat niet levert. Klein venster ⇒ geen stille
+    // max_rows-afkap. Vervangt het week-deel van de vroegere 12-mnd expense/income-fetch.
+    supabase.from('transactions').select('amount, date, budget_id, transaction_type').gte('date', weekFetchStart).lt('date', weekFetchEnd),
   ])
 
   // Vaste lasten: consumeer de canonieke bron (dezelfde die /overzicht/cashflow?view=vaste-lasten
@@ -289,6 +322,12 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   )
   // Vorige-maand-venster [prevMonthStart, monthStart) (alle tekens).
   const prevMonthTxRows = tx12mRows.filter((t) => t.date >= prevMonthStart && t.date < monthStart)
+
+  // Gedeeld 12-maands maandaggregaat — voedt de SUM/GROUP-BY-consumers (last12Income,
+  // 6-maands sommen, expense/income/debt-per-maand-histories, canoniek dagtarief),
+  // die anders stil op 1000 rijen afkapten. earliestIncomeDateD/sovereignty/vorige-
+  // maand blijven op de (kleine, subset-)tx12m-slices hierboven.
+  const txAgg12 = (txAgg12Result.data ?? []) as TxMonthAggregateRow[]
 
   // ── Derive budget subsets from single query (was 4 queries) ──
   const allBudgetsRaw = (allBudgetsRawResult.data ?? []) as { id: string; name: string; icon: string; default_limit: number; interval: string; budget_type: string; alert_threshold: number; parent_id: string | null; is_favorite: boolean; is_essential: boolean }[]
@@ -570,7 +609,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       })),
   ]
 
-  const last12Income = income12Rows.filter(isRealTx).reduce((s, t) => s + Number(t.amount), 0)
+  const last12Income = aggSumPositief(txAgg12, { realOnly: true })
   let extrapolatedIncome = last12Income
   // earliestIncomeDateD is hierboven al afgeleid uit de gedeelde 12-maands slice.
   if (earliestIncomeDateD && last12Income > 0) {
@@ -587,28 +626,19 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // ── 6-month rolling average savings rate ─────────────────────
   // 6 kalendermaanden incl. de huidige = 5 maanden terug (getMonth()-6 telde 7 maanden — off-by-one)
   const sixMonthsAgo = localMonthStartMonthsAgo(now, 5)
+  // 6-maands sub-venster op maand-niveau ('YYYY-MM'). sixMonthsAgo is de 1e van de
+  // maand, dus `date >= sixMonthsAgo` == `maand >= sixMonthsAgoMonth` (exact).
+  const sixMonthsAgoMonth = sixMonthsAgo.slice(0, 7)
 
-  const income6m = income12Rows
-    .filter(t => isRealTx(t) && (t as { date: string }).date >= sixMonthsAgo)
-    .reduce((s, t) => s + Number(t.amount), 0)
-
-  const expenses6m = Math.abs(
-    (expenseTx12Result.data ?? [])
-      .filter(t => isRealTx(t) && (t as { date: string }).date >= sixMonthsAgo)
-      .reduce((s, t) => s + Number(t.amount), 0)
-  )
-
-  // 6-month savings-budget spend (for spaarquote correction)
-  let savingsBudgetSpent6m = 0
-  for (const tx of (expenseTx12Result.data ?? [])) {
-    if (!isRealTx(tx)) continue
-    const d = (tx as { date: string }).date
-    if (d < sixMonthsAgo) continue
-    const bid = (tx as { budget_id?: string | null }).budget_id
-    if (bid && savingsBudgetIds.has(bid)) {
-      savingsBudgetSpent6m += Math.abs(Number(tx.amount))
-    }
-  }
+  // Transfer-gefilterd (realOnly:true), 6-maands sub-venster — byte-identiek aan
+  // de vroegere rij-reducties over income12/expense12.
+  const income6m = aggSumPositief(txAgg12, { realOnly: true, sinceMonth: sixMonthsAgoMonth })
+  const expenses6m = aggSumNegatiefAbs(txAgg12, { realOnly: true, sinceMonth: sixMonthsAgoMonth })
+  const savingsBudgetSpent6m = aggSumNegatiefAbs(txAgg12, {
+    realOnly: true,
+    sinceMonth: sixMonthsAgoMonth,
+    budgetIds: savingsBudgetIds,
+  })
 
   let dataMonths6 = 6
   if (earliestIncomeDateD) {
@@ -1071,11 +1101,13 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // balans/budget/vermogen-rapport en de sidebar), via de gedeelde bron
   // `lib/expense-rate.ts` — NIET langer de losse huidige kalendermaand, die per
   // maand kon uitschieten en hetzelfde bedrag een andere vrijheidstijd gaf dan de
-  // rapporten (KRUIS-20). `expenseTx12Result` is al het 12-mnd venster; bewust
-  // ZONDER isRealTx-filter zodat de basis identiek is aan de rapport-routes.
+  // rapporten (KRUIS-20). `txAgg12` is het 12-mnd maandaggregaat; de synthetische
+  // maand-uitgaven-rijen worden bewust ZONDER isRealTx-filter (realOnly:false)
+  // opgebouwd zodat de basis identiek is aan de rapport-routes. De helper gebruikt
+  // alleen het totaal én de vroegste maand; beide blijven byte-identiek.
   // Fallback naar de maand-schatting voor gebruikers zonder transacties.
   const recentExpenseRate = recentDailyExpenseRateFromRows(
-    (expenseTx12Result.data ?? []) as { amount: number; date: string }[],
+    aggToExpenseRows(txAgg12, { realOnly: false }),
     now,
     effectiveMonthlyExpenses,
   )
@@ -1240,23 +1272,15 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     },
   )
 
-  // Expense history: aggregate negative transactions per month (absolute values)
-  const expenseByMonth = new Map<string, number>()
-  for (const tx of ((expenseTx12Result.data ?? []) as { amount: number; date: string; transaction_type?: string | null }[]).filter(isRealTx)) {
-    const month = (tx.date as string).slice(0, 7) // "YYYY-MM"
-    expenseByMonth.set(month, (expenseByMonth.get(month) ?? 0) + Math.abs(Number(tx.amount)))
-  }
+  // Expense history: Σ |negatieve bedragen| per maand, transfer-gefilterd — uit het
+  // maandaggregaat (byte-identiek aan de vroegere rij-bucket).
+  const expenseByMonth = aggExpenseByMonthAbs(txAgg12, { realOnly: true })
   const expenseHistory = Array.from(expenseByMonth.entries())
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([month, value]) => ({ month, value }))
 
-  // Budget type history: use ALL transactions (not just budget-linked) for accurate trends
-  // Income history: all positive transactions per month
-  const incomeByMonth = new Map<string, number>()
-  for (const tx of (income12Rows as { amount: number; date: string; transaction_type?: string | null }[]).filter(isRealTx)) {
-    const month = (tx.date as string).slice(0, 7)
-    incomeByMonth.set(month, (incomeByMonth.get(month) ?? 0) + Number(tx.amount))
-  }
+  // Income history: positieve transacties per maand, transfer-gefilterd.
+  const incomeByMonth = aggIncomeByMonth(txAgg12, { realOnly: true })
 
   // Savings history: income minus expenses per month (using all transactions)
   const savingsByMonth = new Map<string, number>()
@@ -1267,20 +1291,13 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     savingsByMonth.set(month, Math.max(0, inc - exp))
   }
 
-  // Debt history: budget-linked debt transactions (fallback)
-  const debtMonthAgg = new Map<string, number>()
-  const allHistTx = [
-    ...(income12Rows as { amount: number; date: string; budget_id?: string | null; transaction_type?: string | null }[]).filter(isRealTx),
-    ...((expenseTx12Result.data ?? []) as { amount: number; date: string; budget_id?: string | null; transaction_type?: string | null }[]).filter(isRealTx),
-  ]
-  for (const tx of allHistTx) {
-    if (!tx.budget_id) continue
-    const bType = budgetTypeMap.get(tx.budget_id)
-    if (bType === 'debt') {
-      const month = (tx.date as string).slice(0, 7)
-      debtMonthAgg.set(month, (debtMonthAgg.get(month) ?? 0) + Math.abs(Number(tx.amount)))
-    }
-  }
+  // Debt history: budget-linked debt transactions (fallback). Σ |bedrag| per maand
+  // over de schuld-budgetten, transfer-gefilterd — uit het maandaggregaat. Per
+  // (maand,budget)-groep = sum_positief + |sum_negatief| (identiek aan de vroegere
+  // Math.abs-reductie over income+expense-rijen).
+  const debtBudgetIds = new Set<string>()
+  for (const [id, type] of budgetTypeMap) if (type === 'debt') debtBudgetIds.add(id)
+  const debtMonthAgg = aggAbsByMonthForBudgets(txAgg12, debtBudgetIds, { realOnly: true })
 
   const toSortedHistory = (m: Map<string, number>) =>
     Array.from(m.entries())
@@ -1969,11 +1986,9 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   let weekIncomeTotal = 0
   let prevWeekExpensesTotal = 0
 
-  // Combine expense + income transactions for the week range
-  const allWeekTx = [
-    ...((expenseTx12Result.data ?? []) as { amount: number; date: string; budget_id?: string | null; transaction_type?: string | null }[]),
-    ...(income12Rows as { amount: number; date: string; budget_id?: string | null; transaction_type?: string | null }[]),
-  ].filter(isRealTx)
+  // Week-transacties (eigen klein raw-venster; dag/categorie-granulariteit die het
+  // maandaggregaat niet levert), transfer-gefilterd.
+  const allWeekTx = ((weekTxResult.data ?? []) as { amount: number; date: string; budget_id?: string | null; transaction_type?: string | null }[]).filter(isRealTx)
 
   // Weekgrenzen als LOKALE datumstrings — nooit toISOString() (dat rekent in UTC
   // en schuift in NL het hele Ma–Zo-venster + de dag-buckets een dag terug).
