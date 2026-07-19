@@ -119,7 +119,7 @@ const criteria: AcceptanceCriterion[] = [
     persona: 'compleet',
     given: 'Vaste 6-maands-aggregaten (inkomen/uitgaven/aflossing) — géén persona-seed, want de consistentie is een formule-identiteit.',
     when: 'De gebruiker leest de spaarquote in de cashflow-tegel, het cashflow-instellingenblok ("berekend, laatste 6 maanden"), de gezondheidsscore-pijler, de forecast en de check-in-gespreksstarter.',
-    then: 'Overal exact hetzelfde percentage: spaarquote% = (inkomen6m − uitgaven6m + aflossing6m) ÷ inkomen6m × 100 via de gedeelde `savingsRateFromAggregates`. EXACT toetsbaar: aggregaten (36.000 / 27.000 / 1.800) → (10.800 ÷ 36.000)×100 = 30,0%; inkomen ≤ 0 → 0 (guard). De loaders voegen alleen extrapolatie/spaarbudget-correctie toe rond diezelfde kernformule.',
+    then: 'Overal exact hetzelfde percentage: spaarquote% = (inkomen6m − uitgaven6m + aflossing6m) ÷ inkomen6m × 100 via de gedeelde `savingsRateFromAggregates`. EXACT toetsbaar: aggregaten (36.000 / 27.000 / 1.800) → (10.800 ÷ 36.000)×100 = 30,0%; inkomen ≤ 0 → 0 (guard). De loaders voegen alleen extrapolatie/spaarbudget-correctie toe rond diezelfde kernformule; sinds fase 2 zijn spaarquote/dagtarief/inkomens-extrapolatie ook correct bij >1000 transacties per venster (het stilzwijgend te-lage afkap-getal is verholpen via het maandaggregaat-pad, ADR 0050) — de kernformule en dit exacte getal blijven gelijk.',
     assertion: {
       kind: 'exact',
       expected: 'spaarquote=30; nulInkomen=0',
@@ -305,10 +305,10 @@ const criteria: AcceptanceCriterion[] = [
     persona: 'compleet',
     given: 'Gebruiker met gekoppelde partner. ⚠ LIVE vereist een ÉCHT tweede account + geaccepteerd huishouden — de engine-laag toetst alleen de perspectief-omrekening/consistentie.',
     when: 'De gebruiker wisselt van "Eigen" naar "Huishouden" en weer terug.',
-    then: 'Netto vermogen, hefboom-totalen, de cashflow-tegel (perspectief-spaarquote) en Box 3 (hub + box3-pagina met partner-verdeling) tonen consistent de gecombineerde huishoud-cijfers; bewust persoonlijk blijven: de briefing-freeze en de vermogens-historie. Terug naar "Eigen" keren alle getallen byte-gelijk terug. De perspectief-spaarquote (maand-perspectief-basis) is een gedocumenteerd ánder getal dan de persoonlijke 6-maands-quote. Consistentie/verwacht verschil.',
+    then: 'Netto vermogen, hefboom-totalen, de cashflow-tegel (spaarquote) en Box 3 (hub + box3-pagina met partner-verdeling) tonen consistent de gecombineerde huishoud-cijfers; bewust persoonlijk blijven: de briefing-freeze en de vermogens-historie. Terug naar "Eigen" keren alle getallen byte-gelijk terug. Sinds fase 2 toont de cashflow-tegel óók in huishoud-/partnerperspectief het canonieke `savingsRate6m` (`savingsRateFromAggregates`, WF-KRUIS-06) i.p.v. een lokaal herrekende maandratio — de tegel spiegelt daarmee één spaarquote-getal over alle perspectieven (consume-don\'t-recompute-fix; tegel-totaal == tegel-status). Consistentie.',
     assertion: {
       kind: 'consistency',
-      source: 'consistentie-eis: perspectief-bewuste loaders rekenen huishoud-cijfers consistent om (lib/household-tax.ts + perspectief-loaders); persoonlijke onderdelen (freeze/historie) onveranderd; terug = byte-gelijk.',
+      source: 'consistentie-eis: perspectief-bewuste loaders rekenen huishoud-cijfers consistent om (lib/household-tax.ts + perspectief-loaders); cashflow-tegel-spaarquote = canoniek savingsRate6m in élk perspectief (consume-don\'t-recompute); persoonlijke onderdelen (freeze/historie) onveranderd; terug = byte-gelijk.',
     },
   },
   {

@@ -46,8 +46,8 @@ const criteria: AcceptanceCriterion[] = [
     titel: 'Dagelijkse stand opnemen op de Overzicht-hub',
     kriticiteit: 'KERN',
     given: 'Persona Willem Jansen: totalAssets €1.619.700, totalDebts €0 → netto vermogen is een directe optelsom. Voor de Box 3-toets een schone, hand-narekenbare synthetische invoer (single, geen fiscaal partner, alléén spaargeld €100.000 — géén beleggingen, zodat het effectief rendement exact het spaargeld-forfait is, geen blend): 2026-forfait spaargeld 1,28%, heffingsvrij (single) €59.357.',
-    when: 'Netto vermogen en de Box 3-belasting worden berekend.',
-    then: 'Netto vermogen = totalAssets (€1.619.700) − totalDebts (€0) = €1.619.700. Box 3 (synthetisch): grondslagSparen = 100.000 − 59.357 = €40.643; effectiefRendement = forfaitairSpaargeld/rendementsgrondslag = 1.280/100.000 = 1,28% (enige categorie, dus geen blend); box3Income = 40.643 × 0,0128 = €520,23; tax = 520,23 × 0,36 ≈ €187,28.',
+    when: 'De gebruiker opent /overzicht; netto vermogen en de Box 3-belasting worden berekend.',
+    then: 'De begroeting en de vier hefboomtegels (incl. netto vermogen en de Box 3-hefboom) verschijnen DIRECT bij het openen; de gezondheidskaart, widgets, briefing en snelkoppelingen streamen daarna in via Suspense (editorial skeleton op vaste hoogtes tegen CLS) — zelfde inhoud, gefaseerde verschijning, dezelfde cijfers. Netto vermogen = totalAssets (€1.619.700) − totalDebts (€0) = €1.619.700. Box 3 (synthetisch): grondslagSparen = 100.000 − 59.357 = €40.643; effectiefRendement = forfaitairSpaargeld/rendementsgrondslag = 1.280/100.000 = 1,28% (enige categorie, dus geen blend); box3Income = 40.643 × 0,0128 = €520,23; tax = 520,23 × 0,36 ≈ €187,28.',
     assertion: {
       kind: 'exact',
       expected: 'nettoVermogen=1619700; box3Tax=187.28',
@@ -142,7 +142,7 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'BELANGRIJK',
     given: 'Persona Daan Bakker met 8 actieve widgets in de hero-rail.',
     when: 'De gebruiker voegt een widget toe, sleept, wijzigt formaat, verwijdert een widget en slaat op.',
-    then: 'De nieuwe indeling is server-side opgeslagen (PUT /api/widgets) en overleeft een herlaad; "alles leegmaken" herstelt de defaults (Voortgang doelen + Vrijheidsstrip). Puur een configuratie-workflow, geen eigen berekening.',
+    then: 'De nieuwe indeling is server-side opgeslagen (PUT /api/widgets) en overleeft een herlaad; "alles leegmaken" herstelt de defaults (Voortgang doelen + Vrijheidsstrip). Puur een configuratie-workflow, geen eigen berekening. Let op (widget-gated berekenen): de widget-exclusieve data (week-overzicht, heatmap, huishoud-activiteit) wordt alleen berekend zolang die widget actief is — een NÉT aangezette week-/heatmap-/huishouden-widget kan tot de eerstvolgende data-refresh leeg zijn; briefing-voedende motoren (backtest/kosten/hvb) blijven altijd draaien.',
     assertion: {
       kind: 'ui-only',
       source: 'components/widgets/draggable-widget-grid.tsx + lib/widget-catalog.ts — configuratie-workflow, geen cijfermatige uitkomst',
@@ -155,7 +155,7 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'KERN',
     given: 'Persona Willem (netto vermogen €1.619.700, begrote maanduitgaven €1.495) en persona Daan (netto vermogen −€4.200).',
     when: '`computeFreedomTotal` berekent de vrijheidsdagen voor beide persona\'s.',
-    then: 'Willem: dailyExpenses = 1.495×12/365 = €49,15/dag; totalDays ≈ 32.957 (positief, isDeficit=false). Daan: netto vermogen −4.200 → isDeficit=true (geen gevierde dagen-teller, "Bouw je eerste vrijheid op" i.p.v. een positief getal).',
+    then: 'Willem: dailyExpenses = 1.495×12/365 = €49,15/dag; totalDays ≈ 32.957 (positief, isDeficit=false). Daan: netto vermogen −4.200 → isDeficit=true (geen gevierde dagen-teller, "Bouw je eerste vrijheid op" i.p.v. een positief getal). De formule is ongewijzigd; de week-overzichtdata wordt sinds fase 2 alleen berekend zolang de "deze week"-widget actief is (widget-gated) — bij een net aangezette widget kan de kaart tot de eerstvolgende refresh nog leeg zijn.',
     assertion: {
       kind: 'exact',
       expected: 'willemIsDeficit=false; willemTotalDaysPositief=true; daanIsDeficit=true',
