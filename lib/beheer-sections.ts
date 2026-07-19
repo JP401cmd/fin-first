@@ -6,6 +6,7 @@
 import {
   AlertOctagon,
   BarChart3,
+  BookOpen,
   Bot,
   Cable,
   CalendarClock,
@@ -160,6 +161,12 @@ export const BEHEER_GROUPS: BeheerGroup[] = [
         href: '/beheer/coach',
         description: 'Suggestieregels, timing en kopregel van Will.',
         icon: MessageCircle,
+      },
+      {
+        label: 'Kennisbank lokale AI',
+        href: '/beheer/kennisbank',
+        description: 'Uitleg-items (begrippen, geen cijfers) voor de systeemprompt van de lokale Will-chat.',
+        icon: BookOpen,
       },
       {
         label: 'Briefing',
