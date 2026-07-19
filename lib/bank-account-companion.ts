@@ -8,6 +8,12 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 export interface CompanionAssetInput {
   id: string
   name: string
+  /**
+   * IBAN/rekeningnummer. LET OP: de bron op `assets` is de kolom
+   * `account_number` — er bestaat GÉÉN `assets.iban`. Selecteer 'm daarom via
+   * PostgREST-alias (`iban:account_number`) of map 'm expliciet. Dit veld mapt
+   * naar `bank_accounts.iban` op de companion-rij.
+   */
   iban: string | null
   institution: string | null
   subtype: string | null

@@ -119,7 +119,8 @@ describe('createLocalAiResolver — interne batchsplitsing (10)', () => {
 })
 
 describe('createLocalAiResolver — sessieherstel', () => {
-  it('herstelt eenmaal na een crash (dispose + verse sessie), dan succes', async () => {
+  it('herstelt eenmaal na een crash (dispose + verse sessie), dan succes — en logt de fout', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const budgets = [
       { slug: 'ov', name: 'OV', parentName: null, type: 'expense' as const, id: 'b-2' },
     ]
@@ -137,9 +138,14 @@ describe('createLocalAiResolver — sessieherstel', () => {
     expect(disposeSpy).toHaveBeenCalledTimes(1)
     expect(generateSpy).toHaveBeenCalledTimes(2) // crash + retry
     expect(out[0].budget_id).toBe('b-2')
+    // Diagnostiek (les 19 jul): de eerste fout is NIET stil — hij staat in de console.
+    expect(errorSpy).toHaveBeenCalledTimes(1)
+    expect(String(errorSpy.mock.calls[0][0])).toContain('[lokale-ai]')
+    errorSpy.mockRestore()
   })
 
-  it('faalt de retry óók → throw (naar failedBatches van de orkestrator)', async () => {
+  it('faalt de retry óók → throw (naar failedBatches) mét beide fouten gelogd', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const budgets = [
       { slug: 'ov', name: 'OV', parentName: null, type: 'expense' as const, id: 'b-2' },
     ]
@@ -149,6 +155,10 @@ describe('createLocalAiResolver — sessieherstel', () => {
     const resolver = createLocalAiResolver(budgets)
     await expect(resolver([item('tx-a')])).rejects.toThrow()
     expect(disposeSpy).toHaveBeenCalledTimes(1)
+    // Beide pogingen zichtbaar in de console — supportbaarheid van "niet gelukt".
+    expect(errorSpy).toHaveBeenCalledTimes(2)
+    expect(String(errorSpy.mock.calls[1][0])).toContain('definitief')
+    errorSpy.mockRestore()
   })
 })
 

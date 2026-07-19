@@ -105,7 +105,10 @@ export async function POST(req: Request) {
     // de aangevinkte, opgeruimd voor de rest. Idempotent, dus veilig bij retry.
     const { data: cashAssets, error: cashErr } = await supabase
       .from('assets')
-      .select('id, name, iban, institution, subtype, ownership, household_id, current_value')
+      // PostgREST-alias: de bron-kolom op `assets` heet `account_number` (er
+      // bestaat GEEN `assets.iban`); we exposen 'm als `iban` zodat de rij
+      // ongewijzigd als CompanionAssetInput naar syncBankAccountCompanion kan.
+      .select('id, name, iban:account_number, institution, subtype, ownership, household_id, current_value')
       .eq('user_id', user.id)
       .eq('asset_type', 'cash')
       .eq('is_active', true)
