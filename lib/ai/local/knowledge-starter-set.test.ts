@@ -1,12 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import { KNOWLEDGE_STARTER_SET, buildStarterItems } from './knowledge-starter-set'
+import { KNOWLEDGE_STARTER_SET, KNOWLEDGE_CATEGORIES, buildStarterItems } from './knowledge-starter-set'
 import { LocalKnowledgeItemSchema, LocalKnowledgePutSchema } from './knowledge-schema'
 
 /**
- * Startset kennisbank lokale AI (fase K1). Bewaakt: het aantal begrippen, dat
- * elk item geldig is tegen het route-schema (zodat "Startset laden" → opslaan
- * niet stukloopt) en — hard — de inhoudsregel: uitleg zonder cijfers/tarieven/
- * jaartallen (alleen de eigennamen Box 1/2/3 mogen een cijfer bevatten).
+ * Startset kennisbank lokale AI (fase K1 / K1.1). Bewaakt: het aantal
+ * begrippen, dat elk item geldig is tegen het route-schema (zodat "Startset
+ * laden" → opslaan niet stukloopt) en — hard — de inhoudsregel: uitleg zonder
+ * cijfers/tarieven/jaartallen (alleen de eigennamen Box 1/2/3 mogen een cijfer
+ * bevatten).
  */
 
 // Verwijder de eigennamen Box 1/2/3 zodat alleen "echte" cijfers overblijven.
@@ -15,8 +16,8 @@ function stripBoxNames(s: string): string {
 }
 
 describe('KNOWLEDGE_STARTER_SET', () => {
-  it('bevat tien gecureerde begrippen', () => {
-    expect(KNOWLEDGE_STARTER_SET).toHaveLength(10)
+  it('bevat de volledige K1.2-set (89 begrippen: 10 uit K1 + 61 uit K1.1 + 18 verdieping)', () => {
+    expect(KNOWLEDGE_STARTER_SET).toHaveLength(89)
   })
 
   it('dekt de C1a-kernbegrippen', () => {
@@ -41,6 +42,26 @@ describe('KNOWLEDGE_STARTER_SET', () => {
       for (const tag of t.tags) {
         expect(stripBoxNames(tag)).not.toMatch(/\d/)
       }
+    }
+  })
+
+  it('elk item heeft een geldige categorie uit KNOWLEDGE_CATEGORIES', () => {
+    for (const t of KNOWLEDGE_STARTER_SET) {
+      expect(KNOWLEDGE_CATEGORIES).toContain(t.categorie)
+    }
+  })
+
+  it('elke categorie heeft minstens één begrip', () => {
+    const gedekt = new Set(KNOWLEDGE_STARTER_SET.map((t) => t.categorie))
+    for (const categorie of KNOWLEDGE_CATEGORIES) {
+      expect(gedekt.has(categorie)).toBe(true)
+    }
+  })
+
+  it('controleerVoor is ontbrekend of een geldige ISO-datumstring', () => {
+    for (const t of KNOWLEDGE_STARTER_SET) {
+      if (t.controleerVoor === undefined) continue
+      expect(Number.isNaN(new Date(t.controleerVoor).getTime())).toBe(false)
     }
   })
 })

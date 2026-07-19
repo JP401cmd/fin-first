@@ -497,3 +497,7 @@
 - **API-routes** toegevoegd: /api/admin/version-status, /api/version, /api/web-vitals, /api/web-vitals/retention/cron
 - **Tabellen** toegevoegd: web_vitals
 - **Componenten (aantal)** toegevoegd: +2
+
+## 2026-07-20
+
+- Geen wijzigingen.

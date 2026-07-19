@@ -30,6 +30,9 @@ function knowledgeItem(over: Partial<LocalKnowledgeItem>): LocalKnowledgeItem {
     actief: true,
     volgorde: 0,
     bijgewerkt: '2026-07-19T00:00:00.000Z',
+    categorie: 'Belastingen',
+    laatstGecontroleerd: '2026-07-19T00:00:00.000Z',
+    controleerVoor: null,
     ...over,
   }
 }

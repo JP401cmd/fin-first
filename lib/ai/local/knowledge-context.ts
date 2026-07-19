@@ -48,6 +48,41 @@ export interface LocalKnowledgeItem {
   volgorde: number
   /** ISO-tijdstempel van de laatste wijziging. */
   bijgewerkt: string
+  /** Groepeer-veld voor het beheerscherm, bv. "Belastingen" of "Pensioen". */
+  categorie: string
+  /** ISO-tijdstempel van de laatste inhoudelijke controle. */
+  laatstGecontroleerd: string
+  /**
+   * ISO-datum waarop dit item herzien moet worden, of `null` voor een
+   * evergreen begrip. Zet dit alleen op items die aan wetgeving/mechaniek
+   * hangen die structureel kan wijzigen (bv. de aangekondigde overgang van
+   * Box 3 naar werkelijk rendement) — niet op tijdloze uitleg.
+   */
+  controleerVoor: string | null
+}
+
+/** Freshness-status van een kennisitem, voor de stoplicht-indicatie in beheer. */
+export type KnowledgeFreshness = 'evergreen' | 'ok' | 'binnenkort' | 'verlopen'
+
+/** Binnen dit venster vóór `controleerVoor` slaat de status om naar 'binnenkort'. */
+const REVIEW_WARNING_WINDOW_MS = 60 * 24 * 60 * 60 * 1000 // 60 dagen
+
+/**
+ * Bepaal de freshness-status van een item t.o.v. `now` (injecteerbaar voor
+ * tests). Geen `controleerVoor` → altijd 'evergreen', ook als de datumstring
+ * ongeldig is (fail-safe: nooit ten onrechte 'verlopen' tonen op rommelige data).
+ */
+export function knowledgeFreshness(
+  item: Pick<LocalKnowledgeItem, 'controleerVoor'>,
+  now: Date = new Date(),
+): KnowledgeFreshness {
+  if (!item.controleerVoor) return 'evergreen'
+  const deadline = new Date(item.controleerVoor)
+  if (Number.isNaN(deadline.getTime())) return 'evergreen'
+  const msLeft = deadline.getTime() - now.getTime()
+  if (msLeft < 0) return 'verlopen'
+  if (msLeft < REVIEW_WARNING_WINDOW_MS) return 'binnenkort'
+  return 'ok'
 }
 
 /** Het resultaat van {@link buildKnowledgeContext}. */
@@ -104,11 +139,27 @@ export function buildKnowledgeContext(
 }
 
 /**
+ * Hard plafond op het AANTAL geselecteerde items bij per-vraag-selectie,
+ * ongeacht hoeveel er nog binnen het tokenbudget zouden passen.
+ *
+ * Waarom naast het tokenbudget? Bij een grotere kennisbank (tientallen items
+ * met overlappende trefwoorden als "sparen"/"belasting"/"pensioen") kan één
+ * vraag tientallen items raken. Elk raakt afzonderlijk ruim binnen het
+ * budget, maar samen leveren ze een wand van losse, deels overlappende feiten
+ * op — precies de ruis waar een klein lokaal model slechter van wordt (zie
+ * de module-uitleg hierboven). Een lage cap dwingt "minder-maar-relevant" af,
+ * onafhankelijk van hoe groot de bank wordt.
+ */
+export const MAX_SELECTED_ITEMS = 6
+
+/**
  * Gerichte selectie voor de lokale chat: neemt alleen actieve items op waarvan
  * de titel of een tag in de vraag voorkomt (case-insensitief, woord/substring),
- * op volgorde en afgekapt op item-grens binnen het budget. Géén match → lege
- * context (bewust: irrelevante uitleg verslechtert een klein model — dan liever
- * puur het eigen DNA laten antwoorden).
+ * gerangschikt op RELEVANTIE (aantal gematchte zoektermen — specifieker matcht
+ * eerst), met `volgorde` als tiebreak, afgekapt op {@link MAX_SELECTED_ITEMS}
+ * én op item-grens binnen het tokenbudget. Géén match → lege context (bewust:
+ * irrelevante uitleg verslechtert een klein model — dan liever puur het eigen
+ * DNA laten antwoorden).
  *
  * @param items     De volledige kennisbank (actief én inactief).
  * @param vraag     De ruwe gebruikersvraag.
@@ -122,8 +173,12 @@ export function selectKnowledgeForQuestion(
   const normalizedQuestion = vraag.toLowerCase()
 
   const matched = items
-    .filter((item) => item.actief && itemMatchesQuestion(item, normalizedQuestion))
-    .sort((a, b) => a.volgorde - b.volgorde)
+    .filter((item) => item.actief)
+    .map((item) => ({ item, score: matchScore(item, normalizedQuestion) }))
+    .filter(({ score }) => score > 0)
+    .sort((a, b) => b.score - a.score || a.item.volgorde - b.item.volgorde)
+    .slice(0, MAX_SELECTED_ITEMS)
+    .map(({ item }) => item)
 
   return assembleWithinBudget(matched, maxTokens)
 }
@@ -140,10 +195,11 @@ function assembleWithinBudget(
   const includedIds: string[] = []
 
   for (const item of ordered) {
-    const candidateText = [...blocks, renderItem(item)].join('\n\n')
+    const rendered = renderItem(item)
+    const candidateText = [...blocks, rendered].join('\n\n')
     // Zou dit item het budget overschrijden? Stop dan op de item-grens.
     if (estimateTokens(candidateText) > maxTokens) break
-    blocks.push(renderItem(item))
+    blocks.push(rendered)
     includedIds.push(item.id)
   }
 
@@ -151,9 +207,13 @@ function assembleWithinBudget(
   return { text, includedIds, estTokens: estimateTokens(text) }
 }
 
-/** Match als één zoekterm (titelwoord of tag) als substring in de vraag zit. */
-function itemMatchesQuestion(item: LocalKnowledgeItem, normalizedQuestion: string): boolean {
-  return searchTermsFor(item).some((term) => normalizedQuestion.includes(term))
+/**
+ * Aantal DISTINCTE zoektermen (titelwoorden + tags) van dit item dat als
+ * substring in de vraag voorkomt — de relevantie-score voor {@link
+ * selectKnowledgeForQuestion}. 0 = geen match.
+ */
+function matchScore(item: LocalKnowledgeItem, normalizedQuestion: string): number {
+  return searchTermsFor(item).filter((term) => normalizedQuestion.includes(term)).length
 }
 
 /**
@@ -222,5 +282,11 @@ function normalizeItem(entry: unknown): LocalKnowledgeItem | null {
 
   const bijgewerkt = typeof o.bijgewerkt === 'string' ? o.bijgewerkt : ''
 
-  return { id, titel, tekst, tags, actief, volgorde, bijgewerkt }
+  // Defaults voor items die vóór de K1.1-uitbreiding zijn opgeslagen (nog
+  // zonder categorie/verloopvelden) — nooit hierop laten struikelen.
+  const categorie = typeof o.categorie === 'string' && o.categorie.trim() ? o.categorie.trim() : 'Algemeen'
+  const laatstGecontroleerd = typeof o.laatstGecontroleerd === 'string' ? o.laatstGecontroleerd : ''
+  const controleerVoor = typeof o.controleerVoor === 'string' ? o.controleerVoor : null
+
+  return { id, titel, tekst, tags, actief, volgorde, bijgewerkt, categorie, laatstGecontroleerd, controleerVoor }
 }

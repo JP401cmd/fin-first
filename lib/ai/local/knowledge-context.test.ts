@@ -4,6 +4,8 @@ import {
   selectKnowledgeForQuestion,
   estimateTokens,
   parseLocalKnowledge,
+  knowledgeFreshness,
+  MAX_SELECTED_ITEMS,
   LOCAL_KNOWLEDGE_TOKEN_BUDGET,
   type LocalKnowledgeItem,
 } from './knowledge-context'
@@ -23,6 +25,9 @@ function makeItem(overrides: Partial<LocalKnowledgeItem> = {}): LocalKnowledgeIt
     actief: overrides.actief ?? true,
     volgorde: overrides.volgorde ?? 0,
     bijgewerkt: overrides.bijgewerkt ?? '2026-07-19T00:00:00.000Z',
+    categorie: overrides.categorie ?? 'Algemeen',
+    laatstGecontroleerd: overrides.laatstGecontroleerd ?? '2026-07-19T00:00:00.000Z',
+    controleerVoor: overrides.controleerVoor ?? null,
   }
 }
 
@@ -143,6 +148,55 @@ describe('selectKnowledgeForQuestion', () => {
     expect(selectKnowledgeForQuestion(items, 'over fire', 13).includedIds).toEqual(['1'])
     expect(selectKnowledgeForQuestion(items, 'over fire').includedIds).toEqual(['1', '2'])
   })
+
+  it('rangschikt op relevantie: meer gematchte termen wint van volgorde', () => {
+    const items = [
+      // Matcht alléén op "sparen" (1 term) maar staat eerder in volgorde.
+      makeItem({ id: 'breed', titel: 'Box 3', tags: ['sparen', 'vermogen'], volgorde: 1 }),
+      // Matcht op "spaarquote" én "sparen" (2 termen) — specifieker, staat later.
+      makeItem({
+        id: 'specifiek',
+        titel: 'Spaarquote',
+        tags: ['sparen'],
+        volgorde: 2,
+      }),
+    ]
+    const ctx = selectKnowledgeForQuestion(items, 'hoeveel moet ik sparen voor mijn spaarquote')
+    expect(ctx.includedIds).toEqual(['specifiek', 'breed'])
+  })
+
+  it('kapt op MAX_SELECTED_ITEMS, ongeacht hoeveel er binnen het budget passen', () => {
+    const items = Array.from({ length: MAX_SELECTED_ITEMS + 4 }, (_, i) =>
+      makeItem({ id: `item-${i}`, titel: `Geld ${i}`, tags: ['geld'], volgorde: i }),
+    )
+    const ctx = selectKnowledgeForQuestion(items, 'vertel me over geld')
+    expect(ctx.includedIds).toHaveLength(MAX_SELECTED_ITEMS)
+    expect(ctx.includedIds).toEqual(items.slice(0, MAX_SELECTED_ITEMS).map((i) => i.id))
+  })
+})
+
+describe('knowledgeFreshness', () => {
+  const now = new Date('2026-07-19T00:00:00.000Z')
+
+  it('evergreen zonder controleerVoor', () => {
+    expect(knowledgeFreshness({ controleerVoor: null }, now)).toBe('evergreen')
+  })
+
+  it('evergreen bij een ongeldige datumstring (fail-safe, nooit ten onrechte verlopen)', () => {
+    expect(knowledgeFreshness({ controleerVoor: 'geen-datum' }, now)).toBe('evergreen')
+  })
+
+  it('ok als de controledatum ruim in de toekomst ligt', () => {
+    expect(knowledgeFreshness({ controleerVoor: '2027-06-01T00:00:00.000Z' }, now)).toBe('ok')
+  })
+
+  it('binnenkort binnen het waarschuwingsvenster (60 dagen)', () => {
+    expect(knowledgeFreshness({ controleerVoor: '2026-08-01T00:00:00.000Z' }, now)).toBe('binnenkort')
+  })
+
+  it('verlopen zodra de controledatum gepasseerd is', () => {
+    expect(knowledgeFreshness({ controleerVoor: '2026-01-01T00:00:00.000Z' }, now)).toBe('verlopen')
+  })
 })
 
 describe('parseLocalKnowledge', () => {
@@ -184,6 +238,33 @@ describe('parseLocalKnowledge', () => {
   it('vult ontbrekende velden met veilige defaults (tags [], actief true, volgorde 0)', () => {
     const parsed = parseLocalKnowledge([{ id: 'a', titel: 'T', tekst: 'U' }])
     expect(parsed[0]).toMatchObject({ tags: [], actief: true, volgorde: 0, bijgewerkt: '' })
+  })
+
+  it('vult categorie/verloopvelden met veilige defaults voor items van vóór K1.1', () => {
+    const parsed = parseLocalKnowledge([{ id: 'a', titel: 'T', tekst: 'U' }])
+    expect(parsed[0]).toMatchObject({
+      categorie: 'Algemeen',
+      laatstGecontroleerd: '',
+      controleerVoor: null,
+    })
+  })
+
+  it('accepteert een expliciete categorie en controleerVoor', () => {
+    const parsed = parseLocalKnowledge([
+      {
+        id: 'a',
+        titel: 'T',
+        tekst: 'U',
+        categorie: 'Belastingen',
+        laatstGecontroleerd: '2026-07-19T00:00:00.000Z',
+        controleerVoor: '2027-01-01T00:00:00.000Z',
+      },
+    ])
+    expect(parsed[0]).toMatchObject({
+      categorie: 'Belastingen',
+      laatstGecontroleerd: '2026-07-19T00:00:00.000Z',
+      controleerVoor: '2027-01-01T00:00:00.000Z',
+    })
   })
 
   it('filtert niet-string tags eruit en trimt de rest', () => {

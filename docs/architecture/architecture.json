@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-20T13:03:32.201Z",
+  "generatedAt": "2026-07-20T15:22:39.409Z",
   "generatedDate": "2026-07-20",
   "repo": {
     "name": "fin",
@@ -14794,7 +14794,7 @@
       },
       {
         "path": "lib/ai",
-        "commits": 47
+        "commits": 48
       },
       {
         "path": "app/(app)/toekomst",
@@ -15668,41 +15668,8 @@
   "diff": {
     "baseline": false,
     "previousDate": "2026-07-20",
-    "hasChanges": true,
-    "sections": [
-      {
-        "label": "Schermen",
-        "added": [
-          "/beheer/versie",
-          "/beheer/webprestaties"
-        ],
-        "removed": []
-      },
-      {
-        "label": "API-routes",
-        "added": [
-          "/api/admin/version-status",
-          "/api/version",
-          "/api/web-vitals",
-          "/api/web-vitals/retention/cron"
-        ],
-        "removed": []
-      },
-      {
-        "label": "Tabellen",
-        "added": [
-          "web_vitals"
-        ],
-        "removed": []
-      },
-      {
-        "label": "Componenten (aantal)",
-        "added": [
-          "+2"
-        ],
-        "removed": []
-      }
-    ]
+    "hasChanges": false,
+    "sections": []
   },
   "statsHistory": [
     {
