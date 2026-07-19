@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import { NL_AOW_AGE } from '@/lib/constants'
+import { getAowLeeftijden, _clearReferenceCacheForTests } from '@/lib/reference-cache'
 
 /**
  * Regressie voor de bug "Verkeerde tabelnaam: AOW-leeftijd valt stil terug op 67".
@@ -14,11 +15,18 @@ import { NL_AOW_AGE } from '@/lib/constants'
  * /toekomst-pagina (`lib/fire-target-shared.ts`) las wél de juiste tabel, dus twee
  * schermen konden verschillende AOW-leeftijden gebruiken voor dezelfde gebruiker.
  *
- * Deze suite bewaakt drie dingen tegelijk:
- *  1. de drie oppervlakken queryen dezelfde tabel (bron-scan → breekt bij een
- *     her-introductie van de foute naam);
- *  2. op dezelfde AOW-input resolven ze tot dezelfde leeftijd (gedrag);
- *  3. het bug-mechanisme zelf: een query op de foute naam valt terug op 67.
+ * SINDS Task 1.7 (module-TTL-cache, `lib/reference-cache.ts`): de drie oppervlakken
+ * queryen niet langer elk hun eigen `.from('aow_leeftijd').select(...)` — ze
+ * delegeren allemaal naar de gedeelde `getAowLeeftijden()`. Dat maakt de kans op
+ * hernieuwde drift (verkeerde tabelnaam op één oppervlak) juist kleiner, maar deze
+ * suite moet wél blijven bewaken dat niemand stiekem weer een eigen losse query
+ * introduceert. Bewaakt nu vier dingen:
+ *  1. de drie oppervlakken delegeren naar de gedeelde cache-functie (geen eigen
+ *     losse query meer — bron-scan);
+ *  2. de gedeelde cache-functie queryt zelf de juiste tabel: aow_leeftijd;
+ *  3. op dezelfde AOW-input resolvet de gedeelde functie tot dezelfde,
+ *     niet-fallback leeftijd (gedrag);
+ *  4. het bug-mechanisme zelf: een query op de foute naam valt terug op 67.
  */
 
 // Seed-rijen, gespiegeld uit supabase/migrations/20260315000001_create_aow_leeftijd.sql
@@ -44,6 +52,30 @@ const AOW_SEED_ROWS: AowLeeftijdRow[] = [
 // Kolommen exact zoals de loaders selecteren (bevat aow_years → herkenbaar als AOW-query).
 const AOW_SELECT = 'id, birth_date_from, birth_date_through, aow_years, aow_months, is_definitive, source'
 
+type AowQueryResult = { data: AowLeeftijdRow[] | null; error: { code: string; message: string } | null }
+
+/**
+ * Generieke thenable query-builder: ondersteunt willekeurige chains
+ * (`.select().order()` etc.) door zichzelf terug te geven; `then` levert het
+ * opgegeven { data, error }-resultaat op — zowel bruikbaar als
+ * `await supabase.from(x).select(y)` (rechtstreeks) als
+ * `await supabase.from(x).select(y).order(z)` (extra chain-stap, zoals
+ * `getAowLeeftijden` gebruikt).
+ */
+interface AowQueryBuilder extends PromiseLike<AowQueryResult> {
+  select(cols: string): AowQueryBuilder
+  order(col: string, opts?: { ascending: boolean }): AowQueryBuilder
+}
+
+function makeQueryResult(result: AowQueryResult): AowQueryBuilder {
+  const builder: AowQueryBuilder = {
+    select: () => builder,
+    order: () => builder,
+    then: (onFulfilled, onRejected) => Promise.resolve(result).then(onFulfilled, onRejected),
+  }
+  return builder
+}
+
 /**
  * Minimale Supabase-mock: levert de seed-rijen ALLEEN voor de echte tabel
  * `aow_leeftijd`. Een query op elke andere naam (o.a. de historische fout
@@ -53,18 +85,14 @@ const AOW_SELECT = 'id, birth_date_from, birth_date_through, aow_years, aow_mont
 function makeAowSupabase() {
   return {
     from(table: string) {
-      return {
-        select(_cols: string): Promise<{ data: AowLeeftijdRow[] | null; error: { code: string; message: string } | null }> {
-          if (table === 'aow_leeftijd') return Promise.resolve({ data: AOW_SEED_ROWS, error: null })
-          return Promise.resolve({ data: null, error: { code: '42P01', message: `relation "public.${table}" does not exist` } })
-        },
-      }
+      if (table === 'aow_leeftijd') return makeQueryResult({ data: AOW_SEED_ROWS, error: null })
+      return makeQueryResult({ data: null, error: { code: '42P01', message: `relation "public.${table}" does not exist` } })
     },
   }
 }
 
 /**
- * Spiegelt de gedeelde AOW-resolutie die ELK oppervlak uitvoert:
+ * Spiegelt de gedeelde AOW-resolutie die ELK oppervlak (via de mock) uitvoert:
  *   const { data } = await supabase.from(<tabel>).select(<kolommen incl. aow_years>)
  *   lookupAowAge(data ?? [], dob)
  */
@@ -74,18 +102,34 @@ async function resolveSurfaceAow(supabase: ReturnType<typeof makeAowSupabase>, t
 }
 
 /**
- * Leest de AOW-tabelnaam die een oppervlak ECHT queryt rechtstreeks uit zijn
- * bronbestand — zodat deze test breekt zodra een oppervlak terugvalt op de foute
- * naam. Zoekt de `.from('X').select('...aow_years...')` in het bestand.
+ * Controleert dat een oppervlak-bestand delegeert naar de gedeelde
+ * `getAowLeeftijden()` (uit `lib/reference-cache.ts`) in plaats van een eigen
+ * losse `.from('aow_leeftijd')`-query te doen — zodat deze test breekt zodra een
+ * oppervlak weer een eigen (mogelijk verkeerde) query introduceert.
  */
-function aowTableInSource(relPath: string): string {
+function delegatesToSharedAowCache(relPath: string): boolean {
   const src = readFileSync(path.resolve(process.cwd(), relPath), 'utf8')
-  const re = /\.from\(\s*['"]([a-z0-9_]+)['"]\s*\)\s*\.select\(\s*['"]([^'"]*)['"]/g
-  let m: RegExpExecArray | null
-  while ((m = re.exec(src)) !== null) {
-    if (m[2].includes('aow_years')) return m[1]
+  const importsFromCache = /from\s+['"]@\/lib\/reference-cache['"]/.test(src)
+  const callsGetAowLeeftijden = /getAowLeeftijden\s*\(/.test(src)
+  return importsFromCache && callsGetAowLeeftijden
+}
+
+/**
+ * Leest de tabelnaam die de gedeelde cache-functie `getAowLeeftijden` ECHT queryt,
+ * rechtstreeks uit `lib/reference-cache.ts` — zodat deze test breekt zodra de ENE
+ * canonieke query terugvalt op de foute naam (of wordt hernoemd/verplaatst).
+ */
+function canonicalAowTable(): string {
+  const src = readFileSync(path.resolve(process.cwd(), 'lib/reference-cache.ts'), 'utf8')
+  const fnMatch = src.match(/export async function getAowLeeftijden[\s\S]*?\n}/)
+  if (!fnMatch) {
+    throw new Error('getAowLeeftijden niet gevonden in lib/reference-cache.ts — is de cache-functie hernoemd/verplaatst? Herzie deze regressietest.')
   }
-  throw new Error(`Geen AOW-query (.select met aow_years) gevonden in ${relPath} — is de query verplaatst? Herzie deze regressietest.`)
+  const tableMatch = fnMatch[0].match(/\.from\(\s*['"]([a-z0-9_]+)['"]\s*\)/)
+  if (!tableMatch) {
+    throw new Error('Geen .from(...) query gevonden binnen getAowLeeftijden — herzie deze regressietest.')
+  }
+  return tableMatch[1]
 }
 
 // De drie oppervlakken die op dezelfde AOW-leeftijd moeten uitkomen.
@@ -96,34 +140,38 @@ const SURFACES: Record<string, string> = {
 }
 
 describe('AOW-leeftijd — één tabel, drie oppervlakken (regressie stille fallback naar 67)', () => {
-  it('alle drie oppervlakken queryen dezelfde tabel: aow_leeftijd (niet de historische fout aow_leeftijden)', () => {
+  it('alle drie oppervlakken delegeren naar de gedeelde cache-functie getAowLeeftijden (lib/reference-cache.ts) — geen eigen losse query meer', () => {
     for (const [label, rel] of Object.entries(SURFACES)) {
-      expect(aowTableInSource(rel), label).toBe('aow_leeftijd')
+      expect(delegatesToSharedAowCache(rel), label).toBe(true)
     }
   })
 
-  it('resolvet op dezelfde AOW-input tot dezelfde leeftijd op alle drie oppervlakken (persona 1975 → 68j, ≠ fallback 67)', async () => {
-    const supabase = makeAowSupabase()
-    const dob = '1975-06-15' // valt in 1973-04-01..1975-12-31 → 68j0m
-    const tables = Object.values(SURFACES).map(aowTableInSource)
-    const [overzicht, core, toekomst] = await Promise.all(tables.map((t) => resolveSurfaceAow(supabase, t, dob)))
-
-    // Drie oppervlakken, één AOW-leeftijd
-    expect(overzicht.fractional).toBe(toekomst.fractional)
-    expect(core.fractional).toBe(toekomst.fractional)
-    // En het is de ECHTE leeftijd uit de tabel, niet de stille fallback
-    expect(toekomst.fractional).toBe(68)
-    expect(toekomst.fractional).not.toBe(NL_AOW_AGE) // 67
+  it('de gedeelde cache-functie queryt de juiste tabel: aow_leeftijd (niet de historische fout aow_leeftijden)', () => {
+    expect(canonicalAowTable()).toBe('aow_leeftijd')
   })
 
-  it('/core split-brain opgelost: het aowAge-displayveld en het FIRE-doel (fireTargetFromHorizon) lezen dezelfde AOW-tabel', () => {
+  it('resolvet op dezelfde AOW-input tot dezelfde, niet-fallback leeftijd via de gedeelde functie (persona 1975 → 68j, ≠ fallback 67)', async () => {
+    _clearReferenceCacheForTests()
+    const supabase = makeAowSupabase()
+    const dob = '1975-06-15' // valt in 1973-04-01..1975-12-31 → 68j0m
+    const rows = await getAowLeeftijden(supabase as never)
+    const age = lookupAowAge(rows, dob)
+
+    // Alle drie oppervlakken roepen dezelfde functie aan — één AOW-leeftijd is
+    // hier geen aparte assertie meer, maar een architectuur-garantie (zie test
+    // hierboven). Dit bewaakt dat die ENE functie de ECHTE leeftijd teruggeeft,
+    // niet de stille fallback.
+    expect(age.fractional).toBe(68)
+    expect(age.fractional).not.toBe(NL_AOW_AGE) // 67
+  })
+
+  it('/core split-brain opgelost: het aowAge-displayveld en het FIRE-doel (fireTargetFromHorizon) delegeren allebei naar dezelfde gedeelde cache-functie', () => {
     // Op /core komt aowAge (de AOW-marker in de netto-vermogen-projectiegrafiek) uit
     // core-data-loader, terwijl fireTargetFromHorizon via fire-target-shared komt.
     // Vóór de fix las alleen de eerste de foute tabel → marker (67) ≠ doel (echte AOW).
-    const aowMarkerTable = aowTableInSource('lib/core-data-loader.ts')
-    const fireTargetTable = aowTableInSource('lib/fire-target-shared.ts')
-    expect(aowMarkerTable).toBe(fireTargetTable)
-    expect(aowMarkerTable).toBe('aow_leeftijd')
+    // Sinds Task 1.7 delegeren beide naar getAowLeeftijden() — geen drift mogelijk.
+    expect(delegatesToSharedAowCache('lib/core-data-loader.ts')).toBe(true)
+    expect(delegatesToSharedAowCache('lib/fire-target-shared.ts')).toBe(true)
   })
 
   it('repro bug-mechanisme: een query op de foute tabelnaam valt stil terug op 67, de juiste niet', async () => {

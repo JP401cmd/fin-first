@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { NibudHouseholdType, NibudReference, NibudBenchmark } from './types'
 import { aggregateBySlug } from './category-mapping'
+import { getNibudReferenceRows } from '@/lib/reference-cache'
 
 /**
  * Map a user profile to the best-matching NIBUD household type.
@@ -28,18 +29,24 @@ export function getNibudHouseholdType(profile: {
 
 /**
  * Fetch NIBUD reference data from the database.
+ *
+ * Bron gaat via de gedeelde module-TTL-cache (`lib/reference-cache.ts`, 24u) —
+ * de rijen wijzigen hooguit jaarlijks. Query-fouten worden hier, net als
+ * voorheen, stil opgevangen (lege lijst); geen enkele bestaande aanroeper
+ * (aandachtspunten-loader, wil/recommendation-context, nibud-benchmark-route)
+ * checkte voorheen een foutveld — dat gedrag blijft ongewijzigd.
  */
 export async function getNibudReferences(
   supabase: SupabaseClient,
   householdType: NibudHouseholdType,
   year = 2026,
 ): Promise<NibudReference[]> {
-  const { data } = await supabase
-    .from('nibud_reference_data')
-    .select('nibud_category_key, nibud_category_name, basis_amount, voorbeeld_amount, mapped_budget_slug')
-    .eq('household_composition', householdType)
-    .eq('year', year)
-    .order('nibud_category_key')
+  let data: Awaited<ReturnType<typeof getNibudReferenceRows>>
+  try {
+    data = await getNibudReferenceRows(supabase, householdType, year)
+  } catch {
+    return []
+  }
 
   return (data ?? []).map(row => ({
     nibud_category_key: row.nibud_category_key,

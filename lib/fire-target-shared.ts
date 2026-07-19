@@ -22,6 +22,7 @@ import { ageAtDate } from '@/lib/horizon-data'
 import { toSimResult } from '@/lib/unified-projection'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import { NL_AOW_AGE } from '@/lib/constants'
+import { getAowLeeftijden } from '@/lib/reference-cache'
 import { loadHorizonData } from '@/lib/horizon-data-loader'
 import { buildHorizonInput } from '@/lib/horizon/build-input'
 import { computeConvergentieProjection } from '@/lib/horizon-kernel/convergentie-router'
@@ -48,16 +49,13 @@ export const computeHorizonFireTarget = cache(async function computeHorizonFireT
     return null
   }
 
-  // ── AOW-leeftijd: aparte query (zit niet in horizon-data-loader) ──
+  // ── AOW-leeftijd: gedeelde module-TTL-cache (zit niet in horizon-data-loader) ──
   // De opgehaalde rijen bewaren we óók als array voor de kernel-rawContext (de
-  // select-kolommen volstaan voor `lookupAowAge`; de kernel gebruikt ze net zo).
+  // kolommen uit de cache volstaan voor `lookupAowAge`; de kernel gebruikt ze net zo).
   let aowAgeFractional = NL_AOW_AGE
   let aowRowsForContext: AowLeeftijdRow[] = []
   try {
-    const { data: aowRows } = await supabase
-      .from('aow_leeftijd')
-      .select('birth_date_from, birth_date_through, aow_years, aow_months, is_definitive')
-    aowRowsForContext = (aowRows as AowLeeftijdRow[] | null) ?? []
+    aowRowsForContext = await getAowLeeftijden(supabase)
     aowAgeFractional = lookupAowAge(
       aowRowsForContext,
       data.effectiveInput.dateOfBirth,

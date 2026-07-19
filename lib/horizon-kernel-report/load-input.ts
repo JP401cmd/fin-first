@@ -18,6 +18,7 @@ import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
 import type { LifeEvent } from '@/lib/horizon-data'
 import type { AowLeeftijdRow } from '@/lib/aow-leeftijd'
+import { getAowLeeftijden } from '@/lib/reference-cache'
 import { resolveFireParams } from '@/lib/fire-params'
 import { parseHousingStrategy } from '@/lib/housing-strategy'
 import { computeYearlyMustExpenses } from '@/lib/budget-utils'
@@ -85,7 +86,7 @@ function num(v: unknown): number {
  * rekenen) — de route vertaalt dat naar een nette "onvoldoende data"-melding.
  */
 export async function loadKernelReportInput(supabase: SupabaseClient): Promise<KernelReportInput> {
-  const [profileResult, assetsResult, debtsResult, eventsResult, aowResult, budgetsResult] =
+  const [profileResult, assetsResult, debtsResult, eventsResult, aowRows, budgetsResult] =
     await Promise.all([
       supabase
         .from('profiles')
@@ -100,7 +101,10 @@ export async function loadKernelReportInput(supabase: SupabaseClient): Promise<K
         .select('*')
         .eq('is_active', true)
         .order('sort_order', { ascending: true }),
-      supabase.from('aow_leeftijd').select('*'),
+      // AOW-referentietabel via de gedeelde module-TTL-cache (lib/reference-cache.ts).
+      // Zelfde stille fallback-op-fout als voorheen (geen .error-check hier): een
+      // query-fout resulteert in een lege array i.p.v. een fatale throw.
+      getAowLeeftijden(supabase).catch(() => [] as AowLeeftijdRow[]),
       supabase
         .from('budgets')
         .select('id, name, default_limit, interval, budget_type, is_essential, parent_id')
@@ -115,7 +119,6 @@ export async function loadKernelReportInput(supabase: SupabaseClient): Promise<K
   const assets = (assetsResult.data ?? []) as Asset[]
   const debts = (debtsResult.data ?? []) as Debt[]
   const events = (eventsResult.data ?? []) as LifeEvent[]
-  const aowRows = (aowResult.data ?? []) as unknown as AowLeeftijdRow[]
 
   // Jaarlijkse essentiële uitgaven (zelfde subset-logica als de horizon-loader).
   const allBudgets = (budgetsResult.data ?? []) as Array<{

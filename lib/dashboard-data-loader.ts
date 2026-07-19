@@ -56,6 +56,7 @@ import { calculateBox3, CURRENT_TAX_YEAR, type TaxYear } from '@/lib/box3-data'
 import { NL_AOW_AGE } from '@/lib/constants'
 import { hasPartner } from '@/lib/household-type'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
+import { getAowLeeftijden } from '@/lib/reference-cache'
 import { computeExpectedAnnualAppreciation, type Asset } from '@/lib/asset-data'
 import { computeAssetsByType, computeLiquidPot, monthsCoveredFrom } from '@/lib/dashboard-wealth-weighting'
 import { loadVasteLastenSummary } from '@/lib/vaste-lasten-summary'
@@ -206,7 +207,14 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     // investment-tracker data; crypto loopt via de exchange-sync.
     supabase.from('investment_holdings').select('id, name, ticker, units, avg_purchase_price, current_price, previous_close, last_price_update, is_favorite').eq('is_favorite', true),
     supabase.from('investment_holdings').select('name, ticker, units, avg_purchase_price, current_price, ter'),
-    supabase.from('aow_leeftijd').select('id, birth_date_from, birth_date_through, aow_years, aow_months, is_definitive, source'),
+    // AOW-referentietabel via de gedeelde module-TTL-cache (lib/reference-cache.ts).
+    // De .then(ok, err)-adapter behoudt hier bewust de { data, error }-vorm van een
+    // rauwe supabase-query, zodat de bestaande error-logging + `.data ?? []`-fallback
+    // hieronder ongewijzigd blijft — alleen de cache-hit maakt hem sneller.
+    getAowLeeftijden(supabase).then(
+      (value) => ({ data: value, error: null as { message?: string; code?: string; details?: string } | null }),
+      (error) => ({ data: null as AowLeeftijdRow[] | null, error: error as { message?: string; code?: string; details?: string } }),
+    ),
     // PSD2 bank connection check (#813) — active bank connections for next-step suggestion
     supabase.from('bank_connections').select('id').eq('status', 'active').limit(1),
     // Heatmap-widget "beschikbaar": rollover-carry (huidige periode) + periode-

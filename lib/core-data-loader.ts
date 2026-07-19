@@ -41,6 +41,7 @@ import { parseFireStrategy, type FireStrategyConfig } from '@/lib/fire-strategy'
 import { ageAtDate } from '@/lib/horizon-data'
 import { loadCombinedCashStats, type CashAssetStats } from '@/lib/kpi-context'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
+import { getAowLeeftijden } from '@/lib/reference-cache'
 import { loadPerspectiveDataServer } from '@/lib/household/perspective-loader-server'
 import type { Perspective } from '@/lib/household-data'
 import { resolveEffectiveIncomeExpenses } from './effective-financials'
@@ -446,9 +447,14 @@ export const loadCoreData = cache(async function loadCoreData(
       .select('id, name, balance')
       .eq('is_active', true)
       .is('linked_asset_id', null),
-    supabase
-      .from('aow_leeftijd')
-      .select('id, birth_date_from, birth_date_through, aow_years, aow_months, is_definitive, source'),
+    // AOW-referentietabel via de gedeelde module-TTL-cache (lib/reference-cache.ts).
+    // De .then(ok, err)-adapter behoudt de { data, error }-vorm van een rauwe
+    // supabase-query, zodat de bestaande error-logging + `.data ?? []`-fallback
+    // hieronder ongewijzigd blijft — alleen de cache-hit maakt hem sneller.
+    getAowLeeftijden(supabase).then(
+      (value) => ({ data: value, error: null as unknown }),
+      (error) => ({ data: null as AowLeeftijdRow[] | null, error: error as unknown }),
+    ),
   ])
 
   if (txResult.error) throw txResult.error
