@@ -919,9 +919,9 @@ describe('AICategorizeSheet — privé-modus resolver-keuze', () => {
     expect(screen.getAllByText('Boodschappen').length).toBeGreaterThanOrEqual(1)
   })
 
-  it('privacy_mode AAN + NIET klaar: blokkeert de AI-fase eerlijk, geen cloud-fallback', async () => {
+  it('privacy_mode AAN + capability-fout: blokkeert eerlijk met de capability-melding, geen cloud-fallback', async () => {
     profilePrivacyMode = true
-    localCapabilityOk = false // geen geschikte WebGPU → niet klaar
+    localCapabilityOk = false // geen geschikte WebGPU → capability-tak
     autoCatContext = { ...autoCatContext, budgets: [boodschappenBudget] }
     // Eén regel-zekere (Albert Heijn → Regel) + één onbekende (dwingt de AI-fase).
     const txs = [
@@ -941,12 +941,43 @@ describe('AICategorizeSheet — privé-modus resolver-keuze', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Vraag Will/i }))
 
+    // Gesplitste melding (fix 19 jul): capability-tak = de concrete reden uit de
+    // capability-check + de transiënte-flap-hint — niet meer de oude generieke tekst.
     await waitFor(() => {
-      expect(screen.getByText(/Lokale AI is niet beschikbaar of nog niet gedownload/i)).toBeInTheDocument()
+      expect(screen.getByText(/Je browser ondersteunt WebGPU niet/i)).toBeInTheDocument()
     })
+    expect(screen.getByText(/herstart dan je browser/i)).toBeInTheDocument()
     // Regelmotor-voorstel blijft werken (stap 1).
     expect(screen.getByText(/^Regel$/)).toBeInTheDocument()
     // Fail-closed: geen lokale resolver gebouwd én géén cloud-fallback.
+    expect(createLocalResolverSpy).not.toHaveBeenCalled()
+    expect(aiCategorizeFetches().length).toBe(0)
+  })
+
+  it('privacy_mode AAN + model weg (eviction): blokkeert met de download-opnieuw-melding, geen cloud-fallback', async () => {
+    profilePrivacyMode = true
+    localCapabilityOk = true
+    localModelReady = false // cache-eviction / nooit voltooide download → model-missing-tak
+    autoCatContext = { ...autoCatContext, budgets: [boodschappenBudget] }
+    const txs = [makeTx('x2', { description: 'Betaling', counterparty_name: 'Onbekende Zaak' })]
+
+    render(
+      <AICategorizeSheet
+        transactions={txs}
+        budgets={[boodschappenBudget]}
+        budgetGroups={[{ parent: boodschappenBudget, children: [boodschappenBudget] }]}
+        onClose={() => {}}
+        onSaved={() => {}}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Vraag Will/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText(/mogelijk heeft je browser het verwijderd om ruimte te maken/i)).toBeInTheDocument()
+    })
+    expect(screen.getByText(/Download het opnieuw via Mijn → Privacy/i)).toBeInTheDocument()
+    // Fail-closed blijft gelden: geen lokale resolver, géén cloud-fallback.
     expect(createLocalResolverSpy).not.toHaveBeenCalled()
     expect(aiCategorizeFetches().length).toBe(0)
   })

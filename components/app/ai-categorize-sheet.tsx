@@ -24,6 +24,7 @@ import { buildBudgetOptions, type BudgetRow } from '@/lib/ai/categorize-budget-o
 import { createLocalAiResolver, LOCAL_INTERNAL_BATCH_SIZE } from '@/lib/ai/local/local-categorize-resolver'
 import { checkLocalAiCapability } from '@/lib/ai/local/webgpu-capability'
 import { getLocalModelState } from '@/lib/ai/local/model-manager'
+import { resolveLocalReadiness, type LocalReadiness } from '@/lib/ai/local/local-readiness'
 
 // De Sleepmodus (drag-&-drop) sleept dnd-kit mee — eigen chunk, laadt pas
 // wanneer de gebruiker de modus opent.
@@ -180,6 +181,10 @@ export function AICategorizeSheet({
   // Alleen een UI-hint-vlag ("experimenteel — lokaal op dit apparaat"); de
   // resolver-keuze zelf gebeurt in fetchSuggestions op basis van profiles.privacy_mode.
   const [localMode, setLocalMode] = useState(false)
+  // Sessiestart-feedback voor het lokale pad: de eerste GPU-warmup is ~45-60s
+  // volledig stil; 'starten' toont een geruststellende regel zodat het niet als
+  // een hang voelt. Gevoed door createLocalAiResolver's onSessionState.
+  const [localSessionState, setLocalSessionState] = useState<'idle' | 'starten' | 'klaar'>('idle')
   // Annuleren van de combined pass: abort tussen AI-rondes; de al-gedane
   // voorstellen blijven staan en landen gewoon in de review (niets toegepast).
   const abortRef = useRef<AbortController | null>(null)
@@ -355,6 +360,7 @@ export function AICategorizeSheet({
   const fetchSuggestions = useCallback(async () => {
     setPhase('ai')
     setAiError(null)
+    setLocalSessionState('idle')
     setAiBatchProgress({ current: 0, total: 0, round: 0, propagated: 0 })
     abortRef.current = new AbortController()
 
@@ -423,6 +429,9 @@ export function AICategorizeSheet({
     let aiResolver = cloudResolver
     let aiBatchSize: number | undefined
     let localNotReady = false
+    // Gescheiden gereedheidsoordeel (capability-flap vs. geëvicteerd model); de
+    // concrete melding hangt hieraan en wordt hieronder in aiError getoond.
+    let readiness: LocalReadiness | null = null
     let privacyMode = false
     {
       const { data: { user } } = await supabase.auth.getUser()
@@ -438,11 +447,15 @@ export function AICategorizeSheet({
     setLocalMode(privacyMode)
 
     if (privacyMode) {
-      // Toestelgeschiktheid + modelstaat: niet klaar → blokkeer de AI-fase
-      // eerlijk. De regel-/transfer-/spiegelvoorstellen (stap 1) blijven werken.
+      // Toestelgeschiktheid + modelstaat via één helper die de twee heel
+      // verschillende oorzaken SCHEIDT (ADR 0043-bugfix): een (mogelijk
+      // transiënte) capability-flap vs. een uit de cache geëvicteerd model. Elk
+      // krijgt een eigen, concrete melding i.p.v. één generieke tekst. Niet klaar
+      // → blokkeer de AI-fase eerlijk; de regel-/transfer-/spiegelvoorstellen
+      // (stap 1) blijven werken.
       const [cap, modelState] = await Promise.all([checkLocalAiCapability(), getLocalModelState()])
-      const ready = cap.ok && modelState.state === 'klaar'
-      if (!ready) {
+      readiness = resolveLocalReadiness(cap, modelState)
+      if (!readiness.ready) {
         localNotReady = true
         // Elke batch laten falen → de bestaande failedBatches-flow vangt het op;
         // NOOIT een stille cloud-fallback (privacy fail-closed, FR-3.6).
@@ -464,7 +477,11 @@ export function AICategorizeSheet({
         }))
         const { options, slugToId } = buildBudgetOptions(rows)
         const localOptions = options.map((o) => ({ ...o, id: slugToId.get(o.slug) ?? null }))
-        aiResolver = createLocalAiResolver(localOptions)
+        // onSessionState voedt de "wordt gestart…"-regel tijdens de stille
+        // GPU-warmup van de eerste chunk (zie localSessionState).
+        aiResolver = createLocalAiResolver(localOptions, {
+          onSessionState: (s) => setLocalSessionState(s),
+        })
         aiBatchSize = LOCAL_INTERNAL_BATCH_SIZE
       }
     }
@@ -486,7 +503,8 @@ export function AICategorizeSheet({
       if (result.failedBatches.length > 0 && result.counts.ai === 0) {
         setAiError(
           localNotReady
-            ? 'Lokale AI is niet beschikbaar of nog niet gedownload — beheer dit via Mijn > Privacy. Je regels en eerdere keuzes staan wel klaar.'
+            ? (readiness?.message ??
+                'Lokale AI is niet beschikbaar — beheer dit via Mijn → Privacy. Je regels en eerdere keuzes staan wel klaar.')
             : privacyMode
               ? 'Lokale categorisatie is niet gelukt. Probeer het opnieuw of categoriseer handmatig. Je regels staan wel klaar.'
               : 'AI-analyse is nu niet beschikbaar — de voorstellen van je regels staan wel klaar.',
@@ -1011,6 +1029,11 @@ export function AICategorizeSheet({
                 Experimenteel — lokaal op dit apparaat, je transactiedata verlaat je toestel niet
               </p>
             )}
+            {localMode && localSessionState === 'starten' && (
+              <p className="text-[11px] leading-relaxed text-wil-700">
+                Lokale AI wordt gestart — dit duurt ongeveer een minuut (eenmalig per browsersessie)…
+              </p>
+            )}
           </div>
 
           {/* Progress bar */}
@@ -1031,7 +1054,15 @@ export function AICategorizeSheet({
               kon indelen). Vóór de teller gezet is, val terug op de actieve set. */}
           <div className="rounded-[var(--r-lg)] border border-dashed border-wil-200 bg-wil-50/50 px-4 py-4">
             <p className="font-[var(--font-source-serif)] text-[13px] italic leading-relaxed text-[var(--ink-2)] border-l-[3px] border-wil-500 pl-3">
-              &ldquo;{aiBatchProgress.total > 0 ? aiBatchProgress.total : activeTransactions.length} transacties worden vergeleken met jouw eerdere gewoonten…&rdquo;
+              {(() => {
+                const n = aiBatchProgress.total > 0 ? aiBatchProgress.total : activeTransactions.length
+                return (
+                  <>
+                    &ldquo;{n} {n === 1 ? 'transactie wordt' : 'transacties worden'} vergeleken met jouw
+                    eerdere gewoonten…&rdquo;
+                  </>
+                )
+              })()}
             </p>
             <p className="mt-3 text-[10px] font-semibold uppercase tracking-[0.1em] text-wil-600">— Will</p>
           </div>

@@ -38,6 +38,42 @@ type GpuLike = {
 /** Ondergrens voor maxStorageBufferBindingSize: 1,2 GiB (Gemma 4 E2B-buffers). */
 export const MIN_STORAGE_BUFFER_BINDING_BYTES = Math.round(1.2 * 1024 ** 3)
 
+/** Wachttijd (ms) vóór de eenmalige adapter-herpoging bij een transiënte null. */
+export const ADAPTER_RETRY_DELAY_MS = 400
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+/**
+ * Vraagt de WebGPU-adapter aan met FLAP-DEMPING. `requestAdapter` kan
+ * kortstondig null (of, zeldzamer, een throw) geven wanneer het GPU-proces net
+ * herstart of een driver-update draait — een TRANSIËNTE flap, geen echt
+ * ongeschikt toestel. Mislukt de eerste poging, dan wachten we even en proberen
+ * we exact één keer opnieuw vóór we het toestel afkeuren. Zo krijgt een
+ * gebruiker die het model wél kan draaien niet onterecht de "niet geschikt"-
+ * blokkade te zien.
+ */
+async function requestAdapterWithRetry(
+  gpu: GpuLike,
+  retryDelayMs: number,
+): Promise<GpuAdapterLike | null> {
+  const attempt = async (): Promise<GpuAdapterLike | null> => {
+    try {
+      // 'high-performance' stuurt op de discrete GPU waar die er is — de zwaarste
+      // buffers passen daar eerder.
+      return await gpu.requestAdapter({ powerPreference: 'high-performance' })
+    } catch {
+      return null
+    }
+  }
+
+  const first = await attempt()
+  if (first) return first
+  await sleep(retryDelayMs)
+  return attempt()
+}
+
 /** Best-effort geheugen-inschatting (GB) uit navigator.deviceMemory (kan ontbreken). */
 function readDeviceMemoryGb(): number | null {
   if (typeof navigator === 'undefined') return null
@@ -48,11 +84,18 @@ function readDeviceMemoryGb(): number | null {
 /**
  * Toetst of dit toestel de lokale AI-runtime kan draaien. Doet een echte
  * `requestAdapter()` (geen device-creatie — dat gebeurt pas bij de
- * modeldownload) en leest de adapter-limits/-features uit.
+ * modeldownload) en leest de adapter-limits/-features uit. Een transiënte
+ * adapter-flap wordt gedempt met één herpoging (zie requestAdapterWithRetry).
  *
  * Werpt nooit: elke faal-tak wordt een `ok:false` met een concrete NL-reden.
+ *
+ * `opts.adapterRetryDelayMs` overschrijft alleen de wachttijd vóór die
+ * herpoging — bedoeld voor tests (0 = instant), productie gebruikt de default.
  */
-export async function checkLocalAiCapability(): Promise<LocalAiCapability> {
+export async function checkLocalAiCapability(
+  opts?: { adapterRetryDelayMs?: number },
+): Promise<LocalAiCapability> {
+  const retryDelayMs = opts?.adapterRetryDelayMs ?? ADAPTER_RETRY_DELAY_MS
   const deviceMemoryGb = readDeviceMemoryGb()
 
   const gpu = typeof navigator !== 'undefined'
@@ -68,14 +111,7 @@ export async function checkLocalAiCapability(): Promise<LocalAiCapability> {
     }
   }
 
-  let adapter: GpuAdapterLike | null = null
-  try {
-    // 'high-performance' stuurt op de discrete GPU waar die er is — de zwaarste
-    // buffers passen daar eerder.
-    adapter = await gpu.requestAdapter({ powerPreference: 'high-performance' })
-  } catch {
-    adapter = null
-  }
+  const adapter = await requestAdapterWithRetry(gpu, retryDelayMs)
 
   if (!adapter) {
     return {

@@ -32,10 +32,57 @@ describe('checkLocalAiCapability', () => {
   })
 
   it('faalt wanneer er geen adapter is', async () => {
+    // adapterRetryDelayMs: 0 → de flap-herpoging is instant (geen echte 400ms-sleep).
     setGpu({ requestAdapter: async () => null })
-    const cap = await checkLocalAiCapability()
+    const cap = await checkLocalAiCapability({ adapterRetryDelayMs: 0 })
     expect(cap.ok).toBe(false)
     expect(cap.reasons[0]).toMatch(/grafische chip|adapter/i)
+  })
+
+  it('dempt een transiënte adapter-flap: null bij de 1e poging, geldige adapter bij de 2e → ok', async () => {
+    // requestAdapter geeft soms kortstondig null bij een GPU-proces-herstart /
+    // driver-update; de eenmalige herpoging vangt dat op i.p.v. het toestel af te
+    // keuren.
+    let calls = 0
+    setGpu({
+      requestAdapter: async () => {
+        calls++
+        return calls === 1
+          ? null
+          : makeAdapter({ shaderF16: true, maxStorageBufferBindingSize: MIN_STORAGE_BUFFER_BINDING_BYTES })
+      },
+    })
+    const cap = await checkLocalAiCapability({ adapterRetryDelayMs: 0 })
+    expect(cap.ok).toBe(true)
+    expect(calls).toBe(2)
+  })
+
+  it('dempt ook een transiënte throw: throw bij de 1e poging, geldige adapter bij de 2e → ok', async () => {
+    let calls = 0
+    setGpu({
+      requestAdapter: async () => {
+        calls++
+        if (calls === 1) throw new Error('gpu process restarting')
+        return makeAdapter({ shaderF16: true, maxStorageBufferBindingSize: MIN_STORAGE_BUFFER_BINDING_BYTES })
+      },
+    })
+    const cap = await checkLocalAiCapability({ adapterRetryDelayMs: 0 })
+    expect(cap.ok).toBe(true)
+    expect(calls).toBe(2)
+  })
+
+  it('adapter blijft null bij beide pogingen → ok:false (echt ongeschikt)', async () => {
+    let calls = 0
+    setGpu({
+      requestAdapter: async () => {
+        calls++
+        return null
+      },
+    })
+    const cap = await checkLocalAiCapability({ adapterRetryDelayMs: 0 })
+    expect(cap.ok).toBe(false)
+    expect(cap.reasons[0]).toMatch(/grafische chip|adapter/i)
+    expect(calls).toBe(2)
   })
 
   it('slaagt op een desktop-GPU met shader-f16 en genoeg buffergeheugen', async () => {
@@ -63,7 +110,7 @@ describe('checkLocalAiCapability', () => {
 
   it('werpt nooit, ook niet als requestAdapter faalt', async () => {
     setGpu({ requestAdapter: async () => { throw new Error('boom') } })
-    const cap = await checkLocalAiCapability()
+    const cap = await checkLocalAiCapability({ adapterRetryDelayMs: 0 })
     expect(cap.ok).toBe(false)
   })
 })

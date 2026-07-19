@@ -61,15 +61,16 @@ describe('mapLocalChunkResults — id-mapping, drempel, slug-validatie', () => {
     ])
   })
 
-  it('onder de drempel (0.9) → budget_id null (assistief: liever niets dan ruis)', () => {
+  it('onder de drempel → budget_id null (assistief: liever niets dan ruis)', () => {
     const chunk = [item('tx-a')]
-    const raw = JSON.stringify([{ id: 't1', budget_slug: 'boodschappen', confidence: 0.89 }])
+    const below = LOCAL_MIN_CONFIDENCE - 0.01
+    const raw = JSON.stringify([{ id: 't1', budget_slug: 'boodschappen', confidence: below }])
     const out = mapLocalChunkResults(chunk, parseLocalCategorizations(raw), validSlugs, slugToId)
     expect(out[0].budget_id).toBeNull()
-    expect(out[0].confidence).toBe(0.89)
+    expect(out[0].confidence).toBe(below)
   })
 
-  it('op de drempel (=0.9) → wél toegewezen', () => {
+  it('op de drempel (=LOCAL_MIN_CONFIDENCE) → wél toegewezen', () => {
     const chunk = [item('tx-a')]
     const raw = JSON.stringify([{ id: 't1', budget_slug: 'boodschappen', confidence: LOCAL_MIN_CONFIDENCE }])
     const out = mapLocalChunkResults(chunk, parseLocalCategorizations(raw), validSlugs, slugToId)
@@ -148,6 +149,24 @@ describe('createLocalAiResolver — sessieherstel', () => {
     const resolver = createLocalAiResolver(budgets)
     await expect(resolver([item('tx-a')])).rejects.toThrow()
     expect(disposeSpy).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('createLocalAiResolver — sessiestart-signaal (onSessionState)', () => {
+  it('meldt "starten" vóór en "klaar" ná het laden van de sessie', async () => {
+    const budgets = [
+      { slug: 'ov', name: 'OV', parentName: null, type: 'expense' as const, id: 'b-2' },
+    ]
+    generateImpl = async (messages) => {
+      const user = messages[1].content
+      const n = (user.match(/(^|\n)t\d+:/g) ?? []).length
+      return echoOutput(n, 'ov', 0.95)
+    }
+    const states: Array<'starten' | 'klaar'> = []
+    const resolver = createLocalAiResolver(budgets, { onSessionState: (s) => states.push(s) })
+    // Eén interne chunk (1 transactie) → precies één starten→klaar-paar.
+    await resolver([item('tx-a')])
+    expect(states).toEqual(['starten', 'klaar'])
   })
 })
 

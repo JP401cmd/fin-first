@@ -101,6 +101,23 @@ function formatGb(bytes: number): string {
   return (bytes / 1e9).toLocaleString('nl-NL', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 }
 
+/**
+ * Best-effort: beschermt de browser deze origin-opslag tegen automatische
+ * eviction (navigator.storage.persisted)? `null` = onbekend/niet-ondersteund —
+ * dan tonen we niets (geen loze bewering). De ~3,2 GB shards overleven eviction
+ * alleen als dit true is; false is een eerlijke waarschuwing waard.
+ */
+async function readStoragePersisted(): Promise<boolean | null> {
+  try {
+    if (typeof navigator !== 'undefined' && navigator.storage?.persisted) {
+      return await navigator.storage.persisted()
+    }
+  } catch {
+    /* best-effort — bij een fout weten we het niet */
+  }
+  return null
+}
+
 export function LocalCategorizationSettings() {
   // Stabiele client-ref: zonder memo is `supabase` bij elke render een nieuw
   // object → de mount-useEffect (dep [supabase]) draait telkens opnieuw en zet
@@ -121,6 +138,11 @@ export function LocalCategorizationSettings() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [likelyMobile, setLikelyMobile] = useState(false)
+  // Opslagbescherming (navigator.storage.persisted): null = onbekend → niets
+  // tonen; true/false → een geruststellende resp. waarschuwende regel in het
+  // beheer-blok. Gelezen op mount én opnieuw na een geslaagde download (persist()
+  // kan 'm net hebben aangezet).
+  const [storagePersisted, setStoragePersisted] = useState<boolean | null>(null)
 
   // Proactieve desktop-only hint: op een coarse-pointer-toestel (mobiel/tablet)
   // faalt de capability-check toch — laat de toggle daar vriendelijk uit staan
@@ -161,6 +183,9 @@ export function LocalCategorizationSettings() {
         ready = false
       }
 
+      // Best-effort opslagbescherming (guarded in readStoragePersisted zelf).
+      const persisted = await readStoragePersisted()
+
       if (!active) return
       if (data?.ai_enabled != null) setAiEnabled(data.ai_enabled as boolean)
       setPrivacyMode(Boolean(data?.privacy_mode))
@@ -168,6 +193,7 @@ export function LocalCategorizationSettings() {
       const subs = (data?.active_subscriptions as string[]) ?? []
       setHasAiTier(hasSubscription(subs, 'ai'))
       setModelReady(ready)
+      setStoragePersisted(persisted)
       setPhase('idle')
     })()
     return () => {
@@ -191,6 +217,8 @@ export function LocalCategorizationSettings() {
         /* best effort */
       }
       setModelReady(true)
+      // Herlees de bescherming: persist() hierboven kan 'm net hebben aangezet.
+      setStoragePersisted(await readStoragePersisted())
       if (setPrivacyAfter) {
         const ok = await writePrivacyMode(true)
         if (ok) setPrivacyMode(true)
@@ -537,6 +565,18 @@ export function LocalCategorizationSettings() {
                     <p className="mt-1.5 text-xs text-[var(--ink-3)] leading-relaxed">
                       Je AI-abonnement is verlopen — lokale categorisatie blijft werken, maar zet je
                       &apos;m uit dan kun je &apos;m zonder abonnement niet opnieuw aanzetten.
+                    </p>
+                  )}
+                  {/* Opslagbescherming: null → niets tonen (geen loze bewering). */}
+                  {storagePersisted === true && (
+                    <p className="mt-1.5 text-xs text-[var(--ink-3)] leading-relaxed">
+                      Je browser beschermt deze opslag — het model blijft bewaard.
+                    </p>
+                  )}
+                  {storagePersisted === false && (
+                    <p className="mt-1.5 text-xs text-[var(--ink-3)] leading-relaxed">
+                      Let op: je browser beschermt deze opslag niet. Bij ruimtegebrek kan het model
+                      verwijderd worden; download dan opnieuw via deze pagina.
                     </p>
                   )}
                 </div>

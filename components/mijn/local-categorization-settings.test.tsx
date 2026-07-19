@@ -59,6 +59,20 @@ vi.mock('@/lib/supabase/client', () => ({
 
 let fetchMock: ReturnType<typeof vi.fn>
 
+/**
+ * Stub navigator.storage.persisted() (jsdom levert de StorageManager niet).
+ * `null` → géén persisted-methode (best-effort onbekend); true/false → de
+ * gemockte uitkomst. persist() wordt altijd meegemockt zodat de download-flow
+ * niet valt over een ontbrekende methode.
+ */
+function setStorageManager(persisted: boolean | null): void {
+  const value =
+    persisted === null
+      ? { persist: vi.fn().mockResolvedValue(true) }
+      : { persisted: vi.fn().mockResolvedValue(persisted), persist: vi.fn().mockResolvedValue(true) }
+  Object.defineProperty(navigator, 'storage', { value, configurable: true })
+}
+
 beforeEach(() => {
   mocks.checkLocalAiCapability.mockReset()
   mocks.getLocalModelState.mockReset()
@@ -67,6 +81,8 @@ beforeEach(() => {
   profileRow = { ai_enabled: true, privacy_mode: false, active_subscriptions: ['ai'] }
   fetchMock = vi.fn().mockResolvedValue({ ok: true })
   vi.stubGlobal('fetch', fetchMock)
+  // Schone navigator per test: geen storage-manager tenzij een test 'm zet.
+  Reflect.deleteProperty(navigator as unknown as Record<string, unknown>, 'storage')
 })
 
 describe('LocalCategorizationSettings', () => {
@@ -195,5 +211,36 @@ describe('LocalCategorizationSettings', () => {
     render(<LocalCategorizationSettings />)
     // Beheer-blok verschijnt (model klaar); de subtiele verlopen-melding staat erin.
     await screen.findByText(/Je AI-abonnement is verlopen/i)
+  })
+
+  it('opslagbescherming actief: beheer-blok meldt dat het model bewaard blijft', async () => {
+    profileRow = { ai_enabled: true, privacy_mode: true, active_subscriptions: ['ai'] }
+    mocks.getLocalModelState.mockResolvedValue({ state: 'klaar', bytes: 3.2e9 })
+    setStorageManager(true)
+
+    render(<LocalCategorizationSettings />)
+    await screen.findByText(/Model staat klaar op dit toestel/i)
+    expect(await screen.findByText(/het model blijft bewaard/i)).toBeTruthy()
+  })
+
+  it('opslag niet beschermd: beheer-blok toont de eviction-waarschuwing', async () => {
+    profileRow = { ai_enabled: true, privacy_mode: true, active_subscriptions: ['ai'] }
+    mocks.getLocalModelState.mockResolvedValue({ state: 'klaar', bytes: 3.2e9 })
+    setStorageManager(false)
+
+    render(<LocalCategorizationSettings />)
+    await screen.findByText(/Model staat klaar op dit toestel/i)
+    expect(await screen.findByText(/Bij ruimtegebrek kan het model verwijderd worden/i)).toBeTruthy()
+  })
+
+  it('opslagbescherming onbekend (geen persisted-API): geen extra regel', async () => {
+    profileRow = { ai_enabled: true, privacy_mode: true, active_subscriptions: ['ai'] }
+    mocks.getLocalModelState.mockResolvedValue({ state: 'klaar', bytes: 3.2e9 })
+    setStorageManager(null)
+
+    render(<LocalCategorizationSettings />)
+    await screen.findByText(/Model staat klaar op dit toestel/i)
+    expect(screen.queryByText(/het model blijft bewaard/i)).toBeNull()
+    expect(screen.queryByText(/Bij ruimtegebrek kan het model verwijderd worden/i)).toBeNull()
   })
 })
