@@ -1,9 +1,9 @@
 ---
-status: accepted
+id: 0049-role-kolom-hardening-guard-triggers
+title: 'Rol-kolom-hardening via guard-triggers op profiles en household_members (retrospectieve vastlegging)'
+status: aanvaard
 date: 2026-07-19
-elements:
-  - technology-supabase
-  - data-profiles
+elements: [t-supabase]
 ---
 
 # 0049 — Rol-kolom-hardening via guard-triggers (retrospectieve vastlegging)
