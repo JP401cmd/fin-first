@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-17T21:58:09.771Z",
-  "generatedDate": "2026-07-17",
+  "generatedAt": "2026-07-19T11:21:38.274Z",
+  "generatedDate": "2026-07-19",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -191,8 +191,8 @@
     "routesProduction": 100,
     "api": 253,
     "tables": 84,
-    "migrations": 142,
-    "integrations": 25,
+    "migrations": 146,
+    "integrations": 24,
     "components": 855,
     "providers": 11,
     "contextBuilders": 9,
@@ -7217,7 +7217,7 @@
         "migration": "supabase/migrations/20260501000001_create_external_connections.sql"
       }
     ],
-    "migrationCount": 142
+    "migrationCount": 146
   },
   "tablesByDomain": [
     {
@@ -8670,10 +8670,6 @@
       "category": "AI"
     },
     {
-      "name": "OpenRouter",
-      "category": "AI"
-    },
-    {
       "name": "Vercel AI SDK",
       "category": "AI"
     },
@@ -9411,28 +9407,6 @@
         {
           "name": "profiles",
           "write": true
-        }
-      ],
-      "dividends": [
-        {
-          "name": "assets",
-          "write": false
-        },
-        {
-          "name": "investment_holdings",
-          "write": false
-        },
-        {
-          "name": "investment_transactions",
-          "write": false
-        },
-        {
-          "name": "transactions",
-          "write": false
-        },
-        {
-          "name": "valuations",
-          "write": false
         }
       ],
       "export": [
@@ -10882,14 +10856,6 @@
           ]
         },
         {
-          "domain": "dividends",
-          "label": "dividends",
-          "write": false,
-          "routes": [
-            "/api/dividends"
-          ]
-        },
-        {
           "domain": "export",
           "label": "export",
           "write": false,
@@ -11275,14 +11241,6 @@
           "write": false,
           "routes": [
             "/api/detect-recurring"
-          ]
-        },
-        {
-          "domain": "dividends",
-          "label": "dividends",
-          "write": false,
-          "routes": [
-            "/api/dividends"
           ]
         },
         {
@@ -12317,14 +12275,6 @@
           ]
         },
         {
-          "domain": "dividends",
-          "label": "dividends",
-          "write": false,
-          "routes": [
-            "/api/dividends"
-          ]
-        },
-        {
           "domain": "investment",
           "label": "investment",
           "write": false,
@@ -12375,14 +12325,6 @@
           ]
         },
         {
-          "domain": "dividends",
-          "label": "dividends",
-          "write": false,
-          "routes": [
-            "/api/dividends"
-          ]
-        },
-        {
           "domain": "goals",
           "label": "Doelen",
           "write": false,
@@ -12414,14 +12356,6 @@
           "write": false,
           "routes": [
             "/api/benchmark-comparison"
-          ]
-        },
-        {
-          "domain": "dividends",
-          "label": "dividends",
-          "write": false,
-          "routes": [
-            "/api/dividends"
           ]
         },
         {
@@ -14438,6 +14372,29 @@
       ],
       "summary": "Tijdens de besloten testfase mag alleen wie is uitgenodigd een account aanmaken. Elke nieuwe registratie (e-mail/wachtwoord én Google-OAuth) wordt geweigerd tenzij het genormaliseerde adres (`lower(trim(email))`, exacte match) op `public.signup_email_allowlist` staat. Bestaande a",
       "file": "docs/adr/0047-email-whitelist-testfase.md"
+    },
+    {
+      "id": "0048-rls-performance-sanering-initplan-consolidatie",
+      "title": "RLS-performance-sanering: auth-initplan-rewrite, permissive-policy-consolidatie en FK-indexen (semantiek ongewijzigd)",
+      "status": "aanvaard",
+      "date": "2026-07-19",
+      "elements": [
+        "t-supabase",
+        "t-platform"
+      ],
+      "summary": "De Supabase performance-advisor meldde op de live database (19 jul 2026) een grote hoeveelheid RLS-overhead die direct doortelt in de TTFB — elke `/overzicht`-SSR doet ~90-105 queries, dus per-query- en per-rij-kosten vermenigvuldigen:",
+      "file": "docs/adr/0048-rls-performance-sanering-initplan-consolidatie.md"
+    },
+    {
+      "id": "0049-role-kolom-hardening-guard-triggers",
+      "title": "Rol-kolom-hardening via guard-triggers op profiles en household_members (retrospectieve vastlegging)",
+      "status": "aanvaard",
+      "date": "2026-07-19",
+      "elements": [
+        "t-supabase"
+      ],
+      "summary": "De security-audit bij de RLS-performance-sanering (ADR 0048) markeerde een plausibel escalatie-gat: de own-row-policies op `profiles` en `household_members` beperken alleen de rij, niet de kolommen — een ingelogde gebruiker zou in theorie zijn eigen `role` naar `superadmin` (prof",
+      "file": "docs/adr/0049-role-kolom-hardening-guard-triggers.md"
     }
   ],
   "churn": {
@@ -14445,35 +14402,35 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 98
+        "commits": 101
+      },
+      {
+        "path": "lib/ai",
+        "commits": 40
       },
       {
         "path": "app/(app)/toekomst",
         "commits": 38
       },
       {
-        "path": "lib/ai",
-        "commits": 37
-      },
-      {
         "path": "app/api/ai",
-        "commits": 14
+        "commits": 15
       },
       {
         "path": "app/api/household",
-        "commits": 13
+        "commits": 14
+      },
+      {
+        "path": "lib/horizon-data.ts",
+        "commits": 9
       },
       {
         "path": "lib/fire-simulation.ts",
         "commits": 8
       },
       {
-        "path": "lib/horizon-data.ts",
-        "commits": 8
-      },
-      {
         "path": "app/api/assets",
-        "commits": 3
+        "commits": 4
       },
       {
         "path": "components/horizon",
@@ -14481,14 +14438,14 @@
       },
       {
         "path": "app/api/budgets",
-        "commits": 1
+        "commits": 2
       }
     ],
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 8386,
-        "commits": 83
+        "loc": 8389,
+        "commits": 86
       },
       {
         "file": "components/app/budgets-client.tsx",
@@ -14498,7 +14455,7 @@
       {
         "file": "components/core/assets-client.tsx",
         "loc": 4302,
-        "commits": 44
+        "commits": 45
       },
       {
         "file": "components/app/cash-account-view.tsx",
@@ -14513,12 +14470,12 @@
       {
         "file": "lib/horizon-data.ts",
         "loc": 2461,
-        "commits": 8
+        "commits": 9
       },
       {
         "file": "lib/dashboard-data-loader.ts",
-        "loc": 2384,
-        "commits": 34
+        "loc": 2392,
+        "commits": 36
       },
       {
         "file": "app/(app)/core/checkin/page.tsx",
@@ -15310,11 +15267,11 @@
     "hasChanges": true,
     "sections": [
       {
-        "label": "Componenten (aantal)",
-        "added": [
-          "+9"
-        ],
-        "removed": []
+        "label": "Integraties",
+        "added": [],
+        "removed": [
+          "OpenRouter"
+        ]
       }
     ]
   },
@@ -15489,6 +15446,13 @@
     },
     {
       "date": "2026-07-17",
+      "api": 253,
+      "components": 855,
+      "tables": 84,
+      "routesProduction": 100
+    },
+    {
+      "date": "2026-07-19",
       "api": 253,
       "components": 855,
       "tables": 84,

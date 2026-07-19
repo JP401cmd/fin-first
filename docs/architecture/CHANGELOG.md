@@ -445,3 +445,7 @@
 ## 2026-07-17
 
 - **Componenten (aantal)** toegevoegd: +9
+
+## 2026-07-19
+
+- **Integraties** verwijderd: OpenRouter
