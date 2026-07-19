@@ -104,7 +104,7 @@ function formatGb(bytes: number): string {
 /**
  * Best-effort: beschermt de browser deze origin-opslag tegen automatische
  * eviction (navigator.storage.persisted)? `null` = onbekend/niet-ondersteund —
- * dan tonen we niets (geen loze bewering). De ~3,2 GB shards overleven eviction
+ * dan tonen we niets (geen loze bewering). De ~2,0 GB bundel overleeft eviction
  * alleen als dit true is; false is een eerlijke waarschuwing waard.
  */
 async function readStoragePersisted(): Promise<boolean | null> {

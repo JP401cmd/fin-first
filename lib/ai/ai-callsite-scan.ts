@@ -74,15 +74,15 @@ export const AI_CALLSITE_ALLOWLIST: CallsiteAllowlistEntry[] = [
 
 /**
  * True if the source imports the on-device generation session
- * (`loadModelSession` from the local Transformers.js runtime). This is the
+ * (`loadModelSession` from the local LiteRT-LM runtime). This is the
  * WebGPU/Gemma privacy-modus generation callsite (ADR 0043): it builds a prompt
- * from transaction data and runs inference locally. It uses @huggingface/
- * transformers instead of the `ai` package, so the cloud-detector above misses
- * it — this marker brings it under the same guardrail net (it belongs on the
- * allowlist: on-device, no egress, sanitize would strip legitimate signal).
+ * from transaction data and runs inference locally. It uses @litert-lm/core
+ * instead of the `ai` package, so the cloud-detector above misses it — this
+ * marker brings it under the same guardrail net (it belongs on the allowlist:
+ * on-device, no egress, sanitize would strip legitimate signal).
  */
 export function importsLocalGeneration(source: string): boolean {
-  const re = /import\s*(?:type\s+)?\{([^}]*)\}\s*from\s*['"][^'"]*transformers-runtime['"]/g
+  const re = /import\s*(?:type\s+)?\{([^}]*)\}\s*from\s*['"][^'"]*litert-runtime['"]/g
   let m: RegExpExecArray | null
   while ((m = re.exec(source)) !== null) {
     if (/\bloadModelSession\b/.test(m[1])) return true

@@ -144,7 +144,7 @@ describe('LocalCategorizationSettings', () => {
 
   it('verwijderen: deleteLocalModel + POST false', async () => {
     profileRow = { ai_enabled: true, privacy_mode: true, active_subscriptions: ['ai'] }
-    mocks.getLocalModelState.mockResolvedValue({ state: 'klaar', bytes: 3.2e9 })
+    mocks.getLocalModelState.mockResolvedValue({ state: 'klaar', bytes: 2.0e9 })
     mocks.deleteLocalModel.mockResolvedValue(undefined)
 
     render(<LocalCategorizationSettings />)
@@ -192,7 +192,7 @@ describe('LocalCategorizationSettings', () => {
 
   it('zonder AI-tier maar privé-modus al aan: uitzetten blijft mogelijk (toggle niet disabled)', async () => {
     profileRow = { ai_enabled: true, privacy_mode: true, active_subscriptions: [] }
-    mocks.getLocalModelState.mockResolvedValue({ state: 'klaar', bytes: 3.2e9 })
+    mocks.getLocalModelState.mockResolvedValue({ state: 'klaar', bytes: 2.0e9 })
 
     render(<LocalCategorizationSettings />)
     const toggle = await screen.findByRole('switch', { name: /Lokale transactiecategorisatie/i })
@@ -206,7 +206,7 @@ describe('LocalCategorizationSettings', () => {
 
   it('verlopen abonnement met privé-modus aan: eerlijke verlopen-notice in het beheer-blok', async () => {
     profileRow = { ai_enabled: true, privacy_mode: true, active_subscriptions: [] }
-    mocks.getLocalModelState.mockResolvedValue({ state: 'klaar', bytes: 3.2e9 })
+    mocks.getLocalModelState.mockResolvedValue({ state: 'klaar', bytes: 2.0e9 })
 
     render(<LocalCategorizationSettings />)
     // Beheer-blok verschijnt (model klaar); de subtiele verlopen-melding staat erin.
@@ -215,7 +215,7 @@ describe('LocalCategorizationSettings', () => {
 
   it('opslagbescherming actief: beheer-blok meldt dat het model bewaard blijft', async () => {
     profileRow = { ai_enabled: true, privacy_mode: true, active_subscriptions: ['ai'] }
-    mocks.getLocalModelState.mockResolvedValue({ state: 'klaar', bytes: 3.2e9 })
+    mocks.getLocalModelState.mockResolvedValue({ state: 'klaar', bytes: 2.0e9 })
     setStorageManager(true)
 
     render(<LocalCategorizationSettings />)
@@ -225,7 +225,7 @@ describe('LocalCategorizationSettings', () => {
 
   it('opslag niet beschermd: beheer-blok toont de eviction-waarschuwing', async () => {
     profileRow = { ai_enabled: true, privacy_mode: true, active_subscriptions: ['ai'] }
-    mocks.getLocalModelState.mockResolvedValue({ state: 'klaar', bytes: 3.2e9 })
+    mocks.getLocalModelState.mockResolvedValue({ state: 'klaar', bytes: 2.0e9 })
     setStorageManager(false)
 
     render(<LocalCategorizationSettings />)
@@ -235,7 +235,7 @@ describe('LocalCategorizationSettings', () => {
 
   it('opslagbescherming onbekend (geen persisted-API): geen extra regel', async () => {
     profileRow = { ai_enabled: true, privacy_mode: true, active_subscriptions: ['ai'] }
-    mocks.getLocalModelState.mockResolvedValue({ state: 'klaar', bytes: 3.2e9 })
+    mocks.getLocalModelState.mockResolvedValue({ state: 'klaar', bytes: 2.0e9 })
     setStorageManager(null)
 
     render(<LocalCategorizationSettings />)

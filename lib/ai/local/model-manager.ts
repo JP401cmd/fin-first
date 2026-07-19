@@ -4,7 +4,7 @@
 // op /mijn/privacy (parallelle agent) én voor de categorisatie-sheet, die de
 // staat leest om te beslissen of het lokale pad beschikbaar is.
 //
-// Bewust dynamische import van de runtime: de zware Transformers.js-bundel komt
+// Bewust dynamische import van de runtime: de zware LiteRT-LM/WASM-bundel komt
 // pas binnen bij een echte download/inferentie, niet bij het lezen van de staat.
 
 export type LocalModelState = 'niet-gedownload' | 'downloaden' | 'klaar' | 'fout'
@@ -16,11 +16,11 @@ export type LocalModelProgress = {
 }
 
 /**
- * Gemeten download-omvang (GB) uit het fase-0-meetrapport (per-module q4f16,
- * tekst-only kern + kleine vision/audio-shards). Getoond in de consent-stap als
- * eerlijke verwachting — geen aanname meer.
+ * Gemeten download-omvang (GB) uit het L1-meetrapport (LiteRT-LM .litertlm
+ * webbundel, gemeten 2,01 GB). Getoond in de consent-stap als eerlijke
+ * verwachting — geen aanname.
  */
-export const LOCAL_MODEL_DOWNLOAD_GB = 3.2
+export const LOCAL_MODEL_DOWNLOAD_GB = 2.0
 
 // In-memory staat voor de duur van deze pagina/sessie. Een lopende download
 // ('downloaden') of een zojuist gefaalde poging ('fout') is niet uit de Cache
@@ -42,7 +42,7 @@ export async function getLocalModelState(): Promise<{ state: LocalModelState; by
     return { state: transientState, bytes: null }
   }
   try {
-    const { isModelCached } = await import('./transformers-runtime')
+    const { isModelCached } = await import('./litert-runtime')
     const cached = await isModelCached()
     return { state: cached ? 'klaar' : 'niet-gedownload', bytes: null }
   } catch {
@@ -59,10 +59,10 @@ export async function getLocalModelState(): Promise<{ state: LocalModelState; by
 export async function downloadLocalModel(onProgress: (p: LocalModelProgress) => void): Promise<void> {
   transientState = 'downloaden'
   try {
-    const { loadModelSession } = await import('./transformers-runtime')
+    const { loadModelSession } = await import('./litert-runtime')
     await loadModelSession((p) => onProgress(p))
 
-    // Persistente opslag aanvragen zodat de ~3,2 GB shards behouden blijven.
+    // Persistente opslag aanvragen zodat de ~2,0 GB bundel behouden blijft.
     try {
       if (typeof navigator !== 'undefined' && navigator.storage?.persist) {
         await navigator.storage.persist()
@@ -80,7 +80,7 @@ export async function downloadLocalModel(onProgress: (p: LocalModelProgress) => 
 
 /** Verwijder het model uit de cache en ontkoppel de sessie ("model verwijderen"). */
 export async function deleteLocalModel(): Promise<void> {
-  const { clearModelCache, disposeSession } = await import('./transformers-runtime')
+  const { clearModelCache, disposeSession } = await import('./litert-runtime')
   await disposeSession()
   await clearModelCache()
   transientState = null
