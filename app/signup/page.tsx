@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
 import { translateAuthError, isUserAlreadyRegisteredError } from '@/lib/auth-errors'
 import { GoogleAuthButton } from '@/components/auth/google-auth-button'
 
@@ -31,6 +30,10 @@ export default function SignupPage() {
     setError(null)
 
     try {
+      // Dynamische import: houdt de Supabase-browser-SDK (@supabase/ssr →
+      // supabase-js) uit het first-load-chunk van /signup. De factory laadt pas
+      // bij de eerste submit — zelfde createClient(), zelfde gedrag.
+      const { createClient } = await import('@/lib/supabase/client')
       const supabase = createClient()
       const next = checkNext
       const { error } = await supabase.auth.signUp({

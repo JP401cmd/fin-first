@@ -3,7 +3,6 @@
 import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
 import { safeRelativePath } from '@/lib/safe-redirect'
 import { translateAuthError } from '@/lib/auth-errors'
 import { GoogleAuthButton } from '@/components/auth/google-auth-button'
@@ -32,6 +31,10 @@ function LoginForm() {
     setError(null)
 
     try {
+      // Dynamische import: houdt de Supabase-browser-SDK (@supabase/ssr →
+      // supabase-js) uit het first-load-chunk van /login. De factory laadt pas
+      // bij de eerste submit — zelfde createClient(), zelfde gedrag.
+      const { createClient } = await import('@/lib/supabase/client')
       const supabase = createClient()
       const { error } = await supabase.auth.signInWithPassword({
         email,

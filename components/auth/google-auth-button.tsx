@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { translateAuthError } from '@/lib/auth-errors'
 
 /**
@@ -45,6 +44,10 @@ export function GoogleAuthButton({
     setLoading(true)
     setError(null)
     try {
+      // Dynamische import: houdt de Supabase-browser-SDK (@supabase/ssr →
+      // supabase-js) uit het first-load-chunk van /login en /signup (die deze
+      // knop delen). De factory laadt pas bij de klik — zelfde gedrag.
+      const { createClient } = await import('@/lib/supabase/client')
       const supabase = createClient()
       const callback = new URL('/auth/callback', window.location.origin)
       if (next) callback.searchParams.set('next', next)
