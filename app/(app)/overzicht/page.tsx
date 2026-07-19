@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { createClient } from '@/lib/supabase/server'
+import { getCachedUser } from '@/lib/supabase/cached-user'
 import { loadDashboardData } from '@/lib/dashboard-data-loader'
 import { loadWillData } from '@/lib/will-data-loader'
 import { loadHorizonData } from '@/lib/horizon-data-loader'
@@ -59,7 +60,25 @@ export default async function OverzichtPage() {
   // router.refresh() (PerspectiveProvider) met de nieuwe cookie.
   const perspective = await getServerPerspective()
 
-  const [dashboardResult, willData, horizonData, aandachtspunten, leverScoresResult] = await Promise.all([
+  // Eén auth-round-trip vooraf (React cache()): de vijf loaders roepen intern
+  // getCachedUser(supabase) aan, dus dit hoist de call die tóch al als eerste
+  // gebeurt en deelt hem — geen extra stap. Met de user-id vooraf kunnen de
+  // markt-/check-in-briefing én de page-status meteen in dezelfde parallelle
+  // batch als de loaders (voorheen een seriële staart ná de loaders).
+  const authUser = await getCachedUser(supabase)
+  const userId = authUser?.id ?? null
+
+  const [
+    dashboardResult,
+    willData,
+    horizonData,
+    aandachtspunten,
+    leverScoresResult,
+    marketEntry,
+    checkinForBriefing,
+    pageStatusInfo,
+    pageStatusMinimized,
+  ] = await Promise.all([
     loadDashboardData(supabase),
     loadWillData(supabase),
     loadHorizonData(supabase, perspective),
@@ -72,6 +91,17 @@ export default async function OverzichtPage() {
     // tweede scoringssysteem). `cache()` dedupliceert binnen het request, dus dit
     // hergebruikt de query-set die de shell-layout al uitvoert.
     loadLeverScores(supabase, perspective),
+    // Markt-briefje (read-only uit de nieuws-cache; triggert geen generatie) +
+    // laatste check-in-reflectie. Hangen alleen van de user-id af → parallel met
+    // de loaders i.p.v. een aparte await-stap. Defaults bij geen user: null /
+    // undefined (byte-identiek aan de vorige `[null, undefined]`-fallback).
+    userId ? loadTopMarketBriefing(supabase, userId) : Promise.resolve(null),
+    userId ? loadLatestCheckinForBriefing(supabase, userId) : Promise.resolve(undefined),
+    // Status-duiding-banner-seed: consumeert dezelfde loadDashboardData
+    // (React-cache() → gratis) en hangt verder alleen van de route/user-id af.
+    // Meelopen in deze batch scheelt twee seriële round-trips aan het eind.
+    computePageStatusInfo(supabase, '/overzicht'),
+    userId ? readMinimizedLevel(supabase, userId, '/overzicht') : Promise.resolve(null),
   ])
 
   const {
@@ -100,8 +130,6 @@ export default async function OverzichtPage() {
   const currentAge = dob ? Math.round(ageAtDate(dob)) : null
   const endAge = horizonData?.fireStrategy?.endAge ?? null
   const isPensioenMode = horizonData?.fireStrategy?.strategy === 'pensioen'
-
-  const { data: authUser } = await supabase.auth.getUser()
 
   // Liquide cash = niet-gekoppelde bank-accounts + cash/savings-typed
   // assets. Basis voor de CompoundInsightCard (plan T-4) zodat we
@@ -157,13 +185,8 @@ export default async function OverzichtPage() {
   // loaders; de snapshot zet hem vast en bepaalt de "Bijgewerkt …"-stempel.
   // Valt terug op vers-gecomposeerde briefjes wanneer de gebruiker (nog) niet
   // bekend is of de snapshot-kolom ontbreekt (graceful degradation).
-  // Markt-briefje (read-only uit de nieuws-cache; triggert geen generatie).
-  const [marketEntry, checkinForBriefing] = authUser.user?.id
-    ? await Promise.all([
-        loadTopMarketBriefing(supabase, authUser.user.id),
-        loadLatestCheckinForBriefing(supabase, authUser.user.id),
-      ])
-    : [null, undefined]
+  // `marketEntry`/`checkinForBriefing` komen uit de parallelle batch bovenaan
+  // (voorheen een aparte await-stap hier).
   // In huishoud-/partnerweergave compose't de briefing met de perspectief-
   // inkomsten/-uitgaven, zodat spaarquote- en vrijheidsdagen-briefjes dezelfde
   // basis gebruiken als de hero-tegels. Vermogensverloop/recommendations
@@ -212,7 +235,7 @@ export default async function OverzichtPage() {
   // weekverhaal en de freeze schrijft naar de eigen rij. In huishoud-/partner-
   // weergave geen snapshot-write; freedomHero wordt live uit het perspectief
   // berekend (currentNetWorth + perspectief-uitgaven hierboven).
-  if (authUser.user?.id && perspective === 'personal') {
+  if (userId && perspective === 'personal') {
     // NB: bij het eerste bezoek van een nieuwe ISO-week schrijft dit de
     // snapshot weg tíjdens de RSC-render. Dat is bewust en veilig: het is een
     // pure data-`.update()` (zet geen cookies, dus geen "cookies can only be
@@ -222,7 +245,7 @@ export default async function OverzichtPage() {
     // blijven en nooit met een sessie-refresh gecombineerd worden.
     const { snapshot } = await getOrCreateWeeklySnapshot(
       supabase,
-      authUser.user.id,
+      userId,
       composedBriefing,
       {
         freedom: {
@@ -298,12 +321,8 @@ export default async function OverzichtPage() {
   // overbodige eerste client-fetch naar /api/overzicht/page-status ná hydration
   // overslaan (−~25 queries + −1 λ per /overzicht-bezoek). De API-route blijft
   // bestaan voor client-side her-fetches bij route-wissel binnen /overzicht.
-  const [pageStatusInfo, pageStatusMinimized] = await Promise.all([
-    computePageStatusInfo(supabase, '/overzicht'),
-    authUser.user?.id
-      ? readMinimizedLevel(supabase, authUser.user.id, '/overzicht')
-      : Promise.resolve(null),
-  ])
+  // `pageStatusInfo`/`pageStatusMinimized` komen uit de parallelle batch bovenaan
+  // (voorheen een aparte await-stap aan het eind van deze render).
 
   return (
     <>

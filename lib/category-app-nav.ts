@@ -15,10 +15,13 @@ import { ASSET_TYPE_LABELS, ASSET_TYPE_ICONS } from '@/lib/asset-data'
 import type { DebtType, Debt } from '@/lib/debt-data'
 import { DEBT_TYPE_LABELS, DEBT_TYPE_ICONS } from '@/lib/debt-data'
 import type { ModuleId } from '@/lib/module-registry'
+// Import de pure key-/data-laag rechtstreeks (niet via de registry): die
+// registry sleept vier zware tab-componenten mee, en deze helper draait in de
+// shell op elke (app)-route. Zie @/lib/category-deepening-keys (perf-fase-1).
 import {
   CATEGORY_DEEPENINGS,
   getDeepeningSlug,
-} from '@/components/core/category-deepening-registry'
+} from '@/lib/category-deepening-keys'
 
 // ── Public types ─────────────────────────────────────────────
 

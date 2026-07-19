@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
+import { getCachedUser } from '@/lib/supabase/cached-user'
 import { ChatProvider } from '@/components/app/chat/chat-provider'
 import { ChatPanelLazy } from '@/components/app/chat/chat-panel-lazy'
 import { ChatPromptDeeplink } from '@/components/app/chat/chat-prompt-deeplink'
@@ -25,7 +26,7 @@ import { CommandPaletteProvider } from '@/components/command-palette/command-pal
 import { computeFeatureAccess } from '@/lib/compute-feature-access'
 import { ALL_MODULES } from '@/lib/module-registry'
 import type { ModuleId } from '@/lib/module-registry'
-import { getActiveAppKeys } from '@/components/core/category-deepening-registry'
+import { getActiveAppKeys } from '@/lib/category-deepening-keys'
 import {
   buildCategoryAppLinks,
   projectAssetForCategoryNav,
@@ -69,7 +70,10 @@ export default async function AppLayout({
   children: React.ReactNode
 }) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  // getCachedUser (React cache()) i.p.v. supabase.auth.getUser(): deelt de
+  // JWT-validate-round-trip met loadLeverScores() verderop (dat óók
+  // getCachedUser(supabase) aanroept) — één auth-call per request i.p.v. twee.
+  const user = await getCachedUser(supabase)
 
   if (!user) {
     // The proxy middleware normally handles auth redirects with redirectTo param.
@@ -80,6 +84,14 @@ export default async function AppLayout({
   const threeMonthsAgo = new Date()
   threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
   const dateStr = threeMonthsAgo.toISOString().split('T')[0]
+
+  // Cutoff voor de holdings-staleness-dots — vooraf berekend zodat de twee
+  // staleness-tellingen in de hoofdbatch hieronder mee kunnen (i.p.v. een
+  // tweede seriële round-trip ná de batch). De app-gate (`sidebarActiveAppKeys`)
+  // verschuift naar de boolean-afleiding — het gedrag blijft identiek.
+  const staleCutoffIso = new Date(
+    Date.now() - HOLDINGS_STALE_DAYS * 24 * 60 * 60 * 1000,
+  ).toISOString()
 
   // ── Active modules ────────────────────────────────────
   // Module-toggle is verwijderd uit Trifinity (zie /mijn/geavanceerd).
@@ -110,6 +122,8 @@ export default async function AppLayout({
     coachTxRes,
     coachHoldingsRes,
     coachLifeEventsRes,
+    aandelenStaleRes,
+    cryptoStaleRes,
   ] = await Promise.all([
     // profile-select bevat velden voor sidebar/feature-access/theming.
     // expected_return + inflation_rate voeden de coach-data-gap `hasFireParams`
@@ -169,6 +183,25 @@ export default async function AppLayout({
     coachHasFireModule
       ? supabase.from('life_events').select('id, event_type').eq('user_id', user.id).eq('is_active', true)
       : Promise.resolve(null),
+    // Holdings-staleness-tellingen (sidebar-dot). Voorheen een aparte seriële
+    // Promise.all ná de batch, gate-d op `sidebarActiveAppKeys`. Hier
+    // ONGEGATE meegenomen (head-only count, minimale payload); de app-gate
+    // verschuift naar de boolean-afleiding hieronder zodat de uitkomst
+    // (`sidebarAandelenStale`/`sidebarCryptoStale`) byte-identiek blijft — één
+    // waterfall-stap minder. De koers is "verouderd" als de jongste
+    // last_price_update ouder is dan HOLDINGS_STALE_DAYS.
+    supabase
+      .from('investment_holdings')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .lt('last_price_update', staleCutoffIso),
+    supabase
+      .from('crypto_holdings')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .lt('last_price_update', staleCutoffIso),
   ])
 
   const platformStatus = parsePlatformStatus(platformStatusRes.data?.value as string | undefined)
@@ -215,33 +248,18 @@ export default async function AppLayout({
     debtRows as unknown as Debt[],
   )
 
-  // ── Sidebar status-dots: holdings-staleness (gated op actieve app) ──────
-  // Alleen querien wanneer de bijbehorende holdings-app daadwerkelijk in de
-  // sidebar staat (egress-besparing). De koers is "verouderd" als de jongste
-  // last_price_update ouder is dan HOLDINGS_STALE_DAYS. Head-only count.
-  const staleCutoffIso = new Date(
-    Date.now() - HOLDINGS_STALE_DAYS * 24 * 60 * 60 * 1000,
-  ).toISOString()
-  const [aandelenStaleRes, cryptoStaleRes] = await Promise.all([
-    sidebarActiveAppKeys.includes('aandelen-holdings')
-      ? supabase
-          .from('investment_holdings')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', user.id)
-          .eq('is_active', true)
-          .lt('last_price_update', staleCutoffIso)
-      : Promise.resolve(null),
-    sidebarActiveAppKeys.includes('crypto-holdings')
-      ? supabase
-          .from('crypto_holdings')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', user.id)
-          .eq('is_active', true)
-          .lt('last_price_update', staleCutoffIso)
-      : Promise.resolve(null),
-  ])
-  const sidebarAandelenStale = (aandelenStaleRes?.count ?? 0) > 0
-  const sidebarCryptoStale = (cryptoStaleRes?.count ?? 0) > 0
+  // ── Sidebar status-dots: holdings-staleness (app-gated afleiding) ──────
+  // De tellingen (`aandelenStaleRes`/`cryptoStaleRes`) draaiden mee in de
+  // hoofdbatch hierboven. De app-gate staat hier: een dot vuurt alleen wanneer
+  // de bijbehorende holdings-app daadwerkelijk in de sidebar staat — identiek
+  // aan het oude `sidebarActiveAppKeys.includes(...)`-gedrag, alleen verplaatst
+  // van de query naar de afleiding (de query zelf is nu ongegate maar head-only).
+  const sidebarAandelenStale =
+    sidebarActiveAppKeys.includes('aandelen-holdings') &&
+    (aandelenStaleRes.count ?? 0) > 0
+  const sidebarCryptoStale =
+    sidebarActiveAppKeys.includes('crypto-holdings') &&
+    (cryptoStaleRes.count ?? 0) > 0
 
   // ── Sidebar status-dot: hypotheek-renteherziening (gratis, app-gated) ───
   // Rentevaste periode van een hypotheek loopt af binnen RATE_RESET_MONTHS
