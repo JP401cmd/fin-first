@@ -45,8 +45,8 @@ De `tester` schrijft unit-/component-tests en (waar end-to-end) een regression-s
 ### 7. Review — `code-review` + `ux-review-expert` + `security-specialist`
 `code-review` voor correctheid/kwaliteit; `ux-review-expert` voor UI-consistentie en gebruikerservaring tegen het designsysteem. Raakt de feature data-toegang, auth, routes, AI-context, secrets of admin-paden (bij twijfel: ja), dan draait de `security-specialist` zijn ship-gate-checklist — een 🔴-bevinding blokkeert tot opgelost.
 
-### 8. Architectuurplaten bijwerken — `architecture-docs-keeper` + fit-review `architect`
-`architecture-docs-keeper` werkt de vier views van `/beheer/architectuur` bij (ArchiMate-topologie/relaties/flows, HLD-capability, ERD via migraties, Berekeningen) en regenereert facts (`npm run arch:diagram`); suites groen. De `architect` doet de eind-fit-review: past het, klopt de ADR, is een concern nodig of opgelost.
+### 8. Architectuur- & UAT-definities bijwerken — `architecture-docs-keeper` + `uat-docs-keeper` + fit-review `architect`
+`architecture-docs-keeper` werkt de vier views van `/beheer/architectuur` bij (ArchiMate-topologie/relaties/flows, HLD-capability, ERD via migraties, Berekeningen) en regenereert facts (`npm run arch:diagram`); suites groen. Parallel landt `uat-docs-keeper` de acceptatiecriteria (Given/When/Then) uit stap 2 in de UAT-definities: een scenario in `lib/uat/catalog.ts` + een `AcceptanceCriterion` in `lib/uat/acceptance/<zone>.ts` + een node in `flows/<zone>.ts`, zodat de nieuwe functie bij ship al in de UAT-plaat staat — **definities vastleggen, niet uitvoeren (dat is `/uat`)**. De `architect` doet de eind-fit-review: past het, klopt de ADR, is een concern nodig of opgelost.
 
 ## Afronding
 Lever op: de feature(s) in de backlog, het requirement-spec, het architectuurbesluit (ADR), wat gebouwd is, groene tests/reviews en de bijgewerkte platen. Benoem next steps en restrisico. Sluit daarna af met de zelfverbeterings-slotstap uit de gedeelde conventies.

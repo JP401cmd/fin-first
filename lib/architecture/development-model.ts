@@ -201,6 +201,11 @@ export const AGENT_CURATION: Record<string, AgentCuration> = {
     rol: 'Maakt van een vage klacht een compleet, reproduceerbaar bugrapport — fixt niet, documenteert.',
     inzet: 'Wanneer een bug gemeld of waargenomen is en je een scherpe write-up wilt vóór de fix.',
   },
+  'uat-docs-keeper': {
+    groupId: 'kwaliteit',
+    rol: 'Houdt de UAT-definities (acceptatiecriteria, scenario’s en flows in lib/uat) in sync met de code — werkt bij en voegt toe, voert niet uit.',
+    inzet: 'Bij release (UAT-sync-poort) of tijdens het bouwen wanneer een wijziging geteste zones raakt; de live-run blijft /uat.',
+  },
   // ── onderzoek ──
   'deep-dive': {
     groupId: 'onderzoek',

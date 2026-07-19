@@ -14,6 +14,8 @@
     "lint": "eslint",
     "audit:kpi-actions": "node scripts/audit-kpi-actions.mjs",
     "arch:diagram": "node scripts/architecture/generate.mjs",
+    "arch:check": "node scripts/architecture/generate.mjs --check",
+    "uat:stale": "node scripts/uat/stale-scan.mjs",
     "db:pull": "npx supabase db pull",
     "db:push": "npx supabase db push",
     "db:diff": "npx supabase db diff",

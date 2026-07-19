@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-17T21:58:09.771Z",
-  "generatedDate": "2026-07-17",
+  "generatedAt": "2026-07-19T11:22:33.073Z",
+  "generatedDate": "2026-07-19",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -14448,32 +14448,32 @@
         "commits": 98
       },
       {
+        "path": "lib/ai",
+        "commits": 41
+      },
+      {
         "path": "app/(app)/toekomst",
         "commits": 38
       },
       {
-        "path": "lib/ai",
-        "commits": 37
-      },
-      {
         "path": "app/api/ai",
-        "commits": 14
+        "commits": 15
       },
       {
         "path": "app/api/household",
-        "commits": 13
+        "commits": 14
+      },
+      {
+        "path": "lib/horizon-data.ts",
+        "commits": 9
       },
       {
         "path": "lib/fire-simulation.ts",
         "commits": 8
       },
       {
-        "path": "lib/horizon-data.ts",
-        "commits": 8
-      },
-      {
         "path": "app/api/assets",
-        "commits": 3
+        "commits": 5
       },
       {
         "path": "components/horizon",
@@ -14481,14 +14481,14 @@
       },
       {
         "path": "app/api/budgets",
-        "commits": 1
+        "commits": 2
       }
     ],
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
         "loc": 8386,
-        "commits": 83
+        "commits": 84
       },
       {
         "file": "components/app/budgets-client.tsx",
@@ -14498,7 +14498,7 @@
       {
         "file": "components/core/assets-client.tsx",
         "loc": 4302,
-        "commits": 44
+        "commits": 45
       },
       {
         "file": "components/app/cash-account-view.tsx",
@@ -14513,12 +14513,12 @@
       {
         "file": "lib/horizon-data.ts",
         "loc": 2461,
-        "commits": 8
+        "commits": 9
       },
       {
         "file": "lib/dashboard-data-loader.ts",
-        "loc": 2384,
-        "commits": 34
+        "loc": 2386,
+        "commits": 35
       },
       {
         "file": "app/(app)/core/checkin/page.tsx",
@@ -14645,6 +14645,13 @@
         "id": "tester",
         "name": "tester",
         "description": "Use this agent to write, run, debug and review tests for TriFinity, and to verify that a change actually works before it's called done. It owns the two test layers: unit/component tests with Vitest (`*.test.ts` / `*.test.tsx`, run via `npm run test:run`) and the in-app regression framework (`lib/regression-tests/suites/*` — 80+ suites, registered via `registerTest`/`registerCategory`). Use it after any non-trivial change, when coverage is missing, when a bug needs a reproducing test, or when tests are failing and need diagnosis.",
+        "model": "sonnet",
+        "color": "green"
+      },
+      {
+        "id": "uat-docs-keeper",
+        "name": "uat-docs-keeper",
+        "description": "Use this agent to keep TriFinity's UAT definitions (lib/uat/**) in sync with code changes — the acceptance criteria (Given/When/Then), the scenario/zone catalog and the process-flow graphs. It is the UAT twin of `architecture-docs-keeper`: it UPDATES and ADDS definitions to match what the code now does, but it NEVER executes the live UAT run (that is the `/uat` command, when a zone is tested again). Use it in the release pipeline's UAT-sync gate, or while building a feature, whenever a change touches a tested zone's behaviour or user-facing surface.",
         "model": "sonnet",
         "color": "green"
       },
@@ -14924,9 +14931,10 @@
           },
           {
             "index": 9,
-            "title": "Platen synchroniseren",
+            "title": "Platen & UAT-definities synchroniseren",
             "agents": [
               "architecture-docs-keeper",
+              "uat-docs-keeper",
               "architect"
             ]
           }
@@ -15051,9 +15059,10 @@
           },
           {
             "index": 8,
-            "title": "Architectuurplaten bijwerken",
+            "title": "Architectuur- & UAT-definities bijwerken",
             "agents": [
               "architecture-docs-keeper",
+              "uat-docs-keeper",
               "architect"
             ]
           }
@@ -15168,11 +15177,18 @@
           },
           {
             "index": 7,
+            "title": "UAT-definitiesynchronisatie",
+            "agents": [
+              "uat-docs-keeper"
+            ]
+          },
+          {
+            "index": 8,
             "title": "Build & echte verificatie",
             "agents": []
           },
           {
-            "index": 8,
+            "index": 9,
             "title": "Review",
             "agents": [
               "calc-engine-specialist",
@@ -15185,12 +15201,12 @@
             ]
           },
           {
-            "index": 9,
+            "index": 10,
             "title": "Ship",
             "agents": []
           },
           {
-            "index": 10,
+            "index": 11,
             "title": "Deploy-verificatie & rollback-pad",
             "agents": []
           }
@@ -15306,17 +15322,9 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-07-17",
-    "hasChanges": true,
-    "sections": [
-      {
-        "label": "Componenten (aantal)",
-        "added": [
-          "+9"
-        ],
-        "removed": []
-      }
-    ]
+    "previousDate": "2026-07-19",
+    "hasChanges": false,
+    "sections": []
   },
   "statsHistory": [
     {
@@ -15489,6 +15497,13 @@
     },
     {
       "date": "2026-07-17",
+      "api": 253,
+      "components": 855,
+      "tables": 84,
+      "routesProduction": 100
+    },
+    {
+      "date": "2026-07-19",
       "api": 253,
       "components": 855,
       "tables": 84,
