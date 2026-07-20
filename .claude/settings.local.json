@@ -151,7 +151,8 @@
       "Bash(ls lib/household/)",
       "Bash(node scripts/uat/stale-scan.mjs lib/format.ts)",
       "Bash(git -C \"c:\\\\Users\\\\janpa\\\\cd\\\\development\\\\fin\" worktree list)",
-      "Bash(git -C \"c:\\\\Users\\\\janpa\\\\cd\\\\development\\\\fin\" branch -a)"
+      "Bash(git -C \"c:\\\\Users\\\\janpa\\\\cd\\\\development\\\\fin\" branch -a)",
+      "Bash(git fetch *)"
     ]
   },
   "enableAllProjectMcpServers": true,

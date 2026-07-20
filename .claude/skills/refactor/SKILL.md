@@ -50,7 +50,7 @@ Volledige `npm run test:run` + lint + relevante regressiesuites. Handmatige clic
 Met als expliciete reviewvraag: is dit een pure move? Elke inhoudelijke wijziging in de diff is een bevinding, hoe goedbedoeld ook.
 
 ### 7. Opruimen & docs — `architecture-docs-keeper` (indien van toepassing)
-Pure herindeling raakt de platen meestal niet, maar: stond er een **aandachtspunt** over dit doelwit in `lib/architecture/archimate-concerns.ts`? Verwijder het zodra opgelost. `npm run arch:diagram` voor de feiten/churn.
+Pure herindeling raakt de platen meestal niet, maar: stond er een **aandachtspunt** over dit doelwit in `lib/architecture/archimate-concerns.ts`? Verwijder het zodra opgelost. `npm run arch:diagram` voor de feiten/churn. Draai óók `npm run arch:boundaries`: een refactor is dé plek waar circulaire deps of laagbreuken ontstaan — de gate faalt alleen op nieuwe grensovertredingen. Loste de refactor bestaande overtredingen op, herbevries dan de baseline (`npm run arch:boundaries:baseline`).
 
 ## Afronding
 Lever op: de nieuwe structuur (welke bestanden ontstonden, hoeveel regels het doelwit nog telt), het vangnet dat nu bestaat, en expliciet **welke verificaties bewijzen dat het gedrag identiek is**. Restpunten (bewust uitgestelde verbeteringen) als aparte lijst — die zijn vervolgwerk, geen onderdeel van deze refactor. Sluit daarna af met de zelfverbeterings-slotstap uit de gedeelde conventies.

@@ -46,6 +46,7 @@ Assess a change against the architecture:
 - **Compliance & philosophy**: no unlicensed financial/tax advice; the freedom-time framing and one-philosophy coherence preserved.
 - **Plate truthfulness**: does this add/remove/rename a domain, module, integration, table, calculation or capability? If so, the four views and ADRs/concerns must move with it — verify (or task `architecture-docs-keeper`) that they do, and that the validation suites stay green.
 - **Decisions**: does this change warrant a new ADR, or invalidate/supersede an existing one? Resolved structural risks must have their concern removed.
+- **Afdwingbare grenzen**: structurele grenzen (lagen, engine-puurheid, geen nieuwe circular-/overlay-drift) worden geratelt door `npm run arch:boundaries` (dependency-cruiser, `.dependency-cruiser.cjs`). Draai het bij een structurele review; een nieuwe overtreding is een blokkerende bevinding. De baseline `.dependency-cruiser-known-violations.json` herbevries je (`npm run arch:boundaries:baseline`) zodra bestaande schuld is opgeruimd.
 
 Give a clear verdict: **fits / fits with changes / doesn't fit** — with reasoning and the specific actions required.
 

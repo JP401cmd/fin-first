@@ -80,3 +80,13 @@ jobs:
       # alleen bestanden, dus CI-veilig.
       - name: Architectuurfeiten-versheid (arch:check)
         run: npm run arch:check
+
+      # Architectuur-grenzen (dependency-cruiser). Broertje van arch:check:
+      # arch:check = "zijn de gescande feiten vers?", arch:boundaries = "heeft
+      # iemand een import-/laaggrens overschreden?". De baseline
+      # (.dependency-cruiser-known-violations.json) bevriest de bestaande
+      # overtredingen; `--ignore-known` laat de gate ALLEEN op NIEUWE falen —
+      # engine-puurheid, laaghygiëne, geen nieuwe circular/overlay-drift.
+      # Bestand-scan, geen DB nodig: CI-veilig.
+      - name: Architectuur-grenzen (arch:boundaries)
+        run: npm run arch:boundaries
