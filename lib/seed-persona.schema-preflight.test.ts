@@ -13,12 +13,16 @@ import { PERSONAS } from './test-personas'
 
 type ProbeError = { code?: string; message?: string } | null
 
-/** Minimale fake die alleen `.from(t).select(...).limit(0)` ondersteunt. */
-function makeClient(errorByTable: Record<string, ProbeError>): SupabaseClient {
+/** Minimale fake die `.from(t).select(cols).limit(0)` ondersteunt en de geprobede kolommen vastlegt. */
+function makeClient(
+  errorByTable: Record<string, ProbeError>,
+  captured?: Record<string, string>,
+): SupabaseClient {
   return {
     from(table: string) {
       return {
-        select() {
+        select(cols: string) {
+          if (captured) captured[table] = cols
           return {
             limit() {
               return Promise.resolve({ error: errorByTable[table] ?? null, data: [] })
@@ -54,5 +58,17 @@ describe('assertSeedSchema · fail-safe vóór de destructieve wipe', () => {
       assets: { message: "Could not find the 'annual_dividend' column of 'assets' in the schema cache" },
     })
     await expect(assertSeedSchema(client, 'user-1', persona)).rejects.toBeInstanceOf(SeedSchemaError)
+  })
+
+  it('dekt BEIDE assets-producers: de assets-probe bevat óók de cash-asset-only kolommen (review-H1)', async () => {
+    const captured: Record<string, string> = {}
+    await assertSeedSchema(makeClient({}, captured), 'user-1', persona)
+    // Kolommen die alleen de cash-asset-producer (buildSeedCashAssetRow) schrijft,
+    // niet buildSeedAssetRow — de eerste post-wipe insert. Deze MOETEN geprobed zijn.
+    for (const col of ['account_number', 'ownership', 'net_worth_inclusion_pct', 'has_budget_tracking']) {
+      expect(captured.assets).toContain(col)
+    }
+    // En de tweede debts-writer (linked_asset_id-update).
+    expect(captured.debts).toContain('linked_asset_id')
   })
 })
