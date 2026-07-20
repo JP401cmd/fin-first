@@ -65,6 +65,20 @@ const SECURITY_HEADERS = [
 // webpack-based `@serwist/next` plugin can't hook into. Configurator-mode
 // keeps the SW build framework-agnostic and Turbopack-compatible.
 const nextConfig: NextConfig = {
+  /**
+   * React Compiler (ADR 0055 — fase 4, T4.3). Automatische, correcte
+   * memoïsatie op build-time; neemt de gebroken handmatige memo-ketens uit de
+   * juli-performance-audit structureel weg (318 bestanden met useMemo/
+   * useCallback/memo). In Next.js 16 is dit een STABIELE, top-level optie
+   * (gepromoveerd uit `experimental`). Next past de compiler via een
+   * SWC-voorfilter alléén toe op relevante (JSX/hook-)bestanden, dus dit werkt
+   * native onder Turbopack — géén webpack-wrapper nodig (spiegelt de Serwist-
+   * keuze hierboven). Dependency: `babel-plugin-react-compiler` (devDep).
+   * Health-check-spike vóór activatie: 1517/1517 componenten compileren,
+   * 0 incompatibele libraries; bails vallen veilig terug op de bestaande
+   * handmatige memo's (geen gedragswijziging). Omkeerbaar via deze ene vlag.
+   */
+  reactCompiler: true,
   experimental: {
     turbopackFileSystemCacheForDev: false,
     optimizePackageImports: ['lucide-react'],
