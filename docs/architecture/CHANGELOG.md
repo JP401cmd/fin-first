@@ -449,3 +449,10 @@
 ## 2026-07-19
 
 - Geen wijzigingen.
+
+## 2026-07-20
+
+- **Schermen** toegevoegd: /beheer/versie
+- **API-routes** toegevoegd: /api/admin/version-status, /api/version, /api/web-vitals
+- **Tabellen** toegevoegd: web_vitals
+- **Componenten (aantal)** toegevoegd: +1

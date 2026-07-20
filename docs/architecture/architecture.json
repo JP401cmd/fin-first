@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-19T11:22:33.073Z",
-  "generatedDate": "2026-07-19",
+  "generatedAt": "2026-07-20T11:13:37.899Z",
+  "generatedDate": "2026-07-20",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -187,13 +187,13 @@
     }
   },
   "stats": {
-    "routes": 142,
+    "routes": 143,
     "routesProduction": 100,
-    "api": 253,
-    "tables": 84,
-    "migrations": 142,
+    "api": 256,
+    "tables": 85,
+    "migrations": 145,
     "integrations": 25,
-    "components": 855,
+    "components": 856,
     "providers": 11,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -421,6 +421,12 @@
     {
       "url": "/beheer/uat",
       "file": "app/(app)/beheer/uat/page.tsx",
+      "group": "beheer",
+      "isTest": false
+    },
+    {
+      "url": "/beheer/versie",
+      "file": "app/(app)/beheer/versie/page.tsx",
       "group": "beheer",
       "isTest": false
     },
@@ -1276,6 +1282,12 @@
       {
         "url": "/beheer/uat",
         "file": "app/(app)/beheer/uat/page.tsx",
+        "group": "beheer",
+        "isTest": false
+      },
+      {
+        "url": "/beheer/versie",
+        "file": "app/(app)/beheer/versie/page.tsx",
         "group": "beheer",
         "isTest": false
       },
@@ -2280,6 +2292,14 @@
       "domain": "admin",
       "methods": [
         "POST"
+      ]
+    },
+    {
+      "url": "/api/admin/version-status",
+      "file": "app/api/admin/version-status/route.ts",
+      "domain": "admin",
+      "methods": [
+        "GET"
       ]
     },
     {
@@ -4001,6 +4021,20 @@
       ]
     },
     {
+      "url": "/api/version",
+      "file": "app/api/version/route.ts",
+      "domain": "version",
+      "methods": []
+    },
+    {
+      "url": "/api/web-vitals",
+      "file": "app/api/web-vitals/route.ts",
+      "domain": "web-vitals",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
       "url": "/api/welcome",
       "file": "app/api/welcome/route.ts",
       "domain": "welcome",
@@ -4066,7 +4100,7 @@
     {
       "domain": "admin",
       "label": "Beheer",
-      "count": 39,
+      "count": 40,
       "routes": [
         {
           "url": "/api/admin/ai-features",
@@ -4398,6 +4432,14 @@
           "domain": "admin",
           "methods": [
             "POST"
+          ]
+        },
+        {
+          "url": "/api/admin/version-status",
+          "file": "app/api/admin/version-status/route.ts",
+          "domain": "admin",
+          "methods": [
+            "GET"
           ]
         },
         {
@@ -6768,6 +6810,34 @@
       ]
     },
     {
+      "domain": "version",
+      "label": "version",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/version",
+          "file": "app/api/version/route.ts",
+          "domain": "version",
+          "methods": []
+        }
+      ]
+    },
+    {
+      "domain": "web-vitals",
+      "label": "web-vitals",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/web-vitals",
+          "file": "app/api/web-vitals/route.ts",
+          "domain": "web-vitals",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "welcome",
       "label": "welcome",
       "count": 1,
@@ -7215,9 +7285,13 @@
       {
         "name": "wallet_addresses",
         "migration": "supabase/migrations/20260501000001_create_external_connections.sql"
+      },
+      {
+        "name": "web_vitals",
+        "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 142
+    "migrationCount": 145
   },
   "tablesByDomain": [
     {
@@ -7354,6 +7428,10 @@
         {
           "name": "user_own_ibans",
           "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
+        },
+        {
+          "name": "web_vitals",
+          "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
         }
       ]
     },
@@ -7659,11 +7737,11 @@
     }
   ],
   "components": {
-    "total": 855,
+    "total": 856,
     "groups": [
       {
         "group": "app",
-        "count": 356,
+        "count": 357,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -8004,6 +8082,7 @@
           "vrijheidsas.test",
           "wealth-composition-chart",
           "wealth-composition-chart.test",
+          "web-vitals-reporter",
           "whatif-actions",
           "whatif-beslishulp",
           "whatif-chat",
@@ -10246,6 +10325,12 @@
         },
         {
           "name": "user_feature_visits",
+          "write": true
+        }
+      ],
+      "web-vitals": [
+        {
+          "name": "web_vitals",
           "write": true
         }
       ],
@@ -13085,6 +13170,16 @@
             "/api/roadmap"
           ]
         }
+      ],
+      "web_vitals": [
+        {
+          "domain": "web-vitals",
+          "label": "web-vitals",
+          "write": true,
+          "routes": [
+            "/api/web-vitals"
+          ]
+        }
       ]
     },
     "multiWriter": [
@@ -13848,6 +13943,11 @@
         "user": true,
         "household": false,
         "rls": true
+      },
+      "web_vitals": {
+        "user": true,
+        "household": false,
+        "rls": true
       }
     }
   },
@@ -14438,6 +14538,19 @@
       ],
       "summary": "Tijdens de besloten testfase mag alleen wie is uitgenodigd een account aanmaken. Elke nieuwe registratie (e-mail/wachtwoord én Google-OAuth) wordt geweigerd tenzij het genormaliseerde adres (`lower(trim(email))`, exacte match) op `public.signup_email_allowlist` staat. Bestaande a",
       "file": "docs/adr/0047-email-whitelist-testfase.md"
+    },
+    {
+      "id": "0056-eigen-web-vitals-rum-collectie",
+      "title": "eigen web vitals rum collectie",
+      "status": "accepted",
+      "date": "2026-07-20",
+      "elements": [
+        "t-platform",
+        "t-supabase",
+        "app-comp"
+      ],
+      "summary": "Speed Insights (t-platform) geeft geen ruwe, kruisbare RUM-data per route/segment; die zit alleen in het Vercel-dashboard en is niet via CLI/MCP op te vragen. We willen vitals per gescrubde route/device/metric kunnen aggregeren (feature 885). Een publiek schrijf-endpoint is nodig",
+      "file": "docs/adr/0056-eigen-web-vitals-rum-collectie.md"
     }
   ],
   "churn": {
@@ -14453,7 +14566,7 @@
       },
       {
         "path": "app/(app)/toekomst",
-        "commits": 38
+        "commits": 39
       },
       {
         "path": "app/api/ai",
@@ -14517,7 +14630,7 @@
       },
       {
         "file": "lib/dashboard-data-loader.ts",
-        "loc": 2386,
+        "loc": 2384,
         "commits": 35
       },
       {
@@ -15323,8 +15436,39 @@
   "diff": {
     "baseline": false,
     "previousDate": "2026-07-19",
-    "hasChanges": false,
-    "sections": []
+    "hasChanges": true,
+    "sections": [
+      {
+        "label": "Schermen",
+        "added": [
+          "/beheer/versie"
+        ],
+        "removed": []
+      },
+      {
+        "label": "API-routes",
+        "added": [
+          "/api/admin/version-status",
+          "/api/version",
+          "/api/web-vitals"
+        ],
+        "removed": []
+      },
+      {
+        "label": "Tabellen",
+        "added": [
+          "web_vitals"
+        ],
+        "removed": []
+      },
+      {
+        "label": "Componenten (aantal)",
+        "added": [
+          "+1"
+        ],
+        "removed": []
+      }
+    ]
   },
   "statsHistory": [
     {
@@ -15507,6 +15651,13 @@
       "api": 253,
       "components": 855,
       "tables": 84,
+      "routesProduction": 100
+    },
+    {
+      "date": "2026-07-20",
+      "api": 256,
+      "components": 856,
+      "tables": 85,
       "routesProduction": 100
     }
   ]

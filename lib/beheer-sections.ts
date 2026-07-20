@@ -35,6 +35,7 @@ import {
   Network,
   Newspaper,
   Activity,
+  Timer,
   ScrollText,
   ShieldAlert,
   Sigma,
@@ -312,6 +313,12 @@ export const BEHEER_GROUPS: BeheerGroup[] = [
         href: '/beheer/ai-verbruik',
         description: 'Werkelijk tokenverbruik per functie en per account.',
         icon: Gauge,
+      },
+      {
+        label: 'Webprestaties',
+        href: '/beheer/webprestaties',
+        description: 'Core Web Vitals (p75) per route en device — echte gebruikersmetingen.',
+        icon: Timer,
       },
       {
         label: 'Architectuur',
