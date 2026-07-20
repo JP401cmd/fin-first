@@ -111,7 +111,7 @@ export const SAMPLE_REPORT: CheckReportData = {
   health: {
     score: 72,
     label: 'Gezond',
-    copy: 'Een 72 betekent: je fundament staat. Rondkomen en buffer zijn op orde, geen dure schuld die aan je rendement knaagt, je vrijheidsopbouw loopt. De winst zit nu in <em>versnellen</em>, niet repareren — daarover gaan Wills zetten.',
+    copy: 'Een 72 betekent: je fundament staat. Rondkomen en buffer zijn op orde, geen dure schuld die aan je rendement knaagt, je vrijheidsopbouw loopt. De winst zit nu in <em>versnellen</em>, niet repareren — daarover gaan Fins zetten.',
     pillars: [
       { id: 'savings_rate', name: 'Spaarquote', score: 82, status: 'green', note: '24%' },
       { id: 'emergency_fund', name: 'Noodfonds', score: 78, status: 'green', note: '5,2 mnd' },
@@ -289,7 +289,7 @@ export const SAMPLE_REPORT: CheckReportData = {
     perks: [
       { title: 'Live volgen', body: 'Vermogen, buffer en vrijheids-% bewegen mee, automatisch bijgewerkt.' },
       { title: "Scenario's", body: 'Schuif aan de knoppen en zie direct wat het doet met je vrijheidsmoment.' },
-      { title: 'Will als coach', body: "Stel je vragen, krijg warme uitleg — op het moment dat je 't nodig hebt." },
+      { title: 'Fin als coach', body: "Stel je vragen, krijg warme uitleg — op het moment dat je 't nodig hebt." },
       { title: 'Banken koppelen', body: 'Koppel je rekeningen en je spaarquote vult zich met je echte maandlijn.' },
       { title: 'Je dossier blijft', body: 'Dit rapport wordt je startpunt — geen leeg scherm, maar precies deze cijfers.' },
     ],

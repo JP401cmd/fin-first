@@ -61,7 +61,7 @@ const WHITELIST_FNS: Record<string, (...args: number[]) => number> = {
   /**
    * Box 3-heffing per jaar (vereenvoudigd, forfaitair). grondslag boven
    * heffingsvrij, forfaitair rendement × tarief. Defaults 2026-achtig:
-   * forfait 6% (beleggen), tarief 36%. Gebruiker/Will kan met eigen
+   * forfait 6% (beleggen), tarief 36%. Gebruiker/Fin kan met eigen
    * formule afwijken; dit is een gemak-helper.
    */
   box3: (grondslag, forfait, tarief) =>

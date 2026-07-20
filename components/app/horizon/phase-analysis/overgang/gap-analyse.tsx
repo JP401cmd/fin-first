@@ -186,7 +186,7 @@ export const GapAnalyse = memo(function GapAnalyse({
       <AnalysisSection
         title="Gap-analyse"
         icon={PieChart}
-        willContext="Gap-analyse overgangsfase: geen overgangsfase — FIRE-leeftijd en AOW-leeftijd vallen samen, er is niets te overbruggen."
+        finContext="Gap-analyse overgangsfase: geen overgangsfase — FIRE-leeftijd en AOW-leeftijd vallen samen, er is niets te overbruggen."
       >
         <div className="flex items-start gap-3 rounded-[var(--r)] border border-dashed border-[var(--border-ed)] bg-[var(--positive)]/5 p-4">
           <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[var(--positive)]" />
@@ -210,7 +210,7 @@ export const GapAnalyse = memo(function GapAnalyse({
       title="Gap-analyse"
       icon={PieChart}
       loading={loading}
-      willContext={
+      finContext={
         state
           ? `Gap-analyse ${isShortfall ? 'overgangsfase (AOW \u2192 FIRE overbruggen met AOW-aanvulling)' : 'overgangsfase (FIRE \u2192 AOW, volledig uit portfolio)'}: ` +
             `${isShortfall && yearlyAowIncome > 0 ? `AOW dekt ${formatMaskedCurrency(Math.round(yearlyAowIncome), masked)}/jaar, ` : ''}` +

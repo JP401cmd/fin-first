@@ -100,7 +100,7 @@ export function ArchimateHldView() {
         </div>
       </section>
 
-      {/* ── Will ── */}
+      {/* ── Fin ── */}
       <section className="border border-[var(--ink)] bg-[var(--paper)] p-5">
         <div className="flex flex-wrap items-center gap-3">
           <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--color-wil-500)] text-[var(--paper)]">

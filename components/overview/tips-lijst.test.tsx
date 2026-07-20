@@ -60,13 +60,13 @@ const baseRec = (overrides: Partial<Recommendation>): Recommendation =>
   }) as Recommendation
 
 describe('TipsLijst', () => {
-  it('shows empty state CTA that opens the Will-chat in-place (geen navigatie)', () => {
+  it('shows empty state CTA that opens the Fin-chat in-place (geen navigatie)', () => {
     render(<TipsLijst recommendations={[]} />)
     expect(screen.getByText(/Geen tips wachten/i)).toBeInTheDocument()
     // Mag GEEN navigerende link naar /berichten meer zijn — dat verliet de
     // pagina onnodig en daar staan de tips niet.
-    expect(screen.queryByRole('link', { name: /Vraag Will/i })).not.toBeInTheDocument()
-    const cta = screen.getByRole('button', { name: /Vraag Will om tips/i })
+    expect(screen.queryByRole('link', { name: /Vraag Fin/i })).not.toBeInTheDocument()
+    const cta = screen.getByRole('button', { name: /Vraag Fin om tips/i })
     fireEvent.click(cta)
     expect(mockOpenWithMessage).toHaveBeenCalledTimes(1)
     expect(mockOpenWithMessage).toHaveBeenCalledWith(

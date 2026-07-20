@@ -510,9 +510,9 @@ describe('buildReport — uitgaven na pensioen', () => {
   })
 })
 
-// ── Will-tips: tot 4 gescoorde zetten (taak 3) ───────────────────────────────
+// ── Fin-tips: tot 4 gescoorde zetten (taak 3) ───────────────────────────────
 
-describe('buildReport — Will-tips (gescoorde pool, tot 4)', () => {
+describe('buildReport — Fin-tips (gescoorde pool, tot 4)', () => {
   it('rijke situatie levert tot 4 zetten (cap), spaarquote-zet als sluitstuk', () => {
     const r = buildReport({
       firstName: null,

@@ -12,13 +12,13 @@
 // de toon consistent is met de gezondheidspijlers.
 //
 // Per route leveren we:
-//  - title:   kort gebieds-label voor de "Bespreek met Will"-context.
+//  - title:   kort gebieds-label voor de "Bespreek met Fin"-context.
 //  - reason:  "wat is er aan de hand" voor de warn- én de bad-status. Mag het
 //             live cijfer (uit resolve.ts) interpoleren via {figure}.
 //  - remedy:  "wat kun je eraan doen" — concreet, niet-belerend.
 //  - action?: optionele deeplink, ALLEEN waar een andere/diepere bestemming
-//             helpt dan de pagina zelf (anders leunen we op de Will-knop).
-//  - will:    onderwerp + 1-regel context voor de "Bespreek met Will"-knop.
+//             helpt dan de pagina zelf (anders leunen we op de Fin-knop).
+//  - will:    onderwerp + 1-regel context voor de "Bespreek met Fin"-knop.
 //
 // `figure` is de live waarde die resolve.ts uit de status-bron haalt (bv. de
 // hefboom-detailtekst of de cashflow-kaart-subtext). `{figure}` wordt door

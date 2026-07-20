@@ -25,14 +25,14 @@ describe('PrivacyOverview', () => {
     expect(labels.filter((l) => l === 'Waarom').length).toBe(7)
   })
 
-  it('toont expliciete categorieën Profiel/Bezittingen/Schulden/Cashflow/Doelen/Will/Briefing', () => {
+  it('toont expliciete categorieën Profiel/Bezittingen/Schulden/Cashflow/Doelen/Fin/Briefing', () => {
     render(<PrivacyOverview />)
     expect(screen.getByText('Profiel')).toBeTruthy()
     expect(screen.getByText('Bezittingen')).toBeTruthy()
     expect(screen.getByText('Schulden')).toBeTruthy()
     expect(screen.getByText('Cashflow & transacties')).toBeTruthy()
     expect(screen.getByText('Doelen')).toBeTruthy()
-    expect(screen.getByText('Will-chat & AI-context')).toBeTruthy()
+    expect(screen.getByText('Fin-chat & AI-context')).toBeTruthy()
     expect(screen.getByText('Wekelijkse briefing')).toBeTruthy()
   })
 
@@ -55,7 +55,7 @@ describe('PrivacyOverview', () => {
     expect(container.textContent).toMatch(/EU-regio/)
   })
 
-  it('vermeldt "Géén model-training" bij Will-chat', () => {
+  it('vermeldt "Géén model-training" bij Fin-chat', () => {
     render(<PrivacyOverview />)
     expect(screen.getByText(/Géén model-training/i)).toBeTruthy()
   })

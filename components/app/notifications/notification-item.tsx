@@ -96,7 +96,7 @@ export const NotificationItem = memo(function NotificationItem({ notification, o
       tabIndex={0}
       onClick={handleClick}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick() } }}
-      // Deze rij bevat een genest interactief element (de "Vraag Will"-knop),
+      // Deze rij bevat een genest interactief element (de "Vraag Fin"-knop),
       // dus blijft het een role="button"-div i.p.v. een echte <button>. De
       // globale focus-ring scopet alleen op echte a/button, daarom hier expliciet
       // een zichtbare focus-visible-outline zodat toetsenbordnavigatie leesbaar is.
@@ -169,7 +169,7 @@ export const NotificationItem = memo(function NotificationItem({ notification, o
             }}
           >
             <Lightbulb className="h-3 w-3" />
-            Vraag Will
+            Vraag Fin
           </button>
         )}
       </div>

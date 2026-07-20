@@ -24,7 +24,7 @@ export function RapportNieuws({ news }: { news?: ReportNews | null }) {
         <p className="lede">
           Algemeen financieel nieuws dat je vrijheidsplan kan raken — rente,
           fiscaliteit, woningmarkt. Bij elk bericht lees je kort waaróm het telt;
-          in de app vertaalt Will dat naar wat het voor jóuw cijfers betekent.
+          in de app vertaalt Fin dat naar wat het voor jóuw cijfers betekent.
         </p>
 
         <div className="news-grid">

@@ -16,7 +16,7 @@
 
 import Link from 'next/link'
 import { Target, CheckCircle2, AlertCircle } from 'lucide-react'
-import type { GoalWithBudget } from '@/lib/will-data-loader'
+import type { GoalWithBudget } from '@/lib/fin-data-loader'
 
 export type GoalProgress = {
   current: number

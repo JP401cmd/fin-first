@@ -16,7 +16,7 @@
   height: 3.5rem; width: 3.5rem; border-radius: 9999px;
   background: color-mix(in srgb, #fff 60%, transparent);
   backdrop-filter: blur(3px);
-  /* Subtiele Will-ring: laat de launcher de gekozen Will-kleur dragen
+  /* Subtiele Fin-ring: laat de launcher de gekozen Fin-kleur dragen
      zonder een vol vlak. border = wil-200, schaduw houdt de lift. */
   border: 1px solid var(--color-wil-200);
   box-shadow: var(--s1);

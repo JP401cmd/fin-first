@@ -120,7 +120,7 @@ export function buildBriefingEmail(input: BriefingEmailInput): BriefingEmailOutp
   if (!hasEntries && !hasFreedom) return null
 
   const appUrl = `${origin}/overzicht#briefing`
-  const willUrl = `${origin}/overzicht?prompt=briefing-week`
+  const finUrl = `${origin}/overzicht?prompt=briefing-week`
   const unsubscribeUrl = `${origin}/api/briefing/email/unsubscribe?token=${encodeURIComponent(unsubscribeToken)}`
 
   // ── Vrijheidstijd-hero (canoniek geformatteerd, geen recompute) ──
@@ -182,7 +182,7 @@ export function buildBriefingEmail(input: BriefingEmailInput): BriefingEmailOutp
       <p style="margin:0 0 8px;font-size:14px;color:#57534e;">Het volledige overzicht — met alle cijfers — staat veilig in de app.</p>
       <p style="margin:0 0 28px;">
         <a href="${appUrl}" style="display:inline-block;background:#1c1917;color:#fff;padding:11px 20px;text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-size:14px;margin:0 8px 8px 0;">Bekijk in de app</a>
-        <a href="${willUrl}" style="display:inline-block;background:#f5f5f4;color:#1c1917;padding:11px 20px;text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-size:14px;border:1px solid #e7e5e4;">Bespreek met Will</a>
+        <a href="${finUrl}" style="display:inline-block;background:#f5f5f4;color:#1c1917;padding:11px 20px;text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-size:14px;border:1px solid #e7e5e4;">Bespreek met Fin</a>
       </p>
       <hr style="border:none;border-top:1px solid #e7e5e4;margin:24px 0;">
       <p style="font-size:12px;color:#a8a29e;font-family:Helvetica,Arial,sans-serif;">

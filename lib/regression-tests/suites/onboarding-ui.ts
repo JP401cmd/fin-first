@@ -122,14 +122,14 @@ const tests: TestCase[] = [
   // ── Step 2: SpeechBubble component ─────────────────────────────────
   {
     id: 'ob-ui-speech-bubble',
-    name: 'SpeechBubble: Will\'s spraakballon met wil-400 accent en serif font',
+    name: 'SpeechBubble: Fin\'s spraakballon met wil-400 accent en serif font',
     category: CAT,
     description: 'SpeechBubble heeft border-l-3 wil-400, font-serif, subtle achtergrond',
     priority: 'high',
     estimatedDurationMs: 100,
     fn() {
       // SpeechBubble styling:
-      // - border-l-3 border-wil-400: left accent bar in Will's teal
+      // - border-l-3 border-wil-400: left accent bar in Fin's teal
       // - bg-[var(--subtle)]: subtle background
       // - font-serif text-sm leading-relaxed text-[var(--ink-2)]: text styling
       // - max-w-[85%] on mobile, sm:max-w-none on desktop
@@ -156,7 +156,7 @@ const tests: TestCase[] = [
     id: 'ob-ui-speech-bubble-context',
     name: 'SpeechBubble: tekst dynamisch per onboarding stap context',
     category: CAT,
-    description: 'Elke onboarding stap heeft unieke Will-tekst in de SpeechBubble',
+    description: 'Elke onboarding stap heeft unieke Fin-tekst in de SpeechBubble',
     priority: 'high',
     estimatedDurationMs: 100,
     fn() {

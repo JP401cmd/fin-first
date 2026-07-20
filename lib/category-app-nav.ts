@@ -1,6 +1,6 @@
 // ── Category App Nav Builder ─────────────────────────────────
 // Server-side helper die de set "klikbare app-links per categorie" bouwt
-// die de nieuwe CategoryAppNavBar bovenin het Will-dashboard rendert.
+// die de nieuwe CategoryAppNavBar bovenin het Fin-dashboard rendert.
 //
 // Eén link verschijnt alleen wanneer:
 //   1. de gekoppelde module (uit `CATEGORY_DEEPENINGS`) actief is, EN
@@ -95,7 +95,7 @@ function isDebtTracked(debt: CategoryNavDebtInput): boolean {
 
 /**
  * Bouw de geordende lijst app-links voor de categorie-balk op het
- * Will-dashboard. Volgorde volgt `CATEGORY_DEEPENINGS` zodat tabs op de
+ * Fin-dashboard. Volgorde volgt `CATEGORY_DEEPENINGS` zodat tabs op de
  * categorie-pagina en links in de balk in dezelfde lees-volgorde verschijnen.
  *
  * Multi-app-categorieën (een categorie met meerdere registry-entries) leveren

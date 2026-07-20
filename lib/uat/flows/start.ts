@@ -80,7 +80,7 @@ export const START_FLOW: UatFlow = {
     // ── 7 · cross-doorwerking (OUTPUT) ───────────────────────────────────────
     { id: 'x-ovz', label: 'Overzicht-hub · netto vermogen & cashflow-instellingen', kind: 'cross', stage: 7, crossZone: 'OVZ' },
     { id: 'x-toek', label: 'Toekomst · doelen, pensioen-life-event, FIRE-parameters', kind: 'cross', stage: 7, crossZone: 'TOEK' },
-    { id: 'x-will', label: 'Will · coach-bubble suggereert overgeslagen (deferred) velden', kind: 'cross', stage: 7, crossZone: 'WILL' },
+    { id: 'x-will', label: 'Fin · coach-bubble suggereert overgeslagen (deferred) velden', kind: 'cross', stage: 7, crossZone: 'WILL' },
     { id: 'x-nav', label: 'Navigatie-shell · routebescherming/uitloggen hergebruikt door NAV', kind: 'cross', stage: 7, crossZone: 'NAV' },
   ],
   edges: [

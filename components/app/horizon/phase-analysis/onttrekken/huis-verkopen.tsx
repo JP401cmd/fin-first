@@ -247,7 +247,7 @@ export const HuisVerkopen = memo(function HuisVerkopen({
     <AnalysisSection
       title="Huis verkopen vs. behouden"
       icon={Home}
-      willContext={
+      finContext={
         hasHouse
           ? `Huis verkopen vs. behouden over ${horizonJaren} jaar (afbouwperiode): aanbeveling "${result.aanbeveling}". ` +
             `Verschil ${formatMaskedCurrency(result.verschil, masked)} (positief = verkopen voordeliger). ` +

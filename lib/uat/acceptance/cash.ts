@@ -7,7 +7,7 @@
  * WF-CASH-31 als latere dekkingscontrole-toevoeging) + Deel 2 §2.8
  * (UAT-CASH-01..31, testpersonen Daan Bakker — solo, 2 ING-rekeningen — en
  * Lisa de Groot voor huishoud-/gedeeld-eigendom-varianten). WF-CASH-32 is een
- * NÓG latere dekkingscontrole-toevoeging (feature #881, "Vraag Will"-wizard).
+ * NÓG latere dekkingscontrole-toevoeging (feature #881, "Vraag Fin"-wizard).
  *
  * CASH is de grootste zone tot nu toe (32 scenario's) en combineert drie
  * toetsbaarheidsprofielen (zie ook de zone-specifieke notitie op de
@@ -34,7 +34,7 @@
  *
  * WF-CASH-25 (AI-tegenpartijgroepen-volgorde) importeert sinds feature #881
  * de ÉCHTE `orderGroupsLargestFirst`/`buildCombinedGroups` (lib/auto-categorize.ts,
- * gedeeld door de motor en de "Vraag Will"-wizard) — geen mirror meer van de
+ * gedeeld door de motor en de "Vraag Fin"-wizard) — geen mirror meer van de
  * vervallen import-pagina-confidence-drempels 0,8/0,5.
  *
  * TWEE ECHTE MAAR NIET-INJECTEERBARE FUNCTIES (`getNextOccurrence`/
@@ -297,10 +297,10 @@ const criteria: AcceptanceCriterion[] = [
   {
     workflow: 'WF-CASH-19',
     scenarioId: 'UAT-CASH-19',
-    titel: 'Vaste kosten laten analyseren door Will (AI)',
+    titel: 'Vaste kosten laten analyseren door Fin (AI)',
     kriticiteit: 'BELANGRIJK',
     given: 'AI-add-on actief resp. uit/kill-switch aan.',
-    when: 'De gebruiker klikt "Laat Will analyseren".',
+    when: 'De gebruiker klikt "Laat Fin analyseren".',
     then: 'Mét AI: voorstellen per rij met classificatie + reden; opslaan toont een toast met het aantal en ververst de vaste-lasten-cijfers. Zonder AI: melding "AI is niet geconfigureerd…" (422), handmatige weg blijft beschikbaar.',
     assertion: {
       kind: 'ui-only',
@@ -380,7 +380,7 @@ const criteria: AcceptanceCriterion[] = [
   {
     workflow: 'WF-CASH-25',
     scenarioId: 'UAT-CASH-25',
-    titel: '"Vraag Will"-wizard: AI-tegenpartijgroepen grootste-eerst met recentste-datum-tiebreak',
+    titel: '"Vraag Fin"-wizard: AI-tegenpartijgroepen grootste-eerst met recentste-datum-tiebreak',
     kriticiteit: 'KERN',
     given: 'Drie onbekende-tegenpartijgroepen na stage-1 (regels/overboekingen/spiegelpaar): "Albert Heijn" (3 leden, meest recente datum 2026-06-20), "Bol.com" (3 leden, meest recente datum 2026-06-25), "Uniek Winkeltje" (1 lid, 2026-06-10).',
     when: 'De wizard (component/app/categorize-wizard.tsx) berekent de presentatievolgorde met dezelfde `buildCombinedGroups` + `orderGroupsLargestFirst` die de AI-motor zelf gebruikt (`groupOrder: \'largest-first\'`) — geen eigen sortering.',
@@ -476,11 +476,11 @@ const criteria: AcceptanceCriterion[] = [
   {
     workflow: 'WF-CASH-32',
     scenarioId: 'UAT-CASH-32',
-    titel: '"Vraag Will"-wizard: stage-1 bulk-kaart, groepskeuzes en verliesvrij stoppen (feature #881, latere dekkingscontrole-toevoeging)',
+    titel: '"Vraag Fin"-wizard: stage-1 bulk-kaart, groepskeuzes en verliesvrij stoppen (feature #881, latere dekkingscontrole-toevoeging)',
     kriticiteit: 'BELANGRIJK',
-    given: 'Stage-1-rijen (bron rule/transfer/mirror) landen in één bulk-kaart ("Will herkende X transacties via je regels en overboekingen"); daarna toont de wizard de onbekende tegenpartijen één AI-groepkaart tegelijk met vier keuzes: "Akkoord & verder", "Andere categorie" (+ optioneel regel maken), "Alleen deze ene" (alleen bij >1 lid) en "Zelf indelen" (sleepmodus), plus "Stoppen en tot hier bewaren". Eén groep krijgt een resolver-fout (AI-call faalt).',
+    given: 'Stage-1-rijen (bron rule/transfer/mirror) landen in één bulk-kaart ("Fin herkende X transacties via je regels en overboekingen"); daarna toont de wizard de onbekende tegenpartijen één AI-groepkaart tegelijk met vier keuzes: "Akkoord & verder", "Andere categorie" (+ optioneel regel maken), "Alleen deze ene" (alleen bij >1 lid) en "Zelf indelen" (sleepmodus), plus "Stoppen en tot hier bewaren". Eén groep krijgt een resolver-fout (AI-call faalt).',
     when: 'De gebruiker klikt achtereenvolgens "Akkoord, allemaal" op de bulk-kaart, "Alleen deze ene" op een groep van 3, en tot slot "Stoppen en tot hier bewaren" vóórdat alle groepen zijn afgehandeld.',
-    then: '"Alleen deze ene" verwerkt alleen het representant-lid; de overige 2 leden van diezelfde tegenpartij keren terug als een kleinere groepkaart (pendingGroups wordt herberekend uit de nog-onbeoordeelde rijen — nooit uit de oorspronkelijke groep). "Stoppen" bewaart uitsluitend de al-geaccepteerde rijen; de rest blijft onbeoordeeld en het afsluitscherm meldt hoeveel er nog openstaan. De groep met een resolver-fout blokkeert de wizard niet: die kaart valt terug op "Will wist het niet zeker — kies zelf een categorie" (handmatige groep-fallback), de overige groepkaarten blijven bruikbaar.',
+    then: '"Alleen deze ene" verwerkt alleen het representant-lid; de overige 2 leden van diezelfde tegenpartij keren terug als een kleinere groepkaart (pendingGroups wordt herberekend uit de nog-onbeoordeelde rijen — nooit uit de oorspronkelijke groep). "Stoppen" bewaart uitsluitend de al-geaccepteerde rijen; de rest blijft onbeoordeeld en het afsluitscherm meldt hoeveel er nog openstaan. De groep met een resolver-fout blokkeert de wizard niet: die kaart valt terug op "Fin wist het niet zeker — kies zelf een categorie" (handmatige groep-fallback), de overige groepkaarten blijven bruikbaar.',
     assertion: {
       kind: 'ui-only',
       source: 'components/app/categorize-wizard.tsx (CategorizeWizard/AiGroupCard — pendingGroups-herberekening, stop-/foutafhandeling) + components/app/ai-categorize-sheet.tsx (accept/stop-handlers) — interactie-/foutafhandelingstoestand, geen pure functie zonder React-state',

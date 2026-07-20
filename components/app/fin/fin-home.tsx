@@ -1,9 +1,9 @@
 'use client'
 
-import './will-home.css'
+import './fin-home.css'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { WillDots } from '@/components/app/will-dots'
+import { FinDots } from '@/components/app/fin-dots'
 import { AiPrivacyIndicator } from '@/components/app/ai-privacy-indicator'
 import { useChatContext } from '@/components/app/chat/chat-provider'
 import { useOverlayOpen } from '@/lib/hooks/use-scroll-lock'
@@ -21,7 +21,7 @@ const THINK_MS = 400
 const POSTPONED_PROMPT =
   'Ik wil opnieuw kijken naar tips die ik eerder heb uitgesteld en waarvan de wachttijd voorbij is. Begin met de belangrijkste.'
 
-export type WillHomeProps = {
+export type FinHomeProps = {
   dataGaps?: CoachDataGaps
   deferredFields?: DeferredField[]
   overrides?: CoachOverrides
@@ -31,14 +31,14 @@ export type WillHomeProps = {
   headerLabel?: string
 }
 
-export function WillHome({
+export function FinHome({
   dataGaps, deferredFields, overrides, activeModules,
   delayMs = DEFAULT_COACH_TIMING.delayMs,
   autoDismissMs = DEFAULT_COACH_TIMING.autoDismissMs,
   headerLabel = DEFAULT_COACH_HEADER,
-}: WillHomeProps) {
+}: FinHomeProps) {
   const { isOpen, toggle, open, openWithMessage } = useChatContext()
-  // Zwevende bottom-FAB: verberg de Will-bubbel zolang er een modal/overlay
+  // Zwevende bottom-FAB: verberg de Fin-bubbel zolang er een modal/overlay
   // open is (scroll-lock actief). Anders bloedt de halftransparante z-[70]-
   // backdrop door en lijkt de FAB bovenop de primaire actieknop onderin de
   // sheet te staan — net zoals de nav-pill door zo'n overlay wordt afgedekt.
@@ -97,7 +97,7 @@ export function WillHome({
   useEffect(() => { void fetchPostponedReady() }, [fetchPostponedReady])
   useEffect(() => { if (!isOpen) void fetchPostponedReady() }, [isOpen, fetchPostponedReady])
 
-  const willState = mode === 'bubble' ? 'idle' : thinking ? 'thinking' : done ? 'listening' : 'talking'
+  const finState = mode === 'bubble' ? 'idle' : thinking ? 'thinking' : done ? 'listening' : 'talking'
 
   const handleBubbleClick = useCallback(() => {
     if (postponedReady > 0) openWithMessage(POSTPONED_PROMPT)
@@ -123,8 +123,8 @@ export function WillHome({
   if (overlayOpen) return null
 
   const fabAria = postponedReady > 0
-    ? `Open chat met Will — ${postponedReady} uitgestelde tip${postponedReady === 1 ? '' : 's'} klaar`
-    : 'Open chat met Will'
+    ? `Open chat met Fin — ${postponedReady} uitgestelde tip${postponedReady === 1 ? '' : 's'} klaar`
+    : 'Open chat met Fin'
 
   return (
     <div className={`willhome willhome--${mode}`}>
@@ -151,7 +151,7 @@ export function WillHome({
       )}
 
       <div className={`wh-avatar wh-avatar--${mode}`} aria-hidden>
-        <WillDots size={36} state={willState} />
+        <FinDots size={36} state={finState} />
       </div>
 
       {mode === 'bubble' && <AiPrivacyIndicator size={12} className="wh-privacy" />}

@@ -1,5 +1,5 @@
 /**
- * Component test for LocalChatPanel — de ON-DEVICE Will-chat (fase C1b).
+ * Component test for LocalChatPanel — de ON-DEVICE Fin-chat (fase C1b).
  *
  * Verifieert:
  *  1. Gated state: model niet op dit toestel → "nog niet klaar"-melding + link
@@ -69,7 +69,7 @@ describe('LocalChatPanel — gated state (model ontbreekt)', () => {
     const link = screen.getByRole('link', { name: /Naar Mijn/ })
     expect(link.getAttribute('href')).toBe('/mijn/privacy')
     // Geen chat-invoer in de gated state.
-    expect(screen.queryByLabelText('Je vraag aan Will')).toBeNull()
+    expect(screen.queryByLabelText('Je vraag aan Fin')).toBeNull()
   })
 })
 
@@ -80,7 +80,7 @@ describe('LocalChatPanel — ready + versturen', () => {
 
     render(<LocalChatPanel overview={OVERVIEW} />)
 
-    const textarea = await screen.findByLabelText('Je vraag aan Will')
+    const textarea = await screen.findByLabelText('Je vraag aan Fin')
     fireEvent.change(textarea, { target: { value: 'Hoe sta ik er eigenlijk voor?' } })
     fireEvent.click(screen.getByRole('button', { name: /Verstuur/ }))
 

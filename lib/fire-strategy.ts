@@ -61,7 +61,7 @@ export function parseFireStrategy(profile: {
 // ── Afgeleide vrijheids-/pensioentoestand (consume-only, ADR 0009) ──────────
 //
 // Eén canonieke, GEDEELDE bron die hero, status-banner én AI consumeren, zodat
-// er geen drift ontstaat ("UI zegt vrij, Will zegt nog 8 jaar te gaan"). Deze
+// er geen drift ontstaat ("UI zegt vrij, Fin zegt nog 8 jaar te gaan"). Deze
 // helpers HERBEREKENEN niets: ze lezen reeds-berekende waarden (freedomPct uit
 // computeFreedomProgress, currentAge/fireAge/aowAge uit de loaders/unified
 // projection) en bevatten GEEN hardcoded leeftijden of forfaits — de AOW-leeftijd

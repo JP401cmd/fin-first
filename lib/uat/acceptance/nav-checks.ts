@@ -105,10 +105,10 @@ export const NAV_ENGINE_CHECKS: NavEngineCheck[] = [
       const coreLegacyTab = deriveTabFromPath('/core/assets')
       const toekomstTab = deriveTabFromPath('/toekomst/doelen')
       const mijnTab = deriveTabFromPath('/mijn/profiel')
-      const willTab = deriveTabFromPath('/will')
+      const finTab = deriveTabFromPath('/will')
       return {
-        expected: 'overzichtTab=kern; coreLegacyTab=kern; toekomstTab=horizon; mijnTab=identity; willTab=wil',
-        actual: `overzichtTab=${overzichtTab}; coreLegacyTab=${coreLegacyTab}; toekomstTab=${toekomstTab}; mijnTab=${mijnTab}; willTab=${willTab}`,
+        expected: 'overzichtTab=kern; coreLegacyTab=kern; toekomstTab=horizon; mijnTab=identity; finTab=wil',
+        actual: `overzichtTab=${overzichtTab}; coreLegacyTab=${coreLegacyTab}; toekomstTab=${toekomstTab}; mijnTab=${mijnTab}; finTab=${finTab}`,
       }
     },
   },

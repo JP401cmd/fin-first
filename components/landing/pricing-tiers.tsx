@@ -36,7 +36,7 @@ const tiers: Tier[] = [
       'Overzicht-module: bezittingen, schulden, cashflow, briefing',
       'Doelen + tijdas met levensgebeurtenissen',
       'Publieke rekenhulp-bibliotheek: 12 kant-en-klare rekenhulpen',
-      'Kennismaken met Will, je AI-coach',
+      'Kennismaken met Fin, je AI-coach',
       'Data-export van je kerngegevens (CSV)',
       'Single-user',
     ],
@@ -52,7 +52,7 @@ const tiers: Tier[] = [
       'Voor wie eigen rekenhulpen op maat wil, de fiscale specialist-rekenhulpen en de huishouden-modus.',
     features: [
       'Alles uit Gratis',
-      'Eigen AI-rekenhulpen op maat: beschrijf je dilemma, Will bouwt de rekenhulp',
+      'Eigen AI-rekenhulpen op maat: beschrijf je dilemma, Fin bouwt de rekenhulp',
       'Specialist-rekenhulpen (BV agio vs. privé, box 3 werkelijk rendement, kamerverhuur-regimes)',
       'Huishouden-modus (privé / samen / partner-perspectief)',
       'Publiceren naar de bibliotheek',

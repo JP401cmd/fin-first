@@ -47,8 +47,8 @@ export async function GET() {
     },
     {
       id: 'wil',
-      label: 'Will (chat)',
-      description: 'Will\'s persoonlijkheid en instructies voor de chatinterface. Wordt gecombineerd met het basisprompt.',
+      label: 'Fin (chat)',
+      description: 'Fin\'s persoonlijkheid en instructies voor de chatinterface. Wordt gecombineerd met het basisprompt.',
       content: WIL_PROMPT,
       source: 'lib/ai/dna/wil.ts',
       domain: 'wil',
@@ -57,8 +57,8 @@ export async function GET() {
     },
     {
       id: 'whatif',
-      label: 'Will Droomscenario',
-      description: 'Standalone prompt voor de Wat-Als droomgids modus. Vervangt het normale Will-prompt volledig.',
+      label: 'Fin Droomscenario',
+      description: 'Standalone prompt voor de Wat-Als droomgids modus. Vervangt het normale Fin-prompt volledig.',
       content: WHATIF_PROMPT,
       source: 'lib/ai/dna/wil.ts',
       domain: 'wil',
@@ -67,8 +67,8 @@ export async function GET() {
     },
     {
       id: 'vaste-kosten-analyse',
-      label: 'Will Vaste Kosten Analyse',
-      description: 'Prompt voor Will\'s AI-classificatie van terugkerende betalingen als abonnement, vaste kosten of overslaan.',
+      label: 'Fin Vaste Kosten Analyse',
+      description: 'Prompt voor Fin\'s AI-classificatie van terugkerende betalingen als abonnement, vaste kosten of overslaan.',
       content: VASTE_KOSTEN_ANALYSE_PROMPT,
       source: 'lib/ai/dna/wil.ts',
       domain: 'wil',
@@ -108,7 +108,7 @@ export async function GET() {
     {
       id: 'briefing',
       label: 'Briefing (redactie)',
-      description: 'Redactieprompt voor de wekelijkse /overzicht-briefing: Will herschrijft de deterministische briefjes (kop-zin + teksten) met een harde nummer-guard. Gestuurd door de beheer-directives.',
+      description: 'Redactieprompt voor de wekelijkse /overzicht-briefing: Fin herschrijft de deterministische briefjes (kop-zin + teksten) met een harde nummer-guard. Gestuurd door de beheer-directives.',
       content: briefingContent,
       source: 'lib/briefing/redactie.ts',
       domain: null,
@@ -178,7 +178,7 @@ export async function GET() {
     {
       id: 'calculator',
       label: 'Rekenhulp-bouwer',
-      description: 'Systeem prompt waarmee Will een herbruikbare rekenhulp (CalculatorDefinition) genereert uit een vrije vraag.',
+      description: 'Systeem prompt waarmee Fin een herbruikbare rekenhulp (CalculatorDefinition) genereert uit een vrije vraag.',
       content: calculatorContent,
       source: 'lib/ai/build-calculator.ts',
       domain: 'horizon',

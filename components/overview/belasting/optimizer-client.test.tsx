@@ -181,8 +181,8 @@ describe('Box3OptimizerClient — leidende aanbeveling + samengevoegde Box 3-kat
     render(<Box3OptimizerClient sections={[section]} topChoice={null} hasPartner={false} />)
 
     expect(screen.getByText(/geen directe besparingskans/i)).toBeTruthy()
-    // Wél de Will-knop om de situatie te bespreken.
-    expect(screen.getByRole('button', { name: /Bespreek .* met Will/i })).toBeTruthy()
+    // Wél de Fin-knop om de situatie te bespreken.
+    expect(screen.getByRole('button', { name: /Bespreek .* met Fin/i })).toBeTruthy()
   })
 
   it('voegt beide Box 3-standen samen tot één katern met een werkende toggle', () => {

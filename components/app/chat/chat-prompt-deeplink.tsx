@@ -6,7 +6,7 @@ import { useChatContext } from './chat-provider'
 
 /**
  * ChatPromptDeeplink — luistert op `?prompt=…` op iedere route en opent
- * de Will-chat met een vooraf-bepaalde kick-off-vraag voor het MAKEN
+ * de Fin-chat met een vooraf-bepaalde kick-off-vraag voor het MAKEN
  * van een nieuw voorstel. De chat is geen museum voor bestaande
  * recommendations — die zijn zichtbaar op /overzicht/tips.
  *
@@ -15,7 +15,7 @@ import { useChatContext } from './chat-provider'
  *   - `herbekijk-uitgesteld`      — kick-off voor postponed-ready
  *                                   recommendations (FAB-badge route)
  *   - `briefing-week`             — brug vanuit de wekelijkse briefing-e-mail
- *                                   ("Bespreek met Will"): bespreek de weekbriefing
+ *                                   ("Bespreek met Fin"): bespreek de weekbriefing
  *
  * Na trigger wordt de query-string opgeschoond zodat refresh / back niet
  * dezelfde prompt opnieuw afvuurt.
@@ -23,7 +23,7 @@ import { useChatContext } from './chat-provider'
 
 /**
  * Kick-off-prompt voor "doorlicht mijn financiën". Eén bron van waarheid zodat
- * zowel deze deeplink als de in-pagina "Vraag Will"-knoppen (tips-lijst /
+ * zowel deze deeplink als de in-pagina "Vraag Fin"-knoppen (tips-lijst /
  * tips-teaser) exact dezelfde tekst gebruiken.
  */
 export const ANALYSE_FINANCIEN_PROMPT =

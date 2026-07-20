@@ -79,22 +79,22 @@ export function FunctiesSecties() {
         </Reveal>
       </section>
 
-      {/* ── PIJLER 2 — GRIP (Will, nieuws & notificaties) ────────── */}
+      {/* ── PIJLER 2 — GRIP (Fin, nieuws & notificaties) ────────── */}
       <SectionRule label="Grip" />
       <section id="grip" className="px-6 py-20 md:px-12 md:py-24">
         <Reveal className="mx-auto max-w-5xl">
           <SectionTitle
-            kicker="Pijler 2 — Grip · Will, je AI-coach"
+            kicker="Pijler 2 — Grip · Fin, je AI-coach"
             title="Niet een chatbot."
             italics="Een tweede paar ogen."
-            intro="Will leeft door je hele app heen — als constatering in je briefing, als suggestie naast een doel, als signaal bij een afwijkende transactie. Altijd in dezelfde stem, altijd op basis van jóuw cijfers."
+            intro="Fin leeft door je hele app heen — als constatering in je briefing, als suggestie naast een doel, als signaal bij een afwijkende transactie. Altijd in dezelfde stem, altijd op basis van jóuw cijfers."
           />
 
           <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {[
-              { Icon: Tags, titel: 'Categoriseert en signaleert', text: 'Will herkent en categoriseert je transacties — en signaleert wat afwijkt: een abonnement dat sluipend duurder wordt, een dubbele afschrijving.' },
+              { Icon: Tags, titel: 'Categoriseert en signaleert', text: 'Fin herkent en categoriseert je transacties — en signaleert wat afwijkt: een abonnement dat sluipend duurder wordt, een dubbele afschrijving.' },
               { Icon: Target, titel: 'Suggereert acties', text: 'Bij elk doel een paar concrete stappen die er sneller bij brengen.' },
-              { Icon: Calendar, titel: 'Stelt gebeurtenissen voor', text: 'Verbouwing, kind, verhuizing — Will vertaalt naar tijd en geld op je tijdas.' },
+              { Icon: Calendar, titel: 'Stelt gebeurtenissen voor', text: 'Verbouwing, kind, verhuizing — Fin vertaalt naar tijd en geld op je tijdas.' },
               { Icon: Newspaper, titel: 'Persoonlijk financieel nieuws', text: 'De Krant brengt nieuws dat over jouw situatie gaat — gefilterd op jouw vermogen, plannen en interesses.' },
               { Icon: Bell, titel: 'Notificaties op maat', text: 'Een seintje als een budget knelt, een doel afwijkt of een vaste last verandert — jij kiest waarover.' },
               { Icon: HelpCircle, titel: 'Beantwoordt vragen', text: 'In jouw context, met jouw cijfers — geen generiek financieel adviespraatje.' },
@@ -111,11 +111,11 @@ export function FunctiesSecties() {
 
           <div className="mx-auto max-w-2xl rounded-[var(--r-lg)] border border-l-[4px] border-l-wil-500 border-[var(--border-ed)] bg-[var(--paper)] px-6 py-5">
             <p className="font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-wil-700">
-              En wat Will <em>niet</em> doet
+              En wat Fin <em>niet</em> doet
             </p>
             <p className="mt-2 font-serif text-sm leading-relaxed text-[var(--ink-2)]">
               Geen beleggingsadvies, geen koop- of verkoopaanbevelingen, geen
-              productpromotie. Will rekent en suggereert &mdash; jij beslist.
+              productpromotie. Fin rekent en suggereert &mdash; jij beslist.
             </p>
           </div>
         </Reveal>
@@ -283,7 +283,7 @@ export function FunctiesSecties() {
                 </li>
                 <li>
                   Wie financieel advies wil zonder zelf na te denken &mdash;
-                  Will rekent, jij beslist.
+                  Fin rekent, jij beslist.
                 </li>
               </ul>
 

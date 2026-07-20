@@ -17,12 +17,12 @@
 // doelen & vrijheid (doelen-kaart, vrijheidsstrip, hero-widgets) → briefing
 // (vrijheidsweek, briefing-kaartjes, delen) → status & onboarding
 // (statusmelding, check-in-banner, welkomstgids) → inzichten & print
-// (samengestelde rente, afdrukken) → tips & acties (Will-tips beslissen,
+// (samengestelde rente, afdrukken) → tips & acties (Fin-tips beslissen,
 // handmatige actie, actiebeheer) → uitkomst → cross-doorwerking.
 //
 // OMGEKEERDE VERWIJZING: WF-WILL-21/22 wezen door naar UAT-OVZ-19/20/21 — de
 // 'tipsbeslissen'/'actietoevoegen'/'actiesbeheren'-knopen hieronder zijn dus
-// tegelijk de "echte" plek waar die WILL-workflows landen (Will levert alleen
+// tegelijk de "echte" plek waar die WILL-workflows landen (Fin levert alleen
 // de AI-context, geen eigen scenario/knoop).
 //
 // GRONDSLAG-REGEL (CLAUDE.md / zone-specifieke notitie): de hub is vooral een
@@ -70,7 +70,7 @@ export const OVZ_FLOW: UatFlow = {
     { id: 'print', scenarioId: 'UAT-OVZ-16', label: 'WF-OVZ-16 · Afdrukken / PDF opslaan', kind: 'action', stage: 5, lane: 'inzichten' },
 
     // ── 6 · tips & acties ─────────────────────────────────────────────────
-    { id: 'tipsbeslissen', scenarioId: 'UAT-OVZ-19', label: 'WF-OVZ-19 · Tips van Will beoordelen (Doe nu/Later/Negeren)', kind: 'screen', stage: 6, lane: 'tips' },
+    { id: 'tipsbeslissen', scenarioId: 'UAT-OVZ-19', label: 'WF-OVZ-19 · Tips van Fin beoordelen (Doe nu/Later/Negeren)', kind: 'screen', stage: 6, lane: 'tips' },
     { id: 'actietoevoegen', scenarioId: 'UAT-OVZ-20', label: 'WF-OVZ-20 · Handmatig een actie toevoegen', kind: 'action', stage: 6, lane: 'tips', subOf: 'tipsbeslissen' },
     { id: 'actiesbeheren', scenarioId: 'UAT-OVZ-21', label: 'WF-OVZ-21 · Open acties beheren', kind: 'screen', stage: 6, lane: 'tips', subOf: 'tipsbeslissen' },
 
@@ -78,7 +78,7 @@ export const OVZ_FLOW: UatFlow = {
     { id: 'uitkomst', label: 'Hub-cijfers, doelen, briefing en actielijst bijgewerkt', kind: 'outcome', stage: 7 },
 
     // ── 8 · cross-doorwerking (OUTPUT) ────────────────────────────────────
-    { id: 'x-will', label: 'Will · aanbevelingen-generatie (AI-context voor tips)', kind: 'cross', stage: 8, crossZone: 'WILL' },
+    { id: 'x-will', label: 'Fin · aanbevelingen-generatie (AI-context voor tips)', kind: 'cross', stage: 8, crossZone: 'WILL' },
     { id: 'x-toek', label: 'Toekomst · doelbeheer, projectie, FIRE-parameters', kind: 'cross', stage: 8, crossZone: 'TOEK' },
     { id: 'x-mijn', label: 'Mijn · profiel-/huishoudinstellingen, check-in-historie', kind: 'cross', stage: 8, crossZone: 'MIJN' },
     { id: 'x-nav', label: 'Navigatie · perspectiefwissel (WF-OVZ-17) + weergavemodus (WF-OVZ-18)', kind: 'cross', stage: 8, crossZone: 'NAV' },

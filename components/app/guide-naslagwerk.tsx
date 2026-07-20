@@ -178,7 +178,7 @@ const MODULES: NaslagwerkModule[] = [
       },
       {
         icon: MessageSquare,
-        title: 'Will AI-chat',
+        title: 'Fin AI-chat',
         summary: 'Je persoonlijke financiële gesprekspartner die meedenkt over vandaag, je tips en je toekomst.',
         anchor: 'guide-reis-5',
       },
@@ -256,8 +256,8 @@ const MODULES: NaslagwerkModule[] = [
       },
       {
         icon: Sparkles,
-        title: 'Will — je AI-assistent',
-        summary: 'Eén assistent, Will, die meedenkt over je overzicht van vandaag, concrete tips en je toekomst — context-aware financieel inzicht.',
+        title: 'Fin — je AI-assistent',
+        summary: 'Eén assistent, Fin, die meedenkt over je overzicht van vandaag, concrete tips en je toekomst — context-aware financieel inzicht.',
       },
       {
         icon: Bell,
@@ -277,7 +277,7 @@ const MODULES: NaslagwerkModule[] = [
       {
         icon: Newspaper,
         title: 'Wekelijkse briefing',
-        summary: 'Wekelijkse briefing met max 6 briefjes, door Will geredigeerd en 1×/dag te verversen.',
+        summary: 'Wekelijkse briefing met max 6 briefjes, door Fin geredigeerd en 1×/dag te verversen.',
       },
       {
         icon: Settings,

@@ -4,7 +4,7 @@ import { useState, useEffect, useReducer, useCallback, useMemo, useRef } from 'r
 import './onboarding.css'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { WillDots } from '@/components/app/will-dots'
+import { FinDots } from '@/components/app/fin-dots'
 import type { IdentityData } from '@/components/onboarding/onboarding-identity'
 import type { HorizonData } from '@/components/onboarding/onboarding-horizon'
 import type { AssetQuickInput, DebtQuickInput } from '@/lib/quick-add/types'
@@ -1491,7 +1491,7 @@ export default function OnboardingPage() {
               <div className="w-full max-w-sm rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] shadow-sm p-8 text-center">
                 <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center">
                   <div className="animate-pulse">
-                    <WillDots size={64} />
+                    <FinDots size={64} />
                   </div>
                 </div>
                 <p className="mb-4 text-sm font-medium text-[var(--ink-2)] transition-opacity duration-300">

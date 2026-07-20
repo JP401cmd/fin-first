@@ -143,7 +143,7 @@ export const SORRAnalyse = memo(function SORRAnalyse({
       title="Volgorde-risico (SORR)"
       icon={ShieldAlert}
       loading={loading}
-      willContext={
+      finContext={
         state
           ? `Volgorde-risico (SORR) onttrekkingsfase (${Math.round(startAge)}→${Math.round(endAge)}): ` +
             `baseline slagingskans ${Math.round(state.baseline.successRate * 100)}% bij ${formatCurrency(yearlyWithdrawal)}/jaar ` +

@@ -546,7 +546,7 @@ export const KNOWLEDGE_STARTER_SET: KnowledgeStarterTemplate[] = [
     tags: ['aandachtspunten', 'signalen', 'belasting', 'budget', 'schulden', 'bezittingen', 'actiepunten'],
     categorie: 'TriFinity-begrippen',
     tekst:
-      "Aandachtspunten zijn signalen die de app automatisch afleidt uit je belasting-, budget-, schuld- en bezittingengegevens: denk aan een fiscale kans die dit jaar nog benut kan worden, een budgetcategorie die structureel boven de gangbare NIBUD-norm uitkomt, een schuld met een rentepercentage dat versneld aflossen de moeite waard maakt, of vermogen dat weinig rendeert terwijl er ruimte is om het te laten werken. Elk aandachtspunt toont het geschatte besparingspotentieel, zowel in euro's als in vrijheidsdagen, zodat je de impact meteen in tijd kunt duiden. Vanuit een aandachtspunt kun je met één klik een concrete actie aanmaken; heb je een aandachtspunt al opgepakt of recent afgerond, dan onderdrukt de app het een tijd lang zodat je niet herhaaldelijk dezelfde suggestie krijgt — tot het moment dat een jaarlijks terugkerende kans weer relevant wordt. Dezelfde signalen voeden ook het gesprek met Will, je coach, zodat inzicht en gesprek op elkaar aansluiten.",
+      "Aandachtspunten zijn signalen die de app automatisch afleidt uit je belasting-, budget-, schuld- en bezittingengegevens: denk aan een fiscale kans die dit jaar nog benut kan worden, een budgetcategorie die structureel boven de gangbare NIBUD-norm uitkomt, een schuld met een rentepercentage dat versneld aflossen de moeite waard maakt, of vermogen dat weinig rendeert terwijl er ruimte is om het te laten werken. Elk aandachtspunt toont het geschatte besparingspotentieel, zowel in euro's als in vrijheidsdagen, zodat je de impact meteen in tijd kunt duiden. Vanuit een aandachtspunt kun je met één klik een concrete actie aanmaken; heb je een aandachtspunt al opgepakt of recent afgerond, dan onderdrukt de app het een tijd lang zodat je niet herhaaldelijk dezelfde suggestie krijgt — tot het moment dat een jaarlijks terugkerende kans weer relevant wordt. Dezelfde signalen voeden ook het gesprek met Fin, je coach, zodat inzicht en gesprek op elkaar aansluiten.",
   },
   {
     titel: 'Briefing / weekoverzicht',
@@ -644,10 +644,10 @@ export const KNOWLEDGE_STARTER_SET: KnowledgeStarterTemplate[] = [
   },
   {
     titel: 'Fase-analyses',
-    tags: ['fase-analyse', 'opbouwfase', 'overgangsfase', 'onttrekkingsfase', 'bespreek met will'],
+    tags: ['fase-analyse', 'opbouwfase', 'overgangsfase', 'onttrekkingsfase', 'bespreek met fin'],
     categorie: 'TriFinity-begrippen',
     tekst:
-      "Fase-analyses zijn de inklapbare verdiepingsblokken binnen de fase-vensters van je Toekomst-projectie — bijvoorbeeld rond de opbouwfase, de overgangsfase naar pensioen, of de onttrekkingsfase daarna. Elk blok zoomt in op wat er in díe specifieke levensfase gebeurt, zoals welke levensgebeurtenissen erin vallen en wat hun impact op die periode is. De blokken staan standaard dicht en klap je zelf open wanneer je de details wilt zien. Bij een fase-analyse kun je met één klik doorschakelen naar Will om de precieze cijfers uit dat blok te bespreken.",
+      "Fase-analyses zijn de inklapbare verdiepingsblokken binnen de fase-vensters van je Toekomst-projectie — bijvoorbeeld rond de opbouwfase, de overgangsfase naar pensioen, of de onttrekkingsfase daarna. Elk blok zoomt in op wat er in díe specifieke levensfase gebeurt, zoals welke levensgebeurtenissen erin vallen en wat hun impact op die periode is. De blokken staan standaard dicht en klap je zelf open wanneer je de details wilt zien. Bij een fase-analyse kun je met één klik doorschakelen naar Fin om de precieze cijfers uit dat blok te bespreken.",
   },
   {
     titel: 'Vrijheidspercentage',
@@ -661,7 +661,7 @@ export const KNOWLEDGE_STARTER_SET: KnowledgeStarterTemplate[] = [
     tags: ['aandachtspunten', 'actiepunten', 'signalen', 'acties aanmaken', 'will-context'],
     categorie: 'TriFinity-begrippen',
     tekst:
-      "Een aandachtspunt is een signaal dat de app zelf opmerkt door je gegevens te analyseren, bijvoorbeeld rond belasting, budget, schulden of bezittingen — het is een constatering, geen taak. Diezelfde aandachtspunten voeden ook het gesprek met Will, die ze als context gebruikt om je gericht te kunnen helpen. Een actiepunt is iets anders: dat maak je zelf bewust aan, eventueel met één klik vanuit een aandachtspunt, als een concreet item met een titel en eventueel een deadline dat je wilt bijhouden of afvinken. Kortom: het aandachtspunt is wat de app opmerkt, het actiepunt is wat jij ervan besluit te maken.",
+      "Een aandachtspunt is een signaal dat de app zelf opmerkt door je gegevens te analyseren, bijvoorbeeld rond belasting, budget, schulden of bezittingen — het is een constatering, geen taak. Diezelfde aandachtspunten voeden ook het gesprek met Fin, die ze als context gebruikt om je gericht te kunnen helpen. Een actiepunt is iets anders: dat maak je zelf bewust aan, eventueel met één klik vanuit een aandachtspunt, als een concreet item met een titel en eventueel een deadline dat je wilt bijhouden of afvinken. Kortom: het aandachtspunt is wat de app opmerkt, het actiepunt is wat jij ervan besluit te maken.",
   },
   {
     titel: 'Weergavemodus',

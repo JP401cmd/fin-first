@@ -40,7 +40,7 @@ export function WhatIfSuggestionCards({
       <div className="flex items-center gap-1.5">
         <Sparkles size={12} className="text-wil-600" />
         <span className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-wil-600">
-          Will suggereert
+          Fin suggereert
         </span>
       </div>
 

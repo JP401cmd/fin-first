@@ -8,7 +8,7 @@ import {
   LEVERAGE_STATUS_DOT,
 } from '@/lib/leverage-status'
 import { usePageStatusContext } from '@/components/app/page-status-provider'
-import { BesprekMetWillButton } from '@/components/app/chat/bespreek-met-will-button'
+import { BesprekMetWillButton } from '@/components/app/chat/bespreek-met-fin-button'
 
 /**
  * PageStatusBanner — duidings-melding bovenaan een niet-groene pagina onder
@@ -23,7 +23,7 @@ import { BesprekMetWillButton } from '@/components/app/chat/bespreek-met-will-bu
  *
  * Stijl: editorial banner met een 3px statusstreep (semantisch stoplicht,
  * GEEN module-accent). Kicker → reason (prominente regel) → remedy (subtieler).
- * CTA-rij: optionele actie-deeplink + altijd "Bespreek met Will".
+ * CTA-rij: optionele actie-deeplink + altijd "Bespreek met Fin".
  *
  * Top-of-page, dus géén --mobile-nav-clearance nodig.
  */
@@ -97,7 +97,7 @@ export function PageStatusBanner() {
             </p>
             <p className="mt-1 font-serif text-sm text-[var(--ink-2)]">{info.remedy}</p>
 
-            {/* CTA-rij: optionele actie + altijd Bespreek met Will. */}
+            {/* CTA-rij: optionele actie + altijd Bespreek met Fin. */}
             <div className="mt-3 flex flex-wrap items-center gap-2">
               {info.action && (
                 <Link

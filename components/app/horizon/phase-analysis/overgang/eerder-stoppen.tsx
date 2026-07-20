@@ -115,7 +115,7 @@ export const EerderStoppen = memo(function EerderStoppen({
       title={sectionTitle}
       icon={TrendingDown}
       loading={loading}
-      willContext={
+      finContext={
         notRelevant
           ? 'Eerder stoppen analyse: niet relevant — FIRE is al op korte termijn bereikbaar'
           : state

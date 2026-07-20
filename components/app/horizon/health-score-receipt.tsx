@@ -150,7 +150,7 @@ function scoreLabelNl(score: number): string {
 }
 
 /**
- * Context-prompt voor Will met het oordeel + de suggestie van de pijler, zodat
+ * Context-prompt voor Fin met het oordeel + de suggestie van de pijler, zodat
  * hij gericht dieper kan kijken naar concrete acties (i.p.v. een lege chat).
  */
 function buildWillContext(pillar: HealthPillar): string {
@@ -473,7 +473,7 @@ function PillarBar({
         </div>
       </div>
 
-      {/* Improvement tip + acties (navigeer · bespreek met Will · maak actie) */}
+      {/* Improvement tip + acties (navigeer · bespreek met Fin · maak actie) */}
       <div className="mt-2 flex items-start gap-1.5">
         <Lightbulb className="h-3 w-3 text-horizon-500 mt-0.5 shrink-0" aria-hidden="true" />
         <div className="min-w-0 flex-1">
@@ -495,10 +495,10 @@ function PillarBar({
               type="button"
               onClick={() => openWithMessage(buildWillContext(pillar))}
               className="inline-flex items-center gap-1 rounded-full border border-[var(--color-wil-300)] bg-[var(--color-wil-50)] px-2.5 py-1 text-[10px] font-medium text-[var(--color-wil-700)] transition-colors hover:bg-[var(--color-wil-100)]"
-              aria-label={`Bespreek ${pillar.name} met Will`}
+              aria-label={`Bespreek ${pillar.name} met Fin`}
             >
               <MessageSquare className="h-3 w-3" aria-hidden="true" />
-              Bespreek met Will
+              Bespreek met Fin
             </button>
             <button
               type="button"

@@ -408,7 +408,7 @@ export interface ReportLifePath {
   scenarios?: ReportLifePathScenario[]
 }
 
-/** Eén zet van Will. `kind` bepaalt de pill-stijl (groene dagen of paarse FIRE-maanden). */
+/** Eén zet van Fin. `kind` bepaalt de pill-stijl (groene dagen of paarse FIRE-maanden). */
 export interface ReportWillMove {
   title: string
   body: string
@@ -417,7 +417,7 @@ export interface ReportWillMove {
   kind: 'freedom-days' | 'fire-months'
 }
 
-/** Sectie 6 — Will. `intro` via AI-framing (guardrails); `moves` deterministisch uit de metrics. */
+/** Sectie 6 — Fin. `intro` via AI-framing (guardrails); `moves` deterministisch uit de metrics. */
 export interface ReportWill {
   intro: string
   moves: ReportWillMove[]

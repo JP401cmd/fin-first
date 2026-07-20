@@ -148,9 +148,9 @@ export function VeiligheidSecties() {
               ook geen aan.
             </p>
             <p>
-              Will, de AI-coach, blijft binnen datzelfde kader: geen
+              Fin, de AI-coach, blijft binnen datzelfde kader: geen
               beleggingsadvies, geen koop- of verkoopaanbevelingen, geen
-              productpromotie. Will rekent en suggereert; jij beslist. Voor
+              productpromotie. Fin rekent en suggereert; jij beslist. Voor
               concrete productkeuzes of fiscale planning blijft een erkend
               adviseur de aangewezen route.
             </p>

@@ -283,7 +283,7 @@ describe('BriefingPanel — AI-abonnementspoort op de ververs', () => {
     )
     // Geen ververs-button (POST) — wel een upsell-link naar het account
     expect(screen.queryByRole('button', { name: /ververs je briefing/i })).toBeNull()
-    const link = screen.getByRole('link', { name: /ververs met will/i })
+    const link = screen.getByRole('link', { name: /ververs met fin/i })
     expect(link).toBeTruthy()
     expect(link.getAttribute('href')).toBe('/mijn/account')
     // De deterministische briefing eronder blijft gewoon zichtbaar (gratis)
@@ -292,7 +292,7 @@ describe('BriefingPanel — AI-abonnementspoort op de ververs', () => {
 
   it('AI-abonnee: geen upsell-link, wél de echte Ververs-knop', () => {
     renderWithSubs(<BriefingPanel entries={entry} canRefresh />, ['ai'])
-    expect(screen.queryByRole('link', { name: /ververs met will/i })).toBeNull()
+    expect(screen.queryByRole('link', { name: /ververs met fin/i })).toBeNull()
     expect(screen.getByRole('button', { name: /ververs je briefing/i })).toBeTruthy()
   })
 })

@@ -2,7 +2,7 @@
 //
 // De kennisbank is een door de beheerder gecureerde UITLEG-laag (begrippen als
 // "wat is Box 3", "hoe werkt jaarruimte") die later (fase C1b) binnen een hard
-// token-budget in de systeemprompt van de lokale Will-chat wordt geïnjecteerd.
+// token-budget in de systeemprompt van de lokale Fin-chat wordt geïnjecteerd.
 //
 // HARDE INHOUDSREGEL (Wft/correctheid, uit het fase-2-plan §K1): de kennisbank
 // bevat uitsluitend uitleg en begrippen — NOOIT cijfers, tarieven of

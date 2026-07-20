@@ -167,7 +167,7 @@ export const KoopkrachtErosieOnttrekken = memo(function KoopkrachtErosieOnttrekk
       <AnalysisSection
         title="Koopkrachterosie"
         icon={ArrowDownRight}
-        willContext="Koopkrachterosie: geen onttrekking, niet relevant"
+        finContext="Koopkrachterosie: geen onttrekking, niet relevant"
       >
         <div className="flex items-start gap-2 rounded-[var(--r)] border border-emerald-200 bg-emerald-50/50 p-3 dark:border-emerald-800 dark:bg-emerald-900/10">
           <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
@@ -185,7 +185,7 @@ export const KoopkrachtErosieOnttrekken = memo(function KoopkrachtErosieOnttrekk
       <AnalysisSection
         title="Koopkrachterosie"
         icon={ArrowDownRight}
-        willContext="Koopkrachterosie: 0% inflatie, geen erosie"
+        finContext="Koopkrachterosie: 0% inflatie, geen erosie"
       >
         <div className="flex items-start gap-2 rounded-[var(--r)] border border-emerald-200 bg-emerald-50/50 p-3 dark:border-emerald-800 dark:bg-emerald-900/10">
           <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
@@ -203,7 +203,7 @@ export const KoopkrachtErosieOnttrekken = memo(function KoopkrachtErosieOnttrekk
       <AnalysisSection
         title="Koopkrachterosie"
         icon={ArrowDownRight}
-        willContext={`Koopkrachterosie: slechts ${durationYears} jaar, minimale impact`}
+        finContext={`Koopkrachterosie: slechts ${durationYears} jaar, minimale impact`}
       >
         <div className="flex items-start gap-2 rounded-[var(--r)] border border-emerald-200 bg-emerald-50/50 p-3 dark:border-emerald-800 dark:bg-emerald-900/10">
           <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
@@ -220,7 +220,7 @@ export const KoopkrachtErosieOnttrekken = memo(function KoopkrachtErosieOnttrekk
       title="Koopkrachterosie"
       icon={ArrowDownRight}
       loading={loading}
-      willContext={
+      finContext={
         state
           ? `Koopkrachterosie over ${durationYears} jaar bij ${(inflationRate * 100).toFixed(1)}% inflatie: ` +
             `alleen het portfolio-deel (${formatCurrency(yearlyWithdrawal)}/jaar) erodeert; ` +

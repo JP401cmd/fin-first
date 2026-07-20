@@ -213,10 +213,10 @@ const MODULES: ModuleEntry[] = [
       { label: 'Verhuurrendement',  href: '/overzicht/bezittingen/real_estate?tab=verhuurrendement', appKey: 'verhuurrendement' },
     ],
   },
-  // 'wil'-entry is verwijderd: Will-coach is een persona overal, geen
-  // route. WillLanding-content (briefing + acties + widget-dashboard)
+  // 'wil'-entry is verwijderd: Fin-coach is een persona overal, geen
+  // route. FinLanding-content (briefing + acties + widget-dashboard)
   // leeft nu op /overzicht (= 'kern' entry hierboven). Floating
-  // nav-button toont "Vraag Will" als globaal item in NavMenuSheet.
+  // nav-button toont "Vraag Fin" als globaal item in NavMenuSheet.
   {
     key: 'horizon',
     prefix: 'De ',
@@ -244,7 +244,7 @@ type OverigeEntry = {
 }
 
 const OVERIGE_BASE: OverigeEntry[] = [
-  // Tips & acties — de Will-stroom (briefing-vervolg) als vaste ingang.
+  // Tips & acties — de Fin-stroom (briefing-vervolg) als vaste ingang.
   // Zap = de actie-helft van "tips & acties" (zie guide-naslagwerk).
   { label: 'Tips & acties', Icon: Zap, href: '/overzicht/tips' },
   { label: 'Berichten', Icon: Inbox, href: '/berichten' },
@@ -287,7 +287,7 @@ function detectActiveModule(pathname: string): NavModule | null {
   if (pathname.startsWith('/overzicht') || pathname.startsWith('/core')) return 'kern'
   if (pathname.startsWith('/toekomst') || pathname.startsWith('/horizon')) return 'horizon'
   // /will redirecteert naar /overzicht — als gebruiker pre-redirect /will ziet
-  // markeren we ook 'kern' (= de tab waar WillLanding nu leeft)
+  // markeren we ook 'kern' (= de tab waar FinLanding nu leeft)
   if (pathname.startsWith('/will')) return 'kern'
   return null
 }

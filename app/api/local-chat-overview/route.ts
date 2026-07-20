@@ -5,7 +5,7 @@ import { checkTierGate } from '@/lib/require-tier'
 import { buildLocalChatOverview } from '@/lib/ai/local/local-chat-context'
 
 /**
- * Hydratie-API voor het financiële overzicht van de lokale Will-chat (fase C2a).
+ * Hydratie-API voor het financiële overzicht van de lokale Fin-chat (fase C2a).
  *
  * De lokale chat draait ON-DEVICE (WebGPU/Gemma) in de client-`LocalChatPanel`.
  * Die heeft de compacte `LocalChatOverview` nodig, maar `buildLocalChatOverview`

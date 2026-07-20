@@ -27,9 +27,9 @@ import type { PrefillValues } from '@/lib/calculator/user-data-keys'
 import { CalendarPlus } from 'lucide-react'
 
 /**
- * RekenhulpView — eigen plek (/toekomst?tab=rekenhulp) waar Will helpt
+ * RekenhulpView — eigen plek (/toekomst?tab=rekenhulp) waar Fin helpt
  * een custom calculator te bouwen. Drie modi:
- *   - 'list':    opgeslagen calculators + "Nieuwe met Will"-knop
+ *   - 'list':    opgeslagen calculators + "Nieuwe met Fin"-knop
  *   - 'build':   prompt-veld → AI-generatie → preview (Opslaan/Verfijnen)
  *   - 'run':     opgeslagen calculator interactief draaien
  *
@@ -191,7 +191,7 @@ export function RekenhulpView({
         <header className="mb-4">
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-horizon-700">
-              Rekenhulp bouwen met Will
+              Rekenhulp bouwen met Fin
             </div>
             {/* Verbruik-badge — geeft de gebruiker zicht op zijn weekquotum
                 vóór hij submit. `usageRefreshKey` bumpt na een succesvolle
@@ -205,7 +205,7 @@ export function RekenhulpView({
             Beschrijf je vraagstuk
           </h2>
           <p className="text-sm text-[var(--ink-2)] mt-1 leading-relaxed">
-            Will maakt er een rekenhulp van met jouw gegevens al ingevuld.
+            Fin maakt er een rekenhulp van met jouw gegevens al ingevuld.
           </p>
         </header>
 
@@ -349,7 +349,7 @@ export function RekenhulpView({
         <div className="flex items-center gap-2 flex-wrap">
           {/* Brug naar de publieke marktplaats — anderen hun gepubliceerde
               rekenhulpen ontdekken en kopiëren. Bewust een tekstlink (geen
-              primary CTA) zodat de "Nieuwe met Will"-actie de hoofdfocus
+              primary CTA) zodat de "Nieuwe met Fin"-actie de hoofdfocus
               blijft. */}
           <Link
             href="/toekomst/bibliotheek"
@@ -368,7 +368,7 @@ export function RekenhulpView({
             className="inline-flex items-center gap-1.5 bg-[var(--ink)] text-[var(--paper)] px-4 py-2.5 text-sm font-semibold hover:bg-[var(--ink-2)] transition-colors"
           >
             <Sparkles className="w-4 h-4" aria-hidden="true" />
-            Nieuwe met Will
+            Nieuwe met Fin
           </button>
         </div>
       </header>
@@ -382,7 +382,7 @@ export function RekenhulpView({
             Nog geen rekenhulpen
           </h3>
           <p className="text-sm text-[var(--ink-2)] leading-relaxed mb-4">
-            Laat Will een rekenhulp maken voor je eigen vraagstuk — aflossen
+            Laat Fin een rekenhulp maken voor je eigen vraagstuk — aflossen
             vs. beleggen, verhuurregimes, of agio naar je BV. Je gegevens zijn
             al ingevuld; je past alleen de aannames aan.
           </p>

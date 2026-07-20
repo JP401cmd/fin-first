@@ -19,7 +19,7 @@ import { getServiceClient } from '@/lib/supabase/service'
 // ── Feature-labels (voor /beheer/ai-verbruik) ───────────────────────────────
 
 export const AI_TOKEN_FEATURE_LABELS: Record<string, string> = {
-  chat: 'Will-chat',
+  chat: 'Fin-chat',
   briefing: 'Briefing',
   aanbevelingen: 'Aanbevelingen',
   aanbevelingen_initieel: 'Aanbevelingen (eerste set)',

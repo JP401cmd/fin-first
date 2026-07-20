@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { CoachMelding } from './coach-melding'
 
 const base = {
-  headerLabel: 'Tip van Will', shown: 'Koppel je bank.', showCursor: false, done: true,
+  headerLabel: 'Tip van Fin', shown: 'Koppel je bank.', showCursor: false, done: true,
   cta: 'Bank koppelen', ctaHref: '/core/cash/connect',
 }
 
@@ -12,7 +12,7 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 describe('CoachMelding', () => {
   it('toont label, getypte tekst en CTA wanneer done', () => {
     render(<CoachMelding {...base} onClose={vi.fn()} onCtaActivate={vi.fn()} onOpenChat={vi.fn()} />)
-    expect(screen.getByText('Tip van Will')).toBeInTheDocument()
+    expect(screen.getByText('Tip van Fin')).toBeInTheDocument()
     expect(screen.getByText('Koppel je bank.')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Bank koppelen/i })).toBeInTheDocument()
   })

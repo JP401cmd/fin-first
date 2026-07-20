@@ -6,7 +6,7 @@
 const CATEGORY_NAV_BAR_KEY = 'dashboard_category_nav_bar_visible'
 
 /**
- * Lees of de categorie-app-balk zichtbaar is op het Will-dashboard.
+ * Lees of de categorie-app-balk zichtbaar is op het Fin-dashboard.
  * Default: `true` — nieuwe gebruikers zien de balk meteen, want hij maakt
  * de koppeling tussen widgets en categorie-pagina's expliciet. Wie de balk
  * uit zet, kan via Modify-mode altijd terug.

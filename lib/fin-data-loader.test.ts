@@ -1,12 +1,12 @@
 import { describe, it, expect, vi } from 'vitest'
 
 /**
- * Tests voor de parameter-doel-laag in `will-data-loader.ts` (ronde 4, stap 4):
+ * Tests voor de parameter-doel-laag in `fin-data-loader.ts` (ronde 4, stap 4):
  *   1. cap-splitsing (`splitActiveGoals`) — parameter-doelen buiten de max-5-slice,
  *      vooraan, index-gekoppeld;
  *   2. de pure actuele-waarde-computers per bron (spaarquote/salaris/rendement/
  *      vrijheidsleeftijd) inclusief de tolerante "ontbrekende bron"-degradatie;
- *   3. end-to-end via `loadWillData` met een fake-Supabase: cap-split-volgorde, de
+ *   3. end-to-end via `loadFinData` met een fake-Supabase: cap-split-volgorde, de
  *      LAZY injectie-bedrading (geen queries zonder parameter-doelen) en metadata-
  *      loze (oude) rijen die niet crashen.
  *
@@ -19,7 +19,7 @@ vi.mock('@/lib/supabase/cached-user', () => ({
 }))
 
 import {
-  loadWillData,
+  loadFinData,
   isParameterGoal,
   splitActiveGoals,
   computeParameterSavingsRatePct,
@@ -27,7 +27,7 @@ import {
   computeParameterWeightedReturnPct,
   pickLatestSnapshotFireAge,
   type GoalWithBudget,
-} from './will-data-loader'
+} from './fin-data-loader'
 import type { Debt } from './debt-data'
 
 // ── Fixtures ──────────────────────────────────────────────────────────────
@@ -300,7 +300,7 @@ describe('pickLatestSnapshotFireAge', () => {
   })
 })
 
-// ── Fake-Supabase voor loadWillData-integratie ──────────────────────────────
+// ── Fake-Supabase voor loadFinData-integratie ──────────────────────────────
 
 interface SupaConfig {
   goals?: GoalWithBudget[]
@@ -362,9 +362,9 @@ function makeSupabase(cfg: SupaConfig): { supabase: never; called: string[] } {
   return { supabase: supabase as never, called }
 }
 
-// ── loadWillData — integratie ───────────────────────────────────────────────
+// ── loadFinData — integratie ───────────────────────────────────────────────
 
-describe('loadWillData — cap-split + lazy injectie (integratie)', () => {
+describe('loadFinData — cap-split + lazy injectie (integratie)', () => {
   it('parameter-doelen komen vooraan; goalProgresses blijft index-gekoppeld', async () => {
     goalSeq = 0
     const goals = [
@@ -373,7 +373,7 @@ describe('loadWillData — cap-split + lazy injectie (integratie)', () => {
       goal({ goal_type: 'savings', name: 'Handmatig 2' }),
     ]
     const { supabase } = makeSupabase({ goals, profileFinancials: { net_monthly_income: 5000, income_source: 'manual' } })
-    const data = await loadWillData(supabase)
+    const data = await loadFinData(supabase)
 
     expect(data.goals[0].name).toBe('Salaris-doel')
     expect(data.goalProgresses).toHaveLength(3)
@@ -385,7 +385,7 @@ describe('loadWillData — cap-split + lazy injectie (integratie)', () => {
   it('LAZY: zonder parameter-doelen draaien de injectie-queries NIET', async () => {
     const goals = [goal({ goal_type: 'savings' }), goal({ goal_type: 'debt_payoff' })]
     const { supabase, called } = makeSupabase({ goals })
-    await loadWillData(supabase)
+    await loadFinData(supabase)
 
     expect(called).not.toContain('transactions')
     expect(called).not.toContain('budgets')
@@ -402,7 +402,7 @@ describe('loadWillData — cap-split + lazy injectie (integratie)', () => {
         { amount: -18000, budget_id: null, date: '2026-05-01' },
       ],
     })
-    const data = await loadWillData(supabase)
+    const data = await loadFinData(supabase)
 
     expect(called).toContain('transactions')
     expect(data.goals[0].current_value).toBe(40) // (30000-18000)/30000
@@ -414,7 +414,7 @@ describe('loadWillData — cap-split + lazy injectie (integratie)', () => {
     const goals = [paramGoal('fire_age', { target_value: 55, current_value: 62 })]
     // Geen snapshots → tolerante degradatie.
     const { supabase } = makeSupabase({ goals, snapshots: [] })
-    const data = await loadWillData(supabase)
+    const data = await loadFinData(supabase)
 
     expect(data.goals[0].current_value).toBe(62) // DB-waarde behouden
   })
@@ -426,7 +426,7 @@ describe('loadWillData — cap-split + lazy injectie (integratie)', () => {
       goal({ goal_type: 'salary', current_value: 1234, metadata: null }),
     ]
     const { supabase, called } = makeSupabase({ goals })
-    const data = await loadWillData(supabase)
+    const data = await loadFinData(supabase)
 
     // Geen parameter-doelen → geen injectie-queries, handmatige current_value ongemoeid.
     expect(called).not.toContain('transactions')
@@ -437,7 +437,7 @@ describe('loadWillData — cap-split + lazy injectie (integratie)', () => {
 
 // ── actions-KPI-totalen: geen kunstmatige afkap onder de cap (Task 2.5) ─────────
 
-describe('loadWillData — actions-KPI-totalen kappen niet af onder de PostgREST-cap', () => {
+describe('loadFinData — actions-KPI-totalen kappen niet af onder de PostgREST-cap', () => {
   it('sommeert over ALLE teruggegeven actie-rijen (fixture > cap van 1000)', async () => {
     // 1200 acties > max_rows (config.toml = 1000). De fake-client negeert `.limit()`,
     // dus alle 1200 komen door — dit bewijst dat de loader-JS zelf GEEN kunstmatige
@@ -457,7 +457,7 @@ describe('loadWillData — actions-KPI-totalen kappen niet af onder de PostgREST
       })),
     ]
     const { supabase } = makeSupabase({ actions })
-    const data = await loadWillData(supabase)
+    const data = await loadFinData(supabase)
 
     // Geen afkap: alle 1200 rijen aanwezig, splitsing per status compleet.
     expect(data.kpiData.allActions).toHaveLength(COMPLETED + OPEN)

@@ -3,7 +3,7 @@
 // Gedeelde bouwstenen van het "Transacties categoriseren"-scherm: de per-rij
 // review-kaart (TransactionRow), de rij-types en de kleine formatters. Zowel de
 // platte review-lijst (AICategorizeSheet, reviewMode 'list') als de "Vraag
-// Will"-wizard (CategorizeWizard) renderen hiermee EXACT dezelfde rij — niet
+// Fin"-wizard (CategorizeWizard) renderen hiermee EXACT dezelfde rij — niet
 // dupliceren, hergebruiken (WP-C, feature #881).
 
 import { Check, HelpCircle, Sparkles, GitFork } from 'lucide-react'
@@ -48,7 +48,7 @@ export const SOURCE_LABELS: Record<CombinedProposalSource, string> = {
   rule: 'Regel',
   transfer: 'Overboeking',
   mirror: 'Overboeking',
-  ai: 'Will',
+  ai: 'Fin',
   propagated: 'Afgeleid',
 }
 
@@ -62,7 +62,7 @@ export type RowState = {
   acceptedCategorySource: string | null
   makeRule: boolean
   /**
-   * Will heeft deze rij in een AI-ronde beoordeeld maar géén bruikbaar voorstel
+   * Fin heeft deze rij in een AI-ronde beoordeeld maar géén bruikbaar voorstel
    * kunnen geven (representant zonder budget_id/leeg resultaat óf een gefaalde
    * batch). Gevoed door `runCombinedCategorization`'s `onNoMatch` (per ronde) +
    * `result.noMatchIds` (vangnet). De wizard toont dan meteen de handmatige
@@ -143,7 +143,7 @@ export function TransactionRow({ row, budgetGroups, onAcceptSuggestion, onManual
         </div>
       </div>
 
-      {/* Voorstel-blok — regel, Will, afgeleid of overboeking (herkomst-label per rij) */}
+      {/* Voorstel-blok — regel, Fin, afgeleid of overboeking (herkomst-label per rij) */}
       {hasSuggestion && !accepted && (
         <div className="mt-3 rounded-r-[var(--r-sm)] border border-dashed border-kern-200 bg-kern-50/50 px-3 py-3">
           <div className="flex items-start justify-between gap-2">

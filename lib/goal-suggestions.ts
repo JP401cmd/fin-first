@@ -1,7 +1,7 @@
 /**
- * Goal-suggestions — contextuele Will-tips per goal_type. Plan §6.3 Tab 2
+ * Goal-suggestions — contextuele Fin-tips per goal_type. Plan §6.3 Tab 2
  * "Detail-pane bij klik (slide-in, edit + bijdrage-monitor + acties van
- * Will)". MVP zonder DB-koppeling: per goal_type een vaste set tactics
+ * Fin)". MVP zonder DB-koppeling: per goal_type een vaste set tactics
  * die de gebruiker kan toepassen om sneller bij het doel te komen.
  *
  * Bron-inspiratie: Nibud-advies + boeken (Ramsey debt-snowball/avalanche,
@@ -14,7 +14,7 @@ export type GoalKind = 'savings' | 'wealth' | 'debt'
 export interface GoalSuggestion {
   /** Stable key voor React-list-key en analytics. */
   key: string
-  /** Will-stem in 1 zin. */
+  /** Fin-stem in 1 zin. */
   text: string
   /** Verwachte impact (vrij vorm — bv. "+30% consistentie"). */
   impact?: string

@@ -176,7 +176,7 @@ export const ROADMAP_TIERS: RoadmapTier[] = [
         pillars: ['grip'],
         effort: 'klein',
         summary:
-          'De wekelijkse briefing ook per e-mail, met een brug terug de app in ("bespreek met Will").',
+          'De wekelijkse briefing ook per e-mail, met een brug terug de app in ("bespreek met Fin").',
         market:
           'Monarchs Weekly Recap (dec 2025) sluit de loop dashboard → e-mail → AI-vervolgvraag; dé retentie-mechaniek.',
         build:

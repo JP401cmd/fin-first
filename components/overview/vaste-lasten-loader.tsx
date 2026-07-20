@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import {
   VasteKostenAnalyse,
   type RecurringItem,
-} from '@/components/will/vaste-kosten-analyse'
+} from '@/components/fin/vaste-kosten-analyse'
 type ApiResponse = {
   subscriptions?: RecurringItem[]
   vasteKosten?: RecurringItem[]
@@ -12,14 +12,14 @@ type ApiResponse = {
 
 /**
  * Client-loader voor de Vaste-lasten view in CashflowViewSwitcher.
- * Fetcht /api/subscriptions (zelfde endpoint als WillLanding gebruikt)
+ * Fetcht /api/subscriptions (zelfde endpoint als FinLanding gebruikt)
  * en geeft door aan VasteKostenAnalyse — geen eigen logica, alleen
  * data-orchestratie zodat we de bestaande analyse-component kunnen
  * hergebruiken zonder hem te wijzigen.
  *
  * onCancellationOpen + onRefresh worden hier minimal afgehandeld:
  * - onCancellationOpen is een no-op want we hebben hier geen modal-host;
- *   user moet voor cancellation naar WillLanding
+ *   user moet voor cancellation naar FinLanding
  * - onRefresh herrefresht alleen lokaal de fetch
  */
 export function VasteLastenLoader({
@@ -92,7 +92,7 @@ export function VasteLastenLoader({
           Geen vaste lasten herkend.
         </p>
         <p className="text-xs text-[var(--ink-3)]">
-          Will herkent terugkerende uitgaven automatisch zodra je transacties
+          Fin herkent terugkerende uitgaven automatisch zodra je transacties
           importeert.
         </p>
       </section>
@@ -100,7 +100,7 @@ export function VasteLastenLoader({
   }
 
   // No-op cancellation handler — voor opzeg-flows verwijst de view de
-  // gebruiker naar WillLanding op /overzicht (waar de cancellation-modal
+  // gebruiker naar FinLanding op /overzicht (waar de cancellation-modal
   // gemount is). De prop signature heeft een metadata-arg maar we
   // negeren deze hier.
   const handleCancellation = () => {

@@ -259,7 +259,7 @@ export function FotoVanNu({
           className="mono"
           style={{ fontSize: 13.5, color: 'var(--ink-soft)', marginTop: 10 }}
         >
-          ↳ Je vrij besteedbare ruimte stuur je naar sparen — bewust. Will kijkt
+          ↳ Je vrij besteedbare ruimte stuur je naar sparen — bewust. Fin kijkt
           verderop of dat houdbaar is.
         </p>
       </div>

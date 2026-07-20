@@ -12,7 +12,7 @@ import { describe, it, expect, vi } from 'vitest'
 
 vi.mock('@/lib/supabase/server', () => ({ createClient: vi.fn() }))
 vi.mock('@/lib/horizon-data-loader', () => ({ loadHorizonData: vi.fn() }))
-vi.mock('@/lib/will-data-loader', () => ({ loadWillData: vi.fn() }))
+vi.mock('@/lib/fin-data-loader', () => ({ loadFinData: vi.fn() }))
 vi.mock('@/components/app/horizon/horizon-client', () => ({ default: () => null }))
 vi.mock('@/components/future/toekomst-nav-cards', () => ({ ToekomstNavCards: () => null }))
 vi.mock('@/components/future/print-tijdas-button', () => ({ PrintTijdasButton: () => null }))

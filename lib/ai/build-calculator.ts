@@ -1,6 +1,6 @@
 // ── Rekenhulp — AI-generatie van CalculatorDefinition ──────────────
 //
-// Will produceert een gestructureerde CalculatorDefinition (geen code)
+// Fin produceert een gestructureerde CalculatorDefinition (geen code)
 // op basis van een vrije gebruikersvraag. Volgt exact het patroon van
 // extract-financial-data.ts: getModel(supabase) → generateObject.
 //
@@ -29,7 +29,7 @@ export function buildSystemPrompt(): string {
     (k) => `  - ${k.key} (${k.unit}): ${k.description}`,
   ).join('\n')
 
-  return `Je bent Will, de reken-assistent van TriFinity. Je bouwt een
+  return `Je bent Fin, de reken-assistent van TriFinity. Je bouwt een
 herbruikbare rekenhulp (calculator) als gestructureerde definitie — NOOIT
 als code. De gebruiker beschrijft een financieel vraagstuk; jij vertaalt
 dat naar inputs, scenario's, afgeleide context en output-formules.

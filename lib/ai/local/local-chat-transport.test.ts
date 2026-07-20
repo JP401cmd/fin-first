@@ -157,9 +157,9 @@ describe('LocalChatTransport — spike: chunk-vertaling naar useChat (C2a)', () 
     await foldToMessage(await transport.sendMessages(sendOpts([userMessage('Wat is mijn dagtarief?')])))
 
     // De canonieke cijfers uit het overzicht staan in de systeemprompt en de DNA
-    // (Will) is aanwezig — bewijst dat buildLocalChatSystemPrompt is aangeroepen.
+    // (Fin) is aanwezig — bewijst dat buildLocalChatSystemPrompt is aangeroepen.
     expect(capturedPrompt).toContain('FINANCIEEL OVERZICHT')
-    expect(capturedPrompt).toContain('Je bent Will')
+    expect(capturedPrompt).toContain('Je bent Fin')
     expect(capturedPrompt).toContain('85.000')
   })
 

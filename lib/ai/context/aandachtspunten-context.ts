@@ -28,11 +28,11 @@ function freedomDaysToString(freedomDays: number): string | null {
 }
 
 /**
- * Bouw de "== AANDACHTSPUNTEN (kansen) ==" context-sectie voor Will.
+ * Bouw de "== AANDACHTSPUNTEN (kansen) ==" context-sectie voor Fin.
  *
  * Voedt zich met dezelfde generieke aandachtspunten-laag die de UI gebruikt om
  * "voeg toe als actie" aan te bieden (collectAandachtspunten → belasting + budget
- * + schulden). Will MAG deze kansen benoemen en aanmoedigen, maar voegt ze NOOIT
+ * + schulden). Fin MAG deze kansen benoemen en aanmoedigen, maar voegt ze NOOIT
  * automatisch als actie toe — dat is een bewuste, deterministische gebruikersactie.
  *
  * Faal-zacht: één try/catch → '' bij elke fout (nooit een throw richting de

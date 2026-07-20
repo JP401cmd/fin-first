@@ -86,7 +86,7 @@ export default function BeheerPromptsPage() {
       <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-6">
         <h2 className="text-lg font-semibold text-[var(--ink)]">System Prompts</h2>
         <p className="mt-1 text-sm text-[var(--ink-3)]">
-          Overzicht van alle system prompts die Will en andere AI-modules gebruiken.
+          Overzicht van alle system prompts die Fin en andere AI-modules gebruiken.
           Aanpassen doe je in de code ({prompts.length} prompts, {totalChars.toLocaleString('nl-NL')} tekens totaal).
         </p>
         <p className="mt-2 text-xs text-[var(--ink-4)]">

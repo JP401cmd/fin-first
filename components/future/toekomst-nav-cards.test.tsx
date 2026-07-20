@@ -7,7 +7,7 @@ import {
   formatPct,
   type GoalProgress,
 } from './toekomst-nav-cards'
-import type { GoalWithBudget } from '@/lib/will-data-loader'
+import type { GoalWithBudget } from '@/lib/fin-data-loader'
 import type { LifeEvent } from '@/lib/horizon-data'
 import type { FireParams } from '@/lib/fire-params'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
@@ -393,7 +393,7 @@ describe('ToekomstNavCards — Rekenhulp-kaart', () => {
     const { container } = renderCards({ calculatorCount: 4 })
     const card = cardByHref(container, '/toekomst/rekenhulp')
     expect(within(card).getByText('4 rekenhulpen')).toBeTruthy()
-    expect(within(card).getByText('Nieuwe met Will')).toBeTruthy()
+    expect(within(card).getByText('Nieuwe met Fin')).toBeTruthy()
   })
 
   it('toont singular "1 rekenhulp" bij precies één', () => {

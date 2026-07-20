@@ -158,7 +158,7 @@ export function WhatIfActions({
     return result
   }, [hasChanges, deltas, overrides, baseline, masked])
 
-  // Build Will chat message with scenario context
+  // Build Fin chat message with scenario context
   const buildWillMessage = () => {
     const parts: string[] = ['Ik heb een wat-als scenario gemaakt met de volgende aanpassingen:']
 
@@ -269,18 +269,18 @@ export function WhatIfActions({
               </div>
             )}
 
-            {/* Talk to Will button */}
+            {/* Talk to Fin button */}
             <button
               type="button"
               onClick={() => openWithMessage(buildWillMessage())}
               className="mt-3 flex w-full items-center justify-center gap-2 rounded-[var(--r)] bg-horizon-600 px-4 py-3 font-sans text-sm font-medium text-white transition-colors hover:bg-horizon-700"
             >
               <MessageCircle className="h-4 w-4" />
-              Bespreek met Will
+              Bespreek met Fin
             </button>
 
             <p className="mt-2 text-center font-sans text-[10px] text-[var(--ink-4)]">
-              Will analyseert je scenario en stelt concrete stappen voor
+              Fin analyseert je scenario en stelt concrete stappen voor
             </p>
           </div>
         )}

@@ -6,7 +6,7 @@ import { checkTierGate } from '@/lib/require-tier'
 import { parseLocalKnowledge } from '@/lib/ai/local/knowledge-context'
 
 /**
- * Lees-API voor de kennisbank van de lokale Will-chat (fase C1b).
+ * Lees-API voor de kennisbank van de lokale Fin-chat (fase C1b).
  *
  * De lokale chat draait ON-DEVICE (WebGPU/Gemma) en heeft de gecureerde
  * uitleg-items nodig om begrippen (bv. Box 3, jaarruimte) correct te duiden —

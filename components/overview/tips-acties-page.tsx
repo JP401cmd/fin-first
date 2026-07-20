@@ -71,7 +71,7 @@ export function TipsActiesPage({
           titleBefore="Wat zou je "
           emphasis="nu"
           titleAfter=" kunnen doen?"
-          deck="Toptips van Will bovenaan; open acties eronder. Beslis op een tip met Doe nu, Later of Negeren — accepteer je 'm, dan verschijnt 'ie op je actielijst."
+          deck="Toptips van Fin bovenaan; open acties eronder. Beslis op een tip met Doe nu, Later of Negeren — accepteer je 'm, dan verschijnt 'ie op je actielijst."
         />
 
         <TipsLijst

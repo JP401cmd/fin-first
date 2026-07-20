@@ -167,7 +167,7 @@ export const OVERVIEW_APP_SUBROUTES: OverviewAppItem[] = [
 export const globalNav: GlobalNavItem[] = [
   { label: 'Krant', icon: Newspaper, href: '/nieuws' },
   { label: 'Berichten', icon: Bell, href: '/berichten' },
-  { label: 'Vraag Will', icon: MessageCircle, action: 'open-chat' },
+  { label: 'Vraag Fin', icon: MessageCircle, action: 'open-chat' },
   { label: 'Account', icon: Settings, action: 'open-account' },
 ]
 

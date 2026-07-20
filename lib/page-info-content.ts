@@ -9,7 +9,7 @@ export const PAGE_INFO: Record<string, string> = {
   // ── Nieuwe navigatie-architectuur (Overzicht / Toekomst / Mijn) ────
   '/overzicht':
     'Hoe sta je er voor in één blik. ' +
-    'Vier hefbomen (bezittingen, schulden, cashflow, belasting), je financiële gezondheidsscore, voortgang op je doelen en de wekelijkse briefing van Will. ' +
+    'Vier hefbomen (bezittingen, schulden, cashflow, belasting), je financiële gezondheidsscore, voortgang op je doelen en de wekelijkse briefing van Fin. ' +
     'Klik op een hefboom voor verdieping.',
 
   '/overzicht/bezittingen':
@@ -74,7 +74,7 @@ export const PAGE_INFO: Record<string, string> = {
 
   '/overzicht/tips':
     'Toptips bovenaan, open acties eronder. ' +
-    'Tips komen van Will (chat of analyse); beslis hier per tip met Doe nu, Later of Negeren. ' +
+    'Tips komen van Fin (chat of analyse); beslis hier per tip met Doe nu, Later of Negeren. ' +
     'Geaccepteerde tips landen automatisch op je actielijst.',
 
   '/toekomst':

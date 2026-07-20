@@ -130,7 +130,7 @@ export function EventPane({
   }
 
   /**
-   * Will heeft via suggestLifeEvent-tool een voorstel gedaan. We vertalen de
+   * Fin heeft via suggestLifeEvent-tool een voorstel gedaan. We vertalen de
    * payload naar een EditFormState en springen naar edit-mode zodat gebruiker
    * kan tweaken en opslaan. Bij accepteren is altijd één van de drie blokken
    * gevuld (anders had de tool geen impact-velden).
@@ -249,7 +249,7 @@ export function EventPane({
     mode === 'catalog'
       ? 'Levensgebeurtenis toevoegen'
       : mode === 'chat'
-        ? 'Brainstormen met Will'
+        ? 'Brainstormen met Fin'
         : mode === 'view'
           ? editingEvent?.name ?? 'Levensgebeurtenis'
           : editingEvent

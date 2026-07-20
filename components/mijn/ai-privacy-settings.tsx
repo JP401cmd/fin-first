@@ -193,7 +193,7 @@ export function AiPrivacySettings() {
                 'Budgetcategorieën en bijbehorende bedragen',
                 'Leeftijd (niet je geboortedatum)',
                 'Huishoudtype en temporal balance level',
-                'De vraag die je zelf aan Will typt — zoals jij hem typt',
+                'De vraag die je zelf aan Fin typt — zoals jij hem typt',
                 'Bij document-import: de volledige tekst van het document dat je uploadt',
                 'Bij abonnement-herkenning: de omschrijvingen van je transacties',
               ].map((item) => (

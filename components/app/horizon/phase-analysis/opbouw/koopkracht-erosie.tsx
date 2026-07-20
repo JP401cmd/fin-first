@@ -85,13 +85,13 @@ export const KoopkrachtErosie = memo(function KoopkrachtErosie({
     : 0
   const extraMaanden = maandelijkseInleg > 0 ? Math.round(erosie / maandelijkseInleg) : 0
 
-  const willContext = `Koopkrachterosie: ${inflationRate * 100}% inflatie over ${jaren} jaar. Nominaal ${formatCurrency(Math.round(nominaalEind))}, reëel ${formatCurrency(Math.round(reeelEind))}. Erosie: ${formatCurrency(Math.round(erosie))} (${erosiePercentage.toFixed(1)}% van vermogensgroei).`
+  const finContext = `Koopkrachterosie: ${inflationRate * 100}% inflatie over ${jaren} jaar. Nominaal ${formatCurrency(Math.round(nominaalEind))}, reëel ${formatCurrency(Math.round(reeelEind))}. Erosie: ${formatCurrency(Math.round(erosie))} (${erosiePercentage.toFixed(1)}% van vermogensgroei).`
 
   return (
     <AnalysisSection
       title="Koopkrachterosie"
       icon={ArrowDownRight}
-      willContext={willContext}
+      finContext={finContext}
     >
       <div className="space-y-4">
         {/* ── Hero: ONE clear number — purchasing power loss ── */}

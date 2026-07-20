@@ -38,11 +38,11 @@ export const ARCHI_FLOWS: ArchiFlow[] = [
   {
     id: 'ai-context',
     title: 'AI-contextketen',
-    lead: 'Hoe Will weet waar hij het over heeft. Negen context-builders worden compositioneel samengevoegd tot één prompt-context.',
+    lead: 'Hoe Fin weet waar hij het over heeft. Negen context-builders worden compositioneel samengevoegd tot één prompt-context.',
     steps: [
       { elementId: 'data-cont', label: 'Bronnen uit Postgres', artifact: 'Promise.all([...buildXContext])', detail: '9 builders, RLS-gefilterd.' },
       { elementId: 'as-coach', label: 'buildContext() stelt samen', artifact: 'lib/ai/context/builder.ts', detail: 'Een nieuw domein plugt in met één extra buildXContext.' },
-      { elementId: 't-aigateway', label: 'Will / briefing redigeren', artifact: 'Vercel AI SDK', detail: 'streamText (chat) + generateObject (briefing-redactie met nummer-guard).' },
+      { elementId: 't-aigateway', label: 'Fin / briefing redigeren', artifact: 'Vercel AI SDK', detail: 'streamText (chat) + generateObject (briefing-redactie met nummer-guard).' },
       { elementId: 'sp-inzicht', label: 'Aanbevelingen & acties', artifact: '/api/ai/actions', detail: 'Aandachtspunten-bus voegt punten als actie toe.' },
     ],
   },

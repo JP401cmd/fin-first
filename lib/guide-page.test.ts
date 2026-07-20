@@ -444,9 +444,9 @@ describe('ConceptFlipCards — concept definitions', () => {
   it('E3: kassabon and will concepts return null personal data', () => {
     // These concepts don't have personal data
     const kassabonFn = () => null
-    const willFn = () => null
+    const finFn = () => null
     expect(kassabonFn()).toBeNull()
-    expect(willFn()).toBeNull()
+    expect(finFn()).toBeNull()
   })
 })
 
@@ -522,7 +522,7 @@ describe('GuideProTips — tips content', () => {
     'Bedragen boven €100 tonen ook het vrijheidstijd-equivalent',
     'Dashboard-widgets zijn aanpasbaar',
     'Nieuwe features ontgrendelen automatisch',
-    'Stel Will een vraag via de chatknop rechtsonder',
+    'Stel Fin een vraag via de chatknop rechtsonder',
     'Werk je saldi maandelijks bij via de check-in',
     'Vergelijk scenario\'s in de What-If droomruimte',
     'Voeg je partner toe voor gezamenlijke vermogensberekeningen',

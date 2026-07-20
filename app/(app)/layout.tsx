@@ -37,7 +37,7 @@ import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
 import { loadLeverScores } from '@/lib/lever-scores-loader'
 import { getServerPerspective } from '@/lib/household/server-perspective'
-import { WillHome } from '@/components/app/will/will-home'
+import { FinHome } from '@/components/app/fin/fin-home'
 import { parseCoachConfig, type CoachDataGaps } from '@/lib/coach-suggestions'
 import { ModuleColorProvider } from '@/components/app/module-color-provider'
 import {
@@ -155,7 +155,7 @@ export default async function AppLayout({
     // signalen voor phase-detectie).
     supabase.from('transactions').select('amount, is_income').eq('user_id', user.id).gte('date', dateStr),
     // Sidebar-metric: openstaande acties (Wil-module). Status-filter spiegelt
-    // `openActions` uit will-data-loader.ts (open + postponed). Head-only +
+    // `openActions` uit fin-data-loader.ts (open + postponed). Head-only +
     // count: 'exact' = geen rows-payload, alleen totaal.
     supabase.from('actions').select('id', { count: 'exact', head: true }).in('status', ['open', 'postponed']),
     // Budget-count: coach-bubble data-gap detectie. Head-only + count: 'exact'
@@ -173,7 +173,7 @@ export default async function AppLayout({
     // Sidebar-dot "Tips & acties": openstaande/uitgestelde aanbevelingen.
     // RLS-gescoped op de gebruiker (geen .eq('user_id') — spiegelt de
     // actionsCountRes-query hierboven en de recommendations-query in
-    // will-data-loader.ts). Head-only + count: 'exact' = geen rows-payload.
+    // fin-data-loader.ts). Head-only + count: 'exact' = geen rows-payload.
     supabase.from('recommendations').select('id', { count: 'exact', head: true }).in('status', ['pending', 'postponed']),
     // (De Box 1-maandinkomen-query is verhuisd naar `loadLeverScores`, de
     // gedeelde SSoT die zowel deze sidebar-dot als de status-duiding-banner
@@ -302,7 +302,7 @@ export default async function AppLayout({
     )
   // Mobile-shell app-strip data: één rij `CategoryAppLink` per actieve
   // category-app (cash → Budgetteren, investment → Aandelen holdings, etc.).
-  // Bron is identiek aan het Will-dashboard (`CategoryAppNavBar`), zodat de
+  // Bron is identiek aan het Fin-dashboard (`CategoryAppNavBar`), zodat de
   // iconen en labels 1-op-1 matchen. Strip rendert pas client-side; hier
   // bouwen we alleen de data zodat de mobile-bottom-bar deze via context kan lezen.
   const sidebarCategoryAppLinks = buildCategoryAppLinks(
@@ -503,7 +503,7 @@ export default async function AppLayout({
                         <ChatPromptDeeplink />
                       </Suspense>
                       <Suspense fallback={null}>
-                        <WillHome
+                        <FinHome
                           dataGaps={coachDataGaps}
                           deferredFields={coachDeferredFields}
                           overrides={coachConfig.rules}

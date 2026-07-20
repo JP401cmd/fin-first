@@ -12,7 +12,7 @@
 // instelling wijzigen — naar CONSISTENTIE-TOETSEN (stage 2, `screen`: hetzelfde
 // getal moet overal identiek zijn, delta = 0) en vervolgens naar de OPPERVLAKKEN &
 // doorwerking (stage 3) — snapshot, briefing, perspectief, deel-kaart, rapportages,
-// Will, legacy-routes — tot de uitkomst (stage 5): alle oppervlakken consistent.
+// Fin, legacy-routes — tot de uitkomst (stage 5): alle oppervlakken consistent.
 // De AI-tier-gate (25) en de volledige gebruikersreis (26) sluiten aan.
 //
 // Veel `kind:'cross'`-knopen wijzen naar de `kruisZones` uit de catalogus — dat
@@ -65,12 +65,12 @@ export const KRUIS_FLOW: UatFlow = {
     { id: 'k19', scenarioId: 'UAT-KRUIS-19', label: 'WF-KRUIS-19 · Perspectief-wissel: consistent omgerekend', kind: 'screen', stage: 3, lane: 'oppervlak' },
     { id: 'k21', scenarioId: 'UAT-KRUIS-21', label: 'WF-KRUIS-21 · Deel-kaart: cijfers sporen met de app', kind: 'screen', stage: 3, lane: 'oppervlak' },
     { id: 'k22', scenarioId: 'UAT-KRUIS-22', label: 'WF-KRUIS-22 · Rapportages sluiten aan op live', kind: 'screen', stage: 3, lane: 'oppervlak' },
-    { id: 'k23', scenarioId: 'UAT-KRUIS-23', label: 'WF-KRUIS-23 · Will (AI) noemt dezelfde getallen als de UI', kind: 'screen', stage: 3, lane: 'oppervlak' },
+    { id: 'k23', scenarioId: 'UAT-KRUIS-23', label: 'WF-KRUIS-23 · Fin (AI) noemt dezelfde getallen als de UI', kind: 'screen', stage: 3, lane: 'oppervlak' },
     { id: 'k24', scenarioId: 'UAT-KRUIS-24', label: 'WF-KRUIS-24 · Legacy backing-routes = zelfde cijfers', kind: 'screen', stage: 3, lane: 'oppervlak' },
     { id: 'x-ovz', label: 'Overzicht-hub', kind: 'cross', stage: 3, lane: 'oppervlak', crossZone: 'OVZ' },
     { id: 'x-rapp', label: 'Rapportages', kind: 'cross', stage: 3, lane: 'oppervlak', crossZone: 'RAPP' },
     { id: 'x-mijn', label: 'Mijn & huishouden (2e account)', kind: 'cross', stage: 3, lane: 'oppervlak', crossZone: 'MIJN' },
-    { id: 'x-will', label: 'Will, berichten & krant', kind: 'cross', stage: 3, lane: 'oppervlak', crossZone: 'WILL' },
+    { id: 'x-will', label: 'Fin, berichten & krant', kind: 'cross', stage: 3, lane: 'oppervlak', crossZone: 'WILL' },
     { id: 'x-nav', label: 'Navigatie & legacy-routes', kind: 'cross', stage: 3, lane: 'oppervlak', crossZone: 'NAV' },
 
     // ── 4 · AI-tier-gate over álle AI-oppervlakken ─────────────────────────

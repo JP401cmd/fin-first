@@ -13,7 +13,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { loadDashboardData } from '@/lib/dashboard-data-loader'
-import { loadWillData } from '@/lib/will-data-loader'
+import { loadFinData } from '@/lib/fin-data-loader'
 import { loadHorizonData } from '@/lib/horizon-data-loader'
 import { ageAtDate } from '@/lib/horizon-data'
 import {
@@ -29,7 +29,7 @@ import type { BriefingEntry } from '@/components/overview/briefing-panel'
 import type { SparklineDataPoint } from '@/components/app/budget-sparkline'
 import type { DashboardData } from '@/components/widgets/widget-renderer'
 
-type WillData = Awaited<ReturnType<typeof loadWillData>>
+type FinData = Awaited<ReturnType<typeof loadFinData>>
 type HorizonData = Awaited<ReturnType<typeof loadHorizonData>> | null
 
 /** Maximum aantal briefjes dat /overzicht toont (3-koloms × 2 rijen). */
@@ -90,7 +90,7 @@ function computeLiquidCash(horizonData: HorizonData): number {
  */
 export function buildOverviewBriefingInput(
   dashboardData: DashboardData,
-  willData: WillData,
+  finData: FinData,
   horizonData: HorizonData,
   now: Date = new Date(),
   marketEntry?: BriefingEntry,
@@ -107,14 +107,14 @@ export function buildOverviewBriefingInput(
     horizonData?.healthScoreInput?.freedomPct ?? dashboardData.freedomPct ?? undefined
 
   return {
-    recommendations: willData.recommendations,
+    recommendations: finData.recommendations,
     events: horizonData?.events ?? [],
     health: horizonData?.healthScore ?? null,
-    goalNames: willData.goals.map((g) => g.name),
-    goalProgresses: willData.goalProgresses,
+    goalNames: finData.goals.map((g) => g.name),
+    goalProgresses: finData.goalProgresses,
     // Parallel aan goalNames/goalProgresses — voedt de goal-heads-up-format +
     // fire_age-exclusie (CR-M1). Zie BriefingEngineInput.goalTypes.
-    goalTypes: willData.goals.map((g) => g.goal_type),
+    goalTypes: finData.goals.map((g) => g.goal_type),
     finance: {
       netWorthHistory: dashboardData.netWorthHistory,
       monthlyExpenses: dashboardData.monthlyExpenses,
@@ -168,7 +168,7 @@ export function buildOverviewBriefingInput(
 /** Compose de getoonde briefjes (gecapt op OVERVIEW_BRIEFING_MAX). */
 export function composeOverviewBriefing(
   dashboardData: DashboardData,
-  willData: WillData,
+  finData: FinData,
   horizonData: HorizonData,
   now: Date = new Date(),
   marketEntry?: BriefingEntry,
@@ -176,7 +176,7 @@ export function composeOverviewBriefing(
   checkin?: { monthKey: string; reflection: string },
 ): BriefingEntry[] {
   const entries = buildBriefingEntries(
-    buildOverviewBriefingInput(dashboardData, willData, horizonData, now, marketEntry, aandachtspunten, checkin),
+    buildOverviewBriefingInput(dashboardData, finData, horizonData, now, marketEntry, aandachtspunten, checkin),
   )
   return entries.slice(0, OVERVIEW_BRIEFING_MAX)
 }
@@ -196,9 +196,9 @@ export async function loadAndComposeOverviewBriefing(
    *  functionele directives), zodat de refresh-route niets dubbel laadt. */
   input: BriefingEngineInput
 }> {
-  const [dashboardResult, willData, horizonData, aandachtspunten] = await Promise.all([
+  const [dashboardResult, finData, horizonData, aandachtspunten] = await Promise.all([
     loadDashboardData(supabase),
-    loadWillData(supabase),
+    loadFinData(supabase),
     loadHorizonData(supabase),
     // Faalt intern zacht per producent (collectAandachtspunten vangt zelf af).
     collectAandachtspunten(supabase).catch(() => [] as Aandachtspunt[]),
@@ -214,7 +214,7 @@ export async function loadAndComposeOverviewBriefing(
     : [null, undefined]
   const input = buildOverviewBriefingInput(
     dashboardResult.dashboardData,
-    willData,
+    finData,
     horizonData,
     now,
     marketEntry ?? undefined,

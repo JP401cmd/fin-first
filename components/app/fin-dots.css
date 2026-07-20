@@ -1,10 +1,10 @@
-/* ── WillDots avatar animations ──────────────────────────── */
+/* ── FinDots avatar animations ──────────────────────────── */
 /* All dots are at center (24,24) in the 48×48 viewBox.       */
 /* CSS animations handle positioning per state.                */
-/* Reference: Will Avatar — TriFinity.html (110px → 48 scale) */
+/* Reference: Fin Avatar — TriFinity.html (110px → 48 scale) */
 
 /* --- IDLE: Triangle with JS-driven random blink + mouth --- */
-/* All idle animations (blink, mouth pulse) are driven by JS in will-dots.tsx */
+/* All idle animations (blink, mouth pulse) are driven by JS in fin-dots.tsx */
 /* Positioning is handled via inline transform to allow JS animation control */
 .will-idle-1 { transform: translate(-8px, -5px); }
 .will-idle-2 { transform: translate(8px, -5px); }

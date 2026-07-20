@@ -7,12 +7,12 @@ import { ANALYSE_FINANCIEN_PROMPT } from '@/components/app/chat/chat-prompt-deep
 
 /**
  * TipsTeaser — compacte strip op /overzicht die naar de Tips & acties
- * pagina verwijst plus een snelle Will-chat-ingang biedt.
+ * pagina verwijst plus een snelle Fin-chat-ingang biedt.
  *
  * Drie tegels:
  *   - Toptips        → /overzicht/tips (lijst met pending recommendations)
  *   - Open acties    → /overzicht/tips (#acties anker voor scroll)
- *   - Vraag Will     → opent de Will-chat-overlay in-place (geen navigatie)
+ *   - Vraag Fin     → opent de Fin-chat-overlay in-place (geen navigatie)
  */
 interface TipsTeaserProps {
   pendingTipCount: number
@@ -47,13 +47,13 @@ export function TipsTeaser({ pendingTipCount, openActionCount }: TipsTeaserProps
       sublabel: openActionCount === 1 ? 'op je lijst' : 'op je lijst',
     },
     {
-      // Geen navigatie: opent de globale Will-chat-overlay in-place met de
+      // Geen navigatie: opent de globale Fin-chat-overlay in-place met de
       // doorlicht-prompt. (Voorheen een Link naar /berichten — dat verliet de
       // pagina onnodig en daar staan de tips niet.)
       href: null,
       onClick: () => chat?.openWithMessage(ANALYSE_FINANCIEN_PROMPT),
       Icon: MessageCircle,
-      label: 'Vraag Will',
+      label: 'Vraag Fin',
       count: null,
       sublabel: 'nieuwe analyse',
       showArrow: false,

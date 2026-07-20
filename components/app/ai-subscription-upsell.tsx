@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { ArrowRight, Sparkles } from 'lucide-react'
-import { WillDots } from '@/components/app/will-dots'
+import { FinDots } from '@/components/app/fin-dots'
 import { ADDON_PLANS, formatPlanPrice } from '@/lib/subscription-catalog'
 
 /**
@@ -33,7 +33,7 @@ export function AiSubscriptionUpsell({
   const price = formatPlanPrice(AI_PLAN?.priceEur ?? 9)
   const tagline =
     AI_PLAN?.tagline ??
-    'Will als persoonlijke financiële coach — analyse, aanbevelingen, briefing en nieuws op maat.'
+    'Fin als persoonlijke financiële coach — analyse, aanbevelingen, briefing en nieuws op maat.'
 
   if (variant === 'inline') {
     return (
@@ -45,10 +45,10 @@ export function AiSubscriptionUpsell({
           <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-wil-500" aria-hidden="true" />
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-wil-800">
-              Will is een betaalde functie
+              Fin is een betaalde functie
             </p>
             <p className="mt-0.5 text-xs leading-snug text-[var(--ink-3)]">
-              Met het AI-abonnement ({price}/mnd) wordt Will je persoonlijke coach.
+              Met het AI-abonnement ({price}/mnd) wordt Fin je persoonlijke coach.
             </p>
             <Link
               href="/mijn/account"
@@ -71,11 +71,11 @@ export function AiSubscriptionUpsell({
     >
       <div className="mx-auto max-w-sm">
         <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-wil-50">
-          <WillDots size={40} />
+          <FinDots size={40} />
         </div>
 
         <h2 className="text-base font-semibold text-[var(--ink)]">
-          Will is een betaalde functie
+          Fin is een betaalde functie
         </h2>
 
         <p className="mt-2 text-sm leading-relaxed text-[var(--ink-3)]">
@@ -84,7 +84,7 @@ export function AiSubscriptionUpsell({
 
         <div className="mt-4 rounded-[var(--r-lg)] border border-wil-200 bg-wil-50/60 px-4 py-3 text-sm text-[var(--ink-2)]">
           Met het <span className="font-semibold text-wil-700">AI-abonnement</span>{' '}
-          ({price}/mnd) wordt Will je persoonlijke coach — met chat, analyse,
+          ({price}/mnd) wordt Fin je persoonlijke coach — met chat, analyse,
           aanbevelingen, briefing en nieuws op maat.
         </div>
 

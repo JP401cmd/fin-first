@@ -107,7 +107,7 @@ export const WIDGET_CATALOG: WidgetDef[] = [
   {
     id: 'voorstellen',
     name: 'Tips',
-    description: 'Persoonlijke tips van Will',
+    description: 'Persoonlijke tips van Fin',
     module: 'wil',
     // 'xl' (Double): horizontale impactvergelijking van de top-tips' jaarlijkse
     // vrijheidsdagen — benut de dubbele breedte i.p.v. dezelfde lijst rekken.

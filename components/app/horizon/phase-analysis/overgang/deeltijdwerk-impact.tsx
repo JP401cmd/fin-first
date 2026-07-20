@@ -239,7 +239,7 @@ export const DeeltijdwerkImpact = memo(function DeeltijdwerkImpact(
       title="Deeltijdwerk flex-impact"
       icon={Briefcase}
       loading={loading}
-      willContext={
+      finContext={
         noIncome
           ? 'Deeltijdwerk impact: geen inkomen opgegeven — analyse niet beschikbaar'
           : state

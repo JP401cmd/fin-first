@@ -653,7 +653,7 @@ export function LocalCategorizationSettings() {
                     </span>
                   </div>
                   <p className="mt-0.5 text-xs text-[var(--ink-3)] leading-relaxed">
-                    Praat met Will volledig op dit apparaat — je financiële gegevens verlaten je toestel niet.
+                    Praat met Fin volledig op dit apparaat — je financiële gegevens verlaten je toestel niet.
                   </p>
                 </div>
               </div>

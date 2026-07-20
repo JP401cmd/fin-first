@@ -501,3 +501,7 @@
 ## 2026-07-20
 
 - Geen wijzigingen.
+
+## 2026-07-20
+
+- **Integraties** toegevoegd: OpenRouter

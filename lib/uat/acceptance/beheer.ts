@@ -11,7 +11,7 @@
  *
  * KERN-BEVINDING (bepaalt exact/consistency/oracle/ui-only): BEHEER is
  * admin-tooling achter superadmin-gating — de motoren wonen elders (Kern/
- * Toekomst/Will) en worden in beheer alleen geconfigureerd, ingezien of
+ * Toekomst/Fin) en worden in beheer alleen geconfigureerd, ingezien of
  * getest. Er is dus GEEN eigen rekenkern; "exact" wordt daarom BEWUST niet
  * geforceerd (0 exact-criteria, lege BEHEER_ENGINE_CHECKS). De verdeling:
  *
@@ -77,7 +77,7 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'BELANGRIJK',
     given: '/beheer/ai (AI-instellingen) en /beheer/prompts (alleen-lezen naslag van alle domein-prompts).',
     when:
-      'De beheerder kiest provider (Anthropic/OpenAI/Mistral/Ollama), vult model + API-keys in (een gemaskeerde "***"-key leeg laten = ongewijzigd), bewerkt de systeemprompt-override van Will en slaat op; opent daarna /beheer/prompts.',
+      'De beheerder kiest provider (Anthropic/OpenAI/Mistral/Ollama), vult model + API-keys in (een gemaskeerde "***"-key leeg laten = ongewijzigd), bewerkt de systeemprompt-override van Fin en slaat op; opent daarna /beheer/prompts.',
     then:
       '"Instellingen opgeslagen"; een override toont de badge "Aangepast" + "Reset naar standaard"; /beheer/prompts toont alle domein-prompts alleen-lezen. De instelling stuurt direct het productie-AI-gedrag; geen eigen berekening.',
     assertion: {
@@ -186,13 +186,13 @@ const criteria: AcceptanceCriterion[] = [
   {
     workflow: 'WF-BEHEER-09',
     scenarioId: 'UAT-BEHEER-09',
-    titel: 'Coach-suggestieregels, timing en kopregel van Will bijstellen',
+    titel: 'Coach-suggestieregels, timing en kopregel van Fin bijstellen',
     kriticiteit: 'BELANGRIJK',
     given: '/beheer/coach (vier lagen: uitgesteld / data-hiaat / pad / standaard).',
     when:
       'De beheerder bewerkt bericht/CTA/link per regel, schakelt regels aan/uit, past de timing (vertraging + auto-verdwijntijd) en de kopregel aan, en slaat op (of Reset per regel).',
     then:
-      'De overrides sturen direct de coach-bubbel/suggesties van Will (WillHome); niet-numerieke timing-invoer wordt genegeerd; Reset valt terug op de standaardtekst. Geen eigen berekening.',
+      'De overrides sturen direct de coach-bubbel/suggesties van Fin (FinHome); niet-numerieke timing-invoer wordt genegeerd; Reset valt terug op de standaardtekst. Geen eigen berekening.',
     assertion: {
       kind: 'ui-only',
       source:
@@ -236,11 +236,11 @@ const criteria: AcceptanceCriterion[] = [
     scenarioId: 'UAT-BEHEER-12',
     titel: 'Doelgids-stappen per doel beheren',
     kriticiteit: 'BELANGRIJK',
-    given: '/beheer/doelen (doelgids-stappen die Will per doel volgt).',
+    given: '/beheer/doelen (doelgids-stappen die Fin per doel volgt).',
     when:
       'De beheerder bewerkt stappen inline (Enter, met validatie), herordent (pijlen), voegt toe/verwijdert en slaat op (of Reset naar DEFAULT_GOAL_GUIDE_STEPS).',
     then:
-      'De stappen sturen de doel-begeleiding van Will; een lege/ongeldige stap geeft een validatiefout in de cel en wordt niet doorgevoerd. Geen eigen berekening.',
+      'De stappen sturen de doel-begeleiding van Fin; een lege/ongeldige stap geeft een validatiefout in de cel en wordt niet doorgevoerd. Geen eigen berekening.',
     assertion: {
       kind: 'ui-only',
       source:

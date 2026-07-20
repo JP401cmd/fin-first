@@ -60,7 +60,7 @@ function estimateGrossYearly(netMonthlyIncome: number): number {
 }
 
 /**
- * Bouw de "== FISCALE SITUATIE ==" context-sectie voor Will.
+ * Bouw de "== FISCALE SITUATIE ==" context-sectie voor Fin.
  *
  * Aggregeert een indicatieve fiscale schatting over Box 1 / 2 / 3, jaarruimte
  * en eerstvolgende deadlines. PII-veilig: alleen bedragen en feiten, nooit
@@ -198,7 +198,7 @@ export async function buildTaxContext(supabase: SupabaseClient): Promise<string>
 
     blocks.push(
       'Let op: dit is een indicatieve schatting (o.a. bruto afgeleid uit netto, tarieven 2026 zijn deels indicatief). ' +
-        'Will geeft GEEN bindend belastingadvies — verwijs voor de aangifte of definitieve keuzes naar een belastingadviseur of de Belastingdienst.',
+        'Fin geeft GEEN bindend belastingadvies — verwijs voor de aangifte of definitieve keuzes naar een belastingadviseur of de Belastingdienst.',
     )
 
     return section('FISCALE SITUATIE', blocks.join('\n\n'))

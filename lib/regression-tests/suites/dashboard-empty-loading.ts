@@ -137,7 +137,7 @@ function makeEmptyDashboardData(): DashboardData {
     partnerOverrides: null,
     householdActivity: [],
     partnerHiddenCategories: [],
-    // Will module
+    // Fin module
     decisionPatterns: [],
     freedomDaysMonthly: [],
     totalFreedomDaysWon: 0,
@@ -772,7 +772,7 @@ const tests: TestCase[] = [
     id: 'error-will-module-defaults',
     name: 'Error state: wilskracht module defaults bij geen data',
     category: CAT,
-    description: 'Will module data heeft veilige defaults: 0 counts, score E',
+    description: 'Fin module data heeft veilige defaults: 0 counts, score E',
     priority: 'medium',
     estimatedDurationMs: 50,
     fn: () => {

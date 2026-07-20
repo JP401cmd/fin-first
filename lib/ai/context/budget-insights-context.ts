@@ -4,7 +4,7 @@ import { localMonthBounds, localMonthStart } from '@/lib/month-range'
 
 /**
  * Budget insights context: alert triggers, 12-month patterns, NIBUD comparison, freedom-time impact.
- * Adds rich budget-specific data for Will to give proactive advice.
+ * Adds rich budget-specific data for Fin to give proactive advice.
  */
 export async function buildBudgetInsightsContext(supabase: SupabaseClient): Promise<string> {
   // Tijdzone-veilige maandgrenzen. monthEnd is exclusief = de 1e van de

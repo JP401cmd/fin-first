@@ -178,7 +178,7 @@ export default function WhatIfPage() {
   const [ieExpanded, setIeExpanded] = useState(typeof window !== 'undefined' && window.innerWidth >= 768)
   const [ieViewMode, setIeViewMode] = useState<'lines' | 'breakdown'>('lines')
 
-  // ── Set Will's auto-open message for the global chat FAB ──
+  // ── Set Fin's auto-open message for the global chat FAB ──
   const { setAutoOpenMessage } = useChatContext()
 
   // ── Load data ──
@@ -852,7 +852,7 @@ export default function WhatIfPage() {
     return buildBreakdownFromSimRows(rows)
   }, [ieViewMode, whatIfSim])
 
-  // ── Build scenario context for Will's global chat (debounced) ──
+  // ── Build scenario context for Fin's global chat (debounced) ──
   const autoOpenTimerRef = useRef<ReturnType<typeof setTimeout>>(null)
   useEffect(() => {
     if (!overrides || !baseline || !input) {
@@ -1551,7 +1551,7 @@ export default function WhatIfPage() {
             onScenariosChange={handleScenariosChange}
           />
 
-          {/* Will-chat — lazy (next/dynamic, ssr:false) zodat de ai-bundels uit de First-Load JS blijven */}
+          {/* Fin-chat — lazy (next/dynamic, ssr:false) zodat de ai-bundels uit de First-Load JS blijven */}
           <WhatIfChatDynamic
             onAddEvent={handleAddEvent}
             scenarioContext={chatScenarioContext}

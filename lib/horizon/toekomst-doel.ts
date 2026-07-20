@@ -4,7 +4,7 @@
  * Pure, isomorfe module: GEEN `'use client'`, geen Supabase, geen `Date.now()`.
  * Zet een vastgelegde lab-stand om naar concrete parameter-doel-rijen voor de
  * `goals`-tabel én levert het doel-gewogen totaalrendement dat het rendement-doel
- * en de will-data-loader consumeren. De promotie-route (`app/api/toekomst-doel`)
+ * en de fin-data-loader consumeren. De promotie-route (`app/api/toekomst-doel`)
  * is de enige schrijver; deze module rekent en normaliseert, maar raakt geen I/O.
  *
  * Eén bron voor ranges/iconen: `GOAL_TYPE_META` / `GOAL_TYPE_ICONS` uit `goal-data.ts`

@@ -164,7 +164,7 @@
      Route-layouts overschrijven deze met hun module-shades volgens de huidige IA:
        /overzicht                → kern   (amber)
        /toekomst                 → horizon (paars)
-       /berichten /nieuws /mijn   → wil    (teal) — Will & acties-domein
+       /berichten /nieuws /mijn   → wil    (teal) — Fin & acties-domein
      Legacy backing-routes (/core, /will, /horizon) houden hun eigen module-accent.
      Overige cross-module-routes (/rapportages, /beheer, …) vallen terug op deze defaults.
      Uitzondering: --module-active-200 wordt gebruikt voor highlight-marker.
@@ -598,9 +598,9 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* Avatar + WillDots animations moved to component CSS files:
+/* Avatar + FinDots animations moved to component CSS files:
    - components/app/avatars.css
-   - components/app/will-dots.css */
+   - components/app/fin-dots.css */
 
 /* Hide scrollbar for module nav */
 .scrollbar-none::-webkit-scrollbar { display: none; }

@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useId, type ComponentType } from 'react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
-import { WillDots } from '@/components/app/will-dots'
+import { FinDots } from '@/components/app/fin-dots'
 import { SpeechBubble } from '@/components/onboarding/speech-bubble'
 import { MODULE_CATALOG, getModuleLabel, type ModuleId } from '@/lib/module-registry'
 import { createClient } from '@/lib/supabase/client'
@@ -52,7 +52,7 @@ interface ModuleInfo {
   iconColor: string
   circleBg: string
   accentColor: string
-  willText: string
+  finText: string
 }
 
 const MODULE_INFO: Record<ModuleId, ModuleInfo> = {
@@ -62,7 +62,7 @@ const MODULE_INFO: Record<ModuleId, ModuleInfo> = {
     iconColor: 'text-kern-600',
     circleBg: 'bg-kern-50',
     accentColor: 'bg-kern-400',
-    willText:
+    finText:
       'Een budget vertaalt je inkomen naar bewuste keuzes. Elke euro die je bespaart is opgeslagen vrijheidstijd \u2014 tijd die je later kunt besteden aan wat jij echt belangrijk vindt.',
   },
   vermogensregistratie: {
@@ -71,7 +71,7 @@ const MODULE_INFO: Record<ModuleId, ModuleInfo> = {
     iconColor: 'text-kern-600',
     circleBg: 'bg-kern-50',
     accentColor: 'bg-kern-400',
-    willText:
+    finText:
       'Als je je rekeningen en bezittingen toevoegt, kan ik meteen je netto vermogen en vrijheidspercentage berekenen. Heb je schulden? Dan laat ik zien hoeveel vrijheid je terugkoopt als je die aflost.',
   },
   aandelenregistratie: {
@@ -80,7 +80,7 @@ const MODULE_INFO: Record<ModuleId, ModuleInfo> = {
     iconColor: 'text-kern-600',
     circleBg: 'bg-kern-50',
     accentColor: 'bg-kern-400',
-    willText:
+    finText:
       'Met een beleggingsrekening kan ik je portefeuille volgen, rendement berekenen en allocatie in kaart brengen.',
   },
   toekomstplannen: {
@@ -89,7 +89,7 @@ const MODULE_INFO: Record<ModuleId, ModuleInfo> = {
     iconColor: 'text-horizon-600',
     circleBg: 'bg-horizon-50',
     accentColor: 'bg-horizon-400',
-    willText:
+    finText:
       'Stel je financi\u00eble horizon in. Ik bereken wanneer je genoeg vermogen hebt voor financi\u00eble vrijheid.',
   },
   inzicht_acties: {
@@ -98,7 +98,7 @@ const MODULE_INFO: Record<ModuleId, ModuleInfo> = {
     iconColor: 'text-wil-600',
     circleBg: 'bg-wil-50',
     accentColor: 'bg-wil-400',
-    willText:
+    finText:
       'Ik analyseer je gegevens en geef gepersonaliseerde aanbevelingen om je financi\u00eble doelen te bereiken.',
   },
   nieuws: {
@@ -107,7 +107,7 @@ const MODULE_INFO: Record<ModuleId, ModuleInfo> = {
     iconColor: 'text-[var(--ink-2)]',
     circleBg: 'bg-[var(--subtle)]',
     accentColor: 'bg-[var(--ink-3)]',
-    willText:
+    finText:
       'Je persoonlijke financi\u00eble krant staat klaar. Nieuws wordt automatisch gefilterd op basis van je situatie.',
   },
 }
@@ -330,12 +330,12 @@ export function ModuleActivationModal({
         {/* Header: icon + module name + summary */}
         <ModuleHeader info={info} label={moduleLabel} inDevelopment={moduleDef?.inDevelopment} />
 
-        {/* Will's speech bubble */}
+        {/* Fin's speech bubble */}
         <div className="flex items-start gap-3">
           <div className="shrink-0 mt-0.5">
-            <WillDots size={32} state="talking" />
+            <FinDots size={32} state="talking" />
           </div>
-          <SpeechBubble>{info.willText}</SpeechBubble>
+          <SpeechBubble>{info.finText}</SpeechBubble>
         </div>
 
         {/* Form content for missing steps */}

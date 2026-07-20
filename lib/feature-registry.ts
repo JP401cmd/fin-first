@@ -158,7 +158,7 @@ export const UNIFIED_FEATURES: UnifiedFeature[] = [
   {
     id: 'ai_assistent',
     label: 'AI Assistent',
-    description: 'AI Chat met Will, AI tools',
+    description: 'AI Chat met Fin, AI tools',
     module: 'ai',
     requiredTier: 'ai',
     widgets: ['ai_inzicht'],

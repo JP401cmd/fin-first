@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { Target, Pencil, ArrowUpRight, MoreHorizontal } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import { formatGoalValue, GOAL_TYPE_META } from '@/lib/goal-data'
-import type { GoalWithBudget } from '@/lib/will-data-loader'
+import type { GoalWithBudget } from '@/lib/fin-data-loader'
 import { DoelToevoegenSheet } from './doel-toevoegen-sheet'
 import { DoelBewerkenSheet } from './doel-bewerken-sheet'
 import { DoelLoslatenConfirm } from './doel-loslaten-confirm'
@@ -37,7 +37,7 @@ type GoalDisplay = {
 }
 
 /**
- * Mirror van lib/will-data-loader#isParameterGoal — bewust LOKAAL gedefinieerd
+ * Mirror van lib/fin-data-loader#isParameterGoal — bewust LOKAAL gedefinieerd
  * zodat deze client-component de server-side loader (supabase/server-imports)
  * niet in de client-bundle trekt. Triviale tag-check (géén financiële
  * herberekening); houd identiek aan de canonieke bron.

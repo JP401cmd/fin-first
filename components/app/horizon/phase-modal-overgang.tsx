@@ -176,7 +176,7 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
   const COVERAGE_BUFFER = 25_000
   const dekkingVoldoende = eindVermogen >= COVERAGE_BUFFER
 
-  // ── Hele-fase-samenvatting voor de top-level "Bespreek met Will" ─────────
+  // ── Hele-fase-samenvatting voor de top-level "Bespreek met Fin" ─────────
   const shortfallPerYear = Math.max(yearlyExpenses - yearlyAowIncome, 0)
   const portfolioNeedPerYear = transitionScenario === 'shortfall' ? shortfallPerYear : yearlyExpenses
   const faseSummary =
@@ -390,7 +390,7 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
             expectedReturn={expectedReturn}
             inflationRate={inflationRate}
             yearlyExpenses={yearlyExpenses}
-            willContextPrefix="Overgangsfase stresstest"
+            finContextPrefix="Overgangsfase stresstest"
           />
         )}
 

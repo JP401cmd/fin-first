@@ -8,10 +8,10 @@ const MODULE_NAMES: Record<ReportAiInsight['module'], string> = {
 }
 
 const AVATAR_NAMES: Record<string, string> = {
-  fhin: 'Will',
-  finn: 'Will',
-  ffin: 'Will',
-  will: 'Will',
+  fhin: 'Fin',
+  finn: 'Fin',
+  ffin: 'Fin',
+  will: 'Fin',
 }
 
 export function PullQuote({ insight }: { insight: ReportAiInsight }) {

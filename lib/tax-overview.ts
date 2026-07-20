@@ -2,7 +2,7 @@
  * Tax overview — pure, perspectief-onafhankelijke aggregator.
  *
  * Vat al-berekende box-resultaten (Box 1/2/3) samen tot één overzicht voor de
- * belasting-hub (C1/C2/C4) én Will. Doet GEEN Supabase-calls en GEEN eigen
+ * belasting-hub (C1/C2/C4) én Fin. Doet GEEN Supabase-calls en GEEN eigen
  * box-berekeningen: hij krijgt reeds berekende cijfers binnen en aggregeert.
  *
  * Geen Supabase/React-imports. Volgt het pure-engine-patroon van box3-data.ts.

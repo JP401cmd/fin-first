@@ -324,7 +324,7 @@ export async function buildRecommendationContext(supabase: SupabaseClient, budge
   }
 
   // Recommendation-historie: actuele voorstellen + recent afgewezen/genegeerd.
-  // Plan §6.6: voorstellen leven niet meer in een UI-lijst, dus Will moet
+  // Plan §6.6: voorstellen leven niet meer in een UI-lijst, dus Fin moet
   // de titels van eerdere voorstellen meekrijgen om tekstueel-vergelijkbare
   // herhalingen te vermijden ("Wissel energieleverancier" → "Vergelijk
   // energiecontracten" is verboden, ook al is het type identiek).
@@ -342,7 +342,7 @@ export async function buildRecommendationContext(supabase: SupabaseClient, budge
 
   if (activeRecs && activeRecs.length > 0) {
     // Splits postponed-recs op terugkomdatum: die voorbij hun
-    // postponed_until zijn mag (en moet) Will opnieuw aandragen.
+    // postponed_until zijn mag (en moet) Fin opnieuw aandragen.
     const readyForReview = activeRecs.filter(
       r => r.status === 'postponed' && r.postponed_until && r.postponed_until <= nowIso,
     )

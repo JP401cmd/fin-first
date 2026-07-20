@@ -404,7 +404,7 @@ export function ScenarioBibliotheek({ currentAge }: { currentAge: number | null 
                   Levensgebeurtenis toevoegen
                 </h2>
                 <p className="text-xs text-[var(--ink-3)] mt-1">
-                  Kies een gebeurtenis hieronder — of laat Will een
+                  Kies een gebeurtenis hieronder — of laat Fin een
                   passend scenario voor je opstellen.
                 </p>
               </div>
@@ -418,7 +418,7 @@ export function ScenarioBibliotheek({ currentAge }: { currentAge: number | null 
               </button>
             </header>
 
-            {/* Will-route: gepersonaliseerde levensgebeurtenis via AI-chat */}
+            {/* Fin-route: gepersonaliseerde levensgebeurtenis via AI-chat */}
             <Link
               href="/toekomst/whatif"
               onClick={() => setOpen(false)}
@@ -429,10 +429,10 @@ export function ScenarioBibliotheek({ currentAge }: { currentAge: number | null 
               </span>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-[var(--ink)]">
-                  Vraag het Will
+                  Vraag het Fin
                 </p>
                 <p className="text-[11px] text-[var(--ink-3)] leading-snug">
-                  Beschrijf je situatie — Will stelt een passende gebeurtenis voor met realistische bedragen.
+                  Beschrijf je situatie — Fin stelt een passende gebeurtenis voor met realistische bedragen.
                 </p>
               </div>
             </Link>

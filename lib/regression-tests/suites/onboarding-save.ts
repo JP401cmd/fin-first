@@ -378,17 +378,17 @@ const tests: TestCase[] = [
   // ── Step 8: Saving animatie ─────────────────────────────────────────
   {
     id: 'ob-save-animation',
-    name: 'Saving animatie: WillDots (64px pulsing), roterende berichten (5\u00d7, 800ms)',
+    name: 'Saving animatie: FinDots (64px pulsing), roterende berichten (5\u00d7, 800ms)',
     category: CAT,
-    description: 'WillDots avatar met pulse animatie, 5 roterende berichten elke 800ms',
+    description: 'FinDots avatar met pulse animatie, 5 roterende berichten elke 800ms',
     priority: 'high',
     estimatedDurationMs: 100,
     fn() {
       const WILLDOTS_SIZE = 64
-      assertEqual(WILLDOTS_SIZE, 64, 'WillDots size is 64px tijdens saving')
+      assertEqual(WILLDOTS_SIZE, 64, 'FinDots size is 64px tijdens saving')
 
       const animationClass = 'animate-pulse'
-      assert(animationClass.includes('pulse'), 'Pulse animatie actief op WillDots')
+      assert(animationClass.includes('pulse'), 'Pulse animatie actief op FinDots')
 
       assertEqual(SAVING_MESSAGES.length, 5, 'Exact 5 saving berichten')
       const MESSAGE_INTERVAL_MS = 800
@@ -551,17 +551,17 @@ const tests: TestCase[] = [
   // ── Step 12: Success scherm ──────────────────────────────────────────
   {
     id: 'ob-save-success-screen',
-    name: 'Success scherm: WillDots avatar, module kaarten, CTA naar getHomePath()',
+    name: 'Success scherm: FinDots avatar, module kaarten, CTA naar getHomePath()',
     category: CAT,
     description: 'OnboardingSuccess component toont welkomstscherm met dynamische module cards en CTA',
     priority: 'critical',
     estimatedDurationMs: 100,
     fn() {
-      // WillDots size on success screen: 140px
+      // FinDots size on success screen: 140px
       const SUCCESS_WILLDOTS_SIZE = 140
-      assertEqual(SUCCESS_WILLDOTS_SIZE, 140, 'WillDots success size is 140px')
+      assertEqual(SUCCESS_WILLDOTS_SIZE, 140, 'FinDots success size is 140px')
       const successAnimation = 'animate-[pulse_3s_ease-in-out_1]'
-      assert(successAnimation.includes('pulse'), 'Success WillDots heeft pulse animatie')
+      assert(successAnimation.includes('pulse'), 'Success FinDots heeft pulse animatie')
       assert(successAnimation.includes('_1]'), 'Pulse speelt slechts 1 keer af')
 
       // Heading text

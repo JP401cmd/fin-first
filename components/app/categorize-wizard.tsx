@@ -1,16 +1,16 @@
 'use client'
 
-// ── "Vraag Will"-wizard — drie opeenvolgende stappen (feature #881, flow-revisie) ──
+// ── "Vraag Fin"-wizard — drie opeenvolgende stappen (feature #881, flow-revisie) ──
 //
 // Pure presentatie bovenop de review-rijen (RowState) die AICategorizeSheet
-// aanlevert. De wizard vervangt de platte reviewlijst voor het "Vraag Will"-pad
+// aanlevert. De wizard vervangt de platte reviewlijst voor het "Vraag Fin"-pad
 // en leidt de gebruiker door drie stappen:
 //
-//   1. Automatisch herkend — één bulk-kaart voor alles wat Will gratis herkende
+//   1. Automatisch herkend — één bulk-kaart voor alles wat Fin gratis herkende
 //      via je regels en overboekingen (stage-1: bron rule/transfer/mirror). Je
 //      past ze in één keer toe, bekijkt ze stuk voor stuk, of gaat verder zonder
 //      toepassen (dan blijven ze openstaan en verschijnen ze in stap 3).
-//   2. Will's voorstellen — de onbekende tegenpartijen als AI-groepkaarten, één
+//   2. Fin's voorstellen — de onbekende tegenpartijen als AI-groepkaarten, één
 //      tegelijk, met vier keuzes per groep. De volgorde volgt de MOTOR-comparator
 //      (buildCombinedGroups + orderGroupsLargestFirst) — nooit een eigen sortering.
 //   3. Controle & opslaan — een eindoverzicht van álle voorgenomen én openstaande
@@ -63,7 +63,7 @@ type WizardStep = 1 | 2 | 3
 
 const STEP_LABEL: Record<WizardStep, string> = {
   1: 'Automatisch',
-  2: "Will's voorstellen",
+  2: "Fin's voorstellen",
   3: 'Controle',
 }
 
@@ -73,7 +73,7 @@ const SOURCE_BADGE: Record<string, string> = {
   rule: 'Regel',
   transfer: 'Overboeking',
   mirror: 'Overboeking',
-  ai: 'Will',
+  ai: 'Fin',
   propagated: 'Afgeleid',
   manual: 'Handmatig',
 }
@@ -385,7 +385,7 @@ export function CategorizeWizard({
   )
   function badgeForRow(row: RowState): string {
     if (row.accepted && row.acceptedCategorySource) return SOURCE_BADGE[row.acceptedCategorySource] ?? 'Handmatig'
-    if (row.suggestion) return SOURCE_BADGE[row.suggestion.source] ?? 'Will'
+    if (row.suggestion) return SOURCE_BADGE[row.suggestion.source] ?? 'Fin'
     return 'Nog te kiezen'
   }
   type S3Group = { key: string; name: string; badges: string[]; rows: { row: RowState; idx: number }[]; acceptedN: number }
@@ -429,11 +429,11 @@ export function CategorizeWizard({
       ? `Stap ${stepPos} van ${stepTotal}: automatisch herkend. ${stage1Rows.length} ${stage1Rows.length === 1 ? 'transactie' : 'transacties'}.`
       : currentStep === 2
         ? currentGroup
-          ? `Stap ${stepPos} van ${stepTotal}: Will's voorstellen. Groep ${progressN} van ${progressM}: ${currentName}`
-          : `Stap ${stepPos} van ${stepTotal}: Will's voorstellen.`
+          ? `Stap ${stepPos} van ${stepTotal}: Fin's voorstellen. Groep ${progressN} van ${progressM}: ${currentName}`
+          : `Stap ${stepPos} van ${stepTotal}: Fin's voorstellen.`
         : currentStep === 3
           ? `Stap ${stepPos} van ${stepTotal}: controle en opslaan.`
-          : 'Will bekijkt je transacties'
+          : 'Fin bekijkt je transacties'
 
   // ── Primaire-actieblok voor de sticky footer (per stap) ──
   let footerContent: ReactNode = null
@@ -573,7 +573,7 @@ export function CategorizeWizard({
       <div className="flex flex-col items-center justify-center gap-3 py-12">
         <div aria-live="polite" className="sr-only">{liveMessage}</div>
         <Loader2 className="h-5 w-5 animate-spin text-wil-500" />
-        <p className="text-[11px] text-[var(--ink-3)]">Will bekijkt je transacties…</p>
+        <p className="text-[11px] text-[var(--ink-3)]">Fin bekijkt je transacties…</p>
       </div>
     )
   }
@@ -593,7 +593,7 @@ export function CategorizeWizard({
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-[var(--ink)]">
-                Will herkende{' '}
+                Fin herkende{' '}
                 <span className="font-[var(--font-dm-mono)] tabular-nums">{stage1Rows.length}</span>{' '}
                 {stage1Rows.length === 1 ? 'transactie' : 'transacties'} via je regels en overboekingen
               </p>
@@ -624,7 +624,7 @@ export function CategorizeWizard({
         </div>
       )}
 
-      {/* ── Stap 2 · Will's voorstellen ── */}
+      {/* ── Stap 2 · Fin's voorstellen ── */}
       {currentStep === 2 && (
         <>
           <p className="px-1 text-[11px] text-[var(--ink-3)]">
@@ -691,7 +691,7 @@ export function CategorizeWizard({
 
           {acceptedCount === 0 && (
             <p className="text-[11px] leading-relaxed text-[var(--ink-4)]">
-              Nog niets goedgekeurd — sluiten kan zonder gevolgen; je kunt &lsquo;Vraag Will&rsquo; later opnieuw starten.
+              Nog niets goedgekeurd — sluiten kan zonder gevolgen; je kunt &lsquo;Vraag Fin&rsquo; later opnieuw starten.
             </p>
           )}
 
@@ -848,7 +848,7 @@ function AiGroupCard({
   // No-match: door de motor beoordeeld zonder bruikbaar voorstel → meteen de
   // handmatige fallback (niet wachten op het einde van de run). Eén lid volstaat.
   const noMatch = group.some((t) => rowsById.get(t.id)?.aiNoMatch)
-  // "Minder zeker": Will heeft wél een voorstel, maar met een confidence onder de
+  // "Minder zeker": Fin heeft wél een voorstel, maar met een confidence onder de
   // zekerheidsgrens (de tweede trap, 0,5–0,8). Path-agnostisch — geldt óók voor
   // cloud-voorstellen met lage confidence en voor gepropageerde voorstellen (een
   // zustergroep die hetzelfde AI-oordeel erft mét dezelfde geërfde confidence);
@@ -893,7 +893,7 @@ function AiGroupCard({
 
   return (
     // Kaart-chrome volgt de Kern-review (conform TransactionRow: border-kern-200 /
-    // bg-kern-50-familie) — de kaart "hoort bij" het categoriseer-overzicht. Will's
+    // bg-kern-50-familie) — de kaart "hoort bij" het categoriseer-overzicht. Fin's
     // stem blijft wil: de WILL-badge, de reasoning en de primaire actieknoppen.
     <div className="rounded-[var(--r-lg)] border border-kern-200 bg-kern-50/40 shadow-[var(--s1)]">
       {/* Kondigt de automatische onthulling van de ledenlijst (no-match) één keer aan. */}
@@ -934,7 +934,7 @@ function AiGroupCard({
             </p>
           )}
         </div>
-        {/* tone="wil" is bewust: dit bedrag hoort bij Will's voorstel-groep (Will's
+        {/* tone="wil" is bewust: dit bedrag hoort bij Fin's voorstel-groep (Fin's
             stem), niet bij de Kern-kaartchrome — géén module-lookup-misser. */}
         <p className={`shrink-0 text-sm font-medium ${
           total > 0 ? 'text-positive' : 'text-[var(--ink)]'
@@ -987,7 +987,7 @@ function AiGroupCard({
               <span className="shrink-0 rounded-full border border-wil-200 bg-[var(--paper)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-2)]">
                 {SOURCE_LABELS[suggestion!.source]}
               </span>
-              {/* Subtiele duiding wanneer Will minder zeker is (tweede trap). Ink-
+              {/* Subtiele duiding wanneer Fin minder zeker is (tweede trap). Ink-
                   token, dezelfde familie als de badge — bewust niet alarmerend. */}
               {isLessConfident && (
                 <span className="shrink-0 text-[10px] text-[var(--ink-3)]">· minder zeker</span>
@@ -1002,9 +1002,9 @@ function AiGroupCard({
             )}
           </div>
         ) : noMatch ? (
-          // No-match: Will kon dit niet zeker plaatsen → meteen handmatig kiezen.
+          // No-match: Fin kon dit niet zeker plaatsen → meteen handmatig kiezen.
           <ManualFallback
-            intro="Will kon dit niet zeker plaatsen — kies zelf een categorie voor deze groep."
+            intro="Fin kon dit niet zeker plaatsen — kies zelf een categorie voor deze groep."
             budgetGroups={budgetGroups}
             value={otherBudgetId}
             onChange={onOtherBudgetId}
@@ -1025,7 +1025,7 @@ function AiGroupCard({
             <div className="flex items-center gap-2 rounded-[var(--r-sm)] border border-dashed border-wil-200 bg-[var(--paper)] px-3 py-3">
               <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-wil-500" />
               <p className="text-[11px] text-[var(--ink-2)]">
-                Will beoordeelt groep{' '}
+                Fin beoordeelt groep{' '}
                 <span className="font-[var(--font-dm-mono)] tabular-nums">{progressN}</span> van{' '}
                 <span className="font-[var(--font-dm-mono)] tabular-nums">{progressM}</span>…
               </p>
@@ -1033,7 +1033,7 @@ function AiGroupCard({
           )
         ) : (
           <ManualFallback
-            intro="Will kon dit niet zeker plaatsen — kies zelf een categorie voor deze groep."
+            intro="Fin kon dit niet zeker plaatsen — kies zelf een categorie voor deze groep."
             budgetGroups={budgetGroups}
             value={otherBudgetId}
             onChange={onOtherBudgetId}

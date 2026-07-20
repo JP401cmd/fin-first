@@ -130,7 +130,7 @@ describe('buildOverviewBriefingInput — finance-mapping', () => {
     ).toBe(2000)
   })
 
-  it('mapt goalNames uit willData.goals', () => {
+  it('mapt goalNames uit finData.goals', () => {
     const input = buildOverviewBriefingInput(
       makeDashboard(),
       makeWill({ goals: [{ name: 'X' }, { name: 'Y' }] }),

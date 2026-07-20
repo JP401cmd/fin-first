@@ -1,10 +1,10 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import './will-dots.css'
+import './fin-dots.css'
 
 /**
- * WillDots — Minimalist 3-dot avatar using module colors.
+ * FinDots — Minimalist 3-dot avatar using module colors.
  *
  * All dots placed at center (24,24) in a 48×48 viewBox.
  * CSS animations handle positioning per state.
@@ -17,7 +17,7 @@ import './will-dots.css'
  * - Respects prefers-reduced-motion
  */
 
-export interface WillDotsProps {
+export interface FinDotsProps {
   size?: number // width/height in px (default 48)
   state?:
     | 'idle'
@@ -30,7 +30,7 @@ export interface WillDotsProps {
     | 'loading'
 }
 
-export function WillDots({ size = 48, state = 'idle' }: WillDotsProps) {
+export function FinDots({ size = 48, state = 'idle' }: FinDotsProps) {
   const vb = 48
   const cx = 24,
     cy = 24
@@ -186,7 +186,7 @@ export function WillDots({ size = 48, state = 'idle' }: WillDotsProps) {
       height={size}
       viewBox={`0 0 ${vb} ${vb}`}
       role="img"
-      aria-label="Will avatar"
+      aria-label="Fin avatar"
     >
       <defs>
         <filter id="will-glow-kern" x="-50%" y="-50%" width="200%" height="200%">
@@ -310,4 +310,4 @@ export function WillDots({ size = 48, state = 'idle' }: WillDotsProps) {
 }
 
 // Backward compatibility alias
-export { WillDots as FinnAvatar }
+export { FinDots as FinnAvatar }

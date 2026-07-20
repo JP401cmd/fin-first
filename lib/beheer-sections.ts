@@ -161,13 +161,13 @@ export const BEHEER_GROUPS: BeheerGroup[] = [
       {
         label: 'Coach',
         href: '/beheer/coach',
-        description: 'Suggestieregels, timing en kopregel van Will.',
+        description: 'Suggestieregels, timing en kopregel van Fin.',
         icon: MessageCircle,
       },
       {
         label: 'Kennisbank lokale AI',
         href: '/beheer/kennisbank',
-        description: 'Uitleg-items (begrippen, geen cijfers) voor de systeemprompt van de lokale Will-chat.',
+        description: 'Uitleg-items (begrippen, geen cijfers) voor de systeemprompt van de lokale Fin-chat.',
         icon: BookOpen,
       },
       {
@@ -179,7 +179,7 @@ export const BEHEER_GROUPS: BeheerGroup[] = [
       {
         label: 'Doelen',
         href: '/beheer/doelen',
-        description: 'Doelgids-stappen die Will per doel volgt.',
+        description: 'Doelgids-stappen die Fin per doel volgt.',
         icon: Goal,
       },
       {

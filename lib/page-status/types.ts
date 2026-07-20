@@ -16,7 +16,7 @@ export interface PageStatusAction {
   href: string
 }
 
-/** "Bespreek met Will"-aanknoping: onderwerp + optionele context-detail. */
+/** "Bespreek met Fin"-aanknoping: onderwerp + optionele context-detail. */
 export interface PageStatusWill {
   onderwerp: string
   detail?: string
@@ -46,7 +46,7 @@ export interface PageStatusInfo {
   remedy: string
   /** Optionele actie-deeplink. */
   action?: PageStatusAction
-  /** "Bespreek met Will"-onderwerp + context. */
+  /** "Bespreek met Fin"-onderwerp + context. */
   will: PageStatusWill
 }
 

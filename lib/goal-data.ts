@@ -1,5 +1,5 @@
 /**
- * Goal types, labels, and progress helpers for the Will module.
+ * Goal types, labels, and progress helpers for the Fin module.
  */
 
 export type GoalType =

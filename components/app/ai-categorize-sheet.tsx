@@ -47,7 +47,7 @@ const SleepmodusOverlay = dynamic(
 //
 // Transaction / SheetSuggestion / RowState / SOURCE_LABELS / TransactionRow /
 // formatCurrency / formatDate wonen in components/app/categorize-row.tsx zodat
-// zowel de platte reviewlijst als de "Vraag Will"-wizard exact dezelfde rij
+// zowel de platte reviewlijst als de "Vraag Fin"-wizard exact dezelfde rij
 // hergebruiken (WP-C, feature #881).
 
 type BulkApplyPrompt = {
@@ -113,7 +113,7 @@ export function AICategorizeSheet({
 }: Props) {
   const [phase, setPhase] = useState<'choice' | 'ai' | 'review' | 'saving' | 'applying' | 'success' | 'sleep'>('choice')
   const [rows, setRows] = useState<RowState[]>([])
-  // Review-weergave: 'wizard' voor het "Vraag Will"-pad (bulk-kaart + AI-
+  // Review-weergave: 'wizard' voor het "Vraag Fin"-pad (bulk-kaart + AI-
   // groepkaarten), 'list' voor het handmatige pad (de bestaande platte lijst,
   // ongewijzigd). fetchSuggestions zet 'wizard', startManual zet 'list'.
   const [reviewMode, setReviewMode] = useState<'wizard' | 'list'>('list')
@@ -121,7 +121,7 @@ export function AICategorizeSheet({
   // primaire-actieblok hierin (niet-scrollend), zodat de vier keuzes + "Stoppen"
   // niet met de kaart-body meescrollen (CLAUDE.md: primaire acties in footerSlot).
   const [wizardFooterNode, setWizardFooterNode] = useState<HTMLDivElement | null>(null)
-  // Draait de motor nog AI-rondes? Stuurt de "Will denkt na…"-laadstatus en de
+  // Draait de motor nog AI-rondes? Stuurt de "Fin denkt na…"-laadstatus en de
   // wakelock in de wizard.
   const [aiRunning, setAiRunning] = useState(false)
   // Deelverzameling voor de sleepmodus vanuit een wizard-groep ("Zelf indelen"):
@@ -163,7 +163,7 @@ export function AICategorizeSheet({
     abortRef.current?.abort()
     gateRef.current?.abort()
   }, [])
-  // Actieve wizard-stap (1 Automatisch · 2 Will's voorstellen · 3 Controle). Leeft
+  // Actieve wizard-stap (1 Automatisch · 2 Fin's voorstellen · 3 Controle). Leeft
   // in de sheet zodat 'ie een sleepmodus-uitstapje (phase 'sleep' → 'review')
   // overleeft; de wizard is gecontroleerd via step/onStepChange. null = nog niet
   // bepaald (de wizard init 'm op de eerste bestaande stap zodra stap-1 klaar is).
@@ -332,7 +332,7 @@ export function AICategorizeSheet({
     }
   }, [])
 
-  // ── "Vraag Will": de gecombineerde automaat (regels → AI → propagatie) ─────
+  // ── "Vraag Fin": de gecombineerde automaat (regels → AI → propagatie) ─────
   //
   // Sinds de combined pass (Notion-kaart jul 2026) is dit niet langer een puur
   // AI-pad: eerst deelt de gratis regelmotor alles in wat hij weet, daarna gaan
@@ -525,7 +525,7 @@ export function AICategorizeSheet({
       )
     }
 
-    // Markeer de gegeven ids als "Will kon dit niet plaatsen" (aiNoMatch) zodat de
+    // Markeer de gegeven ids als "Fin kon dit niet plaatsen" (aiNoMatch) zodat de
     // wizard-kaart meteen de handmatige fallback toont. Rijen die (alsnog) een
     // voorstel kregen laten we ongemoeid — een voorstel wint van no-match.
     const markNoMatch = (ids: string[]) => {
@@ -596,7 +596,7 @@ export function AICategorizeSheet({
       // stage1Resolved al, maar bij 0 AI-rondes of een vroege fout in de opzet-
       // fase (context/capability) kan die hook uitblijven. Hier pinnen we 'm
       // gegarandeerd zodat structPinned in de wizard nooit blijft hangen op
-      // "Will bekijkt je transacties…".
+      // "Fin bekijkt je transacties…".
       setStage1Resolved(true)
       setAiRunning(false)
     }
@@ -754,7 +754,7 @@ export function AICategorizeSheet({
     }))
   }
 
-  // ── Wizard-acties ("Vraag Will"-pad) ───────────────────────────────────────
+  // ── Wizard-acties ("Vraag Fin"-pad) ───────────────────────────────────────
   // Wrappers om de bestaande accept-semantiek — NIETS herimplementeren. De
   // wizard werkt op tx-id's; opslaan loopt via het bestaande handleSave-pad.
 
@@ -1083,7 +1083,7 @@ export function AICategorizeSheet({
           {/* Subtiele scheiding tussen scope-setting en de primaire acties */}
           {scopeAvailable && <div className="border-t border-[var(--border-ed)]" />}
 
-          {/* Vraag Will */}
+          {/* Vraag Fin */}
           <button
             type="button"
             onClick={() => void fetchSuggestions()}
@@ -1094,9 +1094,9 @@ export function AICategorizeSheet({
               <Sparkles className="h-4 w-4 text-wil-600" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-[var(--ink)]">Vraag Will</p>
+              <p className="text-sm font-semibold text-[var(--ink)]">Vraag Fin</p>
               <p className="mt-1 text-[11px] leading-relaxed text-[var(--ink-3)]">
-                Je regels en eerdere keuzes delen eerst gratis in; alleen onbekende tegenpartijen gaan in kleine rondes naar Will en zijn oordeel wordt slim doorgetrokken naar vergelijkbare transacties. Alles komt ter controle in één overzicht.
+                Je regels en eerdere keuzes delen eerst gratis in; alleen onbekende tegenpartijen gaan in kleine rondes naar Fin en zijn oordeel wordt slim doorgetrokken naar vergelijkbare transacties. Alles komt ter controle in één overzicht.
               </p>
             </div>
           </button>
@@ -1254,7 +1254,7 @@ export function AICategorizeSheet({
             </div>
           )}
 
-          {/* Review-weergave: wizard ("Vraag Will") of platte lijst (handmatig) */}
+          {/* Review-weergave: wizard ("Vraag Fin") of platte lijst (handmatig) */}
           {reviewMode === 'wizard' ? (
             <CategorizeWizard
               rows={rows}
@@ -1348,11 +1348,11 @@ export function AICategorizeSheet({
                 <p className="mt-1 text-xs text-[var(--ink-3)]">
                   {autoSummary.ruleCount} op regels
                   {autoSummary.transferCount > 0 && <> · {autoSummary.transferCount} als eigen rekening</>}
-                  {autoSummary.unmatchedCount > 0 && <> · {autoSummary.unmatchedCount} nog open voor Will of handmatig</>}
+                  {autoSummary.unmatchedCount > 0 && <> · {autoSummary.unmatchedCount} nog open voor Fin of handmatig</>}
                 </p>
                 {autoSummary.mirrorCandidateCount > 0 && (
                   <p className="mt-1 text-xs text-[var(--ink-3)]">
-                    {autoSummary.mirrorCandidateCount} {autoSummary.mirrorCandidateCount === 1 ? 'mogelijke overboeking' : 'mogelijke overboekingen'} gevonden — bekijk ze via Vraag Will of handmatig.
+                    {autoSummary.mirrorCandidateCount} {autoSummary.mirrorCandidateCount === 1 ? 'mogelijke overboeking' : 'mogelijke overboekingen'} gevonden — bekijk ze via Vraag Fin of handmatig.
                   </p>
                 )}
               </>

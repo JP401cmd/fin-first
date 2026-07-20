@@ -1,4 +1,4 @@
-import { WillDots } from '@/components/app/will-dots'
+import { FinDots } from '@/components/app/fin-dots'
 import { Wallet, Compass, type LucideIcon } from 'lucide-react'
 import { Button } from '@/components/editorial'
 
@@ -9,9 +9,9 @@ export function OnboardingSuccess({
 }) {
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col items-center py-8 text-center sm:py-12">
-      {/* Will's avatar — celebration emphasis with subtle pulse */}
+      {/* Fin's avatar — celebration emphasis with subtle pulse */}
       <div className="mb-6 animate-[pulse_3s_ease-in-out_1]">
-        <WillDots size={140} />
+        <FinDots size={140} />
       </div>
 
       {/* Celebration heading — font-display */}
@@ -56,12 +56,12 @@ export function OnboardingSuccess({
           kleur="var(--color-horizon-600)"
           rubriek="De Toekomst · Morgen + later"
           titel="Wat brengt mijn vrijheid dichterbij?"
-          ondertitel="Levensgebeurtenissen, scenario's en de Rekenhulp van Will."
+          ondertitel="Levensgebeurtenissen, scenario's en de Rekenhulp van Fin."
           features={[
             'Tijdas met levensgebeurtenissen (kinderen, verhuizing, pensioen)',
             'FIRE-prognose met scenario-vergelijking',
             'Rekenhulp-bibliotheek met 12 kant-en-klare rekenhulpen',
-            'Vraag Will een eigen rekenhulp op maat',
+            'Vraag Fin een eigen rekenhulp op maat',
           ]}
           bgClass="bg-horizon-50"
           borderClass="border-horizon-200"
@@ -70,7 +70,7 @@ export function OnboardingSuccess({
         />
       </div>
 
-      {/* Will's closing — font-serif italic */}
+      {/* Fin's closing — font-serif italic */}
       <div className="mx-auto mt-10 max-w-md border-y border-[var(--border-ed)] px-4 py-4">
         <p className="font-serif text-sm italic leading-relaxed text-[var(--ink-2)]">
           Veel ontdekkingen! Elke bewuste keuze brengt je dichter bij vrijheid.

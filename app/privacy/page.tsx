@@ -41,7 +41,7 @@ const SUBVERWERKERS: {
   },
   {
     naam: 'Anthropic (Claude)',
-    rol: 'Primaire AI-aanbieder voor Will, de briefing, categorisering en rekenhulpen',
+    rol: 'Primaire AI-aanbieder voor Fin, de briefing, categorisering en rekenhulpen',
     locatie: 'VS',
     wanneer: 'Alleen als je AI-functies gebruikt (uitschakelbaar).',
   },
@@ -246,7 +246,7 @@ export default function PrivacyPage() {
 
       <MarketingSection heading="5. Wat er naar AI gaat — eerlijk verhaal">
         <p>
-          De AI-functies (Will — je coach, de briefing, categorisering van
+          De AI-functies (Fin — je coach, de briefing, categorisering van
           transacties, de rekenhulp-bouwer en document-import) sturen de
           context die voor die taak nodig is naar de actieve AI-aanbieder.
           Daarbij geldt:
@@ -275,7 +275,7 @@ export default function PrivacyPage() {
             <strong className="font-semibold text-[var(--ink)]">Niet alles wordt gemaskeerd</strong>{' '}
             — bij document-import gaat de volledige documenttekst mee, bij
             abonnement-herkenning de omschrijvingen van je transacties, en de
-            vraag die je zelf aan Will typt gaat mee zoals jij hem typt.
+            vraag die je zelf aan Fin typt gaat mee zoals jij hem typt.
             Zonder die inhoud kan de functie zijn werk niet doen.
           </li>
           <li className="border-l-2 border-wil-300 pl-4">

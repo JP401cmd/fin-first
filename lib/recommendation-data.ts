@@ -1,5 +1,5 @@
 /**
- * Recommendation & action types, labels, and helpers for the Will module.
+ * Recommendation & action types, labels, and helpers for the Fin module.
  */
 
 export type RecommendationType =

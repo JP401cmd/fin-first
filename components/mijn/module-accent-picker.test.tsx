@@ -41,10 +41,10 @@ function isActivePreset(btn: HTMLButtonElement): boolean {
 }
 
 describe('ModuleAccentPicker — render', () => {
-  it('rendert drie ColorPickerCards (Overzicht / Will & acties / Toekomst)', () => {
+  it('rendert drie ColorPickerCards (Overzicht / Fin & acties / Toekomst)', () => {
     renderPicker()
     expect(screen.getByText('Overzicht')).toBeTruthy()
-    expect(screen.getByText('Will & acties')).toBeTruthy()
+    expect(screen.getByText('Fin & acties')).toBeTruthy()
     expect(screen.getByText('Toekomst')).toBeTruthy()
   })
 
@@ -83,9 +83,9 @@ describe('ModuleAccentPicker — switching', () => {
     expect(isActivePreset(presetButton(overzicht, 'Aardetint (default)'))).toBe(false)
   })
 
-  it('switch op Will-accent verandert alleen Will, niet Overzicht of Toekomst', () => {
+  it('switch op Fin-accent verandert alleen Fin, niet Overzicht of Toekomst', () => {
     renderPicker()
-    const wil = cardFor('Will & acties')
+    const wil = cardFor('Fin & acties')
     fireEvent.click(presetButton(wil, 'Teal'))
     expect(isActivePreset(presetButton(wil, 'Teal'))).toBe(true)
     // Overzicht en Toekomst houden hun default actief.

@@ -713,7 +713,7 @@ describe('runCombinedCategorization — parity met lege opts (pin)', () => {
   })
 })
 
-// ── no-match-signaal (bug: "Will denkt na…" blijft hangen) ────────────────
+// ── no-match-signaal (bug: "Fin denkt na…" blijft hangen) ────────────────
 //
 // Bug (bug-reporter): een groep die een AI-ronde doorliep maar géén bruikbaar
 // voorstel kreeg (below-threshold/leeg antwoord voor de representant, óf

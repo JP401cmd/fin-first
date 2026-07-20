@@ -344,7 +344,7 @@ const criteria: AcceptanceCriterion[] = [
   {
     workflow: 'WF-SCHULD-22',
     scenarioId: 'UAT-SCHULD-22',
-    titel: 'Doorwerking naar gezondheidsscore (DSTI) en Will-acties',
+    titel: 'Doorwerking naar gezondheidsscore (DSTI) en Fin-acties',
     kriticiteit: 'BELANGRIJK',
     persona: 'lisa',
     given: 'Persona Lisa geladen.',

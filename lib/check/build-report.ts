@@ -373,7 +373,7 @@ interface EngineContext {
 //     health/markers, die de portefeuille los lezen).
 //  2. AOW/pensioen, post-pensioen-uitgave-delta en levensgebeurtenissen vormen de projectie-
 //     LIJN NIET meer (de scalar-pot kent geen kasstromen naast inkomen−uitgaven). Ze blijven
-//     wél als LEVENSPAD-MARKERS zichtbaar (`buildLifeMarkers`) en voeden de Will-tips.
+//     wél als LEVENSPAD-MARKERS zichtbaar (`buildLifeMarkers`) en voeden de Fin-tips.
 //  3. "Besteedbaar/liquide vermogen" (oud LedgerRow-veld) benaderen we met `rows[].netWorth`
 //     — voor een intake zónder eigen huis ≈ gelijk; mét eigen huis is netWorth een BOVENGRENS
 //     (het huis is niet vrij besteedbaar). Het levenspad groeit het huis mee met het
@@ -956,7 +956,7 @@ function statusForScore(score: number | null): ReportHealthPillar['status'] {
 
 function buildHealthCopy(score: number): string {
   if (score >= 70) return 'Je fundament staat. De winst zit nu in versnellen, niet repareren.'
-  if (score >= 40) return 'Een redelijk fundament met duidelijke groeikansen. Will wijst de eerste zetten aan.'
+  if (score >= 40) return 'Een redelijk fundament met duidelijke groeikansen. Fin wijst de eerste zetten aan.'
   return 'Er is werk aan de basis. Begin bij rondkomen en buffer — dat geeft de meeste rust.'
 }
 
@@ -1338,13 +1338,13 @@ function estimateMortgagePayoffAge(ctx: EngineContext, mortgage: Debt): number |
   return Math.round(ctx.age + months / 12)
 }
 
-/** Maximaal aantal Will-zetten op het rapport. */
+/** Maximaal aantal Fin-zetten op het rapport. */
 const MAX_WILL_MOVES = 4
 /** Bufferdrempel (maanden) waarboven het overschot beter belegd kan worden. */
-const WILL_BUFFER_TARGET_MONTHS = 4
+const FIN_BUFFER_TARGET_MONTHS = 4
 
 /** Eén kandidaat-zet met impactscore (vrijheidsdagen/jaar) voor de ranking. */
-interface WillCandidate {
+interface FinCandidate {
   move: CheckReportData['will']['moves'][number]
   /** Impact in vrijheidsdagen/jaar — sorteersleutel (hoog = eerst). */
   score: number
@@ -1353,13 +1353,13 @@ interface WillCandidate {
 }
 
 /**
- * Bouw tot {@link MAX_WILL_MOVES} Will-zetten uit een gescoorde KANDIDATENPOOL.
+ * Bouw tot {@link MAX_WILL_MOVES} Fin-zetten uit een gescoorde KANDIDATENPOOL.
  *
  * Alle impactlabels gaan via het canonieke dagtarief (`dailyExpense`, = €→tijd
  * uit lib/format) en het profiel-`grossReturn` — geen lokale 0,04/forfait-
  * constanten. De pool bevat:
  *  - spaarquote +4pp (gegarandeerde basiszet, altijd aanwezig);
- *  - bufferoverschot boven {@link WILL_BUFFER_TARGET_MONTHS} mnd beleggen;
+ *  - bufferoverschot boven {@link FIN_BUFFER_TARGET_MONTHS} mnd beleggen;
  *  - cash-drag: een groot cash/spaar-aandeel aan het werk zetten op rendement;
  *  - dure schuld: ALLE schuld met rente > rendement (geaggregeerd, top-post benoemd);
  *  - pensioengat: AOW laag t.o.v. de maanduitgaven.
@@ -1367,7 +1367,7 @@ interface WillCandidate {
  * de gegarandeerde basiszet) wordt teruggegeven.
  */
 function buildWillMoves(ctx: EngineContext, dailyExpense: number): CheckReportData['will']['moves'] {
-  const candidates: WillCandidate[] = []
+  const candidates: FinCandidate[] = []
   const r = ctx.grossReturn
   const daysFrom = (annualEur: number): number =>
     dailyExpense > 0 ? Math.round(annualEur / dailyExpense) : 0
@@ -1394,15 +1394,15 @@ function buildWillMoves(ctx: EngineContext, dailyExpense: number): CheckReportDa
     0,
     ctx.monthlyExpenses,
   )
-  if (bufferMonths > WILL_BUFFER_TARGET_MONTHS && ctx.monthlyExpenses > 0) {
-    const surplus = Math.max(0, ctx.intake.emergencyFund - ctx.monthlyExpenses * WILL_BUFFER_TARGET_MONTHS)
+  if (bufferMonths > FIN_BUFFER_TARGET_MONTHS && ctx.monthlyExpenses > 0) {
+    const surplus = Math.max(0, ctx.intake.emergencyFund - ctx.monthlyExpenses * FIN_BUFFER_TARGET_MONTHS)
     if (surplus > 0) {
       const gainDays = daysFrom(surplus * r)
       candidates.push({
         score: gainDays,
         move: {
           title: 'Laat je bufferoverschot werken',
-          body: `Je buffer dekt ${round1(bufferMonths)} maanden. Het deel boven ${WILL_BUFFER_TARGET_MONTHS} maanden (±${formatEurShort(surplus)}) staat stil — breng het naar je beleggingsdeel.`,
+          body: `Je buffer dekt ${round1(bufferMonths)} maanden. Het deel boven ${FIN_BUFFER_TARGET_MONTHS} maanden (±${formatEurShort(surplus)}) staat stil — breng het naar je beleggingsdeel.`,
           gainLabel: `~${gainDays} dagen vrijheid / jaar`,
           gainDays,
           kind: 'freedom-days',
@@ -1420,7 +1420,7 @@ function buildWillMoves(ctx: EngineContext, dailyExpense: number): CheckReportDa
   if (cashBar && totalFireWealth > 0) {
     const cashShare = cashBar.eur / totalFireWealth
     // Het deel boven de aan te houden buffer (4 mnd uitgaven) is "drag".
-    const bufferTarget = ctx.monthlyExpenses * WILL_BUFFER_TARGET_MONTHS
+    const bufferTarget = ctx.monthlyExpenses * FIN_BUFFER_TARGET_MONTHS
     const investableCash = Math.max(0, cashBar.eur - bufferTarget)
     // Alleen relevant bij een fors cash-aandeel én daadwerkelijk te beleggen cash.
     if (cashShare > 0.30 && investableCash > 0) {

@@ -9,8 +9,8 @@ const CAT = 'widgets.avatar'
 
 const ALL_MODULES: WidgetModule[] = ['kern', 'wil', 'horizon', 'cross']
 const ALL_SIZES: WidgetSize[] = ['mini', 'quarter', 'half', 'full']
-const WILL_STATES = ['idle', 'talking', 'thinking', 'listening', 'streaming', 'success', 'error'] as const
-const WILL_SIZES = [24, 48, 80, 120] as const
+const FIN_STATES = ['idle', 'talking', 'thinking', 'listening', 'streaming', 'success', 'error'] as const
+const FIN_SIZES = [24, 48, 80, 120] as const
 
 const tests: TestCase[] = [
   // ── Step 1: All WIDGET_CATALOG widgets render without crash ────────────
@@ -130,41 +130,41 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── Step 6: Will avatar states ────────────────────────────────────────
+  // ── Step 6: Fin avatar states ────────────────────────────────────────
   {
     id: 'will-avatar-all-states',
-    name: 'Will avatar: alle 7 states gedefinieerd',
+    name: 'Fin avatar: alle 7 states gedefinieerd',
     category: CAT,
     description: 'idle, talking, thinking, listening, streaming, success, error',
     priority: 'critical',
     estimatedDurationMs: 5,
     fn() {
-      assertEqual(WILL_STATES.length, 7, 'Expected 7 WillDots states')
+      assertEqual(FIN_STATES.length, 7, 'Expected 7 FinDots states')
       const expectedStates = ['idle', 'talking', 'thinking', 'listening', 'streaming', 'success', 'error']
       for (const state of expectedStates) {
         assert(
-          WILL_STATES.includes(state as typeof WILL_STATES[number]),
-          `Missing WillDots state: ${state}`,
+          FIN_STATES.includes(state as typeof FIN_STATES[number]),
+          `Missing FinDots state: ${state}`,
         )
       }
     },
   },
 
-  // ── Step 7: Will avatar sizes ─────────────────────────────────────────
+  // ── Step 7: Fin avatar sizes ─────────────────────────────────────────
   {
     id: 'will-avatar-all-sizes',
-    name: 'Will avatar: alle 4 sizes (24/48/80/120)',
+    name: 'Fin avatar: alle 4 sizes (24/48/80/120)',
     category: CAT,
-    description: 'WillDots ondersteunt 24, 48, 80 en 120px',
+    description: 'FinDots ondersteunt 24, 48, 80 en 120px',
     priority: 'high',
     estimatedDurationMs: 5,
     fn() {
-      assertEqual(WILL_SIZES.length, 4, 'Expected 4 WillDots sizes')
+      assertEqual(FIN_SIZES.length, 4, 'Expected 4 FinDots sizes')
       const expectedSizes = [24, 48, 80, 120]
       for (const size of expectedSizes) {
         assert(
-          WILL_SIZES.includes(size as typeof WILL_SIZES[number]),
-          `Missing WillDots size: ${size}`,
+          FIN_SIZES.includes(size as typeof FIN_SIZES[number]),
+          `Missing FinDots size: ${size}`,
         )
       }
     },
@@ -173,9 +173,9 @@ const tests: TestCase[] = [
   // ── Step 8: Light + dark metadata per avatar-state ────────────────────
   {
     id: 'will-avatar-light-dark-defined',
-    name: 'Will avatar: light + dark backgrounds in page',
+    name: 'Fin avatar: light + dark backgrounds in page',
     category: CAT,
-    description: 'Will avatar pagina definieert light en dark achtergronden voor elke state',
+    description: 'Fin avatar pagina definieert light en dark achtergronden voor elke state',
     priority: 'medium',
     estimatedDurationMs: 5,
     fn() {
@@ -189,7 +189,7 @@ const tests: TestCase[] = [
         { key: 'success', label: 'Succes' },
         { key: 'error', label: 'Fout' },
       ]
-      assertEqual(statesMeta.length, WILL_STATES.length, 'State metadata count mismatch')
+      assertEqual(statesMeta.length, FIN_STATES.length, 'State metadata count mismatch')
       for (const meta of statesMeta) {
         assert(meta.label.length > 0, `State ${meta.key} missing label`)
       }
@@ -202,7 +202,7 @@ export function register(): void {
   registerCategory({
     id: CAT,
     label: 'Beheer — Widgets & Avatar',
-    description: 'Widget catalog validatie, module groepering, Will avatar states en sizes',
+    description: 'Widget catalog validatie, module groepering, Fin avatar states en sizes',
     icon: 'LayoutGrid',
     testCount: 0,
   })

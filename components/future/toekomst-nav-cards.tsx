@@ -34,7 +34,7 @@ import {
   leverageStatusTextClass,
   type LeverageStatus,
 } from '@/lib/leverage-status'
-import type { GoalWithBudget } from '@/lib/will-data-loader'
+import type { GoalWithBudget } from '@/lib/fin-data-loader'
 import type { LifeEvent } from '@/lib/horizon-data'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
 import { STRATEGY_LABELS } from '@/lib/fire-strategy'
@@ -45,7 +45,7 @@ import type { FireParams } from '@/lib/fire-params'
 
 /**
  * Voortgang per doel — parallel array met `goals` (zelfde index), exact zoals
- * `loadWillData` (`WillPageData.goalProgresses`) hem teruggeeft.
+ * `loadFinData` (`FinPageData.goalProgresses`) hem teruggeeft.
  */
 export type GoalProgress = {
   current: number
@@ -314,14 +314,14 @@ export function buildNavCards({
       tint: tintForStatus('neutral'),
       kpi: countKpi(calcCount, 'rekenhulp', 'rekenhulpen'),
       status: 'neutral',
-      subText: calcCount > 0 ? 'Nieuwe met Will' : 'Nog geen rekenhulpen',
+      subText: calcCount > 0 ? 'Nieuwe met Fin' : 'Nog geen rekenhulpen',
       detail: {
         detailLabel: 'Eigen rekenhulpen',
         value: countKpi(calcCount, 'rekenhulp', 'rekenhulpen'),
         tip:
           calcCount > 0
-            ? 'Will houdt je rekenhulpen bij en maakt er nieuwe.'
-            : 'Nog geen rekenhulpen — begin er één met Will.',
+            ? 'Fin houdt je rekenhulpen bij en maakt er nieuwe.'
+            : 'Nog geen rekenhulpen — begin er één met Fin.',
         actionLabel: 'Open rekenhulpen',
       },
     },

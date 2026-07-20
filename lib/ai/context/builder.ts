@@ -11,7 +11,7 @@ import { buildAandachtspuntenContext } from './aandachtspunten-context'
 import { ALL_MODULES, MODULE_CATALOG, type ModuleId } from '@/lib/module-registry'
 
 /**
- * Build the full financial context for Will.
+ * Build the full financial context for Fin.
  * Combines all context sources: shared overview + budgets + actions + assets/projections + spending patterns + budget insights.
  * When budgeting_active is false, budget-related context sections are skipped.
  * Includes module awareness section so the AI knows which modules are active.

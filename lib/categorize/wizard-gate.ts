@@ -1,5 +1,5 @@
 /**
- * Prefetch-gate voor de "Vraag Will"-wizard.
+ * Prefetch-gate voor de "Vraag Fin"-wizard.
  *
  * De categorisatie-motor (`runCombinedCategorization`) roept vóór elke AI-ronde
  * de `onBeforeRound`-hook aan. Deze gate koppelt dat aan de wizard-presentatie:

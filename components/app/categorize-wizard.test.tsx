@@ -1,5 +1,5 @@
 /**
- * Component test voor CategorizeWizard — de "Vraag Will"-wizard (WP-C/WP-E2,
+ * Component test voor CategorizeWizard — de "Vraag Fin"-wizard (WP-C/WP-E2,
  * feature #881): bulk-kaart voor stage-1 (regel/overboeking/spiegel) + AI-
  * groepkaarten voor de rest, één tegelijk in largest-first-volgorde.
  *
@@ -153,7 +153,7 @@ describe('CategorizeWizard — stap 1 · bulk-kaart (stage-1)', () => {
     const rows = [makeRuleRow('r1'), makeRuleRow('r2')]
     const props = renderWizard({ rows })
 
-    expect(screen.getByText(/Will herkende/i)).toBeInTheDocument()
+    expect(screen.getByText(/Fin herkende/i)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /Alle 2 toepassen/i }))
     expect(props.onBulkAcceptStage1).toHaveBeenCalledTimes(1)
   })
@@ -256,13 +256,13 @@ describe('CategorizeWizard — de vier keuzes routeren correct', () => {
 // ── Randgevallen ─────────────────────────────────────────────────────────────
 
 describe('CategorizeWizard — randgevallen', () => {
-  it('0 AI-groepen: alleen stap 1 + stap 3 (geen "Will\'s voorstellen"-stap)', () => {
+  it('0 AI-groepen: alleen stap 1 + stap 3 (geen "Fin\'s voorstellen"-stap)', () => {
     renderWizard({ rows: [makeRuleRow('r1')] })
 
-    expect(screen.getByText(/Will herkende/i)).toBeInTheDocument()
+    expect(screen.getByText(/Fin herkende/i)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Akkoord & verder/i })).toBeNull()
     // Zonder AI-rijen bestaat stap 2 niet: de stap-indicator toont 'm niet.
-    expect(screen.queryByText(/Will's voorstellen/i)).toBeNull()
+    expect(screen.queryByText(/Fin's voorstellen/i)).toBeNull()
     expect(screen.getByText('Automatisch')).toBeInTheDocument()
     expect(screen.getByText('Controle')).toBeInTheDocument()
   })
@@ -288,8 +288,8 @@ describe('CategorizeWizard — randgevallen', () => {
 
     // Eén-malige GPU-warmup: een visueel onderscheiden opstartblok (geen subregel).
     expect(screen.getByText(/Lokale AI wordt gestart/i)).toBeInTheDocument()
-    // Tijdens 'starten' NIET de gewone "Will beoordeelt groep…"-status.
-    expect(screen.queryByText(/Will beoordeelt groep/i)).toBeNull()
+    // Tijdens 'starten' NIET de gewone "Fin beoordeelt groep…"-status.
+    expect(screen.queryByText(/Fin beoordeelt groep/i)).toBeNull()
     expect(screen.queryByRole('button', { name: /Akkoord & verder/i })).toBeNull()
   })
 
@@ -301,7 +301,7 @@ describe('CategorizeWizard — randgevallen', () => {
       localSessionState: 'klaar',
     })
 
-    expect(screen.getByText(/Will beoordeelt groep/i)).toBeInTheDocument()
+    expect(screen.getByText(/Fin beoordeelt groep/i)).toBeInTheDocument()
     expect(screen.queryByText(/Lokale AI wordt gestart/i)).toBeNull()
   })
 
@@ -313,9 +313,9 @@ describe('CategorizeWizard — randgevallen', () => {
       aiPhaseActive: true,
     })
 
-    expect(screen.getByText(/Will kon dit niet zeker plaatsen/i)).toBeInTheDocument()
+    expect(screen.getByText(/Fin kon dit niet zeker plaatsen/i)).toBeInTheDocument()
     // Geen laadstatus meer voor deze groep.
-    expect(screen.queryByText(/Will beoordeelt groep/i)).toBeNull()
+    expect(screen.queryByText(/Fin beoordeelt groep/i)).toBeNull()
     const select = screen.getByRole('combobox', { name: /Categorie kiezen voor deze groep/i })
     fireEvent.change(select, { target: { value: boodschappenBudget.id } })
     fireEvent.click(screen.getByRole('button', { name: /Deze groep indelen/i }))
@@ -330,7 +330,7 @@ describe('CategorizeWizard — randgevallen', () => {
 
     // Eén no-match-bewoording app-breed (UX-5): ook het "AI klaar zonder
     // voorstel"-pad gebruikt exact dezelfde tekst als het aiNoMatch-pad.
-    expect(screen.getByText(/Will kon dit niet zeker plaatsen/i)).toBeInTheDocument()
+    expect(screen.getByText(/Fin kon dit niet zeker plaatsen/i)).toBeInTheDocument()
     const select = screen.getByRole('combobox', { name: /Categorie kiezen voor deze groep/i })
     fireEvent.change(select, { target: { value: boodschappenBudget.id } })
     fireEvent.click(screen.getByRole('button', { name: /Deze groep indelen/i }))
@@ -517,7 +517,7 @@ describe('CategorizeWizard — twee traps · details bij no-match', () => {
     // De toggle staat op expanded (kan weer inklappen).
     expect(screen.getByRole('button', { expanded: true, name: /2\s*transacties/i })).toBeInTheDocument()
     // En de handmatige keuze staat klaar.
-    expect(screen.getByText(/Will kon dit niet zeker plaatsen/i)).toBeInTheDocument()
+    expect(screen.getByText(/Fin kon dit niet zeker plaatsen/i)).toBeInTheDocument()
   })
 })
 
@@ -635,7 +635,7 @@ describe('CategorizeWizard — footer-portal', () => {
 // ── GWT-1: stepper toont alle 3 stappen ──────────────────────────────────────
 
 describe('CategorizeWizard — GWT-1 · stepper met alle 3 stappen', () => {
-  it('toont "Automatisch" › "Will\'s voorstellen" › "Controle" wanneer stage-1 én AI-rijen bestaan', () => {
+  it('toont "Automatisch" › "Fin\'s voorstellen" › "Controle" wanneer stage-1 én AI-rijen bestaan', () => {
     const rows = [
       makeRuleRow('r1'),
       makeRow(makeTx('a1', { counterparty_name: 'AI Winkel' }), makeSuggestion()),
@@ -643,7 +643,7 @@ describe('CategorizeWizard — GWT-1 · stepper met alle 3 stappen', () => {
     renderWizard({ rows })
 
     expect(screen.getByText('Automatisch')).toBeInTheDocument()
-    expect(screen.getByText("Will's voorstellen")).toBeInTheDocument()
+    expect(screen.getByText("Fin's voorstellen")).toBeInTheDocument()
     expect(screen.getByText('Controle')).toBeInTheDocument()
     expect(stepHeaderLabel()).toBe('Stap 1 van 3')
   })
@@ -652,13 +652,13 @@ describe('CategorizeWizard — GWT-1 · stepper met alle 3 stappen', () => {
 // ── GWT-2: 0 stage-1-rijen → stap 1 bestaat niet, start direct op stap 2 ─────
 
 describe('CategorizeWizard — GWT-2 · 0 stage-1-voorstellen slaat stap 1 over', () => {
-  it('start direct op "Will\'s voorstellen" (stap 1 van 2) zonder enige stage-1-bulk-kaart', () => {
+  it('start direct op "Fin\'s voorstellen" (stap 1 van 2) zonder enige stage-1-bulk-kaart', () => {
     const rows = [makeRow(makeTx('a1', { counterparty_name: 'AI Alleen' }), makeSuggestion())]
     renderWizard({ rows })
 
     expect(screen.queryByText('Automatisch')).toBeNull()
-    expect(screen.queryByText(/Will herkende/i)).toBeNull()
-    expect(screen.getByText("Will's voorstellen")).toBeInTheDocument()
+    expect(screen.queryByText(/Fin herkende/i)).toBeNull()
+    expect(screen.getByText("Fin's voorstellen")).toBeInTheDocument()
     expect(screen.getByText('AI Alleen')).toBeInTheDocument()
     expect(stepHeaderLabel()).toBe('Stap 1 van 2')
   })
@@ -680,7 +680,7 @@ describe('CategorizeWizard — GWT-4 · "Alle X toepassen" gaat door naar stap 2
     // De wizard navigeert zelf door (goNext), onafhankelijk van of de parent de
     // rijen al heeft bijgewerkt — dat is precies het in-memory→stap-2-contract.
     expect(screen.getByText('AI Winkel')).toBeInTheDocument()
-    expect(screen.queryByText(/Will herkende/i)).toBeNull()
+    expect(screen.queryByText(/Fin herkende/i)).toBeNull()
   })
 })
 
@@ -750,7 +750,7 @@ describe('CategorizeWizard — GWT-9 · cloud-pad zonder opstartblok', () => {
       localSessionState: 'starten',
     })
 
-    expect(screen.getByText(/Will beoordeelt groep/i)).toBeInTheDocument()
+    expect(screen.getByText(/Fin beoordeelt groep/i)).toBeInTheDocument()
     expect(screen.queryByText(/Lokale AI wordt gestart/i)).toBeNull()
   })
 })

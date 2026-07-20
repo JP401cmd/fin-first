@@ -6,8 +6,8 @@
  * manieren bruikbaar worden:
  *
  *   (a) ACTIE  — `aandachtspuntToActionPayload` levert exact de body voor
- *               POST /api/ai/actions. Deterministisch, los van Will.
- *   (b) BUS     — dezelfde laag voedt Will als chat-context (zie
+ *               POST /api/ai/actions. Deterministisch, los van Fin.
+ *   (b) BUS     — dezelfde laag voedt Fin als chat-context (zie
  *               aandachtspunten-loader.ts → collectAandachtspunten).
  *
  * Dit bestand bevat alleen de adapters + de payload-mapping; de Supabase-

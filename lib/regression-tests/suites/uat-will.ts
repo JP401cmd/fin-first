@@ -1,5 +1,5 @@
 /**
- * In-app regressie-suite: UAT-Will engine-checks.
+ * In-app regressie-suite: UAT-Fin engine-checks.
  *
  * Draait `WILL_ENGINE_CHECKS` (lib/uat/acceptance/will-checks.ts) — dezelfde
  * lijst als `lib/uat/acceptance/will.engine.test.ts` (vitest/CI) — vanuit
@@ -37,9 +37,9 @@ const tests: TestCase[] = WILL_ENGINE_CHECKS.map((check) => ({
 export function register(): void {
   registerCategory({
     id: CAT,
-    label: 'UAT — Will & berichten (engine)',
+    label: 'UAT — Fin & berichten (engine)',
     description:
-      'Acceptatiecriteria domein Will/berichten/krant: échte en gemirrorde deterministische functies (tip-postpone-termijn, coach-regelselectie, bel-badge-cap, budgetmelding-tekst, ongelezen-teller, notificatievoorkeuren-filter, briefing-weeksleutel, krant-editienummer/jaargang/ververs-limiet/archief, nieuws-actie-defaults, "minder hierover"-demotiedrempel). Gedeeld met will.engine.test.ts.',
+      'Acceptatiecriteria domein Fin/berichten/krant: échte en gemirrorde deterministische functies (tip-postpone-termijn, coach-regelselectie, bel-badge-cap, budgetmelding-tekst, ongelezen-teller, notificatievoorkeuren-filter, briefing-weeksleutel, krant-editienummer/jaargang/ververs-limiet/archief, nieuws-actie-defaults, "minder hierover"-demotiedrempel). Gedeeld met will.engine.test.ts.',
     icon: 'MessageCircle',
     testCount: 0,
     defaultRole: 'any',

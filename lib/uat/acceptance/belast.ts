@@ -113,11 +113,11 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'KERN',
     persona: 'compleet',
     given: 'Persona Tessa geladen; een besparingskans (bv. "Benut je jaarruimte") is zichtbaar op de hub.',
-    when: 'De gebruiker voegt de kans toe als actie (Will) en vindt \'m terug in de actielijst.',
-    then: 'De kans wordt als actie weggeschreven (DB-mutatie) en verschijnt in de Will-actielijst. Pure UI-/persistentie-workflow zonder cijfermatige uitkomst uit een rekenmotor.',
+    when: 'De gebruiker voegt de kans toe als actie (Fin) en vindt \'m terug in de actielijst.',
+    then: 'De kans wordt als actie weggeschreven (DB-mutatie) en verschijnt in de Fin-actielijst. Pure UI-/persistentie-workflow zonder cijfermatige uitkomst uit een rekenmotor.',
     assertion: {
       kind: 'ui-only',
-      source: 'actie-creatie (DB-insert) + Will-actielijst; geen persona-cijfer uit een rekenmotor te herleiden',
+      source: 'actie-creatie (DB-insert) + Fin-actielijst; geen persona-cijfer uit een rekenmotor te herleiden',
     },
   },
   {

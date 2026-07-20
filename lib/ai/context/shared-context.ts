@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { computeCoreData, type FinancialInput } from '@/lib/core-metrics'
 import { loadCoreData } from '@/lib/core-data-loader'
 import { isFinanciallyFree } from '@/lib/fire-strategy'
-import { buildWillFinancialFacts } from './will-financial-facts'
+import { buildWillFinancialFacts } from './fin-financial-facts'
 import { section, formatCurrency, formatFreedomTime, formatPercentage } from './formatter'
 
 const TEMPORAL_LABELS: Record<number, string> = {
@@ -20,7 +20,7 @@ const TEMPORAL_LABELS: Record<number, string> = {
  * Egress-reductie (jun 2026): alle financiële kerngetallen komen uit
  * `loadCoreData` (React-cached, dezelfde bron als de app-pagina's) in
  * plaats van zes eigen queries die functioneel overlapten. Dat scheelt
- * per chatbericht ~6 PostgREST-calls én garandeert dat Will exact
+ * per chatbericht ~6 PostgREST-calls én garandeert dat Fin exact
  * dezelfde getallen ziet als de gebruiker op /core en /overzicht
  * (single-source-of-truth). Alleen de drie profielvelden die niet in
  * `CorePageData` zitten (temporal_balance, household_type,
@@ -76,8 +76,8 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
   const core = computeCoreData(coreInput, coreData.fireParams.effectiveSwr)
 
   // Netto vermogen, vrijgekochte tijd, vrijheids-% en FIRE-doel komen ALLE uit de
-  // gedeelde extractor `buildWillFinancialFacts` — DEZELFDE bron die de lokale Will
-  // (`buildLocalChatOverview`) leest, zodat beide Wills exact dezelfde getallen op
+  // gedeelde extractor `buildWillFinancialFacts` — DEZELFDE bron die de lokale Fin
+  // (`buildLocalChatOverview`) leest, zodat beide Fins exact dezelfde getallen op
   // dezelfde grondslag tonen. `facts.nettoVermogen/freedomYears/freedomMonths` zijn
   // per constructie identiek aan `core.*` (zelfde `computeCoreData`-input + SWR); ze
   // óók uit facts lezen maakt er één bron van, zodat een toekomstige wijziging aan de
@@ -108,7 +108,7 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
     `Budgettering: ${coreData.budgetingActive !== false ? 'actief' : 'NIET actief — gebruiker budgetteert niet. Doe GEEN budget-gerelateerde voorstellen.'}`,
     // Levensfase-signaal (consume-only, ADR 0009): wanneer de gebruiker AL
     // financieel vrij is (vrijheids-% ≥ 100 of leeftijd voorbij vrijheidsleeftijd)
-    // moet Will coachen op behoud/onttrekking i.p.v. "eerder vrij worden". Afgeleid
+    // moet Fin coachen op behoud/onttrekking i.p.v. "eerder vrij worden". Afgeleid
     // via de canonieke `isFinanciallyFree`-vlag uit reeds-in-context getallen
     // (freedomPercentage + currentAge); geen nieuwe data naar het model.
     isFinanciallyFree({ freedomPct: freedomPercentage, currentAge: coreData.currentAge ?? null, fireAge: null })

@@ -172,7 +172,7 @@ export default function GuideHorizonUitleg() {
           </p>
           <p>
             Elke fase-modal bevat nu ook <strong>Monte Carlo simulaties</strong>, <strong>stresstests</strong> en
-            een <strong>Vraag Will</strong> knop voor gepersonaliseerd advies.
+            een <strong>Vraag Fin</strong> knop voor gepersonaliseerd advies.
           </p>
         </>
       ),
@@ -852,8 +852,8 @@ export default function GuideHorizonUitleg() {
             effect op je vermogen. Zo weet je of je plan ook werkt als het tegenzit.
           </p>
           <p>
-            <strong>Vraag Will</strong> — bij elke analyse vind je een knop om de resultaten
-            direct met Will te bespreken. Will ziet dezelfde cijfers als jij en kan je helpen
+            <strong>Vraag Fin</strong> — bij elke analyse vind je een knop om de resultaten
+            direct met Fin te bespreken. Fin ziet dezelfde cijfers als jij en kan je helpen
             met het interpreteren van de uitkomsten of het bedenken van alternatieven.
           </p>
           <p>

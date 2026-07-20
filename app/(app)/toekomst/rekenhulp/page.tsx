@@ -8,7 +8,7 @@ import type { CustomCalculatorRow } from '@/lib/calculator/types'
 
 export const metadata: Metadata = {
   title: 'Rekenhulp — TriFinity',
-  description: 'Will-ondersteunde rekenhulpen — vergelijk financiële keuzes en bewaar je eigen berekeningen.',
+  description: 'Fin-ondersteunde rekenhulpen — vergelijk financiële keuzes en bewaar je eigen berekeningen.',
 }
 
 /**
@@ -23,7 +23,7 @@ export default async function ToekomstRekenhulpPage() {
   const supabase = await createClient()
   const horizonData = await loadHorizonData(supabase)
 
-  // Rekenhulp (Will-assisted calculators): prefill-waarden uit de
+  // Rekenhulp (Fin-assisted calculators): prefill-waarden uit de
   // horizon-data + opgeslagen calculators van de gebruiker.
   const prefill = buildPrefillValues({
     effectiveInput: horizonData.effectiveInput,
@@ -53,7 +53,7 @@ export default async function ToekomstRekenhulpPage() {
         titleBefore="Wat kost een keuze je aan "
         emphasis="tijd"
         titleAfter="?"
-        deck="Will-ondersteunde rekenhulpen — vergelijk financiële keuzes en bewaar je eigen berekeningen."
+        deck="Fin-ondersteunde rekenhulpen — vergelijk financiële keuzes en bewaar je eigen berekeningen."
       />
       <RekenhulpView saved={savedCalculators} prefill={prefill} />
     </>

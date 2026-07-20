@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { Target, AlertCircle, ArrowRight } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
-import type { GoalWithBudget } from '@/lib/will-data-loader'
+import type { GoalWithBudget } from '@/lib/fin-data-loader'
 
 /**
  * OffTrackDoelenLijst — sub-component op /overzicht/tips dat doelen

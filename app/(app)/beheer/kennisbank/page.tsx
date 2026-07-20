@@ -40,7 +40,7 @@ import {
  * /beheer/kennisbank — beheer van de kennisbank lokale AI (fase K1 / K1.1).
  *
  * Een gecureerde uitleg-laag die later (C1b) binnen een token-budget in de
- * systeemprompt van de lokale Will-chat wordt geïnjecteerd. Deze pagina is puur
+ * systeemprompt van de lokale Fin-chat wordt geïnjecteerd. Deze pagina is puur
  * beheer: toevoegen, bewerken, aan/uit, categoriseren, verloop bijhouden,
  * verwijderen en volgorde. Er is nog geen consument aan gebruikerskant.
  *
@@ -368,7 +368,7 @@ export default function BeheerKennisbankPage() {
           Kennisbank lokale AI
         </h2>
         <p className="mt-1 text-sm text-[var(--ink-3)]">
-          Beheer de uitleg-items die de lokale Will straks meekrijgt in haar systeemprompt. Je voegt
+          Beheer de uitleg-items die de lokale Fin straks meekrijgt in haar systeemprompt. Je voegt
           begrippen toe, ordent ze per categorie, zet ze aan of uit en houdt bij wanneer ze
           gecontroleerd moeten worden. De items worden binnen een token-budget in volgorde opgenomen
           — wat niet past, valt af.
@@ -383,7 +383,7 @@ export default function BeheerKennisbankPage() {
           <p>
             Zet hier uitsluitend uitleg neer (bijvoorbeeld &ldquo;wat is Box 3&rdquo; of &ldquo;hoe
             werkt jaarruimte&rdquo;). <strong>Nooit</strong> cijfers, tarieven of rekentabellen:
-            bedragen en percentages komen altijd uit de rekenmotoren. Zo blijft de lokale Will
+            bedragen en percentages komen altijd uit de rekenmotoren. Zo blijft de lokale Fin
             correct en Wft-veilig.
           </p>
         </div>
@@ -595,7 +595,7 @@ export default function BeheerKennisbankPage() {
         <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-[var(--border-md)] bg-[var(--paper)] px-5 py-12 text-center">
           <BookOpen className="h-8 w-8 text-[var(--ink-4)]" aria-hidden="true" />
           <p className="max-w-md text-sm italic text-[var(--ink-3)]">
-            Nog geen kennisitems — voeg begrippen toe die de lokale Will helpen je vragen te begrijpen.
+            Nog geen kennisitems — voeg begrippen toe die de lokale Fin helpen je vragen te begrijpen.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-2">
             <button

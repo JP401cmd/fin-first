@@ -204,7 +204,7 @@ export const DEFAULT_WELCOME_GUIDE: WelcomeGuideConfig = {
         },
         {
           id: 's3-will',
-          title: 'AI: vraag Will om tips',
+          title: 'AI: vraag Fin om tips',
           description: 'Klik ook eens op de chatfunctie vanaf een ander scherm voor specifieke tips.',
           href: '/overzicht/tips',
           icon: 'Sparkles',

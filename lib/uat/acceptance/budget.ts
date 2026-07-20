@@ -299,11 +299,11 @@ const criteria: AcceptanceCriterion[] = [
   {
     workflow: 'WF-BUDGET-19',
     scenarioId: 'UAT-BUDGET-19',
-    titel: 'Will om budgetadvies vragen',
+    titel: 'Fin om budgetadvies vragen',
     kriticiteit: 'OVERIG',
     persona: 'lisa',
     given: 'Persona Lisa geladen op een budgetdetail met een overschrijding.',
-    when: 'De gebruiker klikt "Vraag Will om advies".',
+    when: 'De gebruiker klikt "Vraag Fin om advies".',
     then: 'De chat opent met een voorgevuld bericht over dit budget; het AI-antwoord zelf is niet-deterministisch.',
     assertion: {
       kind: 'ui-only',

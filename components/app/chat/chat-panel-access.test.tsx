@@ -6,7 +6,7 @@ import type { FeatureAccessData } from '@/lib/compute-feature-access'
 
 /**
  * Regressietest voor de layout-plaatsingsbug rond de AI-abonnee-gate in de
- * Will-chat.
+ * Fin-chat.
  *
  * Bug: `<ChatPanelLazy />` werd in `app/(app)/layout.tsx` gerenderd BUITEN
  * `<FeatureAccessProvider>`. `ChatPanel` leest de abonnementsstatus via
@@ -97,7 +97,7 @@ describe('ChatPanel — AI-abonnee-toegang via de échte FeatureAccessProvider',
     // Sinds FR-C2a resolveert de transport-keuze (cloud/lokaal) async — het
     // invoerveld verschijnt pas zodra `chatReady` waar is (privacy-mode-fetch
     // afgerond). `findBy*` wacht daarop i.p.v. een synchrone `getBy*`.
-    expect(await screen.findByPlaceholderText('Vraag Will iets...')).toBeInTheDocument()
+    expect(await screen.findByPlaceholderText('Vraag Fin iets...')).toBeInTheDocument()
     expect(screen.queryByTestId('ai-upsell-panel')).not.toBeInTheDocument()
   })
 
@@ -110,6 +110,6 @@ describe('ChatPanel — AI-abonnee-toegang via de échte FeatureAccessProvider',
     render(<ChatPanel />)
 
     expect(screen.getByTestId('ai-upsell-panel')).toBeInTheDocument()
-    expect(screen.queryByPlaceholderText('Vraag Will iets...')).not.toBeInTheDocument()
+    expect(screen.queryByPlaceholderText('Vraag Fin iets...')).not.toBeInTheDocument()
   })
 })

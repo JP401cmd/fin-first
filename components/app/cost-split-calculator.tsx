@@ -151,7 +151,7 @@ const MODE_ICONS: Record<SplitMode, typeof Scale> = {
 }
 
 // Split-modes zijn geen module-identiteit — een verdelingsmodus "hoort" niet bij
-// Kern/Will/Toekomst. We tonen de actieve modus daarom in het route-accent
+// Kern/Fin/Toekomst. We tonen de actieve modus daarom in het route-accent
 // (`--module-active-*`) en de niet-actieve modi neutraal (ink-tokens), i.p.v.
 // elke modus een eigen module-/standaardkleur (incl. de eerdere kale `blue-*`)
 // te geven. De `isActive`-styling in SplitModeCard bepaalt welke variant zichtbaar is.

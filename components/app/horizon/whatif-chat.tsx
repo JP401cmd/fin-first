@@ -3,7 +3,7 @@
 import { useRef, useEffect, useState, useMemo, useCallback } from 'react'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport } from 'ai'
-import { WillDots } from '@/components/app/will-dots'
+import { FinDots } from '@/components/app/fin-dots'
 import { LIFE_EVENT_CATALOG } from '@/lib/horizon-data'
 import { EVENT_ICONS } from '@/components/app/horizon/log-timeline'
 
@@ -421,9 +421,9 @@ export function WhatIfChat({ onAddEvent, scenarioContext }: WhatIfChatProps) {
 
       {/* Header */}
       <div className="flex items-center gap-2 border-b border-[var(--border-ed)] px-4 py-2.5">
-        <WillDots size={28} />
+        <FinDots size={28} />
         <div>
-          <span className="text-sm font-semibold text-horizon-700">Will</span>
+          <span className="text-sm font-semibold text-horizon-700">Fin</span>
           <span className={`ml-1 text-[11px] transition-colors ${isPlannerMode ? 'text-horizon-700 font-medium' : 'text-[var(--ink-3)]'}`}>
             {isPlannerMode ? 'Planner' : 'Droomgids'}
           </span>
@@ -437,8 +437,8 @@ export function WhatIfChat({ onAddEvent, scenarioContext }: WhatIfChatProps) {
           <div className="flex items-start gap-2">
             <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-horizon-600" aria-hidden="true" />
             <p className="text-[11px] leading-relaxed text-[var(--ink-2)]">
-              Wat-als met Will is niet beschikbaar in privé-modus — zet privé-modus
-              uit om je scenario met Will te bespreken.
+              Wat-als met Fin is niet beschikbaar in privé-modus — zet privé-modus
+              uit om je scenario met Fin te bespreken.
             </p>
           </div>
         </div>
@@ -448,7 +448,7 @@ export function WhatIfChat({ onAddEvent, scenarioContext }: WhatIfChatProps) {
       <div ref={scrollAreaRef} onScroll={handleScroll} className={`overflow-y-auto px-4 py-3 ${messages.length === 0 ? 'h-[120px]' : 'max-h-[320px]'}`}>
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center py-4 text-center">
-            <WillDots size={36} />
+            <FinDots size={36} />
             <p className="mt-2 font-[family-name:var(--font-source-serif)] text-sm italic text-horizon-700">
               Stel je voor dat alles mogelijk is...
             </p>
@@ -487,7 +487,7 @@ export function WhatIfChat({ onAddEvent, scenarioContext }: WhatIfChatProps) {
           return (
             <div key={msg.id} className="mb-3 flex justify-start">
               <div className="mr-2 mt-1 shrink-0">
-                <WillDots size={24} state={isStreaming ? 'streaming' : 'idle'} />
+                <FinDots size={24} state={isStreaming ? 'streaming' : 'idle'} />
               </div>
               <div className="max-w-[85%] rounded-[var(--r-lg)] bg-horizon-50 px-3 py-2 text-sm leading-relaxed text-[var(--ink-2)]">
                 {renderAssistantMessage(parts)}
@@ -499,7 +499,7 @@ export function WhatIfChat({ onAddEvent, scenarioContext }: WhatIfChatProps) {
         {isStreaming && (messages.length === 0 || messages[messages.length - 1]?.role === 'user') && (
           <div className="mb-3 flex justify-start">
             <div className="mr-2 mt-1 shrink-0">
-              <WillDots size={24} state="streaming" />
+              <FinDots size={24} state="streaming" />
             </div>
             <div className="rounded-[var(--r-lg)] bg-horizon-50 px-3 py-2">
               <Loader2 className="h-4 w-4 animate-spin text-horizon-600" />

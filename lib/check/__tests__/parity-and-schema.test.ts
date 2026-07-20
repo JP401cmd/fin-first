@@ -605,7 +605,7 @@ describe('buildReport — aanvullende randgevallen', () => {
   })
 })
 
-describe('buildReport — Will-moves randgevallen', () => {
+describe('buildReport — Fin-moves randgevallen', () => {
   function base(overrides: Partial<CheckIntake> = {}): CheckIntake {
     return {
       firstName: null,

@@ -41,7 +41,7 @@ export const ADDON_PLANS: AddonPlan[] = [
   {
     tier: 'ai',
     name: 'AI',
-    tagline: 'Will als persoonlijke financiële coach — analyse, aanbevelingen, briefing en nieuws op maat.',
+    tagline: 'Fin als persoonlijke financiële coach — analyse, aanbevelingen, briefing en nieuws op maat.',
     priceEur: 9, // Conform de landingspagina (Pro = €9/mnd).
     available: false,
   },

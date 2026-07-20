@@ -1,5 +1,5 @@
 /**
- * Server-side data loader for the Will (Overzicht) landing page.
+ * Server-side data loader for the Fin (Overzicht) landing page.
  *
  * Assets/debts/profile komen uit de gedeelde basisdata-laag
  * (lib/server-data/base.ts, Task 2.1): React `cache()` dedupliceert die
@@ -56,7 +56,7 @@ export type PendingRec = {
   created_at: string
 }
 
-export interface WillKpiData {
+export interface FinKpiData {
   completedActions: CompletedAction[]
   allActions: AllAction[]
   openActions: OpenAction[]
@@ -67,10 +67,10 @@ export interface WillKpiData {
   goalProgresses: { current: number; target: number; pct: number; onTrack: boolean; eta: string | null }[]
 }
 
-export interface WillPageData {
+export interface FinPageData {
   recommendations: Recommendation[]
   actions: Action[]
-  kpiData: WillKpiData
+  kpiData: FinKpiData
   goals: GoalWithBudget[]
   goalProgresses: { current: number; target: number; pct: number; onTrack: boolean; eta: string | null }[]
   partnerInfo: { partnerId: string; partnerName: string } | null
@@ -84,9 +84,9 @@ export interface WillPageData {
 // Loader
 // ---------------------------------------------------------------------------
 
-export async function loadWillData(
+export async function loadFinData(
   supabase: SupabaseClient,
-): Promise<WillPageData> {
+): Promise<FinPageData> {
   const today = new Date().toISOString().split('T')[0]
 
   // 1. Get authenticated user. getCachedUser is React `cache()`-gewrapt, dus dit
@@ -101,7 +101,7 @@ export async function loadWillData(
   //    resolves and runs in parallel with whatever else is still in flight.
   const householdPromise = (async (): Promise<{
     householdFilter: string
-    partnerInfo: WillPageData['partnerInfo']
+    partnerInfo: FinPageData['partnerInfo']
   }> => {
     if (!currentUserId) return { householdFilter: '', partnerInfo: null }
     const { data: membership } = await supabase
@@ -296,7 +296,7 @@ export async function loadWillData(
   }
 
   // 9. Build KPI data
-  const kpiData: WillKpiData = {
+  const kpiData: FinKpiData = {
     completedActions: allActions.filter(a => a.status === 'completed'),
     allActions,
     openActions: allActions.filter(a => a.status === 'open' || a.status === 'postponed'),
@@ -330,7 +330,7 @@ export async function loadWillData(
  * `resolveEffectiveIncomeExpenses` — dezelfde grondslag als `data.monthlyIncome`/
  * `data.monthlyExpenses` in de bundel. Handmatige profielbron ('manual') wint over
  * transacties. Bewust een aparte, lichte loader (2 gerichte queries) i.p.v. deze
- * kosten aan `loadWillData` (4 hot call-sites) toe te voegen — alleen de doelen-
+ * kosten aan `loadFinData` (4 hot call-sites) toe te voegen — alleen de doelen-
  * pagina heeft de cijfers nodig, voor de gepersonaliseerde standaard-doelen-kiezer.
  */
 export async function loadEffectiveMonthlyFigures(

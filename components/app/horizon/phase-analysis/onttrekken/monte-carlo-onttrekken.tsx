@@ -156,7 +156,7 @@ export const MonteCarloOnttrekken = memo(function MonteCarloOnttrekken({
       title="Monte Carlo simulatie"
       icon={BarChart3}
       loading={loading}
-      willContext={
+      finContext={
         !isRelevant
           ? `Monte Carlo simulatie: niet beschikbaar — ${irrelevantReason}`
           : state

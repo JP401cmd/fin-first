@@ -47,7 +47,7 @@ import { HideInSimple } from '@/components/app/hide-in-simple'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 
 // EventPane = herstelde toevoeg/bewerk-flow uit /horizon (catalogus + Praat met
-// Will + 3-blokken-editor). Dynamisch geladen zodat de pagina-bundle licht blijft.
+// Fin + 3-blokken-editor). Dynamisch geladen zodat de pagina-bundle licht blijft.
 const EventPane = dynamic(() =>
   import('@/components/app/horizon/event-pane').then(m => ({ default: m.EventPane })),
   { ssr: false }

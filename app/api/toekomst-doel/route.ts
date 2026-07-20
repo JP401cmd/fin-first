@@ -289,7 +289,7 @@ async function updateParameterGoal(
 }
 
 /**
- * De insert-rij voor een parameter-doel. `current_value` = 0: de will-data-loader (stap 4)
+ * De insert-rij voor een parameter-doel. `current_value` = 0: de fin-data-loader (stap 4)
  * injecteert de echte huidige waarde bij het lezen. `metadata` komt uit de builder (bron/
  * oorsprong/marge) — nooit uit de client.
  */

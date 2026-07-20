@@ -19,7 +19,7 @@ import {
  *
  * Bij klik:
  *   1) bouwt het een `Aandachtspunt`, mapt het via `aandachtspuntToActionPayload`
- *      naar de body van POST /api/ai/actions (deterministisch, los van Will),
+ *      naar de body van POST /api/ai/actions (deterministisch, los van Fin),
  *   2) POST't met `source: 'manual'`,
  *   3) toont feedback: idle → bezig → "Toegevoegd ✓" (ook bij deduped:true).
  *

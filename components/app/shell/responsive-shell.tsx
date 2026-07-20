@@ -1,7 +1,7 @@
 /**
  * ResponsiveShell — wrapper rond de pagina-content die de shell rendert:
  * Sidebar (desktop, via portal) + de enkelvoudige ShellFrame (MobileStackShell)
- * voor de content + mobiele chrome, binnen ChatLayoutWrapper voor de Will-chat-
+ * voor de content + mobiele chrome, binnen ChatLayoutWrapper voor de Fin-chat-
  * sidebar.
  *
  * Layout-strategie (ADR 0053 — enkelvoudige render):
@@ -74,7 +74,7 @@ export type SidebarMetrics = {
   activeAppKeys: string[]
   /**
    * Klikbare app-deeplinks per actieve categorie. Bron is dezelfde server-
-   * builder die het Will-dashboard voedt (`buildCategoryAppLinks`), zodat
+   * builder die het Fin-dashboard voedt (`buildCategoryAppLinks`), zodat
    * iconen + labels exact matchen tussen dashboard en mobile shell.
    * Mobile-only consumer: `MobileAppStrip` boven de bottom-nav.
    */

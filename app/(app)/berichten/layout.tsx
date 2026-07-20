@@ -1,5 +1,5 @@
 /**
- * Will & acties-route layout. Wraps `/berichten` en zet de `--module-active-*`
+ * Fin & acties-route layout. Wraps `/berichten` en zet de `--module-active-*`
  * CSS-variabelen op de Wil-shades zodat editorial primitives (kicker-streep,
  * headline-emphasis, highlight-marker) en shell-elementen de Wil-tint krijgen
  * die de gebruiker koos op `/mijn/uiterlijk` — via één variabele i.p.v.

@@ -25,7 +25,7 @@ import { formatCurrency } from '@/lib/format'
  *   4. Secundaire tekstlink `Voeg nog iets toe →` (terug naar stap 4).
  *
  * **Niet hetzelfde als `onboarding-success.tsx`**: dat blijft het post-save
- * scherm (toont module-kaarten, Will-avatar, philosophical closing). Deze
+ * scherm (toont module-kaarten, Fin-avatar, philosophical closing). Deze
  * stap leeft tussen stap 4 en de save-call.
  *
  * **Facts-paneel = startpositie** — de rechter aside (desktop) / inline-blok

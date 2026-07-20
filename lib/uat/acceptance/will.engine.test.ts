@@ -1,5 +1,5 @@
 /**
- * Engine-niveau toets voor de UAT-Will-acceptatiecriteria (`will.ts`).
+ * Engine-niveau toets voor de UAT-Fin-acceptatiecriteria (`will.ts`).
  *
  * De 'exact'-criteria worden NIET hier herimplementeerd — die rekenlogica leeft
  * in `will-checks.ts` (`WILL_ENGINE_CHECKS`), gedeeld met de in-app
@@ -38,7 +38,7 @@ function criterion(workflow: string): AcceptanceCriterion {
   return found
 }
 
-describe('UAT Will — acceptatiecriteria dekking', () => {
+describe('UAT Fin — acceptatiecriteria dekking', () => {
   it('heeft precies één criterium per catalogus-WILL-scenario (20 stuks, WF-WILL-21/22 bestaan niet in de catalogus)', () => {
     const workflows = WILL_ACCEPTANCE.criteria.map((c) => c.workflow).sort()
     expect(workflows).toEqual(catalogWillWorkflows)

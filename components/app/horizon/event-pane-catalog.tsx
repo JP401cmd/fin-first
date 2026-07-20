@@ -12,7 +12,7 @@ import { EVENT_ICONS } from './log-timeline'
 
 interface Props {
   onSelect: (type: string) => void
-  /** Klik op de "Praat met Will"-tegel — schakelt pane naar chat-mode. */
+  /** Klik op de "Praat met Fin"-tegel — schakelt pane naar chat-mode. */
   onOpenChat: () => void
   /** Filter `householdOnly` types weg als gebruiker solo is. */
   householdMode: boolean
@@ -46,13 +46,13 @@ export function EventPaneCatalog({ onSelect, onOpenChat, householdMode }: Props)
           Welke gebeurtenis komt eraan?
         </EditorialHeadline>
         <EditorialDeck className="mt-5">
-          Kies een type om met een ingevuld voorstel te beginnen. Of brainstorm eerst met Will —
+          Kies een type om met een ingevuld voorstel te beginnen. Of brainstorm eerst met Fin —
           hij helpt je het concreet te maken en zet een voorstel klaar dat je kunt openen in de
           editor.
         </EditorialDeck>
       </header>
 
-      {/* Will-tegel — prominent boven de catalog-grid */}
+      {/* Fin-tegel — prominent boven de catalog-grid */}
       <button
         type="button"
         onClick={onOpenChat}
@@ -69,10 +69,10 @@ export function EventPaneCatalog({ onSelect, onOpenChat, householdMode }: Props)
             className="mt-0.5 text-base sm:text-lg font-bold tracking-[-0.01em]"
             style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
           >
-            Praat met <em className="not-italic font-normal italic">Will</em>
+            Praat met <em className="not-italic font-normal italic">Fin</em>
           </div>
           <div className="text-xs text-[var(--ink-3)] mt-0.5 truncate">
-            Vertel je droom of plan — Will zet er een voorstel voor klaar.
+            Vertel je droom of plan — Fin zet er een voorstel voor klaar.
           </div>
         </div>
         <ArrowRight className="h-5 w-5 text-[var(--module-active-700)] shrink-0 group-hover:translate-x-0.5 transition-transform" aria-hidden />

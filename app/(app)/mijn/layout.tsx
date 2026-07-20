@@ -3,11 +3,11 @@ import { ModuleNav } from '@/components/app/module-nav'
 import { mijnNav } from '@/lib/navigation'
 
 /**
- * Will & acties-route layout voor `/mijn`. Naast de bestaande ModuleNav +
+ * Fin & acties-route layout voor `/mijn`. Naast de bestaande ModuleNav +
  * Breadcrumb (teal) zet deze wrapper de `--module-active-*` CSS-variabelen op
  * de Wil-shades, zodat editorial primitives (kicker-streep, headline-emphasis,
  * highlight-marker) onder `/mijn` het Wil-accent dragen dat de gebruiker koos
- * op `/mijn/uiterlijk`. De picker noemt deze kleur "Will & acties" en de
+ * op `/mijn/uiterlijk`. De picker noemt deze kleur "Fin & acties" en de
  * /mijn-tabs zijn al wil — vandaar het wil-accent (zie accentkleuren-actieplan).
  * Cross-module-defaults staan in `app/globals.css` (neutrale ink-shades).
  */

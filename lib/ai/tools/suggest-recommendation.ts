@@ -3,16 +3,16 @@ import { tool } from 'ai'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 /**
- * suggestRecommendation — Will-tool die ÉÉN voorstel aan de gebruiker
+ * suggestRecommendation — Fin-tool die ÉÉN voorstel aan de gebruiker
  * toont, persistent opgeslagen in de `recommendations`-tabel als
  * status='pending'. De chat rendert een kaart met drie expliciete
  * knoppen (Accepteer / Uitstel / Wijs af). Niks doen = chat sluit met
  * een onbeantwoorde recommendation → trigger expire (zie chat-panel).
  *
  * Plan §6.6: voorstellen leven enkel nog in de chat, één tegelijk. De
- * DB-rij blijft bestaan voor anti-duplicaat (Will mag eerder
+ * DB-rij blijft bestaan voor anti-duplicaat (Fin mag eerder
  * accepted/rejected/expired voorstellen niet opnieuw doen) en als
- * audit-trail van wat Will aanraadde.
+ * audit-trail van wat Fin aanraadde.
  *
  * Geaccepteerd voorstel → /api/ai/recommendations/[id] met action:'accept'
  * inserteert automatisch de bijhorende actions (bestaande flow).

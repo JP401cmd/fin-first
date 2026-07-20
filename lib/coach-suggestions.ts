@@ -1,7 +1,7 @@
 /**
  * Coach-suggestie catalogus + selectie-logica.
  *
- * De "coach" is de zwevende CoachBubble ("Tip van Will"). Deze module bevat
+ * De "coach" is de zwevende CoachBubble ("Tip van Fin"). Deze module bevat
  * de volledige, statische catalogus van coaching-tips in 4 prioriteitslagen
  * en de pure selectie-functie die bepaalt welke tip getoond wordt.
  *
@@ -111,7 +111,7 @@ export const DEFAULT_COACH_TIMING: CoachTiming = {
   autoDismissMs: 45_000,
 }
 
-export const DEFAULT_COACH_HEADER = 'Tip van Will'
+export const DEFAULT_COACH_HEADER = 'Tip van Fin'
 
 // ── Laag-metadata (voor de beheer-weergave) ───────────────────────────────
 

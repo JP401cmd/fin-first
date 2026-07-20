@@ -10,7 +10,7 @@ import { createSuggestRecommendationTool } from './suggest-recommendation'
 
 /**
  * Get the tool set for a given domain.
- * Standaard tools krijgen alle domeinen — Will is de enige assistent.
+ * Standaard tools krijgen alle domeinen — Fin is de enige assistent.
  *
  * Voor de whatif-context wisselen we suggestAction in voor suggestLifeEvent
  * en LATEN we suggestRecommendation weg: voorstellen horen in de hoofdchat,

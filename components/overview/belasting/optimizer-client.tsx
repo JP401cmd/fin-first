@@ -23,7 +23,7 @@ import {
   TogglePill,
   HighlightMark,
 } from '@/components/editorial'
-import { BesprekMetWillButton } from '@/components/app/chat/bespreek-met-will-button'
+import { BesprekMetWillButton } from '@/components/app/chat/bespreek-met-fin-button'
 import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
 import { JaarruimteCard } from '@/components/overview/jaarruimte-card'
 import { OPTIMIZER_DISCLAIMER, OPTIMIZER_DISCLAIMER_SHORT } from '@/lib/tax-optimizer/compliance'
@@ -260,9 +260,9 @@ export function Box3OptimizerClient({
  * TopChoiceBlock — "Je grootste kans nu". De leidende aanbeveling: de
  * opportuniteit met de hoogste impact over ALLE doelen. Prominente editorial
  * kaart (ink-border + box-accent), besparing groot in vrijheidstijd-framing, een
- * eerlijke kanttekening en één "Bespreek met Will" + een in-page "Bekijk →".
+ * eerlijke kanttekening en één "Bespreek met Fin" + een in-page "Bekijk →".
  *
- * `topChoice === null` → neutrale variant: geen groen bedrag, wél de Will-knop.
+ * `topChoice === null` → neutrale variant: geen groen bedrag, wél de Fin-knop.
  */
 function TopChoiceBlock({
   topChoice,
@@ -295,7 +295,7 @@ function TopChoiceBlock({
 
   const { title, savings, freedomDays, caveat, kind, anchorId } = topChoice
   const accent = kind === 'box3' ? 'var(--color-box3-500)' : 'var(--color-box1-500)'
-  const willDetail =
+  const finDetail =
     `Deze kans levert naar schatting ${formatCurrency(savings)} per jaar op (≈ ${freedomDays} ` +
     `vrijheidsdagen).${caveat ? ` Kanttekening: ${caveat}` : ''}`
 
@@ -343,7 +343,7 @@ function TopChoiceBlock({
       <div className="mt-5 flex flex-wrap items-center gap-3">
         <BesprekMetWillButton
           onderwerp={title}
-          detail={willDetail}
+          detail={finDetail}
           vraag="Past dit bij mijn situatie en moet ik dit nu doen?"
         />
         <a

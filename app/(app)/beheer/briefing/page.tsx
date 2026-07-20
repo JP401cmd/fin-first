@@ -188,7 +188,7 @@ function TemporalRow({
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Instructie voor Will</label>
+            <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Instructie voor Fin</label>
             <textarea
               value={directive.instruction}
               onChange={(e) => onChange({ ...directive, instruction: e.target.value })}
@@ -355,7 +355,7 @@ function FunctionalRow({
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Instructie voor Will</label>
+            <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Instructie voor Fin</label>
             <textarea
               value={directive.instruction}
               onChange={(e) => onChange({ ...directive, instruction: e.target.value })}
@@ -399,7 +399,7 @@ function PromptPreview({
     getActiveDirectives(directives, currentMonth, currentDay).map((d) => d.id),
   )
 
-  // Format the prompt blocks using the same functions Will's system prompt uses
+  // Format the prompt blocks using the same functions Fin's system prompt uses
   const activeTemporalDirectives = directives.filter((d) => d.enabled && activeTemporalIds.has(d.id))
   const temporalPrompt = formatDirectivesForPrompt(activeTemporalDirectives)
   const functionalPrompt = formatFunctionalDirectivesForPrompt(funcDirectives)
@@ -636,7 +636,7 @@ export default function BriefingDirectivesPage() {
         <div>
           <h2 className="text-xl font-bold text-[var(--ink)]">Briefing Richtlijnen</h2>
           <p className="mt-1 text-sm text-[var(--ink-3)]">
-            Redactionele aandachtspunten die Will&apos;s briefing sturen
+            Redactionele aandachtspunten die Fin&apos;s briefing sturen
           </p>
         </div>
         <button
@@ -772,7 +772,7 @@ export default function BriefingDirectivesPage() {
       <div className="border-t border-[var(--border-ed)] pt-6">
         <SectionHeader icon={Activity} label="Functionele richtlijnen" />
         <p className="mt-1 mb-4 text-xs text-[var(--ink-3)]">
-          Situationele sturing op basis van financiele data. Will past deze toe wanneer de conditie herkend wordt.
+          Situationele sturing op basis van financiele data. Fin past deze toe wanneer de conditie herkend wordt.
         </p>
       </div>
 
@@ -826,7 +826,7 @@ export default function BriefingDirectivesPage() {
           </button>
         </div>
         <p className="mt-1 mb-4 text-xs text-[var(--ink-3)]">
-          Bekijk hoe de huidige richtlijnen als prompt-blok aan Will worden meegegeven.
+          Bekijk hoe de huidige richtlijnen als prompt-blok aan Fin worden meegegeven.
         </p>
       </div>
 

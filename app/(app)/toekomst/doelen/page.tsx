@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
-import { loadWillData, loadEffectiveMonthlyFigures } from '@/lib/will-data-loader'
+import { loadFinData, loadEffectiveMonthlyFigures } from '@/lib/fin-data-loader'
 import { ToekomstSubpageShell } from '@/components/future/toekomst-subpage-shell'
 import { DoelenView } from '@/components/future/doelen-view'
 
@@ -15,7 +15,7 @@ export const metadata: Metadata = {
  *
  * Onderdeel van de tijdas-landing + navigatiekaarten-architectuur: de
  * tijdas op /toekomst is de landing, en Doelen krijgt een eigen
- * bookmarkbare subpagina. Laadt alleen de Will-data die DoelenView nodig
+ * bookmarkbare subpagina. Laadt alleen de Fin-data die DoelenView nodig
  * heeft (goals + goalProgresses) — niet meer dan nodig.
  *
  * De prop-opbouw is 1-op-1 overgenomen uit de oude ToekomstPage (de
@@ -23,8 +23,8 @@ export const metadata: Metadata = {
  */
 export default async function ToekomstDoelenPage() {
   const supabase = await createClient()
-  const [willData, monthlyFigures] = await Promise.all([
-    loadWillData(supabase),
+  const [finData, monthlyFigures] = await Promise.all([
+    loadFinData(supabase),
     loadEffectiveMonthlyFigures(supabase),
   ])
 
@@ -39,8 +39,8 @@ export default async function ToekomstDoelenPage() {
         infoKey="/toekomst/doelen"
       />
       <DoelenView
-        goals={willData.goals}
-        goalProgresses={willData.goalProgresses}
+        goals={finData.goals}
+        goalProgresses={finData.goalProgresses}
         monthlyIncome={monthlyFigures.monthlyIncome}
         monthlyExpenses={monthlyFigures.monthlyExpenses}
       />

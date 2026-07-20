@@ -45,7 +45,7 @@ export async function buildHorizonContext(supabase: SupabaseClient): Promise<str
   }
 
   // Vermogenssamenstelling per groep (spaargeld / beleggingen / pensioen /
-  // vastgoed / overig). Geeft Will de spaargeld-vs-beleggingen-verhouding zodat
+  // vastgoed / overig). Geeft Fin de spaargeld-vs-beleggingen-verhouding zodat
   // hij allocatie- en cash-drag-tips kan geven zonder zelf per asset te rekenen.
   if (assets.length > 0) {
     const groupTotals: Record<WealthGroup, number> = {

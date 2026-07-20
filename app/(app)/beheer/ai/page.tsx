@@ -298,11 +298,11 @@ export default function BeheerAIPage() {
         </div>
       </div>
 
-      {/* Will's System Prompt */}
+      {/* Fin's System Prompt */}
       <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-6">
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <h2 className="text-lg font-semibold text-[var(--ink)]">Will&apos;s Systeem Prompt</h2>
+            <h2 className="text-lg font-semibold text-[var(--ink)]">Fin&apos;s Systeem Prompt</h2>
             {hasOverride && (
               <span className="rounded-full bg-wil-100 px-2.5 py-0.5 text-xs font-medium text-wil-700">
                 Aangepast
@@ -324,7 +324,7 @@ export default function BeheerAIPage() {
         <p className="mb-3 text-sm text-[var(--ink-3)]">
           {hasOverride
             ? 'Je gebruikt een aangepast prompt. Dit vervangt het volledige standaard prompt (inclusief persoonlijkheid).'
-            : 'Dit is het standaard prompt van Will. Bewerk het om een aangepast prompt te gebruiken.'}
+            : 'Dit is het standaard prompt van Fin. Bewerk het om een aangepast prompt te gebruiken.'}
         </p>
 
         <textarea
@@ -334,7 +334,7 @@ export default function BeheerAIPage() {
           }
           rows={16}
           className="w-full rounded-lg border border-[var(--border-md)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] font-mono focus:border-wil-500 focus:outline-none focus:ring-1 focus:ring-wil-500"
-          placeholder="Leeg = standaard Will prompt wordt gebruikt..."
+          placeholder="Leeg = standaard Fin prompt wordt gebruikt..."
         />
 
         <div className="mt-1.5 flex items-center justify-between">

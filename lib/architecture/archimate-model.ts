@@ -264,8 +264,8 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     {
       id: 'sp-inzicht', x: 320, y: row(5), w: 210, h: 66, kind: 'bizproc',
       title: 'Inzicht & acties',
-      lead: "Aanbevelingen, volgende stappen, check-ins en aandachtspunten — de motor achter 'wat nu te doen', met Will als coach.",
-      items: ['/overzicht', 'check-ins', 'aandachtspunten', 'Vraag Will'],
+      lead: "Aanbevelingen, volgende stappen, check-ins en aandachtspunten — de motor achter 'wat nu te doen', met Fin als coach.",
+      items: ['/overzicht', 'check-ins', 'aandachtspunten', 'Vraag Fin'],
     },
     {
       id: 'sp-nieuws', x: 320, y: row(6), w: 210, h: 66, kind: 'bizproc',
@@ -320,7 +320,7 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     {
       id: 'as-coach', x: 560, y: row(5), w: 220, h: 66, kind: 'appsvc',
       title: 'Inzicht- & coachingsdienst',
-      lead: 'Will (AI-coach), aanbevelingen, volgende stappen, aandachtspunten-bus en de briefing-kaarten. Bij privacy_mode draait de dagelijkse Will-chat lokaal via t-lokale-ai in plaats van via de AI-gateway — dezelfde chat, ander transport (ADR 0056).',
+      lead: 'Fin (AI-coach), aanbevelingen, volgende stappen, aandachtspunten-bus en de briefing-kaarten. Bij privacy_mode draait de dagelijkse Fin-chat lokaal via t-lokale-ai in plaats van via de AI-gateway — dezelfde chat, ander transport (ADR 0056).',
       items: ['/api/ai/*', '/api/briefing', '/api/next-steps', 'lib/coach-suggestions'],
     },
     {
@@ -406,7 +406,7 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     {
       id: 't-lokale-ai', x: 1250, y: row(6), w: 185, h: 66, kind: 'tech',
       title: 'Lokale AI-runtime — in-browser, WebGPU',
-      lead: 'LiteRT-LM (@litert-lm/core, Early Preview) + Gemma 4 E2B web-bundel, volledig on-device: categorisatie-voorstellen verlaten het toestel niet. Sinds 19 jul 2026 runtime-swap vanaf Transformers.js/ONNX (L1-meting: betrouwbaarder + sneller op dezelfde iGPU-realiteit) — desktop-only, assistief (review-UI-only, geen automatische toepassing) blijft ongewijzigd. Dezelfde runtime bedient sinds C1b ook een experimentele lokale Will-chat (/mijn/lokale-chat): vragen over eigen cijfers, antwoord blijft on-device, gegrond op een door beheer gecureerde kennisbank (categorieën + verloopbewaking, relevantie-ranking met een harde items-cap) die het kleine model NL-begrippenkennis meegeeft zonder het te overladen. Bewust géén externe-partij-relatie, in tegenstelling tot ext-claude → t-aigateway. Dat ontbreken ís de privacygarantie (ADR 0043).',
+      lead: 'LiteRT-LM (@litert-lm/core, Early Preview) + Gemma 4 E2B web-bundel, volledig on-device: categorisatie-voorstellen verlaten het toestel niet. Sinds 19 jul 2026 runtime-swap vanaf Transformers.js/ONNX (L1-meting: betrouwbaarder + sneller op dezelfde iGPU-realiteit) — desktop-only, assistief (review-UI-only, geen automatische toepassing) blijft ongewijzigd. Dezelfde runtime bedient sinds C1b ook een experimentele lokale Fin-chat (/mijn/lokale-chat): vragen over eigen cijfers, antwoord blijft on-device, gegrond op een door beheer gecureerde kennisbank (categorieën + verloopbewaking, relevantie-ranking met een harde items-cap) die het kleine model NL-begrippenkennis meegeeft zonder het te overladen. Bewust géén externe-partij-relatie, in tegenstelling tot ext-claude → t-aigateway. Dat ontbreken ís de privacygarantie (ADR 0043).',
       items: ['LiteRT-LM (@litert-lm/core 0.14.0)', 'Gemma 4 E2B web-bundel', 'WebGPU', 'privacy_mode', 'Lokale kennisbank (app_settings.local_knowledge)'],
     },
 
@@ -531,7 +531,7 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
   const ENRICH: Record<string, Enrichment> = {
     // Technologie → applicatie
     't-supabase->app-comp': { payload: 'Rijen (RLS-gefilterd), auth-sessie en realtime-events', mechanism: 'realtime', cadence: 'realtime', note: 'Server-side aangeroepen met de service-client; RLS dwingt eigenaarschap af.' },
-    't-aigateway->app-comp': { payload: 'Streaming-completions en tool-calls van Will', mechanism: 'compute', cadence: 'on-demand', contractDomains: ['ai', 'briefing'] },
+    't-aigateway->app-comp': { payload: 'Streaming-completions en tool-calls van Fin', mechanism: 'compute', cadence: 'on-demand', contractDomains: ['ai', 'briefing'] },
     't-bankconnect->app-comp': { payload: 'Geautoriseerde saldi en transacties (PSD2)', mechanism: 'rest', cadence: 'daily', contractDomains: ['bank-connect'] },
     't-bankimport->app-comp': { payload: 'Geparste MT940/CSV/OFX-boekingen met dedup-hash', mechanism: 'import', cadence: 'on-demand' },
     't-marktdata->app-comp': { payload: 'Koersen, fundamentals en wallet-/exchange-saldi', mechanism: 'rest', cadence: 'daily', contractDomains: ['integrations', 'prices'] },

@@ -34,7 +34,7 @@ import type { FreedomCardData } from '@/components/app/freedom-card'
  *   De briefing wordt server-side per ISO-week (Amsterdam) vastgezet en krijgt
  *   een "Bijgewerkt …"-stempel. De gebruiker mag de briefing daarnaast 1× per
  *   dag handmatig verversen via de Ververs-knop; daarna staat die tot de
- *   volgende dag uit. Het oude "Will — jouw briefing" samenvattende blok is
+ *   volgende dag uit. Het oude "Fin — jouw briefing" samenvattende blok is
  *   verwijderd ten gunste van beter vormgegeven losse kaartjes.
  *
  * Categorieën (6 stuks):
@@ -180,7 +180,7 @@ export function BriefingPanel({
   // (stale client-subscriptions) — geen retry-lus, wél de AI-propositie.
   const [showUpsell, setShowUpsell] = useState(false)
 
-  // AI-redactie van de briefing (de Ververs-knop → Will's stem + AI-kop) is een
+  // AI-redactie van de briefing (de Ververs-knop → Fin's stem + AI-kop) is een
   // betaalde functie; de deterministische briefing eronder blijft gratis. Spiegel
   // de server-gate (checkTierGate 'ai') op active_subscriptions, niet op een module.
   const { subscriptions } = useModuleAccess()
@@ -392,7 +392,7 @@ function BriefingWeekHistory({ items }: { items: BriefingWeekHistoryItem[] }) {
 
 /**
  * Sectiekop boven het briefing-grid: titel + "Bijgewerkt …"-stempel links,
- * Ververs-knop rechts. Vervangt het oude Will-narratief-blok als visuele
+ * Ververs-knop rechts. Vervangt het oude Fin-narratief-blok als visuele
  * identiteit van de briefing.
  */
 function BriefingHeader({
@@ -461,17 +461,17 @@ function BriefingHeader({
 
         {showRefresh &&
           (!hasAi ? (
-            // Zonder AI-abonnement: de ververs herschrijft de briefing door Will
+            // Zonder AI-abonnement: de ververs herschrijft de briefing door Fin
             // (een betaalde AI-functie). Toon op dezelfde plek een upsell-affordance
             // i.p.v. de POST — de deterministische briefing eronder blijft gratis.
             <Link
               href="/mijn/account"
-              title="Laat Will je briefing herschrijven — met AI-abonnement"
-              aria-label="Ververs met Will — vereist een AI-abonnement, bekijk het abonnement"
+              title="Laat Fin je briefing herschrijven — met AI-abonnement"
+              aria-label="Ververs met Fin — vereist een AI-abonnement, bekijk het abonnement"
               className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-wil-200 bg-wil-50/70 px-3 py-1.5 text-[11px] font-semibold text-wil-700 transition-colors hover:border-wil-300 hover:bg-wil-100"
             >
               <Lock className="h-3.5 w-3.5" aria-hidden="true" />
-              Ververs met Will (AI)
+              Ververs met Fin (AI)
             </Link>
           ) : (
             <button

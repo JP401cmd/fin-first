@@ -24,7 +24,7 @@ export async function POST(req: Request) {
   }
 
   // ── Privé-modus gate (laag 3 uit het plan — server-side, beslissend) ───────
-  // FR-C2a.6: staat privé-modus aan, dan draait de Will-chat lokaal op het
+  // FR-C2a.6: staat privé-modus aan, dan draait de Fin-chat lokaal op het
   // toestel en mag de financiële context deze route NOOIT richting een externe
   // AI-provider verlaten. We blokkeren hier — direct ná de auth-check en VÓÓR de
   // tier-/credit-gate, het model laden en de context/prompt-opbouw. Dit is de

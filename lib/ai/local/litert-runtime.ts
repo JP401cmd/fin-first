@@ -69,7 +69,7 @@ export type LocalSession = {
 }
 
 /**
- * Een lopende, ON-DEVICE chatsessie (fase C1b — lokale Will-chat). Wrapt één
+ * Een lopende, ON-DEVICE chatsessie (fase C1b — lokale Fin-chat). Wrapt één
  * LiteRT-`Conversation` met een vaste systeem-preface, zodat de meerdere beurten
  * hun geschiedenis NATIEF in die ene conversatie bijhouden (geen handmatige
  * historie-heropbouw per bericht, geen tweede promptvariant).

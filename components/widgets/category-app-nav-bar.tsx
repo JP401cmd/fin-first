@@ -30,7 +30,7 @@ function formatItemMeta(count: number): string {
 // ── Component ────────────────────────────────────────────────
 
 /**
- * Editorial nav-balk bovenaan het Will-dashboard. Toont één klikbare kaart
+ * Editorial nav-balk bovenaan het Fin-dashboard. Toont één klikbare kaart
  * per actieve "kern-app" (cash → Budgetteren, investment → Holdings, etc.).
  *
  * Een kaart leidt naar `/core/{assets|debts}/[type]?tab=<slug>` zodat de

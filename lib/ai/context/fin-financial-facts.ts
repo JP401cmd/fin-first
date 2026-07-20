@@ -1,7 +1,7 @@
-// ── Gedeelde Will-cijferbron: één canonieke ADR 0009-afleiding ────────────────
+// ── Gedeelde Fin-cijferbron: één canonieke ADR 0009-afleiding ────────────────
 //
 // `buildWillFinancialFacts` is de ÉNE plek waar de kern-cijfers die zowel de
-// cloud-Will (`buildSharedContext`) als de lokale Will (`buildLocalChatOverview`)
+// cloud-Fin (`buildSharedContext`) als de lokale Fin (`buildLocalChatOverview`)
 // tonen worden afgeleid. Vóór C2b bestond deze afleiding dubbel — met een subtiel
 // verschil dat tot uiteenlopende getallen leidde:
 //
@@ -11,10 +11,10 @@
 //     ZONDER terugval (`requiredPortfolio = fireTargetFromHorizon > 0 ? … : null`),
 //     die in het randgeval (`fireTargetFromHorizon === null`) 0% teruggaf, terwijl
 //     het lokale FIRE-doel WÉL de met-terugval-grondslag gebruikte → interne
-//     grondslag-mismatch binnen de lokale Will.
+//     grondslag-mismatch binnen de lokale Fin.
 //
 // Eigenaarsbesluit (2026-07, C2b): de canonieke grondslag = MET-terugval — exact
-// wat cloud-Will en de dashboard-widgets al doen. Deze extractor legt die keuze op
+// wat cloud-Fin en de dashboard-widgets al doen. Deze extractor legt die keuze op
 // één plek vast; beide renderers consumeren 'm en tonen daardoor gegarandeerd
 // hetzelfde vrijheids-% én FIRE-doel op dezelfde grondslag.
 //
@@ -27,7 +27,7 @@
 //
 // JAARRUIMTE BEWUST BUITEN DE STRUCT: jaarruimte vereist `computeJaarruimte` /
 // `resolvePensionFactorA` (pensioen-/factor-A-invoer die `loadCoreData` niet laadt)
-// en zit daarom niet in `WillFacts`. Zie `local-chat-context.ts`-kop en FR-C2b.3.
+// en zit daarom niet in `FinFacts`. Zie `local-chat-context.ts`-kop en FR-C2b.3.
 
 import type { CorePageData } from '@/lib/core-data-loader'
 import { computeCoreData, computeFreedomProgressWithBasis, inclHomeTargetFromScalar, type FinancialInput } from '@/lib/core-metrics'
@@ -42,10 +42,10 @@ import {
 import { dailyExpenseRate } from '@/lib/format'
 
 /**
- * De canonieke kern-cijfers die beide Wills nodig hebben. Alle EUR-/%-waarden zijn
+ * De canonieke kern-cijfers die beide Fins nodig hebben. Alle EUR-/%-waarden zijn
  * ONGEROND — elke renderer rondt/format zelf exact zoals vandaag (byte-identiek).
  */
-export interface WillFacts {
+export interface FinFacts {
   /** False wanneer er geen financiële data is (geen bezit/schuld/transacties). */
   hasData: boolean
   /** Netto vermogen in EUR (bezittingen − schulden) — `computeCoreData().netWorth`. */
@@ -77,13 +77,13 @@ export interface WillFacts {
 }
 
 /** Alleen `housing_strategy_config` is nodig; beide callers laden méér, maar delen dit veld. */
-export type WillFactsProfile = { housing_strategy_config?: unknown } | null
+export type FinFactsProfile = { housing_strategy_config?: unknown } | null
 
 /**
- * Leid de gedeelde Will-cijfers af uit reeds-geladen `CorePageData` + profiel.
+ * Leid de gedeelde Fin-cijfers af uit reeds-geladen `CorePageData` + profiel.
  * De enige home voor de MET-terugval ADR 0009-grondslag (vrijheids-% + FIRE-doel).
  */
-export function buildWillFinancialFacts(coreData: CorePageData, profile: WillFactsProfile): WillFacts {
+export function buildWillFinancialFacts(coreData: CorePageData, profile: FinFactsProfile): FinFacts {
   const { rawFinancials } = coreData
   const totalAssets = rawFinancials.totalAssets
   const totalDebts = rawFinancials.totalDebts

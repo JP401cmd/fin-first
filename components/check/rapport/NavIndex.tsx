@@ -100,7 +100,7 @@ export function NavIndex({ report }: { report: CheckReportData }) {
             <span className="index-icon" aria-hidden="true">
               <Target />
             </span>
-            <span className="index-label">06 — Will&apos;s zetten</span>
+            <span className="index-label">06 — Fin&apos;s zetten</span>
           </span>
           <b>{will.moves.length} stuks</b>
         </a>

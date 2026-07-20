@@ -12,7 +12,7 @@ import type { LocalChatOverview } from '@/lib/ai/local/local-chat-context'
 import { buildLocalChatSystemPrompt } from '@/lib/ai/local/local-chat-prompt'
 
 /**
- * LocalChatPanel — de client-UI van de ON-DEVICE Will-chat (fase C1b).
+ * LocalChatPanel — de client-UI van de ON-DEVICE Fin-chat (fase C1b).
  *
  * Kaal maar netjes in de app-stijl; bewust GEEN koppeling met de cloud-chat-store
  * (eigen berichten-state). De generatie draait volledig op het toestel via de
@@ -161,7 +161,7 @@ export function LocalChatPanel({ overview }: { overview: LocalChatOverview }) {
           <div className="flex h-7 w-7 items-center justify-center bg-wil-50">
             <Cpu className="h-4 w-4 text-wil-600" aria-hidden="true" />
           </div>
-          <h1 className="text-base font-semibold text-[var(--ink)]">Lokale chat met Will</h1>
+          <h1 className="text-base font-semibold text-[var(--ink)]">Lokale chat met Fin</h1>
           <span className="inline-flex items-center border border-amber-500/40 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-700">
             Experimenteel
           </span>
@@ -220,7 +220,7 @@ export function LocalChatPanel({ overview }: { overview: LocalChatOverview }) {
                       (generating && m.role === 'assistant' && i === messages.length - 1 ? (
                         <span className="inline-flex items-center gap-1.5 text-[var(--ink-3)]">
                           <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-                          Will denkt na…
+                          Fin denkt na…
                         </span>
                       ) : null)}
                   </div>
@@ -231,7 +231,7 @@ export function LocalChatPanel({ overview }: { overview: LocalChatOverview }) {
 
           {/* Live-regio voor status (blijft gemount). */}
           <p className="sr-only" aria-live="polite">
-            {generating ? 'Will genereert een antwoord op je toestel.' : ''}
+            {generating ? 'Fin genereert een antwoord op je toestel.' : ''}
             {error ?? ''}
           </p>
 
@@ -263,7 +263,7 @@ export function LocalChatPanel({ overview }: { overview: LocalChatOverview }) {
               rows={2}
               placeholder="Stel je vraag aan Will…"
               disabled={generating}
-              aria-label="Je vraag aan Will"
+              aria-label="Je vraag aan Fin"
               className="min-h-[2.75rem] flex-1 resize-none border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-wil-500 disabled:opacity-60"
             />
             <button

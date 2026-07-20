@@ -185,7 +185,7 @@ export function NewsArticleActions({ item, isRead, onMarkRead }: { item: NewsIte
         className="inline-flex min-h-[44px] items-center gap-1.5 rounded-[var(--r-sm)] border border-wil-200 bg-wil-50 px-3 py-2 font-inter text-[11px] font-medium text-wil-700 transition-colors hover:bg-wil-100 sm:min-h-0 sm:px-2 sm:py-1"
       >
         <MessageSquare className="h-3 w-3" />
-        Bespreek met Will
+        Bespreek met Fin
       </button>
       {item.impactType === 'direct' && (
         <button

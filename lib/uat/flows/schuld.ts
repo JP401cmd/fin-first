@@ -77,7 +77,7 @@ export const SCHULD_FLOW: UatFlow = {
 
     // ── 4 · doorwerking (eigen SCHULD-scenario's op belasting/gezondheid) ──
     { id: 'box1', scenarioId: 'UAT-SCHULD-21', label: 'WF-SCHULD-21 · Doorwerking Box 1 (hypotheekrenteaftrek)', kind: 'screen', stage: 4, lane: 'doorwerking' },
-    { id: 'dsti', scenarioId: 'UAT-SCHULD-22', label: 'WF-SCHULD-22 · Doorwerking gezondheidsscore (DSTI) & Will', kind: 'screen', stage: 4, lane: 'doorwerking' },
+    { id: 'dsti', scenarioId: 'UAT-SCHULD-22', label: 'WF-SCHULD-22 · Doorwerking gezondheidsscore (DSTI) & Fin', kind: 'screen', stage: 4, lane: 'doorwerking' },
 
     // ── 5 · uitkomst ──────────────────────────────────────────────────────
     { id: 'netto', label: 'Totale schuld, netto vermogen & vrijheidstijd bijgewerkt', kind: 'outcome', stage: 5 },

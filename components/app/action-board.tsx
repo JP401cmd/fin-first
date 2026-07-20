@@ -237,7 +237,7 @@ export function ActionBoard({ initialActions, onCancellationOpen, partnerInfo, c
             className="mt-3 italic text-[14px] text-[var(--ink-2)] max-w-prose"
             style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
           >
-            Acties zijn concrete stappen richting financiële vrijheid — maak er zelf een aan, of accepteer een tip van Will.
+            Acties zijn concrete stappen richting financiële vrijheid — maak er zelf een aan, of accepteer een tip van Fin.
           </p>
           <button
             type="button"
@@ -286,8 +286,8 @@ export function ActionBoard({ initialActions, onCancellationOpen, partnerInfo, c
             style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
           >
             {completedActions.length > 0
-              ? `${completedActions.length} actie${completedActions.length !== 1 ? 's' : ''} afgerond — goed bezig. Voeg een nieuwe actie toe of accepteer een tip van Will.`
-              : 'Geen openstaande acties. Voeg een nieuwe actie toe of accepteer een tip van Will.'}
+              ? `${completedActions.length} actie${completedActions.length !== 1 ? 's' : ''} afgerond — goed bezig. Voeg een nieuwe actie toe of accepteer een tip van Fin.`
+              : 'Geen openstaande acties. Voeg een nieuwe actie toe of accepteer een tip van Fin.'}
           </p>
           <button
             type="button"

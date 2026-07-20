@@ -36,7 +36,7 @@ export function ActivationButton({ data }: { data: FeatureAccessData }) {
   const [activating, setActivating] = useState(false)
   // Zwevende bottom-FAB: verberg zolang een modal/overlay open is (scroll-lock
   // actief), zodat de FAB niet door de halftransparante backdrop over de
-  // sheet-CTA bloedt. Eén consistente regel met de Will-chat-FAB.
+  // sheet-CTA bloedt. Eén consistente regel met de Fin-chat-FAB.
   const overlayOpen = useOverlayOpen()
 
   const gradientStyle = PHASE_GRADIENT_STYLE[data.phase] ?? PHASE_GRADIENT_STYLE.recovery

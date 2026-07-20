@@ -1,5 +1,5 @@
 /**
- * Gedeelde engine-checks voor de UAT-Will-acceptatiecriteria (`will.ts`).
+ * Gedeelde engine-checks voor de UAT-Fin-acceptatiecriteria (`will.ts`).
  *
  * PURE module — geen vitest/DOM/Supabase-afhankelijkheden — zodat dezelfde
  * lijst checks kan draaien onder:
@@ -72,7 +72,7 @@ function postponedUntil(nowMs: number): number {
   return nowMs + POSTPONE_DAYS * 24 * 60 * 60 * 1000
 }
 
-/** Mirror van de bel-badge-cap in components/app/will/will-home.tsx. */
+/** Mirror van de bel-badge-cap in components/app/fin/fin-home.tsx. */
 function capBadge(n: number): string {
   return n > 9 ? '9+' : n === 0 ? '' : String(n)
 }

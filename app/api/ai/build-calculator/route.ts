@@ -10,7 +10,7 @@ const MAX_PROMPT_LENGTH = 500
  * POST /api/ai/build-calculator
  *
  * Genereert een CalculatorDefinition uit een vrije gebruikersvraag via
- * Will (generateObject). Optioneel `refineFrom` om een bestaande
+ * Fin (generateObject). Optioneel `refineFrom` om een bestaande
  * definitie te verfijnen. Tier-gated op 'ai' (zelfde als chat). Bovendien
  * geldt een vlakke weeklimiet van 10 generaties + 5 verfijningen per
  * gebruiker — gehandhaafd door `lib/calculator/rate-limit.ts`.

@@ -98,7 +98,7 @@ const CONCEPTS: ConceptCard[] = [
     color: 'var(--color-horizon-50)',
     colorAccent: 'var(--color-horizon-400)',
     explanation: GLOSSARY_ENTRIES.will.explanation,
-    personalDataFn: () => null, // no personal data for Will
+    personalDataFn: () => null, // no personal data for Fin
   },
   {
     id: 'per-asset-rendement',

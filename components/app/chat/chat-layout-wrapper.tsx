@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 
 /**
  * Wraps app content and creates a viewport-like container that shrinks
- * when Will's chat panel is pinned as a sidebar.
+ * when Fin's chat panel is pinned as a sidebar.
  *
  * Uses position:fixed + contain:layout to create a CSS containing block
  * for all fixed-position descendants (modals, bottom nav, etc.).

@@ -4,12 +4,12 @@ import { MessageCircle } from 'lucide-react'
 import { useChatContextOptional } from './chat-provider'
 
 /**
- * BesprekMetWillButton — opent de Will-chat met een kant-en-klare kick-off-vraag
+ * BesprekMetWillButton — opent de Fin-chat met een kant-en-klare kick-off-vraag
  * over een specifiek onderwerp, en neemt de betreffende info (titel + toelichting)
  * mee de chat in als context.
  *
  * Generiek & herbruikbaar (niet belasting-specifiek): bedoeld voor "vooruitblik"-
- * en duidings-onderwerpen waar de gebruiker met Will wil sparren in plaats van
+ * en duidings-onderwerpen waar de gebruiker met Fin wil sparren in plaats van
  * (of naast) een concrete actie toe te voegen. Gebruikt het bestaande
  * chat-mechanisme `useChatContext().openWithMessage` — geen nieuw kanaal.
  *
@@ -22,7 +22,7 @@ export function BesprekMetWillButton({
   vraag,
   className = '',
 }: {
-  /** Het onderwerp/titel dat besproken wordt (gaat als context naar Will). */
+  /** Het onderwerp/titel dat besproken wordt (gaat als context naar Fin). */
   onderwerp: string
   /** Optionele toelichting die mee de chat in gaat. */
   detail?: string
@@ -45,11 +45,11 @@ export function BesprekMetWillButton({
     <button
       type="button"
       onClick={handleClick}
-      aria-label={`Bespreek "${onderwerp}" met Will`}
+      aria-label={`Bespreek "${onderwerp}" met Fin`}
       className={`inline-flex items-center gap-1.5 border border-[var(--border-ed)] bg-[var(--paper)] px-2.5 py-1 text-[11px] font-medium text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)] ${className}`}
     >
       <MessageCircle className="h-3.5 w-3.5" aria-hidden="true" />
-      Bespreek met Will
+      Bespreek met Fin
     </button>
   )
 }

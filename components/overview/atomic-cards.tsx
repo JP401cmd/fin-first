@@ -9,10 +9,10 @@ import { TrendingUp, Lightbulb, Calendar } from 'lucide-react'
  *
  * Categorieën (altijd 3 zichtbaar voor consistente layout):
  *  - Observation (WAT VALT OP) — feit over je vermogen/uitgaven/score.
- *    Bron: Will-briefing recommendations[0] (algoritmische analyse + AI-
+ *    Bron: Fin-briefing recommendations[0] (algoritmische analyse + AI-
  *    template). Bij ontbreken: lege placeholder met dimmed-state.
  *  - Tip (EEN TIP) — concrete suggestie voor optimalisatie.
- *    Bron: Will-briefing recommendations[1] (laagste-score-hefboom +
+ *    Bron: Fin-briefing recommendations[1] (laagste-score-hefboom +
  *    actie-koppeling). Bij ontbreken: lege placeholder met dimmed-state.
  *  - Upcoming (KOMENDE MAAND) — wat staat eraan te komen.
  *    Bron: recurring_transactions met komende afschrijving + life_events
@@ -22,8 +22,8 @@ import { TrendingUp, Lightbulb, Calendar } from 'lucide-react'
  * presentatie van de wekelijkse briefing (Cleo-stijl) zoals beschreven in
  * het navigatie-redesign-plan §6.2. De volledige briefing-tekst is
  * beschikbaar via /overzicht/briefing of de "Toon alle briefings →"-link
- * in de Will-coach. AI-laag genereert teksten op basis van rauwe
- * Will-recommendations + temporal-context; geen statische fallback-zinnen.
+ * in de Fin-coach. AI-laag genereert teksten op basis van rauwe
+ * Fin-recommendations + temporal-context; geen statische fallback-zinnen.
  *
  * Stijl matcht mockup-dutchet: kleine ronde dot per categorie + label-kicker
  * + zin-met-vetgedrukte-CTA. Optioneel href maakt de hele card klikbaar.

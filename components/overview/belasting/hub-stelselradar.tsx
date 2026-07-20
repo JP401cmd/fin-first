@@ -1,5 +1,5 @@
 import { Kicker, ScenarioCallout } from '@/components/editorial'
-import { BesprekMetWillButton } from '@/components/app/chat/bespreek-met-will-button'
+import { BesprekMetWillButton } from '@/components/app/chat/bespreek-met-fin-button'
 
 const SOURCE_SERIF = 'var(--font-source-serif, Georgia, serif)'
 

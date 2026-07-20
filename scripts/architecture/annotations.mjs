@@ -93,7 +93,7 @@ export const annotations = {
       file: 'lib/briefing/engine.ts',
       summary:
         'Deterministische generatoren zetten de financiële cijfers om in wekelijkse briefjes; ' +
-        'Will redigeert alleen de teksten (lib/briefing/redactie.ts, nummer-guard — ADR 0007).',
+        'Fin redigeert alleen de teksten (lib/briefing/redactie.ts, nummer-guard — ADR 0007).',
       extend:
         'Voeg een generator toe in buildFinanceEntries (drempel + test) en een rank in ' +
         'briefingRank; de redactie en de directives pakken het nieuwe briefje automatisch mee.',

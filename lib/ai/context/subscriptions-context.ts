@@ -6,11 +6,11 @@ import { loadVasteLastenSummary } from '@/lib/vaste-lasten-summary'
 const TOP_N = 5
 
 /**
- * Bouw de "== ABONNEMENTEN & VASTE LASTEN ==" context-sectie voor Will.
+ * Bouw de "== ABONNEMENTEN & VASTE LASTEN ==" context-sectie voor Fin.
  *
  * Hergebruikt EXACT dezelfde detectie als de Vaste-lasten-pagina en de
  * cashflow-landingskaart (loadVasteLastenSummary): confirmed
- * recurring_transactions + auto-detectie over 12 maanden. Zo ziet Will
+ * recurring_transactions + auto-detectie over 12 maanden. Zo ziet Fin
  * terugkerende uitgaven als een aparte hefboom — abonnementen stapelen
  * ongemerkt op, vaste lasten zijn vaak heronderhandelbaar — i.p.v. ze alleen
  * verspreid over budgetcategorieën te zien.

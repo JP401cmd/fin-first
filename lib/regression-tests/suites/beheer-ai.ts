@@ -200,7 +200,7 @@ const tests: TestCase[] = [
     id: 'beheer-ai-prompt-default',
     name: 'Default prompt correct opgehaald',
     category: CAT,
-    description: 'GET /api/admin/ai-prompt-default retourneert het standaard Will prompt',
+    description: 'GET /api/admin/ai-prompt-default retourneert het standaard Fin prompt',
     priority: 'high',
     estimatedDurationMs: 1000,
     async fn() {

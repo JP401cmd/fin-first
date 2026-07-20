@@ -166,7 +166,7 @@ export const MonteCarloOvergang = memo(function MonteCarloOvergang({
       <AnalysisSection
         title="Monte Carlo simulatie"
         icon={BarChart3}
-        willContext="Monte Carlo overgangsfase: geen overgangsfase — FIRE-leeftijd en AOW-leeftijd vallen samen, er is geen periode om te overbruggen."
+        finContext="Monte Carlo overgangsfase: geen overgangsfase — FIRE-leeftijd en AOW-leeftijd vallen samen, er is geen periode om te overbruggen."
       >
         <div className="flex items-start gap-3 rounded-[var(--r)] border border-dashed border-[var(--border-ed)] bg-[var(--positive)]/5 p-4">
           <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[var(--positive)]" />
@@ -195,7 +195,7 @@ export const MonteCarloOvergang = memo(function MonteCarloOvergang({
       title="Monte Carlo simulatie"
       icon={BarChart3}
       loading={loading}
-      willContext={
+      finContext={
         state
           ? `Monte Carlo ${isShortfall ? 'overgangsfase (AOW → FIRE, tekort aangevuld vanuit portfolio)' : 'overgangsfase (FIRE → AOW, volledig uit portfolio)'}: ` +
             `slagingskans ${Math.round(state.main.successRate * 100)}% over ${yearsInPhase} jaar, ` +

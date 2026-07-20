@@ -245,7 +245,7 @@ export const HypotheekVsBeleggenOpbouw = memo(
         <AnalysisSection
           title="Hypotheek vs. beleggen"
           icon={Scale}
-          willContext="Hypotheek vs. beleggen: geen actieve hypotheek gevonden."
+          finContext="Hypotheek vs. beleggen: geen actieve hypotheek gevonden."
         >
           <div className="rounded-md border border-[var(--border-ed)] bg-[var(--subtle)]/30 px-3 py-4 text-center">
             <p className="text-xs text-[var(--ink-3)]">
@@ -264,8 +264,8 @@ export const HypotheekVsBeleggenOpbouw = memo(
     const restLooptijdMaanden = estimateRestLooptijd(mortgage)
     const restLooptijdJaren = Math.round(restLooptijdMaanden / 12)
 
-    // ── Rich Will-context: gekozen bedrag + aanbeveling + hypotheekgegevens ──
-    const willContext = [
+    // ── Rich Fin-context: gekozen bedrag + aanbeveling + hypotheekgegevens ──
+    const finContext = [
       `Hypotheek vs. beleggen: ${formatCurrency(extraBedrag)}/mnd extra over ${HORIZON_JAREN} jaar.`,
       `Aanbeveling: ${result.aanbeveling}. Verschil (beleggen − aflossen): ${formatCurrency(result.verschil)}. Omslagpunt: ${(result.breakevenRendement * 100).toFixed(1)}% bruto rendement.`,
       result.fireImpactMaanden != null
@@ -280,7 +280,7 @@ export const HypotheekVsBeleggenOpbouw = memo(
       <AnalysisSection
         title="Hypotheek vs. beleggen"
         icon={Scale}
-        willContext={willContext}
+        finContext={finContext}
       >
         <div className="space-y-3">
           {/* ── Mortgage context strip ────────────────────────── */}

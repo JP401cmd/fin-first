@@ -145,16 +145,16 @@ export interface DashboardDataResult {
   nextSteps: NextStep[]
   /** User's full name from profile (shared to avoid extra queries) */
   userName: string | null
-  /** Whether AI/Will is enabled for the user (shared to avoid extra queries) */
+  /** Whether AI/Fin is enabled for the user (shared to avoid extra queries) */
   aiEnabled: boolean
   /** Authenticated user ID (shared to avoid extra auth calls) */
   userId: string | null
-  /** Raw active assets with id+name+current_value (shared for will-data-loader) */
+  /** Raw active assets with id+name+current_value (shared for fin-data-loader) */
   sharedAssets: { id: string; name: string; current_value: number }[]
-  /** Raw active debts with id+name+current_balance (shared for will-data-loader) */
+  /** Raw active debts with id+name+current_balance (shared for fin-data-loader) */
   sharedDebts: { id: string; name: string; current_balance: number }[]
   /**
-   * Klikbare app-deeplinks per categorie voor de balk bovenaan het Will-
+   * Klikbare app-deeplinks per categorie voor de balk bovenaan het Fin-
    * dashboard. Lege array als gebruiker geen actieve apps heeft (geen items
    * of bijbehorende module uit) — UI verbergt de balk dan.
    */
@@ -1173,7 +1173,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     }
   }
 
-  // Will calculations
+  // Fin calculations
   const allActions = actionsResult.data ?? []
   const openActions = allActions.filter(a => a.status === 'open' || a.status === 'postponed')
   const openActionDays = openActions.reduce((s, a) => s + (Number(a.freedom_days_impact) || 0), 0)
@@ -2529,7 +2529,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       name: (d as { name: string }).name,
       current_balance: Number((d as { current_balance: number }).current_balance),
     })),
-    // Categorie-balk-input voor het Will-dashboard. We projecteren naar de
+    // Categorie-balk-input voor het Fin-dashboard. We projecteren naar de
     // lichte CategoryNavAssetInput/DebtInput shapes — de builder filtert
     // verder op actieve module + tracked-items.
     regelSimSnapshot,

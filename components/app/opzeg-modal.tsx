@@ -225,7 +225,7 @@ ${nameVal}`
             {saving ? 'Opslaan…' : 'Opzegbrief bewaren voor later'}
           </button>
 
-          {/* Secundair — coming soon: Will regelt het */}
+          {/* Secundair — coming soon: Fin regelt het */}
           <button
             type="button"
             disabled
@@ -233,7 +233,7 @@ ${nameVal}`
             className="flex w-full items-center justify-center gap-2 rounded-[var(--r)] border border-wil-200 px-4 py-3 text-sm font-medium text-wil-400 cursor-not-allowed opacity-60"
           >
             <Bot className="h-4 w-4" />
-            Laat Will het opzeggen
+            Laat Fin het opzeggen
             <span className="ml-1 rounded-full bg-wil-100 px-1.5 py-px text-[10px] uppercase tracking-wide text-wil-500">binnenkort</span>
           </button>
 

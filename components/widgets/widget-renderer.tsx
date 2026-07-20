@@ -663,9 +663,9 @@ export interface DashboardData {
   householdActivity: HouseholdActivityItem[]
   // Partner privacy: categories the partner has hidden (Feature #537)
   partnerHiddenCategories: string[]
-  // Will: decision patterns — freedom days per recommendation type
+  // Fin: decision patterns — freedom days per recommendation type
   decisionPatterns: { type: string; days: number; count: number }[]
-  // Will: 12-month freedom days trend (monthly aggregation of completed actions)
+  // Fin: 12-month freedom days trend (monthly aggregation of completed actions)
   freedomDaysMonthly: { month: string; days: number }[]
   // Wilskracht widget data
   totalFreedomDaysWon: number

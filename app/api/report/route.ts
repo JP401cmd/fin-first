@@ -681,7 +681,7 @@ export async function GET(request: Request) {
       try {
         const model = await getModel(supabase, 'rapport')
         const periodLabel = formatPeriodName(periodType, dateFrom, dateTo)
-        const prompt = `Je bent Will, de financieel adviseur van TriFinity. Schrijf een bondige redactionele inleiding (3-4 zinnen, max 200 tokens) voor het financieel rapport "${periodLabel}".
+        const prompt = `Je bent Fin, de financieel adviseur van TriFinity. Schrijf een bondige redactionele inleiding (3-4 zinnen, max 200 tokens) voor het financieel rapport "${periodLabel}".
 
 Kerndata:
 - Netto vermogen: €${netWorthEnd != null ? Math.round(netWorthEnd) : '?'} (${netWorthGrowthPct != null ? (netWorthGrowthPct >= 0 ? '+' : '') + netWorthGrowthPct + '%' : 'onbekend'})

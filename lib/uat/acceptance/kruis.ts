@@ -357,15 +357,15 @@ const criteria: AcceptanceCriterion[] = [
   {
     workflow: 'WF-KRUIS-23',
     scenarioId: 'UAT-KRUIS-23',
-    titel: 'Will (AI) noemt dezelfde getallen als de UI',
+    titel: 'Fin (AI) noemt dezelfde getallen als de UI',
     kriticiteit: 'KERN',
     persona: 'compleet',
     given: 'Persona Tessa geladen; spaarquote, netto vermogen en vrijheids-% genoteerd.',
-    when: 'De gebruiker vraagt Will naar spaarquote, netto vermogen en "ben ik financieel vrij?".',
-    then: 'Will noemt de canonieke 6-maands spaarquote (letterlijk, de context instrueert de AI dit NIET te herberekenen), het netto vermogen zoals op /overzicht en een vrijheidsframing consistent met vrijheids-%/FIRE-leeftijd — alles uit `lib/ai/context/shared-context.ts` dat de canonieke loaders consumeert. Huiseigenaar: de framing gebruikt de FIRE-eligible grondslag (`resolveFreedomFraming`). Consistentie: AI-context == UI-getallen.',
+    when: 'De gebruiker vraagt Fin naar spaarquote, netto vermogen en "ben ik financieel vrij?".',
+    then: 'Fin noemt de canonieke 6-maands spaarquote (letterlijk, de context instrueert de AI dit NIET te herberekenen), het netto vermogen zoals op /overzicht en een vrijheidsframing consistent met vrijheids-%/FIRE-leeftijd — alles uit `lib/ai/context/shared-context.ts` dat de canonieke loaders consumeert. Huiseigenaar: de framing gebruikt de FIRE-eligible grondslag (`resolveFreedomFraming`). Consistentie: AI-context == UI-getallen.',
     assertion: {
       kind: 'consistency',
-      source: 'consistentie-eis: Will-context-getallen == UI (lib/ai/context/shared-context.ts put uit de canonieke loaders; letterlijke spaarquote-instructie; resolveFreedomFraming op FIRE-eligible grondslag).',
+      source: 'consistentie-eis: Fin-context-getallen == UI (lib/ai/context/shared-context.ts put uit de canonieke loaders; letterlijke spaarquote-instructie; resolveFreedomFraming op FIRE-eligible grondslag).',
     },
   },
   {
@@ -389,7 +389,7 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'BELANGRIJK',
     persona: 'compleet',
     given: 'Een account ZONDER AI-add-on. ⚠ LIVE vereist zo\'n account; pure interactie/weergave, geen cijfer.',
-    when: 'De gebruiker opent achtereenvolgens de AI-oppervlakken: Will-chat, /nieuws, /rapportages (persoonlijk plan), /toekomst/rekenhulp, abonnementen-detectie/-analyse, AI-categorisering en AI-aanbevelingen.',
+    when: 'De gebruiker opent achtereenvolgens de AI-oppervlakken: Fin-chat, /nieuws, /rapportages (persoonlijk plan), /toekomst/rekenhulp, abonnementen-detectie/-analyse, AI-categorisering en AI-aanbevelingen.',
     then: 'Elk oppervlak toont een consistente, nette blokkade ("betaalde AI-functie") met verwijzing naar /mijn/account; géén enkel oppervlak levert AI-output of een kale fout. Eén gedeelde gate (`checkTierGate` in `lib/require-tier.ts`, gebruikt door 11 API-routes) over zes modules. Tegenproef: mét add-on werkt alles. Pure gate-ervaring, geen rekenuitkomst.',
     assertion: {
       kind: 'ui-only',

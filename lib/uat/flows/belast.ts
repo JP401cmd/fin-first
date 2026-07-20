@@ -157,8 +157,8 @@ export const BELAST_FLOW: UatFlow = {
     { from: 'box3', to: 'uitkomst' },
     { from: 'bruto', to: 'uitkomst' },
 
-    // actie → doorwerking (kans → actie op Overzicht/Will)
-    { from: 'actie', to: 'x-ovz', kind: 'cross', label: 'kans → actie (Will/acties op Overzicht)' },
+    // actie → doorwerking (kans → actie op Overzicht/Fin)
+    { from: 'actie', to: 'x-ovz', kind: 'cross', label: 'kans → actie (Fin/acties op Overzicht)' },
 
     // uitkomst → cross-doorwerking (OUTPUT)
     { from: 'uitkomst', to: 'x-ovz', kind: 'cross' },

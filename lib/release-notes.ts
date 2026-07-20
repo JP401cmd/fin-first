@@ -65,7 +65,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
           {
             title: 'Acht verouderde pagina’s verwijderd',
             description:
-              'De features- en tiers-redirects, het meldingen-plakkaat, test-deferred, de Will Avatar-showcase, de widgets-galerij, propositie en roadmap zijn opgeruimd. De inhoud blijft beschikbaar in de git-historie.',
+              'De features- en tiers-redirects, het meldingen-plakkaat, test-deferred, de Fin Avatar-showcase, de widgets-galerij, propositie en roadmap zijn opgeruimd. De inhoud blijft beschikbaar in de git-historie.',
           },
         ],
       },
@@ -739,7 +739,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
           {
             title: 'Data loader extractie',
             description:
-              'Dashboard- en De Wil data-ophalen geëxtraheerd naar dedicated loaders (dashboard-data-loader.ts, will-data-loader.ts). Schonere paginacomponenten en betere testbaarheid.',
+              'Dashboard- en De Wil data-ophalen geëxtraheerd naar dedicated loaders (dashboard-data-loader.ts, fin-data-loader.ts). Schonere paginacomponenten en betere testbaarheid.',
           },
         ],
       },
@@ -760,7 +760,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
           {
             title: 'Component-extractie',
             description:
-              'De Wil volledig gemodulariseerd: will-hero, will-landing, action-center, module-side-bar en module-strip als losse componenten. Berichten-pagina refactored naar berichten-client.',
+              'De Wil volledig gemodulariseerd: will-hero, fin-landing, action-center, module-side-bar en module-strip als losse componenten. Berichten-pagina refactored naar berichten-client.',
           },
         ],
       },
@@ -1094,9 +1094,9 @@ export const RELEASE_NOTES: ReleaseNote[] = [
               'Meldingen zijn nu inklapbaar bovenaan de pagina, zodat nieuws de hoofdcontent is.',
           },
           {
-            title: 'Bespreek met Will',
+            title: 'Bespreek met Fin',
             description:
-              'Elk nieuwsartikel heeft een "Bespreek met Will" knop om het artikel te bespreken met de AI-coach. Gelezen artikelen worden bijgehouden.',
+              'Elk nieuwsartikel heeft een "Bespreek met Fin" knop om het artikel te bespreken met de AI-coach. Gelezen artikelen worden bijgehouden.',
           },
           {
             title: 'Scroll-navigatie',
@@ -1245,7 +1245,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
           {
             title: 'Streaming briefing compositie',
             description:
-              'De AI briefing wordt nu via Server-Sent Events (SSE) gestreamd in plaats van in één keer opgehaald. Cards verschijnen één voor één terwijl Will componeert, wat een snellere en meer interactieve ervaring geeft. De skeleton loader is vervangen door een compacte composing-indicator.',
+              'De AI briefing wordt nu via Server-Sent Events (SSE) gestreamd in plaats van in één keer opgehaald. Cards verschijnen één voor één terwijl Fin componeert, wat een snellere en meer interactieve ervaring geeft. De skeleton loader is vervangen door een compacte composing-indicator.',
           },
           {
             title: 'Nieuwe card types: Goal Progress & Budget Bar',
@@ -1780,7 +1780,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
   {
     version: 'fin_prod_0.75',
     date: '2026-02-25',
-    title: 'Grafiek-animaties, kassabon forecasts & Will insights',
+    title: 'Grafiek-animaties, kassabon forecasts & Fin insights',
     sections: [
       {
         module: 'Platform — Animaties',
@@ -1829,8 +1829,8 @@ export const RELEASE_NOTES: ReleaseNote[] = [
             description: 'Het forecast-bedrag in het budget-detailpaneel is nu klikbaar. Opent een BottomSheet met een kassabon (KassabonShell): maandwaarden × gewichten, statistieken, totaalregel, freedom badge, limietvergelijking, formule en betrouwbaarheidsscore.',
           },
           {
-            title: 'G3: Will AI budget insights kaart',
-            description: 'Nieuwe AI-inzichtenkaart tussen de KPI-sectie en de weergave-toggle op /core/budgets. Toont conditioneel maximaal 2 overschreden of bijna-volle budgetten, met een "Vraag Will →" link naar de chat. Gebruikt het editorial card-patroon (accent bar + neutrale border).',
+            title: 'G3: Fin AI budget insights kaart',
+            description: 'Nieuwe AI-inzichtenkaart tussen de KPI-sectie en de weergave-toggle op /core/budgets. Toont conditioneel maximaal 2 overschreden of bijna-volle budgetten, met een "Vraag Fin →" link naar de chat. Gebruikt het editorial card-patroon (accent bar + neutrale border).',
           },
         ],
       },
@@ -1905,8 +1905,8 @@ export const RELEASE_NOTES: ReleaseNote[] = [
         color: 'amber',
         items: [
           {
-            title: 'AI-categorisatie bij import ("Vraag Will")',
-            description: 'Nieuwe Sparkles-knop in stap 3 van de importflow stuurt ongecategoriseerde transacties (vertrouwen < 70%) in batches van 20 naar /api/ai/categorize. Will geeft per rij een voorstel met redenering en betrouwbaarheidsscore. Accepteer alles met één klik of keur individueel goed via de inline "OK?"-knop.',
+            title: 'AI-categorisatie bij import ("Vraag Fin")',
+            description: 'Nieuwe Sparkles-knop in stap 3 van de importflow stuurt ongecategoriseerde transacties (vertrouwen < 70%) in batches van 20 naar /api/ai/categorize. Fin geeft per rij een voorstel met redenering en betrouwbaarheidsscore. Accepteer alles met één klik of keur individueel goed via de inline "OK?"-knop.',
           },
           {
             title: 'Verbeterde duplicaatdetectie via datumbereik',
@@ -2025,8 +2025,8 @@ export const RELEASE_NOTES: ReleaseNote[] = [
             description: 'Automatische herkenning van terugkerende abonnementen uit je transacties. Nieuwe KPI-kaart toont aantal actieve abonnementen en maandelijkse kosten met kassabon-breakdown.',
           },
           {
-            title: 'AI-abonnementsadvies van Will',
-            description: 'Vraag Will om elk abonnement te beoordelen: nuttig, overlappend of niet relevant. Toont besparingspotentieel in euro\'s en vrijheidsdagen met concrete opzegacties.',
+            title: 'AI-abonnementsadvies van Fin',
+            description: 'Vraag Fin om elk abonnement te beoordelen: nuttig, overlappend of niet relevant. Toont besparingspotentieel in euro\'s en vrijheidsdagen met concrete opzegacties.',
           },
           {
             title: 'Opzegbrief-generator',
@@ -2088,7 +2088,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
           },
           {
             title: 'Rapportages: optionele AI-inleiding',
-            description: 'Kies bij het genereren van een rapport voor "Standaard" (direct) of "Met AI-inleiding" (+5-10 sec). Will schrijft een persoonlijke editorial over je financiële maand.',
+            description: 'Kies bij het genereren van een rapport voor "Standaard" (direct) of "Met AI-inleiding" (+5-10 sec). Fin schrijft een persoonlijke editorial over je financiële maand.',
           },
           {
             title: 'Rapportcaching',
@@ -2353,7 +2353,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
           },
           {
             title: 'Dynamische AI-context per module',
-            description: 'ChatPanel detecteert de huidige module via het pad en past de context, kleuren, begroeting en placeholder aan. Will denkt mee vanuit het juiste perspectief (overzicht/teal, toekomst/paars) en elke module heeft een apart chatgesprek.',
+            description: 'ChatPanel detecteert de huidige module via het pad en past de context, kleuren, begroeting en placeholder aan. Fin denkt mee vanuit het juiste perspectief (overzicht/teal, toekomst/paars) en elke module heeft een apart chatgesprek.',
           },
         ],
       },

@@ -30,8 +30,8 @@
    *    de toekomst-accent zodat een flip daarvan deze niet meesleurt.
    *  - PAARS = toekomst/projectie: §4 Toekomst-identiteit + de levenslijn-OPBOUW,
    *    de FIRE-marker, de ±2%-band en de vrijheidszone-wash. `--horizon` is nu
-   *    een in-stijl violet (wil-600), nét iets dieper dan de Will-sectie (wil-500)
-   *    zodat §4 Toekomst en §6 Will onderscheidbaar blijven.
+   *    een in-stijl violet (wil-600), nét iets dieper dan de Fin-sectie (wil-500)
+   *    zodat §4 Toekomst en §6 Fin onderscheidbaar blijven.
    *  - BRUIN (kern) = fundament/nu + de AFBOUW-lijn (decumulatie). */
   --kern: var(--color-kern-500);
   --kern-deep: var(--color-kern-700);
@@ -41,7 +41,7 @@
   --vrijgekocht-soft: var(--color-horizon-400);
   --vrijgekocht-pale: var(--color-horizon-200);
 
-  /* Toekomst-accent = PAARS (wil-600, iets dieper dan §6 Will = wil-500). */
+  /* Toekomst-accent = PAARS (wil-600, iets dieper dan §6 Fin = wil-500). */
   --horizon: var(--color-wil-600);
   --horizon-soft: var(--color-wil-400);
   --horizon-pale: var(--color-wil-200);
@@ -816,7 +816,7 @@
   border: 1px solid var(--rule);
 }
 .rapport-root .tag.leven {
-  /* "Leven"-gebeurtenis = wil-paars (Will & acties = wat je zelf kiest). */
+  /* "Leven"-gebeurtenis = wil-paars (Fin & acties = wat je zelf kiest). */
   background: var(--color-wil-50);
   color: var(--wil);
   border: 1px solid var(--color-wil-200);
@@ -1133,7 +1133,7 @@
   border-left: 4px solid var(--wil);
 }
 .rapport-root .will-av-dots {
-  /* Will-avatar = de gedeelde WillDots (3 module-stippen) i.p.v. de oude losse
+  /* Fin-avatar = de gedeelde FinDots (3 module-stippen) i.p.v. de oude losse
    * CSS-gradient-bol. flex:none zodat de 54px-SVG niet krimpt in de intro-flex;
    * line-height:0 haalt de baseline-ruimte onder de inline-SVG weg. */
   flex: none;
@@ -1331,7 +1331,7 @@
 
 /* cta — GEEN zwart blok meer. Warme paper-afsluiter in app-stijl: lichte
  * subtle-achtergrond, dubbele bovenregel als krant-afscheiding, wil-paars als
- * accent (de CTA hoort bij "in actie komen" → Will). Nadruk via kop + accent. */
+ * accent (de CTA hoort bij "in actie komen" → Fin). Nadruk via kop + accent. */
 .rapport-root .cta-sec {
   background: var(--paper-2);
   color: var(--ink);
@@ -1680,7 +1680,7 @@
     --vrijgekocht-pale: #f1e6d6;
     --color-kern-50: #e1dedd;
     --color-kern-200: #bfb1ad;
-    /* kern-500/horizon-500: print-fallback voor de WillDots-avatar (§6), die deze
+    /* kern-500/horizon-500: print-fallback voor de FinDots-avatar (§6), die deze
      * -500-tokens rechtstreeks als dot-fill gebruikt. Op scherm resolven ze uit
      * :root (oklch); deze sRGB-benaderingen vangen print-engines op die de
      * var-keten niet volgen. */

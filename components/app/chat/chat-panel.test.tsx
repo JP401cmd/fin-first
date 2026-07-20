@@ -6,14 +6,14 @@ import { LocalChatTransport } from '@/lib/ai/local/local-chat-transport'
 import { LOCAL_READINESS_FLAP_HINT } from '@/lib/ai/local/local-readiness'
 
 /**
- * Regressietest voor de Wft-akkoord-gate in de Will-chat.
+ * Regressietest voor de Wft-akkoord-gate in de Fin-chat.
  *
  * Bug (Notion 397f9e8d): bij het openen van de chat MET een vooraf-ingevulde
  * vraag (openWithMessage → pendingMessage, of autoOpenMessage) vuurde het
  * auto-send-effect `sendMessage` af zodra `isOpen && hasAi && !isStreaming`,
  * ZONDER te wachten op Wft-acceptatie. Voor een nieuwe gebruiker (lege
  * localStorage) toonde het akkoordscherm wel de UI-blokkade, maar de AI-aanroep
- * ging tóch door — Will begon te antwoorden vóór de klik op 'Ik begrijp het'.
+ * ging tóch door — Fin begon te antwoorden vóór de klik op 'Ik begrijp het'.
  *
  * Deze test pint vast: (1) geen sendMessage zolang het akkoordscherm er staat,
  * en (2) de vooraf-ingevulde vraag gaat NIET verloren maar wordt alsnog
@@ -309,8 +309,8 @@ describe('ChatPanel — privé-modus transport-swap (cloud ↔ lokaal, FR-C2a)',
     render(<ChatPanel />)
 
     await screen.findByText('Experimenteel · lokaal')
-    expect(screen.getByText(/Will denkt lokaal na/)).toBeInTheDocument()
-    expect(screen.getByText(/Acties en wat-als-simulaties kan Will lokaal nog niet uitvoeren/)).toBeInTheDocument()
+    expect(screen.getByText(/Fin denkt lokaal na/)).toBeInTheDocument()
+    expect(screen.getByText(/Acties en wat-als-simulaties kan Fin lokaal nog niet uitvoeren/)).toBeInTheDocument()
     expect(screen.getByText('Draait op je toestel')).toBeInTheDocument()
   })
 

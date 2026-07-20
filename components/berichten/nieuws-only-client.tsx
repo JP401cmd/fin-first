@@ -337,7 +337,7 @@ export function NieuwsOnlyClient() {
                     </div>
                     <div className="space-y-1">
                       <p className="font-inter text-sm font-medium text-[var(--ink-2)]">
-                        Will stelt je persoonlijke editie samen&hellip;
+                        Fin stelt je persoonlijke editie samen&hellip;
                       </p>
                       <p className="font-source-serif text-[13px] italic text-[var(--ink-4)]">
                         Elk artikel wordt afgestemd op jouw financi&euml;le situatie
@@ -409,7 +409,7 @@ export function NieuwsOnlyClient() {
                     </p>
                     <p className="max-w-sm font-source-serif text-[13px] italic leading-relaxed text-[var(--ink-4)]">
                       {sourceCount
-                        ? `Will heeft ${sourceCount} bronartikelen getoetst aan je financiële profiel — geen ervan raakt je situatie op dit moment. Dat is goed nieuws: geen actie nodig.`
+                        ? `Fin heeft ${sourceCount} bronartikelen getoetst aan je financiële profiel — geen ervan raakt je situatie op dit moment. Dat is goed nieuws: geen actie nodig.`
                         : 'Er zijn op dit moment geen bronartikelen om te toetsen. Zodra er nieuws is dat jouw situatie raakt, verschijnt het hier.'}
                     </p>
                   </div>

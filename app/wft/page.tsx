@@ -40,7 +40,7 @@ export default function WftPage() {
           op het financieel toezicht (Wft). De app beoordeelt niet of een
           product of beslissing passend is voor jouw persoonlijke situatie, en
           doet geen gepersonaliseerde aanbevelingen zoals een adviseur dat zou
-          doen. Dit geldt onverkort voor alles wat Will — de AI-coach — zegt,
+          doen. Dit geldt onverkort voor alles wat Fin — de AI-coach — zegt,
           rekent of suggereert.
         </p>
       </MarketingSection>
@@ -59,7 +59,7 @@ export default function WftPage() {
         <p>
           Niets in TriFinity is een aanbeveling om een financieel product of
           beleggingsinstrument te kopen, te verkopen, aan te houden of af te
-          lossen. Will — de AI-coach — rekent en illustreert; de keuze blijft
+          lossen. Fin — de AI-coach — rekent en illustreert; de keuze blijft
           altijd volledig de jouwe.
         </p>
       </MarketingSection>

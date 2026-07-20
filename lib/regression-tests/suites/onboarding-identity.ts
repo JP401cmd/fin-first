@@ -308,9 +308,9 @@ const tests: TestCase[] = [
   // ── Step 5: SpeechBubble guidance ─────────────────────────────────────────
   {
     id: 'ob-id-speech-bubble-guidance',
-    name: 'SpeechBubble: Will guidance tekst bij persoonlijke gegevens',
+    name: 'SpeechBubble: Fin guidance tekst bij persoonlijke gegevens',
     category: CAT,
-    description: 'SpeechBubble met WillDots avatar aanwezig voor identity velden',
+    description: 'SpeechBubble met FinDots avatar aanwezig voor identity velden',
     priority: 'high',
     estimatedDurationMs: 500,
     async fn() {
@@ -320,7 +320,7 @@ const tests: TestCase[] = [
       if (res.status === 200) {
         const html = await res.text()
         assert(
-          html.includes('onboarding') || html.includes('Onboarding') || html.includes('will-dots'),
+          html.includes('onboarding') || html.includes('Onboarding') || html.includes('fin-dots'),
           'Onboarding pagina bevat verwachte componenten',
         )
       }

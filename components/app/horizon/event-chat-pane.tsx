@@ -16,7 +16,7 @@ import {
 import { MaskedAmount } from '@/components/app/masked-amount'
 
 /**
- * Will-chat binnen de levensgebeurtenis-pane. Hergebruikt `/api/ai/chat` met
+ * Fin-chat binnen de levensgebeurtenis-pane. Hergebruikt `/api/ai/chat` met
  * `context: 'whatif'` zodat de bestaande WHATIF_PROMPT (droomgids → planner)
  * actief wordt en de `suggestLifeEvent` tool kan gebruiken.
  *
@@ -233,7 +233,7 @@ export function EventChatPane({ events, onAcceptSuggestion }: Props) {
         {isStreaming && messages[messages.length - 1]?.role === 'user' && (
           <div className="flex items-center gap-2 text-xs text-[var(--ink-3)]">
             <Loader2 className="h-3 w-3 animate-spin" />
-            <span>Will denkt na…</span>
+            <span>Fin denkt na…</span>
           </div>
         )}
       </div>
@@ -256,7 +256,7 @@ export function EventChatPane({ events, onAcceptSuggestion }: Props) {
                 submit()
               }
             }}
-            placeholder="Vertel Will wat je in gedachten hebt…"
+            placeholder="Vertel Fin wat je in gedachten hebt…"
             rows={1}
             className="flex-1 resize-none px-3 py-2 border border-[var(--border-md)] rounded-lg bg-[var(--paper)] text-sm focus:border-[var(--module-active-700)] focus:outline-none min-h-[40px] max-h-[120px]"
           />

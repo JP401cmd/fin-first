@@ -9,7 +9,7 @@
  *
  * CASH is aaneengesloten 01..32 (32 catalogus-scenario's, geen verwijsregel-
  * gaten) — de grootste UAT-zone tot nu toe. WF-CASH-32 is een latere
- * dekkingscontrole-toevoeging (feature #881, "Vraag Will"-wizard), net als
+ * dekkingscontrole-toevoeging (feature #881, "Vraag Fin"-wizard), net als
  * WF-CASH-31.
  */
 

@@ -384,7 +384,7 @@ const tests: TestCase[] = [
     name: 'Lokale resolver: tweetraps-drempel — vloer 0,5 plaatst, 0,8 is enkel de "zeker"-label­grens',
     category: CAT,
     description:
-      'ADR 0043 + bug-fix jul 2026 (Will categoriseert 0): het lokale pad plaatst een voorstel al vanaf de ' +
+      'ADR 0043 + bug-fix jul 2026 (Fin categoriseert 0): het lokale pad plaatst een voorstel al vanaf de ' +
       'VLOER (LOCAL_MIN_PROPOSAL_CONFIDENCE = 0,5) — gelijk aan de ≥0,5-instructie in buildCategorizeSystemPrompt. ' +
       'LOCAL_MIN_CONFIDENCE (0,8, eigenaarsbesluit 19 jul 2026) is GEEN plaatsingsdrempel meer, enkel de grens die ' +
       'de review-UI gebruikt om "zeker" (≥0,8) van "minder zeker" (0,5–0,8) te onderscheiden. Onder de vloer (< 0,5) ' +

@@ -2,7 +2,7 @@
 
 import { useRef } from 'react'
 import { Trash2, Plus } from 'lucide-react'
-import { WillDots } from '@/components/app/will-dots'
+import { FinDots } from '@/components/app/fin-dots'
 import { SpeechBubble } from './speech-bubble'
 import { StepProgress } from './step-progress'
 import type { RetirementExpenseMethod } from '@/lib/budget-utils'
@@ -218,10 +218,10 @@ export function OnboardingHorizon({
 
       <p className="label-editorial mb-2 text-[var(--ink-4)]">Toekomstplannen</p>
 
-      {/* Will's speech bubble */}
+      {/* Fin's speech bubble */}
       <div className="mb-6 sm:mb-8 flex items-start gap-3">
         <div className="shrink-0">
-          <WillDots size={48} />
+          <FinDots size={48} />
         </div>
         <SpeechBubble>
           {getSpeechText(data.fire_end_strategy)}

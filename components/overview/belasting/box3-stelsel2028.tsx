@@ -1,7 +1,7 @@
 import { TrendingUp, Home, Calculator, ArrowRight } from 'lucide-react'
 import { Box3SectionHeader } from './box3-section-header'
 import { ScenarioCallout } from '@/components/editorial'
-import { BesprekMetWillButton } from '@/components/app/chat/bespreek-met-will-button'
+import { BesprekMetWillButton } from '@/components/app/chat/bespreek-met-fin-button'
 
 const SOURCE_SERIF = 'var(--font-source-serif, Georgia, serif)'
 

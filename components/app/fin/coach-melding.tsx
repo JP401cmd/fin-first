@@ -19,8 +19,8 @@ const CTA_CLASS =
   'mt-1 inline-flex items-center gap-1.5 font-mono text-xs text-wil-700 underline underline-offset-4 hover:text-wil-600'
 
 /**
- * Editorial typemachine-strook (richting A). Géén eigen avatar — WillHome legt
- * de enige Will-avatar rechtsboven in de platen-kop. Body-klik opent de chat;
+ * Editorial typemachine-strook (richting A). Géén eigen avatar — FinHome legt
+ * de enige Fin-avatar rechtsboven in de platen-kop. Body-klik opent de chat;
  * × en CTA stoppen propagatie zodat ze niet doorvallen naar de body-klik.
  */
 export function CoachMelding({

@@ -5,7 +5,7 @@ import { unauthorized, serverError } from '@/lib/api/respond'
 /**
  * POST /api/subscriptions/schedule-action
  *
- * Creates a plannable action in the `actions` table based on Will's
+ * Creates a plannable action in the `actions` table based on Fin's
  * subscription advice. Source is 'ai', no recommendation_id (standalone action).
  */
 export async function POST(req: Request) {

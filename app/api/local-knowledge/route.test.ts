@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 /**
  * Tests voor /api/local-knowledge — de lees-API van de kennisbank voor de lokale
- * Will-chat (fase C1b). Contract:
+ * Fin-chat (fase C1b). Contract:
  *   - GET: 401 zonder sessie; 403 zonder 'ai'-abonnement (checkTierGate)
  *   - GET: alleen ACTIEVE items, en enkel {titel, tags, tekst} (geen id/volgorde)
  *   - GET: korte privé-cache-header; 500 bij DB-fout

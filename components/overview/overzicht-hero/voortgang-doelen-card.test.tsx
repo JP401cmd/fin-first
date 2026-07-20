@@ -4,7 +4,7 @@ import {
   VoortgangDoelenCard,
   type GoalProgress,
 } from './voortgang-doelen-card'
-import type { GoalWithBudget } from '@/lib/will-data-loader'
+import type { GoalWithBudget } from '@/lib/fin-data-loader'
 
 /**
  * Tests voor VoortgangDoelenCard — list-view actieve doelen met

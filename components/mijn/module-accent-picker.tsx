@@ -20,7 +20,7 @@ import { DEFAULT_MODULE_COLORS, type ModuleColorConfig } from '@/lib/color-palet
  * als navigatie. We benoemen daarom wat de kleur in de app daadwerkelijk
  * kleurt:
  *  - kern    → Overzicht (de kern-financiën: bezittingen, budgetten, kassa)
- *  - wil     → Will & acties (coaching-meldingen, doelen, aanbevelingen)
+ *  - wil     → Fin & acties (coaching-meldingen, doelen, aanbevelingen)
  *  - horizon → Toekomst (FIRE, projecties, vrijheid)
  */
 
@@ -50,8 +50,8 @@ const MODULE_SWATCHES: Record<
     ],
   },
   wil: {
-    label: 'Will & acties',
-    sublabel: 'De kleur van Will, coaching-meldingen, doelen en aanbevelingen.',
+    label: 'Fin & acties',
+    sublabel: 'De kleur van Fin, coaching-meldingen, doelen en aanbevelingen.',
     presets: [
       { name: 'Plum (default)', hex: '#3d3048' },
       { name: 'Teal', hex: '#0d9488' },

@@ -36,7 +36,7 @@ const KeyString = z
 /**
  * Rekenhulp — CalculatorDefinition.
  *
- * Will (de AI-coach) produceert een CalculatorDefinition als JSON, nooit
+ * Fin (de AI-coach) produceert een CalculatorDefinition als JSON, nooit
  * uitvoerbare code. De definitie beschrijft invoervelden (optioneel
  * voorgevuld met gebruikersdata), één of meer scenario's, en outputs als
  * wiskundige formules. De formules worden veilig geëvalueerd door

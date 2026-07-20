@@ -165,7 +165,7 @@ export default function ReportViewerPage() {
       <LeadStory kern={data.kern} />
 
       {data.aiIntroduction && (
-        <ScenarioCallout title="Will — redactie">
+        <ScenarioCallout title="Fin — redactie">
           {data.aiIntroduction}
         </ScenarioCallout>
       )}

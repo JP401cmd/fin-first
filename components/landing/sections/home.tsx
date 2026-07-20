@@ -67,7 +67,7 @@ const PIJLERS: Pijler[] = [
     titel: 'Grip',
     italics: 'zonder spreadsheet-avonden',
     body:
-      'Grip is niet alles zelf bijhouden — het is op tijd weten waar je iets van moet vinden. Will, je AI-coach, let mee op jouw cijfers.',
+      'Grip is niet alles zelf bijhouden — het is op tijd weten waar je iets van moet vinden. Fin, je AI-coach, let mee op jouw cijfers.',
     bullets: [
       'Gepersonaliseerde constateringen uit jouw cijfers',
       'Concrete suggesties bij doelen en keuzes',

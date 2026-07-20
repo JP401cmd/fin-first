@@ -63,7 +63,7 @@ const ACTIONS: ActionDef[] = [
   {
     id: 'action:open-chat',
     getLabel: () => 'Open AI-chat',
-    getSublabel: () => 'Stel een vraag of laat Will analyseren',
+    getSublabel: () => 'Stel een vraag of laat Fin analyseren',
     getIcon: () => MessageSquare,
     module: 'wil',
     build: (ctx) => () => {

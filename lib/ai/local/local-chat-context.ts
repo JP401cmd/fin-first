@@ -1,4 +1,4 @@
-// ── Lokale Will-chat: compacte financiële context (fase C1b) ──────────────────
+// ── Lokale Fin-chat: compacte financiële context (fase C1b) ──────────────────
 //
 // Bouwt een KLEIN, getypeerd overzicht-object met exact de kerncijfers die de
 // C1a-proefset gebruikte (gemeten en bewezen: `spikes/litert-lm/c1a-resultaat.md`).
@@ -10,9 +10,9 @@
 // canonieke laag. De kern-cijfers (netto vermogen, vrijheids-%, FIRE-doel,
 // spaarquote, SWR, dagtarief, maandinkomen/-uitgaven) komen sinds C2b uit de
 // gedeelde extractor `buildWillFinancialFacts` (`lib/ai/context/will-financial-
-// facts.ts`) — DEZELFDE bron die `buildSharedContext` (cloud-Will) leest, op de
-// canonieke MET-terugval ADR 0009-grondslag. Daardoor ziet Will lokaal exact
-// dezelfde getallen als de cloud-Will én de gebruiker in de app, en delen het
+// facts.ts`) — DEZELFDE bron die `buildSharedContext` (cloud-Fin) leest, op de
+// canonieke MET-terugval ADR 0009-grondslag. Daardoor ziet Fin lokaal exact
+// dezelfde getallen als de cloud-Fin én de gebruiker in de app, en delen het
 // vrijheids-% en het FIRE-doel één grondslag (vóór C2b las het lokale pad het
 // vrijheids-% uit de zonder-terugval loader-variant → 0% in het randgeval,
 // terwijl het FIRE-doel al met-terugval was: een interne grondslag-mismatch).
@@ -38,7 +38,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { loadCoreData } from '@/lib/core-data-loader'
-import { buildWillFinancialFacts } from '@/lib/ai/context/will-financial-facts'
+import { buildWillFinancialFacts } from '@/lib/ai/context/fin-financial-facts'
 
 /**
  * Compacte noodbuffer-stand: het liquide potje in maanden dekking (canonieke
@@ -52,7 +52,7 @@ export interface LocalChatBuffer {
 }
 
 /**
- * Klein, getypeerd financieel overzicht voor de lokale Will-chat. Mapt 1-op-1 op
+ * Klein, getypeerd financieel overzicht voor de lokale Fin-chat. Mapt 1-op-1 op
  * de FINANCIEEL OVERZICHT-velden uit de C1a-proefset (`c1a-data.json`).
  */
 export interface LocalChatOverview {
@@ -129,7 +129,7 @@ export async function buildLocalChatOverview(supabase: SupabaseClient): Promise<
 
   // Noodbuffer: maanden = canonieke `emergencyFundMonths`; bedrag = het liquide
   // potje dat daaraan ten grondslag ligt (maanden × maanduitgaven — consistent,
-  // geen losse eigen som van een ander begrip). Lokaal-only, niet in WillFacts.
+  // geen losse eigen som van een ander begrip). Lokaal-only, niet in FinFacts.
   const bufferMonths = healthScoreInput.emergencyFundMonths
   const noodbuffer: LocalChatBuffer | null =
     bufferMonths > 0 && rawFinancials.monthlyExpenses > 0
@@ -145,7 +145,7 @@ export async function buildLocalChatOverview(supabase: SupabaseClient): Promise<
     vrijheidstijd: formatVrijheidstijd(facts.freedomYears, facts.freedomMonths),
     fireDoel: Math.round(facts.fireDoel),
     // Consume de canonieke ADR 0009-vrijheids-% (met-terugval; dezelfde bron én
-    // grondslag als cloud-Will en als het FIRE-doel hierboven).
+    // grondslag als cloud-Fin en als het FIRE-doel hierboven).
     vrijheidsPct: Math.round(facts.vrijheidsPct * 10) / 10,
     maandinkomen: facts.maandinkomen,
     maanduitgaven: facts.maanduitgaven,

@@ -305,7 +305,7 @@ export const SchuldenSamenvatting = memo(function SchuldenSamenvatting({
       <AnalysisSection
         title="Schuldenanalyse"
         icon={Landmark}
-        willContext=""
+        finContext=""
       >
         <div className="flex items-start gap-3 rounded-md bg-[var(--positive)]/8 px-3 py-3">
           <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[var(--positive)]" />
@@ -340,7 +340,7 @@ export const SchuldenSamenvatting = memo(function SchuldenSamenvatting({
   // First scenario (10%) is the most achievable — green highlight
   const hasScenarios = scenarios.length > 0 && scenarios.some((s) => s.monthsEarlier > 0)
 
-  // ── Rich Will-context: per-scenario cijfers + FIRE-maatstaf ──────────────
+  // ── Rich Fin-context: per-scenario cijfers + FIRE-maatstaf ──────────────
   // Money via raw formatCurrency (chat context, niet gemaskeerd).
   const scenarioContext = scenarios
     .filter((s) => s.extraPerMonth > 0)
@@ -353,7 +353,7 @@ export const SchuldenSamenvatting = memo(function SchuldenSamenvatting({
     )
     .join('; ')
 
-  const willContext = [
+  const finContext = [
     `Schulden opbouwfase: ${activeDebts.length} schuld(en), totaal ${formatCurrency(totalDebt)}, maandlast ${formatCurrency(totalMonthlyPayment)}.`,
     baselineInterest > 0 ? `Totale rentelast bij huidig tempo: ${formatCurrency(baselineInterest)}.` : '',
     resolvedFireTarget > 0
@@ -368,7 +368,7 @@ export const SchuldenSamenvatting = memo(function SchuldenSamenvatting({
     <AnalysisSection
       title="Schuldenanalyse"
       icon={Landmark}
-      willContext={willContext}
+      finContext={finContext}
     >
       <div className="space-y-3">
         {/* ── Total overview ─────────────────────────────────── */}

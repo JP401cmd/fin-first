@@ -48,7 +48,7 @@ const criteria: AcceptanceCriterion[] = [
     then: 'Zowel /overzicht/bezittingen als het legacy-pad /core/assets resolven naar tab "kern" (startsWith-matching op oude paden); /toekomst/doelen → "horizon"; /mijn/profiel → "identity"; /will → "wil".',
     assertion: {
       kind: 'exact',
-      expected: 'overzichtTab=kern; coreLegacyTab=kern; toekomstTab=horizon; mijnTab=identity; willTab=wil',
+      expected: 'overzichtTab=kern; coreLegacyTab=kern; toekomstTab=horizon; mijnTab=identity; finTab=wil',
       source: 'components/app/shell/nav-stack-provider.tsx#deriveTabFromPath — échte productiefunctie, geen mirror',
     },
   },
@@ -85,7 +85,7 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'BELANGRIJK',
     given: 'Mobiel viewport (<1024px), NavMenuSheet (z-50, bewust ónder de FloatingNavButton z-[60]).',
     when: 'De gebruiker tikt het raster-icoon, navigeert of sluit zonder keuze.',
-    then: 'De pill blijft altijd zichtbaar bóven de sheet (sluit-functie); "Vraag Will" onder "Overal beschikbaar" is een bevestigde no-op (de Will-bubbel is de werkende mobiele ingang).',
+    then: 'De pill blijft altijd zichtbaar bóven de sheet (sluit-functie); "Vraag Fin" onder "Overal beschikbaar" is een bevestigde no-op (de Fin-bubbel is de werkende mobiele ingang).',
     assertion: {
       kind: 'ui-only',
       source: 'components/app/shell/floating-nav-button.tsx + nav-menu-sheet.tsx — interactie/laag-conventie, geen cijfermatige uitkomst',
@@ -284,14 +284,14 @@ const criteria: AcceptanceCriterion[] = [
   {
     workflow: 'WF-NAV-20',
     scenarioId: 'UAT-NAV-20',
-    titel: 'Will-chat openen (bubbel, ⌘K, ?prompt=-deeplink)',
+    titel: 'Fin-chat openen (bubbel, ⌘K, ?prompt=-deeplink)',
     kriticiteit: 'BELANGRIJK',
-    given: 'Drie ingangen: de Will-bubbel, de ⌘K-actie "Open AI-chat", en een `?prompt=`-deeplink.',
+    given: 'Drie ingangen: de Fin-bubbel, de ⌘K-actie "Open AI-chat", en een `?prompt=`-deeplink.',
     when: 'De gebruiker opent de chat via elk van de drie.',
-    then: 'Alle drie openen consistent hetzelfde chatpaneel; een onbekende `?prompt=`-sleutel doet niets (geen crash); "Vraag Will" in het mobiele nav-menu blijft een bevestigde no-op (zie WF-NAV-04).',
+    then: 'Alle drie openen consistent hetzelfde chatpaneel; een onbekende `?prompt=`-sleutel doet niets (geen crash); "Vraag Fin" in het mobiele nav-menu blijft een bevestigde no-op (zie WF-NAV-04).',
     assertion: {
       kind: 'ui-only',
-      source: 'components/app/chat/chat-prompt-deeplink.tsx + will-home.tsx — drie ingangen naar hetzelfde paneel, geen cijfermatige uitkomst',
+      source: 'components/app/chat/chat-prompt-deeplink.tsx + fin-home.tsx — drie ingangen naar hetzelfde paneel, geen cijfermatige uitkomst',
     },
   },
   {

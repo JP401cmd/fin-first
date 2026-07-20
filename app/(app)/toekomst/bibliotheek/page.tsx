@@ -194,7 +194,7 @@ export default async function BibliotheekPage({
           titleBefore="Wat anderen al hebben "
           emphasis="uitgerekend"
           titleAfter=""
-          deck="Bekijk rekenhulpen die andere TriFinity-gebruikers met Will hebben gemaakt en gedeeld. Dupliceer wat je raakt — je eigen cijfers worden meteen ingevuld zodat je 'm op jouw situatie kunt beoordelen."
+          deck="Bekijk rekenhulpen die andere TriFinity-gebruikers met Fin hebben gemaakt en gedeeld. Dupliceer wat je raakt — je eigen cijfers worden meteen ingevuld zodat je 'm op jouw situatie kunt beoordelen."
         />
         <LibraryFilter defaultEnabled={showOnlyUsable} />
       </div>
@@ -275,7 +275,7 @@ function EmptyState({ showOnlyUsable }: { showOnlyUsable: boolean }) {
         De bibliotheek is nog leeg
       </h2>
       <p className="text-sm text-[var(--ink-2)] leading-relaxed mb-4 max-w-md mx-auto">
-        Word de eerste die een rekenhulp deelt. Maak er een met Will, en
+        Word de eerste die een rekenhulp deelt. Maak er een met Fin, en
         publiceer &apos;m zodat anderen op jouw inzicht kunnen voortbouwen.
       </p>
       <Button href="/toekomst?tab=rekenhulp" variant="primary" className="gap-1.5">

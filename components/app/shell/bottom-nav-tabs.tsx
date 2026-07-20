@@ -14,7 +14,7 @@ import { useCategoryAppLinks } from '@/components/app/shell/responsive-shell'
 // gebruikt de nieuwe Overzicht/Toekomst-namen + URLs uit de navigatie-
 // architectuur.
 //
-// `wil` is verwijderd: WillLanding leeft nu op /overzicht (zie
+// `wil` is verwijderd: FinLanding leeft nu op /overzicht (zie
 // app/(app)/overzicht/page.tsx), /will redirect daarheen. Mijn-tab
 // komt niet terug in bottom-nav — wordt bereikbaar via de floating
 // nav-button (waffle-icoon → NavMenuSheet → Mijn).

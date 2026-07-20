@@ -253,7 +253,7 @@ export default function MijnNotificatiesPage() {
           <span className="font-semibold text-[var(--ink)]">Push-meldingen</span>{' '}
           die je op je apparaat ontvangt — ook bekend onder het{' '}
           <em>belletje</em>-icoon op /berichten. De{' '}
-          <span className="font-semibold text-[var(--ink)]">Will-coach</span> heeft
+          <span className="font-semibold text-[var(--ink)]">Fin-coach</span> heeft
           een eigen meldingen-stream onder &quot;Berichten&quot; in het hoofdmenu.
           Die twee zijn los van elkaar.
         </p>

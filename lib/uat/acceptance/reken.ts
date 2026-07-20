@@ -63,7 +63,7 @@ const criteria: AcceptanceCriterion[] = [
   {
     workflow: 'WF-REKEN-02',
     scenarioId: 'UAT-REKEN-02',
-    titel: 'Een nieuwe rekenhulp bouwen met Will (AI)',
+    titel: 'Een nieuwe rekenhulp bouwen met Fin (AI)',
     kriticiteit: 'KERN',
     persona: 'daan',
     given: 'Persona Daan Bakker, actief AI-abonnement (tier-gate \'ai\' — gate-mechaniek zelf → UAT-KRUIS-25), weeklimiet 10 generaties / 5 verfijningen per ISO-week (reset maandag 00:00 Europe/Amsterdam, `lib/calculator/rate-limit.ts`).',
@@ -289,11 +289,11 @@ const criteria: AcceptanceCriterion[] = [
   {
     workflow: 'WF-REKEN-19',
     scenarioId: 'UAT-REKEN-19',
-    titel: 'Met Will over je scenario chatten en suggesties overnemen',
+    titel: 'Met Fin over je scenario chatten en suggesties overnemen',
     kriticiteit: 'BELANGRIJK',
     persona: 'tessa',
     given: 'Persona Tessa Compleet, volledige Wat-Als-pagina met een actief scenario.',
-    when: 'De gebruiker chat met Will over het scenario en klikt een voorgestelde levensgebeurtenis-kaart aan.',
+    when: 'De gebruiker chat met Fin over het scenario en klikt een voorgestelde levensgebeurtenis-kaart aan.',
     then: 'AI-antwoordinhoud is niet-deterministisch (alleen het toevoeg-mechanisme is deterministisch testbaar); toegevoegde gebeurtenis wordt daadwerkelijk in het scenario opgenomen (projectie past zich meetbaar aan, richting-toets, zie WF-REKEN-15). Netwerkonderbreking bij laden → skeleton blijft staan (geen crash).',
     assertion: {
       kind: 'ui-only',

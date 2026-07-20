@@ -61,10 +61,10 @@ export const GLOSSARY_ENTRIES: Record<string, GlossaryEntry> = {
       'Je financiële zelfredzaamheid, gemeten in niveaus van Herstel tot Meesterschap. Elk niveau ontgrendelt nieuwe functies in de app.',
   },
   will: {
-    name: 'Will',
+    name: 'Fin',
     alternative: 'Persoonlijke assistent',
     explanation:
-      'Je persoonlijke financiële assistent. Will kent de context van elke pagina en vertaalt cijfers naar inzichten. Stel hem een vraag via de chatknop rechtsonder.',
+      'Je persoonlijke financiële assistent. Fin kent de context van elke pagina en vertaalt cijfers naar inzichten. Stel hem een vraag via de chatknop rechtsonder.',
   },
   per_asset_rendement: {
     name: 'Per-asset rendement',

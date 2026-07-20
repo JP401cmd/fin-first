@@ -47,7 +47,7 @@ export function FloatingNavButton() {
       router.push('/mijn/account')
       return
     }
-    // open-chat wordt later gekoppeld aan de Will-coach-pane. Voor nu no-op
+    // open-chat wordt later gekoppeld aan de Fin-coach-pane. Voor nu no-op
     // zodat de knop niet crasht.
   }
 

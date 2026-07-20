@@ -11,7 +11,7 @@
 // WF-CASH-01..32 hebben een eigen UAT-scenario en dus een eigen knoop
 // hieronder (drie daarvan — UAT-CASH-25/26/28 — dragen de WF-code in hun naam
 // i.p.v. het `wf`-veld, zie cash.engine.test.ts-normalisatie). WF-CASH-32
-// ("Vraag Will"-wizard: bulk-kaart + groepskeuzes + verliesvrij stoppen,
+// ("Vraag Fin"-wizard: bulk-kaart + groepskeuzes + verliesvrij stoppen,
 // feature #881) is een latere dekkingscontrole-toevoeging, net als WF-CASH-31.
 //
 // Het proces leest links→rechts: landing (4 hefboom-kaarten) → verkennen
@@ -27,7 +27,7 @@
 // SOM zijn daarom 'consistency'/'direction' in cash.ts, niet 'exact'. De
 // bankimport-parsers en de meeste rekenkernen (statusdrempels, periode-
 // vensters, forecast, tegenpartij-analyse, recurring-totalen) zijn wél
-// volledig pure en 'exact' — de kern van deze zone. AI (Vraag Will/analyse)
+// volledig pure en 'exact' — de kern van deze zone. AI (Vraag Fin/analyse)
 // en de TrueLayer-koppeling zijn 'ui-only' resp. BLOCKED (sandbox vereist).
 //
 // GEEN React, GEEN data-fetching — pure curatie.
@@ -65,7 +65,7 @@ export const CASH_FLOW: UatFlow = {
     { id: 'vastelasten', scenarioId: 'UAT-CASH-16', label: 'WF-CASH-16 · Vaste lasten: totaal/aandeel/vrijheidstijd', kind: 'screen', stage: 4, lane: 'vastelasten' },
     { id: 'classificeren', scenarioId: 'UAT-CASH-17', label: 'WF-CASH-17 · Terugkerend item classificeren/bevestigen', kind: 'action', stage: 4, lane: 'vastelasten', subOf: 'vastelasten' },
     { id: 'opzeggen', scenarioId: 'UAT-CASH-18', label: 'WF-CASH-18 · Abonnement opzeggen (opzegbrief)', kind: 'action', stage: 4, lane: 'vastelasten', subOf: 'vastelasten' },
-    { id: 'aianalyse', scenarioId: 'UAT-CASH-19', label: 'WF-CASH-19 · Vaste kosten laten analyseren door Will (AI)', kind: 'action', stage: 4, lane: 'vastelasten', subOf: 'vastelasten' },
+    { id: 'aianalyse', scenarioId: 'UAT-CASH-19', label: 'WF-CASH-19 · Vaste kosten laten analyseren door Fin (AI)', kind: 'action', stage: 4, lane: 'vastelasten', subOf: 'vastelasten' },
     { id: 'watals', scenarioId: 'UAT-CASH-20', label: 'WF-CASH-20 · "Wat als ik opzeg"-schuif', kind: 'action', stage: 4, lane: 'vastelasten', subOf: 'vastelasten' },
     { id: 'kalender', scenarioId: 'UAT-CASH-21', label: 'WF-CASH-21 · Cashflow-kalender (5 weken)', kind: 'screen', stage: 4, lane: 'vastelasten' },
     { id: 'forecast', scenarioId: 'UAT-CASH-22', label: 'WF-CASH-22 · Cashflow-forecast (6 maanden)', kind: 'screen', stage: 4, lane: 'vastelasten' },
@@ -75,7 +75,7 @@ export const CASH_FLOW: UatFlow = {
     { id: 'importbeslis', label: 'Bankbestand-formaat (MT940/OFX/CSV) of open banking?', kind: 'decision', stage: 5 },
     { id: 'mt940', scenarioId: 'UAT-CASH-23', label: 'WF-CASH-23 · MT940/OFX importeren', kind: 'action', stage: 5, lane: 'import' },
     { id: 'csv', scenarioId: 'UAT-CASH-24', label: 'WF-CASH-24 · CSV importeren (preset + kolom-toewijzing)', kind: 'action', stage: 5, lane: 'import' },
-    { id: 'aicat', scenarioId: 'UAT-CASH-25', label: 'WF-CASH-25 · AI-categorisering ("Vraag Will"-wizard, groepsvolgorde)', kind: 'action', stage: 5, lane: 'import', subOf: 'mt940' },
+    { id: 'aicat', scenarioId: 'UAT-CASH-25', label: 'WF-CASH-25 · AI-categorisering ("Vraag Fin"-wizard, groepsvolgorde)', kind: 'action', stage: 5, lane: 'import', subOf: 'mt940' },
     { id: 'aiwizard', scenarioId: 'UAT-CASH-32', label: 'WF-CASH-32 · Wizard: bulk-kaart, groepskeuzes en verliesvrij stoppen', kind: 'action', stage: 5, lane: 'import', subOf: 'aicat' },
     { id: 'handmatigcat', scenarioId: 'UAT-CASH-26', label: 'WF-CASH-26 · Handmatig categoriseren (bulk + regels onthouden)', kind: 'action', stage: 5, lane: 'import', subOf: 'mt940' },
     { id: 'eigenrekening', scenarioId: 'UAT-CASH-27', label: 'WF-CASH-27 · Eigen-overboekingen herkennen/markeren', kind: 'action', stage: 5, lane: 'import', subOf: 'mt940' },
@@ -90,7 +90,7 @@ export const CASH_FLOW: UatFlow = {
     { id: 'x-budget', label: 'Budgetteren · besteding per categorie', kind: 'cross', stage: 7, crossZone: 'BUDGET' },
     { id: 'x-ovz', label: 'Overzicht · netto vermogen, gezondheidsscore, sidebar-status-dots', kind: 'cross', stage: 7, crossZone: 'OVZ' },
     { id: 'x-toek', label: 'Toekomst · spaarquote/inkomen-bron voor de FIRE-projectie', kind: 'cross', stage: 7, crossZone: 'TOEK' },
-    { id: 'x-will', label: 'Will · "Bespreek met Will" bij vaste lasten', kind: 'cross', stage: 7, crossZone: 'WILL' },
+    { id: 'x-will', label: 'Fin · "Bespreek met Fin" bij vaste lasten', kind: 'cross', stage: 7, crossZone: 'WILL' },
     { id: 'x-bezit', label: 'Bezittingen · cash-asset herwaarderen/AssetPane', kind: 'cross', stage: 7, crossZone: 'BEZIT' },
     { id: 'x-mijn', label: 'Mijn · gekoppelde rekeningen in /mijn/koppelingen', kind: 'cross', stage: 7, crossZone: 'MIJN' },
   ],

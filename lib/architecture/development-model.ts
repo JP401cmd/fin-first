@@ -172,7 +172,7 @@ export const AGENT_CURATION: Record<string, AgentCuration> = {
   },
   'ai-specialist-prompt-dna': {
     groupId: 'ai',
-    rol: 'De prompt-DNA — hoe Will praat, redeneert en categoriseert (over de domeinen overzicht/tips/toekomst).',
+    rol: 'De prompt-DNA — hoe Fin praat, redeneert en categoriseert (over de domeinen overzicht/tips/toekomst).',
     inzet: 'Voor toon/lengte-bijsturing, categorisatie-fouten of het verfijnen van een prompt.',
   },
   // ── kwaliteit & security ──

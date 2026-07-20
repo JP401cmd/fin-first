@@ -9,7 +9,7 @@ import { Gezondheidsgetal } from './Gezondheidsgetal'
 import { TweeToekomsten } from './TweeToekomsten'
 import { Toekomst } from './Toekomst'
 import { RapportNieuws } from './RapportNieuws'
-import { WillZetten } from './WillZetten'
+import { FinZetten } from './FinZetten'
 import { SectionTrigger } from './SectionTrigger'
 import { CtaSection } from './CtaSection'
 import { RapportFooter } from './RapportFooter'
@@ -20,7 +20,7 @@ import { RapportFooter } from './RapportFooter'
  *
  * Sectievolgorde: 1 Foto van nu · 2 Gezondheidsgetal · 3 Twee toekomsten ·
  * 4 De toekomst (kruising + levenspad samengevoegd) · 5 Uit het nieuws ·
- * 6 Will's zetten.
+ * 6 Fin's zetten.
  */
 export function RapportView({ report }: { report: CheckReportData }) {
   return (
@@ -66,10 +66,10 @@ export function RapportView({ report }: { report: CheckReportData }) {
         href={report.cta.signupHref}
         label="Zie welk financieel nieuws jóuw vrijheid raakt — gefilterd op jouw situatie."
       />
-      <WillZetten will={report.will} />
+      <FinZetten will={report.will} />
       <SectionTrigger
         href={report.cta.signupHref}
-        label="Will geeft je doorlopend gerichte suggesties en inzichten om je eigen financiële keuzes te verbeteren."
+        label="Fin geeft je doorlopend gerichte suggesties en inzichten om je eigen financiële keuzes te verbeteren."
       />
       <CtaSection cta={report.cta} />
       <RapportFooter disclaimers={report.disclaimers} />

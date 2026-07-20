@@ -11,11 +11,11 @@ import { buildLocalChatOverview } from '@/lib/ai/local/local-chat-context'
 
 export const metadata: Metadata = {
   title: 'Lokale chat (experimenteel) — TriFinity',
-  description: 'Praat met Will volledig op je eigen apparaat — je financiële data verlaat je toestel niet.',
+  description: 'Praat met Fin volledig op je eigen apparaat — je financiële data verlaat je toestel niet.',
 }
 
 /**
- * /mijn/lokale-chat — de ON-DEVICE Will-chat (fase C1b, experimenteel).
+ * /mijn/lokale-chat — de ON-DEVICE Fin-chat (fase C1b, experimenteel).
  *
  * SERVER-SIDE GATE (drie lagen, dezelfde als de rest van de AI-functies):
  *  1. ingelogd — anders naar /login;

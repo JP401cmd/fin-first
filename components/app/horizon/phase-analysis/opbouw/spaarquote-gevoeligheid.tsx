@@ -131,7 +131,7 @@ export const SpaarquoteGevoeligheid = memo(function SpaarquoteGevoeligheid({
     : yearlyExpenses > 0
       ? yearlyExpenses / fallbackSwr
       : 0
-  // Effective SWR implied by the resolved target (for the Will-context).
+  // Effective SWR implied by the resolved target (for the Fin-context).
   const resolvedSwr = yearlyExpenses > 0 && resolvedFireTarget > 0
     ? yearlyExpenses / resolvedFireTarget
     : fallbackSwr
@@ -235,7 +235,7 @@ export const SpaarquoteGevoeligheid = memo(function SpaarquoteGevoeligheid({
         title="Spaarquote gevoeligheid"
         icon={TrendingUp}
         loading={false}
-        willContext="Spaarquote gevoeligheid: geen spaarquote beschikbaar."
+        finContext="Spaarquote gevoeligheid: geen spaarquote beschikbaar."
       >
         <div className="rounded-md border border-[var(--border-ed)] bg-[var(--subtle)]/30 px-3 py-4 text-center">
           <p className="text-xs text-[var(--ink-3)]">
@@ -249,7 +249,7 @@ export const SpaarquoteGevoeligheid = memo(function SpaarquoteGevoeligheid({
     )
   }
 
-  const willContext = scenarios
+  const finContext = scenarios
     ? [
         effectiveSavingsRate != null
           ? `Spaarquote gevoeligheid. Huidige spaarquote: ${effectiveSavingsRate.toFixed(1)}% (${formatCurrency(Math.round(annualSavings / 12))}/mnd).`
@@ -269,7 +269,7 @@ export const SpaarquoteGevoeligheid = memo(function SpaarquoteGevoeligheid({
       title="Spaarquote gevoeligheid"
       icon={TrendingUp}
       loading={!scenarios}
-      willContext={willContext}
+      finContext={finContext}
     >
       <div className="space-y-3">
         {/* ── Current savings rate badge ───────────────────── */}

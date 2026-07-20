@@ -75,7 +75,7 @@ export const AI_CALLSITE_ALLOWLIST: CallsiteAllowlistEntry[] = [
 /**
  * True if the source imports an on-device generation entrypoint from the local
  * LiteRT-LM runtime: `loadModelSession` (transaction categorisation, ADR 0043)
- * or `createChatSession` (local Will-chat, ADR 0043 §C1b). Both build a prompt
+ * or `createChatSession` (local Fin-chat, ADR 0043 §C1b). Both build a prompt
  * from application data and run inference locally on WebGPU/Gemma. They use
  * @litert-lm/core instead of the `ai` package, so the cloud-detector above
  * misses them — this marker brings such callsites under the same guardrail net.

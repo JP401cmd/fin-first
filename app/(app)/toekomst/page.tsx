@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { createClient } from '@/lib/supabase/server'
 import { loadHorizonData } from '@/lib/horizon-data-loader'
-import { loadWillData } from '@/lib/will-data-loader'
+import { loadFinData } from '@/lib/fin-data-loader'
 import HorizonPage from '@/components/app/horizon/horizon-client'
 import { ToekomstNavCards } from '@/components/future/toekomst-nav-cards'
 import { PrintTijdasButton } from '@/components/future/print-tijdas-button'
@@ -65,7 +65,7 @@ export function resolveTabRedirect(
  * De zware per-view data (`strategieData`, `prefill`, `simSnapshot`,
  * `potBalances`, `aowRows`, volledige `custom_calculators`) is verhuisd naar de
  * respectievelijke subpagina's; de landing laadt alleen de lichte KPI-data
- * (`loadHorizonData` + `loadWillData`) plus één count-query op
+ * (`loadHorizonData` + `loadFinData`) plus één count-query op
  * `custom_calculators`.
  *
  * Backwards-compat: oude `?tab=<doelen|gebeurtenissen|voorkeuren|rekenhulp>`
@@ -90,9 +90,9 @@ export default async function ToekomstPage({
     data: { user },
   } = await supabase.auth.getUser()
 
-  const [horizonData, willData, calcCountRes] = await Promise.all([
+  const [horizonData, finData, calcCountRes] = await Promise.all([
     loadHorizonData(supabase),
-    loadWillData(supabase),
+    loadFinData(supabase),
     user
       ? supabase
           .from('custom_calculators')
@@ -133,8 +133,8 @@ export default async function ToekomstPage({
 
         {/* Navkaarten staan nu altijd boven de altijd-zichtbare tijdas. */}
         <ToekomstNavCards
-          goals={willData.goals}
-          goalProgresses={willData.goalProgresses}
+          goals={finData.goals}
+          goalProgresses={finData.goalProgresses}
           events={horizonData.events}
           fireStrategy={horizonData.fireStrategy}
           withdrawalStrategy={horizonData.withdrawalStrategy}

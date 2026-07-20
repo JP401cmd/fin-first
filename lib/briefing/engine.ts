@@ -13,8 +13,8 @@
 //     herschrijft alleen de teksten — alle cijfers komen uit deze engine
 //
 // Categorieën (matchend met BriefingPanel):
-//  - observation  Will-recommendations[0] + finance-observaties
-//  - tip          Will-recommendations[1] + finance-tips
+//  - observation  Fin-recommendations[0] + finance-observaties
+//  - tip          Fin-recommendations[1] + finance-tips
 //  - upcoming     eerstvolgend life-event ≤90 dagen, salaris, seizoen
 //  - heads_up     laagst-scorende health-pillar < 50, budgetdruk, daling
 //  - milestone    behaald doel OF +5 punten health-score t.o.v. vorige maand
@@ -164,7 +164,7 @@ export interface BriefingFinanceInput {
 }
 
 export interface BriefingEngineInput {
-  /** Will-recommendations gesorteerd op prioriteit (eerste = belangrijkste). */
+  /** Fin-recommendations gesorteerd op prioriteit (eerste = belangrijkste). */
   recommendations: Recommendation[]
   /** Levensgebeurtenissen uit horizonData. */
   events: LifeEvent[]
@@ -218,7 +218,7 @@ export function buildBriefingEntries(input: BriefingEngineInput): BriefingEntry[
   const now = input.now ?? new Date()
   const entries: BriefingEntry[] = []
 
-  // 1. Observation — eerste Will-recommendation
+  // 1. Observation — eerste Fin-recommendation
   const firstRec = input.recommendations[0]
   if (firstRec) {
     entries.push({
@@ -233,7 +233,7 @@ export function buildBriefingEntries(input: BriefingEngineInput): BriefingEntry[
     })
   }
 
-  // 2. Tip — tweede Will-recommendation
+  // 2. Tip — tweede Fin-recommendation
   const secondRec = input.recommendations[1]
   if (secondRec) {
     entries.push({
@@ -371,7 +371,7 @@ export function buildBriefingEntries(input: BriefingEngineInput): BriefingEntry[
 // ── Aandachtspunten-bus ─────────────────────────────────────────────
 //
 // De app-brede aandachtspunten (belasting-kansen, budgetoverschrijdingen,
-// dure schulden, stilstaand vermogen) voeden ook de Will-chat-context. Hier
+// dure schulden, stilstaand vermogen) voeden ook de Fin-chat-context. Hier
 // pakt de briefing het zwaarste punt (hoogste besparing) als briefje, zodat
 // de belangrijkste kans van het moment niet alleen in de chat leeft.
 

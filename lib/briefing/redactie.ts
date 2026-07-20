@@ -5,7 +5,7 @@
 // model. Deze module is de dunne AI-laag die daar bovenop redigeert, in
 // één model-call bij de handmatige dagelijkse ververs:
 //
-//  1. één kop-zin (headline) in de stem van Will;
+//  1. één kop-zin (headline) in de stem van Fin;
 //  2. herschreven briefje-teksten (toon, verbinding, vrijheidstijd-framing)
 //     met een harde nummer-guard: elk getal uit de brontekst moet letterlijk
 //     terugkomen en er mogen geen nieuwe getallen bij — anders valt dát
@@ -163,7 +163,7 @@ export function sanitizeRedactedText(
 
 // ── De redactie-call ─────────────────────────────────────────────────
 
-const REDACTIE_SYSTEM = `Je bent Will, de financiële redacteur van TriFinity. Kernfilosofie: "Geld is opgeslagen tijd" — elke euro is vrijheidstijd.
+const REDACTIE_SYSTEM = `Je bent Fin, de financiële redacteur van TriFinity. Kernfilosofie: "Geld is opgeslagen tijd" — elke euro is vrijheidstijd.
 
 Je krijgt de wekelijkse briefing als kant-en-klare, feitelijk correcte briefjes. Jouw taak is uitsluitend REDACTIE:
 - Herschrijf de tekst van elk briefje in jouw stem: warm, helder, concreet, nooit klef. Maximaal 2 zinnen per briefje.

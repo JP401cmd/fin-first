@@ -108,7 +108,7 @@ export const INTENT_TO_GOAL_FALLBACK: Record<IntentId, GoalSlug | null> = {
   nieuws: null,
 }
 
-/** Spreektekst voor Will-mascotte na keuze */
+/** Spreektekst voor Fin-mascotte na keuze */
 export const GOAL_SPEECH_TEXT: Record<GoalSlug, string> = {
   'grip-uitgaven':
     'Slim! Ik breng je direct naar je budgetten en cashflow.',

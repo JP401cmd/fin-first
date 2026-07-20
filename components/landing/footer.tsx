@@ -15,7 +15,7 @@ const PRODUCTEN = [
   { label: 'Functies', href: '/functies' },
   { label: 'Prijzen', href: '/prijzen' },
   { label: 'Veiligheid', href: '/veiligheid' },
-  { label: 'Will — AI-coach', href: '/functies#grip' },
+  { label: 'Fin — AI-coach', href: '/functies#grip' },
 ]
 
 const HULP = [

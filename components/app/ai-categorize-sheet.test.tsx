@@ -514,7 +514,7 @@ describe('AICategorizeSheet — choice-fase handmatige opties', () => {
 // ── AI-flow transfer-behandeling ──────────────────────────────────────────────
 //
 // GEDRAGSWIJZIGING (combined pass, Notion-kaart jul 2026, eis 2): in de "Vraag
-// Will"-automaat wordt NIETS meer stil toegepast — óók sterke IBAN/naam-
+// Fin"-automaat wordt NIETS meer stil toegepast — óók sterke IBAN/naam-
 // transfers landen als review-voorstel (label "Overboeking"). Deze suite
 // vergrendelt:
 //  (a) spiegelpaar-only → geen silent write, wél een review-suggestie;
@@ -583,7 +583,7 @@ describe('AICategorizeSheet — AI-flow transfer-behandeling', () => {
       />
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /Vraag Will/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Vraag Fin/i }))
 
     // De review-fase laadt; het spiegelpaar-voorstel (reasoning) verschijnt per rij.
     await waitFor(() => {
@@ -609,7 +609,7 @@ describe('AICategorizeSheet — AI-flow transfer-behandeling', () => {
       />
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /Vraag Will/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Vraag Fin/i }))
     // Spiegelparen zijn stage-1 → de wizard opent op stap 1 (bulk-kaart,
     // auto-uitgeklapt want ≤8 rijen) met per rij de "Spiegelboeking"-reasoning.
     await waitFor(() => {
@@ -682,7 +682,7 @@ describe('AICategorizeSheet — AI-flow transfer-behandeling', () => {
       />
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /Vraag Will/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Vraag Fin/i }))
 
     // Het sterke signaal is stage-1 → stap 1 (bulk-kaart) toont het als
     // review-voorstel met herkomst-label.
@@ -695,7 +695,7 @@ describe('AICategorizeSheet — AI-flow transfer-behandeling', () => {
     expect(transactionUpdates).toHaveLength(0)
 
     // Accepteer de transfer in stap 1 (OK) en loop door naar de controle-stap:
-    // stap 1 → stap 2 (de gewone tx wacht op Will) → "Stoppen" naar stap 3 → Opslaan.
+    // stap 1 → stap 2 (de gewone tx wacht op Fin) → "Stoppen" naar stap 3 → Opslaan.
     fireEvent.click(screen.getByRole('button', { name: /^OK$/i }))
     fireEvent.click(screen.getByRole('button', { name: /Verder zonder toepassen/i }))
     await waitFor(() => {
@@ -715,10 +715,10 @@ describe('AICategorizeSheet — AI-flow transfer-behandeling', () => {
 
 // ── Combined pass in de sheet (Notion-kaart jul 2026) ─────────────────────────
 //
-// Eis 1+2: "Vraag Will" draait eerst de gratis regelmotor, stuurt alleen
+// Eis 1+2: "Vraag Fin" draait eerst de gratis regelmotor, stuurt alleen
 // onbekende tegenpartijen (1 representant per genormaliseerde tegenpartij) naar
 // de AI en propageert het oordeel — en legt ALLES ter review voor met een
-// herkomst-label per rij ("Regel" / "Will" / "Afgeleid" / "Overboeking").
+// herkomst-label per rij ("Regel" / "Fin" / "Afgeleid" / "Overboeking").
 
 const boodschappenBudget = {
   id: 'b-boodschappen',
@@ -750,7 +750,7 @@ describe('AICategorizeSheet — combined pass (regels → AI → propagatie)', (
       />
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /Vraag Will/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Vraag Fin/i }))
 
     await waitFor(() => {
       expect(screen.getAllByText(/^Regel$/).length).toBe(2)
@@ -764,10 +764,10 @@ describe('AICategorizeSheet — combined pass (regels → AI → propagatie)', (
     expect(aiCalls).toHaveLength(0)
   })
 
-  it('onbekende tegenpartij: 1 AI-call voor de representant, groepkaart toont aantal + Will-voorstel, save propageert naar siblings (WP-E2, feature #881)', async () => {
+  it('onbekende tegenpartij: 1 AI-call voor de representant, groepkaart toont aantal + Fin-voorstel, save propageert naar siblings (WP-E2, feature #881)', async () => {
     // Twee transacties van dezelfde onbekende tegenpartij → de combined pass
     // stuurt er precies ÉÉN naar de AI en leidt de tweede af. Sinds WP-C landt
-    // dit als "Vraag Will"-WIZARD (bulk-kaart + AI-groepkaart), niet meer als
+    // dit als "Vraag Fin"-WIZARD (bulk-kaart + AI-groepkaart), niet meer als
     // platte lijst — de assertie hieronder toetst dus wizard-gedrag i.p.v. een
     // losse "Afgeleid"-rij (die bestaat in de wizard niet: de gepropageerde
     // sibling zit gevouwen in dezelfde groepkaart als de representant).
@@ -807,14 +807,14 @@ describe('AICategorizeSheet — combined pass (regels → AI → propagatie)', (
       />
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /Vraag Will/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Vraag Fin/i }))
 
     // De groepkaart toont de tegenpartij, het aantal transacties in de groep en
-    // het Will-voorstel (label + budgetnaam + reasoning van de representant).
+    // het Fin-voorstel (label + budgetnaam + reasoning van de representant).
     await waitFor(() => {
       expect(screen.getByText('Nieuwe Winkel')).toBeInTheDocument()
     })
-    expect(screen.getByText(/^Will$/)).toBeInTheDocument()
+    expect(screen.getByText(/^Fin$/)).toBeInTheDocument()
     expect(screen.getByText('Boodschappen')).toBeInTheDocument()
     expect(screen.getByText(/Lijkt op een supermarkt/i)).toBeInTheDocument()
     // "2 transacties" — de groep bevat beide tx's van dezelfde tegenpartij. De
@@ -907,7 +907,7 @@ describe('AICategorizeSheet — Stoppen en controleren slaat alleen geaccepteerd
       />
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /Vraag Will/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Vraag Fin/i }))
 
     // Eerste groepkaart verschijnt (largest-first met gelijke grootte 1 → op
     // datum; beide txs delen dezelfde datum in makeTx, dus insertievolgorde).
@@ -988,7 +988,7 @@ describe('AICategorizeSheet — Stoppen routeert naar de controle-stap', () => {
       />
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /Vraag Will/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Vraag Fin/i }))
     await waitFor(() => {
       expect(screen.getByText('Eerste Winkel')).toBeInTheDocument()
     })
@@ -1021,7 +1021,7 @@ describe('AICategorizeSheet — Stoppen routeert naar de controle-stap', () => {
       />
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /Vraag Will/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Vraag Fin/i }))
     await waitFor(() => {
       expect(screen.getByText('Eerste Winkel')).toBeInTheDocument()
     })
@@ -1107,7 +1107,7 @@ describe('AICategorizeSheet — budget-boom flatten', () => {
 
 // ── Privé-modus: lokale vs. cloud resolver-keuze (ADR 0043, fase 3) ────────────
 //
-// De sheet leest profiles.privacy_mode bij "Vraag Will" en kiest de resolver:
+// De sheet leest profiles.privacy_mode bij "Vraag Fin" en kiest de resolver:
 //  - uit (default) → exact bestaand cloud-gedrag (fetch /api/ai/categorize).
 //  - aan + klaar → uitsluitend de lokale on-device resolver, GEEN cloud-call.
 //  - aan + niet klaar → AI-fase geblokkeerd met eerlijke melding; regelmotor-
@@ -1133,7 +1133,7 @@ describe('AICategorizeSheet — privé-modus resolver-keuze', () => {
       />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /Vraag Will/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Vraag Fin/i }))
 
     // De wizard toont de onbekende tegenpartij als AI-groepkaart (geen platte
     // "nog te beoordelen"-header meer in wizard-modus).
@@ -1162,16 +1162,16 @@ describe('AICategorizeSheet — privé-modus resolver-keuze', () => {
       />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /Vraag Will/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Vraag Fin/i }))
 
     await waitFor(() => {
-      expect(screen.getByText(/^Will$/)).toBeInTheDocument()
+      expect(screen.getByText(/^Fin$/)).toBeInTheDocument()
     })
     // Lokale resolver gebruikt met het onbekende item; geen enkele cloud-call.
     expect(createLocalResolverSpy).toHaveBeenCalledTimes(1)
     expect(localResolverSpy).toHaveBeenCalled()
     expect(aiCategorizeFetches().length).toBe(0)
-    // Het lokale voorstel landt als "Will" op het boodschappen-budget.
+    // Het lokale voorstel landt als "Fin" op het boodschappen-budget.
     expect(screen.getAllByText('Boodschappen').length).toBeGreaterThanOrEqual(1)
   })
 
@@ -1195,7 +1195,7 @@ describe('AICategorizeSheet — privé-modus resolver-keuze', () => {
       />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /Vraag Will/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Vraag Fin/i }))
 
     // Gesplitste melding (fix 19 jul): capability-tak = de concrete reden uit de
     // capability-check + de transiënte-flap-hint — niet meer de oude generieke tekst.
@@ -1229,7 +1229,7 @@ describe('AICategorizeSheet — privé-modus resolver-keuze', () => {
       />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /Vraag Will/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Vraag Fin/i }))
 
     await waitFor(() => {
       expect(screen.getByText(/mogelijk heeft je browser het verwijderd om ruimte te maken/i)).toBeInTheDocument()
@@ -1263,7 +1263,7 @@ describe('AICategorizeSheet — GWT-1 · wizard-modus zonder globale lijst-heade
       />
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /Vraag Will/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Vraag Fin/i }))
 
     await waitFor(() => {
       expect(screen.getByText('Onbekende Zaak')).toBeInTheDocument()
@@ -1300,7 +1300,7 @@ describe('AICategorizeSheet — GWT-16 · sleepmodus-terugkeer naar stap 2', () 
       />
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /Vraag Will/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Vraag Fin/i }))
     await waitFor(() => {
       expect(screen.getByText('Sleep Winkel')).toBeInTheDocument()
     })
@@ -1311,13 +1311,13 @@ describe('AICategorizeSheet — GWT-16 · sleepmodus-terugkeer naar stap 2', () 
     fireEvent.click(screen.getByRole('button', { name: /Sluit sleepmodus/i }))
 
     // Terug in de wizard: de volgende groep verschijnt vanzelf (stap 2 blijft
-    // actief) — geen terugval naar het keuzescherm ("Vraag Will") en geen
-    // terugval naar stap 1 ("Will herkende").
+    // actief) — geen terugval naar het keuzescherm ("Vraag Fin") en geen
+    // terugval naar stap 1 ("Fin herkende").
     await waitFor(() => {
       expect(screen.getByText('Tweede Winkel')).toBeInTheDocument()
     })
     expect(screen.queryByTestId('sleepmodus-overlay')).toBeNull()
-    expect(screen.queryByRole('button', { name: /^Vraag Will$/i })).toBeNull()
-    expect(screen.queryByText(/Will herkende/i)).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Vraag Fin$/i })).toBeNull()
+    expect(screen.queryByText(/Fin herkende/i)).toBeNull()
   })
 })

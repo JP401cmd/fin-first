@@ -328,7 +328,7 @@ export default function RapportagesPage() {
               className="mt-4 italic text-[12px] leading-snug text-[var(--ink-3)]"
               style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
             >
-              {useAi ? 'Will leest je cijfers en schrijft een korte editie. +5–10 seconden.' : 'Direct beschikbaar — een redactionele samenvatting in jouw context.'}
+              {useAi ? 'Fin leest je cijfers en schrijft een korte editie. +5–10 seconden.' : 'Direct beschikbaar — een redactionele samenvatting in jouw context.'}
             </p>
           </div>
         </div>

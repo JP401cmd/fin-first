@@ -28,7 +28,7 @@ const PRO_TIPS: ProTip[] = [
   },
   {
     icon: MessageSquare,
-    text: 'Stel Will een vraag via de chatknop rechtsonder \u2014 hij kent de context van je pagina.',
+    text: 'Stel Fin een vraag via de chatknop rechtsonder \u2014 hij kent de context van je pagina.',
   },
   {
     icon: CalendarCheck,

@@ -20,7 +20,7 @@ export interface AiFeatureDef {
 }
 
 export const AI_FEATURES: AiFeatureDef[] = [
-  { key: 'chat', label: 'Will-chat', cost: 1 },
+  { key: 'chat', label: 'Fin-chat', cost: 1 },
   { key: 'briefing', label: 'Briefing', cost: 2 },
   { key: 'recommendations', label: 'Aanbevelingen', cost: 2 },
   { key: 'report', label: 'Rapporten', cost: 5 },

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { DoelenView } from './doelen-view'
-import type { GoalWithBudget } from '@/lib/will-data-loader'
+import type { GoalWithBudget } from '@/lib/fin-data-loader'
 
 // DoelenView mount DoelToevoegenSheet die next/navigation + supabase
 // client gebruikt. Mock beide zodat de view in isolatie test-baar blijft.

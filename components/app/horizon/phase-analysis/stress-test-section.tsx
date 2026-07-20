@@ -16,8 +16,8 @@ interface StressTestSectionProps {
   expectedReturn: number
   inflationRate: number
   yearlyExpenses: number
-  /** Context prefix for "Bespreek met Will" — scenario results are appended automatically */
-  willContextPrefix: string
+  /** Context prefix for "Bespreek met Fin" — scenario results are appended automatically */
+  finContextPrefix: string
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -35,7 +35,7 @@ export const StressTestSection = memo(function StressTestSection({
   expectedReturn,
   inflationRate,
   yearlyExpenses,
-  willContextPrefix,
+  finContextPrefix,
 }: StressTestSectionProps) {
   const [results, setResults] = useState<StressTestResult[] | null>(null)
 
@@ -56,15 +56,15 @@ export const StressTestSection = memo(function StressTestSection({
     return () => cancelAnimationFrame(raf)
   }, [rows, expectedReturn, inflationRate, yearlyExpenses])
 
-  // Build the "Vraag Will" context from computed results
-  const willContext = results
-    ? `${willContextPrefix} Stresstest resultaten (veerkracht = aandeel van je verwachte eindvermogen dat ná de schok overblijft, géén kans): ${results
+  // Build the "Vraag Fin" context from computed results
+  const finContext = results
+    ? `${finContextPrefix} Stresstest resultaten (veerkracht = aandeel van je verwachte eindvermogen dat ná de schok overblijft, géén kans): ${results
         .map(
           (r) =>
             `${r.scenario.label}: effect ${formatCurrency(r.endPortfolioDelta)}, veerkracht ${Math.round(r.estimatedSuccessRate * 100)}%`,
         )
         .join('; ')}`
-    : willContextPrefix
+    : finContextPrefix
 
   const loading = results === null && rows.length > 0
 
@@ -75,7 +75,7 @@ export const StressTestSection = memo(function StressTestSection({
         title="Stresstest: extreme scenario&rsquo;s"
         icon={Zap}
         loading={false}
-        willContext={willContextPrefix}
+        finContext={finContextPrefix}
       >
         <div className="flex items-start gap-2 rounded-lg border border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/50 p-3">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
@@ -93,7 +93,7 @@ export const StressTestSection = memo(function StressTestSection({
       title="Stresstest: extreme scenario&rsquo;s"
       icon={Zap}
       loading={loading}
-      willContext={willContext}
+      finContext={finContext}
     >
       {results && results.length > 0 && (
         <div className="space-y-2">

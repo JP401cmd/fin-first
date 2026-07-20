@@ -15,14 +15,14 @@ import type { LocalKnowledgeItem } from '@/lib/ai/local/knowledge-context'
 import { useModuleAccess } from '@/components/app/feature-access-provider'
 import { hasSubscription } from '@/lib/feature-registry'
 import { AiSubscriptionUpsell } from '@/components/app/ai-subscription-upsell'
-import { WillDots } from '@/components/app/will-dots'
+import { FinDots } from '@/components/app/fin-dots'
 import { ActionEditModal } from '@/components/app/action-edit-modal'
 import type { Action, ActionStatus } from '@/lib/recommendation-data'
 import { renderMarkdown, findToolInvocation, TOOL_LOADING_STATES, TOOL_OUTPUT_STATES, type MessagePart } from './markdown-helpers'
 import { X, Send, Loader2, Zap, Check, AlertTriangle, RefreshCw, Pin, PinOff, ShieldCheck, Sparkles, Clock, ThumbsDown, Cpu } from 'lucide-react'
 import type { SuggestRecommendationResult } from '@/lib/ai/tools/suggest-recommendation'
 import { ChatVisualizationCard } from './chat-visualization-card'
-import '@/components/app/will/will-home.css' // wh-melding-in keyframe (corner-grow entree, gedeeld met WillHome)
+import '@/components/app/fin/fin-home.css' // wh-melding-in keyframe (corner-grow entree, gedeeld met FinHome)
 import type { VisualizationOutput } from '@/lib/ai/tools/show-visualization'
 
 /* ── Wft Disclaimer ───────────────────────────────────────────────── */
@@ -91,11 +91,11 @@ function LocalModeBanner() {
         <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-wil-600" aria-hidden="true" />
         <div className="text-[11px] leading-relaxed text-[var(--ink-2)]">
           <p>
-            Will denkt lokaal na — dit draait volledig op je toestel en duurt wat
+            Fin denkt lokaal na — dit draait volledig op je toestel en duurt wat
             langer, maar je gegevens blijven privé.
           </p>
           <p className="mt-1 text-[var(--ink-3)]">
-            Acties en wat-als-simulaties kan Will lokaal nog niet uitvoeren. Zet
+            Acties en wat-als-simulaties kan Fin lokaal nog niet uitvoeren. Zet
             privé-modus uit voor die functies.
           </p>
         </div>
@@ -149,13 +149,13 @@ type DomainConfig = {
   sendHoverBg: string
 }
 
-const WILL_CONFIG: DomainConfig = {
-  name: 'Will',
+const FIN_CONFIG: DomainConfig = {
+  name: 'Fin',
   subtitle: 'Financieel assistent',
-  placeholder: 'Vraag Will iets...',
-  greeting: 'Hoi, ik ben Will',
+  placeholder: 'Vraag Fin iets...',
+  greeting: 'Hoi, ik ben Fin',
   greetingDescription: 'Ik help je met al je financiele vragen — van budgetten tot FIRE-projecties.',
-  fabAvatar: (size: number) => <WillDots size={size} />,
+  fabAvatar: (size: number) => <FinDots size={size} />,
   headerColor: 'text-wil-600',
   bubbleBg: 'bg-wil-50',
   accentColor: 'text-wil-600',
@@ -274,7 +274,7 @@ function RecommendationSuggestionCard({
           />
           <div className="min-w-0 flex-1">
             <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-wil-700">
-              Tip van Will
+              Tip van Fin
             </div>
             <h4 className="mt-0.5 text-sm font-semibold text-[var(--ink)] leading-snug">
               {data.title}
@@ -482,8 +482,8 @@ export function ChatPanel() {
     try { localStorage.setItem(WFT_ACCEPTED_KEY, 'true') } catch {}
   }, [])
 
-  // Will is the sole assistant — no domain switching
-  const config = WILL_CONFIG
+  // Fin is the sole assistant — no domain switching
+  const config = FIN_CONFIG
 
   // Track which suggestions have been added (by toolInvocationId)
   const [addedActions, setAddedActions] = useState<Set<string>>(new Set())
@@ -691,7 +691,7 @@ export function ChatPanel() {
     }
   }, [isOpen])
 
-  // Auto-send pending message (notificatie "Vraag AI" + "Vraag Will"-knoppen).
+  // Auto-send pending message (notificatie "Vraag AI" + "Vraag Fin"-knoppen).
   // One-shot per bericht: zonder deze ref-guard verstuurt React's dubbele
   // effect-invocatie (Strict Mode, of een re-render vóórdat clearPendingMessage
   // doorkomt) hetzelfde bericht twee keer → twee identieke user-bubbles in de
@@ -707,7 +707,7 @@ export function ChatPanel() {
     }
     // Wacht op Wft-acceptatie voordat we een vooraf-ingevulde vraag versturen.
     // Zonder deze gate zou een openWithMessage-pad (tips-teaser, BesprekMetWill,
-    // ?prompt=-deeplink, WillHome-bubbel) de AI-aanroep afvuren terwijl het
+    // ?prompt=-deeplink, FinHome-bubbel) de AI-aanroep afvuren terwijl het
     // akkoordscherm nog getoond wordt — de disclaimer zou de UI blokkeren maar
     // niet het daadwerkelijke versturen. De vraag blijft in pendingMessage staan
     // tot wftAccepted===true; na 'Ik begrijp het' vuurt dit effect opnieuw en
@@ -804,7 +804,7 @@ export function ChatPanel() {
       })
 
       // Postponed-voorstellen krijgen een terugkomdatum mee — na 14 dagen
-      // mag Will ze opnieuw aandragen (zie recommendation-context sectie
+      // mag Fin ze opnieuw aandragen (zie recommendation-context sectie
       // "UITGESTELD — KLAAR VOOR HERBEOORDELING"). Zonder timer zou
       // "uitstellen" effectief een soft-delete zijn.
       const POSTPONE_DAYS = 14
@@ -1008,7 +1008,7 @@ export function ChatPanel() {
     if (!err) return 'Er ging iets mis. Probeer het opnieuw.'
     const msg = err.message?.toLowerCase() ?? ''
     if (isSubscriptionError(err)) {
-      return 'Will is een betaalde functie. Sluit het AI-abonnement af om verder te chatten.'
+      return 'Fin is een betaalde functie. Sluit het AI-abonnement af om verder te chatten.'
     }
     if (msg.includes('timeout') || msg.includes('duurde te lang') || msg.includes('504')) {
       return 'Het AI-antwoord duurde te lang. Probeer het opnieuw met een kortere vraag.'
@@ -1038,7 +1038,7 @@ export function ChatPanel() {
     clearError()
   }, [clearError])
 
-  // De launcher (FAB) leeft nu in WillHome — die toont de bubbel én opent de chat.
+  // De launcher (FAB) leeft nu in FinHome — die toont de bubbel én opent de chat.
   // Wanneer de chat gesloten is, rendert ChatPanel niets.
   if (!isOpen) return null
 
@@ -1166,7 +1166,7 @@ export function ChatPanel() {
             return (
               <div key={msg.id} className="mb-3 flex justify-start">
                 <div className="mr-2 mt-1 shrink-0">
-                  <WillDots size={28} state={isStreaming ? 'streaming' : 'idle'} />
+                  <FinDots size={28} state={isStreaming ? 'streaming' : 'idle'} />
                 </div>
                 <div className={`max-w-[85%] rounded-[var(--r-lg)] px-3 py-2 text-sm leading-relaxed ${config.bubbleBg} text-[var(--ink-2)]`}>
                   {renderAssistantMessage(parts)}
@@ -1178,7 +1178,7 @@ export function ChatPanel() {
           {isStreaming && (messages.length === 0 || messages[messages.length - 1]?.role === 'user') && (
             <div className="mb-3 flex justify-start">
               <div className="mr-2 mt-1 shrink-0">
-                <WillDots size={28} state="streaming" />
+                <FinDots size={28} state="streaming" />
               </div>
               <div className={`rounded-[var(--r-lg)] px-3 py-2 ${config.bubbleBg}`}>
                 <Loader2 className={`h-4 w-4 animate-spin ${config.accentColor}`} />

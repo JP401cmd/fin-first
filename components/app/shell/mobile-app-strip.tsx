@@ -27,7 +27,7 @@
  *  3. Navigatie naar een andere route — path-change useEffect sluit zodra
  *     `pathname` verandert (= tegel-tap, andere tab, browser-back, etc.).
  *
- * Bron-van-waarheid is dezelfde server-builder die het Will-dashboard voedt:
+ * Bron-van-waarheid is dezelfde server-builder die het Fin-dashboard voedt:
  * `buildCategoryAppLinks` in `lib/category-app-nav.ts`. De iconen komen via
  * `iconMap` uit `components/app/budget-shared`, gevoed door
  * `ASSET_TYPE_ICONS` / `DEBT_TYPE_ICONS`.

@@ -105,7 +105,7 @@ import { FeatureGate } from '@/components/app/feature-gate'
 import { CollapsibleSection } from '@/components/app/collapsible-section'
 import { HideInSimple } from '@/components/app/hide-in-simple'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
-import { NibudBenchmarkSection } from '@/components/app/will/nibud-benchmark'
+import { NibudBenchmarkSection } from '@/components/app/fin/nibud-benchmark'
 import { SPLIT_MODE_LABELS, type SplitMode, type PrivacySettings } from '@/lib/household-data'
 import { loadPerspectiveContext } from '@/lib/household/perspective-loader'
 import {
@@ -662,7 +662,7 @@ export function BudgetHub({
         className="flex w-full items-center justify-between px-4 py-2.5 text-left"
       >
         <div className="flex items-center gap-2">
-          <span className="rounded-full bg-wil-50 px-2 py-0.5 font-sans text-[9px] font-semibold uppercase tracking-[0.08em] text-wil-700">Will</span>
+          <span className="rounded-full bg-wil-50 px-2 py-0.5 font-sans text-[9px] font-semibold uppercase tracking-[0.08em] text-wil-700">Fin</span>
           <span className="font-sans text-xs font-semibold text-[var(--ink-2)]">Budgetanalyse</span>
           {!expanded && visibleSnippets.length > 0 && (
             <span className="font-sans text-[11px] text-[var(--ink-3)]">
@@ -870,14 +870,14 @@ export function BudgetHub({
           )
         })()}
 
-        {/* Blok 3: Footer — Vraag Will (right-aligned, consistent ritme met collapsed header) */}
+        {/* Blok 3: Footer — Vraag Fin (right-aligned, consistent ritme met collapsed header) */}
         <div className="mt-3 border-t border-[var(--border-ed)] pt-2 flex items-center justify-end">
           <button
             type="button"
             onClick={() => openWithMessage('Analyseer mijn budgetten en geef me de belangrijkste inzichten over overschreden en bijna-volle categorieën')}
             className="min-h-[44px] px-0 font-sans text-[11px] italic text-wil-600 hover:underline"
           >
-            Vraag Will voor uitgebreide analyse →
+            Vraag Fin voor uitgebreide analyse →
           </button>
         </div>
       </div>
@@ -4164,10 +4164,10 @@ function BudgetDetailModal({
             type="button"
             onClick={() => openWithMessage(`Analyseer mijn ${budget.name} budget`)}
             className="inline-flex flex-shrink-0 items-center justify-center gap-1.5 border border-wil-200 bg-wil-50 px-3 py-2 text-xs font-medium text-wil-700 transition-colors hover:bg-wil-100 hover:border-wil-300"
-            title="Vraag Will om tips over dit budget"
+            title="Vraag Fin om tips over dit budget"
           >
             <MessageCircle className="h-3.5 w-3.5" />
-            Vraag Will
+            Vraag Fin
           </button>
           <button
             type="button"

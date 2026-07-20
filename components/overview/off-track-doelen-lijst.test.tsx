@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { OffTrackDoelenLijst } from './off-track-doelen-lijst'
-import type { GoalWithBudget } from '@/lib/will-data-loader'
+import type { GoalWithBudget } from '@/lib/fin-data-loader'
 
 function mockGoal(overrides: Partial<GoalWithBudget> = {}): GoalWithBudget {
   return {

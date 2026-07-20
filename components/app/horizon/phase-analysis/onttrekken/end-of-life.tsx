@@ -93,7 +93,7 @@ export const EndOfLife = memo(function EndOfLife({
       title="Einde levensfase"
       icon={Heart}
       loading={loading}
-      willContext={
+      finContext={
         analysis
           ? `Einde levensfase bij ${Math.round(endAge)} jaar (strategie: ${strategyLabel}): ` +
             `eindvermogen ${formatMaskedCurrency(analysis.eindVermogen, masked)}. ` +

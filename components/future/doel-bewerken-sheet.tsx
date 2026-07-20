@@ -19,7 +19,7 @@ type DebtLite = { id: string; name: string; current_balance: number }
  * DoelBewerkenSheet — quick-update flow per doel op /toekomst Doelen-tab.
  *
  * Plan §6.3 Tab 2: "Detail-pane bij klik (slide-in, edit + bijdrage-
- * monitor + acties van Will)". MVP-versie: alleen voortgang bijwerken
+ * monitor + acties van Fin)". MVP-versie: alleen voortgang bijwerken
  * (current_value) + verwijderen. Volledige edit van naam/bedrag/datum
  * blijft op /will (legacy) totdat de detail-pane volledig is.
  *
@@ -274,20 +274,20 @@ export function DoelBewerkenSheet({
           </div>
         )}
 
-        {/* Will-suggesties — plan §6.3 "acties van Will" op doel-detail.
+        {/* Fin-suggesties — plan §6.3 "acties van Fin" op doel-detail.
             Statische tips per goal_type uit lib/goal-suggestions; geen
             DB-fetch nodig. Verschijnt alleen wanneer er suggesties zijn
             voor het type (savings/wealth/debt). */}
         {suggestions.length > 0 && (
           <section
             data-testid="will-suggesties"
-            aria-label="Will-suggesties"
+            aria-label="Fin-suggesties"
             className="mb-4 rounded-xl border border-horizon-100 bg-horizon-50/40 p-3"
           >
             <header className="flex items-center gap-1.5 mb-2">
               <Sparkles className="w-3.5 h-3.5 text-horizon-700" aria-hidden="true" />
               <span className="text-[10px] uppercase tracking-[0.08em] font-semibold text-horizon-700">
-                Will-suggesties
+                Fin-suggesties
               </span>
             </header>
             <ul className="space-y-2">

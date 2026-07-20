@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { loadDashboardData } from '@/lib/dashboard-data-loader'
-import { loadWillData } from '@/lib/will-data-loader'
+import { loadFinData } from '@/lib/fin-data-loader'
 import type { HorizonPageData } from '@/lib/horizon-data-loader'
 import type { Perspective } from '@/lib/household-data'
 import {
@@ -70,7 +70,7 @@ export async function OverzichtSecondaryLoader({
 }) {
   const [
     dashboardResult,
-    willData,
+    finData,
     aandachtspunten,
     marketEntry,
     checkinForBriefing,
@@ -78,7 +78,7 @@ export async function OverzichtSecondaryLoader({
     pageStatusMinimized,
   ] = await Promise.all([
     loadDashboardData(supabase),
-    loadWillData(supabase),
+    loadFinData(supabase),
     // Aandachtspunten-bus voedt de briefing (zwaarste punt als briefje).
     collectAandachtspunten(supabase).catch(() => [] as Aandachtspunt[]),
     // Markt-briefje + laatste check-in-reflectie (read-only; hangen van user-id af).
@@ -116,7 +116,7 @@ export async function OverzichtSecondaryLoader({
     : dashboardData
   const composedBriefing = composeOverviewBriefing(
     briefingDashboardData,
-    willData,
+    finData,
     horizonData,
     new Date(),
     marketEntry ?? undefined,
@@ -220,8 +220,8 @@ export async function OverzichtSecondaryLoader({
       />
       <OverzichtSecondary
         health={health}
-        goals={willData.goals}
-        goalProgresses={willData.goalProgresses}
+        goals={finData.goals}
+        goalProgresses={finData.goalProgresses}
         freedomPct={freedomPct}
         currentAge={currentAge}
         endAge={endAge}

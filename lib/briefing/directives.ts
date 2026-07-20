@@ -1,5 +1,5 @@
 // ── Briefing Directives ─────────────────────────────────────
-// Admin-configurable editorial directives for Will's briefing.
+// Admin-configurable editorial directives for Fin's briefing.
 // Temporal directives: app_settings key 'briefing_directives'
 // Functional directives: app_settings key 'briefing_functional_directives'
 
@@ -44,7 +44,7 @@ export function getActiveDirectives(
     .sort((a, b) => (PRIORITY_ORDER[a.priority] ?? 1) - (PRIORITY_ORDER[b.priority] ?? 1))
 }
 
-/** Format active directives as a prompt block for Will's system prompt. */
+/** Format active directives as a prompt block for Fin's system prompt. */
 export function formatDirectivesForPrompt(directives: BriefingDirective[]): string {
   if (directives.length === 0) return ''
 
@@ -64,14 +64,14 @@ export function formatDirectivesForPrompt(directives: BriefingDirective[]): stri
 
 // ── Functional Directives ────────────────────────────────────
 // Data-driven editorial guidance: triggered by financial conditions.
-// Will evaluates conditions against the user's data contextually.
+// Fin evaluates conditions against the user's data contextually.
 
 export interface FunctionalDirective {
   id: string
   title: string
   metric: string            // key from DIRECTIVE_METRICS
   condition: string         // key from metric's conditions
-  instruction: string       // editorial guidance for Will
+  instruction: string       // editorial guidance for Fin
   priority: 'low' | 'normal' | 'high'
   enabled: boolean
 }

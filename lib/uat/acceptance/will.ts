@@ -1,5 +1,5 @@
 /**
- * Acceptatiecriteria — domein Will (AI-coach), berichten & krant (WF-WILL-01..20 /
+ * Acceptatiecriteria — domein Fin (AI-coach), berichten & krant (WF-WILL-01..20 /
  * UAT-WILL-01..20).
  *
  * Spiegelt exact de aanpak van `budget.ts`/`start.ts`/`schuld.ts`/`toek.ts`. Bron:
@@ -14,7 +14,7 @@
  *
  * KERN-BEVINDING (bepaalt exact vs. ui-only — zie ook de zone-specifieke notitie
  * op de Notion-kaart): dit domein combineert twee toetsbaarheidsprofielen.
- * (1) Will-chat en de krant zijn AI-gegenereerd → NIET deterministisch toetsbaar
+ * (1) Fin-chat en de krant zijn AI-gegenereerd → NIET deterministisch toetsbaar
  * op de letterlijke tekst; deze workflows zijn 'ui-only' en toetsen in de live-run
  * het PROCES (komt er tijdig een antwoord, gaat het over de vraag, geen datalek,
  * streaming start, gesprek blijft bewaard) — nooit een hard cijfer.
@@ -35,7 +35,7 @@
  * client-parameter, dus niet importeerbaar in een pure module — spiegelt de
  * spaardoel-mirror in `budget-checks.ts` en de netto-vermogen-mirror in
  * `start-checks.ts`): de postpone-termijn (chat-panel.tsx/tips-lijst.tsx,
- * beide `POSTPONE_DAYS = 14`), de bel-badge-cap "9+" (will-home.tsx), de
+ * beide `POSTPONE_DAYS = 14`), de bel-badge-cap "9+" (fin-home.tsx), de
  * budgetmelding-titel/omschrijving (`app/api/notifications/route.ts#pushBudgetNotification`),
  * het krant-editienummer/jaargang + ververs-resterend (`app/api/news/route.ts`),
  * en de "minder hierover"-demotiedrempel (`app/api/news/route.ts#getDemotedCategories`).
@@ -47,10 +47,10 @@ const criteria: AcceptanceCriterion[] = [
   {
     workflow: 'WF-WILL-01',
     scenarioId: 'UAT-WILL-01',
-    titel: 'Vrije vraag stellen aan Will',
+    titel: 'Vrije vraag stellen aan Fin',
     kriticiteit: 'BELANGRIJK',
     given: 'Een ingelogde gebruiker (willekeurige persona) opent een app-pagina; chat nog nooit geopend op dit apparaat.',
-    when: 'De gebruiker klikt de Will-bubbel, accepteert de Wft-disclaimer en stelt een vrije vraag.',
+    when: 'De gebruiker klikt de Fin-bubbel, accepteert de Wft-disclaimer en stelt een vrije vraag.',
     then: 'Het antwoord stroomt zichtbaar binnen, gaat inhoudelijk over de gestelde vraag en bevat geen ruw datalek (bv. volledige IBAN); de Wft-voetnoot blijft permanent zichtbaar; de disclaimer verschijnt na acceptatie nooit meer op dit apparaat. AI-tekst zelf is niet deterministisch toetsbaar — alleen het PROCES en de randvoorwaarden.',
     assertion: {
       kind: 'ui-only',
@@ -60,9 +60,9 @@ const criteria: AcceptanceCriterion[] = [
   {
     workflow: 'WF-WILL-02',
     scenarioId: 'UAT-WILL-02',
-    titel: 'Een tip van Will beslissen: accepteren, uitstellen, afwijzen',
+    titel: 'Een tip van Fin beslissen: accepteren, uitstellen, afwijzen',
     kriticiteit: 'KERN',
-    given: 'Een "Tip van Will"-kaart in de chat; "nu" = 5 juli 2026.',
+    given: 'Een "Tip van Fin"-kaart in de chat; "nu" = 5 juli 2026.',
     when: 'De gebruiker kiest "Uitstel".',
     then: '`postponed_until` = nu + 14 dagen = 19 juli 2026 (POSTPONE_DAYS = 14, identiek in chat-panel.tsx en tips-lijst.tsx); de tip mag pas vanaf die datum via de badge terugkomen (WF-WILL-06). De tip-inhoud zelf ("+X dagen vrijheid/jaar") is AI-tool-output en niet hand-narekenbaar.',
     assertion: {
@@ -117,25 +117,25 @@ const criteria: AcceptanceCriterion[] = [
     titel: 'Uitgestelde tips heropakken via de badge',
     kriticiteit: 'BELANGRIJK',
     given: 'Badge-aantal = 0 (geen uitgestelde tips klaar) resp. 12 (meer dan 9 klaar).',
-    when: 'De gebruiker bekijkt de badge op de Will-bubbel.',
+    when: 'De gebruiker bekijkt de badge op de Fin-bubbel.',
     then: 'Bij 0: geen badge, klik opent de lege chat (geen automatische vraag). Bij 12: de badge toont "9+" in plaats van het exacte aantal.',
     assertion: {
       kind: 'exact',
       expected: 'badge0=; badge12=9+',
-      source: 'components/app/will/will-home.tsx (badge-cap-formule, gemirrord) — zie will-checks.ts',
+      source: 'components/app/fin/fin-home.tsx (badge-cap-formule, gemirrord) — zie will-checks.ts',
     },
   },
   {
     workflow: 'WF-WILL-07',
     scenarioId: 'UAT-WILL-07',
-    titel: '"Bespreek met Will" vanaf een onderwerp elders in de app',
+    titel: '"Bespreek met Fin" vanaf een onderwerp elders in de app',
     kriticiteit: 'BELANGRIJK',
-    given: 'Persona met alle in-depth apps actief; een "Bespreek met Will"-knop bij een fase-analyse of vaste-lasten-analyse.',
+    given: 'Persona met alle in-depth apps actief; een "Bespreek met Fin"-knop bij een fase-analyse of vaste-lasten-analyse.',
     when: 'De gebruiker klikt de knop (en klikt snel nogmaals).',
     then: 'De chat opent met het kick-off-bericht (onderwerp + toelichting) al verstuurd; een tweede snelle klik verstuurt niet nogmaals hetzelfde bericht (one-shot-guard).',
     assertion: {
       kind: 'ui-only',
-      source: 'components/app/chat/bespreek-met-will-button.tsx + openWithMessage (chat-provider.tsx) — procestoets, geen cijfermatige uitkomst',
+      source: 'components/app/chat/bespreek-met-fin-button.tsx + openWithMessage (chat-provider.tsx) — procestoets, geen cijfermatige uitkomst',
     },
   },
   {
@@ -195,11 +195,11 @@ const criteria: AcceptanceCriterion[] = [
   {
     workflow: 'WF-WILL-12',
     scenarioId: 'UAT-WILL-12',
-    titel: 'Een melding opvolgen: doorklikken of Will vragen',
+    titel: 'Een melding opvolgen: doorklikken of Fin vragen',
     kriticiteit: 'BELANGRIJK',
     given: 'Een ongelezen budgetmelding in de bel/berichtencentrum.',
-    when: 'De gebruiker klikt op de melding zelf, of op de knop "Vraag Will".',
-    then: 'Klik op de melding: gelezen gemarkeerd + navigatie naar de bestemmings-URL (indien aanwezig). Klik "Vraag Will": gelezen gemarkeerd, paneel sluit, chat opent met een voorgeformuleerde vraag die het percentage/bedrag noemt. Legacy-actionUrl-doelen (/core/budgets, /core/cash, /horizon) moeten per doorklik op werkend/redirect/dood gecontroleerd worden (genoteerd risico).',
+    when: 'De gebruiker klikt op de melding zelf, of op de knop "Vraag Fin".',
+    then: 'Klik op de melding: gelezen gemarkeerd + navigatie naar de bestemmings-URL (indien aanwezig). Klik "Vraag Fin": gelezen gemarkeerd, paneel sluit, chat opent met een voorgeformuleerde vraag die het percentage/bedrag noemt. Legacy-actionUrl-doelen (/core/budgets, /core/cash, /horizon) moeten per doorklik op werkend/redirect/dood gecontroleerd worden (genoteerd risico).',
     assertion: {
       kind: 'ui-only',
       source: 'components/app/notifications/notification-item.tsx (handleClick/handleAskAI) — navigatie/chat-start, geen cijfermatige uitkomst',
@@ -278,10 +278,10 @@ const criteria: AcceptanceCriterion[] = [
   {
     workflow: 'WF-WILL-18',
     scenarioId: 'UAT-WILL-18',
-    titel: 'Een nieuwsartikel met Will bespreken',
+    titel: 'Een nieuwsartikel met Fin bespreken',
     kriticiteit: 'BELANGRIJK',
     given: 'Een artikel op de huidige editie van /nieuws (niet het archief).',
-    when: 'De gebruiker klikt "Bespreek met Will".',
+    when: 'De gebruiker klikt "Bespreek met Fin".',
     then: 'De chat opent met een al-verstuurd bericht (kop + samenvatting + nieuws-zoeklink); het artikel wordt als gelezen gemarkeerd; op het archief (read-only) is de knop niet aanwezig.',
     assertion: {
       kind: 'ui-only',

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createSuggestRecommendationTool } from './suggest-recommendation'
 
 /**
- * Unit-tests voor suggestRecommendation — Will's chat-tool die ÉÉN voorstel
+ * Unit-tests voor suggestRecommendation — Fin's chat-tool die ÉÉN voorstel
  * persistent opslaat in de recommendations-tabel (status='pending') zodat
  * de chat-card vervolgens accepteren/uitstellen/afwijzen-knoppen kan
  * weergeven met een echt recommendation-id om naar te PATCHen.

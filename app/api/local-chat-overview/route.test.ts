@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 /**
  * Tests voor GET /api/local-chat-overview — de hydratieroute die de client-
- * `LocalChatPanel` (on-device Will-chat) voedt met het financiële overzicht.
+ * `LocalChatPanel` (on-device Fin-chat) voedt met het financiële overzicht.
  *
  * Borgt de gate-drieluik (spiegel van /mijn/lokale-chat/page.tsx):
  *  - 401 zonder sessie (geen profielquery, geen overview-build).

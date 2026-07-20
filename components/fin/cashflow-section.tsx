@@ -63,7 +63,7 @@ function MiniSparkline({
 interface CashflowSectionProps {
   data: DashboardData
   /**
-   * Legacy WillLanding-props. De samenvatting rendert alleen op basis van
+   * Legacy FinLanding-props. De samenvatting rendert alleen op basis van
    * `data`; deze blijven optioneel zodat bestaande callers blijven
    * compileren zonder ze door te geven.
    */

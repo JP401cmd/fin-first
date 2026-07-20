@@ -49,7 +49,7 @@ const JOB_CATALOG = [
     label: 'Briefing-e-mail',
     schedule: 'Maandag 07:00',
     path: '/api/briefing/email/cron',
-    description: 'Wekelijkse briefing-e-mail (opt-in) van de bevroren weeksnapshot — vrijheidstijd-first, euro-vrij, met brug terug naar Will.',
+    description: 'Wekelijkse briefing-e-mail (opt-in) van de bevroren weeksnapshot — vrijheidstijd-first, euro-vrij, met brug terug naar Fin.',
   },
   {
     key: 'web-vitals-retention',

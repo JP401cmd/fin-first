@@ -15,7 +15,7 @@
  *      we een fallback met "typ liever zelf"-link conform plan: parallelle
  *      ontwikkeling, fault-tolerant.
  *   5. Tax-year-picker default = vorig jaar (aangiftes lopen 1 jaar achter).
- *   6. Loading-state met `WillDots`-pulse en kopij "Bedragen worden gelezen".
+ *   6. Loading-state met `FinDots`-pulse en kopij "Bedragen worden gelezen".
  *
  * Verbod:
  *   - Geen logging van raw tekst of bedragen — alleen schema-fouten.
@@ -33,7 +33,7 @@
 
 import { useCallback, useRef, useState } from 'react'
 import { Upload, FileText, AlertCircle, X } from 'lucide-react'
-import { WillDots } from '@/components/app/will-dots'
+import { FinDots } from '@/components/app/fin-dots'
 import { stripSensitiveData } from '@/lib/aangifte/strip-bsn'
 import type { AangifteExtractionResult } from '@/lib/aangifte/types'
 
@@ -315,8 +315,8 @@ export function UploadStep({
       {/* Loading state */}
       {parsing && (
         <div className="flex flex-col items-center gap-4 border border-[var(--border-ed)] bg-[var(--paper)] px-6 py-12 min-h-[200px]">
-          {/* WillDots heeft een eigen state-gestuurde puls; geen extra wrapper-animate-pulse. */}
-          <WillDots size={48} state="loading" />
+          {/* FinDots heeft een eigen state-gestuurde puls; geen extra wrapper-animate-pulse. */}
+          <FinDots size={48} state="loading" />
           <div className="text-center space-y-1">
             <p className="font-serif italic text-base text-[var(--ink-2)]">
               Bedragen worden gelezen...

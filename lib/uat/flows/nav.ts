@@ -67,7 +67,7 @@ export const NAV_FLOW: UatFlow = {
 
     // ── 6 · perspectief, chat & sheets ────────────────────────────────────
     { id: 'perspectief', scenarioId: 'UAT-NAV-19', label: 'WF-NAV-19 · Perspectief wisselen', kind: 'action', stage: 6, lane: 'perspectief' },
-    { id: 'willchat', scenarioId: 'UAT-NAV-20', label: 'WF-NAV-20 · Will-chat openen', kind: 'action', stage: 6, lane: 'perspectief' },
+    { id: 'willchat', scenarioId: 'UAT-NAV-20', label: 'WF-NAV-20 · Fin-chat openen', kind: 'action', stage: 6, lane: 'perspectief' },
     { id: 'bottomsheet', scenarioId: 'UAT-NAV-21', label: 'WF-NAV-21 · BottomSheet-bediening', kind: 'action', stage: 6, lane: 'perspectief' },
 
     // ── 7 · randvoorwaarden ───────────────────────────────────────────────
@@ -82,7 +82,7 @@ export const NAV_FLOW: UatFlow = {
 
     // ── 9 · cross-doorwerking (OUTPUT) ────────────────────────────────────
     { id: 'x-ovz', label: 'Overzicht · netto vermogen volgt perspectief/weergave', kind: 'cross', stage: 9, crossZone: 'OVZ' },
-    { id: 'x-will', label: 'Will · chatpaneel + prompt-deeplinks', kind: 'cross', stage: 9, crossZone: 'WILL' },
+    { id: 'x-will', label: 'Fin · chatpaneel + prompt-deeplinks', kind: 'cross', stage: 9, crossZone: 'WILL' },
     { id: 'x-mijn', label: 'Mijn · huishoud-uitnodiging (testhuishouden voor perspectief)', kind: 'cross', stage: 9, crossZone: 'MIJN' },
   ],
   edges: [

@@ -127,7 +127,7 @@ export function AiCreditsSection() {
           Je AI-verbruik
         </h2>
         <p className="mt-2 text-sm text-[var(--ink-2)] leading-relaxed">
-          Elke AI-actie — Will-chat, briefing, rapporten, extractie — kost credits. Je budget
+          Elke AI-actie — Fin-chat, briefing, rapporten, extractie — kost credits. Je budget
           vernieuwt elke maand.
         </p>
       </header>

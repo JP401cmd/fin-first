@@ -258,7 +258,7 @@ const criteria: AcceptanceCriterion[] = [
   {
     workflow: 'WF-OVZ-19',
     scenarioId: 'UAT-OVZ-19',
-    titel: 'Tips van Will beoordelen: Doe nu / Later / Negeren',
+    titel: 'Tips van Fin beoordelen: Doe nu / Later / Negeren',
     kriticiteit: 'KERN',
     given: 'Twee seed-aanbevelingen: (1) "Verlaag je uitgavenratio naar 80%" — prioriteit 5, +45 dagen/jr, €340/mnd; (2) "Overweeg zakelijke uitgaven via werkgever" — prioriteit 3, +10 dagen/jr, €75/mnd. "Nu" = 5 juli 2026.',
     when: 'De tips worden gesorteerd op `priority_score` en de gebruiker kiest "Later" op tip 2.',

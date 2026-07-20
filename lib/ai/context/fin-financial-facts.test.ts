@@ -11,7 +11,7 @@ vi.mock('@/lib/core-data-loader', () => ({
   loadCoreData: () => loadCoreDataMock(),
 }))
 
-import { buildWillFinancialFacts, type WillFactsProfile } from './will-financial-facts'
+import { buildWillFinancialFacts, type FinFactsProfile } from './fin-financial-facts'
 import { buildSharedContext } from './shared-context'
 import { buildLocalChatOverview } from '@/lib/ai/local/local-chat-context'
 
@@ -58,7 +58,7 @@ function makeSupabase(profile: Record<string, unknown> | null) {
   } as never
 }
 
-const INCLUDE_FULL: WillFactsProfile = { housing_strategy_config: { mode: 'include_full' } }
+const INCLUDE_FULL: FinFactsProfile = { housing_strategy_config: { mode: 'include_full' } }
 
 /** Parse "Vrijheids-%: 80%" uit de cloud-context. */
 function cloudFreedomPct(ctx: string): number {
@@ -165,14 +165,14 @@ describe('buildWillFinancialFacts — pure extractor', () => {
   })
 })
 
-// ── C2b cijferpariteit: cloud == lokaal == WillFacts ───────────
+// ── C2b cijferpariteit: cloud == lokaal == FinFacts ───────────
 
-describe('C2b cijferpariteit — cloud-render == lokale-render == WillFacts', () => {
+describe('C2b cijferpariteit — cloud-render == lokale-render == FinFacts', () => {
   beforeEach(() => {
     loadCoreDataMock.mockReset()
   })
 
-  it('normaal geval: beide Wills tonen hetzelfde vrijheids-% en FIRE-doel als de extractor', async () => {
+  it('normaal geval: beide Fins tonen hetzelfde vrijheids-% en FIRE-doel als de extractor', async () => {
     const coreData = makeCoreData()
     loadCoreDataMock.mockResolvedValue(coreData)
     const facts = buildWillFinancialFacts(coreData, INCLUDE_FULL)
@@ -183,7 +183,7 @@ describe('C2b cijferpariteit — cloud-render == lokale-render == WillFacts', ()
     const factsPct = Math.round(facts.vrijheidsPct * 10) / 10
     const factsGoal = Math.round(facts.fireDoel)
 
-    // Vrijheids-%: cloud-render == lokale-render == WillFacts.
+    // Vrijheids-%: cloud-render == lokale-render == FinFacts.
     expect(cloudFreedomPct(cloud)).toBe(factsPct)
     expect(local.vrijheidsPct).toBe(factsPct)
     expect(cloudFreedomPct(cloud)).toBe(local.vrijheidsPct)
@@ -193,7 +193,7 @@ describe('C2b cijferpariteit — cloud-render == lokale-render == WillFacts', ()
     expect(local.fireDoel).toBe(factsGoal)
     expect(cloudFireGoal(cloud)).toBe(local.fireDoel)
 
-    // Overige gedeelde cijfers: lokaal leest exact WillFacts.
+    // Overige gedeelde cijfers: lokaal leest exact FinFacts.
     expect(local.nettoVermogen).toBe(facts.nettoVermogen)
     expect(local.spaarquotePct).toBe(facts.spaarquotePct)
     expect(local.swrPct).toBe(Math.round(facts.swr * 1000) / 10)
@@ -204,7 +204,7 @@ describe('C2b cijferpariteit — cloud-render == lokale-render == WillFacts', ()
 
   it('randgeval fireTargetFromHorizon===null: lokaal gecorrigeerd van 0 → echt, gelijk aan cloud', async () => {
     // healthScoreInput.freedomPct = 0 spiegelt wat de loader (zonder-terugval) hier
-    // zou opleveren; het lokale pad LAS dat vroeger → 0%. Nu leest het WillFacts.
+    // zou opleveren; het lokale pad LAS dat vroeger → 0%. Nu leest het FinFacts.
     const coreData = makeCoreData({
       fireTargetFromHorizon: null,
       healthScoreInput: { emergencyFundMonths: 3, freedomPct: 0 } as CorePageData['healthScoreInput'],
@@ -222,7 +222,7 @@ describe('C2b cijferpariteit — cloud-render == lokale-render == WillFacts', ()
     expect(local.vrijheidsPct).toBe(factsPct)
     expect(local.vrijheidsPct).not.toBe(coreData.healthScoreInput.freedomPct) // was 0
 
-    // Cloud == lokaal == WillFacts, ook in het randgeval (beide met-terugval).
+    // Cloud == lokaal == FinFacts, ook in het randgeval (beide met-terugval).
     expect(cloudFreedomPct(cloud)).toBe(factsPct)
     expect(cloudFreedomPct(cloud)).toBe(local.vrijheidsPct)
 

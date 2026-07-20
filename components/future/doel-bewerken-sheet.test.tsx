@@ -109,11 +109,11 @@ describe('DoelBewerkenSheet — bijdrage-monitor', () => {
     expect(monitor.textContent).toMatch(/Nog geen wijziging/)
   })
 
-  it('toont Will-suggesties-blok voor savings-doel', () => {
+  it('toont Fin-suggesties-blok voor savings-doel', () => {
     renderSheet(() => {}, { goalType: 'savings' })
     const block = screen.getByTestId('will-suggesties')
     expect(block).toBeTruthy()
-    expect(block.textContent).toMatch(/Will-suggesties/i)
+    expect(block.textContent).toMatch(/Fin-suggesties/i)
   })
 
   it('toont 2 suggestie-items per default', () => {
@@ -126,7 +126,7 @@ describe('DoelBewerkenSheet — bijdrage-monitor', () => {
     expect(items.length).toBe(2)
   })
 
-  it('verbergt Will-suggesties-blok bij goal_type zonder suggesties', () => {
+  it('verbergt Fin-suggesties-blok bij goal_type zonder suggesties', () => {
     // 'custom' heeft geen suggestion-set in lib/goal-suggestions.ts.
     renderSheet(() => {}, { goalType: 'custom' as GoalType })
     expect(screen.queryByTestId('will-suggesties')).toBeNull()

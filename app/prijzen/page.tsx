@@ -47,7 +47,7 @@ export default function PrijzenPage() {
             doelen stellen, rekenen met de bibliotheek.
           </p>
           <p className="mt-3 font-serif text-base leading-relaxed text-[var(--ink-2)]">
-            Pro voegt de diepte toe: rekenhulpen op maat door Will, fiscale
+            Pro voegt de diepte toe: rekenhulpen op maat door Fin, fiscale
             specialist-tools en het gezamenlijke huishouden-perspectief — voor
             €9 per maand, maandelijks opzegbaar.
           </p>

@@ -71,7 +71,7 @@ export function buildHldModel(): HldModel {
     journey: [
       { n: 1, title: 'Beginnen', you: 'Je vertelt waar je naartoe wilt.', app: 'We zetten alleen de onderdelen aan die jij nodig hebt.' },
       { n: 2, title: 'Vastleggen', you: 'Je koppelt je bank of importeert je gegevens.', app: 'Inkomsten, uitgaven en bezittingen staan overzichtelijk bij elkaar.' },
-      { n: 3, title: 'Begrijpen', you: 'Je ziet in één oogopslag hoe je ervoor staat.', app: 'Will, je coach, legt uit wat opvalt en wat je nú kunt doen.' },
+      { n: 3, title: 'Begrijpen', you: 'Je ziet in één oogopslag hoe je ervoor staat.', app: 'Fin, je coach, legt uit wat opvalt en wat je nú kunt doen.' },
       { n: 4, title: 'Vooruitkijken', you: 'Je rekent je toekomst door.', app: 'Je ziet wanneer je financieel vrij bent — en wat keuzes daaraan veranderen.' },
       { n: 5, title: 'Samen groeien', you: 'Je deelt met je partner en bouwt verder.', app: 'Eén beeld voor het hele huishouden; je groeit van herstel naar meesterschap.' },
     ],
@@ -92,7 +92,7 @@ export function buildHldModel(): HldModel {
           { title: 'Je broker koppelen of je portefeuille importeren', desc: 'Trading 212 koppelen of een bestand inladen — je aandelen en fondsen kloppen automatisch, net als bij je crypto.' },
           { title: 'Zien wat je beleggingen je hebben opgeleverd', desc: 'Per belegging je totale opbrengst — koerswinst, dividend én verkochte (gesloten) posities samen — afgeleid uit je eigen transacties.' },
           { title: 'Jezelf spiegelen aan Nederland en de wereld', desc: 'Zie hoe je gezondheid, spaarquote, vermogen en vrijheidsleeftijd zich verhouden tot een vergelijkbare doelgroep — en waar je staat wereldwijd.' },
-          { title: 'Meteen begrijpen waaróm iets je aandacht vraagt en wat je kunt doen', desc: 'Als een overzichtspagina oranje of rood kleurt, legt een banner in gewone taal uit wat er speelt en wat je concreet kunt aanpakken — met een directe link naar de juiste plek of een gesprek met Will.' },
+          { title: 'Meteen begrijpen waaróm iets je aandacht vraagt en wat je kunt doen', desc: 'Als een overzichtspagina oranje of rood kleurt, legt een banner in gewone taal uit wat er speelt en wat je concreet kunt aanpakken — met een directe link naar de juiste plek of een gesprek met Fin.' },
           { title: 'Transacties lokaal laten categoriseren, zonder dat je gegevens je toestel verlaten', desc: 'Experimenteel en alleen op desktop: zet je AI-categorisatie lokaal aan en je transactiegegevens gaan niet naar een cloud-AI-provider — elk voorstel controleer je zelf voor je het overneemt.' },
         ],
       },
@@ -129,11 +129,11 @@ export function buildHldModel(): HldModel {
         goal: 'Ik wil begeleiding, geen spreadsheet',
         accent: 'wil',
         items: [
-          { title: 'Een coach die je cijfers uitlegt', desc: 'Will vertaalt data naar wat het voor jóu betekent.' },
+          { title: 'Een coach die je cijfers uitlegt', desc: 'Fin vertaalt data naar wat het voor jóu betekent.' },
           { title: 'Een korte wekelijkse update', desc: 'De briefing: wat veranderde, waar je op kunt letten — desgewenst ook wekelijks in je mailbox (zelf aan te zetten).' },
           { title: 'Tips op het juiste moment', desc: 'Aandachtspunten die je met één tik tot actie maakt.' },
-          { title: 'Je vragen beantwoorden', desc: 'Vraag Will alles over je eigen situatie.' },
-          { title: 'Je dagelijkse gesprek met Will, ook privé', desc: 'Zet je privacy-modus aan, dan beantwoordt Will je vragen met een AI die lokaal op je toestel draait — dezelfde chat, maar je vraag en je cijfers verlaten het toestel niet. Experimenteel en alleen op desktop.' },
+          { title: 'Je vragen beantwoorden', desc: 'Vraag Fin alles over je eigen situatie.' },
+          { title: 'Je dagelijkse gesprek met Fin, ook privé', desc: 'Zet je privacy-modus aan, dan beantwoordt Fin je vragen met een AI die lokaal op je toestel draait — dezelfde chat, maar je vraag en je cijfers verlaten het toestel niet. Experimenteel en alleen op desktop.' },
         ],
       },
       {
@@ -149,7 +149,7 @@ export function buildHldModel(): HldModel {
     ],
 
     companion: {
-      name: 'Will',
+      name: 'Fin',
       role: 'Je financiële metgezel — door de hele reis heen',
       touches: ['legt je cijfers uit', 'maakt een wekelijkse briefing', 'let op aandachtspunten', 'beantwoordt je vragen'],
     },

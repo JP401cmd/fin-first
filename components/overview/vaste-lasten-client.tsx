@@ -7,13 +7,13 @@
  *
  *   Eenvoudig → hoofdcijfer €/mnd + vrijheidstijd-onderschrift + compacte
  *               aandeel-stoplichtmeter + de bestaande lijst (VasteKostenAnalyse)
- *               + één "Bespreek met Will"-knop.
+ *               + één "Bespreek met Fin"-knop.
  *   Volledig  → daarbovenop de uitgebreide inzicht-blokken (VasteLastenInsights)
  *               onder <HideInSimple>.
  *
  * Data komt server-side binnen als props (geen client-fetch/spinner meer);
- * refresh = router.refresh(). Module-chrome = kern (amber); Will-teal alleen op
- * de Will-knop. Bedragen via <MaskedAmount>. De opzeg-flow (OpzegModal) wordt
+ * refresh = router.refresh(). Module-chrome = kern (amber); Fin-teal alleen op
+ * de Fin-knop. Bedragen via <MaskedAmount>. De opzeg-flow (OpzegModal) wordt
  * hier gehost zodat zowel de rij-opzegknoppen als de sluipverbruik-CTA werken.
  */
 
@@ -22,12 +22,12 @@ import { useRouter } from 'next/navigation'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { PageOpening, PageOpeningFigure } from '@/components/editorial'
 import { HideInSimple } from '@/components/app/hide-in-simple'
-import { BesprekMetWillButton } from '@/components/app/chat/bespreek-met-will-button'
+import { BesprekMetWillButton } from '@/components/app/chat/bespreek-met-fin-button'
 import { OpzegModal } from '@/components/app/opzeg-modal'
 import {
   VasteKostenAnalyse,
   type RecurringItem,
-} from '@/components/will/vaste-kosten-analyse'
+} from '@/components/fin/vaste-kosten-analyse'
 import { VasteLastenInsights } from '@/components/overview/vaste-lasten-insights'
 import { formatFreedomTimeString, formatCurrency } from '@/lib/format'
 import {
@@ -102,8 +102,8 @@ export function VasteLastenClient({
     [fullName],
   )
 
-  // Detail-context voor Will: totaal, aandeel, grootste posten.
-  const willDetail = insights.hasData
+  // Detail-context voor Fin: totaal, aandeel, grootste posten.
+  const finDetail = insights.hasData
     ? `Mijn vaste lasten zijn ${formatCurrency(insights.totalMonthly)} per maand` +
       (insights.ratioPct != null ? ` (${insights.ratioPct}% van mijn inkomen)` : '') +
       `. Abonnementen ${formatCurrency(insights.subscriptionsMonthly)}/mnd, overige vaste kosten ${formatCurrency(insights.vasteKostenMonthly)}/mnd.` +
@@ -114,14 +114,14 @@ export function VasteLastenClient({
     <div className="space-y-6">
       {/* ── Kop: editorial aanhef (canonieke PageOpening-primitive) —
              kicker met hairline, groot mono-hoofdcijfer, vrijheidstijd-
-             onderschrift, aandeel-stoplichtmeter + Will. Geen gradient-kaart. ── */}
+             onderschrift, aandeel-stoplichtmeter + Fin. Geen gradient-kaart. ── */}
       <PageOpening
         kicker="Vaste lasten"
         titleBefore="Hoeveel "
         emphasis="vrijheid"
         titleAfter=" ligt er maandelijks vast?"
       >
-        {/* Hoofdcijfer-blok — hairline-scheiding, groot mono-cijfer, Will rechts */}
+        {/* Hoofdcijfer-blok — hairline-scheiding, groot mono-cijfer, Fin rechts */}
         <div className="flex flex-wrap items-start justify-between gap-4 border-t border-[var(--border-ed)] pt-4">
           <PageOpeningFigure
             kicker="Totaal per maand"
@@ -155,7 +155,7 @@ export function VasteLastenClient({
           />
           <BesprekMetWillButton
             onderwerp="Mijn vaste lasten"
-            detail={willDetail}
+            detail={finDetail}
             vraag="Waar kan ik het meeste vrijheid terugwinnen op mijn vaste lasten?"
           />
         </div>

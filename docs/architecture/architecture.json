@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-20T15:22:39.409Z",
+  "generatedAt": "2026-07-20T21:02:54.590Z",
   "generatedDate": "2026-07-20",
   "repo": {
     "name": "fin",
@@ -62,7 +62,7 @@
         "id": "briefing-engine",
         "title": "Briefing-engine + redactie",
         "file": "lib/briefing/engine.ts",
-        "summary": "Deterministische generatoren zetten de financiële cijfers om in wekelijkse briefjes; Will redigeert alleen de teksten (lib/briefing/redactie.ts, nummer-guard — ADR 0007).",
+        "summary": "Deterministische generatoren zetten de financiële cijfers om in wekelijkse briefjes; Fin redigeert alleen de teksten (lib/briefing/redactie.ts, nummer-guard — ADR 0007).",
         "extend": "Voeg een generator toe in buildFinanceEntries (drempel + test) en een rank in briefingRank; de redactie en de directives pakken het nieuwe briefje automatisch mee."
       }
     ],
@@ -192,7 +192,7 @@
     "api": 261,
     "tables": 85,
     "migrations": 152,
-    "integrations": 24,
+    "integrations": 25,
     "components": 868,
     "providers": 11,
     "contextBuilders": 9,
@@ -7913,7 +7913,7 @@
           "beheer-nav",
           "belasting-section",
           "benchmark-comparison-chart",
-          "bespreek-met-will-button",
+          "bespreek-met-fin-button",
           "bill-calendar",
           "bottom-nav-tabs",
           "bottom-sheet",
@@ -8021,6 +8021,9 @@
           "feature-access-provider",
           "feature-gate",
           "fee-erosion-chart",
+          "fin-dots",
+          "fin-home",
+          "fin-home.test",
           "fin-table",
           "floating-nav-button",
           "form-error",
@@ -8241,9 +8244,6 @@
           "whatif-sliders",
           "whatif-sliders.test",
           "whatif-suggestion-cards",
-          "will-dots",
-          "will-home",
-          "will-home.test",
           "withdrawal-modal",
           "zoomable-chart-container"
         ]
@@ -8658,6 +8658,7 @@
           "CtaSection",
           "DeKruising",
           "DownloadButton",
+          "FinZetten",
           "FotoVanNu",
           "Gezondheidsgetal",
           "LifeGrid",
@@ -8670,7 +8671,6 @@
           "SectionTrigger",
           "Toekomst",
           "TweeToekomsten",
-          "WillZetten",
           "check-wizard",
           "check-wizard-section",
           "step-bezittingen",
@@ -8849,7 +8849,7 @@
         ]
       },
       {
-        "group": "will",
+        "group": "fin",
         "count": 2,
         "items": [
           "cashflow-section",
@@ -8897,6 +8897,10 @@
     },
     {
       "name": "OpenAI",
+      "category": "AI"
+    },
+    {
+      "name": "OpenRouter",
       "category": "AI"
     },
     {
@@ -15668,8 +15672,16 @@
   "diff": {
     "baseline": false,
     "previousDate": "2026-07-20",
-    "hasChanges": false,
-    "sections": []
+    "hasChanges": true,
+    "sections": [
+      {
+        "label": "Integraties",
+        "added": [
+          "OpenRouter"
+        ],
+        "removed": []
+      }
+    ]
   },
   "statsHistory": [
     {

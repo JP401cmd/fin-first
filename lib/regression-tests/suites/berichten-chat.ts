@@ -47,15 +47,15 @@ const tests: TestCase[] = [
     fn() {
       // Verify ChatPanel component contract: config has placeholder and greeting
       const config = {
-        name: 'Will',
+        name: 'Fin',
         subtitle: 'Financieel assistent',
-        placeholder: 'Vraag Will iets...',
-        greeting: 'Hoi, ik ben Will',
+        placeholder: 'Vraag Fin iets...',
+        greeting: 'Hoi, ik ben Fin',
         greetingDescription: 'Ik help je met al je financiele vragen — van budgetten tot FIRE-projecties.',
       }
-      assertEqual(config.placeholder, 'Vraag Will iets...', 'placeholder text')
-      assertEqual(config.greeting, 'Hoi, ik ben Will', 'greeting text')
-      assertEqual(config.name, 'Will', 'assistant name')
+      assertEqual(config.placeholder, 'Vraag Fin iets...', 'placeholder text')
+      assertEqual(config.greeting, 'Hoi, ik ben Fin', 'greeting text')
+      assertEqual(config.name, 'Fin', 'assistant name')
       assertEqual(config.subtitle, 'Financieel assistent', 'subtitle')
       assert(config.greetingDescription.length > 0, 'greeting description non-empty')
     },
@@ -237,7 +237,7 @@ const tests: TestCase[] = [
     name: 'Pending message wordt exact één keer verstuurd',
     category: CAT,
     description:
-      'De auto-send van pendingMessage ("Vraag Will"/notificatie) gebruikt een ref-guard op de berichttekst, zodat React\'s dubbele effect-invocatie (Strict Mode / re-render vóór clear) niet twee identieke user-bubbles produceert.',
+      'De auto-send van pendingMessage ("Vraag Fin"/notificatie) gebruikt een ref-guard op de berichttekst, zodat React\'s dubbele effect-invocatie (Strict Mode / re-render vóór clear) niet twee identieke user-bubbles produceert.',
     priority: 'high',
     estimatedDurationMs: 10,
     fn() {

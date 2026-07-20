@@ -38,7 +38,7 @@ export const EMPTY_GUIDE_HELP: GuideHelpBlob = {}
  * Server-side getter: laad de hele help-content blob uit `app_settings`.
  * Returnt een leeg object wanneer er nog geen row bestaat.
  *
- * Gebruik vanuit server-components (will-landing data-load) en API-routes.
+ * Gebruik vanuit server-components (fin-landing data-load) en API-routes.
  */
 export async function getGuideHelp(
   supabase: SupabaseClient,

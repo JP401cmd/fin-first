@@ -20,7 +20,7 @@ import { checkTierGate } from '@/lib/require-tier'
  *
  * Handmatige dagelijkse ververs van de /overzicht-briefing. Mag maximaal
  * 1× per kalenderdag (Amsterdam). Recomposeert de briefjes deterministisch
- * uit verse data en laat Will ze daarna redigeren (kop-zin + teksten) in
+ * uit verse data en laat Fin ze daarna redigeren (kop-zin + teksten) in
  * één AI-call, gestuurd door de beheer-directives. Elke AI-fout of
  * afgekeurde tekst (nummer-guard) valt stil terug op de deterministische
  * variant — zie lib/briefing/redactie.ts.
@@ -38,7 +38,7 @@ export async function POST() {
     return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
   }
 
-  // AI-abonnementspoort: de ververs herschrijft de briefjes in Will's stem via
+  // AI-abonnementspoort: de ververs herschrijft de briefjes in Fin's stem via
   // een model-call (getModel(supabase, 'briefing')) — een betaalde AI-functie.
   // Afdwingen vóór het dure werk zodat een gebruiker zonder 'ai' de model-call
   // niet 1×/dag kan afvuren. De deterministische briefing op /overzicht blijft

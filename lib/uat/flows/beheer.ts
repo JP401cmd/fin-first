@@ -43,7 +43,7 @@ export const BEHEER_FLOW: UatFlow = {
     { id: 'integraties', scenarioId: 'UAT-BEHEER-32', label: 'WF-BEHEER-32 · Integraties: inventaris, liveness-probe, contractbewaking', kind: 'screen', stage: 3, lane: 'technisch', subOf: 'sectie-tech' },
 
     // ── 3 · Functioneel beheer ────────────────────────────────────────────
-    { id: 'coach', scenarioId: 'UAT-BEHEER-09', label: 'WF-BEHEER-09 · Coach-suggestieregels/timing/kopregel van Will', kind: 'screen', stage: 3, lane: 'functioneel', subOf: 'sectie-func' },
+    { id: 'coach', scenarioId: 'UAT-BEHEER-09', label: 'WF-BEHEER-09 · Coach-suggestieregels/timing/kopregel van Fin', kind: 'screen', stage: 3, lane: 'functioneel', subOf: 'sectie-func' },
     { id: 'welkomstgids', scenarioId: 'UAT-BEHEER-10', label: 'WF-BEHEER-10 · Welkomstgids samenstellen (live-preview)', kind: 'screen', stage: 3, lane: 'functioneel', subOf: 'sectie-func' },
     { id: 'briefing', scenarioId: 'UAT-BEHEER-11', label: 'WF-BEHEER-11 · Briefing-directieven beheren', kind: 'screen', stage: 3, lane: 'functioneel', subOf: 'sectie-func' },
     { id: 'doelgids', scenarioId: 'UAT-BEHEER-12', label: 'WF-BEHEER-12 · Doelgids-stappen per doel beheren', kind: 'screen', stage: 3, lane: 'functioneel', subOf: 'sectie-func' },

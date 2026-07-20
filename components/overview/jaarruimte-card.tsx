@@ -233,7 +233,7 @@ export function JaarruimteCard({
 
             {/* "Voeg toe als actie" — alleen wanneer er een concrete besparing is.
                 Stuurt de marginaal-besparing + vrijheidsdagen door naar het
-                acties-systeem (deterministisch, los van Will). */}
+                acties-systeem (deterministisch, los van Fin). */}
             {besparing != null && besparing > 0 && (
               <div className="mt-3">
                 <AandachtspuntActieButton

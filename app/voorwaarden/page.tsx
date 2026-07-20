@@ -98,7 +98,7 @@ export default function VoorwaardenPage() {
           geen vergunningsplichtig financieel advies in de zin van de Wet op
           het financieel toezicht (Wft). TriFinity heeft geen vergunning van
           de AFM of DNB en staat niet onder hun toezicht. Berekeningen,
-          prognoses en suggesties van Will zijn illustraties op basis van
+          prognoses en suggesties van Fin zijn illustraties op basis van
           aannames die jij invoert — geen aanbeveling om te kopen, verkopen,
           aflossen of beleggen. Voor persoonlijke beslissingen raadpleeg je
           een erkend adviseur. Zie ook onze{' '}

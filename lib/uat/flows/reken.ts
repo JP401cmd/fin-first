@@ -37,7 +37,7 @@ export const REKEN_FLOW: UatFlow = {
   nodes: [
     // ── 0 · instap ────────────────────────────────────────────────────────
     { id: 'lijst', scenarioId: 'UAT-REKEN-01', label: 'WF-REKEN-01 · Opgeslagen rekenhulp openen en doorrekenen', kind: 'entry', stage: 0 },
-    { id: 'nieuwmetwill', scenarioId: 'UAT-REKEN-02', label: 'WF-REKEN-02 · Nieuwe rekenhulp bouwen met Will (AI)', kind: 'action', stage: 0, lane: 'rekenhulpen', subOf: 'lijst' },
+    { id: 'nieuwmetwill', scenarioId: 'UAT-REKEN-02', label: 'WF-REKEN-02 · Nieuwe rekenhulp bouwen met Fin (AI)', kind: 'action', stage: 0, lane: 'rekenhulpen', subOf: 'lijst' },
     { id: 'naareve', scenarioId: 'UAT-REKEN-03', label: 'WF-REKEN-03 · Uitkomst omzetten in levensgebeurtenis', kind: 'action', stage: 0, lane: 'rekenhulpen', subOf: 'lijst' },
     { id: 'verwijderen', scenarioId: 'UAT-REKEN-06', label: 'WF-REKEN-06 · Rekenhulp verwijderen (geen bevestiging)', kind: 'action', stage: 0, lane: 'rekenhulpen', subOf: 'lijst' },
 
@@ -62,7 +62,7 @@ export const REKEN_FLOW: UatFlow = {
 
     // ── 4 · verkennen ─────────────────────────────────────────────────────
     { id: 'montecarlo', scenarioId: 'UAT-REKEN-18', label: 'WF-REKEN-18 · Onzekerheid (Monte Carlo) en grafiekweergaven', kind: 'action', stage: 4, lane: 'verkennen' },
-    { id: 'chat', scenarioId: 'UAT-REKEN-19', label: 'WF-REKEN-19 · Met Will over het scenario chatten', kind: 'action', stage: 4, lane: 'verkennen' },
+    { id: 'chat', scenarioId: 'UAT-REKEN-19', label: 'WF-REKEN-19 · Met Fin over het scenario chatten', kind: 'action', stage: 4, lane: 'verkennen' },
     { id: 'acties', scenarioId: 'UAT-REKEN-20', label: 'WF-REKEN-20 · Concrete acties uit het scenario halen', kind: 'action', stage: 4, lane: 'verkennen' },
 
     // ── 5 · losse rekentools ──────────────────────────────────────────────

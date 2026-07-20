@@ -1,27 +1,27 @@
 import type { ReportWill, ReportWillMove } from '@/lib/check/types'
-import { WillDots } from '@/components/app/will-dots'
+import { FinDots } from '@/components/app/fin-dots'
 
 /**
- * Sectie 6 — Will: avatar + intro + de zetten. Server-render; de Will-avatar is de
- * gedeelde `WillDots` (client-component) die op de client haar idle-animatie draait
+ * Sectie 6 — Fin: avatar + intro + de zetten. Server-render; de Fin-avatar is de
+ * gedeelde `FinDots` (client-component) die op de client haar idle-animatie draait
  * — consistent met de overige geanimeerde rapport-componenten (LifeGrid e.d.).
  */
-export function WillZetten({ will }: { will: ReportWill }) {
+export function FinZetten({ will }: { will: ReportWill }) {
   return (
     <section id="s6">
       <div className="wrap">
         <div className="eyebrow">
-          <span className="num">6</span> Drie zetten van Will{' '}
+          <span className="num">6</span> Drie zetten van Fin{' '}
           <span className="swatch" style={{ background: 'var(--wil)' }} />
         </div>
         <h2>Wat je morgen al kunt doen</h2>
 
         <div className="will-intro">
           <div className="will-av-dots">
-            <WillDots size={54} />
+            <FinDots size={54} />
           </div>
           <div className="txt">
-            <div className="who">Will · jouw budgetcoach</div>
+            <div className="who">Fin · jouw budgetcoach</div>
             <p>{will.intro}</p>
           </div>
         </div>

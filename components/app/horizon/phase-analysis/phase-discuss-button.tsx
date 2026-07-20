@@ -1,13 +1,13 @@
 'use client'
 
-import { BesprekMetWillButton } from '@/components/app/chat/bespreek-met-will-button'
+import { BesprekMetWillButton } from '@/components/app/chat/bespreek-met-fin-button'
 
 /**
- * PhaseDiscussButton — top-level "Bespreek je [fase] met Will"-knop bij de
+ * PhaseDiscussButton — top-level "Bespreek je [fase] met Fin"-knop bij de
  * fase-header van elke fase-modal (opbouw / overgang / onttrekking).
  *
  * Dunne wrapper rond {@link BesprekMetWillButton} die de hele-fase-samenvatting
- * (`summary`) als chatcontext meegeeft, zodat de gebruiker met Will over de fase
+ * (`summary`) als chatcontext meegeeft, zodat de gebruiker met Fin over de fase
  * als geheel kan sparren. Eén conventie voor alle drie de fases.
  */
 export function PhaseDiscussButton({
@@ -15,7 +15,7 @@ export function PhaseDiscussButton({
   summary,
   className = '',
 }: {
-  /** Bijv. "Mijn opbouwfase" — gaat als onderwerp naar Will. */
+  /** Bijv. "Mijn opbouwfase" — gaat als onderwerp naar Fin. */
   onderwerp: string
   /** Hele-fase-samenvatting met de echte cijfers (start→eind vermogen, jaren, etc.). */
   summary: string

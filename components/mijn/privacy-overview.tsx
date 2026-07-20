@@ -74,7 +74,7 @@ const CATEGORIES: DataCategory[] = [
     label: 'Cashflow & transacties',
     what: 'Inkomsten, uitgaven en categorieën. Alleen aanwezig als je transacties handmatig invoert of een PSD2-bank koppelt.',
     where: 'Supabase (EU-regio); banktokens en IBAN’s extra veld-versleuteld (AES-256-GCM). Nooit verkocht of gedeeld voor marketing.',
-    why: 'Voor je cashflow-pillar, vaste-lasten-overzicht en de Will-briefing.',
+    why: 'Voor je cashflow-pillar, vaste-lasten-overzicht en de Fin-briefing.',
     action: { label: 'Koppelingen beheren', href: '/mijn/koppelingen' },
   },
   {
@@ -89,10 +89,10 @@ const CATEGORIES: DataCategory[] = [
   {
     Icon: MessageSquare,
     iconTint: 'text-rose-700 bg-rose-50',
-    label: 'Will-chat & AI-context',
-    what: 'Berichten die je naar Will stuurt plus de samenvatting van je financiële context die als prompt wordt meegegeven.',
+    label: 'Fin-chat & AI-context',
+    what: 'Berichten die je naar Fin stuurt plus de samenvatting van je financiële context die als prompt wordt meegegeven.',
     where: 'Verwerking via Anthropic / OpenAI (afhankelijk van model-config). Géén model-training op je data.',
-    why: 'Zonder context kan Will geen relevante antwoorden geven. Chat-historie blijft van jou.',
+    why: 'Zonder context kan Fin geen relevante antwoorden geven. Chat-historie blijft van jou.',
     action: { label: 'AI-instellingen', href: '/mijn/privacy' },
   },
   {

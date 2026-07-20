@@ -28,7 +28,7 @@ import {
 import { computeSharePct, SPLIT_MODE_LABELS, type SplitMode } from '@/lib/household-data'
 import { BudgetIcon } from '@/components/app/budget-shared'
 import { GoalForm } from '@/components/app/goal-form'
-import { GoalProgressTimeline, buildGoalHistory } from '@/components/app/will/goal-progress-timeline'
+import { GoalProgressTimeline, buildGoalHistory } from '@/components/app/fin/goal-progress-timeline'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { useDailyExpenseRate, eurToFreedomTime } from '@/components/app/freedom-time-label'
 import { Kicker } from '@/components/editorial'

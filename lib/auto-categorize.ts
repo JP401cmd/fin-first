@@ -178,7 +178,7 @@ export type AutoCatResult = {
   /**
    * Aantal transacties die ALLEEN op een spiegelpaar (fuzzy signaal) wijzen en
    * géén sterke detectie/regel kregen. NIET toegewezen — bewust overgelaten aan
-   * de gebruiker (review via Vraag Will of handmatig). De UI meldt dit aantal.
+   * de gebruiker (review via Vraag Fin of handmatig). De UI meldt dit aantal.
    */
   mirrorCandidateCount: number
   /**

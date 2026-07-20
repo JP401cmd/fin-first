@@ -200,9 +200,9 @@ export default function BeheerGebruikersPage() {
 
   async function handleBlockToggle() {
     if (!user) return
-    const willBlock = !user.blockedAt
+    const finBlock = !user.blockedAt
     if (
-      willBlock &&
+      finBlock &&
       !window.confirm(
         `${user.name || user.email} blokkeren? Het account wordt direct uitgelogd en kan niet meer inloggen.`,
       )
@@ -215,14 +215,14 @@ export default function BeheerGebruikersPage() {
       const res = await fetch('/api/admin/users/block', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, blocked: willBlock }),
+        body: JSON.stringify({ userId: user.id, blocked: finBlock }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error || 'Blokkeren mislukt')
-      setUser({ ...user, blockedAt: data.blockedAt ?? (willBlock ? new Date().toISOString() : null) })
+      setUser({ ...user, blockedAt: data.blockedAt ?? (finBlock ? new Date().toISOString() : null) })
       setStatus({
         type: 'success',
-        message: willBlock
+        message: finBlock
           ? `${user.name || user.email} geblokkeerd`
           : `${user.name || user.email} gedeblokkeerd`,
       })

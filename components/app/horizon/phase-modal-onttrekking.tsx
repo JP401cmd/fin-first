@@ -196,7 +196,7 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
   const afronding = Math.round(endPortfolio - reconstructedEnd)
   const showAfronding = Math.abs(afronding) > 1000
 
-  // Whole-phase summary for the top-level "Bespreek met Will" button. Uses
+  // Whole-phase summary for the top-level "Bespreek met Fin" button. Uses
   // plain formatCurrency (chat strings are never masked). Slagingskans/kritische
   // SWR live in the Monte Carlo section's local state, so they are intentionally
   // omitted here — the MC section carries those into its own discuss context.
@@ -456,7 +456,7 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
             expectedReturn={expectedReturn}
             inflationRate={inflationRate}
             yearlyExpenses={yearlyExpenses ?? yearlyWithdrawal}
-            willContextPrefix="Onttrekkingsfase stresstest"
+            finContextPrefix="Onttrekkingsfase stresstest"
           />
         )}
 

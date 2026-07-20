@@ -2,7 +2,7 @@
 
 import { useState, memo, type ReactNode } from 'react'
 import { ChevronRight, ChevronDown, type LucideIcon } from 'lucide-react'
-import { BesprekMetWillButton } from '@/components/app/chat/bespreek-met-will-button'
+import { BesprekMetWillButton } from '@/components/app/chat/bespreek-met-fin-button'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -13,8 +13,8 @@ interface AnalysisSectionProps {
   defaultOpen?: boolean
   /** Show loading skeleton instead of children */
   loading?: boolean
-  /** Context string sent to Will when "Bespreek met Will" is clicked (becomes the chat detail) */
-  willContext?: string
+  /** Context string sent to Fin when "Bespreek met Fin" is clicked (becomes the chat detail) */
+  finContext?: string
   children: ReactNode
 }
 
@@ -35,14 +35,14 @@ function AnalysisSkeleton() {
 /**
  * Collapsible wrapper for each analysis block inside phase modals.
  * Follows the existing dashed-border collapsible pattern from phase-modal-opbouw,
- * upgraded with a solid border, icon support, and an optional "Vraag Will" CTA.
+ * upgraded with a solid border, icon support, and an optional "Vraag Fin" CTA.
  */
 export const AnalysisSection = memo(function AnalysisSection({
   title,
   icon,
   defaultOpen = false,
   loading = false,
-  willContext,
+  finContext,
   children,
 }: AnalysisSectionProps) {
   const [open, setOpen] = useState(defaultOpen)
@@ -73,11 +73,11 @@ export const AnalysisSection = memo(function AnalysisSection({
         <div className="border-t border-[var(--border-ed)] px-3 pb-4 pt-3">
           {loading ? <AnalysisSkeleton /> : children}
 
-          {/* "Bespreek met Will" CTA — only when context is provided and not loading.
-              title → onderwerp, willContext → detail (de echte cijfers gaan zo mee de chat in). */}
-          {willContext && !loading && (
+          {/* "Bespreek met Fin" CTA — only when context is provided and not loading.
+              title → onderwerp, finContext → detail (de echte cijfers gaan zo mee de chat in). */}
+          {finContext && !loading && (
             <div className="mt-3 flex justify-end">
-              <BesprekMetWillButton onderwerp={title} detail={willContext} />
+              <BesprekMetWillButton onderwerp={title} detail={finContext} />
             </div>
           )}
         </div>

@@ -21,7 +21,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import type { BenchmarkMetric } from '@/lib/benchmark-report-data'
-import { WillDots } from '@/components/app/will-dots'
+import { FinDots } from '@/components/app/fin-dots'
 import { VIZ } from './viz-palette'
 
 const RING_R = 60
@@ -31,7 +31,7 @@ const RING_CIRC = 2 * Math.PI * RING_R // ≈ 376.99
 const RING_DY = 30
 
 /**
- * Will-als-gezicht: de drie-stippen-avatar (knipperende ogen + mond, in de
+ * Fin-als-gezicht: de drie-stippen-avatar (knipperende ogen + mond, in de
  * module-accentkleuren) wordt als gezicht op het hoofd van de lijntekening
  * gezet — een speelse knipoog in de Spiegel. Coördinaten liggen op het gezicht
  * van de body-PNG (vierkant, beeld op x=28 y=42 560×560 → hoofd ≈ x 308, y 142).
@@ -107,10 +107,10 @@ const BODY_SRC: Record<BodyBand, string> = {
 export function BodyFigure({ metrics, formatValue, onMetricClick }: BodyFigureProps) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 1200, threshold: 0.2 })
 
-  // --- Speelse "kijk naar links/rechts"-beweging van het Will-gezicht ---
-  // Naast het knipperen + mondbeweging (in WillDots zelf) glijdt de héle avatar
+  // --- Speelse "kijk naar links/rechts"-beweging van het Fin-gezicht ---
+  // Naast het knipperen + mondbeweging (in FinDots zelf) glijdt de héle avatar
   // af en toe een paar pixels opzij, zodat het lijkt of het hoofd rondkijkt.
-  // Bewust lokaal in de Spiegel: WillDots blijft app-breed ongewijzigd.
+  // Bewust lokaal in de Spiegel: FinDots blijft app-breed ongewijzigd.
   const [lookOffset, setLookOffset] = useState(0)
   const glanceTimers = useRef<ReturnType<typeof setTimeout>[]>([])
 
@@ -278,7 +278,7 @@ export function BodyFigure({ metrics, formatValue, onMetricClick }: BodyFigurePr
           aria-hidden="true"
         />
 
-        {/* ===== Will-als-gezicht: drie-stippen-avatar op het hoofd ===== */}
+        {/* ===== Fin-als-gezicht: drie-stippen-avatar op het hoofd ===== */}
         {/* Live SVG-avatar (knipperen + mond) via foreignObject; de wrapper-div
             schuift af en toe opzij (lookOffset) zodat het hoofd lijkt rond te
             kijken. Decoratief → geen pointer-events. */}
@@ -299,7 +299,7 @@ export function BodyFigure({ metrics, formatValue, onMetricClick }: BodyFigurePr
               transition: 'transform 0.7s cubic-bezier(0.22, 1, 0.36, 1)',
             }}
           >
-            <WillDots size={FACE_SIZE} state="idle" />
+            <FinDots size={FACE_SIZE} state="idle" />
           </div>
         </foreignObject>
 

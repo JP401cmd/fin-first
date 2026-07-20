@@ -13,7 +13,7 @@
 // Het proces leest links→rechts: instap (setup gedaan?) → budgethub (plan vs.
 // realisatie) → verkennen (analyse-hub/NIBUD-benchmark/eigen-rekening/deeplinks)
 // → toevoegen (nieuw budget vs. template-VERVANG) → beheren (detail-pane-rail:
-// detail/bewerken/archiveren/volgorde/tx-bewerken/spaardoel/Will-advies) →
+// detail/bewerken/archiveren/volgorde/tx-bewerken/spaardoel/Fin-advies) →
 // planeditor (plan bewerken + kopieer-vorige-maand) → periode & weergave (maand-
 // nav/periodemodus + Boom-Ring-Heatmap-Pillen) → voorkeuren (rollover/
 // voorspelling/gedeeld budgetteren) → doorwerking (categorisatie vanuit Cash +
@@ -61,7 +61,7 @@ export const BUDGET_FLOW: UatFlow = {
     { id: 'volgorde', scenarioId: 'UAT-BUDGET-12', label: 'WF-BUDGET-12 · Budgetvolgorde aanpassen', kind: 'action', stage: 2, lane: 'beheren' },
     { id: 'txbewerken', scenarioId: 'UAT-BUDGET-17', label: 'WF-BUDGET-17 · Transactie openen/bewerken vanuit detail', kind: 'action', stage: 2, lane: 'beheren', subOf: 'detail' },
     { id: 'spaardoel', scenarioId: 'UAT-BUDGET-18', label: 'WF-BUDGET-18 · Spaardoel koppelen aan spaarbudget', kind: 'screen', stage: 2, lane: 'beheren', subOf: 'detail' },
-    { id: 'will', scenarioId: 'UAT-BUDGET-19', label: 'WF-BUDGET-19 · Will om budgetadvies vragen', kind: 'action', stage: 2, lane: 'beheren', subOf: 'detail' },
+    { id: 'will', scenarioId: 'UAT-BUDGET-19', label: 'WF-BUDGET-19 · Fin om budgetadvies vragen', kind: 'action', stage: 2, lane: 'beheren', subOf: 'detail' },
 
     // ── 3 · planeditor ────────────────────────────────────────────────────
     { id: 'plan', scenarioId: 'UAT-BUDGET-06', label: 'WF-BUDGET-06 · Budgetplan bewerken in de planeditor', kind: 'screen', stage: 3, lane: 'planeditor' },

@@ -5,7 +5,7 @@ import { createClient, getAuthClaims } from '@/lib/supabase/server'
  *
  * Telt postponed-voorstellen waarvan de terugkomdatum
  * (`postponed_until`) verstreken is. Gebruikt door de chat-FAB om een
- * badge te tonen ("Will heeft N uitgestelde voorstellen klaar voor
+ * badge te tonen ("Fin heeft N uitgestelde voorstellen klaar voor
  * herbeoordeling") en discoverability te bieden voor de
  * `?prompt=herbekijk-uitgesteld` flow.
  *

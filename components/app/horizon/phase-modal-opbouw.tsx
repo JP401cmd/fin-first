@@ -197,8 +197,8 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
     ? Math.round(effectiveMonthlySavings / dailyExpenseRate)
     : null
 
-  // ── Hele-fase-samenvatting voor "Bespreek met Will" (raw formatCurrency) ──
-  // Chat-context, géén gemaskeerde bedragen — Will moet de echte cijfers zien.
+  // ── Hele-fase-samenvatting voor "Bespreek met Fin" (raw formatCurrency) ──
+  // Chat-context, géén gemaskeerde bedragen — Fin moet de echte cijfers zien.
   const phaseSummary = [
     `Opbouwfase van ${Math.round(currentAge)} tot ${Math.round(fireAge)} jaar (${yearsAccumulation} jaar).`,
     `Vermogen groeit van ${formatCurrency(Math.round(startVermogen))} naar ${formatCurrency(Math.round(eindVermogen))}.`,
@@ -270,7 +270,7 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
           </>
         )}
 
-        {/* 2. Fase-header — compact summary line + top-level "Bespreek met Will" */}
+        {/* 2. Fase-header — compact summary line + top-level "Bespreek met Fin" */}
         <div className="text-center">
           <p className="font-sans text-sm font-bold text-[var(--ink)] sm:text-base">
             Opbouw &middot; {<MaskedAmount value={Math.round(startVermogen)} tone="horizon" />} &rarr; {<MaskedAmount value={Math.round(eindVermogen)} tone="horizon" />} &middot; {yearsAccumulation} jaar
@@ -440,7 +440,7 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
           expectedReturn={expectedReturn}
           inflationRate={inflationRate}
           yearlyExpenses={yearlyExpenses}
-          willContextPrefix="Opbouwfase stresstest"
+          finContextPrefix="Opbouwfase stresstest"
         />
 
         {/* 10. PhaseDetailTable — yearly detail rows (collapsed by default) */}

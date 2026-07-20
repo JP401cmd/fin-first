@@ -1,5 +1,5 @@
 -- ── CUSTOM_CALCULATORS ─────────────────────────────────────────
--- Rekenhulp: door Will gegenereerde, door de gebruiker opgeslagen
+-- Rekenhulp: door Fin gegenereerde, door de gebruiker opgeslagen
 -- custom calculators. De volledige CalculatorDefinition wordt als JSONB
 -- bewaard (inputs, scenarios, outputs, compare, assumptions).
 CREATE TABLE IF NOT EXISTS custom_calculators (
