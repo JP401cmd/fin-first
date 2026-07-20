@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { translateAuthError, isUserAlreadyRegisteredError } from '@/lib/auth-errors'
+import { checkLeakedPassword } from '@/lib/leaked-password'
+import { LEAKED_PASSWORD_MESSAGE } from '@/lib/password-policy'
 import { GoogleAuthButton } from '@/components/auth/google-auth-button'
 
 export default function SignupPage() {
@@ -30,6 +32,17 @@ export default function SignupPage() {
     setError(null)
 
     try {
+      // Leaked-password-check (ADR 0057): controleer het wachtwoord tegen bekende
+      // datalekken (HIBP k-anonimiteit) VÓÓR de aanmaak. Het wachtwoord verlaat de
+      // browser nooit — alleen de 5-tekens SHA-1-prefix. Fail-open: bij een storing
+      // geeft checkLeakedPassword `pwned:false` terug en gaat de flow gewoon door.
+      const { pwned } = await checkLeakedPassword(password)
+      if (pwned) {
+        setError(LEAKED_PASSWORD_MESSAGE)
+        setLoading(false)
+        return
+      }
+
       // Dynamische import: houdt de Supabase-browser-SDK (@supabase/ssr →
       // supabase-js) uit het first-load-chunk van /signup. De factory laadt pas
       // bij de eerste submit — zelfde createClient(), zelfde gedrag.

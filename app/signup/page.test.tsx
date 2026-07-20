@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import SignupPage from './page'
+import { checkLeakedPassword } from '@/lib/leaked-password'
+import { LEAKED_PASSWORD_MESSAGE } from '@/lib/password-policy'
 
 /**
- * Anti-enumeratie-regressietest voor de signup-pagina.
+ * Anti-enumeratie-regressietest voor de signup-pagina + leaked-password-poort.
  *
  * Kernclaim: of een e-mailadres al bestaat mag NIET uit de UI af te leiden
  * zijn. Een geslaagde registratie, de Supabase-"obfuscated user"-variant
@@ -11,6 +13,9 @@ import SignupPage from './page'
  * fout moeten HETZELFDE "Controleer je e-mail"-scherm tonen — nooit de
  * onthullende "dit e-mailadres is al geregistreerd"-melding. Echte fouten
  * (bv. zwak wachtwoord) blijven wél zichtbaar.
+ *
+ * De leaked-password-check (ADR 0057) wordt gemockt zodat de regressietests geen
+ * echte HIBP-call doen; default = niet gelekt (flow ongewijzigd).
  */
 
 const signUp = vi.fn()
@@ -20,8 +25,15 @@ vi.mock('@/lib/supabase/client', () => ({
   createClient: () => mockSupabase,
 }))
 
+vi.mock('@/lib/leaked-password', () => ({
+  checkLeakedPassword: vi.fn(),
+}))
+const mockedCheckLeaked = vi.mocked(checkLeakedPassword)
+
 beforeEach(() => {
   signUp.mockReset()
+  // Default: niet gelekt → de bestaande flow verandert niet.
+  mockedCheckLeaked.mockReset().mockResolvedValue({ pwned: false, count: 0 })
 })
 
 function submitSignup() {
@@ -81,5 +93,26 @@ describe('SignupPage — anti-enumeratie', () => {
     )
     // Geen succes-scherm bij een echte fout.
     expect(screen.queryByText('Controleer je e-mail')).toBeNull()
+  })
+})
+
+describe('SignupPage — leaked-password-poort (ADR 0057)', () => {
+  it('blokkeert een bekend-gelekt wachtwoord: melding + GEEN signUp-call', async () => {
+    mockedCheckLeaked.mockResolvedValue({ pwned: true, count: 39100 })
+    render(<SignupPage />)
+    submitSignup()
+    await waitFor(() => expect(screen.getByText(LEAKED_PASSWORD_MESSAGE)).toBeTruthy())
+    // De registratie mag NIET starten bij een gelekt wachtwoord.
+    expect(signUp).not.toHaveBeenCalled()
+    expect(screen.queryByText('Controleer je e-mail')).toBeNull()
+  })
+
+  it('laat een niet-gelekt wachtwoord door naar de normale flow (fail-open/normaal pad)', async () => {
+    mockedCheckLeaked.mockResolvedValue({ pwned: false, count: 0 })
+    signUp.mockResolvedValue({ data: { user: { id: 'u1', identities: [{}] } }, error: null })
+    render(<SignupPage />)
+    submitSignup()
+    await waitFor(() => expect(screen.getByText('Controleer je e-mail')).toBeTruthy())
+    expect(signUp).toHaveBeenCalledTimes(1)
   })
 })

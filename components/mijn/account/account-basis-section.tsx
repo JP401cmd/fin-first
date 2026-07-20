@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Mail, KeyRound, LogOut } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { checkLeakedPassword } from '@/lib/leaked-password'
+import { LEAKED_PASSWORD_MESSAGE, MIN_PASSWORD_LENGTH } from '@/lib/password-policy'
 
 /**
  * AccountBasisSection — account-basis los van het abonnement: e-mailadres en
@@ -137,7 +139,7 @@ function PasswordForm() {
     e.preventDefault()
     setError(null)
     setDone(false)
-    if (password.length < 6) {
+    if (password.length < MIN_PASSWORD_LENGTH) {
       setError('Wachtwoord moet minimaal 6 tekens bevatten.')
       return
     }
@@ -146,6 +148,14 @@ function PasswordForm() {
       return
     }
     setLoading(true)
+    // Leaked-password-check (ADR 0057) vóór updateUser: HIBP k-anonimiteit, het
+    // wachtwoord verlaat de browser nooit. Fail-open bij een storing.
+    const { pwned } = await checkLeakedPassword(password)
+    if (pwned) {
+      setError(LEAKED_PASSWORD_MESSAGE)
+      setLoading(false)
+      return
+    }
     const supabase = createClient()
     const { error } = await supabase.auth.updateUser({ password })
     setLoading(false)

@@ -48,6 +48,11 @@ export async function updateSession(request: NextRequest) {
     '/check/rapport',
     '/api/check/submit',
     '/api/session-info',
+    // Leaked-password-check (ADR 0057): bewust publiek — signup gebeurt uitgelogd,
+    // dus de check moet zonder sessie bij de HIBP-proxy kunnen. Zonder deze entry
+    // geeft de /api/-protected-prefix een 401 vóór de handler, waardoor de check
+    // fail-open stil uitgeschakeld wordt op de belangrijkste flow (registratie).
+    '/api/auth/password-check',
     // NB (allowlist-opschoning, aparte kaart): onderstaande API-routes stammen
     // uit het harness-tijdperk en zijn hierdoor publiek (geen middleware-401).
     // De routes zelf checken auth; of ze uit deze lijst kunnen is de scope van

@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { translateAuthError } from '@/lib/auth-errors'
+import { checkLeakedPassword } from '@/lib/leaked-password'
+import { LEAKED_PASSWORD_MESSAGE, MIN_PASSWORD_LENGTH } from '@/lib/password-policy'
 
 export default function ResetPasswordPage() {
   const router = useRouter()
@@ -44,7 +46,7 @@ export default function ResetPasswordPage() {
     setError(null)
 
     // Synchrone validatie vóór de netwerkcall — geen loading-flikkering nodig.
-    if (password.length < 6) {
+    if (password.length < MIN_PASSWORD_LENGTH) {
       setError('Wachtwoord moet minimaal 6 tekens bevatten')
       return
     }
@@ -56,6 +58,14 @@ export default function ResetPasswordPage() {
 
     setLoading(true)
     try {
+      // Leaked-password-check (ADR 0057) vóór updateUser: HIBP k-anonimiteit, het
+      // wachtwoord verlaat de browser nooit. Fail-open bij een storing.
+      const { pwned } = await checkLeakedPassword(password)
+      if (pwned) {
+        setError(LEAKED_PASSWORD_MESSAGE)
+        return
+      }
+
       const supabase = createClient()
       const { error } = await supabase.auth.updateUser({ password })
 
