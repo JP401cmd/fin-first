@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-20T07:31:50.826Z",
+  "generatedAt": "2026-07-20T09:17:19.706Z",
   "generatedDate": "2026-07-20",
   "repo": {
     "name": "fin",
@@ -189,7 +189,7 @@
   "stats": {
     "routes": 144,
     "routesProduction": 101,
-    "api": 256,
+    "api": 257,
     "tables": 84,
     "migrations": 148,
     "integrations": 24,
@@ -2460,6 +2460,14 @@
       "domain": "assets",
       "methods": [
         "POST"
+      ]
+    },
+    {
+      "url": "/api/auth/password-check",
+      "file": "app/api/auth/password-check/route.ts",
+      "domain": "auth",
+      "methods": [
+        "GET"
       ]
     },
     {
@@ -5954,6 +5962,21 @@
           "domain": "appearance",
           "methods": [
             "PUT"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "auth",
+      "label": "Authenticatie",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/auth/password-check",
+          "file": "app/api/auth/password-check/route.ts",
+          "domain": "auth",
+          "methods": [
+            "GET"
           ]
         }
       ]
@@ -14605,6 +14628,18 @@
       ],
       "summary": "C2a/C2b breiden het lokale-AI-pad (ADR 0043) uit van transactiecategorisatie naar de dagelijkse Will-chat (WillHome): bij `privacy_mode=true` moet het gesprek met Will lokaal blijven draaien, zonder dat de gebruiker een aparte pagina of een tweede chat-ervaring krijgt. De vraag w",
       "file": "docs/adr/0056-chat-transport-cloud-lokaal-omschakelpunt.md"
+    },
+    {
+      "id": "0057-eigen-leaked-password-check",
+      "title": "Eigen leaked-password-protection via HaveIBeenPwned k-anonimiteit (gratis, UI-grade)",
+      "status": "aanvaard",
+      "date": "2026-07-20",
+      "elements": [
+        "t-supabase",
+        "app-comp"
+      ],
+      "summary": "De drie auth-flows (signup, reset-password, account-wachtwoord) controleren een gekozen wachtwoord tegen de HaveIBeenPwned \"Pwned Passwords\"-range-API vóór de `supabase.auth.*`-call. De check draait via **k-anonimiteit**: de browser hasht het wachtwoord lokaal (SHA-1), stuurt all",
+      "file": "docs/adr/0057-eigen-leaked-password-check.md"
     }
   ],
   "churn": {
@@ -15479,21 +15514,7 @@
       {
         "label": "API-routes",
         "added": [
-          "/api/local-chat-overview"
-        ],
-        "removed": []
-      },
-      {
-        "label": "Integraties",
-        "added": [],
-        "removed": [
-          "OpenRouter"
-        ]
-      },
-      {
-        "label": "Componenten (aantal)",
-        "added": [
-          "+2"
+          "/api/auth/password-check"
         ],
         "removed": []
       }
@@ -15684,7 +15705,7 @@
     },
     {
       "date": "2026-07-20",
-      "api": 256,
+      "api": 257,
       "components": 866,
       "tables": 84,
       "routesProduction": 101

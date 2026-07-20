@@ -486,3 +486,7 @@
 - **API-routes** toegevoegd: /api/local-chat-overview
 - **Integraties** verwijderd: OpenRouter
 - **Componenten (aantal)** toegevoegd: +2
+
+## 2026-07-20
+
+- **API-routes** toegevoegd: /api/auth/password-check
