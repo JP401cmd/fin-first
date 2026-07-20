@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { isSuperAdmin } from '@/lib/admin'
 import { PERSONAS, type PersonaKey } from '@/lib/test-personas'
-import { deleteAllUserData, seedPersonaData, countSeedSteps } from '@/lib/seed-persona'
+import { deleteAllUserData, seedPersonaData, countSeedSteps, assertSeedSchema, SeedSchemaError } from '@/lib/seed-persona'
 import { unauthorized, forbidden, badRequest } from '@/lib/api/respond'
 
 
@@ -48,6 +48,21 @@ export async function POST(req: Request) {
       }
 
       try {
+        // Fail-safe preflight: valideer het schema vóór de destructieve wipe.
+        // Zonder dit wist een seed eerst álle data en faalt daarna op een
+        // ontbrekende kolom (schema-drift), waardoor het account leeg-maar-niet-
+        // hersteld achterblijft. Bij drift: meld het en STOP — niets gewist.
+        try {
+          await assertSeedSchema(supabase, userId, persona)
+        } catch (preErr) {
+          if (preErr instanceof SeedSchemaError) {
+            console.error(`[admin-seed:POST] schema-preflight afgebroken: ${preErr.message}`)
+            send({ error: preErr.message })
+            return // finally sluit de stream; deleteAllUserData is NIET aangeroepen
+          }
+          throw preErr
+        }
+
         // Phase 1: Delete all user data
         await deleteAllUserData(supabase, userId, progress)
 

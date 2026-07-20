@@ -72,9 +72,15 @@ function statusFor(progress: GoalDisplay['progress']): {
 export function DoelenView({
   goals,
   goalProgresses,
+  monthlyIncome = 0,
+  monthlyExpenses = 0,
 }: {
   goals: GoalWithBudget[]
   goalProgresses: GoalDisplay['progress'][]
+  /** Canonieke effectieve maand-cijfers uit de loader — voeden de gepersonaliseerde
+   *  standaard-doelen-kiezer in DoelToevoegenSheet (consume, don't recompute). */
+  monthlyIncome?: number
+  monthlyExpenses?: number
 }) {
   const router = useRouter()
 
@@ -148,7 +154,7 @@ export function DoelenView({
             bereiken. Doelen worden hier zichtbaar met status-flags zodat
             je weet hoe je ervoor staat.
           </p>
-          <DoelToevoegenSheet />
+          <DoelToevoegenSheet monthlyIncome={monthlyIncome} monthlyExpenses={monthlyExpenses} />
         </article>
       </section>
     )
@@ -344,7 +350,7 @@ export function DoelenView({
             {manualHeading}
           </h2>
         </div>
-        <DoelToevoegenSheet />
+        <DoelToevoegenSheet monthlyIncome={monthlyIncome} monthlyExpenses={monthlyExpenses} />
       </header>
 
       {manualCount === 0 ? (

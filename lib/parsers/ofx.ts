@@ -82,9 +82,12 @@ export async function parseOFX(content: string): Promise<ParsedTransaction[]> {
       counterparty_name: counterpartyName,
       counterparty_iban: null,
       reference: fitid || null,
-      transaction_type: trnType || null,
+      // OFX <TRNTYPE> (bv. "DEBIT"/"CREDIT") is een bank-eigen code — die hoort in
+      // bank_code, NIET in transaction_type (DB-enum met CHECK-constraint; een rauwe
+      // code daarin doet de import-commit falen — WF-CASH-23).
+      transaction_type: null,
       source_type: null,
-      bank_code: null,
+      bank_code: trnType || null,
       bank_seq: null,
       running_balance: null,
       creditor_id: null,

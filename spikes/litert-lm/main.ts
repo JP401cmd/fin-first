@@ -53,12 +53,16 @@ window.addEventListener('unhandledrejection', (ev) => {
 })
 
 // ── Query-params (auto-modus) ───────────────────────────────────────────────────
-function params(): { autorun: boolean; runs: number; batch: number; set: 'dev' | 'goud-replay' } {
+function params(): { autorun: boolean; runs: number; batch: number; set: 'dev' | 'goud-replay'; tx: number | null } {
   const q = new URLSearchParams(location.search)
   const runs = Math.max(1, Math.min(50, Number(q.get('runs')) || DEFAULT_RUNS))
   const batch = Math.max(1, Math.min(100, Number(q.get('batch')) || DEFAULT_BATCH_SIZE))
   const set = q.get('set') === 'goud-replay' ? 'goud-replay' : 'dev'
-  return { autorun: q.get('autorun') === '1', runs, batch, set }
+  // Mobiel-maat: ?tx=30 beperkt de run tot de eerste N transacties (L1.5 —
+  // telefoons halen geen 101-tx-marathon door thermiek/tab-throttling).
+  const txRaw = Number(q.get('tx'))
+  const tx = Number.isFinite(txRaw) && txRaw >= 1 ? Math.min(500, Math.floor(txRaw)) : null
+  return { autorun: q.get('autorun') === '1', runs, batch, set, tx }
 }
 
 /**
@@ -210,8 +214,12 @@ function renderResults(): void {
       return `<tr><td>${run}</td><td>${num(acc, 1, '%')}</td><td>${correct}/${txr.length}</td><td>${num(validity, 1, '%')}</td><td>${num(avgTtft, 0, ' ms')}</td><td>${num(avgRate, 1)}</td><td>${(wall / 1000).toFixed(1)} s</td></tr>`
     })
     .join('')
+  // Debug: eerste ruwe modeluitvoer zichtbaar op het scherm — cruciaal op
+  // toestellen zonder console-toegang (L1.5-mobiel: validiteit 0% duiden).
+  const firstRaw = runSummaries[0]?.result.batches[0]?.rawOutput ?? ''
   $('results').innerHTML = `<table><thead><tr><th>run</th><th>accuracy</th><th>correct</th><th>validiteit</th><th>gem. TTFT</th><th>tok/s</th><th>wandklok</th></tr></thead><tbody>${rows}</tbody></table>
-    <div class="muted" style="margin-top:6px">Volledige, machine-leesbare meetdata staat in de console als <code>[metric] …</code>-regels.</div>`
+    <div class="muted" style="margin-top:6px">Volledige, machine-leesbare meetdata staat in de console als <code>[metric] …</code>-regels.</div>
+    <div style="margin-top:10px"><b>Debug — ruwe modeluitvoer batch 1</b> (eerste 400 tekens):<pre style="white-space:pre-wrap;word-break:break-all;background:#111;border:1px solid #333;padding:8px;max-height:220px;overflow:auto">${esc(firstRaw.slice(0, 400) || '(leeg — model gaf geen tekst terug)')}</pre></div>`
 }
 
 // ── Init ─────────────────────────────────────────────────────────────────────────
@@ -233,7 +241,11 @@ async function boot(): Promise<void> {
       return
     }
   }
-  $('dataset-status').innerHTML = `Dataset: <b>${esc(activeSet.version)}</b> · ${activeSet.transactions.length} transacties · budgetlijst ${budgetOptions.length} opties${p.set === 'goud-replay' ? ' (gouden set — échte budgetlijst)' : ' (standaardboom)'}.`
+  if (p.tx !== null && p.tx < activeSet.transactions.length) {
+    activeSet = { ...activeSet, transactions: activeSet.transactions.slice(0, p.tx) }
+    metric('dataset', { set: p.set, tx: activeSet.transactions.length, limited: true })
+  }
+  $('dataset-status').innerHTML = `Dataset: <b>${esc(activeSet.version)}</b> · ${activeSet.transactions.length} transacties${p.tx !== null ? ' (beperkt via ?tx=)' : ''} · budgetlijst ${budgetOptions.length} opties${p.set === 'goud-replay' ? ' (gouden set — échte budgetlijst)' : ' (standaardboom)'}.`
 
   $('init-btn').addEventListener('click', () => void onInit())
   $('clear-cache-btn').addEventListener('click', () => void onClearCache())

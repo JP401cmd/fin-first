@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
-import { loadWillData } from '@/lib/will-data-loader'
+import { loadWillData, loadEffectiveMonthlyFigures } from '@/lib/will-data-loader'
 import { ToekomstSubpageShell } from '@/components/future/toekomst-subpage-shell'
 import { DoelenView } from '@/components/future/doelen-view'
 
@@ -23,7 +23,10 @@ export const metadata: Metadata = {
  */
 export default async function ToekomstDoelenPage() {
   const supabase = await createClient()
-  const willData = await loadWillData(supabase)
+  const [willData, monthlyFigures] = await Promise.all([
+    loadWillData(supabase),
+    loadEffectiveMonthlyFigures(supabase),
+  ])
 
   return (
     <>
@@ -38,6 +41,8 @@ export default async function ToekomstDoelenPage() {
       <DoelenView
         goals={willData.goals}
         goalProgresses={willData.goalProgresses}
+        monthlyIncome={monthlyFigures.monthlyIncome}
+        monthlyExpenses={monthlyFigures.monthlyExpenses}
       />
     </>
   )

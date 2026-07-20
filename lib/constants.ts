@@ -59,6 +59,18 @@ export const FIRE_SAVINGS_RATE_BENCHMARK_PCT = 50
  */
 export const EXPENSE_RATE_ROLLING_MONTHS = 12
 
+// ── Noodfonds (emergency fund) ──────────────────────────────────
+
+/**
+ * Doel-buffer noodfonds, uitgedrukt in maanden vaste lasten — 6× (Nibud-richtlijn
+ * 3–6 maanden, bovengrens gekozen als comfortabele buffer). SINGLE SOURCE voor
+ * zowel de afgeleide noodfonds-bundel (`lib/dashboard-data-loader.ts`) als de
+ * standaard-doelen-kiezer (`lib/goals/standaard-doelen.ts`) én de onboarding-
+ * prefill — zodat de widget, het aan te maken doel en de onboarding-tegel exact
+ * hetzelfde bedrag tonen (geen drift tussen de vier oude noodfonds-definities).
+ */
+export const TARGET_EMERGENCY_MONTHS = 6
+
 // ── Inflation ───────────────────────────────────────────────────
 
 /** Default annual inflation rate — 2% (ECB target). */

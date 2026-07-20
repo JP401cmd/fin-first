@@ -83,9 +83,12 @@ export async function parseMT940(content: string): Promise<ParsedTransaction[]> 
         counterparty_name: extractCounterpartyName(details),
         counterparty_iban: extractCounterpartyIban(details),
         reference: extractReference(details),
-        transaction_type: tx.transactionType || null,
+        // De MT940 SWIFT-transactietypecode (bv. "NTRF") is een bank-eigen code —
+        // die hoort in bank_code, NIET in transaction_type (dat is een DB-enum met
+        // CHECK-constraint; een rauwe code daarin doet de import-commit falen — WF-CASH-23).
+        transaction_type: null,
         source_type: null,
-        bank_code: null,
+        bank_code: tx.transactionType || null,
         bank_seq: null,
         running_balance: null,
         creditor_id: null,

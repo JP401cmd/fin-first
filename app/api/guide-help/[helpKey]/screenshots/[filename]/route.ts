@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { isSuperAdmin } from '@/lib/admin'
+import { getServiceClient } from '@/lib/supabase/service'
 import {
   GUIDE_HELP_SETTINGS_KEY,
   getGuideHelp,
@@ -39,7 +40,8 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   }
 
   const path = `${helpKey}/${filename}`
-  const { error: removeError } = await supabase.storage.from(BUCKET).remove([path])
+  const service = getServiceClient()
+  const { error: removeError } = await service.storage.from(BUCKET).remove([path])
   if (removeError) {
     console.error('[guide-help/screenshots/delete] Remove error:', removeError)
     // Doorgaan met metadata-update — bestand kan al weg zijn.

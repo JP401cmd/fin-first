@@ -4,9 +4,10 @@
  * Eén tile per preset met een vaste defaultkeuze voor naam, bedrag, kleur,
  * icoon en tijdshorizon. De gebruiker mag elk veld na selectie nog
  * aanpassen — de presets zijn een laagdrempelig startpunt, geen rigide
- * keuze. Het "Noodfonds"-bedrag is dynamisch: 3× maandelijkse uitgaven of
+ * keuze. Het "Noodfonds"-bedrag is dynamisch: 6× maandelijkse uitgaven of
  * een fallback gebaseerd op 70% van het netto-inkomen wanneer de uitgaven
- * onbekend zijn.
+ * onbekend zijn — via de gedeelde bron `lib/goals/standaard-doelen.ts` zodat
+ * onboarding, de Doelen-tab en de noodfonds-widget dezelfde grondslag hanteren.
  *
  * Bewuste keuze: ALLE presets gebruiken `goal_type: 'savings'`, óók het
  * noodfonds. De `emergency_fund`-enum gebruikt `unit: 'maanden'` (zie
@@ -17,6 +18,7 @@
  */
 
 import type { GoalType } from './goal-data'
+import { computeNoodfondsTarget as computeStandaardNoodfondsTarget } from './goals/standaard-doelen'
 
 export type SpaardoelPresetKey =
   | 'noodfonds'
@@ -56,7 +58,7 @@ export const SPAARDOEL_PRESETS: Record<SpaardoelPresetKey, SpaardoelPreset> = {
     goalType: 'savings',
     defaultMonthsAhead: 12,
     defaultTarget: null,
-    tagline: 'Drie maanden vaste lasten — een rustige buffer',
+    tagline: 'Zes maanden vaste lasten — een rustige buffer',
   },
   vakantie: {
     key: 'vakantie',
@@ -113,23 +115,14 @@ export const SPAARDOEL_PRESETS: Record<SpaardoelPresetKey, SpaardoelPreset> = {
 /**
  * Bereken het pre-fill-bedrag voor het noodfonds-tile.
  *
- * Formule: 3× de maandelijkse uitgaven, met een fallback van 3× (70% van
- * het netto-maandinkomen) wanneer de uitgaven (nog) niet bekend zijn. Het
- * resultaat wordt afgerond op €100 voor leesbaarheid in de UI.
- *
- * Als zowel inkomen als uitgaven 0 zijn (gebruiker heeft niets ingevuld)
- * retourneert deze 0 — de caller toont dan een leeg input-veld zonder
- * pre-fill, zodat de gebruiker zelf een bedrag invult.
+ * Delegeert naar de gedeelde bron `lib/goals/standaard-doelen.ts` (6× maanduitgaven,
+ * fallback 6× 70%-inkomen, afgerond op €100, 0 bij geen data) zodat onboarding
+ * exact hetzelfde noodfonds-bedrag hanteert als de Doelen-tab en de widget. Behouden
+ * als dunne wrapper voor de bestaande call-sites + regressietests.
  */
 export function computeNoodfondsTarget(ctx: {
   monthlyIncome: number
   monthlyExpenses: number
 }): number {
-  // Beide context-velden ontbreken → geen pre-fill mogelijk.
-  if (ctx.monthlyExpenses <= 0 && ctx.monthlyIncome <= 0) return 0
-
-  const base = ctx.monthlyExpenses > 0 ? ctx.monthlyExpenses : ctx.monthlyIncome * 0.7
-  const raw = base * 3
-  // Afronden op €100 — voorkomt "€7.327,42" en houdt de UI rustig.
-  return Math.round(raw / 100) * 100
+  return computeStandaardNoodfondsTarget(ctx)
 }

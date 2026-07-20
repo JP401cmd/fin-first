@@ -318,6 +318,64 @@ export async function deleteAllUserData(
 }
 
 /**
+ * Fout die de seed-preflight gooit wanneer de verbonden DB een kolom mist die de
+ * seed schrijft (schema-drift). De boodschap is bewust gecureerd (geen rauwe
+ * Postgres-melding, ADR 0044) en veilig om aan de superadmin te tonen.
+ */
+export class SeedSchemaError extends Error {
+  constructor(
+    public readonly table: string,
+    public readonly column: string,
+  ) {
+    super(
+      `Schema-drift: kolom "${column}" ontbreekt op tabel "${table}". De seed is ` +
+        `afgebroken vóór het wissen van je data. Pas de ontbrekende migratie(s) toe ` +
+        `(supabase/migrations) en herlaad de PostgREST-schemacache, en probeer opnieuw.`,
+    )
+    this.name = 'SeedSchemaError'
+  }
+}
+
+/**
+ * Preflight vóór de destructieve wipe (fail-safe tegen schema-drift).
+ *
+ * `deleteAllUserData` wist eerst álle accountdata en pas dáárna volgen de inserts;
+ * ontbreekt een kolom die de seed schrijft, dan faalt de insert en blijft het
+ * account leeg-maar-niet-hersteld achter (de infra-S1 uit de UAT-run van 17 jul).
+ * Deze check SELECT't per drift-gevoelige tabel (assets, debts — de type-rijke
+ * tabellen waar migraties kolommen aan toevoegen) exact de kolomset die de seed
+ * gaat schrijven, afgeleid uit dezelfde builder-functies (geen hardcoded lijst die
+ * kan wegdriften). PostgREST geeft 42703 als een kolom ontbreekt — vóórdat er iets
+ * gewist is. Gooit dan `SeedSchemaError` zodat de aanroeper de wipe kan overslaan.
+ */
+export async function assertSeedSchema(
+  supabase: SupabaseClient,
+  userId: string,
+  persona: PersonaData,
+): Promise<void> {
+  const probes: { table: string; columns: string[] }[] = []
+  if (persona.assets.length > 0) {
+    probes.push({ table: 'assets', columns: Object.keys(buildSeedAssetRow(persona.assets[0], userId, 0)) })
+  }
+  if (persona.debts.length > 0) {
+    probes.push({ table: 'debts', columns: Object.keys(buildSeedDebtRow(persona.debts[0], userId, 0)) })
+  }
+
+  for (const probe of probes) {
+    // limit(0): puur een kolom-existentiecheck, haalt geen rijen op.
+    const { error } = await supabase.from(probe.table).select(probe.columns.join(', ')).limit(0)
+    if (error) {
+      // Haal de ontbrekende kolomnaam best-effort uit de PostgREST-melding
+      // ("column assets.x does not exist" of "Could not find the 'x' column").
+      const colMatch =
+        error.message?.match(/column\s+"?[a-z_]*\.?([a-z_]+)"?\s+does not exist/i) ||
+        error.message?.match(/'([a-z_]+)'\s+column/i)
+      throw new SeedSchemaError(probe.table, colMatch ? colMatch[1] : 'onbekend')
+    }
+  }
+}
+
+/**
  * Seed all persona data for a user.
  * Uses phased parallel inserts to minimize DB round-trips.
  */
