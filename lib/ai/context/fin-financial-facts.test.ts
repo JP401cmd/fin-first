@@ -10,6 +10,18 @@ const loadCoreDataMock = vi.fn<() => Promise<CorePageData>>()
 vi.mock('@/lib/core-data-loader', () => ({
   loadCoreData: () => loadCoreDataMock(),
 }))
+// De lokale overview verrijkt sinds de context-verrijking met aandachtspunten
+// (kansen). Die bus draait de hele horizon-loader; voor deze cijferpariteit-test
+// (kern-getallen cloud==lokaal) is dat irrelevant én zou het de stub-supabase
+// laten crashen. Mock 'm dus op een lege lijst — de acties-lees is al faal-zacht.
+vi.mock('@/lib/aandachtspunten-loader', () => ({
+  collectAandachtspunten: () => Promise.resolve([]),
+}))
+// De acties-lees (`loadOpenActions`) haalt de gebruiker via getCachedUser; deze
+// parity-test heeft geen echte auth-client → mock naar null (→ acties leeg).
+vi.mock('@/lib/supabase/cached-user', () => ({
+  getCachedUser: () => Promise.resolve(null),
+}))
 
 import { buildWillFinancialFacts, type FinFactsProfile } from './fin-financial-facts'
 import { buildSharedContext } from './shared-context'

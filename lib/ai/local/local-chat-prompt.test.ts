@@ -19,6 +19,11 @@ const OVERVIEW: LocalChatOverview = {
   dagtarief: 85,
   swrPct: 3.4,
   noodbuffer: { bedrag: 7500, maanden: 2.9 },
+  jaarruimte: { onbenut: 22155, besparing: 12409, vrijheidsdagen: 108 },
+  kansen: [
+    { titel: 'Bespaar op boodschappen', besparingPerJaar: 600, vrijheidsdagen: 5, deadline: '31 dec' },
+  ],
+  openstaandeActies: [{ titel: 'Benut je jaarruimte', vrijheidsdagen: 108, status: 'open' }],
 }
 
 function knowledgeItem(over: Partial<LocalKnowledgeItem>): LocalKnowledgeItem {
@@ -83,6 +88,39 @@ describe('buildLocalChatSystemPrompt — overzicht-parametrisering', () => {
     const noBuffer: LocalChatOverview = { ...OVERVIEW, noodbuffer: null }
     const prompt = buildLocalChatSystemPrompt({ overview: noBuffer, question: 'hoi', knowledgeItems: [] })
     expect(prompt).not.toContain('Noodbuffer nu')
+  })
+})
+
+describe('buildLocalChatSystemPrompt — verrijking (jaarruimte, kansen, acties)', () => {
+  it('bevat de DNA-regel die kansen/jaarruimte/acties als eerste bron aanwijst', () => {
+    const prompt = buildLocalChatSystemPrompt({ overview: OVERVIEW, question: 'hoi', knowledgeItems: [] })
+    expect(prompt).toContain('je hebt dit al als actie staan')
+    expect(prompt).toContain('vrijheidsdagen')
+  })
+
+  it('rendert de jaarruimte-lever met onbenutte ruimte, besparing en vrijheidsdagen', () => {
+    const prompt = buildLocalChatSystemPrompt({ overview: OVERVIEW, question: 'geef een tip', knowledgeItems: [] })
+    expect(prompt).toContain('Jaarruimte (aftrekbare')
+    expect(prompt).toContain('€22.155')
+    expect(prompt).toContain('€12.409')
+    expect(prompt).toContain('108 dagen vrijheid')
+  })
+
+  it('rendert concrete kansen en openstaande acties', () => {
+    const prompt = buildLocalChatSystemPrompt({ overview: OVERVIEW, question: 'geef een tip', knowledgeItems: [] })
+    expect(prompt).toContain('Concrete kansen')
+    expect(prompt).toContain('Bespaar op boodschappen')
+    expect(prompt).toContain('~€600/jaar')
+    expect(prompt).toContain('Openstaande acties')
+    expect(prompt).toContain('Benut je jaarruimte')
+  })
+
+  it('laat de verrijkings-blokken weg wanneer alles leeg is', () => {
+    const bare: LocalChatOverview = { ...OVERVIEW, jaarruimte: null, kansen: [], openstaandeActies: [] }
+    const prompt = buildLocalChatSystemPrompt({ overview: bare, question: 'hoi', knowledgeItems: [] })
+    expect(prompt).not.toContain('Jaarruimte (aftrekbare')
+    expect(prompt).not.toContain('Concrete kansen')
+    expect(prompt).not.toContain('Openstaande acties')
   })
 })
 

@@ -1,9 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { section, formatCurrency, formatFreedomTime, formatPercentage } from './formatter'
 import { calculateFreedomTime } from '@/lib/format'
-import { computeBox1Tax, marginalRateAt } from '@/lib/box1-tax'
+import { computeBox1Tax } from '@/lib/box1-tax'
 import { loadPerspectiveBox3 } from '@/lib/household-tax'
 import { computeJaarruimte, resolvePensionFactorA, jaarruimteBesparing } from '@/lib/jaarruimte'
+import { estimateGrossYearly } from '@/lib/jaarruimte-facts'
 import { getTaxDeadlines } from '@/lib/tax-calendar'
 import { hasBox2Relevance } from '@/lib/box2-relevance'
 
@@ -33,30 +34,6 @@ function withFreedom(amount: number, dailyExpenses: number): string {
   const base = formatCurrency(amount)
   if (!ft || (ft.years === 0 && ft.months === 0)) return base
   return `${base} (${formatFreedomTime(ft.years, ft.months)} vrijheid)`
-}
-
-/**
- * Schat het bruto jaarinkomen uit het netto maandinkomen via netto/(1−marginaal).
- * Het marginale tarief hangt zelf van het bruto af, dus we itereren een paar keer
- * (fixed-point) tot het stabiliseert. Faal-zacht: 0 in → 0 uit.
- */
-function estimateGrossYearly(netMonthlyIncome: number): number {
-  const netYearly = Math.max(0, netMonthlyIncome) * 12
-  if (netYearly <= 0) return 0
-  // Startschatting: gebruik een redelijk middentarief om te beginnen.
-  let gross = netYearly / (1 - 0.37)
-  for (let i = 0; i < 6; i++) {
-    const marginal = marginalRateAt(Math.round(gross), TAX_YEAR)
-    const denom = 1 - marginal
-    if (denom <= 0.05) break // bescherm tegen deling door (bijna) nul
-    const next = netYearly / denom
-    if (Math.abs(next - gross) < 1) {
-      gross = next
-      break
-    }
-    gross = next
-  }
-  return Math.round(gross)
 }
 
 /**
@@ -94,7 +71,7 @@ export async function buildTaxContext(supabase: SupabaseClient): Promise<string>
       factorA = 0
     }
 
-    const grossYearly = estimateGrossYearly(netMonthlyIncome)
+    const grossYearly = estimateGrossYearly(netMonthlyIncome, TAX_YEAR)
 
     // Box 3 eerst — levert ook de perspectief-correcte dag-uitgaven die we voor
     // de vrijheidstijd-conversie van álle bedragen hergebruiken.

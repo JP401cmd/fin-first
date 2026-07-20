@@ -29,6 +29,9 @@ const OVERVIEW: LocalChatOverview = {
   dagtarief: 69,
   swrPct: 3.4,
   noodbuffer: { bedrag: 12600, maanden: 6 },
+  jaarruimte: null,
+  kansen: [],
+  openstaandeActies: [],
 }
 
 /** Mock-sessie die `reply` in vaste stukjes streamt via `onDelta`. */

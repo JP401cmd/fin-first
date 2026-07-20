@@ -1,44 +1,56 @@
-// ── Lokale Fin-chat: compacte financiële context (fase C1b) ──────────────────
+// ── Lokale Fin-chat: compacte financiële context (fase C1b + verrijking) ──────
 //
-// Bouwt een KLEIN, getypeerd overzicht-object met exact de kerncijfers die de
-// C1a-proefset gebruikte (gemeten en bewezen: `spikes/litert-lm/c1a-resultaat.md`).
-// De server-page (`app/(app)/mijn/lokale-chat/page.tsx`) roept dit aan en geeft
-// het object door aan de client; `buildLocalChatSystemPrompt` rendert het in de
-// FINANCIEEL OVERZICHT-sectie van de lokale systeemprompt.
+// Bouwt een KLEIN, getypeerd overzicht-object met de kerncijfers plus de drie
+// "concrete-tip"-bronnen die de cloud-Fin ook krijgt: jaarruimte, aandachts-
+// punten (kansen) en openstaande acties. De server-page
+// (`app/(app)/mijn/lokale-chat/page.tsx`) en `/api/local-chat-overview` roepen
+// dit aan; `buildLocalChatSystemPrompt` rendert het in de FINANCIEEL OVERZICHT-
+// sectie van de lokale systeemprompt.
 //
 // CONSUME, DON'T RECOMPUTE (harde regel, CLAUDE.md): élk cijfer komt uit de
 // canonieke laag. De kern-cijfers (netto vermogen, vrijheids-%, FIRE-doel,
 // spaarquote, SWR, dagtarief, maandinkomen/-uitgaven) komen sinds C2b uit de
-// gedeelde extractor `buildWillFinancialFacts` (`lib/ai/context/will-financial-
+// gedeelde extractor `buildWillFinancialFacts` (`lib/ai/context/fin-financial-
 // facts.ts`) — DEZELFDE bron die `buildSharedContext` (cloud-Fin) leest, op de
-// canonieke MET-terugval ADR 0009-grondslag. Daardoor ziet Fin lokaal exact
-// dezelfde getallen als de cloud-Fin én de gebruiker in de app, en delen het
-// vrijheids-% en het FIRE-doel één grondslag (vóór C2b las het lokale pad het
-// vrijheids-% uit de zonder-terugval loader-variant → 0% in het randgeval,
-// terwijl het FIRE-doel al met-terugval was: een interne grondslag-mismatch).
-// De noodbuffer (`emergencyFundMonths`) is lokaal-only en blijft hier; er wordt
-// NIETS zelf opgeteld of herberekend.
+// canonieke MET-terugval ADR 0009-grondslag. De noodbuffer (`emergencyFund-
+// Months`) is lokaal-only en blijft hier; er wordt NIETS zelf opgeteld.
+//
+// VERRIJKING (waarom de lokale chat vóór dit generieke tips gaf): het lokale
+// model kreeg alléén ~10 aggregaat-cijfers en géén jaarruimte/kansen/acties, dus
+// het viel terug op standaardadvies. We voegen nu — parity-van-bedoeling met de
+// cloud, alles-in-context (geen tools lokaal) — drie bronnen toe, elk uit de
+// canonieke motor:
+//   • JAARRUIMTE via `computeJaarruimteFacts` (`lib/jaarruimte-facts.ts` → net→
+//     bruto + `computeJaarruimte` + `jaarruimteBesparing`), IDENTIEK aan wat de
+//     tax-context-builder de cloud-Fin voedt. Dit dicht het gedocumenteerde gat
+//     ("jaarruimte bewust buiten de POC-context") nu de chat productie wordt.
+//   • KANSEN via `collectAandachtspunten` (dezelfde bus als /overzicht en de
+//     cloud-aandachtspunten-context; al gesorteerd op besparing en al ontdaan
+//     van reeds-geactioneerde punten). Cap 3; de jaarruimte-kans filteren we eruit
+//     omdat die al als eigen blok staat.
+//   • OPENSTAANDE ACTIES via de `actions`-tabel (own-row RLS), zodat Fin "je hebt
+//     dit al als actie staan" kan zeggen — spiegelt wil-context's OPENSTAANDE
+//     ACTIES. Cap 3.
 //
 // GEEN CLOUD-GUARDRAILS: dit is het on-device pad. De cijfers zijn het eigen
 // financiële beeld van de gebruiker en gaan van de server naar diens éigen
 // browser — precies zoals elke /overzicht-pagina. Er is geen egress naar een
 // externe AI-provider, dus `sanitizeForAI`/`maskPIIInOutput`/token-logging zijn
 // hier N.V.T. (ADR 0043 §5).
-//
-// JAARRUIMTE — BEWUST BUITEN DE POC-CONTEXT: de C1a-proefset toonde een jaar-
-// ruimte-regel, maar dat cijfer zit NIET in `loadCoreData`/`CorePageData`. De
-// canonieke waarde komt uit een aparte motor (`lib/jaarruimte.ts` →
-// `computeJaarruimte` + `resolvePensionFactorA`) die pensioen-/factor-A-invoer
-// vereist die deze context niet laadt. "Consume, don't recompute" verbiedt het
-// hier alsnog uit te rekenen; een nieuwe query/engine-call optuigen valt buiten
-// de POC-scope. Daarom bevat het overzicht GEEN jaarruimte, en noemt het model
-// er — conform de DNA-regel "verzin nooit zelf cijfers" — dus ook geen bedrag
-// over. (Vervolgstap wanneer de chat productie wordt: jaarruimte via de
-// canonieke motor toevoegen, net als de tax-context-builder dat doet.)
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { loadCoreData } from '@/lib/core-data-loader'
 import { buildWillFinancialFacts } from '@/lib/ai/context/fin-financial-facts'
+import { computeJaarruimteFacts } from '@/lib/jaarruimte-facts'
+import { resolvePensionFactorA } from '@/lib/jaarruimte'
+import { collectAandachtspunten } from '@/lib/aandachtspunten-loader'
+import type { Aandachtspunt } from '@/lib/aandachtspunten'
+import { getCachedUser } from '@/lib/supabase/cached-user'
+
+/** Belastingjaar voor de jaarruimte-afleiding (gelijk aan de cloud tax-context). */
+const TAX_YEAR = 2026 as const
+/** Max. aantal kansen/acties in het compacte overzicht — een klein 8k-model niet overladen. */
+const MAX_ITEMS = 3
 
 /**
  * Compacte noodbuffer-stand: het liquide potje in maanden dekking (canonieke
@@ -51,14 +63,47 @@ export interface LocalChatBuffer {
   maanden: number
 }
 
+/** Jaarruimte-lever: onbenutte pensioen-aftrekruimte + geschatte belastingbesparing. */
+export interface LocalChatJaarruimte {
+  /** Onbenutte aftrekruimte in EUR. */
+  onbenut: number
+  /** Geschatte Box 1-belastingbesparing bij volledige benutting (EUR). */
+  besparing: number
+  /** Besparing omgerekend naar vrijheidsdagen (besparing ÷ dagtarief). */
+  vrijheidsdagen: number
+}
+
+/** Eén concrete kans (aandachtspunt) uit de canonieke aandachtspunten-bus. */
+export interface LocalChatKans {
+  /** Korte titel, bv. "Bespaar op boodschappen". */
+  titel: string
+  /** Geschatte besparing in EUR/jaar (0 = onbekend). */
+  besparingPerJaar: number
+  /** Vrijheidsdagen-equivalent van de jaarbesparing. */
+  vrijheidsdagen: number
+  /** Vrije-tekst deadline of ISO-datum, indien bekend. */
+  deadline?: string
+}
+
+/** Eén openstaande actie van de gebruiker (own-row). */
+export interface LocalChatActie {
+  /** Actietitel. */
+  titel: string
+  /** Vrijheidsdagen-impact van de actie. */
+  vrijheidsdagen: number
+  /** Status: 'open' | 'postponed'. */
+  status: string
+}
+
 /**
- * Klein, getypeerd financieel overzicht voor de lokale Fin-chat. Mapt 1-op-1 op
- * de FINANCIEEL OVERZICHT-velden uit de C1a-proefset (`c1a-data.json`).
+ * Klein, getypeerd financieel overzicht voor de lokale Fin-chat. De kern-velden
+ * mappen 1-op-1 op de C1a-proefset; de drie verrijkings-velden (jaarruimte,
+ * kansen, openstaandeActies) voeden de "geef één concrete tip"-vragen.
  */
 export interface LocalChatOverview {
   /**
    * False wanneer er nog geen financiële data is (geen bezit/schuld/transacties).
-   * De prompt toont dan een korte "nog geen data"-regel i.p.v. de cijfers.
+   * De prompt toont dan een korte "nog geen data"-regel i.p.v. de kern-cijfers.
    */
   hasData: boolean
   /** Netto vermogen in EUR (bezittingen − schulden). */
@@ -81,6 +126,12 @@ export interface LocalChatOverview {
   swrPct: number
   /** Noodbuffer-stand, of null wanneer er geen liquide buffer/uitgaven zijn. */
   noodbuffer: LocalChatBuffer | null
+  /** Jaarruimte-lever, of null bij geen/onvoldoende inkomen of ruimte 0. */
+  jaarruimte: LocalChatJaarruimte | null
+  /** Top concrete kansen (aandachtspunten), max 3. Leeg = geen. */
+  kansen: LocalChatKans[]
+  /** Openstaande acties van de gebruiker, max 3. Leeg = geen. */
+  openstaandeActies: LocalChatActie[]
 }
 
 /** Vrijgekochte-tijd string uit hele jaren + maanden (zelfde vorm als de context-formatter). */
@@ -93,24 +144,113 @@ function formatVrijheidstijd(years: number, months: number): string {
 }
 
 /**
+ * Herkent de jaarruimte-kans, zodat die niet dubbel (eigen blok + kans) verschijnt.
+ * Matcht op de STABIELE namespaced id (`tax:jaarruimte`, `lib/aandachtspunten.ts`),
+ * niet op de titel — die titel is prompt-dna-copy en kan hernoemd worden.
+ */
+function isJaarruimteAandachtspunt(a: Aandachtspunt): boolean {
+  return a.id === 'tax:jaarruimte'
+}
+
+/** Rij-vorm van de openstaande-acties-query (own-row). */
+interface OpenActionRow {
+  title: string
+  freedom_days_impact: number | null
+  status: string
+}
+
+/**
+ * Openstaande acties (own-row RLS, prioriteit desc, cap MAX_ITEMS) — spiegelt de
+ * OPENSTAANDE ACTIES-sectie van wil-context. Faal-zacht: bij welke query-/client-
+ * fout dan ook → lege lijst, zodat het overzicht nooit sneuvelt op een falende
+ * acties-lees (net als de faal-zachte aandachtspunten-bus).
+ */
+async function loadOpenActions(supabase: SupabaseClient): Promise<OpenActionRow[]> {
+  try {
+    // RLS is de canonieke own-row-waarborg; het expliciete `user_id`-filter is
+    // defense-in-depth — gelijk aan het zusterpatroon in aandachtspunten-loader,
+    // robuust tegen een toekomstige RLS-regressie.
+    const user = await getCachedUser(supabase)
+    if (!user) return []
+    const { data } = await supabase
+      .from('actions')
+      .select('title, freedom_days_impact, status')
+      .eq('user_id', user.id)
+      .in('status', ['open', 'postponed'])
+      .order('priority_score', { ascending: false })
+      .limit(MAX_ITEMS)
+    return (data ?? []) as OpenActionRow[]
+  } catch {
+    return []
+  }
+}
+
+/**
  * Bouw het compacte overzicht voor de lokale chat uit de canonieke bronnen.
  * Leest uitsluitend `loadCoreData` + canonieke engines — geen eigen sommen.
  */
 export async function buildLocalChatOverview(supabase: SupabaseClient): Promise<LocalChatOverview> {
-  const [coreData, profileResult] = await Promise.all([
+  // Alles parallel voor de latentie. De verrijkings-fan-out (aandachtspunten/acties)
+  // draait óók in de zeldzame no-data-tak, waar we 'm daarna weggooien — bewust
+  // geruild tegen de parallelliteit; het overzicht wordt per chat-open één keer gebouwd.
+  const [coreData, profileResult, aandachtspunten, actieRows] = await Promise.all([
     loadCoreData(supabase),
-    supabase.from('profiles').select('housing_strategy_config').maybeSingle(),
+    supabase
+      .from('profiles')
+      .select('housing_strategy_config, net_monthly_income, pension_factor_a, pension_factor_a_source')
+      .maybeSingle(),
+    // `collectAandachtspunten` faalt intern zacht (per producent → []); de extra
+    // `.catch` is puur defensief zodat één onverwachte fout het overzicht niet sloopt.
+    collectAandachtspunten(supabase).catch(() => [] as Aandachtspunt[]),
+    // OPENSTAANDE ACTIES — faal-zacht (zie `loadOpenActions`).
+    loadOpenActions(supabase),
   ])
 
   const { rawFinancials, healthScoreInput } = coreData
-  // Gedeelde kern-cijfers (netto vermogen, vrijheids-%, FIRE-doel, spaarquote,
-  // SWR, dagtarief, maandbedragen) op de canonieke MET-terugval ADR 0009-
-  // grondslag. Dit corrigeert de vroegere lokale afwijking (vrijheids-% uit de
-  // zonder-terugval loader-variant → 0% in het randgeval) en trekt vrijheids-%
-  // en FIRE-doel op één grondslag.
   const facts = buildWillFinancialFacts(coreData, profileResult.data)
 
-  // Geen enkele financiële data → minimaal overzicht (de prompt duidt dit).
+  // ── Jaarruimte (zelfde canonieke motoren als de cloud tax-context) ──────────
+  // Consume `computeJaarruimteFacts` (net→bruto + computeJaarruimte + besparing).
+  // NB: in de no-data-tak (geen bezit/schuld/transacties) laten we jaarruimte
+  // hieronder BEWUST weg om de "nog geen data"-boodschap niet tegen te spreken;
+  // dáár wijkt het af van de cloud tax-context (die jaarruimte ook income-only toont).
+  const factorA = resolvePensionFactorA({
+    pension_factor_a: profileResult.data?.pension_factor_a,
+    pension_factor_a_source: profileResult.data?.pension_factor_a_source,
+  }).factorA
+  const jf = computeJaarruimteFacts(Number(profileResult.data?.net_monthly_income ?? 0), factorA, TAX_YEAR)
+  const jaarruimte: LocalChatJaarruimte | null = jf.hasData
+    ? {
+        onbenut: jf.onbenut,
+        besparing: jf.besparing,
+        // Vrijheidsdagen via het canonieke dagtarief (uitgaven per dag); 0 bij geen uitgaven.
+        vrijheidsdagen: facts.dagtarief > 0 ? Math.round(jf.besparing / facts.dagtarief) : 0,
+      }
+    : null
+
+  // ── Kansen (aandachtspunten) ────────────────────────────────────────────────
+  // Al gesorteerd op besparing en al ontdaan van geactioneerde punten. De
+  // jaarruimte-kans filteren we eruit (staat al als eigen blok). Cap 3.
+  const kansen: LocalChatKans[] = aandachtspunten
+    .filter((a) => !isJaarruimteAandachtspunt(a))
+    .slice(0, MAX_ITEMS)
+    .map((a) => ({
+      titel: a.title,
+      besparingPerJaar: Math.round(a.savings),
+      vrijheidsdagen: Math.round(a.freedomDays),
+      ...(a.deadline ? { deadline: a.deadline } : {}),
+    }))
+
+  // ── Openstaande acties ──────────────────────────────────────────────────────
+  const openstaandeActies: LocalChatActie[] = actieRows.map((a) => ({
+    titel: a.title,
+    vrijheidsdagen: Math.round(a.freedom_days_impact ?? 0),
+    status: a.status,
+  }))
+
+  // Geen enkele kern-financiële data → minimaal overzicht (de prompt duidt dit).
+  // De verrijkings-blokken laten we hier bewust weg: zonder kern-cijfers past het
+  // niet bij de "nog geen data"-boodschap, en de gebruiker is nog niet ingericht.
   if (!facts.hasData) {
     return {
       hasData: false,
@@ -124,6 +264,9 @@ export async function buildLocalChatOverview(supabase: SupabaseClient): Promise<
       dagtarief: 0,
       swrPct: Math.round(facts.swr * 1000) / 10,
       noodbuffer: null,
+      jaarruimte: null,
+      kansen: [],
+      openstaandeActies: [],
     }
   }
 
@@ -153,5 +296,8 @@ export async function buildLocalChatOverview(supabase: SupabaseClient): Promise<
     dagtarief: Math.round(facts.dagtarief),
     swrPct: Math.round(facts.swr * 1000) / 10,
     noodbuffer,
+    jaarruimte,
+    kansen,
+    openstaandeActies,
   }
 }

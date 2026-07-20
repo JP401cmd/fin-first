@@ -45,6 +45,9 @@ const OVERVIEW: LocalChatOverview = {
   dagtarief: 85,
   swrPct: 3.4,
   noodbuffer: { bedrag: 7500, maanden: 2.9 },
+  jaarruimte: null,
+  kansen: [],
+  openstaandeActies: [],
 }
 
 const CAPABLE = { ok: true, reasons: [], shaderF16: true, deviceMemoryGb: 16 }
