@@ -1,10 +1,17 @@
 'use client'
 
 import { useRef, useEffect, useState, useMemo, useCallback } from 'react'
+import Link from 'next/link'
 import { useChat } from '@ai-sdk/react'
-import { DefaultChatTransport } from 'ai'
+import { DefaultChatTransport, type ChatTransport, type UIMessage } from 'ai'
 import { useRouter, usePathname } from 'next/navigation'
 import { useChatContext } from './chat-provider'
+import { LocalChatTransport } from '@/lib/ai/local/local-chat-transport'
+import { checkLocalAiCapability } from '@/lib/ai/local/webgpu-capability'
+import { getLocalModelState } from '@/lib/ai/local/model-manager'
+import { resolveLocalReadiness } from '@/lib/ai/local/local-readiness'
+import type { LocalChatOverview } from '@/lib/ai/local/local-chat-context'
+import type { LocalKnowledgeItem } from '@/lib/ai/local/knowledge-context'
 import { useModuleAccess } from '@/components/app/feature-access-provider'
 import { hasSubscription } from '@/lib/feature-registry'
 import { AiSubscriptionUpsell } from '@/components/app/ai-subscription-upsell'
@@ -12,7 +19,7 @@ import { WillDots } from '@/components/app/will-dots'
 import { ActionEditModal } from '@/components/app/action-edit-modal'
 import type { Action, ActionStatus } from '@/lib/recommendation-data'
 import { renderMarkdown, findToolInvocation, TOOL_LOADING_STATES, TOOL_OUTPUT_STATES, type MessagePart } from './markdown-helpers'
-import { X, Send, Loader2, Zap, Check, AlertTriangle, RefreshCw, Pin, PinOff, ShieldCheck, Sparkles, Clock, ThumbsDown } from 'lucide-react'
+import { X, Send, Loader2, Zap, Check, AlertTriangle, RefreshCw, Pin, PinOff, ShieldCheck, Sparkles, Clock, ThumbsDown, Cpu } from 'lucide-react'
 import type { SuggestRecommendationResult } from '@/lib/ai/tools/suggest-recommendation'
 import { ChatVisualizationCard } from './chat-visualization-card'
 import '@/components/app/will/will-home.css' // wh-melding-in keyframe (corner-grow entree, gedeeld met WillHome)
@@ -65,6 +72,62 @@ function WftDisclaimer({ onAccept }: { onAccept: () => void }) {
         <p className="mt-3 text-[10px] text-[var(--ink-4)]">
           Deze melding verschijnt eenmalig.
         </p>
+      </div>
+    </div>
+  )
+}
+
+/* ── Lokale-modus: banner + fail-closed blokkade ──────────────────── */
+
+/**
+ * Permanente strip bovenin de lokale chat: eerlijke snelheids-/privacy-framing
+ * (bewuste afweging, niet verontschuldigend) + een korte hint dat acties en
+ * wat-als lokaal nog niet kunnen. Blijft de hele sessie staan.
+ */
+function LocalModeBanner() {
+  return (
+    <div className="border-b border-[var(--border-ed)] bg-wil-50/60 px-4 py-2.5">
+      <div className="flex items-start gap-2">
+        <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-wil-600" aria-hidden="true" />
+        <div className="text-[11px] leading-relaxed text-[var(--ink-2)]">
+          <p>
+            Will denkt lokaal na — dit draait volledig op je toestel en duurt wat
+            langer, maar je gegevens blijven privé.
+          </p>
+          <p className="mt-1 text-[var(--ink-3)]">
+            Acties en wat-als-simulaties kan Will lokaal nog niet uitvoeren. Zet
+            privé-modus uit voor die functies.
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Fail-closed-scherm: privé-modus staat aan maar het lokale pad is niet gereed
+ * op dit toestel. We tonen de concrete readiness-melding en verwijzen naar
+ * Mijn → Privacy (download/beheer). NOOIT een stille cloud-fallback.
+ */
+function LocalBlockedNotice({ message, onNavigate }: { message: string; onNavigate: () => void }) {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center px-6 py-8">
+      <div className="mx-auto max-w-sm text-center">
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-amber-50">
+          <Cpu className="h-6 w-6 text-amber-600" aria-hidden="true" />
+        </div>
+        <h2 className="text-base font-semibold text-[var(--ink)]">Lokale chat nog niet klaar</h2>
+        <p className="mt-3 text-sm leading-relaxed text-[var(--ink-2)]">{message}</p>
+        <p className="mt-3 text-xs text-[var(--ink-3)]">
+          Je gegevens zijn privé gebleven — er is niets naar onze servers gestuurd.
+        </p>
+        <Link
+          href="/mijn/privacy"
+          onClick={onNavigate}
+          className="mt-5 inline-flex items-center gap-1.5 bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800"
+        >
+          Naar Mijn → Privacy
+        </Link>
       </div>
     </div>
   )
@@ -472,10 +535,132 @@ export function ChatPanel() {
     return 'kern'
   }, [pathname, activeModules])
 
-  const transport = useMemo(
+  // ── Transport-keuze: cloud vs. on-device (privé-modus) ─────────────────────
+  //
+  // De cloud-transport is de default en blijft ONGEWIJZIGD (DefaultChatTransport
+  // → /api/ai/chat). Staat privé-modus AAN én is het lokale model gereed op dit
+  // toestel, dan wisselen we naar de LocalChatTransport zodat er geen byte naar
+  // de server gaat (FR-C2a). Is privé-modus aan maar het lokale pad NIET gereed,
+  // dan blokkeren we FAIL-CLOSED (nette melding, nooit stil terugvallen op cloud).
+  //
+  // Alles ná deze swap (useChat, message-rendering, WftDisclaimer, quick-chips)
+  // blijft ongewijzigd — de transport is de enige naad.
+  const cloudTransport = useMemo(
     () => new DefaultChatTransport({ api: '/api/ai/chat', body: { domain } }),
     [domain],
   )
+
+  // Resolutie-toestand van de privé-modus-swap. 'resolving' zolang we de modus +
+  // gereedheid bepalen (er wordt dan bewust NIETS verstuurd — ook niet naar de
+  // cloud — zodat een privé-gebruiker nooit per ongeluk via de cloud gaat).
+  type LocalChatState =
+    | { status: 'resolving' }
+    | { status: 'cloud' }
+    | { status: 'local'; transport: LocalChatTransport }
+    | { status: 'blocked'; message: string }
+  const [localState, setLocalState] = useState<LocalChatState>({ status: 'resolving' })
+
+  // Bepaal de modus bij (her)openen van de chat. Verse lezing per open (bewust
+  // NIET via de gedeelde usePrivacyMode-singleton) zodat een net-gewijzigde
+  // privé-toggle direct correct is en de swap fail-closed blijft.
+  useEffect(() => {
+    if (!isOpen || !hasAi) {
+      // Chat dicht/geen abonnement → terug naar resolving; het dispose-effect
+      // hieronder ruimt een eventuele lopende lokale sessie op.
+      setLocalState({ status: 'resolving' })
+      return
+    }
+    let cancelled = false
+    setLocalState({ status: 'resolving' })
+    ;(async () => {
+      // 1. Privé-modus lezen (own-row via GET /api/privacy-mode). Faalt de lezing
+      //    (transient), dan default cloud — spiegelt de categorisatie-sheet.
+      let privacyMode = false
+      try {
+        const res = await fetch('/api/privacy-mode')
+        if (res.ok) {
+          const data = (await res.json()) as { privacyMode?: boolean }
+          privacyMode = data.privacyMode ?? false
+        }
+      } catch {
+        /* stil: default cloud */
+      }
+      if (cancelled) return
+      if (!privacyMode) {
+        setLocalState({ status: 'cloud' })
+        return
+      }
+
+      // 2. Gereedheid op DÍT toestel (capability + modelstaat), zoals LocalChatPanel.
+      const [cap, model] = await Promise.all([checkLocalAiCapability(), getLocalModelState()])
+      if (cancelled) return
+      const readiness = resolveLocalReadiness(cap, { state: model.state })
+      if (!readiness.ready) {
+        setLocalState({
+          status: 'blocked',
+          message: readiness.message ?? 'Lokale AI is nu niet beschikbaar op dit toestel.',
+        })
+        return
+      }
+
+      // 3. Hydrateer het overzicht + de kennisbank en bouw de lokale transport.
+      try {
+        const [overviewRes, knowledgeRes] = await Promise.all([
+          fetch('/api/local-chat-overview'),
+          fetch('/api/local-knowledge'),
+        ])
+        if (cancelled) return
+        if (!overviewRes.ok) {
+          setLocalState({
+            status: 'blocked',
+            message:
+              'Je financiële overzicht voor de lokale chat kon niet worden geladen. Probeer het opnieuw.',
+          })
+          return
+        }
+        const overview = (await overviewRes.json()) as LocalChatOverview
+        let knowledgeItems: LocalKnowledgeItem[] = []
+        if (knowledgeRes.ok) {
+          const kd = (await knowledgeRes.json()) as { items?: LocalKnowledgeItem[] }
+          if (Array.isArray(kd.items)) knowledgeItems = kd.items
+        }
+        if (cancelled) return
+        setLocalState({
+          status: 'local',
+          transport: new LocalChatTransport({ overview, knowledgeItems }),
+        })
+      } catch {
+        if (cancelled) return
+        setLocalState({
+          status: 'blocked',
+          message:
+            'De lokale chat kon niet worden voorbereid. Er is niets naar onze servers gestuurd. Probeer het opnieuw.',
+        })
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [isOpen, hasAi])
+
+  // Dispose de lokale sessie bij transport-wissel én bij unmount (architect rode
+  // vlag 2: anders lekt een WebGPU-sessie). Keyed op localState → de cleanup
+  // vuurt zodra we van dít 'local'-object af bewegen (nieuwe local, blocked,
+  // resolving of unmount).
+  useEffect(() => {
+    if (localState.status !== 'local') return
+    const t = localState.transport
+    return () => {
+      t.dispose()
+    }
+  }, [localState])
+
+  const isLocalMode = localState.status === 'local'
+  // Alleen versturen zodra de modus is vastgesteld (cloud óf lokaal). In
+  // 'resolving'/'blocked' mag er niets uit — dat is de fail-closed-garantie.
+  const chatReady = localState.status === 'cloud' || localState.status === 'local'
+  const transport: ChatTransport<UIMessage> =
+    localState.status === 'local' ? localState.transport : cloudTransport
 
   const { messages: rawMessages, sendMessage, status, error, clearError, regenerate } = useChat({
     id: 'chat-will',
@@ -527,27 +712,27 @@ export function ChatPanel() {
     // niet het daadwerkelijke versturen. De vraag blijft in pendingMessage staan
     // tot wftAccepted===true; na 'Ik begrijp het' vuurt dit effect opnieuw en
     // wordt de vraag alsnog verstuurd (de vraag gaat dus niet verloren).
-    if (isOpen && hasAi && wftAccepted === true && !isStreaming && dispatchedPendingRef.current !== pendingMessage) {
+    if (isOpen && hasAi && chatReady && wftAccepted === true && !isStreaming && dispatchedPendingRef.current !== pendingMessage) {
       dispatchedPendingRef.current = pendingMessage
       sendMessage({ text: pendingMessage })
       clearPendingMessage()
     }
-  }, [isOpen, hasAi, wftAccepted, pendingMessage, isStreaming, sendMessage, clearPendingMessage])
+  }, [isOpen, hasAi, chatReady, wftAccepted, pendingMessage, isStreaming, sendMessage, clearPendingMessage])
 
   // Auto-send scenario context message when chat opens from whatif page (first open only).
   // Zelfde Wft-gate als het pendingMessage-effect: pas versturen ná acceptatie.
   const autoSentRef = useRef(false)
   useEffect(() => {
-    if (isOpen && hasAi && wftAccepted === true && autoOpenMessage && !isStreaming && messages.length === 0 && !autoSentRef.current) {
+    if (isOpen && hasAi && chatReady && wftAccepted === true && autoOpenMessage && !isStreaming && messages.length === 0 && !autoSentRef.current) {
       autoSentRef.current = true
       sendMessage({ text: autoOpenMessage })
       setAutoOpenMessage(null)
     }
-  }, [isOpen, hasAi, wftAccepted, autoOpenMessage, isStreaming, messages.length, sendMessage, setAutoOpenMessage])
+  }, [isOpen, hasAi, chatReady, wftAccepted, autoOpenMessage, isStreaming, messages.length, sendMessage, setAutoOpenMessage])
 
   const submit = () => {
     const text = input.trim()
-    if (!text || isStreaming) return
+    if (!text || isStreaming || !chatReady) return
     setInput('')
     sendMessage({ text })
   }
@@ -841,9 +1026,13 @@ export function ChatPanel() {
   }
 
   const handleRetry = useCallback(() => {
+    // Fail-closed: net als alle andere verzendpaden mag retry pas vuren als de
+    // transport gereed is (cloud/local). Anders zou regenerate() tijdens
+    // resolving/blocked alsnog over de cloud-transport kunnen vuren.
+    if (!chatReady) return
     clearError()
     regenerate()
-  }, [clearError, regenerate])
+  }, [chatReady, clearError, regenerate])
 
   const handleDismissError = useCallback(() => {
     clearError()
@@ -873,8 +1062,19 @@ export function ChatPanel() {
           <div className="flex items-center gap-2">
             {config.fabAvatar(32)}
             <div>
-              <span className={`text-sm font-semibold ${config.headerColor}`}>{config.name}</span>
-              <span className="ml-1 text-xs text-[var(--ink-3)]">{config.subtitle}</span>
+              <div className="flex items-center gap-1.5">
+                <span className={`text-sm font-semibold ${config.headerColor}`}>{config.name}</span>
+                {/* Permanente "lokaal"-indicatie gedurende de hele privé-sessie. */}
+                {isLocalMode && (
+                  <span className="inline-flex items-center gap-1 border border-amber-500/40 bg-amber-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-amber-700">
+                    <Cpu className="h-2.5 w-2.5" aria-hidden="true" />
+                    Experimenteel · lokaal
+                  </span>
+                )}
+              </div>
+              <span className="text-xs text-[var(--ink-3)]">
+                {isLocalMode ? 'Draait op je toestel' : config.subtitle}
+              </span>
             </div>
           </div>
           <div className="flex items-center gap-1">
@@ -903,9 +1103,17 @@ export function ChatPanel() {
           <WftDisclaimer onAccept={handleWftAccept} />
         )}
 
+        {/* Privé-modus aan, maar lokaal niet gereed → fail-closed blokkade
+            (nooit stil terugvallen op de cloud). */}
+        {hasAi && wftAccepted !== false && localState.status === 'blocked' && (
+          <LocalBlockedNotice message={localState.message} onNavigate={close} />
+        )}
+
         {/* Messages */}
-        {hasAi && wftAccepted !== false && (
+        {hasAi && wftAccepted !== false && localState.status !== 'blocked' && (
         <>
+        {/* Permanente lokaal-strip gedurende de hele privé-sessie. */}
+        {isLocalMode && <LocalModeBanner />}
         <div className="flex-1 overflow-y-auto px-4 py-3">
           {/* Polite live-regio alléén om de berichten — de assertive foutbanner
               staat er bewust buiten (geen geneste live-regio's). */}
@@ -921,8 +1129,8 @@ export function ChatPanel() {
               </p>
               <QuickActionChips
                 pathname={pathname}
-                disabled={isStreaming}
-                onPick={(prompt) => sendMessage({ text: prompt })}
+                disabled={isStreaming || !chatReady}
+                onPick={(prompt) => { if (chatReady) sendMessage({ text: prompt }) }}
               />
             </div>
           )}
@@ -1005,7 +1213,8 @@ export function ChatPanel() {
                       <button
                         type="button"
                         onClick={handleRetry}
-                        className="inline-flex items-center gap-1 rounded-lg bg-red-100 px-3 py-1.5 text-xs font-medium text-red-700 transition-colors hover:bg-red-200"
+                        disabled={!chatReady}
+                        className="inline-flex items-center gap-1 rounded-lg bg-red-100 px-3 py-1.5 text-xs font-medium text-red-700 transition-colors hover:bg-red-200 disabled:cursor-not-allowed disabled:opacity-50"
                         data-testid="chat-retry-button"
                       >
                         <RefreshCw className="h-3 w-3" />
@@ -1037,14 +1246,15 @@ export function ChatPanel() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={onKeyDown}
-              placeholder={config.placeholder}
+              placeholder={chatReady ? config.placeholder : 'Even geduld…'}
               rows={1}
-              className="max-h-24 flex-1 resize-none rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2 text-sm outline-none placeholder:text-[var(--ink-3)] focus:border-[var(--border-md)] focus:ring-1 focus:ring-zinc-200"
+              disabled={!chatReady}
+              className="max-h-24 flex-1 resize-none rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2 text-sm outline-none placeholder:text-[var(--ink-3)] focus:border-[var(--border-md)] focus:ring-1 focus:ring-zinc-200 disabled:opacity-60"
             />
             <button
               type="button"
               onClick={submit}
-              disabled={isStreaming || !input.trim()}
+              disabled={isStreaming || !input.trim() || !chatReady}
               className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--r-lg)] ${config.sendBg} text-white transition-colors ${config.sendHoverBg} disabled:bg-zinc-300 disabled:text-[var(--ink-3)]`}
             >
               <Send className="h-4 w-4" />

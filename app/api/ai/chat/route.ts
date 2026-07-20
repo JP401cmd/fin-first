@@ -23,6 +23,38 @@ export async function POST(req: Request) {
     return unauthorized()
   }
 
+  // ── Privé-modus gate (laag 3 uit het plan — server-side, beslissend) ───────
+  // FR-C2a.6: staat privé-modus aan, dan draait de Will-chat lokaal op het
+  // toestel en mag de financiële context deze route NOOIT richting een externe
+  // AI-provider verlaten. We blokkeren hier — direct ná de auth-check en VÓÓR de
+  // tier-/credit-gate, het model laden en de context/prompt-opbouw. Dit is de
+  // beslissende fail-closed-laag: een client-race (bv. autoOpenMessage vuurt
+  // vóór privacyMode/readiness client-side geladen is) of een gemanipuleerd
+  // verzoek mag buildContext/buildSystemPrompt (regels verderop) nooit alsnog
+  // naar de cloud laten gaan. Spiegelt exact app/api/ai/categorize/route.ts.
+  //
+  // Own-row read via de anon/RLS-client (auth.uid() = id), NOOIT service-role.
+  // Eén minimale scalar-select. Defensief: de kolom kan in oudere omgevingen nog
+  // ontbreken → fail-open naar `false` (bestaand cloud-gedrag), zodat de route
+  // niet breekt vóór de migratie is toegepast. Pre-migratie kán geen enkele
+  // gebruiker privacy_mode=true hebben, dus deze fail-open honoreert geen
+  // bestaande privacy-voorkeur ten onrechte.
+  const { data: privacyRow } = await supabase
+    .from('profiles')
+    .select('privacy_mode')
+    .eq('id', user.id)
+    .maybeSingle()
+  const privacyMode = (privacyRow as { privacy_mode?: boolean | null } | null)?.privacy_mode ?? false
+  if (privacyMode) {
+    return Response.json(
+      {
+        error: 'Privé-modus actief: de chat draait lokaal op je apparaat.',
+        code: 'privacy_mode_active',
+      },
+      { status: 403 },
+    )
+  }
+
   const tierGate = await checkTierGate(supabase, user.id, 'ai')
   if (tierGate) {
     return new Response(JSON.stringify({ error: tierGate.error }), { status: 403, headers: { 'Content-Type': 'application/json' } })

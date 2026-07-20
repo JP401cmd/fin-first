@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-20T06:45:46.570Z",
+  "generatedAt": "2026-07-20T07:31:50.826Z",
   "generatedDate": "2026-07-20",
   "repo": {
     "name": "fin",
@@ -189,11 +189,11 @@
   "stats": {
     "routes": 144,
     "routesProduction": 101,
-    "api": 255,
+    "api": 256,
     "tables": 84,
     "migrations": 148,
-    "integrations": 25,
-    "components": 864,
+    "integrations": 24,
+    "components": 866,
     "providers": 11,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -3382,6 +3382,14 @@
       ]
     },
     {
+      "url": "/api/local-chat-overview",
+      "file": "app/api/local-chat-overview/route.ts",
+      "domain": "local-chat-overview",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
       "url": "/api/local-knowledge",
       "file": "app/api/local-knowledge/route.ts",
       "domain": "local-knowledge",
@@ -6380,6 +6388,21 @@
       ]
     },
     {
+      "domain": "local-chat-overview",
+      "label": "local-chat-overview",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/local-chat-overview",
+          "file": "app/api/local-chat-overview/route.ts",
+          "domain": "local-chat-overview",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "local-knowledge",
       "label": "local-knowledge",
       "count": 1,
@@ -7724,11 +7747,11 @@
     }
   ],
   "components": {
-    "total": 864,
+    "total": 866,
     "groups": [
       {
         "group": "app",
-        "count": 360,
+        "count": 362,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -7742,6 +7765,7 @@
           "ai-categorize-sheet",
           "ai-categorize-sheet.test",
           "ai-privacy-indicator",
+          "ai-privacy-indicator.test",
           "ai-subscription-upsell",
           "ai-subscription-upsell.test",
           "ai-vaste-kosten-sheet",
@@ -8076,6 +8100,7 @@
           "whatif-actions",
           "whatif-beslishulp",
           "whatif-chat",
+          "whatif-chat.test",
           "whatif-development-notice",
           "whatif-events",
           "whatif-header",
@@ -8741,10 +8766,6 @@
     },
     {
       "name": "OpenAI",
-      "category": "AI"
-    },
-    {
-      "name": "OpenRouter",
       "category": "AI"
     },
     {
@@ -9737,6 +9758,12 @@
           "write": false
         }
       ],
+      "local-chat-overview": [
+        {
+          "name": "profiles",
+          "write": false
+        }
+      ],
       "local-knowledge": [
         {
           "name": "app_settings",
@@ -10726,6 +10753,14 @@
           "write": false,
           "routes": [
             "/api/health"
+          ]
+        },
+        {
+          "domain": "local-chat-overview",
+          "label": "local-chat-overview",
+          "write": false,
+          "routes": [
+            "/api/local-chat-overview"
           ]
         },
         {
@@ -14557,6 +14592,19 @@
       ],
       "summary": "Laatste taak van FASE 4 van het performance-programma. We zetten de **React Compiler** aan (`reactCompiler: true`), zodat React onze componenten op build-time automatisch en *correct* memoïseert. Dat neemt de gebroken handmatige memo-ketens uit de juli-performance-audit structure",
       "file": "docs/adr/0055-react-compiler.md"
+    },
+    {
+      "id": "0056-chat-transport-cloud-lokaal-omschakelpunt",
+      "title": "Chat-transport = het cloud/lokaal-omschakelpunt voor Will-chat + gedeelde buildWillFinancialFacts als enige Will-cijferbron",
+      "status": "aanvaard",
+      "date": "2026-07-20",
+      "elements": [
+        "as-coach",
+        "t-aigateway",
+        "t-lokale-ai"
+      ],
+      "summary": "C2a/C2b breiden het lokale-AI-pad (ADR 0043) uit van transactiecategorisatie naar de dagelijkse Will-chat (WillHome): bij `privacy_mode=true` moet het gesprek met Will lokaal blijven draaien, zonder dat de gebruiker een aparte pagina of een tweede chat-ervaring krijgt. De vraag w",
+      "file": "docs/adr/0056-chat-transport-cloud-lokaal-omschakelpunt.md"
     }
   ],
   "churn": {
@@ -14568,7 +14616,7 @@
       },
       {
         "path": "lib/ai",
-        "commits": 46
+        "commits": 47
       },
       {
         "path": "app/(app)/toekomst",
@@ -14576,7 +14624,7 @@
       },
       {
         "path": "app/api/ai",
-        "commits": 16
+        "commits": 17
       },
       {
         "path": "app/api/household",
@@ -15425,9 +15473,31 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-07-19",
-    "hasChanges": false,
-    "sections": []
+    "previousDate": "2026-07-20",
+    "hasChanges": true,
+    "sections": [
+      {
+        "label": "API-routes",
+        "added": [
+          "/api/local-chat-overview"
+        ],
+        "removed": []
+      },
+      {
+        "label": "Integraties",
+        "added": [],
+        "removed": [
+          "OpenRouter"
+        ]
+      },
+      {
+        "label": "Componenten (aantal)",
+        "added": [
+          "+2"
+        ],
+        "removed": []
+      }
+    ]
   },
   "statsHistory": [
     {
@@ -15614,8 +15684,8 @@
     },
     {
       "date": "2026-07-20",
-      "api": 255,
-      "components": 864,
+      "api": 256,
+      "components": 866,
       "tables": 84,
       "routesProduction": 101
     }

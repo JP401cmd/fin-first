@@ -87,14 +87,17 @@ beforeEach(() => {
 })
 
 describe('ChatPanel — AI-abonnee-toegang via de échte FeatureAccessProvider', () => {
-  it('toont het chat-invoerveld (geen upsell) voor een AI-abonnee BINNEN FeatureAccessProvider', () => {
+  it('toont het chat-invoerveld (geen upsell) voor een AI-abonnee BINNEN FeatureAccessProvider', async () => {
     render(
       <FeatureAccessProvider data={aiSubscriberData}>
         <ChatPanel />
       </FeatureAccessProvider>,
     )
 
-    expect(screen.getByPlaceholderText('Vraag Will iets...')).toBeInTheDocument()
+    // Sinds FR-C2a resolveert de transport-keuze (cloud/lokaal) async — het
+    // invoerveld verschijnt pas zodra `chatReady` waar is (privacy-mode-fetch
+    // afgerond). `findBy*` wacht daarop i.p.v. een synchrone `getBy*`.
+    expect(await screen.findByPlaceholderText('Vraag Will iets...')).toBeInTheDocument()
     expect(screen.queryByTestId('ai-upsell-panel')).not.toBeInTheDocument()
   })
 

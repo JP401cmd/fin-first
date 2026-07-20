@@ -1,5 +1,14 @@
 import '@testing-library/jest-dom'
-import { vi } from 'vitest'
+import { vi, afterEach } from 'vitest'
+import { __resetPrivacyModeCache } from '@/components/app/use-privacy-mode'
+
+// De privacy-mode-hook (usePrivacyMode) deelt een module-singleton-cache zodat
+// meerdere indicatoren op één pagina niet elk apart /api/privacy-mode fetchen.
+// Zonder reset tussen tests kan die gecachete promise over test-volgordes heen
+// lekken (load-flakiness). Globale teardown houdt elke test vers.
+afterEach(() => {
+  __resetPrivacyModeCache()
+})
 
 /**
  * Globale test-setup. jsdom mist browser-API's die door componenten

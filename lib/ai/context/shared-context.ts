@@ -1,15 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { computeCoreData, computeFreedomProgressWithBasis, inclHomeTargetFromScalar, type FinancialInput } from '@/lib/core-metrics'
+import { computeCoreData, type FinancialInput } from '@/lib/core-metrics'
 import { loadCoreData } from '@/lib/core-data-loader'
-import type { Asset } from '@/lib/asset-data'
-import type { Debt } from '@/lib/debt-data'
-import {
-  deriveHousingContext,
-  getFireEligibleNetWorth,
-  parseHousingStrategy,
-  isHomeExcludedFromFire,
-} from '@/lib/housing-strategy'
 import { isFinanciallyFree } from '@/lib/fire-strategy'
+import { buildWillFinancialFacts } from './will-financial-facts'
 import { section, formatCurrency, formatFreedomTime, formatPercentage } from './formatter'
 
 const TEMPORAL_LABELS: Record<number, string> = {
@@ -82,44 +75,23 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
   }
   const core = computeCoreData(coreInput, coreData.fireParams.effectiveSwr)
 
-  // Vrijheids-% op de canonieke grondslag (ADR 0009): FIRE-eligible vermogen
-  // (eigen woning gefilterd via de housing-strategie) ÷ benodigde portfolio uit
-  // de unified projection. Dit is exact dezelfde teller/noemer als de "nog X
-  // jaar"-aftelling op /overzicht en /toekomst, zodat Will nooit "100% op weg"
-  // beweert terwijl de UI <100% en "nog jaren" toont. `computeCoreData`'s eigen
-  // `freedomPercentage` (vol netto vermogen incl. huis ÷ simpel fireTarget) is
-  // bewust NIET de bron — alleen een laatste fallback voor het FIRE-doelbedrag.
-  const housingStrategy = parseHousingStrategy(profile?.housing_strategy_config)
-  const housingContext = deriveHousingContext(
-    (coreData.fullAssets ?? []) as Asset[],
-    (coreData.fullDebts ?? []) as Debt[],
-  )
-  const fireEligibleNetWorth = getFireEligibleNetWorth(core.netWorth, housingContext, housingStrategy)
-  // Noemer: benodigde portfolio uit de unified projection (zelfde getal als de
-  // loaders gebruiken). Valt terug op het strategie-loze fireTarget wanneer de
-  // projectie niet kon draaien (geen geboortedatum / geen jaaruitgaven).
-  const requiredPortfolio = coreData.fireTargetFromHorizon ?? (core.fireTarget > 0 ? core.fireTarget : null)
-  // Grondslag-keuze (ADR 0009 herzien): standaard telt de eigen woning mee →
-  // INCL.-woning grondslag (teller = volledig netto vermogen, noemer = incl.-doel
-  // via scalar-fallback). Alleen bij exclude_from_fire → EXCL. (liquide).
-  const homeExcludedFromFire = housingContext.hasEigenHuis && isHomeExcludedFromFire(housingStrategy)
-  const requiredNetWorthInclHome = inclHomeTargetFromScalar(requiredPortfolio, core.netWorth, fireEligibleNetWorth)
-  const freedomPercentage = computeFreedomProgressWithBasis({
-    homeExcludedFromFire,
-    netWorthInclHome: core.netWorth,
-    fireEligibleNetWorth,
-    requiredNetWorthInclHome,
-    requiredPortfolioExclHome: requiredPortfolio,
-  })
-  // FIRE-doel op DEZELFDE grondslag als het Vrijheids-% (incl. woning tenzij
-  // uitgesloten), met fallback op het simpele fireTarget.
-  const displayFireGoal = homeExcludedFromFire
-    ? requiredPortfolio
-    : (requiredNetWorthInclHome ?? requiredPortfolio)
+  // Netto vermogen, vrijgekochte tijd, vrijheids-% en FIRE-doel komen ALLE uit de
+  // gedeelde extractor `buildWillFinancialFacts` — DEZELFDE bron die de lokale Will
+  // (`buildLocalChatOverview`) leest, zodat beide Wills exact dezelfde getallen op
+  // dezelfde grondslag tonen. `facts.nettoVermogen/freedomYears/freedomMonths` zijn
+  // per constructie identiek aan `core.*` (zelfde `computeCoreData`-input + SWR); ze
+  // óók uit facts lezen maakt er één bron van, zodat een toekomstige wijziging aan de
+  // coreInput (bv. dateOfBirth) hier niet stil kan divergeren van het vrijheids-%.
+  // `core` hieronder blijft uitsluitend de bron voor de cloud-only KPI-regels
+  // (FIRE-datum, dagen/jaar, autonomie, dagelijkse uitgaven, fireTarget-fallback) die
+  // de extractor niet draagt.
+  const facts = buildWillFinancialFacts(coreData, profile)
+  const freedomPercentage = facts.vrijheidsPct
+  const displayFireGoal = facts.displayFireGoal
 
   const lines = [
-    `Netto vermogen: ${formatCurrency(core.netWorth)}`,
-    `Vrijgekochte tijd: ${formatFreedomTime(core.freedomYears, core.freedomMonths)}`,
+    `Netto vermogen: ${formatCurrency(facts.nettoVermogen)}`,
+    `Vrijgekochte tijd: ${formatFreedomTime(facts.freedomYears, facts.freedomMonths)}`,
     `Vrijheids-%: ${formatPercentage(freedomPercentage)}`,
     // Toon het FIRE-doel op dezelfde grondslag als het Vrijheids-% — zo zijn
     // teller, noemer en doelbedrag onderling consistent.

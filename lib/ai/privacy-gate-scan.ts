@@ -5,19 +5,21 @@
 // confirms the privacy-gate is present where scope demands it — never a
 // hardcoded route list that quietly rots as new AI routes appear.
 //
-// Scope A (ADR 0043 §Besluit 4, "aanvaard"): `profiles.privacy_mode` gates
-// ONLY `/api/ai/categorize` (server-side 403, laag 3, decisive). All other
-// getModel consumers stay cloud-based, unaffected by the toggle. This is a
-// deliberate, documented narrowing of Option B (a central guard over every
-// AI route) — see requirements §3.
+// Scope A (ADR 0043 §Besluit 4, "aanvaard") — GEGROEID naar TWEE routes met
+// ADR 0055 / docs/requirements-lokale-chat-overname.md (C2a): `profiles.
+// privacy_mode` gates `/api/ai/categorize` ÉN `/api/ai/chat` (beide server-side
+// 403, laag 3, decisive). Dit blijft geen Optie B (geen centrale, alle-routes-
+// dekkende guard) — het is scope A die bewust van 1 naar 2 expliciet benoemde
+// routes groeit. Alle overige getModel-consumenten blijven cloud-based,
+// onaangeroerd door de toggle — zie requirements §2/§3.
 //
 // This module does two things:
 //   1. Enumerates every real getModel-consumer file (an actual import of
 //      `getModel` from '@/lib/ai/config', not a comment/string mention and
 //      not the definition file itself).
-//   2. Exposes an anchor check for the categorize route: does its source
-//      contain the `privacy_mode_active` gate code BEFORE the getModel(...)
-//      call, i.e. before any transaction data reaches prompt construction?
+//   2. Exposes an anchor check per gated route: does its source contain the
+//      `privacy_mode_active` gate code BEFORE the getModel(...) call, i.e.
+//      before any financial/transaction data reaches prompt construction?
 //
 // This is a coarse, source-level net — same spirit as ai-callsite-scan.ts
 // (ADR 0035). It proves the guard's TEXTUAL presence and ordering, not that
@@ -27,8 +29,16 @@
 import * as fs from 'fs'
 import * as path from 'path'
 
-/** The exact route this scope-A guard must protect (ADR 0043 §Besluit 4). */
-export const PRIVACY_GATED_ROUTE = 'app/api/ai/categorize/route.ts'
+/**
+ * The exact routes this (grown) scope-A guard must protect: categorize (ADR
+ * 0043 §Besluit 4) + chat (ADR 0055 / C2a). Each must carry the
+ * `privacy_mode_active` 403 anchor BEFORE its getModel(...) call. Adding a route
+ * here is a conscious scope-A-grows decision, not a silent widening.
+ */
+export const PRIVACY_GATED_ROUTES = [
+  'app/api/ai/categorize/route.ts',
+  'app/api/ai/chat/route.ts',
+] as const
 
 /** The stable error code the gate returns — the anchor the scan looks for. */
 export const PRIVACY_GATE_CODE = 'privacy_mode_active'

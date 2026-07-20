@@ -15,7 +15,7 @@ import {
   collectGetModelConsumers,
   importsGetModel,
   hasPrivacyGateBeforeModelCall,
-  PRIVACY_GATED_ROUTE,
+  PRIVACY_GATED_ROUTES,
   PRIVACY_GATE_CODE,
 } from './privacy-gate-scan'
 
@@ -44,16 +44,16 @@ const KNOWN_GETMODEL_CONSUMERS = [
   'lib/briefing/redactie.ts',
 ].sort()
 
-describe('privacy-gate scan — scope A coverage (ADR 0043, FR-1.3)', () => {
-  it('/api/ai/categorize has the privacy-gate anchor BEFORE the getModel() call', () => {
-    const abs = path.join(process.cwd(), ...PRIVACY_GATED_ROUTE.split('/'))
-    expect(fs.existsSync(abs), `missing: ${PRIVACY_GATED_ROUTE}`).toBe(true)
+describe('privacy-gate scan — scope A coverage (ADR 0043 + 0055, FR-1.3 / FR-C2a.7)', () => {
+  it.each(PRIVACY_GATED_ROUTES)('%s has the privacy-gate anchor BEFORE the getModel() call', (route) => {
+    const abs = path.join(process.cwd(), ...route.split('/'))
+    expect(fs.existsSync(abs), `missing: ${route}`).toBe(true)
     const src = fs.readFileSync(abs, 'utf-8')
-    expect(src.includes(PRIVACY_GATE_CODE), `gate anchor "${PRIVACY_GATE_CODE}" not found in ${PRIVACY_GATED_ROUTE}`).toBe(true)
+    expect(src.includes(PRIVACY_GATE_CODE), `gate anchor "${PRIVACY_GATE_CODE}" not found in ${route}`).toBe(true)
     expect(
       hasPrivacyGateBeforeModelCall(src),
-      `privacy-gate must return 403 BEFORE getModel() is called in ${PRIVACY_GATED_ROUTE} (FR-1.2) — ` +
-        'transaction data must never reach prompt construction when privacy_mode is active.',
+      `privacy-gate must return 403 BEFORE getModel() is called in ${route} (FR-1.2 / FR-C2a.6) — ` +
+        'financial/transaction data must never reach prompt construction when privacy_mode is active.',
     ).toBe(true)
   })
 
@@ -69,12 +69,13 @@ describe('privacy-gate scan — scope A coverage (ADR 0043, FR-1.3)', () => {
     },
   )
 
-  it('scope A: no getModel-consumer OTHER than /api/ai/categorize carries the privacy-gate anchor', () => {
-    // Confirms the guard is narrow-by-design (scope A), not accidentally
-    // present elsewhere and not silently expected elsewhere either — a
-    // future Option-B migration should change this test deliberately.
+  it('scope A: no getModel-consumer OTHER than the gated routes carries the privacy-gate anchor', () => {
+    // Confirms the guard is narrow-by-design (scope A: categorize + chat), not
+    // accidentally present elsewhere and not silently expected elsewhere either
+    // — a future Option-B migration should change this test deliberately.
     const root = process.cwd()
-    const others = collectGetModelConsumers(root).filter((f) => f !== PRIVACY_GATED_ROUTE)
+    const gatedSet = new Set<string>(PRIVACY_GATED_ROUTES)
+    const others = collectGetModelConsumers(root).filter((f) => !gatedSet.has(f))
     const gated = others.filter((rel) => {
       const src = fs.readFileSync(path.join(root, ...rel.split('/')), 'utf-8')
       return src.includes(PRIVACY_GATE_CODE)

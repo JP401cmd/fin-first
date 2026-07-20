@@ -1203,8 +1203,10 @@ describe('AICategorizeSheet — privé-modus resolver-keuze', () => {
       expect(screen.getByText(/Je browser ondersteunt WebGPU niet/i)).toBeInTheDocument()
     })
     expect(screen.getByText(/herstart dan je browser/i)).toBeInTheDocument()
-    // Regelmotor-voorstel blijft werken (stap 1).
-    expect(screen.getByText(/^Regel$/)).toBeInTheDocument()
+    // Regelmotor-voorstel blijft werken (stap 1). Async wachten: de stage-1-review
+    // rendert pas zodra structPinned settelt (aparte async-tik dan de capability-
+    // melding) — synchroon getByText was hier load-flaky (task #26).
+    expect(await screen.findByText(/^Regel$/)).toBeInTheDocument()
     // Fail-closed: geen lokale resolver gebouwd én géén cloud-fallback.
     expect(createLocalResolverSpy).not.toHaveBeenCalled()
     expect(aiCategorizeFetches().length).toBe(0)

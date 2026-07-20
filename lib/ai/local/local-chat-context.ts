@@ -7,14 +7,17 @@
 // FINANCIEEL OVERZICHT-sectie van de lokale systeemprompt.
 //
 // CONSUME, DON'T RECOMPUTE (harde regel, CLAUDE.md): élk cijfer komt uit de
-// canonieke laag — `loadCoreData` (dezelfde React-cached bron als /overzicht en
-// /core) plus de canonieke engines (`computeCoreData`, `computeFreedomProgress`
-// via `healthScoreInput.freedomPct`, `dailyExpenseRate`, `emergencyFundMonths`).
-// Er wordt NIETS zelf opgeteld of herberekend; de freedom-%- en FIRE-doel-
-// grondslag (incl./excl. eigen woning, ADR 0009) spiegelt exact `buildShared-
-// Context` en `loadCoreData`, zodat Will lokaal dezelfde getallen ziet als de
-// gebruiker in de app. (Toekomstige opruiming: één gedeelde numerieke extractor
-// achter zowel deze builder als `buildSharedContext`.)
+// canonieke laag. De kern-cijfers (netto vermogen, vrijheids-%, FIRE-doel,
+// spaarquote, SWR, dagtarief, maandinkomen/-uitgaven) komen sinds C2b uit de
+// gedeelde extractor `buildWillFinancialFacts` (`lib/ai/context/will-financial-
+// facts.ts`) — DEZELFDE bron die `buildSharedContext` (cloud-Will) leest, op de
+// canonieke MET-terugval ADR 0009-grondslag. Daardoor ziet Will lokaal exact
+// dezelfde getallen als de cloud-Will én de gebruiker in de app, en delen het
+// vrijheids-% en het FIRE-doel één grondslag (vóór C2b las het lokale pad het
+// vrijheids-% uit de zonder-terugval loader-variant → 0% in het randgeval,
+// terwijl het FIRE-doel al met-terugval was: een interne grondslag-mismatch).
+// De noodbuffer (`emergencyFundMonths`) is lokaal-only en blijft hier; er wordt
+// NIETS zelf opgeteld of herberekend.
 //
 // GEEN CLOUD-GUARDRAILS: dit is het on-device pad. De cijfers zijn het eigen
 // financiële beeld van de gebruiker en gaan van de server naar diens éigen
@@ -35,16 +38,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { loadCoreData } from '@/lib/core-data-loader'
-import { computeCoreData, inclHomeTargetFromScalar, type FinancialInput } from '@/lib/core-metrics'
-import type { Asset } from '@/lib/asset-data'
-import type { Debt } from '@/lib/debt-data'
-import {
-  parseHousingStrategy,
-  deriveHousingContext,
-  getFireEligibleNetWorth,
-  isHomeExcludedFromFire,
-} from '@/lib/housing-strategy'
-import { dailyExpenseRate } from '@/lib/format'
+import { buildWillFinancialFacts } from '@/lib/ai/context/will-financial-facts'
 
 /**
  * Compacte noodbuffer-stand: het liquide potje in maanden dekking (canonieke
@@ -109,11 +103,15 @@ export async function buildLocalChatOverview(supabase: SupabaseClient): Promise<
   ])
 
   const { rawFinancials, healthScoreInput } = coreData
-  const totalAssets = rawFinancials.totalAssets
-  const totalDebts = rawFinancials.totalDebts
+  // Gedeelde kern-cijfers (netto vermogen, vrijheids-%, FIRE-doel, spaarquote,
+  // SWR, dagtarief, maandbedragen) op de canonieke MET-terugval ADR 0009-
+  // grondslag. Dit corrigeert de vroegere lokale afwijking (vrijheids-% uit de
+  // zonder-terugval loader-variant → 0% in het randgeval) en trekt vrijheids-%
+  // en FIRE-doel op één grondslag.
+  const facts = buildWillFinancialFacts(coreData, profileResult.data)
 
   // Geen enkele financiële data → minimaal overzicht (de prompt duidt dit).
-  if (totalAssets === 0 && totalDebts === 0 && !coreData.hasTransactions) {
+  if (!facts.hasData) {
     return {
       hasData: false,
       nettoVermogen: 0,
@@ -124,42 +122,14 @@ export async function buildLocalChatOverview(supabase: SupabaseClient): Promise<
       maanduitgaven: rawFinancials.monthlyExpenses,
       spaarquotePct: 0,
       dagtarief: 0,
-      swrPct: Math.round(coreData.fireParams.effectiveSwr * 1000) / 10,
+      swrPct: Math.round(facts.swr * 1000) / 10,
       noodbuffer: null,
     }
   }
 
-  // Canonieke kern-metrics (netto vermogen, vrijgekochte tijd, FIRE-doel-fallback).
-  const coreInput: FinancialInput = {
-    totalAssets,
-    totalDebts,
-    monthlyIncome: rawFinancials.monthlyIncome,
-    monthlyExpenses: rawFinancials.monthlyExpenses,
-    yearlyMustExpenses: rawFinancials.yearlyRetirementExpenses ?? 0,
-    monthlyContributions: 0,
-    dateOfBirth: null,
-  }
-  const core = computeCoreData(coreInput, coreData.fireParams.effectiveSwr)
-
-  // FIRE-doel op DEZELFDE grondslag als het vrijheids-% (incl. eigen woning
-  // tenzij expliciet uitgesloten) — spiegelt `buildSharedContext`/`loadCoreData`
-  // (ADR 0009) zodat teller, noemer en doelbedrag onderling consistent zijn.
-  const housingStrategy = parseHousingStrategy(profileResult.data?.housing_strategy_config)
-  const housingContext = deriveHousingContext(
-    (coreData.fullAssets ?? []) as Asset[],
-    (coreData.fullDebts ?? []) as Debt[],
-  )
-  const fireEligibleNetWorth = getFireEligibleNetWorth(core.netWorth, housingContext, housingStrategy)
-  const requiredPortfolio = coreData.fireTargetFromHorizon ?? (core.fireTarget > 0 ? core.fireTarget : null)
-  const homeExcludedFromFire = housingContext.hasEigenHuis && isHomeExcludedFromFire(housingStrategy)
-  const requiredNetWorthInclHome = inclHomeTargetFromScalar(requiredPortfolio, core.netWorth, fireEligibleNetWorth)
-  const displayFireGoal = homeExcludedFromFire
-    ? requiredPortfolio
-    : (requiredNetWorthInclHome ?? requiredPortfolio)
-
   // Noodbuffer: maanden = canonieke `emergencyFundMonths`; bedrag = het liquide
   // potje dat daaraan ten grondslag ligt (maanden × maanduitgaven — consistent,
-  // geen losse eigen som van een ander begrip).
+  // geen losse eigen som van een ander begrip). Lokaal-only, niet in WillFacts.
   const bufferMonths = healthScoreInput.emergencyFundMonths
   const noodbuffer: LocalChatBuffer | null =
     bufferMonths > 0 && rawFinancials.monthlyExpenses > 0
@@ -171,16 +141,17 @@ export async function buildLocalChatOverview(supabase: SupabaseClient): Promise<
 
   return {
     hasData: true,
-    nettoVermogen: core.netWorth,
-    vrijheidstijd: formatVrijheidstijd(core.freedomYears, core.freedomMonths),
-    fireDoel: Math.round(displayFireGoal ?? core.fireTarget),
-    // Consume de canonieke ADR 0009-freedomPct (dezelfde die /overzicht toont).
-    vrijheidsPct: Math.round(healthScoreInput.freedomPct * 10) / 10,
-    maandinkomen: rawFinancials.monthlyIncome,
-    maanduitgaven: rawFinancials.monthlyExpenses,
-    spaarquotePct: coreData.savingsRate6m,
-    dagtarief: Math.round(dailyExpenseRate(rawFinancials.monthlyExpenses)),
-    swrPct: Math.round(coreData.fireParams.effectiveSwr * 1000) / 10,
+    nettoVermogen: facts.nettoVermogen,
+    vrijheidstijd: formatVrijheidstijd(facts.freedomYears, facts.freedomMonths),
+    fireDoel: Math.round(facts.fireDoel),
+    // Consume de canonieke ADR 0009-vrijheids-% (met-terugval; dezelfde bron én
+    // grondslag als cloud-Will en als het FIRE-doel hierboven).
+    vrijheidsPct: Math.round(facts.vrijheidsPct * 10) / 10,
+    maandinkomen: facts.maandinkomen,
+    maanduitgaven: facts.maanduitgaven,
+    spaarquotePct: facts.spaarquotePct,
+    dagtarief: Math.round(facts.dagtarief),
+    swrPct: Math.round(facts.swr * 1000) / 10,
     noodbuffer,
   }
 }

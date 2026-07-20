@@ -10,9 +10,10 @@ import { EVENT_ICONS } from '@/components/app/horizon/log-timeline'
 import type { WhatIfEvent } from '@/components/app/horizon/whatif-events'
 import { renderMarkdown, findToolInvocation, TOOL_LOADING_STATES, TOOL_OUTPUT_STATES, type MessagePart } from '@/components/app/chat/markdown-helpers'
 import {
-  Send, Loader2, Check, Calendar, Target, Clock, Plus,
+  Send, Loader2, Check, Calendar, Target, Clock, Plus, ShieldCheck,
 } from 'lucide-react'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { usePrivacyMode } from '@/components/app/use-privacy-mode'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -220,6 +221,14 @@ export function WhatIfChat({ onAddEvent, scenarioContext }: WhatIfChatProps) {
 
   const isStreaming = status === 'streaming' || status === 'submitted'
 
+  // De WhatIfChat houdt bewust zijn eigen cloud-transport (architect-bevestigd:
+  // valt buiten de lokale overname). Consistent met "privacy aan = geen
+  // cloud-fallback" sturen we in privé-modus GEEN scenario naar de cloud: het
+  // oppervlak wordt eerlijk geblokkeerd (invoer uit + blokkeer-melding) i.p.v.
+  // stil te falen op een server-403.
+  const privacyMode = usePrivacyMode()
+  const isBlockedByPrivacy = privacyMode === true
+
   // Detect if last AI message used suggestAction → planner mode active
   const isPlannerMode = useMemo(() => {
     const lastAssistant = [...messages].reverse().find(m => m.role === 'assistant')
@@ -257,10 +266,10 @@ export function WhatIfChat({ onAddEvent, scenarioContext }: WhatIfChatProps) {
 
   const submit = useCallback(() => {
     const text = input.trim()
-    if (!text || isStreaming) return
+    if (!text || isStreaming || isBlockedByPrivacy) return
     setInput('')
     sendMessage({ text })
-  }, [input, isStreaming, sendMessage])
+  }, [input, isStreaming, isBlockedByPrivacy, sendMessage])
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -421,6 +430,20 @@ export function WhatIfChat({ onAddEvent, scenarioContext }: WhatIfChatProps) {
         </div>
       </div>
 
+      {/* Fail-closed in privé-modus: wat-als gaat NIET naar de cloud — eerlijk
+          geblokkeerd i.p.v. een stille cloud-belofte. */}
+      {isBlockedByPrivacy && (
+        <div className="border-b border-[var(--border-ed)] bg-horizon-50/60 px-4 py-2.5">
+          <div className="flex items-start gap-2">
+            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-horizon-600" aria-hidden="true" />
+            <p className="text-[11px] leading-relaxed text-[var(--ink-2)]">
+              Wat-als met Will is niet beschikbaar in privé-modus — zet privé-modus
+              uit om je scenario met Will te bespreken.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Messages area — compact when empty, grows with messages */}
       <div ref={scrollAreaRef} onScroll={handleScroll} className={`overflow-y-auto px-4 py-3 ${messages.length === 0 ? 'h-[120px]' : 'max-h-[320px]'}`}>
         {messages.length === 0 && (
@@ -494,14 +517,15 @@ export function WhatIfChat({ onAddEvent, scenarioContext }: WhatIfChatProps) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder="Wat zijn je dromen?"
+            disabled={isBlockedByPrivacy}
+            placeholder={isBlockedByPrivacy ? 'Privé-modus staat aan' : 'Wat zijn je dromen?'}
             rows={1}
-            className="max-h-20 flex-1 resize-none rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2 text-sm outline-none placeholder:text-[var(--ink-3)] focus:border-[var(--border-md)] focus:ring-1 focus:ring-zinc-200"
+            className="max-h-20 flex-1 resize-none rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2 text-sm outline-none placeholder:text-[var(--ink-3)] focus:border-[var(--border-md)] focus:ring-1 focus:ring-zinc-200 disabled:cursor-not-allowed disabled:opacity-60"
           />
           <button
             type="button"
             onClick={submit}
-            disabled={isStreaming || !input.trim()}
+            disabled={isStreaming || !input.trim() || isBlockedByPrivacy}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--r-lg)] bg-horizon-600 text-white transition-colors hover:bg-horizon-700 disabled:bg-zinc-300 disabled:text-[var(--ink-3)]"
           >
             <Send className="h-4 w-4" />

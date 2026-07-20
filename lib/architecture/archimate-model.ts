@@ -320,7 +320,7 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     {
       id: 'as-coach', x: 560, y: row(5), w: 220, h: 66, kind: 'appsvc',
       title: 'Inzicht- & coachingsdienst',
-      lead: 'Will (AI-coach), aanbevelingen, volgende stappen, aandachtspunten-bus en de briefing-kaarten.',
+      lead: 'Will (AI-coach), aanbevelingen, volgende stappen, aandachtspunten-bus en de briefing-kaarten. Bij privacy_mode draait de dagelijkse Will-chat lokaal via t-lokale-ai in plaats van via de AI-gateway — dezelfde chat, ander transport (ADR 0056).',
       items: ['/api/ai/*', '/api/briefing', '/api/next-steps', 'lib/coach-suggestions'],
     },
     {
@@ -376,7 +376,7 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     {
       id: 't-aigateway', x: 1250, y: row(1), w: 185, h: 66, kind: 'tech',
       title: 'AI-gateway (Vercel AI SDK)',
-      lead: 'Provider-agnostische AI-laag; model omschakelbaar tussen Anthropic, OpenAI en Mistral via beheer. Optioneel pad naast — niet vervangen door — de lokale AI-runtime (t-lokale-ai): bij privacy_mode=true blokkeert een server-side 403 op /api/ai/categorize vóór modelaanroep (ADR 0043).',
+      lead: 'Provider-agnostische AI-laag; model omschakelbaar tussen Anthropic, OpenAI en Mistral via beheer. Optioneel pad naast — niet vervangen door — de lokale AI-runtime (t-lokale-ai): bij privacy_mode=true blokkeert een server-side 403 (privacy_mode_active, PRIVACY_GATED_ROUTES) vóór modelaanroep, nu op zowel /api/ai/categorize (ADR 0043) als /api/ai/chat (ADR 0056) — dubbel fail-closed naast de client-side transport-swap.',
       items: ['streaming + tools', 'Zod tool-schemas', 'PII-filter'],
     },
     {
