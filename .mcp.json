@@ -20,6 +20,10 @@
       "type": "http",
       "url": "https://mcp.notion.com/mcp"
     },
+    "vercel": {
+      "type": "http",
+      "url": "https://mcp.vercel.com"
+    },
     "chrome-devtools": {
       "type": "stdio",
       "command": "npx",

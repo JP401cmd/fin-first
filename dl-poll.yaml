@@ -1,0 +1,370 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - link "Naar hoofdinhoud" [ref=e3] [cursor=pointer]:
+      - /url: "#main-content"
+    - main [ref=e6]:
+      - generic [ref=e7]:
+        - navigation "Mijn navigatie" [ref=e11]:
+          - link "Overzicht" [ref=e12] [cursor=pointer]:
+            - /url: /mijn
+          - link "Profiel" [ref=e13] [cursor=pointer]:
+            - /url: /mijn/profiel
+          - link "Account" [ref=e14] [cursor=pointer]:
+            - /url: /mijn/account
+          - link "Notificaties" [ref=e15] [cursor=pointer]:
+            - /url: /mijn/notificaties
+          - link "Uiterlijk" [ref=e16] [cursor=pointer]:
+            - /url: /mijn/uiterlijk
+          - link "Privacy" [ref=e17] [cursor=pointer]:
+            - /url: /mijn/privacy
+          - link "Koppelingen" [ref=e18] [cursor=pointer]:
+            - /url: /mijn/koppelingen
+          - link "Geavanceerd" [ref=e19] [cursor=pointer]:
+            - /url: /mijn/geavanceerd
+        - navigation "Breadcrumb navigatie" [ref=e22]:
+          - link "Mijn" [ref=e24] [cursor=pointer]:
+            - /url: /mijn
+          - generic [ref=e25]:
+            - img [ref=e26]
+            - generic [ref=e28]: Privacy
+        - button "Wat zie ik hier?" [ref=e32]:
+          - img [ref=e33]
+        - generic [ref=e35]:
+          - generic [ref=e36]:
+            - generic [ref=e37]: Mijn · privacy & transparantie
+            - heading "Wat we opslaan, waar en waarom" [level=1] [ref=e39]:
+              - text: Wat we opslaan,
+              - emphasis [ref=e40]: waar
+              - text: en waarom
+            - paragraph [ref=e41]: TriFinity is cloud-first — bewust, omdat partner-delen, de wekelijkse briefing en multi-device synchronisatie dat vereisen. Hieronder per data-categorie wat we bewaren en waar het leeft, plus directe acties om je data te exporteren of te verwijderen.
+          - list [ref=e42]:
+            - listitem [ref=e43]:
+              - generic [ref=e44]:
+                - img [ref=e46]
+                - generic [ref=e49]:
+                  - heading "Profiel" [level=2] [ref=e50]
+                  - paragraph [ref=e51]: Naam, geboortejaar, eventuele partner en huishouden-info.
+              - generic [ref=e52]:
+                - generic [ref=e53]:
+                  - term [ref=e54]: Opslag
+                  - definition [ref=e55]: Supabase (EU-regio, encrypted at rest)
+                - generic [ref=e56]:
+                  - term [ref=e57]: Waarom
+                  - definition [ref=e58]: Nodig om leeftijds-projecties te berekenen en de juiste fiscale regels (AOW-leeftijd, hypotheekrenteaftrek) toe te passen.
+              - link "Profiel openen" [ref=e60] [cursor=pointer]:
+                - /url: /mijn/profiel
+                - text: Profiel openen
+                - img [ref=e61]
+            - listitem [ref=e63]:
+              - generic [ref=e64]:
+                - img [ref=e66]
+                - generic [ref=e69]:
+                  - heading "Bezittingen" [level=2] [ref=e70]
+                  - paragraph [ref=e71]: Saldi en samenstelling van cash, beleggen, eigen huis en pensioen — bedragen + asset_type, geen rekening-/IBAN-gegevens tenzij je expliciet koppelt.
+              - generic [ref=e72]:
+                - generic [ref=e73]:
+                  - term [ref=e74]: Opslag
+                  - definition [ref=e75]: Supabase (EU-regio, encrypted at rest)
+                - generic [ref=e76]:
+                  - term [ref=e77]: Waarom
+                  - definition [ref=e78]: Basis voor netto-vermogen, diversificatie-pillar en de Beleggen-tegel.
+              - link "Bezittingen openen" [ref=e80] [cursor=pointer]:
+                - /url: /overzicht/bezittingen
+                - text: Bezittingen openen
+                - img [ref=e81]
+            - listitem [ref=e83]:
+              - generic [ref=e84]:
+                - img [ref=e86]
+                - generic [ref=e88]:
+                  - heading "Schulden" [level=2] [ref=e89]
+                  - paragraph [ref=e90]: Saldo, rente en aflossings-structuur — geen kredietbeoordeling, geen externe rapportage.
+              - generic [ref=e91]:
+                - generic [ref=e92]:
+                  - term [ref=e93]: Opslag
+                  - definition [ref=e94]: Supabase (EU-regio, encrypted at rest)
+                - generic [ref=e95]:
+                  - term [ref=e96]: Waarom
+                  - definition [ref=e97]: Drijft de schulden-pillar, hypotheek-strategie en het bruto/netto-vermogen.
+              - link "Schulden openen" [ref=e99] [cursor=pointer]:
+                - /url: /overzicht/schulden
+                - text: Schulden openen
+                - img [ref=e100]
+            - listitem [ref=e102]:
+              - generic [ref=e103]:
+                - img [ref=e105]
+                - generic [ref=e108]:
+                  - heading "Cashflow & transacties" [level=2] [ref=e109]
+                  - paragraph [ref=e110]: Inkomsten, uitgaven en categorieën. Alleen aanwezig als je transacties handmatig invoert of een PSD2-bank koppelt.
+              - generic [ref=e111]:
+                - generic [ref=e112]:
+                  - term [ref=e113]: Opslag
+                  - definition [ref=e114]: Supabase (EU-regio); banktokens en IBAN’s extra veld-versleuteld (AES-256-GCM). Nooit verkocht of gedeeld voor marketing.
+                - generic [ref=e115]:
+                  - term [ref=e116]: Waarom
+                  - definition [ref=e117]: Voor je cashflow-pillar, vaste-lasten-overzicht en de Will-briefing.
+              - link "Koppelingen beheren" [ref=e119] [cursor=pointer]:
+                - /url: /mijn/koppelingen
+                - text: Koppelingen beheren
+                - img [ref=e120]
+            - listitem [ref=e122]:
+              - generic [ref=e123]:
+                - img [ref=e125]
+                - generic [ref=e129]:
+                  - heading "Doelen" [level=2] [ref=e130]
+                  - paragraph [ref=e131]: Naam, doelbedrag, streefdatum en voortgang.
+              - generic [ref=e132]:
+                - generic [ref=e133]:
+                  - term [ref=e134]: Opslag
+                  - definition [ref=e135]: Supabase (EU-regio, encrypted at rest)
+                - generic [ref=e136]:
+                  - term [ref=e137]: Waarom
+                  - definition [ref=e138]: Voortgang-bars, Wealthfolio-status-flags, briefing-mijlpalen.
+              - link "Doelen openen" [ref=e140] [cursor=pointer]:
+                - /url: /toekomst?tab=doelen
+                - text: Doelen openen
+                - img [ref=e141]
+            - listitem [ref=e143]:
+              - generic [ref=e144]:
+                - img [ref=e146]
+                - generic [ref=e148]:
+                  - heading "Will-chat & AI-context" [level=2] [ref=e149]
+                  - paragraph [ref=e150]: Berichten die je naar Will stuurt plus de samenvatting van je financiële context die als prompt wordt meegegeven.
+              - generic [ref=e151]:
+                - generic [ref=e152]:
+                  - term [ref=e153]: Opslag
+                  - definition [ref=e154]: Verwerking via Anthropic / OpenAI (afhankelijk van model-config). Géén model-training op je data.
+                - generic [ref=e155]:
+                  - term [ref=e156]: Waarom
+                  - definition [ref=e157]: Zonder context kan Will geen relevante antwoorden geven. Chat-historie blijft van jou.
+              - link "AI-instellingen" [ref=e159] [cursor=pointer]:
+                - /url: /mijn/privacy
+                - text: AI-instellingen
+                - img [ref=e160]
+            - listitem [ref=e162]:
+              - generic [ref=e163]:
+                - img [ref=e165]
+                - generic [ref=e168]:
+                  - heading "Wekelijkse briefing" [level=2] [ref=e169]
+                  - paragraph [ref=e170]: Je wekelijkse briefing-kaartjes (vermogen, budget, doelen, vrijheid) — per week vastgezet.
+              - generic [ref=e171]:
+                - generic [ref=e172]:
+                  - term [ref=e173]: Opslag
+                  - definition [ref=e174]: Server-side opgeslagen in je profiel (briefing_snapshot).
+                - generic [ref=e175]:
+                  - term [ref=e176]: Waarom
+                  - definition [ref=e177]: Zo blijft je briefing de hele week stabiel en kun je hem 1× per dag handmatig verversen.
+              - link "Briefing openen" [ref=e179] [cursor=pointer]:
+                - /url: /overzicht
+                - text: Briefing openen
+                - img [ref=e180]
+          - region "Data-rechten" [ref=e182]:
+            - generic [ref=e183]:
+              - img [ref=e184]
+              - heading "Jouw data, jouw keuze" [level=2] [ref=e187]
+            - paragraph [ref=e188]: AVG-rechten zijn niet alleen tekst onderaan een policy-pagina — hieronder direct uitvoerbaar.
+            - generic [ref=e189]:
+              - link "Data exporteren (CSV)" [ref=e190] [cursor=pointer]:
+                - /url: /mijn/geavanceerd#export
+                - img [ref=e191]
+                - text: Data exporteren (CSV)
+              - link "Account verwijderen" [ref=e194] [cursor=pointer]:
+                - /url: /mijn/geavanceerd
+                - img [ref=e195]
+                - text: Account verwijderen
+            - paragraph [ref=e198]: Account verwijderen wist je persoonlijke en financiële gegevens direct uit de actieve database en stopt alle koppelingen. Alleen beperkte beveiligingslogs (e-mail-log, audit-log, zonder financiële inhoud) blijven tijdelijk bewaard — zie de privacyverklaring. Onomkeerbaar — exporteer eerst als je een back-up wilt.
+        - generic [ref=e201]:
+          - generic [ref=e202]:
+            - paragraph [ref=e203]: Financiële toelichting
+            - paragraph [ref=e204]: Beschrijf je financiële situatie in eigen woorden. Deze tekst wordt gebruikt als extra context voor het personaliseren van je nieuws.
+            - generic [ref=e205]:
+              - textbox "Bijv. ik ben zzp'er in de IT, spaar maandelijks ~€1.500, heb een hypotheek op mijn appartement en beleg via DeGiro..." [ref=e206]
+              - generic [ref=e208]: 0 / 1.000
+            - button "Opslaan" [disabled] [ref=e210]
+          - generic [ref=e212]:
+            - generic [ref=e213]:
+              - heading "AI-features inschakelen" [level=3] [ref=e214]
+              - paragraph [ref=e215]: AI-briefing, chat en gepersonaliseerd nieuws zijn actief.
+            - switch "AI-features uitschakelen" [checked] [ref=e216] [cursor=pointer]
+          - generic [ref=e218]:
+            - img [ref=e219]
+            - generic [ref=e221]:
+              - paragraph [ref=e222]: Jij bent eigenaar van je data
+              - paragraph [ref=e223]: TriFinity gebruikt AI om je financiële inzichten te geven. Hieronder zie je precies welke informatie wordt gedeeld — en wat altijd privé blijft. Je kunt AI op elk moment uitschakelen.
+          - generic [ref=e224]:
+            - generic [ref=e225]:
+              - img [ref=e227]
+              - heading "Wat wordt gedeeld" [level=3] [ref=e230]
+            - list [ref=e231]:
+              - listitem [ref=e232]:
+                - generic [ref=e234]: Geaggregeerde bedragen (netto vermogen, totale inkomsten/uitgaven)
+              - listitem [ref=e235]:
+                - generic [ref=e237]: Percentages en ratio's (spaarquote, vrijheidspercentage, SWR)
+              - listitem [ref=e238]:
+                - generic [ref=e240]: Budgetcategorieën en bijbehorende bedragen
+              - listitem [ref=e241]:
+                - generic [ref=e243]: Leeftijd (niet je geboortedatum)
+              - listitem [ref=e244]:
+                - generic [ref=e246]: Huishoudtype en temporal balance level
+              - listitem [ref=e247]:
+                - generic [ref=e249]: De vraag die je zelf aan Will typt — zoals jij hem typt
+              - listitem [ref=e250]:
+                - generic [ref=e252]: "Bij document-import: de volledige tekst van het document dat je uploadt"
+              - listitem [ref=e253]:
+                - generic [ref=e255]: "Bij abonnement-herkenning: de omschrijvingen van je transacties"
+          - generic [ref=e256]:
+            - generic [ref=e257]:
+              - img [ref=e259]
+              - heading "Wat wordt gemaskeerd" [level=3] [ref=e264]
+            - paragraph [ref=e265]: Op de chat-, categorisatie- en nieuwsroutes maskeren we persoonsgegevens automatisch vóór verzending. Bij document-import en abonnement-herkenning gaat de brontekst zelf mee — zonder die inhoud kan de functie niet werken.
+            - list [ref=e266]:
+              - listitem [ref=e267]:
+                - generic [ref=e269]: Namen (vervangen door 'gebruiker' / 'partner')
+              - listitem [ref=e270]:
+                - generic [ref=e272]: IBAN-nummers en bankrekeningen
+              - listitem [ref=e273]:
+                - generic [ref=e275]: BSN (burgerservicenummer)
+              - listitem [ref=e276]:
+                - generic [ref=e278]: E-mailadressen en telefoonnummers
+              - listitem [ref=e279]:
+                - generic [ref=e281]: Adressen en postcodes
+              - listitem [ref=e282]:
+                - generic [ref=e284]: Geboortedatum (vervangen door leeftijd)
+          - generic [ref=e285]:
+            - generic [ref=e286]:
+              - img [ref=e288]
+              - heading "Hoe je data wordt verwerkt" [level=3] [ref=e291]
+            - list [ref=e292]:
+              - listitem [ref=e293]:
+                - generic [ref=e295]:
+                  - strong [ref=e296]: "Geen training:"
+                  - text: je gegevens worden door de AI-providers niet gebruikt om modellen te trainen
+              - listitem [ref=e297]:
+                - generic [ref=e299]:
+                  - strong [ref=e300]: "Korte provider-retentie:"
+                  - text: AI-providers (Anthropic, OpenAI) bewaren verzoeken kortdurend volgens hun eigen voorwaarden, o.a. voor misbruikdetectie
+              - listitem [ref=e301]:
+                - generic [ref=e303]:
+                  - strong [ref=e304]: "Data-minimalisatie:"
+                  - text: per functie gaat alleen de context mee die voor die taak nodig is — nooit je volledige dataset
+              - listitem [ref=e305]:
+                - generic [ref=e307]:
+                  - strong [ref=e308]: "Versleuteld:"
+                  - text: alle communicatie verloopt via HTTPS/TLS
+          - generic [ref=e309]:
+            - img [ref=e310]
+            - paragraph [ref=e312]: Waar het kan maskeren we persoonsgegevens automatisch vóór verzending; bij document-import en sommige analyses gaat de inhoud zelf mee. AI is altijd volledig uitschakelbaar.
+          - button "Volledige privacyverklaring" [ref=e313]:
+            - img [ref=e314]
+            - text: Volledige privacyverklaring
+        - generic [ref=e319]:
+          - generic [ref=e320]:
+            - generic [ref=e321]:
+              - paragraph [ref=e322]: Lokale transactiecategorisatie
+              - generic [ref=e323]: Experimenteel
+            - paragraph [ref=e324]: Als dit aanstaat, categoriseert TriFinity je transacties volledig op je eigen apparaat — de tekst van je transacties wordt nooit naar onze AI-server gestuurd voor categorisatie. Andere AI-functies (zoals chat en de briefing) gebruiken nog wel de cloud-AI.
+            - paragraph [ref=e325]: Werkt alleen op desktop met een geschikte grafische kaart; voorstellen zijn behoudend en vragen altijd jouw controle.
+          - generic [ref=e326]:
+            - generic [ref=e327]:
+              - img [ref=e329]
+              - generic [ref=e332]:
+                - heading "Categoriseer transacties lokaal" [level=3] [ref=e333]
+                - paragraph [ref=e334]: Je transactiedata verlaat je toestel niet bij het categoriseren.
+            - switch "Lokale transactiecategorisatie uitschakelen" [checked] [ref=e496] [cursor=pointer]
+          - paragraph [ref=e337]
+          - generic [ref=e497]:
+            - generic [ref=e498]:
+              - img [ref=e499]
+              - generic [ref=e502]:
+                - heading "Model staat klaar op dit toestel" [level=4] [ref=e503]
+                - paragraph [ref=e504]: Ongeveer 3.2 GB, opgeslagen in deze browser. Lokale categorisatie staat aan.
+                - paragraph [ref=e505]: "Let op: je browser beschermt deze opslag niet. Bij ruimtegebrek kan het model verwijderd worden; download dan opnieuw via deze pagina."
+            - generic [ref=e506]:
+              - button "Model verwijderen" [ref=e507]:
+                - img [ref=e508]
+                - text: Model verwijderen
+              - button "Opnieuw downloaden" [ref=e511]:
+                - img [ref=e512]
+                - text: Opnieuw downloaden
+    - generic [ref=e338]:
+      - button "Open chat met Will" [ref=e491]
+      - generic:
+        - img
+      - img "Deze functie gebruikt AI — je data wordt geanonimiseerd verstuurd." [ref=e492]:
+        - img [ref=e493]
+  - alert [ref=e344]
+  - complementary "Hoofdnavigatie" [ref=e345]:
+    - generic [ref=e346]:
+      - generic [ref=e347]:
+        - generic [ref=e348]: tf.
+        - button "Sidebar inklappen" [ref=e349]:
+          - img [ref=e350]
+      - button "Zoeken in TriFinity" [ref=e353]:
+        - img [ref=e354]
+        - generic [ref=e357]: ⌘K
+    - generic [ref=e358]:
+      - generic [ref=e361]: Twee modules
+      - generic [ref=e362]:
+        - link "Het Overzicht € 2k" [ref=e364] [cursor=pointer]:
+          - /url: /overzicht
+          - img [ref=e366]
+          - generic [ref=e370]:
+            - text: Het
+            - emphasis [ref=e371]: Overzicht
+          - generic [ref=e372]: € 2k
+        - link "De Toekomst ·" [ref=e374] [cursor=pointer]:
+          - /url: /toekomst
+          - img [ref=e376]
+          - generic [ref=e380]:
+            - text: De
+            - emphasis [ref=e381]: Toekomst
+          - generic [ref=e382]: ·
+    - generic [ref=e384]:
+      - generic [ref=e385]: overige
+      - generic [ref=e386]:
+        - link "Tips & acties Geen openstaande acties" [ref=e387] [cursor=pointer]:
+          - /url: /overzicht/tips
+          - generic [ref=e388]:
+            - img [ref=e389]
+            - generic [ref=e391]: Tips & acties
+          - generic "Geen openstaande acties" [ref=e393]
+        - link "Berichten · 1 Ongelezen berichten" [ref=e453] [cursor=pointer]:
+          - /url: /berichten
+          - generic [ref=e395]:
+            - img [ref=e396]
+            - generic [ref=e399]: Berichten
+          - generic [ref=e400]:
+            - generic [ref=e454]: · 1
+            - generic "Ongelezen berichten" [ref=e455]
+        - link "Nieuws Nieuws gelezen" [ref=e402] [cursor=pointer]:
+          - /url: /nieuws
+          - generic [ref=e403]:
+            - img [ref=e404]
+            - generic [ref=e407]: Nieuws
+          - generic "Nieuws gelezen" [ref=e409]
+        - link "Rapportages Rapportages op aanvraag" [ref=e410] [cursor=pointer]:
+          - /url: /rapportages
+          - generic [ref=e411]:
+            - img [ref=e412]
+            - generic [ref=e414]: Rapportages
+          - generic "Rapportages op aanvraag" [ref=e416]
+    - generic [ref=e418]:
+      - link "Account-menu" [ref=e419] [cursor=pointer]:
+        - /url: /mijn
+        - generic [ref=e420]: RE
+        - generic [ref=e421]: regression-test
+        - img [ref=e422]
+      - generic [ref=e424]:
+        - link "Beheer" [ref=e425] [cursor=pointer]:
+          - /url: /beheer
+        - link "Mijn" [ref=e426] [cursor=pointer]:
+          - /url: /mijn
+        - link "Uitloggen" [ref=e427] [cursor=pointer]:
+          - /url: /logout
+        - generic [ref=e428]:
+          - generic [ref=e429]:
+            - button "Synchroniseer alle koppelingen" [ref=e430]:
+              - img [ref=e431]
+            - generic [ref=e436]: Sync nu
+          - button "Rapport" [ref=e437]:
+            - img [ref=e439]
+            - generic [ref=e441]: Rapport
