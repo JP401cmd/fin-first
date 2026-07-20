@@ -51,6 +51,13 @@ const JOB_CATALOG = [
     path: '/api/briefing/email/cron',
     description: 'Wekelijkse briefing-e-mail (opt-in) van de bevroren weeksnapshot — vrijheidstijd-first, euro-vrij, met brug terug naar Will.',
   },
+  {
+    key: 'web-vitals-retention',
+    label: 'Webprestaties-retentie',
+    schedule: 'Dagelijks 03:30',
+    path: '/api/web-vitals/retention/cron',
+    description: 'Verwijdert web_vitals-metingen ouder dan de retentietermijn (180 dagen) zodat de RUM-tabel niet ongebreideld groeit.',
+  },
 ] as const
 
 const dateTimeFmt = new Intl.DateTimeFormat('nl-NL', {

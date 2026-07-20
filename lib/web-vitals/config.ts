@@ -24,6 +24,15 @@ export type WebVitalMetric = (typeof WEB_VITAL_METRICS)[number];
  */
 export const MAX_METRIC_VALUE = 3_600_000;
 
+/**
+ * Retentietermijn (dagen) voor de web_vitals-tabel. Ruim boven het langste
+ * beheer-inzichtvenster (90 dagen) zodat de view volledige historie houdt,
+ * maar begrensd zodat de high-write telemetrie-tabel niet ongebreideld groeit.
+ * De dagelijkse retentie-cron (/api/web-vitals/retention/cron) verwijdert rijen
+ * ouder dan dit.
+ */
+export const WEB_VITALS_RETENTION_DAYS = 180;
+
 /** De ratings die web-vitals meelevert. */
 export const WEB_VITAL_RATINGS = ["good", "needs-improvement", "poor"] as const;
 export type WebVitalRating = (typeof WEB_VITAL_RATINGS)[number];
