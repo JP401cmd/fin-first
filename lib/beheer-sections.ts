@@ -16,6 +16,7 @@ import {
   FlaskConical,
   FunctionSquare,
   Gauge,
+  GitBranch,
   GitCompareArrows,
   Goal,
   History,
@@ -235,6 +236,13 @@ export const BEHEER_GROUPS: BeheerGroup[] = [
         href: '/beheer/testdata',
         description: "Persona's seeden, onboarding-reset en mobile preview.",
         icon: FlaskConical,
+      },
+      {
+        label: 'Versie & git',
+        href: '/beheer/versie',
+        description:
+          'Git-, deploy- en migratie-staat in één blik: waar staat localhost t.o.v. master en prod, ongecommit/ongepusht werk, worktrees en migratiedrift — plus een spiekbrief.',
+        icon: GitBranch,
       },
       {
         label: 'Regressietest',
