@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { isSuperAdmin } from '@/lib/admin'
+import { getServiceClient } from '@/lib/supabase/service'
 import {
   GUIDE_HELP_SETTINGS_KEY,
   getGuideHelp,
@@ -14,13 +15,13 @@ const MAX_FILE_SIZE = 4 * 1024 * 1024 // 4 MB
 const MAX_SCREENSHOTS_PER_KEY = 6
 const ALLOWED_MIME = ['image/png', 'image/jpeg', 'image/webp'] as const
 
-type SupabaseClient = Awaited<ReturnType<typeof createClient>>
+type StorageClient = ReturnType<typeof getServiceClient>
 
-async function ensureBucket(supabase: SupabaseClient): Promise<void> {
-  const { data: buckets } = await supabase.storage.listBuckets()
+async function ensureBucket(client: StorageClient): Promise<void> {
+  const { data: buckets } = await client.storage.listBuckets()
   const exists = buckets?.some((b) => b.id === BUCKET)
   if (!exists) {
-    await supabase.storage.createBucket(BUCKET, {
+    await client.storage.createBucket(BUCKET, {
       public: true,
       fileSizeLimit: MAX_FILE_SIZE,
       allowedMimeTypes: [...ALLOWED_MIME],
@@ -105,7 +106,8 @@ export async function POST(
     )
   }
 
-  await ensureBucket(supabase)
+  const service = getServiceClient()
+  await ensureBucket(service)
 
   const seq = String(existing.screenshots.length + 1).padStart(2, '0')
   const slug = slugify(file.name)
@@ -114,7 +116,7 @@ export async function POST(
   const path = `${helpKey}/${filename}`
   const arrayBuffer = await file.arrayBuffer()
 
-  const { error: uploadError } = await supabase.storage
+  const { error: uploadError } = await service.storage
     .from(BUCKET)
     .upload(path, arrayBuffer, {
       contentType: file.type,
@@ -126,7 +128,7 @@ export async function POST(
     return NextResponse.json({ error: 'Upload mislukt' }, { status: 500 })
   }
 
-  const { data: publicData } = supabase.storage.from(BUCKET).getPublicUrl(path)
+  const { data: publicData } = service.storage.from(BUCKET).getPublicUrl(path)
   const publicUrl = publicData.publicUrl
 
   const captionStr = typeof caption === 'string' ? caption.slice(0, 200) : undefined

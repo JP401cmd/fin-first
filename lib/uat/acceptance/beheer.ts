@@ -1,11 +1,13 @@
 /**
- * Acceptatiecriteria — domein Beheer (admin) (WF-BEHEER-01..33 / UAT-BEHEER-01..33).
+ * Acceptatiecriteria — domein Beheer (admin) (WF-BEHEER-01..34 / UAT-BEHEER-01..34).
  *
  * Spiegelt exact de aanpak van `start.ts`/`nav.ts`/`rapp.ts` (de UI-heavy zones).
  * Bron: `docs/uat/uat-plan.md` Deel 1 (workflow-definities WF-BEHEER-01..33) +
- * de catalogus in `lib/uat/catalog.ts` (UAT-BEHEER-01..33). BEHEER is
- * aaneengesloten 01..33 (33 catalogus-scenario's, GEEN verwijsregel-gaten) —
- * elk scenario heeft hier precies één criterium.
+ * de catalogus in `lib/uat/catalog.ts` (UAT-BEHEER-01..34). BEHEER is
+ * aaneengesloten 01..34 (34 catalogus-scenario's, GEEN verwijsregel-gaten) —
+ * elk scenario heeft hier precies één criterium. 34 (Webprestaties) kwam
+ * later bij: read-only Core Web Vitals-observability boven op de web_vitals-
+ * tabel, dezelfde superadmin/service-role/consistency-vorm als 04/32.
  *
  * KERN-BEVINDING (bepaalt exact/consistency/oracle/ui-only): BEHEER is
  * admin-tooling achter superadmin-gating — de motoren wonen elders (Kern/
@@ -14,7 +16,7 @@
  * geforceerd (0 exact-criteria, lege BEHEER_ENGINE_CHECKS). De verdeling:
  *
  *  - 0  'exact'       — BEHEER heeft geen eigen hand-narekenbare rekenformule.
- *  - 9  'consistency' — een getoond getal komt aantoonbaar ergens anders vandaan
+ *  - 10 'consistency' — een getoond getal komt aantoonbaar ergens anders vandaan
  *                        (A=B): AI-credit-/token-/KPI-aggregaten = som van de
  *                        usage-/DB-rijen (03/04), supportview-diagnose = de
  *                        eigen schermen van de doelgebruiker (08), AOW-tabel =
@@ -24,7 +26,8 @@
  *                        budget-template-kassabon = Σ template (21),
  *                        architectuur-plaat-tellingen = architecture.json (30),
  *                        integratie-tellingen = service-role COUNT op de
- *                        bron-tabellen (32).
+ *                        bron-tabellen (32), webprestaties-p75 = de web_vitals-
+ *                        aggregatie-RPC's + officiële CWV-drempels (34).
  *  - 2  'oracle'      — een zware-rekenmotor-uitkomst die NIET met de hand na te
  *                        rekenen is (de horizon-kernel). types.ts noemt precies
  *                        déze twee beheer-UI's als de oracle-UI: de
@@ -576,6 +579,23 @@ const criteria: AcceptanceCriterion[] = [
       kind: 'ui-only',
       source:
         'app/(app)/beheer/{releases,roadmap,widget-audit,blueprints,grafiek-werking,development}/… — statische/gescande naslag, geen cijfermatige uitkomst',
+    },
+  },
+  {
+    workflow: 'WF-BEHEER-34',
+    scenarioId: 'UAT-BEHEER-34',
+    titel: 'Webprestaties (Core Web Vitals p75) raadplegen',
+    kriticiteit: 'OVERIG',
+    given:
+      '/beheer/webprestaties (alleen-lezen RUM-observability). Server-component leest via de service-role drie RPC\'s (`web_vitals_p75_summary`, `web_vitals_p75_daily`, `web_vitals_p75_by_route`) op de `web_vitals`-tabel; elke RPC-fout (tabel/migratie ontbreekt nog) wordt afgevangen en gelogd i.p.v. de pagina te laten crashen.',
+    when:
+      'De beheerder opent de pagina, wisselt de periode (7/28/90 dagen via ?dagen=) en de metric-selector (LCP/INP/CLS/FCP/TTFB via ?metric=); een niet-superadmin probeert dezelfde URL rechtstreeks.',
+    then:
+      'De niet-superadmin wordt zonder foutmelding naar /overzicht gestuurd (dezelfde layout-guard als de rest van /beheer). Bij drie RPC-fouten of nul rijen toont de pagina een rustige empty-state (onderscheiden "bron nog niet beschikbaar" vs. "nog geen metingen"), geen rauwe fout. Met data tonen de vijf KPI-cards de p75 per metric met een stoplicht-rating die exact volgt uit `ratingForValue()` (de officiële CWV-drempels); periode/metric-switcher filteren tijdreeks + route-ranglijst consistent; de ranglijst toont alleen routes met ≥5 metingen, slechtste eerst, en toont nergens een user_id of per-gebruiker-rij — enkel het geaggregeerde p75 per route.',
+    assertion: {
+      kind: 'consistency',
+      source:
+        'app/(app)/beheer/webprestaties/page.tsx (superadmin-redirect, service-role RPC-aggregatie, empty-state) + lib/web-vitals/config.ts#ratingForValue (stoplicht-drempels) — getoonde p75/rating komt aantoonbaar uit de web_vitals-aggregatie-RPC + de officiële drempelfunctie, geen losse berekening',
     },
   },
 ]

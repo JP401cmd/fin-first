@@ -676,7 +676,7 @@ function scanIntegrationClients() {
 }
 
 // ── build ───────────────────────────────────────────────────────────────--
-function build() {
+function build({ write = true } = {}) {
   console.log('TriFinity architectuurplaat — scannen...')
   const pkg = JSON.parse(read(join(ROOT, 'package.json')) || '{}')
   const now = new Date()
@@ -759,12 +759,14 @@ function build() {
     routesProduction: data.stats.routesProduction,
   })
 
-  // schrijven
-  if (!existsSync(OUT_DIR)) mkdirSync(OUT_DIR, { recursive: true })
-  writeFileSync(DATA_FILE, JSON.stringify(data, null, 2))
-  renderHtml(data)
-  writeChangelog(data)
-  printSummary(data)
+  // schrijven (in --check-modus alleen berekenen, niets naar schijf)
+  if (write) {
+    if (!existsSync(OUT_DIR)) mkdirSync(OUT_DIR, { recursive: true })
+    writeFileSync(DATA_FILE, JSON.stringify(data, null, 2))
+    renderHtml(data)
+    writeChangelog(data)
+    printSummary(data)
+  }
   return data
 }
 
@@ -814,4 +816,45 @@ function printSummary(data) {
   console.log(`\n  ✓ ${rel(HTML_FILE)}\n  ✓ ${rel(DATA_FILE)}\n`)
 }
 
-build()
+// ── versheidscheck (CI-poort): gescande feiten mogen niet stale zijn ─────────
+// De gecommitte architecture.json wordt door niets in CI/hooks vers gehouden
+// (alleen een dagelijkse externe taak). Deze --check-modus herberekent de
+// STRUCTURELE feiten in-memory en vergelijkt ze met de gecommitte snapshot,
+// bewust ROBUUST i.p.v. volledig: alleen de counts (`stats`) en de gesorteerde
+// tabelnamen — 100% deterministisch (integers + tabelnamen, geen bestandspaden
+// of readdir-volgorde), dus geen cross-OS-flakiness. Dit vangt exact het
+// gestelde gat: een nieuwe tabel/route/module/integratie die live gaat zonder
+// `npm run arch:diagram`. Renames binnen padgebonden scans (routes/componenten)
+// leunen op de dagelijkse run — bewuste, veel kleinere restmarge.
+function structuralSignature(data) {
+  const tableNames = (data?.tables?.list || []).map((t) => t.name).sort()
+  return JSON.stringify({ stats: data?.stats || {}, tableNames })
+}
+
+function checkFresh() {
+  if (!existsSync(DATA_FILE)) {
+    console.error('arch:check — docs/architecture/architecture.json ontbreekt. Draai `npm run arch:diagram` en commit het resultaat.')
+    process.exit(1)
+  }
+  const committed = JSON.parse(read(DATA_FILE) || 'null')
+  const fresh = build({ write: false })
+  if (structuralSignature(committed) === structuralSignature(fresh)) {
+    console.log('\narch:check — architectuurfeiten zijn vers (structureel gelijk). ✓\n')
+    return
+  }
+  const c = JSON.parse(structuralSignature(committed))
+  const f = JSON.parse(structuralSignature(fresh))
+  console.error('\narch:check — docs/architecture/architecture.json is STALE.\n')
+  for (const k of new Set([...Object.keys(c.stats), ...Object.keys(f.stats)])) {
+    if (c.stats[k] !== f.stats[k]) console.error(`  • stats.${k}: gecommit ${c.stats[k]} → nu ${f.stats[k]}`)
+  }
+  const added = f.tableNames.filter((t) => !c.tableNames.includes(t))
+  const removed = c.tableNames.filter((t) => !f.tableNames.includes(t))
+  if (added.length) console.error(`  • tabellen toegevoegd: ${added.join(', ')}`)
+  if (removed.length) console.error(`  • tabellen verwijderd: ${removed.join(', ')}`)
+  console.error('\nDraai `npm run arch:diagram` en commit het bijgewerkte docs/architecture/architecture.json.\n')
+  process.exit(1)
+}
+
+if (process.argv.includes('--check')) checkFresh()
+else build()

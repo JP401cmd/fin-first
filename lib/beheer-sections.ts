@@ -17,6 +17,7 @@ import {
   FlaskConical,
   FunctionSquare,
   Gauge,
+  GitBranch,
   GitCompareArrows,
   Goal,
   History,
@@ -35,6 +36,7 @@ import {
   Network,
   Newspaper,
   Activity,
+  Timer,
   ScrollText,
   ShieldAlert,
   Sigma,
@@ -244,6 +246,13 @@ export const BEHEER_GROUPS: BeheerGroup[] = [
         icon: FlaskConical,
       },
       {
+        label: 'Versie & git',
+        href: '/beheer/versie',
+        description:
+          'Git-, deploy- en migratie-staat in één blik: waar staat localhost t.o.v. master en prod, ongecommit/ongepusht werk, worktrees en migratiedrift — plus een spiekbrief.',
+        icon: GitBranch,
+      },
+      {
         label: 'Regressietest',
         href: '/beheer/regressietest',
         description: 'Regressiesuite draaien met live resultaten per module.',
@@ -311,6 +320,12 @@ export const BEHEER_GROUPS: BeheerGroup[] = [
         href: '/beheer/ai-verbruik',
         description: 'Werkelijk tokenverbruik per functie en per account.',
         icon: Gauge,
+      },
+      {
+        label: 'Webprestaties',
+        href: '/beheer/webprestaties',
+        description: 'Core Web Vitals (p75) per route en device — echte gebruikersmetingen.',
+        icon: Timer,
       },
       {
         label: 'Architectuur',

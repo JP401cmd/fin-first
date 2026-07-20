@@ -70,7 +70,15 @@ jobs:
       # computeRetirementExpenses) die tot Arch F2 bevinding #17 alleen via de
       # dev-only in-app regressiesuite draaide — nu ook in deze CI-gate.
       - name: Rekenmotor- & pariteitstests (vitest)
-        run: npx vitest run lib/horizon-kernel test/horizon-oracle lib/box1-tax lib/box3 lib/fiscale-kerngetallen lib/architecture lib/budget-utils.test.ts test/budget-berekeningen-suite-check.test.ts
+        run: npx vitest run lib/horizon-kernel test/horizon-oracle lib/box1-tax lib/box3 lib/fiscale-kerngetallen lib/architecture lib/budget-utils.test.ts test/budget-berekeningen-suite-check.test.ts test/uat-stale-scan.test.ts
+
+      # Versheidscheck: de gescande architectuurfeiten (docs/architecture/
+      # architecture.json) worden door niets anders in CI/hooks vers gehouden —
+      # alleen een dagelijkse externe Cowork-taak. Deze stap faalt wanneer de
+      # gecommitte snapshot structureel achterloopt op de code (nieuwe tabel/
+      # route/module/integratie zonder `npm run arch:diagram`). DB-vrij: scant
+      # alleen bestanden, dus CI-veilig.
+      - name: Architectuurfeiten-versheid (arch:check)
 
   # Bundle-budget (performance-programma fase 3, Task 3.4). Een volledige
   # `next build` is zwaar (~146 App-Router-routes) — draait daarom alleen op

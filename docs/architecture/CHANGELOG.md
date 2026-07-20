@@ -490,3 +490,10 @@
 ## 2026-07-20
 
 - **API-routes** toegevoegd: /api/auth/password-check
+
+## 2026-07-20
+
+- **Schermen** toegevoegd: /beheer/versie, /beheer/webprestaties
+- **API-routes** toegevoegd: /api/admin/version-status, /api/version, /api/web-vitals, /api/web-vitals/retention/cron
+- **Tabellen** toegevoegd: web_vitals
+- **Componenten (aantal)** toegevoegd: +2

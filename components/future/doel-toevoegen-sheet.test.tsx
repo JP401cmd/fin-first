@@ -164,32 +164,56 @@ describe('DoelToevoegenSheet — ETA-preview', () => {
   })
 })
 
-describe('DoelToevoegenSheet — presets', () => {
-  it('toont 3 preset-buttons (Noodfonds / Schuldvrij / Vrijheidsgetal)', () => {
+describe('DoelToevoegenSheet — standaard-doelen-kiezer', () => {
+  it('toont de standaard-doelen (noodfonds / vrijheidsgetal / schuldenvrij / vakantie / auto / aanbetaling)', () => {
     render(<DoelToevoegenSheet />)
     fireEvent.click(screen.getByText('Doel toevoegen'))
     expect(screen.getByText('Noodfonds')).toBeTruthy()
-    expect(screen.getByText('Schuldvrij')).toBeTruthy()
     expect(screen.getByText('Vrijheidsgetal')).toBeTruthy()
+    expect(screen.getByText('Schuldenvrij')).toBeTruthy()
+    expect(screen.getByText('Vakantie')).toBeTruthy()
+    expect(screen.getByText('Nieuwe auto')).toBeTruthy()
+    expect(screen.getByText('Aanbetaling woning')).toBeTruthy()
   })
 
-  it('klik op Noodfonds-preset vult naam + bedrag in', () => {
-    render(<DoelToevoegenSheet />)
+  it('personaliseert het noodfonds-bedrag = 6× maanduitgaven uit props', () => {
+    render(<DoelToevoegenSheet monthlyExpenses={2000} />)
     fireEvent.click(screen.getByText('Doel toevoegen'))
     fireEvent.click(screen.getByText('Noodfonds'))
     const dialog = screen.getByRole('dialog')
     const nameInput = dialog.querySelector('input[type="text"]') as HTMLInputElement
     const targetInput = dialog.querySelector('input[type="number"]') as HTMLInputElement
     expect(nameInput.value).toBe('Noodfonds')
-    expect(targetInput.value).toBe('5000')
+    expect(targetInput.value).toBe('12000')
   })
 
-  it('klik op Schuldvrij-preset zet goalType naar debt', () => {
+  it('laat het bedrag leeg wanneer er geen inkomen/uitgaven bekend zijn', () => {
     render(<DoelToevoegenSheet />)
     fireEvent.click(screen.getByText('Doel toevoegen'))
-    fireEvent.click(screen.getByText('Schuldvrij'))
+    fireEvent.click(screen.getByText('Noodfonds'))
+    const dialog = screen.getByRole('dialog')
+    const targetInput = dialog.querySelector('input[type="number"]') as HTMLInputElement
+    expect(targetInput.value).toBe('')
+  })
+
+  it('personaliseert het vrijheidsgetal = 25× jaaruitgaven uit props', () => {
+    render(<DoelToevoegenSheet monthlyExpenses={2000} />)
+    fireEvent.click(screen.getByText('Doel toevoegen'))
+    fireEvent.click(screen.getByText('Vrijheidsgetal'))
+    const dialog = screen.getByRole('dialog')
+    const targetInput = dialog.querySelector('input[type="number"]') as HTMLInputElement
+    // 2000 × 12 × 25 = 600.000
+    expect(targetInput.value).toBe('600000')
+  })
+
+  it('klik op Schuldenvrij zet goalType naar debt (bedrag leeg — gebruiker vult zelf)', () => {
+    render(<DoelToevoegenSheet monthlyExpenses={2000} />)
+    fireEvent.click(screen.getByText('Doel toevoegen'))
+    fireEvent.click(screen.getByText('Schuldenvrij'))
     const dialog = screen.getByRole('dialog')
     const select = dialog.querySelector('select') as HTMLSelectElement
+    const targetInput = dialog.querySelector('input[type="number"]') as HTMLInputElement
     expect(select.value).toBe('debt')
+    expect(targetInput.value).toBe('')
   })
 })

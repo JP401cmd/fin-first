@@ -193,6 +193,7 @@ export const WIDGET_MODULE_MAP: Record<string, ModuleId> = {
   levensgebeurtenissen: 'toekomstplannen',
   vrijheidsvoortgang: 'toekomstplannen',
   surplus_gap: 'toekomstplannen',
+  swr_monitor: 'toekomstplannen',
 }
 
 // ── Lookup Maps ─────────────────────────────────────────────────────────────

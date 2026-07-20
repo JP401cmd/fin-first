@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-20T09:17:19.706Z",
+  "generatedAt": "2026-07-20T13:03:32.201Z",
   "generatedDate": "2026-07-20",
   "repo": {
     "name": "fin",
@@ -187,13 +187,13 @@
     }
   },
   "stats": {
-    "routes": 144,
+    "routes": 146,
     "routesProduction": 101,
-    "api": 257,
-    "tables": 84,
-    "migrations": 148,
+    "api": 261,
+    "tables": 85,
+    "migrations": 152,
     "integrations": 24,
-    "components": 866,
+    "components": 868,
     "providers": 11,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -431,8 +431,20 @@
       "isTest": false
     },
     {
+      "url": "/beheer/versie",
+      "file": "app/(app)/beheer/versie/page.tsx",
+      "group": "beheer",
+      "isTest": false
+    },
+    {
       "url": "/beheer/vragenlijsten",
       "file": "app/(app)/beheer/vragenlijsten/page.tsx",
+      "group": "beheer",
+      "isTest": false
+    },
+    {
+      "url": "/beheer/webprestaties",
+      "file": "app/(app)/beheer/webprestaties/page.tsx",
       "group": "beheer",
       "isTest": false
     },
@@ -1298,8 +1310,20 @@
         "isTest": false
       },
       {
+        "url": "/beheer/versie",
+        "file": "app/(app)/beheer/versie/page.tsx",
+        "group": "beheer",
+        "isTest": false
+      },
+      {
         "url": "/beheer/vragenlijsten",
         "file": "app/(app)/beheer/vragenlijsten/page.tsx",
+        "group": "beheer",
+        "isTest": false
+      },
+      {
+        "url": "/beheer/webprestaties",
+        "file": "app/(app)/beheer/webprestaties/page.tsx",
         "group": "beheer",
         "isTest": false
       },
@@ -2313,6 +2337,14 @@
       "domain": "admin",
       "methods": [
         "POST"
+      ]
+    },
+    {
+      "url": "/api/admin/version-status",
+      "file": "app/api/admin/version-status/route.ts",
+      "domain": "admin",
+      "methods": [
+        "GET"
       ]
     },
     {
@@ -4058,6 +4090,28 @@
       ]
     },
     {
+      "url": "/api/version",
+      "file": "app/api/version/route.ts",
+      "domain": "version",
+      "methods": []
+    },
+    {
+      "url": "/api/web-vitals",
+      "file": "app/api/web-vitals/route.ts",
+      "domain": "web-vitals",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "url": "/api/web-vitals/retention/cron",
+      "file": "app/api/web-vitals/retention/cron/route.ts",
+      "domain": "web-vitals",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
       "url": "/api/welcome",
       "file": "app/api/welcome/route.ts",
       "domain": "welcome",
@@ -4123,7 +4177,7 @@
     {
       "domain": "admin",
       "label": "Beheer",
-      "count": 40,
+      "count": 41,
       "routes": [
         {
           "url": "/api/admin/ai-features",
@@ -4464,6 +4518,14 @@
           "domain": "admin",
           "methods": [
             "POST"
+          ]
+        },
+        {
+          "url": "/api/admin/version-status",
+          "file": "app/api/admin/version-status/route.ts",
+          "domain": "admin",
+          "methods": [
+            "GET"
           ]
         },
         {
@@ -5892,6 +5954,29 @@
       ]
     },
     {
+      "domain": "web-vitals",
+      "label": "web-vitals",
+      "count": 2,
+      "routes": [
+        {
+          "url": "/api/web-vitals",
+          "file": "app/api/web-vitals/route.ts",
+          "domain": "web-vitals",
+          "methods": [
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/web-vitals/retention/cron",
+          "file": "app/api/web-vitals/retention/cron/route.ts",
+          "domain": "web-vitals",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "aandelen-holdings",
       "label": "aandelen-holdings",
       "count": 1,
@@ -6879,6 +6964,19 @@
       ]
     },
     {
+      "domain": "version",
+      "label": "version",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/version",
+          "file": "app/api/version/route.ts",
+          "domain": "version",
+          "methods": []
+        }
+      ]
+    },
+    {
       "domain": "welcome",
       "label": "welcome",
       "count": 1,
@@ -7326,9 +7424,13 @@
       {
         "name": "wallet_addresses",
         "migration": "supabase/migrations/20260501000001_create_external_connections.sql"
+      },
+      {
+        "name": "web_vitals",
+        "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 148
+    "migrationCount": 152
   },
   "tablesByDomain": [
     {
@@ -7465,6 +7567,10 @@
         {
           "name": "user_own_ibans",
           "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
+        },
+        {
+          "name": "web_vitals",
+          "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
         }
       ]
     },
@@ -7770,11 +7876,11 @@
     }
   ],
   "components": {
-    "total": 866,
+    "total": 868,
     "groups": [
       {
         "group": "app",
-        "count": 362,
+        "count": 364,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -8120,6 +8226,8 @@
           "vrijheidsas.test",
           "wealth-composition-chart",
           "wealth-composition-chart.test",
+          "web-vitals-reporter",
+          "web-vitals-trend",
           "whatif-actions",
           "whatif-beslishulp",
           "whatif-chat",
@@ -10354,6 +10462,12 @@
         },
         {
           "name": "user_feature_visits",
+          "write": true
+        }
+      ],
+      "web-vitals": [
+        {
+          "name": "web_vitals",
           "write": true
         }
       ],
@@ -13170,6 +13284,17 @@
             "/api/roadmap"
           ]
         }
+      ],
+      "web_vitals": [
+        {
+          "domain": "web-vitals",
+          "label": "web-vitals",
+          "write": true,
+          "routes": [
+            "/api/web-vitals",
+            "/api/web-vitals/retention/cron"
+          ]
+        }
       ]
     },
     "multiWriter": [
@@ -13933,6 +14058,11 @@
         "user": true,
         "household": false,
         "rls": true
+      },
+      "web_vitals": {
+        "user": true,
+        "household": false,
+        "rls": true
       }
     }
   },
@@ -14630,6 +14760,19 @@
       "file": "docs/adr/0056-chat-transport-cloud-lokaal-omschakelpunt.md"
     },
     {
+      "id": "0056-eigen-web-vitals-rum-collectie",
+      "title": "eigen web vitals rum collectie",
+      "status": "accepted",
+      "date": "2026-07-20",
+      "elements": [
+        "t-platform",
+        "t-supabase",
+        "app-comp"
+      ],
+      "summary": "Speed Insights (t-platform) geeft geen ruwe, kruisbare RUM-data per route/segment; die zit alleen in het Vercel-dashboard en is niet via CLI/MCP op te vragen. We willen vitals per gescrubde route/device/metric kunnen aggregeren (feature 885). Een publiek schrijf-endpoint is nodig",
+      "file": "docs/adr/0056-eigen-web-vitals-rum-collectie.md"
+    },
+    {
       "id": "0057-eigen-leaked-password-check",
       "title": "Eigen leaked-password-protection via HaveIBeenPwned k-anonimiteit (gratis, UI-grade)",
       "status": "aanvaard",
@@ -14655,7 +14798,7 @@
       },
       {
         "path": "app/(app)/toekomst",
-        "commits": 38
+        "commits": 39
       },
       {
         "path": "app/api/ai",
@@ -14847,6 +14990,13 @@
         "id": "tester",
         "name": "tester",
         "description": "Use this agent to write, run, debug and review tests for TriFinity, and to verify that a change actually works before it's called done. It owns the two test layers: unit/component tests with Vitest (`*.test.ts` / `*.test.tsx`, run via `npm run test:run`) and the in-app regression framework (`lib/regression-tests/suites/*` — 80+ suites, registered via `registerTest`/`registerCategory`). Use it after any non-trivial change, when coverage is missing, when a bug needs a reproducing test, or when tests are failing and need diagnosis.",
+        "model": "sonnet",
+        "color": "green"
+      },
+      {
+        "id": "uat-docs-keeper",
+        "name": "uat-docs-keeper",
+        "description": "Use this agent to keep TriFinity's UAT definitions (lib/uat/**) in sync with code changes — the acceptance criteria (Given/When/Then), the scenario/zone catalog and the process-flow graphs. It is the UAT twin of `architecture-docs-keeper`: it UPDATES and ADDS definitions to match what the code now does, but it NEVER executes the live UAT run (that is the `/uat` command, when a zone is tested again). Use it in the release pipeline's UAT-sync gate, or while building a feature, whenever a change touches a tested zone's behaviour or user-facing surface.",
         "model": "sonnet",
         "color": "green"
       },
@@ -15126,9 +15276,10 @@
           },
           {
             "index": 9,
-            "title": "Platen synchroniseren",
+            "title": "Platen & UAT-definities synchroniseren",
             "agents": [
               "architecture-docs-keeper",
+              "uat-docs-keeper",
               "architect"
             ]
           }
@@ -15253,9 +15404,10 @@
           },
           {
             "index": 8,
-            "title": "Architectuurplaten bijwerken",
+            "title": "Architectuur- & UAT-definities bijwerken",
             "agents": [
               "architecture-docs-keeper",
+              "uat-docs-keeper",
               "architect"
             ]
           }
@@ -15370,11 +15522,18 @@
           },
           {
             "index": 7,
+            "title": "UAT-definitiesynchronisatie",
+            "agents": [
+              "uat-docs-keeper"
+            ]
+          },
+          {
+            "index": 8,
             "title": "Build & echte verificatie",
             "agents": []
           },
           {
-            "index": 8,
+            "index": 9,
             "title": "Review",
             "agents": [
               "calc-engine-specialist",
@@ -15387,12 +15546,12 @@
             ]
           },
           {
-            "index": 9,
+            "index": 10,
             "title": "Ship",
             "agents": []
           },
           {
-            "index": 10,
+            "index": 11,
             "title": "Deploy-verificatie & rollback-pad",
             "agents": []
           }
@@ -15512,9 +15671,34 @@
     "hasChanges": true,
     "sections": [
       {
+        "label": "Schermen",
+        "added": [
+          "/beheer/versie",
+          "/beheer/webprestaties"
+        ],
+        "removed": []
+      },
+      {
         "label": "API-routes",
         "added": [
-          "/api/auth/password-check"
+          "/api/admin/version-status",
+          "/api/version",
+          "/api/web-vitals",
+          "/api/web-vitals/retention/cron"
+        ],
+        "removed": []
+      },
+      {
+        "label": "Tabellen",
+        "added": [
+          "web_vitals"
+        ],
+        "removed": []
+      },
+      {
+        "label": "Componenten (aantal)",
+        "added": [
+          "+2"
         ],
         "removed": []
       }
@@ -15705,9 +15889,9 @@
     },
     {
       "date": "2026-07-20",
-      "api": 257,
-      "components": 866,
-      "tables": 84,
+      "api": 261,
+      "components": 868,
+      "tables": 85,
       "routesProduction": 101
     }
   ]

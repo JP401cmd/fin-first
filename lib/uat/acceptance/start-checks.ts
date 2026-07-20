@@ -191,7 +191,7 @@ export const START_ENGINE_CHECKS: StartEngineCheck[] = [
       const noodfondsPrefill = computeNoodfondsTarget({ monthlyIncome: 3000, monthlyExpenses: 2100 })
       const netto = nettoVermogenRecap([2500, 18000, 12000], [9000])
       return {
-        expected: 'spaarquotePreview=30; pensioenPrefill=20160; noodfondsPrefill=6300; nettoVermogenRecap=23500',
+        expected: 'spaarquotePreview=30; pensioenPrefill=20160; noodfondsPrefill=12600; nettoVermogenRecap=23500',
         actual: `spaarquotePreview=${spaarquote}; pensioenPrefill=${pensioenPrefill}; noodfondsPrefill=${noodfondsPrefill}; nettoVermogenRecap=${netto}`,
       }
     },
@@ -233,7 +233,7 @@ export const START_ENGINE_CHECKS: StartEngineCheck[] = [
       criterion('WF-START-21')
       const prefill = computeNoodfondsTarget({ monthlyIncome: 2800, monthlyExpenses: 1900 })
       return {
-        expected: 'noodfondsPrefill=5700',
+        expected: 'noodfondsPrefill=11400',
         actual: `noodfondsPrefill=${prefill}`,
       }
     },

@@ -48,8 +48,8 @@ De `tester` voegt tests toe voor het nieuwe gedrag **en** draait de bestaande su
 ### 8. Review — `code-review` (+ `ux-review-expert` bij UI, + `security-specialist` bij data/auth/routes)
 Beoordeling op correctheid, neveneffecten op bestaand gedrag, en UI-consistentie. Raakt de uitbreiding data-toegang, auth, routes, AI-context of partner-/huishouddata (bij twijfel: ja), dan draait de `security-specialist` zijn ship-gate-checklist — let extra op een tweede datapad dat een privacy-bewuste loader omzeilt; een 🔴-bevinding blokkeert tot opgelost.
 
-### 9. Platen synchroniseren — `architecture-docs-keeper` (indien structureel)
-Veranderde de uitbreiding een domein/tabel/rekenmotor/capability? Dan werkt `architecture-docs-keeper` de relevante view(s) bij en regenereert facts; de `architect` bevestigt de fit. Puur additief binnen bestaande grenzen? Sla over.
+### 9. Platen & UAT-definities synchroniseren — `architecture-docs-keeper` + `uat-docs-keeper` (indien structureel)
+Veranderde de uitbreiding een domein/tabel/rekenmotor/capability? Dan werkt `architecture-docs-keeper` de relevante view(s) bij en regenereert facts; de `architect` bevestigt de fit. Raakt de uitbreiding zichtbaar gedrag of een oppervlak van een geteste zone? Dan werkt `uat-docs-keeper` de acceptatiecriteria in `lib/uat/acceptance/<zone>.ts` bij (en voegt een scenario toe waar een oppervlak nieuw is) — bijwerken, niet uitvoeren. Puur additief binnen bestaande grenzen, zonder UI/gedragswijziging? Sla over.
 
 ## Afronding
 Lever op: de bijgewerkte feature, de delta-spec met scope in/uit, bewijs dat bestaand gedrag heelblijft (regressietests groen), wat gewijzigd is en eventuele plaat/ADR-updates. Benoem restrisico en next steps — en of er ge-de-escaleerd is naar het kleine-aanpassing-regime. Sluit daarna af met de zelfverbeterings-slotstap uit de gedeelde conventies.

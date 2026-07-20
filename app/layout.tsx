@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Playfair_Display, Source_Serif_4, DM_Mono, Inter, Andada_Pro } from "next/font/google";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { HeadScripts } from "@/components/app/head-scripts";
+import { WebVitalsReporter } from "@/components/app/web-vitals-reporter";
 import "./globals.css";
 
 // LCP-font: hero h1 op /core, /will, /horizon en alle category-pages.
@@ -106,6 +107,7 @@ export default function RootLayout({
         <HeadScripts />
         {children}
         <SpeedInsights />
+        <WebVitalsReporter />
       </body>
     </html>
   );

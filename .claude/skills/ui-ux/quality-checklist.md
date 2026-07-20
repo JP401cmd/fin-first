@@ -42,6 +42,7 @@
 - [ ] Geen verticale borders — alleen horizontale `border-b border-[var(--border-ed)]`?
 - [ ] **Dotted ritme** voor editorial-pagina's: tabellen op gids, jaaroverzicht, rapportages gebruiken `border-b border-dotted border-[var(--rule-soft)]` i.p.v. solid borders. Op data-zware dashboards blijft `border-[var(--border-ed)]` solid voor scanbaarheid.
 - [ ] **Sleep-affordance**: tabellen die op `<640px` horizontaal scrollen tonen `'sleep →'`-hint absolute top-2 right-2 in mono UPPERCASE. Verbergen via `[data-scrolled="true"]::before { opacity: 0 }` zodra `scrollLeft > 0`. Zie patroon-kaart *Sleep-affordance op overflow-tabellen*.
+- [ ] **Conditionele celkleur** (bv. stoplicht per rij/waarde): geef de kleur door als een override die de standaard-kleurklasse *vervángt* (JS-ternary / `className || default`), nooit als een extra `text-*`-class die náást de component-eigen kleurklasse wordt geplakt. Twee `text-*`-utilities met gelijke specificiteit strijden om dezelfde property en de winnaar hangt af van Tailwinds scanvolgorde, niet van de stringvolgorde — de kleur rendert dan onbetrouwbaar. Spiegel het `Kpi`-patroon (`valueClass ?? 'text-[var(--ink)]'`), niet een `Td`-helper die intern al een default zet én een losse kleur-className achteraan plakt.
 
 ### Grafiek-animaties
 - [ ] Elke chart/sparkline/voortgangsbalk gebruikt `useInViewAnimation` (`lib/hooks/use-in-view-animation.ts`)?

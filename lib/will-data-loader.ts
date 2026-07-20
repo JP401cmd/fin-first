@@ -322,6 +322,59 @@ export async function loadWillData(
   }
 }
 
+/**
+ * Effectieve maand-cijfers (inkomen + uitgaven) voor de Doelen-tab.
+ *
+ * CONSUME, don't recompute: aggregeert de lopende-maand-transacties (transfers
+ * uitgesloten, spiegelt de dashboard-loader) en resolvet ze via de CANONIEKE
+ * `resolveEffectiveIncomeExpenses` — dezelfde grondslag als `data.monthlyIncome`/
+ * `data.monthlyExpenses` in de bundel. Handmatige profielbron ('manual') wint over
+ * transacties. Bewust een aparte, lichte loader (2 gerichte queries) i.p.v. deze
+ * kosten aan `loadWillData` (4 hot call-sites) toe te voegen — alleen de doelen-
+ * pagina heeft de cijfers nodig, voor de gepersonaliseerde standaard-doelen-kiezer.
+ */
+export async function loadEffectiveMonthlyFigures(
+  supabase: SupabaseClient,
+): Promise<{ monthlyIncome: number; monthlyExpenses: number }> {
+  const user = await getCachedUser(supabase)
+  const { start: monthStart, end: monthEnd } = localMonthBounds(new Date())
+  const profileQuery: PromiseLike<{ data: IncomeExpenseSources | null }> = user
+    ? supabase
+        .from('profiles')
+        .select('net_monthly_income, estimated_monthly_expenses, income_source, expenses_source')
+        .eq('id', user.id)
+        .single()
+    : Promise.resolve({ data: null })
+  const [txRes, profileRes] = await Promise.all([
+    supabase
+      .from('transactions')
+      .select('amount, transaction_type')
+      .gte('date', monthStart)
+      .lt('date', monthEnd),
+    profileQuery,
+  ])
+
+  let txIncome = 0
+  let txExpenses = 0
+  for (const t of (txRes.data ?? []) as { amount: number | string; transaction_type?: string | null }[]) {
+    if (t.transaction_type === 'transfer' || t.transaction_type === 'joint_transfer') continue
+    const amt = Number(t.amount)
+    if (!Number.isFinite(amt)) continue
+    if (amt > 0) txIncome += amt
+    else txExpenses += Math.abs(amt)
+  }
+
+  const { income, expenses } = resolveEffectiveIncomeExpenses(
+    (profileRes.data ?? {}) as IncomeExpenseSources,
+    txIncome,
+    txExpenses,
+  )
+  return {
+    monthlyIncome: income > 0 ? Math.round(income) : 0,
+    monthlyExpenses: expenses > 0 ? Math.round(expenses) : 0,
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Parameter-doelen (ronde 4) — cap-splitsing + actuele-waarde-injectie
 // ---------------------------------------------------------------------------

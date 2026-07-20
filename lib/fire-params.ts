@@ -7,10 +7,12 @@
  *    Alleen gebruiken voor vergelijking/referentie (bijv. "25× regel").
  *    Export: horizon-data.ts → CLASSIC_SWR
  *
- * 2. NL_SWR (≈0.02883 / 2.88%) — Nederlandse standaard na Box 3 + inflatie.
- *    Formule: DEFAULT_RETURN − BOX3_DRAG − INFLATION = 0.07 − 0.02117 − 0.02.
- *    Gebruiken als fallback wanneer geen gebruikersprofiel beschikbaar is.
- *    Export: horizon-data.ts → NL_SWR
+ * 2. NL_SWR (jaargebonden, 2026 ≈ 0.0284 / 2.84%) — Nederlandse standaard na
+ *    Box 3 + inflatie. Formule: DEFAULT_RETURN − BOX3_DRAG − NL_INFLATIE, waarbij
+ *    BOX3_DRAG is afgeleid uit BOX3_PARAMS[CURRENT_TAX_YEAR] (2026: 6,00% × 36%).
+ *    Beweegt dus automatisch mee met het belastingjaar. Gebruiken als fallback
+ *    wanneer geen gebruikersprofiel beschikbaar is. Export: lib/constants.ts →
+ *    NL_SWR (ook via horizon-data.ts).
  *
  * 3. effectiveSwr (dynamisch) — Gepersonaliseerd per gebruiker.
  *    Berekend door resolveFireParams() op basis van profiel-instellingen

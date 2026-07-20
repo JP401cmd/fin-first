@@ -5,6 +5,7 @@ import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
 import { computeEffectiveSwr } from '@/lib/fire-params'
+import { SWR, NL_SWR } from '@/lib/constants'
 import { Users, UserCheck } from 'lucide-react'
 import { usePerspective } from '@/components/app/perspective-provider'
 import { MaskedAmount } from '@/components/app/masked-amount'
@@ -16,10 +17,9 @@ interface Props {
   href?: string
 }
 
-// Trinity Study classic SWR
-const CLASSIC_SWR = 0.04
-// NL SWR (default, pre-tax-adjusted)
-const NL_SWR_DEFAULT = 0.02883
+// Referentie-SWR's komen uit de canonieke bron (lib/constants.ts): SWR = Trinity
+// Study 4%, NL_SWR = NL-standaard na Box 3 + inflatie (beweegt met het belastingjaar
+// mee). Nooit lokaal hardcoden — "consume, don't recompute".
 
 function swrStatus(swr: number): { color: string; label: string; bg: string } {
   if (swr >= 0.04) return { color: 'text-positive', label: 'Veilig', bg: 'bg-positive/20' }
@@ -113,8 +113,8 @@ export const SwrMonitorWidget = memo(function SwrMonitorWidget({ size, data, hre
     // Visual gauge bar
     const gaugeMax = 0.06 // 6% scale
     const swrPct = Math.min(effectiveSwr / gaugeMax, 1) * 100
-    const classicPct = (CLASSIC_SWR / gaugeMax) * 100
-    const nlSwrPct = (NL_SWR_DEFAULT / gaugeMax) * 100
+    const classicPct = (SWR / gaugeMax) * 100
+    const nlSwrPct = (NL_SWR / gaugeMax) * 100
 
     return (
       <WidgetShell module="horizon" size={size} kicker={kicker} href={href}>
@@ -136,7 +136,12 @@ export const SwrMonitorWidget = memo(function SwrMonitorWidget({ size, data, hre
         </div>
 
         {/* Gauge bar */}
-        <div ref={barRef} className="relative h-2.5 w-full rounded-full bg-[var(--subtle)] overflow-visible mb-3">
+        <div
+          ref={barRef}
+          className="relative h-2.5 w-full rounded-full bg-[var(--subtle)] overflow-visible mb-3"
+          role="img"
+          aria-label={`Veilige onttrekkingsvoet ${formatPct(effectiveSwr)}, status ${status.label}. Referenties: Trinity Study ${formatPct(SWR)}, NL standaard ${formatPct(NL_SWR)}.`}
+        >
           <div
             className={`h-full rounded-full ${effectiveSwr >= 0.03 ? 'bg-positive' : effectiveSwr >= 0.02 ? 'bg-[var(--ink-3)]' : 'bg-negative'}`}
             style={{ width: hasEntered ? `${swrPct}%` : '0%', transition: barTransition }}
@@ -145,13 +150,13 @@ export const SwrMonitorWidget = memo(function SwrMonitorWidget({ size, data, hre
           <div
             className="absolute top-0 h-2.5 w-px bg-[var(--ink-3)]"
             style={{ left: `${classicPct}%` }}
-            title="Trinity Study 4%"
+            title={`Trinity Study ${formatPct(SWR)}`}
           />
           {/* NL SWR marker */}
           <div
             className="absolute top-0 h-2.5 w-px bg-horizon-400"
             style={{ left: `${nlSwrPct}%` }}
-            title="NL standaard 2.88%"
+            title={`NL standaard ${formatPct(NL_SWR)}`}
           />
         </div>
 
@@ -160,12 +165,12 @@ export const SwrMonitorWidget = memo(function SwrMonitorWidget({ size, data, hre
           <div className="flex items-center gap-1.5">
             <div className="h-1.5 w-1.5 rounded-full bg-[var(--ink-3)]" />
             <span className="text-[10px] text-[var(--ink-3)]">Trinity Study</span>
-            <span className="font-mono text-[10px] tabular-nums text-[var(--ink-2)]">{formatPct(CLASSIC_SWR)}</span>
+            <span className="font-mono text-[10px] tabular-nums text-[var(--ink-2)]">{formatPct(SWR)}</span>
           </div>
           <div className="flex items-center gap-1.5">
             <div className="h-1.5 w-1.5 rounded-full bg-horizon-400" />
             <span className="text-[10px] text-[var(--ink-3)]">NL standaard</span>
-            <span className="font-mono text-[10px] tabular-nums text-[var(--ink-2)]">{formatPct(NL_SWR_DEFAULT)}</span>
+            <span className="font-mono text-[10px] tabular-nums text-[var(--ink-2)]">{formatPct(NL_SWR)}</span>
           </div>
         </div>
       </WidgetShell>
@@ -175,8 +180,8 @@ export const SwrMonitorWidget = memo(function SwrMonitorWidget({ size, data, hre
   // ── Full: SWR + scenarios + impact ────────────────────────
   const gaugeMax = 0.06
   const swrPct = Math.min(effectiveSwr / gaugeMax, 1) * 100
-  const classicPct = (CLASSIC_SWR / gaugeMax) * 100
-  const nlSwrPct = (NL_SWR_DEFAULT / gaugeMax) * 100
+  const classicPct = (SWR / gaugeMax) * 100
+  const nlSwrPct = (NL_SWR / gaugeMax) * 100
 
   // FIRE multiplier = 1 / SWR
   const multiplier = 1 / effectiveSwr
@@ -222,28 +227,42 @@ export const SwrMonitorWidget = memo(function SwrMonitorWidget({ size, data, hre
             <p className="font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
               {multiplier.toFixed(1)}×
             </p>
+            <p className="text-[10px] text-[var(--ink-3)]">× jaaruitgaven aan vrijheid</p>
           </div>
         </div>
 
         {/* Gauge bar with markers */}
-        <div ref={barRef} className="relative h-3 w-full rounded-full bg-[var(--subtle)] overflow-visible">
+        <div
+          ref={barRef}
+          className="relative h-3 w-full rounded-full bg-[var(--subtle)] overflow-visible"
+          role="img"
+          aria-label={`Veilige onttrekkingsvoet ${formatPct(effectiveSwr)}, status ${status.label}. Referenties: Trinity Study ${formatPct(SWR)}, NL standaard ${formatPct(NL_SWR)}.`}
+        >
           <div
             className={`h-full rounded-full ${effectiveSwr >= 0.03 ? 'bg-positive' : effectiveSwr >= 0.02 ? 'bg-[var(--ink-3)]' : 'bg-negative'}`}
             style={{ width: hasEntered ? `${swrPct}%` : '0%', transition: barTransition }}
           />
-          <div className="absolute top-0 h-3 w-px bg-[var(--ink-3)]" style={{ left: `${classicPct}%` }} />
-          <div className="absolute top-0 h-3 w-px bg-horizon-400" style={{ left: `${nlSwrPct}%` }} />
+          <div
+            className="absolute top-0 h-3 w-px bg-[var(--ink-3)]"
+            style={{ left: `${classicPct}%` }}
+            title={`Trinity Study ${formatPct(SWR)}`}
+          />
+          <div
+            className="absolute top-0 h-3 w-px bg-horizon-400"
+            style={{ left: `${nlSwrPct}%` }}
+            title={`NL standaard ${formatPct(NL_SWR)}`}
+          />
         </div>
 
         {/* Legend row */}
         <div className="flex items-center justify-between text-[10px]">
           <div className="flex items-center gap-1.5">
             <div className="h-1.5 w-1.5 rounded-full bg-[var(--ink-3)]" />
-            <span className="text-[var(--ink-3)]">Trinity <span className="font-mono tabular-nums">{formatPct(CLASSIC_SWR)}</span></span>
+            <span className="text-[var(--ink-3)]">Trinity <span className="font-mono tabular-nums">{formatPct(SWR)}</span></span>
           </div>
           <div className="flex items-center gap-1.5">
             <div className="h-1.5 w-1.5 rounded-full bg-horizon-400" />
-            <span className="text-[var(--ink-3)]">NL standaard <span className="font-mono tabular-nums">{formatPct(NL_SWR_DEFAULT)}</span></span>
+            <span className="text-[var(--ink-3)]">NL standaard <span className="font-mono tabular-nums">{formatPct(NL_SWR)}</span></span>
           </div>
         </div>
 
@@ -295,7 +314,7 @@ export const SwrMonitorWidget = memo(function SwrMonitorWidget({ size, data, hre
             </span>
             {netWorth > 0 && (
               <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${withdrawalSafe ? 'bg-positive/10 text-positive' : 'bg-negative/10 text-negative'}`}>
-                {withdrawalSafe ? '✓ OK' : '⚠  Te hoog'}
+                {withdrawalSafe ? '✓ OK' : '⚠ Te hoog'}
               </span>
             )}
           </div>

@@ -148,7 +148,10 @@
       "Bash(head -60 components/app/holding-transaction-log.test.tsx)",
       "Bash(ls vitest.setup* vitest.config*)",
       "Bash(ls lib/household/*.test.ts lib/*household*.test.ts)",
-      "Bash(ls lib/household/)"
+      "Bash(ls lib/household/)",
+      "Bash(node scripts/uat/stale-scan.mjs lib/format.ts)",
+      "Bash(git -C \"c:\\\\Users\\\\janpa\\\\cd\\\\development\\\\fin\" worktree list)",
+      "Bash(git -C \"c:\\\\Users\\\\janpa\\\\cd\\\\development\\\\fin\" branch -a)"
     ]
   },
   "enableAllProjectMcpServers": true,

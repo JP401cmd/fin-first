@@ -9,6 +9,7 @@ export type JobKey =
   | 'news-ingest'
   | 'integraties-health'
   | 'briefing-email'
+  | 'web-vitals-retention'
 
 /**
  * Schrijf één uitvoering van een achtergrondtaak weg in `job_runs`.
