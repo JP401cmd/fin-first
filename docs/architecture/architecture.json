@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-19T21:52:32.812Z",
-  "generatedDate": "2026-07-19",
+  "generatedAt": "2026-07-20T06:45:46.570Z",
+  "generatedDate": "2026-07-20",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -14546,6 +14546,17 @@
       ],
       "summary": "`/toekomst` draaide de FIRE-kernel **synchroon op de main thread**. In `use-horizon-fire-sim.ts` deden drie `useMemo`'s elk een volledige kernel-run: de hoofd-projectie (`computeConvergentieProjection` — gemeten 173–419 ms), de wat-als-scenario-run en het gekozen-stop-pad (`runFo",
       "file": "docs/adr/0054-horizon-kernel-web-worker.md"
+    },
+    {
+      "id": "0055-react-compiler",
+      "title": "React Compiler aan — automatische, correcte memoïsatie app-breed (Task 4.3)",
+      "status": "aanvaard",
+      "date": "2026-07-20",
+      "elements": [
+        "app-comp"
+      ],
+      "summary": "Laatste taak van FASE 4 van het performance-programma. We zetten de **React Compiler** aan (`reactCompiler: true`), zodat React onze componenten op build-time automatisch en *correct* memoïseert. Dat neemt de gebroken handmatige memo-ketens uit de juli-performance-audit structure",
+      "file": "docs/adr/0055-react-compiler.md"
     }
   ],
   "churn": {
@@ -14557,7 +14568,7 @@
       },
       {
         "path": "lib/ai",
-        "commits": 45
+        "commits": 46
       },
       {
         "path": "app/(app)/toekomst",
@@ -15415,23 +15426,8 @@
   "diff": {
     "baseline": false,
     "previousDate": "2026-07-19",
-    "hasChanges": true,
-    "sections": [
-      {
-        "label": "Integraties",
-        "added": [
-          "OpenRouter"
-        ],
-        "removed": []
-      },
-      {
-        "label": "Componenten (aantal)",
-        "added": [
-          "+1"
-        ],
-        "removed": []
-      }
-    ]
+    "hasChanges": false,
+    "sections": []
   },
   "statsHistory": [
     {
@@ -15611,6 +15607,13 @@
     },
     {
       "date": "2026-07-19",
+      "api": 255,
+      "components": 864,
+      "tables": 84,
+      "routesProduction": 101
+    },
+    {
+      "date": "2026-07-20",
       "api": 255,
       "components": 864,
       "tables": 84,
