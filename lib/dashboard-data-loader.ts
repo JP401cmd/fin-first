@@ -27,7 +27,7 @@ import type { FireProjection, FireCountdown } from '@/lib/horizon-data'
 import { loadNewsPreview } from '@/lib/news-preview'
 
 import { computeEffectiveExpenses, computeFireTarget, computeFreedomProgressWithBasis, inclHomeTargetFromScalar, computeSavingsRateFromNetWorthDelta } from '@/lib/core-metrics'
-import { localMonthStartMonthsAgo } from '@/lib/month-range'
+import { localMonthStart, localMonthStartMonthsAgo } from '@/lib/month-range'
 import {
   getActiveAssets,
   getActiveDebts,
@@ -66,6 +66,7 @@ import { calculateBox3, CURRENT_TAX_YEAR, type TaxYear } from '@/lib/box3-data'
 import { NL_AOW_AGE } from '@/lib/constants'
 import { hasPartner } from '@/lib/household-type'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
+import { resolveFireAssumptions, type FireAssumptionRow } from '@/lib/fire-assumptions'
 import { getAowLeeftijden } from '@/lib/reference-cache'
 import { computeExpectedAnnualAppreciation, type Asset } from '@/lib/asset-data'
 import { computeAssetsByType, computeLiquidPot, monthsCoveredFrom } from '@/lib/dashboard-wealth-weighting'
@@ -93,6 +94,8 @@ import {
   type TxMonthAggregateRow,
 } from '@/lib/server-data/tx-aggregates'
 import { fetchActionsKpiAggregate } from '@/lib/server-data/actions-aggregate'
+import { fetchLatestSnapshotsByMonth } from '@/lib/server-data/snapshot-aggregates'
+import { buildDebtSaldoHistory } from '@/lib/load-debt-balance-history'
 import { computeSovereigntyLevel, levelToPhaseId } from '@/lib/feature-phases'
 import { mergeWidgetPrefs, type WidgetSize } from '@/lib/widget-catalog'
 import { computePortfolioFees, computeFeeImpactOnFire } from '@/lib/fee-analysis'
@@ -266,6 +269,8 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     membershipResult,
     rebalHoldingsResult, rebalTargetsResult,
     earliestIncomeResult, actionsKpiResult,
+    fireAssumptionsResult,
+    debtSnapshotMonthlyResult,
   ] = await Promise.all([
     // Gedeelde basisdata-laag (lib/server-data/base.ts): huidige-maand-tx, actieve
     // assets/schulden, eigen profiel, alle budgetten, het 12-maands transactie-
@@ -357,6 +362,19 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     // .limit(1000)-actie-fetch (totalFreedomDaysWon/completionRatio waren stil te
     // laag voor >1000-actie-gebruikers). RLS-breed via de authenticated client.
     fetchActionsKpiAggregate(supabase),
+    // FIRE-marktaannames — jaargelaagde override-laag (Optie 2: DB-override met
+    // TS-fallback). Ontbrekende tabel / lege set → resolveFireAssumptions valt terug
+    // op de TS-constanten → byte-identiek. Server-side geresolveerd zodat rendement/
+    // inflatie op /overzicht consistent zijn met /toekomst en /core.
+    supabase
+      .from('fire_assumptions')
+      .select('year, expected_return, inflation, volatility, source, is_definitive')
+      .order('year', { ascending: true })
+      .then((r) => r, () => ({ data: null })),
+    // Openstaand schuldsaldo per maand (Schuldtrend-widget, Optie B): latest-per-maand
+    // balance_snapshots-aggregaat (RLS-veilig, egress-zuinig). Netwerkfout → { data: null }
+    // → de widget valt terug op de aflossingen-bron hieronder (graceful degradation).
+    fetchLatestSnapshotsByMonth(supabase, twelveMonthsAgo).then((r) => r, () => ({ data: null, error: null })),
   ])
 
   // Vaste lasten: consumeer de canonieke bron (dezelfde die /overzicht/cashflow?view=vaste-lasten
@@ -835,7 +853,26 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   const savingsRate6mIncomeMonthly = savingsRateIsEstimate ? effectiveMonthlyIncome : extIncome6 / 6
   const monthlySavingsAmount = monthlySavingsFromRate(savingsRate6mIncomeMonthly, savingsRate6m)
 
-  const fireParams = resolveFireParams(profileResult.data ?? {})
+  // ── FIRE-marktaannames: jaarlaag-shadow (Optie 2, DB-override met TS-fallback) ──
+  // Vul rendement/inflatie ALLEEN aan met de jaar-geresolveerde markt-default wanneer
+  // de gebruiker zelf niets zette (null); een expliciete keuze wint. Lege/ontbrekende
+  // jaarlaag → TS-constanten → byte-identiek. We shadowen op een KOPIE — nooit de
+  // gedeelde getOwnProfile-rij muteren: die is cache()'d en gedeeld met de layout,
+  // waar expected_return/inflation_rate == null betekent "gebruiker heeft FIRE-params
+  // niet ingesteld" (coach-datagap). De kopie voedt resolveFireParams (scalar/target)
+  // én de convergentie-kernel-context hieronder, zodat /overzicht dezelfde grondslag
+  // toont als /toekomst en /core. buildHorizonInput erft de override via fireParams.
+  const fireAssumptions = resolveFireAssumptions(
+    (fireAssumptionsResult.data ?? []) as FireAssumptionRow[],
+  )
+  const shadowedProfile = { ...(profileResult.data ?? {}) }
+  {
+    const sp = shadowedProfile as { expected_return?: number | null; inflation_rate?: number | null }
+    if (sp.expected_return == null) sp.expected_return = fireAssumptions.expectedReturn
+    if (sp.inflation_rate == null) sp.inflation_rate = fireAssumptions.inflation
+  }
+
+  const fireParams = resolveFireParams(shadowedProfile)
   const fireSwr = fireParams.effectiveSwr
 
   const yearlyRetirementExpenses = computeRetirementExpenses(
@@ -1014,7 +1051,10 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
         // grondslag hanteert als de v2-tak.
         const convergentieRawContext: ConvergentieRawContext = {
           profile: {
-            ...(profileResult.data as ConvergentieRawProfileRow),
+            // shadowedProfile = getOwnProfile-kopie met de FIRE-jaarlaag-shadow
+            // (rendement/inflatie) toegepast; zo leest de convergentie-kernel
+            // dezelfde inflatie als de scalar/target-laag (consistent /overzicht).
+            ...(shadowedProfile as ConvergentieRawProfileRow),
             yearly_essential_expenses: yearlyMustExpenses,
           },
           assets: dashboardAssetsArr,
@@ -1388,23 +1428,33 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     savingsByMonth.set(month, Math.max(0, inc - exp))
   }
 
-  // Debt history: budget-linked debt transactions (fallback). Σ |bedrag| per maand
-  // over de schuld-budgetten, transfer-gefilterd — uit het maandaggregaat. Per
-  // (maand,budget)-groep = sum_positief + |sum_negatief| (identiek aan de vroegere
-  // Math.abs-reductie over income+expense-rijen).
-  const debtBudgetIds = new Set<string>()
-  for (const [id, type] of budgetTypeMap) if (type === 'debt') debtBudgetIds.add(id)
-  const debtMonthAgg = aggAbsByMonthForBudgets(txAgg12, debtBudgetIds, { realOnly: true })
-
   const toSortedHistory = (m: Map<string, number>) =>
     Array.from(m.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([month, value]) => ({ month, value }))
+
+  // Schuldtrend (widgetreview, Optie B): het openstaand schuldSALDO per maand uit de
+  // balance_snapshots — een dalend saldo is "goed" (schuld = vrijheid die je
+  // terugkoopt), wat via `goodWhenUp:false` op het debt-type vanzelf correct kleurt.
+  // Fallback op de vroegere AFLOSSINGEN-som (debt-budget-transacties) als er nog geen
+  // snapshot-historie is (nieuw account) of de RPC faalde, zodat de widget niet leegt.
+  const debtSaldoHistory = buildDebtSaldoHistory(
+    (debtSnapshotMonthlyResult.data ?? []),
+    now,
+  )
+  let debtHistory = debtSaldoHistory
+  if (debtHistory.length === 0) {
+    const debtBudgetIds = new Set<string>()
+    for (const [id, type] of budgetTypeMap) if (type === 'debt') debtBudgetIds.add(id)
+    const debtMonthAgg = aggAbsByMonthForBudgets(txAgg12, debtBudgetIds, { realOnly: true })
+    debtHistory = toSortedHistory(debtMonthAgg)
+  }
+
   const budgetTypeHistory = {
     income:  toSortedHistory(incomeByMonth),
     expense: toSortedHistory(expenseByMonth),
     savings: toSortedHistory(savingsByMonth),
-    debt:    toSortedHistory(debtMonthAgg),
+    debt:    debtHistory,
   }
 
   // FIRE-leeftijd: prefereer simulatieresultaat (consistent met horizon pagina),
@@ -1950,6 +2000,11 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
               .from('transactions')
               .select('id, description, amount, date, budget_id, user_id, ownership')
               .in('user_id', memberIds)
+              // Shared-only huishouden-feed: alleen ownership='shared' — dit is de
+              // échte gedeelde huishouden-activiteit, niet "mijn recente transacties
+              // onder een huishouden-vlag". Zo is de feed symmetrisch (van beide
+              // partners alleen shared) en klopt hij met de catalogusomschrijving.
+              .eq('ownership', 'shared')
               .gte('date', cutoffStr)
               .order('date', { ascending: false })
               .limit(30),
@@ -1963,26 +2018,15 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
             // Budgetnamen uit de child-inclusieve naam-map (Task 2.5) i.p.v. een
             // aparte `budgets`-lookup-query — zelfde RLS-scope, byte-identieke namen.
 
-            // Check partner's privacy settings for transactions
-            let partnerTxPrivacy = 'totalen'  // default
-            if (partnerId) {
-              const partnerMem = (allMembers ?? []).find(m => m.user_id === partnerId)
-              const privSettings = (partnerMem as { privacy_settings?: Record<string, string> })?.privacy_settings
-              if (privSettings) {
-                partnerTxPrivacy = privSettings.transactions || privSettings.transacties || 'totalen'
-              }
-            }
-
+            // Privacy = bron van waarheid: de RLS-policy "Household members can view
+            // shared transactions" (ownership='shared' AND zelfde household_id) + de
+            // expliciete `.eq('ownership','shared')`-gate op de query hierboven. Partner-
+            // personal transacties komen dus NOOIT in deze feed — ook niet als de
+            // household-RLS later verbreedt (roadmap gedeeld-budgetteren). De vorige
+            // in-code filter kende alleen 'hidden', negeerde de default 'totalen'-
+            // semantiek en werd door de shared-scope nooit geraakt (schijnzekerheid) —
+            // daarom verwijderd i.p.v. gerepareerd.
             householdActivity = sharedTxs
-              .filter(tx => {
-                const isMe = tx.user_id === authUser!.id
-                const isShared = tx.ownership === 'shared'
-                // If partner's privacy is 'verborgen'/'hidden', don't show partner's personal transactions
-                if (!isMe && !isShared && (partnerTxPrivacy === 'verborgen' || partnerTxPrivacy === 'hidden')) {
-                  return false
-                }
-                return true
-              })
               .map(tx => ({
                 id: tx.id,
                 description: tx.description || 'Transactie',
@@ -1991,7 +2035,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
                 category: tx.budget_id ? budgetNameMapAll.get(tx.budget_id) ?? null : null,
                 partnerName: tx.user_id === authUser!.id ? myDisplayName : partnerDisplayName,
                 isCurrentUser: tx.user_id === authUser!.id,
-                ownership: tx.ownership || 'personal',
+                ownership: tx.ownership || 'shared',
               }))
               .slice(0, 15)
           }
@@ -2016,19 +2060,28 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     .map(([type, agg]) => ({ type, days: agg.days, count: agg.count }))
     .sort((a, b) => b.days - a.days)
 
-  // ── Freedom Days Monthly: group completed actions by month (last 12 months) ──
+  // ── Freedom Days Monthly: gewonnen vrijheidsdagen per (lokale) maand ──
+  // Groepeer afgeronde acties op de LOKALE maand van `completed_at` (niet de
+  // UTC-`slice(0,7)`) zodat de maandtoewijzing gelijkloopt met de "deze
+  // maand"-highlight in de widget (vastgelegde conventie: nooit een UTC-slice/
+  // toISOString voor maandgrenzen — acties rond middernacht op een maandgrens
+  // belanden anders in de verkeerde maand). Daarna over een DOORLOPENDE
+  // 12-maands-as met nul-invulling: maanden zónder afgeronde actie worden een
+  // 0-balk i.p.v. te ontbreken, zodat de grafiek geen gaten dichtplakt en de
+  // trend-voetnoot over een vaste kalenderspanne rekent.
   const freedomMonthMap = new Map<string, number>()
   for (const a of completedActions) {
     const completedAt = (a as { completed_at?: string | null }).completed_at
     if (!completedAt) continue
-    const month = completedAt.slice(0, 7) // "YYYY-MM"
-    if (month < twelveMonthsAgo.slice(0, 7)) continue // only last 12 months
+    const monthKey = localMonthStart(new Date(completedAt)).slice(0, 7) // lokale "YYYY-MM"
     const days = Number(a.freedom_days_impact) || 0
-    freedomMonthMap.set(month, (freedomMonthMap.get(month) ?? 0) + days)
+    freedomMonthMap.set(monthKey, (freedomMonthMap.get(monthKey) ?? 0) + days)
   }
-  const freedomDaysMonthly = Array.from(freedomMonthMap.entries())
-    .map(([month, days]) => ({ month, days }))
-    .sort((a, b) => a.month.localeCompare(b.month))
+  const freedomDaysMonthly = Array.from({ length: 12 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (11 - i), 1)
+    const month = localMonthStart(d).slice(0, 7)
+    return { month, days: freedomMonthMap.get(month) ?? 0 }
+  })
 
   // ── Wilskracht widget data — afkap-vrij via de actions_kpi_aggregate-RPC ──
   // totalFreedomDaysWon (Σ freedom_days_impact over completed) + de counts komen

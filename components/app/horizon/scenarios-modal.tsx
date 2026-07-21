@@ -43,11 +43,13 @@ type Props = {
   grossReturn?: number
   /**
    * Canonieke health-score-input van de geladen pagina (HorizonPageData). Wanneer
-   * meegegeven hergebruikt de modal die als basis en overschrijft alleen de
-   * scenario-afhankelijke velden (freedomPct + spaarquote) — zo blijven de
-   * v2-indicatoren (DSTI, vermogensconcentratie, noodfonds, budget) één bron en
-   * driften ze niet weg van /toekomst. Zonder deze prop (bv. de test-pagina)
-   * valt de modal terug op een lichtgewicht reconstructie uit `input`/`debts`.
+   * meegegeven consumeert de modal die ONGEWIJZIGD: de gezondheidsscore is een
+   * huidige-staat "weerbaarheid" die niet van het gekozen scenario/weer afhangt,
+   * dus er is geen scenario-afhankelijk veld om te overschrijven. Zo blijft de
+   * modal-score per definitie gelijk aan /toekomst en driften de v2-indicatoren
+   * (spaarquote, freedomPct, DSTI, vermogensconcentratie, noodfonds, budget) niet
+   * weg. Zonder deze prop (bv. de test-pagina) valt de modal terug op een
+   * lichtgewicht reconstructie uit `input`/`debts`.
    */
   baseHealthInput?: HealthScoreInput
 }
@@ -68,36 +70,39 @@ export function ScenariosModal({ input, debts = [], open, onClose, simRows, simF
       const effectiveReturn = weather === 'normal' ? grossReturn : MARKET_WEATHER[weather].return
       setScenarios(buildScenarioPathsFromSim(simRows, effectiveReturn, simFireTarget))
     }
-    // Compute health score (v2-indicatoren)
-    const savingsRate = input.monthlyIncome > 0
-      ? ((input.monthlyIncome - input.monthlyExpenses) / input.monthlyIncome) * 100
-      : 0
-    const nw = input.totalAssets - input.totalDebts
-    // FIRE-doel: gebruik het canonieke sim-doel als dat is doorgegeven, anders
-    // de canonieke NL SWR op de must-uitgaven (geen vaste 4%).
-    const target = simFireTarget != null && simFireTarget > 0
-      ? simFireTarget
-      : input.yearlyMustExpenses > 0 ? input.yearlyMustExpenses / NL_SWR : 0
-    const fPct = target > 0 ? Math.max(0, Math.min((nw / target) * 100, 100)) : 0
-
-    // Voorkeur: hergebruik de canonieke geladen input en overschrijf alleen de
-    // scenario-afhankelijke velden — minder drift t.o.v. /toekomst. Geen prop →
-    // lichtgewicht reconstructie uit `input`/`debts` (de 3 v2-velden canoniek
-    // gevuld: DSTI-noemer uit het maandinkomen, schuldlast uit de debts-prop;
-    // vermogensconcentratie blijft inactief zonder asset-detail).
-    const healthInput: HealthScoreInput = baseHealthInput
-      ? { ...baseHealthInput, savingsRate6m: savingsRate, freedomPct: fPct }
-      : {
-          savingsRate6m: savingsRate,
-          totalAssets: input.totalAssets,
-          totalDebts: input.totalDebts,
-          emergencyFundMonths: input.monthlyExpenses > 0 ? (input.totalAssets * 0.3) / input.monthlyExpenses : 0,
-          freedomPct: fPct,
-          netMonthlyIncome: input.monthlyIncome,
-          debtMonthlyPayments: debts.reduce((s, d) => s + Number(d.monthly_payment ?? 0), 0),
-          largestAssetTypeShare: null,
-          budgetCategories: [],
-        }
+    // Gezondheidsscore = canonieke huidige-staat "weerbaarheid". Deze hangt niet
+    // van het gekozen scenario/weer af, dus de canonieke baseHealthInput wordt
+    // ONGEWIJZIGD geconsumeerd (geen savingsRate6m/freedomPct-override) — zo is de
+    // modal-score per definitie gelijk aan /toekomst en verdwijnt de drift.
+    // Zonder prop (test-pagina): lichtgewicht reconstructie uit `input`/`debts`,
+    // zónder noodfondsproxy te fabriceren (geen `totalAssets * 0.3`).
+    let healthInput: HealthScoreInput
+    if (baseHealthInput) {
+      healthInput = baseHealthInput
+    } else {
+      const savingsRate = input.monthlyIncome > 0
+        ? ((input.monthlyIncome - input.monthlyExpenses) / input.monthlyIncome) * 100
+        : 0
+      const nw = input.totalAssets - input.totalDebts
+      // FIRE-doel: canoniek sim-doel als doorgegeven, anders de canonieke NL SWR
+      // op de must-uitgaven (geen vaste 4%).
+      const target = simFireTarget != null && simFireTarget > 0
+        ? simFireTarget
+        : input.yearlyMustExpenses > 0 ? input.yearlyMustExpenses / NL_SWR : 0
+      const fPct = target > 0 ? Math.max(0, Math.min((nw / target) * 100, 100)) : 0
+      healthInput = {
+        savingsRate6m: savingsRate,
+        totalAssets: input.totalAssets,
+        totalDebts: input.totalDebts,
+        // Geen noodfonds fabriceren zonder cash-detail → neutraal 0.
+        emergencyFundMonths: 0,
+        freedomPct: fPct,
+        netMonthlyIncome: input.monthlyIncome,
+        debtMonthlyPayments: debts.reduce((s, d) => s + Number(d.monthly_payment ?? 0), 0),
+        largestAssetTypeShare: null,
+        budgetCategories: [],
+      }
+    }
     setHealthScore(computeHealthScoreFromInputs(healthInput))
   }, [input, weather, open, simRows, simFireTarget, grossReturn, debts, baseHealthInput])
 

@@ -12,6 +12,7 @@ import {
 import { resolveFireParams } from '@/lib/fire-params'
 import { computeSovereigntyLevel } from '@/lib/feature-phases'
 import { captureBalanceSnapshots } from '@/lib/balance-snapshot'
+import { logError } from '@/lib/log-error'
 import { type Debt, computeRenteAflossingsSplit } from '@/lib/debt-data'
 import { localMonthBounds, localMonthStart } from '@/lib/month-range'
 import {
@@ -351,8 +352,27 @@ export async function POST() {
     snapshot = fullSnapshot
   }
 
-  // Capture per-entity balance snapshots (fire-and-forget, non-critical)
-  captureBalanceSnapshots(supabase, user.id, today, assets, debts).catch(() => {})
+  // Capture per-entity balance snapshots (fire-and-forget, non-critical).
+  // Silent failures are logged to error_logs so empty sparklines don't go
+  // unnoticed for months — main path stays non-blocking (no await).
+  captureBalanceSnapshots(supabase, user.id, today, assets, debts)
+    .then(res => {
+      if (res.error) {
+        void logError(supabase, {
+          userId: user.id,
+          context: 'balance-snapshot:POST',
+          message: res.error,
+        })
+      }
+    })
+    .catch((err: unknown) => {
+      void logError(supabase, {
+        userId: user.id,
+        context: 'balance-snapshot:POST',
+        message: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
+      })
+    })
 
   return NextResponse.json({
     snapshot: {

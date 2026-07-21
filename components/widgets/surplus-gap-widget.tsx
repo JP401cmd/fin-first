@@ -26,19 +26,6 @@ const KICKER = 'Surplus / Gap'
 export const SurplusGapWidget = memo(function SurplusGapWidget({ size, data, href }: Props) {
   const { simRows, fireAgeFractional, fireEndStrategy } = data
 
-  if (size === 'mini') {
-    return (
-      <WidgetShell module="horizon" size="mini" kicker={KICKER} href={href}>
-        <p className="text-[var(--ink)] leading-none truncate">
-          {simRows && simRows.length > 1
-            ? <SaldoMini rows={simRows} />
-            : <span className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink-3)]">—</span>
-          }
-        </p>
-      </WidgetShell>
-    )
-  }
-
   if (!simRows || simRows.length < 2) {
     // Géén href op de shell: de WidgetEmpty-CTA rendert een eigen <Link> en een
     // whole-card <a> eromheen zou <a>-in-<a> geven (hydration-error). De CTA is
@@ -69,7 +56,7 @@ export const SurplusGapWidget = memo(function SurplusGapWidget({ size, data, hre
             <p className="leading-none">
               <MaskedAmount
                 value={totals.saldo}
-                tone={totals.saldo >= 0 ? 'horizon' : 'kern'}
+                tone="ink"
                 signPrefix={totals.saldo >= 0 ? '+' : '-'}
                 className={`font-mono text-[22px] font-semibold tabular-nums ${
                   totals.saldo >= 0 ? 'text-[var(--positive)]' : 'text-[var(--negative)]'
@@ -131,21 +118,6 @@ export const SurplusGapWidget = memo(function SurplusGapWidget({ size, data, hre
     </WidgetShell>
   )
 })
-
-function SaldoMini({ rows }: { rows: SurplusGapRow[] }) {
-  const totals = computeLifetimeTotals(rows)
-  const tone = totals.saldo >= 0 ? 'horizon' : 'kern'
-  return (
-    <MaskedAmount
-      value={totals.saldo}
-      tone={tone}
-      signPrefix={totals.saldo >= 0 ? '+' : '-'}
-      className={`text-[15px] font-semibold ${
-        totals.saldo >= 0 ? 'text-[var(--positive)]' : 'text-[var(--negative)]'
-      }`}
-    />
-  )
-}
 
 function SaldoSparkline({ rows }: { rows: SurplusGapRow[] }) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 600 })

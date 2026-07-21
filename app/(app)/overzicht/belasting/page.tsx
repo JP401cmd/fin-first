@@ -12,6 +12,7 @@ import { computeJaarruimte, box1JaarruimteStatus, jaarruimteBesparing } from '@/
 import { dailyExpenseRate } from '@/lib/format'
 import { hasBox2Relevance } from '@/lib/box2-relevance'
 import { computeBox3TaxableInput, box3TaxStatus } from '@/lib/box3-taxable-input'
+import { CURRENT_TAX_YEAR } from '@/lib/box3-data'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { PageStatusDot } from '@/components/app/page-status-dot'
 import { PAGE_INFO } from '@/lib/page-info-content'
@@ -79,7 +80,7 @@ export default async function OverzichtBelastingPage() {
   let partnerAllocatieSavings = 0
   if (perspective !== 'personal') {
     try {
-      const box3Data = await loadPerspectiveBox3(supabase, perspective, 2026)
+      const box3Data = await loadPerspectiveBox3(supabase, perspective, CURRENT_TAX_YEAR)
       // household → gecombineerd huishoud-totaal; partner → partner-resultaat
       // (loadPerspectiveBox3 zet `personal` in partner-view op het partner-
       // resultaat). Bij graceful degradation (partner deelt geen vermogen) is

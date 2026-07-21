@@ -1,7 +1,9 @@
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
-import { ageAtDate, NL_SWR } from '@/lib/horizon-data'
+import { ageAtDate } from '@/lib/horizon-data'
 import { calculateFreedomTime } from '@/lib/format'
 import { localMonthBounds, localMonthStartMonthsAgo } from '@/lib/month-range'
+import { resolveFireParams } from '@/lib/fire-params'
+import { resolveSavingsSource, savingsRateFromAggregates } from '@/lib/savings-source'
 
 /**
  * GET /api/guide-progress
@@ -33,8 +35,9 @@ export async function GET() {
     ] = await Promise.all([
       supabase
         .from('assets')
-        .select('current_value', { count: 'exact', head: false })
-        .eq('user_id', claims.sub),
+        .select('current_value, net_worth_inclusion_pct', { count: 'exact', head: false })
+        .eq('user_id', claims.sub)
+        .eq('is_active', true),
       supabase
         .from('transactions')
         .select('id', { count: 'exact', head: true })
@@ -56,11 +59,12 @@ export async function GET() {
         .eq('is_active', true),
       supabase
         .from('debts')
-        .select('current_balance, debt_type')
-        .eq('user_id', claims.sub),
+        .select('current_balance, debt_type, net_worth_inclusion_pct')
+        .eq('user_id', claims.sub)
+        .eq('is_active', true),
       supabase
         .from('profiles')
-        .select('date_of_birth, expected_return, inflation_rate, active_modules')
+        .select('date_of_birth, expected_return, inflation_rate, active_modules, box3_method, marginaal_tarief, net_monthly_income, income_source, expenses_source, estimated_monthly_expenses')
         .eq('id', claims.sub)
         .single(),
       supabase
@@ -74,15 +78,18 @@ export async function GET() {
         .eq('status', 'pending'),
     ])
 
-    // Calculate net worth
+    // Netto vermogen — inclusion-gewogen (net_worth_inclusion_pct) en alleen
+    // actieve bezittingen/schulden, exact zoals de canonieke bron (next-steps /
+    // dashboard-loader). current_balance staat positief opgeslagen, dus
+    // netWorth = Σ bezittingen − Σ schulden (geen Math.abs, geen ongewogen som).
     const assets = assetsResult.data ?? []
     const totalAssets = assets.reduce(
-      (sum, a) => sum + (Number(a.current_value) || 0),
+      (sum, a) => sum + (Number(a.current_value) || 0) * ((a.net_worth_inclusion_pct ?? 100) / 100),
       0
     )
     const debts = debtsResult.data ?? []
     const totalDebts = debts.reduce(
-      (sum, d) => sum + Math.abs(Number(d.current_balance) || 0),
+      (sum, d) => sum + (Number(d.current_balance) || 0) * ((d.net_worth_inclusion_pct ?? 100) / 100),
       0
     )
     const netWorth = totalAssets - totalDebts
@@ -92,17 +99,20 @@ export async function GET() {
     const twelveMonthsAgo = localMonthStartMonthsAgo(now, 11)
     const monthEnd = localMonthBounds(now).end
 
-    const expenseResult = await supabase
+    // Alle transacties over de laatste 12 maanden (beide tekens): uitgaven voor
+    // dagtarief/vrijheidstijd én inkomen voor de canonieke spaarbron.
+    const txResult = await supabase
       .from('transactions')
       .select('amount, date')
       .eq('user_id', claims.sub)
-      .lt('amount', 0)
       .gte('date', twelveMonthsAgo)
       .lt('date', monthEnd)
 
-    const expenses = expenseResult.data ?? []
+    const txRows = txResult.data ?? []
+    const expenses = txRows.filter((tx) => Number(tx.amount) < 0)
     let dailyExpenseRate = 0
     let monthlyExpenses = 0
+    let monthlyIncome = 0
 
     if (expenses.length > 0) {
       const totalExpenses = expenses.reduce(
@@ -125,6 +135,11 @@ export async function GET() {
       )
       monthlyExpenses = totalExpenses / dataMonths
       dailyExpenseRate = (monthlyExpenses * 12) / 365
+
+      const totalIncome = txRows
+        .filter((tx) => Number(tx.amount) > 0)
+        .reduce((sum, tx) => sum + Number(tx.amount), 0)
+      monthlyIncome = totalIncome / dataMonths
     }
 
     // Freedom days
@@ -133,29 +148,46 @@ export async function GET() {
         ? calculateFreedomTime(netWorth, dailyExpenseRate)
         : { days: 0, months: 0, years: 0 }
 
-    // FIRE age estimate
+    // FIRE age estimate — canonieke bronnen (consume, don't recompute):
+    //  • FIRE-doel op de gepersonaliseerde effectiveSwr (resolveFireParams),
+    //    niet de statische NL_SWR.
+    //  • Spaarbron via resolveSavingsSource (respecteert handmatige inkomen/
+    //    uitgaven-bron), niet de verzonnen uitgaven×0.3.
+    //  • Reëel rendement (inflatie-gecorrigeerd), mirror next-steps, niet het
+    //    nominale ?? 0.07.
     const profile = profileResult.data
     const dateOfBirth = profile?.date_of_birth
     const currentAge = dateOfBirth ? ageAtDate(dateOfBirth, now) : null
     const yearlyExpenses = monthlyExpenses * 12
-    const swr = NL_SWR
-    const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / swr : 0
+    const fireParams = resolveFireParams(profile ?? {})
+    const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / fireParams.effectiveSwr : 0
     const shortfall = fireTarget - netWorth
 
+    // Lichte spaarquote uit het 12-maands transactie-inkomen/-uitgaven; het
+    // handmatige inkomen/uitgaven-pad wint via resolveSavingsSource.
+    const txSavingsRate = savingsRateFromAggregates(monthlyIncome, monthlyExpenses, 0)
+    const { baseAnnualSavings } = resolveSavingsSource({
+      incomeSource: profile?.income_source,
+      expensesSource: profile?.expenses_source,
+      netMonthlyIncome: Number(profile?.net_monthly_income) || 0,
+      estimatedAnnualIncome: monthlyIncome * 12,
+      estimatedMonthlyExpenses: Number(profile?.estimated_monthly_expenses) || 0,
+      savingsRate6m: txSavingsRate,
+    })
+
     let fireAge: number | null = null
-    if (currentAge !== null && shortfall > 0 && monthlyExpenses > 0) {
-      const grossReturn = profile?.expected_return ?? 0.07
-      const annualSavings = monthlyExpenses * 0.3 // rough estimate
-      if (annualSavings > 0) {
-        // Simple compound growth estimate
-        let portfolio = netWorth
-        let years = 0
-        while (portfolio < fireTarget && years < 80) {
-          portfolio = portfolio * (1 + grossReturn) + annualSavings
-          years++
-        }
-        fireAge = Math.round(currentAge + years)
+    if (currentAge !== null && shortfall > 0 && baseAnnualSavings > 0) {
+      // Reëel rendement (mirror next-steps): nominaal gecorrigeerd voor inflatie.
+      const realReturn = (1 + fireParams.grossReturn) / (1 + fireParams.inflationRate) - 1
+      const monthlyReturn = realReturn / 12
+      const monthlySavings = baseAnnualSavings / 12
+      let portfolio = netWorth
+      let months = 0
+      while (portfolio < fireTarget && months < 960) {
+        portfolio = portfolio * (1 + monthlyReturn) + monthlySavings
+        months++
       }
+      fireAge = months < 960 ? Math.round(currentAge + months / 12) : null
     } else if (currentAge !== null && shortfall <= 0) {
       fireAge = Math.round(currentAge) // Already at FIRE
     }

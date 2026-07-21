@@ -39,6 +39,11 @@ interface TypeConfig {
   /** Woord voor de referentielijn/streefwaarde. Inkomen heeft geen "budget" maar
    *  een streven → per type een passend label i.p.v. het generieke "budget". */
   limitLabel: string
+  /** Is de reeks een SALDO/voorraad (schuld) i.p.v. een maandstroom (inkomen/
+   *  uitgaven/sparen)? Schuld toont het openstaand saldo (Optie B): een maand-budget-
+   *  referentielijn is dan betekenisloos en de vrijheidstijd is geen "/maand"-stroom
+   *  maar de vrijheid die je terugkoopt door de schuld af te lossen. */
+  isStock: boolean
 }
 
 const TYPE_CONFIGS: Record<BudgetType, TypeConfig> = {
@@ -53,6 +58,7 @@ const TYPE_CONFIGS: Record<BudgetType, TypeConfig> = {
     goodWhenUp: true,
     xlHistoryMonths: 24,
     limitLabel: 'streven',
+    isStock: false,
   },
   expense: {
     kicker: 'Uitgaventrend',
@@ -65,6 +71,7 @@ const TYPE_CONFIGS: Record<BudgetType, TypeConfig> = {
     goodWhenUp: false,
     xlHistoryMonths: 12,
     limitLabel: 'budget',
+    isStock: false,
   },
   savings: {
     kicker: 'Spaartrend',
@@ -77,6 +84,7 @@ const TYPE_CONFIGS: Record<BudgetType, TypeConfig> = {
     goodWhenUp: true,
     xlHistoryMonths: 12,
     limitLabel: 'doel',
+    isStock: false,
   },
   debt: {
     kicker: 'Schuldtrend',
@@ -85,10 +93,11 @@ const TYPE_CONFIGS: Record<BudgetType, TypeConfig> = {
     fillColor: 'var(--color-debt-100)',
     iconBg: 'bg-debt-50',
     iconText: 'text-debt-600',
-    emptyMessage: 'Nog geen schuldaflossingen geregistreerd.',
+    emptyMessage: 'Nog geen schuld geregistreerd.',
     goodWhenUp: false,
     xlHistoryMonths: 12,
     limitLabel: 'plan',
+    isStock: true,
   },
 }
 
@@ -406,8 +415,10 @@ export const BudgetTrendWidget = memo(function BudgetTrendWidget({ budgetType, s
     ? `${config.kicker}: ${trendWord} ${Math.abs(momDelta).toFixed(0)}% t.o.v. vorige maand`
     : `${config.kicker}: verloop laatste maanden`
 
-  // Budget limit for this type (for reference line in full)
-  const budgetLimit = data.budgetTotals[budgetType].limit
+  // Budget limit for this type (for reference line in full). Voor schuld tonen we
+  // het openstaand SALDO (Optie B); een maand-aflossingsbudget als referentielijn is
+  // daar betekenisloos, dus onderdrukt (0 = geen lijn/telling).
+  const budgetLimit = config.isStock ? 0 : data.budgetTotals[budgetType].limit
 
   // Sparkline data slicing
   const sparkData6 = history.slice(-6)
@@ -422,11 +433,16 @@ export const BudgetTrendWidget = memo(function BudgetTrendWidget({ budgetType, s
   // Freedom time for full size
   // Canoniek 12-mnd rolling dagtarief uit de bundel (KRUIS-20); fallback voor mocks.
   const dailyExp = data.dailyExpenseRate ?? dailyExpenseRate(data.monthlyExpenses)
-  const monthAvg = avg(history)
-  const freedomTime = dailyExp > 0 && monthAvg > 0
-    ? calculateFreedomTime(monthAvg, dailyExp)
+  // Stromen (inkomen/uitgaven/sparen): vrijheidstijd van de gemiddelde MAANDstroom
+  // → "≈ X/maand". Schuld is een saldo (voorraad): de vrijheidstijd van het huidige
+  // openstaande saldo = de vrijheid die je terugkoopt door het af te lossen.
+  const freedomBase = config.isStock ? current.value : avg(history)
+  const freedomTime = dailyExp > 0 && freedomBase > 0
+    ? calculateFreedomTime(freedomBase, dailyExp)
     : null
   const freedomStr = freedomTime ? formatFreedomTimeString(freedomTime, 'short') : null
+  // Label-suffix bij de "≈"-regel: maandstroom vs. terug te kopen vrijheid.
+  const freedomSuffix = config.isStock ? ' terug te kopen' : '/maand'
 
   // ── Mini ─────────────────────────────────────────────────
   if (size === 'mini') {
@@ -517,9 +533,11 @@ export const BudgetTrendWidget = memo(function BudgetTrendWidget({ budgetType, s
             </div>
           )}
 
-          {/* Monthly average */}
+          {/* Monthly average (stroom) resp. gemiddeld saldo (schuld) */}
           <p className="font-serif italic text-[11px] text-[var(--ink-3)]">
-            Gem. <MaskedAmount value={avg6m} tone="kern" />/maand
+            {config.isStock ? 'Gem. saldo ' : 'Gem. '}
+            <MaskedAmount value={avg6m} tone="kern" />
+            {config.isStock ? '' : '/maand'}
           </p>
         </div>
       </WidgetShell>
@@ -542,7 +560,7 @@ export const BudgetTrendWidget = memo(function BudgetTrendWidget({ budgetType, s
     const countHeader = config.goodWhenUp ? `Boven ${config.limitLabel}` : `Binnen ${config.limitLabel}`
     const limitStripHeader = hasLimit
       ? `${config.limitLabel.charAt(0).toUpperCase()}${config.limitLabel.slice(1)}/maand`
-      : 'Gem./maand'
+      : config.isStock ? 'Gem. saldo' : 'Gem./maand'
     const histAria = `${config.kicker} per maand, laatste ${xlData.length} maanden${
       hasLimit ? `, met ${config.limitLabel}lijn` : ''
     }`
@@ -563,7 +581,7 @@ export const BudgetTrendWidget = memo(function BudgetTrendWidget({ budgetType, s
             </div>
             {freedomStr && (
               <p className="font-serif italic text-[11px] text-[var(--ink-3)] text-right">
-                ≈ {freedomStr}/maand
+                ≈ {freedomStr}{freedomSuffix}
               </p>
             )}
           </div>
@@ -682,7 +700,7 @@ export const BudgetTrendWidget = memo(function BudgetTrendWidget({ budgetType, s
           </div>
           {freedomStr && (
             <p className="font-serif italic text-[11px] text-[var(--ink-3)] text-right">
-              ≈ {freedomStr}/maand
+              ≈ {freedomStr}{freedomSuffix}
             </p>
           )}
         </div>

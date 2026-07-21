@@ -191,12 +191,13 @@ export function BudgetEditorialHeader({
   const { masked } = useMaskedAmounts()
   const planRuimte = teVerdelen
   const planPositive = planRuimte >= 0
-  const planLabel = planPositive ? '€' : '−€'
+  // Alleen het minteken als prefix; formatMaskedCurrency levert het €-teken al.
+  const planLabel = planPositive ? '' : '−'
   const planBedrag = formatMaskedCurrency(Math.abs(planRuimte), masked)
 
   const werkelijkRuimte = totalIncome - totalActualOutflow
   const werkelijkPositive = werkelijkRuimte >= 0
-  const werkelijkLabel = werkelijkPositive ? '€' : '−€'
+  const werkelijkLabel = werkelijkPositive ? '' : '−'
   const werkelijkBedrag = formatMaskedCurrency(Math.abs(werkelijkRuimte), masked)
 
   return (
@@ -231,7 +232,7 @@ export function BudgetEditorialHeader({
                 color: planPositive ? 'var(--ink)' : 'var(--negative)',
               }}
             >
-              {planLabel} {planBedrag}
+              {planLabel}{planBedrag}
             </span>
           </p>
           <p
@@ -252,7 +253,7 @@ export function BudgetEditorialHeader({
             className="mt-1 font-mono tabular-nums text-[28px] sm:text-[36px] font-bold leading-none"
             style={{ color: werkelijkPositive ? 'var(--ink)' : 'var(--negative)' }}
           >
-            {werkelijkLabel} {werkelijkBedrag}
+            {werkelijkLabel}{werkelijkBedrag}
           </p>
           <p
             className="mt-2 italic text-[12px] text-[var(--ink-3)]"
@@ -4090,8 +4091,8 @@ function BudgetDetailModal({
                 <p className="text-xs font-semibold text-orange-800">Budget archiveren?</p>
                 <p className="mt-1 text-xs text-orange-700">
                   {isParent
-                    ? `Dit archiveert "${budget.name}" en alle ${children.length} subbudgetten. Budgetten met gekoppelde transacties kunnen niet worden gearchiveerd.`
-                    : `Dit archiveert "${budget.name}". Budgetten met gekoppelde transacties kunnen niet worden gearchiveerd.`
+                    ? `Dit archiveert "${budget.name}" en alle ${children.length} subbudgetten. Gekoppelde transacties blijven behouden; het budget verdwijnt uit je actieve lijst.`
+                    : `Dit archiveert "${budget.name}". Gekoppelde transacties blijven behouden; het budget verdwijnt uit je actieve lijst.`
                   }
                 </p>
                 <FormError id={formErrorId('budget-archiveren')} message={deleteError} />

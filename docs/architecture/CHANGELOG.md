@@ -505,3 +505,9 @@
 ## 2026-07-20
 
 - **Integraties** toegevoegd: OpenRouter
+
+## 2026-07-21
+
+- **API-routes** toegevoegd: /api/admin/fire-assumptions
+- **Tabellen** toegevoegd: fire_assumptions
+- **Componenten (aantal)** toegevoegd: +2

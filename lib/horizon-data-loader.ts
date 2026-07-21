@@ -40,6 +40,7 @@ import {
 import { type HousingTriggerSimBasis } from '@/lib/housing-trigger'
 import { lifeEventsToCashflows } from '@/lib/fire-simulation'
 import { type AowLeeftijdRow } from '@/lib/aow-leeftijd'
+import { resolveFireAssumptions, type FireAssumptionRow } from '@/lib/fire-assumptions'
 import { NL_AOW_AGE } from '@/lib/constants'
 import { hasPartner } from '@/lib/household-type'
 import { resolvePensionFactorA } from '@/lib/jaarruimte'
@@ -340,6 +341,7 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
     aowRowsResult,
     txAgg12Result,
     earliestIncomeResult,
+    fireAssumptionsResult,
   ] = await Promise.all([
     // Gedeelde basisdata-laag (lib/server-data/base.ts): huidige-maand-tx,
     // actieve assets, eigen profiel (select('*') dekt óók de withdrawal/guardrail-
@@ -421,6 +423,15 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
     // helper als dashboard-data-loader.ts/lever-scores-loader.ts; cache()
     // dedupliceert met die calls binnen hetzelfde request.
     getEarliestIncomeDate(supabase),
+    // FIRE-marktaannames — jaargelaagde override-laag (Optie 2: DB-override met
+    // TS-fallback). Klein, RLS-breed (authenticated read). Ontbrekende tabel /
+    // lege set → resolveFireAssumptions valt terug op de TS-constanten
+    // (DEFAULT_RETURN/INFLATION) → byte-identiek gedrag. Server-side geresolveerd
+    // zodat rendement/inflatie consistent zijn met /overzicht en /core.
+    supabase
+      .from('fire_assumptions')
+      .select('year, expected_return, inflation, volatility, source, is_definitive')
+      .order('year', { ascending: true }),
   ])
 
   // Same row both consumers want: alias instead of re-querying.
@@ -470,6 +481,22 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
     guardrail_cut_step: wsData.guardrail_cut_step ?? PROFILE_DEFAULTS.guardrail_cut_step,
     guardrail_raise_step: wsData.guardrail_raise_step ?? PROFILE_DEFAULTS.guardrail_raise_step,
   }
+
+  // ── FIRE-marktaannames: jaarlaag-shadow (Optie 2, DB-override met TS-fallback) ──
+  // Vul rendement/inflatie ALLEEN aan met de jaar-geresolveerde markt-default wanneer
+  // de gebruiker zelf niets zette (null). Een expliciete gebruikerskeuze wint dus.
+  // Bij een ontbrekende/lege jaarlaag geeft resolveFireAssumptions exact
+  // DEFAULT_RETURN/INFLATION terug → byte-identiek aan vóór deze override.
+  // Downstream werkt de override consistent: resolveFireParams (scalar/target:
+  // freedomPct, FIRE-doel, effectiveSwr) én — voor inflatie — de kernel-scalar
+  // (adapter/index.ts leest resolveFireParams(profile).inflationRate). Rendement
+  // beweegt bewust NIET de kernel-accumulatiecurve: die leidt groei per-asset af
+  // (asset.expected_return), IDENTIEK aan hoe DEFAULT_RETURN vandaag al werkt.
+  const fireAssumptions = resolveFireAssumptions(
+    (fireAssumptionsResult.data ?? []) as FireAssumptionRow[],
+  )
+  if (profile.expected_return == null) profile.expected_return = fireAssumptions.expectedReturn
+  if (profile.inflation_rate == null) profile.inflation_rate = fireAssumptions.inflation
 
   // Factor A (pensioenaangroei) uit de canonieke resolver — NULL ≠ 0. Niet in
   // PROFILE_DEFAULTS opgenomen zodat een ontbrekend veld als undefined →

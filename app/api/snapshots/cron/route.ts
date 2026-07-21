@@ -11,6 +11,7 @@ import {
 import { resolveFireParams } from '@/lib/fire-params'
 import { computeSovereigntyLevel } from '@/lib/feature-phases'
 import { captureBalanceSnapshots } from '@/lib/balance-snapshot'
+import { logError } from '@/lib/log-error'
 import { type Debt, computeRenteAflossingsSplit } from '@/lib/debt-data'
 import { recordJobRun } from '@/lib/job-runs'
 import { localMonthBounds, localMonthStart } from '@/lib/month-range'
@@ -324,8 +325,27 @@ export async function GET(request: Request) {
         }
       }
 
-      // Capture per-entity balance snapshots (fire-and-forget)
-      captureBalanceSnapshots(supabase, userId, today, assets, debts).catch(() => {})
+      // Capture per-entity balance snapshots (fire-and-forget). Silent failures
+      // are logged to error_logs (service-role client bypasses RLS) so empty
+      // sparklines don't go unnoticed — main path stays non-blocking (no await).
+      captureBalanceSnapshots(supabase, userId, today, assets, debts)
+        .then(res => {
+          if (res.error) {
+            void logError(supabase, {
+              userId,
+              context: 'balance-snapshot:cron',
+              message: res.error,
+            })
+          }
+        })
+        .catch((err: unknown) => {
+          void logError(supabase, {
+            userId,
+            context: 'balance-snapshot:cron',
+            message: err instanceof Error ? err.message : String(err),
+            stack: err instanceof Error ? err.stack : undefined,
+          })
+        })
 
       results.push({ userId, created: true })
     } catch (err) {

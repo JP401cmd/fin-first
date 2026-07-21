@@ -293,7 +293,7 @@ const criteria: AcceptanceCriterion[] = [
     assertion: {
       kind: 'exact',
       expected: 'effectiefSaldo=3000; nettoVermogenDelta=3000',
-      source: 'current_balance × pct/100 (lib/dashboard-data-loader.ts r258-266); delta = volle saldo − effectief saldo',
+      source: 'current_balance × pct/100 (lib/dashboard-data-loader.ts r487, inclusion-gewogen debt-som); delta = volle saldo − effectief saldo',
     },
   },
   {

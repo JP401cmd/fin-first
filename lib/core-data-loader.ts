@@ -42,10 +42,12 @@ import { ageAtDate } from '@/lib/horizon-data'
 import { loadCombinedCashStats, type CashAssetStats } from '@/lib/kpi-context'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import { getAowLeeftijden } from '@/lib/reference-cache'
+import { resolveFireAssumptions, type FireAssumptionRow } from '@/lib/fire-assumptions'
 import { loadPerspectiveDataServer } from '@/lib/household/perspective-loader-server'
 import type { Perspective } from '@/lib/household-data'
 import { resolveEffectiveIncomeExpenses } from './effective-financials'
 import { savingsRateFromAggregates } from './savings-source'
+import { fetchLatestSnapshotsByMonth } from '@/lib/server-data/snapshot-aggregates'
 
 /** Filter out own-account transfers from income/expense calculations */
 const isRealTx = (t: { transaction_type?: string | null }) =>
@@ -287,22 +289,15 @@ export const loadCoreData = cache(async function loadCoreData(
   const twelveMonthsAgoForSparkline = new Date(
     Date.UTC(now.getFullYear(), now.getMonth() - 11, 1),
   ).toISOString().split('T')[0]
-  type SnapRow = {
-    snapshot_date: string
-    entity_type: 'asset' | 'debt'
-    entity_subtype: string | null
-    entity_id: string
-    balance: number | string
-    net_worth_inclusion_pct: number | string | null
-  }
   const categorySparklinesPromise: Promise<Record<string, number[]>> = (async () => {
     try {
-      const result = await supabase
-        .from('balance_snapshots')
-        .select('snapshot_date, entity_type, entity_subtype, entity_id, balance, net_worth_inclusion_pct')
-        .gte('snapshot_date', twelveMonthsAgoForSparkline)
-        .order('snapshot_date', { ascending: true })
-      const rows = (result.data ?? []) as SnapRow[]
+      // Server-side latest-per-(entity_id, maand) aggregaat i.p.v. ALLE snapshots
+      // ophalen en in JS reduceren. Lost de egress (entiteiten×frequentie i.p.v.
+      // ×12) én de stille max_rows=1000-afkap op: het aggregaat levert ≤
+      // entiteiten×12 rijen en kan niet afkappen. SECURITY INVOKER → own-row RLS
+      // van balance_snapshots geldt onverkort (zelfde rijen als de vroegere fetch).
+      const result = await fetchLatestSnapshotsByMonth(supabase, twelveMonthsAgoForSparkline)
+      const rows = result.data ?? []
       if (rows.length === 0) return {}
 
       // Bouw tot 12 maand-keys op (YYYY-MM, oudste → nieuwste).
@@ -313,34 +308,21 @@ export const loadCoreData = cache(async function loadCoreData(
       }
       const monthIdx = new Map<string, number>(monthKeys.map((k, i) => [k, i]))
 
-      // Stap 1 — per (entity_id, maand): pak de meest recente snapshot.
-      // Bewust niet over meerdere snapshots in dezelfde maand sommeren —
-      // anders zou een mid-month correctie de waarde verdubbelen.
-      const latestDateByEntityMonth = new Map<string, string>()
+      // Per (entity_id, maand): het aggregaat gaf al de LAATSTE snapshot per maand
+      // (DISTINCT ON … ORDER BY snapshot_date DESC) — geen dedupe meer nodig. We
+      // vullen direct de categorie-map en de gewogen waarde per (entity_id, maand).
+      // Bewust niet over meerdere snapshots in dezelfde maand sommeren — dat doet
+      // de RPC al niet, anders zou een mid-month correctie de waarde verdubbelen.
       const catByEntity = new Map<string, string>() // entity_id → `${type}:${subtype}`
+      const valByEntityMonth = new Map<string, number>()
       for (const r of rows) {
-        const month = r.snapshot_date.substring(0, 7)
-        if (!monthIdx.has(month)) continue
-        const k = `${r.entity_id}|${month}`
-        const cur = latestDateByEntityMonth.get(k)
-        if (!cur || r.snapshot_date > cur) {
-          latestDateByEntityMonth.set(k, r.snapshot_date)
-        }
+        if (!monthIdx.has(r.month)) continue
         if (!catByEntity.has(r.entity_id)) {
           const subtype = r.entity_subtype ?? 'other'
           catByEntity.set(r.entity_id, `${r.entity_type}:${subtype}`)
         }
-      }
-
-      // Stap 2 — per (entity_id, maand): gewogen waarde van die laatste snapshot.
-      const valByEntityMonth = new Map<string, number>()
-      for (const r of rows) {
-        const month = r.snapshot_date.substring(0, 7)
-        if (!monthIdx.has(month)) continue
-        const k = `${r.entity_id}|${month}`
-        if (latestDateByEntityMonth.get(k) !== r.snapshot_date) continue
         const weight = Number(r.net_worth_inclusion_pct ?? 100) / 100
-        valByEntityMonth.set(k, Number(r.balance) * weight)
+        valByEntityMonth.set(`${r.entity_id}|${r.month}`, Number(r.balance) * weight)
       }
 
       // Stap 3 — per categorie: per-entiteit backward+forward fill, daarna
@@ -387,6 +369,7 @@ export const loadCoreData = cache(async function loadCoreData(
     essentialBudgetsResult, earliestIncomeResult, childBudgetsResult,
     expense12Result, earliestTxResult, profileResult, bankAccountsResult,
     aowResult,
+    fireAssumptionsResult,
   ] = await Promise.all([
     supabase
       .from('transactions')
@@ -455,6 +438,15 @@ export const loadCoreData = cache(async function loadCoreData(
       (value) => ({ data: value, error: null as unknown }),
       (error) => ({ data: null as AowLeeftijdRow[] | null, error: error as unknown }),
     ),
+    // FIRE-marktaannames — jaargelaagde override-laag (Optie 2: DB-override met
+    // TS-fallback). Ontbrekende tabel / lege set → resolveFireAssumptions valt terug
+    // op de TS-constanten → byte-identiek. Server-side geresolveerd zodat rendement/
+    // inflatie op /core consistent zijn met /toekomst en /overzicht.
+    supabase
+      .from('fire_assumptions')
+      .select('year, expected_return, inflation, volatility, source, is_definitive')
+      .order('year', { ascending: true })
+      .then((r) => r, () => ({ data: null })),
   ])
 
   if (txResult.error) throw txResult.error
@@ -606,7 +598,24 @@ export const loadCoreData = cache(async function loadCoreData(
     profileResult.data?.retirement_expense_custom_amount,
     profileMonthlyExpenses * 12,
   )
-  const fireParams = resolveFireParams(profileResult.data ?? {})
+  // ── FIRE-marktaannames: jaarlaag-shadow (Optie 2, DB-override met TS-fallback) ──
+  // Vul rendement/inflatie ALLEEN aan met de jaar-geresolveerde markt-default wanneer
+  // de gebruiker zelf niets zette (null); een expliciete keuze wint. Lege/ontbrekende
+  // jaarlaag → TS-constanten → byte-identiek. We shadowen op een KOPIE (nooit de
+  // profielrij muteren — die kan elders als "null = niet ingesteld" gelezen worden).
+  // /core's FIRE-doel komt uit computeHorizonFireTarget → loadHorizonData, die dezelfde
+  // shadow toepast; deze fireParams voedt de lokale FIRE-strip/SWR op /core consistent.
+  const fireAssumptions = resolveFireAssumptions(
+    (fireAssumptionsResult.data ?? []) as FireAssumptionRow[],
+  )
+  const shadowedProfile = { ...(profileResult.data ?? {}) }
+  {
+    const sp = shadowedProfile as { expected_return?: number | null; inflation_rate?: number | null }
+    if (sp.expected_return == null) sp.expected_return = fireAssumptions.expectedReturn
+    if (sp.inflation_rate == null) sp.inflation_rate = fireAssumptions.inflation
+  }
+
+  const fireParams = resolveFireParams(shadowedProfile)
   const fireSwr = fireParams.effectiveSwr
   // Strategie + leeftijd: identiek aan Horizon's loaders zodat de FIRE-strip
   // op /core exact hetzelfde doelbedrag berekent als de Horizon-pagina.

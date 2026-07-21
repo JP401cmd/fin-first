@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-20T21:02:54.590Z",
-  "generatedDate": "2026-07-20",
+  "generatedAt": "2026-07-21T06:49:41.760Z",
+  "generatedDate": "2026-07-21",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -189,11 +189,11 @@
   "stats": {
     "routes": 146,
     "routesProduction": 101,
-    "api": 261,
-    "tables": 85,
-    "migrations": 152,
+    "api": 262,
+    "tables": 86,
+    "migrations": 154,
     "integrations": 25,
-    "components": 868,
+    "components": 870,
     "providers": 11,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -2094,6 +2094,17 @@
       "methods": [
         "GET",
         "PATCH"
+      ]
+    },
+    {
+      "url": "/api/admin/fire-assumptions",
+      "file": "app/api/admin/fire-assumptions/route.ts",
+      "domain": "admin",
+      "methods": [
+        "GET",
+        "POST",
+        "PUT",
+        "DELETE"
       ]
     },
     {
@@ -4177,7 +4188,7 @@
     {
       "domain": "admin",
       "label": "Beheer",
-      "count": 41,
+      "count": 42,
       "routes": [
         {
           "url": "/api/admin/ai-features",
@@ -4275,6 +4286,17 @@
           "methods": [
             "GET",
             "PATCH"
+          ]
+        },
+        {
+          "url": "/api/admin/fire-assumptions",
+          "file": "app/api/admin/fire-assumptions/route.ts",
+          "domain": "admin",
+          "methods": [
+            "GET",
+            "POST",
+            "PUT",
+            "DELETE"
           ]
         },
         {
@@ -7230,6 +7252,10 @@
         "migration": "supabase/migrations/20260713130000_create_feedback.sql"
       },
       {
+        "name": "fire_assumptions",
+        "migration": "supabase/migrations/20260721000000_create_fire_assumptions.sql"
+      },
+      {
         "name": "goal_contributions",
         "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
       },
@@ -7430,7 +7456,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 152
+    "migrationCount": 154
   },
   "tablesByDomain": [
     {
@@ -7495,6 +7521,10 @@
         {
           "name": "feedback",
           "migration": "supabase/migrations/20260713130000_create_feedback.sql"
+        },
+        {
+          "name": "fire_assumptions",
+          "migration": "supabase/migrations/20260721000000_create_fire_assumptions.sql"
         },
         {
           "name": "goal_contributions",
@@ -7876,11 +7906,11 @@
     }
   ],
   "components": {
-    "total": 868,
+    "total": 870,
     "groups": [
       {
         "group": "app",
-        "count": 364,
+        "count": 365,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -8202,6 +8232,7 @@
           "success-banner",
           "success-banner.test",
           "surplus-gap-chart",
+          "surplus-gap-chart.test",
           "svg-text-no-html-nesting.test",
           "swipe-back-tracker",
           "sync-status-badge",
@@ -8391,7 +8422,7 @@
       },
       {
         "group": "widgets",
-        "count": 84,
+        "count": 85,
         "items": [
           "abonnementen-widget",
           "acties-widget",
@@ -8476,7 +8507,8 @@
           "widget-grid-helpers",
           "widget-renderer",
           "widget-shell",
-          "wilskracht-widget"
+          "wilskracht-widget",
+          "wilskracht-widget.test"
         ]
       },
       {
@@ -9219,6 +9251,10 @@
           "write": true
         },
         {
+          "name": "fire_assumptions",
+          "write": true
+        },
+        {
           "name": "household_members",
           "write": false
         },
@@ -9427,19 +9463,7 @@
       ],
       "budgets": [
         {
-          "name": "budget_amounts",
-          "write": true
-        },
-        {
-          "name": "budget_rollovers",
-          "write": true
-        },
-        {
           "name": "budgets",
-          "write": true
-        },
-        {
-          "name": "transactions",
           "write": true
         }
       ],
@@ -10307,36 +10331,6 @@
           "write": true
         }
       ],
-      "share": [
-        {
-          "name": "actions",
-          "write": false
-        },
-        {
-          "name": "assets",
-          "write": false
-        },
-        {
-          "name": "bank_accounts",
-          "write": false
-        },
-        {
-          "name": "budgets",
-          "write": false
-        },
-        {
-          "name": "debts",
-          "write": false
-        },
-        {
-          "name": "profiles",
-          "write": false
-        },
-        {
-          "name": "transactions",
-          "write": false
-        }
-      ],
       "snapshots": [
         {
           "name": "assets",
@@ -10959,14 +10953,6 @@
           ]
         },
         {
-          "domain": "share",
-          "label": "share",
-          "write": false,
-          "routes": [
-            "/api/share/freedom-card"
-          ]
-        },
-        {
           "domain": "subscriptions",
           "label": "subscriptions",
           "write": false,
@@ -11177,14 +11163,6 @@
           ]
         },
         {
-          "domain": "share",
-          "label": "share",
-          "write": false,
-          "routes": [
-            "/api/share/freedom-card"
-          ]
-        },
-        {
           "domain": "snapshots",
           "label": "Snapshots",
           "write": false,
@@ -11383,14 +11361,6 @@
           ]
         },
         {
-          "domain": "share",
-          "label": "share",
-          "write": false,
-          "routes": [
-            "/api/share/freedom-card"
-          ]
-        },
-        {
           "domain": "snapshots",
           "label": "Snapshots",
           "write": false,
@@ -11416,14 +11386,6 @@
           "write": true,
           "routes": [
             "/api/bank-connect/sync"
-          ]
-        },
-        {
-          "domain": "budgets",
-          "label": "Budgetten",
-          "write": true,
-          "routes": [
-            "/api/budgets/[id]"
           ]
         },
         {
@@ -11553,14 +11515,6 @@
             "/api/report/balans",
             "/api/report/budget",
             "/api/report/vermogen"
-          ]
-        },
-        {
-          "domain": "share",
-          "label": "share",
-          "write": false,
-          "routes": [
-            "/api/share/freedom-card"
           ]
         },
         {
@@ -11929,6 +11883,16 @@
           ]
         }
       ],
+      "fire_assumptions": [
+        {
+          "domain": "admin",
+          "label": "Beheer",
+          "write": true,
+          "routes": [
+            "/api/admin/fire-assumptions"
+          ]
+        }
+      ],
       "news_articles": [
         {
           "domain": "admin",
@@ -12095,14 +12059,6 @@
           "write": false,
           "routes": [
             "/api/report"
-          ]
-        },
-        {
-          "domain": "share",
-          "label": "share",
-          "write": false,
-          "routes": [
-            "/api/share/freedom-card"
           ]
         },
         {
@@ -12294,14 +12250,6 @@
           ]
         },
         {
-          "domain": "share",
-          "label": "share",
-          "write": false,
-          "routes": [
-            "/api/share/freedom-card"
-          ]
-        },
-        {
           "domain": "snapshots",
           "label": "Snapshots",
           "write": false,
@@ -12468,14 +12416,6 @@
           ]
         },
         {
-          "domain": "share",
-          "label": "share",
-          "write": false,
-          "routes": [
-            "/api/share/freedom-card"
-          ]
-        },
-        {
           "domain": "snapshots",
           "label": "Snapshots",
           "write": false,
@@ -12638,14 +12578,6 @@
       ],
       "budget_amounts": [
         {
-          "domain": "budgets",
-          "label": "Budgetten",
-          "write": true,
-          "routes": [
-            "/api/budgets/[id]"
-          ]
-        },
-        {
           "domain": "budget-variance",
           "label": "budget-variance",
           "write": false,
@@ -12659,32 +12591,6 @@
           "write": false,
           "routes": [
             "/api/checkin/budgets"
-          ]
-        },
-        {
-          "domain": "notifications",
-          "label": "notifications",
-          "write": false,
-          "routes": [
-            "/api/notifications"
-          ]
-        },
-        {
-          "domain": "report",
-          "label": "Rapportages",
-          "write": false,
-          "routes": [
-            "/api/report/budget"
-          ]
-        }
-      ],
-      "budget_rollovers": [
-        {
-          "domain": "budgets",
-          "label": "Budgetten",
-          "write": true,
-          "routes": [
-            "/api/budgets/[id]"
           ]
         },
         {
@@ -13190,6 +13096,24 @@
             "/api/next-steps",
             "/api/next-steps/complete",
             "/api/next-steps/dismiss"
+          ]
+        }
+      ],
+      "budget_rollovers": [
+        {
+          "domain": "notifications",
+          "label": "notifications",
+          "write": false,
+          "routes": [
+            "/api/notifications"
+          ]
+        },
+        {
+          "domain": "report",
+          "label": "Rapportages",
+          "write": false,
+          "routes": [
+            "/api/report/budget"
           ]
         }
       ],
@@ -14067,6 +13991,11 @@
         "user": true,
         "household": false,
         "rls": true
+      },
+      "fire_assumptions": {
+        "user": false,
+        "household": false,
+        "rls": true
       }
     }
   },
@@ -14794,19 +14723,19 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 103
+        "commits": 104
       },
       {
         "path": "lib/ai",
-        "commits": 48
+        "commits": 50
       },
       {
         "path": "app/(app)/toekomst",
-        "commits": 39
+        "commits": 40
       },
       {
         "path": "app/api/ai",
-        "commits": 17
+        "commits": 18
       },
       {
         "path": "app/api/household",
@@ -14841,8 +14770,8 @@
       },
       {
         "file": "components/app/budgets-client.tsx",
-        "loc": 5081,
-        "commits": 33
+        "loc": 5082,
+        "commits": 34
       },
       {
         "file": "components/core/assets-client.tsx",
@@ -14857,12 +14786,12 @@
       {
         "file": "lib/release-notes.ts",
         "loc": 2763,
-        "commits": 2
+        "commits": 3
       },
       {
         "file": "lib/dashboard-data-loader.ts",
-        "loc": 2553,
-        "commits": 41
+        "loc": 2606,
+        "commits": 42
       },
       {
         "file": "lib/horizon-data.ts",
@@ -15675,9 +15604,23 @@
     "hasChanges": true,
     "sections": [
       {
-        "label": "Integraties",
+        "label": "API-routes",
         "added": [
-          "OpenRouter"
+          "/api/admin/fire-assumptions"
+        ],
+        "removed": []
+      },
+      {
+        "label": "Tabellen",
+        "added": [
+          "fire_assumptions"
+        ],
+        "removed": []
+      },
+      {
+        "label": "Componenten (aantal)",
+        "added": [
+          "+2"
         ],
         "removed": []
       }
@@ -15871,6 +15814,13 @@
       "api": 261,
       "components": 868,
       "tables": 85,
+      "routesProduction": 101
+    },
+    {
+      "date": "2026-07-21",
+      "api": 262,
+      "components": 870,
+      "tables": 86,
       "routesProduction": 101
     }
   ]

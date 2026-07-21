@@ -7732,7 +7732,7 @@ export default function HorizonPage({
           cashflows={simCashflows}
           allRows={unifiedRows ?? []}
           monthlyIncome={effectiveInput?.monthlyIncome}
-          monthlyExpenses={effectiveInput?.monthlyExpenses}
+          savingsRate6m={healthScoreInput.savingsRate6m}
           fireTarget={fire?.fireTarget}
           hasPartner={initialData.hasPartner}
           marginaalTarief={fireParams.marginaalTarief}

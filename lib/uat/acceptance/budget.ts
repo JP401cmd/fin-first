@@ -24,11 +24,11 @@
  * ÉCHT tweede account — de engine-check bewijst alleen de reken-split (`buildSpendingSums`/
  * `combineSpending`/`shareFractionFor`), niet de live UI met een echte partner.
  *
- * BUG-KANDIDAAT (zie ook budget-checks.ts en de Notion-zonekaart): WF-BUDGET-11 — de
- * bevestigingstekst bij "Budget archiveren?" belooft dat budgetten met gekoppelde transacties
- * niet kunnen worden gearchiveerd, maar `DELETE /api/budgets/[id]` voert een HARDE delete uit
- * (budget + subbudgetten weg, `transactions.budget_id` → NULL) zonder die blokkade — de
- * `is_archived`-kolom bestaat, maar geen UI-pad zet 'm. Karakteriseren als bug, niet hier fixen.
+ * WF-BUDGET-11 (GEFIXT, 2026-07-20): "Budget archiveren?" voert nu een echte, niet-destructieve
+ * archivering uit — `DELETE /api/budgets/[id]` zet `is_archived = true` op het budget + zijn
+ * subbudgetten i.p.v. een harde delete. Gekoppelde transacties, rollovers en budget_amounts
+ * blijven behouden; de budget-SELECT filtert `is_archived = false`, dus het budget verdwijnt
+ * vanzelf uit de actieve lijst. Zie `app/api/budgets/[id]/route.ts`.
  */
 
 import type { AcceptanceCriterion, AcceptanceSet } from './types'
@@ -188,11 +188,11 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'KERN',
     persona: 'lisa',
     given: 'Persona Lisa geladen; budget met gekoppelde transacties.',
-    when: 'De gebruiker klikt "Verwijderen" en bevestigt de dialoog "Budget archiveren?".',
-    then: '⚠ BUG-KANDIDAAT (zie budget-checks.ts-commentaar en de zonekaart): de dialoogtekst belooft dat budgetten met gekoppelde transacties niet kunnen worden gearchiveerd, maar `DELETE /api/budgets/[id]` voert altijd een harde delete uit (budget + subbudgetten weg, transacties ontkoppeld naar budget_id=NULL) — geen blokkade, geen `is_archived`-pad. LIVE VERIFIËREN wélk gedrag daadwerkelijk optreedt en als bug vastleggen.',
+    when: 'De gebruiker klikt "Archiveren" en bevestigt de dialoog "Budget archiveren?".',
+    then: 'Het budget + zijn subbudgetten krijgen `is_archived = true` (niet-destructieve soft-delete); `DELETE /api/budgets/[id]` zet de vlag i.p.v. te verwijderen. Gekoppelde transacties (`budget_id` ongewijzigd), rollovers en budget_amounts blijven behouden; het budget verdwijnt uit de actieve lijst omdat de SELECT op `is_archived = false` filtert. Reeds gearchiveerd → 409. Dialoogtekst belooft geen (valse) transactie-blokkade meer.',
     assertion: {
       kind: 'ui-only',
-      source: 'tekst-vs-gedrag-conflict, geen cijfermatige uitkomst — bevestigen via de live Chrome DevTools-run, niet via de engine-suite',
+      source: 'app/api/budgets/[id]/route.ts (DELETE → UPDATE is_archived=true) + components/app/budgets-client.tsx archiveer-dialoog; niet-destructief, live te bevestigen via Chrome DevTools-run',
     },
   },
   {

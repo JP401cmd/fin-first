@@ -127,7 +127,9 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
     income:  months.map(m => ({ month: m, value: 5200 })),
     expense: months.map((m, i) => ({ month: m, value: 3400 - i * 50 })),
     savings: months.map(m => ({ month: m, value: 1400 })),
-    debt:    months.map(m => ({ month: m, value: 400 })),
+    // Schuldtrend toont het openstaand SALDO (Optie B): een dalende reeks = schuld
+    // wordt afgelost = goed (dalend → groen via goodWhenUp:false).
+    debt:    months.map((m, i) => ({ month: m, value: 14400 - i * 400 })),
   },
 
   // Assets

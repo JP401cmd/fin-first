@@ -76,6 +76,36 @@ describe('BudgetEditorialHeader — Eenvoudig vs Volledig', () => {
   })
 })
 
+describe('BudgetEditorialHeader — één euroteken (regressie WF-BUDGET-02-bug2)', () => {
+  it('positief: hero-getallen tonen geen dubbel euroteken', () => {
+    const { container } = render(
+      <DisplayModeProvider initialMode="full">
+        <BudgetEditorialHeader {...HEADER_PROPS} simple={false} />
+      </DisplayModeProvider>,
+    )
+    const text = container.textContent ?? ''
+    expect(text).not.toMatch(/€\s*€/)
+  })
+
+  it('negatief: over-toegewezen plan + boven inkomen tonen "−€" zonder dubbel teken', () => {
+    // teVerdelen < 0 → over-toegewezen; outflow > inkomen → werkelijk negatief.
+    const { container } = render(
+      <DisplayModeProvider initialMode="full">
+        <BudgetEditorialHeader
+          {...HEADER_PROPS}
+          teVerdelen={-500}
+          totalActualOutflow={3500}
+          simple={false}
+        />
+      </DisplayModeProvider>,
+    )
+    const text = container.textContent ?? ''
+    expect(text).not.toMatch(/€\s*€/)
+    // Minteken staat vóór het (enkele) euroteken.
+    expect(text).toMatch(/−€/)
+  })
+})
+
 describe('BudgetFiguresStrip — Eenvoudig vs Volledig', () => {
   it('simple: toont alleen Inkomen + Uitgaven (geen Sparen/Schulden)', () => {
     render(

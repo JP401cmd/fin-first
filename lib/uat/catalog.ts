@@ -434,6 +434,7 @@ export const UAT_SCENARIOS: UatScenario[] = [
   { id: 'UAT-BEHEER-32', wf: 'WF-BEHEER-32', zone: 'BEHEER', band: 'randvoorwaarden', naam: 'Integraties: inventaris, liveness-probe en contractbewaking', kriticiteit: 'BELANGRIJK', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'c'], volgorde: 32, duurMin: 7 },
   { id: 'UAT-BEHEER-33', wf: 'WF-BEHEER-33', zone: 'BEHEER', band: 'randvoorwaarden', naam: 'Statische naslag bekijken', kriticiteit: 'OVERIG', rooktest: false, platforms: ['webapp'], subscenarios: ['a'], volgorde: 33, duurMin: 6 },
   { id: 'UAT-BEHEER-34', wf: 'WF-BEHEER-34', zone: 'BEHEER', band: 'randvoorwaarden', naam: 'Webprestaties (Core Web Vitals p75) raadplegen', kriticiteit: 'OVERIG', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'b'], volgorde: 34, duurMin: 6 },
+  { id: 'UAT-BEHEER-35', wf: 'WF-BEHEER-35', zone: 'BEHEER', band: 'randvoorwaarden', naam: 'FIRE-marktaannames jaarlaag toevoegen/bewerken/verwijderen', kriticiteit: 'BELANGRIJK', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'b'], volgorde: 35, duurMin: 8 },
 ]
 
 /** Alle scenario-ID's die tot de canonieke rooktest (§2.6) behoren. */

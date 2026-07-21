@@ -300,15 +300,31 @@ const criteria: AcceptanceCriterion[] = [
     scenarioId: 'UAT-BEHEER-16',
     titel: 'Fiscale kerngetallen en jaar-checklist raadplegen',
     kriticiteit: 'OVERIG',
-    given: '/beheer/fiscale-kerngetallen (alleen-lezen inventaris van jaargebonden fiscale constanten).',
+    given: '/beheer/fiscale-kerngetallen (inventaris van jaargebonden fiscale constanten; grotendeels alleen-lezen).',
     when:
       'De beheerder bekijkt per kerngetal de matrix (waarden per jaar), de bron en verificatiedatum, de jaar-checklist en de open drift-punten.',
     then:
-      'De getoonde fiscale waarden worden LIVE afgelezen uit de canonieke bronconstanten (lib/box3-data.ts, box1-tax.ts, box2-data.ts, jaarruimte.ts, constants.ts) — nooit hier gedupliceerd — en moeten daarmee exact overeenkomen (consume-don’t-recompute, A=B); buildJaarChecklist() en validateFiscaleKerngetallen() bewaken de curatie. Geen los na te rekenen cijfer buiten de bron.',
+      'De getoonde fiscale waarden worden LIVE afgelezen uit de canonieke bronconstanten (lib/box3-data.ts, box1-tax.ts, box2-data.ts, jaarruimte.ts, constants.ts) — nooit hier gedupliceerd — en moeten daarmee exact overeenkomen (consume-don’t-recompute, A=B); buildJaarChecklist() en validateFiscaleKerngetallen() bewaken de curatie. Uitzondering (FASE 2): het kerngetal "FIRE-marktaannames" is sinds deze release NIET meer een losse constante maar jaargelaagd bewerkbaar via een DB-override-laag (tabel fire_assumptions, resolver resolveFireAssumptions) — die editor is een eigen mutatie-workflow, zie WF-BEHEER-35. De overige kerngetallen op deze pagina blijven read-only.',
     assertion: {
       kind: 'consistency',
       source:
         'lib/fiscale-kerngetallen.ts (FISCALE_KERNGETALLEN leest live uit de bronmodules; buildJaarChecklist/validateFiscaleKerngetallen) + lib/box3-data.ts (CURRENT_TAX_YEAR) — weergave = canonieke constanten (A=B), consistentietoets',
+    },
+  },
+  {
+    workflow: 'WF-BEHEER-35',
+    scenarioId: 'UAT-BEHEER-35',
+    titel: 'FIRE-marktaannames jaarlaag toevoegen/bewerken/verwijderen',
+    kriticiteit: 'BELANGRIJK',
+    given: '/beheer/fiscale-kerngetallen, FireAssumptionsEditor-tegel (superadmin-gated CRUD op tabel fire_assumptions).',
+    when:
+      'De beheerder voegt een jaarlaag toe (of bewerkt/verwijdert er een) met rendement/inflatie/volatiliteit in procenten en optioneel een bron + "definitief"-vlag.',
+    then:
+      'De invoer (procenten) wordt naar decimalen omgerekend en via POST/PUT/DELETE /api/admin/fire-assumptions weggeschreven (zod-gevalideerd: rendement/inflatie −100%..100%, volatiliteit 0..200%; year = PK); de route is superadmin-gated (401 niet ingelogd, 403 geen superadmin) en schrijft via getServiceClient (RLS staat alleen SELECT toe voor authenticated). De SWR-preview in het formulier EN de tabelkolom zijn puur afgeleid via computeEffectiveSwr (rendement−Box3-drag−inflatie) en worden nooit zelf ingevoerd of opgeslagen. Na opslaan resolven de rekenmotoren (dashboard-data-loader, /toekomst, /core) de nieuwe jaarlaag via resolveFireAssumptions; ontbrekende/lege jaarlagen vallen terug op de TS-constanten in lib/constants.ts (byte-identiek gedrag met vóór deze release).',
+    assertion: {
+      kind: 'consistency',
+      source:
+        'app/api/admin/fire-assumptions/route.ts (UpsertSchema/DeleteSchema, gateSuperAdmin, getServiceClient) + app/(app)/beheer/fiscale-kerngetallen/fire-assumptions-editor.tsx (procenten↔decimalen, previewSwr=computeEffectiveSwr) + lib/fire-assumptions.ts#resolveFireAssumptions (DB-override met TS-fallback, consume-don’t-recompute op de SWR)',
     },
   },
   {

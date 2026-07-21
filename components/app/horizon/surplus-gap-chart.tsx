@@ -2,6 +2,8 @@
 
 import { useState, useEffect, memo, useCallback, useId } from 'react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+import { MASKED_AMOUNT_PLACEHOLDER } from '@/lib/format'
 
 const PAD = { top: 16, right: 16, bottom: 28, left: 60 }
 
@@ -237,7 +239,7 @@ export const SurplusGapChart = memo(function SurplusGapChart({
         {yTicks.map(({ val, y }) => (
           <text key={`yl-${val}`} x={PAD.left - 5} y={y + 4} textAnchor="end" fontSize={9}
             fill="var(--ink-4)" fontFamily="var(--font-dm-mono, monospace)">
-            {val === 0 ? '€0' : (val > 0 ? '+' : '−') + fmtY(Math.abs(val)).replace('€', '€')}
+            {val === 0 ? '€0' : (val > 0 ? '+' : '−') + fmtY(Math.abs(val))}
           </text>
         ))}
 
@@ -371,27 +373,34 @@ export function SurplusGapSummary({
 }) {
   const { opgebouwd, ingeteerd, saldo } = computeLifetimeTotals(rows)
   const saldoPositive = saldo >= 0
+  const { masked } = useMaskedAmounts()
+
+  // Privacy-masking: kaal fmtEur negeert de toggle, dus hier expliciet maskeren.
+  // Bij masked verbergen we óók het teken (placeholder mag geregeld richting
+  // niet lekken) — spiegelt de MaskedAmount-conventie.
+  const cell = (value: number, sign: '+' | '−') =>
+    masked ? MASKED_AMOUNT_PLACEHOLDER : `${sign}${fmtEur(value)}`
 
   if (variant === 'strip') {
     return (
-      <div className="grid grid-cols-3 border-t border-b border-[var(--ink)] my-4">
-        <div className="p-4 sm:p-5 border-r border-[var(--rule-soft)]">
-          <div className="text-[10px] uppercase tracking-[0.20em] text-[var(--ink-3)] mb-1.5 font-mono">Opgebouwd</div>
-          <div className="font-serif font-black text-[22px] sm:text-[28px] leading-none tracking-[-0.02em] tabular-nums text-[var(--positive)]">
-            +{fmtEur(opgebouwd)}
+      <div className="grid grid-cols-3 border-t border-b border-[var(--ink)] my-2">
+        <div className="p-2 sm:p-2.5 border-r border-[var(--rule-soft)]">
+          <div className="text-[9px] uppercase tracking-[0.15em] text-[var(--ink-3)] mb-1 font-mono">Opgebouwd</div>
+          <div className="font-serif font-black text-[15px] sm:text-[17px] leading-none tracking-[-0.02em] tabular-nums text-[var(--positive)]">
+            {cell(opgebouwd, '+')}
           </div>
         </div>
-        <div className="p-4 sm:p-5 border-r border-[var(--rule-soft)]">
-          <div className="text-[10px] uppercase tracking-[0.20em] text-[var(--ink-3)] mb-1.5 font-mono">Ingeteerd</div>
-          <div className="font-serif font-black text-[22px] sm:text-[28px] leading-none tracking-[-0.02em] tabular-nums text-[var(--negative)]">
-            −{fmtEur(ingeteerd)}
+        <div className="p-2 sm:p-2.5 border-r border-[var(--rule-soft)]">
+          <div className="text-[9px] uppercase tracking-[0.15em] text-[var(--ink-3)] mb-1 font-mono">Ingeteerd</div>
+          <div className="font-serif font-black text-[15px] sm:text-[17px] leading-none tracking-[-0.02em] tabular-nums text-[var(--negative)]">
+            {cell(ingeteerd, '−')}
           </div>
         </div>
-        <div className="p-4 sm:p-5">
-          <div className="text-[10px] uppercase tracking-[0.20em] text-[var(--ink-3)] mb-1.5 font-mono">Saldo</div>
-          <div className="font-serif font-black text-[22px] sm:text-[28px] leading-none tracking-[-0.02em] tabular-nums text-[var(--ink)]">
-            <span className={saldoPositive ? 'bg-[var(--horizon-200)]/60 px-1' : ''}>
-              {saldoPositive ? '+' : '−'}{fmtEur(Math.abs(saldo))}
+        <div className="p-2 sm:p-2.5">
+          <div className="text-[9px] uppercase tracking-[0.15em] text-[var(--ink-3)] mb-1 font-mono">Saldo</div>
+          <div className="font-serif font-black text-[15px] sm:text-[17px] leading-none tracking-[-0.02em] tabular-nums text-[var(--ink)]">
+            <span className={!masked && saldoPositive ? 'bg-[var(--horizon-200)]/60 px-1' : ''}>
+              {cell(Math.abs(saldo), saldoPositive ? '+' : '−')}
             </span>
           </div>
         </div>
@@ -404,19 +413,19 @@ export function SurplusGapSummary({
       <div>
         <div className="text-[9px] uppercase tracking-[0.15em] text-[var(--ink-4)] font-mono">Opgebouwd</div>
         <div className="font-mono tabular-nums text-sm font-semibold text-[var(--positive)] mt-0.5">
-          +{fmtEur(opgebouwd)}
+          {cell(opgebouwd, '+')}
         </div>
       </div>
       <div>
         <div className="text-[9px] uppercase tracking-[0.15em] text-[var(--ink-4)] font-mono">Ingeteerd</div>
         <div className="font-mono tabular-nums text-sm font-semibold text-[var(--negative)] mt-0.5">
-          −{fmtEur(ingeteerd)}
+          {cell(ingeteerd, '−')}
         </div>
       </div>
       <div>
         <div className="text-[9px] uppercase tracking-[0.15em] text-[var(--ink-4)] font-mono">Saldo</div>
         <div className="font-mono tabular-nums text-sm font-semibold text-[var(--ink)] mt-0.5">
-          {saldoPositive ? '+' : '−'}{fmtEur(Math.abs(saldo))}
+          {cell(Math.abs(saldo), saldoPositive ? '+' : '−')}
         </div>
       </div>
     </div>

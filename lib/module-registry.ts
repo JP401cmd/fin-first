@@ -176,6 +176,7 @@ export const WIDGET_MODULE_MAP: Record<string, ModuleId> = {
   trend_sparen: 'inzicht_acties',
   trend_schulden: 'inzicht_acties',
   beslissingspatronen: 'inzicht_acties',
+  vrijheidsdagen_maand: 'inzicht_acties',
   gezondheids_score: 'inzicht_acties',
   ai_inzicht: 'inzicht_acties',
 

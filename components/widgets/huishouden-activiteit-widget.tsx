@@ -95,13 +95,21 @@ export const HuishoudenActiviteitWidget = memo(function HuishoudenActiviteitWidg
           >
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
-                {/* Partner indicator */}
-                <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-bold shrink-0 ${
-                  item.isCurrentUser
-                    ? 'bg-kern-100 text-kern-700'
-                    : 'bg-wil-100 text-wil-700'
-                }`}>
-                  {item.partnerName.charAt(0).toUpperCase()}
+                {/* Persoon-indicator: stabiel, niet-accent onderscheid (solid = jij,
+                    outline = partner). Bewust GEEN module-accenttokens (kern/wil): die
+                    signaleren module-identiteit en schuiven mee bij herkleuren op
+                    de uiterlijk-pagina, waardoor zelf/partner konden samenvallen. Eigenaarschap
+                    wordt ook toegankelijk gemaakt via aria-label (kleur+initiaal alleen is
+                    niet genoeg). */}
+                <span
+                  className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-bold shrink-0 ${
+                    item.isCurrentUser
+                      ? 'bg-[var(--ink)] text-[var(--paper)]'
+                      : 'border border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-2)]'
+                  }`}
+                  aria-label={item.isCurrentUser ? 'Van jou' : `Van ${item.partnerName}`}
+                >
+                  <span aria-hidden="true">{item.partnerName.charAt(0).toUpperCase()}</span>
                 </span>
                 <span className="text-sm text-[var(--ink)] truncate">
                   {item.description || 'Transactie'}
@@ -115,12 +123,9 @@ export const HuishoudenActiviteitWidget = memo(function HuishoudenActiviteitWidg
                     <span className="text-[10px] text-[var(--ink-3)]">{item.category}</span>
                   </>
                 )}
-                {item.ownership === 'shared' && (
-                  <>
-                    <span className="text-[10px] text-[var(--ink-4)]">&middot;</span>
-                    <span className="text-[10px] text-wil-600 font-medium">gedeeld</span>
-                  </>
-                )}
+                {/* Geen losse 'gedeeld'-tag meer: de feed is nu volledig shared-only,
+                    dus per rij zou het redundante ruis zijn (en het gebruikte een
+                    module-accenttoken voor niet-module-semantiek). */}
               </div>
             </div>
             <span className={`shrink-0 ${

@@ -199,3 +199,49 @@ describe('BudgetTrendWidget — sparen-XL (waarde-labels per maand)', () => {
     expect(svg?.textContent).not.toContain('1.1k')
   })
 })
+
+/**
+ * Regressie voor de widgetreview Schuldtrend (trend_schulden), Optie B:
+ * de widget toont het openstaand schuldSALDO (dalend = goed). Een dalend saldo
+ * hoort groen (text-positive), een stijgend saldo rood. De reeks is een SALDO,
+ * geen maandstroom → geen aflossings-budget-referentielijn en de vrijheidstijd is
+ * "terug te kopen", niet "/maand".
+ */
+describe('BudgetTrendWidget — Schuldtrend (saldo, Optie B)', () => {
+  const dalend: History = [
+    { month: '2026-05', value: 12000 },
+    { month: '2026-06', value: 11000 },
+  ]
+  const stijgend: History = [
+    { month: '2026-05', value: 11000 },
+    { month: '2026-06', value: 12000 },
+  ]
+
+  it('een DÁLEND schuldsaldo toont groen (text-positive)', () => {
+    const { container } = render(
+      <BudgetTrendWidget budgetType="debt" size="half" data={makeData('debt', dalend)} />,
+    )
+    expect(container.querySelector('.text-positive')?.textContent).toContain('%')
+    expect(container.querySelector('.text-negative')).toBeNull()
+  })
+
+  it('een STIJGEND schuldsaldo toont rood (text-negative)', () => {
+    const { container } = render(
+      <BudgetTrendWidget budgetType="debt" size="half" data={makeData('debt', stijgend)} />,
+    )
+    expect(container.querySelector('.text-negative')?.textContent).toContain('%')
+    expect(container.querySelector('.text-positive')).toBeNull()
+  })
+
+  it('full-size framet de vrijheidstijd als "terug te kopen", niet "/maand"', () => {
+    const { container } = render(
+      <BudgetTrendWidget budgetType="debt" size="full" data={makeData('debt', dalend)} />,
+    )
+    expect(container.textContent).toContain('terug te kopen')
+    // Geen aflossings-budget-referentie voor een saldo, ook niet als er een limit staat.
+    const { container: withLimit } = render(
+      <BudgetTrendWidget budgetType="debt" size="full" data={makeData('debt', dalend, 400)} />,
+    )
+    expect(withLimit.textContent).not.toContain('Budget:')
+  })
+})

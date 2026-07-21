@@ -27,6 +27,7 @@ import {
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { formatMaskedCurrency } from '@/lib/format'
 import { type calculatePortfolioBox3 } from '@/lib/box3-holdings'
+import { BOX3_PARAMS, CURRENT_TAX_YEAR } from '@/lib/box3-data'
 import { NL_SWR } from '@/lib/constants'
 
 type Box3Summary = ReturnType<typeof calculatePortfolioBox3>
@@ -434,7 +435,7 @@ function Box3Sheet({
     (s, h) => s + h.forfaitRendement,
     0,
   )
-  const tarief = box3.holdings[0]?.tarief ?? 0.36
+  const tarief = box3.holdings[0]?.tarief ?? BOX3_PARAMS[CURRENT_TAX_YEAR].tarief
   const forfaitRate = box3.holdings[0]?.forfaitRate ?? 0
   return (
     <ShellOverlay open={open} onClose={onClose} kind="sheet" size="md" title="Box 3-kassabon">

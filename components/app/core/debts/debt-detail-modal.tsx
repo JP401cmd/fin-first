@@ -30,6 +30,7 @@ import {
 } from '@/lib/debt-data'
 import type { Asset } from '@/lib/asset-data'
 import { deriveMarginaalTarief } from '@/lib/box1-tax'
+import { INFLATION } from '@/lib/constants'
 import { computeSharePct, SPLIT_MODE_LABELS, type SplitMode } from '@/lib/household-data'
 import { createClient } from '@/lib/supabase/client'
 import { usePerspective } from '@/components/app/perspective-provider'
@@ -534,7 +535,7 @@ export function DebtDetailModal({
             restLooptijd={proj.monthsToPayoff > 0 ? proj.monthsToPayoff : 360}
             isTaxDeductible={debt.is_tax_deductible ?? false}
             marginaalTarief={deriveMarginaalTarief()}
-            inflatie={0.02}
+            inflatie={INFLATION}
             hasPartner={!!partnerSplit}
           />
         )

@@ -13,6 +13,7 @@ import {
 import { resolveFireParams } from '@/lib/fire-params'
 import { computeSovereigntyLevel, levelToPhaseId } from '@/lib/feature-phases'
 import { captureBalanceSnapshots } from '@/lib/balance-snapshot'
+import { logError } from '@/lib/log-error'
 import { captureNetWorthHistory, type NetWorthHistorySource } from '@/lib/networth-history'
 import { type Debt, computeRenteAflossingsSplit } from '@/lib/debt-data'
 import { localMonthBounds, localMonthStart } from '@/lib/month-range'
@@ -316,8 +317,27 @@ export async function GET(request: Request) {
     snapshot = fullSnapshot
   }
 
-  // Capture per-entity balance snapshots (fire-and-forget, non-critical)
-  captureBalanceSnapshots(supabase, user.id, today, assets, debts).catch(() => {})
+  // Capture per-entity balance snapshots (fire-and-forget, non-critical).
+  // Silent failures are logged to error_logs so empty sparklines don't go
+  // unnoticed for months — main path stays non-blocking (no await).
+  captureBalanceSnapshots(supabase, user.id, today, assets, debts)
+    .then(res => {
+      if (res.error) {
+        void logError(supabase, {
+          userId: user.id,
+          context: 'balance-snapshot:auto',
+          message: res.error,
+        })
+      }
+    })
+    .catch((err: unknown) => {
+      void logError(supabase, {
+        userId: user.id,
+        context: 'balance-snapshot:auto',
+        message: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
+      })
+    })
 
   // Bij een prijs-sync (daily-open / manual): leg een tijdstempel-punt vast in
   // net_worth_history (intraday vermogenscurve). Consumeert het reeds canoniek

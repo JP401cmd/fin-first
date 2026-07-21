@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { computeSovereigntyLevel } from '@/lib/feature-phases'
 import { calculateFreedomTime } from '@/lib/format'
-import { ageAtDate, NL_SWR } from '@/lib/horizon-data'
+import { computeEffectiveSwr } from '@/lib/fire-params'
 
 // ── Types mirroring the API response ─────────────────────────────────────
 
@@ -37,28 +37,35 @@ interface GuideProgressResponse {
   calculatedAt: string
 }
 
-/** Simulates the FIRE age calculation used in the API route */
+/**
+ * Simulates the FIRE age calculation used in the API route (canoniek).
+ * Spiegelt de route: spaarbron via resolveSavingsSource (hier als
+ * `annualSavings` doorgegeven) i.p.v. de verzonnen uitgaven×0.3, en een
+ * REËEL (inflatie-gecorrigeerd) maandelijks compound-rendement i.p.v. het
+ * nominale `?? 0.07`. Cap op 80 jaar (960 maanden).
+ */
 function computeFireAge(
   currentAge: number,
   netWorth: number,
   fireTarget: number,
-  monthlyExpenses: number,
+  annualSavings: number,
   grossReturn: number,
+  inflationRate: number,
 ): number | null {
   const shortfall = fireTarget - netWorth
   if (shortfall <= 0) return Math.round(currentAge)
-  if (monthlyExpenses <= 0) return null
-
-  const annualSavings = monthlyExpenses * 0.3
   if (annualSavings <= 0) return null
 
+  const realReturn = (1 + grossReturn) / (1 + inflationRate) - 1
+  const monthlyReturn = realReturn / 12
+  const monthlySavings = annualSavings / 12
   let portfolio = netWorth
-  let years = 0
-  while (portfolio < fireTarget && years < 80) {
-    portfolio = portfolio * (1 + grossReturn) + annualSavings
-    years++
+  let months = 0
+  while (portfolio < fireTarget && months < 960) {
+    portfolio = portfolio * (1 + monthlyReturn) + monthlySavings
+    months++
   }
-  return years < 80 ? Math.round(currentAge + years) : null
+  return months < 960 ? Math.round(currentAge + months / 12) : null
 }
 
 /** Simulates the progress bar percentage calculation (4 steps) */
@@ -151,24 +158,34 @@ describe('Guide Progress API — response shape', () => {
     }
   })
 
-  it('A2: net worth = total assets - total debts', () => {
+  it('A2: netto vermogen = Σ bezittingen − Σ schulden (inclusion-gewogen, actief)', () => {
+    // current_balance staat POSITIEF opgeslagen; netWorth = assets − debts
+    // (canonieke conventie: dashboard-loader / next-steps / report — geen Math.abs).
     const assets = [
-      { current_value: 100000 },
-      { current_value: 50000 },
-      { current_value: 25000 },
+      { current_value: 100000, net_worth_inclusion_pct: 100 },
+      { current_value: 50000, net_worth_inclusion_pct: 100 },
+      { current_value: 25000, net_worth_inclusion_pct: 100 },
     ]
     const debts = [
-      { current_balance: -80000, debt_type: 'hypotheek' },
-      { current_balance: -5000, debt_type: 'studieschuld' },
+      { current_balance: 80000, net_worth_inclusion_pct: 100, debt_type: 'hypotheek' },
+      { current_balance: 5000, net_worth_inclusion_pct: 100, debt_type: 'studieschuld' },
     ]
 
-    const totalAssets = assets.reduce((s, a) => s + Number(a.current_value), 0)
-    const totalDebts = debts.reduce((s, d) => s + Math.abs(Number(d.current_balance)), 0)
+    const totalAssets = assets.reduce((s, a) => s + Number(a.current_value) * ((a.net_worth_inclusion_pct ?? 100) / 100), 0)
+    const totalDebts = debts.reduce((s, d) => s + Number(d.current_balance) * ((d.net_worth_inclusion_pct ?? 100) / 100), 0)
     const netWorth = totalAssets - totalDebts
 
     expect(totalAssets).toBe(175000)
     expect(totalDebts).toBe(85000)
     expect(netWorth).toBe(90000)
+
+    // Inclusion-gewogen: een asset op 0% (bv. eigen woning buiten FIRE) telt niet
+    // mee; 50% telt half. Dit is precies de grondslag-verschuiving van de fix.
+    const weightedAssets = [
+      { current_value: 400000, net_worth_inclusion_pct: 0 },
+      { current_value: 100000, net_worth_inclusion_pct: 50 },
+    ].reduce((s, a) => s + Number(a.current_value) * ((a.net_worth_inclusion_pct ?? 100) / 100), 0)
+    expect(weightedAssets).toBe(50000)
   })
 
   it('A3: daily expense rate computed from monthly over 365 days', () => {
@@ -581,11 +598,15 @@ describe('GuideNaslagwerk — reference material', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('Guide FIRE age estimation', () => {
+  // Gepersonaliseerde SWR (default-profiel: 7% rendement, 2% inflatie) i.p.v. de
+  // statische NL_SWR — exact wat de route via resolveFireParams gebruikt.
+  const effectiveSwr = computeEffectiveSwr(0.07, 0.02)
+
   it('I1: FIRE age computes correctly with standard parameters', () => {
-    // 35 year old, €150K portfolio, €36K/yr expenses, 7% return
+    // 35 year old, €150K portfolio, €36K/yr essentiële lasten, €18K/jr sparen.
     const yearlyExpenses = 36000
-    const fireTarget = yearlyExpenses / NL_SWR
-    const fireAge = computeFireAge(35, 150000, fireTarget, 3000, 0.07)
+    const fireTarget = yearlyExpenses / effectiveSwr
+    const fireAge = computeFireAge(35, 150000, fireTarget, 18000, 0.07, 0.02)
 
     expect(fireAge).not.toBeNull()
     expect(fireAge).toBeGreaterThan(35)
@@ -594,18 +615,24 @@ describe('Guide FIRE age estimation', () => {
 
   it('I2: FIRE age is current age when already at target', () => {
     const yearlyExpenses = 36000
-    const fireTarget = yearlyExpenses / NL_SWR
+    const fireTarget = yearlyExpenses / effectiveSwr
     // Net worth exceeds fire target
-    const fireAge = computeFireAge(45, fireTarget + 100000, fireTarget, 3000, 0.07)
+    const fireAge = computeFireAge(45, fireTarget + 100000, fireTarget, 18000, 0.07, 0.02)
     expect(fireAge).toBe(45)
   })
 
-  it('I3: FIRE target = yearly expenses / NL_SWR', () => {
-    const yearlyExpenses = 36000
-    const fireTarget = yearlyExpenses / NL_SWR
+  it('I2b: FIRE age is null when there is no positive savings', () => {
+    // Geen (of negatieve) spaarquote → onbereikbaar, geen verzonnen ×0.3 meer.
+    const fireTarget = 36000 / effectiveSwr
+    expect(computeFireAge(35, 150000, fireTarget, 0, 0.07, 0.02)).toBeNull()
+  })
 
-    expect(NL_SWR).toBeGreaterThan(0)
-    expect(NL_SWR).toBeLessThan(0.05) // Dutch SWR is around 3.4%
+  it('I3: FIRE target = yearly expenses / effectiveSwr', () => {
+    const yearlyExpenses = 36000
+    const fireTarget = yearlyExpenses / effectiveSwr
+
+    expect(effectiveSwr).toBeGreaterThan(0)
+    expect(effectiveSwr).toBeLessThan(0.05) // NL SWR na Box 3 + inflatie ≈ 2,8%
     expect(fireTarget).toBeGreaterThan(yearlyExpenses * 20) // > 20x expenses
   })
 })

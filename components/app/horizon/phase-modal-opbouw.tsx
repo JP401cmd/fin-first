@@ -61,8 +61,9 @@ interface PhaseModalOpbouwProps {
   allRows?: UnifiedProjectionRow[]
   /** Monthly income for hypotheek analysis */
   monthlyIncome?: number
-  /** Monthly expenses for hypotheek analysis */
-  monthlyExpenses?: number
+  /** Canonieke 6-maands spaarquote (%) — anker voor de gevoeligheidsanalyse
+   *  (zelfde bron als cashflow/whatif//toekomst), i.p.v. een 1-maands quote. */
+  savingsRate6m?: number | null
   /** Portfolio volatility for Monte Carlo (default DEFAULT_VOLATILITY) */
   volatility?: number
   /** FIRE target portfolio amount for Monte Carlo success probability */
@@ -115,7 +116,7 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
   cashflows,
   allRows,
   monthlyIncome,
-  monthlyExpenses,
+  savingsRate6m,
   volatility,
   fireTarget,
   hasPartner,
@@ -405,7 +406,7 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
           yearlyExpenses={yearlyExpenses}
           fireTarget={fireTarget}
           cashflows={cashflows}
-          savingsRate={monthlyIncome && monthlyIncome > 0 ? ((monthlyIncome - (monthlyExpenses ?? 0)) / monthlyIncome) * 100 : null}
+          savingsRate={savingsRate6m ?? null}
           monthlyIncome={monthlyIncome}
         />
 

@@ -10,8 +10,13 @@
 // (spiegel van validateCalculations).
 //
 // FASE 1 (deze module): read-only inventaris + jaar-checklist + drift-punten.
-// FASE 2 (vervolgkaart): bewerkbaar met historie via een DB-override-laag
-// (resolver met TS-fallback) — bewust NIET hier gebouwd.
+// FASE 2 (in uitvoering): bewerkbaar met historie via een DB-override-laag
+// (resolver met TS-fallback). Eerste toepassing: de FIRE-marktaannames
+// (rendement/inflatie/volatiliteit) zijn nu jaargelaagd beheerbaar via de tabel
+// `fire_assumptions` + de pure resolver lib/fire-assumptions.ts#resolveFireAssumptions
+// (fallback = de constanten in lib/constants.ts). De beheer-CRUD zit op
+// /beheer/fiscale-kerngetallen. De overige (fiscale) kerngetallen blijven read-only
+// inventaris tot ze op dezelfde manier worden gemigreerd.
 //
 // Onderhoudsregel: voeg je een jaarlaag toe aan een van de bronbestanden of
 // verifieer je een waarde tegen de officiële bron, werk dan `lastVerified`
@@ -424,28 +429,29 @@ export const FISCALE_KERNGETALLEN: FiscaalKerngetal[] = [
     id: 'fire-aannames',
     title: 'FIRE-marktaannames',
     domain: 'FIRE-aannames',
-    summary: 'De lange-termijn marktaannames onder de FIRE-projecties: verwacht rendement, inflatie, volatiliteit en de klassieke 4%-regel. Profiel-instellingen van de gebruiker overschrijven rendement/inflatie.',
-    jaargelaagd: false,
-    years: [],
+    summary:
+      'De lange-termijn marktaannames onder de FIRE-projecties: verwacht rendement, inflatie en volatiliteit — jaargelaagd beheerbaar via de DB-override-laag (tabel fire_assumptions), met de constanten in lib/constants.ts als fallback. SWR = rendement − Box 3-drag − inflatie is puur afgeleid (nooit opgeslagen) en beweegt mee met alle drie. Profiel-instellingen van de gebruiker overschrijven rendement/inflatie per gebruiker.',
+    jaargelaagd: true,
+    years: [CURRENT_TAX_YEAR],
     valuesByYear: [
       {
-        year: null,
+        year: CURRENT_TAX_YEAR,
         values: [
-          { label: 'Verwacht rendement (default)', value: pct(DEFAULT_RETURN) },
-          { label: 'Inflatie (default)', value: pct(INFLATION) },
-          { label: 'Volatiliteit (Monte Carlo)', value: pct(DEFAULT_VOLATILITY) },
-          { label: 'Klassieke SWR (referentie)', value: pct(SWR) },
+          { label: 'Verwacht rendement (fallback-default)', value: pct(DEFAULT_RETURN) },
+          { label: 'Inflatie (fallback-default)', value: pct(INFLATION) },
+          { label: 'Volatiliteit — Monte Carlo (fallback-default)', value: pct(DEFAULT_VOLATILITY) },
+          { label: 'SWR = rendement − Box 3-drag − inflatie (afgeleid)', value: pct(NL_SWR) },
           { label: 'Box 3-drag (afgeleid)', value: pct(BOX3_DRAG) },
-          { label: 'NL-SWR (afgeleid)', value: pct(NL_SWR) },
+          { label: 'Klassieke SWR (referentie, 4%-regel)', value: pct(SWR) },
         ],
       },
     ],
     file: 'lib/constants.ts',
     exportName: 'DEFAULT_RETURN',
     source: 'Markt/aanname',
-    updateFrequency: 'zelden',
-    lastVerified: '2025-01-01',
-    note: 'Geen wettelijke getallen maar modelaannames — wijzigingen raken álle projecties en horen via de calc-engine-specialist + regressietests te lopen. Box 3-drag en NL-SWR bewegen automatisch mee met BOX3_PARAMS.',
+    updateFrequency: 'jaarlijks',
+    lastVerified: '2026-07-20',
+    note: 'Geen wettelijke getallen maar modelaannames — wijzigingen raken álle projecties. FASE 2 (DB-override met TS-fallback): rendement/inflatie/volatiliteit zijn nu PER JAAR beheerbaar in de tabel fire_assumptions, geresolveerd door lib/fire-assumptions.ts#resolveFireAssumptions (val terug op DEFAULT_RETURN/INFLATION/DEFAULT_VOLATILITY bij een ontbrekende jaarrij). Deze catalogus toont de FALLBACK-laag (de TS-constanten); de live DB-jaarlagen worden bewerkt in de CRUD-tegel op /beheer/fiscale-kerngetallen. De jaar-default schuift alléén in wanneer de gebruiker zelf niets zette; rendement voedt de scalar/target-laag (freedomPct, FIRE-doel) — de kernel-accumulatiecurve blijft per-asset (asset.expected_return), bewust out of scope. SWR wordt NOOIT opgeslagen: rendement − Box 3-drag − inflatie via computeEffectiveSwr; Box 3-drag beweegt zelf mee met BOX3_PARAMS.',
   },
 
   // ── Presets & kalender ──

@@ -7,6 +7,7 @@ import {
   type FiscaalKerngetal,
 } from '@/lib/fiscale-kerngetallen'
 import { CURRENT_TAX_YEAR } from '@/lib/box3-data'
+import { FireAssumptionsEditor } from './fire-assumptions-editor'
 
 export const metadata = {
   title: 'Fiscale kerngetallen — Beheer',
@@ -57,9 +58,11 @@ export default function FiscaleKerngetallenPage() {
           <h2 className="text-xl font-bold text-[var(--ink)]">Fiscale kerngetallen</h2>
         </div>
         <p className="mt-1 text-sm text-[var(--ink-3)]">
-          Read-only inventaris van de jaargebonden fiscale en financiële constanten in de rekenmotoren:
+          Inventaris van de jaargebonden fiscale en financiële constanten in de rekenmotoren:
           waarde(n) per jaar, bronbestand, bron-instantie, update-frequentie en verificatiestatus.
-          Waarden worden live uit de code gelezen — dit scherm kan dus niet driften. Actief belastingjaar: <strong>{CURRENT_TAX_YEAR}</strong>.
+          De fiscale waarden worden live uit de code gelezen (kunnen dus niet driften); de
+          <strong> FIRE-marktaannames</strong> (rendement/inflatie/volatiliteit) zijn sinds Fase 2
+          jaargelaagd <strong>bewerkbaar</strong> via de DB-override-laag hieronder. Actief belastingjaar: <strong>{CURRENT_TAX_YEAR}</strong>.
         </p>
       </div>
 
@@ -86,6 +89,9 @@ export default function FiscaleKerngetallenPage() {
           <div className="text-xs text-[var(--ink-3)]">Drift-punten open</div>
         </div>
       </div>
+
+      {/* FIRE-marktaannames — bewerkbare DB-override-laag (Fase 2) */}
+      <FireAssumptionsEditor />
 
       {/* Jaar-checklist */}
       <section className="rounded-xl border border-amber-200 bg-amber-50 p-4">
@@ -136,8 +142,10 @@ export default function FiscaleKerngetallenPage() {
           </div>
         ))}
         <p className="text-xs text-[var(--ink-4)]">
-          Het structureel wegnemen van de open punten (DB-override-laag met historie en resolver) is bewust een
-          vervolgkaart (Fase 2) — dit scherm is de read-only inventaris.
+          Fase 2 (DB-override met TS-fallback) is gestart: de FIRE-marktaannames zijn nu jaargelaagd bewerkbaar
+          via de tabel <span className="font-mono">fire_assumptions</span> + resolver
+          <span className="font-mono"> resolveFireAssumptions</span> (fallback = lib/constants.ts). De overige
+          (fiscale) kerngetallen blijven read-only inventaris tot ze op dezelfde manier worden gemigreerd.
         </p>
       </section>
 

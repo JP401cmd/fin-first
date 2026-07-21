@@ -34,8 +34,18 @@ function BarChart({
   const maxDays = Math.max(...months.map((m) => m.days), 1)
   const barHeight = compact ? 48 : 80
 
+  // Tekstalternatief voor schermlezers: per maand de gewonnen vrijheidsdagen.
+  const summary = months
+    .map((m) => `${monthAbbr(m.month)}: ${Math.round(m.days)} ${Math.round(m.days) === 1 ? 'dag' : 'dagen'}`)
+    .join(', ')
+
   return (
-    <div className="flex items-end gap-[3px] w-full" style={{ height: barHeight }}>
+    <div
+      className="flex items-end gap-[3px] w-full"
+      style={{ height: barHeight }}
+      role="img"
+      aria-label={`Gewonnen vrijheidsdagen per maand — ${summary}`}
+    >
       {months.map((m) => {
         const current = isCurrentMonth(m.month)
         const pct = m.days / maxDays
@@ -79,7 +89,7 @@ export const VrijheidsdagenMaandWidget = memo(function VrijheidsdagenMaandWidget
   // ── Empty state ──────────────────────────────────────────────
   if (months.length === 0) {
     return (
-      <WidgetShell module="wil" size={size} kicker="Vrijheidsdagen/maand" href={href}>
+      <WidgetShell module="wil" size={size} kicker="Gewonnen vrijheidsdagen/maand" href={href}>
         <div className="flex flex-col items-center justify-center h-full text-center">
           <p className="text-sm text-[var(--ink-3)]">Geen maanddata beschikbaar</p>
           <p className="font-serif italic text-[11px] text-[var(--ink-4)] mt-1">
@@ -93,7 +103,7 @@ export const VrijheidsdagenMaandWidget = memo(function VrijheidsdagenMaandWidget
   // ── Mini size ───────────────────────────────────────────────
   if (size === 'mini') {
     return (
-      <WidgetShell module="wil" size="mini" kicker="Vrijheidsdagen/maand" href={href}>
+      <WidgetShell module="wil" size="mini" kicker="Gewonnen vrijheidsdagen/maand" href={href}>
         <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
           {currentDays}d
         </p>
@@ -104,7 +114,7 @@ export const VrijheidsdagenMaandWidget = memo(function VrijheidsdagenMaandWidget
   // ── Quarter size: current month value only ───────────────────
   if (size === 'quarter') {
     return (
-      <WidgetShell module="wil" size={size} kicker="Vrijheidsdagen/maand" href={href}>
+      <WidgetShell module="wil" size={size} kicker="Gewonnen vrijheidsdagen/maand" href={href}>
         <p className="font-mono text-lg font-semibold tabular-nums text-[var(--ink)]">
           {currentDays}
           <span className="text-xs font-normal text-[var(--ink-3)]"> dagen</span>
@@ -122,7 +132,7 @@ export const VrijheidsdagenMaandWidget = memo(function VrijheidsdagenMaandWidget
   // ── Half size: headline + compact bar chart ──────────────────
   if (size === 'half') {
     return (
-      <WidgetShell module="wil" size={size} kicker="Vrijheidsdagen/maand" href={href}>
+      <WidgetShell module="wil" size={size} kicker="Gewonnen vrijheidsdagen/maand" href={href}>
         <div className="flex items-center gap-3 mb-2">
           <span className="font-mono text-lg font-semibold tabular-nums text-[var(--ink)]">
             {currentDays}
@@ -139,7 +149,7 @@ export const VrijheidsdagenMaandWidget = memo(function VrijheidsdagenMaandWidget
   const totalYear = displayMonths.reduce((sum, m) => sum + m.days, 0)
 
   return (
-    <WidgetShell module="wil" size={size} kicker="Vrijheidsdagen/maand" href={href}>
+    <WidgetShell module="wil" size={size} kicker="Gewonnen vrijheidsdagen/maand" href={href}>
       {/* Summary row */}
       <div className="flex items-baseline gap-4 mb-3">
         <div>
@@ -156,26 +166,9 @@ export const VrijheidsdagenMaandWidget = memo(function VrijheidsdagenMaandWidget
         </div>
       </div>
 
-      {/* Bar chart */}
+      {/* Bar chart — BarChart rendert in full (non-compact) de maandlabels zelf
+          onder elke balk; geen losse labelrij (dat gaf dubbele labels). */}
       <BarChart months={displayMonths} />
-
-      {/* Month labels for full view */}
-      <div className="flex gap-[3px] w-full mt-0.5">
-        {displayMonths.map((m) => {
-          const current = isCurrentMonth(m.month)
-          return (
-            <div key={m.month} className="flex-1 min-w-0 text-center">
-              <span
-                className={`text-[9px] leading-none ${
-                  current ? 'font-semibold text-wil-700' : 'text-[var(--ink-4)]'
-                }`}
-              >
-                {monthAbbr(m.month)}
-              </span>
-            </div>
-          )
-        })}
-      </div>
 
       {/* Trend footnote */}
       {displayMonths.length >= 2 && (

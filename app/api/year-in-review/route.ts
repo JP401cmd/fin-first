@@ -1,9 +1,12 @@
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
-// Scalar-router (FASE 5, stap 2e) — BEWUSTE UITZONDERING: deze route riep
-// computeFireProjection nooit aan (dode import, hier opgeruimd). De FIRE-sectie
-// is historische snapshot-weergave (doel = uitgaven/NL_SWR per snapshot-moment),
-// geen FIRE-solve — de kernel kan historische percentages niet herrekenen.
-import { NL_SWR } from '@/lib/horizon-data'
+// De FIRE-sectie is historische snapshot-weergave (geen FIRE-solve): het
+// FIRE-doel wordt canoniek bepaald uit de essentiële jaarlasten
+// (computeYearlyMustExpenses over essentiële budgetten + children) gedeeld door
+// de gepersonaliseerde effectiveSwr (resolveFireParams) — exact de grondslag van
+// /api/report, /toekomst en de AI-context. Geen eigen NL_SWR of
+// transactie-gemiddelde meer ("consume, don't recompute", ADR 0009).
+import { resolveFireParams } from '@/lib/fire-params'
+import { computeYearlyMustExpenses } from '@/lib/budget-utils'
 
 export interface YearInReviewData {
   year: number
@@ -115,10 +118,10 @@ export async function GET(request: Request) {
         .gte('date', yearStart)
         .lt('date', yearEnd),
 
-      // User profile
+      // User profile — incl. FIRE-parameters voor de canonieke effectiveSwr
       supabase
         .from('profiles')
-        .select('full_name, date_of_birth')
+        .select('full_name, date_of_birth, expected_return, inflation_rate, box3_method, marginaal_tarief, net_monthly_income')
         .single(),
 
       // Current assets (for end-of-year FIRE calc)
@@ -141,10 +144,11 @@ export async function GET(request: Request) {
         .in('budget_type', ['expense'])
         .is('parent_id', null),
 
-      // Child budgets
+      // Child budgets — velden die computeYearlyMustExpenses nodig heeft
+      // (essential-children-logica + orphan-detectie)
       supabase
         .from('budgets')
-        .select('id, parent_id, default_limit')
+        .select('id, parent_id, default_limit, interval, budget_type, is_essential')
         .not('parent_id', 'is', null),
     ])
 
@@ -256,12 +260,17 @@ export async function GET(request: Request) {
     let fireStart: YearInReviewData['fireStart'] = null
     let fireEnd: YearInReviewData['fireEnd'] = null
 
-    // Get average monthly expenses for FIRE target calculation
-    const avgMonthlyExpenses = monthsWithData.length > 0
-      ? totalExpenses / monthsWithData.length
-      : 0
-    const yearlyExpenses = avgMonthlyExpenses * 12
-    const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / NL_SWR : 0
+    // FIRE-doel op de canonieke grondslag: essentiële jaarlasten
+    // (computeYearlyMustExpenses over de al-opgehaalde essentiële budgetten +
+    // children) gedeeld door de gepersonaliseerde effectiveSwr — spiegelt
+    // /api/report. Vervangt het transactie-gemiddelde gedeeld door de statische
+    // NL_SWR.
+    const fireParams = resolveFireParams(profile ?? {})
+    const { yearlyMustExpenses } = computeYearlyMustExpenses(
+      essentialBudgets,
+      childBudgetsData,
+    )
+    const fireTarget = yearlyMustExpenses > 0 ? yearlyMustExpenses / fireParams.effectiveSwr : 0
 
     if (firstSnapshot && fireTarget > 0) {
       const startNw = Number(firstSnapshot.net_worth)

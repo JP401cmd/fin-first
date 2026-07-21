@@ -1,18 +1,25 @@
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { badRequest, conflict, notFound, serverError, unauthorized } from '@/lib/api/respond'
 
 /**
- * DELETE /api/budgets/[id] — Delete a budget category with cascade cleanup.
+ * DELETE /api/budgets/[id] — Archive a budget category (soft-delete).
+ *
+ * Ondanks de HTTP-methode DELETE is dit een VEILIGE, niet-destructieve
+ * archivering (WF-BUDGET-11): het budget en zijn subbudgetten worden op
+ * `is_archived = true` gezet, niet uit de database verwijderd. Gekoppelde
+ * transacties, subbudgetten, rollovers en budget_amounts blijven ONGEWIJZIGD
+ * behouden — de transactiehistorie blijft dus intact. De budget-SELECT filtert
+ * al op `is_archived = eq.false`, dus gearchiveerde budgetten verdwijnen vanzelf
+ * uit de actieve lijst. Dit spiegelt het bestaande archiveer-patroon van de
+ * huishoudbudget-merge-flow (migratie 20260611000002).
  *
  * Steps:
  * 1. Verify authenticated user owns the budget
- * 2. If parent budget: delete all children first (cascade)
- * 3. For each budget being deleted:
- *    a. Delete budget_rollovers referencing the budget
- *    b. Delete budget_amounts referencing the budget
- *    c. Set transactions.budget_id = NULL for transactions referencing the budget
- *    d. Delete the budget itself
- * 4. Return summary of what was deleted
+ * 2. Guard: reeds gearchiveerd → 409 (geen dubbele actie)
+ * 3. If parent budget: verzamel alle subbudget-ids
+ * 4. UPDATE budgets SET is_archived = true voor budget + subbudgetten
+ * 5. Return summary of what was archived
  */
 export async function DELETE(
   request: NextRequest,
@@ -23,17 +30,14 @@ export async function DELETE(
   // Validate UUID format
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
   if (!uuidRegex.test(id)) {
-    return NextResponse.json(
-      { error: 'Ongeldig budget ID formaat' },
-      { status: 400 }
-    )
+    return badRequest('Ongeldig budget ID formaat')
   }
 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   try {
@@ -46,14 +50,16 @@ export async function DELETE(
       .single()
 
     if (fetchError || !budget) {
-      return NextResponse.json(
-        { error: 'Budget niet gevonden of geen toegang' },
-        { status: 404 }
-      )
+      return notFound('Budget niet gevonden of geen toegang')
     }
 
-    // Collect all budget IDs to delete (including children if this is a parent)
-    const budgetIdsToDelete: string[] = [id]
+    // Guard: al gearchiveerd → geen dubbele archiveer-actie
+    if (budget.is_archived) {
+      return conflict('Dit budget is al gearchiveerd.')
+    }
+
+    // Collect all budget IDs to archive (including children if this is a parent)
+    const budgetIdsToArchive: string[] = [id]
     let childCount = 0
 
     // If this is a parent budget (no parent_id), find and include all children
@@ -63,85 +69,38 @@ export async function DELETE(
         .select('id')
         .eq('parent_id', id)
         .eq('user_id', user.id)
+        .eq('is_archived', false)
 
       if (children && children.length > 0) {
         const childIds = children.map((c: { id: string }) => c.id)
-        budgetIdsToDelete.push(...childIds)
+        budgetIdsToArchive.push(...childIds)
         childCount = children.length
       }
     }
 
-    // Track cleanup counts
-    let rolloversDeleted = 0
-    let amountsDeleted = 0
-    let transactionsUnlinked = 0
-
-    // Step 1: Delete budget_rollovers for all affected budgets
-    const { count: rolloverCount } = await supabase
-      .from('budget_rollovers')
-      .delete({ count: 'exact' })
-      .in('budget_id', budgetIdsToDelete)
-
-    rolloversDeleted = rolloverCount ?? 0
-
-    // Step 2: Delete budget_amounts for all affected budgets
-    const { count: amountsCount } = await supabase
-      .from('budget_amounts')
-      .delete({ count: 'exact' })
-      .in('budget_id', budgetIdsToDelete)
-
-    amountsDeleted = amountsCount ?? 0
-
-    // Step 3: Unlink transactions (set budget_id to NULL instead of deleting)
-    // This preserves transaction history while removing the budget reference
-    const { count: txCount } = await supabase
-      .from('transactions')
-      .update({ budget_id: null })
-      .in('budget_id', budgetIdsToDelete)
-
-    transactionsUnlinked = txCount ?? 0
-
-    // Step 4: Delete child budgets first (if any)
-    if (childCount > 0) {
-      const childIds = budgetIdsToDelete.filter(bid => bid !== id)
-      await supabase
-        .from('budgets')
-        .delete()
-        .in('id', childIds)
-    }
-
-    // Step 5: Delete the budget itself
-    const { error: deleteError } = await supabase
+    // Soft-delete: markeer budget + subbudgetten als gearchiveerd.
+    // Transacties (budget_id), rollovers en budget_amounts blijven behouden.
+    const { error: archiveError } = await supabase
       .from('budgets')
-      .delete()
-      .eq('id', id)
+      .update({ is_archived: true, updated_at: new Date().toISOString() })
+      .in('id', budgetIdsToArchive)
+      .eq('user_id', user.id)
 
-    if (deleteError) {
-      return NextResponse.json(
-        // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
-        { error: `Kon budget niet verwijderen: ${deleteError.message}` },
-        { status: 500 }
-      )
+    if (archiveError) {
+      return serverError(archiveError, 'budgets:DELETE')
     }
 
     return NextResponse.json({
       success: true,
-      deleted: {
+      archived: {
         budget_id: id,
         budget_name: budget.name,
         is_parent: !budget.parent_id,
-        children_deleted: childCount,
-        rollovers_deleted: rolloversDeleted,
-        amounts_deleted: amountsDeleted,
-        transactions_unlinked: transactionsUnlinked,
+        children_archived: childCount,
       },
     })
   } catch (err) {
-    console.error('Error deleting budget:', err)
-    return NextResponse.json(
-      { error: 'Interne fout bij het verwijderen van het budget' },
-      { status: 500 }
-    )
+    return serverError(err, 'budgets:DELETE')
   }
 }
 

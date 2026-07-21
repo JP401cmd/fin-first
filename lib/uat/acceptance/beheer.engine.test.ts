@@ -4,8 +4,8 @@
  * BEHEER is een admin-tooling-zone ZONDER rekenkern: er zijn geen 'exact'-
  * criteria, dus `BEHEER_ENGINE_CHECKS` (beheer-checks.ts) is bewust leeg. Deze
  * test borgt daarom vooral de DEKKING en de kind-verdeling: elk BEHEER-scenario
- * uit de catalogus (UAT-BEHEER-01..34, contiguous — géén verwijsregels) heeft
- * precies één criterium; de kinds zijn geldig (0 exact, 10 consistency, 2 oracle,
+ * uit de catalogus (UAT-BEHEER-01..35, contiguous — géén verwijsregels) heeft
+ * precies één criterium; de kinds zijn geldig (0 exact, 11 consistency, 2 oracle,
  * 22 ui-only); en er is precies één engine-check per exact-criterium (0 = 0).
  */
 
@@ -28,9 +28,9 @@ function criterion(workflow: string): AcceptanceCriterion {
 }
 
 describe('UAT Beheer — acceptatiecriteria dekking', () => {
-  it('is de BEHEER-zone met precies 34 criteria', () => {
+  it('is de BEHEER-zone met precies 35 criteria', () => {
     expect(BEHEER_ACCEPTANCE.zone).toBe('BEHEER')
-    expect(BEHEER_ACCEPTANCE.criteria.length).toBe(34)
+    expect(BEHEER_ACCEPTANCE.criteria.length).toBe(35)
   })
 
   it('heeft precies één criterium per catalogus-BEHEER-scenario', () => {
@@ -64,11 +64,11 @@ describe('UAT Beheer — acceptatiecriteria dekking', () => {
     expect(checkWorkflows).toEqual(exactWorkflows)
   })
 
-  it('heeft de verwachte kind-verdeling (0 exact, 10 consistency, 2 oracle, 22 ui-only)', () => {
+  it('heeft de verwachte kind-verdeling (0 exact, 11 consistency, 2 oracle, 22 ui-only)', () => {
     const counts = { exact: 0, consistency: 0, 'ui-only': 0, oracle: 0, direction: 0 }
     for (const c of BEHEER_ACCEPTANCE.criteria) counts[c.assertion.kind]++
     expect(counts.exact).toBe(0)
-    expect(counts.consistency).toBe(10)
+    expect(counts.consistency).toBe(11)
     expect(counts.oracle).toBe(2)
     expect(counts['ui-only']).toBe(22)
     expect(counts.direction).toBe(0)

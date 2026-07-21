@@ -380,7 +380,7 @@ export const WIDGET_CATALOG: WidgetDef[] = [
   },
   {
     id: 'vrijheidsdagen_maand',
-    name: 'Vrijheidsdagen/maand',
+    name: 'Gewonnen vrijheidsdagen/maand',
     description: 'Maandelijkse trend van gewonnen vrijheidsdagen',
     module: 'wil',
     sizes: ['mini', 'quarter', 'half', 'full'],

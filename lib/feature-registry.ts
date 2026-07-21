@@ -125,7 +125,7 @@ export const UNIFIED_FEATURES: UnifiedFeature[] = [
     description: 'Inkomsten/uitgaven/spaar/schuld trends, beslissingspatronen',
     module: 'wil',
     requiredTier: 'gratis',
-    widgets: ['trend_inkomen', 'trend_uitgaven', 'trend_sparen', 'trend_schulden', 'beslissingspatronen'],
+    widgets: ['trend_inkomen', 'trend_uitgaven', 'trend_sparen', 'trend_schulden', 'beslissingspatronen', 'vrijheidsdagen_maand'],
     legacyIds: ['beslissingspatronen'],
   },
   {
