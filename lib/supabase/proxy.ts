@@ -32,42 +32,45 @@ export async function updateSession(request: NextRequest) {
   const claims = await supabase.auth.getClaims()
   const user = claims?.data?.claims ? claims.data.claims : null
 
+  // Alleen echt-publieke (uitgelogd bereikbare) paden. Matching is EXACT
+  // (publicPaths.includes), plus de prefix-regel voor /auth/ verderop. Voeg hier
+  // NOOIT een productie-API toe die eigen auth heeft: dan omzeilt-ie de
+  // middleware-401 en leunt de beveiliging op één self-check (fragiel). Zie de
+  // Arch F4-sanering: /api/goals(+/history), /api/dividends, /api/portfolio-
+  // allocation en /api/daily-expense-rate zijn hier bewust WEGgehaald — ze zijn
+  // ingelogde app-surfaces en 401'en zelf al zonder sessie.
   const publicPaths = [
+    // --- Publieke pagina's (uitgelogd bereikbaar) ---
     '/',
     '/login',
     '/signup',
     '/forgot-password',
     '/reset-password',
+    // --- Publieke API's / infra ---
     '/api/health',
     '/api/schema-check',
     '/api/dev-login',
+    '/api/session-info',
     // Vrijheidscheck — publieke lead-gen-funnel (ADR 0022). De wizard, het
-    // rapport en de twee anonieme API's zijn bewust publiek; /check/activeren en
-    // /api/check/activate blijven achter auth (conversie ná inloggen).
+    // rapport en de submit-API zijn bewust publiek; /check/activeren en
+    // /api/check/activate blijven achter auth (conversie ná inloggen). /check
+    // staat daarom EXACT (geen prefix-regel), zodat de sub-paden auth-gated blijven.
     '/check',
     '/check/rapport',
     '/api/check/submit',
-    '/api/session-info',
     // Leaked-password-check (ADR 0057): bewust publiek — signup gebeurt uitgelogd,
     // dus de check moet zonder sessie bij de HIBP-proxy kunnen. Zonder deze entry
     // geeft de /api/-protected-prefix een 401 vóór de handler, waardoor de check
     // fail-open stil uitgeschakeld wordt op de belangrijkste flow (registratie).
     '/api/auth/password-check',
-    // NB (allowlist-opschoning, aparte kaart): onderstaande API-routes stammen
-    // uit het harness-tijdperk en zijn hierdoor publiek (geen middleware-401).
-    // De routes zelf checken auth; of ze uit deze lijst kunnen is de scope van
-    // de aparte allowlist-kaart — hier bewust ongemoeid gelaten.
-    '/api/goals',
-    '/api/portfolio-allocation',
-    '/api/daily-expense-rate',
+    // --- Cron-routes (Arch F4-besluit AC#2): headless aangeroepen, GEEN
+    // sessiecookie. Het echte auth-slot is CRON_SECRET in de handler zelf
+    // (fail-closed in productie: ontbrekend/onjuist secret -> 401/500). Zónder
+    // deze entries zou de /api/-protected-prefix de cron 401'en VÓÓR de
+    // CRON_SECRET-check draait -> cron kapot. Daarom bewust in de allowlist. ---
     '/api/snapshots/cron',
     '/api/holdings/refresh-prices/cron',
-    // AVG-retentie-cron (Arch F3, ADR 0059): draait zonder gebruikerssessie en is
-    // fail-closed beschermd door CRON_SECRET in de handler. Zonder deze entry geeft
-    // de /api/-protected-prefix een 401 vóór de handler (zoals bij de andere crons).
-    '/api/cron/retention',
-    '/api/goals/history',
-    '/api/dividends',
+    '/api/cron/retention', // AVG-retentie (Arch F3, ADR 0059)
   ]
 
   // Protected route prefixes that require authentication

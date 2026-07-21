@@ -1,23 +1,29 @@
 import { defineConfig, devices } from '@playwright/test'
 
 /**
- * Playwright-configuratie voor de TriFinity UAT-suite (domein Bezit, en
- * uitbreidbaar naar de overige UAT-deelgebieden uit `docs/uat/uat-plan.md`
- * Deel 2).
+ * Playwright-configuratie voor de TriFinity e2e-suite: de UAT-suite (domein
+ * Bezit, en uitbreidbaar naar de overige UAT-deelgebieden uit
+ * `docs/uat/uat-plan.md` Deel 2) onder `e2e/uat/`, plus de kale, persona-
+ * onafhankelijke auth-smoke (`e2e/smoke.spec.ts`) op de root van deze map.
  *
- * SKELET-status: dit demonstreert de automatiserings-weg voor de UAT-
- * scenario's; er is in de ontwikkelomgeving geen draaiende app-server, geen
- * admin-sessie en geen browser-install beschikbaar om deze suite hier uit
- * te voeren. Zie `e2e/README.md` voor hoe je 'm wél draait.
+ * SKELET-status (UAT-deel): dit demonstreert de automatiserings-weg voor de
+ * UAT-scenario's; er is in de ontwikkelomgeving geen draaiende app-server,
+ * geen admin-sessie en geen browser-install beschikbaar om die suite hier
+ * uit te voeren. Zie `e2e/README.md` voor hoe je 'm wél draait — dat geldt
+ * ook voor de smoke-spec.
  *
- * Bewust GEEN `webServer`-blok: de UAT draait per ontwerp tegen een
+ * Bewust GEEN `webServer`-blok: de suite draait per ontwerp tegen een
  * gedeelde, herstelbare testomgeving met test-/adminaccounts (§2.3
  * uat-plan.md) — niet tegen een per-run gestarte lokale server met
  * productiedata-risico. Start de app zelf (`npm run dev`, of een
  * Vercel-preview) en geef de URL mee via UAT_BASE_URL.
  */
 export default defineConfig({
-  testDir: './uat',
+  // '.' i.p.v. alleen './uat' zodat zowel `e2e/uat/*.spec.ts` als
+  // `e2e/smoke.spec.ts` door dezelfde config worden opgepikt. Playwright's
+  // standaard testMatch (**/*.@(spec|test).ts) sluit helpers.ts/README.md
+  // vanzelf uit.
+  testDir: '.',
 
   // UAT-scenario's muteren gedeelde testdata via persona-seeds
   // (/beheer/testdata wist en herlaadt alle financiële data van het

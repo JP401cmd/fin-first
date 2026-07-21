@@ -23,6 +23,7 @@ import {
   weightedDebtTotal,
   computeSnapshotNetWorth,
   computeSnapshotFreedomPct,
+  buildSnapshotParams,
   type SnapshotAsset,
   type SnapshotDebt,
 } from '../snapshot-math'
@@ -302,6 +303,9 @@ export async function GET(request: Request) {
     // Methode-versie van de opgeslagen score (ADR 0010 / FR-7). DEFAULT 1 op de
     // kolom; v2-snapshots schrijven expliciet 2 voor de trend-methodemarkering.
     score_version: 2,
+    // Provenance-parameterset ([Arch F6] #27) — zie POST /api/snapshots. De
+    // basic-fallback-upsert hieronder laat 'm bewust weg (kolom nullable).
+    params: buildSnapshotParams(fireParams),
   }
 
   // Try upsert with extended fields; fall back to basic if columns don't exist

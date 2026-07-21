@@ -86,14 +86,12 @@ const ALLOWLIST = new Set([
   // — Fase b, slice 4: horizon / toekomst —
   'components/app/horizon/horizon-client.tsx',
   'components/app/horizon/strategie-modal.tsx',
-  'components/app/fin/goal-detail-modal.tsx',
   'components/future/doel-toevoegen-sheet.tsx',
   'components/future/doel-bewerken-sheet.tsx',
   'app/(app)/horizon/whatif/whatif-page-client.tsx',
   // — Fase b, slice 5: debts + belasting —
   'app/(app)/core/debts/debts-client.tsx',
   'components/core/debt-category-page.tsx',
-  'components/app/core/debts/belasting-section.tsx',
   'components/aangifte/review-step.tsx',
   // — Fase b, slice 6: beheer / rapportages / onboarding / checkin / overig —
   'app/(app)/beheer/integraties/integraties-shell.tsx',

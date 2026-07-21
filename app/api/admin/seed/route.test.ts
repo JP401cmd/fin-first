@@ -29,3 +29,41 @@ describe('admin seed — persona-seed markeert account als demo', () => {
     expect(idx).toBeGreaterThan(seedIdx)
   })
 })
+
+/**
+ * Borgt de schema-drift fail-safe (infra-S1 uit de UAT-run 17 jul): de seed wiste
+ * eerst álle accountdata en faalde daarna op een ontbrekende kolom (schema-drift),
+ * waardoor het account leeg-maar-niet-hersteld achterbleef. De route MOET het schema
+ * valideren VÓÓR de destructieve wipe en bij `SeedSchemaError` stoppen zónder te
+ * wissen. `assertSeedSchema` zelf is los getest (lib/seed-persona.schema-preflight.test.ts);
+ * deze test bewaakt de orkestratie-garantie op routeniveau: preflight vóór wipe,
+ * en op drift een `return` die `deleteAllUserData` overslaat.
+ */
+describe('admin seed — schema-drift preflight slaat de wipe over', () => {
+  const routePath = path.resolve(__dirname, 'route.ts')
+  const source = readFileSync(routePath, 'utf8')
+  const codeOnly = source
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n')
+    .map((line) => line.replace(/\/\/.*$/, ''))
+    .join('\n')
+
+  it('roept assertSeedSchema aan VÓÓR deleteAllUserData', () => {
+    const preflightIdx = codeOnly.indexOf('assertSeedSchema(')
+    const wipeIdx = codeOnly.indexOf('deleteAllUserData(')
+    expect(preflightIdx).toBeGreaterThan(-1)
+    expect(wipeIdx).toBeGreaterThan(-1)
+    expect(preflightIdx).toBeLessThan(wipeIdx)
+  })
+
+  it('stopt met een return in de SeedSchemaError-tak vóór de wipe (niets gewist)', () => {
+    // De catch rond de preflight herkent SeedSchemaError en verlaat de handler.
+    const branchIdx = codeOnly.indexOf('preErr instanceof SeedSchemaError')
+    expect(branchIdx).toBeGreaterThan(-1)
+    const wipeIdx = codeOnly.indexOf('deleteAllUserData(')
+    // Tussen de drift-detectie en de wipe staat een return: de wipe wordt overgeslagen.
+    const returnIdx = codeOnly.indexOf('return', branchIdx)
+    expect(returnIdx).toBeGreaterThan(-1)
+    expect(returnIdx).toBeLessThan(wipeIdx)
+  })
+})

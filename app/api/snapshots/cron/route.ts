@@ -15,12 +15,14 @@ import { captureBalanceSnapshots } from '@/lib/balance-snapshot'
 import { logError } from '@/lib/log-error'
 import { type Debt, computeRenteAflossingsSplit } from '@/lib/debt-data'
 import { recordJobRun } from '@/lib/job-runs'
+import { mapWithConcurrency } from '@/lib/concurrency'
 import { localMonthBounds, localMonthStart } from '@/lib/month-range'
 import {
   weightedAssetTotal,
   weightedDebtTotal,
   computeSnapshotNetWorth,
   computeSnapshotFreedomPct,
+  buildSnapshotParams,
   type SnapshotAsset,
   type SnapshotDebt,
 } from '../snapshot-math'
@@ -48,6 +50,12 @@ import {
  *
  * No 24-record cap — keeps unlimited history.
  */
+// Deze cron verwerkt ALLE onboarded gebruikers per maand-run. Sinds de
+// parallelisatie (gebonden pool, zie GET) is de wall-clock kort, maar bij groei
+// van de userbase moet de functie langer mogen draaien dan de korte Vercel-
+// default. Spiegelt de zuster-cron holdings/refresh-prices (maxDuration = 60).
+export const maxDuration = 60
+
 export async function GET(request: Request) {
   // Verify authorization via CRON_SECRET or Authorization header
   const cronSecret = process.env.CRON_SECRET
@@ -116,9 +124,15 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: profilesError.message }, { status: 500 })
   }
 
-  const results: { userId: string; created: boolean; error?: string }[] = []
+  type SnapshotEntry = { userId: string; created: boolean; error?: string }
 
-  for (const profile of profiles ?? []) {
+  // Verwerk één gebruiker. Vangt ALTIJD zijn eigen fouten en throwt NOOIT: onder
+  // parallelisatie zou een throw de `Promise.all`-pool in mapWithConcurrency laten
+  // rejecten en de overige gebruikers overslaan. Retourneert de resultaat-entry én
+  // de (optionele) balance-snapshot-promise, die we ná de pool awaiten — zie GET.
+  async function processUser(
+    profile: NonNullable<typeof profiles>[number],
+  ): Promise<{ entry: SnapshotEntry; balancePromise: Promise<void> | null }> {
     const userId = profile.id
 
     try {
@@ -131,8 +145,7 @@ export async function GET(request: Request) {
         .limit(1)
 
       if (existing && existing.length > 0) {
-        results.push({ userId, created: false })
-        continue
+        return { entry: { userId, created: false }, balancePromise: null }
       }
 
       // Fetch all data for this user
@@ -199,8 +212,10 @@ export async function GET(request: Request) {
       ])
 
       if (assetsResult.error || debtsResult.error) {
-        results.push({ userId, created: false, error: (assetsResult.error || debtsResult.error)?.message })
-        continue
+        return {
+          entry: { userId, created: false, error: (assetsResult.error || debtsResult.error)?.message },
+          balancePromise: null,
+        }
       }
 
       const assets = assetsResult.data ?? []
@@ -316,6 +331,9 @@ export async function GET(request: Request) {
         // de kolom; v2-snapshots schrijven expliciet 2. De basic-fallback-upsert
         // hieronder laat 'm bewust weg (mag terugvallen op de kolom-default).
         score_version: 2,
+        // Provenance-parameterset ([Arch F6] #27) — zie POST /api/snapshots. De
+        // basic-fallback-upsert hieronder laat 'm bewust weg (kolom nullable).
+        params: buildSnapshotParams(fireParams),
       }
 
       const { error: upsertError } = await supabase
@@ -335,15 +353,18 @@ export async function GET(request: Request) {
           }, { onConflict: 'user_id,snapshot_date' })
 
         if (basicError) {
-          results.push({ userId, created: false, error: basicError.message })
-          continue
+          return { entry: { userId, created: false, error: basicError.message }, balancePromise: null }
         }
       }
 
-      // Capture per-entity balance snapshots (fire-and-forget). Silent failures
-      // are logged to error_logs (service-role client bypasses RLS) so empty
-      // sparklines don't go unnoticed — main path stays non-blocking (no await).
-      captureBalanceSnapshots(supabase, userId, today, assets, debts)
+      // Capture per-entity balance snapshots. Silent failures are logged to
+      // error_logs (service-role client bypasses RLS) so empty sparklines don't
+      // go unnoticed. In de seriële loop was dit fire-and-forget; onder
+      // parallelisatie keert de functie te snel terug en zouden losse
+      // background-upserts gekilld kunnen worden (lege sparklines). We geven de
+      // promise dáárom terug zodat GET 'm ná de pool awaited — inhoud identiek,
+      // alleen betrouwbaar geflusht.
+      const balancePromise = captureBalanceSnapshots(supabase, userId, today, assets, debts)
         .then(res => {
           if (res.error) {
             void logError(supabase, {
@@ -362,11 +383,28 @@ export async function GET(request: Request) {
           })
         })
 
-      results.push({ userId, created: true })
+      return { entry: { userId, created: true }, balancePromise }
     } catch (err) {
-      results.push({ userId, created: false, error: String(err) })
+      return { entry: { userId, created: false, error: String(err) }, balancePromise: null }
     }
   }
+
+  // Parallelliseer per gebruiker met een GEBONDEN pool (CAP = 5): hoogstens 5
+  // gebruikers tegelijk in-flight. Met ~7 reads + 1-2 upserts per gebruiker zijn
+  // dat ~35 gelijktijdige reads + ≤10 upserts per venster — ruim binnen
+  // PgBouncer transaction-pooling. Hoger dan 5 levert bij deze querymix weinig
+  // extra doorstroom maar wel meer piekbelasting. Resultaten komen index-geordend
+  // terug (mapWithConcurrency), dus de summary blijft volgorde-onafhankelijk en
+  // bit-identiek aan de seriële uitvoering.
+  const SNAPSHOT_CONCURRENCY = 5
+  const outcomes = await mapWithConcurrency(profiles ?? [], SNAPSHOT_CONCURRENCY, processUser)
+  const results = outcomes.map(o => o.entry)
+
+  // Wacht de verzamelde balance-snapshot-upserts af vóór de response (zie
+  // processUser): voorkomt dat de snel terugkerende serverless-functie ze killt.
+  await Promise.allSettled(
+    outcomes.map(o => o.balancePromise).filter((p): p is Promise<void> => p !== null),
+  )
 
   const created = results.filter(r => r.created).length
   const skipped = results.filter(r => !r.created && !r.error).length

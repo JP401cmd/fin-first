@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { Plus, X, ArrowLeft, ArrowUpRight, ArrowDownRight, Briefcase, Receipt, DollarSign, PieChart, AlertTriangle, CheckCircle, Upload, LayoutGrid, List } from 'lucide-react'
 import { formatTimestamp, formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+import { useAbortableFetch, isAbortError } from '@/lib/hooks/use-abortable-fetch'
 
 /**
  * Masked-aware EUR formatter hook used across this file's many sub-views
@@ -152,39 +153,47 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
   // Track whether a form was recently submitted to prevent re-submission on back navigation
   const formSubmittedRef = useRef(false)
 
+  // Afbreekbaar fetchen: bij wegnavigeren van de holdings-pagina breken lopende
+  // requests af (geen verspilde egress, geen setState-na-unmount).
+  const { abortableFetch, isMounted } = useAbortableFetch()
+
   const loadHoldings = useCallback(async () => {
     try {
       setError(null)
-      const res = await fetch('/api/holdings')
+      const res = await abortableFetch('/api/holdings')
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}`)
       }
       const data = await res.json()
+      if (!isMounted()) return
       setHoldings(data.holdings || [])
       setTotalValue(data.total_value || 0)
       setTotalCost(data.total_cost || 0)
-    } catch {
+    } catch (e) {
+      // Afgebroken fetch (unmount) → stil negeren, geen foutmelding.
+      if (isAbortError(e) || !isMounted()) return
       setError('Kon holdings niet laden. Probeer het opnieuw.')
     } finally {
-      setLoading(false)
+      if (isMounted()) setLoading(false)
     }
-  }, [])
+  }, [abortableFetch, isMounted])
 
   // Load benchmark comparison data
   const loadBenchmarkComparison = useCallback(async (periodId: string) => {
     setBenchmarkLoading(true)
     try {
-      const res = await fetch(`/api/benchmark-comparison?period=${periodId}`)
+      const res = await abortableFetch(`/api/benchmark-comparison?period=${periodId}`)
       if (res.ok) {
         const data = await res.json()
+        if (!isMounted()) return
         setBenchmarkComparison(data.comparison || null)
       }
     } catch {
-      // Non-critical — silently fail
+      // Non-critical (incl. afgebroken fetch bij unmount) — silently fail
     } finally {
-      setBenchmarkLoading(false)
+      if (isMounted()) setBenchmarkLoading(false)
     }
-  }, [])
+  }, [abortableFetch, isMounted])
 
   useEffect(() => {
     loadHoldings()

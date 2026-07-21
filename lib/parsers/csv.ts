@@ -3,9 +3,15 @@
  * Supports ING, Rabobank, ABN AMRO CSV formats via presets.
  */
 
-import type { ParsedTransaction } from './shared'
-import { computeHash } from './shared'
+import type { ParsedTransaction, ImportWarning } from './shared'
+import { computeHash, parseAmountOrNull } from './shared'
 import type { CSVPreset } from './index'
+
+/** Resultaat van {@link parseCSVWithWarnings}: geldige transacties + overgeslagen rijen. */
+export interface CSVParseResult {
+  transactions: ParsedTransaction[]
+  warnings: ImportWarning[]
+}
 
 /**
  * Parse a CSV date string into YYYY-MM-DD format.
@@ -33,29 +39,22 @@ function parseDate(value: string, format: string): string {
 }
 
 /**
- * Parse an amount string from Dutch CSV (handles comma as decimal separator).
+ * Parse a debit/credit column value. An EMPTY cell means "0" (the amount lives
+ * in the sibling column); a non-empty but unparseable cell returns null so the
+ * caller skips the row with a warning instead of importing a wrong €0 amount.
  */
-function parseAmount(value: string): number {
-  value = value.replace(/['"]/g, '').trim()
-  // Dutch format: 1.234,56 → remove dots, replace comma with dot
-  if (value.includes(',')) {
-    value = value.replace(/\./g, '').replace(',', '.')
-  }
-  const n = parseFloat(value)
-  return Number.isNaN(n) ? 0 : n
+function parseDebitCredit(value: string): number | null {
+  if (!value.replace(/['"]/g, '').trim()) return 0
+  return parseAmountOrNull(value)
 }
 
 /**
- * Parse an optional Dutch-format amount; null for empty or unparseable cells.
+ * Parse an optional Dutch-format amount (balance, FX); null for empty or
+ * unparseable cells. These are non-critical enrichment fields — an unreadable
+ * value degrades silently to null rather than blocking the transaction.
  */
 function parseOptionalAmount(value: string): number | null {
-  value = value.replace(/['"]/g, '').trim()
-  if (!value) return null
-  if (value.includes(',')) {
-    value = value.replace(/\./g, '').replace(',', '.')
-  }
-  const n = parseFloat(value)
-  return Number.isNaN(n) ? null : n
+  return parseAmountOrNull(value)
 }
 
 /**
@@ -88,17 +87,28 @@ function splitCSVLine(line: string, delimiter: string): string[] {
 }
 
 /**
- * Parse a CSV file content using the given preset configuration.
+ * Parse a CSV file, returning both the valid transactions and any rows that were
+ * skipped because their amount could not be read. Prefer this over {@link parseCSV}
+ * on surfaces that can surface warnings to the user (e.g. the import UI).
  */
-export async function parseCSV(
+export async function parseCSVWithWarnings(
   content: string,
   preset: CSVPreset,
-): Promise<ParsedTransaction[]> {
+): Promise<CSVParseResult> {
   const lines = content.trim().split(/\r?\n/)
-  if (lines.length < 2) return []
+  if (lines.length < 2) return { transactions: [], warnings: [] }
 
   const startIdx = preset.hasHeader ? 1 : 0
   const transactions: ParsedTransaction[] = []
+  const warnings: ImportWarning[] = []
+
+  const skipUnparseable = (line: number, raw: string) => {
+    warnings.push({
+      line,
+      code: 'unparseable_amount',
+      message: `Regel ${line} overgeslagen: het bedrag "${raw.trim()}" is onleesbaar.`,
+    })
+  }
 
   for (let i = startIdx; i < lines.length; i++) {
     const line = lines[i].trim()
@@ -124,11 +134,23 @@ export async function parseCSV(
 
     let amount: number
     if (preset.debitColumn != null && preset.creditColumn != null) {
-      const debit = parseAmount(fields[preset.debitColumn] ?? '0')
-      const credit = parseAmount(fields[preset.creditColumn] ?? '0')
+      const debitRaw = fields[preset.debitColumn] ?? ''
+      const creditRaw = fields[preset.creditColumn] ?? ''
+      const debit = parseDebitCredit(debitRaw)
+      const credit = parseDebitCredit(creditRaw)
+      // Onleesbaar (niet-leeg, geen getal) → rij overslaan + waarschuwing i.p.v. €0.
+      if (debit === null || credit === null) {
+        skipUnparseable(i + 1, debit === null ? debitRaw : creditRaw)
+        continue
+      }
       amount = credit > 0 ? credit : -debit
     } else {
-      amount = parseAmount(amountStr)
+      const parsedAmount = parseAmountOrNull(amountStr)
+      if (parsedAmount === null) {
+        skipUnparseable(i + 1, amountStr)
+        continue
+      }
+      amount = parsedAmount
       // Handle sign column (e.g. ING "Af Bij" column where "Af" = debit, "Bij" = credit)
       if (preset.signColumn != null && preset.signDebitValue) {
         const signValue = (fields[preset.signColumn] ?? '').trim().toLowerCase()
@@ -180,7 +202,21 @@ export async function parseCSV(
     })
   }
 
-  return transactions
+  return { transactions, warnings }
+}
+
+/**
+ * Parse a CSV file content using the given preset configuration.
+ *
+ * Backwards-compatible thin wrapper around {@link parseCSVWithWarnings} that
+ * returns only the transactions. Skipped/unreadable rows are dropped silently
+ * here — call `parseCSVWithWarnings` when you need to surface those to the user.
+ */
+export async function parseCSV(
+  content: string,
+  preset: CSVPreset,
+): Promise<ParsedTransaction[]> {
+  return (await parseCSVWithWarnings(content, preset)).transactions
 }
 
 /**

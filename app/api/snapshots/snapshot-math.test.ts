@@ -7,9 +7,12 @@ import {
   weightedDebtTotal,
   computeSnapshotNetWorth,
   computeSnapshotFreedomPct,
+  buildSnapshotParams,
   type SnapshotAsset,
   type SnapshotDebt,
 } from './snapshot-math'
+import { BOX3_DRAG } from '@/lib/constants'
+import { CURRENT_TAX_YEAR } from '@/lib/box3-data'
 
 /**
  * Regressie-suite voor de canonieke snapshot-rekenhelpers. Borgt dat de drie
@@ -101,6 +104,43 @@ describe('snapshot-math — per-rij freedom_percentage', () => {
   })
 })
 
+describe('snapshot-math — buildSnapshotParams (provenance, [Arch F6] #27)', () => {
+  const fire = { grossReturn: 0.07, inflationRate: 0.02, effectiveSwr: 0.0284, box3Method: 'forfaitair' as const, marginaalTarief: 0.37 }
+
+  it('legt de aannames vast (SWR/rendement/inflatie/box3Drag/belastingjaar/grondslag)', () => {
+    const p = buildSnapshotParams(fire)
+    expect(p).toEqual({
+      v: 1,
+      swr: 0.0284,
+      grossReturn: 0.07,
+      inflation: 0.02,
+      box3Drag: Math.round(BOX3_DRAG * 1e5) / 1e5,
+      taxYear: CURRENT_TAX_YEAR,
+      grondslag: 'full-networth',
+      savingsSource: 'transactions',
+    })
+  })
+
+  it('consumeert het canonieke belastingjaar (geen hardcode)', () => {
+    expect(buildSnapshotParams(fire).taxYear).toBe(CURRENT_TAX_YEAR)
+  })
+
+  it('trimt float-ruis af op 5 decimalen', () => {
+    const p = buildSnapshotParams({ grossReturn: 0.070000001, inflationRate: 0.0199999, effectiveSwr: 0.02840003 })
+    expect(p.grossReturn).toBe(0.07)
+    expect(p.inflation).toBe(0.02)
+    expect(p.swr).toBe(0.0284)
+  })
+
+  it('bevat geen PII/bedragen — uitsluitend numerieke parameters + enum-labels', () => {
+    const p = buildSnapshotParams(fire)
+    // Alleen de acht bekende sleutels; niets dat op een naam/omschrijving/bedrag lijkt.
+    expect(Object.keys(p).sort()).toEqual(
+      ['box3Drag', 'grondslag', 'grossReturn', 'inflation', 'savingsSource', 'swr', 'taxYear', 'v'],
+    )
+  })
+})
+
 // ── Structurele borging: de drie schrijfpaden gebruiken DE helper ─────────
 // De pure-helper-tests hierboven borgen de FORMULE, maar niet dat de drie
 // snapshot-routes 'm ook echt aanroepen. Een toekomstige edit zou in één route
@@ -138,6 +178,15 @@ describe('snapshot-math — drie schrijfpaden delen de helper (bron-structuur)',
       const ongewogenReduceAssign =
         /(?:netWorth|totalAssets|net_worth)\s*[:=]\s*[^\n]*\.reduce\([^\n]*current_value/.test(src)
       expect(ongewogenReduceAssign).toBe(false)
+    })
+
+    it(`${label} vult de provenance-parameterset via buildSnapshotParams ([Arch F6] #27)`, () => {
+      const src = readFileSync(path, 'utf8')
+      // Elk schrijfpad importeert de helper en zet 'm op de op-te-slaan rij als
+      // `params:`. Borgt AC-punt "alle drie schrijfpaden vullen hem" — een edit
+      // die één route stil laat vallen, wordt hier rood.
+      expect(src).toMatch(/buildSnapshotParams/)
+      expect(src).toMatch(/params:\s*buildSnapshotParams\s*\(/)
     })
   }
 })

@@ -66,6 +66,60 @@ describe('detectBroker — Trading 212 + eToro', () => {
   })
 })
 
+describe('broker-import robuustheid — corrupt bedrag → waarschuwing i.p.v. €0-holding', () => {
+  it('Trading 212: onleesbare Total-cel → rij overgeslagen + error, geldige rij blijft correct', () => {
+    const csv = [
+      'Action,Time,ISIN,Ticker,Name,No. of shares,Price / share,Total,Currency (Total)',
+      'Market buy,2024-03-12 09:00:00,US0378331005,AAPL,Apple Inc,10,170.50,1705.00,EUR',
+      'Market buy,2024-03-13 09:00:00,US0378331005,AAPL,Apple Inc,10,170.50,corrupt,EUR',
+    ].join('\n')
+    const result = parseBrokerCSV(csv, 'trading212')
+    expect(result.rows).toHaveLength(1)
+    expect(result.rows[0].total_amount).toBe(1705)
+    expect(result.rows.some((r) => r.total_amount === 0)).toBe(false)
+    expect(result.skipped).toBe(1)
+    expect(result.errors.some((e) => e.toLowerCase().includes('onleesbare waarde'))).toBe(true)
+  })
+
+  it('eToro: onleesbare Amount-cel → rij overgeslagen + error', () => {
+    const csv = [
+      'Date,Type,Details,Amount,Units,ISIN,Realized Equity Change',
+      '2024-03-12,Open Position,AAPL/USD,1705.00,10,US0378331005,0',
+      '2024-03-13,Open Position,AAPL/USD,corrupt,10,US0378331005,0',
+    ].join('\n')
+    const result = parseBrokerCSV(csv, 'etoro')
+    expect(result.rows).toHaveLength(1)
+    expect(result.rows[0].total_amount).toBe(1705)
+    expect(result.skipped).toBe(1)
+    expect(result.errors.some((e) => e.toLowerCase().includes('onleesbare waarde'))).toBe(true)
+  })
+
+  it('DEGIRO portfolio: onleesbare "Waarde in EUR"-cel → rij overgeslagen + error', () => {
+    const csv = [
+      'Product;ISIN;Beurs;Aantal;Slotkoers;Waarde in EUR',
+      'Apple;US0378331005;NDQ;10;170,00;1700,50',
+      'Microsoft;US5949181045;NDQ;5;300,00;corrupt',
+    ].join('\n')
+    const result = parseBrokerCSV(csv, 'degiro')
+    expect(result.rows).toHaveLength(1)
+    expect(result.rows[0].total_amount).toBeCloseTo(1700.5)
+    expect(result.skipped).toBe(1)
+    expect(result.errors.some((e) => e.toLowerCase().includes('onleesbare waarde'))).toBe(true)
+  })
+
+  it('een leeg waarde-veld blijft toegestaan (0), alleen niet-lege corrupte cellen worden geweigerd', () => {
+    // Lege Total = geen corruptie (0 is een geldige uitkomst) → geen error.
+    const csv = [
+      'Action,Time,ISIN,Ticker,Name,No. of shares,Price / share,Total,Currency (Total)',
+      'Market buy,2024-03-12 09:00:00,US0378331005,AAPL,Apple Inc,10,170.50,,EUR',
+    ].join('\n')
+    const result = parseBrokerCSV(csv, 'trading212')
+    expect(result.rows).toHaveLength(1)
+    expect(result.rows[0].total_amount).toBe(0)
+    expect(result.errors.some((e) => e.toLowerCase().includes('onleesbare waarde'))).toBe(false)
+  })
+})
+
 describe('parseTrading212', () => {
   const result = parseTrading212(fixture('trading212-sample.csv'))
 

@@ -7,6 +7,7 @@ import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
 import { dailyExpenseRate, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import { terSeverity, type TerSeverity } from '@/lib/fee-analysis'
+import { CENT_EPSILON } from '@/lib/constants'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { TrendingDown, AlertTriangle, ArrowRight } from 'lucide-react'
@@ -29,8 +30,9 @@ export const FeeAnalyzerWidget = memo(function FeeAnalyzerWidget({ size, data, h
   const [showDetail, setShowDetail] = useState(false)
   const feeAnalysis = data.feeAnalysis
 
-  // No holdings at all
-  if (!feeAnalysis || feeAnalysis.totalPortfolioValue === 0) {
+  // No holdings at all. Epsilon i.p.v. `=== 0`: totalPortfolioValue is een
+  // berekende som, dus een bijna-nul-restsom (afrondingsruis) telt óók als "leeg".
+  if (!feeAnalysis || Math.abs(feeAnalysis.totalPortfolioValue) < CENT_EPSILON) {
     return (
       <WidgetShell module="kern" size={size} kicker="Kostenanalyse" href={href}>
         <WidgetEmpty icon={TrendingDown} message="Voeg beleggingen toe om je fondskosten te analyseren." />

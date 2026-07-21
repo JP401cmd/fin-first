@@ -659,9 +659,9 @@ De app gebruikt **33+ Supabase-tabellen** verdeeld over 8 domeinen. Oorspronkeli
 **Doel:** Drie divergerende scenario-paden (Drifter, Huidige Koers, Optimizer).
 **Logica:** Varieert uitgavengroei, spaargroei, en initiële multipliers.
 
-#### `runMonteCarlo()` — `lib/horizon-data.ts:744`
+#### `runMonteCarlo()` — `lib/horizon/fire-sim-legacy.ts`
 **Doel:** 1000 stochastische paden over N jaar.
-**Formule:** `annualReturn = normalRandom(DEFAULT_RETURN, volatility)`
+**Formule:** `annualReturn = rng.normal(DEFAULT_RETURN, volatility)` met een deterministische, geseede PRNG (`rng = new SeededRandom(s * 7919 + 42)`) — reproduceerbaar, geen `Math.random`.
 **Output:** Percentielband (p10/p25/p50/p75/p90), FIRE-kansen.
 
 #### `computeWithdrawal()` — `lib/horizon-data.ts:841`

@@ -33,7 +33,12 @@ import {
 
 /** Parameters voor één kernel-run. */
 export interface RunKernelUnifiedParams {
-  /** De volledige adapter-invoer (profiel + potten + events + optionele partner). */
+  /**
+   * De volledige adapter-invoer (profiel + potten + events + optionele partner).
+   * F6 — reproduceerbare runs: zet `adapterInput.asOf` (peildatum) om een run exact
+   * herhaalbaar te maken; weglaten = `new Date()` (nu aan de rand). Er is bewust géén
+   * aparte `asOf` op dit niveau — de peildatum heeft één bron (`KernelAdapterInput.asOf`).
+   */
   readonly adapterInput: KernelAdapterInput
   /** Jaaruitgaven (reëel/koopkracht-nu) voor de bridge-`implicitWithdrawalRate`. */
   readonly yearlyExpenses: number

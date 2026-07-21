@@ -76,8 +76,9 @@ describe('buildReport — Sanne (realistisch)', () => {
   })
 
   it('snapshot: netto vermogen = assets − schulden (gewogen), spaarquote 24%', () => {
-    // assets: 31600 + 22000 + 16640 + 320000 = 390240; schulden: 282000 → 108240
-    expect(report.snapshot.netWorth).toBe(108240)
+    // assets: 31600 + 22000 + 16640 (spaarrekening) + 16640 (noodfonds als cash)
+    //   + 320000 = 406880; schulden: 282000 → 124880
+    expect(report.snapshot.netWorth).toBe(124880)
     // spaarquote = (3250 − 2470)/3250 = 24%
     expect(report.snapshot.savingsRatePct).toBeCloseTo(24, 0)
     expect(report.snapshot.savingsMonthly).toBe(780)
@@ -86,19 +87,20 @@ describe('buildReport — Sanne (realistisch)', () => {
   })
 
   // Fix 1 + Fix 3 (50%-huismethodiek): de eigen woning telt voor 50% van haar
-  // NETTO overwaarde mee in de vrijheids-/FIRE-grondslag. Voor Sanne:
-  //   netWorth (incl. huis)        = 108.240
+  // NETTO overwaarde mee in de vrijheids-/FIRE-grondslag. Voor Sanne (incl. het
+  // noodfonds €16.640 dat nu als liquide cash meetelt — WF-START-08-bug1-fix):
+  //   netWorth (incl. huis)        = 124.880
   //   overwaarde (320k − 280k)     =  40.000
-  //   fireEligibleNetWorth         = 108.240 − 0,5×40.000 = 88.240
-  // De vrijheidstijd rust op 88.240 (= snapshot.freedomBaseEur), het getoonde
+  //   fireEligibleNetWorth         = 124.880 − 0,5×40.000 = 104.880
+  // De vrijheidstijd rust op 104.880 (= snapshot.freedomBaseEur), het getoonde
   // €-saldo blijft het volle netto vermogen incl. huis. De vrijheid is
   // single-sourced met lifeGrid.alreadyFundedYears + twoFutures.stopToday.
-  it('snapshot-vrijheid: 50%-huis FIRE-eligible grondslag (88.240), NIET netto incl. huis', () => {
+  it('snapshot-vrijheid: 50%-huis FIRE-eligible grondslag (104.880), NIET netto incl. huis', () => {
     // Het getoonde €-saldo blijft het volledige netto vermogen (incl. huis).
-    expect(report.snapshot.netWorth).toBe(108240)
+    expect(report.snapshot.netWorth).toBe(124880)
 
     // Fix 3: de vrijheidstijd rust op het vrijheidsvermogen (FIRE-eligible, 50% huis).
-    expect(report.snapshot.freedomBaseEur).toBe(88240)
+    expect(report.snapshot.freedomBaseEur).toBe(104880)
 
     // De vrijheidstijd is op dezelfde grondslag als lifeGrid.alreadyFundedYears.
     const f = report.snapshot.netWorthFreedom
@@ -118,8 +120,8 @@ describe('buildReport — Sanne (realistisch)', () => {
     // weggelaten) = €88.240. De €-grondslag van de vrijheid is dus < het getoonde
     // netWorth-saldo én het verschil bedraagt exact de niet-meegerekende €20k.
     const snapshotImpliedEur = (f.totalDays ?? 0) * dailyExpense
-    expect(snapshotImpliedEur).toBeLessThan(report.snapshot.netWorth) // < €108.240
-    expect(snapshotImpliedEur).toBeCloseTo(88240, -3) // ≈ FIRE-eligible €88,2k (±€500)
+    expect(snapshotImpliedEur).toBeLessThan(report.snapshot.netWorth) // < €124.880
+    expect(snapshotImpliedEur).toBeCloseTo(104880, -3) // ≈ FIRE-eligible €104,9k (±€500)
     // Het verschil met netWorth = de niet-meegerekende helft van de overwaarde (€20k).
     expect(report.snapshot.netWorth - report.snapshot.freedomBaseEur).toBe(20000)
   })
@@ -247,10 +249,13 @@ describe('buildReport — Sanne (realistisch)', () => {
 
   it('will-moves zijn deterministisch; intro blijft leeg (W6 vult die)', () => {
     expect(report.will.intro).toBe('')
-    // Creditcard 14% > rendement 7% → "duurste schuld"-zet aanwezig.
-    expect(report.will.moves.some((m) => m.title.includes('duurste schuldpost'))).toBe(true)
-    // Buffer 16640 / 2470 ≈ 6,7 mnd > 4 → bufferoverschot-zet aanwezig.
+    // Liquide pot = spaarrekening 16.640 + noodfonds 16.640 = 33.280 (WF-START-08-
+    // bug1-fix: het noodfonds telt nu als cash mee). Dat is >4 mnd buffer én >30%
+    // cash-aandeel van het vrijheidsvermogen, dus zowel de bufferoverschot- als de
+    // cash-drag-zet verschijnen. Onder de 4-zetten-cap (1 gegarandeerd + 3)
+    // verdringen die de verwaarloosbare creditcard-aflos-zet (€2.000 @ 14% ≈ €3/dag).
     expect(report.will.moves.some((m) => m.title.includes('bufferoverschot'))).toBe(true)
+    expect(report.will.moves.some((m) => m.title.includes('stilstaande cash'))).toBe(true)
   })
 })
 
@@ -312,6 +317,7 @@ describe('buildReport — randgevallen', () => {
   // Er is dus een positief — zij het klein — vrijheidsvermogen.
   it('alleen-huis (liquide 0): 50%-overwaarde geeft klein FIRE-eligible vermogen; lifeGrid consistent', () => {
     const r = buildReport(base({
+      emergencyFund: 0, // écht liquide 0 — geen noodfonds dat als cash meetelt
       assets: [{ assetType: 'eigen_huis', name: 'Huis', value: 300000 }],
       debts: [{ debtType: 'mortgage', name: 'Hyp', balance: 250000, interestRatePct: 3, monthlyPayment: 1000 }],
       monthlyIncomeNet: 2000,
@@ -342,6 +348,7 @@ describe('buildReport — randgevallen', () => {
   // dat groeiende vermogen + AOW-brug uiteindelijk bereikbaar (laat in het leven).
   it('alleen-huis met 0 spaarquote → 50%-overwaarde maakt FIRE (laat) bereikbaar', () => {
     const r = buildReport(base({
+      emergencyFund: 0, // écht liquide 0 — geen noodfonds dat als cash meetelt
       assets: [{ assetType: 'eigen_huis', name: 'Huis', value: 300000 }],
       debts: [{ debtType: 'mortgage', name: 'Hyp', balance: 250000, interestRatePct: 3, monthlyPayment: 1000 }],
       monthlyIncomeNet: 6000,
@@ -869,7 +876,9 @@ describe('buildReport — snapshot-vrijheid bij negatief FIRE-eligible vermogen'
       monthlyIncomeNet: 3000,
       yearlyIncomeGross: 48000,
       expenses: { wonen: 1300, vasteLasten: 700, vrijBesteedbaar: 200, totaalMaand: 2200 },
-      emergencyFund: 2000,
+      // Écht 0 noodfonds — dit edge-scenario test de NEGATIEVE/nul FIRE-eligible-tak;
+      // een noodfonds zou als liquide cash de pot boven nul tillen (WF-START-08-bug1-fix).
+      emergencyFund: 0,
       assets: [
         { assetType: 'eigen_huis', name: 'Rijtjeshuis', value: 300000 },
         { assetType: 'cash', name: 'Spaarrekening', value: 5000 },
@@ -932,5 +941,56 @@ describe('buildReport — snapshot-vrijheid bij negatief FIRE-eligible vermogen'
     expect(r.snapshot.netWorthFreedom.isDeficit).toBe(false)
     expect(r.snapshot.netWorthFreedom.years).toBeGreaterThan(0)
     expect(r.snapshot.netWorthFreedomLabel).toMatch(/jaar|maand|dag/)
+  })
+})
+
+// ── WF-START-08 / bug1 — noodfonds telt mee in netto vermogen ────────────────
+// Regressie voor "2026-07-17-WF-START-08-bug1": het publieke Vrijheidsrapport
+// toonde een te laag netto vermogen omdat buildPortfolio het noodfonds (los veld
+// intake.emergencyFund) NIET als asset toevoegde, terwijl het geactiveerde
+// account (intake-to-persona) dat wél doet. Dit legt het exacte UAT-scenario vast:
+// noodfonds €6.600 + spaargeld €15.000 + beleggingen €8.000, geen schulden/huis
+// → netWorth €29.600, buffer ≈ 9,8182 mnd, geen dubbeltelling.
+describe('buildReport — WF-START-08: noodfonds in netto vermogen (bug1)', () => {
+  function sanneCheck(): CheckIntake {
+    return {
+      firstName: 'Sanne',
+      dateOfBirth: '1992-03-10',
+      household: 'alleen',
+      monthlyIncomeNet: 3200,
+      yearlyIncomeGross: 51200,
+      expenses: { wonen: 1000, vasteLasten: 700, vrijBesteedbaar: 500, totaalMaand: 2200 },
+      emergencyFund: 6600,
+      assets: [
+        { assetType: 'savings', name: 'Spaargeld', value: 15000 },
+        { assetType: 'investment', name: 'Beleggingen', value: 8000 },
+      ],
+      debts: [],
+      pension: { aowExpectedMonthly: null, expectedReturnPct: null, riskProfile: null },
+      goal: null,
+    }
+  }
+
+  it('netto vermogen = noodfonds + spaargeld + beleggingen = €29.600 (exacte som)', () => {
+    const r = buildReport(sanneCheck(), NOW)
+    expect(r.snapshot.netWorth).toBe(29600)
+    // Geen huis → vrijheidsvermogen == netto vermogen (100% liquide/FIRE-eligible).
+    expect(r.snapshot.freedomBaseEur).toBe(29600)
+  })
+
+  it('buffer-dekking telt het noodfonds precies één keer: (6600+15000)/2200 ≈ 9,8 mnd', () => {
+    const r = buildReport(sanneCheck(), NOW)
+    // Liquide pot = noodfonds 6.600 + spaargeld 15.000 = 21.600 (beleggingen tellen
+    // NIET mee als liquide); geen dubbeltelling van het noodfonds. snapshot.bufferMonths
+    // is op 1 decimaal afgerond (round1) → 9,8 (canoniek 21.600/2.200 = 9,8182).
+    expect(r.snapshot.bufferMonths).toBe(9.8)
+  })
+
+  it('potten-breakdown bevat het noodfonds in de cash-bucket (SSoT met account)', () => {
+    const r = buildReport(sanneCheck(), NOW)
+    const cash = r.dualBars.find((b) => b.bucket === 'cash')
+    expect(cash).toBeDefined()
+    // Cash-bucket = noodfonds 6.600 + spaargeld 15.000 = 21.600 (één keer geteld).
+    expect(cash!.eur).toBe(21600)
   })
 })

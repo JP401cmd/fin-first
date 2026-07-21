@@ -49,7 +49,7 @@ Elke inhoudelijke opdracht routeert via de bijpassende pijplijn-skill — niet a
 ### View 1 — ArchiMate-plaat
 De interactieve ArchiMate-plaat MOET meebewegen met architectuurwijzigingen:
 
-- **Feiten** (tellingen, versie, diff) komen automatisch uit `docs/architecture/architecture.json` — regenereer met `npm run arch:diagram` (draait ook dagelijks). Nooit handmatig tellingen in de plaat zetten.
+- **Feiten** (tellingen, versie, diff) komen automatisch uit `docs/architecture/architecture.json` — regenereer met `npm run arch:diagram` (draai **handmatig**: er is géén in-repo cron/CI-schedule die dit draait; versheid hangt af van een externe Cowork-taak — verifieer of die nog loopt). Nooit handmatig tellingen in de plaat zetten.
 - **Topologie** is gecureerd in `lib/architecture/archimate-model.ts`. Werk dit bestand bij wanneer je een **nieuw domein, bedrijfsproces, applicatieservice, technologie-laag, data-object of externe integratie** toevoegt of verwijdert — inclusief lead-tekst en relaties.
 - **Nieuwe functionele module** in `lib/module-registry.ts`? `FUNCTION_SERVICE_MAP` in archimate-model.ts dwingt via het type een koppeling af (compile-fout tot de plaat klopt); de vitest-suite `lib/architecture/archimate-model.test.ts` bewaakt de rest.
 - **Verhaal/annotaties** van het gegenereerde architectuurdocument staan in `scripts/architecture/annotations.mjs` — houd beide consistent (bv. soevereiniteit = motivatie, geen gating).
@@ -141,6 +141,16 @@ Er is één norm voor hoe de frontend aan data komt (ADR 0058). Drie paden, elk 
 
 ## Project Specification
 
+> ⚠️ **HISTORISCHE BUILD-SPEC** — onderstaande `<project_specification>` is de
+> oorspronkelijke bouwspec en beschrijft niet meer één-op-één de huidige app. De
+> **canonieke navigatie/IA is `lib/nav-config.ts`** (primair: /overzicht,
+> /toekomst, /berichten, /nieuws, /mijn); **fase-/soevereiniteitsgating bestaat
+> niet meer** — soevereiniteit is *motivatie*, geen gating (ADR
+> `docs/adr/0001-soevereiniteit-is-motivatie.md`). Bij tegenspraak zijn de
+> **conventies bovenaan dit bestand leidend**. Het volledig herschrijven van deze
+> embedded spec is belegd bij kaart *[Arch F4]* — hier zijn alleen de
+> feitelijk-onjuiste `<pages>` en `<feature_gating>` gemarkeerd, niet herschreven.
+
 <project_specification>
   <project_name>TriFinity</project_name>
 
@@ -210,29 +220,36 @@ Er is één norm voor hoe de frontend aan data komt (ADR 0058). Drie paden, elk 
       - DE HORIZON (The Horizon) — purple — Future projections: FIRE, scenarios, simulations
     </modules>
     <pages>
-      - /dashboard — Module hub with preview metrics per module
-      - /core — De Kern overview (hero + KPIs + quick links + charts)
+      <!-- ⚠️ Achterhaald t.o.v. de huidige IA (canoniek: lib/nav-config.ts).
+           Primaire routes zijn nu /overzicht, /toekomst, /berichten, /nieuws, /mijn.
+           /dashboard en /core blijven als backing-/redirect-routes; /will en
+           /identity bestaan NIET meer (/identity → /mijn). -->
+      - /dashboard — [backing-/redirect-route, geen primaire IA] Module hub with preview metrics per module
+      - /core — [backing-route, geen primaire IA] De Kern overview (hero + KPIs + quick links + charts)
       - /core/budgets — Budget management (4 visualization modes)
       - /core/cash — Transactions and bank accounts
       - /core/cash/import — Bank file import (MT940/CSV/OFX)
       - /core/assets — Asset portfolio tracking
       - /core/debts — Debt management and payoff strategies
       - /core/belasting — Box 3 tax calculations
-      - /will — De Wil overview (recommendations, actions, goals, patterns)
+      - /will — [VERWIJDERD — bestaat niet meer als route] De Wil overview (recommendations, actions, goals, patterns)
       - /horizon — De Horizon overview (FIRE, scenarios, simulations, timeline)
-      - /identity — User profile and sovereignty level
+      - /identity — [VERWIJDERD — vervangen door /mijn] User profile and sovereignty level
       - /beheer — Admin panel (AI settings, feature flags)
       - /onboarding — Multi-step onboarding flow
       - / — Landing page
     </pages>
     <feature_gating>
-      Features are gated by sovereignty level (computed from financial data):
+      <!-- ⚠️ ACHTERHAALD — fase-/soevereiniteitsgating is verwijderd. Soevereiniteit
+           is nu *motivatie*, geen gating (ADR docs/adr/0001-soevereiniteit-is-motivatie.md).
+           Functies worden niet meer verborgen op basis van een soevereiniteitsniveau. -->
+      [HISTORISCH] Features were gated by sovereignty level (computed from financial data):
       - Recovery (levels -2, -1, 0)
       - Stability (levels 1, 2)
       - Momentum (levels 3, 4)
       - Mastery (levels 5, 6)
 
-      Currently uses FeatureGate component with fallback='hidden' (features completely invisible).
+      [HISTORISCH] Previously used a FeatureGate component with fallback='hidden'.
     </feature_gating>
     <key_patterns>
       - Hero sections with gradient backgrounds per module color

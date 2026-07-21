@@ -7,19 +7,28 @@ zoals het eigen Excel-model** `Core calc v5.xlsm` (ADR 0032,
 `(1+inflatie)^(m/12)`), structurele één-maand-lag. Het Excel is de **oracle**:
 elke tabel wordt cel-voor-cel tegen 19 fixtures bewezen, tolerantie **€0,01**.
 
-> Status: FASE 2 — **alle 14 tabellen geport** (teacher-forced parity, ~8,9 mln
-> cellen, 0 mismatches), **integrale engine ✔** (`engine.ts`: forward-recursie
-> voedt DepViews uit eigen toestand; integrale parity over alle tabellen ×
-> 19 fixtures, 0 mismatches — geen foutophoping over 1200 maanden) en
-> **solver ✔** (`solver.ts`: VBA-getrouwe `BepaalFIRE`-bisectie + statusblok
-> P!B93-B100; 19/19 fixtures exact vanuit alleen de input, incl. parkeerstand,
-> AOW-kortsluiting, doel=0-quirk en pensioengat). Let op: kernel-floats dragen
-> sub-cent-ruis — messcherpe drempel-condities op afgeleide euro-waarden (zoals
-> B99 > 0) clampen ruis onder een halve cent naar 0 (zie solver.ts).
-> Fixture-ronde 3 (+gezin, +schuld-prio, +reserve-depletie) landde de dormante
-> takken; **wrappers ✔** (band zonder pensioen-kortsluiting; MC sin-hash exact;
-> hist inert) en **alle ronde-3-takken geïmplementeerd** — de rekenlaag is
-> compleet: **847 tests groen over 19 fixtures**. Volgende: FASE 3 (adapter).
+> Status: **FASE 6 — de canonieke en enige Horizon/FIRE-rekenmotor** (ADR 0032).
+> De rekenlaag is compleet en euro-exact tegen de oracle bewezen: **alle 14
+> tabellen geport** (teacher-forced parity, ~10,6 mln cellen, 0 mismatches),
+> **integrale engine ✔** (`engine.ts`: forward-recursie voedt DepViews uit eigen
+> toestand; integrale parity over alle tabellen × 19 fixtures, 0 mismatches —
+> geen foutophoping over 1200 maanden), **solver ✔** (`solver.ts`: VBA-getrouwe
+> `BepaalFIRE`-bisectie + statusblok P!B93-B100; 19/19 fixtures exact vanuit
+> alleen de input, incl. parkeerstand, AOW-kortsluiting, doel=0-quirk en
+> pensioengat) en **wrappers ✔** (band zonder pensioen-kortsluiting; MC sin-hash
+> exact; hist inert). Let op: kernel-floats dragen sub-cent-ruis — messcherpe
+> drempel-condities op afgeleide euro-waarden (zoals B99 > 0) clampen ruis onder
+> een halve cent naar 0 (zie solver.ts).
+>
+> Bovenop de rekenlaag draaien **adapter/** (domein → `KernelInput`), de
+> **bridge** (`bridge.ts` / `run-unified.ts`), de **wrappers/** en de vier
+> **routers** (`convergentie-`, `household-`, `scalar-`, `whatif-router.ts`)
+> plus de **worker/**-offload — allemaal live en door de app geconsumeerd via
+> `lib/unified-projection`. De vroegere FASE 3 (adapter) is dus lang geleden
+> geland. De pariteit-/testtelling is bewust **niet** in dit blok hardgecodeerd
+> (zulke getallen verouderen snel): de parity-stand onderaan is de bron en CI
+> draait de volledige suite via
+> `npx vitest run lib/horizon-kernel test/horizon-oracle`.
 
 ## Architectuur
 
@@ -30,11 +39,25 @@ lib/horizon-kernel/
 ├─ scaffold.ts            Gedeelde A/B/C-scaffold: leeftijd, maand-in-jaar,
 │                         horizon-guard (>100 → lege cel), inflatie-index.
 ├─ input-from-fixture.ts  Bouwt KernelInput uit een OracleFixture (P + bens);
-│                         elke celverwijzing gedocumenteerd.
-├─ tables/
-│   └─ bel.ts             Tabel Bel (Box 3): pure per-maand-functie computeBel.
-├─ parity/
-│   └─ teacher.ts         Herbruikbare teacher-forced-runner (TableParitySpec).
+│                         elke celverwijzing gedocumenteerd (test/oracle-only).
+├─ tables/                De 14 geporte Excel-tabellen (pure per-maand-functies):
+│                         bel, cf, ont, af, toename-afname, verdeling/, bez, s,
+│                         prognose, es, auto-gebeurtenissen, geb, pt,
+│                         werk-strategie.
+├─ engine.ts              Integrale forward-recursie: voedt de DepViews uit
+│                         eigen toestand (vervangt de teacher-forcing).
+├─ solver.ts / gap.ts     VBA-getrouwe BepaalFIRE-bisectie + P!B93-B100-statusblok
+│                         en pensioengat-/tekort-detectie.
+├─ wrappers/              band.ts (RunScenarioBand), mc.ts (Monte-Carlo, sin-hash),
+│                         hist.ts (backtest, inert), noise.ts.
+├─ adapter/               Domein → KernelInput: events, household, params, potten,
+│                         defaults, guard, whatif-varianten.
+├─ bridge.ts /            Kernel-uitvoer → SimRow/SimResult voor de app,
+│  run-unified.ts         geconsumeerd via lib/unified-projection.
+├─ *-router.ts            De vier routers (convergentie, household, scalar, whatif)
+│                         die de kernel per gebruiksgeval aanroepen.
+├─ worker/                Off-main-thread-offload (kernel.worker.ts + protocol).
+├─ parity/                Herbruikbare teacher-forced-runner (TableParitySpec).
 └─ oracle/                (FASE 1) fixture-loader + comparator + typen.
 ```
 

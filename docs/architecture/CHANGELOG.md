@@ -515,3 +515,11 @@
 ## 2026-07-21
 
 - Geen wijzigingen.
+
+## 2026-07-21
+
+- **API-routes** toegevoegd: /api/account/export, /api/cron/retention
+
+## 2026-07-21
+
+- **Componenten (aantal)** verwijderd: -38

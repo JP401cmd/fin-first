@@ -19,7 +19,7 @@
  *    (expected_return, inflation_rate). Valt terug op NL_SWR bij lege input.
  *    Altijd gebruiken wanneer profiel beschikbaar is.
  */
-import { DEFAULT_RETURN, INFLATION, BOX3_DRAG } from '@/lib/horizon-data'
+import { DEFAULT_RETURN, INFLATION, BOX3_DRAG } from '@/lib/constants'
 import { deriveMarginaalTarief, schijfGrensVoor } from './box1-tax'
 import type { Box3Method } from './bucket-projection'
 

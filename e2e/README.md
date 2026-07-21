@@ -1,22 +1,49 @@
-# E2E — Playwright UAT-skelet (domein Bezit)
+# E2E — Playwright (auth-smoke + UAT-skelet domein Bezit)
 
-Dit is een **skelet**: het demonstreert de automatiserings-weg voor de
-UAT-scenario's uit `uat2-bezit.md` — het los aangeleverde UAT-BEZIT-
-scenariodocument voor deze sessie (niet in dit repo opgenomen) — en, bij
-uitbreiding, voor de overige deelgebieden in het wél gecommitte
-`docs/uat/uat-plan.md` (Deel 2). Er is in de
-ontwikkelomgeving waarin dit is opgebouwd **geen draaiende app-server, geen
-admin-testsessie en geen Playwright-browser-install** beschikbaar — de tests
-zijn dus (nog) niet hier uitgevoerd. Ze zijn wél syntactisch correct,
+Twee soorten specs delen deze config:
+
+1. **`smoke.spec.ts`** (root van deze map) — kale, persona-onafhankelijke
+   auth-smoke: login → `/overzicht` → een tweede beveiligde route, plus het
+   negatieve geval (uitgelogd op een beveiligde route → redirect naar
+   `/login`). Geen testdata-seed nodig, dus lichter en sneller dan de
+   UAT-specs. Dit dekt de kaart "Één Playwright smoke-spec (login →
+   dashboard → beveiligde route)".
+2. **`uat/*.spec.ts`** — een **skelet**: het demonstreert de automatiserings-
+   weg voor de UAT-scenario's uit `uat2-bezit.md` — het los aangeleverde
+   UAT-BEZIT-scenariodocument voor deze sessie (niet in dit repo opgenomen)
+   — en, bij uitbreiding, voor de overige deelgebieden in het wél gecommitte
+   `docs/uat/uat-plan.md` (Deel 2).
+
+Er is in de ontwikkelomgeving waarin dit is opgebouwd **geen draaiende
+app-server, geen testsessie en geen Playwright-browser-install** beschikbaar
+— geen van beide specs is hier daadwerkelijk uitgevoerd. Ze zijn wél
+syntactisch correct en type-checken (`npx tsc -p e2e/tsconfig.json --noEmit`),
 gebaseerd op de daadwerkelijke broncode (labels, aria-attributen, DOM-
-structuur) en direct uitbreidbaar.
+structuur, `lib/supabase/proxy.ts`-route-lijst) en direct uitbreidbaar.
 
-De tests zijn **geen** `test.skip()`-placeholders: ze falen zichtbaar zodra
-iemand ze zonder omgeving draait (geen `UAT_BASE_URL` bereikbaar, geen
-credentials) — dat is bewust, zodat de suite niet stilzwijgend "groen"
-oogt zonder ooit echt te hebben gedraaid.
+De tests zijn **geen** `test.skip()`-placeholders zonder reden: ze falen (of
+skippen mét duidelijke melding, zie hieronder) zichtbaar zodra iemand ze
+zonder omgeving draait — dat is bewust, zodat de suite niet stilzwijgend
+"groen" oogt zonder ooit echt te hebben gedraaid.
 
-## Draaien
+## Draaien — smoke.spec.ts (auth-smoke)
+
+```bash
+npm install
+npx playwright install --with-deps chromium
+UAT_BASE_URL=https://jouw-preview-of-dev-url \
+REGRESSION_TEST_EMAIL=regression-test@fintwo.nl \
+REGRESSION_TEST_PASSWORD=... \
+npm run test:e2e -- smoke.spec.ts
+```
+
+Ontbreken `REGRESSION_TEST_EMAIL`/`REGRESSION_TEST_PASSWORD`? Dan **skipt**
+de spec met een expliciete melding (`test.skip(...)`) in plaats van te falen
+of stil te slagen — bewust anders dan de UAT-specs hieronder, omdat dit een
+kaal, herbruikbaar auth-account is (geen admin, geen persona-seed) dat in
+veel meer omgevingen wél beschikbaar zou moeten zijn.
+
+## Draaien — uat/*.spec.ts (UAT-skelet)
 
 ```bash
 npm install
@@ -24,7 +51,7 @@ npx playwright install --with-deps chromium
 UAT_BASE_URL=https://jouw-preview-of-dev-url \
 UAT_ADMIN_EMAIL=admin@test.trifinity.nl \
 UAT_ADMIN_PASSWORD=... \
-npx playwright test --config=e2e/playwright.config.ts
+npx playwright test --config=e2e/playwright.config.ts uat/
 ```
 
 Vereiste env-variabelen:
@@ -32,21 +59,44 @@ Vereiste env-variabelen:
 | Variabele | Doel |
 |---|---|
 | `UAT_BASE_URL` | Basis-URL van de testomgeving (default `http://localhost:3000`) |
-| `UAT_ADMIN_EMAIL` | E-mailadres van een admin-testaccount (bereikt `/beheer/testdata`) |
-| `UAT_ADMIN_PASSWORD` | Wachtwoord bij dat account |
+| `UAT_ADMIN_EMAIL` | E-mailadres van een admin-testaccount (bereikt `/beheer/testdata`) — alleen voor `uat/*.spec.ts` |
+| `UAT_ADMIN_PASSWORD` | Wachtwoord bij dat account — alleen voor `uat/*.spec.ts` |
+| `REGRESSION_TEST_EMAIL` | E-mailadres van het bestaande, niet-admin regressie-testaccount — alleen voor `smoke.spec.ts` |
+| `REGRESSION_TEST_PASSWORD` | Wachtwoord bij dat account — alleen voor `smoke.spec.ts` |
 
 **Nooit** productie-accounts of echte financiële gegevens gebruiken — zie
 `docs/uat/uat-plan.md` §2.3 ("Testomgeving en herstelbare testdata"). Elke
-test seedt zelf de benodigde persona via `/beheer/testdata` voordat hij
-assertions doet, dus scenario's zijn onderling onafhankelijk.
+UAT-test seedt zelf de benodigde persona via `/beheer/testdata` voordat hij
+assertions doet, dus scenario's zijn onderling onafhankelijk; de auth-smoke
+seedt niets (read-only).
+
+## CI
+
+`.github/workflows/ci.yml` bevat een `e2e-smoke`-job die **opt-in en
+niet-gatend** is (`continue-on-error: true`): hij draait alleen wanneer vier
+repo-secrets zijn geconfigureerd (menselijk-gated, nog niet gezet):
+
+- `E2E_SUPABASE_URL` / `E2E_SUPABASE_ANON_KEY` — een **test**-Supabase-
+  project (nooit productie)
+- `REGRESSION_TEST_EMAIL` / `REGRESSION_TEST_PASSWORD` — hetzelfde
+  testaccount als hierboven
+
+Ontbreken deze secrets (bv. op een fork-PR, of tot iemand ze instelt), dan
+zet een guard-stap `configured=false` en worden alle vervolgstappen
+overgeslagen — de job slaagt triviaal en blokkeert nooit een merge. Zodra
+een hermetische/hosted test-Supabase-omgeving bestaat, is de vervolgstap om
+dit naar een echte, gatende CI-stap te promoveren (`continue-on-error` eraf).
+De job draait alleen `smoke.spec.ts`, niet de zwaardere `uat/*.spec.ts`
+(die blijven lokaal/menselijk-gated).
 
 ## Structuur
 
 ```
 e2e/
-├── playwright.config.ts   — config (testDir, baseURL uit env, chromium)
+├── playwright.config.ts   — config (testDir: '.', baseURL uit env, chromium)
 ├── tsconfig.json          — eigen TS-scope (root-tsconfig sluit e2e/ uit)
 ├── README.md              — dit bestand
+├── smoke.spec.ts          — auth-smoke: login → /overzicht → beveiligde route
 └── uat/
     ├── helpers.ts         — loginAsAdmin / seedPersona / readFiguresStrip / parseEuroAmount
     └── bezit.spec.ts      — UAT-BEZIT-01 / 05 / 06 / 08 / 10

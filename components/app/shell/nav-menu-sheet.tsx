@@ -16,7 +16,7 @@ import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import {
   useLeverScores,
   useActiveAppKeys,
-} from '@/components/app/shell/responsive-shell'
+} from '@/components/app/shell/shell-contexts'
 import type { LeverStatus } from '@/components/app/shell/lever-compass'
 
 const statusDotClass: Record<LeverStatus, string> = {

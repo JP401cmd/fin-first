@@ -14,7 +14,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { parseOFX } from './ofx'
+import { parseOFX, parseOFXWithWarnings } from './ofx'
 
 const fixture = (name: string): string =>
   readFileSync(path.resolve(__dirname, '__fixtures__', name), 'utf-8')
@@ -107,5 +107,34 @@ describe('parseOFX — randgeval: ofx-no-closing-tags.ofx', () => {
     const rows = await parseOFX(fixture('ofx-no-closing-tags.ofx'))
     const referenties = rows.map((r) => r.reference)
     expect(referenties).not.toContain('ABN-OFX-0003')
+  })
+})
+
+describe('parseOFXWithWarnings — onleesbaar TRNAMT wordt NIET stil €0', () => {
+  const OFX = (blocks: string): string =>
+    `<OFX><BANKMSGSRSV1><STMTTRNRS><STMTRS><BANKTRANLIST>${blocks}</BANKTRANLIST></STMTRS></STMTTRNRS></BANKMSGSRSV1></OFX>`
+
+  it('een blok met onparsbaar bedrag wordt overgeslagen met een waarschuwing; geldige blokken blijven', async () => {
+    const content = OFX(
+      '<STMTTRN><TRNTYPE>DEBIT<DTPOSTED>20260101<TRNAMT>-38,42<MEMO>Geldig</STMTTRN>' +
+      '<STMTTRN><TRNTYPE>DEBIT<DTPOSTED>20260102<TRNAMT>onleesbaar<MEMO>Corrupt</STMTTRN>' +
+      '<STMTTRN><TRNTYPE>CREDIT<DTPOSTED>20260103<TRNAMT>100.00<MEMO>Salaris</STMTTRN>',
+    )
+    const { transactions, warnings } = await parseOFXWithWarnings(content)
+    expect(transactions).toHaveLength(2)
+    expect(transactions.some((t) => t.amount === 0)).toBe(false)
+    expect(transactions[0].amount).toBeCloseTo(-38.42)
+    expect(transactions[1].amount).toBeCloseTo(100)
+    expect(warnings).toHaveLength(1)
+    expect(warnings[0].code).toBe('unparseable_amount')
+    expect(warnings[0].message).toContain('onleesbaar')
+  })
+
+  it('parseOFX blijft een kale array teruggeven (backwards compatible)', async () => {
+    const content = OFX('<STMTTRN><DTPOSTED>20260101<TRNAMT>-10,00<MEMO>X</STMTTRN>')
+    const arr = await parseOFX(content)
+    expect(Array.isArray(arr)).toBe(true)
+    expect(arr).toHaveLength(1)
+    expect(arr[0].amount).toBeCloseTo(-10)
   })
 })

@@ -14,8 +14,12 @@
 //     notice)
 //
 // Deze post-install hook kopieert `pdf.worker.min.mjs` van
-// `node_modules/pdfjs-dist/build/` naar `public/pdf.worker.min.mjs` zodat
-// Next.js het serveert vanaf `/pdf.worker.min.mjs`. Idempotent: re-runnen
+// `node_modules/pdfjs-dist/legacy/build/` naar `public/pdf.worker.min.mjs`
+// zodat Next.js het serveert vanaf `/pdf.worker.min.mjs`. LET OP: de bron is
+// de LEGACY-build, omdat upload-step.tsx op pdfjs-dist v6 bewust de
+// legacy-build importeert (bredere browser-compat). pdf.js gooit een harde
+// runtime-fout bij een API/worker-versie- of build-mismatch, dus API-import
+// en worker MOETEN uit dezelfde (legacy) build komen. Idempotent: re-runnen
 // schrijft hetzelfde bestand opnieuw zonder side-effects. Failures worden
 // gelogd maar gooien geen exit-code; de install blijft doorgaan zelfs als
 // de worker (tijdelijk) niet beschikbaar is — de feature degrade-pad in
@@ -32,7 +36,7 @@ const __dirname = dirname(__filename)
 // Repo root = parent of /scripts. Resolved at runtime so the script can
 // be moved if the repo layout changes.
 const REPO_ROOT = join(__dirname, '..')
-const SOURCE = join(REPO_ROOT, 'node_modules', 'pdfjs-dist', 'build', 'pdf.worker.min.mjs')
+const SOURCE = join(REPO_ROOT, 'node_modules', 'pdfjs-dist', 'legacy', 'build', 'pdf.worker.min.mjs')
 const DEST_DIR = join(REPO_ROOT, 'public')
 const DEST = join(DEST_DIR, 'pdf.worker.min.mjs')
 

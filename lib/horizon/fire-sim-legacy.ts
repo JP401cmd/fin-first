@@ -2,8 +2,10 @@
  * Horizon — losse simulatie-motoren (forward-projectie, scenario's, Monte Carlo,
  * withdrawal-strategieën, backtesting). Los van de horizon-kernel; deze draaien
  * ad-hoc simulaties. Afgesplitst van lib/horizon-data.ts (pure move, geen
- * gedragswijziging). NB: computeScenarios/computeResilienceScore/normalRandom
- * hebben 0 importers — opruimen gebeurt via een apart kaartje (slice 3).
+ * gedragswijziging). NB: computeScenarios/computeResilienceScore hebben 0 importers —
+ * opruimen gebeurt via een apart kaartje (slice 3). De dode, stochastische
+ * `normalRandom` (Box-Muller met `Math.random`-tak) is verwijderd (Arch F6): Monte
+ * Carlo draait deterministisch op de `SeededRandom`-klasse.
  */
 import type { FinancialInput } from '../core-metrics'
 import { DEFAULT_RETURN, DEFAULT_VOLATILITY, NL_SWR, NL_AOW_AGE, NL_AOW_MONTHLY, INFLATION } from '../constants'
@@ -90,27 +92,6 @@ export interface WithdrawalResult {
   totalYears: number
   schedule: WithdrawalYear[]
   depleted: boolean
-}
-
-/** Box-Muller transform for normal distribution */
-export function normalRandom(mean: number, stddev: number, seed?: number): number {
-  // Simple seeded PRNG (xorshift32) when seed provided
-  let u1: number, u2: number
-  if (seed !== undefined) {
-    let s = seed
-    s ^= s << 13; s ^= s >> 17; s ^= s << 5
-    u1 = Math.abs(s) / 2147483647
-    s ^= s << 13; s ^= s >> 17; s ^= s << 5
-    u2 = Math.abs(s) / 2147483647
-    u1 = Math.max(u1, 0.0001)
-    u2 = Math.max(u2, 0.0001)
-  } else {
-    u1 = Math.random()
-    u2 = Math.random()
-    u1 = Math.max(u1, 0.0001)
-  }
-  const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2)
-  return mean + stddev * z
 }
 
 // Seeded PRNG class for Monte Carlo

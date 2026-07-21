@@ -152,7 +152,8 @@
       "Bash(node scripts/uat/stale-scan.mjs lib/format.ts)",
       "Bash(git -C \"c:\\\\Users\\\\janpa\\\\cd\\\\development\\\\fin\" worktree list)",
       "Bash(git -C \"c:\\\\Users\\\\janpa\\\\cd\\\\development\\\\fin\" branch -a)",
-      "Bash(git switch *)"
+      "Bash(git switch *)",
+      "mcp__notion__notion-query-data-sources"
     ]
   },
   "enableAllProjectMcpServers": true,

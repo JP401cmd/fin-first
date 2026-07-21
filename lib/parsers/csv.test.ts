@@ -1,12 +1,17 @@
 import { describe, it, expect } from 'vitest'
-import { parseCSV } from './csv'
-import { CSV_PRESETS } from './index'
+import { parseCSV, parseCSVWithWarnings } from './csv'
+import { CSV_PRESETS, type CSVPreset } from './index'
 
 const ING = CSV_PRESETS.find((p) => p.id === 'ing')!
 
 const RABO = CSV_PRESETS.find((p) => p.id === 'rabobank')!
 
 const PAYPAL = CSV_PRESETS.find((p) => p.id === 'paypal')!
+
+const CUSTOM = CSV_PRESETS.find((p) => p.id === 'custom')!
+
+// Quoted zodat NL komma-decimalen niet op de ','-delimiter splitsen.
+const CUSTOM_HEADER = '"Datum","Bedrag","Omschrijving"'
 
 const HEADER =
   '"IBAN/BBAN","Munt","BIC","Volgnr","Datum","Rentedatum","Bedrag","Saldo na trn","Tegenrekening IBAN/BBAN","Naam tegenpartij","Naam uiteindelijke partij","Naam initiërende partij","BIC tegenpartij","Code","Batch ID","Transactiereferentie","Machtigingskenmerk","Incassant ID","Betalingskenmerk","Omschrijving-1","Omschrijving-2","Omschrijving-3","Reden retour","Oorspr bedrag","Oorspr munt","Koers"'
@@ -152,5 +157,115 @@ describe('parseCSV — stabiele import_hash + Volgnr in bank_seq', () => {
     const [y] = await parseCSV([IH, R].join('\n'), ING)
     expect(x.import_hash).toBe(y.import_hash)
     expect(x.bank_seq).toBeNull()
+  })
+})
+
+describe('parseCSVWithWarnings — onleesbaar bedrag wordt NIET stil €0', () => {
+  it('een niet-lege, onparsbare bedragcel → rij overgeslagen + waarschuwing (geen €0-transactie)', async () => {
+    const rows = [
+      CUSTOM_HEADER,
+      '"2026-01-05","12,50","Albert Heijn"',   // geldig
+      '"2026-01-09","omschrijving-tekst","Fout"', // bedragkolom wijst op tekst
+    ].join('\n')
+    const { transactions, warnings } = await parseCSVWithWarnings(rows, CUSTOM)
+    // De geldige rij komt door; de corrupte rij is NIET als €0 geïmporteerd.
+    expect(transactions).toHaveLength(1)
+    expect(transactions[0].amount).toBeCloseTo(12.5)
+    expect(transactions.some((t) => t.amount === 0)).toBe(false)
+    // De corrupte rij is als waarschuwing oppervlakt (regel 3, 1-gebaseerd).
+    expect(warnings).toHaveLength(1)
+    expect(warnings[0].code).toBe('unparseable_amount')
+    expect(warnings[0].line).toBe(3)
+    expect(warnings[0].message).toContain('omschrijving-tekst')
+  })
+
+  it('een echt €0-bedrag ("0,00") wordt WÉL geïmporteerd en niet gemarkeerd', async () => {
+    const rows = [CUSTOM_HEADER, '"2026-01-08","0,00","Correctie"'].join('\n')
+    const { transactions, warnings } = await parseCSVWithWarnings(rows, CUSTOM)
+    expect(transactions).toHaveLength(1)
+    expect(transactions[0].amount).toBe(0)
+    expect(warnings).toHaveLength(0)
+  })
+
+  it('een verkeerd toegewezen bedragkolom levert 0 transacties + N waarschuwingen (geen stille import)', async () => {
+    const rows = [
+      CUSTOM_HEADER,
+      '"2026-01-01","tekst-a","X"',
+      '"2026-01-02","tekst-b","Y"',
+    ].join('\n')
+    const { transactions, warnings } = await parseCSVWithWarnings(rows, CUSTOM)
+    expect(transactions).toHaveLength(0)
+    expect(warnings).toHaveLength(2)
+  })
+
+  it('geldige rijen leveren geen waarschuwingen op (geen regressie)', async () => {
+    const { transactions, warnings } = await parseCSVWithWarnings([HEADER, INCASSO].join('\n'), RABO)
+    expect(transactions).toHaveLength(1)
+    expect(warnings).toHaveLength(0)
+  })
+
+  it('parseCSV blijft een kale transactie-array teruggeven (backwards compatible)', async () => {
+    const arr = await parseCSV([HEADER, INCASSO].join('\n'), RABO)
+    expect(Array.isArray(arr)).toBe(true)
+    expect(arr).toHaveLength(1)
+  })
+})
+
+describe('parseCSVWithWarnings — float-randgevallen (komma/punt-notatie)', () => {
+  const parseAmt = async (cell: string): Promise<number> => {
+    const rows = [CUSTOM_HEADER, `"2026-01-01","${cell}","X"`].join('\n')
+    const { transactions } = await parseCSVWithWarnings(rows, CUSTOM)
+    return transactions[0].amount
+  }
+
+  it('NL-notatie "1.234,56" → 1234.56 (punt = duizendtal, komma = decimaal)', async () => {
+    expect(await parseAmt('1.234,56')).toBeCloseTo(1234.56)
+  })
+
+  it('US-notatie "1,234.56" → 1234.56 (komma = duizendtal, punt = decimaal) — voorheen stil fout', async () => {
+    expect(await parseAmt('1,234.56')).toBeCloseTo(1234.56)
+  })
+
+  it('enkel komma-decimaal "12,50" → 12.5', async () => {
+    expect(await parseAmt('12,50')).toBeCloseTo(12.5)
+  })
+
+  it('negatief bedrag "-49,99" → -49.99', async () => {
+    expect(await parseAmt('-49,99')).toBeCloseTo(-49.99)
+  })
+})
+
+describe('parseCSVWithWarnings — onleesbaar debet/credit → waarschuwing i.p.v. €0', () => {
+  // Handmatige preset met aparte Af/Bij-kolommen (debit/credit-pad).
+  const DC_PRESET: CSVPreset = {
+    id: 'test-debit-credit',
+    label: 'Test debit/credit',
+    delimiter: ',',
+    dateColumn: 0,
+    amountColumn: 1, // ongebruikt in dit pad, maar de non-null-check op amountStr valt weg door debitColumn
+    descriptionColumn: 3,
+    counterpartyColumn: null,
+    ibanColumn: null,
+    referenceColumn: null,
+    dateFormat: 'YYYY-MM-DD',
+    hasHeader: true,
+    debitColumn: 1,
+    creditColumn: 2,
+  }
+  const DC_HEADER = '"Datum","Af","Bij","Omschrijving"'
+
+  it('geldige debet/credit importeert; onleesbare debetcel wordt overgeslagen met waarschuwing', async () => {
+    const rows = [
+      DC_HEADER,
+      '"2026-02-01","10,00","","Uitgave"',   // debet 10 → -10
+      '"2026-02-02","","250,00","Inkomen"',  // credit 250 → +250
+      '"2026-02-03","kapot","","Corrupt"',   // onleesbare debetcel → skip + warning
+    ].join('\n')
+    const { transactions, warnings } = await parseCSVWithWarnings(rows, DC_PRESET)
+    expect(transactions).toHaveLength(2)
+    expect(transactions[0].amount).toBeCloseTo(-10)
+    expect(transactions[1].amount).toBeCloseTo(250)
+    expect(warnings).toHaveLength(1)
+    expect(warnings[0].line).toBe(4)
   })
 })

@@ -3,8 +3,14 @@
  * OFX is an SGML-like format used by many banks.
  */
 
-import type { ParsedTransaction } from './shared'
-import { computeHash } from './shared'
+import type { ParsedTransaction, ImportWarning } from './shared'
+import { computeHash, parseAmountOrNull } from './shared'
+
+/** Resultaat van {@link parseOFXWithWarnings}: geldige transacties + overgeslagen blokken. */
+export interface OFXParseResult {
+  transactions: ParsedTransaction[]
+  warnings: ImportWarning[]
+}
 
 /**
  * Parse an OFX date string (YYYYMMDD or YYYYMMDDHHMMSS) into YYYY-MM-DD.
@@ -52,13 +58,17 @@ function extractTransactionBlocks(content: string): string[] {
 }
 
 /**
- * Parse an OFX/QFX file content into normalized transactions.
+ * Parse an OFX/QFX file, returning both the valid transactions and any blocks
+ * skipped because their TRNAMT could not be read. Prefer this over
+ * {@link parseOFX} on surfaces that can surface warnings to the user.
  */
-export async function parseOFX(content: string): Promise<ParsedTransaction[]> {
+export async function parseOFXWithWarnings(content: string): Promise<OFXParseResult> {
   const blocks = extractTransactionBlocks(content)
   const transactions: ParsedTransaction[] = []
+  const warnings: ImportWarning[] = []
 
-  for (const block of blocks) {
+  for (let blockIdx = 0; blockIdx < blocks.length; blockIdx++) {
+    const block = blocks[blockIdx]
     const datePosted = extractTag(block, 'DTPOSTED')
     const trnAmt = extractTag(block, 'TRNAMT')
     const memo = extractTag(block, 'MEMO')
@@ -69,7 +79,17 @@ export async function parseOFX(content: string): Promise<ParsedTransaction[]> {
     if (!datePosted || !trnAmt) continue
 
     const date = parseOFXDate(datePosted)
-    const amount = parseFloat(trnAmt.replace(',', '.')) || 0
+    // Onleesbaar bedrag (bv. onverwacht TRNAMT-formaat) → blok overslaan +
+    // waarschuwing i.p.v. stil €0 te importeren dat de saldi vervuilt.
+    const amount = parseAmountOrNull(trnAmt)
+    if (amount === null) {
+      warnings.push({
+        line: blockIdx + 1,
+        code: 'unparseable_amount',
+        message: `Transactie ${blockIdx + 1} overgeslagen: het bedrag "${trnAmt.trim()}" is onleesbaar.`,
+      })
+      continue
+    }
     const description = (memo || name || 'Geen omschrijving').replace(/\s+/g, ' ').trim()
     const counterpartyName = name ? name.trim() : null
 
@@ -98,5 +118,16 @@ export async function parseOFX(content: string): Promise<ParsedTransaction[]> {
     })
   }
 
-  return transactions
+  return { transactions, warnings }
+}
+
+/**
+ * Parse an OFX/QFX file content into normalized transactions.
+ *
+ * Backwards-compatible thin wrapper around {@link parseOFXWithWarnings} that
+ * returns only the transactions. Skipped/unreadable blocks are dropped silently
+ * here — call `parseOFXWithWarnings` when you need to surface those to the user.
+ */
+export async function parseOFX(content: string): Promise<ParsedTransaction[]> {
+  return (await parseOFXWithWarnings(content)).transactions
 }

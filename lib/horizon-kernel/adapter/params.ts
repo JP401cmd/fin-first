@@ -98,13 +98,22 @@ export interface PersoonTijdas {
 }
 
 /**
- * Persoon + tijdas. `startLeeftijd` = hele-jaren-leeftijd vandaag (`ageAtDate`);
+ * Persoon + tijdas. `startLeeftijd` = hele-jaren-leeftijd op de peildatum (`ageAtDate`);
  * `geboortejaar` uit de geboortedatum; `startjaar = geboortejaar + startLeeftijd`
  * (deterministisch en intern consistent: startjaar − geboortejaar = startLeeftijd).
  * AOW-leeftijd via de canonieke `lookupAowAge`-tabel (fallback 67).
+ *
+ * F6 — reproduceerbare runs: de peildatum `asOf` is expliciet injecteerbaar (default
+ * `new Date()` = nu aan de rand). Zo pint één `asOf` de hele kernel-run: al het
+ * downstream-gedrag (events, potten, liquidaties, onzekerheid) leidt deterministisch af
+ * uit `startLeeftijd`. `asOf` weglaten = byte-identiek aan het oude impliciete `new Date()`.
  */
-export function buildPersoonTijdas(dateOfBirth: string, aowRows: readonly AowLeeftijdRow[]): PersoonTijdas {
-  const startLeeftijd = ageAtDate(dateOfBirth)
+export function buildPersoonTijdas(
+  dateOfBirth: string,
+  aowRows: readonly AowLeeftijdRow[],
+  asOf: Date = new Date(),
+): PersoonTijdas {
+  const startLeeftijd = ageAtDate(dateOfBirth, asOf)
   const geboortejaar = new Date(dateOfBirth).getFullYear()
   const startjaar = geboortejaar + startLeeftijd
   const aow = lookupAowAge([...aowRows], dateOfBirth)

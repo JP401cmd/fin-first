@@ -14,8 +14,12 @@
  *            − Σ(debts.current_balance × inclusion_pct/100)
  *
  * Alléén pure functies — geen Supabase, geen I/O — zodat ze triviaal testbaar
- * zijn en in zowel user- als service-role/cron-context draaien.
+ * zijn en in zowel user- als service-role/cron-context draaien. Constanten
+ * (BOX3_DRAG / CURRENT_TAX_YEAR) worden geconsumeerd uit hun canonieke home,
+ * nooit hier gehercodeerd.
  */
+import { BOX3_DRAG } from '@/lib/constants'
+import { CURRENT_TAX_YEAR } from '@/lib/box3-data'
 
 /** Minimale assetvorm voor de inclusion-gewogen vermogenssom. */
 export interface SnapshotAsset {
@@ -68,4 +72,69 @@ export function computeSnapshotNetWorth(
 export function computeSnapshotFreedomPct(netWorth: number, fireTarget: number): number {
   if (fireTarget <= 0) return 0
   return Math.max(Math.min((netWorth / fireTarget) * 100, 100), 0)
+}
+
+// ── Snapshot-provenance ([Arch F6], bevinding #27) ────────────────────────
+//
+// De parameterset/aannames die de AFGELEIDEN van een snapshot produceerden
+// (freedom_percentage, fire_age, savings_rate, sovereignty_level,
+// resilience_score), zodat een historisch getal later herleidbaar is. Landt in
+// de nullable `params jsonb`-kolom (migr. 20260721170000). Bewust een compacte
+// WAARDE-snapshot (spiegelt lead_intakes.report_snapshot), colocatie met de rij,
+// geen join.
+
+/**
+ * Provenance-parameterset van één snapshot-rij. Bewust ENGINE-ONAFHANKELIJK:
+ * de motor die fire_age schreef staat in de `engine_bron`-kolom, de score-
+ * methode in `score_version` — die worden hier NIET gedupliceerd (dat zou
+ * params↔fire_age laten driften zodra de /toekomst-hook fire_age naar de kernel
+ * patcht). De hier vastgelegde aannames (SWR/rendement/inflatie/Box 3-drag/
+ * belastingjaar/grondslag) blijven geldig ongeacht welke motor ze consumeerde.
+ */
+export interface SnapshotParams {
+  /** Schema-versie van deze payload (nu 1). */
+  v: 1
+  /** Effectieve onttrekkingsvoet (grossReturn − box3Drag − inflation). */
+  swr: number
+  /** Bruto verwacht rendement (profiel-instelling of default). */
+  grossReturn: number
+  /** Verwachte inflatie (profiel-instelling of default). */
+  inflation: number
+  /** Box 3-belastingdruk op rendement (forfait × tarief), jaargebonden. */
+  box3Drag: number
+  /** Belastingjaar dat box3Drag bepaalt — verschuift effectiveSwr bij een jaarwissel. */
+  taxYear: number
+  /** Vermogensgrondslag van freedom_percentage: snapshots gebruiken VOLLEDIG netto vermogen (huis mee). */
+  grondslag: 'full-networth'
+  /** Bron van de spaarquote-invoer: snapshots leiden 'm af uit transacties (income/expenses). */
+  savingsSource: 'transactions'
+}
+
+/** Trimt float-ruis af op 5 decimalen (basispunt-precisie) zonder betekenisverlies. */
+function round5(x: number): number {
+  return Math.round(x * 1e5) / 1e5
+}
+
+/**
+ * Bouw de compacte provenance-parameterset voor een snapshot-rij. Consumeert de
+ * reeds-geresolvede FIRE-parameters (resolveFireParams) plus de canonieke Box 3-
+ * constanten (BOX3_DRAG / CURRENT_TAX_YEAR) — geen herberekening, geen inline
+ * getallen. Aangeroepen door alle drie de schrijfpaden (POST/auto/cron) zodat de
+ * parameterset identiek en op één plek gevormd wordt.
+ */
+export function buildSnapshotParams(fire: {
+  grossReturn: number
+  inflationRate: number
+  effectiveSwr: number
+}): SnapshotParams {
+  return {
+    v: 1,
+    swr: round5(fire.effectiveSwr),
+    grossReturn: round5(fire.grossReturn),
+    inflation: round5(fire.inflationRate),
+    box3Drag: round5(BOX3_DRAG),
+    taxYear: CURRENT_TAX_YEAR,
+    grondslag: 'full-networth',
+    savingsSource: 'transactions',
+  }
 }

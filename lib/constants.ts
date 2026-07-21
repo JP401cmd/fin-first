@@ -46,6 +46,18 @@ export const CLASSIC_MULTIPLIER = 1 / SWR // = 25
  */
 export const FIRE_SAVINGS_RATE_BENCHMARK_PCT = 50
 
+// ── Numerieke tolerantie ────────────────────────────────────────
+
+/**
+ * Tolerantie (in euro's) voor het vergelijken van float-geldsommen met nul.
+ * Een halve cent: kleiner dan de kleinste betekenisvolle munteenheid, groter dan
+ * de opeenstapelende IEEE-754-afrondingsruis van optellingen. Gebruik
+ * `Math.abs(bedrag) < CENT_EPSILON` i.p.v. `bedrag === 0` op BEREKENDE sommen
+ * (portefeuille-totalen, restwaarden), zodat een bijna-nul-restsom als "leeg"
+ * telt i.p.v. een lege-staat te missen. NIET voor exact-geparste losse bedragen.
+ */
+export const CENT_EPSILON = 0.005
+
 // ── Uitgaven-tarief (vrijheidstijd) ─────────────────────────────
 
 /**
@@ -209,3 +221,20 @@ export const KOSTEN_KOPER_TAXATIE = 500
 
 /** Bankgarantie (waarborgsom-garantie), als fractie van de aankoopprijs — 0,1%. Bron: marktgemiddelde, 2026 — jaarlijks verifiëren. */
 export const KOSTEN_KOPER_BANKGARANTIE_PCT = 0.001
+
+// ── Historische Weerbaarheid — weergavedrempels (backtest-succeskans) ──
+//
+// Stoplicht-grenzen voor de backtest-succeskans (0–100), gedeeld door de
+// weerbaarheids-widgets zodat de tinten en het schild-icoon één bron hebben.
+// Dit zijn WEERGAVE-drempels (geen financiële aanname): boven STERK = "weerbaar",
+// eronder maar boven MATIG = "aandacht", daaronder = "kwetsbaar". Het schild
+// kantelt op WEERBAAR_SCHILD. De succeskans zelf komt canoniek uit runBacktest.
+
+/** Succeskans-grens (%) waarboven een plan historisch als weerbaar geldt (groen + benchmark-doel). */
+export const WEERBAARHEID_STERK = 85
+
+/** Succeskans-grens (%) waarboven een plan als "aandacht" geldt; eronder = kwetsbaar (rood). */
+export const WEERBAARHEID_MATIG = 65
+
+/** Succeskans-grens (%) waarboven het schild-icoon op "veilig" (ShieldCheck) staat. */
+export const WEERBAARHEID_SCHILD = 75

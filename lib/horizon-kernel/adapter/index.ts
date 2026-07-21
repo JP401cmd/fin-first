@@ -72,6 +72,13 @@ export interface KernelAdapterInput {
   /** Box 3-belastingjaar (`BOX3_PARAMS`). Default = meest recente. */
   readonly taxYear?: TaxYear
   /**
+   * F6 — peildatum voor reproduceerbare runs. Bepaalt de startleeftijd (`ageAtDate`)
+   * en dus de hele tijdas. Weglaten → `new Date()` (nu aan de rand): byte-identiek aan
+   * het oude, impliciete gedrag. Een gepinde `asOf` maakt een run exact herhaalbaar
+   * (randvoorwaarde voor de snapshot-provenance-kaart).
+   */
+  readonly asOf?: Date
+  /**
    * Partner-blok (V3, snede 3). Aanwezig → **huishouden-run**: de kern krijgt de partner
    * via de PT-laag (`box3.personen = 2`, `leefsituatie = 'Samenwonend'`, `partner`-blok
    * uit `buildPartnerParams`). Weggelaten → solo-run, byte-identiek aan snede 2b. De
@@ -102,7 +109,10 @@ export function buildKernelInputFromAppWithNotices(input: KernelAdapterInput): K
   const aowRows = input.aowRows ?? []
   const inflatie = resolveFireParams(profile).inflationRate
 
-  const { startLeeftijd, persoon } = buildPersoonTijdas(profile.date_of_birth, aowRows)
+  // F6 — peildatum: expliciete `asOf` maakt de run reproduceerbaar; weglaten = `new Date()`
+  // (nu aan de rand). `asOf` pint via `buildPersoonTijdas` de startleeftijd en dus de hele run.
+  const asOf = input.asOf ?? new Date()
+  const { startLeeftijd, persoon } = buildPersoonTijdas(profile.date_of_birth, aowRows, asOf)
 
   const eigenHuisIds = deriveEigenHuisIds(assets)
   // V7: tekort-lening-rente uit het profiel (deficit_loan_rate) of Excel-default.

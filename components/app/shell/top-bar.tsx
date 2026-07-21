@@ -53,7 +53,7 @@ import { useNotifications } from '@/components/app/notifications/notification-pr
 import { GlobalSyncButton } from '@/components/sync/global-sync-button'
 import { SyncReportModal } from '@/components/sync/sync-report-modal'
 import { LeverCompassMobile } from '@/components/app/shell/lever-compass'
-import { useLeverScores } from '@/components/app/shell/responsive-shell'
+import { useLeverScores } from '@/components/app/shell/shell-contexts'
 
 type TopBarProps = {
   /**

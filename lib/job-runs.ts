@@ -44,7 +44,15 @@ export async function recordJobRun(
       summary: params.summary ?? null,
       error: params.error ?? null,
     })
+
+    // Actieve melding bij een HARDE fout (status='error'). Success-met-partiële-
+    // fouten (status='success' + error-tekst) is bewust GEEN alert -> geen dagelijkse
+    // ruis. Best-effort + intern getthrottled; mag de cron nooit breken.
+    if (params.status === 'error') {
+      const { alertCronFailure } = await import('@/lib/cron-alert')
+      await alertCronFailure(service, { job: params.job, error: params.error })
+    }
   } catch {
-    // Logging mag de cron nooit breken.
+    // Logging/alerting mag de cron nooit breken.
   }
 }

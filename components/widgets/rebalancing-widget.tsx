@@ -7,6 +7,7 @@ import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { formatWithFreedom, dailyExpenseRate } from '@/lib/format'
+import { CENT_EPSILON } from '@/lib/constants'
 import { Scale, AlertTriangle, ArrowRight, ArrowUpRight, ArrowDownRight, CalendarClock } from 'lucide-react'
 import type { DriftResult, Trade } from '@/lib/rebalancing'
 
@@ -108,7 +109,9 @@ export const RebalancingWidget = memo(function RebalancingWidget({ size, data, h
   }
 
   // ── No holdings / error ──
-  if (!rebalData || rebalData.totalValue === 0) {
+  // Epsilon i.p.v. `=== 0`: totalValue is een berekende portefeuille-som, dus een
+  // bijna-nul-restsom (afrondingsruis) telt óók als "leeg".
+  if (!rebalData || Math.abs(rebalData.totalValue) < CENT_EPSILON) {
     return (
       <WidgetShell module="kern" size={size} kicker="Rebalancing" href={href}>
         <WidgetEmpty icon={Scale} message="Voeg beleggingen toe om portfolio drift te monitoren." />

@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   VasteKostenAnalyse,
   type RecurringItem,
 } from '@/components/fin/vaste-kosten-analyse'
+import { useAbortableFetch, isAbortError } from '@/lib/hooks/use-abortable-fetch'
 type ApiResponse = {
   subscriptions?: RecurringItem[]
   vasteKosten?: RecurringItem[]
@@ -31,26 +32,32 @@ export function VasteLastenLoader({
   const [vasteKosten, setVasteKosten] = useState<RecurringItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { abortableFetch, isMounted } = useAbortableFetch()
 
-  async function refresh() {
+  // Afbreekbaar: bij wegnavigeren uit de Vaste-lasten-view breekt de lopende
+  // /api/subscriptions-fetch af (geen verspilde egress, geen setState-na-unmount).
+  const refresh = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch('/api/subscriptions')
+      const res = await abortableFetch('/api/subscriptions')
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = (await res.json()) as ApiResponse
+      if (!isMounted()) return
       setSubscriptions(data.subscriptions ?? [])
       setVasteKosten(data.vasteKosten ?? [])
     } catch (e) {
+      // Afgebroken fetch (unmount) → stil negeren, geen foutmelding.
+      if (isAbortError(e) || !isMounted()) return
       setError(e instanceof Error ? e.message : 'Onbekende fout')
     } finally {
-      setLoading(false)
+      if (isMounted()) setLoading(false)
     }
-  }
+  }, [abortableFetch, isMounted])
 
   useEffect(() => {
     void refresh()
-  }, [])
+  }, [refresh])
 
   const totalMonthlySubscriptions = subscriptions.reduce(
     (s, i) => s + i.monthlyAmount,

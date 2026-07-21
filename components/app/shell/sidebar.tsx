@@ -50,7 +50,7 @@ import { LeverCompassCollapsed, type LeverScores, type LeverStatus } from '@/com
 import { GlobalSyncButton } from '@/components/sync/global-sync-button'
 import { SyncReportModal } from '@/components/sync/sync-report-modal'
 import { useCommandPalette } from '@/components/command-palette/command-palette-provider'
-import type { SidebarSignals } from '@/components/app/shell/responsive-shell'
+import type { SidebarSignals } from '@/components/app/shell/shell-contexts'
 import {
   LEVERAGE_STATUS_DOT,
   LEVERAGE_STATUS_LABEL,

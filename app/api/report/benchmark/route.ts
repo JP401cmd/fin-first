@@ -77,7 +77,17 @@ export async function GET() {
       kernelScalarEnabled,
     })
 
-    return Response.json(report)
+    // Korte privé-cache óver requests heen. De onderliggende loaders draaien ~40-48
+    // DB-queries + de rekenmotor-pipeline, terwijl profiel/vermogen/CBS-referentie
+    // binnen een dag amper wijzigen. `private` = per-browser, nooit in een gedeelde/
+    // CDN-cache (de response bevat eigen financiële data). Binnen de TTL serveert de
+    // browser herhaalde GET's uit zijn HTTP-cache → 0 loader-queries op de server.
+    // TTL = 15 min: staleness begrensd tot dat venster na een profiel-/vermogensmutatie.
+    // BEWUST geen unstable_cache: de Supabase-client is cookie-/RLS-gebonden (zie
+    // lib/reference-cache.ts). Spiegelt /api/local-knowledge + /api/local-chat-overview.
+    return Response.json(report, {
+      headers: { 'Cache-Control': 'private, max-age=900' },
+    })
   } catch (error) {
     console.error('Benchmark generation error:', error)
     return Response.json(

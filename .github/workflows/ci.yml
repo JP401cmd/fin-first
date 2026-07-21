@@ -146,3 +146,91 @@ jobs:
       #      convergentie richting 300 kB), nooit optrekken.
       - name: Bundle-budget meten (route-sizes.mjs)
         run: npm run perf:route-sizes
+
+  # Auth-smoke (Playwright) — kaart "Één Playwright smoke-spec (login →
+  # dashboard → beveiligde route)". Opt-in en NIET-gatend (aanpak C uit de
+  # kaartanalyse): draait alleen wanneer de vier onderstaande secrets in de
+  # repo/organisatie zijn geconfigureerd, en blokkeert de PR/merge nooit
+  # (`continue-on-error: true`) zolang er geen hermetische, hosted
+  # test-Supabase-omgeving voor CI bestaat. Fork-PR's krijgen geen secrets
+  # (GitHub-standaardgedrag) → de guard-stap zet `configured=false` → alle
+  # vervolgstappen worden overgeslagen, job slaagt triviaal.
+  #
+  # Benodigde repo-secrets (menselijk-gated, nog niet gezet — zie
+  # e2e/README.md):
+  #   - E2E_SUPABASE_URL / E2E_SUPABASE_ANON_KEY   (een test-Supabase-project,
+  #     NOOIT het productieproject)
+  #   - REGRESSION_TEST_EMAIL / REGRESSION_TEST_PASSWORD (bestaand,
+  #     niet-admin testaccount — zelfde paar als lib/regression-tests)
+  #
+  # Vervolgkaart: zodra die omgeving bestaat, dit naar een echte, gatende
+  # stap promoveren (continue-on-error weg, needs op quality-gate elders).
+  e2e-smoke:
+    name: E2E auth-smoke (Playwright, opt-in)
+    needs: quality-gate
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    env:
+      HUSKY: 0
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Secrets aanwezig?
+        id: check-secrets
+        run: |
+          if [ -n "${{ secrets.E2E_SUPABASE_URL }}" ] && \
+             [ -n "${{ secrets.E2E_SUPABASE_ANON_KEY }}" ] && \
+             [ -n "${{ secrets.REGRESSION_TEST_EMAIL }}" ] && \
+             [ -n "${{ secrets.REGRESSION_TEST_PASSWORD }}" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::E2E-smoke overgeslagen — secrets (E2E_SUPABASE_URL/ANON_KEY, REGRESSION_TEST_EMAIL/PASSWORD) zijn niet geconfigureerd. Zie e2e/README.md."
+          fi
+
+      - name: Setup Node (versie uit .nvmrc)
+        if: steps.check-secrets.outputs.configured == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies (npm ci)
+        if: steps.check-secrets.outputs.configured == 'true'
+        run: npm ci
+
+      - name: Install Playwright chromium
+        if: steps.check-secrets.outputs.configured == 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Production build (tegen test-Supabase)
+        if: steps.check-secrets.outputs.configured == 'true'
+        run: npm run build:next-only
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY }}
+
+      # Start `next start` op de achtergrond, wacht tot 'ie antwoordt, draai
+      # dan alleen de auth-smoke (niet de zwaardere, persona-seedende
+      # uat/bezit.spec.ts — die blijft lokaal/menselijk-gated).
+      - name: Server starten + auth-smoke draaien
+        if: steps.check-secrets.outputs.configured == 'true'
+        run: |
+          npm run start &
+          npx wait-on http://localhost:3000 --timeout 60000
+          npx playwright test --config=e2e/playwright.config.ts smoke.spec.ts
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY }}
+          REGRESSION_TEST_EMAIL: ${{ secrets.REGRESSION_TEST_EMAIL }}
+          REGRESSION_TEST_PASSWORD: ${{ secrets.REGRESSION_TEST_PASSWORD }}
+          UAT_BASE_URL: http://localhost:3000
+
+      - name: Playwright-rapport bij falen
+        if: steps.check-secrets.outputs.configured == 'true' && failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

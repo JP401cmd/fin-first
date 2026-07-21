@@ -124,6 +124,43 @@ export function parseENNumber(str: string): number {
 }
 
 /**
+ * Strikte varianten van {@link parseNLNumber} / {@link parseENNumber}: retourneer
+ * `null` wanneer de cel leeg is OF een niet-leeg maar onparsbaar getal bevat.
+ * Gebruikt door {@link requireNumber} om een corrupte waarde/koers-kolom als
+ * importwaarschuwing te laten verschijnen i.p.v. stil een €0-holding op te leveren.
+ */
+export function parseNLNumberOrNull(str: string): number | null {
+  const cleaned = (str ?? '').replace(/['"]/g, '').trim()
+  if (!cleaned) return null
+  const value = parseFloat(cleaned.replace(/\./g, '').replace(',', '.'))
+  return Number.isFinite(value) ? value : null
+}
+
+export function parseENNumberOrNull(str: string): number | null {
+  const cleaned = (str ?? '').replace(/['"]/g, '').trim()
+  if (!cleaned) return null
+  const value = parseFloat(cleaned.replace(/,/g, ''))
+  return Number.isFinite(value) ? value : null
+}
+
+/**
+ * Lees een WAARDEBEPALEND getalveld (bedrag/waarde) strikt: een lege cel geeft 0
+ * (optioneel veld of de waarde staat in een zustercolom), maar een niet-lege,
+ * onparsbare cel gooit een Error. Die wordt door de try/catch in
+ * {@link parseBrokerCSV} opgevangen → `errors[]` + `skipped++`, zodat een
+ * verkeerd toegewezen bedrag-kolom als zichtbare waarschuwing eindigt i.p.v. een
+ * stille €0-holding die de portefeuillewaarde vervuilt.
+ */
+function requireNumber(raw: string, label: string, parse: (s: string) => number | null): number {
+  if (!(raw ?? '').replace(/['"]/g, '').trim()) return 0
+  const value = parse(raw)
+  if (value === null) {
+    throw new Error(`onleesbare waarde in kolom "${label}": "${raw.trim()}"`)
+  }
+  return value
+}
+
+/**
  * Convert a Dutch date string (DD-MM-YYYY) to ISO format (YYYY-MM-DD).
  * Returns null for empty or invalid date strings.
  */
@@ -436,9 +473,8 @@ function parseDegiroRow(
       col(headers, fields, 'Waarde EUR') !== ''
         ? col(headers, fields, 'Waarde EUR')
         : colContains(headers, fields, 'waarde eur')
-    const total = waardeEurRaw !== ''
-      ? parseNLNumber(waardeEurRaw)
-      : parseNLNumber(col(headers, fields, 'Waarde'))
+    const waardeRaw = waardeEurRaw !== '' ? waardeEurRaw : col(headers, fields, 'Waarde')
+    const total = requireNumber(waardeRaw, 'Waarde EUR', parseNLNumberOrNull)
 
     // price_per_unit is derived in EUR: |WaardeEUR| / |Aantal|
     // NOT the "Koers" column which is in local currency (e.g. USD).
@@ -487,7 +523,7 @@ function parseDegiroRow(
   // Portfolio (position) row
   const units = parseNLNumber(col(headers, fields, 'Aantal'))
   const price = parseNLNumber(col(headers, fields, 'Slotkoers'))
-  const total = parseNLNumber(col(headers, fields, 'Waarde in EUR'))
+  const total = requireNumber(col(headers, fields, 'Waarde in EUR'), 'Waarde in EUR', parseNLNumberOrNull)
 
   return {
     name,
@@ -513,7 +549,7 @@ function parseSaxoRow(headers: string[], fields: string[]): ParsedHoldingRow | n
   const isin = col(headers, fields, 'ISIN') || null
   const units = parseNLNumber(col(headers, fields, 'Aantal'))
   const currentPrice = parseNLNumber(col(headers, fields, 'Huidige prijs'))
-  const total = parseNLNumber(col(headers, fields, 'Waarde'))
+  const total = requireNumber(col(headers, fields, 'Waarde'), 'Waarde', parseNLNumberOrNull)
   const currency = col(headers, fields, 'Valuta') || 'EUR'
   const raw = buildRawRecord(headers, fields)
 
@@ -541,7 +577,7 @@ function parseINGBeleggenRow(headers: string[], fields: string[]): ParsedHolding
   const dateStr = col(headers, fields, 'Datum')
   const units = parseNLNumber(col(headers, fields, 'Aantal'))
   const price = parseNLNumber(col(headers, fields, 'Koers'))
-  const total = parseNLNumber(col(headers, fields, 'Waarde'))
+  const total = requireNumber(col(headers, fields, 'Waarde'), 'Waarde', parseNLNumberOrNull)
   const raw = buildRawRecord(headers, fields)
 
   return {
@@ -596,7 +632,7 @@ function parseTrading212Row(headers: string[], fields: string[]): ParsedHoldingR
   const time = col(headers, fields, 'Time')
   const units = parseENNumber(col(headers, fields, 'No. of shares'))
   const pricePerShare = parseENNumber(col(headers, fields, 'Price / share'))
-  const total = parseENNumber(col(headers, fields, 'Total'))
+  const total = requireNumber(col(headers, fields, 'Total'), 'Total', parseENNumberOrNull)
   const currency = col(headers, fields, 'Currency (Total)') || col(headers, fields, 'Currency (Price / share)') || 'EUR'
   const notes = col(headers, fields, 'Notes')
   const raw = buildRawRecord(headers, fields)
@@ -653,7 +689,7 @@ function parseEtoroRow(headers: string[], fields: string[]): ParsedHoldingRow | 
   if (!details && !isin) return null
 
   const date = col(headers, fields, 'Date')
-  const amount = parseENNumber(col(headers, fields, 'Amount'))
+  const amount = requireNumber(col(headers, fields, 'Amount'), 'Amount', parseENNumberOrNull)
   const units = parseENNumber(col(headers, fields, 'Units') || col(headers, fields, 'Units / Contracts'))
   const equityChange = parseENNumber(col(headers, fields, 'Realized Equity Change'))
   const raw = buildRawRecord(headers, fields)

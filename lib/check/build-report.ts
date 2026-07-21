@@ -298,6 +298,21 @@ interface SyntheticPortfolio {
  */
 function buildPortfolio(intake: CheckIntake, grossReturn: number): SyntheticPortfolio {
   const assets = intake.assets.map((a, i) => intakeAssetToAsset(a, i, grossReturn))
+  // Noodfonds (stap ④) zit als los veld `intake.emergencyFund`, niet als
+  // CheckIntakeAsset. Voeg het toe als liquide `cash`-asset — spiegel
+  // intake-to-persona.ts (r142-155) — zodat netto vermogen, potten-breakdown,
+  // buffer-dekking én het geactiveerde account uit ÉÉN bron komen (SSoT). Zonder
+  // dit werd het noodfonds alleen ad-hoc bij-gespreid in buffer/health/Will en
+  // ontbrak het stelselmatig in de netto-vermogen-grondslag.
+  if (intake.emergencyFund > 0) {
+    assets.push(
+      intakeAssetToAsset(
+        { assetType: 'cash', name: 'Noodfonds', value: intake.emergencyFund },
+        assets.length,
+        grossReturn,
+      ),
+    )
+  }
   const firstHouse = assets.find((a) => a.asset_type === 'eigen_huis')
   let mortgageLinked = false
   const debts = intake.debts.map((d, i) => {
@@ -772,7 +787,9 @@ function buildSnapshot(ctx: EngineContext, dailyExpense: number): CheckReportDat
         asset_type: a.asset_type,
         net_worth_inclusion_pct: a.net_worth_inclusion_pct,
       })),
-      ctx.intake.emergencyFund,
+      // Noodfonds zit nu als cash-asset in portfolio.assets (SSoT) — niet
+      // nogmaals als losse cash meegeven, anders telt het dubbel.
+      0,
     ),
     effectiveMonthlyExpenses: ctx.monthlyExpenses,
     goal: null,
@@ -927,7 +944,9 @@ function buildHealth(ctx: EngineContext): CheckReportData['health'] {
       netMonthlyIncome: ctx.netMonthlyIncome,
     },
     {
-      assets: [...ctx.portfolio.assets, { asset_type: 'cash', current_value: ctx.intake.emergencyFund }],
+      // Noodfonds zit nu als cash-asset in portfolio.assets (SSoT) — geen losse
+      // spread meer, anders telt het noodfonds dubbel in de buffer-pijler.
+      assets: ctx.portfolio.assets,
       unlinkedCash: 0,
       budgets: [],
       transactions: [],
@@ -1409,7 +1428,9 @@ function buildWillMoves(ctx: EngineContext, dailyExpense: number): CheckReportDa
         asset_type: a.asset_type,
         net_worth_inclusion_pct: a.net_worth_inclusion_pct,
       })),
-      ctx.intake.emergencyFund,
+      // Noodfonds zit nu als cash-asset in portfolio.assets (SSoT) — niet
+      // nogmaals als losse cash meegeven, anders telt het dubbel.
+      0,
     ),
     effectiveMonthlyExpenses: ctx.monthlyExpenses,
     goal: null,

@@ -751,13 +751,14 @@ export const loadCoreData = cache(async function loadCoreData(
   const prevMonthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 1, 1)).toISOString().split('T')[0]
   const [
     budgetResult, spendingResult, snapshotResult,
-    debtFullResult, assetValuationResult, goalsResult, spending6mResult,
+    assetValuationResult, goalsResult, spending6mResult,
     holdingsResult, prevSpendingResult,
   ] = await Promise.all([
     supabase.from('budgets').select('id, name, icon, default_limit, budget_type, parent_id, is_essential, interval, is_favorite, alert_threshold').limit(500),
     supabase.from('transactions').select('budget_id, amount').gte('date', monthStart).lt('date', monthEnd),
     supabase.from('net_worth_snapshots').select('snapshot_date, total_assets, total_debts, net_worth, freedom_percentage, fire_age, sovereignty_level, savings_rate, resilience_score, fire_portfolio_required').order('snapshot_date', { ascending: true }).limit(24),
-    supabase.from('debts').select('current_balance, original_amount').eq('is_active', true),
+    // debt-progress (original_amount/current_balance, is_active) hergebruikt nu
+    // `debtsResult` uit batch-1 — aparte query verwijderd (−1 query, byte-identiek).
     supabase.from('valuations').select('value, valuation_date').eq('entity_type', 'asset').order('valuation_date', { ascending: false }).limit(50),
     // Doelen: bestaan (hasGoals) + noodfonds-target voor de score. Selecteert de
     // velden voor de emergency-resolver; hasGoals blijft "heeft ≥1 doel" (incl.
@@ -949,10 +950,14 @@ export const loadCoreData = cache(async function loadCoreData(
   }
 
   // ── Compute debt payoff progress ──
+  // Hergebruikt `debtsResult` (batch-1, `.eq('is_active', true)`) i.p.v. een aparte
+  // debts-query: die bevat `original_amount` + `current_balance` al en filtert op
+  // dezelfde `is_active = true`. Byte-identiek (reduce = som, volgorde-onafhankelijk;
+  // schulden « 1000 rijen ⇒ geen max_rows-afkap).
   let debtProgress: CorePageData['debtProgress'] = null
-  if (debtFullResult.data && debtFullResult.data.length > 0) {
-    const totalOriginal = debtFullResult.data.reduce((s, d) => s + Number(d.original_amount || d.current_balance), 0)
-    const totalCurrent = debtFullResult.data.reduce((s, d) => s + Number(d.current_balance), 0)
+  if (debtsResult.data && debtsResult.data.length > 0) {
+    const totalOriginal = debtsResult.data.reduce((s, d) => s + Number(d.original_amount || d.current_balance), 0)
+    const totalCurrent = debtsResult.data.reduce((s, d) => s + Number(d.current_balance), 0)
     const progressPct = totalOriginal > 0 ? ((totalOriginal - totalCurrent) / totalOriginal) * 100 : 0
     debtProgress = { totalOriginal, totalCurrent, progressPct: Math.max(0, Math.min(100, progressPct)) }
   }

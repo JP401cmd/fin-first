@@ -8,9 +8,10 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { parseMT940 } from '@/lib/parsers/mt940'
-import { parseCSV, getCSVHeaders, getCSVPreview } from '@/lib/parsers/csv'
-import { parseOFX } from '@/lib/parsers/ofx'
+import { parseCSVWithWarnings, getCSVHeaders, getCSVPreview } from '@/lib/parsers/csv'
+import { parseOFXWithWarnings } from '@/lib/parsers/ofx'
 import { detectFormat, CSV_PRESETS, type CSVPreset } from '@/lib/parsers/index'
+import type { ImportWarning } from '@/lib/parsers/shared'
 import type { ParsedTransaction } from '@/lib/parsers/shared'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { categorizeTransaction, isOwnAccountTransfer, isWalletTransferType, buildFrequencyMap, type CategoryCorrection, type FrequencyMatch } from '@/lib/parsers/categorize'
@@ -168,6 +169,10 @@ export default function ImportPage() {
   const [importStartTime, setImportStartTime] = useState<number | null>(null)
   const [isNetworkError, setIsNetworkError] = useState(false)
   const [error, setError] = useState('')
+  // Niet-fatale parse-waarschuwingen: rijen die zijn overgeslagen omdat hun bedrag
+  // onleesbaar was (bv. verkeerde kolom-toewijzing). Getoond in de controlestap zodat
+  // een corrupte kolom NIET stil als €0-transactie wordt geïmporteerd.
+  const [parseWarnings, setParseWarnings] = useState<ImportWarning[]>([])
   const [fileName, setFileName] = useState('')
   const [detectedFormat, setDetectedFormat] = useState<'mt940' | 'csv' | 'ofx' | 'unknown'>('mt940')
   const [fileContent, setFileContent] = useState('')
@@ -432,6 +437,7 @@ export default function ImportPage() {
     }
 
     setParsing(true)
+    setParseWarnings([])
 
     try {
       const content = await file.text()
@@ -491,7 +497,9 @@ export default function ImportPage() {
         }
       } else if (format === 'ofx') {
         try {
-          parsed = await parseOFX(content)
+          const ofxResult = await parseOFXWithWarnings(content)
+          parsed = ofxResult.transactions
+          setParseWarnings(ofxResult.warnings)
         } catch (parseErr) {
           console.error('OFX parse error:', parseErr)
           setError(
@@ -546,10 +554,12 @@ export default function ImportPage() {
   async function handleCSVParse() {
     setParsing(true)
     setError('')
+    setParseWarnings([])
     setShowColumnMapping(false)
 
     try {
-      const parsed = await parseCSV(fileContent, csvPreset)
+      const { transactions: parsed, warnings } = await parseCSVWithWarnings(fileContent, csvPreset)
+      setParseWarnings(warnings)
 
       if (parsed.length === 0) {
         setError(
@@ -1501,6 +1511,27 @@ export default function ImportPage() {
                 <ChevronLeft className="h-4 w-4" />
                 Terug naar upload
               </button>
+
+              {parseWarnings.length > 0 && (
+                <div className="rounded-lg border border-orange-300 bg-orange-50 p-3 text-sm text-orange-800">
+                  <div className="flex items-center gap-2 font-medium">
+                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                    {parseWarnings.length} {parseWarnings.length === 1 ? 'rij overgeslagen' : 'rijen overgeslagen'} met een onleesbaar bedrag
+                  </div>
+                  <p className="mt-1 text-orange-700">
+                    Deze rijen zijn NIET geïmporteerd (om een verkeerd €0-bedrag te voorkomen).
+                    Controleer of de bedrag-kolom goed is toegewezen en probeer het zo nodig opnieuw.
+                  </p>
+                  <ul className="mt-2 list-disc space-y-0.5 pl-5">
+                    {parseWarnings.slice(0, 8).map((w, i) => (
+                      <li key={i}>{w.message}</li>
+                    ))}
+                    {parseWarnings.length > 8 && (
+                      <li>… en nog {parseWarnings.length - 8} andere.</li>
+                    )}
+                  </ul>
+                </div>
+              )}
 
               <div className="flex items-center justify-between">
                 <div className="flex gap-4 text-sm">

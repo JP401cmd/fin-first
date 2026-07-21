@@ -94,10 +94,10 @@ describe('Pariteit buildReport ↔ intakeToPersona — eigen woning deels-FIRE-e
 
   it('buildReport: FIRE-eligible vermogen = netWorth minus de NIET-meegerekende helft overwaarde', () => {
     const report = buildReport(intake, NOW)
-    // assets: 400000 + 60000 + 40000 = 500000; schulden: 320000
-    // netWorth = 180000; huisoverwaarde = 400000 − 320000 = 80000
-    // Fix 1 (50%-huis): FIRE-eligible = 180000 − 0,5×80000 = 140000
-    expect(report.snapshot.freedomBaseEur).toBe(140000)
+    // assets: 400000 + 60000 + 40000 + 10000 (noodfonds als cash) = 510000; schulden: 320000
+    // netWorth = 190000; huisoverwaarde = 400000 − 320000 = 80000
+    // Fix 1 (50%-huis): FIRE-eligible = 190000 − 0,5×80000 = 150000
+    expect(report.snapshot.freedomBaseEur).toBe(150000)
 
     // Proxy: de "stop vandaag"-vrijheidstijd is op die FIRE-eligible grondslag.
     // Met 140000 FIRE-eligible en dagelijks tarief (2500×12/365 ≈ 82,19/dag) →
@@ -123,24 +123,21 @@ describe('Pariteit buildReport ↔ intakeToPersona — eigen woning deels-FIRE-e
     expect(persona.meta.netWorth).toBe(190000)
   })
 
-  it('grondslag-consistentie: snapshot.netWorth ≈ intakeToPersona meta.netWorth − noodfonds-delta', () => {
+  it('grondslag-consistentie: snapshot.netWorth == intakeToPersona meta.netWorth (één bron)', () => {
     /**
-     * buildReport.snapshot.netWorth = Σ(assets.current_value × inclusionPct) − Σ(debts)
-     *   waarbij GEEN noodfonds-asset wordt meegeteld (emergencyFund is een los veld).
-     *   → 400000 + 60000 + 40000 − 320000 = 180000
+     * WF-START-08-bug1-fix: beide paden tellen het noodfonds nu als liquide
+     * `cash`-asset mee, zodat het netto vermogen ÉÉN bron heeft (SSoT). Vroeger
+     * sloot buildReport het noodfonds stelselmatig uit (→ delta = emergencyFund),
+     * wat op het publieke Vrijheidsrapport een te laag netto vermogen gaf en
+     * afweek van het account dat de gebruiker daarna kreeg (intakeToPersona).
      *
-     * intakeToPersona.meta.netWorth telt het noodfonds WEL als cash-asset mee (het
-     *   verschijnt in het overzicht):
-     *   → (10000 + 400000 + 60000 + 40000) − 320000 = 190000
-     *
-     * Het verschil van precies intake.emergencyFund (10000) is gedocumenteerd gedrag —
-     * geen bug maar de bewuste keuze in elk pad (report pakt het noodfonds alleen mee
-     * voor de buffer-pijler, persona maakt het zichtbaar als cash-asset).
+     * buildReport.snapshot.netWorth   = (10000 + 400000 + 60000 + 40000) − 320000 = 190000
+     * intakeToPersona.meta.netWorth   = (10000 + 400000 + 60000 + 40000) − 320000 = 190000
      */
     const report = buildReport(intake, NOW)
     const persona = intakeToPersona(intake)
-    const delta = persona.meta.netWorth - report.snapshot.netWorth
-    expect(delta).toBe(intake.emergencyFund)
+    expect(report.snapshot.netWorth).toBe(190000)
+    expect(persona.meta.netWorth).toBe(report.snapshot.netWorth)
   })
 
   it('beide paden: eigen woning van dezelfde waarde', () => {

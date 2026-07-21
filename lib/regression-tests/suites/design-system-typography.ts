@@ -131,27 +131,6 @@ const tests: TestCase[] = [
 
   // ── 3. Content sections use text-base for body text ──────────────────
   {
-    id: 'typo-guide-body-text-base',
-    name: 'Horizon-uitleg guide gebruikt text-base voor body tekst',
-    category: CAT,
-    description: 'Guide content moet text-base (16px) gebruiken voor leesbare body tekst',
-    priority: 'medium',
-    estimatedDurationMs: 10,
-    fn() {
-      const src = readSourceFile('components/app/guide-horizon-uitleg.tsx')
-      assert(src.length > 0, 'guide-horizon-uitleg.tsx kon niet gelezen worden')
-
-      assert(
-        src.includes('text-base'),
-        'guide-horizon-uitleg moet text-base gebruiken voor body tekst',
-      )
-      assert(
-        src.includes('leading-relaxed'),
-        'guide-horizon-uitleg moet leading-relaxed gebruiken voor leesbare regelafstand',
-      )
-    },
-  },
-  {
     id: 'typo-rapportages-body-text-base',
     name: 'Rapportages gebruikt text-base voor body tekst',
     category: CAT,

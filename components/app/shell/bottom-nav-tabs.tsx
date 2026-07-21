@@ -7,7 +7,7 @@ import { useRef, type ComponentType } from 'react'
 import { useModuleAccess } from '@/components/app/feature-access-provider'
 import { getActiveNavModules } from '@/lib/module-registry'
 import { useMobileAppStripState } from '@/components/app/shell/mobile-app-strip-state'
-import { useCategoryAppLinks } from '@/components/app/shell/responsive-shell'
+import { useCategoryAppLinks } from '@/components/app/shell/shell-contexts'
 
 // Static config per nav module — label, path, icon, and color token.
 // Module-IDs blijven `kern`/`horizon` (interne registry), maar de UI

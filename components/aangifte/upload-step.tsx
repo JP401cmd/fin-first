@@ -59,11 +59,22 @@ const TAX_YEAR_OPTIONS = Array.from({ length: 6 }, (_, i) => CURRENT_YEAR - 1 - 
  * zodat de zware bibliotheek pas geladen wordt bij eerste klik (next/lazy
  * doet dit voor componenten, dynamic import doet hetzelfde voor libs).
  *
- * Worker-strategie: pdfjs-dist v4 ships `pdf.worker.min.mjs` als losse
+ * Worker-strategie: pdfjs-dist v6 ships `pdf.worker.min.mjs` als losse
  * worker-bundle. Een postinstall-hook (`scripts/copy-pdfjs-worker.mjs`)
- * kopieert deze naar `public/pdf.worker.min.mjs` zodat Next.js het op
- * een stabiel pad serveert. Wij wijzen `GlobalWorkerOptions.workerSrc`
- * exact daarheen — geen CDN, geen externe netwerk-call.
+ * kopieert deze (uit de LEGACY-build, zie hieronder) naar
+ * `public/pdf.worker.min.mjs` zodat Next.js het op een stabiel pad
+ * serveert. Wij wijzen `GlobalWorkerOptions.workerSrc` exact daarheen —
+ * geen CDN, geen externe netwerk-call.
+ *
+ * Build-keuze: we importeren bewust de LEGACY-build
+ * (`pdfjs-dist/legacy/build/pdf.mjs`) i.p.v. de bare module. De v6
+ * modern-build trok de browser-baseline flink op (polyfills verwijderd);
+ * de aangifte-PDF wordt door consumenten op diverse (mobiele) devices
+ * geüpload, dus de bredere legacy-compat (Chrome 125+/Safari 18+/
+ * Firefox ESR+) is hier het veiligst. Worker-bron MOET dan óók uit
+ * `legacy/build/` komen — anders faalt pdf.js met een harde
+ * API/worker-versiemismatch. De type-shim voor deze deep-import staat in
+ * `types/pdfjs-dist-legacy.d.ts`.
  */
 // Statisch pad onder /public; wordt door de postinstall-hook gevuld zodat
 // Next.js het als static asset serveert. Constante uitgelift uit de
@@ -73,7 +84,7 @@ const PDFJS_WORKER_SRC = '/pdf.worker.min.mjs'
 async function extractTextFromPdf(file: File): Promise<string> {
   // Dynamische import — voorkomt dat pdfjs op SSR landt en houdt de bundle
   // kleiner voor users die de feature niet aanraken.
-  const pdfjs = await import('pdfjs-dist')
+  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
 
   if (!pdfjs.GlobalWorkerOptions.workerSrc) {
     pdfjs.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_SRC

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-21T12:37:49.645Z",
+  "generatedAt": "2026-07-21T20:52:29.463Z",
   "generatedDate": "2026-07-21",
   "repo": {
     "name": "fin",
@@ -189,11 +189,11 @@
   "stats": {
     "routes": 146,
     "routesProduction": 101,
-    "api": 262,
+    "api": 264,
     "tables": 86,
-    "migrations": 154,
+    "migrations": 159,
     "integrations": 25,
-    "components": 870,
+    "components": 832,
     "providers": 11,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -1991,6 +1991,14 @@
       ]
     },
     {
+      "url": "/api/account/export",
+      "file": "app/api/account/export/route.ts",
+      "domain": "account",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
       "url": "/api/activate",
       "file": "app/api/activate/route.ts",
       "domain": "activate",
@@ -2810,6 +2818,14 @@
       "url": "/api/core/category-history",
       "file": "app/api/core/category-history/route.ts",
       "domain": "core",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "url": "/api/cron/retention",
+      "file": "app/api/cron/retention/route.ts",
+      "domain": "cron",
       "methods": [
         "GET"
       ]
@@ -5781,6 +5797,29 @@
       ]
     },
     {
+      "domain": "account",
+      "label": "account",
+      "count": 2,
+      "routes": [
+        {
+          "url": "/api/account/delete",
+          "file": "app/api/account/delete/route.ts",
+          "domain": "account",
+          "methods": [
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/account/export",
+          "file": "app/api/account/export/route.ts",
+          "domain": "account",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "check",
       "label": "check",
       "count": 2,
@@ -6014,21 +6053,6 @@
       ]
     },
     {
-      "domain": "account",
-      "label": "account",
-      "count": 1,
-      "routes": [
-        {
-          "url": "/api/account/delete",
-          "file": "app/api/account/delete/route.ts",
-          "domain": "account",
-          "methods": [
-            "POST"
-          ]
-        }
-      ]
-    },
-    {
       "domain": "activate",
       "label": "activate",
       "count": 1,
@@ -6218,6 +6242,21 @@
           "url": "/api/core/category-history",
           "file": "app/api/core/category-history/route.ts",
           "domain": "core",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "cron",
+      "label": "cron",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/cron/retention",
+          "file": "app/api/cron/retention/route.ts",
+          "domain": "cron",
           "methods": [
             "GET"
           ]
@@ -7456,7 +7495,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 154
+    "migrationCount": 159
   },
   "tablesByDomain": [
     {
@@ -7906,11 +7945,11 @@
     }
   ],
   "components": {
-    "total": 870,
+    "total": 832,
     "groups": [
       {
         "group": "app",
-        "count": 365,
+        "count": 325,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -7920,7 +7959,6 @@
           "action-edit-modal",
           "action-form",
           "action-list-modal",
-          "activation-button",
           "ai-categorize-sheet",
           "ai-categorize-sheet.test",
           "ai-privacy-indicator",
@@ -7929,31 +7967,23 @@
           "ai-subscription-upsell.test",
           "ai-vaste-kosten-sheet",
           "analysis-section",
-          "animated-progress-bar",
           "app-setup-gate",
           "app-setup-section",
           "aspiration-questionnaire",
           "asset-pane",
           "auto-snapshot-trigger",
-          "avatars",
           "backtesting-modal",
-          "balance-history-chart",
           "bank-selector",
           "beheer-container",
           "beheer-nav",
-          "belasting-section",
           "benchmark-comparison-chart",
           "bespreek-met-fin-button",
           "bill-calendar",
           "bottom-nav-tabs",
           "bottom-sheet",
           "bottom-sheet.test",
-          "box3-calculation",
-          "box3-classification",
           "box3-partner-modal",
-          "box3-scenario-modal",
           "breadcrumb",
-          "budget-blob",
           "budget-detail-pane",
           "budget-donut",
           "budget-form",
@@ -7966,7 +7996,6 @@
           "budget-pill-tree",
           "budget-pill-tree.test",
           "budget-plan-editor-sheet",
-          "budget-sankey",
           "budget-shared",
           "budget-sparkline",
           "budget-tree",
@@ -7999,24 +8028,19 @@
           "collapsible-section",
           "color-picker-card",
           "compound-interest-chart",
-          "concept-flip-cards",
           "concept-snijpunt",
           "concept-terugrekening",
           "confirm-destructive",
           "confirm-destructive.test",
           "connected-account-card",
-          "cost-split-calculator",
           "counterparty-analysis-panel",
           "crypto-holdings.config",
           "daily-price-sync-trigger",
           "debt-comparison-chart",
           "debt-detail-modal",
           "debt-form",
-          "debt-mini-sparkline",
           "debt-pane",
-          "debt-payoff-chart",
           "debt-trajectory-chart",
-          "debt-valuation-history",
           "debt-valuation-modal",
           "debt-valuation-modal.test",
           "deeltijdwerk-impact",
@@ -8026,12 +8050,9 @@
           "density-toggle.test",
           "depth-section",
           "depth-section.test",
-          "desktop-sidebar-shell",
-          "discover-carousel",
           "dividend-tracker",
           "doel-vastleg-sheet",
           "doel-vastleg-sheet.test",
-          "domain-card",
           "dream-transition-context",
           "eerder-stoppen",
           "empty-state",
@@ -8060,25 +8081,14 @@
           "form-error.test",
           "freedom-card",
           "freedom-days-animation",
-          "freedom-days-monthly-trend",
           "freedom-time-label",
           "freshness-label",
           "freshness-label.test",
-          "full-screen-modal",
           "gap-analyse",
-          "goal-detail-modal",
           "goal-form",
           "goal-form.test",
-          "goal-progress-timeline",
           "grafiek-uitleg-walkthrough",
           "guardrail-kompas",
-          "guide-faq",
-          "guide-horizon-uitleg",
-          "guide-how-to",
-          "guide-naslagwerk",
-          "guide-pro-tips",
-          "guide-progress-bar",
-          "guide-topic-card",
           "head-scripts",
           "health-score-receipt",
           "health-score-receipt.test",
@@ -8090,7 +8100,6 @@
           "holdings-heatmap",
           "horizon-cashflow-sankey",
           "horizon-client",
-          "horizon-fire-params-panel",
           "horizon-helpers",
           "horizon-trend-grid",
           "horizon-trend-grid.test",
@@ -8125,7 +8134,6 @@
           "mobile-app-strip",
           "mobile-app-strip-state",
           "mobile-bottom-bar",
-          "mobile-bottom-bar-live",
           "mobile-preview-frame",
           "mobile-preview-provider",
           "mobile-stack-shell",
@@ -8135,7 +8143,6 @@
           "module-color-provider",
           "module-color-provider.persist.test",
           "module-nav",
-          "module-onboarding-modal",
           "monte-carlo-onttrekken",
           "monte-carlo-opbouw",
           "monte-carlo-overgang",
@@ -8145,7 +8152,6 @@
           "nav-stack-meta",
           "nav-stack-provider",
           "net-worth-projection-chart",
-          "next-step-card",
           "nibud-benchmark",
           "notification-item",
           "notification-item.test",
@@ -8153,7 +8159,6 @@
           "notification-provider",
           "opzeg-modal",
           "ownership-toggle",
-          "page-action-bar",
           "page-skeleton",
           "page-status-banner",
           "page-status-dot",
@@ -8179,20 +8184,16 @@
           "postpone-form",
           "privacy-hidden-notice",
           "privacy-toggle",
-          "projections-modal",
           "quick-add-trigger",
           "quick-add-wizard",
           "quick-add-wizard-collect.test",
           "receipt-row",
-          "recommendation-card",
           "recurring-classify-sheet",
           "recurring-edit-sheet",
           "regime-kaart",
           "regime-kaart.test",
-          "reis-stap-section",
           "responsive-shell",
           "responsive-shell.characterization.test",
-          "roadmap-modal",
           "sankey-diagram",
           "scenario-chip",
           "scenario-kaarten",
@@ -8205,6 +8206,7 @@
           "session-monitor.test",
           "settlement-overview",
           "share-dialog",
+          "shell-contexts",
           "shell-overlay",
           "sidebar",
           "sim-chart",
@@ -8217,11 +8219,9 @@
           "sleepmodus-overlay.test",
           "slide-in-pane",
           "slide-in-pane.test",
-          "snapshot-comparison-view",
           "sorr-analyse",
           "spaarquote-gevoeligheid",
           "spending-confidence-indicator",
-          "spending-insight-card",
           "step-choice",
           "step-details",
           "step-header",
@@ -8234,7 +8234,6 @@
           "surplus-gap-chart",
           "surplus-gap-chart.test",
           "svg-text-no-html-nesting.test",
-          "swipe-back-tracker",
           "sync-status-badge",
           "toast-provider",
           "toekomst-exit-notice",
@@ -8422,7 +8421,7 @@
       },
       {
         "group": "widgets",
-        "count": 85,
+        "count": 87,
         "items": [
           "abonnementen-widget",
           "acties-widget",
@@ -8433,6 +8432,7 @@
           "assets-widget.test",
           "auto-dashboard-wizard",
           "backtesting-score-widget",
+          "backtesting-score-widget.test",
           "belasting-box3-widget",
           "belasting-box3-widget.test",
           "beleggingsrendement-widget",
@@ -8441,6 +8441,7 @@
           "beslissingspatronen-widget",
           "beslissingspatronen-widget.test",
           "box3-drag-widget",
+          "box3-drag-widget.test",
           "budget-fav-widget",
           "budget-fav-widget.test",
           "budget-heatmap-widget",
@@ -8470,6 +8471,7 @@
           "hypotheek-vs-beleggen-widget",
           "hypotheek-vs-beleggen-widget.test",
           "inflatie-impact-widget",
+          "inflatie-impact-widget.test",
           "jouw-pad-widget-wrapper",
           "levensgebeurtenissen-widget",
           "maandoverzicht-widget",
@@ -8477,7 +8479,6 @@
           "monte-carlo-widget",
           "netto-vermogen-widget",
           "netto-vermogen-widget.test",
-          "nibud-benchmark-widget",
           "noodfonds-widget",
           "pensioen-aow-widget",
           "rebalancing-widget",
@@ -10559,7 +10560,8 @@
           "label": "account",
           "write": true,
           "routes": [
-            "/api/account/delete"
+            "/api/account/delete",
+            "/api/account/export"
           ]
         },
         {
@@ -11076,8 +11078,7 @@
           "label": "Beheer",
           "write": false,
           "routes": [
-            "/api/admin/user-diagnose",
-            "/api/admin/user-export"
+            "/api/admin/user-diagnose"
           ]
         },
         {
@@ -11282,8 +11283,7 @@
           "label": "Beheer",
           "write": false,
           "routes": [
-            "/api/admin/user-diagnose",
-            "/api/admin/user-export"
+            "/api/admin/user-diagnose"
           ]
         },
         {
@@ -11413,8 +11413,7 @@
           "label": "Beheer",
           "write": false,
           "routes": [
-            "/api/admin/user-diagnose",
-            "/api/admin/user-export"
+            "/api/admin/user-diagnose"
           ]
         },
         {
@@ -14730,6 +14729,44 @@
       ],
       "summary": "De drie auth-flows (signup, reset-password, account-wachtwoord) controleren een gekozen wachtwoord tegen de HaveIBeenPwned \"Pwned Passwords\"-range-API vóór de `supabase.auth.*`-call. De check draait via **k-anonimiteit**: de browser hasht het wachtwoord lokaal (SHA-1), stuurt all",
       "file": "docs/adr/0057-eigen-leaked-password-check.md"
+    },
+    {
+      "id": "0058-datapad-conventie-lezen-muteren-client-direct",
+      "title": "Datapad-conventie — lezen via loader/bundel, muteren via API-route, client-direct afgebakend",
+      "status": "aanvaard",
+      "date": "2026-07-21",
+      "elements": [
+        "app-comp",
+        "t-supabase",
+        "data-cont"
+      ],
+      "summary": "De frontend leest weergavedata voortaan **alléén** via een server-loader (`lib/*-data-loader.ts` → `DashboardData`-bundel → props) en muteert **alléén** via een API-route met de error-envelope (ADR 0044) + zod (`parseBody`). Rechtstreeks de browser-client (`lib/supabase/client`) ",
+      "file": "docs/adr/0058-datapad-conventie-lezen-muteren-client-direct.md"
+    },
+    {
+      "id": "0059-avg-bewaartermijnen-en-wissing",
+      "title": "AVG-rechten afmaken — bewaartermijnen, volledige wissing/reset, export en FK-anonimisering",
+      "status": "aanvaard",
+      "date": "2026-07-21",
+      "elements": [
+        "t-supabase",
+        "app-comp"
+      ],
+      "summary": "De AVG-rechten (verwijderen, reset, dataportabiliteit, bewaartermijnen) worden sluitend gemaakt met één datamodel-single-source (`lib/user-data-tables.ts`), een FK-ON-DELETE-hardening (migratie `20260721140000`), een volledige alles-in-één JSON-export en een dagelijkse retentie-c",
+      "file": "docs/adr/0059-avg-bewaartermijnen-en-wissing.md"
+    },
+    {
+      "id": "0060-server-observability-instrumentation-en-cron-alert",
+      "title": "server observability instrumentation en cron alert",
+      "status": "accepted",
+      "date": "2026-07-21",
+      "elements": [
+        "t-platform",
+        "t-supabase",
+        "app-comp"
+      ],
+      "summary": "De parallelle sessie (ADR 0056) landde CLIENT-observability (web-vitals/RUM). SERVER-observability had gaten: onafgevangen server-fouten (Server Components / Route Handlers / Server Actions die niet via `serverError()` lopen) landden alleen in Vercel-logs, een crash in de root `a",
+      "file": "docs/adr/0060-server-observability-instrumentation-en-cron-alert.md"
     }
   ],
   "churn": {
@@ -14741,7 +14778,7 @@
       },
       {
         "path": "lib/ai",
-        "commits": 50
+        "commits": 51
       },
       {
         "path": "app/(app)/toekomst",
@@ -14757,7 +14794,7 @@
       },
       {
         "path": "lib/horizon-data.ts",
-        "commits": 9
+        "commits": 10
       },
       {
         "path": "lib/fire-simulation.ts",
@@ -14769,7 +14806,7 @@
       },
       {
         "path": "app/api/budgets",
-        "commits": 4
+        "commits": 5
       },
       {
         "path": "components/horizon",
@@ -14779,7 +14816,7 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 8457,
+        "loc": 8269,
         "commits": 89
       },
       {
@@ -14804,13 +14841,13 @@
       },
       {
         "file": "lib/dashboard-data-loader.ts",
-        "loc": 2663,
-        "commits": 43
+        "loc": 2677,
+        "commits": 44
       },
       {
         "file": "lib/test-personas.ts",
         "loc": 2210,
-        "commits": 9
+        "commits": 10
       },
       {
         "file": "app/(app)/core/checkin/page.tsx",
@@ -15615,8 +15652,16 @@
   "diff": {
     "baseline": false,
     "previousDate": "2026-07-21",
-    "hasChanges": false,
-    "sections": []
+    "hasChanges": true,
+    "sections": [
+      {
+        "label": "Componenten (aantal)",
+        "added": [],
+        "removed": [
+          "-38"
+        ]
+      }
+    ]
   },
   "statsHistory": [
     {
@@ -15810,8 +15855,8 @@
     },
     {
       "date": "2026-07-21",
-      "api": 262,
-      "components": 870,
+      "api": 264,
+      "components": 832,
       "tables": 86,
       "routesProduction": 101
     }

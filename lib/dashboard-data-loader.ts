@@ -268,14 +268,13 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     bankAccountsResult,
     nextStepCompletionsResult,
     txAgg12Result,
-    favHoldingsResult,
-    allHoldingsResult,
+    holdingsSupersetResult,
     aowResult,
     bankConnectionsResult,
     budgetRolloversResult, budgetAmountsResult,
     weekTxResult,
     membershipResult,
-    rebalHoldingsResult, rebalTargetsResult,
+    rebalTargetsResult,
     earliestIncomeResult, actionsKpiResult,
     fireAssumptionsResult,
     debtSnapshotMonthlyResult,
@@ -320,8 +319,12 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     fetchTxMonthAggregate(supabase, { from: twelveMonthsAgo, to: monthEnd }),
     // Tabel-split (migratie 20260502000003): dashboard-widgets tonen
     // investment-tracker data; crypto loopt via de exchange-sync.
-    supabase.from('investment_holdings').select('id, name, ticker, units, avg_purchase_price, current_price, previous_close, last_price_update, is_favorite').eq('is_favorite', true),
-    supabase.from('investment_holdings').select('name, ticker, units, avg_purchase_price, current_price, ter'),
+    // Eén ongefilterde superset-query i.p.v. drie losse investment_holdings-fetches
+    // (favorieten, fee-analyse, rebalance-drift). De drie subsets worden ná de batch
+    // via JS-filter gereconstrueerd (is_favorite / ongefilterd / is_active).
+    // Byte-identiek: holdings « 1000 rijen ⇒ geen max_rows-afkap, en een seq-scan
+    // levert dezelfde rij-volgorde met of zonder WHERE-filter. −2 queries.
+    supabase.from('investment_holdings').select('id, name, ticker, units, avg_purchase_price, current_price, previous_close, last_price_update, is_favorite, ter, asset_class, sector, geography, is_active'),
     // AOW-referentietabel via de gedeelde module-TTL-cache (lib/reference-cache.ts).
     // De .then(ok, err)-adapter behoudt hier bewust de { data, error }-vorm van een
     // rauwe supabase-query, zodat de bestaande error-logging + `.data ?? []`-fallback
@@ -353,11 +356,9 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       ? supabase.from('household_members').select('household_id').eq('user_id', authUser.id).maybeSingle()
           .then((r) => r, () => ({ data: null }))
       : Promise.resolve({ data: null }),
-    // Rebalance-drift: holdings + streefallocatie (voedt de rebalance-notificaties).
-    supabase.from('investment_holdings')
-      .select('id, name, ticker, units, avg_purchase_price, current_price, asset_class, sector, geography')
-      .eq('is_active', true)
-      .then((r) => r, () => ({ data: null })),
+    // Rebalance-drift: streefallocatie (voedt de rebalance-notificaties). De
+    // bijbehorende holdings (is_active) komen uit de gedeelde holdings-superset
+    // hierboven via JS-filter — geen aparte investment_holdings-fetch meer.
     supabase.from('target_allocations')
       .select('category, target_pct')
       .eq('view_mode', 'asset_class')
@@ -384,6 +385,19 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     // → de widget valt terug op de aflossingen-bron hieronder (graceful degradation).
     fetchLatestSnapshotsByMonth(supabase, twelveMonthsAgo).then((r) => r, () => ({ data: null, error: null })),
   ])
+
+  // ── Holdings-superset → drie JS-subsets ─────────────────────────────────────
+  // Eén ongefilterde investment_holdings-fetch (holdingsSupersetResult) voedt de
+  // drie voorheen losse queries: favorieten (is_favorite), fee-analyse (alle rijen)
+  // en rebalance-drift (is_active). Byte-identiek — de subsets zijn filters op
+  // dezelfde rijen; holdings « 1000 ⇒ geen afkap. De consumers casten elk naar hun
+  // eigen kolom-subtype en lezen alleen hun eigen velden (extra kolommen zijn inert).
+  const holdingsSupersetRows = (holdingsSupersetResult.data ?? []) as Array<
+    Record<string, unknown> & { is_favorite?: boolean; is_active?: boolean }
+  >
+  const favHoldingsResult = { data: holdingsSupersetRows.filter((h) => h.is_favorite === true) }
+  const allHoldingsResult = { data: holdingsSupersetRows }
+  const rebalHoldingsResult = { data: holdingsSupersetRows.filter((h) => h.is_active === true) }
 
   // Vaste lasten: consumeer de canonieke bron (dezelfde die /overzicht/cashflow?view=vaste-lasten
   // voedt) zodat het widgettotaal EXACT gelijk is aan het paginatotaal — filtert amount<0,

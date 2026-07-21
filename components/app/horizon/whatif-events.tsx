@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { formatMaskedCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { LIFE_EVENT_CATALOG, type CatalogField } from '@/lib/horizon-data'
@@ -10,7 +10,7 @@ import { KassabonShell } from '@/components/app/kassabon-shell'
 import { EVENT_ICONS } from '@/components/app/horizon/log-timeline'
 import {
   Calendar, Plus, ChevronDown, ChevronUp, Eye, EyeOff, Info, Clock,
-  ArrowLeft, Check, Pencil,
+  ArrowLeft, Check, Pencil, Loader2,
 } from 'lucide-react'
 import { MaskedAmount } from '@/components/app/masked-amount'
 
@@ -69,9 +69,43 @@ export function WhatIfEventsPanel({
   const [expanded, setExpanded] = useState(true)
   const [showCatalog, setShowCatalog] = useState(false)
   const [selectedImpact, setSelectedImpact] = useState<EventImpact | null>(null)
+  /** Event whose impact is being computed off the click frame (null = idle). */
+  const [pendingImpactId, setPendingImpactId] = useState<string | null>(null)
   const [formState, setFormState] = useState<EventFormState | null>(null)
   /** The event being edited (null = creating new) */
   const [editingEventId, setEditingEventId] = useState<string | null>(null)
+
+  // Always call the freshest computeImpact (slider/scenario changes) without
+  // making the deferral effect re-run on every tick — the effect gates strictly
+  // on the explicit request signal `pendingImpactId`, never on computeImpact deps.
+  // The deferred solve runs in a later frame, so this post-commit sync is fresh.
+  const computeImpactRef = useRef(computeImpact)
+  useEffect(() => {
+    computeImpactRef.current = computeImpact
+  })
+
+  /**
+   * Impact is 2× een volledige FIRE-solve (468–839ms). Draai 'm daarom NÁ de
+   * eerste paint: de klik zet `pendingImpactId` (opent de sheet + toont
+   * "berekenen…"), en pas in de volgende animation frame rekent de canonieke
+   * `computeImpact`. Identiek resultaat — enkel later aangeroepen. De cleanup
+   * annuleert een verouderde run zodat de laatste klik/slider-stand wint.
+   */
+  useEffect(() => {
+    if (pendingImpactId === null) return
+    const raf = requestAnimationFrame(() => {
+      const impact = computeImpactRef.current(pendingImpactId)
+      setSelectedImpact(impact)
+      setPendingImpactId(null)
+    })
+    return () => cancelAnimationFrame(raf)
+  }, [pendingImpactId])
+
+  /** Event backing the current impact view (pending compute or resolved). */
+  const impactEventName =
+    selectedImpact?.event.name ??
+    (pendingImpactId ? events.find(e => e.id === pendingImpactId)?.name : null) ??
+    'Impact'
 
   const activeCount = events.filter(e => !e.whatIfDisabled).length
   const totalCount = events.length
@@ -252,8 +286,10 @@ export function WhatIfEventsPanel({
                         type="button"
                         className="min-w-0 flex-1 text-left"
                         onClick={() => {
-                          const impact = computeImpact(ev.id)
-                          if (impact) setSelectedImpact(impact)
+                          // Open de sheet + toon "berekenen…" meteen; de zware
+                          // 2×-solve draait ná de paint (zie effect boven).
+                          setSelectedImpact(null)
+                          setPendingImpactId(ev.id)
                         }}
                       >
                         <p className="flex items-center gap-1.5 truncate font-sans text-sm font-medium text-[var(--ink)]">
@@ -261,6 +297,12 @@ export function WhatIfEventsPanel({
                           {ev.is_scenario_only && (
                             <span className="shrink-0 rounded-full border border-horizon-300 bg-horizon-50 px-1.5 py-0.5 font-mono text-[9px] font-medium uppercase tracking-[0.05em] text-horizon-700">
                               Scenario
+                            </span>
+                          )}
+                          {pendingImpactId === ev.id && (
+                            <span className="flex shrink-0 items-center gap-1 font-sans text-[10px] font-medium text-horizon-600">
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                              berekenen…
                             </span>
                           )}
                         </p>
@@ -404,13 +446,15 @@ export function WhatIfEventsPanel({
 
       {/* ── Impact Kassabon BottomSheet ──────────────────── */}
       <BottomSheet
-        open={selectedImpact !== null}
-        onClose={() => setSelectedImpact(null)}
-        title={selectedImpact?.event.name ?? 'Impact'}
+        open={selectedImpact !== null || pendingImpactId !== null}
+        onClose={() => { setSelectedImpact(null); setPendingImpactId(null) }}
+        title={impactEventName}
       >
-        {selectedImpact && (
+        {selectedImpact ? (
           <EventImpactKassabon impact={selectedImpact} />
-        )}
+        ) : pendingImpactId ? (
+          <ImpactLoadingState />
+        ) : null}
       </BottomSheet>
     </>
   )
@@ -803,6 +847,25 @@ function CatalogFieldInput({
         </button>
       )}
     </div>
+  )
+}
+
+// ── ImpactLoadingState ───────────────────────────────────────────────────────
+
+/** Shown while the (deferred) 2× FIRE-solve runs, so the sheet paints instantly. */
+function ImpactLoadingState() {
+  return (
+    <KassabonShell>
+      <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
+        <Loader2 className="h-6 w-6 animate-spin text-horizon-600" />
+        <p className="font-sans text-sm font-medium text-[var(--ink-2)]">
+          Impact op FIRE berekenen…
+        </p>
+        <p className="max-w-[240px] font-sans text-[11px] leading-relaxed text-[var(--ink-4)]">
+          We rekenen je scenario met en zonder deze gebeurtenis door.
+        </p>
+      </div>
+    </KassabonShell>
   )
 }
 

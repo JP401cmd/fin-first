@@ -21,6 +21,7 @@ import {
   weightedDebtTotal,
   computeSnapshotNetWorth,
   computeSnapshotFreedomPct,
+  buildSnapshotParams,
   type SnapshotAsset,
   type SnapshotDebt,
 } from './snapshot-math'
@@ -339,6 +340,11 @@ export async function POST() {
     // kolom; v2-snapshots schrijven expliciet 2 zodat de trendlijn de
     // methodewissel kan markeren bij een mix v1/v2.
     score_version: 2,
+    // Provenance-parameterset ([Arch F6] #27): de aannames (SWR/rendement/
+    // inflatie/Box 3-drag/belastingjaar/grondslag) die deze afgeleiden
+    // produceerden. Engine-onafhankelijk — de basic-fallback-upsert hieronder
+    // laat 'm bewust weg (kolom nullable) als de kolom nog niet bestaat.
+    params: buildSnapshotParams(fireParams),
   }
 
   // Try upsert with extended fields first

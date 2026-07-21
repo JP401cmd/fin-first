@@ -225,7 +225,7 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     id: 'box3_drag',
     name: 'Box 3 Belastingdrag',
     description: 'Jaarlijkse Box 3-belasting in euro\'s en vrijheidsdagen',
-    module: 'horizon',
+    module: 'kern',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
   },

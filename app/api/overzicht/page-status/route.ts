@@ -7,7 +7,14 @@ import {
   normalizePageStatusRoute,
   asMinimizedLevel,
   readMinimizedLevel,
+  ROUTE_FAMILY,
 } from '@/lib/page-status/compute'
+import {
+  statusCacheKey,
+  readStatusCache,
+  writeStatusCache,
+} from '@/lib/page-status/status-cache'
+import { getServerPerspective } from '@/lib/household/server-perspective'
 import type { MinimizedLevel } from '@/lib/page-status/display'
 
 /**
@@ -47,6 +54,28 @@ export async function GET(request: NextRequest) {
     if (!route) {
       // Onbekende/buiten-scope-route → geen banner, geen data-load.
       return NextResponse.json({ info: null, minimized: null })
+    }
+
+    // CASHFLOW-familie: korte per-gebruiker+perspectief+route TTL-cache op de
+    // (zware) statusberekening. De cashflow-subpagina's seeden hun status niet
+    // server-side, dus elke subnavigatie her-fetcht hier; snel heen-en-weer klikken
+    // herhaalt anders telkens loadDashboardData + loadCashflowData +
+    // loadVasteLastenSummary. Staleness op een duidings-banner is akkoord
+    // (kaart-besluit). De minimized-voorkeur wordt NOOIT gecachet (fris gelezen),
+    // zodat minimaliseren/escalatie-heropening direct blijven werken. Andere
+    // families (lever/box2/freedom) blijven ongecachet — freedom wordt al geseed.
+    if (ROUTE_FAMILY[route] === 'cashflow') {
+      const perspective = await getServerPerspective()
+      const key = statusCacheKey(user.id, perspective, route)
+      const cached = readStatusCache(key)
+      const [info, minimized] = await Promise.all([
+        cached.hit
+          ? Promise.resolve(cached.info)
+          : computePageStatusInfo(supabase, route),
+        readMinimizedLevel(supabase, user.id, route),
+      ])
+      if (!cached.hit) writeStatusCache(key, info)
+      return NextResponse.json({ info, minimized })
     }
 
     // De minimized-voorkeur (lichte single-row select) draait PARALLEL aan de

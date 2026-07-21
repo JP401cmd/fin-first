@@ -86,7 +86,12 @@ describe('VasteLastenLoader', () => {
     })
     render(<VasteLastenLoader fullName="Test" />)
     await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledWith('/api/subscriptions')
+      // Afbreekbaar: de fetch loopt nu via useAbortableFetch en krijgt een
+      // AbortSignal mee als tweede argument (abort-on-unmount).
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/subscriptions',
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      )
     })
   })
 

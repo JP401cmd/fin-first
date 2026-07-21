@@ -12,6 +12,7 @@ import type { Asset, AssetType } from '@/lib/asset-data'
 import type { Debt, DebtType } from '@/lib/debt-data'
 import { buildCompleetHorizonFixture } from '@/lib/regression-tests/horizon-strategie/persona-fixture'
 import { solveFire } from '../index'
+import { runKernelUnified } from '../run-unified'
 import {
   buildKernelInputFromApp,
   buildAssetPotten,
@@ -337,6 +338,49 @@ describe('buildKernelInputFromApp — integraal', () => {
     expect(result).toBeDefined()
     expect(Number.isFinite(result.fireAge)).toBe(true)
     expect(typeof result.status).toBe('string')
+  })
+
+  // ── F6 — reproduceerbare runs: expliciete asOf pint de peildatum ────────────────
+  //
+  // Bewijst dat een gepinde `asOf` de run byte-identiek maakt (reproduceerbaar), dat de
+  // peildatum écht doorwerkt op de tijdas (andere asOf → andere startleeftijd) en dat
+  // `asOf` weglaten het oude, impliciete `new Date()`-gedrag behoudt (geen regressie).
+  describe('asOf — reproduceerbaarheid (Arch F6)', () => {
+    // Vaste dob (NIET gepind op "nu"), zodat de asOf de startleeftijd bepaalt.
+    const fixedDob = '1980-06-15'
+    const asOfInput = { ...smallInput, profile: { ...smallInput.profile, date_of_birth: fixedDob } }
+    // Lokale-tijd-constructie (jaar, maandindex, dag) → geen TZ-drift op de datumgrens.
+    const asOf2026 = new Date(2026, 0, 1)
+    const asOf2030 = new Date(2030, 0, 1)
+
+    it('twee runs met dezelfde vaste asOf → byte-identieke KernelInput', () => {
+      const a = buildKernelInputFromApp({ ...asOfInput, asOf: asOf2026 })
+      const b = buildKernelInputFromApp({ ...asOfInput, asOf: asOf2026 })
+      expect(a).toStrictEqual(b)
+    })
+
+    it('twee runs met dezelfde vaste asOf → byte-identiek kernel-resultaat', () => {
+      const params = { adapterInput: { ...asOfInput, asOf: asOf2026 }, yearlyExpenses: 30_000 }
+      const a = runKernelUnified(params)
+      const b = runKernelUnified(params)
+      expect(a.result).toStrictEqual(b.result)
+    })
+
+    it('asOf werkt écht door de tijdas: 4 jaar later → startLeeftijd +4', () => {
+      const a = buildKernelInputFromApp({ ...asOfInput, asOf: asOf2026 })
+      const b = buildKernelInputFromApp({ ...asOfInput, asOf: asOf2030 })
+      expect(b.startLeeftijd).toBe(a.startLeeftijd + 4)
+      // startjaar schuift exact mee (startjaar = geboortejaar + startLeeftijd).
+      expect(b.persoon.startjaar).toBe(a.persoon.startjaar + 4)
+    })
+
+    it('asOf weglaten = expliciete nu (geen regressie t.o.v. impliciete new Date())', () => {
+      const now = new Date()
+      const withDefault = buildKernelInputFromApp(asOfInput)
+      const withExplicitNow = buildKernelInputFromApp({ ...asOfInput, asOf: now })
+      expect(withDefault.startLeeftijd).toBe(withExplicitNow.startLeeftijd)
+      expect(withDefault.persoon).toStrictEqual(withExplicitNow.persoon)
+    })
   })
 
   it('rooktest met een realistisch persona-profiel loopt door solveFire', () => {

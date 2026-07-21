@@ -1,7 +1,20 @@
 # Field-Level Encryptie — PR1 Status & Handoff
 
-**Datum:** 2026-04-07
-**Status:** Code geïmplementeerd, **NIET gemerged, NIET gedeployed**, geen keys in env, geen migration toegepast.
+> ⚠️ **HISTORISCH / HANDOFF-AFGEROND** — de "je kunt deze PR nog mergen"-framing
+> hieronder is achterhaald. De PR1-code **is** gemerged (commit `3532e91eb` —
+> *"feat: field-level encryption infra + onboarding self-healing restore"*) en de
+> migration `supabase/migrations/20260408000001_encrypt_bank_credentials.sql`
+> staat in git. De 8 handmatige stappen en de PR2-checklist blijven bruikbaar als
+> **ops-runbook voor activatie** (env-keys zetten, migration op remote toepassen,
+> backfill, plaintext-drop), maar die ops-feiten zijn **niet uit de repo te
+> verifiëren** — bevestig ze apart. Lees dit doc dus als activatie-runbook, niet
+> als open merge-verzoek.
+
+**Datum:** 2026-04-07 (code) · statusregel bijgewerkt 2026-07-21
+**Status:** Code **gemerged** (commit `3532e91eb`) + migration in git
+(`20260408000001_encrypt_bank_credentials.sql`). Env-keys / migration-op-remote /
+PR2 (plaintext-kolommen droppen) = losse **OPS-status**, apart te verifiëren —
+niet uit de repo af te lezen, dus hier bewust niet als "gedaan" geclaimd.
 **Volledig plan:** `C:\Users\janpa\.claude\plans\groovy-wondering-peacock.md`
 
 ## TL;DR voor jou (de relevante beslissing nu)

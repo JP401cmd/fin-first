@@ -43,7 +43,7 @@ import { usePathname, useSearchParams } from 'next/navigation'
 import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { Circle } from 'lucide-react'
 import { iconMap } from '@/components/app/budget-shared'
-import { useCategoryAppLinks } from './responsive-shell'
+import { useCategoryAppLinks } from './shell-contexts'
 import { useMobileAppStripState } from './mobile-app-strip-state'
 import type { CategoryAppLink } from '@/lib/category-app-nav'
 

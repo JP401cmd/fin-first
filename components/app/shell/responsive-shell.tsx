@@ -25,7 +25,7 @@
  */
 'use client'
 
-import { createContext, useContext, useMemo, useSyncExternalStore, type ReactNode } from 'react'
+import { useMemo, useSyncExternalStore, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { ChatLayoutWrapper } from '@/components/app/chat/chat-layout-wrapper'
 import { FloatingNavButton } from '@/components/app/shell/floating-nav-button'
@@ -34,106 +34,13 @@ import { Sidebar } from '@/components/app/shell/sidebar'
 import { MobileStackShell } from '@/components/app/shell/mobile-stack-shell'
 import { NavStackProvider } from '@/components/app/shell/nav-stack-provider'
 import { MobileAppStripProvider } from '@/components/app/shell/mobile-app-strip-state'
-import type { CategoryAppLink } from '@/lib/category-app-nav'
-import type { LeverScores } from '@/components/app/shell/lever-compass'
-import type { LeverageStatus } from '@/lib/leverage-status'
-
-/**
- * Goedkope sidebar-signalen voor de status-dots, voorberekend in
- * `app/(app)/layout.tsx` (server). Twee dot-talen:
- *  - binaire freshness-booleans ("iets nieuws / iets te doen")
- *  - status-mirror `belasting` (good/warn/bad/neutral) voor Box 1/2/3.
- */
-export type SidebarSignals = {
-  /** Tips & acties: open/uitgestelde acties óf aanbevelingen. */
-  tipsActions: boolean
-  /** Minstens één budget overschreden. */
-  budgetOver: boolean
-  /** Aandelen-koersen ouder dan de staleness-drempel. */
-  aandelenStale: boolean
-  /** Crypto-koersen ouder dan de staleness-drempel. */
-  cryptoStale: boolean
-  /** Hypotheek-rentevaste periode loopt binnen het venster af. */
-  hypotheekRateReset: boolean
-  /** Verhuurd onroerend goed zonder ingevulde huurinkomsten. */
-  verhuurMissingIncome: boolean
-  /** Status-mirror voor de Box 1/2/3-subpagina's onder Belasting. */
-  belasting: { box1: LeverageStatus; box2: LeverageStatus; box3: LeverageStatus }
-}
-
-export type SidebarMetrics = {
-  /** Netto vermogen (assets − debts, gewogen volgens inclusion-pct). */
-  netWorth: number
-  /** Aantal openstaande/uitgestelde acties (Wil-module). */
-  actionCount: number
-  /**
-   * App-slugs die geactiveerd zijn door minstens één gekoppeld asset/debt —
-   * voedt de Sidebar's apps-strip filter zodat apps alleen verschijnen
-   * wanneer de gebruiker ze daadwerkelijk gebruikt.
-   */
-  activeAppKeys: string[]
-  /**
-   * Klikbare app-deeplinks per actieve categorie. Bron is dezelfde server-
-   * builder die het Fin-dashboard voedt (`buildCategoryAppLinks`), zodat
-   * iconen + labels exact matchen tussen dashboard en mobile shell.
-   * Mobile-only consumer: `MobileAppStrip` boven de bottom-nav.
-   */
-  categoryAppLinks: CategoryAppLink[]
-  /**
-   * Vier-hefbomen-kompas: bezittingen, schulden, cashflow, belasting.
-   * Berekend in layout.tsx uit reeds-geladen data. Optioneel voor
-   * backwards-compatibiliteit.
-   */
-  leverScores?: LeverScores
-  /**
-   * Goedkope sidebar-signalen voor de status-dots (freshness + belasting-
-   * status-mirror). Optioneel: bij weglaten tonen de dots hun grijze/neutrale
-   * inactieve staat.
-   */
-  sidebarSignals?: SidebarSignals
-}
-
-// ── CategoryAppLinks context ────────────────────────────────────────────────
-//
-// Door de tree heen prop-drillen van `MobileStackShell → Tray → MobileBottomBar`
-// zou Tray dwingen om iets van app-strip-data af te weten. Een lichte context
-// houdt het slot-component-patroon zuiver — MobileBottomBar leest direct, Tray
-// blijft puur over visuele transitie gaan. Sidebar zit elders in de tree
-// (portal) en behoudt zijn bestaande prop-API.
-const CategoryAppLinksContext = createContext<CategoryAppLink[]>([])
-
-export function useCategoryAppLinks(): CategoryAppLink[] {
-  return useContext(CategoryAppLinksContext)
-}
-
-// ── LeverScores context ─────────────────────────────────────────────────────
-//
-// Vier-hefbomen-kompas data, voorberekend in layout.tsx. Via context beschikbaar
-// voor zowel de Sidebar (portal, buiten tree) als de mobile TopBar.
-const DEFAULT_LEVER_SCORES: LeverScores = {
-  assets: { score: null, status: 'neutral', detail: 'Geen data — Start' },
-  debts: { score: null, status: 'neutral', detail: 'Geen data — Start' },
-  cashflow: { score: null, status: 'neutral', detail: 'Geen data — Start' },
-  tax: { score: null, status: 'neutral', detail: 'Geen data — Start' },
-}
-
-const LeverScoresContext = createContext<LeverScores>(DEFAULT_LEVER_SCORES)
-
-export function useLeverScores(): LeverScores {
-  return useContext(LeverScoresContext)
-}
-
-// ── ActiveAppKeys context ────────────────────────────────────────────────────
-//
-// Welke deep-app-tools daadwerkelijk geactiveerd zijn door tracking-flags op
-// assets/debts. Sidebar (desktop, portal-tree) consumeert dit al via prop;
-// NavMenuSheet (mobile, render-tree) leest via context zodat hij dezelfde
-// filtering kan toepassen voor de Overzicht-sub-items.
-const ActiveAppKeysContext = createContext<string[]>([])
-
-export function useActiveAppKeys(): string[] {
-  return useContext(ActiveAppKeysContext)
-}
+import {
+  CategoryAppLinksContext,
+  LeverScoresContext,
+  ActiveAppKeysContext,
+  DEFAULT_LEVER_SCORES,
+  type SidebarMetrics,
+} from '@/components/app/shell/shell-contexts'
 
 export type ResponsiveShellProps = {
   /** Email van de ingelogde user — initials/name worden hieruit afgeleid voor de Sidebar profile-pill. */

@@ -1,6 +1,11 @@
 'use client'
 
 import { useEffect } from 'react'
+import {
+  AUTO_SNAPSHOT_DAY_KEY,
+  shouldSkipAutoSnapshot,
+  utcDayStamp,
+} from '@/lib/snapshot-daystamp'
 
 /**
  * useAutoSnapshot — Client-side auto-snapshot trigger
@@ -19,23 +24,50 @@ import { useEffect } from 'react'
  *
  * DEDUPE (perf fase 1): een module-level dag-guard i.p.v. de vorige per-mount
  * `useRef` — zo vuurt de trigger óók bij twéé gelijktijdige mounts (of een
- * StrictMode-dubbelmount) maar één keer per UTC-dag. Een nieuwe dag of een harde
- * reload (nieuw JS-context) laat 'm weer één keer lopen; de server-gate maakt een
- * eventuele herhaling toch een goedkope no-op.
+ * StrictMode-dubbelmount) maar één keer per UTC-dag.
+ *
+ * THROTTLE (perf): een localStorage-dagstempel als extra fast-path. De module-
+ * guard is per JS-context; een HARDE reload start een nieuw context waarin die
+ * guard leeg is → de (goedkope, server-gegate) roundtrip vuurde dan opnieuw. De
+ * localStorage-stempel overleeft de reload en slaat die no-op-call over. Hij wordt
+ * pas ná een GESLAAGDE roundtrip gezet, zodat een mislukte poging vandaag opnieuw
+ * mag proberen — de dagelijkse garantie blijft dus intact. De server-side dag-gate
+ * blijft de échte garantie tegen dubbel wegschrijven.
  */
 let lastAutoSnapshotDay: string | null = null
 
 export function useAutoSnapshot() {
   useEffect(() => {
-    const day = new Date().toISOString().split('T')[0]
-    // Al gedaan vandaag (welke mount dan ook) → geen tweede roundtrip.
-    if (lastAutoSnapshotDay === day) return
+    const day = utcDayStamp()
+
+    let storedDay: string | null = null
+    try {
+      if (typeof window !== 'undefined') {
+        storedDay = window.localStorage.getItem(AUTO_SNAPSHOT_DAY_KEY)
+      }
+    } catch {
+      // localStorage niet beschikbaar (private mode e.d.) → val terug op de roundtrip.
+    }
+
+    // Al gedaan vandaag (deze JS-context óf een eerdere geslaagde roundtrip) →
+    // geen tweede roundtrip. Wel de module-guard bijzetten voor volgende mounts.
+    if (shouldSkipAutoSnapshot(lastAutoSnapshotDay, storedDay, day)) {
+      lastAutoSnapshotDay = day
+      return
+    }
     lastAutoSnapshotDay = day
 
     // Fire-and-forget: don't block rendering
     fetch('/api/snapshots/auto', { credentials: 'include' })
       .then(res => {
         if (res.ok) {
+          // Geslaagde roundtrip → dagstempel zetten zodat een harde reload vandaag
+          // de no-op-call overslaat. (res.ok geldt ook voor de server-no-op.)
+          try {
+            window.localStorage.setItem(AUTO_SNAPSHOT_DAY_KEY, day)
+          } catch {
+            // localStorage niet beschikbaar — geen fast-path, verder niets aan de hand.
+          }
           return res.json()
         }
         // Silently ignore auth errors (user might not be fully authenticated yet)

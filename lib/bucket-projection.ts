@@ -429,7 +429,12 @@ export function computeBucketProjection(input: BucketProjectionInput): BucketPro
 
   const bucketSummaries: BucketSummary[] = []
   for (const [type, { assets: bucketAssets, totalValue }] of bucketMap) {
-    if (totalValue === 0 && bucketAssets.length === 0) continue
+    // Sla lege buckets over op basis van het AANTAL assets, niet op `totalValue === 0`:
+    // een bucket-entry ontstaat alleen bij het pushen van een asset (zie hierboven),
+    // dus length is altijd >= 1 — maar een asset mág legitiem €0 waard zijn (bv.
+    // afgeschreven positie). Gaten op de berekende float-som zou zo'n asset onterecht
+    // wegfilteren; de length-guard blijft correct en vrij van float-gelijkheid.
+    if (bucketAssets.length === 0) continue
 
     // Weighted average return
     let weightedReturn = 0
