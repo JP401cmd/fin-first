@@ -36,7 +36,7 @@ import {
   type HealthScoreBudget,
   type HealthScoreTransaction,
 } from '@/lib/health-score-input'
-import type { DashboardData } from '@/components/widgets/widget-renderer'
+import type { DashboardData } from '@/lib/types/dashboard'
 import type { HealthScoreInput } from '@/lib/financial-health'
 
 const CAT = 'wil.gezondheid'

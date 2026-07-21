@@ -8,7 +8,7 @@ import {
   applyManualRefresh,
   type BriefingSnapshot,
 } from './snapshot'
-import type { BriefingEntry } from '@/components/overview/briefing-panel'
+import type { BriefingEntry } from '@/lib/types/briefing'
 
 /**
  * Tests voor de wekelijkse briefing-snapshot. De supabase-calls worden gemockt

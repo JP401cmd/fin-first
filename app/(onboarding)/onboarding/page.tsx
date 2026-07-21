@@ -975,6 +975,9 @@ export default function OnboardingPage() {
             goal_type: preset.goalType,
             icon: preset.icon,
             color: preset.color,
+            // Marker B: preset-key → goals.metadata.standaardDoel (detecteerbaar
+            // noodfonds-doel voor de score/resolver, lib/emergency-fund.ts).
+            standaardDoel: preset.key,
           }
         }
       }

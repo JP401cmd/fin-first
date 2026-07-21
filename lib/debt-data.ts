@@ -3,6 +3,8 @@
  * (amortization, snowball, avalanche, projections).
  */
 
+import { roundCents } from '@/lib/format'
+
 // ── Types ────────────────────────────────────────────────────
 
 export type DebtType =
@@ -324,10 +326,10 @@ export function amortizationSchedule(
     rows.push({
       month,
       date: date.toISOString().split('T')[0],
-      payment: Math.round(payment * 100) / 100,
-      principal: Math.round(principal * 100) / 100,
-      interest: Math.round(interestCharge * 100) / 100,
-      balance: Math.round(remaining * 100) / 100,
+      payment: roundCents(payment),
+      principal: roundCents(principal),
+      interest: roundCents(interestCharge),
+      balance: roundCents(remaining),
     })
   }
 
@@ -363,10 +365,10 @@ export function linearAmortization(
     rows.push({
       month,
       date: date.toISOString().split('T')[0],
-      payment: Math.round(payment * 100) / 100,
-      principal: Math.round(principal * 100) / 100,
-      interest: Math.round(interestCharge * 100) / 100,
-      balance: Math.round(remaining * 100) / 100,
+      payment: roundCents(payment),
+      principal: roundCents(principal),
+      interest: roundCents(interestCharge),
+      balance: roundCents(remaining),
     })
   }
 
@@ -397,10 +399,10 @@ export function interestOnlySchedule(
     rows.push({
       month,
       date: date.toISOString().split('T')[0],
-      payment: Math.round(interestCharge * 100) / 100,
+      payment: roundCents(interestCharge),
       principal: 0,
-      interest: Math.round(interestCharge * 100) / 100,
-      balance: Math.round(balance * 100) / 100,
+      interest: roundCents(interestCharge),
+      balance: roundCents(balance),
     })
   }
 
@@ -452,7 +454,7 @@ export function computeExpectedBalance(debt: Debt): ExpectedBalance | null {
       expectedBalance: original,
       monthsElapsed,
       totalTermMonths,
-      totalInterestPaid: Math.round(original * monthlyRate * monthsElapsed * 100) / 100,
+      totalInterestPaid: roundCents(original * monthlyRate * monthsElapsed),
     }
   }
 
@@ -466,7 +468,7 @@ export function computeExpectedBalance(debt: Debt): ExpectedBalance | null {
       expectedBalance: row ? row.balance : 0,
       monthsElapsed: elapsed,
       totalTermMonths,
-      totalInterestPaid: Math.round(totalInterest * 100) / 100,
+      totalInterestPaid: roundCents(totalInterest),
     }
   }
 
@@ -487,7 +489,7 @@ export function computeExpectedBalance(debt: Debt): ExpectedBalance | null {
     expectedBalance: row ? row.balance : 0,
     monthsElapsed: elapsed,
     totalTermMonths,
-    totalInterestPaid: Math.round(totalInterest * 100) / 100,
+    totalInterestPaid: roundCents(totalInterest),
   }
 }
 
@@ -518,7 +520,7 @@ export function computeRenteAflossingsSplit(debt: Debt): RenteAflossingsSplit | 
 
   // Aflossingsvrij: 100% rente, 0% aflossing
   if (debt.repayment_type === 'aflossingsvrij') {
-    const monthlyPayment = Math.round(currentRente * 100) / 100
+    const monthlyPayment = roundCents(currentRente)
     return {
       monthlyPayment,
       currentRente: monthlyPayment,
@@ -543,9 +545,9 @@ export function computeRenteAflossingsSplit(debt: Debt): RenteAflossingsSplit | 
     if (!remainingMonths && payment <= 0) return null
     const n = remainingMonths ?? (payment > currentRente ? Math.ceil(balance / (payment - currentRente)) : null)
     if (!n || n <= 0) return null
-    const aflossing = Math.round((balance / n) * 100) / 100
-    const rente = Math.round(currentRente * 100) / 100
-    const monthlyPayment = Math.round((aflossing + rente) * 100) / 100
+    const aflossing = roundCents(balance / n)
+    const rente = roundCents(currentRente)
+    const monthlyPayment = roundCents(aflossing + rente)
     return {
       monthlyPayment,
       currentRente: rente,
@@ -570,9 +572,9 @@ export function computeRenteAflossingsSplit(debt: Debt): RenteAflossingsSplit | 
     return null
   }
 
-  monthlyPayment = Math.round(monthlyPayment * 100) / 100
-  const rente = Math.round(currentRente * 100) / 100
-  const aflossing = Math.round(Math.max(0, monthlyPayment - rente) * 100) / 100
+  monthlyPayment = roundCents(monthlyPayment)
+  const rente = roundCents(currentRente)
+  const aflossing = roundCents(Math.max(0, monthlyPayment - rente))
 
   return {
     monthlyPayment,
@@ -618,7 +620,7 @@ export function debtProjection(debt: Debt): {
     const lastRow = schedule[schedule.length - 1]
     return {
       monthsToPayoff: months,
-      totalInterest: Math.round(totalInterest * 100) / 100,
+      totalInterest: roundCents(totalInterest),
       payoffDate: lastRow?.date ?? '',
       isPayable: true,
     }
@@ -640,7 +642,7 @@ export function debtProjection(debt: Debt): {
     const lastRow = schedule[schedule.length - 1]
     return {
       monthsToPayoff: schedule.length,
-      totalInterest: Math.round(totalInterest * 100) / 100,
+      totalInterest: roundCents(totalInterest),
       payoffDate: lastRow?.date ?? '',
       isPayable: true,
     }
@@ -659,7 +661,7 @@ export function debtProjection(debt: Debt): {
 
   return {
     monthsToPayoff: schedule.length,
-    totalInterest: Math.round(totalInterest * 100) / 100,
+    totalInterest: roundCents(totalInterest),
     payoffDate: lastRow?.date ?? '',
     isPayable: true,
   }
@@ -838,13 +840,13 @@ export function simulatePayoff(
       date: date.toISOString().split('T')[0],
       debts: monthDebts.map((d) => ({
         ...d,
-        payment: Math.round(d.payment * 100) / 100,
-        interest: Math.round(d.interest * 100) / 100,
-        principal: Math.round(d.principal * 100) / 100,
-        balance: Math.round(d.balance * 100) / 100,
+        payment: roundCents(d.payment),
+        interest: roundCents(d.interest),
+        principal: roundCents(d.principal),
+        balance: roundCents(d.balance),
       })),
-      totalPayment: Math.round(monthDebts.reduce((s, d) => s + d.payment, 0) * 100) / 100,
-      totalBalance: Math.round(monthDebts.reduce((s, d) => s + d.balance, 0) * 100) / 100,
+      totalPayment: roundCents(monthDebts.reduce((s, d) => s + d.payment, 0)),
+      totalBalance: roundCents(monthDebts.reduce((s, d) => s + d.balance, 0)),
     })
   }
 
@@ -872,8 +874,8 @@ export function payoffSummary(months: StrategyMonth[]): {
 
   return {
     totalMonths: months.length,
-    totalInterest: Math.round(totalInterest * 100) / 100,
-    totalPaid: Math.round(totalPaid * 100) / 100,
+    totalInterest: roundCents(totalInterest),
+    totalPaid: roundCents(totalPaid),
     payoffDate: months[months.length - 1].date,
   }
 }
@@ -1063,18 +1065,18 @@ export function computeDefaultMonthlyPayment(
   repayment: RepaymentType | null,
 ): number {
   if (repayment === 'aflossingsvrij') {
-    return Math.round((balance * (ratePct / 100) / 12) * 100) / 100
+    return roundCents(balance * (ratePct / 100) / 12)
   }
   if (years == null || years <= 0) return 0
 
   const months = years * 12
-  if (ratePct === 0) return Math.round((balance / months) * 100) / 100
+  if (ratePct === 0) return roundCents(balance / months)
 
   const monthlyRate = ratePct / 100 / 12
   if (repayment === 'lineair') {
-    return Math.round((balance / months + balance * monthlyRate) * 100) / 100
+    return roundCents(balance / months + balance * monthlyRate)
   }
   // annuiteit (default als repayment null of 'annuiteit')
   const factor = Math.pow(1 + monthlyRate, months)
-  return Math.round(((balance * (monthlyRate * factor)) / (factor - 1)) * 100) / 100
+  return roundCents((balance * (monthlyRate * factor)) / (factor - 1))
 }

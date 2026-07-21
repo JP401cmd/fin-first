@@ -5,7 +5,7 @@
 // de pagina toch al laadt (DashboardData + CashflowData). Pure module zodat de
 // server-page hem kan aanroepen; de client rendert de serialiseerbare output.
 
-import type { DashboardData } from '@/components/widgets/widget-renderer'
+import type { DashboardData } from '@/lib/types/dashboard'
 import type { CashflowData } from '@/lib/cashflow-data-loader'
 import type { VasteLastenSummary } from '@/lib/vaste-lasten-summary'
 import { buildForecast } from '@/lib/cashflow-forecast-math'

@@ -1012,11 +1012,19 @@ function InvestmentHoldingPaneEdit({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detail?.holding.notes, holding.id])
 
-  // Auto-sync: alleen units staat read-only bij broker-import. Avg-purchase-
-  // price blijft bewerkbaar omdat brokers vaak geen gewogen-gemiddelde
-  // doorgeven (bv. DEGIRO levert per-trade-prijs maar geen position-avg).
-  // Notes blijft altijd bewerkbaar — gebruiker-eigen veld.
+  // Auto-sync: bij broker-import staat units read-only. Notes blijft altijd
+  // bewerkbaar — gebruiker-eigen veld.
   const isAutoSynced = holding.externalSource !== null
+  // Transactie-afgeleid: zodra er transacties zijn, worden units én gemiddelde
+  // inkoopprijs server-side herberekend uit de historie (canonieke engine), dus
+  // ze zijn read-only. Handmatig overschrijven zou het opgeslagen veld direct
+  // weer laten afwijken van de transactiehistorie — precies de inconsistente-
+  // kostenbasis-bug. Alleen holdings zónder transacties (puur handmatig) houden
+  // een vrij bewerkbaar avg/units-veld (broker levert soms geen gewogen
+  // gemiddelde en geen trade-detail).
+  const hasTx = (detail?.transactions?.length ?? 0) > 0
+  const unitsReadOnly = isAutoSynced || hasTx
+  const avgPriceReadOnly = hasTx
   const tickerDisplay = holding.ticker?.toUpperCase() ?? ''
   const displayName = holding.name?.trim() || tickerDisplay
   const currency = (holding.currency ?? 'EUR').toUpperCase()
@@ -1036,15 +1044,16 @@ function InvestmentHoldingPaneEdit({
     if (saving) return false
     const notesChanged = notesInput.trim() !== serverNotes.trim()
     const avgParsed = parseNumericInput(avgPriceInput)
-    const avgChanged = (() => {
+    const avgChanged = !avgPriceReadOnly && (() => {
       if (avgParsed == null && initialAvgPrice === 0) return false
       if (avgParsed == null) return false
       return Math.abs(avgParsed - initialAvgPrice) > 1e-6
     })()
-    if (isAutoSynced) return notesChanged || avgChanged
     const unitsParsed = parseNumericInput(unitsInput)
     const unitsChanged =
-      unitsParsed != null && Math.abs(unitsParsed - initialUnits) > 1e-9
+      !unitsReadOnly &&
+      unitsParsed != null &&
+      Math.abs(unitsParsed - initialUnits) > 1e-9
     return notesChanged || unitsChanged || avgChanged
   }, [
     saving,
@@ -1054,7 +1063,8 @@ function InvestmentHoldingPaneEdit({
     initialUnits,
     initialAvgPrice,
     serverNotes,
-    isAutoSynced,
+    avgPriceReadOnly,
+    unitsReadOnly,
   ])
 
   // Save-handler. Body-bouw: notes altijd; avg-price altijd; units alleen
@@ -1066,15 +1076,19 @@ function InvestmentHoldingPaneEdit({
     const body: Record<string, unknown> = {
       notes: notesInput,
     }
-    const avgParsed = parseNumericInput(avgPriceInput)
-    if (avgParsed != null && avgParsed < 0) {
-      setValidationError('Gemiddelde inkoopprijs mag niet negatief zijn.')
-      return
+    // Positie-velden alleen meesturen als ze bewerkbaar zijn: bij transacties
+    // (of auto-sync) zijn ze read-only en worden ze server-side afgeleid.
+    if (!avgPriceReadOnly) {
+      const avgParsed = parseNumericInput(avgPriceInput)
+      if (avgParsed != null && avgParsed < 0) {
+        setValidationError('Gemiddelde inkoopprijs mag niet negatief zijn.')
+        return
+      }
+      if (avgParsed != null) {
+        body.avg_purchase_price = avgParsed
+      }
     }
-    if (avgParsed != null) {
-      body.avg_purchase_price = avgParsed
-    }
-    if (!isAutoSynced) {
+    if (!unitsReadOnly) {
       const unitsParsed = parseNumericInput(unitsInput)
       if (unitsParsed == null || unitsParsed < 0) {
         setValidationError('Aantal eenheden moet een positief getal zijn.')
@@ -1091,10 +1105,13 @@ function InvestmentHoldingPaneEdit({
         body: JSON.stringify(body),
       })
       const data = await res.json().catch(() => ({}))
-      if (res.status === 409 && data?.error === 'auto_synced') {
+      if (
+        res.status === 409 &&
+        (data?.error === 'auto_synced' || data?.error === 'has_transactions')
+      ) {
         const msg =
           data.message ||
-          'Aantal kan niet worden gewijzigd: deze holding is auto-synced.'
+          'Aantal en gemiddelde inkoopprijs kunnen niet handmatig worden gewijzigd.'
         setValidationError(msg)
         addToast({
           type: 'warning',
@@ -1124,7 +1141,8 @@ function InvestmentHoldingPaneEdit({
     }
   }, [
     holding.id,
-    isAutoSynced,
+    avgPriceReadOnly,
+    unitsReadOnly,
     unitsInput,
     avgPriceInput,
     notesInput,
@@ -1199,8 +1217,8 @@ function InvestmentHoldingPaneEdit({
         </p>
       </section>
 
-      {/* Auto-sync banner — alleen tonen voor broker-imports. Editorial
-          neutral-grond + kern-accent (zelfde palet als crypto-pane). */}
+      {/* Auto-sync banner — broker-imports. Editorial neutral-grond +
+          kern-accent (zelfde palet als crypto-pane). */}
       {isAutoSynced && (
         <section
           className="flex items-start gap-2 border border-kern-200 bg-kern-50 px-3 py-2"
@@ -1221,6 +1239,30 @@ function InvestmentHoldingPaneEdit({
         </section>
       )}
 
+      {/* Transactie-afgeleid banner — toont waarom positie-velden read-only
+          zijn wanneer er transacties bestaan (en het geen broker-sync is).
+          Zelfde palet als de auto-sync-banner. */}
+      {hasTx && !isAutoSynced && (
+        <section
+          className="flex items-start gap-2 border border-kern-200 bg-kern-50 px-3 py-2"
+          style={{ borderRadius: 'var(--r)' }}
+        >
+          <Briefcase
+            className="mt-0.5 h-3.5 w-3.5 shrink-0 text-kern-600"
+            aria-hidden="true"
+          />
+          <p
+            className="text-[12px] leading-snug text-kern-800"
+            style={{ fontFamily: 'var(--font-source-serif, serif)' }}
+          >
+            Aantal en gemiddelde inkoopprijs worden{' '}
+            <strong className="not-italic">afgeleid uit je transacties</strong>{' '}
+            en zijn niet los bewerkbaar. Voeg een transactie toe om de positie te
+            wijzigen.
+          </p>
+        </section>
+      )}
+
       {/* Form-velden */}
       <section className="space-y-4">
         {/* Veld 1 — Units */}
@@ -1229,27 +1271,35 @@ function InvestmentHoldingPaneEdit({
           label="Aantal eenheden"
           value={unitsInput}
           onChange={setUnitsInput}
-          readOnly={isAutoSynced}
+          readOnly={unitsReadOnly}
           step="any"
           min={0}
           help={
-            isAutoSynced
-              ? `Synced vanuit ${autoSyncSourceLabel}`
-              : 'Hoeveelheid van deze positie in je portefeuille.'
+            hasTx
+              ? 'Afgeleid uit je transactiehistorie.'
+              : isAutoSynced
+                ? `Synced vanuit ${autoSyncSourceLabel}`
+                : 'Hoeveelheid van deze positie in je portefeuille.'
           }
         />
 
-        {/* Veld 2 — Gem. inkoopprijs (altijd bewerkbaar — broker geeft niet
-            altijd een gewogen-gemiddelde terug, dus dit blijft een
-            gebruiker-eigen veld). */}
+        {/* Veld 2 — Gem. inkoopprijs. Read-only zodra er transacties zijn
+            (dan is het de transactie-afgeleide gewogen gemiddelde kostprijs);
+            bij een puur handmatige holding zonder transacties blijft het een
+            vrij bewerkbaar gebruiker-eigen veld. */}
         <FormFieldNumeric
           id="investment-edit-avg-price"
           label={`Gem. inkoopprijs (${currency})`}
           value={avgPriceInput}
           onChange={setAvgPriceInput}
+          readOnly={avgPriceReadOnly}
           step="0.01"
           min={0}
-          help="Gewogen gemiddelde aankoopprijs over al je transacties."
+          help={
+            avgPriceReadOnly
+              ? 'Gewogen gemiddelde kostprijs, afgeleid uit je transactiehistorie.'
+              : 'Gewogen gemiddelde aankoopprijs over al je transacties.'
+          }
         />
 
         {/* Veld 3 — Notities (altijd bewerkbaar, ook bij auto-sync) */}

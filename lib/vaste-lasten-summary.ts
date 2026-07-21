@@ -16,6 +16,7 @@ import {
 } from '@/lib/recurring-detection'
 import { isRecurringExpired } from '@/lib/recurring-data'
 import { localMonthStartMonthsAgo } from '@/lib/month-range'
+import { roundCents } from '@/lib/format'
 
 /** Kolomset die `detectRecurringTransactions` nodig heeft (getrimd). */
 type RecurringTxRow = {
@@ -188,9 +189,9 @@ export const loadVasteLastenSummary = cache(
       return {
         subscriptions: subs,
         vasteKosten: vk,
-        totalMonthlySubscriptions: Math.round(totalSubs * 100) / 100,
-        totalMonthlyVasteKosten: Math.round(totalVK * 100) / 100,
-        totalMonthly: Math.round((totalSubs + totalVK) * 100) / 100,
+        totalMonthlySubscriptions: roundCents(totalSubs),
+        totalMonthlyVasteKosten: roundCents(totalVK),
+        totalMonthly: roundCents(totalSubs + totalVK),
         count: subs.length + vk.length,
       }
     }
@@ -262,9 +263,9 @@ export const loadVasteLastenSummary = cache(
     return {
       subscriptions,
       vasteKosten,
-      totalMonthlySubscriptions: Math.round(totalSubs * 100) / 100,
-      totalMonthlyVasteKosten: Math.round(totalVK * 100) / 100,
-      totalMonthly: Math.round((totalSubs + totalVK) * 100) / 100,
+      totalMonthlySubscriptions: roundCents(totalSubs),
+      totalMonthlyVasteKosten: roundCents(totalVK),
+      totalMonthly: roundCents(totalSubs + totalVK),
       count: subscriptions.length + vasteKosten.length,
     }
   },

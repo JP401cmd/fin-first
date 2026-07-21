@@ -62,6 +62,10 @@ export async function updateSession(request: NextRequest) {
     '/api/daily-expense-rate',
     '/api/snapshots/cron',
     '/api/holdings/refresh-prices/cron',
+    // AVG-retentie-cron (Arch F3, ADR 0059): draait zonder gebruikerssessie en is
+    // fail-closed beschermd door CRON_SECRET in de handler. Zonder deze entry geeft
+    // de /api/-protected-prefix een 401 vóór de handler (zoals bij de andere crons).
+    '/api/cron/retention',
     '/api/goals/history',
     '/api/dividends',
   ]

@@ -1,12 +1,15 @@
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { syncAssetValueFromHoldings } from '@/lib/holdings-sync'
+import {
+  syncAssetValueFromHoldings,
+  syncHoldingAggregatesFromTransactions,
+} from '@/lib/holdings-sync'
 import { unauthorized, serverError } from '@/lib/api/respond'
+import { roundCents } from '@/lib/format'
 import {
   resolveHolding,
   type HoldingTables,
   tablesFor,
-  type HoldingBucket,
 } from '@/lib/holdings-table-resolver'
 
 /**
@@ -93,16 +96,12 @@ function computeRunningPnL(transactions: TransactionRow[]) {
       ...tx,
       // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
       running_units: parseFloat(runningUnits.toFixed(6)),
-      // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
-      running_cost_basis: parseFloat(runningCostBasis.toFixed(2)),
+      running_cost_basis: roundCents(runningCostBasis),
       // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
       running_avg_price: parseFloat(newRunningAvgPrice.toFixed(4)),
-      // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
-      realized_pnl: parseFloat(realizedPnl.toFixed(2)),
-      // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
-      cumulative_realized_pnl: parseFloat(cumulativeRealizedPnL.toFixed(2)),
-      // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
-      cumulative_dividends: parseFloat(cumulativeDividends.toFixed(2)),
+      realized_pnl: roundCents(realizedPnl),
+      cumulative_realized_pnl: roundCents(cumulativeRealizedPnL),
+      cumulative_dividends: roundCents(cumulativeDividends),
     }
   })
 }
@@ -193,18 +192,12 @@ export async function GET(
       transactions: transactions.reverse(),
       source,
       summary: {
-        // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
-        total_invested: parseFloat(totalInvested.toFixed(2)),
-        // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
-        total_sold: parseFloat(totalSold.toFixed(2)),
-        // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
-        realized_pnl: parseFloat(realizedPnl.toFixed(2)),
-        // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
-        unrealized_pnl: parseFloat(unrealizedPnl.toFixed(2)),
-        // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
-        dividend_income: parseFloat(dividendIncome.toFixed(2)),
-        // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
-        total_return: parseFloat(totalReturn.toFixed(2)),
+        total_invested: roundCents(totalInvested),
+        total_sold: roundCents(totalSold),
+        realized_pnl: roundCents(realizedPnl),
+        unrealized_pnl: roundCents(unrealizedPnl),
+        dividend_income: roundCents(dividendIncome),
+        total_return: roundCents(totalReturn),
         current_units: holdingUnits,
         current_avg_price: holdingAvgPrice,
         current_price: holdingCurrentPrice,
@@ -293,46 +286,23 @@ export async function POST(
 
     const source = `${resolved.tables.transactions}_table`
 
-    const currentUnits = Number(resolved.holding.units) || 0
-    const currentAvg = Number(resolved.holding.avg_purchase_price) || 0
-    let newUnits = currentUnits
-    let newAvg = currentAvg
-    let realizedPnl = 0
+    // Herbereken units + avg_purchase_price uit de VOLLEDIGE transactiehistorie
+    // (incl. de zojuist ingevoegde rij) via de canonieke engine — nooit meer een
+    // incrementele update op een mogelijk stale opgeslagen basis. Zo blijft het
+    // opgeslagen veld exact gelijk aan wat de detail-pane uit dezelfde engine
+    // afleidt (fix: holding-detail toonde inconsistente kostenbasis).
+    const sync = await syncHoldingAggregatesFromTransactions(
+      supabase,
+      resolved.tables,
+      holdingId,
+      user.id,
+    )
 
-    if (type === 'buy') {
-      newUnits = currentUnits + numUnits
-      newAvg = newUnits > 0
-        ? (currentUnits * currentAvg + numUnits * numPrice) / newUnits
-        : numPrice
-    } else if (type === 'sell') {
-      realizedPnl = (numPrice - currentAvg) * numUnits
-      newUnits = Math.max(0, currentUnits - numUnits)
-    } else if (type === 'split') {
-      const multiplier = numUnits
-      if (multiplier > 0 && currentUnits > 0) {
-        newUnits = currentUnits * multiplier
-        newAvg = currentAvg / multiplier
-      }
-    }
-    // dividend/reward/transfer_in/transfer_out/deposit/withdrawal/fee: laat
-    // units en avg met rust — caller verwacht idempotent gedrag voor non-buy/sell.
-
-    const { error: updateErr } = await supabase
-      .from(resolved.tables.holdings)
-      .update({
-        units: newUnits,
-        // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
-        avg_purchase_price: parseFloat(newAvg.toFixed(4)),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', holdingId)
-      .eq('user_id', user.id)
-
-    if (updateErr) {
+    if (!sync.synced) {
       return NextResponse.json({
         transaction,
         source,
-        warning: `Transaction recorded but holding update failed: ${updateErr.message}`,
+        warning: 'Transactie opgeslagen, maar de holding-aggregatie kon niet worden bijgewerkt.',
         holding_updated: false,
       }, { status: 201 })
     }
@@ -342,63 +312,11 @@ export async function POST(
       source,
       bucket: resolved.bucket,
       holding_updated: true,
-      new_units: newUnits,
-      // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
-      new_avg_price: parseFloat(newAvg.toFixed(4)),
-      // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
-      realized_pnl: type === 'sell' ? parseFloat(realizedPnl.toFixed(2)) : undefined,
+      new_units: sync.units,
+      new_avg_price: sync.avgPurchasePrice,
     }, { status: 201 })
   } catch (err) {
     return serverError(err, 'holdings-transactions:POST')
-  }
-}
-
-/**
- * Replay all transactions for a holding chronologically and compute the final
- * units and avg_purchase_price. Single source of truth na elke mutatie.
- */
-function replayTransactions(
-  transactions: Array<{ type: string; units: number; price_per_unit: number; date: string; created_at: string }>
-): { units: number; avgPurchasePrice: number } {
-  const sorted = [...transactions].sort((a, b) => {
-    const dateCompare = a.date.localeCompare(b.date)
-    if (dateCompare !== 0) return dateCompare
-    return (a.created_at || '').localeCompare(b.created_at || '')
-  })
-
-  let units = 0
-  let avgPrice = 0
-
-  for (const tx of sorted) {
-    const numUnits = Number(tx.units) || 0
-    const numPrice = Number(tx.price_per_unit) || 0
-
-    if (tx.type === 'buy') {
-      const newUnits = units + numUnits
-      avgPrice = newUnits > 0
-        ? (units * avgPrice + numUnits * numPrice) / newUnits
-        : numPrice
-      units = newUnits
-    } else if (tx.type === 'sell') {
-      units = Math.max(0, units - numUnits)
-      if (units <= 0) {
-        units = 0
-        avgPrice = 0
-      }
-    } else if (tx.type === 'split') {
-      const multiplier = numUnits
-      if (multiplier > 0 && units > 0) {
-        units *= multiplier
-        avgPrice /= multiplier
-      }
-    }
-  }
-
-  return {
-    // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
-    units: parseFloat(units.toFixed(6)),
-    // eslint-disable-next-line no-restricted-syntax -- parseFloat(toFixed): zie [Arch F4] centrale afrondingshelpers
-    avgPurchasePrice: parseFloat(avgPrice.toFixed(4)),
   }
 }
 
@@ -447,25 +365,17 @@ export async function DELETE(
       return serverError(error, 'holdings-transactions:DELETE')
     }
 
-    const { data: remaining } = await supabase
-      .from(resolved.tables.transactions)
-      .select('type, units, price_per_unit, date, created_at')
-      .eq('holding_id', holdingId)
-      .eq('user_id', user.id)
-      .order('date', { ascending: true })
-      .order('created_at', { ascending: true })
-
-    const { units: newUnits, avgPurchasePrice: newAvg } = replayTransactions(remaining || [])
-
-    const { error: updateErr } = await supabase
-      .from(resolved.tables.holdings)
-      .update({
-        units: newUnits,
-        avg_purchase_price: newAvg,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', holdingId)
-      .eq('user_id', user.id)
+    // Herbereken units + avg_purchase_price uit de RESTERENDE transactiehistorie
+    // via dezelfde canonieke engine als de POST-route en de detail-pane — één
+    // bron voor het opgeslagen veld (fix: inconsistente kostenbasis).
+    const sync = await syncHoldingAggregatesFromTransactions(
+      supabase,
+      resolved.tables,
+      holdingId,
+      user.id,
+    )
+    const newUnits = sync.units
+    const newAvg = sync.avgPurchasePrice
 
     // Sync parent asset waarde — `syncAssetValueFromHoldings` heeft de oude
     // tabel-namen niet gemigreerd, dus we slaan de aanroep over voor crypto
@@ -485,7 +395,7 @@ export async function DELETE(
     return NextResponse.json({
       success: true,
       bucket: resolved.bucket,
-      holding_updated: !updateErr,
+      holding_updated: sync.synced,
       new_units: newUnits,
       new_avg_price: newAvg,
       asset_synced: assetSynced,

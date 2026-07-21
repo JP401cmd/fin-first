@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildDraftEvent, initFormState, type EditFormState } from '@/components/app/horizon/event-pane-edit'
+import { buildDraftEvent, initFormState, type EditFormState } from '@/lib/horizon/event-pane-edit-form'
 
 const baseState: EditFormState = {
   name: 'Test',

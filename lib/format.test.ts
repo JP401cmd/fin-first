@@ -4,6 +4,11 @@ import {
   calculateFreedomTime,
   formatFreedomTimeString,
   formatWithFreedom,
+  roundCents,
+  roundEuro,
+  roundTenths,
+  roundToDecimals,
+  CENT_EPSILON,
 } from './format'
 
 describe('dailyExpenseRate — canonieke dagtarief-conversie', () => {
@@ -94,5 +99,167 @@ describe('formatWithFreedom — deficit-loan-banner scenario (includeDays:false)
     })
     expect(out).not.toBe('0 dagen')
     expect(out).toMatch(/dag/)
+  })
+})
+
+// ── Centrale afrondingshelpers ([Arch F4]) ────────────────────────────
+
+describe('roundCents — hele centen (2 decimalen)', () => {
+  it('rondt normale bedragen op 2 decimalen', () => {
+    expect(roundCents(1.234)).toBe(1.23)
+    expect(roundCents(1.236)).toBe(1.24)
+    expect(roundCents(100)).toBe(100)
+    expect(roundCents(0)).toBe(0)
+  })
+
+  it('behandelt negatieve bedragen (Math.round rondt half naar +∞)', () => {
+    expect(roundCents(-1.234)).toBe(-1.23)
+    expect(roundCents(-1.236)).toBe(-1.24)
+  })
+
+  it('.5-cent-randgevallen: spiegelt exact het vervangen idioom Math.round(x*100)/100', () => {
+    for (const v of [0.005, 1.255, 35.855, -0.5, 2.675, 8.575, 0.615]) {
+      expect(roundCents(v)).toBe(Math.round(v * 100) / 100)
+    }
+  })
+
+  it('niet-eindige/undefined input → 0 (safeNumber-guard, geen NaN-lek)', () => {
+    expect(roundCents(NaN)).toBe(0)
+    expect(roundCents(Infinity)).toBe(0)
+    expect(roundCents(-Infinity)).toBe(0)
+    // @ts-expect-error — runtime-safety voor undefined
+    expect(roundCents(undefined)).toBe(0)
+  })
+})
+
+describe('roundEuro — hele euro’s (0 decimalen)', () => {
+  it('rondt op hele euro’s (half naar +∞)', () => {
+    expect(roundEuro(1.49)).toBe(1)
+    expect(roundEuro(1.5)).toBe(2)
+    expect(roundEuro(2.5)).toBe(3)
+    expect(roundEuro(-1.5)).toBe(-1)
+  })
+
+  it('.5-randgeval spiegelt Math.round exact (incl. -0 via Object.is)', () => {
+    for (const v of [0.5, -0.5, 35.855, -2.5]) {
+      expect(roundEuro(v)).toBe(Math.round(v))
+    }
+  })
+
+  it('niet-eindige/undefined input → 0', () => {
+    expect(roundEuro(NaN)).toBe(0)
+    expect(roundEuro(Infinity)).toBe(0)
+    // @ts-expect-error — runtime-safety voor undefined
+    expect(roundEuro(undefined)).toBe(0)
+  })
+})
+
+describe('roundTenths — tienden (1 decimaal)', () => {
+  it('rondt op 1 decimaal', () => {
+    expect(roundTenths(1.24)).toBe(1.2)
+    expect(roundTenths(1.25)).toBe(1.3)
+    expect(roundTenths(0)).toBe(0)
+  })
+
+  it('spiegelt exact het vervangen idioom Math.round(x*10)/10', () => {
+    for (const v of [1.25, 98.63, 0.05, -0.05, 30.45]) {
+      expect(roundTenths(v)).toBe(Math.round(v * 10) / 10)
+    }
+  })
+
+  it('niet-eindige input → 0', () => {
+    expect(roundTenths(NaN)).toBe(0)
+    expect(roundTenths(Infinity)).toBe(0)
+  })
+})
+
+describe('roundToDecimals — variabel aantal decimalen', () => {
+  it('rondt op het gevraagde aantal decimalen', () => {
+    expect(roundToDecimals(1.23456, 3)).toBe(1.235)
+    expect(roundToDecimals(1.23456, 2)).toBe(roundCents(1.23456))
+    expect(roundToDecimals(12.34, 1)).toBe(roundTenths(12.34))
+  })
+
+  it('niet-positief/niet-eindig aantal decimalen → 0 decimalen (hele getallen)', () => {
+    expect(roundToDecimals(1.5, 0)).toBe(2)
+    expect(roundToDecimals(1.5, -1)).toBe(2)
+    expect(roundToDecimals(1.5, NaN)).toBe(2)
+  })
+
+  it('niet-eindige waarde → 0', () => {
+    expect(roundToDecimals(NaN, 2)).toBe(0)
+    expect(roundToDecimals(Infinity, 2)).toBe(0)
+  })
+})
+
+describe('afronders spiegelen de vervangen lokale helpers exact (gedragsbehoud)', () => {
+  // De oude lokale round2 (vaste-lasten-insights/-summary, schuld-checks, debt-data
+  // inline) = Math.round(n*100)/100 → roundCents is byte-identiek voor eindige input.
+  const oldRound2 = (n: number) => Math.round(n * 100) / 100
+  // De oude round0 in lib/check/build-report.ts = Math.round met finite-guard.
+  const oldRound0 = (n: number) => (Number.isFinite(n) ? Math.round(n) : 0)
+
+  it('roundCents ≡ oude round2 over een realistische bedragen-set', () => {
+    for (const n of [0, 12.5, 249.999, 750.005, -60.006, 14200.42, 3.8, 0.46]) {
+      expect(roundCents(n)).toBe(oldRound2(n))
+    }
+  })
+
+  it('roundEuro ≡ oude round0 (incl. finite-guard: NaN/∞ → 0)', () => {
+    for (const n of [0, 1.4, 1.6, -2.5, 450000.49, NaN, Infinity]) {
+      expect(roundEuro(n)).toBe(oldRound0(n))
+    }
+  })
+})
+
+describe('CENT_EPSILON — halve-cent-drempel', () => {
+  it('is een halve cent', () => {
+    expect(CENT_EPSILON).toBe(0.005)
+  })
+
+  it('twee bedragen binnen een halve cent gelden als gelijk, daarbuiten niet', () => {
+    expect(Math.abs(1.234 - 1.2345) < CENT_EPSILON).toBe(true)
+    expect(Math.abs(1.234 - 1.24) < CENT_EPSILON).toBe(false)
+  })
+})
+
+describe('Slice 2 characterization — idioom B → A (holdings/dividends-routes)', () => {
+  // De gemigreerde routes gingen van parseFloat(x.toFixed(2)) (idioom B) naar
+  // roundCents (idioom A). Deze twee idiomen zijn NIET altijd gelijk: op halve-
+  // cent-FP-randen (bv. 0.615, 249.005) rondt idioom A naar boven en idioom B —
+  // dat op de string-representatie rondt — naar beneden. TriFinity kiest hier
+  // BEWUST idioom A als canoniek ([Arch F4] + de F2-lint die idioom B verbiedt).
+  // Deze test pint die keuze en bewijst dat de afwijking begrensd is (≤ 1 cent),
+  // zodat een grondslag nooit ongemerkt méér dan één cent verschuift.
+  const idiomB = (v: number) => parseFloat(v.toFixed(2))
+
+  it('idioom A en B verschillen alleen op FP-randen, en dan hooguit één cent', () => {
+    let maxDelta = 0
+    let sawDivergence = false
+    for (let i = 0; i < 500000; i++) {
+      const v = i / 10000 // 0 .. 50, stap 0.0001
+      const delta = Math.abs(roundCents(v) - idiomB(v))
+      if (delta > 0) sawDivergence = true
+      if (delta > maxDelta) maxDelta = delta
+    }
+    expect(maxDelta).toBeLessThanOrEqual(0.01 + 1e-9)
+    // Ze verschillen daadwerkelijk — dát is waarom één canoniek idioom nodig was.
+    expect(sawDivergence).toBe(true)
+  })
+
+  it('canonieke keuze vastgepind: idioom A (roundCents) op de bekende halve-cent-randen', () => {
+    // Idioom A rondt naar boven; idioom B (string-toFixed) naar beneden.
+    expect(roundCents(0.615)).toBe(0.62)
+    expect(idiomB(0.615)).toBe(0.61)
+    expect(roundCents(249.005)).toBe(249.01)
+    expect(idiomB(249.005)).toBe(249)
+    expect(roundCents(2.675)).toBe(2.68)
+    expect(idiomB(2.675)).toBe(2.67)
+  })
+
+  it('op niet-rand-bedragen (het gros van de route-waarden) zijn beide idiomen identiek', () => {
+    for (const v of [12.34, 105.9, 1000, 3.8, 14200.42, 9592.59, 250.0, 1234.56]) {
+      expect(roundCents(v)).toBe(idiomB(v))
+    }
   })
 })

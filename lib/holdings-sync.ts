@@ -1,7 +1,97 @@
 import { createClient } from '@/lib/supabase/server'
 import { getEURRateSync } from '@/lib/forex'
+import {
+  computePositionFromTransactions,
+  HOLDINGS_TX_AGG_LIMIT,
+  type PositionAggregate,
+  type PositionTransaction,
+} from '@/lib/holdings-aggregation'
 
 type SupabaseLike = Awaited<ReturnType<typeof createClient>>
+
+export interface HoldingAggregatesSync {
+  /** False als de holding-update faalde (best-effort). */
+  synced: boolean
+  /** Herberekend aantal eenheden (= engine netUnits). */
+  units: number
+  /** Herberekende gemiddelde kostprijs (= engine avgCost). */
+  avgPurchasePrice: number
+  /** De volledige engine-aggregatie (voor callers die meer velden willen). */
+  aggregate: PositionAggregate
+}
+
+/**
+ * Herbereken units + avg_purchase_price van een holding uit de VOLLEDIGE
+ * transactiehistorie via de canonieke engine (computePositionFromTransactions)
+ * en schrijf ze terug op de holding-rij. DE bron voor de opgeslagen aggregaten
+ * na elke transactie-mutatie (create/update/delete van een `*_transactions`-rij),
+ * zodat het opgeslagen veld nooit kan afwijken van de transactie-afgeleide
+ * waarde die de detail-pane toont (fix: holding-detail toonde inconsistente
+ * kostenbasis — ingelegd + koerswinst ≠ marktwaarde).
+ *
+ * Consume, don't recompute: geen eigen average-cost-loop hier — we consumeren
+ * exact dezelfde engine die de detail-pane en de full-page-detail gebruiken,
+ * zodat elke surface hetzelfde gewogen gemiddelde ziet. Fees worden bewust NIET
+ * meegestuurd (net als de detail-fetch): ze beïnvloeden alleen het gerealiseerde
+ * resultaat, niet de op te slaan units/avgCost.
+ *
+ * Precisie: `avg_purchase_price` is een ongescaalde NUMERIC-kolom, dus de
+ * volledige engine-waarde blijft exact behouden — geen afronding die opnieuw een
+ * (sub-cent) afwijking t.o.v. de detail-pane introduceert.
+ */
+export async function syncHoldingAggregatesFromTransactions(
+  supabase: SupabaseLike,
+  tables: { holdings: string; transactions: string },
+  holdingId: string,
+  userId: string,
+): Promise<HoldingAggregatesSync> {
+  const { data: txRows } = await supabase
+    .from(tables.transactions)
+    .select('type, units, price_per_unit, total_amount, date, created_at')
+    .eq('holding_id', holdingId)
+    .eq('user_id', userId)
+    .order('date', { ascending: true })
+    .order('created_at', { ascending: true })
+    .limit(HOLDINGS_TX_AGG_LIMIT)
+
+  // NUMERIC-kolommen komen via PostgREST als string terug; de engine's interne
+  // `num()`-cast normaliseert dat, dus we geven de rauwe waarden ongewijzigd door.
+  const txs: PositionTransaction[] = (txRows ?? []).map((t) => {
+    const row = t as {
+      type: unknown
+      units: number | string | null
+      price_per_unit: number | string | null
+      total_amount: number | string | null
+      date: string | null
+    }
+    return {
+      type: String(row.type ?? ''),
+      units: row.units ?? 0,
+      price_per_unit: row.price_per_unit ?? 0,
+      total_amount: row.total_amount ?? null,
+      date: row.date ?? null,
+    }
+  })
+
+  const agg = computePositionFromTransactions(txs)
+
+  const { error } = await supabase
+    .from(tables.holdings)
+    .update({
+      units: agg.netUnits,
+      avg_purchase_price: agg.avgCost,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', holdingId)
+    .eq('user_id', userId)
+
+  return {
+    synced: !error,
+    units: agg.netUnits,
+    avgPurchasePrice: agg.avgCost,
+    aggregate: agg,
+  }
+}
 
 /**
  * Aggregate all active investment_holdings for a given asset and write the

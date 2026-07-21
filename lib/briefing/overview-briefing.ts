@@ -25,9 +25,9 @@ import { buildBriefingEntries, type BriefingEngineInput } from './engine'
 import { loadTopMarketBriefing } from './news-market'
 import { collectAandachtspunten } from '@/lib/aandachtspunten-loader'
 import type { Aandachtspunt } from '@/lib/aandachtspunten'
-import type { BriefingEntry } from '@/components/overview/briefing-panel'
-import type { SparklineDataPoint } from '@/components/app/budget-sparkline'
-import type { DashboardData } from '@/components/widgets/widget-renderer'
+import type { BriefingEntry } from '@/lib/types/briefing'
+import type { SparklineDataPoint } from '@/lib/types/briefing'
+import type { DashboardData } from '@/lib/types/dashboard'
 
 type FinData = Awaited<ReturnType<typeof loadFinData>>
 type HorizonData = Awaited<ReturnType<typeof loadHorizonData>> | null

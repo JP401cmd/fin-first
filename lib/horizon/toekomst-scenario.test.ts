@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { Asset, AssetType } from '@/lib/asset-data'
-import type { WhatIfEvent } from '@/components/app/horizon/whatif-events'
+import type { WhatIfEvent } from '@/lib/types/horizon-whatif'
 import {
   parseToekomstScenarioPrefs,
   isDoelConceptGewijzigd,

@@ -188,6 +188,9 @@ async function insertOnboardingGoal(
     custom_unit: null,
     ownership: 'personal',
     household_id: null,
+    // Marker B: standaard-doel-key zodat het noodfonds-doel detecteerbaar is
+    // voor de score/resolver (lib/emergency-fund.ts).
+    metadata: goal.standaardDoel ? { standaardDoel: goal.standaardDoel } : {},
   })
   if (error) {
     console.error('[onboarding-save] goal insert failed:', error.message)
@@ -466,6 +469,12 @@ const bodySchema = z.object({
     ]),
     icon: z.string().min(1).max(40),
     color: z.enum(['teal', 'amber', 'purple', 'emerald', 'red', 'blue']),
+    /**
+     * Standaard-doel-key (marker B) — meegeschreven als `goals.metadata.standaardDoel`
+     * zodat het noodfonds-doel detecteerbaar is voor de gezondheidsscore/resolver
+     * (lib/emergency-fund.ts). Optioneel/backward-compatibel.
+     */
+    standaardDoel: z.string().max(40).optional(),
   }).optional(),
   /** Parsed UPO pension data — optional, used to create pension life events and override AOW amount. */
   pensionData: z.object({

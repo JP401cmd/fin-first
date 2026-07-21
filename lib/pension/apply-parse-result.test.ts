@@ -19,7 +19,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import type { PensionParseResult } from '@/app/api/pension/parse/route'
+import type { PensionParseResult } from '@/lib/pension/types'
 
 // ── Minimale Supabase-stub ──────────────────────────────────────────────────
 // We moeten de Supabase-client nabootsen zonder de echte SDK/server-omgeving

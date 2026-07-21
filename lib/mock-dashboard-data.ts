@@ -3,7 +3,7 @@
  * Realistic Dutch test values for all fields.
  */
 
-import type { DashboardData } from '@/components/widgets/widget-renderer'
+import type { DashboardData } from '@/lib/types/dashboard'
 import type { FireRange } from '@/lib/horizon-data'
 import type { FreedomMilestoneResult } from '@/lib/freedom-milestones'
 import type { FireEndStrategy } from '@/lib/fire-strategy'

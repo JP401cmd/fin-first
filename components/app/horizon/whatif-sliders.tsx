@@ -19,13 +19,9 @@ import { useOptionalToast } from '@/components/app/toast-provider'
  * components that still consume the snapshot shape (WhatIfActions / Chat /
  * Scenarios). Pages compute it via deriveOverridesFromEvents.
  */
-export interface WhatIfOverrides {
-  monthlyIncome: number
-  workDaysPerWeek: number
-  savingsRate: number
-  expectedReturn: number
-  extraContribution: number
-}
+// Datacontract(en) wonen nu in @/lib/types/horizon-whatif (import-richting UI→lib).
+import type { WhatIfOverrides } from '@/lib/types/horizon-whatif'
+export type { WhatIfOverrides }
 
 interface SlidersProps {
   baseline: WhatIfOverrides

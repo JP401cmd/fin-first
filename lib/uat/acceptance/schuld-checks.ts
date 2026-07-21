@@ -44,6 +44,7 @@ import { debtsToAandachtspunten } from '@/lib/aandachtspunten'
 import { computeSharePct } from '@/lib/household-data'
 import { SCHULD_ACCEPTANCE } from './schuld'
 import type { AcceptanceCriterion } from './types'
+import { roundCents } from '@/lib/format'
 
 const lisa = PERSONAS.lisa
 const compleet = PERSONAS.compleet
@@ -75,11 +76,6 @@ function criterion(workflow: string): AcceptanceCriterion {
 
 function fx(n: number, decimals: number): string {
   return n.toFixed(decimals)
-}
-
-/** Bankers-veilige afronding op 2 decimalen (spiegelt Math.round(x*100)/100 in de engines). */
-function round2(n: number): number {
-  return Math.round(n * 100) / 100
 }
 
 /** Volledig getypeerde Debt uit een PersonaDebt-template — vult de velden aan
@@ -340,7 +336,7 @@ export const SCHULD_ENGINE_CHECKS: SchuldEngineCheck[] = [
       const hypo = toDebt(lisa.debts.find((d) => d.debt_type === 'mortgage') as PersonaDebt, 'hypo-lisa')
       const split = computeRenteAflossingsSplit(hypo)!
       const aflossingsdeel = split.currentAflossing
-      const incl50 = round2(aflossingsdeel * 0.5)
+      const incl50 = roundCents(aflossingsdeel * 0.5)
       return {
         expected: 'aflossingsdeel=254.17; aflossingsdeel50pct=127.09',
         actual: `aflossingsdeel=${fx(aflossingsdeel, 2)}; aflossingsdeel50pct=${fx(incl50, 2)}`,

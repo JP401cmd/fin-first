@@ -29,8 +29,13 @@ import type { CalculatorDefinition, InputKind } from './types'
  * mantissa's leveren psychologisch ronde waarden zonder die uitsluiting.
  *
  * Negatieve waarden behouden het teken; nul blijft nul.
+ *
+ * NB: dit is een significante-cijfer-SNAPPER, GEEN euro-cent-afronder. Bewust
+ * `snapToRoundNumber` genoemd (niet `roundEuro`) om verwarring/botsing met de
+ * centrale `roundEuro` uit lib/format ([Arch F4]) te voorkomen — die rondt op
+ * hele euro's; deze snapt een bedrag naar een psychologisch ronde waarde.
  */
-function roundEuro(value: number): number {
+function snapToRoundNumber(value: number): number {
   if (value === 0) return 0
   const sign = value < 0 ? -1 : 1
   const abs = Math.abs(value)
@@ -95,7 +100,7 @@ export function suggestPublicDefault(value: number, kind: InputKind): number {
   if (!Number.isFinite(value)) return value
   switch (kind) {
     case 'euro':
-      return roundEuro(value)
+      return snapToRoundNumber(value)
     case 'percent':
       return roundPercent(value)
     case 'years':

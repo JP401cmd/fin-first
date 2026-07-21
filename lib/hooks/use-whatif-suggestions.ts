@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import type { WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
-import type { SuggestedEvent } from '@/components/app/horizon/whatif-suggestion-cards'
+import type { WhatIfOverrides } from '@/lib/types/horizon-whatif'
+import type { SuggestedEvent } from '@/lib/types/horizon-whatif'
 import { isSignificantDelta, buildSuggestionPrompt } from '@/lib/whatif-suggestions'
 
 interface UseWhatIfSuggestionsOptions {

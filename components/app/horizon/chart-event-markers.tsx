@@ -8,6 +8,9 @@ import {
   type ChartEventKind,
 } from '@/lib/chart-event-overlay'
 import { EVENT_ICONS } from './log-timeline'
+// Geometrie-helpers + gedeelde layout-consts wonen nu in lib/horizon/chart-event-geometry.ts (UI→lib).
+import { ICON_R, STACK_SPACING, TOP_GUTTER, BOTTOM_GUTTER, LINE_GAP, topPaddingFor, bottomPaddingFor, iconStackTopFloor } from '@/lib/horizon/chart-event-geometry'
+export { topPaddingFor, bottomPaddingFor, iconStackTopFloor }
 
 /** Pixels-drempel voor drag-promotion. Onder deze afstand telt een
  *  pointer-down/up nog als click. F-1 plan: directe manipulatie op de
@@ -37,51 +40,10 @@ function formatAgeYearsMonths(age: number): { years: number; months: number } {
 // resp. PAD.bottom-zones van de chart-SVG; de host-chart moet zijn padding
 // vergroten zodat er ruimte is voor MAX_STACK_VISIBLE rijen.
 
-const ICON_R = 8
 const ICON_R_HOVER = 10
-const STACK_SPACING = 20
-const TOP_GUTTER = 6
-const BOTTOM_GUTTER = 6
 const TICK_DASH = '2 2'
-/** Verticale afstand tussen het lijn-punt en het midden van het onderste icoon. */
-const LINE_GAP = 10
 
-/** Minimale extra PAD-bovenrand zodat een icoon-stapel boven de bar (legacy)
- *  of vlak onder de chart-bovenrand op de lijn ankert zonder te clippen. */
-export function topPaddingFor(eventCount: number): number {
-  const stack = Math.min(eventCount, MAX_STACK_VISIBLE)
-  return stack > 0 ? TOP_GUTTER + ICON_R * 2 + (stack - 1) * STACK_SPACING + LINE_GAP : 0
-}
 
-/** Minimale extra PAD-onderrand zodat events onder de bar passen (legacy
- *  boven/onder-modus, bv. wealth-composition-chart die geen lijn-anker geeft). */
-export function bottomPaddingFor(eventCount: number): number {
-  const stack = Math.min(eventCount, MAX_STACK_VISIBLE)
-  return stack > 0 ? BOTTOM_GUTTER + ICON_R * 2 + (stack - 1) * STACK_SPACING + 4 : 0
-}
-
-/**
- * Absoluut minimum-y (clamp-vloer) voor het centrum van het ONDERSTE icoon
- * (stackIndex 0) wanneer de vermogenslijn zó hoog ligt dat de stapel anders
- * tegen de plot-bovenrand klemt.
- *
- * De clamp gebruikt deze vloer i.p.v. binnen het plot te klemmen, zodat de
- * iconen omhoog uitwijken in de via `topPaddingFor(maxStackAtAge)` gereserveerde
- * marge BOVEN het plot-vlak — wég van de doellijn-/FIRE-labels die ín het plot
- * staan. De vloer is zó gekozen dat de volledige stapel van `maxStackAtAge`
- * iconen rechtop in die marge past: het ONDERSTE icoon zit
- * `(stack-1)·STACK_SPACING` lager dan het bovenste, en het bovenste mag niet
- * boven `chartGutterTop + TOP_GUTTER` uitkomen (SVG-bovenrand-vrij).
- *
- * @param maxStackAtAge  grootste stapel op één leeftijd (zoals doorgegeven aan
- *                       topPaddingFor) — bepaalt hoe diep de vloer moet liggen.
- * @param chartGutterTop de vaste bovenmarge van de host-chart (CHART_PAD.top),
- *                       d.w.z. de bovenkant van de gereserveerde icoon-band.
- */
-export function iconStackTopFloor(maxStackAtAge: number, chartGutterTop: number): number {
-  const stack = Math.min(Math.max(maxStackAtAge, 1), MAX_STACK_VISIBLE)
-  return chartGutterTop + TOP_GUTTER + ICON_R + (stack - 1) * STACK_SPACING
-}
 
 /**
  * SVG-laag met event-markers boven en onder de chart-area.

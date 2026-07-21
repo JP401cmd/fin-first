@@ -93,6 +93,10 @@ export function DoelToevoegenSheet({
   // de goal-kaart de juiste identiteit krijgt (default: neutraal Target/teal).
   const [icon, setIcon] = useState('Target')
   const [color, setColor] = useState('teal')
+  // Gekozen standaard-doel-key (marker B): wordt als `metadata.standaardDoel`
+  // meegeschreven zodat het canonieke noodfonds-doel detecteerbaar is voor de
+  // gezondheidsscore + noodfonds-resolver (lib/emergency-fund.ts). null = vrij doel.
+  const [selectedPreset, setSelectedPreset] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // Geavanceerd-modus: opent GoalForm met alle goal_types + asset/debt-
@@ -128,6 +132,7 @@ export function DoelToevoegenSheet({
     setGoalType('savings')
     setIcon('Target')
     setColor('teal')
+    setSelectedPreset(null)
     setError(null)
   }
 
@@ -163,6 +168,9 @@ export function DoelToevoegenSheet({
       icon,
       color,
       is_completed: false,
+      // Marker B: standaard-doel-key zodat het noodfonds-doel detecteerbaar is
+      // voor de score/resolver (lib/emergency-fund.ts). Vrij doel → geen marker.
+      metadata: selectedPreset ? { standaardDoel: selectedPreset } : {},
     })
     if (insertError) {
       setError(`Opslaan mislukt: ${insertError.message}`)
@@ -243,6 +251,7 @@ export function DoelToevoegenSheet({
                         setGoalType(preset.goalType)
                         setIcon(preset.icon)
                         setColor(preset.color)
+                        setSelectedPreset(preset.key)
                       }}
                       className="flex flex-col items-start gap-0.5 border border-[var(--border-ed)] bg-[var(--paper)] p-2.5 text-left hover:border-[var(--ink-3)] hover:shadow-sm transition-all"
                     >

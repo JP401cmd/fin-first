@@ -15,7 +15,7 @@ import {
   Lock,
   type LucideIcon,
 } from 'lucide-react'
-import { HEFBOOM_CONFIG, type Hefboom } from '@/lib/hefboom-config'
+import { HEFBOOM_CONFIG } from '@/lib/hefboom-config'
 import { formatTimestamp } from '@/lib/format'
 import { ShareDialog, type ShareContent } from '@/components/app/share-dialog'
 import { useModuleAccess } from '@/components/app/feature-access-provider'
@@ -50,48 +50,12 @@ import type { FreedomCardData } from '@/components/app/freedom-card'
  *   - 'wide'    → 2 kolommen (breekt visueel uit, voor headline-items)
  */
 
-export type BriefingCategory =
-  | 'observation'
-  | 'tip'
-  | 'upcoming'
-  | 'heads_up'
-  | 'milestone'
-  | 'market'
-
-export type BriefingSpan = 'narrow' | 'wide'
-
-/** Backwards-compatible alias — gedeelde definitie staat in
- *  `lib/hefboom-config.ts`. */
-export type HefboomTag = Hefboom
-
-export interface BriefingEntry {
-  /** Unieke key voor React-list-key. */
-  id: string
-  category: BriefingCategory
-  /** Eén-zin body — primaire boodschap. */
-  text: string
-  /** Optionele href voor doorklikken naar context. */
-  href?: string
-  /** Visuele span — 'wide' = 2-kolom-card, 'narrow' = 1-kolom (default). */
-  span?: BriefingSpan
-  /** Optionele hefboom-tag. Wanneer aanwezig: mini-icoon naast kicker. */
-  hefboom?: HefboomTag
-  /** Optionele impact-metadata (freedom-days + EUR-effect uit recommendation). */
-  impact?: {
-    freedomDaysPerYear?: number | null
-    euroPerYear?: number | null
-  }
-}
-
-/** Eén afgesloten week uit de briefing-historie (bewaard in de snapshot,
- *  gecapt — zie lib/briefing/snapshot.ts). */
-export interface BriefingWeekHistoryItem {
-  /** ISO-week-sleutel 'YYYY-Www'. */
-  week: string
-  headline?: string
-  entries: BriefingEntry[]
-  /** Vrijheidsdagen-stand van die week (voor de mini-samenvatting). */
-  freedomDays?: number
+// Datacontracten wonen nu in lib/types/briefing.ts (import-richting UI→lib).
+import type {
+  BriefingCategory, BriefingSpan, HefboomTag, BriefingEntry, BriefingWeekHistoryItem,
+} from '@/lib/types/briefing'
+export type {
+  BriefingCategory, BriefingSpan, HefboomTag, BriefingEntry, BriefingWeekHistoryItem,
 }
 
 const CATEGORY_CONFIG: Record<

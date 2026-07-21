@@ -12,7 +12,7 @@
 // De stap "horizon-instellingen" verwijst bewust naar /identity/instellingen,
 // niet naar een module-gated route.
 
-import type { DashboardData } from '@/components/widgets/widget-renderer'
+import type { DashboardData } from '@/lib/types/dashboard'
 import type { ModuleGuideStep } from './module-guide-steps'
 
 // ── Progress-key prefix ────────────────────────────────────────────────

@@ -3,11 +3,9 @@
 import { useMemo, memo } from 'react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 
-export type SparklineDataPoint = {
-  month: string  // YYYY-MM-DD
-  label: string  // e.g. 'jan', 'feb'
-  spent: number
-}
+// Datacontract woont nu in lib/types/briefing.ts (import-richting UI→lib).
+import type { SparklineDataPoint } from '@/lib/types/briefing'
+export type { SparklineDataPoint }
 
 type BudgetSparklineProps = {
   /** Monthly spending data (up to 12 points) */

@@ -17,7 +17,7 @@
 import { cache } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getCachedUser } from '@/lib/supabase/cached-user'
-import type { TransactionRow } from '@/components/app/transacties-feed'
+import type { TransactionRow } from '@/lib/types/transactions'
 import type { RecurringTransaction } from '@/lib/recurring-data'
 import { loadPerspectiveTransactionsServer } from '@/lib/household/perspective-loader-server'
 import { type PerspectiveItem } from '@/lib/household/perspective-loader'

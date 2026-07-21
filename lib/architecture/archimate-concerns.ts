@@ -19,6 +19,8 @@ export interface ArchiConcern {
   severity: ArchiConcernSeverity
   /** Element-id's waarop dit punt slaat */
   elementIds: string[]
+  /** Datum (YYYY-MM-DD) waarop dit punt voor het laatst geverifieerd is tegen de code. */
+  reviewedAt: string
 }
 
 export const ARCHI_CONCERNS: ArchiConcern[] = [
@@ -26,17 +28,10 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
     id: 'legacy-backing-routes',
     title: 'Legacy backing-routes blijven leven',
     detail:
-      'De canonieke navigatie is /overzicht · /toekomst · /mijn, maar /core · /will · /horizon · /identity bestaan nog als backing-routes. Bewust, maar dubbele paden vergroten de kans op drift.',
+      'De canonieke navigatie is /overzicht · /toekomst · /mijn, maar /core · /horizon · /dashboard bestaan nog als backing-routes. Bewust, maar dubbele paden vergroten de kans op drift.',
     severity: 'info',
     elementIds: ['app-comp'],
-  },
-  {
-    id: 'nav-shell-cleanup',
-    title: 'Navigatie-redesign — fase 4 cleanup openstaand',
-    detail:
-      'De nieuwe sidebar/mobile-shell staat achter feature-flag new_navigation_shell. Fase 0-3 zijn af; de opruimfase (oude shell verwijderen) loopt nog.',
-    severity: 'debt',
-    elementIds: ['app-comp'],
+    reviewedAt: '2026-07-21',
   },
   {
     id: 'horizon-god-component',
@@ -45,22 +40,7 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
       'Eén client van ~6900 regels draagt /toekomst zonder eigen tests. Decompositie loopt (stap 1 HorizonTrendGrid klaar); tot dan is dit het grootste wijzigingsrisico van de app.',
     severity: 'debt',
     elementIds: ['fn-toekomstplannen', 'as-planning'],
-  },
-  {
-    id: 'checkin-island',
-    title: 'Check-in rekent op een eigen eiland',
-    detail:
-      'De check-in gebruikt SWR 4%, “deze maand” en ongewogen vermogen, terwijl de rest op resolveFireParams + gewogen vermogen draait. Inconsistente kerngetallen tussen check-in en dashboard.',
-    severity: 'risk',
-    elementIds: ['as-coach', 'as-planning'],
-  },
-  {
-    id: 'tz-month-boundaries',
-    title: 'Tijdzone-onveilige maandgrenzen',
-    detail:
-      '~15 call-sites bouwen maandgrenzen met toISOString() i.p.v. localMonthBounds(); in NL schuift dat een dag terug en lekt vorige-maand-salaris in de totalen. Gebruik lib/month-range.ts.',
-    severity: 'risk',
-    elementIds: ['as-budget', 'as-import'],
+    reviewedAt: '2026-07-21',
   },
   {
     id: 'public-intake-write',
@@ -69,6 +49,7 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
       'De Vrijheidscheck-funnel laat een anonieme bezoeker (geen auth.uid()) server-side wegschrijven naar lead_intakes — het eerste publieke schrijfpad dat via de service-role RLS omzeilt. De vangrails (zod + payload-grens + IP-rate-limit + Turnstile, fail-closed) zijn ontworpen en security gaf een voorwaardelijke GO, maar de migratie/secrets zijn nog niet uitgerold. Tot de hardening getest én gedeployed is, blijft dit het scherpste structurele risico. Verwijder dit punt zodra deploy + GO rond zijn.',
     severity: 'risk',
     elementIds: ['as-vrijheidscheck', 't-supabase', 'do-lead'],
+    reviewedAt: '2026-07-03',
   },
   {
     id: 'migration-drift',
@@ -77,6 +58,7 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
       'De lokale supabase/migrations-map loopt niet gelijk met remote. DDL via apply_migration; check kolommen/functies vóór je erop bouwt, anders bouw je op een schema dat remote niet bestaat.',
     severity: 'risk',
     elementIds: ['t-supabase', 'data-cont'],
+    reviewedAt: '2026-07-20',
   },
   {
     id: 'horizon-kernel-bekende-afwijkingen',
@@ -85,6 +67,7 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
       'Vier structurele kanttekeningen bij de horizon-kernel (ADR 0032), geen bugs maar wel aandachtspunten. (1) B93 reached_now-quirk: bij een doelbedrag van €0 (bv. legacy-nalatenschap €0, of deplete zonder expliciet doel) geeft het solver-statusblok altijd status reached_now zodra Prognose!J(0) ≥ 0 — letterlijke Excel-parity, maar mogelijk verwarrend als UI-tekst ("je kunt nu al stoppen" bij een leeg doel). Nog geen apart gap-besluit genomen (docs/horizon-excel-oracle-plan.md §V12). (2) De scenario-band/Monte-Carlo-wrappers (lib/horizon-kernel/wrappers/band.ts, wrappers/mc.ts) leveren uitsluitend SCALAIRE uitkomsten per scenario (fireAge, netto-vermogen-bij-FIRE, netto-liquide-bij-eindleeftijd — de Sim!B/C/D-rij) — geen volledige per-jaar LedgerRow-achtige asset-/schuld-/onttrekkingsbreakdown per scenario. Een toekomstige UI die per-scenario samenstelling wil tonen (net als de hoofdgrafiek) vindt die breakdown niet; dat vereist een aparte volledige kernel-run per scenario. (3) Lege-surplus-doelpot-divergentie (gap-besluit V17, eigenaar 2026-07-03): staat de surplus-doelpot op €0, dan laat het Excel-oracle het maandspaar VERDAMPEN (Σgewicht=0 → inleg €0), terwijl de kernel via de bewuste degeneratie-fallback (toenameGewichten tak A) het spaargeld wél in de lege pot stort — bij het eigenaar-account het verschil tussen FIRE 59,58 (kernel) en 89,33 (Excel, zelfde invoer; end-to-end-verificatie scripts/horizon-oracle/*eigenaar-live*). De kernel-extensie is de gewenste semantiek; definitieve borging = Excel v6 fixen + fixtures herextraheren (eigenaar-actie); tot die tijd bewaken surplus-/withdrawal-evaporation-tests het kernel-gedrag en mag deze divergentie NIET "richting oracle" worden weggefixt zonder nieuw eigenaar-besluit. (4) Tekort-aflossing-uit-liquide (gap-besluit V19 / ADR 0033, eigenaar 2026-07-04, F6-bugfix): het Excel v5-oracle lost een tekort-lening alléén af uit de positieve maandkasstroom-surplus-tak — in de onttrekkingsfase 0 — waardoor een verkoop-transitie-lag-piek (eigenaar: €6.758 op leeftijd 75) 17 jaar met 5% rente compoundt terwijl er >€900k liquide náást staat. De kernel lost dit tekort voortaan (app-pad) maandelijks af uit de resterende liquide bezit-capaciteit (m−1-lag, onttrekking-waterval-volgorde, Σruw=0). Schakelbaar via KernelInput.tekortAflossingUitLiquide: app-pad AAN, parity-/fixture-pad UIT (input-from-fixture zet de vlag niet → 735 fixtures byte-groen). TRANSITIONEEL: borging = Excel v6 fixen + fixtures herextraheren; vangnet lib/horizon-kernel/tekort-aflossing-liquide.test.ts; niet "richting oracle" wegfixen zonder nieuw eigenaar-besluit.',
     severity: 'debt',
     elementIds: ['as-planning', 'fn-toekomstplannen'],
+    reviewedAt: '2026-07-13',
   },
   {
     id: 'vermogenshistorie-persoonlijk-only',
@@ -93,6 +76,7 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
       'De "Netto vermogen — verloop"-uitsplitsing draait op balance_snapshots, en die tabel heeft (anders dan assets/debts) nog geen household-model — dus de per-groep-historie toont alleen het persoonlijke perspectief, terwijl de rest van Kern het huishoud-perspectief kan tonen. loadWealthGroupHistory is perspectief-agnostisch gebouwd (ownership-parameter aanwezig, nog niet vertakt), maar tot balance_snapshots een huishoud-eigenaarschap kent divergeert deze laag stil van het gedeelde perspectief. Verwijder dit punt zodra de household-variant (ownership: "all") is uitgerold. Zie ADR 0046.',
     severity: 'debt',
     elementIds: ['as-vermogen', 'fn-vermogensregistratie'],
+    reviewedAt: '2026-07-17',
   },
   {
     id: 'signup-email-allowlist',
@@ -101,6 +85,7 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
       'Een Supabase auth-hook (signup_email_allowlist, ADR 0047) blokkeert registraties waarvan het e-mailadres niet op de allowlist staat — bedoeld om de app tijdens de besloten testfase gesloten te houden. Dit moet vóór publieke lancering weer uit, anders blijft de app onbereikbaar voor nieuwe gebruikers.',
     severity: 'debt',
     elementIds: ['t-supabase'],
+    reviewedAt: '2026-07-17',
   },
   {
     id: 'fragiele-webgpu-lokaal-ai',
@@ -109,6 +94,7 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
       'Sinds 19 jul 2026 vervangen: de oude Transformers.js/ONNX-fragiliteit (reproduceerbare unaligned accesses-crash, device-loss die het héle browser-GPU-proces vergiftigde tot een paginaherlaad — bevestigd in de L1-controlemeting, spikes/litert-lm/meetrapport-v1.md) is weg na de runtime-swap naar LiteRT-LM. Daarvoor in de plaats een kleiner, ander risico: `@litert-lm/core` 0.14.0 is Early Preview (API-breuk tussen versies mogelijk, daarom exact gepind, niet op een range), biedt geen sampling-controle op de web-SDK, en de Windows/NVIDIA-tak is minder getest dan de standaardpaden (kanarie: upstream-issue #2572). Windows-multi-GPU kiest bovendien de iGPU en negeert `powerPreference` (crbug 369219127) — geen runtime-bug maar een browserbeperking die de realistische performance bepaalt. Gemitigeerd met dezelfde bouwvoorwaarden als voorheen: review-UI-only, geen-cloud-fallback (fail-closed), automatisch sessieherstel (ADR 0043). Verwijder of verzwak dit punt zodra LiteRT-LM JS uit Early Preview is en de Windows/NVIDIA-tak breder bewezen is.',
     severity: 'debt',
     elementIds: ['t-lokale-ai', 'as-import', 'as-coach'],
+    reviewedAt: '2026-07-19',
   },
 ]
 
@@ -136,6 +122,19 @@ export function validateConcerns(model: ArchimateModel): string[] {
     seen.add(c.id)
     if (c.elementIds.length === 0) errors.push(`concern ${c.id} heeft geen elementen`)
     for (const e of c.elementIds) if (!ids.has(e)) errors.push(`concern ${c.id} verwijst naar onbekend element ${e}`)
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(c.reviewedAt)) errors.push(`concern ${c.id} heeft geen geldige reviewedAt (YYYY-MM-DD)`)
   }
   return errors
+}
+
+/** Aandachtspunten die langer dan `maxAgeMonths` niet herzien zijn tegen `now` (default: vandaag). */
+export const CONCERN_MAX_AGE_MONTHS = 6
+
+export function findStaleConcerns(maxAgeMonths: number = CONCERN_MAX_AGE_MONTHS, now: Date = new Date()): ArchiConcern[] {
+  const cutoff = new Date(now.getFullYear(), now.getMonth() - maxAgeMonths, now.getDate())
+  return ARCHI_CONCERNS.filter((c) => {
+    const [y, m, d] = c.reviewedAt.split('-').map(Number)
+    const reviewed = new Date(y, m - 1, d)
+    return reviewed.getTime() < cutoff.getTime()
+  })
 }

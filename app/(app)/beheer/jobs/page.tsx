@@ -58,6 +58,13 @@ const JOB_CATALOG = [
     path: '/api/web-vitals/retention/cron',
     description: 'Verwijdert web_vitals-metingen ouder dan de retentietermijn (180 dagen) zodat de RUM-tabel niet ongebreideld groeit.',
   },
+  {
+    key: 'retention',
+    label: 'AVG-bewaartermijnen',
+    schedule: 'Dagelijks 03:45',
+    path: '/api/cron/retention',
+    description: 'Purget log-/usage-rijen ouder dan de vastgelegde bewaartermijn (error_logs/mail_log 12m, job_runs 6m, contract_events/ai_token_usage/ai_usage 24m) en verlopen lead_intakes (90d). Zie ADR 0059.',
+  },
 ] as const
 
 const dateTimeFmt = new Intl.DateTimeFormat('nl-NL', {

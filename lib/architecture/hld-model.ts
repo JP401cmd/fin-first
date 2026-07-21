@@ -94,6 +94,7 @@ export function buildHldModel(): HldModel {
           { title: 'Jezelf spiegelen aan Nederland en de wereld', desc: 'Zie hoe je gezondheid, spaarquote, vermogen en vrijheidsleeftijd zich verhouden tot een vergelijkbare doelgroep — en waar je staat wereldwijd.' },
           { title: 'Meteen begrijpen waaróm iets je aandacht vraagt en wat je kunt doen', desc: 'Als een overzichtspagina oranje of rood kleurt, legt een banner in gewone taal uit wat er speelt en wat je concreet kunt aanpakken — met een directe link naar de juiste plek of een gesprek met Fin.' },
           { title: 'Transacties lokaal laten categoriseren, zonder dat je gegevens je toestel verlaten', desc: 'Experimenteel en alleen op desktop: zet je AI-categorisatie lokaal aan en je transactiegegevens gaan niet naar een cloud-AI-provider — elk voorstel controleer je zelf voor je het overneemt.' },
+          { title: 'Financieel nieuws lezen dat om jouw cijfers draait', desc: 'Zet de nieuwsmodule aan voor gepersonaliseerd nieuws — alleen artikelen die daadwerkelijk raken aan jouw bezittingen, categorieën of doelen, geen ruis.' },
         ],
       },
       {

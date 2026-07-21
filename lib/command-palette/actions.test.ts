@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { buildActionItems, type ActionRunContext } from './actions'
-import type { PerspectiveOption } from '@/components/app/perspective-provider'
+import type { PerspectiveOption } from '@/lib/types/perspective'
 
 /**
  * Tests voor buildActionItems — focus op de nieuwe dynamische

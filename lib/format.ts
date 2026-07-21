@@ -12,6 +12,72 @@ function safeNumber(value: unknown): number {
   return value
 }
 
+// ── Centrale afrondingshelpers ([Arch F4]) ────────────────────────────
+//
+// Eén huis voor euro-afronding. Vóór deze helpers waren er twee idiomen naast
+// elkaar — `Math.round(x*100)/100` (idioom A) en `parseFloat(x.toFixed(2))`
+// (idioom B) — plus losse lokale `round2`/`round1`-helpers. Idioom A en B
+// verschillen in exotische floating-point-randgevallen; dit blok legt idioom A
+// vast als canoniek (conform de F2-lint die idioom B in app/**+components/**
+// verbiedt).
+//
+// Regel: afronden hoort bij WEERGAVE / response-shaping. Accumulatoren blijven
+// ONGEROND — het patroon dat de rekenkernen al volgen. Rond dus pas af op de
+// uitvoer-rij, nooit tussentijds in een som.
+//
+// Alle helpers hergebruiken de `safeNumber`-guard (NaN/Infinity/undefined → 0).
+// Dat is essentieel bij het vervangen van een ongeguarde inline-afronding:
+// zonder guard zou een niet-eindige tussenwaarde als NaN doorlekken.
+
+/**
+ * Halve cent — de drempel waaronder twee geldbedragen als "gelijk" gelden.
+ *
+ * Vooruitlopende, gedocumenteerde standaard ([Arch F4] beslispunt c): er is nog
+ * geen call-site. Gebruik dit i.p.v. een losse `0.005`/`1e-2` zodra euro-
+ * bedragen uit verschillende afrondingspaden vergeleken moeten worden, zodat een
+ * sub-cent floating-point-residu geen vals verschil oplevert
+ * (`Math.abs(a - b) < CENT_EPSILON`).
+ */
+export const CENT_EPSILON = 0.005
+
+/**
+ * Rond een geldbedrag af op hele centen (2 decimalen) — dé centrale euro-
+ * afronder. Canoniek idioom A (`Math.round(x*100)/100`); byte-identiek aan de
+ * inline-vorm voor eindige input, en NaN/Infinity/undefined → 0 via `safeNumber`.
+ */
+export function roundCents(value: number): number {
+  return Math.round(safeNumber(value) * 100) / 100
+}
+
+/**
+ * Rond een geldbedrag af op hele euro's (0 decimalen). Zie `roundCents` voor de
+ * canonieke-idioom- en guard-motivatie.
+ */
+export function roundEuro(value: number): number {
+  return Math.round(safeNumber(value))
+}
+
+/**
+ * Rond af op tienden (1 decimaal). Voor afgeleide 1-decimaal-grootheden zoals
+ * `freedom_days_per_year` (vrijheidsdagen) die geen centen zijn maar wel een
+ * vaste weergaveprecisie hebben.
+ */
+export function roundTenths(value: number): number {
+  return Math.round(safeNumber(value) * 10) / 10
+}
+
+/**
+ * Algemene afronding op `decimals` decimalen (idioom A). `roundCents`/
+ * `roundTenths` zijn de benoemde snelkoppelingen voor 2/1 decimalen; gebruik
+ * deze voor een variabel aantal decimalen. Niet-positieve/niet-eindige
+ * `decimals` valt terug op 0 decimalen.
+ */
+export function roundToDecimals(value: number, decimals: number): number {
+  const d = Number.isFinite(decimals) && decimals > 0 ? Math.floor(decimals) : 0
+  const factor = Math.pow(10, d)
+  return Math.round(safeNumber(value) * factor) / factor
+}
+
 export function formatCurrency(value: number): string {
   const safe = safeNumber(value)
   return new Intl.NumberFormat('nl-NL', {

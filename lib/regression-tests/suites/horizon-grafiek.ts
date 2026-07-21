@@ -14,7 +14,7 @@ import { runScalarProjectionV2 as runSimulation } from './_kernel-sim'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
 import { resolveFireParams } from '@/lib/fire-params'
 import { BOX3_DRAG, NL_AOW_AGE } from '@/lib/constants'
-import { buildSegments, type FaseId } from '@/components/app/horizon/phase-bar'
+import { buildSegments, type FaseId } from '@/lib/horizon/phase-bar-segments'
 import { PERSONAS, PERSONA_KEYS, type PersonaKey } from '@/lib/test-personas'
 
 const CAT = 'horizon.projecties'

@@ -28,11 +28,11 @@
  * truth voor het redirect-net — geen mirror nodig.
  */
 
-import { deriveTabFromPath, isTabRoot, STACK_DEPTH_LIMIT } from '@/components/app/shell/nav-stack-provider'
+import { deriveTabFromPath, isTabRoot, STACK_DEPTH_LIMIT } from '@/lib/nav/tab-path'
 import { resolveRouteTitle, SIMPLE_HIDDEN_NAV_HREFS } from '@/lib/nav-config'
 import { getAllPageItems, filterPagesByModules } from '@/lib/command-palette/navigation-index'
 import { buildActionItems, type ActionRunContext } from '@/lib/command-palette/actions'
-import type { PerspectiveOption } from '@/components/app/perspective-provider'
+import type { PerspectiveOption } from '@/lib/types/perspective'
 import nextConfig from '@/next.config'
 import { NAV_ACCEPTANCE } from './nav'
 import type { AcceptanceCriterion } from './types'

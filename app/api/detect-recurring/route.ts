@@ -4,6 +4,7 @@ import {
   detectRecurringTransactions,
   type DetectedRecurring,
 } from '@/lib/recurring-detection'
+import { localMonthStartMonthsAgo } from '@/lib/month-range'
 
 /**
  * GET /api/detect-recurring
@@ -29,10 +30,9 @@ export async function GET(request: Request) {
     const months = Math.min(24, Math.max(3, parseInt(url.searchParams.get('months') || '12')))
     const minConfidence = url.searchParams.get('min_confidence') || 'low'
 
-    // Calculate date range
+    // Calculate date range — lokale maandgrens, geen toISOString() (NL-dag-shift)
     const now = new Date()
-    const startDate = new Date(now.getFullYear(), now.getMonth() - months, 1)
-    const startDateStr = startDate.toISOString().split('T')[0]
+    const startDateStr = localMonthStartMonthsAgo(now, months)
 
     // Fetch transactions, existing recurrings, and budgets in parallel
     const txQuery = supabase

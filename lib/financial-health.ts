@@ -22,8 +22,9 @@
  * inactief → total 0, label 'Kritiek', zonder divide-by-zero.
  */
 
-import type { DashboardData } from '@/components/widgets/widget-renderer'
+import type { DashboardData } from '@/lib/types/dashboard'
 import type { ModuleId } from '@/lib/module-registry'
+import { DEFAULT_EMERGENCY_TARGET_MONTHS, emergencyScoreTargetMonths } from '@/lib/emergency-fund'
 
 // ── Lightweight input for server-side / snapshot usage ───────
 // Allows computing the health score without a full DashboardData bundle.
@@ -33,6 +34,12 @@ export interface HealthScoreInput {
   totalAssets: number
   totalDebts: number
   emergencyFundMonths: number
+  /**
+   * DISPLAY-target voor het noodfonds in maanden (gebruikerskeuze via een
+   * noodfonds-doel, anders de default 6). De score-curve floort deze intern op
+   * MIN_EMERGENCY_SCORE_TARGET_MONTHS (anti-gaming). Afwezig → default 6.
+   */
+  emergencyTargetMonths?: number
   freedomPct: number
   /**
    * Netto maandinkomen — dezelfde canonieke inkomensbron die `savingsRate6m`
@@ -131,7 +138,7 @@ const PILLAR_GROUP: Record<string, PillarGroup> = {
 const PILLAR_ACTION: Record<string, { href: string; label: string }> = {
   savings_rate:       { href: '/overzicht/cashflow',    label: 'Verhoog je spaarquote' },
   budget_discipline:  { href: '/overzicht/cashflow',    label: 'Stel je budget bij' },
-  emergency_fund:     { href: '/overzicht/bezittingen', label: 'Bouw je noodfonds' },
+  emergency_fund:     { href: '/toekomst/doelen',       label: 'Stel je noodfondsdoel' },
   debt_service_ratio: { href: '/overzicht/schulden',    label: 'Verlaag je maandlasten' },
   debt_ratio:         { href: '/overzicht/schulden',    label: 'Versnel je aflossing' },
   fire_progress:      { href: '/toekomst',              label: 'Versnel je vrijheid' },
@@ -190,13 +197,28 @@ export function scoreDSTI(dstiPercent: number): number {
   return Math.round(40 - ((dstiPercent - 43) / 17) * 40)                          // 40 → 0
 }
 
-/** Noodfonds-dekking: months of expenses covered. 6+ = 100 */
-function scoreEmergencyFund(monthsCovered: number): number {
+/**
+ * Noodfonds-dekking: months of expenses covered, geschaald tegen de gekozen
+ * target. Vorm blijft: 100 bij monthsCovered ≥ target, ~60 bij target/2, 0 bij 0.
+ * Bij de default target (6) is dit exact de oude curve (0→0, 3→60, 6→100).
+ *
+ * ANTI-GAMING: de score-curve gebruikt `emergencyScoreTargetMonths(targetMonths)`
+ * — de gekozen target met een vloer van MIN_EMERGENCY_SCORE_TARGET_MONTHS (3 mnd).
+ * Een gebruiker die een 1-maands-buffer als doel kiest krijgt dus GEEN 100% bij
+ * één maand dekking. De DISPLAY-target (emergencyFund.targetMonths) mag wél de
+ * gebruikerskeuze zijn; alleen deze score-curve floort.
+ */
+function scoreEmergencyFund(
+  monthsCovered: number,
+  targetMonths: number = DEFAULT_EMERGENCY_TARGET_MONTHS,
+): number {
   if (monthsCovered <= 0) return 0
-  if (monthsCovered >= 6) return 100
-  // Linear 0→0, 3→60, 6→100
-  if (monthsCovered <= 3) return Math.round((monthsCovered / 3) * 60)
-  return Math.round(60 + ((monthsCovered - 3) / 3) * 40)
+  const target = emergencyScoreTargetMonths(targetMonths)
+  if (monthsCovered >= target) return 100
+  const half = target / 2
+  // Piecewise linear: 0→0, half→60, target→100.
+  if (monthsCovered <= half) return Math.round((monthsCovered / half) * 60)
+  return Math.round(60 + ((monthsCovered - half) / (target - half)) * 40)
 }
 
 /** FIRE-voortgang: freedomPct (0–100+). Already 0-100 scale, cap at 100. */
@@ -441,6 +463,7 @@ export function computeHealthScore(
     totalAssets: data.totalAssets,
     totalDebts: data.totalDebts,
     emergencyFundMonths: data.emergencyFund.monthsCovered,
+    emergencyTargetMonths: data.emergencyFund.targetMonths,
     freedomPct: data.freedomPct,
     netMonthlyIncome: 0,            // not available on DashboardData
     debtMonthlyPayments: 0,         // 0 = geen-schulden-pad → DSTI actief op 100
@@ -466,7 +489,7 @@ export function computeHealthScore(
   const prevScores: Record<string, number> = {
     savings_rate: scoreSavingsRate(prevSavingsRate),
     budget_discipline: scoreBudgetDiscipline(input.budgetCategories),
-    emergency_fund: scoreEmergencyFund(data.emergencyFund.monthsCovered),
+    emergency_fund: scoreEmergencyFund(data.emergencyFund.monthsCovered, data.emergencyFund.targetMonths),
     debt_ratio: scoreDebtRatio(prevNetWorth + data.totalDebts, data.totalDebts),
     fire_progress: scoreFireProgress(
       data.fireTarget > 0 ? (prevNetWorth / data.fireTarget) * 100 : data.freedomPct,
@@ -515,8 +538,9 @@ export function computeHealthScoreFromInputs(
   const budgetScore = scoreBudgetDiscipline(input.budgetCategories)
   if (budgetTotal === 0) inactiveByData.add('budget_discipline')
 
-  // Noodfonds — always has a value.
-  const emergencyScore = scoreEmergencyFund(input.emergencyFundMonths)
+  // Noodfonds — always has a value. Target = gebruikerskeuze (doel) of default 6;
+  // de curve floort de score-target zelf (anti-gaming).
+  const emergencyScore = scoreEmergencyFund(input.emergencyFundMonths, input.emergencyTargetMonths)
 
   // DSTI — geen schulden → actief 100; schulden zonder inkomen → inactief.
   const dstiPercent = input.netMonthlyIncome > 0

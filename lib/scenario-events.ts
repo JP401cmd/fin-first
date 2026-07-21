@@ -26,8 +26,8 @@
  * All non-special types fall through to the generic fallback in lifeEventsToCashflows.
  */
 
-import type { WhatIfEvent } from '@/components/app/horizon/whatif-events'
-import type { WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
+import type { WhatIfEvent } from '@/lib/types/horizon-whatif'
+import type { WhatIfOverrides } from '@/lib/types/horizon-whatif'
 
 /** Slider keys that map onto scenario-events. The return-rate slider is intentionally absent — it stays a market-assumption override. */
 export type SliderKey = 'income' | 'workdays' | 'savings' | 'extra_inleg'

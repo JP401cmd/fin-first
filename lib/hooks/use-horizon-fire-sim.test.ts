@@ -14,8 +14,8 @@ import {
   buildCompleetKernelProfileBase,
 } from '@/lib/regression-tests/horizon-strategie/persona-fixture'
 import { buildSliderEvent } from '@/lib/scenario-events'
-import type { WhatIfEvent } from '@/components/app/horizon/whatif-events'
-import type { WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
+import type { WhatIfEvent } from '@/lib/types/horizon-whatif'
+import type { WhatIfOverrides } from '@/lib/types/horizon-whatif'
 
 /**
  * FASE 6, stap 5A — use-horizon-fire-sim: kernel-only contract-tests.

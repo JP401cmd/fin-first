@@ -8,6 +8,7 @@ import { detectRecurringTransactions } from '@/lib/recurring-detection'
 import { SUBSCRIPTION_DETECT_PROMPT } from '@/lib/ai/subscription-detect-prompt'
 import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
 import { unauthorized } from '@/lib/api/respond'
+import { localMonthStartMonthsAgo } from '@/lib/month-range'
 
 /**
  * POST /api/subscriptions/detect-ai
@@ -33,8 +34,7 @@ export async function POST() {
     }
 
     const now = new Date()
-    const startDate = new Date(now.getFullYear(), now.getMonth() - 11, 1)
-    const startDateStr = startDate.toISOString().split('T')[0]
+    const startDateStr = localMonthStartMonthsAgo(now, 11)
 
     const [txResult, recurringResult, budgetResult] = await Promise.all([
       supabase

@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react'
 import { formatMaskedCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
-import { LIFE_EVENT_CATALOG, type LifeEvent, type CatalogField } from '@/lib/horizon-data'
+import { LIFE_EVENT_CATALOG, type CatalogField } from '@/lib/horizon-data'
 import type { SimResult } from '@/lib/fire-simulation'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
@@ -16,14 +16,9 @@ import { MaskedAmount } from '@/components/app/masked-amount'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-export interface WhatIfEvent extends LifeEvent {
-  /** Temporarily disabled in what-if (not persisted) */
-  whatIfDisabled?: boolean
-  /** Lives only in client state — added by a preset or slider, not in DB. */
-  is_scenario_only?: boolean
-  /** Source of a scenario-only event: 'preset:<id>' or 'slider:<key>'. */
-  scenario_origin?: string
-}
+// Datacontract(en) wonen nu in @/lib/types/horizon-whatif (import-richting UI→lib).
+import type { WhatIfEvent } from '@/lib/types/horizon-whatif'
+export type { WhatIfEvent }
 
 interface EventImpact {
   event: WhatIfEvent

@@ -1,1 +1,1 @@
-export { useFeatureAccess } from '@/components/app/feature-access-provider'
+export { useFeatureAccess } from '@/lib/feature-access/context'

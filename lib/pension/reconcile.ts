@@ -11,7 +11,7 @@
  */
 
 import type { LifeEvent } from '@/lib/horizon-data'
-import type { PensionParseResult } from '@/app/api/pension/parse/route'
+import type { PensionParseResult } from '@/lib/pension/types'
 
 // ── Type re-exports ──────────────────────────────────────────────────────────
 

@@ -27,7 +27,7 @@
  *   `nabestaandenpensioen`-veld (niet als regeling in de array).
  */
 
-import type { PensionParseResult } from '@/app/api/pension/parse/route'
+import type { PensionParseResult } from '@/lib/pension/types'
 
 // ── Defensieve narrowing-helpers ────────────────────────────────────────────
 // We krijgen `unknown` binnen en mogen nooit throwen. Deze helpers smallen

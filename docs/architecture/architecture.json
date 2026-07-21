@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-21T06:49:41.760Z",
+  "generatedAt": "2026-07-21T12:37:49.645Z",
   "generatedDate": "2026-07-21",
   "repo": {
     "name": "fin",
@@ -10353,6 +10353,10 @@
           "write": false
         },
         {
+          "name": "goals",
+          "write": false
+        },
+        {
           "name": "net_worth_snapshots",
           "write": true
         },
@@ -12757,6 +12761,16 @@
           "routes": [
             "/api/report"
           ]
+        },
+        {
+          "domain": "snapshots",
+          "label": "Snapshots",
+          "write": false,
+          "routes": [
+            "/api/snapshots",
+            "/api/snapshots/auto",
+            "/api/snapshots/cron"
+          ]
         }
       ],
       "net_worth_snapshots": [
@@ -14723,7 +14737,7 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 104
+        "commits": 105
       },
       {
         "path": "lib/ai",
@@ -14755,7 +14769,7 @@
       },
       {
         "path": "app/api/budgets",
-        "commits": 3
+        "commits": 4
       },
       {
         "path": "components/horizon",
@@ -14766,12 +14780,12 @@
       {
         "file": "components/app/horizon/horizon-client.tsx",
         "loc": 8457,
-        "commits": 88
+        "commits": 89
       },
       {
         "file": "components/app/budgets-client.tsx",
         "loc": 5082,
-        "commits": 34
+        "commits": 35
       },
       {
         "file": "components/core/assets-client.tsx",
@@ -14790,12 +14804,12 @@
       },
       {
         "file": "lib/dashboard-data-loader.ts",
-        "loc": 2606,
-        "commits": 42
+        "loc": 2663,
+        "commits": 43
       },
       {
-        "file": "lib/horizon-data.ts",
-        "loc": 2461,
+        "file": "lib/test-personas.ts",
+        "loc": 2210,
         "commits": 9
       },
       {
@@ -15600,31 +15614,9 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-07-20",
-    "hasChanges": true,
-    "sections": [
-      {
-        "label": "API-routes",
-        "added": [
-          "/api/admin/fire-assumptions"
-        ],
-        "removed": []
-      },
-      {
-        "label": "Tabellen",
-        "added": [
-          "fire_assumptions"
-        ],
-        "removed": []
-      },
-      {
-        "label": "Componenten (aantal)",
-        "added": [
-          "+2"
-        ],
-        "removed": []
-      }
-    ]
+    "previousDate": "2026-07-21",
+    "hasChanges": false,
+    "sections": []
   },
   "statsHistory": [
     {

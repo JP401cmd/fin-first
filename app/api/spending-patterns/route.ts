@@ -7,6 +7,7 @@ import {
   patternsToInsights,
   type SpendingInsight,
 } from '@/lib/spending-patterns'
+import { localMonthStartMonthsAgo } from '@/lib/month-range'
 
 /**
  * GET /api/spending-patterns
@@ -25,8 +26,7 @@ export async function GET() {
   try {
     // Get date range: last 18 months of data for robust pattern detection
     const now = new Date()
-    const eighteenMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 17, 1)
-    const startDate = eighteenMonthsAgo.toISOString().split('T')[0]
+    const startDate = localMonthStartMonthsAgo(now, 17)
 
     // Fetch budgets and transactions in parallel
     const [budgetsResult, transactionsResult, essentialBudgetsResult] = await Promise.all([

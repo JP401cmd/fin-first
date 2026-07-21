@@ -36,7 +36,7 @@ import { applyKernelHousingSaleToEvents } from '@/lib/horizon/kernel-display-eve
 import type { SolverStatus } from '@/lib/horizon-kernel/solver'
 import type { KernelHousingSale, KernelPensionPotView } from '@/lib/horizon-kernel/bridge'
 import type { AssetCategorie } from '@/lib/horizon-kernel/types'
-import type { WhatIfEvent } from '@/components/app/horizon/whatif-events'
+import type { WhatIfEvent } from '@/lib/types/horizon-whatif'
 import type { AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'

@@ -92,8 +92,17 @@ function isWidgetAccessible(widgetId: string, features: FeatureAccessMap): boole
   return isFeatureAccessible(features, featureId)
 }
 
+/** Catalogus-id's voor een snelle geldigheidscheck (stale/verwijderde prefs). */
+const KNOWN_WIDGET_IDS = new Set(WIDGET_CATALOG.map(w => w.id))
+
 /** Check if a widget should be visible: accessible + budget/holding data present */
 function isWidgetVisible(pref: WidgetPref, features: FeatureAccessMap, data: DashboardData): boolean {
+  // Onbekende/verwijderde widget-id in opgeslagen prefs (bv. na het schrappen
+  // van een widget): negeer 'm netjes i.p.v. een lege grid-tegel te tonen.
+  // Dynamische favorieten (budget_fav:*/holding_fav:*) staan niet in de catalogus.
+  if (!KNOWN_WIDGET_IDS.has(pref.id) && !pref.id.startsWith('budget_fav:') && !pref.id.startsWith('holding_fav:')) {
+    return false
+  }
   if (!isWidgetAccessible(pref.id, features)) return false
   // Budget widgets: hidden when budgeting is off
   if (!data.budgetingActive && (BUDGET_WIDGETS.has(pref.id) || pref.id.startsWith('budget_fav:'))) return false

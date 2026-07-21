@@ -131,7 +131,7 @@ export function BerichtenClient() {
   const pathname = usePathname()
   const pageInfoText = (pathname && PAGE_INFO[pathname]) || PAGE_INFO['/berichten']
 
-  const { markAsRead, refresh } = useNotifications()
+  const { unreadCount, markAsRead, refresh } = useNotifications()
 
   const [history, setHistory] = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
@@ -180,8 +180,17 @@ export function BerichtenClient() {
   }, [history, refresh])
 
   // ── Counts ──────────────────────────────────────────────────────────
+  // De weergegeven teller consumeert de canonieke `unreadCount` uit de
+  // NotificationProvider — exact dezelfde bron (7-daags live venster) als de
+  // bel-badge en het sidebar-aantal. Zo tonen alle 3 de oppervlakken hetzelfde
+  // getal ("consume, don't recompute" — WF-WILL-11). Bewuste trade-off (optie
+  // A): structureel al-langer-onbekeken items (briefing/WOZ/pensioen/oudere
+  // partner-tx) buiten het 7-daagse venster tellen niet meer mee in de teller.
+  const displayUnread = unreadCount
+  // `historyUnread` blijft de daadwerkelijk ongelezen items in de 30-daagse
+  // lijst die deze pagina toont — stuurt alleen de lijst-actie ("Alles gelezen"),
+  // niet de teller.
   const historyUnread = history.filter((n) => !n.read).length
-  const displayUnread = historyUnread
   const totalCount = history.length
 
   // ── Partition (filter → urgent / today / earlier) ───────────────────

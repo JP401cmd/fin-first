@@ -12,6 +12,7 @@
  */
 
 import { DEFAULT_RETURN } from '@/lib/constants'
+import { localMonthStart } from '@/lib/month-range'
 
 export interface NetWorthProjectionPoint {
   /** Month index from now (0 = current) */
@@ -84,7 +85,7 @@ export function computeNetWorthProjection(
     projected = projected * (1 + monthlyReturn) + monthlySavings
 
     const futureDate = new Date(now.getFullYear(), now.getMonth() + m, 1)
-    const dateStr = futureDate.toISOString().split('T')[0]
+    const dateStr = localMonthStart(futureDate)
 
     points.push({
       month: m,

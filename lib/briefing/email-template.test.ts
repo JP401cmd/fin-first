@@ -5,7 +5,7 @@ import {
   stripEuroAmounts,
 } from './email-template'
 import type { BriefingSnapshot } from './snapshot'
-import type { BriefingEntry } from '@/components/overview/briefing-panel'
+import type { BriefingEntry } from '@/lib/types/briefing'
 
 /**
  * Tests voor de briefing-e-mail-template (puur):

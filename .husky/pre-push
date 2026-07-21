@@ -33,4 +33,11 @@ if [ -n "$production_errors" ]; then
 fi
 
 echo "✓ TypeScript check passed (production code clean)."
+
+# Datapad-conventie (ADR 0058): flag NIEUWE directe client-reads voor
+# weergavedata buiten de grandfather-allowlist. De bestaande ~47 lezers
+# staan op de allowlist; alleen nieuwe overtredingen blokkeren de push.
+echo "→ Running datapad-conventie check (ADR 0058)…"
+node scripts/check-client-data-reads.mjs
+
 exit 0

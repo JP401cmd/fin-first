@@ -9,16 +9,9 @@ import { MaskedAmount } from '@/components/app/masked-amount'
 
 // SuggestedEvent mirrors the shape returned by the /api/whatif/suggest route (Task 6).
 // Defined here to keep the component self-contained until the API route is created.
-export interface SuggestedEvent {
-  event_type: string
-  name: string
-  target_age: number | null
-  one_time_cost: number
-  monthly_cost_change: number
-  monthly_income_change: number
-  duration_months: number
-  explanation: string
-}
+// Datacontract(en) wonen nu in @/lib/types/horizon-whatif (import-richting UI→lib).
+import type { SuggestedEvent } from '@/lib/types/horizon-whatif'
+export type { SuggestedEvent }
 
 interface WhatIfSuggestionCardsProps {
   suggestions: SuggestedEvent[]

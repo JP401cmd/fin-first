@@ -15,6 +15,7 @@
     "arch:diagram": "node scripts/architecture/generate.mjs",
     "perf:route-sizes": "node scripts/perf/route-sizes.mjs",
     "arch:check": "node scripts/architecture/generate.mjs --check",
+    "check:client-reads": "node scripts/check-client-data-reads.mjs",
     "uat:stale": "node scripts/uat/stale-scan.mjs",
     "db:pull": "npx supabase db pull",
     "db:push": "npx supabase db push",

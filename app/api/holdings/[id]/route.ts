@@ -187,6 +187,31 @@ export async function PATCH(
       )
     }
 
+    // Transactie-guard: zodra een holding transacties heeft, zijn `units` en
+    // `avg_purchase_price` transactie-afgeleide waarden die server-side worden
+    // herberekend (zie `syncHoldingAggregatesFromTransactions` in de transactie-
+    // route). Handmatig overschrijven zou het opgeslagen veld direct weer laten
+    // afwijken van de transactiehistorie — precies de inconsistente-kostenbasis-
+    // bug. Het veld is daarom read-only zodra er transacties bestaan; alleen
+    // holdings zónder transacties (puur handmatig ingevoerd) blijven bewerkbaar.
+    if (!isAutoSynced && (unitsRequested !== undefined || avgPriceRequested !== undefined)) {
+      const { count } = await supabase
+        .from(resolved.tables.transactions)
+        .select('id', { count: 'exact', head: true })
+        .eq('holding_id', id)
+        .eq('user_id', user.id)
+      if ((count ?? 0) > 0) {
+        return NextResponse.json(
+          {
+            error: 'has_transactions',
+            message:
+              'Aantal en gemiddelde inkoopprijs worden afgeleid uit de transactiehistorie en kunnen niet handmatig worden gewijzigd.',
+          },
+          { status: 409 },
+        )
+      }
+    }
+
     if (unitsRequested !== undefined) updates.units = unitsRequested
     if (avgPriceRequested !== undefined) updates.avg_purchase_price = avgPriceRequested
 

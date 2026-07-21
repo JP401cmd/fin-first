@@ -5,7 +5,7 @@ import {
   BOX3_ASSET_TYPES,
   BOX3_VRIJSTELLING_SINGLE,
 } from './box3-taxable-input'
-import { computeLeverScores } from '@/components/app/shell/lever-scores'
+import { computeLeverScores } from '@/lib/lever-scores'
 import type { LeverageStatus } from '@/lib/leverage-status'
 
 // ── computeBox3TaxableInput ────────────────────────────────────────────────────

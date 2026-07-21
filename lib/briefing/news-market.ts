@@ -7,7 +7,7 @@
 // `GET /api/news` al heeft gevuld. Leeg/verlopen cache → null → kaart verbergt zich.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { BriefingEntry, HefboomTag } from '@/components/overview/briefing-panel'
+import type { BriefingEntry, HefboomTag } from '@/lib/types/briefing'
 
 /** Spiegelt de TTL van `app/api/news/route.ts` (7 dagen). */
 const NEWS_CACHE_TTL_HOURS = 7 * 24

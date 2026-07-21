@@ -291,7 +291,7 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
       id: 'as-import', x: 560, y: row(0), w: 220, h: 66, kind: 'appsvc',
       title: 'Import- & koppeldienst',
       lead: 'Import en synchronisatie van transacties, saldi en holdings uit banken, exchanges en bestanden. Fundament-dienst, module-onafhankelijk. Categorisatie kan optioneel lokaal (desktop, WebGPU) i.p.v. via de cloud-AI-gateway lopen — review-UI-only, fail-closed zonder cloud-fallback (ADR 0043).',
-      items: ['/api/bank-connect', '/api/import', '/api/recurring', 'lib/parsers'],
+      items: ['/api/bank-connect', '/api/holdings/import', '/api/detect-recurring', '/api/recurring', 'lib/parsers'],
     },
     {
       id: 'as-budget', x: 560, y: row(1), w: 220, h: 66, kind: 'appsvc',

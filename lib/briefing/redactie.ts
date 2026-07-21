@@ -23,7 +23,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { getModel } from '@/lib/ai/config'
 import { sanitizeForAI } from '@/lib/ai/sanitize'
 import { maskPIIInObject } from '@/lib/ai/pii-output-filter'
-import type { BriefingEntry } from '@/components/overview/briefing-panel'
+import type { BriefingEntry } from '@/lib/types/briefing'
 import { sanitizeAiHeadline } from './overview-briefing'
 import {
   getActiveDirectives,

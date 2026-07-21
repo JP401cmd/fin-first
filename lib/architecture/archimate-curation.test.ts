@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { buildArchimateModel, getElementImpact, getRelationsFor } from './archimate-model'
 import { ARCHI_FLOWS, getFlowHighlight, validateFlows } from './archimate-flows'
-import { ARCHI_CONCERNS, concernCountByElement, getConcernsFor, validateConcerns } from './archimate-concerns'
+import {
+  ARCHI_CONCERNS,
+  CONCERN_MAX_AGE_MONTHS,
+  concernCountByElement,
+  findStaleConcerns,
+  getConcernsFor,
+  validateConcerns,
+} from './archimate-concerns'
 
 const model = buildArchimateModel({
   version: '0.71.0',
@@ -82,8 +89,37 @@ describe('aandachtspunten', () => {
 
   it('dekt de bekende risico-gebieden', () => {
     const ids = ARCHI_CONCERNS.map((c) => c.id)
-    expect(ids).toContain('tz-month-boundaries')
     expect(ids).toContain('migration-drift')
     expect(ARCHI_CONCERNS.some((c) => c.severity === 'risk')).toBe(true)
+  })
+})
+
+// ── Waarheids-vangnet 2 — reviewedAt + verouderingstest (Arch F5) ───────────
+describe('aandachtspunten — reviewedAt-verouderingsbewaking', () => {
+  it('elk concern heeft een geldige reviewedAt-datum', () => {
+    for (const c of ARCHI_CONCERNS) {
+      expect(c.reviewedAt, `${c.id} mist reviewedAt`).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    }
+  })
+
+  it('geen enkel concern is nu ouder dan de verouderingsdrempel', () => {
+    const stale = findStaleConcerns()
+    expect(
+      stale.map((c) => c.id),
+      `Concern(s) niet herzien in > ${CONCERN_MAX_AGE_MONTHS} maanden — verifieer tegen de code en werk reviewedAt bij:\n${stale.map((c) => `  ${c.id} (reviewedAt ${c.reviewedAt})`).join('\n')}`,
+    ).toEqual([])
+  })
+
+  it('sentinel: een concern met een oude reviewedAt valt op tegen een vaste, geïnjecteerde now', () => {
+    // Vaste `now` i.p.v. Date.now() — voorkomt CI-flakiness/tijdsafhankelijkheid.
+    const fixedNow = new Date('2026-07-21T12:00:00Z')
+    const stale = findStaleConcerns(CONCERN_MAX_AGE_MONTHS, fixedNow)
+    // Alle echte concerns zijn recent (zie hierboven) — het huidige bestand mag
+    // dus niets opleveren op deze vaste datum; de detector zelf bewijzen we apart.
+    expect(stale).toEqual([])
+
+    const farFuture = new Date(fixedNow.getFullYear() + 1, fixedNow.getMonth(), fixedNow.getDate())
+    const staleFromFuture = findStaleConcerns(CONCERN_MAX_AGE_MONTHS, farFuture)
+    expect(staleFromFuture.length).toBe(ARCHI_CONCERNS.length)
   })
 })

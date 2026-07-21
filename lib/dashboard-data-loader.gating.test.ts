@@ -8,7 +8,7 @@ import {
 } from './dashboard-data-loader'
 import { WIDGET_CATALOG, type WidgetPref } from './widget-catalog'
 import { MOCK_DASHBOARD_DATA } from './mock-dashboard-data'
-import type { DashboardData } from '@/components/widgets/widget-renderer'
+import type { DashboardData } from '@/lib/types/dashboard'
 import { buildOverviewBriefingInput } from './briefing/overview-briefing'
 
 /**

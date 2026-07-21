@@ -2091,7 +2091,13 @@ const tessaData: PersonaData = {
       isin: null,
       name: 'Meesman Wereldwijd Totaal',
       units: 2215,
-      avg_purchase_price: 94.81,
+      // Transactie-afgeleide gewogen gemiddelde kostprijs: Σ inleg / Σ units =
+      // 226.140 / 2.215 = 102,0948. MOET gelijk blijven aan
+      // computePositionFromTransactions(transactions).avgCost — anders toont de
+      // holding-detail een inconsistente kostenbasis (ingelegd + koerswinst ≠
+      // marktwaarde). Bewaakt door holdings-aggregation.test.ts. (Was 94,81 —
+      // een structureel stale seed-veld, €7,28/eenheid naast de historie.)
+      avg_purchase_price: 102.0948,
       current_price: 135.48,
       purchase_date_monthsAgo: 120,
       asset_class: 'equity',

@@ -1,5 +1,5 @@
 import { registerCategory, registerTests } from '../test-registry'
-import { MODULE_REQUIRED_STEPS } from '@/components/app/module-activation-modal'
+import { MODULE_REQUIRED_STEPS } from '@/lib/module-required-steps'
 import type { ModuleId } from '@/lib/module-registry'
 import { assert, assertEqual } from '../assert'
 import type { TestCase } from '../test-types'

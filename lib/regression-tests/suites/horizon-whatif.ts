@@ -11,7 +11,7 @@ import { lifeEventsToCashflows, type SimCashflow } from '@/lib/fire-simulation'
 import { runScalarProjectionV2 as runSimulation } from './_kernel-sim'
 import { ageAtDate, DEFAULT_RETURN, INFLATION } from '@/lib/horizon-data'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
-import type { WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
+import type { WhatIfOverrides } from '@/lib/types/horizon-whatif'
 
 const CAT = 'horizon.whatif'
 

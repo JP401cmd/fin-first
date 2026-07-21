@@ -129,6 +129,16 @@ Alle route-handlers onder `app/api/*` gebruiken één gedeelde foutvorm (ADR 004
 - **Eén 401-tekst app-breed: `'Niet ingelogd'`** — via `unauthorized()`. Match nooit in frontend/tests op de exacte 401-string.
 - **Zod op nieuwe mutatie-routes.** Nieuwe POST/PUT/PATCH/DELETE-met-body valideert de body met een zod-schema via `parseBody(schema, req)` uit `lib/api/parse-body.ts` (geeft bij falen een client-veilige 400). Bestaande handlers worden niet massaal geretrofit — zod komt erbij waar de migratie er toch al langskomt.
 
+## Datapad-conventie — lezen via loader, muteren via API, client-direct afgebakend (verplicht bij data-werk)
+
+Er is één norm voor hoe de frontend aan data komt (ADR 0058). Drie paden, elk met een vaste rol:
+
+- **Lezen (weergavedata) = server-loader/bundel.** Server-page → loader (`lib/*-data-loader.ts`) → `DashboardData`-bundel → props naar het client-component. **Geen** `createClient()` + `.from().select()` in een `'use client'`-bestand om weergavedata op te halen.
+- **Muteren = API-route** met de error-envelope (ADR 0044) + zod (`parseBody`). Client doet `fetch('/api/...')`; **geen** directe `.insert/.update/.delete/.upsert` uit de browser-client (`lib/supabase/client`).
+- **Client-direct toegestaan, afgebakend tot drie gevallen:** (1) **eigen-rij preferences** (profiles/appearance/widget-prefs) — own-row read-modify-write via de anon-RLS-client, spiegel `app/api/appearance` (nooit service-role); (2) **auth** (`supabase.auth.*`); (3) **realtime** (`.channel()`/`postgres_changes`) — de **initiële** load blijft via loader/API. Alles daarbuiten hoort server-side.
+- **On-demand/lazy client-read** (modals, tab-lazy) die écht niet in de loader-bundel past: via een API-route (`fetch`), toekomstig fundament = één gedeelde `useApiQuery`-hook met TTL-cache (hergebruik egress-lessen: poll 60s→10min + TTL). `.insert().select('id')` returning is **geen** read-for-display en valt buiten de meetlat.
+- **Lint-gate:** `npm run check:client-reads` (`scripts/check-client-data-reads.mjs`, ook in pre-push) flagt **nieuwe** directe client-reads voor weergavedata buiten de grandfather-allowlist. De ~47 bestaande lezers staan op die allowlist; **Fase b** faseert ze per domein uit (assets → budgets → cash → horizon → debts/belasting → beheer). Voeg NIETS aan de allowlist toe zonder motivatie — dat is precies de overtreding die de gate hoort te vangen.
+
 ## Project Specification
 
 <project_specification>

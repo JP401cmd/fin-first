@@ -1,7 +1,7 @@
 import { registerCategory, registerTests } from '../test-registry'
 import { assert, assertEqual, assertNotNull, assertGreaterThan, assertIncludes } from '../assert'
 import type { TestCase } from '../test-types'
-import type { DashboardData } from '@/components/widgets/widget-renderer'
+import type { DashboardData } from '@/lib/types/dashboard'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import { WIDGET_CATALOG, getWidgetDef, BUDGET_WIDGETS } from '@/lib/widget-catalog'
 import { authenticatedFetch } from '../server-runner'
@@ -802,7 +802,7 @@ const tests: TestCase[] = [
         'holdings', 'voorstellen', 'acties', 'doelen', 'fire_prognose',
         'monte_carlo', 'levensgebeurtenissen', 'spaarquote', 'vrijheidsvoortgang',
         'vaste_lasten', 'jouw_pad', 'gezondheids_score', 'belasting_box3',
-        'nibud_benchmark', 'vrijheidsscenarios', 'sim_vermogenspad',
+        'vrijheidsscenarios', 'sim_vermogenspad',
         'box3_drag', 'vrijheidsmijlpalen',
         'backtesting_score', 'inflatie_impact', 'beleggingsrendement',
         'pensioen_aow', 'meldingen', 'ai_inzicht', 'volgende_stap',

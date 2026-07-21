@@ -1,37 +1,16 @@
 'use client'
 
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import type { FeatureAccessData, FeatureAccessMap } from '@/lib/compute-feature-access'
-import { ALL_MODULES, isModuleActive, type ModuleId } from '@/lib/module-registry'
+import { ALL_MODULES, type ModuleId } from '@/lib/module-registry'
+import { FeatureAccessContext, type FeatureAccessContextValue } from '@/lib/feature-access/context'
 
-type FeatureAccessContextValue = FeatureAccessData & {
-  /** Refresh feature prefs after user toggle */
-  refreshFeaturePrefs: (prefs: Record<string, boolean>) => void
-  /** Active module IDs for the current user */
-  activeModules: ModuleId[]
-  /** Update active modules client-side without page reload */
-  refreshModules: (modules: ModuleId[]) => void
-}
-
-const FeatureAccessContext = createContext<FeatureAccessContextValue | null>(null)
-
-export function useFeatureAccess(): FeatureAccessContextValue {
-  const ctx = useContext(FeatureAccessContext)
-  if (!ctx) return {
-    features: {},
-    phase: 'recovery',
-    level: 0,
-    tier: 'gratis',
-    subscriptions: [],
-    netWorth: 0,
-    monthlyExpenses: 0,
-    freedomPct: 0,
-    refreshFeaturePrefs: () => {},
-    activeModules: [...ALL_MODULES],
-    refreshModules: () => {},
-  }
-  return ctx
-}
+// De context + de consumer-hooks (useFeatureAccess/useModuleAccess) wonen nu in
+// lib/feature-access/context.ts (import-richting UI→lib). Hier ge-re-export zodat
+// bestaande component-imports uit dit pad blijven werken. Precies één
+// createContext-instantie (die uit lib) — zowel Provider als hooks gebruiken 'm.
+export { useFeatureAccess, useModuleAccess } from '@/lib/feature-access/context'
+export type { FeatureAccessContextValue }
 
 export function FeatureAccessProvider({
   data,
@@ -83,18 +62,4 @@ export function FeatureAccessProvider({
       {children}
     </FeatureAccessContext.Provider>
   )
-}
-
-/**
- * Focused hook for module access. Returns only module-related data,
- * abstracting away legacy sovereignty fields.
- */
-export function useModuleAccess() {
-  const ctx = useFeatureAccess()
-  return {
-    activeModules: ctx.activeModules,
-    subscriptions: ctx.subscriptions,
-    isModuleActive: (id: ModuleId) => isModuleActive(ctx.activeModules, id),
-    refreshModules: ctx.refreshModules,
-  }
 }

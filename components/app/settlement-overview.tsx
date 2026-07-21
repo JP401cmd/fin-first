@@ -60,10 +60,12 @@ export function SettlementOverview({ householdId, currentUserId, members }: Sett
 
   const { netAmount, owedBy, owedTo } = computeNetBalance(entries, currentUserId)
 
+  // NULL-tegenpartijen (geanonimiseerd na accountverwijdering) worden uitgefilterd:
+  // ze horen niet bij een echte partner-kaart.
   const otherUserIds = Array.from(new Set([
     ...entries.map(e => e.from_user_id),
     ...entries.map(e => e.to_user_id),
-  ])).filter(id => id !== currentUserId)
+  ])).filter((id): id is string => id !== null && id !== currentUserId)
 
   if (loading) {
     return (

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Link2, ChevronRight } from 'lucide-react'
+import { Link2, ChevronRight, Download } from 'lucide-react'
 import { ExportDropdown } from '@/components/app/export-dropdown'
 import { PageOpening, Button } from '@/components/editorial'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
@@ -59,8 +59,18 @@ export function GeavanceerdSettings() {
       <section id="export" className="card-editorial overflow-hidden scroll-mt-24">
         <div className="px-4 sm:px-6 py-4">
           <h2 className="text-xs font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">Data export</h2>
-          <p className="mt-1 text-xs text-[var(--ink-4)]">Download je financiële gegevens als CSV-bestand</p>
-          <div className="mt-3">
+          <p className="mt-1 text-xs text-[var(--ink-4)]">
+            Download al je gegevens in één JSON-bestand (dataportabiliteit), of losse CSV&apos;s per onderdeel voor Excel.
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <a
+              href="/api/account/export"
+              download
+              className="inline-flex items-center gap-1.5 border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-1.5 text-xs font-medium text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)]"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Download al mijn gegevens (JSON)
+            </a>
             <ExportDropdown />
           </div>
         </div>

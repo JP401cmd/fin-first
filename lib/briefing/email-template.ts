@@ -15,7 +15,7 @@
 // gestripte kop gaan mee; het volledige detail zit achter de CTA in de app.
 
 import type { BriefingSnapshot } from './snapshot'
-import type { BriefingEntry } from '@/components/overview/briefing-panel'
+import type { BriefingEntry } from '@/lib/types/briefing'
 import { buildFreedomHeroProps } from './overview-briefing'
 
 export interface BriefingEmailInput {

@@ -16,7 +16,7 @@
 //   De cashflow-kaarten en box1/box3-statussen zijn AL LeverageStatus → direct.
 
 import type { LeverScoresResult } from '@/lib/lever-scores-loader'
-import type { LeverStatus } from '@/components/app/shell/lever-scores'
+import type { LeverStatus } from '@/lib/lever-scores'
 import type { CashflowCard } from '@/lib/cashflow-cards'
 import type { LeverageStatus } from '@/lib/leverage-status'
 import type { PageStatusInfo, PageStatusMap } from '@/lib/page-status/types'

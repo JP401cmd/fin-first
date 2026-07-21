@@ -8,6 +8,7 @@ import { detectRecurringTransactions, CATEGORY_LABELS } from '@/lib/recurring-de
 import { VASTE_KOSTEN_ANALYSE_PROMPT } from '@/lib/ai/dna/wil'
 import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
 import { unauthorized } from '@/lib/api/respond'
+import { localMonthStartMonthsAgo } from '@/lib/month-range'
 
 /** Maximum number of candidates to send to the AI model to avoid token waste. */
 const MAX_AI_CANDIDATES = 50
@@ -36,8 +37,7 @@ export async function POST() {
     }
 
     const now = new Date()
-    const startDate = new Date(now.getFullYear(), now.getMonth() - 11, 1)
-    const startDateStr = startDate.toISOString().split('T')[0]
+    const startDateStr = localMonthStartMonthsAgo(now, 11)
 
     const [txResult, recurringResult, budgetResult] = await Promise.all([
       supabase

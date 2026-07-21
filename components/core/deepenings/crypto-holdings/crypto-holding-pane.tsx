@@ -892,6 +892,14 @@ function CryptoHoldingPaneEdit({
   }, [detail?.holding.notes, holding.id])
 
   const isAutoSynced = holding.source.kind !== 'manual'
+  // Transactie-afgeleid: zodra er transacties zijn, worden units + gemiddelde
+  // inkoopprijs server-side herberekend uit de historie (canonieke engine) na
+  // elke mutatie, dus ze zijn read-only. Handmatig overschrijven zou het
+  // opgeslagen veld direct weer laten afwijken van de transactiehistorie —
+  // precies de inconsistente-kostenbasis-bug (spiegelt de investment-pane).
+  const hasTx = (detail?.transactions?.length ?? 0) > 0
+  const unitsReadOnly = isAutoSynced || hasTx
+  const avgPriceReadOnly = isAutoSynced || hasTx
   const symbolDisplay = holding.symbol.toUpperCase()
 
   // Bron-label voor de auto-sync banner. Wallet-label = "Ethereum · 0x12…78".
@@ -914,12 +922,13 @@ function CryptoHoldingPaneEdit({
   const canSave = useMemo(() => {
     if (saving) return false
     const notesChanged = notesInput.trim() !== serverNotes.trim()
-    if (isAutoSynced) return notesChanged
     const unitsParsed = parseNumericInput(unitsInput)
     const avgParsed = parseNumericInput(avgPriceInput)
     const unitsChanged =
-      unitsParsed != null && Math.abs(unitsParsed - initialUnits) > 1e-9
-    const avgChanged = (() => {
+      !unitsReadOnly &&
+      unitsParsed != null &&
+      Math.abs(unitsParsed - initialUnits) > 1e-9
+    const avgChanged = !avgPriceReadOnly && (() => {
       if (avgParsed == null && initialAvgPrice === 0) return false
       if (avgParsed == null) return false
       return Math.abs(avgParsed - initialAvgPrice) > 1e-6
@@ -933,7 +942,8 @@ function CryptoHoldingPaneEdit({
     initialUnits,
     initialAvgPrice,
     serverNotes,
-    isAutoSynced,
+    unitsReadOnly,
+    avgPriceReadOnly,
   ])
 
   // Save-handler. Body bouw: notes altijd; units/avg alleen als de holding
@@ -945,20 +955,24 @@ function CryptoHoldingPaneEdit({
     const body: Record<string, unknown> = {
       notes: notesInput,
     }
-    if (!isAutoSynced) {
+    // Positie-velden alleen meesturen als ze bewerkbaar zijn: bij transacties
+    // (of auto-sync) zijn ze read-only en worden ze server-side afgeleid.
+    if (!unitsReadOnly) {
       const unitsParsed = parseNumericInput(unitsInput)
-      const avgParsed = parseNumericInput(avgPriceInput)
       if (unitsParsed == null || unitsParsed < 0) {
         setValidationError('Aantal eenheden moet een positief getal zijn.')
         return
       }
+      body.units = unitsParsed
+    }
+    if (!avgPriceReadOnly) {
+      const avgParsed = parseNumericInput(avgPriceInput)
       if (avgParsed != null && avgParsed < 0) {
         setValidationError(
           'Gemiddelde inkoopprijs mag niet negatief zijn.',
         )
         return
       }
-      body.units = unitsParsed
       // Avg-price is optioneel: gebruiker kan het veld leeg laten om "geen
       // kostenbasis" te signaleren. We sturen alleen door als er een
       // waarde getypt is.
@@ -975,10 +989,13 @@ function CryptoHoldingPaneEdit({
         body: JSON.stringify(body),
       })
       const data = await res.json().catch(() => ({}))
-      if (res.status === 409 && data?.error === 'auto_synced') {
+      if (
+        res.status === 409 &&
+        (data?.error === 'auto_synced' || data?.error === 'has_transactions')
+      ) {
         const msg =
           data.message ||
-          'Aantal kan niet worden gewijzigd: deze coin is auto-synced.'
+          'Aantal en gemiddelde inkoopprijs kunnen niet handmatig worden gewijzigd.'
         setValidationError(msg)
         addToast({ type: 'warning', title: 'Bewerking geblokkeerd', message: msg })
         return
@@ -1004,7 +1021,8 @@ function CryptoHoldingPaneEdit({
     }
   }, [
     holding.id,
-    isAutoSynced,
+    unitsReadOnly,
+    avgPriceReadOnly,
     unitsInput,
     avgPriceInput,
     notesInput,
@@ -1078,8 +1096,8 @@ function CryptoHoldingPaneEdit({
         </p>
       </section>
 
-      {/* Auto-sync banner — alleen tonen voor exchange/wallet-sourced
-          holdings. Editorial neutral-grond + kern-accent. */}
+      {/* Auto-sync banner — exchange/wallet-sourced holdings. Editorial
+          neutral-grond + kern-accent. */}
       {isAutoSynced && (
         <section
           className="flex items-start gap-2 border border-kern-200 bg-kern-50 px-3 py-2"
@@ -1101,6 +1119,29 @@ function CryptoHoldingPaneEdit({
         </section>
       )}
 
+      {/* Transactie-afgeleid banner — toont waarom positie-velden read-only
+          zijn wanneer er transacties bestaan (en het geen auto-sync is). */}
+      {hasTx && !isAutoSynced && (
+        <section
+          className="flex items-start gap-2 border border-kern-200 bg-kern-50 px-3 py-2"
+          style={{ borderRadius: 'var(--r)' }}
+        >
+          <Briefcase
+            className="mt-0.5 h-3.5 w-3.5 shrink-0 text-kern-600"
+            aria-hidden="true"
+          />
+          <p
+            className="text-[12px] leading-snug text-kern-800"
+            style={{ fontFamily: 'var(--font-source-serif, serif)' }}
+          >
+            Aantal en gemiddelde inkoopprijs worden{' '}
+            <strong className="not-italic">afgeleid uit je transacties</strong>{' '}
+            en zijn niet los bewerkbaar. Voeg een transactie toe om de positie te
+            wijzigen.
+          </p>
+        </section>
+      )}
+
       {/* Form-velden */}
       <section className="space-y-4">
         {/* Veld 1 — Units */}
@@ -1109,13 +1150,15 @@ function CryptoHoldingPaneEdit({
           label="Aantal eenheden"
           value={unitsInput}
           onChange={setUnitsInput}
-          readOnly={isAutoSynced}
+          readOnly={unitsReadOnly}
           step="any"
           min={0}
           help={
-            isAutoSynced
-              ? `Synced vanuit ${autoSyncSourceLabel}`
-              : 'Hoeveelheid van deze coin in je portefeuille.'
+            hasTx
+              ? 'Afgeleid uit je transactiehistorie.'
+              : isAutoSynced
+                ? `Synced vanuit ${autoSyncSourceLabel}`
+                : 'Hoeveelheid van deze coin in je portefeuille.'
           }
           disabled={isFiat}
         />
@@ -1126,13 +1169,15 @@ function CryptoHoldingPaneEdit({
           label="Gem. inkoopprijs (EUR)"
           value={avgPriceInput}
           onChange={setAvgPriceInput}
-          readOnly={isAutoSynced}
+          readOnly={avgPriceReadOnly}
           step="0.01"
           min={0}
           help={
-            isAutoSynced
-              ? 'Wordt automatisch berekend uit de gesynchroniseerde transacties.'
-              : 'Gewogen gemiddelde aankoopprijs over al je transacties.'
+            hasTx
+              ? 'Gewogen gemiddelde kostprijs, afgeleid uit je transactiehistorie.'
+              : isAutoSynced
+                ? 'Wordt automatisch berekend uit de gesynchroniseerde transacties.'
+                : 'Gewogen gemiddelde aankoopprijs over al je transacties.'
           }
           disabled={isFiat}
         />

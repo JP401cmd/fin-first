@@ -21,7 +21,7 @@ import type {
   UpcomingEvent,
   HouseholdActivityItem,
   WeekOverviewData,
-} from '@/components/widgets/widget-renderer'
+} from '@/lib/types/dashboard'
 import type { WidgetPref, WidgetPrefs } from '@/lib/widget-catalog'
 import type { FireProjection, FireCountdown } from '@/lib/horizon-data'
 import { loadNewsPreview } from '@/lib/news-preview'
@@ -70,7 +70,15 @@ import { resolveFireAssumptions, type FireAssumptionRow } from '@/lib/fire-assum
 import { getAowLeeftijden } from '@/lib/reference-cache'
 import { computeExpectedAnnualAppreciation, type Asset } from '@/lib/asset-data'
 import { computeAssetsByType, computeLiquidPot, monthsCoveredFrom } from '@/lib/dashboard-wealth-weighting'
+import {
+  pickEmergencyGoal,
+  emergencyGoalTarget,
+  resolveEmergencyFund,
+  type EmergencyGoalCandidate,
+} from '@/lib/emergency-fund'
 import { loadVasteLastenSummary } from '@/lib/vaste-lasten-summary'
+import { syncActiveGoalValues } from '@/lib/goal-current-value'
+import type { GoalType } from '@/lib/goal-data'
 import { type Debt } from '@/lib/debt-data'
 import {
   parseHousingStrategy,
@@ -81,7 +89,7 @@ import {
   isHomeExcludedFromFire,
   type HousingStrategyConfig,
 } from '@/lib/housing-strategy'
-import { formatCurrency, calculateFreedomTime, formatFreedomTimeString, dailyExpenseRate } from '@/lib/format'
+import { formatCurrency, calculateFreedomTime, formatFreedomTimeString, dailyExpenseRate, roundCents } from '@/lib/format'
 import { recentDailyExpenseRateFromRows } from '@/lib/expense-rate'
 import {
   fetchTxMonthAggregate,
@@ -295,7 +303,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       .limit(1000),
     supabase.from('life_events').select('id, name, event_type, target_age, target_date, one_time_cost, monthly_cost_change, monthly_income_change, duration_months, icon, is_active, sort_order, is_indexed, linked_asset_id, metadata').eq('is_active', true).order('sort_order', { ascending: true }).limit(50),
     supabase.from('recommendations').select('id, title, freedom_days_per_year, priority_score, recommendation_type, status').in('status', ['pending', 'postponed']),
-    supabase.from('goals').select('id, name, goal_type, current_value, target_value, target_date, color, icon').eq('is_completed', false).order('sort_order', { ascending: true }),
+    supabase.from('goals').select('id, name, goal_type, current_value, target_value, target_date, color, icon, metadata, linked_asset_id, linked_debt_id').eq('is_completed', false).order('sort_order', { ascending: true }),
     supabase.from('net_worth_snapshots').select('snapshot_date, net_worth, fire_age, savings_rate').gte('snapshot_date', twelveMonthsAgo).order('snapshot_date', { ascending: true }).limit(12),
     // 12-maands transactievenster → income12 / vroegste-inkomen / 6-maands /
     // sovereignty / vorige-maand via JS-slicing hieronder (byte-identiek; die
@@ -1357,6 +1365,17 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       value: Number((s as { savings_rate?: number | null }).savings_rate),
     }))
 
+  // ── Noodfonds (canonieke resolver) ──────────────────────────────
+  // Eén bron voor de noodfonds-bundel (hieronder) én de score-target: het
+  // (optionele) noodfonds-doel stuurt de target; de liquide pot (inclusion-
+  // gewogen) is de teller. Goals zijn al geladen (topGoals) — geen extra query.
+  const emergencyGoal = pickEmergencyGoal((goalsResult.data ?? []) as EmergencyGoalCandidate[])
+  const emergencyResolved = resolveEmergencyFund({
+    liquidPot: liquidPotWeighted,
+    effectiveMonthlyExpenses,
+    goal: emergencyGoal ? emergencyGoalTarget(emergencyGoal, effectiveMonthlyExpenses) : null,
+  })
+
   // ── Canonieke gezondheidsscore (ADR 0008) ──────────────────────
   // Eén bron: dezelfde `buildHealthScoreInput` + `computeHealthScoreFromInputs`
   // als /toekomst (horizon-data-loader ±r634) en de snapshot-routes — inclusief
@@ -1383,9 +1402,12 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       freedomPct,
       avgMonthlyExpenses: effectiveMonthlyExpenses,
       netMonthlyIncome: healthNetMonthlyIncome,
+      // Score-target = de canonieke noodfonds-target (doel of default 6). De
+      // curve floort 'm intern (anti-gaming); zie lib/emergency-fund.ts.
+      emergencyTargetMonths: emergencyResolved.targetMonths,
     },
     {
-      assets: (assetsResult.data ?? []) as { asset_type?: string | null; current_value?: number | string | null }[],
+      assets: (assetsResult.data ?? []) as { asset_type?: string | null; current_value?: number | string | null; net_worth_inclusion_pct?: number | null }[],
       unlinkedCash,
       budgets: allBudgetsRaw,
       transactions: (txResult.data ?? []) as { amount?: number | string | null; budget_id?: string | null }[],
@@ -1801,21 +1823,17 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   upcomingEvents.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
   const upcomingEventsLimited = upcomingEvents.slice(0, 10)
 
-  // ── Emergency Fund: derived from liquid assets + expenses ──
-  const TARGET_EMERGENCY_MONTHS = 6
-  // Liquide pot = niet-gekoppelde bankrekeningen + spaar/betaal/cash-bezittingen,
-  // inclusion-gewogen (gedeelde helper) — één grondslag met sovereignty-niveau
-  // en top-level monthsCovered. Een gedeelde spaarrekening telt zo hier óók maar
-  // voor het opgegeven inclusion-percentage mee.
-  const liquidAssets = liquidPotWeighted
-  const targetEmergencyAmount = effectiveMonthlyExpenses * TARGET_EMERGENCY_MONTHS
-  const emergencyMonthsCovered = monthsCoveredFrom(liquidAssets, effectiveMonthlyExpenses)
+  // ── Emergency Fund: canonieke resolver (emergencyResolved, boven berekend) ──
+  // Consume, don't recompute: currentAmount = inclusion-gewogen liquide pot,
+  // target uit het noodfonds-doel (of default 6), monthsCovered op dezelfde
+  // grondslag als sovereignty-niveau + top-level monthsCovered.
   const emergencyFund = {
-    currentAmount: Math.round(liquidAssets * 100) / 100,
-    targetAmount: Math.round(targetEmergencyAmount * 100) / 100,
-    monthsCovered: Math.round(emergencyMonthsCovered * 10) / 10,
-    targetMonths: TARGET_EMERGENCY_MONTHS,
-    isComplete: emergencyMonthsCovered >= TARGET_EMERGENCY_MONTHS,
+    currentAmount: roundCents(emergencyResolved.currentAmount),
+    targetAmount: roundCents(emergencyResolved.targetAmount),
+    monthsCovered: Math.round(emergencyResolved.monthsCovered * 10) / 10,
+    // Display-target: gebruikerskeuze (doel) of 6, afgerond op 0,5 mnd.
+    targetMonths: Math.round(emergencyResolved.targetMonths * 2) / 2,
+    isComplete: emergencyResolved.monthsCovered >= emergencyResolved.targetMonths,
   }
 
   // ── Household & partner perspective overrides ──────────────────────────
@@ -1926,7 +1944,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
             monthlyExpenses: effectiveMonthlyExpenses,
             monthlyIncome: effectiveMonthlyIncome,
             savingsRate: Math.round(householdSavingsRate * 10) / 10,
-            monthlySavings: Math.round(monthlySavingsFromRate(effectiveMonthlyIncome, householdSavingsRate) * 100) / 100,
+            monthlySavings: roundCents(monthlySavingsFromRate(effectiveMonthlyIncome, householdSavingsRate)),
             ...fireFields(combinedProj),
           }
 
@@ -1946,7 +1964,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
             monthlyExpenses: partnerDisplayExpenses,
             monthlyIncome: partnerDisplayIncome,
             savingsRate: Math.round(partnerSavingsRate * 10) / 10,
-            monthlySavings: Math.round(monthlySavingsFromRate(partnerDisplayIncome, partnerSavingsRate) * 100) / 100,
+            monthlySavings: roundCents(monthlySavingsFromRate(partnerDisplayIncome, partnerSavingsRate)),
             ...fireFields(partnerProj),
           }
         }
@@ -2199,13 +2217,13 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     weekDailyExpenses.push({
       day: dayStr,
       label: DAY_LABELS[i],
-      amount: Math.round((dailyExpenseMap.get(dayStr) ?? 0) * 100) / 100,
+      amount: roundCents(dailyExpenseMap.get(dayStr) ?? 0),
     })
   }
 
   // Weekly budget = monthly expense budget / 4.33
   const weekBudget = budgetTotals.expense.limit > 0
-    ? Math.round((budgetTotals.expense.limit / 4.33) * 100) / 100
+    ? roundCents(budgetTotals.expense.limit / 4.33)
     : 0
 
   // Top 3 categories by amount
@@ -2214,16 +2232,16 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     .slice(0, 3)
     .map(([name, amount]) => ({
       name,
-      amount: Math.round(amount * 100) / 100,
-      prevAmount: Math.round((prevWeekCategoryMap.get(name) ?? 0) * 100) / 100,
+      amount: roundCents(amount),
+      prevAmount: roundCents(prevWeekCategoryMap.get(name) ?? 0),
     }))
 
   weekOverview = {
-    weekExpenses: Math.round(weekExpensesTotal * 100) / 100,
-    weekIncome: Math.round(weekIncomeTotal * 100) / 100,
+    weekExpenses: roundCents(weekExpensesTotal),
+    weekIncome: roundCents(weekIncomeTotal),
     dailyExpenses: weekDailyExpenses,
     weekBudget,
-    prevWeekExpenses: Math.round(prevWeekExpensesTotal * 100) / 100,
+    prevWeekExpenses: roundCents(prevWeekExpensesTotal),
     topCategories: topWeekCategories,
   }
   } // einde if (wantWeekOverview)
@@ -2409,6 +2427,54 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   }
   } // einde if (wantHeatmap)
 
+  // ── Doelen-widget: LIVE-gesynchroniseerde top-3 doelen ─────────────────────
+  // Consume dezelfde bron als het doelen-scherm (`lib/fin-data-loader.ts`): de
+  // gedeelde `syncActiveGoalValues` past de canonieke volgorde toe (parameter-
+  // doelen eerst + max 5 handmatige) én injecteert de ACTUELE `current_value` van
+  // asset/debt-gekoppelde en parameter-doelen (spaarquote/salaris/rendement/
+  // vrijheidsleeftijd). Zonder deze sync toonde de widget de RAUWE opgeslagen
+  // waarde (parameter-doelen staan bewust op 0 in de DB) → 0% terwijl het scherm
+  // bv. 42,3% liet zien. LAZY: parameter-queries draaien alleen bij aanwezige
+  // parameter-doelen. We klonen de rijen zodat andere consumenten van
+  // `goalsResult.data` (o.a. het noodfonds-doel hierboven) ongemoeid blijven.
+  type WidgetGoalRow = {
+    id: string
+    name: string
+    goal_type: GoalType
+    current_value: number
+    target_value: number
+    target_date: string | null
+    color?: string
+    icon?: string
+    custom_unit?: string | null
+    metadata?: Record<string, unknown> | null
+    linked_asset_id?: string | null
+    linked_debt_id?: string | null
+  }
+  const goalsForWidget: WidgetGoalRow[] = ((goalsResult.data ?? []) as WidgetGoalRow[]).map(g => ({
+    ...g,
+    current_value: Number((g as { current_value: unknown }).current_value ?? 0),
+    target_value: Number((g as { target_value: unknown }).target_value ?? 0),
+  }))
+  const { goals: syncedWidgetGoals } = await syncActiveGoalValues(
+    supabase,
+    goalsForWidget,
+    (assetsResult.data ?? []) as { id: string; current_value: number | string | null }[],
+    (debtsResult.data ?? []) as { id: string; current_balance: number | string | null }[],
+    currentUserId,
+  )
+  const topGoals: TopGoal[] = syncedWidgetGoals.slice(0, 3).map(g => ({
+    id: g.id,
+    name: g.name,
+    goal_type: g.goal_type,
+    current_value: g.current_value,
+    target_value: g.target_value,
+    target_date: g.target_date ?? null,
+    color: g.color ?? 'teal',
+    icon: g.icon ?? 'Target',
+    custom_unit: g.custom_unit ?? null,
+  }))
+
   // DashboardData bundle for widgets
   const dashboardData: DashboardData = {
     netWorth,
@@ -2459,17 +2525,8 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     hasConsumerDebt,
     recommendations: (recsResult.data ?? []).filter(r => (r as { status: string }).status === 'pending').length,
     goals: (goalsResult.data ?? []).length,
-    topGoals: (goalsResult.data ?? []).slice(0, 3).map(g => ({
-      id: (g as { id: string }).id,
-      name: (g as { name: string }).name,
-      goal_type: (g as { goal_type: string }).goal_type,
-      current_value: Number((g as { current_value: unknown }).current_value ?? 0),
-      target_value: Number((g as { target_value: unknown }).target_value ?? 0),
-      target_date: (g as { target_date?: string | null }).target_date ?? null,
-      color: (g as { color?: string }).color ?? 'teal',
-      icon: (g as { icon?: string }).icon ?? 'Target',
-      custom_unit: (g as { custom_unit?: string | null }).custom_unit ?? null,
-    })) satisfies TopGoal[],
+    // Live-gesynchroniseerd + in dezelfde volgorde als het doelen-scherm (zie boven).
+    topGoals,
     recurringTransactions: vasteLastenSummary.count,
     lifeEvents: (eventsResult.data ?? []).length,
     netWorthHistory,
@@ -2511,19 +2568,19 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     upcomingEvents: upcomingEventsLimited,
     emergencyFund,
     topRecurringTransactions,
-    totalRecurringAmount: Math.round(totalRecurringAmount * 100) / 100,
+    totalRecurringAmount: roundCents(totalRecurringAmount),
     topRecommendations,
     topLifeEvents,
     savingsRate6m: Math.round(savingsRate6m * 10) / 10,
     // Canoniek maandspaarbedrag op savingsRate6m-grondslag (zie berekening boven) —
     // de spaarquote-widget consumeert dit i.p.v. een eigen huidige-maand-som.
-    monthlySavingsAmount: Math.round(monthlySavingsAmount * 100) / 100,
+    monthlySavingsAmount: roundCents(monthlySavingsAmount),
     // Transparantie: de 6m-quote viel terug op een profiel/net-worth-delta-schatting
     // (er was geen transactie-gebaseerde 6m-quote). De widget kan dit markeren.
     savingsRateIsEstimate,
-    monthlySavingsBudgetSpent: Math.round(monthlySavingsBudgetSpent * 100) / 100,
-    savingsBudgetSpent6m: Math.round(savingsBudgetSpent6m * 100) / 100,
-    prevMonthSavingsBudgetSpent: Math.round(prevMonthSavingsBudgetSpent * 100) / 100,
+    monthlySavingsBudgetSpent: roundCents(monthlySavingsBudgetSpent),
+    savingsBudgetSpent6m: roundCents(savingsBudgetSpent6m),
+    prevMonthSavingsBudgetSpent: roundCents(prevMonthSavingsBudgetSpent),
     budgetingActive,
     householdOverrides,
     partnerOverrides,

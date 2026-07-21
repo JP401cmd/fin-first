@@ -3,12 +3,9 @@
 import { useState } from 'react'
 import { ChevronDown, ChevronUp, LineChart } from 'lucide-react'
 
-export interface AssetGroupReturn {
-  assetType: string
-  label: string
-  /** Weighted average expected_return for this asset-type (decimal, e.g. 0.07 for 7%). */
-  weightedReturn: number
-}
+// Datacontract(en) wonen nu in @/lib/types/horizon-whatif (import-richting UI→lib).
+import type { AssetGroupReturn } from '@/lib/types/horizon-whatif'
+export type { AssetGroupReturn }
 
 interface Props {
   /** Per-asset-type delta in decimal (e.g. { investment: 0.02, cash: -0.005 }). Empty = no shift. */

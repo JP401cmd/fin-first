@@ -22,23 +22,27 @@
 import type { HealthScoreInput } from '@/lib/financial-health'
 import { hasPartner } from '@/lib/household-type'
 import { BOX3_PARAMS, CURRENT_TAX_YEAR } from '@/lib/box3-data'
+import { computeLiquidPot } from '@/lib/dashboard-wealth-weighting'
+import { DEFAULT_EMERGENCY_TARGET_MONTHS } from '@/lib/emergency-fund'
 
 // ── Box 3 (educatief "kans"-inzicht; sinds v2 geen score-pijler, ADR 0010) ───
 
 /** Vermogenstypes die als Box 3-bezit tellen (spaargeld + beleggingen). */
 const BOX3_ASSET_TYPES = new Set(['cash', 'savings', 'checking', 'investment', 'crypto'])
 
-/** Vermogenstypes die als liquide noodfonds tellen. */
-const LIQUID_ASSET_TYPES = new Set(['savings', 'checking', 'cash'])
-
 /** Budgettypes die in de budget-discipline-pijler meewegen. */
 const HEALTH_BUDGET_TYPES = ['income', 'expense', 'savings', 'debt'] as const
 type HealthBudgetType = (typeof HEALTH_BUDGET_TYPES)[number]
 
-/** Minimale assetvorm: alleen type + waarde zijn nodig voor de score-inputs. */
+/** Minimale assetvorm: type + waarde + inclusie-percentage voor de score-inputs. */
 export interface HealthScoreAsset {
   asset_type?: string | null
   current_value?: number | string | null
+  /**
+   * `net_worth_inclusion_pct` (0..100). Bepaalt hoe zwaar de bezitting in de
+   * INCLUSION-gewogen liquide pot meetelt (D1-fix); ontbreekt → 100%.
+   */
+  net_worth_inclusion_pct?: number | null
 }
 
 /** Minimale budgetvorm (parent of child). */
@@ -87,8 +91,14 @@ export function buildTaxData(
 // ── Noodfonds (emergency_fund-pillar) ────────────────────────────────────────
 
 /**
- * Aantal maanden noodfondsdekking: liquide bezit (spaar/betaal/cash) plus
- * niet-gekoppelde bankrekeningen, gedeeld door de gemiddelde maanduitgaven.
+ * Aantal maanden noodfondsdekking: de canonieke INCLUSION-gewogen liquide pot
+ * (spaar/betaal/cash × inclusie-% + niet-gekoppelde bankrekeningen), gedeeld
+ * door de gemiddelde maanduitgaven.
+ *
+ * D1-fix: weegt nu via `computeLiquidPot` (dezelfde gedeelde weging als de
+ * loader-bundel `emergencyFund`), zodat een deel-getelde spaarrekening
+ * (net_worth_inclusion_pct < 100) op de gezondheidsscore precies zo zwaar telt
+ * als in de bundel — geen drift meer tussen "gezondheid" en de noodfonds-widget.
  *
  * @param avgMonthlyExpenses 6-maands gemiddelde maanduitgaven; 0 → 0 maanden.
  */
@@ -97,11 +107,15 @@ export function computeEmergencyFundMonths(
   unlinkedCash: number,
   avgMonthlyExpenses: number,
 ): number {
-  const liquidAssets =
-    assets
-      .filter((a) => a.asset_type && LIQUID_ASSET_TYPES.has(a.asset_type))
-      .reduce((s, a) => s + Number(a.current_value ?? 0), 0) + unlinkedCash
-  return avgMonthlyExpenses > 0 ? liquidAssets / avgMonthlyExpenses : 0
+  const liquidPot = computeLiquidPot(
+    assets.map((a) => ({
+      current_value: a.current_value ?? 0,
+      asset_type: a.asset_type,
+      net_worth_inclusion_pct: a.net_worth_inclusion_pct,
+    })),
+    unlinkedCash,
+  )
+  return avgMonthlyExpenses > 0 ? liquidPot / avgMonthlyExpenses : 0
 }
 
 // ── Diversificatie (legacy, niet langer een pijler) ──────────────────────────
@@ -242,6 +256,12 @@ export interface HealthScoreScalars {
   /** 6-maands gemiddelde maanduitgaven voor de noodfonds-dekking. */
   avgMonthlyExpenses: number
   /**
+   * DISPLAY-target voor het noodfonds in maanden (uit het noodfonds-doel via
+   * `resolveEmergencyFund`; afwezig → default 6). De score-curve floort deze
+   * intern (anti-gaming); zie `lib/emergency-fund.ts`.
+   */
+  emergencyTargetMonths?: number
+  /**
    * Netto maandinkomen — DEZELFDE canonieke bron die `savingsRate6m` voedt
    * (income6m/6 resp. effectiveMonthlyIncome). Noemer van de DSTI-pijler;
    * géén nieuwe/afwijkende inkomensbron introduceren (ADR 0010 / FR-2).
@@ -289,6 +309,7 @@ export function buildHealthScoreInput(
     netMonthlyIncome: scalars.netMonthlyIncome,
     debtMonthlyPayments: rows.debtMonthlyPayments,
     emergencyFundMonths: computeEmergencyFundMonths(rows.assets, rows.unlinkedCash, scalars.avgMonthlyExpenses),
+    emergencyTargetMonths: scalars.emergencyTargetMonths ?? DEFAULT_EMERGENCY_TARGET_MONTHS,
     largestAssetTypeShare: computeLargestAssetTypeShare(rows.assets, rows.unlinkedCash),
     budgetCategories: buildBudgetCategories(rows.budgets, rows.transactions),
     // Backward-compat-velden (voeden geen pijler meer, ADR 0010) — voor het

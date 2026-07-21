@@ -7,6 +7,7 @@ import {
   detectAnomalies,
   type SpendingPattern,
 } from '@/lib/spending-patterns'
+import { localMonthStartMonthsAgo } from '@/lib/month-range'
 
 /**
  * Build spending pattern context for AI prompts.
@@ -15,8 +16,7 @@ import {
  */
 export async function buildSpendingPatternsContext(supabase: SupabaseClient): Promise<string> {
   const now = new Date()
-  const eighteenMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 17, 1)
-  const startDate = eighteenMonthsAgo.toISOString().split('T')[0]
+  const startDate = localMonthStartMonthsAgo(now, 17)
 
   const [budgetsResult, transactionsResult] = await Promise.all([
     supabase

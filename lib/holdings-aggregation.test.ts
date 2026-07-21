@@ -2,9 +2,11 @@ import { describe, it, expect } from 'vitest'
 import {
   computePositionFromTransactions,
   valuePosition,
+  deriveStoredAggregates,
   HOLDINGS_TX_AGG_LIMIT,
   type PositionTransaction,
 } from './holdings-aggregation'
+import { PERSONAS } from './test-personas'
 
 describe('computePositionFromTransactions', () => {
   it('geeft een lege positie terug zonder transacties', () => {
@@ -131,5 +133,121 @@ describe('HOLDINGS_TX_AGG_LIMIT — cap-correctheidscontract (H1)', () => {
 
   it('cap is minstens 5000 — per-ongeluk verlagen maakt deze test rood', () => {
     expect(HOLDINGS_TX_AGG_LIMIT).toBeGreaterThanOrEqual(5000)
+  })
+})
+
+describe('computePositionFromTransactions — split (aandelensplitsing)', () => {
+  it('2-voor-1 split verdubbelt units en halveert de kostprijs; kostbasis blijft gelijk', () => {
+    const agg = computePositionFromTransactions([
+      { type: 'buy', units: 100, price_per_unit: 10, date: '2024-01-01' },
+      { type: 'split', units: 2, price_per_unit: 0, date: '2024-06-01' },
+    ])
+    expect(agg.netUnits).toBe(200)
+    expect(agg.avgCost).toBeCloseTo(5, 6)
+    // Een split verandert je inleg niet, alleen de stukjes: 200×5 === 100×10.
+    expect(agg.netUnits * agg.avgCost).toBeCloseTo(1000, 6)
+  })
+
+  it('split vóór een verkoop realiseert tegen de post-split kostprijs', () => {
+    const agg = computePositionFromTransactions([
+      { type: 'buy', units: 100, price_per_unit: 10, date: '2024-01-01' },
+      { type: 'split', units: 2, price_per_unit: 0, date: '2024-06-01' },
+      { type: 'sell', units: 50, price_per_unit: 8, date: '2024-09-01' },
+    ])
+    expect(agg.netUnits).toBe(150)
+    expect(agg.avgCost).toBeCloseTo(5, 6)
+    // Verkoop 50 @ 8 tegen kostprijs 5 → gerealiseerd 50×(8−5)=150.
+    expect(agg.realizedPnL).toBeCloseTo(150, 6)
+  })
+})
+
+describe('deriveStoredAggregates — engine-uitvoer als op te slaan holding-aggregaten', () => {
+  it('units === netUnits en avgPurchasePrice === avgCost (geen tweede berekening)', () => {
+    const txs: PositionTransaction[] = [
+      { type: 'buy', units: 10, price_per_unit: 10, date: '2024-01-01' },
+      { type: 'buy', units: 10, price_per_unit: 20, date: '2024-02-01' },
+    ]
+    const agg = computePositionFromTransactions(txs)
+    const stored = deriveStoredAggregates(txs)
+    expect(stored.units).toBe(agg.netUnits)
+    expect(stored.avgPurchasePrice).toBe(agg.avgCost)
+    expect(stored.avgPurchasePrice).toBeCloseTo(15, 6)
+  })
+})
+
+/**
+ * Regressie voor de bug "Holding-detail toont inconsistente kostenbasis"
+ * (UAT-BEZIT-16): het opgeslagen `avg_purchase_price` mag NOOIT afwijken van de
+ * transactie-afgeleide gewogen gemiddelde kostprijs — anders leest "ingelegd"
+ * een andere bron dan "koerswinst" en telt het scherm niet op.
+ */
+describe('consistente kostenbasis — ingelegd + koerswinst === marktwaarde', () => {
+  /** Bouwt een ISO-datum uit `monthsAgo` — spiegelt seed-persona.ts. */
+  function personaTxDate(monthsAgo: number): string {
+    const d = new Date()
+    d.setMonth(d.getMonth() - monthsAgo)
+    return d.toISOString()
+  }
+
+  it('single-source-invariant: netUnits×avgCost + ongerealiseerd === marktwaarde', () => {
+    // Zolang ÉÉN avgCost zowel de kostbasis ("ingelegd") als de ongerealiseerde
+    // winst ("koerswinst") voedt, telt het scherm per definitie op. Dit is de
+    // generieke assertie die het hele bugtype afvangt.
+    const cases: PositionTransaction[][] = [
+      [{ type: 'buy', units: 100, price_per_unit: 10, date: '2020-01-01' }],
+      [
+        { type: 'buy', units: 100, price_per_unit: 10, date: '2020-01-01' },
+        { type: 'buy', units: 50, price_per_unit: 20, date: '2021-01-01' },
+        { type: 'sell', units: 30, price_per_unit: 25, date: '2022-01-01' },
+        { type: 'dividend', units: 0, price_per_unit: 0, total_amount: 40, date: '2022-06-01' },
+      ],
+    ]
+    for (const txs of cases) {
+      const agg = computePositionFromTransactions(txs)
+      const valued = valuePosition(agg, 30)
+      const ingelegd = agg.netUnits * agg.avgCost
+      expect(ingelegd + valued.unrealizedPnL).toBeCloseTo(valued.currentValue, 6)
+    }
+  })
+
+  it('persona compleet (Meesman): opgeslagen avg === transactie-afgeleide avgCost (geen stale 94,81)', () => {
+    const meesman = PERSONAS.compleet.holdings!.find(
+      (h) => h.assetName === 'Meesman Wereldwijd Totaal',
+    )!
+    const agg = computePositionFromTransactions(
+      meesman.transactions.map((t) => ({
+        type: t.type,
+        units: t.units,
+        price_per_unit: t.price_per_unit,
+        total_amount: t.total_amount,
+        date: personaTxDate(t.monthsAgo),
+      })),
+    )
+    // Σ inleg / Σ units = 226.140 / 2.215 = 102,0948 (NIET het oude 94,81).
+    expect(agg.avgCost).toBeCloseTo(102.0948, 4)
+    expect(meesman.avg_purchase_price).toBeCloseTo(agg.avgCost, 4)
+    expect(meesman.units).toBe(agg.netUnits)
+  })
+
+  it('Meesman detail-pane telt op: ingelegd(opgeslagen) + koerswinst(engine) === marktwaarde', () => {
+    const meesman = PERSONAS.compleet.holdings!.find(
+      (h) => h.assetName === 'Meesman Wereldwijd Totaal',
+    )!
+    const agg = computePositionFromTransactions(
+      meesman.transactions.map((t) => ({
+        type: t.type,
+        units: t.units,
+        price_per_unit: t.price_per_unit,
+        total_amount: t.total_amount,
+        date: personaTxDate(t.monthsAgo),
+      })),
+    )
+    const valued = valuePosition(agg, meesman.current_price)
+    // Exact de mix uit de bug: "ingelegd" leest het opgeslagen veld, "koerswinst"
+    // de engine. Vóór de fix: 210.004 + 73.948 = 283.952 ≠ 300.088 (gat €16.136).
+    const ingelegd = meesman.units * meesman.avg_purchase_price
+    const koerswinst = valued.unrealizedPnL
+    const marktwaarde = meesman.units * meesman.current_price
+    expect(Math.abs(ingelegd + koerswinst - marktwaarde)).toBeLessThan(1)
   })
 })

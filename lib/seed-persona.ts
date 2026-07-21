@@ -14,6 +14,7 @@ import {
   encryptField,
   isFieldEncryptionConfigured,
 } from '@/lib/crypto/field-encryption'
+import { SERVICE_WIPE_TABLES, FULL_ERASE_SERVICE_TABLES } from '@/lib/user-data-tables'
 
 type ProgressCallback = (step: string, table: string, action: string, count?: number) => void
 
@@ -232,17 +233,62 @@ async function deleteTable(supabase: SupabaseClient, table: string, userId: stri
 }
 
 /**
+ * Best-effort service-role wipe voor persoonlijke/log-tabellen ZONDER eigen-rij
+ * DELETE-policy (net_worth_history, feedback en — bij full-erase — de retentie-
+ * tabellen). Via de sessie-client zouden deze een stille no-op zijn; de service-
+ * role omzeilt RLS. Bewust throw-vrij: een gefaalde log-wipe mag het AVG-
+ * verwijderrecht van de gebruiker niet blokkeren (de DB-cascade uit migratie
+ * 20260721140000 is het vangnet). Fouten worden server-side gelogd.
+ */
+async function serviceWipeTable(service: SupabaseClient, table: string, userId: string): Promise<number> {
+  try {
+    const { count, error } = await service
+      .from(table)
+      .delete({ count: 'exact' })
+      .eq('user_id', userId)
+    if (error) {
+      console.error(`[seed] service-wipe van ${table} mislukt: ${error.message}`)
+      return 0
+    }
+    return count ?? 0
+  } catch (err) {
+    console.error(`[seed] service-wipe van ${table} gooide:`, err)
+    return 0
+  }
+}
+
+/**
+ * Opties voor {@link deleteAllUserData}.
+ * - `service`: service-role-client om de RLS-afgeschermde persoonlijke tabellen
+ *   (net_worth_history, feedback) te wissen die de sessie-client niet kan raken.
+ *   Zonder deze client worden die tabellen overgeslagen (dev/seed-paden).
+ * - `fullErase`: bij een VOLLEDIGE accountverwijdering ook de retentie-/log-
+ *   tabellen per gebruiker wissen (ai_token_usage, ai_usage, error_logs,
+ *   web_vitals) zodat er geen identifier achterblijft. Vereist `service`.
+ */
+export interface DeleteAllUserDataOptions {
+  service?: SupabaseClient
+  fullErase?: boolean
+}
+
+/**
  * Delete all user data from all financial tables.
- * Uses 4 batched parallel deletes respecting FK constraints:
+ * Uses batched parallel deletes respecting FK constraints:
  * 1a) deepest leaves (goal_contributions, category_corrections)
  * 1b) leaf tables (goals, snapshots, events, etc.)
  * 2) mid-level (actions, transactions, budget_amounts)
+ * 2c) aanvullende user-scoped tabellen (koppelingen, calculators, legacy holdings)
  * 3) parent tables (recommendations, debts, assets, bank_accounts, budgets)
+ *
+ * De verzameling gewiste tabellen wordt bewaakt door de dekkings-vitest
+ * lib/user-data-tables.test.ts (elke user-scoped tabel valt in precies één
+ * partitie). Zie lib/user-data-tables.ts voor de single source.
  */
 export async function deleteAllUserData(
   supabase: SupabaseClient,
   userId: string,
   onProgress?: ProgressCallback,
+  opts?: DeleteAllUserDataOptions,
 ): Promise<Record<string, number>> {
   const summary: Record<string, number> = {}
 
@@ -323,6 +369,39 @@ export async function deleteAllUserData(
   const connectionsResult = await deleteTable(supabase, 'bank_connections', userId)
   summary.bank_connections = connectionsResult
 
+  // Batch 2c: aanvullende user-scoped tabellen die een reset eerder OVERLEEFDEN
+  // (o.a. exchange_connections met API-keys!, wallet_addresses, broker_connections,
+  // custom_calculators). Allemaal via de sessie-client wisbaar (eigen-rij DELETE-
+  // policy geverifieerd). FK-veilige sub-orde: children vóór parents, en álle
+  // vóór batch 3 omdat de koppelings-/legacy-tabellen CASCADE-en naar `assets`.
+  // Geen eigen onProgress-tick (SEED_DELETE_STEPS blijft 5, voortgangsbalk-teller).
+  const batch2cChildren = await Promise.all([
+    deleteTable(supabase, 'calculator_likes', userId),
+    deleteTable(supabase, '_legacy_holding_transactions', userId),
+  ])
+  summary.calculator_likes = batch2cChildren[0]
+  summary._legacy_holding_transactions = batch2cChildren[1]
+
+  const batch2cTables = [
+    'custom_calculators',
+    '_legacy_holdings',
+    'exchange_connections',
+    'wallet_addresses',
+    'broker_connections',
+    'external_data_sources',
+    'ai_calculator_usage',
+    'news_feedback',
+    'questionnaire_sessions',
+    'report_configs',
+    'user_own_ibans',
+  ]
+  const batch2cResults = await Promise.all(
+    batch2cTables.map((t) => deleteTable(supabase, t, userId)),
+  )
+  for (let i = 0; i < batch2cTables.length; i++) {
+    summary[batch2cTables[i]] = batch2cResults[i]
+  }
+
   // Batch 3: parent tables
   const batch3Results = await Promise.all([
     deleteTable(supabase, 'recommendations', userId),
@@ -351,6 +430,18 @@ export async function deleteAllUserData(
   }
   summary.app_settings = settingsCount ?? 0
   onProgress?.('App-instellingen wissen...', 'batch4', 'delete', settingsCount ?? 0)
+
+  // Batch 5 (service-role): persoonlijke tabellen ZONDER eigen-rij DELETE-policy
+  // die de sessie-client niet kan wissen (net_worth_history, feedback). Alleen
+  // uitgevoerd als de aanroeper een service-client meegeeft (account-delete,
+  // onboarding-reset). Bij een VOLLEDIGE accountverwijdering (`fullErase`) ook de
+  // retentie-/log-tabellen zodat er geen identifier achterblijft (AVG-wissing).
+  if (opts?.service) {
+    const serviceTables = opts.fullErase ? FULL_ERASE_SERVICE_TABLES : SERVICE_WIPE_TABLES
+    for (const table of serviceTables) {
+      summary[table] = await serviceWipeTable(opts.service, table, userId)
+    }
+  }
 
   return summary
 }

@@ -70,7 +70,9 @@ import {
   type HousingContext,
   type HousingStrategyConfig,
 } from '@/lib/housing-strategy'
-import { buildHealthScoreInput, computeEmergencyFundMonths } from '@/lib/health-score-input'
+import { buildHealthScoreInput } from '@/lib/health-score-input'
+import { resolveEmergencyFund } from '@/lib/emergency-fund'
+import { computeLiquidPot } from '@/lib/dashboard-wealth-weighting'
 import { computeHealthScoreFromInputs } from '@/lib/financial-health'
 import { resolveSavingsSource } from '@/lib/savings-source'
 import { calculateFreedomTime, dailyExpenseRate } from '@/lib/format'
@@ -759,12 +761,22 @@ function buildLifeGrid(
 }
 
 function buildSnapshot(ctx: EngineContext, dailyExpense: number): CheckReportData['snapshot'] {
-  const bufferMonths = computeEmergencyFundMonths(
-    // Buffer telt de noodfonds-saldo als liquide cash + de liquide assets.
-    [...ctx.portfolio.assets, { asset_type: 'cash', current_value: ctx.intake.emergencyFund }],
-    0,
-    ctx.monthlyExpenses,
-  )
+  // Noodfonds via de canonieke resolver. /check heeft GEEN doelen (persona-intake)
+  // → liquide-tak (source='liquid', default 6 mnd). Buffer telt het noodfonds-
+  // saldo als losse cash + de liquide portfolio-assets (computeLiquidPot filtert
+  // op spaar/betaal/cash). Zo heeft de noodfonds-definitie één bron.
+  const bufferMonths = resolveEmergencyFund({
+    liquidPot: computeLiquidPot(
+      ctx.portfolio.assets.map((a) => ({
+        current_value: a.current_value,
+        asset_type: a.asset_type,
+        net_worth_inclusion_pct: a.net_worth_inclusion_pct,
+      })),
+      ctx.intake.emergencyFund,
+    ),
+    effectiveMonthlyExpenses: ctx.monthlyExpenses,
+    goal: null,
+  }).monthsCovered
   // Vrijheidstijd op de FIRE-eligible/LIQUIDE grondslag (eigen woning gefilterd) —
   // identiek aan lifeGrid.alreadyFundedYears + twoFutures.stopToday. Het getoonde
   // €-saldo (`netWorth`) blijft incl. huis; alléén de vrijheidstijd rekent op de
@@ -1388,12 +1400,20 @@ function buildWillMoves(ctx: EngineContext, dailyExpense: number): CheckReportDa
   })
 
   // ── (a) Bufferoverschot boven 4 maanden laten werken. ──
-  const bufferMonths = computeEmergencyFundMonths(
-    // Buffer = noodfonds + liquide (cash/savings) bezittingen, niet alleen het noodfonds.
-    [...ctx.portfolio.assets, { asset_type: 'cash', current_value: ctx.intake.emergencyFund }],
-    0,
-    ctx.monthlyExpenses,
-  )
+  // Buffer = noodfonds + liquide (cash/savings) bezittingen, via de canonieke
+  // resolver (liquide-tak: /check heeft geen doelen).
+  const bufferMonths = resolveEmergencyFund({
+    liquidPot: computeLiquidPot(
+      ctx.portfolio.assets.map((a) => ({
+        current_value: a.current_value,
+        asset_type: a.asset_type,
+        net_worth_inclusion_pct: a.net_worth_inclusion_pct,
+      })),
+      ctx.intake.emergencyFund,
+    ),
+    effectiveMonthlyExpenses: ctx.monthlyExpenses,
+    goal: null,
+  }).monthsCovered
   if (bufferMonths > FIN_BUFFER_TARGET_MONTHS && ctx.monthlyExpenses > 0) {
     const surplus = Math.max(0, ctx.intake.emergencyFund - ctx.monthlyExpenses * FIN_BUFFER_TARGET_MONTHS)
     if (surplus > 0) {

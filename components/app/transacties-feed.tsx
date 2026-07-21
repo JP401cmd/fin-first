@@ -16,14 +16,9 @@ import { DensityToggle, useListDensity, type ListDensity } from '@/components/ap
  * zelf draait inmiddels op het rijkere `AnalysisTransaction`-type (zie props),
  * maar `TransactionRow` blijft bestaan voor die afnemers.
  */
-export type TransactionRow = {
-  id: string
-  date: string // ISO yyyy-mm-dd
-  description: string
-  category?: string | null
-  amount: number // negative = uitgave, positive = inkomst
-  account_name?: string | null
-}
+// Datacontract(en) wonen nu in @/lib/types/transactions (import-richting UI→lib).
+import type { TransactionRow } from '@/lib/types/transactions'
+export type { TransactionRow }
 
 type FilterMode = 'all' | 'expense' | 'income'
 

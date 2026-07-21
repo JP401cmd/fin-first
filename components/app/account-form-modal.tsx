@@ -19,14 +19,9 @@ export type Account = {
   ownership?: OwnershipType
 }
 
-export const ACCOUNT_TYPES = [
-  { value: 'checking', label: 'Betaalrekening' },
-  { value: 'savings', label: 'Spaarrekening' },
-  { value: 'joint', label: 'En/of-rekening' },
-  { value: 'business', label: 'Zakelijke rekening' },
-  { value: 'contant_geld', label: 'Contant geld' },
-  { value: 'other', label: 'Overig' },
-] as const
+// ACCOUNT_TYPES woont nu in lib/account-types.ts (import-richting UI→lib).
+import { ACCOUNT_TYPES } from '@/lib/account-types'
+export { ACCOUNT_TYPES }
 
 export function AccountFormModal({
   account,

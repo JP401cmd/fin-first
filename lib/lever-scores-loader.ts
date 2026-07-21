@@ -22,7 +22,7 @@ import { getCachedUser } from '@/lib/supabase/cached-user'
 import {
   computeLeverScores,
   type LeverScores,
-} from '@/components/app/shell/lever-scores'
+} from '@/lib/lever-scores'
 import {
   computeBox3TaxableInput,
   box3TaxStatus,

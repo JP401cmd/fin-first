@@ -9,6 +9,7 @@ import {
   type HealthScoreTransaction,
 } from '@/lib/health-score-input'
 import { resolveFireParams } from '@/lib/fire-params'
+import { resolveEmergencyTargetMonths, type EmergencyGoalCandidate } from '@/lib/emergency-fund'
 import { computeSovereigntyLevel } from '@/lib/feature-phases'
 import { captureBalanceSnapshots } from '@/lib/balance-snapshot'
 import { logError } from '@/lib/log-error'
@@ -143,6 +144,7 @@ export async function GET(request: Request) {
         budgetsResult,
         monthTxResult,
         bankAccountsResult,
+        goalsResult,
       ] = await Promise.all([
         supabase
           .from('assets')
@@ -187,6 +189,13 @@ export async function GET(request: Request) {
           .eq('user_id', userId)
           .eq('is_active', true)
           .is('linked_asset_id', null),
+        // Actieve doelen → noodfonds-target (goal-losgekoppeld-fix). Één
+        // geïndexeerde query per user (user_id) — past in het per-user-batch.
+        supabase
+          .from('goals')
+          .select('goal_type, target_value, metadata')
+          .eq('user_id', userId)
+          .eq('is_completed', false),
       ])
 
       if (assetsResult.error || debtsResult.error) {
@@ -263,6 +272,11 @@ export async function GET(request: Request) {
         : 0
       // DSTI-teller: Σ maandlasten over de actieve schulden (select bevat monthly_payment).
       const debtMonthlyPayments = debts.reduce((s, d) => s + Number(d.monthly_payment ?? 0), 0)
+      // Noodfonds-target uit het (optionele) noodfonds-doel; geen doel → default 6.
+      const emergencyTargetMonths = resolveEmergencyTargetMonths(
+        (goalsResult.data ?? []) as EmergencyGoalCandidate[],
+        monthlyExpenses,
+      )
       const healthScore = computeHealthScoreFromInputs(
         buildHealthScoreInput(
           {
@@ -273,6 +287,7 @@ export async function GET(request: Request) {
             avgMonthlyExpenses: monthlyExpenses,
             // Zelfde inkomensbron als savingsRate6m (income/6) — DSTI-noemer.
             netMonthlyIncome: monthlyIncome,
+            emergencyTargetMonths,
           },
           {
             assets: assets as HealthScoreAsset[],

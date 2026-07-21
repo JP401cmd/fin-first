@@ -30,7 +30,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { normalizePensionType } from '@/lib/horizon-data'
-import type { PensionParseResult } from '@/app/api/pension/parse/route'
+import type { PensionParseResult } from '@/lib/pension/types'
 import { normalizePensionFondsNaam } from '@/lib/pension/reconcile'
 import type { PensionReconcileAction, Regeling } from '@/lib/pension/reconcile'
 

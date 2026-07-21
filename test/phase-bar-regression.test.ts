@@ -7,7 +7,7 @@
  * Feature #468
  */
 import { describe, it, expect } from 'vitest'
-import { buildSegments, type FaseId } from '@/components/app/horizon/phase-bar'
+import { buildSegments, type FaseId } from '@/lib/horizon/phase-bar-segments'
 import { PERSONAS, PERSONA_KEYS, type PersonaKey } from '@/lib/test-personas'
 import { computeFireProjection, ageAtDate } from '@/lib/horizon-data'
 import { NL_AOW_AGE } from '@/lib/constants'

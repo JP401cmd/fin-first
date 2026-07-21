@@ -50,8 +50,8 @@ export const UNIFIED_FEATURES: UnifiedFeature[] = [
     description: 'Budgetcategorieën, optimalisatie, NIBUD benchmark',
     module: 'kern',
     requiredTier: 'gratis',
-    widgets: ['budgetten', 'nibud_benchmark', 'spaarquote', 'noodfonds'],
-    legacyIds: ['budget_optimalisatie', 'nibud_benchmark'],
+    widgets: ['budgetten', 'spaarquote', 'noodfonds'],
+    legacyIds: ['budget_optimalisatie'],
   },
   {
     id: 'cashflow',

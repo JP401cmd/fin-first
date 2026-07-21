@@ -1,4 +1,4 @@
-import type { WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
+import type { WhatIfOverrides } from '@/lib/types/horizon-whatif'
 
 /**
  * Detect if slider changes are significant enough to trigger AI suggestions.

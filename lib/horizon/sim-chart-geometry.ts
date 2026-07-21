@@ -18,7 +18,7 @@ import type { SimRow } from '@/lib/fire-simulation'
 import type { FireEndStrategy } from '@/lib/fire-strategy'
 import type { ChartEventOverlay } from '@/lib/chart-event-overlay'
 import { CHART_PAD } from '@/lib/chart-constants'
-import { topPaddingFor, iconStackTopFloor } from '@/components/app/horizon/chart-event-markers'
+import { topPaddingFor, iconStackTopFloor } from '@/lib/horizon/chart-event-geometry'
 
 // ── Overlay-types (publieke API — via sim-chart.tsx her-geëxporteerd) ────────
 

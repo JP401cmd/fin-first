@@ -78,7 +78,6 @@ export const WIDGET_CLASSIFICATION: Record<string, WidgetClassification> = {
   vaste_lasten:             'insight',       // → /core/cash (review subscriptions)
   gezondheids_score:        'insight',       // onClick → kassabon drill-down
   belasting_box3:           'insight',       // → /core/debts (tax optimization)
-  nibud_benchmark:          'insight',       // → /core (compare/improve)
   vrijheidsscenarios:       'insight',       // → /horizon?modal=scenarios
   sim_vermogenspad:         'insight',       // → /horizon?modal=simulations
   box3_drag:                'insight',       // → /core/debts (tax strategy)

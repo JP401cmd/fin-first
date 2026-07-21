@@ -73,6 +73,7 @@ import {
   type HealthScoreBudget,
   type HealthScoreTransaction,
 } from '@/lib/health-score-input'
+import { resolveEmergencyTargetMonths, type EmergencyGoalCandidate } from '@/lib/emergency-fund'
 
 // Snapshot type for resilience trend data
 export type SnapshotForTrend = {
@@ -342,6 +343,7 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
     txAgg12Result,
     earliestIncomeResult,
     fireAssumptionsResult,
+    goalsResult,
   ] = await Promise.all([
     // Gedeelde basisdata-laag (lib/server-data/base.ts): huidige-maand-tx,
     // actieve assets, eigen profiel (select('*') dekt óók de withdrawal/guardrail-
@@ -432,6 +434,14 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
       .from('fire_assumptions')
       .select('year, expected_return, inflation, volatility, source, is_definitive')
       .order('year', { ascending: true }),
+    // Actieve doelen → noodfonds-target voor de gezondheidsscore. Zelfde bron/
+    // semantiek als /overzicht + de snapshot-routes, zodat de emergency_fund-
+    // pijler op /toekomst niet tegen een andere target scoort (goal-losgekoppeld-fix).
+    supabase
+      .from('goals')
+      .select('goal_type, target_value, metadata')
+      .eq('is_completed', false)
+      .order('sort_order', { ascending: true }),
   ])
 
   // Same row both consumers want: alias instead of re-querying.
@@ -821,6 +831,12 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
       freedomPct,
       avgMonthlyExpenses: avgExpenses6m,
       netMonthlyIncome: avgIncome6m,
+      // Noodfonds-score-target uit het (optionele) noodfonds-doel; consistent
+      // met /overzicht + snapshots (geen doel → default 6).
+      emergencyTargetMonths: resolveEmergencyTargetMonths(
+        (goalsResult.data ?? []) as EmergencyGoalCandidate[],
+        avgExpenses6m,
+      ),
     },
     {
       assets: (fullAssetsResult.data ?? []) as HealthScoreAsset[],

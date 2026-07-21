@@ -4,7 +4,7 @@ import {
   type ConvergentieRawContext,
 } from '@/lib/horizon-kernel/convergentie-router'
 import { buildSliderEvent } from '@/lib/scenario-events'
-import type { WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
+import type { WhatIfOverrides } from '@/lib/types/horizon-whatif'
 import {
   buildCompleetHorizonFixture,
   buildCompleetKernelProfileBase,

@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import * as fs from 'fs'
+import * as path from 'path'
 import { buildArchimateModel } from './archimate-model'
 import {
   CALCULATIONS,
@@ -45,5 +47,37 @@ describe('calculations — catalogus', () => {
       expect(c.inputs.length, `${c.id} mist invoer`).toBeGreaterThan(0)
       expect(c.outputs.length, `${c.id} mist uitvoer`).toBeGreaterThan(0)
     }
+  })
+})
+
+// ── Waarheids-vangnet 1 — bestandsexistentie op files[] (Arch F5) ───────────
+// Test-only: validateCalculations zelf blijft fs-vrij (client-bundelbaar);
+// deze check draait uitsluitend hier, analoog aan de allowlist-integriteit in
+// formula-drift-scan.test.ts.
+describe('calculations — files[] bestaan echt op schijf', () => {
+  const root = process.cwd()
+
+  it('elke files[]-entry verwijst naar een bestaand bestand (of, bij een `dir/*.ts`-joker, een niet-lege map)', () => {
+    const missing: string[] = []
+    for (const c of CALCULATIONS) {
+      for (const f of c.files) {
+        if (f.includes('*')) {
+          const dir = path.join(root, ...f.replace(/\/\*\.ts$/, '').split('/'))
+          const hasTs = fs.existsSync(dir) && fs.readdirSync(dir).some((entry) => entry.endsWith('.ts'))
+          if (!hasTs) missing.push(`${c.id}: ${f} (map leeg of ontbreekt)`)
+          continue
+        }
+        const abs = path.join(root, ...f.split('/'))
+        if (!fs.existsSync(abs)) missing.push(`${c.id}: ${f}`)
+      }
+    }
+    expect(missing, `Verdwenen bronbestand(en) — update calculations.ts:\n${missing.join('\n')}`).toEqual([])
+  })
+})
+
+describe('calculations — files[] sentinel-bewijs', () => {
+  it('detecteert een verzonnen niet-bestaand pad', () => {
+    const abs = path.join(process.cwd(), 'lib', 'architecture', 'dit-bestand-bestaat-niet-sentinel.ts')
+    expect(fs.existsSync(abs)).toBe(false)
   })
 })

@@ -147,7 +147,6 @@ export const PERSONA_MODULE_PRESETS: Record<PersonaId, ModuleId[]> = {
 export const WIDGET_MODULE_MAP: Record<string, ModuleId> = {
   // Budgetteren
   budgetten: 'budgetteren',
-  nibud_benchmark: 'budgetteren',
   spaarquote: 'budgetteren',
   noodfonds: 'budgetteren',
   cash_flow: 'budgetteren',

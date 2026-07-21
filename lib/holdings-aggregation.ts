@@ -121,9 +121,19 @@ export function computePositionFromTransactions(
       const div = num(tx.total_amount) || u * px
       dividends += div
       realized += div
+    } else if (type === 'split') {
+      // Aandelensplitsing: `units` op de split-rij = de vermenigvuldigingsfactor
+      // (bv. 2 = een 2-voor-1-split). Verhoogt het aantal eenheden en verlaagt
+      // de gemiddelde kostprijs evenredig; de totale kostbasis (units × avgCost)
+      // blijft gelijk — een split verandert je inleg niet, alleen de stukjes
+      // waarin die is opgedeeld. `bought`/`invested` blijven daarom ongemoeid.
+      // Semantiek is identiek aan de holdings-mutatie-route die vóór de
+      // consolidatie op deze engine z'n eigen split-replay had (single source).
+      if (u > EPSILON && units > EPSILON) {
+        units *= u
+        avgCost /= u
+      }
     }
-    // 'split' e.d.: bewust genegeerd (geen unit-aanpassing) tot er een echt
-    // splitsformaat is; documenteer drift liever dan te gokken.
   }
 
   // Kosten drukken het nettoresultaat van een gerealiseerde/gesloten positie.
@@ -143,6 +153,34 @@ export function computePositionFromTransactions(
     realizedPnL: realized,
     isClosed: netUnits === 0,
   }
+}
+
+/**
+ * De op de holding-rij op te slaan aggregaten (units + gemiddelde kostprijs).
+ * Bewust dezelfde grootheden als `investment_holdings`/`crypto_holdings`
+ * bijhouden, zodat het opgeslagen veld een gematerialiseerde cache van de
+ * engine-uitvoer is — nooit een tweede, afwijkende bron.
+ */
+export interface StoredHoldingAggregates {
+  /** = `PositionAggregate.netUnits`. */
+  units: number
+  /** = `PositionAggregate.avgCost` (gewogen gemiddelde kostprijs per eenheid). */
+  avgPurchasePrice: number
+}
+
+/**
+ * Leidt de op te slaan holding-aggregaten (units + avg_purchase_price) af uit de
+ * transactiehistorie via de canonieke engine. DE bron voor het terugschrijven na
+ * elke transactie-mutatie (import/seed/handmatige buy-sell-delete), zodat het
+ * opgeslagen veld nooit kan afwijken van de transactie-afgeleide waarde die de
+ * detail-pane toont. Consume, don't recompute: geen tweede average-cost-loop —
+ * dit is de enige mapping van engine-uitvoer naar holding-kolommen.
+ */
+export function deriveStoredAggregates(
+  txs: readonly PositionTransaction[],
+): StoredHoldingAggregates {
+  const agg = computePositionFromTransactions(txs)
+  return { units: agg.netUnits, avgPurchasePrice: agg.avgCost }
 }
 
 /**

@@ -39,7 +39,7 @@ export const GRID_TARGET_CELLS: Record<GridSize, number> = {
 export const FOCUS_WIDGET_BOOST: Record<FocusChoice, string[]> = {
   budget_cashflow: [
     'cash_flow', 'budgetten', 'spaarquote', 'vaste_lasten',
-    'nibud_benchmark', 'noodfonds',
+    'noodfonds',
     'trend_inkomen', 'trend_uitgaven', 'trend_sparen', 'trend_schulden',
   ],
   assets_investments: [
@@ -82,7 +82,6 @@ export const WIDGET_POPULARITY: Record<string, number> = {
   voorstellen: 5,
   wilskracht: 5,
   meldingen: 5,
-  nibud_benchmark: 4,
   berichten: 4,
   agenda: 4,
   gezondheids_score: 4,

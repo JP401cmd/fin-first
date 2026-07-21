@@ -29,20 +29,9 @@ import {
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-type OnboardingStep = 'bezittingen' | 'budgets' | 'horizon'
-
-/**
- * Maps each module to the onboarding steps it requires before activation.
- * When a user enables a module they haven't gone through onboarding for,
- * we check this map to determine which steps are missing.
- */
-export const MODULE_REQUIRED_STEPS: Partial<Record<ModuleId, OnboardingStep[]>> = {
-  budgetteren: ['bezittingen', 'budgets'],
-  vermogensregistratie: ['bezittingen'],
-  aandelenregistratie: ['bezittingen'],
-  toekomstplannen: ['horizon'],
-  inzicht_acties: [],
-}
+// OnboardingStep + MODULE_REQUIRED_STEPS wonen nu in lib/module-required-steps.ts (UI→lib).
+import { MODULE_REQUIRED_STEPS, type OnboardingStep } from '@/lib/module-required-steps'
+export { MODULE_REQUIRED_STEPS }
 
 // ── Module visual info ──────────────────────────────────────────────────────
 

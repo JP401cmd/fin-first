@@ -10,6 +10,7 @@ export type JobKey =
   | 'integraties-health'
   | 'briefing-email'
   | 'web-vitals-retention'
+  | 'retention'
 
 /**
  * Schrijf één uitvoering van een achtergrondtaak weg in `job_runs`.

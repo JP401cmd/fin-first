@@ -23,6 +23,7 @@ import type { LeverageStatus } from '@/lib/leverage-status'
 import {
   dailyExpenseRate,
   calculateFreedomTime,
+  roundCents,
   type FreedomTimeBreakdown,
 } from '@/lib/format'
 import {
@@ -96,10 +97,6 @@ const EMPTY_FREEDOM: FreedomTimeBreakdown = {
   isInfinite: false,
 }
 
-function round2(n: number): number {
-  return Math.round(n * 100) / 100
-}
-
 function buildComposition(items: VasteLastenItem[], total: number): CategoryComposition[] {
   const byCategory = new Map<RecurringCategory, number>()
   for (const item of items) {
@@ -110,7 +107,7 @@ function buildComposition(items: VasteLastenItem[], total: number): CategoryComp
     rows.push({
       category,
       label: CATEGORY_LABELS[category] ?? category,
-      monthlyAmount: round2(monthlyAmount),
+      monthlyAmount: roundCents(monthlyAmount),
       share: total > 0 ? monthlyAmount / total : 0,
     })
   }
@@ -125,7 +122,7 @@ function largestOf(
     if (!best || item.monthlyAmount > best.monthlyAmount) best = item
   }
   return best
-    ? { id: best.id, name: best.name, monthlyAmount: round2(best.monthlyAmount), category: best.category }
+    ? { id: best.id, name: best.name, monthlyAmount: roundCents(best.monthlyAmount), category: best.category }
     : null
 }
 
@@ -138,7 +135,7 @@ export function cancelEffect(
   monthlyAmount: number,
   monthlyExpenses: number,
 ): { yearlyEuro: number; freedom: FreedomTimeBreakdown } {
-  const yearlyEuro = round2(Math.max(0, monthlyAmount) * 12)
+  const yearlyEuro = roundCents(Math.max(0, monthlyAmount) * 12)
   const freedom = calculateFreedomTime(yearlyEuro, dailyExpenseRate(monthlyExpenses))
   return { yearlyEuro, freedom }
 }
@@ -150,9 +147,9 @@ export function buildVasteLastenInsights(params: {
 }): VasteLastenInsights {
   const { summary, monthlyIncome, monthlyExpenses } = params
 
-  const subscriptionsMonthly = round2(summary.totalMonthlySubscriptions)
-  const vasteKostenMonthly = round2(summary.totalMonthlyVasteKosten)
-  const totalMonthly = round2(summary.totalMonthly)
+  const subscriptionsMonthly = roundCents(summary.totalMonthlySubscriptions)
+  const vasteKostenMonthly = roundCents(summary.totalMonthlyVasteKosten)
+  const totalMonthly = roundCents(summary.totalMonthly)
   const count = summary.count
   const hasData = count > 0
 
@@ -171,7 +168,7 @@ export function buildVasteLastenInsights(params: {
 
   // Benchmark-delta (geciteerd getal, redactioneel).
   const subscriptionBenchmarkMonthly = SUBSCRIPTION_BENCHMARK.avgMonthlyPerPerson
-  const subscriptionDeltaMonthly = round2(subscriptionsMonthly - subscriptionBenchmarkMonthly)
+  const subscriptionDeltaMonthly = roundCents(subscriptionsMonthly - subscriptionBenchmarkMonthly)
 
   const composition = buildComposition(
     [...summary.subscriptions, ...summary.vasteKosten],
@@ -187,11 +184,11 @@ export function buildVasteLastenInsights(params: {
     vasteKostenCount: summary.vasteKosten.length,
 
     totalMonthly,
-    totalYearly: round2(totalMonthly * 12),
+    totalYearly: roundCents(totalMonthly * 12),
     subscriptionsMonthly,
-    subscriptionsYearly: round2(subscriptionsMonthly * 12),
+    subscriptionsYearly: roundCents(subscriptionsMonthly * 12),
     vasteKostenMonthly,
-    vasteKostenYearly: round2(vasteKostenMonthly * 12),
+    vasteKostenYearly: roundCents(vasteKostenMonthly * 12),
 
     monthlyIncome,
     monthlyExpenses,

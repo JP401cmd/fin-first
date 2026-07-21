@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { getServiceClient } from '@/lib/supabase/service'
 import { deleteAllUserData } from '@/lib/seed-persona'
 import { unauthorized, serverError } from '@/lib/api/respond'
 
@@ -19,12 +19,6 @@ import { unauthorized, serverError } from '@/lib/api/respond'
  *
  * Both modes return { success, deletionSummary }.
  */
-function getServiceClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-  return createServiceClient(url, serviceKey)
-}
-
 export async function POST(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -49,14 +43,32 @@ export async function POST(request: Request) {
     }
   }
 
-  try {
-    // Step 1: Delete all user financial data (badges, streaks, holdings, etc.)
-    const deletionSummary = await deleteAllUserData(supabase, user.id)
+  // Service-role client voor de RLS-afgeschermde persoonlijke tabellen
+  // (net_worth_history/feedback) en — bij full-delete — de retentie-tabellen +
+  // de auth-delete zelf. Alleen bouwen als de key gezet is; anders vallen die
+  // stappen best-effort weg (dev/preview zonder service-key).
+  const hasServiceKey =
+    !!process.env.NEXT_PUBLIC_SUPABASE_URL && !!process.env.SUPABASE_SERVICE_ROLE_KEY
+  const service = hasServiceKey ? getServiceClient() : undefined
 
-    if (fullDelete) {
+  if (fullDelete && !service) {
+    return serverError(
+      new Error('SUPABASE_SERVICE_ROLE_KEY not configured'),
+      'account-delete:POST',
+    )
+  }
+
+  try {
+    // Step 1: Delete all user data. Bij full-delete óók de retentie-/log-tabellen
+    // (fullErase) zodat er na de AVG-wissing geen identifier achterblijft.
+    const deletionSummary = await deleteAllUserData(supabase, user.id, undefined, {
+      service,
+      fullErase: fullDelete,
+    })
+
+    if (fullDelete && service) {
       // Step 2a: Remove the auth account itself (service-role). DB-level
       // ON DELETE CASCADE on auth.users(id) clears anything left.
-      const service = getServiceClient()
       const { error: authDeleteError } = await service.auth.admin.deleteUser(user.id)
       if (authDeleteError) {
         return serverError(authDeleteError, 'account-delete:POST')

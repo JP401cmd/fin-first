@@ -6,6 +6,7 @@
  */
 
 import { localMonthEnd, localMonthStart } from './month-range'
+import { roundCents } from '@/lib/format'
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -392,8 +393,8 @@ export function buildPortfolioHistory(
     if (totalValue > 0 || totalCost > 0) {
       snapshots.push({
         date: monthEnd,
-        totalValue: Math.round(totalValue * 100) / 100,
-        totalCost: Math.round(totalCost * 100) / 100,
+        totalValue: roundCents(totalValue),
+        totalCost: roundCents(totalCost),
       })
     }
 

@@ -36,7 +36,7 @@ import {
 import { calculateHoldingBox3 } from '@/lib/box3-holdings'
 import { parseSaleConfig } from '@/lib/sale-config'
 import { computeSharePct } from '@/lib/household-data'
-import { calculateRental } from '@/components/core/deepenings/verhuurrendement/calc'
+import { calculateRental } from '@/lib/verhuurrendement-calc'
 import { BEZIT_ACCEPTANCE } from './bezit'
 import type { AcceptanceCriterion } from './types'
 

@@ -30,7 +30,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { ACCOUNT_TYPES } from '@/components/app/account-form-modal'
+import { ACCOUNT_TYPES } from '@/lib/account-types'
 import { PERSONAS, PERSONA_KEYS } from '@/lib/test-personas'
 
 // ── Laag 1: de exacte set waarden die het formulier aanbiedt ────────────────

@@ -8,7 +8,7 @@ import {
   Layers, PanelTopClose, type LucideIcon,
 } from 'lucide-react'
 import type { ModuleId } from '@/lib/module-registry'
-import type { Perspective, PerspectiveOption } from '@/components/app/perspective-provider'
+import type { Perspective, PerspectiveOption } from '@/lib/types/perspective'
 import type { CommandItem, CommandModuleContext } from './types'
 
 /**

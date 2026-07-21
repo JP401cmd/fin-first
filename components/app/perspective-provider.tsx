@@ -4,13 +4,9 @@ import { createContext, useContext, useState, useEffect, useCallback, useMemo, u
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
-export type Perspective = 'personal' | 'household' | 'partner'
-
-export interface PerspectiveOption {
-  id: Perspective
-  label: string
-  description: string
-}
+// Datacontract(en) wonen nu in @/lib/types/perspective (import-richting UI→lib).
+import type { Perspective, PerspectiveOption } from '@/lib/types/perspective'
+export type { Perspective, PerspectiveOption }
 
 interface PerspectiveContextType {
   /** Current selected perspective */

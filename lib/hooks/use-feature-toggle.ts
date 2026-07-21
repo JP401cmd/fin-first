@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { useFeatureAccess } from '@/components/app/feature-access-provider'
+import { useFeatureAccess } from '@/lib/feature-access/context'
 
 /**
  * Hook for toggling individual feature preferences.

@@ -7,7 +7,7 @@ import {
   LEVERAGE_STATUS_LABEL,
   type LeverageStatus,
 } from './leverage-status'
-import type { LeverStatus } from '@/components/app/shell/lever-scores'
+import type { LeverStatus } from '@/lib/lever-scores'
 
 /**
  * Pure-logic tests voor leverage-status helpers.

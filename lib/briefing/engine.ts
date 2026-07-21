@@ -30,7 +30,7 @@ import type { HealthScore } from '@/lib/financial-health'
 import type { LifeEvent } from '@/lib/horizon-data'
 import type { Recommendation } from '@/lib/recommendation-data'
 import type { Aandachtspunt, AandachtspuntDomain } from '@/lib/aandachtspunten'
-import type { BriefingEntry, HefboomTag } from '@/components/overview/briefing-panel'
+import type { BriefingEntry, HefboomTag } from '@/lib/types/briefing'
 
 /**
  * Health-pillar id → hefboom-tag. Plan T-3: tips visueel gekoppeld aan

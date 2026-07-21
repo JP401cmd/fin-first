@@ -8,8 +8,11 @@ import { createClient } from '@/lib/supabase/client'
 export type SettlementEntry = {
   id: string
   household_id: string
-  from_user_id: string
-  to_user_id: string
+  // NULL-baar sinds de AVG-anonimisering (migratie 20260721140000, ON DELETE SET
+  // NULL): bij accountverwijdering blijft de post bestaan voor het grootboek van
+  // de achterblijvende partner, maar verdwijnt de identifier van de vertrokkene.
+  from_user_id: string | null
+  to_user_id: string | null
   amount: number
   description: string | null
   related_transaction_id: string | null
@@ -134,11 +137,13 @@ export function computeNetBalance(
 
   for (const entry of entries) {
     if (entry.status !== 'open') continue
-    if (entry.to_user_id === userId) {
+    // Truthy-guard op de tegenpartij: een geanonimiseerde (NULL) tegenpartij van
+    // een verwijderd account telt niet mee in de per-partner-uitsplitsing.
+    if (entry.to_user_id === userId && entry.from_user_id) {
       // Someone owes this user
       owedByMap[entry.from_user_id] = (owedByMap[entry.from_user_id] ?? 0) + Number(entry.amount)
     }
-    if (entry.from_user_id === userId) {
+    if (entry.from_user_id === userId && entry.to_user_id) {
       // This user owes someone
       owedToMap[entry.to_user_id] = (owedToMap[entry.to_user_id] ?? 0) + Number(entry.amount)
     }

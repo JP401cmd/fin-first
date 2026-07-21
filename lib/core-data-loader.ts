@@ -5,7 +5,7 @@
 
 import { cache } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { SparklineDataPoint } from '@/components/app/budget-sparkline'
+import type { SparklineDataPoint } from '@/lib/types/briefing'
 import type { NetWorthSnapshot } from '@/lib/net-worth-data'
 import type { Budget, BudgetWithChildren } from '@/lib/budget-data'
 import { computeExpectedAnnualAppreciation, type Asset } from '@/lib/asset-data'
@@ -26,6 +26,7 @@ import {
   type HealthScoreBudget,
   type HealthScoreTransaction,
 } from '@/lib/health-score-input'
+import { resolveEmergencyTargetMonths, type EmergencyGoalCandidate } from '@/lib/emergency-fund'
 import {
   parseHousingStrategy,
   deriveHousingContext,
@@ -758,7 +759,10 @@ export const loadCoreData = cache(async function loadCoreData(
     supabase.from('net_worth_snapshots').select('snapshot_date, total_assets, total_debts, net_worth, freedom_percentage, fire_age, sovereignty_level, savings_rate, resilience_score, fire_portfolio_required').order('snapshot_date', { ascending: true }).limit(24),
     supabase.from('debts').select('current_balance, original_amount').eq('is_active', true),
     supabase.from('valuations').select('value, valuation_date').eq('entity_type', 'asset').order('valuation_date', { ascending: false }).limit(50),
-    supabase.from('goals').select('id').limit(1),
+    // Doelen: bestaan (hasGoals) + noodfonds-target voor de score. Selecteert de
+    // velden voor de emergency-resolver; hasGoals blijft "heeft ≥1 doel" (incl.
+    // voltooid), de emergency-target filtert client-side op niet-voltooid.
+    supabase.from('goals').select('id, goal_type, target_value, metadata, is_completed'),
     supabase.from('transactions').select('budget_id, amount').gte('date', sixMonthsAgoForBudgets).lt('date', monthEnd),
     // Holdings from tracked assets for portfolio card. Na de tabel-split
     // (migratie 20260502000003) zit deze data alleen in `investment_holdings`
@@ -1026,6 +1030,13 @@ export const loadCoreData = cache(async function loadCoreData(
       freedomPct: coreFreedomPct,
       avgMonthlyExpenses: effectiveMonthlyExpenses,
       netMonthlyIncome: extHalfYearIncome > 0 ? extHalfYearIncome / 6 : effectiveMonthlyIncome,
+      // Noodfonds-score-target uit het (optionele) noodfonds-doel; consistent met
+      // /overzicht + /toekomst + snapshots (geen doel → default 6).
+      emergencyTargetMonths: resolveEmergencyTargetMonths(
+        ((goalsResult.data ?? []) as (EmergencyGoalCandidate & { is_completed?: boolean })[])
+          .filter((g) => !g.is_completed),
+        effectiveMonthlyExpenses,
+      ),
     },
     {
       assets: (assetsResult.data ?? []) as HealthScoreAsset[],

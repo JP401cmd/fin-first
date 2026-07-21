@@ -140,7 +140,10 @@ export type StackEntry = {
   topBar?: TopBarConfig
 }
 
-export type TabId = 'kern' | 'wil' | 'horizon' | 'identity' | 'other'
+// TabId + pad-helpers wonen nu in lib/nav/tab-path.ts (import-richting UI→lib).
+import { deriveTabFromPath, isTabRoot, STACK_DEPTH_LIMIT, type TabId } from '@/lib/nav/tab-path'
+export { deriveTabFromPath, isTabRoot, STACK_DEPTH_LIMIT }
+export type { TabId }
 
 /** Animatie-fase tijdens push/pop. 'idle' = geen transitie aan de gang. */
 export type TransitionPhase = 'idle' | 'pushing' | 'popping' | 'cross-tab'
@@ -179,7 +182,7 @@ export type NavStackContextValue = {
  * oudste entry weggegooid (FIFO). Reden: meerdere stack-entries onthouden
  * = meerdere DOM-trees op mobile, performance-impact.
  */
-const MAX_STACK_DEPTH = 5
+const MAX_STACK_DEPTH = STACK_DEPTH_LIMIT
 
 /** sessionStorage-sleutel — bewust geprefixed met `fintwo:` om collisions te voorkomen. */
 const STORAGE_KEY = 'fintwo:nav-stacks'
@@ -212,54 +215,6 @@ const ALL_TABS: TabId[] = ['kern', 'wil', 'horizon', 'identity', 'other']
 export const TRANSITION_DURATION_MS = 240
 
 // ── Pathname → Tab mapping ───────────────────────────────────────
-
-/**
- * Leid de active tab af uit de pathname.
- *
- * Canonieke IA (single source of truth: `lib/nav-config.ts`):
- *  - /overzicht/** → kern
- *  - /toekomst/**  → horizon
- *  - /mijn/**      → identity
- *
- * Legacy backing-routes blijven werken en mappen op dezelfde tabs:
- *  - /core/**     → kern
- *  - /will/**     → wil
- *  - /horizon/**  → horizon
- *  - /identity/** → identity
- *
- * Alles anders → other. Belangrijk: de canonieke routes MOETEN hier herkend
- * worden — anders vallen ze in `other`, worden ze nooit als tab-root gezien
- * (zie `isTabRoot`) en krijgen de hoofd-pagina's `topBar.kind = 'simple'`
- * i.p.v. `'rich'` → de mobiele utility-cluster (kompas + account) verdwijnt.
- */
-export function deriveTabFromPath(pathname: string): TabId {
-  if (pathname === '/overzicht' || pathname.startsWith('/overzicht/')) return 'kern'
-  if (pathname === '/toekomst' || pathname.startsWith('/toekomst/')) return 'horizon'
-  if (pathname === '/mijn' || pathname.startsWith('/mijn/')) return 'identity'
-  if (pathname === '/core' || pathname.startsWith('/core/')) return 'kern'
-  if (pathname === '/will' || pathname.startsWith('/will/')) return 'wil'
-  if (pathname === '/horizon' || pathname.startsWith('/horizon/')) return 'horizon'
-  if (pathname === '/identity' || pathname.startsWith('/identity/')) return 'identity'
-  return 'other'
-}
-
-/**
- * Bepaal of een pathname de root van een tab is. Gebruikt om automatisch te
- * resetten naar single-entry bij root-bezoek (auto-pop tot de root) én om de
- * TopBar-kind te bepalen: roots → `'rich'` (utility-cluster), sub-pages →
- * `'simple'`. Zowel de canonieke als de legacy root telt mee.
- *
- * Geëxporteerd voor unit-tests (zie nav-stack-provider.test.ts).
- */
-export function isTabRoot(pathname: string, tab: TabId): boolean {
-  switch (tab) {
-    case 'kern': return pathname === '/overzicht' || pathname === '/core'
-    case 'wil': return pathname === '/will'
-    case 'horizon': return pathname === '/toekomst' || pathname === '/horizon'
-    case 'identity': return pathname === '/mijn' || pathname === '/identity'
-    case 'other': return false
-  }
-}
 
 // ── External store (sessionStorage-backed) ───────────────────────
 //
@@ -867,5 +822,4 @@ export function useNavStack(): NavStackContextValue {
 // ── Test/debug exports ───────────────────────────────────────────
 
 export const ALL_NAV_TABS: ReadonlyArray<TabId> = ALL_TABS
-export const STACK_DEPTH_LIMIT = MAX_STACK_DEPTH
 export const NAV_STACK_STORAGE_KEY = STORAGE_KEY

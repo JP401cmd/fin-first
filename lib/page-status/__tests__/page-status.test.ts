@@ -7,9 +7,9 @@ import { describe, it, expect } from 'vitest'
 import { fillFigure, PAGE_STATUS_COPY, getRouteCopy, getStatusCopy } from '../copy'
 import { resolvePageStatusMap, leverToLeverageStatus } from '../resolve'
 import type { LeverScoresResult } from '@/lib/lever-scores-loader'
-import type { LeverScores, LeverEntry } from '@/components/app/shell/lever-scores'
+import type { LeverScores, LeverEntry } from '@/lib/lever-scores'
 import type { CashflowCard } from '@/lib/cashflow-cards'
-import type { LeverStatus } from '@/components/app/shell/lever-scores'
+import type { LeverStatus } from '@/lib/lever-scores'
 import type { LeverageStatus } from '@/lib/leverage-status'
 
 // ── Helpers voor fake data ────────────────────────────────────────────────────

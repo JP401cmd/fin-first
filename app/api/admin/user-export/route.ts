@@ -3,16 +3,18 @@ import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/supabase/service'
 import { isSuperAdmin } from '@/lib/admin'
 import { logAdminAction } from '@/lib/admin-audit'
+import { ADMIN_EXPORT_TABLES } from '@/lib/user-data-tables'
 
 /**
- * GET /api/admin/user-export?userId=...&label=... — AVG-export (inzageverzoek):
- * de financiële kerndata van één gebruiker als JSON-download. Superadmin-only;
- * de export wordt gelogd in de audit-trail (data.export). Leest via de
- * service-role-client — RLS geeft interactieve sessies bewust geen
- * cross-user leesrecht.
+ * GET /api/admin/user-export?userId=...&label=... — AVG-inzageverzoek: de
+ * VOLLEDIGE data van één gebruiker als JSON-download. Superadmin-only; de export
+ * wordt gelogd in de audit-trail (data.export). Leest via de service-role-client —
+ * RLS geeft interactieve sessies bewust geen cross-user leesrecht.
  *
- * NB: dekt profiel + bezittingen + schulden + transacties (de financiële kern).
- * Een volledige export over álle tabellen volgt hetzelfde patroon.
+ * Dekt profiel + álle persoonlijke user-tabellen (ADMIN_EXPORT_TABLES, de single
+ * source uit lib/user-data-tables.ts — dezelfde lijst die de wipe bewaakt, zodat
+ * export en verwijdering niet wegdriften). Dit is de exhaustieve variant naast de
+ * zelf-service-export (/api/account/export).
  */
 export async function GET(req: Request) {
   const supabase = await createClient()
@@ -34,20 +36,26 @@ export async function GET(req: Request) {
   const label = searchParams.get('label') || userId
 
   const service = getServiceClient()
-  const [profileRes, assetsRes, debtsRes, txRes] = await Promise.all([
-    service.from('profiles').select('*').eq('id', userId).maybeSingle(),
-    service.from('assets').select('*').eq('user_id', userId),
-    service.from('debts').select('*').eq('user_id', userId),
-    service.from('transactions').select('*').eq('user_id', userId).order('date', { ascending: false }),
-  ])
+
+  const profileRes = await service.from('profiles').select('*').eq('id', userId).maybeSingle()
+
+  // Volledige persoonlijke tabellen-set via service-role (RLS omzeild, bewust).
+  const tableResults = await Promise.all(
+    ADMIN_EXPORT_TABLES.map(async (table) => {
+      const { data } = await service.from(table).select('*').eq('user_id', userId)
+      return [table, data ?? []] as const
+    }),
+  )
+  const tables: Record<string, unknown> = {}
+  for (const [table, rows] of tableResults) {
+    tables[table] = rows
+  }
 
   const payload = {
     exported_at: new Date().toISOString(),
     user_id: userId,
     profile: profileRes.data ?? null,
-    assets: assetsRes.data ?? [],
-    debts: debtsRes.data ?? [],
-    transactions: txRes.data ?? [],
+    tables,
   }
 
   await logAdminAction(supabase, {

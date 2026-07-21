@@ -3,7 +3,7 @@ import { assertEqual, assertNotNull, assertGreaterThanOrEqual } from '../assert'
 import type { TestCase } from '../test-types'
 import { frequencyMatch, categorizeTransaction, type FrequencyMatch } from '@/lib/parsers/categorize'
 import type { Budget } from '@/lib/budget-data'
-import { buildBudgetOptions, resolveSlug, type BudgetRow } from '@/app/api/ai/categorize/budget-options'
+import { buildBudgetOptions, resolveSlug, type BudgetRow } from '@/lib/ai/categorize-budget-options'
 import { buildCategorizeSystemPrompt, batchItemId } from '@/lib/ai/categorize-system-prompt'
 import {
   runCombinedCategorization,

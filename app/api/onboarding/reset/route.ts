@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getServiceClient } from '@/lib/supabase/service'
 import { deleteAllUserData } from '@/lib/seed-persona'
 import { unauthorized, serverError } from '@/lib/api/respond'
 
@@ -10,9 +11,18 @@ export async function POST() {
     return unauthorized()
   }
 
+  // Service-role client voor de RLS-afgeschermde persoonlijke tabellen
+  // (net_worth_history/feedback) die de sessie-client bij een reset niet kan
+  // wissen. Best-effort: zonder service-key worden die overgeslagen (dev).
+  const hasServiceKey =
+    !!process.env.NEXT_PUBLIC_SUPABASE_URL && !!process.env.SUPABASE_SERVICE_ROLE_KEY
+  const service = hasServiceKey ? getServiceClient() : undefined
+
   try {
-    // Delete all user financial data (also wipes news_editions + per-user app_settings rows)
-    await deleteAllUserData(supabase, user.id)
+    // Delete all user financial data (also wipes news_editions + per-user app_settings rows).
+    // Reset (geen fullErase): retentie-/log-tabellen blijven staan; persoonlijke
+    // service-only tabellen (net_worth_history/feedback) worden wél gewist.
+    await deleteAllUserData(supabase, user.id, undefined, { service })
 
     // Reset profile — core fields first (always exist)
     // last_known_phase is set to null so phase is recomputed on next load

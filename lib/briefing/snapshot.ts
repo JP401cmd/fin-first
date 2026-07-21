@@ -17,7 +17,7 @@
 // (geen freeze, knop blijft beschikbaar maar persisteert niets).
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { BriefingEntry, BriefingWeekHistoryItem } from '@/components/overview/briefing-panel'
+import type { BriefingEntry, BriefingWeekHistoryItem } from '@/lib/types/briefing'
 
 /** Vrijheidstijd-meetpunt van deze week — basis voor de week-over-week delta. */
 export interface FreedomSnapshotData {

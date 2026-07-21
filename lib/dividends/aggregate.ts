@@ -13,6 +13,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { roundCents, roundTenths } from '@/lib/format'
 
 /**
  * Check if a table exists by probing it.
@@ -336,16 +337,7 @@ export async function aggregateDividends(
   }
 }
 
-// Afronding via parseFloat(toFixed(n)) — behoudt exact de afronding die de
-// route gaf. In lib/ geldt de app/components-afrondingsvangrail niet, dus geen
-// eslint-disable nodig.
-
-/** Rond af op centen (2 decimalen). */
-function roundCents(value: number): number {
-  return parseFloat(value.toFixed(2))
-}
-
-/** Rond af op tienden (1 decimaal) — voor freedom_days_per_year. */
-function roundTenths(value: number): number {
-  return parseFloat(value.toFixed(1))
-}
+// Afronding: centrale roundCents/roundTenths uit lib/format ([Arch F4]). Vóór
+// deze migratie stonden hier lokale idioom-B-helpers (parseFloat(toFixed(n)));
+// nu canoniek idioom A (Math.round-variant), byte-identiek voor de realistische
+// waarden op dit pad (zie de characterization-check in lib/format.test.ts).

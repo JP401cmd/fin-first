@@ -20,8 +20,8 @@
 import type { Asset, AssetType } from '@/lib/asset-data'
 import type { AssetCategorie } from '@/lib/horizon-kernel/types'
 import { ASSET_TYPE_TO_CATEGORIE } from '@/lib/horizon-kernel/adapter/potten'
-import type { WhatIfEvent } from '@/components/app/horizon/whatif-events'
-import type { AssetGroupReturn } from '@/components/app/horizon/whatif-market-assumptions'
+import type { WhatIfEvent } from '@/lib/types/horizon-whatif'
+import type { AssetGroupReturn } from '@/lib/types/horizon-whatif'
 
 // ── Ranges / whitelist (spiegelen de bestaande sliders — één bron voor de clamps) ──
 

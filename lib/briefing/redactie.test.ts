@@ -6,7 +6,7 @@ import {
   buildEngineMetrics,
   buildDirectivesBlock,
 } from './redactie'
-import type { BriefingEntry } from '@/components/overview/briefing-panel'
+import type { BriefingEntry } from '@/lib/types/briefing'
 import type { BriefingEngineInput } from './engine'
 import type { BriefingDirective, FunctionalDirective } from './directives'
 
