@@ -2,7 +2,7 @@
 // Pure scoring function that builds a personalized 4×4 dashboard layout.
 // Deterministic client-side logic — no AI/API calls.
 
-import { WIDGET_CATALOG, WIDGET_FEATURE_MAP, type WidgetDef, type WidgetPref, type WidgetSize } from './widget-catalog'
+import { WIDGET_FEATURE_MAP, type WidgetDef, type WidgetPref, type WidgetSize } from './widget-catalog'
 import { isFeatureAccessible, type FeatureAccessMap } from './compute-feature-access'
 
 // ── Types ────────────────────────────────────────────────────
@@ -90,6 +90,9 @@ export const WIDGET_POPULARITY: Record<string, number> = {
   sim_vermogenspad: 4,
   vrijheidsmijlpalen: 4,
   ai_inzicht: 4,
+  uitgaven_heatmap: 4,
+  weekoverzicht: 4,
+  pensioen_aow: 4,
   holdings: 3,
   belasting_box3: 3,
   monte_carlo: 3,
@@ -103,6 +106,13 @@ export const WIDGET_POPULARITY: Record<string, number> = {
   trend_uitgaven: 3,
   trend_sparen: 3,
   trend_schulden: 3,
+  surplus_gap: 3,
+  inflatie_impact: 3,
+  beleggingsrendement: 3,
+  swr_monitor: 3,
+  rebalancing: 3,
+  fee_analyzer: 3,
+  hypotheek_vs_beleggen: 3,
 }
 
 /** Grid size × detail level → size distribution budget */

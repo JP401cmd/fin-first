@@ -1718,7 +1718,7 @@ export default function ImportPage() {
         <div className="space-y-4">
           <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6 text-center">
             <p className="text-sm text-[var(--ink-2)]">
-              Je transacties zijn <strong>opgeslagen</strong>. Deel de nog ongecategoriseerde rijen nu in — of doe dat rustig later.
+              Je transacties zijn <strong>opgeslagen</strong>. Categoriseren is <strong>optioneel</strong> — deel de nog ongecategoriseerde rijen nu in, of doe dat rustig later.
             </p>
             <div className="mt-4 flex flex-col items-center gap-3">
               {postImportRows.length > 0 && !showCategorizeSheet && (
