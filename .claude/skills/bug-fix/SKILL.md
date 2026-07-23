@@ -48,6 +48,7 @@ De `senior-developer` routeert naar het juiste domein en integreert:
 - UI/component/scherm → `frontend-ui-builder`
 - Overig/cross-cutting → `coder` of de `senior-developer` zelf
 Fix bij de **bron** (geen symptoombestrijding, geen duplicatie van een berekening). **Bij een rekenmotor- of constante-correctie: grep niet alleen op de canonieke functienaam, maar óók op de rúwe constante-literalen van de oude/foute formule (bv. `0.133`, `17_545`) — een tweede surface die de metric volledig herimplementeert met magic numbers verschijnt nooit in een grep op de geëxporteerde functie, en blijft anders ongecorrigeerd achter.**
+**Introduceert de fix een gegevensbron voor een "vorige/recentste-vóórgaande" waarde (trend, delta, "was X", laatste-voor-nu): verifieer dat de query-ordening/limit die recente rijen gegarandeerd teruggeeft (`order(desc)` óf een datum-filter) — een `order(asc).limit(N)` levert bij >N rijen juist de OUDSTE N, waardoor het "vorige"-anker structureel verstaalt zonder ooit te falen. Kopieer een bestaand `[len-2]`-patroon niet blind: controleer eerst dát het de recente kant afkapt.**
 De fixer levert in zijn rapport een **blast-radius-regel** mee: "gewijzigd veld/symbool X wordt gelezen door: [lijst uit de grep]" — die grep doet hij toch al, en stap 7 valideert dan die lijst i.p.v. hem from scratch op te bouwen.
 
 ### 6. Verifiëren — `tester`
