@@ -194,9 +194,14 @@ type AssetsPageProps = {
    *  gecontroleerd door de page-wrapper die ook `toolbarFilter` rendert
    *  zodat dropdown en lijst in sync blijven. */
   assetTypeFilter?: AssetType | null
+  /** Verberg de ingebouwde PageInfoButton in de PageOpening. Default `true`
+   *  (standalone `/core/assets`). Ge-embed via `<BezittingenView>` op
+   *  `/overzicht/bezittingen` rendert de page-shell zélf de `i` (+ statuspunt
+   *  + insight-toggle); dan `false` om een dubbele info-knop te voorkomen. */
+  showPageInfo?: boolean
 }
 
-export default function AssetsPage({ initialAssetId, initialData, toolbarFilter, inspirationCards, assetTypeFilter }: AssetsPageProps = {}) {
+export default function AssetsPage({ initialAssetId, initialData, toolbarFilter, inspirationCards, assetTypeFilter, showPageInfo = true }: AssetsPageProps = {}) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
@@ -716,6 +721,9 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
           met één <em>-accent → deck. Alles eronder (FiguresStrip, toolbar,
           grid) ongewijzigd. */}
       <PageOpening
+        // Rechter-gutter blijft óók bij showPageInfo=false: de overzicht-shell
+        // rendert daar zijn eigen i-cluster (i + statuspunt + insight-toggle),
+        // dus de kicker/H1 mogen die zone niet in lopen.
         className="mb-5 pr-24 sm:pr-28"
         kicker={
           <>
@@ -733,10 +741,12 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
           </>
         }
       >
-        <PageInfoButton
-          description={pageInfoText}
-          className="absolute right-0 top-0"
-        />
+        {showPageInfo && (
+          <PageInfoButton
+            description={pageInfoText}
+            className="absolute right-0 top-0"
+          />
+        )}
         {partnerAssetsHidden && (
           <PrivacyHiddenNotice hiddenCategories={['assets']} forCategories={['assets']} />
         )}

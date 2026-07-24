@@ -1,17 +1,34 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
+import dynamic from 'next/dynamic'
 import { EditorialHeadline, Kicker } from '@/components/editorial'
 import { SectionDivider } from '@/components/app/section-divider'
+import { BottomSheet } from '@/components/app/bottom-sheet'
 import type { HealthScore } from '@/lib/financial-health'
 import {
   HefbomenNav,
   type HefbomenHousingSplit,
   type HefbomenTotals,
 } from './overzicht-hero/hefbomen-nav'
+import { HealthScoreCard } from './overzicht-hero/health-score-card'
+import { HealthScoreEmptyState } from './overzicht-hero/empty-states'
 import type { LeverScores } from '@/components/app/shell/lever-scores'
 import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
+
+// HealthScoreReceipt (zwaar, ~1011 r) blijft lazy — hij zit alleen in de
+// BottomSheet die pas ná een klik op de Health-card opent, dus buiten het
+// first-load client-JS-chunk van /overzicht (perf Task 3.2). `ssr:false` +
+// `loading:null`: de sheet mount pas na de klik, een skeleton zou één frame
+// flitsen.
+const HealthScoreReceipt = dynamic(
+  () =>
+    import('@/components/app/horizon/health-score-receipt').then((m) => ({
+      default: m.HealthScoreReceipt,
+    })),
+  { ssr: false, loading: () => null },
+)
 
 type OverzichtHeroPrimaryProps = {
   userName?: string
@@ -37,10 +54,19 @@ type OverzichtHeroPrimaryProps = {
   /** Dubbele grondslag incl./excl. eigen woning — bron = horizonData. Null → geen splitsing. */
   housingSplit?: HefbomenHousingSplit | null
   /**
+   * De rechter cel (3/4) van de hero-row: de mini-vermogen-grafiek, GESTREAMD
+   * achter een eigen `<Suspense>` (`OverzichtNetWorthChartLoader`) omdat de
+   * per-jaar-projectie de kernel-sim uit `loadDashboardData` nodig heeft. De
+   * Health-card links (1/4) rendert wél direct uit de blok-1-`health` — zo komt
+   * gezondheid meteen in beeld, los van de widget-zware databundel (kaart
+   * "gezondheid & netto vermogen los laden van widgets").
+   */
+  heroChart: ReactNode
+  /**
    * Het GESTREAMDE tweede blok (`<Suspense>` rond `OverzichtSecondaryLoader`).
-   * Alles wat op `loadDashboardData` (+ will/briefing/snapshot) wacht — de
-   * Health-card, mini-vermogen-grafiek, widget-rail, briefing en de
-   * utility-controls — komt hierlangs binnen, ná de eerste paint van dit blok.
+   * Alles wat verder op `loadDashboardData` (+ will/briefing/snapshot) wacht —
+   * de widget-rail, briefing en de utility-controls — komt hierlangs binnen, ná
+   * de eerste paint van dit blok.
    */
   secondary: ReactNode
 }
@@ -66,6 +92,7 @@ export function OverzichtHeroPrimary({
   leverScores,
   totals,
   housingSplit = null,
+  heroChart,
   secondary,
 }: OverzichtHeroPrimaryProps) {
   // SINGLE SOURCE OF TRUTH voor de weergavemodus: één read van useDisplayMode().
@@ -73,6 +100,11 @@ export function OverzichtHeroPrimary({
   // sub-tekst) — identiek aan het gestreamde blok, dat 'simple' zelf leest.
   const { mode } = useDisplayMode()
   const simple = mode === 'simple'
+
+  // Health-Score-receipt (deep-dive-BottomSheet) — opent pas na een klik op de
+  // Health-card. De card + sheet leven nu in blok 1 zodat gezondheid direct
+  // paint, i.p.v. mee te stromen met de widget-zware databundel.
+  const [receiptOpen, setReceiptOpen] = useState(false)
 
   // `dateLabel` + `greeting` komen als props binnen (server-side berekend in
   // Europe/Amsterdam) — één bron van waarheid voor de tijd, zodat SSR en de
@@ -104,11 +136,43 @@ export function OverzichtHeroPrimary({
         simple={simple}
       />
 
-      {/* Subtiele editorial scheiding tussen de hefbomen-rij en het gestreamde
+      {/* Subtiele editorial scheiding tussen de hefbomen-rij en het
           health/chart/briefing-blok. `!my-5` tempert de standaard `my-8`. */}
       <SectionDivider className="!my-5" />
 
+      {/* Hero-row: Health Score smaller (1/4) + vermogensgrafiek breder (3/4),
+          beide even hoog via items-stretch + h-full op de cards. De Health-card
+          rendert DIRECT uit de blok-1-`health` (los van de widget-databundel);
+          de grafiek stroomt in de rechter cel achter een eigen `<Suspense>`. */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 sm:gap-4 items-stretch">
+        <div className="lg:col-span-1">
+          {health ? (
+            <HealthScoreCard
+              health={health}
+              onOpenReceipt={() => setReceiptOpen(true)}
+              simple={simple}
+            />
+          ) : (
+            <HealthScoreEmptyState />
+          )}
+        </div>
+        <div className="lg:col-span-3">
+          <div className="h-full">{heroChart}</div>
+        </div>
+      </div>
+
       {secondary}
+
+      {health && (
+        <BottomSheet
+          open={receiptOpen}
+          onClose={() => setReceiptOpen(false)}
+          title="Financiële gezondheid"
+          size="lg"
+        >
+          <HealthScoreReceipt health={health} />
+        </BottomSheet>
+      )}
     </section>
   )
 }

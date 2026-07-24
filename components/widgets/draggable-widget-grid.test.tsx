@@ -38,6 +38,11 @@ vi.mock('@/components/app/feature-access-provider', () => ({
 const mockFetch = vi.fn()
 global.fetch = mockFetch
 
+// jsdom heeft geen navigator.sendBeacon — de unload/unmount-flush gebruikt het.
+if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon !== 'function') {
+  Object.defineProperty(navigator, 'sendBeacon', { value: vi.fn(), configurable: true, writable: true })
+}
+
 const mockData: DashboardData = {
   netWorth: 50000,
   totalAssets: 60000,
@@ -312,6 +317,124 @@ describe('DraggableWidgetGrid', () => {
     )
 
     expect(screen.getByTestId('auto-dashboard-btn')).toBeInTheDocument()
+  })
+
+  it('onderste "Gereed"-toolbarknop is verborgen buiten bewerkmodus', () => {
+    const prefs = makePrefs(['acties'])
+    render(
+      <DraggableWidgetGrid
+        initialPrefs={prefs}
+        allPrefs={prefs}
+        data={mockData}
+      />
+    )
+    expect(screen.queryByTestId('edit-done-bottom')).not.toBeInTheDocument()
+  })
+
+  it('onderste "Gereed"-toolbarknop sluit bewerken via dezelfde handler als bovenin', () => {
+    // Kaart "Widget bewerken: opslaan ook mogelijk via toolbar onder de widgets".
+    // De onderste toolbar-knop moet exact dezelfde afsluit/opslaan-flow aanroepen
+    // als de bovenste Gereed-toggle: in controlled edit-mode is dat
+    // onEditModeChange(false). Zo bewijzen we hergebruik i.p.v. een tweede pad.
+    const prefs = makePrefs(['acties'])
+    const onEditModeChange = vi.fn()
+    render(
+      <DraggableWidgetGrid
+        initialPrefs={prefs}
+        allPrefs={prefs}
+        data={mockData}
+        editMode={true}
+        onEditModeChange={onEditModeChange}
+      />
+    )
+    screen.getByTestId('edit-done-bottom').click()
+    expect(onEditModeChange).toHaveBeenCalledWith(false)
+  })
+})
+
+// ── Reverse-sync: favoriet-widget verwijderen wist de favorietstatus ────────
+//
+// Notion S2/P1: "Zorg dat favoriet- en widgetweergave altijd gelijk zijn: bij
+// verwijderen van een widget moet de favorietstatus worden bijgewerkt." Het
+// verwijderen van een holding_fav:*/budget_fav:*-widget moet dus de onderliggende
+// favoriet wissen via de API, anders blijft het hart gevuld terwijl de widget weg is.
+describe('DraggableWidgetGrid — favoriet ⇄ widget reverse-sync', () => {
+  beforeEach(() => {
+    mockFetch.mockResolvedValue({ ok: true })
+  })
+
+  it('wist is_favorite van een holding bij verwijderen van de holding_fav-widget', async () => {
+    const data: DashboardData = {
+      ...mockData,
+      favoriteHoldings: [
+        { id: 'HID1', name: 'Marvell', ticker: 'MRVL', units: 10, currentPrice: 70, totalValue: 700, totalCost: 600, returnPct: 16.67, dailyChangePct: 0, lastPriceUpdate: null },
+      ],
+    }
+    const prefs = makePrefs(['holding_fav:HID1'])
+    render(
+      <DraggableWidgetGrid
+        initialPrefs={prefs}
+        allPrefs={prefs}
+        data={data}
+        editMode={true}
+        onEditModeChange={() => {}}
+      />
+    )
+    const hideBtn = await screen.findByRole('button', { name: 'Verberg holding_fav:HID1 widget' })
+    mockFetch.mockClear()
+    await act(async () => { hideBtn.click() })
+
+    const holdingCall = mockFetch.mock.calls.find(([url]) => url === '/api/holdings/HID1')
+    expect(holdingCall).toBeTruthy()
+    expect(holdingCall![1]).toMatchObject({ method: 'PATCH' })
+    expect(JSON.parse((holdingCall![1] as RequestInit).body as string)).toEqual({ is_favorite: false })
+  })
+
+  it('stuurt de resterende favoriet-ids bij verwijderen van een budget_fav-widget', async () => {
+    const data: DashboardData = {
+      ...mockData,
+      favoriteBudgets: [
+        { id: 'B1', name: 'Boodschappen', icon: '', budgetType: 'expense', limit: 400, spent: 200 },
+        { id: 'B2', name: 'Vervoer', icon: '', budgetType: 'expense', limit: 200, spent: 100 },
+      ],
+    }
+    const prefs = makePrefs(['budget_fav:B1', 'budget_fav:B2'])
+    render(
+      <DraggableWidgetGrid
+        initialPrefs={prefs}
+        allPrefs={prefs}
+        data={data}
+        editMode={true}
+        onEditModeChange={() => {}}
+      />
+    )
+    const hideBtn = await screen.findByRole('button', { name: 'Verberg budget_fav:B1 widget' })
+    mockFetch.mockClear()
+    await act(async () => { hideBtn.click() })
+
+    const favCall = mockFetch.mock.calls.find(([url]) => url === '/api/budgets/favorites')
+    expect(favCall).toBeTruthy()
+    expect(favCall![1]).toMatchObject({ method: 'PUT' })
+    expect(JSON.parse((favCall![1] as RequestInit).body as string)).toEqual({ favoriteIds: ['B2'] })
+  })
+
+  it('roept géén favoriet-API aan bij verwijderen van een gewone widget', async () => {
+    const prefs = makePrefs(['netto_vermogen'])
+    render(
+      <DraggableWidgetGrid
+        initialPrefs={prefs}
+        allPrefs={prefs}
+        data={mockData}
+        editMode={true}
+        onEditModeChange={() => {}}
+      />
+    )
+    const hideBtn = await screen.findByRole('button', { name: 'Verberg netto_vermogen widget' })
+    mockFetch.mockClear()
+    await act(async () => { hideBtn.click() })
+
+    expect(mockFetch.mock.calls.some(([url]) => String(url).startsWith('/api/holdings/'))).toBe(false)
+    expect(mockFetch.mock.calls.some(([url]) => url === '/api/budgets/favorites')).toBe(false)
   })
 })
 

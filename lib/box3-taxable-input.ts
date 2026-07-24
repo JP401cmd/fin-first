@@ -23,7 +23,8 @@
 
 import type { LeverageStatus } from '@/lib/leverage-status'
 import { hasPartner as deriveHasPartner } from '@/lib/household-type'
-import { BOX3_PARAMS, CURRENT_TAX_YEAR } from '@/lib/box3-data'
+import { BOX3_PARAMS, CURRENT_TAX_YEAR, classifyDebt } from '@/lib/box3-data'
+import type { Debt } from '@/lib/debt-data'
 
 /**
  * Box 3-belastbare asset-typen. Pension, eigen_huis, vehicle, physical en
@@ -64,6 +65,8 @@ export interface Box3TaxableInput {
 
 /** Minimale asset-shape die de helper nodig heeft (zowel layout-rows als Asset). */
 interface Box3AssetLike {
+  /** Nodig om de eigen-woning-asset-set te bouwen voor de hypotheek-uitsluiting. */
+  id?: string | null
   asset_type?: string | null
   current_value: number | string
   net_worth_inclusion_pct?: number | null
@@ -73,12 +76,27 @@ interface Box3AssetLike {
 interface Box3DebtLike {
   current_balance: number | string
   net_worth_inclusion_pct?: number | null
+  /** Voor de canonieke Box 3-classificatie: eigen-woning-hypotheek → Box 1. */
+  debt_type?: string | null
+  linked_asset_id?: string | null
+  is_tax_deductible?: boolean | null
 }
 
 /**
  * Bereken het box3-belast-vermogen-signaal uit assets + debts. Weegt elke post
  * met `net_worth_inclusion_pct` (default 100%), exact zoals de sidebar-layout
  * voorheen inline deed.
+ *
+ * De schuld-behandeling is single-sourced op de canonieke `calculateBox3`:
+ *   • Alleen ECHTE Box 3-schulden tellen — de eigen-woning-hypotheek valt in
+ *     Box 1 en wordt via `classifyDebt` (box3-data.ts) uitgesloten. Voorheen trok
+ *     deze helper ÁLLE schulden af (incl. de eigenwoninghypotheek), waardoor een
+ *     grote hypotheek de Box 3-grondslag ten onrechte wegvaagde → status "geen
+ *     belasting" terwijl de Belasting-kaart wél heffing berekende (deze bug).
+ *   • Schuldendrempel (alleen schulden bóven de drempel zijn aftrekbaar) —
+ *     dezelfde jaarwaarde als `calculateBox3`, zodat `box3TaxableAboveThreshold`
+ *     rekenkundig gelijkloopt met `calculateBox3.grondslagSparen` (alleenstaande
+ *     voet) en KPI (€) en status (band) elkaar niet meer kunnen tegenspreken.
  */
 export function computeBox3TaxableInput(
   assets: readonly Box3AssetLike[],
@@ -91,11 +109,20 @@ export function computeBox3TaxableInput(
       (s, a) => s + Number(a.current_value) * ((a.net_worth_inclusion_pct ?? 100) / 100),
       0,
     )
-  const box3Debts = debts.reduce(
-    (s, d) => s + Number(d.current_balance) * ((d.net_worth_inclusion_pct ?? 100) / 100),
-    0,
+  // Eigen-woning-assets → de hypotheek gekoppeld aan zo'n asset valt buiten Box 3.
+  const eigenHuisAssetIds = new Set(
+    assets
+      .filter((a) => a.asset_type === 'eigen_huis' && a.id != null)
+      .map((a) => String(a.id)),
   )
-  const box3Net = box3Assets - Math.max(0, box3Debts)
+  const box3Debts = debts.reduce((s, d) => {
+    const { inBox3 } = classifyDebt(d as unknown as Debt, eigenHuisAssetIds)
+    if (!inBox3) return s
+    return s + Number(d.current_balance) * ((d.net_worth_inclusion_pct ?? 100) / 100)
+  }, 0)
+  const schuldendrempel = BOX3_PARAMS[CURRENT_TAX_YEAR].schuldendrempelSingle
+  const aftrekbareSchulden = Math.max(0, box3Debts - schuldendrempel)
+  const box3Net = box3Assets - aftrekbareSchulden
   const box3TaxableAboveThreshold = Math.max(0, box3Net - BOX3_VRIJSTELLING_SINGLE)
   const hasBox3Assets = assets.some(
     (a) => a.asset_type != null && BOX3_ASSET_TYPES.has(a.asset_type),

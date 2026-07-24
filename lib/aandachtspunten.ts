@@ -23,6 +23,14 @@ import type { Asset, AssetType } from './asset-data'
 
 export type AandachtspuntDomain = 'tax' | 'budget' | 'debt' | 'asset'
 
+/**
+ * Stabiele namespaced id van de jaarruimte-kans ('{domain}:{bron-id}'). Eén
+ * bron voor alle consumers die specifiek de jaarruimte-tip willen (h)erkennen of
+ * onderdrukken — de AI-context-builders (cloud tax-context + lokale chat) matchen
+ * hierop i.p.v. op de titel (die is prompt-dna-copy en kan hernoemd worden).
+ */
+export const JAARRUIMTE_AANDACHTSPUNT_ID = 'tax:jaarruimte'
+
 export interface Aandachtspunt {
   /** Namespaced id: '{domain}:{bron-id}'. Stabiel over re-loads. */
   id: string

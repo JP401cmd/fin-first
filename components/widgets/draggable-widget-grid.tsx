@@ -4,8 +4,9 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
-import { X, Plus, Lock, Wand2, ChevronRight, Layers, CalendarClock, PieChart, Wallet, Flame, LayoutDashboard, Compass, Trash2 } from 'lucide-react'
+import { X, Plus, Lock, Wand2, ChevronRight, Layers, CalendarClock, PieChart, Wallet, Flame, LayoutDashboard, Compass, Trash2, Check } from 'lucide-react'
 import type { DashboardData } from './widget-renderer'
+import { Button } from '@/components/editorial/button'
 import { StaticWidgetItem, sizeLabel } from './widget-grid-helpers'
 import { CategoryAppNavBar } from './category-app-nav-bar'
 import {
@@ -263,13 +264,47 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, categoryAppL
     })
   }, [scheduleSave])
 
+  // Reverse-sync: het verwijderen van een favoriet-widget (budget_fav:*/holding_fav:*)
+  // moet óók de favorietstatus van de onderliggende entiteit wissen, zodat
+  // favoriet- en widgetweergave altijd gelijk blijven. Zonder dit bleef een holding/
+  // budget "favoriet" (gevuld hart) terwijl de widget al weg was — juist de drift die
+  // de bug beschrijft. Fire-and-forget via de API (mutatie = API-route, datapad-conventie);
+  // router.refresh trekt de server-bundel opnieuw zodat de favoriet niet heringespoten wordt.
+  const syncFavoriteRemoval = useCallback((widgetId: string) => {
+    if (widgetId.startsWith('holding_fav:')) {
+      const holdingId = widgetId.slice('holding_fav:'.length)
+      fetch(`/api/holdings/${holdingId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_favorite: false }),
+      })
+        .then(() => router.refresh())
+        .catch(() => { /* niet-fataal: widget is lokaal al verborgen */ })
+    } else if (widgetId.startsWith('budget_fav:')) {
+      const budgetId = widgetId.slice('budget_fav:'.length)
+      // De favorites-route zet de volledige set (true voor genoemde ids, false voor
+      // de rest). Stuur de resterende favorieten mee zodat alleen déze afvalt.
+      const remaining = data.favoriteBudgets.filter(b => b.id !== budgetId).map(b => b.id)
+      fetch('/api/budgets/favorites', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ favoriteIds: remaining }),
+      })
+        .then(() => router.refresh())
+        .catch(() => { /* niet-fataal */ })
+    }
+  }, [data.favoriteBudgets, router])
+
   const handleHide = useCallback((widgetId: string) => {
+    if (widgetId.startsWith('holding_fav:') || widgetId.startsWith('budget_fav:')) {
+      syncFavoriteRemoval(widgetId)
+    }
     setActiveWidgets(prev => {
       const updated = prev.filter(w => w.id !== widgetId)
       scheduleSave(updated)
       return updated
     })
-  }, [scheduleSave])
+  }, [scheduleSave, syncFavoriteRemoval])
 
   const handleAdd = useCallback((widgetId: string) => {
     setActiveWidgets(prev => {
@@ -643,6 +678,25 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, categoryAppL
             <Trash2 className="h-3.5 w-3.5" />
             Leegmaken
           </button>
+        </div>
+      )}
+
+      {/* Afrond-toolbar onder de widgets — spiegelt de bovenste Gereed-toggle
+          (hero-rail) zodat je na het scrollen door de widgets niet terug naar
+          boven hoeft om het bewerken af te sluiten. Wijzigingen worden al
+          automatisch bewaard; "Gereed" sluit de bewerkmodus — identiek aan de
+          knop bovenaan (roept dezelfde `setIsEditMode(false)`-flow aan). */}
+      {isEditMode && (
+        <div className="mt-4 flex justify-end border-t border-[var(--border-ed)] pt-4">
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => setIsEditMode(false)}
+            data-testid="edit-done-bottom"
+          >
+            <Check className="h-4 w-4 mr-1.5" aria-hidden="true" />
+            Gereed
+          </Button>
         </div>
       )}
 

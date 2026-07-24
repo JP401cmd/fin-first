@@ -7,6 +7,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('@/lib/core-data-loader', () => ({ loadCoreData: vi.fn() }))
 vi.mock('@/lib/ai/context/fin-financial-facts', () => ({ buildWillFinancialFacts: vi.fn() }))
 vi.mock('@/lib/aandachtspunten-loader', () => ({ collectAandachtspunten: vi.fn() }))
+vi.mock('@/lib/aandachtspunten-actions', () => ({ loadActionedAandachtspuntIds: vi.fn() }))
 vi.mock('@/lib/jaarruimte-facts', () => ({ computeJaarruimteFacts: vi.fn() }))
 vi.mock('@/lib/supabase/cached-user', () => ({ getCachedUser: vi.fn() }))
 
@@ -14,6 +15,7 @@ import { buildLocalChatOverview } from './local-chat-context'
 import { loadCoreData } from '@/lib/core-data-loader'
 import { buildWillFinancialFacts } from '@/lib/ai/context/fin-financial-facts'
 import { collectAandachtspunten } from '@/lib/aandachtspunten-loader'
+import { loadActionedAandachtspuntIds } from '@/lib/aandachtspunten-actions'
 import { computeJaarruimteFacts } from '@/lib/jaarruimte-facts'
 import { getCachedUser } from '@/lib/supabase/cached-user'
 
@@ -64,6 +66,7 @@ beforeEach(() => {
   } as never)
   vi.mocked(buildWillFinancialFacts).mockReturnValue(FACTS as never)
   vi.mocked(collectAandachtspunten).mockResolvedValue([])
+  vi.mocked(loadActionedAandachtspuntIds).mockResolvedValue(new Set<string>())
   vi.mocked(computeJaarruimteFacts).mockReturnValue({
     hasData: true,
     onbenut: 22155,
@@ -91,6 +94,15 @@ describe('buildLocalChatOverview — jaarruimte', () => {
       grossYearly: 0,
     })
     const overview = await buildLocalChatOverview(makeSupabase({ net_monthly_income: 0 }, []))
+    expect(overview.jaarruimte).toBeNull()
+  })
+
+  it('onderdrukt het jaarruimte-blok wanneer de kans al als actie is genomen', async () => {
+    // computeJaarruimteFacts vindt WEL ruimte (default beforeEach), maar de
+    // gebruiker heeft de jaarruimte-kans al geactioneerd → geen tip meer, anders
+    // blijft de lokale Fin "benut je jaarruimte" herhalen (de gerapporteerde bug).
+    vi.mocked(loadActionedAandachtspuntIds).mockResolvedValue(new Set(['tax:jaarruimte']))
+    const overview = await buildLocalChatOverview(makeSupabase({ net_monthly_income: 3400 }, []))
     expect(overview.jaarruimte).toBeNull()
   })
 })

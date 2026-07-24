@@ -21,14 +21,13 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import {
   type Aandachtspunt,
-  type ActionSuppressionRow,
   taxOpportunitiesToAandachtspunten,
   budgetBenchmarksToAandachtspunten,
   debtsToAandachtspunten,
   assetsToAandachtspunten,
   filterActionedAandachtspunten,
-  collectActionedIds,
 } from './aandachtspunten'
+import { loadActionedAandachtspuntIds } from './aandachtspunten-actions'
 import { dailyExpenseRate } from './format'
 import { buildTaxOverview } from './tax-overview'
 import { computeBox1Tax, deriveMarginaalTarief } from './box1-tax'
@@ -40,7 +39,6 @@ import {
   getNibudReferences,
   calculateBenchmarks,
 } from './nibud/reference-data'
-import { getCachedUser } from './supabase/cached-user'
 import {
   getActiveAssets,
   getActiveDebts,
@@ -76,13 +74,15 @@ async function collectTaxAandachtspunten(supabase: SupabaseClient): Promise<Aand
     box1Tax = Math.round(box1.tax)
   }
 
-  // Box 3 (perspectief 'personal' — persoonlijk resultaat).
-  let box3Tax: number | null = horizonData.healthScoreInput.taxData?.box3Tax ?? null
+  // Box 3 (perspectief 'personal' — persoonlijk resultaat). Fallback = de
+  // canonieke calculateBox3-heffing uit de loader-bundel (horizonData.box3Tax),
+  // NIET de simplistische healthScoreInput.taxData-proxy (die schulden negeerde).
+  let box3Tax: number | null = horizonData.box3Tax
   try {
     const box3Data = await loadPerspectiveBox3(supabase, 'personal', 2026)
     if (box3Data.personal?.tax != null) box3Tax = box3Data.personal.tax
   } catch {
-    // Box 3-perspectief faalt → behoud de health-proxy-waarde.
+    // Box 3-perspectief faalt → behoud de canonieke loader-waarde.
   }
 
   // Jaarruimte-besparing = marginaal-correct Box 1-belastingverschil van de inleg
@@ -259,30 +259,10 @@ export async function collectAandachtspunten(
   // Kruis tegen de acties van de gebruiker: een aandachtspunt waarvoor al een
   // OPEN actie op de lijst staat — óf een recent AFGERONDE actie (≤9 mnd, zie
   // collectActionedIds) — hoort niet ook nog als suggestie op te duiken (zelfde
-  // metadata.aandachtspunt_id). Spiegelt de idempotentie-query bij het AANMAKEN
-  // van een actie (app/api/ai/actions/route.ts), maar verbreed naar 'completed'
-  // zodat het venster-oordeel client-side (en dus testbaar) blijft. Faalt zacht:
-  // bij welke fout dan ook blijft `actionedIds` leeg → geen suppressie, huidig
-  // gedrag intact.
-  let actionedIds: ReadonlySet<string> = new Set<string>()
-  try {
-    const user = await getCachedUser(supabase)
-    if (user) {
-      const { data } = await supabase
-        .from('actions')
-        .select('metadata, status, completed_at')
-        .eq('user_id', user.id)
-        .in('status', ['open', 'completed'])
-        .not('metadata->>aandachtspunt_id', 'is', null)
-        // Ruim bemeten: open + afgerond(≤9 mnd) delen deze cap. De id-ruimte is
-        // klein (per aandachtspunt hooguit enkele acties), dus 500 voorkomt dat
-        // de suppressie ooit fail-open gaat door truncatie.
-        .limit(500)
-      actionedIds = collectActionedIds((data ?? []) as ActionSuppressionRow[])
-    }
-  } catch {
-    // Nooit throwen: de bus mag niet sneuvelen op een falende actie-kruising.
-  }
+  // metadata.aandachtspunt_id). De actie-set komt uit de gedeelde, faal-zachte
+  // `loadActionedAandachtspuntIds` (nu óók door de AI-context-builders
+  // geconsumeerd zodat de suppressie op élk oppervlak identiek is).
+  const actionedIds = await loadActionedAandachtspuntIds(supabase)
 
   return filterActionedAandachtspunten(sorted, actionedIds)
 }

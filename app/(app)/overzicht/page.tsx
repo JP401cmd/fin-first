@@ -9,8 +9,12 @@ import { getServerPerspective } from '@/lib/household/server-perspective'
 import { OverzichtHeroPrimary } from '@/components/overview/overzicht-hero'
 import {
   OverzichtSecondaryLoader,
+  OverzichtNetWorthChartLoader,
 } from '@/components/overview/overzicht-secondary-loader'
-import { OverzichtSecondaryFallback } from '@/components/overview/overzicht-secondary'
+import {
+  OverzichtSecondaryFallback,
+  MiniNetWorthChartFallback,
+} from '@/components/overview/overzicht-secondary'
 import { resolveOverviewGreeting } from '@/lib/overview/greeting'
 import { CheckinBanner } from '@/components/overview/checkin-banner'
 import { WelcomeGuideBanner } from '@/components/overview/welcome-guide-banner'
@@ -24,25 +28,30 @@ export const metadata: Metadata = {
 }
 
 /**
- * /overzicht — canonieke landing, in TWEE gestreamde blokken (perf Task 2.4):
+ * /overzicht — canonieke landing, gestreamd in blokken (perf Task 2.4 + de kaart
+ * "gezondheid & netto vermogen los laden van widgets"):
  *
- *  Blok 1 (direct): de begroeting + het vier-hefbomen-kompas (`OverzichtHero
- *  Primary`). Hangt UITSLUITEND van de lichte, `cache()`-gedeelde blok-1-loaders
- *  af — `loadLeverScores` (al door de shell-layout gedraaid) + `loadHorizonData`
+ *  Blok 1 (direct): de begroeting + het vier-hefbomen-kompas ÉN de
+ *  Health-Score-card (`OverzichtHeroPrimary`). Hangt UITSLUITEND van de lichte,
+ *  `cache()`-gedeelde blok-1-loaders af — `loadLeverScores` + `loadHorizonData`
  *  (health/vrijheid%/housing/leeftijd) + het profiel (naam) + de twee
- *  banner-seeds (user-id-only). Paint dus zónder op de zware `loadDashboardData`
- *  te wachten.
+ *  banner-seeds. Paint dus zónder op de zware `loadDashboardData` te wachten;
+ *  gezondheid komt daardoor meteen in beeld, los van de widget-databundel.
  *
- *  Blok 2 (gestreamd, achter `<Suspense>`): `OverzichtSecondaryLoader` doet
- *  `loadDashboardData` (kernel/backtest/aandachtspunten) + will + markt-/
- *  check-in-briefing + de wekelijkse snapshot-write + de page-status-seed, en
- *  levert de Health-card, mini-vermogen-grafiek, widget-rail en briefing. De
- *  Suspense-fallback reserveert een stabiele hoogte (skeleton) zodat de instroom
- *  geen layout-shift geeft (CLS blijft ~0).
+ *  `heroChart` (gestreamd, eigen `<Suspense>`): de mini-vermogen-grafiek
+ *  (`OverzichtNetWorthChartLoader`). De per-jaar-PROJECTIE komt uit de
+ *  kernel-zware `loadDashboardData` en kan niet mee naar blok 1; het HUIDIGE
+ *  netto vermogen staat al perspectief-correct in het kompas van blok 1.
  *
- * DEDUP: `horizonData` gaat als prop naar blok 2 (geen tweede horizon-load); de
- * enige overlap — `loadDashboardData`, ook aangeroepen door de page-status-seed
- * — deelt de React-`cache()`-wrapper, dus één query-set per request.
+ *  `secondary` (gestreamd, eigen `<Suspense>`): `OverzichtSecondaryLoader` doet
+ *  `loadDashboardData` + will + markt-/check-in-briefing + de wekelijkse
+ *  snapshot-write + de page-status-seed, en levert de widget-rail, compound en
+ *  briefing. Elke Suspense-fallback reserveert een stabiele hoogte (skeleton)
+ *  zodat de instroom geen layout-shift geeft (CLS blijft ~0).
+ *
+ * DEDUP: `horizonData` gaat als prop mee (geen tweede horizon-load); de drie
+ * `loadDashboardData`-consumers (chart-loader, secondary-loader, page-status-
+ * seed) delen dezelfde React-`cache()`-wrapper → één query-set per request.
  */
 export default async function OverzichtPage() {
   const supabase = await createClient()
@@ -96,7 +105,7 @@ export default async function OverzichtPage() {
         bezittingen: horizonData.healthScoreInput.totalAssets,
         schulden: horizonData.healthScoreInput.totalDebts,
         cashflow: horizonData.healthScoreInput.savingsRate6m,
-        belasting: horizonData.healthScoreInput.taxData?.box3Tax ?? null,
+        belasting: horizonData.box3Tax ?? null,
       }
     : undefined
 
@@ -134,6 +143,19 @@ export default async function OverzichtPage() {
         leverScores={leverScoresResult.scores}
         totals={totals}
         housingSplit={housingSplit}
+        heroChart={
+          <Suspense fallback={<MiniNetWorthChartFallback />}>
+            <OverzichtNetWorthChartLoader
+              supabase={supabase}
+              currentNetWorth={currentNetWorth}
+              currentAge={currentAge}
+              endAge={endAge}
+              isPensioenMode={isPensioenMode}
+              netWorthExclHome={netWorthExclHome}
+              housingSplit={housingSplit}
+            />
+          </Suspense>
+        }
         secondary={
           <Suspense fallback={<OverzichtSecondaryFallback />}>
             <OverzichtSecondaryLoader
@@ -144,11 +166,7 @@ export default async function OverzichtPage() {
               health={health}
               freedomPct={freedomPct}
               currentAge={currentAge}
-              endAge={endAge}
-              isPensioenMode={isPensioenMode}
               currentNetWorth={currentNetWorth}
-              netWorthExclHome={netWorthExclHome}
-              housingSplit={housingSplit}
               liquidCash={liquidCash}
             />
           </Suspense>

@@ -1390,14 +1390,18 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     goal: emergencyGoal ? emergencyGoalTarget(emergencyGoal, effectiveMonthlyExpenses) : null,
   })
 
-  // ── Canonieke gezondheidsscore (ADR 0008) ──────────────────────
-  // Eén bron: dezelfde `buildHealthScoreInput` + `computeHealthScoreFromInputs`
-  // als /toekomst (horizon-data-loader ±r634) en de snapshot-routes — inclusief
-  // de echte tax_optimization-pijler uit buildTaxData. Vroeger rekende de
-  // gezondheids-widget zelf via computeHealthScore(DashboardData), waar de
-  // tax-pijler hardcoded 50 was, zodat het dashboard-getal kon afwijken van
-  // /toekomst. De trend komt uit de snapshot-historie (computeHealthScoreWith-
-  // Trend), op de canonieke freedomPct-noemer (requiredPortfolioForProgress).
+  // ── Gezondheidsscore (widget-bundel-FALLBACK) ──────────────────────
+  // LET OP: dit is NIET de canonieke display-score. Deze bundel-score deelt wél
+  // de assembler `buildHealthScoreInput`, maar wordt gevoed met ONAFHANKELIJK
+  // afgeleide scalars (noodfonds-uitgaven current-month i.p.v. 6-mnd-gemiddelde,
+  // freedomPct op de sim-kernel-noemer, geëxtrapoleerd DSTI-inkomen) én ALTIJD
+  // persoonlijk (geen perspectief), zodat 'm structureel afwijkt van de
+  // /overzicht-hero (horizon-data-loader). Op /overzicht wordt deze score dan ook
+  // overschreven door de perspectief-correcte horizonData-score
+  // (components/overview/overzicht-secondary-loader.tsx). Blijft bestaan als
+  // fallback voor consumers zonder horizonData (bv. de benchmark-rapportroute,
+  // die horizonData.healthScore prefereert). Wijzig je iets aan de score-scalars:
+  // doe dat aan de canonieke bron in horizon-data-loader, niet hier.
   const healthHouseholdType = (profileResult.data as Record<string, unknown> | null)?.household_type as string | null
   // DSTI-noemer: DEZELFDE canonieke inkomensbron die savingsRate6m voedt
   // (extIncome6/6 = het 6-maands-gemiddelde inkomen; profiel-fallback wanneer er

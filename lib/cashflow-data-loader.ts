@@ -18,7 +18,7 @@ import { cache } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getCachedUser } from '@/lib/supabase/cached-user'
 import type { TransactionRow } from '@/lib/types/transactions'
-import type { RecurringTransaction } from '@/lib/recurring-data'
+import { withDerivedDayOfMonth, type RecurringTransaction, type DayDerivationTx } from '@/lib/recurring-data'
 import { loadPerspectiveTransactionsServer } from '@/lib/household/perspective-loader-server'
 import { type PerspectiveItem } from '@/lib/household/perspective-loader'
 import type { OwnershipType, Perspective } from '@/lib/household-data'
@@ -190,6 +190,22 @@ export const loadCashflowData = cache(async (
       return { ...r, amount: Number(r.amount) * frac } as RecurringTransaction
     })
 
+  // ── Incassodag afleiden voor regels zonder day_of_month ──────────────────
+  // De AI-abonnementen-detectie slaat recurrings op zónder day_of_month; zonder
+  // dag klonteren ze op de kalender allemaal op één rand-dag samen. De werkelijke
+  // incassodag staat in de transactiegeschiedenis (het 6-maands perspectief-
+  // venster dat we hierboven al laadden) — leid 'm daaruit af (per-regel, geen
+  // globale vaste dag). Aggregaat-rijen (privacy='totals') missen per-post-detail
+  // en dragen niet bij.
+  const derivationTx: DayDerivationTx[] = perspectiveTx.transactions
+    .filter((t) => !t._aggregated)
+    .map((t) => ({
+      counterparty_name: (t.counterparty_name as string | null | undefined) ?? null,
+      date: t.date as string,
+      amount: Number(t.amount),
+    }))
+  const recurringsWithDays = withDerivedDayOfMonth(recurrings, derivationTx)
+
   // ── Bank-saldo: scope op ownership + aandeel ─────────────────────────────
   const accountsRows = (accountsResult.data ?? []) as Array<{
     id: string
@@ -266,7 +282,7 @@ export const loadCashflowData = cache(async (
     transactions,
     monthLabel,
     fullName,
-    recurrings,
+    recurrings: recurringsWithDays,
     baselineIncome,
     baselineExpenses,
     startingBalance,

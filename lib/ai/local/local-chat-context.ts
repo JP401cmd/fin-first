@@ -44,7 +44,8 @@ import { buildWillFinancialFacts } from '@/lib/ai/context/fin-financial-facts'
 import { computeJaarruimteFacts } from '@/lib/jaarruimte-facts'
 import { resolvePensionFactorA } from '@/lib/jaarruimte'
 import { collectAandachtspunten } from '@/lib/aandachtspunten-loader'
-import type { Aandachtspunt } from '@/lib/aandachtspunten'
+import { type Aandachtspunt, JAARRUIMTE_AANDACHTSPUNT_ID } from '@/lib/aandachtspunten'
+import { loadActionedAandachtspuntIds } from '@/lib/aandachtspunten-actions'
 import { getCachedUser } from '@/lib/supabase/cached-user'
 
 /** Belastingjaar voor de jaarruimte-afleiding (gelijk aan de cloud tax-context). */
@@ -149,7 +150,7 @@ function formatVrijheidstijd(years: number, months: number): string {
  * niet op de titel — die titel is prompt-dna-copy en kan hernoemd worden.
  */
 function isJaarruimteAandachtspunt(a: Aandachtspunt): boolean {
-  return a.id === 'tax:jaarruimte'
+  return a.id === JAARRUIMTE_AANDACHTSPUNT_ID
 }
 
 /** Rij-vorm van de openstaande-acties-query (own-row). */
@@ -193,7 +194,7 @@ export async function buildLocalChatOverview(supabase: SupabaseClient): Promise<
   // Alles parallel voor de latentie. De verrijkings-fan-out (aandachtspunten/acties)
   // draait óók in de zeldzame no-data-tak, waar we 'm daarna weggooien — bewust
   // geruild tegen de parallelliteit; het overzicht wordt per chat-open één keer gebouwd.
-  const [coreData, profileResult, aandachtspunten, actieRows] = await Promise.all([
+  const [coreData, profileResult, aandachtspunten, actieRows, actionedIds] = await Promise.all([
     loadCoreData(supabase),
     supabase
       .from('profiles')
@@ -204,6 +205,11 @@ export async function buildLocalChatOverview(supabase: SupabaseClient): Promise<
     collectAandachtspunten(supabase).catch(() => [] as Aandachtspunt[]),
     // OPENSTAANDE ACTIES — faal-zacht (zie `loadOpenActions`).
     loadOpenActions(supabase),
+    // Geactioneerde aandachtspunt-ids (faal-zacht → lege set) — voor de
+    // jaarruimte-suppressie hieronder. Dezelfde bron als de bus en de cloud
+    // tax-context, zodat "benut je jaarruimte" op élk oppervlak verdwijnt zodra
+    // de gebruiker de actie nam.
+    loadActionedAandachtspuntIds(supabase),
   ])
 
   const { rawFinancials, healthScoreInput } = coreData
@@ -219,14 +225,20 @@ export async function buildLocalChatOverview(supabase: SupabaseClient): Promise<
     pension_factor_a_source: profileResult.data?.pension_factor_a_source,
   }).factorA
   const jf = computeJaarruimteFacts(Number(profileResult.data?.net_monthly_income ?? 0), factorA, TAX_YEAR)
-  const jaarruimte: LocalChatJaarruimte | null = jf.hasData
-    ? {
-        onbenut: jf.onbenut,
-        besparing: jf.besparing,
-        // Vrijheidsdagen via het canonieke dagtarief (uitgaven per dag); 0 bij geen uitgaven.
-        vrijheidsdagen: facts.dagtarief > 0 ? Math.round(jf.besparing / facts.dagtarief) : 0,
-      }
-    : null
+  // ONDERDRUKKING: heeft de gebruiker de jaarruimte-kans al als actie (open of
+  // recent afgerond ≤9 mnd), laat het blok dan weg — anders blijft de lokale Fin
+  // "benut je jaarruimte" tippen terwijl de actie al genomen is. Faal-open: bij
+  // een lege set (geen actie of query-fout) blijft het blok, gelijk aan de bus.
+  const jaarruimteActioned = actionedIds.has(JAARRUIMTE_AANDACHTSPUNT_ID)
+  const jaarruimte: LocalChatJaarruimte | null =
+    jf.hasData && !jaarruimteActioned
+      ? {
+          onbenut: jf.onbenut,
+          besparing: jf.besparing,
+          // Vrijheidsdagen via het canonieke dagtarief (uitgaven per dag); 0 bij geen uitgaven.
+          vrijheidsdagen: facts.dagtarief > 0 ? Math.round(jf.besparing / facts.dagtarief) : 0,
+        }
+      : null
 
   // ── Kansen (aandachtspunten) ────────────────────────────────────────────────
   // Al gesorteerd op besparing en al ontdaan van geactioneerde punten. De

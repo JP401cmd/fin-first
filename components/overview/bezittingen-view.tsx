@@ -32,6 +32,9 @@ export function BezittingenView({ initialData, inspirationCards }: BezittingenVi
       toolbarFilter={<BezittingenFilter value={filter} onChange={setFilter} />}
       inspirationCards={inspirationCards}
       assetTypeFilter={filter}
+      // De page-shell (`overzicht/bezittingen/page.tsx`) rendert de i +
+      // statuspunt + insight-toggle; onderdruk de ingebouwde i hier.
+      showPageInfo={false}
     />
   )
 }

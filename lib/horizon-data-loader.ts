@@ -43,6 +43,8 @@ import { type AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import { resolveFireAssumptions, type FireAssumptionRow } from '@/lib/fire-assumptions'
 import { NL_AOW_AGE } from '@/lib/constants'
 import { hasPartner } from '@/lib/household-type'
+import { calculateBox3, CURRENT_TAX_YEAR } from '@/lib/box3-data'
+import { dailyExpenseRate } from '@/lib/format'
 import { resolvePensionFactorA } from '@/lib/jaarruimte'
 import type { ConvergentieRawProfileRow } from '@/lib/horizon-kernel/convergentie-router'
 import { resolvePotRules, type PotRulesConfig } from '@/lib/pot-rules'
@@ -114,6 +116,16 @@ export interface HorizonPageData {
   assets: Asset[]
   /** Box 3 berekeningsmethode (forfaitair of werkelijk), afgeleid uit fireParams */
   box3Method: 'forfaitair' | 'werkelijk'
+  /**
+   * Canonieke Box 3-heffing (€/jaar, personal) uit `calculateBox3`
+   * (lib/box3-data.ts, CURRENT_TAX_YEAR, hasPartner:false) — dezelfde motor als
+   * de Box 3-subpagina en de dashboard-loader. Bewust NIET de simplistische
+   * `healthScoreInput.taxData.box3Tax`-proxy (die schulden negeert en alles als
+   * beleggingen forfait rekent → contradiceerde de kaart-status). null wanneer er
+   * geen assets zijn of de berekening faalt. Household-/partnerperspectief loopt
+   * op de Belasting-hub via loadPerspectiveBox3 (combined/partner).
+   */
+  box3Tax: number | null
   /** Of de gebruiker een fiscaal partner heeft (voor heffingsvrij vermogen berekening) */
   hasPartner: boolean
   /** Factor A (jaarlijkse pensioenaangroei uit UPO) — geresolved uit
@@ -847,6 +859,17 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
       debtMonthlyPayments: healthDebtMonthlyPayments,
     },
   )
+  // Canonieke gezondheidsscore (ADR 0008/0010) — de ÉNE bron voor zowel de
+  // /overzicht-hero als de Gezondheid-widget (die 'm consumeert via
+  // withCanonicalHealthScore i.p.v. de eigen bundel-score te herberekenen).
+  // TRENDLOOS (previousMonth=null): de hero toonde nooit een trend, en de widget
+  // lijnt daar nu mee uit — één cijfer, één presentatie. Een geünificeerde
+  // gezondheids-trend is bewust een APARTE follow-up: die vereist een correcte
+  // meest-recente-vóórgaande-snapshotbron (de gedeelde allSnapshots-query is
+  // order(asc).limit(60) → bij >60 snapshots de OUDSTE, niet de recente) én een
+  // besluit over het /toekomst-gedrag (horizon-client herrekent op slider-
+  // wijziging trendloos). De dashboard-bundel-fallback berekent wél een trend,
+  // maar die score wordt op /overzicht overschreven door deze.
   const healthScore = computeHealthScoreFromInputs(healthScoreInput, budgetingActive)
 
   // Events, actions, debts, assets
@@ -926,6 +949,35 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
   // Bug-fix: voorheen tegen de verouderde woordenschat ('samenwonend'/'getrouwd')
   // die household_type nooit is → altijd false. Nu via canonieke helper.
   const box3Method = fireParams.box3Method
+
+  // ── Canonieke Box 3-heffing (personal) ─────────────────────────
+  // Zelfde motor als /overzicht/belasting/box3 en de dashboard-loader:
+  // calculateBox3 (lib/box3-data.ts) op CURRENT_TAX_YEAR, hasPartner:false. De
+  // Belasting-hub-kaart en de /overzicht-belastingtegel consumeren dit i.p.v. de
+  // `healthScoreInput.taxData.box3Tax`-proxy (buildTaxData): die negeert schulden
+  // (incl. de eigenwoninghypotheek → Box 1) en rekent alles als beleggingen, wat
+  // een positieve heffing toonde náást een "geen belasting"-status. dailyExpenses
+  // raakt alleen freedomDays, niet .tax — de heffing zelf is er onafhankelijk van.
+  let box3Tax: number | null = null
+  if (assets.length > 0) {
+    try {
+      const box3DailyExp = yearlyMustExpenses > 0
+        ? yearlyMustExpenses / 365
+        : dailyExpenseRate(effectiveMonthlyExpenses)
+      const rawBox3Tax = calculateBox3({
+        assets,
+        debts,
+        hasPartner: false,
+        dailyExpenses: box3DailyExp,
+        year: CURRENT_TAX_YEAR,
+      }).tax
+      // Normaliseer negatief-nul (grondslagSparen 0 × negatief effectief rendement
+      // levert -0) zodat de KPI nooit "-€ 0" toont.
+      box3Tax = Object.is(rawBox3Tax, -0) ? 0 : rawBox3Tax
+    } catch {
+      box3Tax = null
+    }
+  }
   const householdType = String((profile as Record<string, unknown>).household_type ?? 'solo')
   const hasPartnerFlag = hasPartner(householdType)
   const potRules = resolvePotRules(profile as { pot_rules?: unknown })
@@ -1012,6 +1064,7 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
     budgetingActive,
     assets,
     box3Method,
+    box3Tax,
     hasPartner: hasPartnerFlag,
     pensioenFactorA,
     pensioenFactorAKnown,

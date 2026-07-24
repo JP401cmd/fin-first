@@ -146,9 +146,14 @@ type DebtsPageProps = {
    *  afwezig (bv. in tests of bij een server-load-fout) → oude client-fetch
    *  op mount, byte-identiek aan voorheen. */
   initialData?: DebtsInitialData
+  /** Verberg de ingebouwde PageInfoButton in de PageOpening. Default `true`
+   *  (standalone `/core/debts`). Ge-embed via `<SchuldenView>` op
+   *  `/overzicht/schulden` rendert de page-shell zélf de `i` (+ statuspunt);
+   *  dan `false` om een dubbele info-knop te voorkomen. */
+  showPageInfo?: boolean
 }
 
-export function DebtsClient({ toolbarFilter, debtTypeFilter, initialData }: DebtsPageProps = {}) {
+export function DebtsClient({ toolbarFilter, debtTypeFilter, initialData, showPageInfo = true }: DebtsPageProps = {}) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
@@ -635,6 +640,9 @@ export function DebtsClient({ toolbarFilter, debtTypeFilter, initialData }: Debt
           met één <em>-accent → deck. Alles eronder (FiguresStrip, aflos-
           route, grid) ongewijzigd. */}
       <PageOpening
+        // Rechter-gutter blijft óók bij showPageInfo=false: de overzicht-shell
+        // rendert daar zijn eigen i-cluster (i + statuspunt), dus de kicker/H1
+        // mogen die zone niet in lopen.
         className="mb-5 pr-20 sm:pr-24"
         kicker={
           <>
@@ -652,10 +660,12 @@ export function DebtsClient({ toolbarFilter, debtTypeFilter, initialData }: Debt
           </>
         }
       >
-        <PageInfoButton
-          description={pageInfoText}
-          className="absolute right-0 top-0"
-        />
+        {showPageInfo && (
+          <PageInfoButton
+            description={pageInfoText}
+            className="absolute right-0 top-0"
+          />
+        )}
         {partnerDebtsHidden && (
           <PrivacyHiddenNotice hiddenCategories={['debts']} forCategories={['debts']} />
         )}

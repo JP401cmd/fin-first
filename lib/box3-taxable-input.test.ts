@@ -7,6 +7,12 @@ import {
 } from './box3-taxable-input'
 import { computeLeverScores } from '@/lib/lever-scores'
 import type { LeverageStatus } from '@/lib/leverage-status'
+import { BOX3_PARAMS, CURRENT_TAX_YEAR } from '@/lib/box3-data'
+
+// Canonieke schuldendrempel (alleenstaande) — alleen schulden boven deze drempel
+// zijn Box 3-aftrekbaar. computeBox3TaxableInput past 'm toe, identiek aan
+// calculateBox3, zodat het status-net gelijkloopt met calculateBox3.grondslagSparen.
+const DREMPEL = BOX3_PARAMS[CURRENT_TAX_YEAR].schuldendrempelSingle
 
 // ── computeBox3TaxableInput ────────────────────────────────────────────────────
 
@@ -99,12 +105,14 @@ describe('computeBox3TaxableInput — net_worth_inclusion_pct weighting', () => 
   })
 
   it('debt with 50% inclusion_pct reduces box3 by half', () => {
-    // asset savings 200000, debt 100000 at 50% → effectief 50000 → net 150000 → above = 150000 − vrijstelling
+    // asset savings 200000, debt 100000 at 50% → effectief 50000, min drempel → aftrekbaar 50000−3800
     const result = computeBox3TaxableInput(
       [{ asset_type: 'savings', current_value: 200_000 }],
       [{ current_balance: 100_000, net_worth_inclusion_pct: 50 }],
     )
-    expect(result.box3TaxableAboveThreshold).toBe(200_000 - 50_000 - BOX3_VRIJSTELLING_SINGLE)
+    expect(result.box3TaxableAboveThreshold).toBe(
+      200_000 - Math.max(0, 50_000 - DREMPEL) - BOX3_VRIJSTELLING_SINGLE,
+    )
   })
 })
 
@@ -126,13 +134,15 @@ describe('computeBox3TaxableInput — threshold calculation', () => {
     expect(result.hasBox3Assets).toBe(true)
   })
 
-  it('debts reduce box3Net before threshold is applied', () => {
-    // savings 100000 − debt 20000 = net 80000 → above = 80000 − vrijstelling
+  it('debts reduce box3Net before threshold is applied (na schuldendrempel)', () => {
+    // savings 100000 − aftrekbaar (20000 − drempel) → net → above = net − vrijstelling
     const result = computeBox3TaxableInput(
       [{ asset_type: 'savings', current_value: 100_000 }],
       [{ current_balance: 20_000 }],
     )
-    expect(result.box3TaxableAboveThreshold).toBe(80_000 - BOX3_VRIJSTELLING_SINGLE)
+    expect(result.box3TaxableAboveThreshold).toBe(
+      100_000 - Math.max(0, 20_000 - DREMPEL) - BOX3_VRIJSTELLING_SINGLE,
+    )
   })
 
   it('debts cannot push threshold below 0 (above is always ≥ 0)', () => {
@@ -148,6 +158,58 @@ describe('computeBox3TaxableInput — threshold calculation', () => {
     const result = computeBox3TaxableInput([], [])
     expect(result.hasBox3Assets).toBe(false)
     expect(result.box3TaxableAboveThreshold).toBe(0)
+  })
+})
+
+describe('computeBox3TaxableInput — eigen-woning-hypotheek uitsluiting (Box 1)', () => {
+  it('eigenwoninghypotheek telt NIET als Box 3-schuld — jpsmit-regressie', () => {
+    // Regressie op de gemelde bug: box3-assets 56.201 (cash+savings+investment),
+    // een €250k eigenwoninghypotheek (gekoppeld aan eigen_huis, aftrekbaar) + €40.800
+    // overige box3-schuld. De hypotheek MAG de grondslag niet wegvagen; net blijft
+    // ónder de vrijstelling om de JUISTE reden → status "good" én KPI (calculateBox3) €0.
+    const assets = [
+      { id: 'huis', asset_type: 'eigen_huis', current_value: 500_000 },
+      { asset_type: 'cash', current_value: 15_001 },
+      { asset_type: 'savings', current_value: 40_000 },
+      { asset_type: 'investment', current_value: 1_200 },
+    ]
+    const debts = [
+      { debt_type: 'mortgage', current_balance: 250_000, linked_asset_id: 'huis', is_tax_deductible: true },
+      { debt_type: 'revolving_credit', current_balance: 800 },
+      { debt_type: 'student_loan', current_balance: 40_000, is_tax_deductible: false },
+    ]
+    const result = computeBox3TaxableInput(assets, debts, 'solo')
+    // box3-assets 56.201; box3-schuld 40.800 (hypotheek uitgesloten); aftrekbaar
+    // 40.800 − drempel = 37.000; net = 19.201 < vrijstelling → above 0.
+    expect(result.box3TaxableAboveThreshold).toBe(0)
+    expect(result.hasBox3Assets).toBe(true)
+    expect(box3TaxStatus(result)).toBe('good')
+  })
+
+  it('grote hypotheek maar ruim box3-vermogen → status toont ECHTE exposure (niet "good")', () => {
+    // Zonder de uitsluiting zou de €300k hypotheek het net negatief maken → "good".
+    // Mét de canonieke classifyDebt telt alleen de echte box3-exposure.
+    const assets = [
+      { id: 'huis', asset_type: 'eigen_huis', current_value: 400_000 },
+      { asset_type: 'savings', current_value: 200_000 },
+    ]
+    const debts = [
+      { debt_type: 'mortgage', current_balance: 300_000, linked_asset_id: 'huis', is_tax_deductible: true },
+    ]
+    const result = computeBox3TaxableInput(assets, debts, 'solo')
+    // hypotheek uitgesloten → geen box3-schuld; net 200.000 > vrijstelling.
+    // above = 140.643 → solo in de 100k–500k-band → 'bad' (echte exposure).
+    expect(result.box3TaxableAboveThreshold).toBe(200_000 - BOX3_VRIJSTELLING_SINGLE)
+    expect(box3TaxStatus(result)).toBe('bad')
+  })
+
+  it('een NIET aan eigen_huis gekoppelde hypotheek telt wél als Box 3-schuld', () => {
+    const assets = [{ asset_type: 'savings', current_value: 200_000 }]
+    const debts = [{ debt_type: 'mortgage', current_balance: 50_000 }] // geen linked_asset_id
+    const result = computeBox3TaxableInput(assets, debts, 'solo')
+    expect(result.box3TaxableAboveThreshold).toBe(
+      200_000 - Math.max(0, 50_000 - DREMPEL) - BOX3_VRIJSTELLING_SINGLE,
+    )
   })
 })
 
@@ -167,8 +229,10 @@ describe('computeBox3TaxableInput — string current_value coercion', () => {
       [{ asset_type: 'savings', current_value: 200_000 }],
       [{ current_balance: '50000' }],
     )
-    // net = 200000 − 50000 = 150000 → above = 150000 − vrijstelling
-    expect(result.box3TaxableAboveThreshold).toBe(150_000 - BOX3_VRIJSTELLING_SINGLE)
+    // net = 200000 − (50000 − drempel) → above = net − vrijstelling
+    expect(result.box3TaxableAboveThreshold).toBe(
+      200_000 - Math.max(0, 50_000 - DREMPEL) - BOX3_VRIJSTELLING_SINGLE,
+    )
   })
 })
 

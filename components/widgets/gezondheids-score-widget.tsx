@@ -426,7 +426,9 @@ export const GezondheidScoreWidget = memo(function GezondheidScoreWidget({ size,
               <PillarRow key={p.id} pillar={p} />
             ))}
             <div className="flex items-center justify-between pt-0.5">
-              <TrendBadge trend={health.trend} />
+              {/* Trend alleen tonen bij een echte vorige-maand-vergelijking —
+                  lijnt uit met de hero-kaart (geen misleidende "Stabiel"). */}
+              {health.previousMonth !== null ? <TrendBadge trend={health.trend} /> : <span />}
               <span className="text-[9px] text-[var(--ink-4)] flex items-center gap-0.5">
                 Details <ChevronRight className="h-2.5 w-2.5" />
               </span>
@@ -453,7 +455,8 @@ export const GezondheidScoreWidget = memo(function GezondheidScoreWidget({ size,
         <div className="flex-1 pt-2">
           <p className={`font-mono text-lg font-semibold ${color}`}>{health.label}</p>
           <div className="mt-1 flex items-center gap-2">
-            <TrendBadge trend={health.trend} />
+            {/* Trend alleen bij een echte vorige-maand-vergelijking (net als de hero). */}
+            {health.previousMonth !== null && <TrendBadge trend={health.trend} />}
             {health.previousMonth !== null && (
               <span className="text-[10px] text-[var(--ink-4)]">
                 (was {health.previousMonth})

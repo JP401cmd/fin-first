@@ -5,6 +5,7 @@ import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { createClient } from '@/lib/supabase/server'
 import { formatCurrency } from '@/lib/format'
 import { HoldingSourceBadge } from '@/components/holdings/holding-source-badge'
+import { HoldingFavoriteButton } from '@/components/holdings/holding-favorite-button'
 import {
   loadCryptoHoldingPriceHistory,
   type CryptoHoldingSource,
@@ -216,13 +217,21 @@ export default async function CryptoHoldingDetailPage({
 
       {/* ── Header ──────────────────────────────────────────────── */}
       <header className="mt-4 border-b border-[var(--border-ed)] pb-6">
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <h1 className="font-mono text-3xl font-bold tabular-nums tracking-tight text-[var(--ink)] sm:text-4xl">
-            {symbolDisplay}
-          </h1>
-          <p className="font-serif text-lg italic text-[var(--ink-2)]">
-            {isFiat ? `Cash bij ${exchange ? EXCHANGE_DISPLAY[exchange.exchange] : 'exchange'}` : displayName}
-          </p>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <h1 className="font-mono text-3xl font-bold tabular-nums tracking-tight text-[var(--ink)] sm:text-4xl">
+                {symbolDisplay}
+              </h1>
+              <p className="font-serif text-lg italic text-[var(--ink-2)]">
+                {isFiat ? `Cash bij ${exchange ? EXCHANGE_DISPLAY[exchange.exchange] : 'exchange'}` : displayName}
+              </p>
+            </div>
+          </div>
+          <HoldingFavoriteButton
+            holdingId={holdingId}
+            initialFavorite={(holding.is_favorite as boolean | null) ?? false}
+          />
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <HoldingSourceBadge

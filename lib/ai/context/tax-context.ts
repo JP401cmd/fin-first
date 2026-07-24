@@ -5,6 +5,8 @@ import { computeBox1Tax } from '@/lib/box1-tax'
 import { loadPerspectiveBox3 } from '@/lib/household-tax'
 import { computeJaarruimte, resolvePensionFactorA, jaarruimteBesparing } from '@/lib/jaarruimte'
 import { estimateGrossYearly } from '@/lib/jaarruimte-facts'
+import { JAARRUIMTE_AANDACHTSPUNT_ID } from '@/lib/aandachtspunten'
+import { loadActionedAandachtspuntIds } from '@/lib/aandachtspunten-actions'
 import { getTaxDeadlines } from '@/lib/tax-calendar'
 import { hasBox2Relevance } from '@/lib/box2-relevance'
 
@@ -124,9 +126,16 @@ export async function buildTaxContext(supabase: SupabaseClient): Promise<string>
     }
 
     // Jaarruimte — onbenutte pensioen-aftrekruimte + geschatte besparing.
+    // ONDERDRUKKING: als de gebruiker de jaarruimte-kans al als actie heeft
+    // (open of recent afgerond) laten we dit blok weg — anders blijft de AI
+    // "benut je jaarruimte" tippen terwijl de aandachtspunten-context de kans al
+    // correct verborg (drift tussen twee context-bronnen naar hetzelfde model).
+    // Faal-zacht: bij een lege set (geen actie of query-fout) blijft het blok.
     let jaarruimteLines: string[] = []
     try {
-      if (grossYearly > 0) {
+      const actionedIds = await loadActionedAandachtspuntIds(supabase)
+      const jaarruimteActioned = actionedIds.has(JAARRUIMTE_AANDACHTSPUNT_ID)
+      if (grossYearly > 0 && !jaarruimteActioned) {
         const jr = computeJaarruimte(grossYearly, factorA, TAX_YEAR)
         if (jr.hasData && jr.jaarruimte > 0) {
           // Besparing = marginaal-correct Box 1-belastingverschil van de volledige

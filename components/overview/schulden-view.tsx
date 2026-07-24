@@ -24,6 +24,9 @@ export function SchuldenView({ initialData }: { initialData?: DebtsInitialData }
       toolbarFilter={<SchuldenFilter value={filter} onChange={setFilter} />}
       debtTypeFilter={filter}
       initialData={initialData}
+      // De page-shell (`overzicht/schulden/page.tsx`) rendert de i +
+      // statuspunt; onderdruk de ingebouwde i hier.
+      showPageInfo={false}
     />
   )
 }

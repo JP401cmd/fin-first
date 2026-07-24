@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { loadDashboardData } from '@/lib/dashboard-data-loader'
+import { withCanonicalHealthScore } from '@/lib/overview/canonical-health'
 import { loadFinData } from '@/lib/fin-data-loader'
 import type { HorizonPageData } from '@/lib/horizon-data-loader'
 import type { Perspective } from '@/lib/household-data'
@@ -19,7 +20,14 @@ import { resolveFreedomFraming } from '@/lib/fire-strategy'
 import { PageStatusSeed } from '@/components/app/page-status-provider'
 import { computePageStatusInfo, readMinimizedLevel } from '@/lib/page-status/compute'
 import type { BriefingWeekHistoryItem } from '@/components/overview/briefing-panel'
+import type { HefbomenHousingSplit } from './overzicht-hero/hefbomen-nav'
+import { MiniNetWorthChart } from './mini-networth-chart'
+import { dailyExpenseRate } from '@/lib/format'
 import { OverzichtSecondary } from './overzicht-secondary'
+
+// Stabiele lege-array-referentie voor de mini-vermogen-grafiek — voorkomt dat
+// een verse `[]` de memo op MiniNetWorthChart breekt.
+const EMPTY_NET_WORTH_HISTORY: { month: string; value: number }[] = []
 
 /**
  * OverzichtSecondaryLoader — async server-child achter de `<Suspense>` op
@@ -47,11 +55,7 @@ export async function OverzichtSecondaryLoader({
   health,
   freedomPct,
   currentAge,
-  endAge,
-  isPensioenMode,
   currentNetWorth,
-  netWorthExclHome,
-  housingSplit,
   liquidCash,
 }: {
   supabase: SupabaseClient
@@ -61,11 +65,8 @@ export async function OverzichtSecondaryLoader({
   health: HorizonPageData['healthScore'] | null
   freedomPct: number | null
   currentAge: number | null
-  endAge: number | null
-  isPensioenMode: boolean
+  /** Netto vermogen (perspectief-correct, blok 1) — basis voor de vrijheidstijd-briefing. */
   currentNetWorth: number
-  netWorthExclHome: number | null
-  housingSplit: { eigenHuisValue: number; mortgageBalance: number } | null
   liquidCash: number
 }) {
   const [
@@ -90,7 +91,13 @@ export async function OverzichtSecondaryLoader({
     userId ? readMinimizedLevel(supabase, userId, '/overzicht') : Promise.resolve(null),
   ])
 
-  const { dashboardData, activeWidgets, allWidgetPrefs } = dashboardResult
+  const { dashboardData: rawDashboardData, activeWidgets, allWidgetPrefs } = dashboardResult
+
+  // Gezondheidsscore — consume, don't recompute (zie lib/overview/canonical-
+  // health.ts). De widget-bundel berekent de score onafhankelijk én altijd
+  // persoonlijk → afwijking van de hero. Laat de widgets de canonieke,
+  // perspectief-correcte score uit horizonData (blok 1) tonen.
+  const dashboardData = withCanonicalHealthScore(rawDashboardData, health)
 
   // Perspectief-override voor de getallen die uit dashboardData komen (freedom-
   // time-uitgaven + briefing). Vermogen/vrijheid% komen al perspectief-correct
@@ -185,13 +192,12 @@ export async function OverzichtSecondaryLoader({
     briefingHeadline = buildBriefingHeadline(freedomHero)
   }
 
-  // Mini-vermogen-grafiek-inputs: dezelfde simulatie-data als /toekomst.
+  // Vrijheidsleeftijd voor de Vrijheid-strip + framing (de mini-vermogen-
+  // grafiek zelf laadt los, zie OverzichtNetWorthChartLoader).
   const fireAge =
     dashboardData.fireAgeFractional != null
       ? Math.round(dashboardData.fireAgeFractional)
       : null
-  const simNetWorthRows = dashboardData.simNetWorthRows ?? null
-  const simRequiredPortfolio = dashboardData.simRequiredPortfolio ?? null
 
   // Afgeleide vrijheids-/pensioenframing via de gedeelde, consume-only vlag
   // (ADR 0009): geen herberekening — freedomPct/currentAge komen uit blok 1,
@@ -202,11 +208,6 @@ export async function OverzichtSecondaryLoader({
     fireAge,
     strategy: horizonData?.fireStrategy?.strategy,
   })
-  // Geschat maandelijks spaarritme voor de back-cast van ontbrekende historie.
-  const monthlySavings =
-    dashboardData.monthlyContributions > 0
-      ? dashboardData.monthlyContributions
-      : (dashboardData.monthlyIncome ?? 0) - (dashboardData.monthlyExpenses ?? 0)
 
   return (
     <>
@@ -219,16 +220,12 @@ export async function OverzichtSecondaryLoader({
         minimized={pageStatusMinimized}
       />
       <OverzichtSecondary
-        health={health}
         goals={finData.goals}
         goalProgresses={finData.goalProgresses}
         freedomPct={freedomPct}
         currentAge={currentAge}
-        endAge={endAge}
-        isPensioenMode={isPensioenMode}
+        fireAge={fireAge}
         freedomFraming={freedomFraming}
-        housingSplit={housingSplit}
-        netWorthExclHome={netWorthExclHome}
         briefingEntries={briefingEntries}
         briefingRefreshedAt={briefingRefreshedAt}
         briefingDataChanged={briefingDataChanged}
@@ -236,17 +233,78 @@ export async function OverzichtSecondaryLoader({
         briefingCanRefresh={briefingCanRefresh}
         freedomHero={freedomHero}
         briefingHeadline={briefingHeadline}
-        netWorthHistory={netWorthHistory}
-        currentNetWorth={currentNetWorth}
-        fireAge={fireAge}
-        simNetWorthRows={simNetWorthRows}
-        simRequiredPortfolio={simRequiredPortfolio}
-        monthlySavings={monthlySavings}
         dashboardData={dashboardData}
         activeWidgets={activeWidgets}
         allWidgetPrefs={allWidgetPrefs}
         liquidCash={liquidCash}
       />
     </>
+  )
+}
+
+/**
+ * OverzichtNetWorthChartLoader — de rechter cel (3/4) van de hero-row op
+ * /overzicht: de mini-vermogen-grafiek. STROOMT los achter een eigen
+ * `<Suspense>` (perf-kaart "gezondheid & netto vermogen los laden van widgets").
+ *
+ * De per-jaar-PROJECTIE (`simNetWorthRows`/`simRequiredPortfolio`) én de
+ * historie komen uit de kernel-zware `loadDashboardData` — die kan niet naar
+ * blok 1 zonder blok 1 even zwaar te maken. Daarom rendert de Health-card links
+ * (1/4) wél direct in blok 1 (`OverzichtHeroPrimary`) uit de lichte blok-1-
+ * `health`, en stroomt alléén de grafiek hier binnen. Het HUIDIGE netto vermogen
+ * (`currentNetWorth`, blok 1, perspectief-correct) is er meteen; de projectielijn
+ * vult later aan.
+ *
+ * DEDUP: deelt `loadDashboardData`'s React-`cache()` met OverzichtSecondaryLoader
+ * en de page-status-seed → één query-set per request. CONSUME, DON'T RECOMPUTE:
+ * dezelfde afgeleiden als voorheen, alleen nu in een eigen streaming-cel.
+ */
+export async function OverzichtNetWorthChartLoader({
+  supabase,
+  currentNetWorth,
+  currentAge,
+  endAge,
+  isPensioenMode,
+  netWorthExclHome,
+  housingSplit,
+}: {
+  supabase: SupabaseClient
+  currentNetWorth: number
+  currentAge: number | null
+  endAge: number | null
+  isPensioenMode: boolean
+  netWorthExclHome: number | null
+  housingSplit: HefbomenHousingSplit | null
+}) {
+  const { dashboardData } = await loadDashboardData(supabase)
+
+  const fireAge =
+    dashboardData.fireAgeFractional != null
+      ? Math.round(dashboardData.fireAgeFractional)
+      : null
+  // Canoniek dagtarief (EUR/dag) uit de bundel — consume-don't-recompute
+  // (KRUIS-20); alleen bij ontbreken vertaalt de helper de maanduitgaven.
+  const dailyExpense = dashboardData.dailyExpenseRate ?? dailyExpenseRate(dashboardData.monthlyExpenses)
+  // Geschat maandelijks spaarritme voor de back-cast van ontbrekende historie.
+  const monthlySavings =
+    dashboardData.monthlyContributions > 0
+      ? dashboardData.monthlyContributions
+      : (dashboardData.monthlyIncome ?? 0) - (dashboardData.monthlyExpenses ?? 0)
+
+  return (
+    <MiniNetWorthChart
+      netWorthHistory={dashboardData.netWorthHistory ?? EMPTY_NET_WORTH_HISTORY}
+      currentNetWorth={currentNetWorth}
+      currentAge={currentAge}
+      fireAge={fireAge}
+      endAge={endAge}
+      isPensioenMode={isPensioenMode}
+      simNetWorthRows={dashboardData.simNetWorthRows ?? null}
+      simRequiredPortfolio={dashboardData.simRequiredPortfolio ?? null}
+      monthlySavings={monthlySavings}
+      netWorthExclHome={netWorthExclHome}
+      showExclHome={housingSplit != null}
+      dailyExpense={dailyExpense}
+    />
   )
 }

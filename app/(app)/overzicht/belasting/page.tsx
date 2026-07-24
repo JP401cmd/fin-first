@@ -57,7 +57,8 @@ export const metadata: Metadata = {
  *  - Box 3: de tax_optimization-pillar uit de gezondheidsscore
  *
  * Box-data bronnen (KPI's):
- *  - Box 3: horizonData.healthScoreInput.taxData.box3Tax (forfaitaire berekening)
+ *  - Box 3: horizonData.box3Tax (canonieke calculateBox3, personal) — household/
+ *    partner via loadPerspectiveBox3 (combined/partner)
  *  - Box 1: schatting via netto-inkomen × marginaal-tarief
  *  - Box 2: KPI leeg (geen deelnemingen-berekening op de landing) — de
  *    box2-subpagina rekent het echte bedrag uit via /api/household/box2
@@ -73,7 +74,12 @@ export default async function OverzichtBelastingPage() {
   // loader van de Box 3-subpagina (`loadPerspectiveBox3` → `loadPerspectiveData`
   // → ONGEWIJZIGDE `calculateBox3`). Box 1 (jaarruimte) en Box 2 blijven
   // per-persoon — de deep box1-pagina toont zelf al een 2-koloms huishoudbeeld.
-  let box3Tax = horizonData.healthScoreInput.taxData?.box3Tax ?? null
+  // Personal: de CANONIEKE calculateBox3-heffing uit de loader-bundel
+  // (horizonData.box3Tax) — dezelfde motor als de Box 3-subpagina. NIET langer de
+  // healthScoreInput.taxData-proxy (buildTaxData), die schulden negeerde (incl. de
+  // eigenwoninghypotheek → Box 1) en zo een positieve KPI toonde náást een "geen
+  // belasting"-kaartstatus. Household/partner overschrijft hieronder via loadPerspectiveBox3.
+  let box3Tax: number | null = horizonData.box3Tax
   let box3PerspectiveAware = false
   // Optimale partner-allocatie levert een Box 3-besparingssignaal voor C4 — in
   // household-view berekent loadPerspectiveBox3 dit als `savingsVsEqual`.

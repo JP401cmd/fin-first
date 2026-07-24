@@ -142,3 +142,37 @@ describe('GezondheidScoreWidget — half toont zwakste 3 pijlers', () => {
     expect(screen.queryByText('Budget')).toBeNull()
   })
 })
+
+describe('GezondheidScoreWidget — trend alleen bij echte vorige-maand-data', () => {
+  // Sinds de canonieke horizon-score op /overzicht trendloos is (previousMonth=
+  // null), mag de widget GEEN misleidende "Stabiel"-badge tonen — hij lijnt uit
+  // met de hero-kaart, die de trend ook alleen bij een echte vergelijking toont.
+  const pillars = [
+    mkPillar('a', 'Spaarquote', 70),
+    mkPillar('b', 'Budget', 60),
+    mkPillar('c', 'Noodfonds', 65),
+    mkPillar('d', 'Schuldenlast', 55),
+    mkPillar('e', 'Vrijheid', 40),
+    mkPillar('f', 'Spreiding', 50),
+  ]
+
+  it('full zonder vorige maand toont GEEN "Stabiel"-badge en geen "was X"', () => {
+    const health: HealthScore = {
+      total: 58, label: 'Redelijk', pillars,
+      previousMonth: null, trend: 0, activePillarCount: 6, budgetingActive: true,
+    }
+    render(<GezondheidScoreWidget size="full" data={bundleWith(health)} />)
+    expect(screen.queryByText('Stabiel')).toBeNull()
+    expect(screen.queryByText(/was /)).toBeNull()
+  })
+
+  it('full met vorige maand toont de trend (+delta en "was X")', () => {
+    const health: HealthScore = {
+      total: 58, label: 'Redelijk', pillars,
+      previousMonth: 53, trend: 5, activePillarCount: 6, budgetingActive: true,
+    }
+    render(<GezondheidScoreWidget size="full" data={bundleWith(health)} />)
+    expect(screen.getByText(/\+5/)).toBeTruthy()
+    expect(screen.getByText(/was 53/)).toBeTruthy()
+  })
+})
