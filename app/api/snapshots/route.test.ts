@@ -39,6 +39,7 @@ vi.mock('@/lib/log-error', () => ({
 }))
 
 import { POST } from './route'
+import { savingsRateFromAggregates } from '@/lib/savings-source'
 
 const USER = { id: 'user-1' }
 
@@ -140,5 +141,78 @@ describe('POST /api/snapshots — balance-snapshot foutlogging', () => {
     const body = await res.json()
     expect(body.snapshot).toBeDefined()
     expect(mockLogError).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * REGRESSIE (W5 Spaarquote-widget): de gepersisteerde `savings_rate`-kolom voedt
+ * de spaarquote-widget-ontwikkeling (savingsHistory). Die MOET de canonieke
+ * spaarquote-grondslag dragen (savingsRateFromAggregates, incl. aflossing) — NIET
+ * het vlakke FIRE-tempo (fireProjection.savingsRate = (inkomen−uitgaven)/inkomen,
+ * zónder aflossing). Anders spreekt de sparkline de headline tegen (0,8% vs 49,5%).
+ *
+ * Persona zó gekozen dat beide grondslagen DIVERGEREN: aflossing > 0 tilt de
+ * canonieke quote boven de vlakke.
+ */
+describe('POST /api/snapshots — savings_rate = canonieke spaarquote (niet flat FIRE-tempo)', () => {
+  const MONTHLY_INCOME = 5000 // 30.000 / 6
+  const MONTHLY_EXPENSES = 3000 // 36.000 / 12
+  const MONTHLY_AFLOSSING = 500 // custom_aflossing_amount, inclusion 100%
+
+  /** Stateful 'transactions'-mock: 3 from('transactions')-calls in bronvolgorde
+   *  (expenses 12m, income 6m, huidige-maand). Andere tabellen per naam. */
+  function mockSavingsPersona() {
+    let txCall = 0
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'profiles') return makeChain({ data: PROFILE, error: null })
+      if (table === 'net_worth_snapshots') {
+        return makeChain({ data: { id: 'snap-1', user_id: USER.id, net_worth: -1000 }, error: null })
+      }
+      if (table === 'debts') {
+        return makeChain({
+          data: [{
+            id: 'd1', name: 'Hypotheek', debt_type: 'mortgage', current_balance: 1000,
+            net_worth_inclusion_pct: 100, interest_rate: 2, monthly_payment: 500,
+            repayment_type: 'annuity', end_date: null, start_date: null,
+            include_aflossing_in_savings: true, custom_aflossing_amount: MONTHLY_AFLOSSING,
+          }],
+          error: null,
+        })
+      }
+      if (table === 'transactions') {
+        txCall += 1
+        if (txCall === 1) return makeChain({ data: [{ amount: -36000 }], error: null }) // expenses 12m
+        if (txCall === 2) return makeChain({ data: [{ amount: 30000 }], error: null }) // income 6m
+        return makeChain({ data: [], error: null }) // huidige-maand budget-discipline
+      }
+      // assets, budgets, bank_accounts, goals → leeg
+      return makeChain({ data: [], error: null })
+    })
+  }
+
+  beforeEach(() => {
+    mockCapture.mockResolvedValue({ count: 0 })
+    mockSavingsPersona()
+  })
+
+  it('persisteert savingsRateFromAggregates (incl. aflossing), niet de flatte FIRE-quote', async () => {
+    const res = await POST()
+    await flush()
+    expect(res.status).toBe(200)
+    const body = await res.json()
+
+    const canonical = Math.round(
+      savingsRateFromAggregates(MONTHLY_INCOME, MONTHLY_EXPENSES, MONTHLY_AFLOSSING) * 10,
+    ) / 10
+    const flat = Math.round(((MONTHLY_INCOME - MONTHLY_EXPENSES) / MONTHLY_INCOME) * 100 * 10) / 10
+
+    expect(canonical).toBe(50) // (5000−3000+500)/5000 = 50%
+    expect(flat).toBe(40) // aflossing weggelaten → zou de widget-historie vervuilen
+    expect(canonical).not.toBe(flat)
+
+    // Zowel de response-echo (snapshot + calculation) als daarmee de kolom dragen
+    // de canonieke spaarquote.
+    expect(body.calculation.savings_rate).toBe(canonical)
+    expect(body.snapshot.savings_rate).toBe(canonical)
   })
 })

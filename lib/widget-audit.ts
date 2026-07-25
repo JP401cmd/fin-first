@@ -16,12 +16,12 @@
 //
 // ── Why observation widgets are legitimate ──────────────────────────────────
 //
-// Observation widgets (14 total) serve a critical UX purpose: they provide
+// Observation widgets (13 total) serve a critical UX purpose: they provide
 // context and overview without demanding user action. Examples:
 //
 //   - Netto Vermogen: shows the total net worth as the primary financial
 //     metric. Its value IS the insight — no button needed.
-//   - Jouw Pad (fase-bar): shows sovereignty level progress. The bar itself
+//   - Vrijheidsvoortgang: shows % progress to the FIRE goal. The bar itself
 //     communicates trajectory — forcing a CTA would be noise.
 //   - Trend widgets: show historical lines. The shape IS the information.
 //   - Vermogensgrafiek: the net-worth-projection-chart on /core is a pure
@@ -48,7 +48,6 @@ export const WIDGET_CLASSIFICATION: Record<string, WidgetClassification> = {
   // ── Observations (pure metrics, phase/progress indicators) ───
   netto_vermogen:           'observation',   // Total net worth — pure KPI
   vrijheidsvoortgang:       'observation',   // % progress to FIRE goal
-  jouw_pad:                 'observation',   // Sovereignty level / phase bar
   pensioen_aow:             'observation',   // AOW countdown timer
   vrijheidsmijlpalen:       'observation',   // Milestone progress markers
   maandoverzicht:           'observation',   // Monthly aggregation summary
@@ -129,8 +128,8 @@ export interface WidgetReviewEntry {
  */
 export const WIDGET_REVIEW_LOG: Record<string, WidgetReviewEntry> = {
   // ── Currently no widgets are flagged for review ──
-  // All 50 widgets have been audited and classified as either
-  // 'observation' (14 — pure metrics/progress) or 'insight' (36 — actionable).
+  // All 49 widgets have been audited and classified as either
+  // 'observation' (13 — pure metrics/progress) or 'insight' (36 — actionable).
   //
   // To flag a widget for review, change its WIDGET_CLASSIFICATION entry
   // to 'needs_review' and add an entry here with decision: 'pending'.

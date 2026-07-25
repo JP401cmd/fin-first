@@ -1,9 +1,17 @@
-import { describe, it, expect, beforeAll } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, it, expect, beforeAll, vi } from 'vitest'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { GezondheidScoreWidget } from '../gezondheids-score-widget'
 import type { DashboardData } from '../widget-renderer'
 import type { HealthPillar, HealthScore, HealthScoreInput } from '@/lib/financial-health'
 import { computeHealthScoreFromInputs } from '@/lib/financial-health'
+
+// De 'Bespreek met Fin'-knop leunt op de chat-provider; mock alleen het
+// optionele-context-hook zodat we de payload kunnen inspecteren zonder de
+// volledige ChatProvider te mounten.
+const { openWithMessageMock } = vi.hoisted(() => ({ openWithMessageMock: vi.fn() }))
+vi.mock('@/components/app/chat/chat-provider', () => ({
+  useChatContextOptional: () => ({ openWithMessage: openWithMessageMock }),
+}))
 
 /**
  * Regressietests voor de GezondheidScoreWidget (Notion-widgetreview).
@@ -174,5 +182,44 @@ describe('GezondheidScoreWidget — trend alleen bij echte vorige-maand-data', (
     render(<GezondheidScoreWidget size="full" data={bundleWith(health)} />)
     expect(screen.getByText(/\+5/)).toBeTruthy()
     expect(screen.getByText(/was 53/)).toBeTruthy()
+  })
+})
+
+describe('GezondheidScoreWidget — full: Bespreek met Fin i.p.v. verbeterpunten', () => {
+  const health: HealthScore = {
+    total: 58,
+    label: 'Redelijk',
+    pillars: [
+      mkPillar('a', 'Spaarquote', 70),
+      mkPillar('b', 'Budget', 60),
+      mkPillar('c', 'Noodfonds', 65),
+      mkPillar('d', 'Schuldenlast', 55),
+      mkPillar('e', 'Vrijheid', 40),
+      mkPillar('f', 'Spreiding', 50),
+    ],
+    previousMonth: null,
+    trend: 0,
+    activePillarCount: 6,
+    budgetingActive: true,
+  }
+
+  it('toont de "Bespreek met Fin"-knop en niet langer het "Verbeterpunten"-blok', () => {
+    render(<GezondheidScoreWidget size="full" data={bundleWith(health)} />)
+    expect(screen.getByRole('button', { name: /Bespreek .* met Fin/i })).toBeTruthy()
+    expect(screen.queryByText('Verbeterpunten')).toBeNull()
+  })
+
+  it('geeft score-, label- en zwakste-pijler-context door aan de Fin-chat', () => {
+    openWithMessageMock.mockClear()
+    render(<GezondheidScoreWidget size="full" data={bundleWith(health)} />)
+    fireEvent.click(screen.getByRole('button', { name: /Bespreek .* met Fin/i }))
+    expect(openWithMessageMock).toHaveBeenCalledTimes(1)
+    const message = openWithMessageMock.mock.calls[0][0] as string
+    // Onderwerp draagt het canonieke totaal + label.
+    expect(message).toContain('Mijn financiële gezondheid (58/100 — Redelijk)')
+    // De zwakste pijler (Vrijheid, 40) zit in de meegegeven context.
+    expect(message).toContain('Vrijheid (40/100')
+    // De vrijheidstijd-gerichte kick-off-vraag gaat mee.
+    expect(message).toContain('vrijheidstijd')
   })
 })

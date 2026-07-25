@@ -15,6 +15,7 @@ import { computeSovereigntyLevel } from '@/lib/feature-phases'
 import { captureBalanceSnapshots } from '@/lib/balance-snapshot'
 import { logError } from '@/lib/log-error'
 import { type Debt, computeRenteAflossingsSplit } from '@/lib/debt-data'
+import { savingsRateFromAggregates } from '@/lib/savings-source'
 import { localMonthBounds, localMonthStart } from '@/lib/month-range'
 import {
   weightedAssetTotal,
@@ -280,9 +281,12 @@ export async function POST() {
   // de auto/cron-routes. Echte noodfonds-maanden, budgetCategories en Box 3-
   // taxData i.p.v. proxies (was: assets×0.3, lege budgetCategories, geen taxData),
   // zodat de opgeslagen resilience_score ≈ de live score (SSoT, ADR 0008).
-  const savingsRate6m = monthlyIncome > 0
-    ? ((monthlyIncome - monthlyExpenses + debtAflossing6m) / monthlyIncome) * 100
-    : 0
+  // Canonieke spaarquote-grondslag via de gedeelde helper (consume, don't
+  // recompute) — dezelfde formule die de dashboard-loader voedt. Voedt zowel de
+  // health-score-input als de gepersisteerde savings_rate-kolom (zie hieronder),
+  // zodat de spaarquote-widget-historie op DE spaarquote draait en niet op het
+  // vlakke FIRE-tempo (fireProjection.savingsRate).
+  const savingsRate6m = savingsRateFromAggregates(monthlyIncome, monthlyExpenses, debtAflossing6m)
   // DSTI-teller: Σ maandlasten over de actieve schulden (select bevat monthly_payment).
   const debtMonthlyPayments = debts.reduce((s, d) => s + Number(d.monthly_payment ?? 0), 0)
   // Noodfonds-target uit het (optionele) noodfonds-doel; geen doel → default 6
@@ -332,7 +336,9 @@ export async function POST() {
     freedom_percentage: Math.round(freedomPercentage * 10) / 10,
     fire_age: fireProjection.fireAge !== null ? Math.round(fireProjection.fireAge * 10) / 10 : null,
     sovereignty_level: sovereigntyLevel,
-    savings_rate: Math.round(fireProjection.savingsRate * 10) / 10,
+    // Canonieke spaarquote (savingsRate6m), NIET fireProjection.savingsRate:
+    // deze kolom voedt de spaarquote-widget-ontwikkeling (savingsHistory).
+    savings_rate: Math.round(savingsRate6m * 10) / 10,
     // Note: resilience_score column is retained for historical data continuity.
     // It now stores the v2 4-pijler/7-indicator gezondheidsscore (ADR 0010).
     resilience_score: healthScore.total,
@@ -403,7 +409,7 @@ export async function POST() {
       freedom_percentage: Math.round(freedomPercentage * 10) / 10,
       fire_age: fireProjection.fireAge !== null ? Math.round(fireProjection.fireAge * 10) / 10 : null,
       sovereignty_level: sovereigntyLevel,
-      savings_rate: Math.round(fireProjection.savingsRate * 10) / 10,
+      savings_rate: Math.round(savingsRate6m * 10) / 10,
       resilience_score: healthScore.total,
       fire_target: fireTarget,
       yearly_must_expenses: yearlyMustExpenses,
@@ -419,7 +425,7 @@ export async function POST() {
       swr: fireSwr,
       fire_age: fireProjection.fireAge,
       sovereignty_level: sovereigntyLevel,
-      savings_rate: Math.round(fireProjection.savingsRate * 10) / 10,
+      savings_rate: Math.round(savingsRate6m * 10) / 10,
       resilience_score: healthScore.total,
       health_pillars: healthScore.pillars.map(p => ({ id: p.id, name: p.name, score: p.score, weight: p.weight })),
     },

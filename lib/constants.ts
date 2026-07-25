@@ -238,3 +238,12 @@ export const WEERBAARHEID_MATIG = 65
 
 /** Succeskans-grens (%) waarboven het schild-icoon op "veilig" (ShieldCheck) staat. */
 export const WEERBAARHEID_SCHILD = 75
+
+/**
+ * Bovengrens (%) voor de GETOONDE historische slaagkans. De ruwe backtest-fractie
+ * kan legitiem 100% zijn (elk startjaar slaagde), maar we tonen nooit 100% —
+ * epistemische bescheidenheid: een gemodelleerde toekomst is nooit zeker.
+ * Dit is een DISPLAY-cap op de canonieke bundelwaarde (dashboard-data-loader),
+ * niet op de meting zelf (runBacktest blijft 0–1). Geen semantische drempel.
+ */
+export const WEERBAARHEID_DISPLAY_MAX = 99

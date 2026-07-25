@@ -1,4 +1,6 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useEffect, useRef, useState } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
@@ -52,6 +54,114 @@ function buildSvgPath(
   return { pathD, fillD }
 }
 
+interface Milestone {
+  year: number
+  label: string
+}
+
+/** Breedte waarop de curve rendert tot de ResizeObserver de echte tegelbreedte meet (SSR/jsdom). */
+const CURVE_FALLBACK_WIDTH = 280
+
+/**
+ * Koopkracht-curve met VASTE pixelhoogte.
+ *
+ * De SVG-hoogte volgde eerder uit breedte × viewBox-aspect (`width="100%"` +
+ * onbegrensde hoogte). Op brede tegels (half=M, full=L, en de brede
+ * aanpassen-menu-preview) werd de SVG dáárdoor hóger dan de vaste tegelhoogte, en
+ * knipte de `overflow-hidden` van de WidgetShell de onderkant van de curve + de
+ * laagste mijlpaallabels (jaar-30) weg — precies het M/L-defect uit W24.
+ *
+ * We meten nu de containerbreedte (ResizeObserver — zelfde patroon als
+ * budgetten-widget) en geven de SVG een viewBox in échte pixels (1 eenheid = 1px)
+ * met een vaste hoogte + expliciete `height`. Zo vult de curve de volle breedte,
+ * blijft de tekst scherp (geen `preserveAspectRatio="none"`-vervorming) en loopt
+ * niets over — ongeacht hoe breed de tegel wordt.
+ */
+function InflationCurve({
+  inflationRate,
+  maxYears,
+  height,
+  milestones = [],
+}: {
+  inflationRate: number
+  maxYears: number
+  height: number
+  milestones?: Milestone[]
+}) {
+  const ref = useRef<HTMLDivElement | null>(null)
+  const [width, setWidth] = useState(CURVE_FALLBACK_WIDTH)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const measure = () => {
+      const w = el.clientWidth
+      if (w > 0) setWidth(w)
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  const points = buildPurchasingPowerPoints(inflationRate, maxYears)
+  const { pathD, fillD } = buildSvgPath(points, width, height, maxYears)
+
+  return (
+    <div ref={ref} className="w-full">
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        width="100%"
+        height={height}
+        className="overflow-visible"
+        aria-hidden="true"
+      >
+        <path d={fillD} fill="var(--color-horizon-100)" opacity={0.5} />
+        <path d={pathD} fill="none" stroke="var(--color-horizon-500)" strokeWidth={2} />
+        {/* Milestone dots and labels on the curve (alleen half) */}
+        {milestones.map(({ year, label }) => {
+          const cx = (year / maxYears) * width
+          const val = purchasingPower(inflationRate, year)
+          const cy = height - (val / 1000) * height
+          const isFirst = year === 0
+          const isLast = year === maxYears
+          // Label boven de curve, behalve het laatste punt (eronder). Clamp op
+          // [8, height-9] zodat de label + de jaar-sublabel (labelY+9) binnen de
+          // vaste hoogte blijven en niet meer worden weggeknipt.
+          const labelY = isLast ? Math.min(cy + 12, height - 9) : Math.max(cy - 6, 8)
+          return (
+            <g key={year}>
+              <circle cx={cx} cy={cy} r={2.5} fill="var(--color-horizon-500)" />
+              <text
+                x={isFirst ? cx + 4 : cx}
+                y={labelY}
+                fontSize={8}
+                fontFamily="var(--font-mono, ui-monospace, monospace)"
+                fontWeight={isFirst || isLast ? 600 : 400}
+                fill={isFirst ? 'var(--ink)' : isLast ? 'var(--color-horizon-700)' : 'var(--ink-3)'}
+                textAnchor={isFirst ? 'start' : isLast ? 'end' : 'middle'}
+              >
+                {label}
+              </text>
+              {!isFirst && (
+                <text
+                  x={cx}
+                  y={labelY + 9}
+                  fontSize={7}
+                  fill="var(--ink-4)"
+                  textAnchor={isLast ? 'end' : 'middle'}
+                >
+                  {year}j
+                </text>
+              )}
+            </g>
+          )
+        })}
+      </svg>
+    </div>
+  )
+}
+
 export const InflatieImpactWidget = memo(function InflatieImpactWidget({ size, data, href }: Props) {
   // ?? (niet ||): een bewust ingestelde 0%-inflatie is een geldige waarde en
   // mag niet stilzwijgend terugvallen op de 2%-default.
@@ -86,12 +196,7 @@ export const InflatieImpactWidget = memo(function InflatieImpactWidget({ size, d
 
   // ── Full: curve + table ────────────────────────────────────
   if (size === 'full') {
-    const svgWidth = 300
-    const svgHeight = 120
     const maxYears = 30
-    const points = buildPurchasingPowerPoints(inflationRate, maxYears)
-    const { pathD, fillD } = buildSvgPath(points, svgWidth, svgHeight, maxYears)
-
     const tableYears = [5, 10, 20, 30]
 
     return (
@@ -107,17 +212,9 @@ export const InflatieImpactWidget = memo(function InflatieImpactWidget({ size, d
           Koopkrachtverlies door inflatie
         </p>
 
-        {/* SVG curve */}
+        {/* SVG curve — vaste pixelhoogte, meet-gebaseerde breedte (geen overflow) */}
         <div className="mt-3">
-          <svg
-            viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-            width="100%"
-            className="overflow-visible"
-            aria-hidden="true"
-          >
-            <path d={fillD} fill="var(--color-horizon-100)" opacity={0.5} />
-            <path d={pathD} fill="none" stroke="var(--color-horizon-500)" strokeWidth={2} />
-          </svg>
+          <InflationCurve inflationRate={inflationRate} maxYears={maxYears} height={96} />
         </div>
 
         {/* Table */}
@@ -153,13 +250,9 @@ export const InflatieImpactWidget = memo(function InflatieImpactWidget({ size, d
   }
 
   // ── Half (default): SVG curve with inline labels ──────────
-  const svgWidth = 240
-  const svgHeight = 90
   const maxYears = 30
-  const points = buildPurchasingPowerPoints(inflationRate, maxYears)
-  const { pathD, fillD } = buildSvgPath(points, svgWidth, svgHeight, maxYears)
 
-  const milestones = [
+  const milestones: Milestone[] = [
     { year: 0, label: '€1.000' },
     { year: 10, label: formatCurrency(purchasingPower(inflationRate, 10)) },
     { year: 20, label: formatCurrency(purchasingPower(inflationRate, 20)) },
@@ -176,54 +269,14 @@ export const InflatieImpactWidget = memo(function InflatieImpactWidget({ size, d
         <span className="text-[10px] text-[var(--ink-3)]">/jaar</span>
       </div>
 
-      {/* SVG declining curve with value labels */}
+      {/* SVG declining curve with value labels — vaste pixelhoogte, meet-gebaseerde breedte */}
       <div className="mt-2">
-        <svg
-          viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-          width="100%"
-          className="overflow-visible"
-          aria-hidden="true"
-        >
-          <path d={fillD} fill="var(--color-horizon-100)" opacity={0.5} />
-          <path d={pathD} fill="none" stroke="var(--color-horizon-500)" strokeWidth={2} />
-          {/* Milestone dots and labels on the curve */}
-          {milestones.map(({ year, label }) => {
-            const cx = (year / maxYears) * svgWidth
-            const val = purchasingPower(inflationRate, year)
-            const cy = svgHeight - (val / 1000) * svgHeight
-            const isFirst = year === 0
-            const isLast = year === maxYears
-            // Position label above curve, except last point which goes below
-            const labelY = isLast ? Math.min(cy + 12, svgHeight) : Math.max(cy - 6, 8)
-            return (
-              <g key={year}>
-                <circle cx={cx} cy={cy} r={2.5} fill="var(--color-horizon-500)" />
-                <text
-                  x={isFirst ? cx + 4 : isLast ? cx : cx}
-                  y={labelY}
-                  fontSize={8}
-                  fontFamily="var(--font-mono, ui-monospace, monospace)"
-                  fontWeight={isFirst || isLast ? 600 : 400}
-                  fill={isFirst ? 'var(--ink)' : isLast ? 'var(--color-horizon-700)' : 'var(--ink-3)'}
-                  textAnchor={isFirst ? 'start' : isLast ? 'end' : 'middle'}
-                >
-                  {label}
-                </text>
-                {!isFirst && (
-                  <text
-                    x={isLast ? cx : cx}
-                    y={labelY + 9}
-                    fontSize={7}
-                    fill="var(--ink-4)"
-                    textAnchor={isLast ? 'end' : 'middle'}
-                  >
-                    {year}j
-                  </text>
-                )}
-              </g>
-            )
-          })}
-        </svg>
+        <InflationCurve
+          inflationRate={inflationRate}
+          maxYears={maxYears}
+          height={64}
+          milestones={milestones}
+        />
         {/* Tekstalternatief: de curve is aria-hidden; geef de schermlezer de
             concrete eroderende mijlpaalwaarden die anders alleen in de SVG staan. */}
         <p className="sr-only">

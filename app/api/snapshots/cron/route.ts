@@ -14,6 +14,7 @@ import { computeSovereigntyLevel } from '@/lib/feature-phases'
 import { captureBalanceSnapshots } from '@/lib/balance-snapshot'
 import { logError } from '@/lib/log-error'
 import { type Debt, computeRenteAflossingsSplit } from '@/lib/debt-data'
+import { savingsRateFromAggregates } from '@/lib/savings-source'
 import { recordJobRun } from '@/lib/job-runs'
 import { mapWithConcurrency } from '@/lib/concurrency'
 import { localMonthBounds, localMonthStart } from '@/lib/month-range'
@@ -282,9 +283,12 @@ export async function GET(request: Request) {
       // freedomPct = snapshot-eigen freedomPercentage (zie /api/snapshots/route.ts
       // voor de motivatie van deze bewuste afwijking t.o.v. de strategy-adjusted
       // loader-freedomPct).
-      const savingsRate6m = monthlyIncome > 0
-        ? ((monthlyIncome - monthlyExpenses + debtAflossing6m) / monthlyIncome) * 100
-        : 0
+      // Canonieke spaarquote-grondslag via de gedeelde helper (consume, don't
+      // recompute) — voedt de health-score-input én de gepersisteerde
+      // savings_rate (zie hieronder), zodat de spaarquote-widget-historie op DE
+      // spaarquote draait en niet op het vlakke FIRE-tempo
+      // (fireProjection.savingsRate).
+      const savingsRate6m = savingsRateFromAggregates(monthlyIncome, monthlyExpenses, debtAflossing6m)
       // DSTI-teller: Σ maandlasten over de actieve schulden (select bevat monthly_payment).
       const debtMonthlyPayments = debts.reduce((s, d) => s + Number(d.monthly_payment ?? 0), 0)
       // Noodfonds-target uit het (optionele) noodfonds-doel; geen doel → default 6.
@@ -325,7 +329,9 @@ export async function GET(request: Request) {
         freedom_percentage: Math.round(freedomPercentage * 10) / 10,
         fire_age: fireProjection.fireAge !== null ? Math.round(fireProjection.fireAge * 10) / 10 : null,
         sovereignty_level: sovereigntyLevel,
-        savings_rate: Math.round(fireProjection.savingsRate * 10) / 10,
+        // Canonieke spaarquote (savingsRate6m), NIET fireProjection.savingsRate:
+        // deze kolom voedt de spaarquote-widget-ontwikkeling (savingsHistory).
+        savings_rate: Math.round(savingsRate6m * 10) / 10,
         resilience_score: healthScore.total,
         // Methode-versie van de opgeslagen score (ADR 0010 / FR-7). DEFAULT 1 op
         // de kolom; v2-snapshots schrijven expliciet 2. De basic-fallback-upsert

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { VrijheidsvoortgangWidget } from './vrijheidsvoortgang-widget'
 import type { DashboardData } from './widget-renderer'
+import { formatCurrency } from '@/lib/format'
 
 // Stuurbaar perspectief — default personal (zelfde als buiten de provider).
 const mockPerspective = { perspective: 'personal' as string, partnerName: null as string | null }
@@ -165,8 +166,10 @@ describe('VrijheidsvoortgangWidget — full-size zonder mijlpaal-datumlijstje', 
     simRequiredPortfolio: 500_000,
     fireTarget: 500_000,
     freedomPct: 60,
-    // Twee historie-punten → groei/mnd wordt getoond (bron ongewijzigd tot
-    // bevinding A over de snapshot-cadans is besloten).
+    // Groei/mnd consumeert CANONIEK data.netWorthDelta (bundel), niet meer een
+    // widget-lokale som over netWorthHistory. De historie hieronder mag bewust
+    // afwijken; ze mag de groei niet (meer) beïnvloeden.
+    netWorthDelta: 20_000,
     netWorthHistory: [
       { month: '2026-05', value: 580_000 },
       { month: '2026-06', value: 600_000 },
@@ -186,6 +189,37 @@ describe('VrijheidsvoortgangWidget — full-size zonder mijlpaal-datumlijstje', 
     expect(screen.queryByText('25% vrijheid')).not.toBeInTheDocument()
     expect(screen.queryByText('75% vrijheid')).not.toBeInTheDocument()
     expect(screen.queryByText('100% vrijheid')).not.toBeInTheDocument()
+  })
+
+  it('groei/mnd == canonieke bundel-vermogensmutatie (data.netWorthDelta), niet een eigen som', () => {
+    // Runtime-assertie: de getoonde groei is EXACT de canonieke bundelwaarde,
+    // ongeacht netWorthHistory (die hier een andere, grotere delta zou geven).
+    render(<VrijheidsvoortgangWidget size="full" data={fullData()} />)
+    // nbsp-tolerante exacte match op de MaskedAmount-span (parent <p> bevat ook
+    // "/mnd" en matcht dus niet exact).
+    const norm = (s: string) => s.replace(/ /g, ' ')
+    expect(
+      screen.getByText((_, el) => norm(el?.textContent ?? '') === norm(formatCurrency(20_000))),
+    ).toBeInTheDocument()
+  })
+
+  it('geen canonieke delta (data.netWorthDelta null) → geen groei-cel, ook al is er historie', () => {
+    // Bewijst dat de widget netWorthHistory NIET meer herberekent: zonder
+    // bundel-delta verschijnt er geen groei, ondanks een gevulde historie.
+    const data = makeData({
+      ...fullData(),
+      netWorthDelta: null,
+    })
+    render(<VrijheidsvoortgangWidget size="full" data={data} />)
+    expect(screen.getByText('60.0%')).toBeInTheDocument()
+    expect(screen.queryByText('Groei')).not.toBeInTheDocument()
+  })
+
+  it('half-size toont geen zelf-berekende "deze mnd"-vrijheidsdelta meer', () => {
+    render(<VrijheidsvoortgangWidget size="half" data={fullData()} />)
+    expect(screen.getByText('60.0%')).toBeInTheDocument()
+    // De gemengde-grondslag delta (bv. de gemelde +19,8%) is verwijderd.
+    expect(screen.queryByText(/deze mnd/i)).not.toBeInTheDocument()
   })
 
   it('huishouden-perspectief: geen per-user groei, wel het household-%', () => {

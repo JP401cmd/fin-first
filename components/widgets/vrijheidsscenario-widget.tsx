@@ -2,6 +2,7 @@ import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
+import type { FireProjection } from '@/lib/horizon-data'
 
 interface Props {
   size: WidgetSize
@@ -9,10 +10,99 @@ interface Props {
   href?: string
 }
 
-export const VrijheidsScenarioWidget = memo(function VrijheidsScenarioWidget({ size, data, href }: Props) {
-  const { fireRange } = data
+// ── Verankerde scenario-projectie ─────────────────────────────────────────────
+// De VERWACHT-leeftijd/aftelling komt canoniek uit de unified-sim (`simFireCountdown`
+// / `fireAgeFractional`) — exact dezelfde bron als W3 (FIRE Prognose) en /toekomst.
+// De scalar-band (`fireRange`) is FALLBACK-ONLY (dashboard-data-loader.ts:970) en kan
+// bij een downsize-woonstrategie onterecht 'Bereikt' zeggen terwijl freedomPct << 100;
+// we consumeren daaruit dus ALLEEN de relatieve rendement-spreiding (optimistisch /
+// pessimistisch t.o.v. verwacht) en verankeren die op het canonieke midden. Zo spreekt
+// W36 nooit meer de canonieke aftelling/voortgang tegen (consume-don't-recompute).
+interface ResolvedScenarios {
+  expAge: number | null
+  optAge: number | null
+  pesAge: number | null
+  expYears: number | null
+  optYears: number | null
+  pesYears: number | null
+  currentAge: number | null
+  isReached: boolean
+  isNotFeasible: boolean
+  optReturn: number
+  expReturn: number
+  pesReturn: number
+}
 
-  if (!fireRange) {
+function resolveScenarios(data: DashboardData): ResolvedScenarios | null {
+  const { fireRange } = data
+  if (!fireRange) return null
+
+  const currentAge = fireRange.expected.currentAge
+  const bandYears = (p: FireProjection): number | null =>
+    p.fireAge != null && p.currentAge != null ? Math.max(0, p.fireAge - p.currentAge) : null
+
+  // Relatieve rendement-spreiding uit de band (jaren t.o.v. het VERWACHT-scenario).
+  const sExp = bandYears(fireRange.expected)
+  const sOpt = bandYears(fireRange.optimistic)
+  const sPes = bandYears(fireRange.pessimistic)
+  const deltaOpt = sExp != null && sOpt != null ? sOpt - sExp : 0
+  const deltaPes = sExp != null && sPes != null ? sPes - sExp : 0
+
+  const optReturn = fireRange.optimistic.annualReturn
+  const expReturn = fireRange.expected.annualReturn
+  const pesReturn = fireRange.pessimistic.annualReturn
+
+  const simCd = data.simFireCountdown
+  const useCanonical = simCd != null || data.fireAgeFractional != null
+
+  if (useCanonical) {
+    const isReached = simCd?.fireDate === 'Bereikt!' || (data.freedomPct != null && data.freedomPct >= 100)
+    const isNotFeasible = !isReached && simCd?.fireDate === 'Niet haalbaar'
+
+    let expYears: number | null
+    if (isReached) expYears = 0
+    else if (isNotFeasible) expYears = null
+    else if (simCd != null) expYears = Math.max(0, simCd.countdownYears + simCd.countdownMonths / 12)
+    else if (data.fireAgeFractional != null && currentAge != null) expYears = Math.max(0, data.fireAgeFractional - currentAge)
+    else expYears = null
+
+    const expAge =
+      data.fireAgeFractional ?? (currentAge != null && expYears != null ? currentAge + expYears : null)
+    const optYears = expYears != null ? Math.max(0, expYears + deltaOpt) : null
+    const pesYears = expYears != null ? Math.max(0, expYears + deltaPes) : null
+    const optAge = expAge != null ? expAge + deltaOpt : null
+    const pesAge = expAge != null ? expAge + deltaPes : null
+
+    return {
+      expAge, optAge, pesAge, expYears, optYears, pesYears, currentAge,
+      isReached, isNotFeasible, optReturn, expReturn, pesReturn,
+    }
+  }
+
+  // Fallback (geen canonieke sim — bv. dob-loze onboarding of sim-error): gebruik de
+  // scalar-band direct, zoals voorheen. Nette degradatie, geen crash.
+  const isReached = fireRange.expected.fireDate === 'Bereikt!'
+  const isNotFeasible = !isReached && fireRange.expected.fireDate === 'Niet haalbaar'
+  return {
+    expAge: fireRange.expected.fireAge,
+    optAge: fireRange.optimistic.fireAge,
+    pesAge: fireRange.pessimistic.fireAge,
+    expYears: sExp,
+    optYears: sOpt,
+    pesYears: sPes,
+    currentAge,
+    isReached,
+    isNotFeasible,
+    optReturn,
+    expReturn,
+    pesReturn,
+  }
+}
+
+export const VrijheidsScenarioWidget = memo(function VrijheidsScenarioWidget({ size, data, href }: Props) {
+  const resolved = resolveScenarios(data)
+
+  if (!resolved) {
     return (
       <WidgetShell module="horizon" size={size} kicker="Vrijheidsscenario's" href={href}>
         <p className="text-xs text-[var(--ink-3)]">Voeg inkomen en vermogen toe om scenario&apos;s te zien</p>
@@ -20,29 +110,43 @@ export const VrijheidsScenarioWidget = memo(function VrijheidsScenarioWidget({ s
     )
   }
 
+  const {
+    expAge, optAge, pesAge, expYears, optYears, pesYears, currentAge,
+    isReached, isNotFeasible, optReturn, expReturn, pesReturn,
+  } = resolved
+
   // Scenario-rendement wordt canoniek geconsumeerd uit de bundel — elk scenario
   // draagt zijn eigen offset-rendement (base+0.02 / base / base−0.03), dat mee
   // beweegt met het door de gebruiker ingestelde verwacht rendement. NOOIT hier
   // hardcoden (consume-don't-recompute).
   const scenarios = [
-    { label: 'Pessimistisch', proj: fireRange.pessimistic, dotColor: 'bg-negative', retColor: 'text-negative' },
-    { label: 'Verwacht', proj: fireRange.expected, dotColor: 'bg-horizon-500', retColor: 'text-horizon-600' },
-    { label: 'Optimistisch', proj: fireRange.optimistic, dotColor: 'bg-positive', retColor: 'text-positive' },
+    { label: 'Pessimistisch', age: pesAge, ret: pesReturn, dotColor: 'bg-negative' },
+    { label: 'Verwacht', age: expAge, ret: expReturn, dotColor: 'bg-horizon-500' },
+    { label: 'Optimistisch', age: optAge, ret: optReturn, dotColor: 'bg-positive' },
   ]
 
-  const expAge = fireRange.expected.fireAge
-  const pesAge = fireRange.pessimistic.fireAge
-  const optAge = fireRange.optimistic.fireAge
-  const bandwidth = pesAge != null && optAge != null ? Math.abs(Math.round(pesAge - optAge)) : null
+  const bandwidth =
+    pesAge != null && optAge != null ? Math.abs(Math.round(pesAge - optAge)) : null
+
+  // ── Reached / niet-haalbaar: nette expliciete staten i.p.v. een degenererende as ──
+  if (isReached) {
+    return (
+      <WidgetShell module="horizon" size={size} kicker="Vrijheidsscenario's" href={href}>
+        <ReachedState size={size} freedomPct={data.freedomPct} />
+      </WidgetShell>
+    )
+  }
 
   // ── Mini-size: scenario range (e.g. '48-54j') ─────────────
   if (size === 'mini') {
     const hasRange = optAge != null && pesAge != null
-    const miniLabel = hasRange
-      ? `${Math.round(optAge)}-${Math.round(pesAge)}j`
-      : expAge != null
-        ? `${Math.round(expAge)}j`
-        : '—'
+    const miniLabel = isNotFeasible
+      ? '—'
+      : hasRange
+        ? `${Math.round(optAge)}-${Math.round(pesAge)}j`
+        : expAge != null
+          ? `${Math.round(expAge)}j`
+          : '—'
     return (
       <WidgetShell module="horizon" size="mini" kicker="Scenario's" href={href}>
         <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
@@ -57,13 +161,13 @@ export const VrijheidsScenarioWidget = memo(function VrijheidsScenarioWidget({ s
     return (
       <WidgetShell module="horizon" size={size} kicker="Scenario's" href={href}>
         <p className="font-mono text-lg font-semibold tabular-nums text-[var(--ink)]">
-          {expAge != null ? Math.round(expAge) : '—'}
+          {isNotFeasible ? '—' : expAge != null ? Math.round(expAge) : '—'}
         </p>
-        {bandwidth != null && (
-          <p className="mt-0.5 text-xs text-[var(--ink-3)]">
-            &plusmn;{bandwidth}j
-          </p>
-        )}
+        {isNotFeasible ? (
+          <p className="mt-0.5 text-xs text-[var(--ink-3)]">nog niet in zicht</p>
+        ) : bandwidth != null && bandwidth > 0 ? (
+          <p className="mt-0.5 text-xs text-[var(--ink-3)]">&plusmn;{bandwidth}j</p>
+        ) : null}
         <p className="mt-1 text-[10px] text-[var(--ink-4)]">verwacht</p>
       </WidgetShell>
     )
@@ -77,22 +181,22 @@ export const VrijheidsScenarioWidget = memo(function VrijheidsScenarioWidget({ s
           <div className="flex-1 min-w-0 flex flex-col justify-center">
             <p className="text-[10px] uppercase tracking-wider text-[var(--ink-4)] mb-0.5">Verwacht</p>
             <p className="font-mono text-2xl font-semibold tabular-nums text-[var(--ink)]">
-              {expAge != null ? Math.round(expAge) : '—'}
+              {isNotFeasible ? '—' : expAge != null ? Math.round(expAge) : '—'}
             </p>
-            {bandwidth != null && (
-              <p className="mt-1 text-[11px] text-[var(--ink-3)]">
-                &plusmn;{bandwidth}j bandbreedte
-              </p>
-            )}
+            {isNotFeasible ? (
+              <p className="mt-1 text-[11px] text-[var(--ink-3)]">nog niet in zicht</p>
+            ) : bandwidth != null && bandwidth > 0 ? (
+              <p className="mt-1 text-[11px] text-[var(--ink-3)]">&plusmn;{bandwidth}j bandbreedte</p>
+            ) : null}
           </div>
           <div className="flex-1 min-w-0 flex flex-col justify-center">
             <div className="grid grid-cols-3 gap-1">
-              {scenarios.map(({ label, proj, dotColor }) => (
+              {scenarios.map(({ label, age, dotColor }) => (
                 <div key={label} className="text-center">
                   <div className={`mx-auto mb-0.5 h-1.5 w-1.5 rounded-full ${dotColor}`} />
-                  {proj.fireAge != null ? (
+                  {!isNotFeasible && age != null ? (
                     <p className="font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
-                      {Math.round(proj.fireAge)}
+                      {Math.round(age)}
                     </p>
                   ) : (
                     <p className="font-mono text-sm text-[var(--ink-3)]">—</p>
@@ -109,21 +213,21 @@ export const VrijheidsScenarioWidget = memo(function VrijheidsScenarioWidget({ s
 
   // ── XL-size (Double): echte vrijheidstijd-as (jaren vanaf nu) + markers ──
   if (size === 'xl') {
-    const currentAge = fireRange.expected.currentAge
-    const yearsFromNow = (proj: typeof fireRange.expected): number | null =>
-      proj.fireAge != null && proj.currentAge != null
-        ? Math.max(0, proj.fireAge - proj.currentAge)
-        : null
+    if (isNotFeasible) {
+      return (
+        <WidgetShell module="horizon" size={size} kicker="Vrijheidsscenario's" href={href}>
+          <NotFeasibleState />
+        </WidgetShell>
+      )
+    }
 
     const axisMarkers = [
-      { label: 'Optimistisch', years: yearsFromNow(fireRange.optimistic), age: optAge, color: 'var(--positive)', ret: fireRange.optimistic.annualReturn },
-      { label: 'Verwacht', years: yearsFromNow(fireRange.expected), age: expAge, color: 'var(--color-horizon-500)', ret: fireRange.expected.annualReturn },
-      { label: 'Pessimistisch', years: yearsFromNow(fireRange.pessimistic), age: pesAge, color: 'var(--negative)', ret: fireRange.pessimistic.annualReturn },
+      { label: 'Optimistisch', years: optYears, age: optAge, color: 'var(--positive)', ret: optReturn },
+      { label: 'Verwacht', years: expYears, age: expAge, color: 'var(--color-horizon-500)', ret: expReturn },
+      { label: 'Pessimistisch', years: pesYears, age: pesAge, color: 'var(--negative)', ret: pesReturn },
     ]
-    const expYears = yearsFromNow(fireRange.expected)
-    const optYears = yearsFromNow(fireRange.optimistic)
-    const pesYears = yearsFromNow(fireRange.pessimistic)
     const hasAxis = axisMarkers.some((m) => m.years != null)
+    const showBand = optYears != null && pesYears != null && Math.abs(Math.round(pesYears - optYears)) > 0
 
     return (
       <WidgetShell module="horizon" size={size} kicker="Vrijheidsscenario's" href={href}>
@@ -143,18 +247,18 @@ export const VrijheidsScenarioWidget = memo(function VrijheidsScenarioWidget({ s
             ) : (
               <p className="font-serif text-lg leading-snug text-[var(--ink)]">Jouw weg naar volledige vrijheid</p>
             )}
-            {optYears != null && pesYears != null && (
+            {showBand && (
               <p className="mt-0.5 text-[11px] text-[var(--ink-3)]">
                 Bandbreedte{' '}
                 <span className="font-mono tabular-nums text-[var(--ink)]">
-                  {Math.round(optYears)}–{Math.round(pesYears)}
+                  {Math.round(optYears!)}–{Math.round(pesYears!)}
                 </span>{' '}
                 jaar, afhankelijk van je rendement
               </p>
             )}
           </div>
 
-          {/* Vrijheidstijd-as (jaren vanaf nu) met de drie scenario-markers */}
+          {/* Vrijheidstijd-as (jaren vanaf nu) met de scenario-markers */}
           {hasAxis ? (
             <FreedomTimeAxis markers={axisMarkers} />
           ) : (
@@ -201,12 +305,12 @@ export const VrijheidsScenarioWidget = memo(function VrijheidsScenarioWidget({ s
   return (
     <WidgetShell module="horizon" size={size} kicker="Vrijheidsscenario's" href={href}>
       <div className="grid grid-cols-3 gap-2">
-        {scenarios.map(({ label, proj, dotColor }) => (
+        {scenarios.map(({ label, age, dotColor }) => (
           <div key={label} className="text-center">
             <p className="text-[9px] uppercase tracking-wider text-[var(--ink-4)] mb-0.5">{label}</p>
-            {proj.fireAge != null ? (
+            {!isNotFeasible && age != null ? (
               <p className="font-mono text-lg font-semibold tabular-nums text-[var(--ink)]">
-                {Math.round(proj.fireAge)}
+                {Math.round(age)}
               </p>
             ) : (
               <p className="font-mono text-lg text-[var(--ink-3)]">—</p>
@@ -215,15 +319,19 @@ export const VrijheidsScenarioWidget = memo(function VrijheidsScenarioWidget({ s
           </div>
         ))}
       </div>
-      {bandwidth != null && (
+      {isNotFeasible ? (
+        <p className="mt-3 text-center text-xs text-[var(--ink-3)]">
+          Nog niet in zicht — verhoog je spaarcapaciteit om vrijheid dichterbij te brengen
+        </p>
+      ) : bandwidth != null && bandwidth > 0 ? (
         <p className="mt-3 text-center text-xs text-[var(--ink-3)]">
           Bandbreedte:{' '}
           <span className="font-mono font-semibold text-[var(--ink)]">{bandwidth} jaar</span>
         </p>
-      )}
-      {size === 'full' && (
+      ) : null}
+      {size === 'full' && !isNotFeasible && (
         <>
-          {/* Mini SVG age axis with 3 scenario markers */}
+          {/* Mini SVG age axis with scenario markers */}
           {pesAge != null && expAge != null && optAge != null && (
             <ScenarioAxis pesAge={Math.round(pesAge)} expAge={Math.round(expAge)} optAge={Math.round(optAge)} />
           )}
@@ -231,9 +339,9 @@ export const VrijheidsScenarioWidget = memo(function VrijheidsScenarioWidget({ s
               (elk scenario draagt zijn eigen offset-rendement, volgt het door de
               gebruiker ingestelde verwacht rendement). NOOIT hardcoden. */}
           <div className="mt-1.5 grid grid-cols-3 gap-1 text-center text-[10px]">
-            <span className="text-negative font-mono">{formatReturnPct(fireRange.pessimistic.annualReturn)}</span>
-            <span className="text-horizon-600 font-mono font-semibold">{formatReturnPct(fireRange.expected.annualReturn)}</span>
-            <span className="text-positive font-mono">{formatReturnPct(fireRange.optimistic.annualReturn)}</span>
+            <span className="text-negative font-mono">{formatReturnPct(pesReturn)}</span>
+            <span className="text-horizon-600 font-mono font-semibold">{formatReturnPct(expReturn)}</span>
+            <span className="text-positive font-mono">{formatReturnPct(optReturn)}</span>
           </div>
           <p className="mt-1 font-serif italic text-[11px] text-[var(--ink-3)] text-center">
             rendement per scenario
@@ -243,6 +351,54 @@ export const VrijheidsScenarioWidget = memo(function VrijheidsScenarioWidget({ s
     </WidgetShell>
   )
 })
+
+// ── Reached-staat: canoniek 'je bent al volledig vrij' ────────────────────────
+function ReachedState({ size, freedomPct }: { size: WidgetSize; freedomPct?: number }) {
+  if (size === 'mini') {
+    return (
+      <p className="font-mono text-[15px] font-semibold tabular-nums text-horizon-600 leading-none truncate">
+        Vrij
+      </p>
+    )
+  }
+  if (size === 'quarter') {
+    return (
+      <div>
+        <p className="font-serif text-lg font-semibold text-horizon-600 leading-none">Bereikt</p>
+        <p className="mt-1 text-[10px] text-[var(--ink-4)]">volledig vrij</p>
+      </div>
+    )
+  }
+  return (
+    <div className="flex h-full flex-col items-center justify-center text-center gap-1.5">
+      <p className="font-serif text-3xl leading-none text-horizon-600">&infin;</p>
+      <p className="font-serif text-base leading-snug text-[var(--ink)]">
+        Je bent <em className="not-italic font-semibold text-horizon-600">volledig vrij</em>
+      </p>
+      <p className="text-[11px] text-[var(--ink-3)] max-w-[220px]">
+        Je vermogen dekt je uitgaven blijvend — elk scenario blijft binnen bereik.
+      </p>
+      {freedomPct != null && (
+        <p className="font-mono text-xs tabular-nums text-[var(--ink-4)]">
+          {Math.round(freedomPct)}% van je FIRE-doel
+        </p>
+      )}
+    </div>
+  )
+}
+
+// ── Niet-haalbaar-staat (XL) ──────────────────────────────────────────────────
+function NotFeasibleState() {
+  return (
+    <div className="flex h-full flex-col items-center justify-center text-center gap-1.5">
+      <p className="font-serif text-lg leading-snug text-[var(--ink)]">Nog niet in zicht</p>
+      <p className="text-[11px] text-[var(--ink-3)] max-w-[240px]">
+        Met je huidige spaarcapaciteit is volledige vrijheid nog niet in beeld. Elke euro
+        die je opzij zet, brengt je eerste vrije dagen dichterbij.
+      </p>
+    </div>
+  )
+}
 
 // ── Mini SVG: 3 markers on an age axis ──────────────────────────
 function ScenarioAxis({ pesAge, expAge, optAge }: { pesAge: number; expAge: number; optAge: number }) {
@@ -306,7 +462,7 @@ function formatReturnPct(annualReturn: number): string {
   return `${pct.toLocaleString('nl-NL', { maximumFractionDigits: 1 })}%`
 }
 
-// ── XL vrijheidstijd-as: jaren-vanaf-nu met de drie scenario-markers ──────────
+// ── XL vrijheidstijd-as: jaren-vanaf-nu met de scenario-markers ───────────────
 interface AxisMarker {
   label: string
   years: number | null
@@ -316,7 +472,18 @@ interface AxisMarker {
 }
 
 function FreedomTimeAxis({ markers }: { markers: AxisMarker[] }) {
-  const shown = markers.filter((m): m is AxisMarker & { years: number } => m.years != null)
+  const withYears = markers.filter((m): m is AxisMarker & { years: number } => m.years != null)
+  // Bij verwaarloosbare spreiding (bv. de fallback-band viel terug op één punt) tonen
+  // we ÉÉN 'Verwacht'-marker i.p.v. drie botsende labels op dezelfde positie — precies
+  // de degeneratie die W36 leeg/kapot deed ogen.
+  const spread = withYears.length
+    ? Math.max(...withYears.map((m) => m.years)) - Math.min(...withYears.map((m) => m.years))
+    : 0
+  const shown =
+    spread < 1 && withYears.length
+      ? [withYears.find((m) => m.label === 'Verwacht') ?? withYears[Math.floor(withYears.length / 2)]]
+      : withYears
+
   const maxYears = shown.reduce((m, s) => Math.max(m, s.years), 0)
   const axisMax = Math.max(1, Math.ceil(maxYears * 1.1))
 

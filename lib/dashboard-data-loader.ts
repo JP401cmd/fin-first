@@ -63,7 +63,7 @@ import { resolvePotRules, POT_RULES_DEFAULTS, type PotRulesConfig } from '@/lib/
 import { computeRetirementExpenses, computeYearlyMustExpenses, type RetirementExpenseMethod, type BudgetRow, type ChildBudgetRow } from '@/lib/budget-utils'
 import { computeEffectiveLimit, type BudgetRollover, type BudgetAmountOverride } from '@/lib/budget-rollover'
 import { calculateBox3, CURRENT_TAX_YEAR, type TaxYear } from '@/lib/box3-data'
-import { NL_AOW_AGE } from '@/lib/constants'
+import { NL_AOW_AGE, WEERBAARHEID_DISPLAY_MAX } from '@/lib/constants'
 import { hasPartner } from '@/lib/household-type'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import { resolveFireAssumptions, type FireAssumptionRow } from '@/lib/fire-assumptions'
@@ -1191,7 +1191,12 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   if (netWorth > 0 && dob) {
     try {
       const btr = runBacktest(horizonInput)
-      backtestSuccessRate = Math.round(btr.successRate * 100)
+      // Display-clamp op max 99%: nooit 100% tonen (epistemische bescheidenheid —
+      // schijnzekerheid vermijden). Dit is de canonieke bundel-bron, dus alle
+      // consumers (W34 Vermogenspad, backtesting_score, monte_carlo, briefing)
+      // bewegen automatisch mee. NIET in runBacktest clampen: de ruwe fractie
+      // btr.successRate blijft een eerlijke statistiek (0–1) voor regressietests.
+      backtestSuccessRate = Math.min(WEERBAARHEID_DISPLAY_MAX, Math.round(btr.successRate * 100))
       backtestNamedPaths = btr.namedPaths.map(p => ({ label: p.label ?? p.startYear.toString(), success: p.success }))
     } catch {
       backtestSuccessRate = null
@@ -1327,7 +1332,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
 
   const activated = profileResult.data?.last_known_phase !== null
 
-  // Sovereignty level calculation for Jouw Pad widget
+  // Sovereignty level calculation for de soevereiniteitsreis op /mijn
   // Uses stable 3-month average expenses (excl. current month) for the
   // months-covered tiers. Het vrijheids-% is bewust de canonieke `freedomPct`
   // (computeFreedomProgress op FIRE-eligible vermogen ÷ benodigde portfolio,
@@ -1348,7 +1353,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   const sovMonthlyExp = sovereigntyTxRows.filter(isRealTx).reduce((s, t) => s + Math.abs(Number(t.amount)), 0) / 3
   const sovereigntyLevel = computeSovereigntyLevel(netWorth, sovMonthlyExp, freedomPct, hasConsumerDebt, liquidPotWeighted)
   // Runway op de EXACTE grondslag die computeSovereigntyLevel gebruikte (liquide
-  // pot ÷ 3-maands tx-gemiddelde). De Jouw Pad-criteria-checklist consumeert dit
+  // pot ÷ 3-maands tx-gemiddelde). De soevereiniteits-criteria-checklist consumeert dit
   // i.p.v. het top-level `monthsCovered` (dat op effectiveMonthlyExpenses rekent):
   // zelfde noemer als de motor, zodat de checklist het niveau nooit tegenspreekt.
   const sovereigntyMonthsCovered = monthsCoveredFrom(liquidPotWeighted, sovMonthlyExp)
@@ -2537,7 +2542,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     currentPhaseId,
     // Runway op de inclusion-gewogen LIQUIDE pot (spaar/betaal/cash), niet op het
     // totale netto vermogen — een huis is geen direct besteedbare buffer. Zelfde
-    // grondslag als emergencyFund.monthsCovered en de Jouw Pad-buffer-mijlpalen.
+    // grondslag als emergencyFund.monthsCovered en de soevereiniteits-buffer-mijlpalen.
     monthsCovered: monthsCoveredFrom(liquidPotWeighted, effectiveMonthlyExpenses),
     sovereigntyMonthsCovered,
     hasConsumerDebt,

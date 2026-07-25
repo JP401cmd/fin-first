@@ -2,8 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { FirePrognoseWidget } from './fire-prognose-widget'
 import type { DashboardData } from './widget-renderer'
-import { computeEffectiveSwr } from '@/lib/fire-params'
-import { NL_SWR } from '@/lib/horizon-data'
 
 // Stuurbaar perspectief — default personal (zelfde als buiten de provider).
 const mockPerspective = { perspective: 'personal' as string, partnerName: null as string | null }
@@ -129,39 +127,42 @@ function makeData(overrides: Partial<DashboardData> = {}): DashboardData {
   } as DashboardData
 }
 
+// Beleggings-portefeuille: investment 60k @ 7% + crypto 40k @ 0% → waarde-gewogen 4,2%.
+// (cash telt niet mee: geen INVESTMENT_ASSET_TYPE.)
+const PORTFOLIO: DashboardData['assetsByType'] = [
+  { type: 'investment', value: 60000, purchaseValue: 50000, expectedReturn: 0.07 },
+  { type: 'crypto', value: 40000, purchaseValue: 40000, expectedReturn: 0 },
+  { type: 'cash', value: 25000, purchaseValue: 25000, expectedReturn: 0 },
+]
+
 /**
- * Borgt dat het SWR-label de per-gebruiker EFFECTIEVE opnameregel toont
- * (computeEffectiveSwr(grossReturn, inflationRate)) — dezelfde grondslag waarop
- * countdown/voortgang zijn gerekend — en NIET de statische NL_SWR-constante.
- * Bij een niet-default profiel divergeren die twee (consume, don't recompute).
+ * Kaart W3: de profiel-brede 7%-aanname én het 2,84% NL-FIRE-model verdwijnen uit
+ * deze widget. In plaats daarvan toont full-size het WAARDE-gewogen verwacht
+ * rendement over de beleggingsportefeuille, geconsumeerd uit data.assetsByType
+ * (zelfde grondslag als beleggingsrendement-widget — consume, don't recompute).
  */
-describe('FirePrognoseWidget — SWR-label consumeert effectieve opnameregel', () => {
-  it('half-size: toont effectieve SWR bij niet-default profiel, niet NL_SWR', () => {
-    // return 6% + inflatie 3% → effectieve SWR 0,88%; NL_SWR ≈ 2,88%.
-    const data = makeData({ grossReturn: 0.06, inflationRate: 0.03 })
-    const effLabel = (computeEffectiveSwr(0.06, 0.03) * 100).toFixed(2)
-    const nlLabel = (NL_SWR * 100).toFixed(2)
-    expect(effLabel).not.toBe(nlLabel) // guard: profiel is echt niet-default
-
-    render(<FirePrognoseWidget size="half" data={data} />)
-    expect(screen.getByText(`NL FIRE-model (${effLabel}%)`)).toBeInTheDocument()
-    expect(screen.queryByText(`NL FIRE-model (${nlLabel}%)`)).not.toBeInTheDocument()
+describe('FirePrognoseWidget — gewogen portefeuille-rendement i.p.v. 7% / NL-FIRE-model', () => {
+  it('toont geen NL FIRE-model-caption meer (half + full)', () => {
+    const data = makeData({ grossReturn: 0.07, inflationRate: 0.02, assetsByType: PORTFOLIO })
+    const { rerender } = render(<FirePrognoseWidget size="half" data={data} />)
+    expect(screen.queryByText(/NL FIRE-model/)).not.toBeInTheDocument()
+    rerender(<FirePrognoseWidget size="full" data={data} />)
+    expect(screen.queryByText(/NL FIRE-model/)).not.toBeInTheDocument()
   })
 
-  it('full-size: toont effectieve SWR + echt verwacht rendement', () => {
-    const data = makeData({ grossReturn: 0.06, inflationRate: 0.03 })
-    const effLabel = (computeEffectiveSwr(0.06, 0.03) * 100).toFixed(2)
-
+  it('full-size: toont het gewogen portefeuille-rendement, niet de 7%-profielaanname', () => {
+    const data = makeData({ grossReturn: 0.07, inflationRate: 0.02, assetsByType: PORTFOLIO })
     render(<FirePrognoseWidget size="full" data={data} />)
-    expect(screen.getByText(`NL FIRE-model (${effLabel}% opnameregel)`)).toBeInTheDocument()
-    // Secundair: 'Verwacht rendement' toont de echte grossReturn (6,0%), geen filler-label.
-    expect(screen.getByText('6.0%')).toBeInTheDocument()
+    // 60k@7% + 40k@0% over 100k = 4,2% — het gewogen getal, niet 7,0%.
+    expect(screen.getByText('Verwacht rendement (portefeuille)')).toBeInTheDocument()
+    expect(screen.getByText('4.2%')).toBeInTheDocument()
+    expect(screen.queryByText('7.0%')).not.toBeInTheDocument()
   })
 
-  it('valt terug op NL_SWR wanneer profiel-params ontbreken', () => {
-    const data = makeData({ grossReturn: null as unknown as number, inflationRate: null as unknown as number })
-    const nlLabel = (NL_SWR * 100).toFixed(2)
-    render(<FirePrognoseWidget size="half" data={data} />)
-    expect(screen.getByText(`NL FIRE-model (${nlLabel}%)`)).toBeInTheDocument()
+  it('lege portefeuille: geen rendement-rij en geen 7%-fallback', () => {
+    const data = makeData({ grossReturn: 0.07, inflationRate: 0.02, assetsByType: [] })
+    render(<FirePrognoseWidget size="full" data={data} />)
+    expect(screen.queryByText('Verwacht rendement (portefeuille)')).not.toBeInTheDocument()
+    expect(screen.queryByText('7.0%')).not.toBeInTheDocument()
   })
 })

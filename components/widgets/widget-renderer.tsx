@@ -122,10 +122,6 @@ const VasteLastenWidget = dynamic(
   () => import('./vaste-lasten-widget').then(m => ({ default: m.VasteLastenWidget })),
   { loading: WidgetLoadingFallback }
 )
-const JouwPadWidgetWrapper = dynamic(
-  () => import('./jouw-pad-widget-wrapper').then(m => ({ default: m.JouwPadWidgetWrapper })),
-  { loading: WidgetLoadingFallback }
-)
 const GezondheidScoreWidget = dynamic(
   () => import('./gezondheids-score-widget').then(m => ({ default: m.GezondheidScoreWidget })),
   { loading: WidgetLoadingFallback }
@@ -254,7 +250,7 @@ const BudgetHeatmapWidget = dynamic(
   () => import('./budget-heatmap-widget').then(m => ({ default: m.BudgetHeatmapWidget })),
   { loading: WidgetLoadingFallback }
 )
-import { getWidgetDef, WIDGET_HREFS, WIDGET_FEATURE_MAP, BUDGET_WIDGETS } from '@/lib/widget-catalog'
+import { getWidgetDef, WIDGET_HREFS, WIDGET_FEATURE_MAP } from '@/lib/widget-catalog'
 import { dailyExpenseRate } from '@/lib/format'
 import { isFeatureAccessible } from '@/lib/compute-feature-access'
 import type { FeatureAccessMap } from '@/lib/compute-feature-access'
@@ -339,7 +335,7 @@ export function WidgetRenderer({ id, size, data, features }: WidgetRendererProps
 
   // Wrap every widget in an error boundary so a single broken widget
   // doesn't crash the entire dashboard — shows "Kan niet laden" fallback.
-  const widget = renderWidgetById(id, size, data, href, features)
+  const widget = renderWidgetById(id, size, data, href)
   if (!widget) return null
   return <WidgetErrorBoundary widgetId={id}>{widget}</WidgetErrorBoundary>
 }
@@ -350,7 +346,6 @@ function renderWidgetById(
   size: WidgetSize,
   data: DashboardData,
   href: string | undefined,
-  features: FeatureAccessMap,
 ): React.ReactNode {
   switch (id) {
     case 'netto_vermogen':
@@ -385,8 +380,6 @@ function renderWidgetById(
       return <VrijheidsvoortgangWidget size={size} data={data} href={href} />
     case 'vaste_lasten':
       return <VasteLastenWidget size={size} data={data} href={href} />
-    case 'jouw_pad':
-      return <JouwPadWidgetWrapper size={size} data={data} href={href} />
     case 'gezondheids_score':
       return <GezondheidScoreWidget size={size} data={data} href={href} />
     case 'belasting_box3':

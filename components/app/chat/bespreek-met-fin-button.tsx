@@ -21,6 +21,7 @@ export function BesprekMetWillButton({
   detail,
   vraag,
   className = '',
+  stopPropagation = false,
 }: {
   /** Het onderwerp/titel dat besproken wordt (gaat als context naar Fin). */
   onderwerp: string
@@ -29,10 +30,17 @@ export function BesprekMetWillButton({
   /** Optionele afsluitende vraag; default vraagt naar betekenis + actie. */
   vraag?: string
   className?: string
+  /**
+   * Stopt de click-event-propagatie. Nodig wanneer deze knop binnen een
+   * klikbare container (bv. een `WidgetShell`-`<button>`) staat, zodat de klik
+   * niet óók de container-onClick triggert.
+   */
+  stopPropagation?: boolean
 }) {
   const chat = useChatContextOptional()
 
-  function handleClick() {
+  function handleClick(e: React.MouseEvent<HTMLButtonElement>) {
+    if (stopPropagation) e.stopPropagation()
     if (!chat) return
     const slot = vraag ?? 'Wat betekent dit voor mijn situatie, en moet ik er nu al op anticiperen?'
     const message = `Ik wil het volgende onderwerp met je bespreken: "${onderwerp}".${

@@ -56,7 +56,7 @@ function ScrollableContent({ children, className = '' }: { children: React.React
 
   return (
     <div className={`relative flex-1 min-w-0 ${className}`}>
-      <div ref={ref} className="overflow-y-auto h-full min-w-0 scrollbar-thin">
+      <div ref={ref} className="overflow-x-hidden overflow-y-auto h-full min-w-0 scrollbar-thin">
         {children}
       </div>
       {canScroll && (

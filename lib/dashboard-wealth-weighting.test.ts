@@ -5,6 +5,8 @@ import {
   computeAssetsByType,
   computeLiquidPot,
   monthsCoveredFrom,
+  weightedExpectedReturn,
+  INVESTMENT_ASSET_TYPES,
   type WeightableAssetRow,
 } from './dashboard-wealth-weighting'
 import { computeSovereigntyLevel } from './feature-phases'
@@ -97,6 +99,30 @@ describe('dashboard-wealth-weighting — computeAssetsByType (Punt 1)', () => {
     const groups = computeAssetsByType(ASSETS)
     const values = groups.map(g => g.value)
     expect(values).toEqual([...values].sort((a, b) => b - a))
+  })
+})
+
+describe('dashboard-wealth-weighting — weightedExpectedReturn (W3)', () => {
+  // Zoals data.assetsByType in de bundel: expectedReturn als 0..1-factor.
+  const GROUPS = [
+    { type: 'investment', value: 60_000, expectedReturn: 0.07 },
+    { type: 'crypto', value: 40_000, expectedReturn: 0 },
+    { type: 'cash', value: 25_000, expectedReturn: 0 },
+  ]
+
+  it('weegt op waarde binnen de opgegeven scope (beleggingsportefeuille)', () => {
+    // (60k*0,07 + 40k*0) / 100k = 4,2%. Cash valt buiten de scope.
+    expect(weightedExpectedReturn(GROUPS, INVESTMENT_ASSET_TYPES)).toBeCloseTo(0.042, 10)
+  })
+
+  it('zonder scope weegt over alle groepen (cash verwatert het rendement)', () => {
+    // (60k*0,07) / 125k = 3,36%.
+    expect(weightedExpectedReturn(GROUPS)).toBeCloseTo(0.0336, 10)
+  })
+
+  it('levert 0 bij lege of waardeloze scope (aanroeper vangt lege portefeuille af)', () => {
+    expect(weightedExpectedReturn([], INVESTMENT_ASSET_TYPES)).toBe(0)
+    expect(weightedExpectedReturn([{ type: 'cash', value: 25_000, expectedReturn: 0 }], INVESTMENT_ASSET_TYPES)).toBe(0)
   })
 })
 

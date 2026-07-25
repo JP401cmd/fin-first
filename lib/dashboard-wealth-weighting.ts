@@ -71,6 +71,36 @@ export function computeAssetsByType(assets: readonly WeightableAssetRow[]): Asse
 }
 
 /**
+ * Beleggings-asset-types die een verwacht rendement dragen (afschrijvende
+ * assets als cash/auto/huis tellen als 0% en zouden een portefeuille-rendement
+ * verwateren). Gedeeld door de rendement-widgets zodat ze dezelfde grondslag
+ * gebruiken.
+ */
+export const INVESTMENT_ASSET_TYPES = ['investment', 'retirement', 'crypto'] as const
+
+/** Minimale vorm van een asset-type-groep waarover een rendement te wegen is. */
+export type ReturnWeightableGroup = { type: string; value: number; expectedReturn: number }
+
+/**
+ * Waarde-gewogen verwacht rendement (0..1-factor) over een set asset-type-groepen.
+ * Consumeert de reeds (inclusion-)gewogen `expectedReturn` per type uit
+ * `computeAssetsByType` / `data.assetsByType` — géén nieuwe som over losse
+ * bezittingen, dus geen drift tussen de widgets (consume-don't-recompute).
+ * `types` beperkt de scope (bv. `INVESTMENT_ASSET_TYPES`); levert 0 als er geen
+ * waarde in scope is, zodat de aanroeper een lege portefeuille kan afvangen.
+ */
+export function weightedExpectedReturn(
+  groups: readonly ReturnWeightableGroup[],
+  types?: readonly string[],
+): number {
+  const allow = types ? new Set(types) : null
+  const scoped = allow ? groups.filter(g => allow.has(g.type)) : groups
+  const totalValue = scoped.reduce((s, g) => s + g.value, 0)
+  if (totalValue <= 0) return 0
+  return scoped.reduce((s, g) => s + g.value * (g.expectedReturn ?? 0), 0) / totalValue
+}
+
+/**
  * Asset-types die als "liquide pot" (direct besteedbaar) tellen — de grondslag
  * voor buffer/noodfonds/runway. Bewust géén vastgoed/beleggingen/pensioen: een
  * huis is geen opeetbare buffer (CLAUDE.md: nettoVermogen ≠ liquide vermogen).

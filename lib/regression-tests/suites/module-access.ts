@@ -282,19 +282,19 @@ const tests: TestCase[] = [
 
   {
     id: 'mod-widget-foundation',
-    name: 'Foundation widget jouw_pad altijd zichtbaar',
+    name: 'Foundation widget meldingen altijd zichtbaar',
     description: 'Widgets die niet in WIDGET_MODULE_MAP staan zijn altijd zichtbaar, ongeacht modules',
     category: CAT,
     priority: 'critical',
     estimatedDurationMs: 50,
     fn() {
-      // jouw_pad is a foundation widget — not in WIDGET_MODULE_MAP
-      const noModules = isWidgetVisible('jouw_pad', [], [])
-      assertEqual(noModules.visible, true, 'jouw_pad visible with no modules')
-      assertEqual(noModules.reason, 'visible', 'jouw_pad reason with no modules')
+      // meldingen is a foundation widget — not in WIDGET_MODULE_MAP
+      const noModules = isWidgetVisible('meldingen', [], [])
+      assertEqual(noModules.visible, true, 'meldingen visible with no modules')
+      assertEqual(noModules.reason, 'visible', 'meldingen reason with no modules')
 
-      const withModules = isWidgetVisible('jouw_pad', ['budgetteren'], [])
-      assertEqual(withModules.visible, true, 'jouw_pad visible with budgetteren')
+      const withModules = isWidgetVisible('meldingen', ['budgetteren'], [])
+      assertEqual(withModules.visible, true, 'meldingen visible with budgetteren')
     },
   },
 

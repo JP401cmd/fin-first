@@ -171,6 +171,19 @@ describe('BudgettenWidget — states', () => {
     expect(screen.getByText('Activeer budgetteren')).toBeInTheDocument()
   })
 
+  it('full: netto-maandbalans (payoff) blijft zichtbaar bij >=7 budgetten', () => {
+    // Regressie W1: op 'full' werd het maandbalans-blok mee de scroll in geduwd
+    // en onder de vouw afgekapt. Het staat nu als gepinde voet (shrink-0) buiten
+    // de fit-lijst en MOET altijd in beeld zijn — ook met meer dan 7 budgetten.
+    const many = Array.from({ length: 9 }, (_, i) =>
+      B(`b${i}`, `Budget-${i}`, 'expense', 100, 90 - i * 5),
+    )
+    render(<BudgettenWidget size="full" data={makeData(many)} />)
+    expect(screen.getByText('Netto maandbalans')).toBeInTheDocument()
+    // De top-rij (drukste budget) staat er ook; geen lege/afgekapte lijst.
+    expect(screen.getByText('Budget-0')).toBeInTheDocument()
+  })
+
   it('mini toont een op-schema-telling', () => {
     const data = makeData([
       B('a', 'X', 'expense', 100, 50),   // op koers

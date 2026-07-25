@@ -5,8 +5,8 @@ import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import { Compass, Users, UserCheck } from 'lucide-react'
 import type { DashboardData } from './widget-renderer'
-import { NL_SWR, NL_AOW_AGE } from '@/lib/horizon-data'
-import { computeEffectiveSwr } from '@/lib/fire-params'
+import { NL_AOW_AGE } from '@/lib/horizon-data'
+import { weightedExpectedReturn, INVESTMENT_ASSET_TYPES } from '@/lib/dashboard-wealth-weighting'
 import { usePerspective } from '@/components/app/perspective-provider'
 
 interface Props {
@@ -45,13 +45,11 @@ export const FirePrognoseWidget = memo(function FirePrognoseWidget({ size, data,
   const countdownYears = isShared ? sharedYears : personalCd.countdownYears
   const countdownMonths = isShared ? sharedMonths : personalCd.countdownMonths
 
-  // SWR-label consumeren i.p.v. herberekenen: dezelfde per-gebruiker effectieve
-  // opnameregel waarmee de countdown/voortgang zijn gerekend (kernel via loader),
-  // met de statische NL_SWR-constante alleen als fallback. Zusters: pensioen-aow-
-  // widget.tsx / swr-monitor-widget.tsx.
-  const swr = (data.grossReturn != null && data.inflationRate != null)
-    ? computeEffectiveSwr(data.grossReturn, data.inflationRate)
-    : NL_SWR
+  // Verwacht rendement = WAARDE-gewogen over de beleggingsportefeuille, geconsumeerd
+  // uit de canonieke bundel (data.assetsByType) — niet de profiel-brede 7%-aanname.
+  // Zelfde helper/grondslag als beleggingsrendement-widget.tsx (geen drift). 0 =
+  // geen beleggingen in portefeuille → rij verbergen (geen 7%-fallback).
+  const portfolioReturn = weightedExpectedReturn(data.assetsByType, INVESTMENT_ASSET_TYPES)
 
   // Reached / not-feasible state. In shared views we infer from the scalar
   // overrides: 100%+ → reached; a missing/zero countdown with <100% → unknown
@@ -190,9 +188,6 @@ export const FirePrognoseWidget = memo(function FirePrognoseWidget({ size, data,
                   />
                 </div>
               </div>
-              <p className="font-serif italic text-[10px] text-[var(--ink-3)]">
-                NL FIRE-model ({(swr * 100).toFixed(2)}%)
-              </p>
             </div>
           </div>
         </div>
@@ -243,10 +238,10 @@ export const FirePrognoseWidget = memo(function FirePrognoseWidget({ size, data,
       {/* AOW-integratie label + scenario (full-size only) */}
       {size === 'full' && !isReached && !isNotFeasible && (
         <div className="mt-2 space-y-1">
-          {data.grossReturn != null && (
+          {portfolioReturn > 0 && (
             <div className="flex items-center justify-between text-[11px]">
-              <span className="text-[var(--ink-3)]">Verwacht rendement</span>
-              <span className="font-mono tabular-nums text-[var(--ink-2)]">{(data.grossReturn * 100).toFixed(1)}%</span>
+              <span className="text-[var(--ink-3)]">Verwacht rendement (portefeuille)</span>
+              <span className="font-mono tabular-nums text-[var(--ink-2)]">{(portfolioReturn * 100).toFixed(1)}%</span>
             </div>
           )}
           <div className="flex items-center justify-between text-[11px]">
@@ -336,9 +331,6 @@ export const FirePrognoseWidget = memo(function FirePrognoseWidget({ size, data,
               style={{ width: `${Math.min(effectivePct, 100)}%` }}
             />
           </div>
-          <p className="mt-1 font-serif italic text-[11px] text-[var(--ink-3)]">
-            NL FIRE-model ({(swr * 100).toFixed(2)}% opnameregel)
-          </p>
         </div>
       )}
     </WidgetShell>

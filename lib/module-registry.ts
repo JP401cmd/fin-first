@@ -141,7 +141,7 @@ export const PERSONA_MODULE_PRESETS: Record<PersonaId, ModuleId[]> = {
 
 // ── Widget → Module Mapping ──────────────────────────────────────────────────
 // Maps each widget ID to the module that must be active for it to show.
-// Widgets NOT in this map are "foundation" widgets (e.g. jouw_pad, acties, meldingen)
+// Widgets NOT in this map are "foundation" widgets (e.g. acties, meldingen)
 // that are always visible regardless of which modules the user has activated.
 
 export const WIDGET_MODULE_MAP: Record<string, ModuleId> = {

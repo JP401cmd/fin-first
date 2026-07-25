@@ -52,20 +52,13 @@ export const VrijheidsvoortgangWidget = memo(function VrijheidsvoortgangWidget({
       ? `${baseKicker} — ${partnerName ?? 'Partner'}`
       : baseKicker
 
-  // Compute delta: change in freedom percentage vs previous month.
-  // netWorthHistory is per-user only — never shown in household/partner view.
-  // De historie is ruw (vol) netto vermogen; we schalen het met de huidige
-  // housing-filter-ratio (FIRE-eligible / vol) zodat de delta op dezelfde
-  // canonieke grondslag ligt als effectivePct en niet tegenspreekt.
-  const housingFilterRatio = netWorth > 0 ? freedomEligibleNetWorth / netWorth : 1
-  const prevMonthPct = (() => {
-    if (isHouseholdView || isPartnerView) return null
-    const hist = data.netWorthHistory
-    if (!hist || hist.length < 2) return null
-    const prevNw = hist[hist.length - 2].value * housingFilterRatio
-    return effectiveFire > 0 ? Math.min((prevNw / effectiveFire) * 100, 100) : null
-  })()
-  const pctDelta = prevMonthPct !== null ? effectivePct - prevMonthPct : null
+  // 'Deze mnd'-vrijheidsdelta is bewust verwijderd: de vorige waarde werd lokaal
+  // gerold uit netWorthHistory[len-2] op een AFWIJKENDE grondslag (ruw vermogen ×
+  // ratio) t.o.v. de canonieke effectivePct → een gemengde, verkeerd-gelabelde
+  // delta (o.a. de gemelde +19,8%). Er is (nog) geen canonieke prevFreedomPct in
+  // de bundel; een correcte trend hangt aan de snapshot-cadans/ordering (aparte
+  // kaart 392f9e8d). Tot die er is tonen we geen zelf-berekende delta —
+  // 'consume, don't recompute' i.p.v. een botsend cijfer.
 
   // FIRE status copy derives from the personal simulation countdown; in
   // household/partner view we have no shared countdown, so fall back to a
@@ -145,11 +138,6 @@ export const VrijheidsvoortgangWidget = memo(function VrijheidsvoortgangWidget({
                 {effectivePct.toFixed(1)}%
               </p>
             </div>
-            {pctDelta !== null && (
-              <span className={`text-[11px] font-mono tabular-nums ${pctDelta >= 0 ? 'text-positive' : 'text-negative'}`}>
-                {pctDelta >= 0 ? '+' : ''}{pctDelta.toFixed(1)}% deze mnd
-              </span>
-            )}
           </div>
           <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
             {/* Progress bar */}
@@ -181,20 +169,13 @@ export const VrijheidsvoortgangWidget = memo(function VrijheidsvoortgangWidget({
   // toont "waar sta ik nu + hoe snel groei ik": ring, bedragen en groei/mnd.
   const milestones = [25, 50, 75, 100] as const
 
-  // Monthly growth rate from netWorthHistory — per-user only, so it is
-  // suppressed in shared views.
-  // Geschaald met de housing-filter-ratio zodat groei én restbedrag op de
-  // FIRE-eligible grondslag liggen (consistent met effectivePct).
-  const monthlyGrowthRate = (() => {
-    if (isHouseholdView || isPartnerView) return null
-    const hist = data.netWorthHistory
-    if (!hist || hist.length < 2) return null
-    const oldest = hist[0].value
-    const newest = hist[hist.length - 1].value
-    const months = hist.length - 1
-    if (oldest <= 0 || months <= 0) return null
-    return ((newest - oldest) / months) * housingFilterRatio
-  })()
+  // Groei/mnd = CANONIEKE bundel-vermogensmutatie (data.netWorthDelta =
+  // snapshot-Δ met cashflow-fallback, loader netWorthDeltaForCard). Zelfde bron
+  // die de Maandoverzicht-rapportkaart én de 'Vermogen'-tegel hiernaast tonen →
+  // nooit meer een widget-lokale, botsende groei-som over netWorthHistory
+  // ('consume, don't recompute'). Per-user grootheid, dus in gedeelde views
+  // onderdrukt (het huishouden/partner heeft geen eigen delta in de bundel).
+  const monthlyGrowthRate = (isHouseholdView || isPartnerView) ? null : data.netWorthDelta
 
   // Restbedrag tot volledige vrijheid — zelfde canonieke paar als effectivePct
   // (FIRE-eligible vermogen vs. doelportfolio), puur presentationeel.
@@ -309,11 +290,6 @@ export const VrijheidsvoortgangWidget = memo(function VrijheidsvoortgangWidget({
               <span className="font-mono text-2xl sm:text-3xl font-bold tabular-nums text-[var(--ink)] leading-none">
                 {effectivePct.toFixed(1)}%
               </span>
-              {pctDelta !== null && (
-                <span className={`mt-1 text-[11px] font-mono tabular-nums ${pctDelta >= 0 ? 'text-positive' : 'text-negative'}`}>
-                  {pctDelta >= 0 ? '+' : ''}{pctDelta.toFixed(1)}%
-                </span>
-              )}
             </div>
           </div>
         </div>

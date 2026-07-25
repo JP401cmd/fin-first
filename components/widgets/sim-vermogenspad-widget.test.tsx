@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { SimVermogenspadWidget } from './sim-vermogenspad-widget'
 import type { DashboardData } from './widget-renderer'
+import { WEERBAARHEID_DISPLAY_MAX } from '@/lib/constants'
 
 // jsdom mist ResizeObserver (WidgetShell), IntersectionObserver + matchMedia
 // (useInViewAnimation). De as-labels renderen los van de animatie, maar de
@@ -147,5 +148,27 @@ describe('SimVermogenspadWidget — slaagkans-badge consumeert data.backtestSucc
     render(<SimVermogenspadWidget size="full" data={data} />)
     expect(screen.queryByText(/Slaagkans/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/risico/i)).not.toBeInTheDocument()
+  })
+
+  // "Nooit 100%": de canonieke bundelwaarde (dashboard-data-loader) clampt de
+  // getoonde slaagkans op WEERBAARHEID_DISPLAY_MAX. De widget consumeert dat
+  // getal 1-op-1 — hier pinnen we zowel het contract (=99, nooit 100) als de
+  // weergave op de gedeelde grens.
+  it('display-cap: contract is 99, nooit 100 (epistemische bescheidenheid)', () => {
+    expect(WEERBAARHEID_DISPLAY_MAX).toBe(99)
+    // Spiegelt de loader-expressie: een ruwe fractie van 1.0 (100% van de
+    // startjaren slaagde) mag nooit als 100% verschijnen.
+    const clamp = (fraction: number) => Math.min(WEERBAARHEID_DISPLAY_MAX, Math.round(fraction * 100))
+    expect(clamp(1.0)).toBe(99)
+    expect(clamp(0.999)).toBe(99)
+    expect(clamp(0.94)).toBe(94) // normale waarden passeren ongemoeid
+    expect(clamp(0)).toBe(0)
+  })
+
+  it('full-size: toont de geclampte "Slaagkans 99%", nooit 100%', () => {
+    const data = makeData({ simRows: makeDepleteRows(), backtestSuccessRate: WEERBAARHEID_DISPLAY_MAX } as Partial<DashboardData>)
+    render(<SimVermogenspadWidget size="full" data={data} />)
+    expect(screen.getByText('Slaagkans 99%')).toBeInTheDocument()
+    expect(screen.queryByText('Slaagkans 100%')).not.toBeInTheDocument()
   })
 })

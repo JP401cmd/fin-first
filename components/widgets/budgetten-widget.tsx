@@ -179,13 +179,17 @@ interface FittingListProps {
   hasEntered: boolean
   /** Entrance-animatie-ref van useInViewAnimation; gemerged met de meet-ref. */
   inViewRef:  React.RefObject<HTMLDivElement | null>
+  /** Verticale uitlijning binnen de gemeten hoogte. 'center' (quarter/half:
+   *  balans in de lege tegel) of 'start' (full: rijen boven een gepinde voet). */
+  align?:     'center' | 'start'
 }
 
-function FittingBudgetList({ ranked, desiredN, rich, hasEntered, inViewRef }: FittingListProps) {
+function FittingBudgetList({ ranked, desiredN, rich, hasEntered, inViewRef, align = 'center' }: FittingListProps) {
   // rich (half): 3-laags rij ~38px, gap-1.5 (6px). compact (quarter): 2-laags rij ~24px, gap-2 (8px).
   const estRowH  = rich ? 40 : 26
   const gapPx    = rich ? 6  : 8
   const gapClass = rich ? 'gap-1.5' : 'gap-2'
+  const justify  = align === 'start' ? 'justify-start' : 'justify-center'
 
   const { ref: measureRef, capacity } = useFittingRowCount(estRowH, gapPx)
   const { visible, hidden, showMore } = fittingRowPlan(capacity, desiredN, ranked.length)
@@ -197,7 +201,7 @@ function FittingBudgetList({ ranked, desiredN, rich, hasEntered, inViewRef }: Fi
   }
 
   return (
-    <div ref={setRefs} className={`flex h-full flex-col justify-center overflow-hidden ${gapClass}`}>
+    <div ref={setRefs} className={`flex h-full flex-col ${justify} overflow-hidden ${gapClass}`}>
       {rows.map((b) => (
         <TopBudgetRow key={b.id} budget={b} hasEntered={hasEntered} rich={rich} />
       ))}
@@ -213,7 +217,6 @@ function FittingBudgetList({ ranked, desiredN, rich, hasEntered, inViewRef }: Fi
 // ── Hoofd-component ────────────────────────────────────────────
 
 export const BudgettenWidget = memo(function BudgettenWidget({ size, data, href }: Props) {
-  const isFullSize = size === 'full'
   const { budgetTotals, monthlyExpenses, topBudgets } = data
   const { ref: inViewRef, hasEntered } = useInViewAnimation({ duration: 600 })
 
@@ -324,43 +327,55 @@ export const BudgettenWidget = memo(function BudgettenWidget({ size, data, href 
     : null
   const freedomStr = freedomTime ? formatFreedomTimeString(freedomTime, 'short') : null
 
-  const fullRows = ranked.slice(0, 7)
-
+  // ── Full: gemeten fit-lijst (top-7) + gepinde netto-maandbalans-voet ──
+  // De maandbalans is de payoff (samenvatting/vrijheidstijd) en MOET altijd in
+  // beeld: hij staat als niet-scrollende voet (shrink-0) onder een fit-lijst die
+  // zich aan de resterende kaarthoogte aanpast — nooit een half-afgesneden rij,
+  // nooit de samenvatting onder de vouw (voorheen: slice(0,7) in een scroll).
   return (
     <WidgetShell module="kern" size={size} kicker="Budgetten" href={href}>
 
-      <div ref={inViewRef} className="flex flex-col gap-2">
-        {fullRows.map((b) => (
-          <TopBudgetRow key={b.id} budget={b} hasEntered={hasEntered} rich />
-        ))}
-      </div>
+      <div className="flex h-full flex-col">
+        <div className="min-h-0 flex-1">
+          <FittingBudgetList
+            ranked={ranked}
+            desiredN={7}
+            rich
+            align="start"
+            hasEntered={hasEntered}
+            inViewRef={inViewRef}
+          />
+        </div>
 
-      {/* ── Netto maandbalans — vrijheidstijd-samenvatting ── */}
-      <div className="mt-3 border-t border-dashed border-[var(--border-ed)]" />
-      <div className={`mt-3 rounded-[var(--r-md)] px-3 py-2.5 ${isNettoPositief ? 'bg-positive/15' : 'bg-negative/15'}`}>
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
-              Netto maandbalans
-            </p>
-            <p className="mt-0.5 font-serif italic text-[11px] text-[var(--ink-4)]">
-              Inkomen min alle uitgaven
-            </p>
-          </div>
-          <div className="text-right">
-            <p className={isNettoPositief ? 'text-positive' : 'text-negative'}>
-              <MaskedAmount
-                value={nettoBalans}
-                signPrefix={isNettoPositief ? '+' : ''}
-                tone="kern"
-                className="text-2xl font-semibold"
-              />
-            </p>
-            {freedomStr && (
-              <p className="font-serif italic text-[11px] text-[var(--ink-3)]">
-                {isNettoPositief ? `+${freedomStr} vrijheid` : `${freedomStr} achter`}
-              </p>
-            )}
+        {/* ── Netto maandbalans — vrijheidstijd-samenvatting (gepinde voet) ── */}
+        <div className="shrink-0">
+          <div className="mt-3 border-t border-dashed border-[var(--border-ed)]" />
+          <div className={`mt-3 rounded-[var(--r-md)] px-3 py-2.5 ${isNettoPositief ? 'bg-positive/15' : 'bg-negative/15'}`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
+                  Netto maandbalans
+                </p>
+                <p className="mt-0.5 font-serif italic text-[11px] text-[var(--ink-4)]">
+                  Inkomen min alle uitgaven
+                </p>
+              </div>
+              <div className="text-right">
+                <p className={isNettoPositief ? 'text-positive' : 'text-negative'}>
+                  <MaskedAmount
+                    value={nettoBalans}
+                    signPrefix={isNettoPositief ? '+' : ''}
+                    tone="kern"
+                    className="text-2xl font-semibold"
+                  />
+                </p>
+                {freedomStr && (
+                  <p className="font-serif italic text-[11px] text-[var(--ink-3)]">
+                    {isNettoPositief ? `+${freedomStr} vrijheid` : `${freedomStr} achter`}
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>

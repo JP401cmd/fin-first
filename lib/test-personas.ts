@@ -21,12 +21,6 @@ const S = BUDGET_SLUGS
 
 // ── Helper: relative date from today ──────────────────────────
 
-function daysAgo(days: number): string {
-  const d = new Date()
-  d.setDate(d.getDate() - days)
-  return d.toISOString().split('T')[0]
-}
-
 function monthsAgo(months: number, day = 1): string {
   const d = new Date()
   d.setMonth(d.getMonth() - months)
@@ -737,7 +731,7 @@ const daanData: PersonaData = {
     rebalance_threshold: 3, // conservatief — lage drempel, snel signaal
     widget_prefs: makeWidgetPrefs([
       'netto_vermogen', 'cash_flow', 'spaarquote', 'doelen',
-      { id: 'fire_prognose', size: 'full' }, 'acties', 'trend_sparen', 'jouw_pad',
+      { id: 'fire_prognose', size: 'full' }, 'acties', 'trend_sparen',
     ]),
     active_modules: ['budgetteren', 'vermogensregistratie'],
   },

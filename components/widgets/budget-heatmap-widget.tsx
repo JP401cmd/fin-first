@@ -91,7 +91,11 @@ export const BudgetHeatmapWidget = memo(function BudgetHeatmapWidget({ size, dat
   }, [data.heatmapExpenseGroups])
 
   const handleNavigate = useCallback((budgetId: string) => {
-    router.push(`/core/budgets/${budgetId}`)
+    // Canonieke categorie-view: opent het budget als ShellOverlay-pane via de
+    // deeplink-param (`?budget=`, single source = searchParams in BudgetsClient) —
+    // conform de overzicht-klik-conventie + WIDGET_HREFS. Werkt voor parent- én
+    // child-id's. Was `/core/budgets/[id]` (backing-/redirect-route).
+    router.push(`/overzicht/cashflow/budget?budget=${budgetId}`)
   }, [router])
 
   if (sections.length === 0 || sections[0].groups.length === 0) {
@@ -116,7 +120,10 @@ export const BudgetHeatmapWidget = memo(function BudgetHeatmapWidget({ size, dat
 
   return (
     <WidgetShell module="kern" size={size} kicker="Uitgaven Heatmap" href={href}>
-      <div className="h-full overflow-hidden">
+      {/* h-full geeft de treemap een definitieve hoogte (fit-to-tile); GEEN
+          overflow-hidden hier — WidgetShell klemt de tegel al, en de full-mobiele
+          gestapelde lijst moet via WidgetShell's ScrollableContent kunnen scrollen. */}
+      <div className="h-full min-w-0">
         <BudgetHeatmap
           sections={sections}
           spending={data.heatmapSpending ?? {}}

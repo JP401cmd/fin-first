@@ -13,6 +13,14 @@ interface Props {
 
 const MONTH_LABELS = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec']
 
+// Grondslag-duiding: dit getal is GEEN eigen som en GEEN netto-vermogen- of
+// dagtarief-afleiding. Het is de som van de per-actie geschatte vrijheidsdagen-
+// impact (freedom_days_impact), gegroepeerd op de maand waarin je de actie
+// afrondde. Zie lib/freedom-days-trend.ts / lib/dashboard-data-loader.ts.
+const GRONDSLAG_FULL =
+  'Som van de geschatte vrijheidsdagen-impact van acties die je die maand afrondde. De impact per actie is een schatting — door Fin voorgesteld of zelf ingevuld.'
+const GRONDSLAG_SHORT = 'Van je afgeronde acties (schatting)'
+
 function monthAbbr(monthStr: string): string {
   const idx = parseInt(monthStr.split('-')[1], 10) - 1
   return MONTH_LABELS[idx] ?? monthStr.slice(5)
@@ -133,13 +141,21 @@ export const VrijheidsdagenMaandWidget = memo(function VrijheidsdagenMaandWidget
   if (size === 'half') {
     return (
       <WidgetShell module="wil" size={size} kicker="Gewonnen vrijheidsdagen/maand" href={href}>
-        <div className="flex items-center gap-3 mb-2">
+        <div className="flex items-center gap-3 mb-1">
           <span className="font-mono text-lg font-semibold tabular-nums text-[var(--ink)]">
             {currentDays}
           </span>
           <span className="text-xs text-[var(--ink-3)]">dagen deze maand</span>
         </div>
         <BarChart months={months.slice(-8)} compact />
+        {/* Grondslag-duiding — één regel (truncate), volledige uitleg via title.
+            Voorkomt dat de gebruiker gokt waar het getal vandaan komt. */}
+        <p
+          className="mt-1.5 font-serif italic text-[10px] leading-none text-[var(--ink-4)] truncate"
+          title={GRONDSLAG_FULL}
+        >
+          {GRONDSLAG_SHORT}
+        </p>
       </WidgetShell>
     )
   }
@@ -185,6 +201,12 @@ export const VrijheidsdagenMaandWidget = memo(function VrijheidsdagenMaandWidget
           })()}
         </p>
       )}
+
+      {/* Grondslag-duiding — maakt expliciet waarop het getal is gebaseerd
+          (geen netto-vermogen/dagtarief, maar afgeronde acties × geschatte impact). */}
+      <p className="mt-2 font-serif italic text-[11px] leading-snug text-[var(--ink-4)]">
+        {GRONDSLAG_FULL}
+      </p>
     </WidgetShell>
   )
 })

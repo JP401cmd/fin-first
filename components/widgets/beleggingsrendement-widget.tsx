@@ -6,6 +6,7 @@ import type { DashboardData } from './widget-renderer'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { calculateFreedomTime, formatFreedomTimeString, dailyExpenseRate } from '@/lib/format'
 import { DEFAULT_RETURN } from '@/lib/constants'
+import { weightedExpectedReturn, INVESTMENT_ASSET_TYPES } from '@/lib/dashboard-wealth-weighting'
 import { TrendingUp } from 'lucide-react'
 
 interface Props {
@@ -21,11 +22,8 @@ const ASSET_LABELS: Record<string, string> = {
   crypto: 'Crypto',
 }
 
-/** Investment-type asset categories */
-const INVESTMENT_TYPES = ['investment', 'retirement', 'crypto']
-
 export const BeleggingsrendementWidget = memo(function BeleggingsrendementWidget({ size, data, href }: Props) {
-  const investmentAssets = data.assetsByType.filter(a => INVESTMENT_TYPES.includes(a.type))
+  const investmentAssets = data.assetsByType.filter(a => (INVESTMENT_ASSET_TYPES as readonly string[]).includes(a.type))
   const totalInvestmentValue = investmentAssets.reduce((s, a) => s + a.value, 0)
   const totalInvestmentCost = investmentAssets.reduce((s, a) => s + a.purchaseValue, 0)
 
@@ -39,14 +37,13 @@ export const BeleggingsrendementWidget = memo(function BeleggingsrendementWidget
     : 0
   const sinceInceptionAbsolute = totalInvestmentValue - totalInvestmentCost
 
-  // Verwacht rendement: asset-gewogen uit de canonieke bundel (assetsByType[].expectedReturn),
-  // profiel-breed grossReturn alleen als fallback — voorkomt drift met de holdings-widget.
-  const weightedExpectedReturn = totalInvestmentValue > 0
-    ? investmentAssets.reduce((s, a) => s + a.value * (a.expectedReturn ?? 0), 0) / totalInvestmentValue
-    : 0
+  // Verwacht rendement: asset-gewogen uit de canonieke bundel (assetsByType[].expectedReturn)
+  // via de gedeelde helper — profiel-breed grossReturn alleen als fallback. Zelfde
+  // grondslag als fire-prognose-widget.tsx, dus geen drift tussen de widgets.
+  const portfolioReturn = weightedExpectedReturn(data.assetsByType, INVESTMENT_ASSET_TYPES)
   // Fallback via de canonieke constante (lib/constants.ts) — geen magic number;
   // data.grossReturn komt normaliter per gebruiker uit resolveFireParams.
-  const expectedReturnPct = (weightedExpectedReturn > 0 ? weightedExpectedReturn : (data.grossReturn || DEFAULT_RETURN)) * 100
+  const expectedReturnPct = (portfolioReturn > 0 ? portfolioReturn : (data.grossReturn || DEFAULT_RETURN)) * 100
 
   // Vrijheidstijd-framing van de absolute winst/verlies ("Geld is opgeslagen tijd").
   const dailyExp = data.dailyExpenseRate ?? dailyExpenseRate(data.monthlyExpenses)
@@ -131,12 +128,12 @@ export const BeleggingsrendementWidget = memo(function BeleggingsrendementWidget
             <span className={rowColor}>
               <MaskedAmount value={gain} tone="kern" />
             </span>
-            <span className={`font-mono tabular-nums w-14 text-right ${rowColor}`}>
+            <span className={`font-mono tabular-nums w-16 shrink-0 text-right ${rowColor}`}>
               {gain >= 0 ? '+' : ''}{pct.toFixed(1)}%
             </span>
           </>
         ) : (
-          <span className={`font-mono tabular-nums w-14 text-right ${rowColor}`}>onbekend</span>
+          <span className={`font-mono tabular-nums w-16 shrink-0 text-right ${rowColor}`}>onbekend</span>
         )}
       </div>
     )

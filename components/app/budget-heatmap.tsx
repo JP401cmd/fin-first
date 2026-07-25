@@ -78,21 +78,32 @@ interface HeatmapConstants {
 }
 
 function getHeatmapConstants(size?: WidgetSize): HeatmapConstants {
+  // NB: viewBox-aspects zijn per widget-formaat afgestemd op de BREDE/LAGE
+  // tegel-verhouding (content-area) zodat de treemap — die nu met
+  // preserveAspectRatio="meet" IN de vaste tegelhoogte past — zo min mogelijk
+  // letterbox-witruimte overhoudt. De SVG loopt daardoor nooit meer over.
   switch (size) {
     // NB: 'mini' rendert BudgetHeatmap niet — de widget toont daar bewust een
     // categorie-telling i.p.v. een kleur-only mini-treemap (na de overflow-fix,
     // commit edd7ca08). Er is daarom geen 'mini'-constantenpad meer.
     case 'quarter':
-      return { VB_W: 400, VB_H: 300, CELL_GAP: 2, CELL_RADIUS: 4, SECTION_LABEL_H: 12 }
+      // Tegel ~1 kolom, kort → aspect ~2.0.
+      return { VB_W: 400, VB_H: 200, CELL_GAP: 2, CELL_RADIUS: 4, SECTION_LABEL_H: 12 }
     case 'half':
-      return { VB_W: 800, VB_H: 250, CELL_GAP: 2, CELL_RADIUS: 5, SECTION_LABEL_H: 14 }
+      // Tegel ~2 kolommen, kort → aspect ~4.2.
+      return { VB_W: 800, VB_H: 190, CELL_GAP: 2, CELL_RADIUS: 5, SECTION_LABEL_H: 14 }
     case 'xl':
-      // Double (lg: 4 kolommen × 2 rijen) = dubbele breedte t.o.v. full bij
-      // gelijke hoogte → bredere viewBox (aspect ~3.2) zodat de cellen groter en
-      // labelrijker worden i.p.v. verticaal te stapelen.
-      return { VB_W: 1600, VB_H: 500, CELL_GAP: 3, CELL_RADIUS: 6, SECTION_LABEL_H: 18 }
+      // Double (lg: 4 kolommen × 2 rijen) = brede, lage tegel; de legenda eet
+      // verticale ruimte → nóg breder effectief SVG-vlak (aspect ~5.0).
+      return { VB_W: 1600, VB_H: 320, CELL_GAP: 3, CELL_RADIUS: 6, SECTION_LABEL_H: 18 }
     case 'full':
+      // Full = 2 kol × 2 rijen; met legenda eronder is het SVG-vlak breed/laag
+      // (aspect ~2.4). Bewust APART van `default` zodat de vrijstaande
+      // budgetten-pagina (size undefined) zijn hoge, multi-sectie viewBox houdt.
+      return { VB_W: 800, VB_H: 340, CELL_GAP: 3, CELL_RADIUS: 6, SECTION_LABEL_H: 18 }
     default:
+      // size === undefined → vrijstaande /overzicht/cashflow/budget-heatmap:
+      // natuurlijke hoogte (h-auto), kan meerdere secties stapelen → hoog.
       return { VB_W: 800, VB_H: 500, CELL_GAP: 3, CELL_RADIUS: 6, SECTION_LABEL_H: 18 }
   }
 }
@@ -630,7 +641,14 @@ function MobileCombinedHeatmap({
                                 transform: hasEntered ? 'scale(1)' : 'scale(0.92)',
                                 transition: `opacity 0.4s ease-out ${idx * 40}ms, transform 0.4s ease-out ${idx * 40}ms`,
                               }}
-                              onClick={() => onNavigate(item.id)}
+                              onClick={(e) => {
+                                // Blok wint van de omhullende tegel-<Link> (WidgetShell):
+                                // stop de bubble zodat déze deeplink (categorie-pane)
+                                // opent i.p.v. de tegel-href.
+                                e.preventDefault()
+                                e.stopPropagation()
+                                onNavigate(item.id)
+                              }}
                             >
                               <span className="truncate text-[10px] font-medium text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.3)]">
                                 {item.name}
@@ -710,10 +728,17 @@ function TreemapCell({
       aria-label={ariaLabel}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
-      onClick={onClick}
+      onClick={(e) => {
+        // Cel wint van de omhullende tegel-<Link> (WidgetShell): stop de bubble
+        // zodat de per-blok deeplink (categorie-pane) opent i.p.v. de tegel-href.
+        e.preventDefault()
+        e.stopPropagation()
+        onClick()
+      }}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault()
+          e.stopPropagation()
           onClick()
         }
       }}
@@ -880,18 +905,40 @@ export const BudgetHeatmap = memo(function BudgetHeatmap({
   // 'quarter' is te krap voor de hover-tooltip/mousemove (kleine cellen).
   const isCompact = size === 'quarter'
 
+  // ── Layout-modus ────────────────────────────────────────────
+  // Widget-context (concrete `size`): de treemap MOET binnen de vaste
+  // tegelhoogte passen → fit-to-height (SVG h-full + preserveAspectRatio meet,
+  // letterbox i.p.v. overflow). Vrijstaande budgetten-pagina (`size` undefined):
+  // natuurlijke hoogte (h-auto, hoogte-uit-breedte) zoals voorheen — ongewijzigd.
+  const constrainToHeight = size !== undefined
+  // Grote formaten (full/xl) + de vrijstaande pagina houden de mobiele
+  // gestapelde lijst; compacte tegels (quarter/half) tonen op mobiel de fit-
+  // treemap i.p.v. de (overlopende) lijst.
+  const showStackedMobile = !size || size === 'full' || size === 'xl'
+  // Legenda alleen waar er ruimte is (full/xl + vrijstaande pagina).
+  const showLegend = !size || size === 'full' || size === 'xl'
+
+  // SVG-blok: fit-to-height in widget-context; op mobiel verborgen zodra de
+  // gestapelde lijst het overneemt.
+  const svgBlockClass = !constrainToHeight
+    ? (showStackedMobile ? 'hidden md:block' : 'block')
+    : showStackedMobile
+      ? 'hidden md:flex md:min-h-0 md:flex-1 md:flex-col'
+      : 'flex min-h-0 flex-1 flex-col'
+
   // Edge case: no sections with data
   const hasData = sections.some((s) => s.groups.length > 0)
   if (!hasData) return null
 
   return (
-    <div ref={ref}>
-      <div ref={containerRef} className="relative">
-        {/* Desktop: SVG treemap (hidden below md) */}
-        <div className="hidden md:block">
+    <div ref={ref} className={constrainToHeight ? 'flex h-full flex-col' : undefined}>
+      {/* SVG treemap — desktop altijd; op mobiel óók voor compacte (quarter/half)
+          tegels. In widget-context past de SVG binnen de tegelhoogte (fit). */}
+      <div className={svgBlockClass}>
+        <div ref={containerRef} className={`relative${constrainToHeight ? ' min-h-0 flex-1' : ''}`}>
           <svg
             viewBox={`0 0 ${VB_W} ${totalVbH}`}
-            className="h-auto w-full"
+            className={constrainToHeight ? 'h-full w-full' : 'h-auto w-full'}
             preserveAspectRatio="xMidYMid meet"
             onMouseMove={isCompact ? undefined : handleMouseMove}
             style={{
@@ -961,16 +1008,32 @@ export const BudgetHeatmap = memo(function BudgetHeatmap({
             ))}
           </svg>
 
-          {/* Attach mousemove on the container for smooth tooltip tracking */}
-          {tooltip && (
-            <div
-              className="absolute inset-0"
-              style={{ pointerEvents: 'none' }}
-            />
+          {/* Tooltip (desktop only) — binnen de positionerende containerRef zodat
+              de mouse-coördinaten exact kloppen; op mobiel/quarter uitgeschakeld. */}
+          {!isCompact && tooltip && (
+            <div className="hidden md:block">
+              <HeatmapTooltip
+                data={tooltip}
+                previousSpending={previousSpending}
+                containerRef={containerRef}
+              />
+            </div>
           )}
         </div>
 
-        {/* Mobile: stacked sections with groups (visible below md) */}
+        {/* Legenda binnen het SVG-blok (fit-mode): flex-col met SVG=flex-1 en
+            legenda=shrink-0 zodat de treemap krimpt en de legenda in de tegel
+            blijft i.p.v. eronder weg te vallen. */}
+        {constrainToHeight && showLegend && (
+          <div className="shrink-0">
+            <CombinedHeatmapLegend />
+          </div>
+        )}
+      </div>
+
+      {/* Mobiel: gestapelde secties — alleen grote formaten (full/xl) + de
+          vrijstaande pagina; scrollt via WidgetShell's ScrollableContent. */}
+      {showStackedMobile && (
         <div className="md:hidden">
           <MobileCombinedHeatmap
             sections={sections}
@@ -979,22 +1042,13 @@ export const BudgetHeatmap = memo(function BudgetHeatmap({
             onNavigate={onNavigate}
             hasEntered={hasEntered}
           />
+          {constrainToHeight && showLegend && <CombinedHeatmapLegend />}
         </div>
+      )}
 
-        {/* Tooltip (desktop only, positioned via mouse coords — disabled at mini/quarter) */}
-        {!isCompact && tooltip && (
-          <div className="hidden md:block">
-            <HeatmapTooltip
-              data={tooltip}
-              previousSpending={previousSpending}
-              containerRef={containerRef}
-            />
-          </div>
-        )}
-      </div>
-
-      {/* Combined legend — only at full/xl size where there's room (hidden at half — too compact) */}
-      {(size === 'full' || size === 'xl' || !size) && <CombinedHeatmapLegend />}
+      {/* Legenda vrijstaande pagina (natuurlijke hoogte): onderaan, buiten de
+          fit-flex — ongewijzigd t.o.v. voorheen. */}
+      {!constrainToHeight && showLegend && <CombinedHeatmapLegend />}
     </div>
   )
 })

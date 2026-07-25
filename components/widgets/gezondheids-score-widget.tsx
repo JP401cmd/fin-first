@@ -4,11 +4,12 @@ import { memo, useState } from 'react'
 import Link from 'next/link'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
-import { Activity, TrendingUp, TrendingDown, Minus, ChevronRight, Lightbulb, ExternalLink } from 'lucide-react'
+import { Activity, TrendingUp, TrendingDown, Minus, ChevronRight, ExternalLink } from 'lucide-react'
 import type { DashboardData } from './widget-renderer'
 import type { HealthPillar, HealthScore } from '@/lib/financial-health'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
+import { BesprekMetWillButton } from '@/components/app/chat/bespreek-met-fin-button'
 import { WidgetEmpty } from './widget-empty'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 
@@ -443,9 +444,17 @@ export const GezondheidScoreWidget = memo(function GezondheidScoreWidget({ size,
   }
 
   // ── Full ─────────────────────────────────────────────────
-  // Sort pillars weakest first for tips
+  // Pijlers zwakste-eerst; de 3 zwakste met ruimte (<80) vormen de gespreks-
+  // context voor Fin. Puur deterministisch opgebouwd uit de canonieke pijler-
+  // data (ADR 0008) — geen widget-eigen herberekening.
   const weakest = [...health.pillars].sort((a, b) => a.score - b.score)
-  const tips = weakest.slice(0, 2).filter(p => p.score < 80)
+  const focus = weakest.filter(p => p.score < 80).slice(0, 3)
+  const finDetail =
+    focus.length > 0
+      ? `De zwakste pijlers zijn: ${focus
+          .map(p => `${p.name} (${p.score}/100, nu ${p.rawValue}) — ${p.improvementTip}`)
+          .join('; ')}.`
+      : `Alle pijlers staan er goed voor; de laagste is ${weakest[0].name} (${weakest[0].score}/100).`
 
   return (
     <WidgetShell module="horizon" size={size} kicker="Gezondheid" onClick={() => setShowKassabon(true)}>
@@ -478,25 +487,18 @@ export const GezondheidScoreWidget = memo(function GezondheidScoreWidget({ size,
         </div>
       </div>
 
-      {/* Tips */}
-      {tips.length > 0 && (
-        <div className="mt-2 rounded-[var(--r-sm)] border border-horizon-200 bg-horizon-50/50 p-2">
-          <div className="flex items-center gap-1.5 mb-1">
-            <Lightbulb className="h-3 w-3 text-horizon-500" />
-            <span className="text-[10px] font-semibold text-horizon-700">Verbeterpunten</span>
-          </div>
-          <ul className="space-y-0.5">
-            {tips.map(p => (
-              <li key={p.id} className="text-[10px] text-[var(--ink-2)] leading-snug">
-                <span className="font-medium">{p.name}:</span> {p.improvementTip}{' '}
-                <Link href={p.actionHref} className="font-medium text-horizon-600 hover:text-horizon-800 underline underline-offset-2">
-                  {p.actionLabel} →
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      {/* Bespreek met Fin — neemt de zwakste-pijler-context mee de chat in.
+          stopPropagation: de knop staat binnen de klikbare WidgetShell-<button>
+          (opent de BottomSheet); zonder stop zou één klik beide openen. */}
+      <div className="mt-2">
+        <BesprekMetWillButton
+          onderwerp={`Mijn financiële gezondheid (${health.total}/100 — ${health.label})`}
+          detail={finDetail}
+          vraag="Waar kan ik het meeste vrijheidstijd winnen, en welke stap zet ik als eerste?"
+          stopPropagation
+          className="w-full justify-center"
+        />
+      </div>
 
       {/* CTA: link to Horizon for full detail view */}
       <Link

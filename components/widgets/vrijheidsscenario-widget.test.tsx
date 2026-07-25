@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { VrijheidsScenarioWidget } from './vrijheidsscenario-widget'
 import type { DashboardData } from './widget-renderer'
-import type { FireProjection, FireRange } from '@/lib/horizon-data'
+import type { FireProjection, FireRange, FireCountdown } from '@/lib/horizon-data'
 
 // jsdom kent geen ResizeObserver; de WidgetShell-scrollcheck gebruikt 'm bij full-size.
 class MockResizeObserver {
@@ -44,8 +44,8 @@ function makeRange(baseReturn = 0.06): FireRange {
   }
 }
 
-function makeData(fireRange: FireRange | null): DashboardData {
-  return { fireRange } as unknown as DashboardData
+function makeData(fireRange: FireRange | null, extra: Partial<DashboardData> = {}): DashboardData {
+  return { fireRange, ...extra } as unknown as DashboardData
 }
 
 describe('VrijheidsScenarioWidget — dynamisch rendement (geen hardcoded 5/7/9)', () => {
@@ -99,5 +99,86 @@ describe('VrijheidsScenarioWidget — XL vrijheidstijd-as', () => {
   it('empty state bij ontbrekende fireRange', () => {
     render(<VrijheidsScenarioWidget size="xl" data={makeData(null)} />)
     expect(screen.getByText(/Voeg inkomen en vermogen toe/)).toBeInTheDocument()
+  })
+})
+
+// ── Kern van W36-bug: de scalar-band is FALLBACK-ONLY en kan onterecht 'Bereikt'
+//    zeggen (band-fireAge == currentAge → 0 jaar). Zolang de canonieke aftelling
+//    (simFireCountdown / fireAgeFractional) een echte toekomstige leeftijd geeft,
+//    MOET de widget die volgen en NOOIT 'je bent al vrij' tonen bij lage freedomPct.
+describe('VrijheidsScenarioWidget — canonieke verankering (W36-bug)', () => {
+  // Band collabeert naar 'Bereikt' (fireAge == currentAge == 46 → 0 jaar).
+  const collapsedBand: FireRange = {
+    optimistic: makeProj(0.09, 46, 46),
+    expected: makeProj(0.07, 46, 46),
+    pessimistic: makeProj(0.04, 46, 46),
+  }
+  const futureCountdown: FireCountdown = {
+    countdownYears: 14,
+    countdownMonths: 0,
+    countdownDays: 5113,
+    fireDate: 'mrt 2040',
+  }
+
+  it('XL: volgt de canonieke aftelling i.p.v. de collabeerde band', () => {
+    render(
+      <VrijheidsScenarioWidget
+        size="xl"
+        data={makeData(collapsedBand, {
+          simFireCountdown: futureCountdown,
+          fireAgeFractional: 60,
+          freedomPct: 27.5,
+        })}
+      />,
+    )
+    // Canoniek verankerd: 14 jaar vanaf nu, op je 60e — NIET 0 jaar / 'Bereikt'.
+    expect(screen.getByText(/14 jaar/)).toBeInTheDocument()
+    expect(screen.getByText(/op je 60e/)).toBeInTheDocument()
+    // Toont de echte tijd-as, NIET de 'Bereikt'-staat bij 27,5% freedomPct.
+    expect(screen.getByRole('img', { name: /vrijheidstijd-as/i })).toBeInTheDocument()
+    expect(screen.queryByText(/dekt je uitgaven blijvend/i)).not.toBeInTheDocument()
+  })
+
+  it('XL: canonieke reached (freedomPct >= 100) toont nette Bereikt-staat', () => {
+    render(
+      <VrijheidsScenarioWidget
+        size="xl"
+        data={makeData(collapsedBand, {
+          simFireCountdown: { ...futureCountdown, fireDate: 'Bereikt!', countdownYears: 0 },
+          fireAgeFractional: 46,
+          freedomPct: 100,
+        })}
+      />,
+    )
+    expect(screen.getByText(/volledig vrij/i)).toBeInTheDocument()
+    // Geen degenererende as / botsende nul-markers meer.
+    expect(screen.queryByRole('img', { name: /vrijheidstijd-as/i })).not.toBeInTheDocument()
+  })
+
+  it('XL: behoudt de rendement-spreiding rond het canonieke midden', () => {
+    // Band met echte spreiding (11/14/19 jaar) + canonieke verwacht = 14 jaar.
+    render(
+      <VrijheidsScenarioWidget
+        size="xl"
+        data={makeData(makeRange(0.06), {
+          simFireCountdown: futureCountdown,
+          fireAgeFractional: 60,
+          freedomPct: 40,
+        })}
+      />,
+    )
+    // Verwacht verankerd op 14; opt = 14 + (11−14) = 11, pes = 14 + (19−14) = 19.
+    expect(screen.getByText(/14 jaar/)).toBeInTheDocument()
+    expect(screen.getByText(/11–19/)).toBeInTheDocument()
+  })
+
+  it('mini: canonieke reached toont "Vrij"', () => {
+    render(
+      <VrijheidsScenarioWidget
+        size="mini"
+        data={makeData(collapsedBand, { fireAgeFractional: 46, freedomPct: 100 })}
+      />,
+    )
+    expect(screen.getByText('Vrij')).toBeInTheDocument()
   })
 })

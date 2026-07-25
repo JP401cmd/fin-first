@@ -56,7 +56,6 @@ describe('Widget Audit — KPI action classification', () => {
   it('expected observation widgets are correctly classified', () => {
     // The spec explicitly names these as observations
     expect(WIDGET_CLASSIFICATION['netto_vermogen']).toBe('observation')
-    expect(WIDGET_CLASSIFICATION['jouw_pad']).toBe('observation') // fase-bar
     expect(WIDGET_CLASSIFICATION['vrijheidsvoortgang']).toBe('observation')
     expect(WIDGET_CLASSIFICATION['pensioen_aow']).toBe('observation')
   })
@@ -84,13 +83,6 @@ describe('Observation widgets retain legitimacy without forced actions (#802)', 
     expect(WIDGET_HREFS['netto_vermogen']).toBe('/overzicht')
   })
 
-  it('jouw_pad (fase-bar/sovereignty) has no forced action button', () => {
-    // JouwPadWidgetWrapper props: { size, data, href? }
-    // Shows sovereignty level + phase progress — purely observational
-    expect(WIDGET_CLASSIFICATION['jouw_pad']).toBe('observation')
-    expect(WIDGET_HREFS['jouw_pad']).toBe('/mijn')
-  })
-
   it('vermogensgrafiek (trend widgets) accepted as observations', () => {
     // Trend widgets show historical data lines — pure observations
     expect(WIDGET_CLASSIFICATION['trend_inkomen']).toBe('observation')
@@ -111,14 +103,14 @@ describe('Observation widgets retain legitimacy without forced actions (#802)', 
     expect(observationViolations).toEqual([])
   })
 
-  it('total observation count is stable (14 widgets)', () => {
+  it('total observation count is stable (13 widgets)', () => {
     const observations = WIDGET_CATALOG.filter(w =>
       isObservationWidget(w.id)
     )
-    // 14 observation widgets: netto_vermogen, vrijheidsvoortgang, jouw_pad,
+    // 13 observation widgets: netto_vermogen, vrijheidsvoortgang,
     // pensioen_aow, vrijheidsmijlpalen, maandoverzicht, weekoverzicht,
     // trend_inkomen, trend_uitgaven, trend_sparen, trend_schulden,
     // huishouden_vergelijking, huishouden_activiteit, beleggingsrendement
-    expect(observations.length).toBe(14)
+    expect(observations.length).toBe(13)
   })
 })

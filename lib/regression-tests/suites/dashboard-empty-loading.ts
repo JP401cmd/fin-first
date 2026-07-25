@@ -1,9 +1,8 @@
 import { registerCategory, registerTests } from '../test-registry'
-import { assert, assertEqual, assertNotNull, assertGreaterThan, assertIncludes } from '../assert'
+import { assert, assertEqual, assertNotNull, assertGreaterThan } from '../assert'
 import type { TestCase } from '../test-types'
 import type { DashboardData } from '@/lib/types/dashboard'
-import type { WidgetSize } from '@/lib/widget-catalog'
-import { WIDGET_CATALOG, getWidgetDef, BUDGET_WIDGETS } from '@/lib/widget-catalog'
+import { getWidgetDef, BUDGET_WIDGETS } from '@/lib/widget-catalog'
 import { authenticatedFetch } from '../server-runner'
 
 const CAT = 'dashboard.empty-loading'
@@ -197,23 +196,6 @@ const EMPTY_ARRAY_KEYS: (keyof DashboardData)[] = [
   'decisionPatterns',
   'freedomDaysMonthly',
 ]
-
-/** Widgets that are known to have WidgetEmpty states based on empty data conditions */
-const WIDGETS_WITH_EMPTY_STATES = [
-  'assets',          // totalAssets === 0 && assetsByType.length === 0
-  'netto_vermogen',  // netWorth === 0 && totalAssets === 0 && totalDebts === 0
-  'cash_flow',       // monthlyIncome === 0 && monthlyExpenses === 0
-  'budgetten',       // budgetingActive === false (gated) or no budgets
-  'spaarquote',      // budgetingActive === false (gated)
-  'ai_inzicht',      // aiInsights.length === 0
-  'meldingen',       // notifications.length === 0
-  'agenda',          // upcomingEvents.length === 0
-  'beleggingsrendement', // no investment assets
-  'berichten',       // always shows empty state with message
-]
-
-/** Widgets that should be hidden (return null) for budget-inactive users */
-const BUDGET_GATED_WIDGETS = Array.from(BUDGET_WIDGETS)
 
 // ── Tests ─────────────────────────────────────────────────────────────
 
@@ -801,7 +783,7 @@ const tests: TestCase[] = [
         'netto_vermogen', 'cash_flow', 'budgetten', 'assets', 'schulden',
         'holdings', 'voorstellen', 'acties', 'doelen', 'fire_prognose',
         'monte_carlo', 'levensgebeurtenissen', 'spaarquote', 'vrijheidsvoortgang',
-        'vaste_lasten', 'jouw_pad', 'gezondheids_score', 'belasting_box3',
+        'vaste_lasten', 'gezondheids_score', 'belasting_box3',
         'vrijheidsscenarios', 'sim_vermogenspad',
         'box3_drag', 'vrijheidsmijlpalen',
         'backtesting_score', 'inflatie_impact', 'beleggingsrendement',

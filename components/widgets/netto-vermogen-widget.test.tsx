@@ -86,6 +86,32 @@ describe('NettoVermogenWidget — MoM delta consumeert netWorthDelta (fix #2)', 
   })
 })
 
+describe('NettoVermogenWidget — L-grafiek label-plaatsing (fix W4)', () => {
+  const occurrences = (haystack: string, needle: string) =>
+    haystack.split(needle).length - 1
+
+  it('full-size toont de huidige waarde één keer (headline) — geen redundant 3e SVG-label op de "nu"-positie', () => {
+    // Distincte start/huidig/prognose zodat we het huidige bedrag ondubbelzinnig kunnen tellen.
+    // start = history[0] = 250.000, huidig = netWorth = 300.000, prognose = 300.000 + 6×1.000 = 306.000.
+    const { container } = render(
+      <NettoVermogenWidget
+        size="full"
+        data={makeData({
+          netWorthHistory: [{ value: 250000 }, { value: 300000 }] as unknown as DashboardData['netWorthHistory'],
+          netWorthDelta: null, // geen deltarij die 300.000 opnieuw zou kunnen bevatten
+        })}
+      />,
+    )
+    const text = container.textContent ?? ''
+    // Vóór de fix stond 300.000 er twee keer: als headline én als gecentreerd SVG-label
+    // dat exact op de dot + verticale "nu"-divider viel ("EUR 28|1.782"). Nu enkel de headline.
+    expect(occurrences(text, '300.000')).toBe(1)
+    // Start- en prognose-labels blijven wél zichtbaar in de grafiek.
+    expect(text).toContain('250.000')
+    expect(text).toContain('306.000')
+  })
+})
+
 describe('NettoVermogenWidget — negatief vermogen (fix #4)', () => {
   it('framet een tekort als "vrijheid terug te kopen", niet als positieve vrijheid', () => {
     const { container } = render(

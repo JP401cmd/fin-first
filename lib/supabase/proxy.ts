@@ -63,14 +63,25 @@ export async function updateSession(request: NextRequest) {
     // geeft de /api/-protected-prefix een 401 vóór de handler, waardoor de check
     // fail-open stil uitgeschakeld wordt op de belangrijkste flow (registratie).
     '/api/auth/password-check',
+    // Web-vitals / RUM-ingest (feature 884): bewust publiek en sessie-optioneel —
+    // de reporter is in de ROOT-layout gemount en beacon't óók pre-auth (uitgelogd
+    // / vóór hydratatie). De handler leidt user_id uitsluitend uit de geverifieerde
+    // JWT af (null voor anoniem) en schrijft via de service-role. Zonder deze entry
+    // 401't de /api/-protected-prefix de logged-out beacons VÓÓR de handler, waardoor
+    // anonieme/pre-auth RUM stil verloren gaat (de fire-and-forget beacon negeert de 401).
+    '/api/web-vitals',
     // --- Cron-routes (Arch F4-besluit AC#2): headless aangeroepen, GEEN
     // sessiecookie. Het echte auth-slot is CRON_SECRET in de handler zelf
     // (fail-closed in productie: ontbrekend/onjuist secret -> 401/500). Zónder
     // deze entries zou de /api/-protected-prefix de cron 401'en VÓÓR de
-    // CRON_SECRET-check draait -> cron kapot. Daarom bewust in de allowlist. ---
+    // CRON_SECRET-check draait -> cron kapot. Moet in sync blijven met de
+    // "crons"-lijst in vercel.json. Daarom bewust in de allowlist. ---
     '/api/snapshots/cron',
     '/api/holdings/refresh-prices/cron',
     '/api/cron/retention', // AVG-retentie (Arch F3, ADR 0059)
+    '/api/web-vitals/retention/cron', // web_vitals-retentie (feature 885)
+    '/api/news-ingest/cron', // dagelijkse nieuws-ingest
+    '/api/briefing/email/cron', // wekelijkse briefing-mail
   ]
 
   // Protected route prefixes that require authentication

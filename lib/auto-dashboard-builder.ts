@@ -58,7 +58,7 @@ export const FOCUS_WIDGET_BOOST: Record<FocusChoice, string[]> = {
   ],
   overview: [
     'netto_vermogen', 'cash_flow', 'fire_prognose', 'acties',
-    'spaarquote', 'vrijheidsvoortgang', 'jouw_pad', 'maandoverzicht',
+    'spaarquote', 'vrijheidsvoortgang', 'maandoverzicht',
   ],
 }
 
@@ -73,7 +73,6 @@ export const WIDGET_POPULARITY: Record<string, number> = {
   vrijheidsvoortgang: 7,
   schulden: 6,
   noodfonds: 6,
-  jouw_pad: 6,
   maandoverzicht: 6,
   volgende_stap: 6,
   vaste_lasten: 5,

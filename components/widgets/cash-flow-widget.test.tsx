@@ -51,7 +51,12 @@ function makeData(overrides: Partial<DashboardData> = {}): DashboardData {
 
 describe('CashFlowWidget — mojibake-regressie (fix #1)', () => {
   it('toont een echt minteken tussen inkomen en uitgaven, geen garbage', () => {
-    const { container } = render(<CashFlowWidget size="full" data={makeData()} />)
+    // Zonder vorige-maand-data valt de full-tegel terug op de compacte
+    // netto-samenvatting (inkomsten − uitgaven = netto), waar het herstelde
+    // U+2212 minteken staat.
+    const { container } = render(
+      <CashFlowWidget size="full" data={makeData({ prevMonthIncome: 0, prevMonthExpenses: 0 })} />,
+    )
     // Het herstelde U+2212 minteken staat in de samenvattingsregel.
     expect(screen.getByText('−')).toBeInTheDocument()
     // Geen enkele mojibake-glyph mag terugkeren.

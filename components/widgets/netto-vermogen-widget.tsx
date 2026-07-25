@@ -128,14 +128,25 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
 
     // Value labels for start and end of trendline
     const startValue = histData[0]
-    const endValue = netWorth
     const forecastEndValue = forecastData[forecastData.length - 1]
     const startY = histPts[0].y
-    const endY = histPts[histPts.length - 1].y
     const forecastEndY = forecastPts[forecastPts.length - 1].y
     const forecastEndX = forecastPts[forecastPts.length - 1].x
 
-    return { histPath, forecastPath, histFill, currentX, currentDotX, currentDotY, pad, chartH, startValue, endValue, forecastEndValue, startY, endY, forecastEndY, forecastEndX }
+    // Label-plaatsing: standaard ~3px BOVEN het punt; klapt naar ONDER het punt zodra
+    // de tekst anders bovenaan de viewBox zou clippen. Vervangt de oude anti-clip-vloer
+    // (Math.max(puntY-4, pad.top+6)) die labels juist OP de lijn de vulling in duwde
+    // zodra de lijn hoog in de plot liep (de vlakke-data-case van W4).
+    const LABEL_FONT = 7
+    const labelY = (pointY: number) => {
+      const above = pointY - 3
+      if (above - LABEL_FONT < 0) return Math.min(pointY + LABEL_FONT + 1, pad.top + chartH)
+      return above
+    }
+    const startLabelY = labelY(startY)
+    const forecastEndLabelY = labelY(forecastEndY)
+
+    return { histPath, forecastPath, histFill, currentX, currentDotX, currentDotY, pad, chartH, startValue, forecastEndValue, startLabelY, forecastEndLabelY, forecastEndX }
   }, [netWorthHistory, netWorth, monthlyGrowthRate, SVG_H])
 
   // Show axis labels for half and full sizes where sparkline is visible
@@ -274,8 +285,8 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
                   <line x1={sparkline.currentX} y1={sparkline.pad.top} x2={sparkline.currentX} y2={sparkline.pad.top + sparkline.chartH} stroke="var(--border-md)" strokeWidth={1} strokeDasharray="2 2" strokeOpacity={hasEntered ? 1 : 0} style={{ transition: hasEntered ? 'stroke-opacity 80ms ease-out 455ms' : 'none' }} />
                   <path d={sparkline.forecastPath} fill="none" stroke="var(--ink-4)" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" strokeDasharray="4 3" strokeOpacity={hasEntered ? 0.7 : 0} style={{ transition: hasEntered ? 'stroke-opacity 400ms ease-out 550ms' : 'none' }} />
                   <circle cx={sparkline.currentDotX} cy={sparkline.currentDotY} r={3} fill="var(--kern-t)" opacity={hasEntered ? 1 : 0} style={{ transition: hasEntered ? 'opacity 80ms ease-out 500ms' : 'none' }} />
-                  <text x={sparkline.pad.left + 1} y={Math.max(sparkline.startY - 4, sparkline.pad.top + 6)} fill="var(--ink-4)" fontSize="7" fontFamily="var(--font-mono), ui-monospace, monospace" opacity={hasEntered ? 1 : 0} style={{ transition: hasEntered ? 'opacity 200ms ease-out 550ms' : 'none' }}>{formatMaskedCurrency(sparkline.startValue, masked)}</text>
-                  <text x={sparkline.forecastEndX - 1} y={Math.max(sparkline.forecastEndY - 4, sparkline.pad.top + 6)} fill="var(--ink-4)" fontSize="7" fontFamily="var(--font-mono), ui-monospace, monospace" textAnchor="end" opacity={hasEntered ? 0.7 : 0} style={{ transition: hasEntered ? 'opacity 400ms ease-out 600ms' : 'none' }}>{formatMaskedCurrency(sparkline.forecastEndValue, masked)}</text>
+                  <text x={sparkline.pad.left + 1} y={sparkline.startLabelY} fill="var(--ink-4)" fontSize="7" fontFamily="var(--font-mono), ui-monospace, monospace" opacity={hasEntered ? 1 : 0} style={{ transition: hasEntered ? 'opacity 200ms ease-out 550ms' : 'none' }}>{formatMaskedCurrency(sparkline.startValue, masked)}</text>
+                  <text x={sparkline.forecastEndX - 1} y={sparkline.forecastEndLabelY} fill="var(--ink-4)" fontSize="7" fontFamily="var(--font-mono), ui-monospace, monospace" textAnchor="end" opacity={hasEntered ? 0.7 : 0} style={{ transition: hasEntered ? 'opacity 400ms ease-out 600ms' : 'none' }}>{formatMaskedCurrency(sparkline.forecastEndValue, masked)}</text>
                 </svg>
                 <div className="flex justify-between mt-0.5">
                   <span className="font-mono text-[9px] tabular-nums" style={{ color: 'var(--ink-4)' }}>12m geleden</span>
@@ -411,7 +422,7 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
               {/* Value label at start of trendline */}
               <text
                 x={sparkline.pad.left + 1}
-                y={Math.max(sparkline.startY - 4, sparkline.pad.top + 6)}
+                y={sparkline.startLabelY}
                 fill="var(--ink-4)"
                 fontSize="7"
                 fontFamily="var(--font-mono), ui-monospace, monospace"
@@ -423,27 +434,14 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
                 {formatMaskedCurrency(sparkline.startValue, masked)}
               </text>
 
-              {/* Value label at current position (end of historical) */}
-              <text
-                x={sparkline.currentDotX}
-                y={Math.max(sparkline.endY - 5, sparkline.pad.top + 6)}
-                fill="var(--kern-t)"
-                fontSize="7.5"
-                fontFamily="var(--font-mono), ui-monospace, monospace"
-                fontWeight="600"
-                textAnchor="middle"
-                opacity={hasEntered ? 1 : 0}
-                style={{
-                  transition: hasEntered ? 'opacity 200ms ease-out 550ms' : 'none',
-                }}
-              >
-                {formatMaskedCurrency(sparkline.endValue, masked)}
-              </text>
+              {/* Huidige waarde staat al prominent als headline boven de grafiek — een
+                  derde SVG-label op de 'nu'-positie botste met de dot + verticale divider
+                  ('EUR 28|1.782') en herhaalde het headline-bedrag. Bewust weggelaten. */}
 
               {/* Value label at end of forecast */}
               <text
                 x={sparkline.forecastEndX - 1}
-                y={Math.max(sparkline.forecastEndY - 4, sparkline.pad.top + 6)}
+                y={sparkline.forecastEndLabelY}
                 fill="var(--ink-4)"
                 fontSize="7"
                 fontFamily="var(--font-mono), ui-monospace, monospace"

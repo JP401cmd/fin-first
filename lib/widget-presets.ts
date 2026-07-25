@@ -46,7 +46,6 @@ export const WIDGET_PRESETS: WidgetPreset[] = [
       { id: 'spaarquote',          enabled: true, size: 'quarter', order: 4 },
       { id: 'cash_flow',           enabled: true, size: 'quarter', order: 5 },
       { id: 'vrijheidsvoortgang',  enabled: true, size: 'quarter', order: 6 },
-      { id: 'jouw_pad',            enabled: true, size: 'quarter', order: 7 },
     ],
   },
   {
@@ -60,9 +59,8 @@ export const WIDGET_PRESETS: WidgetPreset[] = [
       { id: 'spaarquote',           enabled: true, size: 'half',    order: 2 },
       { id: 'acties',               enabled: true, size: 'half',    order: 3 },
       { id: 'netto_vermogen',       enabled: true, size: 'quarter', order: 4 },
-      { id: 'jouw_pad',             enabled: true, size: 'quarter', order: 5 },
-      { id: 'vrijheidsvoortgang',   enabled: true, size: 'quarter', order: 6 },
-      { id: 'fire_prognose',        enabled: true, size: 'quarter', order: 7 },
+      { id: 'vrijheidsvoortgang',   enabled: true, size: 'quarter', order: 5 },
+      { id: 'fire_prognose',        enabled: true, size: 'quarter', order: 6 },
     ],
   },
   {
