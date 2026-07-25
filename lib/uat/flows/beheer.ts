@@ -55,6 +55,7 @@ export const BEHEER_FLOW: UatFlow = {
     { id: 'widget-presets', scenarioId: 'UAT-BEHEER-17', label: 'WF-BEHEER-17 · Widget-presets samenstellen en ordenen', kind: 'screen', stage: 3, lane: 'functioneel', subOf: 'sectie-func' },
     { id: 'rekenhulp-mod', scenarioId: 'UAT-BEHEER-18', label: 'WF-BEHEER-18 · Rekenhulp-meldingen modereren', kind: 'screen', stage: 3, lane: 'functioneel', subOf: 'sectie-func' },
     { id: 'feedback-afhandelen', scenarioId: 'UAT-BEHEER-19', label: 'WF-BEHEER-19 · Gebruikersfeedback afhandelen', kind: 'screen', stage: 3, lane: 'functioneel', subOf: 'sectie-func' },
+    { id: 'kennisbank', scenarioId: 'UAT-BEHEER-37', label: 'WF-BEHEER-37 · Kennisbank-items beheren + lokale prompt-parity-status', kind: 'screen', stage: 3, lane: 'functioneel', subOf: 'sectie-func' },
 
     // ── 3 · Test & ontwikkeling ───────────────────────────────────────────
     { id: 'testdata', scenarioId: 'UAT-BEHEER-20', label: 'WF-BEHEER-20 · Persona-testdata laden (seeden)', kind: 'action', stage: 3, lane: 'test', subOf: 'sectie-test' },
@@ -73,6 +74,7 @@ export const BEHEER_FLOW: UatFlow = {
     { id: 'architectuur', scenarioId: 'UAT-BEHEER-30', label: 'WF-BEHEER-30 · Architectuurdocumentatie raadplegen', kind: 'screen', stage: 3, lane: 'info', subOf: 'sectie-info' },
     { id: 'naslag', scenarioId: 'UAT-BEHEER-33', label: 'WF-BEHEER-33 · Statische naslag bekijken', kind: 'screen', stage: 3, lane: 'info', subOf: 'sectie-info' },
     { id: 'webprestaties', scenarioId: 'UAT-BEHEER-34', label: 'WF-BEHEER-34 · Webprestaties (Core Web Vitals p75) raadplegen', kind: 'screen', stage: 3, lane: 'info', subOf: 'sectie-info' },
+    { id: 'versie-dashboard', scenarioId: 'UAT-BEHEER-36', label: 'WF-BEHEER-36 · Versie & git-dashboard raadplegen', kind: 'screen', stage: 3, lane: 'info', subOf: 'sectie-info' },
 
     // ── 4 · uitkomst ──────────────────────────────────────────────────────
     { id: 'beheerd', label: 'Platform geconfigureerd, bewaakt & getest', kind: 'outcome', stage: 4 },
@@ -108,6 +110,7 @@ export const BEHEER_FLOW: UatFlow = {
     { from: 'sectie-func', to: 'widget-presets' },
     { from: 'sectie-func', to: 'rekenhulp-mod' },
     { from: 'sectie-func', to: 'feedback-afhandelen' },
+    { from: 'sectie-func', to: 'kennisbank' },
 
     // Test & ontwikkeling
     { from: 'sectie-test', to: 'testdata' },
@@ -126,6 +129,7 @@ export const BEHEER_FLOW: UatFlow = {
     { from: 'sectie-info', to: 'architectuur' },
     { from: 'sectie-info', to: 'naslag' },
     { from: 'sectie-info', to: 'webprestaties' },
+    { from: 'sectie-info', to: 'versie-dashboard' },
 
     // secties → uitkomst
     { from: 'sectie-tech', to: 'beheerd' },

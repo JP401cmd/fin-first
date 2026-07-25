@@ -42,6 +42,12 @@ import type { LocalChatSession } from './litert-runtime'
 import type { LocalChatOverview } from './local-chat-context'
 import type { LocalKnowledgeItem } from './knowledge-context'
 import { buildLocalChatSystemPrompt } from './local-chat-prompt'
+import {
+  parseFinActionIntent,
+  finActionFenceStart,
+  resolveFinActionIntent,
+  finActionIntentHash,
+} from './parse-intent'
 
 /**
  * Factory die één on-device chatsessie opent. Default (productie) importeert
@@ -85,6 +91,36 @@ function lastUserText(messages: UIMessage[]): string | null {
 function randomId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID()
   return `local-${Math.random().toString(36).slice(2)}-${Date.now()}`
+}
+
+/**
+ * Hoeveel tekens de streaming-strip achter de staart vasthoudt zodra er een
+ * backtick opduikt: ruim genoeg voor een half-geëmitteerde ` ```fin-actie `-start
+ * (incl. spaties) zodat die nooit als zichtbare delta lekt. Kleine tail-hold —
+ * gewone proza zonder backticks stroomt direct door.
+ */
+const FENCE_TAIL_HOLD = 16
+
+/**
+ * Bepaal tot welke index van `buffer` we VEILIG zichtbare tekst mogen emitten,
+ * zónder ooit (een deel van) het fin-actie-fence-blok te laten lekken:
+ *  - Is er een complete fence-open? → boundary = die index (blok wordt gestript).
+ *  - Anders, bevat de staart binnen het hold-venster een backtick-run? → houd
+ *    vanaf die run vast (het kan een half-getypte fence-start zijn).
+ *  - Anders → de hele buffer is veilig.
+ * Puur op strings; de definitieve strip gebeurt canoniek in `parseFinActionIntent`.
+ */
+function safeVisibleBoundary(buffer: string): number {
+  const fence = finActionFenceStart(buffer)
+  if (fence !== -1) return fence
+  const tick = buffer.lastIndexOf('`')
+  if (tick === -1) return buffer.length
+  // Backtick te ver van de staart om nog een korte fence-start te vormen → veilig.
+  if (buffer.length - tick > FENCE_TAIL_HOLD) return buffer.length
+  // Houd vanaf het begin van de backtick-run vast.
+  let start = tick
+  while (start > 0 && buffer[start - 1] === '`') start--
+  return start
 }
 
 /**
@@ -143,6 +179,7 @@ export class LocalChatTransport implements ChatTransport<UIMessage> {
     const text = lastUserText(messages)
     const ensureSession = (q: string) => this.#ensureSession(q)
     const partId = this.#generateId()
+    const overview = this.#overview
 
     const stream = new ReadableStream<UIMessageChunk>({
       start: async (controller) => {
@@ -160,12 +197,56 @@ export class LocalChatTransport implements ChatTransport<UIMessage> {
           controller.enqueue({ type: 'start' })
           controller.enqueue({ type: 'text-start', id: partId })
 
+          // Streaming-strip: buffer de volledige modeltekst maar emit alleen de
+          // ZICHTBARE proza; een (deel van een) ` ```fin-actie `-blok mag nooit in
+          // de bubbel verschijnen. `emittedLen` telt hoeveel prefix-tekens van
+          // `buffer` we al als delta stuurden (we emitten altijd een prefix).
+          let buffer = ''
+          let emittedLen = 0
+
           await session.send(text, (delta) => {
             if (abortSignal?.aborted) return
-            if (delta) controller.enqueue({ type: 'text-delta', id: partId, delta })
+            if (!delta) return
+            buffer += delta
+            const boundary = safeVisibleBoundary(buffer)
+            if (boundary > emittedLen) {
+              controller.enqueue({ type: 'text-delta', id: partId, delta: buffer.slice(emittedLen, boundary) })
+              emittedLen = boundary
+            }
           })
 
+          // Generatie klaar → PARSE precies één keer op de volledige buffer.
+          // `cleanedText` is de canonieke zichtbare tekst (fence-blok verwijderd);
+          // flush de nog niet-geëmitteerde staart (vastgehouden tail of eventuele
+          // proza ná het blok). `cleanedText` behoudt de kop exact, dus de reeds
+          // geëmitteerde prefix hoort er per definitie voor te staan — de
+          // `startsWith`-guard is defensief tegen een onverwachte divergentie.
+          const { cleanedText, intent } = parseFinActionIntent(buffer)
+          if (cleanedText.length > emittedLen && cleanedText.startsWith(buffer.slice(0, emittedLen))) {
+            controller.enqueue({ type: 'text-delta', id: partId, delta: cleanedText.slice(emittedLen) })
+          }
           controller.enqueue({ type: 'text-end', id: partId })
+
+          // Actie-voorstel? Resolve de CANONIEKE cijfers uit het overzicht
+          // (cijfer-guardrail — de model-getallen worden genegeerd) en surface de
+          // opgeloste intent als NIET-transient `data-finActie`-part, met een
+          // stabiele id = de intent-hash (dedupe-sleutel voor de UI). Twee gevallen
+          // geven GEEN data-part (beide fail-closed, geen fout):
+          //  - parse-miss (`intent: null`): geen bruikbaar blok.
+          //  - geen canonieke match (`resolved: null`): de titel matchte geen enkele
+          //    overzicht-bron → géén "+0 dagen vrijheid"-kaart uit het niets. Het
+          //    fence-blok is dan al uit `cleanedText` gestript; alleen de kaart vervalt.
+          if (intent) {
+            const resolved = resolveFinActionIntent(intent, overview)
+            if (resolved) {
+              controller.enqueue({
+                type: `data-finActie`,
+                id: finActionIntentHash(resolved),
+                data: resolved,
+              })
+            }
+          }
+
           controller.enqueue({ type: 'finish' })
           controller.close()
         } catch (err) {

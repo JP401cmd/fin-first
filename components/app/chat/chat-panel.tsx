@@ -95,8 +95,10 @@ function LocalModeBanner() {
             langer, maar je gegevens blijven privé.
           </p>
           <p className="mt-1 text-[var(--ink-3)]">
-            Acties en wat-als-simulaties kan Fin lokaal nog niet uitvoeren. Zet
-            privé-modus uit voor die functies.
+            Ook lokaal kan Fin actievoorstellen doen; bevestiging via
+            &lsquo;+ Toevoegen&rsquo; is altijd vereist voordat er iets wordt
+            opgeslagen — dat gaat dan naar je eigen TriFinity-account, niet naar
+            een AI-provider. Wat-als-simulaties kan Fin lokaal nog niet uitvoeren.
           </p>
         </div>
       </div>
@@ -193,7 +195,7 @@ function ActionSuggestionCard({
       type="button"
       onClick={onClick}
       disabled={added || loading}
-      className={`mt-2 w-full rounded-[var(--r-lg)] border text-left transition-all ${
+      className={`mt-2 first:mt-0 w-full rounded-[var(--r-lg)] border text-left transition-all ${
         added
           ? 'border-emerald-200 bg-emerald-50'
           : 'border-wil-200 bg-[var(--paper)] hover:border-wil-400 hover:shadow-[var(--s0)] active:scale-[0.98]'
@@ -746,7 +748,15 @@ export function ChatPanel() {
 
   /* ── Action creation from suggestion ──────────────────────────── */
 
-  const handleAddAction = useCallback(async (invocationId: string, data: SuggestActionResult) => {
+  const handleAddAction = useCallback(async (
+    invocationId: string,
+    data: SuggestActionResult,
+    // Vrije jsonb-herkomststempel. Het lokale (privacy-)transport geeft
+    // `{ origin: 'local-chat' }` mee zodat een tekst-geparst voorstel te
+    // onderscheiden is van een cloud-tool-voorstel — zonder de `source`-enum
+    // (blijft 'chat') te wijzigen. Cloud-pad geeft niets mee.
+    metadata?: Record<string, unknown>,
+  ) => {
     if (addedActions.has(invocationId)) return
     setLoadingAction(invocationId)
     // Vorige faalstatus wissen bij een nieuwe poging.
@@ -768,6 +778,7 @@ export function ChatPanel() {
           euro_impact_monthly: data.euro_impact_monthly,
           priority_score: data.priority_score,
           source: 'chat',
+          ...(metadata ? { metadata } : {}),
         }),
       })
 
@@ -891,7 +902,7 @@ export function ChatPanel() {
 
         if (isLoading) {
           elements.push(
-            <div key={`action-loading-${action.toolCallId}`} className="mt-2 w-full rounded-[var(--r-lg)] border border-wil-100 bg-[var(--paper)] px-3 py-2.5">
+            <div key={`action-loading-${action.toolCallId}`} className="mt-2 first:mt-0 w-full rounded-[var(--r-lg)] border border-wil-100 bg-[var(--paper)] px-3 py-2.5">
               <div className="flex items-center gap-2">
                 <Loader2 className="h-3.5 w-3.5 animate-spin text-wil-400" />
                 <span className="text-xs text-[var(--ink-3)]">Actie wordt voorbereid...</span>
@@ -913,6 +924,26 @@ export function ChatPanel() {
             />
           )
         }
+      }
+
+      // Lokaal (privacy-)pad: het on-device transport heeft geen tool-invocations
+      // maar een tekst-geparst `data-finActie`-part met REEDS canonieke cijfers
+      // (resolved uit LocalChatOverview — cijfer-guardrail zit in de transport).
+      // Hergebruik exact dezelfde ActionSuggestionCard; dedupe-sleutel is de
+      // stabiele intent-hash die de transport als part-id meegaf.
+      if (part.type === 'data-finActie' && part.data) {
+        const data = part.data as SuggestActionResult
+        const hash = (part.id as string | undefined) ?? `finactie-${i}`
+        elements.push(
+          <ActionSuggestionCard
+            key={`finactie-${hash}`}
+            data={data}
+            added={addedActions.has(hash)}
+            loading={loadingAction === hash}
+            error={actionErrors.has(hash)}
+            onClick={() => handleAddAction(hash, data, { origin: 'local-chat' })}
+          />
+        )
       }
 
       // Recommendation suggestion — één-voor-één voorstel met 3 knoppen.
@@ -1159,7 +1190,13 @@ export function ChatPanel() {
             const hasContent =
               parts.some((p) => p.type === 'text' && 'text' in p && p.text) ||
               parts.some((p) => findToolInvocation(p as Record<string, unknown>, 'suggestAction') !== null) ||
-              parts.some((p) => findToolInvocation(p as Record<string, unknown>, 'showVisualization') !== null)
+              parts.some((p) => findToolInvocation(p as Record<string, unknown>, 'showVisualization') !== null) ||
+              parts.some((p) => findToolInvocation(p as Record<string, unknown>, 'suggestRecommendation') !== null) ||
+              // Lokaal (privacy-)pad: een fin-actie-voorstel kan het ENIGE part
+              // van het bericht zijn (het model gaf alleen het fenced blok terug,
+              // geen omringende proza — cleanedText is dan ''). Zonder deze check
+              // verdween de hele bubbel (incl. ActionSuggestionCard) stilzwijgend.
+              parts.some((p) => p.type === 'data-finActie' && (p as Record<string, unknown>).data)
 
             if (!hasContent) return null
 

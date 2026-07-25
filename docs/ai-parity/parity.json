@@ -1,0 +1,22 @@
+{
+  "generatedAt": "2026-07-24T22:21:28.487Z",
+  "manifestGeneratedAt": "2026-07-24T22:10:46.710Z",
+  "inSync": true,
+  "dnaSubBudget": 2000,
+  "dnaEstimatedTokens": 490,
+  "dnaTokenSource": "live",
+  "sources": [
+    {
+      "file": "lib/ai/dna/base.ts",
+      "storedSha256": "4089da9e6e0a736479423786bcf653065c7ad9f523e8d0d8c8022ae57a6c639d",
+      "liveSha256": "4089da9e6e0a736479423786bcf653065c7ad9f523e8d0d8c8022ae57a6c639d",
+      "inSync": true
+    },
+    {
+      "file": "lib/ai/dna/wil.ts",
+      "storedSha256": "767859a72ab97e81722d1befd6b00d0937fa9d6580e5537bfe288f4e31e9ab0f",
+      "liveSha256": "767859a72ab97e81722d1befd6b00d0937fa9d6580e5537bfe288f4e31e9ab0f",
+      "inSync": true
+    }
+  ]
+}

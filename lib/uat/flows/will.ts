@@ -11,7 +11,9 @@
 // UAT-WILL-scenario (het UAT-plan wijst ze door naar UAT-OVZ-19/20/21) en
 // bestaan dus niet in de catalogus voor zone WILL. Alle 20 WF-WILL-01..20
 // hebben wél een eigen knoop hieronder — geen verwijsregel-gaten BINNEN de
-// 20 die deze zone daadwerkelijk bezit.
+// 20 die deze zone daadwerkelijk bezit. WF-WILL-23 (lokaal actievoorstel,
+// backlog #886 C2c) is een latere toevoeging naast de 20, genest onder
+// dezelfde 'vraag'-knoop als het cloud-pad WF-WILL-03.
 //
 // Het proces leest links→rechts: instap (bubbel/bel/krant overal zichtbaar) →
 // chat-kern (vrije vraag, tip/actie-beslissing, pin, badge-heropak, contextuele
@@ -42,6 +44,7 @@ export const WILL_FLOW: UatFlow = {
     { id: 'vraag', scenarioId: 'UAT-WILL-01', label: 'WF-WILL-01 · Vrije vraag stellen aan Fin', kind: 'screen', stage: 1, lane: 'chat' },
     { id: 'tip', scenarioId: 'UAT-WILL-02', label: 'WF-WILL-02 · Tip beslissen (accepteren/uitstellen/afwijzen)', kind: 'action', stage: 1, lane: 'chat', subOf: 'vraag' },
     { id: 'actie', scenarioId: 'UAT-WILL-03', label: 'WF-WILL-03 · Actievoorstel toevoegen', kind: 'action', stage: 1, lane: 'chat', subOf: 'vraag' },
+    { id: 'actie-lokaal', scenarioId: 'UAT-WILL-23', label: 'WF-WILL-23 · Lokaal (privacy-modus) actievoorstel toevoegen', kind: 'action', stage: 1, lane: 'chat', subOf: 'vraag' },
     { id: 'pin', scenarioId: 'UAT-WILL-04', label: 'WF-WILL-04 · Chat vastzetten als zijpaneel', kind: 'action', stage: 1, lane: 'chat', subOf: 'vraag' },
     { id: 'fouth', scenarioId: 'UAT-WILL-09', label: 'WF-WILL-09 · Foutherstel in de chat', kind: 'action', stage: 1, lane: 'chat', subOf: 'vraag' },
     { id: 'badge', scenarioId: 'UAT-WILL-06', label: 'WF-WILL-06 · Uitgestelde tips heropakken via de badge', kind: 'action', stage: 1, lane: 'chat' },
@@ -87,6 +90,7 @@ export const WILL_FLOW: UatFlow = {
     { from: 'chatbeslis', to: 'badge', kind: 'branch', label: 'badge > 0 (uitgestelde tips)' },
     { from: 'vraag', to: 'tip' },
     { from: 'vraag', to: 'actie' },
+    { from: 'vraag', to: 'actie-lokaal' },
     { from: 'vraag', to: 'pin' },
     { from: 'vraag', to: 'fouth' },
     { from: 'bespreek', to: 'tip' },
@@ -114,6 +118,7 @@ export const WILL_FLOW: UatFlow = {
     // samenvloeien → uitkomst
     { from: 'tip', to: 'uitkomst' },
     { from: 'actie', to: 'uitkomst' },
+    { from: 'actie-lokaal', to: 'uitkomst' },
     { from: 'pin', to: 'uitkomst' },
     { from: 'fouth', to: 'uitkomst' },
     { from: 'opvolgen', to: 'uitkomst' },

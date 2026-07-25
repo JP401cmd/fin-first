@@ -47,15 +47,18 @@ describe('WILL_FLOW — curatie-integriteit', () => {
     }
   })
 
-  it('dekt alle 20 WF-WILL-scenario\'s (01..20 — WF-WILL-21/22 bestaan niet in de catalogus)', () => {
+  it('dekt alle 21 WF-WILL-scenario\'s (01..20 + 23 — WF-WILL-21/22 bestaan niet in de catalogus)', () => {
     const covered = new Set(
       WILL_FLOW.nodes.map((n) => n.scenarioId).filter((id): id is string => Boolean(id)),
     )
-    const expected = Array.from({ length: 20 }, (_, i) => `UAT-WILL-${String(i + 1).padStart(2, '0')}`)
+    const expected = [
+      ...Array.from({ length: 20 }, (_, i) => `UAT-WILL-${String(i + 1).padStart(2, '0')}`),
+      'UAT-WILL-23',
+    ]
     for (const id of expected) {
       expect(covered.has(id), `${id} moet als flow-knoop voorkomen`).toBe(true)
     }
-    expect(covered.size).toBe(20)
+    expect(covered.size).toBe(21)
   })
 
   it('de domeinoverschrijdende cross-knopen dekken OVZ/MIJN/BEZIT/TOEK', () => {

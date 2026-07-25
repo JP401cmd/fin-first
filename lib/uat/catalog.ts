@@ -361,6 +361,7 @@ export const UAT_SCENARIOS: UatScenario[] = [
   { id: 'UAT-WILL-18', wf: 'WF-WILL-18', zone: 'WILL', band: 'dagelijks', naam: 'Een nieuwsartikel met Fin bespreken', kriticiteit: 'BELANGRIJK', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'c'], volgorde: 18, duurMin: 5 },
   { id: 'UAT-WILL-19', wf: 'WF-WILL-19', zone: 'WILL', band: 'dagelijks', naam: 'Een actie maken vanuit een nieuwsartikel', kriticiteit: 'KERN', rooktest: false, platforms: ['webapp', 'mobiel'], subscenarios: ['a', 'c'], volgorde: 19, duurMin: 6 },
   { id: 'UAT-WILL-20', wf: 'WF-WILL-20', zone: 'WILL', band: 'dagelijks', naam: '"Minder hierover"-feedback op een nieuwsartikel geven', kriticiteit: 'BELANGRIJK', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'c'], volgorde: 20, duurMin: 4 },
+  { id: 'UAT-WILL-23', wf: 'WF-WILL-23', zone: 'WILL', band: 'dagelijks', naam: 'Een lokaal (privacy-modus) actievoorstel uit de chat toevoegen', kriticiteit: 'BELANGRIJK', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'c'], volgorde: 21, duurMin: 6 },
   { id: 'UAT-RAPP-01', wf: 'WF-RAPP-01', zone: 'RAPP', band: 'vooruitkijken', naam: 'Rapportage-hub openen en oriënteren', kriticiteit: 'BELANGRIJK', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'c'], volgorde: 1, duurMin: 3 },
   { id: 'UAT-RAPP-02', wf: 'WF-RAPP-02', zone: 'RAPP', band: 'vooruitkijken', naam: 'Periodiek rapport genereren en lezen (maand/kwartaal/jaar)', kriticiteit: 'KERN', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'b', 'c', 'd'], volgorde: 2, duurMin: 7 },
   { id: 'UAT-RAPP-03', wf: 'WF-RAPP-03', zone: 'RAPP', band: 'vooruitkijken', naam: 'Periodiek rapport met AI-inleiding genereren', kriticiteit: 'BELANGRIJK', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'c'], volgorde: 3, duurMin: 4 },
@@ -435,6 +436,8 @@ export const UAT_SCENARIOS: UatScenario[] = [
   { id: 'UAT-BEHEER-33', wf: 'WF-BEHEER-33', zone: 'BEHEER', band: 'randvoorwaarden', naam: 'Statische naslag bekijken', kriticiteit: 'OVERIG', rooktest: false, platforms: ['webapp'], subscenarios: ['a'], volgorde: 33, duurMin: 6 },
   { id: 'UAT-BEHEER-34', wf: 'WF-BEHEER-34', zone: 'BEHEER', band: 'randvoorwaarden', naam: 'Webprestaties (Core Web Vitals p75) raadplegen', kriticiteit: 'OVERIG', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'b'], volgorde: 34, duurMin: 6 },
   { id: 'UAT-BEHEER-35', wf: 'WF-BEHEER-35', zone: 'BEHEER', band: 'randvoorwaarden', naam: 'FIRE-marktaannames jaarlaag toevoegen/bewerken/verwijderen', kriticiteit: 'BELANGRIJK', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'b'], volgorde: 35, duurMin: 8 },
+  { id: 'UAT-BEHEER-36', wf: 'WF-BEHEER-36', zone: 'BEHEER', band: 'randvoorwaarden', naam: 'Versie & git-dashboard raadplegen', kriticiteit: 'OVERIG', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'b'], volgorde: 36, duurMin: 6 },
+  { id: 'UAT-BEHEER-37', wf: 'WF-BEHEER-37', zone: 'BEHEER', band: 'randvoorwaarden', naam: 'Kennisbank-items beheren + lokale prompt-parity-status raadplegen', kriticiteit: 'OVERIG', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'c'], volgorde: 37, duurMin: 7 },
 ]
 
 /** Alle scenario-ID's die tot de canonieke rooktest (§2.6) behoren. */

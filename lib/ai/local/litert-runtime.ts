@@ -48,8 +48,14 @@ export const LOCAL_MODEL_URL =
 /** Cache-Storage-cachenaam; key = LOCAL_MODEL_URL. */
 const CACHE_NAME = 'litert-lm-model'
 
-/** mainExecutorSettings.maxNumTokens uit het integratierecept. */
-const MAX_NUM_TOKENS = 8192
+/**
+ * mainExecutorSettings.maxNumTokens uit het integratierecept. Dit is het TOTALE
+ * contextvenster (systeemprompt + overzicht + kennis + vraag + antwoord samen),
+ * NIET het DNA-condensatiebudget — dat losstaande, veel kleinere sub-budget
+ * (waarbinnen `LOCAL_CHAT_DNA` gecondenseerd wordt) staat als `dnaSubBudget` in
+ * `lib/ai/local/parity-manifest.json`.
+ */
+export const LOCAL_MODEL_TOKEN_BUDGET = 8192
 
 /**
  * Eigen-origin pad naar de zelf-gehoste WASM-assets (public/litert-wasm/*,
@@ -211,7 +217,7 @@ async function buildSession(onProgress?: (p: LocalModelLoadProgress) => void): P
     // laadt de interne getOrLoadGlobalLiteRtLm() van de jsdelivr-CDN. Idempotent
     // (zelfde pad → hergebruik), dus veilig na een disposeSession/re-load.
     await core.getOrLoadGlobalLiteRtLm(LOCAL_WASM_PATH)
-    engine = await core.Engine.create({ model: blob, mainExecutorSettings: { maxNumTokens: MAX_NUM_TOKENS } })
+    engine = await core.Engine.create({ model: blob, mainExecutorSettings: { maxNumTokens: LOCAL_MODEL_TOKEN_BUDGET } })
   } catch (err) {
     // Kanarie voor LiteRT-LM issue #2572 (weight-cache "Access is denied" op de
     // native tak) en overige init-fouten: integraal loggen vóór doorgooien.

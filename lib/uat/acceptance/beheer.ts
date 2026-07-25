@@ -1,13 +1,16 @@
 /**
- * Acceptatiecriteria — domein Beheer (admin) (WF-BEHEER-01..34 / UAT-BEHEER-01..34).
+ * Acceptatiecriteria — domein Beheer (admin) (WF-BEHEER-01..36 / UAT-BEHEER-01..36).
  *
  * Spiegelt exact de aanpak van `start.ts`/`nav.ts`/`rapp.ts` (de UI-heavy zones).
  * Bron: `docs/uat/uat-plan.md` Deel 1 (workflow-definities WF-BEHEER-01..33) +
- * de catalogus in `lib/uat/catalog.ts` (UAT-BEHEER-01..34). BEHEER is
- * aaneengesloten 01..34 (34 catalogus-scenario's, GEEN verwijsregel-gaten) —
+ * de catalogus in `lib/uat/catalog.ts` (UAT-BEHEER-01..36). BEHEER is
+ * aaneengesloten 01..36 (36 catalogus-scenario's, GEEN verwijsregel-gaten) —
  * elk scenario heeft hier precies één criterium. 34 (Webprestaties) kwam
  * later bij: read-only Core Web Vitals-observability boven op de web_vitals-
- * tabel, dezelfde superadmin/service-role/consistency-vorm als 04/32.
+ * tabel, dezelfde superadmin/service-role/consistency-vorm als 04/32. 35
+ * (FIRE-marktaannames CRUD) voegde de eerste mutatie-workflow op de fiscale-
+ * kerngetallen-pagina toe. 36 (Versie & git-dashboard) is het alleen-lezen
+ * git-/deploy-/migratiedashboard op /beheer/versie.
  *
  * KERN-BEVINDING (bepaalt exact/consistency/oracle/ui-only): BEHEER is
  * admin-tooling achter superadmin-gating — de motoren wonen elders (Kern/
@@ -16,7 +19,7 @@
  * geforceerd (0 exact-criteria, lege BEHEER_ENGINE_CHECKS). De verdeling:
  *
  *  - 0  'exact'       — BEHEER heeft geen eigen hand-narekenbare rekenformule.
- *  - 10 'consistency' — een getoond getal komt aantoonbaar ergens anders vandaan
+ *  - 12 'consistency' — een getoond getal komt aantoonbaar ergens anders vandaan
  *                        (A=B): AI-credit-/token-/KPI-aggregaten = som van de
  *                        usage-/DB-rijen (03/04), supportview-diagnose = de
  *                        eigen schermen van de doelgebruiker (08), AOW-tabel =
@@ -27,7 +30,10 @@
  *                        architectuur-plaat-tellingen = architecture.json (30),
  *                        integratie-tellingen = service-role COUNT op de
  *                        bron-tabellen (32), webprestaties-p75 = de web_vitals-
- *                        aggregatie-RPC's + officiële CWV-drempels (34).
+ *                        aggregatie-RPC's + officiële CWV-drempels (34),
+ *                        FIRE-marktaannames-CRUD = de resolver + SWR-preview
+ *                        (35), versie-/migratiedashboard = git-plumbing +
+ *                        computeMigrationDrift() (36).
  *  - 2  'oracle'      — een zware-rekenmotor-uitkomst die NIET met de hand na te
  *                        rekenen is (de horizon-kernel). types.ts noemt precies
  *                        déze twee beheer-UI's als de oracle-UI: de
@@ -36,7 +42,7 @@
  *  - 22 'ui-only'     — configuratie/inhoudsbeheer/naslag/moderatie zonder
  *                        cijfermatige uitkomst.
  *
- * SUPERADMIN-GATING (blanket): alle 33 scenario's draaien als superadmin — het
+ * SUPERADMIN-GATING (blanket): alle scenario's draaien als superadmin — het
  * UAT-testaccount is superadmin. De /beheer-layout weert niet-admins al
  * server-side (redirect naar /overzicht); /beheer/kpi en /beheer/ai-verbruik
  * hebben daarbovenop een eigen superadmin-check. Dit staat expliciet in het
@@ -612,6 +618,40 @@ const criteria: AcceptanceCriterion[] = [
       kind: 'consistency',
       source:
         'app/(app)/beheer/webprestaties/page.tsx (superadmin-redirect, service-role RPC-aggregatie, empty-state) + lib/web-vitals/config.ts#ratingForValue (stoplicht-drempels) — getoonde p75/rating komt aantoonbaar uit de web_vitals-aggregatie-RPC + de officiële drempelfunctie, geen losse berekening',
+    },
+  },
+  {
+    workflow: 'WF-BEHEER-36',
+    scenarioId: 'UAT-BEHEER-36',
+    titel: 'Versie & git-dashboard raadplegen',
+    kriticiteit: 'OVERIG',
+    given:
+      '/beheer/versie (alleen-lezen git-/deploy-/migratiedashboard). Client haalt de staat op bij GET /api/admin/version-status (superadmin-gated) en vergelijkt met GET {PROD_URL}/api/version voor de prod-SHA.',
+    when:
+      'De beheerder opent de pagina, bekijkt git-staat/werkbomen/commits, de deploy-vergelijking met prod en de Supabase-migratiestatus, en klikt Ververs; een niet-superadmin (of uitgelogde gebruiker) benadert dezelfde API rechtstreeks; de pagina draait op een host zonder git (Vercel/prod).',
+    then:
+      'De niet-superadmin krijgt een 403 van de API (client toont "Geen toegang (superadmin vereist)"), geen data. Zonder git-werkboom toont de pagina git.available=false met de reden, en blijven alleen de deploy-/migratiepanelen zichtbaar. De migratie-badge ("in sync" / "N nog niet toegepast" / "lineage-divergentie") volgt deterministisch uit `computeMigrationDrift(files, applied)`: alleen bestandsversies STRIKT nieuwer dan de laatst toegepaste (`pendingNewer`) escaleren naar rood, oudere niet-toegepaste bestanden (`driftOlder`) en toegepaste-zonder-bestand (`unknownApplied`) blijven neutrale, ingeklapte ruis. De kop-banner-toon (ok/warn/alert) volgt `computeGitVerdict()` op dezelfde ongecommit-/ahead-telling die het git-staat-paneel toont (A=B), en escaleert naar `alert` zodra `pendingNewer.length > 0`. De prod-SHA-vergelijking (gelijk/localhost-is-nieuwer/wijkt-af) volgt uit het lokale commit-log versus de opgehaalde prod-SHA. Alleen-lezen: geen enkele knop muteert git, database of migraties.',
+    assertion: {
+      kind: 'consistency',
+      source:
+        'app/api/admin/version-status/route.ts (superadmin-gate, git-plumbing via execFileSync, RPC applied_migration_versions) + lib/version-status/migrations.ts#computeMigrationDrift (pendingNewer/driftOlder/unknownApplied) + app/(app)/beheer/versie/versie-client.tsx#computeGitVerdict — getoonde badges/verdict volgen aantoonbaar uit de git-/migratiestaat (A=B), consistentietoets',
+    },
+  },
+  {
+    workflow: 'WF-BEHEER-37',
+    scenarioId: 'UAT-BEHEER-37',
+    titel: 'Kennisbank-items beheren + lokale prompt-parity-status raadplegen',
+    kriticiteit: 'OVERIG',
+    given:
+      '/beheer/kennisbank: bovenaan een alleen-lezen "Prompt-parity"-blok (server-component, gevoed door de gegenereerde snapshot `docs/ai-parity/parity.json` — ververst via `npm run parity:scan`), daaronder de bestaande kennisbank-item-CRUD (`KennisbankClient`: toevoegen/bewerken/categoriseren/verwijderen/opslaan via PUT).',
+    when:
+      'De beheerder opent de pagina vóór ooit een parity-scan te hebben gedraaid, en (apart) ná een scan met een gewijzigde bron-DNA-bestand zonder herbouw van de lokale DNA; en beheert daarnaast kennisbank-items (item toevoegen, categorie wijzigen, verwijderen, opslaan).',
+    then:
+      'Nooit gescand (`parity.neverGenerated`): neutrale lege-staat-tekst met de `npm run parity:scan`-instructie, geen verzonnen cijfers. Wel gescand: badge "In sync" (groen, `--positive`) of "Drift" (rood, `--negative`) volgt exact `parity.inSync`; bij drift toont het blok een concrete vervolgstap (skill `lokale-prompt-parity` + `npm run parity:scan`) en per bron een stoplicht "ongewijzigd"/"gewijzigd". De tokenbalk-vulling = `round(dnaEstimatedTokens / dnaSubBudget × 100)`, gecapt op 100% (deling-door-0-guard bij `dnaSubBudget<=0`). Regressie: de bestaande kennisbank-CRUD (item toevoegen/bewerken/categoriseren/verwijderen, PUT-opslaan) werkt ongewijzigd na de server/client-pagina-split — dit is nu een read-only server-blok vóór het bestaande client-component, geen wijziging aan de CRUD zelf.',
+    assertion: {
+      kind: 'consistency',
+      source:
+        'app/(app)/beheer/kennisbank/page.tsx#PromptParityBlock (badge=parity.inSync, lege-staat=parity.neverGenerated, tokenPct-formule) + lib/ai/local/parity-facts.ts#selectParityFacts + docs/ai-parity/parity.json + app/(app)/beheer/kennisbank/kennisbank-client.tsx (item-CRUD, PUT-opslaan) — badge/tokenbalk volgen aantoonbaar uit parity.json (A=B), consistentietoets; CRUD-regressie is ui-only binnen hetzelfde criterium',
     },
   },
 ]

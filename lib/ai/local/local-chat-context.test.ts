@@ -130,6 +130,26 @@ describe('buildLocalChatOverview — kansen (aandachtspunten)', () => {
     // Geen deadline → veld weggelaten (niet undefined-property).
     expect(overview.kansen[1]).toEqual({ titel: 'Los dure schuld af', besparingPerJaar: 400, vrijheidsdagen: 3 })
   })
+
+  it('draagt de expliciete euroImpactMonthly van een aandachtspunt door naar de kans (L1)', async () => {
+    // NIBUD-budgetoverschrijding draagt een expliciet maandbedrag dat AFWIJKT van
+    // savings/12 (200/12 ≈ 16,67, maar canoniek 17,5). Dat expliciete bedrag moet
+    // meekomen zodat de resolver het prefereert boven ÷12 (parity met /overzicht).
+    vi.mocked(collectAandachtspunten).mockResolvedValue([
+      { id: 'budget:boodschappen', domain: 'budget', title: 'Bespaar op boodschappen', savings: 200, euroImpactMonthly: 17.5, freedomDays: 3, href: '' },
+      { id: 'debt:a', domain: 'debt', title: 'Los dure schuld af', savings: 400, freedomDays: 3, href: '' },
+    ] as never)
+    const overview = await buildLocalChatOverview(makeSupabase({ net_monthly_income: 3400 }, []))
+    expect(overview.kansen[0]).toEqual({
+      titel: 'Bespaar op boodschappen',
+      besparingPerJaar: 200,
+      euroImpactMonthly: 17.5,
+      vrijheidsdagen: 3,
+    })
+    // Zonder expliciet maandbedrag blijft het veld weg (geen undefined-property).
+    expect(overview.kansen[1]).toEqual({ titel: 'Los dure schuld af', besparingPerJaar: 400, vrijheidsdagen: 3 })
+    expect('euroImpactMonthly' in overview.kansen[1]).toBe(false)
+  })
 })
 
 describe('buildLocalChatOverview — openstaande acties', () => {

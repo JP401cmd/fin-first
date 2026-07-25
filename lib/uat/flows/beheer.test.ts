@@ -52,14 +52,14 @@ describe('BEHEER_FLOW — curatie-integriteit', () => {
     expect(crossNodes.length).toBe(0)
   })
 
-  it("dekt alle 35 BEHEER-scenario's (01..35, contiguous — geen verwijsregels)", () => {
+  it("dekt alle 37 BEHEER-scenario's (01..37, contiguous — geen verwijsregels)", () => {
     const covered = new Set(
       BEHEER_FLOW.nodes.map((n) => n.scenarioId).filter((id): id is string => Boolean(id)),
     )
-    const expected = Array.from({ length: 35 }, (_, i) => `UAT-BEHEER-${String(i + 1).padStart(2, '0')}`)
+    const expected = Array.from({ length: 37 }, (_, i) => `UAT-BEHEER-${String(i + 1).padStart(2, '0')}`)
     for (const id of expected) {
       expect(covered.has(id), `${id} moet als flow-knoop voorkomen`).toBe(true)
     }
-    expect(covered.size).toBe(35)
+    expect(covered.size).toBe(37)
   })
 })

@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-21T20:52:29.463Z",
-  "generatedDate": "2026-07-21",
+  "generatedAt": "2026-07-24T23:19:33.081Z",
+  "generatedDate": "2026-07-24",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -193,7 +193,7 @@
     "tables": 86,
     "migrations": 159,
     "integrations": 25,
-    "components": 832,
+    "components": 835,
     "providers": 11,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -7945,7 +7945,7 @@
     }
   ],
   "components": {
-    "total": 832,
+    "total": 835,
     "groups": [
       {
         "group": "app",
@@ -8280,7 +8280,7 @@
       },
       {
         "group": "overview",
-        "count": 135,
+        "count": 136,
         "items": [
           "aandachtspunt-actie-button",
           "atomic-cards",
@@ -8329,6 +8329,7 @@
           "compound-insight-card",
           "compound-insight-card.test",
           "eenvoudig-pill-list",
+          "embedded-page-info.test",
           "empty-states",
           "empty-states.test",
           "entity-backfill-editor",
@@ -8421,7 +8422,7 @@
       },
       {
         "group": "widgets",
-        "count": 87,
+        "count": 88,
         "items": [
           "abonnementen-widget",
           "acties-widget",
@@ -8445,6 +8446,7 @@
           "budget-fav-widget",
           "budget-fav-widget.test",
           "budget-heatmap-widget",
+          "budget-heatmap-widget.test",
           "budget-trend-widget",
           "budget-trend-widget.test",
           "budgetten-widget",
@@ -8824,6 +8826,18 @@
         ]
       },
       {
+        "group": "holdings",
+        "count": 6,
+        "items": [
+          "crypto-holding-card",
+          "crypto-sparkline",
+          "holding-favorite-button",
+          "holding-source-badge",
+          "investment-holding-card",
+          "isin-lookup-field"
+        ]
+      },
+      {
         "group": "aangifte",
         "count": 5,
         "items": [
@@ -8832,17 +8846,6 @@
           "review-primitives",
           "review-step",
           "upload-step"
-        ]
-      },
-      {
-        "group": "holdings",
-        "count": 5,
-        "items": [
-          "crypto-holding-card",
-          "crypto-sparkline",
-          "holding-source-badge",
-          "investment-holding-card",
-          "isin-lookup-field"
         ]
       },
       {
@@ -14767,6 +14770,29 @@
       ],
       "summary": "De parallelle sessie (ADR 0056) landde CLIENT-observability (web-vitals/RUM). SERVER-observability had gaten: onafgevangen server-fouten (Server Components / Route Handlers / Server Actions die niet via `serverError()` lopen) landden alleen in Vercel-logs, een crash in de root `a",
       "file": "docs/adr/0060-server-observability-instrumentation-en-cron-alert.md"
+    },
+    {
+      "id": "0061-lokaal-actievoorstel-tool-calling-substituut",
+      "title": "C2c: lokaal tekst-geparst actievoorstel als tool-calling-substituut",
+      "status": "aanvaard",
+      "date": "2026-07-25",
+      "elements": [
+        "t-lokale-ai",
+        "as-coach"
+      ],
+      "summary": "De lokale (on-device) Fin-chat kan een gestructureerd actievoorstel emitten als een fenced tekstblok (` ```fin-actie `) in zijn antwoord. Dit is GEEN autonome function-invocation — LiteRT-LM JS heeft geen tool-calling-API — maar een tekst-intent die fail-closed geparst wordt, alt",
+      "file": "docs/adr/0061-lokaal-actievoorstel-tool-calling-substituut.md"
+    },
+    {
+      "id": "0062-lokale-chat-dna-afgeleid-artefact",
+      "title": "Lokale chat-DNA wordt een afgeleid, hash-geverifieerd artefact",
+      "status": "aanvaard",
+      "date": "2026-07-25",
+      "elements": [
+        "t-lokale-ai"
+      ],
+      "summary": "`LOCAL_CHAT_DNA` (`lib/ai/local/local-chat-prompt.ts`) is niet langer een hand-onderhouden verbatim-kopie van de cloud-prompt-DNA. Het wordt via de `lokale-prompt-parity`-skill en een gecommit manifest (`lib/ai/local/parity-manifest.json`) gesynchroniseerd met de cloud-bron (`lib",
+      "file": "docs/adr/0062-lokale-chat-dna-afgeleid-artefact.md"
     }
   ],
   "churn": {
@@ -14774,11 +14800,11 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 105
+        "commits": 106
       },
       {
         "path": "lib/ai",
-        "commits": 51
+        "commits": 52
       },
       {
         "path": "app/(app)/toekomst",
@@ -14817,7 +14843,7 @@
       {
         "file": "components/app/horizon/horizon-client.tsx",
         "loc": 8269,
-        "commits": 89
+        "commits": 90
       },
       {
         "file": "components/app/budgets-client.tsx",
@@ -14826,8 +14852,8 @@
       },
       {
         "file": "components/core/assets-client.tsx",
-        "loc": 4302,
-        "commits": 45
+        "loc": 4312,
+        "commits": 46
       },
       {
         "file": "components/app/cash-account-view.tsx",
@@ -14841,8 +14867,8 @@
       },
       {
         "file": "lib/dashboard-data-loader.ts",
-        "loc": 2677,
-        "commits": 44
+        "loc": 2686,
+        "commits": 46
       },
       {
         "file": "lib/test-personas.ts",
@@ -15325,6 +15351,46 @@
         ]
       },
       {
+        "id": "lokale-prompt-parity",
+        "name": "lokale-prompt-parity",
+        "description": "Gereedschap om de gecondenseerde lokale Fin-DNA (LOCAL_CHAT_DNA) in sync te houden met de cloud-bron-DNA — drift detecteren via het gecommitte parity-manifest, opnieuw condenseren binnen het sub-budget met behoud van de harde invarianten, en pas na eigenaar-review shippen.",
+        "steps": [
+          {
+            "index": 1,
+            "title": "Bron diffen tegen de baseline",
+            "agents": [
+              "ai-specialist-prompt-dna"
+            ]
+          },
+          {
+            "index": 2,
+            "title": "Opnieuw condenseren binnen budget",
+            "agents": [
+              "ai-specialist-prompt-dna"
+            ]
+          },
+          {
+            "index": 3,
+            "title": "Manifest + doelbestand schrijven",
+            "agents": [
+              "ai-specialist-general"
+            ]
+          },
+          {
+            "index": 4,
+            "title": "Kwaliteitspoort",
+            "agents": [
+              "tester"
+            ]
+          },
+          {
+            "index": 5,
+            "title": "Verplichte eigenaar-review vóór ship",
+            "agents": []
+          }
+        ]
+      },
+      {
         "id": "new-feature",
         "name": "new-feature",
         "description": "End-to-end pijplijn voor een NIEUWE functionaliteit in TriFinity. Gebruik deze skill wanneer iets nieuws gebouwd moet worden dat nog niet bestaat. Bouwt het voort op iets bestaands → /extend-feature; kleine bijschaving → /kleine-aanpassing; AI-functionaliteit → /ai-feature.",
@@ -15651,15 +15717,15 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-07-21",
+    "previousDate": "2026-07-24",
     "hasChanges": true,
     "sections": [
       {
         "label": "Componenten (aantal)",
-        "added": [],
-        "removed": [
-          "-38"
-        ]
+        "added": [
+          "+1"
+        ],
+        "removed": []
       }
     ]
   },
@@ -15857,6 +15923,13 @@
       "date": "2026-07-21",
       "api": 264,
       "components": 832,
+      "tables": 86,
+      "routesProduction": 101
+    },
+    {
+      "date": "2026-07-24",
+      "api": 264,
+      "components": 835,
       "tables": 86,
       "routesProduction": 101
     }

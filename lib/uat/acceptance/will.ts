@@ -8,9 +8,17 @@
  *
  * WF-WILL-21 en WF-WILL-22 hebben BEWUST GEEN eigen criterium hier — het UAT-plan
  * zelf wijst ze door naar UAT-OVZ-19/20/21 ("→ gedekt door UAT-OVZ-19/20/21");
- * `lib/uat/catalog.ts` bevat dan ook geen UAT-WILL-21/22 (de catalogus stopt bij
- * UAT-WILL-20) — dit domein is dus, net als SCHULD/TOEK, NIET volledig
- * aaneengesloten op WF-nummer, maar WEL 1-op-1 met de 20 catalogus-scenario's.
+ * `lib/uat/catalog.ts` bevat dan ook geen UAT-WILL-21/22 (het volgnummer na 20
+ * is UAT-WILL-23, zie hieronder) — dit domein is dus, net als SCHULD/TOEK, NIET
+ * volledig aaneengesloten op WF-nummer, maar WEL 1-op-1 met de catalogus-
+ * scenario's die daadwerkelijk bestaan (20 + UAT-WILL-23 = 21).
+ *
+ * UAT-WILL-23 (lokaal actievoorstel toevoegen, backlog #886 C2c): het on-device
+ * pad hergebruikt de bestaande `ActionSuggestionCard`/`POST /api/ai/actions` van
+ * WF-WILL-03, maar het intent-parsen/-resolven zit in
+ * `lib/ai/local/local-chat-transport.ts` (fail-closed bij parse-miss/geen
+ * canonieke match) — vandaar een eigen workflow i.p.v. een uitbreiding van
+ * WF-WILL-03.
  *
  * KERN-BEVINDING (bepaalt exact vs. ui-only — zie ook de zone-specifieke notitie
  * op de Notion-kaart): dit domein combineert twee toetsbaarheidsprofielen.
@@ -314,6 +322,23 @@ const criteria: AcceptanceCriterion[] = [
       kind: 'exact',
       expected: 'macroNa1=false; macroNa2=true; wonenGedemoveerd=false',
       source: 'app/api/news/route.ts#getDemotedCategories (r219-241, drempel ≥2/90 dagen, gemirrord) — zie will-checks.ts',
+    },
+  },
+  {
+    workflow: 'WF-WILL-23',
+    scenarioId: 'UAT-WILL-23',
+    titel: 'Een lokaal (privacy-modus) actievoorstel uit de chat toevoegen',
+    kriticiteit: 'BELANGRIJK',
+    given:
+      'Privé-modus aan (on-device Fin actief, lokale-ai-strip zichtbaar); het lokale antwoord bevat een fenced `fin-actie`-blok. NB: op moment van vastleggen emit het huidige on-device model dit blok nog niet spontaan (volgt via de skill `lokale-prompt-parity`/promptronde) — het pad zelf (transport → UI → schrijven) is al volledig gebouwd en moet bij de eerstvolgende live-run al meegenomen worden.',
+    when:
+      'De generatie stopt. Bij een titel die canoniek matcht in het LocalChatOverview verschijnt een `data-finActie`-part met dezelfde ActionSuggestionCard als het cloud-pad (WF-WILL-03); bij een parse-miss (geen blok) of een niet-matchende titel verschijnt géén kaart. De gebruiker klikt "+ Toevoegen" (en eventueel nogmaals).',
+    then:
+      'Alleen bij een canonieke match toont de kaart de titel + de CANONIEKE "+X dagen vrijheid"/euro-impact — uit LocalChatOverview resolved, NOOIT de modelcijfers zelf. Bij parse-miss of geen match verschijnt niets (fail-closed, geen foutmelding, het fence-blok is al uit de zichtbare tekst gestript). De actie wordt pas geschreven bij de klik op "+ Toevoegen" — nooit automatisch bij streaming-einde — via POST /api/ai/actions met het bron-veld op "chat" en metadata.origin op "local-chat" (own-row RLS, dezelfde route als het cloud-pad). Herhaald klikken dedupliceert op de stabiele intent-hash (`finActionIntentHash`), identiek aan de dubbelklik-guard van WF-WILL-03. Regressie: het cloud-tool-call-pad (WF-WILL-03) blijft ongewijzigd functioneel naast dit lokale pad.',
+    assertion: {
+      kind: 'ui-only',
+      source:
+        'lib/ai/local/local-chat-transport.ts (parseFinActionIntent/resolveFinActionIntent/finActionIntentHash — fail-closed bij parse-miss/geen canonieke match) + components/app/chat/chat-panel.tsx (data-finActie-rendering, handleAddAction met metadata.origin op "local-chat") + app/api/ai/actions/route.ts (metadata vrije record, het bron-veld op waarde "chat") — procestoets: de canonieke cijfers zelf zijn deterministisch resolved, maar of/wanneer het model een blok emit is niet hand-forceerbaar in UAT',
     },
   },
 ]

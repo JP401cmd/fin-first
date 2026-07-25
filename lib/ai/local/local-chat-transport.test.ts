@@ -206,3 +206,162 @@ describe('LocalChatTransport — spike: chunk-vertaling naar useChat (C2a)', () 
     expect(disposed()).toBe(1)
   })
 })
+
+/**
+ * C2c: het fin-actie-fence-blok end-to-end door de ECHTE stream-machinerie
+ * (`readUIMessageStream`, hetzelfde orakel als hierboven), niet alleen de pure
+ * `parse-intent.ts`-unittests. Bewijst dat de transport het contract uit
+ * `chat-panel.tsx`'s `renderAssistantMessage` (part.type === 'data-finActie' &&
+ * part.data) daadwerkelijk aflevert, met de canonieke (cijfer-guardrail)
+ * getallen — en dat een afgekapt/onparsebaar blok GEEN data-part oplevert.
+ */
+describe('LocalChatTransport — data-finActie-part (C2c fin-actie-fence)', () => {
+  const OVERVIEW_MET_KANS: LocalChatOverview = {
+    ...OVERVIEW,
+    kansen: [
+      { titel: 'Verhoog je maandelijkse inleg', besparingPerJaar: 600, vrijheidsdagen: 5 },
+    ],
+  }
+
+  function findDataFinActie(msg: UIMessage | undefined) {
+    return (msg?.parts ?? []).find((p) => p.type === 'data-finActie') as
+      | { type: 'data-finActie'; id?: string; data?: unknown }
+      | undefined
+  }
+
+  it('geldig fin-actie-blok → data-finActie-part met CANONIEKE cijfers (model-getallen genegeerd)', async () => {
+    // Model suggereert bewust AFWIJKENDE (foute) cijfers — de resolver moet die
+    // negeren en de canonieke waarden uit het overzicht gebruiken (999/9999).
+    const reply =
+      'Hier is een idee.\n' +
+      '```fin-actie\n' +
+      '{ "title": "Verhoog je maandelijkse inleg", "description": "Doe het nu", ' +
+      '"freedom_days_impact": 999, "euro_impact_monthly": 9999, "priority_score": 2 }\n' +
+      '```'
+    const { session } = mockSession(reply)
+    const transport = new LocalChatTransport({
+      overview: OVERVIEW_MET_KANS,
+      knowledgeItems: [],
+      createSession: async () => session,
+    })
+
+    const stream = await transport.sendMessages(sendOpts([userMessage('Wat kan ik doen?')]))
+    const msg = await foldToMessage(stream)
+
+    // Zichtbare tekst bevat het fence-blok NIET (nooit laten lekken in de bubbel).
+    // (.trim() — de reeds-gestreamde prefix vóór de fence-strip kan een
+    // onschadelijke staart-nieuweregel bevatten; dat is geen onderwerp van deze
+    // test, wél de afwezigheid van het fence-blok zelf.)
+    expect(textOf(msg).trim()).toBe('Hier is een idee.')
+    expect(textOf(msg)).not.toContain('fin-actie')
+    expect(textOf(msg)).not.toContain('999')
+
+    const part = findDataFinActie(msg)
+    expect(part).toBeDefined()
+    expect(part?.data).toEqual({
+      title: 'Verhoog je maandelijkse inleg',
+      description: 'Doe het nu',
+      freedom_days_impact: 5, // canoniek uit kansen, NIET 999
+      euro_impact_monthly: 50, // 600/12, NIET 9999
+      priority_score: 2,
+    })
+    expect(part?.id).toBeTruthy() // stabiele intent-hash (dedupe-sleutel)
+  })
+
+  it('bericht dat UITSLUITEND het fin-actie-blok bevat (geen proza) → lege tekst-part + data-finActie-part', async () => {
+    const reply =
+      '```fin-actie\n' +
+      '{ "title": "Verhoog je maandelijkse inleg", "description": null, ' +
+      '"freedom_days_impact": 1, "euro_impact_monthly": 1, "priority_score": 3 }\n' +
+      '```'
+    const { session } = mockSession(reply)
+    const transport = new LocalChatTransport({
+      overview: OVERVIEW_MET_KANS,
+      knowledgeItems: [],
+      createSession: async () => session,
+    })
+
+    const msg = await foldToMessage(await transport.sendMessages(sendOpts([userMessage('Suggestie?')])))
+
+    expect(textOf(msg)).toBe('')
+    expect(findDataFinActie(msg)).toBeDefined()
+  })
+
+  it('afgekapt fin-actie-blok (geen sluiting) → GEEN data-finActie-part, blok uit de zichtbare tekst gestript', async () => {
+    const reply = 'Nog aan het typen...\n```fin-actie\n{ "title": "Verhoog'
+    const { session } = mockSession(reply)
+    const transport = new LocalChatTransport({
+      overview: OVERVIEW_MET_KANS,
+      knowledgeItems: [],
+      createSession: async () => session,
+    })
+
+    const msg = await foldToMessage(await transport.sendMessages(sendOpts([userMessage('?')])))
+
+    expect(textOf(msg).trim()).toBe('Nog aan het typen...')
+    expect(findDataFinActie(msg)).toBeUndefined()
+  })
+
+  it('onparsebaar JSON in het blok → GEEN data-finActie-part, proza blijft zichtbaar', async () => {
+    const reply = 'Kijk eens.\n```fin-actie\n{ dit is geen geldige JSON }\n```'
+    const { session } = mockSession(reply)
+    const transport = new LocalChatTransport({
+      overview: OVERVIEW_MET_KANS,
+      knowledgeItems: [],
+      createSession: async () => session,
+    })
+
+    const msg = await foldToMessage(await transport.sendMessages(sendOpts([userMessage('?')])))
+
+    expect(textOf(msg).trim()).toBe('Kijk eens.')
+    expect(findDataFinActie(msg)).toBeUndefined()
+  })
+
+  it('geen match in het overzicht → GEEN data-finActie-part (M1: geen "+0 dagen vrijheid"-kaart), blok wél gestript', async () => {
+    // Het model emitteert een geldig blok, maar de titel matcht GEEN enkele
+    // overzicht-bron. Fail-closed: geen kaart. Het fence-blok wordt nog steeds uit
+    // de zichtbare tekst gestript (nooit JSON in de bubbel), alleen de kaart vervalt.
+    const reply =
+      'Even meedenken.\n' +
+      '```fin-actie\n' +
+      '{ "title": "Iets dat nergens op matcht", "description": null, ' +
+      '"freedom_days_impact": 42, "euro_impact_monthly": 42, "priority_score": 3 }\n' +
+      '```'
+    const { session } = mockSession(reply)
+    const transport = new LocalChatTransport({
+      overview: OVERVIEW_MET_KANS, // heeft alleen de "Verhoog je maandelijkse inleg"-kans
+      knowledgeItems: [],
+      createSession: async () => session,
+    })
+
+    const msg = await foldToMessage(await transport.sendMessages(sendOpts([userMessage('?')])))
+
+    // Proza blijft, blok is weg, en er is GEEN kaart.
+    expect(textOf(msg).trim()).toBe('Even meedenken.')
+    expect(textOf(msg)).not.toContain('fin-actie')
+    expect(textOf(msg)).not.toContain('42')
+    expect(findDataFinActie(msg)).toBeUndefined()
+  })
+
+  it('een gematchte kans blijft WÉL een data-finActie-part opleveren (M1 onderdrukt alleen de niet-match)', async () => {
+    // Regressie-anker naast de no-match: bewijs dat de match-tak intact is en de
+    // fail-closed-suppressie niet per ongeluk álle kaarten wegneemt.
+    const reply =
+      '```fin-actie\n' +
+      '{ "title": "Verhoog je maandelijkse inleg", "description": null, ' +
+      '"freedom_days_impact": 999, "euro_impact_monthly": 999, "priority_score": 3 }\n' +
+      '```'
+    const { session } = mockSession(reply)
+    const transport = new LocalChatTransport({
+      overview: OVERVIEW_MET_KANS,
+      knowledgeItems: [],
+      createSession: async () => session,
+    })
+
+    const msg = await foldToMessage(await transport.sendMessages(sendOpts([userMessage('?')])))
+    const part = findDataFinActie(msg)
+    expect(part).toBeDefined()
+    // Canoniek uit kansen: 5 dagen, 600/12 = 50/mnd (model-999 genegeerd).
+    expect(part?.data).toMatchObject({ freedom_days_impact: 5, euro_impact_monthly: 50 })
+  })
+})

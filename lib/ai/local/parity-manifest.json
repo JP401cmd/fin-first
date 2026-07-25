@@ -1,0 +1,15 @@
+{
+  "generatedAt": "2026-07-24T22:10:46.710Z",
+  "dnaSubBudget": 2000,
+  "dnaEstimatedTokens": 490,
+  "sources": [
+    {
+      "file": "lib/ai/dna/base.ts",
+      "sha256": "4089da9e6e0a736479423786bcf653065c7ad9f523e8d0d8c8022ae57a6c639d"
+    },
+    {
+      "file": "lib/ai/dna/wil.ts",
+      "sha256": "767859a72ab97e81722d1befd6b00d0937fa9d6580e5537bfe288f4e31e9ab0f"
+    }
+  ]
+}

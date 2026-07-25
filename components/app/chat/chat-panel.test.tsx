@@ -26,6 +26,9 @@ let mockClearPendingMessage = vi.fn()
 let mockError: unknown = undefined
 let mockRegenerate = vi.fn()
 let mockClearError = vi.fn()
+// Per-test in te stellen berichten-historie — default leeg (bestaande gedrags-
+// tests raken 'm niet); de data-finActie-tests zetten 'm vooraf aan render.
+let mockMessages: unknown[] = []
 
 // Mutabele chat-context — per test in te stellen
 let ctx: Record<string, unknown> = {}
@@ -38,7 +41,7 @@ vi.mock('@ai-sdk/react', () => ({
   useChat: (opts: { transport: unknown }) => {
     mockUseChatCalls.push(opts)
     return {
-      messages: [],
+      messages: mockMessages,
       sendMessage: mockSendMessage,
       status: 'ready',
       error: mockError,
@@ -156,6 +159,7 @@ beforeEach(() => {
   mockClearError = vi.fn()
   localStorage.clear()
   ctx = makeCtx()
+  mockMessages = []
   mockUseChatCalls = []
   mockLocalTransportInstances = []
   mockCheckLocalAiCapability.mockReset()
@@ -310,7 +314,8 @@ describe('ChatPanel — privé-modus transport-swap (cloud ↔ lokaal, FR-C2a)',
 
     await screen.findByText('Experimenteel · lokaal')
     expect(screen.getByText(/Fin denkt lokaal na/)).toBeInTheDocument()
-    expect(screen.getByText(/Acties en wat-als-simulaties kan Fin lokaal nog niet uitvoeren/)).toBeInTheDocument()
+    expect(screen.getByText(/Ook lokaal kan Fin actievoorstellen doen/)).toBeInTheDocument()
+    expect(screen.getByText(/Wat-als-simulaties kan Fin lokaal nog niet uitvoeren/)).toBeInTheDocument()
     expect(screen.getByText('Draait op je toestel')).toBeInTheDocument()
   })
 
@@ -382,5 +387,121 @@ describe('ChatPanel — retry fail-closed tijdens niet-ready (FR-C2a)', () => {
 
     fireEvent.click(retry)
     expect(mockRegenerate).toHaveBeenCalledTimes(1)
+  })
+})
+
+/**
+ * C2c: het lokale (privé-)pad heeft geen tool-invocations — het transport
+ * (`local-chat-transport.ts`) surfaced een geparste actie als een NIET-transient
+ * `data-finActie`-part i.p.v. een `suggestAction`-tool-output. `renderAssistantMessage`
+ * hergebruikt dezelfde `ActionSuggestionCard` voor dat part-type (regel ~932).
+ *
+ * Deze suite bewijst het render-contract end-to-end via de useChat-messages-mock
+ * (geen echte transport nodig — dat is al gedekt door local-chat-transport.test.ts
+ * en parse-intent.test.ts):
+ *  - een geldig `data-finActie`-part náást tekst rendert de kaart;
+ *  - een `data-finActie`-part MET LEGE tekst (`cleanedText === ''`, het geval
+ *    waarin het model ALLEEN het fin-actie-blok teruggeeft) rendert de kaart óók —
+ *    dit is de regressie-val: `hasContent` checkte oorspronkelijk alleen op
+ *    text/suggestAction/showVisualization en zou een berichtje met UITSLUITEND
+ *    een data-finActie-part stilzwijgend laten verdwijnen;
+ *  - een ontbrekend/leeg `data` op het part (defensieve malformed-guard,
+ *    `part.type === 'data-finActie' && part.data`) rendert GEEN kaart.
+ */
+describe('ChatPanel — data-finActie kaart (lokaal actievoorstel, C2c)', () => {
+  beforeEach(() => {
+    localStorage.setItem(WFT_KEY, 'true')
+    stubPrivacySwapFetch({ privacyMode: false })
+  })
+
+  const FIN_ACTIE_DATA = {
+    title: 'Verhoog je maandelijkse inleg',
+    description: 'Bespaar ~5 vrijheidsdagen per jaar.',
+    freedom_days_impact: 5,
+    euro_impact_monthly: 50,
+    priority_score: 3,
+  }
+
+  it('rendert de kaart voor een data-finActie-part náást gewone tekst', async () => {
+    mockMessages = [{
+      id: 'm1',
+      role: 'assistant',
+      parts: [
+        { type: 'text', text: 'Hier is een voorstel:' },
+        { type: 'data-finActie', id: 'hash-1', data: FIN_ACTIE_DATA },
+      ],
+    }]
+
+    render(<ChatPanel />)
+
+    expect(await screen.findByText('Verhoog je maandelijkse inleg')).toBeInTheDocument()
+    expect(screen.getByText('Hier is een voorstel:')).toBeInTheDocument()
+    expect(screen.getByText('+ Toevoegen')).toBeInTheDocument()
+  })
+
+  it('rendert de kaart óók wanneer het bericht UITSLUITEND het data-finActie-part bevat (lege tekst)', async () => {
+    // Spiegelt local-chat-transport.ts: cleanedText kan '' zijn wanneer het
+    // model alleen het fin-actie-fence-blok teruggaf (geen omringende proza).
+    mockMessages = [{
+      id: 'm1',
+      role: 'assistant',
+      parts: [
+        { type: 'text', text: '' },
+        { type: 'data-finActie', id: 'hash-1', data: FIN_ACTIE_DATA },
+      ],
+    }]
+
+    render(<ChatPanel />)
+
+    expect(await screen.findByText('Verhoog je maandelijkse inleg')).toBeInTheDocument()
+  })
+
+  it('rendert GEEN kaart wanneer het data-finActie-part geen data heeft (malformed-guard)', async () => {
+    mockMessages = [{
+      id: 'm1',
+      role: 'assistant',
+      parts: [
+        { type: 'text', text: 'Even nadenken...' },
+        { type: 'data-finActie', id: 'hash-1', data: null },
+      ],
+    }]
+
+    render(<ChatPanel />)
+
+    expect(await screen.findByText('Even nadenken...')).toBeInTheDocument()
+    expect(screen.queryByText('+ Toevoegen')).not.toBeInTheDocument()
+  })
+
+  it('POST\'t de metadata.origin:local-chat bij het toevoegen van een lokale actie', async () => {
+    const fetchSpy = stubPrivacySwapFetch({ privacyMode: false })
+    mockMessages = [{
+      id: 'm1',
+      role: 'assistant',
+      parts: [
+        { type: 'text', text: 'Voorstel:' },
+        { type: 'data-finActie', id: 'hash-1', data: FIN_ACTIE_DATA },
+      ],
+    }]
+    fetchSpy.mockImplementation((url: string, init?: RequestInit) => {
+      if (url === '/api/privacy-mode') return Promise.resolve({ ok: true, json: () => Promise.resolve({ privacyMode: false }) })
+      if (url === '/api/ai/actions') {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ action: { id: 'a1', ...JSON.parse(String(init?.body)) } }),
+        })
+      }
+      return Promise.reject(new Error(`onverwachte fetch in test: ${url}`))
+    })
+
+    render(<ChatPanel />)
+    const addButton = await screen.findByText('+ Toevoegen')
+    fireEvent.click(addButton)
+
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledWith('/api/ai/actions', expect.anything()))
+    const calls = fetchSpy.mock.calls as unknown as Array<[string, RequestInit?]>
+    const call = calls.find(([url]) => url === '/api/ai/actions')
+    const body = JSON.parse(String(call?.[1]?.body))
+    expect(body.metadata).toEqual({ origin: 'local-chat' })
+    expect(body.source).toBe('chat')
   })
 })

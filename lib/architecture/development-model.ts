@@ -89,6 +89,10 @@ export const SKILL_CURATION: Record<string, SkillCuration> = {
     tagline: 'Stuur het gedrag van de AI bij — een evaluatie-loop van voorbeelden naar chirurgische prompt-aanpassing.',
   },
   // tooling
+  'lokale-prompt-parity': {
+    kind: 'tooling',
+    tagline: 'Houdt de gecondenseerde lokale Fin-DNA in sync met de cloud-bron-DNA — drift-detectie via manifest, hercondenseren binnen budget, eigenaar-gate vóór ship.',
+  },
   'frontend-design': {
     kind: 'tooling',
     tagline: 'Gereedschap voor onderscheidende, productiewaardige frontend — vermijdt generieke AI-look.',

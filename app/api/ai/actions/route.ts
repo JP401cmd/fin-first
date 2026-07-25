@@ -1,6 +1,34 @@
 import { NextRequest } from 'next/server'
+import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
+import { parseBody } from '@/lib/api/parse-body'
 import { unauthorized, serverError } from '@/lib/api/respond'
+
+/**
+ * Zod-schema voor POST /api/ai/actions (ADR 0044 — parseBody + platte envelope).
+ *
+ * BACKWARD-COMPAT: dit is bewust de UNIE van álle bestaande POST-callers:
+ *   - aandachtspunten-bus (`lib/aandachtspunten.ts`) → metadata.{kind,domain,aandachtspunt_id}
+ *   - belasting-actieknop (`aandachtspunt-actie-button.tsx`) → payload + source:'manual'
+ *   - cloud-chat (`chat-panel.tsx`, source:'chat') + LOKAAL-chat (metadata.origin:'local-chat')
+ *   - action-board (handmatig), whatif-chat (description/euro = null), health-score-receipt
+ *     (description undefined, freedom_days=0), news-components (freedom_days=0, metadata vrij)
+ *
+ * Daarom: `description`/`euro_impact_monthly`/`metadata` zijn nullish (null én
+ * undefined toegestaan), `metadata` is een vrije record (moet `aandachtspunt_id`
+ * én `origin` én willekeurige sleutels toelaten), en `priority_score` blijft los
+ * (de DB-CHECK 1–5 + de `|| 3`-fallback hieronder bewaken het bereik — ongewijzigd).
+ */
+const actionCreateSchema = z.object({
+  title: z.string().min(1, 'title is verplicht'),
+  description: z.string().nullish(),
+  freedom_days_impact: z.number(),
+  euro_impact_monthly: z.number().nullish(),
+  due_date: z.string().optional(),
+  priority_score: z.number().optional(),
+  source: z.enum(['manual', 'chat']).optional(),
+  metadata: z.record(z.string(), z.unknown()).nullish(),
+})
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -10,20 +38,9 @@ export async function POST(req: NextRequest) {
     return unauthorized()
   }
 
-  const body = await req.json() as {
-    title: string
-    description?: string
-    freedom_days_impact: number
-    euro_impact_monthly?: number
-    due_date?: string
-    priority_score?: number
-    source?: 'manual' | 'chat'
-    metadata?: Record<string, unknown>
-  }
-
-  if (!body.title || body.freedom_days_impact == null) {
-    return Response.json({ error: 'title and freedom_days_impact are required' }, { status: 400 })
-  }
+  const parsed = await parseBody(actionCreateSchema, req)
+  if (!parsed.ok) return parsed.response
+  const body = parsed.data
 
   const source = body.source === 'chat' ? 'chat' : 'manual'
 

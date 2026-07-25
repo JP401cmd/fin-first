@@ -80,6 +80,13 @@ export interface LocalChatKans {
   titel: string
   /** Geschatte besparing in EUR/jaar (0 = onbekend). */
   besparingPerJaar: number
+  /**
+   * Expliciete maandelijkse euro-impact uit de canonieke bron (bv. de NIBUD-
+   * maandoverschrijding), indien gezet. Wordt door `resolveFinActionIntent`
+   * geprefereerd boven JAAR÷12 — spiegelt `aandachtspuntToActionPayload`, zodat
+   * dezelfde actie op /overzicht en in de lokale chat hetzelfde €/mnd toont.
+   */
+  euroImpactMonthly?: number
   /** Vrijheidsdagen-equivalent van de jaarbesparing. */
   vrijheidsdagen: number
   /** Vrije-tekst deadline of ISO-datum, indien bekend. */
@@ -250,6 +257,9 @@ export async function buildLocalChatOverview(supabase: SupabaseClient): Promise<
       titel: a.title,
       besparingPerJaar: Math.round(a.savings),
       vrijheidsdagen: Math.round(a.freedomDays),
+      // Expliciete maand-euro canoniek doorgeven wanneer de bron 'm draagt (bv.
+      // NIBUD-budgetoverschrijding); de resolver prefereert 'm boven JAAR÷12.
+      ...(a.euroImpactMonthly != null ? { euroImpactMonthly: a.euroImpactMonthly } : {}),
       ...(a.deadline ? { deadline: a.deadline } : {}),
     }))
 
