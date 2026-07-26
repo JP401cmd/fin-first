@@ -21,6 +21,7 @@ export type UatZone =
   | 'WILL'
   | 'RAPP'
   | 'KRUIS'
+  | 'CANON'
   | 'BEHEER'
 
 export interface UatScenario {
@@ -51,7 +52,7 @@ export const UAT_BANDEN: { id: UatBand; label: string; zones: UatZone[] }[] = [
   { id: 'dagelijks', label: 'Dagelijks gebruik', zones: ['OVZ', 'WILL', 'NAV'] },
   { id: 'vooruitkijken', label: 'Vooruitkijken', zones: ['TOEK', 'REKEN', 'BELAST', 'RAPP'] },
   { id: 'randvoorwaarden', label: 'Randvoorwaarden', zones: ['MIJN', 'BEHEER'] },
-  { id: 'verbinding', label: 'Cross-module', zones: ['KRUIS'] },
+  { id: 'verbinding', label: 'Cross-module', zones: ['KRUIS', 'CANON'] },
 ]
 
 export const UAT_ZONES: UatZoneMeta[] = [
@@ -69,6 +70,7 @@ export const UAT_ZONES: UatZoneMeta[] = [
   { zone: 'WILL', naam: "Fin, berichten & krant", band: 'dagelijks' },
   { zone: 'RAPP', naam: "Rapportages", band: 'vooruitkijken' },
   { zone: 'KRUIS', naam: "Cross-module consistentie", band: 'verbinding' },
+  { zone: 'CANON', naam: "Canonieke getallen", band: 'verbinding' },
   { zone: 'BEHEER', naam: "Beheer (admin)", band: 'randvoorwaarden' },
 ]
 
@@ -401,6 +403,21 @@ export const UAT_SCENARIOS: UatScenario[] = [
   { id: 'UAT-KRUIS-24', wf: 'WF-KRUIS-24', zone: 'KRUIS', band: 'verbinding', naam: 'Legacy backing-routes tonen dezelfde cijfers als de canonieke routes', kriticiteit: 'KERN', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'd'], volgorde: 24, duurMin: 8, kruisZones: ['NAV', 'OVZ', 'TOEK'] },
   { id: 'UAT-KRUIS-25', wf: 'WF-KRUIS-25', zone: 'KRUIS', band: 'verbinding', naam: 'Tier-gate-ervaring zonder AI-add-on (alle AI-oppervlakken)', kriticiteit: 'KERN', rooktest: false, platforms: ['webapp', 'mobiel'], subscenarios: ['a', 'b', 'c', 'd'], volgorde: 25, duurMin: 15, kruisZones: ['WILL', 'RAPP', 'REKEN', 'CASH', 'MIJN'] },
   { id: 'UAT-KRUIS-26', wf: null, zone: 'KRUIS', band: 'verbinding', naam: 'Volledige gebruikersreis: van registratie tot vrijheidsinzicht (nieuw — vult de 2.3-eis "volledige gebruikersreis" in, spiegelt géén WF-nummer)', kriticiteit: 'KERN', rooktest: false, platforms: ['webapp', 'mobiel'], subscenarios: ['a', 'b', 'c', 'd'], volgorde: 26, duurMin: 40, kruisZones: ['START', 'BEZIT', 'CASH', 'BUDGET', 'TOEK', 'RAPP'] },
+  { id: 'UAT-CANON-01', wf: 'WF-CANON-01', zone: 'CANON', band: 'verbinding', naam: 'Netto vermogen: één inclusie-gewogen bron, overal identiek', kriticiteit: 'KERN', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'd'], volgorde: 1, duurMin: 4 },
+  { id: 'UAT-CANON-02', wf: 'WF-CANON-02', zone: 'CANON', band: 'verbinding', naam: 'Spaarquote (6m): savingsRateFromAggregates is de enige bron', kriticiteit: 'KERN', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'd'], volgorde: 2, duurMin: 4 },
+  { id: 'UAT-CANON-03', wf: 'WF-CANON-03', zone: 'CANON', band: 'verbinding', naam: 'Vrijheids-%: computeFreedomProgress is de enige bron (clamp [0,100])', kriticiteit: 'KERN', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'd'], volgorde: 3, duurMin: 4 },
+  { id: 'UAT-CANON-04', wf: 'WF-CANON-04', zone: 'CANON', band: 'verbinding', naam: 'FIRE-eligible grondslag: getFireEligibleNetWorth (netto ≠ FIRE-eligible)', kriticiteit: 'KERN', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'd'], volgorde: 4, duurMin: 4 },
+  { id: 'UAT-CANON-05', wf: 'WF-CANON-05', zone: 'CANON', band: 'verbinding', naam: 'Effectieve SWR: computeEffectiveSwr is de enige bron (drag + vloer)', kriticiteit: 'KERN', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'd'], volgorde: 5, duurMin: 4 },
+  { id: 'UAT-CANON-06', wf: 'WF-CANON-06', zone: 'CANON', band: 'verbinding', naam: 'Dagtarief €→tijd: dailyExpenseRate + calculateFreedomTime, één tarief', kriticiteit: 'KERN', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'd'], volgorde: 6, duurMin: 4 },
+  { id: 'UAT-CANON-07', wf: 'WF-CANON-07', zone: 'CANON', band: 'verbinding', naam: 'Gezondheidsgetal: buildHealthScoreInput is de enige bron', kriticiteit: 'KERN', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'd'], volgorde: 7, duurMin: 4 },
+  { id: 'UAT-CANON-08', wf: 'WF-CANON-08', zone: 'CANON', band: 'verbinding', naam: 'FIRE-datum/-leeftijd: horizon-kernel is de enige bron (oracle)', kriticiteit: 'KERN', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'd'], volgorde: 8, duurMin: 5 },
+  { id: 'UAT-CANON-09', wf: 'WF-CANON-09', zone: 'CANON', band: 'verbinding', naam: 'Box 3-heffing: calculateBox3 is de enige bron (3 bewuste weergaven)', kriticiteit: 'KERN', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'd'], volgorde: 9, duurMin: 5 },
+  { id: 'UAT-CANON-10', wf: 'WF-CANON-10', zone: 'CANON', band: 'verbinding', naam: 'Jaarruimte-besparing: jaarruimteBesparing (marginaal-correct via Box 1)', kriticiteit: 'KERN', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'd'], volgorde: 10, duurMin: 5 },
+  { id: 'UAT-CANON-11', wf: 'WF-CANON-11', zone: 'CANON', band: 'verbinding', naam: 'Noodfonds (maanden gedekt): resolveEmergencyFund is de enige bron', kriticiteit: 'BELANGRIJK', rooktest: false, platforms: ['webapp'], subscenarios: ['a'], volgorde: 11, duurMin: 3 },
+  { id: 'UAT-CANON-12', wf: 'WF-CANON-12', zone: 'CANON', band: 'verbinding', naam: 'Hefboom-status: leverage-status is de enige stoplicht-bron', kriticiteit: 'BELANGRIJK', rooktest: false, platforms: ['webapp'], subscenarios: ['a'], volgorde: 12, duurMin: 3 },
+  { id: 'UAT-CANON-13', wf: 'WF-CANON-13', zone: 'CANON', band: 'verbinding', naam: 'Fiscale constanten per jaar: BOX1/2/3/VPB_PARAMS is de enige bron', kriticiteit: 'BELANGRIJK', rooktest: false, platforms: ['webapp'], subscenarios: ['a'], volgorde: 13, duurMin: 3 },
+  { id: 'UAT-CANON-14', wf: 'WF-CANON-14', zone: 'CANON', band: 'verbinding', naam: 'Fundament: localMonthBounds voor elk maand-query-venster (vangrail)', kriticiteit: 'BELANGRIJK', rooktest: false, platforms: ['webapp'], subscenarios: ['a'], volgorde: 14, duurMin: 3 },
+  { id: 'UAT-CANON-15', wf: 'WF-CANON-15', zone: 'CANON', band: 'verbinding', naam: 'Register compleet & uitputtend: elk kerngetal één bron, nooit oppervlak-eigen herberekend', kriticiteit: 'KERN', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'd'], volgorde: 15, duurMin: 6 },
   { id: 'UAT-BEHEER-01', wf: 'WF-BEHEER-01', zone: 'BEHEER', band: 'randvoorwaarden', naam: 'Beheeromgeving betreden en navigeren; toegangscontrole', kriticiteit: 'KERN', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'b', 'c', 'd'], volgorde: 1, duurMin: 15 },
   { id: 'UAT-BEHEER-02', wf: 'WF-BEHEER-02', zone: 'BEHEER', band: 'randvoorwaarden', naam: 'AI-provider, model en systeemprompt configureren', kriticiteit: 'BELANGRIJK', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'c'], volgorde: 2, duurMin: 8 },
   { id: 'UAT-BEHEER-03', wf: 'WF-BEHEER-03', zone: 'BEHEER', band: 'randvoorwaarden', naam: 'AI-feature-limieten en creditbudgetten instellen', kriticiteit: 'BELANGRIJK', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'c'], volgorde: 3, duurMin: 6 },

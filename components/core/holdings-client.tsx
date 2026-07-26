@@ -1098,6 +1098,7 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
       {/* New holding form modal */}
       {showForm && (
         <HoldingForm
+          assetId={assetFilter}
           onClose={() => setShowForm(false)}
           onSaved={() => {
             setShowForm(false)
@@ -1348,9 +1349,14 @@ function ManualPriceOverrideModal({
 function HoldingForm({
   onClose,
   onSaved,
+  assetId,
 }: {
   onClose: () => void
   onSaved: () => void
+  /** Asset-context (uit `?asset=<uuid>`) — expliciet meegestuurd zodat de nieuwe
+   *  holding aan het juiste bezit hangt i.p.v. de server-fallback te vertrouwen
+   *  (WF-BEZIT-14-bug2). Null bij de portfolio-brede weergave zonder filter. */
+  assetId?: string | null
 }) {
   const [name, setName] = useState('')
   const [isin, setIsin] = useState('')
@@ -1445,6 +1451,9 @@ function HoldingForm({
           is_active: isActive,
           notes: notes || null,
           force_duplicate: forceDuplicate,
+          // Koppel expliciet aan het asset uit de context; laat weg bij portfolio-
+          // brede weergave (dan valt de server terug op de defensieve fallback).
+          ...(assetId ? { asset_id: assetId } : {}),
           ...(ter ? { ter: Number(ter) / 100, ter_source: 'manual' } : {}),
         }),
       })

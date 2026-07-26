@@ -967,7 +967,7 @@ export function DebtsClient({ toolbarFilter, debtTypeFilter, initialData, showPa
         onClose={() => { setQuickAddOpen(false); setQuickAddInitialType(null) }}
         initialIntent="debt"
         initialDebtType={quickAddInitialType ?? undefined}
-        onSaved={() => router.refresh()}
+        onSaved={() => { loadDebts(); router.refresh() }}
       />
     </div>
   )

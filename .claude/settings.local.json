@@ -153,7 +153,9 @@
       "Bash(git -C \"c:\\\\Users\\\\janpa\\\\cd\\\\development\\\\fin\" worktree list)",
       "Bash(git -C \"c:\\\\Users\\\\janpa\\\\cd\\\\development\\\\fin\" branch -a)",
       "Bash(git switch *)",
-      "mcp__notion__notion-query-data-sources"
+      "mcp__notion__notion-query-data-sources",
+      "mcp__chrome-devtools__list_pages",
+      "mcp__chrome-devtools__evaluate_script"
     ]
   },
   "enableAllProjectMcpServers": true,

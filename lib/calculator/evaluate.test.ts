@@ -3,6 +3,7 @@ import {
   evaluateCalculator,
   resolveInitialInputs,
   validateFormulas,
+  validateNarrative,
 } from './evaluate'
 import type { CalculatorDefinition } from './types'
 import { PREFILL_KEY_SET } from './user-data-keys'
@@ -494,5 +495,45 @@ describe('validateFormulas — DNA-velden', () => {
       scenarios: [{ key: 'a', label: 'A', appliesWhen: 'verzonnen_key > 0' }],
     })
     expect(validateFormulas(d, PREFILL_KEY_SET)).toContain('verzonnen_key')
+  })
+})
+
+describe('validateNarrative — placeholder-referenties', () => {
+  it('{output:key} die naar een input i.p.v. output wijst is onbekend', () => {
+    // Reproduceert de gemelde bug (WF-REKEN-02-bug2): de AI declareerde
+    // 'looptijd' als input (slider) maar verwees er in de narrative naar
+    // als {output:looptijd}. Op runtime blijft die placeholder letterlijk
+    // staan (zie regressietest hieronder) — hier vangen we 'm eerder af.
+    const d = def({
+      inputs: [{ key: 'looptijd', label: 'Looptijd', kind: 'number', default: 15 }],
+      outputs: [{ key: 'voordeel', label: 'V', formula: 'looptijd * 100', format: 'euro' }],
+      narrative: 'Na {output:looptijd} jaar levert Beleggen {output:voordeel} op.',
+    })
+    const errs = validateNarrative(d)
+    expect(errs.some((e) => e.includes('looptijd'))).toBe(true)
+    // De geldige {output:voordeel} mag NIET als onbekend worden gemeld.
+    expect(errs.some((e) => e.includes('voordeel'))).toBe(false)
+  })
+
+  it('geldige {output:key}/{derived:key} geven geen fout', () => {
+    const d = def({
+      inputs: [{ key: 'p', label: 'P', kind: 'euro', default: 1000 }],
+      derived: [{ key: 'extra', label: 'X', formula: 'p * 2', format: 'euro' }],
+      outputs: [{ key: 'totaal', label: 'T', formula: 'p + 100', format: 'euro' }],
+      narrative: 'T = {output:totaal}, X = {derived:extra} ({winner_label}).',
+    })
+    expect(validateNarrative(d)).toEqual([])
+  })
+
+  it('{derived:key} die naar een niet-bestaande derived wijst is onbekend', () => {
+    const d = def({
+      outputs: [{ key: 'uit', label: 'U', formula: 'inleg * 2', format: 'euro' }],
+      narrative: 'Waarde: {derived:nietbestaand}.',
+    })
+    expect(validateNarrative(d)).toContain('{derived:nietbestaand}')
+  })
+
+  it('geen narrative → lege lijst', () => {
+    expect(validateNarrative(def())).toEqual([])
   })
 })

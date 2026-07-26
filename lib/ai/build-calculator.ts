@@ -17,7 +17,7 @@ import {
   CalculatorDefinitionSchema,
   type CalculatorDefinition,
 } from '@/lib/calculator/types'
-import { validateFormulas } from '@/lib/calculator/evaluate'
+import { validateFormulas, validateNarrative } from '@/lib/calculator/evaluate'
 import { PREFILL_KEYS, PREFILL_KEY_SET } from '@/lib/calculator/user-data-keys'
 
 export type BuildCalculatorResult =
@@ -132,8 +132,14 @@ alleen toe wanneer ze de calc duidelijker maken — niet als invuloefening.
 **Voor het hele resultaat**:
   - \`narrative\`: één samenvattende zin bovenaan. Placeholders:
     {winner_label}, {compare_output}, {output:key}, {derived:key}.
+    LET OP — {output:key} mag UITSLUITEND naar een key uit je \`outputs\`
+    verwijzen en {derived:key} uitsluitend naar een key uit je \`derived\`;
+    NOOIT naar een input-key (die verschijnt niet in de uitkomst en blijft
+    dan als rauwe \`{output:...}\` in de zin staan). Wil je een input in de
+    narrative noemen, maak er dan eerst een output/derived van.
     Voorbeeld: "Bij maandlast {output:maandlast} ben je schuldvrij
-    in {output:looptijd_jaren}."
+    in {output:looptijd_jaren}." (hier zijn \`maandlast\` en
+    \`looptijd_jaren\` beide outputs).
 
 ═════════════════════════════════════════════════════════════════════
 TRIFINITY-FILOSOFIE — "Geld is opgeslagen tijd" (conditioneel)
@@ -276,12 +282,18 @@ export async function buildCalculator(
 
     const { object: first } = await generate(basePrompt)
 
-    // Statische formule-validatie: vang hallucinerende variabelen.
-    // Bij fail één retry met de fout in de prompt — de AI verzint
-    // soms een domein-specifieke variabele (bv. 'co2_uitstoot' bij
-    // een auto-calc) zonder die als input te declareren; meestal kan
-    // hij dat zelf repareren als hij de fout-context krijgt.
-    let unknown = validateFormulas(first, PREFILL_KEY_SET)
+    // Statische validatie: vang hallucinerende variabelen (formules) én
+    // narrative-placeholders die naar een niet-bestaande output/derived
+    // wijzen (bv. {output:looptijd} terwijl 'looptijd' een input is).
+    // Bij fail één retry met de fout in de prompt — de AI verzint soms
+    // een domein-specifieke variabele (bv. 'co2_uitstoot' bij een
+    // auto-calc) zonder die als input te declareren, of verwijst in de
+    // narrative naar een input als ware het een output; meestal kan hij
+    // dat zelf repareren als hij de fout-context krijgt.
+    let unknown = [
+      ...validateFormulas(first, PREFILL_KEY_SET),
+      ...validateNarrative(first),
+    ]
     if (unknown.length === 0) {
       return { ok: true, definition: first }
     }
@@ -292,22 +304,33 @@ export async function buildCalculator(
     )
     const retryPrompt = `${basePrompt}
 
-LET OP — je vorige poging gebruikte deze namen die NIET bestaan:
+LET OP — je vorige poging gebruikte in een formule of in de narrative
+deze namen/placeholders die NIET bestaan:
   ${unknown.join(', ')}
 
 Mogelijke oorzaken:
-  - Je hebt ze in een formule gebruikt zonder ze als input te declareren.
-    Oplossing: voeg ze toe als input met sensible default + label, OF
-    haal ze uit de formule.
+  - Je hebt een naam in een formule gebruikt zonder die als input te
+    declareren. Oplossing: voeg 'm toe als input met sensible default +
+    label, OF haal 'm uit de formule.
   - Je gebruikte een naam die LIJKT op een prefill-key maar niet exact
     matcht. Prefill-keys zijn case-sensitive en snake_case.
+  - Een narrative-placeholder zoals {output:key} of {derived:key} verwees
+    naar een INPUT (bv. {output:looptijd} terwijl 'looptijd' een input/
+    slider is). {output:key} mag UITSLUITEND naar een echte output-key
+    verwijzen, {derived:key} uitsluitend naar een derived-key — nooit naar
+    een input. Verwijs naar een bestaande output/derived, of laat de
+    placeholder weg.
 
-Genereer de calc opnieuw zonder deze fout. Elke variabele in een
-formule MOET ofwel in je eigen inputs/outputs/derived staan, ofwel
-EXACT overeenkomen met een prefill-key.`
+Genereer de calc opnieuw zonder deze fout. Elke variabele in een formule
+MOET ofwel in je eigen inputs/outputs/derived staan, ofwel EXACT
+overeenkomen met een prefill-key; elke {output:key}/{derived:key} in de
+narrative MOET naar een bestaande output resp. derived wijzen.`
 
     const { object: second } = await generate(retryPrompt)
-    unknown = validateFormulas(second, PREFILL_KEY_SET)
+    unknown = [
+      ...validateFormulas(second, PREFILL_KEY_SET),
+      ...validateNarrative(second),
+    ]
     if (unknown.length === 0) {
       return { ok: true, definition: second }
     }

@@ -113,7 +113,13 @@ export async function syncAssetValueFromInvestmentHoldings(
       .eq('user_id', userId)
       .eq('is_active', true)
 
-    if (!holdings) return { synced: false, totalValue: 0 }
+    // Alleen overschrijven als er daadwerkelijk holdings-rijen zijn. Een lege
+    // array (0 rijen) is GEEN geldige grond om `assets.current_value` op 0 te
+    // zetten — dat wist een reeds ingevoerde, geldige waarde (S0-dataverlies,
+    // WF-BEZIT-21: een crypto-holding die per abuis in de andere tabel belandde
+    // liet deze query leeg terugkomen en nulde de bestaande €20.000). `null` =
+    // query-fout, `[]` = geen rijen: in beide gevallen de waarde met rust laten.
+    if (!holdings || holdings.length === 0) return { synced: false, totalValue: 0 }
 
     const totalValue = holdings.reduce((sum, h) => {
       const price = (h.current_price as number | null) ?? (h.avg_purchase_price as number | null) ?? 0
@@ -156,7 +162,10 @@ export async function syncAssetValueFromCryptoHoldings(
       .eq('user_id', userId)
       .eq('is_active', true)
 
-    if (!holdings) return { synced: false, totalValue: 0 }
+    // Zie `syncAssetValueFromInvestmentHoldings`: 0 gevonden rijen mag NOOIT een
+    // bestaande, geldige `assets.current_value` naar 0 overschrijven. `null` =
+    // query-fout, `[]` = geen rijen — beide laten de waarde ongemoeid.
+    if (!holdings || holdings.length === 0) return { synced: false, totalValue: 0 }
 
     const totalValue = holdings.reduce((sum, h) => {
       const price = (h.current_price as number | null) ?? (h.avg_purchase_price as number | null) ?? 0

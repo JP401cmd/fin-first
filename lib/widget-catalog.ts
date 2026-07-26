@@ -275,9 +275,11 @@ export const WIDGET_CATALOG: WidgetDef[] = [
   {
     id: 'pensioen_aow',
     name: 'Pensioen / AOW',
-    description: 'AOW-leeftijd countdown en verwacht bedrag',
+    description: 'AOW-leeftijd countdown, verwacht bedrag en aanvullend pensioen',
     module: 'horizon',
-    sizes: ['mini', 'quarter', 'half', 'full'],
+    // 'xl' (Double): drie-pijler-overzicht — AOW + aanvullend pensioen + zelf
+    // aanvullen — met now→AOW-tijdlijn. Alleen zinvol bij dubbele breedte.
+    sizes: ['mini', 'quarter', 'half', 'full', 'xl'],
     defaultSize: 'half',
   },
   {

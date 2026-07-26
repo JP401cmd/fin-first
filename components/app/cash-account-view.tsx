@@ -270,8 +270,13 @@ export function CashAccountView({
 
     if (data) {
       setBudgets(data as Budget[])
-      const parents = (data as Budget[]).filter((b) => !b.parent_id && b.budget_type !== 'archive')
-      const children = (data as Budget[]).filter((b) => b.parent_id && Number(b.default_limit) > 0 && b.budget_type !== 'archive')
+      // Gearchiveerde budgetten (is_archived = true) horen NIET in de selecteerbare
+      // opties (Budget-dropdown transactieformulier + AICategorizeSheet) — analoog aan
+      // budgets-data-loader.ts en budgets-client.tsx. Bewust alleen hier filteren, niet
+      // op de budgets-state zelf: die voedt ook budgetById/getBudgetForId voor het
+      // WEERGEVEN van reeds-gekoppelde (historische) transacties, dat moet intact blijven.
+      const parents = (data as Budget[]).filter((b) => !b.parent_id && b.budget_type !== 'archive' && !b.is_archived)
+      const children = (data as Budget[]).filter((b) => b.parent_id && Number(b.default_limit) > 0 && b.budget_type !== 'archive' && !b.is_archived)
       const groups = parents.map((parent) => ({
         parent,
         children: children.filter((c) => c.parent_id === parent.id),

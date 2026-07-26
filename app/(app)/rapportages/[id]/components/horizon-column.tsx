@@ -3,6 +3,7 @@
 import { useCallback } from 'react'
 import type { ReportHorizonSection } from '@/lib/report-data'
 import { formatMaskedCurrency } from '@/lib/format'
+import { formatFireAge } from '@/lib/horizon/fire-format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { useResolvedModuleColor } from '@/lib/hooks/use-resolved-module-color'
 import { SectionLabel } from '@/components/editorial'
@@ -70,7 +71,7 @@ export function HorizonColumn({
               <span className="font-inter text-[11px]">
                 FIRE-datum: <span className="font-dm-mono font-medium">{horizon.fireDate}</span>
                 {horizon.fireAge && (
-                  <span className="text-[var(--ink-3)]"> (leeftijd {horizon.fireAge})</span>
+                  <span className="text-[var(--ink-3)]"> (leeftijd {formatFireAge(horizon.fireAge)})</span>
                 )}
               </span>
             </div>

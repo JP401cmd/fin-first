@@ -25,23 +25,43 @@ interface LocalNewsCache {
   fetchedAt: number
   generatedAt?: string
   sourceCount?: number
+  editionNr?: number
+  jaargang?: number
 }
 
-function getLocalNewsCache(): { items: NewsItem[]; generatedAt?: string; sourceCount?: number } | null {
+function getLocalNewsCache(): {
+  items: NewsItem[]
+  generatedAt?: string
+  sourceCount?: number
+  editionNr?: number
+  jaargang?: number
+} | null {
   try {
     const raw = localStorage.getItem(NEWS_LOCAL_CACHE_KEY)
     if (!raw) return null
     const cache: LocalNewsCache = JSON.parse(raw)
     if (Date.now() - cache.fetchedAt > NEWS_CACHE_TTL_MS) return null
-    return { items: cache.items, generatedAt: cache.generatedAt, sourceCount: cache.sourceCount }
+    return {
+      items: cache.items,
+      generatedAt: cache.generatedAt,
+      sourceCount: cache.sourceCount,
+      editionNr: cache.editionNr,
+      jaargang: cache.jaargang,
+    }
   } catch {
     return null
   }
 }
 
-function setLocalNewsCache(items: NewsItem[], generatedAt?: string, sourceCount?: number): void {
+function setLocalNewsCache(
+  items: NewsItem[],
+  generatedAt?: string,
+  sourceCount?: number,
+  editionNr?: number,
+  jaargang?: number,
+): void {
   try {
-    const cache: LocalNewsCache = { items, fetchedAt: Date.now(), generatedAt, sourceCount }
+    const cache: LocalNewsCache = { items, fetchedAt: Date.now(), generatedAt, sourceCount, editionNr, jaargang }
     localStorage.setItem(NEWS_LOCAL_CACHE_KEY, JSON.stringify(cache))
   } catch {
     // Silent fail — localStorage might be full
@@ -101,6 +121,8 @@ export function NieuwsOnlyClient() {
       setNewsItems(cached.items)
       if (cached.generatedAt) setGeneratedAt(cached.generatedAt)
       if (cached.sourceCount !== undefined) setSourceCount(cached.sourceCount)
+      if (cached.editionNr !== undefined) setEditionNr(cached.editionNr)
+      if (cached.jaargang !== undefined) setJaargang(cached.jaargang)
       setNewsFetched(true)
       return
     }
@@ -124,7 +146,7 @@ export function NieuwsOnlyClient() {
 
       const items: NewsItem[] = data.items ?? data
       setNewsItems(items)
-      setLocalNewsCache(items, data.generatedAt, data.sourceCount)
+      setLocalNewsCache(items, data.generatedAt, data.sourceCount, data.editionNr, data.jaargang)
       setNewsFetched(true)
       if (data.editionNr) setEditionNr(data.editionNr)
       if (data.jaargang) setJaargang(data.jaargang)
@@ -168,7 +190,7 @@ export function NieuwsOnlyClient() {
 
       const items: NewsItem[] = data.items ?? data
       setNewsItems(items)
-      setLocalNewsCache(items, data.generatedAt, data.sourceCount)
+      setLocalNewsCache(items, data.generatedAt, data.sourceCount, data.editionNr, data.jaargang)
       setNewsFetched(true)
       setRefreshing(false)
       if (data.editionNr) setEditionNr(data.editionNr)
@@ -213,7 +235,7 @@ export function NieuwsOnlyClient() {
         // Generation complete — final items arrived
         const items: NewsItem[] = data.items ?? data
         setNewsItems(items)
-        setLocalNewsCache(items, data.generatedAt, data.sourceCount)
+        setLocalNewsCache(items, data.generatedAt, data.sourceCount, data.editionNr, data.jaargang)
         setNewsFetched(true)
         setGenerating(false)
         setRefreshing(false)

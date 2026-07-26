@@ -1153,7 +1153,7 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
         onClose={() => { setQuickAddOpen(false); setQuickAddInitialType(null) }}
         initialIntent="asset"
         initialAssetType={quickAddInitialType ?? undefined}
-        onSaved={() => router.refresh()}
+        onSaved={() => { loadAssets(); router.refresh() }}
       />
 
       {/* Part B: hypotheek-vervolgvraag bij een nieuw aangemaakte eigen woning.

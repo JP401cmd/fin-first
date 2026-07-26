@@ -211,17 +211,71 @@ export async function POST(request: NextRequest) {
     // Check if user wants to force-create despite duplicate warning
     const forceDuplicate = body.force_duplicate === true
 
-    // Get a default asset_id (first investment asset, or null)
+    // Resolve het doel-asset. Primair: het `asset_id` dat de UI meestuurt vanuit
+    // de asset-context (WF-BEZIT-14-bug2). Ontbreekt dat, dan een DEFENSIEVE
+    // fallback i.p.v. stilzwijgend "de eerste" asset te pakken:
+    //   - `.eq('is_active', true)` — kies NOOIT een soft-deleted asset (anders
+    //     belandt de holding op een verwijderd bezit en is 'ie permanent
+    //     onzichtbaar, want GET joint op has_holdings_tracking).
+    //   - deterministische `order()` — voorkeur voor een asset dat holdings
+    //     trackt (anders is de holding sowieso onzichtbaar), met `created_at`
+    //     als stabiele tiebreak, zodat de keuze reproduceerbaar is i.p.v.
+    //     afhankelijk van de DB-scanvolgorde.
+    // Crypto blijft in de kandidatenset zodat de crypto-guard hieronder
+    // (WF-BEZIT-21) desnoods een duidelijke 400 kan geven i.p.v. hier al
+    // stilzwijgend te filteren.
     let assetId = body.asset_id || null
     if (!assetId) {
       const { data: investmentAsset } = await supabase
         .from('assets')
         .select('id')
         .eq('user_id', user.id)
+        .eq('is_active', true)
         .in('asset_type', ['investment', 'crypto', 'savings'])
+        .order('has_holdings_tracking', { ascending: false })
+        .order('created_at', { ascending: true })
         .limit(1)
-        .single()
+        .maybeSingle()
       assetId = investmentAsset?.id || null
+    }
+
+    // Doel-asset valideren + routeren (één user-scoped lookup):
+    //   1. Eigenaarscheck (WF-BEZIT-14-bug2): een expliciet meegestuurd
+    //      `asset_id` moet van deze gebruiker zijn en actief. `.eq('user_id', …)`
+    //      voorkomt dat een holding aan een vreemd/onbekend of soft-deleted asset
+    //      wordt gekoppeld. (De fallback hierboven levert per definitie een eigen,
+    //      actief asset; deze check dekt vooral het door de UI meegestuurde id.)
+    //   2. Crypto-routing (WF-BEZIT-21): dit endpoint schrijft ALTIJD naar
+    //      `investment_holdings` (effectenposities). Een crypto-asset hoort in
+    //      `crypto_holdings` (via de exchange-sync). Zonder deze check belandde
+    //      een crypto-holding stilzwijgend in de verkeerde tabel — onzichtbaar op
+    //      de crypto-pagina, én de navolgende asset-sync (die crypto_holdings
+    //      bevraagt) vond 0 rijen en nulde de bestaande asset-waarde.
+    if (assetId) {
+      const { data: targetAsset } = await supabase
+        .from('assets')
+        .select('asset_type, is_active')
+        .eq('id', assetId)
+        .eq('user_id', user.id)
+        .maybeSingle()
+      if (!targetAsset) {
+        return NextResponse.json(
+          { error: 'Onbekend vermogensobject voor deze holding.' },
+          { status: 400 },
+        )
+      }
+      if ((targetAsset.is_active as boolean | null) === false) {
+        return NextResponse.json(
+          { error: 'Dit vermogensobject is gearchiveerd; kies een actief object voor deze holding.' },
+          { status: 400 },
+        )
+      }
+      if ((targetAsset.asset_type as string | undefined) === 'crypto') {
+        return NextResponse.json(
+          { error: 'Crypto-posities kunnen niet via dit endpoint worden toegevoegd; die lopen via de exchange-synchronisatie (crypto_holdings).' },
+          { status: 400 },
+        )
+      }
     }
 
     // Check for duplicate ticker within the same asset (if ticker is provided).

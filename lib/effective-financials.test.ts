@@ -33,4 +33,16 @@ describe('resolveEffectiveIncomeExpenses', () => {
     )
     expect(r).toEqual({ income: 5000, expenses: 2500 })
   })
+
+  // WF-TOEK-10-bug1: de wat-als-baseline in horizon-client.tsx::loadData() zakte
+  // naar een partiële lopende-maand-transactiesom (~€950) omdat de eigen inline
+  // fallback de income_source-'manual'-override negeerde. Nu geconsumeerd → de
+  // handmatige baseline (€7600) wint, ongeacht een gedeeltelijk geboekte maand.
+  it('manual: partiële lopende-maand-transactiesom overschrijft handmatige baseline NIET (WF-TOEK-10-bug1)', () => {
+    const r = resolveEffectiveIncomeExpenses(
+      { net_monthly_income: 7600, estimated_monthly_expenses: 3200, income_source: 'manual', expenses_source: 'manual' },
+      950, 400,
+    )
+    expect(r).toEqual({ income: 7600, expenses: 3200 })
+  })
 })

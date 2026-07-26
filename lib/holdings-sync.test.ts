@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest'
 import {
   assetsWithActiveHoldings,
   syncHoldingAggregatesFromTransactions,
+  syncAssetValueFromCryptoHoldings,
+  syncAssetValueFromInvestmentHoldings,
 } from './holdings-sync'
 
 /**
@@ -185,5 +187,117 @@ describe('syncHoldingAggregatesFromTransactions', () => {
 
     expect(result.units).toBe(20)
     expect(result.avgPurchasePrice).toBeCloseTo(15, 6)
+  })
+})
+
+/**
+ * Tests voor de asset-value-rollup (`syncAssetValueFromCryptoHoldings` /
+ * `syncAssetValueFromInvestmentHoldings`) — het pad dat na een holding-mutatie
+ * `assets.current_value` bijwerkt uit de som van de holdings.
+ *
+ * Regressie WF-BEZIT-21 (S0 dataverlies): bij 0 gevonden holding-rijen mag de
+ * bestaande `current_value` NOOIT met 0 worden overschreven. Dat gebeurde toen
+ * een crypto-holding per abuis in `investment_holdings` belandde: de crypto-
+ * rollup vond een lege array in `crypto_holdings` en nulde stilzwijgend de
+ * geldige €20.000. De guard moet `[]` (geen rijen) net zo behandelen als `null`
+ * (query-fout): de asset-update overslaan.
+ *
+ * De sync-functies doen:
+ *   from('<holdings>').select(...).eq('asset_id').eq('user_id').eq('is_active')
+ *   → data
+ *   from('assets').update({ current_value }).eq('id').eq('user_id')
+ * We mocken beide en vangen of `assets.update` überhaupt is aangeroepen.
+ */
+function makeRollupSupabase(
+  holdings: Record<string, unknown>[] | null,
+  capture: { updateCalled?: boolean; payload?: Record<string, unknown> },
+) {
+  const holdingsChain: Record<string, unknown> = {
+    select: () => holdingsChain,
+    eq: () => holdingsChain,
+    then: (resolve: (v: { data: Record<string, unknown>[] | null; error: null }) => void) =>
+      resolve({ data: holdings, error: null }),
+  }
+  const assetsUpdateChain: Record<string, unknown> = {
+    eq: () => assetsUpdateChain,
+    then: (resolve: (v: { error: null }) => void) => resolve({ error: null }),
+  }
+  const assetsTable = {
+    update: (payload: Record<string, unknown>) => {
+      capture.updateCalled = true
+      capture.payload = payload
+      return assetsUpdateChain
+    },
+  }
+  return {
+    from: (table: string) => (table === 'assets' ? assetsTable : holdingsChain),
+  } as never
+}
+
+describe('syncAssetValueFromCryptoHoldings — geen dataverlies bij 0 rijen (WF-BEZIT-21)', () => {
+  it('overschrijft de asset-waarde NIET bij een lege holdings-array', async () => {
+    const capture: { updateCalled?: boolean; payload?: Record<string, unknown> } = {}
+    const supabase = makeRollupSupabase([], capture)
+
+    const res = await syncAssetValueFromCryptoHoldings(supabase, 'asset-1', USER)
+
+    expect(res.synced).toBe(false)
+    expect(res.totalValue).toBe(0)
+    expect(capture.updateCalled).toBeFalsy()
+  })
+
+  it('overschrijft de asset-waarde NIET bij een query-fout (data=null)', async () => {
+    const capture: { updateCalled?: boolean; payload?: Record<string, unknown> } = {}
+    const supabase = makeRollupSupabase(null, capture)
+
+    const res = await syncAssetValueFromCryptoHoldings(supabase, 'asset-1', USER)
+
+    expect(res.synced).toBe(false)
+    expect(capture.updateCalled).toBeFalsy()
+  })
+
+  it('schrijft de som WEL terug wanneer er holdings zijn (EUR-prijs, geen FX)', async () => {
+    const capture: { updateCalled?: boolean; payload?: Record<string, unknown> } = {}
+    // 0,5 BTC @ €58.000 = €29.000
+    const supabase = makeRollupSupabase(
+      [{ units: 0.5, current_price: 58000, avg_purchase_price: 25000 }],
+      capture,
+    )
+
+    const res = await syncAssetValueFromCryptoHoldings(supabase, 'asset-1', USER)
+
+    expect(res.synced).toBe(true)
+    expect(res.totalValue).toBe(29000)
+    expect(capture.updateCalled).toBe(true)
+    expect(capture.payload?.current_value).toBe(29000)
+  })
+})
+
+describe('syncAssetValueFromInvestmentHoldings — geen dataverlies bij 0 rijen (WF-BEZIT-21)', () => {
+  it('overschrijft de asset-waarde NIET bij een lege holdings-array', async () => {
+    const capture: { updateCalled?: boolean; payload?: Record<string, unknown> } = {}
+    const supabase = makeRollupSupabase([], capture)
+
+    const res = await syncAssetValueFromInvestmentHoldings(supabase, 'asset-1', USER)
+
+    expect(res.synced).toBe(false)
+    expect(res.totalValue).toBe(0)
+    expect(capture.updateCalled).toBeFalsy()
+  })
+
+  it('schrijft de som WEL terug wanneer er holdings zijn (EUR, rate=1)', async () => {
+    const capture: { updateCalled?: boolean; payload?: Record<string, unknown> } = {}
+    // 10 @ €100 = €1.000
+    const supabase = makeRollupSupabase(
+      [{ units: 10, current_price: 100, avg_purchase_price: 90, currency: 'EUR' }],
+      capture,
+    )
+
+    const res = await syncAssetValueFromInvestmentHoldings(supabase, 'asset-1', USER)
+
+    expect(res.synced).toBe(true)
+    expect(res.totalValue).toBe(1000)
+    expect(capture.updateCalled).toBe(true)
+    expect(capture.payload?.current_value).toBe(1000)
   })
 })

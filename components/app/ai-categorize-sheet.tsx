@@ -972,6 +972,10 @@ export function AICategorizeSheet({
   const acceptedCount = rows.filter((r) => r.accepted).length
   const pendingCount = rows.filter((r) => !r.accepted).length
   const aiSuggestionCount = rows.filter((r) => r.suggestion?.budget_id).length
+  // Aangeboden minus daadwerkelijk opgeslagen = wat er na de Vraag-Fin/handmatige
+  // route nog onbeoordeeld/ongecategoriseerd blijft. Spiegel van de autoSummary-tak,
+  // die dit via computeAutoCategorization al toont (WF-CASH-32).
+  const unmatchedCount = rows.length - savedCount
 
   // Is een budget-id een gedeeld huishoudbudget?
   const isSharedBudget = useCallback(
@@ -1360,6 +1364,7 @@ export function AICategorizeSheet({
               <>
                 <p className="mt-2 text-sm text-[var(--ink-2)]">
                   {savedCount} {savedCount === 1 ? 'transactie' : 'transacties'} gecategoriseerd
+                  {unmatchedCount > 0 && <> · {unmatchedCount} nog open voor Fin of handmatig</>}
                 </p>
                 {ruleCount > 0 && (
                   <p className="mt-1 text-xs text-[var(--ink-3)]">

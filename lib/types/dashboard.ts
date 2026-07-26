@@ -113,7 +113,7 @@ export interface UpcomingEvent {
   date: string
   amount: number | null
   direction: 'in' | 'out' | 'neutral'
-  source: 'recurring' | 'goal' | 'life_event'
+  source: 'recurring' | 'goal' | 'life_event' | 'tax_deadline'
 }
 
 export interface EmergencyFund {
@@ -414,6 +414,14 @@ export interface DashboardData {
   grossReturn: number     // e.g. 0.07
   // Current age of user (null if no date_of_birth)
   currentAge: number | null
+  // Pensioen / AOW-widget bron. aowAge = cohort-correcte AOW-leeftijd (hele jaren)
+  // uit de aow_leeftijd-tabel via lookupAowAge — NIET de hardcoded 67-fallback.
+  // null bij ontbrekende geboortedatum (widget toont empty-state).
+  aowAge?: number | null
+  // Verwacht aanvullend pensioen (2e pijler) — piek-bruto maandbedrag, verbatim
+  // uit de canonieke buildPensionProjection-motor (brutoNominaal = mijnpensioen
+  // 'TeBereiken'). null als er geen pensioen-events zijn geïmporteerd.
+  pensionMonthlyGross?: number | null
   // Weekoverzicht widget data
   weekOverview: WeekOverviewData
   // Fee analyzer widget data

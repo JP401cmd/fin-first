@@ -37,10 +37,15 @@ export async function POST(request: NextRequest) {
 
   const result = data as { success?: boolean; error?: string; status?: number; counts?: Record<string, number>; id_map?: Record<string, string> }
   if (result?.error) {
-    return NextResponse.json(
-      { error: result.error, detail: result },
-      { status: result.status ?? 500 },
-    )
+    // The RPC returns author-written, client-safe messages for its 401/403
+    // guard failures. A 500 carries the raw SQLERRM/SQLSTATE from the
+    // EXCEPTION-block — that must never reach the client (ADR 0044). Route it
+    // through serverError() so the real error is logged server-side under a
+    // grep-able tag and the client only sees a generic message.
+    if (result.status === 401 || result.status === 403) {
+      return NextResponse.json({ error: result.error }, { status: result.status })
+    }
+    return serverError(new Error(result.error), 'budgets-plan:rpc')
   }
 
   return NextResponse.json({

@@ -189,6 +189,7 @@ export async function loadAllTests(): Promise<void> {
     import('@/lib/regression-tests/suites/uat-schuld').then(m => m.register()).catch(e => { console.warn('[test-registry] uat-schuld failed:', e) }),
     import('@/lib/regression-tests/suites/uat-budget').then(m => m.register()).catch(e => { console.warn('[test-registry] uat-budget failed:', e) }),
     import('@/lib/regression-tests/suites/uat-kruis').then(m => m.register()).catch(e => { console.warn('[test-registry] uat-kruis failed:', e) }),
+    import('@/lib/regression-tests/suites/uat-canon').then(m => m.register()).catch(e => { console.warn('[test-registry] uat-canon failed:', e) }),
     import('@/lib/regression-tests/suites/uat-start').then(m => m.register()).catch(e => { console.warn('[test-registry] uat-start failed:', e) }),
     import('@/lib/regression-tests/suites/uat-will').then(m => m.register()).catch(e => { console.warn('[test-registry] uat-will failed:', e) }),
     import('@/lib/regression-tests/suites/uat-cash').then(m => m.register()).catch(e => { console.warn('[test-registry] uat-cash failed:', e) }),

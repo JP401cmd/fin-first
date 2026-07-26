@@ -18,7 +18,8 @@ import {
   type LifeEventImpact,
 } from '@/lib/horizon-data'
 import type { Action } from '@/lib/recommendation-data'
-import { computeYearlyMustExpenses, computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
+import { computeYearlyMustExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
+import { deriveRetirementExpenseBasis } from '@/lib/retirement-expense-basis'
 import { WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
 import type { Asset } from '@/lib/asset-data'
 import { type Debt } from '@/lib/debt-data'
@@ -577,23 +578,12 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
   // de spaarquote-gelijktrekking); die raakt alleen de spaarquote-RATE (savingsRate6m,
   // nu transfer-exclusief), niet deze income-multiplier.
   const last12Income = aggSumPositief(txAgg12, { realOnly: false })
-  let extrapolatedIncome = last12Income
   // Vroegste inkomens-datum: all-time via de gedeelde `getEarliestIncomeDate`
   // (order(date asc).limit(1)) i.p.v. een reduce over een gecapte 12-maands-slice —
   // die kon bij >1000 positieve rijen stil afkappen (incomeMonths te klein →
   // over-extrapolatie). Spiegelt dashboard-data-loader.ts/lever-scores-loader.ts.
   const earliestIncomeDate =
     (earliestIncomeResult.data as { date?: string | null } | null)?.date ?? undefined
-  if (earliestIncomeDate && last12Income > 0) {
-    const earliest = new Date(earliestIncomeDate)
-    const incomeMonths = Math.max(1, Math.min(12,
-      (now.getFullYear() - earliest.getFullYear()) * 12 +
-      (now.getMonth() - earliest.getMonth())
-    ))
-    if (incomeMonths < 12) {
-      extrapolatedIncome = (last12Income / incomeMonths) * 12
-    }
-  }
 
   // ── Budget subsets from single query ──────────────────────────
   const allBudgetsRaw = (allBudgetsResult.data ?? []) as { id: string; name: string; default_limit: number; interval: string; budget_type: string; is_essential: boolean; parent_id: string | null }[]
@@ -615,13 +605,18 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
     allChildren.filter(c => !['archive', 'income', 'savings'].includes(c.budget_type)),
   )
 
-  const yearlyRetirementExpenses = computeRetirementExpenses(
-    profile.retirement_expense_method as RetirementExpenseMethod,
+  // Extrapolatie (inkomen → jaarbasis) + pensioenuitgave-methode: ÉÉN gedeelde
+  // bron (lib/retirement-expense-basis.ts), identiek gedeeld met horizon-client
+  // loadData() en /api/uitgaven-na-pensioen/context (consume, don't recompute).
+  const { extrapolatedIncome, yearlyRetirementExpenses } = deriveRetirementExpenseBasis({
+    method: profile.retirement_expense_method as RetirementExpenseMethod,
     yearlyMustExpenses,
-    extrapolatedIncome,
-    profile.retirement_expense_custom_amount,
-    profileMonthlyExpenses * 12,
-  )
+    last12Income,
+    earliestIncomeDate,
+    customAmount: profile.retirement_expense_custom_amount,
+    estimatedYearlyExpenses: profileMonthlyExpenses * 12,
+    now,
+  })
 
   const dob = profile.date_of_birth ?? null
 

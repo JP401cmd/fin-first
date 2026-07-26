@@ -753,6 +753,25 @@ export default function BudgetReportPage() {
         ]}
       />
 
+      {/* ── Ruimte & dekking — begrotingscontext, consumeert bestaande bundelvelden ── */}
+      <FiguresStrip
+        cols={2}
+        figures={[
+          {
+            kicker: 'Te verdelen',
+            amount: fc(data.summary.teVerdelen),
+            sub: 'inkomen − begroot',
+            variant: data.summary.teVerdelen >= 0 ? 'positive' : 'negative',
+          },
+          {
+            kicker: 'Dekkingsgraad',
+            amount: `${data.summary.dekkingsgraad}%`,
+            sub: 'begroot gedekt door inkomen',
+            variant: 'neutral',
+          },
+        ]}
+      />
+
       {/* ── Secundaire scorecard: sparkline + categorie-pillars + burn-rate ── */}
       <BudgetScorecard data={data} />
 

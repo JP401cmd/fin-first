@@ -57,7 +57,8 @@ import { WhatIfSlidersCollapsible, type WhatIfOverrides } from '@/components/app
 import { WhatIfBeslishulp } from '@/components/app/horizon/whatif-beslishulp'
 import { WhatIfDevelopmentNotice } from '@/components/app/horizon/whatif-development-notice'
 import { applyWhatIfOverrides, buildBaselineOverrides } from '@/lib/whatif-overrides'
-import { computeDebtAflossingMonthly, savingsRateFromAggregates, resolveSavingsSource } from '@/lib/savings-source'
+import { computeDebtAflossingMonthly, computeSavingsRate6m, resolveSavingsSource } from '@/lib/savings-source'
+import { resolveEffectiveIncomeExpenses } from '@/lib/effective-financials'
 import { parseHousingStrategy, type HousingStrategyConfig } from '@/lib/housing-strategy'
 import { hasPartner as deriveHasPartner } from '@/lib/household-type'
 import {
@@ -196,7 +197,7 @@ export default function WhatIfPage() {
       const twelveMonthsAgo = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 11, 1)).toISOString().split('T')[0]
       const sixMonthsAgo = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 5, 1)).toISOString().split('T')[0]
 
-      const [txResult, assetsResult, debtsResult, profileResult, essentialBudgetsResult, eventsResult, childBudgetsResult, income12Result, earliestIncomeResult, fullAssetsResult, fullDebtsResult, bankAccountsResult, income6mResult, expense6mResult] = await Promise.all([
+      const [txResult, assetsResult, debtsResult, profileResult, essentialBudgetsResult, eventsResult, childBudgetsResult, income12Result, earliestIncomeResult, fullAssetsResult, fullDebtsResult, bankAccountsResult, income6mResult, expense6mResult, allBudgetsTypeResult] = await Promise.all([
         supabase.from('transactions').select('amount').gte('date', monthStart).lt('date', monthEnd),
         supabase.from('assets').select('current_value, monthly_contribution, net_worth_inclusion_pct').eq('is_active', true),
         supabase.from('debts').select('current_balance, net_worth_inclusion_pct').eq('is_active', true),
@@ -210,16 +211,30 @@ export default function WhatIfPage() {
         supabase.from('debts').select('*').eq('is_active', true).limit(200),
         supabase.from('bank_accounts').select('id, balance').eq('is_active', true).is('linked_asset_id', null),
         supabase.from('transactions').select('amount, transaction_type').eq('is_income', true).gte('date', sixMonthsAgo).lt('date', monthEnd),
-        supabase.from('transactions').select('amount, transaction_type').eq('is_income', false).gte('date', sixMonthsAgo).lt('date', monthEnd),
+        supabase.from('transactions').select('amount, transaction_type, budget_id').eq('is_income', false).gte('date', sixMonthsAgo).lt('date', monthEnd),
+        // Budget-type-map-bron (parent + kind) → spaarbudget-IDs voor de
+        // spaarbudget-correctie in computeSavingsRate6m (WF-REKEN-13).
+        supabase.from('budgets').select('id, budget_type, parent_id'),
       ])
 
-      let monthlyIncome = 0
-      let monthlyExpenses = 0
+      // Rauwe transactie-som over de huidige kalendermaand-tot-nu-toe (zoals de
+      // SSR-loaders). Deze mag laag/onvolledig zijn — de fallback zit in de
+      // resolver hieronder.
+      let txMonthIncome = 0
+      let txMonthExpenses = 0
       for (const tx of txResult.data ?? []) {
         const amt = Number(tx.amount)
-        if (amt > 0) monthlyIncome += amt
-        else monthlyExpenses += Math.abs(amt)
+        if (amt > 0) txMonthIncome += amt
+        else txMonthExpenses += Math.abs(amt)
       }
+      // Canonieke effectieve maandbedragen (WF-REKEN-13): een handmatige bron
+      // (income_source/expenses_source === 'manual') wint over de transactie-som;
+      // bij 'auto' winnen transacties wanneer aanwezig, anders de profiel-schatting
+      // (net_monthly_income / estimated_monthly_expenses). Zelfde resolver die
+      // dashboard/horizon/core/fin-data-loader al consumeren — geen eigen
+      // kalendermaand-optelsom-zonder-fallback meer.
+      const { income: monthlyIncome, expenses: monthlyExpenses } =
+        resolveEffectiveIncomeExpenses(profileResult.data ?? {}, txMonthIncome, txMonthExpenses)
 
       const totalAssets = (assetsResult.data ?? []).reduce((s, a) =>
         s + Number(a.current_value) * ((a.net_worth_inclusion_pct ?? 100) / 100), 0)
@@ -300,33 +315,79 @@ export default function WhatIfPage() {
       const unlinkedCash = (bankAccountsResult.data ?? []).reduce((s: number, a: { balance: number | string }) => s + Number(a.balance), 0)
       setBankAccountCash(unlinkedCash)
 
-      // Canonieke 6m-spaarquote voor de slider-baseline — zelfde semantiek
-      // als savingsRate6m op de cashflow-pagina (transfers uitgesloten,
-      // schuldaflossing telt als vermogensopbouw), i.p.v. de oude
-      // deze-maand-surplus-benadering.
+      // Canonieke 6m-spaarquote voor de slider-baseline (WF-REKEN-13) — nu via
+      // dezelfde computeSavingsRate6m-helper als horizon/dashboard/core/lever-
+      // scores i.p.v. het kale savingsRateFromAggregates. Dat brengt de
+      // spaarbudget-correctie mee (stortingen op savings-budgetten tellen als
+      // sparen, niet als uitgave), de <6m-extrapolatie én de profiel-fallback —
+      // waardoor de spaarquote-slider hetzelfde percentage toont als /toekomst.
       const isRealTx = (t: { transaction_type?: string | null }) =>
         t.transaction_type !== 'transfer' && t.transaction_type !== 'joint_transfer'
       const income6m = (income6mResult.data ?? []).filter(isRealTx)
         .reduce((s: number, t: { amount: number | string | null }) => s + Math.abs(Number(t.amount) || 0), 0)
       const expenses6m = (expense6mResult.data ?? []).filter(isRealTx)
         .reduce((s: number, t: { amount: number | string | null }) => s + Math.abs(Number(t.amount) || 0), 0)
+
+      // Budget-type-map (parent + kind erft parent) → spaarbudget-IDs, zodat
+      // stortingen op savings-budgetten uit de uitgaven-term worden gehaald.
+      // Spiegelt de map-opbouw in horizon-data-loader.
+      const allBudgetsForType = (allBudgetsTypeResult.data ?? []) as { id: string; budget_type: string; parent_id: string | null }[]
+      const budgetTypeMap = new Map<string, string>()
+      for (const b of allBudgetsForType) if (b.parent_id === null) budgetTypeMap.set(b.id, b.budget_type)
+      for (const c of allBudgetsForType) {
+        if (c.parent_id !== null) {
+          const parentType = budgetTypeMap.get(c.parent_id)
+          if (parentType) budgetTypeMap.set(c.id, parentType)
+        }
+      }
+      const savingsBudgetIds = new Set<string>()
+      for (const [id, type] of budgetTypeMap) if (type === 'savings') savingsBudgetIds.add(id)
+      const savingsBudgetSpent6m = (expense6mResult.data ?? []).filter(isRealTx)
+        .reduce((s: number, t: { amount: number | string | null; budget_id?: string | null }) => {
+          const bid = t.budget_id
+          return bid && savingsBudgetIds.has(bid) ? s + Math.abs(Number(t.amount) || 0) : s
+        }, 0)
+
       const aflossing6m = computeDebtAflossingMonthly((fullDebtsResult.data ?? []) as Debt[]) * 6
-      const cashflowSavingsRate6m = income6m > 0 ? savingsRateFromAggregates(income6m, expenses6m, aflossing6m) : null
-      setSavingsRate6m(cashflowSavingsRate6m)
+
+      // Aantal maanden werkelijke data (1–6) voor de <6m-extrapolatie — zelfde
+      // vroegste-inkomens-datum als de income-extrapolatie hierboven.
+      let dataMonths6 = 6
+      if (earliestIncomeDate) {
+        const earliest = new Date(earliestIncomeDate)
+        dataMonths6 = Math.max(1, Math.min(6,
+          (now.getFullYear() - earliest.getFullYear()) * 12 +
+          (now.getMonth() - earliest.getMonth())
+        ))
+      }
+
+      const { savingsRate6m: computedSavingsRate6m, extSavingsBudget6 } = computeSavingsRate6m({
+        income6m,
+        expenses6m,
+        savingsBudgetSpent6m,
+        debtAflossing6m: aflossing6m,
+        dataMonths: dataMonths6,
+        // Fallback bij een (bijna) transactieloze gebruiker: de effectieve
+        // maandbedragen uit de resolver (respecteert 'manual').
+        fallbackMonthlyIncome: monthlyIncome,
+        fallbackMonthlyExpenses: monthlyExpenses,
+      })
+      setSavingsRate6m(computedSavingsRate6m)
 
       // Jaarlijks spaarbedrag uit de cashflow (inkomen × spaarquote) via dezelfde
       // resolveSavingsSource-keuzeregel als de horizon-loader — primaire
-      // FIRE-spaarbron wanneer er geen handmatige override is.
+      // FIRE-spaarbron wanneer er geen handmatige override is. Nu incl.
+      // spaarbudget-storting op het handmatige pad (symmetrisch met /toekomst).
       const { baseAnnualSavings } = resolveSavingsSource({
         incomeSource: profileResult.data?.income_source,
         expensesSource: profileResult.data?.expenses_source,
         netMonthlyIncome: Number(profileResult.data?.net_monthly_income ?? 0),
         estimatedAnnualIncome: extrapolatedIncome,
         estimatedMonthlyExpenses: profileMonthlyExpenses,
-        savingsRate6m: cashflowSavingsRate6m ?? 0,
+        savingsRate6m: computedSavingsRate6m,
         // Handmatig pad volgt dezelfde definitie als het transactie-pad.
-        // Spaarbudget wordt hier (nog) niet geladen → bewust default 0.
         monthlyDebtAflossing: aflossing6m / 6,
+        monthlySavingsContribution: extSavingsBudget6 / 6,
       })
       setBaseAnnualSavingsFromCashflow(baseAnnualSavings)
 

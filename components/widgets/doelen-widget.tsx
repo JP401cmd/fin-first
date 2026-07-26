@@ -145,9 +145,15 @@ export const DoelenWidget = memo(function DoelenWidget({ size, data, href }: Pro
     )
   }
 
+  // Sorteer op voortgang: meest achterlopende doel (laagste %) eerst (WF-OVZ-06).
+  // `goalPct` leunt op de richting-bewuste `computeGoalProgress`, dus dit klopt
+  // ook voor `direction:'down'`-doelen. Losse kopie — `topGoals` (canonieke
+  // sort_order-volgorde uit de bundel) blijft ongemoeid.
+  const sortedGoals = [...topGoals].sort((a, b) => goalPct(a) - goalPct(b))
+
   // ── Quarter-size: eerste doel compact ───────────────────────
   if (size === 'quarter') {
-    const goal = topGoals[0] ?? null
+    const goal = sortedGoals[0] ?? null
 
     if (!goal) {
       return (
@@ -201,7 +207,7 @@ export const DoelenWidget = memo(function DoelenWidget({ size, data, href }: Pro
 
   // ── Half-size: horizontal layout — left stats, right goal bars ────
   if (size === 'half') {
-    const halfGoals = topGoals.slice(0, 2)
+    const halfGoals = sortedGoals.slice(0, 2)
     const avgPctHalf = topGoals.length > 0
       ? Math.round(topGoals.reduce((sum, g) => sum + goalPct(g), 0) / topGoals.length)
       : 0
@@ -273,7 +279,7 @@ export const DoelenWidget = memo(function DoelenWidget({ size, data, href }: Pro
     .filter(g => g.target_date && new Date(g.target_date) > now && goalPct(g) < 100)
     .sort((a, b) => new Date(a.target_date!).getTime() - new Date(b.target_date!).getTime())[0] ?? null
 
-  const fullGoals = topGoals.slice(0, 3)
+  const fullGoals = sortedGoals.slice(0, 3)
 
   return (
     <WidgetShell module="wil" size={size} kicker="Doelen" href={href}>

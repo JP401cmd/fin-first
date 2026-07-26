@@ -3,7 +3,11 @@
 import { useState } from 'react'
 import { Trash2, Save } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { type RecurringTransaction, FREQUENCY_LABELS } from '@/lib/recurring-data'
+import {
+  type RecurringTransaction,
+  FREQUENCY_LABELS,
+  dayOfMonthFromISODate,
+} from '@/lib/recurring-data'
 import { type Budget } from '@/lib/budget-data'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { OwnershipToggle, useHouseholdStatus } from '@/components/app/ownership-toggle'
@@ -25,7 +29,11 @@ export function RecurringEditSheet({ recurring, budgets, onClose, onSaved }: Rec
     amount: String(Math.abs(Number(recurring.amount))),
     isIncome: Number(recurring.amount) > 0,
     frequency: recurring.frequency,
-    dayOfMonth: String(recurring.day_of_month ?? 1),
+    // Zelfde effectieve-dag-fallback als getNextOccurrence/withDerivedDayOfMonth:
+    // bij NULL day_of_month de dag uit start_date afleiden i.p.v. blind 1. Voorkomt
+    // dat opslaan (handleSave schrijft dit veld terug) een voorheen-NULL rij
+    // stilzwijgend permanent op dag 1 zet.
+    dayOfMonth: String(recurring.day_of_month ?? dayOfMonthFromISODate(recurring.start_date) ?? 1),
     dayOfWeek: String(recurring.day_of_week ?? 1),
     endDate: recurring.end_date ?? '',
     isActive: recurring.is_active,

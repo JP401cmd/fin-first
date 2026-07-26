@@ -11,10 +11,8 @@ import {
   OverzichtSecondaryLoader,
   OverzichtNetWorthChartLoader,
 } from '@/components/overview/overzicht-secondary-loader'
-import {
-  OverzichtSecondaryFallback,
-  MiniNetWorthChartFallback,
-} from '@/components/overview/overzicht-secondary'
+import { OverzichtSecondaryFallback } from '@/components/overview/overzicht-secondary'
+import { MiniNetWorthChartAnchor } from '@/components/overview/mini-networth-chart-anchor'
 import { resolveOverviewGreeting } from '@/lib/overview/greeting'
 import { CheckinBanner } from '@/components/overview/checkin-banner'
 import { WelcomeGuideBanner } from '@/components/overview/welcome-guide-banner'
@@ -144,7 +142,19 @@ export default async function OverzichtPage() {
         totals={totals}
         housingSplit={housingSplit}
         heroChart={
-          <Suspense fallback={<MiniNetWorthChartFallback />}>
+          // Twee-traps-render (kaart "Weergave grafiek op het overzicht", optie B):
+          // trap 1 = het Vandaag-anker met het ECHTE netto vermogen uit blok 1
+          // (geen kale skeleton); trap 2 = de volle projectie/historie stroomt in
+          // zodra `OverzichtNetWorthChartLoader` klaar is.
+          <Suspense
+            fallback={
+              <MiniNetWorthChartAnchor
+                currentNetWorth={currentNetWorth}
+                netWorthExclHome={netWorthExclHome}
+                showExclHome={housingSplit != null}
+              />
+            }
+          >
             <OverzichtNetWorthChartLoader
               supabase={supabase}
               currentNetWorth={currentNetWorth}

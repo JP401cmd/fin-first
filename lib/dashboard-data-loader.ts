@@ -66,6 +66,7 @@ import { calculateBox3, CURRENT_TAX_YEAR, type TaxYear } from '@/lib/box3-data'
 import { NL_AOW_AGE, WEERBAARHEID_DISPLAY_MAX } from '@/lib/constants'
 import { hasPartner } from '@/lib/household-type'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
+import { buildPensionProjection } from '@/lib/pension/pension-projection'
 import { resolveFireAssumptions, type FireAssumptionRow } from '@/lib/fire-assumptions'
 import { getAowLeeftijden } from '@/lib/reference-cache'
 import { computeExpectedAnnualAppreciation, type Asset } from '@/lib/asset-data'
@@ -77,6 +78,9 @@ import {
   type EmergencyGoalCandidate,
 } from '@/lib/emergency-fund'
 import { loadVasteLastenSummary } from '@/lib/vaste-lasten-summary'
+import { getUpcomingTransactions, type RecurringTransaction } from '@/lib/recurring-data'
+import { getTaxDeadlines } from '@/lib/tax-calendar'
+import { recurringToUpcomingEvents, taxDeadlinesToUpcomingEvents } from '@/lib/upcoming-events'
 import { syncActiveGoalValues } from '@/lib/goal-current-value'
 import type { GoalType } from '@/lib/goal-data'
 import { type Debt } from '@/lib/debt-data'
@@ -404,6 +408,16 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // sluit 'excluded' uit én telt auto-gedetecteerde vaste lasten mee. Start hier zodat de
   // detectie parallel loopt met de FIRE-berekening hieronder; cache() dedupt per request.
   const vasteLastenSummaryPromise = loadVasteLastenSummary(supabase)
+
+  // Agenda-widget: volledige actieve recurring-rijen voor de canonieke
+  // `getUpcomingTransactions`-motor (echte "wat komt eraan"-kasstromen), naast
+  // de fiscale deadlines. Klein per-gebruiker (RLS-gescoped, « max_rows); start
+  // parallel zodat de query naast de FIRE-berekening loopt.
+  const recurringRowsPromise = supabase
+    .from('recurring_transactions')
+    .select('id, name, counterparty_name, amount, frequency, day_of_month, day_of_week, start_date, end_date, is_active')
+    .eq('is_active', true)
+    .then((r) => r, () => ({ data: null }))
 
   // AOW-referentietabel (gedeeld, RLS: authenticated read all). Val bij een leesfout NIET
   // stil op [] terug: dat maskeerde eerder een tabelnaamfout ('aow_leeftijden'), waardoor
@@ -1813,8 +1827,19 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     prevMonthComparison: prevExpenseComparison,
   }
 
-  // ── Upcoming Events: from recurring + goals + life events ──
+  // ── Upcoming Events: recurring (kasstromen) + fiscale deadlines + goals + life events ──
+  // Consume, don't recompute: recurring via getUpcomingTransactions, fiscale
+  // deadlines via getTaxDeadlines — geen eigen event-lijst meer.
+  const AGENDA_HORIZON_DAYS = 30
   const upcomingEvents: UpcomingEvent[] = []
+  // Terugkerende afschrijvingen/inkomsten binnen de agenda-horizon
+  const recurringRowsResult = await recurringRowsPromise
+  const recurringRows = (recurringRowsResult.data ?? []) as unknown as RecurringTransaction[]
+  upcomingEvents.push(
+    ...recurringToUpcomingEvents(getUpcomingTransactions(recurringRows, AGENDA_HORIZON_DAYS)),
+  )
+  // Fiscale deadlines binnen dezelfde horizon
+  upcomingEvents.push(...taxDeadlinesToUpcomingEvents(getTaxDeadlines(new Date()), AGENDA_HORIZON_DAYS))
   // Goal deadlines
   for (const g of (goalsResult.data ?? []) as { id: string; name: string; target_date?: string | null; target_value?: number | null }[]) {
     if (g.target_date) {
@@ -2498,6 +2523,35 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     custom_unit: g.custom_unit ?? null,
   }))
 
+  // ── Pensioen / AOW-widget bron (HIGH-1 correctness + optie B: aanvullend pensioen) ──
+  // AOW-leeftijd cohort-correct via lookupAowAge (i.p.v. de hardcoded 67-fallback
+  // die de widget zelf zette) — pure consumptie van de canonieke aow_leeftijd-tabel,
+  // geen eigen leeftijdrekenwerk. Gegate op dob (niet op netWorth), zodat de leeftijd
+  // ook klopt voor gebruikers met een nul/negatief vermogen. null → widget empty-state.
+  const widgetAowAge: number | null = dob
+    ? lookupAowAge((aowResult.data ?? []) as AowLeeftijdRow[], dob).years
+    : null
+  // Verwacht aanvullend pensioen (2e pijler): piek-bruto maandbedrag, verbatim uit de
+  // canonieke pensioen-projectiemotor (buildPensionProjection consumeert de 'pension'
+  // life_events uit mijnpensioen). brutoNominaal = mijnpensioen 'TeBereiken' (geen eigen
+  // indexatie-/belastingaanname). null als er geen pensioen-events zijn geïmporteerd.
+  let widgetPensionMonthlyGross: number | null = null
+  if (currentAge != null) {
+    const pensionEventsForWidget = ((eventsResult.data ?? []) as LifeEvent[]).filter(
+      (e) => e.event_type === 'pension',
+    )
+    if (pensionEventsForWidget.length > 0) {
+      const pensionRows = buildPensionProjection({
+        pensionEvents: pensionEventsForWidget,
+        currentAge,
+        inflationRate: fireParams.inflationRate,
+        year: CURRENT_TAX_YEAR,
+      })
+      const peakYearlyGross = pensionRows.reduce((max, r) => Math.max(max, r.brutoNominaal), 0)
+      if (peakYearlyGross > 0) widgetPensionMonthlyGross = peakYearlyGross / 12
+    }
+  }
+
   // DashboardData bundle for widgets
   const dashboardData: DashboardData = {
     netWorth,
@@ -2620,6 +2674,8 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     inflationRate: fireParams.inflationRate,
     grossReturn: fireParams.grossReturn,
     currentAge: dob ? ageAtDate(dob) : null,
+    aowAge: widgetAowAge,
+    pensionMonthlyGross: widgetPensionMonthlyGross,
     weekOverview,
     feeAnalysis,
     feeImpactMonths,

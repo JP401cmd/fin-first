@@ -575,3 +575,40 @@ export function validateFormulas(
 
   return Array.from(unknown)
 }
+
+/**
+ * Statische validatie van de narrative-string: controleert dat elke
+ * `{output:key}`/`{derived:key}`-placeholder verwijst naar een bestaande
+ * output- resp. derived-key. Geeft een lijst van onbekende placeholders
+ * terug (leeg = ok). Gebruikt door de builder om hallucinerende
+ * narrative-referenties vroeg te vangen — analoog aan validateFormulas.
+ *
+ * Achtergrond: interpolateNarrative laat een onbekende placeholder op
+ * runtime BEWUST letterlijk staan (fail-visible-by-design, zie regel 316).
+ * Deze functie vangt zo'n hallucinatie al aan de generatie-poort af, zodat
+ * de gebruiker nooit een rauwe `{output:...}` te zien krijgt.
+ *
+ * BELANGRIJK: gebruikt EXACT dezelfde placeholder-regex als
+ * interpolateNarrative (regel 349). Wijk je hiervan af, dan lopen
+ * validatie en runtime uiteen (valse negatieven/positieven).
+ */
+export function validateNarrative(definition: CalculatorDefinition): string[] {
+  if (!definition.narrative) return []
+  const outputKeys = new Set(definition.outputs.map((o) => o.key))
+  const derivedKeys = new Set((definition.derived ?? []).map((d) => d.key))
+  const unknown = new Set<string>()
+  const re =
+    /\{(winner_label|compare_output|output:[a-z][a-z0-9_]*|derived:[a-z][a-z0-9_]*)\}/g
+  let match: RegExpExecArray | null
+  while ((match = re.exec(definition.narrative)) !== null) {
+    const token = match[1]
+    if (token.startsWith('output:')) {
+      const key = token.slice('output:'.length)
+      if (!outputKeys.has(key)) unknown.add(`{output:${key}}`)
+    } else if (token.startsWith('derived:')) {
+      const key = token.slice('derived:'.length)
+      if (!derivedKeys.has(key)) unknown.add(`{derived:${key}}`)
+    }
+  }
+  return Array.from(unknown)
+}

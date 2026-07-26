@@ -29,6 +29,12 @@ export function UitgavenPane({ open, onClose }: UitgavenPaneProps) {
   const [ctx, setCtx] = useState<Context | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Bumpt de fetch-effect-dep zodat de pane zijn ctx opnieuw ophaalt ná een
+  // methode-wissel (save) terwijl 'ie open blijft. Zonder dit blijft `ctx`
+  // (incl. currentRetirementExpense) hangen op de waarde van de initiële open —
+  // `router.refresh()` in de child raakt deze client-fetch-state niet.
+  const [reloadKey, setReloadKey] = useState(0)
+  const reloadContext = useCallback(() => setReloadKey(k => k + 1), [])
   // Save-state komt uit de child via `onActionsChange`. We houden 'm hier
   // in lokale state zodat de pane-footer (primary/secondary) reactief is.
   // Default = `null` → footer wordt niet gerenderd zolang de child nog niet
@@ -63,7 +69,7 @@ export function UitgavenPane({ open, onClose }: UitgavenPaneProps) {
     return () => {
       cancelled = true
     }
-  }, [open])
+  }, [open, reloadKey])
 
   // Reset actions wanneer de pane sluit, anders blijft een stale snapshot
   // hangen voor de volgende open (tot child re-publishes). Bewust set-state-
@@ -163,6 +169,7 @@ export function UitgavenPane({ open, onClose }: UitgavenPaneProps) {
           inPane
           onActionsChange={handleActionsChange}
           onSaved={onClose}
+          onSaveComplete={reloadContext}
         />
       ) : null}
     </ShellOverlay>

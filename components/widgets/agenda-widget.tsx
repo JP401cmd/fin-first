@@ -4,6 +4,7 @@ import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import type { DashboardData, UpcomingEvent } from './widget-renderer'
+import { relativeDayLabel, formatShortDate, parseLocalDate } from '@/lib/upcoming-events'
 import { Calendar, ArrowUpRight, ArrowDownRight, ArrowRight } from 'lucide-react'
 
 interface Props {
@@ -24,25 +25,9 @@ function DirectionIcon({ direction }: { direction: string }) {
   return <ArrowRight className="h-3 w-3 text-[var(--ink-4)] shrink-0" />
 }
 
-function relativeDate(dateStr: string): string {
-  const now = new Date()
-  const target = new Date(dateStr)
-  const diffMs = target.getTime() - now.getTime()
-  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24))
-
-  if (diffDays <= 0) return 'vandaag'
-  if (diffDays === 1) return 'morgen'
-  if (diffDays === 2) return 'overmorgen'
-  if (diffDays <= 7) return `over ${diffDays} dagen`
-  return target.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
-}
-
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
-}
-
+/** Naïef weeknummer (label-only) — lokaal geparsed, geen UTC-shift. */
 function getWeekNumber(dateStr: string): number {
-  const d = new Date(dateStr)
+  const d = parseLocalDate(dateStr)
   const startOfYear = new Date(d.getFullYear(), 0, 1)
   const diff = d.getTime() - startOfYear.getTime()
   return Math.ceil((diff / (1000 * 60 * 60 * 24) + startOfYear.getDay() + 1) / 7)
@@ -50,11 +35,12 @@ function getWeekNumber(dateStr: string): number {
 
 export const AgendaWidget = memo(function AgendaWidget({ size, data, href }: Props) {
   const { upcomingEvents } = data
+  const now = new Date()
 
   // ── Empty state ────────────────────────────────────────────
   if (upcomingEvents.length === 0) {
     return (
-      <WidgetShell module="kern" size={size} kicker="Agenda" href={href}>
+      <WidgetShell module="cross" size={size} kicker="Agenda" href={href}>
         <WidgetEmpty icon={Calendar} message="Geen komende events" />
       </WidgetShell>
     )
@@ -63,7 +49,7 @@ export const AgendaWidget = memo(function AgendaWidget({ size, data, href }: Pro
   // ── Mini: event count ──
   if (size === 'mini') {
     return (
-      <WidgetShell module="kern" size="mini" kicker="Agenda" href={href}>
+      <WidgetShell module="cross" size="mini" kicker="Agenda" href={href}>
         <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
           {upcomingEvents.length} events
         </p>
@@ -75,12 +61,12 @@ export const AgendaWidget = memo(function AgendaWidget({ size, data, href }: Pro
   if (size === 'quarter') {
     const next = upcomingEvents[0]
     return (
-      <WidgetShell module="kern" size={size} kicker="Agenda" href={href}>
+      <WidgetShell module="cross" size={size} kicker="Agenda" href={href}>
         <div className="flex items-center gap-2">
-          <Calendar className="h-4 w-4 text-kern-500 shrink-0" />
+          <Calendar className="h-4 w-4 text-[var(--ink-3)] shrink-0" />
           <p className="text-sm font-medium text-[var(--ink)] line-clamp-1 flex-1">{next.name}</p>
         </div>
-        <p className="mt-1 text-xs text-[var(--ink-3)]">{relativeDate(next.date)}</p>
+        <p className="mt-1 text-xs text-[var(--ink-3)]">{relativeDayLabel(next.date, now)}</p>
         {next.amount != null && (
           <p className={`mt-0.5 ${DIR_COLORS[next.direction]}`}>
             <MaskedAmount
@@ -97,19 +83,18 @@ export const AgendaWidget = memo(function AgendaWidget({ size, data, href }: Pro
 
   // ── Half: compact for 1-row 160px height ─────────────────
   if (size === 'half') {
-    const now = new Date()
     const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
-    const weekEvents = upcomingEvents.filter(e => new Date(e.date) <= weekFromNow).slice(0, 3)
+    const weekEvents = upcomingEvents.filter(e => parseLocalDate(e.date) <= weekFromNow).slice(0, 3)
     const shown = weekEvents.length > 0 ? weekEvents : upcomingEvents.slice(0, 3)
 
     return (
-      <WidgetShell module="kern" size={size} kicker="Agenda" href={href}>
+      <WidgetShell module="cross" size={size} kicker="Agenda" href={href}>
         <ul className="space-y-1.5">
           {shown.map(event => (
             <li key={event.id} className="flex items-center gap-2">
               <DirectionIcon direction={event.direction} />
               <span className="flex-1 min-w-0 text-sm text-[var(--ink)] truncate">{event.name}</span>
-              <span className="shrink-0 text-[10px] text-[var(--ink-4)]">{relativeDate(event.date)}</span>
+              <span className="shrink-0 text-[10px] text-[var(--ink-4)]">{relativeDayLabel(event.date, now)}</span>
               {event.amount != null && (
                 <span className={`shrink-0 ${DIR_COLORS[event.direction]}`}>
                   <MaskedAmount
@@ -133,9 +118,8 @@ export const AgendaWidget = memo(function AgendaWidget({ size, data, href }: Pro
   }
 
   // ── Full: 30-day timeline + weekly cashflow + totals ───────
-  const now = new Date()
   const monthFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
-  const monthEvents = upcomingEvents.filter(e => new Date(e.date) <= monthFromNow)
+  const monthEvents = upcomingEvents.filter(e => parseLocalDate(e.date) <= monthFromNow)
   const allShown = monthEvents.length > 0 ? monthEvents : upcomingEvents.slice(0, 8)
 
   // Calculate totals
@@ -146,30 +130,33 @@ export const AgendaWidget = memo(function AgendaWidget({ size, data, href }: Pro
     .filter(e => e.direction === 'out' && e.amount != null)
     .reduce((s, e) => s + (e.amount ?? 0), 0)
 
-  // Group by week
-  const weekGroups = new Map<number, UpcomingEvent[]>()
+  // Group by week — sleutel jaar-gekwalificeerd zodat W52/W1 over de jaargrens
+  // niet samenvallen; het label toont enkel het weeknummer.
+  const weekGroups = new Map<string, { week: number; events: UpcomingEvent[] }>()
   for (const event of allShown) {
+    const d = parseLocalDate(event.date)
     const wk = getWeekNumber(event.date)
-    if (!weekGroups.has(wk)) weekGroups.set(wk, [])
-    weekGroups.get(wk)!.push(event)
+    const key = `${d.getFullYear()}-${wk}`
+    if (!weekGroups.has(key)) weekGroups.set(key, { week: wk, events: [] })
+    weekGroups.get(key)!.events.push(event)
   }
 
   // Weekly cashflow
-  const weeklyCashflow = Array.from(weekGroups.entries()).map(([wk, events]) => {
+  const weeklyCashflow = Array.from(weekGroups.values()).map(({ week, events }) => {
     const income = events.filter(e => e.direction === 'in').reduce((s, e) => s + (e.amount ?? 0), 0)
     const expense = events.filter(e => e.direction === 'out').reduce((s, e) => s + (e.amount ?? 0), 0)
-    return { week: wk, net: income - expense, count: events.length }
+    return { week, net: income - expense, count: events.length }
   })
 
   return (
-    <WidgetShell module="kern" size={size} kicker="Agenda" href={href}>
+    <WidgetShell module="cross" size={size} kicker="Agenda" href={href}>
       <div className="space-y-4">
         {/* Event timeline */}
         <ul className="space-y-2">
           {allShown.map(event => (
             <li key={event.id} className="flex items-center gap-2">
               <span className="w-12 shrink-0 text-[10px] font-mono tabular-nums text-[var(--ink-4)]">
-                {formatDate(event.date)}
+                {formatShortDate(event.date)}
               </span>
               <DirectionIcon direction={event.direction} />
               <p className="text-sm text-[var(--ink)] line-clamp-1 flex-1 min-w-0">{event.name}</p>

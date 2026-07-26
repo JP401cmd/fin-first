@@ -61,6 +61,11 @@ interface Props {
    *  standalone route, daar blijft het inline save-blok met "Klaar ✓"-flash
    *  het feedback-kanaal. */
   onSaved?: () => void
+  /** Optionele callback ná een succesvolle NIET-custom methode-pick (pane blijft
+   *  open). De pane-wrapper gebruikt dit om zijn ctx te herladen, zodat het
+   *  hero-bedrag (currentRetirementExpense) de zojuist opgeslagen methode toont
+   *  i.p.v. de stale waarde van de initiële pane-open. */
+  onSaveComplete?: () => void
 }
 
 /** Merge bewaarde JSON met defaults zodat nieuwe keys altijd een fallback hebben. */
@@ -171,6 +176,12 @@ export default function UitgavenNaPensioenClient(props: Props) {
       // om het preview-bedrag te zien zonder dat de pane wegvalt.
       if (targetMethod === 'custom_amount' && aspirationsToPersist) {
         props.onSaved?.()
+      } else {
+        // Niet-custom methode-pick: pane blijft open. `router.refresh()` raakt
+        // alleen server-props (SSR), niet de client-`fetch()`-ctx van de pane —
+        // dus vraag de wrapper expliciet zijn ctx te herladen zodat het
+        // hero-bedrag de nieuwe methode volgt (WF-TOEK-02-bug2, ctx-staleness).
+        props.onSaveComplete?.()
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Onbekende fout')

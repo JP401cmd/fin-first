@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server'
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
+import { getEarliestIncomeDate } from '@/lib/server-data/base'
 import {
   computeYearlyMustExpenses,
-  computeRetirementExpenses,
   type RetirementExpenseMethod,
 } from '@/lib/budget-utils'
+import { deriveRetirementExpenseBasis } from '@/lib/retirement-expense-basis'
 
 /**
  * Context-loader voor de uitgaven-na-pensioen pane.
@@ -23,7 +24,7 @@ export async function GET() {
     .toISOString()
     .split('T')[0]
 
-  const [profileResult, budgetsResult, incomeResult] = await Promise.all([
+  const [profileResult, budgetsResult, incomeResult, earliestIncomeResult] = await Promise.all([
     supabase
       .from('profiles')
       .select(
@@ -40,6 +41,10 @@ export async function GET() {
       .gt('amount', 0)
       .gte('date', twelveMonthsAgo)
       .lt('date', monthEnd),
+    // Vroegste inkomstendatum ALL-TIME — canonieke gedeelde fetcher, hetzelfde
+    // deler-anker als de SSR-loader. Een 12-maands-venster gaf een te recente
+    // datum → afwijkend jaarbedrag t.o.v. de KPI (WF-TOEK-02-bug2).
+    getEarliestIncomeDate(supabase),
   ])
 
   const profile = profileResult.data ?? {
@@ -72,22 +77,9 @@ export async function GET() {
   )
 
   const txs = incomeResult.data ?? []
-  const incomeSum = txs.reduce((s, t) => s + Number(t.amount), 0)
-  const monthsCovered = (() => {
-    if (!txs.length) return 0
-    const dates = txs.map(t => new Date(t.date as string)).sort((a, b) => a.getTime() - b.getTime())
-    const earliest = dates[0]
-    return Math.max(
-      1,
-      Math.min(
-        12,
-        (now.getFullYear() - earliest.getFullYear()) * 12 + (now.getMonth() - earliest.getMonth()),
-      ),
-    )
-  })()
-  const yearlyIncomeFromTx = monthsCovered > 0 ? (incomeSum / monthsCovered) * 12 : 0
-  const profileMonthlyIncome = Number(profile.net_monthly_income ?? 0)
-  const yearlyIncome = yearlyIncomeFromTx > 0 ? yearlyIncomeFromTx : profileMonthlyIncome * 12
+  const last12Income = txs.reduce((s, t) => s + Number(t.amount), 0)
+  const earliestIncomeDate =
+    (earliestIncomeResult.data as { date?: string | null } | null)?.date ?? null
 
   const profileMonthlyExpenses = Number(profile.estimated_monthly_expenses ?? 0)
   const estimatedYearlyExpenses = profileMonthlyExpenses * 12
@@ -95,13 +87,22 @@ export async function GET() {
   const initialMethod = (profile.retirement_expense_method ?? 'essential_budgets') as RetirementExpenseMethod
   const customAmount = profile.retirement_expense_custom_amount
 
-  const currentRetirementExpense = computeRetirementExpenses(
-    initialMethod,
+  // Extrapolatie (inkomen → jaarbasis) + pensioenuitgave-methode: ÉÉN gedeelde
+  // bron (lib/retirement-expense-basis.ts), identiek aan de SSR-loader en de
+  // horizon-client load()-refresh. Géén eigen net_monthly_income*12-fallback
+  // meer: die week af van de canonieke extrapolatie en zou de sheet weer laten
+  // divergeren van de KPI voor gebruikers zonder inkomenstransacties.
+  const { extrapolatedIncome, yearlyRetirementExpenses } = deriveRetirementExpenseBasis({
+    method: initialMethod,
     yearlyMustExpenses,
-    yearlyIncome,
+    last12Income,
+    earliestIncomeDate,
     customAmount,
     estimatedYearlyExpenses,
-  )
+    now,
+  })
+  const yearlyIncome = extrapolatedIncome
+  const currentRetirementExpense = yearlyRetirementExpenses
 
   const featurePrefs = (profile.feature_preferences ?? {}) as Record<string, unknown>
   const savedAspirations = featurePrefs.retirement_aspirations ?? null

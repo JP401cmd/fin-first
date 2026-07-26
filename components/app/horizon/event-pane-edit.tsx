@@ -107,6 +107,17 @@ export function EventPaneEdit({
   const { masked } = useMaskedAmounts()
   const debouncedState = useDebouncedValue(state, 200)
   const currentAge = baselineInput.dateOfBirth ? Math.floor(ageAtDate(baselineInput.dateOfBirth)) : 30
+  // Bovengrens = de door de gebruiker geconfigureerde eind-leeftijd (fireStrategy.endAge,
+  // default 90, ruwweg 60-120). Tijdens laden kan `endAge` NaN/undefined zijn (voor de
+  // baseline-input klaar is) — val dan terug op een ruime, altijd-geldige bovengrens zodat
+  // het formulier niet permanent blokkeert. De grens is bewust dynamisch per gebruiker,
+  // geen hardcoded range.
+  const maxAge = Number.isFinite(endAge) ? Math.max(currentAge, endAge) : Math.max(currentAge, 120)
+  // Leeftijd binnen het toegestane venster? Vangt zowel getypte/geplakte out-of-range
+  // waarden als reeds-gepersisteerde onzin (bv. een eerder opgeslagen 421) af — beide
+  // moeten "Opslaan" blokkeren.
+  const ageValid =
+    Number.isFinite(state.shared_age) && state.shared_age >= currentAge && state.shared_age <= maxAge
 
   const draftEvent = useMemo(
     () => buildDraftEvent(debouncedState, existingEvent),
@@ -160,7 +171,7 @@ export function EventPaneEdit({
   useEffect(() => {
     saveHandlerRef.current = () => onSave(buildDraftEvent(state, existingEvent))
   }, [onSave, state, existingEvent])
-  const canSave = !saving && hasAnyImpact && state.name.trim().length > 0
+  const canSave = !saving && hasAnyImpact && state.name.trim().length > 0 && ageValid
   useEffect(() => {
     if (!onActionsChange) return
     onActionsChange({
@@ -224,13 +235,22 @@ export function EventPaneEdit({
           <input
             type="number"
             min={currentAge}
-            max={endAge}
+            max={maxAge}
             value={state.shared_age}
+            aria-invalid={!ageValid}
             onChange={e =>
-              setState({ ...state, shared_age: Math.max(currentAge, Number(e.target.value) || currentAge) })
+              setState({
+                ...state,
+                shared_age: Math.min(maxAge, Math.max(currentAge, Number(e.target.value) || currentAge)),
+              })
             }
-            className="mt-1 w-24 px-3 py-2 border border-[var(--border-md)] bg-[var(--paper)] font-mono tabular-nums focus:border-[var(--module-active-700)] focus:outline-none"
+            className="mt-1 w-24 px-3 py-2 border bg-[var(--paper)] font-mono tabular-nums focus:outline-none aria-invalid:border-red-500 aria-invalid:focus:border-red-500 border-[var(--border-md)] focus:border-[var(--module-active-700)]"
           />
+          {!ageValid && (
+            <p className="mt-1 text-[11px] text-red-700">
+              Kies een leeftijd tussen {currentAge} en {maxAge}.
+            </p>
+          )}
         </div>
       </div>
 
@@ -499,7 +519,7 @@ export function EventPaneEdit({
             <button
               type="button"
               onClick={() => onSave(buildDraftEvent(state, existingEvent))}
-              disabled={saving || !hasAnyImpact || !state.name.trim()}
+              disabled={saving || !hasAnyImpact || !state.name.trim() || !ageValid}
               className="shrink-0 px-5 py-3 bg-[var(--paper)] text-[var(--ink)] font-semibold text-sm hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {saving ? 'Opslaan…' : existingEvent ? 'Opslaan' : 'Toevoegen'}
@@ -742,7 +762,14 @@ function StoryQuestionInput({
           max={question.max}
           step={question.step ?? 1}
           value={num}
-          onChange={e => onChange(Number(e.target.value) || 0)}
+          onChange={e => {
+            // Clamp naar het vraag-venster zodat een out-of-range invoer (typen/plakken)
+            // niet in de story-afgeleide waarden lekt — spiegel van de shared_age-clamp.
+            const raw = Number(e.target.value) || 0
+            const lo = Number.isFinite(question.min) ? (question.min as number) : -Infinity
+            const hi = Number.isFinite(question.max) ? (question.max as number) : Infinity
+            onChange(Math.min(hi, Math.max(lo, raw)))
+          }}
           className="w-40 px-3 py-2 border border-[var(--border-md)] bg-[var(--paper)] font-mono tabular-nums focus:border-[var(--module-active-700)] focus:outline-none"
         />
         {question.suffix && (

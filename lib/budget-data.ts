@@ -42,6 +42,7 @@ export type Budget = {
   goal_date: string | null
   goal_frequency: string | null
   is_favorite: boolean
+  is_archived?: boolean
 }
 
 /** Stable budget slugs — use these for matching instead of display names. */

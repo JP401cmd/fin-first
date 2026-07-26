@@ -1,38 +1,53 @@
+'use client'
+
 import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
-import type { DashboardData, Notification } from './widget-renderer'
+import type { DashboardData } from './widget-renderer'
+import { useNotifications } from '@/components/app/notifications/notification-provider'
+import type { Notification } from '@/app/api/notifications/route'
 import { Bell } from 'lucide-react'
 import { formatTimestamp } from '@/lib/format'
 
 interface Props {
   size: WidgetSize
+  // Blijft in de props zodat widget-renderer de widget ongewijzigd kan aanroepen,
+  // maar wordt NIET meer gelezen: de meldingen komen sinds de herbekabeling uit
+  // de canonieke NotificationProvider i.p.v. de losse loader-bundel (zie hieronder).
   data: DashboardData
   href?: string
 }
 
-const TYPE_ICONS: Record<Notification['type'], string> = {
-  budget: '\u26a0\ufe0f',
-  milestone: '\ud83d\udcca',
-  positive: '\u2705',
-  anomaly: '\ud83d\udea8',
-  rebalance: '\u2696\ufe0f',
+// Urgent = priority <= 2 én ongelezen — identiek aan de "Dringend"-partitie van
+// het berichten-paneel (notification-panel.tsx), zodat de widget dezelfde
+// urgentie-semantiek toont als de bel.
+function isUrgentUnread(n: Notification): boolean {
+  return !n.read && n.priority <= 2
 }
 
-const TYPE_LABELS: Record<Notification['type'], string> = {
-  budget: 'Budget',
-  milestone: 'Mijlpaal',
-  positive: 'Positief',
-  anomaly: 'Ongebruikelijk',
-  rebalance: 'Rebalancing',
+// Dot-kleur: stoplicht-semantiek op ink/negative-tokens (bewust GEEN
+// module-accent, cf. F6) — urgent-ongelezen → aandacht, ongelezen → prominent,
+// gelezen → gedempt.
+function dotClass(n: Notification): string {
+  if (isUrgentUnread(n)) return 'bg-[var(--negative)]'
+  if (!n.read) return 'bg-[var(--ink-2)]'
+  return 'bg-[var(--ink-4)]'
 }
 
-
-export const MeldingenWidget = memo(function MeldingenWidget({ size, data, href }: Props) {
-  const { notifications } = data
+export const MeldingenWidget = memo(function MeldingenWidget({ size, href }: Props) {
+  // Canonieke bron van waarheid: dezelfde NotificationProvider die de bel-badge
+  // én /berichten voedt (prefs-gefilterd, echte createdAt, echte actionUrl,
+  // gelezen/ongelezen-status). Zo tonen widget, bel en berichtencentrum bij
+  // dezelfde staat hetzelfde — geen tweede, afwijkende meldingen-motor meer.
+  const { notifications, unreadCount } = useNotifications()
   const count = notifications.length
-  const critical = notifications.filter(n => n.severity === 'critical').length
+  const urgentUnread = notifications.filter(isUrgentUnread).length
+  // "Nieuw" = echte ongelezen-teller (spiegelt de bel); valt terug op het aantal
+  // actieve meldingen wanneer alles gelezen is.
+  const headline = unreadCount > 0
+    ? `${unreadCount} nieuw`
+    : `${count} melding${count !== 1 ? 'en' : ''}`
 
   if (count === 0) {
     return (
@@ -42,51 +57,50 @@ export const MeldingenWidget = memo(function MeldingenWidget({ size, data, href 
     )
   }
 
-  // ── Mini: unread count ──
+  // ── Mini: ongelezen-teller ──
   if (size === 'mini') {
     return (
       <WidgetShell module="cross" size="mini" kicker="Meldingen" href={href}>
         <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
-          {count} nieuw
+          {headline}
         </p>
       </WidgetShell>
     )
   }
 
-  // ── Quarter: teller met urgentie-kleur badge, rode dot bij kritiek ──
+  // ── Quarter: teller-badge, rode puls bij dringende ongelezen meldingen ──
   if (size === 'quarter') {
-    const badgeColor = critical > 0
+    const badgeColor = urgentUnread > 0
       ? 'bg-[color-mix(in_oklab,var(--negative)_10%,transparent)] text-[var(--negative)]'
       : 'bg-[var(--subtle)] text-[var(--ink-2)]'
     return (
       <WidgetShell module="cross" size={size} kicker="Meldingen" href={href}>
         <div className="flex items-center gap-2">
           <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-sm font-semibold ${badgeColor}`}>
-            {critical > 0 && <span className="h-2 w-2 rounded-full bg-[var(--negative)] animate-pulse" />}
-            {count} melding{count !== 1 ? 'en' : ''}
+            {urgentUnread > 0 && <span className="h-2 w-2 rounded-full bg-[var(--negative)] animate-pulse" />}
+            {headline}
           </span>
         </div>
       </WidgetShell>
     )
   }
 
-  // ── Half: compact for 1-row 160px height ──
+  // Ongelezen eerst, daarna nieuwste bovenaan — zelfde prioritering als de bel.
+  const ordered = [...notifications].sort((a, b) => {
+    if (a.read !== b.read) return a.read ? 1 : -1
+    return b.createdAt.localeCompare(a.createdAt)
+  })
+
+  // ── Half: 3 titels met urgentie-dot ──
   if (size === 'half') {
-    const shown = notifications.slice(0, 3)
+    const shown = ordered.slice(0, 3)
     return (
       <WidgetShell module="cross" size={size} kicker="Meldingen" href={href}>
         <ul className="space-y-1.5">
           {shown.map(n => (
             <li key={n.id} className="flex items-center gap-2 text-sm text-[var(--ink-2)]">
-              <span className="shrink-0 text-xs">{TYPE_ICONS[n.type] ?? '\u2139\ufe0f'}</span>
-              <span className="flex-1 line-clamp-1">{n.message}</span>
-              <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${
-                n.severity === 'critical' ? 'bg-[color-mix(in_oklab,var(--negative)_10%,transparent)] text-[var(--negative)]' :
-                n.severity === 'warning' ? 'bg-[var(--subtle)] text-[var(--ink-2)]' :
-                'bg-[var(--subtle)] text-[var(--ink-3)]'
-              }`}>
-                {TYPE_LABELS[n.type] ?? n.type}
-              </span>
+              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotClass(n)}`} />
+              <span className="flex-1 line-clamp-1">{n.title}</span>
             </li>
           ))}
         </ul>
@@ -97,48 +111,30 @@ export const MeldingenWidget = memo(function MeldingenWidget({ size, data, href 
     )
   }
 
-  // ── Full: alle meldingen gegroepeerd per type + tijdstempel + actie-links ──
-  const grouped = notifications.reduce<Record<string, Notification[]>>((acc, n) => {
-    const key = n.type
-    if (!acc[key]) acc[key] = []
-    acc[key].push(n)
-    return acc
-  }, {})
-
+  // ── Full: volledige lijst met omschrijving + echt tijdstempel ──
+  // De hele kaart linkt (via WidgetShell) naar /berichten waar de gebruiker per
+  // melding kan doorklikken; per-item links zouden <a>-in-<a> nesten, dus geen
+  // schijn-"Bekijk"-affordance meer.
   return (
     <WidgetShell module="cross" size={size} kicker="Meldingen" href={href}>
-      <div className="space-y-4">
-        {Object.entries(grouped).map(([type, items]) => (
-          <div key={type}>
-            <h4 className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--ink-3)]">
-              <span>{TYPE_ICONS[type as Notification['type']] ?? '\u2139\ufe0f'}</span>
-              {TYPE_LABELS[type as Notification['type']] ?? type}
-              <span className="text-[var(--ink-4)]">({items.length})</span>
-            </h4>
-            <ul className="space-y-1.5">
-              {items.map(n => (
-                <li key={n.id} className="flex items-start justify-between gap-2">
-                  <div className="flex items-start gap-2 min-w-0 flex-1">
-                    <span className={`mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full ${
-                      n.severity === 'critical' ? 'bg-[var(--negative)]' :
-                      n.severity === 'warning' ? 'bg-[var(--ink-3)]' : 'bg-[var(--ink-4)]'
-                    }`} />
-                    <span className="text-sm text-[var(--ink-2)] line-clamp-2">{n.message}</span>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <span className="text-[10px] text-[var(--ink-4)]">{formatTimestamp(n.createdAt)}</span>
-                    {n.actionHref && (
-                      <span className="text-[10px] font-medium text-[var(--ink)]">
-                        Bekijk
-                      </span>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
+      <ul className="space-y-3">
+        {ordered.map(n => (
+          <li key={n.id} className="flex items-start gap-2">
+            <span className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${dotClass(n)}`} />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-baseline justify-between gap-2">
+                <p className={`text-sm line-clamp-1 ${!n.read ? 'font-semibold text-[var(--ink)]' : 'text-[var(--ink-2)]'}`}>
+                  {n.title}
+                </p>
+                <span className="shrink-0 text-[10px] text-[var(--ink-4)]">{formatTimestamp(n.createdAt)}</span>
+              </div>
+              {n.description && (
+                <p className="mt-0.5 text-xs text-[var(--ink-3)] line-clamp-2">{n.description}</p>
+              )}
+            </div>
+          </li>
         ))}
-      </div>
+      </ul>
     </WidgetShell>
   )
 })

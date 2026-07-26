@@ -40,7 +40,9 @@ import { resolveFireParams, type FireParams } from '@/lib/fire-params'
 import { deriveMarginaalTarief } from '@/lib/box1-tax'
 import { type WithdrawalStrategyType, type WithdrawalStrategyConfig, WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
 import type { Action, ActionStatus } from '@/lib/recommendation-data'
-import { computeYearlyMustExpenses, computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
+import { computeYearlyMustExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
+import { deriveRetirementExpenseBasis } from '@/lib/retirement-expense-basis'
+import { resolveEffectiveIncomeExpenses, type IncomeExpenseSources } from '@/lib/effective-financials'
 import type { Debt } from '@/lib/debt-data'
 import { deriveNaturalMilestones, naturalMilestoneToLifeEvent, type NaturalMilestone } from '@/lib/natural-milestones'
 import {
@@ -952,7 +954,7 @@ export default function HorizonPage({
         supabase.from('transactions').select('amount').gte('date', monthStart).lt('date', monthEnd),
         supabase.from('assets').select('current_value, monthly_contribution, net_worth_inclusion_pct').eq('is_active', true),
         supabase.from('debts').select('current_balance, net_worth_inclusion_pct').eq('is_active', true),
-        supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, box3_method, marginaal_tarief, feature_preferences, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step, withdrawal_profile_config, deficit_loan_rate, housing_strategy_config, pot_rules').single(),
+        supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source, box3_method, marginaal_tarief, feature_preferences, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step, withdrawal_profile_config, deficit_loan_rate, housing_strategy_config, pot_rules').single(),
         supabase.from('budgets').select('id, name, default_limit, interval, budget_type, is_essential').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
         supabase.from('life_events').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
         supabase
@@ -971,7 +973,11 @@ export default function HorizonPage({
           .order('snapshot_date', { ascending: true })
           .limit(60),
         supabase.from('transactions').select('amount, date').gt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd),
-        supabase.from('transactions').select('date').gt('amount', 0).gte('date', twelveMonthsAgo).order('date', { ascending: true }).limit(1),
+        // Vroegste inkomstendatum ALL-TIME (geen 12-maands-venster) — deler-anker
+        // voor de extrapolatie. Spiegelt de canonieke getEarliestIncomeDate
+        // (SSR-loader / API-route); een gecapt venster gaf een te recente datum →
+        // afwijkend jaarbedrag (WF-TOEK-02-bug2).
+        supabase.from('transactions').select('date').gt('amount', 0).order('date', { ascending: true }).limit(1),
         // 6-month transactions for stable resilience calculation
         supabase.from('transactions').select('amount').gte('date', sixMonthsAgo).lt('date', monthEnd),
         supabase.from('bank_accounts').select('id, name, balance').eq('is_active', true).is('linked_asset_id', null),
@@ -993,11 +999,20 @@ export default function HorizonPage({
         else monthlyExpenses += Math.abs(amt)
       }
 
-      // Fallback to profile estimates for users without transactions
-      const profileMonthlyIncome = Number(profileResult.data?.net_monthly_income ?? 0)
+      // Canonieke income/expenses-resolutie (lib/effective-financials.ts): een
+      // expliciete handmatige bron (income_source/expenses_source === 'manual')
+      // wint ALTIJD van de mogelijk-onvolledige lopende-maand-transactiesom.
+      // Consumeert de ene bron i.p.v. een eigen inline fallback — voorheen zakte
+      // de wat-als-baseline naar een partiële maandsom (WF-TOEK-10-bug1,
+      // ADR 0058 "consume, don't recompute"). Spiegelt de SSR-loader
+      // (lib/horizon-data-loader.ts).
       const profileMonthlyExpenses = Number(profileResult.data?.estimated_monthly_expenses ?? 0)
-      const effectiveMonthlyIncome = monthlyIncome > 0 ? monthlyIncome : profileMonthlyIncome
-      const effectiveMonthlyExpenses = monthlyExpenses > 0 ? monthlyExpenses : profileMonthlyExpenses
+      const { income: effectiveMonthlyIncome, expenses: effectiveMonthlyExpenses } =
+        resolveEffectiveIncomeExpenses(
+          (profileResult.data ?? {}) as IncomeExpenseSources,
+          monthlyIncome,
+          monthlyExpenses,
+        )
 
       // 6-month average income/expenses for stable resilience calculation
       let totalIncome6m = 0
@@ -1021,18 +1036,7 @@ export default function HorizonPage({
       const monthlyContributions = (assetsResult.data ?? []).reduce((s, a) => s + Number(a.monthly_contribution), 0)
 
       const last12Income = income12Result.data?.reduce((s, t) => s + Number(t.amount), 0) ?? 0
-      let extrapolatedIncome = last12Income
       const earliestIncomeDate = earliestIncomeResult.data?.[0]?.date
-      if (earliestIncomeDate && last12Income > 0) {
-        const earliest = new Date(earliestIncomeDate)
-        const incomeMonths = Math.max(1, Math.min(12,
-          (now.getFullYear() - earliest.getFullYear()) * 12 +
-          (now.getMonth() - earliest.getMonth())
-        ))
-        if (incomeMonths < 12) {
-          extrapolatedIncome = (last12Income / incomeMonths) * 12
-        }
-      }
 
       const allChildren = childBudgetsResult.data ?? []
       const { yearlyMustExpenses } = computeYearlyMustExpenses(
@@ -1040,13 +1044,18 @@ export default function HorizonPage({
         allChildren,
       )
 
-      const yearlyRetirementExpenses = computeRetirementExpenses(
-        profileResult.data?.retirement_expense_method as RetirementExpenseMethod,
+      // Extrapolatie (inkomen → jaarbasis) + pensioenuitgave-methode: ÉÉN gedeelde
+      // bron (lib/retirement-expense-basis.ts), identiek aan de SSR-loader en
+      // /api/uitgaven-na-pensioen/context (consume, don't recompute).
+      const { extrapolatedIncome, yearlyRetirementExpenses } = deriveRetirementExpenseBasis({
+        method: profileResult.data?.retirement_expense_method as RetirementExpenseMethod,
         yearlyMustExpenses,
-        extrapolatedIncome,
-        profileResult.data?.retirement_expense_custom_amount,
-        profileMonthlyExpenses * 12,
-      )
+        last12Income,
+        earliestIncomeDate,
+        customAmount: profileResult.data?.retirement_expense_custom_amount,
+        estimatedYearlyExpenses: profileMonthlyExpenses * 12,
+        now,
+      })
 
       setRetirementMethod((profileResult.data?.retirement_expense_method ?? 'essential_budgets') as RetirementExpenseMethod)
 
