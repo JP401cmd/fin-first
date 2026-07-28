@@ -8,9 +8,11 @@ import {
 } from '@/components/app/module-color-provider'
 
 /**
- * PalettePicker — visuele preset-keuze tussen de 3 beschikbare cream-
- * palettes (cream / licht / fd-bruin) die in module-color-provider zijn
- * gedefinieerd. Eén klik wisselt het hele design-token-systeem.
+ * PalettePicker — visuele preset-keuze tussen de beschikbare paletten
+ * (cream / licht / fd-bruin / krant) die in module-color-provider zijn
+ * gedefinieerd. Eén klik wisselt het hele design-token-systeem. Het
+ * "Krant"-palet draagt daarnaast een eigen label-typografie (Inter) — zie
+ * `data-palette` in globals.css.
  *
  * Plan-context: backlog-item "Module-color als instelbare accent".
  * Persistence loopt via localStorage (`tf-palette-theme`) in de bestaande
@@ -32,7 +34,7 @@ export function PalettePicker() {
       <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
         Palet
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {themes.map(([key, theme]) => {
           const active = paletteTheme === key
           return (

@@ -60,7 +60,10 @@ export function Kicker({
   const stripWidth = size === 'small' ? 'w-5' : 'w-7'
   return (
     <div
-      className={`flex items-center gap-2.5 ${sizeClass} uppercase font-mono text-[var(--module-active-700)] ${className}`}
+      // `ed-kicker`: stabiele haak zodat het Krant-palet deze labels naar Inter
+      // kan scopen (globals.css :root[data-palette="krant"] .ed-kicker). Zonder
+      // dat palet blijft `font-mono` (DM Mono) leidend — geen regressie.
+      className={`ed-kicker flex items-center gap-2.5 ${sizeClass} uppercase font-mono text-[var(--module-active-700)] ${className}`}
     >
       <span
         aria-hidden

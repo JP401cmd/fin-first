@@ -663,6 +663,19 @@ body {
   letter-spacing: 0.08em;
 }
 
+/* ── Krant-palet: editorial labels → Inter ─────────────────
+   Uitsluitend wanneer het "Krant"-palet actief is (data-palette="krant" op
+   <html>, gezet door ModuleColorProvider.applyPaletteVars) rendert de gedeelde
+   label-laag in Inter i.p.v. DM Mono — de redactionele reference-typografie.
+   Bewust gescopet: alle andere paletten behouden hun DM-Mono-labels, dus dit
+   is opt-in en zonder regressie. Hogere specificiteit dan de `font-mono`
+   utility, dus geen !important nodig. */
+:root[data-palette="krant"] .ed-kicker,
+:root[data-palette="krant"] .label-editorial,
+:root[data-palette="krant"] .briefing-rubriek {
+  font-family: var(--font-inter, Inter, -apple-system, BlinkMacSystemFont, sans-serif);
+}
+
 /* Editorial body warmth — optionele radial-gradient voor narratieve pagina's
    (gids, briefing, jaaroverzicht, hero-secties). Niet als default body-bg —
    dashboards en data-pagina's blijven plat var(--bg) voor leesbaarheid. */

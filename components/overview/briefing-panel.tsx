@@ -60,14 +60,14 @@ export type {
 
 const CATEGORY_CONFIG: Record<
   BriefingCategory,
-  { label: string; dotColor: string; bar: string; Icon: LucideIcon }
+  { label: string; dotColor: string; bar: string; text: string; Icon: LucideIcon }
 > = {
-  observation: { label: 'Wat valt op', dotColor: 'bg-emerald-500', bar: 'bg-emerald-400', Icon: TrendingUp },
-  tip:         { label: 'Een tip',      dotColor: 'bg-violet-500',  bar: 'bg-violet-400',  Icon: Lightbulb },
-  upcoming:    { label: 'Binnenkort',   dotColor: 'bg-sky-500',     bar: 'bg-sky-400',     Icon: Calendar },
-  heads_up:    { label: 'Heads-up',     dotColor: 'bg-amber-500',   bar: 'bg-amber-400',   Icon: AlertTriangle },
-  milestone:   { label: 'Mijlpaal',     dotColor: 'bg-fuchsia-500', bar: 'bg-fuchsia-400', Icon: Sparkles },
-  market:      { label: 'Markt',        dotColor: 'bg-slate-500',   bar: 'bg-slate-400',   Icon: LineChart },
+  observation: { label: 'Wat valt op', dotColor: 'bg-emerald-500', bar: 'bg-emerald-400', text: 'text-emerald-700', Icon: TrendingUp },
+  tip:         { label: 'Een tip',      dotColor: 'bg-violet-500',  bar: 'bg-violet-400',  text: 'text-violet-700',  Icon: Lightbulb },
+  upcoming:    { label: 'Binnenkort',   dotColor: 'bg-sky-500',     bar: 'bg-sky-400',     text: 'text-sky-700',     Icon: Calendar },
+  heads_up:    { label: 'Heads-up',     dotColor: 'bg-amber-500',   bar: 'bg-amber-400',   text: 'text-amber-700',   Icon: AlertTriangle },
+  milestone:   { label: 'Mijlpaal',     dotColor: 'bg-fuchsia-500', bar: 'bg-fuchsia-400', text: 'text-fuchsia-700', Icon: Sparkles },
+  market:      { label: 'Markt',        dotColor: 'bg-slate-500',   bar: 'bg-slate-400',   text: 'text-slate-600',   Icon: LineChart },
 }
 
 /** Maximum aantal kaartjes — 3-koloms × 2 rijen = 6. */
@@ -123,9 +123,10 @@ export function BriefingPanel({
   weekHistory?: BriefingWeekHistoryItem[]
   /**
    * Eenvoudige weergave (display_mode === 'simple'): verberg de
-   * "Jouw vrijheid deze week"-hero en toon enkel het belangrijkste briefje
-   * (de eerste entry, door de engine al op prioriteit geordend) over de volle
-   * breedte. Default false → ongewijzigde, volledige briefing.
+   * "Jouw vrijheid deze week"-hero en toon de drie belangrijkste briefjes
+   * (de eerste entries, door de engine al op prioriteit geordend) in hetzelfde
+   * 3-koloms grid als de volledige weergave — alleen begrensd op 3. Default
+   * false → volledige briefing (max 6).
    */
   simpleMode?: boolean
 }) {
@@ -159,9 +160,9 @@ export function BriefingPanel({
     ((d: FreedomCardData) => HTMLCanvasElement | Promise<HTMLCanvasElement>) | null
   >(null)
 
-  // In Eenvoudig tonen we alleen het belangrijkste briefje (1, over de volle
-  // breedte); anders het volledige grid (max 6).
-  const entryLimit = simpleMode ? 1 : MAX_BRIEFING_ENTRIES
+  // In Eenvoudig tonen we de drie belangrijkste briefjes (zelfde 3-koloms grid,
+  // begrensd op 3); anders het volledige grid (max 6).
+  const entryLimit = simpleMode ? 3 : MAX_BRIEFING_ENTRIES
   const shownEntries = (override?.entries ?? entries).slice(0, entryLimit)
   const shownRefreshedAt = override?.refreshedAt ?? refreshedAt ?? null
   const shownHeadline = override?.headline ?? headline ?? null
@@ -273,18 +274,14 @@ export function BriefingPanel({
           </article>
         </div>
       ) : (
-        <div
-          className={
-            simpleMode
-              ? 'grid grid-cols-1 gap-3 sm:gap-4'
-              : 'grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4'
-          }
-        >
+        <div className="grid grid-cols-1 gap-8 sm:grid-cols-3 sm:gap-x-0 sm:gap-y-10">
           {shownEntries.map((entry, i) => (
             <BriefingCard key={entry.id} entry={entry} index={i} />
           ))}
         </div>
       )}
+
+      {!simpleMode && shownEntries.length > 0 && <BriefingColophon />}
 
       {weekHistory && weekHistory.length > 0 && (
         <BriefingWeekHistory items={weekHistory} />
@@ -384,30 +381,17 @@ function BriefingHeader({
   sharing: boolean
 }) {
   return (
-    <div className="mb-3 flex items-end justify-between gap-3">
-      <div className="min-w-0">
-        <h2 className="font-serif text-lg sm:text-xl font-semibold leading-tight text-[var(--ink)]">
-          Jouw wekelijkse briefing
+    <div className="mb-5">
+      {/* Masthead: krantenkop + dikke inkt-regel, met de acties rechts. */}
+      <div className="flex items-end justify-between gap-3 border-b-2 border-[var(--ink)] pb-2.5">
+        <h2
+          className="text-2xl sm:text-[26px] font-bold leading-none tracking-[-0.02em] text-[var(--ink)]"
+          style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+        >
+          De briefing
         </h2>
-        {headline && (
-          <p className="mt-1 text-[13px] sm:text-sm text-[var(--ink-2)] leading-snug">
-            {headline}
-          </p>
-        )}
-        {refreshedAt && (
-          <p className="mt-0.5 text-[11px] text-[var(--ink-3)] tabular-nums">
-            Bijgewerkt {formatTimestamp(refreshedAt)}
-            {dataChanged && (
-              <span className="ml-1.5 text-amber-700">
-                · je cijfers zijn sindsdien veranderd
-                {refreshable ? ' — ververs voor de actuele stand' : ''}
-              </span>
-            )}
-          </p>
-        )}
-      </div>
 
-      <div className="flex shrink-0 items-center gap-2 print:hidden">
+        <div className="flex shrink-0 items-center gap-2 print:hidden">
         <button
           type="button"
           onClick={onShare}
@@ -461,7 +445,31 @@ function BriefingHeader({
               {refreshing ? 'Verversen…' : 'Ververs'}
             </button>
           ))}
+        </div>
       </div>
+
+      {(refreshedAt || headline) && (
+        <div className="mt-2.5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          {refreshedAt && (
+            // Dateline: bewust DM Mono (data-stempel), óók onder het Krant-palet —
+            // spiegelt de reference waar de rubrieken Inter zijn maar de datum mono blijft.
+            <p className="font-mono text-[11px] uppercase tracking-[0.06em] text-[var(--ink-3)] tabular-nums">
+              Bijgewerkt {formatTimestamp(refreshedAt)}
+              {dataChanged && (
+                <span className="ml-1.5 normal-case tracking-normal text-amber-700">
+                  · je cijfers zijn sindsdien veranderd
+                  {refreshable ? ' — ververs voor de actuele stand' : ''}
+                </span>
+              )}
+            </p>
+          )}
+          {headline && (
+            <p className="min-w-0 flex-1 text-right font-serif text-[13px] italic leading-snug text-[var(--ink-2)] sm:text-sm">
+              {headline}
+            </p>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -506,56 +514,74 @@ function BriefingCard({ entry, index = 0 }: { entry: BriefingEntry; index?: numb
 
   const inner = (
     <>
-      {/* Kleur-accent: linkerrail per categorie. */}
-      <span
-        className={`absolute left-0 top-0 bottom-0 w-1 ${config.bar}`}
-        aria-hidden="true"
-      />
-      <div className="flex items-center gap-2 mb-1.5">
-        <span className={`w-2 h-2 rounded-full ${config.dotColor}`} aria-hidden="true" />
-        <span className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
+      {/* Rubriek: krant-kicker met categorie-dot. Inter onder het Krant-palet
+          (ed-kicker/briefing-rubriek → globals.css), anders DM Mono. */}
+      <div className="mb-2.5 flex items-center gap-2">
+        <span className={`h-1.5 w-1.5 rounded-full ${config.dotColor}`} aria-hidden="true" />
+        <span className={`briefing-rubriek font-mono text-[10px] font-bold uppercase tracking-[0.14em] ${config.text}`}>
           {config.label}
         </span>
         {hefboomCfg && HefboomIcon && (
           <span
-            className={`inline-flex items-center justify-center w-5 h-5 rounded-md ${hefboomCfg.tint}`}
+            className={`inline-flex h-5 w-5 items-center justify-center rounded-md ${hefboomCfg.tint}`}
             aria-label={`Hefboom: ${hefboomCfg.label}`}
             title={`Hefboom: ${hefboomCfg.label}`}
           >
-            <HefboomIcon className="w-3 h-3" aria-hidden="true" />
+            <HefboomIcon className="h-3 w-3" aria-hidden="true" />
           </span>
         )}
-        <Icon className="w-3.5 h-3.5 text-[var(--ink-4)] ml-auto" aria-hidden="true" />
+        <Icon className="ml-auto h-3.5 w-3.5 text-[var(--ink-4)]" aria-hidden="true" />
       </div>
-      <p className="text-sm text-[var(--ink)] leading-snug">{entry.text}</p>
+      {/* Body: redactionele serif (Source Serif), krant-leesbaar. */}
+      <p className="font-serif text-[15px] leading-[1.55] text-pretty text-[var(--ink)]">{entry.text}</p>
       <BriefingImpactBadge impact={entry.impact} />
       {entry.href && (
-        <span className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--ink-3)] opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+        <span className="briefing-rubriek mt-3.5 inline-flex items-center gap-1 self-start border-b border-[var(--border-md)] pb-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-2)] transition-colors group-hover:border-[var(--ink-3)] group-hover:text-[var(--ink)]">
           Bekijk
-          <ArrowUpRight className="w-3 h-3" aria-hidden="true" />
+          <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
         </span>
       )}
     </>
   )
 
+  // Krant-kolom i.p.v. kaart: geen doos/afronding, wél verticale scheidslijn
+  // tussen kolommen (border-l, gereset op de eerste van elke rij) — spiegelt
+  // de reference-plaat. Op mobiel stapelen ze zonder rail (grid-gap scheidt).
   const base =
-    'group relative flex flex-col overflow-hidden rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-3.5 sm:p-4'
+    'group relative flex min-w-0 flex-col animate-fade-up ' +
+    'sm:px-6 sm:border-l sm:border-[var(--border-ed)] ' +
+    'sm:[&:nth-child(3n+1)]:border-l-0 sm:[&:nth-child(3n+1)]:pl-0 ' +
+    'sm:[&:nth-child(3n)]:pr-0'
 
   if (entry.href) {
     return (
       <Link
         href={entry.href}
         style={revealStyle}
-        className={`${base} ${spanClass} animate-fade-up transition-all hover:-translate-y-0.5 hover:border-[var(--ink-3)] hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ink-3)] focus-visible:ring-offset-1`}
+        className={`${base} ${spanClass} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ink-3)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]`}
       >
         {inner}
       </Link>
     )
   }
   return (
-    <article style={revealStyle} className={`${base} ${spanClass} animate-fade-up`}>
+    <article style={revealStyle} className={`${base} ${spanClass}`}>
       {inner}
     </article>
+  )
+}
+
+/**
+ * Colofon onder de briefing — de krant-signatuur "Geld is opgeslagen tijd"
+ * gecentreerd onder een hairline, zoals op de reference-plaat. Puur visueel.
+ */
+function BriefingColophon() {
+  return (
+    <div className="mt-9 border-t border-[var(--border-ed)] pt-4 text-center">
+      <span className="briefing-rubriek font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--ink-3)]">
+        Geld is opgeslagen tijd
+      </span>
+    </div>
   )
 }
 

@@ -5,12 +5,14 @@ import { ModuleColorProvider } from '@/components/app/module-color-provider'
 import { DEFAULT_MODULE_COLORS } from '@/lib/color-palette'
 
 /**
- * Tests voor PalettePicker — 3-preset keuze met persistence via
- * localStorage (`tf-palette-theme`).
+ * Tests voor PalettePicker — preset-keuze met persistence via
+ * localStorage (`tf-palette-theme`). Het "Krant"-palet zet daarnaast
+ * `data-palette` op <html> (label-typografie-scoping).
  */
 
 beforeEach(() => {
   window.localStorage.clear()
+  delete document.documentElement.dataset.palette
 })
 
 function renderWithProvider() {
@@ -22,11 +24,12 @@ function renderWithProvider() {
 }
 
 describe('PalettePicker — render', () => {
-  it('rendert drie palet-opties', () => {
+  it('rendert de vier palet-opties', () => {
     renderWithProvider()
     expect(screen.getByText('Cream')).toBeTruthy()
     expect(screen.getByText('Licht')).toBeTruthy()
     expect(screen.getByText('FD-bruin')).toBeTruthy()
+    expect(screen.getByText('Krant')).toBeTruthy()
   })
 
   it('toont Palet-kicker label', () => {
@@ -62,5 +65,14 @@ describe('PalettePicker — switching', () => {
     renderWithProvider()
     fireEvent.click(screen.getByText('FD-bruin'))
     expect(window.localStorage.getItem('tf-palette-theme')).toBe('fd-bruin')
+  })
+
+  it('Krant zet data-palette op <html>; een ander palet wist het weer', () => {
+    renderWithProvider()
+    fireEvent.click(screen.getByText('Krant'))
+    expect(document.documentElement.dataset.palette).toBe('krant')
+    // Terug naar een palet zonder eigen label-font → attribuut verdwijnt.
+    fireEvent.click(screen.getByText('Cream'))
+    expect(document.documentElement.dataset.palette).toBeUndefined()
   })
 })

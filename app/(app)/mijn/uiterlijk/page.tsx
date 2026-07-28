@@ -35,7 +35,7 @@ export default function MijnUiterlijkPage() {
           titleBefore="Hoe ziet TriFinity "
           emphasis="eruit"
           titleAfter="?"
-          deck="Wissel tussen de drie cream-paletten. Je keuze wordt opgeslagen en geldt voor alle pagina's. Fijnregelen kan onder “Geavanceerd”."
+          deck="Wissel tussen de paletten — van warm cream tot knapperig krant-wit — en de typografie. Je keuze wordt opgeslagen en geldt voor alle pagina's. Fijnregelen kan onder “Geavanceerd”."
         />
 
         {/* Essentieel — Palet wisselt het complete token-systeem in één klik. */}

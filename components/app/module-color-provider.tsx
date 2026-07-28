@@ -16,8 +16,14 @@ export type FontTheme = 'editorial' | 'andada' | 'digital'
  * Palette-thema's voor de page-bg / paper / subtle / borders.
  * Uitsluitend de "papieren onderlaag" — module-kleuren, ink-shades en accenten
  * blijven onafhankelijk gestuurd via `ModuleColorConfig`.
+ *
+ * `labelFont` (optioneel): sommige paletten dragen een eigen "krant"-typografie
+ * voor de gedeelde editorial-labels (Kicker etc.). Wanneer gezet, activeert
+ * `applyPaletteVars` `data-palette` op <html> zodat globals.css de labels naar
+ * dat font kan scopen — zónder de andere paletten te raken. Ontbreekt het,
+ * dan blijft de bestaande label-typografie (DM Mono) ongewijzigd.
  */
-export type PaletteTheme = 'cream' | 'licht' | 'fd-bruin'
+export type PaletteTheme = 'cream' | 'licht' | 'fd-bruin' | 'krant'
 
 export const PALETTE_THEMES: Record<PaletteTheme, {
   label: string
@@ -55,7 +61,29 @@ export const PALETTE_THEMES: Record<PaletteTheme, {
     borderEd: '#c9b88e',
     borderMd: '#a89968',
   },
+  // "Krant": knapperige redactionele wit-op-papier (bron: TriFinity Design
+  // System-plaat). Lichtere, koelere basis met zuiver-witte kaarten voor
+  // maximaal krantencontrast. Ink-shades blijven identiek aan de andere
+  // paletten. Draagt een eigen label-font (Inter i.p.v. DM Mono) — gescopet
+  // via data-palette="krant" in globals.css, dus opt-in en zonder regressie.
+  krant: {
+    label: 'Krant',
+    description: 'Redactioneel wit — lichter, knapperig, Inter-labels',
+    bg: '#faf9f6',
+    paper: '#ffffff',
+    subtle: '#f3f2ee',
+    borderEd: '#e2e0d8',
+    borderMd: '#c8c5ba',
+  },
 }
+
+/**
+ * Paletten die een eigen "krant"-label-typografie dragen. `applyPaletteVars`
+ * zet `data-palette` op <html> zodat globals.css de gedeelde editorial-labels
+ * (`.ed-kicker` e.d.) naar Inter kan scopen. Andere paletten blijven op de
+ * bestaande DM-Mono-labels.
+ */
+const LABEL_FONT_PALETTES: ReadonlySet<PaletteTheme> = new Set(['krant'])
 
 const PALETTE_STORAGE_KEY = 'tf-palette-theme'
 
@@ -274,6 +302,14 @@ export function ModuleColorProvider({
     root.style.setProperty('--border-ed', palette.borderEd)
     root.style.setProperty('--border-md', palette.borderMd)
     root.style.setProperty('--background', palette.bg)
+    // Label-typografie is per-palet: alleen paletten met een eigen krant-font
+    // krijgen data-palette gezet zodat globals.css de editorial-labels naar
+    // Inter scopet. Andere paletten wissen het attribuut → DM-Mono-labels.
+    if (LABEL_FONT_PALETTES.has(theme)) {
+      root.dataset.palette = theme
+    } else {
+      delete root.dataset.palette
+    }
   }, [])
 
   const setPaletteTheme = useCallback((theme: PaletteTheme) => {

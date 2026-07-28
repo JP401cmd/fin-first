@@ -237,9 +237,9 @@ describe('BriefingPanel — vrijheidstijd-hero + kop', () => {
 })
 
 describe('BriefingPanel — wekelijkse-briefing header + ververs', () => {
-  it('rendert de sectiekop "Jouw wekelijkse briefing"', () => {
+  it('rendert de krant-masthead "De briefing"', () => {
     render(<BriefingPanel entries={[makeEntry('observation', 'X')]} />)
-    expect(screen.getByText(/Jouw wekelijkse briefing/i)).toBeTruthy()
+    expect(screen.getByText(/De briefing/i)).toBeTruthy()
   })
 
   it('toont een "Bijgewerkt …"-stempel wanneer refreshedAt gegeven is', () => {
@@ -317,18 +317,19 @@ describe('BriefingPanel — Eenvoudige weergave (simpleMode)', () => {
     makeEntry('market', 'Zesde briefje', { id: 'six' }),
   ]
 
-  it('toont in Eenvoudig alleen het eerste (belangrijkste) briefje', () => {
+  it('toont in Eenvoudig de drie belangrijkste briefjes (1–3), niet de rest', () => {
     const { container } = render(<BriefingPanel entries={sixEntries} simpleMode />)
     expect(container.textContent).toContain('Belangrijkste eerst')
-    expect(container.textContent).not.toContain('Tweede briefje')
+    expect(container.textContent).toContain('Tweede briefje')
+    expect(container.textContent).toContain('Derde briefje')
+    expect(container.textContent).not.toContain('Vierde briefje')
     expect(container.textContent).not.toContain('Zesde briefje')
   })
 
-  it('rendert het ene briefje over de volle breedte (grid-cols-1, geen sm:grid-cols-3)', () => {
+  it('rendert de drie briefjes naast elkaar in hetzelfde 3-koloms grid als de volledige weergave', () => {
     const { container } = render(<BriefingPanel entries={sixEntries} simpleMode />)
     const grid = container.querySelector('.grid')
-    expect(grid?.className).toContain('grid-cols-1')
-    expect(grid?.className.includes('sm:grid-cols-3')).toBe(false)
+    expect(grid?.className).toContain('sm:grid-cols-3')
   })
 
   it('verbergt "Jouw vrijheid deze week" in Eenvoudig, ook als freedomHero gegeven is', () => {
