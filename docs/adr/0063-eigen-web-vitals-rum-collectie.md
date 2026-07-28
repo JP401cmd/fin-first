@@ -4,7 +4,9 @@ date: 2026-07-20
 elements: [t-platform, t-supabase, app-comp]
 ---
 
-# 0056 — Eigen web-vitals/RUM-collectie naast Vercel Speed Insights
+# 0063 — Eigen web-vitals/RUM-collectie naast Vercel Speed Insights
+
+> Was abusievelijk genummerd 0056 (botste met `0056-chat-transport-cloud-lokaal-omschakelpunt.md`); hernummerd naar 0063 op 2026-07-28. Verwijzingen naar "ADR 0056" over RUM/web-vitals bedoelen dit besluit.
 
 ## Context
 

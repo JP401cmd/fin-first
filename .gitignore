@@ -101,3 +101,6 @@ cookies*.txt
 
 # python bytecode (horizon-oracle extractor)
 __pycache__/
+
+# Persoonlijke Claude-permissies — nooit committen
+.claude/settings.local.json

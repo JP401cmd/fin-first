@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-28T07:21:53.224Z",
+  "generatedAt": "2026-07-28T14:54:03.702Z",
   "generatedDate": "2026-07-28",
   "repo": {
     "name": "fin",
@@ -14711,19 +14711,6 @@
       "file": "docs/adr/0056-chat-transport-cloud-lokaal-omschakelpunt.md"
     },
     {
-      "id": "0056-eigen-web-vitals-rum-collectie",
-      "title": "eigen web vitals rum collectie",
-      "status": "accepted",
-      "date": "2026-07-20",
-      "elements": [
-        "t-platform",
-        "t-supabase",
-        "app-comp"
-      ],
-      "summary": "Speed Insights (t-platform) geeft geen ruwe, kruisbare RUM-data per route/segment; die zit alleen in het Vercel-dashboard en is niet via CLI/MCP op te vragen. We willen vitals per gescrubde route/device/metric kunnen aggregeren (feature 885). Een publiek schrijf-endpoint is nodig",
-      "file": "docs/adr/0056-eigen-web-vitals-rum-collectie.md"
-    },
-    {
       "id": "0057-eigen-leaked-password-check",
       "title": "Eigen leaked-password-protection via HaveIBeenPwned k-anonimiteit (gratis, UI-grade)",
       "status": "aanvaard",
@@ -14770,7 +14757,7 @@
         "t-supabase",
         "app-comp"
       ],
-      "summary": "De parallelle sessie (ADR 0056) landde CLIENT-observability (web-vitals/RUM). SERVER-observability had gaten: onafgevangen server-fouten (Server Components / Route Handlers / Server Actions die niet via `serverError()` lopen) landden alleen in Vercel-logs, een crash in de root `a",
+      "summary": "De parallelle sessie (ADR 0063, destijds genummerd 0056) landde CLIENT-observability (web-vitals/RUM). SERVER-observability had gaten: onafgevangen server-fouten (Server Components / Route Handlers / Server Actions die niet via `serverError()` lopen) landden alleen in Vercel-logs",
       "file": "docs/adr/0060-server-observability-instrumentation-en-cron-alert.md"
     },
     {
@@ -14795,6 +14782,19 @@
       ],
       "summary": "`LOCAL_CHAT_DNA` (`lib/ai/local/local-chat-prompt.ts`) is niet langer een hand-onderhouden verbatim-kopie van de cloud-prompt-DNA. Het wordt via de `lokale-prompt-parity`-skill en een gecommit manifest (`lib/ai/local/parity-manifest.json`) gesynchroniseerd met de cloud-bron (`lib",
       "file": "docs/adr/0062-lokale-chat-dna-afgeleid-artefact.md"
+    },
+    {
+      "id": "0063-eigen-web-vitals-rum-collectie",
+      "title": "eigen web vitals rum collectie",
+      "status": "accepted",
+      "date": "2026-07-20",
+      "elements": [
+        "t-platform",
+        "t-supabase",
+        "app-comp"
+      ],
+      "summary": "> Was abusievelijk genummerd 0056 (botste met `0056-chat-transport-cloud-lokaal-omschakelpunt.md`); hernummerd naar 0063 op 2026-07-28. Verwijzingen naar \"ADR 0056\" over RUM/web-vitals bedoelen dit besluit.",
+      "file": "docs/adr/0063-eigen-web-vitals-rum-collectie.md"
     }
   ],
   "churn": {
@@ -15719,17 +15719,9 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-07-24",
-    "hasChanges": true,
-    "sections": [
-      {
-        "label": "Componenten (aantal)",
-        "added": [
-          "+2"
-        ],
-        "removed": []
-      }
-    ]
+    "previousDate": "2026-07-28",
+    "hasChanges": false,
+    "sections": []
   },
   "statsHistory": [
     {

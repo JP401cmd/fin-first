@@ -88,5 +88,6 @@ grandfather-allowlist staat. De ~47 bestaande lezers staan op die allowlist, zod
 
 ## Losse observatie (buiten scope)
 
-Er bestaan twee `0056-*.md`-ADR's (`0056-chat-transport-*` en `0056-eigen-web-vitals-*`) —
-dubbele nummering. Niet in deze kaart opgelost; benoemd zodat het niet verdwijnt.
+~~Er bestaan twee `0056-*.md`-ADR's — dubbele nummering.~~ **Opgelost 2026-07-28:**
+`0056-eigen-web-vitals-*` is hernummerd naar `0063-eigen-web-vitals-*`;
+`lib/architecture/adr-numbering.test.ts` bewaakt sindsdien dat nummers uniek blijven.

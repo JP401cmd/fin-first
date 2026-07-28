@@ -8,11 +8,11 @@ elements: [t-platform, t-supabase, app-comp]
 
 ## Context
 
-De parallelle sessie (ADR 0056) landde CLIENT-observability (web-vitals/RUM). SERVER-observability had gaten: onafgevangen server-fouten (Server Components / Route Handlers / Server Actions die niet via `serverError()` lopen) landden alleen in Vercel-logs, een crash in de root `app/layout.tsx` viel terug op de blanco Next-default (route-segment `error.tsx` vangt die niet), en falende crons logden wél passief in `job_runs` (/beheer/jobs) maar duwden niets naar een beheerder. Vóór testers fouten gaan veroorzaken die niemand ziet, willen we lichte, proportionele server-observability — zonder nieuwe vendor.
+De parallelle sessie (ADR 0063, destijds genummerd 0056) landde CLIENT-observability (web-vitals/RUM). SERVER-observability had gaten: onafgevangen server-fouten (Server Components / Route Handlers / Server Actions die niet via `serverError()` lopen) landden alleen in Vercel-logs, een crash in de root `app/layout.tsx` viel terug op de blanco Next-default (route-segment `error.tsx` vangt die niet), en falende crons logden wél passief in `job_runs` (/beheer/jobs) maar duwden niets naar een beheerder. Vóór testers fouten gaan veroorzaken die niemand ziet, willen we lichte, proportionele server-observability — zonder nieuwe vendor.
 
 ## Besluit
 
-- **Vendorkeuze = eigen infra, geen Sentry.** Consistent met de eigen-RUM-keuze (ADR 0056): hergebruik de bestaande `error_logs`-tabel + `logError()`, `job_runs` + `recordJobRun()`, en het Resend-mailtransport (`lib/email.ts`). Geen `@sentry/*`-dependency.
+- **Vendorkeuze = eigen infra, geen Sentry.** Consistent met de eigen-RUM-keuze (ADR 0063): hergebruik de bestaande `error_logs`-tabel + `logError()`, `job_runs` + `recordJobRun()`, en het Resend-mailtransport (`lib/email.ts`). Geen `@sentry/*`-dependency.
 - **`instrumentation.ts` (root) met `register()` + `onRequestError`.** `register()` is bewust licht (no-op, gereserveerd). `onRequestError` persisteert onafgevangen server-fouten via `logError(getServiceClient(), …)` met grep-bare tag `onRequestError:<routeType>` → zichtbaar op /beheer/errors.
   - **Runtime-guard:** `onRequestError` draait ook op de edge-runtime; de service-role-client is een node-pad. De node-helper wordt daarom alleen dynamisch geladen als `NEXT_RUNTIME === 'nodejs'`. Best-effort, nooit throwen.
   - **Ruisfilter:** Next control-flow (`digest` `NEXT_REDIRECT` / `NEXT_NOT_FOUND` / `NEXT_HTTP_ERROR_FALLBACK`) wordt genegeerd.
@@ -20,7 +20,7 @@ De parallelle sessie (ADR 0056) landde CLIENT-observability (web-vitals/RUM). SE
   - Helper-logica staat in een sibling-module (`lib/observability/request-error.ts`), niet in `instrumentation.ts` — Next verbiedt niet-conventionele exports daaruit (71002) en de helper is zo unit-testbaar.
 - **`app/global-error.tsx`** — de enige boundary die een root-layout-crash vangt; rendert eigen `<html>/<body>`, bewust self-contained met inline styles (geen provider-/Tailwind-garantie bij een layout-crash), filosofie-neutraal (geen module-accent), beacon naar `/api/log-error` (context `global-error`), toont `digest`.
 - **Cron-alert (`lib/cron-alert.ts#alertCronFailure`)** — actieve admin-mail bij een HARDE cron-fout (`job_runs.status='error'`), aangehaakt in `recordJobRun`. Success-met-partiële-fouten (`status='success'` + fouttekst) alarmeert bewust NIET (geen dagelijkse ruis). Recipient uit `ALERT_EMAIL`/`OPS_EMAIL` (niet gezet → stille no-op). Per-taak dag-throttle (24u) via een `app_settings`-sleutel `cron_alert_last_<job>` tegen mailstorm. Alleen taak-label + fouttekst in de mail → geen PII.
-- **Interne observability blijft buiten ArchiMate-topologie/HLD/Berekeningen** (precedent ADR 0056). Geen nieuwe tabel/FK → geen ERD-/`arch:diagram`-wijziging nodig.
+- **Interne observability blijft buiten ArchiMate-topologie/HLD/Berekeningen** (precedent ADR 0063). Geen nieuwe tabel/FK → geen ERD-/`arch:diagram`-wijziging nodig.
 
 ## Gevolgen
 
