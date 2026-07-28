@@ -97,6 +97,10 @@ interface Box3DebtLike {
  *     dezelfde jaarwaarde als `calculateBox3`, zodat `box3TaxableAboveThreshold`
  *     rekenkundig gelijkloopt met `calculateBox3.grondslagSparen` (alleenstaande
  *     voet) en KPI (€) en status (band) elkaar niet meer kunnen tegenspreken.
+ *     NB: die gelijkloop is exact voor een solo-gebruiker met inclusion_pct=100;
+ *     deze helper weegt assets/schulden met net_worth_inclusion_pct en rekent
+ *     altijd de single-voet, dus bij gedeeld bezit of een fiscaal partner is dit
+ *     bewust een status-signaal, geen exacte €-pariteit.
  */
 export function computeBox3TaxableInput(
   assets: readonly Box3AssetLike[],

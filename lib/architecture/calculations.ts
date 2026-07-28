@@ -709,8 +709,11 @@ export const CALCULATIONS: Calculation[] = [
     summary: 'Toetst het plan tegen historische marktreeksen en geeft een slaagkans.',
     inputs: ['vermogenspad', 'historische rendementen'],
     outputs: ['slaagkans %', 'named paths (best/mediaan/worst)'],
-    files: ['lib/horizon/fire-sim-legacy.ts', 'lib/horizon/fire-format.ts', 'lib/horizon-data.ts'],
+    files: ['lib/horizon/fire-sim-legacy.ts', 'lib/horizon/fire-format.ts', 'lib/horizon-data.ts', 'lib/dashboard-data-loader.ts'],
     functions: ['runBacktest', 'ageAtDate'],
+    constants: [
+      { label: 'Getoonde slaagkans-cap', value: '99% — WEERBAARHEID_DISPLAY_MAX (lib/constants.ts); ruwe btr.successRate blijft 0–1, de cap geldt alleen voor de getoonde bundelwaarde backtestSuccessRate' },
+    ],
     elementIds: ['as-planning', 'fn-toekomstplannen'],
   },
   {

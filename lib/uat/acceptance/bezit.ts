@@ -213,11 +213,11 @@ const criteria: AcceptanceCriterion[] = [
     persona: 'willem',
     given: 'Persona Willem Jansen geladen (portefeuille €570.016).',
     when: 'De gebruiker voegt "Vanguard S&P 500 UCITS" (VUSA) toe: 50 eenheden @ €95,00, TER 0,07%.',
-    then: 'Nieuwe kaart-waarde €4.750 (50×95); jaarkosten-preview €3,33 (0,0007×4.750); nieuw portfoliototaal €574.766 (570.016+4.750).',
+    then: 'Nieuwe kaart-waarde €4.750 (50×95); jaarkosten-preview €3,33 (0,0007×4.750); nieuw portfoliototaal €574.766 (570.016+4.750). Regressie (POST /api/holdings, WF-BEZIT-14-bug2): het doel-asset wordt server-side gevalideerd — een meegestuurd `asset_id` moet van de gebruiker zelf en actief zijn (400 "Onbekend vermogensobject" resp. "gearchiveerd" anders), en een crypto-asset wordt geweigerd (400, crypto loopt via de exchange-sync naar `crypto_holdings`, nooit via dit endpoint naar `investment_holdings`); zonder `asset_id` valt de route terug op het eerste actieve, holdings-trackende asset van de gebruiker (nooit een soft-deleted asset).',
     assertion: {
       kind: 'exact',
       expected: 'waarde=4750; jaarkosten=3.33; nieuwTotaal=574766',
-      source: 'units×prijs (HoldingForm-preview) + PERSONAS.willem-portefeuillewaarde uit WF-BEZIT-12',
+      source: 'units×prijs (HoldingForm-preview) + PERSONAS.willem-portefeuillewaarde uit WF-BEZIT-12; asset-routing/validatie in app/api/holdings/route.ts (POST)',
     },
   },
   {
@@ -329,7 +329,7 @@ const criteria: AcceptanceCriterion[] = [
     persona: 'compleet',
     given: 'Vervolg op UAT-BEZIT-21: BTC-coin aanwezig (0,5 eenheden @ gem. €25.000, huidig €58.000).',
     when: 'De gebruiker opent de BTC-detailpagina.',
-    then: 'Waarde €29.000 (0,5×58.000); kostenbasis €12.500 (0,5×25.000); rendement 132,0% ((29.000−12.500)/12.500×100).',
+    then: 'Waarde €29.000 (0,5×58.000); kostenbasis €12.500 (0,5×25.000); rendement 132,0% ((29.000−12.500)/12.500×100). Regressie: beide typed detailpagina\'s (crypto en investment) delen sinds deze release dezelfde `HoldingFavoriteButton` (components/holdings/holding-favorite-button.tsx, ook gebruikt op de generieke holdings/[id]-pagina); favoriet aan/uit zet `is_favorite` op de holding en werkt door in de dashboard-favorieten-widget (reverse-sync bij verwijderen, zie WF-OVZ-08) — geen eigen berekening.',
     assertion: {
       kind: 'exact',
       expected: 'waarde=29000; kostenbasis=12500; rendementPct=132.0',

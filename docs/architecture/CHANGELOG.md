@@ -531,3 +531,7 @@
 ## 2026-07-24
 
 - **Componenten (aantal)** toegevoegd: +1
+
+## 2026-07-28
+
+- **Componenten (aantal)** toegevoegd: +2

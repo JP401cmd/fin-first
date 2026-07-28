@@ -53,7 +53,7 @@ const criteria: AcceptanceCriterion[] = [
     persona: 'willem',
     given: 'Persona Willem geladen (retirement_expense_method "custom_amount", €3.000/mnd; expected_return 6%).',
     when: 'De gebruiker opent de kassabonnen "Vrijheidsleeftijd", "Doelbedrag" en "Opnamerate".',
-    then: 'De jaarlijkse pensioenuitgave = €3.000 × 12 = €36.000 (exacte persona-echo) en het rendementpercentage (6%) zijn in alle drie de bonnen én in de KPI "Na pensioen" identiek — één bron (resolveFireParams/simResult), geen losse herberekening per bon. EXACT-provable deel: €36.000 en 6% als persona-echo. De totalen (vrijheidsleeftijd/doelbedrag) zelf = toetsvorm oracle; de "identiek op elke bon"-eis = toetsvorm consistentie.',
+    then: 'De jaarlijkse pensioenuitgave = €3.000 × 12 = €36.000 (exacte persona-echo) en het rendementpercentage (6%) zijn in alle drie de bonnen én in de KPI "Na pensioen" identiek — één bron (resolveFireParams/simResult), geen losse herberekening per bon. EXACT-provable deel: €36.000 en 6% als persona-echo. De totalen (vrijheidsleeftijd/doelbedrag) zelf = toetsvorm oracle; de "identiek op elke bon"-eis = toetsvorm consistentie. Regressie (bug2, niet-custom_amount-methodes): `/api/uitgaven-na-pensioen/context` extrapoleert inkomen en pensioenuitgave sinds deze release via de gedeelde `deriveRetirementExpenseBasis` (all-time vroegste-inkomstendatum als deler-anker, identiek aan de SSR-loader) — voorheen gebruikte de route-lokale som een eigen 12-maands-venster + `net_monthly_income×12`-fallback, wat bij income-based methodes een afwijkend jaarbedrag t.o.v. de KPI kon geven. Willem (custom_amount) zelf raakt dit pad niet: die methode negeert `extrapolatedIncome` volledig.',
     assertion: {
       kind: 'exact',
       expected: 'pensioenMaand=3000; jaaruitgaven=36000; rendementPct=6',
@@ -165,7 +165,7 @@ const criteria: AcceptanceCriterion[] = [
     persona: 'willem',
     given: 'Persona Willem geladen (maandinkomen €6.500).',
     when: 'De gebruiker verschuift de "Spaarquote"-slider omhoog en daarna terug naar baseline.',
-    then: 'Een hogere spaarquote maakt de vrijheidsleeftijd-KPI gelijk-of-lager, nooit hoger (directe herberekening, geen opslaan-knop). Terug naar baseline ruimt het tijdelijke slider-scenario-event op (clearScenarioEvents) en herstelt de exacte baseline-lijn. Richtingstoets; sliders zijn bewust niet-persistent.',
+    then: 'Een hogere spaarquote maakt de vrijheidsleeftijd-KPI gelijk-of-lager, nooit hoger (directe herberekening, geen opslaan-knop). Terug naar baseline ruimt het tijdelijke slider-scenario-event op (clearScenarioEvents) en herstelt de exacte baseline-lijn. Richtingstoets; sliders zijn bewust niet-persistent. Regressie (bug1): de baseline-inkomen/uitgaven-resolutie in horizon-client.tsx gebruikt sinds deze release `resolveEffectiveIncomeExpenses` (lib/effective-financials.ts) i.p.v. een eigen inline fallback — een expliciete handmatige bron (`income_source`/`expenses_source` === "manual") wint nu altijd van een mogelijk-onvolledige lopende-maand-transactiesom, identiek aan de SSR-loader.',
     assertion: {
       kind: 'direction',
       source: 'richtingstoets: hogere spaarquote-slider → vrijheidsleeftijd gelijk-of-lager (kernel-herberekening).',

@@ -205,11 +205,11 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'KERN',
     persona: 'compleet',
     given: 'Persona Tessa (> heffingsvrij vermogen) geladen; de vier Box 3-oppervlakken geopend.',
-    when: 'De gebruiker vergelijkt /overzicht/belasting/box3 (volledig, jaar 2026), de hub-KPI + hero-tegel (vereenvoudigde schatting, 2026), de Box 3-widget (volledig, jaar 2025) en de schulden-belastingsectie (client-side, actueel jaar).',
-    then: 'Elk bedrag is verklaarbaar vanuit zijn gedocumenteerde grondslag; verschillen tussen de oppervlakken zijn BEWUST (`calculateBox3` volledig vs. `buildTaxData` schatting; jaar 2026 vs. 2025-widget) — géén inconsistentie. Toetsbaar: op één fixture is de rendementsgrondslag identiek over de jaren (delta 0) terwijl de heffing per jaar bewust verschilt (forfait/tarief). Consistency (documented difference), diepgaand geborgd door de suite `box3-belasting`.',
+    when: 'De gebruiker vergelijkt /overzicht/belasting/box3 (volledig, jaar 2026), de hub-KPI + hero-tegel (personal: `horizonData.box3Tax`, household/partner via `loadPerspectiveBox3`, jaar 2026), de Box 3-widget (volledig, jaar 2025) en de schulden-belastingsectie (client-side, actueel jaar).',
+    then: 'Elk bedrag is verklaarbaar vanuit zijn gedocumenteerde grondslag. Sinds deze release consumeert de hub-KPI dezelfde canonieke `calculateBox3`-uitkomst als de box3-subpagina (voorheen de `buildTaxData`-proxy via `healthScoreInput.taxData`, die schulden — incl. de eigenwoninghypotheek — negeerde) — die twee zijn nu A=B op jaar 2026, geen bewust verschil meer. Het overblijvende bewuste verschil is uitsluitend het jaartal: 2026 (hub/box3-subpagina) vs. 2025 (widget). Toetsbaar: op één fixture is de rendementsgrondslag identiek over de jaren (delta 0) terwijl de heffing per jaar bewust verschilt (forfait/tarief). Consistency (documented difference), diepgaand geborgd door de suite `box3-belasting`.',
     assertion: {
       kind: 'consistency',
-      source: 'consistentie-eis: drie weergaven verklaarbaar uit grondslag (calculateBox3 vs buildTaxData; 2026 vs 2025-widget); zelfde grondslag over jaren, bewust andere heffing. Exacte heffing geborgd in de box3-belasting-suite.',
+      source: 'consistentie-eis: hub-KPI + box3-subpagina zijn A=B op calculateBox3 (app/(app)/overzicht/belasting/page.tsx#box3Tax + loadPerspectiveBox3); widget blijft bewust op jaar 2025. Exacte heffing geborgd in de box3-belasting-suite.',
     },
   },
   {

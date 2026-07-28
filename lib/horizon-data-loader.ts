@@ -947,7 +947,11 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
 
   // ── Canonieke Box 3-heffing (personal) ─────────────────────────
   // Zelfde motor als /overzicht/belasting/box3 en de dashboard-loader:
-  // calculateBox3 (lib/box3-data.ts) op CURRENT_TAX_YEAR, hasPartner:false. De
+  // calculateBox3 (lib/box3-data.ts) op CURRENT_TAX_YEAR, hasPartner:false.
+  // Pariteit met de box3-subpagina is exact voor solo-gebruikers; bij een
+  // fiscaal partner rekent de subpagina in household-perspectief met
+  // hasPartner:true (dubbele voet + shared assets) en kan dit personal-getal
+  // dus afwijken — partner-perspectief loopt via loadPerspectiveBox3. De
   // Belasting-hub-kaart en de /overzicht-belastingtegel consumeren dit i.p.v. de
   // `healthScoreInput.taxData.box3Tax`-proxy (buildTaxData): die negeert schulden
   // (incl. de eigenwoninghypotheek → Box 1) en rekent alles als beleggingen, wat

@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-24T23:19:33.081Z",
-  "generatedDate": "2026-07-24",
+  "generatedAt": "2026-07-28T07:21:53.224Z",
+  "generatedDate": "2026-07-28",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -191,9 +191,9 @@
     "routesProduction": 101,
     "api": 264,
     "tables": 86,
-    "migrations": 159,
+    "migrations": 162,
     "integrations": 25,
-    "components": 835,
+    "components": 837,
     "providers": 11,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -7495,7 +7495,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 159
+    "migrationCount": 162
   },
   "tablesByDomain": [
     {
@@ -7945,7 +7945,7 @@
     }
   ],
   "components": {
-    "total": 835,
+    "total": 837,
     "groups": [
       {
         "group": "app",
@@ -8280,7 +8280,7 @@
       },
       {
         "group": "overview",
-        "count": 136,
+        "count": 138,
         "items": [
           "aandachtspunt-actie-button",
           "atomic-cards",
@@ -8366,6 +8366,8 @@
           "leverage-card",
           "marginale-druk-curve",
           "mini-networth-chart",
+          "mini-networth-chart-anchor",
+          "mini-networth-chart-anchor.test",
           "mini-networth-chart.test",
           "mini-timeline-strip",
           "mini-timeline-strip.test",
@@ -8474,7 +8476,6 @@
           "hypotheek-vs-beleggen-widget.test",
           "inflatie-impact-widget",
           "inflatie-impact-widget.test",
-          "jouw-pad-widget-wrapper",
           "levensgebeurtenissen-widget",
           "maandoverzicht-widget",
           "meldingen-widget",
@@ -8483,6 +8484,7 @@
           "netto-vermogen-widget.test",
           "noodfonds-widget",
           "pensioen-aow-widget",
+          "pensioen-aow-widget.test",
           "rebalancing-widget",
           "schulden-widget",
           "sim-vermogenspad-widget",
@@ -14800,11 +14802,11 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 106
+        "commits": 107
       },
       {
         "path": "lib/ai",
-        "commits": 52
+        "commits": 54
       },
       {
         "path": "app/(app)/toekomst",
@@ -14812,7 +14814,7 @@
       },
       {
         "path": "app/api/ai",
-        "commits": 18
+        "commits": 19
       },
       {
         "path": "app/api/household",
@@ -14827,11 +14829,11 @@
         "commits": 8
       },
       {
-        "path": "app/api/assets",
-        "commits": 6
+        "path": "app/api/budgets",
+        "commits": 5
       },
       {
-        "path": "app/api/budgets",
+        "path": "app/api/assets",
         "commits": 5
       },
       {
@@ -14842,13 +14844,13 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 8269,
+        "loc": 8278,
         "commits": 90
       },
       {
         "file": "components/app/budgets-client.tsx",
         "loc": 5082,
-        "commits": 35
+        "commits": 34
       },
       {
         "file": "components/core/assets-client.tsx",
@@ -14857,8 +14859,8 @@
       },
       {
         "file": "components/app/cash-account-view.tsx",
-        "loc": 2780,
-        "commits": 15
+        "loc": 2785,
+        "commits": 16
       },
       {
         "file": "lib/release-notes.ts",
@@ -14867,18 +14869,18 @@
       },
       {
         "file": "lib/dashboard-data-loader.ts",
-        "loc": 2686,
-        "commits": 46
-      },
-      {
-        "file": "lib/test-personas.ts",
-        "loc": 2210,
-        "commits": 10
+        "loc": 2742,
+        "commits": 48
       },
       {
         "file": "app/(app)/core/checkin/page.tsx",
         "loc": 2205,
         "commits": 10
+      },
+      {
+        "file": "lib/test-personas.ts",
+        "loc": 2204,
+        "commits": 11
       }
     ]
   },
@@ -15723,7 +15725,7 @@
       {
         "label": "Componenten (aantal)",
         "added": [
-          "+1"
+          "+2"
         ],
         "removed": []
       }
@@ -15930,6 +15932,13 @@
       "date": "2026-07-24",
       "api": 264,
       "components": 835,
+      "tables": 86,
+      "routesProduction": 101
+    },
+    {
+      "date": "2026-07-28",
+      "api": 264,
+      "components": 837,
       "tables": 86,
       "routesProduction": 101
     }
