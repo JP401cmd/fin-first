@@ -6,6 +6,8 @@ description: Lichte pijplijn voor een KLEINE AANPASSING op verzoek in TriFinity 
 
 # Kleine-aanpassing pijplijn
 
+**Eerste regel — juridische pagina's zijn uitgezonderd:** raakt het verzoek `/privacy`, `/voorwaarden` of `/wft`, stop dan hier — hoe klein de wijziging ook is. Die pagina's wijzigen uitsluitend via de Grenswachter-route (juridische toets), met een aantekening waaróm (brief-formaat). Meld dit en rond de skill af zonder te wijzigen.
+
 Voert een klein verzoek tot wijziging uit — de "wens-variant" van een bug-fix. Niet een defect repareren, maar iets bijschaven dat al werkt: een tekst, label, marge, kleur, een onboarding-beeld, een kleine gedragstweak. Bewust **licht**: zo min mogelijk stappen en agents, zodat een vijf-minuten-wens geen negen-staps-orkestratie wordt. Maar de vangrails blijven: juiste specialist, echte verificatie, en bij UI of datatoegang de bijbehorende review.
 
 Geef de gewenste aanpassing mee als argument; ontbreekt die, vraag er eerst naar.
@@ -20,6 +22,7 @@ Lees en volg `.claude/skills/_shared/pijplijn-conventies.md`: orchestrator-rol (
 
 ### 1. "Is dit wel klein?" — poort vooraf (zelf, geen agent)
 Toets het verzoek tegen deze criteria. **Alle moeten waar zijn** om door te gaan:
+- raakt **géén** juridische pagina (`/privacy`, `/voorwaarden`, `/wft`) — die gaan nooit via deze pijplijn (zie de eerste regel bovenaan);
 - raakt naar verwachting **≤ ~3 bestanden**;
 - **geen** Supabase-migratie, **geen** nieuwe tabel/kolom/dataobject, **geen** RLS-wijziging;
 - **geen** nieuwe API-route of nieuw UI-oppervlak (bestaand scherm/route bijschaven mag);

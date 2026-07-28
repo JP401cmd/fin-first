@@ -40,7 +40,13 @@ Elke inhoudelijke opdracht routeert via de bijpassende pijplijn-skill — niet a
 - **nieuwe AI-functionaliteit** → `ai-feature` · **hoe de AI antwoordt/zich gedraagt** → `ai-gedrag`
 - **"ship het" / af / live** → `release`
 
+**Uitzondering — juridische pagina's:** raakt de wijziging `/privacy`, `/voorwaarden` of `/wft`, dan nooit via `kleine-aanpassing` — hoe klein ook. Altijd via de Grenswachter-route (juridische toets), met een aantekening waaróm de tekst wijzigt (brief-formaat, één pagina). Zie `trifinity-org/org_plan/30-werkstromen.md`, stroom 03.
+
 **Harde regel: een vervolgbericht binnen een lopende sessie telt als een nieuwe opdracht.** Een bugmelding die ná feature-werk komt start opnieuw `bug-fix`; een nieuwe tweak start opnieuw `kleine-aanpassing`. Sla de skill NIET over omdat je al middenin een sessie zit, al code aan het lezen bent, of de vorige stap een andere skill gebruikte. Bij twijfel tussen "klein vs. defect vs. uitbreiding": kies de skill die past bij de aard van de vraag, niet de makkelijkste. Begin pas met onderzoeken/implementeren ná het invoken van de skill.
+
+### Organisatieopzet (verwijzing)
+
+De organisatieopzet — rollen, skills, werkstromen, status en besluiten — staat in de repo `trifinity-org` onder `org_plan/` (broer van deze repo op schijf). Die is de bron; kopieer er niets uit, verwijs ernaar.
 
 ## Architectuurpagina (verplicht bijhouden)
 
