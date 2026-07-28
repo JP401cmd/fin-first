@@ -15,7 +15,7 @@ description: Gebruik bij elk vermoeden van een datalek — een signaal dat perso
 
 ## De route
 
-1. **Kennisname vastleggen** (tijdstip, signaalbron) — het meldregister-item begint hier.
+1. **Kennisname vastleggen** (tijdstip, signaalbron) — het meldregister-item begint hier: het **AVG & datalekken-register** in Notion (onder de startpagina *trifinity*; spoor = lek, de ⏰-deadlineview toont de 72-uursklok).
 2. **Beoordelen** met de drie vragen. Twijfel over de juridische weging → `legal-risk-assessment`-blik: risico voor betrokkenen, niet voor het bedrijf, is de maatstaf.
 3. **Indammen** (vraag 3). Haast is de meest voorkomende reden dat een fix meer blootlegt dan het probleem — de leak-check geldt ook in de spoedroute.
 4. **Melden bij de AP** — via het meldloket datalekken van de AP, binnen 72 uur na t=0. Gebruik het sjabloon hieronder. Een voorlopige melding (met "onderzoek loopt nog") is toegestaan en beter dan een te late volledige melding.
@@ -35,6 +35,8 @@ description: Gebruik bij elk vermoeden van een datalek — een signaal dat perso
 - **Betrokkenen geïnformeerd:** [ja/nee/gepland + hoe]
 
 ## Meldregister-item (ook bij niet melden)
+
+Vastleggen in het AVG & datalekken-register (Notion):
 
 `datum kennisname · signaalbron · wat · welke gegevens · hoeveel betrokkenen · gemeld ja/nee + reden · maatregelen · afgesloten op`
 

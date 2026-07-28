@@ -16,7 +16,7 @@ description: Gebruik wanneer iemand vraagt om inzage, export, verwijdering of co
 
 ## De route
 
-1. **Registreren** — ontvangstdatum, kanaal, soort verzoek. De aantekening begint hier.
+1. **Registreren** — ontvangstdatum, kanaal, soort verzoek. De aantekening is een item in het **AVG & datalekken-register** in Notion (onder de startpagina *trifinity*; spoor = verzoek) — de ⏰-deadlineview rekent de 30 dagen mee.
 2. **Identiteit vaststellen** — antwoord uitsluitend naar het e-mailadres dat bij het account hoort; dat antwoord ís de toets. Vraag nooit méér gegevens op om iemand te identificeren dan je al hebt (dataminimalisatie) — geen kopie-ID.
 3. **Uitvoeren** via de bestaande API's (export, verwijdering) of handmatig (correctie). Geen maatwerk-query's op productie als er een voorziening bestaat.
 4. **Bevestigen** aan de verzoeker: wat is er gedaan, en bij verwijdering wat er op welke grond bewaard blijft.
