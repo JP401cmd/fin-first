@@ -326,6 +326,9 @@ export const CashFlowWidget = memo(function CashFlowWidget({ size, data, href }:
   const cashFlow = monthlyIncome - monthlyExpenses
   const isPositive = cashFlow >= 0
   const { ref: inViewRef, hasEntered } = useInViewAnimation({ duration: 600 })
+  // Vóór alle size-early-returns aanroepen (rules-of-hooks); alleen de
+  // full-size-weergave gebruikt de meting.
+  const { ref: spaceRef, height: spaceH } = useMeasuredHeight()
 
   const kickerLabel = isHouseholdView
     ? 'Cashflow Maand — Huishouden'
@@ -463,7 +466,6 @@ export const CashFlowWidget = memo(function CashFlowWidget({ size, data, href }:
   // Rest-gebied meten: toon de (zware) vergelijking alleen als hij HÉÉL past.
   // Niet gemeten (SSR/jsdom → null) telt als "past" zodat de weergave
   // deterministisch blijft (spiegelt W1).
-  const { ref: spaceRef, height: spaceH } = useMeasuredHeight()
   const showComparison = hasPrevMonth && (spaceH === null || spaceH >= COMPARISON_MIN_H)
 
   return (
