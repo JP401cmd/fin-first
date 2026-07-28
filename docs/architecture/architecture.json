@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-28T15:17:24.153Z",
+  "generatedAt": "2026-07-28T15:22:35.792Z",
   "generatedDate": "2026-07-28",
   "repo": {
     "name": "fin",
@@ -15223,6 +15223,12 @@
             ]
           }
         ]
+      },
+      {
+        "id": "compliance-check",
+        "name": "compliance-check",
+        "description": "Gebruik vóór elke publicatie van publieke tekst (landing, SEO-pagina, funnel, social post, deelbaar asset), vóór elke wijziging aan prompt-DNA of AI-gedrag, bij elk /nieuws- of briefing-item dat over keuzes met geld gaat, en bij elke nieuwe claim over veiligheid, opslag of rendement. Toetst aan de Wft-grens (inzicht mag, vergunningsplichtig advies niet) en de claimlijst, en levert een beslisbare uitkomst — goedkeuren, aanpassen of afwijzen.",
+        "steps": []
       },
       {
         "id": "datalek-72u",

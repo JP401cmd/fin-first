@@ -125,6 +125,10 @@ export const SKILL_CURATION: Record<string, SkillCuration> = {
     kind: 'tooling',
     tagline: 'Wie verwerkt wat en op welke grond: nieuwe dienst éérst in het register, kwartaalcontrole naast de BTW-administratie, per verwerker gegevens, doel, grondslag en overeenkomst.',
   },
+  'compliance-check': {
+    kind: 'tooling',
+    tagline: 'De Wft/AVG-poort vóór elke publieke uiting, AI-wijziging en SEO-pagina: inzicht mag, vergunningsplichtig advies niet — plus de claimlijst, en altijd een beslisbare uitkomst (goedkeuren · aanpassen · afwijzen).',
+  },
 }
 
 // ── Curatie: groepen + agents ───────────────────────────────────────────────-
