@@ -17,9 +17,10 @@ Je werkt de **Trifinity Notion-werkqueue** af. Bugs en features staan in de Noti
 3. Claim een item meteen met CC-actie `Bezig (Claude Code)` voordat je begint (voorkomt dubbel werk).
 4. Eén item per run; het bovenste in de queue-view is de hoogste prioriteit. Pak geen volgend item tenzij ik expliciet "ga door" zeg.
 5. Vastgelopen of onduidelijk? Stel je vraag **niet** in de terminal — gebruik het Notion-kanaal: zet CC-actie op `Vraag aan gebruiker`, schrijf de concrete vraag bovenaan **Analyse & voorstel** ÉN voeg één regel toe: "→ Antwoord a.u.b. in de kolom **Antwoord gebruiker**.", en stop. (Zo ziet de gebruiker alle openstaande vragen via een filter op CC-actie = `Vraag aan gebruiker` of de Wacht-op-akkoord-view, en weet hij precies waar te antwoorden.)
+6. Kaarten met **Type = `Org`** pak je **nooit** op, ongeacht CC-actie — óók niet als ze op `1`/`3`/`6` staan. Dat zijn organisatie-items (besluiten, rituelen, org-projecten) uit de 🏛️ Organisatie-view; de eigenaar behandelt ze zelf of geeft er expliciet een aparte opdracht voor.
 
 ## Stappen
-1. Lees de queue-view. `$ARGUMENTS` leeg → neem het bovenste item; anders het item dat matcht met die titel/URL. Lege queue → meld en stop.
+1. Lees de queue-view. `$ARGUMENTS` leeg → neem het bovenste item; anders het item dat matcht met die titel/URL. **Sla kaarten met Type = `Org` altijd over** (harde regel 6). Lege queue → meld en stop.
 2. **Afbeeldingen in het kaartje?** Heeft het kaartje een afbeelding (bv. een screenshot in de body of een property), download dan de gesigneerde Notion-afbeeldings-URL naar een tijdelijk bestand (bv. `curl -sL "<signed-url>" -o /tmp/notion-img.png`) en lees dat bestand als beeld — zo zie je de pixels. Werkt zolang de gesigneerde URL nog geldig is op het moment van verwerken. Lukt het ophalen niet, val dan terug op een eventuele tekstuele beschrijving naast de afbeelding.
 3. Lees **CC-actie**: `1. Onderzoek gevraagd` → ONDERZOEK · `3. Implementatie akkoord` → IMPLEMENTATIE · `6. Testen door Claude` → TESTEN · iets anders → meld en stop.
 4. Zet **CC-actie** op `Bezig (Claude Code)`.
