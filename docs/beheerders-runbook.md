@@ -107,3 +107,18 @@ Aanpasbaar zonder deploy (Functioneel beheer):
 
 Nog hardcoded (vereisen een deploy): landingscopy, FAQ, glossarium, en de juridische pagina's
 (`/privacy`, `/voorwaarden`, `/wft` — gemarkeerd als concept, nog juridisch te valideren).
+
+## Back-up en herstel
+
+De werkwijze staat in `.claude/skills/herstelproef` — elk kwartaal oefenen, nooit op productie.
+
+**Hersteldoelen** (voorstel 2026-07-28 — bevestigen of bijstellen bij de eerste herstelproef):
+
+- **RPO (hoeveel data mag je kwijt zijn): 24 uur** — vereist minimaal een dagelijkse Supabase-back-up; verifieer dat die aanstaat en op welk tijdstip.
+- **RTO (hoe lang mag herstel duren): 4 uur** — van "besluit tot terugzetten" tot checklist groen. De geklokte tijd van elke proef komt hieronder te staan.
+
+**Proeflog:**
+
+| Datum | Back-updatum | Hersteltijd | Uitkomst | Wat schuurde |
+| --- | --- | --- | --- | --- |
+| *(eerste proef — gepland vóór de allowlist opengaat)* | | | | |
