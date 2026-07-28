@@ -33,6 +33,30 @@ Je draait een **UAT live-run** over de TriFinity-app: je test de gekozen UAT-zon
 - Toon kort de **huidige dekking** per zone (haal via `GET /api/admin/uat/rounds` de laatste rondes op, of query de laatst bekende status) zodat de gebruiker ziet wat al getest is.
 - Stel via **AskUserQuestion** de vraag *"Welke UAT-zones wil je testen?"* met keuzes o.a.: **Alle nog-niet-(volledig-)geteste**, **Alle 15 zones**, **Specifieke zones** (laat de gebruiker via "Other" de namen typen, bv. `CASH, BUDGET, START`). Bevestig de definitieve zonelijst + volgorde vóór je begint. Zet zones die op de huidige data-persona veilig draaien vooraan; **START als laatste** (vereist uitgelogde/onboarding-staat, zie stap 3).
 
+### 1b. Vraag diepte
+Stel via **AskUserQuestion** de vraag *"Welke diepte wil je testen?"*:
+- **Happy-path (aanbevolen voor een snelle veeg)** — het standaardgedrag hieronder: alleen sub `a`, webapp.
+- **Volledige dekking (a+b+c+d + mobiel waar van toepassing)** — grondiger en trager; richt zich op de go/no-go-dekkingsdrempel (≥95%) op `/beheer/uat`. Ga bij deze keuze door naar stap 1c vóórdat je sub-agents dispatcht.
+
+Bij happy-path: sla stap 1c over, ga direct naar stap 2 — **0% gedragswijziging** t.o.v. het bestaande commandogedrag.
+
+### 1c. Bij volledige dekking — prioriteitswachtrij (alleen als stap 1b = volledige dekking)
+Bereken in de hoofdthread, via `evaluate_script` in de ingelogde browsersessie (geen nieuwe API-route nodig):
+1. Haal alle `uat_rounds` op en per ronde de `uat_results`; reduceer tot "laatst bekend per (scenario_id, sub, platform)" over álle rondes samen (dezelfde reductie die de plaat op `/beheer/uat` al doet — zie `buildResultLookup`/`deriveSubStatus` in `lib/uat/status.ts`).
+2. Grijs = nooit geregistreerd, voor elke sub×platform-combinatie in de catalogus (`lib/uat/catalog.ts`) van de in stap 1 gekozen zones.
+3. Sorteer de grijze gaten: KERN eerst, dan BELANGRIJK, dan OVERIG (matcht het go/no-go-criterium "alle KERN uitgevoerd én geslaagd").
+4. Bundel per scenario: alle nog-grijze subs van hetzelfde scenario samen als één wachtrij-item (een scenario wordt niet over meerdere sessies heen heropend).
+
+Is de wachtrij leeg (alles al gedekt op deze diepte in deze zones) → meld dat direct en sla de sub-agent-dispatch over.
+
+Toon anders een compacte tabel (grijze KERN-/BELANGRIJK-/OVERIG-instanties per zone) en stel een behapbare hap voor: **de KERN-gaten van precies één zone — de zone met de minste resterende grijze KERN-instanties (tie-breaker: eerste in catalogus-volgorde)**. Stel via **AskUserQuestion**:
+1. **Volg het voorstel** (aanbevolen)
+2. **Alles in één keer** — alle grijze KERN+BELANGRIJK van de gekozen zones
+3. **Eén zone volledig afmaken** — zone via "Other"
+4. **Other (vrije tekst)** — zone-namen, "alleen KERN", aantallen, scenario-ID's; interpreteer dit tegen de berekende wachtrij en bevestig kort ("ik ga dan X draaien, klopt dat?") vóórdat je sub-agents dispatcht — geen mini-syntax, gewoon natuurlijke taal.
+
+Het resultaat is een concrete lijst `[{scenarioId, zone, subs:['b','c','d',...], platforms:[...]}, ...]` — dit is wat de zone-agent(s) in stap 2 meekrijgen.
+
 ### 2. Test per zone — serieel, één sub-agent per zone
 Er is **één gedeelde browser**; draai de zones **na elkaar** (nooit twee browser-agents tegelijk). Per zone een **sub-agent** (Agent-tool, `general-purpose`) om het hoofd-contextvenster licht te houden. Geef de sub-agent deze self-contained briefing (vul `<ZONE>` + datum in):
 
@@ -48,6 +72,12 @@ Er is **één gedeelde browser**; draai de zones **na elkaar** (nooit twee brows
 > - **`fill(uid, '')` → verifieer met echte toetsaanslagen.** Een tekst-/e-mailveld legen naar een lege string zet de waarde soms alleen in de rauwe DOM zonder React's `onChange` te vuren — een knop die z'n `disabled` op die state baseert (bv. een getypte bevestiging vóór een destructieve actie) kan dan ten onrechte enabled ogen. Verifieer bij twijfel met echte toetsaanslagen (klik in het veld → `Ctrl+A`/`Shift+End` → `Backspace`).
 > **3) Bugs → Notion** (`mcp__notion__notion-create-pages`, data source `d87e54c5-fb52-4607-a72a-52e4b58ee806`): één pagina per echt defect met **Feature**(titel) `<datum>-WF-<ZONE>-NN-bug<n>`, **Type** `Bug`, **Status** `Nieuw`, **CC-actie** `Backlog` (het Status-veld heeft géén "Backlog" — dat leeft in CC-actie), **Severity** `S0 - blocker`|`S1 - high`|`S2 - medium`|`S3 - low`, **Tags** `["<ZONE>"]` (+ `"UX"`/`"Backend"`/`"Security"` waar terecht), **Steps to reproduce**, **Expected result** (uit `then`), **Actual result**, **Analyse & voorstel** (oorzaakhypothese + verdacht bestand; grep mag). Alleen echte defecten; cosmetisch → S3.
 > **4) Retour:** compacte JSON-samenvatting: `round_id`, counts `{geslaagd,gefaald,geblokkeerd,total}`, geblokkeerd-lijst met redenen, bugs `[{title,wf,severity,oneLine,notionUrl}]`, observaties (o.a. verouderde criteria) + opvallende positieven.
+
+**Bij diepte=volledig (stap 1b/1c), pas de briefing hierboven als volgt aan:**
+- **Instantielijst i.p.v. "per scenario":** geef de sub-agent de concrete lijst uit stap 1c mee (`[{scenarioId, subs, platforms}, ...]`) i.p.v. "doorloop de hele zone" — hij test precies die scenario's × subs × platforms, niet meer en niet minder.
+- **Bron voor b/c/d:** naast `lib/uat/acceptance/<zone-lc>.ts` (blijft de bron voor de exacte cijfer-assertie, doorgaans sub `a`) grept de agent `docs/uat/uat-plan.md` op de exacte kop `#### UAT-<ID>` (bv. `#### UAT-SCHULD-07`) en leest **alleen die sectie** (niet het hele ~13.500-regels-document) voor de volledige a/b/c/d-given/when/then-prose. **CANON-fallback:** bestaat er geen `#### UAT-CANON-NN`-kop (CANON is een latere toevoeging, niet in het oorspronkelijke Deel-2-document), gebruik dan `given`/`when`/`then` uit `lib/uat/acceptance/canon.ts` als enige bron voor alle subs van dat scenario, en meld dit als observatie voor `uat-docs-keeper` — niet blokkeren.
+- **Falende sub blokkeert niet:** faalt sub `b`, ga gewoon door met `c`/`d` van hetzelfde scenario — elke sub is een onafhankelijke test, apart geregistreerd.
+- **Rondelabel:** `{label:'<ZONE> diepte-run — <datum> (chromedev)', notes:'volledige dekking a+b+c+d, instanties: [...]'}` i.p.v. `'... live-run ...'` — zodat de rondegeschiedenis op `/beheer/uat` het runtype onderscheidt.
 
 **Crash-herstel:** de incrementele registratie overleeft een sub-agent-crash (API 529 / connection closed). Crasht een zone-agent, controleer via de DB/`GET results` welke `scenario_id`s al staan en **hervat dezelfde agent via SendMessage** met de nog-ontbrekende scenario's (niet opnieuw beginnen).
 
