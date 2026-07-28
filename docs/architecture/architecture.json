@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-28T14:59:33.039Z",
+  "generatedAt": "2026-07-28T15:17:24.153Z",
   "generatedDate": "2026-07-28",
   "repo": {
     "name": "fin",
@@ -15142,6 +15142,12 @@
         ]
       },
       {
+        "id": "avg-verzoek",
+        "name": "avg-verzoek",
+        "description": "Gebruik wanneer iemand vraagt om inzage, export, verwijdering of correctie van zijn persoonsgegevens — per support-mail, in een gesprek, of hoe dan ook geformuleerd (\"mag ik mijn data?\", \"verwijder mijn account maar\"). Ook bij twijfel of iets een AVG-verzoek is; behandel het dan als verzoek. Start de 30-dagenklok, stelt de identiteit vast en handelt af via de bestaande export- en verwijder-API.",
+        "steps": []
+      },
+      {
         "id": "bug-fix",
         "name": "bug-fix",
         "description": "Bug-fix pijplijn voor TriFinity. Gebruik wanneer een defect gemeld of waargenomen is — 'werkt niet', 'klopt niet', crash, verkeerd getal. NIET voor AI-gedragsafwijkingen (verkeerde categorisatie, toon of antwoorden van de AI) → /ai-gedrag.",
@@ -15307,6 +15313,18 @@
         "id": "frontend-design",
         "name": "frontend-design",
         "description": "Create distinctive, production-grade frontend interfaces for NON-APP surfaces — marketing-/landingpagina's, artifacts, posters, one-off demo's. Voor in-app TriFinity-UI (app/(app)/**, components/**) is de ui-ux-skill de single source of truth en overrulet die deze skill volledig. Genereert creatief, gepolijst design dat generieke AI-esthetiek vermijdt.",
+        "steps": []
+      },
+      {
+        "id": "herstelproef",
+        "name": "herstelproef",
+        "description": "Gebruik elk kwartaal (vaste rij in het ritme), na elke wijziging aan de back-upinrichting, en in elk geval vóór de allowlist opengaat. Zet een echte back-up terug naar een aparte omgeving en bewijst dat hij klopt; legt hersteltijd en uitkomst vast in het beheerders-runbook. Ook de bron voor de herstelroute tijdens een incident.",
+        "steps": []
+      },
+      {
+        "id": "incidentprotocol",
+        "name": "incidentprotocol",
+        "description": "Gebruik bij elk productie-incident of signaal daarvan — nieuwe fouten op /beheer/errors, een gefaalde cron (job_runs of de cron-alert-mail), een Vercel-alarm, een site die niet reageert, of een gebruikersmelding die naar een storing ruikt. Beantwoordt binnen tien minuten de drie vragen die de route bepalen: herstellen, repareren, of óók de meldplichtklok starten.",
         "steps": []
       },
       {
@@ -15619,6 +15637,12 @@
         "id": "ui-ux",
         "name": "ui-ux",
         "description": "Use when building, restyling or reviewing ANY TriFinity UI — pagina's, components, modals, charts, KPI-cards, formulieren, empty states. Bevat de canonieke krant/editorial design-taal, de kleur- & typografie-conventies, de kwaliteitstoets, de patroon-catalogus (kassabon, figures-strip, hero-band, ShellOverlay-driewegregel) en de elf page-type-blueprints. Raadpleeg vóór elke zichtbare UI-wijziging; dit is de single source of truth voor het ontwerp.",
+        "steps": []
+      },
+      {
+        "id": "verwerkersregister",
+        "name": "verwerkersregister",
+        "description": "Gebruik bij elke nieuwe of gewijzigde externe dienst die persoonsgegevens raakt (nieuwe SDK, mail-, analytics- of betaalpartij), bij het kwartaalmoment naast de BTW-administratie, en bij een AVG-vraag over wie wat verwerkt. Houdt het register bij; welke verwerker, welke gegevens, welk doel, welke grondslag, welke overeenkomst.",
         "steps": []
       }
     ]

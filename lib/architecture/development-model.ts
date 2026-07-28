@@ -109,6 +109,22 @@ export const SKILL_CURATION: Record<string, SkillCuration> = {
     kind: 'tooling',
     tagline: 'De 72-uursroute bij een (vermoed) datalek: kennisname vastleggen, drie vragen, indammen, AP-melding met voorbereide tekst — en het meldregister, ook voor lekken die je niet meldt.',
   },
+  'avg-verzoek': {
+    kind: 'tooling',
+    tagline: 'De 30-dagenroute voor inzage-, export-, verwijder- en correctieverzoeken: klok vanaf ontvangst, identiteit via het geregistreerde adres, afhandeling via de bestaande export-/verwijder-API, altijd een aantekening.',
+  },
+  incidentprotocol: {
+    kind: 'tooling',
+    tagline: 'De tien-minuten-triage bij een productie-incident: data weg → herstel, te repareren → bug-fix mét leak-check, data gezien → parallel datalek-72u; daarna informeren en een postmortem in het runbook.',
+  },
+  herstelproef: {
+    kind: 'tooling',
+    tagline: 'Kwartaaloefening die bewijst dat een back-up echt terug te zetten is: naar een aparte omgeving, met controlepunten tot op bedrag-niveau en een geklokte hersteltijd — een ongeteste back-up is geen back-up.',
+  },
+  verwerkersregister: {
+    kind: 'tooling',
+    tagline: 'Wie verwerkt wat en op welke grond: nieuwe dienst éérst in het register, kwartaalcontrole naast de BTW-administratie, per verwerker gegevens, doel, grondslag en overeenkomst.',
+  },
 }
 
 // ── Curatie: groepen + agents ───────────────────────────────────────────────-
