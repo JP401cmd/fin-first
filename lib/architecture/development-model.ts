@@ -105,6 +105,10 @@ export const SKILL_CURATION: Record<string, SkillCuration> = {
     kind: 'tooling',
     tagline: 'De canonieke TriFinity-design-taal: kwaliteitstoets, patroon-catalogus en page-type-blueprints voor elke UI-bouw en -review.',
   },
+  'datalek-72u': {
+    kind: 'tooling',
+    tagline: 'De 72-uursroute bij een (vermoed) datalek: kennisname vastleggen, drie vragen, indammen, AP-melding met voorbereide tekst — en het meldregister, ook voor lekken die je niet meldt.',
+  },
 }
 
 // ── Curatie: groepen + agents ───────────────────────────────────────────────-

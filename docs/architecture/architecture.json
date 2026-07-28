@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-28T14:54:03.702Z",
+  "generatedAt": "2026-07-28T14:59:33.039Z",
   "generatedDate": "2026-07-28",
   "repo": {
     "name": "fin",
@@ -15217,6 +15217,12 @@
             ]
           }
         ]
+      },
+      {
+        "id": "datalek-72u",
+        "name": "datalek-72u",
+        "description": "Gebruik bij elk vermoeden van een datalek — een signaal dat persoonsgegevens gezien, gewijzigd of meegenomen kunnen zijn door iemand die dat niet mocht. Ingangen; een melding van buiten (support-mail), een incident uit het incidentprotocol, verdachte toegang in logs, of een kwijtgeraakt apparaat. Beoordeelt, damt in en meldt binnen 72 uur bij de AP; legt óók niet-gemelde lekken vast in het meldregister.",
+        "steps": []
       },
       {
         "id": "extend-feature",
