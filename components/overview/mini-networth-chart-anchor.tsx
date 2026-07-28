@@ -18,6 +18,9 @@ const chartW = W - PAD_LEFT - PAD_RIGHT
 // anker-punt exact op de plek van het latere Vandaag-punt valt.
 const todayX = PAD_LEFT + chartW * 0.25
 const anchorY = PAD_TOP + (H - PAD_TOP - PAD_BOTTOM) * 0.55
+// Reisafstand van het sonde-punt — afgeleid uit de geometrie zodat een latere
+// wijziging van todayFraction/padding de animatie automatisch meeneemt.
+const probeTravel = W - PAD_RIGHT - todayX
 
 /**
  * MiniNetWorthChartAnchor — twee-traps-render voor de rechter hero-cel op
@@ -59,7 +62,7 @@ export function MiniNetWorthChartAnchor({
           Netto vermogen door de tijd
         </span>
         {/* Signaleert dat de projectielijn nog binnenstroomt (trap 2). */}
-        <span className="text-xs font-mono tabular-nums text-[var(--ink-4)] animate-pulse">
+        <span className="nwseek-label text-xs font-mono tabular-nums text-[var(--ink-4)]">
           Projectie laden…
         </span>
       </header>
@@ -73,9 +76,23 @@ export function MiniNetWorthChartAnchor({
           className="!mt-1 !mb-0"
         />
       )}
-      {/* Anker-frame: alleen het Vandaag-punt + basislijn; de projectie-/historie-
-          zone rechts pulseert als placeholder tot de volle grafiek instroomt. */}
+      {/* Anker-frame: alleen het Vandaag-punt + basislijn; rechts van Vandaag
+          "zoekt" een rustige gestippelde lijn de projectie tot de volle grafiek
+          instroomt (trap 2) — géén knipperend vlak. */}
       <div className="relative flex-1 mt-2">
+        {/* Scoped keyframes — houdt globals.css onaangeraakt; gate op
+            prefers-reduced-motion zet alle beweging stil (statisch gestippeld). */}
+        <style>{`
+          @keyframes nwseek-march { from { stroke-dashoffset: 0 } to { stroke-dashoffset: -20 } }
+          @keyframes nwseek-travel { from { transform: translateX(0) } to { transform: translateX(${probeTravel}px) } }
+          @keyframes nwseek-fade { from { opacity: .55 } to { opacity: 1 } }
+          .nwseek-line { animation: nwseek-march 2.6s ease-in-out infinite alternate; }
+          .nwseek-probe { animation: nwseek-travel 2.6s ease-in-out infinite alternate; }
+          .nwseek-label { animation: nwseek-fade 2.6s ease-in-out infinite alternate; }
+          @media (prefers-reduced-motion: reduce) {
+            .nwseek-line, .nwseek-probe, .nwseek-label { animation: none; }
+          }
+        `}</style>
         <svg
           viewBox={`0 0 ${W} ${H}`}
           className="w-full h-auto"
@@ -83,15 +100,27 @@ export function MiniNetWorthChartAnchor({
           preserveAspectRatio="none"
           style={{ minHeight: '120px' }}
         >
-          {/* Placeholder-zone rechts van Vandaag (pulserend) — waar de projectie komt. */}
-          <rect
-            x={todayX}
-            y={PAD_TOP}
-            width={W - PAD_RIGHT - todayX}
-            height={H - PAD_TOP - PAD_BOTTOM}
-            rx="6"
-            className="animate-pulse"
-            fill="var(--paper-2)"
+          {/* Zoekende projectie-lijn rechts van Vandaag: rustige gestippelde lijn
+              (drift-dashes heen en weer) met een sonde-punt dat langzaam
+              uit- en terugschuift richting de rechterrand. */}
+          <line
+            className="nwseek-line"
+            x1={todayX}
+            y1={anchorY}
+            x2={W - PAD_RIGHT}
+            y2={anchorY}
+            stroke="var(--ink-4)"
+            strokeWidth="1"
+            strokeDasharray="4 6"
+            opacity="0.4"
+          />
+          <circle
+            className="nwseek-probe"
+            cx={todayX}
+            cy={anchorY}
+            r="3"
+            fill="var(--module-active-700)"
+            opacity="0.5"
           />
           {/* X-as basislijn. */}
           <line
