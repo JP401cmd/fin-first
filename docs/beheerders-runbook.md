@@ -112,7 +112,7 @@ Nog hardcoded (vereisen een deploy): landingscopy, FAQ, glossarium, en de juridi
 
 De werkwijze staat in `.claude/skills/herstelproef` — elk kwartaal oefenen, nooit op productie.
 
-**Hersteldoelen** (voorstel 2026-07-28 — bevestigen of bijstellen bij de eerste herstelproef):
+**Hersteldoelen** (vastgesteld 2026-07-29, org-besluit 10 "lichte voorziening" — bijstellen mag bij de eerste herstelproef):
 
 - **RPO (hoeveel data mag je kwijt zijn): 24 uur** — vereist minimaal een dagelijkse Supabase-back-up; verifieer dat die aanstaat en op welk tijdstip.
 - **RTO (hoe lang mag herstel duren): 4 uur** — van "besluit tot terugzetten" tot checklist groen. De geklokte tijd van elke proef komt hieronder te staan.
