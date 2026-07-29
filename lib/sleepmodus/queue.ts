@@ -13,6 +13,19 @@
  *   idle/dragging ─FINISH_EARLY→ done (tussentijds stoppen; tellers + resterende
  *                                       items behouden, geen write — alles is al
  *                                       per drop gepersisteerd)
+ *   idle/dragging ─OPEN_CREATE→ creating ─CREATE_CANCEL→ idle
+ *
+ * `creating` is een parkeerstand: de wachtrij, de tellers en `items[0]` blijven
+ * onaangeroerd terwijl de in-veld-kaart openstaat. Het aanmaken zélf heeft géén
+ * eigen fase — die write leeft lokaal in de kaart (net als de andere writes doet
+ * de state-machine hem niet). Slaagt het aanmaken, dan dispatcht de overlay
+ * `CREATE_CANCEL` (terug naar idle) gevolgd door `DROP` op het verse budget, en
+ * loopt de wachtende transactie het gewone drop-pad in.
+ *
+ * `creating` is bewust géén geldige bron voor SKIP/FINISH_EARLY/DROP/DRAG_CANCEL:
+ * die guards checken expliciet op idle/dragging en sluiten de kaart-fase daarmee
+ * vanzelf uit. De DRAG_CANCEL die volgt op een drop-op-de-+-knop is daardoor een
+ * no-op — precies het gewenste gedrag, anders zou de kaart meteen weer sluiten.
  */
 
 export type QueueTx = {
@@ -38,7 +51,14 @@ export type DropTarget = {
 
 export type AssignScope = 'rule' | 'these' | 'one'
 
-export type SleepmodusPhase = 'idle' | 'dragging' | 'confirm' | 'applying' | 'celebrating' | 'done'
+export type SleepmodusPhase =
+  | 'idle'
+  | 'dragging'
+  | 'confirm'
+  | 'creating'
+  | 'applying'
+  | 'celebrating'
+  | 'done'
 
 export type PendingDrop = {
   target: DropTarget
@@ -66,6 +86,8 @@ export type SleepmodusAction =
   | { type: 'DROP'; target: DropTarget; siblingIds: string[] }
   | { type: 'CONFIRM_SCOPE'; scope: AssignScope }
   | { type: 'CONFIRM_CANCEL' }
+  | { type: 'OPEN_CREATE' }
+  | { type: 'CREATE_CANCEL' }
   | { type: 'APPLY_SUCCESS'; assignedIds: string[]; ruleCreated: boolean; bulkUpdated: number }
   | { type: 'APPLY_ERROR' }
   | { type: 'ANIMATION_DONE' }
@@ -144,6 +166,17 @@ export function sleepmodusReducer(state: SleepmodusState, action: SleepmodusActi
     case 'CONFIRM_CANCEL':
       if (state.phase !== 'confirm') return state
       return { ...state, phase: 'idle', pendingDrop: null }
+
+    case 'OPEN_CREATE':
+      // Alleen vanuit een rustige fase — nooit midden in een write, vraagkaart
+      // of animatie. De wachtrij blijft staan: de wachtende transactie wordt na
+      // het aanmaken alsnog op het verse budget gedropt.
+      if (state.phase !== 'idle' && state.phase !== 'dragging') return state
+      return { ...state, phase: 'creating', pendingDrop: null }
+
+    case 'CREATE_CANCEL':
+      if (state.phase !== 'creating') return state
+      return { ...state, phase: 'idle' }
 
     case 'APPLY_SUCCESS': {
       if (state.phase !== 'applying') return state

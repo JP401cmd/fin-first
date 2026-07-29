@@ -1,5 +1,5 @@
 /**
- * Acceptatiecriteria — domein Budgetteren (WF-BUDGET-01..24 / UAT-BUDGET-01..24).
+ * Acceptatiecriteria — domein Budgetteren (WF-BUDGET-01..25 / UAT-BUDGET-01..25).
  *
  * Spiegelt exact de aanpak van `schuld.ts`/`toek.ts`/`bezit.ts`. Bron: `docs/uat/uat-plan.md`
  * Deel 1 (workflow-definities) + Deel 2 §2.8 (BUDGET-scenario's), en de budget-rekenmotoren
@@ -380,6 +380,20 @@ const criteria: AcceptanceCriterion[] = [
     assertion: {
       kind: 'ui-only',
       source: 'kruis-navigatie naar RAPP; geen eigen berekening binnen BUDGET',
+    },
+  },
+  {
+    workflow: 'WF-BUDGET-25',
+    scenarioId: 'UAT-BUDGET-25',
+    titel: 'Nieuw budget aanmaken vanuit de sleepmodus (in-veld-kaart via de +-knop)',
+    kriticiteit: 'BELANGRIJK',
+    given: 'In de sleepmodus (bereikbaar vanuit de Budget Hub, /core/cash en de import-flow) staat tussen de pills "Eigen rekening" en "Overslaan" een +-knop (aria-label "Nieuw budget toevoegen"); een transactie wacht in de ring.',
+    when: 'Klikken op de knop of de transactie erop slepen opent de in-veld-kaart (role="dialog", aria-label "Nieuw budget": naam, hoofd-/deelbudget + parent-select bij deelbudget, bedrag per maand). "Aanmaken en toewijzen" bouwt de diff met `buildCreateBudgetDiff` en POST\'t die naar `/api/budgets/plan`.',
+    then: 'Slepen op de knop wijst niets toe — de bol veert terug, de wachtrij blijft intact, alleen de kaart opent. Een lege (getrimde) naam, een ontbrekende parent bij een deelbudget, of een bedrag ≤ 0 wordt geweigerd — `buildCreateBudgetDiff` gooit voor elk van deze drie een fout, wat de client-validatie in de kaart spiegelt; `budgetType: \'archive\'` wordt eveneens geweigerd (een nieuw budget kan geen Eigen-rekening-archief zijn). Bij geldige invoer levert de diff één insert op met `budget_type=\'expense\'` (nieuwe hoofdbudgetten uit deze kaart vragen geen type) en `is_essential=false`; na de succesvolle POST wordt het budget lokaal toegevoegd met `ownership=\'personal\'` (de kaart biedt geen gezamenlijk-optie) en de wachtende transactie er direct aan toegewezen. Annuleren of Escape sluit alléén de kaart — sleepmodus en wachtrij blijven ongewijzigd. Mislukt de aanmaak (API-fout), dan blijft de kaart open met de ingevulde waarden en de foutmelding uit de API. Bij 9+ hoofdbudgetten kan het nieuwe budget achter de "Meer"-bol belanden; de toewijzing van de wachtende transactie slaagt dan nog steeds, programmatisch — aanvaard gedrag, geen bug.',
+    assertion: {
+      kind: 'exact',
+      expected: 'leegNaamGooit=true; nulBedragGooit=true; archiveTypeGooit=true; validInsertBudgetType=expense; validIsEssential=false',
+      source: 'lib/budget-plan-diff.ts#buildCreateBudgetDiff — echte productiefunctie, geen mirror (aangeroepen door components/app/sleepmodus/sleepmodus-overlay.tsx#handleCreateBudget); de client-validatie in components/app/sleepmodus/nieuw-budget-kaart.tsx#handleSubmit spiegelt dezelfde drie regels vóór de fetch',
     },
   },
 ]

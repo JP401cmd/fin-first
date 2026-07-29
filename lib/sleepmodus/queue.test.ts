@@ -190,3 +190,69 @@ describe('sleepmodusReducer', () => {
     expect(currentTx(initQueue([]))).toBeNull()
   })
 })
+
+describe('sleepmodusReducer — in-veld budget aanmaken', () => {
+  const base = initQueue([
+    tx('a', { counterparty_name: 'AH' }),
+    tx('b', { counterparty_name: 'AH' }),
+    tx('c', { counterparty_name: 'Jumbo' }),
+  ])
+
+  it('OPEN_CREATE → creating vanuit idle én dragging, met wachtrij en tellers intact', () => {
+    for (const start of [base, sleepmodusReducer(base, { type: 'DRAG_START' })]) {
+      const creating = sleepmodusReducer(start, { type: 'OPEN_CREATE' })
+      expect(creating.phase).toBe('creating')
+      expect(creating.items.map((t) => t.id)).toEqual(['a', 'b', 'c'])
+      expect(currentTx(creating)?.id).toBe('a')
+      expect(creating.processedCount).toBe(0)
+      expect(creating.assignedCount).toBe(0)
+      expect(creating.skippedCount).toBe(0)
+      expect(creating.pendingDrop).toBeNull()
+    }
+  })
+
+  it('OPEN_CREATE wordt genegeerd vanuit confirm, applying, celebrating en done', () => {
+    const confirm = dropped(base, ['b'])
+    const applying = dropped(base)
+    const celebrating = sleepmodusReducer(applying, {
+      type: 'APPLY_SUCCESS', assignedIds: ['a'], ruleCreated: false, bulkUpdated: 0,
+    })
+    const done = sleepmodusReducer(base, { type: 'FINISH_EARLY' })
+
+    expect(confirm.phase).toBe('confirm')
+    expect(applying.phase).toBe('applying')
+    expect(celebrating.phase).toBe('celebrating')
+    expect(done.phase).toBe('done')
+
+    for (const state of [confirm, applying, celebrating, done]) {
+      expect(sleepmodusReducer(state, { type: 'OPEN_CREATE' })).toBe(state)
+    }
+  })
+
+  it('de DRAG_CANCEL na een drop op de +-knop is een no-op (kaart blijft open)', () => {
+    // Naad: de pointer-up op de +-zone dispatcht OPEN_CREATE, waarna de
+    // sleep-afhandeling nog een DRAG_CANCEL nastuurt. Die mag de net geopende
+    // kaart niet wegklikken.
+    const dragging = sleepmodusReducer(base, { type: 'DRAG_START' })
+    const creating = sleepmodusReducer(dragging, { type: 'OPEN_CREATE' })
+    expect(sleepmodusReducer(creating, { type: 'DRAG_CANCEL' })).toBe(creating)
+    expect(creating.phase).toBe('creating')
+  })
+
+  it('CREATE_CANCEL → idle met de wachtrij intact; vanuit idle een no-op', () => {
+    const creating = sleepmodusReducer(base, { type: 'OPEN_CREATE' })
+    const cancelled = sleepmodusReducer(creating, { type: 'CREATE_CANCEL' })
+    expect(cancelled.phase).toBe('idle')
+    expect(cancelled.items.map((t) => t.id)).toEqual(['a', 'b', 'c'])
+    expect(cancelled.processedCount).toBe(0)
+    expect(cancelled.pendingDrop).toBeNull()
+
+    expect(sleepmodusReducer(base, { type: 'CREATE_CANCEL' })).toBe(base)
+  })
+
+  it('SKIP en FINISH_EARLY worden genegeerd zolang de aanmaakkaart openstaat', () => {
+    const creating = sleepmodusReducer(base, { type: 'OPEN_CREATE' })
+    expect(sleepmodusReducer(creating, { type: 'SKIP' })).toBe(creating)
+    expect(sleepmodusReducer(creating, { type: 'FINISH_EARLY' })).toBe(creating)
+  })
+})

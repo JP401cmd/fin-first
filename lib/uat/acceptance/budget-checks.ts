@@ -38,6 +38,7 @@ import {
   computeBudgetPlanDiff,
   countDiff,
   resolveActiveAmount,
+  buildCreateBudgetDiff,
   type DraftBudget,
   type BudgetAmountLite,
 } from '@/lib/budget-plan-diff'
@@ -389,6 +390,46 @@ export const BUDGET_ENGINE_CHECKS: BudgetEngineCheck[] = [
       return {
         expected: 'householdTypeGezinJong=gezin_jong; householdTypeAlleenstaand=alleenstaand; householdTypePaar=paar; householdTypeGezinTiener=gezin_tiener; delta=150; freedomDaysPotential=18',
         actual: `householdTypeGezinJong=${gezinJong}; householdTypeAlleenstaand=${alleenstaand}; householdTypePaar=${paar}; householdTypeGezinTiener=${gezinTiener}; delta=${b.delta}; freedomDaysPotential=${b.freedom_days_potential}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-BUDGET-25',
+    scenarioId: 'UAT-BUDGET-25',
+    label: 'Sleepmodus-nieuw-budget-guards (buildCreateBudgetDiff): lege naam/bedrag≤0/archive-type gooien; geldige insert budget_type=expense, is_essential=false',
+    run: () => {
+      criterion('WF-BUDGET-25')
+      const base = {
+        clientId: 'tmp-1',
+        parentId: null as string | null,
+        budgetType: 'expense' as Budget['budget_type'],
+        sortOrder: 0,
+        monthlyAmount: 50,
+        effectiveFrom: '2026-07-01',
+      }
+      let leegNaamGooit = false
+      try {
+        buildCreateBudgetDiff({ ...base, name: '   ' })
+      } catch {
+        leegNaamGooit = true
+      }
+      let nulBedragGooit = false
+      try {
+        buildCreateBudgetDiff({ ...base, name: 'Boodschappen', monthlyAmount: 0 })
+      } catch {
+        nulBedragGooit = true
+      }
+      let archiveTypeGooit = false
+      try {
+        buildCreateBudgetDiff({ ...base, name: 'Boodschappen', budgetType: 'archive' })
+      } catch {
+        archiveTypeGooit = true
+      }
+      const diff = buildCreateBudgetDiff({ ...base, name: 'Boodschappen' })
+      const insert = diff.to_insert[0]
+      return {
+        expected: 'leegNaamGooit=true; nulBedragGooit=true; archiveTypeGooit=true; validInsertBudgetType=expense; validIsEssential=false',
+        actual: `leegNaamGooit=${leegNaamGooit}; nulBedragGooit=${nulBedragGooit}; archiveTypeGooit=${archiveTypeGooit}; validInsertBudgetType=${insert.budget_type}; validIsEssential=${insert.is_essential}`,
       }
     },
   },

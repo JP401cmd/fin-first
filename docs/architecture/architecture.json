@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-28T15:22:35.792Z",
-  "generatedDate": "2026-07-28",
+  "generatedAt": "2026-07-29T13:25:33.242Z",
+  "generatedDate": "2026-07-29",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -191,9 +191,9 @@
     "routesProduction": 101,
     "api": 264,
     "tables": 86,
-    "migrations": 162,
+    "migrations": 163,
     "integrations": 25,
-    "components": 837,
+    "components": 839,
     "providers": 11,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -7495,7 +7495,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 162
+    "migrationCount": 163
   },
   "tablesByDomain": [
     {
@@ -7945,11 +7945,11 @@
     }
   ],
   "components": {
-    "total": 837,
+    "total": 839,
     "groups": [
       {
         "group": "app",
-        "count": 325,
+        "count": 326,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -8153,6 +8153,7 @@
           "nav-stack-provider",
           "net-worth-projection-chart",
           "nibud-benchmark",
+          "nieuw-budget-kaart",
           "notification-item",
           "notification-item.test",
           "notification-panel",
@@ -8424,13 +8425,12 @@
       },
       {
         "group": "widgets",
-        "count": 88,
+        "count": 89,
         "items": [
           "abonnementen-widget",
           "acties-widget",
           "acties-widget.test",
           "agenda-widget",
-          "ai-inzicht-widget",
           "assets-widget",
           "assets-widget.test",
           "auto-dashboard-wizard",
@@ -8483,6 +8483,7 @@
           "netto-vermogen-widget",
           "netto-vermogen-widget.test",
           "noodfonds-widget",
+          "noodfonds-widget.test",
           "pensioen-aow-widget",
           "pensioen-aow-widget.test",
           "rebalancing-widget",
@@ -8495,6 +8496,7 @@
           "swr-monitor-widget",
           "vaste-lasten-widget",
           "volgende-stap-widget",
+          "volgende-stap-widget.test",
           "voorstellen-widget",
           "voorstellen-widget.test",
           "vrijheidsdagen-maand-widget",
@@ -11023,7 +11025,6 @@
           "label": "Bank-connect",
           "write": true,
           "routes": [
-            "/api/bank-connect/balances",
             "/api/bank-connect/callback"
           ]
         },
@@ -12370,7 +12371,6 @@
           "label": "Bank-connect",
           "write": true,
           "routes": [
-            "/api/bank-connect/balances",
             "/api/bank-connect/callback"
           ]
         },
@@ -14795,6 +14795,70 @@
       ],
       "summary": "> Was abusievelijk genummerd 0056 (botste met `0056-chat-transport-cloud-lokaal-omschakelpunt.md`); hernummerd naar 0063 op 2026-07-28. Verwijzingen naar \"ADR 0056\" over RUM/web-vitals bedoelen dit besluit.",
       "file": "docs/adr/0063-eigen-web-vitals-rum-collectie.md"
+    },
+    {
+      "id": "0064-aow-bedragen-ssot-en-kernel-input-injectie",
+      "title": "AOW-bedragen: één bron in constants.ts, de kernel krijgt de basis als INPUT (oracle-fallback blijft)",
+      "status": "aanvaard",
+      "date": "2026-07-29",
+      "elements": [
+        "as-planning",
+        "fn-toekomstplannen",
+        "as-vermogen"
+      ],
+      "summary": "De app toonde en berekende de AOW op **twee grondslagen tegelijk**. Dit besluit maakt `lib/constants.ts` de enige bron van de AOW-bedragen — óók voor de FIRE-projectie — en legt vast hóe de horizon-kernel die bron consumeert zonder het Excel-oracle-contract (ADR 0032) te breken.",
+      "file": "docs/adr/0064-aow-bedragen-ssot-en-kernel-input-injectie.md"
+    },
+    {
+      "id": "0065-landingspagina-blijft-in-fin-first",
+      "title": "Landingspagina en publieke funnel blijven in fin-first (geen aparte marketing-repo)",
+      "status": "aanvaard",
+      "date": "2026-07-29",
+      "elements": [
+        "as-vrijheidscheck",
+        "b-bezoeker",
+        "t-platform"
+      ],
+      "summary": "Org-besluit 01 (`trifinity-org/org_plan/60-besluiten.md`), hier vastgelegd zodat de vraag niet elk kwartaal terugkomt.",
+      "file": "docs/adr/0065-landingspagina-blijft-in-fin-first.md"
+    },
+    {
+      "id": "0066-repo-topologie-skills-op-schijf-deploy-op-push",
+      "title": "Repo-topologie: twee repo''s naast elkaar, Claude-skills direct op schijf, deploy-op-push als releasemodel",
+      "status": "aanvaard",
+      "date": "2026-07-29",
+      "elements": [
+        "t-platform",
+        "app-comp"
+      ],
+      "summary": "Org-besluiten 03, 06 en 07 (`trifinity-org/org_plan/60-besluiten.md`) in één ADR — het eerste besluitdocument over repo-opzet en deployment-topologie.",
+      "file": "docs/adr/0066-repo-topologie-skills-op-schijf-deploy-op-push.md"
+    },
+    {
+      "id": "0067-vrijheidscheck-uitkomst-deelbaar-zonder-bedragen",
+      "title": "De Vrijheidscheck-uitkomst wordt deelbaar — uitsluitend vrijheidstijd, nooit bedragen of invoer",
+      "status": "aanvaard",
+      "date": "2026-07-29",
+      "elements": [
+        "as-vrijheidscheck",
+        "sp-vrijheidscheck",
+        "b-bezoeker"
+      ],
+      "summary": "Org-besluit 08 (`trifinity-org/org_plan/60-besluiten.md`). Ontwerpbesluit vooraf, zodat de bouw (nog niet gestart) binnen deze grens blijft.",
+      "file": "docs/adr/0067-vrijheidscheck-uitkomst-deelbaar-zonder-bedragen.md"
+    },
+    {
+      "id": "0068-leads-bewust-niet-opvolgen-tot-f1",
+      "title": "Vrijheidscheck-leads worden bewust níet opgevolgd tot F1 — verdamping is een keuze, geen lek",
+      "status": "aanvaard",
+      "date": "2026-07-29",
+      "elements": [
+        "do-lead",
+        "as-vrijheidscheck",
+        "b-bezoeker"
+      ],
+      "summary": "Org-besluit 09 (`trifinity-org/org_plan/60-besluiten.md`), het blokkerende grondslag-besluit van werkstroom 10.",
+      "file": "docs/adr/0068-leads-bewust-niet-opvolgen-tot-f1.md"
     }
   ],
   "churn": {
@@ -14806,7 +14870,7 @@
       },
       {
         "path": "lib/ai",
-        "commits": 54
+        "commits": 55
       },
       {
         "path": "app/(app)/toekomst",
@@ -14844,8 +14908,8 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 8278,
-        "commits": 90
+        "loc": 8281,
+        "commits": 91
       },
       {
         "file": "components/app/budgets-client.tsx",
@@ -14855,7 +14919,7 @@
       {
         "file": "components/core/assets-client.tsx",
         "loc": 4312,
-        "commits": 46
+        "commits": 45
       },
       {
         "file": "components/app/cash-account-view.tsx",
@@ -14869,18 +14933,18 @@
       },
       {
         "file": "lib/dashboard-data-loader.ts",
-        "loc": 2742,
-        "commits": 48
+        "loc": 2646,
+        "commits": 49
+      },
+      {
+        "file": "lib/test-personas.ts",
+        "loc": 2216,
+        "commits": 12
       },
       {
         "file": "app/(app)/core/checkin/page.tsx",
         "loc": 2205,
         "commits": 10
-      },
-      {
-        "file": "lib/test-personas.ts",
-        "loc": 2204,
-        "commits": 11
       }
     ]
   },
@@ -15756,8 +15820,16 @@
   "diff": {
     "baseline": false,
     "previousDate": "2026-07-28",
-    "hasChanges": false,
-    "sections": []
+    "hasChanges": true,
+    "sections": [
+      {
+        "label": "Componenten (aantal)",
+        "added": [
+          "+2"
+        ],
+        "removed": []
+      }
+    ]
   },
   "statsHistory": [
     {
@@ -15967,6 +16039,13 @@
       "date": "2026-07-28",
       "api": 264,
       "components": 837,
+      "tables": 86,
+      "routesProduction": 101
+    },
+    {
+      "date": "2026-07-29",
+      "api": 264,
+      "components": 839,
       "tables": 86,
       "routesProduction": 101
     }

@@ -103,3 +103,15 @@ standaard-affordances; de migratie van de afwijkende oppervlakken volgt in fase
     `acquireOverlay()` toevoegen.
   De uitzonderingslijst (chat, palette, share, sleepmodus, sessie-timeout)
   blijft buiten de migratie.
+
+**Addendum (2026-07-29) — modale sub-oppervlakken bínnen een uitzonderings-overlay.**
+Een full-screen overlay op de uitzonderingslijst (chat, palette, share,
+sleepmodus, sessie-timeout) krijgt géén tweede z-laag voor zijn eigen modale
+sub-oppervlakken. Bevestigingen, detailkaarten en kleine formulieren renderen
+als kaart binnen dezelfde container, boven de content maar binnen de
+bestaande focus-trap, scroll-lock en Escape-handler van de overlay. Reden:
+een `createPortal` naar `document.body` valt buiten de `containerRef` van de
+focus-trap (toegankelijkheidsregressie) en zou de uitzonderingslijst laten
+groeien met lagen die geen eigen uitzondering zijn. Precedent: `ConfirmCard`
+en `TransactieDetailsKaart` in de sleepmodus. Sub-oppervlakken horen als fase
+in de state-machine van de overlay, niet als losse open/dicht-vlag ernaast.

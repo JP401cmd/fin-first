@@ -127,6 +127,12 @@ export function AICategorizeSheet({
   // Deelverzameling voor de sleepmodus vanuit een wizard-groep ("Zelf indelen"):
   // de tx-id's van die groep. null = de gewone, volledige sleepmodus.
   const [sleepSubset, setSleepSubset] = useState<string[] | null>(null)
+  // Budgetten die de gebruiker binnen de sleepmodus heeft aangemaakt. Ze staan
+  // server-side, maar de `budgetGroups`-prop ververst pas na een herlaad — en de
+  // wizard-variant herlaadt bewust niet tussen twee groepen door. Op sheet-niveau
+  // bewaard omdat de overlay per groep unmount: zonder dit zou het verse budget
+  // bij de volgende groep verdwenen zijn en maakt de gebruiker 'm nóg een keer.
+  const [sleepCreatedBudgets, setSleepCreatedBudgets] = useState<Budget[]>([])
   // Incrementele voorstellen tijdens de streaming AI-fase: we verzamelen ze in een
   // ref en flushen per ronde naar `rows` (nooit setState per individueel voorstel —
   // dat zouden er duizenden zijn bij "Alle tijden").
@@ -1404,6 +1410,8 @@ export function AICategorizeSheet({
         budgetGroups={budgetGroups}
         hasHousehold={hasHousehold}
         monthLabel={sleepSubset ? undefined : scope === 'month' ? monthLabel : undefined}
+        extraBudgets={sleepCreatedBudgets}
+        onBudgetCreated={(b) => setSleepCreatedBudgets((prev) => [...prev, b])}
         onExit={() => (sleepSubset ? finishSleepSubset() : setPhase('choice'))}
         onDone={() => (sleepSubset ? finishSleepSubset() : onSaved())}
       />

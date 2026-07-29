@@ -96,6 +96,15 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
     elementIds: ['t-lokale-ai', 'as-import', 'as-coach'],
     reviewedAt: '2026-07-19',
   },
+  {
+    id: 'budget-plan-route-zonder-zod',
+    title: 'Budget-schrijfpaden: plan-route zonder zod, nu met tweede consument',
+    detail:
+      'Budget-aanmaken loopt via drie schrijfpaden — de client-directe budget-form.tsx (grandfathered), POST /api/budgets/plan (RPC save_budget_plan) en POST /api/budgetteren/setup (seed). Sinds de +-knop in sleepmodus (buildCreateBudgetDiff in lib/budget-plan-diff.ts) heeft de plan-route een tweede consument, terwijl de body nog niet met zod/parseBody gevalideerd wordt — alleen een handmatige array-check. Uitweg: zod-schema dat de BudgetPlanDiff-vorm exact spiegelt, retrofit op de route.',
+    severity: 'debt',
+    elementIds: ['as-budget', 'fn-budgetteren'],
+    reviewedAt: '2026-07-29',
+  },
 ]
 
 /** Aandachtspunten die een specifiek element raken. */

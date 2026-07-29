@@ -52,6 +52,11 @@ import {
   type AssignScope,
 } from '@/lib/sleepmodus/queue'
 import { resolveEigenRekeningBudgetId, type Budget } from '@/lib/budget-data'
+import {
+  buildCreateBudgetDiff,
+  firstOfCurrentMonth,
+  NEW_BUDGET_DETAIL_DEFAULTS,
+} from '@/lib/budget-plan-diff'
 import { getTypeColors } from '@/components/app/budget-shared'
 import type { AutoCatContext } from '@/lib/auto-categorize'
 import { useFocusTrap } from '@/lib/hooks/use-focus-trap'
@@ -69,9 +74,71 @@ import {
   TransactieDetailsKaart,
   type BolState,
 } from './sleepmodus-bollen'
+import { NieuwBudgetKaart, type NieuwBudgetWaarden } from './nieuw-budget-kaart'
 
 const MEER_SLOT = MAX_RING_BUDGETS - 1
 const MEER_EXPANDED = '__meer__'
+
+/** Client-veilige terugvaltekst wanneer het aanmaken strandt (ADR 0044-envelope). */
+const FOUT_AANMAKEN = 'Aanmaken lukte niet. Probeer het opnieuw.'
+
+/**
+ * Bouwt de lokale `Budget`-rij voor een zojuist aangemaakt budget.
+ *
+ * Deze rij dient UITSLUITEND voor weergave en drop-targeting binnen déze
+ * sleepsessie: de verse bol in de ring, de doelnaam in de vraagkaart en de
+ * ownership-check bij de write. Elke echte write gaat via /api/budgets/plan →
+ * de atomische `save_budget_plan`-RPC die de gebruiker server-side vaststelt;
+ * hier ontstaat niets. Bij de eerstvolgende herlaad (onDone) komt de echte rij
+ * gewoon via de `budgetGroups`-prop binnen en verdwijnt deze plaatsvervanger.
+ *
+ * De defaults spiegelen wat die RPC schrijft: detailvelden uit
+ * NEW_BUDGET_DETAIL_DEFAULTS, en ownership/household uit de kolomdefaults
+ * ('personal' / null — de INSERT in de RPC noemt die kolommen niet).
+ */
+function lokaalBudget(args: {
+  id: string
+  name: string
+  parentId: string | null
+  budgetType: Budget['budget_type']
+  sortOrder: number
+  monthlyAmount: number
+}): Budget {
+  return {
+    id: args.id,
+    // Placeholders: de overlay leest deze velden nergens. De echte waarden
+    // staan server-side en komen mee bij de eerstvolgende herlaad-ronde.
+    user_id: '',
+    created_at: '',
+    updated_at: '',
+    parent_id: args.parentId,
+    name: args.name,
+    slug: null,
+    icon: 'Circle', // gelijk aan de icon-default van buildCreateBudgetDiff
+    description: null,
+    default_limit: args.monthlyAmount,
+    budget_type: args.budgetType,
+    interval: 'monthly',
+    rollover_type: 'reset',
+    limit_type: NEW_BUDGET_DETAIL_DEFAULTS.limitType,
+    alert_threshold: NEW_BUDGET_DETAIL_DEFAULTS.alertThreshold,
+    max_single_transaction_amount: 0,
+    // De kaart maakt alleen 'expense'-hoofdbudgetten (deelbudgetten erven het
+    // parent-type), dus nooit een van de essentiële roottypes — net als de
+    // is_essential-afleiding in buildCreateBudgetDiff hier op false uitkomt.
+    is_essential: false,
+    priority_score: NEW_BUDGET_DETAIL_DEFAULTS.priorityScore,
+    is_inflation_indexed: NEW_BUDGET_DETAIL_DEFAULTS.isInflationIndexed,
+    sort_order: args.sortOrder,
+    ownership: 'personal',
+    household_id: null,
+    goal_type: NEW_BUDGET_DETAIL_DEFAULTS.goalType,
+    goal_amount: NEW_BUDGET_DETAIL_DEFAULTS.goalAmount,
+    goal_date: NEW_BUDGET_DETAIL_DEFAULTS.goalDate,
+    goal_frequency: NEW_BUDGET_DETAIL_DEFAULTS.goalFrequency,
+    is_favorite: false,
+  }
+}
 
 export type SleepmodusApplyRequest = {
   tx: QueueTx
@@ -105,6 +172,17 @@ type Props = {
   applyAssignment?: (req: SleepmodusApplyRequest) => Promise<SleepmodusApplyResult>
   /** CTA-label op het samenvattingsscherm. Default: "Terug naar budgetten". */
   doneLabel?: string
+  /**
+   * Budgetten die eerder in dezelfde caller-sessie via de in-veld-kaart zijn
+   * aangemaakt. De overlay unmount tussen twee wizard-groepen door, terwijl de
+   * `budgetGroups`-prop pas na een herlaad ververst; zonder deze meegegeven
+   * lijst zou een zojuist aangemaakt budget bij de volgende groep verdwijnen en
+   * de gebruiker het nóg eens aanmaken. Alleen gelezen bij mount — de overlay
+   * is de enige schrijver en meldt elke aanmaak via `onBudgetCreated`.
+   */
+  extraBudgets?: Budget[]
+  /** Meldt een zojuist (server-side) aangemaakt budget aan de caller. */
+  onBudgetCreated?: (budget: Budget) => void
 }
 
 /** pointerWithin met rectIntersection-fallback (kleine doelen, snelle bewegingen). */
@@ -180,6 +258,8 @@ export function SleepmodusOverlay({
   onDone,
   applyAssignment,
   doneLabel,
+  extraBudgets: sessionBudgets,
+  onBudgetCreated,
 }: Props) {
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
@@ -188,6 +268,15 @@ export function SleepmodusOverlay({
   const [ctx, setCtx] = useState<AutoCatContext | null>(null)
   const [ctxSettled, setCtxSettled] = useState(false)
   const [expandedParentId, setExpandedParentId] = useState<string | null>(null)
+  /**
+   * Budgetten die via de in-veld-kaart zijn aangemaakt. Ze staan al server-side,
+   * maar de `budgetGroups`-prop ververst pas na een herlaad — tot die tijd
+   * vullen we ze hier lokaal aan zodat de verse bol meteen in de ring staat en
+   * als drop-doel werkt. Geseed uit de `extraBudgets`-prop zodat budgetten uit
+   * een eerdere groep van dezelfde caller-sessie blijven bestaan; daarna is deze
+   * state de enige schrijver (elke aanmaak gaat óók naar `onBudgetCreated`).
+   */
+  const [extraBudgets, setExtraBudgets] = useState<Budget[]>(() => sessionBudgets ?? [])
   const [shareSharedBudgetTx, setShareSharedBudgetTx] = useState(true)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [pulseTarget, setPulseTarget] = useState<string | null>(null)
@@ -208,6 +297,15 @@ export function SleepmodusOverlay({
   /** Ringslot van het geopende cluster — voor de directe geometrische sluiting. */
   const expandedSlotRef = useRef<number | null>(null)
   const applyRunning = useRef(false)
+  /**
+   * Heeft de gebruiker het aanmaken geannuleerd? De aanmaak-fetch leeft buiten
+   * de state-machine (fase blijft `creating`) en loopt door als de kaart
+   * tussentijds sluit. Zonder deze vlag zou de toewijzing ná zo'n annulering
+   * alsnog geschreven worden: `CREATE_CANCEL` zet de fase op `idle` en een
+   * `DROP` is daar geldig — en dat moet zo blijven voor tap-to-assign. Een
+   * reducer-guard kan dit dus niet vangen; de intentie hoort hier.
+   */
+  const createAbortedRef = useRef(false)
   /** Snapshot van de laatste drop voor de celebratie (queue is dan al geleegd). */
   const lastDropRef = useRef<{ droppableId: string; scope: AssignScope; siblingTxs: QueueTx[] } | null>(null)
 
@@ -222,26 +320,54 @@ export function SleepmodusOverlay({
     [state.items, siblingIds],
   )
 
+  /**
+   * De budgetboom zoals de sessie hem kent: de `budgetGroups`-prop plus wat er
+   * tijdens deze sessie is bijgemaakt. Dit is vanaf hier de enige boom waarop
+   * het component werkt — `budgetGroups` wordt nergens anders meer gelezen,
+   * anders zou een vers budget uit de ring, de lookups of de usage-telling
+   * vallen.
+   */
+  const effectiveGroups = useMemo(() => {
+    if (extraBudgets.length === 0) return budgetGroups
+    const groups = budgetGroups.map((g) => ({ parent: g.parent, children: [...g.children] }))
+    const byParent = new Map(groups.map((g) => [g.parent.id, g]))
+    // Ververst de prop tussentijds tóch (bv. omdat de caller herlaadde), dan
+    // staat het verse budget er al in — sla het dan over i.p.v. te verdubbelen.
+    const bekend = new Set(groups.flatMap((g) => [g.parent.id, ...g.children.map((c) => c.id)]))
+    for (const b of extraBudgets) {
+      if (bekend.has(b.id)) continue
+      bekend.add(b.id)
+      const target = b.parent_id ? byParent.get(b.parent_id) : null
+      if (target) target.children.push(b)
+      else if (!b.parent_id) {
+        const g = { parent: b, children: [] as Budget[] }
+        groups.push(g)
+        byParent.set(b.id, g)
+      }
+    }
+    return groups
+  }, [budgetGroups, extraBudgets])
+
   // Callers (zoals budgets-client) geven soms alleen de parents door als
   // `budgets`, met de children genest in `budgetGroups`. Voeg samen zodat
   // lookups (naam, ownership, eigen-rekening, suggesties) ook leaves vinden.
   const allBudgets = useMemo(() => {
     const map = new Map<string, Budget>()
     for (const b of budgets) map.set(b.id, b)
-    for (const g of budgetGroups) {
+    for (const g of effectiveGroups) {
       map.set(g.parent.id, g.parent)
       for (const c of g.children) map.set(c.id, c)
     }
     return [...map.values()]
-  }, [budgets, budgetGroups])
+  }, [budgets, effectiveGroups])
 
   const eigenRekeningBudgetId = useMemo(() => resolveEigenRekeningBudgetId(allBudgets), [allBudgets])
-  const parents = useMemo(() => budgetGroups.map((g) => g.parent), [budgetGroups])
+  const parents = useMemo(() => effectiveGroups.map((g) => g.parent), [effectiveGroups])
   const childrenByParent = useMemo(() => {
     const map = new Map<string, Budget[]>()
-    for (const g of budgetGroups) map.set(g.parent.id, g.children)
+    for (const g of effectiveGroups) map.set(g.parent.id, g.children)
     return map
-  }, [budgetGroups])
+  }, [effectiveGroups])
   const budgetById = useMemo(() => {
     const map = new Map<string, Budget>()
     for (const b of allBudgets) map.set(b.id, b)
@@ -249,8 +375,10 @@ export function SleepmodusOverlay({
   }, [allBudgets])
 
   // ── Context (regels/historie) éénmalig laden — bepaalt gloed + ringvolgorde ──
-  // Once-guard: prop-identiteit kan per parent-render wisselen, maar de
-  // sessie-context (en daarmee de ringvolgorde) moet stabiel blijven.
+  // Once-guard: prop-identiteit kan per parent-render wisselen — en sinds de
+  // in-veld-kaart groeit `allBudgets` óók tijdens de sessie — maar de
+  // sessie-context moet stabiel blijven. De guard houdt het bij één load, zodat
+  // `ctxSettled` niet terugklapt en het veld niet naar "voorbereiden…" springt.
   // Geen cancelled-vlag: StrictMode draait effects dubbel en zou de enige
   // echte load wegcancellen terwijl de guard de herkansing blokkeert.
   const ctxRequested = useRef(false)
@@ -268,7 +396,7 @@ export function SleepmodusOverlay({
     const map = new Map<string, number>()
     if (!ctx) return map
     const toParent = new Map<string, string>()
-    for (const g of budgetGroups) {
+    for (const g of effectiveGroups) {
       toParent.set(g.parent.id, g.parent.id)
       for (const c of g.children) toParent.set(c.id, g.parent.id)
     }
@@ -279,9 +407,12 @@ export function SleepmodusOverlay({
     for (const corr of ctx.corrections) if (corr.budget_id) bump(corr.budget_id, 1)
     for (const freq of ctx.freqMap.values()) bump(freq.budget_id, freq.count)
     return map
-  }, [ctx, budgetGroups])
+  }, [ctx, effectiveGroups])
 
-  // Vast voor de sessie: pas berekenen als de context geladen (of mislukt) is.
+  // Pas berekenen als de context geladen (of mislukt) is. Daarna ligt de ring
+  // vast voor de sessie op één uitzondering na: maakt de gebruiker via de
+  // in-veld-kaart een hoofdbudget bij, dan groeit `parents` en herverdeelt de
+  // ring éénmalig — anders zou de verse bol nergens staan om op te droppen.
   const ring = useMemo(
     () => (ctxSettled ? assignRingSlots(parents, usage) : null),
     [ctxSettled, parents, usage],
@@ -313,6 +444,16 @@ export function SleepmodusOverlay({
 
   /** Gedeeld doel-pad voor loslaten én tap-to-assign. Retourneert true bij een echte drop. */
   const resolveTarget = useCallback((overId: string): boolean => {
+    if (overId === 'zone:nieuw') {
+      // Geen drop, maar een parkeerstand: de kaart opent en de wachtende
+      // transactie blijft staan. Het cluster moet hier dicht — anders lekt een
+      // openstaande parent door naar de `celebrationId` van de child-toewijzing
+      // hieronder en pulst straks de verkeerde bol.
+      setExpandedParentId(null)
+      createAbortedRef.current = false
+      dispatch({ type: 'OPEN_CREATE' })
+      return false
+    }
     if (overId === 'zone:skip') {
       dispatch({ type: 'SKIP' })
       setExpandedParentId(null)
@@ -354,6 +495,100 @@ export function SleepmodusOverlay({
     return false
   }, [childrenByParent, dropOnBudget, eigenRekeningBudgetId, expandedParentId])
 
+  /** Parent-keuze in de kaart: echte hoofdbudgetten, zonder het archive-budget
+   *  (Eigen rekening) — daar hoort niets onder, en buildCreateBudgetDiff
+   *  weigert dat type sowieso. */
+  const nieuwBudgetParents = useMemo(
+    () => parents.filter((p) => p.budget_type !== 'archive').map((p) => ({ id: p.id, name: p.name })),
+    [parents],
+  )
+
+  /**
+   * Maakt het budget écht aan (server-side via de plan-RPC) en wijst de
+   * wachtende transactie er direct aan toe.
+   *
+   * Vaste volgorde: API-call → lokale rij toevoegen → kaart sluiten → droppen.
+   * De rij moet er staan vóór de drop, want de vraagkaart en de write-stap
+   * zoeken naam en ownership van het doel op in `budgetById`. Fouten worden
+   * GEWORPEN in plaats van in `errorMsg` gezet: de kaart vangt ze en blijft
+   * open mét de ingevulde waarden, zodat niemand alles opnieuw hoeft te typen.
+   *
+   * Annuleert de gebruiker terwijl de fetch nog loopt, dan stopt de keten na de
+   * lokale rij: het budget bestáát server-side (dus tonen blijft juist), maar de
+   * toewijzing die hij expliciet afbrak wordt niet geschreven.
+   */
+  const handleCreateBudget = useCallback(async (v: NieuwBudgetWaarden) => {
+    const parent = v.parentId ? budgetById.get(v.parentId) ?? null : null
+    // Een deelbudget erft het type van zijn hoofdbudget; een nieuw hoofdbudget
+    // uit deze kaart is altijd een uitgavenbudget (de kaart vraagt geen type).
+    const budgetType: Budget['budget_type'] = parent ? parent.budget_type : 'expense'
+    // sort_order = max+1 binnen de juiste laag — zelfde regel als de planeditor.
+    const siblings = v.parentId
+      ? (childrenByParent.get(v.parentId) ?? [])
+      : parents.filter((p) => p.budget_type === budgetType)
+    const sortOrder = siblings.length > 0 ? Math.max(...siblings.map((s) => s.sort_order ?? 0)) + 1 : 0
+
+    const clientId = `tmp-${Date.now().toString(36)}`
+    const diff = buildCreateBudgetDiff({
+      clientId,
+      name: v.name,
+      parentId: v.parentId,
+      budgetType,
+      sortOrder,
+      monthlyAmount: v.monthlyAmount,
+      effectiveFrom: firstOfCurrentMonth(),
+    })
+
+    const res = await fetch('/api/budgets/plan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(diff),
+    })
+    // Platte foutvorm `{ error: string }` (ADR 0044); bij een lege of kapotte
+    // body valt de tekst terug op de generieke melding.
+    const data = (await res.json().catch(() => null)) as
+      | { error?: unknown; id_map?: Record<string, string> }
+      | null
+    if (!res.ok) {
+      throw new Error(data && typeof data.error === 'string' ? data.error : FOUT_AANMAKEN)
+    }
+    // Het echte UUID komt uit de id_map van de RPC — zonder dat kunnen we niets
+    // toewijzen, dus dan is het aanmaken voor deze flow simpelweg mislukt.
+    const newId = data?.id_map?.[clientId]
+    if (typeof newId !== 'string' || !newId) throw new Error(FOUT_AANMAKEN)
+
+    const nieuw = lokaalBudget({
+      id: newId,
+      name: v.name,
+      parentId: v.parentId,
+      budgetType,
+      sortOrder,
+      monthlyAmount: v.monthlyAmount,
+    })
+    setExtraBudgets((prev) => [...prev, nieuw])
+    // Ook bij een annulering: het budget staat er echt, dus de caller moet 'm
+    // meenemen naar de volgende groep.
+    onBudgetCreated?.(nieuw)
+
+    // Tussentijds geannuleerd (Annuleren of Escape terwijl de fetch liep): geen
+    // toewijzing. De fase staat dan al op `idle` — de CREATE_CANCEL hieronder
+    // zou een no-op zijn en de DROP juist wél doorgaan.
+    if (createAbortedRef.current) return
+
+    // CREATE_CANCEL zet de fase terug naar idle; de DROP hierna is daardoor
+    // geldig. Beide updates batchen in dezelfde tick, dus de kaart en de
+    // vraagkaart staan nooit tegelijk in beeld.
+    dispatch({ type: 'CREATE_CANCEL' })
+    // Bewust `dropOnBudget` en niet `resolveTarget`: de celebratie moet op een
+    // bol landen die ook echt gerenderd is. Een vers HOOFDbudget heeft die
+    // (eigen ringslot), een vers DEELbudget niet — de ring staat na OPEN_CREATE
+    // in ruststand, dus pulsen op `child:<id>` zou nergens landen. Richt de puls
+    // daarom op de parent-bol. Via `resolveTarget` kan dat niet: die leest
+    // `expandedParentId` uit zijn eigen closure (hier altijd null) en komt
+    // onvermijdelijk op `child:<id>` uit.
+    dropOnBudget(v.parentId ? `parent:${v.parentId}` : `parent:${newId}`, newId, false)
+  }, [budgetById, childrenByParent, dropOnBudget, onBudgetCreated, parents])
+
   // Naam + helptekst van een doel — voedt de helper boven de transactie zodat
   // je vóór het loslaten zeker weet op welk (deel)budget je terechtkomt.
   const describeTarget = useCallback((overId: string | null): { name: string; description: string | null; color: string | null } | null => {
@@ -362,6 +597,7 @@ export function SleepmodusOverlay({
     if (overId === 'zone:eigen') return { name: 'Eigen rekening', description: 'Markeer als overboeking tussen je eigen rekeningen — telt niet mee in je budgetten.', color: getTypeColors('archive').hex }
     // Geen budget → neutrale fallback (kern) in de render.
     if (overId === 'zone:skip') return { name: 'Overslaan', description: 'Sla deze transactie nu over; hij komt later weer langs.', color: null }
+    if (overId === 'zone:nieuw') return { name: 'Nieuw budget', description: 'Maak een budget en wijs deze transactie er direct aan toe.', color: null }
     if (overId === 'meer') return { name: 'Meer budgetten', description: 'Open de overige budgetten.', color: null }
     let id: string | null = null
     if (overId.startsWith('child:')) id = overId.slice('child:'.length)
@@ -567,6 +803,14 @@ export function SleepmodusOverlay({
       if (e.key !== 'Escape') return
       e.stopPropagation()
       if (state.phase === 'confirm') dispatch({ type: 'CONFIRM_CANCEL' })
+      // Deze document-handler bedient ook de in-veld-kaart (net als ConfirmCard)
+      // en doet stopPropagation — de kaart heeft dus géén eigen keydown nodig.
+      // Escape blijft ook tijdens de aanmaak-fetch werken (de Annuleren-knop is
+      // dan uit); de vlag zorgt dat er daarna niets meer wordt toegewezen.
+      else if (state.phase === 'creating') {
+        createAbortedRef.current = true
+        dispatch({ type: 'CREATE_CANCEL' })
+      }
       else if (state.phase === 'idle' || state.phase === 'done' || state.phase === 'dragging') handleExit()
       // applying/celebrating: negeren — write loopt nog
     }
@@ -584,7 +828,8 @@ export function SleepmodusOverlay({
     : []
   const expandedParentSlot = ring?.slotted.find((s) => s.budget.id === expandedParentId)?.slot ?? null
   const meerExpanded = expandedParentId === MEER_EXPANDED
-  const fieldDimmed = state.phase === 'confirm'
+  // Vraagkaart én in-veld-kaart nemen het midden over: de ring dimt eronder weg.
+  const fieldDimmed = state.phase === 'confirm' || state.phase === 'creating'
   // Ref-spiegel voor de geometrische sluiting in de pointermove-handler.
   expandedSlotRef.current = expandedParentId ? (meerExpanded ? MEER_SLOT : expandedParentSlot) : null
 
@@ -673,10 +918,14 @@ export function SleepmodusOverlay({
           {/* ── Speelveld — begrensd zodat de ring op desktop compact om de bol blijft ── */}
           <div ref={fieldRef} className="relative mx-auto w-full max-w-2xl flex-1 overflow-hidden" style={{ minHeight: 0 }}>
             {/* Ring: rust = hoofdbudgetten; expanded = children of overflow nemen de slots over */}
-            {/* Miniatuur-voorproefjes van de deelbudgetten bij elke hoofdbol */}
+            {/* Miniatuur-voorproefjes van de deelbudgetten bij elke hoofdbol.
+                Ook bij één deelbudget: die parent opent geen cluster (een drop
+                gaat er stilzwijgend doorheen), dus zonder dit voorproefje is een
+                enkel deelbudget nergens te zien — precies wat er gebeurt als je
+                hier een hoofdbudget én er één deelbudget onder aanmaakt. */}
             {!expandedParentId && ring.slotted.flatMap(({ budget, slot }) => {
               const children = childrenByParent.get(budget.id) ?? []
-              if (children.length < 2) return []
+              if (children.length < 1) return []
               const preview = childPreviewFor(slot, children.length)
               return children.map((child, i) => (
                 <MiniSatelliet key={`mini:${child.id}`} budget={child} pos={preview[i]} dimmed={fieldDimmed} />
@@ -846,6 +1095,23 @@ export function SleepmodusOverlay({
                 />
               </div>
             )}
+
+            {/* In-veld-kaart: budget aanmaken, daarna gaat de wachtende
+                transactie er meteen heen (zie handleCreateBudget) */}
+            {state.phase === 'creating' && (
+              <div className="absolute inset-0 z-[4] flex items-center justify-center px-4">
+                <NieuwBudgetKaart
+                  parents={nieuwBudgetParents}
+                  txLabel={(tx.counterparty_name || tx.description).slice(0, 40)}
+                  txAmount={tx.amount}
+                  onCreate={handleCreateBudget}
+                  onCancel={() => {
+                    createAbortedRef.current = true
+                    dispatch({ type: 'CREATE_CANCEL' })
+                  }}
+                />
+              </div>
+            )}
           </div>
 
           {/* ── Dropzones in de duim-zone ── */}
@@ -856,6 +1122,7 @@ export function SleepmodusOverlay({
               dimmed={fieldDimmed || !!expandedParentId}
               onEigenTap={state.phase === 'idle' ? () => resolveTarget('zone:eigen') : undefined}
               onSkipTap={state.phase === 'idle' ? () => resolveTarget('zone:skip') : undefined}
+              onNieuwTap={state.phase === 'idle' ? () => resolveTarget('zone:nieuw') : undefined}
             />
             {hasHousehold && anySharedBudget && (
               <label className="mx-4 mt-2 flex items-center gap-2 text-[10px] text-[var(--ink-3)]">

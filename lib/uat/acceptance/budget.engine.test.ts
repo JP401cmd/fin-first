@@ -10,7 +10,7 @@
  * De niet-exacte criteria (02/16/21 consistency, 13 direction, 04/08/11/12/17/19/23/24
  * ui-only) hebben geen vast cijfer en worden hier als bespoke kind-controle
  * geborgd, samen met de dekkingscontrole op `budget.ts` zelf (elk BUDGET-scenario
- * uit de catalogus heeft precies één criterium — 01..24, aaneengesloten, geen
+ * uit de catalogus heeft precies één criterium — 01..25, aaneengesloten, geen
  * verwijsregel-gaten zoals bij SCHULD/TOEK).
  */
 
@@ -21,7 +21,7 @@ import { UAT_SCENARIOS } from '@/lib/uat/catalog'
 import type { AcceptanceCriterion } from './types'
 
 /** De BUDGET-scenario's zoals de catalogus ze kent (bron van waarheid voor
- *  WELKE workflows bestaan). BUDGET is aaneengesloten 01..24, geen gaten. */
+ *  WELKE workflows bestaan). BUDGET is aaneengesloten 01..25, geen gaten. */
 const catalogBudgetWorkflows = UAT_SCENARIOS.filter((s) => s.zone === 'BUDGET').map((s) => s.wf).sort()
 
 function criterion(workflow: string): AcceptanceCriterion {
@@ -31,11 +31,11 @@ function criterion(workflow: string): AcceptanceCriterion {
 }
 
 describe('UAT Budget — acceptatiecriteria dekking', () => {
-  it('heeft precies één criterium per catalogus-BUDGET-scenario (01..24, geen gaten)', () => {
+  it('heeft precies één criterium per catalogus-BUDGET-scenario (01..25, geen gaten)', () => {
     const workflows = BUDGET_ACCEPTANCE.criteria.map((c) => c.workflow).sort()
     expect(workflows).toEqual(catalogBudgetWorkflows)
     expect(new Set(workflows).size).toBe(catalogBudgetWorkflows.length)
-    expect(workflows.length).toBe(24)
+    expect(workflows.length).toBe(25)
   })
 
   it('elk criterium heeft een geldige assertion.kind', () => {
@@ -61,7 +61,7 @@ describe('UAT Budget — acceptatiecriteria dekking', () => {
       .sort()
     const checkWorkflows = BUDGET_ENGINE_CHECKS.map((c) => c.workflow).sort()
     expect(checkWorkflows).toEqual(exactWorkflows)
-    expect(exactWorkflows.length).toBe(12)
+    expect(exactWorkflows.length).toBe(13)
   })
 
   it('markeert de niet-narekenbare/niet-exacte scenario\'s met de juiste kind', () => {

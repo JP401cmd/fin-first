@@ -10,7 +10,7 @@
 
 import { useEffect, useRef } from 'react'
 import { useDroppable } from '@dnd-kit/core'
-import { ArrowLeftRight, ArrowRight, Check, CheckCircle, MoreHorizontal, Sparkles, X } from 'lucide-react'
+import { ArrowLeftRight, ArrowRight, Check, CheckCircle, MoreHorizontal, Plus, Sparkles, X } from 'lucide-react'
 import { BudgetIcon, getTypeColors, formatCurrencyDecimals } from '@/components/app/budget-shared'
 import type { Budget } from '@/lib/budget-data'
 import type { QueueTx, AssignScope } from '@/lib/sleepmodus/queue'
@@ -581,12 +581,46 @@ function DropPill({ droppableId, icon, children, glow, onTap, label, dimmed }: {
   )
 }
 
-export function DropZones({ eigenRekeningActief, eigenGloeit, dimmed, onEigenTap, onSkipTap }: {
+/**
+ * Kleine +-knop tussen de twee pills: nieuw budget maken, met de transactie
+ * er direct in. Bewust smal (44×44) — dit is een uitweg, geen hoofdroute.
+ * Zelfde dashed/isOver-taal als DropPill zodat het één familie blijft.
+ *
+ * Bewust géén `data-slot-target` (anders dan DropPill): dat attribuut is puur
+ * de landingsplek voor de celebratie, en `zone:nieuw` wordt nooit een
+ * celebratie-doel — het opent de kaart en levert geen drop op.
+ */
+function NieuwBudgetKnop({ onTap, dimmed }: { onTap?: () => void; dimmed?: boolean }) {
+  const { setNodeRef, isOver } = useDroppable({ id: 'zone:nieuw' })
+  return (
+    <div ref={setNodeRef} className="w-11 shrink-0">
+      <button
+        type="button"
+        onClick={onTap}
+        disabled={!onTap}
+        aria-label="Nieuw budget toevoegen"
+        className={[
+          'flex min-h-[44px] w-11 shrink-0 items-center justify-center rounded-full',
+          'border-[1.5px] border-dashed border-[var(--border-md)] bg-[var(--subtle)]/70',
+          'text-[var(--ink-2)]',
+          'transition-[box-shadow,background-color,opacity] duration-200',
+          isOver ? 'bg-[var(--subtle)] shadow-[0_0_0_6px_rgba(26,25,22,0.08)] border-[var(--ink-3)]' : '',
+          dimmed ? 'opacity-30' : '',
+        ].join(' ')}
+      >
+        <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+      </button>
+    </div>
+  )
+}
+
+export function DropZones({ eigenRekeningActief, eigenGloeit, dimmed, onEigenTap, onSkipTap, onNieuwTap }: {
   eigenRekeningActief: boolean
   eigenGloeit: boolean
   dimmed: boolean
   onEigenTap?: () => void
   onSkipTap?: () => void
+  onNieuwTap?: () => void
 }) {
   return (
     <div className="flex gap-2.5 px-4">
@@ -602,6 +636,7 @@ export function DropZones({ eigenRekeningActief, eigenGloeit, dimmed, onEigenTap
           Eigen rekening
         </DropPill>
       )}
+      <NieuwBudgetKnop onTap={onNieuwTap} dimmed={dimmed} />
       <DropPill
         droppableId="zone:skip"
         icon={<ArrowRight className="h-3.5 w-3.5" />}

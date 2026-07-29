@@ -349,3 +349,88 @@ export function firstOfCurrentMonth(now: Date = new Date()): string {
   const m = String(now.getMonth() + 1).padStart(2, '0')
   return `${y}-${m}-01`
 }
+
+/** Invoer voor één los aan te maken budget (in-veld-kaart, bv. de Sleepmodus). */
+export type CreateBudgetInput = {
+  /** Client-gegenereerde temp-id ('tmp-…'); de RPC mapt 'm naar het echte UUID. */
+  clientId: string
+  /** Al getrimd en niet leeg. */
+  name: string
+  /** Bestaande parent-UUID, of null voor een hoofdbudget. */
+  parentId: string | null
+  budgetType: Budget['budget_type']
+  sortOrder: number
+  /** Maandbedrag > 0; wordt zowel `default_limit` als de amount-rij. */
+  monthlyAmount: number
+  /** 'YYYY-MM-01' — via `firstOfCurrentMonth()`. */
+  effectiveFrom: string
+  icon?: string
+}
+
+/** Budgettypes die als hoofdbudget per definitie essentieel zijn. */
+const ESSENTIAL_ROOT_TYPES: ReadonlySet<Budget['budget_type']> = new Set(['income', 'savings', 'debt'])
+
+/**
+ * Bouwt de plan-diff voor precies ÉÉN nieuw budget.
+ *
+ * BEWUST NIET via `computeBudgetPlanDiff`: dat is een volledige-boom-reconciler
+ * die `to_delete` afleidt uit "originals die niet in de draft zitten". Voeden met
+ * één losse rij zou dus de rest van de budgetboom verwijderen. Daarom bouwt deze
+ * functie elk veld letterlijk op en is `to_delete` hardcoded leeg — nooit
+ * afgeleid. Callers die de hele boom bewerken houden `computeBudgetPlanDiff`.
+ */
+export function buildCreateBudgetDiff(input: CreateBudgetInput): BudgetPlanDiff {
+  // Defensieve guards: deze diff gaat rechtstreeks naar de atomische
+  // save_budget_plan-RPC, dus onzin hoort hier te stranden, niet in Postgres.
+  if (!input.name.trim()) {
+    throw new Error('Budgetnaam mag niet leeg zijn')
+  }
+  if (!(input.monthlyAmount > 0)) {
+    throw new Error('Maandbedrag moet groter dan nul zijn')
+  }
+  if (input.budgetType === 'archive') {
+    throw new Error('Een nieuw budget kan niet van het type archief zijn')
+  }
+  if (!isTempId(input.clientId)) {
+    throw new Error('clientId moet een tijdelijke id zijn (tmp-…)')
+  }
+
+  const insert: BudgetInsert = {
+    client_id: input.clientId,
+    // Parent is altijd een bestaand budget (of geen) — nooit een andere insert
+    // uit dezelfde payload, dus parent_client_id blijft leeg.
+    parent_client_id: null,
+    parent_id: input.parentId,
+    name: input.name,
+    slug: null,
+    icon: input.icon ?? 'Circle',
+    description: null,
+    budget_type: input.budgetType,
+    default_limit: input.monthlyAmount,
+    is_essential: input.parentId === null && ESSENTIAL_ROOT_TYPES.has(input.budgetType),
+    sort_order: input.sortOrder,
+    interval: 'monthly',
+    rollover_type: 'reset',
+    priority_score: NEW_BUDGET_DETAIL_DEFAULTS.priorityScore,
+    limit_type: NEW_BUDGET_DETAIL_DEFAULTS.limitType,
+    alert_threshold: NEW_BUDGET_DETAIL_DEFAULTS.alertThreshold,
+    is_inflation_indexed: NEW_BUDGET_DETAIL_DEFAULTS.isInflationIndexed,
+    goal_type: NEW_BUDGET_DETAIL_DEFAULTS.goalType,
+    goal_amount: NEW_BUDGET_DETAIL_DEFAULTS.goalAmount,
+    goal_date: NEW_BUDGET_DETAIL_DEFAULTS.goalDate,
+    goal_frequency: NEW_BUDGET_DETAIL_DEFAULTS.goalFrequency,
+  }
+
+  return {
+    to_insert: [insert],
+    to_update: [],
+    to_delete: [],
+    amounts: [
+      {
+        budget_id: input.clientId,
+        effective_from: input.effectiveFrom,
+        amount: input.monthlyAmount,
+      },
+    ],
+  }
+}

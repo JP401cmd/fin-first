@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { unauthorized, serverError } from '@/lib/api/respond'
+import { unauthorized, badRequest, serverError } from '@/lib/api/respond'
 import type { BudgetPlanDiff } from '@/lib/budget-plan-diff'
 
 /**
@@ -21,11 +21,11 @@ export async function POST(request: NextRequest) {
   const diff = (await request.json()) as BudgetPlanDiff
 
   if (!diff || typeof diff !== 'object') {
-    return NextResponse.json({ error: 'Ongeldige payload' }, { status: 400 })
+    return badRequest('Ongeldige payload')
   }
   for (const key of ['to_insert', 'to_update', 'to_delete', 'amounts'] as const) {
     if (!Array.isArray(diff[key])) {
-      return NextResponse.json({ error: `${key} moet een array zijn` }, { status: 400 })
+      return badRequest(`${key} moet een array zijn`)
     }
   }
 
