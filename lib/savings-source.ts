@@ -6,13 +6,15 @@
  *
  *   - inkomen     = handmatig ? net_monthly_income × 12 : extrapolated jaarinkomen
  *   - spaarquote  = uitgaven-handmatig
- *                     ? (inkomen − (handmatige uitgaven − spaarbudget) + aflossing) / inkomen
+ *                     ? (inkomen − handmatige uitgaven) / inkomen
  *                     : savingsRate6m  (incl. spaarbudgetten + schuldaflossing)
  *   - baseAnnualSavings = inkomen × spaarquote%
  *
- * Beide paden volgen dus dezelfde definitie (spaarbudgetten + aflossing tellen als
- * sparen). Op het handmatige pad zijn die correcties optioneel (default 0) en
- * geldt de aanname dat het handmatige uitgavenbedrag de VOLLEDIGE uitstroom is.
+ * De spaarbudget-/aflossing-correctie hoort BIJ het transactie-pad, waar de
+ * uitgavensom rauw uit transacties komt. Handmatige invoer is al een keuze van de
+ * gebruiker (en bij een ingevoerd "eigen percentage" zelfs de bron waaruit de
+ * uitgaven worden terugberekend) — daar nog eens corrigeren telt hetzelfde
+ * spaargeld twee keer. Zie de toelichting bij `resolveSavingsSource`.
  *
  * Door precies dezelfde keuzeregel te gebruiken kan de prognose nooit
  * divergeren van wat de gebruiker op de cashflow-pagina ziet.
@@ -33,15 +35,16 @@ export interface SavingsSourceInput {
   /** Canonieke 6-maands spaarquote (%) incl. spaarbudgetten + aflossing-correctie. */
   savingsRate6m: number
   /**
-   * Maandelijkse schuldaflossing die als sparen telt (computeDebtAflossingMonthly).
-   * Optioneel; default 0. Wordt op het HANDMATIGE pad bij het spaardeel opgeteld,
-   * zodat dat pad dezelfde definitie volgt als het transactie-pad (savingsRate6m).
+   * @deprecated Genegeerd sinds 29 jul 2026. Maandelijkse schuldaflossing die als
+   * sparen telt (`computeDebtAflossingMonthly`). Werd op het HANDMATIGE pad bij
+   * het spaardeel opgeteld — bovenop een percentage dat de gebruiker zélf al als
+   * spaarquote had ingevoerd. Dat dubbeltelde: op productie werd 30 % → 37,2 %
+   * en 40 % → 55 %. Blijft alleen in de signatuur zodat call-sites niet breken.
    */
   monthlyDebtAflossing?: number
   /**
-   * Maandelijkse storting op spaarbudgetten (savings-type budgetten).
-   * Optioneel; default 0. Wordt op het HANDMATIGE pad van de uitgaven afgetrokken
-   * (telt als sparen, niet als uitgave), symmetrisch met het transactie-pad.
+   * @deprecated Genegeerd sinds 29 jul 2026 — zelfde dubbeltelling als
+   * `monthlyDebtAflossing`, zie daar.
    */
   monthlySavingsContribution?: number
 }
@@ -191,19 +194,21 @@ export function resolveSavingsSource(input: SavingsSourceInput): SavingsSource {
   const effectiveMonthlyIncome = effectiveAnnualIncome / 12
 
   const expensesManual = input.expensesSource === 'manual'
-  // Handmatig pad volgt dezelfde definitie als het transactie-pad: spaarbudgetten
-  // van de uitgaven af, schuldaflossing erbij. Aanname: het handmatige
-  // estimated_monthly_expenses is de VOLLEDIGE maandelijkse uitstroom (incl.
-  // hypotheeklast en spaarstortingen) — de cashflow-UI maakt dat expliciet.
-  // Met defaults 0 valt dit terug op de oude (inkomen − uitgaven)/inkomen.
-  const monthlyAflossing = input.monthlyDebtAflossing ?? 0
-  const monthlySavingsContribution = input.monthlySavingsContribution ?? 0
+  // HANDMATIG PAD = letterlijk wat het instellingenblok onderaan
+  // /overzicht/cashflow toont: (inkomen − uitgaven) / inkomen. Géén
+  // spaarbudget-/aflossing-correctie erbovenop.
+  //
+  // Waarom niet: die correcties hoorden bij het TRANSACTIE-pad, waar `expenses6m`
+  // een rúwe uitgavensom is waar spaarstortingen en aflossing ten onrechte in
+  // zitten. Op het handmatige pad is `estimated_monthly_expenses` géén rauwe som
+  // maar de uitkomst van een keuze van de gebruiker — sterker nog, wie in het
+  // spaarquote-sheet een "eigen percentage" invult, laat `recomputeTriple` de
+  // uitgaven juist ÚIT dat percentage terugrekenen. De correcties er dan weer
+  // bovenop leggen telt hetzelfde spaargeld twee keer: op productie werd een
+  // ingevoerde 30 % zo 37,2 % en een ingevoerde 40 % zelfs 55 %, en dat
+  // opgeblazen getal voedde zowel de gezondheidsscore als de FIRE-prognose.
   const effectiveSavingsRatePct = expensesManual
-    ? savingsRateFromAggregates(
-        effectiveMonthlyIncome,
-        input.estimatedMonthlyExpenses - monthlySavingsContribution,
-        monthlyAflossing,
-      )
+    ? savingsRateFromAggregates(effectiveMonthlyIncome, input.estimatedMonthlyExpenses, 0)
     : input.savingsRate6m
 
   const baseAnnualSavings = effectiveAnnualIncome * (effectiveSavingsRatePct / 100)

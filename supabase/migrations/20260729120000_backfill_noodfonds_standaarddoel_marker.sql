@@ -2,6 +2,14 @@
 -- Kaart "Noodfonds nakijken canoniek" — testronde 29 jul 2026, bevinding 1
 -- (BLOKKEREND), eigenaar-besluit optie (a).
 --
+-- ⚠️ DEELS ACHTERHAALD (eigenaar-besluit later op 29 jul 2026). De norm voor de
+-- noodbuffer is sindsdien ALTIJD 3 × netto maandsalaris; een noodfonds-DOEL
+-- stuurt de gezondheidsscore niet meer (zie lib/emergency-fund.ts). Deze
+-- migratie is daarmee niet langer nodig om de score te laten kloppen — het
+-- "GEVOLG NA TOEPASSEN" hieronder geldt niet meer. Ze blijft wél nuttig en
+-- veilig: de marker is hoe /toekomst/doelen hét noodfonds-doel herkent
+-- (isEmergencyGoal/pickEmergencyGoal). Draaien mag, hoeft niet.
+--
 -- PROBLEEM. De canonieke noodfonds-resolver (lib/emergency-fund.ts) detecteert
 -- het noodfonds-doel via één stabiele marker: goal_type='emergency_fund' OF
 -- goals.metadata.standaardDoel='noodfonds'. Die marker wordt sinds de vorige

@@ -1350,13 +1350,11 @@ export default function HorizonPage({
     // savingsRate6m + budgetCategories: server-canoniek (transactiedata wijzigt
     // niet client-side).
     const expensesForHealth = avgExpenses6m ?? effectiveInput.monthlyExpenses
-    // Noodfonds: gedeelde helper (liquide bezit / gem. maanduitgaven). Identiek
-    // aan de loader; vervangt de eerdere inline liquidAssets-som.
-    const emergencyMonths = computeEmergencyFundMonths(
-      initialData.assets ?? [],
-      initialData.unlinkedCash ?? 0,
-      expensesForHealth,
-    )
+    // Noodfonds: server-canoniek. De norm is 3 × netto maandsalaris en zowel het
+    // salaris als de liquide pot wijzigen niet onder de what-if-sliders (die
+    // raken totalAssets/totalDebts, niet je betaal-/spaarsaldo), dus hier valt
+    // niets te herrekenen — consume, don't recompute.
+    const emergencyMonths = healthScoreInput.emergencyFundMonths
     // Vrijheidsvoortgang: zelfde TELLER-grondslag als de loader en de hero —
     // FIRE-eligible netto vermogen (huis gefilterd via de housing-strategie)
     // via computeFreedomProgress (NIET de oude computeFreedomPercentage op het

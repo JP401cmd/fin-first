@@ -74,12 +74,25 @@ export const EXPENSE_RATE_ROLLING_MONTHS = 12
 // ── Noodfonds (emergency fund) ──────────────────────────────────
 
 /**
- * Doel-buffer noodfonds, uitgedrukt in maanden vaste lasten — 6× (Nibud-richtlijn
- * 3–6 maanden, bovengrens gekozen als comfortabele buffer). SINGLE SOURCE voor
- * zowel de afgeleide noodfonds-bundel (`lib/dashboard-data-loader.ts`) als de
- * standaard-doelen-kiezer (`lib/goals/standaard-doelen.ts`) én de onboarding-
- * prefill — zodat de widget, het aan te maken doel en de onboarding-tegel exact
- * hetzelfde bedrag tonen (geen drift tussen de vier oude noodfonds-definities).
+ * Doel-buffer noodfonds, uitgedrukt in maanden NETTO MAANDSALARIS — 3× (Nibud
+ * spreekt van 3–6 maanden; de ondergrens op de salaris-grondslag). Dit is sinds
+ * het eigenaar-besluit van 29 jul 2026 de norm waartegen de noodbuffer wordt
+ * beoordeeld: het salaris is het getal dat de gebruiker zelf invoert en herkent
+ * (instellingenblok onderaan /overzicht/cashflow), terwijl de gemeten
+ * maanduitgaven bij transactie-zware of net gestarte accounts wild schommelen.
+ *
+ * SINGLE SOURCE voor de noodfonds-bundel (`lib/emergency-fund.ts`), de
+ * gezondheidsscore-pijler en de noodfonds-widget.
+ */
+export const TARGET_EMERGENCY_SALARY_MONTHS = 3
+
+/**
+ * Terugval-buffer in maanden VASTE LASTEN — 6× (Nibud-bovengrens). Wordt alleen
+ * nog gebruikt wanneer er géén netto maandsalaris bekend is (nul inkomen), zodat
+ * de buffer-pijler dan niet degenereert. Blijft daarnaast de grondslag voor de
+ * standaard-doelen-kiezer (`lib/goals/standaard-doelen.ts`) en de onboarding-
+ * prefill: een noodfonds-DOEL in euro's mag de gebruiker vrij kiezen — het
+ * stuurt sinds 29 jul 2026 alleen de score-target niet meer.
  */
 export const TARGET_EMERGENCY_MONTHS = 6
 

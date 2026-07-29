@@ -26,7 +26,6 @@ import {
   type HealthScoreBudget,
   type HealthScoreTransaction,
 } from '@/lib/health-score-input'
-import { resolveEmergencyTargetMonths, type EmergencyGoalCandidate } from '@/lib/emergency-fund'
 import {
   parseHousingStrategy,
   deriveHousingContext,
@@ -47,7 +46,7 @@ import { resolveFireAssumptions, type FireAssumptionRow } from '@/lib/fire-assum
 import { loadPerspectiveDataServer } from '@/lib/household/perspective-loader-server'
 import type { Perspective } from '@/lib/household-data'
 import { resolveEffectiveIncomeExpenses } from './effective-financials'
-import { savingsRateFromAggregates } from './savings-source'
+import { resolveSavingsSource, savingsRateFromAggregates } from './savings-source'
 import { fetchLatestSnapshotsByMonth } from '@/lib/server-data/snapshot-aggregates'
 import {
   fetchTxMonthAggregate,
@@ -1026,21 +1025,27 @@ export const loadCoreData = cache(async function loadCoreData(
     (s, d) => s + Number((d as { monthly_payment?: number | string | null }).monthly_payment ?? 0),
     0,
   )
+  // EFFECTIEVE spaarquote: handmatige invoer wint over de 6-maands transactie-
+  // quote — hetzelfde percentage dat het instellingenblok onderaan
+  // /overzicht/cashflow toont. Zelfde helper als de dashboard-/horizon-loader.
+  const { effectiveSavingsRatePct: coreEffectiveSavingsRate } = resolveSavingsSource({
+    incomeSource: (profileResult.data as { income_source?: string | null } | null)?.income_source,
+    expensesSource: (profileResult.data as { expenses_source?: string | null } | null)?.expenses_source,
+    netMonthlyIncome: profileMonthlyIncome,
+    estimatedAnnualIncome: extrapolatedIncome,
+    estimatedMonthlyExpenses: profileMonthlyExpenses,
+    savingsRate6m: Math.round(computedSavingsRate6m * 10) / 10,
+  })
   const healthScoreInput: HealthScoreInput = buildHealthScoreInput(
     {
-      savingsRate6m: Math.round(computedSavingsRate6m * 10) / 10,
+      savingsRate6m: coreEffectiveSavingsRate,
       totalAssets: effectiveTotalAssets,
       totalDebts: effectiveTotalDebts,
       freedomPct: coreFreedomPct,
       avgMonthlyExpenses: effectiveMonthlyExpenses,
       netMonthlyIncome: extHalfYearIncome > 0 ? extHalfYearIncome / 6 : effectiveMonthlyIncome,
-      // Noodfonds-score-target uit het (optionele) noodfonds-doel; consistent met
-      // /overzicht + /toekomst + snapshots (geen doel → default 6).
-      emergencyTargetMonths: resolveEmergencyTargetMonths(
-        ((goalsResult.data ?? []) as (EmergencyGoalCandidate & { is_completed?: boolean })[])
-          .filter((g) => !g.is_completed),
-        effectiveMonthlyExpenses,
-      ),
+      // Noodbuffer-norm: 3 × netto maandsalaris (lib/emergency-fund.ts).
+      netMonthlySalary: effectiveMonthlyIncome,
     },
     {
       assets: (assetsResult.data ?? []) as HealthScoreAsset[],

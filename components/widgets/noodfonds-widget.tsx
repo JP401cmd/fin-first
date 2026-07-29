@@ -15,10 +15,15 @@ interface Props {
   href?: string
 }
 
-/** Color based on months covered: red <3m, orange 3-5m, green >=6m */
-function progressColor(months: number): { text: string; bar: string; bg: string } {
-  if (months >= 6) return { text: 'text-positive', bar: 'bg-positive', bg: 'bg-positive/10' }
-  if (months >= 3) return { text: 'text-[var(--ink-2)]', bar: 'bg-[var(--ink-3)]', bg: 'bg-[var(--subtle)]' }
+/**
+ * Kleur naar dekking, geschaald op de NORM (3 maandsalarissen): groen op/boven
+ * doel, neutraal vanaf de helft, rood daaronder. `target` meegegeven zodat de
+ * uitgaven-terugval (norm 6) dezelfde verhouding aanhoudt i.p.v. vaste getallen.
+ */
+function progressColor(months: number, target: number): { text: string; bar: string; bg: string } {
+  const norm = target > 0 ? target : 3
+  if (months >= norm) return { text: 'text-positive', bar: 'bg-positive', bg: 'bg-positive/10' }
+  if (months >= norm / 2) return { text: 'text-[var(--ink-2)]', bar: 'bg-[var(--ink-3)]', bg: 'bg-[var(--subtle)]' }
   return { text: 'text-negative', bar: 'bg-negative', bg: 'bg-negative/10' }
 }
 
@@ -26,20 +31,15 @@ export const NoodfondsWidget = memo(function NoodfondsWidget({ size, data, href 
   const { emergencyFund } = data
   const { currentAmount, targetAmount, monthsCovered, targetMonths, isComplete } = emergencyFund
   const pct = targetAmount > 0 ? Math.min((currentAmount / targetAmount) * 100, 100) : 0
-  const colors = progressColor(monthsCovered)
+  const colors = progressColor(monthsCovered, targetMonths)
 
-  // Maanduitgaven = de CANONIEKE bundelwaarde (consume, don't recompute).
-  // Voorheen stond hier `targetAmount / targetMonths`. Dat was exact zolang de
-  // target altijd 6× de maanduitgaven was, maar sinds een eigen noodfondsdoel de
-  // target stuurt is targetAmount een vrij euro-bedrag en targetMonths een
-  // afgeleide die op 0,5 mnd wordt afgerond — de reconstructie liep dan tot ~20%
-  // uit de pas met het bedrag dat de rest van de app "je maanduitgaven" noemt.
-  const monthlyExpenses = data.monthlyExpenses
-
-  // Bij een eigen doel is het BEDRAG primair en zijn de maanden het (afgeronde,
-  // begrensde) gevolg — dan is "N× maanduitgaven = doel" geen kloppende
-  // gelijkheid. Alleen bij de 6-maands-richtlijn geldt die vermenigvuldiging wél.
-  const targetFromGoal = emergencyFund.source === 'goal'
+  // Grondslag van de norm: 3 × netto maandsalaris, of (bij nul inkomen) de
+  // terugval op 6 × maanduitgaven. In BEIDE gevallen geldt
+  // `targetMonths × maandbasis == targetAmount` exact, dus de maandbasis is
+  // veilig te reconstrueren — dat was in het oude doel-gestuurde model niet zo.
+  const onSalaryBasis = emergencyFund.source !== 'expenses'
+  const monthlyBase = targetMonths > 0 ? targetAmount / targetMonths : data.monthlyExpenses
+  const basisLabel = onSalaryBasis ? 'netto maandsalaris' : 'maanduitgaven'
 
   // Freedom time framing
   // Canoniek 12-mnd rolling dagtarief uit de bundel (KRUIS-20); fallback voor mocks.
@@ -65,12 +65,20 @@ export const NoodfondsWidget = memo(function NoodfondsWidget({ size, data, href 
   const { ref: barRef, hasEntered } = useInViewAnimation({ duration: 700 })
   const barTransition = hasEntered ? 'width 700ms cubic-bezier(.22,1,.36,1)' : 'none'
 
+  // AFKAPPING BOVEN DE NORM. Zodra het doel gehaald is, stopt de teller: de
+  // balk staat vol en de kop leest "Doel bereikt" i.p.v. een doorgroeiend
+  // "11,0 / 3 maanden gedekt". Een buffer die vier keer de norm is, is geen
+  // vier keer betere buffer — het meerdere hoort te beleggen, niet te scoren.
+  // Het BEDRAG blijft wél volledig zichtbaar (regel eronder), en de runway
+  // vertelt hoe lang je er echt van rondkomt.
+  const doelBereiktKop = 'Doel bereikt'
+
   // ── Mini-size ────────────────────────────────────────────
   if (size === 'mini') {
     return (
       <WidgetShell module="kern" size="mini" kicker="Noodfonds" href={href}>
-        <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
-          {monthsCovered.toFixed(1)} mnd
+        <p className={`font-mono text-[15px] font-semibold tabular-nums leading-none truncate ${isComplete ? 'text-positive' : 'text-[var(--ink)]'}`}>
+          {isComplete ? 'Bereikt' : `${monthsCovered.toFixed(1)} mnd`}
         </p>
       </WidgetShell>
     )
@@ -81,7 +89,9 @@ export const NoodfondsWidget = memo(function NoodfondsWidget({ size, data, href 
     return (
       <WidgetShell module="kern" size={size} kicker="Noodfonds" href={href}>
         <p className={`font-mono text-lg font-semibold tabular-nums ${colors.text}`}>
-          {monthsCovered.toFixed(1)} <span className="text-xs text-[var(--ink-3)]">van {targetMonths} maanden</span>
+          {isComplete
+            ? doelBereiktKop
+            : <>{monthsCovered.toFixed(1)} <span className="text-xs text-[var(--ink-3)]">van {targetMonths} maanden</span></>}
         </p>
         {/* Mini progress bar */}
         <div ref={barRef} className="mt-2 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
@@ -91,7 +101,7 @@ export const NoodfondsWidget = memo(function NoodfondsWidget({ size, data, href 
           />
         </div>
         {isComplete && (
-          <p className="mt-1 text-[10px] font-medium text-positive">Compleet</p>
+          <p className="mt-1 text-[10px] text-[var(--ink-3)]">{targetMonths}× je {basisLabel}</p>
         )}
       </WidgetShell>
     )
@@ -107,7 +117,9 @@ export const NoodfondsWidget = memo(function NoodfondsWidget({ size, data, href 
             <ShieldCheck className={`h-4 w-4 ${colors.text}`} strokeWidth={1.5} />
           </div>
           <p className={`font-mono text-xl font-semibold tabular-nums ${isComplete ? 'text-positive' : 'text-[var(--ink)]'}`}>
-            {monthsCovered.toFixed(1)}<span className="text-sm text-[var(--ink-3)]"> / {targetMonths} mnd</span>
+            {isComplete
+              ? doelBereiktKop
+              : <>{monthsCovered.toFixed(1)}<span className="text-sm text-[var(--ink-3)]"> / {targetMonths} mnd</span></>}
           </p>
         </div>
 
@@ -140,7 +152,7 @@ export const NoodfondsWidget = memo(function NoodfondsWidget({ size, data, href 
 
   // ── Full: progress bar with milestones + bedrag + berekening + tips ──
   // Milestone positions on the bar
-  const milestones = [1, 3, 6].map(m => ({
+  const milestones = [1, 2, 3].map(m => ({
     months: m,
     pct: targetMonths > 0 ? Math.min((m / targetMonths) * 100, 100) : 0,
     reached: monthsCovered >= m,
@@ -158,18 +170,18 @@ export const NoodfondsWidget = memo(function NoodfondsWidget({ size, data, href 
         </div>
         <div className="min-w-0 flex-1">
           <p className={`font-mono text-2xl font-semibold tabular-nums ${isComplete ? 'text-positive' : 'text-[var(--ink)]'}`}>
-            {monthsCovered.toFixed(1)}<span className="text-base text-[var(--ink-3)]"> / {targetMonths} maanden gedekt</span>
+            {isComplete
+              ? doelBereiktKop
+              : <>{monthsCovered.toFixed(1)}<span className="text-base text-[var(--ink-3)]"> / {targetMonths} maanden gedekt</span></>}
           </p>
           {/* Grondslag van de dekking, zodat de vrijheidsregel onderaan (andere
-              noemer) niet als tegenspraak leest. */}
+              noemer) niet als tegenspraak leest. Boven de norm benoemt dezelfde
+              regel wat er bereikt is, i.p.v. een doorgroeiende teller. */}
           <p className="mt-0.5 text-[11px] text-[var(--ink-4)]">
-            van je maanduitgaven
+            {isComplete
+              ? `${targetMonths}× je ${basisLabel} staat opzij`
+              : `van je ${basisLabel}`}
           </p>
-          {isComplete && (
-            <p className="mt-0.5 text-sm font-medium text-positive">
-              Noodfonds bereikt!
-            </p>
-          )}
         </div>
       </div>
 
@@ -207,13 +219,12 @@ export const NoodfondsWidget = memo(function NoodfondsWidget({ size, data, href 
       {/* Calculation explanation */}
       <div className="mt-3 rounded-lg bg-[var(--subtle)] px-3 py-2 text-[11px] text-[var(--ink-3)]">
         <p className="font-medium text-[var(--ink-2)]">Berekening</p>
-        {targetFromGoal ? (
+        <p className="mt-0.5">
+          {targetMonths}&times; <MaskedAmount value={monthlyBase} tone="kern" /> {basisLabel} = <MaskedAmount value={targetAmount} tone="kern" /> doel
+        </p>
+        {emergencyFund.runwayMonths != null && emergencyFund.runwayMonths > 0 && (
           <p className="mt-0.5">
-            Jouw noodfondsdoel <MaskedAmount value={targetAmount} tone="kern" /> &asymp; {targetMonths}&times; je maanduitgaven van <MaskedAmount value={monthlyExpenses} tone="kern" />
-          </p>
-        ) : (
-          <p className="mt-0.5">
-            {targetMonths}&times; <MaskedAmount value={monthlyExpenses} tone="kern" /> maanduitgaven = <MaskedAmount value={targetAmount} tone="kern" /> doel
+            Daarmee kom je {emergencyFund.runwayMonths.toFixed(1)} maanden rond van je vaste lasten
           </p>
         )}
         {!isComplete && remaining > 0 && (
@@ -242,7 +253,7 @@ export const NoodfondsWidget = memo(function NoodfondsWidget({ size, data, href 
             <ul className="mt-0.5 space-y-0.5 list-none">
               <li>Automatiseer een vaste storting per maand</li>
               <li>Zet onverwachte meevallers direct opzij</li>
-              <li>Begin met 1 maand, bouw stap voor stap op</li>
+              <li>Begin met één maandsalaris, bouw stap voor stap op</li>
             </ul>
           </div>
         </div>

@@ -151,19 +151,32 @@ describe('computeLargestAssetTypeShare — percentage-berekening', () => {
 // ── computeEmergencyFundMonths ────────────────────────────────────────────
 
 describe('computeEmergencyFundMonths', () => {
-  it('liquid assets (savings + checking + cash) + unlinked ÷ avg expenses', () => {
-    const assets: HealthScoreAsset[] = [
-      { asset_type: 'savings', current_value: 10_000 },
-      { asset_type: 'checking', current_value: 5_000 },
-      { asset_type: 'investment', current_value: 100_000 }, // niet liquide
-    ]
-    // liquide: 10k + 5k + 5k unlinked = 20k ÷ 2500 = 8 maanden
-    expect(computeEmergencyFundMonths(assets, 5_000, 2_500)).toBeCloseTo(8, 5)
+  const assets: HealthScoreAsset[] = [
+    { asset_type: 'savings', current_value: 10_000 },
+    { asset_type: 'checking', current_value: 5_000 },
+    { asset_type: 'investment', current_value: 100_000 }, // niet liquide
+  ]
+
+  it('liquide pot (savings + checking + cash) + unlinked ÷ netto maandsalaris', () => {
+    // liquide: 10k + 5k + 5k unlinked = 20k ÷ 4.000 salaris = 5 maandsalarissen
+    expect(computeEmergencyFundMonths(assets, 5_000, 4_000, 2_500)).toBeCloseTo(5, 5)
   })
 
-  it('avgMonthlyExpenses = 0 → 0 maanden (geen divide-by-zero)', () => {
-    const assets: HealthScoreAsset[] = [{ asset_type: 'savings', current_value: 10_000 }]
-    expect(computeEmergencyFundMonths(assets, 0, 0)).toBe(0)
+  it('de maanduitgaven raken de meting niet zolang er salaris is', () => {
+    expect(computeEmergencyFundMonths(assets, 5_000, 4_000, 2_500)).toBeCloseTo(
+      computeEmergencyFundMonths(assets, 5_000, 4_000, 900),
+      10,
+    )
+  })
+
+  it('geen salaris → terugval op de maanduitgaven', () => {
+    // 20k ÷ 2.500 = 8 maanden uitgaven (het oude gedrag, nu enkel de terugval)
+    expect(computeEmergencyFundMonths(assets, 5_000, 0, 2_500)).toBeCloseTo(8, 5)
+  })
+
+  it('geen salaris én geen uitgaven → 0 maanden (geen divide-by-zero)', () => {
+    const only: HealthScoreAsset[] = [{ asset_type: 'savings', current_value: 10_000 }]
+    expect(computeEmergencyFundMonths(only, 0, 0, 0)).toBe(0)
   })
 })
 
@@ -223,6 +236,7 @@ describe('buildHealthScoreInput — doorgifte v2-velden', () => {
     freedomPct: 30,
     avgMonthlyExpenses: 2_000,
     netMonthlyIncome: 4_200,
+    netMonthlySalary: 4_200,
   }
   const rows = {
     assets,

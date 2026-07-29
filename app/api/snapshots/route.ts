@@ -10,12 +10,12 @@ import {
   type HealthScoreTransaction,
 } from '@/lib/health-score-input'
 import { resolveFireParams } from '@/lib/fire-params'
-import { resolveEmergencyTargetMonths, type EmergencyGoalCandidate } from '@/lib/emergency-fund'
 import { computeSovereigntyLevel } from '@/lib/feature-phases'
 import { captureBalanceSnapshots } from '@/lib/balance-snapshot'
 import { logError } from '@/lib/log-error'
 import { type Debt, computeRenteAflossingsSplit } from '@/lib/debt-data'
-import { savingsRateFromAggregates } from '@/lib/savings-source'
+import { resolveSavingsSource, savingsRateFromAggregates } from '@/lib/savings-source'
+import { resolveEffectiveIncomeExpenses } from '@/lib/effective-financials'
 import { localMonthBounds, localMonthStart } from '@/lib/month-range'
 import {
   weightedAssetTotal,
@@ -140,7 +140,6 @@ export async function POST() {
     budgetsResult,
     monthTxResult,
     bankAccountsResult,
-    goalsResult,
   ] = await Promise.all([
     supabase
       .from('assets')
@@ -168,7 +167,10 @@ export async function POST() {
       .lt('date', monthEnd),
     supabase
       .from('profiles')
-      .select('date_of_birth, expected_return, inflation_rate, household_type')
+      // net_monthly_income/estimated_monthly_expenses + de bron-vlaggen: nodig
+      // voor de EFFECTIEVE spaarquote (handmatig wint) en de noodbuffer-norm
+      // (3 × netto maandsalaris) — dezelfde grondslag als de live loader.
+      .select('date_of_birth, expected_return, inflation_rate, household_type, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source')
       .eq('id', user.id)
       .single(),
     // Alle budgetten (alle types, parents + children) — must-expenses + health.
@@ -190,12 +192,6 @@ export async function POST() {
       .eq('user_id', user.id)
       .eq('is_active', true)
       .is('linked_asset_id', null),
-    // Actieve doelen → noodfonds-target voor de score (goal-losgekoppeld-fix).
-    supabase
-      .from('goals')
-      .select('goal_type, target_value, metadata')
-      .eq('user_id', user.id)
-      .eq('is_completed', false),
   ])
 
   if (assetsResult.error) {
@@ -286,16 +282,26 @@ export async function POST() {
   // health-score-input als de gepersisteerde savings_rate-kolom (zie hieronder),
   // zodat de spaarquote-widget-historie op DE spaarquote draait en niet op het
   // vlakke FIRE-tempo (fireProjection.savingsRate).
-  const savingsRate6m = savingsRateFromAggregates(monthlyIncome, monthlyExpenses, debtAflossing6m)
-  // DSTI-teller: Σ maandlasten over de actieve schulden (select bevat monthly_payment).
-  const debtMonthlyPayments = debts.reduce((s, d) => s + Number(d.monthly_payment ?? 0), 0)
-  // Noodfonds-target uit het (optionele) noodfonds-doel; geen doel → default 6
-  // (liquide-tak). Houdt de opgeslagen resilience_score consistent met de live
-  // score op /overzicht. Bij een goal-load-fout → [] → default 6.
-  const emergencyTargetMonths = resolveEmergencyTargetMonths(
-    (goalsResult.data ?? []) as EmergencyGoalCandidate[],
+  const savingsRateFromTx = savingsRateFromAggregates(monthlyIncome, monthlyExpenses, debtAflossing6m)
+  // EFFECTIEVE inkomsten/uitgaven en spaarquote: handmatige invoer wint over de
+  // transactiemeting, exact zoals de live loader en het instellingenblok
+  // onderaan /overzicht/cashflow. Zonder dit dreef de opgeslagen historie weg
+  // van het getal dat de gebruiker ziet.
+  const { income: effectiveMonthlyIncome } = resolveEffectiveIncomeExpenses(
+    profileResult.data ?? {},
+    monthlyIncome,
     monthlyExpenses,
   )
+  const { effectiveSavingsRatePct: savingsRate6m } = resolveSavingsSource({
+    incomeSource: profileResult.data?.income_source,
+    expensesSource: profileResult.data?.expenses_source,
+    netMonthlyIncome: Number(profileResult.data?.net_monthly_income ?? 0),
+    estimatedAnnualIncome: monthlyIncome * 12,
+    estimatedMonthlyExpenses: Number(profileResult.data?.estimated_monthly_expenses ?? 0),
+    savingsRate6m: savingsRateFromTx,
+  })
+  // DSTI-teller: Σ maandlasten over de actieve schulden (select bevat monthly_payment).
+  const debtMonthlyPayments = debts.reduce((s, d) => s + Number(d.monthly_payment ?? 0), 0)
   const healthScore = computeHealthScoreFromInputs(
     buildHealthScoreInput(
       {
@@ -304,9 +310,10 @@ export async function POST() {
         totalDebts,
         freedomPct: freedomPercentage,
         avgMonthlyExpenses: monthlyExpenses,
-        // Zelfde inkomensbron als savingsRate6m (income/6) — DSTI-noemer.
+        // Zelfde inkomensbron als de transactiequote (income/6) — DSTI-noemer.
         netMonthlyIncome: monthlyIncome,
-        emergencyTargetMonths,
+        // Noodbuffer-norm: 3 × netto maandsalaris (lib/emergency-fund.ts).
+        netMonthlySalary: effectiveMonthlyIncome,
       },
       {
         assets: assets as HealthScoreAsset[],

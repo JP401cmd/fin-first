@@ -34,15 +34,17 @@ global.ResizeObserver = MockResizeObserver as unknown as typeof ResizeObserver
 // bewust een andere NOEMER. Beide worden hier uit de ECHTE motor gehaald, zodat
 // de test weergave-drift vangt (verkeerd veld / eigen som in de widget).
 const LIQUID_POT = 18_600
-/** Noemer 1 — effectieve maanduitgaven (huidige maand of profielschatting). */
+/** Noemer van de NORM — netto maandsalaris (3× is het doel). */
+const NETTO_SALARIS = 6_200
+/** Noemer van de runway — effectieve maanduitgaven. */
 const MAAND_UITGAVEN = 3_100
-/** Noemer 2 — 12-mnd rolling uitgavenniveau (canoniek, uit de bundel). */
+/** Noemer van de vrijheidstijd — 12-mnd rolling uitgavenniveau (uit de bundel). */
 const ROLLING_MAAND_UITGAVEN = 9_300
 
 const RESOLVED = resolveEmergencyFund({
   liquidPot: LIQUID_POT,
   effectiveMonthlyExpenses: MAAND_UITGAVEN,
-  goal: null,
+  netMonthlyIncome: NETTO_SALARIS,
 })
 
 const ROLLING_DAGTARIEF = dailyExpenseRate(ROLLING_MAAND_UITGAVEN)
@@ -63,9 +65,37 @@ function makeData(overrides: Partial<DashboardData> = {}): DashboardData {
       monthsCovered: Math.round(RESOLVED.monthsCovered * 10) / 10,
       targetMonths: Math.round(RESOLVED.targetMonths * 2) / 2,
       isComplete: RESOLVED.monthsCovered >= RESOLVED.targetMonths,
+      runwayMonths: Math.round(RESOLVED.runwayMonths * 10) / 10,
+      source: RESOLVED.source,
     },
     ...overrides,
   }
+}
+
+/**
+ * Tweede scenario, ONDER de norm (9.300 pot → 1,5 van 3). Nodig omdat de widget
+ * boven de norm afkapt op "Doel bereikt": assertions over het getoonde CIJFER
+ * moeten op een niet-bereikt scenario draaien, anders toetsen ze niets meer.
+ */
+const ONDER_NORM = resolveEmergencyFund({
+  liquidPot: 9_300,
+  effectiveMonthlyExpenses: MAAND_UITGAVEN,
+  netMonthlyIncome: NETTO_SALARIS,
+})
+
+function makeOnderNorm(overrides: Partial<DashboardData> = {}): DashboardData {
+  return makeData({
+    emergencyFund: {
+      currentAmount: ONDER_NORM.currentAmount,
+      targetAmount: ONDER_NORM.targetAmount,
+      monthsCovered: Math.round(ONDER_NORM.monthsCovered * 10) / 10,
+      targetMonths: Math.round(ONDER_NORM.targetMonths * 2) / 2,
+      isComplete: ONDER_NORM.monthsCovered >= ONDER_NORM.targetMonths,
+      runwayMonths: Math.round(ONDER_NORM.runwayMonths * 10) / 10,
+      source: ONDER_NORM.source,
+    },
+    ...overrides,
+  })
 }
 
 /** nbsp uit formatCurrency normaliseren (zie ui-ux-kwaliteitstoets). */
@@ -74,15 +104,50 @@ function text(container: HTMLElement): string {
 }
 
 describe('NoodfondsWidget — pint de getoonde cijfers op de canonieke motor', () => {
-  it('sanity: de motor levert precies de gemelde situatie (6/6 gedekt naast ~2 mnd vrijheid)', () => {
-    expect(RESOLVED.monthsCovered).toBe(6)
-    expect(RESOLVED.targetMonths).toBe(6)
+  it('sanity: de motor levert precies de gemelde situatie (3/3 gedekt naast ~2 mnd vrijheid)', () => {
+    expect(RESOLVED.monthsCovered).toBe(3)
+    expect(RESOLVED.targetMonths).toBe(3)
+    expect(RESOLVED.runwayMonths).toBe(6)
     expect(VERWACHTE_VRIJHEID).toBe('2m')
   })
 
-  it('full — dekking komt uit emergencyFund (resolver), niet uit een eigen pot ÷ uitgaven-som', () => {
+  it('full — dekking komt uit emergencyFund (resolver), niet uit een eigen pot ÷ salaris-som', () => {
+    const { container } = render(<NoodfondsWidget size="full" data={makeOnderNorm()} />)
+    expect(text(container)).toContain('1.5 / 3 maanden gedekt')
+  })
+
+  it('full — boven de norm kapt de teller af op "Doel bereikt"', () => {
+    // 18.600 is 3,0× de norm van 6.200 — precies bereikt. Een pot van 4× de norm
+    // zou vroeger als "12.0 / 3 maanden gedekt" doorgroeien; dat leest als een
+    // score die blijft stijgen terwijl de buffer af is.
     const { container } = render(<NoodfondsWidget size="full" data={makeData()} />)
-    expect(text(container)).toContain('6.0 / 6 maanden gedekt')
+    const t = text(container)
+    expect(t).toContain('Doel bereikt')
+    expect(t).not.toContain('maanden gedekt')
+    // Het BEDRAG blijft wél volledig zichtbaar.
+    expect(t).toContain('18.600')
+  })
+
+  it('full — ver boven de norm groeit de teller niet door', () => {
+    const ver = resolveEmergencyFund({
+      liquidPot: 55_001, effectiveMonthlyExpenses: 3_500, netMonthlyIncome: 5_000,
+    })
+    const { container } = render(
+      <NoodfondsWidget size="full" data={makeData({
+        emergencyFund: {
+          currentAmount: ver.currentAmount,
+          targetAmount: ver.targetAmount,
+          monthsCovered: Math.round(ver.monthsCovered * 10) / 10,
+          targetMonths: Math.round(ver.targetMonths * 2) / 2,
+          isComplete: ver.monthsCovered >= ver.targetMonths,
+          runwayMonths: Math.round(ver.runwayMonths * 10) / 10,
+          source: ver.source,
+        },
+      })} />,
+    )
+    const t = text(container)
+    expect(t).toContain('Doel bereikt')
+    expect(t).not.toContain('11.0')
   })
 
   it('full — vrijheidstijd komt uit data.dailyExpenseRate (12-mnd rolling), niet uit monthlyExpenses', () => {
@@ -98,11 +163,11 @@ describe('NoodfondsWidget — pint de getoonde cijfers op de canonieke motor', (
     expect(t).not.toContain('6m vrijheid')
   })
 
-  it('full — benoemt beide grondslagen expliciet, zodat 6 gedekt naast 2 mnd vrijheid geen tegenspraak leest', () => {
-    const { container } = render(<NoodfondsWidget size="full" data={makeData()} />)
+  it('full — benoemt beide grondslagen expliciet, zodat 3 gedekt naast 2 mnd vrijheid geen tegenspraak leest', () => {
+    const { container } = render(<NoodfondsWidget size="full" data={makeOnderNorm()} />)
     const t = text(container)
     // Grondslag van de dekking …
-    expect(t).toContain('van je maanduitgaven')
+    expect(t).toContain('van je netto maandsalaris')
     // … en die van de vrijheidstijd, mét het canonieke rolling maandbedrag.
     expect(t).toContain('Vrijheidstijd rekent met je gemiddelde uitgaven over 12 maanden')
     expect(t).toContain('9.300')
@@ -113,104 +178,72 @@ describe('NoodfondsWidget — pint de getoonde cijfers op de canonieke motor', (
   it('half — toont de vrijheidsregel mét grondslag, ook wanneer het doel bereikt is', () => {
     const { container } = render(<NoodfondsWidget size="half" data={makeData()} />)
     const t = text(container)
-    expect(t).toContain('6.0')
+    expect(t).toContain('Doel bereikt')
     expect(t).toContain(`${VERWACHTE_VRIJHEID} vrijheid op je gemiddelde uitgaven`)
     expect(t).not.toContain('vrijheid opgebouwd als vangnet')
   })
 
   it('consume, don-t-recompute — een afwijkende data.monthlyExpenses verandert de dekking niet', () => {
     const { container } = render(
-      <NoodfondsWidget size="full" data={makeData({ monthlyExpenses: 500 })} />,
+      <NoodfondsWidget size="full" data={makeOnderNorm({ monthlyExpenses: 500 })} />,
     )
     const t = text(container)
-    // Een eigen som (18.600 ÷ 500) zou 37,2 maanden tonen.
-    expect(t).toContain('6.0 / 6 maanden gedekt')
-    expect(t).not.toContain('37.2')
+    // Een eigen som (9.300 ÷ 500) zou 18,6 maanden tonen.
+    expect(t).toContain('1.5 / 3 maanden gedekt')
+    expect(t).not.toContain('18.6 /')
   })
 
-  // ── Berekening-regel: maanduitgaven uit de bundel, niet gereconstrueerd ──────
-  // Vroeger stond hier `targetAmount / targetMonths`. Zodra een eigen €-doel de
-  // target stuurt (en targetMonths op 0,5 mnd wordt afgerond) liep die
-  // reconstructie uit de pas met de canonieke maanduitgaven.
+  // ── Berekening-regel: de norm is een sluitende gelijkheid ───────────────────
+  // Sinds de norm 3 × netto maandsalaris is, geldt targetMonths × maandbasis ==
+  // targetAmount altijd exact — de widget mag de maandbasis dus reconstrueren.
+  // (In het oude doel-gestuurde model was targetAmount een vrij €-bedrag en
+  // targetMonths een op 0,5 afgeronde afgeleide; dáár liep die reconstructie
+  // scheef, vandaar de eerdere data.monthlyExpenses-uitzondering.)
 
-  it('berekening — toont de canonieke data.monthlyExpenses, niet targetAmount ÷ targetMonths', () => {
-    // €-doel van 10.500 bij 3.100 maanduitgaven → 3,387… → afgerond 3,5 mnd.
-    // De reconstructie zou 10.500 / 3,5 = 3.000 tonen i.p.v. de echte 3.100.
-    const resolved = resolveEmergencyFund({
-      liquidPot: LIQUID_POT,
-      effectiveMonthlyExpenses: MAAND_UITGAVEN,
-      goal: { targetAmount: 10_500 },
-    })
-    const data = makeData({
-      emergencyFund: {
-        currentAmount: resolved.currentAmount,
-        targetAmount: resolved.targetAmount,
-        monthsCovered: Math.round(resolved.monthsCovered * 10) / 10,
-        targetMonths: Math.round(resolved.targetMonths * 2) / 2,
-        isComplete: resolved.monthsCovered >= resolved.targetMonths,
-        source: resolved.source,
-      },
-    })
-    const { container } = render(<NoodfondsWidget size="full" data={data} />)
+  it('berekening — toont de salaris-grondslag als sluitende gelijkheid', () => {
+    const { container } = render(<NoodfondsWidget size="full" data={makeData()} />)
     const t = text(container)
-    expect(t).toContain('3.100') // canonieke maanduitgaven uit de bundel
-    expect(t).not.toContain('3.000') // de oude reconstructie
-  })
-
-  it('berekening — een eigen doel wordt niet als sluitende vermenigvuldiging gepresenteerd', () => {
-    const resolved = resolveEmergencyFund({
-      liquidPot: LIQUID_POT,
-      effectiveMonthlyExpenses: MAAND_UITGAVEN,
-      goal: { targetAmount: 10_500 },
-    })
-    const data = makeData({
-      emergencyFund: {
-        currentAmount: resolved.currentAmount,
-        targetAmount: resolved.targetAmount,
-        monthsCovered: Math.round(resolved.monthsCovered * 10) / 10,
-        targetMonths: Math.round(resolved.targetMonths * 2) / 2,
-        isComplete: resolved.monthsCovered >= resolved.targetMonths,
-        source: resolved.source,
-      },
-    })
-    const { container } = render(<NoodfondsWidget size="full" data={data} />)
-    const t = text(container)
-    // Bij een eigen doel is het BEDRAG primair — benoemd als zodanig, met ≈.
-    expect(t).toContain('Jouw noodfondsdoel')
-    expect(t).toContain('≈')
-    expect(t).not.toContain('maanduitgaven = ')
-  })
-
-  it('berekening — zonder doel blijft de richtlijn een sluitende gelijkheid (6× uitgaven)', () => {
-    const { container } = render(
-      <NoodfondsWidget size="full" data={makeData({ emergencyFund: { ...makeData().emergencyFund, source: 'liquid' } })} />,
-    )
-    const t = text(container)
-    expect(t).toContain('maanduitgaven = ')
-    expect(t).not.toContain('Jouw noodfondsdoel')
-    // 6 × 3.100 = 18.600 — beide getallen staan er, de gelijkheid klopt.
-    expect(t).toContain('3.100')
+    expect(t).toContain('netto maandsalaris')
+    // 3 × 6.200 = 18.600 — beide getallen staan er, de gelijkheid klopt.
+    expect(t).toContain('6.200')
     expect(t).toContain('18.600')
   })
 
-  it('niet-bereikt scenario — dekking en vrijheidstijd volgen beide hun eigen canonieke bron', () => {
-    const halfVol = resolveEmergencyFund({
+  it('berekening — vermeldt de runway apart, zodat "hoe lang kom ik rond" waar blijft', () => {
+    const { container } = render(<NoodfondsWidget size="full" data={makeData()} />)
+    expect(text(container)).toContain('6.0 maanden rond van je vaste lasten')
+  })
+
+  it('terugval zonder salaris — norm en label schakelen naar de maanduitgaven', () => {
+    // Bewust ONDER de norm (9.300 / 3.100 = 3,0 van 6), anders kapt de widget af
+    // op "Doel bereikt" en toetst deze test het label niet meer.
+    const zonderSalaris = resolveEmergencyFund({
       liquidPot: 9_300,
       effectiveMonthlyExpenses: MAAND_UITGAVEN,
-      goal: null,
+      netMonthlyIncome: 0,
     })
     const data = makeData({
       emergencyFund: {
-        currentAmount: halfVol.currentAmount,
-        targetAmount: halfVol.targetAmount,
-        monthsCovered: Math.round(halfVol.monthsCovered * 10) / 10,
-        targetMonths: Math.round(halfVol.targetMonths * 2) / 2,
-        isComplete: halfVol.monthsCovered >= halfVol.targetMonths,
+        currentAmount: zonderSalaris.currentAmount,
+        targetAmount: zonderSalaris.targetAmount,
+        monthsCovered: Math.round(zonderSalaris.monthsCovered * 10) / 10,
+        targetMonths: Math.round(zonderSalaris.targetMonths * 2) / 2,
+        isComplete: zonderSalaris.monthsCovered >= zonderSalaris.targetMonths,
+        runwayMonths: Math.round(zonderSalaris.runwayMonths * 10) / 10,
+        source: zonderSalaris.source,
       },
     })
     const { container } = render(<NoodfondsWidget size="full" data={data} />)
     const t = text(container)
     expect(t).toContain('3.0 / 6 maanden gedekt')
+    expect(t).toContain('van je maanduitgaven')
+    expect(t).not.toContain('netto maandsalaris')
+  })
+
+  it('niet-bereikt scenario — dekking en vrijheidstijd volgen beide hun eigen canonieke bron', () => {
+    const { container } = render(<NoodfondsWidget size="full" data={makeOnderNorm()} />)
+    const t = text(container)
+    expect(t).toContain('1.5 / 3 maanden gedekt')
     const verwacht = formatFreedomTimeString(
       calculateFreedomTime(9_300, ROLLING_DAGTARIEF),
       'short',

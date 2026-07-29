@@ -129,20 +129,26 @@ export interface UpcomingEvent {
 export interface EmergencyFund {
   currentAmount: number
   targetAmount: number
+  /** Dekking in maanden op de NORM-grondslag (salaris, of uitgaven-terugval). */
   monthsCovered: number
+  /** Norm in maanden: 3 op de salaris-grondslag, 6 op de uitgaven-terugval. */
   targetMonths: number
   isComplete: boolean
   /**
-   * Herkomst van de TARGET, uit `resolveEmergencyFund` (lib/emergency-fund.ts):
-   * 'goal' = een noodfondsdoel van de gebruiker stuurt 'm, 'liquid' = geen doel
-   * → de richtlijn van 6 maanden. De widget heeft dit nodig om de berekening
-   * eerlijk te tonen: bij 'liquid' geldt targetMonths × maanduitgaven ==
-   * targetAmount, bij 'goal' is het doelBEDRAG primair en zijn de maanden een
-   * (afgerond, begrensd) gevolg — dan is die vermenigvuldiging géén geldige
-   * gelijkheid meer. Optioneel zodat test-/mockbundels 'm mogen weglaten;
-   * ontbreekt hij, dan lezen consumers dat als 'liquid'.
+   * Dekking in maanden VASTE LASTEN — "hoe lang kun je hiervan rondkomen".
+   * Bewust apart van `monthsCovered`: de norm meet tegen het salaris, maar deze
+   * zin moet waar blijven. Optioneel zodat test-/mockbundels 'm mogen weglaten.
    */
-  source?: 'goal' | 'liquid'
+  runwayMonths?: number
+  /**
+   * Grondslag van de NORM, uit `resolveEmergencyFund` (lib/emergency-fund.ts):
+   * 'salary' = 3 × netto maandsalaris (de norm sinds 29 jul 2026), 'expenses' =
+   * terugval op 6 × maanduitgaven wanneer er geen salaris bekend is. In beide
+   * gevallen geldt `targetMonths × maandbasis == targetAmount`. Optioneel zodat
+   * test-/mockbundels 'm mogen weglaten; ontbreekt hij, dan lezen consumers dat
+   * als 'salary'.
+   */
+  source?: 'salary' | 'expenses'
 }
 
 export interface FavoriteHolding {

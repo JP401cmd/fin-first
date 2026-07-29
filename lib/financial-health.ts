@@ -24,7 +24,7 @@
 
 import type { DashboardData } from '@/lib/types/dashboard'
 import type { ModuleId } from '@/lib/module-registry'
-import { DEFAULT_EMERGENCY_TARGET_MONTHS, emergencyScoreTargetMonths } from '@/lib/emergency-fund'
+import { TARGET_EMERGENCY_SALARY_MONTHS, emergencyScoreTargetMonths } from '@/lib/emergency-fund'
 
 // ── Lightweight input for server-side / snapshot usage ───────
 // Allows computing the health score without a full DashboardData bundle.
@@ -33,11 +33,15 @@ export interface HealthScoreInput {
   savingsRate6m: number
   totalAssets: number
   totalDebts: number
+  /**
+   * Buffer-dekking in maanden op de NORM-grondslag: liquide pot ÷ netto
+   * maandsalaris (of ÷ maanduitgaven wanneer er geen salaris bekend is).
+   */
   emergencyFundMonths: number
   /**
-   * DISPLAY-target voor het noodfonds in maanden (gebruikerskeuze via een
-   * noodfonds-doel, anders de default 6). De score-curve floort deze intern op
-   * MIN_EMERGENCY_SCORE_TARGET_MONTHS (anti-gaming). Afwezig → default 6.
+   * Norm voor de noodbuffer in maanden: 3 op de salaris-grondslag, 6 op de
+   * uitgaven-terugval. Komt uit `emergencyTargetBasis` — altijd dezelfde
+   * grondslag als `emergencyFundMonths`. Afwezig → 3.
    */
   emergencyTargetMonths?: number
   freedomPct: number
@@ -198,19 +202,19 @@ export function scoreDSTI(dstiPercent: number): number {
 }
 
 /**
- * Noodfonds-dekking: months of expenses covered, geschaald tegen de gekozen
- * target. Vorm blijft: 100 bij monthsCovered ≥ target, ~60 bij target/2, 0 bij 0.
- * Bij de default target (6) is dit exact de oude curve (0→0, 3→60, 6→100).
+ * Noodfonds-dekking geschaald tegen de norm. Vorm: 100 bij monthsCovered ≥
+ * target, ~60 bij target/2, 0 bij 0. Op de salaris-norm (3) betekent dat:
+ * 3 maandsalarissen → 100, 1,5 → 60, 0 → 0.
  *
- * ANTI-GAMING: de score-curve gebruikt `emergencyScoreTargetMonths(targetMonths)`
- * — de gekozen target met een vloer van MIN_EMERGENCY_SCORE_TARGET_MONTHS (3 mnd).
- * Een gebruiker die een 1-maands-buffer als doel kiest krijgt dus GEEN 100% bij
- * één maand dekking. De DISPLAY-target (emergencyFund.targetMonths) mag wél de
- * gebruikerskeuze zijn; alleen deze score-curve floort.
+ * ANTI-GAMING: de curve gebruikt `emergencyScoreTargetMonths(targetMonths)`, die
+ * de target op MIN_EMERGENCY_SCORE_TARGET_MONTHS (3) floort en op
+ * MAX_EMERGENCY_DISPLAY_TARGET_MONTHS (24) plafonneert. Sinds de norm zelf 3 is,
+ * is de vloer een no-op op het salaris-pad; hij blijft de uitgaven-terugval en
+ * eventuele toekomstige gebruikerskeuzes begrenzen.
  */
 function scoreEmergencyFund(
   monthsCovered: number,
-  targetMonths: number = DEFAULT_EMERGENCY_TARGET_MONTHS,
+  targetMonths: number = TARGET_EMERGENCY_SALARY_MONTHS,
 ): number {
   if (monthsCovered <= 0) return 0
   const target = emergencyScoreTargetMonths(targetMonths)
@@ -608,15 +612,15 @@ export function computeHealthScoreFromInputs(
       'emergency_fund',
       'Noodfonds',
       emergencyScore,
-      'Hoeveel maanden kun je rondkomen van je noodfonds?',
+      'Hoeveel maandsalarissen heb je als buffer? Het doel is 3.',
       input.emergencyFundMonths < 1
-        ? 'Start met een doel van 1 maand buffer — automatiseer een vaste storting.'
+        ? 'Start met één maandsalaris buffer — automatiseer een vaste storting.'
+        : input.emergencyFundMonths < 2
+        ? 'Je hebt ruim een maandsalaris staan. Bouw door naar 3 — zet meevallers direct opzij.'
         : input.emergencyFundMonths < 3
-        ? 'Bouw naar 3 maanden — zet onverwachte meevallers direct opzij.'
-        : input.emergencyFundMonths < 6
-        ? 'Bijna op het ideaal van 6 maanden. Elke extra maand geeft meer rust.'
-        : 'Noodfonds compleet — financiële rust als vangnet.',
-      `${input.emergencyFundMonths.toFixed(1)} mnd`,
+        ? 'Bijna op het doel van 3 maandsalarissen. Elke extra euro geeft meer rust.'
+        : 'Noodfonds compleet — drie maandsalarissen als vangnet.',
+      `${input.emergencyFundMonths.toFixed(1)} × salaris`,
     ),
     makePillar(
       'debt_service_ratio',

@@ -709,8 +709,6 @@ function buildContext(intake: CheckIntake, now: Date): EngineContext {
     estimatedAnnualIncome: netMonthlyIncome * 12,
     estimatedMonthlyExpenses: monthlyExpenses,
     savingsRate6m: 0,
-    monthlyDebtAflossing: 0,
-    monthlySavingsContribution: 0,
   })
 
   // AOW-maandbedrag: primair de door de gebruiker ingevulde AOW-verwachting;
@@ -792,8 +790,12 @@ function buildSnapshot(ctx: EngineContext, dailyExpense: number): CheckReportDat
       0,
     ),
     effectiveMonthlyExpenses: ctx.monthlyExpenses,
-    goal: null,
-  }).monthsCovered
+    netMonthlyIncome: ctx.netMonthlyIncome,
+    // `runwayMonths` (maanden VASTE LASTEN), bewust niet `monthsCovered`: het
+    // rapport zegt letterlijk "je buffer dekt X maanden" en vergelijkt met
+    // FIN_BUFFER_TARGET_MONTHS. De gezondheidsscore meet apart tegen de
+    // salaris-norm (3 × netto maandsalaris) — twee vragen, twee grondslagen.
+  }).runwayMonths
   // Vrijheidstijd op de FIRE-eligible/LIQUIDE grondslag (eigen woning gefilterd) —
   // identiek aan lifeGrid.alreadyFundedYears + twoFutures.stopToday. Het getoonde
   // €-saldo (`netWorth`) blijft incl. huis; alléén de vrijheidstijd rekent op de
@@ -942,6 +944,8 @@ function buildHealth(ctx: EngineContext): CheckReportData['health'] {
       freedomPct,
       avgMonthlyExpenses: ctx.monthlyExpenses,
       netMonthlyIncome: ctx.netMonthlyIncome,
+      // Noodbuffer-norm: 3 × netto maandsalaris (lib/emergency-fund.ts).
+      netMonthlySalary: ctx.netMonthlyIncome,
     },
     {
       // Noodfonds zit nu als cash-asset in portfolio.assets (SSoT) — geen losse
@@ -1433,8 +1437,12 @@ function buildWillMoves(ctx: EngineContext, dailyExpense: number): CheckReportDa
       0,
     ),
     effectiveMonthlyExpenses: ctx.monthlyExpenses,
-    goal: null,
-  }).monthsCovered
+    netMonthlyIncome: ctx.netMonthlyIncome,
+    // `runwayMonths` (maanden VASTE LASTEN), bewust niet `monthsCovered`: het
+    // rapport zegt letterlijk "je buffer dekt X maanden" en vergelijkt met
+    // FIN_BUFFER_TARGET_MONTHS. De gezondheidsscore meet apart tegen de
+    // salaris-norm (3 × netto maandsalaris) — twee vragen, twee grondslagen.
+  }).runwayMonths
   if (bufferMonths > FIN_BUFFER_TARGET_MONTHS && ctx.monthlyExpenses > 0) {
     const surplus = Math.max(0, ctx.intake.emergencyFund - ctx.monthlyExpenses * FIN_BUFFER_TARGET_MONTHS)
     if (surplus > 0) {

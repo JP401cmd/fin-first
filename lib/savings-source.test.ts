@@ -131,18 +131,23 @@ describe('resolveSavingsSource — keuzeregel onaangetast', () => {
   })
 })
 
-describe('resolveSavingsSource — handmatig pad gelijkgetrokken met transactie-pad', () => {
-  it('zonder aflossing/spaarbudget (default 0) == oude (inkomen − uitgaven)/inkomen', () => {
+describe('resolveSavingsSource — handmatig pad = wat de cashflow-kaart toont', () => {
+  it('handmatige invoer geeft (inkomen − uitgaven)/inkomen', () => {
     const r = resolveSavingsSource({
       incomeSource: 'manual', expensesSource: 'manual',
       netMonthlyIncome: 4000, estimatedAnnualIncome: 0,
       estimatedMonthlyExpenses: 3000, savingsRate6m: 99,
     })
-    // 4000−3000)/4000 = 25% — byte-gelijk aan vóór de gelijktrekking.
+    // (4000−3000)/4000 = 25% — exact het percentage op de kaart onderaan
+    // /overzicht/cashflow.
     expect(r.effectiveSavingsRatePct).toBeCloseTo(25, 10)
   })
 
-  it('telt schuldaflossing op en spaarbudget van de uitgaven af', () => {
+  it('aflossing en spaarbudget komen er NIET bovenop (geen dubbeltelling)', () => {
+    // Die correcties horen bij het TRANSACTIE-pad, waar de uitgavensom rauw is.
+    // Handmatige invoer is al een keuze van de gebruiker — bij een ingevoerd
+    // "eigen percentage" zelfs de bron waaruit de uitgaven zijn terugberekend.
+    // Vóór 29 jul 2026 gaf dit 32,5% terwijl de gebruiker 25% zag staan.
     const r = resolveSavingsSource({
       incomeSource: 'manual', expensesSource: 'manual',
       netMonthlyIncome: 4000, estimatedAnnualIncome: 0,
@@ -150,20 +155,19 @@ describe('resolveSavingsSource — handmatig pad gelijkgetrokken met transactie-
       monthlyDebtAflossing: 200,
       monthlySavingsContribution: 100,
     })
-    // (4000 − (3000 − 100) + 200) / 4000 = 1300/4000 = 32,5%
-    expect(r.effectiveSavingsRatePct).toBeCloseTo(32.5, 10)
+    expect(r.effectiveSavingsRatePct).toBeCloseTo(25, 10)
   })
 
-  it('handmatig pad == savingsRateFromAggregates(inkomen, uitgaven − sb, afl)', () => {
-    const income = 4000, expenses = 3000, afl = 250, sb = 150
+  it('handmatig pad == savingsRateFromAggregates(inkomen, uitgaven, 0)', () => {
+    const income = 4000, expenses = 3000
     const r = resolveSavingsSource({
       incomeSource: 'manual', expensesSource: 'manual',
       netMonthlyIncome: income, estimatedAnnualIncome: 0,
       estimatedMonthlyExpenses: expenses, savingsRate6m: 0,
-      monthlyDebtAflossing: afl, monthlySavingsContribution: sb,
+      monthlyDebtAflossing: 250, monthlySavingsContribution: 150,
     })
     expect(r.effectiveSavingsRatePct).toBeCloseTo(
-      savingsRateFromAggregates(income, expenses - sb, afl), 10,
+      savingsRateFromAggregates(income, expenses, 0), 10,
     )
   })
 })

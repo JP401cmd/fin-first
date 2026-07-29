@@ -156,7 +156,7 @@ export function CashflowInstellingenBlok({ data }: { data: CashflowSettingsData 
           <ChoiceRow computedLabel={`Gebruik berekend (€${Math.round(computedExpenses).toLocaleString('nl-NL')}/mnd)`}
             isManual={expensesManual} onUseComputed={() => applyComputed('expenses')}
             manualValue={Math.round(triple.monthlyExpenses)} onManual={(v) => editField('expenses', v)} unit="€/mnd" />
-          <p className="text-[11px] text-[var(--ink-4)]">Vul je <strong>totale</strong> maandelijkse uitgaven in — inclusief je hypotheeklast en wat je naar spaar- of beleggingspotjes overmaakt. Sparen in budgetten en schuldaflossing tellen we daarna weer als sparen mee, zodat je spaarquote klopt.</p>
+          <p className="text-[11px] text-[var(--ink-4)]">Vul in wat je maandelijks écht kwijt bent — inclusief je hypotheeklast, maar <strong>zonder</strong> wat je naar spaar- of beleggingspotjes overmaakt. Wat je zo overhoudt is je spaarquote: bij handmatige invoer rekenen we er niets meer bij op.</p>
         </div>
       </BottomSheet>
 
@@ -215,7 +215,7 @@ export function CashflowInstellingenBlok({ data }: { data: CashflowSettingsData 
 
           <div className="space-y-2 border-t border-[var(--border-md)] pt-3">
             <p className="text-[11px] leading-relaxed text-[var(--ink-3)]">
-              Sparen in je budgetten en het aflossen van schulden rekenen we mee als sparen — dat geld verdwijnt niet, het bouwt vermogen op. Een handmatige spaarquote (eigen percentage) volgt dezelfde definitie en past je geschatte uitgaven aan; je inkomen blijft gelijk.
+              In de <strong>berekende</strong> spaarquote rekenen we sparen in je budgetten en het aflossen van schulden mee als sparen — dat geld verdwijnt niet, het bouwt vermogen op. Vul je zelf een <strong>eigen percentage</strong> in, dan is dát je spaarquote: we tellen er niets meer bij op, en passen je geschatte uitgaven erop aan. Je inkomen blijft gelijk.
             </p>
             <details className="group text-[var(--ink-4)]">
               <summary className="flex cursor-pointer list-none items-center gap-1 text-[11px] font-medium text-[var(--ink-3)] transition-colors hover:text-[var(--ink-2)] [&::-webkit-details-marker]:hidden">

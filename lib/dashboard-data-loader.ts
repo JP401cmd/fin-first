@@ -68,12 +68,7 @@ import { resolveFireAssumptions, type FireAssumptionRow } from '@/lib/fire-assum
 import { getAowLeeftijden } from '@/lib/reference-cache'
 import { computeExpectedAnnualAppreciation, type Asset } from '@/lib/asset-data'
 import { computeAssetsByType, computeLiquidPot, monthsCoveredFrom } from '@/lib/dashboard-wealth-weighting'
-import {
-  pickEmergencyGoal,
-  emergencyGoalTarget,
-  resolveEmergencyFund,
-  type EmergencyGoalCandidate,
-} from '@/lib/emergency-fund'
+import { resolveEmergencyFund } from '@/lib/emergency-fund'
 import { loadVasteLastenSummary } from '@/lib/vaste-lasten-summary'
 import { getUpcomingTransactions, type RecurringTransaction } from '@/lib/recurring-data'
 import { getTaxDeadlines } from '@/lib/tax-calendar'
@@ -855,7 +850,6 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     fallbackMonthlyExpenses: effectiveMonthlyExpenses,
   })
   const extIncome6 = savings6m.extIncome6
-  const extSavingsBudget6 = savings6m.extSavingsBudget6
   const savingsRateIsEstimate = savings6m.isEstimate
   let savingsRate6m = savings6m.savingsRate6m
 
@@ -926,16 +920,20 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // De unified engine indexeert dit jaarbedrag zelf met inflatie.
   const dashboardSavingsOverrideRaw = (profileResult.data as { monthly_savings_override?: number | string | null } | null)?.monthly_savings_override
   const dashboardSavingsOverride = dashboardSavingsOverrideRaw == null ? null : Number(dashboardSavingsOverrideRaw)
-  const { baseAnnualSavings: dashboardBaseAnnualSavings } = resolveSavingsSource({
+  const {
+    baseAnnualSavings: dashboardBaseAnnualSavings,
+    // De EFFECTIEVE spaarquote: handmatige invoer wint over de 6-maands
+    // transactiequote. Dit is exact het percentage dat het instellingenblok
+    // onderaan /overzicht/cashflow toont, en dus het getal waarop de
+    // gezondheidsscore hoort te oordelen (zie healthScoreInput hieronder).
+    effectiveSavingsRatePct: effectiveSavingsRate,
+  } = resolveSavingsSource({
     incomeSource: (profileResult.data as { income_source?: string | null } | null)?.income_source,
     expensesSource: (profileResult.data as { expenses_source?: string | null } | null)?.expenses_source,
     netMonthlyIncome: Number(profileResult.data?.net_monthly_income ?? 0),
     estimatedAnnualIncome: extrapolatedIncome,
     estimatedMonthlyExpenses: profileMonthlyExpenses,
     savingsRate6m,
-    // Handmatig pad volgt dezelfde definitie als het transactie-pad.
-    monthlyDebtAflossing: debtAflossingMonthly,
-    monthlySavingsContribution: extSavingsBudget6 / 6,
   })
   // dashboardSavingsOverride + dashboardBaseAnnualSavings worden als parameters aan
   // buildHorizonInput doorgegeven (dezelfde annualSavings-prioriteit als de
@@ -1353,14 +1351,12 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     }))
 
   // ── Noodfonds (canonieke resolver) ──────────────────────────────
-  // Eén bron voor de noodfonds-bundel (hieronder) én de score-target: het
-  // (optionele) noodfonds-doel stuurt de target; de liquide pot (inclusion-
-  // gewogen) is de teller. Goals zijn al geladen (topGoals) — geen extra query.
-  const emergencyGoal = pickEmergencyGoal((goalsResult.data ?? []) as EmergencyGoalCandidate[])
+  // Eén bron voor de noodfonds-bundel (hieronder) én de score-norm: 3 × netto
+  // maandsalaris is het doel, de liquide pot (inclusion-gewogen) is de teller.
   const emergencyResolved = resolveEmergencyFund({
     liquidPot: liquidPotWeighted,
     effectiveMonthlyExpenses,
-    goal: emergencyGoal ? emergencyGoalTarget(emergencyGoal, effectiveMonthlyExpenses) : null,
+    netMonthlyIncome: effectiveMonthlyIncome,
   })
 
   // ── Gezondheidsscore (widget-bundel-FALLBACK) ──────────────────────
@@ -1387,15 +1383,17 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   )
   const healthScoreInput = buildHealthScoreInput(
     {
-      savingsRate6m,
+      // Oordeelt op de EFFECTIEVE spaarquote (handmatige invoer wint), niet op
+      // de rauwe 6-maands transactiequote — anders scoort de app op een getal
+      // dat de gebruiker nergens ziet staan.
+      savingsRate6m: effectiveSavingsRate,
       totalAssets,
       totalDebts,
       freedomPct,
       avgMonthlyExpenses: effectiveMonthlyExpenses,
       netMonthlyIncome: healthNetMonthlyIncome,
-      // Score-target = de canonieke noodfonds-target (doel of default 6). De
-      // curve floort 'm intern (anti-gaming); zie lib/emergency-fund.ts.
-      emergencyTargetMonths: emergencyResolved.targetMonths,
+      // Noodbuffer-norm: 3 × dit salaris (zie lib/emergency-fund.ts).
+      netMonthlySalary: effectiveMonthlyIncome,
     },
     {
       assets: (assetsResult.data ?? []) as { asset_type?: string | null; current_value?: number | string | null; net_worth_inclusion_pct?: number | null }[],
@@ -1748,17 +1746,17 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
 
   // ── Emergency Fund: canonieke resolver (emergencyResolved, boven berekend) ──
   // Consume, don't recompute: currentAmount = inclusion-gewogen liquide pot,
-  // target uit het noodfonds-doel (of default 6), monthsCovered op dezelfde
-  // grondslag als sovereignty-niveau + top-level monthsCovered.
+  // norm = 3 × netto maandsalaris, monthsCovered op DIE grondslag. De leesbare
+  // runway (maanden vaste lasten) reist apart mee.
   const emergencyFund = {
     currentAmount: roundCents(emergencyResolved.currentAmount),
     targetAmount: roundCents(emergencyResolved.targetAmount),
     monthsCovered: Math.round(emergencyResolved.monthsCovered * 10) / 10,
-    // Display-target: gebruikerskeuze (doel) of 6, afgerond op 0,5 mnd.
     targetMonths: Math.round(emergencyResolved.targetMonths * 2) / 2,
     isComplete: emergencyResolved.monthsCovered >= emergencyResolved.targetMonths,
-    // Provenance uit de resolver — de widget toont de berekening anders bij een
-    // eigen doel (bedrag primair) dan bij de 6-maands-richtlijn (maanden primair).
+    runwayMonths: Math.round(emergencyResolved.runwayMonths * 10) / 10,
+    // Provenance uit de resolver — 'salary' (de norm) of 'expenses' (terugval
+    // bij nul inkomen). De widget benoemt de grondslag die hij toont.
     source: emergencyResolved.source,
   }
 

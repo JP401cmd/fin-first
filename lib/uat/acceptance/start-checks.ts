@@ -153,10 +153,12 @@ export const START_ENGINE_CHECKS: StartEngineCheck[] = [
         { asset_type: 'savings', current_value: 15000 },
         { asset_type: 'investment', current_value: 8000 },
       ]
-      const bufferMaanden = computeEmergencyFundMonths(assets, 0, 2200)
+      // Norm-grondslag = netto maandsalaris (€3.200), niet de maanduitgaven:
+      // 21.600 / 3.200 = 6,75 maandsalarissen tegen een norm van 3.
+      const bufferMaanden = computeEmergencyFundMonths(assets, 0, 3200, 2200)
       return {
-        expected: 'netWorth=29600; bufferMaandenCanoniek=9.8182',
-        actual: `netWorth=${netWorth}; bufferMaandenCanoniek=${fx(bufferMaanden, 4)}`,
+        expected: 'netWorth=29600; bufferMaandenCanoniek=6.75',
+        actual: `netWorth=${netWorth}; bufferMaandenCanoniek=${fx(bufferMaanden, 2)}`,
       }
     },
   },

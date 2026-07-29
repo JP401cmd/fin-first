@@ -15,19 +15,30 @@
  *  - `currentAmount` = de canonieke INCLUSION-gewogen liquide pot
  *    (`computeLiquidPot`, spaar/betaal/cash + niet-gekoppelde bankrekeningen).
  *    NOOIT goal.current_value als teller — dat is stale/gameable en zou
- *    dubbeltellen. Het DOEL levert uitsluitend de TARGET.
- *  - `monthsCovered` = currentAmount / effectiveMonthlyExpenses (dezelfde noemer
- *    als de loader; 0 bij 0 uitgaven — geen divide-by-zero).
+ *    dubbeltellen.
+ *  - Het DOEL is `TARGET_EMERGENCY_SALARY_MONTHS` × netto maandsalaris
+ *    (eigenaar-besluit 29 jul 2026). Een noodfonds-DOEL in goals stuurt de
+ *    score-target NIET meer; het blijft een gewoon doel op /toekomst/doelen.
+ *  - `monthsCovered` = currentAmount / netto maandsalaris — teller en doel op
+ *    DEZELFDE grondslag, zodat "3 van de 3 maanden" letterlijk klopt.
+ *  - `runwayMonths` = currentAmount / effectiveMonthlyExpenses — de leesbare
+ *    "hoe lang kun je hiervan rondkomen"-uitdrukking, bewust apart gehouden.
  *  - `nettoVermogen` en `liquideVermogen` worden nooit gemengd: de liquide pot
  *    is bewust géén huis/beleggingen/pensioen (CLAUDE.md).
  */
 
-import { MAX_EMERGENCY_TARGET_MONTHS, TARGET_EMERGENCY_MONTHS } from '@/lib/constants'
+import {
+  MAX_EMERGENCY_TARGET_MONTHS,
+  TARGET_EMERGENCY_MONTHS,
+  TARGET_EMERGENCY_SALARY_MONTHS,
+} from '@/lib/constants'
+
+export { TARGET_EMERGENCY_SALARY_MONTHS }
 
 /**
- * Default noodfonds-buffer in maanden vaste lasten (6×, Nibud-bovengrens).
- * Alias op de canonieke `TARGET_EMERGENCY_MONTHS` (lib/constants.ts) — geen
- * tweede magic number. Gebruikt wanneer er geen noodfonds-doel bestaat.
+ * Terugval-buffer in maanden vaste lasten (6×, Nibud-bovengrens). Alias op de
+ * canonieke `TARGET_EMERGENCY_MONTHS` (lib/constants.ts) — geen tweede magic
+ * number. Geldt uitsluitend nog wanneer er géén netto maandsalaris bekend is.
  */
 export const DEFAULT_EMERGENCY_TARGET_MONTHS = TARGET_EMERGENCY_MONTHS // = 6
 
@@ -50,17 +61,6 @@ export const MIN_EMERGENCY_SCORE_TARGET_MONTHS = 3
  */
 export const MAX_EMERGENCY_DISPLAY_TARGET_MONTHS = MAX_EMERGENCY_TARGET_MONTHS // = 24
 
-/**
- * Begrens een target-in-maanden tot een zinnige buffer-bandbreedte. Puur op de
- * BOVENkant (de vloer hoort bij de score, niet bij de weergave) plus een
- * eindigheids-check, zodat een deling door bijna-nul maanduitgaven nooit als
- * "389 maanden" doorlekt naar tegel of score.
- */
-function clampTargetMonths(months: number): number {
-  if (!Number.isFinite(months) || months <= 0) return DEFAULT_EMERGENCY_TARGET_MONTHS
-  return Math.min(months, MAX_EMERGENCY_DISPLAY_TARGET_MONTHS)
-}
-
 /** Marker-waarde in `goals.metadata.standaardDoel` voor het standaard-noodfonds. */
 export const EMERGENCY_STANDAARD_DOEL_KEY = 'noodfonds'
 
@@ -78,66 +78,76 @@ export interface EmergencyGoalTarget {
 export interface EmergencyFundInput {
   /** Canonieke inclusion-gewogen liquide pot (currentAmount teller). */
   liquidPot: number
-  /** Effectieve maanduitgaven — noemer (identiek aan de loader). */
+  /** Effectieve maanduitgaven — noemer van de leesbare runway. */
   effectiveMonthlyExpenses: number
-  /** Geresolveerd noodfonds-doel, of `null` → default-buffer / liquide-tak. */
-  goal: EmergencyGoalTarget | null
+  /**
+   * Effectief netto maandsalaris (`resolveEffectiveIncomeExpenses(...).income`
+   * — handmatige invoer wint). Grondslag van doel én dekking. 0 → terugval op
+   * de uitgaven-grondslag met de 6-maands default.
+   */
+  netMonthlyIncome: number
 }
+
+/** Grondslag waartegen de buffer wordt gemeten. */
+export type EmergencyBasis = 'salary' | 'expenses'
 
 export interface EmergencyFundResult {
   /** Canonieke liquide pot (= input.liquidPot; nooit de goal.current_value). */
   currentAmount: number
-  /** Display-target in maanden (gebruikerskeuze als er een doel is, anders 6). */
+  /** Doel in maanden op de gekozen grondslag: 3 (salaris) of 6 (terugval). */
   targetMonths: number
-  /** Doelbedrag in €: expliciet doelbedrag, anders targetMonths × maanduitgaven. */
+  /** Doelbedrag in €: targetMonths × de maandbasis (salaris, of uitgaven). */
   targetAmount: number
-  /** currentAmount / effectiveMonthlyExpenses (0 bij 0 uitgaven). */
+  /** currentAmount / maandbasis — dezelfde grondslag als `targetMonths`. */
   monthsCovered: number
-  /** Herkomst van de target: 'goal' (noodfonds-doel) of 'liquid' (default 6). */
-  source: 'goal' | 'liquid'
+  /** currentAmount / maanduitgaven — "hoe lang kun je hiervan rondkomen". */
+  runwayMonths: number
+  /** Herkomst van de norm: 'salary' (3× salaris) of 'expenses' (terugval 6×). */
+  source: EmergencyBasis
 }
 
 /**
- * Zet de canonieke liquide pot + het (optionele) noodfonds-doel om naar de
- * afgeleide noodfonds-cijfers. Dit is de ÉNE definitie die loader-bundel,
- * score-target en /check consumeren.
+ * Kiest de grondslag voor de noodbuffer-norm. Salaris wint altijd wanneer het
+ * bekend is; alleen bij nul inkomen valt de norm terug op 6 × maanduitgaven,
+ * zodat de pijler niet degenereert op een leeg account.
  */
-export function resolveEmergencyFund(input: EmergencyFundInput): EmergencyFundResult {
-  const { liquidPot, effectiveMonthlyExpenses, goal } = input
-
-  // Target-maanden: expliciete doel-maanden > afgeleid uit doelbedrag > default.
-  // Altijd door clampTargetMonths: een €-doel gedeeld door (bijna) nul
-  // maanduitgaven zou anders een absurde target opleveren (productie: €5.000 /
-  // €12,85 = 389 maanden), en ook een handmatig ingetikt maanden-doel mag niet
-  // ongelimiteerd zijn. Het doelBEDRAG blijft hieronder ongemoeid.
-  let targetMonths = DEFAULT_EMERGENCY_TARGET_MONTHS
-  if (goal) {
-    if (goal.targetMonths != null && goal.targetMonths > 0) {
-      targetMonths = clampTargetMonths(goal.targetMonths)
-    } else if (
-      goal.targetAmount != null &&
-      goal.targetAmount > 0 &&
-      effectiveMonthlyExpenses > 0
-    ) {
-      targetMonths = clampTargetMonths(goal.targetAmount / effectiveMonthlyExpenses)
+export function emergencyTargetBasis(
+  netMonthlyIncome: number,
+  effectiveMonthlyExpenses: number,
+): { basis: EmergencyBasis; monthlyBase: number; targetMonths: number } {
+  if (Number.isFinite(netMonthlyIncome) && netMonthlyIncome > 0) {
+    return {
+      basis: 'salary',
+      monthlyBase: netMonthlyIncome,
+      targetMonths: TARGET_EMERGENCY_SALARY_MONTHS,
     }
   }
+  return {
+    basis: 'expenses',
+    monthlyBase: Math.max(0, effectiveMonthlyExpenses),
+    targetMonths: DEFAULT_EMERGENCY_TARGET_MONTHS,
+  }
+}
 
-  // Doelbedrag: expliciet doelbedrag wint; anders target-maanden × maanduitgaven.
-  const targetAmount =
-    goal?.targetAmount != null && goal.targetAmount > 0
-      ? goal.targetAmount
-      : targetMonths * effectiveMonthlyExpenses
-
-  const monthsCovered =
-    effectiveMonthlyExpenses > 0 ? liquidPot / effectiveMonthlyExpenses : 0
+/**
+ * Zet de canonieke liquide pot + het netto maandsalaris om naar de afgeleide
+ * noodfonds-cijfers. Dit is de ÉNE definitie die loader-bundel, score-target,
+ * widget en /check consumeren.
+ */
+export function resolveEmergencyFund(input: EmergencyFundInput): EmergencyFundResult {
+  const { liquidPot, effectiveMonthlyExpenses, netMonthlyIncome } = input
+  const { basis, monthlyBase, targetMonths } = emergencyTargetBasis(
+    netMonthlyIncome,
+    effectiveMonthlyExpenses,
+  )
 
   return {
     currentAmount: liquidPot,
     targetMonths,
-    targetAmount,
-    monthsCovered,
-    source: goal ? 'goal' : 'liquid',
+    targetAmount: targetMonths * monthlyBase,
+    monthsCovered: monthlyBase > 0 ? liquidPot / monthlyBase : 0,
+    runwayMonths: effectiveMonthlyExpenses > 0 ? liquidPot / effectiveMonthlyExpenses : 0,
+    source: basis,
   }
 }
 
@@ -159,6 +169,11 @@ export function emergencyScoreTargetMonths(displayTargetMonths: number): number 
 }
 
 // ── Marker & doel-selectie (detectie-marker B) ───────────────────────────────
+//
+// LET OP (eigenaar-besluit 29 jul 2026): een noodfonds-DOEL stuurt de
+// score-target NIET meer — de norm is altijd 3 × netto maandsalaris
+// (`resolveEmergencyFund`). Deze helpers blijven bestaan om het noodfonds-doel
+// te herkennen op /toekomst/doelen (eigen voortgangsbalk op het doelbedrag).
 
 /**
  * Minimale goal-vorm voor noodfonds-detectie (subset van `Goal`). Zowel een
@@ -233,19 +248,3 @@ export function emergencyGoalTarget(
   }
 }
 
-/**
- * Convenience: resolveer het display-target-in-maanden voor een lijst goals +
- * maanduitgaven, in ÉÉN stap (pick → descriptor → resolve → targetMonths). Voor
- * callers (snapshot-routes) die alléén de score-target nodig hebben.
- */
-export function resolveEmergencyTargetMonths(
-  goals: readonly EmergencyGoalCandidate[],
-  monthlyExpenses: number,
-): number {
-  const goal = pickEmergencyGoal(goals)
-  return resolveEmergencyFund({
-    liquidPot: 0, // niet-relevant voor de target
-    effectiveMonthlyExpenses: monthlyExpenses,
-    goal: goal ? emergencyGoalTarget(goal, monthlyExpenses) : null,
-  }).targetMonths
-}

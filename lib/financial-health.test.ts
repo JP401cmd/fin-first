@@ -608,6 +608,7 @@ describe('Defect B — buildHealthScoreInput deelt canoniek pad', () => {
     freedomPct: 40,
     avgMonthlyExpenses,
     netMonthlyIncome: 4_500,
+    netMonthlySalary: 4_500,
   }
   const rows = {
     assets,
@@ -620,9 +621,9 @@ describe('Defect B — buildHealthScoreInput deelt canoniek pad', () => {
 
   const routeInput = buildHealthScoreInput(routeScalars, rows)
 
-  it('levert echte noodfonds-input (liquid assets ÷ avg expenses)', () => {
-    // liquid = savings 15k + unlinked 8k = 23k ÷ 2500 = 9.2
-    expect(routeInput.emergencyFundMonths).toBeCloseTo(23_000 / 2_500, 5)
+  it('levert echte noodfonds-input (liquide pot ÷ netto maandsalaris)', () => {
+    // liquid = savings 15k + unlinked 8k = 23k ÷ 4.500 salaris ≈ 5,1 maandsalarissen
+    expect(routeInput.emergencyFundMonths).toBeCloseTo(23_000 / 4_500, 5)
   })
 
   it('levert 3 budgetcategorieën, minstens één met limiet > 0', () => {

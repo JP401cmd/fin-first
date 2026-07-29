@@ -2,13 +2,13 @@
  * Tests voor lib/emergency-fund.ts — de CANONIEKE noodfonds-resolver.
  *
  * Dekt:
- * - resolveEmergencyFund: doel aan/afwezig, target-gestuurde velden, geen
- *   dubbeltelling (goal.current_value nooit teller), source-veld, 0-uitgaven.
+ * - resolveEmergencyFund: de salaris-norm (3 × netto maandsalaris), de
+ *   uitgaven-terugval bij nul inkomen, de aparte runway, 0-noemers.
  * - pickEmergencyGoal + isEmergencyGoal: marker B (goal_type / metadata),
- *   deterministische keuze, geen doel.
+ *   deterministische keuze, geen doel. Deze helpers herkennen het noodfonds-doel
+ *   op /toekomst/doelen; ze sturen sinds 29 jul 2026 de score-norm NIET meer.
  * - emergencyGoalTarget: maanden- vs €-doel, twee-weg-afgeleide.
- * - emergencyScoreTargetMonths + score-curve: anti-gaming vloer (klein target ≠
- *   100% bij lage dekking), vorm-behoud bij default target.
+ * - emergencyScoreTargetMonths + score-curve: vloer/plafond, curve-vorm.
  * - CROSS-SURFACE PARITEIT (D1): loader-bundel monthsCovered == de emergency_fund-
  *   pijler rawValue-maanden uit de gezondheidsscore, incl. inclusion-weging.
  */
@@ -23,8 +23,8 @@ import {
   emergencyGoalTarget,
   pickEmergencyGoal,
   isEmergencyGoal,
-  resolveEmergencyTargetMonths,
   DEFAULT_EMERGENCY_TARGET_MONTHS,
+  TARGET_EMERGENCY_SALARY_MONTHS,
   MIN_EMERGENCY_SCORE_TARGET_MONTHS,
   MAX_EMERGENCY_DISPLAY_TARGET_MONTHS as MAX_EMERGENCY_TARGET_MONTHS,
   type EmergencyGoalCandidate,
@@ -36,100 +36,75 @@ import {
 } from '@/lib/health-score-input'
 import { computeHealthScoreFromInputs } from '@/lib/financial-health'
 
-// ── resolveEmergencyFund — doel afwezig (liquide-tak) ─────────────────────────
+// ── resolveEmergencyFund — de salaris-norm ────────────────────────────────────
 
-describe('resolveEmergencyFund — geen doel (liquide-tak)', () => {
-  it('geen doel → source=liquid, default 6 mnd, targetAmount = 6 × uitgaven', () => {
+describe('resolveEmergencyFund — norm is 3 × netto maandsalaris', () => {
+  it('salaris bekend → source=salary, 3 mnd, targetAmount = 3 × salaris', () => {
     const r = resolveEmergencyFund({
       liquidPot: 12_000,
       effectiveMonthlyExpenses: 2_000,
-      goal: null,
+      netMonthlyIncome: 4_000,
     })
-    expect(r.source).toBe('liquid')
+    expect(r.source).toBe('salary')
+    expect(r.targetMonths).toBe(TARGET_EMERGENCY_SALARY_MONTHS) // 3
+    expect(r.targetAmount).toBe(12_000) // 3 × 4000
+    expect(r.currentAmount).toBe(12_000)
+    expect(r.monthsCovered).toBeCloseTo(3, 5) // 12.000 / 4.000
+  })
+
+  it('de maanduitgaven raken de norm niet — alleen de runway', () => {
+    // Zelfde pot en salaris, half zo hoge uitgaven: de norm blijft 3 × 4.000,
+    // maar je komt er twee keer zo lang van rond.
+    const duur = resolveEmergencyFund({
+      liquidPot: 12_000, effectiveMonthlyExpenses: 2_000, netMonthlyIncome: 4_000,
+    })
+    const zuinig = resolveEmergencyFund({
+      liquidPot: 12_000, effectiveMonthlyExpenses: 1_000, netMonthlyIncome: 4_000,
+    })
+    expect(zuinig.targetAmount).toBe(duur.targetAmount)
+    expect(zuinig.monthsCovered).toBeCloseTo(duur.monthsCovered, 10)
+    expect(duur.runwayMonths).toBeCloseTo(6, 5)
+    expect(zuinig.runwayMonths).toBeCloseTo(12, 5)
+  })
+
+  it('geen salaris → terugval op 6 × maanduitgaven (source=expenses)', () => {
+    const r = resolveEmergencyFund({
+      liquidPot: 12_000,
+      effectiveMonthlyExpenses: 2_000,
+      netMonthlyIncome: 0,
+    })
+    expect(r.source).toBe('expenses')
     expect(r.targetMonths).toBe(DEFAULT_EMERGENCY_TARGET_MONTHS) // 6
     expect(r.targetAmount).toBe(12_000) // 6 × 2000
-    expect(r.currentAmount).toBe(12_000)
     expect(r.monthsCovered).toBeCloseTo(6, 5)
   })
 
-  it('avgMonthlyExpenses = 0 → monthsCovered 0 (geen divide-by-zero)', () => {
-    const r = resolveEmergencyFund({ liquidPot: 10_000, effectiveMonthlyExpenses: 0, goal: null })
+  it('nul salaris én nul uitgaven → geen divide-by-zero', () => {
+    const r = resolveEmergencyFund({
+      liquidPot: 10_000, effectiveMonthlyExpenses: 0, netMonthlyIncome: 0,
+    })
     expect(r.monthsCovered).toBe(0)
-  })
-})
-
-// ── resolveEmergencyFund — doel aanwezig (stuurt target) ──────────────────────
-
-describe('resolveEmergencyFund — met doel', () => {
-  it('emergency_fund-doel (maanden) stuurt targetMonths, source=goal', () => {
-    const r = resolveEmergencyFund({
-      liquidPot: 8_000,
-      effectiveMonthlyExpenses: 2_000,
-      goal: { targetMonths: 4 },
-    })
-    expect(r.source).toBe('goal')
-    expect(r.targetMonths).toBe(4)
-    expect(r.targetAmount).toBe(8_000) // 4 × 2000
-    expect(r.monthsCovered).toBeCloseTo(4, 5)
+    expect(r.runwayMonths).toBe(0)
+    expect(r.targetAmount).toBe(0)
   })
 
-  it('savings-doel (€) stuurt targetAmount, targetMonths afgeleid', () => {
+  it('nul uitgaven bij bekend salaris: norm blijft geldig, runway 0', () => {
     const r = resolveEmergencyFund({
-      liquidPot: 5_000,
-      effectiveMonthlyExpenses: 2_500,
-      goal: { targetAmount: 15_000 },
+      liquidPot: 9_000, effectiveMonthlyExpenses: 0, netMonthlyIncome: 3_000,
     })
-    expect(r.source).toBe('goal')
-    expect(r.targetAmount).toBe(15_000)
-    expect(r.targetMonths).toBeCloseTo(6, 5) // 15000 / 2500
+    expect(r.targetAmount).toBe(9_000)
+    expect(r.monthsCovered).toBeCloseTo(3, 10)
+    expect(r.runwayMonths).toBe(0)
   })
 
-  it('DEGENERATIETAK: €-doel bij bijna-nul maanduitgaven explodeert niet (clamp 24)', () => {
-    // Exact de productiesituatie die de backfill blootlegde: een €5.000-doel bij
-    // €12,85 gemeten maanduitgaven gaf 389 "maanden" target. Ongeclampt zou dat
-    // als "0,0 / 389 maanden gedekt" op de tegel landen en de score op 0 pinnen.
+  it('targetMonths × maandbasis == targetAmount blijft een geldige gelijkheid', () => {
+    // In het oude doel-gestuurde model was targetAmount een vrij euro-bedrag en
+    // targetMonths een afgeronde afgeleide; die vermenigvuldiging klopte dan niet
+    // meer. De widget reconstrueert de maandbasis nu uit deze gelijkheid.
     const r = resolveEmergencyFund({
-      liquidPot: 0,
-      effectiveMonthlyExpenses: 12.85,
-      goal: { targetAmount: 5_000 },
+      liquidPot: 1, effectiveMonthlyExpenses: 3_500, netMonthlyIncome: 5_000,
     })
-    expect(5_000 / 12.85).toBeGreaterThan(380) // de ongeclampte ratio
-    expect(r.targetMonths).toBe(MAX_EMERGENCY_TARGET_MONTHS) // 24
-    // Het doelBEDRAG blijft de onverkorte gebruikerskeuze — alleen de
-    // maanden-expressie is begrensd (de voortgangsbalk rekent op het bedrag).
-    expect(r.targetAmount).toBe(5_000)
-    expect(r.source).toBe('goal')
-  })
-
-  it('handmatig maanden-doel boven het plafond wordt begrensd (bedrag volgt de clamp)', () => {
-    const r = resolveEmergencyFund({
-      liquidPot: 10_000,
-      effectiveMonthlyExpenses: 1_000,
-      goal: { targetMonths: 60 },
-    })
-    expect(r.targetMonths).toBe(MAX_EMERGENCY_TARGET_MONTHS)
-    // Bij een MAANDEN-doel is het bedrag de afgeleide → volgt de begrensde maanden.
-    expect(r.targetAmount).toBe(24_000)
-  })
-
-  it('target binnen de bandbreedte blijft exact ongewijzigd (clamp is niet-invasief)', () => {
-    const r = resolveEmergencyFund({
-      liquidPot: 0,
-      effectiveMonthlyExpenses: 3_500,
-      goal: { targetAmount: 10_500 },
-    })
-    expect(r.targetMonths).toBeCloseTo(3, 10) // 10500 / 3500 — geen clamp
-  })
-
-  it('currentAmount = liquide pot, NOOIT de goal.current_value (geen dubbeltelling)', () => {
-    // Een doel-descriptor draagt alleen een target; de teller is puur de pot.
-    const r = resolveEmergencyFund({
-      liquidPot: 3_000,
-      effectiveMonthlyExpenses: 1_000,
-      goal: { targetMonths: 6, targetAmount: 6_000 },
-    })
-    expect(r.currentAmount).toBe(3_000) // niet 6000, niet 6000+3000
-    expect(r.monthsCovered).toBeCloseTo(3, 5)
+    expect(r.targetAmount / r.targetMonths).toBeCloseTo(5_000, 10)
   })
 })
 
@@ -234,19 +209,26 @@ describe('backfill-migratie — marker blijft in sync met de resolver', () => {
 
   it('de legacy-productievorm (savings, metadata {}) wordt zonder marker NIET herkend', () => {
     // Dit is de rij zoals ze op productie stond: naam "Noodfonds", savings,
-    // metadata {} → géén detectie, dus source='liquid' en target 6. Daarom de
-    // backfill.
+    // metadata {} → géén detectie. Daarom de backfill.
     const legacy: EmergencyGoalCandidate = { goal_type: 'savings', target_value: '10500.00', metadata: {} }
     expect(isEmergencyGoal(legacy)).toBe(false)
     expect(pickEmergencyGoal([legacy])).toBeNull()
 
-    // Na de backfill draagt dezelfde rij de marker → doel stuurt de target.
+    // Na de backfill draagt dezelfde rij de marker → herkend als hét
+    // noodfonds-doel op /toekomst/doelen. De score-NORM raakt dit niet meer
+    // (die is altijd 3 × netto maandsalaris, eigenaar-besluit 29 jul 2026).
     const backfilled: EmergencyGoalCandidate = {
       ...legacy,
       metadata: { standaardDoel: EMERGENCY_STANDAARD_DOEL_KEY },
     }
     expect(isEmergencyGoal(backfilled)).toBe(true)
-    expect(resolveEmergencyTargetMonths([backfilled], 3_500)).toBeCloseTo(3, 10)
+    expect(
+      resolveEmergencyFund({
+        liquidPot: 0,
+        effectiveMonthlyExpenses: 3_500,
+        netMonthlyIncome: 5_000,
+      }).targetAmount,
+    ).toBe(15_000)
   })
 })
 
@@ -273,9 +255,17 @@ describe('score-curve anti-gaming via computeHealthScoreFromInputs', () => {
     expect(ef.score).toBe(40)
   })
 
-  it('default target 6 behoudt de oude curve-vorm (3 mnd → 60)', () => {
+  it('salaris-norm (3): drie maandsalarissen → 100, anderhalf → 60', () => {
+    const vol = computeHealthScoreFromInputs({ ...base, emergencyFundMonths: 3 }, true)
+    expect(vol.pillars.find((p) => p.id === 'emergency_fund')!.score).toBe(100)
+
+    const half = computeHealthScoreFromInputs({ ...base, emergencyFundMonths: 1.5 }, true)
+    expect(half.pillars.find((p) => p.id === 'emergency_fund')!.score).toBe(60)
+  })
+
+  it('uitgaven-terugval (target 6) behoudt de oude curve-vorm (3 mnd → 60)', () => {
     const score = computeHealthScoreFromInputs(
-      { ...base, emergencyFundMonths: 3 },
+      { ...base, emergencyFundMonths: 3, emergencyTargetMonths: 6 },
       true,
     )
     const ef = score.pillars.find((p) => p.id === 'emergency_fund')!
@@ -305,7 +295,9 @@ describe('D1-pariteit — loader-bundel == health-pijler (inclusion-gewogen)', (
     { asset_type: 'investment', current_value: 100_000 }, // niet-liquide
   ]
   const unlinkedCash = 2_000
-  const avgMonthlyExpenses = 2_000
+  const avgMonthlyExpenses = 1_500
+  // Norm-grondslag: 11.000 / 2.000 = 5,5 maandsalarissen.
+  const netMonthlySalary = 2_000
 
   it('inclusion-weging: 50%-spaarrekening telt half mee in beide paden', () => {
     // Liquide pot = 10k×0.5 + 4k×1.0 + 2k unlinked = 11k
@@ -323,7 +315,7 @@ describe('D1-pariteit — loader-bundel == health-pijler (inclusion-gewogen)', (
     const bundleMonths = resolveEmergencyFund({
       liquidPot,
       effectiveMonthlyExpenses: avgMonthlyExpenses,
-      goal: null,
+      netMonthlyIncome: netMonthlySalary,
     }).monthsCovered
 
     // (b) health-pad: buildHealthScoreInput → emergencyFundMonths
@@ -335,6 +327,7 @@ describe('D1-pariteit — loader-bundel == health-pijler (inclusion-gewogen)', (
         freedomPct: 20,
         avgMonthlyExpenses,
         netMonthlyIncome: 4_000,
+        netMonthlySalary,
       },
       {
         assets,
@@ -362,8 +355,11 @@ describe('D1-pariteit — loader-bundel == health-pijler (inclusion-gewogen)', (
       unlinkedCash,
     )
     const bundleMonths = Math.round(
-      resolveEmergencyFund({ liquidPot, effectiveMonthlyExpenses: avgMonthlyExpenses, goal: null })
-        .monthsCovered * 10,
+      resolveEmergencyFund({
+        liquidPot,
+        effectiveMonthlyExpenses: avgMonthlyExpenses,
+        netMonthlyIncome: netMonthlySalary,
+      }).monthsCovered * 10,
     ) / 10
 
     const input = buildHealthScoreInput(
@@ -374,6 +370,7 @@ describe('D1-pariteit — loader-bundel == health-pijler (inclusion-gewogen)', (
         freedomPct: 20,
         avgMonthlyExpenses,
         netMonthlyIncome: 4_000,
+        netMonthlySalary,
       },
       {
         assets,
@@ -385,18 +382,27 @@ describe('D1-pariteit — loader-bundel == health-pijler (inclusion-gewogen)', (
       },
     )
     const score = computeHealthScoreFromInputs(input, false)
-    const pillarRaw = score.pillars.find((p) => p.id === 'emergency_fund')!.rawValue // "5.5 mnd"
-    expect(pillarRaw).toBe(`${bundleMonths.toFixed(1)} mnd`)
+    const pillarRaw = score.pillars.find((p) => p.id === 'emergency_fund')!.rawValue // "5.5 × salaris"
+    expect(pillarRaw).toBe(`${bundleMonths.toFixed(1)} × salaris`)
   })
 })
 
-// ── resolveEmergencyTargetMonths — convenience voor snapshot-routes ────────────
+// ── Een noodfonds-DOEL stuurt de score-norm niet meer ─────────────────────────
+// Eigenaar-besluit 29 jul 2026. Deze test pint het expliciet vast, zodat een
+// latere "handige" herintroductie van goal-steering meteen rood wordt.
 
-describe('resolveEmergencyTargetMonths', () => {
-  it('geen doel → default 6', () => {
-    expect(resolveEmergencyTargetMonths([{ goal_type: 'savings' }], 2_000)).toBe(6)
-  })
-  it('emergency_fund-doel → doel-maanden', () => {
-    expect(resolveEmergencyTargetMonths([{ goal_type: 'emergency_fund', target_value: 9 }], 2_000)).toBe(9)
+describe('noodfonds-doel is losgekoppeld van de score-norm', () => {
+  it('de norm hangt uitsluitend aan het salaris, niet aan een doelbedrag', () => {
+    const zonderDoel = resolveEmergencyFund({
+      liquidPot: 6_000, effectiveMonthlyExpenses: 2_000, netMonthlyIncome: 3_000,
+    })
+    expect(zonderDoel.targetAmount).toBe(9_000)
+    expect(zonderDoel.targetMonths).toBe(TARGET_EMERGENCY_SALARY_MONTHS)
+    // Een gebruiker met een €18.000-noodfondsdoel krijgt exact dezelfde norm.
+    expect(emergencyGoalTarget(
+      { goal_type: 'savings', target_value: 18_000, metadata: { standaardDoel: EMERGENCY_STANDAARD_DOEL_KEY } },
+      2_000,
+    ).targetAmount).toBe(18_000) // het doel bestaat nog steeds ...
+    expect(zonderDoel.targetAmount).toBe(9_000) // ... maar stuurt de norm niet
   })
 })

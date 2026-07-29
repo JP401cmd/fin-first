@@ -76,7 +76,6 @@ import {
   type HealthScoreBudget,
   type HealthScoreTransaction,
 } from '@/lib/health-score-input'
-import { resolveEmergencyTargetMonths, type EmergencyGoalCandidate } from '@/lib/emergency-fund'
 
 // Snapshot type for resilience trend data
 export type SnapshotForTrend = {
@@ -356,7 +355,6 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
     txAgg12Result,
     earliestIncomeResult,
     fireAssumptionsResult,
-    goalsResult,
   ] = await Promise.all([
     // Gedeelde basisdata-laag (lib/server-data/base.ts): huidige-maand-tx,
     // actieve assets, eigen profiel (select('*') dekt óók de withdrawal/guardrail-
@@ -447,14 +445,6 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
       .from('fire_assumptions')
       .select('year, expected_return, inflation, volatility, source, is_definitive')
       .order('year', { ascending: true }),
-    // Actieve doelen → noodfonds-target voor de gezondheidsscore. Zelfde bron/
-    // semantiek als /overzicht + de snapshot-routes, zodat de emergency_fund-
-    // pijler op /toekomst niet tegen een andere target scoort (goal-losgekoppeld-fix).
-    supabase
-      .from('goals')
-      .select('goal_type, target_value, metadata')
-      .eq('is_completed', false)
-      .order('sort_order', { ascending: true }),
   ])
 
   // Same row both consumers want: alias instead of re-querying.
@@ -727,7 +717,7 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
       (now.getMonth() - earliest.getMonth())
     ))
   }
-  const { savingsRate6m, extSavingsBudget6 } = computeSavingsRate6m({
+  const { savingsRate6m } = computeSavingsRate6m({
     income6m,
     expenses6m,
     savingsBudgetSpent6m,
@@ -739,18 +729,19 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
 
   // Canonieke spaarbron voor de FIRE-prognose: inkomen × spaarquote, exact zoals
   // het instellingenblok onderaan /overzicht/cashflow het toont (berekend óf
-  // overschreven, incl. spaarbudgetten + schuldaflossing).
+  // overschreven). `effectiveSavingsRate` is datzelfde percentage en voedt
+  // hieronder ook de gezondheidsscore — één getal, één oordeel.
   const sources = profile as { income_source?: string | null; expenses_source?: string | null }
-  const { baseAnnualSavings: baseAnnualSavingsFromCashflow } = resolveSavingsSource({
+  const {
+    baseAnnualSavings: baseAnnualSavingsFromCashflow,
+    effectiveSavingsRatePct: effectiveSavingsRate,
+  } = resolveSavingsSource({
     incomeSource: sources.income_source,
     expensesSource: sources.expenses_source,
     netMonthlyIncome: Number(profile.net_monthly_income ?? 0),
     estimatedAnnualIncome: extrapolatedIncome,
     estimatedMonthlyExpenses: profileMonthlyExpenses,
     savingsRate6m,
-    // Handmatig pad volgt dezelfde definitie als het transactie-pad.
-    monthlyDebtAflossing: debtAflossing6m / 6,
-    monthlySavingsContribution: extSavingsBudget6 / 6,
   })
 
 
@@ -832,18 +823,17 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
   )
   const healthScoreInput: HealthScoreInput = buildHealthScoreInput(
     {
-      savingsRate6m,
+      // EFFECTIEVE spaarquote (handmatige invoer wint) — hetzelfde percentage
+      // dat het instellingenblok onderaan /overzicht/cashflow toont en dat de
+      // FIRE-prognose hierboven gebruikt. Niet de rauwe transactiequote.
+      savingsRate6m: effectiveSavingsRate,
       totalAssets: perspectiveTotalAssets,
       totalDebts: perspectiveTotalDebts,
       freedomPct,
       avgMonthlyExpenses: avgExpenses6m,
       netMonthlyIncome: avgIncome6m,
-      // Noodfonds-score-target uit het (optionele) noodfonds-doel; consistent
-      // met /overzicht + snapshots (geen doel → default 6).
-      emergencyTargetMonths: resolveEmergencyTargetMonths(
-        (goalsResult.data ?? []) as EmergencyGoalCandidate[],
-        avgExpenses6m,
-      ),
+      // Noodbuffer-norm: 3 × netto maandsalaris (lib/emergency-fund.ts).
+      netMonthlySalary: effectiveMonthlyIncome,
     },
     {
       assets: (fullAssetsResult.data ?? []) as HealthScoreAsset[],
