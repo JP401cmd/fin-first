@@ -43,7 +43,7 @@ For a cross-cutting change, **decompose** into independent workstreams and dispa
    - Wft-compliance (no unlicensed financial/tax advice).
    - The architecture docs stay in sync with the change (same PR).
 4. **Hold the quality bar.** Match existing patterns and conventions; refactor toward clarity; handle error/edge cases; no dead code, no magic numbers, no silent scope creep.
-5. **Verify like it ships.** Run `npx tsc --noEmit`, `npm run lint`, and the relevant `npm run test:run` paths after multi-file changes. Never report done while checks are red. For risky changes, ensure the `tester` agent has coverage proving it.
+5. **Verify like it ships.** Run `npx tsc --noEmit`, `npm run lint`, and the relevant `npm run test:run` paths after multi-file changes. Never report done while checks are red. For risky changes, ensure the `tester` agent has coverage proving it. **Let op — twee testlagen:** de in-app regression suites (`lib/regression-tests/suites/*`, geregistreerd via `registerTest`/`registerCategory`) draaien NIET in vitest maar via de server-runner — UI: `/beheer/regressietest`, of headless: `POST /api/regression/run` tegen een lopende `npm run dev` (dev-only; auth via `REGRESSION_TEST_EMAIL`/`_PASSWORD` + seed). `npm run test:run` dekt ze dus niet. Voor FIRE/horizon-kernel-drift is er wél een puur-vitest gouden matrix (`lib/regression-tests/horizon-strategie/matrix.test.ts`) die `npm run test:run` al draait — gebruik die als snelle headless engine-check en regenereer de goldens bewust.
 6. **Communicate decisions.** Explain the why, the trade-offs considered, what you delegated, what you verified, and what's next. Be direct about residual risk.
 
 ## Non-negotiables

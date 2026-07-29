@@ -85,7 +85,7 @@ You have access to powerful tools - USE THEM EXTENSIVELY:
 
 **MCP Servers**: Utilize any available MCP servers that could provide relevant information or capabilities for your investigation.
 
-**Grep/Search**: Use code search extensively to find usages, patterns, and related code across the codebase.
+**Grep/Search**: Use code search extensively to find usages, patterns, and related code across the codebase. Grep op **symbool/patroon/waarde, niet op regelnummers uit de opdracht** — regelnummers driften. Noemt de opdracht een constante/bedrag/tekst: grep die rúwe waarde breed en check of dezelfde constante óók in een echt rekenpad (niet enkel de UI/tip-plek) voorkomt.
 
 ## Quality Standards
 
