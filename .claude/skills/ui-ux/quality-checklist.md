@@ -54,6 +54,7 @@
 - [ ] `prefers-reduced-motion` gerespecteerd (hook handelt dit intern af)?
 - [ ] Animaties herhalen bij pagina-navigatie (component remount reset hook state)?
 - [ ] `duration` dekt de volledige animatiesequentie?
+- [ ] **Ambient/perpetuele laad-motieven** (reizende sonde, oneindige seek-lijn — beweging die níet aan viewport-intrede of modal-open hangt): pure CSS `@keyframes … infinite`, altijd met eigen `prefers-reduced-motion`-gate. Lopen meerdere loops in één vlak, synchroniseer hun cyclusduur zodat ze in fase blijven i.p.v. tegen elkaar in te driften. Wordt een herbruikbaar avatar-component (zoals `FinDots`) als laad-motief hergebruikt, toets dan expliciet of dit de bestaande semantiek van dat component elders in de app verwatert — leg die afweging bij bouw voor, niet pas bij review.
 
 ### Editorial signature-elementen
 - [ ] **Kicker-streep**: elke kicker heeft een 28×1px module-gekleurde streep ervoor. Implementatie: `<span class="inline-block w-7 h-px bg-[var(--module-active-500)] mr-2.5 align-middle" />` vóór de kicker-tekst, of `::before` met dezelfde dimensies. Op `<380px` reduceren naar 20px.
