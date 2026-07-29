@@ -10,7 +10,8 @@
  *
  * Event types used by this module:
  *   - 'income_change'        — permanent monthly income shift (raise, income slider)
- *   - 'lifestyle_adjustment' — permanent monthly expense shift (frugal, savings slider)
+ *   - 'lifestyle_adjustment' — monthly expense shift (frugal preset = permanent; savings
+ *                              slider = income-bound, FIRE-gated via SLIDER_WORK_ORIGINS)
  *   - 'extra_inleg'          — additional monthly contribution (sprinter, extra slider)
  *   - 'part_time'            — workday reduction with income loss (slider)
  *   - 'sabbatical'           — finite-duration income loss (preset)
@@ -657,13 +658,20 @@ export function buildSliderEvent(
       })
     }
     case 'savings': {
+      // Spaarquote-slider. Het bedrag blijft bewust op `monthly_cost_change` staan (negatief
+      // = minder besteden = meer sparen): dat is het SHAPE waarop de round-trip
+      // (`readSliderValueFromEvents`/`deriveOverridesFromEvents`) én eerder OPGESLAGEN
+      // scenario's de sliderstand reconstrueren. Het is dus GEEN permanente lifestyle-keuze:
+      // de adapter-guard (`SLIDER_WORK_ORIGINS`, guard.ts) routeert dit event per 29-jul via
+      // het FIRE-gegate salaris-kanaal — spaarquote is inkomensgebonden en vervalt met het
+      // inkomen. Een `lifestyle_adjustment` ZONDER slider-origin blijft wél permanent.
       if (Math.round(value) === Math.round(baseline.savingsRate)) return null
       const baselineIncome = baseline.monthlyIncome * (baseline.workDaysPerWeek / 5)
       const deltaPp = value - baseline.savingsRate
       const deltaCost = -Math.round(baselineIncome * (deltaPp / 100))
       return buildScenarioEvent({
         id,
-        name: `Lifestyle-aanpassing (${deltaPp > 0 ? '+' : ''}${Math.round(deltaPp)}%)`,
+        name: `Spaarquote-aanpassing (${deltaPp > 0 ? '+' : ''}${Math.round(deltaPp)}pp)`,
         event_type: 'lifestyle_adjustment',
         target_age: currentAge,
         monthly_cost_change: deltaCost,

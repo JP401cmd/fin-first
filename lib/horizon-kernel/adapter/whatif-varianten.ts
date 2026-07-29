@@ -15,14 +15,17 @@
  *        routeert vrije events → Geb-rijen, beheerde types → param-blokken,
  *        market_shock → potMutaties. Geen per-variant-code nodig.
  *      → **Slider-werk-uitzondering (modellek-fix):** een event met `scenario_origin`
- *        `slider:income` (income_change), `slider:workdays` (part_time) of
- *        `slider:extra_inleg` (extra_inleg) draagt een PERMANENTE inkomens-delta. De guard
+ *        `slider:income` (income_change), `slider:workdays` (part_time),
+ *        `slider:extra_inleg` (extra_inleg) of `slider:savings` (lifestyle_adjustment)
+ *        draagt een PERMANENTE, inkomensgebonden spaarruimte-delta. De guard
  *        (`isSliderWorkEvent`) routeert die naar het salaris-kanaal (`nettoJaarinkomen`,
- *        `buildEventInputs.salarisDeltaPerMaand`) i.p.v. naar een doorlopende Geb-baat — daar
+ *        `buildEventInputs.salarisDeltaPerMaand`) i.p.v. naar een doorlopende Geb-rij — daar
  *        geldt de kern-FIRE-gate dynamisch, dus de delta lekt niet de onttrekkingsfase in.
- *        `slider:extra_inleg` is per 13-jul mee-gegate (kaart "Doel lijn grafiek vragen").
- *        Alleen de kósten-slider (`slider:savings`) blijft bewust een Geb-event. Presets
- *        (`preset:*`) dragen géén slider-origin en blijven dus ongewijzigd (Geb) — nog niet
+ *        `slider:extra_inleg` is per 13-jul mee-gegate (kaart "Doel lijn grafiek vragen");
+ *        `slider:savings` per 29-jul op eigenaarsbesluit (spaarquote = inkomensgebonden, dus
+ *        het effect vervalt met het inkomen — het FIRE-doelbedrag blijft onaangetast).
+ *        Presets (`preset:*`) en échte `lifestyle_adjustment`-events dragen géén
+ *        slider-origin en blijven dus ongewijzigd (Geb, permanent) — presets nog niet
  *        FIRE-gegate (follow-up).
  *  - rendement-slider (`returnDeltaByAssetType`):
  *      → pre-muteer het `expected_return` van de matchende bezittingen (+delta×100

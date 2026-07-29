@@ -412,8 +412,16 @@ describe('events — slider-werk-gate (modellek)', () => {
     expect({ ...withDelta.inkomenUitgaven, nettoJaarinkomen: 0 }).toStrictEqual({ ...baseline.inkomenUitgaven, nettoJaarinkomen: 0 })
   })
 
-  // (3) slider:savings (kosten-delta) → BEWUST ONGEWIJZIGD ──────────────────────────────
-  it('slider:savings (lifestyle) BLIJFT een vrije Geb-rij — kosten lopen door, geen salaris-delta', () => {
+  // (3) slider:savings (kosten-delta) → per 29-jul MEE-GEGATE (eigenaarsbesluit) ──────────
+  //
+  // Deze test stond eerder omgekeerd ("BLIJFT een vrije Geb-rij"): de aanname was dat een
+  // permanente uitgavenwijziging logisch doorloopt in de onttrekking. De eigenaar heeft die
+  // aanname op 2026-07-29 verworpen VOOR DE SLIDER: spaarquote = het deel van je ínkomen dat
+  // je spaart, dus valt het effect weg zodra het inkomen wegvalt. De kosten-delta gaat nu als
+  // `−monthly_cost_change` naar het FIRE-gegate salaris-kanaal (pre-FIRE identiek: sparen =
+  // inkomen − uitgaven). Zie `lib/horizon/scenario-slider-gate-savings.test.ts` voor de
+  // run-niveau-fingerprint.
+  it('slider:savings (spaarquote) → GEEN Geb-rij; −monthly_cost_change op salarisDeltaPerMaand', () => {
     const ev = makeSliderEvent('slider:savings', {
       id: 'whatif-slider-savings',
       event_type: 'lifestyle_adjustment',
@@ -422,9 +430,33 @@ describe('events — slider-werk-gate (modellek)', () => {
       duration_months: 0,
     })
     const { gebeurtenissen, salarisDeltaPerMaand } = buildEventInputs([ev], CTX)
+    expect(salarisDeltaPerMaand).toBe(300) // minder besteden = meer spaarruimte
+    expect(gebeurtenissen).toHaveLength(0) // partitie: salaris-kanaal XOR Geb-rij, nooit beide
+  })
+
+  // (3b) ÉCHT lifestyle_adjustment ZONDER slider-origin → ongewijzigd permanent ────────────
+  it('lifestyle_adjustment ZONDER slider-origin → vrije, doorlopende Geb-rij (geen salaris-delta)', () => {
+    const ev = makeEvent({
+      id: 'db-lifestyle',
+      event_type: 'lifestyle_adjustment',
+      target_age: 45,
+      monthly_cost_change: -300,
+      duration_months: 0,
+      is_indexed: true,
+    })
+    const { gebeurtenissen, salarisDeltaPerMaand } = buildEventInputs([ev], CTX)
     expect(salarisDeltaPerMaand).toBe(0)
     expect(gebeurtenissen).toHaveLength(1)
-    expect(gebeurtenissen[0].posten[0].eindLeeftijd).toBeNull() // doorlopend (bewust behouden)
+    expect(gebeurtenissen[0].posten[0].eindLeeftijd).toBeNull() // permanent — bewust behouden
+  })
+
+  // (3c) income + savings samen → één gesommeerde spaarruimte-delta ────────────────────────
+  it('income + savings samen → inkomens- en kosten-delta gesommeerd op één salaris-kanaal', () => {
+    const inc = makeSliderEvent('slider:income', { id: 'whatif-slider-income', event_type: 'income_change', target_age: 45, monthly_income_change: 1000 })
+    const sav = makeSliderEvent('slider:savings', { id: 'whatif-slider-savings', event_type: 'lifestyle_adjustment', target_age: 45, monthly_cost_change: -250 })
+    const { gebeurtenissen, salarisDeltaPerMaand } = buildEventInputs([inc, sav], CTX)
+    expect(gebeurtenissen).toHaveLength(0)
+    expect(salarisDeltaPerMaand).toBe(1250)
   })
 
   // (4) slider:extra_inleg → FIRE-gegate (kaart "Doel lijn grafiek vragen", 13-jul) ──────────

@@ -2025,9 +2025,12 @@ export default function HorizonPage({
     () => buildCoverageStrip(duidingUnifiedRows ?? []),
     [duidingUnifiedRows],
   )
-  // Bij een actief scenario schuift de bestedingsgrondslag mee met de spaarquote-slider
-  // (`lifestyle_adjustment`-event → `monthly_cost_change`), zodat het kompas het scenario
-  // volgt. Basis zonder scenario.
+  // Bij een actief scenario schuift de bestedingsgrondslag mee met de scenario-events die
+  // de motor óók als permanente uitgavenwijziging telt (`monthly_cost_change` op een vrije
+  // Geb-rij). De spaarquote-slider valt daar per 29-jul BUITEN: die is inkomensgebonden en
+  // loopt via het FIRE-gegate salaris-kanaal, dus hij verlaagt het FIRE-doelbedrag niet en
+  // mag hier de onttrekkings-bestedingsgrenzen evenmin verlagen (`scenarioMonthlySpendDelta`
+  // past dezelfde `isSliderWorkEvent`-gate toe). Basis zonder scenario.
   const activeMonthlySpend =
     (effectiveInput?.monthlyExpenses ?? 0) + (hasScenario ? scenarioMonthlySpendDelta(scenarioSliderEvents) : 0)
   const guardrailBounds = useMemo(

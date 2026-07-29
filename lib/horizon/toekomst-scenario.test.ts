@@ -549,4 +549,18 @@ describe('scenarioMonthlySpendDelta', () => {
   it('lege lijst → 0', () => {
     expect(scenarioMonthlySpendDelta([])).toBe(0)
   })
+
+  // ── Slider-werk-gate (29-jul): één grondslag met de motor ──────────────────
+  it('negeert de spaarquote-slider (slider:savings) — die loopt via het FIRE-gegate salaris-kanaal', () => {
+    const events = [
+      makeSliderEvent({ monthly_cost_change: -400, scenario_origin: 'slider:savings' }),
+      makeSliderEvent({ monthly_cost_change: -100 }), // écht lifestyle-event (geen origin) → telt wél
+    ]
+    expect(scenarioMonthlySpendDelta(events)).toBe(-100)
+  })
+
+  it('preset-events (preset:*) tellen wél mee — die blijven in de motor een permanente Geb-rij', () => {
+    const events = [makeSliderEvent({ monthly_cost_change: -250, scenario_origin: 'preset:frugal' })]
+    expect(scenarioMonthlySpendDelta(events)).toBe(-250)
+  })
 })

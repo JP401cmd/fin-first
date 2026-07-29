@@ -137,10 +137,10 @@ export function buildKernelInputFromAppWithNotices(input: KernelAdapterInput): K
   const partnerResult = input.partner ? buildPartnerParams(input.partner, aowRows) : null
   const personen = partnerResult ? 2 : 1
 
-  // Slider-werk-flows (inkomen/werkdagen, wat-als/scenariolaag) → salaris-kanaal. Hun
-  // permanente maand-delta wordt op het basissalaris (`nettoJaarinkomen`) opgeteld — daar
-  // geldt de dynamische kern-FIRE-gate (CF!D → F sparen, 0 ná FIRE), zodat de delta niet als
-  // levenslange Geb-baat de onttrekkingsfase in lekt. BEWUST ná `buildInkomenUitgaven`, zodat
+  // Slider-werk-flows (inkomen/werkdagen/extra inleg/spaarquote, wat-als/scenariolaag) →
+  // salaris-kanaal. Hun permanente maand-delta wordt op het basissalaris (`nettoJaarinkomen`)
+  // opgeteld — daar geldt de dynamische kern-FIRE-gate (CF!D → F sparen, 0 ná FIRE), zodat de
+  // delta niet als levenslange Geb-rij de onttrekkingsfase in lekt. BEWUST ná `buildInkomenUitgaven`, zodat
   // `uitgaveNaPensioenPerJaar` op het ongewijzigde basisinkomen blijft (scenario-inkomen
   // raakt de uitgave-na-pensioen-aanname niet — minimale blast radius). Delta 0 → byte-
   // identieke `inkomenUitgaven` (referentie behouden) → snede-1-determinisme intact.

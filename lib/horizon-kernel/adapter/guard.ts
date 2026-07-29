@@ -17,15 +17,18 @@
  *   wél als domein-invoer — dus mogen ze evenmin als vrije Geb-rij dubbeltellen.
  * - **Slider-werk-flows** (`isSliderWorkEvent`, wat-als/scenariolaag): een
  *   `scenario_origin`-event `slider:income` (income_change), `slider:workdays`
- *   (part_time) of `slider:extra_inleg` (extra_inleg) draagt een PERMANENTE inkomens-
- *   delta. Die hoort NIET als doorlopende Geb-baat (die CF!H onvoorwaardelijk telt —
- *   óók ná FIRE = modellek), maar via het salaris-kanaal (`nettoJaarinkomen`), waar de
- *   kern-FIRE-gate dynamisch geldt. De partitie houdt ze dus óók uit `vrij`; `events.ts`
- *   sommeert hun delta apart. **Extra inleg is per 13-jul FIRE-gegate** (kaart "Doel lijn
- *   grafiek vragen"): het stelt voor de gebruiker extra werk-/spaarruimte voor die na de
+ *   (part_time), `slider:extra_inleg` (extra_inleg) of `slider:savings`
+ *   (lifestyle_adjustment) draagt een PERMANENTE, INKOMENSGEBONDEN delta. Die hoort
+ *   NIET als doorlopende Geb-rij (die CF!H onvoorwaardelijk telt — óók ná FIRE =
+ *   modellek), maar via het salaris-kanaal (`nettoJaarinkomen`), waar de kern-FIRE-gate
+ *   dynamisch geldt. De partitie houdt ze dus óók uit `vrij`; `events.ts` sommeert hun
+ *   delta apart. **Extra inleg is per 13-jul FIRE-gegate** (kaart "Doel lijn grafiek
+ *   vragen"): het stelt voor de gebruiker extra werk-/spaarruimte voor die na de
  *   vrijheidsleeftijd — als je stopt met werken — vervalt, precies als income/workdays.
- *   De kósten-slider (`slider:savings` = lifestyle_adjustment) blijft BEWUST een vrije
- *   Geb-event: een permanente uitgavenwijziging loopt logisch door in de onttrekking.
+ *   **De spaarquote-slider is per 29-jul mee-gegate** (eigenaarsbesluit): spaarquote =
+ *   het deel van je ínkomen dat je spaart; valt het inkomen weg bij FIRE, dan vervalt
+ *   het spaarquote-effect mee. Zie `SLIDER_WORK_ORIGINS` voor de grens met échte
+ *   (niet-slider) `lifestyle_adjustment`-events, die wél permanent doorlopen.
  *
  * ## Verplichte eigenschap (plan-doc §9)
  * Met een strategie actief bevat de kern-input de afgeleide stroom precies ÉÉN keer,
@@ -54,10 +57,22 @@ export interface GuardEvent {
 }
 
 /**
- * `scenario_origin`-waarden die een SLIDER-WERK-flow markeren: de inkomens-, werkdagen- en
- * extra-inleg-slider. Alledrie dragen een permanente inkomens-delta die via het salaris-kanaal
- * (FIRE-gegate) hoort te lopen i.p.v. als levenslange Geb-baat. BEWUST NIET erin:
- * `slider:savings` (kósten-delta, loopt door in de onttrekking).
+ * `scenario_origin`-waarden die een SLIDER-WERK-flow markeren: de inkomens-, werkdagen-,
+ * extra-inleg- en spaarquote-slider. Alle vier dragen een permanente, INKOMENSGEBONDEN
+ * delta die via het salaris-kanaal (FIRE-gegate) hoort te lopen i.p.v. als levenslange
+ * Geb-rij.
+ *
+ * **`slider:savings` per 2026-07-29 erbij (eigenaarsbesluit).** De eerdere motivering
+ * ("een permanente uitgavenwijziging loopt logisch door in de onttrekking") is door de
+ * eigenaar verworpen VOOR DE SLIDER: de spaarquote is het deel van je ínkomen dat je
+ * spaart, dus valt het effect weg zodra het inkomen wegvalt — precies zoals bij income/
+ * workdays/extra_inleg. Pre-FIRE is de rekenkundige route identiek (sparen = inkomen −
+ * uitgaven, dus +X inkomen ≡ −X uitgaven); ná FIRE gate't het salaris-kanaal 'm vanzelf
+ * én blijft het FIRE-doelbedrag (dat op de uitgave-na-pensioen rust) onaangetast.
+ *
+ * BEWUST NIET erin: een échte `lifestyle_adjustment` ZONDER slider-origin (DB-/gebruikers-
+ * levensgebeurtenis). Die blijft een vrije, permanent doorlopende Geb-rij — daar is de
+ * uitgavenwijziging wél een levenskeuze en géén inkomensgebonden spaarafspraak.
  *
  * Let op — dit is de SLIDER-set: alleen `buildSliderEvent` (`lib/scenario-events.ts`) zet deze
  * origins. De beslishulp-runs dragen `beslishulp:*` (bewust GEEN slider-origin): daar hoort de
@@ -68,13 +83,15 @@ export const SLIDER_WORK_ORIGINS: ReadonlySet<string> = new Set([
   'slider:income',
   'slider:workdays',
   'slider:extra_inleg',
+  'slider:savings',
 ])
 
 /**
- * True als dit event een slider-werk-flow is (inkomen-, werkdagen- of extra-inleg-slider).
- * Herkenning via `scenario_origin` (robuust; geen naam- of id-string-matching). Deze events
- * worden noch aan een strategie/expander, noch aan een vrije Geb-rij toegewezen — hun
- * inkomens-delta gaat via het salaris-kanaal (`buildEventInputs.salarisDeltaPerMaand`).
+ * True als dit event een slider-werk-flow is (inkomen-, werkdagen-, extra-inleg- of
+ * spaarquote-slider). Herkenning via `scenario_origin` (robuust; geen naam- of
+ * id-string-matching). Deze events worden noch aan een strategie/expander, noch aan een
+ * vrije Geb-rij toegewezen — hun inkomensgebonden delta gaat via het salaris-kanaal
+ * (`buildEventInputs.salarisDeltaPerMaand`).
  */
 export function isSliderWorkEvent(event: GuardEvent): boolean {
   return event.scenario_origin != null && SLIDER_WORK_ORIGINS.has(event.scenario_origin)

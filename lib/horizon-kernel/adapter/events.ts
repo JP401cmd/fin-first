@@ -9,16 +9,18 @@
  *    adapter geeft pot-parameters door, geen uitkeringsbedragen, behalve bij direct-
  *    bruto-metadata, zie `mapPensionPots`);
  *  - **werk** → `WerkStrategieParams` (de kern bouwt de salarisladder → CF!D-delta);
- *  - **slider-werk** (`scenario_origin` `slider:income`/`slider:workdays`/`slider:extra_inleg`)
- *    → een PERMANENTE inkomens-delta die als één bedrag (`salarisDeltaPerMaand`) op het
- *    salaris-kanaal (`nettoJaarinkomen`, snede 1) landt i.p.v. als Geb-rij. Daar geldt de
- *    dynamische FIRE-gate van de kern automatisch (CF!D → F sparen, 0 ná FIRE), zodat de
- *    delta — anders dan een doorlopende Geb-baat in CF!H — NIET de onttrekkingsfase in lekt.
- *    Sliders starten altijd op `currentAge` (= maand 0), dus een vlakke delta op het basis-
- *    salaris heeft dezelfde start-semantiek. `slider:extra_inleg` is per 13-jul mee-gegate
- *    (kaart "Doel lijn grafiek vragen"): extra inleg vervalt logisch zodra je stopt met werken.
- *    Alleen de kósten-slider (`slider:savings`) blijft BEWUST een vrije Geb-event (een
- *    permanente uitgavenwijziging loopt door in de onttrekking);
+ *  - **slider-werk** (`scenario_origin` `slider:income`/`slider:workdays`/`slider:extra_inleg`/
+ *    `slider:savings`) → een PERMANENTE, inkomensgebonden SPAARRUIMTE-delta die als één bedrag
+ *    (`salarisDeltaPerMaand`) op het salaris-kanaal (`nettoJaarinkomen`, snede 1) landt i.p.v.
+ *    als Geb-rij. Daar geldt de dynamische FIRE-gate van de kern automatisch (CF!D → F sparen,
+ *    0 ná FIRE), zodat de delta — anders dan een doorlopende Geb-rij in CF!H — NIET de
+ *    onttrekkingsfase in lekt. Sliders starten altijd op `currentAge` (= maand 0), dus een
+ *    vlakke delta op het basissalaris heeft dezelfde start-semantiek. `slider:extra_inleg` is
+ *    per 13-jul mee-gegate (kaart "Doel lijn grafiek vragen"): extra inleg vervalt logisch
+ *    zodra je stopt met werken. `slider:savings` (spaarquote, kósten-delta) is per 29-jul
+ *    mee-gegate op eigenaarsbesluit: spaarquote is het deel van je ínkomen dat je spaart, dus
+ *    valt het effect weg zodra het inkomen wegvalt. Een échte `lifestyle_adjustment` ZONDER
+ *    slider-origin blijft wél een permanent doorlopende vrije Geb-rij;
  *  - **alle overige (vrije) typen** → handmatige `GebeurtenisRij[]` (Geb rij 4-13),
  *    via hergebruik van de app-expander `lifeEventsToCashflows` (children/inheritance/
  *    aow/pension/werk/huis/slider-werk worden dáár NIET meegeteld — die zijn hier al gerouteerd).
@@ -80,10 +82,11 @@ export interface EventInputs {
   readonly werkStrategie: WerkStrategieParams
   readonly gebeurtenissen: readonly GebeurtenisRij[]
   /**
-   * Permanente netto-inkomens-delta per maand (€) uit de slider-werk-flows
-   * (`slider:income`/`slider:workdays`), gesommeerd. De barrel telt dit op bij
+   * Permanente netto-SPAARRUIMTE-delta per maand (€) uit de slider-werk-flows
+   * (`slider:income`/`slider:workdays`/`slider:extra_inleg`/`slider:savings`), gesommeerd als
+   * `monthly_income_change − monthly_cost_change`. De barrel telt dit op bij
    * `nettoJaarinkomen` (× 12) zodat het via het FIRE-gegate salaris-kanaal loopt i.p.v. als
-   * levenslange Geb-baat. 0 wanneer er geen slider-werk-events zijn (byte-identiek aan snede 1).
+   * levenslange Geb-rij. 0 wanneer er geen slider-werk-events zijn (byte-identiek aan snede 1).
    */
   readonly salarisDeltaPerMaand: number
   /**
@@ -131,8 +134,9 @@ export function buildEventInputs(
 ): EventInputs {
   const active = dedupeById(events).filter((e) => e.is_active)
 
-  // Slider-werk-flows (inkomen/werkdagen) worden eerst afgevangen: hun permanente inkomens-
-  // delta gaat via het salaris-kanaal (FIRE-gegate), niet via een Geb-rij. Wat overblijft
+  // Slider-werk-flows (inkomen/werkdagen/extra inleg/spaarquote) worden eerst afgevangen: hun
+  // permanente, inkomensgebonden spaarruimte-delta gaat via het salaris-kanaal (FIRE-gegate),
+  // niet via een Geb-rij — één van de twee, nooit beide (dubbeltelling-guard). Wat overblijft
   // partitioneert de guard als vanouds (beheerd → param-blokken, vrij → Geb-rijen).
   const salarisDeltaEvents = active.filter(isSliderWorkEvent)
   const rest = active.filter((e) => !isSliderWorkEvent(e))
@@ -150,17 +154,33 @@ export function buildEventInputs(
 }
 
 /**
- * Som de permanente maandelijkse inkomens-delta over de slider-werk-events. Beide bronnen
- * dragen de delta op `monthly_income_change` (income-slider: raise/verlaging; werkdagen-slider:
- * het inkomensverlies, negatief). Sliders zetten `target_age = currentAge` (= maand 0), dus de
- * delta start synchroon met het basissalaris — een vlakke optelling op `nettoJaarinkomen`
- * heeft dezelfde start-semantiek. Geen delta / lege lijst → 0 (byte-identiek aan snede 1).
+ * Som de permanente maandelijkse SPAARRUIMTE-delta over de slider-werk-events:
+ * `monthly_income_change − monthly_cost_change` per event. Beide termen tellen omdat de
+ * spaarruimte per definitie inkomen − uitgaven is; een slider die de kósten verlaagt
+ * levert pre-FIRE exact dezelfde opbouw als een slider die het inkomen evenveel verhoogt.
+ *
+ * Per bron:
+ *  - `slider:income` (raise/verlaging) en `slider:workdays` (inkomensverlies, negatief) en
+ *    `slider:extra_inleg` dragen de delta op `monthly_income_change`; hun
+ *    `monthly_cost_change` is 0 (`buildScenarioEvent`-default) → byte-identieke uitkomst
+ *    als vóór deze uitbreiding;
+ *  - `slider:savings` (spaarquote, per 29-jul mee-gegate) draagt 'm op `monthly_cost_change`
+ *    (negatief = minder besteden = meer sparen) → `−monthly_cost_change` is de positieve
+ *    spaarruimte-delta. Het event-SHAPE blijft bewust ongewijzigd, zodat de round-trip
+ *    (`readSliderValueFromEvents`/`deriveOverridesFromEvents`) en eerder OPGESLAGEN
+ *    scenario's de sliderstand onveranderd reconstrueren.
+ *
+ * Sliders zetten `target_age = currentAge` (= maand 0), dus de delta start synchroon met het
+ * basissalaris — een vlakke optelling op `nettoJaarinkomen` heeft dezelfde start-semantiek.
+ * Geen delta / lege lijst → 0 (byte-identiek aan snede 1).
  */
 function sumSalarisDeltaPerMaand(events: readonly LifeEvent[]): number {
   let som = 0
   for (const ev of events) {
-    const delta = Number(ev.monthly_income_change ?? 0)
-    if (Number.isFinite(delta)) som += delta
+    const inkomen = Number(ev.monthly_income_change ?? 0)
+    if (Number.isFinite(inkomen)) som += inkomen
+    const kosten = Number(ev.monthly_cost_change ?? 0)
+    if (Number.isFinite(kosten)) som -= kosten
   }
   return som
 }

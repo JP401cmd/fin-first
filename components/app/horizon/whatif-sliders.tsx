@@ -280,7 +280,7 @@ function SliderGrid({
         <div className="border-b border-dashed border-[var(--border-ed)] xl:border-b-0">
           <SliderRow
             label="Spaarquote"
-            hint="→ Lifestyle-event"
+            hint="→ Spaarquote-event"
             value={savingsValue}
             baseValue={baseline.savingsRate}
             min={savingsRange.min}
