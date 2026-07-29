@@ -42,6 +42,8 @@ Elke inhoudelijke opdracht routeert via de bijpassende pijplijn-skill — niet a
 
 **Uitzondering — juridische pagina's:** raakt de wijziging `/privacy`, `/voorwaarden` of `/wft`, dan nooit via `kleine-aanpassing` — hoe klein ook. Altijd via de Grenswachter-route (juridische toets), met een aantekening waaróm de tekst wijzigt (brief-formaat, één pagina). Zie de org-site: `trifinity-org/site/werkstromen.html#stroom-03`.
 
+**Proportionaliteit bij defecten — diagnose eerst.** Een defect blijft via `bug-fix` lopen, maar begin altijd zelf: lees de betrokken code en verifieer gemelde teksten/bedragen met een grep vóór je een agent start. Is de oorzaak daarmee hard én lokaal — één bestand, geen gedeeld contract, geen nieuw veld — neem dan de fast-path (stap 0 van de skill): falende test, fix, verificatie. De volledige pijplijn (`bug-reporter`, `requirement-specialist`, `architect`) pas bij een gedeeld contract, een rekenmotor, een nieuw bundel-/DB-veld, meerdere surfaces, of wanneer live accountdata nodig is om te bewijzen wát er fout is. Bij twijfel: volledige pijplijn.
+
 **Harde regel: een vervolgbericht binnen een lopende sessie telt als een nieuwe opdracht.** Een bugmelding die ná feature-werk komt start opnieuw `bug-fix`; een nieuwe tweak start opnieuw `kleine-aanpassing`. Sla de skill NIET over omdat je al middenin een sessie zit, al code aan het lezen bent, of de vorige stap een andere skill gebruikte. Bij twijfel tussen "klein vs. defect vs. uitbreiding": kies de skill die past bij de aard van de vraag, niet de makkelijkste. Begin pas met onderzoeken/implementeren ná het invoken van de skill.
 
 ### Organisatieopzet (verwijzing)
