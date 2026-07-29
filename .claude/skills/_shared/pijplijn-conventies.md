@@ -12,6 +12,8 @@ Eindigt een subagent voortijdig (limiet/fout) of zonder bruikbaar rapport: inven
 
 Verifieer bestandspad- en symboolverwijzingen in een agent-briefing vóór dispatch met een snelle Glob/grep — een stale pad kost de agent een zoekronde en kan een verificatie-opdracht ongeldig maken.
 
+Bevat een (bug)melding letterlijke UI-tekst, labels of bedragen, verifieer die dan éérst met één repo-brede grep op de meest onderscheidende strings — plus `git log -S` over alle branches bij nul treffers — vóór component-/functienaam-onderzoek of een agent-dispatch (en geef de uitkomst mee in de briefing). Nul treffers overal betekent: het scherm komt mogelijk niet uit deze codebase (prototype, demo, ander gereedschap) — dat inzicht stuurt het hele onderzoek en bespaart vergeefse zoekrondes.
+
 Bouwt een agent-briefing op **statische review-bevindingen** (een eerder rapport, een audit-snapshot), formuleer elke fix dan als **verifieer-eerst** ("controleer of X nog ontbreekt; fix alleen dan") in plaats van "doe dit" — de codebase kan sinds de review veranderd zijn, en een blind uitgevoerde stale opdracht bouwt het defect juist ín (bv. een tweede hero stapelen op een pagina die de kop inmiddels al heeft).
 
 ## Voortgangsrapportage (verplicht)
