@@ -14,8 +14,11 @@
  */
 
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import {
   resolveEmergencyFund,
+  EMERGENCY_STANDAARD_DOEL_KEY,
   emergencyScoreTargetMonths,
   emergencyGoalTarget,
   pickEmergencyGoal,
@@ -23,6 +26,7 @@ import {
   resolveEmergencyTargetMonths,
   DEFAULT_EMERGENCY_TARGET_MONTHS,
   MIN_EMERGENCY_SCORE_TARGET_MONTHS,
+  MAX_EMERGENCY_DISPLAY_TARGET_MONTHS as MAX_EMERGENCY_TARGET_MONTHS,
   type EmergencyGoalCandidate,
 } from '@/lib/emergency-fund'
 import { computeLiquidPot } from '@/lib/dashboard-wealth-weighting'
@@ -78,6 +82,43 @@ describe('resolveEmergencyFund — met doel', () => {
     expect(r.source).toBe('goal')
     expect(r.targetAmount).toBe(15_000)
     expect(r.targetMonths).toBeCloseTo(6, 5) // 15000 / 2500
+  })
+
+  it('DEGENERATIETAK: €-doel bij bijna-nul maanduitgaven explodeert niet (clamp 24)', () => {
+    // Exact de productiesituatie die de backfill blootlegde: een €5.000-doel bij
+    // €12,85 gemeten maanduitgaven gaf 389 "maanden" target. Ongeclampt zou dat
+    // als "0,0 / 389 maanden gedekt" op de tegel landen en de score op 0 pinnen.
+    const r = resolveEmergencyFund({
+      liquidPot: 0,
+      effectiveMonthlyExpenses: 12.85,
+      goal: { targetAmount: 5_000 },
+    })
+    expect(5_000 / 12.85).toBeGreaterThan(380) // de ongeclampte ratio
+    expect(r.targetMonths).toBe(MAX_EMERGENCY_TARGET_MONTHS) // 24
+    // Het doelBEDRAG blijft de onverkorte gebruikerskeuze — alleen de
+    // maanden-expressie is begrensd (de voortgangsbalk rekent op het bedrag).
+    expect(r.targetAmount).toBe(5_000)
+    expect(r.source).toBe('goal')
+  })
+
+  it('handmatig maanden-doel boven het plafond wordt begrensd (bedrag volgt de clamp)', () => {
+    const r = resolveEmergencyFund({
+      liquidPot: 10_000,
+      effectiveMonthlyExpenses: 1_000,
+      goal: { targetMonths: 60 },
+    })
+    expect(r.targetMonths).toBe(MAX_EMERGENCY_TARGET_MONTHS)
+    // Bij een MAANDEN-doel is het bedrag de afgeleide → volgt de begrensde maanden.
+    expect(r.targetAmount).toBe(24_000)
+  })
+
+  it('target binnen de bandbreedte blijft exact ongewijzigd (clamp is niet-invasief)', () => {
+    const r = resolveEmergencyFund({
+      liquidPot: 0,
+      effectiveMonthlyExpenses: 3_500,
+      goal: { targetAmount: 10_500 },
+    })
+    expect(r.targetMonths).toBeCloseTo(3, 10) // 10500 / 3500 — geen clamp
   })
 
   it('currentAmount = liquide pot, NOOIT de goal.current_value (geen dubbeltelling)', () => {
@@ -161,6 +202,51 @@ describe('emergencyScoreTargetMonths — anti-gaming vloer', () => {
   it('ongeldige/0 target → default 6', () => {
     expect(emergencyScoreTargetMonths(0)).toBe(DEFAULT_EMERGENCY_TARGET_MONTHS)
     expect(emergencyScoreTargetMonths(NaN)).toBe(DEFAULT_EMERGENCY_TARGET_MONTHS)
+  })
+  it('absurd hoge target wordt begrensd — de pijler kan niet permanent op 0 blijven', () => {
+    expect(emergencyScoreTargetMonths(389)).toBe(MAX_EMERGENCY_TARGET_MONTHS)
+    expect(emergencyScoreTargetMonths(Infinity)).toBe(DEFAULT_EMERGENCY_TARGET_MONTHS)
+  })
+})
+
+// ── Backfill-marker: code en migratie moeten dezelfde sleutel schrijven ───────
+// De marker-waarde leeft in TypeScript (EMERGENCY_STANDAARD_DOEL_KEY) maar staat
+// als string-literal in de backfill-migratie. Deze test bewaakt die naad: gaat de
+// constante ooit veranderen, dan wordt de migratie (en daarmee de detectie op
+// bestaande rijen) stil inert — precies de bug die deze kaart terugstuurde.
+
+describe('backfill-migratie — marker blijft in sync met de resolver', () => {
+  const sql = readFileSync(
+    join(
+      process.cwd(),
+      'supabase/migrations/20260729120000_backfill_noodfonds_standaarddoel_marker.sql',
+    ),
+    'utf8',
+  )
+
+  it('schrijft exact de sleutel/waarde die isEmergencyGoal detecteert', () => {
+    expect(sql).toContain(`{"standaardDoel":"${EMERGENCY_STANDAARD_DOEL_KEY}"}`)
+  })
+
+  it('overschrijft nooit een bestaande marker (idempotent)', () => {
+    expect(sql).toContain("metadata->>'standaardDoel' IS NULL")
+  })
+
+  it('de legacy-productievorm (savings, metadata {}) wordt zonder marker NIET herkend', () => {
+    // Dit is de rij zoals ze op productie stond: naam "Noodfonds", savings,
+    // metadata {} → géén detectie, dus source='liquid' en target 6. Daarom de
+    // backfill.
+    const legacy: EmergencyGoalCandidate = { goal_type: 'savings', target_value: '10500.00', metadata: {} }
+    expect(isEmergencyGoal(legacy)).toBe(false)
+    expect(pickEmergencyGoal([legacy])).toBeNull()
+
+    // Na de backfill draagt dezelfde rij de marker → doel stuurt de target.
+    const backfilled: EmergencyGoalCandidate = {
+      ...legacy,
+      metadata: { standaardDoel: EMERGENCY_STANDAARD_DOEL_KEY },
+    }
+    expect(isEmergencyGoal(backfilled)).toBe(true)
+    expect(resolveEmergencyTargetMonths([backfilled], 3_500)).toBeCloseTo(3, 10)
   })
 })
 

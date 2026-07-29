@@ -475,7 +475,6 @@ describe('computeHealthScore(DashboardData) overload', () => {
       favoriteHoldings: [],
       allBudgets: [],
       notifications: [],
-      aiInsights: [],
       nextSteps: [],
       monthSummary: { label: '', highlights: [] } as any,
       upcomingEvents: [],

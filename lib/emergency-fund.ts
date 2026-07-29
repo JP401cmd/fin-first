@@ -22,7 +22,7 @@
  *    is bewust géén huis/beleggingen/pensioen (CLAUDE.md).
  */
 
-import { TARGET_EMERGENCY_MONTHS } from '@/lib/constants'
+import { MAX_EMERGENCY_TARGET_MONTHS, TARGET_EMERGENCY_MONTHS } from '@/lib/constants'
 
 /**
  * Default noodfonds-buffer in maanden vaste lasten (6×, Nibud-bovengrens).
@@ -40,6 +40,26 @@ export const DEFAULT_EMERGENCY_TARGET_MONTHS = TARGET_EMERGENCY_MONTHS // = 6
  * gebruikt de gefloorde target.
  */
 export const MIN_EMERGENCY_SCORE_TARGET_MONTHS = 3
+
+/**
+ * BOVENGRENS voor de target in maanden — alias op de canonieke
+ * `MAX_EMERGENCY_TARGET_MONTHS` (lib/constants.ts), geen tweede magic number.
+ * Begrenst uitsluitend de MAANDEN-expressie van een doel; het doelbedrag in
+ * euro's blijft ongemoeid. Zie de constante voor de onderbouwing (degenerate
+ * maanduitgaven-noemer + symmetrie met de anti-gaming-vloer).
+ */
+export const MAX_EMERGENCY_DISPLAY_TARGET_MONTHS = MAX_EMERGENCY_TARGET_MONTHS // = 24
+
+/**
+ * Begrens een target-in-maanden tot een zinnige buffer-bandbreedte. Puur op de
+ * BOVENkant (de vloer hoort bij de score, niet bij de weergave) plus een
+ * eindigheids-check, zodat een deling door bijna-nul maanduitgaven nooit als
+ * "389 maanden" doorlekt naar tegel of score.
+ */
+function clampTargetMonths(months: number): number {
+  if (!Number.isFinite(months) || months <= 0) return DEFAULT_EMERGENCY_TARGET_MONTHS
+  return Math.min(months, MAX_EMERGENCY_DISPLAY_TARGET_MONTHS)
+}
 
 /** Marker-waarde in `goals.metadata.standaardDoel` voor het standaard-noodfonds. */
 export const EMERGENCY_STANDAARD_DOEL_KEY = 'noodfonds'
@@ -86,16 +106,20 @@ export function resolveEmergencyFund(input: EmergencyFundInput): EmergencyFundRe
   const { liquidPot, effectiveMonthlyExpenses, goal } = input
 
   // Target-maanden: expliciete doel-maanden > afgeleid uit doelbedrag > default.
+  // Altijd door clampTargetMonths: een €-doel gedeeld door (bijna) nul
+  // maanduitgaven zou anders een absurde target opleveren (productie: €5.000 /
+  // €12,85 = 389 maanden), en ook een handmatig ingetikt maanden-doel mag niet
+  // ongelimiteerd zijn. Het doelBEDRAG blijft hieronder ongemoeid.
   let targetMonths = DEFAULT_EMERGENCY_TARGET_MONTHS
   if (goal) {
     if (goal.targetMonths != null && goal.targetMonths > 0) {
-      targetMonths = goal.targetMonths
+      targetMonths = clampTargetMonths(goal.targetMonths)
     } else if (
       goal.targetAmount != null &&
       goal.targetAmount > 0 &&
       effectiveMonthlyExpenses > 0
     ) {
-      targetMonths = goal.targetAmount / effectiveMonthlyExpenses
+      targetMonths = clampTargetMonths(goal.targetAmount / effectiveMonthlyExpenses)
     }
   }
 
@@ -118,14 +142,20 @@ export function resolveEmergencyFund(input: EmergencyFundInput): EmergencyFundRe
 }
 
 /**
- * Score-target: display-target met de anti-gaming-vloer toegepast. Alleen de
+ * Score-target: display-target begrensd op [vloer, plafond]. Alleen de
  * gezondheidsscore-curve gebruikt deze; de display-target blijft ongefloord.
+ * De vloer is anti-gaming (mini-doel ≠ gratis 100%); het plafond voorkomt dat
+ * een absurd hoge target de pijler permanent op 0 pint. Callers geven soms een
+ * rauwe waarde door, dus beide grenzen ook hier — niet alleen in de resolver.
  */
 export function emergencyScoreTargetMonths(displayTargetMonths: number): number {
   if (!Number.isFinite(displayTargetMonths) || displayTargetMonths <= 0) {
     return DEFAULT_EMERGENCY_TARGET_MONTHS
   }
-  return Math.max(MIN_EMERGENCY_SCORE_TARGET_MONTHS, displayTargetMonths)
+  return Math.min(
+    MAX_EMERGENCY_DISPLAY_TARGET_MONTHS,
+    Math.max(MIN_EMERGENCY_SCORE_TARGET_MONTHS, displayTargetMonths),
+  )
 }
 
 // ── Marker & doel-selectie (detectie-marker B) ───────────────────────────────

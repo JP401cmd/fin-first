@@ -47,6 +47,7 @@ import type {
   WoningStrategieParams,
 } from '../types'
 import {
+  APP_AOW_BASIS_PER_MAAND,
   DEFAULT_TAX_YEAR,
   EXCEL_FASE_CURVE,
   EXCEL_GUARDRAIL_DEFAULTS,
@@ -418,6 +419,12 @@ export const NEUTRAL_GEBEURTENISSEN: readonly GebeurtenisRij[] = []
  * erfenis, geen pensioen-multipot. BEWUST 0 AOW-opbouwjaren: de AOW-/pensioen-expander
  * (afgeleid uit het echte profiel/UPO) is snede 2/3 — tot dan injecteert de adapter
  * geen (ongemapte) AOW-stroom.
+ *
+ * WÉL gezet: `aowBasisPerMaand` — het app-pad rekent de kern-B21 op de canonieke SVB-
+ * bedragen uit `lib/constants.ts` i.p.v. de Excel-oracle-basis 1452/993 (gap-besluit
+ * V20 / ADR 0064). Dit is de enige injectieplek voor het app-pad: `buildAutoGebeurtenissen`
+ * (adapter/events.ts) spreidt deze constante altijd als basis, ook zonder AOW-event.
+ * Het parity-/fixture-pad (`input-from-fixture`) laat het veld weg → oracle-fallback.
  */
 export const NEUTRAL_AUTO_GEBEURTENISSEN: AutoGebeurtenisParams = {
   leefsituatie: 'Alleenstaand',
@@ -432,6 +439,7 @@ export const NEUTRAL_AUTO_GEBEURTENISSEN: AutoGebeurtenisParams = {
   erfenisRelatie: 'Kind',
   erfenisLeeftijd: 0,
   pensioenPotten: [],
+  aowBasisPerMaand: APP_AOW_BASIS_PER_MAAND,
 }
 
 /** Geen partner (household/partner V3 = snede 3). Inerte waarden. */

@@ -463,7 +463,7 @@ export const FISCALE_KERNGETALLEN: FiscaalKerngetal[] = [
     sourceUrl: 'https://www.svb.nl/nl/aow/bedragen-aow/aow-bedragen',
     updateFrequency: 'jaarlijks',
     lastVerified: '2026-07-04',
-    note: 'SVB indexeert de AOW-bedragen twee keer per jaar (januari/juli); dit zijn de bedragen per 1-7-2026. Niet jaargelaagd, maar de eerdere losse duplicaten in CASHFLOW_CATALOG en de AOW-prefab (defaultMonthlyIncome) zijn opgeheven — die importeren nu deze constante (zie drift-punt "aow-bedrag-dubbel"). De cohort-tabel aow_leeftijd (DB) is de bron voor de individuele AOW-leeftijd.',
+    note: 'SVB indexeert de AOW-bedragen twee keer per jaar (januari/juli); dit zijn de bedragen per 1-7-2026. Niet jaargelaagd, maar de eerdere losse duplicaten in CASHFLOW_CATALOG en de AOW-prefab (defaultMonthlyIncome) zijn opgeheven — die importeren nu deze constante (zie drift-punt "aow-bedrag-dubbel"). Sinds ADR 0064 consumeert óók de FIRE-kernel deze constante: de adapter injecteert ze als KernelInput.autoGebeurtenissen.aowBasisPerMaand, terwijl het Excel-parity-pad op de oracle-basis 1452/993 blijft (drift-punt "aow-bedrag-kernel-divergentie"). De cohort-tabel aow_leeftijd (DB) is de bron voor de individuele AOW-leeftijd.',
   },
 
   // ── FIRE-aannames ──
@@ -564,7 +564,21 @@ export const FISCALE_DRIFT_PUNTEN: DriftPunt[] = [
     status: 'opgelost',
     description:
       'De AOW-bedragen stonden als NL_AOW_MONTHLY(_SAMENWONEND) in constants.ts én los hardcoded in CASHFLOW_CATALOG en de AOW-prefab (defaultMonthlyIncome) in horizon-data.ts (plus in onboarding-horizon.tsx). Opgelost: alle plekken importeren nu de constante en de labels/tips zijn afgeleid; constants.ts is bijgewerkt naar de SVB-bedragen per 1-7-2026 (€1.581,55 / €1.084,13). Bewaakt door lib/fiscale-duplicaten-guard.test.ts.',
-    files: ['lib/constants.ts', 'lib/horizon-data.ts'],
+    files: ['lib/constants.ts', 'lib/horizon-data.ts', 'components/onboarding/onboarding-horizon.tsx'],
+  },
+  {
+    id: 'aow-bedrag-kernel-divergentie',
+    title: 'FIRE-kernel rekende op een eigen AOW-basis',
+    status: 'opgelost',
+    description:
+      'De horizon-kernel berekende de AOW (Auto-geb B21) op de Excel-oracle-basis €1.452/€993 (2025-basis) i.p.v. de canonieke SVB-bedragen — ~8% lager dan wat de app elders toont; de partner-AOW (PT!B9) spiegelde diezelfde 993. Opgelost (eigenaar-keuze C, ADR 0064 / gap-besluit V20): de basis is een optioneel invoerveld geworden (KernelInput.autoGebeurtenissen.aowBasisPerMaand). Het app-pad injecteert APP_AOW_BASIS_PER_MAAND = NL_AOW_MONTHLY(_SAMENWONEND); het parity-/fixture-pad laat het veld weg en valt terug op de oracle-basis, zodat de Excel-fixtures byte-groen blijven. Bewaakt door lib/horizon-kernel/aow-basis-injectie.test.ts.',
+    files: [
+      'lib/constants.ts',
+      'lib/horizon-kernel/types.ts',
+      'lib/horizon-kernel/tables/auto-gebeurtenissen.ts',
+      'lib/horizon-kernel/adapter/defaults.ts',
+      'lib/horizon-kernel/adapter/params.ts',
+    ],
   },
   {
     id: 'marginale-tarieven-verspreid',
@@ -669,7 +683,11 @@ export function validateFiscaleKerngetallen(): string[] {
     if (!d.title || !d.description) errors.push(`drift-punt ${d.id} mist titel of beschrijving`)
     if (d.files.length === 0) errors.push(`drift-punt ${d.id} heeft geen bestanden`)
     for (const f of d.files) {
-      if (!/^(lib|app|supabase)\//.test(f)) errors.push(`drift-punt ${d.id} heeft ongeldig bestandspad: "${f}"`)
+      // `components/` hoort er óók bij: fiscale duplicaten zijn meermaals in UI-
+      // componenten opgedoken (bv. de AOW-default in onboarding-horizon.tsx).
+      if (!/^(lib|app|components|supabase)\//.test(f)) {
+        errors.push(`drift-punt ${d.id} heeft ongeldig bestandspad: "${f}"`)
+      }
     }
   }
 

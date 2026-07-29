@@ -6,9 +6,12 @@ import {
   aggIncomeByMonth,
   aggExpenseByMonthAbs,
   aggAbsByMonthForBudgets,
+  aggAbsByBudgetMonth,
   aggToExpenseRows,
+  type TxMonthAggregateRow,
 } from './tx-aggregates'
 import { recentDailyExpenseRateFromRows } from '@/lib/expense-rate'
+import { savingsRateFromAggregates } from '@/lib/savings-source'
 
 // ── Parity: oude JS-aggregatie over ruwe rijen == nieuwe aggregaat-consumptie ──
 // Bewijst tegelijk de STILLE-AFKAP-bug: op een >1000-rijen-fixture wijkt de oude
@@ -153,6 +156,83 @@ describe('tx-aggregate parity (oud JS ↔ nieuw aggregaat)', () => {
     expect(aggExpenseByMonthAbs(agg, { realOnly: true }).get('2026-07')).toBe(14000)
     // De afgekapte som (eerste 1000 rijen = 1000×-10) mist rijen → lager.
     expect(oldExpenseByMonth(capped).get('2026-07') ?? 0).toBeLessThan(14000)
+  })
+
+  // ── core-data-loader: budget-sparklines (zelfde afkap, ander oppervlak) ────
+  // De sparkline-fetch in loadCoreData haalde 12 maanden RUWE rijen op zonder
+  // `.limit()` en werd dus óók op 1000 afgekapt: budget-sparklines toonden te lage
+  // bedragen. Ze consumeren nu hetzelfde aggregaat.
+  describe('core-data-loader budget-sparklines (afkap-regressie)', () => {
+    // Oude rij-pass, letterlijk zoals hij in de loader stond (transfers tellen MEE).
+    function oldSumByBudgetMonth(rows: Raw[]): Map<string, Map<string, number>> {
+      const out = new Map<string, Map<string, number>>()
+      for (const t of rows) {
+        if (!t.budget_id) continue
+        const mKey = t.date.slice(0, 7)
+        let b = out.get(t.budget_id)
+        if (!b) { b = new Map(); out.set(t.budget_id, b) }
+        b.set(mKey, (b.get(mKey) ?? 0) + Math.abs(t.amount))
+      }
+      return out
+    }
+    const flatten = (m: Map<string, Map<string, number>>) =>
+      [...m.entries()].flatMap(([b, mm]) => [...mm.entries()].map(([k, v]) => `${b}|${k}=${v}`)).sort()
+
+    it('per-budget maandsommen — byte-identiek aan de volledige rij-pass', () => {
+      expect(flatten(aggAbsByBudgetMonth(agg))).toEqual(flatten(oldSumByBudgetMonth(fixture)))
+    })
+
+    it('REGRESSIE: de afgekapte rij-pass mist bedragen die het aggregaat wél telt', () => {
+      const capped = oldSumByBudgetMonth(fixture.slice(0, 1000))
+      const full = aggAbsByBudgetMonth(agg)
+      // De huur-sparkline in de recentste maand: 1200×10 + 1200 = 13200 volledig.
+      expect(full.get(RENT)?.get('2026-07')).toBe(13200)
+      expect(capped.get(RENT)?.get('2026-07') ?? 0).toBeLessThan(13200)
+    })
+  })
+
+  // ── core-data-loader: de spaarquote-keten end-to-end ───────────────────────
+  // `loadCoreData` haalde deze 12-maands inkomsten/uitgaven vroeger als RUWE rijen
+  // op ZONDER `.limit()`, en werd daardoor stil op max_rows=1000 afgekapt terwijl
+  // /overzicht (via deze RPC) het juiste getal toonde. Gevolg in productie: een
+  // "berekende" spaarquote van 82% naast de correcte 5%. Deze test bewijst dat de
+  // aggregaat-route de volle waarheid geeft én dat de afgekapte route een
+  // aantoonbaar te HOGE quote oplevert — de exacte vorm waarin de bug zich uitte.
+  describe('core-data-loader spaarquote (afkap-regressie)', () => {
+    // Spiegelt letterlijk de reductie in lib/core-data-loader.ts.
+    const rateFromAgg = (rows: TxMonthAggregateRow[]) =>
+      savingsRateFromAggregates(
+        aggSumPositief(rows, { realOnly: true, sinceMonth: SIX_MONTHS_AGO_MONTH }),
+        aggSumNegatiefAbs(rows, { realOnly: true, sinceMonth: SIX_MONTHS_AGO_MONTH }),
+        0,
+      )
+    // Spiegelt de OUDE rij-reductie (zoals hij vóór de fix in de loader stond).
+    const rateFromRows = (rows: Raw[]) =>
+      savingsRateFromAggregates(oldIncome6m(rows), oldExpenses6m(rows), 0)
+
+    it('aggregaat == volledige rij-waarheid (geen afkap)', () => {
+      expect(rateFromAgg(agg)).toBe(rateFromRows(fixture))
+    })
+
+    it('REGRESSIE: op >1000 rijen liegt de afgekapte rij-route de quote omhoog', () => {
+      // PostgREST leverde maar de eerste 1000 rijen; de rest van de uitgaven viel weg.
+      const capped = fixture.slice(0, 1000)
+      const truth = rateFromAgg(agg)
+      const cappedRate = rateFromRows(capped)
+      // De afgekapte route ziet te weinig uitgaven ⇒ te hoge spaarquote. Dit is
+      // precies het 82%-vs-5%-symptoom uit het bugrapport.
+      expect(cappedRate).toBeGreaterThan(truth)
+      // En de volle waarheid is niet toevallig gelijk: de afkap scheelt >1 procentpunt.
+      expect(cappedRate - truth).toBeGreaterThan(1)
+    })
+
+    it('de 6-maands uitgaven-som telt ALLE rijen, ook voorbij de 1000-grens', () => {
+      // 6m-venster = 2026-02..2026-07. Echte uitgaven per maand = 1200+500+300 = 2000,
+      // plus in 2026-07 de 1200 losse rijen × 10 = 12000 ⇒ 6×2000 + 12000 = 24000.
+      expect(aggSumNegatiefAbs(agg, { realOnly: true, sinceMonth: SIX_MONTHS_AGO_MONTH })).toBe(24000)
+      // De afgekapte rij-route komt daar aantoonbaar niet aan.
+      expect(oldExpenses6m(fixture.slice(0, 1000))).toBeLessThan(24000)
+    })
   })
 
   it('transfers tellen NIET in isRealTx-sommen, WEL in het dagtarief (parity op beide paden)', () => {

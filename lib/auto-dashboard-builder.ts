@@ -88,7 +88,6 @@ export const WIDGET_POPULARITY: Record<string, number> = {
   vrijheidsscenarios: 4,
   sim_vermogenspad: 4,
   vrijheidsmijlpalen: 4,
-  ai_inzicht: 4,
   uitgaven_heatmap: 4,
   weekoverzicht: 4,
   pensioen_aow: 4,

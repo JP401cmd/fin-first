@@ -161,9 +161,11 @@ export const UNIFIED_FEATURES: UnifiedFeature[] = [
     description: 'AI Chat met Fin, AI tools',
     module: 'ai',
     requiredTier: 'ai',
-    widgets: ['ai_inzicht'],
+    // De widget 'ai_inzicht' is verwijderd (widgetreview 2026-07-17, richting C):
+    // hij claimde AI maar was regelgebaseerd. Deze feature blijft de AI-chat/tools.
+    widgets: [],
     legacyIds: [
-      'widget_ai_inzicht', 'ai_chat', 'ai_personalities',
+      'ai_chat', 'ai_personalities',
       'ai_suggest_action', 'ai_freedom_calc', 'ai_lookup',
     ],
   },
@@ -182,10 +184,14 @@ export const UNIFIED_FEATURES: UnifiedFeature[] = [
   {
     id: 'ai_aanbevelingen',
     label: 'AI Aanbevelingen',
-    description: 'Persoonlijke aanbevelingen genereren, volgende stappen engine',
+    description: 'Persoonlijke aanbevelingen genereren',
     module: 'ai',
     requiredTier: 'ai',
-    widgets: ['voorstellen', 'volgende_stap'],
+    // 'volgende_stap' hoort hier bewust NIET (meer) bij: de Volgende Stap-motor
+    // is deterministisch (geen modelcall) en juist gratis-gebruikers hebben de
+    // inrichtings-nudge het hardst nodig. De widget is ongated; de module-gate
+    // 'inzicht_acties' blijft gelden.
+    widgets: ['voorstellen'],
     legacyIds: [
       'widget_voorstellen', 'ai_recommendations', 'ai_next_steps',
     ],

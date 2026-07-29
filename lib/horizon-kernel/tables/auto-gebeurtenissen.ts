@@ -11,7 +11,9 @@
  *
  * ## Wat is berekend (en getoetst)
  * - **B6/B7** — leeftijd-koppelingen (`=P!B7`, `=ES!C15`=P!B55).
- * - **B21 (AOW)** — `=IF(B4="Alleenstaand",1452,993)·MIN(B5,50)/50`.
+ * - **B21 (AOW)** — `=IF(B4="Alleenstaand",1452,993)·MIN(B5,50)/50`. De basis 1452/993
+ *   is de oracle-fallback; het app-pad injecteert de canonieke SVB-bedragen via
+ *   `KernelInput.autoGebeurtenissen.aowBasisPerMaand` (ADR 0064).
  * - **Kinderen rij 35-52** — 3 kinderen × 6 posten (fase 1/2/3 · opvang · bijslag ·
  *   babyuitzet): fase-grenzen (C/D), type (E), geboorte-offset m0 (F), start/eind-
  *   maandindex sIdx/eIdx (G/H) met klem op maand 0 en de eenmalig-tak, actief-vlag
@@ -42,13 +44,16 @@ export const EMPTY = '' as const
 export type Empty = typeof EMPTY
 
 // ── AOW (Auto-geb B21) ───────────────────────────────────────────────────────
-// ⚠️ ORACLE-ONLY: bewust NIET gelijk aan NL_AOW_MONTHLY/lib-constanten — deze motor
-// reproduceert de Excel-oracle 1-op-1 (ADR 0032, tolerantie €0,01) op het niveau van
-// het brondocument, niet het actuele SVB/Belastingdienst-niveau. NOOIT vervangen door
-// een lib-import; dat breekt de kernel-fixture-pariteit.
-/** AOW netto per maand, alleenstaand (2025-basis, vóór opbouwkorting). */
+// ⚠️ ORACLE-FALLBACK: deze twee waarden zijn de Excel-oracle-basis (2025-basis van
+// `Core calc v5.xlsm`), NIET het actuele SVB-niveau. Ze blijven de default zodat het
+// parity-/fixture-pad byte-identiek aan het oracle blijft (ADR 0032, tolerantie €0,01);
+// `input-from-fixture` zet `autoGebeurtenissen.aowBasisPerMaand` bewust NIET.
+// Vervang ze NOOIT door een lib-import — dat breekt de fixture-pariteit. De canonieke
+// SVB-bedragen komen als INJECTIE binnen via `aowBasisPerMaand` (app-adapter,
+// gap-besluit V20 / ADR 0064).
+/** AOW netto per maand, alleenstaand (2025-oracle-basis, vóór opbouwkorting). */
 const AOW_ALLEENSTAAND_PER_MAAND = 1452
-/** AOW netto per maand p.p., samenwonend (2025-basis). ONBEPROEFD in de fixtures. */
+/** AOW netto per maand p.p., samenwonend (2025-oracle-basis). ONBEPROEFD in de fixtures. */
 const AOW_SAMENWONEND_PER_MAAND = 993
 /** Volledige AOW-opbouw = 50 jaar (2%/jr). */
 const AOW_MAX_OPBOUWJAREN = 50
@@ -166,11 +171,22 @@ export interface AutoGebeurtenissenResult {
   readonly erfenis: ErfenisResult
 }
 
-/** AOW bruto/mnd (B21): tarief per leefsituatie × opbouwjaren-korting (max 50). */
+/**
+ * AOW bruto/mnd (B21): tarief per leefsituatie × opbouwjaren-korting (max 50).
+ *
+ * De basis komt uit `autoGebeurtenissen.aowBasisPerMaand` als die is meegegeven
+ * (app-pad: de canonieke SVB-bedragen uit `lib/constants.ts`) en anders uit de
+ * Excel-oracle-constanten hierboven (parity-/fixture-pad). De formulevorm zelf —
+ * `IF(B4="Alleenstaand"; basis_a; basis_s) · MIN(B5;50)/50` — is in beide gevallen
+ * identiek; alleen de basis verschilt. Zie gap-besluit V20 / ADR 0064.
+ */
 function computeAow(input: KernelInput): number {
   const auto = input.autoGebeurtenissen
+  const injected = auto.aowBasisPerMaand
   const basis =
-    auto.leefsituatie === 'Alleenstaand' ? AOW_ALLEENSTAAND_PER_MAAND : AOW_SAMENWONEND_PER_MAAND
+    auto.leefsituatie === 'Alleenstaand'
+      ? (injected?.alleenstaand ?? AOW_ALLEENSTAAND_PER_MAAND)
+      : (injected?.samenwonend ?? AOW_SAMENWONEND_PER_MAAND)
   return (basis * Math.min(auto.aowOpbouwjaren, AOW_MAX_OPBOUWJAREN)) / AOW_MAX_OPBOUWJAREN
 }
 

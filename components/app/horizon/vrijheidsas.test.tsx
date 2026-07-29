@@ -9,6 +9,7 @@ import {
   MARGE_BAND_MIN_AMBER_PCT,
   clampLabelPct,
 } from './vrijheidsas'
+import { computeStopMarge } from '@/lib/horizon/stop-marge'
 
 /**
  * Unit-tests voor de Vrijheidsas (mockup-blok ⑤ van de wat-als-scenariolaag — twee
@@ -21,6 +22,8 @@ import {
  *   B. fireDeltaLabel — beslushulp-conventie (eerder/later/gelijk/onbereikbaar).
  *   C. computeMargeBandPct — strakke amber-buffer zodat VERWACHT/LAATST nooit botsen.
  *   D. Rendering — cijferrij, stopleeftijd-slider (aria), driezone-labels, marge-zonekleur.
+ *   E. Stopleeftijd-regel — stopleeftijd + berekende (verwacht-)leeftijd + afwijking t.o.v.
+ *      de basislijn op één regel, met de duiding gepind tegen `computeStopMarge`.
  */
 
 const baseProps = {
@@ -228,19 +231,54 @@ describe('Vrijheidsas rendering', () => {
     expect(screen.queryByText(/mnd (eerder|later) vrij/)).not.toBeInTheDocument()
   })
 
-  it('toont de eerder/later-vrij-duiding bij een actief scenario nog PRECIES ÉÉN keer (cijferrij)', () => {
+  it('zet stopleeftijd + berekende leeftijd + afwijking op ÉÉN regel, en pint de duiding tegen computeStopMarge', () => {
+    // Canonieke engine-uitvoer voor exact dezelfde input als het component krijgt — zo valt
+    // weergave-drift (verkeerd veld/grondslag) om, niet alleen "er staat een getal".
+    const engine = computeStopMarge({
+      stopAge: 60,
+      verwachtFireAgeFractional: 52.5,
+      laatstFireAgeFractional: 58,
+      baseFireAgeFractional: 55,
+    })
+    expect(engine.deltaVsBasis).toBe(-2.5) // verwacht − basis
+    const duiding = fireDeltaLabel(Math.round(engine.deltaVsBasis! * 12), true)
+    expect(duiding.text).toBe('30 mnd eerder vrij')
+
     render(
       <Vrijheidsas
         {...baseProps}
         hasScenario
         verwachtFireAge={52.5}
-        margeJaren={7.5}
-        zone="stevig"
+        margeJaren={engine.margeJaren!}
+        zone={engine.zone!}
       />,
     )
-    // verwacht 52.5 vs basis 55 = 30 mnd eerder → na de deduplicatie enkel nog in de cijferrij,
-    // niet meer óók naast de stopleeftijd-slider.
-    expect(screen.getAllByText('30 mnd eerder vrij')).toHaveLength(1)
+
+    // Één duiding in het hele blok — niet óók nog als sub in de cijferrij.
+    const nodes = screen.getAllByText(duiding.text)
+    expect(nodes).toHaveLength(1)
+
+    // …en die plek is de stopleeftijd-regel: label, gekozen leeftijd, berekende (verwacht-)
+    // leeftijd én afwijking zitten in één en dezelfde regel-container.
+    const regel = screen.getByText('Gewenste stopleeftijd').parentElement!
+    expect(regel).toContainElement(nodes[0])
+    expect(regel.textContent).toContain('60') // gekozen stopleeftijd
+    expect(regel.textContent).toContain('verwacht 52,5') // berekende leeftijd
+  })
+
+  it('toont de berekende (verwacht-)leeftijd op de stopregel, óók zonder actief scenario', () => {
+    render(<Vrijheidsas {...baseProps} />)
+    const regel = screen.getByText('Gewenste stopleeftijd').parentElement!
+    expect(regel.textContent).toContain('verwacht 55')
+    // Zonder scenario is er geen afwijking t.o.v. de basislijn om te duiden.
+    expect(regel.textContent).not.toMatch(/mnd (eerder|later) vrij/)
+  })
+
+  it('laat de afwijking-duiding weg wanneer de verwacht-FIRE onbereikbaar is', () => {
+    render(<Vrijheidsas {...baseProps} hasScenario verwachtFireAge={null} zone={null} margeJaren={null} />)
+    const regel = screen.getByText('Gewenste stopleeftijd').parentElement!
+    expect(regel.textContent).not.toContain('verwacht')
+    expect(screen.queryByText('onbereikbaar')).not.toBeInTheDocument()
   })
 
   it('kleurt het marge-getal per zone (tekort = rood), zowel bracket als cijferrij-sub', () => {

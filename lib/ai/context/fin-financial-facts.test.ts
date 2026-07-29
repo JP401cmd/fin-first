@@ -134,6 +134,46 @@ describe('buildWillFinancialFacts — pure extractor', () => {
     expect(facts.fireDoel).toBeCloseTo(fallbackTarget, 6)
   })
 
+  // ── WF-KRUIS-23: Fin consumeert de kernel-INCL.-waarde i.p.v. te benaderen ──
+  //
+  // Onder 'downsize' telt de woning WÉL mee voor de grondslag-keuze (niet
+  // exclude_from_fire → INCL.-tak), maar valt de overwaarde uit het FIRE-eligible
+  // vermogen. Precies daar liepen UI en Fin uiteen: de UI leest de door de kernel
+  // op de FIRE-MAAND geprojecteerde INCL.-waarde, terwijl Fin de EXCL.-scalar
+  // ophoogde met de overwaarde van VANDAAG.
+  const DOWNSIZE: FinFactsProfile = { housing_strategy_config: { mode: 'downsize' } }
+  const WITH_HOUSE = {
+    fullAssets: [HOUSE_ASSET] as unknown as CorePageData['fullAssets'],
+    fullDebts: [MORTGAGE_DEBT] as unknown as CorePageData['fullDebts'],
+  }
+
+  it('kernel-INCL.-doel aanwezig: dat is de noemer én het getoonde doel (geen vandaag-benadering)', () => {
+    // netWorth 400k, overwaarde 150k → FIRE-eligible 250k. Vandaag-benadering zou
+    // 500k + 150k = 650k geven; de kernel projecteert 590k op de FIRE-maand.
+    const facts = buildWillFinancialFacts(
+      makeCoreData({ ...WITH_HOUSE, fireNetWorthTargetFromHorizon: 590_000 }),
+      DOWNSIZE,
+    )
+    expect(facts.displayFireGoal).toBe(590_000)
+    expect(facts.fireDoel).toBe(590_000)
+    expect(facts.vrijheidsPct).toBe(
+      computeFreedomProgress({ fireEligibleNetWorth: 400_000, requiredPortfolio: 590_000 }),
+    )
+    // Expliciet: NIET de oude scalar-benadering (500k + 150k overwaarde).
+    expect(facts.displayFireGoal).not.toBe(650_000)
+  })
+
+  it('kernel-INCL.-doel ontbreekt (run gefaald): terugval op de scalar-benadering blijft', () => {
+    const facts = buildWillFinancialFacts(
+      makeCoreData({ ...WITH_HOUSE, fireNetWorthTargetFromHorizon: null }),
+      DOWNSIZE,
+    )
+    expect(facts.displayFireGoal).toBe(650_000)
+    expect(facts.vrijheidsPct).toBe(
+      computeFreedomProgress({ fireEligibleNetWorth: 400_000, requiredPortfolio: 650_000 }),
+    )
+  })
+
   it('exclude_from_fire: eigen woning gefilterd, doel op EXCL.-grondslag', () => {
     // FIRE-eligible = 400k − 150k equity = 250k; required 500k → 50%; doel = 500k.
     const facts = buildWillFinancialFacts(

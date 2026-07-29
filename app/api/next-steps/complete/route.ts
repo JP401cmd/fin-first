@@ -1,26 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { NEXT_STEP_KEYS } from '@/lib/next-steps/engine'
 
-// Valid step keys as defined in /api/next-steps GET endpoint
-const VALID_STEP_KEYS = [
-  'connect_bank_psd2',
-  'import_transactions',
-  'set_budgets',
-  'add_assets',
-  'register_debts',
-  'complete_profile',
-  'create_snapshot',
-  'set_goals',
-  'budget_attention',
-  'check_tax',
-  'review_recommendations',
-  'work_on_actions',
-  'check_goals',
-  'calculate_fire',
-  'plan_life_event',
-  'explore_scenarios',
-  'fire_unreachable',
-]
+// Geldige sleutels = precies wat de canonieke Volgende Stap-motor uitgeeft
+// (lib/next-steps/engine.ts). Eén bron, zodat deze lijst niet opnieuw uit de
+// pas gaat lopen met de stappen die de gebruiker daadwerkelijk ziet.
+const VALID_STEP_KEYS: readonly string[] = NEXT_STEP_KEYS
 
 /**
  * POST /api/next-steps/complete — Mark a next step as completed.

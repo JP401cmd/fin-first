@@ -206,7 +206,7 @@ const tests: TestCase[] = [
       // Spot-check specific mappings
       assertEqual(WIDGET_TO_FEATURE['fire_prognose'], 'fire_projecties', 'fire_prognose mapping')
       assertEqual(WIDGET_TO_FEATURE['monte_carlo'], 'simulaties', 'monte_carlo mapping')
-      assertEqual(WIDGET_TO_FEATURE['ai_inzicht'], 'ai_assistent', 'ai_inzicht mapping')
+      assertEqual(WIDGET_TO_FEATURE['voorstellen'], 'ai_aanbevelingen', 'voorstellen mapping')
     },
   },
 

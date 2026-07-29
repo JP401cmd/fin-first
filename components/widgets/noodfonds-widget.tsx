@@ -27,7 +27,19 @@ export const NoodfondsWidget = memo(function NoodfondsWidget({ size, data, href 
   const { currentAmount, targetAmount, monthsCovered, targetMonths, isComplete } = emergencyFund
   const pct = targetAmount > 0 ? Math.min((currentAmount / targetAmount) * 100, 100) : 0
   const colors = progressColor(monthsCovered)
-  const monthlyExpenses = targetMonths > 0 ? targetAmount / targetMonths : 0
+
+  // Maanduitgaven = de CANONIEKE bundelwaarde (consume, don't recompute).
+  // Voorheen stond hier `targetAmount / targetMonths`. Dat was exact zolang de
+  // target altijd 6× de maanduitgaven was, maar sinds een eigen noodfondsdoel de
+  // target stuurt is targetAmount een vrij euro-bedrag en targetMonths een
+  // afgeleide die op 0,5 mnd wordt afgerond — de reconstructie liep dan tot ~20%
+  // uit de pas met het bedrag dat de rest van de app "je maanduitgaven" noemt.
+  const monthlyExpenses = data.monthlyExpenses
+
+  // Bij een eigen doel is het BEDRAG primair en zijn de maanden het (afgeronde,
+  // begrensde) gevolg — dan is "N× maanduitgaven = doel" geen kloppende
+  // gelijkheid. Alleen bij de 6-maands-richtlijn geldt die vermenigvuldiging wél.
+  const targetFromGoal = emergencyFund.source === 'goal'
 
   // Freedom time framing
   // Canoniek 12-mnd rolling dagtarief uit de bundel (KRUIS-20); fallback voor mocks.
@@ -36,6 +48,16 @@ export const NoodfondsWidget = memo(function NoodfondsWidget({ size, data, href 
     ? calculateFreedomTime(currentAmount, dailyExp)
     : null
   const freedomStr = freedomTime ? formatFreedomTimeString(freedomTime, 'short') : null
+
+  // TWEE GRONDSLAGEN, expliciet benoemd (W29).
+  // De dekking (`monthsCovered`) en de vrijheidstijd delen dezelfde TELLER (de
+  // canonieke liquide pot) maar hebben bewust een andere NOEMER:
+  //   dekking      = pot ÷ effectiveMonthlyExpenses  → "je maanduitgaven"
+  //   vrijheidstijd = pot ÷ dailyExpenseRate (12-mnd rolling) → "je gemiddelde uitgaven"
+  // Beide komen kant-en-klaar uit de bundel (consume, don't recompute); de widget
+  // labelt ze alleen zó dat "6 mnd gedekt" naast "~2 mnd vrijheid" geen tegenspraak
+  // meer leest. Het gelijktrekken van de noemers zelf is een rekenmotor-besluit.
+  const rollingMonthlyExpenses = data.recentMonthlyExpenses ?? null
 
   // In-view fill-animatie (700ms bezier, 0% → doel; transition:none pre-entered).
   // Eén hook bovenaan; per render toont het widget precies één size, dus dezelfde
@@ -103,14 +125,13 @@ export const NoodfondsWidget = memo(function NoodfondsWidget({ size, data, href 
           <MaskedAmount value={targetAmount} tone="kern" />
         </div>
 
-        {/* Freedom time or complete state */}
-        {isComplete ? (
-          <p className="mt-1.5 font-serif italic text-[11px] text-positive">
-            Noodfonds bereikt — {targetMonths} maanden ademruimte
-          </p>
-        ) : freedomStr ? (
-          <p className="mt-1.5 font-serif italic text-[11px] text-[var(--ink-3)]">
-            {freedomStr} vrijheid opgebouwd als vangnet
+        {/* Vrijheidstijd — expliciet op de andere grondslag (zie toelichting boven).
+            Bij een bereikt doel kleurt dezelfde regel positief i.p.v. een aparte
+            'bereikt'-regel: de tegel is 140px hoog en de groene kop + volle balk
+            dragen dat signaal al. */}
+        {freedomStr ? (
+          <p className={`mt-1.5 font-serif italic text-[11px] ${isComplete ? 'text-positive' : 'text-[var(--ink-3)]'}`}>
+            {freedomStr} vrijheid op je gemiddelde uitgaven
           </p>
         ) : null}
       </WidgetShell>
@@ -138,6 +159,11 @@ export const NoodfondsWidget = memo(function NoodfondsWidget({ size, data, href 
         <div className="min-w-0 flex-1">
           <p className={`font-mono text-2xl font-semibold tabular-nums ${isComplete ? 'text-positive' : 'text-[var(--ink)]'}`}>
             {monthsCovered.toFixed(1)}<span className="text-base text-[var(--ink-3)]"> / {targetMonths} maanden gedekt</span>
+          </p>
+          {/* Grondslag van de dekking, zodat de vrijheidsregel onderaan (andere
+              noemer) niet als tegenspraak leest. */}
+          <p className="mt-0.5 text-[11px] text-[var(--ink-4)]">
+            van je maanduitgaven
           </p>
           {isComplete && (
             <p className="mt-0.5 text-sm font-medium text-positive">
@@ -181,12 +207,28 @@ export const NoodfondsWidget = memo(function NoodfondsWidget({ size, data, href 
       {/* Calculation explanation */}
       <div className="mt-3 rounded-lg bg-[var(--subtle)] px-3 py-2 text-[11px] text-[var(--ink-3)]">
         <p className="font-medium text-[var(--ink-2)]">Berekening</p>
-        <p className="mt-0.5">
-          {targetMonths}&times; <MaskedAmount value={monthlyExpenses} tone="kern" /> maanduitgaven = <MaskedAmount value={targetAmount} tone="kern" /> doel
-        </p>
+        {targetFromGoal ? (
+          <p className="mt-0.5">
+            Jouw noodfondsdoel <MaskedAmount value={targetAmount} tone="kern" /> &asymp; {targetMonths}&times; je maanduitgaven van <MaskedAmount value={monthlyExpenses} tone="kern" />
+          </p>
+        ) : (
+          <p className="mt-0.5">
+            {targetMonths}&times; <MaskedAmount value={monthlyExpenses} tone="kern" /> maanduitgaven = <MaskedAmount value={targetAmount} tone="kern" /> doel
+          </p>
+        )}
         {!isComplete && remaining > 0 && (
           <p className="mt-0.5">
             Nog <MaskedAmount value={remaining} tone="kern" /> te gaan
+          </p>
+        )}
+        {/* De tweede grondslag expliciet: vrijheidstijd rekent met het 12-mnd
+            rolling uitgavenniveau, niet met de maanduitgaven hierboven. */}
+        {freedomStr && (
+          <p className="mt-1.5 border-t border-[var(--border-ed)] pt-1.5">
+            Vrijheidstijd rekent met je gemiddelde uitgaven over 12 maanden
+            {rollingMonthlyExpenses != null && (
+              <> (<MaskedAmount value={rollingMonthlyExpenses} tone="kern" /> per maand)</>
+            )} — een andere grondslag dan de dekking hierboven.
           </p>
         )}
       </div>
@@ -194,7 +236,7 @@ export const NoodfondsWidget = memo(function NoodfondsWidget({ size, data, href 
       {/* Tips to reach faster (only when not complete) */}
       {!isComplete && (
         <div className="mt-3 flex items-start gap-2 text-[11px] text-[var(--ink-3)]">
-          <Lightbulb className="h-3.5 w-3.5 flex-shrink-0 text-amber-500 mt-0.5" strokeWidth={1.5} />
+          <Lightbulb className="h-3.5 w-3.5 flex-shrink-0 text-kern-500 mt-0.5" strokeWidth={1.5} />
           <div>
             <p className="font-medium text-[var(--ink-2)]">Sneller bereiken</p>
             <ul className="mt-0.5 space-y-0.5 list-none">
@@ -206,12 +248,12 @@ export const NoodfondsWidget = memo(function NoodfondsWidget({ size, data, href 
         </div>
       )}
 
-      {/* Freedom time framing */}
+      {/* Vrijheidstijd — altijd mét zijn eigen grondslag erbij (W29). */}
       {freedomStr && (
         <p className="mt-2 font-serif italic text-[12px] text-[var(--ink-3)]">
           {isComplete
-            ? `${freedomStr} vrijheid als vangnet — financiele rust`
-            : `${freedomStr} vrijheid opgebouwd, op weg naar volledige rust`
+            ? `${freedomStr} vrijheid op je gemiddelde uitgaven — je vangnet staat`
+            : `${freedomStr} vrijheid op je gemiddelde uitgaven, en het groeit`
           }
         </p>
       )}

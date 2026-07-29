@@ -545,6 +545,24 @@ export interface PensioenPot {
 }
 
 /**
+ * AOW-basisbedragen per maand (vóór opbouwkorting) die de kern in B21 gebruikt —
+ * de OPTIONELE injectie-variant van de Excel-tabelconstanten (gap-besluit V20,
+ * ADR 0064).
+ *
+ * Weggelaten → de kern valt terug op de Excel-oracle-waarden 1452/993 uit
+ * `tables/auto-gebeurtenissen.ts` (byte-identiek Excel v5; `input-from-fixture`
+ * zet dit veld NIET). De app-adapter zet 'm wél, met de canonieke SVB-bedragen
+ * `NL_AOW_MONTHLY` / `NL_AOW_MONTHLY_SAMENWONEND` uit `lib/constants.ts`, zodat de
+ * FIRE-projectie dezelfde AOW hanteert als de rest van de app (SSoT).
+ */
+export interface AowBasisPerMaand {
+  /** B21-tak `leefsituatie === 'Alleenstaand'` — AOW/mnd bij volle opbouw. */
+  readonly alleenstaand: number
+  /** B21-tak overig (samenwonend) — AOW/mnd p.p. bij volle opbouw. */
+  readonly samenwonend: number
+}
+
+/**
  * Auto-gebeurtenissen-INVOER (B4-B18 + pensioen-multipot). De uitkomsten (AOW
  * B21, kinderen-expansie rij 35-52, erfenis-afleidingen B56-B59) zijn OUTPUT die
  * naar Geb rij 14-30 vloeit — die sla we hier over.
@@ -574,6 +592,12 @@ export interface AutoGebeurtenisParams {
   readonly erfenisLeeftijd: number
   /** Rij 26-31 — pensioen-multipot-slots (leeg → weggelaten). */
   readonly pensioenPotten: readonly PensioenPot[]
+  /**
+   * B21-basisbedragen (optioneel, inert-by-default). Weggelaten → Excel-oracle
+   * 1452/993 (parity-/fixture-pad, byte-identiek). Gezet door de app-adapter met
+   * de canonieke SVB-constanten (SSoT). Zie `AowBasisPerMaand`, ADR 0064.
+   */
+  readonly aowBasisPerMaand?: AowBasisPerMaand
 }
 
 // ── PT (partner-parameterlaag) ───────────────────────────────────────────────

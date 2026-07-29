@@ -268,15 +268,15 @@ const tests: TestCase[] = [
   {
     id: 'mod-widget-tier-locked',
     name: 'AI widget verborgen zonder AI abonnement',
-    description: 'Widget ai_inzicht vereist de ai subscription tier naast de inzicht_acties module',
+    description: 'Widget voorstellen vereist de ai subscription tier naast de inzicht_acties module',
     category: CAT,
     priority: 'critical',
     estimatedDurationMs: 50,
     fn() {
       // inzicht_acties module active, but subscriptions is empty (no 'ai' sub)
-      const result = isWidgetVisible('ai_inzicht', ['budgetteren', 'inzicht_acties'], [])
-      assertEqual(result.visible, false, 'ai_inzicht visible without ai subscription')
-      assertEqual(result.reason, 'tier_locked', 'ai_inzicht reason without ai subscription')
+      const result = isWidgetVisible('voorstellen', ['budgetteren', 'inzicht_acties'], [])
+      assertEqual(result.visible, false, 'voorstellen visible without ai subscription')
+      assertEqual(result.reason, 'tier_locked', 'voorstellen reason without ai subscription')
     },
   },
 

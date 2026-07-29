@@ -178,10 +178,6 @@ const MeldingenWidget = dynamic(
   () => import('./meldingen-widget').then(m => ({ default: m.MeldingenWidget })),
   { loading: WidgetLoadingFallback }
 )
-const AiInzichtWidget = dynamic(
-  () => import('./ai-inzicht-widget').then(m => ({ default: m.AiInzichtWidget })),
-  { loading: WidgetLoadingFallback }
-)
 const VolgendeStapWidget = dynamic(
   () => import('./volgende-stap-widget').then(m => ({ default: m.VolgendeStapWidget })),
   { loading: WidgetLoadingFallback }
@@ -265,7 +261,7 @@ import type { DashboardData } from '@/lib/types/dashboard'
 
 export type {
   TopAction, CompletedAction, RejectedAction, TopGoal, TopRecurringTransaction,
-  TopRecommendation, TopLifeEvent, Notification, AiInsight, NextStep, MonthSummary,
+  TopRecommendation, TopLifeEvent, Notification, NextStep, NextStepModule, MonthSummary,
   UpcomingEvent, EmergencyFund, FavoriteHolding, HeatmapBudgetGroup, DashboardData,
   HvbSummary, WeekOverviewData, HouseholdActivityItem,
 } from '@/lib/types/dashboard'
@@ -404,8 +400,6 @@ function renderWidgetById(
       return <PensioenAowWidget size={size} data={data} href={href} />
     case 'meldingen':
       return <MeldingenWidget size={size} data={data} href={href} />
-    case 'ai_inzicht':
-      return <AiInzichtWidget size={size} data={data} href={href} />
     case 'volgende_stap':
       return <VolgendeStapWidget size={size} data={data} href={href} />
     case 'maandoverzicht':

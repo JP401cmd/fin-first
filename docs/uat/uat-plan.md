@@ -1797,9 +1797,10 @@ Scope: `/overzicht` (hoofdpagina/hub), `/dashboard` (redirect), `/overzicht/tips
   3. Bekijk de sparkline rechts (desktop).
 - **Schermen/componenten:** /overzicht — `components/overview/vrijheidsbriefing-hero.tsx`, `components/overview/briefing-panel.tsx`; snapshot-logica `lib/briefing/snapshot.ts` (`getOrCreateWeeklySnapshot`), berekening `lib/briefing/overview-briefing.ts`.
 - **Kriticiteit:** KERN
-- **Rekenend:** ja — vrijheidsdagen = netto vermogen ÷ dagelijkse uitgaven, dagbasis jaaruitgaven/365 (`computeFreedomTotal` in `lib/briefing/overview-briefing.ts` regel 277-284, via `calculateFreedomTime` in `lib/format.ts`); delta = huidige dagen − vorige-week-basis (`computeFreedomDelta`); sparkline per maand uit `buildFreedomSparkline`; weekbevriezing in `profiles.briefing_snapshot` (`lib/briefing/snapshot.ts`).
+- **Rekenend:** ja — vrijheidsdagen = netto vermogen ÷ dagelijkse uitgaven, dagbasis jaaruitgaven/365 (`computeFreedomTotal` in `lib/briefing/overview-briefing.ts` regel 277-284, via `calculateFreedomTime` in `lib/format.ts`); delta = huidige dagen − vorige-week-basis (`computeFreedomDelta`), mét plausibiliteitsgrens (`isImplausibleFreedomDelta`: |delta| ≥ 365 dagen ÉN > 25% van het huidige totaal → delta onderdrukt); sparkline per maand uit `buildFreedomSparkline`; weekbevriezing in `profiles.briefing_snapshot` (`lib/briefing/snapshot.ts`).
 - **Varianten & randgevallen:**
   - Eerste week (geen basis) → alleen het totaal + hint "Vanaf volgende week zie je hier je wekelijkse vrijheidswinst."
+  - Implausibele sprong (basis bevroren op nog-settelende data of eenmalige vermogenscorrectie) → delta onderdrukt, hero toont het totaal met de regel "Je cijfers zijn net flink bijgesteld …" en de kop valt terug op de totaal-zin.
   - Geen uitgaven bekend (isInfinite) → "Vul je uitgaven aan om je vrijheidstijd te zien".
   - Netto vermogen ≤ 0 (isDeficit) → "Bouw je eerste vrijheid op — elke euro telt" (geen viering van schuld-dagen).
   - Live cijfers wijken ≥ 2 dagen af van het bevroren weekbeeld → hint "je cijfers zijn sindsdien veranderd" in de briefing-kop.
@@ -7348,7 +7349,7 @@ Dit deelgebied toetst niet één pagina, maar de belofte dat **hetzelfde kernget
   5. Controleer dat het netto vermogen elders op de pagina (grafiek/tegels) wél al live was — alleen de briefing-hero bevriest.
 - **Schermen/componenten:** `lib/briefing/snapshot.ts#getOrCreateWeeklySnapshot`/`canRefreshToday`, hero-props `lib/briefing/overview-briefing.ts#buildFreedomHeroProps`/`computeFreedomTotal`, weergave `components/overview/briefing-panel.tsx` binnen `components/overview/overzicht-hero.tsx`; freshness-drempel `app/(app)/overzicht/page.tsx` r228–232.
 - **Kriticiteit:** KERN
-- **Rekenend:** ja — vrijheidstotaal = netto vermogen ÷ dagtarief (jaaruitgaven ÷ 365); bron: `lib/briefing/overview-briefing.ts#computeFreedomTotal` + `lib/format.ts#dailyExpenseRate`; delta-drempel = 2 dagen.
+- **Rekenend:** ja — vrijheidstotaal = netto vermogen ÷ dagtarief (jaaruitgaven ÷ 365); bron: `lib/briefing/overview-briefing.ts#computeFreedomTotal` + `lib/format.ts#dailyExpenseRate`; delta-drempel = 2 dagen; de week-over-week delta zelf kent daarnaast een plausibiliteitsgrens (`isImplausibleFreedomDelta`).
 - **Varianten & randgevallen:**
   - Eerste week ooit (geen basis): hero toont het totaal zonder delta.
   - Huishoud-/partnerweergave: geen snapshot-write; hero live berekend uit het perspectief — geen freeze-gedrag.

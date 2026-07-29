@@ -232,16 +232,10 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
 
 
 
-  // AI Insights
-  aiInsights: [
-    { id: 'ai1', text: 'Je spaarquote is de afgelopen 3 maanden gestegen van 22% naar 27%. Als je dit tempo volhoudt, bereik je je noodfonds-doel 4 maanden eerder.', module: 'kern', createdAt: '2026-03-07T08:00:00Z' },
-    { id: 'ai2', text: 'Je energiekosten zijn 15% hoger dan vergelijkbare huishoudens. Overweeg om van leverancier te wisselen.', module: 'wil', createdAt: '2026-03-06T08:00:00Z' },
-  ],
-
   // Next steps
   nextSteps: [
-    { key: 'ns1', title: 'Noodfonds aanvullen', description: 'Nog 3 maanden tot je doel van 6 maanden buffer', impact: 15, href: '/will', dismissed: false },
-    { key: 'ns2', title: 'Energieleverancier vergelijken', description: 'Potentieel €35/maand besparing', impact: 12, href: '/will', dismissed: false },
+    { key: 'noodfonds_aanvullen', label: 'Noodfonds aanvullen', title: 'Vul je noodfonds aan', description: 'Een gevulde buffer is vrijheid die je vandaag al bezit.', impact: null, metric: '3 van 6 maanden gedekt', module: 'kern', kind: 'groei', href: '/overzicht/cashflow/budget', dismissed: false },
+    { key: 'review_actions', label: 'Acties oppakken', title: 'Pak je openstaande acties op', description: 'Deze acties liggen klaar om vrijheidstijd terug te winnen.', impact: 12, metric: '3 acties open', module: 'wil', kind: 'groei', href: '/overzicht/tips', dismissed: false },
   ],
 
   // Month summary

@@ -192,8 +192,8 @@ export async function OverzichtSecondaryLoader({
     briefingHeadline = buildBriefingHeadline(freedomHero)
   }
 
-  // Vrijheidsleeftijd voor de Vrijheid-strip + framing (de mini-vermogen-
-  // grafiek zelf laadt los, zie OverzichtNetWorthChartLoader).
+  // Vrijheidsleeftijd voor de Vrijheid-strip (de mini-vermogen-grafiek zelf
+  // laadt los, zie OverzichtNetWorthChartLoader). Afgerond — dit is WEERGAVE.
   const fireAge =
     dashboardData.fireAgeFractional != null
       ? Math.round(dashboardData.fireAgeFractional)
@@ -202,10 +202,14 @@ export async function OverzichtSecondaryLoader({
   // Afgeleide vrijheids-/pensioenframing via de gedeelde, consume-only vlag
   // (ADR 0009): geen herberekening — freedomPct/currentAge komen uit blok 1,
   // fireAge + strategie hieruit.
+  // DREMPEL, niet weergave: `isFinanciallyFree` vergelijkt `currentAge >= fireAge`,
+  // dus hier gaat de FRACTIONELE leeftijd in (zoals /toekomst al deed). Met de
+  // afgeronde waarde trok 44,92 omhoog naar 45 en triggerde "financieel vrij" tot
+  // 6 maanden vóór de daadwerkelijke FIRE-maand (WF-CANON-03).
   const freedomFraming = resolveFreedomFraming({
     freedomPct,
     currentAge,
-    fireAge,
+    fireAge: dashboardData.fireAgeFractional ?? null,
     strategy: horizonData?.fireStrategy?.strategy,
   })
 

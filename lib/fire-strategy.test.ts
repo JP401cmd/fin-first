@@ -44,6 +44,20 @@ describe('isFinanciallyFree', () => {
     expect(isFinanciallyFree({ freedomPct: 30, currentAge: 40, fireAge: 55 })).toBe(false)
   })
 
+  // WF-CANON-03: fireAge is een DREMPEL, dus de callers geven de FRACTIONELE
+  // vrijheidsleeftijd door. Voor elke fractie in (currentAge, currentAge+0,5)
+  // rondde Math.round OMLAAG naar currentAge, waardoor deze vlag tot 6 maanden
+  // vóór de daadwerkelijke FIRE-maand omsloeg naar "vrij".
+  it('false bij een fractionele fireAge die nog nét niet bereikt is', () => {
+    expect(isFinanciallyFree({ freedomPct: 99.4, currentAge: 45, fireAge: 45.3 })).toBe(false)
+    // Het afgeronde equivalent geeft hier ten onrechte true — regressie-slot.
+    expect(isFinanciallyFree({ freedomPct: 99.4, currentAge: 45, fireAge: Math.round(45.3) })).toBe(true)
+  })
+
+  it('true zodra de fractionele fireAge is gepasseerd', () => {
+    expect(isFinanciallyFree({ freedomPct: 99.4, currentAge: 46, fireAge: 45.3 })).toBe(true)
+  })
+
   it('false bij freedomPct null en ontbrekende leeftijden', () => {
     expect(isFinanciallyFree({ freedomPct: null, currentAge: null, fireAge: null })).toBe(false)
   })

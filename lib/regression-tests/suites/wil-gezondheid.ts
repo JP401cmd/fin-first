@@ -111,7 +111,6 @@ function makeDashboardData(overrides: Partial<DashboardData> = {}): DashboardDat
     favoriteHoldings: [],
     allBudgets: [],
     notifications: [],
-    aiInsights: [],
     nextSteps: [],
     monthSummary: { label: '', highlights: [] } as any,
     upcomingEvents: [],

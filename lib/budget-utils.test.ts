@@ -151,6 +151,42 @@ describe('computeYearlyMustExpenses', () => {
     expect(result.yearlyMustExpenses).toBe(0)
   })
 
+  // Regressieslot — Notion "Persoonlijk plan telt Inkomen + Sparen mee als
+  // essentiële uitgave". Tak A had (anders dan tak B) geen budget_type-vangnet;
+  // een call-site die vergat te filteren telde Inkomen/Sparen als must-expense.
+  it('sluit essential PARENTS met budget_type archive/income/savings uit (tak A-vangnet)', () => {
+    const parents: BudgetRow[] = [
+      { id: 'p-inkomen', name: 'Inkomen', default_limit: 6500, interval: 'monthly', budget_type: 'income', is_essential: true },
+      { id: 'p-sparen', name: 'Sparen & investeren', default_limit: 3000, interval: 'monthly', budget_type: 'savings', is_essential: true },
+      { id: 'p-oud', name: 'Oud budget', default_limit: 100, interval: 'monthly', budget_type: 'archive', is_essential: true },
+      { id: 'p-wonen', name: 'Vaste lasten wonen', default_limit: 455, interval: 'monthly', budget_type: 'expense', is_essential: true },
+    ]
+    const { yearlyMustExpenses, expenseItems } = computeYearlyMustExpenses(parents, [])
+
+    // Alleen de expense-parent telt: 455 × 12 = 5460 (niet 6500+3000+100+455 × 12)
+    expect(yearlyMustExpenses).toBe(5460)
+    expect(expenseItems.map(i => i.name)).toEqual(['Vaste lasten wonen'])
+  })
+
+  it('telt children van een uitgesloten income/savings-parent evenmin mee (geen orphan-lek)', () => {
+    const parents: BudgetRow[] = [
+      { id: 'p-sparen', name: 'Sparen', default_limit: 3000, interval: 'monthly', budget_type: 'savings', is_essential: true },
+    ]
+    const children: ChildBudgetRow[] = [
+      { id: 'c-spaar', parent_id: 'p-sparen', name: 'Beleggen', default_limit: 1000, interval: 'monthly', budget_type: 'savings', is_essential: true },
+    ]
+    const { yearlyMustExpenses, expenseItems } = computeYearlyMustExpenses(parents, children)
+    expect(yearlyMustExpenses).toBe(0)
+    expect(expenseItems).toHaveLength(0)
+  })
+
+  it('laat parents ZONDER budget_type ongemoeid (blocklist, geen allowlist)', () => {
+    const parents: BudgetRow[] = [
+      { id: 'p-geen-type', name: 'Zonder type', default_limit: 100, interval: 'monthly', is_essential: true },
+    ]
+    expect(computeYearlyMustExpenses(parents, []).yearlyMustExpenses).toBe(1200)
+  })
+
   it('geeft 0 en lege expenseItems terug bij lege input', () => {
     const { yearlyMustExpenses, expenseItems } = computeYearlyMustExpenses([], [])
     expect(yearlyMustExpenses).toBe(0)

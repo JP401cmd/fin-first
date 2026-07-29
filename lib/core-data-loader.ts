@@ -33,7 +33,7 @@ import {
   getFireEligibleNetWorth,
   isHomeExcludedFromFire,
 } from '@/lib/housing-strategy'
-import { computeHorizonFireTarget } from '@/lib/fire-target-shared'
+import { computeHorizonFireTarget, EMPTY_HORIZON_FIRE_TARGETS } from '@/lib/fire-target-shared'
 import { computeYearlyMustExpenses, computeRetirementExpenses } from '@/lib/budget-utils'
 import { resolveFireParams } from '@/lib/fire-params'
 import { DEFAULT_RETURN, INFLATION } from '@/lib/constants'
@@ -49,10 +49,14 @@ import type { Perspective } from '@/lib/household-data'
 import { resolveEffectiveIncomeExpenses } from './effective-financials'
 import { savingsRateFromAggregates } from './savings-source'
 import { fetchLatestSnapshotsByMonth } from '@/lib/server-data/snapshot-aggregates'
-
-/** Filter out own-account transfers from income/expense calculations */
-const isRealTx = (t: { transaction_type?: string | null }) =>
-  t.transaction_type !== 'transfer' && t.transaction_type !== 'joint_transfer'
+import {
+  fetchTxMonthAggregate,
+  aggSumPositief,
+  aggSumNegatiefAbs,
+  aggIncomeByMonth,
+  aggExpenseByMonthAbs,
+  aggAbsByBudgetMonth,
+} from '@/lib/server-data/tx-aggregates'
 
 // ── Result type ────────────────────────────────────────────────
 
@@ -71,8 +75,8 @@ export interface CorePageData {
 
   /**
    * Vaste 12-slots reeks (oudste → nieuwste) van inkomsten én uitgaven per
-   * kalendermaand, gebouwd uit dezelfde transfer-gefilterde 12-maands
-   * transacties (`realIncome12`/`realExpense12`). Elke slot is een echte
+   * kalendermaand, gebouwd uit hetzelfde transfer-gefilterde 12-maands
+   * maandaggregaat (`txAgg12`). Elke slot is een echte
    * kalendermaand binnen het venster, ook als er geen transacties waren (dan
    * 0). `label` is de nl-NL korte maandnaam ('jan', 'feb', …). Voedt de
    * cashflow-kassabonnen (12-mnd inkomen, 6-mnd spaarquote) en de
@@ -177,6 +181,17 @@ export interface CorePageData {
    * (geen geboortedatum, geen yearly expenses).
    */
   fireTargetFromHorizon: number | null
+  /**
+   * FIRE-doelbedrag INCL. eigen woning (Prognose!I@FIRE) uit DEZELFDE kernel-run
+   * als `fireTargetFromHorizon` — de echte, op de FIRE-maand geprojecteerde
+   * INCL.-noemer die `/overzicht` en `/toekomst` ook tonen (dashboard-data-loader:
+   * `simRequiredNetWorth`). `null` wanneer de kernel-run niet kon draaien; de
+   * consument valt dan terug op `inclHomeTargetFromScalar`.
+   *
+   * CONSUME, DON'T RECOMPUTE: bestaat zodat de AI-context de INCL.-grondslag niet
+   * meer met een vandaag-offset hoeft te BENADEREN (WF-KRUIS-23).
+   */
+  fireNetWorthTargetFromHorizon: number | null
 
   // Sparklines
   budgetSparklines: { id: string; name: string; icon: string; budgetType: string; data: SparklineDataPoint[] }[]
@@ -251,7 +266,7 @@ export const loadCoreData = cache(async function loadCoreData(
   // ── FIRE-target promise: vroeg gestart zodat hij parallel met de
   //    Kern-batches draait. We awaiten 'em pas vlak voor de return.
   //    Cache via React `cache()` zorgt voor dedup binnen één request.
-  const fireTargetPromise = computeHorizonFireTarget(supabase).catch(() => null)
+  const fireTargetPromise = computeHorizonFireTarget(supabase).catch(() => EMPTY_HORIZON_FIRE_TARGETS)
 
   // ── Cash-stats promise: parallel met alle andere batches. Combineert
   //    transactie-stats (cash mét bank-koppeling/budgetteren) en
@@ -260,25 +275,14 @@ export const loadCoreData = cache(async function loadCoreData(
   //    KPI valt op de UI-laag terug op rente.
   const cashStatsPromise = loadCombinedCashStats(supabase).catch(() => ({} as Record<string, CashAssetStats>))
 
-  // ── Sparkline-transacties promise: parallel met alle batches. Voorheen
-  //    ran deze query als blocking await ná batch 2 (waterfall ~200-400ms).
-  //    Hij hangt qua DATA niet af van batch 2 — alleen de parent/child
-  //    budget-aggregatie wel. Door 'em vroeg te starten en pas bij gebruik
-  //    te awaiten besparen we de waterfall. Failure → lege array,
-  //    sparklines vervallen non-fataal (zelfde gedrag als de oude try/catch).
-  type SparkTx = { budget_id: string | null; amount: number | string; date: string }
-  const sparkTxPromise: Promise<SparkTx[]> = (async () => {
-    try {
-      const result = await supabase
-        .from('transactions')
-        .select('budget_id, amount, date')
-        .gte('date', twelveMonthsAgo)
-        .lt('date', monthEnd)
-      return (result.data ?? []) as SparkTx[]
-    } catch {
-      return []
-    }
-  })()
+  // ── Sparkline-transacties: GEEN eigen query meer. De budget-sparklines draaien
+  //    op exact hetzelfde 12-maands venster [twelveMonthsAgo, monthEnd) als het
+  //    maandaggregaat uit batch 1 (`txAgg12`) en op exact dezelfde granulariteit
+  //    (maand × budget), dus ze consumeren dat aggregaat. Dat scheelt niet alleen
+  //    een query, het lost dezelfde STILLE max_rows=1000-afkap op als hierboven:
+  //    deze fetch had ook geen `.limit()` en telde voor tx-rijke gebruikers maar
+  //    een deel van de maanden mee, waardoor sparklines te lage bedragen toonden.
+  //    (De naburige categorie-sparklines waren om precies deze reden al gemigreerd.)
 
   // ── Categorie-sparklines promise: balance_snapshots over de afgelopen
   //    12 maanden, per-entiteit backward+forward gefilled en daarna
@@ -366,9 +370,9 @@ export const loadCoreData = cache(async function loadCoreData(
 
   // ── Batch 1: Primary data fetches ──
   const [
-    txResult, assetsResult, debtsResult, income12Result,
+    txResult, assetsResult, debtsResult, txAgg12Result,
     essentialBudgetsResult, earliestIncomeResult, childBudgetsResult,
-    expense12Result, earliestTxResult, profileResult, bankAccountsResult,
+    earliestTxResult, profileResult, bankAccountsResult,
     aowResult,
     fireAssumptionsResult,
   ] = await Promise.all([
@@ -385,12 +389,17 @@ export const loadCoreData = cache(async function loadCoreData(
       .from('debts')
       .select('id, name, current_balance, net_worth_inclusion_pct, interest_rate, monthly_payment, repayment_type, end_date, debt_type, is_active, original_amount, minimum_payment, start_date, creditor, subtype, is_tax_deductible, linked_asset_id, nhg, include_aflossing_in_savings, custom_aflossing_amount')
       .eq('is_active', true),
-    supabase
-      .from('transactions')
-      .select('amount, date, transaction_type')
-      .gt('amount', 0)
-      .gte('date', twelveMonthsAgo)
-      .lt('date', monthEnd),
+    // 12-maands maandaggregaat (Σ positief/negatief per maand/budget/type).
+    // Vervangt de vroegere twee RUWE 12-maands fetches (income `.gt(amount,0)` +
+    // expense `.lt(amount,0)`): die hadden geen `.limit()` en werden daardoor STIL
+    // afgekapt op PostgREST's `max_rows` (config.toml = 1000). Voor tx-rijke
+    // gebruikers telde de uitgaven-som daardoor maar een deel van de rijen, wat
+    // `savingsRate6m` fors te HOOG maakte (gemeten: 82% i.p.v. 5%) terwijl
+    // /overzicht via dezelfde RPC al het juiste getal toonde. Een aggregaat levert
+    // per definitie enkele rijen en kan niet afkappen.
+    // RLS-breed (eigen + gedeeld huishouden) — identiek aan de vervangen fetches,
+    // en hetzelfde venster/dezelfde aanroep als dashboard-data-loader.
+    fetchTxMonthAggregate(supabase, { from: twelveMonthsAgo, to: monthEnd }),
     supabase
       .from('budgets')
       .select('id, name, default_limit, interval, budget_type, is_essential')
@@ -410,12 +419,6 @@ export const loadCoreData = cache(async function loadCoreData(
       .select('id, name, parent_id, default_limit, is_essential, interval, budget_type')
       .not('parent_id', 'is', null)
       .not('budget_type', 'in', '("archive","income","savings")'),
-    supabase
-      .from('transactions')
-      .select('amount, date, transaction_type')
-      .lt('amount', 0)
-      .gte('date', twelveMonthsAgo)
-      .lt('date', monthEnd),
     supabase
       .from('transactions')
       .select('date')
@@ -453,11 +456,10 @@ export const loadCoreData = cache(async function loadCoreData(
   if (txResult.error) throw txResult.error
   if (assetsResult.error) throw assetsResult.error
   if (debtsResult.error) throw debtsResult.error
-  if (income12Result.error) throw income12Result.error
+  if (txAgg12Result.error) throw txAgg12Result.error
   if (essentialBudgetsResult.error) throw essentialBudgetsResult.error
   if (earliestIncomeResult.error) throw earliestIncomeResult.error
   if (childBudgetsResult.error) throw childBudgetsResult.error
-  if (expense12Result.error) throw expense12Result.error
   if (earliestTxResult.error) throw earliestTxResult.error
   // AOW-referentietabel (gedeeld, RLS: authenticated read all). Niet fataal, maar val bij
   // een leesfout NIET stil op [] terug: dat maskeerde eerder een tabelnaamfout
@@ -489,11 +491,13 @@ export const loadCoreData = cache(async function loadCoreData(
   const hasVermogen = activeModules.includes('vermogensregistratie')
 
   // ── Last 12 months income — extrapolate if less than 12 months of data ──
-  // Filter out own-account transfers for accurate income/expense totals
-  const realIncome12 = income12Result.data.filter(isRealTx)
-  const realExpense12 = expense12Result.data.filter(isRealTx)
+  // Bron = het 12-maands maandaggregaat (afkap-vrij). `realOnly: true` spiegelt de
+  // vroegere `isRealTx`-filter: eigen-rekening-transfers tellen niet mee in de
+  // inkomsten/uitgaven-sommen. De Σ-positief/Σ-negatief-split van het aggregaat
+  // vervangt de vroegere `.gt(amount,0)`/`.lt(amount,0)`-queries één-op-één.
+  const txAgg12 = txAgg12Result.data ?? []
 
-  const last12MonthsIncome = realIncome12.reduce((s, t) => s + Number(t.amount), 0)
+  const last12MonthsIncome = aggSumPositief(txAgg12, { realOnly: true })
   let extrapolatedIncome = last12MonthsIncome
   let actualIncomeMonths = 12
   const earliestIncomeDate = earliestIncomeResult.data?.[0]?.date
@@ -510,19 +514,19 @@ export const loadCoreData = cache(async function loadCoreData(
   }
 
   // ── Group income by month for kassabon ──
-  const incomeMonthMap: Record<string, number> = {}
-  for (const tx of realIncome12) {
-    const d = new Date(tx.date)
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-    incomeMonthMap[key] = (incomeMonthMap[key] ?? 0) + Number(tx.amount)
-  }
+  // Het aggregaat groepeert al op kalendermaand ('YYYY-MM', = `date.slice(0,7)`);
+  // dat vervangt de vroegere `new Date(tx.date).getMonth()`-sleutel en haalt
+  // meteen de latente tijdzone-afhankelijkheid daaruit weg (een UTC-middernacht-
+  // datum kon op een negatieve-offset-server een maand terugvallen).
+  const incomeByMonth12 = aggIncomeByMonth(txAgg12, { realOnly: true })
+  const incomeMonthMap: Record<string, number> = Object.fromEntries(incomeByMonth12)
   const sortedIncomeMonths = Object.entries(incomeMonthMap)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([month, amount]) => ({ month, amount }))
 
   // ── Vaste 12-slots inkomsten/uitgaven-reeks per kalendermaand ──
-  // Hergebruikt EXACT dezelfde transfer-gefilterde transacties als hierboven
-  // (realIncome12/realExpense12, geladen in batch 1) — geen extra query. We
+  // Hergebruikt EXACT hetzelfde transfer-gefilterde maandaggregaat als hierboven
+  // (txAgg12, geladen in batch 1) — geen extra query. We
   // bouwen 12 vaste maand-slots (oudste → nieuwste, t/m de huidige maand) zodat
   // de kassabonnen en de kaart-achtergronden een lege maand als 0 tonen i.p.v.
   // 'm over te slaan. Sommeert per maand; uitgaven als positieve bedragen.
@@ -534,18 +538,8 @@ export const loadCoreData = cache(async function loadCoreData(
       label: d.toLocaleDateString('nl-NL', { month: 'short' }),
     })
   }
-  const seriesIncomeByMonth = new Map<string, number>()
-  for (const tx of realIncome12) {
-    const d = new Date(tx.date)
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-    seriesIncomeByMonth.set(key, (seriesIncomeByMonth.get(key) ?? 0) + Number(tx.amount))
-  }
-  const seriesExpensesByMonth = new Map<string, number>()
-  for (const tx of realExpense12) {
-    const d = new Date(tx.date)
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-    seriesExpensesByMonth.set(key, (seriesExpensesByMonth.get(key) ?? 0) + Math.abs(Number(tx.amount)))
-  }
+  const seriesIncomeByMonth = incomeByMonth12
+  const seriesExpensesByMonth = aggExpenseByMonthAbs(txAgg12, { realOnly: true })
   const monthlyIncomeExpenseSeries = seriesMonthKeys.map(({ key, label }) => ({
     label,
     income: Math.round(seriesIncomeByMonth.get(key) ?? 0),
@@ -555,14 +549,12 @@ export const loadCoreData = cache(async function loadCoreData(
   // ── Last 6 months expenses & savings rate (rolling average) ──
   // 6 kalendermaanden incl. de huidige = 5 maanden terug (getMonth()-6 telde 7 maanden — off-by-one)
   const sixMonthsAgo = localMonthStartMonthsAgo(now, 5)
-  const last6MonthsIncome = realIncome12
-    .filter(t => t.date >= sixMonthsAgo)
-    .reduce((s, t) => s + Number(t.amount), 0)
-  const last6MonthsExpenses = Math.abs(
-    realExpense12
-      .filter(t => t.date >= sixMonthsAgo)
-      .reduce((s, t) => s + Number(t.amount), 0),
-  )
+  // `sixMonthsAgo` is per definitie een maandbegin ('YYYY-MM-01'), dus de vroegere
+  // rij-filter `t.date >= sixMonthsAgo` is exact gelijk aan de maand-ondergrens
+  // `month >= 'YYYY-MM'` op het aggregaat — geen randgeval, geen benadering.
+  const sinceMonth6m = sixMonthsAgo.slice(0, 7)
+  const last6MonthsIncome = aggSumPositief(txAgg12, { realOnly: true, sinceMonth: sinceMonth6m })
+  const last6MonthsExpenses = aggSumNegatiefAbs(txAgg12, { realOnly: true, sinceMonth: sinceMonth6m })
   // Use earliest income date (matching dashboard-data-loader) for month extrapolation
   let savingsRateDataMonths = 6
   if (earliestIncomeDate && (last6MonthsIncome > 0 || last6MonthsExpenses > 0)) {
@@ -985,7 +977,11 @@ export const loadCoreData = cache(async function loadCoreData(
   // ── FIRE target via shared helper (single source of truth) ──
   // Promise is vroeg gestart (zie boven), nu pas resolven zodat hij parallel
   // met de Kern-batches heeft kunnen draaien. Identieke output als Horizon.
-  const fireTargetFromHorizon = await fireTargetPromise
+  // Beide grondslagen komen uit ÉÉN kernel-run: EXCL. woning (Prognose!J@FIRE) én
+  // INCL. woning (Prognose!I@FIRE). De INCL.-waarde wordt doorgezet op CorePageData
+  // zodat consumenten (AI-context) 'm consumeren i.p.v. te benaderen.
+  const { requiredFirePortfolio: fireTargetFromHorizon, requiredFireNetWorth: fireNetWorthTargetFromHorizon } =
+    await fireTargetPromise
 
   // ── Canonieke gezondheidsscore-input (ADR 0008/0010, FR-8.7) ──────────
   // Trekt de /core-score op het ÉNE canonieke pad (`buildHealthScoreInput`),
@@ -1010,9 +1006,10 @@ export const loadCoreData = cache(async function loadCoreData(
   )
   const coreFireEligibleNetWorth = getFireEligibleNetWorth(netWorth, housingContext, housingStrategyCfg)
   // Grondslag-keuze (ADR 0009 herzien): standaard incl. eigen woning; alleen bij
-  // exclude_from_fire → EXCL. (liquide). Incl.-noemer via scalar-fallback (deze
-  // route laadt geen unified projection, alleen fireTargetFromHorizon = het
-  // strategie-loze doel op de EXCL.-grondslag).
+  // exclude_from_fire → EXCL. (liquide). Incl.-noemer = de kernel-geprojecteerde
+  // `requiredFireNetWorth` uit dezelfde run (identiek aan dashboard-data-loader's
+  // `simRequiredNetWorth`), met de scalar-benadering enkel als fallback wanneer de
+  // kernel-run niet kon draaien — spiegelt regel-voor-regel het dashboard-pad.
   const coreHomeExcludedFromFire = housingContext.hasEigenHuis && isHomeExcludedFromFire(housingStrategyCfg)
   const coreRequiredPortfolioExcl =
     fireTargetFromHorizon != null && fireTargetFromHorizon > 0 ? fireTargetFromHorizon : null
@@ -1020,7 +1017,9 @@ export const loadCoreData = cache(async function loadCoreData(
     homeExcludedFromFire: coreHomeExcludedFromFire,
     netWorthInclHome: netWorth,
     fireEligibleNetWorth: coreFireEligibleNetWorth,
-    requiredNetWorthInclHome: inclHomeTargetFromScalar(coreRequiredPortfolioExcl, netWorth, coreFireEligibleNetWorth),
+    requiredNetWorthInclHome:
+      fireNetWorthTargetFromHorizon ??
+      inclHomeTargetFromScalar(coreRequiredPortfolioExcl, netWorth, coreFireEligibleNetWorth),
     requiredPortfolioExclHome: coreRequiredPortfolioExcl,
   })
   const coreDebtMonthlyPayments = (debtsResult.data ?? []).reduce(
@@ -1054,16 +1053,13 @@ export const loadCoreData = cache(async function loadCoreData(
   )
 
   // ── Load 12-month budget spending sparklines per parent category ──
-  // Aggregeert in één pass over de transacties ipv O(parents × months × txs).
-  // De query is al vroeg gestart (sparkTxPromise) zodat hij parallel met de
-  // batches draait i.p.v. als waterfall daarná.
+  // Consumeert het 12-maands maandaggregaat uit batch 1 (`txAgg12`) — zelfde
+  // venster, zelfde granulariteit (maand × budget), zonder afkap.
   let budgetSparklines: CorePageData['budgetSparklines'] = []
   let budgetSpendingHistory: CorePageData['budgetSpendingHistory'] = []
 
   try {
-    const sparkTxData = await sparkTxPromise
-
-    if (budgetResult.data && budgetResult.data.length > 0 && sparkTxData.length > 0) {
+    if (budgetResult.data && budgetResult.data.length > 0 && txAgg12.length > 0) {
       const allBudgets = budgetResult.data as Budget[]
       const parentBudgets = allBudgets.filter(b => !b.parent_id)
       const childBudgets = allBudgets.filter(b => b.parent_id)
@@ -1077,29 +1073,13 @@ export const loadCoreData = cache(async function loadCoreData(
         sparkMonths.push({ month: start, start, monthKey: start.substring(0, 7), label })
       }
 
-      // Eén pass: bouw twee maps op uit alle transacties.
-      //  - sumByBudgetMonth: budgetId → monthKey → som van |amount|
-      //  - totalExpenseByMonth: monthKey → som van |amount| voor uitgaven
-      // Hierdoor is de daaropvolgende per-parent loop O(parents × months)
-      // i.p.v. O(parents × months × txs) — dat scheelt op een typisch user
-      // met 50K transacties enkele honderden ms aan CPU.
-      const sumByBudgetMonth = new Map<string, Map<string, number>>()
-      const totalExpenseByMonth = new Map<string, number>()
-      for (const t of sparkTxData) {
-        const mKey = t.date.substring(0, 7)
-        const amt = Math.abs(Number(t.amount))
-        if (t.budget_id) {
-          let bMap = sumByBudgetMonth.get(t.budget_id)
-          if (!bMap) {
-            bMap = new Map()
-            sumByBudgetMonth.set(t.budget_id, bMap)
-          }
-          bMap.set(mKey, (bMap.get(mKey) ?? 0) + amt)
-        }
-        if (Number(t.amount) < 0) {
-          totalExpenseByMonth.set(mKey, (totalExpenseByMonth.get(mKey) ?? 0) + amt)
-        }
-      }
+      // Twee maps uit het aggregaat — identiek aan de vroegere rij-pass:
+      //  - sumByBudgetMonth: budgetId → monthKey → Σ|amount| (beide tekens)
+      //  - totalExpenseByMonth: monthKey → Σ|amount| over de uitgaven
+      // Transfers tellen hier bewust MEE (`realOnly: false`), net als in de
+      // vroegere ongefilterde rij-pass — een sparkline toont wat er omging.
+      const sumByBudgetMonth = aggAbsByBudgetMonth(txAgg12)
+      const totalExpenseByMonth = aggExpenseByMonthAbs(txAgg12)
 
       const sparklines: CorePageData['budgetSparklines'] = []
       for (const parent of parentBudgets) {
@@ -1279,6 +1259,7 @@ export const loadCoreData = cache(async function loadCoreData(
     assetGrowthDirection,
     snapshots,
     fireTargetFromHorizon,
+    fireNetWorthTargetFromHorizon,
 
     budgetSparklines,
     budgetSpendingHistory,

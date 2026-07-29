@@ -195,8 +195,14 @@ export function buildPersoonlijkPlanSections(
   }))
 
   // ── Uitgaven nu vs. na pensioen ──
+  // Alleen ECHTE uitgave-budgetten tellen als essentiële uitgave. Zonder het
+  // `budget_type`-filter tellen essentiële Inkomen-/Sparen-parents mee als
+  // "must expense" (bug: Willem €127.140 i.p.v. €13.140/jaar). Dit is exact de
+  // grondslag die álle andere call-sites van `computeYearlyMustExpenses` al
+  // hanteren (dashboard-/core-/horizon-loader, periodiek rapport, what-if,
+  // year-in-review, huishouden-projectie) — hier ontbrak hij als enige.
   const essentialParents: BudgetRow[] = budgetRows
-    .filter((b) => !b.parent_id && b.is_essential === true)
+    .filter((b) => !b.parent_id && b.is_essential === true && b.budget_type === 'expense')
     .map((b) => ({
       id: b.id,
       name: b.name,

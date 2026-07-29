@@ -83,6 +83,30 @@ export const EXPENSE_RATE_ROLLING_MONTHS = 12
  */
 export const TARGET_EMERGENCY_MONTHS = 6
 
+/**
+ * BOVENGRENS voor de noodfonds-target in maanden (24 = twee jaar vaste lasten).
+ *
+ * Waarom: een noodfonds-doel in EURO's wordt naar maanden vertaald via
+ * `doelbedrag / maanduitgaven`. Bij (bijna) nul maanduitgaven — een net gestart
+ * of leeg account — explodeert die deling: op productie levert een €5.000-doel
+ * bij €12,85 gemeten maanduitgaven een "target" van 389 maanden (en op de
+ * 6-maands-noemer zelfs 2.335). Dat is geen buffer meer maar een deling door
+ * bijna-nul, en het zou zowel de tegel ("0,0 / 389 maanden gedekt") als de
+ * score-curve onbruikbaar maken.
+ *
+ * Deze grens is de symmetrische tegenhanger van de anti-gaming-VLOER
+ * (`MIN_EMERGENCY_SCORE_TARGET_MONTHS`, 3): de vloer voorkomt dat een
+ * mini-doel triviaal 100% scoort, het plafond voorkomt dat een absurd hoge
+ * (of door een degenerate noemer opgeblazen) target de score voor altijd op 0
+ * pint. 24 maanden is ruim boven de Nibud-richtlijn van 3–6 en boven de
+ * 12 maanden die voor wisselende inkomens gebruikelijk is.
+ *
+ * Let op: alleen de MAANDEN-expressie wordt begrensd. Het doelBEDRAG in euro's
+ * (`targetAmount`) blijft altijd de onverkorte gebruikerskeuze — dat is de
+ * grootheid waar de voortgangsbalk op rekent.
+ */
+export const MAX_EMERGENCY_TARGET_MONTHS = 24
+
 // ── Inflation ───────────────────────────────────────────────────
 
 /** Default annual inflation rate — 2% (ECB target). */
@@ -247,3 +271,16 @@ export const WEERBAARHEID_SCHILD = 75
  * niet op de meting zelf (runBacktest blijft 0–1). Geen semantische drempel.
  */
 export const WEERBAARHEID_DISPLAY_MAX = 99
+
+// ── Volgende Stap — signaaldrempels (nudge) ─────────────────────
+//
+// Drempels waarboven/waaronder de Volgende Stap-motor een groei-stap voorstelt.
+// Dit zijn SIGNAAL-drempels (wanneer nudgen we?), geen financiële aannames: de
+// onderliggende cijfers (spaarquote, vaste lasten, noodfonds-dekking) komen
+// canoniek uit de bundel. Ze staan hier zodat motor en widget één bron delen.
+
+/** Spaarquote (%) waaronder de motor "spaarquote verhogen" voorstelt. */
+export const VOLGENDE_STAP_SPAARQUOTE_MIN_PCT = 15
+
+/** Aandeel vaste lasten (% van inkomen) waarboven de motor "vaste lasten verlagen" voorstelt. */
+export const VOLGENDE_STAP_VASTE_LASTEN_MAX_PCT = 60

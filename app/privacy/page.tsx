@@ -30,7 +30,7 @@ const SUBVERWERKERS: {
   {
     naam: 'Supabase',
     rol: 'Database, authenticatie en opslag van al je account- en financiële gegevens',
-    locatie: 'EU (Frankfurt)',
+    locatie: 'EU (Ierland)',
     wanneer: 'Altijd — dit is waar je data leeft.',
   },
   {
@@ -336,7 +336,7 @@ export default function PrivacyPage() {
 
       <MarketingSection heading="7. Hoe we beveiligen">
         <p>
-          Je gegevens staan op Supabase, met de database gehost in Frankfurt
+          Je gegevens staan op Supabase, met de database gehost in Ierland
           (EU). Data is versleuteld in rust en in transport (TLS). De
           gevoeligste velden — banktokens en IBAN&apos;s — zijn daarbovenop
           veld-versleuteld met AES-256-GCM. Toegang tot je rijen in de

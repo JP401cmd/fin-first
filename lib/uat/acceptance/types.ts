@@ -13,7 +13,10 @@
  *                    wijst naar de functie die het moet reproduceren.
  * - 'consistency' — een "A = B"-toets (bv. lijstwaarde = detailwaarde) zonder één
  *                    hard te verifiëren cijfer, of een cijfer dat deels op
- *                    niet-deterministische input leunt (live koersen).
+ *                    niet-deterministische input leunt (live koersen, of
+ *                    maand-realisatie uit persona-transacties — die zijn
+ *                    `Math.random()`-gejitterd en relatief aan vandaag, dus nooit
+ *                    exact narekenbaar; zie de header van lib/test-personas.ts).
  * - 'oracle'      — een exact cijfer dat NIET met de hand na te rekenen is omdat het
  *                    uit een zware rekenmotor komt (de horizon-kernel: FIRE-leeftijd,
  *                    benodigd vermogen, projectiepaden). Verifieerbaar via de

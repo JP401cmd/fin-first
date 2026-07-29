@@ -75,7 +75,6 @@ export const CALC_COVERAGE_IGNORE: CalcCoverageIgnoreEntry[] = [
   { file: 'lib/household-data.ts', reason: 'Perspectiefverdeling (persoonlijk/huishouden/partner) — presentatielaag over reeds-gecatalogiseerde totalen, geen nieuwe rekenkern.' },
   { file: 'lib/jaarruimte-facts.ts', reason: 'Orkestreert uitsluitend de al-gecatalogiseerde jaarruimte-motor (lib/jaarruimte.ts, zie calc "box1") tot een feiten-object voor AI-context — eigen docstring: "orkestreert alleen".' },
   { file: 'lib/onboarding-presets.ts', reason: 'Eenmalige onboarding-defaultberekening (noodfondsdoel-suggestie), geen doorlopende rekenmotor.' },
-  { file: 'lib/persoonlijk-plan-assembly.ts', reason: 'Assemblagelaag voor het persoonlijk-plan-document (leeftijd-afleiding e.d.), geen eigen berekening.' },
   { file: 'lib/retirement-aspirations.ts', reason: 'Aggregeert pensioenwensen tot een totaal — presentatiehelper, geen nieuwe rekenkern.' },
   { file: 'lib/settlement-data.ts', reason: 'Verrekening/afwikkeling-weergave (bv. partnersplit-overzicht), dunne afleiding op reeds-vastgelegde bedragen.' },
   { file: 'lib/strategy-preview.ts', reason: 'Preview-helper voor een strategiewijziging (dunne afleiding op bestaande scenario-uitkomsten), geen eigen rekenkern.' },

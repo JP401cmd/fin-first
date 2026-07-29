@@ -8,7 +8,7 @@ import { FaqSection } from '@/components/landing/faq-section'
 import { FAQ_VEILIGHEID } from '@/components/landing/faq-data'
 
 const DESCRIPTION =
-  'Hoe TriFinity met je gegevens omgaat: EU-hosting in Frankfurt, geen dataverkoop, beperkte AI-context, open methodologie en altijd je eigen export.'
+  'Hoe TriFinity met je gegevens omgaat: EU-hosting in Ierland, geen dataverkoop, beperkte AI-context, open methodologie en altijd je eigen export.'
 
 export const metadata: Metadata = {
   title: 'Veiligheid & privacy — TriFinity',

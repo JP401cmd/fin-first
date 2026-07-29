@@ -72,7 +72,15 @@ export interface FreedomStateInput {
   freedomPct: number | null
   /** Huidige leeftijd in jaren. Null = geen geboortedatum bekend. */
   currentAge: number | null
-  /** Vrijheids-/FIRE-leeftijd in jaren. Null = projectie kon niet draaien. */
+  /**
+   * Vrijheids-/FIRE-leeftijd in jaren. Null = projectie kon niet draaien.
+   *
+   * GEEF DE FRACTIONELE WAARDE (`fireAgeFractional`), niet een afgeronde: dit veld
+   * is een DREMPEL (`currentAge >= fireAge`), geen weergave. Afronden van bv. 44,92
+   * naar 45 laat "financieel vrij" tot 6 maanden te vroeg triggeren bij een
+   * currentAge van 45 (WF-CANON-03). Rond alléén af waar het getal als
+   * vrijheidsleeftijd wordt getoond.
+   */
   fireAge: number | null
   /** Gekozen eindstrategie — onderscheidt 'regulier pensioen' van 'vervroegde vrijheid'. */
   strategy?: FireEndStrategy

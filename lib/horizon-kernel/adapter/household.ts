@@ -35,7 +35,7 @@ import type { PartnerParams } from '../types'
 import type { EventMappingNotice } from './events'
 import type { KernelAdapterProfile } from './params'
 import type { KernelAdapterInput } from './index'
-import { EXCEL_AOW_SAMENWONEND_PP_PER_MAAND } from './defaults'
+import { AOW_SAMENWONEND_PP_PER_MAAND } from './defaults'
 
 // ── Partner-invoer op de app-zijde ──────────────────────────────────────────────────
 
@@ -71,7 +71,7 @@ export interface PartnerBuildResult {
  *  - **B6/B7/B8 partner-pensioen** — de app kent GEEN partner-pensioen in het profiel-
  *    oppervlak → **gedocumenteerde default 0** (inert; startleeftijd = AOW-leeftijd, niet
  *    geïndexeerd) + notice. Open punt voor FASE 4/5 (partner-pensioen-bron).
- *  - **B9 AOW-bedrag p.p./jaar** — samenwonend-tarief (`EXCEL_AOW_SAMENWONEND_PP_PER_MAAND
+ *  - **B9 AOW-bedrag p.p./jaar** — samenwonend-tarief (`AOW_SAMENWONEND_PP_PER_MAAND
  *    × 12`), **consistent met de hoofd-persoon-bron** (kern-B21 samenwonend zodra
  *    `leefsituatie = 'Samenwonend'`). Volle opbouw aangenomen — de app kent de partner-
  *    AOW-opbouwjaren niet → notice.
@@ -118,7 +118,7 @@ export function buildPartnerParams(
       pensioenBrutoPerJaar: 0,
       pensioenStartleeftijd: Math.round(aow.fractional),
       pensioenGeindexeerd: false,
-      aowBedragPpPerJaar: EXCEL_AOW_SAMENWONEND_PP_PER_MAAND * 12,
+      aowBedragPpPerJaar: AOW_SAMENWONEND_PP_PER_MAAND * 12,
     },
     notices,
   }

@@ -217,8 +217,10 @@ function pick(managed: readonly LifeEvent[], kind: ReturnType<typeof expanderFor
 
 /**
  * AOW → `leefsituatie` + `aowOpbouwjaren`. De kern rekent de AOW-hoogte + startleeftijd
- * zelf (basis 1452/993 uit `tables/auto-gebeurtenissen.ts`; START = `persoon.aowLeeftijd`
- * uit snede 1). Het event-`target_age` wordt dus BEWUST genegeerd voor de startmaand —
+ * zelf; de BASIS komt op het app-pad uit `NEUTRAL_AUTO_GEBEURTENISSEN.aowBasisPerMaand`
+ * (= `APP_AOW_BASIS_PER_MAAND`, de canonieke SVB-constanten — ADR 0064), niet uit de
+ * oracle-fallback 1452/993 in `tables/auto-gebeurtenissen.ts`. START = `persoon.aowLeeftijd`
+ * uit snede 1. Het event-`target_age` wordt dus BEWUST genegeerd voor de startmaand —
  * de canonieke AOW-leeftijd wint (bij mismatch = oracle). `aowOpbouwjaren = 50 −
  * jaren-buiten-NL` (2%/jr korting; spiegelt `computeAowMonthly`).
  */
@@ -233,7 +235,7 @@ function mapAow(events: LifeEvent[], notices: EventMappingNotice[]): Partial<Aut
   const m = (events[0]!.metadata ?? {}) as AOWMetadata
   const jarenBuitenNL = clamp(Number(m.jarenBuitenNL ?? m.jarenInNL ?? 0), 0, AOW_VOLLE_OPBOUW_JAREN)
   return {
-    // De kern vergelijkt op exact 'Alleenstaand'; al het andere → samenwonend-tarief (993).
+    // De kern vergelijkt op exact 'Alleenstaand'; al het andere → samenwonend-tarief.
     leefsituatie: m.leefsituatie === 'samenwonend' ? 'Samenwonend' : 'Alleenstaand',
     aowOpbouwjaren: AOW_VOLLE_OPBOUW_JAREN - jarenBuitenNL,
   }

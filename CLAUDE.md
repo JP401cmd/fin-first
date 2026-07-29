@@ -40,13 +40,15 @@ Elke inhoudelijke opdracht routeert via de bijpassende pijplijn-skill — niet a
 - **nieuwe AI-functionaliteit** → `ai-feature` · **hoe de AI antwoordt/zich gedraagt** → `ai-gedrag`
 - **"ship het" / af / live** → `release`
 
-**Uitzondering — juridische pagina's:** raakt de wijziging `/privacy`, `/voorwaarden` of `/wft`, dan nooit via `kleine-aanpassing` — hoe klein ook. Altijd via de Grenswachter-route (juridische toets), met een aantekening waaróm de tekst wijzigt (brief-formaat, één pagina). Zie `trifinity-org/org_plan/30-werkstromen.md`, stroom 03.
+**Uitzondering — juridische pagina's:** raakt de wijziging `/privacy`, `/voorwaarden` of `/wft`, dan nooit via `kleine-aanpassing` — hoe klein ook. Altijd via de Grenswachter-route (juridische toets), met een aantekening waaróm de tekst wijzigt (brief-formaat, één pagina). Zie de org-site: `trifinity-org/site/werkstromen.html#stroom-03`.
 
 **Harde regel: een vervolgbericht binnen een lopende sessie telt als een nieuwe opdracht.** Een bugmelding die ná feature-werk komt start opnieuw `bug-fix`; een nieuwe tweak start opnieuw `kleine-aanpassing`. Sla de skill NIET over omdat je al middenin een sessie zit, al code aan het lezen bent, of de vorige stap een andere skill gebruikte. Bij twijfel tussen "klein vs. defect vs. uitbreiding": kies de skill die past bij de aard van de vraag, niet de makkelijkste. Begin pas met onderzoeken/implementeren ná het invoken van de skill.
 
 ### Organisatieopzet (verwijzing)
 
-De organisatieopzet — rollen, skills, werkstromen, status en besluiten — staat in de repo `trifinity-org` onder `org_plan/` (broer van deze repo op schijf). Die is de bron; kopieer er niets uit, verwijs ernaar.
+De organisatieopzet — rollen, skills, werkstromen, status en besluiten — **lees je op de org-site**, niet in de losse markdown: open `trifinity-org/site/index.html` (broer-repo op schijf; dubbelklik, werkt via `file://`, geen server). Deeplinks openen het detailvenster direct: `organisatie.html#rol-<naam>`, `skills.html#skill-<naam>`, `werkstromen.html#stroom-NN`. Kopieer er niets uit, verwijs ernaar.
+
+De site is een gegenereerd venster, geen bron. Moet er iets ín de opzet veranderen, dan bewerk je `trifinity-org/org_plan/*.md` en draai je daarna `node site/build.mjs`. De team-pagina van die site leest **deze** repo (`docs/architecture/architecture.json` + `lib/architecture/development-model.ts`) — voeg je hier een agent of skill toe, draai dan eerst `npm run arch:diagram` hier en bouw daarna de site, anders loopt de teamopstelling achter.
 
 ## Architectuurpagina (verplicht bijhouden)
 

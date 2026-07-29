@@ -291,18 +291,12 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     defaultSize: 'half',
   },
   {
-    id: 'ai_inzicht',
-    name: 'AI Inzicht',
-    description: 'Persoonlijke AI-gedreven inzichten',
-    module: 'cross',
-    sizes: ['mini', 'quarter', 'half', 'full'],
-    defaultSize: 'half',
-  },
-  {
     id: 'volgende_stap',
     name: 'Volgende Stap',
-    description: 'Aanbevolen volgende actie',
-    module: 'cross',
+    description: 'Wat er nú toe doet — inrichting en groei per module',
+    // De widget rendert als De Wil (accent + module-gate inzicht_acties); de
+    // stappen zelf dragen hun eigen module-stip (Kern/Wil/Horizon).
+    module: 'wil',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
   },
@@ -515,7 +509,6 @@ export const WIDGET_HREFS: Record<string, string> = {
   beleggingsrendement:      '/overzicht/bezittingen',
   pensioen_aow:             '/toekomst/gebeurtenissen',
   meldingen:                '/berichten',
-  ai_inzicht:               '/berichten',
   volgende_stap:            '/overzicht/tips',
   maandoverzicht:           '/overzicht/cashflow',
   weekoverzicht:            '/overzicht/cashflow',

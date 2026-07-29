@@ -175,7 +175,8 @@ export function buildKernelInputFromAppWithNotices(input: KernelAdapterInput): K
     ts,
     gebeurtenissen: events.gebeurtenissen,
     // Bij een partner dwingt de huishouden-run het samenwonend-AOW-tarief af (kern-B21 =
-    // 993) — óók als een AOW-event 'Alleenstaand' zou zeggen; partner-aanwezigheid wint.
+    // de samenwonend-tak van `aowBasisPerMaand`) — óók als een AOW-event 'Alleenstaand'
+    // zou zeggen; partner-aanwezigheid wint.
     autoGebeurtenissen: partnerResult
       ? { ...events.autoGebeurtenissen, leefsituatie: 'Samenwonend' }
       : events.autoGebeurtenissen,

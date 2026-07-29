@@ -22,7 +22,7 @@ import type { Debt } from '@/lib/debt-data'
 import { scoreDSTI, scoreAssetConcentration } from '@/lib/financial-health'
 import { pillarStatus } from '@/lib/leverage-status'
 import { computeGoalProgress, type Goal } from '@/lib/goal-data'
-import { computeFreedomTotal } from '@/lib/briefing/overview-briefing'
+import { computeFreedomTotal, computeFreedomDelta } from '@/lib/briefing/overview-briefing'
 import { compareCompound } from '@/lib/compound-projection'
 import { OVZ_ACCEPTANCE } from './ovz'
 import type { AcceptanceCriterion } from './types'
@@ -215,14 +215,29 @@ export const OVZ_ENGINE_CHECKS: OvzEngineCheck[] = [
   {
     workflow: 'WF-OVZ-09',
     scenarioId: 'UAT-OVZ-09',
-    label: 'Vrijheidsdagen-totaal (computeFreedomTotal): Willem (positief) vs. Daan (deficit)',
+    label: 'Vrijheidsdagen-totaal (computeFreedomTotal) + week-delta-plausibiliteitsgrens (computeFreedomDelta)',
     run: () => {
       criterion('WF-OVZ-09')
       const willem = computeFreedomTotal(1619700, 1495)
       const daan = computeFreedomTotal(-4200, 1500)
+      // Week-over-week: basis bevroren op half-geïmporteerde data (€200/mnd)
+      // vs. de realistische week erna (€3.000/mnd) → ±−17.033 dagen, buiten de
+      // plausibele bandbreedte → onderdrukt (bug "−3788 dagen minder").
+      const opgeblazenBasis = computeFreedomTotal(120000, 200)
+      const realistisch = computeFreedomTotal(120000, 3000)
+      const gesprongen = computeFreedomDelta(realistisch, opgeblazenBasis)
+      // Normale week: €2.500 gespaard bij €3.000/mnd → +25 dagen, blijft zichtbaar.
+      const normaal = computeFreedomDelta(
+        computeFreedomTotal(122500, 3000),
+        computeFreedomTotal(120000, 3000),
+      )
       return {
-        expected: 'willemIsDeficit=false; willemTotalDaysPositief=true; daanIsDeficit=true',
-        actual: `willemIsDeficit=${willem.breakdown.isDeficit}; willemTotalDaysPositief=${willem.totalFreedomDays > 0}; daanIsDeficit=${daan.breakdown.isDeficit}`,
+        expected:
+          'willemIsDeficit=false; willemTotalDaysPositief=true; daanIsDeficit=true; opgeblazenDelta=onderdrukt; opgeblazenImplausibel=true; normaleDelta=25',
+        actual:
+          `willemIsDeficit=${willem.breakdown.isDeficit}; willemTotalDaysPositief=${willem.totalFreedomDays > 0}; daanIsDeficit=${daan.breakdown.isDeficit}` +
+          `; opgeblazenDelta=${gesprongen.deltaDays === null ? 'onderdrukt' : gesprongen.deltaDays}` +
+          `; opgeblazenImplausibel=${gesprongen.isImplausibleDelta}; normaleDelta=${normaal.deltaDays}`,
       }
     },
   },

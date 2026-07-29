@@ -195,8 +195,12 @@ export interface ComboExpectation {
  *      B93-doel=0-quirk maakt deplete triviaal "reached_now" — zie
  *      `bridge.ts#isKernelReachedNowDisplay`). Geen mapping-fout; de kernel-liquide-
  *      categorisatie op een vermogende persona.
- *  (d) **AOW/pensioen endogeen**: de kernel rekent de AOW-hoogte zelf (basis 993/mnd
- *      samenwonend, start = canonieke AOW-leeftijd 67) en annuïtiseert het pensioen-event.
+ *  (d) **AOW/pensioen endogeen**: de kernel rekent de AOW-hoogte zelf en annuïtiseert het
+ *      pensioen-event. De AOW-BASIS komt sinds ADR 0064 (gap V20) als invoer binnen —
+ *      op dit app-pad de canonieke SVB-constante `NL_AOW_MONTHLY_SAMENWONEND`, niet meer
+ *      de Excel-oracle-basis €993/mnd; start = canonieke AOW-leeftijd 67. Dat verlaagde de
+ *      goldens (herijkt 2026-07-29): doelbedrag −2 à −3%, vrijheidsleeftijd 0,1–0,4 jr
+ *      eerder — meer AOW-inkomen ⇒ minder benodigde portefeuille.
  *  (e) **Spaargrondslag** = netto jaarinkomen − geschatte jaaruitgaven ((7600−4100)×12 =
  *      42.000).
  *
@@ -205,30 +209,30 @@ export interface ComboExpectation {
  * degeneratief samen (8× 42,083 / €1.102.575): de kernel-deplete-FIRE is voor deze
  * vermogende persona "reached now" (B93-doel=0-quirk, oorzaak c). Daarom draaien C en D op
  * de **perpetual-baseline** (`PERP_END`), waar FIRE een echte toekomst-datum (~45,8 jr) is:
- *   - Groep C discrimineert: oplopend 42,08 < afnemend 43,50 < vast 45,83 < guardrails 47,75.
- *   - Groep D discrimineert: combi 45,17 < groei 45,67 < geen 45,83 < deeltijd 46,83.
+ *   - Groep C discrimineert: oplopend 42,08 < afnemend 43,17 < vast 45,58 < guardrails 47,50.
+ *   - Groep D discrimineert: combi 44,92 < groei 45,42 < geen 45,58 < deeltijd 46,42.
  *
  * GENERATED:GOLDEN:START
  */
 export const EXPECTED: Record<string, ComboExpectation> = {
   'A-include_full': { fireAgeFractional: 42.083, doelbedrag: 1102575 },
-  'A-exclude': { fireAgeFractional: 43.0, doelbedrag: 1036734 },
-  'A-downsize': { fireAgeFractional: 42.583, doelbedrag: 997273 },
+  'A-exclude': { fireAgeFractional: 42.833, doelbedrag: 1020880 },
+  'A-downsize': { fireAgeFractional: 42.417, doelbedrag: 981649 },
   'A-reverse': { fireAgeFractional: 42.083, doelbedrag: 950670 },
   'B-deplete': { fireAgeFractional: 42.083, doelbedrag: 1102575 },
   'B-legacy': { fireAgeFractional: 42.083, doelbedrag: 1102575 },
-  'B-perpetual': { fireAgeFractional: 45.833, doelbedrag: 1562958 },
-  'B-pensioen': { fireAgeFractional: 67.0, doelbedrag: 5747356 },
+  'B-perpetual': { fireAgeFractional: 45.583, doelbedrag: 1530312 },
+  'B-pensioen': { fireAgeFractional: 67.0, doelbedrag: 5747506 },
   // Groep C/D op de PERPETUAL-baseline (PERP_END) — hier discrimineren de profielen/
   // werk-varianten wél (op deplete vielen ze samen op 42,083).
-  'C-vast': { fireAgeFractional: 45.833, doelbedrag: 1562958 },
-  'C-afnemend': { fireAgeFractional: 43.5, doelbedrag: 1269697 },
+  'C-vast': { fireAgeFractional: 45.583, doelbedrag: 1530312 },
+  'C-afnemend': { fireAgeFractional: 43.167, doelbedrag: 1229674 },
   'C-oplopend': { fireAgeFractional: 42.083, doelbedrag: 1103777 },
-  'C-guardrails': { fireAgeFractional: 47.75, doelbedrag: 1823619 },
-  'D-geen': { fireAgeFractional: 45.833, doelbedrag: 1562958 },
-  'D-groei': { fireAgeFractional: 45.667, doelbedrag: 1561132 },
-  'D-deeltijd': { fireAgeFractional: 46.833, doelbedrag: 1583739 },
-  'D-combi': { fireAgeFractional: 45.167, doelbedrag: 1558998 },
+  'C-guardrails': { fireAgeFractional: 47.5, doelbedrag: 1788538 },
+  'D-geen': { fireAgeFractional: 45.583, doelbedrag: 1530312 },
+  'D-groei': { fireAgeFractional: 45.417, doelbedrag: 1525573 },
+  'D-deeltijd': { fireAgeFractional: 46.417, doelbedrag: 1544750 },
+  'D-combi': { fireAgeFractional: 44.917, doelbedrag: 1516249 },
 }
 // GENERATED:GOLDEN:END
 

@@ -100,7 +100,6 @@ function makeEmptyDashboardData(): DashboardData {
     allBudgets: [],
     // Notifications & Insights
     notifications: [],
-    aiInsights: [],
     nextSteps: [],
     monthSummary: {
       netWorthDelta: 0,
@@ -185,7 +184,6 @@ const EMPTY_ARRAY_KEYS: (keyof DashboardData)[] = [
   'favoriteHoldings',
   'allBudgets',
   'notifications',
-  'aiInsights',
   'nextSteps',
   'upcomingEvents',
   'topRecurringTransactions',
@@ -415,20 +413,6 @@ const tests: TestCase[] = [
       assertNotNull(mod.MeldingenWidget, 'MeldingenWidget should be exported')
       const data = makeEmptyDashboardData()
       assertEqual(data.notifications.length, 0, 'notifications should be empty')
-    },
-  },
-  {
-    id: 'widget-empty-ai-inzicht-condition',
-    name: 'AI inzicht widget toont empty state bij geen inzichten',
-    category: CAT,
-    description: 'AI inzicht widget toont lege state wanneer aiInsights leeg is',
-    priority: 'high',
-    estimatedDurationMs: 100,
-    fn: async () => {
-      const mod = await import('@/components/widgets/ai-inzicht-widget')
-      assertNotNull(mod.AiInzichtWidget, 'AiInzichtWidget should be exported')
-      const data = makeEmptyDashboardData()
-      assertEqual(data.aiInsights.length, 0, 'aiInsights should be empty')
     },
   },
   {
@@ -787,7 +771,7 @@ const tests: TestCase[] = [
         'vrijheidsscenarios', 'sim_vermogenspad',
         'box3_drag', 'vrijheidsmijlpalen',
         'backtesting_score', 'inflatie_impact', 'beleggingsrendement',
-        'pensioen_aow', 'meldingen', 'ai_inzicht', 'volgende_stap',
+        'pensioen_aow', 'meldingen', 'volgende_stap',
         'maandoverzicht', 'weekoverzicht', 'swr_monitor', 'agenda',
         'noodfonds', 'huishouden_vergelijking', 'huishouden_activiteit',
         'beslissingspatronen', 'vrijheidsdagen_maand', 'wilskracht',

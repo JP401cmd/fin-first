@@ -10,7 +10,10 @@ import {
   TOTAALPLAN_MC_RUNS,
   type TotaalplanRawInputs,
 } from './totaalplan-data'
-import type { PersoonlijkPlanProfileRow } from './persoonlijk-plan-assembly'
+import {
+  buildPersoonlijkPlanSections,
+  type PersoonlijkPlanProfileRow,
+} from './persoonlijk-plan-assembly'
 
 /**
  * Tests voor de totaalplan-assemblage (`lib/totaalplan-data.ts`). Het contract:
@@ -241,5 +244,46 @@ describe('assembleTotaalplan — inzichten deterministisch', () => {
     const raw = makeRawInputs({ aandachtspunten: makeAandachtspunten().slice(0, 2) })
     const report = assembleTotaalplan(raw)
     expect(report.inzichten.length).toBe(2)
+  })
+})
+
+/**
+ * Regressieslot — Notion "Persoonlijk plan telt Inkomen + Sparen mee als
+ * essentiële uitgave" (P1/S1). De bug zat in `buildPersoonlijkPlanSections`
+ * (gedeelde aannames-assemblage), dus het TWEEDE rapport-oppervlak — het
+ * gecomponeerde totaalplan — was even hard geraakt als /rapportages/persoonlijk-plan.
+ * Deze suite pint dat het totaalplan de gecorrigeerde grondslag doorgeeft.
+ * De directe consument staat in `lib/persoonlijk-plan-assembly.test.ts`.
+ */
+describe('assembleTotaalplan — essentiële uitgaven tellen alleen budget_type=expense', () => {
+  const BUDGET_ROWS = [
+    { id: 'b-inkomen', parent_id: null, name: 'Inkomen', default_limit: 6500, interval: 'monthly', budget_type: 'income', is_essential: true },
+    { id: 'b-wonen', parent_id: null, name: 'Vaste lasten wonen', default_limit: 455, interval: 'monthly', budget_type: 'expense', is_essential: true },
+    { id: 'b-dagelijks', parent_id: null, name: 'Dagelijkse uitgaven', default_limit: 410, interval: 'monthly', budget_type: 'expense', is_essential: true },
+    { id: 'b-vervoer', parent_id: null, name: 'Vervoer', default_limit: 230, interval: 'monthly', budget_type: 'expense', is_essential: true },
+    { id: 'b-sparen', parent_id: null, name: 'Sparen & investeren', default_limit: 3000, interval: 'monthly', budget_type: 'savings', is_essential: true },
+  ]
+
+  function reportWith(budgetRows: typeof BUDGET_ROWS) {
+    return assembleTotaalplan(
+      makeRawInputs({
+        persoonlijkPlan: { profile: PROFILE, aowRows: [], events: [], budgetRows },
+      }),
+    )
+  }
+
+  it('Inkomen-/Sparen-parents tellen niet mee in het totaalplan (€13.140 i.p.v. €127.140/jaar)', () => {
+    const report = reportWith(BUDGET_ROWS)
+    expect(report.uitgaven.yearlyEssentialExpenses).toBe(13140)
+    expect(report.uitgaven.yearlyEssentialExpenses).not.toBe(127140)
+  })
+
+  it('totaalplan en persoonlijk plan tonen byte-identieke aannames (één bron, geen drift)', () => {
+    const budgetRows = BUDGET_ROWS
+    const totaalplan = reportWith(budgetRows)
+    const persoonlijk = buildPersoonlijkPlanSections({
+      profile: PROFILE, aowRows: [], events: [], budgetRows,
+    })
+    expect(totaalplan.uitgaven).toEqual(persoonlijk.uitgaven)
   })
 })

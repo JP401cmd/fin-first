@@ -83,18 +83,28 @@ export interface Notification {
 
 
 
-export interface AiInsight {
-  id: string
-  text: string
-  module: 'kern' | 'wil' | 'horizon'
-  createdAt: string
-}
+/** Module waar een volgende stap toe hoort — bepaalt het accent in de widget. */
+export type NextStepModule = 'kern' | 'wil' | 'horizon'
+
+/**
+ * Soort volgende stap:
+ *  - `fundament` = eenmalige inrichting (bank koppelen, bezittingen vastleggen…)
+ *  - `groei`     = doorlopende waarde ná de inrichting (noodfonds, acties, vrijheid versnellen)
+ */
+export type NextStepKind = 'fundament' | 'groei'
 
 export interface NextStep {
   key: string
+  /** Kort actielabel (~≤ 24 tekens) voor mini/compacte rijen — géén volzin. */
+  label: string
   title: string
   description: string
+  /** Vrijheidsdagen-impact — alleen gezet als er een canonieke bron voor is. */
   impact: number | null
+  /** Gemeten kengetal uit de bundel (bv. "1,8 van 6 maanden gedekt"); null = geen meting. */
+  metric: string | null
+  module: NextStepModule
+  kind: NextStepKind
   href: string
   dismissed: boolean
 }
@@ -122,6 +132,17 @@ export interface EmergencyFund {
   monthsCovered: number
   targetMonths: number
   isComplete: boolean
+  /**
+   * Herkomst van de TARGET, uit `resolveEmergencyFund` (lib/emergency-fund.ts):
+   * 'goal' = een noodfondsdoel van de gebruiker stuurt 'm, 'liquid' = geen doel
+   * → de richtlijn van 6 maanden. De widget heeft dit nodig om de berekening
+   * eerlijk te tonen: bij 'liquid' geldt targetMonths × maanduitgaven ==
+   * targetAmount, bij 'goal' is het doelBEDRAG primair en zijn de maanden een
+   * (afgerond, begrensd) gevolg — dan is die vermenigvuldiging géén geldige
+   * gelijkheid meer. Optioneel zodat test-/mockbundels 'm mogen weglaten;
+   * ontbreekt hij, dan lezen consumers dat als 'liquid'.
+   */
+  source?: 'goal' | 'liquid'
 }
 
 export interface FavoriteHolding {
@@ -325,9 +346,6 @@ export interface DashboardData {
   }[]
   // New widget data fields
   notifications: Notification[]
-
-
-  aiInsights: AiInsight[]
   nextSteps: NextStep[]
   monthSummary: MonthSummary
   upcomingEvents: UpcomingEvent[]

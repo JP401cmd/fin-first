@@ -38,15 +38,28 @@ function annualAmount(limit: number, interval: string | null | undefined): numbe
  * Logica:
  * A) Essential parents: als ze essential children hebben, tel alleen die;
  *    anders tel alle children (backwards compat). Gebruik child interval wanneer er exact 1 child is.
+ *    archive/income/savings-parents worden uitgesloten (zie vangnet hieronder).
  * B) Orphan essential children: essential children van niet-essential parents worden
  *    individueel meegeteld (archive/income/savings uitgesloten).
+ *
+ * VANGNET op tak A: elke call-site hoort `essentialParents` al te filteren op
+ * `budget_type === 'expense'`; toen één call-site dat vergat telden Inkomen- en
+ * Sparen-budgetten mee als essentiële uitgave (Willem €127.140 i.p.v. €13.140/jr).
+ * Tak B had deze blocklist al — tak A nu ook, zodat de fout-klasse structureel
+ * onmogelijk is. Blocklist (niet allowlist) omdat `budget_type` optioneel is:
+ * rijen zónder type blijven meetellen, precies zoals voorheen.
  */
 export function computeYearlyMustExpenses(
-  essentialParents: BudgetRow[],
+  essentialParentsInput: BudgetRow[],
   allChildren: ChildBudgetRow[],
 ): { yearlyMustExpenses: number; expenseItems: MustExpenseItem[] } {
   const expenseItems: MustExpenseItem[] = []
   let total = 0
+  // Vóór het opbouwen van `essentialParentIds`, zodat de orphan-detectie in tak B
+  // identiek is aan een call-site die dezelfde rijen zelf al had weggefilterd.
+  const essentialParents = essentialParentsInput.filter(
+    b => !EXCLUDED_BUDGET_TYPES.includes(b.budget_type ?? ''),
+  )
   const essentialParentIds = new Set(essentialParents.map(b => b.id))
 
   // A: Essential parent budgets — gebruik essential children indien aanwezig; anders alle children

@@ -69,6 +69,18 @@ ingedeeld in vier groepen: **Technisch beheer**, **Functioneel beheer**, **Test 
 ### Bankkoppeling uitschakelen
 - **Technisch beheer → Bank Connect** (`/beheer/bank-connect`): zet TrueLayer uit.
 
+### TrueLayer-omgeving wisselen (sandbox ↔ productie)
+- Sandbox en Live zijn in de TrueLayer-console **aparte apps met eigen credentials**:
+  het sandbox-client-id heeft een `sandbox-`-prefix (bv. `sandbox-finfirst-…`) en een
+  **eigen** client-secret. Wissel je van omgeving, wissel dan altijd client-id én secret mee —
+  anders toont de TrueLayer-authpagina "Unknown client or client not enabled".
+- **"Test verbinding" bewijst in sandbox-modus de credentials níet** (haalt alleen de kale
+  providerlijst op, die slaagt ook met fout client-id). De echte proef is een koppelpoging.
+- Registreer per omgeving de redirect-URI `…/api/bank-connect/callback` in de TrueLayer-console
+  (Settings → Redirect URIs). Let op: op de **Live**-app staat nu alleen
+  `https://fin-first.vercel.app/callback` — het juiste pad
+  `https://fin-first.vercel.app/api/bank-connect/callback` moet daar nog bij vóór livegang.
+
 ---
 
 ## Monitoring
@@ -117,8 +129,62 @@ De werkwijze staat in `.claude/skills/herstelproef` — elk kwartaal oefenen, no
 - **RPO (hoeveel data mag je kwijt zijn): 24 uur** — vereist minimaal een dagelijkse Supabase-back-up; verifieer dat die aanstaat en op welk tijdstip.
 - **RTO (hoe lang mag herstel duren): 4 uur** — van "besluit tot terugzetten" tot checklist groen. De geklokte tijd van elke proef komt hieronder te staan.
 
+### Wat je náást de database nodig hebt
+
+Een teruggezette database alléén is géén werkende omgeving. Deze drie dingen zitten **niet** in een
+Supabase-databaseback-up en moeten apart geregeld zijn, anders staat er straks onleesbare data:
+
+- **Sleutels uit de omgeving.** `ENCRYPTION_KEY_V1` (versleutelde bankkoppeling-credentials, migratie
+  `20260503193310_encrypt_bank_credentials`) en `IBAN_INDEX_KEY_V1` (de gehashte IBAN-index) wonen in
+  Vercel/`.env.local`, niet in de database. Zonder exact dezelfde sleutels is de herstelde data er wél,
+  maar onbruikbaar. Bewaar ze buiten de repo én buiten hetzelfde Supabase-project.
+- **De `auth`- en `storage`-schema's.** Alleen `public` terugzetten betekent: data zonder gebruikers —
+  niemand kan inloggen. Een dump/herstel moet `auth` (en `storage`) meenemen.
+- **Bestanden in Storage.** De bucket `pension-documents` bevat geüploade documenten. Een database-
+  back-up herstelt de rijen in `storage.objects`, niet per se de bestanden zelf — controleer dit
+  expliciet bij de proef.
+
+### De proef in stappen (met verwachte duur)
+
+Omvang op 2026-07-29: database ~56 MB — klein genoeg dat het terugzetten zelf minuten kost, niet uren.
+De tijd zit in het optuigen van de doelomgeving en de controle.
+
+| # | Stap | Verwacht |
+| --- | --- | --- |
+| 0 | Vaststellen dát er een back-up is: Supabase-dashboard → Database → Backups (plan + tijdstip + retentie). Free plan = géén back-ups; dan haalt de RPO van 24 uur het niet. | 5 min |
+| 1 | Doelomgeving: **een apart Supabase-project** (restore van de back-up/PITR). Géén branch — een branch draait de migraties op een lege database en bevat dus **geen productiedata**; dat toetst schema, niet herstel. | 15 min |
+| 2 | Back-up terugzetten naar dat project, inclusief `auth` en `storage`. | 10–20 min |
+| 3 | Env samenstellen: nieuwe project-URL + anon/service-role-key, plus de bestaande `ENCRYPTION_KEY_V1` en `IBAN_INDEX_KEY_V1` uit de kluis. | 15 min |
+| 4 | Checklist aflopen (hieronder). | 30 min |
+| | **Totaal (eerste keer, realistisch)** | **1,5–2,5 uur — binnen de RTO van 4 uur, maar nog niet bewezen** |
+
+### Controlechecklist
+
+Draai deze telling eerst op productie (dat is de verwachting), dan op de herstelde omgeving; ze moeten
+gelijk zijn voor de back-updatum:
+
+```sql
+select (select count(*) from auth.users)              as auth_users,
+       (select count(*) from public.profiles)         as profiles,
+       (select count(*) from public.transactions)     as transactions,
+       (select count(*) from public.bank_accounts)    as bank_accounts,
+       (select count(*) from public.assets)           as assets,
+       (select count(*) from public.budgets)          as budgets,
+       (select count(*) from public.debts)            as debts,
+       (select count(*) from public.net_worth_snapshots) as nw_snapshots;
+```
+
+Daarnaast, en dit is bij een vermogensapp het punt waar het écht om gaat:
+
+- **inloggen** met een testaccount tegen de herstelde omgeving werkt;
+- **steekproef op bedragen** — een paar bekende saldi én een uitkomst van de rekenkern
+  (netto vermogen / FIRE-doel uit `net_worth_snapshots`) komen overeen met productie op de back-updatum;
+- **bankkoppeling leesbaar** — een `bank_connections`-rij ontsleutelt met `ENCRYPTION_KEY_V1`;
+- **Storage** — een bestand uit `pension-documents` is daadwerkelijk op te halen.
+
 **Proeflog:**
 
 | Datum | Back-updatum | Hersteltijd | Uitkomst | Wat schuurde |
 | --- | --- | --- | --- | --- |
-| *(eerste proef — gepland vóór de allowlist opengaat)* | | | | |
+| 2026-07-29 | — | — | **Droge doorloop, niet uitgevoerd** — er is nog geen herstel-doelomgeving. Stappenplan + checklist hierboven vastgelegd; wachten op go voor een tweede Supabase-project. | Geen Docker/psql op de beheerdersmachine (lokaal terugzetten kan niet); een Supabase-branch is géén geldig doel (geen productiedata); de encryptiesleutels en Storage-bestanden zitten niet in de databaseback-up. |
+| *(eerste échte proef — af vóór de allowlist opengaat)* | | | | |

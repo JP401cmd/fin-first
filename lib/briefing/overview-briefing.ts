@@ -269,9 +269,14 @@ export interface FreedomHeroProps {
   totalFreedomDays: number
   /** Vooraf geformatteerd ("8 jaar en 4 maanden"). */
   totalLabel: string
-  /** Week-over-week delta in dagen; null in de eerste week (geen basis). */
+  /** Week-over-week delta in dagen; null in de eerste week (geen basis) én
+   *  wanneer de delta de plausibiliteitsgrens overschrijdt (zie
+   *  `isImplausibleFreedomDelta`). */
   deltaDays: number | null
   isFirstWeek: boolean
+  /** De week-over-week delta is onderdrukt omdat hij buiten de plausibele
+   *  bandbreedte viel (settelende data / eenmalige vermogenscorrectie). */
+  isImplausibleDelta: boolean
   sparkline: SparklineDataPoint[]
   /** Geen daguitgaven bekend → vrijheidstijd onbepaald. */
   isInfinite: boolean
@@ -292,16 +297,59 @@ export function computeFreedomTotal(netWorth: number, monthlyExpenses: number): 
   return { totalFreedomDays, netWorth, monthlyExpenses, breakdown }
 }
 
-/** Week-over-week delta in vrijheidsdagen t.o.v. de vorige-week-basis. */
+// ── Plausibiliteitsgrens op de week-over-week delta ─────────────────
+//
+// De basis (`previousFreedomSnapshot`) wordt één keer per ISO-week bevroren.
+// Wordt hij bevroren op een moment dat de onderliggende data nog niet klopt —
+// een vers account met een half-geïmporteerde transactiehistorie geeft een
+// kunstmatig lage maanduitgave en dus een torenhoog vrijheidstotaal — dan is
+// het verschil met de volgende (wél realistische) week geen echte weekbeweging
+// maar een datacorrectie. Zonder grens toont /overzicht dat als "−3788 dagen
+// minder": een prominent, ongeloofwaardig getal op de hoofdpagina.
+//
+// De grens is bewust dubbel (beide moeten gelden), zodat we alleen echte
+// uitbijters afvangen en normale volatiliteit ongemoeid laten:
+//  - absoluut: onder een jaar vrijheidstijd verschil grijpen we nooit in
+//    (een grote bonus of een marktweek mag gewoon zichtbaar zijn);
+//  - relatief: pas boven een kwart van het huidige totaal is de beweging niet
+//    meer als weekbeweging te verklaren. Voor een grote portefeuille is een
+//    absoluut groot verschil juist wél gewoon (marktbeweging), voor een kleine
+//    is een relatief groot verschil vaak maar een handvol dagen.
+
+/** Onder dit absolute verschil (in vrijheidsdagen) grijpt de guard nooit in. */
+export const FREEDOM_DELTA_MIN_DAYS = 365
+/** Aandeel van het huidige totaal dat een week mag bewegen vóór de guard grijpt. */
+export const FREEDOM_DELTA_MAX_SHARE = 0.25
+
+/**
+ * Valt deze week-over-week delta buiten de plausibele bandbreedte? Pure,
+ * losstaand getoetste predicaat zodat de grens niet alleen via de hero bewezen
+ * wordt. Beide voorwaarden moeten gelden (zie de toelichting hierboven).
+ */
+export function isImplausibleFreedomDelta(
+  deltaDays: number,
+  currentTotalDays: number,
+): boolean {
+  const abs = Math.abs(deltaDays)
+  if (!Number.isFinite(abs)) return true
+  if (abs < FREEDOM_DELTA_MIN_DAYS) return false
+  return abs > Math.abs(currentTotalDays) * FREEDOM_DELTA_MAX_SHARE
+}
+
+/** Week-over-week delta in vrijheidsdagen t.o.v. de vorige-week-basis.
+ *  Een implausibele sprong (settelende data / eenmalige vermogenscorrectie)
+ *  wordt onderdrukt: `deltaDays: null` + `isImplausibleDelta: true`, zodat de
+ *  hero en de kop terugvallen op het (wél betrouwbare) totaal. */
 export function computeFreedomDelta(
   current: { totalFreedomDays: number },
   baseline: { totalFreedomDays: number } | null,
-): { deltaDays: number | null; isFirstWeek: boolean } {
-  if (!baseline) return { deltaDays: null, isFirstWeek: true }
-  return {
-    deltaDays: Math.round(current.totalFreedomDays - baseline.totalFreedomDays),
-    isFirstWeek: false,
+): { deltaDays: number | null; isFirstWeek: boolean; isImplausibleDelta: boolean } {
+  if (!baseline) return { deltaDays: null, isFirstWeek: true, isImplausibleDelta: false }
+  const deltaDays = Math.round(current.totalFreedomDays - baseline.totalFreedomDays)
+  if (isImplausibleFreedomDelta(deltaDays, current.totalFreedomDays)) {
+    return { deltaDays: null, isFirstWeek: false, isImplausibleDelta: true }
   }
+  return { deltaDays, isFirstWeek: false, isImplausibleDelta: false }
 }
 
 /** Vrijheidsdagen-sparkline-serie uit het vermogensverloop (per maand → dagen). */
@@ -336,6 +384,7 @@ export function buildFreedomHeroProps(
     totalLabel: formatFreedomTimeString(total.breakdown, 'long'),
     deltaDays: delta.deltaDays,
     isFirstWeek: delta.isFirstWeek,
+    isImplausibleDelta: delta.isImplausibleDelta,
     sparkline: buildFreedomSparkline(netWorthHistory, freedom.monthlyExpenses),
     isInfinite: total.breakdown.isInfinite,
     isDeficit: total.breakdown.isDeficit,

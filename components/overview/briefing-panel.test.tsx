@@ -212,6 +212,7 @@ describe('BriefingPanel — vrijheidstijd-hero + kop', () => {
     sparkline: [],
     isInfinite: false,
     isDeficit: false,
+    isImplausibleDelta: false,
   }
 
   it('rendert de hero wanneer freedomHero gegeven is', () => {
@@ -306,6 +307,7 @@ describe('BriefingPanel — Eenvoudige weergave (simpleMode)', () => {
     sparkline: [],
     isInfinite: false,
     isDeficit: false,
+    isImplausibleDelta: false,
   }
 
   const sixEntries: BriefingEntry[] = [

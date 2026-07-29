@@ -16,7 +16,6 @@ import type {
   TopLifeEvent,
   Notification,
   FavoriteHolding,
-  AiInsight,
   NextStep,
   UpcomingEvent,
   HouseholdActivityItem,
@@ -25,6 +24,7 @@ import type {
 import type { WidgetPref, WidgetPrefs } from '@/lib/widget-catalog'
 import type { FireProjection, FireCountdown } from '@/lib/horizon-data'
 import { loadNewsPreview } from '@/lib/news-preview'
+import { computeNextSteps } from '@/lib/next-steps/engine'
 
 import { computeEffectiveExpenses, computeFireTarget, computeFreedomProgressWithBasis, inclHomeTargetFromScalar, computeSavingsRateFromNetWorthDelta } from '@/lib/core-metrics'
 import { localMonthStart, localMonthStartMonthsAgo } from '@/lib/month-range'
@@ -51,11 +51,9 @@ import {
 import { resolveFireParams } from '@/lib/fire-params'
 import { lifeEventsToCashflows } from '@/lib/fire-simulation'
 import { parseFireStrategy, resolveFireStrategyWithOverride } from '@/lib/fire-strategy'
-import { WITHDRAWAL_DEFAULTS, resolveWithdrawalStrategy } from '@/lib/withdrawal-strategy'
-import { toSimResult } from '@/lib/unified-projection'
-import { computeConvergentieProjection, type ConvergentieRawProfileRow, type ConvergentieRawContext } from '@/lib/horizon-kernel/convergentie-router'
+import { WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
 import { computeScalarFireProjection, computeScalarFireRange, computeScalarFreedomMilestones, type ScalarFireParams } from '@/lib/horizon-kernel/scalar-router'
-import { buildHorizonInput } from '@/lib/horizon/build-input'
+import { computeHorizonFireSim } from '@/lib/fire-target-shared'
 import { buildSimNetWorthRows } from '@/lib/horizon/networth-rows'
 import { clipRowsToPlanEnd } from '@/lib/horizon/clip-rows-to-plan-end'
 import type { RegelSimSnapshot } from '@/lib/future/regel-sim'
@@ -64,7 +62,6 @@ import { computeRetirementExpenses, computeYearlyMustExpenses, type RetirementEx
 import { computeEffectiveLimit, type BudgetRollover, type BudgetAmountOverride } from '@/lib/budget-rollover'
 import { calculateBox3, CURRENT_TAX_YEAR, type TaxYear } from '@/lib/box3-data'
 import { NL_AOW_AGE, WEERBAARHEID_DISPLAY_MAX } from '@/lib/constants'
-import { hasPartner } from '@/lib/household-type'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import { buildPensionProjection } from '@/lib/pension/pension-projection'
 import { resolveFireAssumptions, type FireAssumptionRow } from '@/lib/fire-assumptions'
@@ -895,9 +892,12 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // jaarlaag → TS-constanten → byte-identiek. We shadowen op een KOPIE — nooit de
   // gedeelde getOwnProfile-rij muteren: die is cache()'d en gedeeld met de layout,
   // waar expected_return/inflation_rate == null betekent "gebruiker heeft FIRE-params
-  // niet ingesteld" (coach-datagap). De kopie voedt resolveFireParams (scalar/target)
-  // én de convergentie-kernel-context hieronder, zodat /overzicht dezelfde grondslag
-  // toont als /toekomst en /core. buildHorizonInput erft de override via fireParams.
+  // niet ingesteld" (coach-datagap). De kopie voedt de scalar/target-laag
+  // (resolveFireParams → fireTarget, fireRange, mijlpalen) — de FALLBACK-laag, alleen
+  // zichtbaar als de kernel-run niet kon draaien. De kernel-tak zelf leest deze shadow
+  // NIET meer uit deze loader: die draait via de gedeelde `computeHorizonFireSim`, waar
+  // horizon-data-loader dezelfde jaarlaag-shadow toepast (WF-WILL-01: één run, één
+  // grondslag voor /overzicht, /toekomst, de Kern en beide Fins).
   const fireAssumptions = resolveFireAssumptions(
     (fireAssumptionsResult.data ?? []) as FireAssumptionRow[],
   )
@@ -1048,110 +1048,64 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   let regelSimSnapshot: RegelSimSnapshot | null = null
   if (dob && netWorth > 0) {
     try {
-      // Look up actual AOW age from aow_leeftijd table (consistent with horizon page)
-      const userAowAge = lookupAowAge((aowResult.data ?? []) as AowLeeftijdRow[], dob)
-      // Derive hasPartner from profile household_type via canonieke helper.
-      // Bug-fix: voorheen vergeleek deze plek met de verouderde woordenschat
-      // ('samenwonend'/'getrouwd') die household_type nooit is → altijd false.
-      const householdType = (profileResult.data as Record<string, unknown> | null)?.household_type as string | null
-      const hasPartnerFlag = hasPartner(householdType)
-      const withdrawalStrategy = resolveWithdrawalStrategy(profileResult.data as Record<string, unknown> ?? {})
-      const dashboardYearlyExpenses = yearlyRetirementExpenses > 0 ? yearlyRetirementExpenses : effectiveMonthlyExpenses * 12
-      // /overzicht gebruikt DEZELFDE gedeelde metadata-assemblage als de /toekomst-hook
-      // (`buildHorizonInput`) + de horizon-kernel, zodat /overzicht en /toekomst per
-      // constructie gelijklopen.
-      const built = buildHorizonInput({
-        horizonInput: { ...horizonInput, yearlyMustExpenses: dashboardYearlyExpenses },
-        lifeEvents: (eventsResult.data ?? []) as LifeEvent[],
-        fireStrategy,
-        withdrawalStrategy,
-        grossReturn: fireParams.grossReturn,
-        inflation: fireParams.inflationRate,
-        aowAgeFractional: userAowAge.fractional,
-        assets: dashboardAssetsArr,
-        debts: dashboardDebtsArr,
-        box3Method: fireParams.box3Method,
-        hasPartner: hasPartnerFlag,
-        bankAccountCash: unlinkedCash,
-        monthlySavingsOverride: dashboardSavingsOverride,
-        baseAnnualSavingsFromCashflow: dashboardBaseAnnualSavings,
-        housingStrategy: housingStrategyCfg,
-      })
-      if (built) {
-        // Rauwe convergentie-context — één keer gebouwd en gedeeld door de
-        // hoofdprojectie ÉN de regel-sim-snapshot (/toekomst-editors), zodat de
-        // editor-baseline op de kernel-tak per constructie de Tijdas-grafiek is.
-        // `yearly_essential_expenses` = de `computeYearlyMustExpenses`-uitkomst
-        // (essentiële budgetten, NIET `yearlyRetirementExpenses`), zodat de
-        // kernel-pensioenuitgave-methode (`essential_budgets`) exact dezelfde
-        // grondslag hanteert als de v2-tak.
-        const convergentieRawContext: ConvergentieRawContext = {
-          profile: {
-            // shadowedProfile = getOwnProfile-kopie met de FIRE-jaarlaag-shadow
-            // (rendement/inflatie) toegepast; zo leest de convergentie-kernel
-            // dezelfde inflatie als de scalar/target-laag (consistent /overzicht).
-            ...(shadowedProfile as ConvergentieRawProfileRow),
-            yearly_essential_expenses: yearlyMustExpenses,
-          },
+      // ── ÉÉN kernel-run, gedeeld met /toekomst, de Kern en de Fin-chat ────────
+      // WF-WILL-01: /overzicht draaide hier een EIGEN `computeConvergentieProjection`
+      // met zelf-afgeleide profiel-, uitgaven- en strategie-inputs, terwijl de Kern
+      // (`fireTargetFromHorizon`) en daarmee de AI-context via `computeHorizonFireTarget`
+      // op de Horizon-run zaten. Twee onafhankelijke runs = twee FIRE-doelen = twee
+      // vrijheids-percentages (8,6pp verschil in productie: widget 99,4% vs. Fin 90,8%).
+      // We CONSUMEREN nu de canonieke run (consume-don't-recompute): React-`cache()`'d,
+      // en op /overzicht al warm omdat blok 1 `loadHorizonData` al laadt — dus geen
+      // extra kernel-solve en (daar) geen extra queries.
+      const shared = await computeHorizonFireSim(supabase)
+      if (shared) {
+        const simResult = shared.sim
+        // Snapshot voor de /toekomst Voorkeuren-editors: exact de rauwe context die
+        // DEZE run voedde, zodat de editor-baseline per constructie de Tijdas-curve is.
+        regelSimSnapshot = {
+          rawContext: shared.rawContext,
+          fireStrategy: shared.fireStrategy,
+          withdrawalStrategy: shared.withdrawalStrategy,
+          aowAgeInt: shared.aowAgeInt,
+          aowFractional: shared.aowAgeFractional,
+        }
+        // Kernel-eindleeftijd voor het weergavelabel + clip-grens (spiegel van
+        // horizon-client.tsx `displaySimRows`).
+        simDisplayEndAge = simResult.displayEndAge
+        // Weergave-clip t/m eindleeftijd − 1 (besluit 4 juli 2026: het laatste levensjaar
+        // is terminale modelmarge en hoort niet in beeld). Zonder deze clip toonde de
+        // /overzicht-widget één jaar méér dan de canonieke /horizon-pagina. clipRowsToPlanEnd
+        // is puur/idempotent; simNetWorthRows erft de clip (bouwt hierop voort).
+        simRows = clipRowsToPlanEnd(simResult.rows, simResult.displayEndAge).map(r => ({
+          age: r.age,
+          endPortfolio: r.endPortfolio,
+          phase: r.phase,
+          flowIn: r.flowIn,
+          flowOut: r.flowOut,
+          oneTimeNet: r.oneTimeNet,
+        }))
+        // Geprojecteerd VOLLEDIG netto vermogen per jaar (incl. niet-liquide assets). De
+        // horizon-kernel houdt het eigen huis voor ÉLKE housing-modus in het grootboek
+        // (ADR 0015/0032) → `houseInLedger: true`: nooit overwaarde dubbeltellen. Verankerd
+        // op netWorth (zelfde "vandaag"-grondslag als het Vandaag-punt). Eén bron: de
+        // canonieke huiswaarde-/hypotheek-projectie (geen tweede engine-run).
+        simNetWorthRows = buildSimNetWorthRows({
+          simRows,
+          currentNetWorth: netWorth,
+          housingStrategy: housingStrategyCfg,
+          houseInLedger: true,
           assets: dashboardAssetsArr,
           debts: dashboardDebtsArr,
-          lifeEvents: (eventsResult.data ?? []) as LifeEvent[],
-          aowRows: (aowResult.data ?? []) as AowLeeftijdRow[],
-          yearlyExpenses: built.input.yearlyExpenses,
-        }
-        // Snapshot voor de /toekomst Voorkeuren-editors (baseline = Tijdas-curve).
-        regelSimSnapshot = {
-          rawContext: convergentieRawContext,
-          fireStrategy,
-          withdrawalStrategy,
-          aowAgeInt: built.aowAgeInt,
-          aowFractional: userAowAge.fractional,
-        }
-        // Convergentie-router (FASE 6 stap 5A — kernel-only): de horizon-kernel is de enige
-        // motor. Bij een kern-fout blijven de sim-velden null (de widgets vallen terug op de
-        // scalar-projectie / snapshot).
-        const outcome = computeConvergentieProjection({ rawContext: convergentieRawContext })
-        if (outcome.ok) {
-          const unifiedResult = outcome.result
-          const simResult = toSimResult(unifiedResult)
-          // Kernel-eindleeftijd voor het weergavelabel + clip-grens (spiegel van
-          // horizon-client.tsx `displaySimRows`).
-          simDisplayEndAge = simResult.displayEndAge
-          // Weergave-clip t/m eindleeftijd − 1 (besluit 4 juli 2026: het laatste levensjaar
-          // is terminale modelmarge en hoort niet in beeld). Zonder deze clip toonde de
-          // /overzicht-widget één jaar méér dan de canonieke /horizon-pagina. clipRowsToPlanEnd
-          // is puur/idempotent; simNetWorthRows erft de clip (bouwt hierop voort).
-          simRows = clipRowsToPlanEnd(simResult.rows, simResult.displayEndAge).map(r => ({
-            age: r.age,
-            endPortfolio: r.endPortfolio,
-            phase: r.phase,
-            flowIn: r.flowIn,
-            flowOut: r.flowOut,
-            oneTimeNet: r.oneTimeNet,
-          }))
-          // Geprojecteerd VOLLEDIG netto vermogen per jaar (incl. niet-liquide assets). De
-          // horizon-kernel houdt het eigen huis voor ÉLKE housing-modus in het grootboek
-          // (ADR 0015/0032) → `houseInLedger: true`: nooit overwaarde dubbeltellen. Verankerd
-          // op netWorth (zelfde "vandaag"-grondslag als het Vandaag-punt). Eén bron: de
-          // canonieke huiswaarde-/hypotheek-projectie (geen tweede engine-run).
-          simNetWorthRows = buildSimNetWorthRows({
-            simRows,
-            currentNetWorth: netWorth,
-            housingStrategy: housingStrategyCfg,
-            houseInLedger: true,
-            assets: dashboardAssetsArr,
-            debts: dashboardDebtsArr,
-            dateOfBirth: dob,
-          })
-          // De kernel verankert de pensioen-eindstrategie ZÉLF op AOW (solver-ES), en de bridge
-          // levert per constructie firePortfolioAtFire === requiredFirePortfolio (bisectie stopt
-          // op de eerste toereikende maand). Lees requiredFirePortfolio + fireAgeFractional
-          // direct uit simResult (óók correct voor niet-pensioen).
-          simRequiredPortfolio = simResult.requiredFirePortfolio > 0 ? simResult.requiredFirePortfolio : null
-          // Incl.-woning FIRE-doel (Prognose!I@FIRE) — zelfde bron/gate als simRequiredPortfolio.
-          simRequiredNetWorth = (simResult.requiredFireNetWorth ?? 0) > 0 ? simResult.requiredFireNetWorth! : null
-          simFireAgeFractional = simResult.fireAgeFractional
-        }
+          dateOfBirth: dob,
+        })
+        // De kernel verankert de pensioen-eindstrategie ZÉLF op AOW (solver-ES), en de bridge
+        // levert per constructie firePortfolioAtFire === requiredFirePortfolio (bisectie stopt
+        // op de eerste toereikende maand). Lees requiredFirePortfolio + fireAgeFractional
+        // direct uit simResult (óók correct voor niet-pensioen).
+        simRequiredPortfolio = simResult.requiredFirePortfolio > 0 ? simResult.requiredFirePortfolio : null
+        // Incl.-woning FIRE-doel (Prognose!I@FIRE) — zelfde bron/gate als simRequiredPortfolio.
+        simRequiredNetWorth = (simResult.requiredFireNetWorth ?? 0) > 0 ? simResult.requiredFireNetWorth! : null
+        simFireAgeFractional = simResult.fireAgeFractional
       }
     } catch (err) {
       console.error('[dashboard-data-loader] FIRE-projectie faalde:', err)
@@ -1718,85 +1672,6 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     // Rebalancing data not available — gracefully degrade, no notifications
   }
 
-  // ── AI Insights: derived from financial data (no DB table) ──
-  const aiInsights: AiInsight[] = []
-  if (savingsRate6m !== 0 || (effectiveMonthlyIncome > 0 && effectiveMonthlyExpenses > 0)) {
-    if (savingsRate6m >= 50) {
-      aiInsights.push({
-        id: 'insight-high-savings',
-        text: `Je spaarquote is ${Math.round(savingsRate6m)}% — uitstekend voor versnelde vrijheid.`,
-        module: 'kern',
-        createdAt: new Date().toISOString(),
-      })
-    } else if (savingsRate6m < 10 && savingsRate6m >= 0) {
-      aiInsights.push({
-        id: 'insight-low-savings',
-        text: `Je spaarquote is ${Math.round(savingsRate6m)}%. Kleine besparingen kunnen al dagen vrijheid opleveren.`,
-        module: 'wil',
-        createdAt: new Date().toISOString(),
-      })
-    }
-  }
-  if (totalRecurringAmount > 0 && effectiveMonthlyIncome > 0) {
-    const recurringPct = (totalRecurringAmount / effectiveMonthlyIncome) * 100
-    if (recurringPct > 60) {
-      aiInsights.push({
-        id: 'insight-high-recurring',
-        text: `${Math.round(recurringPct)}% van je inkomen gaat naar vaste lasten. Flexibiliteit vergroten geeft meer vrijheid.`,
-        module: 'kern',
-        createdAt: new Date().toISOString(),
-      })
-    }
-  }
-  if (simFireCountdown && simFireCountdown.countdownYears <= 5 && simFireCountdown.countdownDays > 0) {
-    aiInsights.push({
-      id: 'insight-fire-near',
-      text: `Nog ${simFireCountdown.countdownYears} jaar en ${simFireCountdown.countdownMonths} maanden tot financiële vrijheid — de eindstreep is in zicht!`,
-      module: 'horizon',
-      createdAt: new Date().toISOString(),
-    })
-  }
-
-  // ── Next Steps: based on data completeness ──────────────────
-  const completedSteps = (nextStepCompletionsResult.data ?? []) as { step_key: string; dismissed: boolean }[]
-  const completedStepMap = new Map(completedSteps.map(s => [s.step_key, s.dismissed]))
-  const potentialSteps: NextStep[] = []
-  const txCount = (txResult.data ?? []).length
-  const assetCount = (assetsResult.data ?? []).length
-  const debtCount = (debtsResult.data ?? []).length
-  const budgetCount = allParentBudgets.length
-  const goalCount = (goalsResult.data ?? []).length
-  const actionCount = openActions.length
-  // Priority 0: PSD2 bank connection (#813) — highest priority after onboarding
-  const hasBankConnection = (bankConnectionsResult.data?.length ?? 0) > 0
-  if (!hasBankConnection) {
-    potentialSteps.push({ key: 'connect_bank_psd2', title: 'Koppel je bank voor automatisch inzicht', description: 'Verbind je bankrekening via PSD2 — transacties worden automatisch geïmporteerd.', impact: null, href: '/core/cash/connect', dismissed: false })
-  }
-  if (txCount === 0) {
-    potentialSteps.push({ key: 'import_transactions', title: 'Transacties importeren', description: 'Importeer je bankgegevens voor inzicht in je cashflow.', impact: null, href: '/core/cash/import', dismissed: false })
-  }
-  if (assetCount === 0) {
-    potentialSteps.push({ key: 'add_assets', title: 'Bezittingen toevoegen', description: 'Voeg je spaargeld, beleggingen en andere bezittingen toe.', impact: null, href: '/core/assets', dismissed: false })
-  }
-  if (debtCount === 0 && netWorth < 0) {
-    potentialSteps.push({ key: 'add_debts', title: 'Schulden registreren', description: 'Registreer je schulden voor een compleet vermogensoverzicht.', impact: null, href: '/core/debts', dismissed: false })
-  }
-  if (budgetCount === 0) {
-    potentialSteps.push({ key: 'create_budgets', title: 'Budgetten aanmaken', description: 'Stel budgetten in om je uitgaven te beheersen.', impact: null, href: '/core/budgets', dismissed: false })
-  }
-  if (goalCount === 0) {
-    potentialSteps.push({ key: 'set_goals', title: 'Doelen stellen', description: 'Definieer financiële doelen om je voortgang te volgen.', impact: null, href: '/will#doelen', dismissed: false })
-  }
-  if (actionCount === 0 && txCount > 0) {
-    potentialSteps.push({ key: 'review_actions', title: 'Acties bekijken', description: 'Bekijk aanbevolen acties om vrijheidsdagen te winnen.', impact: totalFreedomDaysOpen > 0 ? Math.round(totalFreedomDaysOpen) : null, href: '/will#acties', dismissed: false })
-  }
-  if (!profileResult.data?.date_of_birth) {
-    potentialSteps.push({ key: 'set_dob', title: 'Geboortedatum invullen', description: 'Nodig voor FIRE-berekeningen en tijdlijn.', impact: null, href: '/identity/profiel', dismissed: false })
-  }
-  const nextSteps = potentialSteps
-    .map(s => ({ ...s, dismissed: completedStepMap.get(s.key) === true }))
-    .filter(s => !completedStepMap.has(s.key) || !s.dismissed)
-
   // ── Month Summary: derived from existing calculations ────────
   // Use 6-month rolling average for consistency across the app
   const savingsRate = savingsRate6m
@@ -1882,7 +1757,39 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     // Display-target: gebruikerskeuze (doel) of 6, afgerond op 0,5 mnd.
     targetMonths: Math.round(emergencyResolved.targetMonths * 2) / 2,
     isComplete: emergencyResolved.monthsCovered >= emergencyResolved.targetMonths,
+    // Provenance uit de resolver — de widget toont de berekening anders bij een
+    // eigen doel (bedrag primair) dan bij de 6-maands-richtlijn (maanden primair).
+    source: emergencyResolved.source,
   }
+
+  // ── Next Steps: canonieke Volgende Stap-motor ───────────────────────────
+  // De motor (lib/next-steps/engine.ts) bepaalt welke stap er nú toe doet en in
+  // welke module hij hoort. Consume, don't recompute: hij krijgt uitsluitend
+  // reeds berekende bundelwaarden mee (noodfonds-dekking, spaarquote, vaste
+  // lasten, vrijheidsdagen, FIRE-countdown) — hij rekent zelf niets uit.
+  // Staat bewust ná emergencyFund omdat de noodfonds-stap die waarden consumeert.
+  const completedSteps = (nextStepCompletionsResult.data ?? []) as { step_key: string; dismissed: boolean }[]
+  const nextSteps: NextStep[] = computeNextSteps({
+    hasBankConnection: (bankConnectionsResult.data?.length ?? 0) > 0,
+    transactionCount: (txResult.data ?? []).length,
+    assetCount: (assetsResult.data ?? []).length,
+    debtCount: (debtsResult.data ?? []).length,
+    budgetCount: allParentBudgets.length,
+    goalCount: (goalsResult.data ?? []).length,
+    hasDateOfBirth: !!profileResult.data?.date_of_birth,
+    netWorth,
+    emergencyMonthsCovered: emergencyFund.monthsCovered,
+    emergencyTargetMonths: emergencyFund.targetMonths,
+    savingsRate6mPct: savingsRate6m,
+    monthlyIncome: effectiveMonthlyIncome,
+    monthlyRecurringAmount: totalRecurringAmount,
+    budgetsOverLimit: topBudgets.filter(b => b.budgetType === 'expense' && b.limit > 0 && b.spent > b.limit).length,
+    openActionCount: openActions.length,
+    freedomDaysOpen: totalFreedomDaysOpen,
+    lifeEventCount: (eventsResult.data ?? []).length,
+    fireCountdownYears: simFireCountdown?.countdownYears ?? null,
+    completions: new Map(completedSteps.map(s => [s.step_key, s.dismissed])),
+  })
 
   // ── Household & partner perspective overrides ──────────────────────────
   let householdOverrides: DashboardData['householdOverrides'] = null
@@ -2637,9 +2544,6 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     allBudgets,
     // Real widget data from queries and computations
     notifications,
-
-
-    aiInsights,
     nextSteps,
     monthSummary,
     upcomingEvents: upcomingEventsLimited,

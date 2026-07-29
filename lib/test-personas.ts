@@ -8,6 +8,18 @@
  * 4. Marijke Vermeer — "De gepensioneerde" (retired, pensioen strategy + legacy planning)
  * 5. Tessa Compleet — "De complete tester" (every asset/debt type + all in-depth apps;
  *    bron voor de horizon-strategie-regressietest)
+ *
+ * DETERMINISME — lees dit vóór je een cijfer uit persona-data "narekent":
+ * de transactie-generatoren jitteren met `Math.random()` en dateren relatief aan
+ * vandaag (`new Date()`). Maand-realisatie (uitgaven per budget, gerealiseerde
+ * spaarquote) is daardoor NOOIT exact hand-narekenbaar en verschilt per seed-run.
+ * Uitzondering: de balans-snapshots (`generateBalanceSnapshots`) gebruiken een
+ * naam-geseede rng — die ruis is wél reproduceerbaar.
+ * Toets exact daarom alleen op statische limieten/totalen uit de persona-definitie
+ * zelf en op pure rekenfuncties met synthetische input; gebruik anders
+ * consistency-/richtingstoetsen. Voor UAT is die keuze al één keer gecureerd per
+ * criterium in `assertion.kind` (lib/uat/acceptance/types.ts) — consumeer die,
+ * leid 'm niet opnieuw af.
  */
 
 import { BUDGET_SLUGS } from '@/lib/budget-data'

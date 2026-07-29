@@ -14,7 +14,7 @@ import { Reveal } from '@/components/landing/reveal'
  * AFM/DNB/PSD2-badges of -claims (TriFinity heeft géén Wft-vergunning —
  * het is een educatief reken-instrument), GEEN verzonnen reviews,
  * gebruikersaantallen of certificeringen, GEEN bankkoppeling-beloftes.
- * Vertrouwen komt uitsluitend uit ware claims: EU-hosting (Frankfurt),
+ * Vertrouwen komt uitsluitend uit ware claims: EU-hosting (Ierland),
  * versleuteling, geen dataverkoop, beperkte AI-context, open methodologie,
  * data-export en het eerlijke Wft-kader.
  *
@@ -38,7 +38,7 @@ export function VeiligheidSecties() {
             <PrivacyBullet
               Icon={ShieldCheck}
               titel="EU-hosted"
-              beschrijving="Je financiële gegevens leven op Supabase-servers in Frankfurt (EU), versleuteld in rust en transport. Alleen voor de AI-functies sturen we strikt-noodzakelijke context naar onze AI-subprocessor — nooit je volledige dataset, nooit voor advertenties of verkoop aan derden."
+              beschrijving="Je financiële gegevens leven op Supabase-servers in Ierland (EU), versleuteld in rust en transport. Alleen voor de AI-functies sturen we strikt-noodzakelijke context naar onze AI-subprocessor — nooit je volledige dataset, nooit voor advertenties of verkoop aan derden."
             />
             <PrivacyBullet
               Icon={Lock}

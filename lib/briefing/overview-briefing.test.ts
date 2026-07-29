@@ -3,6 +3,7 @@ import {
   buildOverviewBriefingInput,
   computeFreedomTotal,
   computeFreedomDelta,
+  isImplausibleFreedomDelta,
   buildFreedomSparkline,
   buildFreedomHeroProps,
   buildBriefingHeadline,
@@ -167,14 +168,91 @@ describe('vrijheidstijd-hero helpers', () => {
     expect(computeFreedomDelta({ totalFreedomDays: 1000 }, null)).toEqual({
       deltaDays: null,
       isFirstWeek: true,
+      isImplausibleDelta: false,
     })
   })
 
   it('computeFreedomDelta: positieve week-over-week winst', () => {
     expect(
       computeFreedomDelta({ totalFreedomDays: 1000 }, { totalFreedomDays: 940 }),
-    ).toEqual({ deltaDays: 60, isFirstWeek: false })
+    ).toEqual({ deltaDays: 60, isFirstWeek: false, isImplausibleDelta: false })
   })
+})
+
+// ── Plausibiliteitsgrens op de week-delta (bug: "−3788 dagen minder") ─────
+//
+// Regressie op de gemelde bevinding: een eerste weeksnapshot die met een
+// half-geïmporteerde transactiehistorie is bevroren (kunstmatig lage
+// maanduitgave → torenhoog vrijheidstotaal) gaf de week erna een absurde
+// negatieve delta op /overzicht. De guard onderdrukt die.
+describe('vrijheidstijd-hero — plausibiliteitsgrens op de week-delta', () => {
+  it('isImplausibleFreedomDelta: onder de absolute ondergrens nooit implausibel', () => {
+    // 300 dagen erbij op een klein totaal: relatief enorm, maar absoluut
+    // onder de 365-dagen-ondergrens → gewoon tonen.
+    expect(isImplausibleFreedomDelta(300, 400)).toBe(false)
+    expect(isImplausibleFreedomDelta(-364, 400)).toBe(false)
+  })
+
+  it('isImplausibleFreedomDelta: grote absolute beweging op een groot totaal blijft plausibel', () => {
+    // €1,6M-portefeuille ≈ 32.000 vrijheidsdagen; een marktweek van ~5%
+    // (1.500 dagen) is geen datafout maar echte volatiliteit.
+    expect(isImplausibleFreedomDelta(1500, 32000)).toBe(false)
+    expect(isImplausibleFreedomDelta(-1500, 32000)).toBe(false)
+  })
+
+  it('isImplausibleFreedomDelta: de gemelde −3788 dagen op ~5 jaar en 8 maanden is implausibel', () => {
+    // Screenshot uit de melding: "−3788 dagen minder" naast "5 jaar en 8
+    // maanden" (≈ 2.070 dagen) → verschil is bijna 2× het hele totaal.
+    expect(isImplausibleFreedomDelta(-3788, 2070)).toBe(true)
+  })
+
+  it('computeFreedomDelta: onderdrukt de sprong van een opgeblazen eerste-week-basis', () => {
+    // Week 1 bevroren met onvolledige transactiedata: €120k netto vermogen bij
+    // een kunstmatig lage €200/mnd → ~18.250 dagen. Week 2 met de realistische
+    // €3.000/mnd → ~1.217 dagen. Zonder guard: −17.033 dagen op de hoofdpagina.
+    const opgeblazenBasis = computeFreedomTotal(120000, 200)
+    const realistisch = computeFreedomTotal(120000, 3000)
+    expect(Math.round(realistisch.totalFreedomDays - opgeblazenBasis.totalFreedomDays)).toBeLessThan(-15000)
+
+    const delta = computeFreedomDelta(realistisch, opgeblazenBasis)
+    expect(delta.deltaDays).toBeNull()
+    expect(delta.isImplausibleDelta).toBe(true)
+    expect(delta.isFirstWeek).toBe(false)
+  })
+
+  it('computeFreedomDelta: een normale week (spaargeld erbij) blijft ongemoeid', () => {
+    const vorige = computeFreedomTotal(120000, 3000)
+    const nu = computeFreedomTotal(122500, 3000) // €2.500 gespaard → ~25 dagen
+    const delta = computeFreedomDelta(nu, vorige)
+    expect(delta.isImplausibleDelta).toBe(false)
+    expect(delta.deltaDays).toBe(25)
+  })
+
+  it('buildFreedomHeroProps: implausibele delta → geen getal, wél de vlag + totaal', () => {
+    const hero = buildFreedomHeroProps(
+      { totalFreedomDays: 2070, netWorth: 120000, monthlyExpenses: 1750 },
+      { totalFreedomDays: 5858 }, // opgeblazen basis → −3788
+      [],
+    )
+    expect(hero.deltaDays).toBeNull()
+    expect(hero.isImplausibleDelta).toBe(true)
+    expect(hero.totalLabel.length).toBeGreaterThan(0)
+  })
+
+  it('buildBriefingHeadline: valt bij een onderdrukte delta terug op de totaal-zin', () => {
+    // Geen "Deze week 3788 dagen minder" meer — de kop noemt alleen het totaal.
+    const headline = buildBriefingHeadline({
+      deltaDays: null,
+      totalLabel: '5 jaar en 8 maanden',
+      isInfinite: false,
+      isDeficit: false,
+    })
+    expect(headline).toBe('Je vermogen staat voor 5 jaar en 8 maanden aan vrijheid.')
+    expect(headline).not.toMatch(/dagen minder/)
+  })
+})
+
+describe('vrijheidstijd-hero helpers (vervolg)', () => {
 
   it('buildFreedomSparkline: vermogen → vrijheidsdagen per maand', () => {
     const series = buildFreedomSparkline(

@@ -20,6 +20,7 @@ export function VrijheidsbriefingHero({
   sparkline,
   isInfinite,
   isDeficit,
+  isImplausibleDelta,
 }: FreedomHeroProps) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 800 })
 
@@ -77,6 +78,16 @@ export function VrijheidsbriefingHero({
               {isFirstWeek && !isInfinite && !isDeficit && (
                 <p className="mt-1 text-[11px] text-[var(--ink-3)]">
                   Vanaf volgende week zie je hier je wekelijkse vrijheidswinst.
+                </p>
+              )}
+              {/* Guard: de week-over-week sprong was te groot om een echte
+                  weekbeweging te zijn (settelende data of een eenmalige
+                  correctie). We tonen dan het totaal zonder verschil, i.p.v.
+                  een ongeloofwaardig getal. */}
+              {isImplausibleDelta && !isInfinite && !isDeficit && (
+                <p className="mt-1 text-[11px] text-[var(--ink-3)]">
+                  Je cijfers zijn net flink bijgesteld — het weekverschil laten we
+                  even rusten tot je gegevens zijn ingeregeld.
                 </p>
               )}
             </>

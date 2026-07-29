@@ -61,7 +61,7 @@ export const FAQ_VEILIGHEID: Vraag[] = [
   {
     q: 'Hoe veilig is mijn data?',
     a:
-      'Je financiële gegevens leven EU-hosted op Supabase (Frankfurt), versleuteld in rust en transport. Geen verkoop aan derden, geen marketing-pixels, geen advertentienetwerken — ons businessmodel is jouw abonnement, niet jouw data. Alleen voor de AI-functies sturen we strikt-noodzakelijke context naar onze AI-subprocessor — nooit je volledige dataset, nooit voor advertenties of verkoop aan derden.',
+      'Je financiële gegevens leven EU-hosted op Supabase (Ierland), versleuteld in rust en transport. Geen verkoop aan derden, geen marketing-pixels, geen advertentienetwerken — ons businessmodel is jouw abonnement, niet jouw data. Alleen voor de AI-functies sturen we strikt-noodzakelijke context naar onze AI-subprocessor — nooit je volledige dataset, nooit voor advertenties of verkoop aan derden.',
   },
   {
     q: 'Is dit financieel advies?',

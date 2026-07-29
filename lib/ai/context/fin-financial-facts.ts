@@ -22,8 +22,11 @@
 // geladen `CorePageData` (uit `loadCoreData`) + het profielveld
 // `housing_strategy_config`. CONSUME, DON'T RECOMPUTE (CLAUDE.md): elke waarde komt
 // uit de canonieke laag (`loadCoreData`, `computeCoreData`, `computeFreedom-
-// ProgressWithBasis`, `dailyExpenseRate`); de énige eigen afleiding is
-// `displayFireGoal` via de bestaande `inclHomeTargetFromScalar`-helper.
+// ProgressWithBasis`, `dailyExpenseRate`). De INCL.-woning noemer/`displayFireGoal`
+// komt sinds WF-KRUIS-23 uit de kernel zelf (`fireNetWorthTargetFromHorizon` =
+// Prognose!I@FIRE, hetzelfde cijfer als /overzicht en /toekomst); de
+// `inclHomeTargetFromScalar`-benadering is alleen nog fallback als de kernel-run
+// niet kon draaien.
 //
 // JAARRUIMTE BEWUST BUITEN DE STRUCT: jaarruimte vereist `computeJaarruimte` /
 // `resolvePensionFactorA` (pensioen-/factor-A-invoer die `loadCoreData` niet laadt)
@@ -57,9 +60,10 @@ export interface FinFacts {
   /** Vrijheids-% (0–100), canonieke ADR 0009-grondslag, MET-terugval. Ongerond. */
   vrijheidsPct: number
   /**
-   * ADR 0009 FIRE-doel op DEZELFDE grondslag als `vrijheidsPct` (incl./excl.
-   * eigen woning via `inclHomeTargetFromScalar`), of null wanneer er geen
-   * benodigde portefeuille bepaald kon worden. Ongerond.
+   * ADR 0034 FIRE-doel op DEZELFDE grondslag als `vrijheidsPct` (incl./excl.
+   * eigen woning; INCL. = kernel-`requiredFireNetWorth`, met
+   * `inclHomeTargetFromScalar` als fallback), of null wanneer er geen benodigde
+   * portefeuille bepaald kon worden. Ongerond.
    */
   displayFireGoal: number | null
   /** Weer te geven FIRE-doel = `displayFireGoal ?? core.fireTarget`. Ongerond. */
@@ -132,7 +136,17 @@ export function buildWillFinancialFacts(coreData: CorePageData, profile: FinFact
   const fireEligibleNetWorth = getFireEligibleNetWorth(core.netWorth, housingContext, housingStrategy)
   const requiredPortfolio = coreData.fireTargetFromHorizon ?? (core.fireTarget > 0 ? core.fireTarget : null)
   const homeExcludedFromFire = housingContext.hasEigenHuis && isHomeExcludedFromFire(housingStrategy)
-  const requiredNetWorthInclHome = inclHomeTargetFromScalar(requiredPortfolio, core.netWorth, fireEligibleNetWorth)
+  // INCL.-noemer: CONSUME de kernel-geprojecteerde `requiredFireNetWorth`
+  // (Prognose!I@FIRE) uit dezelfde run die ook `fireTargetFromHorizon` leverde —
+  // exact wat /overzicht en /toekomst tonen (dashboard-data-loader:
+  // `simRequiredNetWorth ?? inclHomeTargetFromScalar(...)`). De scalar-benadering
+  // (excl.-doel + overwaarde van VANDAAG) is enkel nog fallback wanneer de
+  // kernel-run niet kon draaien; als hoofdroute gaf ze een structureel te hoog
+  // FIRE-doel en een te laag vrijheids-% zodra er tussen nu en FIRE nog wordt
+  // afgelost of de huiswaarde beweegt (WF-KRUIS-23).
+  const requiredNetWorthInclHome =
+    coreData.fireNetWorthTargetFromHorizon ??
+    inclHomeTargetFromScalar(requiredPortfolio, core.netWorth, fireEligibleNetWorth)
   const vrijheidsPct = computeFreedomProgressWithBasis({
     homeExcludedFromFire,
     netWorthInclHome: core.netWorth,

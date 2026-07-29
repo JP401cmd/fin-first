@@ -1,10 +1,14 @@
 /**
- * Shared FIRE-target compute helper.
+ * De canonieke server-side FIRE-run — één kernel-solve per request, gedeeld door
+ * élk oppervlak dat op de FIRE-projectie leunt.
  *
  * Dezelfde inputs als `useHorizonFireSim` (zie `lib/hooks/use-horizon-fire-sim.ts`)
  * en daardoor identieke output. Eén bron van waarheid voor het FIRE-doelbedrag —
- * gebruikt door de Kern (`core-data-loader.ts`) zodat het bedrag op `/core`
- * exact overeenkomt met wat Horizon toont, zonder afhankelijkheid van een DB-snapshot.
+ * gebruikt door de Kern (`core-data-loader.ts`, en via die weg de Fin-chat) zodat
+ * het bedrag op `/core` exact overeenkomt met wat Horizon toont, zonder
+ * afhankelijkheid van een DB-snapshot, én door de /overzicht-bundel
+ * (`dashboard-data-loader.ts`) die hier de VOLLEDIGE uitkomst uit consumeert
+ * (`computeHorizonFireSim`) i.p.v. een eigen tweede kernel-run te draaien.
  *
  * ## Convergentie-set-oppervlak (FASE 5 stap 2b, ADR 0032 §6)
  * Dit is oppervlak 3 van de convergentie-set: de engine-keuze loopt via
@@ -25,20 +29,89 @@ import { NL_AOW_AGE } from '@/lib/constants'
 import { getAowLeeftijden } from '@/lib/reference-cache'
 import { loadHorizonData } from '@/lib/horizon-data-loader'
 import { buildHorizonInput } from '@/lib/horizon/build-input'
-import { computeConvergentieProjection } from '@/lib/horizon-kernel/convergentie-router'
+import {
+  computeConvergentieProjection,
+  type ConvergentieRawContext,
+} from '@/lib/horizon-kernel/convergentie-router'
+import type { SimResult } from '@/lib/fire-simulation'
+import type { FireStrategyConfig } from '@/lib/fire-strategy'
+import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 
 /**
- * Compute het FIRE-doelbedrag identiek aan Horizon's `useHorizonFireSim`-hook.
+ * Beide FIRE-doel-grondslagen uit ÉÉN kernel-run (ADR 0034).
  *
- * Retourneert `null` wanneer essentiële inputs ontbreken (geen geboortedatum,
- * geen yearly expenses) — de aanroeper toont dan een eigen fallback.
- *
- * Wrapped in React `cache()` zodat meerdere aanroepen binnen één request
- * (bv. Kern + dashboard widgets) dezelfde Promise hergebruiken.
+ * De kernel berekent ze allebei; deze helper geeft ze allebei door zodat
+ * consumenten de INCL.-woning noemer niet zelf hoeven te benaderen met
+ * `inclHomeTargetFromScalar` (= de vandaag-offset). Dat was precies de drift
+ * tussen de UI (kernel-waarde) en de Fin-chat (benadering) — WF-KRUIS-23.
  */
-export const computeHorizonFireTarget = cache(async function computeHorizonFireTarget(
+export interface HorizonFireTargets {
+  /**
+   * FIRE-doel EXCL. eigen woning / niet-liquide (Prognose!J@FIRE).
+   * `null` wanneer de kernel-run niet kon draaien of ≤ 0 opleverde.
+   */
+  requiredFirePortfolio: number | null
+  /**
+   * FIRE-doel INCL. eigen woning (Prognose!I@FIRE) — de ECHTE, door de kernel
+   * op de FIRE-maand geprojecteerde waarde (dus ná verdere hypotheekaflossing,
+   * huiswaardeontwikkeling en woon-strategiewijzigingen tussen nu en FIRE).
+   * `null` op stub-/preview-resultaten die het veld niet zetten of bij een
+   * mislukte run — de aanroeper valt dan terug op `inclHomeTargetFromScalar`.
+   */
+  requiredFireNetWorth: number | null
+}
+
+/** Lege uitkomst — gedeelde constante zodat elke faal-tak dezelfde vorm teruggeeft. */
+export const EMPTY_HORIZON_FIRE_TARGETS: HorizonFireTargets = {
+  requiredFirePortfolio: null,
+  requiredFireNetWorth: null,
+}
+
+/**
+ * De VOLLEDIGE kernel-uitkomst uit de canonieke Horizon-run — één bron voor élk
+ * oppervlak dat op de FIRE-projectie leunt (ADR 0034, WF-WILL-01).
+ *
+ * Vóór deze samenvoeging draaide `/overzicht` (dashboard-data-loader) een EIGEN,
+ * onafhankelijke `computeConvergentieProjection` met zelf-afgeleide profiel-,
+ * uitgaven- en strategie-inputs, terwijl de Kern + de Fin-chat via
+ * `computeHorizonFireTarget` op de Horizon-run zaten. Twee runs = twee
+ * FIRE-doelen = twee vrijheids-percentages (8,6pp verschil in productie).
+ * `/overzicht` consumeert nu deze uitkomst i.p.v. te herberekenen.
+ */
+export interface HorizonFireSim {
+  /** Kernel-resultaat (rijen, FIRE-leeftijd, beide doelbedragen, eindleeftijd). */
+  sim: SimResult
+  /**
+   * De rauwe kernel-context die déze run voedde. Wordt doorgegeven als
+   * `RegelSimSnapshot.rawContext` zodat de /toekomst-Voorkeuren-editors per
+   * constructie op dezelfde baseline draaien als de getoonde curve.
+   */
+  rawContext: ConvergentieRawContext
+  /** Huidige eindstrategie (weergave + editor-baseline). */
+  fireStrategy: FireStrategyConfig
+  /** Huidige onttrekkingsstrategie (weergave + editor-baseline). */
+  withdrawalStrategy: WithdrawalStrategyConfig
+  /** AOW-leeftijd afgerond omhoog (weergave). */
+  aowAgeInt: number
+  /** Fractionele AOW-leeftijd (weergave). */
+  aowAgeFractional: number
+}
+
+/**
+ * Draai de canonieke Horizon-FIRE-projectie — identiek aan Horizon's
+ * `useHorizonFireSim`-hook — en geef de volledige uitkomst terug.
+ *
+ * `null` wanneer essentiële inputs ontbreken (geen geboortedatum, geen yearly
+ * expenses, geen profielrij) of de kernel-run faalde; de aanroeper valt dan op
+ * zijn eigen fallback terug.
+ *
+ * Wrapped in React `cache()` zodat élke consumer binnen één request (Kern,
+ * AI-context, /overzicht-bundel) dezelfde Promise — en dus letterlijk dezelfde
+ * cijfers — hergebruikt.
+ */
+export const computeHorizonFireSim = cache(async function computeHorizonFireSim(
   supabase: SupabaseClient,
-): Promise<number | null> {
+): Promise<HorizonFireSim | null> {
   // ── Volledige Horizon-data via bestaande loader ──────────────
   // Hergebruikt assets, debts, life events, fire-strategy, withdrawal-strategy,
   // box3Method, hasPartner, unlinkedCash — alle inputs die de hook ook krijgt.
@@ -99,18 +172,46 @@ export const computeHorizonFireTarget = cache(async function computeHorizonFireT
   // per constructie `firePortfolioAtFire === requiredFirePortfolio` op de FIRE-maand (de
   // bisectie stopt op de eerste toereikende maand — zie lib/horizon-kernel/bridge.ts), dus
   // `requiredFirePortfolio` ís hier al het portfolio-op-FIRE (óók voor pensioen).
-  const outcome = computeConvergentieProjection({
-    rawContext: {
-      profile: data.rawProfile,
-      assets: data.assets,
-      debts: data.debts,
-      lifeEvents: data.events ?? [],
-      aowRows: aowRowsForContext,
-      yearlyExpenses: built.input.yearlyExpenses,
-    },
-  })
+  const rawContext: ConvergentieRawContext = {
+    profile: data.rawProfile,
+    assets: data.assets,
+    debts: data.debts,
+    lifeEvents: data.events ?? [],
+    aowRows: aowRowsForContext,
+    yearlyExpenses: built.input.yearlyExpenses,
+  }
+  const outcome = computeConvergentieProjection({ rawContext })
   if (!outcome.ok) return null
-  const sim = toSimResult(outcome.result)
 
-  return sim.requiredFirePortfolio > 0 ? sim.requiredFirePortfolio : null
+  return {
+    sim: toSimResult(outcome.result),
+    rawContext,
+    fireStrategy: data.fireStrategy,
+    withdrawalStrategy: data.withdrawalStrategy,
+    aowAgeInt: built.aowAgeInt,
+    aowAgeFractional,
+  }
+})
+
+/**
+ * Compute het FIRE-doelbedrag identiek aan Horizon's `useHorizonFireSim`-hook.
+ *
+ * Dunne afleiding van `computeHorizonFireSim` — géén eigen kernel-run. Retourneert
+ * beide grondslagen op `null` wanneer essentiële inputs ontbreken (geen
+ * geboortedatum, geen yearly expenses) of de run faalde; de aanroeper toont dan
+ * een eigen fallback.
+ */
+export const computeHorizonFireTarget = cache(async function computeHorizonFireTarget(
+  supabase: SupabaseClient,
+): Promise<HorizonFireTargets> {
+  const run = await computeHorizonFireSim(supabase)
+  if (!run) return EMPTY_HORIZON_FIRE_TARGETS
+  const { sim } = run
+  // Beide grondslagen uit DEZELFDE run doorgeven (ADR 0034). Zelfde gate/vorm als
+  // `dashboard-data-loader` (simRequiredPortfolio/simRequiredNetWorth) zodat de Kern,
+  // de AI-context en /overzicht letterlijk hetzelfde paar cijfers consumeren.
+  return {
+    requiredFirePortfolio: sim.requiredFirePortfolio > 0 ? sim.requiredFirePortfolio : null,
+    requiredFireNetWorth: (sim.requiredFireNetWorth ?? 0) > 0 ? sim.requiredFireNetWorth! : null,
+  }
 })

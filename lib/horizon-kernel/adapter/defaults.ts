@@ -16,6 +16,8 @@
  */
 
 import type { TaxYear } from '@/lib/box3-data'
+import { NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND } from '@/lib/constants'
+import type { AowBasisPerMaand } from '../types'
 
 /**
  * Box 3-belastingjaar waarvan de forfaits/vrijstellingen uit `BOX3_PARAMS` worden
@@ -38,16 +40,30 @@ export const EXCEL_TEKORT_LENING_RENTE = 0.05
 export const EXCEL_HEFFINGVRIJ_INKOMEN_PP = 1800
 
 /**
+ * Auto-geb B21 — de AOW-basisbedragen die het **app-pad** in de kern injecteert
+ * (`KernelInput.autoGebeurtenissen.aowBasisPerMaand`). Eén bron: de canonieke SVB-
+ * constanten uit `lib/constants.ts` (`lib/fiscale-kerngetallen.ts#aow-bedragen` is het
+ * gecureerde register met bron/lastVerified). GEEN eigen literals hier.
+ *
+ * Het parity-/fixture-pad (`input-from-fixture`) laat het veld weg en valt daarmee terug
+ * op de Excel-oracle-basis 1452/993 in `tables/auto-gebeurtenissen.ts` → fixtures blijven
+ * byte-groen. Gap-besluit V20 / ADR 0064.
+ */
+export const APP_AOW_BASIS_PER_MAAND: AowBasisPerMaand = {
+  alleenstaand: NL_AOW_MONTHLY,
+  samenwonend: NL_AOW_MONTHLY_SAMENWONEND,
+}
+
+/**
  * PT!B9 — partner-AOW per persoon per maand (samenwonend-tarief), snede 3 (V3).
- * Bewust gespiegeld op de **kern-B21 samenwonend-basis** (`tables/auto-gebeurtenissen.ts`,
- * `AOW_SAMENWONEND_PER_MAAND` — privé, niet geëxporteerd; de kern mag niet gewijzigd),
- * zodat de partner-AOW binnen dezelfde huishouden-run consistent is met de hoofd-persoon-
- * AOW (die óók de 993-tak volgt zodra `leefsituatie = 'Samenwonend'`). NB: dit is de
- * Excel-oracle-waarde (993), NIET de app-constante `NL_AOW_MONTHLY_SAMENWONEND` (1072) —
- * de kern rekent op zijn eigen basis en die is hier leidend voor de consistentie.
+ * Bewust gespiegeld op de **kern-B21 samenwonend-basis** die het app-pad injecteert
+ * (`APP_AOW_BASIS_PER_MAAND.samenwonend`), zodat de partner-AOW binnen dezelfde
+ * huishouden-run dezelfde grondslag heeft als de hoofd-persoon-AOW (die óók de
+ * samenwonend-tak volgt zodra `leefsituatie = 'Samenwonend'`). Sinds ADR 0064 is dat
+ * de canonieke SVB-waarde i.p.v. de Excel-oracle-waarde 993.
  * Excel-cel PT!B9 (afgeleid van de B21-samenwonend-tak).
  */
-export const EXCEL_AOW_SAMENWONEND_PP_PER_MAAND = 993
+export const AOW_SAMENWONEND_PP_PER_MAAND = APP_AOW_BASIS_PER_MAAND.samenwonend
 
 /**
  * Onttrekkingsprofiel — 3-fasen-curve (go-go / slow-go / no-go), P!B71-B75 (F4).

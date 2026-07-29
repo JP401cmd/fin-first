@@ -549,6 +549,10 @@ function buildAutoGebeurtenissen(fx: OracleFixture): AutoGebeurtenisParams {
     erfenisRelatie: str(fx, `${AUTO}!B17`, 'erfenis relatie'),
     erfenisLeeftijd: num(fx, `${AUTO}!B18`, 'erfenis leeftijd'),
     pensioenPotten,
+    // `aowBasisPerMaand` wordt hier BEWUST NIET gezet: zonder injectie valt de kern
+    // terug op de Excel-oracle-basis 1452/993 (tables/auto-gebeurtenissen.ts) en blijft
+    // B21 byte-identiek aan `Core calc v5.xlsm`. Alleen het app-pad injecteert de
+    // canonieke SVB-bedragen (adapter, gap-besluit V20 / ADR 0064).
   }
 }
 

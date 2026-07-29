@@ -241,7 +241,7 @@ export function Filosofie() {
 // ── Trust-strip — vertrouwen ─────────────────────────────────────────
 
 const TRUST_ITEMS = [
-  { Icon: ShieldCheck, label: 'EU-hosted (Frankfurt)' },
+  { Icon: ShieldCheck, label: 'EU-hosted (Ierland)' },
   { Icon: Lock, label: 'Wij verkopen je data niet' },
   { Icon: Eye, label: 'Open methodologie' },
   { Icon: Fingerprint, label: 'Export altijd mogelijk' },

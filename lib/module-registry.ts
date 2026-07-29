@@ -177,7 +177,6 @@ export const WIDGET_MODULE_MAP: Record<string, ModuleId> = {
   beslissingspatronen: 'inzicht_acties',
   vrijheidsdagen_maand: 'inzicht_acties',
   gezondheids_score: 'inzicht_acties',
-  ai_inzicht: 'inzicht_acties',
 
   // Nieuws — de Nieuws-widget (id `berichten`) vereist de nieuws-module.
   // Bestaande layouts blijven renderen; dit gate't alleen de picker-zichtbaarheid.

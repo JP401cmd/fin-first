@@ -9,14 +9,21 @@
  * Opzet (twee vragen, netjes gescheiden — grid-cols-1 sm:grid-cols-2, mobiel gestapeld):
  *   LINKS  "Wanneer kun je stoppen? — de streep": de draaiknoppen + rendement-per-groep
  *          (via de `draaiknoppen`-slot uit horizon-client).
- *   RECHTS "Hoe stevig is dat? — de marge": de gewenste-stopleeftijd-slider + driezone-
- *          band waarop je de héle reis afleest — basis → verwacht → laatst als markers,
- *          de stop-marker als jouw ambitie, en de marge als overspanning tussen verwacht
- *          en stop (bracket + zone-woord) + de onzekerheidszin.
+ *   RECHTS "Hoe stevig is dat? — de marge": de gewenste-stopleeftijd-regel (zie hieronder)
+ *          + slider + driezone-band waarop je de héle reis afleest — basis → verwacht →
+ *          laatst als markers, de stop-marker als jouw ambitie, en de marge als overspanning
+ *          tussen verwacht en stop (bracket + zone-woord) + de onzekerheidszin.
  *   ONDER  volle-breedte cijferrij met de drie grootheden (Basis- / Doel- of Wat-als- /
  *          Geambieerde vrijheid). Dit is de énige Figure-gestileerde plek voor de leeftijd-
  *          en marge-getallen; de band toont het marge-getal daarnaast als ruimtelijk
  *          bracket-label (datalabel op de visualisatie, geen tweede figure).
+ *
+ * Stopleeftijd-regel (één regel, drie grootheden naast elkaar):
+ *   `Gewenste stopleeftijd  |  {stop} · verwacht {berekende leeftijd} · {X mnd eerder/later vrij}`
+ *   — de gekozen stopleeftijd (jouw ambitie), de BEREKENDE leeftijd (in de app-woordenlijst
+ *   consequent "verwacht": dezelfde grootheid als de verwacht-tick op de band eronder) en de
+ *   afwijking t.o.v. de basislijn ("nu"). De afwijking staat hiér — en dus bewust NIET óók
+ *   als sub onder de cijferrij: één duiding, op de plek waar je je keuze maakt.
  *
  * Kleur-conventie:
  *   - module-identiteit (paneel-badges, stop-slider, accentwaarden) via horizon-tokens;
@@ -242,6 +249,10 @@ export function Vrijheidsas({
       : null
   const delta = fireDeltaLabel(deltaMonths, reachable)
 
+  // De afwijking-t.o.v.-de-basislijn hoort op de stopleeftijd-regel; zonder actief scenario
+  // (of bij een onbereikbare verwacht-FIRE) is er geen zinnige duiding om te tonen.
+  const showStopDelta = hasScenario && reachable && delta.tone !== 'none'
+
   // Marge-band-grenzen (rood/amber/groen), met strakke amber-buffer rond de verwacht-streep.
   const verwachtPos = verwachtFireAge !== null ? posOf(verwachtFireAge) : null
   const bandLaatstPct =
@@ -344,14 +355,41 @@ export function Vrijheidsas({
         <section className="min-w-0">
           <PanelHeader num="2" title="Hoe stevig is dat?" tag="de marge" />
 
-          {/* Gewenste stopleeftijd + leeftijd op één regel (de delta staat alleen nog
-              onder in de cijferrij, niet meer hier). */}
-          <div className="mt-4 mb-1.5 flex items-center justify-between gap-2">
+          {/* Gewenste stopleeftijd · berekende (verwacht-)leeftijd · afwijking t.o.v. de
+              basislijn — alle drie op ÉÉN regel, zodat je je ambitie, de uitkomst en het
+              effect van je wat-als in één oogopslag naast elkaar leest. De duiding staat
+              hier en niet (meer) óók als sub in de cijferrij. Wrapt pas op zeer smalle
+              schermen; de gekozen leeftijd blijft dan de eerste, zwaarste waarde. */}
+          <div className="mt-4 mb-1.5 flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
             <span className="font-sans text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
               Gewenste stopleeftijd
             </span>
-            <span className="font-mono text-sm tabular-nums text-[var(--ink)]">
-              {formatAge(stopAge)}
+            <span className="flex min-w-0 flex-wrap items-baseline justify-end gap-x-1.5 gap-y-0.5">
+              <span className="font-mono text-sm tabular-nums text-[var(--ink)]">
+                {formatAge(stopAge)}
+              </span>
+              {verwachtFireAge !== null && (
+                <>
+                  <span aria-hidden className="font-mono text-[10px] text-[var(--ink-4)]">
+                    ·
+                  </span>
+                  <span className="font-mono text-[11px] tabular-nums text-[var(--ink-3)]">
+                    verwacht {formatAge(verwachtFireAge)}
+                  </span>
+                </>
+              )}
+              {showStopDelta && (
+                <>
+                  <span aria-hidden className="font-mono text-[10px] text-[var(--ink-4)]">
+                    ·
+                  </span>
+                  <span
+                    className={`font-mono text-[11px] tabular-nums ${DELTA_TONE_CLASS[delta.tone]}`}
+                  >
+                    {delta.text}
+                  </span>
+                </>
+              )}
             </span>
           </div>
 
@@ -515,13 +553,13 @@ export function Vrijheidsas({
       {/* ── Cijferrij (volle breedte, onder de twee vlakken) — de drieslag ── */}
       <div className="mt-6 grid grid-cols-3 gap-3 border-t border-[var(--border-ed)] pt-4">
         <Figure kicker="Basis-vrijheid" value={formatAge(baseFireAge)} unit="jr" />
+        {/* Geen delta-sub meer: de "X mnd eerder/later vrij"-duiding staat één keer, op de
+            stopleeftijd-regel in het rechter vlak (zie de module-doc bovenaan). */}
         <Figure
           kicker={watAlsKicker}
           value={formatAge(hasScenario ? verwachtFireAge : baseFireAge)}
           unit="jr"
           highlight={hasScenario}
-          sub={hasScenario ? delta.text : undefined}
-          subClass={hasScenario ? DELTA_TONE_CLASS[delta.tone] : undefined}
         />
         <Figure
           kicker="Geambieerde vrijheid"

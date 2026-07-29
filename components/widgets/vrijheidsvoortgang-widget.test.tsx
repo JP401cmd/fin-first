@@ -89,7 +89,6 @@ function makeData(overrides: Partial<DashboardData> = {}): DashboardData {
     favoriteHoldings: [],
     allBudgets: [],
     notifications: [],
-    aiInsights: [],
     nextSteps: [],
     monthSummary: { netWorthDelta: 0, freedomDaysWon: 0, savingsRate: 0, budgetScore: 0, prevMonthComparison: 0 },
     upcomingEvents: [],

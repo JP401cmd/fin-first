@@ -27,7 +27,7 @@ import {
   type KernelAdapterProfile,
 } from './index'
 import { NEUTRAL_PARTNER } from './params'
-import { EXCEL_AOW_SAMENWONEND_PP_PER_MAAND, EXCEL_HEFFINGVRIJ_INKOMEN_PP } from './defaults'
+import { AOW_SAMENWONEND_PP_PER_MAAND, EXCEL_HEFFINGVRIJ_INKOMEN_PP } from './defaults'
 
 // ── Factories (volledige DB-shape, overschrijfbaar) ──────────────────────────────
 
@@ -97,7 +97,7 @@ describe('buildPartnerParams — profiel → PT-cellen', () => {
     expect(partner.nettoJaarinkomen).toBe(3000 * 12)
     expect(partner.aowLeeftijd).toBe(67) // fallback (geen aow-tabel)
     // PT!B9 — samenwonend-tarief p.p./jaar, consistent met de kern-B21-basis.
-    expect(partner.aowBedragPpPerJaar).toBe(EXCEL_AOW_SAMENWONEND_PP_PER_MAAND * 12)
+    expect(partner.aowBedragPpPerJaar).toBe(AOW_SAMENWONEND_PP_PER_MAAND * 12)
     // Partner-pensioen onbekend → inert 0 + notices.
     expect(partner.pensioenBrutoPerJaar).toBe(0)
     expect(notices.length).toBeGreaterThanOrEqual(1)

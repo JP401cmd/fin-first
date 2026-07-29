@@ -124,10 +124,10 @@ export async function computePageStatusInfo(
     return resolveFreedomBanner({
       freedomPct: dashboardData.freedomPct ?? null,
       currentAge: dashboardData.currentAge ?? null,
-      fireAge:
-        dashboardData.fireAgeFractional != null
-          ? Math.round(dashboardData.fireAgeFractional)
-          : null,
+      // FRACTIONEEL, niet afgerond: `isFinanciallyFree` gebruikt dit als DREMPEL
+      // (`currentAge >= fireAge`). Afronden trok 44,92 omhoog naar 45 en liet de
+      // "financieel vrij"-banner tot 6 maanden te vroeg verschijnen (WF-CANON-03).
+      fireAge: dashboardData.fireAgeFractional ?? null,
       strategy: dashboardData.fireEndStrategy,
     })
   }
