@@ -70,68 +70,107 @@ export async function GET(req: Request) {
       const iban = tlAccount.account_number?.iban ?? null
       const accountName = tlAccount.display_name || connection.provider_name
 
-      // Find or create a matching bank_account
-      let bankAccountId: string | null = null
+      // ── Stap 1: identiteit vóór aanmaak ────────────────────────────────────
+      // `external_account_id` is de stabiele identiteit van een rekening bij de
+      // bank en overleeft een herautorisatie (elke 90 dagen!) én een reconnect na
+      // "Verbreken". Deze lookup stond eerder ONDER de aanmaak van bank_accounts,
+      // waardoor elke nieuwe koppeling eerst een tweede bankrekening + tweede
+      // cash-asset aanmaakte en het saldo daarna dubbel in het vermogen telde.
+      // Bewust GEEN filter op is_active: een reconnect na een soft disconnect moet
+      // de bestaande rij hergebruiken en heractiveren, niet dupliceren.
+      const { data: existingLink } = await supabase
+        .from('bank_connection_accounts')
+        .select('id, bank_account_id')
+        .eq('user_id', user.id)
+        .eq('external_account_id', tlAccount.account_id)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle()
 
-      if (iban) {
+      // Find or create a matching bank_account
+      let bankAccountId: string | null = existingLink?.bank_account_id ?? null
+
+      // ── Stap 2: IBAN-fallback ──────────────────────────────────────────────
+      // Alleen nodig als er nog geen koppeling bestond (eerste keer koppelen op
+      // een handmatig aangemaakte rekening).
+      if (!bankAccountId && iban) {
         // Look up existing bank_account by IBAN. We use the blind index so
         // this keeps working once the plaintext `iban` column is dropped in
         // PR2. Existing rows that haven't been backfilled yet have a NULL
         // iban_hash and would silently miss — the backfill script
         // (scripts/encrypt-existing-bank-credentials.mjs) populates iban_hash
         // for every existing row before we deploy this code path to prod.
+        //
+        // maybeSingle() i.p.v. single(): single() gooit óók bij méér dan één
+        // treffer, en die fout landde in de "maak een nieuwe aan"-tak — precies
+        // het gedrag dat bestaande duplicaten liet dóórgroeien. Oudste eerst,
+        // zodat we deterministisch op de rij mét historie uitkomen.
         const ibanHash = blindIndex(iban)
         const { data: existing } = await supabase
           .from('bank_accounts')
-          .select('id, linked_asset_id')
+          .select('id')
           .eq('user_id', user.id)
           .eq('iban_hash', ibanHash)
           .eq('is_active', true)
+          .order('created_at', { ascending: true })
           .limit(1)
-          .single()
+          .maybeSingle()
 
-        if (existing) {
-          bankAccountId = existing.id
+        bankAccountId = existing?.id ?? null
+      }
 
-          // Cash-as-asset backfill for legacy bank accounts
-          if (!existing.linked_asset_id) {
-            const assetName = `${connection.provider_name} ${iban.slice(-4)}`
-            const { data: backfillAsset } = await supabase
-              .from('assets')
-              .insert({
-                user_id: user.id,
-                name: assetName,
-                asset_type: 'cash',
-                current_value: 0,
-                purchase_value: 0,
-                expected_return: 0,
-                monthly_contribution: 0,
-                institution: connection.provider_name,
-                // Dual-write: plaintext for fallback + encrypted/hash for the
-                // post-PR2 world where the plaintext column is gone.
-                account_number: iban,
-                account_number_encrypted: encryptField(iban),
-                account_number_hash: blindIndex(iban),
-                is_liquid: true,
-                subtype: 'checking',
-                has_budget_tracking: true,
-                ownership: 'personal',
-                net_worth_inclusion_pct: 100,
-                is_active: true,
-              })
-              .select('id')
-              .single()
+      // ── Stap 2b: cash-as-asset backfill voor hergebruikte rekeningen ───────
+      // Nieuw aangemaakte rekeningen krijgen hun asset hieronder (of via de
+      // trigger fn_auto_link_bank_account_asset); alleen bestaande rijen van vóór
+      // cash-as-asset kunnen nog zonder zitten.
+      if (bankAccountId) {
+        const { data: reused } = await supabase
+          .from('bank_accounts')
+          .select('id, linked_asset_id, iban')
+          .eq('id', bankAccountId)
+          .maybeSingle()
 
-            if (backfillAsset) {
-              await supabase
-                .from('bank_accounts')
-                .update({ linked_asset_id: backfillAsset.id })
-                .eq('id', existing.id)
-            }
+        if (reused && !reused.linked_asset_id) {
+          const assetIban = iban ?? reused.iban ?? null
+          const assetName = assetIban
+            ? `${connection.provider_name} ${assetIban.slice(-4)}`
+            : connection.provider_name
+          const { data: backfillAsset } = await supabase
+            .from('assets')
+            .insert({
+              user_id: user.id,
+              name: assetName,
+              asset_type: 'cash',
+              current_value: 0,
+              purchase_value: 0,
+              expected_return: 0,
+              monthly_contribution: 0,
+              institution: connection.provider_name,
+              // Dual-write: plaintext for fallback + encrypted/hash for the
+              // post-PR2 world where the plaintext column is gone.
+              account_number: assetIban,
+              account_number_encrypted: encryptField(assetIban),
+              account_number_hash: assetIban ? blindIndex(assetIban) : null,
+              is_liquid: true,
+              subtype: 'checking',
+              has_budget_tracking: true,
+              ownership: 'personal',
+              net_worth_inclusion_pct: 100,
+              is_active: true,
+            })
+            .select('id')
+            .single()
+
+          if (backfillAsset) {
+            await supabase
+              .from('bank_accounts')
+              .update({ linked_asset_id: backfillAsset.id })
+              .eq('id', bankAccountId)
           }
         }
       }
 
+      // ── Stap 3: pas nu aanmaken ────────────────────────────────────────────
       if (!bankAccountId) {
         // Create linked asset (cash-as-asset)
         const assetName = iban ? `${connection.provider_name} ${iban.slice(-4)}` : connection.provider_name
@@ -183,15 +222,10 @@ export async function GET(req: Request) {
         bankAccountId = newAccount?.id ?? null
       }
 
-      // Check if connection account already exists (re-authorization)
-      const { data: existingAccount } = await supabase
-        .from('bank_connection_accounts')
-        .select('id')
-        .eq('external_account_id', tlAccount.account_id)
-        .eq('user_id', user.id)
-        .single()
-
-      if (existingAccount) {
+      // ── Stap 4: koppeling bijwerken of aanmaken ────────────────────────────
+      // `existingLink` komt uit stap 1 — bewust niet opnieuw opgehaald, zodat
+      // "welke rij hergebruiken we" op één plek beslist wordt.
+      if (existingLink) {
         await supabase
           .from('bank_connection_accounts')
           .update({
@@ -204,7 +238,7 @@ export async function GET(req: Request) {
             is_active: true,
             updated_at: new Date().toISOString(),
           })
-          .eq('id', existingAccount.id)
+          .eq('id', existingLink.id)
       } else {
         await supabase
           .from('bank_connection_accounts')
@@ -219,6 +253,50 @@ export async function GET(req: Request) {
             account_name: accountName,
           })
       }
+    }
+
+    // ── Stap 5: verweesde verbindingen opruimen ───────────────────────────────
+    // Elke klik op "Verbind" maakt via /api/bank-connect/auth-link een `pending`
+    // rij aan die niemand ooit opruimde — afgebroken pogingen stapelden zich op.
+    // En na een herautorisatie blijft de vórige verbinding op 'active' staan met
+    // een levend refresh token, terwijl al haar rekeningen hierboven naar de
+    // nieuwe verbinding zijn verhangen.
+    //
+    // We ruimen daarom alle ándere verbindingen van deze gebruiker op die géén
+    // enkele rekening meer dragen: die zijn per definitie verweesd. Verbindingen
+    // die nog wél rekeningen hebben (bv. een andere bank) blijven ongemoeid.
+    // Dode credentials gaan mee weg — een consent die we niet meer gebruiken
+    // hoort geen bruikbaar token achter te laten.
+    const { data: linkedConnections } = await supabase
+      .from('bank_connection_accounts')
+      .select('connection_id')
+      .eq('user_id', user.id)
+
+    const inUse = new Set(
+      (linkedConnections ?? []).map((row) => row.connection_id as string),
+    )
+    inUse.add(connection.id)
+
+    const { data: ownConnections } = await supabase
+      .from('bank_connections')
+      .select('id, status')
+      .eq('user_id', user.id)
+
+    const orphanIds = (ownConnections ?? [])
+      .filter((c) => !inUse.has(c.id as string) && c.status !== 'expired' && c.status !== 'revoked')
+      .map((c) => c.id as string)
+
+    if (orphanIds.length > 0) {
+      await supabase
+        .from('bank_connections')
+        .update({
+          status: 'expired',
+          access_token_encrypted: encryptField(''),
+          refresh_token_encrypted: null,
+          updated_at: new Date().toISOString(),
+        })
+        .in('id', orphanIds)
+        .eq('user_id', user.id)
     }
 
     // Check if user has completed onboarding. If not, redirect back to

@@ -2,6 +2,14 @@ import type { TLTransaction } from './types'
 import type { ParsedTransaction } from '@/lib/parsers/shared'
 import { computeHash } from '@/lib/parsers/shared'
 
+/** Lege/whitespace-only providerwaarden tellen als "niet gevuld" (→ null),
+ *  zodat ze niet als lege tegenpartij in de DB landen en de meta-fallback
+ *  hieronder gewoon aan bod komt. ParsedTransaction gebruikt null, niet ''. */
+function blankToNull(value: string | undefined | null): string | null {
+  const trimmed = value?.trim()
+  return trimmed ? trimmed : null
+}
+
 /**
  * Map a TrueLayer transaction to our ParsedTransaction format.
  * Uses the same computeHash() as file-based import for cross-import deduplication.
@@ -9,8 +17,19 @@ import { computeHash } from '@/lib/parsers/shared'
 export async function mapTransaction(tl: TLTransaction): Promise<ParsedTransaction> {
   const date = tl.timestamp.split('T')[0]
   const description = tl.description ?? ''
-  const counterparty_name = tl.merchant_name ?? null
+  // Tegenpartij: `merchant_name` is het gestandaardiseerde veld, maar de
+  // Nederlandse xs2a-banken (Rabobank live: 0/354 gevuld) laten het leeg en
+  // zetten naam + IBAN in `meta.counter_party_*`. Vandaar de fallback — zonder
+  // deze blijft counterparty_name/-iban leeg en verliest de categorisatie
+  // (regelmotor én AI) haar sterkste signaal. Pariteit met de CSV/MT940-import,
+  // die deze twee velden al vult.
+  const counterparty_name =
+    blankToNull(tl.merchant_name) ?? blankToNull(tl.meta?.counter_party_preferred_name)
+  const counterparty_iban = blankToNull(tl.meta?.counter_party_iban)
 
+  // import_hash blijft bewust date+amount+description: de tegenpartij verrijkt
+  // de rij, maar mag de dedup-sleutel niet verschuiven (bestaande rijen zouden
+  // anders als "nieuw" terugkomen bij de volgende sync).
   const import_hash = await computeHash(date, tl.amount, description)
 
   return {
@@ -18,7 +37,7 @@ export async function mapTransaction(tl: TLTransaction): Promise<ParsedTransacti
     amount: tl.amount,
     description,
     counterparty_name,
-    counterparty_iban: null,
+    counterparty_iban,
     reference: tl.transaction_id ?? null,
     // De DB-CHECK op transaction_type staat alleen semantische types toe
     // ('transfer'/'salary'/...); rauwe TrueLayer-categorieën ('PURCHASE',

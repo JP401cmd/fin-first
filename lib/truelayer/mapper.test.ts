@@ -66,4 +66,52 @@ describe('mapTransaction', () => {
     expect(typeof result.import_hash).toBe('string')
     expect(result.import_hash.length).toBeGreaterThan(0)
   })
+
+  // Bug: Rabobank (provider xs2a-rabobank, live) vult merchant_name NIET (0/354
+  // transacties in de echte sync); naam + IBAN zitten in `meta.counter_party_*`.
+  // TLTransaction kent `meta` nog niet -> cast via unknown, zie types.ts (fix in
+  // een latere stap). Dit legt vast dat mapTransaction daar (nog) niet naar kijkt.
+  it('BUG: leest counterparty uit meta.counter_party_* als merchant_name ontbreekt (Rabobank)', async () => {
+    const tl = {
+      transaction_id: '7ab7dea768d6bb7389ec2e97086a8e36',
+      timestamp: '2026-07-29T06:05:01.241Z',
+      amount: -11.99,
+      currency: 'EUR',
+      description: 'BRN?00000679,3: S-7760892, 2026-07-25 - 2026-08-24',
+      transaction_type: 'DEBIT',
+      transaction_category: 'DEBIT',
+      meta: {
+        transaction_type: 'Debit',
+        counter_party_preferred_name: 'VIDEOLAND DOOR BUCKAROO',
+        counter_party_iban: 'NL16DEUT0265237289',
+      },
+    } as unknown as TLTransaction
+
+    const result = await mapTransaction(tl)
+
+    expect(result.counterparty_name).toBe('VIDEOLAND DOOR BUCKAROO')
+    expect(result.counterparty_iban).toBe('NL16DEUT0265237289')
+  })
+
+  it('BUG: een gevulde merchant_name houdt voorrang boven meta.counter_party_preferred_name', async () => {
+    const tl = {
+      transaction_id: 'tl-4',
+      timestamp: '2026-07-29T06:05:01.241Z',
+      amount: -11.99,
+      currency: 'EUR',
+      description: 'Videoland abonnement',
+      transaction_type: 'DEBIT',
+      transaction_category: 'DEBIT',
+      merchant_name: 'Videoland B.V.',
+      meta: {
+        transaction_type: 'Debit',
+        counter_party_preferred_name: 'VIDEOLAND DOOR BUCKAROO',
+        counter_party_iban: 'NL16DEUT0265237289',
+      },
+    } as unknown as TLTransaction
+
+    const result = await mapTransaction(tl)
+
+    expect(result.counterparty_name).toBe('Videoland B.V.')
+  })
 })

@@ -3,6 +3,7 @@
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { SubtotalLine } from '@/components/editorial/subtotal-line'
+import { FinDots } from '@/components/app/fin-dots'
 
 // SVG-dimensies — spiegelen MiniNetWorthChart (module-scope, puur constant) zodat
 // het anker-frame exact dezelfde geometrie/kliklijn deelt als de volle grafiek en
@@ -18,9 +19,6 @@ const chartW = W - PAD_LEFT - PAD_RIGHT
 // anker-punt exact op de plek van het latere Vandaag-punt valt.
 const todayX = PAD_LEFT + chartW * 0.25
 const anchorY = PAD_TOP + (H - PAD_TOP - PAD_BOTTOM) * 0.55
-// Reisafstand van het sonde-punt — afgeleid uit de geometrie zodat een latere
-// wijziging van todayFraction/padding de animatie automatisch meeneemt.
-const probeTravel = W - PAD_RIGHT - todayX
 
 /**
  * MiniNetWorthChartAnchor — twee-traps-render voor de rechter hero-cel op
@@ -81,80 +79,102 @@ export function MiniNetWorthChartAnchor({
           instroomt (trap 2) — géén knipperend vlak. */}
       <div className="relative flex-1 mt-2">
         {/* Scoped keyframes — houdt globals.css onaangeraakt; gate op
-            prefers-reduced-motion zet alle beweging stil (statisch gestippeld). */}
+            prefers-reduced-motion zet alle beweging stil (statisch gestippeld;
+            Fin blijft dan stil op het startpunt staan). 3.2s spiegelt de
+            thinking-orbit van FinDots (fin-dots.css) zodat lijn, label en Fin
+            in fase bewegen i.p.v. tegen elkaar in te driften. */}
         <style>{`
           @keyframes nwseek-march { from { stroke-dashoffset: 0 } to { stroke-dashoffset: -20 } }
-          @keyframes nwseek-travel { from { transform: translateX(0) } to { transform: translateX(${probeTravel}px) } }
+          @keyframes nwseek-travel { from { left: 0% } to { left: 100% } }
           @keyframes nwseek-fade { from { opacity: .55 } to { opacity: 1 } }
-          .nwseek-line { animation: nwseek-march 2.6s ease-in-out infinite alternate; }
-          .nwseek-probe { animation: nwseek-travel 2.6s ease-in-out infinite alternate; }
-          .nwseek-label { animation: nwseek-fade 2.6s ease-in-out infinite alternate; }
+          .nwseek-line { animation: nwseek-march 3.2s ease-in-out infinite alternate; }
+          .nwseek-probe { animation: nwseek-travel 3.2s ease-in-out infinite alternate; }
+          .nwseek-label { animation: nwseek-fade 3.2s ease-in-out infinite alternate; }
           @media (prefers-reduced-motion: reduce) {
             .nwseek-line, .nwseek-probe, .nwseek-label { animation: none; }
           }
         `}</style>
-        <svg
-          viewBox={`0 0 ${W} ${H}`}
-          className="w-full h-auto"
-          aria-hidden="true"
-          preserveAspectRatio="none"
-          style={{ minHeight: '120px' }}
-        >
-          {/* Zoekende projectie-lijn rechts van Vandaag: rustige gestippelde lijn
-              (drift-dashes heen en weer) met een sonde-punt dat langzaam
-              uit- en terugschuift richting de rechterrand. */}
-          <line
-            className="nwseek-line"
-            x1={todayX}
-            y1={anchorY}
-            x2={W - PAD_RIGHT}
-            y2={anchorY}
-            stroke="var(--ink-4)"
-            strokeWidth="1"
-            strokeDasharray="4 6"
-            opacity="0.4"
-          />
-          <circle
-            className="nwseek-probe"
-            cx={todayX}
-            cy={anchorY}
-            r="3"
-            fill="var(--module-active-700)"
-            opacity="0.5"
-          />
-          {/* X-as basislijn. */}
-          <line
-            x1={PAD_LEFT}
-            y1={H - PAD_BOTTOM}
-            x2={W - PAD_RIGHT}
-            y2={H - PAD_BOTTOM}
-            stroke="var(--ink-4)"
-            strokeWidth="0.5"
-            opacity="0.35"
-          />
-          {/* Vandaag verticaal richtlijntje. */}
-          <line
-            x1={todayX}
-            y1={PAD_TOP}
-            x2={todayX}
-            y2={H - PAD_BOTTOM}
-            stroke="var(--ink-4)"
-            strokeWidth="0.5"
-            strokeDasharray="2 3"
-            opacity="0.5"
-          />
-          {/* Vandaag-anker: het startpunt van de vermogenslijn. */}
-          <circle cx={todayX} cy={anchorY} r="4" fill="var(--module-active-700)" />
-          <text
-            x={todayX < 70 ? Math.max(2, todayX - 4) : todayX}
-            y={H - 4}
-            textAnchor={todayX < 70 ? 'start' : 'middle'}
-            className="fill-[var(--ink-3)] font-mono"
-            fontSize="9"
+        {/* Eigen wrapper rond de svg: de buitenste cel is `flex-1` en dus hoger dan
+            de svg zelf — deze block-wrapper is exact zo hoog als de svg, zodat de
+            Fin-overlay in %-en van de SVG-geometrie gepositioneerd kan worden. */}
+        <div className="relative">
+          <svg
+            viewBox={`0 0 ${W} ${H}`}
+            className="block w-full h-auto"
+            aria-hidden="true"
+            preserveAspectRatio="none"
+            style={{ minHeight: '120px' }}
           >
-            Vandaag
-          </text>
-        </svg>
+            {/* Zoekende projectie-lijn rechts van Vandaag: rustige gestippelde
+                lijn (drift-dashes heen en weer). Fin loopt er als overlay
+                overheen — zie de strip onder deze svg. */}
+            <line
+              className="nwseek-line"
+              x1={todayX}
+              y1={anchorY}
+              x2={W - PAD_RIGHT}
+              y2={anchorY}
+              stroke="var(--ink-4)"
+              strokeWidth="1"
+              strokeDasharray="4 6"
+              opacity="0.4"
+            />
+            {/* X-as basislijn. */}
+            <line
+              x1={PAD_LEFT}
+              y1={H - PAD_BOTTOM}
+              x2={W - PAD_RIGHT}
+              y2={H - PAD_BOTTOM}
+              stroke="var(--ink-4)"
+              strokeWidth="0.5"
+              opacity="0.35"
+            />
+            {/* Vandaag verticaal richtlijntje. */}
+            <line
+              x1={todayX}
+              y1={PAD_TOP}
+              x2={todayX}
+              y2={H - PAD_BOTTOM}
+              stroke="var(--ink-4)"
+              strokeWidth="0.5"
+              strokeDasharray="2 3"
+              opacity="0.5"
+            />
+            {/* Vandaag-anker: het startpunt van de vermogenslijn. */}
+            <circle cx={todayX} cy={anchorY} r="4" fill="var(--module-active-700)" />
+            <text
+              x={todayX < 70 ? Math.max(2, todayX - 4) : todayX}
+              y={H - 4}
+              textAnchor={todayX < 70 ? 'start' : 'middle'}
+              className="fill-[var(--ink-3)] font-mono"
+              fontSize="9"
+            >
+              Vandaag
+            </text>
+          </svg>
+          {/* Fin loopt het projectie-traject af: strip van Vandaag tot de
+              rechterrand, op de hoogte van de zoeklijn. Percentages komen uit
+              dezelfde SVG-constanten als de lijn zelf, zodat een wijziging van
+              todayFraction/padding de loopbaan automatisch meeneemt. */}
+          <div
+            className="pointer-events-none absolute"
+            aria-hidden="true"
+            style={{
+              left: `${(todayX / W) * 100}%`,
+              right: `${(PAD_RIGHT / W) * 100}%`,
+              top: `${(anchorY / H) * 100}%`,
+            }}
+          >
+            {/* `nwseek-travel` schuift `left` 0% → 100% heen en weer; de vaste
+                translate houdt Fin daarbij gecentreerd op de zoeklijn. */}
+            <div
+              className="nwseek-probe absolute"
+              style={{ left: 0, transform: 'translate(-50%, -50%)' }}
+            >
+              <FinDots size={26} state="thinking" />
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   )

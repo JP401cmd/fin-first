@@ -7,7 +7,7 @@ vi.mock('@/lib/supabase/service', () => ({
 }))
 
 import { getServiceClient } from '@/lib/supabase/service'
-import { getProviders, buildAuthLink } from './client'
+import { getProviders, buildAuthLink, getAccountTransactions } from './client'
 
 /**
  * Bouwt een supabase-achtige stub waarvan `.from('app_settings').select('value')
@@ -68,6 +68,56 @@ describe('getProviders', () => {
     const calledUrl = fetchMock.mock.calls[0][0] as string
     expect(calledUrl).toBe('https://auth.truelayer-sandbox.com/api/providers')
     expect(result).toHaveLength(fixture.length)
+  })
+})
+
+describe('getAccountTransactions', () => {
+  // Bug: TLTransactionSchema (zod) kent `meta` nog niet. safeParse() strip
+  // onbekende velden bij een succesvolle parse, dus de Rabobank-tegenpartij
+  // (naam+IBAN in meta.counter_party_*) gaat hier al verloren, vóórdat
+  // mapTransaction() er ooit naar kan kijken. Fix volgt in stap 5 (types.ts +
+  // client.ts schema); dit legt alleen het huidige (foute) gedrag vast.
+  let fetchMock: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    vi.mocked(getServiceClient).mockReturnValue(
+      makeSupabaseStub({}) as unknown as ReturnType<typeof getServiceClient>
+    )
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('BUG: meta overleeft de schema-parse NIET (wordt weggestript)', async () => {
+    const rawTransaction = {
+      timestamp: '2026-07-29T06:05:01.241Z',
+      description: 'BRN?00000679,3: S-7760892, 2026-07-25 - 2026-08-24',
+      transaction_type: 'DEBIT',
+      transaction_category: 'DEBIT',
+      transaction_classification: [],
+      amount: -11.99,
+      currency: 'EUR',
+      transaction_id: '7ab7dea768d6bb7389ec2e97086a8e36',
+      meta: {
+        transaction_type: 'Debit',
+        counter_party_preferred_name: 'VIDEOLAND DOOR BUCKAROO',
+        counter_party_iban: 'NL16DEUT0265237289',
+      },
+    }
+
+    fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ results: [rawTransaction] }),
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await getAccountTransactions('token', 'https://api.truelayer.com', 'acc-1')
+
+    expect(result).toHaveLength(1)
+    // Dit is de vastgelegde bug: meta zou hier aanwezig moeten blijven zodat
+    // mapTransaction() de tegenpartij kan lezen, maar zod strip het weg.
+    expect((result[0] as unknown as { meta?: unknown }).meta).toEqual(rawTransaction.meta)
   })
 })
 

@@ -4,6 +4,7 @@ import { unauthorized, serverError } from '@/lib/api/respond'
 import { isTrueLayerEnabled } from '@/lib/truelayer/feature-flag'
 import { getBaseUrls, getAccountTransactions, refreshAccessToken } from '@/lib/truelayer/client'
 import { mapTransactions } from '@/lib/truelayer/mapper'
+import { syncAccountBalance } from '@/lib/truelayer/balance-sync'
 import { categorizeTransaction, buildFrequencyMap, type CategoryCorrection } from '@/lib/parsers/categorize'
 import { decryptField, encryptField } from '@/lib/crypto/field-encryption'
 import type { Budget } from '@/lib/budget-data'
@@ -200,6 +201,32 @@ export async function POST(req: Request) {
       }
     }
 
+    // ── Saldo meeliften op de sync ────────────────────────────────────────────
+    // Een sync zonder saldo laat `bank_accounts.balance` op 0 staan (en daarmee
+    // de gekoppelde cash-asset): de balances-route bestaat, maar werd door geen
+    // enkel scherm aangeroepen. Hier hoort het thuis — het token is al ontsleuteld
+    // en zo nodig ververst, en één "Synchroniseer" levert de gebruiker één
+    // kloppend beeld (transacties én saldo) in plaats van twee losse acties.
+    //
+    // Rate limit: dit telt bewust als ÉÉN verzoek (de teller hieronder gaat met 1
+    // omhoog). De 10/dag is een app-rem op sync-spam, geen per-endpoint-quotum;
+    // de gebruiker dubbel belasten voor één klik zou de rem oneerlijk maken.
+    //
+    // Niet-fataal: de transacties staan op dit punt al in de DB. Een falende
+    // saldo-call mag die winst niet omzetten in een 500 — we loggen en gaan door.
+    let syncedBalance: number | null = null
+    try {
+      const { synced } = await syncAccountBalance(supabase, {
+        accessToken,
+        dataUrl,
+        externalAccountId: connAccount.external_account_id,
+        bankAccountId: connAccount.bank_account_id,
+      })
+      syncedBalance = synced?.balance ?? null
+    } catch (balanceErr) {
+      console.error('TrueLayer balance sync (non-fataal) mislukt:', balanceErr)
+    }
+
     // Update sync cursor to latest date
     let latestDate = connAccount.sync_cursor
     for (const tx of tlTransactions) {
@@ -235,6 +262,9 @@ export async function POST(req: Request) {
       new: insertedCount,
       duplicates: duplicateCount,
       daily_requests: dailyRequests + 1,
+      // null als het saldo niet opgehaald/weggeschreven kon worden — additief,
+      // bestaande lezers van new/duplicates/daily_requests blijven werken.
+      balance: syncedBalance,
     })
   } catch (err) {
     console.error('TrueLayer sync error:', err)

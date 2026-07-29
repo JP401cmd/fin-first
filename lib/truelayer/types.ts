@@ -31,6 +31,21 @@ export type TLBalance = {
   update_timestamp: string
 }
 
+/**
+ * Het `meta`-blok van een transactie: provider-specifieke verrijking naast de
+ * gestandaardiseerde velden. Voor Nederlandse banken via xs2a (Rabobank, ING)
+ * is dit de ENIGE plek waar de tegenpartij staat — `merchant_name` blijft daar
+ * leeg (0/354 transacties in de live Rabobank-sync). De vorm verschilt per
+ * provider en groeit; daarom alleen de velden die we consumeren getypeerd, de
+ * rest blijft als unknown behouden (zie TLTransactionMetaSchema in client.ts).
+ */
+export type TLTransactionMeta = {
+  transaction_type?: string
+  counter_party_preferred_name?: string
+  counter_party_iban?: string
+  [key: string]: unknown
+}
+
 export type TLTransaction = {
   transaction_id: string
   timestamp: string
@@ -44,6 +59,7 @@ export type TLTransaction = {
     amount: number
     currency: string
   }
+  meta?: TLTransactionMeta
 }
 
 export type TLTokenResponse = {

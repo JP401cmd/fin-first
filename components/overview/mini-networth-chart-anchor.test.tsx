@@ -17,6 +17,8 @@ describe('MiniNetWorthChartAnchor — trap 1 (directe paint)', () => {
     expect(screen.getByText('Vandaag')).toBeTruthy()
     // Signaleert dat de projectie nog binnenstroomt (trap 2).
     expect(screen.getByText('Projectie laden…')).toBeTruthy()
+    // Fin loopt het projectie-traject af terwijl de kernel rekent.
+    expect(container.querySelector('[aria-label="Fin avatar"]')).toBeTruthy()
   })
 
   it('toont de excl.-eigen-woning-subregel alleen bij showExclHome', () => {

@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { unauthorized, serverError } from '@/lib/api/respond'
 import { isTrueLayerEnabled } from '@/lib/truelayer/feature-flag'
-import { getBaseUrls, getAccountBalance, refreshAccessToken } from '@/lib/truelayer/client'
+import { getBaseUrls, refreshAccessToken } from '@/lib/truelayer/client'
+import { syncAccountBalance } from '@/lib/truelayer/balance-sync'
 import { decryptField, encryptField } from '@/lib/crypto/field-encryption'
 
 export async function POST(req: Request) {
@@ -71,36 +72,18 @@ export async function POST(req: Request) {
     }
 
     const { dataUrl } = await getBaseUrls(supabase)
-    const balances = await getAccountBalance(accessToken, dataUrl, connAccount.external_account_id)
 
-    const preferred = balances[0]
+    // Ophalen + wegschrijven (bank_accounts.balance + gekoppelde cash-asset)
+    // leeft in de gedeelde helper, zodat de sync-route exact hetzelfde doet.
+    const { balances, synced } = await syncAccountBalance(supabase, {
+      accessToken,
+      dataUrl,
+      externalAccountId: connAccount.external_account_id,
+      bankAccountId: connAccount.bank_account_id,
+    })
 
-    if (preferred && connAccount.bank_account_id) {
-      const balance = preferred.current
-
-      await supabase
-        .from('bank_accounts')
-        .update({
-          balance,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', connAccount.bank_account_id)
-
-      // Sync balance to linked asset (cash-as-asset)
-      const { data: ba } = await supabase
-        .from('bank_accounts')
-        .select('linked_asset_id')
-        .eq('id', connAccount.bank_account_id)
-        .single()
-
-      if (ba?.linked_asset_id) {
-        await supabase
-          .from('assets')
-          .update({ current_value: balance, updated_at: new Date().toISOString() })
-          .eq('id', ba.linked_asset_id)
-      }
-
-      return NextResponse.json({ balance, currency: preferred.currency })
+    if (synced) {
+      return NextResponse.json({ balance: synced.balance, currency: synced.currency })
     }
 
     return NextResponse.json({ balance: null, balances })

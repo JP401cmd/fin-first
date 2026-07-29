@@ -26,6 +26,17 @@ const TLAccountSchema = z.object({
   }).optional(),
 })
 
+// `meta` draagt de provider-specifieke verrijking. Bij de Nederlandse xs2a-banken
+// (Rabobank/ING) zit de tegenpartij UITSLUITEND hier — `merchant_name` blijft
+// leeg. Bewust een looseObject: zod strip onbekende sleutels bij een geslaagde
+// parse, en dat is precies hoe de tegenpartij eerder verloren ging. Loose houdt
+// de overige provider-velden intact zonder ze te hoeven kennen.
+const TLTransactionMetaSchema = z.looseObject({
+  transaction_type: z.string().optional(),
+  counter_party_preferred_name: z.string().optional(),
+  counter_party_iban: z.string().optional(),
+})
+
 const TLTransactionSchema = z.object({
   transaction_id: z.string(),
   timestamp: z.string(),
@@ -36,6 +47,7 @@ const TLTransactionSchema = z.object({
   transaction_category: z.string(),
   merchant_name: z.string().optional(),
   running_balance: z.object({ amount: z.number(), currency: z.string() }).optional(),
+  meta: TLTransactionMetaSchema.optional(),
 })
 
 const SANDBOX_AUTH_URL = 'https://auth.truelayer-sandbox.com'
@@ -279,7 +291,7 @@ export async function getAccountTransactions(
       const firstRow = Array.isArray(results) && results[0] ? results[0] as unknown as Record<string, unknown> : null
       const observedKeys = Object.keys(firstRow ?? {})
       const fingerprint = await fingerprintKeys(observedKeys)
-      const knownKeys = new Set(['transaction_id','timestamp','amount','currency','description','transaction_type','transaction_category','merchant_name','running_balance'])
+      const knownKeys = new Set(['transaction_id','timestamp','amount','currency','description','transaction_type','transaction_category','merchant_name','running_balance','meta'])
       const added = observedKeys.filter(k => !knownKeys.has(k.toLowerCase()))
       const removed = [...knownKeys].filter(k => !observedKeys.map(o => o.toLowerCase()).includes(k))
       const service = getServiceClient()
