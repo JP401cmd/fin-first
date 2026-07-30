@@ -47,7 +47,7 @@ describe('CASH_FLOW — curatie-integriteit', () => {
     }
   })
 
-  it('dekt alle 50 WF-CASH-scenario\'s (01..50, aaneengesloten — geen verwijsregel-gaten)', () => {
+  it('dekt alle 51 WF-CASH-scenario\'s (01..51, aaneengesloten — geen verwijsregel-gaten)', () => {
     const covered = new Set(
       CASH_FLOW.nodes.map((n) => n.scenarioId).filter((id): id is string => Boolean(id)),
     )
@@ -68,11 +68,14 @@ describe('CASH_FLOW — curatie-integriteit', () => {
     // 49 → 50: UAT-b fase 8 (FR8, saldo via het herwaarderingspad, plan.md §6)
     // — WF-CASH-50 (valuations-rij + snapshot-mirror alleen bij wijziging, de
     // compenserende waardering bij een relink).
-    const expected = Array.from({ length: 50 }, (_, i) => `UAT-CASH-${String(i + 1).padStart(2, '0')}`)
+    // 50 → 51: bugfix-toevoeging (docs/adr/0073-grondslag-in-de-veldnaam.md)
+    // — WF-CASH-51 (de cashflow-landingskaarten: Budget-KPI = resterend i.p.v.
+    // plafond, Transacties-KPI = gerealiseerde huidige maand i.p.v. effective).
+    const expected = Array.from({ length: 51 }, (_, i) => `UAT-CASH-${String(i + 1).padStart(2, '0')}`)
     for (const id of expected) {
       expect(covered.has(id), `${id} moet als flow-knoop voorkomen`).toBe(true)
     }
-    expect(covered.size).toBe(50)
+    expect(covered.size).toBe(51)
   })
 
   it('de domeinoverschrijdende cross-knopen dekken BUDGET/OVZ/TOEK/WILL/BEZIT/MIJN', () => {

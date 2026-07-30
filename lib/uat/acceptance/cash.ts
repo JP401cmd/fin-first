@@ -729,6 +729,20 @@ const criteria: AcceptanceCriterion[] = [
       source: 'lib/truelayer/balance-valuation.ts#isSameBalance + #formatBankSyncNote + #parseBankSyncPrevious + #formatBankSyncCorrectionNote — echte productiefuncties, geen mirror; de DB-schrijfvolgorde (recordBankBalanceRevaluation/revertBankBalanceRevaluation: bezitting eerst, markering laatst) en de success-pagina-melding zijn DB-mutatie over meerdere Supabase-rondes en staan hier narratief vastgelegd, niet los getoetst.',
     },
   },
+  {
+    workflow: 'WF-CASH-51',
+    scenarioId: 'UAT-CASH-51',
+    titel: 'Cashflow-landingskaarten: Budget toont het resterende bedrag, Transacties de gerealiseerde huidige maand (dekt app/(app)/overzicht/cashflow/page.tsx)',
+    kriticiteit: 'KERN',
+    given: 'De pagina /overzicht/cashflow rendert de vier hefboom-kaarten via `buildCashflowCards` (`lib/dashboard-data-loader.ts` + `lib/cashflow-data-loader.ts` + `lib/vaste-lasten-summary.ts` als invoer). ADR 0073 ("grondslag in de veldnaam") legt vast dat elk inkomsten-/uitgavenveld op de bundel zijn venster in de naam draagt.',
+    when: 'De gebruiker leest de Budget-kaart en de Transacties-kaart op de landingspagina.',
+    then: 'De Budget-KPI toont wat er van het maandbudget OVER is (plafond − besteed), niet het plafond zelf, en zonder "/mnd"-suffix — bij overschrijding een negatief bedrag, geduid door `subText` ("Boven budget"); `budgetCardStatus` blijft ongewijzigd op `monthSummary.budgetScore`. De Transacties-KPI, de spaarquote in het uitklap-detail, de tip en de kaartstatus draaien allemaal op de GEREALISEERDE huidige kalendermaand (`DashboardData.currentMonthIncome`/`currentMonthExpenses`, transfer-gefilterd via `aggIncomeByMonth`/`aggExpenseByMonthAbs` met `realOnly: true`) — NIET op het effective `monthlyIncome`/`monthlyExpenses`, dat bij `profiles.income_source = \'manual\'` een profielinschatting is in plaats van wat deze maand werkelijk gebeurde. De Vaste-lasten-kaart is bewust de UITZONDERING: die blijft het effective maandinkomen als noemer gebruiken voor het aandeel, omdat een structureel aandeel tegen een stabiel inkomen hoort te worden gemeten, niet tegen een half-afgelopen kalendermaand.',
+    assertion: {
+      kind: 'exact',
+      expected: 'budgetKpi=€ -250 (plafond 3.950, besteed 4.200); transKpi=€ -500 (gerealiseerd 3.000/3.500, effective 6.000/2.000 genegeerd)',
+      source: 'app/(app)/overzicht/cashflow/page.tsx + lib/cashflow-cards.ts#buildCashflowCards — echte productiefunctie, aangeroepen op literaire invoer; zie cash-checks.ts',
+    },
+  },
 ]
 
 export const CASH_ACCEPTANCE: AcceptanceSet = {

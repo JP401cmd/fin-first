@@ -56,37 +56,37 @@ describe('budgetCardStatus — pillarStatus thresholds (active budget)', () => {
 
 describe('transactiesCardStatus — neutral when no transactions', () => {
   it('income 0 and expenses 0 → neutral', () => {
-    expect(transactiesCardStatus({ monthlyIncome: 0, monthlyExpenses: 0 })).toBe('neutral')
+    expect(transactiesCardStatus({ currentMonthIncome: 0, currentMonthExpenses: 0 })).toBe('neutral')
   })
 
   it('income 0, expenses > 0 → neutral (rate is null)', () => {
-    expect(transactiesCardStatus({ monthlyIncome: 0, monthlyExpenses: 500 })).toBe('neutral')
+    expect(transactiesCardStatus({ currentMonthIncome: 0, currentMonthExpenses: 500 })).toBe('neutral')
   })
 })
 
 describe('transactiesCardStatus — status by savings rate', () => {
   it('income 1000, expenses 700 → net 300 → 30% → good (>= 20%)', () => {
-    expect(transactiesCardStatus({ monthlyIncome: 1000, monthlyExpenses: 700 })).toBe('good')
+    expect(transactiesCardStatus({ currentMonthIncome: 1000, currentMonthExpenses: 700 })).toBe('good')
   })
 
   it('income 1000, expenses 800 → net 200 → 20% → good (exactly 20%)', () => {
-    expect(transactiesCardStatus({ monthlyIncome: 1000, monthlyExpenses: 800 })).toBe('good')
+    expect(transactiesCardStatus({ currentMonthIncome: 1000, currentMonthExpenses: 800 })).toBe('good')
   })
 
   it('income 1000, expenses 950 → net 50 → 5% → warn (>= 0%, < 20%)', () => {
-    expect(transactiesCardStatus({ monthlyIncome: 1000, monthlyExpenses: 950 })).toBe('warn')
+    expect(transactiesCardStatus({ currentMonthIncome: 1000, currentMonthExpenses: 950 })).toBe('warn')
   })
 
   it('income 1000, expenses 1000 → net 0 → 0% → warn (= 0%)', () => {
-    expect(transactiesCardStatus({ monthlyIncome: 1000, monthlyExpenses: 1000 })).toBe('warn')
+    expect(transactiesCardStatus({ currentMonthIncome: 1000, currentMonthExpenses: 1000 })).toBe('warn')
   })
 
   it('income 1000, expenses 1100 → net -100 → -10% → bad (< 0%)', () => {
-    expect(transactiesCardStatus({ monthlyIncome: 1000, monthlyExpenses: 1100 })).toBe('bad')
+    expect(transactiesCardStatus({ currentMonthIncome: 1000, currentMonthExpenses: 1100 })).toBe('bad')
   })
 
   it('income 5000, expenses 0 → net 5000 → 100% → good', () => {
-    expect(transactiesCardStatus({ monthlyIncome: 5000, monthlyExpenses: 0 })).toBe('good')
+    expect(transactiesCardStatus({ currentMonthIncome: 5000, currentMonthExpenses: 0 })).toBe('good')
   })
 })
 

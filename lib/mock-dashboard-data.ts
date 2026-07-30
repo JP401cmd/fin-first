@@ -57,6 +57,11 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
   totalDebts: 57500,
   monthlyIncome: 5200,
   monthlyExpenses: 3100,
+  // Gerealiseerde huidige kalendermaand — in de mock gelijk aan de effective
+  // waarden (geen manual-override-scenario), zodat kaarten/widgets die de ene of
+  // de andere grondslag lezen in de mock geen verschil laten zien.
+  currentMonthIncome: 5200,
+  currentMonthExpenses: 3100,
   // Canoniek dagtarief (€/dag) — voedt de "Geld is opgeslagen tijd"-vertaling in widgets.
   dailyExpenseRate: 100,
   monthlyContributions: 1400,

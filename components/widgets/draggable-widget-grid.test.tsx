@@ -49,6 +49,8 @@ const mockData: DashboardData = {
   totalDebts: 10000,
   monthlyIncome: 3000,
   monthlyExpenses: 2000,
+  currentMonthIncome: 3000,
+  currentMonthExpenses: 2000,
   monthlyContributions: 500,
   yearlyMustExpenses: 20000,
   budgetTotals: {

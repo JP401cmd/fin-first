@@ -71,7 +71,7 @@ function criterion(workflow: string): AcceptanceCriterion {
 }
 
 describe('UAT Cash — acceptatiecriteria dekking', () => {
-  it('heeft precies één criterium per catalogus-CASH-scenario (01..47, geen gaten)', () => {
+  it('heeft precies één criterium per catalogus-CASH-scenario (01..51, geen gaten)', () => {
     const workflows = CASH_ACCEPTANCE.criteria.map((c) => c.workflow).sort()
     expect(workflows).toEqual(catalogCashWorkflows)
     expect(new Set(workflows).size).toBe(catalogCashWorkflows.length)
@@ -100,7 +100,10 @@ describe('UAT Cash — acceptatiecriteria dekking', () => {
     // 49 → 50: UAT-b fase 8 (FR8, saldo via het herwaarderingspad, plan.md §6)
     // — WF-CASH-50 (isSameBalance-poort + notitie-rondtrip, de compensatie bij
     // een relink en de success-pagina-melding in één criterium).
-    expect(workflows.length).toBe(50)
+    // 50 → 51: bugfix-toevoeging (docs/adr/0073-grondslag-in-de-veldnaam.md)
+    // — WF-CASH-51 (cashflow-landingskaarten: Budget-KPI = resterend,
+    // Transacties-KPI = gerealiseerde huidige maand).
+    expect(workflows.length).toBe(51)
   })
 
   it('elk criterium heeft een geldige assertion.kind', () => {
@@ -157,7 +160,11 @@ describe('UAT Cash — acceptatiecriteria dekking', () => {
     // echte productiefuncties uit lib/truelayer/balance-valuation.ts) is
     // 'exact' en krijgt een CASH_ENGINE_CHECKS-rij; de DB-schrijfvolgorde en
     // de success-pagina-melding blijven narratief in hetzelfde criterium.
-    expect(exactWorkflows.length).toBe(30)
+    // 30 → 31: bugfix-toevoeging (docs/adr/0073-grondslag-in-de-veldnaam.md,
+    // nieuw oppervlak app/(app)/overzicht/cashflow/page.tsx) — WF-CASH-51
+    // (buildCashflowCards, échte productiefunctie op literaire invoer) is
+    // 'exact' en krijgt een CASH_ENGINE_CHECKS-rij.
+    expect(exactWorkflows.length).toBe(31)
   })
 
   it('markeert de jitter-gebonden/AI/gebonden randgevallen met de juiste kind', () => {

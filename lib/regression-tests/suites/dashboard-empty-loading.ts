@@ -18,6 +18,8 @@ function makeEmptyDashboardData(): DashboardData {
     totalDebts: 0,
     monthlyIncome: 0,
     monthlyExpenses: 0,
+    currentMonthIncome: 0,
+    currentMonthExpenses: 0,
     monthlyContributions: 0,
     yearlyMustExpenses: 0,
     budgetTotals: {

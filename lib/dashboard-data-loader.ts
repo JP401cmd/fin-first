@@ -1430,6 +1430,17 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // Income history: positieve transacties per maand, transfer-gefilterd.
   const incomeByMonth = aggIncomeByMonth(txAgg12, { realOnly: true })
 
+  // Gerealiseerde HUIDIGE kalendermaand (excl. transfers) — de grondslag voor
+  // oppervlakken die "wat gebeurde er déze maand echt" tonen, los van de
+  // effective/manual-override die `monthlyIncome`/`monthlyExpenses` voedt (zie
+  // resolveEffectiveIncomeExpenses). Bewust een slice van HETZELFDE canonieke
+  // maandaggregaat als de historieën hierboven — geen vierde eigen tel-lus, en
+  // een aggregaat kan niet stil op max_rows afkappen. `monthStart` is al
+  // 'YYYY-MM-DD' van de 1e van deze maand, dus slice(0,7) == de aggregaat-sleutel.
+  const currentMonthKey = monthStart.slice(0, 7)
+  const currentMonthIncome = incomeByMonth.get(currentMonthKey) ?? 0
+  const currentMonthExpenses = expenseByMonth.get(currentMonthKey) ?? 0
+
   // Savings history: income minus expenses per month (using all transactions)
   const savingsByMonth = new Map<string, number>()
   const allMonths = new Set([...incomeByMonth.keys(), ...expenseByMonth.keys()])
@@ -2472,6 +2483,11 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     // gebaseerd) consumeert dit i.p.v. de losse huidige-kalendermaand-som,
     // zodat het weektotaal overeenkomt met sidebar/balans (KRUIS-17).
     recentMonthlyExpenses,
+    // Gerealiseerde huidige kalendermaand uit transacties (excl. transfers) —
+    // NIET de effective/manual-override hierboven. De Transacties-kaart op
+    // /overzicht/cashflow toont "deze maand" en consumeert deze twee.
+    currentMonthIncome,
+    currentMonthExpenses,
     monthlyContributions,
     yearlyMustExpenses,
     budgetTotals,

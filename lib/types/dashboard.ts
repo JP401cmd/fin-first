@@ -197,6 +197,32 @@ export interface DashboardData {
    * mock-/empty-bundels zonder dit veld vallen terug op `monthlyExpenses`.
    */
   recentMonthlyExpenses?: number
+  /**
+   * WERKELIJK GEREALISEERD inkomen van de HUIDIGE kalendermaand (€) — venster
+   * [1e van deze maand, 1e van volgende maand), transfers (`transfer`/
+   * `joint_transfer`) uitgesloten. Bron: het canonieke maandaggregaat
+   * (`tx_month_aggregate` via `aggIncomeByMonth(..., { realOnly: true })`), niet
+   * een eigen rij-loop — een aggregaat kan niet stil op `max_rows` afkappen.
+   *
+   * Dit is BEWUST iets anders dan het ongemarkeerde `monthlyIncome`: dát veld is
+   * en blijft de EFFECTIVE grondslag (`resolveEffectiveIncomeExpenses`), waarbij
+   * bij `profiles.income_source = 'manual'` de handmatige profielinschatting
+   * wint — precies wat Horizon/FIRE en de spaarquote nodig hebben. Oppervlakken
+   * die "wat is er déze maand echt gebeurd" tonen (de Transacties-kaart op
+   * /overzicht/cashflow) consumeren daarom dit veld en NIET `monthlyIncome`.
+   * Zuster met hetzelfde venster-in-de-naam-principe: `prevMonthIncome`
+   * (zelfde grondslag, vorige maand) en `recentMonthlyExpenses` (12-mnd rolling).
+   */
+  currentMonthIncome: number
+  /**
+   * WERKELIJK GEREALISEERDE uitgaven van de HUIDIGE kalendermaand (€, absoluut)
+   * — zelfde venster, filter en aggregaat-bron als `currentMonthIncome` (via
+   * `aggExpenseByMonthAbs(..., { realOnly: true })`), en dus dezelfde
+   * afbakening t.o.v. het effective `monthlyExpenses`: dát blijft de
+   * profiel-/override-grondslag voor Horizon/FIRE en de spaarquote, dit is de
+   * gerealiseerde maand. Zuster: `prevMonthExpenses` (vorige maand).
+   */
+  currentMonthExpenses: number
   monthlyContributions: number
   yearlyMustExpenses: number
   budgetTotals: {

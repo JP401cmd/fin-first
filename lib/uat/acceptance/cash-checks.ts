@@ -27,12 +27,17 @@
  * écht async zijn (crypto.subtle.digest voor de import-hash).
  */
 
-import { dailyExpenseRate, calculateFreedomTime } from '@/lib/format'
+import { dailyExpenseRate, calculateFreedomTime, formatCurrency } from '@/lib/format'
 import {
   transactiesCardStatus,
   vasteLastenCardStatus,
   forecastCardStatus,
+  buildCashflowCards,
 } from '@/lib/cashflow-cards'
+import type { DashboardData } from '@/lib/types/dashboard'
+import { MOCK_DASHBOARD_DATA } from '@/lib/mock-dashboard-data'
+import type { CashflowData } from '@/lib/cashflow-data-loader'
+import type { VasteLastenSummary } from '@/lib/vaste-lasten-summary'
 import { localMonthBounds } from '@/lib/month-range'
 import { recomputeTriple } from '@/lib/cashflow-overrides'
 import { resolvePeriodWindow, summarizeFlow, resolveHeatmapWindow, type AnalysisTransaction } from '@/lib/transaction-insights'
@@ -854,6 +859,60 @@ NEWFILEUID:NONE
       return {
         expected: 'ongewijzigd=true; centTolerantie=true; gewijzigd=false; rondtrip=2543.67; correctieNietAlsBanksyncGelezen=null',
         actual: `ongewijzigd=${ongewijzigd}; centTolerantie=${centTolerantie}; gewijzigd=${gewijzigd}; rondtrip=${rondtrip}; correctieNietAlsBanksyncGelezen=${correctieNietAlsBanksyncGelezen}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-CASH-51',
+    scenarioId: 'UAT-CASH-51',
+    label: 'Cashflow-landingskaarten (buildCashflowCards): Budget-KPI = resterend (niet plafond), Transacties-KPI = gerealiseerde maand (niet effective)',
+    run: () => {
+      criterion('WF-CASH-51')
+      // Échte productiefunctie op literaire invoer — geen mirror. Budget:
+      // plafond €3.950, al €4.200 besteed → resterend moet NEGATIEF zijn, niet
+      // het plafond. Transacties: EFFECTIVE (monthlyIncome/Expenses) bewust
+      // anders dan de GEREALISEERDE huidige maand, om te bewijzen dat de kaart
+      // de laatste gebruikt (ADR 0073).
+      const dashboardData: DashboardData = {
+        ...MOCK_DASHBOARD_DATA,
+        budgetingActive: true,
+        budgetTotals: {
+          ...MOCK_DASHBOARD_DATA.budgetTotals,
+          expense: { limit: 3950, spent: 4200 },
+        },
+        monthlyIncome: 6000,
+        monthlyExpenses: 2000,
+        currentMonthIncome: 3000,
+        currentMonthExpenses: 3500,
+      }
+      const cashflow: CashflowData = {
+        transactions: [],
+        monthLabel: undefined,
+        fullName: null,
+        recurrings: [],
+        baselineIncome: 0,
+        baselineExpenses: 0,
+        startingBalance: 0,
+        accountCount: 0,
+        perspective: 'personal',
+        partnerMonthlyIncome: null,
+        hasHousehold: false,
+        partnerName: null,
+      }
+      const vasteLastenSummary: VasteLastenSummary = {
+        subscriptions: [],
+        vasteKosten: [],
+        totalMonthlySubscriptions: 0,
+        totalMonthlyVasteKosten: 0,
+        totalMonthly: 0,
+        count: 0,
+      }
+      const cards = buildCashflowCards(dashboardData, cashflow, vasteLastenSummary)
+      const budget = cards.find((c) => c.key === 'budget')
+      const transacties = cards.find((c) => c.key === 'transacties')
+      return {
+        expected: `budgetKpi=${formatCurrency(-250)}; transKpi=${formatCurrency(-500)}`,
+        actual: `budgetKpi=${budget?.kpi}; transKpi=${transacties?.kpi}`,
       }
     },
   },

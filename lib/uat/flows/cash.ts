@@ -40,6 +40,7 @@ export const CASH_FLOW: UatFlow = {
     // ── 0 · landing ───────────────────────────────────────────────────────
     { id: 'nav', label: 'Navigatie naar /overzicht/cashflow', kind: 'entry', stage: 0 },
     { id: 'hefboom', scenarioId: 'UAT-CASH-01', label: 'WF-CASH-01 · Vier hefboom-kaarten (Budget/Transacties/Vaste lasten/Forecast)', kind: 'screen', stage: 0, lane: 'landing' },
+    { id: 'kpiweergave', scenarioId: 'UAT-CASH-51', label: 'WF-CASH-51 · Budget-KPI resterend, Transacties-KPI gerealiseerde maand', kind: 'screen', stage: 0, lane: 'landing', subOf: 'hefboom' },
 
     // ── 1 · verkennen ─────────────────────────────────────────────────────
     { id: 'geldstroom', scenarioId: 'UAT-CASH-02', label: 'WF-CASH-02 · Maand-geldstroom bekijken', kind: 'screen', stage: 1, lane: 'verkennen' },
@@ -115,6 +116,7 @@ export const CASH_FLOW: UatFlow = {
   edges: [
     // landing
     { from: 'nav', to: 'hefboom' },
+    { from: 'hefboom', to: 'kpiweergave' },
     { from: 'hefboom', to: 'geldstroom' },
     { from: 'geldstroom', to: 'kassabon' },
     { from: 'hefboom', to: 'rekeningen' },
@@ -175,6 +177,7 @@ export const CASH_FLOW: UatFlow = {
     { from: 'precedentieketen', to: 'correctiemoment' },
 
     // samenvloeien → uitkomst
+    { from: 'kpiweergave', to: 'uitkomst' },
     { from: 'bewerken', to: 'uitkomst' },
     { from: 'splitsen', to: 'uitkomst' },
     { from: 'verwijderen', to: 'uitkomst' },

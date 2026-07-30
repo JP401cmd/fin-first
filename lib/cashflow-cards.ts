@@ -50,15 +50,22 @@ export function budgetCardStatus(input: {
   return active ? pillarStatus(input.budgetScore) : 'neutral'
 }
 
-/** Transacties: maand-spaarquote (netto/inkomen). ≥20% good, ≥0% warn, <0 bad. */
+/**
+ * Transacties: maand-spaarquote (netto/inkomen). ≥20% good, ≥0% warn, <0 bad.
+ *
+ * De parameternamen benoemen de grondslag met opzet: dit draait op de
+ * GEREALISEERDE huidige kalendermaand (`DashboardData.currentMonthIncome/
+ * currentMonthExpenses`), niet op het effective `monthlyIncome/monthlyExpenses`
+ * — dat laatste is bij `income_source = 'manual'` een profielinschatting.
+ */
 export function transactiesCardStatus(input: {
-  monthlyIncome: number
-  monthlyExpenses: number
+  currentMonthIncome: number
+  currentMonthExpenses: number
 }): LeverageStatus {
-  const { monthlyIncome, monthlyExpenses } = input
-  const monthlyNet = monthlyIncome - monthlyExpenses
-  const hasTx = monthlyIncome > 0 || monthlyExpenses > 0
-  const rate = monthlyIncome > 0 ? (monthlyNet / monthlyIncome) * 100 : null
+  const { currentMonthIncome, currentMonthExpenses } = input
+  const monthlyNet = currentMonthIncome - currentMonthExpenses
+  const hasTx = currentMonthIncome > 0 || currentMonthExpenses > 0
+  const rate = currentMonthIncome > 0 ? (monthlyNet / currentMonthIncome) * 100 : null
   if (!hasTx || rate == null) return 'neutral'
   return rate >= 20 ? 'good' : rate >= 0 ? 'warn' : 'bad'
 }
@@ -110,6 +117,13 @@ export function buildCashflowCards(
   const budgetSpent = dashboardData.budgetTotals.expense.spent
   const budgetScore = dashboardData.monthSummary.budgetScore
   const budgetActive = dashboardData.budgetingActive && budgetLimit > 0
+  // Wat er van het maandbudget OVER is — een moment-opname van deze maand, geen
+  // maandplafond (dus geen '/mnd'-suffix). Negatief = over budget; de duiding
+  // daarvan komt uit `subText` (status bad → 'Boven budget'), niet uit een eigen
+  // status: `budgetCardStatus` blijft op monthSummary.budgetScore staan zodat er
+  // geen tweede statusbron naast lib/leverage-status.ts ontstaat.
+  // Grondslag uitsluitend budgetTotals.expense — savings-budgetten tellen niet mee.
+  const budgetRemaining = budgetLimit - budgetSpent
   const budgetStatus: LeverageStatus = budgetCardStatus({
     budgetingActive: dashboardData.budgetingActive,
     expenseLimit: budgetLimit,
@@ -120,7 +134,7 @@ export function buildCashflowCards(
     label: 'Budget',
     href: `${BASE}/budget`,
     tooltip: 'Plan en volg je maandbudgetten.',
-    kpi: budgetActive ? `${formatCurrency(budgetLimit)}/mnd` : null,
+    kpi: budgetActive ? formatCurrency(budgetRemaining) : null,
     status: budgetStatus,
     subText: budgetActive
       ? budgetStatus === 'good'
@@ -140,12 +154,22 @@ export function buildCashflowCards(
   }
 
   // ── Transacties ─────────────────────────────────────────────
-  const monthlyIncome = dashboardData.monthlyIncome
-  const monthlyExpenses = dashboardData.monthlyExpenses
-  const monthlyNet = monthlyIncome - monthlyExpenses
-  const hasTx = monthlyIncome > 0 || monthlyExpenses > 0
-  const rate = monthlyIncome > 0 ? (monthlyNet / monthlyIncome) * 100 : null
-  const txStatus: LeverageStatus = transactiesCardStatus({ monthlyIncome, monthlyExpenses })
+  // GRONDSLAG: de GEREALISEERDE huidige kalendermaand uit transacties. LET OP —
+  // `dashboardData.monthlyIncome/monthlyExpenses` zijn de EFFECTIVE waarden
+  // (resolveEffectiveIncomeExpenses): bij profiles.income_source/expenses_source
+  // = 'manual' winnen de handmatige profielbedragen, dus die mogen hier NIET
+  // gebruikt worden — de kaart zou dan een profielinschatting tonen i.p.v. wat
+  // deze maand werkelijk gebeurde. KPI, spaarquote, tip en status draaien
+  // allemaal op ditzelfde paar, anders spreekt de tip de KPI tegen.
+  const currentMonthIncome = dashboardData.currentMonthIncome
+  const currentMonthExpenses = dashboardData.currentMonthExpenses
+  const monthlyNet = currentMonthIncome - currentMonthExpenses
+  const hasTx = currentMonthIncome > 0 || currentMonthExpenses > 0
+  const rate = currentMonthIncome > 0 ? (monthlyNet / currentMonthIncome) * 100 : null
+  const txStatus: LeverageStatus = transactiesCardStatus({
+    currentMonthIncome,
+    currentMonthExpenses,
+  })
   const transacties: CashflowCard = {
     key: 'transacties',
     label: 'Transacties',
@@ -163,7 +187,7 @@ export function buildCashflowCards(
     detail: {
       label: 'Deze maand',
       value: rate != null ? `${rate.toFixed(0)}% spaarquote` : '—',
-      tip: `Inkomen ${formatCurrency(monthlyIncome)} · uitgaven ${formatCurrency(monthlyExpenses)}.`,
+      tip: `Inkomen ${formatCurrency(currentMonthIncome)} · uitgaven ${formatCurrency(currentMonthExpenses)}.`,
       actionLabel: 'Bekijk transacties',
     },
   }
@@ -175,11 +199,16 @@ export function buildCashflowCards(
   const vastePerMonth = vasteLastenSummary.totalMonthly
   const vasteCount = vasteLastenSummary.count
   const hasVaste = vasteCount > 0
-  const vasteRatio = monthlyIncome > 0 ? vastePerMonth / monthlyIncome : null
+  // BEWUST het EFFECTIVE `monthlyIncome` (niet de gerealiseerde maand): een
+  // structureel aandeel hoort tegen een stabiel maandinkomen te worden gemeten,
+  // niet tegen een half-afgelopen kalendermaand (die het aandeel vroeg in de
+  // maand kunstmatig naar 100%+ zou duwen).
+  const effectiveMonthlyIncome = dashboardData.monthlyIncome
+  const vasteRatio = effectiveMonthlyIncome > 0 ? vastePerMonth / effectiveMonthlyIncome : null
   const vasteStatus: LeverageStatus = vasteLastenCardStatus({
     totalMonthly: vastePerMonth,
     count: vasteCount,
-    monthlyIncome,
+    monthlyIncome: effectiveMonthlyIncome,
   })
   const vasteLasten: CashflowCard = {
     key: 'vaste-lasten',
