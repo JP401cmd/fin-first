@@ -4,6 +4,8 @@ import { getServiceClient } from '@/lib/supabase/service'
 import { isSuperAdmin } from '@/lib/admin'
 import { logAdminAction } from '@/lib/admin-audit'
 import { ADMIN_EXPORT_TABLES } from '@/lib/user-data-tables'
+import { decryptField } from '@/lib/crypto/field-encryption'
+import { shapeExportRows, shapeExportRow, type ExportRow } from '@/lib/account-export-shape'
 
 /**
  * GET /api/admin/user-export?userId=...&label=... — AVG-inzageverzoek: de
@@ -40,10 +42,16 @@ export async function GET(req: Request) {
   const profileRes = await service.from('profiles').select('*').eq('id', userId).maybeSingle()
 
   // Volledige persoonlijke tabellen-set via service-role (RLS omzeild, bewust).
+  //
+  // Dezelfde exportvorm als de zelf-service-variant (`lib/account-export-shape.ts`):
+  // rekeningnummers ontsleuteld en leesbaar, crypto-kolommen en bank-/exchange-/
+  // broker-tokens eruit. Dit bestand gaat naar een betrokkene bij een
+  // inzageverzoek — dat het via een superadmin loopt maakt een meegeleverd
+  // banktoken niet minder een uitgereikte credential.
   const tableResults = await Promise.all(
     ADMIN_EXPORT_TABLES.map(async (table) => {
       const { data } = await service.from(table).select('*').eq('user_id', userId)
-      return [table, data ?? []] as const
+      return [table, shapeExportRows(table, (data ?? []) as ExportRow[], decryptField)] as const
     }),
   )
   const tables: Record<string, unknown> = {}
@@ -54,7 +62,9 @@ export async function GET(req: Request) {
   const payload = {
     exported_at: new Date().toISOString(),
     user_id: userId,
-    profile: profileRes.data ?? null,
+    // Zelfde exportvorm als elke tabel hierboven — zie de noot bij de
+    // zelf-service-variant.
+    profile: shapeExportRow('profiles', (profileRes.data ?? null) as ExportRow | null, decryptField),
     tables,
   }
 

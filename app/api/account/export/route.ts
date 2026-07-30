@@ -1,6 +1,8 @@
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { unauthorized, serverError } from '@/lib/api/respond'
 import { EXPORT_SESSION_TABLES } from '@/lib/user-data-tables'
+import { decryptField } from '@/lib/crypto/field-encryption'
+import { shapeExportRows, shapeExportRow, type ExportRow } from '@/lib/account-export-shape'
 
 /**
  * GET /api/account/export — [Arch F3] Recht 3 (dataportabiliteit, AVG art. 20).
@@ -34,7 +36,10 @@ export async function GET() {
       .select('*')
       .eq('id', claims.sub)
       .maybeSingle()
-    tables.profiles = profile ?? null
+    // Óók het profiel door de exportvorm. `profiles` heeft vandaag geen
+    // geheim-achtige kolom, maar dit is de plek waar de eerste er anders
+    // ongemerkt doorheen glipt — één vorm voor élke tabel in de export.
+    tables.profiles = shapeExportRow('profiles', (profile ?? null) as ExportRow | null, decryptField)
 
     // Alle user-scoped tabellen die de gebruiker onder RLS kan lezen. Parallel,
     // maar begrensd: het zijn eigen-rij-selects op geïndexeerde user_id-kolommen.
@@ -44,7 +49,13 @@ export async function GET() {
         // RLS-afscherming of een ontbrekende tabel levert een lege set, geen 500:
         // een export mag niet breken op één tabel. De echte fout is server-side
         // niet nodig (leeg = leeg voor de gebruiker).
-        return [table, error ? [] : (data ?? [])] as const
+        //
+        // `shapeExportRows` maakt van de ruwe `select('*')` een geldige AVG-vorm:
+        // het rekeningnummer ontsleuteld en leesbaar, de crypto-kolommen
+        // (`iban_encrypted`/`iban_hash`) en de bank-/exchange-/broker-tokens eruit.
+        // Zie `lib/account-export-shape.ts` voor waarom die er niet in horen.
+        const rows = error ? [] : ((data ?? []) as ExportRow[])
+        return [table, shapeExportRows(table, rows, decryptField)] as const
       }),
     )
     for (const [table, rows] of results) {

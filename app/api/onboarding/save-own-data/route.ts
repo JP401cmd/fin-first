@@ -14,6 +14,7 @@ import { LINKED_DEBT_SUGGESTIONS, type AssetType } from '@/lib/asset-data'
 import type { DebtType } from '@/lib/debt-data'
 import type { GoalSlug } from '@/lib/goals/types'
 import { GOAL_MODULE_PRESETS } from '@/lib/goals/catalog'
+import { deleteEmptyOnboardingBankAccounts } from '@/lib/onboarding-bank-cleanup'
 
 /**
  * Best-effort mapping van een nieuwe goal-slug naar de oude `IntentId` zodat
@@ -330,8 +331,9 @@ function buildRpcPayload(
     child_budgets: childBudgets,
     // Geen bank_accounts meer in onboarding — cash-rekeningen worden als
     // `cash`-type asset toegevoegd via de QuickAddWizard. De RPC verwijdert
-    // bestaande bank_accounts (regel `iban=''`) en cash-assets aan het begin
-    // van die step; daarna worden cash-assets in stap 7 (assets) ingevoegd.
+    // lege bestaande bank_accounts (zie `deleteEmptyOnboardingBankAccounts`) en
+    // cash-assets aan het begin van die step; daarna worden cash-assets in
+    // stap 7 (assets) ingevoegd.
     bank_accounts: [],
     // QuickAddInput → volledige Asset-row via buildAssetDraft. Die helper
     // levert alle velden die de RPC verwacht (subtype/risk_profile/etc.
@@ -955,7 +957,12 @@ export async function POST(req: Request) {
     // Cleanup-volgorde mirrort de RPC: eerst lege bank_accounts en cash-
     // assets verwijderen (van een vorige onboarding-poging), dan alle
     // non-cash, dan inserten.
-    await supabase.from('bank_accounts').delete().eq('user_id', user.id).eq('iban', '')
+    // Lege placeholder-rekeningen van een eerdere poging. Bewust NIET meer
+    // `.eq('iban', '')`: dat is een filter óp de plaintext-kolom die Stage B laat
+    // vallen. De vervangende sleutel (geen IBAN + geen transacties + geen
+    // bankkoppeling) en waarom een kaal `iban_encrypted IS NULL` daar níét voor
+    // volstaat, staan in `lib/onboarding-bank-cleanup.ts`.
+    await deleteEmptyOnboardingBankAccounts(supabase, user.id)
     await supabase.from('assets').delete().eq('user_id', user.id).eq('asset_type', 'cash')
 
     if (quickAssets.length > 0) {

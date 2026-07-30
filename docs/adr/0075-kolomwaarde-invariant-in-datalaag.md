@@ -46,12 +46,30 @@ kolom, telkens vóórdat het als aanvalsscenario werd bewezen:
    geverifieerd: geen cross-user READ (die rij mag hij toch al lezen), wél
    eigen-data-vervuiling plus een misleidend dragerlabel. Gedicht met dezelfde
    triggervorm.
-4. **`bank_accounts.linked_asset_id`** (gevonden bij fase 8, **nog niet
-   gedicht**) — dezelfde motivatie geldt onverkort, maar mist de
-   guard-trigger die zijn twee zusterkolommen sinds fase 4/6 wel hebben.
-   `syncAccountBalance` (fase 8) dicht het gat in de CODE met een
-   `user_id`-filter op elke schrijfronde, maar dat is een control op één
-   aanroeppad, geen datalaag-invariant.
+4. **`bank_accounts.linked_asset_id`** (gevonden bij fase 8, gedicht op
+   2026-07-30 met migratie
+   `20260730210321_guard_bank_accounts_linked_asset_owner.sql`) — dezelfde
+   motivatie gold onverkort: `syncAccountBalance` (fase 8) dichtte het gat in
+   de CODE met een `user_id`-filter op elke schrijfronde, maar dat is een
+   control op één aanroeppad, geen datalaag-invariant. Gedicht met dezelfde
+   triggervorm (`guard_bank_account_linked_asset`). Pre-flight: 26 van de 28
+   rijen dragen een `linked_asset_id`, 0 met een niet-bestaande bezitting, 0
+   met een bezitting van een andere gebruiker — de guard raakte geen enkele
+   bestaande rij. Rol-gesimuleerd geverifieerd (zes gevallen: eigen bezit,
+   andermans bezit, `null`, ongerelateerde UPDATE, verleggen naar andermans
+   bezit, nullen), alle zes zoals ontworpen.
+
+**Alle vier de gevonden kolommen zijn hiermee gedicht.** Wat nog open staat is
+een vijfde, van een andere soort: `valuations.entity_id` is **polymorf**
+(`entity_type` kiest `assets` of `debts`), dus daar kán geen echte FK op en
+draagt de kolom vandaag nul triggers. De toevallige rem die de globale sleutel
+`UNIQUE (entity_id, valuation_date)` daarop gaf is op dezelfde dag weggevallen
+(`20260730210158_drop_valuations_legacy_entity_date_unique.sql`) — bewust, want
+die rem was partieel en nooit een control, en het pad is onbereikbaar zolang er
+geen huishouden met twee leden bestaat (remote: 0). Het aandachtspunt
+`fk-waarde-zonder-datalaag-guard` blijft daarvoor open staan en beschrijft de
+twee delen die het dichten: de polymorfe guard-trigger én het eigenaar-scopen
+van de `valuations`-lezing in `lib/assets-data-loader.ts`.
 
 ## Besluit
 
@@ -61,6 +79,17 @@ in de route die de kolom vandaag toevallig schrijft.** Een routecontrole is
 per definitie incompleet: elke huidige én toekomstige schrijver op die kolom
 moet de regel zelf onthouden en correct toepassen, en één vergeten aanroeper
 volstaat om het gat te heropenen.
+
+**Wat een guard-trigger precies is — en niet is.** Hij is een
+**schrijfmoment-controle**, geen invariant: hij toetst de FK-waarde bij elke
+schrijf op de tabel waar hij op staat. Wijzigt de EIGENAAR van de doelrij
+later (huishoud-reparenting), dan violeert een bestaande rij de regel stil,
+want de trigger kijkt op dat moment niet mee. Dat is een bewuste keuze — de
+skip-branch bij een ongewijzigde kolom is er juist om zulke latere updates niet
+te laten stuklopen — maar wie een echte invariant nodig heeft, heeft er een
+periodieke controle of een tweede trigger op de doeltabel bij nodig. Vandaag
+muteert geen enkele schrijver `assets.user_id` of `bank_accounts.user_id`, dus
+er is geen pad; een toekomstige reparenting-functie moet deze regel meenemen.
 
 **De vorm: een BEFORE INSERT/UPDATE-trigger, `security definer` (of
 `security invoker` waar dat volstaat — zie ADR 0049),
@@ -94,11 +123,13 @@ existentie-orakel).
 
 ## Gevolgen
 
-- **`bank_accounts.linked_asset_id` mist de trigger nog** (bevinding bij fase
-  8). Eigen kaart voor `supabase-db-specialist`: spiegel
-  `guard_bank_connection_target_account` /
-  `guard_bank_connection_account_bank_account` naar deze kolom.
-- **De guard op beide bestaande triggers leunt op een AFWEZIGE expliciete
+- **`bank_accounts.linked_asset_id` is gedicht** (2026-07-30). Daarmee zijn
+  alle vier de in dit ADR genoemde kolommen voorzien van een guard-trigger.
+  Open blijft `valuations.entity_id` — zie het aandachtspunt
+  `fk-waarde-zonder-datalaag-guard`; die vraagt een polymorfe variant
+  (`entity_type` kiest de doeltabel) plus een eigenaar-gescoopte lezing in
+  `lib/assets-data-loader.ts`.
+- **De guard op de fase-4- en fase-6-triggers leunt op een AFWEZIGE expliciete
   `with check` op de onderliggende policy** (bevinding bij fase 6). De
   trigger vergelijkt de eigenaar van de FK-doelrij met `new.user_id`; dat
   `new.user_id` betrouwbaar is komt vandaag van de `using`-clause die
@@ -107,7 +138,10 @@ existentie-orakel).
   mét `user_id` = slachtoffer en een FK van dat slachtoffer de guard
   passeren. Fatsoenlijk repareren: `with check ((select auth.uid()) =
   user_id)` expliciet maken op beide policies. Eigen stap,
-  `supabase-db-specialist`.
+  `supabase-db-specialist`. Geldt **niet** voor de nieuwe
+  `bank_accounts`-guard: daar dragen zowel `Users insert own bank_accounts`
+  als `Users update own bank_accounts` die `with check` al expliciet
+  (geverifieerd op remote, 2026-07-30).
 - Toekomstige kolommen die een FK naar een andere eigenaarschapstabel dragen
   (huishouden-gedeeld of niet) worden bij aanmaak tegen dit besluit getoetst:
   hoort er een guard-trigger bij, of is de kolom aantoonbaar altijd

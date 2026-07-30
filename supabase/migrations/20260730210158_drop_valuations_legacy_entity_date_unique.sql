@@ -1,0 +1,55 @@
+-- Stap 2 (CONTRACT) van de valuations-sleutelmigratie. Stap 1 (EXPAND) is
+-- 20260730072804_add_valuations_user_scoped_unique.sql, die
+-- `valuations_user_entity_date_key` UNIQUE (user_id, entity_type, entity_id,
+-- valuation_date) ernaast zette.
+--
+-- Waarom de oude sleutel weg moet
+-- ------------------------------
+-- `valuations_entity_id_valuation_date_key` UNIQUE (entity_id, valuation_date) is
+-- CROSS-USER: botst een `entity_id` tussen twee gebruikers, dan landt de upsert
+-- van de een op de rij van de ander en loopt hij op de RLS-check stuk in plaats
+-- van te mergen — de herwaardering is dan weg terwijl de gebruiker denkt dat ze is
+-- opgeslagen. Zolang deze constraint bestaat dwingt zíj dat conflict nog steeds af
+-- en voorkomt de nieuwe sleutel dus feitelijk niets.
+--
+-- DEPLOY-VOORWAARDE — lees dit vóór je 'm toepast
+-- ----------------------------------------------
+-- Deze migratie mag PAS draaien in dezelfde deploy als (of ná) de bundel die
+-- `lib/valuations.ts` bevat. Dat is geen formaliteit maar de kern van de
+-- expand/contract-opzet: `ON CONFLICT` inferreert op een exact passende unieke
+-- index, dus een bundel die nog `onConflict: 'entity_id,valuation_date'`
+-- meestuurt breekt zodra deze constraint weg is — hard, met Postgres 42P10
+-- ("no unique or exclusion constraint matching the ON CONFLICT specification").
+-- Getroffen paden: handmatige herwaardering, check-in, schuldwaardering,
+-- verloop-editor én de geautomatiseerde banksaldo-herwaardering
+-- (`lib/truelayer/balance-valuation.ts` — die gooit hard, de banksync valt om).
+--
+-- Firsthand geleerd op 2026-07-30: deze migratie is één keer toegepast terwijl de
+-- bijbehorende bundel nog niet gepusht was; alle negen schrijvers op de
+-- gedeployede branch stuurden op dat moment nog de oude sleutel. De constraint is
+-- toen teruggezet en de migratie-registratie verwijderd, zodat deze migratie
+-- alsnog mét de deploy meeloopt. Voer 'm dus niet los uit via de MCP-/console-weg.
+--
+-- Codevoorwaarde die WEL is afgevinkt (in de boom, 2026-07-30)
+-- -----------------------------------------------------------
+-- Alle negen schrijvers op `valuations` sturen `VALUATIONS_CONFLICT_KEY`
+-- (`lib/valuations.ts`) als conflict-target — geverifieerd met een repo-brede grep
+-- op `from('valuations')`: zeven upserts via de constante, plus `lib/seed-persona.ts`
+-- (kale `.insert()`, geen conflict-target) en de leespaden. De index waarop die
+-- sleutel inferreert (`valuations_user_entity_date_key`) blijft staan, dus geen
+-- enkele schrijver verliest zijn doel zodra de bundel live is.
+--
+-- Restrisico dat deze drop NIET afdekt (bewust vastgelegd)
+-- -------------------------------------------------------
+-- De oude globale sleutel remde als NEVENEFFECT het injectiepad uit
+-- `archimate-concerns.ts#fk-waarde-zonder-datalaag-guard` (b): `valuations.entity_id`
+-- heeft geen guard-trigger en geen FK (het veld is polymorf), en de INSERT-policy
+-- toetst alleen `user_id`. Een huishoudpartner kan daardoor een waardering schrijven
+-- die via de ongescoopte lezing in `lib/assets-data-loader.ts` in de historie van de
+-- eigenaar landt. Die rem was toevallig en partieel (alleen op dagen waarop de
+-- eigenaar zelf al een rij had), nooit een control, en is op dit moment onbereikbaar:
+-- remote telt 0 huishoudens, 0 huishoudleden en 0 `ownership='shared'`-waarderingen.
+-- Het aandachtspunt blijft daarom expliciet OPEN staan voor `valuations.entity_id`.
+
+alter table public.valuations
+  drop constraint if exists valuations_entity_id_valuation_date_key;

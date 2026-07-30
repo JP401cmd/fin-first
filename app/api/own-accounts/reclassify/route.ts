@@ -28,7 +28,17 @@ export async function POST() {
       // `iban_encrypted`, niet de plaintext kolom: Stage B dropt
       // `bank_accounts.iban`. `user_own_ibans.iban` is een handmatig ingevoerde
       // regel en valt buiten de veldencryptie — die blijft plaintext.
-      supabase.from('bank_accounts').select('iban_encrypted').eq('user_id', user.id),
+      //
+      // GEEN `.eq('user_id', user.id)` — bewust, en spiegelt `/api/own-accounts/ibans`.
+      // De SELECT-policy op `bank_accounts` is huishoud-verbreed:
+      //   (auth.uid() = user_id) OR (ownership = 'shared' AND household_id = user_household_id())
+      // Met het eigenaarsfilter viel de gezamenlijke huishoudrekening buiten de
+      // identifier-set, waardoor een overboeking dáárheen als échte uitgave bleef
+      // staan in plaats van als interne verschuiving — dubbeltelling die de
+      // spaarquote vertekent, zonder dat er ergens iets faalt. Eigenaarsbesluit:
+      // gedeelde rekeningen tellen als eigen. RLS is hier de scope, niet een
+      // extra filter; voeg 'm niet "voor de zekerheid" terug.
+      supabase.from('bank_accounts').select('iban_encrypted'),
       supabase.from('budgets').select('id, slug').eq('user_id', user.id),
     ])
 
