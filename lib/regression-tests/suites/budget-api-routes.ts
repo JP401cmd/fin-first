@@ -2,11 +2,32 @@
  * Regression tests: Budget API routes
  *
  * Tests for budget-related API endpoints:
- * - DELETE /api/budgets/[id]: cascade deletion
+ * - DELETE /api/budgets/[id]: soft-delete (archiveren, WF-BUDGET-11)
  * - PUT /api/budgets/favorites: sync favorites
  * - GET /api/budget-trends: 12-month trend calculation
  * - GET /api/budget-variance: spending variance & confidence
  * - GET /api/cashflow-forecast: 6-month cashflow projection
+ *
+ * ## Waarom de meeste cases hier lokaal blijven — en wat wél naar de echte
+ * motor is getild
+ *
+ * `app/api/*` route-handlers zijn hier NIET rechtstreeks aanroepbaar: deze
+ * suite draait ook in de browser (`/beheer/regressietest`), dus mag geen
+ * `vitest`/`vi.mock` of `next/server` importeren — en zonder module-mocking
+ * is `createClient()`/Supabase niet te stubben. Waar de route-logica wél
+ * doorverwezen is naar een losstaande, pure, geëxporteerde functie in `lib/`,
+ * roepen deze cases die functie nu ECHT aan i.p.v. de formule hier te
+ * herimplementeren:
+ * - variance/confidence-cases (D) → `lib/budget-forecast.ts#computeBudgetForecast`
+ *   (dezelfde CV-formule; de route-comment noemt 'm letterlijk als bron)
+ * - forecast-frequency-case (E) → `lib/cashflow-forecast-math.ts#recurringPerMonth`
+ *   (zie het commentaar bij die case voor een BEVINDING: de route zelf
+ *   herimplementeert deze formule los, in plaats van 'm te importeren)
+ * Voor de rest bestaat er geen zo'n gedeelde pure functie — de logica staat
+ * inline in het route-bestand — dus die cases blijven lokale
+ * contract-/shape-mirrors. Zie het CI-wrapper-bestand
+ * (test/budget-api-routes-suite-check.test.ts) voor de volledige inventarisatie
+ * en het voorstel per resterende case.
  */
 
 import { registerTests, registerCategory } from '../test-registry'
@@ -23,6 +44,8 @@ import {
 } from '../assert'
 import type { TestCase } from '../test-types'
 import { localMonthBounds } from '@/lib/month-range'
+import { computeBudgetForecast } from '@/lib/budget-forecast'
+import { recurringPerMonth } from '@/lib/cashflow-forecast-math'
 
 const CAT = 'kern.budgets-api'
 
@@ -54,13 +77,23 @@ const tests: TestCase[] = [
   },
   {
     id: 'budget-api-delete-cascade-structure',
-    name: 'DELETE /api/budgets/[id]: cascade verwijdering structuur',
-    description: 'Parent budget deletion cascades to children, rollovers, amounts, and unlinks transactions',
+    name: 'DELETE /api/budgets/[id]: archiveer-structuur (geen hard-delete)',
+    description: 'Parent budget archivering neemt children mee via is_archived=true; response bevat GEEN delete/unlink-tellingen',
     category: CAT,
     priority: 'critical',
     estimatedDurationMs: 50,
     fn() {
-      // Simulate the cascade deletion logic from the route
+      // BEVINDING (gecorrigeerd 2026-07): deze case beweerde eerder een
+      // hard-delete-cascade met rollovers_deleted/amounts_deleted/
+      // transactions_unlinked in de response. Dat bestaat niet meer (en is
+      // in de huidige route ook nooit gebouwd) — app/api/budgets/[id]/route.ts
+      // is per WF-BUDGET-11 een niet-destructieve ARCHIVERING: alleen
+      // `budgets.is_archived` wordt gezet, rollovers/amounts/transacties
+      // blijven ongewijzigd. De echte gedragstoets (met vi.mock op Supabase,
+      // wat hier niet kan — zie kop van dit bestand) staat in
+      // app/api/budgets/[id]/route.test.ts. Deze case toetst alleen dat de
+      // ID-verzamel-structuur (parent + children) klopt, met de ECHTE
+      // response-vorm.
       const parentBudget = { id: 'parent-1', parent_id: null, name: 'Wonen' }
       const children = [
         { id: 'child-1', parent_id: 'parent-1' },
@@ -68,113 +101,110 @@ const tests: TestCase[] = [
         { id: 'child-3', parent_id: 'parent-1' },
       ]
 
-      // When deleting a parent, collect all IDs (parent + children)
-      const budgetIdsToDelete: string[] = [parentBudget.id]
+      // Bij archiveren van een parent: verzamel alle IDs (parent + children)
+      // voor de UPDATE ... IN (...) — spiegelt route.ts budgetIdsToArchive.
+      const budgetIdsToArchive: string[] = [parentBudget.id]
       const isParent = !parentBudget.parent_id
 
       if (isParent) {
         const childIds = children
           .filter(c => c.parent_id === parentBudget.id)
           .map(c => c.id)
-        budgetIdsToDelete.push(...childIds)
+        budgetIdsToArchive.push(...childIds)
       }
 
-      assertEqual(budgetIdsToDelete.length, 4, 'Parent + 3 children to delete')
-      assertIncludes(budgetIdsToDelete, 'parent-1', 'Parent included')
-      assertIncludes(budgetIdsToDelete, 'child-1', 'Child 1 included')
-      assertIncludes(budgetIdsToDelete, 'child-2', 'Child 2 included')
-      assertIncludes(budgetIdsToDelete, 'child-3', 'Child 3 included')
+      assertEqual(budgetIdsToArchive.length, 4, 'Parent + 3 children worden gearchiveerd')
+      assertIncludes(budgetIdsToArchive, 'parent-1', 'Parent included')
+      assertIncludes(budgetIdsToArchive, 'child-1', 'Child 1 included')
+      assertIncludes(budgetIdsToArchive, 'child-2', 'Child 2 included')
+      assertIncludes(budgetIdsToArchive, 'child-3', 'Child 3 included')
 
-      // Response shape validation
+      // Echte response-vorm (route.ts: { success, archived: { budget_id,
+      // budget_name, is_parent, children_archived } }) — geen delete/unlink-tellingen.
       const response = {
         success: true,
-        deleted: {
+        archived: {
           budget_id: parentBudget.id,
           budget_name: parentBudget.name,
           is_parent: isParent,
-          children_deleted: children.length,
-          rollovers_deleted: 5,
-          amounts_deleted: 12,
-          transactions_unlinked: 45,
+          children_archived: children.length,
         },
       }
 
       assert(response.success, 'Response success flag')
-      assertEqual(response.deleted.budget_id, 'parent-1', 'Response contains budget_id')
-      assertEqual(response.deleted.budget_name, 'Wonen', 'Response contains budget_name')
-      assert(response.deleted.is_parent, 'Response marks as parent')
-      assertEqual(response.deleted.children_deleted, 3, 'Response tracks children count')
-      assertType(response.deleted.rollovers_deleted, 'number', 'rollovers_deleted is number')
-      assertType(response.deleted.amounts_deleted, 'number', 'amounts_deleted is number')
-      assertType(response.deleted.transactions_unlinked, 'number', 'transactions_unlinked is number')
+      assertEqual(response.archived.budget_id, 'parent-1', 'Response contains budget_id')
+      assertEqual(response.archived.budget_name, 'Wonen', 'Response contains budget_name')
+      assert(response.archived.is_parent, 'Response marks as parent')
+      assertEqual(response.archived.children_archived, 3, 'Response tracks children count')
     },
   },
   {
     id: 'budget-api-delete-child-no-cascade',
     name: 'DELETE /api/budgets/[id]: child budget geen cascade',
-    description: 'Deleting a child budget does not cascade to siblings',
+    description: 'Archiveren van een child budget archiveert geen siblings/parent',
     category: CAT,
     priority: 'high',
     estimatedDurationMs: 50,
     fn() {
-      // Child budget has a parent_id, so no cascade
+      // Child budget heeft een parent_id → geen children-lookup, alleen
+      // zichzelf archiveren (route.ts: `if (!budget.parent_id)`-guard).
       const childBudget = { id: 'child-1', parent_id: 'parent-1', name: 'Huur' }
-      const budgetIdsToDelete: string[] = [childBudget.id]
+      const budgetIdsToArchive: string[] = [childBudget.id]
       const isParent = !childBudget.parent_id
 
-      // Should NOT attempt to find children
       assert(!isParent, 'Child budget is not parent')
-      assertEqual(budgetIdsToDelete.length, 1, 'Only the child itself is deleted')
+      assertEqual(budgetIdsToArchive.length, 1, 'Alleen het kind zelf wordt gearchiveerd')
 
       const response = {
         success: true,
-        deleted: {
+        archived: {
           budget_id: childBudget.id,
           budget_name: childBudget.name,
           is_parent: isParent,
-          children_deleted: 0,
-          rollovers_deleted: 0,
-          amounts_deleted: 0,
-          transactions_unlinked: 0,
+          children_archived: 0,
         },
       }
 
-      assert(!response.deleted.is_parent, 'Response marks as child')
-      assertEqual(response.deleted.children_deleted, 0, 'No children deleted')
+      assert(!response.archived.is_parent, 'Response marks as child')
+      assertEqual(response.archived.children_archived, 0, 'Geen children gearchiveerd')
     },
   },
   {
     id: 'budget-api-delete-transaction-unlink',
-    name: 'DELETE /api/budgets/[id]: transacties worden ontkoppeld, niet verwijderd',
-    description: 'Transactions are unlinked (budget_id=null) rather than deleted to preserve history',
+    name: 'DELETE /api/budgets/[id]: transacties blijven gekoppeld (GEEN unlink)',
+    description: 'Archiveren raakt gekoppelde transacties niet aan — budget_id blijft ongewijzigd op elke rij',
     category: CAT,
     priority: 'high',
     estimatedDurationMs: 50,
     fn() {
-      // The route sets budget_id to null rather than deleting transactions
-      // This ensures transaction history is preserved
+      // BEVINDING (gecorrigeerd 2026-07): deze case beweerde eerder dat de
+      // route transacties ontkoppelt (budget_id → null). Dat is feitelijk
+      // onjuist voor de huidige archiveer-implementatie: route.ts's eigen
+      // JSDoc is expliciet — "Gekoppelde transacties, subbudgetten,
+      // rollovers en budget_amounts blijven ONGEWIJZIGD behouden". De
+      // authoritatieve gedragstoets (met een supabase-mock die op
+      // `.delete()`-aanroepen gooit) staat in
+      // app/api/budgets/[id]/route.test.ts. Hier alleen het omgekeerde
+      // vastgelegd: archiveren is een no-op voor transacties.
       const transactions = [
         { id: 'tx-1', budget_id: 'budget-1', amount: -85, description: 'Albert Heijn' },
         { id: 'tx-2', budget_id: 'budget-1', amount: -42, description: 'Jumbo' },
         { id: 'tx-3', budget_id: 'budget-2', amount: -120, description: 'Ziggo' },
       ]
 
-      const budgetIdsToDelete = ['budget-1']
+      const archivedBudgetIds = ['budget-1']
 
-      // Simulate unlinking
-      const unlinked = transactions
-        .filter(tx => budgetIdsToDelete.includes(tx.budget_id))
-        .map(tx => ({ ...tx, budget_id: null }))
+      // Archiveren muteert alleen `budgets.is_archived` — transacties blijven
+      // als-is, ongeacht of hun budget zojuist gearchiveerd is.
+      const afterArchive = transactions.map(tx => ({ ...tx }))
 
-      assertEqual(unlinked.length, 2, 'Two transactions unlinked')
-      assertEqual(unlinked[0].budget_id, null, 'budget_id set to null')
-      assertEqual(unlinked[0].amount, -85, 'Transaction amount preserved')
-      assertEqual(unlinked[0].description, 'Albert Heijn', 'Transaction description preserved')
-
-      // Unaffected transactions remain linked
-      const remaining = transactions.filter(tx => !budgetIdsToDelete.includes(tx.budget_id))
-      assertEqual(remaining.length, 1, 'One transaction unaffected')
-      assertEqual(remaining[0].budget_id, 'budget-2', 'Other budget_id preserved')
+      assertEqual(afterArchive.length, transactions.length, 'Geen transacties verdwijnen of muteren')
+      for (let i = 0; i < transactions.length; i++) {
+        assertEqual(afterArchive[i].budget_id, transactions[i].budget_id, `tx ${transactions[i].id} houdt zijn budget_id`)
+      }
+      // Ook de gearchiveerde-budget-transacties blijven gewoon gekoppeld
+      const stillLinkedToArchived = afterArchive.filter(tx => archivedBudgetIds.includes(tx.budget_id ?? ''))
+      assertEqual(stillLinkedToArchived.length, 2, 'Transacties op een gearchiveerd budget blijven gekoppeld')
     },
   },
 
@@ -412,79 +442,72 @@ const tests: TestCase[] = [
   {
     id: 'budget-api-variance-statistics',
     name: 'GET /api/budget-variance: statistische berekeningen',
-    description: 'Variance endpoint computes mean, stdDev, CV correctly',
+    description: 'Dezelfde CV-formule als de route, nu getoetst via de echte motor computeBudgetForecast',
     category: CAT,
     priority: 'critical',
     estimatedDurationMs: 50,
     fn() {
-      // Same formula as the route
+      // Roept de echte, gedeelde motor aan (lib/budget-forecast.ts). De route
+      // zelf herimplementeert dezelfde mean/stdDev/cv-formule inline — de
+      // route-comment noemt computeBudgetForecast letterlijk als bron
+      // ("matches budget-forecast.ts logic"). Deze case toetst dus de
+      // motor die de route bewust spiegelt, niet de route zelf (die is
+      // hier niet aanroepbaar zonder vi.mock — zie kop van dit bestand).
       const monthlySpending = [500, 520, 480, 510, 490, 500]
-      const nonZero = monthlySpending.filter(v => v > 0)
-      const mean = nonZero.reduce((s, v) => s + v, 0) / nonZero.length
-      const variance = nonZero.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / nonZero.length
-      const stdDev = Math.sqrt(variance)
-      const cv = mean > 0 ? stdDev / mean : 1
+      const result = computeBudgetForecast(monthlySpending, 0, 'Test')
 
-      assertEqual(mean, 500, 'Mean of symmetric data')
-      assertFinite(stdDev, 'StdDev is finite')
-      assertGreaterThan(stdDev, 0, 'StdDev is positive for varying data')
+      assertEqual(result.mean, 500, 'Mean of symmetric data')
+      assertFinite(result.stdDev, 'StdDev is finite')
+      assertGreaterThan(result.stdDev, 0, 'StdDev is positive for varying data')
+      assert(result.hasSufficientData, 'Genoeg data voor statistiek')
+
+      const cv = result.mean > 0 ? result.stdDev / result.mean : 1
       assertFinite(cv, 'CV is finite')
       assertGreaterThan(cv, 0, 'CV is positive')
-
-      // CV should be small for low-variance data
       assertLessThanOrEqual(cv, 0.15, 'Low CV for consistent spending')
+      assertEqual(result.confidence, 'high', 'Lage CV → hoge confidence in de echte motor')
     },
   },
   {
     id: 'budget-api-variance-confidence-levels',
     name: 'GET /api/budget-variance: confidence level mapping',
-    description: 'CV maps to high/medium/low confidence correctly',
+    description: 'CV → high/medium/low mapping getoetst via computeBudgetForecast, niet een lokale kopie',
     category: CAT,
     priority: 'critical',
     estimatedDurationMs: 50,
     fn() {
-      // Confidence mapping logic from the route
-      function getConfidence(cv: number): { confidence: string; confidencePercent: number } {
-        let confidence: string
-        let confidencePercent: number
-
-        if (cv < 0.15) {
-          confidence = 'high'
-          confidencePercent = Math.round(90 - cv * 100)
-        } else if (cv < 0.35) {
-          confidence = 'medium'
-          confidencePercent = Math.round(75 - (cv - 0.15) * 150)
-        } else {
-          confidence = 'low'
-          confidencePercent = Math.round(Math.max(20, 45 - (cv - 0.35) * 100))
-        }
-        confidencePercent = Math.max(10, Math.min(95, confidencePercent))
-        return { confidence, confidencePercent }
+      // Bouw invoerreeksen met een EXACT bekende CV (afwisselend m+delta/
+      // m-delta over 6 maanden geeft mean=m, stdDev=delta, dus cv=delta/m)
+      // en laat de echte motor de confidence-classificatie doen — in plaats
+      // van een losse getConfidence(cv)-kopie tegen zichzelf te toetsen.
+      const spendingForCv = (mean: number, cv: number): number[] => {
+        const delta = mean * cv
+        return [mean + delta, mean - delta, mean + delta, mean - delta, mean + delta, mean - delta]
       }
 
-      // High confidence: CV < 0.15
-      const high = getConfidence(0.05)
+      // High confidence: CV = 0.05 (< 0.15)
+      const high = computeBudgetForecast(spendingForCv(1000, 0.05), 0, 'Test')
       assertEqual(high.confidence, 'high', 'CV 0.05 → high')
       assertGreaterThanOrEqual(high.confidencePercent, 80, 'High confidence ≥ 80%')
       assertLessThanOrEqual(high.confidencePercent, 95, 'High confidence ≤ 95%')
 
-      // Medium confidence: 0.15 ≤ CV < 0.35
-      const medium = getConfidence(0.25)
+      // Medium confidence: CV = 0.25 (0.15 ≤ CV < 0.35)
+      const medium = computeBudgetForecast(spendingForCv(1000, 0.25), 0, 'Test')
       assertEqual(medium.confidence, 'medium', 'CV 0.25 → medium')
       assertGreaterThanOrEqual(medium.confidencePercent, 10, 'Medium confidence ≥ 10%')
 
-      // Low confidence: CV ≥ 0.35
-      const low = getConfidence(0.5)
+      // Low confidence: CV = 0.5 (≥ 0.35)
+      const low = computeBudgetForecast(spendingForCv(1000, 0.5), 0, 'Test')
       assertEqual(low.confidence, 'low', 'CV 0.5 → low')
       assertGreaterThanOrEqual(low.confidencePercent, 10, 'Low confidence ≥ 10%')
       assertLessThanOrEqual(low.confidencePercent, 45, 'Low confidence ≤ 45%')
 
       // Boundary: exactly 0.15
-      const boundary1 = getConfidence(0.15)
+      const boundary1 = computeBudgetForecast(spendingForCv(1000, 0.15), 0, 'Test')
       assertEqual(boundary1.confidence, 'medium', 'CV 0.15 → medium')
 
       // Boundary: exactly 0.35
-      const boundary2 = getConfidence(0.35)
+      const boundary2 = computeBudgetForecast(spendingForCv(1000, 0.35), 0, 'Test')
       assertEqual(boundary2.confidence, 'low', 'CV 0.35 → low')
     },
   },
@@ -511,7 +534,21 @@ const tests: TestCase[] = [
         assertEqual(hasSufficientData, expected, `${nonZeroMonths} non-zero months`)
       }
 
-      // Insufficient data returns zeroed stats
+      // De route zelf gebruikt een 4-waardige confidence ('insufficient'
+      // erbij) die alleen lokaal bestaat — computeBudgetForecast (de
+      // gedeelde motor) kent dat label NIET en valt terug op
+      // confidence:'low' + hasSufficientData:false. Dat is een bewuste
+      // BEVINDING (divergentie), geen bug: de route-vorm hieronder blijft
+      // dus een lokale contract-mirror (niet motor-getoetst), maar we
+      // toetsen wél expliciet wat de echte motor voor hetzelfde
+      // te-weinig-data-scenario teruggeeft, zodat de divergentie zichtbaar
+      // blijft i.p.v. stilzwijgend.
+      const realMotorResult = computeBudgetForecast([100, 200, 0, 0, 0, 0], 0, 'Test')
+      assert(!realMotorResult.hasSufficientData, 'Echte motor: onvoldoende data')
+      assertEqual(realMotorResult.confidence, 'low', "Echte motor kent geen 'insufficient' — valt terug op 'low'")
+      assertEqual(realMotorResult.predicted, 0, 'Echte motor: geen predictie bij onvoldoende data')
+
+      // Route-eigen (lokale) response-vorm — NIET motor-getoetst, zie hierboven.
       const insufficientResult = {
         stdDev: 0,
         mean: 0,
@@ -659,12 +696,24 @@ const tests: TestCase[] = [
   {
     id: 'budget-api-forecast-recurring-frequency',
     name: 'GET /api/cashflow-forecast: recurring frequency normalisatie',
-    description: 'Recurring transactions are normalized to monthly amounts',
+    description: 'Frequency→maandbedrag getoetst via de echte motor (lib/cashflow-forecast-math.ts#recurringPerMonth)',
     category: CAT,
     priority: 'high',
     estimatedDurationMs: 50,
     fn() {
-      // Frequency normalization logic from the route
+      // BEVINDING (niet hier opgelost — productiecode, buiten scope van
+      // testwerk): app/api/cashflow-forecast/route.ts (regel ~87-92)
+      // herimplementeert dezelfde weekly/monthly/quarterly/yearly→maand-
+      // formule LOKAAL met een eigen switch, in plaats van de al bestaande,
+      // gedeelde `recurringPerMonth` uit lib/cashflow-forecast-math.ts te
+      // importeren (die functie wordt wél al gebruikt door
+      // lib/cashflow-cards.ts voor /overzicht/cashflow/forecast). Twee
+      // onafhankelijke implementaties van dezelfde formule zijn vandaag
+      // toevallig identiek, maar dat is drift-risico zonder waarschuwing —
+      // exact de bugklasse die CLAUDE.md's "consume, don't recompute"-regel
+      // bedoelt te voorkomen. Deze case toetst daarom de motor die de route
+      // ZOU moeten aanroepen (recurringPerMonth), niet de route zelf (die
+      // is hier niet aanroepbaar zonder vi.mock — zie kop van dit bestand).
       const frequencies = [
         { frequency: 'weekly', amount: 100, expectedMonthly: 100 * (52 / 12) },
         { frequency: 'monthly', amount: 3000, expectedMonthly: 3000 },
@@ -673,18 +722,17 @@ const tests: TestCase[] = [
       ]
 
       for (const { frequency, amount, expectedMonthly } of frequencies) {
-        let monthlyAmount = 0
-        switch (frequency) {
-          case 'weekly': monthlyAmount = amount * (52 / 12); break
-          case 'monthly': monthlyAmount = amount; break
-          case 'quarterly': monthlyAmount = amount / 3; break
-          case 'yearly': monthlyAmount = amount / 12; break
-        }
+        const monthlyAmount = recurringPerMonth({ amount, frequency })
 
         // Use approximate comparison for weekly (52/12 = 4.333...)
         const diff = Math.abs(monthlyAmount - expectedMonthly)
         assert(diff < 0.01, `${frequency}: ${monthlyAmount} ≈ ${expectedMonthly}`)
       }
+
+      // Onbekende frequency → 0 (recurringPerMonth's default-branch; de
+      // route heeft geen default en laat monthlyAmount op 0 staan — zelfde
+      // effectieve uitkomst).
+      assertEqual(recurringPerMonth({ amount: 500, frequency: 'biweekly' }), 0, 'Onbekende frequency → 0')
     },
   },
   {

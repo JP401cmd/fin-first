@@ -11,13 +11,15 @@
  * transactie-fixtures (geen netwerk/Supabase), dus er is niets over te
  * slaan.
  *
- * BEKENDE RODE STATUS (2026-07-29, niet hier opgelost — buiten scope van
- * het bankkoppeling-werk van vandaag): 'recurring-yearly-payments' geeft
- * maar 2 fixture-transacties mee, terwijl detectRecurringTransactions()
- * (@/lib/recurring-detection.ts:526) een harde minimum-eis van 3
- * transacties hanteert voordat er iets gedetecteerd wordt — de test kan
- * dus nooit geslaagd zijn sinds hij geschreven is. Los op door een derde
- * jaarlijkse ANWB-betaling aan de fixture toe te voegen.
+ * BEVINDING (opgelost 2026-07): de vijf 'transfer-match-*'-cases (sectie F)
+ * herimplementeerden voorheen de matchregels van findTransferPairs
+ * (@/lib/transfer-matching.ts) als losse boolean-expressies — ze toetsten
+ * dus hun eigen kopie, niet de motor, en konden een echte regressie in de
+ * matcher per constructie nooit vangen. Omgezet naar echte
+ * findTransferPairs-aanroepen op UnlinkedTransfer-fixtures; alle vijf
+ * bleven groen (geen drift gevonden — @/lib/transfer-matching.test.ts dekt
+ * dezelfde motor al grondig via vitest, dus dit is een bevestiging, geen
+ * verrassing).
  */
 import { describe, it, expect } from 'vitest'
 import { register } from '@/lib/regression-tests/suites/recurring-transfers'

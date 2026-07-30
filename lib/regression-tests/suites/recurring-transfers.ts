@@ -26,6 +26,7 @@ import {
   type RecurringCategory,
   CATEGORY_LABELS,
 } from '@/lib/recurring-detection'
+import { findTransferPairs, type UnlinkedTransfer } from '@/lib/transfer-matching'
 
 const CAT = 'kern.transactie-analyse'
 
@@ -320,116 +321,126 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── F: Transfer matching logic (structural tests) ────────────────────────
+  // ── F: Transfer matching logic — roept de echte motor (findTransferPairs
+  // uit lib/transfer-matching.ts) aan i.p.v. de matchregels hier te
+  // herimplementeren. Deze sectie herimplementeerde voorheen de boolean-logica
+  // inline (amount/sign/date/IBAN-vergelijkingen als losse expressies) en kon
+  // een echte regressie in de matcher dus per constructie nooit vangen: hij
+  // toetste zijn eigen kopie, niet de motor. `lib/transfer-matching.test.ts`
+  // dekt findTransferPairs al grondig (vitest); deze cases zijn de
+  // in-app-regressie-spiegel daarvan, met dezelfde motor.
   {
     id: 'transfer-match-opposite-amounts',
     name: 'Transfer matching: tegenovergestelde bedragen op zelfde dag',
-    description: 'Matching transfers must have same absolute amount with opposite sign',
+    description: 'findTransferPairs koppelt alleen bij gelijk absoluut bedrag met tegengesteld teken',
     category: CAT,
     priority: 'critical',
     estimatedDurationMs: 50,
     fn() {
-      // Transfer A: -500 from account 1
-      // Transfer B: +500 to account 2
-      const amountA = -500
-      const amountB = 500
-      const sameAbsolute = Math.abs(Math.abs(amountA) - Math.abs(amountB)) <= 0.005
-      const oppositeSign = Math.sign(amountA) !== Math.sign(amountB)
+      const ibans = new Map([['acc-a', 'NL91ABNA0417164300'], ['acc-b', 'NL20INGB0001234567']])
 
-      assert(sameAbsolute, 'Same absolute amount')
-      assert(oppositeSign, 'Opposite signs')
+      // Tegengestelde tekens, gelijk absoluut bedrag → paar
+      const opposite: UnlinkedTransfer[] = [
+        { id: 'uit', account_id: 'acc-a', date: '2025-03-15', amount: -500, counterparty_iban: 'NL20INGB0001234567' },
+        { id: 'in', account_id: 'acc-b', date: '2025-03-15', amount: 500, counterparty_iban: 'NL91ABNA0417164300' },
+      ]
+      const pairs = findTransferPairs(opposite, ibans)
+      assertEqual(pairs.length, 1, 'Tegengestelde bedragen worden gekoppeld')
+      assertEqual(pairs[0][0], 'uit')
+      assertEqual(pairs[0][1], 'in')
+
+      // Zelfde teken (beide uitgaven) → geen paar, ook al is het bedrag gelijk
+      const sameSign: UnlinkedTransfer[] = [
+        { id: 'a', account_id: 'acc-a', date: '2025-03-15', amount: -500, counterparty_iban: 'NL20INGB0001234567' },
+        { id: 'b', account_id: 'acc-b', date: '2025-03-15', amount: -500, counterparty_iban: 'NL91ABNA0417164300' },
+      ]
+      assertEqual(findTransferPairs(sameSign, ibans).length, 0, 'Gelijk teken koppelt niet')
     },
   },
   {
     id: 'transfer-match-date-tolerance',
     name: 'Transfer matching: tolerantie voor 1-dag verschil',
-    description: 'Transfers within 1 day (86400000ms) are matched',
+    description: 'findTransferPairs koppelt binnen 1 dag (86400000ms), niet daarna',
     category: CAT,
     priority: 'critical',
     estimatedDurationMs: 50,
     fn() {
-      const dayA = new Date('2025-03-15').getTime()
+      const ibans = new Map([['acc-a', 'NL91ABNA0417164300'], ['acc-b', 'NL20INGB0001234567']])
+      const base = (bDate: string): UnlinkedTransfer[] => [
+        { id: 'uit', account_id: 'acc-a', date: '2025-03-15', amount: -250, counterparty_iban: 'NL20INGB0001234567' },
+        { id: 'in', account_id: 'acc-b', date: bDate, amount: 250, counterparty_iban: 'NL91ABNA0417164300' },
+      ]
 
-      // Same day → match
-      const sameDay = new Date('2025-03-15').getTime()
-      assert(Math.abs(dayA - sameDay) <= 86_400_000, 'Same day matches')
-
-      // Next day → match
-      const nextDay = new Date('2025-03-16').getTime()
-      assert(Math.abs(dayA - nextDay) <= 86_400_000, '1 day difference matches')
-
-      // Two days later → no match
-      const twoDays = new Date('2025-03-17').getTime()
-      assert(Math.abs(dayA - twoDays) > 86_400_000, '2 day difference does NOT match')
+      assertEqual(findTransferPairs(base('2025-03-15'), ibans).length, 1, 'Zelfde dag koppelt')
+      assertEqual(findTransferPairs(base('2025-03-16'), ibans).length, 1, '1 dag verschil koppelt')
+      assertEqual(findTransferPairs(base('2025-03-17'), ibans).length, 0, '2 dagen verschil koppelt NIET')
     },
   },
   {
     id: 'transfer-match-iban-cross',
     name: 'Transfer matching: IBAN cross-referencing',
-    description: 'Both IBANs must cross-match bidirectionally',
+    description: 'findTransferPairs vereist dat beide IBANs elkaar kruislings bevestigen',
     category: CAT,
     priority: 'critical',
     estimatedDurationMs: 50,
     fn() {
-      const accountA = { iban: 'NL91ABNA0417164300', counterpartyIban: 'NL20INGB0001234567' }
-      const accountB = { iban: 'NL20INGB0001234567', counterpartyIban: 'NL91ABNA0417164300' }
+      // Bidirectioneel kloppende IBANs → paar
+      const crossMatch: UnlinkedTransfer[] = [
+        { id: 'uit', account_id: 'acc-a', date: '2025-03-15', amount: -300, counterparty_iban: 'NL20INGB0001234567' },
+        { id: 'in', account_id: 'acc-b', date: '2025-03-15', amount: 300, counterparty_iban: 'NL91ABNA0417164300' },
+      ]
+      const ibans = new Map([['acc-a', 'NL91ABNA0417164300'], ['acc-b', 'NL20INGB0001234567']])
+      assertEqual(findTransferPairs(crossMatch, ibans).length, 1, 'Bidirectionele IBAN-match koppelt')
 
-      // Bidirectional cross-match
-      const crossMatch =
-        accountA.iban === accountB.counterpartyIban &&
-        accountB.iban === accountA.counterpartyIban
-      assert(crossMatch, 'Bidirectional IBAN cross-match')
-
-      // Non-matching case
-      const accountC = { iban: 'NL20INGB0001234567', counterpartyIban: 'NL99RABO9999999999' }
-      const noMatch =
-        accountA.iban === accountC.counterpartyIban &&
-        accountC.iban === accountA.counterpartyIban
-      assert(!noMatch, 'Non-matching IBANs rejected')
+      // acc-b's counterparty_iban wijst NIET naar acc-a's eigen IBAN → geen kruislingse bevestiging
+      const oneSided: UnlinkedTransfer[] = [
+        { id: 'uit', account_id: 'acc-a', date: '2025-03-15', amount: -300, counterparty_iban: 'NL20INGB0001234567' },
+        { id: 'in', account_id: 'acc-b', date: '2025-03-15', amount: 300, counterparty_iban: 'NL99RABO9999999999' },
+      ]
+      assertEqual(findTransferPairs(oneSided, ibans).length, 0, 'Eenzijdige IBAN-match koppelt NIET')
     },
   },
   {
     id: 'transfer-match-iban-normalization',
     name: 'Transfer matching: IBAN normalisatie (spaties, uppercase)',
-    description: 'IBANs are normalized before matching (spaces removed, uppercase)',
+    description: 'findTransferPairs normaliseert IBANs (spaties/hoofdletters) vóór het vergelijken',
     category: CAT,
     priority: 'high',
     estimatedDurationMs: 50,
     fn() {
-      const normalize = (iban: string) => iban.replace(/\s/g, '').toUpperCase()
+      // IBANs in de invoer én in de account-map staan bewust ongelijk
+      // geformatteerd (spaties, kleine letters) — de motor moet ze zelf
+      // normaliseren, niet de test.
+      const transfers: UnlinkedTransfer[] = [
+        { id: 'uit', account_id: 'acc-a', date: '2025-03-15', amount: -250, counterparty_iban: 'nl20 ingb 0001 2345 67' },
+        { id: 'in', account_id: 'acc-b', date: '2025-03-15', amount: 250, counterparty_iban: 'NL91 ABNA 0417 1643 00' },
+      ]
+      const ibans = new Map([['acc-a', 'nl91abna0417164300'], ['acc-b', ' NL20INGB0001234567 ']])
 
-      assertEqual(normalize('NL91 ABNA 0417 1643 00'), 'NL91ABNA0417164300')
-      assertEqual(normalize('nl91abna0417164300'), 'NL91ABNA0417164300')
-      assertEqual(normalize('NL91ABNA0417164300'), 'NL91ABNA0417164300')
-
-      // After normalization, different formats match
-      const a = normalize('NL91 ABNA 0417 1643 00')
-      const b = normalize('nl91abna0417164300')
-      assertEqual(a, b, 'Normalized IBANs match')
+      const pairs = findTransferPairs(transfers, ibans)
+      assertEqual(pairs.length, 1, 'Genormaliseerde IBANs koppelen ondanks afwijkende invoer-opmaak')
+      assertEqual(pairs[0][0], 'uit')
+      assertEqual(pairs[0][1], 'in')
     },
   },
   {
     id: 'transfer-false-positive',
     name: 'Transfer matching: vergelijkbare bedragen GEEN transfers',
-    description: 'Similar amounts from different counterparties should not be matched as transfers',
+    description: 'findTransferPairs koppelt NIET wanneer bedrag/datum kloppen maar de IBANs niet kruislings matchen',
     category: CAT,
     priority: 'high',
     estimatedDurationMs: 50,
     fn() {
-      // Two transactions with similar amounts but different counterparties
-      const accountA = { iban: 'NL91ABNA0417164300', counterpartyIban: 'NL20INGB0001234567' }
-      const accountB = { iban: 'NL99RABO9999999999', counterpartyIban: 'NL55TRIO0555555555' }
+      // Gelijk bedrag, tegengesteld teken, zelfde dag — maar de rekeningen
+      // horen niet bij elkaar (geen kruislingse IBAN-bevestiging), dus dit is
+      // gewoon twee losse boekingen bij verschillende tegenpartijen.
+      const transfers: UnlinkedTransfer[] = [
+        { id: 'a', account_id: 'acc-a', date: '2025-03-15', amount: -100, counterparty_iban: 'NL20INGB0001234567' },
+        { id: 'b', account_id: 'acc-c', date: '2025-03-15', amount: 100, counterparty_iban: 'NL55TRIO0555555555' },
+      ]
+      const ibans = new Map([['acc-a', 'NL91ABNA0417164300'], ['acc-c', 'NL99RABO9999999999']])
 
-      // Same amount, opposite sign, same day — but IBANs don't cross-match
-      const amountMatch = Math.abs(Math.abs(-100) - Math.abs(100)) <= 0.005
-      const signMatch = Math.sign(-100) !== Math.sign(100)
-      const ibanMatch =
-        accountA.iban === accountB.counterpartyIban &&
-        accountB.iban === accountA.counterpartyIban
-
-      assert(amountMatch, 'Amounts match')
-      assert(signMatch, 'Signs differ')
-      assert(!ibanMatch, 'IBAN cross-match FAILS → not a transfer')
+      assertEqual(findTransferPairs(transfers, ibans).length, 0, 'Geen kruislingse IBAN-match → geen transfer-paar')
     },
   },
 
