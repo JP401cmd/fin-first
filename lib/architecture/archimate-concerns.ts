@@ -105,6 +105,42 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
     elementIds: ['as-budget', 'fn-budgetteren'],
     reviewedAt: '2026-07-29',
   },
+  {
+    id: 'maand-cashflow-grondslag-duplicaten',
+    title: '"Deze maand"-oppervlakken lezen nog de effective grondslag',
+    detail:
+      'DashboardData draagt sinds ADR 0073 currentMonthIncome/currentMonthExpenses (gerealiseerde kalendermaand uit het tx-aggregaat) náást het effective monthlyIncome/monthlyExpenses (waar income_source=\'manual\' de profielinschatting laat winnen). De Transacties-kaart is omgezet, maar twee oppervlakken presenteren de effective waarden nog als "deze maand": components/widgets/cash-flow-widget.tsx zet ze zelfs in één vergelijking naast prevMonthIncome/prevMonthExpenses (effective vs. gerealiseerd in hetzelfde beeld), en app/api/checkin/overview/route.ts telt eigen kalendermaand-sommen zónder transfer-filter. Uitweg: beide laten consumeren uit de bundelvelden — per surface een one-liner.',
+    severity: 'risk',
+    elementIds: ['as-budget'],
+    reviewedAt: '2026-07-30',
+  },
+  {
+    id: 'fk-waarde-zonder-datalaag-guard',
+    title: 'bank_accounts.linked_asset_id mist de eigenaarschaps-guard van zijn zusterkolommen',
+    detail:
+      'RLS scopet de RIJ, niet de WAARDE van een FK-kolom daarop (ADR 0075) — vierde keer dat dit patroon opduikt, na profiles.role/commercial_tier (ADR 0049), bank_connections.target_bank_account_id (fase 4, gedicht) en bank_connection_accounts.bank_account_id (fase 6, gedicht). bank_accounts.linked_asset_id heeft géén guard-trigger: de policy op bank_accounts is breed genoeg dat een browserclient deze kolom naar een asset van een huishoudpartner zou kunnen laten wijzen. lib/truelayer/balance-sync.ts#syncAccountBalance filtert sinds fase 8 elke schrijfronde op user_id als code-side control, maar dat dekt alleen dat ene aanroeppad, geen datalaag-invariant. Verwijder dit punt zodra een guard-trigger (spiegel van guard_bank_connection_target_account) op deze kolom staat.',
+    severity: 'risk',
+    elementIds: ['t-bankconnect', 'as-vermogen'],
+    reviewedAt: '2026-07-30',
+  },
+  {
+    id: 'bank-sync-gefaalde-batch-niet-retried',
+    title: 'Een gesneuvelde insert-batch bij een banksync wordt niet opnieuw geprobeerd',
+    detail:
+      'app/api/bank-connect/sync/route.ts schrijft sinds fase 1 status: "partial" plus het aantal niet-weggeschreven rijen in error_message zodra een insert-batch faalt (voorheen werd zo\'n botsing stil als "success" weggeschreven — dat deel is gedicht). Wat blijft staan: de mislukte batch zelf is nog steeds niet-fataal voor de sync én wordt niet automatisch herhaald, dus de rijen blijven ontbreken tot de gebruiker zelf opnieuw synchroniseert. Kandidaat: retry met backoff, of een zichtbare "gedeeltelijk gelukt, probeer opnieuw"-actie op de success-pagina.',
+    severity: 'debt',
+    elementIds: ['t-bankconnect', 'do-transactie'],
+    reviewedAt: '2026-07-30',
+  },
+  {
+    id: 'idx-transactions-user-date-drift-remote',
+    title: 'idx_transactions_user_date staat in de repo maar niet op remote',
+    detail:
+      'supabase/migrations/20260504000001_perf_composite_indexes.sql definieert deze index, maar pg_indexes op remote toont hem niet (wel de losse idx_transactions_user_id en idx_transactions_date). De hotste query van de app draait dus zonder de samengestelde index die ervoor bedoeld was, en de eerste-ophaal-strategie (B8/ADR 0072) vergroot het transactievolume per rekening fors — een prestatiemeting ná die fase kan hierdoor misleidend zijn. Migratie opnieuw toepassen op remote (of expliciet vervangen als hij inmiddels overbodig is) sluit dit punt.',
+    severity: 'debt',
+    elementIds: ['t-supabase', 'do-transactie'],
+    reviewedAt: '2026-07-30',
+  },
 ]
 
 /** Aandachtspunten die een specifiek element raken. */

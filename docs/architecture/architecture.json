@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-29T13:25:33.242Z",
-  "generatedDate": "2026-07-29",
+  "generatedAt": "2026-07-30T06:11:31.927Z",
+  "generatedDate": "2026-07-30",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -189,11 +189,11 @@
   "stats": {
     "routes": 146,
     "routesProduction": 101,
-    "api": 264,
+    "api": 268,
     "tables": 86,
-    "migrations": 163,
+    "migrations": 170,
     "integrations": 25,
-    "components": 839,
+    "components": 846,
     "providers": 11,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -2522,6 +2522,14 @@
       ]
     },
     {
+      "url": "/api/bank-connect/accounts",
+      "file": "app/api/bank-connect/accounts/route.ts",
+      "domain": "bank-connect",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
       "url": "/api/bank-connect/auth-link",
       "file": "app/api/bank-connect/auth-link/route.ts",
       "domain": "bank-connect",
@@ -2554,11 +2562,27 @@
       ]
     },
     {
+      "url": "/api/bank-connect/linked-accounts",
+      "file": "app/api/bank-connect/linked-accounts/route.ts",
+      "domain": "bank-connect",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
       "url": "/api/bank-connect/providers",
       "file": "app/api/bank-connect/providers/route.ts",
       "domain": "bank-connect",
       "methods": [
         "GET"
+      ]
+    },
+    {
+      "url": "/api/bank-connect/relink",
+      "file": "app/api/bank-connect/relink/route.ts",
+      "domain": "bank-connect",
+      "methods": [
+        "POST"
       ]
     },
     {
@@ -4093,6 +4117,15 @@
       ]
     },
     {
+      "url": "/api/transactions/import",
+      "file": "app/api/transactions/import/route.ts",
+      "domain": "transactions",
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
       "url": "/api/uitgaven-na-pensioen/context",
       "file": "app/api/uitgaven-na-pensioen/context/route.ts",
       "domain": "uitgaven-na-pensioen",
@@ -4981,8 +5014,16 @@
     {
       "domain": "bank-connect",
       "label": "Bank-connect",
-      "count": 7,
+      "count": 10,
       "routes": [
+        {
+          "url": "/api/bank-connect/accounts",
+          "file": "app/api/bank-connect/accounts/route.ts",
+          "domain": "bank-connect",
+          "methods": [
+            "GET"
+          ]
+        },
         {
           "url": "/api/bank-connect/auth-link",
           "file": "app/api/bank-connect/auth-link/route.ts",
@@ -5016,11 +5057,27 @@
           ]
         },
         {
+          "url": "/api/bank-connect/linked-accounts",
+          "file": "app/api/bank-connect/linked-accounts/route.ts",
+          "domain": "bank-connect",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
           "url": "/api/bank-connect/providers",
           "file": "app/api/bank-connect/providers/route.ts",
           "domain": "bank-connect",
           "methods": [
             "GET"
+          ]
+        },
+        {
+          "url": "/api/bank-connect/relink",
+          "file": "app/api/bank-connect/relink/route.ts",
+          "domain": "bank-connect",
+          "methods": [
+            "POST"
           ]
         },
         {
@@ -6980,6 +7037,22 @@
       ]
     },
     {
+      "domain": "transactions",
+      "label": "transactions",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/transactions/import",
+          "file": "app/api/transactions/import/route.ts",
+          "domain": "transactions",
+          "methods": [
+            "GET",
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "uitgaven-na-pensioen",
       "label": "uitgaven-na-pensioen",
       "count": 1,
@@ -7495,7 +7568,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 163
+    "migrationCount": 170
   },
   "tablesByDomain": [
     {
@@ -7945,11 +8018,11 @@
     }
   ],
   "components": {
-    "total": 839,
+    "total": 846,
     "groups": [
       {
         "group": "app",
-        "count": 326,
+        "count": 331,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -8002,6 +8075,7 @@
           "budgets-client",
           "budgets-client.test",
           "budgetteren.config",
+          "carrier-correction",
           "cash-account-view",
           "cash-account-view.test",
           "cash-overview",
@@ -8033,6 +8107,7 @@
           "confirm-destructive",
           "confirm-destructive.test",
           "connected-account-card",
+          "connected-account-card.test",
           "counterparty-analysis-panel",
           "crypto-holdings.config",
           "daily-price-sync-trigger",
@@ -8236,6 +8311,9 @@
           "surplus-gap-chart.test",
           "svg-text-no-html-nesting.test",
           "sync-status-badge",
+          "sync-status-badge.test",
+          "target-account-choice",
+          "target-account-choice.test",
           "toast-provider",
           "toekomst-exit-notice",
           "toekomst-exit-notice.test",
@@ -8520,8 +8598,10 @@
       },
       {
         "group": "core",
-        "count": 64,
+        "count": 66,
         "items": [
+          "account-source-icon",
+          "account-source-icon.test",
           "add-category-card",
           "amortisation-chart",
           "app-toggle-section",
@@ -10361,10 +10441,6 @@
           "write": false
         },
         {
-          "name": "goals",
-          "write": false
-        },
-        {
           "name": "net_worth_snapshots",
           "write": true
         },
@@ -10438,6 +10514,24 @@
       "toekomst-scenario": [
         {
           "name": "profiles",
+          "write": true
+        }
+      ],
+      "transactions": [
+        {
+          "name": "bank_accounts",
+          "write": false
+        },
+        {
+          "name": "bank_connection_accounts",
+          "write": false
+        },
+        {
+          "name": "budgets",
+          "write": false
+        },
+        {
+          "name": "transactions",
           "write": true
         }
       ],
@@ -11014,7 +11108,6 @@
           "label": "Bezittingen",
           "write": true,
           "routes": [
-            "/api/assets/toggle-budget",
             "/api/assets/toggle-holdings",
             "/api/assets/toggle-rental",
             "/api/assets/toggle-woonbalans"
@@ -11025,6 +11118,7 @@
           "label": "Bank-connect",
           "write": true,
           "routes": [
+            "/api/bank-connect/accounts",
             "/api/bank-connect/callback"
           ]
         },
@@ -11395,6 +11489,7 @@
           "label": "Bank-connect",
           "write": true,
           "routes": [
+            "/api/bank-connect/accounts",
             "/api/bank-connect/sync"
           ]
         },
@@ -11404,6 +11499,14 @@
           "write": true,
           "routes": [
             "/api/own-accounts/reclassify"
+          ]
+        },
+        {
+          "domain": "transactions",
+          "label": "transactions",
+          "write": true,
+          "routes": [
+            "/api/transactions/import"
           ]
         },
         {
@@ -12286,6 +12389,14 @@
           ]
         },
         {
+          "domain": "transactions",
+          "label": "transactions",
+          "write": false,
+          "routes": [
+            "/api/transactions/import"
+          ]
+        },
+        {
           "domain": "uitgaven-na-pensioen",
           "label": "uitgaven-na-pensioen",
           "write": false,
@@ -12323,54 +12434,13 @@
           ]
         }
       ],
-      "bank_connections": [
-        {
-          "domain": "bank-connect",
-          "label": "Bank-connect",
-          "write": true,
-          "routes": [
-            "/api/bank-connect/auth-link",
-            "/api/bank-connect/balances",
-            "/api/bank-connect/callback",
-            "/api/bank-connect/sync"
-          ]
-        },
-        {
-          "domain": "next-steps",
-          "label": "next-steps",
-          "write": false,
-          "routes": [
-            "/api/next-steps"
-          ]
-        }
-      ],
-      "bank_connection_accounts": [
-        {
-          "domain": "bank-connect",
-          "label": "Bank-connect",
-          "write": true,
-          "routes": [
-            "/api/bank-connect/balances",
-            "/api/bank-connect/callback",
-            "/api/bank-connect/disconnect",
-            "/api/bank-connect/sync"
-          ]
-        },
-        {
-          "domain": "notifications",
-          "label": "notifications",
-          "write": false,
-          "routes": [
-            "/api/notifications"
-          ]
-        }
-      ],
       "bank_accounts": [
         {
           "domain": "bank-connect",
           "label": "Bank-connect",
           "write": true,
           "routes": [
+            "/api/bank-connect/accounts",
             "/api/bank-connect/callback"
           ]
         },
@@ -12431,6 +12501,67 @@
             "/api/snapshots",
             "/api/snapshots/auto",
             "/api/snapshots/cron"
+          ]
+        },
+        {
+          "domain": "transactions",
+          "label": "transactions",
+          "write": false,
+          "routes": [
+            "/api/transactions/import"
+          ]
+        }
+      ],
+      "bank_connection_accounts": [
+        {
+          "domain": "bank-connect",
+          "label": "Bank-connect",
+          "write": true,
+          "routes": [
+            "/api/bank-connect/auth-link",
+            "/api/bank-connect/balances",
+            "/api/bank-connect/callback",
+            "/api/bank-connect/disconnect",
+            "/api/bank-connect/linked-accounts",
+            "/api/bank-connect/relink",
+            "/api/bank-connect/sync"
+          ]
+        },
+        {
+          "domain": "notifications",
+          "label": "notifications",
+          "write": false,
+          "routes": [
+            "/api/notifications"
+          ]
+        },
+        {
+          "domain": "transactions",
+          "label": "transactions",
+          "write": false,
+          "routes": [
+            "/api/transactions/import"
+          ]
+        }
+      ],
+      "bank_connections": [
+        {
+          "domain": "bank-connect",
+          "label": "Bank-connect",
+          "write": true,
+          "routes": [
+            "/api/bank-connect/auth-link",
+            "/api/bank-connect/balances",
+            "/api/bank-connect/callback",
+            "/api/bank-connect/sync"
+          ]
+        },
+        {
+          "domain": "next-steps",
+          "label": "next-steps",
+          "write": false,
+          "routes": [
+            "/api/next-steps"
           ]
         }
       ],
@@ -12764,16 +12895,6 @@
           "write": false,
           "routes": [
             "/api/report"
-          ]
-        },
-        {
-          "domain": "snapshots",
-          "label": "Snapshots",
-          "write": false,
-          "routes": [
-            "/api/snapshots",
-            "/api/snapshots/auto",
-            "/api/snapshots/cron"
           ]
         }
       ],
@@ -13307,6 +13428,11 @@
         "from": "bank_connection_accounts",
         "to": "bank_connections",
         "column": "connection_id"
+      },
+      {
+        "from": "bank_connections",
+        "to": "bank_accounts",
+        "column": "target_bank_account_id"
       },
       {
         "from": "bank_sync_log",
@@ -14859,6 +14985,90 @@
       ],
       "summary": "Org-besluit 09 (`trifinity-org/org_plan/60-besluiten.md`), het blokkerende grondslag-besluit van werkstroom 10.",
       "file": "docs/adr/0068-leads-bewust-niet-opvolgen-tot-f1.md"
+    },
+    {
+      "id": "0069-callback-haalt-alleen-saldo-op",
+      "title": "De bank-callback haalt nooit transacties op — alleen saldo, en dát maakt een verkeerde koppeling corrigeerbaar",
+      "status": "aanvaard",
+      "date": "2026-07-30",
+      "elements": [
+        "t-bankconnect",
+        "do-transactie",
+        "as-import"
+      ],
+      "summary": "Fase 5 van `specs/bank-connect-doelrekening/plan.md`, §0 (\"harde regel die hierbij hoort\").",
+      "file": "docs/adr/0069-callback-haalt-alleen-saldo-op.md"
+    },
+    {
+      "id": "0070-cross-bron-transactie-dedup",
+      "title": "Cross-bron transactie-dedup — additieve laag 2 met een exacte sleutel, laag 1 blijft bevroren",
+      "status": "aanvaard",
+      "date": "2026-07-29",
+      "elements": [
+        "t-bankimport",
+        "do-transactie"
+      ],
+      "summary": "Fase 2 van `specs/bank-connect-doelrekening/plan.md` (§6), met de importkant in fase 3.",
+      "file": "docs/adr/0070-cross-bron-transactie-dedup.md"
+    },
+    {
+      "id": "0071-banksaldo-via-herwaarderingspad",
+      "title": "Bank-saldosync via het canonieke herwaarderingspad — géén \"niet overschrijven\"-vlag",
+      "status": "aanvaard",
+      "date": "2026-07-30",
+      "elements": [
+        "t-bankconnect",
+        "as-vermogen"
+      ],
+      "summary": "Fase 8 van `specs/bank-connect-doelrekening/plan.md` (§6, FR8) — geschreven bij fase 9 op eigenaarsbesluit (30 juli 2026: de inhoud moest wachten tot fase 8 was uitgevoerd).",
+      "file": "docs/adr/0071-banksaldo-via-herwaarderingspad.md"
+    },
+    {
+      "id": "0072-omvang-van-de-eerste-ophaal",
+      "title": "Omvang van de eerste ophaal — maximale historie in blokken, bank-eigen limiet kapt af",
+      "status": "aanvaard",
+      "date": "2026-07-29",
+      "elements": [
+        "t-bankconnect",
+        "do-transactie"
+      ],
+      "summary": "Fase 1 van `specs/bank-connect-doelrekening/plan.md` (§6), besluiten B8/B9.",
+      "file": "docs/adr/0072-omvang-van-de-eerste-ophaal.md"
+    },
+    {
+      "id": "0073-grondslag-in-de-veldnaam",
+      "title": "Elk inkomsten-/uitgavenveld op DashboardData draagt zijn venster in de naam — de ongemarkeerde naam is de effective grondslag",
+      "status": "aanvaard",
+      "date": "2026-07-30",
+      "elements": [
+        "as-budget"
+      ],
+      "summary": "`DashboardData` draagt meerdere maand-inkomsten/uitgaven-grootheden die er identiek uitzien maar verschillende dingen betekenen:",
+      "file": "docs/adr/0073-grondslag-in-de-veldnaam.md"
+    },
+    {
+      "id": "0074-importpad-via-server-route",
+      "title": "Importpad voor gekoppelde rekeningen via een server-route — parsen client-side, opslaan + dedup server-side",
+      "status": "aanvaard",
+      "date": "2026-07-29",
+      "elements": [
+        "t-bankimport",
+        "do-transactie"
+      ],
+      "summary": "Fase 3 van `specs/bank-connect-doelrekening/plan.md` (§6, besluit B7). Nummer 0073 was al vergeven aan een parallelle ADR (`grondslag-in-de-veldnaam`) tegen de tijd dat dit document werd geschreven; dit is het eerstvolgende vrije nummer.",
+      "file": "docs/adr/0074-importpad-via-server-route.md"
+    },
+    {
+      "id": "0075-kolomwaarde-invariant-in-datalaag",
+      "title": "Een invariant over een kolomwaarde hoort in de datalaag, niet in de route die de kolom vandaag schrijft",
+      "status": "aanvaard",
+      "date": "2026-07-30",
+      "elements": [
+        "t-supabase",
+        "t-bankconnect"
+      ],
+      "summary": "Vierde keer dat dit patroon onafhankelijk werd gevonden tijdens `specs/bank-connect-doelrekening/plan.md`; kandidaat voor een eigen ADR sinds het restpunt bij fase 4 (§0c-omgeving), nu geschreven bij fase 9.",
+      "file": "docs/adr/0075-kolomwaarde-invariant-in-datalaag.md"
     }
   ],
   "churn": {
@@ -14894,7 +15104,7 @@
       },
       {
         "path": "app/api/budgets",
-        "commits": 5
+        "commits": 6
       },
       {
         "path": "app/api/assets",
@@ -14908,8 +15118,8 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 8281,
-        "commits": 91
+        "loc": 8279,
+        "commits": 92
       },
       {
         "file": "components/app/budgets-client.tsx",
@@ -14923,7 +15133,7 @@
       },
       {
         "file": "components/app/cash-account-view.tsx",
-        "loc": 2785,
+        "loc": 2883,
         "commits": 16
       },
       {
@@ -14933,18 +15143,18 @@
       },
       {
         "file": "lib/dashboard-data-loader.ts",
-        "loc": 2646,
-        "commits": 49
+        "loc": 2660,
+        "commits": 50
+      },
+      {
+        "file": "app/(app)/core/cash/import/page.tsx",
+        "loc": 2230,
+        "commits": 19
       },
       {
         "file": "lib/test-personas.ts",
         "loc": 2216,
         "commits": 12
-      },
-      {
-        "file": "app/(app)/core/checkin/page.tsx",
-        "loc": 2205,
-        "commits": 10
       }
     ]
   },
@@ -15775,6 +15985,13 @@
       "parserFormat": "csv"
     },
     {
+      "file": "lib/parsers/cross-source-dedup.ts",
+      "exists": true,
+      "baseUrl": null,
+      "hasAdapter": false,
+      "parserFormat": null
+    },
+    {
       "file": "lib/parsers/csv.ts",
       "exists": true,
       "baseUrl": null,
@@ -15796,9 +16013,72 @@
       "parserFormat": "ofx"
     },
     {
+      "file": "lib/truelayer/balance-valuation.ts",
+      "exists": true,
+      "baseUrl": null,
+      "hasAdapter": false,
+      "parserFormat": null
+    },
+    {
+      "file": "lib/truelayer/cash-asset-backfill.ts",
+      "exists": true,
+      "baseUrl": null,
+      "hasAdapter": false,
+      "parserFormat": null
+    },
+    {
       "file": "lib/truelayer/client.ts",
       "exists": true,
       "baseUrl": "https://auth.truelayer-sandbox.com",
+      "hasAdapter": false,
+      "parserFormat": null
+    },
+    {
+      "file": "lib/truelayer/errors.ts",
+      "exists": true,
+      "baseUrl": null,
+      "hasAdapter": false,
+      "parserFormat": null
+    },
+    {
+      "file": "lib/truelayer/existing-hashes.ts",
+      "exists": true,
+      "baseUrl": null,
+      "hasAdapter": false,
+      "parserFormat": null
+    },
+    {
+      "file": "lib/truelayer/initial-fetch.ts",
+      "exists": true,
+      "baseUrl": null,
+      "hasAdapter": false,
+      "parserFormat": null
+    },
+    {
+      "file": "lib/truelayer/linked-account.ts",
+      "exists": true,
+      "baseUrl": null,
+      "hasAdapter": false,
+      "parserFormat": null
+    },
+    {
+      "file": "lib/truelayer/orphan-connections.ts",
+      "exists": true,
+      "baseUrl": null,
+      "hasAdapter": false,
+      "parserFormat": null
+    },
+    {
+      "file": "lib/truelayer/start-relink.ts",
+      "exists": true,
+      "baseUrl": null,
+      "hasAdapter": false,
+      "parserFormat": null
+    },
+    {
+      "file": "lib/truelayer/target-account.ts",
+      "exists": true,
+      "baseUrl": null,
       "hasAdapter": false,
       "parserFormat": null
     },
@@ -15819,17 +16099,9 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-07-28",
-    "hasChanges": true,
-    "sections": [
-      {
-        "label": "Componenten (aantal)",
-        "added": [
-          "+2"
-        ],
-        "removed": []
-      }
-    ]
+    "previousDate": "2026-07-30",
+    "hasChanges": false,
+    "sections": []
   },
   "statsHistory": [
     {
@@ -16044,8 +16316,15 @@
     },
     {
       "date": "2026-07-29",
-      "api": 264,
-      "components": 839,
+      "api": 268,
+      "components": 844,
+      "tables": 86,
+      "routesProduction": 101
+    },
+    {
+      "date": "2026-07-30",
+      "api": 268,
+      "components": 846,
       "tables": 86,
       "routesProduction": 101
     }

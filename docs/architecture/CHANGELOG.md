@@ -555,3 +555,45 @@
 ## 2026-07-29
 
 - **Componenten (aantal)** toegevoegd: +2
+
+## 2026-07-29
+
+- **Integratie-clients** toegevoegd: lib/truelayer/orphan-connections.ts
+- **Componenten (aantal)** toegevoegd: +2
+
+## 2026-07-29
+
+- **Integratie-clients** toegevoegd: lib/truelayer/errors.ts, lib/truelayer/existing-hashes.ts, lib/truelayer/initial-fetch.ts
+
+## 2026-07-29
+
+- **API-routes** toegevoegd: /api/bank-connect/accounts, /api/transactions/import
+- **Integratie-clients** toegevoegd: lib/parsers/cross-source-dedup.ts, lib/truelayer/target-account.ts
+- **Componenten (aantal)** toegevoegd: +2
+
+## 2026-07-29
+
+- **API-routes** toegevoegd: /api/bank-connect/linked-accounts, /api/bank-connect/relink
+- **Integratie-clients** toegevoegd: lib/truelayer/cash-asset-backfill.ts, lib/truelayer/linked-account.ts
+- **Componenten (aantal)** toegevoegd: +1
+
+## 2026-07-29
+
+- Geen wijzigingen.
+
+## 2026-07-30
+
+- Geen wijzigingen.
+
+## 2026-07-30
+
+- **Integratie-clients** toegevoegd: lib/truelayer/start-relink.ts
+- **Componenten (aantal)** toegevoegd: +2
+
+## 2026-07-30
+
+- **Integratie-clients** toegevoegd: lib/truelayer/balance-valuation.ts
+
+## 2026-07-30
+
+- Geen wijzigingen.

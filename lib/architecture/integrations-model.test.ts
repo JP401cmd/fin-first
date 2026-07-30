@@ -25,12 +25,35 @@ function clientFilesOnDisk(): string[] {
     'index.ts', 'shared.ts',
     // support/helper files in integration dirs (not API clients)
     'types.ts', 'mapper.ts', 'feature-flag.ts',
-    'linked-asset.ts', 'wallet-validation.ts',
+    'linked-asset.ts', 'wallet-validation.ts', 'orphan-connections.ts',
     'category-mapping.ts', 'reference-data.ts',
+    // fase 1 bank-connect-doelrekening (initial-fetch plan): puur/support, geen
+    // eigen externe client — planInitialFetch/errors/dedup-helpers draaien op
+    // client.ts (dat wél in sourceFiles staat)
+    'errors.ts', 'existing-hashes.ts', 'initial-fetch.ts',
+    // fase 4 bank-connect-doelrekening: de doelrekening-geschiktheidsregel praat
+    // met Supabase, niet met TrueLayer — geen eigen externe client
+    'target-account.ts',
+    // fase 5 bank-connect-doelrekening: de cash-as-asset-backfill schrijft naar
+    // Supabase en de linked-account-vorm is puur wire-type + formatter — beide
+    // bellen TrueLayer nooit
+    'cash-asset-backfill.ts', 'linked-account.ts',
+    // fase 7 bank-connect-doelrekening: `start-relink.ts` is de CLIENTkant van het
+    // herstelpad — één `fetch` naar onze eigen `/api/bank-connect/auth-link`, die
+    // route belt TrueLayer. Geen tweede externe client, dus geen eigen
+    // INTEGRATIONS-entry; hij staat wél in `apiRoutes` van de truelayer-entry.
+    'start-relink.ts',
+    // fase 8 bank-connect-doelrekening: `balance-valuation.ts` schrijft het
+    // herwaarderingsspoor van een banksaldo (valuations + balance_snapshots) naar
+    // Supabase en belt TrueLayer nooit — de saldo-ophaal zelf zit in `client.ts`.
+    // Geen externe client, dus geen eigen INTEGRATIONS-entry; hij staat wél als
+    // bronbestand bij de calc "Netto vermogen (gewogen)".
+    'balance-valuation.ts',
     // infra/probe/registry — geen extern API-client
     'health-probe.ts', 'version-registry.ts',
     // parser-support
     'format-contracts.ts', 'categorize.ts', 'counterparty-normalize.ts',
+    'cross-source-dedup.ts',
   ]
   const out: string[] = []
   for (const dir of dirs) {
@@ -56,12 +79,16 @@ function parserFilesOnDisk(): string[] {
   // - format-contracts.ts: declaratief contract-register, geen externe client
   // - categorize.ts: AI-categorie-helper (geen extern API)
   // - counterparty-normalize.ts: normaliseringslogica (geen extern API)
+  // - cross-source-dedup.ts: pure cross-bron dedup-laag (laag 2), geen
+  //   bestandsformaat en geen externe client — gedeeld door de bank-sync en,
+  //   vanaf fase 3, het importpad
   const SKIP = [
     'index.ts',
     'shared.ts',
     'format-contracts.ts',
     'categorize.ts',
     'counterparty-normalize.ts',
+    'cross-source-dedup.ts',
   ]
   return readdirSync(dir)
     .filter(f => f.endsWith('.ts') && !f.endsWith('.test.ts') && !f.endsWith('.d.ts') && !SKIP.includes(f))

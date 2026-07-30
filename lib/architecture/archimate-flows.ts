@@ -28,7 +28,7 @@ export const ARCHI_FLOWS: ArchiFlow[] = [
     title: 'Transactie → vrijheid',
     lead: 'De kernketen van de app: een bankboeking wordt uiteindelijk een FIRE-datum. Hier zie je waarom “spaarquote × inkomen” de prognose drijft.',
     steps: [
-      { elementId: 't-bankimport', label: 'Bank-bestand inlezen', artifact: 'lib/parsers/*', detail: 'Coherente dedup via import_hash + bank_seq.' },
+      { elementId: 't-bankimport', label: 'Bank-bestand inlezen', artifact: 'lib/parsers/*', detail: 'Laag 1: import_hash + bank_seq (bevroren, ADR 0070). Laag 2: cross-bron-dedup op datum ±1 dag, bedrag exact en tegenpartij-IBAN/naam (ADR 0070) — op een gekoppelde rekening verplicht via POST /api/transactions/import (ADR 0074).' },
       { elementId: 'do-transactie', label: 'Transactie vastgelegd', artifact: 'transactions', detail: 'Eigen-rekening-transfers krijgen een zichtbare budgetpost.' },
       { elementId: 'as-budget', label: 'Budget-match + spaarquote', artifact: 'lib/savings-source.ts', detail: 'Cashflow-spaarquote = (inkomen − uitgaven) / inkomen.' },
       { elementId: 'as-planning', label: 'Spaarquote × inkomen → projectie', artifact: 'runKernelUnified', detail: 'Geïndexeerd door de horizon-kernel (maandbasis, Excel-oracle, ADR 0032), met aflossing-dubbeltel-guard.' },
