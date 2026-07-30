@@ -39,6 +39,7 @@ import { SettlementOverview } from '@/components/app/settlement-overview'
 import { UncategorizedTransactionsBanner } from '@/components/app/uncategorized-transactions-banner'
 import { AICategorizeSheet } from '@/components/app/ai-categorize-sheet'
 import { AccountFormModal, ACCOUNT_TYPES, type Account } from '@/components/app/account-form-modal'
+import { fetchOwnAccountIbansStrict, ibanById } from '@/lib/own-accounts-ibans'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
@@ -376,26 +377,46 @@ export function CashAccountView({
       if (signal?.aborted) return
 
       // Load all active accounts (needed for transfers)
-      let accountsQuery = supabase.from('bank_accounts').select('*').eq('is_active', true).order('sort_order', { ascending: true })
+      // Expliciete kolomlijst i.p.v. `select('*')`: die stuurde óók `iban_encrypted`
+      // en `iban_hash` mee. De blind index is een stabiele, uit een server-only
+      // sleutel afgeleide gelijkheids-identifier en hoort de browser niet te
+      // bereiken (securityreview 30 juli). De leesbare IBAN komt uit de route
+      // hieronder.
+      let accountsQuery = supabase
+        .from('bank_accounts')
+        .select('id, name, bank_name, account_type, balance, is_active, sort_order, linked_asset_id, ownership')
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true })
       if (perspective === 'personal') {
         accountsQuery = accountsQuery.eq('ownership', 'personal')
       }
 
-      const [{ data: allData, error: fetchError }, { data: ownIbanRows }] = await Promise.all([
+      const [{ data: allData, error: fetchError }, { data: ownIbanRows }, ownAccountIbans] = await Promise.all([
         accountsQuery,
         user
           ? supabase.from('user_own_ibans').select('match_type, match_value, iban').eq('user_id', user.id)
           : Promise.resolve({ data: [] }),
+        // De IBAN staat bewust niet in de kolomlijst hierboven: `bank_accounts.iban`
+        // (plaintext) verdwijnt in Stage B en `iban_encrypted` is alleen server-side
+        // te ontsleutelen. De merge hieronder zet het `iban`-veld dus uit deze route
+        // — één bron, en de drop verandert hier straks niets.
+        //
+        // Strikt, want deze IBANs zijn hier niet alleen decoratie: de
+        // TransferConfirmSheet matcht er tegenpartij-IBANs mee om te bepalen welke
+        // transacties een verschuiving tussen eigen rekeningen zijn.
+        fetchOwnAccountIbansStrict(),
       ])
 
       if (signal?.aborted) return // Discard stale results
       if (fetchError) throw fetchError
       if (!allData) throw new Error('Geen rekeningen gevonden')
 
-      setAllAccounts(allData as Account[])
+      const ibanFor = ibanById(ownAccountIbans)
+      const allAccounts = (allData as Account[]).map((a) => ({ ...a, iban: ibanFor.get(a.id) ?? null }))
+      setAllAccounts(allAccounts)
 
       if (isCombined) {
-        const total = (allData as Account[]).reduce((s, a) => s + Number(a.balance), 0)
+        const total = allAccounts.reduce((s, a) => s + Number(a.balance), 0)
         setAccount({
           id: 'all',
           name: 'Alle rekeningen',
@@ -407,7 +428,10 @@ export function CashAccountView({
           sort_order: 0,
         })
       } else {
-        const target = (allData as Account[]).find((a) => a.id === accountId)
+        // Uit de MERGED lijst, niet uit `allData`: anders draagt `account.iban`
+        // weer de plaintext-kolomwaarde (en na Stage B niets), waar zowel de
+        // IBAN-regel onder de rekeningnaam als het bewerkformulier op leunen.
+        const target = allAccounts.find((a) => a.id === accountId)
         if (!target) {
           setError('Rekening niet gevonden')
           setLoading(false)
@@ -416,10 +440,13 @@ export function CashAccountView({
         setAccount(target)
       }
 
-      // Build own-account identifiers (IBANs + naam-patronen)
+      // Build own-account identifiers (IBANs + naam-patronen). Uit de MERGED
+      // lijst — dit is de set die bepaalt of een tegenpartij een eigen rekening
+      // is, dus hier zou de plaintext-kolom lezen na Stage B stil "geen eigen
+      // rekeningen" opleveren.
       const ids = buildOwnAccountIdentifiers(
         (ownIbanRows ?? []) as { match_type?: string | null; match_value?: string | null; iban?: string | null }[],
-        (allData as Account[]).map((a) => a.iban),
+        allAccounts.map((a) => a.iban),
       )
       setOwnIbans(ids.ibans)
       setOwnNamePatterns(ids.namePatterns)
@@ -940,17 +967,30 @@ export function CashAccountView({
     balance: number
   }) {
     if (!account) return
-    const supabase = createClient()
-    await supabase
-      .from('bank_accounts')
-      .update({
+
+    // Via de route, niet rechtstreeks: de IBAN moet als `iban_encrypted` +
+    // `iban_hash` worden weggeschreven en die sleutels zijn server-only. Zou dit
+    // een client-update blijven, dan werd alleen de plaintext-kolom bijgewerkt
+    // terwijl élk leespad de versleutelde kolom leest — de gebruiker corrigeert
+    // zijn IBAN, ziet niets veranderen, en de eigen-rekeningherkenning blijft op
+    // het oude nummer matchen.
+    const res = await fetch(`/api/bank-accounts/${account.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         name: formData.name,
         iban: formData.iban || null,
         bank_name: formData.bank_name || null,
         account_type: formData.account_type,
         balance: formData.balance,
-      })
-      .eq('id', account.id)
+      }),
+    })
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      setError((data as { error?: string }).error ?? 'Rekening opslaan mislukt. Probeer het opnieuw.')
+      return
+    }
 
     setShowAccountForm(false)
     loadAccount()

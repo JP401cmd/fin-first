@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { type Account } from '@/components/app/account-form-modal'
+import { fetchOwnAccountIbans, ibanById } from '@/lib/own-accounts-ibans'
 import { formatCurrency as formatCurrencyShort } from '@/components/app/budget-shared'
 import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
 import { BottomSheet } from '@/components/app/bottom-sheet'
@@ -272,19 +273,47 @@ export function CashOverview({
     // het optioneel gekoppelde cash-asset). Een ongekoppelde of niet-getrackte
     // rekening liet anders ál zijn transacties volledig verdwijnen uit dit
     // overzicht, terwijl cash-account-view ze wél toont (alle actieve
-    // rekeningen). RLS begrenst dit tot EIGEN rekeningen (bank_accounts is
-    // own-row: auth.uid()=user_id, géén household-verbreding zoals bij
-    // assets/budgets); in 'personal' versmalt een extra ownership-filter verder
-    // tot je niet-gedeelde rekeningen. Handmatige cash-assets zonder
-    // bank_accounts-rij vallen sowieso buiten deze query.
+    // rekeningen).
+    //
+    // RLS-scope, geverifieerd tegen `pg_policies`: de SELECT-policy "Users view
+    // own or shared bank_accounts" is NIET eigen-rij maar huishoud-verbreed —
+    //   (auth.uid() = user_id)
+    //   OR (ownership = 'shared' AND household_id = user_household_id())
+    // (`20260719090108_perf_rls_initplan_consolidatie.sql`). Hier stond eerder het
+    // tegenovergestelde ("own-row, géén household-verbreding"); dat klopte niet en
+    // is precies het soort aanname waarop iemand een `user_id`-filter toevoegt en
+    // daarmee de gedeelde huishoudrekening stil uit beeld haalt. In 'personal'
+    // versmalt het extra ownership-filter hieronder wél tot je niet-gedeelde
+    // rekeningen. Handmatige cash-assets zonder bank_accounts-rij vallen sowieso
+    // buiten deze query.
+    // Expliciete kolomlijst i.p.v. `select('*')`: die stuurde óók `iban_encrypted`
+    // en `iban_hash` naar de browser. De ciphertext is zonder sleutel onschadelijk,
+    // maar de blind index is een stabiele gelijkheids-identifier afgeleid van een
+    // server-only sleutel — die hoort niet in browsercache, devtools of een
+    // error-reporter (securityreview 30 juli). De leesbare IBAN komt hieronder uit
+    // de route.
     let q = supabase
       .from('bank_accounts')
-      .select('*')
+      .select('id, name, bank_name, account_type, balance, is_active, sort_order, linked_asset_id, ownership')
       .eq('is_active', true)
       .order('sort_order', { ascending: true })
     if (perspective === 'personal') q = q.eq('ownership', 'personal')
-    const { data } = await q
-    if (data) setAccounts(data as Account[])
+    // De IBAN in de `select('*')` hierboven is de plaintext-kolom die in Stage B
+    // verdwijnt; ontsleutelen kan alleen server-side. Hier dient hij puur als
+    // regel onder de rekeningnaam, dus de niet-strikte variant met een eigen
+    // terugval volstaat: zonder IBAN toont de kaart alleen de banknaam, en dat
+    // mag het rekeningoverzicht niet laten vallen.
+    const [{ data }, ibanResult] = await Promise.all([
+      q,
+      fetchOwnAccountIbans().catch((err) => {
+        console.warn('[cash-overview] IBANs niet beschikbaar:', err)
+        return { accounts: [], unreadable: 0 }
+      }),
+    ])
+    if (data) {
+      const ibanFor = ibanById(ibanResult.accounts)
+      setAccounts((data as Account[]).map((a) => ({ ...a, iban: ibanFor.get(a.id) ?? null })))
+    }
   }, [perspective])
 
   // Laadt ALLE cash-rekeningen (bank-gekoppeld én handmatige cash-assets) —

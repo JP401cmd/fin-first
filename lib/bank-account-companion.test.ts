@@ -1,6 +1,24 @@
-import { describe, it, expect, vi } from 'vitest'
-import { syncBankAccountCompanion, type CompanionAssetInput } from './bank-account-companion'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
+
+// De echte `encryptField` heeft ENCRYPTION_KEY_V1 uit de env nodig; die staat in
+// de testomgeving niet. Zonder deze mock viel élke aanroep hieronder stil in de
+// catch van `ibanColumns` en bewees geen enkele test iets over de dual-write.
+const { mockEncryptField, mockBlindIndex } = vi.hoisted(() => ({
+  mockEncryptField: vi.fn(),
+  mockBlindIndex: vi.fn(),
+}))
+vi.mock('@/lib/crypto/field-encryption', () => ({
+  encryptField: mockEncryptField,
+  blindIndex: mockBlindIndex,
+}))
+
+import { syncBankAccountCompanion, type CompanionAssetInput } from './bank-account-companion'
+
+beforeEach(() => {
+  mockEncryptField.mockImplementation((s: string | null) => (s === null ? null : `enc:${s}`))
+  mockBlindIndex.mockImplementation((s: string) => `hash:${s.toLowerCase()}`)
+})
 
 /**
  * Regressie: aanvinken van een rekening in de Budgetteren-setupwizard zette wél
@@ -156,5 +174,46 @@ describe('syncBankAccountCompanion', () => {
 
     expect(bankDelete).not.toHaveBeenCalled()
     expect(bankUpdate).not.toHaveBeenCalled()
+  })
+
+  // ── De IBAN-dual-write ───────────────────────────────────────────────────
+  //
+  // Sinds de encryptie-omzetting lezen álle eigen-rekeningpaden uitsluitend
+  // `iban_encrypted`. Een companion-rij die die kolom niet krijgt, is voor de app
+  // dus een rekening ZÓNDER IBAN — en dan telt elke interne overboeking van of
+  // naar die rekening mee als een échte inkomst én een échte uitgave.
+
+  it('schrijft de IBAN versleuteld én als blind index mee, niet alleen plaintext', async () => {
+    const { supabase, bankInsert } = mockSupabase({ existingBankAccountId: null })
+
+    await syncBankAccountCompanion(supabase, 'user-1', asset, true)
+
+    expect(bankInsert.mock.calls[0][0]).toMatchObject({
+      iban: 'NL00BANK0123456789',
+      iban_encrypted: 'enc:NL00BANK0123456789',
+      iban_hash: 'hash:nl00bank0123456789',
+    })
+  })
+
+  it('valt bij een onbruikbare sleutel NIET terug op alleen plaintext', async () => {
+    // Dit is het securityreview-defect van 30 juli, vastgelegd. Zo faalt het in
+    // de browser (`ENCRYPTION_KEY_V1` bestaat daar niet). De oude catch schreef
+    // dan `{ iban: <plaintext> }`: een rij die er compleet uitziet maar voor élke
+    // lezer geen IBAN heeft — stille corruptie van de spaarquote. De sync gaat
+    // door (de rekening blijft zichtbaar), maar zónder IBAN-kolommen, zodat een
+    // bestaande correcte ciphertext bij een update ook niet gewist wordt.
+    mockEncryptField.mockImplementation(() => {
+      throw new Error('[field-encryption] Missing env var ENCRYPTION_KEY_V1')
+    })
+    const { supabase, bankInsert } = mockSupabase({ existingBankAccountId: null })
+
+    await syncBankAccountCompanion(supabase, 'user-1', asset, true)
+
+    const row = bankInsert.mock.calls[0][0]
+    expect(row).not.toHaveProperty('iban')
+    expect(row).not.toHaveProperty('iban_encrypted')
+    expect(row).not.toHaveProperty('iban_hash')
+    // De rest van de sync gaat wél door — de rekening mag niet verdwijnen.
+    expect(row).toMatchObject({ name: 'Betaalrekening', balance: 1500 })
   })
 })

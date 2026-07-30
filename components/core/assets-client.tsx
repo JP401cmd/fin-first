@@ -12,8 +12,10 @@ import { PAGE_INFO } from '@/lib/page-info-content'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { AssetPane } from '@/components/app/core/assets/asset-pane'
 import { createClient } from '@/lib/supabase/client'
-import { syncBudgetingActive } from '@/lib/budgeting-active'
-import { syncBankAccountCompanion } from '@/lib/bank-account-companion'
+// LET OP: importeer hier géén `syncBankAccountCompanion` (of iets anders uit
+// `lib/bank-account-iban.ts`). Dit is een client-component en die keten
+// versleutelt de IBAN met een server-only sleutel — zie de toelichting bij de
+// toggle-budget-fetch in `handleSave`. De companion-sync loopt via de route.
 import { buildUnlinkedCashAssets } from '@/lib/unlinked-cash-assets'
 import { upsertSingleBalanceSnapshot } from '@/lib/balance-snapshot'
 import { DGA_LENING_DREMPEL } from '@/lib/box2-data'
@@ -3205,35 +3207,37 @@ export function AssetForm({
       assetId = inserted?.id
     }
 
-    // Create/sync/cleanup de gekoppelde bank_accounts-companion voor cash-assets.
-    // Zelfde gedeelde helper als de Budgetteren-setupwizard, zodat de rekening
-    // meteen zichtbaar is op /core/cash/import en de twee vlaggen nooit
-    // uiteenlopen. Alleen relevant wanneer we aan- of uitzetten:
-    //  - aanzetten (hasBudgetTracking) → companion aan/bijwerken;
-    //  - uitzetten op een asset die het eerder aan had → companion opruimen.
-    if (isCashType && assetId && (hasBudgetTracking || (isEdit && asset?.has_budget_tracking))) {
-      await syncBankAccountCompanion(
-        supabase,
-        user.id,
-        {
-          id: assetId,
-          name,
-          iban: iban || null,
-          institution: institution || null,
-          subtype: subtype || null,
-          ownership,
-          household_id: ownership === 'shared' ? householdId : null,
-          current_value: Number(currentValue) || 0,
-        },
-        hasBudgetTracking,
-      )
-    }
-
-    // After save: sync budgeting_active with has_budget_tracking status.
-    // Best-effort (zoals de oude inline sync): een gefaalde gate-write mag de
-    // save-flow niet breken; een volgende save herstelt de gate.
-    if (isCashType) {
-      await syncBudgetingActive(supabase, user.id).catch(() => undefined)
+    // Create/sync/cleanup de gekoppelde bank_accounts-companion voor cash-assets,
+    // plus de module-gate `profiles.budgeting_active` — allebei via de route.
+    //
+    // **Waarom dit niet meer client-side mag.** Dit bestand is `'use client'`, en
+    // `syncBankAccountCompanion` schrijft de IBAN sinds de encryptie-omzetting als
+    // `iban_encrypted` + `iban_hash`. Die versleuteling vraagt `ENCRYPTION_KEY_V1`,
+    // een server-only env-var die in de browser gegarandeerd ontbreekt. De
+    // helper ving dat op en schreef dan alleen de plaintext-kolom — vroeger een
+    // nette degradatie, maar sinds álle lezers uitsluitend `iban_encrypted` lezen
+    // is zo'n rij voor de app een rekening ZONDER IBAN. Gevolg: budgetteren
+    // aanzetten op een cash-bezit met IBAN leverde een companion die uit de
+    // eigen-rekeningherkenning viel, waarna elke interne overboeking van of naar
+    // die rekening als échte inkomst én uitgave meetelde. Stil, en precies de
+    // corruptie die deze omzetting moest voorkomen (securityreview 30 juli).
+    //
+    // `POST /api/assets/toggle-budget` doet exact hetzelfde drieluik server-side
+    // (`setBudgetTracking`: asset-vlag → companion → gate) en leest de assetvelden
+    // vers uit de DB — die zijn hierboven net weggeschreven. Best-effort zoals
+    // voorheen, maar niet geruisloos: een gefaalde sync mag de save-flow niet
+    // breken, en een volgende save herstelt 'm.
+    if (isCashType && assetId) {
+      try {
+        const res = await fetch('/api/assets/toggle-budget', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: assetId, enabled: hasBudgetTracking }),
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      } catch (syncErr) {
+        console.error('[assets-client] companion/gate-sync mislukt:', syncErr)
+      }
     }
 
     setSaving(false)

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { BUDGET_SLUGS } from '@/lib/budget-data'
+import { blindIndex, encryptField, isFieldEncryptionConfigured } from '@/lib/crypto/field-encryption'
 
 // ── Test Data Seed for Regression Test Account ──────────────────────────────
 //
@@ -137,6 +138,21 @@ export async function seedTestData(
   }
 
   // ── 3. Bank account ─────────────────────────────────────────────────────
+  //
+  // De IBAN moet hier óók versleuteld worden weggeschreven, niet alleen als
+  // plaintext. Sinds de encryptie-omzetting lezen álle eigen-rekeningpaden
+  // uitsluitend `iban_encrypted`; een seed-rekening met alleen de plaintext-
+  // kolom is voor de app dus een rekening ZONDER IBAN. Regressiesuites die
+  // eigen-rekening-verschuivingen aantonen zouden dan groen blijven terwijl ze
+  // niets meer bewijzen — precies de stille dekking die we niet willen.
+  //
+  // Conditie identiek aan `seed-persona`: zonder sleutels in de env slaan we de
+  // versleutelde kolommen over in plaats van te crashen op een lokale dev-DB.
+  const seedIban = 'NL91INGB0001234567'
+  const seedIbanEncrypted = isFieldEncryptionConfigured()
+    ? { iban_encrypted: encryptField(seedIban), iban_hash: blindIndex(seedIban) }
+    : {}
+
   const { data: existingBanks } = await supabase
     .from('bank_accounts')
     .select('id')
@@ -154,7 +170,8 @@ export async function seedTestData(
         bank_name: 'ING',
         account_type: 'checking',
         balance: 3200,
-        iban: 'NL91INGB0001234567',
+        iban: seedIban,
+        ...seedIbanEncrypted,
         is_active: true,
         sort_order: 0,
         linked_asset_id: savingsAssetId,

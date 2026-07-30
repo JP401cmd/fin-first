@@ -18,6 +18,7 @@ import { InfoTooltip } from '@/components/editorial/info-icon-tooltip'
 import { categorizeTransaction, isOwnAccountTransfer, isWalletTransferType, buildFrequencyMap, type CategoryCorrection, type FrequencyMatch } from '@/lib/parsers/categorize'
 import { type Budget, resolveEigenRekeningBudgetId } from '@/lib/budget-data'
 import { buildOwnAccountIdentifiers } from '@/lib/own-accounts'
+import { fetchOwnAccountIbansStrict, ibanById } from '@/lib/own-accounts-ibans'
 import { linkUnmatchedTransfers } from '@/lib/transfer-matching'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { Kicker, EditorialHeadline, EditorialDeck } from '@/components/editorial'
@@ -253,12 +254,26 @@ export default function ImportPage() {
 
       const { data: { user } } = await supabase.auth.getUser()
 
-      const [accountsRes, budgetsRes, correctionsRes, ownIbansRes] = await Promise.all([
-        supabase.from('bank_accounts').select('id, name, iban, ownership').eq('is_active', true).order('sort_order'),
+      // `bank_accounts.iban` (plaintext) is hier vervangen door de ontsleutelde
+      // IBANs uit `/api/own-accounts/ibans`: de encryptiesleutels zijn server-only,
+      // dus deze `'use client'`-pagina kan `iban_encrypted` niet zelf lezen.
+      //
+      // Bewust de STRICTE variant, en bewust binnen deze `Promise.all` zodat een
+      // fout in de `catch` van `loadInitialData` landt en de pagina zichtbaar
+      // faalt. `ownIbans` bepaalt namelijk of een overboeking naar je eigen
+      // rekening als verschuiving wordt geïmporteerd of als gewone inkomst/uitgave
+      // wordt weggeschreven. Zou deze ophaal stil terugvallen op een lege set, dan
+      // importeert de pagina vrolijk door en staat de spaarquote van de gebruiker
+      // permanent verkeerd — zonder dat iets rood wordt. Liever niet importeren.
+      const [accountsRes, budgetsRes, correctionsRes, ownIbansRes, ownAccountIbans] = await Promise.all([
+        supabase.from('bank_accounts').select('id, name, ownership').eq('is_active', true).order('sort_order'),
         supabase.from('budgets').select('*').order('sort_order'),
         supabase.from('category_corrections').select('match_field, match_value, budget_id'),
         user ? supabase.from('user_own_ibans').select('match_type, match_value, iban').eq('user_id', user.id) : Promise.resolve({ data: [], error: null }),
+        fetchOwnAccountIbansStrict(),
       ])
+
+      const ibanByAccountId = ibanById(ownAccountIbans)
 
       const anyError = accountsRes.error || budgetsRes.error || correctionsRes.error
       if (anyError && isNetworkFailure(anyError)) {
@@ -269,11 +284,16 @@ export default function ImportPage() {
       }
 
       if (accountsRes.data) {
-        setAccounts(accountsRes.data as Account[])
-        if (accountsRes.data.length > 0) {
-          setSelectedAccountId(accountsRes.data[0].id)
+        const accountRows = (accountsRes.data as { id: string; name: string; ownership?: 'personal' | 'shared' }[])
+          .map((a) => ({ ...a, iban: ibanByAccountId.get(a.id) ?? null }))
+        setAccounts(accountRows as Account[])
+        if (accountRows.length > 0) {
+          setSelectedAccountId(accountRows[0].id)
         }
-        const bankIbans = (accountsRes.data as Account[]).map((a) => a.iban)
+        // Alleen de ACTIEVE rekeningen tellen mee als eigen-rekening-identifier —
+        // exact de afbakening van vóór de omzetting (de select filtert al op
+        // `is_active`, dus de merge hierboven levert precies die set).
+        const bankIbans = accountRows.map((a) => a.iban)
         const ids = buildOwnAccountIdentifiers(
           (ownIbansRes.data ?? []) as { match_type?: string | null; match_value?: string | null; iban?: string | null }[],
           bankIbans,

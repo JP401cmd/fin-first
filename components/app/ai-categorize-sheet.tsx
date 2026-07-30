@@ -382,21 +382,30 @@ export function AICategorizeSheet({
     })))
     setPhase('review')
 
-    // Context laden; mislukt dat, dan degradeert de pass naar "alles onbekend →
-    // AI" (lege regels/frequentie, geen eigen-rekening-detectie) — zelfde
-    // degradatie als de oude flow.
+    // Context laden. Mislukt dat, dan STOPPEN we — we degraderen niet meer naar
+    // een lege context.
+    //
+    // Waarom die degradatie weg moest: `ctx.ownIbans` is de enige reden dat een
+    // overboeking naar je eigen spaarrekening als verschuiving wordt herkend.
+    // Een lege set betekende dat zulke transacties gewoon aan de AI werden
+    // aangeboden, die er een gewone post van maakt — waarna diezelfde euro als
+    // inkomst én als uitgave meetelt en de spaarquote structureel verkeerd staat.
+    // Dat gebeurde zonder één zichtbaar signaal. Sinds de IBANs via
+    // `/api/own-accounts/ibans` komen (server-only sleutels) is een mislukte
+    // ophaal bovendien een reëel netwerkscenario in plaats van een randgeval.
+    // Liever geen voorstellen dan stil verkeerde voorstellen.
     let ctx: AutoCatContext
     try {
       ctx = await loadAutoCatContext()
-    } catch {
-      ctx = {
-        budgets: flatBudgets,
-        corrections: [],
-        freqMap: new Map(),
-        ownIbans: new Set<string>(),
-        ownNamePatterns: [],
-        eigenRekeningBudgetId: null,
-      }
+    } catch (err) {
+      setAiError(
+        err instanceof Error && err.message
+          ? `Je regels en eigen rekeningen konden niet worden geladen: ${err.message}`
+          : 'Je regels en eigen rekeningen konden niet worden geladen. Probeer het zo opnieuw.',
+      )
+      setStage1Resolved(true)
+      setAiRunning(false)
+      return
     }
     setEigenRekeningBudgetId(ctx.eigenRekeningBudgetId)
 

@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { cashSubtypeToAccountType } from './account-types'
-import { blindIndex, encryptField } from './crypto/field-encryption'
+import { ibanWriteColumns } from './bank-account-iban'
 
 /**
  * De IBAN-kolommen van de companion-rij: plaintext (zolang die kolom bestaat) én
@@ -16,29 +16,42 @@ import { blindIndex, encryptField } from './crypto/field-encryption'
  * `iban_hash`-tak van de callback worden gemist — stille drift in precies de
  * kolom die Stage B tot enige bron maakt.
  *
- * **Try/catch en niet `isFieldEncryptionConfigured()`** — bewust, en dat is een
- * securityreview-bevinding: die poort test alléén of de env-vars BESTAAN. Een
- * sleutel die er wél staat maar niet naar 32 bytes hex decodeert komt erdoor,
- * waarna `encryptField` alsnog gooit — en deze helper draait in een best-effort
- * `.catch()` (`setBudgetTracking`), dus die throw zou de hele companion-sync
- * geruisloos overslaan. Dat is precies het faalpad dat deze noot beweerde te
- * voorkomen: bij het SC-13-herstel zou het bezit dan zichtbaar én budgetterend
- * worden terwijl de companion-rij inactief blijft — de rekening blijft weg uit
- * `/core/cash` en de import, stil. De `catch` hier dekt "ontbreekt" én "ongeldig"
- * met één pad, en logt altijd. Uitkomst zonder werkende sleutels = het gedrag van
- * vóór deze regel (alleen plaintext), nooit een overgeslagen sync.
+ * **Try/catch en niet `isFieldEncryptionConfigured()`** — bewust: die poort test
+ * alléén of de env-vars BESTAAN. Een sleutel die er wél staat maar niet naar 32
+ * bytes hex decodeert komt erdoor, waarna `encryptField` alsnog gooit — en deze
+ * helper draait in een best-effort `.catch()` (`setBudgetTracking`), dus die throw
+ * zou de hele companion-sync geruisloos overslaan. Bij het SC-13-herstel zou het
+ * bezit dan zichtbaar én budgetterend worden terwijl de companion-rij inactief
+ * blijft: de rekening verdwijnt uit `/core/cash` en de import, stil. De `catch`
+ * dekt "ontbreekt" én "ongeldig" met één pad, en logt altijd.
+ *
+ * **Wat de catch NIET meer doet: terugvallen op alleen plaintext**
+ * (securityreview 30 juli). Die terugval was correct zolang de leespaden de
+ * plaintext-kolom lazen. Nu ze uitsluitend `iban_encrypted` lezen, is een rij met
+ * alleen `iban` voor de app een rekening ZÓNDER IBAN — en dan telt elke interne
+ * overboeking van of naar die rekening mee als een échte inkomst én een échte
+ * uitgave. Dat is erger dan geen IBAN schrijven, want het ziet er compleet uit.
+ *
+ * De catch laat de IBAN-kolommen daarom volledig met rust: bij een UPDATE blijft
+ * een eerder correct versleutelde waarde staan (geen wipe), bij een INSERT krijgt
+ * de rij simpelweg geen IBAN. De rest van de sync (naam, type, saldo, eigendom)
+ * gaat gewoon door, dus de rekening blijft zichtbaar. Zichtbaar-zonder-IBAN is
+ * herstelbaar via het bewerkscherm; stil-verkeerd-gerekend niet.
  */
 function ibanColumns(iban: string | null): Record<string, string | null> {
   const value = iban || null
   if (!value) return { iban: null, iban_encrypted: null, iban_hash: null }
   try {
-    return { iban: value, iban_encrypted: encryptField(value), iban_hash: blindIndex(value) }
+    // Gedeelde schrijfvorm (`lib/bank-account-iban.ts`) — één plek die bepaalt
+    // welke drie kolommen een IBAN-schrijver aanraakt.
+    return ibanWriteColumns(value)
   } catch (err) {
     console.error(
-      '[bank-account-companion] IBAN niet te versleutelen (sleutel ontbreekt of is ongeldig) — companion krijgt alleen de plaintext IBAN:',
+      '[bank-account-companion] IBAN niet te versleutelen (sleutel ontbreekt, is ongeldig, of deze code draait in de browser) — ' +
+      'de companion-rij wordt zonder IBAN-kolommen gesynchroniseerd; de rekening blijft zichtbaar maar telt niet mee als eigen rekening:',
       err,
     )
-    return { iban: value }
+    return {}
   }
 }
 

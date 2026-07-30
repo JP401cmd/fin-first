@@ -21,6 +21,7 @@ import {
 } from '@/lib/household/perspective-loader'
 import type { Perspective } from '@/lib/household-data'
 import type { Budget } from '@/lib/budget-data'
+import { fetchOwnAccountIbans, ibanById } from '@/lib/own-accounts-ibans'
 import { TransactieTijdlijn, type AccountOption } from './transactie-tijdlijn'
 import { TransactionForm } from '@/components/app/transaction-form'
 import { HideInSimple } from '@/components/app/hide-in-simple'
@@ -205,7 +206,7 @@ export function TransactiesAnalyse() {
       // zónder een losse RLS-query die het perspectief zou omzeilen.
       const fetchSince = monthsBefore(periodWindow.since, 12)
       try {
-        const [txResult, budgetsResult, accountsResult, connectionsResult] = await Promise.all([
+        const [txResult, budgetsResult, accountsResult, connectionsResult, ibanResult] = await Promise.all([
           loadPerspectiveTransactions(supabase, perspective, {
             since: fetchSince,
             until: periodWindow.until,
@@ -213,13 +214,27 @@ export function TransactiesAnalyse() {
           supabase.from('budgets').select('*').order('sort_order', { ascending: true }),
           supabase
             .from('bank_accounts')
-            .select('id, name, bank_name, iban, sort_order')
+            .select('id, name, bank_name, sort_order')
             .eq('is_active', true)
             .order('sort_order', { ascending: true }),
           supabase
             .from('bank_connection_accounts')
             .select('bank_account_id')
             .eq('is_active', true),
+          // De IBAN dient hier één doel: de laatste vier tekens in de rekening-
+          // kiezer. Plaintext `bank_accounts.iban` verdwijnt in Stage B en
+          // ontsleutelen kan alleen server-side, dus dat gaat via deze route.
+          //
+          // Bewust de NIET-strikte variant én een eigen terugval: een ontbrekend
+          // staartje is een schoonheidsfoutje, en dat mag de hele transactie-
+          // analyse niet laten vallen. Precies het omgekeerde van de import- en
+          // categorisatiepaden, waar dezelfde IBAN een match-identifier is en een
+          // stille terugval de spaarquote zou vervuilen — vandaar twee varianten
+          // in `lib/own-accounts-ibans.ts` in plaats van één compromis.
+          fetchOwnAccountIbans().catch((err) => {
+            console.warn('[transacties-analyse] IBAN-staartjes niet beschikbaar:', err)
+            return { accounts: [], unreadable: 0 }
+          }),
         ])
         if (cancelled) return
 
@@ -230,18 +245,19 @@ export function TransactiesAnalyse() {
           id: string
           name: string
           bank_name: string | null
-          iban: string | null
           sort_order: number | null
         }>
+        const ibanFor = ibanById(ibanResult.accounts)
         const accMap = new Map<string, string>()
         const accList: AccountOption[] = []
         for (const a of accRows) {
           accMap.set(a.id, a.name)
+          const iban = ibanFor.get(a.id) ?? null
           accList.push({
             id: a.id,
             name: a.name,
             bankName: a.bank_name ?? null,
-            ibanTail: a.iban ? a.iban.replace(/\s/g, '').slice(-4) : null,
+            ibanTail: iban ? iban.replace(/\s/g, '').slice(-4) : null,
             connected: connectedIds.has(a.id),
           })
         }

@@ -159,6 +159,26 @@ vi.mock('@/components/app/transaction-form', () => ({
 
 import { CashAccountView } from './cash-account-view'
 
+/**
+ * `/api/own-accounts/ibans` is GEEN optioneel endpoint (anders dan de rest die
+ * hier ge-no-op't wordt): sinds de IBAN-encryptie komt `account.iban` daarvandaan
+ * en niet meer uit de `bank_accounts`-kolom, omdat ontsleutelen de server-only
+ * sleutels vraagt. `loadAccount` gebruikt bewust de STRIKTE variant — een
+ * onvolledige IBAN-set zou eigen-rekening-verschuivingen als gewone inkomsten en
+ * uitgaven laten doorgaan — dus een 404 hierop laat het hele scherm terecht
+ * falen. Elke fetch-stub in dit bestand moet 'm daarom beantwoorden.
+ */
+function ownAccountIbansResponse() {
+  return {
+    ok: true,
+    status: 200,
+    json: async () => ({
+      accounts: [{ id: fixtures.account.id, iban: fixtures.account.iban, is_active: true }],
+      unreadable: 0,
+    }),
+  } as unknown as Response
+}
+
 // Globale fetch neutraliseren: alle optionele endpoints (bank-connect status,
 // cashflow-forecast, household) mogen no-op teruggeven. Plus een ResizeObserver-
 // stub die jsdom mist (de Sankey-geldstroom gebruikt 'm in een effect).
@@ -166,7 +186,10 @@ function setupEnv() {
   mutationLog = []
   vi.stubGlobal(
     'fetch',
-    vi.fn(async () => ({ ok: false, status: 404, json: async () => ({}) })) as unknown as typeof fetch,
+    vi.fn(async (input: RequestInfo | URL) => {
+      if (input === '/api/own-accounts/ibans') return ownAccountIbansResponse()
+      return { ok: false, status: 404, json: async () => ({}) } as unknown as Response
+    }) as unknown as typeof fetch,
   )
   vi.stubGlobal(
     'ResizeObserver',
@@ -233,6 +256,7 @@ describe('CashAccountView — "Budgetteren uitschakelen" gaat via de API-route, 
     vi.stubGlobal(
       'fetch',
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (input === '/api/own-accounts/ibans') return ownAccountIbansResponse()
         if (input === '/api/assets/toggle-budget' && init?.method === 'POST') {
           toggleBudgetCalls.push(JSON.parse(init.body as string))
           return {
