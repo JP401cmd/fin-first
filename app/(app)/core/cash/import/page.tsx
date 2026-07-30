@@ -85,6 +85,14 @@ type ImportRow = ParsedTransaction & {
    * de gebruiker erbij, anders dan bij een sync.
    */
   crossSourceDuplicate: CrossSourceFlag | null
+  /**
+   * Dedup-laag 1b: stond al op deze GEDEELDE rekening omdat de huishoudpartner
+   * 'm al had geïmporteerd. Komt uit het antwoord van de server-route
+   * (`skipped[].layer === 'household_partner'`) en dus pas ná de importpoging —
+   * anders dan `crossSourceDuplicate`, die al vóór het wegschrijven bekend is.
+   * Niet overrulebaar: het is een exacte sleuteltreffer, geen oordeel.
+   */
+  householdPartnerDuplicate?: boolean
   skipImport: boolean
   isTransfer: boolean
   aiAccepted?: boolean
@@ -201,16 +209,24 @@ export default function ImportPage() {
   const [ownNamePatterns, setOwnNamePatterns] = useState<string[]>([])
   const [checkingDups, setCheckingDups] = useState(false)
   /**
-   * Rekeningen met een actieve bankkoppeling. Die MOETEN via
-   * `POST /api/transactions/import` opslaan (B7): op zo'n rekening schrijft de
-   * bank-sync in dezelfde rijruimte, en twee schrijvers met verschillende
-   * dedup-regels leveren gegarandeerd een dubbele reeks op. Losse rekeningen
-   * houden voorlopig het bestaande clientpad.
+   * Rekeningen die MOETEN via `POST /api/transactions/import` opslaan (B7).
+   * Eén motivatie, twee gronden — beide draaien om een TWEEDE SCHRIJVER in
+   * dezelfde rijruimte, want twee schrijvers met verschillende dedup-regels
+   * leveren gegarandeerd een dubbele reeks op:
    *
-   * De lijst komt van de server — "wat telt als gekoppeld" hoort niet als tweede
-   * interpretatie in de browser te leven.
+   *  - een actieve **bankkoppeling** (tweede schrijver = de bank-sync);
+   *  - **`ownership = 'shared'`** (tweede schrijver = de huishoudpartner, die op
+   *    een gedeelde rekening evengoed mag importeren). Alleen het serverpad
+   *    draait de huishoud-brede dedup-laag; het clientpad hieronder filtert op
+   *    de eigen `user_id` en ziet partnerrijen dus nooit. Zo'n rekening hoeft
+   *    NIET gekoppeld te zijn.
+   *
+   * Persoonlijke, ongekoppelde rekeningen houden het bestaande clientpad.
+   *
+   * De lijst komt van de server — "wanneer is het serverpad verplicht" hoort
+   * niet als tweede interpretatie in de browser te leven.
    */
-  const [linkedAccountIds, setLinkedAccountIds] = useState<Set<string>>(() => new Set())
+  const [serverPathAccountIds, setServerPathAccountIds] = useState<Set<string>>(() => new Set())
   /**
    * De lijst kon niet opgehaald worden. Dan kiezen we het SERVERPAD voor élke
    * rekening: dat pad is functioneel een superset (zelfde dedup, plus laag 2 en
@@ -218,7 +234,7 @@ export default function ImportPage() {
    * bestaat is beperking van de blast radius — een mislukte lookup is geen reden
    * om de één-schrijver-regel te laten vallen.
    */
-  const [linkedLookupFailed, setLinkedLookupFailed] = useState(false)
+  const [serverPathLookupFailed, setServerPathLookupFailed] = useState(false)
   const [pendingSession, setPendingSession] = useState<ImportSession | null>(null)
   // Post-import categoriseren: de zojuist weggeschreven, nog ongecategoriseerde
   // rijen (budget_id null, geen overboeking) worden hier vastgehouden en aan de
@@ -231,11 +247,11 @@ export default function ImportPage() {
 
   /**
    * Schrijft de gekozen rekening via de server-route weg (B7)? Zie de
-   * toelichting bij `linkedAccountIds` en `linkedLookupFailed`. Op
+   * toelichting bij `serverPathAccountIds` en `serverPathLookupFailed`. Op
    * component-niveau berekend omdat zowel de import-lus als de voortgangs-UI
    * (batchgrootte) hem nodig heeft.
    */
-  const useServerPath = linkedLookupFailed || linkedAccountIds.has(selectedAccountId)
+  const useServerPath = serverPathLookupFailed || serverPathAccountIds.has(selectedAccountId)
   /**
    * Clientpad: 100 rijen per insert — ongewijzigd sinds de incident-fix.
    * Serverpad: 500, want daar is elke batch één HTTP-verzoek dat zijn eigen
@@ -327,13 +343,13 @@ export default function ImportPage() {
       try {
         const res = await fetch('/api/transactions/import')
         if (!res.ok) throw new Error('lookup mislukt')
-        const data = await res.json() as { linked_account_ids?: string[] }
-        setLinkedAccountIds(new Set(data.linked_account_ids ?? []))
-        setLinkedLookupFailed(false)
+        const data = await res.json() as { server_path_account_ids?: string[] }
+        setServerPathAccountIds(new Set(data.server_path_account_ids ?? []))
+        setServerPathLookupFailed(false)
       } catch {
-        // Zie de toelichting bij `linkedLookupFailed`: bij twijfel het serverpad.
-        setLinkedAccountIds(new Set())
-        setLinkedLookupFailed(true)
+        // Zie de toelichting bij `serverPathLookupFailed`: bij twijfel het serverpad.
+        setServerPathAccountIds(new Set())
+        setServerPathLookupFailed(true)
       }
 
       setLoading(false)
@@ -955,7 +971,7 @@ export default function ImportPage() {
      */
     async function importBatchViaRoute(batch: typeof insertRows): Promise<{
       rows: PostImportTx[]
-      skipped: { import_hash: string; bank_seq: string | null }[]
+      skipped: { import_hash: string; bank_seq: string | null; layer?: string }[]
       failed: number
       error: string | null
     }> {
@@ -975,7 +991,7 @@ export default function ImportPage() {
         error?: string
         failed?: number
         rows?: PostImportTx[]
-        skipped?: { import_hash: string; bank_seq: string | null }[]
+        skipped?: { import_hash: string; bank_seq: string | null; layer?: string }[]
       }
 
       if (!res.ok) {
@@ -1026,6 +1042,11 @@ export default function ImportPage() {
      *  de UI vinkt die rijen daarop uit — zelfde behandeling als de pre-insert-
      *  filter van het clientpad. */
     const serverSkippedKeys = new Set<string>()
+    /** Deelverzameling daarvan: overgeslagen omdat de partner de rij al op deze
+     *  gedeelde rekening had staan (laag 1b). Apart bijgehouden zodat de
+     *  statuscel de juiste reden kan tonen in plaats van een generiek
+     *  "overgeslagen". */
+    const householdPartnerKeys = new Set<string>()
 
     for (let batchIdx = startBatch; batchIdx < batches.length; batchIdx++) {
       let batchFailed = false
@@ -1054,7 +1075,9 @@ export default function ImportPage() {
           const result = await importBatchViaRoute(batches[batchIdx])
           insertedRows = result.rows as typeof insertedRows
           for (const s of result.skipped) {
-            serverSkippedKeys.add(rowDedupKey({ import_hash: s.import_hash, bank_seq: s.bank_seq }))
+            const key = rowDedupKey({ import_hash: s.import_hash, bank_seq: s.bank_seq })
+            serverSkippedKeys.add(key)
+            if (s.layer === 'household_partner') householdPartnerKeys.add(key)
           }
           if (result.error) {
             batchFailed = true
@@ -1131,9 +1154,17 @@ export default function ImportPage() {
     // "overgeslagen" tonen in plaats van als "mislukt" — spiegelt exact wat het
     // clientpad met zijn eigen pre-insert-filter doet.
     if (serverSkippedKeys.size > 0) {
-      setRows((prev) => prev.map((row) => (
-        serverSkippedKeys.has(rowDedupKey(row)) ? { ...row, skipImport: true } : row
-      )))
+      setRows((prev) => prev.map((row) => {
+        const key = rowDedupKey(row)
+        if (!serverSkippedKeys.has(key)) return row
+        return {
+          ...row,
+          skipImport: true,
+          // Alleen de partner-treffer krijgt een eigen reden mee; de rest blijft
+          // gewoon "overgeslagen", precies als voorheen.
+          householdPartnerDuplicate: householdPartnerKeys.has(key) || undefined,
+        }
+      }))
     }
 
     // Import complete — clear session from localStorage
@@ -1952,6 +1983,21 @@ export default function ImportPage() {
                                 {row.isDuplicate ? (
                                   <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700">
                                     Duplicaat
+                                  </span>
+                                ) : row.householdPartnerDuplicate ? (
+                                  // Dedup-laag 1b: je partner heeft deze boeking
+                                  // al op de gedeelde rekening gezet. Zelfde
+                                  // vorm als de laag-2-badge hieronder — korte
+                                  // badge, uitleg in de tooltip — want het is
+                                  // dezelfde vraag ("waarom staat hier niet
+                                  // 'Nieuw'?") en die verdient één antwoordvorm.
+                                  <span className="inline-flex items-center gap-1">
+                                    <span className="rounded-full bg-warning-bg px-2 py-0.5 text-xs font-medium text-warning">
+                                      Al door partner
+                                    </span>
+                                    <InfoTooltip
+                                      text="Staat al op deze gedeelde rekening (geïmporteerd door je partner). Eén keer importeren is genoeg — jullie zien allebei dezelfde transacties."
+                                    />
                                   </span>
                                 ) : row.crossSourceDuplicate ? (
                                   // Dedup-laag 2: dezelfde boeking kwam al via de bank

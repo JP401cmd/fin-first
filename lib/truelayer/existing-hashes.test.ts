@@ -1,6 +1,11 @@
 import { describe, it, expect, vi } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { loadExistingDedupKeys, loadExistingImportHashes, EXISTING_HASH_PAGE_SIZE } from './existing-hashes'
+import {
+  loadExistingDedupKeys,
+  loadExistingImportHashes,
+  loadHouseholdSharedDedupKeys,
+  EXISTING_HASH_PAGE_SIZE,
+} from './existing-hashes'
 
 /**
  * De dedup-leesronde van de bank-sync. Twee dingen worden hier vastgelegd:
@@ -27,7 +32,7 @@ function makeSupabase(pages: Array<{ data: unknown[] | null; error?: { message: 
     if (op === 'range') ranges.push([args[0] as number, args[1] as number])
     return builder
   }
-  for (const op of ['select', 'eq', 'not', 'gte', 'lte', 'order']) builder[op] = chain(op)
+  for (const op of ['select', 'eq', 'neq', 'not', 'gte', 'lte', 'order']) builder[op] = chain(op)
   builder.range = (...args: unknown[]) => {
     filters.push({ op: 'range', args })
     ranges.push([args[0] as number, args[1] as number])
@@ -146,6 +151,86 @@ describe('loadExistingDedupKeys', () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     await expect(loadExistingDedupKeys(supabase, SCOPE))
+      .rejects.toThrow('Bestaande transacties voor duplicaatcontrole ophalen mislukt')
+    expect(consoleError).toHaveBeenCalled()
+    consoleError.mockRestore()
+  })
+})
+
+/**
+ * De huishoud-brede laag-1-leesronde: dezelfde indexsleutel, maar dan van de
+ * PARTNER op een gedeelde rekening.
+ *
+ * Waarom deze loader bestaat: op een `ownership='shared'`-rekening mogen beide
+ * partners importeren, en tot deze laag ving niets de tweede reeks af — niet de
+ * `.eq('user_id')` van `loadExistingDedupKeys` (die ziet partnerrijen nooit) en
+ * niet de unieke index (die droeg `user_id` in de sleutel). Gevolg was een
+ * volledige dubbele transactiereeks in één gedeeld grootboek.
+ *
+ * De twee filters hieronder zijn samen de privacy-control en worden daarom
+ * allebei apart vastgelegd: `.eq('ownership','shared')` is de tweede gordel naast
+ * RLS, `.neq('user_id', …)` houdt de set zuiver op partnerrijen. Sneuvelt één van
+ * de twee asserties, dan is dat geen test-detail maar een privacy-regressie.
+ */
+describe('loadHouseholdSharedDedupKeys', () => {
+  it('leest ALLEEN gedeelde partnerrijen: .neq op user_id én .eq op ownership', async () => {
+    const { supabase, filters } = makeSupabase([{ data: [] }])
+
+    await loadHouseholdSharedDedupKeys(supabase, SCOPE)
+
+    // `.neq('user_id')` — eigen rijen zijn hier niet interessant, die dekt laag 1
+    // al af, en zo blijft de teller apart telbaar.
+    expect(filters.filter((f) => f.op === 'neq').map((f) => f.args)).toEqual([['user_id', 'user-1']])
+    // `.eq('ownership','shared')` — de expliciete tweede gordel naast RLS: een
+    // toekomstige policy-verbreding mag hier nooit stil persoonlijke
+    // partnerrijen binnenlaten.
+    expect(filters.filter((f) => f.op === 'eq').map((f) => f.args)).toEqual([
+      ['account_id', 'acct-1'],
+      ['ownership', 'shared'],
+    ])
+    // Rekening + datumvenster blijven exact als bij de andere loaders.
+    expect(filters.filter((f) => f.op === 'gte').map((f) => f.args)).toEqual([['date', '2026-01-01']])
+    expect(filters.filter((f) => f.op === 'lte').map((f) => f.args)).toEqual([['date', '2026-07-29']])
+  })
+
+  it('bouwt de volledige indexsleutel, inclusief bank_seq', async () => {
+    const { supabase, filters } = makeSupabase([{
+      data: [
+        { import_hash: 'h1', bank_seq: '001' },
+        { import_hash: 'h2', bank_seq: null },
+      ],
+    }])
+
+    const result = await loadHouseholdSharedDedupKeys(supabase, SCOPE)
+
+    expect(result).toEqual(new Set(['h1|001', 'h2|']))
+    expect(filters.filter((f) => f.op === 'select').map((f) => f.args)).toEqual([['import_hash, bank_seq']])
+  })
+
+  it('pagineert door tot een niet-volle pagina', async () => {
+    const fullPage = Array.from({ length: EXISTING_HASH_PAGE_SIZE }, (_, i) => ({ import_hash: `h${i}`, bank_seq: null }))
+    const { supabase, ranges } = makeSupabase([
+      { data: fullPage },
+      { data: [{ import_hash: 'laatste', bank_seq: null }] },
+    ])
+
+    const result = await loadHouseholdSharedDedupKeys(supabase, SCOPE)
+
+    expect(result.size).toBe(EXISTING_HASH_PAGE_SIZE + 1)
+    expect(result.has('laatste|')).toBe(true)
+    expect(ranges).toEqual([
+      [0, EXISTING_HASH_PAGE_SIZE - 1],
+      [EXISTING_HASH_PAGE_SIZE, 2 * EXISTING_HASH_PAGE_SIZE - 1],
+    ])
+  })
+
+  it('gooit bij een queryfout in plaats van "niets bestaat al" te concluderen', async () => {
+    const { supabase } = makeSupabase([{ data: null, error: { message: 'permission denied' } }])
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    // Stil leeg teruggeven zou de partnerrijen onzichtbaar maken en precies de
+    // dubbele reeks opleveren die deze loader hoort te voorkomen.
+    await expect(loadHouseholdSharedDedupKeys(supabase, SCOPE))
       .rejects.toThrow('Bestaande transacties voor duplicaatcontrole ophalen mislukt')
     expect(consoleError).toHaveBeenCalled()
     consoleError.mockRestore()

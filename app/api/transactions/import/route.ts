@@ -8,6 +8,7 @@ import {
   dedupKey,
   loadCrossSourceCandidates,
   loadExistingDedupKeys,
+  loadHouseholdSharedDedupKeys,
 } from '@/lib/truelayer/existing-hashes'
 import {
   countCrossSourceDecisions,
@@ -32,12 +33,30 @@ import {
  * muteren gaat via een API-route, nooit met een directe `.insert()` uit de
  * browser).
  *
- * ## De twee dedup-lagen, in deze volgorde
+ * ## De drie dedup-lagen, in deze volgorde
  *
  * 1. **Laag 1 — de indexsleutel** `import_hash | coalesce(bank_seq,'')`, gescoped
  *    op `(user_id, account_id)`. Spiegelt de unieke index exact. Niet
  *    overrulebaar: dit is geen oordeel maar natuurkunde — de database zou de rij
  *    hoe dan ook weigeren, en dan sneuvelt de hele batch.
+ * 1b. **Laag 1b — de partner op een GEDEELDE rekening.** Dezelfde exacte
+ *    sleutel, maar dan van de ándere huishoudpartner. Draait ALLEEN op een
+ *    rekening met `ownership = 'shared'`; op een persoonlijke rekening wordt de
+ *    query niet eens gesteld.
+ *
+ *    Waarom deze laag nodig is: op een gedeelde rekening mogen beide partners
+ *    importeren (de rekeningcontrole hieronder gaat bewust via RLS), de trigger
+ *    `trg_stamp_household_id` stempelt beide reeksen op hetzelfde huishouden en
+ *    de SELECT-policy op `transactions` is huishoud-verbreed. Laag 1 filtert
+ *    echter op `.eq('user_id', …)` en de unieke index droeg `user_id` in de
+ *    sleutel — dus vóór deze laag ving NIETS de tweede reeks af, en zagen én
+ *    telden beide partners elke transactie dubbel.
+ *
+ *    Niet overrulebaar, net als laag 1 en anders dan laag 2: dit is een EXACTE
+ *    match op dezelfde rekening, geen fuzzy oordeel. Twee écht verschillende
+ *    boekingen met gelijke datum/bedrag/omschrijving worden al onderscheiden
+ *    door `bank_seq`, en dat zit in de sleutel. Er is dus bewust géén
+ *    `allow_*`-vlag voor.
  * 2. **Laag 2 — cross-bron** (`lib/parsers/cross-source-dedup.ts`): dezelfde
  *    boeking uit een andere bron, waar de bank een andere omschrijvingstekst
  *    levert dan het CSV-bestand. Dít is wél een oordeel, dus **wél overrulebaar**:
@@ -45,7 +64,7 @@ import {
  *    voorgedeselecteerd staan en kan 'm alsnog aanvinken (`allow_cross_source`).
  *    Bij de sync gebeurt hetzelfde stil — daar is niemand om iets te vragen.
  *
- * Beide lagen verhinderen uitsluitend INSERTs. Nooit een update, merge of delete:
+ * Alle drie de lagen verhinderen uitsluitend INSERTs. Nooit een update, merge of delete:
  * de oudste rij wint en houdt haar budget-toewijzing. Er komt ook geen "mogelijk
  * duplicaat"-status in `transactions` — dat zou een derde waarheid worden die
  * élke lezer correct zou moeten negeren.
@@ -125,22 +144,38 @@ type ImportRowInput = z.infer<typeof ImportRowSchema>
 type SkippedRow = {
   import_hash: string
   bank_seq: string | null
-  layer: 'exact' | 'cross_source'
+  layer: 'exact' | 'household_partner' | 'cross_source'
   reason?: 'iban' | 'name'
 }
 
 /**
  * GET /api/transactions/import — welke rekeningen MOETEN via deze route.
  *
- * De regel "verplicht voor gekoppelde rekeningen, losse rekeningen houden
- * voorlopig het clientpad" leeft hier, op de server, en niet als tweede
- * interpretatie van "gekoppeld" in de browser. De import-pagina vraagt de lijst
- * op en kiest daarop haar schrijfpad.
+ * De regel leeft hier, op de server, en niet als tweede interpretatie in de
+ * browser. De import-pagina vraagt de lijst op en kiest daarop haar schrijfpad.
  *
- * Signaal is `bank_connection_accounts.is_active` — dezelfde bron als het
- * herkomst-symbool op de rekeningkaart. Een verlopen token telt bewust mee: de
- * koppeling bestaat nog, de sync-route schrijft er na herautorisatie gewoon weer
- * in, en dus geldt de één-schrijver-regel onverkort.
+ * ## De regel is een UNIE van twee gevallen
+ *
+ * Eén motivatie, twee verschijningsvormen: zodra er MEER DAN ÉÉN schrijver in
+ * dezelfde rijruimte kan zitten, moeten alle schrijvers dezelfde dedup-regels
+ * volgen — anders levert dat gegarandeerd een dubbele reeks op.
+ *
+ * 1. **Actieve bankkoppeling.** De tweede schrijver is de bank-sync.
+ *    Signaal is `bank_connection_accounts.is_active` — dezelfde bron als het
+ *    herkomst-symbool op de rekeningkaart. Een verlopen token telt bewust mee:
+ *    de koppeling bestaat nog en de sync-route schrijft er na herautorisatie
+ *    gewoon weer in.
+ * 2. **`bank_accounts.ownership = 'shared'`.** De tweede schrijver is de
+ *    huishoudpartner. Op een gedeelde rekening mogen beide partners importeren
+ *    (de SELECT-policy is huishoud-verbreed), en alleen het serverpad draait
+ *    laag 1b — het clientpad filtert op `.eq('user_id', …)` en ziet de rijen van
+ *    de partner dus nooit. Een gedeelde rekening hoeft NIET gekoppeld te zijn;
+ *    dit geval staat volledig los van (1) en is waarschijnlijk het gewone geval.
+ *
+ * De gedeelde rekeningen komen via de RLS-client uit `bank_accounts` zelf —
+ * geen tweede, stil uiteenlopende eigendomsregel hier. RLS levert eigen rijen
+ * plus huishoud-gedeelde rijen, wat precies de verzameling is waar deze
+ * gebruiker op mag importeren.
  */
 export async function GET() {
   const supabase = await createClient()
@@ -148,21 +183,36 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return unauthorized()
 
-  const { data, error } = await supabase
-    .from('bank_connection_accounts')
-    .select('bank_account_id')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .not('bank_account_id', 'is', null)
+  const [linked, shared] = await Promise.all([
+    supabase
+      .from('bank_connection_accounts')
+      .select('bank_account_id')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .not('bank_account_id', 'is', null),
+    supabase
+      .from('bank_accounts')
+      .select('id')
+      .eq('ownership', 'shared')
+      .eq('is_active', true),
+  ])
 
-  if (error) return serverError(error, 'transactions-import:GET')
+  if (linked.error) return serverError(linked.error, 'transactions-import:GET')
+  if (shared.error) return serverError(shared.error, 'transactions-import:GET')
 
   const ids = new Set<string>()
-  for (const row of (data ?? []) as { bank_account_id: string | null }[]) {
+  for (const row of (linked.data ?? []) as { bank_account_id: string | null }[]) {
     if (row.bank_account_id) ids.add(row.bank_account_id)
   }
+  for (const row of (shared.data ?? []) as { id: string }[]) {
+    ids.add(row.id)
+  }
 
-  return NextResponse.json({ linked_account_ids: [...ids] })
+  // Bewust NIET `linked_account_ids`: het veld draagt sinds de gedeelde-rekening-
+  // uitbreiding twee gronden, en een veld dat "linked" heet maar ook "shared"
+  // betekent is precies de stille betekeniswissel die dit dossier elders
+  // verbiedt. De naam zegt nu wat het is: hier hoort het serverpad gebruikt.
+  return NextResponse.json({ server_path_account_ids: [...ids] })
 }
 
 export async function POST(req: Request) {
@@ -181,9 +231,13 @@ export async function POST(req: Request) {
     // rekening hoort importeerbaar te blijven, en de eigendomsregel hoort in de
     // policy te leven en niet in een tweede, stil uiteenlopende kopie hier. Ziet
     // de gebruiker de rij niet, dan bestaat ze voor hem niet.
+    //
+    // `ownership` komt mee omdat het precies dát verbrede schrijfrecht is dat
+    // laag 1b nodig maakt: op een gedeelde rekening kan de partner al dezelfde
+    // reeks hebben weggeschreven.
     const { data: account, error: accountError } = await supabase
       .from('bank_accounts')
-      .select('id')
+      .select('id, ownership')
       .eq('id', accountId)
       .eq('is_active', true)
       .maybeSingle()
@@ -223,12 +277,19 @@ export async function POST(req: Request) {
       maxDate: dates[dates.length - 1],
     }
 
-    // Beide leesronden zijn onafhankelijk en delen de scope-regel uit
-    // `lib/truelayer/existing-hashes.ts` (gebruiker + rekening + datumvenster,
-    // gepagineerd). Eén parallelle ronde in plaats van een waterval.
-    const [existingKeys, crossSourceCandidates] = await Promise.all([
+    // Alleen op een GEDEELDE rekening kan een tweede schrijver bestaan. Op een
+    // persoonlijke rekening wordt de partner-query dus niet eens gesteld — geen
+    // extra round-trip, en geen leesronde over rijen van een ander waar geen
+    // enkele aanleiding voor is.
+    const isSharedAccount = (account as { ownership?: string | null }).ownership === 'shared'
+
+    // De leesronden zijn onafhankelijk en delen de scope-regel uit
+    // `lib/truelayer/existing-hashes.ts` (rekening + datumvenster, gepagineerd).
+    // Eén parallelle ronde in plaats van een waterval.
+    const [existingKeys, crossSourceCandidates, householdPartnerKeys] = await Promise.all([
       loadExistingDedupKeys(supabase, scope),
       loadCrossSourceCandidates(supabase, scope),
+      isSharedAccount ? loadHouseholdSharedDedupKeys(supabase, scope) : Promise.resolve(new Set<string>()),
     ])
 
     // ── Laag 1 ────────────────────────────────────────────────────────────────
@@ -237,18 +298,28 @@ export async function POST(req: Request) {
     const seenInBatch = new Set<string>()
     const skipped: SkippedRow[] = []
     const afterLayer1: { row: ImportRowInput; import_hash: string }[] = []
+    let duplicatesExact = 0
+    let duplicatesHouseholdPartner = 0
 
     rows.forEach((row, i) => {
       const key = dedupKey({ import_hash: hashes[i], bank_seq: row.bank_seq ?? null })
       if (existingKeys.has(key) || seenInBatch.has(key)) {
         skipped.push({ import_hash: hashes[i], bank_seq: row.bank_seq ?? null, layer: 'exact' })
+        duplicatesExact++
+        return
+      }
+      // ── Laag 1b ────────────────────────────────────────────────────────────
+      // Ná de eigen-rij-controle, zodat een rij die óók zelf al bestaat de
+      // directere laag-1-reden houdt en niet twee keer geteld wordt. Op een
+      // persoonlijke rekening is deze set altijd leeg en is dit een no-op.
+      if (householdPartnerKeys.has(key)) {
+        skipped.push({ import_hash: hashes[i], bank_seq: row.bank_seq ?? null, layer: 'household_partner' })
+        duplicatesHouseholdPartner++
         return
       }
       seenInBatch.add(key)
       afterLayer1.push({ row, import_hash: hashes[i] })
     })
-
-    const duplicatesExact = skipped.length
 
     // ── Laag 2 ────────────────────────────────────────────────────────────────
     // Draait ALTIJD ná laag 1, nooit ervoor: een rij die laag 1 al heeft
@@ -358,6 +429,14 @@ export async function POST(req: Request) {
       failed: failedCount,
       /** Laag 1 — al aanwezig of dubbel binnen deze batch. */
       duplicates: duplicatesExact,
+      /**
+       * Laag 1b — stond al op deze GEDEELDE rekening, weggeschreven door de
+       * andere huishoudpartner. Bewust een apart veld naast `duplicates`: die
+       * betekent "van jezelf" en wordt elders zo gelezen; ze samenvoegen zou een
+       * bestaande betekenis stil verschuiven. Op een persoonlijke rekening is
+       * dit altijd 0.
+       */
+      duplicates_household_partner: duplicatesHouseholdPartner,
       /** Laag 2, gesplitst naar reden; `total` is de som. De naam-terugval staat
        *  apart omdat dat de zwakste grond voor een treffer is. */
       duplicates_cross_source: crossSourceCounts,

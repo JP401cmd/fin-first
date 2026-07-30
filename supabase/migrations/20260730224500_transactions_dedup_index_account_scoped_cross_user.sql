@@ -1,0 +1,167 @@
+-- =====================================================================
+-- Dedup-index op public.transactions: user_id UIT de unieke sleutel
+--   van  UNIQUE (user_id, account_id, import_hash, coalesce(bank_seq,''))
+--   naar UNIQUE (account_id, import_hash, coalesce(bank_seq,''))
+--   (beide WHERE import_hash IS NOT NULL)
+-- =====================================================================
+-- Directe opvolger van 20260729171125_transactions_drift_account_scoped_
+-- dedup_and_source.sql, deel (b). Die migratie maakte de sleutel
+-- rekening-gescoped; deze maakt hem ook gebruiker-overstijgend.
+--
+-- ---------------------------------------------------------------------
+-- AANLEIDING: dubbele boekingen op een gedeelde rekening
+-- ---------------------------------------------------------------------
+-- Op een huishouden-gedeelde rekening (bank_accounts.ownership = 'shared')
+-- kunnen BEIDE partners importeren:
+--   * de SELECT-policy op bank_accounts is huishoud-verbreed, en de
+--     importroute controleert schrijfrecht bewust via RLS -- de partner
+--     mag de rekening dus zien en er tegenaan schrijven;
+--   * de trigger trg_stamp_household_id stempelt household_id op elke rij
+--     met ownership = 'shared';
+--   * de SELECT-policy op transactions is identiek verbreed
+--     ("View own or shared transactions": auth.uid() = user_id OR
+--      (ownership = 'shared' AND household_id = user_household_id())),
+--     dus beide partners zien beide kopieen.
+-- De dedup-loader filterde op .eq('user_id', ...) en de unieke index
+-- bevatte user_id, dus geen van beide ving de tweede reeks. Gevolg: elke
+-- transactie twee keer in een en hetzelfde gedeelde grootboek.
+--
+-- De code-kant (huishoud-brede dedup-laag in lib/truelayer/existing-
+-- hashes.ts + app/api/transactions/import/route.ts) wordt parallel
+-- gebouwd; deze index is de sluitsteen eronder.
+--
+-- ---------------------------------------------------------------------
+-- DEPLOY-VOORWAARDE  -- LEES DIT VOOR JE 'M TOEPAST
+-- ---------------------------------------------------------------------
+-- Deze index mag pas toegepast worden NADAT de codewijziging (de
+-- huishoud-brede dedup-laag in het importpad) gedeployed is. Zonder die
+-- laag filtert het importpad de botsende rij niet vooraf weg en wijst de
+-- index hem hard af -- en een afgewezen rij sleurt in route.ts de hele
+-- insert-chunk van 200 rijen (INSERT_CHUNK_SIZE) mee. De index is dan
+-- geen vangnet maar een importbreker. Volgorde: code eerst, index daarna.
+--
+-- WELK SCHRIJFPAD DEKT DAT? -- alle rekeningen waar een tweede schrijver
+-- kan bestaan. De bestandsimport kent twee schrijfpaden
+-- (app/(app)/core/cash/import/page.tsx, `useServerPath`); welk pad geldt
+-- bepaalt de server in GET /api/transactions/import, en die regel is de
+-- UNIE van twee gronden:
+--   * een actieve bankkoppeling  (tweede schrijver = de bank-sync);
+--   * bank_accounts.ownership = 'shared'  (tweede schrijver = de partner).
+-- Beide gaan dus verplicht via POST /api/transactions/import en krijgen
+-- daar de huishoud-brede dedup-laag. Een gedeelde rekening hoeft NIET
+-- gekoppeld te zijn -- dat losse geval was aanvankelijk niet gedekt en is
+-- expliciet toegevoegd, juist omdat het het gewone geval is.
+--
+-- Het client-directe schrijfpad blijft alleen over voor PERSOONLIJKE,
+-- ongekoppelde rekeningen (de grandfather-situatie uit ADR 0058). Daar kan
+-- per definitie geen tweede schrijver bestaan -- de rekening is voor
+-- niemand anders zichtbaar en de INSERT-policy is auth.uid() = user_id --
+-- dus die rijen kunnen deze index niet schenden.
+--
+-- ---------------------------------------------------------------------
+-- PRE-FLIGHT  -- draaien vlak voor toepassen; 0 rijen vereist
+-- ---------------------------------------------------------------------
+--   select account_id, import_hash, coalesce(bank_seq,'')
+--   from public.transactions
+--   where import_hash is not null
+--   group by 1,2,3
+--   having count(distinct user_id) > 1;
+--
+-- Elke rij die deze query teruggeeft is een groep die de nieuwe index
+-- schendt; die moet eerst met de hand ontdubbeld worden. Levert de query
+-- rijen op, dan draai je deze migratie NIET.
+--
+-- Meting 30-07-2026 op remote (read-only, eigen meting):
+--   * 0 conflicterende groepen
+--   * 0 rekeningen met ownership = 'shared'
+--   * 0 huishoud-leden (household_members)
+--   * 0 transacties met household_id IS NOT NULL
+-- De tightening was op dat moment dus conflictvrij -- maar dat is een
+-- MOMENTOPNAME. Zodra er een gedeelde rekening bijkomt kan het beeld
+-- kantelen; de pre-flight hoort daarom opnieuw te draaien vlak voor het
+-- toepassen, niet eenmalig bij het schrijven.
+--
+-- ---------------------------------------------------------------------
+-- WAAROM DIT EEN TIGHTENING IS  -- en dus NIET per constructie veilig
+-- ---------------------------------------------------------------------
+-- Expliciet contrast met de voorganger. 20260729171125 VOEGDE account_id
+-- TOE aan de sleutel; een kolom toevoegen kan het aantal onderscheiden
+-- sleutels alleen maar vergroten, dus elke rijverzameling die de oude
+-- index respecteerde respecteerde ook de nieuwe. Dat was per constructie
+-- een VERSOEPELING en kon niet mislukken.
+--
+-- Hier gebeurt het omgekeerde: user_id gaat de sleutel UIT. Een kolom
+-- weghalen kan alleen MINDER sleutels onderscheiden -- rijen die elkaar
+-- eerst niet raakten vallen nu op elkaar. Deze migratie KAN dus falen op
+-- bestaande data, en dat is precies de bedoeling: hij weigert wat we
+-- willen verbieden. Vandaar de pre-flight hierboven; hij is niet
+-- optioneel.
+--
+-- ---------------------------------------------------------------------
+-- WAAROM user_id WEG MAG
+-- ---------------------------------------------------------------------
+-- account_id is NOT NULL (0 rijen met account_id IS NULL op remote,
+-- opnieuw geverifieerd), dus er ontstaat geen NULL-gat waardoor een rij
+-- automatisch uniek wordt en langs de dedup glipt.
+--
+-- Een PERSOONLIJKE rekening is per RLS maar door een gebruiker
+-- beschrijfbaar: de INSERT-policy op transactions is
+-- "Users insert own transactions" with check auth.uid() = user_id, en de
+-- rekening zelf is alleen zichtbaar voor de eigenaar tenzij
+-- ownership = 'shared'. Twee verschillende user_id's op een en dezelfde
+-- persoonlijke rekening kunnen dus niet ontstaan; op zulke rijen voegt
+-- user_id in de sleutel niets toe.
+--
+-- De sleutel verliest daarmee onderscheid in precies een geval: twee
+-- gebruikers die dezelfde boeking (zelfde datum|bedrag|omschrijving, en
+-- dus zelfde import_hash) op dezelfde GEDEELDE rekening zetten. Dat is
+-- geen legitiem geval maar de dubbeling die we bestrijden.
+--
+-- ---------------------------------------------------------------------
+-- INDEXNAAM
+-- ---------------------------------------------------------------------
+-- De canonieke naam transactions_import_hash_account_idx is bezet tot de
+-- drop verderop, dus de nieuwe index krijgt een eigen naam. Bewust GEEN
+-- 'alter index ... rename to' terug naar de oude naam achteraf: dan zou
+-- een tweede run van deze migratie de create-if-not-exists opnieuw laten
+-- aanslaan (de eerste index heet inmiddels anders) en zou er een dubbele
+-- index ontstaan. Een eigen, sprekende definitieve naam maakt de migratie
+-- herdraaibaar: tweede run = create is een no-op, drop is een no-op.
+-- transactions_import_hash_per_account_idx = "een import_hash per
+-- rekening, ongeacht welke gebruiker hem invoert".
+--
+-- ---------------------------------------------------------------------
+-- RLS- EN LOCK-NOTITIE
+-- ---------------------------------------------------------------------
+-- Deze migratie voegt GEEN kolom, tabel of policy toe en verbreedt er
+-- geen. RLS op public.transactions blijft ongewijzigd (SELECT verbreed
+-- naar het huishouden, INSERT/UPDATE/DELETE strikt auth.uid() = user_id).
+-- Een unieke index werkt onder RLS door: hij toetst over ALLE rijen, ook
+-- die de schrijver zelf niet mag zien. Dat is hier gewenst -- juist de
+-- onzichtbare kopie van de partner moet geweigerd worden -- maar het
+-- betekent ook dat een botsing zich voor de gebruiker voordoet als een
+-- fout op een rij die hij niet kan aanwijzen. Het importpad hoort die
+-- botsing dus vooraf weg te filteren (zie DEPLOY-VOORWAARDE), niet op de
+-- index te laten aanlopen.
+--
+-- CONCURRENTLY kan niet: apply_migration draait in een transactieblok.
+-- Zelfde afweging als 20260504000001_perf_composite_indexes.sql en de
+-- voorganger. Volume op remote (geverifieerd 30-07-2026): 37.002 rijen /
+-- 25 MB, waarvan 35.344 met import_hash -- de indexbouw is sub-seconde.
+-- De SHARE-lock blokkeert in dat venster schrijvers op transactions,
+-- geen lezers.
+--
+-- Volgorde: eerst de nieuwe index AANMAKEN, pas daarna de oude DROPPEN,
+-- zodat er geen moment is waarop de tabel onbeschermd is tegen dubbele
+-- imports.
+-- ---------------------------------------------------------------------
+
+create unique index if not exists transactions_import_hash_per_account_idx
+  on public.transactions using btree (account_id, import_hash, coalesce(bank_seq, ''::text))
+  where (import_hash is not null);
+
+drop index if exists public.transactions_import_hash_account_idx;
+
+comment on index public.transactions_import_hash_per_account_idx is
+  'Dedup-sleutel voor import/sync: een import_hash (+bank_seq) per rekening, bewust ZONDER user_id, zodat twee partners dezelfde boeking op een gedeelde rekening (ownership = shared) niet allebei kunnen inschrijven. Het importpad filtert de botsing huishoud-breed vooraf weg; deze index is het vangnet daaronder.';
+-- =====================================================================

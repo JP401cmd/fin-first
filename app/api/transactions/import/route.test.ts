@@ -46,6 +46,8 @@ type TxRow = {
   budget_id?: string | null
   category_source?: string | null
   source?: string | null
+  /** Zonder waarde = persoonlijk; alleen 'shared' is voor laag 1b zichtbaar. */
+  ownership?: 'personal' | 'shared'
 }
 
 /** Minimale geldige rij zoals de import-pagina 'm stuurt. */
@@ -61,13 +63,25 @@ function row(over: Record<string, unknown> = {}) {
   }
 }
 
-function makeSupabase(existing: TxRow[], opts: { visibleAccounts?: string[]; visibleBudgets?: string[]; linked?: string[]; failInserts?: boolean } = {}) {
+function makeSupabase(existing: TxRow[], opts: { visibleAccounts?: string[]; visibleBudgets?: string[]; linked?: string[]; failInserts?: boolean; accountOwnership?: 'personal' | 'shared'; sharedAccounts?: string[] } = {}) {
   const visibleAccounts = opts.visibleAccounts ?? [ACCOUNT, OTHER_ACCOUNT]
   const visibleBudgets = opts.visibleBudgets ?? [BUDGET]
+  /**
+   * Welke rekeningen `ownership = 'shared'` dragen. Standaard geen enkele: laag
+   * 1b hoort dan niet te draaien en het serverpad is niet verplicht.
+   * `accountOwnership: 'shared'` is de korte vorm voor "alle zichtbare
+   * rekeningen zijn gedeeld".
+   */
+  const sharedAccounts = new Set(
+    opts.sharedAccounts ?? (opts.accountOwnership === 'shared' ? visibleAccounts : []),
+  )
+  const ownershipOf = (id: string) => (sharedAccounts.has(id) ? 'shared' : 'personal')
   const inserted: Record<string, unknown>[][] = []
   /** Elke niet-insert-mutatie op `transactions`. Moet altijd leeg blijven. */
   const transactionMutations: string[] = []
   const dedupQueries: { eqs: Record<string, unknown>; gte: string | null; lte: string | null }[] = []
+  /** Leesronden van laag 1b, herkenbaar aan de omgekeerde `.neq('user_id')`. */
+  const householdQueries: { eqs: Record<string, unknown>; neqs: Record<string, unknown> }[] = []
   let nextId = 1
 
   function builder(table: string) {
@@ -75,6 +89,7 @@ function makeSupabase(existing: TxRow[], opts: { visibleAccounts?: string[]; vis
     let payload: Record<string, unknown>[] = []
     let cols = ''
     const eqs: Record<string, unknown> = {}
+    const neqs: Record<string, unknown> = {}
     let inList: unknown[] | null = null
     let gte: string | null = null
     let lte: string | null = null
@@ -88,6 +103,7 @@ function makeSupabase(existing: TxRow[], opts: { visibleAccounts?: string[]; vis
     b.not = self
     b.in = (_col: string, vals: unknown[]) => { inList = vals; return b }
     b.eq = (col: string, val: unknown) => { eqs[col] = val; return b }
+    b.neq = (col: string, val: unknown) => { neqs[col] = val; return b }
     b.gte = (_col: string, val: string) => { gte = val; return b }
     b.lte = (_col: string, val: string) => { lte = val; return b }
     b.range = (from: number, to: number) => { range = [from, to]; return b }
@@ -142,8 +158,16 @@ function makeSupabase(existing: TxRow[], opts: { visibleAccounts?: string[]; vis
       if (op !== 'select') return { data: payload, error: null }
 
       if (table === 'bank_accounts') {
-        const id = eqs['id'] as string
-        return { data: visibleAccounts.includes(id) ? { id } : null, error: null }
+        const id = eqs['id'] as string | undefined
+        // POST: één rekening opzoeken om schrijfrecht + eigendom te bepalen.
+        if (id !== undefined) {
+          return { data: visibleAccounts.includes(id) ? { id, ownership: ownershipOf(id) } : null, error: null }
+        }
+        // GET: de lijst-query naar gedeelde rekeningen.
+        const rows = visibleAccounts
+          .filter((a) => eqs['ownership'] === undefined || ownershipOf(a) === eqs['ownership'])
+          .map((a) => ({ id: a }))
+        return { data: rows, error: null }
       }
       if (table === 'budgets') {
         const ids = (inList ?? []).filter((i) => visibleBudgets.includes(i as string))
@@ -155,6 +179,9 @@ function makeSupabase(existing: TxRow[], opts: { visibleAccounts?: string[]; vis
       if (table === 'transactions') {
         const scoped = existing.filter((r) =>
           (eqs['user_id'] === undefined || r.user_id === eqs['user_id']) &&
+          // Laag 1b draait de eigenaarsfilter om: alles BEHALVE de eigen rijen.
+          (neqs['user_id'] === undefined || r.user_id !== neqs['user_id']) &&
+          (eqs['ownership'] === undefined || (r.ownership ?? 'personal') === eqs['ownership']) &&
           (eqs['account_id'] === undefined || r.account_id === eqs['account_id']) &&
           (gte === null || r.date >= gte) &&
           (lte === null || r.date <= lte)
@@ -172,8 +199,10 @@ function makeSupabase(existing: TxRow[], opts: { visibleAccounts?: string[]; vis
             error: null,
           }
         }
-        // Laag 1: import_hash + bank_seq.
-        dedupQueries.push({ eqs: { ...eqs }, gte, lte })
+        // Laag 1 (eigen rijen) of laag 1b (partnerrijen) — beide lezen
+        // `import_hash, bank_seq`; de omgekeerde eigenaarsfilter onderscheidt ze.
+        if (neqs['user_id'] !== undefined) householdQueries.push({ eqs: { ...eqs }, neqs: { ...neqs } })
+        else dedupQueries.push({ eqs: { ...eqs }, gte, lte })
         let rows = scoped.filter((r) => r.import_hash !== null)
         if (range) rows = rows.slice(range[0], range[1] + 1)
         return { data: rows.map((r) => ({ import_hash: r.import_hash, bank_seq: r.bank_seq })), error: null }
@@ -196,6 +225,7 @@ function makeSupabase(existing: TxRow[], opts: { visibleAccounts?: string[]; vis
     inserted,
     transactionMutations,
     dedupQueries,
+    householdQueries,
     existing,
   }
 }
@@ -305,6 +335,141 @@ describe('POST /api/transactions/import — laag 1 (indexsleutel)', () => {
 
     expect(body).toMatchObject({ inserted: 1, duplicates: 1 })
     expect(inserted[0]).toHaveLength(1)
+  })
+})
+
+/**
+ * Laag 1b — de partner op een GEDEELDE rekening.
+ *
+ * Op een `ownership='shared'`-rekening mogen beide partners importeren. Laag 1
+ * filtert op `.eq('user_id', …)` en de unieke index droeg `user_id` in de
+ * sleutel, dus vóór deze laag ving niets de tweede reeks af: beide partners
+ * kregen een volledige dubbele transactiereeks te zien én mee te tellen.
+ *
+ * De twee filters van de loader zijn samen de privacy-control. Daarom staat
+ * hieronder niet alleen "vangt de partnerrij af", maar óók dat een PERSOONLIJKE
+ * rij van diezelfde partner buiten beeld blijft, en dat de hele leesronde op een
+ * persoonlijke rekening achterwege blijft.
+ */
+describe('POST /api/transactions/import — laag 1b (partner op gedeelde rekening)', () => {
+  const PARTNER_ID = 'user-2'
+
+  /** Dezelfde boeking, weggeschreven door de partner op de gedeelde rekening. */
+  async function partnerRow(over: Partial<TxRow> = {}): Promise<TxRow> {
+    return {
+      id: 'tx-partner',
+      user_id: PARTNER_ID,
+      account_id: ACCOUNT,
+      date: '2026-07-01',
+      amount: -12.5,
+      import_hash: await computeHash('2026-07-01', -12.5, 'Albert Heijn 1234'),
+      bank_seq: null,
+      ownership: 'shared',
+      ...over,
+    }
+  }
+
+  it('slaat een rij over die de partner al op deze gedeelde rekening zette', async () => {
+    const existing = [await partnerRow()]
+    const { client, inserted } = makeSupabase(existing, { accountOwnership: 'shared' })
+    mockCreateClient.mockResolvedValue(client)
+
+    const res = await POST(request({ account_id: ACCOUNT, rows: [row({ ownership: 'shared' })] }))
+    const body = await res.json()
+
+    expect(body).toMatchObject({ inserted: 0, duplicates: 0, duplicates_household_partner: 1 })
+    expect(body.skipped).toEqual([
+      { import_hash: existing[0].import_hash, bank_seq: null, layer: 'household_partner' },
+    ])
+    // De kern van de bug: zonder deze laag stond de reeks er twee keer.
+    expect(inserted).toHaveLength(0)
+    expect(existing).toHaveLength(1)
+  })
+
+  it('telt meerdere partner-duplicaten los van `duplicates` en `duplicates_cross_source`', async () => {
+    const rows = [
+      row({ description: 'Boeking A', counterparty_iban: null, counterparty_name: null }),
+      row({ description: 'Boeking B', counterparty_iban: null, counterparty_name: null }),
+      row({ description: 'Boeking C', counterparty_iban: null, counterparty_name: null }),
+    ]
+    // A en B staan al bij de partner; C is nieuw.
+    const existing: TxRow[] = [
+      await partnerRow({ id: 'p-a', import_hash: await computeHash('2026-07-01', -12.5, 'Boeking A') }),
+      await partnerRow({ id: 'p-b', import_hash: await computeHash('2026-07-01', -12.5, 'Boeking B') }),
+    ]
+    const { client, inserted } = makeSupabase(existing, { accountOwnership: 'shared' })
+    mockCreateClient.mockResolvedValue(client)
+
+    const res = await POST(request({ account_id: ACCOUNT, rows }))
+    const body = await res.json()
+
+    expect(body).toMatchObject({
+      inserted: 1,
+      duplicates: 0,
+      duplicates_household_partner: 2,
+      duplicates_cross_source: { total: 0 },
+    })
+    expect(inserted[0]).toHaveLength(1)
+    expect(inserted[0][0]).toMatchObject({ description: 'Boeking C' })
+  })
+
+  it('houdt de laag-1-reden wanneer de rij óók van de gebruiker zelf al bestaat', async () => {
+    const hash = await computeHash('2026-07-01', -12.5, 'Albert Heijn 1234')
+    const { client } = makeSupabase([
+      { id: 'tx-eigen', user_id: USER_ID, account_id: ACCOUNT, date: '2026-07-01', amount: -12.5, import_hash: hash, bank_seq: null, ownership: 'shared' },
+      await partnerRow(),
+    ], { accountOwnership: 'shared' })
+    mockCreateClient.mockResolvedValue(client)
+
+    const res = await POST(request({ account_id: ACCOUNT, rows: [row({ ownership: 'shared' })] }))
+    const body = await res.json()
+
+    // Eén keer geteld, met de directere reden — niet dubbel in twee tellers.
+    expect(body).toMatchObject({ inserted: 0, duplicates: 1, duplicates_household_partner: 0 })
+    expect(body.skipped).toHaveLength(1)
+    expect(body.skipped[0].layer).toBe('exact')
+  })
+
+  it('negeert een PERSOONLIJKE rij van de partner — de ownership-filter is de tweede gordel', async () => {
+    // Zo'n rij is voor deze gebruiker niet zichtbaar in zijn transactielijst;
+    // 'm hier laten meewegen zou stil andermans privé-boeking blootleggen én
+    // een eigen transactie ten onrechte weggooien.
+    const { client, inserted } = makeSupabase([await partnerRow({ ownership: 'personal' })], {
+      accountOwnership: 'shared',
+    })
+    mockCreateClient.mockResolvedValue(client)
+
+    const res = await POST(request({ account_id: ACCOUNT, rows: [row({ ownership: 'shared' })] }))
+    const body = await res.json()
+
+    expect(body).toMatchObject({ inserted: 1, duplicates_household_partner: 0 })
+    expect(inserted[0]).toHaveLength(1)
+  })
+
+  it('stelt de partner-query op een PERSOONLIJKE rekening niet eens', async () => {
+    const { client, householdQueries, inserted } = makeSupabase([await partnerRow()])
+    mockCreateClient.mockResolvedValue(client)
+
+    const res = await POST(request({ account_id: ACCOUNT, rows: [row()] }))
+    const body = await res.json()
+
+    // Geen extra round-trip, en het bestaande gedrag verandert niet.
+    expect(householdQueries).toHaveLength(0)
+    expect(body).toMatchObject({ inserted: 1, duplicates: 0, duplicates_household_partner: 0 })
+    expect(inserted[0]).toHaveLength(1)
+  })
+
+  it('leest de partnerrijen met beide filters: .neq op user_id én .eq op ownership', async () => {
+    const { client, householdQueries } = makeSupabase([], { accountOwnership: 'shared' })
+    mockCreateClient.mockResolvedValue(client)
+
+    await POST(request({ account_id: ACCOUNT, rows: [row({ ownership: 'shared' })] }))
+
+    expect(householdQueries.length).toBeGreaterThan(0)
+    for (const q of householdQueries) {
+      expect(q.neqs).toMatchObject({ user_id: USER_ID })
+      expect(q.eqs).toMatchObject({ account_id: ACCOUNT, ownership: 'shared' })
+    }
   })
 })
 
@@ -512,7 +677,41 @@ describe('GET /api/transactions/import — welke rekeningen moeten via de route'
     const body = await res.json()
 
     expect(res.status).toBe(200)
-    expect(body.linked_account_ids.sort()).toEqual([ACCOUNT, OTHER_ACCOUNT].sort())
+    expect(body.server_path_account_ids.sort()).toEqual([ACCOUNT, OTHER_ACCOUNT].sort())
+  })
+
+  it('levert óók een GEDEELDE rekening zonder bankkoppeling', async () => {
+    // De tweede schrijver is hier de partner, niet de sync. Zonder deze tak
+    // blijft zo'n rekening op het clientpad, en dat filtert op de eigen user_id
+    // — precies het gat waardoor beide partners een dubbele reeks kregen.
+    const { client } = makeSupabase([], { linked: [], sharedAccounts: [ACCOUNT] })
+    mockCreateClient.mockResolvedValue(client)
+
+    const res = await GET()
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(body.server_path_account_ids).toEqual([ACCOUNT])
+  })
+
+  it('levert de UNIE en noemt een rekening die aan beide gronden voldoet één keer', async () => {
+    const { client } = makeSupabase([], { linked: [ACCOUNT], sharedAccounts: [ACCOUNT, OTHER_ACCOUNT] })
+    mockCreateClient.mockResolvedValue(client)
+
+    const res = await GET()
+    const body = await res.json()
+
+    expect(body.server_path_account_ids.sort()).toEqual([ACCOUNT, OTHER_ACCOUNT].sort())
+  })
+
+  it('laat een persoonlijke, ongekoppelde rekening op het clientpad', async () => {
+    const { client } = makeSupabase([], { linked: [], sharedAccounts: [] })
+    mockCreateClient.mockResolvedValue(client)
+
+    const res = await GET()
+    const body = await res.json()
+
+    expect(body.server_path_account_ids).toEqual([])
   })
 
   it('geeft 401 zonder sessie', async () => {

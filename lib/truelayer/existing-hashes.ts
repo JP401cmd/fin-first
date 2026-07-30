@@ -20,14 +20,28 @@ const MAX_PAGES = 100
 
 export type ExistingHashScope = {
   /**
-   * Verplicht, en in beide loaders hieronder een PRIVACY-CONTROL — geen
-   * optimalisatie. De SELECT-policy op `transactions` is bewust bréder dan
-   * eigen-rij: ze laat óók huishoud-gedeelde partnerrijen door
-   * (`ownership = 'shared' AND household_id = user_household_id()`). RLS is hier
-   * dus géén vangnet. Valt de `.eq('user_id', …)` ooit weg omdat iemand 'm als
-   * dubbelop leest, dan komen partnerboekingen in de dedup-vergelijking: een
-   * eigen transactie wordt stil weggegooid omdat de partner 'm ook heeft, en de
-   * cross-bron-teller wordt een inferentiekanaal over andermans uitgaven.
+   * Verplicht. In `loadExistingImportHashes`, `loadExistingDedupKeys` en
+   * `loadCrossSourceCandidates` is de `.eq('user_id', …)` onverkort een
+   * PRIVACY-CONTROL — geen optimalisatie. De SELECT-policy op `transactions` is
+   * bewust bréder dan eigen-rij: ze laat óók huishoud-gedeelde partnerrijen door
+   * (`ownership = 'shared' AND household_id = user_household_id()`). RLS is daar
+   * dus géén vangnet. Valt de `.eq('user_id', …)` in één van die drie ooit weg
+   * omdat iemand 'm als dubbelop leest, dan komen partnerboekingen in de
+   * dedup-vergelijking: een eigen transactie wordt stil weggegooid omdat de
+   * partner 'm ook heeft, en de cross-bron-teller wordt een inferentiekanaal
+   * over andermans uitgaven.
+   *
+   * `loadHouseholdSharedDedupKeys` hieronder is de bewust afgebakende
+   * UITZONDERING: die draait de filter om (`.neq('user_id', …)`) om juist de
+   * partnerrijen te vinden. Dat is géén inferentiekanaal, en het verschil zit
+   * precies in `ownership`: die loader leest uitsluitend rijen met
+   * `ownership = 'shared'`, en zulke rijen zijn voor deze gebruiker per
+   * definitie al zichtbaar via dezelfde SELECT-policy — hij ziet ze gewoon in
+   * zijn eigen transactielijst staan. Er wordt daar dus niets blootgesteld wat
+   * hij niet al mocht zien. De redenering hierboven blijft onverminderd gelden
+   * voor PERSOONLIJKE partnerrijen, en díe worden door de `ownership`-filter
+   * expliciet buitengesloten. Lees de omgekeerde filter daar dus niet als een
+   * regressie van deze regel, maar als de enige plek waar ze bewust niet geldt.
    */
   userId: string
   /** Verplicht: de dedup is rekening-gescoped, net als de unieke index. */
@@ -159,6 +173,95 @@ export async function loadExistingDedupKeys(
       // Rauwe PostgREST-melding blijft server-side (AVG): de route stuurt een
       // generieke tekst en logt het echte detail met tag.
       console.error('[transactions-import:existing-dedup-keys] query mislukt:', error)
+      throw new Error('Bestaande transacties voor duplicaatcontrole ophalen mislukt')
+    }
+
+    const rows = (data ?? []) as { import_hash: string | null; bank_seq: string | null }[]
+    for (const row of rows) {
+      if (row.import_hash) keys.add(dedupKey({ import_hash: row.import_hash, bank_seq: row.bank_seq }))
+    }
+
+    if (rows.length < EXISTING_HASH_PAGE_SIZE) break
+  }
+
+  return keys
+}
+
+/**
+ * Laag 1, maar dan HUISHOUD-BREED: de indexsleutels van transacties die de
+ * PARTNER al op deze gedeelde rekening heeft gezet.
+ *
+ * ## Welk gat dit dicht
+ *
+ * Op een rekening met `ownership = 'shared'` mogen beide partners importeren —
+ * de SELECT-policy op `bank_accounts` is huishoud-verbreed en de importroute
+ * controleert schrijfrecht bewust via RLS in plaats van via een eigen
+ * `.eq('user_id', …)`. Importeren beide partners hetzelfde bestand, dan ontstond
+ * er een volledige dubbele transactiereeks die door géén enkele laag werd
+ * gevangen:
+ *
+ *  - `loadExistingDedupKeys` filtert op `.eq('user_id', …)` en zag de rijen van
+ *    de partner dus nooit;
+ *  - de unieke index droeg `user_id` in de sleutel, dus twee gebruikers botsten
+ *    niet;
+ *  - de trigger `trg_stamp_household_id` stempelt beide reeksen op hetzelfde
+ *    huishouden en de SELECT-policy op `transactions` is identiek verbreed —
+ *    dus BEIDE partners zagen BEIDE kopieën, en beide reeksen telden mee in
+ *    uitgaven, spaarquote en budgetten.
+ *
+ * ## Waarom dit niet overrulebaar is (anders dan laag 2)
+ *
+ * Laag 2 is fuzzy en kan fout-positief zijn; daar is de gebruiker bij en die
+ * mag ons overrulen. Dit is een EXACTE match op `import_hash|bank_seq` binnen
+ * dezelfde rekening — even zeker als laag 1 zelf. Twee écht verschillende
+ * boekingen met gelijke datum, bedrag en omschrijving worden al onderscheiden
+ * door `bank_seq`, en dat zit in de sleutel.
+ *
+ * ## De twee filters zijn samen de privacy-control
+ *
+ * Ze zijn geen van beide dubbelop; haal er nooit één weg:
+ *
+ *  - **RLS** garandeert al dat hier alleen eigen rijen of huishoud-gedeelde
+ *    rijen uit kunnen komen.
+ *  - **`.eq('ownership', 'shared')`** is de expliciete tweede gordel: zou de
+ *    policy ooit verbreed worden, dan mag dat hier nooit stil PERSOONLIJKE
+ *    partnerrijen binnenlaten. Alleen gedeelde rijen zijn voor deze gebruiker
+ *    toch al zichtbaar in zijn eigen transactielijst, dus deze query legt niets
+ *    bloot wat hij niet al mocht zien.
+ *  - **`.neq('user_id', …)`** houdt de set zuiver op partnerrijen, zodat de
+ *    teller (`duplicates_household_partner`) apart telbaar blijft en niet stil
+ *    met de eigen laag-1-treffers vermengt.
+ *
+ * Verder identiek aan `loadExistingDedupKeys`: dezelfde rekening- en
+ * datumvenster-scope, dezelfde `range()`-paginatie met stabiele `order`, en
+ * fouten worden gegooid in plaats van als "niets bestaat al" gelezen — dat
+ * laatste zou juist de dubbele reeks opleveren die deze laag hoort te
+ * voorkomen.
+ */
+export async function loadHouseholdSharedDedupKeys(
+  supabase: SupabaseClient,
+  scope: ExistingHashScope,
+): Promise<Set<string>> {
+  const keys = new Set<string>()
+
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const from = page * EXISTING_HASH_PAGE_SIZE
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('import_hash, bank_seq')
+      .neq('user_id', scope.userId)
+      .eq('account_id', scope.accountId)
+      .eq('ownership', 'shared')
+      .not('import_hash', 'is', null)
+      .gte('date', scope.minDate)
+      .lte('date', scope.maxDate)
+      .order('id', { ascending: true })
+      .range(from, from + EXISTING_HASH_PAGE_SIZE - 1)
+
+    if (error) {
+      // Rauwe PostgREST-melding blijft server-side (AVG): de route stuurt een
+      // generieke tekst en logt het echte detail met tag.
+      console.error('[transactions-import:household-shared-dedup-keys] query mislukt:', error)
       throw new Error('Bestaande transacties voor duplicaatcontrole ophalen mislukt')
     }
 
