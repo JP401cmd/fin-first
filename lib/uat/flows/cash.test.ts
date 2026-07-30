@@ -47,15 +47,32 @@ describe('CASH_FLOW — curatie-integriteit', () => {
     }
   })
 
-  it('dekt alle 32 WF-CASH-scenario\'s (01..32, aaneengesloten — geen verwijsregel-gaten)', () => {
+  it('dekt alle 50 WF-CASH-scenario\'s (01..50, aaneengesloten — geen verwijsregel-gaten)', () => {
     const covered = new Set(
       CASH_FLOW.nodes.map((n) => n.scenarioId).filter((id): id is string => Boolean(id)),
     )
-    const expected = Array.from({ length: 32 }, (_, i) => `UAT-CASH-${String(i + 1).padStart(2, '0')}`)
+    // 32 → 41: UAT-a bank-connect-doelrekening-toevoeging (WF-CASH-33..41).
+    // 41 → 43: UAT-b fase 1 (B8/B9) — WF-CASH-42/43.
+    // 43 → 44: UAT-b fase 4 (wizard, plan.md §6) — WF-CASH-44
+    // (doelrekening kiezen tijdens onboarding, nul kandidaten).
+    // 44 → 47: UAT-b fase 5 (callback, plan.md §6) — WF-CASH-45
+    // (precedentieketen), WF-CASH-46 (rekeningtype van de bank, B3) en
+    // WF-CASH-47 (het correctiemoment, nieuw gebruikersoppervlak op de
+    // success-pagina).
+    // 47 → 48: UAT-b fase 6 (FR5, plan.md §6) — WF-CASH-48 (één actieve
+    // bankkoppeling per rekening: bezet is zichtbaar-maar-uitgeschakeld in de
+    // wizard/correctiemoment, en 409 op auth-link/relink).
+    // 48 → 49: UAT-b fase 7 (B6, herkoppelen vanaf de rekening, plan.md §6) —
+    // WF-CASH-49 (deriveBankLinkHealth-regelvolgorde, het herstelpad vanaf de
+    // rekening en de SC-13-reactivatie).
+    // 49 → 50: UAT-b fase 8 (FR8, saldo via het herwaarderingspad, plan.md §6)
+    // — WF-CASH-50 (valuations-rij + snapshot-mirror alleen bij wijziging, de
+    // compenserende waardering bij een relink).
+    const expected = Array.from({ length: 50 }, (_, i) => `UAT-CASH-${String(i + 1).padStart(2, '0')}`)
     for (const id of expected) {
       expect(covered.has(id), `${id} moet als flow-knoop voorkomen`).toBe(true)
     }
-    expect(covered.size).toBe(32)
+    expect(covered.size).toBe(50)
   })
 
   it('de domeinoverschrijdende cross-knopen dekken BUDGET/OVZ/TOEK/WILL/BEZIT/MIJN', () => {

@@ -49,6 +49,17 @@ import { CSV_PRESETS } from '@/lib/parsers/index'
 import { isOwnAccountTransfer } from '@/lib/parsers/categorize'
 import { applyAssignmentToImportRows, type AssignableImportRow } from '@/lib/sleepmodus/import-assign'
 import { buildCombinedGroups, orderGroupsLargestFirst, type CombinedTx } from '@/lib/auto-categorize'
+import { mapTransaction, mapAccountType } from '@/lib/truelayer/mapper'
+import type { TLTransaction } from '@/lib/truelayer/types'
+import { planInitialFetch } from '@/lib/truelayer/initial-fetch'
+import { isSelectableTargetOption, occupiedTargetAccountMessage, type TargetAccountOption } from '@/lib/truelayer/target-account'
+import { deriveBankLinkState } from '@/lib/bank-connection-status'
+import {
+  isSameBalance,
+  formatBankSyncNote,
+  parseBankSyncPrevious,
+  formatBankSyncCorrectionNote,
+} from '@/lib/truelayer/balance-valuation'
 import { CASH_ACCEPTANCE } from './cash'
 import type { AcceptanceCriterion } from './types'
 
@@ -154,6 +165,21 @@ function euroImpactMonthly(monthlyAmount: number): number {
   return -monthlyAmount
 }
 
+/** Minimale TargetAccountOption voor de FR5-kiesbaarheidscheck (WF-CASH-48). */
+function makeTargetOption(overrides: Partial<TargetAccountOption> & { id: string; linked_provider_name: string | null }): TargetAccountOption {
+  return {
+    name: 'Rekening',
+    bank_name: null,
+    iban_tail: null,
+    transaction_count: 0,
+    oldest_transaction_date: null,
+    newest_transaction_date: null,
+    budget_tracking: true,
+    fetch_plan: { mode: 'incremental', start_date: '2026-07-01' },
+    ...overrides,
+  }
+}
+
 /** Minimale CombinedTx met sensible defaults, voor de groepsvolgorde-check (WF-CASH-25). */
 function makeCombinedTx(overrides: Partial<CombinedTx> & { id: string; counterparty_name: string; date: string }): CombinedTx {
   return {
@@ -174,6 +200,21 @@ function normalizeCounterparty(name: string): string {
 function countSiblings(rows: { counterparty: string }[], target: string): number {
   const normalizedTarget = normalizeCounterparty(target)
   return rows.filter((r) => normalizeCounterparty(r.counterparty) === normalizedTarget).length - 1
+}
+
+/** Mirror van de rate-limit-drempel + dagreset (app/api/bank-connect/sync/route.ts
+ *  regel 55-76): >=10 verzoeken vandaag blokkeert; een nieuwe kalenderdag reset
+ *  de teller naar 0 ongeacht de vorige stand. */
+function rateLimitCheck(dailyRequests: number, resetDate: string, today: string): { blocked: boolean; effectiveCount: number } {
+  const effectiveCount = resetDate !== today ? 0 : dailyRequests
+  return { blocked: effectiveCount >= 10, effectiveCount }
+}
+
+/** Mirror van de dedup-scoping (lib/truelayer/existing-hashes.ts#loadExistingImportHashes):
+ *  een hash "bestaat al" alléén als een bestaande rij zowel dezelfde `import_hash`
+ *  ALS dezelfde `account_id` heeft — de query filtert expliciet op accountId. */
+function existsInAccount(existing: { accountId: string; hash: string }[], candidate: { accountId: string; hash: string }): boolean {
+  return existing.some((e) => e.accountId === candidate.accountId && e.hash === candidate.hash)
 }
 
 /** Mirror van de eerstvolgende-voorkomst-arithmetiek voor een monthly recurring
@@ -200,9 +241,9 @@ export const CASH_ENGINE_CHECKS: CashEngineCheck[] = [
     label: 'Hefboom-kaart-statusdrempels (transactiesCardStatus/vasteLastenCardStatus/forecastCardStatus)',
     run: () => {
       criterion('WF-CASH-01')
-      const transGood = transactiesCardStatus({ monthlyIncome: 1000, monthlyExpenses: 800 })
-      const transWarn = transactiesCardStatus({ monthlyIncome: 1000, monthlyExpenses: 1000 })
-      const transBad = transactiesCardStatus({ monthlyIncome: 1000, monthlyExpenses: 1100 })
+      const transGood = transactiesCardStatus({ currentMonthIncome: 1000, currentMonthExpenses: 800 })
+      const transWarn = transactiesCardStatus({ currentMonthIncome: 1000, currentMonthExpenses: 1000 })
+      const transBad = transactiesCardStatus({ currentMonthIncome: 1000, currentMonthExpenses: 1100 })
       const vlGood = vasteLastenCardStatus({ totalMonthly: 499, count: 1, monthlyIncome: 1000 })
       const vlWarn = vasteLastenCardStatus({ totalMonthly: 700, count: 1, monthlyIncome: 1000 })
       const vlBad = vasteLastenCardStatus({ totalMonthly: 701, count: 1, monthlyIncome: 1000 })
@@ -621,6 +662,198 @@ NEWFILEUID:NONE
       return {
         expected: 'totaalEenRegel=-975; totaalGedeactiveerd=0; totaalTweeRegels=-1125',
         actual: `totaalEenRegel=${getExpectedMonthlyTotal(eenRegel)}; totaalGedeactiveerd=${getExpectedMonthlyTotal(gedeactiveerd)}; totaalTweeRegels=${getExpectedMonthlyTotal(tweeRegels)}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-CASH-35',
+    scenarioId: 'UAT-CASH-35',
+    label: 'Sync-rate-limit (mirror): 10 verzoeken blokkeert, 9 mag door, nieuwe dag reset',
+    run: () => {
+      criterion('WF-CASH-35')
+      const bij10 = rateLimitCheck(10, '2026-07-29', '2026-07-29')
+      const bij9 = rateLimitCheck(9, '2026-07-29', '2026-07-29')
+      const nieuweDag = rateLimitCheck(10, '2026-07-28', '2026-07-29')
+      return {
+        expected: 'geblokkeerdBij10=true; toegestaanBij9=true; resetBijNieuweDag=0',
+        actual: `geblokkeerdBij10=${bij10.blocked}; toegestaanBij9=${!bij9.blocked}; resetBijNieuweDag=${nieuweDag.effectiveCount}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-CASH-36',
+    scenarioId: 'UAT-CASH-36',
+    label: 'Lege sync (mirror): geen bank-transacties → 0 nieuw, 0 dup, cursor ongewijzigd',
+    run: () => {
+      criterion('WF-CASH-36')
+      const parsed: { import_hash: string }[] = []
+      const existingHashSet = new Set<string>()
+      const newTransactions = parsed.filter((p) => !existingHashSet.has(p.import_hash))
+      const insertedCount = newTransactions.length
+      const duplicateCount = parsed.length - newTransactions.length
+      const tlTransactions: { timestamp: string }[] = []
+      let latestDate: string | null = '2026-07-01' // vorige sync_cursor-waarde
+      for (const tx of tlTransactions) {
+        const txDate = tx.timestamp.split('T')[0]
+        if (!latestDate || txDate > latestDate) latestDate = txDate
+      }
+      return {
+        expected: 'insertedCount=0; duplicateCount=0; cursorOngewijzigd=true',
+        actual: `insertedCount=${insertedCount}; duplicateCount=${duplicateCount}; cursorOngewijzigd=${latestDate === '2026-07-01'}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-CASH-38',
+    scenarioId: 'UAT-CASH-38',
+    label: 'Tegenpartij-meta-fallback (mapTransaction): merchant_name ontbreekt → meta.counter_party_*',
+    run: async () => {
+      criterion('WF-CASH-38')
+      const rabobankStijl: TLTransaction = {
+        transaction_id: 'tx1',
+        timestamp: '2026-07-10T00:00:00Z',
+        amount: -12.5,
+        currency: 'EUR',
+        description: 'BETALING',
+        transaction_type: 'DEBIT',
+        transaction_category: 'PURCHASE',
+        merchant_name: '   ', // whitespace-only → telt als "niet gevuld"
+        meta: {
+          counter_party_preferred_name: 'Jumbo Supermarkten',
+          counter_party_iban: 'NL91ABNA0417164300',
+        },
+      }
+      const standaardVeldGevuld: TLTransaction = {
+        transaction_id: 'tx2',
+        timestamp: '2026-07-11T00:00:00Z',
+        amount: -8,
+        currency: 'EUR',
+        description: 'AH BOODSCHAPPEN',
+        transaction_type: 'DEBIT',
+        transaction_category: 'PURCHASE',
+        merchant_name: 'Albert Heijn',
+        meta: { counter_party_preferred_name: 'Andere naam in meta' },
+      }
+      const fallback = await mapTransaction(rabobankStijl)
+      const merchantWint = await mapTransaction(standaardVeldGevuld)
+      return {
+        expected: 'metaFallbackNaam=Jumbo Supermarkten; metaFallbackIban=NL91ABNA0417164300; merchantNameWintBoven=Albert Heijn',
+        actual: `metaFallbackNaam=${fallback.counterparty_name}; metaFallbackIban=${fallback.counterparty_iban}; merchantNameWintBoven=${merchantWint.counterparty_name}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-CASH-40',
+    scenarioId: 'UAT-CASH-40',
+    label: 'Dedup rekening-gescoped (mirror): zelfde hash op twee rekeningen botst niet, binnen één rekening wel',
+    run: () => {
+      criterion('WF-CASH-40')
+      const existing = [{ accountId: 'rekening-A', hash: 'hash-1' }]
+      const opAndereRekening = existsInAccount(existing, { accountId: 'rekening-B', hash: 'hash-1' })
+      const opZelfdeRekening = existsInAccount(existing, { accountId: 'rekening-A', hash: 'hash-1' })
+      return {
+        expected: 'verschillendeRekeningBeideNieuw=true; zelfdeRekeningTweedeIsDuplicaat=true',
+        actual: `verschillendeRekeningBeideNieuw=${!opAndereRekening}; zelfdeRekeningTweedeIsDuplicaat=${opZelfdeRekening}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-CASH-42',
+    scenarioId: 'UAT-CASH-42',
+    label: 'Eerste ophaal (planInitialFetch): lege rekening → 4 blokken nieuwste-eerst tot 24 mnd, rekening met historie → D−3-venster',
+    run: () => {
+      criterion('WF-CASH-42')
+      const today = '2026-07-29'
+
+      const legeRekening = planInitialFetch({ today, newestExistingDate: null })
+      const nieuwsteBlokEerst = legeRekening.blocks.length > 1
+        && legeRekening.blocks[0].to === today
+        && legeRekening.blocks[legeRekening.blocks.length - 1].from === legeRekening.startDate
+
+      const metHistorie = planInitialFetch({ today, newestExistingDate: '2026-07-20' })
+      const vandaagGrens = planInitialFetch({ today, newestExistingDate: today })
+
+      return {
+        expected: 'legeRekeningMode=historical; legeRekeningBlokken=4; legeRekeningStartDate=2024-07-29; nieuwsteBlokEerst=true; historieRekeningMode=incremental; historieRekeningStart=2026-07-17; vandaagGrensStart=2026-07-26',
+        actual: `legeRekeningMode=${legeRekening.mode}; legeRekeningBlokken=${legeRekening.blocks.length}; legeRekeningStartDate=${legeRekening.startDate}; nieuwsteBlokEerst=${nieuwsteBlokEerst}; historieRekeningMode=${metHistorie.mode}; historieRekeningStart=${metHistorie.startDate}; vandaagGrensStart=${vandaagGrens.startDate}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-CASH-46',
+    scenarioId: 'UAT-CASH-46',
+    label: 'Rekeningtype van de bank (mapAccountType, B3): spaar/zakelijk/creditcard/onbekend',
+    run: () => {
+      criterion('WF-CASH-46')
+      const fmt = (m: ReturnType<typeof mapAccountType>) => `${m.account_type},${m.subtype},${m.is_liquid}`
+      return {
+        expected: 'transaction=checking,checking,true; savings=savings,savings_account,true; business=business,business,true; creditCard=other,other_cash,false; onbekend=checking,checking,true',
+        actual: `transaction=${fmt(mapAccountType('TRANSACTION'))}; savings=${fmt(mapAccountType('SAVINGS'))}; business=${fmt(mapAccountType('BUSINESS_SAVINGS'))}; creditCard=${fmt(mapAccountType('CREDIT_CARD'))}; onbekend=${fmt(mapAccountType('FOO'))}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-CASH-48',
+    scenarioId: 'UAT-CASH-48',
+    label: 'FR5-kiesbaarheid (isSelectableTargetOption) + bezet-melding (occupiedTargetAccountMessage): bezet uitgeschakeld, huidige drager blijft kiesbaar',
+    run: () => {
+      criterion('WF-CASH-48')
+      const bezet = makeTargetOption({ id: 'R', linked_provider_name: 'ING' })
+      const vrij = makeTargetOption({ id: 'R2', linked_provider_name: null })
+      const bezetNietKiesbaar = isSelectableTargetOption(bezet)
+      const vrijKiesbaar = isSelectableTargetOption(vrij)
+      const huidigeDragerBlijftKiesbaar = isSelectableTargetOption(bezet, 'R')
+      const melding = occupiedTargetAccountMessage('ING')
+      return {
+        expected: 'bezetNietKiesbaar=false; vrijKiesbaar=true; huidigeDragerBlijftKiesbaar=true; melding=Deze rekening is al gekoppeld aan ING. Verbreek die koppeling eerst bij de rekening; daarna kun je hem aan een andere bank koppelen.',
+        actual: `bezetNietKiesbaar=${bezetNietKiesbaar}; vrijKiesbaar=${vrijKiesbaar}; huidigeDragerBlijftKiesbaar=${huidigeDragerBlijftKiesbaar}; melding=${melding}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-CASH-49',
+    scenarioId: 'UAT-CASH-49',
+    label: 'Bankkoppeling-gezondheid (deriveBankLinkHealth): regelvolgorde is het contract — intentie wint van storing, linked-broken ≠ manual',
+    run: () => {
+      criterion('WF-CASH-49')
+      const now = new Date('2026-07-30T12:00:00.000Z')
+      const geenKoppelrij = deriveBankLinkState(null, now)
+      const zachtOntkoppeldMaarVerlopen = deriveBankLinkState(
+        { linkIsActive: false, connectionStatus: 'expired', tokenExpiresAt: '2026-01-01T00:00:00.000Z', lastSyncedAt: null },
+        now,
+      )
+      const statusKapot = deriveBankLinkState(
+        { linkIsActive: true, connectionStatus: 'expired', tokenExpiresAt: '2026-09-01T00:00:00.000Z', lastSyncedAt: null },
+        now,
+      )
+      const tokenVerstreken = deriveBankLinkState(
+        { linkIsActive: true, connectionStatus: 'active', tokenExpiresAt: '2026-07-01T00:00:00.000Z', lastSyncedAt: null },
+        now,
+      )
+      const gezond = deriveBankLinkState(
+        { linkIsActive: true, connectionStatus: 'active', tokenExpiresAt: '2026-09-01T00:00:00.000Z', lastSyncedAt: null },
+        now,
+      )
+      return {
+        expected: 'geenKoppelrij=manual; zachtOntkoppeldMaarVerlopen=manual; statusKapot=linked-broken; tokenVerstreken=linked-broken; gezond=linked',
+        actual: `geenKoppelrij=${geenKoppelrij}; zachtOntkoppeldMaarVerlopen=${zachtOntkoppeldMaarVerlopen}; statusKapot=${statusKapot}; tokenVerstreken=${tokenVerstreken}; gezond=${gezond}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-CASH-50',
+    scenarioId: 'UAT-CASH-50',
+    label: 'Saldo via het herwaarderingspad (isSameBalance-poort + notitie-rondtrip): ongewijzigd saldo schrijft niets, de compensatie leest zichzelf niet als banksync',
+    run: () => {
+      criterion('WF-CASH-50')
+      const ongewijzigd = isSameBalance(2543.67, 2543.67)
+      const centTolerantie = isSameBalance(2543.6700000000001, 2543.67)
+      const gewijzigd = isSameBalance(2543.67, 2600)
+      const rondtrip = parseBankSyncPrevious(formatBankSyncNote(2543.67))
+      const correctieNietAlsBanksyncGelezen = parseBankSyncPrevious(formatBankSyncCorrectionNote(2600))
+      return {
+        expected: 'ongewijzigd=true; centTolerantie=true; gewijzigd=false; rondtrip=2543.67; correctieNietAlsBanksyncGelezen=null',
+        actual: `ongewijzigd=${ongewijzigd}; centTolerantie=${centTolerantie}; gewijzigd=${gewijzigd}; rondtrip=${rondtrip}; correctieNietAlsBanksyncGelezen=${correctieNietAlsBanksyncGelezen}`,
       }
     },
   },
