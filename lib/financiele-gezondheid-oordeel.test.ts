@@ -18,9 +18,9 @@
  *    gebruikten dan de gebruiker zelf had ingevoerd.
  *
  * Productie-ijkpunten (beide accounts, gemeten via execute_sql):
- *   jpsmit@jps-holding.nl ......... 5.000 / 3.500 → 30 %  (was 37,2 % canoniek,
+ *   gebruiker A .................. 5.000 / 3.500 → 30 %  (was 37,2 % canoniek,
  *                                   49,5 % op de forecast-pagina + in de score)
- *   janpaul050486@gmail.com ....... 5.000 / 3.000 → 40 %  (berekend: 7 %)
+ *   gebruiker B .................. 5.000 / 3.000 → 40 %  (berekend: 7 %)
  */
 import { describe, it, expect } from 'vitest'
 import { resolveSavingsSource } from '@/lib/savings-source'

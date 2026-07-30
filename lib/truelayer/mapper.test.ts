@@ -72,24 +72,24 @@ describe('mapTransaction', () => {
   // mapTransaction valt daarop terug zodat de tegenpartij niet leeg blijft.
   it('leest counterparty uit meta.counter_party_* wanneer merchant_name ontbreekt (Rabobank xs2a)', async () => {
     const tl = {
-      transaction_id: '7ab7dea768d6bb7389ec2e97086a8e36',
+      transaction_id: 'tl-rabo-meta-1',
       timestamp: '2026-07-29T06:05:01.241Z',
       amount: -11.99,
       currency: 'EUR',
-      description: 'BRN?00000679,3: S-7760892, 2026-07-25 - 2026-08-24',
+      description: 'BRN?00000000,0: S-0000000, 2026-07-25 - 2026-08-24',
       transaction_type: 'DEBIT',
       transaction_category: 'DEBIT',
       meta: {
         transaction_type: 'Debit',
         counter_party_preferred_name: 'VIDEOLAND DOOR BUCKAROO',
-        counter_party_iban: 'NL16DEUT0265237289',
+        counter_party_iban: 'NL00TEST0123456789',
       },
     } as unknown as TLTransaction
 
     const result = await mapTransaction(tl)
 
     expect(result.counterparty_name).toBe('VIDEOLAND DOOR BUCKAROO')
-    expect(result.counterparty_iban).toBe('NL16DEUT0265237289')
+    expect(result.counterparty_iban).toBe('NL00TEST0123456789')
   })
 
   it('leest counterparty uit meta.counter_party_* wanneer merchant_name alleen whitespace bevat', async () => {
@@ -105,7 +105,7 @@ describe('mapTransaction', () => {
       meta: {
         transaction_type: 'Debit',
         counter_party_preferred_name: 'VIDEOLAND DOOR BUCKAROO',
-        counter_party_iban: 'NL16DEUT0265237289',
+        counter_party_iban: 'NL00TEST0123456789',
       },
     } as unknown as TLTransaction
 
@@ -144,7 +144,7 @@ describe('mapTransaction', () => {
       meta: {
         transaction_type: 'Debit',
         counter_party_preferred_name: 'VIDEOLAND DOOR BUCKAROO',
-        counter_party_iban: 'NL16DEUT0265237289',
+        counter_party_iban: 'NL00TEST0123456789',
       },
     } as unknown as TLTransaction
 

@@ -225,18 +225,18 @@ const tests: TestCase[] = [
         timestamp: '2026-07-29T06:05:01.241Z',
         amount: -11.99,
         currency: 'EUR',
-        description: 'BRN?00000679,3: S-7760892',
+        description: 'BRN?00000000,0: S-0000000',
         transaction_type: 'DEBIT',
         transaction_category: 'DEBIT',
         meta: {
           counter_party_preferred_name: 'VIDEOLAND DOOR BUCKAROO',
-          counter_party_iban: 'NL16DEUT0265237289',
+          counter_party_iban: 'NL00TEST0123456789',
         },
       } as unknown as TLTransaction
 
       const rabobankResult = await mapTransaction(rabobankTx)
       assertEqual(rabobankResult.counterparty_name, 'VIDEOLAND DOOR BUCKAROO', 'Meta-fallback vult tegenpartij zonder merchant_name')
-      assertEqual(rabobankResult.counterparty_iban, 'NL16DEUT0265237289', 'Meta-fallback vult IBAN')
+      assertEqual(rabobankResult.counterparty_iban, 'NL00TEST0123456789', 'Meta-fallback vult IBAN')
 
       // Providers die merchant_name WEL vullen (bv. sandbox/UK) behouden voorrang
       const filledMerchantTx = {
