@@ -355,6 +355,46 @@ const tests: TestCase[] = [
     },
   },
 
+  {
+    id: 'ob-bank-target-account-select-encrypted-iban',
+    name: 'De keuzelijst-SELECT leest de versleutelde IBAN, niet de plaintext-kolom',
+    category: CAT,
+    description: 'TARGET_ACCOUNT_SELECT (lib/truelayer/target-account.ts) is de kolomlijst van de kandidaat-doelrekeningen: hij wordt gelezen door GET /api/bank-connect/accounts (de keuzelijst in de wizard én in het correctiemoment) én door loadTargetAccount, de grens die auth-link/relink/callback gebruiken. Hij MOET iban_encrypted selecteren en niet de plaintext `iban`-kolom — die verdwijnt in Stage B (aangekondigd in supabase/migrations/20260713142000_drop_plaintext_bank_tokens.sql). Waarom dit een eigen case is en niet "een detail": valt die drop terwijl deze SELECT nog plaintext leest, dan 500t de keuzelijst-route en degradeert de wizard STIL naar "alleen een nieuwe rekening aanmaken" — de gebruiker kan zijn bestaande rekening dan niet meer kiezen zonder dat iets meldt waarom. Dezelfde doctrine als de cash-as-asset backfill hierboven; de backfill van de kolom is op 30 juli afgerond (0 rijen zonder iban_encrypted).',
+    priority: 'high',
+    estimatedDurationMs: 50,
+    fn() {
+      const modulePath = path.join(process.cwd(), 'lib/truelayer/target-account.ts')
+      assert(fs.existsSync(modulePath), `target-account-module niet gevonden op ${modulePath}`)
+      const src = fs.readFileSync(modulePath, 'utf-8')
+
+      const match = /TARGET_ACCOUNT_SELECT\s*=\s*['"]([^'"]+)['"]/.exec(src)
+      assert(
+        match !== null,
+        'TARGET_ACCOUNT_SELECT niet gevonden als string-constante in lib/truelayer/target-account.ts',
+      )
+
+      const columns = match![1].split(',').map((c) => c.trim())
+      assert(
+        columns.includes('iban_encrypted'),
+        `TARGET_ACCOUNT_SELECT selecteert geen iban_encrypted (kolommen: ${columns.join(', ')})`,
+      )
+      assert(
+        !columns.includes('iban'),
+        'TARGET_ACCOUNT_SELECT selecteert nog de plaintext `iban`-kolom — na de Stage B-drop 500t de keuzelijst en valt de wizard stil terug op "alleen een nieuwe rekening"',
+      )
+
+      // En de route mag de IBAN niet rauw doorgeven: alleen het staartje verlaat
+      // de server, en de ontsleuteling gebeurt server-side.
+      const routePath = path.join(process.cwd(), 'app/api/bank-connect/accounts/route.ts')
+      assert(fs.existsSync(routePath), `Accounts-route niet gevonden op ${routePath}`)
+      const routeSrc = fs.readFileSync(routePath, 'utf-8')
+      assert(
+        /decryptIbanForLabel\s*\(/.test(routeSrc) && /iban_tail:/.test(routeSrc),
+        'De keuzelijst-route moet iban_encrypted ontsleutelen (decryptIbanForLabel) en alleen iban_tail teruggeven',
+      )
+    },
+  },
+
   // ── Step 3: POST /api/bank-connect/sync ───────────────────────────
   {
     id: 'ob-bank-sync-transactions',

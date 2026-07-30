@@ -112,6 +112,7 @@ import { loadEntitySparklines } from '@/lib/load-entity-sparklines'
 import { loadConnectionsByAssetIds, type AssetConnectionSummary } from '@/lib/connections-data'
 import type { AssetsPageData, AssetsPerspectiveContext } from '@/lib/assets-data-loader'
 import type { Provenance } from '@/lib/household-data'
+import { VALUATIONS_CONFLICT_KEY } from '@/lib/valuations'
 
 type Mortgage = { id: string; name: string; current_balance: number; linked_asset_id: string | null }
 
@@ -3187,7 +3188,7 @@ export function AssetForm({
           valuation_date: today,
           value: newValue,
           notes: `Waarde bijgewerkt van ${oldValue} naar ${newValue}`,
-        }, { onConflict: 'entity_id,valuation_date' })
+        }, { onConflict: VALUATIONS_CONFLICT_KEY })
         // Mirror naar balance_snapshots zodat de categorie-sparkline meebeweegt.
         await upsertSingleBalanceSnapshot(supabase, user.id, today, {
           type: 'asset',
@@ -4206,7 +4207,7 @@ export function ValuationModal({
       valuation_date: date,
       value: Number(value),
       notes: notes || null,
-    }, { onConflict: 'entity_id,valuation_date' })
+    }, { onConflict: VALUATIONS_CONFLICT_KEY })
 
     if (valError) {
       console.error('Valuation error:', valError)

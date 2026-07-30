@@ -9,6 +9,7 @@ import { WEALTH_GROUPS } from '@/lib/wealth-composition'
 import type { AssetType } from '@/lib/asset-data'
 import { getDebtGroup } from '@/lib/debt-data'
 import type { DebtType } from '@/lib/debt-data'
+import { VALUATIONS_CONFLICT_KEY } from '@/lib/valuations'
 
 /**
  * /api/snapshots/entity-backfill — per-entiteit historische saldo-backfill.
@@ -22,7 +23,7 @@ import type { DebtType } from '@/lib/debt-data'
  * datum `<month>-01`):
  *   1. Een `valuations`-rij  (spiegel van components/core/assets-client.tsx en
  *      components/app/core/debts/debt-valuation-modal.tsx) — valuation_date =
- *      `<month>-01`, onConflict 'entity_id,valuation_date'.
+ *      `<month>-01`, onConflict `VALUATIONS_CONFLICT_KEY`.
  *   2. Een mirror naar `balance_snapshots` via upsertSingleBalanceSnapshot uit
  *      lib/balance-snapshot.ts — snapshot_date `<month>-01`. entity_name /
  *      entity_subtype / net_worth_inclusion_pct komen uit de ACTUELE assets/
@@ -312,7 +313,7 @@ export async function POST(request: Request) {
     const date = `${entry.month}-01`
 
     // 1. valuations-rij op de historische datum (spiegel LIVE-herwaardering:
-    //    zelfde kolommen + onConflict-sleutel 'entity_id,valuation_date').
+    //    zelfde kolommen + dezelfde `VALUATIONS_CONFLICT_KEY`).
     const { error: valError } = await supabase.from('valuations').upsert(
       {
         user_id: user.id,
@@ -322,7 +323,7 @@ export async function POST(request: Request) {
         value: entry.balance,
         notes: 'Historische invoer via verloop-editor',
       },
-      { onConflict: 'entity_id,valuation_date' },
+      { onConflict: VALUATIONS_CONFLICT_KEY },
     )
     if (valError) {
       return serverError(valError, 'entity-backfill:POST')

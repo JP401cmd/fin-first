@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-30T06:11:31.927Z",
+  "generatedAt": "2026-07-30T08:05:15.958Z",
   "generatedDate": "2026-07-30",
   "repo": {
     "name": "fin",
@@ -191,7 +191,7 @@
     "routesProduction": 101,
     "api": 268,
     "tables": 86,
-    "migrations": 170,
+    "migrations": 171,
     "integrations": 25,
     "components": 846,
     "providers": 11,
@@ -7568,7 +7568,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 170
+    "migrationCount": 171
   },
   "tablesByDomain": [
     {
@@ -15076,7 +15076,7 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 107
+        "commits": 108
       },
       {
         "path": "lib/ai",
@@ -15108,7 +15108,7 @@
       },
       {
         "path": "app/api/assets",
-        "commits": 5
+        "commits": 6
       },
       {
         "path": "components/horizon",
@@ -15128,13 +15128,13 @@
       },
       {
         "file": "components/core/assets-client.tsx",
-        "loc": 4312,
+        "loc": 4313,
         "commits": 45
       },
       {
         "file": "components/app/cash-account-view.tsx",
         "loc": 2883,
-        "commits": 16
+        "commits": 17
       },
       {
         "file": "lib/release-notes.ts",
@@ -15144,12 +15144,12 @@
       {
         "file": "lib/dashboard-data-loader.ts",
         "loc": 2660,
-        "commits": 50
+        "commits": 51
       },
       {
         "file": "app/(app)/core/cash/import/page.tsx",
         "loc": 2230,
-        "commits": 19
+        "commits": 20
       },
       {
         "file": "lib/test-personas.ts",

@@ -30,6 +30,7 @@ const {
   mockSyncAccountBalance,
   mockDecryptField,
   mockSyncBudgetingActive,
+  mockSetBudgetTracking,
 } = vi.hoisted(() => ({
   mockCreateClient: vi.fn(),
   mockExchangeCode: vi.fn(),
@@ -38,6 +39,7 @@ const {
   mockSyncAccountBalance: vi.fn(),
   mockDecryptField: vi.fn(),
   mockSyncBudgetingActive: vi.fn(),
+  mockSetBudgetTracking: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -62,6 +64,19 @@ vi.mock('@/lib/truelayer/balance-sync', () => ({
 // mockSyncBudgetingActive.mockResolvedValue/mockRejectedValueOnce.
 vi.mock('@/lib/budgeting-active', () => ({
   syncBudgetingActive: mockSyncBudgetingActive,
+}))
+
+// Zelfde reden als hierboven, één laag dieper: sinds het eigenaarsbesluit van
+// 30 juli zet het SC-13-herstel in stap 2b óók de budgettracking terug, en het
+// doet dat via `setBudgetTracking` — de ENE schrijver van dat drieluik. Die
+// helper leest en schrijft zelf `assets`, de companion-rij én de module-gate,
+// dus ongemockt zou hij de tabel-queues van deze suite droogleggen op writes die
+// niets met de callback te maken hebben. Het drieluik heeft eigen dekking
+// (`lib/truelayer/cash-asset-backfill.test.ts`,
+// `app/api/assets/toggle-budget/route.test.ts`); hier telt of de callback
+// delegeert.
+vi.mock('@/lib/budget-tracking', () => ({
+  setBudgetTracking: mockSetBudgetTracking,
 }))
 
 vi.mock('@/lib/crypto/field-encryption', () => ({
@@ -205,6 +220,11 @@ beforeEach(() => {
   mockSyncAccountBalance.mockReset()
   mockDecryptField.mockReset()
   mockSyncBudgetingActive.mockReset().mockResolvedValue(true)
+  mockSetBudgetTracking.mockReset().mockResolvedValue({
+    ok: true,
+    asset: { id: 'asset-ba-terug', has_budget_tracking: true, name: 'ING' },
+    budgetingActive: true,
+  })
   // De route valt terug op NEXT_PUBLIC_APP_URL voor zijn redirects (niet de
   // request-origin) — expliciet zetten zodat de redirect-assertie ondubbelzinnig is.
   process.env.NEXT_PUBLIC_APP_URL = ORIGIN
@@ -1261,8 +1281,8 @@ describe('GET /api/bank-connect/callback — fase 7: bezette drager krijgt een e
   })
 })
 
-describe('GET /api/bank-connect/callback — fase 7: SC-13, hergebruik reactiveert het cash-bezit', () => {
-  it('een gedeactiveerd cash-bezit op de hergebruikte rekening gaat weer op is_active true', async () => {
+describe('GET /api/bank-connect/callback — fase 7: SC-13, hergebruik herstelt het cash-bezit', () => {
+  it('een gedeactiveerd cash-bezit op de hergebruikte rekening wordt zichtbaar én budgetteert weer mee', async () => {
     // Het incident: "verwijder" een rekening in de UI (functioneel
     // `assets.is_active = false`) en koppel opnieuw. Zonder deze stap werkt de
     // koppeling, klopt het saldo, en filtert `cash-overview` de rekening weg op
@@ -1278,7 +1298,7 @@ describe('GET /api/bank-connect/callback — fase 7: SC-13, hergebruik reactivee
       bank_accounts: [carrierWithAsset('ba-terug')],
       assets: [
         { data: { id: 'asset-ba-terug', is_active: false } }, // stap 2b: bezit stáát uit
-        { data: null }, // stap 2b: de reactivatie-update
+        { data: null }, // stap 2b: de zichtbaarheids-update
       ],
       profiles: [{ data: { onboarding_completed: true } }],
     })
@@ -1291,12 +1311,22 @@ describe('GET /api/bank-connect/callback — fase 7: SC-13, hergebruik reactivee
 
     const assetUpdates = stub.calls.filter((c) => c.table === 'assets' && c.op === 'update')
     expect(assetUpdates).toHaveLength(1)
-    // Exact één vlag: budgetteren blijft een eigen, zichtbare keuze (B2).
+    // As 1 — zichtbaarheid. De route schrijft deze ene vlag zélf.
     expect(assetUpdates[0].data).toEqual({ is_active: true })
 
-    // Géén tweede cash-bezit, en de bankrekening zelf blijft ongemoeid.
+    // As 2 — budgettracking, via de ENE schrijver van dat drieluik. Het besluit van
+    // 30 juli: herstel dat de rekening zichtbaar maakt maar buiten de budgetten
+    // laat, leest als half hersteld.
+    expect(mockSetBudgetTracking).toHaveBeenCalledTimes(1)
+    expect(mockSetBudgetTracking).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.any(String),
+      'asset-ba-terug',
+      true,
+    )
+
+    // Géén tweede cash-bezit.
     expect(stub.calls.filter((c) => c.table === 'assets' && c.op === 'insert')).toHaveLength(0)
-    expect(stub.calls.filter((c) => c.table === 'bank_accounts' && c.op === 'update')).toHaveLength(0)
   })
 })
 

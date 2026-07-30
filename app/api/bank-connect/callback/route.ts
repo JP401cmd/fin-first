@@ -497,29 +497,34 @@ export async function GET(req: Request) {
         continue
       }
 
-      // ── Stap 4b: cash-as-asset backfill + SC-13-reactivatie ────────────────
+      // ── Stap 4b: cash-as-asset backfill + SC-13-herstel ────────────────────
       // Nieuw aangemaakte rekeningen krijgen hun asset via schakel 4 (of via de
       // trigger fn_auto_link_bank_account_asset); alleen bestaande rijen van vóór
       // cash-as-asset kunnen nog zonder zitten. Draait dus voor élke hergebruikte
       // rekening — via identiteit, via de voorkeur én via `iban_hash`.
       //
-      // Sinds fase 7 doet diezelfde stap óók de REACTIVATIE van een gedeactiveerd
+      // Sinds fase 7 doet diezelfde stap óók het HERSTEL van een gedeactiveerd
       // cash-bezit (SC-13): zonder dat komt het saldo binnen op een rij die
       // `cash-overview` wegfiltert op `is_active !== false`, en dan werkt de
       // koppeling wel maar ziet de gebruiker niets. Het herstelpad van `auth-link`
       // laat de geschiktheidstoets daarom bewust vallen — hier wordt die keuze
-      // waargemaakt.
+      // waargemaakt. Sinds het eigenaarsbesluit van 30 juli zet dat herstel béide
+      // assen terug (zichtbaarheid én budgettracking); de tweede gaat via
+      // `setBudgetTracking`, de ene schrijver van dat drieluik — zie de docstring
+      // in `cash-asset-backfill.ts`.
       //
       // **De plaats in de lus is het punt, en die is bij de security-review van fase
       // 7 verschoven van vóór de koppelwrite naar hierná.** Stond dit ervóór, dan
-      // reactiveerde een MISLUKTE koppelpoging (bezet-botsing → `continue`) alsnog
-      // een door de gebruiker "verwijderd" cash-bezit, of liet ze een vers €0-bezit
+      // herstelde een MISLUKTE koppelpoging (bezet-botsing → `continue`) alsnog een
+      // door de gebruiker "verwijderd" cash-bezit, of liet ze een vers €0-bezit
       // achter: een half toegepaste mutatie die stil het netto vermogen wijzigt
-      // terwijl de gebruiker een foutmelding leest. `POST /api/bank-connect/relink`
-      // maakte dezelfde afweging al en legt dezelfde reden vast. Nog steeds vóór stap
-      // 5, dus het saldo landt op een rekening die haar bezit al heeft.
+      // terwijl de gebruiker een foutmelding leest. Dat weegt sinds 30 juli zwaarder,
+      // niet lichter: het herstel raakt nu óók de budgetten.
+      // `POST /api/bank-connect/relink` maakte dezelfde afweging al en legt dezelfde
+      // reden vast. Nog steeds vóór stap 5, dus het saldo landt op een rekening die
+      // haar bezit al heeft.
       // Alleen voor een HERGEBRUIKTE rij: schakel 4 maakt bezit en rekening in één
-      // tak aan, dus daar is er niets bij te vullen en niets te reactiveren.
+      // tak aan, dus daar is er niets bij te vullen en niets te herstellen.
       if (!createdNewAccount) {
         const backfill = await ensureCashAssetForBankAccount(supabase, {
           userId: user.id,
@@ -533,7 +538,7 @@ export async function GET(req: Request) {
         // eerder alleen als "rekening blijft onzichtbaar" naar boven kwam.
         if (backfill.reactivated) {
           console.info(
-            '[bank-connect:callback] gedeactiveerd cash-bezit gereactiveerd (SC-13) voor rekening',
+            '[bank-connect:callback] gedeactiveerd cash-bezit hersteld (SC-13: zichtbaar + budgettracking) voor rekening',
             bankAccountId,
           )
         }

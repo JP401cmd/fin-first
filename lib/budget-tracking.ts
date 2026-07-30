@@ -65,7 +65,14 @@ export async function setBudgetTracking(
 
   if (error) return { ok: false, error }
 
-  await syncBankAccountCompanion(supabase, userId, data, enabled).catch(() => undefined)
+  // Best-effort, maar niet geruisloos (securityreview 30 juli): een geslikte
+  // companion-fout laat de rekening uit `/core/cash` en de import verdwijnen
+  // terwijl `has_budget_tracking` al aanstaat — dezelfde klasse stille desync als
+  // een gefaalde gate-write hieronder, en sinds het SC-13-herstel óók bereikbaar
+  // vanuit de bankkoppeling. De fout bereikt de client nog steeds niet.
+  await syncBankAccountCompanion(supabase, userId, data, enabled).catch((companionErr) => {
+    console.error('[budget-tracking] companion-sync mislukt:', companionErr)
+  })
 
   const budgetingActive = await syncBudgetingActive(supabase, userId).catch((gateErr) => {
     // Wél server-side loggen: een geruisloos geslikte gate-desync is een bekend

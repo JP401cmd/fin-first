@@ -18,15 +18,32 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
  *  3. **Het startpunt komt uit `planInitialFetch`, niet uit de UI.** Bij historie
  *     tot D levert de route D−3; op een lege rekening de historische modus. Nergens
  *     een tweede "−3 dagen".
- *  4. **Van de IBAN verlaten alleen de laatste vier tekens de server.**
+ *  4. **De route leest `iban_encrypted`, niet de plaintext `iban`-kolom** (die
+ *     verdwijnt in Stage B), en van de ontsleutelde IBAN verlaten alleen de
+ *     laatste vier tekens de server. Een onleesbare ciphertext degradeert naar een
+ *     leeg staartje in plaats van de hele keuzelijst te laten vallen — dán zou de
+ *     wizard stil terugvallen op "alleen een nieuwe rekening".
  *
  * De Supabase-stub is bewust geen call-queue maar een piepklein in-memory
  * tabellenspul dat de filters écht toepast — alleen zo bewijst een test
  * scope-gedrag in plaats van aanroepvolgorde.
  */
 
-const { mockCreateClient } = vi.hoisted(() => ({ mockCreateClient: vi.fn() }))
+const { mockCreateClient, mockDecryptField } = vi.hoisted(() => ({
+  mockCreateClient: vi.fn(),
+  mockDecryptField: vi.fn(),
+}))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mockCreateClient }))
+
+// De echte `decryptField` heeft ENCRYPTION_KEY_V1 uit de env nodig; die staat in
+// de testomgeving niet. Zonder deze mock zou élke ontsleuteling stil in de
+// `catch` van `decryptIbanForLabel` landen en zou "staartje is leeg" niets
+// bewijzen over de lees-omzetting.
+vi.mock('@/lib/crypto/field-encryption', () => ({
+  blindIndex: (s: string) => `hash:${s}`,
+  encryptField: (s: string | null) => (s === null || s === undefined ? null : `enc:${s}`),
+  decryptField: mockDecryptField,
+}))
 
 import { GET } from './route'
 
@@ -38,7 +55,7 @@ type BankAccountRow = {
   user_id: string
   name: string
   bank_name: string | null
-  iban: string | null
+  iban_encrypted: string | null
   is_active: boolean
   linked_asset_id: string | null
   sort_order?: number
@@ -60,7 +77,13 @@ type Fixture = {
   links: LinkRow[]
 }
 
-function makeSupabase(fixture: Fixture, opts: { user?: string | null; failTransactions?: boolean } = {}) {
+/** Eén `.select(...)`-aanroep zoals de route hem deed — tabel + rauwe kolomlijst. */
+type CapturedSelect = { table: string; columns: string }
+
+function makeSupabase(
+  fixture: Fixture,
+  opts: { user?: string | null; failTransactions?: boolean; capture?: CapturedSelect[] } = {},
+) {
   const user = opts.user === undefined ? USER : opts.user
 
   function builder(table: string) {
@@ -72,7 +95,8 @@ function makeSupabase(fixture: Fixture, opts: { user?: string | null; failTransa
     let limit: number | null = null
 
     const b: Record<string, unknown> = {}
-    b.select = (_cols?: string, options?: { count?: string }) => {
+    b.select = (cols?: string, options?: { count?: string }) => {
+      opts.capture?.push({ table, columns: cols ?? '' })
       if (options?.count) countMode = true
       return b
     }
@@ -151,6 +175,15 @@ const TODAY = '2026-07-29'
 
 beforeEach(() => {
   mockCreateClient.mockReset()
+  // Spiegel van de mock-`encryptField`: 'enc:<iban>' → '<iban>'. Een waarde
+  // zonder dat prefix is een onleesbare ciphertext en gooit, precies zoals de
+  // echte `decryptField` bij een ontbrekende versie-prefix.
+  mockDecryptField.mockReset()
+  mockDecryptField.mockImplementation((ct: string | null) => {
+    if (ct === null || ct === undefined) return null
+    if (!ct.startsWith('enc:')) throw new Error('geen versie-prefix')
+    return ct.slice(4)
+  })
   vi.useFakeTimers()
   vi.setSystemTime(new Date(`${TODAY}T10:00:00Z`))
 })
@@ -159,6 +192,18 @@ async function callGet(fixture: Fixture, opts?: Parameters<typeof makeSupabase>[
   mockCreateClient.mockResolvedValue(makeSupabase(fixture, opts))
   const res = await GET()
   return { res, body: await res.json() }
+}
+
+/**
+ * Zelfde aanroep, maar mét de kolomlijsten die de route heeft opgevraagd. Nodig
+ * omdat "leest geen plaintext-kolom" een eigenschap van de SELECT is en niet van
+ * de uitkomst: een stub die de kolom toch teruggeeft zou de omzetting verbergen.
+ */
+async function callGetCapturingSelects(fixture: Fixture) {
+  const capture: CapturedSelect[] = []
+  mockCreateClient.mockResolvedValue(makeSupabase(fixture, { capture }))
+  const res = await GET()
+  return { res, body: await res.json(), selects: capture }
 }
 
 const EMPTY: Fixture = { bankAccounts: [], assets: [], transactions: [], links: [] }
@@ -182,8 +227,8 @@ describe('GET /api/bank-connect/accounts — eigenaarschap', () => {
     const { body } = await callGet({
       ...EMPTY,
       bankAccounts: [
-        { id: 'acc-mine', user_id: USER, name: 'Mijn betaalrekening', bank_name: 'ING', iban: 'NL91ABNA0417164300', is_active: true, linked_asset_id: null },
-        { id: 'acc-partner', user_id: PARTNER, name: 'Gedeelde rekening', bank_name: 'ING', iban: null, is_active: true, linked_asset_id: null },
+        { id: 'acc-mine', user_id: USER, name: 'Mijn betaalrekening', bank_name: 'ING', iban_encrypted: 'enc:NL91ABNA0417164300', is_active: true, linked_asset_id: null },
+        { id: 'acc-partner', user_id: PARTNER, name: 'Gedeelde rekening', bank_name: 'ING', iban_encrypted: null, is_active: true, linked_asset_id: null },
       ],
     })
 
@@ -194,7 +239,7 @@ describe('GET /api/bank-connect/accounts — eigenaarschap', () => {
     const { body } = await callGet({
       ...EMPTY,
       bankAccounts: [
-        { id: 'acc-1', user_id: USER, name: 'Betaalrekening', bank_name: null, iban: null, is_active: true, linked_asset_id: null },
+        { id: 'acc-1', user_id: USER, name: 'Betaalrekening', bank_name: null, iban_encrypted: null, is_active: true, linked_asset_id: null },
       ],
       transactions: [
         { id: 't1', user_id: USER, account_id: 'acc-1', date: '2026-07-10' },
@@ -214,13 +259,13 @@ describe('GET /api/bank-connect/accounts — welke rekeningen zijn kandidaat', (
   const fixture: Fixture = {
     ...EMPTY,
     bankAccounts: [
-      { id: 'acc-active', user_id: USER, name: 'Actief', bank_name: null, iban: null, is_active: true, linked_asset_id: 'asset-active' },
+      { id: 'acc-active', user_id: USER, name: 'Actief', bank_name: null, iban_encrypted: null, is_active: true, linked_asset_id: 'asset-active' },
       // Budgetteren uit = companion gedeactiveerd, bezitting leeft nog → kandidaat.
-      { id: 'acc-nobudget', user_id: USER, name: 'Zonder budgetteren', bank_name: null, iban: null, is_active: false, linked_asset_id: 'asset-nobudget' },
+      { id: 'acc-nobudget', user_id: USER, name: 'Zonder budgetteren', bank_name: null, iban_encrypted: null, is_active: false, linked_asset_id: 'asset-nobudget' },
       // Bezitting gedeactiveerd → geen kandidaat (SC-13 is een ander pad).
-      { id: 'acc-dead', user_id: USER, name: 'Verwijderd bezit', bank_name: null, iban: null, is_active: false, linked_asset_id: 'asset-dead' },
+      { id: 'acc-dead', user_id: USER, name: 'Verwijderd bezit', bank_name: null, iban_encrypted: null, is_active: false, linked_asset_id: 'asset-dead' },
       // Losse, inactieve rekening zonder bezit → geen kandidaat.
-      { id: 'acc-loose-off', user_id: USER, name: 'Losse inactieve', bank_name: null, iban: null, is_active: false, linked_asset_id: null },
+      { id: 'acc-loose-off', user_id: USER, name: 'Losse inactieve', bank_name: null, iban_encrypted: null, is_active: false, linked_asset_id: null },
     ],
     assets: [
       { id: 'asset-active', user_id: USER, is_active: true, has_budget_tracking: true },
@@ -249,7 +294,7 @@ describe('GET /api/bank-connect/accounts — startpunt en IBAN', () => {
     const { body } = await callGet({
       ...EMPTY,
       bankAccounts: [
-        { id: 'acc-1', user_id: USER, name: 'Betaalrekening', bank_name: null, iban: null, is_active: true, linked_asset_id: null },
+        { id: 'acc-1', user_id: USER, name: 'Betaalrekening', bank_name: null, iban_encrypted: null, is_active: true, linked_asset_id: null },
       ],
       transactions: [{ id: 't1', user_id: USER, account_id: 'acc-1', date: '2026-07-20' }],
     })
@@ -261,7 +306,7 @@ describe('GET /api/bank-connect/accounts — startpunt en IBAN', () => {
     const { body } = await callGet({
       ...EMPTY,
       bankAccounts: [
-        { id: 'acc-1', user_id: USER, name: 'Nieuwe rekening', bank_name: null, iban: null, is_active: true, linked_asset_id: null },
+        { id: 'acc-1', user_id: USER, name: 'Nieuwe rekening', bank_name: null, iban_encrypted: null, is_active: true, linked_asset_id: null },
       ],
     })
 
@@ -270,11 +315,11 @@ describe('GET /api/bank-connect/accounts — startpunt en IBAN', () => {
     expect(body.accounts[0].newest_transaction_date).toBeNull()
   })
 
-  it('alleen de laatste vier IBAN-tekens verlaten de server', async () => {
+  it('ontsleutelt iban_encrypted en laat alleen de laatste vier tekens de server verlaten', async () => {
     const { res, body } = await callGet({
       ...EMPTY,
       bankAccounts: [
-        { id: 'acc-1', user_id: USER, name: 'Betaalrekening', bank_name: 'ING', iban: 'NL91 ABNA 0417 1643 00', is_active: true, linked_asset_id: null },
+        { id: 'acc-1', user_id: USER, name: 'Betaalrekening', bank_name: 'ING', iban_encrypted: 'enc:NL91 ABNA 0417 1643 00', is_active: true, linked_asset_id: null },
       ],
     })
 
@@ -283,6 +328,42 @@ describe('GET /api/bank-connect/accounts — startpunt en IBAN', () => {
     expect(raw).not.toContain('NL91')
     expect(res.status).toBe(200)
   })
+
+  it('leest géén plaintext iban-kolom meer (Stage B dropt die)', async () => {
+    // De keuzelijst mag niet meer op `bank_accounts.iban` leunen: valt de
+    // Stage-B-drop, dan zou de SELECT 500'en en degradeerde de wizard stil naar
+    // "alleen een nieuwe rekening" — de gebruiker kan zijn bestaande rekening dan
+    // niet meer kiezen zonder dat iets meldt waarom. Deze test pint de SELECT
+    // zelf, want een rij mét plaintext-kolom bewijst niets als de route hem niet
+    // meer opvraagt.
+    const { selects } = await callGetCapturingSelects({
+      ...EMPTY,
+      bankAccounts: [
+        { id: 'acc-1', user_id: USER, name: 'Betaalrekening', bank_name: 'ING', iban_encrypted: 'enc:NL91ABNA0417164300', is_active: true, linked_asset_id: null },
+      ],
+    })
+
+    const bankAccountSelect = selects.find((s) => s.table === 'bank_accounts')?.columns ?? ''
+    expect(bankAccountSelect).toContain('iban_encrypted')
+    expect(bankAccountSelect.split(/\s*,\s*/)).not.toContain('iban')
+  })
+
+  it('onleesbare ciphertext → leeg staartje, geen 500', async () => {
+    // Een niet-gebackfillde of met een oude sleutel geschreven rij mag de hele
+    // keuzelijst niet laten vallen: het staartje is cosmetisch naast `name` en
+    // `bank_name`, en zonder lijst is de wizard onbruikbaar.
+    const { res, body } = await callGet({
+      ...EMPTY,
+      bankAccounts: [
+        { id: 'acc-1', user_id: USER, name: 'Betaalrekening', bank_name: 'ING', iban_encrypted: 'legacy-zonder-prefix', is_active: true, linked_asset_id: null },
+      ],
+    })
+
+    expect(res.status).toBe(200)
+    expect(body.accounts).toHaveLength(1)
+    expect(body.accounts[0].iban_tail).toBeNull()
+    expect(body.accounts[0].name).toBe('Betaalrekening')
+  })
 })
 
 describe('GET /api/bank-connect/accounts — actieve koppeling en fouten', () => {
@@ -290,8 +371,8 @@ describe('GET /api/bank-connect/accounts — actieve koppeling en fouten', () =>
     const { body } = await callGet({
       ...EMPTY,
       bankAccounts: [
-        { id: 'acc-1', user_id: USER, name: 'Betaalrekening', bank_name: null, iban: null, is_active: true, linked_asset_id: null },
-        { id: 'acc-2', user_id: USER, name: 'Spaarrekening', bank_name: null, iban: null, is_active: true, linked_asset_id: null },
+        { id: 'acc-1', user_id: USER, name: 'Betaalrekening', bank_name: null, iban_encrypted: null, is_active: true, linked_asset_id: null },
+        { id: 'acc-2', user_id: USER, name: 'Spaarrekening', bank_name: null, iban_encrypted: null, is_active: true, linked_asset_id: null },
       ],
       links: [
         { id: 'link-1', user_id: USER, bank_account_id: 'acc-1', is_active: true, provider_name: 'ING' },
@@ -309,7 +390,7 @@ describe('GET /api/bank-connect/accounts — actieve koppeling en fouten', () =>
     const { body } = await callGet({
       ...EMPTY,
       bankAccounts: [
-        { id: 'acc-1', user_id: USER, name: 'Betaalrekening', bank_name: null, iban: null, is_active: true, linked_asset_id: null },
+        { id: 'acc-1', user_id: USER, name: 'Betaalrekening', bank_name: null, iban_encrypted: null, is_active: true, linked_asset_id: null },
       ],
       links: [
         { id: 'link-p', user_id: PARTNER, bank_account_id: 'acc-1', is_active: true, provider_name: 'Rabobank' },
@@ -326,7 +407,7 @@ describe('GET /api/bank-connect/accounts — actieve koppeling en fouten', () =>
     const { body } = await callGet({
       ...EMPTY,
       bankAccounts: [
-        { id: 'acc-1', user_id: USER, name: 'Betaalrekening', bank_name: null, iban: null, is_active: true, linked_asset_id: null },
+        { id: 'acc-1', user_id: USER, name: 'Betaalrekening', bank_name: null, iban_encrypted: null, is_active: true, linked_asset_id: null },
       ],
       links: [
         { id: 'link-1', user_id: USER, bank_account_id: 'acc-1', is_active: true, provider_name: null },
@@ -340,7 +421,7 @@ describe('GET /api/bank-connect/accounts — actieve koppeling en fouten', () =>
     const { res, body } = await callGet({
       ...EMPTY,
       bankAccounts: [
-        { id: 'acc-1', user_id: USER, name: 'Betaalrekening', bank_name: null, iban: null, is_active: true, linked_asset_id: null },
+        { id: 'acc-1', user_id: USER, name: 'Betaalrekening', bank_name: null, iban_encrypted: null, is_active: true, linked_asset_id: null },
       ],
     }, { failTransactions: true })
 

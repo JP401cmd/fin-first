@@ -7,6 +7,7 @@ import { amsterdamWeekKey } from '@/lib/briefing/snapshot'
 import { localMonthBounds } from '@/lib/month-range'
 import { resolveFireParams } from '@/lib/fire-params'
 import { calculateFreedomTime } from '@/lib/format'
+import { decryptIbanForLabel } from '@/lib/truelayer/cash-asset-backfill'
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -290,7 +291,11 @@ export async function GET(request: NextRequest) {
     const { data: bankAccounts } = computeSlow
       ? await supabase
           .from('bank_connection_accounts')
-          .select('id, iban, last_synced_at')
+          // `iban_encrypted`, niet de plaintext kolom: Stage B dropt
+          // `bank_connection_accounts.iban`. De IBAN dient hier één cosmetisch
+          // doel (het label van de melding), dus een onleesbare rij degradeert
+          // naar 'Bankrekening' i.p.v. de hele meldingenlijst mee te nemen.
+          .select('id, iban_encrypted, last_synced_at')
           .eq('is_active', true)
       : { data: null }
 
@@ -304,7 +309,8 @@ export async function GET(request: NextRequest) {
         if (lastSynced >= threeDaysAgo) continue
 
         const daysSince = Math.floor((Date.now() - lastSynced.getTime()) / 86_400_000)
-        const label = account.iban ? account.iban.replace(/(.{4})/g, '$1 ').trim().slice(-9) : 'Bankrekening'
+        const accountIban = decryptIbanForLabel(account.iban_encrypted)
+        const label = accountIban ? accountIban.replace(/(.{4})/g, '$1 ').trim().slice(-9) : 'Bankrekening'
         const id = `sync_${account.id}`
 
         slow.push({

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { syncAccountBalance } from './balance-sync'
 import { parseBankSyncPrevious } from './balance-valuation'
+import { VALUATIONS_CONFLICT_KEY } from '@/lib/valuations'
 
 // ── Minimale Supabase-stub ──────────────────────────────────────────────────
 // syncAccountBalance krijgt zijn client als argument (dependency injection),
@@ -339,8 +340,14 @@ describe('syncAccountBalance', () => {
       value: 2543.67,
     })
     // Dezelfde conflictsleutel als de handmatige herwaardering: één waarde per
-    // entiteit per dag, laatste van de dag wint.
-    expect(valuations[0].onConflict).toBe('entity_id,valuation_date')
+    // entiteit per dag, laatste van de dag wint — en sinds
+    // `20260730072804_add_valuations_user_scoped_unique.sql` mét `user_id`, zodat
+    // een botsende `entity_id` van een ándere gebruiker niet de conflict-target is.
+    // Bewust tegen de gedeelde constante en niet tegen een tweede letterlijke
+    // string: een test die zijn eigen sleutel meeschrijft bewijst niet dat élke
+    // schrijver dezelfde gebruikt.
+    expect(valuations[0].onConflict).toBe(VALUATIONS_CONFLICT_KEY)
+    expect(VALUATIONS_CONFLICT_KEY).toContain('user_id')
 
     const snapshots = upserts(calls, 'balance_snapshots')
     expect(snapshots).toHaveLength(1)

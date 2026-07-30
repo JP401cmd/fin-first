@@ -6,10 +6,17 @@ import { detailBankAccountIdForAsset } from './cash-detail-target'
  * Tests voor de paneel-keuze van een cash-kaart
  * (specs/bank-connect-doelrekening/plan.md, fase 7).
  *
- * De bug die hier gepind wordt: een via SC-13 gereactiveerde rekening (bezit weer
- * actief, `has_budget_tracking` nog uit) viel buiten de budget-map en opende
- * daardoor het bezitting-bewerk-paneel — precies níet het paneel met de
- * bankverbinding, de statusuitleg en het herstelpad.
+ * De bug die hier gepind wordt: een rekening mét koppelrij maar zónder
+ * budgettracking viel buiten de budget-map en opende daardoor het
+ * bezitting-bewerk-paneel — precies níet het paneel met de bankverbinding, de
+ * statusuitleg en het herstelpad.
+ *
+ * Die combinatie ontstond oorspronkelijk uit het SC-13-herstel, dat alléén
+ * `assets.is_active` terugzette. Sinds het eigenaarsbesluit van 30 juli zet het
+ * herstel béide assen terug, dus dát pad levert 'm niet meer op — maar de regel
+ * blijft nodig, want de gebruiker kan budgetteren op een gekoppelde rekening zelf
+ * uitzetten (en de budget-write van het herstel kan falen). De regel is dus
+ * "koppelrij wint van budget-map", niet "gereactiveerd geval".
  */
 
 function link(overrides: Partial<CashBankLink> = {}): CashBankLink {
@@ -25,7 +32,7 @@ function link(overrides: Partial<CashBankLink> = {}): CashBankLink {
 
 describe('detailBankAccountIdForAsset', () => {
   it('wijst de rekeningdetail aan zodra er een koppelrij is, óók zonder budget-map', () => {
-    // Dit IS het gereactiveerde geval: budgetteren staat uit, dus de map is leeg.
+    // Budgetteren staat uit, dus de budget-map is leeg — en tóch is er een rekening.
     expect(detailBankAccountIdForAsset([link()], {}, 'asset-1')).toBe('ba-1')
   })
 

@@ -57,6 +57,7 @@ import {
   type Debt,
   DEBT_TYPE_LABELS,
 } from '@/lib/debt-data'
+import { VALUATIONS_CONFLICT_KEY } from '@/lib/valuations'
 
 /* ── Step definitions ────────────────────────────────────────────────── */
 const STEPS = [
@@ -1048,7 +1049,7 @@ function StepBezittingen({
       }))
       const { error: valError } = await supabase
         .from('valuations')
-        .upsert(valuationRows, { onConflict: 'entity_id,valuation_date' })
+        .upsert(valuationRows, { onConflict: VALUATIONS_CONFLICT_KEY })
       if (valError) throw valError
 
       // Update asset current_values
@@ -1267,7 +1268,7 @@ function StepSchulden({
       }))
       const { error: valError } = await supabase
         .from('valuations')
-        .upsert(valuationRows, { onConflict: 'entity_id,valuation_date' })
+        .upsert(valuationRows, { onConflict: VALUATIONS_CONFLICT_KEY })
       if (valError) throw valError
 
       // Update debt current_balances + auto-deactivate if ≤ 0

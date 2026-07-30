@@ -50,7 +50,6 @@ const MAX_LINKED_ACCOUNTS = 100
 
 type CarrierRow = {
   name: string | null
-  iban: string | null
   iban_encrypted: string | null
   /** De cash-bezitting waarop de banksync het saldo herwaardeert (fase 8). */
   linked_asset_id: string | null
@@ -68,7 +67,6 @@ type ConnectionRow = {
 type LinkRow = {
   id: string
   account_name: string | null
-  iban: string | null
   iban_encrypted: string | null
   bank_account_id: string | null
   /** Signaal 1 van de gezondheidsafleiding — zie de noot bij de mapping. */
@@ -97,16 +95,18 @@ export async function GET() {
     // partnerrijen komen daar wél door) — de koppeling zelf is dus de scope.
     const { data, error } = await supabase
       .from('bank_connection_accounts')
-      // `bank_accounts.iban_encrypted` staat er bewust bij, niet alleen de
-      // plaintext-kolom: Stage B dropt `bank_accounts.iban` (zie de noot in
-      // `cash-asset-backfill.ts`), en dan zou deze GET 500'en en de
-      // success-pagina haar hele correctiemoment verliezen.
+      // Uitsluitend `iban_encrypted` — van de koppelrij én van de drager. De
+      // plaintext-kolommen (`bank_connection_accounts.iban`,
+      // `bank_accounts.iban`) verdwijnen in Stage B, en dan zou deze GET 500'en en
+      // de success-pagina haar hele correctiemoment verliezen. Nu de backfill rond
+      // is (0 rijen zonder `iban_encrypted`) is de plaintext-terugval niet langer
+      // een vangnet maar precies de afhankelijkheid die de drop opblaast.
       // `is_active`, `status` en `token_expires_at` staan er sinds fase 7 bij: dat
       // zijn drie van de vier signalen die `deriveBankLinkHealth` nodig heeft (het
       // vierde, `last_synced_at`, stond er al). `provider_id` is de bank waarmee
       // het herstelpad opnieuw autoriseert.
       .select(
-        'id, account_name, iban, iban_encrypted, bank_account_id, is_active, last_synced_at, bank_connections(provider_name, provider_logo, provider_id, status, token_expires_at), bank_accounts(name, iban, iban_encrypted, linked_asset_id)',
+        'id, account_name, iban_encrypted, bank_account_id, is_active, last_synced_at, bank_connections(provider_name, provider_logo, provider_id, status, token_expires_at), bank_accounts(name, iban_encrypted, linked_asset_id)',
       )
       .eq('user_id', user.id)
       .eq('is_active', true)
@@ -137,11 +137,11 @@ export async function GET() {
     const accounts: LinkedAccountView[] = rows.map((row) => {
       const connection = one(row.bank_connections)
       const carrier = one(row.bank_accounts)
-      // `iban_encrypted` eerst: Stage B dropt de plaintext-kolommen, en
-      // `decryptIbanForLabel` slikt een niet-gebackfillde legacy-ciphertext in
-      // plaats van deze route te laten vallen op één rommelige rij.
-      const iban = decryptIbanForLabel(row.iban_encrypted) ?? row.iban
-      const carrierIban = decryptIbanForLabel(carrier?.iban_encrypted ?? null) ?? carrier?.iban ?? null
+      // Alleen de versleutelde kolom; `decryptIbanForLabel` slikt een onleesbare
+      // ciphertext in plaats van deze route te laten vallen op één rommelige rij.
+      // Het staartje is cosmetisch — een leeg staartje is beter dan een 500.
+      const iban = decryptIbanForLabel(row.iban_encrypted)
+      const carrierIban = decryptIbanForLabel(carrier?.iban_encrypted ?? null)
 
       return {
         id: row.id,

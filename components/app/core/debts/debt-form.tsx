@@ -35,6 +35,7 @@ import {
 import type { Asset } from '@/lib/asset-data'
 import { OwnershipToggle, useHouseholdStatus, type OwnershipType } from '@/components/app/ownership-toggle'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { VALUATIONS_CONFLICT_KEY } from '@/lib/valuations'
 
 /**
  * Shape die `DebtForm` (in `embedded`-mode) publiceert naar de pane-wrapper.
@@ -332,7 +333,7 @@ export function DebtForm({
           valuation_date: today,
           value: newBalance,
           notes: valuationNotes,
-        }, { onConflict: 'entity_id,valuation_date' })
+        }, { onConflict: VALUATIONS_CONFLICT_KEY })
         // Mirror naar balance_snapshots zodat de categorie-sparkline meebeweegt.
         await upsertSingleBalanceSnapshot(supabase, user.id, today, {
           type: 'debt',

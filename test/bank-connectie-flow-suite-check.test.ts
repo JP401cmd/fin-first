@@ -30,12 +30,16 @@ describe('bank-connectie-flow regressie-suite (zonder netwerk)', () => {
     register()
     const tests = getTestsByCategory('onboarding.bank-connectie')
 
-    // 17 tests geregistreerd; 7 zijn netwerk-only (overgeslagen in vitest CI).
+    // 18 tests geregistreerd; 7 zijn netwerk-only (overgeslagen in vitest CI).
     // 17e = ob-bank-sync-cross-source-dedup (fase 2, cross-bron dedup-laag 2).
-    expect(tests.length).toBe(17)
+    // 18e = ob-bank-target-account-select-encrypted-iban (30 juli): de
+    // keuzelijst-SELECT moet iban_encrypted lezen, niet de plaintext-kolom die
+    // Stage B dropt — anders 500t de keuzelijst en degradeert de wizard stil naar
+    // "alleen een nieuwe rekening".
+    expect(tests.length).toBe(18)
 
     const staticTests = tests.filter(t => !NETWORK_TEST_IDS.has(t.id))
-    expect(staticTests.length).toBe(10)
+    expect(staticTests.length).toBe(11)
 
     for (const t of staticTests) {
       await expect(

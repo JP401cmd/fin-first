@@ -943,10 +943,10 @@ export function CashOverview({
                        niets opent is erger dan geen knop. */
                     onReconnect={embedded ? handleReconnect : undefined}
                     /* De koppelrij wint van de budget-map: zie
-                       `detailBankAccountIdForAsset`. Een gereactiveerde rekening
-                       (bezit actief, budgetteren uit) opende anders het
-                       bewerk-paneel in plaats van de rekeningdetail — juist het
-                       paneel met de bankverbinding en het herstelpad. */
+                       `detailBankAccountIdForAsset`. Een gekoppelde rekening
+                       waarop budgetteren uitstaat opende anders het bewerk-paneel
+                       in plaats van de rekeningdetail — juist het paneel met de
+                       bankverbinding en het herstelpad. */
                     onClick={(asset) => {
                       const bankId = detailBankAccountIdForAsset(bankLinks, bankByAsset, asset.id)
                       if (bankId) setDetailAccountId(bankId)

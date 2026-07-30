@@ -40,7 +40,8 @@ type AccountRow = {
   user_id: string
   name: string
   bank_name: string | null
-  iban: string | null
+  /** Versleuteld, net als in `TargetAccountRow` — de plaintext kolom verdwijnt in Stage B. */
+  iban_encrypted: string | null
   is_active: boolean
   linked_asset_id: string | null
 }
@@ -109,7 +110,7 @@ const OWN_ACCOUNT: AccountRow = {
   user_id: USER,
   name: 'Betaalrekening',
   bank_name: 'ING',
-  iban: 'NL91ABNA0417164300',
+  iban_encrypted: 'v1:cipher',
   is_active: true,
   linked_asset_id: 'asset-1',
 }

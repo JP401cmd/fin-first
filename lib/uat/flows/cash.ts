@@ -99,7 +99,7 @@ export const CASH_FLOW: UatFlow = {
     { id: 'rekeningtypebank', scenarioId: 'UAT-CASH-46', label: 'WF-CASH-46 · Rekeningtype van de bank overnemen (spaar/creditcard)', kind: 'action', stage: 5, lane: 'import', subOf: 'bankkoppelen' },
     { id: 'correctiemoment', scenarioId: 'UAT-CASH-47', label: 'WF-CASH-47 · Correctiemoment: dragende rekening zien en verhangen vóór de eerste sync', kind: 'action', stage: 5, lane: 'import', subOf: 'bankkoppelen' },
     { id: 'eenactievekoppelingperrekening', scenarioId: 'UAT-CASH-48', label: 'WF-CASH-48 · FR5: bezette rekening zichtbaar-maar-uitgeschakeld, 409 op de route', kind: 'action', stage: 5, lane: 'import', subOf: 'bankkoppelen' },
-    { id: 'koppelgezondheidherstel', scenarioId: 'UAT-CASH-49', label: 'WF-CASH-49 · Koppelgezondheid: derde icoon-toestand, herstelpad vanaf de rekening, SC-13-reactivatie', kind: 'action', stage: 5, lane: 'import', subOf: 'bankkoppelen' },
+    { id: 'koppelgezondheidherstel', scenarioId: 'UAT-CASH-49', label: 'WF-CASH-49 · Koppelgezondheid: derde icoon-toestand, herstelpad vanaf de rekening, SC-13-herstel (beide assen)', kind: 'action', stage: 5, lane: 'import', subOf: 'bankkoppelen' },
     { id: 'saldoherwaarderingspad', scenarioId: 'UAT-CASH-50', label: 'WF-CASH-50 · Saldo via het herwaarderingspad: valuations-rij + snapshot-mirror, compensatie bij relink', kind: 'action', stage: 5, lane: 'import', subOf: 'bankkoppelen' },
 
     // ── 6 · uitkomst ──────────────────────────────────────────────────────

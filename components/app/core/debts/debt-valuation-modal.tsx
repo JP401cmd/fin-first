@@ -18,6 +18,7 @@ import { useId, useState } from 'react'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { createClient } from '@/lib/supabase/client'
 import { upsertSingleBalanceSnapshot } from '@/lib/balance-snapshot'
+import { VALUATIONS_CONFLICT_KEY } from '@/lib/valuations'
 
 import { MaskedAmount } from '@/components/app/masked-amount'
 
@@ -64,7 +65,7 @@ export function ValuationModal({
       valuation_date: date,
       value: Number(value),
       notes: notes || null,
-    }, { onConflict: 'entity_id,valuation_date' })
+    }, { onConflict: VALUATIONS_CONFLICT_KEY })
 
     if (valError) {
       console.error('Valuation error:', valError)

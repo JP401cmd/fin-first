@@ -77,14 +77,20 @@ describe('GET /api/bank-connect/linked-accounts', () => {
   })
 
   it('levert per koppeling de dragende TriFinity-rekening, en alleen de laatste 4 IBAN-tekens', async () => {
-    mockDecryptField.mockReturnValue('NL91ABNA0417164300')
+    // Twee verschillende ciphertexts, twee verschillende IBANs: de koppelrij en de
+    // drager mogen niet uit dezelfde bron komen (dat was de fout die de
+    // plaintext-terugval kon verbergen).
+    mockDecryptField.mockImplementation((ct: string | null) =>
+      ct === 'v1:cipher' ? 'NL91ABNA0417164300'
+      : ct === 'v1:carrier' ? 'NL02RABO0123456789'
+      : null,
+    )
     mockCreateClient.mockResolvedValue(
       makeStub({
         data: [
           {
             id: 'link-1',
             account_name: 'Betaalrekening',
-            iban: 'NL91ABNA0417164300',
             iban_encrypted: 'v1:cipher',
             bank_account_id: 'ba-1',
             is_active: true,
@@ -96,7 +102,7 @@ describe('GET /api/bank-connect/linked-accounts', () => {
               status: 'active',
               token_expires_at: '2099-01-01T00:00:00.000Z',
             },
-            bank_accounts: { name: 'Mijn hoofdrekening', iban: 'NL02RABO0123456789', iban_encrypted: null },
+            bank_accounts: { name: 'Mijn hoofdrekening', iban_encrypted: 'v1:carrier' },
           },
         ],
       }),
@@ -140,9 +146,7 @@ describe('GET /api/bank-connect/linked-accounts', () => {
         data: [
           {
             id: 'link-1',
-            account_name: 'Betaalrekening',
-            iban: null,
-            iban_encrypted: null,
+            account_name: 'Betaalrekening',            iban_encrypted: null,
             bank_account_id: 'ba-1',
             is_active: true,
             last_synced_at: '2026-05-01T10:00:00.000Z',
@@ -177,9 +181,7 @@ describe('GET /api/bank-connect/linked-accounts', () => {
         data: [
           {
             id: 'link-1',
-            account_name: null,
-            iban: null,
-            iban_encrypted: null,
+            account_name: null,            iban_encrypted: null,
             bank_account_id: 'ba-1',
             is_active: true,
             last_synced_at: null,
@@ -211,9 +213,7 @@ describe('GET /api/bank-connect/linked-accounts', () => {
         data: [
           {
             id: 'link-1',
-            account_name: null,
-            iban: null,
-            iban_encrypted: null,
+            account_name: null,            iban_encrypted: null,
             bank_account_id: 'ba-1',
             is_active: true,
             last_synced_at: null,
@@ -240,7 +240,13 @@ describe('GET /api/bank-connect/linked-accounts', () => {
     })
   })
 
-  it('niet-ontsleutelbare legacy-ciphertext → val terug op de plaintext-kolom, geen 500', async () => {
+  it('niet-ontsleutelbare legacy-ciphertext → leeg staartje, geen 500', async () => {
+    // Sinds de backfill rond is (0 rijen zonder `iban_encrypted`) leest deze route
+    // uitsluitend de versleutelde kolom — de plaintext-terugval is weg, want díe
+    // was precies de afhankelijkheid die de Stage-B-drop zou opblazen. Een
+    // onleesbare rij mag deze GET nog steeds niet laten vallen: dan zou de
+    // success-pagina haar hele correctiemoment verliezen. Het staartje is
+    // cosmetisch, dus het degradeert naar `null`.
     mockDecryptField.mockImplementation(() => {
       throw new Error('[field-encryption] Ciphertext is missing the "v1:" version prefix.')
     })
@@ -250,7 +256,6 @@ describe('GET /api/bank-connect/linked-accounts', () => {
           {
             id: 'link-1',
             account_name: null,
-            iban: 'NL91ABNA0417161234',
             iban_encrypted: 'legacy-zonder-prefix',
             bank_account_id: null,
             last_synced_at: null,
@@ -265,7 +270,7 @@ describe('GET /api/bank-connect/linked-accounts', () => {
     const body = await res.json()
 
     expect(res.status).toBe(200)
-    expect(body.accounts[0].iban_tail).toBe('1234')
+    expect(body.accounts[0].iban_tail).toBeNull()
     // Geen drager: de aanmaak van de rekening is toen mislukt. De pagina toont dan
     // "een nieuwe rekening" in plaats van een correctie-actie aan te bieden op een
     // rij die niet bestaat.
@@ -280,9 +285,7 @@ describe('GET /api/bank-connect/linked-accounts', () => {
         data: [
           {
             id: 'link-1',
-            account_name: 'Spaar',
-            iban: null,
-            iban_encrypted: null,
+            account_name: 'Spaar',            iban_encrypted: null,
             bank_account_id: 'ba-2',
             is_active: true,
             last_synced_at: '2026-07-29T10:00:00.000Z',
@@ -295,7 +298,7 @@ describe('GET /api/bank-connect/linked-accounts', () => {
                 token_expires_at: null,
               },
             ],
-            bank_accounts: [{ name: 'Spaarpot', iban: null, iban_encrypted: null }],
+            bank_accounts: [{ name: 'Spaarpot', iban_encrypted: null }],
           },
         ],
       }),
@@ -324,14 +327,12 @@ describe('GET /api/bank-connect/linked-accounts', () => {
         data: [
           {
             id: 'link-1',
-            account_name: 'Betaal',
-            iban: null,
-            iban_encrypted: 'v1:bank',
+            account_name: 'Betaal',            iban_encrypted: 'v1:bank',
             bank_account_id: 'ba-1',
             last_synced_at: null,
             bank_connections: { provider_name: 'ING', provider_logo: null },
             // Stage B dropt de plaintext-kolom; dan is dit het enige dat er staat.
-            bank_accounts: { name: 'Hoofdrekening', iban: null, iban_encrypted: 'v1:carrier' },
+            bank_accounts: { name: 'Hoofdrekening', iban_encrypted: 'v1:carrier' },
           },
         ],
       }),
@@ -358,14 +359,12 @@ describe('GET /api/bank-connect/linked-accounts', () => {
           data: [
             {
               id: 'link-1',
-              account_name: 'Betaal',
-              iban: null,
-              iban_encrypted: null,
+              account_name: 'Betaal',              iban_encrypted: null,
               bank_account_id: 'ba-1',
               is_active: true,
               last_synced_at: null,
               bank_connections: { provider_name: 'ING', provider_logo: null, provider_id: 'ob-ing', status: 'active', token_expires_at: null },
-              bank_accounts: { name: 'Hoofdrekening', iban: null, iban_encrypted: null, linked_asset_id: 'asset-1' },
+              bank_accounts: { name: 'Hoofdrekening', iban_encrypted: null, linked_asset_id: 'asset-1' },
             },
           ],
         },
@@ -394,14 +393,12 @@ describe('GET /api/bank-connect/linked-accounts', () => {
           data: [
             {
               id: 'link-1',
-              account_name: 'Betaal',
-              iban: null,
-              iban_encrypted: null,
+              account_name: 'Betaal',              iban_encrypted: null,
               bank_account_id: 'ba-1',
               is_active: true,
               last_synced_at: null,
               bank_connections: null,
-              bank_accounts: { name: 'Hoofdrekening', iban: null, iban_encrypted: null, linked_asset_id: 'asset-1' },
+              bank_accounts: { name: 'Hoofdrekening', iban_encrypted: null, linked_asset_id: 'asset-1' },
             },
           ],
         },

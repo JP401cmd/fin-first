@@ -3,6 +3,8 @@ import { createClient } from '@/lib/supabase/server'
 import { serverError, unauthorized } from '@/lib/api/respond'
 import { mapWithConcurrency } from '@/lib/concurrency'
 import { planInitialFetch } from '@/lib/truelayer/initial-fetch'
+import { decryptIbanForLabel } from '@/lib/truelayer/cash-asset-backfill'
+import { ibanTail } from '@/lib/truelayer/linked-account'
 import {
   accountFollowsBudgets,
   isEligibleTargetAccount,
@@ -177,13 +179,20 @@ export async function GET() {
       const stat = statsById.get(account.id)
       const newestDate = stat?.newestDate ?? null
       const plan = planInitialFetch({ today, newestExistingDate: newestDate })
-      const iban = account.iban?.replace(/\s/g, '') || null
+      // `iban_encrypted` ontsleutelen i.p.v. de plaintext kolom lezen: Stage B
+      // dropt `bank_accounts.iban`, en dán zou deze GET 500'en en de wizard stil
+      // degraderen naar "alleen een nieuwe rekening aanmaken" — de gebruiker kan
+      // zijn bestaande rekening dan niet meer kiezen zonder dat iets meldt waarom.
+      // `decryptIbanForLabel` slikt een onleesbare legacy-ciphertext: het staartje
+      // is cosmetisch (naast `name` en `bank_name`), dus één rommelige rij mag de
+      // hele keuzelijst niet laten vallen.
+      const iban = decryptIbanForLabel(account.iban_encrypted)
 
       return {
         id: account.id,
         name: account.name,
         bank_name: account.bank_name,
-        iban_tail: iban && iban.length >= 4 ? iban.slice(-4) : null,
+        iban_tail: ibanTail(iban),
         transaction_count: stat?.count ?? 0,
         oldest_transaction_date: stat?.oldestDate ?? null,
         newest_transaction_date: newestDate,

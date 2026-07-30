@@ -589,13 +589,42 @@ alter table public.bank_connections
 
 **Restpunten die openstaan (niet blokkerend, wel bewust)**
 
-- **`TARGET_ACCOUNT_SELECT` leest `bank_accounts.iban` in plaintext**, terwijl de
-  callback de omgekeerde doctrine documenteert (lees `iban_encrypted`; Stage B dropt
-  de plaintext-kolom). Gemeten op remote: 28 rijen, 17 met plaintext `iban`, 7 met
-  `iban_encrypted`/`iban_hash` — de backfill is dus niet af en plaintext is nog de
-  gevulde kolom. Nu omzetten breekt meer dan het repareert. **Zet deze kolom op de
-  Stage B-checklist:** valt de drop, dan 500't de accounts-route en degradeert de
-  wizard stil naar "alleen nieuwe rekening".
+- ~~**`TARGET_ACCOUNT_SELECT` leest `bank_accounts.iban` in plaintext**, terwijl de
+  callback de omgekeerde doctrine documenteert.~~ — **✅ gedicht 30 juli.** Eerst de
+  backfill afgemaakt (`scripts/encrypt-existing-bank-credentials.mjs`, na een
+  sleutel-pariteitsproef tegen twee bestaande prod-rijen: lokale
+  `ENCRYPTION_KEY_V1`/`IBAN_INDEX_KEY_V1` ontsleutelen wat prod schreef en leveren
+  dezelfde blind index). Remote vóór → ná: `bank_accounts` 17 rijen met een
+  plaintext IBAN waarvan 7 versleuteld → **15 versleuteld, 0 te backfillen**;
+  `assets.account_number` 9 te backfillen → **0**; `bank_connection_accounts` was al
+  rond. De twee resterende "plaintext" rijen per tabel zijn lege strings (`iban =
+  ''`), bewust overgeslagen: een leeg veld versleutelen levert een zinloze
+  ciphertext én laat álle IBAN-loze rekeningen op dezelfde blind index botsen.
+  Daarna zijn `TARGET_ACCOUNT_SELECT` en de vier andere server-leespaden omgezet
+  naar `iban_encrypted` + `decryptField` (zie het restpunt hieronder voor wat er
+  bewust bleef staan), en bewaakt een eigen regressie-case
+  (`ob-bank-target-account-select-encrypted-iban`) de kolomlijst.
+- **Vier CLIENT-leespaden lezen `bank_accounts.iban`/`assets.account_number` nog in
+  plaintext, en dat is de échte Stage B-blokkade (nieuw, 30 juli).**
+  `app/(app)/core/cash/import/page.tsx`, `components/overview/transacties/transacties-analyse.tsx`,
+  `lib/auto-categorize-context.ts` (via `ai-categorize-sheet` en de sleepmodus) en
+  `lib/transfer-matching.ts` draaien met de browser-client en kunnen per definitie
+  niet ontsleutelen — de sleutels zijn server-only. Ze omzetten is dus geen
+  kolomwissel maar het verplaatsen van de read naar een loader/route, precies
+  **fase b van ADR 0058**. Twee daarvan gebruiken de IBAN als MATCH-identifier
+  (eigen-rekening-detectie), dus een halve migratie laat overboekingen stil als
+  uitgave gelden. Server-side rest nog `app/api/budgetteren/setup/route.ts`
+  (`iban:account_number`-alias) en `app/api/onboarding/save-own-data/route.ts`
+  (`.eq('iban','')`-delete — geen read-for-display, maar breekt wél op de drop).
+  Stage B kan niet vallen voor deze zeven weg zijn.
+- **`saveAccount` in `components/app/cash-account-view.tsx` schrijft
+  `bank_accounts.iban` ZONDER de dual-write (nieuw, securityreview 30 juli).** Het
+  pad is vandaag dood (`AccountFormModal` wordt geïmporteerd maar `showAccountForm`
+  gaat nergens op `true`), dus er staan 0 gedesynchroniseerde rijen. Wordt het
+  herbedraad zonder `iban_encrypted`/`iban_hash`, dan levert dat een verouderd
+  staartje in de koppelwizard én een verouderde eigen-rekening-match. Weghalen of
+  via een route laten lopen die `ibanColumns()` uit `lib/bank-account-companion.ts`
+  gebruikt.
 - **De B2-write is niet transactioneel met de insert.** Faalt de insert ná een
   geslaagde budget-write, dan staat budgetteren aan zonder koppeling. Zichtbaar en
   zelf-herstelbaar via de bestaande toggle; geen securityprobleem.
@@ -1497,13 +1526,39 @@ Vier onderdelen, in deze volgorde:
 
 **Restpunten die openstaan (niet blokkerend, wel bewust)**
 
-- **`valuations` heeft UNIQUE `(entity_id, valuation_date)` zónder `user_id`**, en
-  géén FK op `entity_id`. De conflict-target is daarmee cross-user: een
-  `valuations`-rij van een andere gebruiker op dezelfde `(entity_id, dag)` laat de
-  banksync-upsert op de RLS-check stuklopen in plaats van te mergen. Pre-existent
-  (`balance_snapshots` doet het wél goed, met `user_id` in de sleutel), maar fase 8
-  maakt het voor het eerst een faalpunt in een schrijfpad. Eigen kaart voor
-  `supabase-db-specialist`.
+- **`valuations` heeft UNIQUE `(entity_id, valuation_date)` zónder `user_id`** —
+  **stap 1 van 2 gedaan 30 juli, nog niet gedicht.** De gebruiker-gescopete sleutel
+  `UNIQUE (user_id, entity_type, entity_id, valuation_date)` staat op remote
+  (`supabase/migrations/20260730072804_add_valuations_user_scoped_unique.sql`,
+  spiegel van `balance_snapshots`) en alle negen upsert-plekken sturen 'm via één
+  constante (`VALUATIONS_CONFLICT_KEY`, `lib/valuations.ts`). Pre-flight vóór
+  toepassen: 39 rijen, 7 gebruikers, **0** groepen die de nieuwe sleutel zouden
+  schenden, 0 `(entity_id, dag)`-paren met gemengd `entity_type` — de nieuwe sleutel
+  is een superset van de oude en dus per constructie zwakker.
+  **De oude constraint staat er nog, bewust.** `ON CONFLICT` inferreert op een exact
+  passende index, dus code die nog de oude sleutel stuurt breekt hárd op het moment
+  van de drop — en dat is niet alleen "tot de deploy": vier van de negen schrijvers
+  zijn client-componenten (herwaardering, check-in, asset-edit, schuld-edit) en een
+  browser houdt een geladen bundel vast. Stap 2 (drop) kan dus pas als de nieuwe
+  bundel live is; tot dan bestaat de cross-user-botsing zoals hij al bestond — geen
+  regressie, ook geen fix. Praktisch is de botsing een UUID-collisie, dus de kans is
+  verwaarloosbaar; de reden om 'm te doen is hygiëne, niet een lopend incident.
+  **Wat vóór of mét stap 2 moet landen** (securityreview 30 juli): op `valuations`
+  staan nul triggers, geen FK en een INSERT-`with_check` die alléén `user_id` toetst,
+  dus `entity_id`, `ownership` en `household_id` zijn vrij door de client te zetten.
+  Een huishoudpartner kan daarmee een verzonnen waardering op een GEDEELDE bezitting
+  van de ander schrijven, en `lib/assets-data-loader.ts` leest `valuations` zonder
+  `user_id`/`ownership`-filter en groepeert op `entity_id` — die rij landt dus in de
+  waarderingshistorie van de eigenaar. Vandaag remt de oude globale sleutel dat tot
+  dagen waarop de eigenaar zelf nog niets had; na de drop werkt het op elke datum.
+  Guard-trigger (`entity_id` hoort bij `user_id`, per `entity_type`; `ownership`/
+  `household_id` niet vrij zetbaar) + de loaderquery scopen zijn dus de VOORWAARDE
+  voor stap 2, niet het vervolg erop. Eigen kaart voor `supabase-db-specialist`.
+  **GEEN FK op `entity_id`, en dat is een oordeel:** het veld is polymorf
+  (`entity_type` kiest `assets` of `debts`) en PostgreSQL kent geen polymorfe FK;
+  bovendien staat er op remote al 1 `debt`-rij zonder bijbehorende `debts`-rij, dus
+  zelfs een gesplitste FK zou op bestaande data falen. De datalaag-variant is hier
+  per definitie een trigger — hetzelfde patroon als het punt hieronder.
 - **`bank_accounts.linked_asset_id` heeft geen eigenaarschaps-guard-trigger**, terwijl
   zijn zusterkolommen `bank_connection_accounts.bank_account_id` en
   `bank_connections.target_bank_account_id` die sinds fase 4/6 wél hebben — met exact

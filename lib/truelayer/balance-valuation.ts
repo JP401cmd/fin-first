@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { upsertSingleBalanceSnapshot } from '@/lib/balance-snapshot'
+import { VALUATIONS_CONFLICT_KEY } from '@/lib/valuations'
 
 /**
  * HET HERWAARDERINGSSPOOR VAN DE BANKSYNC (fase 8, FR8).
@@ -184,7 +185,7 @@ export async function recordBankBalanceRevaluation(
       value: opts.value,
       notes: formatBankSyncNote(opts.previous),
     },
-    { onConflict: 'entity_id,valuation_date' },
+    { onConflict: VALUATIONS_CONFLICT_KEY },
   )
 
   if (error) {
@@ -375,7 +376,7 @@ export async function revertBankBalanceRevaluation(
       value: previous,
       notes: formatBankSyncCorrectionNote(replaced),
     },
-    { onConflict: 'entity_id,valuation_date' },
+    { onConflict: VALUATIONS_CONFLICT_KEY },
   )
 
   if (writeError) {

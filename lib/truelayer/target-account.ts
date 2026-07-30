@@ -26,7 +26,13 @@ export type TargetAccountRow = {
   id: string
   name: string
   bank_name: string | null
-  iban: string | null
+  /**
+   * De VERSLEUTELDE IBAN (`bank_accounts.iban_encrypted`), niet de plaintext
+   * kolom — die verdwijnt in Stage B. Ontsleutel 'm met `decryptIbanForLabel`
+   * en gebruik de uitkomst alleen voor het staartje (`ibanTail`): méér dan vier
+   * tekens verlaat de server niet.
+   */
+  iban_encrypted: string | null
   is_active: boolean
   linked_asset_id: string | null
 }
@@ -82,8 +88,17 @@ export type TargetAccountOption = {
   fetch_plan: { mode: 'incremental' | 'historical'; start_date: string }
 }
 
-/** Kolommen die {@link loadTargetAccount} en de keuzelijst-route nodig hebben. */
-export const TARGET_ACCOUNT_SELECT = 'id, name, bank_name, iban, is_active, linked_asset_id'
+/**
+ * Kolommen die {@link loadTargetAccount} en de keuzelijst-route nodig hebben.
+ *
+ * `iban_encrypted` en NIET de plaintext `iban`-kolom: die wordt in Stage B
+ * gedropt (aangekondigd in de scope-noot van
+ * `20260713142000_drop_plaintext_bank_tokens.sql`). Zou deze SELECT de
+ * plaintext-kolom houden, dan zou de drop de keuzelijst laten 500'en en
+ * degradeerde de wizard stil naar "alleen een nieuwe rekening aanmaken" —
+ * dezelfde doctrine die de callback en `cash-asset-backfill.ts` al volgen.
+ */
+export const TARGET_ACCOUNT_SELECT = 'id, name, bank_name, iban_encrypted, is_active, linked_asset_id'
 export const TARGET_ASSET_SELECT = 'id, is_active, has_budget_tracking'
 
 /**

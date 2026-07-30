@@ -18,6 +18,7 @@ import {
   ASSET_TYPE_ICONS,
   ASSET_TYPE_COLORS,
 } from '@/lib/asset-data'
+import { VALUATIONS_CONFLICT_KEY } from '@/lib/valuations'
 
 type HoldingsMap = Record<string, boolean>
 type LinkedBankMap = Set<string>
@@ -220,7 +221,7 @@ export default function RevaluePage() {
 
       const { error: valError } = await supabase
         .from('valuations')
-        .upsert(valuationRows, { onConflict: 'entity_id,valuation_date' })
+        .upsert(valuationRows, { onConflict: VALUATIONS_CONFLICT_KEY })
 
       if (valError) throw valError
 

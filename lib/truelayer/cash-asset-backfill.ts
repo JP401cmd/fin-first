@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { blindIndex, decryptField, encryptField } from '@/lib/crypto/field-encryption'
 import { accountTypeToCashSubtype } from '@/lib/account-types'
+import { setBudgetTracking } from '@/lib/budget-tracking'
 
 /**
  * CASH-AS-ASSET BACKFILL: zorg dat een `bank_accounts`-rij een gekoppeld
@@ -15,9 +16,11 @@ import { accountTypeToCashSubtype } from '@/lib/account-types'
  * vermogens-/cash-oppervlak: die surfaces lezen `assets`. Twee kopieën van deze
  * stap zouden dus twee kansen op precies dat gat betekenen.
  *
- * Fase 7 (herkoppelen, SC-13) heeft hier de reactivatie van een gedeactiveerd
- * bezit op gebouwd — dit is de plek waar dat hoort, niet een derde kopie. Zie
- * {@link ensureCashAssetForBankAccount} voor de invariant en haar twee grenzen.
+ * Fase 7 (herkoppelen, SC-13) heeft hier het HERSTEL van een gedeactiveerd bezit
+ * op gebouwd — dit is de plek waar dat hoort, niet een derde kopie. Sinds het
+ * eigenaarsbesluit van 30 juli zet dat herstel béide assen terug: zichtbaarheid
+ * (`assets.is_active`) én budgettracking (via `setBudgetTracking`, de ene
+ * schrijver van die as). Zie {@link ensureCashAssetForBankAccount}.
  */
 
 /**
@@ -42,9 +45,14 @@ export type CashAssetBackfillResult = {
   /** `true` als deze aanroep het bezit heeft aangemaakt. */
   created: boolean
   /**
-   * `true` als deze aanroep een BESTAAND, gedeactiveerd cash-bezit weer op
-   * `is_active = true` heeft gezet (SC-13). Additief veld, zodat de aanroeper het
-   * kan melden zonder de bestaande twee velden anders te lezen.
+   * `true` als deze aanroep een BESTAAND, gedeactiveerd cash-bezit heeft HERSTELD
+   * (SC-13): `assets.is_active` weer op `true` én — sinds het eigenaarsbesluit van
+   * 30 juli — de budgettracking terug via `setBudgetTracking`. Additief veld, zodat
+   * de aanroeper het kan melden zonder de bestaande twee velden anders te lezen.
+   *
+   * De naam is bewust niet meeverhuisd naar `restored`: dit veld is de wire-vorm
+   * die de callback en `relink` al lezen, en een rename zou een puur cosmetische
+   * wijziging in twee routes zijn. Wat het BETEKENT staat hier.
    */
   reactivated: boolean
 }
@@ -58,26 +66,43 @@ export type CashAssetBackfillResult = {
  * bepaalt. Transacties en saldo kwamen dus binnen op een rij die nergens in de app
  * te zien was.
  *
- * Invariant sinds fase 7: **élk pad dat een bestaand cash-bezit hergebruikt zet
- * `assets.is_active` op `true`.** Beide hergebruik-paden (de OAuth-callback stap 2b
- * en `POST /api/bank-connect/relink`) lopen via deze functie, dus hier staat de
- * regel één keer.
+ * Invariant sinds fase 7: **élk pad dat een bestaand cash-bezit hergebruikt
+ * herstelt dat bezit.** Beide hergebruik-paden (de OAuth-callback stap 2b en
+ * `POST /api/bank-connect/relink`) lopen via deze functie, dus hier staat de regel
+ * één keer.
  *
- * **Twee grenzen, expliciet:**
+ * ## Herstel = béide vlaggen (eigenaarsbesluit 30 juli)
  *
- *  - **`has_budget_tracking` wordt NIET aangeraakt.** De "verwijder"-actie zet die
- *    óók uit, maar budgetteren is een eigen, zichtbare as met zijn eigen vinkje
- *    (besluit B2 / besluit 3: niets stil aanzetten). Reactiveren maakt de rekening
- *    zíchtbaar; of ze meedoet in de budgetten blijft een keuze.
- *  - **`bank_accounts.is_active` wordt NIET aangeraakt.** Die vlag drukt in
- *    `syncBankAccountCompanion` "budgetteren staat uit" uit — meeflippen zou
- *    budgetteren stil aanzetten, precies wat de vorige grens verbiedt.
+ * De "verwijder"-actie zet twee dingen uit: de bezitting (`assets.is_active`) én
+ * de budgettering (`assets.has_budget_tracking` + de companion-rij). Fase 7 zette
+ * alleen de eerste terug, met de motivatie "budgetteren is een eigen, zichtbare
+ * keuze". In de praktijk leest dat als **half hersteld**: de rekening is weer
+ * zichtbaar, de transacties komen binnen, maar ze doen in geen enkel budget mee —
+ * en niets vertelt de gebruiker waarom. De eigenaar heeft daarom besloten dat
+ * herstel béide assen terugzet, passend bij de invariant "hergebruik =
+ * heractivatie".
+ *
+ * **De budget-as gaat via `setBudgetTracking`** (`lib/budget-tracking.ts`) en
+ * nergens anders: dat is de ENE schrijver van dat drieluik
+ * (`assets.has_budget_tracking` → companion-rij → de module-gate
+ * `profiles.budgeting_active`). Hier met de hand `has_budget_tracking = true`
+ * zetten zou de companion en de gate laten achterlopen — precies hoe die vlaggen
+ * eerder uiteen zijn gelopen (bekend terugkerend defect). Als gevolg beweegt
+ * `bank_accounts.is_active` nu wél mee: dát is hoe `syncBankAccountCompanion`
+ * "budgetteren staat aan" uitdrukt, en dat is sinds dit besluit de bedoeling.
+ *
+ * **De volgorde is het punt.** Eerst de zichtbaarheid (`assets.is_active`), dan de
+ * budget-as. Faalt de tweede, dan is de rekening in het ergste geval zíchtbaar
+ * zonder budgettering — de toestand van vóór dit besluit, zelf-herstelbaar via de
+ * bestaande toggle. Omgekeerd zou budgetteren aanstaan op een bezitting die nergens
+ * te zien is. En deze hele functie draait pas ná de geslaagde koppelwrite (zie de
+ * aanroepers), zodat een mislukte koppelpoging geen stille wijziging achterlaat.
  *
  * Gooit niet (zelfde contract als de rest van deze module): een gefaalde lezing of
  * write wordt gelézen en gelogd, en levert `false` — niet geslikt, en niet als
  * succes gemeld.
  */
-async function reactivateCashAssetIfDeactivated(
+async function restoreCashAssetIfDeactivated(
   supabase: SupabaseClient,
   userId: string,
   assetId: string,
@@ -90,7 +115,7 @@ async function reactivateCashAssetIfDeactivated(
     .maybeSingle()
 
   if (readError) {
-    console.error('[truelayer:cash-asset-backfill] cash-bezit niet te lezen voor reactivatie:', readError)
+    console.error('[truelayer:cash-asset-backfill] cash-bezit niet te lezen voor herstel:', readError)
     return false
   }
 
@@ -101,29 +126,45 @@ async function reactivateCashAssetIfDeactivated(
 
   const { error: updateError } = await supabase
     .from('assets')
-    // Uitsluitend deze ene vlag — zie de twee grenzen in de docstring hierboven.
+    // Alleen de zichtbaarheidsvlag; de budget-as hieronder heeft zijn eigen ENE
+    // schrijver — zie de docstring.
     .update({ is_active: true })
     .eq('id', assetId)
     .eq('user_id', userId)
 
   if (updateError) {
-    console.error('[truelayer:cash-asset-backfill] cash-bezit reactiveren mislukt:', updateError)
+    console.error('[truelayer:cash-asset-backfill] cash-bezit herstellen mislukt:', updateError)
     return false
+  }
+
+  // Pas hierna: de bezitting is nu zichtbaar, dus een gefaalde budget-write laat
+  // een toestand achter die de gebruiker zelf ziet en met de bestaande toggle kan
+  // rechtzetten.
+  const tracking = await setBudgetTracking(supabase, userId, assetId, true)
+  if (!tracking.ok) {
+    // Wél loggen en niet slikken: de rekening is hersteld maar doet niet mee in de
+    // budgetten, en dat is precies het "half herstelde" beeld dat dit besluit
+    // wegneemt. De reactivatie zelf is geslaagd, dus het antwoord blijft `true`.
+    console.error(
+      '[truelayer:cash-asset-backfill] budgettracking terugzetten bij herstel mislukt:',
+      tracking.error,
+    )
   }
 
   return true
 }
 
 /**
- * Maak het cash-bezit bij als de bankrekening er nog geen heeft, en **reactiveer
- * het als het gedeactiveerd was** (SC-13, zie
- * {@link reactivateCashAssetIfDeactivated} voor het waarom en de twee grenzen).
+ * Maak het cash-bezit bij als de bankrekening er nog geen heeft, en **herstel het
+ * als het gedeactiveerd was** (SC-13, zie
+ * {@link restoreCashAssetIfDeactivated} voor het waarom, de twee assen en de
+ * volgorde).
  *
  * Idempotent en niet-destructief: een rekening die al een `linked_asset_id` heeft
  * houdt dat bezit — er komt nooit een tweede bij. `linked_asset_id` wordt nooit
- * genuld en de bestaande asset nooit overschreven (alleen haar `is_active` mag,
- * en alleen van `false` naar `true`) — zie de invarianten in
- * `lib/bank-account-companion.ts`.
+ * genuld en de bestaande asset nooit overschreven; alleen haar `is_active` (van
+ * `false` naar `true`) en haar `has_budget_tracking` (via `setBudgetTracking`)
+ * bewegen bij een herstel — zie de invarianten in `lib/bank-account-companion.ts`.
  *
  * `user_id` staat expliciet in de lookup en dat is géén dubbelop: de
  * SELECT-policy op `bank_accounts` laat huishoud-gedeelde partnerrijen door
@@ -162,11 +203,12 @@ export async function ensureCashAssetForBankAccount(
   if (!reused) return { assetId: null, created: false, reactivated: false }
 
   // Hergebruik-tak: het bezit bestaat al. Niets aanmaken — maar wél garanderen dat
-  // het zíchtbaar is, want een koppeling op een onzichtbare rij is precies het
-  // incident van SC-13.
+  // het zíchtbaar is én meedoet in de budgetten, want een koppeling op een
+  // onzichtbare rij is precies het incident van SC-13 en een zichtbare rij zonder
+  // budgettering leest als half hersteld.
   if (reused.linked_asset_id) {
     const assetId = reused.linked_asset_id as string
-    const reactivated = await reactivateCashAssetIfDeactivated(supabase, opts.userId, assetId)
+    const reactivated = await restoreCashAssetIfDeactivated(supabase, opts.userId, assetId)
     return { assetId, created: false, reactivated }
   }
 

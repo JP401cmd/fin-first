@@ -1,5 +1,46 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { cashSubtypeToAccountType } from './account-types'
+import { blindIndex, encryptField } from './crypto/field-encryption'
+
+/**
+ * De IBAN-kolommen van de companion-rij: plaintext (zolang die kolom bestaat) én
+ * versleuteld + blind index.
+ *
+ * **Waarom de dual-write hier hoort en niet "later".** Elke andere schrijver op
+ * `bank_accounts.iban` doet dit al (de OAuth-callback, `cash-asset-backfill`,
+ * `seed-persona`), en sinds de IBAN-backfill rond is lezen de leespaden
+ * UITSLUITEND `iban_encrypted` (`TARGET_ACCOUNT_SELECT`, de keuzelijst van de
+ * koppelwizard, `linked-accounts`). Zou deze helper alleen plaintext schrijven,
+ * dan zou een companion-rij die hier ontstaat (budgetteren aanzetten op een
+ * cash-bezit) in de wizard zónder IBAN-staartje verschijnen én door de
+ * `iban_hash`-tak van de callback worden gemist — stille drift in precies de
+ * kolom die Stage B tot enige bron maakt.
+ *
+ * **Try/catch en niet `isFieldEncryptionConfigured()`** — bewust, en dat is een
+ * securityreview-bevinding: die poort test alléén of de env-vars BESTAAN. Een
+ * sleutel die er wél staat maar niet naar 32 bytes hex decodeert komt erdoor,
+ * waarna `encryptField` alsnog gooit — en deze helper draait in een best-effort
+ * `.catch()` (`setBudgetTracking`), dus die throw zou de hele companion-sync
+ * geruisloos overslaan. Dat is precies het faalpad dat deze noot beweerde te
+ * voorkomen: bij het SC-13-herstel zou het bezit dan zichtbaar én budgetterend
+ * worden terwijl de companion-rij inactief blijft — de rekening blijft weg uit
+ * `/core/cash` en de import, stil. De `catch` hier dekt "ontbreekt" én "ongeldig"
+ * met één pad, en logt altijd. Uitkomst zonder werkende sleutels = het gedrag van
+ * vóór deze regel (alleen plaintext), nooit een overgeslagen sync.
+ */
+function ibanColumns(iban: string | null): Record<string, string | null> {
+  const value = iban || null
+  if (!value) return { iban: null, iban_encrypted: null, iban_hash: null }
+  try {
+    return { iban: value, iban_encrypted: encryptField(value), iban_hash: blindIndex(value) }
+  } catch (err) {
+    console.error(
+      '[bank-account-companion] IBAN niet te versleutelen (sleutel ontbreekt of is ongeldig) — companion krijgt alleen de plaintext IBAN:',
+      err,
+    )
+    return { iban: value }
+  }
+}
 
 /**
  * De cash-asset-velden die nodig zijn om een gekoppelde `bank_accounts`-rij
@@ -67,7 +108,8 @@ export async function syncBankAccountCompanion(
   if (enabled) {
     const fields = {
       name: asset.name,
-      iban: asset.iban || null,
+      // Plaintext + versleuteld + blind index in één keer — zie `ibanColumns`.
+      ...ibanColumns(asset.iban),
       bank_name: asset.institution || null,
       // Twee woordenlijsten, één brug: `assets.subtype` kent 'savings_account'
       // en 'other_cash', maar de CHECK-constraint op `bank_accounts.account_type`

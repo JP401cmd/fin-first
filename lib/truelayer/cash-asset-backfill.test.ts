@@ -1,13 +1,26 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-const { mockDecryptField } = vi.hoisted(() => ({ mockDecryptField: vi.fn() }))
+const { mockDecryptField, mockSetBudgetTracking } = vi.hoisted(() => ({
+  mockDecryptField: vi.fn(),
+  mockSetBudgetTracking: vi.fn(),
+}))
 
 vi.mock('@/lib/crypto/field-encryption', () => ({
   blindIndex: (s: string) => `hash:${s}`,
   encryptField: (s: string | null) => (s === null || s === undefined ? null : `enc:${s}`),
   decryptField: mockDecryptField,
 }))
+
+/**
+ * `setBudgetTracking` is hier bewust GEMOCKT, en dat is de assertie zelf: het
+ * herstel mag de budget-as niet met de hand schrijven maar hoort te delegeren aan
+ * de ENE schrijver van dat drieluik (`assets.has_budget_tracking` → companion-rij
+ * → de module-gate `profiles.budgeting_active`). Het drieluik zelf heeft eigen
+ * dekking (`app/api/assets/toggle-budget/route.test.ts`); hier nabouwen zou die
+ * regels verdubbelen én de canned-response-queues onleesbaar maken.
+ */
+vi.mock('@/lib/budget-tracking', () => ({ setBudgetTracking: mockSetBudgetTracking }))
 
 import { ensureCashAssetForBankAccount } from './cash-asset-backfill'
 
@@ -19,12 +32,17 @@ import { ensureCashAssetForBankAccount } from './cash-asset-backfill'
  * cash-oppervlak — die lezen `assets`.
  *
  * Sinds fase 7 bewaakt deze suite óók SC-13: **élk pad dat een bestaand cash-bezit
- * hergebruikt zet `assets.is_active` op `true`.** Dat is het incident van de
- * eigenaar — een "verwijderde" rekening opnieuw koppelen leverde een werkende
- * koppeling met een kloppend saldo op een rij die `cash-overview` wegfiltert. De
- * twee grenzen van die invariant staan hieronder als eigen assertie, want ze zijn
- * de reden dat reactiveren géén "zet alles maar weer aan" is:
- * `has_budget_tracking` en `bank_accounts.is_active` blijven ongemoeid.
+ * hergebruikt herstelt dat bezit.** Dat is het incident van de eigenaar — een
+ * "verwijderde" rekening opnieuw koppelen leverde een werkende koppeling met een
+ * kloppend saldo op een rij die `cash-overview` wegfiltert.
+ *
+ * Sinds het eigenaarsbesluit van 30 juli omvat dat herstel BEIDE assen:
+ * zichtbaarheid (`assets.is_active`) én budgettracking. Fase 7 liet de tweede
+ * bewust staan; in de praktijk las dat als half hersteld — zichtbare rekening,
+ * binnenkomende transacties, en toch in geen enkel budget. De assertie is daarom
+ * omgedraaid: `has_budget_tracking` MOET meebewegen, maar uitsluitend via
+ * `setBudgetTracking`, en de VOLGORDE (zichtbaarheid eerst) staat er als eigen
+ * test bij.
  */
 
 type Queues = Record<string, Array<{ data: unknown; error?: unknown }>>
@@ -81,6 +99,12 @@ function makeStub(queues: Queues) {
 
 beforeEach(() => {
   mockDecryptField.mockReset()
+  mockSetBudgetTracking.mockReset()
+  mockSetBudgetTracking.mockResolvedValue({
+    ok: true,
+    asset: { id: 'asset-1', has_budget_tracking: true, name: 'ING 4300' },
+    budgetingActive: true,
+  })
 })
 
 describe('ensureCashAssetForBankAccount', () => {
@@ -244,10 +268,10 @@ describe('ensureCashAssetForBankAccount — SC-13: hergebruik is heractivatie', 
     })
   }
 
-  it('gedeactiveerd bezit → is_active gaat op true, en niets anders', async () => {
+  it('gedeactiveerd bezit → is_active op true én budgettracking terug', async () => {
     const { client, calls } = makeDeactivatedAssetStub([
       assetState('asset-1', false),
-      { data: null }, // de reactivatie-update
+      { data: null }, // de zichtbaarheids-update
     ])
 
     const result = await ensureCashAssetForBankAccount(client, {
@@ -261,15 +285,18 @@ describe('ensureCashAssetForBankAccount — SC-13: hergebruik is heractivatie', 
     // Er komt géén tweede bezit bij — de rekening houdt haar eigen historie.
     expect(calls.filter((c) => c.op === 'insert')).toHaveLength(0)
 
+    // As 1 — zichtbaarheid. Deze module schrijft zélf uitsluitend deze ene vlag.
     const updates = calls.filter((c) => c.op === 'update')
     expect(updates).toHaveLength(1)
     expect(updates[0].table).toBe('assets')
-    // Exact één vlag. `toEqual` en niet `toMatchObject`: de hele waarde van deze
-    // test zit in wat er NIET bij staat.
     expect(updates[0].data).toEqual({ is_active: true })
+
+    // As 2 — budgettracking, via de ENE schrijver, aan (`true`) en op dit bezit.
+    expect(mockSetBudgetTracking).toHaveBeenCalledTimes(1)
+    expect(mockSetBudgetTracking).toHaveBeenCalledWith(client, 'user-1', 'asset-1', true)
   })
 
-  it('raakt has_budget_tracking niet aan — budgetteren is een eigen, zichtbare as (B2)', async () => {
+  it('schrijft has_budget_tracking nooit met de hand — altijd via setBudgetTracking', async () => {
     const { client, calls } = makeDeactivatedAssetStub([assetState('asset-1', false), { data: null }])
 
     await ensureCashAssetForBankAccount(client, {
@@ -278,26 +305,53 @@ describe('ensureCashAssetForBankAccount — SC-13: hergebruik is heractivatie', 
       providerName: 'ING',
     })
 
+    // De vlag hier zelf zetten zou de companion-rij én de module-gate laten
+    // achterlopen — precies hoe die vlaggen eerder uiteen zijn gelopen.
     for (const call of calls) {
       expect(call.data).not.toHaveProperty('has_budget_tracking')
     }
+    expect(mockSetBudgetTracking).toHaveBeenCalledOnce()
   })
 
-  it('raakt bank_accounts.is_active niet aan — die vlag betekent "budgetteren staat uit"', async () => {
-    const { client, calls } = makeDeactivatedAssetStub([assetState('asset-1', false), { data: null }])
+  it('zichtbaarheid eerst, budget-as daarna — nooit omgekeerd', async () => {
+    // De volgorde is geen detail: faalt de budget-write, dan is de rekening in het
+    // ergste geval zichtbaar zonder budgettering (zelf-herstelbaar via de bestaande
+    // toggle). Omgekeerd zou budgetteren aanstaan op een bezitting die nergens te
+    // zien is.
+    const order: string[] = []
+    const { client } = makeStub({
+      bank_accounts: [
+        { data: { id: 'ba-1', linked_asset_id: 'asset-1', iban_encrypted: null, account_type: 'checking' } },
+      ],
+      assets: [assetState('asset-1', false), { data: null }],
+    })
+    mockSetBudgetTracking.mockImplementation(async () => {
+      order.push('budget-as')
+      return { ok: true, asset: { id: 'asset-1', has_budget_tracking: true, name: 'ING' }, budgetingActive: true }
+    })
 
-    await ensureCashAssetForBankAccount(client, {
+    const spied = {
+      from: (table: string) => {
+        const builder = (client as unknown as { from: (t: string) => any }).from(table)
+        const originalUpdate = builder.update
+        builder.update = (data: Record<string, unknown>) => {
+          if (table === 'assets' && 'is_active' in data) order.push('zichtbaarheid')
+          return originalUpdate(data)
+        }
+        return builder
+      },
+    } as unknown as SupabaseClient
+
+    await ensureCashAssetForBankAccount(spied, {
       userId: 'user-1',
       bankAccountId: 'ba-1',
       providerName: 'ING',
     })
 
-    // Meeflippen zou budgetteren stil aanzetten (`syncBankAccountCompanion` leest
-    // deze vlag), precies wat besluit B2 verbiedt.
-    expect(calls.filter((c) => c.table === 'bank_accounts')).toHaveLength(0)
+    expect(order).toEqual(['zichtbaarheid', 'budget-as'])
   })
 
-  it('reactivatie filtert op user_id, ook op de update', async () => {
+  it('herstel filtert op user_id, ook op de zichtbaarheids-update', async () => {
     const { client, filters } = makeDeactivatedAssetStub([assetState('asset-1', false), { data: null }])
 
     await ensureCashAssetForBankAccount(client, {
@@ -308,11 +362,12 @@ describe('ensureCashAssetForBankAccount — SC-13: hergebruik is heractivatie', 
 
     // Twee keer: de lezing én de write. De SELECT-policy op `assets` is bréder dan
     // eigen-rij (huishoud-gedeelde partnerrijen komen erdoor), dus dit is geen
-    // dubbelop maar de eigenaarschapseis zelf.
+    // dubbelop maar de eigenaarschapseis zelf. `setBudgetTracking` doet zijn eigen
+    // `user_id`-filter (eigen dekking).
     expect(filters.filter((f) => f.table === 'assets' && f.column === 'user_id')).toHaveLength(2)
   })
 
-  it('gefaalde reactivatie-write wordt gelezen: reactivated blijft false, assetId blijft staan', async () => {
+  it('gefaalde zichtbaarheids-write: reactivated blijft false, en de budget-as wordt niet aangeraakt', async () => {
     const { client } = makeDeactivatedAssetStub([
       assetState('asset-1', false),
       { data: null, error: { message: 'permission denied for table assets' } },
@@ -325,8 +380,43 @@ describe('ensureCashAssetForBankAccount — SC-13: hergebruik is heractivatie', 
     })
 
     // Niet geslikt en niet als succes gemeld: het bezit bestaat wél (dus `assetId`),
-    // maar het is niet gereactiveerd (dus `reactivated: false`).
+    // maar het is niet hersteld (dus `reactivated: false`).
     expect(result).toEqual({ assetId: 'asset-1', created: false, reactivated: false })
+    // En budgetteren gaat niet aan op een bezitting die onzichtbaar bleef.
+    expect(mockSetBudgetTracking).not.toHaveBeenCalled()
+  })
+
+  it('gefaalde budget-write: het herstel geldt nog steeds (de rekening is zichtbaar)', async () => {
+    const { client } = makeDeactivatedAssetStub([assetState('asset-1', false), { data: null }])
+    mockSetBudgetTracking.mockResolvedValue({ ok: false, error: { message: 'permission denied' } })
+
+    const result = await ensureCashAssetForBankAccount(client, {
+      userId: 'user-1',
+      bankAccountId: 'ba-1',
+      providerName: 'ING',
+    })
+
+    // De zichtbaarheid — het incident van SC-13 — is wél gerepareerd, dus dat mag
+    // niet als mislukt gelden. De rest is zichtbaar en zelf-herstelbaar via de
+    // bestaande budget-toggle.
+    expect(result).toEqual({ assetId: 'asset-1', created: false, reactivated: true })
+  })
+
+  it('actief bezit → geen herstel, dus ook geen budget-write', async () => {
+    // De budget-as terugzetten is een HERSTEL-actie, geen "zet altijd maar aan":
+    // een rekening waarvan de gebruiker budgetteren bewust uitzette terwijl het
+    // bezit gewoon bestaat, mag door een herkoppeling niet stil aangezet worden.
+    const { client, calls } = makeDeactivatedAssetStub([assetState('asset-1', true)])
+
+    const result = await ensureCashAssetForBankAccount(client, {
+      userId: 'user-1',
+      bankAccountId: 'ba-1',
+      providerName: 'ING',
+    })
+
+    expect(result).toEqual({ assetId: 'asset-1', created: false, reactivated: false })
+    expect(calls.filter((c) => c.op === 'update')).toHaveLength(0)
+    expect(mockSetBudgetTracking).not.toHaveBeenCalled()
   })
 
   it('leesfout op het bezit → geen write en geen valse melding, en de module gooit niet', async () => {
