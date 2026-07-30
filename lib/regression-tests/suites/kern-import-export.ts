@@ -79,19 +79,24 @@ const tests: TestCase[] = [
     id: 'import-csv-valid-broker-presets',
     name: 'CSV upload: broker presets configuratie correct',
     category: CAT,
-    description: 'BROKER_PRESETS has 3 valid broker types with required fields',
+    description: 'BROKER_PRESETS has 5 valid broker types with required fields',
     priority: 'high',
     estimatedDurationMs: 200,
     async fn() {
       // Test broker-csv module exports
       const mod = await import('@/lib/parsers/broker-csv')
       assertDefined(mod.BROKER_PRESETS, 'BROKER_PRESETS exported')
-      assertEqual(mod.BROKER_PRESETS.length, 3, '3 broker presets')
+      // Telling volgt broker-csv.ts#BROKER_PRESETS. Groeit die lijst, dan hoort
+      // deze assertie mee te groeien — een preset erbij zonder label/kolommen
+      // is precies wat de lus hieronder moet vangen.
+      assertEqual(mod.BROKER_PRESETS.length, 5, '5 broker presets')
 
       const ids = mod.BROKER_PRESETS.map((b: { id: string }) => b.id)
       assertIncludes(ids, 'degiro', 'DEGIRO preset')
       assertIncludes(ids, 'saxo', 'Saxo preset')
       assertIncludes(ids, 'ing_beleggen', 'ING Beleggen preset')
+      assertIncludes(ids, 'trading212', 'Trading 212 preset')
+      assertIncludes(ids, 'etoro', 'eToro preset')
 
       for (const preset of mod.BROKER_PRESETS) {
         assertDefined(preset.label, `${preset.id} has label`)

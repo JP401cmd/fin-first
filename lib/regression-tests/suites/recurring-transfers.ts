@@ -208,9 +208,16 @@ const tests: TestCase[] = [
     priority: 'medium',
     estimatedDurationMs: 100,
     fn() {
+      // Twee jaarboekingen volstaan voor het patroon zelf (MIN_OCCURRENCES.yearly
+      // is 2), maar `detectRecurringTransactions` heeft een instapdrempel op de
+      // TOTALE invoer (`recurring-detection.ts`, `transactions.length < 3`). Met
+      // maar twee rijen kwam de functie dus nooit voorbij die poort en testte
+      // deze case in werkelijkheid niets. De losse ruisregel brengt de invoer op
+      // drie zonder het jaarpatroon te raken.
       const txs: TransactionForDetection[] = [
         { id: 'y1', date: '2024-03-01', amount: -120, description: 'Jaarabonnement', counterparty_name: 'ANWB', is_income: false, budget_id: null },
         { id: 'y2', date: '2025-03-01', amount: -120, description: 'Jaarabonnement', counterparty_name: 'ANWB', is_income: false, budget_id: null },
+        { id: 'ruis', date: '2025-06-14', amount: -8.5, description: 'Losse aankoop', counterparty_name: 'Kiosk', is_income: false, budget_id: null },
       ]
 
       const detected = detectRecurringTransactions(txs)
