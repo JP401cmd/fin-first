@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic'
 import type { CashflowSettingsData } from '@/lib/cashflow-settings-data'
+import type { CashBankLink } from '@/lib/bank-connection-status'
 
 /**
  * cashflow-below-fold.tsx — dun client-eiland voor perf Task 3.2.
@@ -181,6 +182,12 @@ export function CashOverviewLazy(props: {
   hideQuickActions?: boolean
   showAllCashAccounts?: boolean
   showMonthLinks?: boolean
+  /**
+   * Koppelstatus per bankrekening uit `loadCashBankLinks()` op de server-pagina.
+   * Serialiseerbare data (geen functie), dus mag wél door dit `dynamic()`-eiland
+   * heen — anders dan `onNavigateToAccount` hierboven.
+   */
+  bankLinks?: CashBankLink[]
 }) {
   return <DynCashOverview {...props} />
 }

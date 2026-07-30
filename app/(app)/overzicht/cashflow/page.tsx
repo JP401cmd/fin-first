@@ -10,6 +10,7 @@ import { PerspectiveContextLabel } from '@/components/app/perspective-context-la
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { InflationImpactCard, INFLATION_IMPACT_ID } from '@/components/overview/inflation-impact-card'
 import { loadCashflowSettingsData } from '@/lib/cashflow-settings-data'
+import { loadCashBankLinks } from '@/lib/bank-link-loader'
 import { CashOverviewLazy, CashflowInstellingenBlokLazy } from './cashflow-below-fold'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { InsightToggleButton } from '@/components/editorial/insight-toggle-button'
@@ -38,11 +39,15 @@ export const metadata: Metadata = {
 export default async function OverzichtCashflowPage() {
   const supabase = await createClient()
   const perspective = await getServerPerspective()
-  const [dashboardResult, cashflow, vasteLasten, settings] = await Promise.all([
+  const [dashboardResult, cashflow, vasteLasten, settings, bankLinks] = await Promise.all([
     loadDashboardData(supabase),
     loadCashflowData(supabase, perspective),
     loadVasteLastenSummary(supabase),
     loadCashflowSettingsData(supabase),
+    // Koppelstatus per rekening (fase 7): weergavedata hoort via de loader, niet
+    // via een client-directe read ná hydratatie (ADR 0058). Voedt zowel het
+    // herkomst-symbool op de rekeningkaarten als de rekeningdetail.
+    loadCashBankLinks(supabase),
   ])
   const { dashboardData } = dashboardResult
   const cards = buildCashflowCards(dashboardData, cashflow, vasteLasten)
@@ -90,7 +95,7 @@ export default async function OverzichtCashflowPage() {
         </HideInSimple>
       )}
 
-      <CashOverviewLazy embedded showAllCashAccounts showMonthLinks />
+      <CashOverviewLazy embedded showAllCashAccounts showMonthLinks bankLinks={bankLinks} />
 
       {settings && (
         // Instellingen (inkomen, spaarquote, uitgaven) zijn óók in Eenvoudig
