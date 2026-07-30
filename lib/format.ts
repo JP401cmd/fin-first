@@ -411,6 +411,21 @@ const NL_MONTH_ABBR = [
 ]
 
 /**
+ * Kale datum in krantstijl: `d MMM yyyy` (bv. `29 jul 2026`).
+ *
+ * Voor `YYYY-MM-DD`-datums zonder tijdcomponent — dus zonder de
+ * "vandaag/deze week"-regels van `formatTimestamp`, en mét het jaartal, omdat
+ * zo'n datum vaak juist over een ander jaar gaat (bv. "historie opgehaald
+ * vanaf"). Leest de datum als UTC zodat een tijdzone hem geen dag laat
+ * verspringen.
+ */
+export function formatDateShort(iso: string): string {
+  const d = new Date(`${iso.slice(0, 10)}T00:00:00Z`)
+  if (isNaN(d.getTime())) return ''
+  return `${d.getUTCDate()} ${NL_MONTH_ABBR[d.getUTCMonth()]} ${d.getUTCFullYear()}`
+}
+
+/**
  * Format a date in newspaper (krant) style — no relative timestamps.
  *
  * Rules:

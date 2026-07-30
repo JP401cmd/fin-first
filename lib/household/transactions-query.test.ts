@@ -38,17 +38,26 @@ const EXPECTED_PERSPECTIVE_COLUMNS =
   'id, date, amount, description, counterparty_name, counterparty_iban, budget_id, account_id, is_income, transaction_type, ownership, user_id, is_split'
 
 // De echte kolommen van public.transactions (geverifieerd via
-// information_schema.columns op de live Supabase-DB, 2026-07-11). Dient als
+// information_schema.columns op de live Supabase-DB, 2026-07-29). Dient als
 // schema-contract zodat een toekomstige refactor van de select-lijst niet
 // opnieuw een non-existente kolom kan opvragen (→ PostgREST 400 → stille lege
 // lijst). Houd deze lijst gelijk aan het migratie-schema van `transactions`.
+//
+// De elf bank-/fx-kolommen (bank_seq t/m is_split) stonden hier al op grond
+// van live-introspectie, maar in géén migratie; ze zijn alsnog gecodificeerd
+// in 20260729171125_transactions_drift_account_scoped_dedup_and_source.sql.
+// Diezelfde migratie voegt `source` toe (herkomst: bank/import/handmatig,
+// besluit B5) — daarom staat die hier nu bij. Nog geen enkele query vraagt
+// 'source' op, dus dit is puur het spiegelen van het schema: de check is een
+// deelverzameling-test (gevraagde kolommen ⊆ deze set), zodat toevoegen nooit
+// een test kan laten slagen die zou moeten falen.
 const SCHEMA_TRANSACTION_COLUMNS = new Set([
   'id', 'user_id', 'account_id', 'budget_id', 'date', 'amount', 'currency',
   'description', 'counterparty_name', 'counterparty_iban', 'category_source',
   'is_income', 'import_hash', 'reference', 'transaction_type', 'notes',
   'created_at', 'updated_at', 'ownership', 'household_id', 'is_split',
   'linked_transfer_id', 'running_balance', 'creditor_id', 'fx_amount',
-  'fx_currency', 'fx_rate', 'bank_code', 'bank_seq',
+  'fx_currency', 'fx_rate', 'bank_code', 'bank_seq', 'source',
 ])
 
 // Minimale solo-context zodat loadPerspectiveTransactions het 'personal'-pad

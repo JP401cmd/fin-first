@@ -101,6 +101,8 @@ export function ManualTransferSheet({
         category_source: 'transfer',
         budget_id: eigenBudgetId,
         is_split: false,
+        // Herkomst (B5): een handmatig ingevoerde overboeking.
+        source: 'handmatig',
       })
       .select('id')
       .single()
@@ -126,6 +128,8 @@ export function ManualTransferSheet({
         budget_id: eigenBudgetId,
         is_split: false,
         linked_transfer_id: debitTx.id,
+        // Herkomst (B5): een handmatig ingevoerde overboeking.
+        source: 'handmatig',
       })
       .select('id')
       .single()

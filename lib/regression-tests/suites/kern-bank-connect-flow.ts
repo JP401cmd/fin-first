@@ -445,6 +445,10 @@ const tests: TestCase[] = [
     async fn() {
       const endpoints = [
         { url: '/api/bank-connect/auth-link', method: 'POST', body: JSON.stringify({ provider_id: 'test' }) },
+        // Kandidaat-doelrekeningen voor de keuzestap in wizardstap 2 (fase 4):
+        // een lijst met rekeningnamen, IBAN-staarten en transactietellingen hoort
+        // per definitie achter de auth-guard.
+        { url: '/api/bank-connect/accounts', method: 'GET' },
         { url: '/api/bank-connect/status', method: 'GET' },
         { url: '/api/bank-connect/sync', method: 'POST', body: JSON.stringify({ connection_account_id: 'test' }) },
         { url: '/api/bank-connect/disconnect', method: 'POST', body: JSON.stringify({ connection_id: 'test' }) },

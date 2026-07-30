@@ -334,7 +334,10 @@ export function TransactionForm({
     } else {
       const { data: insertedTx, error: insertError } = await supabase
         .from('transactions')
-        .insert(row)
+        // Herkomst (B5) alleen op de INSERT: een handmatig aangemaakte transactie
+        // is `handmatig`. Het update-pad hierboven schrijft `source` bewust NIET —
+        // een bank- of importrij bewerken verandert niet waar hij vandaan kwam.
+        .insert({ ...row, source: 'handmatig' })
         .select('id')
         .single()
 
