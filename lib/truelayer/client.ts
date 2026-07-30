@@ -3,6 +3,11 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { getServiceClient } from '@/lib/supabase/service'
 import { recordContractEvent } from '@/lib/contract-events'
 import { fingerprintKeys } from '@/lib/parsers/shared'
+import {
+  PROVIDER_REQUEST_LIMIT_CODE,
+  TrueLayerProviderLimitError,
+  TrueLayerRequestError,
+} from './errors'
 import type {
   TLProvider,
   TLAccount,
@@ -135,9 +140,12 @@ export async function buildAuthLink(
     params.set('provider_id', providerId)
     params.set('providers', providerId)
   }
-  // Zonder providerId zetten we bewust géén `providers`-param: de auth-link-route
-  // dwingt `provider_id` al af (400-guard), dus dit pad is vanuit de app
-  // onbereikbaar.
+  // Zonder providerId zetten we bewust géén `providers`-param. Dit pad is vanuit de
+  // app onbereikbaar, maar de garantie ligt sinds fase 7 op twéé plekken in
+  // `auth-link`: op het wizardpad dwingt het zod-schema `provider_id` af, en op het
+  // herstelpad leidt de route hem uit de koppeling af en weigert ze met een 400 als
+  // die verbinding geen leesbare bank heeft. `provider_id` is dáár dus optioneel in
+  // de body — niet optioneel in de uitkomst.
 
   return `${authUrl}/?${params.toString()}`
 }
@@ -250,6 +258,13 @@ export async function getAccountBalance(
 ): Promise<TLBalance[]> {
   const res = await fetch(`${dataUrl}/data/v1/accounts/${accountId}/balance`, {
     headers: { Authorization: `Bearer ${accessToken}` },
+    // De OAuth-callback doet deze call per rekening vóór ze redirect. Een
+    // hangende TrueLayer-respons zou daar de hele functie in de platform-timeout
+    // laten lopen: de koppeling staat dan wél in de database, maar de gebruiker
+    // ziet een gateway-fout in plaats van de success-pagina. Een afgebroken call
+    // wordt door alle callers niet-fataal afgevangen. Zelfde waarde als het
+    // huispatroon in lib/forex.ts en lib/price-feed.ts.
+    signal: AbortSignal.timeout(8000),
   })
 
   if (!res.ok) {
@@ -258,6 +273,38 @@ export async function getAccountBalance(
 
   const data = await res.json()
   return data.results ?? []
+}
+
+/**
+ * Vertaal een mislukte transactie-respons naar een fouttype dat de call-site
+ * kan wégen.
+ *
+ * De oude vorm gooide alleen `res.status` in een tekst, waarmee de
+ * providerfoutcode verloren ging. Juist die code bepaalt wat de sync-route mag
+ * doen: `provider_request_limit_exceeded` is een limiet van de bánk (los van
+ * onze 10/dag en los van die van TrueLayer) en betekent "stop met ophalen, houd
+ * wat je hebt" — niet "de sync is mislukt".
+ *
+ * De body wordt defensief gelezen: een provider die HTML of niets teruggeeft mag
+ * deze functie niet zelf laten falen.
+ */
+async function buildTransactionsError(res: Response): Promise<TrueLayerRequestError> {
+  let providerErrorCode: string | null = null
+  try {
+    const body = await res.clone().json() as { error?: unknown }
+    if (typeof body?.error === 'string') providerErrorCode = body.error
+  } catch {
+    // Geen (geldige) JSON-body — dan blijft alleen de status over.
+  }
+
+  const suffix = providerErrorCode ? `${res.status} (${providerErrorCode})` : `${res.status}`
+  const message = `TrueLayer transacties ophalen mislukt: ${suffix}`
+
+  if (res.status === 429 && providerErrorCode === PROVIDER_REQUEST_LIMIT_CODE) {
+    return new TrueLayerProviderLimitError(message, res.status, providerErrorCode)
+  }
+
+  return new TrueLayerRequestError(message, res.status, providerErrorCode)
 }
 
 /**
@@ -280,7 +327,7 @@ export async function getAccountTransactions(
   })
 
   if (!res.ok) {
-    throw new Error(`TrueLayer transacties ophalen mislukt: ${res.status}`)
+    throw await buildTransactionsError(res)
   }
 
   const data = await res.json()

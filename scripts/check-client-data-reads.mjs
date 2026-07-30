@@ -82,7 +82,8 @@ const ALLOWLIST = new Set([
   'components/app/counterparty-analysis-panel.tsx',
   'components/overview/transacties/transacties-analyse.tsx',
   'app/(app)/core/cash/import/page.tsx',
-  'app/(app)/core/cash/connect/success/page.tsx',
+  // 'app/(app)/core/cash/connect/success/page.tsx' — VERVALLEN (fase 5): leest nu
+  // via GET /api/bank-connect/linked-accounts. Entries verwijderen mag; toevoegen niet.
   // — Fase b, slice 4: horizon / toekomst —
   'components/app/horizon/horizon-client.tsx',
   'components/app/horizon/strategie-modal.tsx',

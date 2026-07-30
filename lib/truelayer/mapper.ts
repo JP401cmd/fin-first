@@ -1,6 +1,8 @@
 import type { TLTransaction } from './types'
 import type { ParsedTransaction } from '@/lib/parsers/shared'
 import { computeHash } from '@/lib/parsers/shared'
+import type { CashSubtype } from '@/lib/asset-data'
+import { cashSubtypeToAccountType, type BankAccountType } from '@/lib/account-types'
 
 /** Lege/whitespace-only providerwaarden tellen als "niet gevuld" (→ null),
  *  zodat ze niet als lege tegenpartij in de DB landen en de meta-fallback
@@ -64,4 +66,89 @@ export async function mapTransaction(tl: TLTransaction): Promise<ParsedTransacti
  */
 export async function mapTransactions(tlTransactions: TLTransaction[]): Promise<ParsedTransaction[]> {
   return Promise.all(tlTransactions.map(mapTransaction))
+}
+
+// ── Rekeningtype van de bank overnemen (besluit B3, fase 5) ──────────────────
+//
+// De koppel-callback stempelde tot fase 5 élke nieuw aangemaakte rekening als
+// betaalrekening: `subtype: 'checking'` op de asset, `account_type: 'checking'`
+// op de `bank_accounts`-rij, `is_liquid: true`. Zit er een spaarrekening in
+// dezelfde consent (SC-05), dan kreeg die dus het verkeerde label — en een
+// creditcard zou als liquide betaalrekening meetellen. Dat is een
+// GRONDSLAGFOUT, geen cosmetisch defect: `is_liquid` bepaalt het liquide
+// vermogen, en dat voedt noodfonds, spaarquote en de FIRE-motor. Downstream is
+// het niet meer te herstellen ("consume, don't recompute").
+//
+// Wat TrueLayer werkelijk levert op `GET /data/v1/accounts`:
+// `TRANSACTION`, `SAVINGS`, `BUSINESS_TRANSACTION`, `BUSINESS_SAVINGS`.
+// Creditcards komen bij TrueLayer uit een ándere resource (`/data/v1/cards`) die
+// wij niet aanroepen — de kaart-tak hieronder is dus een VANGNET, niet het
+// normale pad: voor een provider die het type tóch via /accounts meldt, en voor
+// de dag dat we cards wél gaan ophalen.
+
+/** Wat één providertype betekent in de twee TriFinity-woordenlijsten. */
+export type MappedAccountType = {
+  /** Voor `bank_accounts.account_type` (CHECK-constraint). */
+  account_type: BankAccountType
+  /** Voor `assets.subtype` van het cash-bezit. */
+  subtype: CashSubtype
+  /**
+   * Voor `assets.is_liquid`. Alleen een kaart-/kredietrekening is `false`: die
+   * draagt een schuld, geen direct opneembaar tegoed, en mag het liquide
+   * vermogen niet opblazen.
+   */
+  is_liquid: boolean
+}
+
+/**
+ * Providertypes waarvan we weten wat ze betekenen. Bewust een expliciete tabel en
+ * geen `includes('SAVINGS')`-heuristiek: een nieuw providertype hoort hier
+ * zichtbaar bij te komen, niet stil in een bestaande tak te vallen.
+ *
+ * `BUSINESS_SAVINGS` → `business` en niet `savings`: de woordenlijst heeft één
+ * slot, en "zakelijk" is de eigenschap die `checking`/`savings` niet óók kan
+ * uitdrukken. Beide BUSINESS_*-varianten landen daarmee op hetzelfde type, wat
+ * consistent is met hoe de gebruiker ze in `ACCOUNT_TYPES` zelf zou kiezen.
+ */
+const PROVIDER_ACCOUNT_TYPES: Record<string, { subtype: CashSubtype; is_liquid: boolean }> = {
+  TRANSACTION: { subtype: 'checking', is_liquid: true },
+  SAVINGS: { subtype: 'savings_account', is_liquid: true },
+  BUSINESS_TRANSACTION: { subtype: 'business', is_liquid: true },
+  BUSINESS_SAVINGS: { subtype: 'business', is_liquid: true },
+  // Vangnet, zie de noot hierboven. `other_cash` omdat er geen creditcard-slot
+  // in de woordenlijst bestaat, en `is_liquid: false` omdat dát de waarde is die
+  // de vermogensgrondslag raakt. Een bankgeleverde creditcard hóórt eigenlijk
+  // een `debts`-rij te zijn; dat is een eigen stap, geen stille aanname hier.
+  CREDIT_CARD: { subtype: 'other_cash', is_liquid: false },
+  CARD: { subtype: 'other_cash', is_liquid: false },
+}
+
+/** Val-terug voor een onbekend of ontbrekend providertype (plan, criterium g). */
+const FALLBACK_ACCOUNT_TYPE: MappedAccountType = {
+  account_type: 'checking',
+  subtype: 'checking',
+  is_liquid: true,
+}
+
+/**
+ * Vertaal het TrueLayer-accounttype naar de TriFinity-velden die de
+ * vermogensgrondslag bepalen.
+ *
+ * Een onbekend, leeg of ontbrekend type valt terug op betaalrekening — het
+ * meest voorkomende geval, en het gedrag van vóór B3. Bewust een val-terug en
+ * geen throw: een onbekend providertype mag een OAuth-callback nooit laten
+ * stranden.
+ */
+export function mapAccountType(tlAccountType: string | null | undefined): MappedAccountType {
+  const key = tlAccountType?.trim().toUpperCase()
+  if (!key) return FALLBACK_ACCOUNT_TYPE
+
+  const known = PROVIDER_ACCOUNT_TYPES[key]
+  if (!known) return FALLBACK_ACCOUNT_TYPE
+
+  return {
+    account_type: cashSubtypeToAccountType(known.subtype),
+    subtype: known.subtype,
+    is_liquid: known.is_liquid,
+  }
 }

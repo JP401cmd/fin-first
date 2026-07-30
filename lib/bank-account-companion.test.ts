@@ -7,6 +7,18 @@ import type { SupabaseClient } from '@supabase/supabase-js'
  * assets.has_budget_tracking, maar maakte géén gekoppelde bank_accounts-rij
  * (companion) aan — waardoor de rekening onzichtbaar bleef op /core/cash/import.
  * Deze helper is de gedeelde companion-sync voor álle schrijfpaden.
+ *
+ * De uitzet-tak (enabled=false) draagt twee invarianten (besluit B1b, zie de
+ * docstring bij de uitzet-tak in bank-account-companion.ts):
+ *  1. De companion-rij (`bank_accounts`) wordt NOOIT verwijderd — `bank_
+ *     connection_accounts.bank_account_id` verwijst ernaar met ON DELETE NO
+ *     ACTION, dus een delete faalt zodra er ooit een bankkoppeling op zit,
+ *     terwijl `assets.has_budget_tracking` dan al is weggeschreven (een half
+ *     toegepaste mutatie zonder foutmelding).
+ *  2. `linked_asset_id` (UNIQUE, permanente 1-op-1-binding) wordt NOOIT genuld
+ *     — meerdere surfaces (horizon-client, what-if, check-in) tellen "losse"
+ *     rekeningen als `is_active AND linked_asset_id IS NULL` BOVENOP de
+ *     cash-asset; nullen betekent dus dubbel geteld vermogen.
  */
 
 const asset: CompanionAssetInput = {
@@ -34,15 +46,18 @@ function mockSupabase(opts: {
   const bankUpdate = vi.fn(() => ({ eq: vi.fn().mockResolvedValue({ error: null }) }))
   const bankDelete = vi.fn(() => ({ eq: vi.fn().mockResolvedValue({ error: null }) }))
 
+  // De companion-lookup filtert op `linked_asset_id` ÉN `user_id` (eigenaarschap,
+  // zie de noot in bank-account-companion.ts), dus `.eq()` moet doorschakelbaar zijn.
+  const bankAccountsSelectChain: Record<string, unknown> = {
+    maybeSingle: vi.fn().mockResolvedValue({
+      data: opts.existingBankAccountId ? { id: opts.existingBankAccountId } : null,
+      error: null,
+    }),
+  }
+  bankAccountsSelectChain.eq = vi.fn(() => bankAccountsSelectChain)
+
   const bankAccounts = {
-    select: vi.fn(() => ({
-      eq: vi.fn(() => ({
-        maybeSingle: vi.fn().mockResolvedValue({
-          data: opts.existingBankAccountId ? { id: opts.existingBankAccountId } : null,
-          error: null,
-        }),
-      })),
-    })),
+    select: vi.fn(() => bankAccountsSelectChain),
     insert: bankInsert,
     update: bankUpdate,
     delete: bankDelete,
@@ -108,7 +123,7 @@ describe('syncBankAccountCompanion', () => {
     expect(bankInsert.mock.calls[0][0]).toMatchObject({ ownership: 'shared', household_id: 'hh-9' })
   })
 
-  it('verwijdert de companion bij uitzetten wanneer er geen transacties zijn', async () => {
+  it('deactiveert de companion bij uitzetten wanneer er geen transacties zijn — nooit delete, nooit linked_asset_id: null', async () => {
     const { supabase, bankDelete, bankUpdate } = mockSupabase({
       existingBankAccountId: 'ba-1',
       transactionCount: 0,
@@ -116,11 +131,12 @@ describe('syncBankAccountCompanion', () => {
 
     await syncBankAccountCompanion(supabase, 'user-1', asset, false)
 
-    expect(bankDelete).toHaveBeenCalledTimes(1)
-    expect(bankUpdate).not.toHaveBeenCalled()
+    expect(bankDelete).not.toHaveBeenCalled()
+    expect(bankUpdate).toHaveBeenCalledTimes(1)
+    expect(bankUpdate.mock.calls[0][0]).toEqual({ is_active: false })
   })
 
-  it('ontkoppelt (behoudt) de companion bij uitzetten wanneer er transacties zijn', async () => {
+  it('deactiveert de companion bij uitzetten wanneer er wél transacties zijn — nooit delete, nooit linked_asset_id: null', async () => {
     const { supabase, bankDelete, bankUpdate } = mockSupabase({
       existingBankAccountId: 'ba-1',
       transactionCount: 3,
@@ -130,7 +146,7 @@ describe('syncBankAccountCompanion', () => {
 
     expect(bankDelete).not.toHaveBeenCalled()
     expect(bankUpdate).toHaveBeenCalledTimes(1)
-    expect(bankUpdate.mock.calls[0][0]).toEqual({ linked_asset_id: null })
+    expect(bankUpdate.mock.calls[0][0]).toEqual({ is_active: false })
   })
 
   it('doet niets bij uitzetten wanneer er geen companion bestaat', async () => {

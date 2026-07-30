@@ -1,6 +1,8 @@
 'use client'
 import { memo, useEffect, useMemo, useState } from 'react'
-import { Repeat, Link2, FileText, CreditCard, RefreshCw, Smartphone, ArrowLeftRight, ArrowDownLeft, Landmark, Search, SlidersHorizontal, X } from 'lucide-react'
+import { Repeat, CreditCard, RefreshCw, Smartphone, ArrowLeftRight, ArrowDownLeft, Landmark, Search, SlidersHorizontal, X } from 'lucide-react'
+import { AccountSourceIcon, accountSourceSuffix } from '@/components/core/account-source-icon'
+import type { BankLinkState } from '@/lib/bank-connection-status'
 import {
   cleanMerchantName, deriveType, parseLocationTime, avgDailyExpense,
   freedomDays, detectRecurring, groupByDay, monogram, parseSmartQuery, type TxKind,
@@ -158,7 +160,14 @@ export function TransactieTijdlijn({ transactions, windowDays, accounts, selecte
         <div className="mb-4 flex flex-wrap gap-1 text-xs" role="group" aria-label="Kies rekening">
           <AccountButton active={selectedAccountId === null} label="Alle rekeningen" onClick={() => onSelectAccount(null)} />
           {accounts.map((a) => (
-            <AccountButton key={a.id} active={selectedAccountId === a.id} connected={a.connected}
+            /* De chips kennen maar twee toestanden: `AccountOption.connected`
+               komt uit de bestaande leesronde van transacties-analyse.tsx en zegt
+               niets over de gezondheid van de koppeling. Hier bewust GEEN derde
+               toestand bijverzinnen en geen extra fetch openen — de
+               verbroken-toestand leeft op de rekeningkaart (cashflow), die de
+               server-loader wél meekrijgt. */
+            <AccountButton key={a.id} active={selectedAccountId === a.id}
+              state={a.connected ? 'linked' : 'manual'}
               label={a.name} onClick={() => onSelectAccount(a.id)} />
           ))}
         </div>
@@ -365,13 +374,25 @@ function NoResultsEmpty({ onClear }: { onClear: () => void }) {
   )
 }
 
-function AccountButton({ active, label, onClick, connected }: { active: boolean; label: string; onClick: () => void; connected?: boolean }) {
-  const SrcIcon = connected === undefined ? null : connected ? Link2 : FileText
+function AccountButton({ active, label, onClick, state }: { active: boolean; label: string; onClick: () => void; state?: BankLinkState }) {
   return (
     <button type="button" onClick={onClick} aria-pressed={active}
+      /* Het symbool is `aria-hidden` (het zou als geneste naam nooit voorgelezen
+         worden), dus de herkomst hoort IN deze naam — anders is de toestand die
+         om een handeling vraagt voor AT-gebruikers volledig afwezig. Zichtbaar
+         label vóóraan, zodat de accessible name de zichtbare tekst niet
+         tegenspreekt. */
+      aria-label={state === undefined ? undefined : `${label} — ${accountSourceSuffix(state)}`}
       className={['inline-flex items-center gap-1.5 min-h-[44px] px-3 py-1 font-mono text-[11px] uppercase tracking-[0.06em] border',
         active ? 'bg-[var(--ink)] text-[var(--paper)] border-[var(--ink)]' : 'bg-[var(--paper)] text-[var(--ink-3)] border-[var(--border-ed)]'].join(' ')}>
-      {SrcIcon && <SrcIcon className="h-3 w-3" aria-hidden />}
+      {/* Herkomst-symbool: gedeeld met de rekening-kaarten op /overzicht/cashflow.
+          `inheritColor` ALLEEN op de actieve pill: die staat op `--ink` met
+          `--paper`-tekst, waar een vaste inkt-toon wegvalt. Onvoorwaardelijk erven
+          gooide op élke inactieve pill de tint weg, en dan moet een 12px `Unlink`
+          het alleen van een 12px `Link2` winnen.
+          Anders dan de kaarten tonen de chips ook "handmatig" — bestaand gedrag,
+          bewust behouden (B4 raakt alleen de kaarten). */}
+      {state !== undefined && <AccountSourceIcon state={state} inheritColor={active} />}
       {label}
     </button>
   )

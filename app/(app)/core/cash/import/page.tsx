@@ -14,6 +14,7 @@ import { detectFormat, CSV_PRESETS, type CSVPreset } from '@/lib/parsers/index'
 import type { ImportWarning } from '@/lib/parsers/shared'
 import type { ParsedTransaction } from '@/lib/parsers/shared'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
+import { InfoTooltip } from '@/components/editorial/info-icon-tooltip'
 import { categorizeTransaction, isOwnAccountTransfer, isWalletTransferType, buildFrequencyMap, type CategoryCorrection, type FrequencyMatch } from '@/lib/parsers/categorize'
 import { type Budget, resolveEigenRekeningBudgetId } from '@/lib/budget-data'
 import { buildOwnAccountIdentifiers } from '@/lib/own-accounts'
@@ -21,7 +22,13 @@ import { linkUnmatchedTransfers } from '@/lib/transfer-matching'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { Kicker, EditorialHeadline, EditorialDeck } from '@/components/editorial'
 import { AICategorizeSheet } from '@/components/app/ai-categorize-sheet'
-import { selectAllState, withAllSkip } from './select-all'
+import { selectAllState, withAllSkip, type CrossSourceFlag } from './select-all'
+import {
+  CROSS_SOURCE_DATE_TOLERANCE_DAYS,
+  partitionCrossSourceDuplicates,
+  shiftIsoDate,
+  type CrossSourceCandidate,
+} from '@/lib/parsers/cross-source-dedup'
 
 /**
  * Minimale transactievorm voor het post-import categoriseer-scherm
@@ -70,6 +77,13 @@ type ImportRow = ParsedTransaction & {
   confidence: number
   category_source: string | null
   isDuplicate: boolean
+  /**
+   * Dedup-laag 2 (fase 3/B7): dezelfde boeking die al via de bankkoppeling
+   * binnenkwam, met een andere omschrijvingstekst en dus een andere hash. Staat
+   * voorgedeselecteerd mét reden, en is bewust overrulebaar — bij een import is
+   * de gebruiker erbij, anders dan bij een sync.
+   */
+  crossSourceDuplicate: CrossSourceFlag | null
   skipImport: boolean
   isTransfer: boolean
   aiAccepted?: boolean
@@ -185,6 +199,25 @@ export default function ImportPage() {
   const [ownIbans, setOwnIbans] = useState<Set<string>>(new Set())
   const [ownNamePatterns, setOwnNamePatterns] = useState<string[]>([])
   const [checkingDups, setCheckingDups] = useState(false)
+  /**
+   * Rekeningen met een actieve bankkoppeling. Die MOETEN via
+   * `POST /api/transactions/import` opslaan (B7): op zo'n rekening schrijft de
+   * bank-sync in dezelfde rijruimte, en twee schrijvers met verschillende
+   * dedup-regels leveren gegarandeerd een dubbele reeks op. Losse rekeningen
+   * houden voorlopig het bestaande clientpad.
+   *
+   * De lijst komt van de server — "wat telt als gekoppeld" hoort niet als tweede
+   * interpretatie in de browser te leven.
+   */
+  const [linkedAccountIds, setLinkedAccountIds] = useState<Set<string>>(() => new Set())
+  /**
+   * De lijst kon niet opgehaald worden. Dan kiezen we het SERVERPAD voor élke
+   * rekening: dat pad is functioneel een superset (zelfde dedup, plus laag 2 en
+   * server-side eigenaarschapscontrole). De enige reden dat het clientpad nog
+   * bestaat is beperking van de blast radius — een mislukte lookup is geen reden
+   * om de één-schrijver-regel te laten vallen.
+   */
+  const [linkedLookupFailed, setLinkedLookupFailed] = useState(false)
   const [pendingSession, setPendingSession] = useState<ImportSession | null>(null)
   // Post-import categoriseren: de zojuist weggeschreven, nog ongecategoriseerde
   // rijen (budget_id null, geen overboeking) worden hier vastgehouden en aan de
@@ -194,6 +227,21 @@ export default function ImportPage() {
   const [showCategorizeSheet, setShowCategorizeSheet] = useState(false)
   const PAGE_SIZE = 50
   const [currentPage, setCurrentPage] = useState(0)
+
+  /**
+   * Schrijft de gekozen rekening via de server-route weg (B7)? Zie de
+   * toelichting bij `linkedAccountIds` en `linkedLookupFailed`. Op
+   * component-niveau berekend omdat zowel de import-lus als de voortgangs-UI
+   * (batchgrootte) hem nodig heeft.
+   */
+  const useServerPath = linkedLookupFailed || linkedAccountIds.has(selectedAccountId)
+  /**
+   * Clientpad: 100 rijen per insert — ongewijzigd sinds de incident-fix.
+   * Serverpad: 500, want daar is elke batch één HTTP-verzoek dat zijn eigen
+   * dedup-leesronde doet. Een import van 3.000 rijen kost zo zes verzoeken in
+   * plaats van dertig leesronden over dezelfde historie.
+   */
+  const batchSize = useServerPath ? 500 : 100
 
   const loadInitialData = useCallback(async () => {
     setLoading(true)
@@ -252,6 +300,20 @@ export default function ImportPage() {
       // Build frequency map from historical transactions (async, non-blocking)
       if (user) {
         buildFrequencyMap(user.id, supabase).then(fm => setFreqMap(fm)).catch(() => { /* non-critical */ })
+      }
+
+      // Welke rekeningen moeten via de server-route opslaan (B7)? Non-blocking:
+      // de keuze is pas bij het importeren nodig, niet bij het laden.
+      try {
+        const res = await fetch('/api/transactions/import')
+        if (!res.ok) throw new Error('lookup mislukt')
+        const data = await res.json() as { linked_account_ids?: string[] }
+        setLinkedAccountIds(new Set(data.linked_account_ids ?? []))
+        setLinkedLookupFailed(false)
+      } catch {
+        // Zie de toelichting bij `linkedLookupFailed`: bij twijfel het serverpad.
+        setLinkedAccountIds(new Set())
+        setLinkedLookupFailed(true)
       }
 
       setLoading(false)
@@ -318,6 +380,15 @@ export default function ImportPage() {
       return
     }
 
+    // De doelrekening is vóór de upload verplicht gekozen (zie handleFileSelect),
+    // en de duplicaatcontrole is rekening-gescoped — zonder rekening is er niets
+    // om tegen te vergelijken.
+    if (!selectedAccountId) {
+      setError('Geen bankrekening geselecteerd. Ga terug en selecteer eerst een rekening.')
+      setCheckingDups(false)
+      return
+    }
+
     const sourceRows = rowsParam ?? rows
 
     const minDate = sourceRows.reduce((min, r) => r.date < min ? r.date : min, sourceRows[0].date)
@@ -326,12 +397,25 @@ export default function ImportPage() {
     try {
       // Single range-query: all transactions within the import's date range
       // Replaces the fragile .in('import_hash', hashes) approach that silently failed on large imports
+      //
+      // Rekening-gescoped, net als de unieke index
+      // `(user_id, account_id, import_hash, coalesce(bank_seq,''))`: dezelfde
+      // boeking (datum/bedrag/omschrijving) mag op twee rekeningen naast elkaar
+      // bestaan, dus een gebruiker-brede vergelijking meldde hier valse
+      // duplicaten die de gebruiker met de hand moest aanvinken.
+      // Twee extra kolommen (`counterparty_iban`, `counterparty_name`) en een met
+      // één dag verbreed venster voeden dedup-laag 2 (cross-bron): dezelfde
+      // query, geen extra roundtrip. Het venster MOET meebewegen met de
+      // tolerantie van de matcher — anders glipt een duplicaat op de dag vóór de
+      // vroegste of ná de laatste rij er stil doorheen. De constante staat in de
+      // dedup-module, niet hier.
       const { data: existing, error: queryError } = await supabase
         .from('transactions')
-        .select('date, amount, description')
+        .select('date, amount, description, bank_seq, counterparty_iban, counterparty_name')
         .eq('user_id', user.id)
-        .gte('date', minDate)
-        .lte('date', maxDate)
+        .eq('account_id', selectedAccountId)
+        .gte('date', shiftIsoDate(minDate, -CROSS_SOURCE_DATE_TOLERANCE_DAYS))
+        .lte('date', shiftIsoDate(maxDate, CROSS_SOURCE_DATE_TOLERANCE_DAYS))
         .limit(50000)
 
       if (queryError) {
@@ -348,14 +432,19 @@ export default function ImportPage() {
         return
       }
 
-      // Build a content-Set with normalized keys
+      // Build a content-Set with normalized keys.
+      // Het volgnummer (`bank_seq`) hoort in de sleutel: zonder dat veld meldde
+      // deze zachte controle een rij als "duplicaat" die de harde pre-insert-
+      // filter (rowDedupKey = import_hash|bank_seq) én de unieke index wél
+      // toelaten — twee échte boekingen met gelijke datum/bedrag/omschrijving en
+      // een verschillend Volgnr. Beide lagen kijken nu naar dezelfde sleutel.
       const contentSet = new Set<string>()
       if (existing) {
         for (const t of existing) {
           // DB returns NUMERIC as string ("8.10", "100", "-143.13")
           // parseFloat → String normalizes both sides to the same representation
           const normalizedAmount = String(parseFloat(String(t.amount)))
-          const key = `${t.date}|${normalizedAmount}|${String(t.description ?? '').slice(0, 100)}`
+          const key = `${t.date}|${normalizedAmount}|${String(t.description ?? '').slice(0, 100)}|${t.bank_seq ?? ''}`
           contentSet.add(key)
         }
       }
@@ -369,7 +458,7 @@ export default function ImportPage() {
 
       const markDups = (r: ImportRow) => {
         const normalizedAmount = String(parseFloat(String(r.amount)))
-        const contentKey = `${r.date}|${normalizedAmount}|${r.description.slice(0, 100)}`
+        const contentKey = `${r.date}|${normalizedAmount}|${r.description.slice(0, 100)}|${r.bank_seq ?? ''}`
         const isDuplicate = contentSet.has(contentKey) || pendingHashes.has(r.import_hash)
         return {
           ...r,
@@ -390,10 +479,61 @@ export default function ImportPage() {
         return r
       }
 
+      // Dedup-laag 2 (cross-bron): dezelfde boeking die eerder al via de
+      // bankkoppeling binnenkwam. De bank levert een andere omschrijvingstekst
+      // dan het CSV-bestand, dus laag 1 (hash over datum|bedrag|omschrijving)
+      // kán die niet vangen. Laag 2 matcht op datum ±1 dag + bedrag exact +
+      // tegenpartij-IBAN (of, bij eenzijdig ontbrekende IBAN, de genormaliseerde
+      // naam) — dezelfde pure module die de sync-route gebruikt, zodat beide
+      // paden op dezelfde invoer gegarandeerd hetzelfde besluiten.
+      //
+      // Draait ALTIJD ná laag 1 en alleen op wat die niet al heeft afgevangen:
+      // een rij die al duplicaat heet, mag niet nóg eens (en met de zwakkere
+      // reden) gemarkeerd worden.
+      //
+      // `amount` komt als NUMERIC-string uit PostgREST — coerceren, anders wordt
+      // de centen-vergelijking NaN en matcht er niets.
+      const crossSourceExisting: CrossSourceCandidate[] = (existing ?? []).map((t) => ({
+        date: String(t.date),
+        amount: Number(t.amount),
+        counterparty_iban: t.counterparty_iban ?? null,
+        counterparty_name: t.counterparty_name ?? null,
+      }))
+
+      const applyCrossSource = (all: ImportRow[]): ImportRow[] => {
+        const openRows = all
+          .map((r, index) => ({ r, index }))
+          .filter(({ r }) => !r.isDuplicate)
+        if (openRows.length === 0 || crossSourceExisting.length === 0) return all
+
+        const decisions = partitionCrossSourceDuplicates(
+          openRows.map(({ r, index }) => ({
+            date: r.date,
+            amount: r.amount,
+            counterparty_iban: r.counterparty_iban,
+            counterparty_name: r.counterparty_name,
+            index,
+          })),
+          crossSourceExisting,
+        )
+
+        const flags = new Map<number, CrossSourceFlag>()
+        for (const d of decisions) {
+          if (d.reason) flags.set(d.candidate.index, { reason: d.reason })
+        }
+        if (flags.size === 0) return all
+
+        return all.map((r, index) => {
+          const flag = flags.get(index)
+          // Voorgedeselecteerd, niet geblokkeerd: de checkbox blijft aanklikbaar.
+          return flag ? { ...r, crossSourceDuplicate: flag, skipImport: true } : r
+        })
+      }
+
       if (rowsParam) {
-        setRows(rowsParam.map(markDups).map(applyFileDedup))
+        setRows(applyCrossSource(rowsParam.map(markDups).map(applyFileDedup)))
       } else {
-        setRows((prev) => prev.map(markDups).map(applyFileDedup))
+        setRows((prev) => applyCrossSource(prev.map(markDups).map(applyFileDedup)))
       }
 
       setCheckingDups(false)
@@ -531,6 +671,7 @@ export default function ImportPage() {
           confidence: cat.confidence,
           category_source: cat.category_source ?? null,
           isDuplicate: false,
+          crossSourceDuplicate: null,
           skipImport: false,
           isTransfer,
           transaction_type: isTransfer ? 'transfer' : tx.transaction_type,
@@ -584,6 +725,7 @@ export default function ImportPage() {
           confidence: cat.confidence,
           category_source: cat.category_source ?? null,
           isDuplicate: false,
+          crossSourceDuplicate: null,
           skipImport: false,
           isTransfer,
           transaction_type: isTransfer ? 'transfer' : tx.transaction_type,
@@ -693,23 +835,42 @@ export default function ImportPage() {
       return true
     })
 
-    // Filter tegen rijen die AL in de DB staan voor deze gebruiker. De unieke index is
-    // `transactions_import_hash_idx` op (user_id, import_hash, coalesce(bank_seq, ''))
-    // (partieel WHERE import_hash IS NOT NULL). Eén botsing laat anders een hele batch van
-    // 100 falen (ON CONFLICT kan de partiële index niet inferren). Haal de bestaande
+    // Filter tegen rijen die AL in de DB staan op DEZE rekening. De unieke index is
+    // `transactions_import_hash_account_idx` op
+    // (user_id, account_id, import_hash, coalesce(bank_seq, '')) (partieel WHERE
+    // import_hash IS NOT NULL). Eén botsing laat anders een hele batch van 100 falen
+    // (ON CONFLICT kan de partiële index niet inferren). Haal de bestaande
     // (import_hash, bank_seq)-paren op en sla die rijen over — zo loopt geen enkele batch
     // op de unieke index stuk en blijven distinct-rijen (zelfde hash, ander Volgnr) wél door.
+    //
+    // Rekening-gescoped sinds de index dat is: gebruiker-breed filteren sloeg een
+    // échte boeking op rekening B over omdat een identieke boeking op rekening A
+    // al bestond. Datumvenster erbij omdat `import_hash` de datum meeneemt —
+    // rijen buiten het venster van dit bestand kunnen per definitie niet botsen,
+    // en dat begrenst de leesronde bij groeiende historie.
+    //
+    // Op het SERVERPAD slaan we deze leesronde over: de route doet exact dezelfde
+    // controle (zelfde sleutel, zelfde scope, zelfde loader) vlak vóór de insert.
+    // Hem hier herhalen zou een tweede, uit-de-pas-lopende interpretatie van
+    // "wat staat er al" opleveren — precies wat B7 wegneemt.
+    const importDates = toImportDeduped.map((r) => r.date).sort()
     const existingHashSet = new Set<string>()
-    for (let from = 0; ; from += 1000) {
-      const { data: hashPage } = await supabase
-        .from('transactions')
-        .select('import_hash, bank_seq')
-        .eq('user_id', user!.id)
-        .not('import_hash', 'is', null)
-        .range(from, from + 999)
-      const pageRows = (hashPage ?? []) as { import_hash: string; bank_seq: string | null }[]
-      for (const h of pageRows) existingHashSet.add(rowDedupKey(h))
-      if (pageRows.length < 1000) break
+    if (!useServerPath && importDates.length > 0) {
+      for (let from = 0; ; from += 1000) {
+        const { data: hashPage } = await supabase
+          .from('transactions')
+          .select('import_hash, bank_seq')
+          .eq('user_id', user!.id)
+          .eq('account_id', selectedAccountId)
+          .not('import_hash', 'is', null)
+          .gte('date', importDates[0])
+          .lte('date', importDates[importDates.length - 1])
+          .order('id', { ascending: true })
+          .range(from, from + 999)
+        const pageRows = (hashPage ?? []) as { import_hash: string; bank_seq: string | null }[]
+        for (const h of pageRows) existingHashSet.add(rowDedupKey(h))
+        if (pageRows.length < 1000) break
+      }
     }
     const finalRows = toImportDeduped.filter((r) => !existingHashSet.has(rowDedupKey(r)))
     if (finalRows.length < toImportDeduped.length) {
@@ -741,6 +902,10 @@ export default function ImportPage() {
       budget_id: r.budget_id,
       is_income: r.amount > 0,
       category_source: r.isTransfer ? 'transfer' : (r.category_source ?? (r.aiAccepted ? 'ai' : r.budget_id ? 'rule' : 'import')),
+      // Herkomst (B5): bestandsimport. `category_source` beschrijft hóé het budget
+      // bepaald is, `source` wáár de transactie vandaan komt. Bestaande rijen
+      // blijven bewust NULL ("onbekend").
+      source: 'import' as const,
       import_hash: r.import_hash,
       reference: r.reference,
       transaction_type: r.isTransfer ? 'transfer' : r.transaction_type,
@@ -754,7 +919,60 @@ export default function ImportPage() {
       }
     })
 
-    const BATCH_SIZE = 100
+    // Sleutels van de rijen waarvan de gebruiker een cross-bron-treffer bewust
+    // heeft overruled. Bewust NAAST de insert-rijen en niet erin: die rijen gaan
+    // op het clientpad ongewijzigd de database in, en een niet-bestaande kolom
+    // zou daar de hele batch laten sneuvelen.
+    const forcedCrossSourceKeys = new Set(
+      finalRows.filter((r) => r.crossSourceDuplicate).map((r) => rowDedupKey(r)),
+    )
+
+    /**
+     * Schrijft één batch weg via `POST /api/transactions/import` (B7). De route
+     * doet daar laag 1 + laag 2 en zet zelf `user_id`, `account_id`, `source` en
+     * `import_hash` — wat we hier meesturen zijn de geparste rijen, niet de
+     * waarheid over wie ze mag wegschrijven.
+     */
+    async function importBatchViaRoute(batch: typeof insertRows): Promise<{
+      rows: PostImportTx[]
+      skipped: { import_hash: string; bank_seq: string | null }[]
+      failed: number
+      error: string | null
+    }> {
+      const res = await fetch('/api/transactions/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          account_id: selectedAccountId,
+          rows: batch.map((r) => ({
+            ...r,
+            allow_cross_source: forcedCrossSourceKeys.has(rowDedupKey(r)) || undefined,
+          })),
+        }),
+      })
+
+      const data = await res.json().catch(() => ({})) as {
+        error?: string
+        failed?: number
+        rows?: PostImportTx[]
+        skipped?: { import_hash: string; bank_seq: string | null }[]
+      }
+
+      if (!res.ok) {
+        return { rows: [], skipped: [], failed: batch.length, error: data.error || 'Importeren mislukt' }
+      }
+      const failed = data.failed ?? 0
+      return {
+        rows: data.rows ?? [],
+        skipped: data.skipped ?? [],
+        failed,
+        // Een deels gesneuvelde batch telt als mislukt zodat "opnieuw proberen"
+        // 'm oppakt; de route is idempotent, dus een herhaling voegt niets dubbel toe.
+        error: failed > 0 ? `${failed} rijen niet weggeschreven` : null,
+      }
+    }
+
+    const BATCH_SIZE = batchSize
     const batches: typeof insertRows[] = []
     for (let i = 0; i < insertRows.length; i += BATCH_SIZE) {
       batches.push(insertRows.slice(i, i + BATCH_SIZE))
@@ -784,10 +1002,17 @@ export default function ImportPage() {
     // de gegenereerde id's terug via `.select()` zodat de AICategorizeSheet ze per
     // id kan bijwerken.
     const importedUncategorized: PostImportTx[] = []
+    /** Sleutels die de server-route heeft overgeslagen (al aanwezig of cross-bron);
+     *  de UI vinkt die rijen daarop uit — zelfde behandeling als de pre-insert-
+     *  filter van het clientpad. */
+    const serverSkippedKeys = new Set<string>()
 
     for (let batchIdx = startBatch; batchIdx < batches.length; batchIdx++) {
       let batchFailed = false
       let batchError = ""
+      /** Aantal rijen dat écht niet is weggeschreven. Op het clientpad is dat de
+       *  hele batch (alles-of-niets); de server-route rapporteert het exact. */
+      let batchFailedRows = 0
       let insertedRows: {
         id: string
         date: string
@@ -802,46 +1027,67 @@ export default function ImportPage() {
       }[] = []
 
       try {
-        const { data: inserted, error: insertError } = await supabase
-          .from("transactions")
-          .insert(batches[batchIdx])
-          .select('id, date, description, counterparty_name, counterparty_iban, amount, import_hash, budget_id, reference, transaction_type')
-        if (insertError) {
-          batchFailed = true
-          batchError = insertError.message
-        } else if (inserted) {
-          insertedRows = inserted as typeof insertedRows
+        if (useServerPath) {
+          // Gekoppelde rekening: opslaan + dedup gaan server-side (B7), zodat de
+          // bestandsimport en de bank-sync dezelfde regels volgen op dezelfde
+          // rijruimte.
+          const result = await importBatchViaRoute(batches[batchIdx])
+          insertedRows = result.rows as typeof insertedRows
+          for (const s of result.skipped) {
+            serverSkippedKeys.add(rowDedupKey({ import_hash: s.import_hash, bank_seq: s.bank_seq }))
+          }
+          if (result.error) {
+            batchFailed = true
+            batchError = result.error
+            batchFailedRows = result.failed
+          }
+        } else {
+          const { data: inserted, error: insertError } = await supabase
+            .from("transactions")
+            .insert(batches[batchIdx])
+            .select('id, date, description, counterparty_name, counterparty_iban, amount, import_hash, budget_id, reference, transaction_type')
+          if (insertError) {
+            batchFailed = true
+            batchError = insertError.message
+            batchFailedRows = batches[batchIdx].length
+          } else if (inserted) {
+            insertedRows = inserted as typeof insertedRows
+          }
         }
       } catch (err) {
         batchFailed = true
         batchError = err instanceof Error ? err.message : "Onbekende fout"
+        batchFailedRows = batches[batchIdx].length
       }
 
       if (batchFailed) {
-        failedCount += batches[batchIdx].length
+        failedCount += batchFailedRows
         newFailedBatches.push({ batchIdx, error: batchError, retries: 0, rows: batches[batchIdx] })
       } else {
         // Track successfully imported hashes for crash recovery
         for (const row of batches[batchIdx]) {
           importedHashesSoFar.push((row as { import_hash: string }).import_hash)
         }
-        // Verzamel de rijen die nog géén budget hebben (en geen overboeking zijn)
-        // voor het post-import categoriseer-scherm.
-        for (const r of insertedRows) {
-          if (r.budget_id === null && r.transaction_type !== 'transfer') {
-            importedUncategorized.push({
-              id: r.id,
-              date: r.date,
-              description: r.description,
-              counterparty_name: r.counterparty_name,
-              counterparty_iban: r.counterparty_iban,
-              amount: Number(r.amount),
-              import_hash: r.import_hash,
-              budget_id: null,
-              reference: r.reference,
-              account_id: selectedAccountId,
-            })
-          }
+      }
+
+      // Verzamel de rijen die nog géén budget hebben (en geen overboeking zijn)
+      // voor het post-import categoriseer-scherm. Bewust búiten de if/else: een
+      // batch die deels sneuvelde heeft wél rijen weggeschreven, en die horen
+      // niet stil uit het categoriseerscherm te verdwijnen.
+      for (const r of insertedRows) {
+        if (r.budget_id === null && r.transaction_type !== 'transfer') {
+          importedUncategorized.push({
+            id: r.id,
+            date: r.date,
+            description: r.description,
+            counterparty_name: r.counterparty_name,
+            counterparty_iban: r.counterparty_iban,
+            amount: Number(r.amount),
+            import_hash: r.import_hash,
+            budget_id: null,
+            reference: r.reference,
+            account_id: selectedAccountId,
+          })
         }
       }
 
@@ -859,6 +1105,15 @@ export default function ImportPage() {
         importedHashes: importedHashesSoFar,
         startedAt: Date.now(),
       })
+    }
+
+    // Wat de server-route heeft overgeslagen (al aanwezig of cross-bron) als
+    // "overgeslagen" tonen in plaats van als "mislukt" — spiegelt exact wat het
+    // clientpad met zijn eigen pre-insert-filter doet.
+    if (serverSkippedKeys.size > 0) {
+      setRows((prev) => prev.map((row) => (
+        serverSkippedKeys.has(rowDedupKey(row)) ? { ...row, skipImport: true } : row
+      )))
     }
 
     // Import complete — clear session from localStorage
@@ -896,24 +1151,43 @@ export default function ImportPage() {
       let ok = true
       let errMsg = ""
       try {
-        // Sla rijen over die al bestaan (dé reden dat de batch faalde) en importeer alleen
-        // de resterende — anders faalt de retry identiek (plain insert van dezelfde batch
-        // loopt opnieuw op de unieke index stuk). Match op (import_hash, bank_seq) zodat
-        // distinct-rijen (zelfde hash, ander Volgnr) niet onterecht worden overgeslagen.
-        const batchHashes = fb.rows.map((row) => (row as { import_hash: string }).import_hash)
-        const existing = new Set<string>()
-        if (retryUser) {
-          const { data: ex } = await supabase
-            .from("transactions")
-            .select("import_hash, bank_seq")
-            .eq("user_id", retryUser.id)
-            .in("import_hash", batchHashes)
-          for (const e of (ex ?? []) as { import_hash: string; bank_seq: string | null }[]) existing.add(rowDedupKey(e))
-        }
-        const survivors = fb.rows.filter((row) => !existing.has(rowDedupKey(row as { import_hash: string; bank_seq: string | null })))
-        if (survivors.length > 0) {
-          const { error: insertError } = await supabase.from("transactions").insert(survivors)
-          if (insertError) { ok = false; errMsg = insertError.message }
+        // Serverpad: gewoon opnieuw aanbieden. De route draait haar eigen
+        // dedup-lagen vlak vóór de insert en is daarmee idempotent — de rijen die
+        // de eerste poging wél haalde komen als duplicaat terug in plaats van
+        // dubbel in de database.
+        if (useServerPath) {
+          const res = await fetch('/api/transactions/import', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ account_id: selectedAccountId, rows: fb.rows }),
+          })
+          const data = await res.json().catch(() => ({})) as { error?: string; failed?: number }
+          if (!res.ok) { ok = false; errMsg = data.error || 'Importeren mislukt' }
+          else if ((data.failed ?? 0) > 0) { ok = false; errMsg = `${data.failed} rijen niet weggeschreven` }
+        } else {
+          // Sla rijen over die al bestaan (dé reden dat de batch faalde) en importeer alleen
+          // de resterende — anders faalt de retry identiek (plain insert van dezelfde batch
+          // loopt opnieuw op de unieke index stuk). Match op (import_hash, bank_seq) zodat
+          // distinct-rijen (zelfde hash, ander Volgnr) niet onterecht worden overgeslagen.
+          // Rekening-gescoped, net als de unieke index: de account_id komt uit de
+          // batchrijen zelf (alle rijen van één import dragen dezelfde rekening).
+          const batchHashes = fb.rows.map((row) => (row as { import_hash: string }).import_hash)
+          const batchAccountId = (fb.rows[0] as { account_id?: string } | undefined)?.account_id
+          const existing = new Set<string>()
+          if (retryUser && batchAccountId) {
+            const { data: ex } = await supabase
+              .from("transactions")
+              .select("import_hash, bank_seq")
+              .eq("user_id", retryUser.id)
+              .eq("account_id", batchAccountId)
+              .in("import_hash", batchHashes)
+            for (const e of (ex ?? []) as { import_hash: string; bank_seq: string | null }[]) existing.add(rowDedupKey(e))
+          }
+          const survivors = fb.rows.filter((row) => !existing.has(rowDedupKey(row as { import_hash: string; bank_seq: string | null })))
+          if (survivors.length > 0) {
+            const { error: insertError } = await supabase.from("transactions").insert(survivors)
+            if (insertError) { ok = false; errMsg = insertError.message }
+          }
         }
       } catch (err) {
         ok = false
@@ -937,7 +1211,8 @@ export default function ImportPage() {
     setRetrying(false)
   }
 
-  const newCount = rows.filter((r) => !r.isDuplicate).length
+  const crossSourceCount = rows.filter((r) => r.crossSourceDuplicate).length
+  const newCount = rows.filter((r) => !r.isDuplicate && !r.crossSourceDuplicate).length
   const dupCount = rows.filter((r) => r.isDuplicate).length
   const toImportCount = rows.filter((r) => !r.skipImport).length
   const totalBij = rows.filter((r) => !r.skipImport && r.amount > 0).reduce((s, r) => s + r.amount, 0)
@@ -1539,6 +1814,9 @@ export default function ImportPage() {
                   {dupCount > 0 && (
                     <span className="text-orange-600"><strong>{dupCount}</strong> {dupCount === 1 ? 'duplicaat' : 'duplicaten'}</span>
                   )}
+                  {crossSourceCount > 0 && (
+                    <span className="text-warning"><strong>{crossSourceCount}</strong> al via bank</span>
+                  )}
                 </div>
                 <button
                   onClick={() => handleImport()}
@@ -1562,6 +1840,19 @@ export default function ImportPage() {
               {dupCount > 0 && (
                 <div className="border border-orange-200 bg-orange-50 p-4 text-sm text-orange-700">
                   <strong>{dupCount}</strong> transactie(s) bestaan al in de database en worden overgeslagen. Je kunt ze hieronder aan- of uitvinken.
+                </div>
+              )}
+
+              {/* Dedup-laag 2: dezelfde boeking kwam eerder al via de bankkoppeling
+                  binnen, maar met een andere omschrijvingstekst — dus met een andere
+                  hash. Bewust zichtbaar en overrulebaar: bij een import is de
+                  gebruiker erbij, en hij kent zijn eigen boekingen beter dan wij. */}
+              {crossSourceCount > 0 && (
+                <div className="border border-warning/30 bg-warning-bg p-4 text-sm text-warning">
+                  <strong>{crossSourceCount}</strong> transactie(s) lijken al via je bankkoppeling
+                  binnengekomen — zelfde datum, bedrag en tegenpartij, andere omschrijving.
+                  Ze staan hieronder uitgevinkt. Vink je er toch één aan, dan importeren we hem
+                  opnieuw — controleer daarna of hij niet dubbel in je overzicht staat.
                 </div>
               )}
 
@@ -1641,6 +1932,24 @@ export default function ImportPage() {
                                 {row.isDuplicate ? (
                                   <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700">
                                     Duplicaat
+                                  </span>
+                                ) : row.crossSourceDuplicate ? (
+                                  // Dedup-laag 2: dezelfde boeking kwam al via de bank
+                                  // binnen. De reden (tegenrekening vs. naam) is
+                                  // vakjargon en staat daarom in de tooltip, niet op de
+                                  // badge — en via InfoTooltip i.p.v. een `title`, want
+                                  // dat laatste is voor toetsenbord en schermlezer
+                                  // onbereikbaar terwijl dít juist de uitleg is die de
+                                  // gebruiker nodig heeft om ons te overrulen.
+                                  <span className="inline-flex items-center gap-1">
+                                    <span className="rounded-full bg-warning-bg px-2 py-0.5 text-xs font-medium text-warning">
+                                      Al via bank
+                                    </span>
+                                    <InfoTooltip
+                                      text={row.crossSourceDuplicate.reason === 'iban'
+                                        ? 'Zelfde datum, bedrag en tegenrekening als een transactie die al via je bankkoppeling binnenkwam.'
+                                        : 'Zelfde datum, bedrag en naam van de tegenpartij als een transactie die al via je bankkoppeling binnenkwam.'}
+                                    />
                                   </span>
                                 ) : (
                                   <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">

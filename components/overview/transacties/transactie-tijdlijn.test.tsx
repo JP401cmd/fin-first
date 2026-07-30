@@ -1,6 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, it, expect } from 'vitest'
-import { TransactieTijdlijn } from './transactie-tijdlijn'
+import { TransactieTijdlijn, type AccountOption } from './transactie-tijdlijn'
+import { accountSourceSuffix } from '@/components/core/account-source-icon'
 import type { AnalysisTransaction } from '@/lib/transaction-insights'
 
 const base: AnalysisTransaction = {
@@ -51,5 +52,72 @@ describe('TransactieTijdlijn', () => {
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'albert' } })
     expect(screen.getByText('Albert Heijn')).toBeInTheDocument()
     expect(screen.queryByText('Hornbach')).not.toBeInTheDocument()
+  })
+})
+
+/**
+ * De rekening-filterpills dragen sinds fase 7 een herkomst-symbool dat óók status
+ * is (`linked-broken` vraagt om een handeling). Het symbool is `aria-hidden` — het
+ * zou als geneste naam nooit voorgelezen worden — dus die betekenis MOET in de
+ * accessible name van de pill staan. Zonder deze twee asserties viel dat verlies
+ * stil terug: de pill heette alleen `{label}`.
+ */
+describe('TransactieTijdlijn — rekening-filterpills', () => {
+  function account(overrides: Partial<AccountOption> = {}): AccountOption {
+    return { id: 'acc1', name: 'Betaal', bankName: 'ING', ibanTail: '4321', connected: true, ...overrides }
+  }
+
+  function renderPills(accounts: AccountOption[]) {
+    return render(
+      <TransactieTijdlijn
+        transactions={[base]}
+        windowDays={30}
+        accounts={accounts}
+        selectedAccountId={null}
+        onSelectAccount={() => {}}
+      />,
+    )
+  }
+
+  it('noemt de herkomst in de accessible name, met het zichtbare label vóóraan', () => {
+    renderPills([account()])
+    // Zichtbare tekst blijft in de naam (WCAG 2.5.3 label-in-name).
+    expect(
+      screen.getByRole('button', { name: `Betaal — ${accountSourceSuffix('linked')}` }),
+    ).toBeInTheDocument()
+  })
+
+  it('onderscheidt handmatig van gekoppeld in die naam', () => {
+    renderPills([account({ id: 'acc2', name: 'Handmatig', connected: false })])
+    expect(
+      screen.getByRole('button', { name: `Handmatig — ${accountSourceSuffix('manual')}` }),
+    ).toBeInTheDocument()
+  })
+
+  it('laat "Alle rekeningen" zonder suffix — die pill draagt geen herkomst', () => {
+    renderPills([account()])
+    expect(screen.getByRole('button', { name: 'Alle rekeningen' })).toBeInTheDocument()
+  })
+
+  it('erft de tekstkleur alleen op de ACTIEVE pill', () => {
+    // `inheritColor` op een inactieve pill gooit de tint weg die de toestand
+    // draagt; dan moet een 12px Unlink het alleen van een 12px Link2 winnen.
+    const { container, unmount } = renderPills([account()])
+    const inactive = container.querySelector('[aria-label="Kies rekening"] [title]')
+    expect(inactive?.className).toContain('--ink-')
+    unmount()
+
+    const actief = render(
+      <TransactieTijdlijn
+        transactions={[base]}
+        windowDays={30}
+        accounts={[account()]}
+        selectedAccountId="acc1"
+        onSelectAccount={() => {}}
+      />,
+    )
+    expect(
+      actief.container.querySelector('[aria-label="Kies rekening"] [title]')?.className,
+    ).not.toContain('--ink-')
   })
 })

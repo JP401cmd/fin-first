@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { mapTransaction } from './mapper'
+import { mapAccountType, mapTransaction } from './mapper'
 import type { TLTransaction } from './types'
 
 // Vastgepind gedrag: transaction_type blijft altijd null (die kolom heeft een
@@ -67,11 +67,10 @@ describe('mapTransaction', () => {
     expect(result.import_hash.length).toBeGreaterThan(0)
   })
 
-  // Bug: Rabobank (provider xs2a-rabobank, live) vult merchant_name NIET (0/354
+  // Rabobank (provider xs2a-rabobank, live) vult merchant_name NIET (0/354
   // transacties in de echte sync); naam + IBAN zitten in `meta.counter_party_*`.
-  // TLTransaction kent `meta` nog niet -> cast via unknown, zie types.ts (fix in
-  // een latere stap). Dit legt vast dat mapTransaction daar (nog) niet naar kijkt.
-  it('BUG: leest counterparty uit meta.counter_party_* als merchant_name ontbreekt (Rabobank)', async () => {
+  // mapTransaction valt daarop terug zodat de tegenpartij niet leeg blijft.
+  it('leest counterparty uit meta.counter_party_* wanneer merchant_name ontbreekt (Rabobank xs2a)', async () => {
     const tl = {
       transaction_id: '7ab7dea768d6bb7389ec2e97086a8e36',
       timestamp: '2026-07-29T06:05:01.241Z',
@@ -93,7 +92,46 @@ describe('mapTransaction', () => {
     expect(result.counterparty_iban).toBe('NL16DEUT0265237289')
   })
 
-  it('BUG: een gevulde merchant_name houdt voorrang boven meta.counter_party_preferred_name', async () => {
+  it('leest counterparty uit meta.counter_party_* wanneer merchant_name alleen whitespace bevat', async () => {
+    const tl = {
+      transaction_id: 'tl-5',
+      timestamp: '2026-07-29T06:05:01.241Z',
+      amount: -11.99,
+      currency: 'EUR',
+      description: 'Videoland abonnement',
+      transaction_type: 'DEBIT',
+      transaction_category: 'DEBIT',
+      merchant_name: '   ',
+      meta: {
+        transaction_type: 'Debit',
+        counter_party_preferred_name: 'VIDEOLAND DOOR BUCKAROO',
+        counter_party_iban: 'NL16DEUT0265237289',
+      },
+    } as unknown as TLTransaction
+
+    const result = await mapTransaction(tl)
+
+    expect(result.counterparty_name).toBe('VIDEOLAND DOOR BUCKAROO')
+  })
+
+  it('zonder merchant_name én zonder meta geeft counterparty_name/iban null (geen lege string)', async () => {
+    const tl: TLTransaction = {
+      transaction_id: 'tl-6',
+      timestamp: '2026-07-29T06:05:01.241Z',
+      amount: -5,
+      currency: 'EUR',
+      description: 'Onbekende afschrijving',
+      transaction_type: 'DEBIT',
+      transaction_category: 'DEBIT',
+    }
+
+    const result = await mapTransaction(tl)
+
+    expect(result.counterparty_name).toBeNull()
+    expect(result.counterparty_iban).toBeNull()
+  })
+
+  it('een gevulde merchant_name houdt voorrang boven meta.counter_party_preferred_name', async () => {
     const tl = {
       transaction_id: 'tl-4',
       timestamp: '2026-07-29T06:05:01.241Z',
@@ -113,5 +151,84 @@ describe('mapTransaction', () => {
     const result = await mapTransaction(tl)
 
     expect(result.counterparty_name).toBe('Videoland B.V.')
+  })
+})
+
+/**
+ * Besluit B3 (fase 5): het rekeningtype komt van de bank, niet uit een aanname.
+ *
+ * Waarom dit een aparte, expliciete suite verdient: `is_liquid` bepaalt het
+ * liquide vermogen, en dat voedt noodfonds, spaarquote én de FIRE-motor. Een
+ * spaarrekening of creditcard die als betaalrekening wordt gestempeld is dus een
+ * grondslagfout die downstream niet meer te repareren is.
+ */
+describe('mapAccountType (B3 — rekeningtype van de bank)', () => {
+  it('TRANSACTION → betaalrekening, liquide (het gedrag van vóór B3, nu expliciet)', () => {
+    expect(mapAccountType('TRANSACTION')).toEqual({
+      account_type: 'checking',
+      subtype: 'checking',
+      is_liquid: true,
+    })
+  })
+
+  it('SAVINGS → spaarrekening, en dus NIET checking', () => {
+    const mapped = mapAccountType('SAVINGS')
+
+    expect(mapped.account_type).toBe('savings')
+    expect(mapped.subtype).toBe('savings_account')
+    expect(mapped.is_liquid).toBe(true)
+    // De kern van de bug die B3 repareert:
+    expect(mapped.account_type).not.toBe('checking')
+    expect(mapped.subtype).not.toBe('checking')
+  })
+
+  it('BUSINESS_TRANSACTION en BUSINESS_SAVINGS → zakelijk (één slot in de woordenlijst)', () => {
+    expect(mapAccountType('BUSINESS_TRANSACTION').account_type).toBe('business')
+    expect(mapAccountType('BUSINESS_SAVINGS').account_type).toBe('business')
+    expect(mapAccountType('BUSINESS_SAVINGS').subtype).toBe('business')
+  })
+
+  it('CREDIT_CARD → niet-liquide: een kredietrekening mag het liquide vermogen niet opblazen', () => {
+    const mapped = mapAccountType('CREDIT_CARD')
+
+    expect(mapped.is_liquid).toBe(false)
+    expect(mapped.account_type).toBe('other')
+    expect(mapped.subtype).toBe('other_cash')
+  })
+
+  it('onbekend, leeg en ontbrekend type → val-terug op betaalrekening, zonder te gooien', () => {
+    for (const input of ['SOMETHING_NEW', '', '   ', null, undefined]) {
+      expect(mapAccountType(input)).toEqual({
+        account_type: 'checking',
+        subtype: 'checking',
+        is_liquid: true,
+      })
+    }
+  })
+
+  it('is niet gevoelig voor casing of omringende spaties uit de providerrespons', () => {
+    expect(mapAccountType(' savings ')).toEqual(mapAccountType('SAVINGS'))
+    expect(mapAccountType('Transaction')).toEqual(mapAccountType('TRANSACTION'))
+  })
+
+  it('levert altijd een account_type dat de CHECK-constraint op bank_accounts toestaat', () => {
+    // Spiegelt bank_accounts_account_type_check
+    // (20260616000000_widen_bank_accounts_account_type_check.sql). Een mapping die
+    // hierbuiten valt laat de insert in de callback stuklopen — midden in een
+    // OAuth-callback, dus zonder bruikbare foutmelding voor de gebruiker.
+    const allowed = new Set(['checking', 'savings', 'joint', 'business', 'contant_geld', 'other'])
+    const providerTypes = [
+      'TRANSACTION',
+      'SAVINGS',
+      'BUSINESS_TRANSACTION',
+      'BUSINESS_SAVINGS',
+      'CREDIT_CARD',
+      'CARD',
+      'ONBEKEND',
+    ]
+
+    for (const type of providerTypes) {
+      expect(allowed.has(mapAccountType(type).account_type)).toBe(true)
+    }
   })
 })

@@ -1,10 +1,18 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
-import { unauthorized, serverError } from '@/lib/api/respond'
+import { notFound, unauthorized, serverError } from '@/lib/api/respond'
+import { parseBody } from '@/lib/api/parse-body'
 import { isTrueLayerEnabled } from '@/lib/truelayer/feature-flag'
 import { getBaseUrls, refreshAccessToken } from '@/lib/truelayer/client'
 import { syncAccountBalance } from '@/lib/truelayer/balance-sync'
+import { RELINK_REQUIRED_MESSAGE } from '@/lib/truelayer/errors'
 import { decryptField, encryptField } from '@/lib/crypto/field-encryption'
+
+const BalancesSchema = z.object({
+  /** De gekoppelde bankrekening waarvan het saldo ververst moet worden. */
+  connection_account_id: z.string().uuid('ongeldige koppeling'),
+})
 
 export async function POST(req: Request) {
   const supabase = await createClient()
@@ -18,13 +26,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Bank Connect is niet ingeschakeld' }, { status: 503 })
   }
 
+  // Zod op de body: deze handler kwam er in fase 8 toch al langs, en dat is
+  // precies het moment waarop de mutatieroute-conventie (ADR 0044) om validatie
+  // vraagt. Buiten de try, want `parseBody` levert zelf al een client-veilige 400.
+  const parsed = await parseBody(BalancesSchema, req)
+  if (!parsed.ok) return parsed.response
+  const { connection_account_id } = parsed.data
+
   try {
-    const { connection_account_id } = await req.json()
-
-    if (!connection_account_id) {
-      return NextResponse.json({ error: 'connection_account_id is vereist' }, { status: 400 })
-    }
-
     const { data: connAccount } = await supabase
       .from('bank_connection_accounts')
       .select('*, bank_connections(*)')
@@ -34,7 +43,7 @@ export async function POST(req: Request) {
       .single()
 
     if (!connAccount) {
-      return NextResponse.json({ error: 'Account niet gevonden' }, { status: 404 })
+      return notFound('Account niet gevonden')
     }
 
     const connection = connAccount.bank_connections
@@ -47,7 +56,7 @@ export async function POST(req: Request) {
 
     if (tokenExpiresAt && tokenExpiresAt.getTime() < Date.now() + 5 * 60 * 1000) {
       if (!refreshToken) {
-        return NextResponse.json({ error: 'Token verlopen, verbind opnieuw' }, { status: 401 })
+        return NextResponse.json({ error: RELINK_REQUIRED_MESSAGE }, { status: 401 })
       }
 
       const newTokens = await refreshAccessToken(supabase, refreshToken)
@@ -68,7 +77,7 @@ export async function POST(req: Request) {
 
     if (!accessToken) {
       // Encrypted token missing/undecryptable and not refreshable — force reconnect.
-      return NextResponse.json({ error: 'Token verlopen, verbind opnieuw' }, { status: 401 })
+      return NextResponse.json({ error: RELINK_REQUIRED_MESSAGE }, { status: 401 })
     }
 
     const { dataUrl } = await getBaseUrls(supabase)
@@ -80,10 +89,19 @@ export async function POST(req: Request) {
       dataUrl,
       externalAccountId: connAccount.external_account_id,
       bankAccountId: connAccount.bank_account_id,
+      userId: user.id,
     })
 
     if (synced) {
-      return NextResponse.json({ balance: synced.balance, currency: synced.currency })
+      return NextResponse.json({
+        balance: synced.balance,
+        currency: synced.currency,
+        // Fase 8, additief: de waarde die het cash-bezit vóór deze verversing
+        // droeg en of er een herwaardering is weggeschreven. Bestaande lezers
+        // van `balance`/`currency` blijven werken.
+        balance_previous: synced.previous,
+        balance_revalued: synced.revalued,
+      })
     }
 
     return NextResponse.json({ balance: null, balances })

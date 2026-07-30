@@ -1,0 +1,12 @@
+-- Afronding van de revoke uit 20260729222134.
+--
+-- Daar stond `revoke all ... from anon, authenticated`, maar functies krijgen bij
+-- creatie standaard EXECUTE aan PUBLIC — anon/authenticated erfden het recht dus
+-- alsnog via PUBLIC (`=X/postgres` in de ACL). Rolspecifiek revoken is tegen een
+-- PUBLIC-grant hetzelfde soort no-op als een kolom-REVOKE tegen een tabel-grant
+-- (zelfde les als 20260717132003).
+--
+-- Nul functioneel effect op de trigger: EXECUTE wordt bij CREATE TRIGGER gecheckt,
+-- niet bij elke rij. Puur hygiëne, in de lijn van
+-- 20260717132632_security_hygiene_revoke_unused_secdef_rpcs.
+revoke all on function public.guard_bank_connection_target_account() from public;

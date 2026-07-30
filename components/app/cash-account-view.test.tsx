@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, screen, fireEvent, cleanup } from '@testing-library/react'
+import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
 
 // ── Fixtures (hoisted zodat de vi.mock-factories eronder ze mogen gebruiken) ──
 const fixtures = vi.hoisted(() => {
@@ -13,6 +13,19 @@ const fixtures = vi.hoisted(() => {
     is_active: true,
     sort_order: 0,
     ownership: 'personal',
+    // Vereist voor de "Budgetteren uitschakelen"-flow (loadLinkedAsset draait
+    // alleen wanneer een companion-rij een linked_asset_id draagt).
+    linked_asset_id: 'asset-1',
+  }
+  const linkedAsset = {
+    id: 'asset-1',
+    name: 'Betaalrekening',
+    current_value: 1000,
+    institution: 'Testbank',
+    account_number: 'NL01BANK0123456789',
+    subtype: 'checking',
+    net_worth_inclusion_pct: 100,
+    expected_return: 0,
   }
   const budget = {
     id: 'b1',
@@ -39,8 +52,15 @@ const fixtures = vi.hoisted(() => {
     user_id: 'u1',
     notes: null,
   }
-  return { account, budget, tx }
+  return { account, linkedAsset, budget, tx }
 })
+
+// ── Mutatie-log: registreert elke .update()/.delete() die de component via de
+//    supabase-client-mock uitvoert, zodat tests kunnen bewijzen dat een flow
+//    GEEN client-directe bank_accounts-mutatie meer doet (ADR 0058: muteren
+//    via een API-route). Wordt per test gereset. ──
+type Mutation = { table: string; op: 'update' | 'delete'; payload?: Record<string, unknown> }
+let mutationLog: Mutation[] = []
 
 // ── Supabase-client-mock: een chainbare, thenable query-builder die per
 //    tabel de juiste rijen teruggeeft. Genoeg om de mount-loaders te voeden. ──
@@ -55,6 +75,10 @@ function makeSupabase() {
         return [fixtures.budget]
       case 'profiles':
         return { budgeting_active: true }
+      // .maybeSingle() (loadLinkedAsset) — geen array-wrap nodig, zie de
+      // then()-narrowing hieronder die alleen bij isSingle van .single() slaat.
+      case 'assets':
+        return fixtures.linkedAsset
       default:
         return []
     }
@@ -62,6 +86,14 @@ function makeSupabase() {
   function builder(table: string, isSingle = false): Record<string, unknown> {
     const target: Record<string, unknown> = {
       single: () => builder(table, true),
+      update: (payload: Record<string, unknown>) => {
+        mutationLog.push({ table, op: 'update', payload })
+        return builder(table, isSingle)
+      },
+      delete: () => {
+        mutationLog.push({ table, op: 'delete' })
+        return builder(table, isSingle)
+      },
       then: (resolve: (v: { data: unknown; error: null }) => unknown) => {
         let data = dataFor(table)
         if (isSingle && Array.isArray(data)) data = data[0] ?? null
@@ -84,7 +116,6 @@ function makeSupabase() {
 }
 
 vi.mock('@/lib/supabase/client', () => ({ createClient: () => makeSupabase() }))
-vi.mock('@/lib/budgeting-active', () => ({ syncBudgetingActive: async () => true }))
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -132,6 +163,7 @@ import { CashAccountView } from './cash-account-view'
 // cashflow-forecast, household) mogen no-op teruggeven. Plus een ResizeObserver-
 // stub die jsdom mist (de Sankey-geldstroom gebruikt 'm in een effect).
 function setupEnv() {
+  mutationLog = []
   vi.stubGlobal(
     'fetch',
     vi.fn(async () => ({ ok: false, status: 404, json: async () => ({}) })) as unknown as typeof fetch,
@@ -183,5 +215,73 @@ describe('CashAccountView — transactierij toegankelijkheid (B-01)', () => {
     fireEvent.keyDown(row, { key: ' ' })
 
     expect(await screen.findByTestId('transaction-form-stub')).toBeInTheDocument()
+  })
+})
+
+/**
+ * Regressie: `handleDisconnectTracking` muteerde ooit client-direct
+ * (`bank_accounts.delete()` — botste op de FK van `bank_connection_accounts`
+ * — en/of een nulling van `linked_asset_id` die bij herkoppelen een tweede
+ * cash-asset opleverde). De canonieke schrijver is nu `/api/assets/
+ * toggle-budget` (ADR 0058: muteren via een API-route, niet client-direct);
+ * het component doet alleen nog een `fetch('/api/assets/toggle-budget', ...)`.
+ */
+describe('CashAccountView — "Budgetteren uitschakelen" gaat via de API-route, niet client-direct', () => {
+  it('bevestigen roept fetch("/api/assets/toggle-budget") aan met { id, enabled: false } en muteert bank_accounts niet client-direct', async () => {
+    setupEnv()
+    const toggleBudgetCalls: Array<{ id: unknown; enabled: unknown }> = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (input === '/api/assets/toggle-budget' && init?.method === 'POST') {
+          toggleBudgetCalls.push(JSON.parse(init.body as string))
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              ok: true,
+              asset: { id: 'asset-1', has_budget_tracking: false, name: 'Betaalrekening' },
+              budgeting_active: true,
+            }),
+          } as unknown as Response
+        }
+        return { ok: false, status: 404, json: async () => ({}) } as unknown as Response
+      }) as unknown as typeof fetch,
+    )
+
+    render(<CashAccountView accountId="acc-1" />)
+
+    // Instellingen → "Rekening bewerken" opent het bewerkscherm (BottomSheet
+    // met AssetEditForm) — dat vereist dat loadLinkedAsset al is doorgelopen.
+    fireEvent.click(await screen.findByTitle('Instellingen'))
+    fireEvent.click(await screen.findByText('Rekening bewerken'))
+
+    // In het bewerkscherm: "Budgetteren uitschakelen" → inline bevestigen.
+    // Beide bevestigingsstappen voeren bewust dezelfde actie-taal
+    // ("Uitschakelen") i.p.v. een generiek "Bevestigen"; we pakken daarom per
+    // stap de laatst gerenderde knop — tijdens de overgang kan het
+    // bewerkscherm nog kort naast de overlay in de DOM staan.
+    fireEvent.click(await screen.findByText('Budgetteren uitschakelen'))
+    const inlineButtons = await screen.findAllByRole('button', { name: 'Uitschakelen' })
+    fireEvent.click(inlineButtons[inlineButtons.length - 1])
+
+    // Dat opent de ShellOverlay-confirm ("Budgetteren uitschakelen?") met de
+    // actie-knop "Uitschakelen".
+    await screen.findByText('Budgetteren uitschakelen?')
+    const confirmButtons = await screen.findAllByRole('button', { name: 'Uitschakelen' })
+    fireEvent.click(confirmButtons[confirmButtons.length - 1])
+
+    await waitFor(() => expect(toggleBudgetCalls).toHaveLength(1))
+    expect(toggleBudgetCalls[0]).toEqual({ id: 'asset-1', enabled: false })
+
+    // De kern van de regressie: geen enkele client-directe bank_accounts-
+    // mutatie (delete of een linked_asset_id: null-update) tijdens deze flow.
+    const bankAccountMutations = mutationLog.filter((m) => m.table === 'bank_accounts')
+    expect(bankAccountMutations.some((m) => m.op === 'delete')).toBe(false)
+    expect(
+      bankAccountMutations.some(
+        (m) => m.op === 'update' && m.payload && 'linked_asset_id' in m.payload && m.payload.linked_asset_id === null,
+      ),
+    ).toBe(false)
   })
 })

@@ -8,6 +8,7 @@ vi.mock('@/lib/supabase/service', () => ({
 
 import { getServiceClient } from '@/lib/supabase/service'
 import { getProviders, buildAuthLink, getAccountTransactions } from './client'
+import { TrueLayerRequestError, isProviderLimitError } from './errors'
 
 /**
  * Bouwt een supabase-achtige stub waarvan `.from('app_settings').select('value')
@@ -72,11 +73,10 @@ describe('getProviders', () => {
 })
 
 describe('getAccountTransactions', () => {
-  // Bug: TLTransactionSchema (zod) kent `meta` nog niet. safeParse() strip
-  // onbekende velden bij een succesvolle parse, dus de Rabobank-tegenpartij
-  // (naam+IBAN in meta.counter_party_*) gaat hier al verloren, vóórdat
-  // mapTransaction() er ooit naar kan kijken. Fix volgt in stap 5 (types.ts +
-  // client.ts schema); dit legt alleen het huidige (foute) gedrag vast.
+  // TLTransactionSchema (zod) draagt `meta` als looseObject: een geslaagde parse
+  // strip onbekende sleutels NIET weg, dus de Rabobank-tegenpartij (naam+IBAN in
+  // meta.counter_party_*) overleeft de schema-parse en blijft beschikbaar voor
+  // mapTransaction() om te lezen.
   let fetchMock: ReturnType<typeof vi.fn>
 
   beforeEach(() => {
@@ -89,7 +89,7 @@ describe('getAccountTransactions', () => {
     vi.unstubAllGlobals()
   })
 
-  it('BUG: meta overleeft de schema-parse NIET (wordt weggestript)', async () => {
+  it('meta overleeft de schema-parse (TLTransactionMetaSchema behoudt de tegenpartij-velden)', async () => {
     const rawTransaction = {
       timestamp: '2026-07-29T06:05:01.241Z',
       description: 'BRN?00000679,3: S-7760892, 2026-07-25 - 2026-08-24',
@@ -115,9 +115,62 @@ describe('getAccountTransactions', () => {
     const result = await getAccountTransactions('token', 'https://api.truelayer.com', 'acc-1')
 
     expect(result).toHaveLength(1)
-    // Dit is de vastgelegde bug: meta zou hier aanwezig moeten blijven zodat
-    // mapTransaction() de tegenpartij kan lezen, maar zod strip het weg.
+    // meta blijft aanwezig na de schema-parse, zodat mapTransaction() de
+    // tegenpartij (naam + IBAN) kan lezen.
     expect((result[0] as unknown as { meta?: unknown }).meta).toEqual(rawTransaction.meta)
+  })
+
+  // ── Providerfoutcodes ────────────────────────────────────────────────────
+  // De oude vorm gooide alleen `res.status` in een tekst. Daardoor was een 429
+  // van de bánk niet te onderscheiden van elke andere 429 — en juist dat
+  // onderscheid bepaalt of de blok-lus mag doorgaan of moet bewaren wat ze heeft.
+
+  it('gooit een herkenbaar provider-limiet-fouttype bij 429 + provider_request_limit_exceeded', async () => {
+    fetchMock = vi.fn(async () => ({
+      ok: false,
+      status: 429,
+      clone: () => ({ json: async () => ({ error: 'provider_request_limit_exceeded' }) }),
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const err = await getAccountTransactions('token', 'https://api.truelayer.com', 'acc-1').catch((e) => e)
+
+    expect(isProviderLimitError(err)).toBe(true)
+    expect(err.status).toBe(429)
+    expect(err.providerErrorCode).toBe('provider_request_limit_exceeded')
+    // De code staat óók in de melding: die belandt in bank_sync_log.
+    expect(err.message).toContain('provider_request_limit_exceeded')
+  })
+
+  it('behandelt een 429 zónder die providercode NIET als provider-limiet', async () => {
+    fetchMock = vi.fn(async () => ({
+      ok: false,
+      status: 429,
+      clone: () => ({ json: async () => ({ error: 'rate_limit_exceeded' }) }),
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const err = await getAccountTransactions('token', 'https://api.truelayer.com', 'acc-1').catch((e) => e)
+
+    expect(err).toBeInstanceOf(TrueLayerRequestError)
+    expect(isProviderLimitError(err)).toBe(false)
+    expect(err.providerErrorCode).toBe('rate_limit_exceeded')
+  })
+
+  it('valt terug op de status als de body geen geldige JSON is', async () => {
+    fetchMock = vi.fn(async () => ({
+      ok: false,
+      status: 502,
+      clone: () => ({ json: async () => { throw new Error('unexpected token <') } }),
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const err = await getAccountTransactions('token', 'https://api.truelayer.com', 'acc-1').catch((e) => e)
+
+    expect(err).toBeInstanceOf(TrueLayerRequestError)
+    expect(err.status).toBe(502)
+    expect(err.providerErrorCode).toBeNull()
+    expect(err.message).toBe('TrueLayer transacties ophalen mislukt: 502')
   })
 })
 

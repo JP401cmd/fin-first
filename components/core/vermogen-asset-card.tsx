@@ -26,6 +26,8 @@ import {
   Briefcase,
   RefreshCw,
   Pencil,
+  Unlink,
+  Link2,
   type LucideIcon,
 } from 'lucide-react'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
@@ -39,10 +41,12 @@ import { findDeepenings } from './category-deepening-registry'
 import { AssetAppChip } from './asset-app-chip'
 import { CardKpiStrip } from './card-kpi-strip'
 import { ConnectionIndicator } from './connection-indicator'
+import { AccountSourceIcon, accountSourceSuffix } from './account-source-icon'
 import { CardTintOverlay } from './card-tint-overlay'
 import { VermogenCardActionButton } from './vermogen-card-action-button'
 import type { KpiPair } from '@/lib/asset-kpi'
 import type { AssetConnectionSummary } from '@/lib/connections-data'
+import type { BankLinkState } from '@/lib/bank-connection-status'
 
 // ── Icon mapping ────────────────────────────────────────────
 
@@ -87,6 +91,32 @@ interface VermogenAssetCardProps {
    */
   connection?: AssetConnectionSummary
   /**
+   * Koppeltoestand van een BANKREKENING, uit `deriveBankLinkState`
+   * (`lib/bank-connection-status.ts`) via de server-loader — deze kaart leidt
+   * niets zelf af.
+   *
+   * Laat `undefined` (default) wanneer herkomst niet van toepassing is: dan
+   * rendert er niets en blijft de kaart exact zoals voorheen. Dat geldt voor de
+   * bezittingen-pagina, voor aggregaatrijen (partner-totaal, geen echte
+   * rekening) én — besluit B4 — voor een puur handmatige rekening: handmatig
+   * bijhouden is de normale toestand en verdient geen markering. `'manual'` is
+   * hier dus wél renderbaar (de filterchips op Transacties houden hun bestaande
+   * gedrag), maar de cashflow-kaarten geven daarvoor `undefined` mee.
+   */
+  bankLink?: BankLinkState
+  /**
+   * Herstelactie bij `bankLink === 'linked-broken'`: start een herkoppeling met
+   * déze rekening als doelrekening. Zonder handler rendert de herstelband niet —
+   * een kwijtgeraakte verbinding melden zonder uitweg is erger dan hem alleen
+   * met het symbool markeren.
+   *
+   * Ontvangt het asset (zoals `onClick`/`onEditClick`) zodat de caller één
+   * stabiele `useCallback` kan doorgeven en de `memo()` van deze kaart blijft
+   * werken. Wát de handeling doet — een overlay openen, een route starten — is aan
+   * de caller; deze kaart doet zelf geen `fetch` en kent geen koppel-API.
+   */
+  onReconnect?: (asset: Asset) => void
+  /**
    * 6 maandwaarden voor de achtergrond-sparkline ("breuklijn") die de
    * tinted boven/onder zones scheidt. Bij `undefined` of <2 punten valt
    * de overlay terug op een rechte horizontale scheiding op het midden.
@@ -127,6 +157,8 @@ export const VermogenAssetCard = memo(function VermogenAssetCard({
   kpiPair,
   onClick,
   connection,
+  bankLink,
+  onReconnect,
   sparklineValues,
   staggerIndex = 0,
   onEditClick,
@@ -259,7 +291,14 @@ export const VermogenAssetCard = memo(function VermogenAssetCard({
       <button
         type="button"
         onClick={() => onClick(asset)}
-        aria-label={`${asset.name} openen`}
+        // Herkomst hoort IN deze naam: het symbool in de naam-regel is
+        // aria-hidden, want een eigen aria-label daarbinnen wordt door dit
+        // button-label overstemd en zou nooit voorgelezen worden.
+        aria-label={
+          bankLink === undefined
+            ? `${asset.name} openen`
+            : `${asset.name} openen — ${accountSourceSuffix(bankLink)}`
+        }
         className="relative z-10 flex w-full items-center gap-3 p-3 text-left transition-colors hover:bg-[var(--subtle)]/30 sm:p-4"
       >
         {/* Left: icon + name + institution */}
@@ -275,6 +314,12 @@ export const VermogenAssetCard = memo(function VermogenAssetCard({
               {asset.name}
             </p>
             {connection && <ConnectionIndicator connection={connection} />}
+            {/* Herkomst-symbool voor bankrekeningen — visueel signaal; de
+                betekenis zit in het aria-label van deze knop (zie hierboven).
+                Zelfde iconentaal als de rekening-filterpills op
+                /overzicht/transacties. Wélke toestanden hier langskomen bepaalt
+                de caller (B4: cashflow stuurt geen `'manual'` mee). */}
+            {bankLink !== undefined && <AccountSourceIcon state={bankLink} />}
             <OwnershipBadge
               provenance={provenance}
               ownership={provenance ? undefined : asset.ownership}
@@ -323,6 +368,55 @@ export const VermogenAssetCard = memo(function VermogenAssetCard({
           )}
         </div>
       </button>
+
+      {/* Herstelband — de énige koppeltoestand die om een handeling vraagt.
+          BUITEN de hoofdregel-<button> hierboven: een knop binnen een knop is
+          ongeldige HTML en onbereikbaar per toetsenbord (zelfde reden als de
+          actie-rij hieronder).
+
+          Direct ónder de naam-regel, zodat de band het `Unlink`-symbool dat daar
+          staat uitlegt in plaats van het elders te herhalen — vandaar hetzelfde
+          glyph en niet de `AlertTriangle` van de waarschuwings-alinea's in de
+          bank-connect-wizard: die markeren een voorbehoud, dit markeert een
+          verbroken schakel.
+
+          Kleur uitsluitend via de `--warning`-tokens: aandacht, geen verlies. De
+          autorisatie verloopt elk kwartaal — dat is verwacht onderhoud, geen
+          fout, dus geen risico-rood. Copy bewust NEUTRAAL over de oorzaak
+          (`bank_connections.status` kent `expired` én `revoked`, maar geen enkel
+          codepad schrijft ooit `revoked`; "ingetrokken door je bank" zou een
+          detectie suggereren die de app niet heeft). */}
+      {bankLink === 'linked-broken' && onReconnect && (
+        <div
+          /* `flex-col sm:flex-row` en niet `flex-wrap`: op 360px moest de tekst
+             zich naast een 44px-knop in drie regels wringen. Zelfde patroon als de
+             herstelband op `ConnectedAccountCard` — één systeem, twee
+             oppervlakken. Het symbool blijft bij zijn tekst (samen in de <p>),
+             anders staat het glyph los boven de regel. */
+          className="relative z-10 flex flex-col items-start gap-1.5 border-t border-warning/30 bg-warning-bg px-3 py-2 sm:flex-row sm:items-center sm:gap-2 sm:px-4"
+          data-testid="asset-card-reconnect-band"
+        >
+          <p className="flex min-w-0 flex-1 items-start gap-2 text-[11px] leading-snug text-[var(--ink-2)]">
+            <Unlink aria-hidden className="mt-px h-3.5 w-3.5 shrink-0 text-warning" />
+            <span>Verbinding kwijt — je transacties komen niet meer binnen.</span>
+          </p>
+          <button
+            type="button"
+            onClick={() => onReconnect(asset)}
+            aria-label={`Bankverbinding voor ${asset.name} opnieuw maken`}
+            /* Inkt op papier, niet `text-warning` op `bg-warning-bg`: die
+               combinatie haalt ~4,4:1 en blijft daarmee onder AA voor tekst. De
+               warning-tint zit in de band (rand, vlak, icoon); de knop hoort
+               leesbaar te zijn. Zelfde behandeling als de herstelknop op
+               `ConnectedAccountCard`, zodat de twee oppervlakken één systeem
+               vormen. */
+            className="inline-flex min-h-[44px] shrink-0 items-center gap-1.5 bg-[var(--paper)] px-2.5 text-xs font-medium text-[var(--ink)] shadow-[var(--s0)] transition-colors hover:bg-[var(--subtle)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+          >
+            <Link2 aria-hidden className="h-3 w-3 text-warning" />
+            Verbind opnieuw
+          </button>
+        </div>
+      )}
 
       {/* Actie-rij — tussen hoofdregel en KPI-strip. Eigen interactieve regio
           met aparte <button>s — geen nested buttons (a11y).

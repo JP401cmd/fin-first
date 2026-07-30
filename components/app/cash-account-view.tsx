@@ -7,10 +7,9 @@ import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Plus, Upload, ArrowUpRight, ArrowDownLeft,
   Wallet, Tag, Settings2, Repeat, Search, Filter, RotateCcw, AlertCircle,
   Link2, ArrowLeftRight, HelpCircle, GitFork, Pencil, Sparkles, ArrowLeft,
-  MoreVertical, Unlink, Save, Check,
+  MoreVertical, ToggleLeft, Save, Check,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { syncBudgetingActive } from '@/lib/budgeting-active'
 import { isOwnAccountTransfer } from '@/lib/parsers/categorize'
 import { buildOwnAccountIdentifiers } from '@/lib/own-accounts'
 import { TransferConfirmSheet } from '@/components/app/transfer-confirm-sheet'
@@ -47,6 +46,7 @@ import { Kicker } from '@/components/editorial'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { ValuationModal } from '@/components/core/assets-client'
 import { DensityToggle, useListDensity } from '@/components/app/density-toggle'
+import type { CashBankLink } from '@/lib/bank-connection-status'
 
 // Aantal rijen dat de transactielijst per keer toont; "Toon meer" voegt telkens
 // een pagina toe. Houdt de DOM klein bij een zware maand (100-400 rijen).
@@ -104,6 +104,7 @@ export function CashAccountView({
   embedded = false,
   onNavigateToAccount,
   initialMonth,
+  bankLink,
 }: {
   accountId?: string
   backHref?: string
@@ -111,6 +112,22 @@ export function CashAccountView({
   embedded?: boolean
   onNavigateToAccount?: (accountId: string | undefined) => void
   initialMonth?: string // 'YYYY-MM' format
+  /**
+   * De koppelrij van DÉZE rekening uit de server-loader (`loadCashBankLinks()`,
+   * doorgegeven door `cash-overview.tsx`). Fase 7: dit is de ENIGE bron voor het
+   * oordeel "is deze rekening gekoppeld / kwijt / handmatig".
+   *
+   * `loadGcAccounts()` hieronder blijft bestaan — die levert de volledige
+   * koppelrijen (sync-teller, rate-limit, provider-logo) die
+   * `ConnectedAccountCard` nodig heeft. Maar het OORDEEL wordt daar niet meer uit
+   * afgeleid: twee afleidingen van hetzelfde feit is precies de drift die fase 7
+   * opruimt.
+   *
+   * `undefined`/`null` = de host heeft niets meegegeven (of de leesronde faalde).
+   * Alleen dán valt het oordeel terug op de aanwezigheid van koppelrijen; zodra
+   * de prop er is, spreekt hij alleen.
+   */
+  bankLink?: CashBankLink | null
 }) {
   const isCombined = !accountId
   const router = useRouter()
@@ -163,6 +180,21 @@ export function CashAccountView({
     }
   }>>([])
   const [showBankConnections, setShowBankConnections] = useState(true)
+
+  /**
+   * "Draagt deze rekening een bankkoppeling?" — één oordeel, uit de prop.
+   *
+   * `linked` én `linked-broken` gelden hier beide als "gekoppeld": een verlopen
+   * autorisatie is een koppeling die hersteld moet worden, geen rekening zonder
+   * koppeling. Het verschil tússen die twee toont `ConnectedAccountCard`
+   * (herautoriseren); de rekeningkaart op cashflow toont het als symbool.
+   *
+   * De val-terug op `gcAccounts.length` geldt uitsluitend wanneer de host de prop
+   * niet meegaf — dan is er geen loader-waarheid om te volgen. Er wordt nooit
+   * iets gecombineerd: is de prop er, dan negeren we `gcAccounts` voor dit
+   * oordeel volledig.
+   */
+  const accountIsBankLinked = bankLink ? bankLink.state !== 'manual' : gcAccounts.length > 0
 
   // Cashflow forecast state
   const [cashFlowForecast, setCashFlowForecast] = useState<ForecastPoint[]>([])
@@ -234,6 +266,8 @@ export function CashAccountView({
   //    bestaande transacties mee omgezet moeten worden (mid-flow → modal i.p.v.
   //    een synchrone confirm midden in de opslag-flow).
   const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false)
+  const [disconnecting, setDisconnecting] = useState(false)
+  const [disconnectError, setDisconnectError] = useState<string | null>(null)
   const [ownershipMigration, setOwnershipMigration] = useState<{
     count: number
     newOwnership: 'personal' | 'shared'
@@ -988,31 +1022,55 @@ export function CashAccountView({
     loadTransactions()
   }
 
+  /**
+   * Zet budgetteren (transactie-tracking) UIT voor deze rekening.
+   *
+   * Één as, één schrijver. Deze actie bezit alleen de **budgetteringsas**
+   * (`assets.has_budget_tracking` → `profiles.budgeting_active`); bezitting
+   * (`assets.is_active`) en bankkoppeling (`bank_connection_accounts`) blijven
+   * ongemoeid. De rekening blijft dus bestaan, de transacties blijven bewaard
+   * en de permanente 1-op-1-binding `bank_accounts.linked_asset_id` blijft staan.
+   *
+   * De mutatie loopt via `/api/assets/toggle-budget` (ADR 0058: muteren via een
+   * API-route, niet client-direct). Die route is de canonieke schrijver van deze
+   * toggle en doet asset-vlag, companion-rij en module-gate in één server-side
+   * pad. Ze vervangt de losse client-mutaties die hier stonden: een
+   * `bank_accounts.delete()` die op de FK van `bank_connection_accounts`
+   * (ON DELETE NO ACTION) botste — half toegepaste mutatie, stille fout — en
+   * een nullen van `linked_asset_id` dat bij herkoppelen een tweede cash-asset
+   * opleverde en het saldo dubbel liet meetellen.
+   */
   async function handleDisconnectTracking() {
     if (!linkedAsset || !account) return
-    const supabase = createClient()
-    // 1. Update asset: has_budget_tracking = false
-    await supabase.from('assets').update({ has_budget_tracking: false }).eq('id', linkedAsset.id)
-    // 2. Check transaction count
-    const { count } = await supabase
-      .from('transactions')
-      .select('id', { count: 'exact', head: true })
-      .eq('account_id', account.id)
-    if (count === 0) {
-      await supabase.from('bank_accounts').delete().eq('id', account.id)
-    } else {
-      await supabase.from('bank_accounts').update({ linked_asset_id: null }).eq('id', account.id)
-    }
-    // 3. Sync budgeting_active
-    const { data: { user } } = await supabase.auth.getUser()
-    let budgetingActive = false
-    if (user) {
-      // Best-effort: bij een gefaalde gate-write navigeren we alsof budgetteren
-      // uit staat; de estimates-prompt is dan de veilige kant.
-      budgetingActive = await syncBudgetingActive(supabase, user.id).catch(() => false)
-    }
-    // 4. Navigate — if budgeting is now off and estimates are missing, prompt user
-    if (user && !budgetingActive) {
+    setDisconnecting(true)
+    setDisconnectError(null)
+    try {
+      const res = await fetch('/api/assets/toggle-budget', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: linkedAsset.id, enabled: false }),
+      })
+      const json = (await res.json().catch(() => null)) as
+        | { error?: string; budgeting_active?: boolean }
+        | null
+      if (!res.ok) {
+        // Niet meer stil falen: de bevestiging blijft staan met de reden, zodat
+        // de gebruiker het opnieuw kan proberen i.p.v. een half doorgevoerde
+        // wijziging te zien.
+        setDisconnectError(json?.error || 'Uitschakelen is niet gelukt. Probeer het opnieuw.')
+        return
+      }
+
+      setShowDisconnectConfirm(false)
+      // De route levert de herberekende module-gate; staat budgetteren nu uit
+      // en ontbreken de schattingen, dan vraagt /core daar alsnog om.
+      if (json?.budgeting_active === true) {
+        router.push('/core/assets')
+        return
+      }
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.push('/core/assets'); return }
       const { data: profile } = await supabase
         .from('profiles')
         .select('net_monthly_income, estimated_monthly_expenses')
@@ -1020,8 +1078,10 @@ export function CashAccountView({
         .single()
       const needsEstimates = !profile?.net_monthly_income || !profile?.estimated_monthly_expenses
       router.push(needsEstimates ? '/core?showEstimates=true' : '/core/assets')
-    } else {
-      router.push('/core/assets')
+    } catch {
+      setDisconnectError('Uitschakelen is niet gelukt. Probeer het opnieuw.')
+    } finally {
+      setDisconnecting(false)
     }
   }
 
@@ -1375,7 +1435,7 @@ export function CashAccountView({
                   onReauthorize={() => router.push('/core/cash/connect')}
                 />
               ))}
-              {!isCombined && gcAccounts.length === 0 ? (
+              {!isCombined && !accountIsBankLinked ? (
                 <div className="rounded-[var(--r-lg)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)] px-4 py-6 text-center">
                   <Link2 className="mx-auto mb-2 h-6 w-6 text-[var(--ink-4)]" />
                   <p className="text-sm font-medium text-[var(--ink-2)]">Nog niet gekoppeld</p>
@@ -1388,7 +1448,7 @@ export function CashAccountView({
                     Bank koppelen
                   </Link>
                 </div>
-              ) : (isCombined || gcAccounts.length > 0) && (
+              ) : (isCombined || accountIsBankLinked) && (
                 <Link
                   href="/core/cash/connect"
                   className="flex items-center justify-center gap-2 rounded-[var(--r-lg)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)] px-4 py-3 text-sm font-medium text-[var(--ink-2)] transition-colors hover:border-kern-300 hover:bg-kern-50 hover:text-kern-700"
@@ -2363,6 +2423,9 @@ export function CashAccountView({
               saving={assetSaving}
               bankConnectEnabled={gcEnabled}
               gcAccounts={gcAccounts}
+              /* Het oordeel komt van boven (de loader-prop), de rijen uit
+                 `gcAccounts` — zie `accountIsBankLinked`. */
+              accountIsBankLinked={accountIsBankLinked}
               onSync={() => { loadAccount(); loadGcAccounts() }}
               onDisconnectBank={() => loadGcAccounts()}
               onReauthorize={() => router.push('/core/cash/connect')}
@@ -2375,35 +2438,54 @@ export function CashAccountView({
         </BottomSheet>
       )}
 
-      {/* I-05: bevestig loskoppelen van transactie-tracking — ShellOverlay
-          kind="confirm" (focus-trap + Esc) i.p.v. window.confirm. */}
+      {/* I-05: bevestig het uitschakelen van budgetteren — ShellOverlay
+          kind="confirm" (focus-trap + Esc) i.p.v. window.confirm.
+          De copy beschrijft exact wat er gebeurt: alleen de budgetteringsas
+          gaat uit. Rekening, transacties en vermogen blijven ongemoeid, dus
+          bewust géén verlies-taal ("loskoppelen", "verwijderen") en géén
+          `destructive`/rood — de actie is omkeerbaar en vernietigt niets.
+          Zolang de call loopt is annuleren (knop, Esc, backdrop) geblokkeerd:
+          de fetch is dan niet meer af te breken, en "Annuleren" dat tóch nog
+          navigeert zou een tweede stille leugen zijn. */}
       <ShellOverlay
         open={showDisconnectConfirm}
-        onClose={() => setShowDisconnectConfirm(false)}
+        onClose={() => {
+          if (disconnecting) return
+          setShowDisconnectConfirm(false)
+          setDisconnectError(null)
+        }}
         kind="confirm"
-        destructive
-        title="Transacties loskoppelen?"
+        title="Budgetteren uitschakelen?"
       >
         <div className="p-6">
           <p className="text-sm leading-relaxed text-[var(--ink-2)]">
-            Je koppelt de transactie-tracking los. De rekening wordt weer een
-            gewone bezitting; je overzicht en budgetten krijgen geen boekingen
-            meer van deze rekening.
+            Deze rekening telt daarna niet meer mee in je budgetten en levert
+            geen boekingen meer aan je overzicht. Je transacties blijven
+            bewaard en de rekening blijft als bezitting meetellen in je
+            vermogen — je kunt budgetteren later weer aanzetten.
           </p>
+          {disconnectError && (
+            <p role="alert" className="mt-4 text-sm font-medium text-negative">
+              {disconnectError}
+            </p>
+          )}
           <div className="mt-6 flex items-center justify-end gap-3">
             <button
               type="button"
-              onClick={() => setShowDisconnectConfirm(false)}
-              className="rounded-lg border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+              disabled={disconnecting}
+              onClick={() => { setShowDisconnectConfirm(false); setDisconnectError(null) }}
+              className="rounded-lg border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] disabled:opacity-50"
             >
               Annuleren
             </button>
             <button
               type="button"
-              onClick={() => { setShowDisconnectConfirm(false); void handleDisconnectTracking() }}
-              className="rounded-lg bg-negative px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+              disabled={disconnecting}
+              aria-busy={disconnecting || undefined}
+              onClick={() => { void handleDisconnectTracking() }}
+              className="rounded-lg bg-[var(--ink)] px-4 py-2 text-sm font-medium text-[var(--paper)] hover:bg-[var(--ink-2)] disabled:opacity-60"
             >
-              Loskoppelen
+              {disconnecting ? 'Uitschakelen…' : 'Uitschakelen'}
             </button>
           </div>
         </div>
@@ -2603,6 +2685,7 @@ function AssetEditForm({
   saving,
   bankConnectEnabled,
   gcAccounts,
+  accountIsBankLinked,
   onSync,
   onDisconnectBank,
   onReauthorize,
@@ -2616,6 +2699,12 @@ function AssetEditForm({
   saving: boolean
   bankConnectEnabled: boolean
   gcAccounts: GcAccount[]
+  /**
+   * Draagt deze rekening een bankkoppeling? Afgeleid in de ouder uit de
+   * loader-prop (fase 7) — bewust NIET hier opnieuw uit `gcAccounts` geteld.
+   * `gcAccounts` levert alleen de rijen die `ConnectedAccountCard` rendert.
+   */
+  accountIsBankLinked: boolean
   onSync: () => void
   onDisconnectBank: () => void
   onReauthorize: () => void
@@ -2632,10 +2721,12 @@ function AssetEditForm({
   const { hasHousehold } = useHouseholdStatus()
   const [confirmDisconnect, setConfirmDisconnect] = useState(false)
 
-  // Alleen koppelingen die bij déze bankrekening horen tonen.
+  // Alleen de RIJEN die bij déze bankrekening horen — voor de kaarten, niet voor
+  // het oordeel (dat is `accountIsBankLinked`).
   const linkedConnections = bankConnectEnabled
     ? gcAccounts.filter((acc) => acc.bank_account_id === account.id)
     : []
+  const showConnections = bankConnectEnabled && accountIsBankLinked
 
   return (
     <div className="space-y-5">
@@ -2657,7 +2748,7 @@ function AssetEditForm({
       {/* 2. Bank-koppeling / status */}
       <div>
         <label className="mb-1.5 block text-xs font-medium text-[var(--ink-2)]">Bankverbinding</label>
-        {linkedConnections.length > 0 ? (
+        {showConnections ? (
           <div className="space-y-3">
             {linkedConnections.map((acc) => (
               <ConnectedAccountCard
@@ -2723,29 +2814,36 @@ function AssetEditForm({
         </div>
       )}
 
-      {/* Budgetteren uitschakelen */}
+      {/* Budgetteren uitschakelen — bewust GEEN verlies-signaal (rood, Unlink).
+          De actie zet alleen de budgetteringsas uit: niets wordt verwijderd,
+          het vermogen verandert niet en budgetteren kan later weer aan. Rood
+          zou hier de angst in stand houden die deze flow juist wegneemt (en
+          `text-red-600`/`bg-red-600` overtraden bovendien de kleurconventie:
+          geen Tailwind-standaardkleuren, wel tokens). */}
       <div className="rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)] p-4">
         {!confirmDisconnect ? (
           <button
             type="button"
             onClick={() => setConfirmDisconnect(true)}
-            className="flex items-center gap-2 text-sm text-red-600 hover:text-red-700"
+            className="flex items-center gap-2 text-sm text-[var(--ink-2)] hover:text-[var(--ink)]"
           >
-            <Unlink className="h-3.5 w-3.5" />
+            <ToggleLeft className="h-3.5 w-3.5" />
             Budgetteren uitschakelen
           </button>
         ) : (
           <div>
             <p className="text-xs text-[var(--ink-2)]">
-              De rekening wordt weer een gewone asset zonder transacties en budgetten.
+              De rekening telt daarna niet meer mee in je budgetten. Je transacties
+              blijven bewaard en de rekening blijft meetellen in je vermogen — je
+              kunt budgetteren later weer aanzetten.
             </p>
             <div className="mt-3 flex items-center gap-2">
               <button
                 type="button"
                 onClick={onDisconnect}
-                className="rounded-[var(--r)] bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
+                className="rounded-[var(--r)] bg-[var(--ink)] px-3 py-1.5 text-xs font-medium text-[var(--paper)] hover:bg-[var(--ink-2)]"
               >
-                Bevestigen
+                Uitschakelen
               </button>
               <button
                 type="button"

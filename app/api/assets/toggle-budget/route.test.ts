@@ -176,6 +176,61 @@ describe('POST /api/assets/toggle-budget — companion-select kolombug (assets.i
   })
 })
 
+describe('POST /api/assets/toggle-budget — zod-validatie (parseBody, ADR 0044)', () => {
+  it('400 bij ontbrekende id (client-veilige envelope, geen from()-call)', async () => {
+    const res = await POST(postRequest({ enabled: true }))
+
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.code).toBe('validation_error')
+    expect(body.error).toMatch(/id/)
+    expect(mockFrom).not.toHaveBeenCalled()
+  })
+
+  it('400 bij ontbrekende enabled (client-veilige envelope, geen from()-call)', async () => {
+    const res = await POST(postRequest({ id: CASH_ASSET_ID }))
+
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.code).toBe('validation_error')
+    expect(body.error).toMatch(/enabled/)
+    expect(mockFrom).not.toHaveBeenCalled()
+  })
+
+  it('400 bij ongeldig JSON in de request body', async () => {
+    const req = { json: () => Promise.reject(new SyntaxError('bad json')) } as unknown as Request
+
+    const res = await POST(req)
+
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toBe('Ongeldig JSON-formaat in request body')
+  })
+})
+
+describe('POST /api/assets/toggle-budget — budgeting_active in de respons', () => {
+  it('geeft de herberekende module-gate terug zoals syncBudgetingActive die oplevert', async () => {
+    mockSyncBudgetingActive.mockResolvedValueOnce(false)
+
+    const res = await POST(postRequest({ id: CASH_ASSET_ID, enabled: false }))
+    const json = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(json.budgeting_active).toBe(false)
+  })
+
+  it('valt terug op budgeting_active: false wanneer syncBudgetingActive faalt (veilige kant voor de client-navigatie)', async () => {
+    mockSyncBudgetingActive.mockRejectedValueOnce(new Error('db down'))
+
+    const res = await POST(postRequest({ id: CASH_ASSET_ID, enabled: false }))
+    const json = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(json.ok).toBe(true)
+    expect(json.budgeting_active).toBe(false)
+  })
+})
+
 describe('POST /api/assets/toggle-budget — uitzetten (enabled=false) gebruikt dezelfde alias-select', () => {
   it('selecteert account_number (niet iban) en roept syncBankAccountCompanion aan met enabled=false', async () => {
     const res = await POST(postRequest({ id: CASH_ASSET_ID, enabled: false }))

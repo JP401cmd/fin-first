@@ -15,6 +15,7 @@ import { BottomSheet } from '@/components/app/bottom-sheet'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { usePerspective } from '@/components/app/perspective-provider'
+import { useToast } from '@/components/app/toast-provider'
 import { HideInSimple } from '@/components/app/hide-in-simple'
 import { EenvoudigPillList, type PillItem } from '@/components/overview/eenvoudig-pill-list'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
@@ -29,6 +30,15 @@ import { loadEntitySparklines } from '@/lib/load-entity-sparklines'
 import { localMonthBounds, localMonthStart } from '@/lib/month-range'
 import { type Asset, ASSET_TYPE_COLORS } from '@/lib/asset-data'
 import type { Provenance } from '@/lib/household-data'
+import {
+  bankLinkForAsset,
+  bankLinkRowForAccount,
+  bankLinkRowForAsset,
+  type BankLinkState,
+  type CashBankLink,
+} from '@/lib/bank-connection-status'
+import { detailBankAccountIdForAsset } from '@/lib/cash-detail-target'
+import { startBankRelink } from '@/lib/truelayer/start-relink'
 
 const DynCashAccountView = dynamic(
   () => import('@/components/app/cash-account-view').then(m => ({ default: m.CashAccountView })),
@@ -67,6 +77,35 @@ type BudgetExpense = {
 // VermogenAssetCard nodig heeft om gedeelde/partner-rijen correct te tonen.
 type StampedAsset = Asset & { _provenance?: Provenance; _myShareFraction?: number; _aggregated?: boolean }
 
+/**
+ * Stabiele default voor `bankLinks`. Een inline `[]` in de destructurering zou
+ * elke render een nieuwe referentie zijn en de `useCallback`/`useMemo`-ketens
+ * hieronder onnodig invalideren.
+ */
+const EMPTY_BANK_LINKS: CashBankLink[] = []
+
+/**
+ * Welke koppeltoestand krijgt déze rekeningkaart te zien?
+ *
+ * Twee keer `undefined` (= geen symbool), elk om een eigen reden:
+ *  - een **aggregaatrij** (privacy='totalen', partner-totaal) is geen echte
+ *    rekening en kan dus geen koppeling hebben;
+ *  - een **handmatige** rekening is de normale toestand en verdient geen
+ *    markering (besluit B4).
+ *
+ * Naar de kaart reizen dus alleen `linked` en `linked-broken`. Het component kan
+ * `manual` wél renderen — de filterchips op Transacties doen dat, bestaand
+ * gedrag — maar hier is dat bewust niet gewenst.
+ */
+function cashAssetBankLink(
+  asset: StampedAsset,
+  links: CashBankLink[],
+): BankLinkState | undefined {
+  if (asset._aggregated) return undefined
+  const state = bankLinkForAsset(links, asset.id)
+  return state === 'manual' ? undefined : state
+}
+
 export function CashOverview({
   embedded = false,
   onNavigateToAccount,
@@ -74,6 +113,7 @@ export function CashOverview({
   hideQuickActions = false,
   showAllCashAccounts = false,
   showMonthLinks = false,
+  bankLinks = EMPTY_BANK_LINKS,
 }: {
   embedded?: boolean
   onNavigateToAccount?: (accountId: string) => void
@@ -84,6 +124,16 @@ export function CashOverview({
    *  geselecteerde maand meenemen via `?maand=YYYY-MM`. Alleen aangezet op de
    *  cashflow-landing; de cash-categoriepagina blijft zonder deze links. */
   showMonthLinks?: boolean
+  /**
+   * De koppelstatus per bankrekening, uit `loadCashBankLinks()` op de
+   * server-pagina (ADR 0058: weergavedata via de loader). Voedt zowel het
+   * herkomst-symbool op de rekeningkaarten als de koppeltoestand die de
+   * rekeningdetail (`CashAccountView`) leest — één bron, twee oppervlakken.
+   *
+   * Leeg = onbekend (host geeft niets mee, of de leesronde faalde). Dan
+   * verdwijnt het symbool en verschijnt er géén onterecht "verbinding kwijt".
+   */
+  bankLinks?: CashBankLink[]
 }) {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [cashAssets, setCashAssets] = useState<StampedAsset[]>([])
@@ -140,8 +190,57 @@ export function CashOverview({
   }, [detailAccountId])
 
   const { perspective } = usePerspective()
+  const { addToast } = useToast()
   // Eenvoudig-modus: rekeningen als pills + geldstroom-sectie verbergen.
   const simple = useDisplayMode().mode === 'simple'
+
+  // ── Herstelactie bij een kwijtgeraakte bankkoppeling (fase 7, B6) ──────────
+  //
+  // Start de herautorisatie meteen: één klik op de kaart, dan door naar de bank.
+  // De POST, de foutcuratie en de NL-fallback wonen in
+  // `lib/truelayer/start-relink.ts` — dezelfde functie die de herstelknop op de
+  // rekeningdetail (`ConnectedAccountCard`) gebruikt. Eén implementatie, want twee
+  // fetch-blokken met elk hun eigen foutafhandeling lopen binnen één release
+  // uiteen; dat is dezelfde driftklasse als de twee koppelstatus-afleidingen die
+  // deze fase opruimt.
+  //
+  // De client noemt alleen de KOPPELING; `auth-link` leidt de doelrekening, de
+  // intentie (`link_intent = 'herautoriseren'`) én de bank er zelf uit af. Daarom
+  // heeft deze kaart géén provider-kolom nodig en dus ook geen eigen leesronde —
+  // precies het pad dat deze fase dichtzet.
+  //
+  // Eén stabiele `useCallback` voor álle kaarten: `VermogenAssetCard` is
+  // `memo()`'d, dus een closure per kaart zou bij elke render van deze pagina de
+  // hele rekeningenlijst opnieuw laten renderen.
+  const handleReconnect = useCallback(
+    async (asset: Asset) => {
+      const link = bankLinkRowForAsset(bankLinks, asset.id)
+      if (!link?.connectionAccountId) {
+        // Onbereikbaar zolang de band alleen bij `linked-broken` rendert (die
+        // toestand heeft per definitie een actieve koppelrij), maar een verouderde
+        // bundel mag geen stille klik worden.
+        console.error('Herkoppelen zonder bekende koppeling', { assetId: asset.id })
+        addToast({
+          type: 'error',
+          title: 'Verbinden mislukt',
+          message: 'Deze koppeling is even niet te lezen. Ververs de pagina en probeer het opnieuw.',
+        })
+        return
+      }
+
+      const result = await startBankRelink(link.connectionAccountId)
+      if (!result.ok) {
+        // De melding van de route is NL en bevat de uitweg (bv. "verbreek die
+        // koppeling eerst bij de rekening"); die hoort de gebruiker te lezen.
+        addToast({ type: 'error', title: 'Verbinden mislukt', message: result.message })
+        return
+      }
+
+      // Volledige navigatie, geen router.push: we verlaten de app naar de bank.
+      window.location.href = result.authUrl
+    },
+    [bankLinks, addToast],
+  )
 
   // Tijdzone-veilige maandgrenzen (zie localMonthBounds): NIET via toISOString,
   // dat schuift in UTC+ tijdzones een dag terug en laat een 31-juli-salaris in
@@ -206,13 +305,20 @@ export function CashOverview({
     )
     setCashAssets(cash)
 
+    // Alleen nog de asset→bank_account-map voor de klik-flow (welke kaart opent
+    // de rekeningdetail i.p.v. het bezittings-paneel). De KOPPELSTATUS werd hier
+    // vroeger uit een tweede query op `bank_connection_accounts` afgeleid; die
+    // is weg. Hij komt nu via `bankLinks` uit `loadCashBankLinks()` op de
+    // server, dezelfde bron die `CashAccountView` leest — anders staan er twee
+    // afleidingen van hetzelfde feit naast elkaar (fase 7, ADR 0058).
     const { data: banks } = await supabase
       .from('bank_accounts')
       .select('id, linked_asset_id, linked_asset:assets!bank_accounts_linked_asset_id_fkey(has_budget_tracking)')
       .eq('is_active', true)
     const map: Record<string, string> = {}
     for (const b of (banks ?? []) as Array<{ id: string; linked_asset_id: string | null; linked_asset?: { has_budget_tracking?: boolean | null } | null }>) {
-      if (b.linked_asset_id && b.linked_asset?.has_budget_tracking === true) map[b.linked_asset_id] = b.id
+      if (!b.linked_asset_id) continue
+      if (b.linked_asset?.has_budget_tracking === true) map[b.linked_asset_id] = b.id
     }
     setBankByAsset(map)
   }, [showAllCashAccounts, perspective])
@@ -471,8 +577,11 @@ export function CashOverview({
           amount,
           sharePct: total > 0 ? (amount / total) * 100 : 0,
           sparklineValues: cashSparklines[a.id],
+          // Zelfde keuze als op de kaarten (`detailBankAccountIdForAsset`): de
+          // eenvoudig-modus mag niet in een ánder paneel eindigen dan de brede
+          // modus voor dezelfde rekening.
           onClick: () => {
-            const bankId = bankByAsset[a.id]
+            const bankId = detailBankAccountIdForAsset(bankLinks, bankByAsset, a.id)
             if (bankId) setDetailAccountId(bankId)
             else setEditingAsset(a as Asset)
           },
@@ -494,7 +603,7 @@ export function CashOverview({
             : undefined,
     }))
   }, [
-    showAllCashAccounts, cashAssets, cashSparklines, bankByAsset, perspective,
+    showAllCashAccounts, cashAssets, cashSparklines, bankByAsset, bankLinks, perspective,
     accounts, totalBalance, embedded, onNavigateToAccount,
   ])
 
@@ -822,13 +931,29 @@ export function CashOverview({
                   <VermogenAssetCard
                     asset={a as Asset}
                     sparklineValues={cashSparklines[a.id]}
+                    /* Alleen een rekening MÉT koppeling krijgt een symbool (besluit
+                       B4): handmatig bijhouden is de normale toestand en verdient
+                       geen markering. `undefined` = niets renderen, dus ook voor
+                       aggregaatrijen (partner-totaal), die geen echte rekening zijn.
+                       De toestand komt uit de server-loader, niet uit een eigen
+                       leesronde — zie de `bankLinks`-prop. */
+                    bankLink={cashAssetBankLink(a, bankLinks)}
+                    /* Alleen aanbieden wanneer de rekeningdetail-overlay er ook
+                       ís (die rendert onder `embedded`) — een herstelknop die
+                       niets opent is erger dan geen knop. */
+                    onReconnect={embedded ? handleReconnect : undefined}
+                    /* De koppelrij wint van de budget-map: zie
+                       `detailBankAccountIdForAsset`. Een gereactiveerde rekening
+                       (bezit actief, budgetteren uit) opende anders het
+                       bewerk-paneel in plaats van de rekeningdetail — juist het
+                       paneel met de bankverbinding en het herstelpad. */
                     onClick={(asset) => {
-                      const bankId = bankByAsset[asset.id]
+                      const bankId = detailBankAccountIdForAsset(bankLinks, bankByAsset, asset.id)
                       if (bankId) setDetailAccountId(bankId)
                       else setEditingAsset(asset)
                     }}
                     onEditClick={(asset) => {
-                      const bankId = bankByAsset[asset.id]
+                      const bankId = detailBankAccountIdForAsset(bankLinks, bankByAsset, asset.id)
                       if (bankId) setDetailAccountId(bankId)
                       else setEditingAsset(asset)
                     }}
@@ -1284,7 +1409,14 @@ export function CashOverview({
           }
         >
           {detailAccountId && (
-            <DynCashAccountView accountId={detailAccountId} embedded />
+            /* De koppeltoestand reist mee als prop: de rekeningdetail leest 'm
+               uit dezelfde loader-bundel als de kaarten hierboven, in plaats van
+               'm nóg een keer uit zijn eigen koppelrijen af te leiden (fase 7). */
+            <DynCashAccountView
+              accountId={detailAccountId}
+              embedded
+              bankLink={bankLinkRowForAccount(bankLinks, detailAccountId)}
+            />
           )}
         </ShellOverlay>
       )}
