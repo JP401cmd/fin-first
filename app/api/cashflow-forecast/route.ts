@@ -1,6 +1,7 @@
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { localMonthStart } from '@/lib/month-range'
+import { recurringPerMonth } from '@/lib/cashflow-forecast-math'
 
 /**
  * GET /api/cashflow-forecast
@@ -82,14 +83,19 @@ export async function GET() {
     let recurringMonthlyExpenses = 0
 
     for (const r of recurrings) {
-      const amount = Number(r.amount)
-      let monthlyAmount = 0
-      switch (r.frequency) {
-        case 'weekly': monthlyAmount = amount * (52 / 12); break
-        case 'monthly': monthlyAmount = amount; break
-        case 'quarterly': monthlyAmount = amount / 3; break
-        case 'yearly': monthlyAmount = amount / 12; break
-      }
+      // Eén eigenaar van de frequentie→maand-omrekening: `recurringPerMonth`
+      // (lib/cashflow-forecast-math.ts), dezelfde die de forecast-tabel en de
+      // cashflow-landingskaarten via `buildForecast` gebruiken. Deze route had
+      // die switch lokaal herhaald — vandaag tekenmatig identiek, maar twee
+      // onafhankelijke kopieën van één formule zijn per definitie toekomstige
+      // drift: de prognose op /overzicht/cashflow en die in deze route zouden
+      // dan uiteenlopen zonder dat er ergens iets rood wordt
+      // ("consume, don't recompute", CLAUDE.md).
+      //
+      // De TEKEN-splitsing blijft hier bewust staan: `recurringPerMonth` levert
+      // een signed bedrag, en deze route heeft de twee kanten los nodig voor de
+      // 70/30-menging met de gerealiseerde maandpatronen hieronder.
+      const monthlyAmount = recurringPerMonth(r)
       if (monthlyAmount > 0) recurringMonthlyIncome += monthlyAmount
       else recurringMonthlyExpenses += Math.abs(monthlyAmount)
     }

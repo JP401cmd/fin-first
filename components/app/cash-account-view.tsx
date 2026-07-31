@@ -467,9 +467,18 @@ export function CashAccountView({
       if (!enabled) return
 
       const supabase = createClient()
+      // Expliciete kolomlijst i.p.v. `select('*')`: die stuurde óók `iban_hash`
+      // en `iban_encrypted` mee. De blind index is een stabiele, uit een
+      // server-only sleutel afgeleide gelijkheids-identifier — dezelfde IBAN
+      // geeft altijd dezelfde hash — en hoort de browser nooit te bereiken. Dit
+      // is de zusterkolom van de `bank_accounts`-fix (984b54eba), exact dezelfde
+      // klasse. De lijst is precies wat `GcAccount` declareert; groeit die,
+      // groeit deze mee — maar nooit met een crypto-kolom.
       let query = supabase
         .from('bank_connection_accounts')
-        .select('*, bank_connections(provider_name, provider_logo, token_expires_at, status)')
+        .select(
+          'id, external_account_id, iban, account_name, last_synced_at, daily_requests, rate_limit_reset_date, is_active, bank_account_id, bank_connections(provider_name, provider_logo, token_expires_at, status)',
+        )
         .eq('is_active', true)
 
       // Bij individuele rekening: toon alleen relevante connectie
@@ -477,7 +486,28 @@ export function CashAccountView({
         query = query.eq('bank_account_id', accountId)
       }
 
-      const { data } = await query.order('iban', { ascending: true })
+      // Ordenen op `created_at`, niet op de plaintext `iban`: die kolom verdwijnt
+      // in Stage B, en een `order()` op een gedropte kolom geeft een PostgREST
+      // 400. Deze loader slikt fouten stil (`const { data } = …`, plus de catch),
+      // dus de koppelkaarten zouden dan geruisloos verdwijnen i.p.v. iets te
+      // melden. `created_at` bestaat altijd en is stabiel — dezelfde ordening als
+      // `/api/bank-connect/linked-accounts`.
+      //
+      // LET OP — dit maakt de query nog NIET Stage B-bestendig: `iban` staat
+      // hierboven nog in de `select()`, want `ConnectedAccountCard` toont 'm.
+      // Bij de drop geeft dát dezelfde 400 en dezelfde stille degradatie. Deze
+      // lezer is precies de reden dat commit 984b54eba de plaintext-kolom nog
+      // liet meeschrijven. De echte uitweg is de kaart op een server-route zetten
+      // (zoals /api/bank-connect/linked-accounts, dat alleen een `iban_tail`
+      // teruggeeft) — die route mist vandaag `daily_requests` en
+      // `rate_limit_reset_date`, die `SyncStatusBadge` nodig heeft. Open punt,
+      // vóór Stage B te sluiten.
+      //
+      // Zichtbaar effect van de ordening-wissel: koppelvolgorde
+      // i.p.v. alfabetisch op IBAN, en dat is alleen merkbaar in het
+      // gecombineerde overzicht — per rekening bestaat er hooguit één actieve
+      // koppeling (unieke index `bank_connection_accounts_one_active_per_bank_account`).
+      const { data } = await query.order('created_at', { ascending: true })
 
       if (data) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -115,6 +115,15 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
     reviewedAt: '2026-07-30',
   },
   {
+    id: 'client-select-star-lekt-crypto-kolommen',
+    title: 'select(\'*\') in clientcomponenten stuurt crypto-kolommen naar de browser',
+    detail:
+      'Een `select(\'*\')` op een tabel met veld-encryptie levert de browser óók `*_encrypted` en `*_hash`. Die hash is een blind index (HMAC-SHA256 onder een server-only sleutel): een STABIELE identifier die dezelfde waarde altijd op hetzelfde getal afbeeldt, dus een correlatiesleutel die niets toevoegt aan wat het scherm toont. Twee van de vier tabellen zijn gedicht — `bank_accounts` (984b54eba) en `bank_connection_accounts` (31 jul, components/app/cash-account-view.tsx#loadGcAccounts, nu een expliciete kolomlijst + tripwire in cash-account-view.test.tsx); `bank_connections` heeft geen client-reads. Wat blijft staan is `assets`, en dat weegt zwaarder dan de twee gedichte: de SELECT-policy daar is HUISHOUD-GEDEELD (`auth.uid()=user_id OR (ownership=\'shared\' AND household_id=user_household_id())`), dus bij een gedeelde bezitting belanden `account_number_hash`, `account_number_encrypted` én het plaintext `account_number` van de PARTNER in de bundel van de vragende gebruiker — buiten de perspectief-loaders om. Negen bevestigde plekken, zwaarst eerst: components/core/asset-detail-flow.tsx:164 en components/app/core/assets/asset-pane.tsx:174 (alle actieve assets), app/(app)/core/checkin/page.tsx:244, app/(app)/horizon/whatif/whatif-page-client.tsx:210, app/(app)/core/assets/revalue/page.tsx:74, components/core/deepenings/verhuurrendement-tab.tsx:122, components/core/deepenings/hypotheekplanner-tab.tsx:171, plus de één-rij-varianten asset-detail-flow.tsx:260 en asset-pane.tsx:267. STRUCTUREEL: alle staan op de grandfather-allowlist van scripts/check-client-data-reads.mjs, en die gate kent alleen "client-read ja/nee", niet "wélke kolommen" — een select(\'*\') op een tabel mét crypto-kolommen glipt er per definitie doorheen, wat verklaart waarom deze twee lekken handmatig gevonden moesten worden. Uitweg: per bestand een expliciete kolomlijst (de crypto-kolommen worden nergens client-side gebruikt — decryptField heeft server-only sleutels), plus een tweede, NIET-allowlistbare regel in die gate die select(\'*\') op assets/bank_accounts/bank_connection_accounts/bank_connections in \'use client\'-bestanden hard afkeurt. Verwijder dit punt zodra de negen om zijn én die regel bestaat.',
+    severity: 'risk',
+    elementIds: ['as-vermogen', 't-supabase'],
+    reviewedAt: '2026-07-31',
+  },
+  {
     id: 'fk-waarde-zonder-datalaag-guard',
     title: 'valuations.entity_id mist de eigenaarschaps-guard van zijn zusterkolommen',
     detail:
