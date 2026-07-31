@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { computeFireAge } from '@/lib/checkin/fire-age'
 import { resolveFireParams } from '@/lib/fire-params'
 import { localMonthBounds, localMonthStart } from '@/lib/month-range'
+import { selectUnlinkedBankAccounts, unlinkedCashTotal } from '@/lib/unlinked-cash'
 
 const MONTH_NAMES = [
   'januari', 'februari', 'maart', 'april', 'mei', 'juni',
@@ -41,13 +42,11 @@ export async function GET() {
       .select('current_balance, net_worth_inclusion_pct')
       .eq('user_id', claims.sub)
       .eq('is_active', true),
-    // Losse bankrekeningen tellen als cash mee in netto vermogen
-    supabase
-      .from('bank_accounts')
-      .select('balance')
-      .eq('user_id', claims.sub)
-      .eq('is_active', true)
-      .is('linked_asset_id', null),
+    // Losse bankrekeningen tellen als cash mee in netto vermogen. Bewust
+    // ZONDER user-filter: de SELECT-policy is huishoud-verbreed (eigen rijen OF
+    // gedeeld binnen het huishouden) en RLS scoopt hier al — zie
+    // lib/unlinked-cash.ts.
+    selectUnlinkedBankAccounts(supabase),
     // Current month income
     supabase
       .from('transactions')
@@ -112,7 +111,7 @@ export async function GET() {
 
   // Zelfde inclusieregels als dashboard-data-loader: gewogen met
   // net_worth_inclusion_pct, plus losse bankrekeningen als cash.
-  const unlinkedCash = (bankRes.data || []).reduce((s, b) => s + Number(b.balance || 0), 0)
+  const unlinkedCash = unlinkedCashTotal(bankRes.data)
   const totalAssets = (assetsRes.data || []).reduce(
     (s, a) => s + (a.current_value || 0) * ((a.net_worth_inclusion_pct ?? 100) / 100), 0,
   ) + unlinkedCash

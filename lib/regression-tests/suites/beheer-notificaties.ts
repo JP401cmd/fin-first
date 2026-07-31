@@ -165,6 +165,12 @@ const tests: TestCase[] = [
     id: 'notif-notification-type-enum',
     name: 'NotificationType bevat alle 8 typen',
     category: CAT,
+    // Het blijven er 8: de bankkoppeling-verloopwaarschuwing (2026-07-31) is
+    // bewust ONDER `sync` gehangen en kreeg géén eigen type. `sync` is in de
+    // praktijk de "Bank"-bak — MODULE_MAP labelt 'm zo, en WOZ_REMINDER_TEMPLATE
+    // gebruikt 'm ook al voor een niet-synchronisatie-signaal. Een eigen type zou
+    // deze telling, MODULE_MAP, de PUT-validTypes én de voorkeurenpagina raken,
+    // en een gebruiker die "Bank"-meldingen uitzette alsnog laten waarschuwen.
     description: 'NotificationType union omvat budget, sync, recommendation, partner_transaction, horizon, holding_alert, briefing, budget_model_proposal',
     priority: 'high',
     estimatedDurationMs: 10,
@@ -177,6 +183,60 @@ const tests: TestCase[] = [
       // Verify uniqueness
       const unique = new Set(allTypes)
       assertEqual(unique.size, 8, 'All types are unique')
+    },
+  },
+  {
+    id: 'notif-bank-verloopwaarschuwing',
+    name: 'Bankkoppeling-verloop: één bericht, en niet bij ontkoppeld of al verlopen',
+    category: CAT,
+    description:
+      'buildBankSignalNotification waarschuwt binnen 14 dagen vóór het verlopen van de autorisatie, zwijgt bij een zacht ontkoppelde rekening, geeft geen verloop-bericht bij een al verlopen koppeling, en laat de verloop-waarschuwing vóórgaan op het versheidsbericht',
+    priority: 'high',
+    estimatedDurationMs: 10,
+    async fn() {
+      const { buildBankSignalNotification } = await import('@/lib/notifications/bank-signalen')
+
+      const now = new Date('2026-07-29T12:00:00.000Z')
+      const overDagen = (d: number) => new Date(now.getTime() + d * 86_400_000).toISOString()
+      const dagenGeleden = (d: number) => new Date(now.getTime() - d * 86_400_000).toISOString()
+      const base = {
+        connectionAccountId: 'acc-1',
+        label: '1 6430 01',
+        providerName: 'ING',
+        linkIsActive: true,
+        connectionStatus: 'active',
+        tokenExpiresAt: overDagen(60),
+        lastSyncedAt: dagenGeleden(0),
+      }
+
+      assertEqual(buildBankSignalNotification(base, now), null, 'Gezonde koppeling zwijgt')
+
+      const bijnaVerlopen = buildBankSignalNotification(
+        { ...base, tokenExpiresAt: overDagen(10) },
+        now,
+      )
+      assertNotNull(bijnaVerlopen, 'Waarschuwt binnen het 14-dagenvenster')
+      assertEqual(bijnaVerlopen!.id, 'bank_expiry_acc-1', 'Eigen melding-id')
+      assert(bijnaVerlopen!.title.includes('ING'), 'Noemt de bank, niet het IBAN-fragment')
+      assert(!bijnaVerlopen!.title.includes('1 6430 01'), 'Geen rekeningnummer in de verloop-melding')
+
+      assertEqual(
+        buildBankSignalNotification({ ...base, linkIsActive: false, tokenExpiresAt: overDagen(3) }, now),
+        null,
+        'Zacht ontkoppelde rekening zwijgt volledig',
+      )
+
+      assertEqual(
+        buildBankSignalNotification({ ...base, connectionStatus: 'expired', tokenExpiresAt: dagenGeleden(2) }, now),
+        null,
+        'Al verlopen koppeling krijgt geen "verloopt bijna"-bericht',
+      )
+
+      const beide = buildBankSignalNotification(
+        { ...base, tokenExpiresAt: overDagen(4), lastSyncedAt: dagenGeleden(20) },
+        now,
+      )
+      assertEqual(beide!.id, 'bank_expiry_acc-1', 'Verloop wint van versheid — nooit twee berichten')
     },
   },
   {

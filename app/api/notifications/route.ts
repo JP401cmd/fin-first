@@ -8,6 +8,7 @@ import { localMonthBounds } from '@/lib/month-range'
 import { resolveFireParams } from '@/lib/fire-params'
 import { calculateFreedomTime } from '@/lib/format'
 import { decryptIbanForLabel } from '@/lib/truelayer/cash-asset-backfill'
+import { buildBankSignalNotification } from '@/lib/notifications/bank-signalen'
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -20,6 +21,26 @@ export type NotificationType =
   | 'holding_alert'
   | 'briefing'
   | 'budget_model_proposal'
+
+/**
+ * Eén koppelrij met de embed erbij. PostgREST levert een to-one embed soms als
+ * array (afhankelijk van de relatie-inferentie) — spiegelt `lib/bank-link-loader.ts`.
+ */
+type BankConnectionAccountRow = {
+  id: string
+  iban_encrypted: string | null
+  last_synced_at: string | null
+  bank_connections:
+    | BankConnectionEmbed
+    | BankConnectionEmbed[]
+    | null
+}
+
+type BankConnectionEmbed = {
+  provider_name: string | null
+  status: string | null
+  token_expires_at: string | null
+}
 
 export type Notification = {
   id: string
@@ -286,7 +307,17 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // ── 4. Sync warnings (stale bank accounts) ───────────────────────
+    // ── 4. Bankkoppeling-signalen (verloopt bijna / niet gesynchroniseerd) ──
+    // Twee signalen over dezelfde rekening, één beslissing: welke van de twee
+    // (of geen) de gebruiker te zien krijgt, bepaalt de pure
+    // `buildBankSignalNotification` (lib/notifications/bank-signalen.ts) op basis
+    // van `deriveBankLinkHealth` — de ene afleiding van koppelgezondheid. De
+    // 90-dagen-autorisatie kreeg hiermee eindelijk een proactief kanaal; tot nu
+    // toe stond die waarschuwing alleen op de rekening zelf.
+    //
+    // De embed levert de verbindingsvelden (status + vervaldatum) mee die de
+    // afleiding nodig heeft. `bank_connections` is own-row-RLS, net als
+    // `bank_connection_accounts`, dus de embed verbreedt de scope niet.
 
     const { data: bankAccounts } = computeSlow
       ? await supabase
@@ -295,36 +326,41 @@ export async function GET(request: NextRequest) {
           // `bank_connection_accounts.iban`. De IBAN dient hier één cosmetisch
           // doel (het label van de melding), dus een onleesbare rij degradeert
           // naar 'Bankrekening' i.p.v. de hele meldingenlijst mee te nemen.
-          .select('id, iban_encrypted, last_synced_at')
+          .select('id, iban_encrypted, last_synced_at, bank_connections(provider_name, status, token_expires_at)')
+          // Zacht ontkoppelde rekeningen vallen hier al weg — gebruikersintentie
+          // wint van storing (zie BankLinkSignals.linkIsActive).
           .eq('is_active', true)
       : { data: null }
 
     if (bankAccounts) {
-      const threeDaysAgo = new Date()
-      threeDaysAgo.setDate(threeDaysAgo.getDate() - 3)
+      const nowDate = new Date(now)
 
-      for (const account of bankAccounts) {
-        if (!account.last_synced_at) continue
-        const lastSynced = new Date(account.last_synced_at)
-        if (lastSynced >= threeDaysAgo) continue
+      for (const account of bankAccounts as unknown as BankConnectionAccountRow[]) {
+        const connection = Array.isArray(account.bank_connections)
+          ? account.bank_connections[0] ?? null
+          : account.bank_connections ?? null
 
-        const daysSince = Math.floor((Date.now() - lastSynced.getTime()) / 86_400_000)
         const accountIban = decryptIbanForLabel(account.iban_encrypted)
         const label = accountIban ? accountIban.replace(/(.{4})/g, '$1 ').trim().slice(-9) : 'Bankrekening'
-        const id = `sync_${account.id}`
+
+        const signal = buildBankSignalNotification(
+          {
+            connectionAccountId: account.id,
+            label,
+            providerName: connection?.provider_name ?? null,
+            linkIsActive: true,
+            connectionStatus: connection?.status ?? null,
+            tokenExpiresAt: connection?.token_expires_at ?? null,
+            lastSyncedAt: account.last_synced_at,
+          },
+          nowDate,
+        )
+        if (!signal) continue
 
         slow.push({
-          id,
-          type: 'sync',
-          priority: 2,
-          title: `${label}: ${daysSince} dagen niet gesynchroniseerd`,
-          description: `Laatste sync: ${lastSynced.toLocaleDateString('nl-NL')}. Vernieuw je bankgegevens voor actueel inzicht.`,
-          icon: 'RefreshCw',
-          color: 'red',
+          ...signal,
           createdAt: now,
-          read: readIds.includes(id),
-          actionUrl: '/core/cash',
-          aiContext: `Mijn bankrekening ${label} is al ${daysSince} dagen niet gesynchroniseerd. Wat moet ik doen?`,
+          read: readIds.includes(signal.id),
         })
       }
     }

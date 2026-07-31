@@ -17,6 +17,7 @@ import { type Debt, computeRenteAflossingsSplit } from '@/lib/debt-data'
 import { resolveSavingsSource, savingsRateFromAggregates } from '@/lib/savings-source'
 import { resolveEffectiveIncomeExpenses } from '@/lib/effective-financials'
 import { localMonthBounds, localMonthStart } from '@/lib/month-range'
+import { selectUnlinkedBankAccounts, unlinkedCashTotal } from '@/lib/unlinked-cash'
 import {
   weightedAssetTotal,
   weightedDebtTotal,
@@ -185,13 +186,11 @@ export async function POST() {
       .eq('user_id', user.id)
       .gte('date', monthStart)
       .lt('date', monthEnd),
-    // Niet-gekoppelde bankrekeningen voor unlinkedCash.
-    supabase
-      .from('bank_accounts')
-      .select('balance')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .is('linked_asset_id', null),
+    // Niet-gekoppelde bankrekeningen voor unlinkedCash. Bewust zónder
+    // user-filter: de policy is huishoud-verbreed, RLS scoopt hier al — een
+    // eigen `.eq('user_id', …)` zou gedeelde huishoudrekeningen wegsnijden en
+    // dit net_worth laten driften met het dashboard (lib/unlinked-cash.ts).
+    selectUnlinkedBankAccounts(supabase),
   ])
 
   if (assetsResult.error) {
@@ -208,7 +207,7 @@ export async function POST() {
 
   // Canoniek opgeslagen net_worth: inclusion-gewogen assets + losse cash
   // − inclusion-gewogen debts (spiegelt dashboard-loader; gedeeld met auto/cron).
-  const unlinkedCash = (bankAccountsResult.data ?? []).reduce((s, a) => s + Number(a.balance), 0)
+  const unlinkedCash = unlinkedCashTotal(bankAccountsResult.data)
   const weightedAssets = weightedAssetTotal(assets as SnapshotAsset[])
   const totalDebts = weightedDebtTotal(debts as SnapshotDebt[])
   const totalAssets = weightedAssets + unlinkedCash

@@ -6,6 +6,7 @@ import { computeFireAge } from '@/lib/checkin/fire-age'
 import { resolveFireParams } from '@/lib/fire-params'
 import { localMonthBounds, localMonthStart } from '@/lib/month-range'
 import { computeDebtAflossingMonthly, savingsRateFromAggregates } from '@/lib/savings-source'
+import { selectUnlinkedBankAccounts, unlinkedCashTotal } from '@/lib/unlinked-cash'
 import {
   buildGespreksstarters,
   type GespreksstartersInput,
@@ -45,7 +46,9 @@ export async function GET() {
     supabase.from('transactions').select('amount, transaction_type, date').eq('user_id', claims.sub).eq('is_income', true).gte('date', sixMonthsAgo).lt('date', monthEnd),
     supabase.from('transactions').select('amount, transaction_type, date').eq('user_id', claims.sub).eq('is_income', false).gte('date', sixMonthsAgo).lt('date', monthEnd),
     supabase.from('profiles').select('date_of_birth, expected_return, inflation_rate').eq('id', claims.sub).maybeSingle(),
-    supabase.from('bank_accounts').select('balance').eq('user_id', claims.sub).eq('is_active', true).is('linked_asset_id', null),
+    // Bewust zónder user-filter: de bank_accounts-policy is huishoud-verbreed
+    // en RLS scoopt hier al (lib/unlinked-cash.ts).
+    selectUnlinkedBankAccounts(supabase),
     supabase.from('transactions').select('amount, category').eq('user_id', claims.sub).eq('is_income', false).gte('date', monthStart).lt('date', monthEnd),
     supabase.from('transactions').select('amount, category').eq('user_id', claims.sub).eq('is_income', false).gte('date', prevMonthStart).lt('date', monthStart),
     supabase.from('transactions').select('amount, counterparty_name, description, date').eq('user_id', claims.sub).eq('is_income', false).gte('date', threeMonthsAgo).lt('date', monthEnd),
@@ -57,7 +60,7 @@ export async function GET() {
   // Zelfde inclusieregels als dashboard-data-loader: actieve posten, gewogen
   // met net_worth_inclusion_pct, plus losse bankrekeningen als cash.
   const assets = assetsRes.data || []
-  const unlinkedCash = (bankRes.data || []).reduce((s, b) => s + Number(b.balance || 0), 0)
+  const unlinkedCash = unlinkedCashTotal(bankRes.data)
   const totalAssets = assets.reduce(
     (s, a) => s + (a.current_value || 0) * ((a.net_worth_inclusion_pct ?? 100) / 100), 0,
   ) + unlinkedCash

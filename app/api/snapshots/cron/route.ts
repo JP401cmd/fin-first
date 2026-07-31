@@ -19,6 +19,11 @@ import { recordJobRun } from '@/lib/job-runs'
 import { mapWithConcurrency } from '@/lib/concurrency'
 import { localMonthBounds, localMonthStart } from '@/lib/month-range'
 import {
+  loadHouseholdIdsByUser,
+  selectUnlinkedBankAccountsForUser,
+  unlinkedCashTotal,
+} from '@/lib/unlinked-cash'
+import {
   weightedAssetTotal,
   weightedDebtTotal,
   computeSnapshotNetWorth,
@@ -127,6 +132,16 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: profilesError.message }, { status: 500 })
   }
 
+  // Huishouden per gebruiker, in ÉÉN leesronde vooraf (niet per gebruiker in de
+  // pool). Nodig omdat de service-role-client RLS passeert: de huishoud-verbrede
+  // scope van `bank_accounts` moet hier met de hand mee. Faalt de leesronde, dan
+  // is de map leeg en valt iedereen terug op alleen-eigen-rijen — hooguit een
+  // gedeeld saldo te weinig, nooit dat van een vreemde.
+  const householdIdByUser = await loadHouseholdIdsByUser(
+    supabase,
+    (profiles ?? []).map(p => p.id),
+  )
+
   type SnapshotEntry = { userId: string; created: boolean; error?: string }
 
   // Verwerk één gebruiker. Vangt ALTIJD zijn eigen fouten en throwt NOOIT: onder
@@ -197,13 +212,17 @@ export async function GET(request: Request) {
           .eq('user_id', userId)
           .gte('date', monthStart)
           .lt('date', monthEnd),
-        // Niet-gekoppelde bankrekeningen voor unlinkedCash.
-        supabase
-          .from('bank_accounts')
-          .select('balance')
-          .eq('user_id', userId)
-          .eq('is_active', true)
-          .is('linked_asset_id', null),
+        // Niet-gekoppelde bankrekeningen voor unlinkedCash. Deze cron draait op
+        // een SERVICE-ROLE-client: `auth.uid()` is NULL, dus de huishoud-verbrede
+        // SELECT-policy scoopt hier NIETS en een RLS-leunende query zou de
+        // rekeningen van álle gebruikers optellen. De scope moet daarom expliciet
+        // mee — eigen rijen OF gedeeld binnen hetzelfde huishouden, exact zoals de
+        // policy 'm voor een sessie-client zou toepassen (lib/unlinked-cash.ts).
+        selectUnlinkedBankAccountsForUser(
+          supabase,
+          userId,
+          householdIdByUser.get(userId) ?? null,
+        ),
       ])
 
       if (assetsResult.error || debtsResult.error) {
@@ -218,7 +237,7 @@ export async function GET(request: Request) {
       const expenses = expensesResult.data ?? []
       const income = incomeResult.data ?? []
 
-      const unlinkedCash = (bankAccountsResult.data ?? []).reduce((s, a) => s + Number(a.balance), 0)
+      const unlinkedCash = unlinkedCashTotal(bankAccountsResult.data)
 
       // Canoniek opgeslagen net_worth: inclusion-gewogen assets + losse cash
       // − inclusion-gewogen debts (spiegelt dashboard-loader; gedeeld met POST/auto).

@@ -109,13 +109,18 @@ export type BankLinkHealth = {
    * op het moment dat het wél stuk is. Het icoon spreekt pas als de verbinding
    * daadwerkelijk kwijt is.
    *
-   * **Waar de vooraankondiging vandaag WÉL leeft: alleen op de rekeningdetail**
-   * (`connected-account-card.tsx`), dus alleen als de gebruiker er zelf naartoe
-   * navigeert. Een proactief kanaal — een notificatie of een regel in de briefing —
-   * bestaat nog niet; `app/api/notifications` waarschuwt op sync-VERSHEID
-   * (`last_synced_at`), niet op een aflopende autorisatie. Dat is een bewust
-   * openstaand punt (fase 7, restpunt), geen bestaande voorziening: bouw er geen
-   * redenering op alsof de gebruiker het al te zien krijgt.
+   * **Waar de vooraankondiging leeft:** op de rekeningdetail
+   * (`connected-account-card.tsx`) én — sinds het berichtenkanaal 'm oppikte — als
+   * melding in `app/api/notifications` (sectie 4). Die route waarschuwde eerder
+   * alléén op sync-VERSHEID (`last_synced_at`); de aflopende autorisatie is daar nu
+   * een eigen bericht naast, gebouwd op déze vlag via
+   * `lib/notifications/bank-signalen.ts`. Dat is dus wél een proactief kanaal: de
+   * gebruiker hoeft niet zelf naar de rekening te navigeren om het te zien.
+   *
+   * Twee regels die daarbij op deze afleiding leunen, en die dus blijven gelden
+   * zolang je ze hier niet omgooit: een AL verlopen koppeling is `linked-broken` en
+   * daarmee `expiringSoon: false` (geen dubbel bericht over dezelfde toestand), en
+   * een zacht ontkoppelde rekening is `manual` en zwijgt volledig.
    */
   expiringSoon: boolean
   /** Doorgegeven signaal 4 — zie {@link BankLinkSignals.lastSyncedAt}. */

@@ -45,6 +45,7 @@
 import { cache } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { localMonthBounds, localMonthStartMonthsAgo } from '@/lib/month-range'
+import { selectUnlinkedBankAccounts } from '@/lib/unlinked-cash'
 
 // ── 1. Assets ──────────────────────────────────────────────────────────────
 /**
@@ -121,13 +122,14 @@ export const getBudgets = cache(async (supabase: SupabaseClient) =>
  *
  * Ruimste kolomset = horizon (`id, name, balance`); dashboard (`id, balance`)
  * en lever-scores (`balance`) zijn subsets.
+ *
+ * Het `is_active`/`linked_asset_id IS NULL`-predicaat is de GRONDSLAG (welk geld
+ * telt náást de assets mee) en woont daarom in `lib/unlinked-cash.ts`, samen met
+ * de optelling zelf en de service-role-variant voor de snapshot-cron. Deze
+ * fetcher voegt alleen de ruimere kolomset en de request-dedupe toe.
  */
 export const getUnlinkedBankAccounts = cache(async (supabase: SupabaseClient) =>
-  supabase
-    .from('bank_accounts')
-    .select('id, name, balance')
-    .eq('is_active', true)
-    .is('linked_asset_id', null),
+  selectUnlinkedBankAccounts(supabase),
 )
 
 // ── 6. Transactie-vensters (raw rows) ──────────────────────────────────────
