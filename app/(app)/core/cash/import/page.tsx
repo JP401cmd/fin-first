@@ -872,9 +872,11 @@ export default function ImportPage() {
     })
 
     // Filter tegen rijen die AL in de DB staan op DEZE rekening. De unieke index is
-    // `transactions_import_hash_account_idx` op
-    // (user_id, account_id, import_hash, coalesce(bank_seq, '')) (partieel WHERE
-    // import_hash IS NOT NULL). Eén botsing laat anders een hele batch van 100 falen
+    // `transactions_import_hash_per_account_idx` op
+    // (account_id, import_hash, coalesce(bank_seq, '')) (partieel WHERE
+    // import_hash IS NOT NULL) — bewust ZONDER user_id, zodat twee partners
+    // dezelfde boeking op een gedeelde rekening niet allebei kunnen inschrijven.
+    // Eén botsing laat anders een hele batch van 100 falen
     // (ON CONFLICT kan de partiële index niet inferren). Haal de bestaande
     // (import_hash, bank_seq)-paren op en sla die rijen over — zo loopt geen enkele batch
     // op de unieke index stuk en blijven distinct-rijen (zelfde hash, ander Volgnr) wél door.
