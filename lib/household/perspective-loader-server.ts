@@ -21,6 +21,7 @@
 
 import { cache } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { getCachedUser } from '@/lib/supabase/cached-user'
 import type { Perspective } from '@/lib/household-data'
 import {
   loadPerspectiveContext,
@@ -36,10 +37,17 @@ import {
  * client-instantie: binnen één render levert elke aanroep met dezelfde
  * server-client de eerste (en enige) `loadPerspectiveContext`-uitvoering.
  * Het resultaat is identiek aan een directe `loadPerspectiveContext`-call.
+ *
+ * De gebruiker komt uit `getCachedUser` (ook `cache()`-gewrapt) en wordt
+ * INGEGEVEN: `loadPerspectiveContext` deed anders zijn eigen, blokkerende
+ * `auth.getUser()`-roundtrip vóór elke query — op de cashflow-hub een derde
+ * volle auth-call bovenop die van de shell en de dashboard-loader. Het
+ * client-pad van `loadPerspectiveContext` blijft ongemoeid: dat roept 'm
+ * zónder tweede argument aan en resolvet de gebruiker zelf.
  */
 export const getCachedPerspectiveContext = cache(
-  (supabase: SupabaseClient): Promise<PerspectiveContext> =>
-    loadPerspectiveContext(supabase),
+  async (supabase: SupabaseClient): Promise<PerspectiveContext> =>
+    loadPerspectiveContext(supabase, await getCachedUser(supabase)),
 )
 
 /**

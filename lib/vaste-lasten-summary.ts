@@ -17,6 +17,7 @@ import {
 import { isRecurringExpired } from '@/lib/recurring-data'
 import { localMonthStartMonthsAgo } from '@/lib/month-range'
 import { roundCents } from '@/lib/format'
+import { getCachedUser } from '@/lib/supabase/cached-user'
 
 /** Kolomset die `detectRecurringTransactions` nodig heeft (getrimd). */
 type RecurringTxRow = {
@@ -118,12 +119,15 @@ function toMonthly(amount: number, frequency: string): number {
  * Detecteert vaste lasten uit de laatste 12 maanden transactie-historie +
  * confirmed recurring_transactions. Queries zijn RLS-gescoped op de ingelogde
  * gebruiker. `cache()` dedupt per request.
+ *
+ * De auth-check loopt via `getCachedUser` (óók `cache()`-gewrapt): op de
+ * cashflow-hub draait deze loader naast de dashboard-/cashflow-loaders, die
+ * dezelfde helper gebruiken. Een rauwe `auth.getUser()` zou hier een extra,
+ * BLOKKERENDE `/auth/v1/user`-roundtrip vóór de `Promise.all` hieronder zetten.
  */
 export const loadVasteLastenSummary = cache(
   async (supabase: SupabaseClient): Promise<VasteLastenSummary> => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const user = await getCachedUser(supabase)
     if (!user) return EMPTY
 
     const now = new Date()

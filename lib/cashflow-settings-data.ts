@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { loadCoreData } from '@/lib/core-data-loader'
+import { getCachedUser } from '@/lib/supabase/cached-user'
 import type { FinancialInput, SavingsRateMethod } from '@/lib/core-metrics'
 import type { RetirementExpenseMethod } from '@/lib/budget-utils'
 
@@ -81,13 +82,16 @@ export async function loadParameterSavingsRateTarget(
  * Assembles a serializable props-bundle for the cashflow-instellingen-blok.
  * Reuses the request-level cached `loadCoreData` call — within a single
  * server render this is a no-op if the loader has already run.
+ *
+ * Idem voor de auth-check: `getCachedUser` is `cache()`-gewrapt en deelt de ene
+ * `/auth/v1/user`-roundtrip met de andere loaders in dezelfde render. Een rauwe
+ * `auth.getUser()` was hier extra duur omdat hij als eerste, blokkerende stap
+ * vóór alle vervolgqueries staat.
  */
 export async function loadCashflowSettingsData(
   supabase: SupabaseClient,
 ): Promise<CashflowSettingsData | null> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getCachedUser(supabase)
   if (!user) return null
 
   // loadCoreData is wrapped with React cache() — no duplicate DB round-trips

@@ -24,7 +24,7 @@
 //   • `_myShareFraction` — het aandeel (0-1) dat in dit perspectief telt
 //   • `_aggregated` — true voor een privacy-'totalen'-aggregaatrij (van de RPC)
 
-import type { SupabaseClient } from '@supabase/supabase-js'
+import type { SupabaseClient, User } from '@supabase/supabase-js'
 import { ASSET_CLIENT_COLUMNS } from '@/lib/asset-data'
 import {
   computeSharePct,
@@ -96,13 +96,26 @@ const SOLO_CONTEXT = (userId: string): PerspectiveContext => ({
  * Resolve het huishoud-perspectief van de huidige gebruiker: partner,
  * split-modus, aandeel-% en de privacy-instellingen van de partner.
  * Solo-gebruikers krijgen een `hasHousehold:false`-context met 100% aandeel.
+ *
+ * `preloadedUser` is een optionele, al-geresolveerde gebruiker. Server-loaders
+ * geven hier de request-gecachte `getCachedUser(supabase)` mee (zie
+ * perspective-loader-server.ts) zodat de blokkerende `/auth/v1/user`-roundtrip
+ * die vóór álle queries hieronder staat gedeeld wordt met de andere loaders in
+ * dezelfde render. Dit bestand is DUAL-USE: zónder het argument resolvet de
+ * functie de gebruiker zelf — byte-identiek aan voorheen, en dat is het pad dat
+ * de browser-consumenten (budgets-client, cash-overview, …) lopen.
+ *
+ * Een expliciete `null` betekent "al gecheckt, niemand ingelogd" en leidt tot
+ * dezelfde `Not authenticated`-fout als een zelf-geresolveerde lege sessie —
+ * zonder er nóg een roundtrip aan te wagen. Alleen `undefined` (= argument
+ * weggelaten) triggert het zelf-resolven.
  */
 export async function loadPerspectiveContext(
   supabase: SupabaseClient,
+  preloadedUser?: User | null,
 ): Promise<PerspectiveContext> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user =
+    preloadedUser !== undefined ? preloadedUser : (await supabase.auth.getUser()).data.user
   if (!user) throw new Error('Not authenticated')
 
   const { data: members } = await supabase
