@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import type { LeverageStatus } from '@/lib/leverage-status'
+import type { CashflowCardStatuses } from '@/lib/cashflow-cards'
 
 /**
  * De vier cashflow-kaartstatussen (Budget, Transacties, Vaste lasten, Forecast)
@@ -19,12 +20,9 @@ import type { LeverageStatus } from '@/lib/leverage-status'
  * Eénmalige fetch per route-bezoek (geen polling). Defensief: bij loading/fout
  * blijven alle statussen 'neutral' (progressive enhancement).
  */
-export type CashflowCardStatuses = {
-  budget: LeverageStatus
-  transacties: LeverageStatus
-  vasteLasten: LeverageStatus
-  forecast: LeverageStatus
-}
+// Het payload-contract woont bij de producent (lib/cashflow-cards.ts); hier
+// alleen doorgegeven, zodat route, TTL-cache en sidebar één vorm delen.
+export type { CashflowCardStatuses }
 
 const NEUTRAL: CashflowCardStatuses = {
   budget: 'neutral',

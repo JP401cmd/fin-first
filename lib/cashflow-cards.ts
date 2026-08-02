@@ -14,6 +14,19 @@ import { formatCurrency } from '@/lib/format'
 
 export type CashflowCardKey = 'budget' | 'transacties' | 'vaste-lasten' | 'forecast'
 
+/**
+ * De vier kaartstatussen als platte payload — het wire-contract van
+ * `GET /api/overzicht/cashflow-status` en daarmee van de sidebar-status-dots
+ * (`useCashflowCardStatuses`). Woont hier omdat dit de module is die de
+ * statussen produceert; route, TTL-cache en hook consumeren allemaal DEZE vorm.
+ */
+export interface CashflowCardStatuses {
+  budget: LeverageStatus
+  transacties: LeverageStatus
+  vasteLasten: LeverageStatus
+  forecast: LeverageStatus
+}
+
 export interface CashflowCard {
   key: CashflowCardKey
   label: string
