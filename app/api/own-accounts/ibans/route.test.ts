@@ -16,7 +16,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
  *     inkomst én uitgave en staat de spaarquote structureel verkeerd — zonder dat
  *     er ergens iets rood wordt. De teller is de veiligheidsklep waarop
  *     `fetchOwnAccountIbansStrict` afgaat.
- *  3. **Alleen eigen rijen** (`user_id`-filter), en niet ingelogd = 401.
+ *  3. **RLS is de grens, niet een eigen `user_id`-filter** — en niet ingelogd = 401.
  *  4. **Een leesfout wordt een 500, geen lege lijst.** "Geen eigen IBANs" en "ik
  *     kon ze niet lezen" mogen nooit dezelfde respons opleveren.
  */
@@ -25,7 +25,15 @@ const { mockCreateClient, mockDecryptField } = vi.hoisted(() => ({
   mockCreateClient: vi.fn(),
   mockDecryptField: vi.fn(),
 }))
-vi.mock('@/lib/supabase/server', () => ({ createClient: mockCreateClient }))
+// `getAuthClaims` is in productie een one-liner om `auth.getClaims()` heen (ADR
+// 0052). De mock doet hier hetzelfde, zodat de auth-toestand — net als voorheen
+// bij `getUser()` — uit de client-stub blijft komen in plaats van uit een losse
+// tweede mock die per test bijgesteld moet worden.
+vi.mock('@/lib/supabase/server', () => ({
+  createClient: mockCreateClient,
+  getAuthClaims: async (supabase: { auth: { getClaims: () => Promise<{ data: { claims: unknown } | null }> } }) =>
+    (await supabase.auth.getClaims()).data?.claims ?? null,
+}))
 vi.mock('@/lib/crypto/field-encryption', () => ({
   blindIndex: (s: string) => `hash:${s}`,
   encryptField: (s: string | null) => (s === null || s === undefined ? null : `enc:${s}`),
@@ -47,8 +55,8 @@ function buildClient(rows: Row[], opts: { user?: string | null; readError?: stri
   const user = opts.user === undefined ? USER : opts.user
   return {
     auth: {
-      getUser: async () => ({
-        data: { user: user ? { id: user } : null },
+      getClaims: async () => ({
+        data: user ? { claims: { sub: user } } : null,
         error: user ? null : { message: 'no session' },
       }),
     },

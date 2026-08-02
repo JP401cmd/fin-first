@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { serverError, unauthorized } from '@/lib/api/respond'
 import { decryptField } from '@/lib/crypto/field-encryption'
 
@@ -68,10 +68,17 @@ export interface OwnAccountIbansResponse {
 export async function GET() {
   try {
     const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) return unauthorized()
+    // Pure read-GET → `getAuthClaims` i.p.v. `auth.getUser()` (ADR 0052): de JWT
+    // wordt lokaal geverifieerd, wat de auth-server-roundtrip per request scheelt op
+    // een route die in het client-pad van /overzicht/cashflow zit. RLS blijft de
+    // echte autorisatiegrens (de query hieronder loopt over de RLS-client), en de
+    // identiteit wordt hier verder nergens gebruikt — alleen de aanwezigheid ervan.
+    // Geaccepteerd: een server-side ingetrokken sessie kan tot de JWT-expiry (max.
+    // 1 uur) nog uitsluitend de EIGEN rijen lezen; schrijven kan niet.
+    const claims = await getAuthClaims(supabase)
+    if (!claims) return unauthorized()
 
-    // GEEN `.eq('user_id', user.id)` — en dat is een bewuste, geverifieerde keuze.
+    // GEEN `.eq('user_id', claims.sub)` — en dat is een bewuste, geverifieerde keuze.
     //
     // De SELECT-policy op `bank_accounts` is NIET eigen-rij maar huishoud-verbreed:
     //   (auth.uid() = user_id)
