@@ -39,16 +39,22 @@
  *  a. TRANSITIEF VIA EEN GEDEELDE HELPER. De scan slaat elk bestand zonder
  *     `use client`-directive over. Staat de `select('*')` in een gewone
  *     lib-module die dóór clientcode wordt aangeroepen, dan ziet de gate niets.
- *     Dit is geen theorie: `lib/household/perspective-loader.ts` doet
- *     `.from('assets').select('*')` en wordt aangeroepen vanuit
- *     components/core/assets-client.tsx, components/app/cash-overview.tsx en
- *     components/core/debt-category-page.tsx.
+ *     Geen theorie: zo liepen `lib/household/perspective-loader.ts` en
+ *     `lib/household-projection.ts` maandenlang groen langs deze gate terwijl ze
+ *     de partner-kolommen van `assets` naar de browser stuurden.
  *  b. SERVER-LOADER → CLIENT-PROP. Een server-loader mag `select('*')` doen,
  *     maar gaat het resultaat als prop naar een clientcomponent, dan
  *     serialiseert Next het volledig in de RSC-payload en staat het alsnog in
- *     de paginabron (core-data-loader#fullAssets → <CoreLanding>,
- *     server-data/base#getActiveAssets → <HorizonPage>, assets-data-loader →
- *     <AssetsPage>). De gate kent alleen bestanden, geen propstromen.
+ *     de paginabron. Zo lekten `core-data-loader#fullAssets` (→ <CoreLanding>),
+ *     `server-data/base#getActiveAssets` (→ <HorizonPage>) en de
+ *     bezittingen-categoriepagina. De gate kent alleen bestanden, geen
+ *     propstromen.
+ *
+ *     Die vijf zijn 2 aug 2026 gedicht (alle vijf lezen nu ASSET_CLIENT_COLUMNS,
+ *     bewaakt door lib/household/assets-column-contract.test.ts) — ze staan hier
+ *     als BEWIJS dat deze twee klassen echt voorkomen, niet als openstaande
+ *     lekken. Een nieuwe gaat er even hard doorheen; alleen de kolomconstante
+ *     vangt 'm, en die is geen automatisme.
  *  c. NIET-LETTERLIJKE ARGUMENTEN. `.from(tabelVariabele)`, `.select(KOLOMMEN)`
  *     met een constante, en een sterretje uit een template-expressie matchen
  *     geen van alle; net zomin als een keten van >500 tekens tussen `.from(`
