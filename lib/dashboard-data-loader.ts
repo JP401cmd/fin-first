@@ -117,6 +117,15 @@ import {
   type CategoryAppLink,
 } from '@/lib/category-app-nav'
 import { resolveEffectiveIncomeExpenses } from './effective-financials'
+import {
+  buildBudgetTypeMap,
+  deriveBudgetTotals,
+  deriveBudgetScore,
+  deriveRealMonthTotals,
+  resolveBudgetingActive,
+  currentMonthKey,
+  BUDGET_TYPES,
+} from '@/lib/cashflow-kpis'
 import { resolveSavingsSource, savingsRateFromAggregates, computeSavingsRate6m, computeDebtAflossingMonthly, monthlySavingsFromRate } from './savings-source'
 import { buildHealthScoreInput } from '@/lib/health-score-input'
 import { computeHealthScoreWithTrend, type HealthScore } from '@/lib/financial-health'
@@ -473,7 +482,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   const favBudgetsData = allBudgetsRaw.filter(b => b.is_favorite)
 
   // Read profile fields from the combined profile query
-  const budgetingActive = (profileResult.data as Record<string, unknown> | null)?.budgeting_active !== false
+  const budgetingActive = resolveBudgetingActive(profileResult.data as Record<string, unknown> | null)
   const profileFullName = (profileResult.data as Record<string, unknown> | null)?.full_name as string | null ?? null
   // ai_enabled column may not exist yet (migration pending) — default to true
   const profileAiEnabled = (profileResult.data as Record<string, unknown> | null)?.ai_enabled !== false
@@ -484,15 +493,11 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   const activeModules: string[] = [...ALL_MODULES]
   const hasVermogen = activeModules.includes('vermogensregistratie')
 
-  // Core calculations
-  let monthlyIncome = 0
-  let monthlyExpenses = 0
-  for (const tx of txResult.data ?? []) {
-    if (!isRealTx(tx)) continue
-    const amt = Number(tx.amount)
-    if (amt > 0) monthlyIncome += amt
-    else monthlyExpenses += Math.abs(amt)
-  }
+  // Core calculations — de rauwe huidige-maand-pass (mét transfer-filter) die de
+  // EFFECTIVE grondslag voedt. Gedeelde helper (lib/cashflow-kpis.ts) zodat de
+  // slanke cashflow-KPI-laag exact dezelfde pass draait (ADR 0077).
+  const { income: monthlyIncome, expenses: monthlyExpenses } =
+    deriveRealMonthTotals(txResult.data ?? [])
 
   // Fallback to profile estimates for users without transactions
   const profileMonthlyExpenses = Number(profileResult.data?.estimated_monthly_expenses ?? 0)
@@ -548,45 +553,13 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
 
   // Budget totals per type — limiet en werkelijke besteding
   const allParentBudgets = allParentBudgetsData as { id: string; name: string; icon: string; budget_type: string; default_limit: number; interval: string; is_favorite: boolean; alert_threshold: number }[]
-  // Map: budget_id → budget_type (voor zowel parent als child budgetten)
-  const budgetTypeMap = new Map<string, string>()
-  for (const b of allParentBudgets) budgetTypeMap.set(b.id, b.budget_type)
-  for (const c of allChildren) {
-    const parentType = budgetTypeMap.get(c.parent_id ?? '')
-    if (parentType) budgetTypeMap.set(c.id, parentType)
-  }
-
-  const BUDGET_TYPES = ['income', 'expense', 'savings', 'debt'] as const
-  const budgetLimits: Record<string, number> = { income: 0, expense: 0, savings: 0, debt: 0 }
-  for (const b of allParentBudgets) {
-    const type = b.budget_type as string
-    if (!BUDGET_TYPES.includes(type as typeof BUDGET_TYPES[number])) continue
-    const children = allChildren.filter(c => c.parent_id === b.id)
-    const limit = children.length > 0
-      ? children.reduce((sum, c) => sum + Number(c.default_limit), 0)
-      : Number(b.default_limit)
-    const monthlyLimit = b.interval === 'monthly' ? limit
-      : b.interval === 'quarterly' ? limit / 3
-      : limit / 12
-    budgetLimits[type] = (budgetLimits[type] ?? 0) + monthlyLimit
-  }
-
-  const budgetSpent: Record<string, number> = { income: 0, expense: 0, savings: 0, debt: 0 }
-  for (const tx of txResult.data ?? []) {
-    const amt = Number(tx.amount)
-    const budgetId = (tx as { budget_id?: string | null }).budget_id
-    if (!budgetId) continue
-    const type = budgetTypeMap.get(budgetId)
-    if (!type || !BUDGET_TYPES.includes(type as typeof BUDGET_TYPES[number])) continue
-    budgetSpent[type] = (budgetSpent[type] ?? 0) + Math.abs(amt)
-  }
-
-  const budgetTotals = {
-    income:  { limit: budgetLimits.income,  spent: budgetSpent.income },
-    expense: { limit: budgetLimits.expense, spent: budgetSpent.expense },
-    savings: { limit: budgetLimits.savings, spent: budgetSpent.savings },
-    debt:    { limit: budgetLimits.debt,    spent: budgetSpent.debt },
-  }
+  // Map budget_id → budget_type (parent + child) en de limiet/besteding-oprol per
+  // type: beide wonen als pure helpers in lib/cashflow-kpis.ts, zodat de slanke
+  // cashflow-KPI-laag EXACT deze afleiding consumeert i.p.v. hem na te bouwen
+  // (ADR 0077). Hier is dat een zuivere verplaatsing — de map voedt verderop nog
+  // de spaar- en schuld-budget-ID-sets.
+  const budgetTypeMap = buildBudgetTypeMap(allBudgetsRaw)
+  const budgetTotals = deriveBudgetTotals(allBudgetsRaw, txResult.data ?? [])
 
   // ── Savings-budget ID set (for spaarquote correction) ─────
   const savingsBudgetIds = new Set<string>()
@@ -1438,11 +1411,13 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // effective/manual-override die `monthlyIncome`/`monthlyExpenses` voedt (zie
   // resolveEffectiveIncomeExpenses). Bewust een slice van HETZELFDE canonieke
   // maandaggregaat als de historieën hierboven — geen vierde eigen tel-lus, en
-  // een aggregaat kan niet stil op max_rows afkappen. `monthStart` is al
-  // 'YYYY-MM-DD' van de 1e van deze maand, dus slice(0,7) == de aggregaat-sleutel.
-  const currentMonthKey = monthStart.slice(0, 7)
-  const currentMonthIncome = incomeByMonth.get(currentMonthKey) ?? 0
-  const currentMonthExpenses = expenseByMonth.get(currentMonthKey) ?? 0
+  // een aggregaat kan niet stil op max_rows afkappen. De maandsleutel komt uit de
+  // gedeelde `currentMonthKey`-helper (lib/cashflow-kpis.ts) — byte-identiek aan
+  // het vroegere `monthStart.slice(0, 7)`, en gedeeld met de cashflow-KPI-laag
+  // zodat beide paden per definitie dezelfde maand lezen (ADR 0077).
+  const monthKey = currentMonthKey(now)
+  const currentMonthIncome = incomeByMonth.get(monthKey) ?? 0
+  const currentMonthExpenses = expenseByMonth.get(monthKey) ?? 0
 
   // Savings history: income minus expenses per month (using all transactions)
   const savingsByMonth = new Map<string, number>()
@@ -1687,11 +1662,10 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // ── Month Summary: derived from existing calculations ────────
   // Use 6-month rolling average for consistency across the app
   const savingsRate = savingsRate6m
-  // Budget score: average % of budgets within limit (0-100)
-  const budgetScoreEntries = Object.values(budgetTotals).filter(v => v.limit > 0)
-  const budgetScore = budgetScoreEntries.length > 0
-    ? Math.round(budgetScoreEntries.reduce((s, v) => s + Math.min(100, (1 - Math.max(0, v.spent - v.limit) / v.limit) * 100), 0) / budgetScoreEntries.length)
-    : 100
+  // Budget score: average % of budgets within limit (0-100) — gedeelde helper
+  // (lib/cashflow-kpis.ts), zodat de cashflow-KPI-laag dezelfde dekkings-score
+  // consumeert i.p.v. hem na te rekenen (ADR 0077).
+  const budgetScore = deriveBudgetScore(budgetTotals)
   // Net worth delta from snapshots
   const prevSnapshot = snapshotRows.length >= 2 ? snapshotRows[snapshotRows.length - 2] : null
   const netWorthDeltaComputed = prevSnapshot ? netWorth - Number(prevSnapshot.net_worth) : null
