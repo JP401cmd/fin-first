@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
+import { unauthorized } from '@/lib/api/respond'
 import { extractFinancialData } from '@/lib/ai/extract-financial-data'
 
 // ── Validation Schema ──────────────────────────────────────────────
@@ -21,7 +22,7 @@ export async function POST(req: Request) {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 })
+    return unauthorized()
   }
 
   const raw = await req.json()

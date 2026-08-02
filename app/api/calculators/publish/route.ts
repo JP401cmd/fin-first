@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { unauthorized } from '@/lib/api/respond'
 import { StoredCalculatorDefinitionSchema } from '@/lib/calculator/types'
 import { screenPublishMetadata } from '@/lib/ai/screen-publish-metadata'
 
@@ -30,7 +31,7 @@ import { screenPublishMetadata } from '@/lib/ai/screen-publish-metadata'
  *
  * Response:
  *   200 { ok: true, publishedId }
- *   401 Unauthorized
+ *   401 { error: 'Niet ingelogd' }
  *   404 niet gevonden / geen eigenaar
  *   422 { ok: false, error, issue?, suggestion? }  (screening of validatie)
  */
@@ -39,7 +40,7 @@ export async function POST(req: Request) {
   const {
     data: { user },
   } = await supabase.auth.getUser()
-  if (!user) return new Response('Unauthorized', { status: 401 })
+  if (!user) return unauthorized()
 
   let body: {
     calculatorId?: unknown

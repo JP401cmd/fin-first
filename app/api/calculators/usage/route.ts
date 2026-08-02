@@ -1,4 +1,5 @@
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
+import { unauthorized } from '@/lib/api/respond'
 import {
   getUsage,
   MAX_GENERATIONS_PER_WEEK,
@@ -20,13 +21,13 @@ import {
  *
  * Respons:
  *   200 { generations, refinements, maxGenerations, maxRefinements }
- *   401 Unauthorized
+ *   401 { error: 'Niet ingelogd' }
  */
 export async function GET() {
   const supabase = await createClient()
   const claims = await getAuthClaims(supabase)
   if (!claims) {
-    return new Response('Unauthorized', { status: 401 })
+    return unauthorized()
   }
 
   const usage = await getUsage(supabase, claims.sub)

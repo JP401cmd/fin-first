@@ -1,5 +1,6 @@
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { unauthorized } from '@/lib/api/respond'
 
 /**
  * GET /api/goals/history?goal_id=xxx
@@ -16,7 +17,7 @@ export async function GET(request: NextRequest) {
   const claims = await getAuthClaims(supabase)
 
   if (!claims) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return unauthorized()
   }
 
   const { searchParams } = new URL(request.url)
@@ -169,7 +170,7 @@ export async function POST(request: NextRequest) {
   const { data: { user }, error: authError } = await supabase.auth.getUser()
 
   if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return unauthorized()
   }
 
   const body = await request.json()

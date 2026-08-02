@@ -592,7 +592,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 10,
     fn() {
       const errorResponses = [
-        { status: 401, body: 'Unauthorized', json: false },
+        { status: 401, body: { error: 'Niet ingelogd' }, json: true },
         { status: 403, body: { error: 'tier gate message' }, json: true },
         { status: 422, body: { error: 'AI config error' }, json: true },
         { status: 500, body: { error: 'model load failure' }, json: true },

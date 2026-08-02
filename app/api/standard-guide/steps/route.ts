@@ -1,5 +1,6 @@
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { unauthorized } from '@/lib/api/respond'
 import { isSuperAdmin } from '@/lib/admin'
 import {
   STANDARD_GUIDE_STEPS,
@@ -24,7 +25,7 @@ const APP_SETTINGS_KEY = 'standard_guide_steps'
 export async function GET() {
   const supabase = await createClient()
   const claims = await getAuthClaims(supabase)
-  if (!claims) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!claims) return unauthorized()
 
   const { data: row } = await supabase
     .from('app_settings')

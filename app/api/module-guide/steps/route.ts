@@ -1,5 +1,6 @@
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { unauthorized } from '@/lib/api/respond'
 import { isSuperAdmin } from '@/lib/admin'
 import {
   DEFAULT_MODULE_GUIDE_STEPS,
@@ -12,7 +13,7 @@ import {
 export async function GET() {
   const supabase = await createClient()
   const claims = await getAuthClaims(supabase)
-  if (!claims) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!claims) return unauthorized()
 
   // Try to load overrides from app_settings
   const { data: row } = await supabase

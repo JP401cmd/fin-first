@@ -1,4 +1,5 @@
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
+import { unauthorized } from '@/lib/api/respond'
 import {
   buildCategorySpending,
   detectSeasonalPatterns,
@@ -20,7 +21,7 @@ export async function GET() {
   const claims = await getAuthClaims(supabase)
 
   if (!claims) {
-    return new Response('Unauthorized', { status: 401 })
+    return unauthorized()
   }
 
   try {

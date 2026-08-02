@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
+import { unauthorized } from '@/lib/api/respond'
 import { getGuideHelp } from '@/lib/briefing/guide-help'
 
 // ── GET — Hele help-content blob (publiek voor ingelogde users) ─────
@@ -13,7 +14,7 @@ export async function GET() {
   const supabase = await createClient()
   const claims = await getAuthClaims(supabase)
   if (!claims) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return unauthorized()
   }
 
   const blob = await getGuideHelp(supabase)

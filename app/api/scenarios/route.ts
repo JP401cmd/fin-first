@@ -1,5 +1,6 @@
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { unauthorized } from '@/lib/api/respond'
 import { WHATIF_SCENARIO_COLORS, type SavedScenario } from '@/lib/scenario-types'
 
 // Re-export for backward compatibility (server-side consumers)
@@ -24,7 +25,7 @@ function parseValue(raw: string | null | undefined): Record<string, unknown> {
 export async function GET() {
   const supabase = await createClient()
   const claims = await getAuthClaims(supabase)
-  if (!claims) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!claims) return unauthorized()
 
   const { data } = await supabase
     .from('app_settings')
@@ -42,7 +43,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user) return unauthorized()
 
   const body = await request.json().catch(() => null)
   if (!body?.name || !body?.overrides) {
@@ -114,7 +115,7 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user) return unauthorized()
 
   const { searchParams } = new URL(request.url)
   const scenarioId = searchParams.get('id')

@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
-import { unauthorized, serverError } from '@/lib/api/respond'
+import { errorResponse, serverError } from '@/lib/api/respond'
 import { getModel } from '@/lib/ai/config'
 import { runNewsIngest } from '@/lib/news-ingest'
 import { recordJobRun } from '@/lib/job-runs'
@@ -74,7 +74,10 @@ export async function GET(request: Request) {
         error: 'Unauthorized — CRON_SECRET kwam niet overeen',
       })
     }
-    return unauthorized()
+    // Bewust NIET `unauthorized()`: die zegt 'Niet ingelogd', maar hier gaat het om
+    // een verkeerd CRON_SECRET van een machine die nooit inlogt. Wel de gedeelde
+    // envelope (ADR 0044); 401 blijft de status, spiegelt /api/cron/retention.
+    return errorResponse('Ongeldig cron-secret', 401, 'unauthorized')
   }
 
   // ── Supabase service role client ──────────────────────────────

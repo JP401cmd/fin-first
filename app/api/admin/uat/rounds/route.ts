@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { unauthorized } from '@/lib/api/respond'
 import { getServiceClient } from '@/lib/supabase/service'
 import { isSuperAdmin } from '@/lib/admin'
 
@@ -40,7 +41,7 @@ export async function POST(req: Request) {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return unauthorized()
   }
 
   const body = await req.json().catch(() => null)

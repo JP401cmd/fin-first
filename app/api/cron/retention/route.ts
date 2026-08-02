@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { errorResponse } from '@/lib/api/respond'
 import { getServiceClient } from '@/lib/supabase/service'
 import { recordJobRun } from '@/lib/job-runs'
 import { RETENTION_MONTHS, retentionCutoffIso, type RetentionTable } from '@/lib/retention'
@@ -38,7 +39,11 @@ export async function GET(request: Request) {
     querySecret === cronSecret
 
   if (!isAuthorized) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // Bewust NIET `unauthorized()`: die zegt 'Niet ingelogd', maar hier gaat het om
+    // een verkeerd CRON_SECRET van een machine die nooit inlogt. Wel de gedeelde
+    // envelope (ADR 0044), en 401 blijft de status — de cron-auth-matrix (fout
+    // secret → 401) is vastgelegd in route.test.ts.
+    return errorResponse('Ongeldig cron-secret', 401, 'unauthorized')
   }
 
   const startedAt = new Date().toISOString()

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { errorResponse } from '@/lib/api/respond'
 import { getServiceClient } from '@/lib/supabase/service'
 import { computeFireProjection, type FinancialInput } from '@/lib/horizon-data'
 import { computeHealthScoreFromInputs } from '@/lib/financial-health'
@@ -87,7 +88,10 @@ export async function GET(request: Request) {
     querySecret === cronSecret
 
   if (!isAuthorized) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // Bewust NIET `unauthorized()`: die zegt 'Niet ingelogd', maar hier gaat het om
+    // een verkeerd CRON_SECRET van een machine die nooit inlogt. Wel de gedeelde
+    // envelope (ADR 0044); 401 blijft de status, spiegelt /api/cron/retention.
+    return errorResponse('Ongeldig cron-secret', 401, 'unauthorized')
   }
 
   // Use service role client to access all users' data

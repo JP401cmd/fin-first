@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
+import { unauthorized } from '@/lib/api/respond'
 import { hasSubscription } from '@/lib/feature-registry'
 import {
   parseAiCreditConfig,
@@ -14,7 +15,7 @@ export async function GET() {
   const supabase = await createClient()
   const claims = await getAuthClaims(supabase)
   if (!claims) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return unauthorized()
   }
 
   const now = new Date()

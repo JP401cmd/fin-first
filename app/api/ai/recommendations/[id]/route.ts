@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { unauthorized } from '@/lib/api/respond'
 
 export async function PATCH(
   req: NextRequest,
@@ -9,7 +10,7 @@ export async function PATCH(
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return new Response('Unauthorized', { status: 401 })
+    return unauthorized()
   }
 
   const { id } = await params

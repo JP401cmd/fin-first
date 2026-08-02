@@ -1,4 +1,5 @@
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
+import { unauthorized } from '@/lib/api/respond'
 import { localMonthBounds } from '@/lib/month-range'
 
 type ExportType = 'transactions' | 'budgets' | 'net_worth' | 'assets' | 'debts' | 'goals'
@@ -25,7 +26,7 @@ export async function GET(req: Request) {
   const claims = await getAuthClaims(supabase)
 
   if (!claims) {
-    return new Response('Unauthorized', { status: 401 })
+    return unauthorized()
   }
 
   const url = new URL(req.url)

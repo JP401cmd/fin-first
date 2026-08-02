@@ -1,5 +1,6 @@
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { unauthorized } from '@/lib/api/respond'
 import { isSuperAdmin } from '@/lib/admin'
 import { GOAL_GUIDE_DISPLAY_ORDER } from '@/lib/briefing/goal-guide-steps'
 
@@ -10,7 +11,7 @@ const SETTINGS_KEY = 'goal_guide_disabled_goals'
 export async function GET() {
   const supabase = await createClient()
   const claims = await getAuthClaims(supabase)
-  if (!claims) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!claims) return unauthorized()
 
   const { data: row } = await supabase
     .from('app_settings')

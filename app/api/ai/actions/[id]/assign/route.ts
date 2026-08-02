@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { unauthorized } from '@/lib/api/respond'
 
 /**
  * POST /api/ai/actions/[id]/assign
@@ -14,7 +15,7 @@ export async function POST(
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 })
+    return unauthorized()
   }
 
   const { id } = await params

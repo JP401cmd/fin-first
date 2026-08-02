@@ -39,6 +39,7 @@
 
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
+import { unauthorized } from '@/lib/api/respond'
 import { recordAiUsage } from '@/lib/ai-credits'
 import { extractAangifteData } from '@/lib/aangifte/extract-aangifte-data'
 import { extractionSchema } from '@/lib/aangifte/extraction-schema'
@@ -78,7 +79,7 @@ export async function POST(req: Request) {
   } = await supabase.auth.getUser()
 
   if (!user) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 })
+    return unauthorized()
   }
 
   // AI-add-on vereist: aangifte-extractie draait op het AI-model. Spiegelt de

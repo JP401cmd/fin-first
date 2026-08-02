@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { unauthorized } from '@/lib/api/respond'
 
 /**
  * POST /api/calculators/unpublish
@@ -15,7 +16,7 @@ export async function POST(req: Request) {
   const {
     data: { user },
   } = await supabase.auth.getUser()
-  if (!user) return new Response('Unauthorized', { status: 401 })
+  if (!user) return unauthorized()
 
   let body: { calculatorId?: unknown }
   try {

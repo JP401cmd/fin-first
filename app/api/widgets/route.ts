@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { unauthorized } from '@/lib/api/respond'
 import type { WidgetPref, WidgetSize } from '@/lib/widget-catalog'
 import { WIDGET_CATALOG, getWidgetDef } from '@/lib/widget-catalog'
 
@@ -17,7 +18,7 @@ export async function PUT(request: Request) {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user) return unauthorized()
 
     const body = await request.json() as { widgets: WidgetPref[] }
     if (!Array.isArray(body.widgets)) {

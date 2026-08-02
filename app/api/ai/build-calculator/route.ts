@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { unauthorized } from '@/lib/api/respond'
 import { checkTierGate } from '@/lib/require-tier'
 import { buildCalculator } from '@/lib/ai/build-calculator'
 import { StoredCalculatorDefinitionSchema } from '@/lib/calculator/types'
@@ -19,6 +20,7 @@ const MAX_PROMPT_LENGTH = 500
  * Resp:
  *   200 { ok: true, definition }
  *   400 { ok: false, error }       — vraag leeg/te lang
+ *   401 { error: 'Niet ingelogd' } — geen sessie
  *   403 { ok: false, error }       — tier-gate (geen AI-abonnement)
  *   422 { ok: false, error }       — generatie-fout (AI-output ongeldig)
  *   429 { ok: false, error }       — weeklimiet bereikt
@@ -28,7 +30,7 @@ export async function POST(req: Request) {
   const {
     data: { user },
   } = await supabase.auth.getUser()
-  if (!user) return new Response('Unauthorized', { status: 401 })
+  if (!user) return unauthorized()
 
   const tierGate = await checkTierGate(supabase, user.id, 'ai')
   if (tierGate) {

@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { unauthorized } from '@/lib/api/respond'
 
 const MAX_REASON_LENGTH = 1000
 
@@ -21,7 +22,7 @@ export async function POST(
   const {
     data: { user },
   } = await supabase.auth.getUser()
-  if (!user) return new Response('Unauthorized', { status: 401 })
+  if (!user) return unauthorized()
 
   const { id: calculatorId } = await params
   if (!calculatorId) {
