@@ -10,7 +10,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
  *   AC5 — validatiefouten (onbekende metric, waarde buiten bereik, ongeldige
  *         JSON, body > 4096 bytes) → 4xx zonder insert, platte { error }-envelope
  *   AC7 — `environment` komt server-side uit VERCEL_ENV (T0.1), met
- *         'development' als lokale fallback, en is niet te spoofen via de body
+ *         'development' als fallback voor zowel ontbrekende als lege waarde,
+ *         en is niet te spoofen via de body
  *   + user_id komt nooit uit de payload, alleen uit getClaims
  * AC6 (fire-and-forget/sendBeacon) is client-gedrag en hier bewust niet getest.
  */
@@ -34,19 +35,20 @@ vi.mock('@/lib/supabase/server', () => ({
 
 import { POST } from './route'
 
-const ORIG_ENV = { ...process.env }
-
 beforeEach(() => {
   mockInsert.mockReset()
   mockInsert.mockResolvedValue({ error: null })
   mockGetClaims.mockReset()
   mockGetClaims.mockResolvedValue({ data: null })
   // Lokale ontwikkel-situatie als uitgangspunt: Vercel zet deze var, wij niet.
-  delete process.env.VERCEL_ENV
+  // Via stubEnv i.p.v. `process.env = {...}`: dat laatste vervangt de echte
+  // env-binding door een plat object, en `process` is gedeeld binnen een
+  // vitest-worker — latere testbestanden zouden die vervanging erven.
+  vi.stubEnv('VERCEL_ENV', undefined)
 })
 
 afterEach(() => {
-  process.env = { ...ORIG_ENV }
+  vi.unstubAllEnvs()
 })
 
 function req(body: unknown, raw?: string): Request {
@@ -152,7 +154,7 @@ describe('POST /api/web-vitals', () => {
     ['production', 'production'],
     ['preview', 'preview'],
   ])('AC7a — VERCEL_ENV=%s → insert-payload environment %s', async (vercelEnv, expected) => {
-    process.env.VERCEL_ENV = vercelEnv
+    vi.stubEnv('VERCEL_ENV', vercelEnv)
     const res = await POST(req(validBody()))
     expect(res.status).toBe(204)
     const [, payload] = mockInsert.mock.calls[0]
@@ -160,6 +162,16 @@ describe('POST /api/web-vitals', () => {
   })
 
   it('AC7b — zonder VERCEL_ENV (lokaal) → environment "development"', async () => {
+    const res = await POST(req(validBody()))
+    expect(res.status).toBe(204)
+    const [, payload] = mockInsert.mock.calls[0]
+    expect(payload).toMatchObject({ environment: 'development' })
+  })
+
+  it('AC7b2 — lege VERCEL_ENV telt als niet-gezet, niet als environment ""', async () => {
+    // Een lege string zou als '' wegschrijven en daarmee in geen enkele
+    // omgevingsselectie op /beheer/webprestaties meer terugkomen.
+    vi.stubEnv('VERCEL_ENV', '')
     const res = await POST(req(validBody()))
     expect(res.status).toBe(204)
     const [, payload] = mockInsert.mock.calls[0]
@@ -176,7 +188,7 @@ describe('POST /api/web-vitals', () => {
   })
 
   it('AC7d — een gespoofte environment overschrijft de echte VERCEL_ENV niet', async () => {
-    process.env.VERCEL_ENV = 'preview'
+    vi.stubEnv('VERCEL_ENV', 'preview')
     const res = await POST(req(validBody({ environment: 'production' })))
     expect(res.status).toBe(204)
     const [, payload] = mockInsert.mock.calls[0]

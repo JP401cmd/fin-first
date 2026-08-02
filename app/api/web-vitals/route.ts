@@ -124,7 +124,10 @@ export async function POST(request: Request) {
         // zodat een `environment` in de body domweg wordt weggestript en een
         // client zijn metingen nooit als 'production' kan laten meetellen.
         // Vercel zet 'production'|'preview'|'development'; lokaal is het leeg.
-        environment: process.env.VERCEL_ENV ?? 'development',
+        // `||` en niet `??`: een lege string is hier net zo goed "niet gezet",
+        // en zou anders als environment '' wegschrijven — een rij die in geen
+        // enkele omgevingsselectie meer terugkomt.
+        environment: process.env.VERCEL_ENV || 'development',
       })
     if (error) {
       return serverError(error, 'web-vitals:POST')
