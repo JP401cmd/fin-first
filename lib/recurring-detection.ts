@@ -544,6 +544,19 @@ export function detectRecurringTransactions(
   }
 
   // Step 2: Analyze each group for recurring patterns
+
+  // Genormaliseerde namen van de al bevestigde recurrings — ÉÉN keer opgebouwd,
+  // buiten de groepslus. Stond voorheen ín de lus: dat normaliseerde elke
+  // bestaande recurring opnieuw per (groep × richting), dus O(groepen ×
+  // recurrings) regex-replaces plus een lineaire `includes` (bij ~800 groepen en
+  // ~60 recurrings tienduizenden overbodige normalisaties per request).
+  // `existingRecurrings` wordt in de lus nergens gemuteerd, dus de Set is
+  // gedurende de hele detectie geldig; `Set.has` en `Array.includes` zijn voor
+  // stringgelijkheid identiek.
+  const existingNormSet = new Set(
+    existingRecurrings.map(r => normalizeCounterparty(r.counterparty_name || r.name)),
+  )
+
   const detected: DetectedRecurring[] = []
 
   for (const [normalizedName, txGroup] of groups) {
@@ -602,10 +615,7 @@ export function detectRecurringTransactions(
       const category = detectCategory(counterpartyName, commonDescription, isIncome)
 
       // Check if already exists as recurring transaction
-      const existingNorms = existingRecurrings.map(r =>
-        normalizeCounterparty(r.counterparty_name || r.name)
-      )
-      const alreadyExists = existingNorms.includes(normalizedName)
+      const alreadyExists = existingNormSet.has(normalizedName)
 
       // Try to match to a budget
       const mostCommonBudgetId = getMostCommonBudgetId(subGroup)
