@@ -217,6 +217,13 @@ export async function fetchTxMonthAggregate(
  * houden bewust hun eigen `fetchTxMonthAggregate`-call: een ander venster is een
  * andere cache-entry (lib/lever-scores-loader.ts draait 6 maanden MÉT `ownOnly`).
  *
+ * DE RIJEN ZIJN GEDEELD — behandel ze als READ-ONLY. Sinds de dedupe krijgt elke
+ * consument binnen het request exact hetzelfde array-object terug, waar ze eerder
+ * elk hun eigen kopie hadden. Een in-place `.sort()`/`.reverse()`/`.splice()` of
+ * een veldtoekenning op een rij corrumpeert dus stil de andere loaders. Heb je een
+ * eigen volgorde nodig, kopieer dan eerst (`[...rows]`); de reducers hierboven
+ * muteren niets en zijn altijd veilig.
+ *
  * MOET met de authenticated/anon RLS-client worden aangeroepen (nooit
  * getServiceClient) — zie `fetchTxMonthAggregate`.
  */

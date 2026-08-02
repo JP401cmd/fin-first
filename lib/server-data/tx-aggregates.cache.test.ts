@@ -20,7 +20,7 @@
  * nooit identiek → cache-miss → 2 RPC's → test rood.
  */
 
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 vi.mock('react', () => ({
   cache: <A extends unknown[], R>(fn: (...args: A) => R) => {
@@ -99,6 +99,21 @@ describe('getTxAgg12m — cache-hit dedupe binnen één request', () => {
 // ── 2. Venster + RPC-vorm ───────────────────────────────────────────────────
 
 describe('getTxAgg12m — venster en RPC-vorm', () => {
+  // Bevroren klok. `getTxAgg12m` berekent zijn `now` INTERN; de verwachting
+  // hieronder berekent er zelf één. Zonder bevriezing kan daar een maandgrens
+  // tussen vallen en faalt de vergelijking op een willekeurige nacht — een echte
+  // flake, geen regressie. Een vaste datum sluit dat venster. Bewust midden in
+  // februari: zou de bevriezing niet doorwerken tot in `getTxAgg12m`, dan wijkt
+  // het venster af van de verwachting en valt deze test om — de bevriezing
+  // bewijst zichzelf dus.
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 1, 14, 12))
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('roept tx_month_aggregate aan met het venster van de vervangen callsites', async () => {
     const { supabase, rpcCalls } = makeCountingSupabase()
     await getTxAgg12m(supabase)
