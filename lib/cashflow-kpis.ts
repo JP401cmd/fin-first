@@ -24,12 +24,21 @@
 // de bestaande aggregaat-reducers (`aggIncomeByMonth`/`aggExpenseByMonthAbs`) en
 // de effective grootheden uit de bestaande `resolveEffectiveIncomeExpenses`.
 //
-// DEZE STAP is de extractie zelf: de helpers hieronder zijn puur en
-// DB-onafhankelijk, en `lib/dashboard-data-loader.ts` consumeert ze al. De
-// `loadCashflowKpis`-fetcher die erop staat volgt als aparte stap, zodat de
-// refactor los terug te draaien is.
+// RLS: `loadCashflowKpis` MOET met de anon/authenticated client (createClient uit
+// lib/supabase/server.ts) worden aangeroepen — nooit met getServiceClient(). Zie
+// de kopteksten van lib/server-data/base.ts en lib/server-data/tx-aggregates.ts.
 
-import { isRealAggRow } from '@/lib/server-data/tx-aggregates'
+import { cache } from 'react'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { getOwnProfile, getBudgets, getCurrentMonthTx } from '@/lib/server-data/base'
+import {
+  getTxAgg12m,
+  aggIncomeByMonth,
+  aggExpenseByMonthAbs,
+  isRealAggRow,
+  type TxMonthAggregateRow,
+} from '@/lib/server-data/tx-aggregates'
+import { resolveEffectiveIncomeExpenses, type IncomeExpenseSources } from '@/lib/effective-financials'
 import { localMonthBounds } from '@/lib/month-range'
 
 // ── Invoervormen ────────────────────────────────────────────────────────────
@@ -233,3 +242,78 @@ export function resolveBudgetingActive(profile: Record<string, unknown> | null |
 export function currentMonthKey(now: Date): string {
   return localMonthBounds(now).start.slice(0, 7)
 }
+
+// ── De loader ───────────────────────────────────────────────────────────────
+
+/**
+ * De zeven scalars die `buildCashflowCards` nodig heeft, uit VIER gedeelde
+ * fetches — zonder de rest van `loadDashboardData` (en zonder de koude
+ * horizon-tak met haar bisectie-solve).
+ *
+ * `cache()`-gewrapt op ALLEEN de supabase-client, precies zoals
+ * lib/server-data/base.ts: `createClient()` is zelf `cache()`-gewrapt → één
+ * instantie per RSC-render, dus pagina en API-route binnen hetzelfde request
+ * raken dezelfde entry. De vier onderliggende fetches zijn óók `cache()`-gedeeld,
+ * dus draait `loadDashboardData` in hetzelfde request tóch mee (bv. op
+ * /overzicht), dan kosten ze daar nul extra queries.
+ *
+ * ── DE ASYMMETRIE DIE MOET BLIJVEN (ADR 0073 · ADR 0077) ───────────────────
+ * De twee paren komen BEWUST uit verschillende bronnen, en dat is geen
+ * slordigheid die "gelijkgetrokken" moet worden:
+ *
+ *  • `currentMonthIncome`/`currentMonthExpenses` — GEREALISEERDE maand, uit het
+ *    12-maands MAANDAGGREGAAT (`tx_month_aggregate`) via de bestaande reducers.
+ *    Een aggregaat levert enkele rijen en kan dus niet stil op PostgREST's
+ *    `max_rows` (1000) afkappen.
+ *  • `monthlyIncome`/`monthlyExpenses` — EFFECTIVE grondslag, uit de RAUWE
+ *    huidige-maand-rijen (`getCurrentMonthTx`, mét `isRealTx`, en dus mét
+ *    diezelfde stille 1000-rijen-cap) door `resolveEffectiveIncomeExpenses`
+ *    heen, waar `income_source = 'manual'` de profielinschatting laat winnen.
+ *
+ * Beide grondslagen worden ook echt allebei gebruikt: de Transacties-kaart staat
+ * op het gerealiseerde paar (een kaart die "deze maand" belooft mag geen
+ * profielinschatting tonen — dat was de bug van ADR 0073), de Vaste-lasten-kaart
+ * juist op het effective inkomen (een structureel aandeel meet je tegen een
+ * stabiel maandinkomen, niet tegen een half-afgelopen maand).
+ *
+ * De cap op de rauwe pass is hier BEWUST niet "gerepareerd": `getCurrentMonthTx`
+ * draagt 'm vandaag óók op /overzicht. Alleen in deze loader repareren zou
+ * precies de drift creëren die deze module bestaat om te voorkomen — dat is een
+ * eigen wijziging, op beide paden tegelijk.
+ */
+export const loadCashflowKpis = cache(async (supabase: SupabaseClient): Promise<CashflowCardScalars> => {
+  const [profileResult, budgetsResult, txResult, txAgg12Result] = await Promise.all([
+    getOwnProfile(supabase),
+    getBudgets(supabase),
+    getCurrentMonthTx(supabase),
+    getTxAgg12m(supabase),
+  ])
+
+  const profile = (profileResult.data ?? null) as (Record<string, unknown> & IncomeExpenseSources) | null
+  const budgets = (budgetsResult.data ?? []) as unknown as BudgetRowForTotals[]
+  const monthTx = (txResult.data ?? []) as unknown as MonthTxRow[]
+  const txAgg12 = (txAgg12Result.data ?? []) as TxMonthAggregateRow[]
+
+  // Budget: limiet/besteding per type → de expense-KPI + de dekkings-score.
+  const budgetTotals = deriveBudgetTotals(budgets, monthTx)
+
+  // Gerealiseerde maand uit het aggregaat (zie de asymmetrie hierboven).
+  const monthKey = currentMonthKey(new Date())
+  const currentMonthIncome = aggIncomeByMonth(txAgg12, { realOnly: true }).get(monthKey) ?? 0
+  const currentMonthExpenses = aggExpenseByMonthAbs(txAgg12, { realOnly: true }).get(monthKey) ?? 0
+
+  // Effective grondslag uit de rauwe maand-rijen (zie de asymmetrie hierboven).
+  const realMonth = deriveRealMonthTotals(monthTx)
+  const { income: monthlyIncome, expenses: monthlyExpenses } =
+    resolveEffectiveIncomeExpenses(profile ?? {}, realMonth.income, realMonth.expenses)
+
+  return {
+    budgetTotals: { expense: budgetTotals.expense },
+    monthSummary: { budgetScore: deriveBudgetScore(budgetTotals) },
+    budgetingActive: resolveBudgetingActive(profile),
+    currentMonthIncome,
+    currentMonthExpenses,
+    monthlyIncome,
+    monthlyExpenses,
+  }
+})

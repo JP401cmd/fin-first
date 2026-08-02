@@ -5,7 +5,7 @@
 // de pagina toch al laadt (DashboardData + CashflowData). Pure module zodat de
 // server-page hem kan aanroepen; de client rendert de serialiseerbare output.
 
-import type { DashboardData } from '@/lib/types/dashboard'
+import type { CashflowCardScalars } from '@/lib/cashflow-kpis'
 import type { CashflowData } from '@/lib/cashflow-data-loader'
 import type { VasteLastenSummary } from '@/lib/vaste-lasten-summary'
 import { buildForecast } from '@/lib/cashflow-forecast-math'
@@ -120,8 +120,16 @@ export function forecastCardStatus(input: {
   return input.netPerMonth > 0 ? 'good' : input.netPerMonth < 0 ? 'bad' : 'warn'
 }
 
+/**
+ * De eerste parameter is bewust `CashflowCardScalars` (lib/cashflow-kpis.ts) en
+ * niet de volledige `DashboardData`: dit zijn exact de zeven scalars die de
+ * kaarten lezen. `DashboardData` is er structureel aan toewijsbaar, dus elke
+ * bestaande callsite die de volle bundel doorgeeft blijft ongewijzigd werken —
+ * terwijl een oppervlak dat alleen de kaarten nodig heeft de slanke
+ * `loadCashflowKpis` kan voeden i.p.v. de hele dashboard-loader (ADR 0077).
+ */
 export function buildCashflowCards(
-  dashboardData: DashboardData,
+  dashboardData: CashflowCardScalars,
   cashflow: CashflowData,
   vasteLastenSummary: VasteLastenSummary,
 ): CashflowCard[] {
