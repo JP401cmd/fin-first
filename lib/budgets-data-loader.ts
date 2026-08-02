@@ -107,11 +107,19 @@ export const loadBudgetsData = cache(async (supabase: SupabaseClient): Promise<B
       .from('goals')
       .select('id, name, goal_type, target_value, current_value, target_date, icon, color, is_completed, budget_id')
       .order('sort_order', { ascending: true }),
+    // Expliciete `.limit(1000)` = de PostgREST-cap (supabase/config.toml
+    // max_rows = 1000): een client-`.limit()` boven die grens is een no-op, dus dit
+    // maakt de bestaande stille afkap zichtbaar i.p.v. impliciet. Byte-identiek aan
+    // de vroegere ongelimiteerde query (die óók op 1000 werd afgekapt). Voor een
+    // tx-rijke gebruiker kappen de 12-maands gemiddelden hieronder dus stil af; de
+    // structurele route is het maandaggregaat (ADR 0050 — kan per definitie niet
+    // afkappen) of keyset-paginatie. Beide vallen buiten deze wijziging.
     supabase
       .from('transactions')
       .select('id, budget_id, amount, date, transaction_type, is_split')
       .gte('date', twelveMonthsAgoStart)
-      .lt('date', monthStart),
+      .lt('date', monthStart)
+      .limit(1000),
   ])
 
   // ── Build budget tree ───────────────────────────────────────

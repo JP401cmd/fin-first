@@ -154,7 +154,14 @@ export default async function AppLayout({
     getActiveDebts(supabase),
     // transactions: 3-maand-window voor `computeFeatureAccess` (income/expense
     // signalen voor phase-detectie).
-    supabase.from('transactions').select('amount, is_income').eq('user_id', user.id).gte('date', dateStr),
+    // Expliciete `.limit(1000)` = de PostgREST-cap (supabase/config.toml
+    // max_rows = 1000): een client-`.limit()` boven die grens is een no-op, dus dit
+    // maakt de bestaande stille afkap zichtbaar i.p.v. impliciet. Byte-identiek aan
+    // de vroegere ongelimiteerde query (die óók op 1000 werd afgekapt). Voor een
+    // tx-rijke gebruiker telt de phase-detectie dus maar een deel van het venster;
+    // de structurele route is het maandaggregaat (ADR 0050 — kan per definitie niet
+    // afkappen) of keyset-paginatie.
+    supabase.from('transactions').select('amount, is_income').eq('user_id', user.id).gte('date', dateStr).limit(1000),
     // Sidebar-metric: openstaande acties (Wil-module). Status-filter spiegelt
     // `openActions` uit fin-data-loader.ts (open + postponed). Head-only +
     // count: 'exact' = geen rows-payload, alleen totaal.
