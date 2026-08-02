@@ -43,7 +43,7 @@ import { type LifeEvent } from '@/lib/horizon-data'
 import { computeWhatifProjection } from '@/lib/horizon-kernel/whatif-router'
 import type { WhatifRawProfileRow } from '@/lib/horizon-kernel/adapter/whatif-varianten'
 import { WITHDRAWAL_DEFAULTS, resolveWithdrawalStrategy, type WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
-import { type Asset, ASSET_TYPE_LABELS } from '@/lib/asset-data'
+import { type Asset, ASSET_CLIENT_COLUMNS, ASSET_TYPE_LABELS } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
 import type { Box3Method } from '@/lib/bucket-projection'
 import { computeYearlyMustExpenses, computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
@@ -207,7 +207,11 @@ export default function WhatIfPage() {
         supabase.from('budgets').select('id, name, parent_id, default_limit, is_essential, interval, budget_type').not('parent_id', 'is', null).not('budget_type', 'in', '("archive","income","savings")'),
         supabase.from('transactions').select('amount, date').gt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd),
         supabase.from('transactions').select('date').gt('amount', 0).gte('date', twelveMonthsAgo).order('date', { ascending: true }).limit(1),
-        supabase.from('assets').select('*').eq('is_active', true).limit(500),
+        // Expliciete kolomlijst i.p.v. `select('*')`: `assets` heeft een
+        // huishoud-gedeelde SELECT-policy, dus `*` levert bij een gedeelde
+        // bezitting óók `account_number_hash`/`account_number_encrypted` van de
+        // PARTNER in deze bundel. Zie ASSET_CLIENT_COLUMNS.
+        supabase.from('assets').select(ASSET_CLIENT_COLUMNS).eq('is_active', true).limit(500),
         supabase.from('debts').select('*').eq('is_active', true).limit(200),
         supabase.from('bank_accounts').select('id, balance').eq('is_active', true).is('linked_asset_id', null),
         supabase.from('transactions').select('amount, transaction_type').eq('is_income', true).gte('date', sixMonthsAgo).lt('date', monthEnd),

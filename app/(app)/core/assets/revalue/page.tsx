@@ -14,6 +14,7 @@ import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import {
   type Asset,
   type AssetType,
+  ASSET_CLIENT_COLUMNS,
   ASSET_TYPE_LABELS,
   ASSET_TYPE_ICONS,
   ASSET_TYPE_COLORS,
@@ -70,9 +71,13 @@ export default function RevaluePage() {
         : `${now.getFullYear()}-${String(now.getMonth() + 2).padStart(2, '0')}-01`
 
       const [assetsResult, bankLinksResult, txResult] = await Promise.all([
+        // Expliciete kolomlijst i.p.v. `select('*')`: `assets` heeft een
+        // huishoud-gedeelde SELECT-policy, dus `*` levert bij een gedeelde
+        // bezitting óók `account_number_hash`/`account_number_encrypted` van de
+        // PARTNER in deze bundel. Zie ASSET_CLIENT_COLUMNS.
         supabase
           .from('assets')
-          .select('*')
+          .select(ASSET_CLIENT_COLUMNS)
           .eq('is_active', true)
           .order('sort_order', { ascending: true }),
         supabase

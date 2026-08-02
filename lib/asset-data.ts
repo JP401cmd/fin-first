@@ -140,6 +140,58 @@ export interface Asset {
  */
 export type AssetSource = 'manual' | 'aangifte_import' | 'broker_csv' | 'bank_psd2'
 
+// ── Kolomcontract voor browser-lezingen op `assets` ──────────
+//
+// GEBRUIK DIT in élke `.from('assets').select(...)` die vanuit een
+// `'use client'`-bestand loopt. Nooit `select('*')` daar — de gate
+// `scripts/check-client-data-reads.mjs` keurt dat hard af.
+//
+// WAAROM: `public.assets` heeft een HUISHOUD-GEDEELDE SELECT-policy
+// (`auth.uid() = user_id OR (ownership = 'shared' AND household_id IS NOT NULL
+// AND household_id = user_household_id())`). Een `select('*')` levert de
+// vragende gebruiker dus óók de account-nummer-kolommen van zijn PARTNER op
+// elke gedeelde bezitting — buiten de perspectief-loaders om. Drie kolommen
+// staan daarom bewust NIET in deze lijst:
+//
+//   • `account_number_hash`      blind index (HMAC-SHA256 onder een server-only
+//                                sleutel): dezelfde invoer geeft altijd dezelfde
+//                                waarde, dus een stabiele correlatiesleutel die
+//                                niets toevoegt aan wat het scherm toont.
+//   • `account_number_encrypted` ciphertext; `decryptField` heeft server-only
+//                                sleutels, de browser kan er niets mee.
+//   • `account_number`           plaintext rekeningnummer. Eén clientlezer heeft
+//                                dit veld écht nodig: `AssetForm` in
+//                                `components/core/assets-client.tsx` vult er het
+//                                IBAN-veld mee en schrijft het bij opslaan terug
+//                                (`account_number: iban || null`) — een reload
+//                                zónder de kolom zou het rekeningnummer bij de
+//                                volgende bewerking wíssen. De twee één-rij-
+//                                reloads die die vorm voeden vragen 'm daarom
+//                                expliciet bij: `${ASSET_CLIENT_COLUMNS},
+//                                account_number`. Lijst-lezingen niet.
+//
+// De lijst is verder één-op-één de `Asset`-interface hierboven, want alle
+// clientlezers casten hun rijen naar precies dat type. Groeit `Asset` met een
+// kolom die het scherm nodig heeft, groei deze lijst mee — maar nooit met een
+// `*_encrypted`/`*_hash`-kolom. `lib/asset-data.test.ts` bewaakt beide kanten:
+// geen crypto-kolom erin, en elke naam moet in het echte schema bestaan (een
+// niet-bestaande kolom geeft een PostgREST 400 en dus een stil leeg scherm).
+//
+// NIET in de lijst omdat de kolom niet in de database bestaat: `expiry_date` en
+// `beneficiary` zijn fantoomvelden op de `Asset`-interface — `select('*')` gaf
+// ze ook nooit terug, dus dit verandert niets aan het gedrag.
+// `linked_bank_account_id` bestaat wél in de database maar niet op `Asset`; geen
+// enkele clientlezer gebruikt 'm.
+// Bewust één string-literal en geen `[...].join(', ')`: de PostgREST-typings van
+// supabase-js parsen het `select()`-argument op TYPE-niveau. Een `join()` levert
+// het brede `string`, waarop die parser terugvalt op `GenericStringError` en elke
+// rij-cast stukloopt. Een literal parseert wél.
+export const ASSET_CLIENT_COLUMNS =
+  'id, user_id, name, asset_type, current_value, purchase_value, purchase_date, expected_return, monthly_contribution, institution, notes, is_active, sort_order, created_at, updated_at, subtype, risk_profile, tax_benefit, is_liquid, lock_end_date, ticker_symbol, rental_income, woz_value, retirement_provider_type, depreciation_rate, address_postcode, address_house_number, kvk_number, ownership_percentage, annual_dividend, linked_asset_id, ownership, household_id, net_worth_inclusion_pct, sale_config, has_budget_tracking, has_holdings_tracking, has_woonbalans_tracking, has_rental_tracking, monthly_maintenance_cost, vva_fee, vacancy_log, source, imported_peildatum'
+
+/** Dezelfde kolommen als array — voor tests en assertions. */
+export const ASSET_CLIENT_COLUMN_LIST: readonly string[] = ASSET_CLIENT_COLUMNS.split(', ')
+
 export const ASSET_TYPE_LABELS: Record<AssetType, string> = {
   cash: 'Cash / Betaalrekeningen',
   savings: 'Spaargeld',

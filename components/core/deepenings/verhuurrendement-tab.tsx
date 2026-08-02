@@ -32,7 +32,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Building2 } from 'lucide-react'
-import type { Asset } from '@/lib/asset-data'
+import { ASSET_CLIENT_COLUMNS, type Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
@@ -118,9 +118,13 @@ function VerhuurrendementActive() {
       try {
         const supabase = createClient()
         const [assetsRes, debtsRes] = await Promise.all([
+          // Expliciete kolomlijst i.p.v. `select('*')`: `assets` heeft een
+          // huishoud-gedeelde SELECT-policy, dus `*` levert bij een gedeelde
+          // bezitting óók `account_number_hash`/`account_number_encrypted` van
+          // de PARTNER in deze bundel. Zie ASSET_CLIENT_COLUMNS.
           supabase
             .from('assets')
-            .select('*')
+            .select(ASSET_CLIENT_COLUMNS)
             .eq('asset_type', 'real_estate')
             .eq('is_active', true)
             .eq('has_rental_tracking', true)

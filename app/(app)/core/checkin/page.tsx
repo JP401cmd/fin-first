@@ -49,6 +49,7 @@ import { BudgetIcon, isOverPositive, type BudgetType } from '@/components/app/bu
 import {
   type Asset,
   type AssetType,
+  ASSET_CLIENT_COLUMNS,
   ASSET_TYPE_LABELS,
   ASSET_TYPE_ICONS,
   ASSET_TYPE_COLORS,
@@ -241,7 +242,12 @@ function CheckinPageContent() {
           fetch('/api/checkin/save'),
           fetch('/api/checkin/gespreksstarters'),
           fetch('/api/checkin/aandachtspunten'),
-          supabase.from('assets').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
+          // Expliciete kolomlijst i.p.v. `select('*')`: `assets` heeft een
+          // huishoud-gedeelde SELECT-policy, dus `*` levert bij een gedeelde
+          // bezitting óók `account_number_hash`/`account_number_encrypted` van de
+          // PARTNER in deze bundel. Zie ASSET_CLIENT_COLUMNS. Deze lijst voedt de
+          // waarde-bijwerkstap van de check-in — die heeft geen rekeningnummer nodig.
+          supabase.from('assets').select(ASSET_CLIENT_COLUMNS).eq('is_active', true).order('sort_order', { ascending: true }),
           supabase.from('debts').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
         ])
 

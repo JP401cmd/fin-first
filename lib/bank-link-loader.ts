@@ -21,10 +21,18 @@ import { deriveBankLinkState, type CashBankLink } from '@/lib/bank-connection-st
  *
  * ## Scope
  *
- * `bank_accounts` is own-row (`auth.uid() = user_id`, géén huishoud-verbreding) en
- * `bank_connection_accounts` eveneens; `user_id` staat er toch expliciet bij —
- * zelfde leesbaarheidsregel als in de bank-connect-routes, zodat de
- * eigenaarschapseis leesbaar blijft naast de tabellen waar RLS bréder is.
+ * `bank_connection_accounts` is own-row (`auth.uid() = user_id`). `bank_accounts`
+ * is dat NIET — die policy is huishoud-verbreed (eigen rijen OF `ownership =
+ * 'shared'` binnen hetzelfde huishouden). Hier staat `.eq('user_id', …)` er
+ * daarom BEWUST bij, en dat is een echte versmalling: deze loader beantwoordt
+ * "de koppelstatus van MIJN rekeningen", en een gedeelde rekening van de partner
+ * heeft geen koppelrij die deze gebruiker mag zien (`bank_connection_accounts` is
+ * own-row) — die zou dus altijd als `manual` terugkomen en een onterecht
+ * "handmatig bijgehouden" op de partnerkaart zetten.
+ *
+ * Let op het verschil met de saldo-optelling: die telt gedeelde huishoudrekeningen
+ * juist WÉL mee en mag daarom geen user-filter hebben (`lib/unlinked-cash.ts`).
+ * Scope-vraag en saldo-vraag zijn hier bewust niet hetzelfde.
  */
 
 /**

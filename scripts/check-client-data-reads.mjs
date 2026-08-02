@@ -25,6 +25,37 @@
  *
  * Exit 0 = geen nieuwe overtredingen. Exit 1 = nieuwe reader buiten de allowlist.
  *
+ * ── Regel 2: geen `select('*')` op tabellen met crypto-kolommen ──────────────
+ * Regel 1 hierboven kent alleen "leest de browser rechtstreeks, ja of nee", en
+ * de allowlist grandfathert een bestand als GEHEEL. Een `select('*')` op een
+ * tabel met veld-encryptie glipt daar dus per definitie doorheen: de gate ziet
+ * geen kolommen. Twee lekken (bank_connection_accounts, 1e2125e8f; assets) zijn
+ * daardoor met de hand gevonden i.p.v. mechanisch. Regel 2 sluit dat gat en
+ * staat BEWUST LOS van de ALLOWLIST — daar een bestand op zetten onderdrukt
+ * regel 2 niet.
+ *
+ * ── Wat regel 2 NIET ziet (gemeten, niet gegokt — behandel groen dus niet als
+ *    bewijs dat er geen crypto-kolommen naar de browser gaan) ────────────────
+ *  a. TRANSITIEF VIA EEN GEDEELDE HELPER. De scan slaat elk bestand zonder
+ *     `use client`-directive over. Staat de `select('*')` in een gewone
+ *     lib-module die dóór clientcode wordt aangeroepen, dan ziet de gate niets.
+ *     Dit is geen theorie: `lib/household/perspective-loader.ts` doet
+ *     `.from('assets').select('*')` en wordt aangeroepen vanuit
+ *     components/core/assets-client.tsx, components/app/cash-overview.tsx en
+ *     components/core/debt-category-page.tsx.
+ *  b. SERVER-LOADER → CLIENT-PROP. Een server-loader mag `select('*')` doen,
+ *     maar gaat het resultaat als prop naar een clientcomponent, dan
+ *     serialiseert Next het volledig in de RSC-payload en staat het alsnog in
+ *     de paginabron (core-data-loader#fullAssets → <CoreLanding>,
+ *     server-data/base#getActiveAssets → <HorizonPage>, assets-data-loader →
+ *     <AssetsPage>). De gate kent alleen bestanden, geen propstromen.
+ *  c. NIET-LETTERLIJKE ARGUMENTEN. `.from(tabelVariabele)`, `.select(KOLOMMEN)`
+ *     met een constante, en een sterretje uit een template-expressie matchen
+ *     geen van alle; net zomin als een keten van >500 tekens tussen `.from(`
+ *     en `.select(`.
+ * Kortom: regel 2 vangt de letterlijke, inline vorm — de vorm waarin de twee
+ * historische lekken stonden. Hij is een vangrail, geen dekkingsbewijs.
+ *
  * Run:  npm run check:client-reads   (of: node scripts/check-client-data-reads.mjs)
  * Flags: --list  print de huidige reader-set (om de allowlist te herijken).
  */
@@ -109,6 +140,76 @@ const ALLOWLIST = new Set([
   'app/(app)/mijn/notificaties/page.tsx', // realtime; initiële load nog client-side → Fase b naar API
 ])
 
+// ── Regel 2 — kolomniveau ────────────────────────────────────────────────────
+//
+// Tabellen met veld-encryptie: naast de zichtbare kolom dragen ze een
+// `*_encrypted` (ciphertext) en een `*_hash` (blind index — HMAC-SHA256 onder
+// een server-only sleutel, dus een STABIELE correlatiesleutel die dezelfde
+// invoer altijd op dezelfde waarde afbeeldt). Geen van beide is in de browser
+// ergens goed voor: `decryptField` heeft server-only sleutels.
+const CRYPTO_TABLES = {
+  assets: {
+    columns: 'account_number_hash / account_number_encrypted / account_number',
+    // Waarom deze tabel het zwaarst weegt: de SELECT-policy is HUISHOUD-GEDEELD.
+    extra:
+      'De SELECT-policy op `assets` is huishoud-gedeeld (auth.uid() = user_id OR (ownership = \'shared\' AND household_id = user_household_id())), dus `*` levert bij een gedeelde bezitting de rekeningnummer-kolommen van de PARTNER in de bundel van de vragende gebruiker.',
+    hint: 'Gebruik ASSET_CLIENT_COLUMNS uit lib/asset-data.ts.',
+  },
+  bank_accounts: {
+    columns: 'iban_hash / iban_encrypted',
+    extra: '',
+    hint: 'Vraag alleen de kolommen op die het scherm toont (zie 984b54eba).',
+  },
+  bank_connection_accounts: {
+    columns: 'iban_hash / iban_encrypted',
+    extra: '',
+    hint: 'Zie components/app/cash-account-view.tsx#loadGcAccounts voor de vorm.',
+  },
+  bank_connections: {
+    columns: 'access_token_encrypted / refresh_token_encrypted',
+    extra: '',
+    hint: 'Tokens horen de browser nooit te bereiken.',
+  },
+}
+
+const TABLE_NAMES = Object.keys(CRYPTO_TABLES).join('|')
+// .from('<tabel>') … .select('*…  — de select-arg moet MET een ster beginnen;
+// `select('id, name')` is prima, `select('*, rel(x)')` niet.
+//
+// Het tussenstuk is een "tempered" token: het mag géén `.from(` of `.select(`
+// bevatten, zodat alleen de EERSTE select ná deze from meetelt. Zonder die
+// temporing sprong de match over een net gerepareerde kolomlijst heen naar de
+// `select('*')` van een náást liggende query op een andere tabel — een fout-
+// positief dat precies het bestand aanwees dat al goed was.
+const STAR_SELECT_RE = new RegExp(
+  `\\.from\\(\\s*['"\`](${TABLE_NAMES})['"\`]\\s*\\)((?:(?!\\.from\\(|\\.select\\()[\\s\\S]){0,500})\\.select\\(\\s*['"\`]\\s*\\*`,
+  'g',
+)
+
+/**
+ * Bekende rest die regel 2 (nog) niet hard mag afkeuren.
+ *
+ * Dit is NIET de grandfather-allowlist van regel 1 en gedraagt zich anders:
+ *  - hij staat per BESTAND+TABEL, niet per bestand,
+ *  - elke run print 'm luid als openstaande rest,
+ *  - een entry die géén overtreding meer is, is een HARDE fout: de gate dwingt
+ *    zo af dat de lijst alleen kan krimpen en nooit stil blijft hangen.
+ * Voeg hier niets aan toe. Een nieuwe `select('*')` op deze tabellen is een
+ * regressie, geen uitzondering.
+ */
+const COLUMN_RULE_RESIDUE = new Map()
+
+function collectStarSelects(src) {
+  const hits = new Set()
+  STAR_SELECT_RE.lastIndex = 0
+  let m
+  while ((m = STAR_SELECT_RE.exec(src))) {
+    if (MUTATION_IN_CHAIN.test(m[2])) continue
+    hits.add(m[1])
+  }
+  return hits
+}
+
 function walk(dir) {
   const out = []
   let entries
@@ -147,25 +248,78 @@ function hasDisplayRead(src) {
 
 function collectReaders() {
   const readers = []
+  // Regel 2-treffers als `<pad>::<tabel>`. Bewust ZONDER de CLIENT_IMPORT-eis:
+  // een `select('*')` op deze tabellen is ook fout wanneer de client via een
+  // wrapper of prop binnenkomt.
+  const starSelects = []
   for (const d of SCAN_DIRS) {
     for (const file of walk(join(ROOT, d))) {
       const src = readFileSync(file, 'utf8')
       if (!USE_CLIENT.test(src)) continue
+      const rel = relative(ROOT, file).split('\\').join('/')
+      for (const table of collectStarSelects(src)) starSelects.push(`${rel}::${table}`)
       if (!CLIENT_IMPORT.test(src)) continue
       if (!hasDisplayRead(src)) continue
-      readers.push(relative(ROOT, file).split('\\').join('/'))
+      readers.push(rel)
     }
   }
   readers.sort()
-  return readers
+  starSelects.sort()
+  return { readers, starSelects }
 }
 
-const readers = collectReaders()
+const { readers, starSelects } = collectReaders()
 
 if (process.argv.includes('--list')) {
   console.log(`${readers.length} client display-readers:`)
   console.log(readers.map((r) => `  ${r}`).join('\n'))
+  console.log(`\n${starSelects.length} select('*') op crypto-tabellen in clientcode:`)
+  console.log(starSelects.map((s) => `  ${s}`).join('\n') || '  (geen)')
   process.exit(0)
+}
+
+// ── Regel 2 eerst: dit is de zwaarste van de twee (server-only crypto-materiaal
+//    in een clientbundel), en hij staat los van de ALLOWLIST. ──
+const starViolations = starSelects.filter((s) => !COLUMN_RULE_RESIDUE.has(s))
+const staleResidue = [...COLUMN_RULE_RESIDUE.keys()].filter((s) => !starSelects.includes(s)).sort()
+const openResidue = starSelects.filter((s) => COLUMN_RULE_RESIDUE.has(s))
+
+if (openResidue.length > 0) {
+  console.log('⚠  Openstaande rest op de kolomregel — deze lijst MOET krimpen, nooit groeien:')
+  for (const s of openResidue) console.log(`   - ${s}  (${COLUMN_RULE_RESIDUE.get(s)})`)
+  console.log('')
+}
+
+if (staleResidue.length > 0) {
+  console.error('✗ COLUMN_RULE_RESIDUE bevat entries die geen overtreding meer zijn — haal ze weg,')
+  console.error('  anders dekt de rest-lijst stilzwijgend een toekomstige regressie af:')
+  for (const s of staleResidue) console.error(`   ${s}`)
+  process.exit(1)
+}
+
+if (starViolations.length > 0) {
+  console.error("✗ Kolomregel: select('*') in clientcode op een tabel met crypto-kolommen.")
+  console.error('')
+  for (const v of starViolations) {
+    const [file, table] = v.split('::')
+    const meta = CRYPTO_TABLES[table]
+    console.error(`   ${file}`)
+    console.error(`      tabel: ${table} — lekt: ${meta.columns}`)
+    if (meta.extra) console.error(`      ${meta.extra}`)
+    console.error(`      ${meta.hint}`)
+  }
+  console.error('')
+  console.error("WAAROM dit hard faalt: een `*_hash` is een blind index (HMAC-SHA256 onder een server-only")
+  console.error('sleutel). Dezelfde invoer geeft altijd dezelfde waarde, dus het is een STABIELE')
+  console.error('correlatiesleutel waarmee rijen en gebruikers aan elkaar te knopen zijn — terwijl hij niets')
+  console.error('toevoegt aan wat het scherm toont. Een `*_encrypted` is ciphertext die de browser niet kan')
+  console.error('ontsleutelen. Beide horen daar dus simpelweg niet te komen, en `select(\'*\')` stuurt ze mee')
+  console.error('zonder dat er iets zichtbaar verandert — precies waarom dit twee keer met de hand gevonden')
+  console.error('moest worden in plaats van door een gate.')
+  console.error('')
+  console.error('OPLOSSING: vraag een expliciete kolomlijst op. Deze regel staat LOS van de ALLOWLIST —')
+  console.error('een bestand daarop zetten onderdrukt hem niet, en dat is de bedoeling.')
+  process.exit(1)
 }
 
 const violations = readers.filter((r) => !ALLOWLIST.has(r))
@@ -190,4 +344,8 @@ if (violations.length > 0) {
 }
 
 console.log(`✓ Datapad-conventie: ${readers.length} bekende client-readers, 0 nieuwe overtredingen (allowlist dekt de bestaande).`)
+console.log(
+  `✓ Kolomregel: 0 nieuwe select('*') op crypto-tabellen in clientcode` +
+    (openResidue.length > 0 ? ` (${openResidue.length} bekende rest, zie hierboven).` : '.'),
+)
 process.exit(0)

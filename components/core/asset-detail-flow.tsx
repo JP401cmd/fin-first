@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/app/toast-provider'
-import type { Asset } from '@/lib/asset-data'
+import { ASSET_CLIENT_COLUMNS, type Asset } from '@/lib/asset-data'
 import {
   loadConnectionForAsset,
   type AssetConnectionSummary,
@@ -161,7 +161,12 @@ export function AssetDetailFlow({
         .select('id, name, current_balance, linked_asset_id')
         .eq('debt_type', 'mortgage')
         .eq('is_active', true),
-      supabase.from('assets').select('*').eq('is_active', true),
+      // Expliciete kolomlijst i.p.v. `select('*')`: `assets` heeft een
+      // huishoud-gedeelde SELECT-policy, dus `*` levert bij een gedeelde
+      // bezitting óók `account_number_hash`/`account_number_encrypted` van de
+      // PARTNER in deze bundel. Zie ASSET_CLIENT_COLUMNS. Deze lijst voedt
+      // `allAssets` (context/vergelijking) — die heeft geen rekeningnummer nodig.
+      supabase.from('assets').select(ASSET_CLIENT_COLUMNS).eq('is_active', true),
       supabase
         .from('bank_accounts')
         .select('id, linked_asset_id')
@@ -256,9 +261,14 @@ export function AssetDetailFlow({
   const reloadAsset = useCallback(async () => {
     if (!currentAsset) return
     const supabase = createClient()
+    // `account_number` staat bewust NIET in ASSET_CLIENT_COLUMNS (zie daar),
+    // maar deze rij voedt `<AssetForm asset={currentAsset}>`: die vult er het
+    // IBAN-veld mee en schrijft het bij opslaan terug. Zonder de kolom zou een
+    // bewerking ná een reload het rekeningnummer wissen. De crypto-kolommen
+    // (`account_number_hash`/`_encrypted`) blijven er wél uit.
     const { data } = await supabase
       .from('assets')
-      .select('*')
+      .select(`${ASSET_CLIENT_COLUMNS}, account_number`)
       .eq('id', currentAsset.id)
       .single()
     if (data) setCurrentAsset(data as Asset)
