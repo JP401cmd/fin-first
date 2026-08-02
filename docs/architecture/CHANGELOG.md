@@ -606,3 +606,7 @@
 
 - **API-routes** toegevoegd: /api/bank-accounts/[id], /api/own-accounts/ibans
 - **Componenten (aantal)** toegevoegd: +1
+
+## 2026-08-02
+
+- **Componenten (aantal)** toegevoegd: +1

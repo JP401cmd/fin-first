@@ -64,10 +64,12 @@ export interface CompanionAssetInput {
   id: string
   name: string
   /**
-   * IBAN/rekeningnummer. LET OP: de bron op `assets` is de kolom
-   * `account_number` — er bestaat GÉÉN `assets.iban`. Selecteer 'm daarom via
-   * PostgREST-alias (`iban:account_number`) of map 'm expliciet. Dit veld mapt
-   * naar `bank_accounts.iban` op de companion-rij.
+   * IBAN/rekeningnummer, ONTSLEUTELD. LET OP: er bestaat GÉÉN `assets.iban`; de
+   * bron is `assets.account_number_encrypted`. Selecteer die kolom en map 'm
+   * expliciet met `decryptAccountNumber` uit `lib/asset-account-number.ts` — niet
+   * via de plaintext-kolom `account_number`, die sinds de auto-link-trigger van
+   * `20260802093000` leeg blijft voor via de bank aangemaakte bezittingen. Dit
+   * veld mapt naar `bank_accounts.iban` op de companion-rij.
    */
   iban: string | null
   institution: string | null

@@ -26,6 +26,7 @@
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { buildAssetDraft, buildDebtDraft } from '@/lib/quick-add/build-drafts'
+import { accountNumberWriteColumns } from '@/lib/asset-account-number'
 import type {
   AangifteImportPayload,
   AangifteImportResponse,
@@ -376,7 +377,7 @@ async function runImportWritePhase({
         expected_return: draft.expected_return,
         monthly_contribution: draft.monthly_contribution,
         institution: draft.institution,
-        account_number: draft.account_number,
+        ...accountNumberWriteColumns(draft.account_number),
         notes: draft.notes,
         is_active: true,
         sort_order: i,

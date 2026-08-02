@@ -160,6 +160,15 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
     reviewedAt: '2026-07-30',
   },
   {
+    id: 'assetform-schrijft-alleen-plaintext-account-number',
+    title: 'AssetForm is de laatste browser-schrijver van één helft van een encrypted kolom-triple',
+    detail:
+      '`assets.account_number` heeft sinds Stage B een encrypted tegenhanger (`account_number_encrypted`, AES-256-GCM) en een blind index (`account_number_hash`), geschreven via de gedeelde helper `accountNumberWriteColumns()` (lib/asset-account-number.ts, spiegel van ibanWriteColumns) — voor élk server-side pad: de OAuth-callback, de TrueLayer cash-asset-backfill en de aangifte-import. Ntt: `components/core/assets-client.tsx` (AssetForm) is een `use client`-bestand dat een bewerkte cash-bezitting rechtstreeks via de browser-supabase-client wegschrijft en daarbij ALLEEN de plaintext-kolom zet — versleutelen kan daar niet, `ENCRYPTION_KEY_V1` is server-only. Datzelfde bestand is ook de laatste plaintext-LEZER (een nalees-fetch die het zichtbare IBAN-veld vult); dat leesgat valt onder het bestaande punt `client-select-star-lekt-crypto-kolommen`, dit punt is het SCHRIJF-gat. Gemeten op productie (2026-08-02): van 33 cash-bezittingen hebben er 2 wél `account_number` maar géén `account_number_encrypted`, allebei `source=\'manual\'` — dus via dit formulier aangemaakt — met een companion-rij in `bank_accounts` waarvan `iban_encrypted` óók leeg is. Zie ADR 0077 voor het bredere contract (gedeelde write/read-helper + wissen-alleen-bij-bekend-leeg) en de Stage B-stoplijn die deze route expliciet noemt als blokkade voor de DROP van `assets.account_number`/`bank_accounts.iban`. Verwijder dit punt zodra de AssetForm-save server-side loopt (via een route die `accountNumberWriteColumns()` gebruikt).',
+    severity: 'risk',
+    elementIds: ['as-vermogen', 't-supabase'],
+    reviewedAt: '2026-08-02',
+  },
+  {
     id: 'idx-transactions-user-date-drift-remote',
     title: 'idx_transactions_user_date staat in de repo maar niet op remote',
     detail:

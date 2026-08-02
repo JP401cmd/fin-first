@@ -13,6 +13,7 @@ import {
 import { APP_SETUP_SLUGS } from '@/lib/app-setup-status'
 import { syncBudgetingActive } from '@/lib/budgeting-active'
 import { syncBankAccountCompanion } from '@/lib/bank-account-companion'
+import { resolveAssetAccountNumber } from '@/lib/asset-account-number'
 import { unauthorized, serverError } from '@/lib/api/respond'
 
 /**
@@ -105,10 +106,13 @@ export async function POST(req: Request) {
     // de aangevinkte, opgeruimd voor de rest. Idempotent, dus veilig bij retry.
     const { data: cashAssets, error: cashErr } = await supabase
       .from('assets')
-      // PostgREST-alias: de bron-kolom op `assets` heet `account_number` (er
-      // bestaat GEEN `assets.iban`); we exposen 'm als `iban` zodat de rij
-      // ongewijzigd als CompanionAssetInput naar syncBankAccountCompanion kan.
-      .select('id, name, iban:account_number, institution, subtype, ownership, household_id, current_value')
+      // Beide rekeningnummer-kolommen: `resolveAssetAccountNumber` bepaalt welke
+      // wint. De versleutelde kolom moet erbij omdat de auto-link-trigger sinds
+      // 20260802093000 uitsluitend die vult voor via de bank aangemaakte
+      // cash-bezittingen; de plaintext-kolom blijft erbij tot `AssetForm` niet
+      // langer client-side opslaat. Er bestaat GEEN `assets.iban`, dus de
+      // companion-vorm wordt hieronder expliciet gemapt.
+      .select('id, name, account_number, account_number_encrypted, institution, subtype, ownership, household_id, current_value')
       .eq('user_id', user.id)
       .eq('asset_type', 'cash')
       .eq('is_active', true)
@@ -116,7 +120,14 @@ export async function POST(req: Request) {
 
     const selectedSet = new Set(selectedCashAssetIds)
     for (const a of cashAssets ?? []) {
-      await syncBankAccountCompanion(supabase, user.id, a, selectedSet.has(a.id))
+      // `resolveAssetAccountNumber` gooit bewust niet: één beschadigde ciphertext
+      // mag niet de complete budget-seed hieronder afbreken via de omliggende catch.
+      await syncBankAccountCompanion(
+        supabase,
+        user.id,
+        { ...a, iban: resolveAssetAccountNumber(a) },
+        selectedSet.has(a.id),
+      )
     }
 
     // ── 2. Budgetten seeden ────────────────────────────────────

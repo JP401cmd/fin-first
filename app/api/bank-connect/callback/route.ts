@@ -8,6 +8,7 @@ import { loadOccupyingLinks, loadTargetAccount } from '@/lib/truelayer/target-ac
 import { mapAccountType } from '@/lib/truelayer/mapper'
 import { syncBudgetingActive } from '@/lib/budgeting-active'
 import { blindIndex, encryptField } from '@/lib/crypto/field-encryption'
+import { accountNumberWriteColumns } from '@/lib/asset-account-number'
 
 /**
  * GET /api/bank-connect/callback — de OAuth-terugkomst van TrueLayer.
@@ -392,9 +393,7 @@ export async function GET(req: Request) {
             expected_return: 0,
             monthly_contribution: 0,
             institution: connection.provider_name,
-            account_number: iban,
-            account_number_encrypted: encryptField(iban),
-            account_number_hash: iban ? blindIndex(iban) : null,
+            ...accountNumberWriteColumns(iban),
             is_liquid: mappedType.is_liquid,
             subtype: mappedType.subtype,
             has_budget_tracking: true,

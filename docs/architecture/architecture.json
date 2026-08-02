@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-02T14:15:31.136Z",
+  "generatedAt": "2026-08-02T20:27:13.131Z",
   "generatedDate": "2026-08-02",
   "repo": {
     "name": "fin",
@@ -191,9 +191,9 @@
     "routesProduction": 101,
     "api": 270,
     "tables": 86,
-    "migrations": 176,
+    "migrations": 178,
     "integrations": 25,
-    "components": 847,
+    "components": 848,
     "providers": 11,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -7607,7 +7607,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 176
+    "migrationCount": 178
   },
   "tablesByDomain": [
     {
@@ -8057,7 +8057,7 @@
     }
   ],
   "components": {
-    "total": 847,
+    "total": 848,
     "groups": [
       {
         "group": "app",
@@ -8637,7 +8637,7 @@
       },
       {
         "group": "core",
-        "count": 67,
+        "count": 68,
         "items": [
           "account-source-icon",
           "account-source-icon.test",
@@ -8649,6 +8649,7 @@
           "asset-detail-flow",
           "asset-edit-broker-section",
           "asset-edit-connection-section",
+          "asset-form-iban.test",
           "assets-client",
           "box3-comparison",
           "card-kpi-strip",
@@ -15097,6 +15098,18 @@
       ],
       "summary": "Zusje van ADR 0075 (\"een invariant over een kolomwaarde hoort in de datalaag\"). Daar ging het over *wélke waarde* mag; hier over *wanneer* een controle geldig is. Aanleiding: restrisico SC-26 uit `specs/bank-connect-doelrekening/scenarios.md`.",
       "file": "docs/adr/0076-limietcontrole-atomair-in-de-datalaag.md"
+    },
+    {
+      "id": "0077-encrypted-kolom-triple-contract-en-stage-b-stoplijn",
+      "title": "Een encrypted kolom-triple heeft één schrijf-helper en één lees-helper per tabel, wist alleen bij bekend-leeg, en de plaintext-kolom blijft tot de laatste browser-schrijver én -lezer server-side is",
+      "status": "aanvaard",
+      "date": "2026-08-02",
+      "elements": [
+        "as-vermogen",
+        "t-supabase"
+      ],
+      "summary": "Aanleiding: Stage B van de field-level encryptie op `assets.account_number` (`lib/asset-account-number.ts`, spiegel van `lib/bank-account-iban.ts`). Tweede keer dat dit patroon opduikt na `bank_accounts.iban` — twee is genoeg om het vast te leggen vóórdat een derde encrypted kolo",
+      "file": "docs/adr/0077-encrypted-kolom-triple-contract-en-stage-b-stoplijn.md"
     }
   ],
   "churn": {
@@ -15116,7 +15129,7 @@
       },
       {
         "path": "app/api/ai",
-        "commits": 19
+        "commits": 20
       },
       {
         "path": "app/api/household",
@@ -15156,13 +15169,13 @@
       },
       {
         "file": "components/core/assets-client.tsx",
-        "loc": 4317,
-        "commits": 43
+        "loc": 4359,
+        "commits": 44
       },
       {
         "file": "components/app/cash-account-view.tsx",
         "loc": 2920,
-        "commits": 17
+        "commits": 18
       },
       {
         "file": "lib/release-notes.ts",
@@ -15182,7 +15195,7 @@
       {
         "file": "lib/test-personas.ts",
         "loc": 2216,
-        "commits": 11
+        "commits": 10
       }
     ]
   },
@@ -15512,7 +15525,6 @@
             "title": "Review",
             "agents": [
               "code-review",
-              "ux-review-expert",
               "security-specialist"
             ]
           },
@@ -15602,7 +15614,6 @@
             "title": "Review",
             "agents": [
               "code-review",
-              "ux-review-expert",
               "security-specialist"
             ]
           },
@@ -15652,7 +15663,7 @@
           },
           {
             "index": 3,
-            "title": "Aanpassen via de juiste specialist",
+            "title": "Aanpassen",
             "agents": [
               "senior-developer",
               "ai-specialist-general",
@@ -15671,8 +15682,7 @@
             "title": "Conditionele review",
             "agents": [
               "ux-review-expert",
-              "security-specialist",
-              "code-review"
+              "security-specialist"
             ]
           },
           {
@@ -15782,8 +15792,8 @@
             "title": "Review",
             "agents": [
               "code-review",
-              "ux-review-expert",
-              "security-specialist"
+              "security-specialist",
+              "ux-review-expert"
             ]
           },
           {
@@ -16127,17 +16137,9 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-07-30",
+    "previousDate": "2026-08-02",
     "hasChanges": true,
     "sections": [
-      {
-        "label": "API-routes",
-        "added": [
-          "/api/bank-accounts/[id]",
-          "/api/own-accounts/ibans"
-        ],
-        "removed": []
-      },
       {
         "label": "Componenten (aantal)",
         "added": [
@@ -16375,7 +16377,7 @@
     {
       "date": "2026-08-02",
       "api": 270,
-      "components": 847,
+      "components": 848,
       "tables": 86,
       "routesProduction": 101
     }

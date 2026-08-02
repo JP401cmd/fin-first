@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { blindIndex, decryptField, encryptField } from '@/lib/crypto/field-encryption'
+import { decryptField } from '@/lib/crypto/field-encryption'
+import { accountNumberWriteColumns } from '@/lib/asset-account-number'
 import { accountTypeToCashSubtype } from '@/lib/account-types'
 import { setBudgetTracking } from '@/lib/budget-tracking'
 
@@ -234,11 +235,9 @@ export async function ensureCashAssetForBankAccount(
       expected_return: 0,
       monthly_contribution: 0,
       institution: opts.providerName,
-      // Dual-write: plaintext for fallback + encrypted/hash for the
-      // post-PR2 world where the plaintext column is gone.
-      account_number: assetIban,
-      account_number_encrypted: encryptField(assetIban),
-      account_number_hash: assetIban ? blindIndex(assetIban) : null,
+      // Alle drie de rekeningnummer-kolommen in één keer; zie
+      // `lib/asset-account-number.ts` voor het waarom van de dual-write.
+      ...accountNumberWriteColumns(assetIban),
       // Een bestaande `bank_accounts`-rij bestaat alleen in de
       // gebruikersvocabulaire van ACCOUNT_TYPES, en dáár zit geen
       // krediet-/kaartrekening in — alle zes waarden zijn direct opneembaar
