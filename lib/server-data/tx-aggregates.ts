@@ -27,7 +27,9 @@
 // rijen (excl. gedeeld huishouden), voor loaders die vroeger `.eq('user_id')`
 // deden (lever-scores).
 
+import { cache } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { localMonthBounds, localMonthStartMonthsAgo } from '@/lib/month-range'
 
 /** Één aggregaat-rij zoals `tx_month_aggregate` teruggeeft. */
 export interface TxMonthAggregateRow {
@@ -187,6 +189,45 @@ export async function fetchTxMonthAggregate(
   })
   return { data: (data as TxMonthAggregateRow[] | null) ?? null, error }
 }
+
+/**
+ * Het ROLLENDE 12-MAANDS maandaggregaat `[maandstart 11 mnd terug, maandeinde)`,
+ * `cache()`-gewrapt zodat dashboard- en core-loader binnen één request ÉÉN RPC
+ * delen i.p.v. beide dezelfde te draaien. Op de cashflow-hub draaien ze allebei
+ * (`loadDashboardData` én `loadCashflowSettingsData` → `loadCoreData`), dus dat
+ * was per request een volledig dubbele RPC + payload.
+ *
+ * WAAROM HET VENSTER HIER BINNEN WORDT BEREKEND — en niet als argument komt.
+ * React `cache()` keyt op argument-IDENTITEIT (Object.is per argument). Een
+ * `cache()` om `fetchTxMonthAggregate` zelf zou dus een stille no-op zijn: elke
+ * callsite bouwt een VERS `{ from, to }`-object, en twee verse objecten zijn
+ * nooit identiek → altijd een miss. Het enige argument hier is daarom de
+ * supabase-client, precies zoals in lib/server-data/base.ts: `createClient()`
+ * (lib/supabase/server.ts) is zelf `cache()`-gewrapt → één instantie per
+ * RSC-render, dus alle loaders binnen één request raken dezelfde cache-entry.
+ *
+ * Het venster komt uit de tijdzone-veilige helpers (lib/month-range.ts) en is
+ * byte-identiek aan de twee inline `Date.UTC(jaar, maand ± n, 1).toISOString()`-
+ * berekeningen die het vervangt (beide leveren altijd dag-01 op UTC-middernacht).
+ * `tx-aggregates.cache.test.ts` pint die gelijkheid vast als anti-drift-getuige.
+ *
+ * `ownOnly` blijft weg (default false) = RLS-breed (eigen + gedeeld huishouden),
+ * identiek aan beide vervangen callsites. Loaders met een ANDER venster houden
+ * bewust hun eigen `fetchTxMonthAggregate`-call: een ander venster is een andere
+ * cache-entry (lib/lever-scores-loader.ts, 6 maanden). NB: horizon-data-loader
+ * draait hetzelfde 12-maands venster nog via een eigen call — die omzetting valt
+ * buiten deze wijziging.
+ *
+ * MOET met de authenticated/anon RLS-client worden aangeroepen (nooit
+ * getServiceClient) — zie `fetchTxMonthAggregate`.
+ */
+export const getTxAgg12m = cache(async (supabase: SupabaseClient) => {
+  const now = new Date()
+  return fetchTxMonthAggregate(supabase, {
+    from: localMonthStartMonthsAgo(now, 11),
+    to: localMonthBounds(now).end,
+  })
+})
 
 // ── Test-hulp: reproduceer de SQL in TS ─────────────────────────────────────
 /**

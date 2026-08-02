@@ -49,7 +49,7 @@ import { resolveEffectiveIncomeExpenses } from './effective-financials'
 import { resolveSavingsSource, savingsRateFromAggregates } from './savings-source'
 import { fetchLatestSnapshotsByMonth } from '@/lib/server-data/snapshot-aggregates'
 import {
-  fetchTxMonthAggregate,
+  getTxAgg12m,
   aggSumPositief,
   aggSumNegatiefAbs,
   aggIncomeByMonth,
@@ -403,8 +403,10 @@ export const loadCoreData = cache(async function loadCoreData(
     // /overzicht via dezelfde RPC al het juiste getal toonde. Een aggregaat levert
     // per definitie enkele rijen en kan niet afkappen.
     // RLS-breed (eigen + gedeeld huishouden) — identiek aan de vervangen fetches,
-    // en hetzelfde venster/dezelfde aanroep als dashboard-data-loader.
-    fetchTxMonthAggregate(supabase, { from: twelveMonthsAgo, to: monthEnd }),
+    // en hetzelfde venster/dezelfde aanroep als dashboard-data-loader. Sinds de
+    // `cache()`-wrap is dat letterlijk dezelfde aanroep: op de cashflow-hub draaien
+    // beide loaders in één request en delen ze deze ene RPC (zie getTxAgg12m).
+    getTxAgg12m(supabase),
     supabase
       .from('budgets')
       .select('id, name, default_limit, interval, budget_type, is_essential')

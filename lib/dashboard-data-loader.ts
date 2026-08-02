@@ -88,7 +88,7 @@ import {
 import { formatCurrency, calculateFreedomTime, formatFreedomTimeString, dailyExpenseRate, roundCents } from '@/lib/format'
 import { recentDailyExpenseRateFromRows } from '@/lib/expense-rate'
 import {
-  fetchTxMonthAggregate,
+  getTxAgg12m,
   aggSumPositief,
   aggSumNegatiefAbs,
   aggIncomeByMonth,
@@ -312,7 +312,10 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     // 12-/6-mnd inkomen/uitgaven/spaarquote/dagtarief te laag voor >1000-tx-gebruikers).
     // Een aggregaat levert enkele rijen en kan niet afkappen. RLS-breed (eigen +
     // gedeeld huishouden), identiek aan de vroegere fetches die op RLS leunden.
-    fetchTxMonthAggregate(supabase, { from: twelveMonthsAgo, to: monthEnd }),
+    // Gedeelde `cache()`-fetcher: exact hetzelfde venster [twelveMonthsAgo, monthEnd),
+    // maar core-data-loader raakt dezelfde cache-entry → op de cashflow-hub (waar
+    // beide loaders draaien) nog één RPC i.p.v. twee.
+    getTxAgg12m(supabase),
     // Tabel-split (migratie 20260502000003): dashboard-widgets tonen
     // investment-tracker data; crypto loopt via de exchange-sync.
     // Eén ongefilterde superset-query i.p.v. drie losse investment_holdings-fetches
