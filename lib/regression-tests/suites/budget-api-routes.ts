@@ -866,7 +866,7 @@ const tests: TestCase[] = [
         { method: 'GET', path: '/api/budgets/[id]', errorMsg: 'Niet ingelogd' },
         { method: 'PUT', path: '/api/budgets/favorites', errorMsg: 'Niet ingelogd' },
         { method: 'POST', path: '/api/budgets/plan', errorMsg: 'Niet ingelogd' },
-        { method: 'GET', path: '/api/budget-trends', errorMsg: 'Unauthorized' },
+        { method: 'GET', path: '/api/budget-trends', errorMsg: 'Niet ingelogd' },
         { method: 'GET', path: '/api/budget-variance', errorMsg: 'Niet ingelogd' },
         { method: 'GET', path: '/api/cashflow-forecast', errorMsg: 'Niet ingelogd' },
       ]

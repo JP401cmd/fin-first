@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
+import { serverError, unauthorized } from '@/lib/api/respond'
 import { localMonthBounds } from '@/lib/month-range'
 
 /**
@@ -32,7 +33,7 @@ export async function GET() {
     const supabase = await createClient()
     const claims = await getAuthClaims(supabase)
     if (!claims) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return unauthorized()
     }
 
     const now = new Date()
@@ -118,7 +119,6 @@ export async function GET() {
       dataMonths,
     })
   } catch (err) {
-    console.error('Error fetching budget trends:', err)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return serverError(err, 'budget-trends:GET')
   }
 }

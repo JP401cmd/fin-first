@@ -21,7 +21,7 @@
   --paper-2: var(--subtle, #f3ead9);
   --paper-3: var(--border-ed, #e3dac8);
   --ink-soft: var(--ink-2, #4a4840);
-  --ink-faint: var(--ink-3, #888070);
+  --ink-faint: var(--ink-3, #6e685a);
   --rule: var(--border-ed, #e3dac8);
 
   /* Semantisch kleursysteem van het rapport:
@@ -1662,7 +1662,7 @@
     --paper-3: #e3dac8;
     --ink: #1a1916;
     --ink-soft: #4a4840;
-    --ink-faint: #888070;
+    --ink-faint: #6e685a;
     --rule: #e3dac8;
     --kern: #6b4339;
     --kern-deep: #532e25;

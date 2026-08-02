@@ -14,7 +14,13 @@
   --border-md: #ccc1aa;   /* hover/medium borders */
   --ink: #1a1916;
   --ink-2: #4a4840;
-  --ink-3: #888070;
+  /* WCAG AA (4.5:1 normale tekst): --ink-3 draagt ~4.2k `text-`-usages (bijtekst,
+     labels, metadata) op --bg/--paper/--subtle. De oude #888070 haalde 3.28:1 op
+     de donkerste van die drie (--subtle) en zakte dus onder de drempel. Zelfde
+     tint (HSL 40°→42°, verzadiging 9.7%→10.0%), alleen donkerder: worst case nu
+     4.64:1 op --subtle (4.83 op --bg, 5.18 op --paper). Houd de print-fallback
+     `.text-[var(--ink-3)]` onderin dit bestand gelijk aan deze waarde. */
+  --ink-3: #6e685a;
   --ink-4: #bbb8b0;
   --rule-soft: rgba(26, 25, 22, 0.18);  /* halftransparante divider voor dotted/dashed */
   --r: 0px;
@@ -375,7 +381,8 @@
   --color-subtle: #f3f2ee;
   --color-ink: #1a1916;
   --color-ink-2: #4a4840;
-  --color-ink-3: #888070;
+  /* Spiegelt de :root-waarde van --ink-3 (WCAG AA) — houd beide gelijk. */
+  --color-ink-3: #6e685a;
   --color-ink-4: #bbb8b0;
 
   /* ── Module color tokens (enables bg-kern-500, text-wil-700, etc.) ── */
@@ -1057,7 +1064,7 @@ body.sleepmodus-dragging * {
     color: #4a4840 !important;
   }
   .text-\[var\(--ink-3\)\] {
-    color: #888070 !important;
+    color: #6e685a !important;
   }
   .text-\[var\(--ink-4\)\] {
     color: #bbb8b0 !important;

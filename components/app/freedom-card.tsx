@@ -144,7 +144,7 @@ export async function renderFreedomCardToCanvas(data: FreedomCardData): Promise<
   const PAPER = readColor('--paper', '#fbf7ec')
   const INK = readColor('--ink', '#1a1916')
   const INK2 = readColor('--ink-2', '#4a4840')
-  const INK3 = readColor('--ink-3', '#888070')
+  const INK3 = readColor('--ink-3', '#6e685a')
   const INK4 = readColor('--ink-4', '#bbb8b0')
   const SUBTLE = readColor('--subtle', '#f3ead9')
   const BORDER = readColor('--border-ed', '#e3dac8')
