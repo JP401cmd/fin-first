@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 /**
  * Tests voor POST /api/web-vitals — de ontvangstkant van de eigen
@@ -9,6 +9,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
  *   AC4 — zonder/ongeldige sessie → user_id null, meting niet verloren (204)
  *   AC5 — validatiefouten (onbekende metric, waarde buiten bereik, ongeldige
  *         JSON, body > 4096 bytes) → 4xx zonder insert, platte { error }-envelope
+ *   AC7 — `environment` komt server-side uit VERCEL_ENV (T0.1), met
+ *         'development' als lokale fallback, en is niet te spoofen via de body
  *   + user_id komt nooit uit de payload, alleen uit getClaims
  * AC6 (fire-and-forget/sendBeacon) is client-gedrag en hier bewust niet getest.
  */
@@ -32,11 +34,19 @@ vi.mock('@/lib/supabase/server', () => ({
 
 import { POST } from './route'
 
+const ORIG_ENV = { ...process.env }
+
 beforeEach(() => {
   mockInsert.mockReset()
   mockInsert.mockResolvedValue({ error: null })
   mockGetClaims.mockReset()
   mockGetClaims.mockResolvedValue({ data: null })
+  // Lokale ontwikkel-situatie als uitgangspunt: Vercel zet deze var, wij niet.
+  delete process.env.VERCEL_ENV
+})
+
+afterEach(() => {
+  process.env = { ...ORIG_ENV }
 })
 
 function req(body: unknown, raw?: string): Request {
@@ -136,6 +146,41 @@ describe('POST /api/web-vitals', () => {
     expect(res.status).toBe(413)
     expect(mockInsert).not.toHaveBeenCalled()
     expect(await res.json()).toEqual({ error: expect.any(String) })
+  })
+
+  it.each([
+    ['production', 'production'],
+    ['preview', 'preview'],
+  ])('AC7a — VERCEL_ENV=%s → insert-payload environment %s', async (vercelEnv, expected) => {
+    process.env.VERCEL_ENV = vercelEnv
+    const res = await POST(req(validBody()))
+    expect(res.status).toBe(204)
+    const [, payload] = mockInsert.mock.calls[0]
+    expect(payload).toMatchObject({ environment: expected })
+  })
+
+  it('AC7b — zonder VERCEL_ENV (lokaal) → environment "development"', async () => {
+    const res = await POST(req(validBody()))
+    expect(res.status).toBe(204)
+    const [, payload] = mockInsert.mock.calls[0]
+    expect(payload).toMatchObject({ environment: 'development' })
+  })
+
+  it('AC7c — environment komt nooit uit de payload (spoof genegeerd)', async () => {
+    // Lokale meting die zich voordoet als productie: zou de productie-p75
+    // vervuilen — precies wat de kolom moet voorkomen.
+    const res = await POST(req(validBody({ environment: 'production' })))
+    expect(res.status).toBe(204)
+    const [, payload] = mockInsert.mock.calls[0]
+    expect(payload).toMatchObject({ environment: 'development' })
+  })
+
+  it('AC7d — een gespoofte environment overschrijft de echte VERCEL_ENV niet', async () => {
+    process.env.VERCEL_ENV = 'preview'
+    const res = await POST(req(validBody({ environment: 'production' })))
+    expect(res.status).toBe(204)
+    const [, payload] = mockInsert.mock.calls[0]
+    expect(payload).toMatchObject({ environment: 'preview' })
   })
 
   it('user_id komt nooit uit de payload, ook niet als het er expliciet in staat', async () => {
