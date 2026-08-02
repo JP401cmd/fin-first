@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { unauthorized, forbidden, badRequest } from '@/lib/api/respond'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/supabase/service'
 import { isSuperAdmin } from '@/lib/admin'
@@ -21,19 +22,19 @@ import { shapeExportRows, shapeExportRow, type ExportRow } from '@/lib/account-e
 export async function GET(req: Request) {
   const supabase = await createClient()
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
   const {
     data: { user: admin },
   } = await supabase.auth.getUser()
   if (!admin) {
-    return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
+    return unauthorized()
   }
 
   const { searchParams } = new URL(req.url)
   const userId = searchParams.get('userId')
   if (!userId) {
-    return NextResponse.json({ error: 'userId is vereist' }, { status: 400 })
+    return badRequest('userId is vereist')
   }
   const label = searchParams.get('label') || userId
 

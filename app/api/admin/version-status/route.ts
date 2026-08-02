@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { forbidden, serverError } from '@/lib/api/respond'
 import { execFileSync } from 'node:child_process'
 import { readdirSync } from 'node:fs'
 import path from 'node:path'
@@ -200,7 +201,7 @@ async function gatherMigrations(): Promise<MigrationStatus> {
 export async function GET() {
   const supabase = await createClient()
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   try {
@@ -217,10 +218,6 @@ export async function GET() {
     }
     return NextResponse.json(body, { headers: { 'Cache-Control': 'no-store' } })
   } catch (e) {
-    console.error(
-      '[api/admin/version-status] onverwachte fout',
-      e instanceof Error ? e.message : e,
-    )
-    return NextResponse.json({ error: 'Serverfout' }, { status: 500 })
+    return serverError(e, 'admin-version-status:GET', 'Serverfout')
   }
 }

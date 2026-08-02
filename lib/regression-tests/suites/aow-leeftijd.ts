@@ -73,10 +73,11 @@ const tests: TestCase[] = [
         res.status === 403 || isRedirectOrAuth(res.status),
         `Expected 403 or redirect for unauthenticated GET, got ${res.status}`,
       )
-      // If 403, verify error message
+      // If 403, verify error message — de gedeelde envelope-tekst uit
+      // `forbidden()` (ADR 0044), niet het oude losse 'Forbidden'.
       if (res.status === 403) {
         const body = await res.json()
-        assertEqual(body.error, 'Forbidden', 'GET returns Forbidden for non-admin')
+        assertEqual(body.error, 'Geen toegang', 'GET geeft de 403-envelopetekst voor niet-admin')
       }
     },
   },

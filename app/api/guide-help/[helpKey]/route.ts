@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { forbidden, badRequest, serverError } from '@/lib/api/respond'
 import { createClient } from '@/lib/supabase/server'
 import { isSuperAdmin } from '@/lib/admin'
 import {
@@ -32,19 +33,19 @@ export async function PUT(
   const supabase = await createClient()
 
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   const { helpKey } = await params
   if (!isValidHelpKey(helpKey)) {
-    return NextResponse.json({ error: 'Invalid helpKey' }, { status: 400 })
+    return badRequest('Invalid helpKey')
   }
 
   let body: PutBody
   try {
     body = (await request.json()) as PutBody
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+    return badRequest('Invalid JSON body')
   }
 
   const explanation = sanitizeText(body.explanation, 2000)
@@ -75,10 +76,7 @@ export async function PUT(
     )
 
   if (error) {
-    return NextResponse.json(
-      { error: 'Failed to save help content' },
-      { status: 500 },
-    )
+    return serverError(error, 'guide-help:PUT', 'Failed to save help content')
   }
 
   return NextResponse.json(updated)
@@ -98,12 +96,12 @@ export async function DELETE(
   const supabase = await createClient()
 
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   const { helpKey } = await params
   if (!isValidHelpKey(helpKey)) {
-    return NextResponse.json({ error: 'Invalid helpKey' }, { status: 400 })
+    return badRequest('Invalid helpKey')
   }
 
   const blob: GuideHelpBlob = await getGuideHelp(supabase)
@@ -128,7 +126,7 @@ export async function DELETE(
     )
 
   if (error) {
-    return NextResponse.json({ error: 'Failed to delete entry' }, { status: 500 })
+    return serverError(error, 'guide-help:DELETE', 'Failed to delete entry')
   }
 
   return NextResponse.json({ ok: true, removed: true })

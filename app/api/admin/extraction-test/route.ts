@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { forbidden, badRequest } from '@/lib/api/respond'
 import { createClient } from '@/lib/supabase/server'
 import { isSuperAdmin } from '@/lib/admin'
 import { extractFinancialData } from '@/lib/ai/extract-financial-data'
@@ -9,14 +10,14 @@ export async function POST(req: Request) {
   const supabase = await createClient()
 
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   const body = await req.json()
   const { text, age, householdType, monthlyIncome, monthlyExpenses } = body
 
   if (!text || typeof text !== 'string') {
-    return NextResponse.json({ error: 'Text is required' }, { status: 400 })
+    return badRequest('Text is required')
   }
 
   const result = await extractFinancialData(supabase, text, {

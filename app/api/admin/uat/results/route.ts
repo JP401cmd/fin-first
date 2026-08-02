@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { unauthorized } from '@/lib/api/respond'
+import { unauthorized, forbidden, badRequest, notFound, conflict, serverError } from '@/lib/api/respond'
 import { getServiceClient } from '@/lib/supabase/service'
 import { isSuperAdmin } from '@/lib/admin'
 
@@ -19,13 +19,13 @@ const VALID_PLATFORM = ['webapp', 'mobiel'] as const
 export async function GET(req: Request) {
   const supabase = await createClient()
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   const { searchParams } = new URL(req.url)
   const roundId = searchParams.get('round')
   if (!roundId) {
-    return NextResponse.json({ error: 'round is verplicht' }, { status: 400 })
+    return badRequest('round is verplicht')
   }
 
   const svc = getServiceClient()
@@ -35,8 +35,7 @@ export async function GET(req: Request) {
     .eq('round_id', roundId)
 
   if (error) {
-    console.error('[api/admin/uat/results] GET resultaten ophalen mislukte', error)
-    return NextResponse.json({ error: 'Databasefout' }, { status: 500 })
+    return serverError(error, 'admin-uat-results:GET', 'Databasefout')
   }
 
   return NextResponse.json({ results: data ?? [] })
@@ -45,7 +44,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const supabase = await createClient()
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   const {
@@ -67,47 +66,31 @@ export async function POST(req: Request) {
   const frictie = typeof body?.frictie === 'string' ? body.frictie : null
 
   if (!round_id || !scenario_id || !sub || !platform || !status) {
-    return NextResponse.json(
-      { error: 'round_id, scenario_id, sub, platform en status zijn verplicht' },
-      { status: 400 },
-    )
+    return badRequest('round_id, scenario_id, sub, platform en status zijn verplicht')
   }
 
   if (!VALID_STATUSES.includes(status)) {
-    return NextResponse.json(
-      { error: `status moet één van ${VALID_STATUSES.join(', ')} zijn` },
-      { status: 400 },
-    )
+    return badRequest(`status moet één van ${VALID_STATUSES.join(', ')} zijn`)
   }
 
   if (!VALID_SUB.includes(sub)) {
-    return NextResponse.json(
-      { error: `sub moet één van ${VALID_SUB.join(', ')} zijn` },
-      { status: 400 },
-    )
+    return badRequest(`sub moet één van ${VALID_SUB.join(', ')} zijn`)
   }
 
   if (!VALID_PLATFORM.includes(platform)) {
-    return NextResponse.json(
-      { error: `platform moet één van ${VALID_PLATFORM.join(', ')} zijn` },
-      { status: 400 },
-    )
+    return badRequest(`platform moet één van ${VALID_PLATFORM.join(', ')} zijn`)
   }
 
   // Format-check severity altijd wanneer meegegeven (ook bij 'geslaagd'/'geblokkeerd'),
   // zodat een geldige-of-lege waarde gegarandeerd is voordat we op verplichtheid toetsen.
   if (severity != null && !VALID_SEVERITIES.includes(severity)) {
-    return NextResponse.json(
-      { error: `severity moet één van ${VALID_SEVERITIES.join(', ')} zijn, of leeg` },
-      { status: 400 },
-    )
+    return badRequest(`severity moet één van ${VALID_SEVERITIES.join(', ')} zijn, of leeg`)
   }
 
   // Bij een gefaalde test is severity verplicht; het format is hierboven al geborgd.
   if (status === 'gefaald' && severity == null) {
-    return NextResponse.json(
-      { error: `severity is verplicht bij status 'gefaald' en moet één van ${VALID_SEVERITIES.join(', ')} zijn` },
-      { status: 400 },
+    return badRequest(
+      `severity is verplicht bij status 'gefaald' en moet één van ${VALID_SEVERITIES.join(', ')} zijn`,
     )
   }
 
@@ -124,10 +107,10 @@ export async function POST(req: Request) {
     // Log alleen een échte DB-fout server-side (een ontbrekende ronde is geen fout);
     // de client krijgt hoe dan ook de generieke 404 zonder Postgres-details.
     if (roundError) console.error('[api/admin/uat/results] POST ronde-check mislukte', roundError)
-    return NextResponse.json({ error: 'Ronde niet gevonden' }, { status: 404 })
+    return notFound('Ronde niet gevonden')
   }
   if (round.closed_at) {
-    return NextResponse.json({ error: 'Deze ronde is gesloten en is read-only' }, { status: 409 })
+    return conflict('Deze ronde is gesloten en is read-only')
   }
 
   const { data, error } = await svc
@@ -152,8 +135,7 @@ export async function POST(req: Request) {
     .single()
 
   if (error) {
-    console.error('[api/admin/uat/results] POST upsert mislukte', error)
-    return NextResponse.json({ error: 'Databasefout' }, { status: 500 })
+    return serverError(error, 'admin-uat-results:POST', 'Databasefout')
   }
 
   return NextResponse.json({ result: data })

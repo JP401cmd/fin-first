@@ -1,6 +1,6 @@
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { unauthorized } from '@/lib/api/respond'
+import { unauthorized, forbidden, badRequest, serverError } from '@/lib/api/respond'
 import { isSuperAdmin } from '@/lib/admin'
 import { GOAL_GUIDE_DISPLAY_ORDER } from '@/lib/briefing/goal-guide-steps'
 
@@ -40,23 +40,20 @@ export async function PUT(request: NextRequest) {
   const supabase = await createClient()
 
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   let body: unknown
   try {
     body = await request.json()
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+    return badRequest('Invalid JSON body')
   }
 
   const { disabledGoals } = body as { disabledGoals?: unknown }
 
   if (!Array.isArray(disabledGoals)) {
-    return NextResponse.json(
-      { error: 'Expected { disabledGoals: string[] }' },
-      { status: 400 },
-    )
+    return badRequest('Expected { disabledGoals: string[] }')
   }
 
   const validIds = new Set<string>(GOAL_GUIDE_DISPLAY_ORDER as readonly string[])
@@ -79,10 +76,7 @@ export async function PUT(request: NextRequest) {
     )
 
   if (error) {
-    return NextResponse.json(
-      { error: 'Failed to save configuration' },
-      { status: 500 },
-    )
+    return serverError(error, 'goals-guide-settings:PUT', 'Failed to save configuration')
   }
 
   return NextResponse.json({ disabledGoals: filtered })

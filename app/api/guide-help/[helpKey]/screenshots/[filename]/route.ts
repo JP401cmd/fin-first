@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { forbidden, badRequest, notFound, serverError } from '@/lib/api/respond'
 import { createClient } from '@/lib/supabase/server'
 import { isSuperAdmin } from '@/lib/admin'
 import { getServiceClient } from '@/lib/supabase/service'
@@ -22,15 +23,15 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   const supabase = await createClient()
 
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   const { helpKey, filename } = await params
   if (!isValidHelpKey(helpKey)) {
-    return NextResponse.json({ error: 'Invalid helpKey' }, { status: 400 })
+    return badRequest('Invalid helpKey')
   }
   if (!filename || filename.includes('/') || filename.includes('..')) {
-    return NextResponse.json({ error: 'Invalid filename' }, { status: 400 })
+    return badRequest('Invalid filename')
   }
 
   const blob: GuideHelpBlob = await getGuideHelp(supabase)
@@ -68,9 +69,10 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
     )
 
   if (settingsError) {
-    return NextResponse.json(
-      { error: 'Bestand verwijderd maar metadata niet bijgewerkt' },
-      { status: 500 },
+    return serverError(
+      settingsError,
+      'guide-help-screenshot:DELETE metadata',
+      'Bestand verwijderd maar metadata niet bijgewerkt',
     )
   }
 
@@ -87,19 +89,19 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   const supabase = await createClient()
 
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   const { helpKey, filename } = await params
   if (!isValidHelpKey(helpKey)) {
-    return NextResponse.json({ error: 'Invalid helpKey' }, { status: 400 })
+    return badRequest('Invalid helpKey')
   }
 
   let body: PatchBody
   try {
     body = (await request.json()) as PatchBody
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+    return badRequest('Invalid JSON body')
   }
 
   const caption = typeof body.caption === 'string'
@@ -109,11 +111,11 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   const blob: GuideHelpBlob = await getGuideHelp(supabase)
   const entry = blob[helpKey]
   if (!entry) {
-    return NextResponse.json({ error: 'Entry not found' }, { status: 404 })
+    return notFound('Entry not found')
   }
   const screenshot = entry.screenshots.find((s) => s.filename === filename)
   if (!screenshot) {
-    return NextResponse.json({ error: 'Screenshot not found' }, { status: 404 })
+    return notFound('Screenshot not found')
   }
 
   const updated: HelpEntry = {
@@ -139,7 +141,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     )
 
   if (error) {
-    return NextResponse.json({ error: 'Failed to update caption' }, { status: 500 })
+    return serverError(error, 'guide-help-screenshot:PATCH', 'Failed to update caption')
   }
 
   return NextResponse.json(updated)

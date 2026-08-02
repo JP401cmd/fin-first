@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { unauthorized, forbidden, badRequest, notFound, serverError } from '@/lib/api/respond'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/supabase/service'
 import { isSuperAdmin } from '@/lib/admin'
@@ -39,12 +40,12 @@ export async function POST(req: Request) {
   const supabase = await createClient()
 
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   const { data: { user: adminUser } } = await supabase.auth.getUser()
   if (!adminUser) {
-    return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
+    return unauthorized()
   }
 
   const body = await req.json()
@@ -62,13 +63,13 @@ export async function POST(req: Request) {
   if (!targetUserId && email) {
     const authUser = await findAuthUserByEmail(service, email)
     if (!authUser) {
-      return NextResponse.json({ error: 'Gebruiker niet gevonden' }, { status: 404 })
+      return notFound('Gebruiker niet gevonden')
     }
     targetUserId = authUser.id
   }
 
   if (!targetUserId) {
-    return NextResponse.json({ error: 'userId of email is vereist' }, { status: 400 })
+    return badRequest('userId of email is vereist')
   }
 
   // Get current state
@@ -79,7 +80,7 @@ export async function POST(req: Request) {
     .maybeSingle()
 
   if (!profile) {
-    return NextResponse.json({ error: 'Gebruiker niet gevonden' }, { status: 404 })
+    return notFound('Gebruiker niet gevonden')
   }
 
   const oldSubs = (profile.active_subscriptions as string[]) ?? []
@@ -102,7 +103,7 @@ export async function POST(req: Request) {
     else if (legacyTier === 'connected') newSubs = ['connected']
     else newSubs = []
   } else {
-    return NextResponse.json({ error: 'subscriptions of tier is vereist' }, { status: 400 })
+    return badRequest('subscriptions of tier is vereist')
   }
 
   // Update subscriptions
@@ -116,8 +117,7 @@ export async function POST(req: Request) {
     .eq('id', targetUserId)
 
   if (updateError) {
-    // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
-    return NextResponse.json({ error: updateError.message }, { status: 500 })
+    return serverError(updateError, 'admin-tier-assign:POST')
   }
 
   // Log the assignment
@@ -147,7 +147,7 @@ export async function GET(req: Request) {
   const supabase = await createClient()
 
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   const { searchParams } = new URL(req.url)
@@ -163,10 +163,10 @@ export async function GET(req: Request) {
     } catch (err) {
       // Lek de rauwe GoTrue/Postgres-fout niet aan de client — log server-side
       // en toon een generieke melding.
-      console.error('[tier-assign] user lookup failed:', err)
-      return NextResponse.json(
-        { error: 'Zoeken mislukt door een serverfout. Probeer het later opnieuw.' },
-        { status: 500 },
+      return serverError(
+        err,
+        'admin-tier-assign:GET',
+        'Zoeken mislukt door een serverfout. Probeer het later opnieuw.',
       )
     }
 

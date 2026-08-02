@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { forbidden } from '@/lib/api/respond'
 import { createClient } from '@/lib/supabase/server'
 import { isSuperAdmin } from '@/lib/admin'
 import { BASE_SYSTEM_PROMPT } from '@/lib/ai/dna/base'
@@ -21,7 +22,7 @@ export async function GET() {
   const supabase = await createClient()
 
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   // Briefing-redactieprompt met representatieve default-directives

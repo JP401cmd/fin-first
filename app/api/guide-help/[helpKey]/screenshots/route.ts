@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { forbidden, badRequest, serverError } from '@/lib/api/respond'
 import { createClient } from '@/lib/supabase/server'
 import { isSuperAdmin } from '@/lib/admin'
 import { getServiceClient } from '@/lib/supabase/service'
@@ -57,38 +58,32 @@ export async function POST(
   const supabase = await createClient()
 
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   const { helpKey } = await params
   if (!isValidHelpKey(helpKey)) {
-    return NextResponse.json({ error: 'Invalid helpKey' }, { status: 400 })
+    return badRequest('Invalid helpKey')
   }
 
   let formData: FormData
   try {
     formData = await request.formData()
   } catch {
-    return NextResponse.json({ error: 'Invalid form data' }, { status: 400 })
+    return badRequest('Invalid form data')
   }
 
   const file = formData.get('file')
   const caption = formData.get('caption')
 
   if (!file || !(file instanceof File)) {
-    return NextResponse.json({ error: 'Geen bestand gevonden' }, { status: 400 })
+    return badRequest('Geen bestand gevonden')
   }
   if (!ALLOWED_MIME.includes(file.type as typeof ALLOWED_MIME[number])) {
-    return NextResponse.json(
-      { error: 'Alleen PNG, JPG of WebP toegestaan' },
-      { status: 400 },
-    )
+    return badRequest('Alleen PNG, JPG of WebP toegestaan')
   }
   if (file.size > MAX_FILE_SIZE) {
-    return NextResponse.json(
-      { error: `Bestand te groot (max ${MAX_FILE_SIZE / 1024 / 1024} MB)` },
-      { status: 400 },
-    )
+    return badRequest(`Bestand te groot (max ${MAX_FILE_SIZE / 1024 / 1024} MB)`)
   }
 
   const blob: GuideHelpBlob = await getGuideHelp(supabase)
@@ -100,10 +95,7 @@ export async function POST(
   }
 
   if (existing.screenshots.length >= MAX_SCREENSHOTS_PER_KEY) {
-    return NextResponse.json(
-      { error: `Maximaal ${MAX_SCREENSHOTS_PER_KEY} screenshots per stap` },
-      { status: 400 },
-    )
+    return badRequest(`Maximaal ${MAX_SCREENSHOTS_PER_KEY} screenshots per stap`)
   }
 
   const service = getServiceClient()
@@ -124,8 +116,7 @@ export async function POST(
     })
 
   if (uploadError) {
-    console.error('[guide-help/screenshots] Upload error:', uploadError)
-    return NextResponse.json({ error: 'Upload mislukt' }, { status: 500 })
+    return serverError(uploadError, 'guide-help-screenshots:POST upload', 'Upload mislukt')
   }
 
   const { data: publicData } = service.storage.from(BUCKET).getPublicUrl(path)
@@ -159,10 +150,10 @@ export async function POST(
   if (settingsError) {
     // Bestand staat in storage maar metadata is niet bijgewerkt.
     // Logging voldoende — gebruiker kan opnieuw proberen.
-    console.error('[guide-help/screenshots] Settings update error:', settingsError)
-    return NextResponse.json(
-      { error: 'Bestand geüpload maar metadata niet bijgewerkt' },
-      { status: 500 },
+    return serverError(
+      settingsError,
+      'guide-help-screenshots:POST metadata',
+      'Bestand geüpload maar metadata niet bijgewerkt',
     )
   }
 

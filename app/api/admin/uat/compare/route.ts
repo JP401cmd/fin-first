@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { forbidden, badRequest, serverError } from '@/lib/api/respond'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/supabase/service'
 import { isSuperAdmin } from '@/lib/admin'
@@ -38,14 +39,14 @@ function classify(baseStatus: string | undefined, targetStatus: string | undefin
 export async function GET(req: Request) {
   const supabase = await createClient()
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   const { searchParams } = new URL(req.url)
   const base = searchParams.get('base')
   const target = searchParams.get('target')
   if (!base || !target) {
-    return NextResponse.json({ error: 'base en target zijn verplicht' }, { status: 400 })
+    return badRequest('base en target zijn verplicht')
   }
 
   const svc = getServiceClient()
@@ -55,12 +56,10 @@ export async function GET(req: Request) {
   ])
 
   if (baseRes.error) {
-    console.error('[api/admin/uat/compare] basisronde ophalen mislukte', baseRes.error)
-    return NextResponse.json({ error: 'Databasefout' }, { status: 500 })
+    return serverError(baseRes.error, 'admin-uat-compare:GET basisronde', 'Databasefout')
   }
   if (targetRes.error) {
-    console.error('[api/admin/uat/compare] doelronde ophalen mislukte', targetRes.error)
-    return NextResponse.json({ error: 'Databasefout' }, { status: 500 })
+    return serverError(targetRes.error, 'admin-uat-compare:GET doelronde', 'Databasefout')
   }
 
   const baseMap = new Map<string, ResultRow>()

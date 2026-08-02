@@ -10,7 +10,7 @@ export async function POST(req: Request) {
 
   // Step 1: Verify superadmin
   if (!(await isSuperAdmin(supabase))) {
-    return forbidden('Forbidden')
+    return forbidden()
   }
 
   const { data: { user } } = await supabase.auth.getUser()

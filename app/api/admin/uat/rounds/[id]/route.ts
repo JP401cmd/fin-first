@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { forbidden, badRequest, notFound } from '@/lib/api/respond'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/supabase/service'
 import { isSuperAdmin } from '@/lib/admin'
@@ -14,13 +15,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params
   const supabase = await createClient()
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   const body = await req.json().catch(() => null)
   const action = body?.action
   if (action !== 'close' && action !== 'reopen') {
-    return NextResponse.json({ error: "action moet 'close' of 'reopen' zijn" }, { status: 400 })
+    return badRequest("action moet 'close' of 'reopen' zijn")
   }
 
   const updates: Record<string, unknown> = {
@@ -39,8 +40,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     .single()
 
   if (error) {
+    // Een mislukte update betekent hier in de praktijk 'ronde bestaat niet'
+    // (.single() faalt op 0 rijen); de echte DB-fout blijft server-side.
     console.error('[api/admin/uat/rounds/[id]] PATCH bijwerken mislukte', error)
-    return NextResponse.json({ error: 'Ronde niet gevonden' }, { status: 404 })
+    return notFound('Ronde niet gevonden')
   }
 
   return NextResponse.json({ round: data })

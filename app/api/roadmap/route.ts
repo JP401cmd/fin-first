@@ -1,5 +1,6 @@
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { isSuperAdmin } from '@/lib/admin'
+import { unauthorized, forbidden, badRequest, serverError } from '@/lib/api/respond'
 import { NextRequest, NextResponse } from 'next/server'
 
 // ── Types ───────────────────────────────────────────────────────────
@@ -20,7 +21,7 @@ export async function GET() {
   const claims = await getAuthClaims(supabase)
 
   if (!claims) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   // Try dedicated table first
@@ -42,11 +43,7 @@ export async function GET() {
     .maybeSingle()
 
   if (settingsError) {
-    return NextResponse.json(
-      // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
-      { error: 'Fout bij laden roadmap data', detail: settingsError.message },
-      { status: 500 },
-    )
+    return serverError(settingsError, 'roadmap:GET', 'Fout bij laden roadmap data')
   }
 
   if (!settingsRow?.value) {
@@ -74,12 +71,12 @@ export async function PUT(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   // Roadmap-status bijwerken is een beheerhandeling (/beheer/roadmap).
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   let body: {
@@ -91,21 +88,18 @@ export async function PUT(request: NextRequest) {
   try {
     body = await request.json()
   } catch {
-    return NextResponse.json({ error: 'Ongeldig verzoek' }, { status: 400 })
+    return badRequest('Ongeldig verzoek')
   }
 
   const feature_nr = Number(body.feature_nr)
   const fase = String(body.fase ?? '').toLowerCase()
 
   if (!feature_nr || isNaN(feature_nr)) {
-    return NextResponse.json({ error: 'feature_nr is verplicht' }, { status: 400 })
+    return badRequest('feature_nr is verplicht')
   }
 
   if (!['a', 'b', 'c', 'd', 'p'].includes(fase)) {
-    return NextResponse.json(
-      { error: 'fase moet a, b, c, d of p zijn' },
-      { status: 400 },
-    )
+    return badRequest('fase moet a, b, c, d of p zijn')
   }
 
   const validStatuses = ['backlog', 'in_ontwikkeling', 'testen', 'afgerond']
@@ -113,10 +107,7 @@ export async function PUT(request: NextRequest) {
   if (body.status !== undefined) {
     const status = String(body.status)
     if (!validStatuses.includes(status)) {
-      return NextResponse.json(
-        { error: `Status moet een van ${validStatuses.join(', ')} zijn` },
-        { status: 400 },
-      )
+      return badRequest(`Status moet een van ${validStatuses.join(', ')} zijn`)
     }
   }
 
@@ -191,11 +182,7 @@ export async function PUT(request: NextRequest) {
     )
 
   if (upsertError) {
-    return NextResponse.json(
-      // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
-      { error: 'Fout bij opslaan', detail: upsertError.message },
-      { status: 500 },
-    )
+    return serverError(upsertError, 'roadmap:PUT', 'Fout bij opslaan')
   }
 
   return NextResponse.json(updated)

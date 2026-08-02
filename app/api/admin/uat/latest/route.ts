@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { forbidden, serverError } from '@/lib/api/respond'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/supabase/service'
 import { isSuperAdmin } from '@/lib/admin'
@@ -17,7 +18,7 @@ import { isSuperAdmin } from '@/lib/admin'
 export async function GET() {
   const supabase = await createClient()
   if (!(await isSuperAdmin(supabase))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   const svc = getServiceClient()
@@ -27,8 +28,7 @@ export async function GET() {
     .order('tested_at', { ascending: true })
 
   if (error) {
-    console.error('[api/admin/uat/latest] GET resultaten ophalen mislukte', error)
-    return NextResponse.json({ error: 'Databasefout' }, { status: 500 })
+    return serverError(error, 'admin-uat-latest:GET', 'Databasefout')
   }
 
   // Laatste registratie per (scenario_id, sub, platform) wint: door oplopend op
