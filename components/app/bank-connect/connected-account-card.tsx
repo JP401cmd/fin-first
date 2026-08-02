@@ -3,19 +3,34 @@
 import { useState } from 'react'
 import { RefreshCw, Unlink, Building2, AlertTriangle, Clock } from 'lucide-react'
 import { SyncStatusBadge } from './sync-status-badge'
-import { deriveBankLinkHealth } from '@/lib/bank-connection-status'
+import type { LinkedAccountView } from '@/lib/truelayer/linked-account'
 import { startBankRelink } from '@/lib/truelayer/start-relink'
 
 /**
  * DE BANKVERBINDING op de rekeningdetail — status, synchroniseren, verbreken en
  * (sinds fase 7, B6/SC-12) het HERSTELPAD.
  *
- * ## Eén afleiding, drie oppervlakken
+ * ## Eén afleiding, drie oppervlakken — en sinds de kolom-drop server-side
  *
  * De toestand komt uit `deriveBankLinkHealth` (`lib/bank-connection-status.ts`),
  * net als op het herkomst-symbool en in de status-pil. Hier stond tot fase 7 een
  * eigen `status === 'expired' || 'revoked'`; die kopie is weg. Leid dus nergens
  * in dit bestand iets af uit `status`, `token_expires_at` of `is_active`.
+ *
+ * Sinds de voorbereiding op het droppen van de plaintext IBAN-kolommen draait die
+ * afleiding niet eens meer in deze client: de kaart consumeert een
+ * {@link LinkedAccountView} uit `GET /api/bank-connect/linked-accounts`, en die
+ * route dráágt het oordeel al (`health`). De aanleiding was niet het oordeel maar
+ * de IBAN — dit oppervlak las `bank_connection_accounts` client-direct en was
+ * daarmee de laatste lezer van `bank_connection_accounts.iban`. Ontsleutelen kan
+ * de browser niet (de sleutel is server-only), dus de enige uitweg was de hele
+ * leesronde naar de server verplaatsen. Dat neemt en passant de client-directe
+ * weergave-read weg die ADR 0058 verbiedt.
+ *
+ * Gevolg voor de identiteitsregel onder de banknaam: er komt nog maar een
+ * IBAN-STAARTJE de server uit (`iban_tail`, vier tekens), geen volledige IBAN.
+ * Zelfde afweging als op de success-pagina — genoeg om een rekening te herkennen,
+ * één plek minder waar een volledige IBAN in een clientbundel of screenshot belandt.
  *
  * ## Dit is het ENIGE oppervlak met de 14-dagen-vooraankondiging
  *
@@ -63,26 +78,14 @@ import { startBankRelink } from '@/lib/truelayer/start-relink'
  * Zie `specs/bank-connect-doelrekening/plan.md`, fase 7.
  */
 
-type BankConnectionAccount = {
-  id: string
-  external_account_id: string
-  iban: string | null
-  account_name: string | null
-  last_synced_at: string | null
-  daily_requests: number
-  rate_limit_reset_date: string | null
-  is_active: boolean
-  bank_account_id: string | null
-  bank_connections: {
-    provider_name: string
-    provider_logo: string | null
-    token_expires_at: string | null
-    status: string
-  }
-}
-
 type ConnectedAccountCardProps = {
-  account: BankConnectionAccount
+  /**
+   * De koppelrij zoals `GET /api/bank-connect/linked-accounts` haar levert —
+   * inclusief het server-afgeleide `health`-oordeel en het IBAN-staartje. Bewust
+   * dezelfde wire-vorm als de success-pagina consumeert: twee oppervlakken die
+   * over één koppeling praten horen niet elk hun eigen vorm te hebben.
+   */
+  account: LinkedAccountView
   onSync: () => void
   onDisconnect: () => void
   /**
@@ -183,14 +186,13 @@ export function ConnectedAccountCard({ account, onSync, onDisconnect, onReauthor
    */
   const [syncNeedsRelink, setSyncNeedsRelink] = useState(false)
 
-  const conn = account.bank_connections
-  const health = deriveBankLinkHealth({
-    linkIsActive: account.is_active,
-    connectionStatus: conn.status,
-    tokenExpiresAt: conn.token_expires_at,
-    lastSyncedAt: account.last_synced_at,
-  })
+  const health = account.health
   const linkLost = health.state === 'linked-broken'
+  /**
+   * De banknaam ontbreekt alleen als de embed van de verbinding niet meekwam;
+   * "je bank" is dan eerlijker dan een lege plek midden in een zin.
+   */
+  const providerName = account.provider_name ?? 'je bank'
   /**
    * Staat het herstel-aanbod al bóven de melding? Dan niet nog een keer erin.
    * Beide banden (verbinding kwijt, vooraankondiging) dragen zelf een "Verbind
@@ -198,8 +200,18 @@ export function ConnectedAccountCard({ account, onSync, onDisconnect, onReauthor
    */
   const relinkOfferedAbove = linkLost || health.expiringSoon
 
-  // Reset daily requests if date has changed
-  const today = new Date().toISOString().split('T')[0]
+  // Teller weergeven, maar alleen als hij over vandáág gaat.
+  //
+  // `Europe/Amsterdam` en niet `toISOString()`: de dagsleutel in
+  // `rate_limit_reset_date` wordt sinds de atomaire reservering
+  // (public.reserve_bank_sync_slot) in Nederlandse tijd bepaald. Met een
+  // UTC-vergelijking hier zou de kaart tussen middernacht en 02:00 "0/10" tonen
+  // en de knop vrijgeven terwijl de server nog op de volle teller staat — de
+  // gebruiker klikt dan tegen een 429 aan. `en-CA` levert YYYY-MM-DD.
+  //
+  // Vriendelijkheid, geen grens: de echte rem is de RPC. Deze kaart mag hooguit
+  // te vroeg blokkeren, nooit iets doorlaten dat de server zou weigeren.
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Amsterdam' }).format(new Date())
   const dailyRequests = account.rate_limit_reset_date === today ? account.daily_requests : 0
   const canSync = dailyRequests < 10 && !linkLost
 
@@ -302,11 +314,11 @@ export function ConnectedAccountCard({ account, onSync, onDisconnect, onReauthor
             is daarmee breder. Op 360px moet de identiteit inschikken, niet de pil
             afbreken. */}
         <div className="flex min-w-0 items-center gap-3">
-          {conn.provider_logo ? (
+          {account.provider_logo ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={conn.provider_logo}
-              alt={conn.provider_name}
+              src={account.provider_logo}
+              alt={providerName}
               className="h-10 w-10 object-contain"
             />
           ) : (
@@ -315,19 +327,16 @@ export function ConnectedAccountCard({ account, onSync, onDisconnect, onReauthor
             </div>
           )}
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-[var(--ink)]">{conn.provider_name}</p>
-            {account.iban && (
-              <p className="truncate text-xs text-[var(--ink-3)]">{account.iban}</p>
+            <p className="truncate text-sm font-semibold text-[var(--ink)]">{providerName}</p>
+            {/* Staartje, geen volledige IBAN — de server geeft er niet meer dan
+                vier tekens uit. Zelfde notatie als de success-pagina. */}
+            {account.iban_tail && (
+              <p className="truncate text-xs text-[var(--ink-3)]">···· {account.iban_tail}</p>
             )}
           </div>
         </div>
 
-        <SyncStatusBadge
-          lastSyncedAt={account.last_synced_at}
-          dailyRequests={dailyRequests}
-          tokenExpiresAt={conn.token_expires_at}
-          connectionStatus={conn.status}
-        />
+        <SyncStatusBadge health={health} dailyRequests={dailyRequests} />
       </div>
 
       {/* Verbinding kwijt — de énige toestand die om een handeling vraagt.
@@ -343,7 +352,7 @@ export function ConnectedAccountCard({ account, onSync, onDisconnect, onReauthor
             <AlertTriangle aria-hidden className="mt-px h-3.5 w-3.5 shrink-0 text-warning" />
             <span>
               Verbinding kwijt — we halen geen nieuwe transacties meer op bij{' '}
-              {conn.provider_name}. Verbind opnieuw om weer bij te werken.
+              {providerName}. Verbind opnieuw om weer bij te werken.
             </span>
           </p>
           <button
@@ -366,7 +375,7 @@ export function ConnectedAccountCard({ account, onSync, onDisconnect, onReauthor
           <p className="flex min-w-0 items-start gap-2 text-xs text-[var(--ink-2)]">
             <Clock aria-hidden className="mt-px h-3.5 w-3.5 shrink-0 text-warning" />
             <span>
-              De verbinding met {conn.provider_name} werkt nog en verloopt{' '}
+              De verbinding met {providerName} werkt nog en verloopt{' '}
               {expiryPhrase(health.daysUntilExpiry)}. Je kunt nu al opnieuw verbinden.
             </span>
           </p>

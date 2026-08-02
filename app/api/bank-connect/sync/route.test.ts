@@ -87,8 +87,35 @@ const TL_TX = {
 
 type DedupQuery = { eqs: Record<string, unknown>; gte: string | null; lte: string | null; range: [number, number] | null }
 
-function makeSupabase(existing: TxRow[]) {
+/** Wat `reserve_bank_sync_slot` teruggeeft; vorm gelijk aan de RPC-kolommen. */
+type Slot = {
+  slot_found: boolean
+  slot_allowed: boolean
+  slot_daily_requests: number
+  slot_limit: number
+  slot_day_key: string
+}
+
+const OK_SLOT: Slot = {
+  slot_found: true,
+  slot_allowed: true,
+  slot_daily_requests: 1,
+  slot_limit: 10,
+  slot_day_key: '2026-08-02',
+}
+
+type SupabaseOpts = {
+  /** De koppelrij zoals de SELECT hem oplevert (defaults hieronder). */
+  connAccount?: Record<string, unknown>
+  /** Vervangt het antwoord van `reserve_bank_sync_slot`. */
+  reserve?: () => Promise<Slot> | Slot
+  /** Laat `reserve_bank_sync_slot` falen (PostgREST-foutvorm). */
+  reserveError?: { message: string }
+}
+
+function makeSupabase(existing: TxRow[], opts: SupabaseOpts = {}) {
   const inserted: Record<string, unknown>[][] = []
+  const rpcCalls: { name: string; args: unknown }[] = []
   const dedupQueries: DedupQuery[] = []
   const crossSourceQueries: DedupQuery[] = []
   const syncLogs: Record<string, unknown>[] = []
@@ -163,6 +190,7 @@ function makeSupabase(existing: TxRow[]) {
               refresh_token_encrypted: 'enc:rt',
               token_expires_at: new Date(Date.now() + 3600_000).toISOString(),
             },
+            ...opts.connAccount,
           },
           error: null,
         }
@@ -224,8 +252,17 @@ function makeSupabase(existing: TxRow[]) {
     client: {
       auth: { getUser: vi.fn(async () => ({ data: { user: { id: USER_ID } } })) },
       from: vi.fn((table: string) => builder(table)),
+      // `reserve_bank_sync_slot` — de atomaire dagteller. PostgREST levert een
+      // table-returning functie als array, dus dat is ook wat de stub doet.
+      rpc: vi.fn(async (name: string, args: unknown) => {
+        rpcCalls.push({ name, args })
+        if (opts.reserveError) return { data: null, error: opts.reserveError }
+        const slot = opts.reserve ? await opts.reserve() : OK_SLOT
+        return { data: [slot], error: null }
+      }),
     },
     inserted,
+    rpcCalls,
     dedupQueries,
     crossSourceQueries,
     syncLogs,
@@ -422,17 +459,26 @@ describe('POST /api/bank-connect/sync — eerste ophaal (B8/B9)', () => {
     // Bewuste eigenaarskeuze: de 10/dag is een rem op sync-spam per
     // gebruikershandeling. Het werkelijke aantal verzoeken blijft observeerbaar
     // via bank_sync_log.provider_requests.
-    const { client, syncLogs, connAccountUpdates } = makeSupabase([])
+    const { client, syncLogs, connAccountUpdates, rpcCalls } = makeSupabase([])
     mockCreateClient.mockResolvedValue(client)
 
     const res = await POST(request())
     const body = await res.json()
 
+    // Eén tik, en die tik komt uit de atomaire RPC — niet uit een UPDATE die de
+    // route zelf op een gelezen waarde baseert.
+    expect(rpcCalls).toHaveLength(1)
+    expect(rpcCalls[0]).toEqual({
+      name: 'reserve_bank_sync_slot',
+      args: { p_connection_account_id: 'conn-acct-1' },
+    })
     expect(body.daily_requests).toBe(1)
-    expect(connAccountUpdates[0]).toMatchObject({ daily_requests: 1 })
-    // De rate-limit-tik en de uitkomst zijn twee aparte writes; alleen de eerste
-    // raakt de teller.
-    expect(connAccountUpdates.at(-1)).not.toHaveProperty('daily_requests')
+    // Geen enkele UPDATE op de koppelrij raakt de teller nog: die kolom is
+    // sinds de RPC exclusief van de database.
+    for (const update of connAccountUpdates) {
+      expect(update).not.toHaveProperty('daily_requests')
+      expect(update).not.toHaveProperty('rate_limit_reset_date')
+    }
     expect(Number(syncLogs[0].provider_requests)).toBeGreaterThan(1)
   })
 
@@ -460,7 +506,7 @@ describe('POST /api/bank-connect/sync — eerste ophaal (B8/B9)', () => {
   it('reserveert de rate-limit-tik vóór de provider-lus, ook als de sync faalt', async () => {
     // Anders is elke mislukte of getimeoute sync gratis en kost herhalen niets,
     // terwijl de provider-verzoeken wél gedaan zijn.
-    const { client, connAccountUpdates } = makeSupabase([])
+    const { client, rpcCalls } = makeSupabase([])
     mockCreateClient.mockResolvedValue(client)
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
 
@@ -470,7 +516,8 @@ describe('POST /api/bank-connect/sync — eerste ophaal (B8/B9)', () => {
 
     await POST(request())
 
-    expect(connAccountUpdates[0]).toMatchObject({ daily_requests: 1 })
+    expect(rpcCalls).toHaveLength(1)
+    expect(rpcCalls[0].name).toBe('reserve_bank_sync_slot')
     consoleError.mockRestore()
   })
 
@@ -678,5 +725,166 @@ describe('POST /api/bank-connect/sync — cross-bron dedup (laag 2)', () => {
 
     expect(body).toMatchObject({ new: 0, duplicates: 1, duplicates_cross_source: 0 })
     expect(syncLogs[0]).toMatchObject({ transactions_dup: 1, transactions_dup_cross_source_iban: 0 })
+  })
+})
+
+/**
+ * De dagteller — atomair (restrisico SC-26).
+ *
+ * ## Wat er stuk was
+ *
+ * De route las `daily_requests`, vergeleek met 10 en schreef daarna
+ * `<gelezen waarde> + 1`. Tussen lezen en schrijven paste een heel tweede
+ * verzoek: twee gelijktijdige syncs zagen allebei ruimte, gingen allebei door,
+ * en overschreven elkaars ophoging. Twee syncs, één tik. Achter onze rem zit de
+ * bank-eigen verzoeklimiet (`provider_request_limit_exceeded` blokkeert de
+ * rekening voor langere tijd), en één sync kost tot vijf provider-verzoeken —
+ * dus dat gat kostte geen verzoek te veel maar vijf.
+ *
+ * ## Wat deze tests bewijzen — en wat niet
+ *
+ * De atomariteit zelf ligt in de DATABASE, in één
+ * `UPDATE … WHERE (… or daily_requests < 10) … RETURNING` onder de
+ * rijvergrendeling (migratie 20260802140500). Die kan een unit-test niet
+ * naspelen; wat ze wél kan bewijzen — en hieronder ook echt bewijst — is dat de
+ * ROUTE geen eigen oordeel meer velt:
+ *
+ *  1. de uitkomst volgt uitsluitend de RPC, óók als de gelezen koppelrij het
+ *     tegenovergestelde suggereert (de twee "vijandige momentopname"-tests);
+ *  2. de route schrijft de teller nergens meer zelf;
+ *  3. bij twee ECHT interleavende aanroepen — beide binnen vóórdat er één heeft
+ *     geschreven, wat de test expliciet vaststelt — komt er samen niet meer dan
+ *     de limiet doorheen.
+ *
+ * De stub modelleert de kritieke sectie synchroon (de JS-eventloop is
+ * single-threaded); dat is de tegenhanger van de rijvergrendeling. Zou de route
+ * nog steeds zelf lezen-en-ophogen, dan zou test 3 twee 200's opleveren.
+ */
+describe('POST /api/bank-connect/sync — atomaire dagteller (SC-26)', () => {
+  it('volgt de RPC en niet de gelezen rij: teller op 99 in de momentopname, tóch toegestaan', async () => {
+    // Vijandige momentopname. De oude code zou hier 429 geven op basis van de
+    // SELECT; de nieuwe code kent de kolom geen betekenis meer toe.
+    const { client, rpcCalls } = makeSupabase([], {
+      connAccount: { daily_requests: 99, rate_limit_reset_date: '2026-08-02' },
+      reserve: () => ({ ...OK_SLOT, slot_allowed: true, slot_daily_requests: 3 }),
+    })
+    mockCreateClient.mockResolvedValue(client)
+
+    const res = await POST(request())
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(body.daily_requests).toBe(3)
+    expect(rpcCalls).toHaveLength(1)
+  })
+
+  it('volgt de RPC en niet de gelezen rij: teller op 0 in de momentopname, tóch geweigerd', async () => {
+    // De spiegel. Dit is het geval dat de race daadwerkelijk produceerde: de
+    // rij die dit verzoek las was al achterhaald toen het bij de rem aankwam.
+    const { client, syncLogs } = makeSupabase([], {
+      connAccount: { daily_requests: 0, rate_limit_reset_date: null },
+      reserve: () => ({ ...OK_SLOT, slot_allowed: false, slot_daily_requests: 10 }),
+    })
+    mockCreateClient.mockResolvedValue(client)
+
+    const res = await POST(request())
+    const body = await res.json()
+
+    expect(res.status).toBe(429)
+    // Ongewijzigde tekst — de regressiesuite en de UAT-criteria matchen hierop.
+    expect(body).toEqual({
+      error: 'Daglimiet bereikt (10 verzoeken per dag per account)',
+      daily_requests: 10,
+    })
+    // Geweigerd = géén enkel verzoek aan de bank.
+    expect(mockGetAccountTransactions).not.toHaveBeenCalled()
+    expect(syncLogs[0]).toMatchObject({ status: 'rate_limited' })
+  })
+
+  it('laat samen niet meer dan de limiet door bij twee ECHT gelijktijdige syncs', async () => {
+    const state = { count: 0, limit: 1 }
+    /** Wat elk verzoek zag toen het de rem binnenkwam. */
+    const seenOnEntry: number[] = []
+
+    // Slagboom: geen van beide verzoeken mag de kritieke sectie in vóórdat het
+    // ándere ook binnen is. Zo is de race deterministisch gelopen in plaats van
+    // "meestal wel" — een timing-afhankelijke test die soms per ongeluk slaagt
+    // bewijst hier niets.
+    let arrived = 0
+    let openBarrier!: () => void
+    const bothArrived = new Promise<void>((resolve) => { openBarrier = resolve })
+
+    async function reserve() {
+      seenOnEntry.push(state.count)
+      arrived += 1
+      if (arrived >= 2) openBarrier()
+      await bothArrived
+
+      // ── Kritieke sectie — geen `await` hierbinnen ─────────────────────────
+      // Tegenhanger van de UPDATE onder de rijvergrendeling: controle en
+      // ophoging zijn ondeelbaar.
+      if (state.count >= state.limit) {
+        return { ...OK_SLOT, slot_allowed: false, slot_daily_requests: state.count, slot_limit: state.limit }
+      }
+      state.count += 1
+      return { ...OK_SLOT, slot_allowed: true, slot_daily_requests: state.count, slot_limit: state.limit }
+    }
+
+    const { client } = makeSupabase([], { reserve })
+    mockCreateClient.mockResolvedValue(client)
+
+    const [resA, resB] = await Promise.all([POST(request()), POST(request())])
+    const statuses = [resA.status, resB.status].sort()
+
+    // De race is écht gelopen: beide verzoeken stonden bij de rem terwijl de
+    // teller nog op 0 stond. Precies de toestand waarin de oude read-then-write
+    // twee keer "er is ruimte" concludeerde.
+    expect(seenOnEntry).toEqual([0, 0])
+
+    // En tóch komt er maar één doorheen.
+    expect(statuses).toEqual([200, 429])
+    expect(state.count).toBe(1)
+    expect(mockGetAccountTransactions.mock.calls.length).toBeGreaterThan(0)
+
+    const denied = resA.status === 429 ? resA : resB
+    expect(await denied.json()).toMatchObject({ error: 'Daglimiet bereikt (1 verzoeken per dag per account)' })
+  })
+
+  it('antwoordt 404 wanneer de RPC de koppelrij niet vindt (bestaat niet of niet van jou)', async () => {
+    const { client } = makeSupabase([], {
+      reserve: () => ({ ...OK_SLOT, slot_found: false, slot_allowed: false, slot_daily_requests: 0 }),
+    })
+    mockCreateClient.mockResolvedValue(client)
+
+    const res = await POST(request())
+
+    expect(res.status).toBe(404)
+    expect(mockGetAccountTransactions).not.toHaveBeenCalled()
+  })
+
+  it('bepaalt de dagsleutel niet zelf — de route stuurt alleen de koppel-id mee', async () => {
+    // De dagrolgrens hoort in Europe/Amsterdam te liggen en wordt daarom in de
+    // database bepaald. Stuurde de route hier een eigen (UTC-)datum mee, dan
+    // rolde de teller voor een Nederlandse gebruiker om 01:00/02:00 om.
+    const { client, rpcCalls } = makeSupabase([])
+    mockCreateClient.mockResolvedValue(client)
+
+    await POST(request())
+
+    expect(Object.keys(rpcCalls[0].args as object)).toEqual(['p_connection_account_id'])
+  })
+
+  it('geeft een RPC-fout terug als 500 zonder de bank te bellen', async () => {
+    // Faalt de reservering, dan is er géén geldige tik — dan mag er ook geen
+    // verzoek aan de bank uit. "Bij twijfel niet ophalen" is hier de veilige kant.
+    const { client } = makeSupabase([], { reserveError: { message: 'boom' } })
+    mockCreateClient.mockResolvedValue(client)
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const res = await POST(request())
+
+    expect(res.status).toBe(500)
+    expect(mockGetAccountTransactions).not.toHaveBeenCalled()
+    consoleError.mockRestore()
   })
 })

@@ -19,6 +19,7 @@ import { CashFlowForecastChart, type ForecastPoint, type ForecastAlert } from '@
 import { FeatureGate } from '@/components/app/feature-gate'
 import { LineChart } from 'lucide-react'
 import { ConnectedAccountCard } from '@/components/app/bank-connect/connected-account-card'
+import type { LinkedAccountView } from '@/lib/truelayer/linked-account'
 import { type Budget } from '@/lib/budget-data'
 import { TransactionForm } from '@/components/app/transaction-form'
 import { BudgetIcon, formatCurrency as formatCurrencyShort, formatCurrencyDecimals as formatCurrency } from '@/components/app/budget-shared'
@@ -163,23 +164,7 @@ export function CashAccountView({
 
   // Bank Connect state
   const [gcEnabled, setGcEnabled] = useState(false)
-  const [gcAccounts, setGcAccounts] = useState<Array<{
-    id: string
-    external_account_id: string
-    iban: string | null
-    account_name: string | null
-    last_synced_at: string | null
-    daily_requests: number
-    rate_limit_reset_date: string | null
-    is_active: boolean
-    bank_account_id: string | null
-    bank_connections: {
-      provider_name: string
-      provider_logo: string | null
-      token_expires_at: string | null
-      status: string
-    }
-  }>>([])
+  const [gcAccounts, setGcAccounts] = useState<GcAccount[]>([])
   const [showBankConnections, setShowBankConnections] = useState(true)
 
   /**
@@ -254,9 +239,14 @@ export function CashAccountView({
   // Settings menu & asset edit state
   const [showSettingsMenu, setShowSettingsMenu] = useState(false)
   const [showAssetEdit, setShowAssetEdit] = useState(false)
+  // Geen `account_number`: die kolom werd opgehaald en doorgegeven maar nergens
+  // getoond — een dode lezer van de PLAINTEXT-kolom die het droppen ervan
+  // tegenhield zonder er iets voor terug te geven. Het rekeningnummer van de
+  // dragende bankrekening staat al onder de rekeningnaam (uit `account.iban`,
+  // dat via `/api/own-accounts/ibans` uit de versleutelde kolom komt).
   const [linkedAsset, setLinkedAsset] = useState<{
     id: string; name: string; current_value: number; institution: string | null;
-    account_number: string | null; subtype: string | null; net_worth_inclusion_pct: number;
+    subtype: string | null; net_worth_inclusion_pct: number;
     expected_return: number
   } | null>(null)
   const [assetSaving, setAssetSaving] = useState(false)
@@ -460,59 +450,42 @@ export function CashAccountView({
 
   const loadGcAccounts = useCallback(async () => {
     try {
-      const res = await fetch('/api/bank-connect/status')
-      if (!res.ok) return
-      const { enabled } = await res.json()
+      const statusRes = await fetch('/api/bank-connect/status')
+      if (!statusRes.ok) return
+      const { enabled } = await statusRes.json()
       setGcEnabled(enabled)
       if (!enabled) return
 
-      const supabase = createClient()
-      // Expliciete kolomlijst i.p.v. `select('*')`: die stuurde óók `iban_hash`
-      // en `iban_encrypted` mee. De blind index is een stabiele, uit een
-      // server-only sleutel afgeleide gelijkheids-identifier — dezelfde IBAN
-      // geeft altijd dezelfde hash — en hoort de browser nooit te bereiken. Dit
-      // is de zusterkolom van de `bank_accounts`-fix (984b54eba), exact dezelfde
-      // klasse. De lijst is precies wat `GcAccount` declareert; groeit die,
-      // groeit deze mee — maar nooit met een crypto-kolom.
-      let query = supabase
-        .from('bank_connection_accounts')
-        .select(
-          'id, external_account_id, iban, account_name, last_synced_at, daily_requests, rate_limit_reset_date, is_active, bank_account_id, bank_connections(provider_name, provider_logo, token_expires_at, status)',
-        )
-        .eq('is_active', true)
-
-      // Bij individuele rekening: toon alleen relevante connectie
-      if (accountId) {
-        query = query.eq('bank_account_id', accountId)
-      }
-
-      // Ordenen op `created_at`, niet op de plaintext `iban`: die kolom verdwijnt
-      // in Stage B, en een `order()` op een gedropte kolom geeft een PostgREST
-      // 400. Deze loader slikt fouten stil (`const { data } = …`, plus de catch),
-      // dus de koppelkaarten zouden dan geruisloos verdwijnen i.p.v. iets te
-      // melden. `created_at` bestaat altijd en is stabiel — dezelfde ordening als
-      // `/api/bank-connect/linked-accounts`.
+      // GEEN client-directe leesronde op `bank_connection_accounts` meer.
       //
-      // LET OP — dit maakt de query nog NIET Stage B-bestendig: `iban` staat
-      // hierboven nog in de `select()`, want `ConnectedAccountCard` toont 'm.
-      // Bij de drop geeft dát dezelfde 400 en dezelfde stille degradatie. Deze
-      // lezer is precies de reden dat commit 984b54eba de plaintext-kolom nog
-      // liet meeschrijven. De echte uitweg is de kaart op een server-route zetten
-      // (zoals /api/bank-connect/linked-accounts, dat alleen een `iban_tail`
-      // teruggeeft) — die route mist vandaag `daily_requests` en
-      // `rate_limit_reset_date`, die `SyncStatusBadge` nodig heeft. Open punt,
-      // vóór Stage B te sluiten.
+      // Die query vroeg de PLAINTEXT `iban`-kolom op, want `ConnectedAccountCard`
+      // toonde 'm — en dat was de laatste lezer die het droppen van die kolom
+      // tegenhield. Ontsleutelen kan de browser niet (`ENCRYPTION_KEY_V1` is
+      // server-only), dus de kolom vervangen door `iban_encrypted` was hier geen
+      // optie: de enige uitweg is de hele leesronde server-side doen. De route
+      // geeft een IBAN-STAARTJE van vier tekens terug in plaats van het volledige
+      // nummer, plus het al afgeleide `health`-oordeel — dus dit oppervlak leidt
+      // niets meer zelf af en toont geen volledige IBAN meer.
       //
-      // Zichtbaar effect van de ordening-wissel: koppelvolgorde
-      // i.p.v. alfabetisch op IBAN, en dat is alleen merkbaar in het
-      // gecombineerde overzicht — per rekening bestaat er hooguit één actieve
-      // koppeling (unieke index `bank_connection_accounts_one_active_per_bank_account`).
-      const { data } = await query.order('created_at', { ascending: true })
+      // En passant verdwijnt hier een weergave-read uit een `'use client'`-bestand
+      // (ADR 0058) en daarmee ook de kans dat een latere `select('*')` de blind
+      // index `iban_hash` naar de browser lekt.
+      //
+      // Fouten blijven stil (Bank Connect is optioneel) — maar nu faalt de route
+      // zichtbaar server-side i.p.v. dat een PostgREST-400 op een gedropte kolom
+      // de koppelkaarten geruisloos laat verdwijnen.
+      const linkRes = await fetch('/api/bank-connect/linked-accounts')
+      if (!linkRes.ok) return
+      const { accounts } = (await linkRes.json()) as { accounts?: GcAccount[] }
 
-      if (data) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        setGcAccounts(data as any)
-      }
+      // De route levert álle actieve koppelingen van de gebruiker; het
+      // rekening-filter dat vroeger een `.eq('bank_account_id', …)` was, gebeurt
+      // nu hier. Ordening blijft die van de route (`created_at`, oplopend).
+      setGcAccounts(
+        accountId
+          ? (accounts ?? []).filter((acc) => acc.bank_account_id === accountId)
+          : accounts ?? [],
+      )
     } catch {
       // Silently fail — Bank Connect is optional
     }
@@ -1032,7 +1005,7 @@ export function CashAccountView({
     const supabase = createClient()
     const { data } = await supabase
       .from('assets')
-      .select('id, name, current_value, institution, account_number, subtype, net_worth_inclusion_pct, expected_return')
+      .select('id, name, current_value, institution, subtype, net_worth_inclusion_pct, expected_return')
       .eq('id', account.linked_asset_id)
       .maybeSingle()
     setLinkedAsset(data)
@@ -2726,23 +2699,17 @@ export function CashAccountView({
   )
 }
 
-type GcAccount = {
-  id: string
-  external_account_id: string
-  iban: string | null
-  account_name: string | null
-  last_synced_at: string | null
-  daily_requests: number
-  rate_limit_reset_date: string | null
-  is_active: boolean
-  bank_account_id: string | null
-  bank_connections: {
-    provider_name: string
-    provider_logo: string | null
-    token_expires_at: string | null
-    status: string
-  }
-}
+/**
+ * Eén gekoppelde bankrekening, in exact de vorm die
+ * `GET /api/bank-connect/linked-accounts` levert.
+ *
+ * Was een eigen, met de hand nagetypte rijvorm zolang `loadGcAccounts` de tabel
+ * client-direct las. Dat leesspoor is weg (het vroeg de plaintext `iban`-kolom
+ * op, de laatste blokkade voor het droppen daarvan), en daarmee is er geen reden
+ * meer voor een tweede vorm naast de wire-vorm die de success-pagina al
+ * consumeert. Eén contract, één plek om bij te werken.
+ */
+type GcAccount = LinkedAccountView
 
 /**
  * Vereenvoudigd bewerkscherm voor een budget-gekoppelde cash-rekening.
@@ -2764,7 +2731,7 @@ function AssetEditForm({
   onCancel,
   onDisconnect,
 }: {
-  asset: { id: string; name: string; current_value: number; institution: string | null; account_number: string | null; subtype: string | null; net_worth_inclusion_pct: number; expected_return: number }
+  asset: { id: string; name: string; current_value: number; institution: string | null; subtype: string | null; net_worth_inclusion_pct: number; expected_return: number }
   account: Account
   saving: boolean
   bankConnectEnabled: boolean

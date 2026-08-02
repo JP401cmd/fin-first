@@ -65,6 +65,23 @@ export type LinkedAccountView = {
    */
   last_synced_at: string | null
   /**
+   * Hoeveel sync-verzoeken deze koppeling vandaag al deed, en op welke dag die
+   * teller voor het laatst is gezet (`YYYY-MM-DD`).
+   *
+   * Staan hier sinds de rekeningdetail (`ConnectedAccountCard`) op deze route
+   * overstapte. Die kaart las `bank_connection_accounts` tot dan client-direct,
+   * en dat was de laatste lezer van de PLAINTEXT `iban`-kolom — de kolom die
+   * gedropt gaat worden. Zonder deze twee velden kon die kaart niet verhuizen:
+   * ze voeden samen de "N/10 verzoeken vandaag"-teller en de vraag of de
+   * synchroniseer-knop nog aan mag staan.
+   *
+   * Rauwe tellers en geen afgeleid "mag synchroniseren", omdat de reset-regel
+   * (teller geldt alleen vandaag) ook de zichtbare tekst voedt; één afgeleide
+   * boolean zou het getal alsnog apart moeten meesturen.
+   */
+  daily_requests: number
+  rate_limit_reset_date: string | null
+  /**
    * Wat de bank vandaag aan saldo heeft overgenomen op de dragende rekening:
    * `{ previous, current }`, of `null` als er vandaag niets is overgenomen.
    *

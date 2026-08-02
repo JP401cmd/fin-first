@@ -1,8 +1,7 @@
-import type { ComponentProps } from 'react'
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { formatTimestamp } from '@/lib/format'
-import { BANK_LINK_EXPIRY_WARNING_DAYS } from '@/lib/bank-connection-status'
+import { BANK_LINK_EXPIRY_WARNING_DAYS, deriveBankLinkHealth } from '@/lib/bank-connection-status'
 import { SyncStatusBadge } from './sync-status-badge'
 
 /**
@@ -22,17 +21,49 @@ const DAY_MS = 24 * 60 * 60 * 1000
 /** Tailwind-standaardkleuren die in dit domein verboden zijn (tokens only). */
 const FORBIDDEN_COLOR_CLASSES = /\b(?:bg|text|border)-(?:red|orange|green|emerald|amber|teal|violet|purple|sky|zinc|slate|gray|grey)-\d{2,3}\b/
 
-function renderBadge(props: Partial<ComponentProps<typeof SyncStatusBadge>> = {}) {
+/**
+ * De vier RAUWE signalen blijven de invoer van deze suite, ook nu de pil zelf een
+ * kant-en-klaar `health`-oordeel binnenkrijgt.
+ *
+ * Bewust zo: de assertie die ertoe doet is "welke woorden en welke kleur hoort
+ * bij deze situatie in de wereld", en die situatie beschrijf je met een status en
+ * een vervaldatum — niet met een `BankLinkHealth`-literal, want dan zou de test
+ * het oordeel zélf opschrijven en niets meer bewaken. `deriveBankLinkHealth` is
+ * dezelfde functie die de server (`/api/bank-connect/linked-accounts`) draait, dus
+ * dit blijft het echte pad naspelen.
+ */
+function renderBadge(
+  props: {
+    lastSyncedAt?: string | null
+    dailyRequests?: number
+    tokenExpiresAt?: string | null
+    connectionStatus?: string
+  } = {},
+) {
+  const {
+    lastSyncedAt = null,
+    dailyRequests = 0,
+    tokenExpiresAt = null,
+    connectionStatus = 'active',
+  } = props
   return render(
     <SyncStatusBadge
-      lastSyncedAt={null}
-      dailyRequests={0}
-      tokenExpiresAt={null}
-      connectionStatus="active"
-      {...props}
+      health={deriveBankLinkHealth({
+        // De lijst waaruit de pil gevoed wordt is op actieve koppelingen
+        // gefilterd; `is_active` is hier dus altijd waar. De koppelrij-brede
+        // lezing van dat signaal doet de route.
+        linkIsActive: true,
+        connectionStatus,
+        tokenExpiresAt,
+        lastSyncedAt,
+      })}
+      dailyRequests={dailyRequests}
     />,
   )
 }
+
+/** Wat `renderBadge` accepteert — de rauwe situatie, niet de props van de pil. */
+type BadgeSituation = Parameters<typeof renderBadge>[0]
 
 /**
  * Staat er ergens `text-warning` als TEKSTkleur op een `--warning-bg`-vlak?
@@ -160,7 +191,7 @@ describe('SyncStatusBadge — gezond en gesynchroniseerd', () => {
 
 describe('SyncStatusBadge — kleurconventie', () => {
   it('gebruikt in geen enkele toestand een Tailwind-standaardkleur', () => {
-    const cases: Array<Partial<ComponentProps<typeof SyncStatusBadge>>> = [
+    const cases: BadgeSituation[] = [
       { connectionStatus: 'expired' },
       { tokenExpiresAt: new Date(Date.now() + 3 * DAY_MS).toISOString(), lastSyncedAt: '2026-07-01T08:00:00Z' },
       { lastSyncedAt: null },

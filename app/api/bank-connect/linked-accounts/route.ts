@@ -72,6 +72,9 @@ type LinkRow = {
   /** Signaal 1 van de gezondheidsafleiding — zie de noot bij de mapping. */
   is_active: boolean | null
   last_synced_at: string | null
+  /** De rate-limit-teller die de rekeningdetail als "N/10 verzoeken vandaag" toont. */
+  daily_requests: number | null
+  rate_limit_reset_date: string | null
   bank_connections: ConnectionRow | ConnectionRow[] | null
   bank_accounts: CarrierRow | CarrierRow[] | null
 }
@@ -105,8 +108,12 @@ export async function GET() {
       // zijn drie van de vier signalen die `deriveBankLinkHealth` nodig heeft (het
       // vierde, `last_synced_at`, stond er al). `provider_id` is de bank waarmee
       // het herstelpad opnieuw autoriseert.
+      // `daily_requests` en `rate_limit_reset_date` kwamen erbij toen de
+      // rekeningdetail (`ConnectedAccountCard`) haar client-directe leesronde op
+      // deze route inruilde — zonder die twee kon dat oppervlak niet verhuizen,
+      // en zolang het bleef staan hield het de plaintext `iban`-kolom in leven.
       .select(
-        'id, account_name, iban_encrypted, bank_account_id, is_active, last_synced_at, bank_connections(provider_name, provider_logo, provider_id, status, token_expires_at), bank_accounts(name, iban_encrypted, linked_asset_id)',
+        'id, account_name, iban_encrypted, bank_account_id, is_active, last_synced_at, daily_requests, rate_limit_reset_date, bank_connections(provider_name, provider_logo, provider_id, status, token_expires_at), bank_accounts(name, iban_encrypted, linked_asset_id)',
       )
       .eq('user_id', user.id)
       .eq('is_active', true)
@@ -166,6 +173,10 @@ export async function GET() {
         carrier_name: carrier?.name ?? null,
         carrier_iban_tail: ibanTail(carrierIban),
         last_synced_at: row.last_synced_at,
+        // De kolom is NOT NULL met default 0, maar PostgREST-typings laten `null`
+        // toe; `?? 0` houdt de consument van een `null/10`-teller af.
+        daily_requests: row.daily_requests ?? 0,
+        rate_limit_reset_date: row.rate_limit_reset_date,
         balance_change: carrier?.linked_asset_id
           ? balanceChanges.get(carrier.linked_asset_id) ?? null
           : null,

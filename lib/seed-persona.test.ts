@@ -3,6 +3,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import {
   deleteAllUserData,
   buildSeedAssetRow,
+  buildSeedBankAccountRow,
+  buildSeedCashAssetRow,
   buildSeedDebtRow,
   countSeedSteps,
   SEED_DELETE_STEPS,
@@ -197,6 +199,52 @@ describe('Seed: retirement_provider_type is constraint-valide voor alle personas
         ).toBe(true)
       }
     }
+  })
+})
+
+/**
+ * De seed mag de PLAINTEXT rekeningnummer-kolommen niet meer vullen.
+ *
+ * `bank_accounts.iban` en `assets.account_number` staan op de droplijst; zolang de
+ * seed ze schrijft, is die drop geen knop maar een project. De bankrekening-rij is
+ * de gevaarlijkste van de twee: die werd gebouwd met `{ user_id, ...persona }`, en
+ * `PersonaBankAccount` draagt een `iban`-veld — de kolom werd dus gevuld zonder dat
+ * haar naam ergens in de seed voorkwam. Geen enkele grep op `iban:` vond hem, en dat
+ * is precies waarom dit een test verdient en geen code-review.
+ *
+ * De persona houdt zijn leesbare IBAN; alleen de weg naar de plaintext-kolom is dicht.
+ */
+describe('Seed: de plaintext rekeningnummer-kolommen worden niet meer geschreven', () => {
+  const bankAccount = PERSONAS.compleet.bank_accounts[0]
+
+  it('de persona draagt wél een leesbare IBAN — dat is de bron, niet het probleem', () => {
+    expect(bankAccount.iban).toBeTruthy()
+  })
+
+  it('buildSeedBankAccountRow schrijft géén iban-kolom (de spread verstopte er één)', () => {
+    const row = buildSeedBankAccountRow(bankAccount, 'user-test', 'asset-1')
+
+    // Op sleutel-aanwezigheid en niet op waarde: `iban: undefined` zou PostgREST
+    // nog steeds de kolom laten noemen.
+    expect(Object.keys(row)).not.toContain('iban')
+    // De rest van de rij moet er wél gewoon staan — dit is geen "alles weglaten".
+    expect(row).toMatchObject({
+      user_id: 'user-test',
+      name: bankAccount.name,
+      bank_name: bankAccount.bank_name,
+      balance: bankAccount.balance,
+      linked_asset_id: 'asset-1',
+    })
+  })
+
+  it('buildSeedCashAssetRow schrijft géén account_number-kolom', () => {
+    const row = buildSeedCashAssetRow(bankAccount, 'user-test', true)
+
+    // Exacte sleutelmatch: `account_number_encrypted` bevat `account_number` als
+    // substring, dus een substring-assertie zou hier stil altijd slagen zodra er
+    // encryptiesleutels in de omgeving staan.
+    expect(Object.keys(row)).not.toContain('account_number')
+    expect(row).toMatchObject({ user_id: 'user-test', asset_type: 'cash' })
   })
 })
 

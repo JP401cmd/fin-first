@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-30T08:05:15.958Z",
-  "generatedDate": "2026-07-30",
+  "generatedAt": "2026-08-02T14:15:31.136Z",
+  "generatedDate": "2026-08-02",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -189,11 +189,11 @@
   "stats": {
     "routes": 146,
     "routesProduction": 101,
-    "api": 268,
+    "api": 270,
     "tables": 86,
-    "migrations": 171,
+    "migrations": 176,
     "integrations": 25,
-    "components": 846,
+    "components": 847,
     "providers": 11,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -2522,6 +2522,14 @@
       ]
     },
     {
+      "url": "/api/bank-accounts/[id]",
+      "file": "app/api/bank-accounts/[id]/route.ts",
+      "domain": "bank-accounts",
+      "methods": [
+        "PATCH"
+      ]
+    },
+    {
       "url": "/api/bank-connect/accounts",
       "file": "app/api/bank-connect/accounts/route.ts",
       "domain": "bank-connect",
@@ -3699,6 +3707,14 @@
       "methods": [
         "GET",
         "PUT"
+      ]
+    },
+    {
+      "url": "/api/own-accounts/ibans",
+      "file": "app/api/own-accounts/ibans/route.ts",
+      "domain": "own-accounts",
+      "methods": [
+        "GET"
       ]
     },
     {
@@ -5977,6 +5993,29 @@
       ]
     },
     {
+      "domain": "own-accounts",
+      "label": "own-accounts",
+      "count": 2,
+      "routes": [
+        {
+          "url": "/api/own-accounts/ibans",
+          "file": "app/api/own-accounts/ibans/route.ts",
+          "domain": "own-accounts",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/own-accounts/reclassify",
+          "file": "app/api/own-accounts/reclassify/route.ts",
+          "domain": "own-accounts",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "pension",
       "label": "pension",
       "count": 2,
@@ -6165,6 +6204,21 @@
           "domain": "auth",
           "methods": [
             "GET"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "bank-accounts",
+      "label": "bank-accounts",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/bank-accounts/[id]",
+          "file": "app/api/bank-accounts/[id]/route.ts",
+          "domain": "bank-accounts",
+          "methods": [
+            "PATCH"
           ]
         }
       ]
@@ -6734,21 +6788,6 @@
           "methods": [
             "GET",
             "PUT"
-          ]
-        }
-      ]
-    },
-    {
-      "domain": "own-accounts",
-      "label": "own-accounts",
-      "count": 1,
-      "routes": [
-        {
-          "url": "/api/own-accounts/reclassify",
-          "file": "app/api/own-accounts/reclassify/route.ts",
-          "domain": "own-accounts",
-          "methods": [
-            "POST"
           ]
         }
       ]
@@ -7568,7 +7607,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 171
+    "migrationCount": 176
   },
   "tablesByDomain": [
     {
@@ -8018,7 +8057,7 @@
     }
   ],
   "components": {
-    "total": 846,
+    "total": 847,
     "groups": [
       {
         "group": "app",
@@ -8598,7 +8637,7 @@
       },
       {
         "group": "core",
-        "count": 66,
+        "count": 67,
         "items": [
           "account-source-icon",
           "account-source-icon.test",
@@ -8661,6 +8700,7 @@
           "section-header",
           "vacancy-timeline",
           "verhuurrendement-tab",
+          "verhuurrendement-tab.test",
           "vermogen-asset-card",
           "vermogen-card-action-button",
           "vermogen-debt-card",
@@ -9447,6 +9487,12 @@
           "write": true
         }
       ],
+      "bank-accounts": [
+        {
+          "name": "bank_accounts",
+          "write": true
+        }
+      ],
       "bank-connect": [
         {
           "name": "app_settings",
@@ -9630,10 +9676,6 @@
         },
         {
           "name": "assets",
-          "write": false
-        },
-        {
-          "name": "bank_accounts",
           "write": false
         },
         {
@@ -10181,10 +10223,6 @@
           "write": true
         },
         {
-          "name": "bank_accounts",
-          "write": true
-        },
-        {
           "name": "budgets",
           "write": true
         },
@@ -10426,10 +10464,6 @@
         },
         {
           "name": "balance_snapshots",
-          "write": false
-        },
-        {
-          "name": "bank_accounts",
           "write": false
         },
         {
@@ -12436,20 +12470,20 @@
       ],
       "bank_accounts": [
         {
+          "domain": "bank-accounts",
+          "label": "bank-accounts",
+          "write": true,
+          "routes": [
+            "/api/bank-accounts/[id]"
+          ]
+        },
+        {
           "domain": "bank-connect",
           "label": "Bank-connect",
           "write": true,
           "routes": [
             "/api/bank-connect/accounts",
             "/api/bank-connect/callback"
-          ]
-        },
-        {
-          "domain": "onboarding",
-          "label": "Onboarding",
-          "write": true,
-          "routes": [
-            "/api/onboarding/save-own-data"
           ]
         },
         {
@@ -12461,19 +12495,11 @@
           ]
         },
         {
-          "domain": "checkin",
-          "label": "checkin",
-          "write": false,
-          "routes": [
-            "/api/checkin/gespreksstarters",
-            "/api/checkin/overview"
-          ]
-        },
-        {
           "domain": "own-accounts",
           "label": "own-accounts",
           "write": false,
           "routes": [
+            "/api/own-accounts/ibans",
             "/api/own-accounts/reclassify"
           ]
         },
@@ -12491,16 +12517,6 @@
           "write": false,
           "routes": [
             "/api/report/balans"
-          ]
-        },
-        {
-          "domain": "snapshots",
-          "label": "Snapshots",
-          "write": false,
-          "routes": [
-            "/api/snapshots",
-            "/api/snapshots/auto",
-            "/api/snapshots/cron"
           ]
         },
         {
@@ -15069,6 +15085,18 @@
       ],
       "summary": "Vierde keer dat dit patroon onafhankelijk werd gevonden tijdens `specs/bank-connect-doelrekening/plan.md`; kandidaat voor een eigen ADR sinds het restpunt bij fase 4 (§0c-omgeving), nu geschreven bij fase 9.",
       "file": "docs/adr/0075-kolomwaarde-invariant-in-datalaag.md"
+    },
+    {
+      "id": "0076-limietcontrole-atomair-in-de-datalaag",
+      "title": "Een limiet die tegen een externe partij beschermt, wordt atomair in de datalaag afgedwongen — niet met lezen-controleren-schrijven in een route",
+      "status": "aanvaard",
+      "date": "2026-08-02",
+      "elements": [
+        "t-supabase",
+        "t-bankconnect"
+      ],
+      "summary": "Zusje van ADR 0075 (\"een invariant over een kolomwaarde hoort in de datalaag\"). Daar ging het over *wélke waarde* mag; hier over *wanneer* een controle geldig is. Aanleiding: restrisico SC-26 uit `specs/bank-connect-doelrekening/scenarios.md`.",
+      "file": "docs/adr/0076-limietcontrole-atomair-in-de-datalaag.md"
     }
   ],
   "churn": {
@@ -15119,21 +15147,21 @@
       {
         "file": "components/app/horizon/horizon-client.tsx",
         "loc": 8279,
-        "commits": 92
+        "commits": 90
       },
       {
         "file": "components/app/budgets-client.tsx",
         "loc": 5082,
-        "commits": 34
+        "commits": 32
       },
       {
         "file": "components/core/assets-client.tsx",
-        "loc": 4313,
-        "commits": 45
+        "loc": 4317,
+        "commits": 43
       },
       {
         "file": "components/app/cash-account-view.tsx",
-        "loc": 2883,
+        "loc": 2920,
         "commits": 17
       },
       {
@@ -15144,17 +15172,17 @@
       {
         "file": "lib/dashboard-data-loader.ts",
         "loc": 2660,
-        "commits": 51
+        "commits": 47
       },
       {
         "file": "app/(app)/core/cash/import/page.tsx",
-        "loc": 2230,
-        "commits": 20
+        "loc": 2298,
+        "commits": 21
       },
       {
         "file": "lib/test-personas.ts",
         "loc": 2216,
-        "commits": 12
+        "commits": 11
       }
     ]
   },
@@ -16100,8 +16128,24 @@
   "diff": {
     "baseline": false,
     "previousDate": "2026-07-30",
-    "hasChanges": false,
-    "sections": []
+    "hasChanges": true,
+    "sections": [
+      {
+        "label": "API-routes",
+        "added": [
+          "/api/bank-accounts/[id]",
+          "/api/own-accounts/ibans"
+        ],
+        "removed": []
+      },
+      {
+        "label": "Componenten (aantal)",
+        "added": [
+          "+1"
+        ],
+        "removed": []
+      }
+    ]
   },
   "statsHistory": [
     {
@@ -16325,6 +16369,13 @@
       "date": "2026-07-30",
       "api": 268,
       "components": 846,
+      "tables": 86,
+      "routesProduction": 101
+    },
+    {
+      "date": "2026-08-02",
+      "api": 270,
+      "components": 847,
       "tables": 86,
       "routesProduction": 101
     }

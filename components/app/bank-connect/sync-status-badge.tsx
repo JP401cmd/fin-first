@@ -2,7 +2,7 @@
 
 import { Clock, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { formatTimestamp } from '@/lib/format'
-import { deriveBankLinkHealth } from '@/lib/bank-connection-status'
+import type { BankLinkHealth } from '@/lib/bank-connection-status'
 
 /**
  * DE STATUS-PIL van één bankkoppeling, op de bankverbindingen-sectie van de
@@ -20,12 +20,17 @@ import { deriveBankLinkHealth } from '@/lib/bank-connection-status'
  * alleen nog woorden en kleur. Reken hier dus niets na — óók de afronding van
  * `daysUntilExpiry` komt kant-en-klaar mee.
  *
- * `linkIsActive: true` is geen aanname maar gedragsbehoud: deze pil heeft geen
- * `is_active`-prop (en de props liggen vast, `cash-account-view.tsx` rendert
- * hem), en de oude afleiding keek er ook nooit naar. De lijst waaruit hij
- * gevoed wordt is bovendien op `is_active = true` gefilterd. De koppelrij-brede
- * lezing van dat signaal hoort op de kaart eromheen
- * (`connected-account-card.tsx`), die 'm wél heeft.
+ * Het OORDEEL komt sinds de kolom-drop-voorbereiding als `health`-prop binnen in
+ * plaats van als drie rauwe signalen die deze pil zelf door `deriveBankLinkHealth`
+ * haalde. Aanleiding: de rekeningdetail las `bank_connection_accounts`
+ * client-direct — de laatste lezer van de PLAINTEXT `iban`-kolom — en is verhuisd
+ * naar `GET /api/bank-connect/linked-accounts`. Die route levert bewust het
+ * oordeel en niet de rauwe signalen, dus die zijn hier simpelweg niet meer
+ * beschikbaar. Winst: de afleiding draait nog één keer, server-side, voor álle
+ * consumers van die route.
+ *
+ * `linkIsActive` hoeft deze pil daarom niet meer te veronderstellen: de route
+ * leest dat signaal wél en verwerkt het in `health`.
  *
  * ## Kleur: verlopen is AANDACHT, geen verlies
  *
@@ -53,10 +58,9 @@ import { deriveBankLinkHealth } from '@/lib/bank-connection-status'
  * statuskolom kan ook op `revoked` staan zonder dat een datum verstreken is).
  */
 type SyncStatusBadgeProps = {
-  lastSyncedAt: string | null
+  /** Server-afgeleid oordeel over deze koppeling. Reken er niets uit na. */
+  health: BankLinkHealth
   dailyRequests: number
-  tokenExpiresAt?: string | null
-  connectionStatus?: string
 }
 
 /**
@@ -70,14 +74,7 @@ type SyncStatusBadgeProps = {
 const BADGE =
   'inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium'
 
-export function SyncStatusBadge({ lastSyncedAt, dailyRequests, tokenExpiresAt, connectionStatus }: SyncStatusBadgeProps) {
-  const health = deriveBankLinkHealth({
-    linkIsActive: true,
-    connectionStatus: connectionStatus ?? null,
-    tokenExpiresAt: tokenExpiresAt ?? null,
-    lastSyncedAt,
-  })
-
+export function SyncStatusBadge({ health, dailyRequests }: SyncStatusBadgeProps) {
   if (health.state === 'linked-broken') {
     return (
       /* Tekst op `--ink`, tint in vlak en icoon. `text-warning` op `--warning-bg`

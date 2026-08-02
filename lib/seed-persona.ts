@@ -138,7 +138,11 @@ export function buildSeedCashAssetRow(
     expected_return: 0,
     monthly_contribution: 0,
     institution: ba.bank_name,
-    account_number: ba.iban,
+    // GEEN `account_number: ba.iban` meer. Die plaintext-kolom wordt gedropt
+    // zodra de live bankkoppeling-tests rond zijn; een seed die 'm nog vult is
+    // dan de enige schrijver die de DROP tegenhoudt. Het rekeningnummer reist
+    // uitsluitend nog als `account_number_encrypted` + `account_number_hash`
+    // (hieronder), en élke lezer haalt het al langs die weg op.
     ...encrypted,
     is_active: ba.is_active,
     sort_order: ba.sort_order,
@@ -147,6 +151,45 @@ export function buildSeedCashAssetRow(
     is_liquid: true,
     subtype: ba.account_type,
     has_budget_tracking: budgetsActive,
+  }
+}
+
+/**
+ * Transformeer één persona-bankrekening naar de `bank_accounts`-insert-rij.
+ *
+ * Bestaat als EXPLICIETE builder omdat de vorige vorm — `{ user_id, ...a, … }` —
+ * de plaintext `iban`-kolom stilzwijgend meeschreef: `PersonaBankAccount` draagt
+ * een `iban`-veld, dus de spread vulde de kolom zonder haar naam ooit te noemen.
+ * Een schrijver die geen enkele grep op `iban:` oplevert is precies de soort die
+ * een kolom-drop later laat klappen. Nu staat elke kolom er met de hand, en is
+ * de afwezigheid van `iban` een testbaar feit ({@link buildSeedBankAccountRow}
+ * heeft een eigen assertie in `seed-persona.test.ts`).
+ *
+ * De persona blijft de leesbare IBAN als BRON dragen — hij gaat alleen nog
+ * versleuteld de database in, onder dezelfde configuratie-conditie als de rest
+ * van de seed (zie {@link buildSeedCashAssetRow}). Zonder sleutels in de omgeving
+ * krijgt de rij géén rekeningnummer; dat is bewust, want zonder sleutel is er
+ * geen kolom die het veilig kan dragen.
+ */
+export function buildSeedBankAccountRow(
+  ba: PersonaData['bank_accounts'][number],
+  userId: string,
+  linkedAssetId: string | null,
+) {
+  const encrypted =
+    isFieldEncryptionConfigured() && ba.iban
+      ? { iban_encrypted: encryptField(ba.iban), iban_hash: blindIndex(ba.iban) }
+      : {}
+  return {
+    user_id: userId,
+    name: ba.name,
+    bank_name: ba.bank_name,
+    account_type: ba.account_type,
+    balance: ba.balance,
+    is_active: ba.is_active,
+    sort_order: ba.sort_order,
+    ...encrypted,
+    linked_asset_id: linkedAssetId,
   }
 }
 
@@ -611,16 +654,6 @@ export async function seedPersonaData(
   // are present — that way an env without the migration applied yet (e.g. a
   // dev DB that hasn't run `db push`) doesn't error on "column does not
   // exist" for unrelated test data.
-  const encryptionEnabled = isFieldEncryptionConfigured()
-
-  function ibanEncryptedFields(iban: string | null | undefined): Record<string, string | null> {
-    if (!encryptionEnabled || !iban) return {}
-    return {
-      iban_encrypted: encryptField(iban),
-      iban_hash: blindIndex(iban),
-    }
-  }
-
   const cashAssetRows = persona.bank_accounts.map((ba) =>
     // Gedeelde builder met de schema-preflight (assertSeedSchema) — geen tweede,
     // stil-wegdriftende kolomset. account_number_encrypted/hash volgen dezelfde
@@ -640,12 +673,9 @@ export async function seedPersonaData(
 
   // ── Phase 1b: Independent inserts (parallel) ─────────────────
 
-  const accountRows = persona.bank_accounts.map((a, i) => ({
-    user_id: userId,
-    ...a,
-    ...ibanEncryptedFields(a.iban),
-    linked_asset_id: cashAssetIds[i] ?? null,
-  }))
+  const accountRows = persona.bank_accounts.map((ba, i) =>
+    buildSeedBankAccountRow(ba, userId, cashAssetIds[i] ?? null),
+  )
 
   const assetRows = persona.assets.map((a, i) => buildSeedAssetRow(a, userId, i))
 

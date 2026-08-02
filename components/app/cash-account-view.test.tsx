@@ -22,7 +22,8 @@ const fixtures = vi.hoisted(() => {
     name: 'Betaalrekening',
     current_value: 1000,
     institution: 'Testbank',
-    account_number: 'NL01BANK0123456789',
+    // Geen `account_number`: die kolom wordt niet meer opgevraagd (plaintext,
+    // staat op de droplijst) en het bewerkscherm toonde 'm nooit.
     subtype: 'checking',
     net_worth_inclusion_pct: 100,
     expected_return: 0,
@@ -323,51 +324,26 @@ describe('CashAccountView — "Budgetteren uitschakelen" gaat via de API-route, 
 })
 
 /**
- * De koppelingen-loader (`loadGcAccounts`) haalt een EXPLICIETE kolomlijst op.
+ * De koppelingen-loader (`loadGcAccounts`) leest NIET meer client-direct.
  *
- * Waarom dit een eigen tripwire verdient: `bank_connection_accounts` draagt naast
- * de zichtbare velden ook `iban_encrypted` en `iban_hash`. Die hash is een blind
- * index — HMAC-SHA256 onder een server-only sleutel, dus een STABIELE identifier
- * die dezelfde IBAN altijd op dezelfde waarde afbeeldt. In een clientbundel is
- * dat een correlatiesleutel die niets toevoegt aan wat het scherm toont. Een
- * `select('*')` lekt 'm zonder dat er iets zichtbaar verandert, dus alleen een
- * expliciete assertie op de gevraagde kolommen houdt dit tegen. Zusterkolom van
- * de `bank_accounts`-fix; zie de noot bij `loadAccount` in het component.
+ * Voorgeschiedenis: deze loader deed een `select()` op `bank_connection_accounts`
+ * met de PLAINTEXT `iban`-kolom erin, omdat `ConnectedAccountCard` het volledige
+ * rekeningnummer toonde. Dat was de laatste lezer die het droppen van die kolom
+ * tegenhield — en de tripwire hier pinde toen alleen dát de kolomlijst expliciet
+ * was (geen `select('*')`, want dat lekt de blind index `iban_hash` naar de
+ * browser) en dat de ordening niet op `iban` stond.
  *
- * De ORDENING hoort hier ook: die stond op de plaintext `iban`-kolom, die in
- * Stage B wordt gedropt. Een `order()` op een gedropte kolom geeft een PostgREST
- * 400, en deze loader slikt fouten stil — de koppelkaarten zouden dus geruisloos
- * verdwijnen. Vandaar `created_at`, gelijk aan /api/bank-connect/linked-accounts.
+ * Beide zorgen zijn nu bij de bron weg: er ís geen client-query meer. De loader
+ * haalt `GET /api/bank-connect/linked-accounts` op, die alleen een IBAN-STAARTJE
+ * van vier tekens teruggeeft en de crypto-kolommen server-side houdt. Deze suite
+ * bewaakt dus niet langer de vórm van een query maar het BESTAAN ervan — een
+ * teruggekeerde client-read is de regressie.
  *
- * WAT DEZE TESTS NIET BEWEREN: dat de query Stage B overleeft. `iban` staat nog
- * in de kolomlijst (de kaart toont 'm), dus de drop breekt 'm alsnog langs
- * dezelfde weg. De ordening-wissel haalt één van de twee afhankelijkheden weg;
- * de tweede is een open punt, zie de noot bij `loadGcAccounts`. Verwacht dus
- * geen dekking hier voor "werkt na de drop" — die is er bewust niet.
+ * En anders dan de oude versie dekt dit wél "werkt na de drop": een leespad dat
+ * de kolom niet noemt, kan er niet op stukslaan.
  */
-describe('CashAccountView — koppelingen-loader lekt geen crypto-kolommen', () => {
-  // De echte kolommen van public.bank_connection_accounts (schema:
-  // supabase/migrations/20260717120000_sync_remote_baseline.sql). Schema-contract:
-  // de gevraagde kolommen moeten hier een deelverzameling van zijn, zodat een
-  // toekomstige uitbreiding van de lijst geen non-existente kolom kan opvragen
-  // (→ PostgREST 400 → stil lege koppelingenlijst).
-  const SCHEMA_COLUMNS = new Set([
-    'id', 'user_id', 'connection_id', 'bank_account_id', 'external_account_id',
-    'iban', 'account_name', 'is_active', 'last_synced_at', 'sync_cursor',
-    'daily_requests', 'rate_limit_reset_date', 'created_at', 'updated_at',
-    'iban_encrypted', 'iban_hash',
-  ])
-
-  // Server-only afgeleiden: nooit naar de browser.
-  const CRYPTO_COLUMNS = ['iban_hash', 'iban_encrypted']
-
-  // Exact de velden die `GcAccount` declareert — niet meer, niet minder.
-  const EXPECTED_COLUMNS =
-    'id, external_account_id, iban, account_name, last_synced_at, daily_requests, ' +
-    'rate_limit_reset_date, is_active, bank_account_id, ' +
-    'bank_connections(provider_name, provider_logo, token_expires_at, status)'
-
-  /** Bank Connect ingeschakeld — anders draait `loadGcAccounts` de query nooit. */
+describe('CashAccountView — koppelingen komen van de server, niet uit de browser', () => {
+  /** Bank Connect ingeschakeld — anders draait `loadGcAccounts` nooit door. */
   function setupBankConnectEnabled() {
     setupEnv()
     vi.stubGlobal(
@@ -377,51 +353,63 @@ describe('CashAccountView — koppelingen-loader lekt geen crypto-kolommen', () 
         if (input === '/api/bank-connect/status') {
           return { ok: true, status: 200, json: async () => ({ enabled: true }) } as unknown as Response
         }
+        if (input === '/api/bank-connect/linked-accounts') {
+          return { ok: true, status: 200, json: async () => ({ accounts: [] }) } as unknown as Response
+        }
         return { ok: false, status: 404, json: async () => ({}) } as unknown as Response
       }) as unknown as typeof fetch,
     )
   }
 
-  async function capturedSelect(): Promise<string> {
-    setupBankConnectEnabled()
-    render(<CashAccountView accountId="acc-1" />)
-    let cols = ''
-    await waitFor(() => {
-      const call = queryLog.find((q) => q.table === 'bank_connection_accounts' && q.method === 'select')
-      expect(call).toBeDefined()
-      cols = String(call!.args[0] ?? '')
-    })
-    return cols
+  /** De URL's die de component tijdens deze render heeft opgehaald. */
+  function fetchedUrls(): string[] {
+    const mock = globalThis.fetch as unknown as { mock: { calls: unknown[][] } }
+    return mock.mock.calls.map((c) => String(c[0]))
   }
 
-  it('vraagt een expliciete kolomlijst op — geen select("*") en geen blind index', async () => {
-    const cols = await capturedSelect()
-    expect(cols).not.toContain('*')
-    for (const forbidden of CRYPTO_COLUMNS) {
-      expect(cols).not.toContain(forbidden)
-    }
-  })
-
-  it('vraagt precies de velden op die GcAccount declareert', async () => {
-    expect(await capturedSelect()).toBe(EXPECTED_COLUMNS)
-  })
-
-  it('vraagt alleen kolommen op die echt op bank_connection_accounts bestaan', async () => {
-    const cols = await capturedSelect()
-    // De embed (`bank_connections(...)`) is geen kolom van deze tabel — knip 'm
-    // eraf voordat we tegen het schema toetsen.
-    const flat = cols.replace(/\w+\([^)]*\)/g, '')
-    const requested = flat.split(',').map((c) => c.trim()).filter(Boolean)
-    expect(requested.filter((c) => !SCHEMA_COLUMNS.has(c))).toEqual([])
-  })
-
-  it('ordent op created_at, niet op de plaintext iban-kolom', async () => {
+  it('haalt de koppelingen op via de server-route', async () => {
     setupBankConnectEnabled()
     render(<CashAccountView accountId="acc-1" />)
+
     await waitFor(() => {
-      const order = queryLog.find((q) => q.table === 'bank_connection_accounts' && q.method === 'order')
-      expect(order).toBeDefined()
-      expect(order!.args[0]).toBe('created_at')
+      expect(fetchedUrls()).toContain('/api/bank-connect/linked-accounts')
+    })
+  })
+
+  it('doet geen enkele client-directe query op bank_connection_accounts', async () => {
+    setupBankConnectEnabled()
+    render(<CashAccountView accountId="acc-1" />)
+
+    // Wachten tot de route-fetch geweest is; pas dán is "geen query" een uitspraak
+    // over een afgeronde loader en niet over een nog niet gestarte.
+    await waitFor(() => {
+      expect(fetchedUrls()).toContain('/api/bank-connect/linked-accounts')
+    })
+    expect(queryLog.filter((q) => q.table === 'bank_connection_accounts')).toEqual([])
+  })
+})
+
+/**
+ * De companion-asset-loader (`loadLinkedAsset`) vraagt `account_number` niet meer op.
+ *
+ * Die kolom werd opgehaald en tot in de props van het bewerkscherm doorgegeven,
+ * maar nergens getoond — een dode lezer van de plaintext-kolom die het droppen
+ * ervan tegenhield zonder er iets voor terug te geven. Na de drop zou hij een
+ * PostgREST 400 geven, en deze loader zet bij een fout stil `null` (het
+ * bewerkscherm verdwijnt dan geruisloos).
+ */
+describe('CashAccountView — companion-asset zonder plaintext rekeningnummer', () => {
+  it('noemt account_number niet in de assets-select', async () => {
+    setupEnv()
+    render(<CashAccountView accountId="acc-1" />)
+
+    await waitFor(() => {
+      const call = queryLog.find((q) => q.table === 'assets' && q.method === 'select')
+      expect(call).toBeDefined()
+      // `account_number_encrypted` zou hier als substring doorheen glippen; de
+      // kolomlijst wordt daarom op losse namen getoetst.
+      const requested = String(call!.args[0] ?? '').split(',').map((c) => c.trim())
+      expect(requested).not.toContain('account_number')
     })
   })
 })

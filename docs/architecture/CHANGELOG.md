@@ -601,3 +601,8 @@
 ## 2026-07-30
 
 - Geen wijzigingen.
+
+## 2026-08-02
+
+- **API-routes** toegevoegd: /api/bank-accounts/[id], /api/own-accounts/ibans
+- **Componenten (aantal)** toegevoegd: +1

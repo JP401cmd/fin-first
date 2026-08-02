@@ -65,10 +65,29 @@ describe('assertSeedSchema · fail-safe vóór de destructieve wipe', () => {
     await assertSeedSchema(makeClient({}, captured), 'user-1', persona)
     // Kolommen die alleen de cash-asset-producer (buildSeedCashAssetRow) schrijft,
     // niet buildSeedAssetRow — de eerste post-wipe insert. Deze MOETEN geprobed zijn.
-    for (const col of ['account_number', 'ownership', 'net_worth_inclusion_pct', 'has_budget_tracking']) {
+    //
+    // `account_number` stond hier tot de kolom-drop-voorbereiding bij; die schrijft
+    // de cash-producer niet meer (zie de test hieronder).
+    for (const col of ['ownership', 'net_worth_inclusion_pct', 'has_budget_tracking']) {
       expect(captured.assets).toContain(col)
     }
     // En de tweede debts-writer (linked_asset_id-update).
     expect(captured.debts).toContain('linked_asset_id')
+  })
+
+  it('probet de PLAINTEXT account_number niet meer — de seed schrijft die kolom niet', async () => {
+    const captured: Record<string, string> = {}
+    await assertSeedSchema(makeClient({}, captured), 'user-1', persona)
+
+    // De probe is per constructie de kolomset die de seed gaat SCHRIJVEN (hij komt
+    // uit dezelfde builders). Staat `account_number` er niet in, dan schrijft de
+    // seed 'm ook niet — en dat is precies wat het droppen van die kolom vrijgeeft.
+    //
+    // Op losse namen toetsen en niet met `toContain`: `account_number_encrypted`
+    // draagt `account_number` als substring, dus een substring-assertie zou in een
+    // omgeving mét encryptiesleutels stil altijd slagen en nooit meer bijten —
+    // precies de val waar deze test eerder in zat.
+    const probed = captured.assets.split(',').map((c) => c.trim())
+    expect(probed).not.toContain('account_number')
   })
 })

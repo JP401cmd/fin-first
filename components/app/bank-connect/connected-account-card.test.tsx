@@ -1,6 +1,7 @@
-import type { ComponentProps } from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { deriveBankLinkHealth } from '@/lib/bank-connection-status'
+import type { LinkedAccountView } from '@/lib/truelayer/linked-account'
 import { ConnectedAccountCard } from './connected-account-card'
 
 /**
@@ -16,33 +17,67 @@ import { ConnectedAccountCard } from './connected-account-card'
  *  - dat de herstel-POST de koppel-id meestuurt en géén doelrekening (de server
  *    leidt die af), en daarna naar de bank navigeert;
  *  - dat een gefaalde POST een vaste NL-melding oplevert en nooit een rauwe
- *    fetch-/SDK-/serverstring.
+ *    fetch-/SDK-/serverstring;
+ *  - dat de identiteitsregel een IBAN-STAARTJE toont en nooit een volledige IBAN
+ *    (de kaart consumeert sinds de kolom-drop-voorbereiding `iban_tail` uit
+ *    `/api/bank-connect/linked-accounts`; een volledige IBAN kán er niet meer
+ *    doorheen, en die grens hoort vast te staan).
  */
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
-type CardProps = ComponentProps<typeof ConnectedAccountCard>
-type Account = CardProps['account']
+type Account = LinkedAccountView
 
-function makeAccount(overrides: Partial<Account> = {}): Account {
+/**
+ * De RAUWE situatie in, een `LinkedAccountView` uit — inclusief het `health`-
+ * oordeel dat de server met dezelfde `deriveBankLinkHealth` afleidt.
+ *
+ * Bewust niet een `BankLinkHealth`-literal als invoer: dan zou de test het
+ * oordeel zélf opschrijven in plaats van het na te spelen, en zou een bug in de
+ * afleiding hier onzichtbaar blijven.
+ */
+type Situatie = {
+  providerName?: string | null
+  providerLogo?: string | null
+  status?: string | null
+  tokenExpiresAt?: string | null
+  lastSyncedAt?: string | null
+  dailyRequests?: number
+  rateLimitResetDate?: string | null
+  ibanTail?: string | null
+}
+
+function makeAccount(s: Situatie = {}): Account {
+  const {
+    providerName = 'ING',
+    providerLogo = null,
+    status = 'active',
+    tokenExpiresAt = null,
+    lastSyncedAt = '2026-07-01T08:00:00Z',
+    dailyRequests = 0,
+    rateLimitResetDate = null,
+    ibanTail = '4567',
+  } = s
   return {
     id: 'bca-1',
-    external_account_id: 'ext-1',
-    iban: 'NL00INGB0001234567',
     account_name: 'Betaalrekening',
-    last_synced_at: '2026-07-01T08:00:00Z',
-    daily_requests: 0,
-    rate_limit_reset_date: null,
-    is_active: true,
+    iban_tail: ibanTail,
+    provider_name: providerName,
+    provider_logo: providerLogo,
+    provider_id: 'ing-nl',
+    health: deriveBankLinkHealth({
+      linkIsActive: true,
+      connectionStatus: status,
+      tokenExpiresAt,
+      lastSyncedAt,
+    }),
     bank_account_id: 'ba-1',
-    ...overrides,
-    bank_connections: {
-      provider_name: 'ING',
-      provider_logo: null,
-      token_expires_at: null,
-      status: 'active',
-      ...overrides.bank_connections,
-    },
+    carrier_name: 'Betaalrekening',
+    carrier_iban_tail: '4567',
+    last_synced_at: lastSyncedAt,
+    daily_requests: dailyRequests,
+    rate_limit_reset_date: rateLimitResetDate,
+    balance_change: null,
   }
 }
 
@@ -62,25 +97,11 @@ function renderCard(account: Account = makeAccount()) {
 }
 
 /** Een koppeling waarvan de autorisatie is verlopen (status-tak). */
-const verlopen = makeAccount({
-  bank_connections: {
-    provider_name: 'ING',
-    provider_logo: null,
-    token_expires_at: null,
-    status: 'expired',
-  },
-})
+const verlopen = makeAccount({ status: 'expired' })
 
 /** Een koppeling die nog werkt maar binnen de drempel verloopt. */
 function verlooptBinnenkort(days: number) {
-  return makeAccount({
-    bank_connections: {
-      provider_name: 'ING',
-      provider_logo: null,
-      token_expires_at: new Date(Date.now() + days * DAY_MS).toISOString(),
-      status: 'active',
-    },
-  })
+  return makeAccount({ tokenExpiresAt: new Date(Date.now() + days * DAY_MS).toISOString() })
 }
 
 const HERSTEL_KNOP = /Verbind opnieuw/i
@@ -151,16 +172,7 @@ describe('ConnectedAccountCard — verbinding kwijt', () => {
   })
 
   it('noemt de bank maar niet "ingetrokken" — expired en revoked zijn één herstelpad', () => {
-    renderCard(
-      makeAccount({
-        bank_connections: {
-          provider_name: 'Rabobank',
-          provider_logo: null,
-          token_expires_at: null,
-          status: 'revoked',
-        },
-      }),
-    )
+    renderCard(makeAccount({ providerName: 'Rabobank', status: 'revoked' }))
 
     // De bank staat in de melding zelf, niet alleen in de kaartkop.
     expect(screen.getByText(/transacties meer op bij Rabobank/i)).toBeTruthy()
@@ -169,15 +181,8 @@ describe('ConnectedAccountCard — verbinding kwijt', () => {
 
   it('toont NIET de 14-dagen-vooraankondiging (die twee sluiten elkaar uit)', () => {
     renderCard(
-      makeAccount({
-        bank_connections: {
-          provider_name: 'ING',
-          provider_logo: null,
-          // Verlopen status én een datum binnen de drempel: de toestand wint.
-          token_expires_at: new Date(Date.now() + 5 * DAY_MS).toISOString(),
-          status: 'expired',
-        },
-      }),
+      // Verlopen status én een datum binnen de drempel: de toestand wint.
+      makeAccount({ status: 'expired', tokenExpiresAt: new Date(Date.now() + 5 * DAY_MS).toISOString() }),
     )
 
     expect(screen.getByText(KWIJT_BAND)).toBeTruthy()
@@ -207,6 +212,34 @@ describe('ConnectedAccountCard — vooraankondiging', () => {
     expect(screen.queryByText(/werkt nog en verloopt/i)).toBeNull()
     expect(screen.queryByText(KWIJT_BAND)).toBeNull()
     expect(screen.queryByRole('button', { name: HERSTEL_KNOP })).toBeNull()
+  })
+})
+
+describe('ConnectedAccountCard — identiteitsregel toont een staartje, geen IBAN', () => {
+  it('toont het staartje uit iban_tail', () => {
+    renderCard(makeAccount({ ibanTail: '4567' }))
+
+    expect(screen.getByText(/···· 4567/)).toBeTruthy()
+  })
+
+  it('laat de regel weg als de server geen staartje kon geven', () => {
+    // `decryptIbanForLabel` slikt een onleesbare ciphertext; dan is het staartje
+    // null en hoort er geen lege regel onder de banknaam te staan.
+    const { container } = renderCard(makeAccount({ ibanTail: null }))
+
+    expect(screen.queryByText(/····/)).toBeNull()
+    expect(container.textContent).toContain('ING')
+  })
+
+  it('kan geen volledige IBAN tonen — die bereikt deze client niet meer', () => {
+    // De harde grens van de kolom-drop-voorbereiding: de kaart las
+    // `bank_connection_accounts.iban` client-direct, nu komt er nog maar vier
+    // tekens uit `/api/bank-connect/linked-accounts`. Zou iemand het volledige
+    // nummer terugvoeren, dan valt deze assertie om.
+    const { container } = renderCard(makeAccount({ ibanTail: '4567' }))
+
+    // Een NL-IBAN in tekst: 2 letters, 2 cijfers, 4 letters, 10 cijfers.
+    expect(container.textContent ?? '').not.toMatch(/[A-Z]{2}\d{2}[A-Z]{4}\d{10}/)
   })
 })
 

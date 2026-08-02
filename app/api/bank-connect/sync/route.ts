@@ -117,25 +117,62 @@ export async function POST(req: Request) {
       return conflict('Deze koppeling heeft nog geen gekoppelde rekening — verbind de bank opnieuw.')
     }
 
-    // Rate limit check
-    const today = new Date().toISOString().split('T')[0]
-    let dailyRequests = connAccount.daily_requests || 0
+    // ── De rem vastzetten: atomair, vóór élk verzoek aan de bank ──────────────
+    // Eén RPC in plaats van lezen → controleren → ophogen. Die drie losse
+    // stappen waren een TOCTOU (restrisico SC-26): twee gelijktijdige syncs
+    // lazen dezelfde stand, zagen allebei ruimte en schreven allebei `n + 1` —
+    // twee syncs voor de prijs van één tik. Sinds één sync tot vijf
+    // provider-verzoeken kost, en de bank ons ná een handvol verzoeken voor
+    // langere tijd blokkeert (`provider_request_limit_exceeded`), was dat gat de
+    // duurste van de twee remmen. `reserve_bank_sync_slot` doet de controle en
+    // de ophoging in één UPDATE, zodat een tweede verzoek wacht op de
+    // rijvergrendeling en dáárna pas de limiet toetst.
+    //
+    // Bewust hier, vóór het ververs-pad van het token: een geblokkeerde
+    // gebruiker mag ook het token-endpoint van de provider niet blijven
+    // bestoken. Prijs daarvan: een sync die op het ververs-pad of in de timeout
+    // stukloopt kost tóch een tik. Dat is dezelfde keuze als de reservering
+    // vóór de blok-lus altijd al maakte — een mislukte poging hoort niet gratis
+    // te zijn, anders is herhalen kosteloos terwijl de verzoeken wél gedaan zijn.
+    //
+    // De dagsleutel wordt in de database in Europe/Amsterdam bepaald. Hier
+    // stond `new Date().toISOString()` — UTC — waardoor de teller voor een
+    // Nederlandse gebruiker pas om 01:00/02:00 omrolde in plaats van om
+    // middernacht.
+    const { data: slotRows, error: slotError } = await supabase.rpc('reserve_bank_sync_slot', {
+      p_connection_account_id: connection_account_id,
+    })
+    if (slotError) {
+      return serverError(slotError, 'bankconnect-sync:POST')
+    }
+    const slot = (Array.isArray(slotRows) ? slotRows[0] : slotRows) as {
+      slot_found: boolean
+      slot_allowed: boolean
+      slot_daily_requests: number
+      slot_limit: number
+    } | undefined | null
 
-    if (connAccount.rate_limit_reset_date !== today) {
-      dailyRequests = 0
+    if (!slot || !slot.slot_found) {
+      // Dezelfde 404 als hierboven: de RPC scope't op `auth.uid()` + `is_active`
+      // en geeft "bestaat niet" en "niet van jou" hetzelfde antwoord.
+      return NextResponse.json({ error: 'Account niet gevonden' }, { status: 404 })
     }
 
-    if (dailyRequests >= 10) {
+    /** Stand ná deze reservering (of de huidige stand als er geweigerd is). */
+    const dailyRequests = slot.slot_daily_requests ?? 0
+    const dailyLimit = slot.slot_limit ?? 10
+
+    if (!slot.slot_allowed) {
       await supabase.from('bank_sync_log').insert({
         user_id: user.id,
         connection_account_id,
         sync_type: 'transactions',
         status: 'rate_limited',
-        error_message: 'Daglimiet van 10 verzoeken bereikt',
+        error_message: `Daglimiet van ${dailyLimit} verzoeken bereikt`,
       })
 
       return NextResponse.json({
-        error: 'Daglimiet bereikt (10 verzoeken per dag per account)',
+        error: `Daglimiet bereikt (${dailyLimit} verzoeken per dag per account)`,
         daily_requests: dailyRequests,
       }, { status: 429 })
     }
@@ -193,6 +230,13 @@ export async function POST(req: Request) {
     //     zo ver terug als de provider geeft, in blokken (B8).
     // De helper is de enige plek waar de marge, de blokgrootte en de maximale
     // terugblik staan — fase 5 (callback) en fase 7 (herkoppelen) consumeren 'm.
+    //
+    // `today` is hier de bovengrens van het OPHAALVENSTER, niet de dagsleutel
+    // van de rem — die woont sinds de atomaire reservering in de database
+    // (Europe/Amsterdam). UTC is voor een venstergrens de veilige kant: hooguit
+    // twee uur conservatief, en het nieuwste blok gaat sowieso zónder `to` naar
+    // de provider (zie toProviderRange).
+    const today = new Date().toISOString().split('T')[0]
     const isFirstFetch = !date_from && !connAccount.sync_cursor
     let blocks: FetchBlock[]
     let fetchMode: 'incremental' | 'historical' | 'cursor' = 'cursor'
@@ -209,28 +253,9 @@ export async function POST(req: Request) {
       blocks = [{ from: date_from || connAccount.sync_cursor, to: date_to || today }]
     }
 
-    // ── De rem vastzetten vóórdat we de provider bellen ───────────────────────
-    // Eerst reserveren, dan pas ophalen. De ophoging stond hiervóór ná de lus,
-    // waardoor élke mislukte of afgekapte sync gratis was: een route die
-    // structureel in de timeout loopt kon zo eindeloos herhaald worden terwijl
-    // de teller op nul bleef. Sinds de blok-lus kost één poging tot vijf
-    // provider-verzoeken, dus dat gat is nu vijf keer zo duur.
-    //
-    // Dit is één sync-tik voor de hele eerste ophaal (eigenaarsbesluit, zie de
-    // log-insert onderaan). Wat het NIET oplost: twee gelijktijdige verzoeken
-    // lezen dezelfde `dailyRequests` en schrijven allebei `n + 1`. Die
-    // read-then-write is er altijd al geweest en vraagt een atomaire
-    // `set daily_requests = daily_requests + 1`-RPC; dat is een eigen stap.
-    await supabase
-      .from('bank_connection_accounts')
-      .update({
-        daily_requests: dailyRequests + 1,
-        rate_limit_reset_date: today,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', connection_account_id)
-
     // ── Ophalen, blok voor blok ───────────────────────────────────────────────
+    // De tik op de rem is hierboven al atomair gereserveerd (één sync-tik voor
+    // de hele eerste ophaal — eigenaarsbesluit, zie de log-insert onderaan).
     // Nieuwste blok eerst (zie planInitialFetch). Loopt de bánk tegen haar eigen
     // verzoeklimiet aan (429 + provider_request_limit_exceeded — los van onze
     // 10/dag en van die van TrueLayer), dan STOPPEN we, HOUDEN we wat we hebben
@@ -541,7 +566,9 @@ export async function POST(req: Request) {
       // plaats van erin — anders verandert stil wat "al bekend" betekent.
       duplicates: duplicateCount,
       duplicates_cross_source: crossSourceCounts.total,
-      daily_requests: dailyRequests + 1,
+      // Stand ná deze sync, zoals de database hem atomair heeft vastgesteld —
+      // geen `gelezen waarde + 1` meer, die kon onder gelijktijdigheid liegen.
+      daily_requests: dailyRequests,
       // null als het saldo niet opgehaald/weggeschreven kon worden — additief,
       // bestaande lezers van new/duplicates/daily_requests blijven werken.
       balance: syncedBalance,

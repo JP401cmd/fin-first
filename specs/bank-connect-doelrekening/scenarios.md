@@ -616,10 +616,14 @@ rekening (bijv. door herhaaldelijk klikken bij het testen van SC-02).
 **Verwacht gedrag.**
 - Given `dailyRequests >= 10` voor vandaag, When je nogmaals synchroniseert,
   Then krijg je `429` met `"Daglimiet bereikt (10 verzoeken per dag per
-  account)"`, en wordt er een `rate_limited`-rij in `bank_sync_log` gelogd
-  (bestaand gedrag, `sync/route.ts` regel 54-67).
+  account)"`, en wordt er een `rate_limited`-rij in `bank_sync_log` gelogd.
 - De teller reset bij het aanbreken van een nieuwe kalenderdag
-  (`rate_limit_reset_date !== today`).
+  (`rate_limit_reset_date !== vandaag`) — de dagsleutel wordt in de database
+  bepaald in `Europe/Amsterdam`, dus de omslag ligt op middernacht Nederlandse
+  tijd en niet op 01:00/02:00 zoals bij de vroegere UTC-sleutel.
+- Controle en ophoging zijn ondeelbaar: ze gebeuren in één
+  `UPDATE … WHERE … RETURNING` in `public.reserve_bank_sync_slot()`, niet meer
+  in applicatiecode (zie SC-26).
 
 **Randgevallen.** Een automatische reconnect-sync (bijv. direct na SC-12) telt
 gewoon mee in dit quotum — er is geen apart budget voor "herstel"-syncs.
@@ -884,9 +888,17 @@ koppeling af terwijl in het andere nog een oude sync loopt.
   scenario; een race tussen twee volledig aparte browser-sessies is
   onwaarschijnlijker maar niet uitgesloten.
 
-**Randgevallen.** De rate-limit-teller (SC-17) is niet race-safe tegen
-gelijktijdige requests (read-then-write zonder lock) — twee gelijktijdige
-syncs kunnen samen de 10/dag-teller met minder dan verwacht laten stijgen.
+**Randgevallen.** De rate-limit-teller (SC-17) was tot 2 augustus 2026 níet
+race-safe: de route las de stand, vergeleek met 10 en schreef daarna
+`<gelezen waarde> + 1`, dus twee gelijktijdige syncs kwamen er allebei door en
+lieten de teller samen maar met 1 stijgen. **Gedicht** — controle en ophoging
+zitten sinds migratie `20260802140500_bank_sync_atomic_daily_limit_rpc.sql` in
+één `UPDATE … WHERE … RETURNING` binnen `public.reserve_bank_sync_slot()`, dus
+een tweede verzoek wacht op de rijvergrendeling en toetst de limiet daarna
+opnieuw. De dagsleutel rolt nu ook in `Europe/Amsterdam` in plaats van UTC (de
+teller resette voorheen pas om 01:00/02:00). De dedup-race in het
+transactie-insertpad hierboven blijft staan; die wordt door de unieke index
+afgevangen, niet door de rem.
 
 **Als we dit niet afvangen.** In het slechtste geval een dubbele transactierij
 die pas via dedup laag 1/2 bij een latere sync alsnog wordt opgemerkt (maar
