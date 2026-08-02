@@ -1,9 +1,10 @@
 // lib/cashflow-cards.ts
 // Bouwt de vier hefboom-stijl kaarten voor de cashflow-landingspagina
 // (/overzicht/cashflow): Budget, Transacties, Vaste lasten, Forecast. Elke
-// kaart krijgt een status, een KPI en uitklap-detail — afgeleid uit data die
-// de pagina toch al laadt (DashboardData + CashflowData). Pure module zodat de
-// server-page hem kan aanroepen; de client rendert de serialiseerbare output.
+// kaart krijgt een status, een KPI en uitklap-detail — afgeleid uit data die de
+// pagina toch al laadt (CashflowCardScalars + CashflowData + de vaste-lasten-
+// samenvatting). Pure module zodat de server-page hem kan aanroepen; de client
+// rendert de serialiseerbare output.
 
 import type { CashflowCardScalars } from '@/lib/cashflow-kpis'
 import type { CashflowData } from '@/lib/cashflow-data-loader'
@@ -129,15 +130,15 @@ export function forecastCardStatus(input: {
  * `loadCashflowKpis` kan voeden i.p.v. de hele dashboard-loader (ADR 0077).
  */
 export function buildCashflowCards(
-  dashboardData: CashflowCardScalars,
+  kpis: CashflowCardScalars,
   cashflow: CashflowData,
   vasteLastenSummary: VasteLastenSummary,
 ): CashflowCard[] {
   // ── Budget ──────────────────────────────────────────────────
-  const budgetLimit = dashboardData.budgetTotals.expense.limit
-  const budgetSpent = dashboardData.budgetTotals.expense.spent
-  const budgetScore = dashboardData.monthSummary.budgetScore
-  const budgetActive = dashboardData.budgetingActive && budgetLimit > 0
+  const budgetLimit = kpis.budgetTotals.expense.limit
+  const budgetSpent = kpis.budgetTotals.expense.spent
+  const budgetScore = kpis.monthSummary.budgetScore
+  const budgetActive = kpis.budgetingActive && budgetLimit > 0
   // Wat er van het maandbudget OVER is — een moment-opname van deze maand, geen
   // maandplafond (dus geen '/mnd'-suffix). Negatief = over budget; de duiding
   // daarvan komt uit `subText` (status bad → 'Boven budget'), niet uit een eigen
@@ -146,7 +147,7 @@ export function buildCashflowCards(
   // Grondslag uitsluitend budgetTotals.expense — savings-budgetten tellen niet mee.
   const budgetRemaining = budgetLimit - budgetSpent
   const budgetStatus: LeverageStatus = budgetCardStatus({
-    budgetingActive: dashboardData.budgetingActive,
+    budgetingActive: kpis.budgetingActive,
     expenseLimit: budgetLimit,
     budgetScore,
   })
@@ -176,14 +177,14 @@ export function buildCashflowCards(
 
   // ── Transacties ─────────────────────────────────────────────
   // GRONDSLAG: de GEREALISEERDE huidige kalendermaand uit transacties. LET OP —
-  // `dashboardData.monthlyIncome/monthlyExpenses` zijn de EFFECTIVE waarden
+  // `kpis.monthlyIncome/monthlyExpenses` zijn de EFFECTIVE waarden
   // (resolveEffectiveIncomeExpenses): bij profiles.income_source/expenses_source
   // = 'manual' winnen de handmatige profielbedragen, dus die mogen hier NIET
   // gebruikt worden — de kaart zou dan een profielinschatting tonen i.p.v. wat
   // deze maand werkelijk gebeurde. KPI, spaarquote, tip en status draaien
   // allemaal op ditzelfde paar, anders spreekt de tip de KPI tegen.
-  const currentMonthIncome = dashboardData.currentMonthIncome
-  const currentMonthExpenses = dashboardData.currentMonthExpenses
+  const currentMonthIncome = kpis.currentMonthIncome
+  const currentMonthExpenses = kpis.currentMonthExpenses
   const monthlyNet = currentMonthIncome - currentMonthExpenses
   const hasTx = currentMonthIncome > 0 || currentMonthExpenses > 0
   const rate = currentMonthIncome > 0 ? (monthlyNet / currentMonthIncome) * 100 : null
@@ -224,7 +225,7 @@ export function buildCashflowCards(
   // structureel aandeel hoort tegen een stabiel maandinkomen te worden gemeten,
   // niet tegen een half-afgelopen kalendermaand (die het aandeel vroeg in de
   // maand kunstmatig naar 100%+ zou duwen).
-  const effectiveMonthlyIncome = dashboardData.monthlyIncome
+  const effectiveMonthlyIncome = kpis.monthlyIncome
   const vasteRatio = effectiveMonthlyIncome > 0 ? vastePerMonth / effectiveMonthlyIncome : null
   const vasteStatus: LeverageStatus = vasteLastenCardStatus({
     totalMonthly: vastePerMonth,
