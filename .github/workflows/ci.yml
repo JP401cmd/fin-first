@@ -72,6 +72,39 @@ jobs:
       - name: Rekenmotor- & pariteitstests (vitest)
         run: npx vitest run lib/horizon-kernel test/horizon-oracle lib/box1-tax lib/box3 lib/fiscale-kerngetallen lib/architecture lib/budget-utils.test.ts test/budget-berekeningen-suite-check.test.ts test/uat-stale-scan.test.ts
 
+      # In-app regressiesuites (lib/regression-tests/suites/*.ts, ~80 suites) —
+      # draaien normaal alleen via de server-runner (/beheer/regressietest of
+      # POST /api/regression/run tegen een lopende dev-server + geseede
+      # gebruiker), dus nooit hier. Suites zonder DB/netwerk/sessie-
+      # afhankelijkheid (pure logica) krijgen een test/<naam>-suite-check.test.ts
+      # die de suite via test/helpers/regression-suite-runner.ts als losse
+      # vitest-tests registreert — dat maakt drift hier al rood in plaats van
+      # pas op /beheer/regressietest. De glob is bewust zelf-actualiserend: een
+      # nieuwe *-suite-check.test.ts draait automatisch mee, zonder dat deze
+      # workflow ooit weer per bestand bijgewerkt hoeft te worden (tot nu toe
+      # stond alleen budget-berekeningen-suite-check.test.ts hierboven met de
+      # hand genoemd — de overige ~23 bestaande wrappers draaiden daardoor
+      # zelf nooit in CI, ondanks de "CI-zichtbaarheid (verplicht)"-regel in
+      # CLAUDE.md). Bekende, nog niet opgeloste suite-drift (tests die
+      # verwijzen naar afgeschafte routes/labels) staat zichtbaar geregistreerd
+      # in test/helpers/regression-known-failures.ts — die lijst mag alleen
+      # krimpen; een entry die weer slaagt maakt de bijbehorende suite-check
+      # hard rood totdat de entry verwijderd wordt.
+      #
+      # Suites MET DB/netwerk/sessie-afhankelijkheid (bv. onboarding-api-flow,
+      # security-auth, kern-api-routes) horen hier NIET geforceerd te worden —
+      # die vereisen een live server + seed en zijn kandidaat voor een aparte,
+      # secrets-gated CI-stap in de stijl van de e2e-smoke-job verderop in dit
+      # bestand (niet gatend zolang die live-omgeving niet bestaat).
+      # LET OP: bewust ONGEQUOTE — de CI-runner is Ubuntu/bash, en bash breidt
+      # deze glob zelf uit tot een lijst bestandsnamen vóór vitest 'm ziet.
+      # Vitest's eigen CLI-filterparsing matcht een gequote glob-string NIET
+      # betrouwbaar (lokaal geverifieerd: "No test files found" bij
+      # `vitest run "test/*-suite-check.test.ts"` op zowel PowerShell als de
+      # vitest-eigen filter-matcher) — de shell moet de expansie doen.
+      - name: In-app regressiesuites — vitest CI-koppeling (pure suites)
+        run: npx vitest run test/*-suite-check.test.ts
+
       # Versheidscheck: de gescande architectuurfeiten (docs/architecture/
       # architecture.json) worden door niets anders in CI/hooks vers gehouden —
       # alleen een dagelijkse externe Cowork-taak. Deze stap faalt wanneer de
