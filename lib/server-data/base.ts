@@ -44,6 +44,7 @@
 
 import { cache } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { ASSET_CLIENT_COLUMNS } from '@/lib/asset-data'
 import { localMonthBounds, localMonthStartMonthsAgo } from '@/lib/month-range'
 import { selectUnlinkedBankAccounts } from '@/lib/unlinked-cash'
 
@@ -51,18 +52,27 @@ import { selectUnlinkedBankAccounts } from '@/lib/unlinked-cash'
 /**
  * Actieve bezittingen van de ingelogde gebruiker (RLS-gescoped).
  *
- * Ruimste kolomset: dashboard- én horizon-data-loader lazen al `select('*')`;
- * alle andere consumers (lever-scores: `current_value, asset_type,
- * net_worth_inclusion_pct`; aandachtspunten: `asset_type, current_value,
- * is_active`; layout: 8 tracking-kolommen) lezen strikte subsets. `*` dekt ze
- * allemaal, dus elke consumer blijft byte-identiek.
+ * Ruimste kolomset = `ASSET_CLIENT_COLUMNS` (lib/asset-data.ts): elke kolom van
+ * de `Asset`-interface behalve de drie account-nummer-kolommen. Alle consumers
+ * (lever-scores: `current_value, asset_type, net_worth_inclusion_pct`;
+ * aandachtspunten: `asset_type, current_value, is_active`; layout: 8
+ * tracking-kolommen; dashboard/horizon: de hele `Asset`) lezen daar strikte
+ * subsets van — geen enkele leest een rekeningnummer.
+ *
+ * BEWUST NIET `select('*')`: `lib/horizon-data-loader.ts` reikt deze rijen als
+ * `HorizonPageData.assets` door naar `<HorizonPage>` (clientcomponent), dus
+ * Next serialiseert ze volledig in de RSC-payload. `assets` heeft een
+ * huishoud-gedeelde SELECT-policy, dus `*` zou bij een gedeelde bezitting
+ * `account_number` (plaintext IBAN), `account_number_encrypted` (ciphertext) en
+ * `account_number_hash` (blind index onder een server-only sleutel = stabiele
+ * correlatiesleutel) van de PARTNER in de paginabron zetten.
  *
  * BEWUST géén `.limit(...)`: dashboard (de numeriek leidende loader) had er
  * nooit één. Horizon/aandachtspunten hadden `.limit(500)` — dat verdwijnt hier;
  * voor ≤500 actieve assets (elke reële/geteste situatie) is dat byte-identiek.
  */
 export const getActiveAssets = cache(async (supabase: SupabaseClient) =>
-  supabase.from('assets').select('*').eq('is_active', true),
+  supabase.from('assets').select(ASSET_CLIENT_COLUMNS).eq('is_active', true),
 )
 
 // ── 2. Debts ───────────────────────────────────────────────────────────────

@@ -41,6 +41,7 @@ import {
   getCurrentMonthTx,
   getTx12m,
 } from './base'
+import { ASSET_CLIENT_COLUMNS } from '@/lib/asset-data'
 import { localMonthBounds, localMonthStartMonthsAgo } from '@/lib/month-range'
 
 // ── Counting mock-client ─────────────────────────────────────────────────────
@@ -93,7 +94,7 @@ const findQuery = (queries: QuerySpec[], table: string) => queries.find((q) => q
 // ── 1. Query-vorm per fetcher ────────────────────────────────────────────────
 
 describe('base fetchers — query-vorm', () => {
-  it('getActiveAssets: assets.select(*).eq(is_active, true) → rauwe rows', async () => {
+  it('getActiveAssets: assets.select(kolomlijst).eq(is_active, true) → rauwe rows', async () => {
     const { supabase, queries, fromCounts } = makeCountingSupabase({
       assets: [{ id: 'a1', is_active: true }],
     })
@@ -101,8 +102,22 @@ describe('base fetchers — query-vorm', () => {
     expect(res.data).toEqual([{ id: 'a1', is_active: true }])
     expect(fromCounts.assets).toBe(1)
     const q = findQuery(queries, 'assets')
-    expect(q.select).toBe('*')
+    expect(q.select).toBe(ASSET_CLIENT_COLUMNS)
     expect(q.filters).toContainEqual(['eq', 'is_active', true])
+  })
+
+  // Deze fetcher voedt o.a. horizon-data-loader → `<HorizonPage>` (client), dus
+  // de rijen belanden in de RSC-payload. `select('*')` zou daar de drie
+  // account-nummer-kolommen in zetten — bij een gedeelde bezitting die van de
+  // PARTNER (huishoud-gedeelde SELECT-policy). Op de losse namen toetsen en niet
+  // met `toContain`: 'account_number' zit als substring in de andere twee.
+  it('getActiveAssets: vraagt geen enkele account-nummer-kolom op', async () => {
+    const { supabase, queries } = makeCountingSupabase({ assets: [] })
+    await getActiveAssets(supabase)
+    const requested = findQuery(queries, 'assets').select!.split(', ')
+    expect(requested).not.toContain('account_number')
+    expect(requested).not.toContain('account_number_encrypted')
+    expect(requested).not.toContain('account_number_hash')
   })
 
   it('getActiveDebts: debts.select(*).eq(is_active, true)', async () => {

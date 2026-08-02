@@ -2899,7 +2899,17 @@ export function AssetForm({
   // De boolean leeft op de asset zelf; geen aparte API-call nodig — de save-payload schrijft mee.
   const [hasWoonbalansTracking, setHasWoonbalansTracking] = useState(asset?.has_woonbalans_tracking ?? false)
   const [hasRentalTracking, setHasRentalTracking] = useState(asset?.has_rental_tracking ?? false)
-  const [iban, setIban] = useState(asset?.account_number ?? '')
+  // IBAN — driewaardig, en dat onderscheid is load-bearing:
+  //   string  → bekend (uit de bron-rij of uit de nalees-fetch hieronder)
+  //   null    → NOG NIET BEKEND: de bron-rij droeg `account_number` niet
+  // Elke lijst-lezing van `assets` gebruikt `ASSET_CLIENT_COLUMNS` en laat die
+  // kolom weg (huishoud-gedeelde SELECT-policy — zie lib/asset-data.ts), dus de
+  // `asset`-prop die deze vorm voedt heeft 'm doorgaans níét. Zou we `null` als
+  // '' behandelen, dan wist de eerstvolgende save stilzwijgend het
+  // rekeningnummer. Nieuwe bezitting = niets te bewaren, dus meteen ''.
+  const [iban, setIban] = useState<string | null>(() =>
+    asset ? (asset.account_number !== undefined ? (asset.account_number ?? '') : null) : '',
+  )
   const [currentValue, setCurrentValue] = useState(String(asset?.current_value ?? ''))
   const [purchaseValue, setPurchaseValue] = useState(String(asset?.purchase_value ?? ''))
 
@@ -2915,6 +2925,29 @@ export function AssetForm({
         .catch(() => { /* non-critical */ })
     }
   }, [isEdit, asset])
+
+  // Haal het rekeningnummer alsnog op wanneer de bron-rij het niet droeg. Eén
+  // rij, één kolom, alleen voor cash-bezittingen — voor elk ander type schrijft
+  // de save-payload sowieso `null` (zie `accountNumberPatch`), dus daar valt
+  // niets te bewaren. Blijft de fetch uit of komt hij te laat, dan blijft `iban`
+  // `null` en laat de payload de kolom ongemoeid: geen stille wissing.
+  useEffect(() => {
+    if (iban !== null || !asset || asset.asset_type !== 'cash') return
+    let cancelled = false
+    const supabase = createClient()
+    void supabase
+      .from('assets')
+      .select('account_number')
+      .eq('id', asset.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (cancelled || !data) return
+        setIban((prev) => (prev === null ? ((data.account_number as string | null) ?? '') : prev))
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [asset, iban])
 
   // Query how many OTHER cash assets have budget tracking (for last-account confirmation)
   useEffect(() => {
@@ -3125,6 +3158,15 @@ export function AssetForm({
       }
     }
 
+    // Rekeningnummer alleen meeschrijven als we het KENNEN. `iban === null`
+    // betekent "de bron-rij droeg de kolom niet en de nalees-fetch is nog niet
+    // terug" — de kolom dan wél in de payload zetten zou het bestaande
+    // rekeningnummer wissen. Bij een niet-cash type schrijven we bewust `null`:
+    // een type-wissel weg van cash hoort het nummer op te ruimen.
+    const accountNumberPatch: { account_number?: string | null } = isCashType
+      ? (iban === null ? {} : { account_number: iban || null })
+      : { account_number: null }
+
     const row = {
       user_id: user.id,
       name,
@@ -3135,7 +3177,7 @@ export function AssetForm({
       expected_return: (depreciationRate && Number(depreciationRate) > 0 ? 0 : Number(expectedReturn) || 0),
       monthly_contribution: isCashType ? 0 : Number(monthlyContribution) || 0,
       institution: institution || null,
-      account_number: isCashType ? (iban || null) : null,
+      ...accountNumberPatch,
       notes: notes || null,
       // Type-specific fields
       subtype: subtype || null,
@@ -3365,7 +3407,7 @@ export function AssetForm({
               <div>
                 <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">IBAN</label>
                 <input
-                  value={iban}
+                  value={iban ?? ''}
                   onChange={(e) => setIban(e.target.value.toUpperCase())}
                   className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm uppercase"
                   placeholder="NL12 INGB 0001 2345 67"

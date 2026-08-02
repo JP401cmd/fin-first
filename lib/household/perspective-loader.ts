@@ -25,6 +25,7 @@
 //   • `_aggregated` — true voor een privacy-'totalen'-aggregaatrij (van de RPC)
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { ASSET_CLIENT_COLUMNS } from '@/lib/asset-data'
 import {
   computeSharePct,
   deriveProvenance,
@@ -258,8 +259,18 @@ export async function loadPerspectiveData(
 
   // Basisquery: RLS levert eigen-persoonlijk + ALLE gedeelde items van het
   // huishouden (dankzij de huishoud-bewuste SELECT-policy).
+  //
+  // Bezittingen met een EXPLICIETE kolomlijst (`ASSET_CLIENT_COLUMNS`), niet
+  // `select('*')`. Deze functie is DUAL-USE en draait dus óók in de browser
+  // (assets-client, cash-overview, debt-category-page, box3-detail,
+  // debts-client). `select('*')` zou daar de drie account-nummer-kolommen
+  // meesturen — en omdat de SELECT-policy op `assets` huishoud-gedeeld is,
+  // bij een gedeelde bezitting die van de PARTNER. Dit bestand draagt zelf
+  // geen `use client`-directive, dus scripts/check-client-data-reads.mjs
+  // opent het nooit: de kolomlijst is hier de enige vangrail.
+  // `debts`/`budgets` dragen geen veld-encryptie en blijven `*`.
   const [aRes, dRes, bRes] = await Promise.all([
-    supabase.from('assets').select('*').eq('is_active', true),
+    supabase.from('assets').select(ASSET_CLIENT_COLUMNS).eq('is_active', true),
     supabase.from('debts').select('*').eq('is_active', true),
     supabase.from('budgets').select('*'),
   ])

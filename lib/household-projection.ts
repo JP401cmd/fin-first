@@ -26,7 +26,7 @@
 // Solo-gebruiker → identiek aan vandaag: één projectie, geen partner-as.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Asset } from '@/lib/asset-data'
+import { ASSET_CLIENT_COLUMNS, type Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
 import {
   ageAtDate,
@@ -686,7 +686,12 @@ export async function buildHouseholdProjectionInput(
     // Profiles RLS is own-only; de RPC levert (privacy-respecterend) de
     // projectie-velden van ALLE huishoudleden — incl. partner-DOB/-naam.
     supabase.rpc('household_member_profiles'),
-    supabase.from('assets').select('*').eq('is_active', true),
+    // Expliciete kolomlijst i.p.v. `select('*')`: deze functie wordt vanuit
+    // clientcomponenten aangeroepen (horizon-client.tsx, household-fire-
+    // section.tsx), en `assets` heeft een huishoud-gedeelde SELECT-policy —
+    // `*` zou bij een gedeelde bezitting de account-nummer-kolommen van de
+    // PARTNER meesturen. Zie ASSET_CLIENT_COLUMNS in lib/asset-data.ts.
+    supabase.from('assets').select(ASSET_CLIENT_COLUMNS).eq('is_active', true),
     supabase.from('debts').select('*').eq('is_active', true),
     supabase.from('budgets').select('id, name, default_limit, interval, budget_type, is_essential, parent_id, user_id, ownership'),
     fetchHouseholdTransactions(),

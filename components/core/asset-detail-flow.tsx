@@ -261,14 +261,14 @@ export function AssetDetailFlow({
   const reloadAsset = useCallback(async () => {
     if (!currentAsset) return
     const supabase = createClient()
-    // `account_number` staat bewust NIET in ASSET_CLIENT_COLUMNS (zie daar),
-    // maar deze rij voedt `<AssetForm asset={currentAsset}>`: die vult er het
-    // IBAN-veld mee en schrijft het bij opslaan terug. Zonder de kolom zou een
-    // bewerking ná een reload het rekeningnummer wissen. De crypto-kolommen
-    // (`account_number_hash`/`_encrypted`) blijven er wél uit.
+    // Kale `ASSET_CLIENT_COLUMNS` — óók zónder `account_number`. Deze rij voedt
+    // `<AssetForm asset={currentAsset}>`, en die vorm haalt het rekeningnummer
+    // sinds de kolom-versmalling zélf op (één rij, één kolom, alleen bij een
+    // cash-bezit) en laat de kolom uit zijn save-payload zolang hij 'm niet
+    // kent. Het plaintext nummer reist dus niet langer mee voor elk type.
     const { data } = await supabase
       .from('assets')
-      .select(`${ASSET_CLIENT_COLUMNS}, account_number`)
+      .select(ASSET_CLIENT_COLUMNS)
       .eq('id', currentAsset.id)
       .single()
     if (data) setCurrentAsset(data as Asset)

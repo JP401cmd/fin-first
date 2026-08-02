@@ -60,7 +60,15 @@ export interface Asset {
   expected_return: number // annual %
   monthly_contribution: number
   institution: string | null
-  account_number: string | null
+  /**
+   * Plaintext rekeningnummer (IBAN) van een cash-bezitting. OPTIONEEL in TS
+   * omdat GEEN ENKELE lijst-lezing deze kolom nog ophaalt: elke lezing die naar
+   * de browser loopt gebruikt `ASSET_CLIENT_COLUMNS` (zie hieronder), en die
+   * lijst laat 'm bewust weg. `undefined` betekent dus "niet opgehaald" en is
+   * iets anders dan `null` ("opgehaald, geen nummer") — `AssetForm` maakt dat
+   * onderscheid en weigert de kolom te overschrijven zolang hij 'm niet kent.
+   */
+  account_number?: string | null
   notes: string | null
   is_active: boolean
   sort_order: number
@@ -142,9 +150,20 @@ export type AssetSource = 'manual' | 'aangifte_import' | 'broker_csv' | 'bank_ps
 
 // ── Kolomcontract voor browser-lezingen op `assets` ──────────
 //
-// GEBRUIK DIT in élke `.from('assets').select(...)` die vanuit een
-// `'use client'`-bestand loopt. Nooit `select('*')` daar — de gate
-// `scripts/check-client-data-reads.mjs` keurt dat hard af.
+// GEBRUIK DIT in élke `.from('assets').select(...)` waarvan het resultaat de
+// browser kan bereiken. Dat is RUIMER dan wat de gate ziet: naast lezingen ín
+// een `'use client'`-bestand (die `scripts/check-client-data-reads.mjs` hard
+// afkeurt) gaat het ook om
+//   • GEDEELDE LIB-FUNCTIES ZONDER `use client`-directive die vanuit de browser
+//     worden aangeroepen — `lib/household/perspective-loader.ts` en
+//     `lib/household-projection.ts`. De gate opent die bestanden niet eens.
+//   • SERVER-LOADERS waarvan de rijen als PROP naar een clientcomponent gaan
+//     (`lib/core-data-loader.ts#fullAssets`, `lib/server-data/base.ts#
+//     getActiveAssets` → `<HorizonPage>`, `app/(app)/core/assets/[type]/page.tsx`
+//     → `<AssetCategoryPage>`). Next serialiseert props volledig in de
+//     RSC-payload, dus die kolommen staan in de paginabron.
+// Een bestandsgerichte grep mist precies deze twee klassen — de kolomlijst is
+// er de enige vangrail voor.
 //
 // WAAROM: `public.assets` heeft een HUISHOUD-GEDEELDE SELECT-policy
 // (`auth.uid() = user_id OR (ownership = 'shared' AND household_id IS NOT NULL
@@ -163,12 +182,18 @@ export type AssetSource = 'manual' | 'aangifte_import' | 'broker_csv' | 'bank_ps
 //                                dit veld écht nodig: `AssetForm` in
 //                                `components/core/assets-client.tsx` vult er het
 //                                IBAN-veld mee en schrijft het bij opslaan terug
-//                                (`account_number: iban || null`) — een reload
+//                                (`account_number: iban || null`) — een lijstrij
 //                                zónder de kolom zou het rekeningnummer bij de
-//                                volgende bewerking wíssen. De twee één-rij-
-//                                reloads die die vorm voeden vragen 'm daarom
-//                                expliciet bij: `${ASSET_CLIENT_COLUMNS},
-//                                account_number`. Lijst-lezingen niet.
+//                                volgende bewerking wíssen. Dat is opgelost ín
+//                                de vorm, niet door de kolom breed mee te
+//                                sturen: `AssetForm` haalt bij een cash-bezit
+//                                zelf één `select('account_number')` op voor die
+//                                ene rij, en LAAT DE KOLOM UIT DE SAVE-PAYLOAD
+//                                zolang die fetch niet terug is. De twee
+//                                één-rij-reloads (asset-pane, asset-detail-flow)
+//                                vragen 'm daarnaast expliciet bij als
+//                                `${ASSET_CLIENT_COLUMNS}, account_number`.
+//                                Lijst-lezingen nooit.
 //
 // De lijst is verder één-op-één de `Asset`-interface hierboven, want alle
 // clientlezers casten hun rijen naar precies dat type. Groeit `Asset` met een

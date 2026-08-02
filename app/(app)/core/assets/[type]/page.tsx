@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import {
+  ASSET_CLIENT_COLUMNS,
   ASSET_TYPE_LABELS,
   type Asset,
   type AssetType,
@@ -104,9 +105,15 @@ export default async function AssetCategoryServerPage({
   // Filter direct op asset_type + actieve items + huidige user. We sorteren
   // op `sort_order` zodat de categorie-pagina dezelfde volgorde aanhoudt als
   // de hoofdlijst op `/core/assets`.
+  // Expliciete kolomlijst i.p.v. `select('*')`: deze rijen gaan als
+  // `initialAssets` naar `<AssetCategoryPage>` (clientcomponent) en staan dus
+  // volledig in de RSC-payload. De `.eq('user_id')` sluit partner-materiaal uit,
+  // maar de drie account-nummer-kolommen (plaintext IBAN, ciphertext en de
+  // blind index onder een server-only sleutel) horen ook in de eigen paginabron
+  // niet thuis. Zie ASSET_CLIENT_COLUMNS in lib/asset-data.ts.
   const { data, error } = await supabase
     .from('assets')
-    .select('*')
+    .select(ASSET_CLIENT_COLUMNS)
     .eq('user_id', user.id)
     .eq('asset_type', type)
     .eq('is_active', true)

@@ -8,7 +8,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { SparklineDataPoint } from '@/lib/types/briefing'
 import type { NetWorthSnapshot } from '@/lib/net-worth-data'
 import type { Budget, BudgetWithChildren } from '@/lib/budget-data'
-import { computeExpectedAnnualAppreciation, type Asset } from '@/lib/asset-data'
+import { ASSET_CLIENT_COLUMNS, computeExpectedAnnualAppreciation, type Asset } from '@/lib/asset-data'
 import { type Debt, computeRenteAflossingsSplit, DEBT_TYPE_ICONS } from '@/lib/debt-data'
 import type { RetirementExpenseMethod } from '@/lib/budget-utils'
 import { localMonthStartMonthsAgo } from '@/lib/month-range'
@@ -380,9 +380,15 @@ export const loadCoreData = cache(async function loadCoreData(
       .select('amount')
       .gte('date', monthStart)
       .lt('date', monthEnd),
+    // Expliciete kolomlijst i.p.v. `select('*')`: deze rijen gaan als
+    // `fullAssets` in de bundel naar `<CoreLanding>` — een clientcomponent,
+    // dus Next serialiseert ze volledig in de RSC-payload (= paginabron).
+    // `assets` heeft een huishoud-gedeelde SELECT-policy, dus `*` zou daar bij
+    // een gedeelde bezitting de account-nummer-kolommen van de PARTNER in
+    // zetten. Zie ASSET_CLIENT_COLUMNS in lib/asset-data.ts.
     supabase
       .from('assets')
-      .select('*')
+      .select(ASSET_CLIENT_COLUMNS)
       .eq('is_active', true),
     supabase
       .from('debts')
