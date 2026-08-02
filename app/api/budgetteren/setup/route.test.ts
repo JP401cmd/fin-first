@@ -1,18 +1,37 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest'
+import { __resetKeyCacheForTests, encryptField } from '@/lib/crypto/field-encryption'
 
 /**
- * Regressietest voor bevestigde bug: `/api/budgetteren/setup` selecteert een
+ * Regressietest voor bevestigde bug: `/api/budgetteren/setup` selecteerde een
  * niet-bestaande kolom `iban` op de `assets`-tabel (moet `account_number` zijn)
- * — zie route.ts, stap 1b. PostgREST/Postgres geeft daardoor een 42703-fout
- * ("column assets.iban does not exist") terug, waarna de route ALTIJD in de
- * generieke 500 eindigt ("Er ging iets mis. Probeer het later opnieuw.").
+ * — zie route.ts, stap 1b (historisch). PostgREST/Postgres gaf daardoor een
+ * 42703-fout ("column assets.iban does not exist") terug, waarna de route
+ * ALTIJD in de generieke 500 eindigde ("Er ging iets mis. Probeer het later
+ * opnieuw.").
  *
- * Deze tests zijn NU rood door precies dat defect en horen groen te worden
- * zodra de route `account_number` selecteert én die waarde op het
- * companion-inputveld `iban` terechtkomt (bv. via PostgREST-aliasing
- * `iban:account_number` in de select-string, zodat de bestaande
- * `for (const a of cashAssets ?? []) syncBankAccountCompanion(..., a, ...)`
- * ongewijzigd kan blijven — of een expliciete mapping vóór die aanroep).
+ * ## Het contract dat hier nu vastligt (na de account-number-seam-refactor)
+ *
+ * De fix is niet langer een PostgREST-alias (`iban:account_number`), maar een
+ * expliciete mapping per cash-asset via `resolveAssetAccountNumber`
+ * (`lib/asset-account-number.ts`) vóór de `syncBankAccountCompanion`-aanroep
+ * in route.ts. Twee dingen liggen hier gepind, allebei op de RAUWE,
+ * ongesplitste select-tokens — niet via de alias-resolvende
+ * `requestedColumns()`-helper hieronder, want die zou een regressie naar de
+ * oude aliasvorm `iban:account_number` onopgemerkt laten passeren (de alias
+ * resolveert naar kolom `account_number`, dus een `.column`-gebaseerde check
+ * ziet geen verschil met de huidige, juiste vorm):
+ *
+ *  1. de select bevat het EXACTE token `account_number` (plaintext-kolom);
+ *  2. de select bevat óók het EXACTE token `account_number_encrypted` — sinds
+ *     `20260802093000_auto_link_cash_asset_encrypted_iban.sql` vult de
+ *     auto-link-trigger bij een bankkoppeling UITSLUITEND die kolom;
+ *  3. de select bevat GEEN bare token `iban` en GEEN alias-token
+ *     `iban:account_number` — die kolom bestaat niet op `assets`.
+ *
+ * Zie ook lib/asset-data.test.ts en lib/household/assets-column-contract.test.ts
+ * voor dezelfde exacte-lijst-stijl (`select.split(', ')` + `toContain`/
+ * `not.toContain` op de losse tokens, nooit een substring-check op de ruwe
+ * string).
  */
 
 // ── Echte kolommenlijst van `assets` (bron: supabase/migrations) ──────────
@@ -84,6 +103,34 @@ function resolveAssetsSelect(
 function requestedColumns(selectStr: string): string[] {
   return parseSelect(selectStr).map((t) => t.column)
 }
+
+/**
+ * Asserteert het account-number-selectcontract op de RAUWE, ongesplitste
+ * select-tokens (`selectStr.split(', ')`) — bewust NIET via `requestedColumns`
+ * hierboven, want die resolveert een alias-token als `iban:account_number`
+ * naar kolom `account_number` en zou een regressie naar de oude aliasvorm dus
+ * NIET opmerken. Exacte token-membership (`Array.prototype.includes`), geen
+ * substring-check op de ruwe string.
+ */
+function expectAssetAccountNumberSelectContract(selectStr: string) {
+  const tokens = selectStr.split(', ')
+  expect(tokens).toContain('account_number')
+  expect(tokens).toContain('account_number_encrypted')
+  expect(tokens).not.toContain('iban')
+  expect(tokens).not.toContain('iban:account_number')
+}
+
+// Twee losse 32-byte hex-sleutels, alleen gebruikt in dit testbestand — nodig
+// omdat `resolveAssetAccountNumber` hier ECHT ontsleutelt, niet gemockt.
+// Zelfde patroon als lib/asset-account-number.test.ts.
+const TEST_ENCRYPTION_KEY = 'aa'.repeat(32)
+const TEST_INDEX_KEY = 'bb'.repeat(32)
+
+beforeAll(() => {
+  process.env.ENCRYPTION_KEY_V1 = TEST_ENCRYPTION_KEY
+  process.env.IBAN_INDEX_KEY_V1 = TEST_INDEX_KEY
+  __resetKeyCacheForTests()
+})
 
 const mockAuthGetUser = vi.fn()
 const mockFrom = vi.fn()
@@ -229,9 +276,12 @@ beforeEach(() => {
 })
 
 describe('POST /api/budgetteren/setup — companion-select kolombug (assets.iban bestaat niet)', () => {
-  it('selecteert account_number, niet de niet-bestaande kolom iban', async () => {
+  it('selecteert zowel account_number als account_number_encrypted, niet de niet-bestaande kolom iban', async () => {
     await POST(postRequest({ selectedCashAssetIds: [CASH_ASSET_ID], templateChoice: 'empty' }))
 
+    expectAssetAccountNumberSelectContract(capturedSelectCols)
+    // Aanvullend op de raw-token-check: ook via de alias-resolvende helper
+    // (dekt de historische regressie letterlijk, niet alleen de vorm).
     const cols = requestedColumns(capturedSelectCols)
     expect(cols).toContain('account_number')
     expect(cols).not.toContain('iban')
@@ -249,6 +299,44 @@ describe('POST /api/budgetteren/setup — companion-select kolombug (assets.iban
     expect(mockSyncCompanion).toHaveBeenCalledTimes(1)
     const [, , assetArg] = mockSyncCompanion.mock.calls[0] as [unknown, unknown, { iban?: unknown }]
     expect(assetArg.iban).toBe(ACCOUNT_NUMBER)
+  })
+})
+
+describe('POST /api/budgetteren/setup — resolveAssetAccountNumber-precedence op wat syncBankAccountCompanion binnenkrijgt', () => {
+  it('geval (a): plaintext gevuld wint — ook met een AFWIJKENDE ciphertext op de rij (anti-staleness)', async () => {
+    const staleCiphertext = encryptField('NL99STALE0000000000')
+    setupSupabaseMocks([
+      { ...CASH_ASSET_DB_ROW, account_number: ACCOUNT_NUMBER, account_number_encrypted: staleCiphertext },
+    ])
+
+    await POST(postRequest({ selectedCashAssetIds: [CASH_ASSET_ID], templateChoice: 'empty' }))
+
+    const [, , assetArg] = mockSyncCompanion.mock.calls[0] as [unknown, unknown, { iban?: unknown }]
+    expect(assetArg.iban).toBe(ACCOUNT_NUMBER)
+  })
+
+  it('geval (b): plaintext null + ciphertext gevuld → de ontsleutelde waarde (bankkoppeling-geval)', async () => {
+    const bankValue = 'NL88BANK1111111111'
+    const bankCiphertext = encryptField(bankValue)
+    setupSupabaseMocks([
+      { ...CASH_ASSET_DB_ROW, account_number: null, account_number_encrypted: bankCiphertext },
+    ])
+
+    await POST(postRequest({ selectedCashAssetIds: [CASH_ASSET_ID], templateChoice: 'empty' }))
+
+    const [, , assetArg] = mockSyncCompanion.mock.calls[0] as [unknown, unknown, { iban?: unknown }]
+    expect(assetArg.iban).toBe(bankValue)
+  })
+
+  it('geval (c): beide leeg → companion-iban is null', async () => {
+    setupSupabaseMocks([
+      { ...CASH_ASSET_DB_ROW, account_number: null, account_number_encrypted: null },
+    ])
+
+    await POST(postRequest({ selectedCashAssetIds: [CASH_ASSET_ID], templateChoice: 'empty' }))
+
+    const [, , assetArg] = mockSyncCompanion.mock.calls[0] as [unknown, unknown, { iban?: unknown }]
+    expect(assetArg.iban).toBeNull()
   })
 })
 
