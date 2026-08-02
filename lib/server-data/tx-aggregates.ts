@@ -192,10 +192,11 @@ export async function fetchTxMonthAggregate(
 
 /**
  * Het ROLLENDE 12-MAANDS maandaggregaat `[maandstart 11 mnd terug, maandeinde)`,
- * `cache()`-gewrapt zodat dashboard- en core-loader binnen één request ÉÉN RPC
- * delen i.p.v. beide dezelfde te draaien. Op de cashflow-hub draaien ze allebei
- * (`loadDashboardData` én `loadCashflowSettingsData` → `loadCoreData`), dus dat
- * was per request een volledig dubbele RPC + payload.
+ * `cache()`-gewrapt zodat dashboard-, core- en horizon-loader binnen één request
+ * ÉÉN RPC delen i.p.v. elk dezelfde te draaien. Op de cashflow-hub draaien ze
+ * alle drie (`loadDashboardData`, `loadCashflowSettingsData` → `loadCoreData`,
+ * en `loadDashboardData` → `computeHorizonFireSim` → `loadHorizonData`), dus dat
+ * waren per request drie identieke RPC's + payloads.
  *
  * WAAROM HET VENSTER HIER BINNEN WORDT BEREKEND — en niet als argument komt.
  * React `cache()` keyt op argument-IDENTITEIT (Object.is per argument). Een
@@ -212,11 +213,9 @@ export async function fetchTxMonthAggregate(
  * `tx-aggregates.cache.test.ts` pint die gelijkheid vast als anti-drift-getuige.
  *
  * `ownOnly` blijft weg (default false) = RLS-breed (eigen + gedeeld huishouden),
- * identiek aan beide vervangen callsites. Loaders met een ANDER venster houden
- * bewust hun eigen `fetchTxMonthAggregate`-call: een ander venster is een andere
- * cache-entry (lib/lever-scores-loader.ts, 6 maanden). NB: horizon-data-loader
- * draait hetzelfde 12-maands venster nog via een eigen call — die omzetting valt
- * buiten deze wijziging.
+ * identiek aan alle drie de vervangen callsites. Loaders met een ANDER venster
+ * houden bewust hun eigen `fetchTxMonthAggregate`-call: een ander venster is een
+ * andere cache-entry (lib/lever-scores-loader.ts draait 6 maanden MÉT `ownOnly`).
  *
  * MOET met de authenticated/anon RLS-client worden aangeroepen (nooit
  * getServiceClient) — zie `fetchTxMonthAggregate`.

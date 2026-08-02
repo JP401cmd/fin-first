@@ -64,12 +64,11 @@ import {
   getEarliestIncomeDate,
 } from './server-data/base'
 import {
-  fetchTxMonthAggregate,
+  getTxAgg12m,
   aggSumPositief,
   aggSumNegatiefAbs,
   type TxMonthAggregateRow,
 } from './server-data/tx-aggregates'
-import { localMonthStartMonthsAgo, localMonthBounds } from './month-range'
 import {
   buildHealthScoreInput,
   type HealthScoreAsset,
@@ -426,10 +425,13 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
     // grondslag, eigen-rekening-overboekingen tellen NERGENS mee); alleen de
     // FIRE-projectie-som last12Income telt transfers BEWUST mee (realOnly:false).
     // RLS-breed.
-    fetchTxMonthAggregate(supabase, {
-      from: localMonthStartMonthsAgo(now, 11),
-      to: localMonthBounds(now).end,
-    }),
+    //
+    // Via de gedeelde `getTxAgg12m` i.p.v. een eigen `fetchTxMonthAggregate`: het
+    // venster was al byte-identiek (zelfde helpers, geen ownOnly), en op de
+    // cashflow-hub draait deze loader in hetzelfde request als de dashboard- en
+    // core-loader (loadDashboardData → computeHorizonFireSim → loadHorizonData).
+    // Dat was dus een DERDE identieke RPC; nu delen ze er één.
+    getTxAgg12m(supabase),
     // Vroegste inkomens-datum (all-time, één rij) — afkap-vrij, i.p.v. de vroegere
     // reduce over een gecapte 12-maands-slice (die kon bij >1000 positieve rijen
     // stil afkappen → incomeMonths te klein → over-extrapolatie). Zelfde gedeelde

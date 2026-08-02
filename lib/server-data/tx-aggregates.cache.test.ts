@@ -2,9 +2,9 @@
  * Tests voor de `cache()`-gewrapte 12-maands aggregaat-fetcher (`getTxAgg12m`).
  *
  * Twee dingen worden bewezen:
- *   1. DEDUPE — twee "loaders" (dashboard + core) die binnen één request het
- *      12-maands aggregaat vragen, laten de `tx_month_aggregate`-RPC maar ÉÉN keer
- *      draaien. Dat is het hele punt van T1.1.
+ *   1. DEDUPE — de drie "loaders" (dashboard + core + horizon) die binnen één
+ *      request het 12-maands aggregaat vragen, laten de `tx_month_aggregate`-RPC
+ *      maar ÉÉN keer draaien. Dat is het hele punt van T1.1.
  *   2. ANTI-DRIFT OP HET VENSTER — het venster dat `getTxAgg12m` intern berekent is
  *      byte-identiek aan de twee inline `Date.UTC(...).toISOString()`-berekeningen
  *      die het in dashboard-/core-data-loader vervangt. Wijkt dat ooit af, dan is
@@ -65,16 +65,23 @@ function makeCountingSupabase(rows: unknown[] = []) {
 // ── 1. Dedupe binnen één request ────────────────────────────────────────────
 
 describe('getTxAgg12m — cache-hit dedupe binnen één request', () => {
-  it('dashboard- en core-loader delen ÉÉN tx_month_aggregate-RPC', async () => {
+  it('dashboard-, core- én horizon-loader delen ÉÉN tx_month_aggregate-RPC', async () => {
     const { supabase, rpcCalls } = makeCountingSupabase([
       { month: '2026-07', budget_id: null, transaction_type: null, sum_positief: 100, sum_negatief: -40, count: 2 },
     ])
 
-    // Twee onafhankelijke "loaders" binnen hetzelfde request.
-    const [a, b] = await Promise.all([getTxAgg12m(supabase), getTxAgg12m(supabase)])
+    // Drie onafhankelijke "loaders" binnen hetzelfde request. Op de cashflow-hub
+    // draaien ze alle drie: loadDashboardData, loadCashflowSettingsData →
+    // loadCoreData, en loadDashboardData → computeHorizonFireSim → loadHorizonData.
+    const [a, b, c] = await Promise.all([
+      getTxAgg12m(supabase),
+      getTxAgg12m(supabase),
+      getTxAgg12m(supabase),
+    ])
 
     expect(rpcCalls).toHaveLength(1)
     expect(a).toBe(b)
+    expect(b).toBe(c)
     expect(a.data).toHaveLength(1)
     expect(a.error).toBeNull()
   })
