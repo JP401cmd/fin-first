@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { unauthorized } from '@/lib/api/respond'
+import { serverError, unauthorized } from '@/lib/api/respond'
 import { checkTierGate } from '@/lib/require-tier'
 import { buildCalculator } from '@/lib/ai/build-calculator'
 import { StoredCalculatorDefinitionSchema } from '@/lib/calculator/types'
@@ -14,7 +14,9 @@ const MAX_PROMPT_LENGTH = 500
  * Fin (generateObject). Optioneel `refineFrom` om een bestaande
  * definitie te verfijnen. Tier-gated op 'ai' (zelfde als chat). Bovendien
  * geldt een vlakke weeklimiet van 10 generaties + 5 verfijningen per
- * gebruiker — gehandhaafd door `lib/calculator/rate-limit.ts`.
+ * gebruiker — atomair gehandhaafd in de database
+ * (`reserve_ai_calculator_slot`), doorgegeven via
+ * `lib/calculator/rate-limit.ts`.
  *
  * Body: { prompt: string, refineFrom?: CalculatorDefinition }
  * Resp:
@@ -24,6 +26,7 @@ const MAX_PROMPT_LENGTH = 500
  *   403 { ok: false, error }       — tier-gate (geen AI-abonnement)
  *   422 { ok: false, error }       — generatie-fout (AI-output ongeldig)
  *   429 { ok: false, error }       — weeklimiet bereikt
+ *   500 { error }                  — reservering niet vast te stellen
  */
 export async function POST(req: Request) {
   const supabase = await createClient()
@@ -71,8 +74,22 @@ export async function POST(req: Request) {
   // generatie telt nog steeds als poging — dat is bewust (anders kan een
   // gebruiker met een slechte prompt eindeloos retryen). Refine-pogingen
   // gebruiken een aparte, lagere teller.
+  //
+  // De reservering is atomair en gebeurt volledig in de database
+  // (`reserve_ai_calculator_slot`, migratie 20260803090000). Deze route velt
+  // géén eigen oordeel meer: ze leest de stand niet, vergelijkt niets met een
+  // limiet en schrijft de teller nergens. Dat wás het gebrek — lezen,
+  // vergelijken en schrijven stonden als drie losse stappen in
+  // `lib/calculator/rate-limit.ts`, en tussen stap 1 en 3 paste een heel
+  // tweede verzoek (ADR 0076).
   const kind = refineFrom ? 'refinement' : 'generation'
-  const rate = await checkAndIncrement(supabase, user.id, kind)
+  const rate = await checkAndIncrement(supabase, kind)
+  if (rate.error) {
+    // Geen geldige reservering = niet genereren. Een 429 zou hier liegen
+    // ("je limiet is bereikt") en een 200 zou de rem gratis omzeilbaar maken
+    // voor wie de database weet te laten hikken.
+    return serverError(rate.error, 'build-calculator:POST')
+  }
   if (!rate.allowed) {
     const usedLabel = kind === 'refinement' ? 'verfijningen' : 'generaties'
     return Response.json(

@@ -105,8 +105,32 @@ Drie regels die daarbij horen:
   volgende limiet ook te zijn: de teller staat per gekoppelde bankrekening
   (`bank_connection_accounts`), niet per gebruiker of per toestemming, en twee
   unieke indexen uit `20260729234928` houden dat niveau op zijn plek.
-- Dezelfde read-then-write staat nog in de **weeklimiet van de rekenmachine**
-  (`lib/calculator/rate-limit.ts` + `ai_calculator_usage`). Die rem beschermt
-  tegen AI-kosten, niet tegen een externe blokkade, dus de urgentie is lager —
-  maar hij valt onder hetzelfde besluit en hoort bij de eerstvolgende
-  aanraking op dezelfde vorm te komen.
+- **Tweede vindplaats, gedicht op 3 augustus 2026:** de **weeklimiet van de
+  rekenhulp** (`lib/calculator/rate-limit.ts` + `ai_calculator_usage`) droeg
+  dezelfde read-then-write. Nu
+  `supabase/migrations/20260803090000_ai_calculator_atomic_weekly_limit_rpc.sql`.
+  Drie afwijkingen van de bankvorm, elk met een reden:
+  - **`INSERT … ON CONFLICT DO UPDATE … WHERE`** in plaats van een kale
+    `UPDATE`: de rij bestaat bij het eerste verbruik van de week nog niet. De
+    INSERT-tak draagt géén `where` en slaagt dus altijd wanneer de rij ontbreekt
+    — daarom betekent 0 bijgewerkte rijen hier onvermijdelijk "geweigerd", en is
+    de tweede query (anders dan bij de bank) alleen nodig om de stand voor de
+    429-tekst op te halen. Die redenering staat of valt met "limiet ≥ 1", wat de
+    functie expliciet afvangt.
+  - **Twee tellers, één functie met `p_kind`.** `generations` (10) en
+    `refinements` (5) zijn onafhankelijk begrensd. `p_kind` kiest wélke teller
+    ophoogt, niet hoe hoog de rem staat — de limiet blijft dus buiten de
+    signatuur, en met een andere `p_kind` bereikt een aanroeper alleen zijn
+    eigen, lagere teller.
+  - **`security invoker`,** waar de bankvariant `security definer` gebruikt: de
+    bestaande own-row-policy op `ai_calculator_usage` geeft precies de toegang
+    die de functie nodig heeft, dus RLS blijft als tweede slot staan. De
+    atomariteit komt van het ene statement, niet van verhoogde rechten.
+  - De weekgrens was hier al correct (Amsterdam, niet UTC — geverifieerd, geen
+    tweede vindplaats van díe fout) maar verhuist mee naar de database, zodat
+    lezen (badge) en schrijven (reservering) niet van mening kunnen verschillen
+    over welke week het is.
+  - De limieten wonen sindsdien in `public.ai_calculator_week_limits()`;
+    `MAX_GENERATIONS_PER_WEEK`/`MAX_REFINEMENTS_PER_WEEK` zijn uit TypeScript
+    verdwenen, zodat een migratie die de rem verandert de verbruiksbadge niet
+    stil kan laten liegen.

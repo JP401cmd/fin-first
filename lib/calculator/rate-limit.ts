@@ -1,166 +1,168 @@
 /**
  * Rekenhulp — wekelijkse rate-limit voor AI-generaties en -verfijningen.
  *
- * Flat 10 generaties + 5 verfijningen per ISO-week per gebruiker. De
- * week-grens is maandag 00:00 in Europe/Amsterdam (NL-context). We slaan
- * de week-start op als DATE in `ai_calculator_usage` (PK = user_id +
- * week_start). Increment via UPSERT-met-+1 zodat we geen race tussen
- * SELECT+INSERT hoeven te beheren.
+ * Flat 10 generaties + 5 verfijningen per ISO-week per gebruiker, twee
+ * ONAFHANKELIJKE tellers in één rij van `ai_calculator_usage`
+ * (PK = user_id + week_start). Wie door zijn generaties heen is mag zijn
+ * bestaande concept dus nog steeds verfijnen.
  *
- * Scheiding van zorgen: deze module weet niets van auth of HTTP — alleen
- * van de Supabase-tabel. De API-route doet `await checkAndIncrement(...)`
- * vóór `buildCalculator(...)`.
+ * ── Waarom deze module vrijwel niets meer doet ────────────────────────────
+ * Tot 3 augustus 2026 deed `checkAndIncrement` hier drie stappen: SELECT de
+ * stand → vergelijk met de limiet → UPSERT de in TypeScript berekende
+ * `n + 1`. Dat was een TOCTOU (ADR 0076): twee gelijktijdige verzoeken lazen
+ * dezelfde stand, zagen allebei ruimte, en schreven allebei dezelfde waarde
+ * terug — twee LLM-generaties voor de prijs van één tik. De UPSERT stuurde
+ * bovendien de héle rij mee, óók de teller die dít verzoek niet ophoogde,
+ * zodat een gelijktijdige verfijning een generatie-ophoging letterlijk kon
+ * terugdraaien. De oude docstring beweerde het tegenovergestelde ("geen race
+ * dankzij UPSERT-met-+1"); de +1 werd in TypeScript berekend, niet door de
+ * database.
+ *
+ * Sinds `20260803090000_ai_calculator_atomic_weekly_limit_rpc.sql` gebeurt
+ * controle én ophoging in ÉÉN `INSERT … ON CONFLICT DO UPDATE … WHERE …
+ * RETURNING` binnen `public.reserve_ai_calculator_slot()`. Deze module is nog
+ * slechts de vertaling van dat antwoord naar een TypeScript-vorm; ze velt
+ * geen eigen oordeel meer over "mag dit door".
+ *
+ * ── Wat hier bewust NIET meer staat ───────────────────────────────────────
+ * · **De limieten.** 10 en 5 wonen in `public.ai_calculator_week_limits()`.
+ *   Stonden ze óók hier, dan zou een migratie die de rem verandert de badge
+ *   stil laten liegen. Ze komen mee in het antwoord van beide RPC's.
+ * · **De weekgrens.** Werd hier berekend met `Intl.DateTimeFormat` in
+ *   `Europe/Amsterdam` — dat was correct (anders dan de UTC-dagsleutel van de
+ *   banksync), maar het hoort niet af te hangen van de lambda die het verzoek
+ *   afhandelt, en lezen en schrijven mogen nooit van mening verschillen over
+ *   welke week het is. Nu: `date_trunc('week', now() at time zone
+ *   'Europe/Amsterdam')` in de database.
+ * · **De gebruiker.** Beide RPC's leiden hem af uit `auth.uid()`. Er is geen
+ *   `userId`-parameter meer, dus geen enkele aanroeper kan — ook niet per
+ *   ongeluk — op andermans teller uitkomen.
+ *
+ * Scheiding van zorgen: deze module weet niets van auth of HTTP, alleen van
+ * de twee RPC's. De API-route doet `await checkAndIncrement(...)` vóór
+ * `buildCalculator(...)`.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-export const MAX_GENERATIONS_PER_WEEK = 10
-export const MAX_REFINEMENTS_PER_WEEK = 5
-
 export type UsageKind = 'generation' | 'refinement'
 
 export interface RateLimitResult {
+  /**
+   * Alleen `true` als de database daadwerkelijk een tik heeft gereserveerd.
+   * Bij een fout staat hij op `false` — fail-closed by construction: wie de
+   * `error`-controle vergeet, weigert de actie in plaats van hem gratis door
+   * te laten.
+   */
   allowed: boolean
-  /** Resterende calls van deze soort vóór de limiet bereikt is. */
+  /** Resterende calls van deze soort ná deze reservering. */
   remaining: number
-  /** Configureerde harde limiet voor deze soort. */
+  /** De geldende harde limiet voor deze soort, uit de database. */
   limit: number
+  /** Stand van deze teller ná de reservering (of de huidige stand bij een weigering). */
+  used: number
+  /**
+   * Gezet wanneer de reservering niet kon worden vastgesteld (DB-fout). Er is
+   * dan géén tik gereserveerd; de aanroeper hoort een 500 te geven, geen 429 —
+   * "je limiet is bereikt" zou een leugen zijn.
+   */
+  error?: unknown
 }
 
 export interface UsageSnapshot {
   generations: number
   refinements: number
+  maxGenerations: number
+  maxRefinements: number
+  /** Maandag van de ISO-week waarvoor deze standen gelden (YYYY-MM-DD). */
+  weekStart: string
+  /** Gezet bij een leesfout; de badge hoort zich dan te verbergen, niet te gokken. */
+  error?: unknown
+}
+
+/** PostgREST levert een table-returning functie als array van rijen. */
+function firstRow<T>(data: unknown): T | null {
+  if (Array.isArray(data)) return (data[0] as T) ?? null
+  return (data as T) ?? null
 }
 
 /**
- * Bereken het start-moment van de huidige ISO-week (maandag 00:00) in
- * Europe/Amsterdam-tijd, en lever dat als een UTC-Date dat dezelfde
- * "kalenderdag" weergeeft als de DATE-kolom verwacht.
+ * Lees het verbruik van de actieve week plus de geldende limieten. Levert
+ * nullen als er nog geen rij is. Gebruikt door de UI-badge ("nog X van Y").
  *
- * Implementatie: we gebruiken `toLocaleString` met de doel-tijdzone om
- * de huidige wandklok-tijd in Amsterdam te bepalen, schuiven naar maandag
- * 00:00, en geven de gevonden DATE terug. We modelleren puur op de
- * kalenderdatum-component — `DATE` in Postgres heeft geen tijdzone.
+ * Leest via `ai_calculator_week_usage()` en niet rechtstreeks uit de tabel,
+ * zodat de badge dezelfde weekgrens en dezelfde plafonds gebruikt als de
+ * reservering. Hier zit geen race — dit is een pure lezing.
  */
-export function getCurrentWeekStart(now: Date = new Date()): Date {
-  // Haal het uur en de weekdag op in Amsterdam-tijd. `weekday: 'short'`
-  // geeft "Mon".."Sun"; we mappen handmatig naar 1..7 (ISO).
-  const dtf = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Europe/Amsterdam',
-    weekday: 'short',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  })
-  const parts = dtf.formatToParts(now)
-  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? ''
+export async function getUsage(supabase: SupabaseClient): Promise<UsageSnapshot> {
+  const { data, error } = await supabase.rpc('ai_calculator_week_usage')
 
-  // ISO weekdays: Mon=1..Sun=7
-  const weekdayMap: Record<string, number> = {
-    Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7,
+  const row = firstRow<{
+    usage_week_start: string
+    usage_generations: number
+    usage_refinements: number
+    usage_generation_limit: number
+    usage_refinement_limit: number
+  }>(data)
+
+  if (error || !row) {
+    return {
+      generations: 0,
+      refinements: 0,
+      maxGenerations: 0,
+      maxRefinements: 0,
+      weekStart: '',
+      error: error ?? new Error('ai_calculator_week_usage gaf geen rij terug'),
+    }
   }
-  const weekday = weekdayMap[get('weekday')] ?? 1
-  const year = Number(get('year'))
-  const month = Number(get('month'))
-  const day = Number(get('day'))
-
-  // De huidige Amsterdam-kalenderdatum als UTC-midnight (we gebruiken UTC
-  // alleen als opslag-vorm; de TZ-component is irrelevant voor DATE).
-  const localMidnight = new Date(Date.UTC(year, month - 1, day))
-
-  // Trek (weekday-1) dagen af om bij maandag uit te komen.
-  const daysSinceMonday = weekday - 1
-  localMidnight.setUTCDate(localMidnight.getUTCDate() - daysSinceMonday)
-  return localMidnight
-}
-
-/** Format DATE-kolom als 'YYYY-MM-DD' (geen tijdzone-component). */
-function toDateString(d: Date): string {
-  const yyyy = d.getUTCFullYear()
-  const mm = String(d.getUTCMonth() + 1).padStart(2, '0')
-  const dd = String(d.getUTCDate()).padStart(2, '0')
-  return `${yyyy}-${mm}-${dd}`
-}
-
-/**
- * Lees het huidige verbruik voor de actieve week. Levert `{ 0, 0 }` als
- * er nog geen rij bestaat. Gebruikt door de UI-badge ("nog X over").
- */
-export async function getUsage(
-  supabase: SupabaseClient,
-  userId: string,
-): Promise<UsageSnapshot> {
-  const weekStart = toDateString(getCurrentWeekStart())
-  const { data } = await supabase
-    .from('ai_calculator_usage')
-    .select('generations, refinements')
-    .eq('user_id', userId)
-    .eq('week_start', weekStart)
-    .maybeSingle()
 
   return {
-    generations: data?.generations ?? 0,
-    refinements: data?.refinements ?? 0,
+    generations: row.usage_generations ?? 0,
+    refinements: row.usage_refinements ?? 0,
+    maxGenerations: row.usage_generation_limit,
+    maxRefinements: row.usage_refinement_limit,
+    weekStart: row.usage_week_start,
   }
 }
 
 /**
- * Atomair: check de huidige stand en verhoog de juiste teller met 1
- * wanneer de limiet nog niet bereikt is. Bij overschrijding blijft de
- * teller staan en krijgt de caller `allowed: false` terug.
+ * Reserveer atomair één tik op de teller van `kind`. De database controleert
+ * en hoogt op in hetzelfde statement; er bestaat geen toestand tussen
+ * "gelezen" en "geschreven" waarin een tweede verzoek zich kan wringen.
  *
- * Implementatie: één UPSERT met +1 incremement op de juiste kolom. We
- * doen de limiet-check ná de read maar vóór de write, zodat we bij
- * gelijktijdige concurrente aanroepen hooguit één extra call laten
- * passeren (acceptabel — dit is rate-limit, geen quota-billing).
+ * `kind` kiest WELKE teller ophoogt, nooit HOE HOOG de rem staat — de limiet
+ * is met opzet geen argument, omdat de functie via PostgREST voor elke
+ * ingelogde gebruiker aanroepbaar is.
  */
 export async function checkAndIncrement(
   supabase: SupabaseClient,
-  userId: string,
   kind: UsageKind,
 ): Promise<RateLimitResult> {
-  const limit =
-    kind === 'generation' ? MAX_GENERATIONS_PER_WEEK : MAX_REFINEMENTS_PER_WEEK
-  const weekStart = toDateString(getCurrentWeekStart())
+  const { data, error } = await supabase.rpc('reserve_ai_calculator_slot', {
+    p_kind: kind,
+  })
 
-  // 1) Lees huidige stand (of 0 als nog geen rij).
-  const { data: existing } = await supabase
-    .from('ai_calculator_usage')
-    .select('generations, refinements')
-    .eq('user_id', userId)
-    .eq('week_start', weekStart)
-    .maybeSingle()
+  const row = firstRow<{
+    slot_allowed: boolean
+    slot_limit: number
+    slot_used: number
+    slot_remaining: number
+  }>(data)
 
-  const currentGen = existing?.generations ?? 0
-  const currentRef = existing?.refinements ?? 0
-  const currentForKind = kind === 'generation' ? currentGen : currentRef
-
-  // 2) Check limiet vóór de write.
-  if (currentForKind >= limit) {
-    return { allowed: false, remaining: 0, limit }
+  if (error || !row) {
+    return {
+      allowed: false,
+      remaining: 0,
+      limit: 0,
+      used: 0,
+      error: error ?? new Error('reserve_ai_calculator_slot gaf geen rij terug'),
+    }
   }
 
-  // 3) Bouw de nieuwe rij-state en UPSERT. We gebruiken upsert i.p.v.
-  //    insert-of-update zodat het in één round-trip past en de PK-conflict
-  //    op (user_id, week_start) automatisch tot een UPDATE leidt.
-  const newGen = kind === 'generation' ? currentGen + 1 : currentGen
-  const newRef = kind === 'refinement' ? currentRef + 1 : currentRef
-
-  await supabase
-    .from('ai_calculator_usage')
-    .upsert(
-      {
-        user_id: userId,
-        week_start: weekStart,
-        generations: newGen,
-        refinements: newRef,
-      },
-      { onConflict: 'user_id,week_start' },
-    )
-
   return {
-    allowed: true,
-    remaining: limit - (currentForKind + 1),
-    limit,
+    allowed: row.slot_allowed === true,
+    remaining: row.slot_remaining ?? 0,
+    limit: row.slot_limit,
+    used: row.slot_used ?? 0,
   }
 }
