@@ -1,5 +1,16 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, cleanup, waitFor, configure } from '@testing-library/react'
+
+// Elke test hier rendert CashAccountView en wacht met `findBy*` tot de
+// fetch-gedreven effectketen de transactierijen heeft neergezet. De
+// standaard-`asyncUtilTimeout` van testing-library is 1000 ms, en dat is te krap
+// zodra de volledige suite parallel draait: de EERSTE render in dit bestand
+// betaalt bovendien de module-initialisatie. Gemeten in een volle suite-run:
+// 1076 ms — net eroverheen, terwijl het bestand geïsoleerd in 1,3 s klaar is.
+// Dat is machinebelasting, geen traag component, dus ruimer wachten is hier de
+// juiste remedie in plaats van de assertie te verzwakken. Bewust bestand-lokaal:
+// een globale verhoging zou echte traagheid elders kunnen maskeren.
+configure({ asyncUtilTimeout: 5000 })
 
 // ── Fixtures (hoisted zodat de vi.mock-factories eronder ze mogen gebruiken) ──
 const fixtures = vi.hoisted(() => {
