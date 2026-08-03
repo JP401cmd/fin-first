@@ -7,6 +7,10 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { BottomSheet } from '@/components/app/bottom-sheet'
+// `useOptionalToast` en niet `useToast`: dit formulier wordt óók buiten een
+// `ToastProvider` gerenderd (onboarding-achtige contexten, tests). De defensieve
+// variant degradeert daar stil in plaats van te gooien.
+import { useOptionalToast } from '@/components/app/toast-provider'
 import { Kicker, FiguresStrip, PageInfoButton, GlossaryTerm, PageOpening, SubtotalLine } from '@/components/editorial'
 import { PAGE_INFO } from '@/lib/page-info-content'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
@@ -2910,6 +2914,25 @@ export function AssetForm({
   const [iban, setIban] = useState<string | null>(() =>
     asset ? (asset.account_number !== undefined ? (asset.account_number ?? '') : null) : '',
   )
+  // Wat de PLAINTEXT-kolom had toen dit formulier openging. Alleen een afwijking
+  // hiervan gaat naar `POST /api/assets/account-number`.
+  //
+  // **Waarom dit niet optioneel is.** Die route schrijft het hele drieluik, dus
+  // ook `account_number_encrypted`/`_hash` — en die twee kan de browser niet
+  // lézen. Een lege plaintext-kolom betekent hier dus NIET "deze rekening heeft
+  // geen nummer": de auto-link-trigger
+  // (`20260802093000_auto_link_cash_asset_encrypted_iban.sql`) maakt een
+  // bankgekoppelde cash-bezitting juist aan met UITSLUITEND ciphertext + blinde
+  // index. Zonder deze vergelijking zou het opslaan van zo'n bezitting — na een
+  // naamswijziging, een nieuwe saldo-invoer, wat dan ook — de route met `null`
+  // aanroepen en het versleutelde rekeningnummer wissen dat het scherm nooit
+  // getoond heeft. De companion-sync hieronder krijgt dan géén IBAN meer mee,
+  // waarna die rekening uit de eigen-rekeningherkenning valt en elke interne
+  // overboeking als échte inkomst én uitgave meetelt (zie
+  // `lib/asset-account-number.ts`).
+  const ibanBaselineRef = useRef<string | null>(
+    asset ? (asset.account_number !== undefined ? (asset.account_number ?? '') : null) : '',
+  )
   const [currentValue, setCurrentValue] = useState(String(asset?.current_value ?? ''))
   const [purchaseValue, setPurchaseValue] = useState(String(asset?.purchase_value ?? ''))
 
@@ -2927,10 +2950,11 @@ export function AssetForm({
   }, [isEdit, asset])
 
   // Haal het rekeningnummer alsnog op wanneer de bron-rij het niet droeg. Eén
-  // rij, één kolom, alleen voor cash-bezittingen — voor elk ander type schrijft
-  // de save-payload sowieso `null` (zie `accountNumberPatch`), dus daar valt
-  // niets te bewaren. Blijft de fetch uit of komt hij te laat, dan blijft `iban`
-  // `null` en laat de payload de kolom ongemoeid: geen stille wissing.
+  // rij, één kolom, alleen voor cash-bezittingen — bij een ander type gaat het
+  // nummer sowieso niet naar de route tenzij de gebruiker het type wég van cash
+  // zet, dus daar valt niets na te lezen. Blijft de fetch uit of komt hij te
+  // laat, dan blijft `iban` `null` en wordt de route niet aangeroepen: geen
+  // stille wissing.
   useEffect(() => {
     if (iban !== null || !asset || asset.asset_type !== 'cash') return
     let cancelled = false
@@ -2942,7 +2966,12 @@ export function AssetForm({
       .maybeSingle()
       .then(({ data }) => {
         if (cancelled || !data) return
-        setIban((prev) => (prev === null ? ((data.account_number as string | null) ?? '') : prev))
+        const uitDatabase = (data.account_number as string | null) ?? ''
+        // Óók bijwerken wanneer de gebruiker intussen zelf iets getypt heeft:
+        // dit is en blijft de waarde die in de database stond, en dus de enige
+        // juiste vergelijkingsbasis voor "heeft de gebruiker dit veld gewijzigd?".
+        ibanBaselineRef.current = uitDatabase
+        setIban((prev) => (prev === null ? uitDatabase : prev))
       })
     return () => {
       cancelled = true
@@ -3019,6 +3048,7 @@ export function AssetForm({
   const [deelnemingOptions, setDeelnemingOptions] = useState<{ id: string; name: string }[]>([])
   const [dgaTotal, setDgaTotal] = useState(0)
   const [validationError, setValidationError] = useState<string | null>(null)
+  const { addToast } = useOptionalToast()
   // Household ownership
   const [ownership, setOwnership] = useState<OwnershipType>(asset?.ownership ?? 'personal')
   const { hasHousehold, householdId } = useHouseholdStatus()
@@ -3158,14 +3188,30 @@ export function AssetForm({
       }
     }
 
-    // Rekeningnummer alleen meeschrijven als we het KENNEN. `iban === null`
-    // betekent "de bron-rij droeg de kolom niet en de nalees-fetch is nog niet
-    // terug" — de kolom dan wél in de payload zetten zou het bestaande
-    // rekeningnummer wissen. Bij een niet-cash type schrijven we bewust `null`:
-    // een type-wissel weg van cash hoort het nummer op te ruimen.
-    const accountNumberPatch: { account_number?: string | null } = isCashType
-      ? (iban === null ? {} : { account_number: iban || null })
-      : { account_number: null }
+    // Het rekeningnummer zit BEWUST NIET in deze payload; het gaat na de save via
+    // `POST /api/assets/account-number`. Reden: dat drieluik (plaintext +
+    // ciphertext + blinde index) is hier niet compleet te schrijven — versleutelen
+    // vraagt server-only sleutels. Zolang de browser alleen de plaintext-kolom
+    // zette, verouderde de ciphertext bij elke IBAN-bewerking stilletjes.
+    // Zelfde reden en zelfde vorm als de companion-sync verderop.
+    //
+    // `undefined` = niet aanroepen. Dat is de standaard, en de aanroep is de
+    // uitzondering: die route schrijft álle drie de kolommen, dus elke aanroep
+    // die niet uit een gebruikersactie volgt is een potentiële wissing van
+    // ciphertext die dit scherm niet kan lezen (zie `ibanBaselineRef`). Twee
+    // gevallen rechtvaardigen 'm:
+    //
+    //   1. de gebruiker heeft het IBAN-veld daadwerkelijk gewijzigd — leeggemaakt
+    //      telt mee, dat is een bewuste wisactie;
+    //   2. het type gaat wég van cash: dan hoort het nummer opgeruimd te worden.
+    //
+    // Onbekend (`iban === null`: de bron-rij droeg de kolom niet en de
+    // nalees-fetch is niet terug) valt automatisch buiten 1 — een onbekende
+    // waarde kan per definitie niet afwijken van de basis.
+    const ibanIsGewijzigd = iban !== null && iban !== ibanBaselineRef.current
+    const accountNumberToWrite: string | null | undefined = isCashType
+      ? (ibanIsGewijzigd ? (iban || null) : undefined)
+      : (asset?.asset_type === 'cash' ? null : undefined)
 
     const row = {
       user_id: user.id,
@@ -3177,7 +3223,6 @@ export function AssetForm({
       expected_return: (depreciationRate && Number(depreciationRate) > 0 ? 0 : Number(expectedReturn) || 0),
       monthly_contribution: isCashType ? 0 : Number(monthlyContribution) || 0,
       institution: institution || null,
-      ...accountNumberPatch,
       notes: notes || null,
       // Type-specific fields
       subtype: subtype || null,
@@ -3247,6 +3292,47 @@ export function AssetForm({
       const { data: inserted, error: insertErr } = await supabase.from('assets').insert(row).select('id').single()
       if (insertErr) { console.error('ASSET INSERT FAILED:', insertErr); setValidationError('Opslaan mislukt: ' + insertErr.message); setSaving(false); return }
       assetId = inserted?.id
+    }
+
+    // Rekeningnummer server-side wegschrijven — VÓÓR de companion-sync hieronder.
+    // Die volgorde is dwingend: `setBudgetTracking` leest het rekeningnummer vers
+    // uit de database om de `bank_accounts`-companion bij te werken. Draai je het
+    // om, dan krijgt de companion het VORIGE nummer mee.
+    //
+    // `undefined` betekent "niet aanroepen" — zie de toelichting bij
+    // `accountNumberToWrite` hierboven.
+    //
+    // Wél best-effort (een gefaalde schrijfactie mag de save-flow niet breken),
+    // maar NIET geruisloos: op dit pad staat gebruikersinvoer die de gebruiker
+    // net zelf getypt heeft. Toen het rekeningnummer nog in de rij-payload zat,
+    // kwam een fout als een gefaalde save terug; nu het een aparte aanroep is,
+    // zou een geslikte fout betekenen dat het formulier "opgeslagen" meldt terwijl
+    // het nummer nergens staat — en de companion-sync hieronder doorgaat met de
+    // OUDE waarde. De toast is die melding; een volgende save probeert het
+    // opnieuw, want de basiswaarde is niet meegeschoven.
+    if (assetId && accountNumberToWrite !== undefined) {
+      let rekeningnummerFout: string | null = null
+      try {
+        const res = await fetch('/api/assets/account-number', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: assetId, iban: accountNumberToWrite }),
+        })
+        if (!res.ok) {
+          const data = await res.json().catch(() => null)
+          rekeningnummerFout = String(data?.error ?? `HTTP ${res.status}`)
+        }
+      } catch (e) {
+        rekeningnummerFout = e instanceof Error ? e.message : 'Onbekende fout'
+      }
+      if (rekeningnummerFout) {
+        console.error('[assets-client] rekeningnummer opslaan mislukt:', rekeningnummerFout)
+        addToast({
+          type: 'error',
+          title: 'Rekeningnummer niet opgeslagen',
+          message: 'De rest van de bezitting is wél bewaard. Open de bezitting opnieuw en probeer het rekeningnummer nogmaals.',
+        })
+      }
     }
 
     // Create/sync/cleanup de gekoppelde bank_accounts-companion voor cash-assets,
