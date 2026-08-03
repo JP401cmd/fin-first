@@ -15,12 +15,15 @@
  * refresh = router.refresh(). Module-chrome = kern (amber); Fin-teal alleen op
  * de Fin-knop. Bedragen via <MaskedAmount>. De opzeg-flow (OpzegModal) wordt
  * hier gehost zodat zowel de rij-opzegknoppen als de sluipverbruik-CTA werken.
+ *
+ * De pagina-aanhef (kicker + titel) staat NIET meer hier maar op de server-pagina
+ * — zie perf Task 2.4 en de comment bij het cijferblok hieronder.
  */
 
 import { useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { MaskedAmount } from '@/components/app/masked-amount'
-import { PageOpening, PageOpeningFigure } from '@/components/editorial'
+import { PageOpeningFigure } from '@/components/editorial'
 import { HideInSimple } from '@/components/app/hide-in-simple'
 import { BesprekMetWillButton } from '@/components/app/chat/bespreek-met-fin-button'
 import { OpzegModal } from '@/components/app/opzeg-modal'
@@ -29,7 +32,7 @@ import {
   type RecurringItem,
 } from '@/components/fin/vaste-kosten-analyse'
 import { VasteLastenInsights } from '@/components/overview/vaste-lasten-insights'
-import { formatFreedomTimeString, formatCurrency } from '@/lib/format'
+import { formatCurrency } from '@/lib/format'
 import {
   LEVERAGE_STATUS_DOT,
   LEVERAGE_STATUS_LABEL,
@@ -112,15 +115,17 @@ export function VasteLastenClient({
 
   return (
     <div className="space-y-6">
-      {/* ── Kop: editorial aanhef (canonieke PageOpening-primitive) —
-             kicker met hairline, groot mono-hoofdcijfer, vrijheidstijd-
-             onderschrift, aandeel-stoplichtmeter + Fin. Geen gradient-kaart. ── */}
-      <PageOpening
-        kicker="Vaste lasten"
-        titleBefore="Hoeveel "
-        emphasis="vrijheid"
-        titleAfter=" ligt er maandelijks vast?"
-      >
+      {/* ── Cijferblok onder de pagina-aanhef: hairline-scheiding, groot
+             mono-hoofdcijfer, vrijheidstijd-onderschrift, aandeel-stoplichtmeter
+             + Fin. Geen gradient-kaart.
+
+             De KICKER + TITEL horen bij dit blok maar staan sinds perf Task 2.4
+             op de server-pagina (`<PageOpening>` in page.tsx): ze hebben geen
+             data nodig en zijn de LCP-kandidaat, dus ze gaan mee in de eerste
+             byte i.p.v. achter de Suspense-grens. De `space-y-3` hier is
+             dezelfde afstand die de `<PageOpening>`-header intern gaf, zodat het
+             ritme kop → hairline → cijfer ongewijzigd blijft. ── */}
+      <div className="space-y-3">
         {/* Hoofdcijfer-blok — hairline-scheiding, groot mono-cijfer, Fin rechts */}
         <div className="flex flex-wrap items-start justify-between gap-4 border-t border-[var(--border-ed)] pt-4">
           <PageOpeningFigure
@@ -161,7 +166,7 @@ export function VasteLastenClient({
         </div>
 
         {insights.hasData && <CompactMeter insights={insights} />}
-      </PageOpening>
+      </div>
 
       {/* ── De bestaande lijst (beide modi) ── */}
       <VasteKostenAnalyse
