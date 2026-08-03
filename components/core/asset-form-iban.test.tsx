@@ -43,7 +43,7 @@ import type { Asset } from '@/lib/asset-data'
  */
 
 type QueryCall = { table: string; method: string; args: unknown[] }
-type FetchCall = { url: string; body: Record<string, unknown> | null }
+type FetchCall = { url: string; httpMethod: string; body: Record<string, unknown> | null }
 
 let queryLog: QueryCall[] = []
 let fetchLog: FetchCall[] = []
@@ -141,9 +141,11 @@ function laatsteAssetUpdate(): Record<string, unknown> | undefined {
   return updates.at(-1)?.args[0] as Record<string, unknown> | undefined
 }
 
-/** Alle aanroepen van de rekeningnummer-route. */
+/** Alleen de SCHRIJF-aanroepen van de rekeningnummer-route (de GET is het nalezen). */
 function rekeningnummerAanroepen(): FetchCall[] {
-  return fetchLog.filter((f) => f.url.includes('/api/assets/account-number'))
+  return fetchLog.filter(
+    (f) => f.url.includes('/api/assets/account-number') && f.httpMethod === 'POST',
+  )
 }
 
 /** Wacht tot het formulier klaar is met opslaan (de update is weggeschreven). */
@@ -153,14 +155,19 @@ async function saveEnWacht(getActions: () => AssetEditActionsState | null) {
   await waitFor(() => expect(laatsteAssetUpdate()).toBeTruthy())
 }
 
-/** Wacht tot de nalees-fetch van het rekeningnummer is gedaan. */
+/** Wacht tot de nalees-fetch van het rekeningnummer is gedaan (GET op de route). */
 async function wachtOpNalezen() {
   await waitFor(() => {
     expect(
-      queryLog.some(
-        (q) => q.table === 'assets' && q.method === 'select' && q.args[0] === 'account_number',
+      fetchLog.some(
+        (f) => f.url.includes('/api/assets/account-number') && f.httpMethod === 'GET',
       ),
     ).toBe(true)
+  })
+  // De waarde landt in een `setIban` ná het await'en van `res.json()`; wachten
+  // tot die verwerkt is, anders vergelijkt de save tegen een lege basislijn.
+  await waitFor(() => {
+    expect(screen.queryByPlaceholderText('NL12 INGB 0001 2345 67')).not.toBeNull()
   })
 }
 
@@ -185,13 +192,28 @@ beforeEach(() => {
   fetchLog = []
   vi.stubGlobal('fetch', async (input: string | URL | Request, init?: RequestInit) => {
     const url = typeof input === 'string' ? input : input.toString()
+    const httpMethod = (init?.method ?? 'GET').toUpperCase()
     let body: Record<string, unknown> | null = null
     try {
       body = init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : null
     } catch {
       body = null
     }
-    fetchLog.push({ url, body })
+    fetchLog.push({ url, httpMethod, body })
+
+    // Het nalezen van het rekeningnummer loopt sinds de route-omzetting via GET.
+    // `pending` = de belofte lost nooit op, zodat "nummer nog onbekend" na te
+    // spelen is.
+    if (url.includes('/api/assets/account-number') && httpMethod === 'GET') {
+      if (ibanResponse.mode === 'pending') return new Promise<Response>(() => {})
+      const waarde = (ibanResponse as { value: string | null }).value
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ ok: true, accountNumber: waarde }),
+      } as unknown as Response
+    }
+
     return {
       ok: true,
       status: 200,
@@ -209,6 +231,25 @@ afterEach(() => {
 })
 
 describe('AssetForm — rekeningnummer gaat via de route, niet via de client-payload', () => {
+  it('leest het rekeningnummer via de route, nooit rechtstreeks uit de kolom', async () => {
+    ibanResponse = { mode: 'resolved', value: 'NL01BANK0000000001' }
+    queryLog = []
+    renderForm()
+    await wachtOpNalezen()
+
+    // Twee redenen dat dit niet rechtstreeks mag. PRIVACY: een directe lezing was
+    // niet op de eigen rij gescoopt, terwijl de SELECT-policy huishoud-verbreed
+    // is — bij een gedeelde bezitting kwam het rekeningnummer van de PARTNER in
+    // deze browser, en de kolomregel in check-client-data-reads.mjs ziet dat niet
+    // (het is geen `select('*')`). HOUDBAARHEID: zolang de browser de kolom
+    // LEEST, kan `assets.account_number` niet gedropt worden.
+    expect(
+      queryLog.some(
+        (q) => q.table === 'assets' && q.method === 'select' && String(q.args[0]).includes('account_number'),
+      ),
+    ).toBe(false)
+  })
+
   it('zet account_number NOOIT meer in de client-side update-payload', async () => {
     ibanResponse = { mode: 'resolved', value: 'NL01BANK0000000001' }
     queryLog = []

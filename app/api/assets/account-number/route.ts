@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
-import { accountNumberWriteColumns } from '@/lib/asset-account-number'
-import { unauthorized, notFound, serverError } from '@/lib/api/respond'
+import { accountNumberWriteColumns, resolveAssetAccountNumber } from '@/lib/asset-account-number'
+import { unauthorized, notFound, badRequest, serverError } from '@/lib/api/respond'
 import { parseBody } from '@/lib/api/parse-body'
 
 /**
@@ -60,9 +60,59 @@ import { parseBody } from '@/lib/api/parse-body'
  * Antwoord: `{ ok: true, hasAccountNumber: boolean }`.
  */
 const AccountNumberSchema = z.object({
-  id: z.string().min(1, 'id is vereist'),
+  id: z.uuid('id moet een geldig asset-id zijn'),
   iban: z.string().nullable(),
 })
+
+/**
+ * GET `/api/assets/account-number?id=<uuid>` — het rekeningnummer van één eigen
+ * bezitting, leesbaar.
+ *
+ * De lees-tegenhanger van de POST hieronder, en de reden dat die er is: het
+ * bewerkscherm las de plaintext-kolom rechtstreeks uit de browser. Twee
+ * problemen tegelijk. Ten eerste privacy — die lezing was niet op de eigen rij
+ * gescoopt, terwijl de SELECT-policy op `assets` huishoud-verbreed is, dus bij
+ * een gedeelde bezitting kwam het rekeningnummer van de PARTNER in de browser
+ * van de ander. Ten tweede houdbaarheid: zolang de browser die kolom leest, kan
+ * `assets.account_number` niet gedropt worden.
+ *
+ * Deze route lost beide op. Hij scoopt op `auth.uid()` en gaat door
+ * `resolveAssetAccountNumber`, die de ciphertext ontsleutelt wanneer de
+ * plaintext-kolom leeg is — precies het geval van een bankgekoppelde
+ * cash-bezitting, die sinds `20260802093000` UITSLUITEND versleuteld wordt
+ * aangemaakt. Bij de DROP verdwijnt de plaintext-tak binnen die ene helper en
+ * hoeft hier niets te veranderen.
+ */
+export async function GET(request: Request) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) {
+    return unauthorized()
+  }
+
+  const id = new URL(request.url).searchParams.get('id')
+  if (!id || !z.uuid().safeParse(id).success) {
+    return badRequest('id ontbreekt of is geen geldig asset-id')
+  }
+
+  const { data, error } = await supabase
+    .from('assets')
+    .select('account_number, account_number_encrypted')
+    .eq('id', id)
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (error) {
+    return serverError(error, 'assets-account-number:GET')
+  }
+  if (!data) {
+    return notFound()
+  }
+
+  return NextResponse.json({ ok: true, accountNumber: resolveAssetAccountNumber(data) })
+}
 
 export async function POST(request: Request) {
   const supabase = await createClient()

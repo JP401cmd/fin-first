@@ -39,14 +39,17 @@ beforeAll(() => {
 
 type Ketenstap = { methode: string; args: unknown[] }
 
+/** Een geldig UUID — de route eist die vorm, zodat onzin een 400 geeft i.p.v. een 500. */
+const ASSET_ID = '11111111-2222-4333-8444-555555555555'
+
 let keten: Ketenstap[] = []
 let ingelogdeGebruiker: { id: string } | null = { id: 'gebruiker-1' }
 /** Wat `.maybeSingle()` teruggeeft — `null` = rij niet gevonden of niet van mij. */
-let updateResultaat: { data: unknown; error: unknown } = { data: { id: 'asset-1' }, error: null }
+let rijResultaat: { data: unknown; error: unknown } = { data: { id: ASSET_ID }, error: null }
 
 function bouwKeten(): Record<string, unknown> {
   const doel: Record<string, unknown> = {
-    maybeSingle: async () => updateResultaat,
+    maybeSingle: async () => rijResultaat,
   }
   return new Proxy(doel, {
     get(t, prop: string) {
@@ -69,7 +72,7 @@ vi.mock('@/lib/supabase/server', () => ({
   }),
 }))
 
-import { POST } from './route'
+import { POST, GET } from './route'
 
 function verzoek(body: unknown): Request {
   return new Request('http://localhost/api/assets/account-number', {
@@ -77,6 +80,10 @@ function verzoek(body: unknown): Request {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
+}
+
+function leesVerzoek(query: string): Request {
+  return new Request(`http://localhost/api/assets/account-number${query}`)
 }
 
 /** De payload van de `update(...)`-aanroep. */
@@ -94,13 +101,13 @@ function eqFilters(): Array<[string, unknown]> {
 beforeEach(() => {
   keten = []
   ingelogdeGebruiker = { id: 'gebruiker-1' }
-  updateResultaat = { data: { id: 'asset-1' }, error: null }
+  rijResultaat = { data: { id: ASSET_ID }, error: null }
 })
 
 describe('POST /api/assets/account-number', () => {
   it('weigert zonder ingelogde gebruiker, met de app-brede 401-tekst', async () => {
     ingelogdeGebruiker = null
-    const res = await POST(verzoek({ id: 'asset-1', iban: 'NL01BANK0000000001' }))
+    const res = await POST(verzoek({ id: ASSET_ID, iban: 'NL01BANK0000000001' }))
     expect(res.status).toBe(401)
     expect(await res.json()).toMatchObject({ error: 'Niet ingelogd' })
     // En vooral: geen enkele schrijfpoging.
@@ -108,7 +115,7 @@ describe('POST /api/assets/account-number', () => {
   })
 
   it('schrijft alle drie de kolommen in één keer — ciphertext ontsleutelt terug', async () => {
-    const res = await POST(verzoek({ id: 'asset-1', iban: 'NL01BANK0000000001' }))
+    const res = await POST(verzoek({ id: ASSET_ID, iban: 'NL01BANK0000000001' }))
     expect(res.status).toBe(200)
 
     const payload = updatePayload()!
@@ -125,7 +132,7 @@ describe('POST /api/assets/account-number', () => {
   })
 
   it('wist alle drie de kolommen bij een lege waarde', async () => {
-    await POST(verzoek({ id: 'asset-1', iban: '' }))
+    await POST(verzoek({ id: ASSET_ID, iban: '' }))
     expect(updatePayload()).toEqual({
       account_number: null,
       account_number_encrypted: null,
@@ -133,7 +140,7 @@ describe('POST /api/assets/account-number', () => {
     })
 
     keten = []
-    await POST(verzoek({ id: 'asset-1', iban: null }))
+    await POST(verzoek({ id: ASSET_ID, iban: null }))
     expect(updatePayload()).toEqual({
       account_number: null,
       account_number_encrypted: null,
@@ -142,16 +149,16 @@ describe('POST /api/assets/account-number', () => {
   })
 
   it('scoopt de update op de eigen rij, niet alleen op het id', async () => {
-    await POST(verzoek({ id: 'asset-1', iban: 'NL01BANK0000000001' }))
+    await POST(verzoek({ id: ASSET_ID, iban: 'NL01BANK0000000001' }))
     const filters = eqFilters()
-    expect(filters).toContainEqual(['id', 'asset-1'])
+    expect(filters).toContainEqual(['id', ASSET_ID])
     // Zonder dit filter kan een gedeelde bezitting van de partner geraakt worden.
     expect(filters).toContainEqual(['user_id', 'gebruiker-1'])
   })
 
   it('geeft 404 wanneer de rij niet bestaat of niet van deze gebruiker is', async () => {
-    updateResultaat = { data: null, error: null }
-    const res = await POST(verzoek({ id: 'van-iemand-anders', iban: 'NL01BANK0000000001' }))
+    rijResultaat = { data: null, error: null }
+    const res = await POST(verzoek({ id: '99999999-2222-4333-8444-555555555555', iban: 'NL01BANK0000000001' }))
     // Niet 200: een update die nul rijen raakt is geen succes.
     expect(res.status).toBe(404)
   })
@@ -160,5 +167,53 @@ describe('POST /api/assets/account-number', () => {
     const res = await POST(verzoek({ iban: 'NL01BANK0000000001' }))
     expect(res.status).toBe(400)
     expect(keten.some((s) => s.methode === 'update')).toBe(false)
+  })
+})
+
+describe('GET /api/assets/account-number', () => {
+  it('weigert zonder ingelogde gebruiker', async () => {
+    ingelogdeGebruiker = null
+    const res = await GET(leesVerzoek(`?id=${ASSET_ID}`))
+    expect(res.status).toBe(401)
+    expect(keten.some((s) => s.methode === 'select')).toBe(false)
+  })
+
+  it('weigert een ontbrekend of ongeldig id met 400, niet met een 500', async () => {
+    expect((await GET(leesVerzoek(''))).status).toBe(400)
+    keten = []
+    // Zonder de vormcontrole zou dit een Postgres-castfout worden → 500.
+    expect((await GET(leesVerzoek('?id=geen-uuid'))).status).toBe(400)
+    expect(keten.some((s) => s.methode === 'select')).toBe(false)
+  })
+
+  it('scoopt de lezing op de eigen rij', async () => {
+    rijResultaat = { data: { account_number: 'NL01BANK0000000001', account_number_encrypted: null }, error: null }
+    await GET(leesVerzoek(`?id=${ASSET_ID}`))
+    const filters = eqFilters()
+    expect(filters).toContainEqual(['id', ASSET_ID])
+    // Dít is de reden dat de lezing hierheen verhuisde: rechtstreeks vanuit de
+    // browser was hij ongescoopt, en de SELECT-policy is huishoud-verbreed.
+    expect(filters).toContainEqual(['user_id', 'gebruiker-1'])
+  })
+
+  it('ontsleutelt wanneer alleen de ciphertext gevuld is — het bankgekoppelde geval', async () => {
+    // Sinds `20260802093000` maakt de auto-link-trigger een cash-bezitting aan
+    // met UITSLUITEND ciphertext. Las het scherm alleen de plaintext-kolom, dan
+    // kwam zo'n rekening binnen als "geen rekeningnummer".
+    const { accountNumberWriteColumns } = await import('@/lib/asset-account-number')
+    const kolommen = accountNumberWriteColumns('NL99BANK0000000009')
+    rijResultaat = {
+      data: { account_number: null, account_number_encrypted: kolommen.account_number_encrypted },
+      error: null,
+    }
+    const res = await GET(leesVerzoek(`?id=${ASSET_ID}`))
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({ accountNumber: 'NL99BANK0000000009' })
+  })
+
+  it('geeft 404 wanneer de rij niet bestaat of niet van deze gebruiker is', async () => {
+    rijResultaat = { data: null, error: null }
+    const res = await GET(leesVerzoek('?id=99999999-2222-4333-8444-555555555555'))
+    expect(res.status).toBe(404)
   })
 })

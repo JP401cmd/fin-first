@@ -160,15 +160,6 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
     reviewedAt: '2026-07-30',
   },
   {
-    id: 'assetform-leest-plaintext-account-number-ongescoopt',
-    title: 'AssetForm leest het plaintext rekeningnummer nog client-side, en niet op de eigen rij',
-    detail:
-      'HET SCHRIJF-GAT IS DICHT (3 aug 2026). `components/core/assets-client.tsx` (AssetForm) schreef een bewerkte cash-bezitting rechtstreeks via de browser-supabase-client weg en zette daarbij ALLEEN `account_number` — versleutelen kan in de browser niet, `ENCRYPTION_KEY_V1` is server-only. Dat gaat nu via `POST /api/assets/account-number`, die alle drie de kolommen in één keer zet met `accountNumberWriteColumns()`. Daarmee is er geen browser-schrijver van deze kolom meer, kan de ciphertext niet meer verouderen, en is de DROP van `assets.account_number` aan de schrijfkant vrij (ADR 0077). De eerder in dit punt genoemde meting "2 van 33 rijen met plaintext zonder ciphertext" is bij nameting NIET reproduceerbaar: op 3 aug dragen 14 van de 33 actieve cash-bezittingen een nummer, alle 14 mét ciphertext, nul drift. WAT RESTEERT is de LEESKANT, en die is scherper dan gedacht: dezelfde vorm doet een nalees-fetch `select(\'account_number\').eq(\'id\', asset.id)` ZONDER `.eq(\'user_id\', …)`. De SELECT-policy op `assets` is huishoud-verbreed, dus bij een gedeelde bezitting levert die fetch het plaintext rekeningnummer van de PARTNER in de browser van de ander. Inhoudelijk is een gedeelde bezitting gedeeld, maar het is precies het scenario dat scripts/check-client-data-reads.mjs als zwaarstwegend benoemt — en die gate ziet het niet, want het is geen `select(\'*\')`. Uitweg: scope de fetch op de ingelogde gebruiker, of haal de waarde via een route. Zolang dit leespad bestaat is de DROP nog niet vrij: de kolom wordt dan nog gelezen. Verwijder dit punt zodra die fetch weg of eigenaar-gescoopt is.',
-    severity: 'risk',
-    elementIds: ['as-vermogen', 't-supabase'],
-    reviewedAt: '2026-08-02',
-  },
-  {
     id: 'idx-transactions-user-date-drift-remote',
     title: 'idx_transactions_user_date staat in de repo maar niet op remote',
     detail:

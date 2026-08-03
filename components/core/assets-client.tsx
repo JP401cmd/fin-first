@@ -2958,21 +2958,39 @@ export function AssetForm({
   useEffect(() => {
     if (iban !== null || !asset || asset.asset_type !== 'cash') return
     let cancelled = false
-    const supabase = createClient()
-    void supabase
-      .from('assets')
-      .select('account_number')
-      .eq('id', asset.id)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (cancelled || !data) return
-        const uitDatabase = (data.account_number as string | null) ?? ''
+    void (async () => {
+      // Via de route, niet rechtstreeks. Twee redenen, allebei hard.
+      //
+      // PRIVACY: een directe lezing hier was niet op de eigen rij gescoopt,
+      // terwijl de SELECT-policy op `assets` HUISHOUD-VERBREED is (eigen rijen
+      // OF `ownership = 'shared'` binnen het huishouden). Bij een gedeelde
+      // bezitting belandde daardoor het rekeningnummer van de PARTNER in deze
+      // browser. `scripts/check-client-data-reads.mjs` vangt dat niet — het is
+      // geen `select('*')`, dus de kolomregel kijkt er langs.
+      //
+      // HOUDBAARHEID: zolang de browser `account_number` LEEST, kan die kolom
+      // niet gedropt worden. De route gaat door `resolveAssetAccountNumber` en
+      // ontsleutelt dus óók een bankgekoppelde bezitting, die sinds
+      // `20260802093000` uitsluitend versleuteld wordt aangemaakt en hier
+      // voorheen als "geen rekeningnummer" binnenkwam.
+      //
+      // Faalt de aanroep, dan blijft `iban` `null` en wordt er niets
+      // weggeschreven — geen stille wissing.
+      try {
+        const res = await fetch(`/api/assets/account-number?id=${encodeURIComponent(asset.id)}`)
+        if (cancelled || !res.ok) return
+        const data = (await res.json()) as { accountNumber?: string | null }
+        if (cancelled) return
+        const uitDatabase = data.accountNumber ?? ''
         // Óók bijwerken wanneer de gebruiker intussen zelf iets getypt heeft:
         // dit is en blijft de waarde die in de database stond, en dus de enige
         // juiste vergelijkingsbasis voor "heeft de gebruiker dit veld gewijzigd?".
         ibanBaselineRef.current = uitDatabase
         setIban((prev) => (prev === null ? uitDatabase : prev))
-      })
+      } catch {
+        /* laat `iban` null: liever geen waarde dan een verkeerde basislijn */
+      }
+    })()
     return () => {
       cancelled = true
     }
