@@ -18,7 +18,13 @@ import { getServiceClient } from '@/lib/supabase/service'
 
 // ── Feature-labels (voor /beheer/ai-verbruik) ───────────────────────────────
 
-export const AI_TOKEN_FEATURE_LABELS: Record<string, string> = {
+// `as const` (niet Record<string, string>) zodat de sleutels een echte union
+// vormen: `AiTokenFeature`. Die union is de bron van de exhaustiviteit in
+// lib/ai/execution-groups.ts — een nieuwe feature-string hier geeft daar een
+// compile-fout tot hij in een uitvoergroep is ingedeeld (en dus tot duidelijk
+// is of hij lokaal kan draaien). Zonder die koppeling zou een nieuwe AI-functie
+// stil buiten de privé-modus-keuze vallen: precies de val die dit fundament dicht.
+export const AI_TOKEN_FEATURE_LABELS = {
   chat: 'Fin-chat',
   briefing: 'Briefing',
   aanbevelingen: 'Aanbevelingen',
@@ -37,10 +43,19 @@ export const AI_TOKEN_FEATURE_LABELS: Record<string, string> = {
   rekenhulp_bouwen: 'Rekenhulp bouwen',
   scherm_publicatie: 'Schermpublicatie (beheer)',
   whatif_suggesties: 'What-if-suggesties',
-}
+} as const satisfies Record<string, string>
+
+/** Elke feature-string die aan `getModel(supabase, feature)` wordt meegegeven. */
+export type AiTokenFeature = keyof typeof AI_TOKEN_FEATURE_LABELS
+
+/** Alle bekende feature-strings — stabiele volgorde voor UI en tests. */
+export const AI_TOKEN_FEATURES = Object.keys(AI_TOKEN_FEATURE_LABELS) as AiTokenFeature[]
 
 export function tokenFeatureLabel(key: string): string {
-  return AI_TOKEN_FEATURE_LABELS[key] ?? key
+  // Bewust `string` in de signatuur: `ai_token_usage` kan historische rijen
+  // bevatten met een feature die intussen hernoemd/verwijderd is — die tonen we
+  // als de rauwe sleutel i.p.v. de rij te laten verdwijnen.
+  return (AI_TOKEN_FEATURE_LABELS as Record<string, string>)[key] ?? key
 }
 
 // ── Loggen ──────────────────────────────────────────────────────────────────

@@ -120,10 +120,14 @@ describe('POST /api/ai/categorize — privé-modus-gate', () => {
     const res = await POST(postRequest({ transactions: TX }))
 
     expect(res.status).toBe(403)
-    expect(await res.json()).toEqual({
-      error: 'Privé-modus actief: categorisatie draait lokaal op je apparaat.',
-      code: 'privacy_mode_active',
-    })
+    // De melding komt sinds ADR 0078 uit de gedeelde helper en noemt de GROEP,
+    // niet de losse functie — dat is ook wat de gebruiker op /mijn/privacy ziet
+    // staan en dus moet aanpassen. De foutcode blijft ongewijzigd, want daar
+    // herkent de client de privé-blokkade aan.
+    const body = (await res.json()) as { error: string; code?: string }
+    expect(body.code).toBe('privacy_mode_active')
+    expect(body.error).toContain('Privé-modus actief')
+    expect(body.error.toLowerCase()).toContain('transacties')
     // Volgorde-bewijs: privé-modus blokkeert vóór tier/credit/model.
     expect(mockCheckTierGate).not.toHaveBeenCalled()
     expect(mockCheckCreditBudget).not.toHaveBeenCalled()

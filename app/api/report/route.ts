@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
-import { unauthorized, forbidden, serverError } from '@/lib/api/respond'
+import { unauthorized, forbidden, serverError, errorResponse } from '@/lib/api/respond'
+import { isCloudAllowed, PRIVACY_GATE_CODE } from '@/lib/ai/privacy-gate'
 import { recordAiUsage } from '@/lib/ai-credits'
 import { computeFireProjection, type FinancialInput } from '@/lib/horizon-data'
 import { computeNetWorthProjection } from '@/lib/net-worth-projection'
@@ -108,7 +109,32 @@ export async function GET(request: Request) {
     const dateFrom = url.searchParams.get('date_from')
     const dateTo = url.searchParams.get('date_to')
     const configId = url.searchParams.get('config_id')
-    const useAi = url.searchParams.get('use_ai') !== 'false'
+    const useAiParam = url.searchParams.get('use_ai')
+    let useAi = useAiParam !== 'false'
+
+    // PRIVÉ-MODUS — hier bewust GEEN kale 403, anders dan bij de andere
+    // AI-routes. Dit rapport is namelijk voor het overgrote deel
+    // DETERMINISTISCH: alleen de inleiding komt van het model. Die hele pagina
+    // blokkeren omdat één alinea lokaal hoort te draaien, zou de gebruiker zijn
+    // eigen cijfers afnemen. Dus:
+    //   - staat 'rapporten' op lokaal → we slaan de AI-inleiding over en leveren
+    //     het volledige rapport zonder; de browser schrijft die inleiding daarna
+    //     zelf on-device (progressive enhancement);
+    //   - vraagt iemand EXPLICIET om `use_ai=true` terwijl de groep lokaal staat
+    //     → dat is een expliciet cloud-verzoek en krijgt wél een eerlijke 403.
+    // In beide gevallen bereikt er geen enkel gegeven een AI-leverancier: dat is
+    // de belofte, en `useAi = false` schakelt het modelblok verderop volledig uit.
+    const cloudAllowed = await isCloudAllowed(supabase, user.id, 'rapporten')
+    if (!cloudAllowed) {
+      if (useAiParam === 'true') {
+        return errorResponse(
+          'Privé-modus actief: de inleiding van je rapport wordt op je eigen apparaat geschreven.',
+          403,
+          PRIVACY_GATE_CODE,
+        )
+      }
+      useAi = false
+    }
 
     if (!dateFrom || !dateTo) {
       return Response.json({ error: 'date_from en date_to zijn verplicht' }, { status: 400 })

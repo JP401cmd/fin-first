@@ -13,7 +13,7 @@ import {
   Send, Loader2, Check, Calendar, Target, Clock, Plus, ShieldCheck,
 } from 'lucide-react'
 import { MaskedAmount } from '@/components/app/masked-amount'
-import { usePrivacyMode } from '@/components/app/use-privacy-mode'
+import { useExecutionMode } from '@/lib/ai/local/use-execution-mode'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -221,13 +221,33 @@ export function WhatIfChat({ onAddEvent, scenarioContext }: WhatIfChatProps) {
 
   const isStreaming = status === 'streaming' || status === 'submitted'
 
+  // ── Waar mag dit gesprek draaien? ─────────────────────────────────────────
+  //
   // De WhatIfChat houdt bewust zijn eigen cloud-transport (architect-bevestigd:
-  // valt buiten de lokale overname). Consistent met "privacy aan = geen
-  // cloud-fallback" sturen we in privé-modus GEEN scenario naar de cloud: het
-  // oppervlak wordt eerlijk geblokkeerd (invoer uit + blokkeer-melding) i.p.v.
-  // stil te falen op een server-403.
-  const privacyMode = usePrivacyMode()
-  const isBlockedByPrivacy = privacyMode === true
+  // valt buiten de lokale overname). Consistent met "lokaal gekozen = geen
+  // cloud-fallback" sturen we dan GEEN scenario naar de cloud: het oppervlak
+  // wordt eerlijk geblokkeerd (invoer uit + melding) i.p.v. stil te falen op een
+  // server-403.
+  //
+  // Dit las eerder `usePrivacyMode()` — maar dat is per eigen documentatie een
+  // COSMETISCHE, per-proces gecachte singleton voor labels, en hij kent alleen de
+  // hoofdschakelaar. Een override op de groep 'gesprek' deed hier dus niets, en
+  // een nog-lopende lezing (null) liet de invoer gewoon open staan: precies het
+  // venster waarin er alsnog een cloud-aanroep kon vertrekken.
+  //
+  // FAIL-CLOSED via `canUseCloud` — nooit een eigen vergelijking op `status`:
+  // alleen een expliciet cloud-groen licht opent de invoer. 'resolving',
+  // 'lokaal' en 'blocked' blokkeren alle drie.
+  const exec = useExecutionMode('gesprek')
+  const canSend = exec.canUseCloud
+
+  const blockNotice: string | null = canSend
+    ? null
+    : exec.status === 'lokaal'
+      ? 'Je gesprekken met Fin draaien op je eigen toestel. Wat-als bespreken kan daar nog niet — zet de groep “Gesprek met Fin” op /mijn/privacy op de cloud om je scenario met Fin te bespreken.'
+      : exec.status === 'blocked'
+        ? (exec.message ?? 'Lokale AI is nu niet beschikbaar op dit toestel.')
+        : 'Even kijken waar dit gesprek mag draaien…'
 
   // Detect if last AI message used suggestAction → planner mode active
   const isPlannerMode = useMemo(() => {
@@ -266,10 +286,10 @@ export function WhatIfChat({ onAddEvent, scenarioContext }: WhatIfChatProps) {
 
   const submit = useCallback(() => {
     const text = input.trim()
-    if (!text || isStreaming || isBlockedByPrivacy) return
+    if (!text || isStreaming || !canSend) return
     setInput('')
     sendMessage({ text })
-  }, [input, isStreaming, isBlockedByPrivacy, sendMessage])
+  }, [input, isStreaming, canSend, sendMessage])
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -430,16 +450,13 @@ export function WhatIfChat({ onAddEvent, scenarioContext }: WhatIfChatProps) {
         </div>
       </div>
 
-      {/* Fail-closed in privé-modus: wat-als gaat NIET naar de cloud — eerlijk
-          geblokkeerd i.p.v. een stille cloud-belofte. */}
-      {isBlockedByPrivacy && (
-        <div className="border-b border-[var(--border-ed)] bg-horizon-50/60 px-4 py-2.5">
+      {/* Fail-closed: zonder cloud-groen licht gaat wat-als NIET naar de cloud —
+          eerlijk geblokkeerd i.p.v. een stille cloud-belofte. */}
+      {blockNotice && (
+        <div className="border-b border-[var(--border-ed)] bg-horizon-50/60 px-4 py-2.5" role="status">
           <div className="flex items-start gap-2">
             <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-horizon-600" aria-hidden="true" />
-            <p className="text-[11px] leading-relaxed text-[var(--ink-2)]">
-              Wat-als met Fin is niet beschikbaar in privé-modus — zet privé-modus
-              uit om je scenario met Fin te bespreken.
-            </p>
+            <p className="text-[11px] leading-relaxed text-[var(--ink-2)]">{blockNotice}</p>
           </div>
         </div>
       )}
@@ -517,15 +534,15 @@ export function WhatIfChat({ onAddEvent, scenarioContext }: WhatIfChatProps) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={onKeyDown}
-            disabled={isBlockedByPrivacy}
-            placeholder={isBlockedByPrivacy ? 'Privé-modus staat aan' : 'Wat zijn je dromen?'}
+            disabled={!canSend}
+            placeholder={canSend ? 'Wat zijn je dromen?' : 'Niet beschikbaar'}
             rows={1}
             className="max-h-20 flex-1 resize-none rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2 text-sm outline-none placeholder:text-[var(--ink-3)] focus:border-[var(--border-md)] focus:ring-1 focus:ring-zinc-200 disabled:cursor-not-allowed disabled:opacity-60"
           />
           <button
             type="button"
             onClick={submit}
-            disabled={isStreaming || !input.trim() || isBlockedByPrivacy}
+            disabled={isStreaming || !input.trim() || !canSend}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--r-lg)] bg-horizon-600 text-white transition-colors hover:bg-horizon-700 disabled:bg-zinc-300 disabled:text-[var(--ink-3)]"
           >
             <Send className="h-4 w-4" />

@@ -47,9 +47,19 @@ import {
 
 export type ReviewMode = 'onboarding-collect' | 'direct-import'
 
+/**
+ * Waar komt deze samenvatting vandaan? Bepaalt of de review-stap een extra
+ * waarschuwing toont. Het lokale model (Gemma 4 E2B on-device) is aantoonbaar
+ * zwakker dan het cloud-model, en dat hoort de gebruiker te weten vóór hij op
+ * "klopt zo" klikt — niet ná de import.
+ */
+export type ExtractionHerkomst = 'cloud' | 'lokaal' | 'handmatig'
+
 interface ReviewStepProps {
   extraction: AangifteExtractionResult
   mode: ReviewMode
+  /** Default 'cloud' — bestaande aanroepers blijven werken. */
+  herkomst?: ExtractionHerkomst
   onSuccess: (payload: { assetIds: string[]; debtIds: string[]; collected?: { assets: AangifteAssetReviewItem[]; debts: AangifteDebtReviewItem[]; profileUpdates: AangifteProfileUpdates } }) => void
   onCancel: () => void
 }
@@ -139,7 +149,7 @@ function parseAmount(value: string): number | null {
 
 // ── Component ─────────────────────────────────────────────────────
 
-export function ReviewStep({ extraction, mode, onSuccess, onCancel }: ReviewStepProps) {
+export function ReviewStep({ extraction, mode, herkomst = 'cloud', onSuccess, onCancel }: ReviewStepProps) {
   // Initial state vanuit de extractie. Elke rij krijgt een UID en `confirmed=false`.
   const [assets, setAssets] = useState<AssetReviewState[]>(() =>
     extraction.assets.map((a, i) => ({
@@ -454,6 +464,21 @@ export function ReviewStep({ extraction, mode, onSuccess, onCancel }: ReviewStep
           <em className="font-serif italic font-normal text-[var(--color-kern-700)]">samenvatting</em>?
         </h2>
       </div>
+
+      {/* Lokale extractie is minder zeker dan de cloud-variant — dat hoort hier
+          te staan, vóór de gebruiker bevestigt. Elk getoond bedrag stond
+          letterlijk in de aangifte (bedrag-grounding, lib/aangifte/local/
+          grounding.ts), maar of het bij de júiste rij hoort, is aan de lezer. */}
+      {herkomst === 'lokaal' && (
+        <p
+          role="note"
+          className="border border-[var(--border-ed)] border-l-4 border-l-[var(--color-kern-500)] bg-[var(--subtle)] px-3 py-2 text-xs text-[var(--ink-2)] leading-relaxed"
+        >
+          Deze samenvatting is op je eigen apparaat gemaakt. Dat model is kleiner dan het model in de cloud, dus reken
+          erop dat er een rij mist of verkeerd is ingedeeld. Bedragen zijn letterlijk uit je aangifte overgenomen —
+          loop ze wel even na.
+        </p>
+      )}
 
       <PeildatumBanner taxYear={extraction.tax_year} peildatum={extraction.peildatum} monthsOld={monthsOld} />
 

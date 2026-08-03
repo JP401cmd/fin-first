@@ -2,8 +2,9 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Info } from 'lucide-react'
+import { Info, TriangleAlert } from 'lucide-react'
 import { suggestPublicDefault } from '@/lib/calculator/suggest-public-default'
+import { screenPublishDeterministic } from '@/lib/ai/screen-publish-deterministic'
 import type {
   CustomCalculatorRow,
   CalculatorInput,
@@ -86,6 +87,27 @@ export function PublishCurationSheet({
     }
     return out
   }, [inputs])
+
+  // Deterministische pre-screen — draait hier in de browser, vóór de fetch, en
+  // kost niets (pure functie, geen AI, geen egress). Doel is puur UX: laten zien
+  // wat er vrijwel zeker gaat opvallen, zodat de auteur het kan oplossen zonder
+  // eerst een afwijzing van de server op te halen.
+  //
+  // DIT IS GEEN POORT. De beslissing valt op de server
+  // (`/api/calculators/publish` → `screenPublishMetadata`): het inhoudelijke
+  // advies-vs-educatie-oordeel is een taaloordeel dat geen regex velt, en een
+  // browser-oordeel is sowieso niet afdwingbaar. Daarom blokkeren we de knop
+  // hier NIET en beloven we bij "geen opmerkingen" ook niets — er staat dan
+  // gewoon niets, in plaats van een groen vinkje dat zou liegen.
+  const preScreen = useMemo(
+    () =>
+      screenPublishDeterministic({
+        name: calculator.name,
+        description: calculator.description,
+        assumptions: calculator.definition.assumptions ?? [],
+      }),
+    [calculator.name, calculator.description, calculator.definition.assumptions],
+  )
 
   const [defaults, setDefaults] = useState<Record<string, number>>(initialDefaults)
   const [prefillOverrides, setPrefillOverrides] = useState<Record<string, boolean>>(initialPrefill)
@@ -172,6 +194,31 @@ export function PublishCurationSheet({
           >
             {error}
           </div>
+        )}
+
+        {!preScreen.ok && (
+          <section className="mb-4 rounded-xl border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-3">
+            <h3 className="flex items-center gap-1.5 text-xs font-semibold text-[var(--ink)] mb-2">
+              <TriangleAlert className="w-3.5 h-3.5 text-[var(--ink-3)]" aria-hidden="true" />
+              Dit valt straks waarschijnlijk op
+            </h3>
+            <ul className="space-y-2">
+              {preScreen.findings.map((f) => (
+                <li key={`${f.soort}-${f.veld}-${f.treffer}`} className="text-[11px] leading-snug">
+                  <span className="text-[var(--ink-2)]">{f.issue}</span>
+                  {f.suggestion && (
+                    <span className="block text-[var(--ink-3)] mt-0.5">{f.suggestion}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2.5 border-t border-[var(--border-ed)] pt-2 text-[10px] text-[var(--ink-3)] leading-snug">
+              Dit is een snelle controle op bedragen, aanbieders en advies-taal.
+              De inhoudelijke toets — educatieve rekenhulp of financieel advies —
+              gebeurt bij het publiceren op onze server, en die kan ook zónder
+              bovenstaande punten nog opmerkingen hebben.
+            </p>
+          </section>
         )}
 
         <ul className="space-y-3">

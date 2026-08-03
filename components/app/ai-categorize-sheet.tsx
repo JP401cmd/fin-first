@@ -22,9 +22,7 @@ import {
 } from '@/lib/auto-categorize'
 import { buildBudgetOptions, type BudgetRow } from '@/lib/ai/categorize-budget-options'
 import { createLocalAiResolver, LOCAL_REP_BATCH_SIZE } from '@/lib/ai/local/local-categorize-resolver'
-import { checkLocalAiCapability } from '@/lib/ai/local/webgpu-capability'
-import { getLocalModelState } from '@/lib/ai/local/model-manager'
-import { resolveLocalReadiness, type LocalReadiness } from '@/lib/ai/local/local-readiness'
+import { useExecutionMode } from '@/lib/ai/local/use-execution-mode'
 import { createPrefetchGate, LOCAL_PREFETCH_WINDOW, type PrefetchGate } from '@/lib/categorize/wizard-gate'
 import { CategorizeWizard } from '@/components/app/categorize-wizard'
 import {
@@ -150,9 +148,25 @@ export function AICategorizeSheet({
   const [ruleCount, setRuleCount] = useState(0)
   const [bulkUpdated, setBulkUpdated] = useState(0)
   const [bulkApplyPrompt, setBulkApplyPrompt] = useState<BulkApplyPrompt | null>(null)
-  // Privé-modus: draait de AI-fase on-device (Gemma 4 E2B/WebGPU) i.p.v. cloud.
-  // Alleen een UI-hint-vlag ("experimenteel — lokaal op dit apparaat"); de
-  // resolver-keuze zelf gebeurt in fetchSuggestions op basis van profiles.privacy_mode.
+  // ── Waar draait de AI-fase? ───────────────────────────────────────────────
+  //
+  // Eén hook beslist het (lib/ai/local/use-execution-mode.ts) volgens de
+  // canonieke regel van ADR 0078: een per-groep-override op /mijn/privacy wint
+  // van de hoofdschakelaar. Deze sheet las eerder rechtstreeks
+  // `profiles.privacy_mode`, waardoor een override op "Transacties & vaste
+  // lasten" niets deed — de schakelaar was decoratief.
+  //
+  // FAIL-CLOSED: we lezen `canUseCloud`/`canUseLocal`, nooit een eigen
+  // vergelijking op `status`. In 'resolving' en 'blocked' zijn beide false en
+  // vertrekt er dus geen enkele AI-aanroep — ook niet "even via de cloud".
+  //
+  // Geen `active`-vlag: de sheet wordt door al zijn callers pas GEMOUNT wanneer
+  // de gebruiker 'm opent (budgets-client, cash-account-view, import-pagina),
+  // dus gemount === open.
+  const exec = useExecutionMode('transacties')
+  // UI-hint-vlag voor de wizard ("experimenteel — lokaal op dit apparaat").
+  // Gezet bij de start van de AI-fase, zodat het label bij de daadwerkelijk
+  // gebruikte resolver hoort en niet halverwege omklapt.
   const [localMode, setLocalMode] = useState(false)
   // Sessiestart-feedback voor het lokale pad: de eerste GPU-warmup is ~45-60s
   // volledig stil; 'starten' toont een geruststellende regel zodat het niet als
@@ -441,78 +455,59 @@ export function AICategorizeSheet({
       }))
     }
 
-    // ── Privé-modus: kies de lokale on-device resolver i.p.v. de cloud ────────
-    // We lezen profiles.privacy_mode client-side op de lichtste manier: één
-    // own-row scalar-select bij het starten van de AI-fase (RLS dekt de rij;
-    // nooit service-role — spiegelt app/api/display-mode). Dit is de plek waar de
-    // keuze telt: categorisatie is de enige functie die privé-modus in scope A
-    // raakt (ADR 0043). Categorisatie is fail-closed: nooit een stille cloud-
-    // fallback bij privacy_mode=true.
-    const supabase = createClient()
+    // ── Bestemming van de AI-fase: cloud of on-device ─────────────────────────
+    // De keuze komt van `useExecutionMode('transacties')` (zie de hook-aanroep
+    // bovenin): override wint van de hoofdschakelaar, en de gereedheid van dít
+    // toestel (capability-flap vs. geëvicteerd model) zit daar al in verwerkt —
+    // de concrete melding staat in `exec.message`.
     let aiResolver = cloudResolver
     let aiBatchSize: number | undefined
-    let localNotReady = false
-    // Gescheiden gereedheidsoordeel (capability-flap vs. geëvicteerd model); de
-    // concrete melding hangt hieraan en wordt hieronder in aiError getoond.
-    let readiness: LocalReadiness | null = null
-    let privacyMode = false
-    {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        const { data: profileRow } = await supabase
-          .from('profiles')
-          .select('privacy_mode')
-          .eq('id', user.id)
-          .maybeSingle()
-        privacyMode = (profileRow as { privacy_mode?: boolean | null } | null)?.privacy_mode ?? false
-      }
-    }
-    setLocalMode(privacyMode)
+    // Geen bestemming waar iets naartoe MAG: 'blocked' (lokaal gekozen, toestel
+    // kan het niet) of 'resolving' (voorkeur nog niet gelezen). In beide gevallen
+    // draait de gratis regelmotor gewoon door, maar vertrekt er geen AI-aanroep.
+    let aiBlocked = false
+    let aiBlockedMessage: string | null = null
+    setLocalMode(exec.canUseLocal)
 
-    if (privacyMode) {
-      // Toestelgeschiktheid + modelstaat via één helper die de twee heel
-      // verschillende oorzaken SCHEIDT (ADR 0043-bugfix): een (mogelijk
-      // transiënte) capability-flap vs. een uit de cache geëvicteerd model. Elk
-      // krijgt een eigen, concrete melding i.p.v. één generieke tekst. Niet klaar
-      // → blokkeer de AI-fase eerlijk; de regel-/transfer-/spiegelvoorstellen
-      // (stap 1) blijven werken.
-      const [cap, modelState] = await Promise.all([checkLocalAiCapability(), getLocalModelState()])
-      readiness = resolveLocalReadiness(cap, modelState)
-      if (!readiness.ready) {
-        localNotReady = true
-        // Elke batch laten falen → de bestaande failedBatches-flow vangt het op;
-        // NOOIT een stille cloud-fallback (privacy fail-closed, FR-3.6).
-        aiResolver = async () => {
-          throw new Error('lokale-ai-niet-beschikbaar')
-        }
-      } else {
-        // Lokale opties mét budget_id via dezelfde leaf/slug-logica als het
-        // cloud-pad (buildBudgetOptions), zodat de resolver de teruggegeven slug
-        // naar een budget_id kan mappen.
-        const rows: BudgetRow[] = flatBudgets.map((b) => ({
-          id: b.id,
-          parent_id: b.parent_id,
-          name: b.name,
-          slug: b.slug,
-          budget_type: b.budget_type,
-          description: b.description,
-          ownership: b.ownership,
-        }))
-        const { options, slugToId } = buildBudgetOptions(rows)
-        const localOptions = options.map((o) => ({ ...o, id: slugToId.get(o.slug) ?? null }))
-        // onSessionState voedt de "wordt gestart…"-regel tijdens de stille
-        // GPU-warmup van de eerste chunk (zie localSessionState).
-        aiResolver = createLocalAiResolver(localOptions, {
-          onSessionState: (s) => setLocalSessionState(s),
-        })
-        // Lokaal pad: kleine groep-rondes (LOCAL_REP_BATCH_SIZE) + prefetch-gate
-        // (LOCAL_PREFETCH_WINDOW) zodat de wizard voorstellen krijgt zodra ze klaar
-        // zijn, zonder de hele batch vooruit te draaien. Cloud houdt de default (20
-        // groepen, geen gate). INVARIANT: aiBatchSize === repBatchSize (== de
-        // wizard-`repBatchSize`, LOCAL_REP_BATCH_SIZE) — de gate rekent rondes ↔
-        // getoonde groepen om via dat gelijke getal (zie wizard-gate.ts).
-        aiBatchSize = LOCAL_REP_BATCH_SIZE
-        gateRef.current = createPrefetchGate(LOCAL_PREFETCH_WINDOW)
+    if (exec.canUseLocal) {
+      // Lokale opties mét budget_id via dezelfde leaf/slug-logica als het
+      // cloud-pad (buildBudgetOptions), zodat de resolver de teruggegeven slug
+      // naar een budget_id kan mappen.
+      const rows: BudgetRow[] = flatBudgets.map((b) => ({
+        id: b.id,
+        parent_id: b.parent_id,
+        name: b.name,
+        slug: b.slug,
+        budget_type: b.budget_type,
+        description: b.description,
+        ownership: b.ownership,
+      }))
+      const { options, slugToId } = buildBudgetOptions(rows)
+      const localOptions = options.map((o) => ({ ...o, id: slugToId.get(o.slug) ?? null }))
+      // onSessionState voedt de "wordt gestart…"-regel tijdens de stille
+      // GPU-warmup van de eerste chunk (zie localSessionState).
+      aiResolver = createLocalAiResolver(localOptions, {
+        onSessionState: (s) => setLocalSessionState(s),
+      })
+      // Lokaal pad: kleine groep-rondes (LOCAL_REP_BATCH_SIZE) + prefetch-gate
+      // (LOCAL_PREFETCH_WINDOW) zodat de wizard voorstellen krijgt zodra ze klaar
+      // zijn, zonder de hele batch vooruit te draaien. Cloud houdt de default (20
+      // groepen, geen gate). INVARIANT: aiBatchSize === repBatchSize (== de
+      // wizard-`repBatchSize`, LOCAL_REP_BATCH_SIZE) — de gate rekent rondes ↔
+      // getoonde groepen om via dat gelijke getal (zie wizard-gate.ts).
+      aiBatchSize = LOCAL_REP_BATCH_SIZE
+      gateRef.current = createPrefetchGate(LOCAL_PREFETCH_WINDOW)
+    } else if (!exec.canUseCloud) {
+      aiBlocked = true
+      aiBlockedMessage =
+        exec.message ??
+        (exec.status === 'resolving'
+          ? 'We konden nog niet bepalen waar Fin mag draaien. Probeer het zo opnieuw — je regels en eerdere keuzes staan wel klaar.'
+          : 'Lokale AI is nu niet beschikbaar op dit toestel.')
+      // Elke batch laten falen → de bestaande failedBatches-flow vangt het op;
+      // NOOIT een stille cloud-fallback (privacy fail-closed, FR-3.6).
+      aiResolver = async () => {
+        throw new Error('ai-bestemming-niet-beschikbaar')
       }
     }
 
@@ -590,10 +585,10 @@ export function AICategorizeSheet({
       // (regel/transfer/spiegel-)voorstellen staan wél gewoon in de review.
       if (result.failedBatches.length > 0 && result.counts.ai === 0) {
         setAiError(
-          localNotReady
-            ? (readiness?.message ??
+          aiBlocked
+            ? (aiBlockedMessage ??
                 'Lokale AI is niet beschikbaar — beheer dit via Mijn → Privacy. Je regels en eerdere keuzes staan wel klaar.')
-            : privacyMode
+            : exec.canUseLocal
               ? 'Lokale categorisatie is niet gelukt. Probeer het opnieuw of categoriseer handmatig. Je regels staan wel klaar.'
               : 'AI-analyse is nu niet beschikbaar — de voorstellen van je regels staan wel klaar.',
         )
@@ -615,7 +610,7 @@ export function AICategorizeSheet({
       setStage1Resolved(true)
       setAiRunning(false)
     }
-  }, [activeTransactions, loadAutoCatContext, flatBudgets])
+  }, [activeTransactions, loadAutoCatContext, flatBudgets, exec.canUseLocal, exec.canUseCloud, exec.status, exec.message])
 
   function startManual() {
     setReviewMode('list')
@@ -1102,11 +1097,13 @@ export function AICategorizeSheet({
           {/* Subtiele scheiding tussen scope-setting en de primaire acties */}
           {scopeAvailable && <div className="border-t border-[var(--border-ed)]" />}
 
-          {/* Vraag Fin */}
+          {/* Vraag Fin — pas beschikbaar zodra we weten WAAR Fin mag draaien.
+              Fail-closed: tijdens 'resolving' vertrekt er niets, dus dan is de
+              knop uit i.p.v. een AI-fase te starten die toch geblokkeerd wordt. */}
           <button
             type="button"
             onClick={() => void fetchSuggestions()}
-            disabled={loadingAll || activeTransactions.length === 0}
+            disabled={loadingAll || activeTransactions.length === 0 || exec.status === 'resolving'}
             className="flex items-start gap-3 rounded-[var(--r-lg)] border border-dashed border-wil-300 bg-wil-50/50 px-4 py-4 text-left transition-all hover:border-wil-400 hover:shadow-[var(--s1)] disabled:opacity-50 disabled:hover:shadow-none disabled:hover:border-wil-300"
           >
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-wil-100">
@@ -1117,6 +1114,16 @@ export function AICategorizeSheet({
               <p className="mt-1 text-[11px] leading-relaxed text-[var(--ink-3)]">
                 Je regels en eerdere keuzes delen eerst gratis in; alleen onbekende tegenpartijen gaan in kleine rondes naar Fin en zijn oordeel wordt slim doorgetrokken naar vergelijkbare transacties. Alles komt ter controle in één overzicht.
               </p>
+              {exec.status === 'resolving' && (
+                <p className="mt-1.5 text-[11px] text-[var(--ink-4)]">
+                  Even kijken waar Fin mag draaien…
+                </p>
+              )}
+              {exec.status === 'lokaal' && (
+                <p className="mt-1.5 text-[11px] text-[var(--ink-4)]">
+                  Draait op dit apparaat — je transacties verlaten je toestel niet.
+                </p>
+              )}
             </div>
           </button>
 

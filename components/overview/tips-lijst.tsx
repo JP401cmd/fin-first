@@ -9,6 +9,7 @@ import { deepLinkForRecommendation } from '@/lib/recommendation-deep-link'
 import { useChatContextOptional } from '@/components/app/chat/chat-provider'
 import { ANALYSE_FINANCIEN_PROMPT } from '@/components/app/chat/chat-prompt-deeplink'
 import { useOptionalToast } from '@/components/app/toast-provider'
+import { LokaleTipsGenerator } from './lokale-tips-generator'
 
 /**
  * TipsLijst — toptips bovenaan /overzicht/tips. Toont pending +
@@ -199,21 +200,26 @@ export function TipsLijst({ recommendations, onChanged, onAccepted }: TipsLijstP
 
   if (visible.length === 0) {
     return (
-      <section aria-label="Tips" className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-6 text-center">
-        <Sparkles className="mx-auto h-6 w-6 text-wil-400" aria-hidden="true" />
-        <h2 className="mt-2 font-serif text-lg text-[var(--ink)]">Geen tips wachten op je</h2>
-        <p className="mt-1 text-sm text-[var(--ink-3)]">
-          Vraag Fin om een doorlichting voor een verse tip.
-        </p>
-        <button
-          type="button"
-          onClick={() => chat?.openWithMessage(ANALYSE_FINANCIEN_PROMPT)}
-          className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-wil-500 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-wil-600"
-        >
-          <MessageCircle className="h-3.5 w-3.5" aria-hidden="true" />
-          Vraag Fin om tips
-        </button>
-      </section>
+      <div className="space-y-2.5">
+        <section aria-label="Tips" className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-6 text-center">
+          <Sparkles className="mx-auto h-6 w-6 text-wil-400" aria-hidden="true" />
+          <h2 className="mt-2 font-serif text-lg text-[var(--ink)]">Geen tips wachten op je</h2>
+          <p className="mt-1 text-sm text-[var(--ink-3)]">
+            Vraag Fin om een doorlichting voor een verse tip.
+          </p>
+          <button
+            type="button"
+            onClick={() => chat?.openWithMessage(ANALYSE_FINANCIEN_PROMPT)}
+            className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-wil-500 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-wil-600"
+          >
+            <MessageCircle className="h-3.5 w-3.5" aria-hidden="true" />
+            Vraag Fin om tips
+          </button>
+        </section>
+        {/* Rendert alleen wanneer de groep 'tips' op 'lokaal' staat; in cloud-modus
+            (en zolang de voorkeur nog laadt) geeft dit component null terug. */}
+        <LokaleTipsGenerator onGenerated={onChanged} />
+      </div>
     )
   }
 
@@ -238,6 +244,8 @@ export function TipsLijst({ recommendations, onChanged, onAccepted }: TipsLijstP
           <TipCard key={rec.id} rec={rec} onDecide={decide} />
         ))}
       </ul>
+
+      <LokaleTipsGenerator onGenerated={onChanged} />
     </section>
   )
 }
@@ -251,6 +259,7 @@ function TipCard({
 }) {
   const days = rec.freedom_days_per_year ?? 0
   const monthly = rec.euro_impact_monthly
+  const yearly = rec.euro_impact_yearly
   const isReadyAgain = rec.status === 'postponed'
   // Sluit de vrijheids-loop: breng de gebruiker van inzicht → naar de plek
   // waar de wijziging écht doorgevoerd wordt (budget/bezit/schuld). De
@@ -274,11 +283,26 @@ function TipCard({
           </div>
           <p className="mt-1 text-sm text-[var(--ink-2)] leading-snug">{rec.description}</p>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-[var(--ink-3)]">
-            <span className="font-medium text-wil-600">
-              +{days} {days === 1 ? 'dag' : 'dagen'} vrijheid/jaar
-            </span>
+            {/* Vrijheidsdagen zijn alleen geldig bij een essentieel budget én
+                retirement_expense_method='essential_budgets'; buiten die twee
+                voorwaarden zet zowel de cloud- als de lokale route ze op 0. Een
+                onvoorwaardelijke "+0 dagen vrijheid/jaar" toonde dan de nul en
+                verzweeg de jaarbesparing — het enige cijfer dat de kans wél
+                draagt. Toon daarom de dagen als ze er zijn, anders de euro's. */}
+            {days > 0 ? (
+              <span className="font-medium text-wil-600">
+                +{days} {days === 1 ? 'dag' : 'dagen'} vrijheid/jaar
+              </span>
+            ) : (
+              yearly != null &&
+              yearly !== 0 && (
+                <span className="font-medium text-wil-600">
+                  &euro;{Math.abs(yearly).toLocaleString('nl-NL')}/jaar
+                </span>
+              )
+            )}
             {monthly != null && monthly !== 0 && (
-              <span>&euro;{Math.abs(monthly)}/mnd</span>
+              <span>&euro;{Math.abs(monthly).toLocaleString('nl-NL')}/mnd</span>
             )}
           </div>
         </div>

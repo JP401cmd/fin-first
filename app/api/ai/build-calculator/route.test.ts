@@ -30,8 +30,25 @@ vi.mock('@/lib/calculator/rate-limit', () => ({ checkAndIncrement: mockCheckAndI
 
 import { POST } from './route'
 
+/**
+ * De privé-gate (lib/ai/privacy-gate.ts) wordt bewust NIET gemockt: hij is de
+ * beslissende laag vóór de modelcall, dus die willen we hier echt uitvoeren.
+ * Daarvoor heeft de client-stub een `from`-keten nodig die het profielrijtje
+ * teruggeeft — `profiles.select(...).eq(...).maybeSingle()`.
+ */
+function profileRow(row: { privacy_mode?: boolean; ai_execution_prefs?: Record<string, string> }) {
+  return {
+    select: vi.fn(() => ({
+      eq: vi.fn(() => ({
+        maybeSingle: vi.fn(async () => ({ data: row, error: null })),
+      })),
+    })),
+  }
+}
+
 const client = {
   auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'user-1' } } })) },
+  from: vi.fn(() => profileRow({ privacy_mode: false, ai_execution_prefs: {} })),
 }
 
 function request(body: Record<string, unknown> = { prompt: 'Wat kost mijn auto per maand?' }) {
@@ -45,6 +62,7 @@ const ALLOWED = { allowed: true, remaining: 9, limit: 10, used: 1 }
 
 beforeEach(() => {
   vi.clearAllMocks()
+  client.from.mockImplementation(() => profileRow({ privacy_mode: false, ai_execution_prefs: {} }))
   mockCreateClient.mockResolvedValue(client)
   mockCheckTierGate.mockResolvedValue(null)
   mockCheckAndIncrement.mockResolvedValue(ALLOWED)
@@ -113,6 +131,40 @@ describe('POST /api/ai/build-calculator — weeklimiet', () => {
     // Geen rauwe DB-fouttekst naar de client (ADR 0044).
     expect(JSON.stringify(body)).not.toContain('boom')
     consoleError.mockRestore()
+  })
+
+  // ── Privé-modus: fail-closed ───────────────────────────────────────────────
+  //
+  // De belofte is hard: staat de groep 'rapporten' op lokaal, dan mag er niets
+  // naar een AI-leverancier. Deze twee tests bewijzen dat op de beslissende
+  // laag — de server — en niet alleen in de client die de keuze óók maakt.
+
+  it('privé-modus blokkeert vóór de generatie: 403, geen LLM-aanroep, geen tik op de teller', async () => {
+    client.from.mockImplementation(() => profileRow({ privacy_mode: true, ai_execution_prefs: {} }))
+
+    const res = await POST(request())
+    const body = await res.json()
+
+    expect(res.status).toBe(403)
+    expect(body.code).toBe('privacy_mode_active')
+    expect(mockBuildCalculator, 'er mag geen enkele modelcall vertrekken').not.toHaveBeenCalled()
+    expect(
+      mockCheckAndIncrement,
+      'een geblokkeerde aanvraag mag de weeklimiet niet opsouperen',
+    ).not.toHaveBeenCalled()
+  })
+
+  it('een per-groep override wint van de hoofdschakelaar', async () => {
+    // Hoofdschakelaar staat op lokaal, maar deze gebruiker wil rekenhulpen
+    // bewust wél via de cloud — dan hoort de route gewoon te werken.
+    client.from.mockImplementation(() =>
+      profileRow({ privacy_mode: true, ai_execution_prefs: { rapporten: 'cloud' } }),
+    )
+
+    const res = await POST(request())
+
+    expect(res.status).toBe(200)
+    expect(mockBuildCalculator).toHaveBeenCalledTimes(1)
   })
 
   it('reserveert vóór de LLM-aanroep, ook als die daarna stukloopt', async () => {

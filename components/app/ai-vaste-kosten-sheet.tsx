@@ -1,8 +1,14 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Check, X, Loader2, ChevronDown, AlertTriangle } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
+import { useExecutionMode } from '@/lib/ai/local/use-execution-mode'
+import {
+  createLocalVasteKostenResolver,
+  type VasteKostenCandidate,
+  type VasteKostenClassificatie,
+} from '@/lib/ai/local/local-vaste-kosten-resolver'
 
 import { MaskedAmount } from '@/components/app/masked-amount'
 
@@ -53,6 +59,24 @@ const CLASSIFICATION_BADGES: Record<'subscription' | 'vaste_kosten', { label: st
 
 // ── Component ────────────────────────────────────────────────
 
+/** Bouw de reviewrij-vorm uit een kandidaat + zijn (lokale) classificatie. */
+function toSuggestion(c: VasteKostenCandidate, r: VasteKostenClassificatie): AiSuggestion {
+  return {
+    id: c.id,
+    name: c.name,
+    // Alle bedragen komen door van de server (`toMonthly`) — het model raakt ze
+    // niet aan en de sheet rekent hier niets zelf uit.
+    monthlyAmount: c.monthlyAmount,
+    frequency: c.frequency,
+    occurrences: c.occurrences,
+    autoCategory: c.autoCategory,
+    autoCategoryLabel: c.autoCategoryLabel,
+    aiClassification: r.klasse,
+    aiReason: r.reden,
+    confidence: c.confidence,
+  }
+}
+
 export function AiVasteKostenSheet({ open, onOpenChange, onComplete }: AiVasteKostenSheetProps) {
   const [phase, setPhase] = useState<'loading' | 'review' | 'saving' | 'success' | 'error' | 'empty'>('loading')
   const [rows, setRows] = useState<SuggestionRow[]>([])
@@ -61,20 +85,50 @@ export function AiVasteKostenSheet({ open, onOpenChange, onComplete }: AiVasteKo
   const [errorMessage, setErrorMessage] = useState('')
   const [savedCount, setSavedCount] = useState(0)
 
-  // ── Fetch AI analysis ──────────────────────────────────────
+  // ── Waar draait deze analyse? ──────────────────────────────
+  //
+  // Eén hook beslist het (lib/ai/local/use-execution-mode.ts) en is FAIL-CLOSED:
+  // zolang de status 'resolving' is weten we de bestemming nog niet en vertrekt
+  // er NIETS; bij 'blocked' moet het lokaal maar kan het toestel het niet, en dan
+  // gaan we ook niet "even via de cloud" — dat is precies de belofte die de
+  // gebruiker op /mijn/privacy heeft gekozen. `active = open` voorkomt een
+  // GPU-check bij elke render van de onderliggende pagina.
+  const exec = useExecutionMode('transacties', open)
 
-  const fetchAnalysis = useCallback(async () => {
+  // Voortgang van het lokale pad. Het model doet er on-device minuten over bij
+  // enkele tientallen kandidaten; zonder deze twee signalen (welke chunk, en of
+  // de GPU nog aan het opwarmen is) voelt dat als een vastgelopen scherm.
+  const [localSessionState, setLocalSessionState] = useState<'starten' | 'klaar' | null>(null)
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
+
+  // Elke run krijgt een nummer; een run die niet meer de laatste is schrijft geen
+  // state meer (sheet opnieuw geopend, modus omgeklapt).
+  const runIdRef = useRef(0)
+
+  // ── Analyse draaien ────────────────────────────────────────
+
+  const runAnalysis = useCallback(async (mode: 'cloud' | 'lokaal') => {
+    const runId = ++runIdRef.current
+    const alive = () => runIdRef.current === runId
+
     setPhase('loading')
     setRows([])
     setSkippedRows([])
     setShowSkipped(false)
     setErrorMessage('')
+    setLocalSessionState(null)
+    setProgress(null)
 
     try {
+      // Eén endpoint, twee modi: `candidatesOnly` stopt server-side vóór
+      // `getModel`, dus op het lokale pad vertrekt er géén AI-aanroep — alleen de
+      // deterministisch gedetecteerde kandidatenlijst komt terug.
       const res = await fetch('/api/subscriptions/analyse-ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(mode === 'lokaal' ? { candidatesOnly: true } : {}),
       })
+      if (!alive()) return
 
       if (res.status === 422) {
         setErrorMessage('AI is niet geconfigureerd. Stel een API key in via Instellingen.')
@@ -88,47 +142,126 @@ export function AiVasteKostenSheet({ open, onOpenChange, onComplete }: AiVasteKo
         return
       }
 
-      const data = await res.json() as {
-        suggestions: AiSuggestion[]
-        analysedCount: number
-        skippedCount: number
-      }
+      if (mode === 'cloud') {
+        const data = await res.json() as {
+          suggestions: AiSuggestion[]
+          analysedCount: number
+          skippedCount: number
+        }
+        if (!alive()) return
 
-      if (!data.suggestions || data.suggestions.length === 0) {
-        setPhase('empty')
-        return
-      }
+        if (!data.suggestions || data.suggestions.length === 0) {
+          setPhase('empty')
+          return
+        }
 
-      // Split into actionable rows and AI-skipped rows
-      const actionable = data.suggestions.filter(s => s.aiClassification !== 'skip')
-      const skipped = data.suggestions.filter(s => s.aiClassification === 'skip')
+        // Split into actionable rows and AI-skipped rows
+        const actionable = data.suggestions.filter(s => s.aiClassification !== 'skip')
+        const skipped = data.suggestions.filter(s => s.aiClassification === 'skip')
 
-      if (actionable.length === 0) {
+        if (actionable.length === 0) {
+          setSkippedRows(skipped)
+          setPhase('empty')
+          return
+        }
+
+        setRows(
+          actionable.map(s => ({
+            suggestion: s,
+            classification: s.aiClassification as 'subscription' | 'vaste_kosten',
+            accepted: true, // accepted by default
+          })),
+        )
         setSkippedRows(skipped)
+        setPhase('review')
+        return
+      }
+
+      // ── Lokaal pad: on-device classificeren, chunk voor chunk ───────────────
+      const data = await res.json() as { candidates?: VasteKostenCandidate[] }
+      if (!alive()) return
+
+      const candidates = data.candidates ?? []
+      if (candidates.length === 0) {
         setPhase('empty')
         return
       }
 
-      setRows(
-        actionable.map(s => ({
-          suggestion: s,
-          classification: s.aiClassification as 'subscription' | 'vaste_kosten',
-          accepted: true, // accepted by default
-        })),
-      )
-      setSkippedRows(skipped)
-      setPhase('review')
+      const byId = new Map(candidates.map(c => [c.id, c] as const))
+      setProgress({ done: 0, total: candidates.length })
+
+      // Teller buiten de state: bepaalt na afloop of er überhaupt iets te
+      // reviewen viel. State lezen zou hier de laatste chunk kunnen missen.
+      let actionableTotal = 0
+
+      const resolver = createLocalVasteKostenResolver({
+        onSessionState: (s) => { if (alive()) setLocalSessionState(s) },
+        // Progressief renderen: elke chunk van 10 verschijnt zodra hij klaar is,
+        // in plaats van één blokkerende spinner over de hele analyse.
+        onChunk: (results, done, total) => {
+          if (!alive()) return
+          const list = results
+            .map((r) => {
+              const c = byId.get(r.id)
+              return c ? toSuggestion(c, r) : null
+            })
+            .filter((s): s is AiSuggestion => s !== null)
+
+          const actionable = list.filter(s => s.aiClassification !== 'skip')
+          const skipped = list.filter(s => s.aiClassification === 'skip')
+          actionableTotal += actionable.length
+
+          if (actionable.length > 0) {
+            setRows(prev => [
+              ...prev,
+              ...actionable.map(s => ({
+                suggestion: s,
+                classification: s.aiClassification as 'subscription' | 'vaste_kosten',
+                accepted: true,
+              })),
+            ])
+          }
+          if (skipped.length > 0) setSkippedRows(prev => [...prev, ...skipped])
+
+          setProgress({ done, total })
+          // Pas naar 'review' zodra er écht iets te beoordelen is; tot dan blijft
+          // het laadscherm staan mét voortgang (anders zie je een lege reviewlijst).
+          if (actionableTotal > 0) setPhase(p => (p === 'loading' ? 'review' : p))
+        },
+      })
+
+      await resolver(candidates)
+      if (!alive()) return
+
+      setLocalSessionState(null)
+      setProgress(null)
+      if (actionableTotal === 0) setPhase('empty')
     } catch {
+      if (!alive()) return
+      // Ook het lokale pad faalt hier eerlijk: bij een herhaalde crash werpt de
+      // resolver en landen we hier. NOOIT alsnog de cloud proberen.
       setErrorMessage('Er ging iets mis bij de AI analyse. Probeer het opnieuw.')
       setPhase('error')
     }
   }, [])
 
+  /** Start (of herstart) de analyse in de modus die nu geldt. Fail-closed. */
+  const startAnalysis = useCallback(() => {
+    if (exec.status === 'resolving') return
+    if (exec.status === 'blocked') {
+      setErrorMessage(exec.message ?? 'Lokale AI is nu niet beschikbaar op dit toestel.')
+      setPhase('error')
+      return
+    }
+    void runAnalysis(exec.status === 'lokaal' ? 'lokaal' : 'cloud')
+  }, [exec.status, exec.message, runAnalysis])
+
   // Trigger fetch when sheet opens — intentional: we load data when
-  // the open prop transitions to true, same pattern as account-form-modal.tsx
+  // the open prop transitions to true, same pattern as account-form-modal.tsx.
+  // Wacht bewust op een BESLISTE uitvoermodus: in 'resolving' vertrekt er niets.
   useEffect(() => {
-    if (open) { void fetchAnalysis() } // eslint-disable-line react-hooks/set-state-in-effect
-  }, [open, fetchAnalysis])
+    if (open) { startAnalysis() } // eslint-disable-line react-hooks/set-state-in-effect
+  }, [open, startAnalysis])
 
   // ── Row actions ────────────────────────────────────────────
 
@@ -206,8 +339,24 @@ export function AiVasteKostenSheet({ open, onOpenChange, onComplete }: AiVasteKo
           <div className="flex flex-col items-center gap-3">
             <Loader2 className="h-7 w-7 animate-spin text-wil-500" />
             <p className="text-sm font-medium text-[var(--ink-2)]">
-              AI analyseert je transacties...
+              {exec.status === 'resolving'
+                ? 'Even kijken waar dit draait...'
+                : exec.status === 'lokaal'
+                  ? 'Fin analyseert je transacties op dit apparaat...'
+                  : 'AI analyseert je transacties...'}
             </p>
+            {/* De eerste sessie-load is de stille GPU-warmup (~45-60 s). Zonder
+                deze regel leest dat als een vastgelopen scherm. */}
+            {localSessionState === 'starten' && (
+              <p className="text-xs text-[var(--ink-3)]">
+                Model wordt gestart — dit duurt de eerste keer even.
+              </p>
+            )}
+            {progress && progress.done > 0 && (
+              <p className="text-xs text-[var(--ink-3)] tabular-nums">
+                {progress.done} van {progress.total} beoordeeld
+              </p>
+            )}
           </div>
 
           {/* Skeleton rows */}
@@ -234,13 +383,17 @@ export function AiVasteKostenSheet({ open, onOpenChange, onComplete }: AiVasteKo
           <p className="text-center text-sm text-[var(--ink-2)]">
             {errorMessage}
           </p>
-          <button
-            type="button"
-            onClick={() => void fetchAnalysis()}
-            className="rounded-[var(--r)] border border-[var(--border-md)] px-4 py-2 text-sm text-[var(--ink-2)] hover:bg-[var(--subtle)]"
-          >
-            Opnieuw proberen
-          </button>
+          {/* Bij 'blocked' heeft opnieuw proberen geen zin zolang het toestel het
+              niet aankan — de knop verdwijnt dan i.p.v. valse hoop te geven. */}
+          {exec.status !== 'blocked' && (
+            <button
+              type="button"
+              onClick={startAnalysis}
+              className="rounded-[var(--r)] border border-[var(--border-md)] px-4 py-2 text-sm text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+            >
+              Opnieuw proberen
+            </button>
+          )}
         </div>
       )}
 
@@ -265,9 +418,18 @@ export function AiVasteKostenSheet({ open, onOpenChange, onComplete }: AiVasteKo
         <div className="flex flex-col">
           {/* Sticky header with count and save button */}
           <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--border-ed)] bg-[var(--paper)] px-5 py-3">
-            <p className="text-sm text-[var(--ink-2)]">
-              <strong className="text-[var(--ink)]">{acceptedCount}</strong> {acceptedCount === 1 ? 'item' : 'items'} geselecteerd
-            </p>
+            <div className="min-w-0">
+              <p className="text-sm text-[var(--ink-2)]">
+                <strong className="text-[var(--ink)]">{acceptedCount}</strong> {acceptedCount === 1 ? 'item' : 'items'} geselecteerd
+              </p>
+              {/* Lokaal pad: de lijst groeit nog terwijl je al kunt beoordelen. */}
+              {progress && progress.done < progress.total && (
+                <p className="mt-0.5 flex items-center gap-1.5 text-[11px] text-[var(--ink-3)] tabular-nums">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  {progress.done} van {progress.total} beoordeeld
+                </p>
+              )}
+            </div>
             <button
               type="button"
               onClick={() => void handleSave()}

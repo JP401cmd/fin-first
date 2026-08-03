@@ -1,21 +1,27 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { LocalCategorizationSettings } from './local-categorization-settings'
+import { AiExecutionSettings } from './local-categorization-settings'
+import type { AiExecutionGroup, AiExecutionMode } from '@/lib/ai/execution-groups'
 
 /**
- * Tests voor de kernflows van de lokale-categorisatie-toggle (ADR 0043, fase 2):
- *  1. capability-fail → toggle blijft uit + de reasons (NL) zijn zichtbaar,
- *     geen download.
+ * Tests voor de sectie "Waar draait de AI?" op /mijn/privacy (ADR 0043).
+ *
+ * Dekking uit de vorige monoliet blijft één-op-één staan — alleen de namen en
+ * teksten volgen de nieuwe opbouw (hoofdkeuze → voor/nadelen → lokaal model →
+ * per functionaliteit):
+ *  1. capability-fail → keuze blijft uit + de reasons (NL) zijn zichtbaar,
+ *     geen download en geen schrijfactie op /api/privacy-mode.
  *  2. happy path → capability ok → consent → download-progress → POST true.
  *  3. verwijderen → deleteLocalModel + POST false.
- *  4. tier-gate (eigenaarsbesluit, requirements §5 optie 2): zonder 'ai'-abonnement
- *     is aanzetten geblokkeerd + de gedeelde AiSubscriptionUpsell is zichtbaar en
- *     via aria-describedby aan de toggle gekoppeld; met privé-modus al aan blijft
- *     uitzetten mogelijk (niemand opgesloten) en meldt het beheer-blok eerlijk dat
- *     het abonnement verlopen is.
+ *  4. tier-gate: zonder 'ai'-abonnement is aanzetten geblokkeerd + de gedeelde
+ *     AiSubscriptionUpsell is zichtbaar en via aria-describedby aan de schakelaar
+ *     gekoppeld; met lokaal al aan blijft uitzetten mogelijk (niemand opgesloten)
+ *     en meldt het beheer-blok eerlijk dat het abonnement verlopen is.
+ *  5. nieuw: de voor-en-nadelen-vergelijking staat er, en de "Experimenteel"-badge
+ *     hangt niet meer aan de sectie als geheel.
  *
- * De lib/ai/local-primitieven (parallel gebouwd tegen het gedeelde contract)
- * worden gemockt; POST /api/privacy-mode wordt via een fetch-mock afgevangen.
+ * De lib/ai/local-primitieven worden gemockt; de twee API's (/api/privacy-mode en
+ * /api/ai-execution-prefs) lopen via één URL-bewuste fetch-mock.
  */
 
 const mocks = vi.hoisted(() => ({
@@ -59,6 +65,22 @@ vi.mock('@/lib/supabase/client', () => ({
 
 let fetchMock: ReturnType<typeof vi.fn>
 
+/** Alle groepen op cloud — de groepenlijst hoeft hier alleen te kunnen laden. */
+const ALL_CLOUD: Record<AiExecutionGroup, AiExecutionMode> = {
+  gesprek: 'cloud',
+  transacties: 'cloud',
+  briefing: 'cloud',
+  tips: 'cloud',
+  rapporten: 'cloud',
+  documenten: 'cloud',
+  nieuws: 'cloud',
+}
+
+/** Werden er schrijfacties op /api/privacy-mode gedaan? */
+function privacyModeCalls(): unknown[][] {
+  return fetchMock.mock.calls.filter((call) => call[0] === '/api/privacy-mode')
+}
+
 /**
  * Stub navigator.storage.persisted() (jsdom levert de StorageManager niet).
  * `null` → géén persisted-methode (best-effort onbekend); true/false → de
@@ -79,30 +101,58 @@ beforeEach(() => {
   mocks.downloadLocalModel.mockReset()
   mocks.deleteLocalModel.mockReset()
   profileRow = { ai_enabled: true, privacy_mode: false, active_subscriptions: ['ai'] }
-  fetchMock = vi.fn().mockResolvedValue({ ok: true })
+  fetchMock = vi.fn().mockImplementation(async (url: unknown) => {
+    if (typeof url === 'string' && url.startsWith('/api/ai-execution-prefs')) {
+      return { ok: true, json: async () => ({ privacyMode: false, prefs: {}, modes: ALL_CLOUD }) }
+    }
+    return { ok: true, json: async () => ({ ok: true }) }
+  })
   vi.stubGlobal('fetch', fetchMock)
   // Schone navigator per test: geen storage-manager tenzij een test 'm zet.
   Reflect.deleteProperty(navigator as unknown as Record<string, unknown>, 'storage')
 })
 
-describe('LocalCategorizationSettings', () => {
-  it('toont kop + experimenteel-badge', async () => {
+describe('AiExecutionSettings', () => {
+  it('toont de hoofdkeuze zonder sectie-brede Experimenteel-badge', async () => {
     mocks.getLocalModelState.mockResolvedValue({ state: 'niet-gedownload', bytes: null })
-    render(<LocalCategorizationSettings />)
-    expect(await screen.findByText('Categoriseer transacties lokaal')).toBeTruthy()
-    // De sectie-badge én de lokale-chat-linkkaart dragen beide 'Experimenteel' — assert ≥1.
-    expect(screen.getAllByText('Experimenteel').length).toBeGreaterThanOrEqual(1)
+    render(<AiExecutionSettings />)
+
+    expect(await screen.findByText('Lokaal waar mogelijk')).toBeTruthy()
+    // De badge hangt alleen nog aan de lokale-chat-ingang, niet aan het geheel.
+    await waitFor(() => expect(screen.getAllByText('Experimenteel')).toHaveLength(1))
   })
 
-  it('capability-fail: toggle blijft uit en toont de reasons, geen download', async () => {
+  it('toont de zes vergelijkingsrijen met beide kolommen', async () => {
+    mocks.getLocalModelState.mockResolvedValue({ state: 'niet-gedownload', bytes: null })
+    render(<AiExecutionSettings />)
+
+    expect(await screen.findByRole('columnheader', { name: /Lokaal op je apparaat/i })).toBeTruthy()
+    expect(screen.getByRole('columnheader', { name: /Cloud-AI/i })).toBeTruthy()
+    for (const criterion of ['Privacy', 'Kwaliteit', 'Snelheid', 'Apparaat', 'AI-tegoed', 'Internet']) {
+      expect(screen.getByRole('rowheader', { name: criterion })).toBeTruthy()
+    }
+    expect(screen.getByText('Je gegevens verlaten je apparaat niet.')).toBeTruthy()
+    expect(screen.getByText('Verbruikt je maandtegoed.')).toBeTruthy()
+  })
+
+  it('rendert de groepenlijst met alle zeven functionaliteiten', async () => {
+    mocks.getLocalModelState.mockResolvedValue({ state: 'niet-gedownload', bytes: null })
+    render(<AiExecutionSettings />)
+
+    expect(await screen.findByRole('button', { name: /Gesprek met Fin/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Transacties & vaste lasten/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Documenten lezen/i })).toBeTruthy()
+  })
+
+  it('capability-fail: keuze blijft uit en toont de reasons, geen download', async () => {
     mocks.getLocalModelState.mockResolvedValue({ state: 'niet-gedownload', bytes: null })
     mocks.checkLocalAiCapability.mockResolvedValue({
       ok: false,
       reasons: ['Geen WebGPU-ondersteuning gevonden in deze browser'],
     })
 
-    render(<LocalCategorizationSettings />)
-    const toggle = await screen.findByRole('switch', { name: /Lokale transactiecategorisatie/i })
+    render(<AiExecutionSettings />)
+    const toggle = await screen.findByRole('switch', { name: /Lokaal waar mogelijk/i })
     expect(toggle.getAttribute('aria-checked')).toBe('false')
 
     fireEvent.click(toggle)
@@ -110,7 +160,7 @@ describe('LocalCategorizationSettings', () => {
     await screen.findByText(/Geen WebGPU-ondersteuning gevonden/i)
     expect(toggle.getAttribute('aria-checked')).toBe('false')
     expect(mocks.downloadLocalModel).not.toHaveBeenCalled()
-    expect(fetchMock).not.toHaveBeenCalled()
+    expect(privacyModeCalls()).toHaveLength(0)
   })
 
   it('happy path: capability ok → consent → download → POST true', async () => {
@@ -120,8 +170,8 @@ describe('LocalCategorizationSettings', () => {
       onProgress?.({ loadedBytes: 3.2e9, totalBytes: 3.2e9 })
     })
 
-    render(<LocalCategorizationSettings />)
-    const toggle = await screen.findByRole('switch', { name: /Lokale transactiecategorisatie/i })
+    render(<AiExecutionSettings />)
+    const toggle = await screen.findByRole('switch', { name: /Lokaal waar mogelijk/i })
 
     fireEvent.click(toggle)
 
@@ -148,7 +198,7 @@ describe('LocalCategorizationSettings', () => {
     mocks.getLocalModelState.mockResolvedValue({ state: 'klaar', bytes: 2.0e9 })
     mocks.deleteLocalModel.mockResolvedValue(undefined)
 
-    render(<LocalCategorizationSettings />)
+    render(<AiExecutionSettings />)
     // Beheer-blok is meteen zichtbaar (model klaar).
     const deleteBtn = await screen.findByRole('button', { name: /^Model verwijderen$/i })
     fireEvent.click(deleteBtn)
@@ -166,50 +216,50 @@ describe('LocalCategorizationSettings', () => {
     )
   })
 
-  it('AI uit: toggle is niet bedienbaar', async () => {
+  it('AI uit: de keuze is niet bedienbaar', async () => {
     profileRow = { ai_enabled: false, privacy_mode: false, active_subscriptions: ['ai'] }
     mocks.getLocalModelState.mockResolvedValue({ state: 'niet-gedownload', bytes: null })
 
-    render(<LocalCategorizationSettings />)
-    const toggle = await screen.findByRole('switch', { name: /Lokale transactiecategorisatie/i })
+    render(<AiExecutionSettings />)
+    const toggle = await screen.findByRole('switch', { name: /Lokaal waar mogelijk/i })
     await waitFor(() => expect(toggle).toBeDisabled())
     expect(screen.getByText(/Schakel eerst/i)).toBeTruthy()
   })
 
-  it('zonder AI-tier: toggle disabled + canonieke AiSubscriptionUpsell met aria-koppeling', async () => {
+  it('zonder AI-tier: keuze disabled + canonieke AiSubscriptionUpsell met aria-koppeling', async () => {
     profileRow = { ai_enabled: true, privacy_mode: false, active_subscriptions: [] }
     mocks.getLocalModelState.mockResolvedValue({ state: 'niet-gedownload', bytes: null })
 
-    render(<LocalCategorizationSettings />)
-    const toggle = await screen.findByRole('switch', { name: /Lokale transactiecategorisatie/i })
-    // AANzetten vereist het 'ai'-abonnement → toggle uitgegrijsd.
+    render(<AiExecutionSettings />)
+    const toggle = await screen.findByRole('switch', { name: /Lokaal waar mogelijk/i })
+    // AANzetten vereist het 'ai'-abonnement → schakelaar uitgegrijsd.
     await waitFor(() => expect(toggle).toBeDisabled())
     // De gedeelde upsell (inline-variant) is zichtbaar met CTA naar het abonnement.
     const cta = screen.getByRole('link', { name: /Bekijk AI-abonnement/i })
     expect(cta.getAttribute('href')).toBe('/mijn/account')
-    // A11Y: de disabled-reden hangt via aria-describedby aan de toggle.
+    // A11Y: de disabled-reden hangt via aria-describedby aan de schakelaar.
     expect(toggle.getAttribute('aria-describedby')).toBe('lokale-cat-reden-tier')
   })
 
-  it('zonder AI-tier maar privé-modus al aan: uitzetten blijft mogelijk (toggle niet disabled)', async () => {
+  it('zonder AI-tier maar lokaal al aan: uitzetten blijft mogelijk (niet disabled)', async () => {
     profileRow = { ai_enabled: true, privacy_mode: true, active_subscriptions: [] }
     mocks.getLocalModelState.mockResolvedValue({ state: 'klaar', bytes: 2.0e9 })
 
-    render(<LocalCategorizationSettings />)
-    const toggle = await screen.findByRole('switch', { name: /Lokale transactiecategorisatie/i })
+    render(<AiExecutionSettings />)
+    const toggle = await screen.findByRole('switch', { name: /Lokaal waar mogelijk/i })
     // Wacht tot de mount-load de opgeslagen 'aan'-stand heeft toegepast.
     await waitFor(() => expect(toggle.getAttribute('aria-checked')).toBe('true'))
-    // Niemand blijft opgesloten in privé-modus: uitzetten mag zonder tier.
+    // Niemand blijft opgesloten: uitzetten mag zonder tier.
     expect(toggle).not.toBeDisabled()
-    // Geen upsell-blok (privé-modus staat immers al aan) → geen aria-describedby.
+    // Geen upsell-blok (lokaal staat immers al aan) → geen aria-describedby.
     expect(toggle.getAttribute('aria-describedby')).toBeNull()
   })
 
-  it('verlopen abonnement met privé-modus aan: eerlijke verlopen-notice in het beheer-blok', async () => {
+  it('verlopen abonnement met lokaal aan: eerlijke verlopen-notice in het beheer-blok', async () => {
     profileRow = { ai_enabled: true, privacy_mode: true, active_subscriptions: [] }
     mocks.getLocalModelState.mockResolvedValue({ state: 'klaar', bytes: 2.0e9 })
 
-    render(<LocalCategorizationSettings />)
+    render(<AiExecutionSettings />)
     // Beheer-blok verschijnt (model klaar); de subtiele verlopen-melding staat erin.
     await screen.findByText(/Je AI-abonnement is verlopen/i)
   })
@@ -219,7 +269,7 @@ describe('LocalCategorizationSettings', () => {
     mocks.getLocalModelState.mockResolvedValue({ state: 'klaar', bytes: 2.0e9 })
     setStorageManager(true)
 
-    render(<LocalCategorizationSettings />)
+    render(<AiExecutionSettings />)
     await screen.findByText(/Model staat klaar op dit toestel/i)
     expect(await screen.findByText(/het model blijft bewaard/i)).toBeTruthy()
   })
@@ -229,7 +279,7 @@ describe('LocalCategorizationSettings', () => {
     mocks.getLocalModelState.mockResolvedValue({ state: 'klaar', bytes: 2.0e9 })
     setStorageManager(false)
 
-    render(<LocalCategorizationSettings />)
+    render(<AiExecutionSettings />)
     await screen.findByText(/Model staat klaar op dit toestel/i)
     expect(await screen.findByText(/Bij ruimtegebrek kan het model verwijderd worden/i)).toBeTruthy()
   })
@@ -239,7 +289,7 @@ describe('LocalCategorizationSettings', () => {
     mocks.getLocalModelState.mockResolvedValue({ state: 'klaar', bytes: 2.0e9 })
     setStorageManager(null)
 
-    render(<LocalCategorizationSettings />)
+    render(<AiExecutionSettings />)
     await screen.findByText(/Model staat klaar op dit toestel/i)
     expect(screen.queryByText(/het model blijft bewaard/i)).toBeNull()
     expect(screen.queryByText(/Bij ruimtegebrek kan het model verwijderd worden/i)).toBeNull()

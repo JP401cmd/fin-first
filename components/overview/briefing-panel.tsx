@@ -20,6 +20,8 @@ import { formatTimestamp } from '@/lib/format'
 import { ShareDialog, type ShareContent } from '@/components/app/share-dialog'
 import { useModuleAccess } from '@/components/app/feature-access-provider'
 import { AiSubscriptionUpsell } from '@/components/app/ai-subscription-upsell'
+import { useExecutionMode } from '@/lib/ai/local/use-execution-mode'
+import type { LocalBriefingProgress } from '@/lib/ai/local/local-briefing-resolver'
 import { VrijheidsbriefingHero } from './vrijheidsbriefing-hero'
 import type { FreedomHeroProps } from '@/lib/briefing/overview-briefing'
 import type { FreedomCardData } from '@/components/app/freedom-card'
@@ -82,6 +84,46 @@ function readPrivacyLevel(): 'anonymous' | 'named' | 'full' {
     /* localStorage niet beschikbaar */
   }
   return 'anonymous'
+}
+
+/**
+ * Voortgangstekst tijdens de ON-DEVICE redactie. De eerste sessie-load is een
+ * stille GPU-warmup van ~45-60s; zonder deze tekst voelt dat als een hang.
+ */
+export function localeVoortgangTekst(p: LocalBriefingProgress): string {
+  if (p.fase === 'model-laden') {
+    return p.gedaan >= p.van
+      ? 'Fin is klaar om te schrijven…'
+      : 'Fin start op je eigen toestel op — de eerste keer duurt dit even.'
+  }
+  if (p.fase === 'kopzin') return 'Fin schrijft de kop…'
+  return `Fin herschrijft je briefjes (${Math.min(p.gedaan + 1, p.van)} van ${p.van})…`
+}
+
+/**
+ * Eerlijke uitkomst-melding na een ververs.
+ *
+ * De nummer-guard keurt elk briefje af waarin een bedrag niet letterlijk
+ * terugkomt — bij het kleine on-device model gebeurt dat regelmatig. Zonder
+ * deze melding lijkt de ververs dan "niets gedaan te hebben", terwijl de
+ * briefing wél op verse cijfers staat. Liever eerlijk tellen dan stil falen.
+ */
+export function herschrevenNotice(
+  herschreven: number | undefined,
+  totaal: number | undefined,
+  lokaal: boolean,
+): string | null {
+  if (typeof herschreven !== 'number' || typeof totaal !== 'number' || totaal <= 0) {
+    return null
+  }
+  const waar = lokaal ? ' op je eigen toestel' : ''
+  if (herschreven === 0) {
+    return `Je briefing staat op verse cijfers. Fin kon geen enkel briefje herschrijven${waar} — je leest de standaardformulering.`
+  }
+  if (herschreven >= totaal) {
+    return `Je briefing is ververst en Fin heeft alle ${totaal} briefjes herschreven${waar}.`
+  }
+  return `Je briefing is ververst; Fin herschreef ${herschreven} van de ${totaal} briefjes${waar}, de rest bleef zoals hij was.`
 }
 
 /** Bouw de ShareContent-tekst uit de vrijheidskaart-data. */
@@ -151,6 +193,17 @@ export function BriefingPanel({
   const { subscriptions } = useModuleAccess()
   const hasAi = subscriptions.includes('ai')
 
+  // WAAR draait de redactie? De gebruiker kiest dat per uitvoergroep op
+  // /mijn/privacy. Alleen actief wanneer de ververs-knop überhaupt aangeboden
+  // wordt (met AI-abonnement) — anders zou elke /overzicht-load een
+  // voorkeur-fetch + GPU-check doen voor een knop die er niet staat.
+  //
+  // FAIL-CLOSED: 'resolving' en 'blocked' geven allebei canUseCloud === false
+  // én canUseLocal === false. Er vertrekt dan niets — geen stille cloud-uitwijk
+  // wanneer het lokale model (nog) niet kan draaien.
+  const exec = useExecutionMode('briefing', hasAi)
+  const execReady = exec.canUseCloud || exec.canUseLocal
+
   // Deel-state: de canvas-renderer wordt dynamisch geïmporteerd bij de eerste
   // klik zodat de tekencode buiten de initiële /overzicht-bundle blijft.
   const [sharing, setSharing] = useState(false)
@@ -166,7 +219,7 @@ export function BriefingPanel({
   const shownEntries = (override?.entries ?? entries).slice(0, entryLimit)
   const shownRefreshedAt = override?.refreshedAt ?? refreshedAt ?? null
   const shownHeadline = override?.headline ?? headline ?? null
-  const refreshable = canRefresh && !usedToday && !refreshing
+  const refreshable = canRefresh && !usedToday && !refreshing && execReady
 
   async function handleShare() {
     if (sharing) return
@@ -189,35 +242,115 @@ export function BriefingPanel({
     }
   }
 
+  /**
+   * Gedeelde 403-afhandeling. Twee heel verschillende oorzaken delen die code:
+   * geen AI-abonnement (→ upsell) en de privé-modus-poort (→ uitleg). Ze door
+   * elkaar halen zou iemand met privé-modus een abonnement aansmeren dat hij al
+   * heeft.
+   */
+  function handle403(data: { code?: string; error?: string } | null): void {
+    if (data?.code === 'privacy_mode_active') {
+      setError(data.error ?? 'Je briefing draait lokaal op je apparaat.')
+      return
+    }
+    setShowUpsell(true)
+    setUsedToday(true)
+  }
+
+  /** Bestaande cloud-flow: composeren, redigeren en opslaan in één request. */
+  async function refreshViaCloud() {
+    const res = await fetch('/api/briefing/refresh', { method: 'POST' })
+    const data = await res.json()
+    if (res.status === 403) return handle403(data)
+    if (!res.ok) throw new Error(data?.error ?? 'Verversen mislukt')
+    if (data.allowed && Array.isArray(data.entries)) {
+      setOverride({
+        entries: data.entries,
+        refreshedAt: data.refreshedAt,
+        headline: data.headline ?? null,
+      })
+      setNotice(herschrevenNotice(data.herschreven, data.totaal, false))
+    } else if (data.allowed === false) {
+      // Stille no-op zichtbaar maken: zonder dit lijkt de spinner "niets te
+      // doen" wanneer de dag-poort de ververs al had verbruikt.
+      setNotice('Je hebt vandaag al ververst — morgen weer beschikbaar.')
+    }
+    // Of de ververs nu nieuwe content opleverde of al gebruikt was: vandaag
+    // is de knop hierna uitgeput.
+    setUsedToday(true)
+  }
+
+  /**
+   * ON-DEVICE-flow: de server componeert (stap 1), de browser herschrijft op
+   * WebGPU/Gemma, de server sanitiseert opnieuw en slaat op (stap 2). Er gaat
+   * op dit pad geen enkel gegeven naar een AI-leverancier.
+   *
+   * Elke fout in de lokale redactie is een STILLE TERUGVAL op de
+   * deterministische tekst — precies zoals op het cloudpad. Dat is bewust géén
+   * cloud-fallback: er wordt hier nooit alsnog een cloud-call gedaan.
+   */
+  async function refreshViaLokaal() {
+    const composeRes = await fetch('/api/briefing/refresh?stap=compose', { method: 'POST' })
+    const compose = await composeRes.json()
+    if (composeRes.status === 403) return handle403(compose)
+    if (!composeRes.ok) throw new Error(compose?.error ?? 'Verversen mislukt')
+    if (compose.allowed === false) {
+      setNotice('Je hebt vandaag al ververst — morgen weer beschikbaar.')
+      setUsedToday(true)
+      return
+    }
+
+    const composed: BriefingEntry[] = Array.isArray(compose.entries) ? compose.entries : []
+    setNotice('Fin start op je eigen toestel op — de eerste keer duurt dit even.')
+
+    // Dynamische import: de LiteRT-runtime hoort niet in de initiële
+    // /overzicht-bundel, hij wordt pas geladen als er echt lokaal gedraaid wordt.
+    const { redactBriefingLocally } = await import('@/lib/ai/local/local-briefing-resolver')
+    const lokaal = await redactBriefingLocally(composed, {
+      directivesBlock: typeof compose.directivesBlock === 'string' ? compose.directivesBlock : undefined,
+      onProgress: (p) => setNotice(localeVoortgangTekst(p)),
+    })
+
+    const persistRes = await fetch('/api/briefing/refresh?stap=persist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ headline: lokaal.headline, texts: lokaal.texts }),
+    })
+    const data = await persistRes.json()
+    if (persistRes.status === 403) return handle403(data)
+    if (!persistRes.ok) throw new Error(data?.error ?? 'Verversen mislukt')
+    if (data.allowed && Array.isArray(data.entries)) {
+      setOverride({
+        entries: data.entries,
+        refreshedAt: data.refreshedAt,
+        headline: data.headline ?? null,
+      })
+      // Tellen doet de SERVER, na zijn eigen her-sanitatie — niet het lokale
+      // model. Wat hier staat is dus wat er echt is overgenomen.
+      setNotice(herschrevenNotice(data.herschreven, data.totaal, true))
+    } else if (data.allowed === false) {
+      setNotice('Je hebt vandaag al ververst — morgen weer beschikbaar.')
+    }
+    setUsedToday(true)
+  }
+
   async function handleRefresh() {
     if (!refreshable) return
+    // TWEEDE SLUITING op fail-closed: `refreshable` is al false in 'resolving'
+    // en 'blocked', maar de keuze hieronder test expliciet op canUseLocal/
+    // canUseCloud in plaats van op `status === 'lokaal'`. Een onbekende of nog
+    // ladende voorkeur mag nooit "dan maar de cloud" betekenen.
+    if (!exec.canUseLocal && !exec.canUseCloud) return
+
     setRefreshing(true)
     setError(null)
+    setNotice(null)
     try {
-      const res = await fetch('/api/briefing/refresh', { method: 'POST' })
-      const data = await res.json()
-      if (res.status === 403) {
-        // AI-abonnement vereist (defense-in-depth): geen foutmelding of retry,
-        // maar de upsell tonen. De knop wordt hierna niet meer aangeboden.
-        setShowUpsell(true)
-        setUsedToday(true)
-        return
+      if (exec.canUseLocal) {
+        await refreshViaLokaal()
+      } else {
+        await refreshViaCloud()
       }
-      if (!res.ok) throw new Error(data?.error ?? 'Verversen mislukt')
-      if (data.allowed && Array.isArray(data.entries)) {
-        setOverride({
-          entries: data.entries,
-          refreshedAt: data.refreshedAt,
-          headline: data.headline ?? null,
-        })
-      } else if (data.allowed === false) {
-        // Stille no-op zichtbaar maken: zonder dit lijkt de spinner "niets te
-        // doen" wanneer de dag-poort de ververs al had verbruikt.
-        setNotice('Je hebt vandaag al ververst — morgen weer beschikbaar.')
-      }
-      // Of de ververs nu nieuwe content opleverde of al gebruikt was: vandaag
-      // is de knop hierna uitgeput.
-      setUsedToday(true)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Verversen mislukt')
     } finally {
@@ -237,6 +370,16 @@ export function BriefingPanel({
         refreshing={refreshing}
         showRefresh={canRefresh || usedToday}
         hasAi={hasAi}
+        // Waarom de knop uit staat is niet altijd "vandaag al gebruikt": zolang
+        // we niet weten waar de AI draait (of het toestel het niet kan) mag er
+        // niets vertrekken, en dat verdient een eigen uitleg.
+        disabledReason={
+          canRefresh && !usedToday && !execReady
+            ? exec.status === 'blocked'
+              ? (exec.message ?? 'Lokale AI is nu niet beschikbaar op dit toestel.')
+              : 'Even bepalen waar je AI draait…'
+            : null
+        }
         onRefresh={handleRefresh}
         onShare={handleShare}
         sharing={sharing}
@@ -364,6 +507,7 @@ function BriefingHeader({
   refreshing,
   showRefresh,
   hasAi,
+  disabledReason,
   onRefresh,
   onShare,
   sharing,
@@ -376,6 +520,8 @@ function BriefingHeader({
   showRefresh: boolean
   /** Heeft de gebruiker het AI-abonnement? Zo niet: Ververs wordt een upsell. */
   hasAi: boolean
+  /** Waarom de knop uit staat, wanneer dat níet "vandaag al gebruikt" is. */
+  disabledReason?: string | null
   onRefresh: () => void
   onShare: () => void
   sharing: boolean
@@ -429,12 +575,13 @@ function BriefingHeader({
               title={
                 refreshable
                   ? 'Ververs je briefing (1× per dag)'
-                  : 'Je hebt vandaag al ververst — morgen weer'
+                  : (disabledReason ?? 'Je hebt vandaag al ververst — morgen weer')
               }
               aria-label={
                 refreshable
                   ? 'Ververs je briefing'
-                  : 'Briefing verversen — vandaag al gebruikt, morgen weer'
+                  : (disabledReason ??
+                    'Briefing verversen — vandaag al gebruikt, morgen weer')
               }
               className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-1.5 text-[11px] font-semibold text-[var(--ink-2)] transition-colors hover:border-[var(--ink-3)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-45"
             >

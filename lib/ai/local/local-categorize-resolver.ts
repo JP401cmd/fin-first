@@ -210,7 +210,12 @@ export function createLocalAiResolver(
   for (const b of budgets) {
     if (b.id) slugToId.set(b.slug, b.id)
   }
-  const system = buildCategorizeSystemPrompt(budgets)
+  // `lokaal: true` zet de snoeigrens op de budgetlijst aan: bij een grote lijst
+  // worden de optionele toelichtingen ingekort/weggelaten. Zonder dat verdringt
+  // het budgetblok bij honderden budgetten de transacties uit het 8192-token-
+  // venster dat systeemprompt + invoer + antwoord moeten delen. De cloud-route
+  // roept dezelfde functie ZONDER die vlag aan en blijft dus ongewijzigd.
+  const system = buildCategorizeSystemPrompt(budgets, { lokaal: true })
 
   const runChunk = async (chunkItems: CombinedAiBatchItem[]): Promise<LocalParseResult> => {
     onSessionState?.('starten')

@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { serverError, unauthorized } from '@/lib/api/respond'
 import { checkTierGate } from '@/lib/require-tier'
 import { buildCalculator } from '@/lib/ai/build-calculator'
+import { assertCloudAllowed } from '@/lib/ai/privacy-gate'
 import { StoredCalculatorDefinitionSchema } from '@/lib/calculator/types'
 import { checkAndIncrement } from '@/lib/calculator/rate-limit'
 
@@ -34,6 +35,22 @@ export async function POST(req: Request) {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return unauthorized()
+
+  // PRIVÉ-MODUS EERST — vóór de tier-gate, de weeklimiet-reservering en élke
+  // dataophaling. Staat 'rapporten' op lokaal, dan bouwt de browser de rekenhulp
+  // zelf (een eenvoudiger scenario) en hoort deze route niets te leveren.
+  // Waarom in deze volgorde: (1) privé-modus is de meest fundamentele keuze van
+  // de gebruiker en gaat vóór commerciële gating — anders krijgt iemand een
+  // tier-fout die de echte reden maskeert; (2) een geblokkeerde call mag niets
+  // kosten: checkAndIncrement reserveert hieronder atomair een slot uit de
+  // weeklimiet, en dat slot is voor de gebruiker net zo goed verbruikte munt als
+  // credits; (3) er mag geen gebruikersinput richting promptopbouw gaan — de
+  // model-call zit niet in deze route maar in buildCalculator
+  // (lib/ai/build-calculator.ts), dat de vraag én een eventuele refineFrom-
+  // definitie in de prompt zet. Nooit een stille terugval naar de cloud: 403 is
+  // het eindpunt.
+  const privacyGate = await assertCloudAllowed(supabase, user.id, 'rapporten')
+  if (privacyGate) return privacyGate
 
   const tierGate = await checkTierGate(supabase, user.id, 'ai')
   if (tierGate) {

@@ -16,6 +16,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { AICategorizeSheet } from './ai-categorize-sheet'
 import type { Budget } from '@/lib/budget-data'
+import { resolveAllExecutionModes } from '@/lib/ai/execution-groups'
 
 // ── Supabase mock ──────────────────────────────────────────────
 //
@@ -35,9 +36,13 @@ let allTimeError: { message: string } | null = null
 type UpdatePayload = Record<string, unknown>
 let transactionUpdates: { ids: string[]; payload: UpdatePayload }[] = []
 
-// Privé-modus: de sheet leest profiles.privacy_mode via een own-row
-// .select().eq('id').maybeSingle(). Per test in te stellen.
-let profilePrivacyMode: boolean | null = false
+// Waar draait de AI-fase? De sheet leest dat sinds ADR 0078 NIET meer als kale
+// profiles.privacy_mode, maar via useExecutionMode('transacties') →
+// GET /api/ai-execution-prefs. Deze twee knoppen zetten de hoofdschakelaar en de
+// per-groep-override; de modes-map wordt met de canonieke resolver gebouwd
+// (zie execPrefsBody), zodat de tests de échte voorrangsregel toetsen.
+let execPrivacyMode: boolean | null = false
+let execTransactiesOverride: 'lokaal' | 'cloud' | null = null
 
 // The fetch now pages with `.range(offset, ...)` (PostgREST capt één query op
 // 1000 rijen, dus de fetch lust door in chunks van 1000). Elke `.from()` maakt
@@ -100,7 +105,7 @@ function makeQueryBuilder(table: string) {
   builder.maybeSingle = (...args: unknown[]) => {
     supabaseCalls.push({ method: 'maybeSingle', args })
     return Promise.resolve({
-      data: table === 'profiles' ? { privacy_mode: profilePrivacyMode } : null,
+      data: table === 'profiles' ? { privacy_mode: execPrivacyMode } : null,
       error: null,
     })
   }
@@ -216,6 +221,50 @@ vi.mock('@/lib/ai/local/local-categorize-resolver', () => ({
   LOCAL_MIN_CONFIDENCE: 0.8,
 }))
 
+// ── Uitvoermodus-endpoint + helpers ───────────────────────────
+//
+// `useExecutionMode('transacties')` haalt GET /api/ai-execution-prefs op. Elke
+// fetch-mock in dit bestand loopt daarom door `withExecPrefs`, zodat die route
+// altijd beantwoord wordt en de hook uit 'resolving' komt — blijft hij daarin
+// hangen, dan is de sheet fail-closed en vertrekt er niets (precies de bedoeling,
+// maar niet wat de meeste tests willen toetsen).
+
+function execPrefsBody() {
+  const prefs = execTransactiesOverride ? { transacties: execTransactiesOverride } : {}
+  return {
+    privacyMode: execPrivacyMode ?? false,
+    prefs,
+    // Canonieke resolver — geen in de test nagebouwde voorrangsregel.
+    modes: resolveAllExecutionModes({ privacy_mode: execPrivacyMode, ai_execution_prefs: prefs }),
+    // De hook eist dit veld expliciet; ontbreekt het, dan blijft hij fail-closed
+    // in 'resolving' hangen.
+    // Deze suite draait altijd met een geldig 'ai'-abonnement; de revocatie-tak
+    // van de hook wordt elders getoetst.
+    hasAiSubscription: true,
+  }
+}
+
+/** Wikkelt een fetch-mock zodat /api/ai-execution-prefs altijd beantwoord wordt. */
+function withExecPrefs(inner: (url: string, init?: { body?: string }) => unknown) {
+  return vi.fn((url: string, init?: { body?: string }) => {
+    if (String(url) === '/api/ai-execution-prefs') {
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(execPrefsBody()) })
+    }
+    return inner(url, init)
+  })
+}
+
+/**
+ * Klikt "Vraag Fin" — maar pas zodra de uitvoermodus beslist is. De knop staat
+ * bewust uit tijdens 'resolving': fail-closed betekent dat er dan niets vertrekt,
+ * dus een AI-fase starten zou toch geblokkeerd worden.
+ */
+async function clickVraagFin() {
+  const btn = screen.getByRole('button', { name: /Vraag Fin/i })
+  await waitFor(() => expect(btn).not.toBeDisabled())
+  fireEvent.click(btn)
+}
+
 // ── Fixtures ──────────────────────────────────────────────────
 
 const mockBudgets: Budget[] = []
@@ -252,7 +301,8 @@ beforeEach(() => {
   allTimeError = null
   transactionUpdates = []
   autoCatContextCalls = []
-  profilePrivacyMode = false
+  execPrivacyMode = false
+  execTransactiesOverride = null
   localCapabilityOk = true
   localModelReady = true
   localResolverSpy.mockClear()
@@ -269,7 +319,7 @@ beforeEach(() => {
   // Default AI-call: lege resultaten (per test te overschrijven).
   vi.stubGlobal(
     'fetch',
-    vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ results: [] }) })),
+    withExecPrefs(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ results: [] }) })),
   )
 })
 
@@ -583,7 +633,7 @@ describe('AICategorizeSheet — AI-flow transfer-behandeling', () => {
       />
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /Vraag Fin/i }))
+    await clickVraagFin()
 
     // De review-fase laadt; het spiegelpaar-voorstel (reasoning) verschijnt per rij.
     await waitFor(() => {
@@ -609,7 +659,7 @@ describe('AICategorizeSheet — AI-flow transfer-behandeling', () => {
       />
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /Vraag Fin/i }))
+    await clickVraagFin()
     // Spiegelparen zijn stage-1 → de wizard opent op stap 1 (bulk-kaart,
     // auto-uitgeklapt want ≤8 rijen) met per rij de "Spiegelboeking"-reasoning.
     await waitFor(() => {
@@ -682,7 +732,7 @@ describe('AICategorizeSheet — AI-flow transfer-behandeling', () => {
       />
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /Vraag Fin/i }))
+    await clickVraagFin()
 
     // Het sterke signaal is stage-1 → stap 1 (bulk-kaart) toont het als
     // review-voorstel met herkomst-label.
@@ -750,7 +800,7 @@ describe('AICategorizeSheet — combined pass (regels → AI → propagatie)', (
       />
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /Vraag Fin/i }))
+    await clickVraagFin()
 
     await waitFor(() => {
       expect(screen.getAllByText(/^Regel$/).length).toBe(2)
@@ -790,7 +840,7 @@ describe('AICategorizeSheet — combined pass (regels → AI → propagatie)', (
         }),
       })
     })
-    vi.stubGlobal('fetch', fetchMock)
+    vi.stubGlobal('fetch', withExecPrefs(fetchMock))
 
     const txs = [
       makeTx('nw1', { description: 'Betaling 1', counterparty_name: 'Nieuwe Winkel' }),
@@ -807,7 +857,7 @@ describe('AICategorizeSheet — combined pass (regels → AI → propagatie)', (
       />
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /Vraag Fin/i }))
+    await clickVraagFin()
 
     // De groepkaart toont de tegenpartij, het aantal transacties in de groep en
     // het Fin-voorstel (label + budgetnaam + reasoning van de representant).
@@ -890,7 +940,7 @@ describe('AICategorizeSheet — Stoppen en controleren slaat alleen geaccepteerd
         }),
       })
     })
-    vi.stubGlobal('fetch', fetchMock)
+    vi.stubGlobal('fetch', withExecPrefs(fetchMock))
 
     const txs = [
       makeTx('grp1', { description: 'Betaling 1', counterparty_name: 'Eerste Winkel' }),
@@ -907,7 +957,7 @@ describe('AICategorizeSheet — Stoppen en controleren slaat alleen geaccepteerd
       />
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /Vraag Fin/i }))
+    await clickVraagFin()
 
     // Eerste groepkaart verschijnt (largest-first met gelijke grootte 1 → op
     // datum; beide txs delen dezelfde datum in makeTx, dus insertievolgorde).
@@ -972,7 +1022,7 @@ function stopFetchMock() {
 
 describe('AICategorizeSheet — Stoppen routeert naar de controle-stap', () => {
   it('0 geaccepteerd → Stoppen toont stap 3 met Opslaan uitgeschakeld en schrijft niets weg', async () => {
-    vi.stubGlobal('fetch', stopFetchMock())
+    vi.stubGlobal('fetch', withExecPrefs(stopFetchMock()))
     const txs = [
       makeTx('s1', { description: 'Betaling 1', counterparty_name: 'Eerste Winkel' }),
       makeTx('s2', { description: 'Betaling 2', counterparty_name: 'Tweede Winkel' }),
@@ -988,7 +1038,7 @@ describe('AICategorizeSheet — Stoppen routeert naar de controle-stap', () => {
       />
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /Vraag Fin/i }))
+    await clickVraagFin()
     await waitFor(() => {
       expect(screen.getByText('Eerste Winkel')).toBeInTheDocument()
     })
@@ -1005,7 +1055,7 @@ describe('AICategorizeSheet — Stoppen routeert naar de controle-stap', () => {
   })
 
   it('>0 geaccepteerd → Stoppen → Opslaan bewaart alléén de geaccepteerde groep', async () => {
-    vi.stubGlobal('fetch', stopFetchMock())
+    vi.stubGlobal('fetch', withExecPrefs(stopFetchMock()))
     const txs = [
       makeTx('k1', { description: 'Betaling 1', counterparty_name: 'Eerste Winkel' }),
       makeTx('k2', { description: 'Betaling 2', counterparty_name: 'Tweede Winkel' }),
@@ -1021,7 +1071,7 @@ describe('AICategorizeSheet — Stoppen routeert naar de controle-stap', () => {
       />
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /Vraag Fin/i }))
+    await clickVraagFin()
     await waitFor(() => {
       expect(screen.getByText('Eerste Winkel')).toBeInTheDocument()
     })
@@ -1119,7 +1169,7 @@ function aiCategorizeFetches() {
 
 describe('AICategorizeSheet — privé-modus resolver-keuze', () => {
   it('privacy_mode UIT: gebruikt de cloud-resolver, niet de lokale', async () => {
-    profilePrivacyMode = false
+    execPrivacyMode = false
     autoCatContext = { ...autoCatContext, budgets: [boodschappenBudget] }
     const txs = [makeTx('u1', { description: 'Betaling', counterparty_name: 'Onbekende Zaak' })]
 
@@ -1133,7 +1183,7 @@ describe('AICategorizeSheet — privé-modus resolver-keuze', () => {
       />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /Vraag Fin/i }))
+    await clickVraagFin()
 
     // De wizard toont de onbekende tegenpartij als AI-groepkaart (geen platte
     // "nog te beoordelen"-header meer in wizard-modus).
@@ -1146,7 +1196,7 @@ describe('AICategorizeSheet — privé-modus resolver-keuze', () => {
   })
 
   it('privacy_mode AAN + klaar: gebruikt de lokale resolver, GEEN cloud-call', async () => {
-    profilePrivacyMode = true
+    execPrivacyMode = true
     localCapabilityOk = true
     localModelReady = true
     autoCatContext = { ...autoCatContext, budgets: [boodschappenBudget] }
@@ -1162,7 +1212,7 @@ describe('AICategorizeSheet — privé-modus resolver-keuze', () => {
       />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /Vraag Fin/i }))
+    await clickVraagFin()
 
     await waitFor(() => {
       expect(screen.getByText(/^Fin$/)).toBeInTheDocument()
@@ -1176,7 +1226,7 @@ describe('AICategorizeSheet — privé-modus resolver-keuze', () => {
   })
 
   it('privacy_mode AAN + capability-fout: blokkeert eerlijk met de capability-melding, geen cloud-fallback', async () => {
-    profilePrivacyMode = true
+    execPrivacyMode = true
     localCapabilityOk = false // geen geschikte WebGPU → capability-tak
     autoCatContext = { ...autoCatContext, budgets: [boodschappenBudget] }
     // Eén regel-zekere (Albert Heijn → Regel) + één onbekende (dwingt de AI-fase).
@@ -1195,7 +1245,7 @@ describe('AICategorizeSheet — privé-modus resolver-keuze', () => {
       />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /Vraag Fin/i }))
+    await clickVraagFin()
 
     // Gesplitste melding (fix 19 jul): capability-tak = de concrete reden uit de
     // capability-check + de transiënte-flap-hint — niet meer de oude generieke tekst.
@@ -1213,7 +1263,7 @@ describe('AICategorizeSheet — privé-modus resolver-keuze', () => {
   })
 
   it('privacy_mode AAN + model weg (eviction): blokkeert met de download-opnieuw-melding, geen cloud-fallback', async () => {
-    profilePrivacyMode = true
+    execPrivacyMode = true
     localCapabilityOk = true
     localModelReady = false // cache-eviction / nooit voltooide download → model-missing-tak
     autoCatContext = { ...autoCatContext, budgets: [boodschappenBudget] }
@@ -1229,7 +1279,7 @@ describe('AICategorizeSheet — privé-modus resolver-keuze', () => {
       />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /Vraag Fin/i }))
+    await clickVraagFin()
 
     await waitFor(() => {
       expect(screen.getByText(/mogelijk heeft je browser het verwijderd om ruimte te maken/i)).toBeInTheDocument()
@@ -1263,7 +1313,7 @@ describe('AICategorizeSheet — GWT-1 · wizard-modus zonder globale lijst-heade
       />
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /Vraag Fin/i }))
+    await clickVraagFin()
 
     await waitFor(() => {
       expect(screen.getByText('Onbekende Zaak')).toBeInTheDocument()
@@ -1284,7 +1334,7 @@ describe('AICategorizeSheet — GWT-1 · wizard-modus zonder globale lijst-heade
 
 describe('AICategorizeSheet — GWT-16 · sleepmodus-terugkeer naar stap 2', () => {
   it('na "Sluit sleepmodus" verschijnt de volgende wachtende groep in de wizard — niet het keuzescherm, niet stap 1', async () => {
-    vi.stubGlobal('fetch', stopFetchMock())
+    vi.stubGlobal('fetch', withExecPrefs(stopFetchMock()))
     const txs = [
       makeTx('sm1', { description: 'Betaling 1', counterparty_name: 'Sleep Winkel' }),
       makeTx('sm2', { description: 'Betaling 2', counterparty_name: 'Tweede Winkel' }),
@@ -1300,7 +1350,7 @@ describe('AICategorizeSheet — GWT-16 · sleepmodus-terugkeer naar stap 2', () 
       />
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /Vraag Fin/i }))
+    await clickVraagFin()
     await waitFor(() => {
       expect(screen.getByText('Sleep Winkel')).toBeInTheDocument()
     })
@@ -1319,5 +1369,92 @@ describe('AICategorizeSheet — GWT-16 · sleepmodus-terugkeer naar stap 2', () 
     expect(screen.queryByTestId('sleepmodus-overlay')).toBeNull()
     expect(screen.queryByRole('button', { name: /^Vraag Fin$/i })).toBeNull()
     expect(screen.queryByText(/Fin herkende/i)).toBeNull()
+  })
+})
+
+// ── ADR 0078: de per-groep-override wint van de hoofdschakelaar ───────────────
+//
+// Dit is precies wat ontbrak: de sheet las de kale `profiles.privacy_mode`, dus
+// de schakelaar "Transacties & vaste lasten" op /mijn/privacy was decoratief.
+// Beide richtingen staan hier vast, met de modes-map uit de canonieke
+// `resolveAllExecutionModes`.
+
+describe('AICategorizeSheet — per-groep-override wint van de hoofdschakelaar (ADR 0078)', () => {
+  it('(a) hoofdschakelaar CLOUD + groep "transacties" LOKAAL → lokale resolver, GEEN cloud-call', async () => {
+    execPrivacyMode = false
+    execTransactiesOverride = 'lokaal'
+    localCapabilityOk = true
+    localModelReady = true
+    autoCatContext = { ...autoCatContext, budgets: [boodschappenBudget] }
+    const txs = [makeTx('ov1', { description: 'Betaling', counterparty_name: 'Onbekende Zaak' })]
+
+    render(
+      <AICategorizeSheet
+        transactions={txs}
+        budgets={[boodschappenBudget]}
+        budgetGroups={[{ parent: boodschappenBudget, children: [boodschappenBudget] }]}
+        onClose={() => {}}
+        onSaved={() => {}}
+      />,
+    )
+
+    await clickVraagFin()
+
+    await waitFor(() => {
+      expect(screen.getByText(/^Fin$/)).toBeInTheDocument()
+    })
+    // De override wint van de (op cloud staande) hoofdschakelaar.
+    expect(createLocalResolverSpy).toHaveBeenCalledTimes(1)
+    expect(localResolverSpy).toHaveBeenCalled()
+    expect(aiCategorizeFetches().length).toBe(0)
+  })
+
+  it('(b) hoofdschakelaar LOKAAL + groep "transacties" CLOUD → cloud-call, GEEN lokale resolver', async () => {
+    execPrivacyMode = true
+    execTransactiesOverride = 'cloud'
+    autoCatContext = { ...autoCatContext, budgets: [boodschappenBudget] }
+    const txs = [makeTx('ov2', { description: 'Betaling', counterparty_name: 'Onbekende Zaak' })]
+
+    render(
+      <AICategorizeSheet
+        transactions={txs}
+        budgets={[boodschappenBudget]}
+        budgetGroups={[{ parent: boodschappenBudget, children: [boodschappenBudget] }]}
+        onClose={() => {}}
+        onSaved={() => {}}
+      />,
+    )
+
+    await clickVraagFin()
+
+    await waitFor(() => {
+      expect(screen.getByText('Onbekende Zaak')).toBeInTheDocument()
+    })
+    // Cloudpad gebruikt ondanks privacy_mode=true — de override overstemt hem.
+    expect(aiCategorizeFetches().length).toBe(1)
+    expect(createLocalResolverSpy).not.toHaveBeenCalled()
+  })
+
+  it('(c) modus nog onbekend → fail-closed: "Vraag Fin" uit, geen enkele AI-call', async () => {
+    // /api/ai-execution-prefs hangt → de hook blijft in 'resolving'.
+    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})))
+    const txs = [makeTx('ov3', { description: 'Betaling', counterparty_name: 'Onbekende Zaak' })]
+
+    render(
+      <AICategorizeSheet
+        transactions={txs}
+        budgets={[boodschappenBudget]}
+        budgetGroups={[{ parent: boodschappenBudget, children: [boodschappenBudget] }]}
+        onClose={() => {}}
+        onSaved={() => {}}
+      />,
+    )
+
+    const btn = screen.getByRole('button', { name: /Vraag Fin/i })
+    expect(btn).toBeDisabled()
+    fireEvent.click(btn)
+
+    expect(aiCategorizeFetches().length).toBe(0)
+    expect(createLocalResolverSpy).not.toHaveBeenCalled()
   })
 })

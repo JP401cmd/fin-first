@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { recordAiUsage } from '@/lib/ai-credits'
 import { getModel, AIConfigError } from '@/lib/ai/config'
 import { checkTierGate } from '@/lib/require-tier'
+import { assertCloudAllowed } from '@/lib/ai/privacy-gate'
 import { checkCreditBudget, creditLimitMessage } from '@/lib/ai/credit-gate'
 import { sanitizeForAI } from '@/lib/ai/sanitize'
 import {
@@ -61,30 +62,18 @@ export async function POST(req: Request) {
   //  4. Garandeert FR-1.2 letterlijk: retour vóórdat enige transactiedata de
   //     promptopbouw of getModel() bereikt (die stappen komen pas later).
   //
-  // Own-row read via de anon/RLS-client (auth.uid() = id), NOOIT service-role —
-  // spiegelt app/api/display-mode. Eén minimale scalar-select (`privacy_mode`).
-  // Defensief: de kolom kan in oudere omgevingen nog ontbreken (de migratie
-  // loopt parallel). Bij een leesfout (kolom bestaat nog niet) of ontbrekende
-  // waarde vallen we terug op `false` — bestaand cloud-gedrag — zodat de route
-  // niet breekt vóór de migratie is toegepast (zelfde defensieve default als
-  // `ai_enabled` in lib/dashboard-data-loader.ts). Pre-migratie kán geen enkele
-  // gebruiker privacy_mode=true hebben, dus deze fail-open honoreert geen
-  // bestaande privacy-voorkeur ten onrechte.
-  const { data: privacyRow } = await supabase
-    .from('profiles')
-    .select('privacy_mode')
-    .eq('id', user.id)
-    .maybeSingle()
-  const privacyMode = (privacyRow as { privacy_mode?: boolean | null } | null)?.privacy_mode ?? false
-  if (privacyMode) {
-    return Response.json(
-      {
-        error: 'Privé-modus actief: categorisatie draait lokaal op je apparaat.',
-        code: 'privacy_mode_active',
-      },
-      { status: 403 },
-    )
-  }
+  // Via de GEDEELDE helper, niet via een eigen `privacy_mode`-lezing. Sinds de
+  // gebruiker per groep kiest (ADR 0078) is de hoofdschakelaar nog maar de
+  // DEFAULT: een override op 'transacties' hoort te winnen. Deze route las alleen
+  // die hoofdschakelaar, waardoor de schakelaar op /mijn/privacy voor
+  // categorisatie decoratief was — en, schever nog, de drie ándere routes van
+  // dezelfde groep (subscriptions/detect-ai, analyse-ai, advice) de override wél
+  // honoreerden. Binnen één groep gedroeg de helft zich anders dan de rest.
+  //
+  // De helper is ook defensief bij een ontbrekende kolom (oudere omgeving waar de
+  // migratie nog niet is toegepast): dan valt hij terug op de hoofdschakelaar.
+  const privacyGate = await assertCloudAllowed(supabase, user.id, 'transacties')
+  if (privacyGate) return privacyGate
 
   const tierGate = await checkTierGate(supabase, user.id, 'ai')
   if (tierGate) {

@@ -6,10 +6,9 @@
 
 import { readFileSync } from 'node:fs'
 import { createClient } from '@supabase/supabase-js'
-import { createAnthropic } from '@ai-sdk/anthropic'
-import { createOpenAI } from '@ai-sdk/openai'
 import { streamObject } from 'ai'
 import { z } from 'zod'
+import { getModel } from '../lib/ai/config'
 import { selectSourceArticles, filterGroundedItems, normalizeUrl } from '../lib/news-selection'
 import { NEWS_SYSTEM_PROMPT } from '../lib/news-system-prompt'
 
@@ -42,19 +41,16 @@ const newsItemSchema = z.object({
   sourceName: z.string().optional(),
 })
 
-async function getModelInline() {
-  const { data } = await service
-    .from('app_settings')
-    .select('key, value')
-    .in('key', ['ai_provider', 'ai_model_anthropic', 'ai_model_openai', 'anthropic_api_key', 'openai_api_key'])
-  const settings: Record<string, string> = {}
-  for (const row of data ?? []) settings[row.key] = row.value
-  const provider = settings.ai_provider || 'anthropic'
-  if (provider === 'openai') {
-    return createOpenAI({ apiKey: settings.openai_api_key || process.env.OPENAI_API_KEY! })(settings.ai_model_openai || 'gpt-4o')
-  }
-  return createAnthropic({ apiKey: settings.anthropic_api_key || process.env.ANTHROPIC_API_KEY! })(settings.ai_model_anthropic || 'claude-sonnet-4-5-20250929')
-}
+// Dit script instantieerde eerder de provider-SDK rechtstreeks (createAnthropic /
+// createOpenAI met de sleutels uit app_settings). Dat was het enige LLM-call-site
+// in de repo dat om `getModel` heen ging, en daarmee ook om de AI-kill-switch
+// (`platform_status`), de tokenlogging in `ai_token_usage` en de sanitize-scan.
+// Een diagnose-script maakt echte kosten bij de provider; die horen zichtbaar te
+// zijn op /beheer/ai-verbruik, en een uitgeschakelde AI hoort ook hier te gelden.
+//
+// `getModel` neemt de meegegeven client alleen om de gebruiker te bepalen voor de
+// tokenlogging. Met de service-client is dat niemand, dus landt het verbruik met
+// `user_id null` — precies zoals de nieuws-ingest-cron dat doet.
 
 async function main() {
   // ── Bronartikelen exact zoals /api/news ze laadt ───────────────
@@ -71,7 +67,7 @@ async function main() {
   const sourceArticles = selectSourceArticles(data || [], { limit: 40 })
   console.log(`Bronartikelen geselecteerd: ${sourceArticles.length} (van ${data?.length ?? 0} kandidaten)\n`)
 
-  const model = await getModelInline()
+  const model = await getModel(service, 'nieuws')
 
   // Representatief profiel (synthetisch — geen echte gebruikersdata in een debug-script)
   const financialContext = `Netto vermogen: €1.050.000 (waarvan €600.000 beleggingen, €250.000 spaargeld, €200.000 overwaarde woning).

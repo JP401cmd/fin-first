@@ -1,8 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams, useParams } from 'next/navigation'
 import type { ReportData } from '@/lib/report-data'
+import { useExecutionMode } from '@/lib/ai/local/use-execution-mode'
+import { useLocalReportIntro } from '@/lib/ai/local/use-local-report-intro'
+import { reportIntroFiguresFromData } from '@/lib/ai/local/local-report-prompt'
 import {
   formatTimestamp,
   formatCurrency,
@@ -35,12 +38,22 @@ export default function ReportViewerPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Waar hoort de rapport-inleiding te draaien? Dit bepaalt of we het rapport
+  // met `use_ai=true` mogen opvragen. FAIL-CLOSED: zolang de bestemming
+  // 'resolving' is, halen we niets op — anders zou één trage voorkeur-lezing
+  // alsnog een cloud-inleiding uitlokken bij iemand die privé-modus aan heeft.
+  const execution = useExecutionMode('rapporten')
+
   useEffect(() => {
+    if (execution.status === 'resolving') return
+
     async function fetchReport() {
       const periodType = searchParams.get('type') || 'month'
       const dateFrom = searchParams.get('from')
       const dateTo = searchParams.get('to')
-      const useAi = searchParams.get('ai') !== 'false'
+      // De gebruiker kan de inleiding uitzetten (?ai=false); de privé-modus kan
+      // 'm alleen naar het eigen toestel verplaatsen, nooit naar de cloud.
+      const useAi = searchParams.get('ai') !== 'false' && execution.canUseCloud
 
       if (!dateFrom || !dateTo) {
         setError('Geen datumbereik opgegeven')
@@ -69,7 +82,17 @@ export default function ReportViewerPage() {
     }
 
     fetchReport()
-  }, [searchParams, configId])
+  }, [searchParams, configId, execution.status, execution.canUseCloud])
+
+  // ── Lokale inleiding (progressive enhancement) ────────────────────────────
+  // Draait 'rapporten' lokaal, dan levert de route geen inleiding en schrijft de
+  // browser 'm zelf, ná het volledige rapport. De cijfers komen uit de bundel
+  // die deze pagina tóch al binnenkreeg — geen extra endpoint.
+  const localFigures = useMemo(
+    () => (data && execution.status === 'lokaal' ? reportIntroFiguresFromData(data) : null),
+    [data, execution.status],
+  )
+  const localIntro = useLocalReportIntro(localFigures)
 
   if (loading) {
     return (
@@ -119,7 +142,11 @@ export default function ReportViewerPage() {
   return (
     <div className="mx-auto max-w-[900px] px-4 py-6 md:px-8">
       <NavStackMeta title="Rapport" />
-      <PrintToolbar />
+      {/* Print-race: de PDF wordt gemaakt van de DOM zoals die nú is. Drukt
+          iemand af terwijl de lokale inleiding nog draait, dan staat er een lege
+          (of skeleton-)callout in het document. Daarom wacht de knop tot de
+          inleiding klaar is of definitief mislukt. */}
+      <PrintToolbar pending={localIntro.pending} />
 
       <ReportMasthead data={data} />
 
@@ -164,10 +191,43 @@ export default function ReportViewerPage() {
 
       <LeadStory kern={data.kern} />
 
-      {data.aiIntroduction && (
-        <ScenarioCallout title="Fin — redactie">
-          {data.aiIntroduction}
-        </ScenarioCallout>
+      {/* Fin's redactie — cloud-inleiding uit de bundel, of de on-device
+          geschreven variant. In lokale modus negeren we `data.aiIntroduction`
+          bewust: dat kan een eerder gecachte cloud-tekst zijn, en die hoort niet
+          als "op dit apparaat geschreven" te verschijnen. */}
+      {execution.status === 'lokaal' ? (
+        <>
+          {localIntro.status === 'klaar' && localIntro.intro && (
+            <ScenarioCallout title="Fin — redactie">{localIntro.intro}</ScenarioCallout>
+          )}
+          {(localIntro.status === 'wachten' || localIntro.status === 'bezig') && (
+            <ScenarioCallout title="Fin — redactie">
+              <span className="flex items-start gap-2">
+                <span
+                  aria-hidden
+                  className="mt-1 h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-[var(--module-active-500)] border-t-transparent"
+                />
+                <span className="text-[var(--ink-3)]">
+                  De inleiding wordt op dit apparaat geschreven — je rapport hieronder is al
+                  volledig. Eerste keer? Het model start hier op; dat duurt doorgaans tientallen
+                  seconden. Je data blijft lokaal.
+                </span>
+              </span>
+            </ScenarioCallout>
+          )}
+        </>
+      ) : (
+        data.aiIntroduction && (
+          <ScenarioCallout title="Fin — redactie">{data.aiIntroduction}</ScenarioCallout>
+        )
+      )}
+
+      {/* Privé-modus aan, maar dit toestel kan het model niet draaien. Eerlijk
+          benoemen (het rapport zelf is compleet), maar niet meeprinten. */}
+      {execution.status === 'blocked' && execution.message && (
+        <p data-print-hide className="mb-5 font-inter text-xs text-[var(--ink-3)]">
+          De inleiding wordt in privé-modus op je eigen apparaat geschreven. {execution.message}
+        </p>
       )}
 
       {/* Historical Comparison */}

@@ -17,6 +17,8 @@ import {
   Library,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { useExecutionMode } from '@/lib/ai/local/use-execution-mode'
+import type { LocalCalcProgress } from '@/lib/ai/local/local-calculator-resolver'
 import { CalculatorRunner } from './calculator-runner'
 import { CalculatorToLifeEventSheet } from './calculator-to-life-event-sheet'
 import { PublishCurationSheet } from './publish-curation-sheet'
@@ -77,8 +79,80 @@ export function RekenhulpView({
   // een page-reload dat zijn quotum is verlaagd.
   const [usageRefreshKey, setUsageRefreshKey] = useState(0)
 
+  // Waar mag deze functie draaien? Alleen actief in build-modus: buiten dat
+  // scherm is er niets te genereren en hoeft er dus ook geen GPU-check of
+  // voorkeur-fetch te gebeuren.
+  const exec = useExecutionMode('rapporten', mode === 'build')
+  const lokaal = exec.status === 'lokaal'
+  // Voortgang van de lokale bouw (vier deelstappen). Bij ~9-12 tok/s duurt dat
+  // een paar minuten; zonder deze regel staat de gebruiker naar een spinner te
+  // kijken zonder te weten of er iets gebeurt.
+  const [localStap, setLocalStap] = useState<LocalCalcProgress | null>(null)
+
+  /**
+   * On-device variant. Levert exact hetzelfde `BuildCalculatorResult`-contract
+   * als de route, dus vanaf `setDraft` is het pad identiek.
+   *
+   * WEEKLIMIET BEWUST NIET: `lib/calculator/rate-limit.ts` remt het cloudpad
+   * omdat elke generatie daar een providerrekening is. Lokaal draait het op het
+   * toestel van de gebruiker — er is geen rekening om te beschermen, en een limiet
+   * zou hem betalen voor iets wat hij zelf al levert. Dat is een keuze, geen
+   * vergeten stap.
+   */
+  async function generateLokaal(refine: boolean) {
+    if (refine) {
+      // EERLIJK MELDEN, NIET STIL DEGRADEREN. Verfijnen stuurt de bestaande
+      // definitie mee terug de prompt in; samen met de instructies past dat niet
+      // in de 8192 tokens die het lokale model in TOTAAL heeft (in + out samen).
+      setError(
+        'Verfijnen kan niet in privé-modus: de bestaande rekenhulp past er dan niet meer bij in het geheugen van het lokale model. Stel je vraag opnieuw voor een nieuwe rekenhulp, of zet "Rapporten & rekenhulpen" op cloud-AI via Mijn → Privacy.',
+      )
+      return
+    }
+    setLoading(true)
+    setError(null)
+    setLocalStap(null)
+    try {
+      // Dynamische import: de lokale bouwer (en daarachter de LiteRT-runtime)
+      // komt pas binnen wanneer iemand 'm echt gebruikt — nooit in het
+      // reguliere cloudpad.
+      const { buildLocalCalculator } = await import('@/lib/ai/local/local-calculator-resolver')
+      const res = await buildLocalCalculator(prompt, { onProgress: setLocalStap })
+      if (!res.ok) {
+        setError(res.error)
+        return
+      }
+      setDraft(res.definition)
+    } catch (err) {
+      console.error('[lokale-ai] rekenhulp bouwen mislukt in de UI:', err)
+      setError('De lokale AI kon geen rekenhulp maken. Probeer het opnieuw.')
+    } finally {
+      setLoading(false)
+      setLocalStap(null)
+    }
+  }
+
   async function generate(refine = false) {
     if (!prompt.trim()) return
+
+    // FAIL-CLOSED. Zowel 'resolving' als 'blocked' betekent: er vertrekt niets —
+    // ook niet "even via de cloud". In 'resolving' weten we nog niet of iemand
+    // privé-modus aan heeft staan, en dat is precies het venster waarin een
+    // stille cloud-call de belofte breekt.
+    if (exec.status === 'resolving') {
+      setError('Nog even geduld — we bepalen waar deze functie mag draaien.')
+      return
+    }
+    if (exec.status === 'blocked') {
+      setError(exec.message ?? 'Lokale AI is nu niet beschikbaar op dit toestel.')
+      return
+    }
+    if (exec.canUseLocal) {
+      await generateLokaal(refine)
+      return
+    }
+    if (!exec.canUseCloud) return
+
     setLoading(true)
     setError(null)
     try {
@@ -191,15 +265,18 @@ export function RekenhulpView({
         <header className="mb-4">
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-horizon-700">
-              Rekenhulp bouwen met Fin
+              {lokaal ? 'Rekenhulp bouwen op je eigen toestel' : 'Rekenhulp bouwen met Fin'}
             </div>
             {/* Verbruik-badge — geeft de gebruiker zicht op zijn weekquotum
                 vóór hij submit. `usageRefreshKey` bumpt na een succesvolle
-                generate zodat de teller meteen zakt. */}
-            <RateLimitBadge
-              refreshKey={usageRefreshKey}
-              mode={draft ? 'refinements' : 'generations'}
-            />
+                generate zodat de teller meteen zakt. Lokaal is er geen quotum
+                (zie generateLokaal), dus dan tonen we 'm niet. */}
+            {exec.status === 'cloud' && (
+              <RateLimitBadge
+                refreshKey={usageRefreshKey}
+                mode={draft ? 'refinements' : 'generations'}
+              />
+            )}
           </div>
           <h2 className="font-serif text-xl text-[var(--ink)] mt-1">
             Beschrijf je vraagstuk
@@ -207,6 +284,30 @@ export function RekenhulpView({
           <p className="text-sm text-[var(--ink-2)] mt-1 leading-relaxed">
             Fin maakt er een rekenhulp van met jouw gegevens al ingevuld.
           </p>
+
+          {/* VERWACHTINGSMANAGEMENT — een lokale rekenhulp is aantoonbaar armer
+              dan een cloud-rekenhulp. Dat is geen storing maar een eigenschap
+              van de privé-modus, en dus benoemen we het vooraf in plaats van de
+              gebruiker het te laten ontdekken. */}
+          {lokaal && (
+            <p className="mt-2 rounded-xl border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2 text-xs text-[var(--ink-2)] leading-relaxed">
+              In privé-modus rekent je eigen toestel. Dat blijft binnen de deur,
+              maar levert een <strong className="font-semibold">kleinere rekenhulp</strong>: één
+              berekening, hooguit vier invoervelden en drie uitkomsten — geen
+              scenario-vergelijking. Reken op een paar minuten. Wil je een
+              uitgebreide rekenhulp, zet &lsquo;Rapporten &amp; rekenhulpen&rsquo; dan op
+              cloud-AI via Mijn → Privacy.
+            </p>
+          )}
+
+          {exec.status === 'blocked' && (
+            <p
+              role="status"
+              className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 leading-relaxed"
+            >
+              {exec.message}
+            </p>
+          )}
         </header>
 
         <textarea
@@ -235,8 +336,8 @@ export function RekenhulpView({
         <div className="mt-3 flex items-center gap-2">
           <button
             type="button"
-            onClick={() => generate(!!draft)}
-            disabled={loading || !prompt.trim()}
+            onClick={() => generate(!!draft && !lokaal)}
+            disabled={loading || !prompt.trim() || exec.status === 'resolving' || exec.status === 'blocked'}
             className="inline-flex items-center gap-2 bg-[var(--ink)] text-[var(--paper)] px-4 py-2.5 text-sm font-semibold hover:bg-[var(--ink-2)] transition-colors disabled:opacity-50"
           >
             {loading ? (
@@ -244,9 +345,30 @@ export function RekenhulpView({
             ) : (
               <Wand2 className="w-4 h-4" aria-hidden="true" />
             )}
-            {draft ? 'Verfijnen' : 'Genereer rekenhulp'}
+            {draft && !lokaal ? 'Verfijnen' : 'Genereer rekenhulp'}
           </button>
         </div>
+
+        {/* Voortgang van de vier deelstappen. `aria-live` zodat een schermlezer
+            de stapwissel meekrijgt — bij minutenlange generatie is stilte geen
+            optie. */}
+        {loading && lokaal && (
+          <p role="status" aria-live="polite" className="mt-2 text-xs text-[var(--ink-3)]">
+            {localStap
+              ? `Stap ${localStap.step} van ${localStap.totaal} — ${localStap.label}`
+              : 'Het model wordt klaargezet…'}
+          </p>
+        )}
+
+        {/* Verfijnen bestaat lokaal niet (zie generateLokaal). Dat melden we
+            zichtbaar naast de knop in plaats van het stil weg te laten. */}
+        {draft && lokaal && (
+          <p className="mt-2 text-xs text-[var(--ink-3)] leading-relaxed">
+            Verfijnen kan alleen met cloud-AI — de bestaande rekenhulp past er
+            lokaal niet bij in het geheugen. Stel je vraag opnieuw voor een
+            nieuwe rekenhulp.
+          </p>
+        )}
 
         {error && (
           <div role="alert" className="mt-3 border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">

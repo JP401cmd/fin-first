@@ -28,12 +28,16 @@ export type LocalParseResult = {
 }
 
 /** Strip <think>…</think>-preambles (ook een niet-afgesloten openende tag). */
-function stripThink(s: string): string {
+// GEDEELD (geëxporteerd sinds de rapport-inleiding + wat-als-suggesties lokaal
+// gingen draaien): dezelfde drie faalmodi — think-preamble, fence, afkapping —
+// treffen élke lokale generatie. Eén implementatie, meerdere consumenten; de
+// werking hier is ongewijzigd (puur additief `export`).
+export function stripThink(s: string): string {
   return s.replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/<think>[\s\S]*$/i, '')
 }
 
 /** Vind de eerste balanced top-level JSON-array; null als niet gesloten/parsebaar. */
-function balancedArray(t: string, start: number): unknown[] | null {
+export function balancedArray(t: string, start: number): unknown[] | null {
   let depth = 0
   let end = -1
   let inStr = false
@@ -66,7 +70,7 @@ function balancedArray(t: string, start: number): unknown[] | null {
 }
 
 /** Berg alle complete top-level {…}-objecten (voor een afgekapte array). */
-function salvageObjects(s: string): unknown[] {
+export function salvageObjects(s: string): unknown[] {
   const out: unknown[] = []
   let i = 0
   while (i < s.length) {
@@ -111,24 +115,31 @@ function nonNull<T>(v: T | null): v is T {
   return v !== null
 }
 
-/** Normaliseer één ruw item naar {id, budget_slug, confidence, reasoning}.
- *  reasoning mag ontbreken ('kort'-uitvoer). */
-export function normalizeLocalItem(item: unknown): RawLocalCategorization | null {
-  if (!item || typeof item !== 'object') return null
-  const o = item as Record<string, unknown>
-  if (!('budget_slug' in o) && !('confidence' in o)) return null
-  const idRaw = o.id
-  const id = idRaw === null || idRaw === undefined || idRaw === '' ? null : String(idRaw).trim()
-  const slugRaw = o.budget_slug
-  const slug = slugRaw === null || slugRaw === undefined || slugRaw === 'null' ? null : String(slugRaw)
-  const confRaw = Number(o.confidence)
-  const confidence = Number.isFinite(confRaw) ? Math.min(1, Math.max(0, confRaw)) : 0
-  const reasoning = typeof o.reasoning === 'string' ? o.reasoning : ''
-  return { id, budget_slug: slug, confidence, reasoning }
+/** Ruwe JSON-objecten uit modeltekst + de diagnose van hoe ze eruit kwamen. */
+export type LocalJsonExtraction = {
+  /** De gevonden top-level objecten, of null als er niets bruikbaars in zat. */
+  objects: unknown[] | null
+  hadFence: boolean
+  hadThink: boolean
+  truncated: boolean
+  salvaged: boolean
 }
 
-/** Parse de modeloutput naar categorisatie-items + diagnose. */
-export function parseLocalCategorizations(text: string): LocalParseResult {
+/**
+ * De EXTRACTIE-helft van {@link parseLocalCategorizations}: fences en
+ * <think>-preambles strippen, de eerste balanced array pakken en bij afkapping
+ * de complete objecten bergen — zonder enige aanname over de VORM van die
+ * objecten.
+ *
+ * Waarom dit apart staat: de faalmodi die deze parser opvangt (fences, think-
+ * preambles, afkapping) zijn eigenschappen van het lokale MODEL, niet van de
+ * categorisatie-taak. Elke volgende on-device taak — de vaste-kosten-analyse is
+ * de eerste — loopt tegen exact dezelfde drie aan. Die logica een tweede keer
+ * overtypen is precies de drift die we bij de prompts ook weigeren; daarom
+ * delegeert `parseLocalCategorizations` hieronder naar deze functie en verschilt
+ * alleen nog de normalisatie per taak.
+ */
+export function extractLocalJsonObjects(text: string): LocalJsonExtraction {
   const original = text.trim()
   const hadThink = /<think>/i.test(original)
 
@@ -148,7 +159,7 @@ export function parseLocalCategorizations(text: string): LocalParseResult {
     // Geen array-haakje: probeer losse objecten (bv. per-regel JSON).
     const salv = salvageObjects(t)
     return {
-      items: salv.length ? salv.map(normalizeLocalItem).filter(nonNull) : null,
+      objects: salv.length ? salv : null,
       hadFence,
       hadThink,
       truncated: !endsClean,
@@ -158,16 +169,51 @@ export function parseLocalCategorizations(text: string): LocalParseResult {
 
   const arr = balancedArray(t, start)
   if (arr) {
-    return { items: arr.map(normalizeLocalItem).filter(nonNull), hadFence, hadThink, truncated: false, salvaged: false }
+    return { objects: arr, hadFence, hadThink, truncated: false, salvaged: false }
   }
 
   // Array niet gesloten (afkapping) → berg de complete objecten uit de body.
   const salv = salvageObjects(t.slice(start + 1))
   return {
-    items: salv.length ? salv.map(normalizeLocalItem).filter(nonNull) : null,
+    objects: salv.length ? salv : null,
     hadFence,
     hadThink,
     truncated: true,
     salvaged: salv.length > 0,
+  }
+}
+
+/** Normaliseer één ruw item naar {id, budget_slug, confidence, reasoning}.
+ *  reasoning mag ontbreken ('kort'-uitvoer). */
+export function normalizeLocalItem(item: unknown): RawLocalCategorization | null {
+  if (!item || typeof item !== 'object') return null
+  const o = item as Record<string, unknown>
+  if (!('budget_slug' in o) && !('confidence' in o)) return null
+  const idRaw = o.id
+  const id = idRaw === null || idRaw === undefined || idRaw === '' ? null : String(idRaw).trim()
+  const slugRaw = o.budget_slug
+  const slug = slugRaw === null || slugRaw === undefined || slugRaw === 'null' ? null : String(slugRaw)
+  const confRaw = Number(o.confidence)
+  const confidence = Number.isFinite(confRaw) ? Math.min(1, Math.max(0, confRaw)) : 0
+  const reasoning = typeof o.reasoning === 'string' ? o.reasoning : ''
+  return { id, budget_slug: slug, confidence, reasoning }
+}
+
+/**
+ * Parse de modeloutput naar categorisatie-items + diagnose.
+ *
+ * Dunne laag boven {@link extractLocalJsonObjects}: die doet de model-faalmodi
+ * (fence/think/afkapping), hier gebeurt alleen nog de taak-specifieke
+ * normalisatie. Gedrag is ongewijzigd — `objects: null` blijft `items: null`,
+ * een gevonden array blijft een (mogelijk lege) lijst.
+ */
+export function parseLocalCategorizations(text: string): LocalParseResult {
+  const { objects, hadFence, hadThink, truncated, salvaged } = extractLocalJsonObjects(text)
+  return {
+    items: objects ? objects.map(normalizeLocalItem).filter(nonNull) : null,
+    hadFence,
+    hadThink,
+    truncated,
+    salvaged,
   }
 }

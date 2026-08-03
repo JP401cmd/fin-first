@@ -9,7 +9,11 @@ import { resolveLocalReadiness, type LocalReadiness } from '@/lib/ai/local/local
 import type { LocalChatSession } from '@/lib/ai/local/litert-runtime'
 import type { LocalKnowledgeItem } from '@/lib/ai/local/knowledge-context'
 import type { LocalChatOverview } from '@/lib/ai/local/local-chat-context'
-import { buildLocalChatSystemPrompt } from '@/lib/ai/local/local-chat-prompt'
+import {
+  buildLocalChatSystemPrompt,
+  createLocalChatTurnBuilder,
+  type LocalChatTurnBuilder,
+} from '@/lib/ai/local/local-chat-prompt'
 
 /**
  * LocalChatPanel — de client-UI van de ON-DEVICE Fin-chat (fase C1b).
@@ -52,6 +56,14 @@ export function LocalChatPanel({ overview }: { overview: LocalChatOverview }) {
   // gebouwd bij het eerste bericht. In een ref zodat re-renders 'm niet resetten.
   const sessionRef = useRef<LocalChatSession | null>(null)
   const scrollRef = useRef<HTMLDivElement | null>(null)
+
+  // Boekhouding van de kennis die deze sessie al heeft gezien. Leeft naast de
+  // sessie: de native conversatie stapelt beurten in hetzelfde 8192-token-venster,
+  // dus dezelfde uitleg twee keer meesturen is verspilde ruimte.
+  //
+  // Pas aangemaakt tegelijk met de sessie, niet bij de eerste render: de
+  // kennisbank wordt asynchroon geladen en zou dan leeg zijn vastgelegd.
+  const turnBuilderRef = useRef<LocalChatTurnBuilder | null>(null)
 
   // Mount: capability + model-staat bepalen, en de kennisbank ophalen.
   useEffect(() => {
@@ -122,13 +134,23 @@ export function LocalChatPanel({ overview }: { overview: LocalChatOverview }) {
 
     try {
       if (!sessionRef.current) {
-        // Bouw de systeemprompt op basis van de eerste vraag (kennis-selectie)
-        // en start de native multi-turn conversatie.
-        const systemPrompt = buildLocalChatSystemPrompt({ overview, question: text, knowledgeItems: knowledge })
+        // Preface BEURT-ONAFHANKELIJK: alleen DNA + het canonieke overzicht.
+        // Kennis hoort hier bewust NIET in. De preface wordt bij een native
+        // multi-turn conversatie éénmalig geprefilled en daarna nooit meer
+        // aangepast; kennis die je hier injecteert is dus voor altijd gekozen op
+        // de eerste vraag. Wie eerst naar zijn buffer vraagt en daarna naar Box 3
+        // zou dat tweede kennisitem nooit meer krijgen.
+        const systemPrompt = buildLocalChatSystemPrompt({ overview })
         const { createChatSession } = await import('@/lib/ai/local/litert-runtime')
         sessionRef.current = await createChatSession(systemPrompt)
+        // Verse sessie = lege historie, dus de kennis-boekhouding begint opnieuw.
+        turnBuilderRef.current = createLocalChatTurnBuilder(knowledge)
       }
-      await sessionRef.current.send(text, appendAssistantDelta)
+      // Kennis gaat per beurt mee, gefenced, en alleen wat nog niet eerder in de
+      // historie terecht is gekomen — zie createLocalChatTurnBuilder.
+      const turnBuilder = turnBuilderRef.current ?? createLocalChatTurnBuilder(knowledge)
+      turnBuilderRef.current = turnBuilder
+      await sessionRef.current.send(turnBuilder.build(text), appendAssistantDelta)
     } catch {
       // Fail-closed: eerlijke melding, geen cloud-fallback. Verwijder het lege
       // assistent-bericht zodat er geen halve bubbel blijft staan.
@@ -148,6 +170,9 @@ export function LocalChatPanel({ overview }: { overview: LocalChatOverview }) {
   const onRestart = useCallback(() => {
     sessionRef.current?.dispose()
     sessionRef.current = null
+    // De volgende beurt bouwt een verse sessie met een lege historie; de al
+    // meegestuurde kennis is daarmee weg en mag opnieuw.
+    turnBuilderRef.current = null
     setMessages([])
     setError(null)
     setInput('')

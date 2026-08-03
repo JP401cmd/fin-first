@@ -7,6 +7,11 @@ import { HORIZON_SETUP_COMPLETED_SLUG } from '@/lib/horizon-data-loader'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import { type ModuleId, type IntentId } from '@/lib/module-registry'
 import { extractFinancialData } from '@/lib/ai/extract-financial-data'
+import { isCloudAllowed } from '@/lib/ai/privacy-gate'
+import { checkTierGate } from '@/lib/require-tier'
+import { checkCreditBudget } from '@/lib/ai/credit-gate'
+import { recordAiUsage } from '@/lib/ai-credits'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { AssetQuickInputSchema, DebtQuickInputSchema } from '@/lib/quick-add/validation'
 import { buildAssetDraft, buildDebtDraft } from '@/lib/quick-add/build-drafts'
 import type { AssetQuickInput, DebtQuickInput } from '@/lib/quick-add/types'
@@ -71,6 +76,35 @@ function applyModuleSeeding(
 // tak (probleem 4 / Keuze B). Het multi-step pad zet has_budget_tracking /
 // has_holdings_tracking al INLINE op de asset-insert (zie de map() in stap 3),
 // dus een aparte post-insert UPDATE is overbodig.
+
+/**
+ * Mag de server-side extractie-tak draaien — de ENIGE plek in deze route waar
+ * gebruikerstekst een externe AI-provider bereikt (via `extractFinancialData` →
+ * `getModel`)?
+ *
+ * WAAROM EEN BOOLEAN EN GEEN 403 OP DE ROUTE. Deze route is een
+ * onboarding-OPSLAGroute die veel méér doet dan AI: profiel, bezittingen,
+ * schulden, life events, doelen. Een tier-gate bovenaan `POST` zou de complete
+ * onboarding blokkeren voor iedereen zonder AI-abonnement — dat is geen
+ * beveiliging maar een kapotte productflow. De poort hoort dus om de AI-tak
+ * heen, precies waar de privé-gate al zat: kan het uitlezen niet, dan slaan we
+ * dat over en wordt de rest van de onboarding gewoon opgeslagen. De gebruiker
+ * vult zijn bezittingen daarna handmatig aan.
+ *
+ * De volgorde binnen de poort is de vastgelegde: privé-modus → tier → credit.
+ * Privé-modus eerst omdat dat de meest fundamentele keuze van de gebruiker is;
+ * de credit-check als laatste omdat een call die de tier-gate toch al tegenhoudt
+ * geen budget-lezing verdient.
+ */
+async function mayRunServerExtraction(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<boolean> {
+  if (!(await isCloudAllowed(supabase, userId, 'documenten'))) return false
+  if (await checkTierGate(supabase, userId, 'ai')) return false
+  const creditGate = await checkCreditBudget(supabase, userId, 'extraction')
+  return creditGate.allowed
+}
 
 /**
  * Is `debtType` het schuld-type dat bij `assetType` hoort volgens de canonieke
@@ -497,17 +531,39 @@ const bodySchema = z.object({
    * targeted post-onboarding suggestions via the coach-bubble.
    */
   deferredFields: z.array(z.enum(['income', 'assets', 'spaardoel'])).optional(),
-  /** Pre-extracted data from client-side review (avoids re-running AI extraction) */
+  /**
+   * Pre-extracted data from client-side review (avoids re-running AI extraction).
+   *
+   * DE AFGELEIDE VELDEN ZIJN OPTIONEEL, MAAR ZE TELLEN. Deze tak accepteerde
+   * oorspronkelijk alleen naam/type/bedrag en vulde rendement, rente, aflossing,
+   * liquiditeit en aftrekbaarheid met nullen. Dat kon zolang de client niets
+   * beters had. Het on-device pad (lib/ai/local/local-extraction-resolver.ts)
+   * lévert die velden nu wél — deterministisch uit TypeScript-lookups, niet uit
+   * het model — en ze dan alsnog op nul zetten zou precies de winst weggooien
+   * die het lokale pad oplevert: een hypotheek zonder rente en zonder aflossing
+   * is in elke projectie een schuld die nooit afneemt.
+   *
+   * Blijven optioneel voor oudere clients; ontbreken ze, dan gelden de
+   * historische defaults (zie de mapping verderop in deze route).
+   */
   extractionData: z.object({
     assets: z.array(z.object({
       name: z.string(),
       asset_type: z.string(),
       estimated_value: z.number(),
+      expected_return: z.number().optional(),
+      monthly_contribution: z.number().optional(),
+      is_liquid: z.boolean().optional(),
+      subtype: z.string().nullable().optional(),
     })).optional(),
     debts: z.array(z.object({
       name: z.string(),
       debt_type: z.string(),
       estimated_balance: z.number(),
+      interest_rate: z.number().optional(),
+      monthly_payment: z.number().optional(),
+      is_tax_deductible: z.boolean().nullable().optional(),
+      subtype: z.string().nullable().optional(),
     })).optional(),
     life_events: z.array(z.object({
       name: z.string(),
@@ -679,14 +735,20 @@ export async function POST(req: Request) {
     if (isNewsOnly && (extractionData || newsDescription)) {
       if (extractionData) {
         // Client already ran extraction and user reviewed/edited the results — use directly
+        // De afgeleide velden komen mee wanneer de client ze levert (het lokale
+        // pad vult ze deterministisch — zie lib/ai/local/local-extraction-
+        // defaults.ts). Ontbreken ze, dan gelden de historische defaults van
+        // oudere clients; `??` en niet `||`, zodat een legitieme 0 (rendement
+        // van contant geld) of `false` (niet liquide) niet stilzwijgend wordt
+        // overschreven.
         extractedAssets = (extractionData.assets ?? []).map((a) => ({
           name: a.name,
           asset_type: a.asset_type,
           current_value: a.estimated_value,
-          expected_return: 0,
-          monthly_contribution: 0,
-          is_liquid: true,
-          subtype: null,
+          expected_return: a.expected_return ?? 0,
+          monthly_contribution: a.monthly_contribution ?? 0,
+          is_liquid: a.is_liquid ?? true,
+          subtype: a.subtype ?? null,
           source: 'ai_extracted' as const,
         }))
 
@@ -694,10 +756,10 @@ export async function POST(req: Request) {
           name: d.name,
           debt_type: d.debt_type,
           current_balance: d.estimated_balance,
-          interest_rate: 0,
-          monthly_payment: 0,
-          is_tax_deductible: null,
-          subtype: null,
+          interest_rate: d.interest_rate ?? 0,
+          monthly_payment: d.monthly_payment ?? 0,
+          is_tax_deductible: d.is_tax_deductible ?? null,
+          subtype: d.subtype ?? null,
           source: 'ai_extracted' as const,
         }))
 
@@ -715,8 +777,30 @@ export async function POST(req: Request) {
         financialContext = extractionData.financial_context_remainder || null
         aiIncomeEstimate = extractionData.monthly_income_estimate ?? null
         aiExpensesEstimate = extractionData.monthly_expenses_estimate ?? null
-      } else if (newsDescription) {
+      } else if (newsDescription && (await mayRunServerExtraction(supabase, user.id))) {
         // Fallback: run extraction server-side (backwards compatibility)
+        //
+        // DRIE POORTEN, ÉÉN VOORWAARDE: privé-modus, AI-abonnement en
+        // creditbudget zitten samen in `mayRunServerExtraction` (zie daar voor
+        // de volgorde en de motivatie). Deze tak is het ENIGE pad in deze route
+        // dat tekst van de gebruiker naar een AI-leverancier stuurt — de
+        // model-call zit niet hier maar in extractFinancialData
+        // (lib/ai/extract-financial-data.ts), en juist daarom miste de statische
+        // scan deze route.
+        //
+        // PRIVÉ-MODUS: staat 'documenten' op lokaal, dan hoort de
+        // onboarding-client het uitlezen zelf on-device te doen en het resultaat
+        // als `extractionData` mee te sturen (de tak hierboven). Deed hij dat
+        // niet, dan slaan we het uitlezen simpelweg over: de rest van de
+        // onboarding wordt gewoon opgeslagen en de gebruiker vult zijn
+        // bezittingen handmatig aan. Bewust GEEN 403 op de hele route — dat zou
+        // de complete onboarding blokkeren om één optionele hulpstap — en
+        // bewust ook geen stille cloud-call.
+        //
+        // Let op de eerlijke grens: de vrije tekst zelf wordt verderop nog wel
+        // als `news_description` op het profiel bewaard. "Lokaal" betekent hier
+        // dus: geen AI-leverancier ziet je tekst — niet: de tekst blijft op je
+        // toestel. Dat verschil hoort ook zo in de UI-tekst te staan.
         const dob = new Date(identity.date_of_birth)
         const age = Math.floor((Date.now() - dob.getTime()) / (365.25 * 24 * 60 * 60 * 1000))
 
@@ -726,6 +810,12 @@ export async function POST(req: Request) {
           monthlyIncome: identity.net_monthly_income,
           monthlyExpenses: identity.estimated_monthly_expenses,
         })
+
+        // Verbruik registreren in dezelfde maandbucket die `mayRunServerExtraction`
+        // hierboven leest — anders is deze AI-call ongemeten en telt hij niet mee
+        // voor de volgende gate. `recordAiUsage` gooit nooit: metering mag de
+        // onboarding niet breken.
+        await recordAiUsage(supabase, user.id, 'extraction')
 
         extractedAssets = extraction.assets.map((a) => ({
           name: a.name,

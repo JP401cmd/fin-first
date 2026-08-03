@@ -207,6 +207,44 @@ async function getModelBlob(onProgress?: (p: LocalModelLoadProgress) => void): P
 let sessionPromise: Promise<LocalSession> | null = null
 let loadedEngine: Engine | null = null
 
+// ── Eén GPU, meerdere consumenten ───────────────────────────────────────────
+//
+// Zolang alleen categorisatie en chat lokaal draaiden, was gelijktijdigheid een
+// theoretisch probleem: je doet niet allebei tegelijk. Nu er meer functies op
+// dezelfde engine komen (briefing, rapport-inleiding, vaste lasten, …) is het
+// reëel — en twee tegelijk lopende generaties op één WebGPU-engine leveren geen
+// snelheidswinst, alleen contentie en een groter risico op device-loss.
+//
+// Daarom loopt ÁLLE inferentie door één wachtrij: aanroepen worden netjes na
+// elkaar afgehandeld, in volgorde van binnenkomst. Dat is een bewuste keuze voor
+// voorspelbaarheid boven schijnbare parallelliteit.
+let gpuQueue: Promise<unknown> = Promise.resolve()
+
+function runExclusive<T>(task: () => Promise<T>): Promise<T> {
+  // We hangen de taak aan de staart van de rij. De `catch` op de ketting zorgt
+  // dat één mislukte generatie de rij niet vergiftigt voor de volgende.
+  const result = gpuQueue.then(task, task)
+  gpuQueue = result.catch(() => {})
+  return result
+}
+
+/**
+ * Volgnummer van de huidige engine. `disposeSession()` hoogt 'm op, zodat een
+ * chatsessie die vóór die teardown is geopend kan zien dat haar conversatie niet
+ * meer bestaat.
+ *
+ * Waarom een epoch en geen refcount: `disposeSession` is het HERSTELPAD na een
+ * WebGPU device-loss. Dat moet altijd door kunnen gaan — een refcount zou het
+ * herstel laten blokkeren door een chatvenster dat toevallig nog openstaat.
+ * Andersom mag een teardown ook niet stilzwijgend een andere consument met een
+ * dode conversatie achterlaten. De epoch geeft die consument een eerlijke,
+ * herkenbare fout in plaats van een cryptische SDK-crash.
+ */
+let engineEpoch = 0
+
+/** Foutmelding wanneer een sessie een engine-teardown heeft overleefd. */
+export const LOCAL_SESSION_STALE = '[lokale-ai] sessie vervallen na herstart van het model'
+
 async function buildSession(onProgress?: (p: LocalModelLoadProgress) => void): Promise<LocalSession> {
   const core = await loadCore()
   const blob = await getModelBlob(onProgress)
@@ -241,6 +279,8 @@ async function buildSession(onProgress?: (p: LocalModelLoadProgress) => void): P
       .map((m) => m.content)
       .join('\n\n')
 
+    // Door de gedeelde wachtrij: één generatie tegelijk op de GPU.
+    return runExclusive(async () => {
     try {
       // VERSE conversatie per aanroep: systeemprompt als preface, geen historie.
       const conversation = await engine.createConversation({
@@ -275,6 +315,7 @@ async function buildSession(onProgress?: (p: LocalModelLoadProgress) => void): P
       console.error('[lokale-ai] inferentie mislukt:', err)
       throw err
     }
+    })
   }
 
   return { generate }
@@ -307,6 +348,10 @@ export async function disposeSession(): Promise<void> {
   const engine = loadedEngine
   sessionPromise = null
   loadedEngine = null
+  // Elke sessie die vóór dit moment is geopend, hangt aan een engine die zo
+  // verdwijnt. De ophoging maakt dat detecteerbaar (zie LOCAL_SESSION_STALE) in
+  // plaats van dat een andere consument later op een dode conversatie stuit.
+  engineEpoch += 1
   if (engine) {
     try {
       await engine.delete()
@@ -345,9 +390,16 @@ export async function createChatSession(systemPrompt: string): Promise<LocalChat
   })
 
   let disposed = false
+  // Aan welke engine deze conversatie hangt. Herstelt een andere consument de
+  // engine (disposeSession na device-loss), dan is deze conversatie weg.
+  const bornAtEpoch = engineEpoch
 
   const send = async (text: string, onDelta: (delta: string) => void): Promise<string> => {
     if (disposed) throw new Error('[lokale-ai] chatsessie is al afgesloten')
+    // Eerlijke, herkenbare fout in plaats van een cryptische SDK-crash: de
+    // aanroeper kan hierop een verse sessie openen en het gesprek voortzetten.
+    if (bornAtEpoch !== engineEpoch) throw new Error(LOCAL_SESSION_STALE)
+    return runExclusive(async () => {
     let full = ''
     try {
       const stream = conversation.sendMessageStreaming(text)
@@ -369,6 +421,7 @@ export async function createChatSession(systemPrompt: string): Promise<LocalChat
       console.error('[lokale-ai] chat-inferentie mislukt:', err)
       throw err
     }
+    })
   }
 
   const dispose = (): void => {

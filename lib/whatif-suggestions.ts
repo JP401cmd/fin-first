@@ -30,16 +30,24 @@ export function isSignificantDelta(
   return false
 }
 
-/**
- * Build prompt context for AI suggestion generation.
- */
-export function buildSuggestionPrompt(context: {
+/** Context waaruit de wijzigingsregels van een wat-als-scenario volgen. */
+export interface SuggestionPromptContext {
   overrides: WhatIfOverrides
   baseline: WhatIfOverrides
   fireAgeDelta: number | null
   activeEventNames: string[]
-}): string {
-  const { overrides, baseline, fireAgeDelta, activeEventNames } = context
+}
+
+/**
+ * De losse delta-regels ("Inkomen: +€400/mnd", "FIRE-leeftijd effect: -14
+ * maanden") van het scenario.
+ *
+ * Geëxtraheerd uit `buildSuggestionPrompt` zodat het lokale (on-device) pad
+ * exact dezelfde regels gebruikt zonder de cloud-instructiestaart mee te
+ * slepen — één bron voor wát er veranderd is, twee promptvormen eromheen.
+ */
+export function buildSuggestionChanges(context: SuggestionPromptContext): string[] {
+  const { overrides, baseline, fireAgeDelta } = context
 
   const changes: string[] = []
 
@@ -70,6 +78,16 @@ export function buildSuggestionPrompt(context: {
     const months = Math.round(fireAgeDelta * 12)
     changes.push(`FIRE-leeftijd effect: ${months > 0 ? '+' : ''}${months} maanden`)
   }
+
+  return changes
+}
+
+/**
+ * Build prompt context for AI suggestion generation (cloud-pad).
+ */
+export function buildSuggestionPrompt(context: SuggestionPromptContext): string {
+  const { activeEventNames } = context
+  const changes = buildSuggestionChanges(context)
 
   return [
     'De gebruiker past een wat-als scenario aan met de volgende wijzigingen:',

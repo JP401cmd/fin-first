@@ -7,6 +7,9 @@ import { buildRecommendationContext } from '@/lib/ai/context/recommendation-cont
 import { maskPIIInOutput } from '@/lib/ai/pii-output-filter'
 import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
 import { checkTierGate } from '@/lib/require-tier'
+import { checkCreditBudget, creditLimitMessage } from '@/lib/ai/credit-gate'
+import { recordAiUsage } from '@/lib/ai-credits'
+import { assertCloudAllowed } from '@/lib/ai/privacy-gate'
 import { unauthorized, serverError } from '@/lib/api/respond'
 
 // ── Schema (same as main recommendations endpoint) ─────────
@@ -43,6 +46,23 @@ const recommendationSchema = z.object({
 // don't survive across serverless instances on Vercel, causing
 // GET polls to miss in-progress results and show an error.
 // Now POST waits for AI completion and returns results directly.
+//
+// ⚠️ GEEN AANROEPER MEER (geconstateerd 3 augustus 2026). De onboarding zegt op
+// app/(onboarding)/onboarding/page.tsx ~r1054 expliciet "geen AI pre-generatie
+// meer hier", en een zoektocht door app/, components/ en lib/ levert buiten dat
+// commentaar, docs/architecture en de gate-scan geen enkele fetch op. De route
+// is dus dood maar wél live en aanroepbaar.
+//
+// Bewust niet verwijderd in deze wijziging (dat is een productbesluit, geen
+// gevolg van de lokale-AI-uitrol), maar de twee gaten die dat opleverde zijn wél
+// gedicht: de privé-gate hierboven, en de credit-gate hieronder die de
+// hoofdroute /api/ai/recommendations wél had en deze niet. Een ongebruikte,
+// ongemeterde generatie-endpoint is een kostenoppervlak dat je niet wilt laten
+// staan "omdat niemand hem toch aanroept".
+//
+// Voor de eerste tips ná onboarding is een deterministische set uit dezelfde
+// kandidatenmotor beter dan welk model dan ook: op dat moment is het lokale
+// model per definitie nog niet gedownload en is de context nog dun.
 
 export async function POST() {
   const supabase = await createClient()
@@ -52,9 +72,33 @@ export async function POST() {
     return unauthorized()
   }
 
+  // PRIVÉ-MODUS EERST — vóór de tier-gate, de credit-gate en élke dataophaling.
+  // Staat 'tips' op lokaal, dan maakt de browser de eerste tips zelf en hoort
+  // deze route niets te leveren.
+  // Waarom deze volgorde: (1) privé-modus is de meest fundamentele keuze van de
+  // gebruiker en gaat vóór commerciële gating — de eerlijke reden is "privé-modus
+  // staat aan", niet "je mist een abonnement"; (2) een geblokkeerde call mag geen
+  // credits kosten; (3) het volledige financiële profiel (buildRecommendationContext)
+  // mag de promptopbouw niet eens bereiken.
+  // Nooit een stille terugval naar de cloud: 403 is het eindpunt.
+  const privacyGate = await assertCloudAllowed(supabase, user.id, 'tips')
+  if (privacyGate) return privacyGate
+
   const tierGate = await checkTierGate(supabase, user.id, 'ai')
   if (tierGate) {
     return Response.json({ error: tierGate.error }, { status: 403 })
+  }
+
+  // Maand-creditbudget (gedeelde bucket) vóór de dure LLM-call. Ontbrak hier,
+  // terwijl de hoofdroute /api/ai/recommendations 'm wél heeft — zie de
+  // toelichting boven deze handler. Zelfde feature-key, zodat beide paden uit
+  // dezelfde bucket putten en de meting klopt.
+  const creditGate = await checkCreditBudget(supabase, user.id, 'recommendations')
+  if (!creditGate.allowed) {
+    return Response.json(
+      { error: creditLimitMessage(creditGate) },
+      { status: 429, headers: { 'Retry-After': String(creditGate.retryAfterSeconds) } },
+    )
   }
 
   const [{ data: budgets }, { data: profile }] = await Promise.all([
@@ -102,6 +146,10 @@ export async function POST() {
       prompt: `Analyseer het volgende financiële profiel en genereer 3 optimalisatietips:\n\n${context}`,
     })
 
+    // Verbruik registreren op dezelfde bucket als de hoofdroute, zodat het
+    // maandbudget klopt en /beheer/ai-verbruik geen blinde vlek houdt.
+    await recordAiUsage(supabase, user.id, 'recommendations')
+
     const recommendations: Record<string, unknown>[] = []
 
     for (const rec of result.object.recommendations) {
@@ -147,6 +195,12 @@ export async function POST() {
 }
 
 // ── GET: poll fallback (checks database) ──────────────────
+//
+// Bewust GEEN privé-gate: deze handler leest uitsluitend eerder opgeslagen
+// aanbevelingen uit de eigen tabel en kan nooit tot een modelcall leiden. Een
+// 403 zou hier de gebruiker afsnijden van zijn eigen, al bestaande gegevens
+// zonder dat er iets naar een AI-leverancier gaat. De blokkade hoort op POST —
+// het pad dat daadwerkelijk genereert.
 
 const RECENT_WINDOW_MS = 2 * 60 * 1000
 

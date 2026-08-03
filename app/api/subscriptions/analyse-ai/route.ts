@@ -4,14 +4,41 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { getModel, AIConfigError } from '@/lib/ai/config'
 import { checkTierGate } from '@/lib/require-tier'
+import { assertCloudAllowed } from '@/lib/ai/privacy-gate'
 import { detectRecurringTransactions, CATEGORY_LABELS } from '@/lib/recurring-detection'
 import { VASTE_KOSTEN_ANALYSE_PROMPT } from '@/lib/ai/dna/wil'
 import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
-import { unauthorized } from '@/lib/api/respond'
+import { unauthorized, badRequest } from '@/lib/api/respond'
 import { localMonthStartMonthsAgo } from '@/lib/month-range'
+import type { VasteKostenCandidate } from '@/lib/ai/local/local-vaste-kosten-resolver'
 
 /** Maximum number of candidates to send to the AI model to avoid token waste. */
 const MAX_AI_CANDIDATES = 50
+
+/**
+ * Kandidaat-cap voor het LOKALE pad (`candidatesOnly`). Bewust lager dan
+ * MAX_AI_CANDIDATES: on-device draait het model op ~9-12 tok/s, dus elke extra
+ * kandidaat is echte wachttijd voor de gebruiker in plaats van tokenkosten.
+ *
+ * SPIEGEL van `LOCAL_VASTE_KOSTEN_CANDIDATE_CAP` in
+ * lib/ai/local/local-vaste-kosten-resolver.ts — bewust gespiegeld en niet
+ * geïmporteerd: die module hangt aan de LiteRT/WebGPU-runtime en hoort niet in
+ * de serverbundel. `local-vaste-kosten-resolver.test.ts` pint dat de twee
+ * getallen gelijk blijven.
+ */
+const MAX_LOCAL_AI_CANDIDATES = 30
+
+/**
+ * Body van POST /api/subscriptions/analyse-ai. Beide velden optioneel: de
+ * cloud-aanroep stuurt (historisch) helemaal geen body.
+ */
+const AnalyseBodySchema = z.object({
+  /**
+   * Alleen de gedetecteerde kandidaten teruggeven en stoppen vóór `getModel` —
+   * de databron voor de ON-DEVICE analyse.
+   */
+  candidatesOnly: z.boolean().optional(),
+})
 
 /**
  * POST /api/subscriptions/analyse-ai
@@ -22,13 +49,54 @@ const MAX_AI_CANDIDATES = 50
  * - 'skip' (not a fixed cost): groceries, fuel, restaurants, variable shopping
  *
  * Returns suggestions for the user to review and confirm.
+ *
+ * TWEE MODI. Deze route deed ophalen ÉN classificeren in één handeling, waardoor
+ * de deterministisch voorgekauwde kandidatenlijst onbereikbaar was zonder een
+ * cloud-modelcall. Met `{ candidatesOnly: true }` stopt hij vóór `getModel` en
+ * geeft hij alleen die lijst terug; de browser classificeert dan zelf on-device
+ * (lib/ai/local/local-vaste-kosten-resolver.ts). Bewust deze kleine ingreep en
+ * geen aparte hydratie-route naast app/api/local-chat-overview: de hele
+ * voorbewerking (12 maanden transacties, detectie, confidence-filter,
+ * al-bevestigd-filter, `toMonthly`) is precies dezelfde en zou daar regel voor
+ * regel gedupliceerd moeten worden — twee kandidatenlijsten die uit elkaar
+ * kunnen lopen is een duurdere prijs dan één extra vlag.
  */
-export async function POST() {
+export async function POST(req: Request) {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
       return unauthorized()
+    }
+
+    // Body is optioneel (de cloud-aanroep stuurt er historisch geen), dus geen
+    // parseBody: die geeft een 400 op een lege body. Een ontbrekende/onleesbare
+    // body betekent hier "gewoon de cloud-analyse", het bestaande gedrag.
+    const rawBody: unknown = await req.json().catch(() => ({}))
+    const parsedBody = AnalyseBodySchema.safeParse(rawBody ?? {})
+    if (!parsedBody.success) return badRequest('Ongeldige invoer')
+    const candidatesOnly = parsedBody.data.candidatesOnly === true
+
+    // PRIVÉ-MODUS EERST — vóór de tier-gate, de credit-gate en élke dataophaling.
+    // Staat 'transacties' op lokaal, dan classificeert de browser de terugkerende
+    // betalingen zelf en hoort deze route niets te leveren.
+    // Waarom deze volgorde: (1) privé-modus is de meest fundamentele keuze van de
+    // gebruiker en gaat vóór commerciële gating — de eerlijke reden is "privé-modus
+    // staat aan", niet "je mist een abonnement"; (2) een geblokkeerde call mag geen
+    // credits kosten; (3) er mag geen enkele transactie richting promptopbouw gaan.
+    // Nooit een stille terugval naar de cloud: 403 is het eindpunt.
+    //
+    // UITZONDERING `candidatesOnly` — zelfde redenering als
+    // app/api/local-chat-overview: dit ÍS de lokale databron. Er is geen
+    // `getModel`-call en geen egress; de kandidatenlijst gaat van de server naar
+    // de éigen browser van de gebruiker, precies zoals elke /overzicht-pagina dat
+    // doet. De gate op die tak zetten zou de lokale modus blokkeren met als reden
+    // "je hebt de lokale modus aan" — de belofte breken die hij moet beschermen.
+    // De gate blijft onverkort staan vóór de modelcall hieronder, en het
+    // `candidatesOnly`-antwoord kan die modelcall niet bereiken (harde return).
+    if (!candidatesOnly) {
+      const privacyGate = await assertCloudAllowed(supabase, user.id, 'transacties')
+      if (privacyGate) return privacyGate
     }
 
     const tierGate = await checkTierGate(supabase, user.id, 'ai')
@@ -70,8 +138,11 @@ export async function POST() {
     }
 
     if (transactions.length < 3) {
+      // `candidates: []` staat er voor het lokale pad bij: beide modi krijgen zo
+      // dezelfde "niets gevonden"-vorm terug en de client hoeft niet te raden.
       return NextResponse.json({
         suggestions: [],
+        candidates: [],
         analysedCount: 0,
         skippedCount: 0,
       })
@@ -110,15 +181,47 @@ export async function POST() {
     )
 
     if (candidates.length === 0) {
+      // `candidates: []` staat er voor het lokale pad bij: beide modi krijgen zo
+      // dezelfde "niets gevonden"-vorm terug en de client hoeft niet te raden.
       return NextResponse.json({
         suggestions: [],
+        candidates: [],
         analysedCount: 0,
         skippedCount: 0,
       })
     }
 
-    // Cap candidates to avoid excessive token usage
-    const cappedCandidates = candidates.slice(0, MAX_AI_CANDIDATES)
+    // Cap candidates to avoid excessive token usage (cloud) resp. wachttijd (lokaal)
+    const cappedCandidates = candidates.slice(
+      0,
+      candidatesOnly ? MAX_LOCAL_AI_CANDIDATES : MAX_AI_CANDIDATES,
+    )
+
+    // ── Lokaal datapad: stop hier, vóór getModel ────────────────────────────────
+    // Alles hierboven is deterministisch (detectie, filters, `toMonthly`) en
+    // bevat geen model-uitkomst. Vanaf hier begint de cloud-AI; het lokale pad
+    // heeft alleen de kandidaten nodig en classificeert zelf on-device.
+    //
+    // GEEN `sanitizeForAI` op deze tak, en dat is bewust géén vergeten guardrail:
+    // saniteren beschermt tegen egress naar een AI-leverancier, en die is hier
+    // per definitie afwezig — deze lijst gaat naar de eigen browser van de
+    // gebruiker, over dezelfde geauthenticeerde verbinding als elke andere
+    // pagina. De handelsnaam van de tegenpartij ongemoeid laten is bovendien
+    // precies wat de on-device classificatie bruikbaar maakt (ADR 0043 §5).
+    if (candidatesOnly) {
+      const localCandidates: VasteKostenCandidate[] = cappedCandidates.map((d) => ({
+        id: d.key,
+        name: d.counterpartyName || d.commonDescription,
+        monthlyAmount: toMonthly(d.averageAmount, d.frequency),
+        averageAmount: Math.abs(d.averageAmount),
+        frequency: d.frequency,
+        occurrences: d.occurrences,
+        autoCategory: d.suggestedCategory,
+        autoCategoryLabel: CATEGORY_LABELS[d.suggestedCategory],
+        confidence: d.confidence,
+      }))
+      return NextResponse.json({ candidates: localCandidates })
+    }
 
     // Prepare AI model
     let model

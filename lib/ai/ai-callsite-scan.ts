@@ -70,6 +70,56 @@ export const AI_CALLSITE_ALLOWLIST: CallsiteAllowlistEntry[] = [
     reason:
       'On-device inferentie (Gemma 4 E2B/WebGPU), geen egress; sanitize zou legitiem on-device-signaal strippen (ADR 0043, FR-3.5).',
   },
+  {
+    file: 'lib/ai/local/local-briefing-resolver.ts',
+    reason:
+      'On-device briefing-redactie (Gemma 4 E2B/WebGPU), geen egress; de prompt bevat uitsluitend de eigen, deterministisch gecomposeerde briefjes (ADR 0043 §5).',
+  },
+  {
+    file: 'lib/ai/local/local-vaste-kosten-resolver.ts',
+    reason:
+      'On-device vaste-kosten-analyse (Gemma 4 E2B/WebGPU), geen egress; de handelsnaam van de tegenpartij is juist het signaal dat de classificatie mogelijk maakt (ADR 0043, FR-3.5).',
+  },
+  {
+    file: 'lib/ai/local/local-extraction-resolver.ts',
+    reason:
+      'On-device vrije-tekst-extractie (Gemma 4 E2B/WebGPU), geen egress; de tekst GÁÁT over de eigen situatie, dus saniteren zou juist het te extraheren signaal wegstrepen (ADR 0043 §5).',
+  },
+  {
+    file: 'lib/ai/local/use-local-report-intro.ts',
+    reason:
+      'On-device rapport-inleiding (Gemma 4 E2B/WebGPU), geen egress; de prompt bevat — net als het cloud-pad in app/api/report/route.ts — uitsluitend geaggregeerde kerncijfers (ADR 0043 §5).',
+  },
+  {
+    file: 'lib/hooks/use-whatif-suggestions.ts',
+    reason:
+      'On-device wat-als-suggesties (Gemma 4 E2B/WebGPU), geen egress; de prompt bevat alleen scenario-delta’s en gebeurtenisnamen, geen rauwe transactie-/naam-velden (ADR 0043 §5).',
+  },
+  {
+    file: 'lib/aangifte/local/extract-aangifte-local.ts',
+    reason:
+      'On-device aangifte-extractie (Gemma 4 E2B/WebGPU), geen egress — de aangiftetekst verlaat het toestel niet. BSN-/naam-strip blijven upstream als defense-in-depth (ADR 0043 §5).',
+  },
+  {
+    file: 'lib/ai/local/local-pension-resolver.ts',
+    reason:
+      'On-device pensioen-uitlezen (Gemma 4 E2B/WebGPU), geen egress — de UPO-tekstlaag verlaat het toestel niet. De aanroeper draait stripSensitiveData als goedkope hygiëne (ADR 0043 §5).',
+  },
+  {
+    file: 'lib/ai/local/local-tips-resolver.ts',
+    reason:
+      'On-device aanbevelingen (Gemma 4 E2B/WebGPU), geen egress. De prompt bevat per call één doorgerekende kans; de titel draagt daarbij BEWUST een handelsnaam (tegenpartij uit de vaste-lasten-detectie) of een zelf ingetypte schuld-/bezitsnaam — net als bij local-vaste-kosten-resolver is dát juist het signaal waar de tip over gaat. Saniteren zou de kans onbenoembaar maken. Let op: het ARTEFACT (recommendations.title/description) wordt later wél door de cloud-context gelezen en gaat dáár door sanitizeForAI (ADR 0043 §5).',
+  },
+  {
+    file: 'lib/ai/local/local-news-resolver.ts',
+    reason:
+      'On-device nieuwseditie (Gemma 4 E2B/WebGPU), geen egress. De prompt bevat publieke bronartikelen plus het compacte LocalChatOverview (geaggregeerde kerncijfers uit de rekenmotoren) — geen rauwe transactie-, tegenpartij- of naamvelden. Het cloudpad (app/api/news/route.ts) saniteert wél, juist omdát het profiel daar een externe provider bereikt (ADR 0043 §5, ADR 0080).',
+  },
+  {
+    file: 'lib/ai/local/local-calculator-resolver.ts',
+    reason:
+      'On-device rekenhulp-bouwer (Gemma 4 E2B/WebGPU), geen egress. Het cloudpad (lib/ai/build-calculator.ts) saniteert de vraag wél — juist omdát die naar een externe provider gaat; hier verlaat de vraag het toestel niet, en saniteren zou de vraag onbruikbaar maken (die GÁÁT over de eigen situatie). Verder bevat de prompt alleen de 13 prefill-KEYS, geen prefill-waarden (ADR 0043 §5).',
+  },
 ]
 
 /**
@@ -123,6 +173,15 @@ export interface CallsiteViolation {
 const EXTRA_FILES = [
   'lib/briefing/redactie.ts',
   'lib/aangifte/extract-aangifte-data.ts',
+  // Het on-device aangifte-pad staat buiten lib/ai (het hoort bij het
+  // aangifte-domein) maar is wél een generatie-callsite. Zonder deze regel valt
+  // het door de mazen van de directory-sweep — precies het gat dat deze scan
+  // hoort te dichten.
+  'lib/aangifte/local/extract-aangifte-local.ts',
+  // De lokale wat-als-suggesties draaien vanuit een hook in lib/hooks (de UI-naad
+  // is daar, niet in lib/ai). Zonder deze regel is het een generatie-callsite die
+  // de directory-sweep niet ziet — zelfde gat als bij het aangifte-pad hierboven.
+  'lib/hooks/use-whatif-suggestions.ts',
   'lib/news-enrich.ts',
 ]
 

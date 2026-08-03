@@ -9,6 +9,7 @@ import { maskPIIInOutput } from '@/lib/ai/pii-output-filter'
 import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
 import { checkTierGate } from '@/lib/require-tier'
 import { checkCreditBudget, creditLimitMessage } from '@/lib/ai/credit-gate'
+import { assertCloudAllowed } from '@/lib/ai/privacy-gate'
 import { unauthorized, serverError } from '@/lib/api/respond'
 
 const recommendationSchema = z.object({
@@ -45,6 +46,18 @@ export async function POST() {
   if (!user) {
     return unauthorized()
   }
+
+  // PRIVÉ-MODUS EERST — vóór de tier-gate, de credit-gate en élke dataophaling.
+  // Staat 'tips' op lokaal, dan maakt de browser de optimalisatietips zelf en
+  // hoort deze route niets te leveren.
+  // Waarom deze volgorde: (1) privé-modus is de meest fundamentele keuze van de
+  // gebruiker en gaat vóór commerciële gating — de eerlijke reden is "privé-modus
+  // staat aan", niet "je mist een abonnement"; (2) een geblokkeerde call mag geen
+  // credits uit het maandbudget vreten; (3) het volledige financiële profiel
+  // (buildRecommendationContext) mag de promptopbouw niet eens bereiken.
+  // Nooit een stille terugval naar de cloud: 403 is het eindpunt.
+  const privacyGate = await assertCloudAllowed(supabase, user.id, 'tips')
+  if (privacyGate) return privacyGate
 
   const tierGate = await checkTierGate(supabase, user.id, 'ai')
   if (tierGate) {

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-02T20:27:13.131Z",
+  "generatedAt": "2026-08-02T22:59:54.410Z",
   "generatedDate": "2026-08-02",
   "repo": {
     "name": "fin",
@@ -189,11 +189,11 @@
   "stats": {
     "routes": 146,
     "routesProduction": 101,
-    "api": 270,
+    "api": 275,
     "tables": 86,
-    "migrations": 178,
+    "migrations": 179,
     "integrations": 25,
-    "components": 848,
+    "components": 859,
     "providers": 11,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -2385,6 +2385,15 @@
       ]
     },
     {
+      "url": "/api/ai-execution-prefs",
+      "file": "app/api/ai-execution-prefs/route.ts",
+      "domain": "ai-execution-prefs",
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
       "url": "/api/ai/actions",
       "file": "app/api/ai/actions/route.ts",
       "domain": "ai",
@@ -3492,6 +3501,39 @@
       "url": "/api/local-knowledge",
       "file": "app/api/local-knowledge/route.ts",
       "domain": "local-knowledge",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "url": "/api/local-news-edition",
+      "file": "app/api/local-news-edition/route.ts",
+      "domain": "local-news-edition",
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "url": "/api/local-news-sources",
+      "file": "app/api/local-news-sources/route.ts",
+      "domain": "local-news-sources",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "url": "/api/local-tips",
+      "file": "app/api/local-tips/route.ts",
+      "domain": "local-tips",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "url": "/api/local-tips-candidates",
+      "file": "app/api/local-tips-candidates/route.ts",
+      "domain": "local-tips-candidates",
       "methods": [
         "GET"
       ]
@@ -6179,6 +6221,22 @@
       ]
     },
     {
+      "domain": "ai-execution-prefs",
+      "label": "ai-execution-prefs",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/ai-execution-prefs",
+          "file": "app/api/ai-execution-prefs/route.ts",
+          "domain": "ai-execution-prefs",
+          "methods": [
+            "GET",
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "appearance",
       "label": "appearance",
       "count": 1,
@@ -6691,6 +6749,67 @@
           "url": "/api/local-knowledge",
           "file": "app/api/local-knowledge/route.ts",
           "domain": "local-knowledge",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "local-news-edition",
+      "label": "local-news-edition",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/local-news-edition",
+          "file": "app/api/local-news-edition/route.ts",
+          "domain": "local-news-edition",
+          "methods": [
+            "GET",
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "local-news-sources",
+      "label": "local-news-sources",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/local-news-sources",
+          "file": "app/api/local-news-sources/route.ts",
+          "domain": "local-news-sources",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "local-tips",
+      "label": "local-tips",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/local-tips",
+          "file": "app/api/local-tips/route.ts",
+          "domain": "local-tips",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "local-tips-candidates",
+      "label": "local-tips-candidates",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/local-tips-candidates",
+          "file": "app/api/local-tips-candidates/route.ts",
+          "domain": "local-tips-candidates",
           "methods": [
             "GET"
           ]
@@ -7607,7 +7726,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 178
+    "migrationCount": 179
   },
   "tablesByDomain": [
     {
@@ -8057,11 +8176,11 @@
     }
   ],
   "components": {
-    "total": 848,
+    "total": 859,
     "groups": [
       {
         "group": "app",
-        "count": 331,
+        "count": 334,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -8078,6 +8197,7 @@
           "ai-subscription-upsell",
           "ai-subscription-upsell.test",
           "ai-vaste-kosten-sheet",
+          "ai-vaste-kosten-sheet.test",
           "analysis-section",
           "app-setup-gate",
           "app-setup-section",
@@ -8279,7 +8399,9 @@
           "page-status-dot",
           "page-status-provider",
           "pending-transfer-banner",
+          "pension-local-review",
           "pension-pdf-upload",
+          "pension-pdf-upload.test",
           "persona-card",
           "perspective-context-label",
           "perspective-context-label.test",
@@ -8398,7 +8520,7 @@
       },
       {
         "group": "overview",
-        "count": 138,
+        "count": 140,
         "items": [
           "aandachtspunt-actie-button",
           "atomic-cards",
@@ -8482,6 +8604,8 @@
           "koppel-rekening-banner",
           "koppel-rekening-banner.test",
           "leverage-card",
+          "lokale-tips-generator",
+          "lokale-tips-generator.test",
           "marginale-druk-curve",
           "mini-networth-chart",
           "mini-networth-chart-anchor",
@@ -8776,12 +8900,15 @@
       },
       {
         "group": "mijn",
-        "count": 30,
+        "count": 34,
         "items": [
           "abonnement-section",
           "account-basis-section",
           "account-client",
           "ai-credits-section",
+          "ai-execution-choice",
+          "ai-execution-group-list",
+          "ai-execution-group-list.test",
           "ai-privacy-settings",
           "ai-privacy-settings.test",
           "budget-tint-picker",
@@ -8800,6 +8927,7 @@
           "local-categorization-settings.test",
           "local-chat-panel",
           "local-chat-panel.test",
+          "local-model-section",
           "mijn-overview",
           "mijn-overview.test",
           "module-accent-picker",
@@ -8938,7 +9066,7 @@
       },
       {
         "group": "berichten",
-        "count": 8,
+        "count": 9,
         "items": [
           "archive-edition-card",
           "archive-section",
@@ -8947,7 +9075,20 @@
           "news-components",
           "newspaper-footer",
           "nieuws-only-client",
+          "nieuws-only-client.test",
           "section-heading"
+        ]
+      },
+      {
+        "group": "aangifte",
+        "count": 6,
+        "items": [
+          "manual-wizard",
+          "privacy-notice",
+          "review-primitives",
+          "review-step",
+          "upload-step",
+          "upload-step.test"
         ]
       },
       {
@@ -8960,17 +9101,6 @@
           "holding-source-badge",
           "investment-holding-card",
           "isin-lookup-field"
-        ]
-      },
-      {
-        "group": "aangifte",
-        "count": 5,
-        "items": [
-          "manual-wizard",
-          "privacy-notice",
-          "review-primitives",
-          "review-step",
-          "upload-step"
         ]
       },
       {
@@ -9474,6 +9604,12 @@
         {
           "name": "profiles",
           "write": false
+        }
+      ],
+      "ai-execution-prefs": [
+        {
+          "name": "profiles",
+          "write": true
         }
       ],
       "appearance": [
@@ -10060,6 +10196,34 @@
           "write": false
         }
       ],
+      "local-news-edition": [
+        {
+          "name": "profiles",
+          "write": false
+        }
+      ],
+      "local-news-sources": [
+        {
+          "name": "profiles",
+          "write": false
+        }
+      ],
+      "local-tips": [
+        {
+          "name": "profiles",
+          "write": false
+        },
+        {
+          "name": "recommendations",
+          "write": true
+        }
+      ],
+      "local-tips-candidates": [
+        {
+          "name": "profiles",
+          "write": false
+        }
+      ],
       "log-error": [
         {
           "name": "error_logs",
@@ -10088,12 +10252,8 @@
           "write": true
         },
         {
-          "name": "news_articles",
-          "write": true
-        },
-        {
           "name": "news_editions",
-          "write": true
+          "write": false
         },
         {
           "name": "news_feedback",
@@ -10725,6 +10885,14 @@
           ]
         },
         {
+          "domain": "ai-execution-prefs",
+          "label": "ai-execution-prefs",
+          "write": true,
+          "routes": [
+            "/api/ai-execution-prefs"
+          ]
+        },
+        {
           "domain": "appearance",
           "label": "appearance",
           "write": true,
@@ -11038,6 +11206,38 @@
           "write": false,
           "routes": [
             "/api/local-chat-overview"
+          ]
+        },
+        {
+          "domain": "local-news-edition",
+          "label": "local-news-edition",
+          "write": false,
+          "routes": [
+            "/api/local-news-edition"
+          ]
+        },
+        {
+          "domain": "local-news-sources",
+          "label": "local-news-sources",
+          "write": false,
+          "routes": [
+            "/api/local-news-sources"
+          ]
+        },
+        {
+          "domain": "local-tips",
+          "label": "local-tips",
+          "write": false,
+          "routes": [
+            "/api/local-tips"
+          ]
+        },
+        {
+          "domain": "local-tips-candidates",
+          "label": "local-tips-candidates",
+          "write": false,
+          "routes": [
+            "/api/local-tips-candidates"
           ]
         },
         {
@@ -12048,14 +12248,6 @@
           "routes": [
             "/api/admin/news-articles"
           ]
-        },
-        {
-          "domain": "news",
-          "label": "news",
-          "write": true,
-          "routes": [
-            "/api/news"
-          ]
         }
       ],
       "job_runs": [
@@ -12458,6 +12650,14 @@
             "/api/ai/recommendations/[id]",
             "/api/ai/recommendations/initial",
             "/api/ai/recommendations/postponed-ready"
+          ]
+        },
+        {
+          "domain": "local-tips",
+          "label": "local-tips",
+          "write": true,
+          "routes": [
+            "/api/local-tips"
           ]
         },
         {
@@ -13225,9 +13425,8 @@
         {
           "domain": "news",
           "label": "news",
-          "write": true,
+          "write": false,
           "routes": [
-            "/api/news",
             "/api/news/archive"
           ]
         }
@@ -13392,9 +13591,9 @@
       "goals",
       "investment_holdings",
       "life_events",
-      "news_articles",
       "profiles",
       "questionnaire_sessions",
+      "recommendations",
       "transactions",
       "user_feature_visits"
     ]
@@ -15110,6 +15309,40 @@
       ],
       "summary": "Aanleiding: Stage B van de field-level encryptie op `assets.account_number` (`lib/asset-account-number.ts`, spiegel van `lib/bank-account-iban.ts`). Tweede keer dat dit patroon opduikt na `bank_accounts.iban` — twee is genoeg om het vast te leggen vóórdat een derde encrypted kolo",
       "file": "docs/adr/0077-encrypted-kolom-triple-contract-en-stage-b-stoplijn.md"
+    },
+    {
+      "id": "0078-uitvoerkeuze-per-groep-lokaal-of-cloud",
+      "title": "De gebruiker kiest per functionaliteitsgroep waar de AI draait",
+      "status": "aanvaard",
+      "date": "2026-08-03",
+      "elements": [
+        "t-lokale-ai"
+      ],
+      "summary": "`profiles.privacy_mode` blijft de hoofdschakelaar, maar krijgt een override per **uitvoergroep** (`profiles.ai_execution_prefs`). Alle zestien aanroepbare AI-routes respecteren die keuze server-side; kan iets lokaal niet, dan wordt het geblokkeerd met uitleg — nooit stilzwijgend ",
+      "file": "docs/adr/0078-uitvoerkeuze-per-groep-lokaal-of-cloud.md"
+    },
+    {
+      "id": "0079-nieuws-ingest-blijft-cloud-by-design",
+      "title": "De nieuws-ingest blijft cloud, en is bewust geen gebruikerskeuze",
+      "status": "aanvaard",
+      "date": "2026-08-03",
+      "elements": [
+        "t-lokale-ai"
+      ],
+      "summary": "De dagelijkse nieuws-ingest (`nieuws_ingest`) krijgt géén privé-gate en géén schakelaar op `/mijn/privacy`. Hij staat in de registry als `scope: 'platform'` met een vastgelegde reden, en wordt op het scherm als één uitleg-regel benoemd.",
+      "file": "docs/adr/0079-nieuws-ingest-blijft-cloud-by-design.md"
+    },
+    {
+      "id": "0080-lokale-nieuwseditie-map-reduce",
+      "title": "Lokale nieuwseditie draait map-reduce, niet één modelcall — server hervalideert",
+      "status": "aanvaard",
+      "date": "2026-08-03",
+      "elements": [
+        "t-lokale-ai",
+        "as-nieuws"
+      ],
+      "summary": "De persoonlijke nieuwseditie kan on-device via de lokale AI-runtime worden samengesteld, maar niet zoals het cloudpad dat doet. In plaats van één `streamObject`-call over de hele set bronartikelen loopt de generatie map-reduce: eerst een scoring-pass per artikel, dan een schrijf-",
+      "file": "docs/adr/0080-lokale-nieuwseditie-map-reduce.md"
     }
   ],
   "churn": {
@@ -15129,7 +15362,7 @@
       },
       {
         "path": "app/api/ai",
-        "commits": 20
+        "commits": 21
       },
       {
         "path": "app/api/household",
@@ -15144,11 +15377,11 @@
         "commits": 8
       },
       {
-        "path": "app/api/budgets",
-        "commits": 6
+        "path": "app/api/assets",
+        "commits": 7
       },
       {
-        "path": "app/api/assets",
+        "path": "app/api/budgets",
         "commits": 6
       },
       {
@@ -16376,8 +16609,8 @@
     },
     {
       "date": "2026-08-02",
-      "api": 270,
-      "components": 848,
+      "api": 275,
+      "components": 859,
       "tables": 86,
       "routesProduction": 101
     }

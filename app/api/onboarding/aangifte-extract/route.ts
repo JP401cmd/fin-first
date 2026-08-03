@@ -41,6 +41,7 @@ import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { unauthorized } from '@/lib/api/respond'
 import { recordAiUsage } from '@/lib/ai-credits'
+import { assertCloudAllowed } from '@/lib/ai/privacy-gate'
 import { extractAangifteData } from '@/lib/aangifte/extract-aangifte-data'
 import { extractionSchema } from '@/lib/aangifte/extraction-schema'
 import { stripSensitiveData, stripHouseholdNames } from '@/lib/aangifte/strip-bsn'
@@ -81,6 +82,23 @@ export async function POST(req: Request) {
   if (!user) {
     return unauthorized()
   }
+
+  // PRIVÉ-MODUS EERST — vóór de tier-gate, de credit-gate en élke dataophaling.
+  // Staat 'documenten' op lokaal, dan leest de browser de aangifte zelf uit en
+  // hoort deze route niets te leveren.
+  // Waarom deze volgorde: (1) privé-modus is de meest fundamentele keuze van de
+  // gebruiker en gaat vóór commerciële gating — de eerlijke reden is "privé-modus
+  // staat aan", niet "je mist een abonnement"; (2) een geblokkeerde call mag geen
+  // credits kosten; (3) er mag geen enkel gegeven richting promptopbouw gaan, en
+  // hier weegt dat extra zwaar: een aangifte is het meest complete financiële
+  // portret dat iemand van zichzelf bezit. Vóór de BSN-strip en de
+  // huishoudnaam-strip dus ook — die minimaliseren wat er vertrekt, maar bij
+  // 'lokaal' hoort er niets te vertrekken.
+  // De model-call zit hier niet in de route maar in extractAangifteData
+  // (lib/aangifte/extract-aangifte-data.ts); de gate hoort dus vóór die aanroep.
+  // Nooit een stille terugval naar de cloud: 403 is het eindpunt.
+  const privacyGate = await assertCloudAllowed(supabase, user.id, 'documenten')
+  if (privacyGate) return privacyGate
 
   // AI-add-on vereist: aangifte-extractie draait op het AI-model. Spiegelt de
   // reeds-gegate onboarding/suggest-budgets — voorheen enkel auth-check.

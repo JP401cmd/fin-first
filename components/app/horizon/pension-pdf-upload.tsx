@@ -6,8 +6,31 @@ import {
   parseMijnpensioenJson,
   mijnpensioenJsonToParseResult,
 } from '@/lib/pension/mijnpensioen-json'
+import { useExecutionMode } from '@/lib/ai/local/use-execution-mode'
+import { extractPdfPageTexts } from '@/lib/pdf/extract-text'
+import { stripSensitiveData } from '@/lib/aangifte/strip-bsn'
+import { createLocalPensionResolver } from '@/lib/ai/local/local-pension-resolver'
+import { PensionLocalReview } from './pension-local-review'
+import type { PensionOnzekerVeld } from '@/lib/ai/local/local-pension-parse'
+import type { PensionParseResult } from '@/lib/pension/types'
 
-type UploadStatus = 'idle' | 'uploading' | 'success' | 'error'
+// 'review' bestaat alleen op het LOKALE pad: daar wordt niets overgenomen
+// zonder dat de gebruiker het heeft gezien (zie pension-local-review.tsx).
+type UploadStatus = 'idle' | 'uploading' | 'review' | 'success' | 'error'
+
+/** Wat de reviewstap nodig heeft, zoals de lokale resolver het teruggeeft. */
+interface LocalReviewData {
+  result: PensionParseResult
+  onzeker: PensionOnzekerVeld[][]
+  afgevallen: number
+}
+
+/**
+ * Paginacap voor het lokale pad. Een UPO is enkele pagina's; een per ongeluk
+ * aangeboden boekwerk moet niet minutenlang de hoofdthread bezighouden — en elk
+ * blok kost on-device een eigen decode van tientallen seconden.
+ */
+const MAX_LOCAL_PDF_PAGES = 12
 
 interface PensionPdfUploadProps {
   onFileSelected?: (file: File) => void
@@ -48,7 +71,14 @@ export function PensionPdfUpload({
   const [dragOver, setDragOver] = useState(false)
   const [storedPdfPath, setStoredPdfPath] = useState<string | null>(existingPdfPath ?? null)
   const [downloading, setDownloading] = useState(false)
+  const [localReview, setLocalReview] = useState<LocalReviewData | null>(null)
+  const [progressLabel, setProgressLabel] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // Waar mag het uitlezen van documenten draaien? Deze hook is de ENIGE bron van
+  // die beslissing (fail-closed: in 'resolving' en 'blocked' vertrekt er niets —
+  // niet naar de cloud én niet naar het model).
+  const exec = useExecutionMode('documenten')
   // Keep a reference to the selected file for later storage upload
   const pendingFileRef = useRef<File | null>(null)
 
@@ -108,6 +138,77 @@ export function PensionPdfUpload({
     }
   }, [onFileSelected, onParseResult, samenwonend])
 
+  /**
+   * LOKALE PDF-route — volledig on-device, geen enkele byte naar buiten.
+   *
+   * Andere taak dan de cloud-route, geen omzetting: het cloud-pad stuurt de PDF
+   * mee en het model KIJKT ernaar; hier wint pdfjs eerst deterministisch de
+   * tekstlaag en doet het lokale model alleen nog tekst→JSON. Zie de kop van
+   * lib/ai/local/local-pension-resolver.ts.
+   *
+   * Drie dingen die hier BEWUST ontbreken t.o.v. de cloud-route: de AVG-consent
+   * (`pension_pdf_ai_v1`), het credit-verbruik en de storage-upload-bij-succes
+   * blijft aan het eind van de REVIEW hangen — er is geen derde partij, geen
+   * rekening, en er wordt niets overgenomen zonder bevestiging.
+   */
+  const handleLocalPdf = useCallback(async (f: File) => {
+    setFile(f)
+    setStatus('uploading')
+    setLocalReview(null)
+    pendingFileRef.current = f
+    onFileSelected?.(f)
+
+    try {
+      setProgressLabel('tekst uit de PDF lezen…')
+      // Pagina voor pagina, met een cap: een 10 MB-PDF ligt hier naast ~2 GB
+      // modelgewicht op gedeeld iGPU-geheugen (zie lib/pdf/extract-text.ts).
+      const pages = await extractPdfPageTexts(f, { maxPages: MAX_LOCAL_PDF_PAGES })
+
+      // Lokaal niet strikt nodig (er is geen egress), maar een BSN hoeft nergens
+      // in een promptstring te staan — goedkope hygiëne op een document dat per
+      // definitie persoonsgegevens draagt.
+      const schoon = pages.map((p) => stripSensitiveData(p).clean)
+
+      const resolve = createLocalPensionResolver({
+        onSessionState: (s) =>
+          setProgressLabel(s === 'starten' ? 'model klaarzetten…' : 'pensioengegevens lezen…'),
+        onProgress: (done, total) => setProgressLabel(`onderdeel ${done} van ${total}…`),
+      })
+      const uitkomst = await resolve(schoon)
+
+      if (!uitkomst.ok) {
+        // Eerlijk stoppen — nooit een stille terugval op /api/pension/parse.
+        setStatus('error')
+        setError(uitkomst.message)
+        return
+      }
+
+      setLocalReview({
+        result: uitkomst.result,
+        onzeker: uitkomst.onzeker,
+        afgevallen: uitkomst.afgevallen,
+      })
+      setStatus('review')
+    } catch (err) {
+      console.error('[lokale-ai] pensioen-PDF lokaal uitlezen mislukt:', err)
+      setStatus('error')
+      setError(
+        'Het uitlezen op je eigen apparaat is niet gelukt. Probeer het opnieuw, of gebruik de JSON-export van mijnpensioen.nl.',
+      )
+    } finally {
+      setProgressLabel(null)
+    }
+  }, [onFileSelected])
+
+  /** Bevestigd in de reviewstap — pas hier wordt er iets overgenomen. */
+  const bevestigLokaal = useCallback((result: PensionParseResult) => {
+    setLocalReview(null)
+    setStatus('success')
+    onParseResult?.(result)
+    const f = pendingFileRef.current
+    if (lifeEventId && f) uploadToStorage(f, lifeEventId)
+  }, [onParseResult, lifeEventId, uploadToStorage])
+
   const validateAndSet = useCallback((f: File) => {
     setError(null)
 
@@ -122,12 +223,34 @@ export function PensionPdfUpload({
     }
 
     // ── JSON-route: deterministisch, client-side, geen AI ──
+    // Staat óók in privé-modus voorop: geen model, geen risico, nul tokens.
     if (json) {
       void handleJsonFile(f)
       return
     }
 
-    // ── PDF-route: ongewijzigd (AI-extractie via /api/pension/parse) ──
+    // ── PDF-route: de uitvoerkeuze bepaalt WAAR dit draait ────────────────────
+    // FAIL-CLOSED. Alleen bij een expliciet 'mag lokaal' of 'mag cloud' vertrekt
+    // er iets. In 'resolving' weten we de voorkeur nog niet en in 'blocked' kan
+    // het toestel het niet — in beide gevallen gebeurt er NIETS, en zeker geen
+    // stille cloud-aanroep "want dat werkt tenminste".
+    if (exec.canUseLocal) {
+      void handleLocalPdf(f)
+      return
+    }
+
+    if (!exec.canUseCloud) {
+      if (exec.status === 'blocked') {
+        setError(
+          `${exec.message ?? 'Lokale AI is nu niet beschikbaar op dit toestel.'} Gebruik de JSON-export van mijnpensioen.nl, of zet "Documenten lezen" op /mijn/privacy om naar de cloud.`,
+        )
+      } else {
+        setError('We controleren nog waar het uitlezen mag draaien. Probeer het zo opnieuw.')
+      }
+      return
+    }
+
+    // ── PDF-route via de cloud: ongewijzigd (AI-extractie via /api/pension/parse) ──
     setFile(f)
     setStatus('uploading')
     pendingFileRef.current = f
@@ -161,7 +284,18 @@ export function PensionPdfUpload({
         setStatus('error')
         setError(err.message || 'Er ging iets mis bij het verwerken van de PDF.')
       })
-  }, [onFileSelected, onParseResult, lifeEventId, uploadToStorage, handleJsonFile])
+  }, [
+    onFileSelected,
+    onParseResult,
+    lifeEventId,
+    uploadToStorage,
+    handleJsonFile,
+    handleLocalPdf,
+    exec.canUseLocal,
+    exec.canUseCloud,
+    exec.status,
+    exec.message,
+  ])
 
   /**
    * Called externally (via ref or effect) after a life event is saved,
@@ -203,6 +337,8 @@ export function PensionPdfUpload({
     setFile(null)
     setStatus('idle')
     setError(null)
+    setLocalReview(null)
+    setProgressLabel(null)
     pendingFileRef.current = null
     if (inputRef.current) inputRef.current.value = ''
     onFileRemoved?.()
@@ -323,6 +459,19 @@ export function PensionPdfUpload({
     )
   }
 
+  // ── Review state (alleen lokaal): niets overnemen zonder bevestiging ──
+  if (status === 'review' && localReview) {
+    return (
+      <PensionLocalReview
+        result={localReview.result}
+        onzeker={localReview.onzeker}
+        afgevallen={localReview.afgevallen}
+        onConfirm={bevestigLokaal}
+        onCancel={handleRemove}
+      />
+    )
+  }
+
   // ── Uploading state ──
   if (status === 'uploading' && file) {
     return (
@@ -331,9 +480,19 @@ export function PensionPdfUpload({
           <Loader2 className="h-5 w-5 shrink-0 animate-spin text-horizon-500" />
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium text-[var(--ink)]">{file.name}</p>
-            <p className="text-xs text-[var(--ink-3)]">{formatFileSize(file.size)} — wordt verwerkt...</p>
+            {/* Op het lokale pad duurt dit merkbaar langer dan via de cloud; de
+                fase-tekst voorkomt dat een stille GPU-warmup als hang voelt. */}
+            <p className="text-xs text-[var(--ink-3)]">
+              {formatFileSize(file.size)} — {progressLabel ?? 'wordt verwerkt...'}
+            </p>
           </div>
         </div>
+        {exec.status === 'lokaal' && (
+          <p className="mt-2 text-[11px] leading-snug text-[var(--ink-4)]">
+            Dit gebeurt volledig op je eigen apparaat. De eerste keer duurt het klaarzetten van het
+            model wat langer.
+          </p>
+        )}
       </div>
     )
   }
@@ -408,14 +567,37 @@ export function PensionPdfUpload({
               <span className="hidden sm:inline">Sleep je PDF of JSON hierheen of </span>
               <span className="text-horizon-600 underline underline-offset-2">kies een bestand</span>
             </p>
-            <p className="mt-0.5 text-xs text-[var(--ink-4)]">PDF of JSON van mijnpensioen.nl, max 10 MB</p>
+            <p className="mt-0.5 text-xs text-[var(--ink-4)]">
+              {exec.status === 'lokaal'
+                ? 'JSON van mijnpensioen.nl (aanbevolen) of PDF, max 10 MB'
+                : 'PDF of JSON van mijnpensioen.nl, max 10 MB'}
+            </p>
           </div>
         </div>
       </div>
-      {/* AVG-notice: a PDF is processed once by an AI service; JSON stays local. */}
+      {/* AVG-notice — drie varianten, want de bestemming van het document
+          verschilt écht per uitvoerkeuze en dat mag de gebruiker niet raden. */}
       <p className="mt-1.5 text-[11px] leading-snug text-[var(--ink-4)]">
-        Een PDF wordt eenmalig door een AI-dienst gelezen om de bedragen over te nemen en niet bewaard.
-        Liever niet? Gebruik de JSON-export van mijnpensioen.nl — die verwerken we volledig op je eigen apparaat.
+        {exec.status === 'lokaal' ? (
+          <>
+            Beide bestanden verwerken we volledig op je eigen apparaat — er gaat niets naar een
+            AI-dienst. De JSON-export van mijnpensioen.nl is de betrouwbaarste route: die lezen we
+            zonder AI uit. Een PDF laten we door het model op je toestel lezen; je controleert het
+            resultaat daarna zelf.
+          </>
+        ) : exec.status === 'blocked' ? (
+          <>
+            Je hebt gekozen om documenten op je eigen apparaat te lezen, maar dat lukt hier niet:{' '}
+            {exec.message ?? 'lokale AI is nu niet beschikbaar op dit toestel.'} Gebruik de
+            JSON-export van mijnpensioen.nl — die verwerken we zonder AI, volledig op je apparaat.
+          </>
+        ) : (
+          <>
+            Een PDF wordt eenmalig door een AI-dienst gelezen om de bedragen over te nemen en niet
+            bewaard. Liever niet? Gebruik de JSON-export van mijnpensioen.nl — die verwerken we
+            volledig op je eigen apparaat.
+          </>
+        )}
       </p>
       {/* Inline error (no file selected yet) */}
       {error && !file && (

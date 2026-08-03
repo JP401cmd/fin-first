@@ -1,6 +1,10 @@
 // ── Unified Feature Registry ─────────────────────────────────────────────────
-// 16 consolidated features that replace the old 67-feature + 31-tier system.
+// 18 consolidated features that replace the old 67-feature + 31-tier system.
 // Each feature controls widgets + page sections + old feature IDs.
+//
+// Verdeling: 11 gratis + 1 connected + 6 ai. De tellingen in dit bestand liepen
+// achter op de inhoud (kop zei 16, de AI-sectie zei 4) — bijgewerkt en hieronder
+// vastgezet door lib/feature-registry.test.ts, zodat het niet opnieuw verschuift.
 
 export type CommercialTier = 'gratis' | 'connected' | 'ai'
 export type FeatureModule = 'kern' | 'wil' | 'horizon' | 'bank' | 'ai'
@@ -153,7 +157,13 @@ export const UNIFIED_FEATURES: UnifiedFeature[] = [
     ],
   },
 
-  // ── AI tier (4 features) ───────────────────────────────────────────────────
+  // ── AI tier (6 features) ───────────────────────────────────────────────────
+  //
+  // Dit is de canonieke lijst waarop het AI-abonnement is ingericht: featuresForTier('ai')
+  // rendert 'm letterlijk als bullets op de AI-kaart in /mijn/account. Het is óók de
+  // indeling die /mijn/privacy volgt voor de keuze "waar draait de AI?" — zie
+  // lib/ai/execution-groups.ts, waar elke groep via `commercieleFeatures` naar deze
+  // id's verwijst. Voeg je hier iets toe, deel het daar dan ook in.
 
   {
     id: 'ai_assistent',

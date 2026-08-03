@@ -25,6 +25,7 @@ import { sanitizeForAI } from '@/lib/ai/sanitize'
 import { maskPIIInObject } from '@/lib/ai/pii-output-filter'
 import type { BriefingEntry } from '@/lib/types/briefing'
 import { sanitizeAiHeadline } from './overview-briefing'
+import { sanitizeRedactedText } from './nummer-guard'
 import {
   getActiveDirectives,
   formatDirectivesForPrompt,
@@ -124,42 +125,45 @@ export function buildDirectivesBlock(
   return blocks.join('\n\n')
 }
 
-// ── Nummer-guard ─────────────────────────────────────────────────────
-
-/** Alle numerieke tokens in een tekst ("1.234,56", "12%", "8"). */
-export function extractNumericTokens(text: string): string[] {
-  return text.match(/\d+(?:[.,]\d+)*/g) ?? []
-}
-
 /**
- * Saneer een herschreven briefje-tekst tegen zijn bron. Retourneert null
- * (→ origineel behouden) bij: lege/te lange output, een bron-getal dat
- * ontbreekt, of een getal dat het model erbij heeft verzonnen.
+ * Hetzelfde directives-blok, gecondenseerd voor het ON-DEVICE pad: alleen de
+ * functionele richtlijnen waarvan de conditie ECHT actief is.
+ *
+ * Het cloudpad stuurt bewust ook de niet-actieve regels mee (gelabeld
+ * [INACTIEF]) zodat een groot model zelf kan wegen. On-device is dat averechts:
+ * elf regels die genegeerd moeten worden zijn voor een 2B-model een echte
+ * verwarringsbron, en ze kosten ~350 tokens die de brontekst nodig heeft. De
+ * temporele richtlijnen zijn al op maand/dag gefilterd (`getActiveDirectives`)
+ * en gaan ongewijzigd mee.
  */
-export function sanitizeRedactedText(
-  raw: string | null | undefined,
-  original: string,
-): string | null {
-  if (!raw) return null
-  const cleaned = raw
-    .replace(/\s+/g, ' ')
-    .replace(/^["'\s]+|["'\s]+$/g, '')
-    .trim()
-  if (!cleaned || cleaned.length > 240) return null
-
-  const sourceTokens = extractNumericTokens(original)
-  for (const token of sourceTokens) {
-    if (!cleaned.includes(token)) return null
-  }
-  // Geen verzonnen getallen: elk token in de redactie moet uit de bron komen.
-  const redactedTokens = extractNumericTokens(cleaned)
-  for (const token of redactedTokens) {
-    if (!sourceTokens.some((s) => s === token || s.includes(token) || token.includes(s))) {
-      return null
-    }
-  }
-  return cleaned
+export function buildLocalDirectivesBlock(
+  config: BriefingDirectivesConfig,
+  now: Date,
+  metrics: EngineMetrics | null,
+): string {
+  const blocks: string[] = []
+  const active = getActiveDirectives(config.temporal, now.getMonth() + 1, now.getDate())
+  const temporalBlock = formatDirectivesForPrompt(active)
+  if (temporalBlock) blocks.push(temporalBlock)
+  const functionalBlock = formatFunctionalDirectivesWithMetrics(config.functional, metrics, {
+    activeOnly: true,
+  })
+  if (functionalBlock) blocks.push(functionalBlock)
+  return blocks.join('\n\n')
 }
+
+// ── Nummer-guard ─────────────────────────────────────────────────────
+//
+// De guard zelf woont in ./nummer-guard (puur, zonder imports) omdat de
+// BROWSER 'm nodig heeft zodra de briefing on-device draait — dit bestand
+// importeert `getModel` en de `ai`-SDK en is dus server-only. Hier alleen
+// doorgegeven, zodat bestaande importeurs van `@/lib/briefing/redactie`
+// ongewijzigd blijven werken.
+export {
+  extractNumericTokens,
+  sanitizeRedactedText,
+  MAX_REDACTED_TEXT_LENGTH,
+} from './nummer-guard'
 
 // ── De redactie-call ─────────────────────────────────────────────────
 

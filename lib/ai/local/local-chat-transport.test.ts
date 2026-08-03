@@ -14,8 +14,10 @@
 import { describe, it, expect, vi } from 'vitest'
 import { readUIMessageStream, type UIMessage } from 'ai'
 import { LocalChatTransport } from './local-chat-transport'
-import type { LocalChatSession } from './litert-runtime'
+import { LOCAL_SESSION_STALE, type LocalChatSession } from './litert-runtime'
 import type { LocalChatOverview } from './local-chat-context'
+import type { LocalKnowledgeItem } from './knowledge-context'
+import { KNOWLEDGE_FENCE_START, KNOWLEDGE_FENCE_END } from './local-chat-prompt'
 
 const OVERVIEW: LocalChatOverview = {
   hasData: true,
@@ -145,7 +147,7 @@ describe('LocalChatTransport — spike: chunk-vertaling naar useChat (C2a)', () 
     expect(sends).toEqual(['eerste vraag', 'tweede vraag'])
   })
 
-  it('bouwt de systeemprompt uit overview + eerste vraag (kennis-selectie eenmalig)', async () => {
+  it('bouwt de systeem-preface uit DNA + overview (beurt-onafhankelijk)', async () => {
     const { session } = mockSession('ok')
     let capturedPrompt = ''
     const transport = new LocalChatTransport({
@@ -166,9 +168,14 @@ describe('LocalChatTransport — spike: chunk-vertaling naar useChat (C2a)', () 
     expect(capturedPrompt).toContain('85.000')
   })
 
-  it('FAIL-CLOSED: send-fout sluit de stream met een error (useChat-status → error), geen cloud-fallback', async () => {
+  it('FAIL-CLOSED: send blijft falen → stream sluit met een error (useChat-status → error), geen cloud-fallback', async () => {
     const { session } = mockSession('', { throwOnSend: true })
-    const transport = new LocalChatTransport({ overview: OVERVIEW, knowledgeItems: [], createSession: async () => session })
+    const transport = new LocalChatTransport({
+      overview: OVERVIEW,
+      knowledgeItems: [],
+      createSession: async () => session,
+      disposeEngine: async () => {},
+    })
     const onError = vi.fn()
 
     const stream = await transport.sendMessages(sendOpts([userMessage('Kraakt dit?')]))
@@ -363,5 +370,275 @@ describe('LocalChatTransport — data-finActie-part (C2c fin-actie-fence)', () =
     expect(part).toBeDefined()
     // Canoniek uit kansen: 5 dagen, 600/12 = 50/mnd (model-999 genegeerd).
     expect(part?.data).toMatchObject({ freedom_days_impact: 5, euro_impact_monthly: 50 })
+  })
+})
+
+/**
+ * Taak 2: sessieherstel. Spiegel van `local-categorize-resolver#runChunkWithRecovery`:
+ * een mislukte `send` krijgt ÉÉN verse sessie + één retry. Fail-closed blijft
+ * absoluut — faalt ook de tweede poging, dan een nette fout, nooit de cloud.
+ */
+describe('LocalChatTransport — sessieherstel rond session.send', () => {
+  /**
+   * Sessie die de eerste `failCount` sends laat falen (met `error`) en daarna
+   * normaal antwoordt. Elke `createSession`-aanroep levert een NIEUWE sessie met
+   * een eigen teller, zodat een verse sessie ook echt vers gedrag heeft.
+   */
+  function flakySessionFactory(reply: string, failures: unknown[]) {
+    const created: LocalChatSession[] = []
+    let call = 0
+    const createSession = vi.fn(async () => {
+      const mine = call++
+      const session: LocalChatSession = {
+        async send(_text, onDelta) {
+          const fail = failures[mine]
+          if (fail) throw fail
+          onDelta(reply)
+          return reply
+        },
+        dispose() {},
+      }
+      created.push(session)
+      return session
+    })
+    return { createSession, created }
+  }
+
+  it('send-fout → verse sessie + één retry levert alsnog het antwoord', async () => {
+    const { createSession } = flakySessionFactory('Alsnog gelukt.', [new Error('[lokale-ai] chat-inferentie mislukt')])
+    const disposeEngine = vi.fn(async () => {})
+    const transport = new LocalChatTransport({
+      overview: OVERVIEW,
+      knowledgeItems: [],
+      createSession,
+      disposeEngine,
+    })
+    const onError = vi.fn()
+
+    const msg = await foldToMessage(await transport.sendMessages(sendOpts([userMessage('Hoe sta ik ervoor?')])), onError)
+
+    expect(onError).not.toHaveBeenCalled()
+    expect(textOf(msg)).toBe('Alsnog gelukt.')
+    // Precies twee sessies: de kapotte en de verse. Geen derde poging.
+    expect(createSession).toHaveBeenCalledTimes(2)
+  })
+
+  it('faalt ook de retry → eerlijke fout, precies één herstelpoging (geen oneindige lus)', async () => {
+    const boom = new Error('[lokale-ai] chat-inferentie mislukt')
+    const { createSession } = flakySessionFactory('nooit', [boom, boom, boom])
+    const transport = new LocalChatTransport({
+      overview: OVERVIEW,
+      knowledgeItems: [],
+      createSession,
+      disposeEngine: async () => {},
+    })
+    const onError = vi.fn()
+
+    await foldToMessage(await transport.sendMessages(sendOpts([userMessage('Kraakt dit?')])), onError)
+
+    expect(onError).toHaveBeenCalledTimes(1)
+    expect(createSession).toHaveBeenCalledTimes(2)
+  })
+
+  it('LOCAL_SESSION_STALE → verse sessie ZONDER engine-teardown (de engine is al vervangen)', async () => {
+    const { createSession } = flakySessionFactory('Verder waar we waren.', [new Error(LOCAL_SESSION_STALE)])
+    const disposeEngine = vi.fn(async () => {})
+    const transport = new LocalChatTransport({
+      overview: OVERVIEW,
+      knowledgeItems: [],
+      createSession,
+      disposeEngine,
+    })
+
+    const msg = await foldToMessage(await transport.sendMessages(sendOpts([userMessage('Nog iets?')])))
+
+    expect(textOf(msg)).toBe('Verder waar we waren.')
+    expect(createSession).toHaveBeenCalledTimes(2)
+    // Cruciaal: de engine van een ANDERE consument mag niet gesloopt worden.
+    expect(disposeEngine).not.toHaveBeenCalled()
+  })
+
+  it('overige fout (mogelijk device-loss) → engine-teardown vóór de verse sessie', async () => {
+    const { createSession } = flakySessionFactory('Hersteld.', [new Error('WebGPU device lost')])
+    const disposeEngine = vi.fn(async () => {})
+    const transport = new LocalChatTransport({
+      overview: OVERVIEW,
+      knowledgeItems: [],
+      createSession,
+      disposeEngine,
+    })
+
+    const msg = await foldToMessage(await transport.sendMessages(sendOpts([userMessage('Nog iets?')])))
+
+    expect(textOf(msg)).toBe('Hersteld.')
+    expect(disposeEngine).toHaveBeenCalledTimes(1)
+  })
+
+  it('faalt de send NÁ zichtbare tekst → geen retry (nooit een dubbel antwoord in de bubbel)', async () => {
+    let call = 0
+    const createSession = vi.fn(async () => {
+      const mine = call++
+      const session: LocalChatSession = {
+        async send(_text, onDelta) {
+          onDelta('Het antwoord begint')
+          if (mine === 0) throw new Error('[lokale-ai] chat-inferentie mislukt halverwege')
+          return 'Het antwoord begint'
+        },
+        dispose() {},
+      }
+      return session
+    })
+    const transport = new LocalChatTransport({
+      overview: OVERVIEW,
+      knowledgeItems: [],
+      createSession,
+      disposeEngine: async () => {},
+    })
+    const onError = vi.fn()
+
+    await foldToMessage(await transport.sendMessages(sendOpts([userMessage('?')])), onError)
+
+    expect(onError).toHaveBeenCalledTimes(1)
+    // Wél sessieherstel (de volgende beurt begint schoon), maar géén tweede send.
+    expect(createSession).toHaveBeenCalledTimes(1)
+  })
+})
+
+/**
+ * Taak 3: kennisselectie PER BEURT. De preface ligt na beurt 1 vast, dus de
+ * kennis reist mee met het user-bericht — gefenced, met de K1-priming intact.
+ */
+describe('LocalChatTransport — kennis per beurt (onderwerpwissel)', () => {
+  function item(over: Partial<LocalKnowledgeItem>): LocalKnowledgeItem {
+    return {
+      id: 'k-box3',
+      titel: 'Box 3',
+      tekst: 'Box 3 belast een forfaitair rendement op je vermogen.',
+      tags: ['box3'],
+      actief: true,
+      volgorde: 0,
+      bijgewerkt: '2026-07-19T00:00:00.000Z',
+      categorie: 'Belastingen',
+      laatstGecontroleerd: '2026-07-19T00:00:00.000Z',
+      controleerVoor: null,
+      ...over,
+    }
+  }
+
+  const BOX3 = item({})
+  const BUFFER = item({
+    id: 'k-buffer',
+    titel: 'Noodbuffer',
+    tekst: 'Een noodbuffer vangt onverwachte uitgaven op.',
+    tags: ['buffer'],
+    volgorde: 1,
+  })
+
+  it('een LATERE vraag over een ander onderwerp krijgt alsnog zijn kennisitem', async () => {
+    const { session, sends } = mockSession('ok')
+    const transport = new LocalChatTransport({
+      overview: OVERVIEW,
+      knowledgeItems: [BOX3, BUFFER],
+      createSession: async () => session,
+    })
+
+    await foldToMessage(await transport.sendMessages(sendOpts([userMessage('Hoe groot moet mijn buffer zijn?')])))
+    await foldToMessage(
+      await transport.sendMessages(
+        sendOpts([
+          userMessage('Hoe groot moet mijn buffer zijn?'),
+          { id: 'a1', role: 'assistant', parts: [{ type: 'text', text: 'ok' }] },
+          userMessage('En hoe werkt Box 3?'),
+        ]),
+      ),
+    )
+
+    // Beurt 1: buffer-uitleg. Beurt 2: Box 3-uitleg — precies het item dat er in
+    // de oude, eenmalige preface-selectie NOOIT meer bij kon komen.
+    expect(sends[0]).toContain('onverwachte uitgaven')
+    expect(sends[0]).not.toContain('forfaitair rendement')
+    expect(sends[1]).toContain('forfaitair rendement')
+  })
+
+  it('houdt de K1-fencing intact op het beurt-bericht (priming vóór én ná het blok)', async () => {
+    const { session, sends } = mockSession('ok')
+    const transport = new LocalChatTransport({
+      overview: OVERVIEW,
+      knowledgeItems: [BOX3],
+      createSession: async () => session,
+    })
+
+    await foldToMessage(await transport.sendMessages(sendOpts([userMessage('Wat is Box 3?')])))
+
+    expect(sends[0]).toContain(KNOWLEDGE_FENCE_START)
+    expect(sends[0]).toContain(KNOWLEDGE_FENCE_END)
+    expect(sends[0].indexOf(KNOWLEDGE_FENCE_START)).toBeLessThan(sends[0].indexOf(KNOWLEDGE_FENCE_END))
+    // De vraag zelf staat ná de fence-footer (de voorrang-instructie zit ertussen).
+    expect(sends[0].indexOf(KNOWLEDGE_FENCE_END)).toBeLessThan(sends[0].indexOf('Wat is Box 3?'))
+  })
+
+  it('stuurt dezelfde uitleg niet elke beurt opnieuw (staat al in de native historie)', async () => {
+    const { session, sends } = mockSession('ok')
+    const transport = new LocalChatTransport({
+      overview: OVERVIEW,
+      knowledgeItems: [BOX3],
+      createSession: async () => session,
+    })
+
+    await foldToMessage(await transport.sendMessages(sendOpts([userMessage('Wat is Box 3?')])))
+    await foldToMessage(
+      await transport.sendMessages(
+        sendOpts([
+          userMessage('Wat is Box 3?'),
+          { id: 'a1', role: 'assistant', parts: [{ type: 'text', text: 'ok' }] },
+          userMessage('En Box 3 met een partner?'),
+        ]),
+      ),
+    )
+
+    expect(sends[0]).toContain('forfaitair rendement')
+    expect(sends[1]).toBe('En Box 3 met een partner?')
+  })
+
+  it('na sessieherstel gaat de kennis WÉL opnieuw mee (verse sessie = lege historie)', async () => {
+    const sends: string[] = []
+    let call = 0
+    const createSession = vi.fn(async () => {
+      const mine = call++
+      const session: LocalChatSession = {
+        async send(text, onDelta) {
+          sends.push(text)
+          // Alleen de eerste send van de eerste sessie faalt.
+          if (mine === 0 && sends.length === 2) throw new Error('[lokale-ai] chat-inferentie mislukt')
+          onDelta('ok')
+          return 'ok'
+        },
+        dispose() {},
+      }
+      return session
+    })
+    const transport = new LocalChatTransport({
+      overview: OVERVIEW,
+      knowledgeItems: [BOX3],
+      createSession,
+      disposeEngine: async () => {},
+    })
+
+    // Beurt 1 slaagt en verbruikt het Box 3-item.
+    await foldToMessage(await transport.sendMessages(sendOpts([userMessage('Wat is Box 3?')])))
+    // Beurt 2 faalt en wordt op een verse sessie herhaald.
+    await foldToMessage(
+      await transport.sendMessages(
+        sendOpts([
+          userMessage('Wat is Box 3?'),
+          { id: 'a1', role: 'assistant', parts: [{ type: 'text', text: 'ok' }] },
+          userMessage('En Box 3 met een partner?'),
+        ]),
+      ),
+    )
+
+    expect(sends[0]).toContain('forfaitair rendement') // beurt 1
+    expect(sends[1]).toBe('En Box 3 met een partner?') // beurt 2, eerste poging (al geïnjecteerd)
+    expect(sends[2]).toContain('forfaitair rendement') // retry op verse sessie → opnieuw mee
   })
 })

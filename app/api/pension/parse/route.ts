@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { unauthorized, forbidden } from '@/lib/api/respond'
 import { recordAiUsage } from '@/lib/ai-credits'
 import { getModel } from '@/lib/ai/config'
+import { assertCloudAllowed } from '@/lib/ai/privacy-gate'
 import { generateObject } from 'ai'
 import { PENSION_PARSE_PROMPT } from '@/lib/ai/pension-parse-prompt'
 import { checkTierGate } from '@/lib/require-tier'
@@ -36,6 +37,23 @@ export async function POST(req: Request) {
   if (!user) {
     return unauthorized()
   }
+
+  // PRIVÉ-MODUS EERST — vóór de tier-gate, de credit-gate en élke dataophaling.
+  // Staat 'documenten' op lokaal, dan leest de browser het pensioenoverzicht zelf
+  // uit en hoort deze route niets te leveren.
+  // Waarom deze volgorde: (1) privé-modus is de meest fundamentele keuze van de
+  // gebruiker en gaat vóór commerciële gating — de eerlijke reden is "privé-modus
+  // staat aan", niet "je mist een abonnement"; (2) een geblokkeerde call mag geen
+  // credits en geen rate-limit-tegoed kosten; (3) er mag geen byte van de PDF
+  // richting promptopbouw gaan — een UPO is een binair document dat niet
+  // betrouwbaar te ontdoen is van persoonsgegevens (juist de reden dat hieronder
+  // expliciete AVG-toestemming wordt gevraagd).
+  // Bewust ook vóór die consent-check: zonder cloud-call is er niets om
+  // toestemming voor te geven, dus mag een ontbrekende toestemming de echte
+  // reden ("privé-modus staat aan") niet maskeren.
+  // Nooit een stille terugval naar de cloud: 403 is het eindpunt.
+  const privacyGate = await assertCloudAllowed(supabase, user.id, 'documenten')
+  if (privacyGate) return privacyGate
 
   // AI-add-on vereist: pensioen-PDF-extractie draait op het AI-model. Voorheen
   // enkel auth — nu gegate zoals de overige AI-routes (kostenbeheersing).

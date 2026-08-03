@@ -19,16 +19,38 @@
 //    beurt zou de native multi-turn-historie wissen (de "categorisatie-valstrik"
 //    uit ADR 0043: sessie-per-call = geheugenloos).
 //  - Alleen het LAATSTE user-bericht gaat naar `session.send`; de sessie houdt de
-//    beurten zelf native bij (litert-runtime.ts:71-93).
+//    beurten zelf native bij (litert-runtime.ts:71-93). Dat bericht is de vraag
+//    plús de voor DEZE beurt geselecteerde, gefencede kennis — zie hieronder.
 //  - `onDelta`-callbacks worden vertaald naar `UIMessageChunk`'s
 //    (`text-start` → `text-delta`* → `text-end`, omkaderd door `start`/`finish`),
 //    exact de chunk-vorm die `processUIMessageStream` (de consumer binnen
 //    `useChat`/`readUIMessageStream`) tot een `TextUIPart` vouwt.
-//  - Faalt `session.send` (fail-closed, litert-runtime.ts), dan wordt de stream
-//    met `controller.error(...)` afgesloten → `useChat`-status wordt 'error'.
-//    NOOIT een stille retry op de cloud-transport.
+//  - Faalt `session.send`, dan volgt ÉÉN herstelpoging met een verse sessie (zie
+//    "SESSIEHERSTEL"); faalt die ook, dan wordt de stream met
+//    `controller.error(...)` afgesloten → `useChat`-status wordt 'error'. NOOIT
+//    een stille retry op de cloud-transport.
 //  - `reconnectToStream` retourneert altijd `null` (geen server om een
 //    onderbroken stream te hervatten — expliciet non-goal).
+//
+// SESSIEHERSTEL (spiegel van `local-categorize-resolver.ts#runChunkWithRecovery`):
+// een mislukte `send` is niet per se het einde van het gesprek. Twee bekende,
+// herstelbare oorzaken:
+//   • `LOCAL_SESSION_STALE` — een andere consument (bv. de categorisatie) heeft de
+//     gedeelde engine herstart; onze conversatie hangt aan de vorige engine. Een
+//     VERSE sessie is dan precies het goede antwoord, en de engine mag je juist
+//     NIET opnieuw slopen (die is al nieuw en van iemand anders).
+//   • WebGPU device-loss / poisoned session — dan moet de engine zelf wél omlaag
+//     (`disposeSession`) voordat een verse sessie zin heeft.
+// Daarna: één retry. Faalt die ook → eerlijk falen. FAIL-CLOSED blijft absoluut;
+// er is geen pad terug naar de cloud-transport.
+//
+// KENNIS PER BEURT (niet eenmalig): de systeem-preface ligt na de eerste beurt
+// vast, dus kennis die daarin wordt gekozen is voor altijd gekozen op de EERSTE
+// vraag. Vraagt iemand eerst over zijn buffer en daarna over Box 3, dan kwam het
+// Box 3-item er nooit meer in. De preface bevat daarom alleen DNA + overzicht; de
+// gefencede kennis reist per beurt mee met het user-bericht
+// (`createLocalChatTurnBuilder`), inclusief boekhouding zodat dezelfde uitleg niet
+// elke beurt opnieuw meegaat en het sessietotaal onder het kennisbudget blijft.
 //
 // GEEN CLOUD-GUARDRAILS: on-device pad (WebGPU/Gemma), geen egress.
 // `sanitizeForAI`/`maskPIIInOutput`/token-logging zijn N.V.T. (ADR 0043 §5) —
@@ -39,9 +61,14 @@
 
 import type { ChatTransport, UIMessage, UIMessageChunk } from 'ai'
 import type { LocalChatSession } from './litert-runtime'
+// Waarde-import van de stale-sentinel + de engine-teardown. Dit trekt de zware
+// WASM-bundel NIET eager mee: litert-runtime importeert @litert-lm/core zelf
+// dynamisch (en `Engine` alleen als type). Bewust GEEN `createChatSession` in deze
+// import — die blijft dynamisch in `defaultSessionFactory` (zie hieronder).
+import { LOCAL_SESSION_STALE, disposeSession } from './litert-runtime'
 import type { LocalChatOverview } from './local-chat-context'
 import type { LocalKnowledgeItem } from './knowledge-context'
-import { buildLocalChatSystemPrompt } from './local-chat-prompt'
+import { buildLocalChatSystemPrompt, createLocalChatTurnBuilder, type LocalChatTurnBuilder } from './local-chat-prompt'
 import {
   parseFinActionIntent,
   finActionFenceStart,
@@ -65,12 +92,31 @@ const defaultSessionFactory: LocalChatSessionFactory = async (systemPrompt) => {
 export type LocalChatTransportOptions = {
   /** Het canonieke financiële overzicht (consume-only) — voedt de systeemprompt. */
   overview: LocalChatOverview
-  /** De volledige kennisbank (actief én inactief) — gerichte selectie op de eerste vraag. */
+  /** De volledige kennisbank (actief én inactief) — gerichte selectie PER BEURT. */
   knowledgeItems: LocalKnowledgeItem[]
   /** Injecteerbare sessie-factory (default: dynamische `createChatSession`-import). */
   createSession?: LocalChatSessionFactory
+  /**
+   * Injecteerbare engine-teardown (default: `disposeSession` uit de runtime).
+   * Alleen aangeroepen bij een NIET-stale fout — zie `#recoverSession`. Injectie
+   * houdt het herstelpad headless testbaar (geen WebGPU/WASM in vitest).
+   */
+  disposeEngine?: () => Promise<void>
   /** Injecteerbare id-generator (default: `crypto.randomUUID`) — deterministisch te maken in tests. */
   generateId?: () => string
+}
+
+/**
+ * Is dit de "je conversatie hing aan een inmiddels vervangen engine"-fout?
+ *
+ * `createChatSession` werpt dan `LOCAL_SESSION_STALE` (litert-runtime.ts). Dat is
+ * geen kapotte engine maar een VERVANGEN engine: een verse sessie volstaat, en de
+ * engine opnieuw slopen zou de consument die 'm net herstelde onnodig raken. We
+ * matchen op `includes` i.p.v. gelijkheid omdat de melding onderweg (SDK-wrapping,
+ * logging) van een prefix voorzien kan raken.
+ */
+function isStaleSessionError(err: unknown): boolean {
+  return err instanceof Error && err.message.includes(LOCAL_SESSION_STALE)
 }
 
 /** Pak de tekst van het LAATSTE user-bericht uit de UIMessage-historie. */
@@ -133,30 +179,32 @@ export class LocalChatTransport implements ChatTransport<UIMessage> {
   #session: LocalChatSession | null = null
   #sessionPromise: Promise<LocalChatSession> | null = null
   readonly #overview: LocalChatOverview
-  readonly #knowledgeItems: LocalKnowledgeItem[]
+  readonly #turns: LocalChatTurnBuilder
   readonly #createSession: LocalChatSessionFactory
+  readonly #disposeEngine: () => Promise<void>
   readonly #generateId: () => string
 
   constructor(options: LocalChatTransportOptions) {
     this.#overview = options.overview
-    this.#knowledgeItems = options.knowledgeItems
+    // De kennis-boekhouding hoort bij de SESSIE, niet bij de beurt: hij onthoudt
+    // wat er al in de native historie staat en hoeveel budget op is.
+    this.#turns = createLocalChatTurnBuilder(options.knowledgeItems)
     this.#createSession = options.createSession ?? defaultSessionFactory
+    this.#disposeEngine = options.disposeEngine ?? (() => disposeSession())
     this.#generateId = options.generateId ?? randomId
   }
 
   /**
-   * Open (of hergebruik) de native multi-turn sessie. De eerste vraag stuurt de
-   * kennis-selectie in de systeemprompt (eenmalig, FR-C2a.3); volgende beurten
-   * hergebruiken dezelfde sessie — geen nieuwe `createChatSession`.
+   * Open (of hergebruik) de native multi-turn sessie.
+   *
+   * De preface is BEURT-ONAFHANKELIJK (DNA + canoniek overzicht) — geen
+   * kennis-selectie meer op de eerste vraag, want die keuze zou daarmee voor het
+   * hele gesprek vastliggen. Kennis reist per beurt mee met het user-bericht.
    */
-  async #ensureSession(firstQuestion: string): Promise<LocalChatSession> {
+  async #ensureSession(): Promise<LocalChatSession> {
     if (this.#session) return this.#session
     if (!this.#sessionPromise) {
-      const systemPrompt = buildLocalChatSystemPrompt({
-        overview: this.#overview,
-        question: firstQuestion,
-        knowledgeItems: this.#knowledgeItems,
-      })
+      const systemPrompt = buildLocalChatSystemPrompt({ overview: this.#overview })
       this.#sessionPromise = this.#createSession(systemPrompt)
         .then((session) => {
           this.#session = session
@@ -172,12 +220,40 @@ export class LocalChatTransport implements ChatTransport<UIMessage> {
     return this.#sessionPromise
   }
 
+  /**
+   * Ruim de kapotte sessie op zodat de volgende `#ensureSession` een verse opent.
+   *
+   * Twee verschillende oorzaken, twee verschillende reacties:
+   *  - STALE (`LOCAL_SESSION_STALE`): de engine is al door iemand anders herstart.
+   *    Alleen onze conversatie is dood → sessie weggooien, engine met RUST laten
+   *    (die opnieuw slopen zou de consument die 'm net opbouwde de das omdoen).
+   *  - alle overige fouten: mogelijk device-loss/poisoned engine → ook
+   *    `disposeSession()`, precies zoals de categorisatie-resolver doet.
+   *
+   * De kennis-boekhouding gaat in beide gevallen op nul: een verse sessie heeft een
+   * LEGE historie, dus de eerder meegestuurde uitleg is weg en mag opnieuw mee.
+   */
+  async #recoverSession(err: unknown): Promise<void> {
+    this.#session?.dispose()
+    this.#session = null
+    this.#sessionPromise = null
+    this.#turns.reset()
+    if (!isStaleSessionError(err)) {
+      try {
+        await this.#disposeEngine()
+      } catch (disposeErr) {
+        // Teardown-fouten mogen het herstel niet blokkeren; de referenties zijn al
+        // weg. Altijd loggen (les 19 jul): anders is dit volstrekt onzichtbaar.
+        console.error('[lokale-ai] engine-teardown tijdens chat-herstel mislukt (genegeerd):', disposeErr)
+      }
+    }
+  }
+
   sendMessages(
     options: Parameters<ChatTransport<UIMessage>['sendMessages']>[0],
   ): Promise<ReadableStream<UIMessageChunk>> {
     const { messages, abortSignal } = options
     const text = lastUserText(messages)
-    const ensureSession = (q: string) => this.#ensureSession(q)
     const partId = this.#generateId()
     const overview = this.#overview
 
@@ -190,10 +266,9 @@ export class LocalChatTransport implements ChatTransport<UIMessage> {
           return
         }
         try {
-          const session = await ensureSession(text)
-
           // Lifecycle-omkadering + tekst-part-opening. `text-start` MOET vóór
-          // elke `text-delta` (processUIMessageStream werpt anders).
+          // elke `text-delta` (processUIMessageStream werpt anders). Bewust vóór
+          // de sessie-opbouw: het herstelpad hieronder kan alsnog deltas leveren.
           controller.enqueue({ type: 'start' })
           controller.enqueue({ type: 'text-start', id: partId })
 
@@ -204,7 +279,7 @@ export class LocalChatTransport implements ChatTransport<UIMessage> {
           let buffer = ''
           let emittedLen = 0
 
-          await session.send(text, (delta) => {
+          const onDelta = (delta: string) => {
             if (abortSignal?.aborted) return
             if (!delta) return
             buffer += delta
@@ -213,7 +288,43 @@ export class LocalChatTransport implements ChatTransport<UIMessage> {
               controller.enqueue({ type: 'text-delta', id: partId, delta: buffer.slice(emittedLen, boundary) })
               emittedLen = boundary
             }
-          })
+          }
+
+          // Eén beurt = (verse of bestaande) sessie + het beurt-bericht van DIT
+          // moment. Het beurt-bericht wordt hier gebouwd en niet buiten deze
+          // functie: na een herstel is de boekhouding leeg en moet de kennis
+          // opnieuw geselecteerd worden voor de verse, geheugenloze sessie.
+          const runTurn = async (): Promise<void> => {
+            const session = await this.#ensureSession()
+            await session.send(this.#turns.build(text), onDelta)
+          }
+
+          try {
+            await runTurn()
+          } catch (err) {
+            // ALTIJD loggen (les 19 jul): zonder deze regel is een lokale-AI-fout
+            // voor gebruiker én support onzichtbaar — de UI toont enkel 'error'.
+            console.error('[lokale-ai] chat-beurt mislukt — sessieherstel volgt:', err)
+            await this.#recoverSession(err)
+
+            // Is er al zichtbare tekst de bubbel in gegaan, dan zou een tweede
+            // generatie die tekst dubbel opleveren (het model begint vooraan; de
+            // chunk-stream kent geen "wis wat je al zag"). Dan liever eerlijk
+            // falen dan een verminkt antwoord tonen. In de praktijk faalt het
+            // herstelbare geval — stale sessie / dode conversatie — vóór het
+            // eerste token, dus dit kost bijna nooit een retry.
+            if (emittedLen > 0) throw err
+
+            buffer = ''
+            try {
+              await runTurn()
+            } catch (err2) {
+              // Tweede poging faalt → definitief. FAIL-CLOSED: de fout gaat naar
+              // controller.error hieronder; NOOIT alsnog de cloud-transport.
+              console.error('[lokale-ai] chat-beurt mislukt ná sessieherstel — definitief:', err2)
+              throw err2
+            }
+          }
 
           // Generatie klaar → PARSE precies één keer op de volledige buffer.
           // `cleanedText` is de canonieke zichtbare tekst (fence-blok verwijderd);
@@ -278,5 +389,8 @@ export class LocalChatTransport implements ChatTransport<UIMessage> {
     this.#session?.dispose()
     this.#session = null
     this.#sessionPromise = null
+    // Ook de kennis-boekhouding op nul: een eventuele volgende sessie begint met
+    // een lege historie en moet de uitleg dus opnieuw kunnen meesturen.
+    this.#turns.reset()
   }
 }

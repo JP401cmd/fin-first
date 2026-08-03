@@ -610,3 +610,12 @@
 ## 2026-08-02
 
 - **Componenten (aantal)** toegevoegd: +1
+
+## 2026-08-02
+
+- **API-routes** toegevoegd: /api/ai-execution-prefs, /api/local-news-edition, /api/local-news-sources, /api/local-tips, /api/local-tips-candidates
+- **Componenten (aantal)** toegevoegd: +10
+
+## 2026-08-02
+
+- **Componenten (aantal)** toegevoegd: +1

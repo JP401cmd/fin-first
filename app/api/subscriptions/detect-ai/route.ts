@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { getModel, AIConfigError } from '@/lib/ai/config'
 import { checkTierGate } from '@/lib/require-tier'
+import { assertCloudAllowed } from '@/lib/ai/privacy-gate'
 import { detectRecurringTransactions } from '@/lib/recurring-detection'
 import { SUBSCRIPTION_DETECT_PROMPT } from '@/lib/ai/subscription-detect-prompt'
 import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
@@ -27,6 +28,17 @@ export async function POST() {
     if (!user) {
       return unauthorized()
     }
+
+    // PRIVÉ-MODUS EERST — vóór de tier-gate, de credit-gate en élke dataophaling.
+    // Staat 'transacties' op lokaal, dan herkent de browser de abonnementen zelf
+    // en hoort deze route niets te leveren.
+    // Waarom deze volgorde: (1) privé-modus is de meest fundamentele keuze van de
+    // gebruiker en gaat vóór commerciële gating — de eerlijke reden is "privé-modus
+    // staat aan", niet "je mist een abonnement"; (2) een geblokkeerde call mag geen
+    // credits kosten; (3) er mag geen enkele transactie richting promptopbouw gaan.
+    // Nooit een stille terugval naar de cloud: 403 is het eindpunt.
+    const privacyGate = await assertCloudAllowed(supabase, user.id, 'transacties')
+    if (privacyGate) return privacyGate
 
     const tierGate = await checkTierGate(supabase, user.id, 'ai')
     if (tierGate) {

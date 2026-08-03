@@ -9,6 +9,7 @@ import { WHATIF_PROMPT } from '@/lib/ai/dna/wil'
 import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
 import { maskPIIInOutput } from '@/lib/ai/pii-output-filter'
 import { checkTierGate } from '@/lib/require-tier'
+import { assertCloudAllowed } from '@/lib/ai/privacy-gate'
 import { checkCreditBudget, creditLimitMessage } from '@/lib/ai/credit-gate'
 import { unauthorized, serverError } from '@/lib/api/respond'
 
@@ -39,21 +40,15 @@ export async function POST(req: Request) {
   // niet breekt vóór de migratie is toegepast. Pre-migratie kán geen enkele
   // gebruiker privacy_mode=true hebben, dus deze fail-open honoreert geen
   // bestaande privacy-voorkeur ten onrechte.
-  const { data: privacyRow } = await supabase
-    .from('profiles')
-    .select('privacy_mode')
-    .eq('id', user.id)
-    .maybeSingle()
-  const privacyMode = (privacyRow as { privacy_mode?: boolean | null } | null)?.privacy_mode ?? false
-  if (privacyMode) {
-    return Response.json(
-      {
-        error: 'Privé-modus actief: de chat draait lokaal op je apparaat.',
-        code: 'privacy_mode_active',
-      },
-      { status: 403 },
-    )
-  }
+  // Via de GEDEELDE helper, niet via een eigen `privacy_mode`-lezing. Dat verschil
+  // is niet cosmetisch: sinds de gebruiker per groep kan kiezen (ADR 0078) is de
+  // hoofdschakelaar nog maar de DEFAULT — een override op 'gesprek' hoort te
+  // winnen. Deze route las alleen de hoofdschakelaar en negeerde de override, dus
+  // wie 'Gesprek met Fin' op lokaal zette terwijl de hoofdschakelaar op cloud
+  // stond, zag zijn volledige financiële context alsnog naar de provider gaan.
+  // De schakelaar op /mijn/privacy was voor deze functie decoratief.
+  const privacyGate = await assertCloudAllowed(supabase, user.id, 'gesprek')
+  if (privacyGate) return privacyGate
 
   const tierGate = await checkTierGate(supabase, user.id, 'ai')
   if (tierGate) {

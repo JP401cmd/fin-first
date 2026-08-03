@@ -35,7 +35,7 @@ import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { PrivacyNotice } from '@/components/aangifte/privacy-notice'
 import { UploadStep } from '@/components/aangifte/upload-step'
 import { ManualWizard } from '@/components/aangifte/manual-wizard'
-import { ReviewStep, type ReviewMode } from '@/components/aangifte/review-step'
+import { ReviewStep, type ReviewMode, type ExtractionHerkomst } from '@/components/aangifte/review-step'
 import type {
   AangifteExtractionResult,
   AangifteAssetReviewItem,
@@ -98,10 +98,19 @@ export function AangifteImportPane({
     }, 300)
   }, [onClose])
 
-  const handleExtracted = useCallback((result: AangifteExtractionResult) => {
-    setExtraction(result)
-    setStep('review')
-  }, [])
+  // Herkomst van de samenvatting. De review-stap labelt een LOKAAL voorstel
+  // zichtbaar als minder zeker — het on-device model is aantoonbaar zwakker dan
+  // het cloud-model, en dat hoort de gebruiker te weten vóór hij bevestigt.
+  const [herkomst, setHerkomst] = useState<ExtractionHerkomst>('cloud')
+
+  const handleExtracted = useCallback(
+    (result: AangifteExtractionResult, bron: ExtractionHerkomst = 'cloud') => {
+      setHerkomst(bron)
+      setExtraction(result)
+      setStep('review')
+    },
+    [],
+  )
 
   const handleReviewSuccess = useCallback(
     (payload: {
@@ -190,7 +199,7 @@ export function AangifteImportPane({
         {step === 'manual' && (
           <ManualWizard
             fallbackTaxYear={fallbackTaxYear}
-            onSubmit={handleExtracted}
+            onSubmit={(result) => handleExtracted(result, 'handmatig')}
             onCancel={handleClose}
             onSwitchToPdf={() => {
               setPreviousInputStep('pdf')
@@ -203,6 +212,7 @@ export function AangifteImportPane({
           <ReviewStep
             extraction={extraction}
             mode={mode}
+            herkomst={herkomst}
             onSuccess={handleReviewSuccess}
             onCancel={handleClose}
           />

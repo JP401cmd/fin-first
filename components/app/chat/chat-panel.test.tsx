@@ -4,6 +4,7 @@ import { ChatPanel } from './chat-panel'
 import { DefaultChatTransport } from 'ai'
 import { LocalChatTransport } from '@/lib/ai/local/local-chat-transport'
 import { LOCAL_READINESS_FLAP_HINT } from '@/lib/ai/local/local-readiness'
+import { resolveAllExecutionModes } from '@/lib/ai/execution-groups'
 
 /**
  * Regressietest voor de Wft-akkoord-gate in de Fin-chat.
@@ -116,13 +117,24 @@ function makeCtx(overrides: Record<string, unknown> = {}) {
 }
 
 /**
- * Stubt `global.fetch` voor de drie endpoints die de privé-modus-swap raakt:
- * `/api/privacy-mode`, `/api/local-chat-overview`, `/api/local-knowledge`.
- * Retourneert de spy zodat een test kan verifiëren wélke endpoints wel/niet
- * zijn aangeroepen (bv. "geen lokale fetches" wanneer privacy uit staat).
+ * Stubt `global.fetch` voor de drie endpoints die de uitvoermodus-swap raakt:
+ * `/api/ai-execution-prefs` (de per-groep keuze), `/api/local-chat-overview` en
+ * `/api/local-knowledge`. Retourneert de spy zodat een test kan verifiëren wélke
+ * endpoints wel/niet zijn aangeroepen (bv. "geen lokale fetches" op het cloudpad).
+ *
+ * De `modes`-map wordt met de CANONIEKE resolver gebouwd (`resolveAllExecutionModes`,
+ * exact wat GET /api/ai-execution-prefs doet) i.p.v. met de hand — zo toetsen de
+ * override-tests hieronder de echte voorrangsregel en niet een in de test
+ * nagebouwde variant ervan.
  */
-function stubPrivacySwapFetch(overrides: {
+function stubExecutionFetch(overrides: {
+  /** De hoofdschakelaar (profiles.privacy_mode). */
   privacyMode?: boolean
+  /** De per-groep-override voor 'gesprek' (profiles.ai_execution_prefs). */
+  gesprek?: 'lokaal' | 'cloud' | null
+  /** Staat het 'ai'-abonnement nog open? De hook eist dit veld expliciet: zonder
+   *  boolean blijft hij fail-closed in 'resolving' hangen. */
+  hasAiSubscription?: boolean
   overviewOk?: boolean
   overview?: unknown
   knowledgeOk?: boolean
@@ -130,14 +142,23 @@ function stubPrivacySwapFetch(overrides: {
 } = {}) {
   const {
     privacyMode = false,
+    gesprek = null,
+    hasAiSubscription = true,
     overviewOk = true,
     overview = { hasData: true, nettoVermogen: 85000 },
     knowledgeOk = true,
     knowledgeItems = [],
   } = overrides
+  const modes = resolveAllExecutionModes({
+    privacy_mode: privacyMode,
+    ai_execution_prefs: gesprek ? { gesprek } : {},
+  })
   const fn = vi.fn((url: string) => {
-    if (url === '/api/privacy-mode') {
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({ privacyMode }) })
+    if (url === '/api/ai-execution-prefs') {
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ privacyMode, prefs: gesprek ? { gesprek } : {}, modes, hasAiSubscription }),
+      })
     }
     if (url === '/api/local-chat-overview') {
       return Promise.resolve({ ok: overviewOk, json: () => Promise.resolve(overview) })
@@ -175,7 +196,7 @@ afterEach(() => {
 
 describe('ChatPanel — Wft-akkoord-gate', () => {
   it('toont het akkoordscherm en verstuurt de pending-vraag NIET vóór acceptatie', async () => {
-    const fetchSpy = stubPrivacySwapFetch({ privacyMode: false })
+    const fetchSpy = stubExecutionFetch({ privacyMode: false })
     ctx = makeCtx({ pendingMessage: 'Doorlicht mijn financiën' })
     render(<ChatPanel />)
 
@@ -185,14 +206,14 @@ describe('ChatPanel — Wft-akkoord-gate', () => {
     expect(mockSendMessage).not.toHaveBeenCalled()
     // Laat de privacy-mode-resolutie afronden zodat de test geen hangende
     // state-update ná afloop achterlaat (act-warning).
-    await waitFor(() => expect(fetchSpy).toHaveBeenCalledWith('/api/privacy-mode'))
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledWith('/api/ai-execution-prefs'))
   })
 
   it('verstuurt de pending-vraag alsnog ná klik op "Ik begrijp het"', async () => {
-    // Privé-modus-resolutie is sinds FR-C2a async (fetch /api/privacy-mode) en
+    // De modus-resolutie is async (fetch /api/ai-execution-prefs) en
     // moet naar 'cloud' resolven (chatReady) vóórdat het auto-send-effect mag
     // versturen — spiegelt de echte fail-closed-garantie i.p.v. 'm te omzeilen.
-    stubPrivacySwapFetch({ privacyMode: false })
+    stubExecutionFetch({ privacyMode: false })
     ctx = makeCtx({ pendingMessage: 'Doorlicht mijn financiën' })
     render(<ChatPanel />)
 
@@ -204,7 +225,7 @@ describe('ChatPanel — Wft-akkoord-gate', () => {
   })
 
   it('verstuurt een autoOpenMessage (whatif-context) pas ná acceptatie', async () => {
-    stubPrivacySwapFetch({ privacyMode: false })
+    stubExecutionFetch({ privacyMode: false })
     ctx = makeCtx({ autoOpenMessage: 'Bespreek dit scenario' })
     render(<ChatPanel />)
 
@@ -217,7 +238,7 @@ describe('ChatPanel — Wft-akkoord-gate', () => {
   })
 
   it('verstuurt de pending-vraag direct wanneer Wft al eerder is geaccepteerd', async () => {
-    stubPrivacySwapFetch({ privacyMode: false })
+    stubExecutionFetch({ privacyMode: false })
     localStorage.setItem(WFT_KEY, 'true')
     ctx = makeCtx({ pendingMessage: 'Doorlicht mijn financiën' })
     render(<ChatPanel />)
@@ -245,7 +266,7 @@ describe('ChatPanel — privé-modus transport-swap (cloud ↔ lokaal, FR-C2a)',
   })
 
   it('privacy UIT → DefaultChatTransport (cloud), geen lokale gereedheids-/overview-fetches', async () => {
-    const fetchSpy = stubPrivacySwapFetch({ privacyMode: false })
+    const fetchSpy = stubExecutionFetch({ privacyMode: false })
     render(<ChatPanel />)
 
     await waitFor(() => expect(mockUseChatCalls.length).toBeGreaterThan(0))
@@ -256,7 +277,7 @@ describe('ChatPanel — privé-modus transport-swap (cloud ↔ lokaal, FR-C2a)',
     expect(mockCheckLocalAiCapability).not.toHaveBeenCalled()
     expect(mockGetLocalModelState).not.toHaveBeenCalled()
 
-    expect(fetchSpy).toHaveBeenCalledWith('/api/privacy-mode')
+    expect(fetchSpy).toHaveBeenCalledWith('/api/ai-execution-prefs')
     expect(fetchSpy).not.toHaveBeenCalledWith('/api/local-chat-overview')
     expect(fetchSpy).not.toHaveBeenCalledWith('/api/local-knowledge')
   })
@@ -264,7 +285,7 @@ describe('ChatPanel — privé-modus transport-swap (cloud ↔ lokaal, FR-C2a)',
   it('privacy AAN + gereed → LocalChatTransport gekozen, geen POST naar /api/ai/chat', async () => {
     mockCheckLocalAiCapability.mockResolvedValue({ ok: true, reasons: [], shaderF16: true, deviceMemoryGb: 8 })
     mockGetLocalModelState.mockResolvedValue({ state: 'klaar', bytes: null })
-    const fetchSpy = stubPrivacySwapFetch({ privacyMode: true })
+    const fetchSpy = stubExecutionFetch({ privacyMode: true })
     render(<ChatPanel />)
 
     await waitFor(() => expect(mockLocalTransportInstances).toHaveLength(1))
@@ -285,7 +306,7 @@ describe('ChatPanel — privé-modus transport-swap (cloud ↔ lokaal, FR-C2a)',
       deviceMemoryGb: null,
     })
     mockGetLocalModelState.mockResolvedValue({ state: 'niet-gedownload', bytes: null })
-    const fetchSpy = stubPrivacySwapFetch({ privacyMode: true })
+    const fetchSpy = stubExecutionFetch({ privacyMode: true })
     render(<ChatPanel />)
 
     await screen.findByText('Lokale chat nog niet klaar')
@@ -309,7 +330,7 @@ describe('ChatPanel — privé-modus transport-swap (cloud ↔ lokaal, FR-C2a)',
   it('labeling "Experimenteel · lokaal" + de permanente banner blijven zichtbaar in privé-modus', async () => {
     mockCheckLocalAiCapability.mockResolvedValue({ ok: true, reasons: [], shaderF16: true, deviceMemoryGb: 8 })
     mockGetLocalModelState.mockResolvedValue({ state: 'klaar', bytes: null })
-    stubPrivacySwapFetch({ privacyMode: true })
+    stubExecutionFetch({ privacyMode: true })
     render(<ChatPanel />)
 
     await screen.findByText('Experimenteel · lokaal')
@@ -322,7 +343,7 @@ describe('ChatPanel — privé-modus transport-swap (cloud ↔ lokaal, FR-C2a)',
   it('dispose() wordt aangeroepen bij unmount (geen lekkende lokale sessie)', async () => {
     mockCheckLocalAiCapability.mockResolvedValue({ ok: true, reasons: [], shaderF16: true, deviceMemoryGb: 8 })
     mockGetLocalModelState.mockResolvedValue({ state: 'klaar', bytes: null })
-    stubPrivacySwapFetch({ privacyMode: true })
+    stubExecutionFetch({ privacyMode: true })
     const { unmount } = render(<ChatPanel />)
 
     await waitFor(() => expect(mockLocalTransportInstances).toHaveLength(1))
@@ -337,7 +358,7 @@ describe('ChatPanel — privé-modus transport-swap (cloud ↔ lokaal, FR-C2a)',
   it('dispose() wordt aangeroepen bij transport-wissel (chat sluiten)', async () => {
     mockCheckLocalAiCapability.mockResolvedValue({ ok: true, reasons: [], shaderF16: true, deviceMemoryGb: 8 })
     mockGetLocalModelState.mockResolvedValue({ state: 'klaar', bytes: null })
-    stubPrivacySwapFetch({ privacyMode: true })
+    stubExecutionFetch({ privacyMode: true })
     const { rerender } = render(<ChatPanel />)
 
     await waitFor(() => expect(mockLocalTransportInstances).toHaveLength(1))
@@ -379,7 +400,7 @@ describe('ChatPanel — retry fail-closed tijdens niet-ready (FR-C2a)', () => {
   })
 
   it('retry werkt wél zodra de transport gereed is (cloud)', async () => {
-    stubPrivacySwapFetch({ privacyMode: false })
+    stubExecutionFetch({ privacyMode: false })
     render(<ChatPanel />)
 
     const retry = await screen.findByTestId('chat-retry-button')
@@ -411,7 +432,7 @@ describe('ChatPanel — retry fail-closed tijdens niet-ready (FR-C2a)', () => {
 describe('ChatPanel — data-finActie kaart (lokaal actievoorstel, C2c)', () => {
   beforeEach(() => {
     localStorage.setItem(WFT_KEY, 'true')
-    stubPrivacySwapFetch({ privacyMode: false })
+    stubExecutionFetch({ privacyMode: false })
   })
 
   const FIN_ACTIE_DATA = {
@@ -473,7 +494,7 @@ describe('ChatPanel — data-finActie kaart (lokaal actievoorstel, C2c)', () => 
   })
 
   it('POST\'t de metadata.origin:local-chat bij het toevoegen van een lokale actie', async () => {
-    const fetchSpy = stubPrivacySwapFetch({ privacyMode: false })
+    const fetchSpy = stubExecutionFetch({ privacyMode: false })
     mockMessages = [{
       id: 'm1',
       role: 'assistant',
@@ -483,7 +504,7 @@ describe('ChatPanel — data-finActie kaart (lokaal actievoorstel, C2c)', () => 
       ],
     }]
     fetchSpy.mockImplementation((url: string, init?: RequestInit) => {
-      if (url === '/api/privacy-mode') return Promise.resolve({ ok: true, json: () => Promise.resolve({ privacyMode: false }) })
+      if (url === '/api/ai-execution-prefs') return Promise.resolve({ ok: true, json: () => Promise.resolve({ modes: { gesprek: 'cloud' }, hasAiSubscription: true }) })
       if (url === '/api/ai/actions') {
         return Promise.resolve({
           ok: true,
@@ -503,5 +524,67 @@ describe('ChatPanel — data-finActie kaart (lokaal actievoorstel, C2c)', () => 
     const body = JSON.parse(String(call?.[1]?.body))
     expect(body.metadata).toEqual({ origin: 'local-chat' })
     expect(body.source).toBe('chat')
+  })
+})
+
+/**
+ * ADR 0078 — de per-groep-override wint van de hoofdschakelaar.
+ *
+ * Dit is precies het gedrag dat ontbrak: de ChatPanel las de kale
+ * `profiles.privacy_mode` via /api/privacy-mode, zodat de schakelaar "Gesprek met
+ * Fin" op /mijn/privacy decoratief was. Beide richtingen worden hier vastgepind,
+ * met de `modes`-map gebouwd door de canonieke `resolveAllExecutionModes`.
+ */
+describe('ChatPanel — per-groep-override wint van de hoofdschakelaar (ADR 0078)', () => {
+  beforeEach(() => {
+    localStorage.setItem(WFT_KEY, 'true')
+  })
+
+  it('(a) hoofdschakelaar CLOUD + groep "gesprek" LOKAAL → lokaal transport, geen cloud-fetch', async () => {
+    mockCheckLocalAiCapability.mockResolvedValue({ ok: true, reasons: [], shaderF16: true, deviceMemoryGb: 8 })
+    mockGetLocalModelState.mockResolvedValue({ state: 'klaar', bytes: null })
+    const fetchSpy = stubExecutionFetch({ privacyMode: false, gesprek: 'lokaal' })
+    render(<ChatPanel />)
+
+    // De override wint: on-device transport, niet de cloud-default.
+    await waitFor(() => expect(mockLocalTransportInstances).toHaveLength(1))
+    const lastCall = mockUseChatCalls[mockUseChatCalls.length - 1]
+    expect(lastCall.transport).toBeInstanceOf(LocalChatTransport)
+    expect(screen.getByText('Experimenteel · lokaal')).toBeInTheDocument()
+
+    // Geen enkele aanroep naar de cloud-chat-route.
+    expect(fetchSpy).not.toHaveBeenCalledWith('/api/ai/chat', expect.anything())
+    const urls = fetchSpy.mock.calls.map((c) => String(c[0]))
+    expect(urls).not.toContain('/api/ai/chat')
+  })
+
+  it('(b) hoofdschakelaar LOKAAL + groep "gesprek" CLOUD → cloudpad, geen lokale sessie', async () => {
+    const fetchSpy = stubExecutionFetch({ privacyMode: true, gesprek: 'cloud' })
+    render(<ChatPanel />)
+
+    await waitFor(() => expect(mockUseChatCalls.length).toBeGreaterThan(0))
+    // Cloud-transport actief en de chat is verzendklaar (chatReady) — bewijs dat
+    // de override de hoofdschakelaar overstemt.
+    const textarea = await screen.findByPlaceholderText('Vraag Fin iets...')
+    await waitFor(() => expect(textarea).not.toBeDisabled())
+    const lastCall = mockUseChatCalls[mockUseChatCalls.length - 1]
+    expect(lastCall.transport).toBeInstanceOf(DefaultChatTransport)
+
+    // Er is geen enkele lokale sessie opgetuigd: geen GPU-check, geen model-
+    // staat, geen lokale hydratie.
+    expect(mockLocalTransportInstances).toHaveLength(0)
+    expect(mockCheckLocalAiCapability).not.toHaveBeenCalled()
+    expect(mockGetLocalModelState).not.toHaveBeenCalled()
+    expect(fetchSpy).not.toHaveBeenCalledWith('/api/local-chat-overview')
+  })
+
+  it('(c) modus nog onbekend (fetch hangt) → fail-closed: invoer uit, niets verstuurd', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})))
+    ctx = makeCtx({ pendingMessage: 'Doorlicht mijn financiën' })
+    render(<ChatPanel />)
+
+    const textarea = await screen.findByPlaceholderText('Even geduld…')
+    expect(textarea).toBeDisabled()
+    expect(mockSendMessage).not.toHaveBeenCalled()
   })
 })

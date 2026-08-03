@@ -1,9 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { FlaskConical, Loader2, ChevronDown, ChevronUp, ArrowRight } from 'lucide-react'
+import { FlaskConical, Loader2, ChevronDown, ChevronUp, ArrowRight, Cpu, Cloud } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
+import { useExecutionMode } from '@/lib/ai/local/use-execution-mode'
+import { getLocalModelState } from '@/lib/ai/local/model-manager'
 
 // ── Types matching the extraction schema ────────────────────────
 
@@ -76,20 +78,72 @@ export default function ExtractieTestPage() {
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<ExtractionResult | null>(null)
   const [showRawJson, setShowRawJson] = useState(false)
+  const [voortgang, setVoortgang] = useState<string | null>(null)
+
+  // ── Waar draait deze extractie? ─────────────────────────────────────────
+  // Eén hook beslist (lib/ai/local/use-execution-mode.ts) en die is
+  // FAIL-CLOSED: in 'resolving' en 'blocked' vertrekt er niets — niet naar de
+  // cloud en niet naar de GPU. Nooit zelf op `=== 'lokaal'` testen en anders de
+  // cloud pakken; dat breekt de belofte precies in het venster waarin de
+  // voorkeur nog geladen wordt.
+  const exec = useExecutionMode('documenten')
+
+  // Staat het model al op dit toestel? Een download van ~2 GB starten omdat
+  // iemand op "Extraheer" klikt is geen redelijke verrassing — we bieden het
+  // lokale pad alleen aan als het model er ál staat.
+  const [modelKlaar, setModelKlaar] = useState<boolean | null>(null)
+  useEffect(() => {
+    if (exec.status !== 'lokaal') {
+      setModelKlaar(null)
+      return
+    }
+    let cancelled = false
+    void getLocalModelState().then(({ state }) => {
+      if (!cancelled) setModelKlaar(state === 'klaar')
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [exec.status])
+
+  const lokaalBeschikbaar = exec.canUseLocal && modelKlaar === true
+  const kanExtraheren = exec.canUseCloud || lokaalBeschikbaar
 
   async function handleExtract() {
-    if (!text.trim()) return
+    if (!text.trim() || !kanExtraheren) return
 
     setLoading(true)
     setError(null)
     setResult(null)
+    setVoortgang(null)
 
     try {
+      const ctx = {
+        age: age ? parseInt(age, 10) : undefined,
+        householdType: householdType || undefined,
+        monthlyIncome: monthlyIncome ? parseInt(monthlyIncome, 10) : undefined,
+        monthlyExpenses: monthlyExpenses ? parseInt(monthlyExpenses, 10) : undefined,
+      }
+
+      if (lokaalBeschikbaar) {
+        // On-device. Dynamische import zodat de LiteRT-bundel niet in de
+        // beheer-bundel belandt voor iedereen die deze pagina cloud-matig
+        // gebruikt. Faalt dit, dan faalt het — GEEN terugval naar de cloud.
+        const { extractFinancialDataLocal } = await import('@/lib/ai/local/local-extraction-resolver')
+        const data = await extractFinancialDataLocal(text.trim(), ctx, {
+          onSessionState: (s) =>
+            setVoortgang(s === 'starten' ? 'Model wordt geladen (eerste keer duurt ~1 minuut)…' : null),
+          onStap: (stap, totaal, label) => setVoortgang(`Stap ${stap}/${totaal} — ${label}`),
+        })
+        setResult(data)
+        return
+      }
+
       const body: Record<string, unknown> = { text: text.trim() }
-      if (age) body.age = parseInt(age, 10)
-      if (householdType) body.householdType = householdType
-      if (monthlyIncome) body.monthlyIncome = parseInt(monthlyIncome, 10)
-      if (monthlyExpenses) body.monthlyExpenses = parseInt(monthlyExpenses, 10)
+      if (ctx.age != null) body.age = ctx.age
+      if (ctx.householdType) body.householdType = ctx.householdType
+      if (ctx.monthlyIncome != null) body.monthlyIncome = ctx.monthlyIncome
+      if (ctx.monthlyExpenses != null) body.monthlyExpenses = ctx.monthlyExpenses
 
       const res = await fetch('/api/admin/extraction-test', {
         method: 'POST',
@@ -108,6 +162,7 @@ export default function ExtractieTestPage() {
       setError(e instanceof Error ? e.message : 'Onbekende fout bij extractie')
     } finally {
       setLoading(false)
+      setVoortgang(null)
     }
   }
 
@@ -209,11 +264,49 @@ export default function ExtractieTestPage() {
           </div>
         </div>
 
+        {/* Uitvoerplek — eerlijk benoemen waar deze extractie landt */}
+        <div className="flex items-start gap-2 rounded-lg bg-[var(--subtle)] px-3 py-2 text-xs text-[var(--ink-3)]">
+          {lokaalBeschikbaar ? (
+            <>
+              <Cpu className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <span>
+                Draait <strong className="font-medium text-[var(--ink-2)]">op dit apparaat</strong>. De tekst gaat
+                niet naar een AI-leverancier. Wel merkbaar trager dan de cloud: drie korte beurten van elk enkele
+                tientallen seconden.
+              </span>
+            </>
+          ) : exec.status === 'lokaal' && modelKlaar === false ? (
+            <>
+              <Cpu className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <span>
+                Privé-modus staat aan voor documenten, maar het lokale model staat nog niet op dit apparaat. Download
+                het eerst via <Link href="/mijn/privacy" className="underline">Mijn · Privacy</Link>. Er wordt hier
+                bewust niets naar de cloud gestuurd.
+              </span>
+            </>
+          ) : exec.status === 'blocked' ? (
+            <>
+              <Cpu className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <span>{exec.message ?? 'Lokale AI is nu niet beschikbaar op dit toestel.'}</span>
+            </>
+          ) : exec.status === 'cloud' ? (
+            <>
+              <Cloud className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <span>Draait bij de AI-leverancier (cloud).</span>
+            </>
+          ) : (
+            <>
+              <Loader2 className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden="true" />
+              <span>Bepalen waar deze functie draait…</span>
+            </>
+          )}
+        </div>
+
         {/* Extract button */}
         <div className="flex items-center gap-3 pt-1">
           <button
             onClick={handleExtract}
-            disabled={loading || !text.trim()}
+            disabled={loading || !text.trim() || !kanExtraheren}
             className="flex items-center gap-1.5 rounded-lg bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-zinc-800 transition-colors disabled:opacity-50"
           >
             {loading ? (
@@ -230,7 +323,7 @@ export default function ExtractieTestPage() {
           </button>
           {loading && (
             <span className="text-xs text-[var(--ink-3)]">
-              Dit kan enkele seconden duren...
+              {voortgang ?? 'Dit kan enkele seconden duren...'}
             </span>
           )}
         </div>

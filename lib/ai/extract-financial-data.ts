@@ -10,104 +10,25 @@
 // rather than throwing, so the onboarding flow can continue.
 
 import { generateObject } from 'ai'
-import { z } from 'zod'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getModel } from '@/lib/ai/config'
 import { sanitizeForAI } from '@/lib/ai/sanitize'
 import { DEFAULT_EXTRACTION_PROMPT } from '@/lib/ai/extraction-system-prompt'
+// Het schema woont sinds de on-device-variant in een eigen, zod-only bestand:
+// het lokale pad valideert dezelfde vorm PER ITEM (geen constrained decoding)
+// en mag deze servermodule — met getModel en de provider-SDK's erachter — niet
+// de browserbundel in trekken. Zie lib/ai/extraction-schema.ts.
+import {
+  extractionSchema,
+  EMPTY_EXTRACTION_RESULT,
+  type ExtractionResult,
+} from '@/lib/ai/extraction-schema'
 
-// ── Zod Schema ──────────────────────────────────────────────────
-
-const extractionSchema = z.object({
-  assets: z.array(
-    z.object({
-      name: z.string().describe('Korte beschrijvende naam, bijv. "Koopwoning", "Spaarrekening", "ETF-portefeuille"'),
-      asset_type: z
-        .enum([
-          'cash',
-          'savings',
-          'investment',
-          'retirement',
-          'eigen_huis',
-          'real_estate',
-          'crypto',
-          'vehicle',
-          'physical',
-          'other',
-        ])
-        .describe('Type bezitting, kies de meest passende categorie'),
-      estimated_value: z.number().describe('Geschatte waarde in euro'),
-      expected_return: z.number().describe('Verwacht jaarlijks rendement in %, bijv. 7 voor aandelen, 2.5 voor sparen, 3.5 voor eigen huis'),
-      monthly_contribution: z.number().describe('Maandelijkse inleg in euro, 0 als niet genoemd'),
-      is_liquid: z.boolean().describe('Is de bezitting liquide (snel beschikbaar)?'),
-      subtype: z.string().nullable().describe('Subtype als van toepassing, bijv. "checking" voor cash, "savings_account" voor spaarrekening'),
-    }),
-  ),
-  debts: z.array(
-    z.object({
-      name: z.string().describe('Korte beschrijvende naam, bijv. "Hypotheek", "Studieschuld DUO"'),
-      debt_type: z
-        .enum([
-          'mortgage',
-          'personal_loan',
-          'student_loan',
-          'car_loan',
-          'credit_card',
-          'revolving_credit',
-          'payment_plan',
-          'belastingschuld',
-          'familielening',
-          'other',
-        ])
-        .describe('Type schuld, kies de meest passende categorie'),
-      estimated_balance: z.number().describe('Geschat openstaand saldo in euro'),
-      interest_rate: z.number().describe('Jaarlijkse rente in %, gebruik standaard marktrente als niet genoemd'),
-      monthly_payment: z.number().describe('Geschatte maandelijkse aflossing in euro, gebruik standaard als niet genoemd'),
-      is_tax_deductible: z.boolean().nullable().describe('Is de rente fiscaal aftrekbaar? true voor hypotheek, null als onbekend'),
-      subtype: z.string().nullable().describe('Subtype als van toepassing, bijv. "annuiteit" voor hypotheek, "nieuw_stelsel" voor DUO'),
-    }),
-  ),
-  life_events: z.array(
-    z.object({
-      name: z.string().describe('Naam van de gebeurtenis, bijv. "Kind krijgen", "Stoppen met werken"'),
-      event_type: z.string().describe('Type-slug zoals huis_kopen, kind, pensioen, aow, sabbatical, emigratie'),
-      target_age: z.number().nullable().describe('Leeftijd waarop dit gepland is, of null als onbekend'),
-      description: z.string().describe('Korte beschrijving van het plan'),
-      one_time_cost: z.number().describe('Geschatte eenmalige kosten in euro, 0 als niet van toepassing'),
-      monthly_cost_change: z.number().describe('Geschatte maandelijkse kostenwijziging in euro (positief = hogere kosten)'),
-      monthly_income_change: z.number().describe('Geschatte maandelijkse inkomenswijziging in euro (positief = meer inkomen, negatief = minder)'),
-      duration_months: z.number().describe('Duur in maanden, 0 = permanent'),
-      icon: z.string().describe('Lucide icon naam, bijv. Baby voor kind, Home voor huis, GraduationCap voor studie, Plane voor emigratie, Heart voor trouwen'),
-    }),
-  ),
-  monthly_income_estimate: z
-    .number()
-    .nullable()
-    .describe('Geschat netto maandinkomen in euro, null als niet genoemd'),
-  monthly_expenses_estimate: z
-    .number()
-    .nullable()
-    .describe('Geschatte maandelijkse uitgaven in euro, null als niet genoemd'),
-  financial_context_remainder: z
-    .string()
-    .describe('Overige relevante context die niet in gestructureerde velden past, lege string als er niets overblijft'),
-})
-
-// ── Exported Type ───────────────────────────────────────────────
-
-export type ExtractionResult = z.infer<typeof extractionSchema>
-
-// ── Empty Result ────────────────────────────────────────────────
+// Her-export zodat bestaande consumenten hun import niet hoeven te wijzigen.
+export type { ExtractionResult }
 
 /** Fallback result returned when extraction fails or input is empty */
-const EMPTY_RESULT: ExtractionResult = {
-  assets: [],
-  debts: [],
-  life_events: [],
-  monthly_income_estimate: null,
-  monthly_expenses_estimate: null,
-  financial_context_remainder: '',
-}
+const EMPTY_RESULT = EMPTY_EXTRACTION_RESULT
 
 // ── Main Extraction Function ────────────────────────────────────
 

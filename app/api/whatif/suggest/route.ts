@@ -2,33 +2,36 @@ import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { unauthorized, forbidden } from '@/lib/api/respond'
 import { generateObject } from 'ai'
-import { z } from 'zod'
+import type { z } from 'zod'
+import {
+  SuggestedEventSchema,
+  SuggestionsResponseSchema,
+} from '@/lib/ai/schemas/whatif-suggestion-schema'
 import { WHATIF_SUGGEST_PROMPT } from '@/lib/ai/whatif-suggest-prompt'
 import { getModel, AIConfigError } from '@/lib/ai/config'
 import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
 import { checkTierGate } from '@/lib/require-tier'
+import { assertCloudAllowed } from '@/lib/ai/privacy-gate'
 
-const SuggestedEventSchema = z.object({
-  event_type: z.string(),
-  name: z.string(),
-  target_age: z.number().nullable(),
-  one_time_cost: z.number(),
-  monthly_cost_change: z.number(),
-  monthly_income_change: z.number(),
-  duration_months: z.number(),
-  explanation: z.string(),
-})
-
-const SuggestionsResponseSchema = z.object({
-  suggestions: z.array(SuggestedEventSchema).min(1).max(3),
-})
-
+/** Schema-single-source: lib/ai/schemas/whatif-suggestion-schema.ts (ook gebruikt
+ *  door het lokale pad als tweede grens). */
 export type SuggestedEvent = z.infer<typeof SuggestedEventSchema>
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return unauthorized()
+
+  // PRIVÉ-MODUS EERST — vóór de tier-gate, de credit-gate en élke dataophaling.
+  // Staat 'tips' op lokaal, dan bedenkt de browser de wat-als-voorstellen zelf en
+  // hoort deze route niets te leveren.
+  // Waarom deze volgorde: (1) privé-modus is de meest fundamentele keuze van de
+  // gebruiker en gaat vóór commerciële gating — de eerlijke reden is "privé-modus
+  // staat aan", niet "je mist een abonnement"; (2) een geblokkeerde call mag geen
+  // credits kosten; (3) de vraag die de gebruiker intypt mag de promptopbouw niet
+  // eens bereiken. Nooit een stille terugval naar de cloud: 403 is het eindpunt.
+  const privacyGate = await assertCloudAllowed(supabase, user.id, 'tips')
+  if (privacyGate) return privacyGate
 
   // AI-add-on vereist (kostenbeheersing) — gaf voorheen alleen auth-check.
   const gate = await checkTierGate(supabase, user.id, 'ai')

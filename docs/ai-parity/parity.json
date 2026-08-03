@@ -1,9 +1,10 @@
 {
-  "generatedAt": "2026-07-25T06:05:05.742Z",
-  "manifestGeneratedAt": "2026-07-24T22:10:46.710Z",
+  "generatedAt": "2026-08-02T22:56:02.501Z",
+  "manifestGeneratedAt": "2026-08-03T00:00:00.000Z",
   "inSync": true,
+  "budgetsOk": true,
   "dnaSubBudget": 2000,
-  "dnaEstimatedTokens": 490,
+  "dnaEstimatedTokens": 651,
   "dnaTokenSource": "live",
   "sources": [
     {
@@ -17,6 +18,222 @@
       "storedSha256": "767859a72ab97e81722d1befd6b00d0937fa9d6580e5537bfe288f4e31e9ab0f",
       "liveSha256": "767859a72ab97e81722d1befd6b00d0937fa9d6580e5537bfe288f4e31e9ab0f",
       "inSync": true
+    }
+  ],
+  "artefacts": [
+    {
+      "id": "chat",
+      "label": "Lokale chat-DNA",
+      "constant": "LOCAL_CHAT_DNA",
+      "file": "lib/ai/local/local-chat-prompt.ts",
+      "subBudget": 2000,
+      "estimatedTokens": 651,
+      "tokenSource": "live",
+      "withinBudget": true,
+      "inSync": true,
+      "sources": [
+        {
+          "file": "lib/ai/dna/base.ts",
+          "storedSha256": "4089da9e6e0a736479423786bcf653065c7ad9f523e8d0d8c8022ae57a6c639d",
+          "liveSha256": "4089da9e6e0a736479423786bcf653065c7ad9f523e8d0d8c8022ae57a6c639d",
+          "inSync": true
+        },
+        {
+          "file": "lib/ai/dna/wil.ts",
+          "storedSha256": "767859a72ab97e81722d1befd6b00d0937fa9d6580e5537bfe288f4e31e9ab0f",
+          "liveSha256": "767859a72ab97e81722d1befd6b00d0937fa9d6580e5537bfe288f4e31e9ab0f",
+          "inSync": true
+        }
+      ]
+    },
+    {
+      "id": "briefing",
+      "label": "Lokale briefing-DNA",
+      "constant": "LOCAL_BRIEFING_DNA",
+      "file": "lib/ai/local/local-briefing-prompt.ts",
+      "subBudget": 600,
+      "estimatedTokens": 207,
+      "tokenSource": "live",
+      "withinBudget": true,
+      "inSync": true,
+      "sources": [
+        {
+          "file": "lib/briefing/redactie.ts",
+          "storedSha256": "5a06942d7c02a1837baaa8a8af58ae789e905da21f7a42a1edccad9c2480a918",
+          "liveSha256": "5a06942d7c02a1837baaa8a8af58ae789e905da21f7a42a1edccad9c2480a918",
+          "inSync": true
+        },
+        {
+          "file": "lib/ai/dna/base.ts",
+          "storedSha256": "4089da9e6e0a736479423786bcf653065c7ad9f523e8d0d8c8022ae57a6c639d",
+          "liveSha256": "4089da9e6e0a736479423786bcf653065c7ad9f523e8d0d8c8022ae57a6c639d",
+          "inSync": true
+        }
+      ]
+    },
+    {
+      "id": "rapport",
+      "label": "Lokale rapport-DNA",
+      "constant": "LOCAL_REPORT_DNA",
+      "file": "lib/ai/local/local-report-prompt.ts",
+      "subBudget": 800,
+      "estimatedTokens": 280,
+      "tokenSource": "live",
+      "withinBudget": true,
+      "inSync": true,
+      "sources": [
+        {
+          "file": "lib/ai/dna/base.ts",
+          "storedSha256": "4089da9e6e0a736479423786bcf653065c7ad9f523e8d0d8c8022ae57a6c639d",
+          "liveSha256": "4089da9e6e0a736479423786bcf653065c7ad9f523e8d0d8c8022ae57a6c639d",
+          "inSync": true
+        }
+      ]
+    },
+    {
+      "id": "whatif",
+      "label": "Lokale wat-als-DNA",
+      "constant": "LOCAL_WHATIF_DNA",
+      "file": "lib/ai/local/local-whatif-prompt.ts",
+      "subBudget": 800,
+      "estimatedTokens": 219,
+      "tokenSource": "live",
+      "withinBudget": true,
+      "inSync": true,
+      "sources": [
+        {
+          "file": "lib/ai/whatif-suggest-prompt.ts",
+          "storedSha256": "c97783a6016bd92fd1ffc823d9bb94bd159062823d2c41a9426a175ee6a679db",
+          "liveSha256": "c97783a6016bd92fd1ffc823d9bb94bd159062823d2c41a9426a175ee6a679db",
+          "inSync": true
+        }
+      ]
+    },
+    {
+      "id": "aanbevelingen",
+      "label": "Lokale aanbevelingen-DNA",
+      "constant": "LOCAL_RECOMMENDATIONS_DNA",
+      "file": "lib/ai/local/local-recommendations-prompt.ts",
+      "subBudget": 1000,
+      "estimatedTokens": 617,
+      "tokenSource": "live",
+      "withinBudget": true,
+      "inSync": true,
+      "sources": [
+        {
+          "file": "lib/ai/dna/recommendations.ts",
+          "storedSha256": "33290e2987d8ad68114afad9288fc07bdae1e89c62758684fd8fed80550d3b06",
+          "liveSha256": "33290e2987d8ad68114afad9288fc07bdae1e89c62758684fd8fed80550d3b06",
+          "inSync": true
+        },
+        {
+          "file": "lib/ai/dna/base.ts",
+          "storedSha256": "4089da9e6e0a736479423786bcf653065c7ad9f523e8d0d8c8022ae57a6c639d",
+          "liveSha256": "4089da9e6e0a736479423786bcf653065c7ad9f523e8d0d8c8022ae57a6c639d",
+          "inSync": true
+        }
+      ]
+    },
+    {
+      "id": "nieuws",
+      "label": "Lokale nieuws-DNA",
+      "constant": "LOCAL_NEWS_DNA",
+      "file": "lib/ai/local/local-news-prompt.ts",
+      "subBudget": 700,
+      "estimatedTokens": 442,
+      "tokenSource": "live",
+      "withinBudget": true,
+      "inSync": true,
+      "sources": [
+        {
+          "file": "lib/news-system-prompt.ts",
+          "storedSha256": "a5eb8c49436a4450268c8f1ef477487783ec789fb678bd8e3f6ac201525521d3",
+          "liveSha256": "a5eb8c49436a4450268c8f1ef477487783ec789fb678bd8e3f6ac201525521d3",
+          "inSync": true
+        },
+        {
+          "file": "lib/ai/dna/base.ts",
+          "storedSha256": "4089da9e6e0a736479423786bcf653065c7ad9f523e8d0d8c8022ae57a6c639d",
+          "liveSha256": "4089da9e6e0a736479423786bcf653065c7ad9f523e8d0d8c8022ae57a6c639d",
+          "inSync": true
+        }
+      ]
+    },
+    {
+      "id": "rekenhulp",
+      "label": "Lokale rekenhulp-DNA",
+      "constant": "LOCAL_CALCULATOR_DNA",
+      "file": "lib/ai/local/local-calculator-prompt.ts",
+      "subBudget": 1000,
+      "estimatedTokens": 461,
+      "tokenSource": "live",
+      "withinBudget": true,
+      "inSync": true,
+      "sources": [
+        {
+          "file": "lib/ai/build-calculator.ts",
+          "storedSha256": "65313f2c4ac0c139149a90269a80d7120ffac55eccc333fab094b33289d4b333",
+          "liveSha256": "65313f2c4ac0c139149a90269a80d7120ffac55eccc333fab094b33289d4b333",
+          "inSync": true
+        }
+      ]
+    },
+    {
+      "id": "extractie",
+      "label": "Lokale vrije-tekst-extractie-DNA",
+      "constant": "LOCAL_EXTRACTION_DNA",
+      "file": "lib/ai/local/local-extraction-prompt.ts",
+      "subBudget": 500,
+      "estimatedTokens": 152,
+      "tokenSource": "live",
+      "withinBudget": true,
+      "inSync": true,
+      "sources": [
+        {
+          "file": "lib/ai/extraction-system-prompt.ts",
+          "storedSha256": "00b1ba88df04c74a1f119edf3eb5ac9f4aaebb9dc2aa6b319addb57ddeced53e",
+          "liveSha256": "00b1ba88df04c74a1f119edf3eb5ac9f4aaebb9dc2aa6b319addb57ddeced53e",
+          "inSync": true
+        }
+      ]
+    },
+    {
+      "id": "aangifte",
+      "label": "Lokale aangifte-DNA",
+      "constant": "LOCAL_AANGIFTE_DNA",
+      "file": "lib/aangifte/local/prompts.ts",
+      "subBudget": 500,
+      "estimatedTokens": 135,
+      "tokenSource": "live",
+      "withinBudget": true,
+      "inSync": true,
+      "sources": [
+        {
+          "file": "lib/aangifte/system-prompt.ts",
+          "storedSha256": "02f82f3ba2f215419825cc98ba69ef9b88c1b07edbeee9108f0b631bb30de91f",
+          "liveSha256": "02f82f3ba2f215419825cc98ba69ef9b88c1b07edbeee9108f0b631bb30de91f",
+          "inSync": true
+        }
+      ]
+    },
+    {
+      "id": "pensioen",
+      "label": "Lokale pensioen-DNA",
+      "constant": "LOCAL_PENSION_DNA",
+      "file": "lib/ai/local/local-pension-prompt.ts",
+      "subBudget": 600,
+      "estimatedTokens": 276,
+      "tokenSource": "live",
+      "withinBudget": true,
+      "inSync": true,
+      "sources": [
+        {
+          "file": "lib/ai/pension-parse-prompt.ts",
+          "storedSha256": "2b47aa14331e0ce1ac8919f2001ff431d86d012c82b1046fdb81a7623c06a1dd",
+          "liveSha256": "2b47aa14331e0ce1ac8919f2001ff431d86d012c82b1046fdb81a7623c06a1dd",
+          "inSync": true
+        }
+      ]
     }
   ]
 }

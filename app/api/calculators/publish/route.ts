@@ -1,5 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
-import { unauthorized } from '@/lib/api/respond'
+import { unauthorized, errorResponse } from '@/lib/api/respond'
+import { isCloudAllowed, PRIVACY_GATE_CODE } from '@/lib/ai/privacy-gate'
+import { checkTierGate } from '@/lib/require-tier'
+import { checkCreditBudget, creditLimitMessage } from '@/lib/ai/credit-gate'
+import { recordAiUsage } from '@/lib/ai-credits'
 import { StoredCalculatorDefinitionSchema } from '@/lib/calculator/types'
 import { screenPublishMetadata } from '@/lib/ai/screen-publish-metadata'
 
@@ -41,6 +45,88 @@ export async function POST(req: Request) {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return unauthorized()
+
+  // PRIVÉ-MODUS — hier blokkeren we bewust wél volledig, anders dan bij /api/report.
+  //
+  // Deze screening is geen assistieve hulp maar een POORTWACHTER vóór een publieke
+  // insert: hij bewaakt de Wft-grens (educatieve rekenhulp mag, concreet financieel
+  // advies niet) en houdt persoonlijke bedragen en leveranciersnamen uit een
+  // template die straks voor iedereen zichtbaar is. Twee dingen volgen daaruit:
+  //
+  //   1. Het oordeel moet op de SERVER vallen. Een browser-oordeel is niet
+  //      afdwingbaar — wie de client omzeilt, publiceert ongescreend. "De client
+  //      zegt dat het goed is" mag hier dus nooit volstaan.
+  //   2. De inhoudelijke helft (advies-vs-educatie) is een taaloordeel dat het
+  //      lokale model niet betrouwbaar velt. Half screenen is voor een publieke,
+  //      vergunning-gevoelige pagina geen optie.
+  //
+  // Daarom: staat 'rapporten' op lokaal, dan kan er niet gepubliceerd worden en
+  // zeggen we dat eerlijk, mét de uitweg. De rekenhulp zelf blijft gewoon werken
+  // en blijft privé bewaard — alleen het DELEN vraagt de cloud-controle.
+  if (!(await isCloudAllowed(supabase, user.id, 'rapporten'))) {
+    return errorResponse(
+      'Privé-modus actief: publiceren vraagt een inhoudelijke controle op onze server. ' +
+        'Zet "Rapporten & rekenhulpen" op cloud-AI via Mijn → Privacy als je deze rekenhulp wilt delen. ' +
+        'Je rekenhulp blijft gewoon voor jezelf bewaard.',
+      403,
+      PRIVACY_GATE_CODE,
+    )
+  }
+
+  // TIER-GATE — de gemotiveerde keuze: PUBLICEREN VEREIST HET AI-ABONNEMENT.
+  //
+  // Publiceren is op zichzelf geen AI-functie; de AI zit alleen in de screening.
+  // Toch gate-t hier de hele route, en niet alleen de screening, om één reden:
+  // `screenPublishMetadata` is een POORTWACHTER die FAIL-CLOSED is (zie die
+  // module). Hem overslaan voor wie geen abonnement heeft, betekent publiceren
+  // zónder de controle die de Wft-grens bewaakt en persoonlijke bedragen en
+  // leveranciersnamen uit een publieke template houdt. Dat is precies het
+  // tweede, minder bewaakte pad dat we nergens willen.
+  //
+  // Waarom niet terugvallen op `screenPublishDeterministic`
+  // (lib/ai/screen-publish-deterministic.ts)? Die functie zegt het zelf: hij is
+  // GEEN poortwachter. Het onderscheid educatieve rekenhulp vs. concreet
+  // financieel advies is een taaloordeel dat geen regex velt. Een non-AI
+  // publiceerpad op alleen die check zou de lat verlagen voor precies de rijen
+  // die daarna voor iedereen zichtbaar zijn.
+  //
+  // Wat dat kost, eerlijk benoemd: wie geen AI-abonnement heeft kan zijn
+  // rekenhulp niet DELEN. Hij kan hem wel gewoon maken, gebruiken en bewaren —
+  // dat blijft ongemoeid. Consistent met /api/ai/build-calculator, dat het
+  // maken van een AI-rekenhulp al achter hetzelfde abonnement zet, en met de
+  // privé-modus-melding hierboven: zelfde vorm (`{ ok: false, error }`), zodat
+  // de curatie-sheet de échte reden toont in plaats van "Publiceren mislukt".
+  const tierGate = await checkTierGate(supabase, user.id, 'ai')
+  if (tierGate) {
+    return Response.json(
+      {
+        ok: false,
+        error:
+          'Publiceren vraagt een inhoudelijke controle door onze AI-screening, en die hoort bij het AI-abonnement. ' +
+          'Je rekenhulp blijft gewoon van jou: je kunt hem blijven gebruiken en bewerken, alleen delen kan nu niet.',
+      },
+      { status: 403 },
+    )
+  }
+
+  // CREDIT-GATE — direct ná de tier-gate en vóór getModel(), conform
+  // lib/ai/credit-gate.ts. Sleutel 'report' (kosten 5): er is geen aparte
+  // publicatie-sleutel en we voegen er bewust geen toe; 'report' hoort bij
+  // dezelfde uitvoergroep ('rapporten' = Rapporten & rekenhulpen) die deze route
+  // hierboven al voor de privé-gate gebruikt, dus de /beheer-uitsplitsing zet
+  // dit verbruik waar de gebruiker het verwacht. De screening is goedkoper dan
+  // een heel rapport, dus we rekenen aan de veilige kant te hoog — bij een
+  // rate-limit is dat de juiste richting, en 'categorize' (kosten 1) zou de
+  // transactie-categorisatie in de verbruiksgrafiek vervuilen.
+  const creditGate = await checkCreditBudget(supabase, user.id, 'report')
+  if (!creditGate.allowed) {
+    const res = Response.json(
+      { ok: false, error: creditLimitMessage(creditGate) },
+      { status: 429 },
+    )
+    res.headers.set('Retry-After', String(creditGate.retryAfterSeconds))
+    return res
+  }
 
   let body: {
     calculatorId?: unknown
@@ -116,6 +202,13 @@ export async function POST(req: Request) {
     description: source.description ?? sourceDef.description ?? null,
     assumptions: sourceDef.assumptions ?? [],
   })
+
+  // Registreren zodra de screening geDRAAID heeft — óók wanneer ze afkeurt.
+  // Een afgekeurde publicatie heeft het model net zo goed gekost, en zonder deze
+  // regel zou een reeks afgekeurde pogingen gratis zijn: dan is de credit-gate
+  // hierboven te omzeilen door steeds tekst aan te bieden die wordt geweigerd.
+  await recordAiUsage(supabase, user.id, 'report')
+
   if (!screen.ok) {
     return Response.json(
       {

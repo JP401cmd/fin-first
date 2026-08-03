@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { ChatPanel } from './chat-panel'
 import { FeatureAccessProvider } from '@/components/app/feature-access-provider'
@@ -84,6 +84,23 @@ beforeEach(() => {
   // invoerveld en test je de verkeerde gate.
   localStorage.setItem(WFT_KEY, 'true')
   Element.prototype.scrollIntoView = vi.fn()
+  // De chat gate't op useExecutionMode('gesprek') → GET /api/ai-execution-prefs.
+  // Zonder antwoord blijft die hook bewust in 'resolving' (fail-closed) en
+  // verschijnt het invoerveld nooit — dan zou deze test de abonnements-gate niet
+  // meer meten maar de uitvoermodus-gate.
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ modes: { gesprek: 'cloud' }, hasAiSubscription: true }),
+      }),
+    ),
+  )
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
 })
 
 describe('ChatPanel — AI-abonnee-toegang via de échte FeatureAccessProvider', () => {

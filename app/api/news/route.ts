@@ -1,9 +1,8 @@
 import { streamObject } from 'ai'
-import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
-import { getServiceClient } from '@/lib/supabase/service'
 import { recordAiUsage } from '@/lib/ai-credits'
 import { getModel, AIConfigError } from '@/lib/ai/config'
+import { assertCloudAllowed } from '@/lib/ai/privacy-gate'
 import { buildSharedContext } from '@/lib/ai/context/shared-context'
 import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
 import { maskPIIInObject } from '@/lib/ai/pii-output-filter'
@@ -11,209 +10,31 @@ import { NextResponse } from 'next/server'
 import { unauthorized, forbidden, serverError } from '@/lib/api/respond'
 import { checkTierGate } from '@/lib/require-tier'
 import { NEWS_SYSTEM_PROMPT } from '@/lib/news-system-prompt'
+import { filterGroundedItems, type SelectableArticle } from '@/lib/news-selection'
+import { newsItemSchema, type NewsItem } from '@/lib/news-item'
 import {
-  selectSourceArticles,
-  filterGroundedItems,
-  type SelectableArticle,
-} from '@/lib/news-selection'
+  archiveCurrentEdition,
+  checkRefreshLimit,
+  currentJaargang,
+  getCachedNews,
+  getNextEditionNr,
+  getRecentHeadlines,
+  loadNewsSourceArticles,
+  markUsedArticles,
+  setCachedNews,
+  type NewsSupabaseClient,
+} from '@/lib/news-edition-store'
 
-// ── Cache TTL ────────────────────────────────────────────────────────
+// Schema, type en opslag wonen sinds de on-device editie in gedeelde modules
+// (`lib/news-item.ts` + `lib/news-edition-store.ts`): het lokale pad schrijft naar
+// DEZELFDE cache-sleutel, en twee kopieën van die sleutelvorm zou stil uit de pas
+// lopen. Her-export zodat bestaande importeurs (components/berichten/*) ongewijzigd
+// blijven werken.
+export type { NewsItem }
 
-const CACHE_TTL_HOURS = 7 * 24 // 7 days
-
-// ── Valid news categories ────────────────────────────────────────────
-
-const NEWS_CATEGORIES = [
-  'fiscaal',
-  'rente',
-  'woningmarkt',
-  'beleggingen',
-  'pensioen',
-  'macro',
-] as const
-
-// ── Schema ───────────────────────────────────────────────────────────
-
-const newsItemSchema = z.object({
-  id: z.string().describe('Uniek ID voor het nieuwsitem (bijv. news-2026-03-07-1)'),
-  headline: z.string().describe('Korte, pakkende kop in het Nederlands'),
-  summary: z.string().describe('Samenvatting van het nieuws in 2-3 zinnen'),
-  impactType: z.enum(['direct', 'relevant']).describe('"direct" = concrete, berekenbare impact op de financiele situatie van de gebruiker. "relevant" = financieel relevant nieuws zonder concrete berekenbare impact, maar wel waardevol om te weten.'),
-  personalImpact: z.string().describe('Bij impactType "direct": concrete impact met specifieke euro-bedragen of vrijheidstijd gebaseerd op het profiel. Bij impactType "relevant": korte uitleg waarom dit nieuwsitem relevant is voor de financiele situatie van de gebruiker, zonder concrete bedragen.'),
-  // NB: geen .int()/.min()/.max() — Anthropic structured output ondersteunt
-  // geen minimum/maximum in het JSON-schema, en Zod v4 voegt die bij .int()
-  // zelf toe (safe-integer-grenzen) → 400 invalid_request_error. Range en
-  // afronding worden afgedwongen via de prompt + server-side clamp.
-  impactScore: z.number().describe('Impactscore: geheel getal van 1 t/m 5 — hoe groot is de impact/relevantie voor deze gebruiker? 5 = grote concrete impact, 1 = achtergrond.'),
-  impactDirection: z.enum(['positief', 'negatief', 'neutraal']).describe('Richting van de impact voor de gebruiker: "positief" (bespaart geld of versnelt vrijheid), "negatief" (kost geld of vertraagt vrijheid) of "neutraal".'),
-  deadline: z.string().optional().describe('Alleen invullen als er een concrete datum (YYYY-MM-DD) is waarvoor de gebruiker iets kan of moet doen.'),
-  category: z.enum(NEWS_CATEGORIES).describe('Nieuwscategorie'),
-  date: z.string().describe('Datum van het nieuws in YYYY-MM-DD formaat'),
-  sourceContext: z.string().optional().describe('Broncontext of toelichting (bijv. "Belastingplan 2026", "ECB persconferentie")'),
-  sourceUrl: z.string().optional().describe('Directe URL naar het bronartikel waarop dit nieuwsitem gebaseerd is — LETTERLIJK overgenomen uit de aangeleverde bronnen'),
-  sourceName: z.string().optional().describe('Naam van de bron (bijv. "Belastingdienst", "Rijksoverheid", "ECB")'),
-})
-
-export type NewsItem = z.infer<typeof newsItemSchema>
+type SupabaseClient = NewsSupabaseClient
 
 // System prompt is imported from lib/news-system-prompt.ts (single source of truth)
-
-// ── Cache helpers ────────────────────────────────────────────────────
-
-function cacheKey(userId: string) {
-  return `news_cache:${userId}`
-}
-
-interface CachedNews {
-  items: NewsItem[]
-  generatedAt: string
-  sourceCount?: number
-  sourceNewestAt?: string
-}
-
-async function getCachedNews(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  userId: string,
-): Promise<CachedNews | null> {
-  const { data } = await supabase
-    .from('app_settings')
-    .select('value')
-    .eq('key', cacheKey(userId))
-    .maybeSingle()
-
-  if (!data?.value) return null
-
-  try {
-    const cached: CachedNews = typeof data.value === 'string'
-      ? JSON.parse(data.value)
-      : data.value
-
-    const generatedAt = new Date(cached.generatedAt)
-    const now = new Date()
-    const ageHours = (now.getTime() - generatedAt.getTime()) / (1000 * 60 * 60)
-
-    // Een lege editie ("geen nieuws met impact") cachen we kort: morgen kan er
-    // wél relevant nieuws zijn, en een fout-veroorzaakte lege editie mag de
-    // gebruiker geen week achtervolgen.
-    const ttlHours = cached.items.length === 0 ? 6 : CACHE_TTL_HOURS
-    if (ageHours > ttlHours) return null
-
-    return cached
-  } catch {
-    return null
-  }
-}
-
-async function setCachedNews(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  userId: string,
-  items: NewsItem[],
-  meta: { sourceCount: number; sourceNewestAt?: string },
-): Promise<void> {
-  const value: CachedNews = {
-    items,
-    generatedAt: new Date().toISOString(),
-    sourceCount: meta.sourceCount,
-    sourceNewestAt: meta.sourceNewestAt,
-  }
-
-  await supabase
-    .from('app_settings')
-    .upsert(
-      {
-        key: cacheKey(userId),
-        value: JSON.stringify(value),
-        updated_at: new Date().toISOString(),
-        updated_by: userId,
-      },
-      { onConflict: 'key' },
-    )
-}
-
-// ── Edition helpers ──────────────────────────────────────────────────
-
-type SupabaseClient = Awaited<ReturnType<typeof createClient>>
-
-async function getNextEditionNr(supabase: SupabaseClient, userId: string): Promise<number> {
-  const { data } = await supabase
-    .from('news_editions')
-    .select('edition_nr')
-    .eq('user_id', userId)
-    .order('edition_nr', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  return (data?.edition_nr ?? 0) + 1
-}
-
-async function archiveCurrentEdition(
-  supabase: SupabaseClient,
-  userId: string,
-): Promise<void> {
-  // Read current cached news
-  const { data: cacheRow } = await supabase
-    .from('app_settings')
-    .select('value')
-    .eq('key', cacheKey(userId))
-    .maybeSingle()
-
-  if (!cacheRow?.value) return
-
-  let cached: CachedNews
-  try {
-    cached = typeof cacheRow.value === 'string'
-      ? JSON.parse(cacheRow.value)
-      : cacheRow.value
-  } catch {
-    return
-  }
-
-  if (!cached.items || cached.items.length === 0) return
-
-  const nextNr = await getNextEditionNr(supabase, userId)
-  const jaargang = new Date().getFullYear() - 2025
-
-  await supabase.from('news_editions').insert({
-    user_id: userId,
-    edition_nr: nextNr,
-    jaargang,
-    articles: cached.items,
-    article_count: cached.items.length,
-    hero_headline: cached.items[0].headline,
-  })
-
-  // Enforce 50-edition cap — delete oldest if over limit
-  const { data: editions } = await supabase
-    .from('news_editions')
-    .select('id, edition_nr')
-    .eq('user_id', userId)
-    .order('edition_nr', { ascending: false })
-
-  if (editions && editions.length > 50) {
-    const toDelete = editions.slice(50).map((e) => e.id)
-    await supabase.from('news_editions').delete().in('id', toDelete)
-  }
-}
-
-// ── Deduplication helper ─────────────────────────────────────────────
-
-async function getRecentHeadlines(supabase: SupabaseClient, userId: string): Promise<string[]> {
-  const twoMonthsAgo = new Date()
-  twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2)
-
-  const { data } = await supabase
-    .from('news_editions')
-    .select('articles')
-    .eq('user_id', userId)
-    .gte('created_at', twoMonthsAgo.toISOString())
-    .order('created_at', { ascending: false })
-
-  if (!data || data.length === 0) return []
-  return data.flatMap((row) => {
-    const articles = row.articles as NewsItem[]
-    return articles.map((a) => a.headline)
-  })
-}
 
 // ── Feedback helper — categorieën die de gebruiker minder wil zien ──
 
@@ -239,31 +60,6 @@ async function getDemotedCategories(supabase: SupabaseClient, userId: string): P
   } catch {
     return []
   }
-}
-
-// ── Refresh rate limiter ─────────────────────────────────────────────
-
-async function checkRefreshLimit(
-  supabase: SupabaseClient, userId: string
-): Promise<{ allowed: boolean; remaining: number; limit: number }> {
-  const { data: setting } = await supabase
-    .from('app_settings')
-    .select('value')
-    .eq('key', 'news_max_refreshes_per_week')
-    .maybeSingle()
-  const limit = setting?.value ? parseInt(setting.value, 10) : 3
-
-  const weekAgo = new Date()
-  weekAgo.setDate(weekAgo.getDate() - 7)
-
-  const { count } = await supabase
-    .from('news_editions')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', userId)
-    .gte('created_at', weekAgo.toISOString())
-
-  const used = count ?? 0
-  return { allowed: used < limit, remaining: Math.max(0, limit - used), limit }
 }
 
 // ── Background generation state (persisted in app_settings) ─────────
@@ -330,55 +126,11 @@ async function clearGenerationState(supabase: SupabaseClient, userId: string): P
 
 // ── Source articles ──────────────────────────────────────────────────
 
-const SOURCE_CANDIDATE_LIMIT = 120
-const SOURCE_PROMPT_LIMIT = 40
-
 /**
- * Laad bronartikelen via de service-role-client: news_articles is een
- * systeemtabel (RLS: superadmin + service_role) en moet voor ÁLLE gebruikers
- * de generatie voeden. Er gaat geen gebruikersinput in deze query en het
- * resultaat blijft server-side — alleen de AI-prompt ziet de artikelen.
+ * Aantal bronartikelen dat in ÉÉN cloud-prompt gaat. Het lokale pad hanteert een
+ * veel lagere limiet (~12): daar krijgt elk artikel een eigen modelcall.
  */
-async function loadSourceArticles(): Promise<SelectableArticle[]> {
-  let client: ReturnType<typeof getServiceClient>
-  try {
-    client = getServiceClient()
-  } catch (err) {
-    console.error('[/api/news] Service client unavailable — no source articles:', err)
-    return []
-  }
-
-  const thirtyDaysAgo = new Date()
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-
-  const { data, error } = await client
-    .from('news_articles')
-    .select('id, title, summary, source_url, source_name, category, published_at, potential_impact, is_used')
-    .gte('fetched_at', thirtyDaysAgo.toISOString())
-    .order('published_at', { ascending: false })
-    .limit(SOURCE_CANDIDATE_LIMIT)
-
-  if (error) {
-    console.error('[/api/news] Failed to load source articles:', error.message)
-    return []
-  }
-
-  return selectSourceArticles(data || [], { limit: SOURCE_PROMPT_LIMIT })
-}
-
-/** Markeer alleen de artikelen die daadwerkelijk in de editie zijn gebruikt. */
-async function markUsedArticles(articles: SelectableArticle[], items: NewsItem[]): Promise<void> {
-  const usedUrls = new Set(items.map((i) => i.sourceUrl).filter(Boolean))
-  const usedIds = articles.filter((a) => usedUrls.has(a.source_url)).map((a) => a.id)
-  if (usedIds.length === 0) return
-
-  try {
-    const client = getServiceClient()
-    await client.from('news_articles').update({ is_used: true }).in('id', usedIds)
-  } catch (err) {
-    console.error('[/api/news] Failed to mark used articles:', err)
-  }
-}
+const SOURCE_PROMPT_LIMIT = 40
 
 // ── GET handler ──────────────────────────────────────────────────────
 
@@ -389,6 +141,31 @@ export async function GET(request: Request) {
   if (!user) {
     return unauthorized()
   }
+
+  // PRIVÉ-MODUS EERST — vóór de tier-gate, de credit-gate en élke dataophaling.
+  // Staat 'nieuws' op lokaal, dan stelt de browser de editie zelf samen en hoort
+  // deze route niets te leveren.
+  // Waarom in deze volgorde: (1) privé-modus is de meest fundamentele keuze van
+  // de gebruiker en gaat vóór commerciële gating — de eerlijke reden is dan
+  // "privé-modus staat aan", niet "je mist een abonnement"; (2) een geblokkeerde
+  // call mag geen credits verbruiken (recordAiUsage hangt verderop aan de
+  // generatie die hier fire-and-forget start); (3) er mag geen enkel
+  // gebruikersgegeven richting promptopbouw gaan — buildSharedContext haalt
+  // hieronder de volledige financiële situatie op en zet die in de prompt.
+  // Nooit een stille terugval naar de cloud: 403 is het eindpunt.
+  //
+  // WELKE HANDLER WEL, WELKE NIET. Deze GET is de enige handler in dit bestand
+  // en het enige pad dat bij getModel(supabase, 'nieuws') uitkomt (de generatie
+  // verderop), dus draagt hij de gate in zijn geheel — inclusief de vroege
+  // peek-/cache-antwoorden, want die serveren precies de editie die dit
+  // cloud-pad heeft gemaakt en staan achter dezelfde tier-gate. De naburige
+  // nieuws-handlers doen géén modelcall en blijven bewust ongegate:
+  // /api/news/archive (opgeslagen edities teruggeven), /api/news/read
+  // (leesstatus) en /api/news/feedback (duim omhoog/omlaag). Die wél gaten zou
+  // nieuws blokkeren dat al bestaat, terwijl er daar nooit iets naar een
+  // AI-leverancier vertrekt.
+  const privacyGate = await assertCloudAllowed(supabase, user.id, 'nieuws')
+  if (privacyGate) return privacyGate
 
   const tierGate = await checkTierGate(supabase, user.id, 'ai')
   if (tierGate) {
@@ -421,7 +198,7 @@ export async function GET(request: Request) {
   }
 
   const editionNr = await getNextEditionNr(supabase, user.id)
-  const jaargang = new Date().getFullYear() - 2025
+  const jaargang = currentJaargang()
 
   // ── Lopende of afgeronde achtergrond-generatie (state in DB) ───
   const existingState = await readGenerationState(supabase, user.id)
@@ -542,7 +319,7 @@ export async function GET(request: Request) {
   const [recentHeadlines, demotedCategories, sourceArticles] = await Promise.all([
     getRecentHeadlines(supabase, user.id),
     getDemotedCategories(supabase, user.id),
-    loadSourceArticles(),
+    loadNewsSourceArticles(SOURCE_PROMPT_LIMIT),
   ])
 
   const sourceNewestAt = sourceArticles

@@ -7,9 +7,7 @@ import { DefaultChatTransport, type ChatTransport, type UIMessage } from 'ai'
 import { useRouter, usePathname } from 'next/navigation'
 import { useChatContext } from './chat-provider'
 import { LocalChatTransport } from '@/lib/ai/local/local-chat-transport'
-import { checkLocalAiCapability } from '@/lib/ai/local/webgpu-capability'
-import { getLocalModelState } from '@/lib/ai/local/model-manager'
-import { resolveLocalReadiness } from '@/lib/ai/local/local-readiness'
+import { useExecutionMode } from '@/lib/ai/local/use-execution-mode'
 import type { LocalChatOverview } from '@/lib/ai/local/local-chat-context'
 import type { LocalKnowledgeItem } from '@/lib/ai/local/knowledge-context'
 import { useModuleAccess } from '@/components/app/feature-access-provider'
@@ -537,75 +535,49 @@ export function ChatPanel() {
     return 'kern'
   }, [pathname, activeModules])
 
-  // ── Transport-keuze: cloud vs. on-device (privé-modus) ─────────────────────
+  // ── Waar draait dit gesprek? cloud vs. on-device ───────────────────────────
   //
   // De cloud-transport is de default en blijft ONGEWIJZIGD (DefaultChatTransport
-  // → /api/ai/chat). Staat privé-modus AAN én is het lokale model gereed op dit
-  // toestel, dan wisselen we naar de LocalChatTransport zodat er geen byte naar
-  // de server gaat (FR-C2a). Is privé-modus aan maar het lokale pad NIET gereed,
-  // dan blokkeren we FAIL-CLOSED (nette melding, nooit stil terugvallen op cloud).
+  // → /api/ai/chat). Waar de groep 'gesprek' draait beslist dit oppervlak echter
+  // NIET meer zelf: dat doet `useExecutionMode`, de canonieke regel achter
+  // ADR 0078 (een per-groep-override op /mijn/privacy wint van de
+  // hoofdschakelaar). Dit component las eerder de kale `profiles.privacy_mode`
+  // via /api/privacy-mode — wie alléén "Gesprek met Fin" op lokaal zette terwijl
+  // de hoofdschakelaar op cloud stond, ging daardoor gewoon naar de cloud.
+  //
+  // FAIL-CLOSED: we lezen `canUseCloud`/`canUseLocal`, nooit een eigen
+  // vergelijking op `status`. In 'resolving' én 'blocked' zijn beide false, dus
+  // vertrekt er NIETS — ook niet "even via de cloud".
   //
   // Alles ná deze swap (useChat, message-rendering, WftDisclaimer, quick-chips)
   // blijft ongewijzigd — de transport is de enige naad.
+  const exec = useExecutionMode('gesprek', isOpen && hasAi)
+
   const cloudTransport = useMemo(
     () => new DefaultChatTransport({ api: '/api/ai/chat', body: { domain } }),
     [domain],
   )
 
-  // Resolutie-toestand van de privé-modus-swap. 'resolving' zolang we de modus +
-  // gereedheid bepalen (er wordt dan bewust NIETS verstuurd — ook niet naar de
-  // cloud — zodat een privé-gebruiker nooit per ongeluk via de cloud gaat).
-  type LocalChatState =
-    | { status: 'resolving' }
-    | { status: 'cloud' }
-    | { status: 'local'; transport: LocalChatTransport }
-    | { status: 'blocked'; message: string }
-  const [localState, setLocalState] = useState<LocalChatState>({ status: 'resolving' })
+  // Hydratie van het lokale pad: het overzicht + de kennisbank die de
+  // LocalChatTransport nodig heeft. Bewust GESCHEIDEN van de modusbeslissing —
+  // die hoort bij de hook — zodat hier alleen nog "is het lokale gesprek
+  // startklaar?" leeft.
+  type LocalHydration =
+    | { status: 'wachten' }
+    | { status: 'klaar'; transport: LocalChatTransport }
+    | { status: 'mislukt'; message: string }
+  const [hydration, setHydration] = useState<LocalHydration>({ status: 'wachten' })
 
-  // Bepaal de modus bij (her)openen van de chat. Verse lezing per open (bewust
-  // NIET via de gedeelde usePrivacyMode-singleton) zodat een net-gewijzigde
-  // privé-toggle direct correct is en de swap fail-closed blijft.
   useEffect(() => {
-    if (!isOpen || !hasAi) {
-      // Chat dicht/geen abonnement → terug naar resolving; het dispose-effect
-      // hieronder ruimt een eventuele lopende lokale sessie op.
-      setLocalState({ status: 'resolving' })
+    if (!exec.canUseLocal) {
+      // Geen lokaal groen licht (cloud, resolving óf blocked) → geen lokale
+      // sessie. Het dispose-effect hieronder ruimt een lopende sessie op.
+      setHydration({ status: 'wachten' })
       return
     }
     let cancelled = false
-    setLocalState({ status: 'resolving' })
+    setHydration({ status: 'wachten' })
     ;(async () => {
-      // 1. Privé-modus lezen (own-row via GET /api/privacy-mode). Faalt de lezing
-      //    (transient), dan default cloud — spiegelt de categorisatie-sheet.
-      let privacyMode = false
-      try {
-        const res = await fetch('/api/privacy-mode')
-        if (res.ok) {
-          const data = (await res.json()) as { privacyMode?: boolean }
-          privacyMode = data.privacyMode ?? false
-        }
-      } catch {
-        /* stil: default cloud */
-      }
-      if (cancelled) return
-      if (!privacyMode) {
-        setLocalState({ status: 'cloud' })
-        return
-      }
-
-      // 2. Gereedheid op DÍT toestel (capability + modelstaat), zoals LocalChatPanel.
-      const [cap, model] = await Promise.all([checkLocalAiCapability(), getLocalModelState()])
-      if (cancelled) return
-      const readiness = resolveLocalReadiness(cap, { state: model.state })
-      if (!readiness.ready) {
-        setLocalState({
-          status: 'blocked',
-          message: readiness.message ?? 'Lokale AI is nu niet beschikbaar op dit toestel.',
-        })
-        return
-      }
-
-      // 3. Hydrateer het overzicht + de kennisbank en bouw de lokale transport.
       try {
         const [overviewRes, knowledgeRes] = await Promise.all([
           fetch('/api/local-chat-overview'),
@@ -613,8 +585,8 @@ export function ChatPanel() {
         ])
         if (cancelled) return
         if (!overviewRes.ok) {
-          setLocalState({
-            status: 'blocked',
+          setHydration({
+            status: 'mislukt',
             message:
               'Je financiële overzicht voor de lokale chat kon niet worden geladen. Probeer het opnieuw.',
           })
@@ -627,14 +599,14 @@ export function ChatPanel() {
           if (Array.isArray(kd.items)) knowledgeItems = kd.items
         }
         if (cancelled) return
-        setLocalState({
-          status: 'local',
+        setHydration({
+          status: 'klaar',
           transport: new LocalChatTransport({ overview, knowledgeItems }),
         })
       } catch {
         if (cancelled) return
-        setLocalState({
-          status: 'blocked',
+        setHydration({
+          status: 'mislukt',
           message:
             'De lokale chat kon niet worden voorbereid. Er is niets naar onze servers gestuurd. Probeer het opnieuw.',
         })
@@ -643,26 +615,37 @@ export function ChatPanel() {
     return () => {
       cancelled = true
     }
-  }, [isOpen, hasAi])
+  }, [exec.canUseLocal])
 
   // Dispose de lokale sessie bij transport-wissel én bij unmount (architect rode
-  // vlag 2: anders lekt een WebGPU-sessie). Keyed op localState → de cleanup
-  // vuurt zodra we van dít 'local'-object af bewegen (nieuwe local, blocked,
-  // resolving of unmount).
+  // vlag 2: anders lekt een WebGPU-sessie). Keyed op hydration → de cleanup
+  // vuurt zodra we van dít 'klaar'-object af bewegen (nieuwe sessie, mislukt,
+  // wachten of unmount).
   useEffect(() => {
-    if (localState.status !== 'local') return
-    const t = localState.transport
+    if (hydration.status !== 'klaar') return
+    const t = hydration.transport
     return () => {
       t.dispose()
     }
-  }, [localState])
+  }, [hydration])
 
-  const isLocalMode = localState.status === 'local'
-  // Alleen versturen zodra de modus is vastgesteld (cloud óf lokaal). In
-  // 'resolving'/'blocked' mag er niets uit — dat is de fail-closed-garantie.
-  const chatReady = localState.status === 'cloud' || localState.status === 'local'
+  const isLocalMode = hydration.status === 'klaar'
+  // Alleen versturen zodra er een BESLISTE, haalbare bestemming is: cloud-groen
+  // licht, of een lokaal gesprek dat volledig gehydrateerd is. In 'resolving' en
+  // 'blocked' mag er niets uit — dat is de fail-closed-garantie.
+  const chatReady = exec.canUseCloud || isLocalMode
   const transport: ChatTransport<UIMessage> =
-    localState.status === 'local' ? localState.transport : cloudTransport
+    hydration.status === 'klaar' ? hydration.transport : cloudTransport
+
+  // Eén blokkade-melding voor de twee gevallen waarin lokaal wél gekozen is maar
+  // niet kan: dit toestel trekt het niet (hook), of de hydratie mislukte. Nooit
+  // een stille cloud-terugval.
+  const blockedMessage: string | null =
+    exec.status === 'blocked'
+      ? (exec.message ?? 'Lokale AI is nu niet beschikbaar op dit toestel.')
+      : hydration.status === 'mislukt'
+        ? hydration.message
+        : null
 
   const { messages: rawMessages, sendMessage, status, error, clearError, regenerate } = useChat({
     id: 'chat-will',
@@ -1134,14 +1117,14 @@ export function ChatPanel() {
           <WftDisclaimer onAccept={handleWftAccept} />
         )}
 
-        {/* Privé-modus aan, maar lokaal niet gereed → fail-closed blokkade
-            (nooit stil terugvallen op de cloud). */}
-        {hasAi && wftAccepted !== false && localState.status === 'blocked' && (
-          <LocalBlockedNotice message={localState.message} onNavigate={close} />
+        {/* Gesprek moet lokaal, maar kan niet → fail-closed blokkade (nooit stil
+            terugvallen op de cloud). */}
+        {hasAi && wftAccepted !== false && blockedMessage !== null && (
+          <LocalBlockedNotice message={blockedMessage} onNavigate={close} />
         )}
 
         {/* Messages */}
-        {hasAi && wftAccepted !== false && localState.status !== 'blocked' && (
+        {hasAi && wftAccepted !== false && blockedMessage === null && (
         <>
         {/* Permanente lokaal-strip gedurende de hele privé-sessie. */}
         {isLocalMode && <LocalModeBanner />}

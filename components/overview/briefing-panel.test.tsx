@@ -1,14 +1,53 @@
-import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import type { ReactElement } from 'react'
 import { FeatureAccessProvider } from '@/components/app/feature-access-provider'
 import type { ActiveSubscriptions } from '@/lib/feature-registry'
-import { BriefingPanel, MAX_BRIEFING_ENTRIES, type BriefingEntry } from './briefing-panel'
+import {
+  BriefingPanel,
+  MAX_BRIEFING_ENTRIES,
+  herschrevenNotice,
+  localeVoortgangTekst,
+  type BriefingEntry,
+} from './briefing-panel'
 
 /**
  * Tests voor BriefingPanel — 3-koloms grid (max 6) voor wekelijkse briefing.
  * Categorieën: observation/tip/upcoming/heads_up/milestone/market.
  */
+
+// ── Uitvoermodus-stub ────────────────────────────────────────────────────────
+//
+// De ververs-knop hangt sinds de on-device briefing aan `useExecutionMode`:
+// die bepaalt of de redactie in de cloud of op het toestel draait, en is
+// FAIL-CLOSED (in 'resolving'/'blocked' vertrekt er niets). De echte hook doet
+// een fetch + GPU-check; hier zetten we de uitkomst per test.
+type ExecStatus = 'resolving' | 'cloud' | 'lokaal' | 'blocked'
+const execState: { status: ExecStatus; message: string | null } = {
+  status: 'cloud',
+  message: null,
+}
+
+function setExecMode(status: ExecStatus, message: string | null = null) {
+  execState.status = status
+  execState.message = message
+}
+
+vi.mock('@/lib/ai/local/use-execution-mode', () => ({
+  useExecutionMode: () => ({
+    status: execState.status,
+    message: execState.message,
+    intended: execState.status === 'cloud' ? 'cloud' : 'lokaal',
+    canUseCloud: execState.status === 'cloud',
+    canUseLocal: execState.status === 'lokaal',
+    refresh: () => {},
+  }),
+}))
+
+const redactBriefingLocally = vi.fn()
+vi.mock('@/lib/ai/local/local-briefing-resolver', () => ({
+  redactBriefingLocally: (...args: unknown[]) => redactBriefingLocally(...args),
+}))
 
 function makeEntry(
   category: BriefingEntry['category'],
@@ -41,6 +80,11 @@ function renderWithSubs(ui: ReactElement, subscriptions: ActiveSubscriptions) {
     </FeatureAccessProvider>,
   )
 }
+
+beforeEach(() => {
+  setExecMode('cloud')
+  redactBriefingLocally.mockReset()
+})
 
 describe('BriefingPanel — basis-render', () => {
   it('rendert empty-state placeholder bij geen entries', () => {
@@ -295,6 +339,219 @@ describe('BriefingPanel — AI-abonnementspoort op de ververs', () => {
     renderWithSubs(<BriefingPanel entries={entry} canRefresh />, ['ai'])
     expect(screen.queryByRole('link', { name: /ververs met fin/i })).toBeNull()
     expect(screen.getByRole('button', { name: /ververs je briefing/i })).toBeTruthy()
+  })
+})
+
+// ── On-device redactie (uitvoergroep 'briefing' op lokaal) ───────────────────
+
+describe('BriefingPanel — waar de redactie draait (fail-closed)', () => {
+  const entry = [makeEntry('observation', 'Je vermogen groeide met €1.234.')]
+  let fetchMock: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  /** Alle URL's waarnaar deze test een POST zag vertrekken. */
+  function postedUrls(): string[] {
+    return fetchMock.mock.calls.map((c) => String(c[0]))
+  }
+
+  it("'lokaal': er vertrekt GEEN cloud-ververs — alleen de compose/persist-stappen", async () => {
+    setExecMode('lokaal')
+    redactBriefingLocally.mockResolvedValue({
+      headline: 'Een rustige week.',
+      texts: [{ id: entry[0].id, text: 'Je vermogen groeide met €1.234.' }],
+      totaal: 1,
+      fouten: 0,
+    })
+    fetchMock.mockImplementation((url: string) => {
+      if (String(url).includes('stap=compose')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ allowed: true, entries: entry, directivesBlock: '' }),
+        })
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          allowed: true,
+          entries: entry,
+          refreshedAt: '2026-08-02T10:00:00.000Z',
+          headline: 'Een rustige week.',
+          herschreven: 1,
+          totaal: 1,
+        }),
+      })
+    })
+
+    renderWithSubs(<BriefingPanel entries={entry} canRefresh />, ['ai'])
+    fireEvent.click(screen.getByRole('button', { name: /ververs je briefing/i }))
+
+    await waitFor(() => expect(postedUrls().length).toBe(2))
+
+    // DE KERN: geen enkele aanroep zonder ?stap= — dat zou de cloud-route zijn.
+    expect(postedUrls().some((u) => !u.includes('stap='))).toBe(false)
+    expect(postedUrls()[0]).toContain('stap=compose')
+    expect(postedUrls()[1]).toContain('stap=persist')
+    expect(redactBriefingLocally).toHaveBeenCalledTimes(1)
+  })
+
+  it("'lokaal': de persist-POST stuurt de on-device teksten mee", async () => {
+    setExecMode('lokaal')
+    redactBriefingLocally.mockResolvedValue({
+      headline: 'Kop van Fin.',
+      texts: [{ id: entry[0].id, text: 'Herschreven met €1.234.' }],
+      totaal: 1,
+      fouten: 0,
+    })
+    fetchMock.mockImplementation((url: string) =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () =>
+          String(url).includes('stap=compose')
+            ? { allowed: true, entries: entry, directivesBlock: 'RICHTLIJN' }
+            : { allowed: true, entries: entry, refreshedAt: 'x', headline: null, herschreven: 1, totaal: 1 },
+      }),
+    )
+
+    renderWithSubs(<BriefingPanel entries={entry} canRefresh />, ['ai'])
+    fireEvent.click(screen.getByRole('button', { name: /ververs je briefing/i }))
+    await waitFor(() => expect(postedUrls().length).toBe(2))
+
+    // Het gecondenseerde directives-blok van de server gaat naar de resolver…
+    expect(redactBriefingLocally).toHaveBeenCalledWith(
+      entry,
+      expect.objectContaining({ directivesBlock: 'RICHTLIJN' }),
+    )
+    // …en de uitkomst gaat als body mee naar de persist-stap.
+    const body = JSON.parse(String(fetchMock.mock.calls[1][1].body))
+    expect(body.texts).toEqual([{ id: entry[0].id, text: 'Herschreven met €1.234.' }])
+    expect(body.headline).toBe('Kop van Fin.')
+  })
+
+  it("'blocked': knop staat uit en er vertrekt niets", () => {
+    setExecMode('blocked', 'Dit toestel ondersteunt geen WebGPU.')
+    renderWithSubs(<BriefingPanel entries={entry} canRefresh />, ['ai'])
+
+    const btn = screen.getByRole('button', {
+      name: /dit toestel ondersteunt geen webgpu/i,
+    }) as HTMLButtonElement
+    expect(btn.disabled).toBe(true)
+    fireEvent.click(btn)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it("'resolving': knop staat uit en er vertrekt niets (geen stille cloud-uitwijk)", () => {
+    setExecMode('resolving')
+    renderWithSubs(<BriefingPanel entries={entry} canRefresh />, ['ai'])
+
+    const btn = screen.getByRole('button', { name: /even bepalen waar je ai draait/i })
+    expect((btn as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(btn)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it("'cloud': ongewijzigd — één POST zonder stap-parameter", async () => {
+    setExecMode('cloud')
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        allowed: true,
+        entries: entry,
+        refreshedAt: 'x',
+        headline: null,
+        herschreven: 1,
+        totaal: 1,
+      }),
+    })
+
+    renderWithSubs(<BriefingPanel entries={entry} canRefresh />, ['ai'])
+    fireEvent.click(screen.getByRole('button', { name: /ververs je briefing/i }))
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+    expect(postedUrls()[0]).toBe('/api/briefing/refresh')
+    expect(redactBriefingLocally).not.toHaveBeenCalled()
+  })
+
+  it('toont eerlijk hoeveel briefjes zijn herschreven (server-telling)', async () => {
+    setExecMode('lokaal')
+    redactBriefingLocally.mockResolvedValue({ headline: null, texts: [], totaal: 6, fouten: 0 })
+    fetchMock.mockImplementation((url: string) =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () =>
+          String(url).includes('stap=compose')
+            ? { allowed: true, entries: entry, directivesBlock: '' }
+            : {
+                allowed: true,
+                entries: entry,
+                refreshedAt: 'x',
+                headline: null,
+                // De server keurde 2 van de 6 goed — dát is wat de gebruiker leest.
+                herschreven: 2,
+                totaal: 6,
+              },
+      }),
+    )
+
+    renderWithSubs(<BriefingPanel entries={entry} canRefresh />, ['ai'])
+    fireEvent.click(screen.getByRole('button', { name: /ververs je briefing/i }))
+
+    await waitFor(() => expect(screen.getByText(/2 van de 6 briefjes/i)).toBeTruthy())
+  })
+})
+
+describe('herschrevenNotice — eerlijke uitkomst', () => {
+  it('0 herschreven: benoemt dat er niets herschreven is, maar de cijfers vers zijn', () => {
+    expect(herschrevenNotice(0, 6, true)).toContain('geen enkel briefje')
+    expect(herschrevenNotice(0, 6, true)).toContain('verse cijfers')
+  })
+
+  it('alles herschreven: noemt het totaal', () => {
+    expect(herschrevenNotice(6, 6, true)).toContain('alle 6')
+  })
+
+  it('deels herschreven: noemt beide getallen', () => {
+    expect(herschrevenNotice(2, 6, false)).toContain('2 van de 6')
+  })
+
+  it('lokaal vs cloud verschilt alleen in de plaatsbepaling', () => {
+    expect(herschrevenNotice(6, 6, true)).toContain('op je eigen toestel')
+    expect(herschrevenNotice(6, 6, false)).not.toContain('op je eigen toestel')
+  })
+
+  it('geen telling beschikbaar → geen melding', () => {
+    expect(herschrevenNotice(undefined, undefined, true)).toBeNull()
+    expect(herschrevenNotice(0, 0, true)).toBeNull()
+  })
+})
+
+describe('localeVoortgangTekst', () => {
+  it('meldt de trage eerste modelload apart', () => {
+    expect(localeVoortgangTekst({ fase: 'model-laden', gedaan: 0, van: 1 })).toMatch(
+      /eerste keer duurt dit even/i,
+    )
+  })
+
+  it('telt de briefjes 1-based', () => {
+    expect(localeVoortgangTekst({ fase: 'briefjes', gedaan: 0, van: 6 })).toContain('1 van 6')
+    expect(localeVoortgangTekst({ fase: 'briefjes', gedaan: 5, van: 6 })).toContain('6 van 6')
+    // Niet over het totaal heen tellen bij de afsluitende melding.
+    expect(localeVoortgangTekst({ fase: 'briefjes', gedaan: 6, van: 6 })).toContain('6 van 6')
+  })
+
+  it('benoemt de kopzin-fase', () => {
+    expect(localeVoortgangTekst({ fase: 'kopzin', gedaan: 0, van: 1 })).toMatch(/kop/i)
   })
 })
 

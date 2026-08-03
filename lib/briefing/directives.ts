@@ -420,6 +420,7 @@ export function formatFunctionalDirectivesForPrompt(
 export function formatFunctionalDirectivesWithMetrics(
   directives: FunctionalDirective[],
   metrics: Record<string, string | number | boolean | null> | null,
+  opts: { activeOnly?: boolean } = {},
 ): string {
   const enabled = directives.filter((d) => d.enabled)
   if (enabled.length === 0) return ''
@@ -429,11 +430,27 @@ export function formatFunctionalDirectivesWithMetrics(
     (a, b) => (PRIORITY_ORDER[a.priority] ?? 1) - (PRIORITY_ORDER[b.priority] ?? 1),
   )
 
-  const lines = sorted.map((d) => {
+  // ALLEEN-ACTIEF (lokaal pad). Op het cloudpad krijgt het model álle regels
+  // mét een [ACTIEF]/[INACTIEF]-label en mag het zelf wegen. Een 2B-model
+  // on-device kan dat niet: elf regels die het moet NEGEREN zijn daar geen
+  // context maar ruis — en kosten bovendien ~350 tokens van een venster van
+  // 8192. Bij `activeOnly` sturen we daarom alleen de bevestigde regels mee,
+  // zónder label (er valt niets meer te onderscheiden).
+  const activeOnly = opts.activeOnly === true && metrics != null
+  const selected = activeOnly
+    ? sorted.filter((d) => evaluateFunctionalDirective(d, metrics))
+    : sorted
+  if (selected.length === 0) return ''
+
+  const lines = selected.map((d) => {
     const { metric, condition } = resolveMetricLabels(d.metric, d.condition)
     const prefix =
       d.priority === 'high' ? '[PRIORITEIT]' :
       d.priority === 'low' ? '[optioneel]' : '-'
+
+    if (activeOnly) {
+      return `${prefix} ${d.instruction}`
+    }
 
     // Pre-evaluate condition if data is available
     if (metrics) {
@@ -445,10 +462,13 @@ export function formatFunctionalDirectivesWithMetrics(
     return `${prefix} Wanneer ${metric.toLowerCase()} ${condition.toLowerCase()}: ${d.instruction}`
   })
 
-  const header = metrics
+  const header = activeOnly
     ? `== FUNCTIONELE RICHTLIJNEN ==
+Deze richtlijnen zijn bevestigd op basis van actuele data:`
+    : metrics
+      ? `== FUNCTIONELE RICHTLIJNEN ==
 Condities zijn vooraf geevalueerd. Geef prioriteit aan [ACTIEF] richtlijnen — deze zijn bevestigd op basis van actuele data. [INACTIEF] richtlijnen kun je negeren tenzij je eigen analyse anders uitwijst.`
-    : `== FUNCTIONELE RICHTLIJNEN ==
+      : `== FUNCTIONELE RICHTLIJNEN ==
 Pas de volgende richtlijnen toe wanneer je de betreffende situatie herkent in de gebruikersdata:`
 
   return `${header}\n${lines.join('\n')}`

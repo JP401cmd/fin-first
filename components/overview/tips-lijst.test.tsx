@@ -20,6 +20,15 @@ vi.mock('@/components/app/chat/chat-provider', () => ({
   useChatContextOptional: () => ({ openWithMessage: mockOpenWithMessage }),
 }))
 
+// De lokale tips-generator leest de uitvoervoorkeur (`useExecutionMode` →
+// /api/ai-execution-prefs) en zou die fetch in ELKE test hieronder meetellen —
+// terwijl deze suite over de beslis-flow gaat, niet over lokale AI. Stub 'm dus,
+// maar wél met een herkenbare marker zodat de wiring hier aantoonbaar blijft.
+// Eigen dekking: components/overview/lokale-tips-generator.test.tsx.
+vi.mock('./lokale-tips-generator', () => ({
+  LokaleTipsGenerator: () => <div data-testid="lokale-tips-generator" />,
+}))
+
 const fetchMock = vi.fn()
 vi.stubGlobal('fetch', fetchMock)
 
@@ -72,6 +81,18 @@ describe('TipsLijst', () => {
     expect(mockOpenWithMessage).toHaveBeenCalledWith(
       expect.stringContaining('Doorlicht mijn financiën'),
     )
+  })
+
+  it('biedt de lokale tips-generator aan in BEIDE takken (leeg én met tips)', () => {
+    // De generator rendert zichzelf alleen wanneer de groep 'tips' op 'lokaal'
+    // staat; TipsLijst moet 'm hoe dan ook aanbieden, anders is de lokale route
+    // in één van beide takken onbereikbaar.
+    const { unmount } = render(<TipsLijst recommendations={[]} />)
+    expect(screen.getByTestId('lokale-tips-generator')).toBeInTheDocument()
+    unmount()
+
+    render(<TipsLijst recommendations={[baseRec({ id: 'r1', title: 'Een tip' })]} />)
+    expect(screen.getByTestId('lokale-tips-generator')).toBeInTheDocument()
   })
 
   it('header "Vraag meer" opent de chat in-place i.p.v. te navigeren', () => {

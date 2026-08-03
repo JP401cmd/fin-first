@@ -88,10 +88,68 @@ const TYPE_LABEL: Record<CategorizeBudgetOption['type'], string> = {
   debt: 'schuld',
 }
 
-function formatBudgetLine(b: CategorizeBudgetOption): string {
+// ── Snoeigrens voor het LOKALE pad ────────────────────────────────────────────
+//
+// Het budgetblok groeit LINEAIR met het aantal leaf-budgetten (~15 tokens per
+// regel, meer met een lange toelichting). De cloud heeft daar geen last van
+// (ruime contextvensters), maar het lokale model deelt één venster van 8192
+// tokens (LOCAL_MODEL_TOKEN_BUDGET) tussen systeemprompt én de transacties die
+// het moet plaatsen. Bij honderden budgetten verdringt de LIJST dus precies de
+// gegevens waarover hij gaat.
+//
+// Wat we snoeien: alleen de OPTIONELE toelichting. Nooit budgetregels zelf —
+// een weggelaten budget kan het model niet meer kiezen, en dat is stille
+// kwaliteitsverlies i.p.v. besparing. De toelichting is verrijking; de slug,
+// naam, hoofdbudget en het type zijn de eigenlijke keuze-informatie.
+//
+// Twee trappen, oplopend met de grootte van de lijst:
+//   • boven LOCAL_BUDGET_DESC_TRIM_FROM  → toelichtingen ingekort tot
+//     LOCAL_BUDGET_DESC_MAX_CHARS tekens (kop behouden, staart weg);
+//   • boven LOCAL_BUDGET_DESC_DROP_FROM  → toelichtingen helemaal weg.
+
+/** Vanaf dit aantal leaf-budgetten kort het lokale pad toelichtingen in. */
+export const LOCAL_BUDGET_DESC_TRIM_FROM = 40
+/** Maximale lengte van een ingekorte toelichting (exclusief het beletselteken). */
+export const LOCAL_BUDGET_DESC_MAX_CHARS = 60
+/** Vanaf dit aantal leaf-budgetten laat het lokale pad toelichtingen wég. */
+export const LOCAL_BUDGET_DESC_DROP_FROM = 120
+
+/** Hoe uitgebreid de toelichting per budgetregel mag zijn. */
+type DescriptionMode = 'volledig' | 'ingekort' | 'weg'
+
+/**
+ * Bepaal de snoeimodus. Het CLOUD-pad krijgt altijd 'volledig' — het gedrag daar
+ * blijft byte-voor-byte gelijk aan vóór deze snoeigrens.
+ */
+export function descriptionModeFor(aantalBudgetten: number, lokaal: boolean): DescriptionMode {
+  if (!lokaal) return 'volledig'
+  if (aantalBudgetten > LOCAL_BUDGET_DESC_DROP_FROM) return 'weg'
+  if (aantalBudgetten > LOCAL_BUDGET_DESC_TRIM_FROM) return 'ingekort'
+  return 'volledig'
+}
+
+/** Rendert het toelichting-achtervoegsel van een budgetregel volgens de modus. */
+function formatDescription(raw: string | null | undefined, mode: DescriptionMode): string {
+  const desc = raw?.trim()
+  if (!desc || mode === 'weg') return ''
+  if (mode === 'volledig' || desc.length <= LOCAL_BUDGET_DESC_MAX_CHARS) return ` — ${desc}`
+  // Op tekengrens afkappen is genoeg: de toelichting is een hint, geen contract.
+  return ` — ${desc.slice(0, LOCAL_BUDGET_DESC_MAX_CHARS).trimEnd()}…`
+}
+
+function formatBudgetLine(b: CategorizeBudgetOption, mode: DescriptionMode = 'volledig'): string {
   const parent = b.parentName ? ` (onder "${b.parentName}")` : ''
-  const desc = b.description?.trim() ? ` — ${b.description.trim()}` : ''
+  const desc = formatDescription(b.description, mode)
   return `- ${b.slug} = "${b.name}"${parent} [${TYPE_LABEL[b.type]}]${desc}`
+}
+
+export type CategorizeSystemPromptOpts = {
+  /**
+   * Draait deze prompt op het LOKALE (on-device) pad? Dan geldt de snoeigrens
+   * hierboven. Default false = cloud, ongewijzigd gedrag. Alleen
+   * `createLocalAiResolver` zet dit aan.
+   */
+  lokaal?: boolean
 }
 
 /**
@@ -99,13 +157,20 @@ function formatBudgetLine(b: CategorizeBudgetOption): string {
  * de gebruiker. Geef de leaf-budgetten mee (eigen + gedeelde huishoudbudgetten;
  * geen parent-met-children). Zonder budgetten valt de prompt terug op de
  * statische variant (geen opties → model geeft altijd null, wat correct is).
+ *
+ * `opts.lokaal` snoeit de toelichtingen bij een grote budgetlijst — zie de
+ * toelichting bij de snoeigrens hierboven. De cloud-uitvoer verandert niet.
  */
-export function buildCategorizeSystemPrompt(budgets: CategorizeBudgetOption[]): string {
+export function buildCategorizeSystemPrompt(
+  budgets: CategorizeBudgetOption[],
+  opts: CategorizeSystemPromptOpts = {},
+): string {
   if (!budgets || budgets.length === 0) {
     return CATEGORIZE_SYSTEM_PROMPT
   }
 
-  const budgetBlock = budgets.map(formatBudgetLine).join('\n')
+  const mode = descriptionModeFor(budgets.length, !!opts.lokaal)
+  const budgetBlock = budgets.map((b) => formatBudgetLine(b, mode)).join('\n')
 
   return `Je bent een Nederlandse financiële assistent die banktransacties categoriseert.
 

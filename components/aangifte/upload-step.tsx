@@ -31,17 +31,24 @@
  * dependency op het host-runtime, geen IP/UA-leak naar derden.
  */
 
-import { useCallback, useRef, useState } from 'react'
-import { Upload, FileText, AlertCircle, X } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Upload, FileText, AlertCircle, X, Cpu } from 'lucide-react'
 import { FinDots } from '@/components/app/fin-dots'
 import { stripSensitiveData } from '@/lib/aangifte/strip-bsn'
+import { extractPdfPageTexts } from '@/lib/pdf/extract-text'
+import { useExecutionMode } from '@/lib/ai/local/use-execution-mode'
+import { getLocalModelState } from '@/lib/ai/local/model-manager'
 import type { AangifteExtractionResult } from '@/lib/aangifte/types'
 
 interface UploadStepProps {
   /** Default tax-year voor de picker. Default: huidige jaar - 1. */
   fallbackTaxYear?: number
-  /** Callback met succesvolle extractie. Routet door naar review-step. */
-  onExtracted: (result: AangifteExtractionResult) => void
+  /**
+   * Callback met succesvolle extractie. Routet door naar review-step.
+   * `bron` vertelt de review-stap of dit een lokaal (zwakker, expliciet als
+   * minder zeker gelabeld) of een cloud-voorstel is.
+   */
+  onExtracted: (result: AangifteExtractionResult, bron?: 'cloud' | 'lokaal') => void
   /** Fallback-link "typ liever zelf" — switcht naar manual-wizard. */
   onSwitchToManual: () => void
   /** Annuleren — sluit de pane. */
@@ -54,57 +61,10 @@ const CURRENT_YEAR = new Date().getFullYear()
 const DEFAULT_FALLBACK_YEAR = CURRENT_YEAR - 1
 const TAX_YEAR_OPTIONS = Array.from({ length: 6 }, (_, i) => CURRENT_YEAR - 1 - i)
 
-/**
- * Parse een PDF-File naar platte tekst via pdfjs-dist. Async dynamic import
- * zodat de zware bibliotheek pas geladen wordt bij eerste klik (next/lazy
- * doet dit voor componenten, dynamic import doet hetzelfde voor libs).
- *
- * Worker-strategie: pdfjs-dist v6 ships `pdf.worker.min.mjs` als losse
- * worker-bundle. Een postinstall-hook (`scripts/copy-pdfjs-worker.mjs`)
- * kopieert deze (uit de LEGACY-build, zie hieronder) naar
- * `public/pdf.worker.min.mjs` zodat Next.js het op een stabiel pad
- * serveert. Wij wijzen `GlobalWorkerOptions.workerSrc` exact daarheen —
- * geen CDN, geen externe netwerk-call.
- *
- * Build-keuze: we importeren bewust de LEGACY-build
- * (`pdfjs-dist/legacy/build/pdf.mjs`) i.p.v. de bare module. De v6
- * modern-build trok de browser-baseline flink op (polyfills verwijderd);
- * de aangifte-PDF wordt door consumenten op diverse (mobiele) devices
- * geüpload, dus de bredere legacy-compat (Chrome 125+/Safari 18+/
- * Firefox ESR+) is hier het veiligst. Worker-bron MOET dan óók uit
- * `legacy/build/` komen — anders faalt pdf.js met een harde
- * API/worker-versiemismatch. De type-shim voor deze deep-import staat in
- * `types/pdfjs-dist-legacy.d.ts`.
- */
-// Statisch pad onder /public; wordt door de postinstall-hook gevuld zodat
-// Next.js het als static asset serveert. Constante uitgelift uit de
-// functie omdat hij ook door de version-mismatch-warning gebruikt wordt.
-const PDFJS_WORKER_SRC = '/pdf.worker.min.mjs'
-
-async function extractTextFromPdf(file: File): Promise<string> {
-  // Dynamische import — voorkomt dat pdfjs op SSR landt en houdt de bundle
-  // kleiner voor users die de feature niet aanraken.
-  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
-
-  if (!pdfjs.GlobalWorkerOptions.workerSrc) {
-    pdfjs.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_SRC
-  }
-
-  const arrayBuffer = await file.arrayBuffer()
-  const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise
-
-  let fullText = ''
-  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum += 1) {
-    const page = await pdf.getPage(pageNum)
-    const content = await page.getTextContent()
-    // pdfjs returnt een items-array met str-veld per text-fragment.
-    const pageText = content.items
-      .map((item) => ('str' in item ? item.str : ''))
-      .join(' ')
-    fullText += `${pageText}\n`
-  }
-  return fullText
-}
+// De pdfjs-tekstextractie (inclusief de worker-strategie en de legacy-build-
+// keuze) woont sinds het lokale pensioen-pad in `lib/pdf/extract-text.ts` —
+// twee consumenten, één implementatie. Zie de kop van dat bestand voor de
+// no-egress-worker en de geheugendiscipline; het gedrag hier is ongewijzigd.
 
 export function UploadStep({
   fallbackTaxYear = DEFAULT_FALLBACK_YEAR,
@@ -118,14 +78,52 @@ export function UploadStep({
   const [error, setError] = useState<string | null>(null)
   const [taxYear, setTaxYear] = useState<number>(fallbackTaxYear)
   const [parsedFileName, setParsedFileName] = useState<string | null>(null)
+  const [voortgang, setVoortgang] = useState<string | null>(null)
+
+  // ── Waar draait het uitlezen? ───────────────────────────────────────────
+  // Eén hook beslist (lib/ai/local/use-execution-mode.ts), FAIL-CLOSED: in
+  // 'resolving' en 'blocked' vertrekt er niets — niet naar de cloud en niet
+  // naar de GPU. Nooit zelf op `=== 'lokaal'` testen en anders de cloud pakken.
+  const exec = useExecutionMode('documenten')
+
+  // Staat het model al op dit toestel? Midden in een import een download van
+  // ~2 GB starten is een afhaakmachine; staat het model er niet, dan wijzen we
+  // naar "Typ liever zelf" — en bewust NIET naar de cloud.
+  const [modelKlaar, setModelKlaar] = useState<boolean | null>(null)
+  useEffect(() => {
+    if (exec.status !== 'lokaal') {
+      setModelKlaar(null)
+      return
+    }
+    let cancelled = false
+    void getLocalModelState().then(({ state }) => {
+      if (!cancelled) setModelKlaar(state === 'klaar')
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [exec.status])
+
+  const lokaalBeschikbaar = exec.canUseLocal && modelKlaar === true
+  const kanLezen = exec.canUseCloud || lokaalBeschikbaar
 
   /**
-   * Centrale parse-flow: bestand binnen → tekst eruit → BSN-strip →
-   * POST naar extract-API → onExtracted callback. Bij elke stap kan het
-   * falen; de error-state ondersteunt de fallback naar de manual wizard.
+   * Centrale parse-flow: bestand binnen → tekst eruit → BSN-strip → uitlezen
+   * (cloud óf on-device) → onExtracted callback. Bij elke stap kan het falen;
+   * de error-state ondersteunt de fallback naar de manual wizard.
    */
   const processFile = useCallback(
     async (file: File) => {
+      // Fail-closed: zolang niet vaststaat waar dit mag draaien, vertrekt er
+      // niets. Ook niet "even via de cloud".
+      if (!kanLezen) {
+        setError(
+          exec.status === 'lokaal'
+            ? 'Je hebt gekozen om documenten op je eigen apparaat te laten lezen, maar het lokale model staat er nog niet. Download het eerst via Mijn · Privacy, of typ de bedragen zelf.'
+            : (exec.message ?? 'We kunnen nu niet bepalen waar dit document gelezen mag worden. Probeer het zo nog eens, of typ de bedragen zelf.'),
+        )
+        return
+      }
       // Validatie: alleen PDF's. Belastingdienst-PDF is altijd `application/pdf`,
       // maar sommige browsers leveren empty mime — vallen we terug op extensie.
       const isPdf =
@@ -150,15 +148,40 @@ export function UploadStep({
       setParsedFileName(file.name)
 
       try {
-        const rawText = await extractTextFromPdf(file)
+        // PAGINA-ARRAY BEHOUDEN. Het lokale pad snijdt per pagina op de
+        // aangifte-kopteksten (lib/aangifte/local/section-select.ts); één
+        // aaneengeplakte string zou een venster over een paginagrens heen
+        // laten lopen en de voettekst meenemen. Het cloud-pad plakt hieronder
+        // alsnog aan elkaar — gedrag daar ongewijzigd.
+        const pageTexts = await extractPdfPageTexts(file)
+        const rawText = pageTexts.map((p) => `${p}\n`).join('')
         if (!rawText.trim()) {
           throw new Error('De PDF lijkt leeg of bevat alleen afbeeldingen. Voor gescande aangiftes werkt PDF-import niet — typ de bedragen liever zelf.')
         }
 
         // BSN-strip in browser. We loggen alleen `strippedCount` voor audit,
         // nooit de clean tekst zelf — die bevat nog wel financiële data.
+        // Op het lokale pad verlaat de tekst het toestel helemaal niet; de strip
+        // blijft dáár als defense-in-depth staan (een BSN dat niet in de prompt
+        // zit, kan ook niet in een naamveld belanden).
         const { clean, strippedCount } = stripSensitiveData(rawText)
         console.info(`[aangifte] removed ${strippedCount} BSN-pattern matches before upload`)
+
+        if (lokaalBeschikbaar) {
+          // On-device. Dynamische import zodat de LiteRT-bundel niet meekomt
+          // voor iedereen die deze flow via de cloud gebruikt. Faalt dit, dan
+          // faalt het — GEEN terugval naar de cloud (de gebruiker koos privé).
+          const { extractAangifteDataLocal } = await import('@/lib/aangifte/local/extract-aangifte-local')
+          const cleanPages = pageTexts.map((p) => stripSensitiveData(p).clean)
+          const result = await extractAangifteDataLocal(cleanPages, taxYear, {
+            onSessionState: (s) =>
+              setVoortgang(s === 'starten' ? 'Model wordt geladen (eerste keer duurt ~1 minuut)…' : null),
+            onVoortgang: (gedaan, totaal, sectie) =>
+              setVoortgang(`Onderdeel ${Math.min(gedaan + 1, totaal)}/${totaal} — ${sectie}`),
+          })
+          onExtracted(result, 'lokaal')
+          return
+        }
 
         const res = await fetch('/api/onboarding/aangifte-extract', {
           method: 'POST',
@@ -185,16 +208,17 @@ export function UploadStep({
         }
 
         const result = (await res.json()) as AangifteExtractionResult
-        onExtracted(result)
+        onExtracted(result, 'cloud')
       } catch (err) {
         const message =
           err instanceof Error ? err.message : 'Er ging iets mis bij het lezen van de PDF.'
         setError(message)
       } finally {
         setParsing(false)
+        setVoortgang(null)
       }
     },
-    [taxYear, onExtracted],
+    [taxYear, onExtracted, kanLezen, lokaalBeschikbaar, exec.status, exec.message],
   )
 
   // ── Drag-drop handlers ─────────────────────────────────────
@@ -255,10 +279,35 @@ export function UploadStep({
         </h2>
         <p className="font-serif italic text-sm text-[var(--ink-2)] leading-relaxed border-l-2 border-[var(--color-kern-500)] pl-3 max-w-[60ch]">
           Download eerst &quot;Kopie van de aangifte&quot; via Mijn Belastingdienst, en sleep
-          die hier naartoe. De PDF zelf gaat nooit naar de server. Alleen de bedragen-tekst
-          (zonder BSN) wordt geanalyseerd door onze AI.
+          die hier naartoe. De PDF zelf gaat nooit naar de server.{' '}
+          {lokaalBeschikbaar
+            ? 'Het uitlezen gebeurt volledig op dit apparaat — er gaat niets naar een AI-leverancier.'
+            : 'Alleen de bedragen-tekst (zonder BSN) wordt geanalyseerd door onze AI.'}
         </p>
       </div>
+
+      {/* Uitvoerplek — eerlijk benoemen waar het uitlezen gebeurt. Deze regel is
+          geen sier: bij 'lokaal' zonder model MOET de gebruiker weten dat we
+          bewust niet uitwijken naar de cloud, anders lijkt het een storing. */}
+      {(lokaalBeschikbaar || exec.status === 'blocked' || (exec.status === 'lokaal' && modelKlaar === false)) && (
+        <div className="flex items-start gap-2 border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2 text-xs text-[var(--ink-2)]">
+          <Cpu className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          {lokaalBeschikbaar ? (
+            <span>
+              Je aangifte wordt <strong className="font-medium">op dit apparaat</strong> gelezen. Dat duurt merkbaar
+              langer dan via de cloud — reken op een paar minuten. Je controleert daarna elk bedrag zelf.
+            </span>
+          ) : exec.status === 'blocked' ? (
+            <span>{exec.message ?? 'Lokale AI is nu niet beschikbaar op dit toestel.'} Typ de bedragen zolang zelf.</span>
+          ) : (
+            <span>
+              Je hebt gekozen om documenten op je eigen apparaat te laten lezen, maar het model staat er nog niet.
+              Download het via Mijn · Privacy, of typ de bedragen zelf — we sturen je aangifte bewust niet naar de
+              cloud.
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Tax-year picker */}
       <div className="flex items-center gap-3">
@@ -330,7 +379,7 @@ export function UploadStep({
           <FinDots size={48} state="loading" />
           <div className="text-center space-y-1">
             <p className="font-serif italic text-base text-[var(--ink-2)]">
-              Bedragen worden gelezen...
+              {voortgang ?? 'Bedragen worden gelezen...'}
             </p>
             {parsedFileName && (
               <p className="text-xs text-[var(--ink-3)] font-mono truncate max-w-[40ch]">

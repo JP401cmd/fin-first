@@ -1,90 +1,63 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import {
-  Cpu,
-  Download,
-  Trash2,
-  RefreshCw,
-  AlertTriangle,
-  ShieldCheck,
-  Loader2,
-  MonitorSmartphone,
-  MessageSquare,
-  ArrowRight,
-} from 'lucide-react'
 import { hasSubscription } from '@/lib/feature-registry'
-import { AiSubscriptionUpsell } from '@/components/app/ai-subscription-upsell'
 import { checkLocalAiCapability, type LocalAiCapability } from '@/lib/ai/local/webgpu-capability'
 import {
   getLocalModelState,
   downloadLocalModel,
   deleteLocalModel,
-  LOCAL_MODEL_DOWNLOAD_GB,
   type LocalModelState,
   type LocalModelProgress,
 } from '@/lib/ai/local/model-manager'
+import { AiExecutionChoice } from './ai-execution-choice'
+import { AiExecutionGroupList } from './ai-execution-group-list'
+import { LocalModelSection, progressPercent, type LocalModelPhase } from './local-model-section'
 
 /**
- * LocalCategorizationSettings — de opt-in toggle + download/consent-flow voor
- * lokale transactie-categorisatie op `/mijn/privacy` (ADR 0043, fase 2, FR-2.x).
+ * AiExecutionSettings — de sectie "Waar draait de AI?" op `/mijn/privacy`.
  *
- * Scope A, desktop-only, assistief: bij `privacy_mode=true` categoriseert
- * TriFinity transacties volledig op het eigen toestel (WebGPU/Gemma) — de
- * transactietekst verlaat de browser niet. Andere AI-functies (chat, briefing)
- * blijven cloud. Elk voorstel loopt nog steeds via de bestaande review-UI; hier
- * regelen we alleen de voorkeur + het model-beheer, niet de categorisatie zelf.
+ * Was: één experimentele toggle voor lokale transactiecategorisatie. Is nu: een
+ * echte keuze over de bestemming van je gegevens, op twee niveaus —
  *
- * Flow: toggle aan → capability-check (checkLocalAiCapability) → bij ok een
- * consent-stap (eenmalige download) → download met voortgang → POST
- * privacy_mode=true. Uit → POST false (model blijft lokaal staan). Beheer-blok
- * met verwijderen / opnieuw downloaden zodra het model klaar staat.
+ *   1. de hoofdkeuze (`profiles.privacy_mode`): Cloud-AI (standaard) of lokaal
+ *      waar mogelijk, met een eerlijke voor-en-nadelen-vergelijking;
+ *   2. per functionaliteit (`profiles.ai_execution_prefs`): de zeven groepen uit
+ *      lib/ai/execution-groups.ts, elk met wat je lokaal inlevert.
  *
- * DESIGN: bewust INLINE disclosure (geen aparte BottomSheet) — de hele
- * capability→consent→download→beheer-toestandsmachine hoort visueel bij de
- * toggle en de voortgangsbalk moet zichtbaar blijven tijdens een meerdere-
- * minuten-download; dat past niet in een modal die open moet blijven. Sluit aan
- * bij de bestaande inline transparantie-blokken van AiPrivacySettings.
+ * Dit bestand is de ORCHESTRATOR: het bezit de profielstaat en de
+ * capability→consent→download→beheer-toestandsmachine, en verdeelt die over drie
+ * presentatie-componenten (`AiExecutionChoice`, `LocalModelSection`,
+ * `AiExecutionGroupList`). De machine blijft hier omdat de hoofdschakelaar hem
+ * aanstuurt: aanzetten start de capability-check, en pas na een geslaagde download
+ * gaat `privacy_mode` op true.
+ *
+ * BESTANDSNAAM. Bewust ongewijzigd. Dit is het enige bestand in deze sectie dat
+ * nog rechtstreeks met de browser-client op `profiles` leest (eigen rij:
+ * ai_enabled + privacy_mode + active_subscriptions), en het staat onder die naam
+ * als grandfather-entry op de ALLOWLIST in scripts/check-client-data-reads.mjs
+ * (ADR 0058). Hernoemen vraagt een wijziging in die gate; dat hoort in een aparte,
+ * gemotiveerde stap — niet als bijvangst van een UI-herbouw. De groepenlijst leest
+ * en schrijft wél volgens de conventie via /api/ai-execution-prefs.
  *
  * SINGLE SOURCE / SECURITY: schrijven van `privacy_mode` gaat via de own-row
- * POST-route (/api/privacy-mode); lezen van ai_enabled + privacy_mode +
- * active_subscriptions gebeurt op mount via één supabase-select (spiegelt
- * AiPrivacySettings, geen flash). De lokale-AI-primitieven komen uit lib/ai/local
- * (parallel gebouwd tegen het gedeelde contract).
+ * POST-route (/api/privacy-mode), die ook de autoritatieve tier-gate draagt; deze
+ * UI spiegelt hem alleen (voorkomt een 403-verrassing). De lokale-AI-primitieven
+ * komen uit lib/ai/local.
  *
- * TIER-GATE (eigenaarsbesluit 17 jul 2026, requirements §5 optie 2): AANzetten
- * vereist het 'ai'-abonnement. De server-route (/api/privacy-mode) is de
- * autoritatieve laag; deze UI spiegelt hem alleen (voorkomt een 403-verrassing)
- * en toont bij aanzet-poging zonder tier de gedeelde `AiSubscriptionUpsell`
- * (single source voor prijs/tagline uit lib/subscription-catalog.ts). UITzetten
- * blijft altijd vrij; staat privé-modus al aan terwijl de tier verliep, dan meldt
- * het beheer-blok dat eerlijk (uitzetten kan niet meer ongedaan zonder abonnement).
- *
- * A11Y: elk reden-blok (AI uit / tier / mobiel) heeft een id; de toggle-button
- * verwijst via `aria-describedby` naar het momenteel zichtbare blok, zodat de
- * disabled-reden ook voor screenreaders aan de schakelaar hangt.
+ * TIER-GATE: AANzetten vereist het 'ai'-abonnement; UITzetten blijft altijd vrij,
+ * zodat een verlopen abonnement of een coarse-pointer-toestel niemand opsluit.
  */
-
-type Phase = 'loading' | 'idle' | 'checking' | 'consent' | 'downloading' | 'error'
 
 /**
  * Gecentraliseerde toegang tot "is het model bruikbaar?". Afgestemd op het
- * bindende fase-3-contract (lib/ai/local/model-manager): getLocalModelState()
- * levert `{ state, bytes }` met `state: LocalModelState` = 'klaar' zodra het
- * model klaarstaat. (Fase-2 nam eerder een `.status === 'ready'`-vorm aan; door
- * de reconciliatie hier — en nergens anders — klopt de integratie met het
- * daadwerkelijke contract.)
+ * bindende contract in lib/ai/local/model-manager: getLocalModelState() levert
+ * `{ state, bytes }` met `state: LocalModelState` = 'klaar' zodra het model
+ * klaarstaat.
  */
 function isModelReady(model: { state: LocalModelState; bytes: number | null }): boolean {
   return model.state === 'klaar'
-}
-
-/** Voortgang → percentage 0..100 (het contract levert bytes, geen percent). */
-function progressPercent(p: LocalModelProgress | null): number {
-  if (!p || !p.totalBytes) return 0
-  return Math.min(100, Math.max(0, (p.loadedBytes / p.totalBytes) * 100))
 }
 
 async function writePrivacyMode(enabled: boolean): Promise<boolean> {
@@ -100,15 +73,10 @@ async function writePrivacyMode(enabled: boolean): Promise<boolean> {
   }
 }
 
-function formatGb(bytes: number): string {
-  return (bytes / 1e9).toLocaleString('nl-NL', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
-}
-
 /**
  * Best-effort: beschermt de browser deze origin-opslag tegen automatische
  * eviction (navigator.storage.persisted)? `null` = onbekend/niet-ondersteund —
- * dan tonen we niets (geen loze bewering). De ~2,0 GB bundel overleeft eviction
- * alleen als dit true is; false is een eerlijke waarschuwing waard.
+ * dan tonen we niets (geen loze bewering).
  */
 async function readStoragePersisted(): Promise<boolean | null> {
   try {
@@ -121,15 +89,14 @@ async function readStoragePersisted(): Promise<boolean | null> {
   return null
 }
 
-export function LocalCategorizationSettings() {
+export function AiExecutionSettings() {
   // Stabiele client-ref: zonder memo is `supabase` bij elke render een nieuw
   // object → de mount-useEffect (dep [supabase]) draait telkens opnieuw en zet
-  // aan het eind setPhase('idle'), wat een net door de toggle gezette 'consent'/
-  // 'checking'-fase overschrijft. useMemo houdt de ref stabiel (mount draait één
-  // keer). (Reconciliatie-fix; zie rapport fase 3.)
+  // aan het eind setPhase('idle'), wat een net gezette 'consent'/'checking'-fase
+  // zou overschrijven.
   const supabase = useMemo(() => createClient(), [])
 
-  const [phase, setPhase] = useState<Phase>('loading')
+  const [phase, setPhase] = useState<LocalModelPhase>('loading')
   const [aiEnabled, setAiEnabled] = useState(true)
   // Default `true` (net als aiEnabled) → voorkomt een flash-of-upsell tijdens de
   // mount-load. De werkelijke tier komt uit de select hieronder.
@@ -139,16 +106,11 @@ export function LocalCategorizationSettings() {
   const [capabilityReasons, setCapabilityReasons] = useState<string[] | null>(null)
   const [progress, setProgress] = useState<LocalModelProgress | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
-  const [confirmDelete, setConfirmDelete] = useState(false)
   const [likelyMobile, setLikelyMobile] = useState(false)
-  // Opslagbescherming (navigator.storage.persisted): null = onbekend → niets
-  // tonen; true/false → een geruststellende resp. waarschuwende regel in het
-  // beheer-blok. Gelezen op mount én opnieuw na een geslaagde download (persist()
-  // kan 'm net hebben aangezet).
   const [storagePersisted, setStoragePersisted] = useState<boolean | null>(null)
 
   // Proactieve desktop-only hint: op een coarse-pointer-toestel (mobiel/tablet)
-  // faalt de capability-check toch — laat de toggle daar vriendelijk uit staan
+  // faalt de capability-check toch — laat de keuze daar vriendelijk uit staan
   // i.p.v. de gebruiker eerst een download-poging te laten doen.
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -160,8 +122,8 @@ export function LocalCategorizationSettings() {
     }
   }, [])
 
-  // Mount-load: ai_enabled + privacy_mode via één supabase-select, en of het
-  // model al lokaal aanwezig is via getLocalModelState().
+  // Mount-load: ai_enabled + privacy_mode + active_subscriptions via één
+  // eigen-rij select, en of het model al lokaal aanwezig is.
   useEffect(() => {
     let active = true
     ;(async () => {
@@ -186,7 +148,6 @@ export function LocalCategorizationSettings() {
         ready = false
       }
 
-      // Best-effort opslagbescherming (guarded in readStoragePersisted zelf).
       const persisted = await readStoragePersisted()
 
       if (!active) return
@@ -237,10 +198,8 @@ export function LocalCategorizationSettings() {
   }, [])
 
   const onToggle = useCallback(async () => {
-    // Spiegelt `toggleDisabled`: AANzetten (privacyMode=false) vereist tier +
-    // desktop; UITzetten (privacyMode=true) blijft altijd toegestaan zolang AI aan
-    // staat en er niets bezig is — zo raakt niemand opgesloten in privé-modus als
-    // de tier of het toestel wegvalt (zelfde niemand-opgesloten-principe).
+    // Spiegelt `toggleDisabled`: AANzetten vereist tier + desktop; UITzetten
+    // blijft altijd toegestaan zolang AI aan staat en er niets bezig is.
     if (!aiEnabled || busy || (!privacyMode && (likelyMobile || !hasAiTier))) return
 
     // Uitzetten: model blijft lokaal staan, alleen de voorkeur gaat uit.
@@ -275,93 +234,41 @@ export function LocalCategorizationSettings() {
     try {
       await deleteLocalModel()
     } catch {
-      /* zelfs bij een fout laten we de UI-status volgen: het model is niet meer bruikbaar */
+      /* zelfs bij een fout volgt de UI de status: het model is niet meer bruikbaar */
     }
     setModelReady(false)
     const ok = await writePrivacyMode(false)
     if (ok) setPrivacyMode(false)
-    setConfirmDelete(false)
     setProgress(null)
     setPhase('idle')
   }, [])
 
-  // AANzetten (privacyMode=false) vereist het 'ai'-abonnement én een desktop;
-  // UITzetten (privacyMode=true) mag altijd (ook op mobiel/zonder tier) — dit
-  // versoepelt bewust het eerdere mobiel-gedrag voor uitzetten, zodat een verlopen
-  // abonnement of coarse-pointer-toestel niemand in privé-modus opsluit.
   const toggleDisabled = !aiEnabled || busy || (!privacyMode && (likelyMobile || !hasAiTier))
-  const showBeheer = phase === 'idle' && modelReady
-  const showPending = phase === 'idle' && privacyMode && !modelReady
 
-  // A11Y: koppel de op dit moment zichtbare reden-melding aan de toggle. De
-  // takken spiegelen exact de render-condities van de drie reden-blokken (die
-  // elkaar uitsluiten); geen zichtbaar blok → geen aria-describedby.
-  const describedById = !aiEnabled
-    ? 'lokale-cat-reden-ai-uit'
-    : !hasAiTier && !privacyMode
-      ? 'lokale-cat-reden-tier'
-      : hasAiTier && likelyMobile
-        ? 'lokale-cat-reden-mobiel'
+  // Lokaal kiezen (hoofdkeuze én per groep) vereist AI aan, het 'ai'-abonnement
+  // en een desktop. De reden staat erbij zodat een uitgegrijsde knop nooit
+  // onverklaard is.
+  const canChooseLocal = aiEnabled && hasAiTier && !likelyMobile
+  const localBlockedReason = !aiEnabled
+    ? 'AI staat helemaal uit. Zet AI-features hierboven aan om per onderdeel te kunnen kiezen.'
+    : !hasAiTier
+      ? 'Lokaal draaien hoort bij het AI-abonnement. Zonder abonnement blijft alles op Cloud-AI staan.'
+      : likelyMobile
+        ? 'Lokaal draaien kan alleen op een desktop of laptop — open deze pagina daar om per onderdeel te kiezen.'
         : undefined
 
-  // Eerlijke verlopen-staat: privé-modus staat aan terwijl het abonnement weg is.
-  const subscriptionExpired = privacyMode && !hasAiTier
-
   return (
-    <section className="mx-auto max-w-3xl px-4 sm:px-6 pb-16">
-      <section className="border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
-        <div className="px-4 sm:px-6 py-6 space-y-6">
-          {/* ── Kop + badge ── */}
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
-                Lokale transactiecategorisatie
-              </p>
-              <span className="inline-flex items-center border border-amber-500/40 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-700">
-                Experimenteel
-              </span>
-            </div>
-            <p className="text-sm text-[var(--ink-2)] leading-relaxed">
-              Als dit aanstaat, categoriseert TriFinity je transacties volledig op je eigen apparaat — de
-              tekst van je transacties wordt nooit naar onze AI-server gestuurd voor categorisatie. Andere
-              AI-functies (zoals chat en de briefing) gebruiken nog wel de cloud-AI.
-            </p>
-            <p className="text-xs text-[var(--ink-3)] leading-relaxed">
-              Werkt alleen op desktop met een geschikte grafische kaart; voorstellen zijn behoudend en
-              vragen altijd jouw controle.
-            </p>
-          </div>
-
-          {/* ── Toggle-rij ── */}
-          <div className="flex items-center justify-between border border-[var(--border-ed)] p-4">
-            <div className="flex items-start gap-3 pr-4">
-              <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center bg-wil-50">
-                <Cpu className="h-4 w-4 text-wil-600" aria-hidden="true" />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-[var(--ink)]">Categoriseer transacties lokaal</h3>
-                <p className="mt-0.5 text-xs text-[var(--ink-3)]">
-                  {privacyMode
-                    ? 'Je transactiedata verlaat je toestel niet bij het categoriseren.'
-                    : 'Standaard categoriseert de cloud-AI je transacties.'}
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={privacyMode}
-              aria-label={`Lokale transactiecategorisatie ${privacyMode ? 'uitschakelen' : 'inschakelen'}`}
-              aria-describedby={describedById}
-              disabled={toggleDisabled}
-              onClick={onToggle}
-              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-wil-500 disabled:cursor-not-allowed disabled:opacity-50 ${privacyMode ? 'bg-wil-500' : 'bg-zinc-300'}`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${privacyMode ? 'translate-x-6' : 'translate-x-1'}`}
-              />
-            </button>
-          </div>
+    <section className="mx-auto max-w-3xl space-y-6 px-4 pb-16 sm:px-6">
+      <section className="border border-[var(--border-ed)] bg-[var(--paper)]">
+        <div className="space-y-8 px-4 py-6 sm:px-6">
+          <AiExecutionChoice
+            privacyMode={privacyMode}
+            aiEnabled={aiEnabled}
+            hasAiTier={hasAiTier}
+            likelyMobile={likelyMobile}
+            disabled={toggleDisabled}
+            onToggle={onToggle}
+          />
 
           {/* Live-regio voor statusaankondigingen (blijft altijd gemount) */}
           <p className="sr-only" aria-live="polite">
@@ -371,297 +278,31 @@ export function LocalCategorizationSettings() {
             {phase === 'error' && 'De download is niet gelukt.'}
           </p>
 
-          {/* ── Niet bedienbaar: AI uit ── */}
-          {!aiEnabled && (
-            <div id="lokale-cat-reden-ai-uit" className="flex items-start gap-3 bg-[var(--subtle)] p-4">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--ink-3)]" aria-hidden="true" />
-              <p className="text-sm text-[var(--ink-2)] leading-relaxed">
-                Schakel eerst <strong>AI-features</strong> hierboven in. Lokale categorisatie is een
-                verfijning van AI-gebruik, geen vervanging voor &apos;AI helemaal uit&apos;.
-              </p>
-            </div>
-          )}
-
-          {/* ── AI-abonnement vereist voor aanzetten ── */}
-          {/* Alleen tonen bij aanzet-poging zonder tier: als privé-modus al aan
-              staat blijft uitzetten vrij en is dit blok misplaatst. Canonieke
-              upsell (AiSubscriptionUpsell) — één patroon met prijs/tagline uit
-              de abonnementscatalogus, gedeeld met chat/briefing. De wrapper draagt
-              het id voor de aria-describedby-koppeling op de toggle. */}
-          {aiEnabled && !hasAiTier && !privacyMode && (
-            <div id="lokale-cat-reden-tier">
-              <AiSubscriptionUpsell variant="inline" />
-            </div>
-          )}
-
-          {/* ── Proactieve desktop-only hint ── */}
-          {/* Alleen als de tier er wél is — anders stapelt dit op het upsell-blok. */}
-          {aiEnabled && hasAiTier && likelyMobile && (
-            <div id="lokale-cat-reden-mobiel" className="flex items-start gap-3 bg-[var(--subtle)] p-4">
-              <MonitorSmartphone className="mt-0.5 h-4 w-4 shrink-0 text-[var(--ink-3)]" aria-hidden="true" />
-              <p className="text-sm text-[var(--ink-2)] leading-relaxed">
-                Lokale categorisatie is <strong>alleen op desktop</strong> beschikbaar — een telefoon of
-                tablet heeft niet genoeg grafisch geheugen om het model te draaien. Open deze instelling op
-                een desktop of laptop om hem aan te zetten.
-              </p>
-            </div>
-          )}
-
-          {/* ── Capability-check gefaald ── */}
-          {capabilityReasons && capabilityReasons.length > 0 && (
-            <div className="border border-amber-500/40 bg-amber-50/60 p-4">
-              <div className="mb-2 flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 shrink-0 text-amber-700" aria-hidden="true" />
-                <h4 className="text-sm font-semibold text-[var(--ink)]">
-                  Dit toestel is (nog) niet geschikt
-                </h4>
-              </div>
-              <ul className="space-y-1.5 text-sm text-[var(--ink-2)]">
-                {capabilityReasons.map((reason) => (
-                  <li key={reason} className="flex items-start gap-2">
-                    <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-amber-500" />
-                    <span>{reason}</span>
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-3 text-xs text-[var(--ink-3)] leading-relaxed">
-                Er is geen download gestart. Je transacties blijven gewoon via de cloud-AI gecategoriseerd
-                worden.
-              </p>
-            </div>
-          )}
-
-          {/* ── Consent-stap ── */}
-          {phase === 'consent' && (
-            <div className="border border-[var(--border-ed)] p-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <Download className="h-4 w-4 shrink-0 text-wil-600" aria-hidden="true" />
-                <h4 className="text-sm font-semibold text-[var(--ink)]">Eenmalige download</h4>
-              </div>
-              <ul className="space-y-1.5 text-sm text-[var(--ink-2)]">
-                <li className="flex items-start gap-2">
-                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-wil-400" />
-                  <span>
-                    Ongeveer <strong>{LOCAL_MODEL_DOWNLOAD_GB} GB</strong> eenmalige download — wifi
-                    aanbevolen.
-                  </span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-wil-400" />
-                  <span>Daarna werkt het offline, direct op je toestel.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-wil-400" />
-                  <span>Je data verlaat je apparaat niet — de download bevat alleen het model, geen gegevens.</span>
-                </li>
-              </ul>
-              <div className="flex flex-wrap items-center gap-3 pt-1">
-                <button
-                  type="button"
-                  onClick={() => runDownload(true)}
-                  className="inline-flex items-center gap-2 bg-zinc-900 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800"
-                >
-                  <Download className="h-4 w-4" aria-hidden="true" />
-                  Download &amp; zet aan
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPhase('idle')}
-                  className="text-sm font-medium text-[var(--ink-3)] hover:text-[var(--ink)] transition-colors"
-                >
-                  Annuleren
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* ── Download bezig ── */}
-          {phase === 'downloading' && (
-            <div className="border border-[var(--border-ed)] p-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <Loader2 className="h-4 w-4 shrink-0 animate-spin text-wil-600" aria-hidden="true" />
-                <h4 className="text-sm font-semibold text-[var(--ink)]">Model downloaden…</h4>
-              </div>
-              <div
-                className="h-2 w-full overflow-hidden bg-[var(--subtle)]"
-                role="progressbar"
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={progress ? Math.round(progressPercent(progress)) : 0}
-                aria-label="Download-voortgang"
-              >
-                <div
-                  className="h-full bg-wil-500 transition-[width] duration-300"
-                  style={{ width: `${progressPercent(progress)}%` }}
-                />
-              </div>
-              <p className="text-xs tabular-nums text-[var(--ink-3)]">
-                {progress
-                  ? `${formatGb(progress.loadedBytes)} / ${formatGb(progress.totalBytes ?? 0)} GB · ${Math.round(progressPercent(progress))}%`
-                  : 'Voorbereiden…'}
-              </p>
-              <p className="text-xs text-[var(--ink-4)] leading-relaxed">
-                Je kunt dit tabblad open laten. Sluit je het tussentijds, dan hervat je de download later
-                vanaf deze pagina.
-              </p>
-            </div>
-          )}
-
-          {/* ── Download-fout ── */}
-          {phase === 'error' && errorMsg && (
-            <div className="border border-negative/30 bg-negative/5 p-4 space-y-3">
-              <div className="flex items-start gap-2">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-negative" aria-hidden="true" />
-                <p className="text-sm text-[var(--ink-2)] leading-relaxed">{errorMsg}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => runDownload(true)}
-                className="inline-flex items-center gap-2 border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-2 text-sm font-medium text-[var(--ink)] transition-colors hover:bg-[var(--subtle)]"
-              >
-                <RefreshCw className="h-4 w-4" aria-hidden="true" />
-                Opnieuw proberen
-              </button>
-            </div>
-          )}
-
-          {/* ── In afwachting: privacy aan, model ontbreekt ── */}
-          {showPending && (
-            <div className="border border-amber-500/40 bg-amber-50/60 p-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 shrink-0 text-amber-700" aria-hidden="true" />
-                <h4 className="text-sm font-semibold text-[var(--ink)]">In afwachting — download vereist</h4>
-              </div>
-              <p className="text-sm text-[var(--ink-2)] leading-relaxed">
-                Lokale categorisatie staat aan, maar het model staat niet (meer) op dit toestel. Zolang het
-                ontbreekt worden je transacties niet gecategoriseerd — er wordt bewust niet stilletjes op de
-                cloud teruggevallen.
-              </p>
-              <button
-                type="button"
-                onClick={() => runDownload(false)}
-                disabled={likelyMobile}
-                className="inline-flex items-center gap-2 bg-zinc-900 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <Download className="h-4 w-4" aria-hidden="true" />
-                Model downloaden (~{LOCAL_MODEL_DOWNLOAD_GB} GB)
-              </button>
-            </div>
-          )}
-
-          {/* ── Beheer-blok: model staat klaar ── */}
-          {showBeheer && (
-            <div className="border border-[var(--border-ed)] p-4 space-y-4">
-              <div className="flex items-start gap-3">
-                <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-positive" aria-hidden="true" />
-                <div>
-                  <h4 className="text-sm font-semibold text-[var(--ink)]">Model staat klaar op dit toestel</h4>
-                  <p className="mt-0.5 text-xs text-[var(--ink-3)] leading-relaxed">
-                    Ongeveer {LOCAL_MODEL_DOWNLOAD_GB} GB, opgeslagen in deze browser.{' '}
-                    {privacyMode
-                      ? 'Lokale categorisatie staat aan.'
-                      : 'Lokale categorisatie staat uit — het model blijft bewaard voor later.'}
-                  </p>
-                  {/* Eerlijke verlopen-staat: geen alarm, wel transparant over het
-                      gevolg van uitzetten zonder abonnement. */}
-                  {subscriptionExpired && (
-                    <p className="mt-1.5 text-xs text-[var(--ink-3)] leading-relaxed">
-                      Je AI-abonnement is verlopen — lokale categorisatie blijft werken, maar zet je
-                      &apos;m uit dan kun je &apos;m zonder abonnement niet opnieuw aanzetten.
-                    </p>
-                  )}
-                  {/* Opslagbescherming: null → niets tonen (geen loze bewering). */}
-                  {storagePersisted === true && (
-                    <p className="mt-1.5 text-xs text-[var(--ink-3)] leading-relaxed">
-                      Je browser beschermt deze opslag — het model blijft bewaard.
-                    </p>
-                  )}
-                  {storagePersisted === false && (
-                    <p className="mt-1.5 text-xs text-[var(--ink-3)] leading-relaxed">
-                      Let op: je browser beschermt deze opslag niet. Bij ruimtegebrek kan het model
-                      verwijderd worden; download dan opnieuw via deze pagina.
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {confirmDelete ? (
-                <div className="border border-negative/30 bg-negative/5 p-3 space-y-3">
-                  <p className="text-sm text-[var(--ink-2)] leading-relaxed">
-                    Weet je zeker dat je het lokale model verwijdert? Lokale categorisatie gaat dan uit en je
-                    moet het model opnieuw downloaden om het weer te gebruiken.
-                  </p>
-                  <div className="flex flex-wrap items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={onDeleteModel}
-                      className="inline-flex items-center gap-2 bg-negative px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
-                    >
-                      <Trash2 className="h-4 w-4" aria-hidden="true" />
-                      Ja, verwijder het model
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setConfirmDelete(false)}
-                      className="text-sm font-medium text-[var(--ink-3)] hover:text-[var(--ink)] transition-colors"
-                    >
-                      Annuleren
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-wrap items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setConfirmDelete(true)}
-                    className="inline-flex items-center gap-2 border border-negative/30 px-4 py-2 text-sm font-medium text-negative transition-colors hover:bg-negative/5"
-                  >
-                    <Trash2 className="h-4 w-4" aria-hidden="true" />
-                    Model verwijderen
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => runDownload(false)}
-                    disabled={likelyMobile}
-                    className="inline-flex items-center gap-2 border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-2 text-sm font-medium text-[var(--ink)] transition-colors hover:bg-[var(--subtle)] disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <RefreshCw className="h-4 w-4" aria-hidden="true" />
-                    Opnieuw downloaden
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-          {/* ── Bescheiden ingang naar de lokale chat (experimenteel) ── */}
-          {/* Alleen tonen als deze lokale-AI-sectie bruikbaar is: AI aan, tier
-              aanwezig en op een desktop (de chat is net als de categorisatie
-              desktop-only). De chatpagina her-checkt capability + model zelf. */}
-          {phase === 'idle' && aiEnabled && hasAiTier && !likelyMobile && (
-            <Link
-              href="/mijn/lokale-chat"
-              className="flex items-center justify-between gap-3 border border-[var(--border-ed)] bg-[var(--paper)] p-4 transition-colors hover:bg-[var(--subtle)]"
-            >
-              <div className="flex items-start gap-3">
-                <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center bg-wil-50">
-                  <MessageSquare className="h-4 w-4 text-wil-600" aria-hidden="true" />
-                </div>
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-sm font-semibold text-[var(--ink)]">Probeer de lokale chat</h3>
-                    <span className="inline-flex items-center border border-amber-500/40 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-700">
-                      Experimenteel
-                    </span>
-                  </div>
-                  <p className="mt-0.5 text-xs text-[var(--ink-3)] leading-relaxed">
-                    Praat met Fin volledig op dit apparaat — je financiële gegevens verlaten je toestel niet.
-                  </p>
-                </div>
-              </div>
-              <ArrowRight className="h-4 w-4 shrink-0 text-[var(--ink-3)]" aria-hidden="true" />
-            </Link>
-          )}
+          <LocalModelSection
+            phase={phase}
+            capabilityReasons={capabilityReasons}
+            progress={progress}
+            errorMsg={errorMsg}
+            modelReady={modelReady}
+            privacyMode={privacyMode}
+            aiEnabled={aiEnabled}
+            hasAiTier={hasAiTier}
+            likelyMobile={likelyMobile}
+            storagePersisted={storagePersisted}
+            onConsentConfirm={() => runDownload(true)}
+            onConsentCancel={() => setPhase('idle')}
+            onRetry={() => runDownload(true)}
+            onRedownload={() => runDownload(false)}
+            onDelete={onDeleteModel}
+          />
         </div>
       </section>
+
+      <AiExecutionGroupList
+        privacyMode={privacyMode}
+        canChooseLocal={canChooseLocal}
+        localBlockedReason={localBlockedReason}
+      />
     </section>
   )
 }

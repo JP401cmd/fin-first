@@ -2,6 +2,7 @@ import { generateObject } from 'ai'
 import { createClient } from '@/lib/supabase/server'
 import { getModel, AIConfigError } from '@/lib/ai/config'
 import { checkTierGate } from '@/lib/require-tier'
+import { assertCloudAllowed } from '@/lib/ai/privacy-gate'
 import { sanitizeForAI } from '@/lib/ai/sanitize'
 import {
   budgetSuggestionSchema,
@@ -16,6 +17,19 @@ export async function POST(req: Request) {
   if (!user) {
     return unauthorized()
   }
+
+  // PRIVÉ-MODUS EERST — vóór de tier-gate, de credit-gate en élke dataophaling.
+  // Staat 'documenten' op lokaal, dan stelt de browser de budgetbedragen zelf
+  // voor en hoort deze route niets te leveren.
+  // Waarom deze volgorde: (1) privé-modus is de meest fundamentele keuze van de
+  // gebruiker en gaat vóór commerciële gating — de eerlijke reden is "privé-modus
+  // staat aan", niet "je mist een abonnement"; (2) een geblokkeerde call mag geen
+  // credits kosten; (3) er mag niets richting promptopbouw gaan: het gaat hier om
+  // netto maandinkomen, gezinssamenstelling én een vrije tekst over de eigen
+  // situatie — dus ook vóór het ophalen van het budgetplan hieronder.
+  // Nooit een stille terugval naar de cloud: 403 is het eindpunt.
+  const privacyGate = await assertCloudAllowed(supabase, user.id, 'documenten')
+  if (privacyGate) return privacyGate
 
   const tierGate = await checkTierGate(supabase, user.id, 'ai')
   if (tierGate) {

@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport } from 'ai'
-import { Send, Loader2, Sparkles, ArrowRight, Edit3 } from 'lucide-react'
+import { Send, Loader2, Sparkles, ArrowRight, Edit3, ShieldCheck } from 'lucide-react'
+import { useExecutionMode } from '@/lib/ai/local/use-execution-mode'
 import { LIFE_EVENT_CATALOG, type LifeEvent } from '@/lib/horizon-data'
 import { EVENT_ICONS } from './log-timeline'
 import {
@@ -101,6 +102,34 @@ export function EventChatPane({ events, onAcceptSuggestion }: Props) {
   })
   const isStreaming = status === 'streaming' || status === 'submitted'
 
+  // ── Waar mag dit gesprek draaien? ─────────────────────────────────────────
+  //
+  // Deze pane postte rechtstreeks naar /api/ai/chat, zónder enige privacy-
+  // afhandeling: bij een override 'gesprek' = 'lokaal' vertrok hier alsnog een
+  // cloud-aanroep, en bij een hoofdschakelaar op lokaal kreeg de gebruiker een
+  // kale streamfout in plaats van uitleg. De canonieke beslissing komt nu van
+  // `useExecutionMode` (ADR 0078: per-groep-override wint van de hoofdschakelaar).
+  //
+  // FAIL-CLOSED via `canUseCloud` — nooit een eigen vergelijking op `status`.
+  // Alleen een expliciet cloud-groen licht laat hier iets vertrekken; in
+  // 'resolving', 'lokaal' en 'blocked' gaat er niets weg.
+  //
+  // Bewuste afbakening: dit oppervlak krijgt (nog) GEEN lokaal transport — het
+  // leunt op de `suggestLifeEvent`-tool, die het on-device model niet kent. Bij
+  // 'lokaal' verwijzen we daarom eerlijk naar de Fin-chat i.p.v. stil naar de
+  // cloud uit te wijken. Geen `active`-vlag nodig: de pane wordt pas gemount
+  // wanneer event-pane naar mode 'chat' schakelt.
+  const exec = useExecutionMode('gesprek')
+  const canSend = exec.canUseCloud
+
+  const notice: string | null = exec.canUseCloud
+    ? null
+    : exec.status === 'lokaal'
+      ? 'Je gesprekken met Fin draaien op je eigen toestel. Brainstormen over een levensgebeurtenis kan hier daardoor nog niet — voer dat gesprek in de Fin-chat, of zet de groep “Gesprek met Fin” op /mijn/privacy op de cloud.'
+      : exec.status === 'blocked'
+        ? (exec.message ?? 'Lokale AI is nu niet beschikbaar op dit toestel.')
+        : 'Even kijken waar dit gesprek mag draaien…'
+
   // Auto-scroll alleen wanneer gebruiker dichtbij bottom is.
   useEffect(() => {
     const el = scrollAreaRef.current
@@ -112,12 +141,13 @@ export function EventChatPane({ events, onAcceptSuggestion }: Props) {
   const submit = useCallback(
     (text?: string) => {
       const value = (text ?? input).trim()
-      if (!value || isStreaming) return
+      // `canSend` is de fail-closed poort: geen bestemming, geen verzending.
+      if (!value || isStreaming || !canSend) return
       sendMessage({ text: value })
       setInput('')
       inputRef.current?.focus()
     },
-    [input, isStreaming, sendMessage],
+    [input, isStreaming, canSend, sendMessage],
   )
 
   function handleAccept(payload: SuggestedLifeEventPayload, key: string) {
@@ -131,6 +161,18 @@ export function EventChatPane({ events, onAcceptSuggestion }: Props) {
 
   return (
     <div className="flex flex-col h-full -mx-4 sm:-mx-6 lg:-mx-2">
+      {/* Fail-closed melding: er is (nog) geen bestemming waar dit gesprek heen
+          mag. Eerlijke uitleg i.p.v. een stille cloud-aanroep of een kale
+          streamfout. */}
+      {notice && (
+        <div className="mx-4 sm:mx-6 mb-2 border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2.5" role="status">
+          <div className="flex items-start gap-2">
+            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[var(--module-active-700)]" aria-hidden="true" />
+            <p className="text-[11px] leading-relaxed text-[var(--ink-2)]">{notice}</p>
+          </div>
+        </div>
+      )}
+
       {/* Welkom + starter-vragen wanneer chat nog leeg is */}
       <div ref={scrollAreaRef} className="flex-1 overflow-y-auto px-4 sm:px-6 py-2 space-y-4">
         {messages.length === 0 && (
@@ -158,7 +200,8 @@ export function EventChatPane({ events, onAcceptSuggestion }: Props) {
                   key={s.label}
                   type="button"
                   onClick={() => submit(s.prompt)}
-                  className="px-3 py-1.5 rounded-full border border-[var(--border-md)] text-sm text-[var(--ink-2)] hover:border-[var(--module-active-700)] hover:bg-[var(--module-active-50)] transition-colors"
+                  disabled={!canSend}
+                  className="px-3 py-1.5 rounded-full border border-[var(--border-md)] text-sm text-[var(--ink-2)] hover:border-[var(--module-active-700)] hover:bg-[var(--module-active-50)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-[var(--border-md)] disabled:hover:bg-transparent"
                 >
                   {s.label}
                 </button>
@@ -256,14 +299,15 @@ export function EventChatPane({ events, onAcceptSuggestion }: Props) {
                 submit()
               }
             }}
-            placeholder="Vertel Fin wat je in gedachten hebt…"
+            disabled={!canSend}
+            placeholder={canSend ? 'Vertel Fin wat je in gedachten hebt…' : 'Niet beschikbaar'}
             rows={1}
-            className="flex-1 resize-none px-3 py-2 border border-[var(--border-md)] rounded-lg bg-[var(--paper)] text-sm focus:border-[var(--module-active-700)] focus:outline-none min-h-[40px] max-h-[120px]"
+            className="flex-1 resize-none px-3 py-2 border border-[var(--border-md)] rounded-lg bg-[var(--paper)] text-sm focus:border-[var(--module-active-700)] focus:outline-none min-h-[40px] max-h-[120px] disabled:opacity-60 disabled:cursor-not-allowed"
           />
           <button
             type="button"
             onClick={() => submit()}
-            disabled={!input.trim() || isStreaming}
+            disabled={!input.trim() || isStreaming || !canSend}
             className="shrink-0 inline-flex items-center justify-center w-10 h-10 rounded-lg bg-[var(--ink)] text-[var(--paper)] disabled:opacity-50 disabled:cursor-not-allowed"
             aria-label="Versturen"
           >
