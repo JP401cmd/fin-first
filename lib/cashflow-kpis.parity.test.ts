@@ -27,7 +27,17 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { DashboardData } from '@/lib/types/dashboard'
 import { buildMonthAggregatesFromRows } from '@/lib/server-data/tx-aggregates'
 import { loadDashboardData } from '@/lib/dashboard-data-loader'
-import { loadCashflowKpis, currentMonthKey, type CashflowCardScalars } from '@/lib/cashflow-kpis'
+import {
+  loadCashflowKpis,
+  currentMonthKey,
+  deriveBudgetTotals,
+  deriveBudgetScore,
+  deriveRealMonthTotals,
+  resolveBudgetingActive,
+  type CashflowCardScalars,
+  type BudgetRowForTotals,
+  type MonthTxRow,
+} from '@/lib/cashflow-kpis'
 
 // ── Nep-database ────────────────────────────────────────────────────────────
 
@@ -177,6 +187,10 @@ function buildFixtures(): Fixture[] {
     tx(-400, `${THIS_MONTH}-07`, B_SAVINGS),
     tx(9000, `${THIS_MONTH}-08`, null, 'transfer'),
     tx(-9000, `${THIS_MONTH}-09`, null, 'joint_transfer'),
+    // Transfer MÉT budget_id: telt WÉL mee in budgetTotals.spent (die pass heeft
+    // bewust geen transfer-filter) en NIET in currentMonthExpenses (die wél).
+    // Dat contrast is de end-to-end getuige van de filterloze spent-pass.
+    tx(-300, `${THIS_MONTH}-10`, B_EXPENSE_KID, 'transfer'),
     tx(3100, `${PREV_MONTH}-25`),
   ]
 
@@ -301,6 +315,9 @@ describe('loadCashflowKpis ↔ loadDashboardData — parity op alle zeven velden
     const { oudQueries, nieuwQueries } = await runBothPaths(buildFixtures()[1].db)
     expect(nieuwQueries).toBeLessThan(oudQueries)
     // Vier fetches: profiel, budgetten, huidige-maand-tx (+ het aggregaat via RPC).
+    // Dit getal is een BUDGET, geen momentopname: komt er een fetch bij, verhoog
+    // 'm bewust en verantwoord waarom. Nooit versoepelen naar een ongelijkheid —
+    // dan verdwijnt precies de bewaking waarvoor deze assertie bestaat.
     expect(nieuwQueries).toBe(3)
   })
 })
@@ -319,6 +336,14 @@ describe('de twee grondslagen blijven uit elkaar (ADR 0073)', () => {
     // Gerealiseerd deze maand: 2500 in, 1750 + 400 = 2150 uit (transfers tellen niet mee).
     expect(nieuw.currentMonthIncome).toBe(2500)
     expect(nieuw.currentMonthExpenses).toBe(2150)
+    // ── Filterloze spent-pass, end-to-end ───────────────────────────────────
+    // De -300-transfer draagt een budget_id en telt dus WÉL mee in `spent`
+    // (1750 + 300 = 2050), terwijl hij in `currentMonthExpenses` (2150) juist
+    // NIET meetelt. Corrigeert iemand de spent-pass ooit "logisch" naar een
+    // transfer-filter, dan valt deze assertie om — op beide paden tegelijk.
+    expect(nieuw.budgetTotals.expense.spent).toBe(2050)
+    expect(oud.budgetTotals.expense.spent).toBe(2050)
+    expect(nieuw.budgetTotals.expense.spent).not.toBe(nieuw.currentMonthExpenses)
     // Effective: de handmatige profielbedragen winnen — een ANDER getal.
     expect(nieuw.monthlyIncome).toBe(5000)
     expect(nieuw.monthlyExpenses).toBe(3000)
@@ -330,12 +355,22 @@ describe('de twee grondslagen blijven uit elkaar (ADR 0073)', () => {
   })
 
   it('fixture 2: zonder manual-override volgt monthlyIncome de transactiesom', async () => {
-    const { nieuw } = await runBothPaths(buildFixtures()[1].db)
+    const { nieuw, oud } = await runBothPaths(buildFixtures()[1].db)
     expect(nieuw.currentMonthIncome).toBe(4200)
     expect(nieuw.currentMonthExpenses).toBe(1300 + 250 + 600 + 77)
     // 'auto' + transacties aanwezig ⇒ effective == de transactiesom van deze maand.
     expect(nieuw.monthlyIncome).toBe(4200)
     expect(nieuw.monthlyExpenses).toBe(1300 + 250 + 600 + 77)
+    // ── Kind-oprol, end-to-end ──────────────────────────────────────────────
+    // De expense-PARENT heeft default_limit 9999, maar hij heeft een kind van
+    // 2000 — de kinderen winnen. Beide paden moeten 2000 tonen, niet 9999.
+    expect(nieuw.budgetTotals.expense.limit).toBe(2000)
+    expect(oud.budgetTotals.expense.limit).toBe(2000)
+    expect(nieuw.budgetTotals.expense.spent).toBe(1300 + 250)
+    // Dekkings-score over álle vier de types met limit>0 (zie de waarde-getuige
+    // hieronder voor de volledige uitwerking): (60 + 100 + 50) / 3 = 70.
+    expect(nieuw.monthSummary.budgetScore).toBe(70)
+    expect(oud.monthSummary.budgetScore).toBe(70)
   })
 
   it('fixture 3: het AGGREGAAT telt door voorbij 1000 rijen, de rauwe pass niet — en beide paden zien hetzelfde', async () => {
@@ -371,6 +406,168 @@ describe('de twee grondslagen blijven uit elkaar (ADR 0073)', () => {
     // Geen enkel budget met limit>0 ⇒ score 100 (niets om te overschrijden).
     expect(nieuw.monthSummary.budgetScore).toBe(100)
     expect(oud).toEqual(nieuw)
+  })
+})
+
+// ── WAARDE-GETUIGEN VOOR DE VERPLAATSTE AFLEIDINGEN ─────────────────────────
+//
+// De parity-tests hierboven bewijzen de BEDRADING: beide loaders leveren
+// hetzelfde. Sinds beide dezelfde helper consumeren kan dat per definitie niet
+// meer uiteenlopen — en dus vangen ze een wijziging in de helper ZELF niet: die
+// verandert beide kanten identiek en de parity blijft groen.
+//
+// Daarom pinnen de tests hieronder de SEMANTIEK met harde getallen, los van
+// beide loaders. Dit is tegelijk de reproduceerbare vervanger van de eenmalige
+// vóór/ná-refactor-vergelijking: verschuift de verplaatste logica, dan valt hier
+// iets om, ook in CI.
+
+describe('deriveBudgetTotals — waarde-getuige (de verplaatste oprol)', () => {
+  const budgets = BUDGETS as unknown as BudgetRowForTotals[]
+
+  it('een parent met kinderen krijgt de SOM van de kinderen, niet zijn eigen default_limit', () => {
+    // expense-parent: default_limit 9999, kind 2000 ⇒ 2000 wint.
+    expect(deriveBudgetTotals(budgets, []).expense.limit).toBe(2000)
+  })
+
+  it('normaliseert het interval naar één maand (quarterly ÷3, yearly ÷12)', () => {
+    const totals = deriveBudgetTotals(budgets, [])
+    expect(totals.savings.limit).toBe(1200 / 3) // 400 — quarterly
+    expect(totals.income.limit).toBe(36000 / 12) // 3000 — yearly
+    expect(totals.expense.limit).toBe(2000) // monthly blijft ongewijzigd
+    expect(totals.debt.limit).toBe(0) // geen debt-budget
+  })
+
+  it('een onbekend interval valt terug op ÷12 (bewust: jaarbedrag als default)', () => {
+    const raar: BudgetRowForTotals[] = [
+      { id: 'x', parent_id: null, budget_type: 'expense', default_limit: 2400, interval: 'sinterklaas' },
+    ]
+    expect(deriveBudgetTotals(raar, []).expense.limit).toBe(200)
+  })
+
+  it('slaat budget-types buiten de vier (bv. archive) over', () => {
+    const metArchief: BudgetRowForTotals[] = [
+      ...budgets,
+      { id: 'arch', parent_id: null, budget_type: 'archive', default_limit: 5000, interval: 'monthly' },
+    ]
+    const totals = deriveBudgetTotals(metArchief, [])
+    expect(totals).toEqual(deriveBudgetTotals(budgets, []))
+  })
+
+  it('spent: een TRANSFER met budget_id telt WÉL mee (de pass heeft geen transfer-filter)', () => {
+    const rows: MonthTxRow[] = [
+      { amount: -100, budget_id: B_EXPENSE_KID, transaction_type: null },
+      { amount: -25, budget_id: B_EXPENSE_KID, transaction_type: 'transfer' },
+      { amount: -10, budget_id: B_EXPENSE_KID, transaction_type: 'joint_transfer' },
+    ]
+    // 100 + 25 + 10 = 135. Zou iemand hier isRealTx toevoegen, dan wordt het 100.
+    expect(deriveBudgetTotals(budgets, rows).expense.spent).toBe(135)
+  })
+
+  it('spent: absoluut (teken-onafhankelijk) en alleen voor rijen MÉT een bekend budget_id', () => {
+    const rows: MonthTxRow[] = [
+      { amount: -100, budget_id: B_EXPENSE_KID },
+      { amount: 40, budget_id: B_EXPENSE_KID }, // positief telt óók, absoluut
+      { amount: -999, budget_id: null }, // geen budget ⇒ genegeerd
+      { amount: -888, budget_id: 'onbekend-budget' }, // onbekend ⇒ genegeerd
+    ]
+    expect(deriveBudgetTotals(budgets, rows).expense.spent).toBe(140)
+  })
+
+  it('een child erft het type van zijn parent (spent landt op het parent-type)', () => {
+    const rows: MonthTxRow[] = [{ amount: -50, budget_id: B_EXPENSE_KID }]
+    const totals = deriveBudgetTotals(budgets, rows)
+    expect(totals.expense.spent).toBe(50)
+    expect(totals.savings.spent).toBe(0)
+  })
+
+  it('de volledige fixture-2-uitkomst, alle vier de types', () => {
+    const rows: MonthTxRow[] = [
+      { amount: 4200, budget_id: B_INCOME },
+      { amount: -1300, budget_id: B_EXPENSE_KID },
+      { amount: -250, budget_id: B_EXPENSE },
+      { amount: -600, budget_id: B_SAVINGS },
+      { amount: -77, budget_id: null },
+    ]
+    expect(deriveBudgetTotals(budgets, rows)).toEqual({
+      income: { limit: 3000, spent: 4200 },
+      expense: { limit: 2000, spent: 1550 },
+      savings: { limit: 400, spent: 600 },
+      debt: { limit: 0, spent: 0 },
+    })
+  })
+})
+
+describe('deriveBudgetScore — waarde-getuige (de verplaatste dekkings-score)', () => {
+  it('middelt over álle types met limit>0; binnen budget = 100, overschrijding telt lineair af', () => {
+    // income 4200/3000 → (1 − 1200/3000)·100 = 60
+    // expense 1550/2000 → binnen budget → 100
+    // savings 600/400  → (1 − 200/400)·100  = 50
+    // debt limit 0     → telt niet mee
+    // gemiddelde = (60 + 100 + 50) / 3 = 70
+    expect(deriveBudgetScore({
+      income: { limit: 3000, spent: 4200 },
+      expense: { limit: 2000, spent: 1550 },
+      savings: { limit: 400, spent: 600 },
+      debt: { limit: 0, spent: 0 },
+    })).toBe(70)
+  })
+
+  it('geen enkel budget met een limiet ⇒ 100 (er valt niets te overschrijden)', () => {
+    expect(deriveBudgetScore({
+      income: { limit: 0, spent: 0 },
+      expense: { limit: 0, spent: 900 },
+      savings: { limit: 0, spent: 0 },
+      debt: { limit: 0, spent: 0 },
+    })).toBe(100)
+  })
+
+  it('is bovenaan geklemd op 100 maar ONDERAAN bewust niet — een forse overschrijding gaat negatief', () => {
+    // expense 10000/2000 → (1 − 8000/2000)·100 = −300; met drie andere types op
+    // 100/100/0-limiet ⇒ (−300 + 100 + 100)/3 = −33,33 → −33.
+    expect(deriveBudgetScore({
+      income: { limit: 3000, spent: 0 },
+      expense: { limit: 2000, spent: 10000 },
+      savings: { limit: 400, spent: 0 },
+      debt: { limit: 0, spent: 0 },
+    })).toBe(-33)
+    // Ver onder nul blijft het doorlopen — bestaand gedrag, geen ondergrens.
+    // limit 100, spent 10100 ⇒ (1 − 10000/100)·100 = −9900, enige type met limiet.
+    expect(deriveBudgetScore({
+      income: { limit: 0, spent: 0 },
+      expense: { limit: 100, spent: 10100 },
+      savings: { limit: 0, spent: 0 },
+      debt: { limit: 0, spent: 0 },
+    })).toBe(-9900)
+  })
+})
+
+describe('deriveRealMonthTotals — waarde-getuige (de verplaatste rauwe maand-pass)', () => {
+  it('splitst op teken, neemt uitgaven absoluut en laat (joint_)transfers vallen', () => {
+    const rows: MonthTxRow[] = [
+      { amount: 2500 },
+      { amount: -1750, budget_id: B_EXPENSE_KID },
+      { amount: -400, budget_id: B_SAVINGS },
+      { amount: 9000, transaction_type: 'transfer' },
+      { amount: -9000, transaction_type: 'joint_transfer' },
+      { amount: -300, budget_id: B_EXPENSE_KID, transaction_type: 'transfer' },
+      { amount: 0 },
+    ]
+    expect(deriveRealMonthTotals(rows)).toEqual({ income: 2500, expenses: 2150 })
+  })
+
+  it('leest string-bedragen als getal (PostgREST numeric komt als string terug)', () => {
+    expect(deriveRealMonthTotals([{ amount: '1200.50' }, { amount: '-200.25' }]))
+      .toEqual({ income: 1200.5, expenses: 200.25 })
+  })
+})
+
+describe('resolveBudgetingActive — waarde-getuige', () => {
+  it('alleen een expliciete false zet de gate uit', () => {
+    expect(resolveBudgetingActive({ budgeting_active: false })).toBe(false)
+    expect(resolveBudgetingActive({ budgeting_active: true })).toBe(true)
+    expect(resolveBudgetingActive({ budgeting_active: null })).toBe(true)
+    expect(resolveBudgetingActive({})).toBe(true) // kolom ontbreekt
+    expect(resolveBudgetingActive(null)).toBe(true) // geen profielrij
   })
 })
 

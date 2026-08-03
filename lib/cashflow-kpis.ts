@@ -282,6 +282,12 @@ export function currentMonthKey(now: Date): string {
  * eigen wijziging, op beide paden tegelijk.
  */
 export const loadCashflowKpis = cache(async (supabase: SupabaseClient): Promise<CashflowCardScalars> => {
+  // `now` VÓÓR de fetches bemonsteren, net als `loadDashboardData` doet. Zou de
+  // maandsleutel ná de awaits worden afgeleid, dan kan een request dat over
+  // middernacht op de 1e heen loopt een maand opzoeken die de queries niet
+  // getarget hebben — een gratis asymmetrie met het pad dat dit moet spiegelen.
+  const now = new Date()
+
   const [profileResult, budgetsResult, txResult, txAgg12Result] = await Promise.all([
     getOwnProfile(supabase),
     getBudgets(supabase),
@@ -298,7 +304,7 @@ export const loadCashflowKpis = cache(async (supabase: SupabaseClient): Promise<
   const budgetTotals = deriveBudgetTotals(budgets, monthTx)
 
   // Gerealiseerde maand uit het aggregaat (zie de asymmetrie hierboven).
-  const monthKey = currentMonthKey(new Date())
+  const monthKey = currentMonthKey(now)
   const currentMonthIncome = aggIncomeByMonth(txAgg12, { realOnly: true }).get(monthKey) ?? 0
   const currentMonthExpenses = aggExpenseByMonthAbs(txAgg12, { realOnly: true }).get(monthKey) ?? 0
 

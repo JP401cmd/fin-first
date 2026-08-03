@@ -95,6 +95,7 @@ import {
   aggExpenseByMonthAbs,
   aggAbsByMonthForBudgets,
   aggToExpenseRows,
+  isRealAggRow,
   type TxMonthAggregateRow,
 } from '@/lib/server-data/tx-aggregates'
 import { fetchActionsKpiAggregate } from '@/lib/server-data/actions-aggregate'
@@ -130,9 +131,16 @@ import { resolveSavingsSource, savingsRateFromAggregates, computeSavingsRate6m, 
 import { buildHealthScoreInput } from '@/lib/health-score-input'
 import { computeHealthScoreWithTrend, type HealthScore } from '@/lib/financial-health'
 
-/** Filter out own-account transfers from income/expense calculations */
-const isRealTx = (t: { transaction_type?: string | null }) =>
-  t.transaction_type !== 'transfer' && t.transaction_type !== 'joint_transfer'
+/**
+ * Filter out own-account transfers from income/expense calculations.
+ *
+ * Delegeert naar `isRealAggRow` (lib/server-data/tx-aggregates.ts), dat exact
+ * dezelfde transfer-definitie draagt als de `realOnly`-vlag op de
+ * aggregaat-reducers. Vroeger stond de vergelijking hier ook letterlijk
+ * uitgeschreven: twee eigenaren van "wat telt als echte transactie" die
+ * toevallig overeenkwamen. ADR 0077 claimt er één — dit maakt die claim waar.
+ */
+const isRealTx = isRealAggRow
 
 // ── Result type ────────────────────────────────────────────────
 
