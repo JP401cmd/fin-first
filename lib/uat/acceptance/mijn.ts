@@ -1,9 +1,14 @@
 /**
  * Acceptatiecriteria — domein Mijn: profiel, huishouden, account & voorkeuren
- * (WF-MIJN-01..09, 11..16, 18..22, 24..29 / UAT-MIJN-01..09, 11..16, 18..22, 24..29).
+ * (WF-MIJN-01..09, 11..16, 18..22, 24..30 / UAT-MIJN-01..09, 11..16, 18..22, 24..30).
  *
  * Spiegelt exact de aanpak van `start.ts`/`nav.ts`/`schuld.ts`. Bron:
  * `docs/uat/uat-plan.md` Deel 1 (WF-MIJN-01..29) + Deel 2 §"UAT-scenario's — Mijn".
+ *
+ * WF-MIJN-30 is TOEGEVOEGD (niet uit het oorspronkelijke UAT-plan): de per-groep
+ * keuze "waar draait de AI?" (`profiles.ai_execution_prefs`, `lib/ai/execution-
+ * groups.ts`) is een echte nieuwe gebruikersmogelijkheid bovenop de bestaande
+ * privacy_mode-hoofdschakelaar op /mijn/privacy, en had nog geen dekking.
  *
  * DRIE VERWIJSREGELS — bewust GEEN eigen criterium hier (het UAT-plan §11574
  * wijst ze door naar een NAV-scenario, en `lib/uat/catalog.ts` bevat dan ook
@@ -20,7 +25,7 @@
  * profiel bewerken, huishouden opbouwen/verlaten, privacy-toggles, account,
  * koppelingen, notificaties, uiterlijk, check-ins, feedback, export/reset.
  *
- * DRIE criteria zijn wél 'exact' herleidbaar op échte, client-veilige
+ * VIER criteria zijn 'exact' herleidbaar op échte, client-veilige
  * rekenfuncties/constanten (persona 'compleet' = Tessa, jaar 2026):
  *  - WF-MIJN-03: het netto maandinkomen dat hier wordt vastgelegd is dezelfde
  *    bron die de canonieke jaarruimte (pensioen-aftrekruimte Box 1) voedt —
@@ -32,6 +37,10 @@
  *  - WF-MIJN-11: de add-on-prijzen (AI €9 / Connected €4) uit de canonieke
  *    commerciële catalogus `ADDON_PLANS` — dezelfde bron als /mijn/account en de
  *    marketing-"Pro €9" (spiegelt WF-START-04).
+ *  - WF-MIJN-30: de per-groep resolutie `mode(groep) = prefs[groep] ??
+ *    (privacy_mode ? 'lokaal' : 'cloud')` via de canonieke `resolveExecutionMode`
+ *    (`lib/ai/execution-groups.ts`) — override wint, ontbrekende override volgt
+ *    de hoofdschakelaar. Puur functioneel, geen LIVE-afhankelijkheid.
  *
  * ÉÉN criterium is 'consistency' (A=B, geen los na te rekenen cijfer):
  *  - WF-MIJN-09: het in de review-tekst genoemde aantal samen te voegen
@@ -271,12 +280,12 @@ const criteria: AcceptanceCriterion[] = [
     scenarioId: 'UAT-MIJN-19',
     titel: 'Belastingaangifte importeren en een import per peildatum verwijderen',
     kriticiteit: 'KERN',
-    given: 'Ingelogd; belastingaangifte-import (bezittingen/schulden in één keer vullen vanuit de IB-aangifte).',
+    given: 'Ingelogd; belastingaangifte-import (bezittingen/schulden in één keer vullen vanuit de IB-aangifte). De groep "Documenten lezen" staat óf op cloud (hoofdschakelaar/override) óf op lokaal.',
     when: 'De gebruiker importeert een aangifte en verwijdert (randgeval) een eerdere import volledig op peildatum.',
-    then: 'De import vult bezittingen/schulden in één keer; een import-verwijdering op peildatum ruimt exact die batch op (alles-of-niets per peildatum), zonder handmatig ingevoerde items te raken.',
+    then: 'Cloud: `POST /api/onboarding/aangifte-extract` vult bezittingen/schulden in één keer; staat "Documenten lezen" op lokaal, dan geeft deze route vóór elke dataophaling een 403 (`assertCloudAllowed`, geen stille terugval) en leest de browser de PDF zelf uit via `extractAangifteDataLocal` (on-device, geen enkel gegeven verlaat het toestel) — mét dezelfde BSN-strip als defense-in-depth; ontbreekt het lokale model nog, dan blokkeert de upload met een duidelijke melding i.p.v. alsnog naar de cloud te vallen. Een import-verwijdering op peildatum ruimt in beide gevallen exact die batch op (alles-of-niets per peildatum), zonder handmatig ingevoerde items te raken.',
     assertion: {
       kind: 'ui-only',
-      source: 'app/api/onboarding/aangifte-extract/route.ts + import-verwijdering per peildatum, geen deterministisch scenario-cijfer',
+      source: 'app/api/onboarding/aangifte-extract/route.ts (assertCloudAllowed op groep "documenten") + components/aangifte/upload-step.tsx (useExecutionMode-gate, extractAangifteDataLocal on-device pad) + import-verwijdering per peildatum, geen deterministisch scenario-cijfer',
     },
   },
   {
@@ -394,6 +403,20 @@ const criteria: AcceptanceCriterion[] = [
     assertion: {
       kind: 'ui-only',
       source: 'components/app/household-section.tsx (uitnodiging intrekken), geen cijfermatige uitkomst',
+    },
+  },
+  {
+    workflow: 'WF-MIJN-30',
+    scenarioId: 'UAT-MIJN-30',
+    titel: 'Per functionaliteit kiezen waar de AI draait (lokaal/cloud-override)',
+    kriticiteit: 'KERN',
+    given: 'Ingelogd, /mijn/privacy, sectie "Liever per onderdeel kiezen?" (AiExecutionGroupList) — de zeven groepen uit `lib/ai/execution-groups.ts` (gesprek, transacties, briefing, tips, rapporten, documenten, nieuws), elk standaard zonder eigen override. Hoofdschakelaar (privacy_mode) staat op Cloud-AI.',
+    when: 'De gebruiker klapt een groep open en zet "Transacties & vaste lasten" op "Lokaal op je apparaat" (vereist het ai-abonnement + desktop), en zet die daarna terug via "Eigen keuze — volg weer de hoofdkeuze".',
+    then: 'Direct na de eerste keuze toont alléén "Transacties & vaste lasten" de chip "Lokaal"; alle andere groepen blijven "Cloud" (ze volgen de hoofdschakelaar). Bij "gedeeltelijk" lokaal ondersteunde groepen (tips, rapporten, documenten) verschijnt zichtbaar — niet achter een tooltip — wat er wordt ingeleverd zodra die groep op lokaal staat. Na "volg weer de hoofdkeuze" verdwijnt de override en toont de groep weer "Cloud" (volgt de hoofdschakelaar). Zonder het ai-abonnement of op een coarse-pointer-toestel is de "Lokaal"-knop disabled met een zichtbare reden. Zet je vervolgens de hoofdschakelaar op privé-modus, dan volgen alle groepen zonder eigen override automatisch mee naar "Lokaal".',
+    assertion: {
+      kind: 'exact',
+      expected: "modeOverrideWint=lokaal; modeZonderOverrideVolgtHoofdschakelaar=cloud; modeNaWissenOverride=cloud",
+      source: 'lib/ai/execution-groups.ts#resolveExecutionMode (override ?? hoofdschakelaar) — zie mijn-checks.ts; UI in components/mijn/ai-execution-group-list.tsx + app/api/ai-execution-prefs/route.ts',
     },
   },
 ]

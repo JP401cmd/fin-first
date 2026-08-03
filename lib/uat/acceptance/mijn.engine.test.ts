@@ -42,9 +42,9 @@ function criterion(workflow: string): AcceptanceCriterion {
 }
 
 describe('UAT Mijn — acceptatiecriteria dekking', () => {
-  it('is de MIJN-zone met precies 26 criteria', () => {
+  it('is de MIJN-zone met precies 27 criteria', () => {
     expect(MIJN_ACCEPTANCE.zone).toBe('MIJN')
-    expect(MIJN_ACCEPTANCE.criteria.length).toBe(26)
+    expect(MIJN_ACCEPTANCE.criteria.length).toBe(27)
   })
 
   it('heeft precies één criterium per catalogus-MIJN-scenario (op scenarioId)', () => {
@@ -97,14 +97,15 @@ describe('UAT Mijn — acceptatiecriteria dekking', () => {
     const checkWorkflows = MIJN_ENGINE_CHECKS.map((c) => c.workflow).sort()
     expect(checkWorkflows).toEqual(exactWorkflows)
     // MIJN is een UI-zware zone: bewust weinig exact.
-    expect(exactWorkflows).toEqual(['WF-MIJN-03', 'WF-MIJN-08', 'WF-MIJN-11'])
+    expect(exactWorkflows).toEqual(['WF-MIJN-03', 'WF-MIJN-08', 'WF-MIJN-11', 'WF-MIJN-30'])
   })
 
-  it('markeert de kinds correct (3 exact, 1 consistency, rest ui-only)', () => {
+  it('markeert de kinds correct (4 exact, 1 consistency, rest ui-only)', () => {
     // Exact (hand-narekenbaar op canonieke functies/constanten).
     expect(criterion('WF-MIJN-03').assertion.kind).toBe('exact') // jaarruimte per persoon
     expect(criterion('WF-MIJN-08').assertion.kind).toBe('exact') // computeSharePct-split
     expect(criterion('WF-MIJN-11').assertion.kind).toBe('exact') // ADDON_PLANS-prijzen
+    expect(criterion('WF-MIJN-30').assertion.kind).toBe('exact') // resolveExecutionMode
     // Consistency (A=B tussen voorstel- en review-telling, geen los cijfer).
     expect(criterion('WF-MIJN-09').assertion.kind).toBe('consistency')
     // Steekproef ui-only (huishouden-LIVE + pure interactie).
@@ -114,7 +115,7 @@ describe('UAT Mijn — acceptatiecriteria dekking', () => {
 
     const counts = { exact: 0, consistency: 0, 'ui-only': 0, oracle: 0, direction: 0 }
     for (const c of MIJN_ACCEPTANCE.criteria) counts[c.assertion.kind]++
-    expect(counts.exact).toBe(3)
+    expect(counts.exact).toBe(4)
     expect(counts.consistency).toBe(1)
     expect(counts['ui-only']).toBe(22)
   })

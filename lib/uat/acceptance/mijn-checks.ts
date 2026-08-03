@@ -12,7 +12,7 @@
  * of op de canonieke commerciële catalogus. Geen herimplementatie van
  * bedrijfslogica, geen Supabase, geen netwerk.
  *
- * MIJN is een UI/interactie-zware zone; slechts DRIE criteria zijn 'exact'
+ * MIJN is een UI/interactie-zware zone; slechts VIER criteria zijn 'exact'
  * hand-narekenbaar:
  *  - WF-MIJN-03: jaarruimte per persoon — het netto maandinkomen uit het
  *    huishoudprofiel voedt (via de canonieke bruto-afleiding) `computeJaarruimte`;
@@ -22,10 +22,13 @@
  *    WF-SCHULD-18).
  *  - WF-MIJN-11: de add-on-prijzen uit `ADDON_PLANS` (spiegelt start-checks
  *    WF-START-04).
+ *  - WF-MIJN-30: de per-groep uitvoerkeuze via `resolveExecutionMode` (override
+ *    ?? hoofdschakelaar) uit `lib/ai/execution-groups.ts`.
  *
  * Alle geïmporteerde functies zijn client-veilig (geen `server-only` /
  * `@/lib/supabase/server` / `next/headers` in hun import-graaf):
- * `lib/jaarruimte.ts`, `lib/household-data.ts`, `lib/subscription-catalog.ts`.
+ * `lib/jaarruimte.ts`, `lib/household-data.ts`, `lib/subscription-catalog.ts`,
+ * `lib/ai/execution-groups.ts`.
  */
 
 import { PERSONAS } from '@/lib/test-personas'
@@ -36,6 +39,7 @@ import {
 } from '@/lib/jaarruimte'
 import { computeSharePct } from '@/lib/household-data'
 import { ADDON_PLANS } from '@/lib/subscription-catalog'
+import { resolveExecutionMode } from '@/lib/ai/execution-groups'
 import { MIJN_ACCEPTANCE } from './mijn'
 import type { AcceptanceCriterion } from './types'
 
@@ -134,6 +138,32 @@ export const MIJN_ENGINE_CHECKS: MijnEngineCheck[] = [
       return {
         expected: 'aiPriceEur=9; connectedPriceEur=4',
         actual: `aiPriceEur=${ai.priceEur}; connectedPriceEur=${connected.priceEur}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-MIJN-30',
+    scenarioId: 'UAT-MIJN-30',
+    label: 'Per-groep uitvoerkeuze via resolveExecutionMode (override wint, anders volgt de hoofdschakelaar)',
+    run: () => {
+      criterion('WF-MIJN-30')
+      // Hoofdschakelaar staat op cloud (privacy_mode=false) in dit scenario.
+      const modeOverrideWint = resolveExecutionMode(
+        { privacy_mode: false, ai_execution_prefs: { transacties: 'lokaal' } },
+        'transacties',
+      )
+      const modeZonderOverrideVolgtHoofdschakelaar = resolveExecutionMode(
+        { privacy_mode: false, ai_execution_prefs: { transacties: 'lokaal' } },
+        'briefing',
+      )
+      // Override gewist (leeg object) → valt terug op de hoofdschakelaar.
+      const modeNaWissenOverride = resolveExecutionMode(
+        { privacy_mode: false, ai_execution_prefs: {} },
+        'transacties',
+      )
+      return {
+        expected: 'modeOverrideWint=lokaal; modeZonderOverrideVolgtHoofdschakelaar=cloud; modeNaWissenOverride=cloud',
+        actual: `modeOverrideWint=${modeOverrideWint}; modeZonderOverrideVolgtHoofdschakelaar=${modeZonderOverrideVolgtHoofdschakelaar}; modeNaWissenOverride=${modeNaWissenOverride}`,
       }
     },
   },

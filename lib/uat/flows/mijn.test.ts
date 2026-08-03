@@ -47,18 +47,18 @@ describe('MIJN_FLOW — curatie-integriteit', () => {
     }
   })
 
-  it("dekt alle 26 statusdragende MIJN-scenario's (01..09, 11..16, 18..22, 24..29)", () => {
+  it("dekt alle 27 statusdragende MIJN-scenario's (01..09, 11..16, 18..22, 24..30)", () => {
     const covered = new Set(
       MIJN_FLOW.nodes.map((n) => n.scenarioId).filter((id): id is string => Boolean(id)),
     )
     // Verwijsregels UAT-MIJN-10/17/23 (→ UAT-NAV-19/11/10) hebben bewust geen knoop.
-    const expected = [1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 29].map(
+    const expected = [1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 29, 30].map(
       (n) => `UAT-MIJN-${String(n).padStart(2, '0')}`,
     )
     for (const id of expected) {
       expect(covered.has(id), `${id} moet als flow-knoop voorkomen`).toBe(true)
     }
-    expect(covered.size).toBe(26)
+    expect(covered.size).toBe(27)
   })
 
   it('bevat NIET de verwijsregel-scenario-knopen 10/17/23', () => {
