@@ -113,3 +113,61 @@ wijziging, op beide paden tegelijk.
 - De omzetting van `app/(app)/overzicht/cashflow/page.tsx` en
   `app/api/overzicht/cashflow-status/route.ts` naar de slanke laag is bewust een
   **volgende** stap; dit besluit legt alleen de fundering.
+
+## Uitbreiding — de forecast-pagina (T2.5, 4 aug 2026)
+
+`/overzicht/cashflow/forecast` (TTFB-p75 8,8 s, LCP 10,9 s desktop) was de
+laatste pagina op de volle bundel. `CashflowSection` leest daaruit **vijf ándere
+velden**: `monthlyIncome`, `monthlyExpenses`, `savingsRate6m`, `savingsHistory`
+en `expenseHistory`.
+
+Dat is een aparte loader geworden — `loadForecastSectionData`, met een eigen
+retourtype `CashflowSectionScalars` — en **geen** uitbreiding van
+`CashflowCardScalars`. Reden: de vier extra fetches die alleen `savingsRate6m` en
+`savingsHistory` nodig hebben (schulden, bezittingen, vroegste-inkomsten-datum,
+`net_worth_snapshots`) zouden anders de hub en de vaste-lasten-pagina — die
+uitsluitend de zeven kaart-scalars lezen — vier queries duurder maken voor niets.
+Acht gedeelde `cache()`-fetches in één golf, dus op een request waar beide
+loaders draaien overlappen ze volledig.
+
+`net_worth_snapshots` is daarvoor een gedeelde fetcher geworden
+(`getNetWorthSnapshots12m`, `lib/server-data/base.ts`), zodat de dashboard-bundel
+en deze laag binnen één request dezelfde rijen delen. De ondergrens komt daarbij
+uit `localMonthStartMonthsAgo` in plaats van uit het TZ-onveilige
+`Date.UTC(...).toISOString()` dat de loader er had — zelfde `YYYY-MM-01`.
+
+### Het gevaarlijke veld: `savingsRate6m` heeft twee fallbacks
+
+`savingsRate6m` is een **kerngetal** dat óók op `/overzicht` en in het
+instellingenblok staat; een tweede rekenweg zou daar direct twee spaarquotes
+opleveren. De keten bestaat uit drie lagen, en alle drie zijn verplaatst naar
+`resolveSavingsRate6m` (`lib/cashflow-kpis.ts`), dat `loadDashboardData`
+consumeert:
+
+1. de transactie-formule met extrapolatie <6 mnd, spaarbudget-correctie en
+   schuldaflossing (`computeSavingsRate6m`, `lib/savings-source.ts`);
+2. de **profiel-fallback** wanneer die formule 0 geeft;
+3. de **net-vermogen-delta-tak** — is (2) van toepassing én zijn er ≥2 snapshots
+   én is het effectieve maandinkomen > 0, dan wint de gemeten vermogensgroei
+   minus de verwachte koerswinst (`computeSavingsRateFromNetWorthDelta`,
+   `lib/core-metrics.ts`).
+
+Die derde tak is op dit pad écht bereikbaar (een gebruiker zonder
+transactie-inkomen mét snapshots is een gewoon account), sleept precies één extra
+fetch mee die niet al nodig was — de bezittingen, voor de koerswinst — en leunt
+zelf nergens op de bundel. `isEstimate` blijft bewust de uitspraak van de
+*aggregaat*-formule, óók als de delta-tak een getal levert.
+
+### De twee historieën hebben verschillende bronnen
+
+`expenseHistory` komt uit het 12-maands **maandaggregaat** (sleutel `YYYY-MM`);
+`savingsHistory` uit **`net_worth_snapshots.savings_rate`** (sleutel = de volle
+`snapshot_date`). Dat lijken twee vormen van hetzelfde en is het niet — ze op
+elkaar "gelijktrekken" zou de spaarquote-sparkline stil van bron laten wisselen.
+
+`lib/cashflow-kpis.forecast-parity.test.ts` draait beide paden end-to-end over
+vijf fixtures: aggregaat-pad, **delta-fallback actief**, `income_source =
+'manual'`, maandgrens, en een lege maand midden in de reeks met door-elkaar
+staande rijen. Omdat beide paden dezelfde helpers consumeren bewijst die
+pariteit alleen de bedrading; de semantiek staat eronder vastgepind in
+waarde-getuigen met harde literals.
