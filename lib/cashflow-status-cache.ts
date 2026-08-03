@@ -4,12 +4,12 @@
 // die `GET /api/overzicht/cashflow-status` levert (de sidebar-status-dots onder
 // Cashflow).
 //
-// Aanleiding (perf): die route draait loadDashboardData + loadCashflowData +
-// loadVasteLastenSummary — tientallen Supabase-roundtrips plus de volledige
-// recurring-detectie — om VIER statuskleuren te leveren. De cashflow-pagina heeft
-// datzelfde werk net server-side gedaan, maar React `cache()` overleeft geen
-// request-grens: de client-hook (lib/hooks/use-cashflow-card-statuses.ts) fetcht
-// ná hydratie en herhaalt dus de hele last, zonder enig hergebruik.
+// Aanleiding (perf): die route draait loadCashflowKpis + loadCashflowData +
+// loadVasteLastenSummary — een tiental Supabase-roundtrips plus de volledige
+// recurring-detectie — om VIER statuskleuren te leveren. De sub-pagina's hebben
+// dat werk niet server-side gedaan, dus de client-hook
+// (lib/hooks/use-cashflow-card-statuses.ts) fetcht ná hydratie, en React
+// `cache()` overleeft geen request-grens.
 //
 // Deze cache vouwt herhaalde reads binnen een kort venster samen — spiegel van
 // lib/page-status/status-cache.ts (zelfde vorm, zelfde TTL), bewust GEEN tweede
@@ -17,13 +17,19 @@
 // status-duiding-banner. Een mutatie op transacties/recurrings/budgets toont
 // maximaal één TTL-venster een verouderde dot — een zwakker signaal dan de banner.
 //
+// WAAROM DEZE CACHE MAG BLIJVEN EN DIE OP /api/cashflow/settings NIET (T2.2-review,
+// commit 316586b9): die cachete VELDEN DIE DE GEBRUIKER ZELF BEWERKT en gaf na een
+// opslag-actie de waarde van vóór de bewerking terug; deze cachet AFGELEIDE,
+// cosmetische statuskleuren waarvan een TTL-venster staleness bij ontwerp is
+// aanvaard. Lees die verwijdering dus niet als "caches horen hier niet" — de
+// meetlat is of de gecachete waarde een invoerveld is dat de gebruiker terugleest.
+//
 // GEEN expliciete invalidatie: de Map leeft per lambda-instance, dus een
 // mutatie-getriggerde purge werkt niet cross-instance en zou schijnzekerheid
 // geven.
 //
 // Reikwijdte: dit lost het TWEEDE bezoek op, niet het eerste. De eerste hit per
-// gebruiker per TTL blijft even duur tot de route zelf op een slankere loader
-// staat.
+// gebruiker per TTL blijft de (inmiddels veel goedkopere) loaders draaien.
 //
 // Cross-account-veiligheid: de sleutel bevat ALTIJD de user-id én het perspectief
 // (een perspectiefwissel levert per definitie verse statussen). Een entry kan dus

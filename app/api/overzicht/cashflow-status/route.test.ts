@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import type { DashboardData } from '@/lib/types/dashboard'
+import type { CashflowCardScalars } from '@/lib/cashflow-kpis'
 import type { CashflowData } from '@/lib/cashflow-data-loader'
 import type { VasteLastenSummary } from '@/lib/vaste-lasten-summary'
 import {
@@ -10,22 +10,26 @@ import {
 /**
  * GET /api/overzicht/cashflow-status — de vier sidebar-statuskleuren.
  *
- * De route draait loadDashboardData + loadCashflowData + loadVasteLastenSummary
- * om VIER kleuren te leveren; de pagina heeft datzelfde werk net gedaan, maar
- * React `cache()` overleeft de request-grens niet. Wat hier bewaakt wordt:
+ * De route draait loadCashflowKpis + loadCashflowData + loadVasteLastenSummary
+ * om VIER kleuren te leveren. Wat hier bewaakt wordt:
  *
- *  1. de TTL-cache slaat de loaders daadwerkelijk OVER bij een hit (spy-tellers,
- *     niet alleen "er kwam een waarde terug");
- *  2. na TTL-verval draait het volle pad weer;
- *  3. een andere gebruiker en een ander perspectief delen NOOIT een entry;
- *  4. de statussen die de route teruggeeft blijven exact die van
- *     `buildCashflowCards` (die draait hier echt mee — niet gemockt).
+ *  1. de statussen die de route teruggeeft blijven exact die van
+ *     `buildCashflowCards` (die draait hier echt mee — niet gemockt);
+ *  2. de VOLLE dashboard-bundel wordt NIET meer aangeraakt (perf Task 2.3) —
+ *     `loadDashboardData` is gemockt en moet nul keer worden aangeroepen;
+ *  3. het perspectief blijft naar `loadCashflowData` gaan, in alle drie de
+ *     weergaven (huishoud-privacy);
+ *  4. de TTL-cache slaat de loaders daadwerkelijk OVER bij een hit (spy-tellers,
+ *     niet alleen "er kwam een waarde terug"), draait na verval het volle pad
+ *     weer, en deelt nooit een entry met een andere gebruiker of een ander
+ *     perspectief.
  */
 
 const {
   mockCreateClient,
   mockGetAuthClaims,
   mockGetServerPerspective,
+  mockLoadCashflowKpis,
   mockLoadDashboardData,
   mockLoadCashflowData,
   mockLoadVasteLastenSummary,
@@ -33,6 +37,7 @@ const {
   mockCreateClient: vi.fn(),
   mockGetAuthClaims: vi.fn(),
   mockGetServerPerspective: vi.fn(),
+  mockLoadCashflowKpis: vi.fn(),
   mockLoadDashboardData: vi.fn(),
   mockLoadCashflowData: vi.fn(),
   mockLoadVasteLastenSummary: vi.fn(),
@@ -45,6 +50,11 @@ vi.mock('@/lib/supabase/server', () => ({
 vi.mock('@/lib/household/server-perspective', () => ({
   getServerPerspective: mockGetServerPerspective,
 }))
+vi.mock('@/lib/cashflow-kpis', () => ({
+  loadCashflowKpis: mockLoadCashflowKpis,
+}))
+// Bewust gemockt hoewel de route hem niet meer importeert: zou iemand de zware
+// bundel terugzetten, dan valt dat hier om (zie de 0-aanroepen-assertie).
 vi.mock('@/lib/dashboard-data-loader', () => ({
   loadDashboardData: mockLoadDashboardData,
 }))
@@ -64,14 +74,14 @@ import { GET } from './route'
 //   transacties → 3000 in / 3300 uit (−10%)      → 'bad'
 //   vaste lasten→ 1800 / 3000 = 60% (>50%, ≤70%) → 'warn'
 //   forecast    → baseline 3000 − 2000 = +1000   → 'good'
-const dashboardData = {
+const kpis = {
   budgetingActive: true,
   budgetTotals: { expense: { limit: 1000, spent: 200 } },
   monthSummary: { budgetScore: 90 },
   currentMonthIncome: 3000,
   currentMonthExpenses: 3300,
   monthlyIncome: 3000,
-} as unknown as DashboardData
+} as unknown as CashflowCardScalars
 
 const cashflow = {
   recurrings: [],
@@ -89,22 +99,24 @@ const EXPECTED = {
   forecast: 'good',
 }
 
-/** Hoe vaak de drie zware loaders samen zijn aangeroepen. */
+/** Hoe vaak de drie loaders samen zijn aangeroepen. */
 function loaderCalls(): number {
   return (
-    mockLoadDashboardData.mock.calls.length +
+    mockLoadCashflowKpis.mock.calls.length +
     mockLoadCashflowData.mock.calls.length +
     mockLoadVasteLastenSummary.mock.calls.length
   )
 }
 
+const SUPABASE = { tag: 'supabase-client' }
+
 beforeEach(() => {
   vi.clearAllMocks()
   __resetCashflowStatusCache()
-  mockCreateClient.mockResolvedValue({})
+  mockCreateClient.mockResolvedValue(SUPABASE)
   mockGetAuthClaims.mockResolvedValue({ sub: 'user-1' })
   mockGetServerPerspective.mockResolvedValue('personal')
-  mockLoadDashboardData.mockResolvedValue({ dashboardData })
+  mockLoadCashflowKpis.mockResolvedValue(kpis)
   mockLoadCashflowData.mockResolvedValue(cashflow)
   mockLoadVasteLastenSummary.mockResolvedValue(vasteLasten)
 })
@@ -119,6 +131,28 @@ describe('GET /api/overzicht/cashflow-status — payload', () => {
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual(EXPECTED)
   })
+
+  it('draait op de slanke KPI-laag, niet op de volle dashboard-bundel', async () => {
+    const res = await GET()
+    expect(await res.json()).toEqual(EXPECTED)
+    expect(mockLoadCashflowKpis).toHaveBeenCalledTimes(1)
+    expect(mockLoadCashflowKpis).toHaveBeenCalledWith(SUPABASE)
+    expect(mockLoadDashboardData).not.toHaveBeenCalled()
+  })
+
+  // Huishoud-privacy: de statussen moeten in huishouden-/partnerweergave
+  // kloppen, dus het cookie-perspectief blijft naar `loadCashflowData` gaan.
+  // Per perspectief een verse cache (anders zou een hit de tweede call slikken).
+  it.each(['personal', 'household', 'partner'] as const)(
+    'geeft perspectief %s door aan loadCashflowData',
+    async (perspective) => {
+      __resetCashflowStatusCache()
+      mockGetServerPerspective.mockResolvedValue(perspective)
+      const res = await GET()
+      expect(res.status).toBe(200)
+      expect(mockLoadCashflowData).toHaveBeenCalledWith(SUPABASE, perspective)
+    },
+  )
 
   it('geeft 401 met de app-brede tekst zonder de loaders te raken', async () => {
     mockGetAuthClaims.mockResolvedValue(null)
@@ -150,7 +184,7 @@ describe('GET /api/overzicht/cashflow-status — TTL-cache', () => {
     const first = await GET()
     expect(await first.json()).toEqual(EXPECTED)
     // Miss: elk van de drie loaders precies één keer.
-    expect(mockLoadDashboardData).toHaveBeenCalledTimes(1)
+    expect(mockLoadCashflowKpis).toHaveBeenCalledTimes(1)
     expect(mockLoadCashflowData).toHaveBeenCalledTimes(1)
     expect(mockLoadVasteLastenSummary).toHaveBeenCalledTimes(1)
 
@@ -170,7 +204,7 @@ describe('GET /api/overzicht/cashflow-status — TTL-cache', () => {
     vi.advanceTimersByTime(CASHFLOW_STATUS_CACHE_TTL_MS)
     const res = await GET()
     expect(await res.json()).toEqual(EXPECTED)
-    expect(mockLoadDashboardData).toHaveBeenCalledTimes(2)
+    expect(mockLoadCashflowKpis).toHaveBeenCalledTimes(2)
     expect(mockLoadCashflowData).toHaveBeenCalledTimes(2)
     expect(mockLoadVasteLastenSummary).toHaveBeenCalledTimes(2)
   })
@@ -209,14 +243,12 @@ describe('GET /api/overzicht/cashflow-status — TTL-cache', () => {
 
     // Gebruiker 2 heeft ándere cijfers → moet zijn EIGEN statussen krijgen.
     mockGetAuthClaims.mockResolvedValue({ sub: 'user-2' })
-    mockLoadDashboardData.mockResolvedValue({
-      dashboardData: {
-        ...dashboardData,
-        budgetingActive: false,
-        currentMonthIncome: 4000,
-        currentMonthExpenses: 1000,
-      } as unknown as DashboardData,
-    })
+    mockLoadCashflowKpis.mockResolvedValue({
+      ...kpis,
+      budgetingActive: false,
+      currentMonthIncome: 4000,
+      currentMonthExpenses: 1000,
+    } as unknown as CashflowCardScalars)
     const second = await GET()
     expect(await second.json()).toEqual({
       budget: 'neutral',

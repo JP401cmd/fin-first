@@ -41,6 +41,28 @@ export interface CashflowCard {
   detail: { label: string; value: string; tip: string; actionLabel: string }
 }
 
+/**
+ * Projecteer de vier kaarten op hun statussen — de ENIGE plek waar
+ * `CashflowCard[]` in `CashflowCardStatuses` wordt omgezet.
+ *
+ * Twee oppervlakken consumeren deze projectie op exact dezelfde kaart-array: de
+ * API-route (`GET /api/overzicht/cashflow-status`, voor de sidebar-dots op de
+ * sub-pagina's) en de server-seed op de cashflow-hub
+ * (`components/overview/cashflow-cards-loader.tsx`). Zo kan een dot per
+ * constructie niet van zijn kaart afwijken: dezelfde `buildCashflowCards`-
+ * uitkomst, dezelfde projectie, geen tweede sleutel-mapping die kan wegdrijven.
+ */
+export function cashflowCardStatuses(cards: CashflowCard[]): CashflowCardStatuses {
+  const byKey = (k: CashflowCardKey): LeverageStatus =>
+    cards.find((c) => c.key === k)?.status ?? 'neutral'
+  return {
+    budget: byKey('budget'),
+    transacties: byKey('transacties'),
+    vasteLasten: byKey('vaste-lasten'),
+    forecast: byKey('forecast'),
+  }
+}
+
 const BASE = '/overzicht/cashflow'
 
 function signed(value: number): string {
