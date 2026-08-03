@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-02T22:59:54.410Z",
-  "generatedDate": "2026-08-02",
+  "generatedAt": "2026-08-03T09:36:55.421Z",
+  "generatedDate": "2026-08-03",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -193,7 +193,7 @@
     "tables": 86,
     "migrations": 179,
     "integrations": 25,
-    "components": 859,
+    "components": 860,
     "providers": 11,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -8176,11 +8176,11 @@
     }
   ],
   "components": {
-    "total": 859,
+    "total": 860,
     "groups": [
       {
         "group": "app",
-        "count": 334,
+        "count": 335,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -8294,6 +8294,7 @@
           "envelope-transfer-sheet",
           "error-reporter",
           "event-chat-pane",
+          "event-chat-pane.test",
           "event-cluster-sheet",
           "event-impact-preview",
           "event-pane",
@@ -11144,7 +11145,6 @@
           "routes": [
             "/api/ai/actions/[id]",
             "/api/ai/actions/[id]/assign",
-            "/api/ai/categorize",
             "/api/ai/chat",
             "/api/ai/recommendations",
             "/api/ai/recommendations/initial"
@@ -15354,7 +15354,7 @@
       },
       {
         "path": "lib/ai",
-        "commits": 55
+        "commits": 56
       },
       {
         "path": "app/(app)/toekomst",
@@ -15362,7 +15362,7 @@
       },
       {
         "path": "app/api/ai",
-        "commits": 21
+        "commits": 22
       },
       {
         "path": "app/api/household",
@@ -15403,7 +15403,7 @@
       {
         "file": "components/core/assets-client.tsx",
         "loc": 4359,
-        "commits": 44
+        "commits": 43
       },
       {
         "file": "components/app/cash-account-view.tsx",
@@ -16611,6 +16611,13 @@
       "date": "2026-08-02",
       "api": 275,
       "components": 859,
+      "tables": 86,
+      "routesProduction": 101
+    },
+    {
+      "date": "2026-08-03",
+      "api": 275,
+      "components": 860,
       "tables": 86,
       "routesProduction": 101
     }
