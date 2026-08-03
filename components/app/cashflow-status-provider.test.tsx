@@ -15,12 +15,24 @@ import type { CashflowCardStatuses } from '@/lib/cashflow-cards'
  *     landt dan alsnog, zonder dat er tussendoor een fetch is losgegaan — dat is
  *     precies de volgorde die het PageStatusSeed-patroon níét garandeert;
  *  3. op een SUB-pagina fetcht hij exact één keer per route-bezoek;
- *  4. buiten de cashflow-routes raakt hij het endpoint niet aan.
+ *  4. buiten de cashflow-routes raakt hij het endpoint niet aan;
+ *  5. bij een PERSPECTIEFWISSEL haalt de sub-pagina opnieuw op (die wissel doet
+ *     alleen een zachte `router.refresh()`, dus zonder het perspectief in de deps
+ *     zouden de dots op het vorige perspectief blijven staan);
+ *  6. over een route-OVERGANG heen lekt er niets: de gefetchte waarden van een
+ *     sub-pagina verschijnen niet op de hub, en een blijvende seed niet op een
+ *     sub-pagina.
  */
 
-const { mockUsePathname } = vi.hoisted(() => ({ mockUsePathname: vi.fn() }))
+const { mockUsePathname, mockUsePerspective } = vi.hoisted(() => ({
+  mockUsePathname: vi.fn(),
+  mockUsePerspective: vi.fn(),
+}))
 
 vi.mock('next/navigation', () => ({ usePathname: mockUsePathname }))
+vi.mock('@/components/app/perspective-provider', () => ({
+  usePerspective: mockUsePerspective,
+}))
 
 import {
   CashflowStatusProvider,
@@ -63,6 +75,7 @@ let fetchSpy: ReturnType<typeof vi.fn>
 beforeEach(() => {
   fetchSpy = vi.fn(async () => ({ ok: true, json: async () => FROM_API }) as Response)
   global.fetch = fetchSpy as unknown as typeof fetch
+  mockUsePerspective.mockReturnValue({ perspective: 'personal' })
 })
 
 afterEach(() => {
@@ -172,6 +185,21 @@ describe('CashflowStatusProvider — sub-pagina en daarbuiten', () => {
     expect(probe()).toBe(NEUTRAL)
   })
 
+  // Begrensde routematch: een zusterroute die toevallig met de hub-prefix begint
+  // is GEEN cashflow-sub-pagina en mag het endpoint dus niet raken.
+  it('behandelt een zusterroute met dezelfde prefix niet als sub-pagina', async () => {
+    mockUsePathname.mockReturnValue('/overzicht/cashflow-instellingen')
+    render(
+      <CashflowStatusProvider>
+        <StatusProbe />
+      </CashflowStatusProvider>,
+    )
+    await act(async () => {})
+
+    expect(fetchSpy).not.toHaveBeenCalled()
+    expect(probe()).toBe(NEUTRAL)
+  })
+
   it('blijft neutraal bij een niet-ok antwoord (progressive enhancement)', async () => {
     mockUsePathname.mockReturnValue('/overzicht/cashflow/budget')
     fetchSpy.mockResolvedValue({ ok: false, json: async () => ({}) } as Response)
@@ -183,6 +211,127 @@ describe('CashflowStatusProvider — sub-pagina en daarbuiten', () => {
     await act(async () => {})
 
     expect(probe()).toBe(NEUTRAL)
+  })
+})
+
+describe('CashflowStatusProvider — perspectiefwissel', () => {
+  // Een wissel doet alleen `router.refresh()` (zachte refresh): clientstate
+  // overleeft. Zonder het perspectief in de deps zouden de dots op een
+  // sub-pagina op het vorige perspectief blijven staan.
+  it('haalt op een sub-pagina opnieuw op', async () => {
+    mockUsePathname.mockReturnValue('/overzicht/cashflow/budget')
+    const { rerender } = render(
+      <CashflowStatusProvider>
+        <StatusProbe />
+      </CashflowStatusProvider>,
+    )
+    await act(async () => {})
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+
+    const HOUSEHOLD_STATUSES = {
+      budget: 'bad',
+      transacties: 'bad',
+      vasteLasten: 'good',
+      forecast: 'warn',
+    }
+    mockUsePerspective.mockReturnValue({ perspective: 'household' })
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      json: async () => HOUSEHOLD_STATUSES,
+    } as Response)
+    rerender(
+      <CashflowStatusProvider>
+        <StatusProbe />
+      </CashflowStatusProvider>,
+    )
+    await act(async () => {})
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2)
+    expect(probe()).toBe('bad/bad/good/warn')
+  })
+
+  // De hub blijft ook ná een wissel op nul fetches: daar hertekent de zachte
+  // refresh het server-blok, dat een verse seed levert.
+  it('laat de hub ook dan niet fetchen — de verse seed doet het werk', async () => {
+    mockUsePathname.mockReturnValue('/overzicht/cashflow')
+    const { rerender } = render(
+      <CashflowStatusProvider>
+        <CashflowStatusSeed statuses={SEEDED} />
+        <StatusProbe />
+      </CashflowStatusProvider>,
+    )
+    await act(async () => {})
+    expect(probe()).toBe('good/bad/warn/good')
+
+    const HOUSEHOLD_SEED: CashflowCardStatuses = {
+      budget: 'bad',
+      transacties: 'bad',
+      vasteLasten: 'good',
+      forecast: 'warn',
+    }
+    mockUsePerspective.mockReturnValue({ perspective: 'household' })
+    rerender(
+      <CashflowStatusProvider>
+        <CashflowStatusSeed statuses={HOUSEHOLD_SEED} />
+        <StatusProbe />
+      </CashflowStatusProvider>,
+    )
+    await act(async () => {})
+
+    expect(fetchSpy).not.toHaveBeenCalled()
+    expect(probe()).toBe('bad/bad/good/warn')
+  })
+})
+
+describe('CashflowStatusProvider — route-overgangen', () => {
+  it('sub → hub: geen extra fetch, en de sub-waarden lekken niet naar de hub', async () => {
+    mockUsePathname.mockReturnValue('/overzicht/cashflow/budget')
+    const { rerender } = render(
+      <CashflowStatusProvider>
+        <StatusProbe />
+      </CashflowStatusProvider>,
+    )
+    await act(async () => {})
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    expect(probe()).toBe('warn/good/bad/neutral')
+
+    // Naar de hub: het gestreamde blok is er nog niet, dus geen seed.
+    mockUsePathname.mockReturnValue('/overzicht/cashflow')
+    rerender(
+      <CashflowStatusProvider>
+        <StatusProbe />
+      </CashflowStatusProvider>,
+    )
+    await act(async () => {})
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    expect(probe()).toBe(NEUTRAL)
+  })
+
+  it('hub → sub: de blijvende seed lekt niet in de sub-dots', async () => {
+    mockUsePathname.mockReturnValue('/overzicht/cashflow')
+    const { rerender } = render(
+      <CashflowStatusProvider>
+        <CashflowStatusSeed statuses={SEEDED} />
+        <StatusProbe />
+      </CashflowStatusProvider>,
+    )
+    await act(async () => {})
+    expect(probe()).toBe('good/bad/warn/good')
+
+    // Naar een sub-pagina: de seed blijft in de provider staan, maar mag daar
+    // niet getoond worden — ook niet in het venster vóór het antwoord.
+    mockUsePathname.mockReturnValue('/overzicht/cashflow/budget')
+    rerender(
+      <CashflowStatusProvider>
+        <StatusProbe />
+      </CashflowStatusProvider>,
+    )
+    expect(probe()).toBe(NEUTRAL)
+
+    await act(async () => {})
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    expect(probe()).toBe('warn/good/bad/neutral')
   })
 })
 

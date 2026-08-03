@@ -60,7 +60,7 @@ import { useNotifications } from '@/components/app/notifications/notification-pr
 import { useNewsUnread } from '@/lib/hooks/use-news-unread'
 import { hasSubscription } from '@/lib/feature-registry'
 import { useCashflowStatusContext } from '@/components/app/cashflow-status-provider'
-import type { CashflowCardStatuses } from '@/lib/hooks/use-cashflow-card-statuses'
+import type { CashflowCardStatuses } from '@/lib/cashflow-cards'
 
 const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
 const SOURCE_SERIF = 'var(--font-source-serif, Georgia, serif)'

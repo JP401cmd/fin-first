@@ -4,8 +4,9 @@ import { createContext, useContext, useEffect, useState } from 'react'
 import {
   useCashflowCardStatuses,
   NEUTRAL_CASHFLOW_STATUSES,
-  type CashflowCardStatuses,
 } from '@/lib/hooks/use-cashflow-card-statuses'
+import { usePerspective } from '@/components/app/perspective-provider'
+import type { CashflowCardStatuses } from '@/lib/cashflow-cards'
 
 /**
  * CashflowStatusProvider — deelt de vier cashflow-kaartstatussen (Budget,
@@ -28,12 +29,19 @@ import {
  * niet op "is er al een seed?" — de seed komt uit een gestreamd blok en zou die
  * race verliezen; zie de kop van lib/hooks/use-cashflow-card-statuses.ts.
  *
+ * PERSPECTIEF: de provider leest `usePerspective()` en geeft dat aan de hook mee,
+ * zodat een perspectiefwissel de sub-pagina's opnieuw laat ophalen. Zonder dat
+ * zouden de dots daar op het vorige perspectief blijven staan (een wissel doet
+ * alleen `router.refresh()` — clientstate overleeft), terwijl de hub via zijn
+ * seed wél zou meebewegen: precies de asymmetrie die dit voorkomt.
+ *
  * De seed blijft na een route-wissel staan. Ga je hub → sub → hub, dan tonen de
  * dots heel even de statussen van het vorige hub-bezoek tot het gestreamde blok
  * opnieuw seedt — dezelfde soort (en kortere) staleness als de TTL-cache achter
- * de route, en beter dan een neutrale flits. Bij uitloggen verdwijnt de
- * (app)-layout en daarmee deze state, dus er lekt niets naar een volgende
- * gebruiker.
+ * de route, en beter dan een neutrale flits. Naar een SUB-pagina lekt hij niet:
+ * daar wint altijd de gefetchte waarde (die neutraal begint). Bij uitloggen
+ * verdwijnt de (app)-layout en daarmee deze state, dus er lekt niets naar een
+ * volgende gebruiker.
  */
 
 const CashflowStatusContext = createContext<CashflowCardStatuses>(
@@ -61,7 +69,11 @@ export function CashflowStatusProvider({ children }: { children: React.ReactNode
   // `useState`-setter: stabiele identiteit, dus het effect in de seed vuurt
   // alleen op een echte waardewijziging.
   const [seed, setSeed] = useState<CashflowCardStatuses | null>(null)
-  const statuses = useCashflowCardStatuses(seed)
+  // Het perspectief hoort bij de statussen: een wissel doet slechts een zachte
+  // `router.refresh()`, die de sub-pagina's niet opnieuw laat fetchen zolang het
+  // perspectief niet in de deps van de hook zit. Zie de kop van de hook.
+  const { perspective } = usePerspective()
+  const statuses = useCashflowCardStatuses(seed, perspective)
 
   return (
     <CashflowStatusContext.Provider value={statuses}>

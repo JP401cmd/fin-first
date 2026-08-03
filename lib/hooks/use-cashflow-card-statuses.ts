@@ -39,13 +39,22 @@ import type { CashflowCardStatuses } from '@/lib/cashflow-cards'
  * die volgorde-afhankelijkheid weg-ontworpen: de seed hoeft alleen de WAARDE te
  * leveren (wanneer hij ook binnenkomt), niet de race te winnen.
  *
+ * PERSPECTIEF HOORT IN DE DEPS. Een perspectiefwissel doet `router.refresh()`
+ * (components/app/perspective-provider.tsx) — een ZACHTE refresh: server-
+ * componenten hertekenen, clientstate overleeft. Op de hub is dat genoeg (de
+ * hertekende `CashflowCardsLoader` seedt nieuwe waarden), maar op een sub-pagina
+ * zou een effect zonder perspectief in de deps nooit opnieuw fetchen en zouden
+ * huishoud-/partnerdots persoonlijke kleuren blijven tonen tot een routewissel.
+ * Het perspectief staat daarom in de deps; de cookie is dan al geschreven (dat
+ * gebeurt synchroon vóór de refresh), dus de route leest meteen het nieuwe
+ * perspectief en de TTL-cache is per perspectief gesleuteld → gegarandeerd vers.
+ *
  * Defensief: zolang er geen seed/antwoord is blijven alle statussen 'neutral'
  * (progressive enhancement) — precies de staat die de dots vandaag ook tijdens
- * de fetch tonen.
+ * de fetch tonen. Tijdens een lopende her-fetch blijven de VORIGE kleuren staan
+ * i.p.v. naar grijs te vallen: dat is een kort venster (één request) en een
+ * grijze flits bij elke perspectiefwissel is de slechtere ruil.
  */
-// Het payload-contract woont bij de producent (lib/cashflow-cards.ts); hier
-// alleen doorgegeven, zodat route, TTL-cache en sidebar één vorm delen.
-export type { CashflowCardStatuses }
 
 /** De hub — de enige cashflow-route die zijn eigen statussen server-side levert. */
 export const CASHFLOW_HUB_ROUTE = '/overzicht/cashflow'
@@ -68,17 +77,23 @@ function coerce(value: unknown): LeverageStatus {
 /**
  * @param seed De server-berekende statussen van de hub, of null. Wordt alleen op
  *   `CASHFLOW_HUB_ROUTE` gelezen; elders is hij per definitie afwezig.
+ * @param perspective Het actieve client-perspectief. Wijzigt het, dan haalt deze
+ *   hook de statussen opnieuw op (zie de kop).
  */
 export function useCashflowCardStatuses(
   seed: CashflowCardStatuses | null,
+  perspective: string,
 ): CashflowCardStatuses {
   const pathname = usePathname() ?? '/'
-  // Trailing slash strippen vóór de hub-vergelijking (Next normaliseert 'm weg,
+  // Trailing slash strippen vóór de routevergelijking (Next normaliseert 'm weg,
   // maar een `/overzicht/cashflow/` zou anders als sub-pagina tellen).
   const route =
     pathname.length > 1 && pathname.endsWith('/') ? pathname.slice(0, -1) : pathname
-  const onCashflowRoute = route.startsWith(CASHFLOW_HUB_ROUTE)
+  // Begrensde match: alleen de hub zelf en zijn kinderen. Een losse prefixmatch
+  // zou een zusterroute als `/overzicht/cashflow-instellingen` als sub-pagina
+  // behandelen en 'm laten fetchen.
   const isHub = route === CASHFLOW_HUB_ROUTE
+  const onCashflowRoute = isHub || route.startsWith(`${CASHFLOW_HUB_ROUTE}/`)
   const [fetched, setFetched] = useState<CashflowCardStatuses>(NEUTRAL_CASHFLOW_STATUSES)
 
   useEffect(() => {
@@ -107,7 +122,11 @@ export function useCashflowCardStatuses(
     return () => {
       cancelled = true
     }
-  }, [onCashflowRoute, isHub])
+    // `perspective` staat hier bewust in: een wissel doet alleen een zachte
+    // refresh, dus zonder deze dep zou de sub-pagina op de oude kleuren blijven
+    // staan. De cleanup zet `cancelled`, dus een antwoord van het vórige
+    // perspectief kan het nieuwe nooit overschrijven.
+  }, [onCashflowRoute, isHub, perspective])
 
   if (!onCashflowRoute) return NEUTRAL_CASHFLOW_STATUSES
   return isHub ? (seed ?? NEUTRAL_CASHFLOW_STATUSES) : fetched
