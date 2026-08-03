@@ -194,15 +194,18 @@ export function AiExecutionChoice({
         </div>
       )}
 
-      {/* ── Proactieve desktop-only hint ── */}
-      {/* Alleen als de tier er wél is — anders stapelt dit op het upsell-blok. */}
+      {/* ── Toestel-hint: ADVISEREND, niet blokkerend ── */}
+      {/* Alleen als de tier er wél is — anders stapelt dit op het upsell-blok.
+          Deze melding kondigt aan wat er waarschijnlijk gaat gebeuren; de
+          schakelaar blijft bruikbaar en de echte toets volgt na de klik. Zie de
+          toelichting bij `likelyMobile` in local-categorization-settings.tsx. */}
       {aiEnabled && hasAiTier && likelyMobile && (
         <div id="lokale-cat-reden-mobiel" className="flex items-start gap-3 bg-[var(--subtle)] p-4">
           <MonitorSmartphone className="mt-0.5 h-4 w-4 shrink-0 text-[var(--ink-3)]" aria-hidden="true" />
           <p className="text-sm leading-relaxed text-[var(--ink-2)]">
-            Lokaal draaien kan <strong>alleen op desktop</strong> — een telefoon of tablet heeft niet genoeg
-            grafisch geheugen om het model te draaien. We hebben het gemeten: op een telefoon komt er geen
-            bruikbaar antwoord uit. Open deze instelling op een desktop of laptop om hem aan te zetten.
+            Dit lijkt een telefoon of tablet, en daar past het model meestal niet in het grafisch geheugen —
+            we hebben het gemeten: er komt geen bruikbaar antwoord uit. Je kunt het gerust proberen: we
+            controleren je apparaat vóór er iets gedownload wordt, en zeggen dan precies wat er ontbreekt.
           </p>
         </div>
       )}

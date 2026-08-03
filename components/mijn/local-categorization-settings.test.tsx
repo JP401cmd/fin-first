@@ -144,14 +144,14 @@ describe('AiExecutionSettings', () => {
     expect(screen.getByRole('button', { name: /Documenten lezen/i })).toBeTruthy()
   })
 
-  // ── Toestel-herkenning ──────────────────────────────────────────────────────
+  // ── Toestel-hint is adviserend, niet blokkerend ─────────────────────────────
   //
-  // Deze poort is HARD: staat 'ie aan, dan doet de schakelaar niets en draait de
-  // capability-check — de enige die echt naar de GPU kijkt — helemaal niet. Een
-  // valse treffer sluit dus een geschikte machine stilzwijgend buiten, en dat is
-  // precies wat er gebeurde: `(pointer: coarse)` alléén beschrijft de PRIMAIRE
-  // aanwijzer, en een laptop met touchscreen rapporteert die vaak als coarse.
-  describe('toestel-herkenning', () => {
+  // Dit wás een harde poort, en die sloot een echte gebruiker buiten: op zijn
+  // laptop wérkte /mijn/lokale-chat (die vraagt het aan de GPU) terwijl dit
+  // scherm "alleen op desktop" toonde (die gokte het uit de aanwijzer). De
+  // capability-check kost niets en downloadt niets, dus die hoort te beslissen —
+  // de hint kondigt alleen aan wat er waarschijnlijk gaat gebeuren.
+  describe('toestel-hint', () => {
     // De stub mag niet doorlekken naar de tests hieronder: die gaan uit van een
     // gewone desktop, en een blijvende "mobiel"-stub zou ze om de verkeerde
     // reden laten slagen of falen.
@@ -172,36 +172,52 @@ describe('AiExecutionSettings', () => {
       )
     }
 
-    it('laptop met touchscreen telt NIET als mobiel — er is een trackpad', async () => {
+    it('laptop met touchscreen krijgt geen hint en geen blokkade', async () => {
       setPointer({ coarsePrimary: true, anyFine: true })
       mocks.getLocalModelState.mockResolvedValue({ state: 'niet-gedownload', bytes: null })
       render(<AiExecutionSettings />)
 
       const schakelaar = await screen.findByRole('switch')
-      expect(
-        (schakelaar as HTMLButtonElement).disabled,
-        'een geschikte laptop moet de keuze kunnen maken; de capability-check oordeelt daarna',
-      ).toBe(false)
-      expect(screen.queryByText(/alleen op een desktop of laptop/i)).toBeNull()
+      expect((schakelaar as HTMLButtonElement).disabled).toBe(false)
+      expect(screen.queryByText(/telefoon of tablet/i)).toBeNull()
     })
 
-    it('telefoon telt wél als mobiel — grove aanwijzer en nergens een fijne', async () => {
+    // De kern van de fix: ook wie er als telefoon uitziet mag klikken. De
+    // capability-check draait dan en geeft een echte reden — geen download, want
+    // die begint pas na de consent-stap.
+    it('telefoon krijgt de hint maar blijft klikbaar; de echte check beslist', async () => {
       setPointer({ coarsePrimary: true, anyFine: false })
       mocks.getLocalModelState.mockResolvedValue({ state: 'niet-gedownload', bytes: null })
+      mocks.checkLocalAiCapability.mockResolvedValue({
+        ok: false,
+        reasons: ['Je browser ondersteunt WebGPU niet.'],
+      })
       render(<AiExecutionSettings />)
 
       const schakelaar = await screen.findByRole('switch')
-      await waitFor(() => expect((schakelaar as HTMLButtonElement).disabled).toBe(true))
-      expect(screen.getByText(/alleen op een desktop of laptop/i)).toBeTruthy()
+      expect(
+        (schakelaar as HTMLButtonElement).disabled,
+        'een gok mag geen poort zijn — de capability-check oordeelt',
+      ).toBe(false)
+      expect(screen.getByText(/telefoon of tablet/i)).toBeTruthy()
+
+      fireEvent.click(schakelaar)
+
+      // De echte toets draait, geeft de concrete reden, en zet niets aan.
+      await waitFor(() => expect(mocks.checkLocalAiCapability).toHaveBeenCalled())
+      expect(await screen.findByText(/WebGPU niet/i)).toBeTruthy()
+      expect(mocks.downloadLocalModel, 'nooit downloaden zonder geldige check').not.toHaveBeenCalled()
+      expect(privacyModeCalls(), 'en de voorkeur niet schrijven').toEqual([])
     })
 
-    it('gewone desktop met muis telt niet als mobiel', async () => {
+    it('gewone desktop met muis krijgt geen hint', async () => {
       setPointer({ coarsePrimary: false, anyFine: true })
       mocks.getLocalModelState.mockResolvedValue({ state: 'niet-gedownload', bytes: null })
       render(<AiExecutionSettings />)
 
       const schakelaar = await screen.findByRole('switch')
       expect((schakelaar as HTMLButtonElement).disabled).toBe(false)
+      expect(screen.queryByText(/telefoon of tablet/i)).toBeNull()
     })
   })
 

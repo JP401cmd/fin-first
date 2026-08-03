@@ -109,25 +109,27 @@ export function AiExecutionSettings() {
   const [likelyMobile, setLikelyMobile] = useState(false)
   const [storagePersisted, setStoragePersisted] = useState<boolean | null>(null)
 
-  // Proactieve desktop-only hint: op een telefoon of tablet faalt de
-  // capability-check toch, dus laten we de keuze daar vriendelijk uit staan in
-  // plaats van de gebruiker eerst een download van 2 GB te laten proberen.
+  // Toestel-hint: ADVISEREND, nooit blokkerend.
   //
-  // DIT MOET NAUWKEURIG, want het is een HARDE poort: staat 'ie aan, dan doet de
-  // schakelaar niets en draait `checkLocalAiCapability` — de enige check die
-  // écht naar de GPU kijkt — helemaal niet. Een valse treffer betekent dus dat
-  // een geschikte machine de functie nooit te zien krijgt.
+  // Dit was een harde poort — stond hij aan, dan deed de schakelaar niets en
+  // draaide `checkLocalAiCapability`, de enige check die écht naar WebGPU kijkt,
+  // helemaal niet. Een gebruiker met een prima videokaart kreeg dan te lezen dat
+  // het "alleen op desktop" werkt, zonder dat zijn kaart ooit was bekeken.
   //
-  // `(pointer: coarse)` alléén was precies zo'n valse treffer: die beschrijft de
-  // PRIMAIRE aanwijzer, en een laptop met touchscreen (een 2-in-1, of gewoon een
-  // moderne laptop) rapporteert die regelmatig als coarse. Zo'n machine heeft
-  // vaak juist een prima GPU en werd hier stilzwijgend buitengesloten.
+  // Dat gebeurde ook echt, en het bewijs was scherp: op dezelfde laptop, in
+  // dezelfde browser, wérkte /mijn/lokale-chat gewoon — want díe pagina vraagt
+  // het aan de GPU. Alleen dit scherm gokte het uit de aanwijzer, en zat ernaast.
   //
-  // Daarom nu: alleen "mobiel" als de primaire aanwijzer grof is ÉN er nergens
-  // een fijne aanwijzer beschikbaar is. Een touchscreen-laptop heeft een
-  // trackpad of muis, dus `any-pointer: fine` is daar waar; een telefoon heeft
-  // dat niet. Bij twijfel laten we de keuze staan: de capability-check geeft
-  // daarna alsnog een eerlijk, concreet antwoord.
+  // De les is niet "kies een betere query" maar "een gok mag geen poort zijn".
+  // `(pointer: coarse)` beschrijft de PRIMAIRE aanwijzer; een laptop met
+  // touchscreen rapporteert die regelmatig als grof. Zelfs met de scherpere
+  // combinatie hieronder blijft het een benadering — en de echte toets kost niets
+  // en downloadt niets, dus er is geen reden om 'm vóór te zijn.
+  //
+  // Wat de hint nu nog doet: aankondigen wat er waarschijnlijk gaat gebeuren, op
+  // een toestel waar de primaire aanwijzer grof is én er nergens een fijne
+  // beschikbaar is (een telefoon; een touchscreen-laptop heeft een trackpad).
+  // Klikt de gebruiker toch, dan volgt een concrete reden in plaats van een gok.
   useEffect(() => {
     if (typeof window === 'undefined') return
     try {
@@ -215,9 +217,10 @@ export function AiExecutionSettings() {
   }, [])
 
   const onToggle = useCallback(async () => {
-    // Spiegelt `toggleDisabled`: AANzetten vereist tier + desktop; UITzetten
-    // blijft altijd toegestaan zolang AI aan staat en er niets bezig is.
-    if (!aiEnabled || busy || (!privacyMode && (likelyMobile || !hasAiTier))) return
+    // Spiegelt `toggleDisabled`: AANzetten vereist tier; UITzetten blijft altijd
+    // toegestaan zolang AI aan staat en er niets bezig is. Het TOESTEL zit hier
+    // bewust niet meer in — zie de toelichting bij `likelyMobile`.
+    if (!aiEnabled || busy || (!privacyMode && !hasAiTier)) return
 
     // Uitzetten: model blijft lokaal staan, alleen de voorkeur gaat uit.
     if (privacyMode) {
@@ -260,19 +263,20 @@ export function AiExecutionSettings() {
     setPhase('idle')
   }, [])
 
-  const toggleDisabled = !aiEnabled || busy || (!privacyMode && (likelyMobile || !hasAiTier))
+  const toggleDisabled = !aiEnabled || busy || (!privacyMode && !hasAiTier)
 
-  // Lokaal kiezen (hoofdkeuze én per groep) vereist AI aan, het 'ai'-abonnement
-  // en een desktop. De reden staat erbij zodat een uitgegrijsde knop nooit
-  // onverklaard is.
-  const canChooseLocal = aiEnabled && hasAiTier && !likelyMobile
+  // Lokaal kiezen (hoofdkeuze én per groep) vereist AI aan en het 'ai'-abonnement.
+  // Die twee zijn feiten die de server ons vertelt. Het TOESTEL staat er bewust
+  // niet meer bij: dat is geen feit maar een gok, en de echte toets
+  // (checkLocalAiCapability) draait pas ná de klik — kost niets, downloadt niets
+  // en geeft een concrete reden. De reden staat er altijd bij, zodat een
+  // uitgegrijsde knop nooit onverklaard is.
+  const canChooseLocal = aiEnabled && hasAiTier
   const localBlockedReason = !aiEnabled
     ? 'AI staat helemaal uit. Zet AI-features hierboven aan om per onderdeel te kunnen kiezen.'
     : !hasAiTier
       ? 'Lokaal draaien hoort bij het AI-abonnement. Zonder abonnement blijft alles op Cloud-AI staan.'
-      : likelyMobile
-        ? 'Lokaal draaien kan alleen op een desktop of laptop — open deze pagina daar om per onderdeel te kiezen.'
-        : undefined
+      : undefined
 
   return (
     <section className="mx-auto max-w-3xl space-y-6 px-4 pb-16 sm:px-6">
