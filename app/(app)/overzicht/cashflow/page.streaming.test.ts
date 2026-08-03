@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, it, expect } from 'vitest'
+import { componentBody, stripComments } from '@/test/helpers/page-source'
 
 /**
  * /overzicht/cashflow — broncontrole op de streaming-vorm (perf Task 2.2).
@@ -28,6 +29,10 @@ import { describe, it, expect } from 'vitest'
  * Plus de bindende regel uit de opdracht: geen ISR/revalidate op deze pagina
  * (gepersonaliseerde financiële data; de winst is minder werk per request,
  * niet stale HTML).
+ *
+ * `componentBody`/`stripComments` wonen in test/helpers/page-source.ts — gedeeld
+ * met de vaste-lasten-variant van deze test, en daar ook zelf vastgepind
+ * (accolade-matching, zodat een `await` áchter de component niet meetelt).
  */
 
 const PAGE_SRC = readFileSync(path.resolve(__dirname, 'page.tsx'), 'utf-8')
@@ -36,65 +41,10 @@ const CARDS_LOADER_SRC = readFileSync(
   'utf-8',
 )
 
-/** Strip block- en regelcommentaar, zodat proza in de kop niet meetelt. */
-function stripComments(src: string): string {
-  return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '')
-}
-
-/**
- * Het lichaam van de default-exported page-component — tot de MATCHENDE
- * accolade, niet tot het einde van het bestand. Dat verschil telt: met een slice
- * tot EOF is "precies één await" gescoped op bestandspositie, en zou de assertie
- * stil verbreden zodra er iets áchter de component wordt gezet.
- *
- * Het commentaar is er al af, en de bron bevat geen accolades binnen
- * string-literals — zou dat veranderen, dan loopt de teller uit de pas en faalt
- * deze helper luid (geen sluitende accolade gevonden) in plaats van stil door.
- */
-function componentBody(src: string): string {
-  const stripped = stripComments(src)
-  const start = stripped.indexOf('export default async function OverzichtCashflowPage')
-  expect(start, 'default-export page-component niet gevonden').toBeGreaterThan(-1)
-
-  const open = stripped.indexOf('{', start)
-  expect(open, 'geen openende accolade na de signature').toBeGreaterThan(-1)
-
-  let depth = 0
-  for (let i = open; i < stripped.length; i++) {
-    if (stripped[i] === '{') depth++
-    else if (stripped[i] === '}') {
-      depth--
-      if (depth === 0) return stripped.slice(open, i + 1)
-    }
-  }
-  throw new Error('geen matchende sluitende accolade voor OverzichtCashflowPage')
-}
-
-describe('componentBody — scoping van de await-telling', () => {
-  it('telt alleen binnen de functie, niet in wat erachter staat', () => {
-    // Zonder accolade-matching (slice tot EOF) zou dit er twee zien en zou de
-    // "precies één await"-assertie hieronder stil verwateren zodra iemand een
-    // helper onder de component zet.
-    const synthetic = [
-      'export default async function OverzichtCashflowPage() {',
-      '  const perspective = await getServerPerspective()',
-      '  return <div>{perspective}</div>',
-      '}',
-      '',
-      'async function helperDieErAchterStaat(supabase) {',
-      '  return await loadDashboardData(supabase)',
-      '}',
-    ].join('\n')
-
-    const body = componentBody(synthetic)
-
-    expect(body.match(/\bawait\b/g) ?? []).toHaveLength(1)
-    expect(body).not.toContain('loadDashboardData')
-  })
-})
+const PAGE_SIGNATURE = 'export default async function OverzichtCashflowPage'
 
 describe('/overzicht/cashflow — geen zware await boven de return', () => {
-  const body = componentBody(PAGE_SRC)
+  const body = componentBody(PAGE_SRC, PAGE_SIGNATURE)
 
   it('heeft exact één await in het component-lichaam', () => {
     const awaits = body.match(/\bawait\b/g) ?? []
