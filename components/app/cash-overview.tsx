@@ -53,7 +53,6 @@ type BudgetRow = {
   parent_id: string | null
   budget_type: string
   default_limit: number | null
-  is_income: boolean
 }
 
 type TxAgg = {
@@ -405,7 +404,10 @@ export function CashOverview({
     const supabase = createClient()
     const { data } = await supabase
       .from('budgets')
-      .select('id, name, icon, parent_id, budget_type, default_limit, is_income')
+      // Expliciete kolomlijst; `is_income` staat NIET op `budgets` (alleen op
+      // `transactions`) — die kolom erbij zetten geeft 42703 → 400 en laat de
+      // hele budget-opsplitsing stil leeglopen.
+      .select('id, name, icon, parent_id, budget_type, default_limit')
       .order('sort_order', { ascending: true })
     if (data) setBudgets(data as BudgetRow[])
   }, [])
