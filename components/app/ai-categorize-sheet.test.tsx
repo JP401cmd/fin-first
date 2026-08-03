@@ -241,6 +241,9 @@ function execPrefsBody() {
     // Deze suite draait altijd met een geldig 'ai'-abonnement; de revocatie-tak
     // van de hook wordt elders getoetst.
     hasAiSubscription: true,
+    // Idem voor de kill-switch: ook dit veld is verplicht, en deze suite draait
+    // met AI aan. De uit-tak wordt in use-execution-mode.test.ts getoetst.
+    aiEnabled: true,
   }
 }
 

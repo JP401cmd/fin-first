@@ -16,7 +16,7 @@ import {
 /**
  * /api/ai-execution-prefs — de per-groep keuze "waar draait de AI?".
  *
- * GET  → `{ privacyMode, prefs, modes, hasAiSubscription }`
+ * GET  → `{ privacyMode, prefs, modes, hasAiSubscription, aiEnabled }`
  *          prefs = de rauwe overrides (alleen wat expliciet is gezet)
  *          modes = de OPGELOSTE keuze per groep (override ?? hoofdschakelaar) —
  *                  dat is wat de UI toont en wat de gates hanteren.
@@ -70,6 +70,15 @@ function sanitizePrefs(raw: unknown): Partial<Record<AiExecutionGroup, AiExecuti
 const UNDEFINED_COLUMN = '42703'
 
 /**
+ * De profielvelden die deze route uitleest: de twee die de KEUZE bepalen
+ * (`AiExecutionPrefsRow`) plus de kill-switch. Bewust hier en niet in
+ * `AiExecutionPrefsRow` zelf: `resolveExecutionMode` beantwoordt "wáár draait
+ * het", niet "mag het überhaupt". Die twee vragen apart houden voorkomt dat een
+ * uitgezette kill-switch stil als een uitvoerkeuze gaat gelden.
+ */
+type ProfileExecutionRow = AiExecutionPrefsRow & { ai_enabled: boolean }
+
+/**
  * Defensief bij een ONTBREKENDE KOLOM — spiegelt `readPrefsRow` in
  * `lib/ai/privacy-gate.ts`, de tweede lezer van precies deze kolom.
  *
@@ -92,10 +101,10 @@ const UNDEFINED_COLUMN = '42703'
 async function readRow(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
-): Promise<AiExecutionPrefsRow> {
+): Promise<ProfileExecutionRow> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('privacy_mode, ai_execution_prefs')
+    .select('privacy_mode, ai_execution_prefs, ai_enabled')
     .eq('id', userId)
     .maybeSingle()
 
@@ -103,25 +112,65 @@ async function readRow(
     if (error.code === UNDEFINED_COLUMN) {
       const fallback = await supabase
         .from('profiles')
-        .select('privacy_mode')
+        .select('privacy_mode, ai_enabled')
         .eq('id', userId)
         .maybeSingle()
       if (fallback.error) {
         if (fallback.error.code === UNDEFINED_COLUMN) {
-          return { privacy_mode: false, ai_execution_prefs: {} }
+          // Ook de smalle select faalt op een ontbrekende kolom. Dat kan nu aan
+          // `ai_enabled` liggen i.p.v. aan `privacy_mode`, dus hier NIET de
+          // hoofdschakelaar hardcoden: `privacy_mode: false` zou elke groep naar
+          // 'cloud' sturen terwijl de gebruiker misschien juist privé-modus aan
+          // heeft staan — fail-open op precies de verkeerde as. Vraag de
+          // hoofdschakelaar daarom apart op en default alleen het veld dat we
+          // écht niet konden lezen.
+          const bare = await supabase
+            .from('profiles')
+            .select('privacy_mode')
+            .eq('id', userId)
+            .maybeSingle()
+          if (bare.error) {
+            if (bare.error.code === UNDEFINED_COLUMN) {
+              return { privacy_mode: false, ai_execution_prefs: {}, ai_enabled: true }
+            }
+            throw bare.error
+          }
+          const bareRow = bare.data as { privacy_mode?: boolean | null } | null
+          return {
+            privacy_mode: bareRow?.privacy_mode ?? false,
+            ai_execution_prefs: {},
+            ai_enabled: true,
+          }
         }
         throw fallback.error
       }
-      const row = fallback.data as { privacy_mode?: boolean | null } | null
-      return { privacy_mode: row?.privacy_mode ?? false, ai_execution_prefs: {} }
+      const row = fallback.data as {
+        privacy_mode?: boolean | null
+        ai_enabled?: boolean | null
+      } | null
+      return {
+        privacy_mode: row?.privacy_mode ?? false,
+        ai_execution_prefs: {},
+        ai_enabled: row?.ai_enabled !== false,
+      }
     }
     throw error
   }
 
-  const row = data as { privacy_mode?: boolean | null; ai_execution_prefs?: unknown } | null
+  const row = data as {
+    privacy_mode?: boolean | null
+    ai_execution_prefs?: unknown
+    ai_enabled?: boolean | null
+  } | null
   return {
     privacy_mode: row?.privacy_mode ?? false,
     ai_execution_prefs: sanitizePrefs(row?.ai_execution_prefs),
+    // `!== false` en niet `=== true`: de kolom is NULLABLE met default `true`
+    // (live geverifieerd), en een omgeving waar hij nog ontbreekt levert
+    // `undefined`. NULL en undefined zijn allebei "geen uitspraak", niet "uit" —
+    // dezelfde lezing als lib/dashboard-data-loader.ts:476,
+    // app/api/local-chat-overview/route.ts:53 en /mijn/lokale-chat.
+    ai_enabled: row?.ai_enabled !== false,
   }
 }
 
@@ -156,11 +205,19 @@ export async function GET() {
     // privé-modus die hij niet meer kan verlaten.
     const tierGate = await checkTierGate(supabase, user.id, 'ai')
 
+    // KILL-SWITCH — zelfde redenering als het abonnement hierboven, en om
+    // dezelfde reden hier nodig. `profiles.ai_enabled` is de knop "AI uit" op
+    // /mijn/privacy. Elke cloudroute checkt 'm zelf, maar de zuiver lokale paden
+    // doen tijdens het genereren geen enkele server-call — daar is er dus geen
+    // route die 'm nog kan handhaven. Zonder dit veld bleef "AI uit" on-device
+    // gewoon doorgenereren over aangiftes, UPO's en transactieomschrijvingen:
+    // een expliciet gezette gebruikerscontrole die stil niets deed.
     return NextResponse.json({
       privacyMode: row.privacy_mode ?? false,
       prefs: row.ai_execution_prefs ?? {},
       modes: resolveAllExecutionModes(row),
       hasAiSubscription: tierGate === null,
+      aiEnabled: row.ai_enabled,
     })
   } catch (err) {
     return serverError(err, 'ai-execution-prefs:GET')

@@ -75,6 +75,7 @@ function stubExecutionFetch(opts: {
             prefs,
             modes: resolveAllExecutionModes({ privacy_mode: privacyMode, ai_execution_prefs: prefs }),
             hasAiSubscription,
+            aiEnabled: true,
           }),
       })
     }

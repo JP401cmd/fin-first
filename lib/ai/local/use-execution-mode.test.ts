@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
-import { useExecutionMode, LOCAL_SUBSCRIPTION_REVOKED_MESSAGE } from './use-execution-mode'
+import {
+  useExecutionMode,
+  LOCAL_SUBSCRIPTION_REVOKED_MESSAGE,
+  LOCAL_AI_DISABLED_MESSAGE,
+} from './use-execution-mode'
 import { checkLocalAiCapability } from './webgpu-capability'
 import { getLocalModelState } from './model-manager'
 
@@ -51,7 +55,7 @@ afterEach(() => {
 describe('useExecutionMode — abonnement op het lokale pad', () => {
   it('VERLOPEN abonnement + groep op lokaal → blocked, en er mag niets draaien', async () => {
     fetchMock.mockResolvedValue(
-      prefsResponse({ modes: { documenten: 'lokaal' }, hasAiSubscription: false }),
+      prefsResponse({ modes: { documenten: 'lokaal' }, hasAiSubscription: false, aiEnabled: true }),
     )
 
     const { result } = renderHook(() => useExecutionMode('documenten'))
@@ -68,7 +72,7 @@ describe('useExecutionMode — abonnement op het lokale pad', () => {
 
   it('de abonnementscheck gaat VÓÓR de GPU-/modelcontrole', async () => {
     fetchMock.mockResolvedValue(
-      prefsResponse({ modes: { documenten: 'lokaal' }, hasAiSubscription: false }),
+      prefsResponse({ modes: { documenten: 'lokaal' }, hasAiSubscription: false, aiEnabled: true }),
     )
 
     const { result } = renderHook(() => useExecutionMode('documenten'))
@@ -82,7 +86,7 @@ describe('useExecutionMode — abonnement op het lokale pad', () => {
 
   it('GELDIG abonnement + groep op lokaal → gewoon lokaal', async () => {
     fetchMock.mockResolvedValue(
-      prefsResponse({ modes: { documenten: 'lokaal' }, hasAiSubscription: true }),
+      prefsResponse({ modes: { documenten: 'lokaal' }, hasAiSubscription: true, aiEnabled: true }),
     )
 
     const { result } = renderHook(() => useExecutionMode('documenten'))
@@ -93,7 +97,7 @@ describe('useExecutionMode — abonnement op het lokale pad', () => {
 
   it('verlopen abonnement maar groep op CLOUD → de hook blokkeert het terugzetten niet', async () => {
     fetchMock.mockResolvedValue(
-      prefsResponse({ modes: { documenten: 'cloud' }, hasAiSubscription: false }),
+      prefsResponse({ modes: { documenten: 'cloud' }, hasAiSubscription: false, aiEnabled: true }),
     )
 
     const { result } = renderHook(() => useExecutionMode('documenten'))
@@ -106,7 +110,9 @@ describe('useExecutionMode — abonnement op het lokale pad', () => {
   })
 
   it('antwoord ZONDER hasAiSubscription telt als onbekend → resolving, niets draait', async () => {
-    fetchMock.mockResolvedValue(prefsResponse({ modes: { documenten: 'lokaal' } }))
+    fetchMock.mockResolvedValue(
+      prefsResponse({ modes: { documenten: 'lokaal' }, aiEnabled: true }),
+    )
 
     const { result } = renderHook(() => useExecutionMode('documenten'))
 
@@ -123,5 +129,68 @@ describe('useExecutionMode — abonnement op het lokale pad', () => {
 
     expect(result.current.status).toBe('resolving')
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * De KILL-SWITCH (`profiles.ai_enabled`, de knop "AI uit" op /mijn/privacy).
+ *
+ * Op het cloudpad handhaaft elke route 'm zelf. Op de zuiver lokale paden is er
+ * geen route meer die kan handhaven — daar was de GET de laatste server-uitspraak
+ * en die zweeg erover, dus "AI uit" genereerde on-device gewoon door.
+ */
+describe('useExecutionMode — kill-switch op het lokale pad', () => {
+  it('AI UIT + groep op lokaal → blocked, er draait niets on-device', async () => {
+    fetchMock.mockResolvedValue(
+      prefsResponse({ modes: { documenten: 'lokaal' }, hasAiSubscription: true, aiEnabled: false }),
+    )
+
+    const { result } = renderHook(() => useExecutionMode('documenten'))
+
+    await waitFor(() => expect(result.current.status).toBe('blocked'))
+    expect(result.current.canUseLocal).toBe(false)
+    // Ook geen stille uitwijk naar de cloud: AI uit is AI uit.
+    expect(result.current.canUseCloud).toBe(false)
+    expect(result.current.message).toBe(LOCAL_AI_DISABLED_MESSAGE)
+  })
+
+  it('de kill-switch gaat VÓÓR de GPU-/modelcontrole', async () => {
+    fetchMock.mockResolvedValue(
+      prefsResponse({ modes: { documenten: 'lokaal' }, hasAiSubscription: true, aiEnabled: false }),
+    )
+
+    const { result } = renderHook(() => useExecutionMode('documenten'))
+    await waitFor(() => expect(result.current.status).toBe('blocked'))
+
+    expect(mockedCapability).not.toHaveBeenCalled()
+    expect(mockedModelState).not.toHaveBeenCalled()
+  })
+
+  it('AI uit meldt de EIGEN KEUZE, niet een verlopen abonnement', async () => {
+    // Beide zijn 'blocked', maar de reden verschilt en dus ook de weg terug.
+    fetchMock.mockResolvedValue(
+      prefsResponse({ modes: { documenten: 'lokaal' }, hasAiSubscription: false, aiEnabled: false }),
+    )
+
+    const { result } = renderHook(() => useExecutionMode('documenten'))
+    await waitFor(() => expect(result.current.status).toBe('blocked'))
+
+    expect(result.current.message).toBe(LOCAL_AI_DISABLED_MESSAGE)
+    expect(result.current.message).not.toBe(LOCAL_SUBSCRIPTION_REVOKED_MESSAGE)
+  })
+
+  it('antwoord ZONDER aiEnabled telt als onbekend → resolving, niets draait', async () => {
+    // Fail-closed, net als bij een ontbrekende hasAiSubscription: een oude
+    // server-versie mag de kill-switch niet stilzwijgend teruggeven.
+    fetchMock.mockResolvedValue(
+      prefsResponse({ modes: { documenten: 'lokaal' }, hasAiSubscription: true }),
+    )
+
+    const { result } = renderHook(() => useExecutionMode('documenten'))
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled())
+    expect(result.current.status).toBe('resolving')
+    expect(result.current.canUseLocal).toBe(false)
+    expect(result.current.canUseCloud).toBe(false)
   })
 })

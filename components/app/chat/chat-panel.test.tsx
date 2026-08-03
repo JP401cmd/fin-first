@@ -157,7 +157,14 @@ function stubExecutionFetch(overrides: {
     if (url === '/api/ai-execution-prefs') {
       return Promise.resolve({
         ok: true,
-        json: () => Promise.resolve({ privacyMode, prefs: gesprek ? { gesprek } : {}, modes, hasAiSubscription }),
+        json: () =>
+          Promise.resolve({
+            privacyMode,
+            prefs: gesprek ? { gesprek } : {},
+            modes,
+            hasAiSubscription,
+            aiEnabled: true,
+          }),
       })
     }
     if (url === '/api/local-chat-overview') {
@@ -504,7 +511,7 @@ describe('ChatPanel — data-finActie kaart (lokaal actievoorstel, C2c)', () => 
       ],
     }]
     fetchSpy.mockImplementation((url: string, init?: RequestInit) => {
-      if (url === '/api/ai-execution-prefs') return Promise.resolve({ ok: true, json: () => Promise.resolve({ modes: { gesprek: 'cloud' }, hasAiSubscription: true }) })
+      if (url === '/api/ai-execution-prefs') return Promise.resolve({ ok: true, json: () => Promise.resolve({ modes: { gesprek: 'cloud' }, hasAiSubscription: true, aiEnabled: true }) })
       if (url === '/api/ai/actions') {
         return Promise.resolve({
           ok: true,

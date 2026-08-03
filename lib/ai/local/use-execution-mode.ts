@@ -14,10 +14,11 @@
 //   'resolving' → we weten het nog niet. Er mag NIETS vertrekken.
 //   'cloud'     → deze groep draait via de cloud-AI; gebruik het normale pad.
 //   'lokaal'    → draait on-device; gebruik het lokale pad.
-//   'blocked'   → moet lokaal, maar het mag of kan niet: dit toestel kan het
-//                 niet, óf het 'ai'-abonnement is niet meer actief. Er mag NIETS
-//                 vertrekken en er mag ook niets on-device gegenereerd worden —
-//                 ook niet "even via de cloud".
+//   'blocked'   → moet lokaal, maar het mag of kan niet. Drie redenen: de
+//                 kill-switch (`profiles.ai_enabled`) staat uit, het
+//                 'ai'-abonnement is niet meer actief, óf dit toestel kan het
+//                 niet. Er mag NIETS vertrekken en er mag ook niets on-device
+//                 gegenereerd worden — ook niet "even via de cloud".
 //
 // FAIL-CLOSED IS DE KERN. Zowel 'resolving' als 'blocked' betekenen: niet
 // versturen. Een consument die alleen op `=== 'lokaal'` test en anders de cloud
@@ -61,6 +62,15 @@ const RESOLVING: Omit<ExecutionModeState, 'refresh'> = {
 }
 
 /**
+ * Melding wanneer de gebruiker AI zélf heeft uitgezet (`profiles.ai_enabled`).
+ * Bewust een andere tekst dan de abonnementsmelding: dit is geen beperking die
+ * hem overkomt maar zijn eigen keuze, en de weg terug is een andere knop.
+ */
+export const LOCAL_AI_DISABLED_MESSAGE =
+  'AI staat uit in je instellingen, dus er wordt niets gegenereerd — ook niet op je eigen toestel. ' +
+  'Via Mijn → Privacy kun je AI weer aanzetten.'
+
+/**
  * Melding bij een verlopen/ontbrekend AI-abonnement terwijl de groep op lokaal
  * staat. Benoemt allebei de helften van het niemand-opgesloten-principe: het
  * genereren stopt, maar de keuze blijft omkeerbaar.
@@ -73,6 +83,8 @@ interface ExecutionPrefs {
   mode: AiExecutionMode
   /** Staat het 'ai'-abonnement nu nog open? Server is hier de enige autoriteit. */
   hasAi: boolean
+  /** Staat de kill-switch (`profiles.ai_enabled`, /mijn/privacy) aan? */
+  aiEnabled: boolean
 }
 
 /**
@@ -83,11 +95,11 @@ interface ExecutionPrefs {
  * voorkomen. We geven `null` terug en de hook blijft in 'resolving' — er
  * vertrekt dus niets.
  *
- * Een antwoord ZONDER `hasAiSubscription` telt bewust ook als onbekend. Dat veld
- * is de enige poort op de zuiver lokale paden (die tijdens het genereren geen
- * server meer aanraken); het stilzwijgend als "abonnement in orde" lezen zou
- * precies het revocatie-gat teruggeven dat dit dicht moet zetten. Een half
- * antwoord is hier geen antwoord.
+ * Een antwoord ZONDER `hasAiSubscription` of ZONDER `aiEnabled` telt bewust ook
+ * als onbekend. Die twee velden zijn samen de enige poort op de zuiver lokale
+ * paden (die tijdens het genereren geen server meer aanraken); ze stilzwijgend
+ * als "in orde" lezen zou precies het revocatie- en kill-switch-gat teruggeven
+ * die dit dicht moet zetten. Een half antwoord is hier geen antwoord.
  */
 async function fetchPrefs(group: AiExecutionGroup): Promise<ExecutionPrefs | null> {
   try {
@@ -96,11 +108,17 @@ async function fetchPrefs(group: AiExecutionGroup): Promise<ExecutionPrefs | nul
     const data = (await res.json()) as {
       modes?: Partial<Record<AiExecutionGroup, AiExecutionMode>>
       hasAiSubscription?: unknown
+      aiEnabled?: unknown
     }
     const mode = data.modes?.[group]
     if (mode !== 'lokaal' && mode !== 'cloud') return null
     if (typeof data.hasAiSubscription !== 'boolean') return null
-    return { mode, hasAi: data.hasAiSubscription }
+    // `aiEnabled` telt om exact dezelfde reden als `hasAiSubscription` mee als
+    // een VERPLICHT veld: het is op de zuiver lokale paden de laatste server-
+    // uitspraak vóór het genereren. Het bij afwezigheid als "staat wel aan"
+    // lezen zou de kill-switch teruggeven aan een oude server-versie.
+    if (typeof data.aiEnabled !== 'boolean') return null
+    return { mode, hasAi: data.hasAiSubscription, aiEnabled: data.aiEnabled }
   } catch {
     return null
   }
@@ -151,6 +169,36 @@ export function useExecutionMode(group: AiExecutionGroup, active = true): Execut
           message: null,
           intended: 'cloud',
           canUseCloud: true,
+          canUseLocal: false,
+        })
+        return
+      }
+
+      // ── Kill-switch, vóór het abonnement ─────────────────────────────────
+      // `profiles.ai_enabled` is de knop "AI uit" op /mijn/privacy. Hij staat
+      // vóór de abonnementscheck omdat dit de eigen, expliciete keuze van de
+      // gebruiker is: wie AI zelf heeft uitgezet moet niet te horen krijgen dat
+      // zijn abonnement verlopen is.
+      //
+      // Deze check zit ná de cloud-tak, en dat is een BEWUSTE AFBAKENING — geen
+      // bewijs dat het cloudpad gedekt is. Dat is het namelijk niet: `ai_enabled`
+      // komt in app/api uitsluitend voor in deze route en de vijf
+      // `local-*`-context-routes; de echte cloudroutes gate'en op `privacy_mode`
+      // (assertCloudAllowed) en tier, niet op de kill-switch — zie
+      // app/api/ai/chat/route.ts r50-53. "AI uit" wordt op het cloudpad dus
+      // evenmin afgedwongen.
+      //
+      // Dat gat is ouder dan deze hook en raakt meer dan alleen de oppervlakken
+      // die hier langskomen, dus het hoort in een eigen ronde thuis en niet als
+      // bijvangst van deze fix. Wat hier wél dicht gaat is het lokale pad: dat
+      // raakt tijdens het genereren geen enkele route meer aan, waardoor deze GET
+      // de laatste server-uitspraak is — en die zweeg erover.
+      if (!prefs.aiEnabled) {
+        setState({
+          status: 'blocked',
+          message: LOCAL_AI_DISABLED_MESSAGE,
+          intended: 'lokaal',
+          canUseCloud: false,
           canUseLocal: false,
         })
         return

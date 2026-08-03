@@ -95,7 +95,7 @@ describe('GET /api/ai-execution-prefs', () => {
   it('leest de voorkeuren wanneer de kolom bestaat', async () => {
     mockFrom.mockImplementation(
       buildFrom({
-        'privacy_mode, ai_execution_prefs': {
+        'privacy_mode, ai_execution_prefs, ai_enabled': {
           data: { privacy_mode: false, ai_execution_prefs: { nieuws: 'lokaal' } },
         },
       }),
@@ -112,8 +112,8 @@ describe('GET /api/ai-execution-prefs', () => {
   it('valt bij een ONTBREKENDE KOLOM terug op de hoofdschakelaar in plaats van 500', async () => {
     mockFrom.mockImplementation(
       buildFrom({
-        'privacy_mode, ai_execution_prefs': { error: UNDEFINED_COLUMN },
-        privacy_mode: { data: { privacy_mode: true } },
+        'privacy_mode, ai_execution_prefs, ai_enabled': { error: UNDEFINED_COLUMN },
+        'privacy_mode, ai_enabled': { data: { privacy_mode: true } },
       }),
     )
 
@@ -131,8 +131,8 @@ describe('GET /api/ai-execution-prefs', () => {
   it('valt terug op cloud wanneer ook privacy_mode nog niet bestaat', async () => {
     mockFrom.mockImplementation(
       buildFrom({
-        'privacy_mode, ai_execution_prefs': { error: UNDEFINED_COLUMN },
-        privacy_mode: { error: UNDEFINED_COLUMN },
+        'privacy_mode, ai_execution_prefs, ai_enabled': { error: UNDEFINED_COLUMN },
+        'privacy_mode, ai_enabled': { error: UNDEFINED_COLUMN },
       }),
     )
 
@@ -144,10 +144,34 @@ describe('GET /api/ai-execution-prefs', () => {
     expect(body.modes.nieuws).toBe('cloud')
   })
 
+  it('ontbreekt ai_enabled óók, dan blijft de hoofdschakelaar staan (geen stille cloud)', async () => {
+    // Twee 42703'en achter elkaar: de brede select valt om, en de smalle
+    // ('privacy_mode, ai_enabled') óók — want in dit scenario is ai_enabled de
+    // ontbrekende kolom. Zonder de derde, kale select zou de route hier
+    // `privacy_mode: false` hardcoden en élke groep naar 'cloud' sturen, terwijl
+    // deze gebruiker juist privé-modus AAN heeft. Fail-open op de verkeerde as.
+    mockFrom.mockImplementation(
+      buildFrom({
+        'privacy_mode, ai_execution_prefs, ai_enabled': { error: UNDEFINED_COLUMN },
+        'privacy_mode, ai_enabled': { error: UNDEFINED_COLUMN },
+        privacy_mode: { data: { privacy_mode: true } },
+      }),
+    )
+
+    const res = await GET()
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(body.privacyMode).toBe(true)
+    expect(body.modes.documenten).toBe('lokaal')
+    // Alleen het écht onleesbare veld valt terug op de default.
+    expect(body.aiEnabled).toBe(true)
+  })
+
   it('geeft WEL 500 bij een andere leesfout — een DB-storing mag geen privé-modus openen', async () => {
     mockFrom.mockImplementation(
       buildFrom({
-        'privacy_mode, ai_execution_prefs': {
+        'privacy_mode, ai_execution_prefs, ai_enabled': {
           error: { code: '08006', message: 'connection failure' },
         },
       }),
@@ -176,7 +200,7 @@ describe('abonnementsstand in het antwoord — revocatie op het lokale pad', () 
   beforeEach(() => {
     mockFrom.mockImplementation(
       buildFrom({
-        'privacy_mode, ai_execution_prefs': {
+        'privacy_mode, ai_execution_prefs, ai_enabled': {
           data: { privacy_mode: false, ai_execution_prefs: { documenten: 'lokaal' } },
         },
       }),
@@ -235,5 +259,71 @@ describe('abonnementsstand in het antwoord — revocatie op het lokale pad', () 
     expect(updates).toHaveLength(1)
     expect((updates[0] as { ai_execution_prefs: Record<string, unknown> }).ai_execution_prefs)
       .not.toHaveProperty('documenten')
+  })
+})
+
+/**
+ * De KILL-SWITCH op het lokale pad — dezelfde klasse als het revocatie-gat
+ * hierboven, en om exact dezelfde reden.
+ *
+ * `profiles.ai_enabled` is de knop "AI uit" op /mijn/privacy. Elke cloudroute
+ * handhaaft 'm zelf, maar de zuiver lokale paden raken tijdens het genereren
+ * geen enkele route meer aan. Deze GET is daar de laatste server-uitspraak — en
+ * hij zweeg over de kill-switch. Wie AI uitzette, kreeg on-device gewoon nog
+ * generatie over zijn aangifte, UPO en transactieomschrijvingen.
+ */
+describe('kill-switch in het antwoord — ai_enabled op het lokale pad', () => {
+  it('GET meldt een UITGEZETTE kill-switch', async () => {
+    mockFrom.mockImplementation(
+      buildFrom({
+        'privacy_mode, ai_execution_prefs, ai_enabled': {
+          data: { privacy_mode: true, ai_execution_prefs: {}, ai_enabled: false },
+        },
+      }),
+    )
+
+    const res = await GET()
+    const body = await res.json()
+
+    // Geen 403 — net als bij het abonnement blijft LEZEN vrij, anders kan deze
+    // gebruiker zijn keuze niet meer terugzetten naar cloud.
+    expect(res.status).toBe(200)
+    expect(body.aiEnabled).toBe(false)
+    expect(body.modes.documenten).toBe('lokaal')
+  })
+
+  it('GET meldt een AANSTAANDE kill-switch', async () => {
+    mockFrom.mockImplementation(
+      buildFrom({
+        'privacy_mode, ai_execution_prefs, ai_enabled': {
+          data: { privacy_mode: false, ai_execution_prefs: {}, ai_enabled: true },
+        },
+      }),
+    )
+
+    const res = await GET()
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(body.aiEnabled).toBe(true)
+  })
+
+  it('een ONTBREKENDE ai_enabled telt als AAN, niet als uit', async () => {
+    // De kolom is nullable met default `true`; ontbreekt hij in een omgeving —
+    // of staat er NULL — dan is dat "geen uitspraak". Dit als `false` lezen zou
+    // AI voor iedereen stilleggen.
+    mockFrom.mockImplementation(
+      buildFrom({
+        'privacy_mode, ai_execution_prefs, ai_enabled': {
+          data: { privacy_mode: false, ai_execution_prefs: {} },
+        },
+      }),
+    )
+
+    const res = await GET()
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(body.aiEnabled).toBe(true)
   })
 })

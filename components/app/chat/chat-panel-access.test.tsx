@@ -93,7 +93,8 @@ beforeEach(() => {
     vi.fn(() =>
       Promise.resolve({
         ok: true,
-        json: () => Promise.resolve({ modes: { gesprek: 'cloud' }, hasAiSubscription: true }),
+        json: () =>
+          Promise.resolve({ modes: { gesprek: 'cloud' }, hasAiSubscription: true, aiEnabled: true }),
       }),
     ),
   )
