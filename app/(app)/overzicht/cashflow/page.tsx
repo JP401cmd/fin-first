@@ -1,22 +1,19 @@
 import type { Metadata } from 'next'
-import { createClient } from '@/lib/supabase/server'
-import { loadDashboardData } from '@/lib/dashboard-data-loader'
-import { loadCashflowData } from '@/lib/cashflow-data-loader'
+import { Suspense } from 'react'
 import { getServerPerspective } from '@/lib/household/server-perspective'
-import { loadVasteLastenSummary } from '@/lib/vaste-lasten-summary'
-import { buildCashflowCards } from '@/lib/cashflow-cards'
-import { CashflowLandingCards } from '@/components/overview/cashflow-landing-cards'
 import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
-import { InflationImpactCard, INFLATION_IMPACT_ID } from '@/components/overview/inflation-impact-card'
-import { loadCashflowSettingsData } from '@/lib/cashflow-settings-data'
-import { loadCashBankLinks } from '@/lib/bank-link-loader'
-import { CashOverviewLazy, CashflowInstellingenBlokLazy } from './cashflow-below-fold'
+import { INFLATION_IMPACT_ID } from '@/components/overview/inflation-impact-card'
+import {
+  CashflowCardsLoader,
+  CashflowCardsFallback,
+} from '@/components/overview/cashflow-cards-loader'
+import { CashOverviewLoader } from './cash-overview-loader'
+import { CashOverviewSkeleton, CashflowInstellingenBlokLazy } from './cashflow-below-fold'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { InsightToggleButton } from '@/components/editorial/insight-toggle-button'
 import { PageStatusDot } from '@/components/app/page-status-dot'
-import { Kicker, PageOpening } from '@/components/editorial'
-import { HideInSimple } from '@/components/app/hide-in-simple'
+import { PageOpening } from '@/components/editorial'
 import { PAGE_INFO } from '@/lib/page-info-content'
 
 export const metadata: Metadata = {
@@ -25,32 +22,45 @@ export const metadata: Metadata = {
 }
 
 /**
- * /overzicht/cashflow — cashflow-landingspagina.
+ * /overzicht/cashflow — cashflow-landingspagina, gestreamd in blokken
+ * (perf Task 2.2, zelfde vorm als /overzicht).
  *
- * Vier hefboom-stijl kaarten (Budget, Transacties, Vaste lasten, Forecast),
- * elk met een status-dot, een KPI en een uitklapbare chevron — identiek aan de
+ * Vier hefboom-stijl kaarten (Budget, Transacties, Vaste lasten, Forecast), elk
+ * met een status-dot, een KPI en een uitklapbare chevron — identiek aan de
  * vier-hefbomen-rij op /overzicht. Elke kaart deeplinkt naar zijn eigen
  * sub-pagina onder /overzicht/cashflow/*, waar de volledige inhoud leeft.
  * Daaronder het inspiratieblok (Inflatie & koopkracht).
  *
- * De spaarquote / maandelijks netto / uitgaventrend-samenvatting is verhuisd
- * naar de Forecast-sub-pagina (CashflowSection).
+ * ── BLOK 1 (direct, in de eerste byte) ──────────────────────────────────────
+ * `NavStackMeta`, de drie header-controls, de `PageOpening` (kicker + titel +
+ * deck) en het frame van het kaartenraster. De LCP-kandidaat is de TITEL, en die
+ * hangt van niets af — hij staat dus in het eerste antwoord i.p.v. achter de
+ * traagste loader.
+ *
+ * **`getServerPerspective()` — een cookie-read — is het ENIGE await boven de
+ * return, en dat moet zo blijven.** Streaming werkt alleen als er geen zware
+ * await boven staat: één `await createClient()`/`loadX()` erbij en de hele
+ * pagina wacht weer, terwijl de `<Suspense>`-grenzen er nog "correct" uitzien.
+ * De loaders hieronder halen hun supabase-client daarom zélf op (`createClient()`
+ * is React-`cache()`-gewrapt → dezelfde instantie, geen dubbele cookie-read).
+ *
+ * ── GESTREAMDE BLOKKEN ──────────────────────────────────────────────────────
+ *  · `CashflowCardsLoader` — `loadCashflowKpis` + `loadCashflowData` +
+ *    `loadVasteLastenSummary` → de vier kaarten + de inflatiekaart. De volle
+ *    `loadDashboardData` is hier VERDWENEN: `buildCashflowCards` leest zeven
+ *    scalars en die levert de slanke KPI-laag (ADR 0077).
+ *  · `CashOverviewLoader` — `loadCashBankLinks` → het rekeningen-/geldstroomblok.
+ *    Voedt een `ssr:false`-eiland onder de vouw; mag dus laat.
+ *  · `CashflowInstellingenBlokLazy` — haalt zijn data ná hydratatie op, pas
+ *    wanneer het blok in beeld komt (zie cashflow-below-fold.tsx). Daarmee
+ *    verdwijnen ~25 `loadCoreData`-queries volledig uit het hub-request voor
+ *    iedereen die niet naar beneden scrollt.
+ *
+ * Dynamiek blijft: geen `revalidate`, geen ISR, geen cache-headers. De winst is
+ * minder werk per request, niet stale HTML.
  */
 export default async function OverzichtCashflowPage() {
-  const supabase = await createClient()
   const perspective = await getServerPerspective()
-  const [dashboardResult, cashflow, vasteLasten, settings, bankLinks] = await Promise.all([
-    loadDashboardData(supabase),
-    loadCashflowData(supabase, perspective),
-    loadVasteLastenSummary(supabase),
-    loadCashflowSettingsData(supabase),
-    // Koppelstatus per rekening (fase 7): weergavedata hoort via de loader, niet
-    // via een client-directe read ná hydratatie (ADR 0058). Voedt zowel het
-    // herkomst-symbool op de rekeningkaarten als de rekeningdetail.
-    loadCashBankLinks(supabase),
-  ])
-  const { dashboardData } = dashboardResult
-  const cards = buildCashflowCards(dashboardData, cashflow, vasteLasten)
 
   return (
     <>
@@ -81,30 +91,22 @@ export default async function OverzichtCashflowPage() {
           titleAfter=" zet je elke maand opzij?"
           deck="Het deel van je inkomen dat je opzij zet bepaalt hoe snel je vrijheid bereikt. Kies een onderdeel om dieper te kijken."
         />
-        <CashflowLandingCards cards={cards} />
       </section>
 
-      {cashflow.baselineExpenses >= 500 && (
-        <HideInSimple>
-          <section className="mx-auto max-w-6xl px-4 pt-4 sm:px-6">
-            <Kicker size="small" className="mb-2">
-              Koopkracht
-            </Kicker>
-            <InflationImpactCard monthlyExpenses={cashflow.baselineExpenses} />
-          </section>
-        </HideInSimple>
-      )}
+      <Suspense fallback={<CashflowCardsFallback />}>
+        <CashflowCardsLoader perspective={perspective} />
+      </Suspense>
 
-      <CashOverviewLazy embedded showAllCashAccounts showMonthLinks bankLinks={bankLinks} />
+      <Suspense fallback={<CashOverviewSkeleton />}>
+        <CashOverviewLoader />
+      </Suspense>
 
-      {settings && (
-        // Instellingen (inkomen, spaarquote, uitgaven) zijn óók in Eenvoudig
-        // zichtbaar — bewust géén HideInSimple. Het blok bevat alleen die drie
-        // kern-instellingen, die de gebruiker in beide modi wil kunnen zien.
-        <section className="mx-auto max-w-6xl px-4 pb-8 pt-2 sm:px-6">
-          <CashflowInstellingenBlokLazy data={settings} />
-        </section>
-      )}
+      {/* Instellingen (inkomen, spaarquote, uitgaven) zijn óók in Eenvoudig
+          zichtbaar — bewust géén HideInSimple. Het blok bevat alleen die drie
+          kern-instellingen, die de gebruiker in beide modi wil kunnen zien. */}
+      <section className="mx-auto max-w-6xl px-4 pb-8 pt-2 sm:px-6">
+        <CashflowInstellingenBlokLazy />
+      </section>
     </>
   )
 }
