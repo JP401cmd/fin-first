@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { AiExecutionSettings } from './local-categorization-settings'
 import type { AiExecutionGroup, AiExecutionMode } from '@/lib/ai/execution-groups'
@@ -142,6 +142,67 @@ describe('AiExecutionSettings', () => {
     expect(await screen.findByRole('button', { name: /Gesprek met Fin/i })).toBeTruthy()
     expect(screen.getByRole('button', { name: /Transacties & vaste lasten/i })).toBeTruthy()
     expect(screen.getByRole('button', { name: /Documenten lezen/i })).toBeTruthy()
+  })
+
+  // ── Toestel-herkenning ──────────────────────────────────────────────────────
+  //
+  // Deze poort is HARD: staat 'ie aan, dan doet de schakelaar niets en draait de
+  // capability-check — de enige die echt naar de GPU kijkt — helemaal niet. Een
+  // valse treffer sluit dus een geschikte machine stilzwijgend buiten, en dat is
+  // precies wat er gebeurde: `(pointer: coarse)` alléén beschrijft de PRIMAIRE
+  // aanwijzer, en een laptop met touchscreen rapporteert die vaak als coarse.
+  describe('toestel-herkenning', () => {
+    // De stub mag niet doorlekken naar de tests hieronder: die gaan uit van een
+    // gewone desktop, en een blijvende "mobiel"-stub zou ze om de verkeerde
+    // reden laten slagen of falen.
+    afterEach(() => {
+      Reflect.deleteProperty(globalThis as unknown as Record<string, unknown>, 'matchMedia')
+    })
+
+    /** Stub matchMedia voor de twee queries die de component bevraagt. */
+    function setPointer({ coarsePrimary, anyFine }: { coarsePrimary: boolean; anyFine: boolean }) {
+      vi.stubGlobal(
+        'matchMedia',
+        vi.fn((query: string) => ({
+          matches: query.includes('any-pointer: fine') ? anyFine : coarsePrimary,
+          media: query,
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+        })),
+      )
+    }
+
+    it('laptop met touchscreen telt NIET als mobiel — er is een trackpad', async () => {
+      setPointer({ coarsePrimary: true, anyFine: true })
+      mocks.getLocalModelState.mockResolvedValue({ state: 'niet-gedownload', bytes: null })
+      render(<AiExecutionSettings />)
+
+      const schakelaar = await screen.findByRole('switch')
+      expect(
+        (schakelaar as HTMLButtonElement).disabled,
+        'een geschikte laptop moet de keuze kunnen maken; de capability-check oordeelt daarna',
+      ).toBe(false)
+      expect(screen.queryByText(/alleen op een desktop of laptop/i)).toBeNull()
+    })
+
+    it('telefoon telt wél als mobiel — grove aanwijzer en nergens een fijne', async () => {
+      setPointer({ coarsePrimary: true, anyFine: false })
+      mocks.getLocalModelState.mockResolvedValue({ state: 'niet-gedownload', bytes: null })
+      render(<AiExecutionSettings />)
+
+      const schakelaar = await screen.findByRole('switch')
+      await waitFor(() => expect((schakelaar as HTMLButtonElement).disabled).toBe(true))
+      expect(screen.getByText(/alleen op een desktop of laptop/i)).toBeTruthy()
+    })
+
+    it('gewone desktop met muis telt niet als mobiel', async () => {
+      setPointer({ coarsePrimary: false, anyFine: true })
+      mocks.getLocalModelState.mockResolvedValue({ state: 'niet-gedownload', bytes: null })
+      render(<AiExecutionSettings />)
+
+      const schakelaar = await screen.findByRole('switch')
+      expect((schakelaar as HTMLButtonElement).disabled).toBe(false)
+    })
   })
 
   it('capability-fail: keuze blijft uit en toont de reasons, geen download', async () => {

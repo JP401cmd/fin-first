@@ -109,14 +109,31 @@ export function AiExecutionSettings() {
   const [likelyMobile, setLikelyMobile] = useState(false)
   const [storagePersisted, setStoragePersisted] = useState<boolean | null>(null)
 
-  // Proactieve desktop-only hint: op een coarse-pointer-toestel (mobiel/tablet)
-  // faalt de capability-check toch — laat de keuze daar vriendelijk uit staan
-  // i.p.v. de gebruiker eerst een download-poging te laten doen.
+  // Proactieve desktop-only hint: op een telefoon of tablet faalt de
+  // capability-check toch, dus laten we de keuze daar vriendelijk uit staan in
+  // plaats van de gebruiker eerst een download van 2 GB te laten proberen.
+  //
+  // DIT MOET NAUWKEURIG, want het is een HARDE poort: staat 'ie aan, dan doet de
+  // schakelaar niets en draait `checkLocalAiCapability` — de enige check die
+  // écht naar de GPU kijkt — helemaal niet. Een valse treffer betekent dus dat
+  // een geschikte machine de functie nooit te zien krijgt.
+  //
+  // `(pointer: coarse)` alléén was precies zo'n valse treffer: die beschrijft de
+  // PRIMAIRE aanwijzer, en een laptop met touchscreen (een 2-in-1, of gewoon een
+  // moderne laptop) rapporteert die regelmatig als coarse. Zo'n machine heeft
+  // vaak juist een prima GPU en werd hier stilzwijgend buitengesloten.
+  //
+  // Daarom nu: alleen "mobiel" als de primaire aanwijzer grof is ÉN er nergens
+  // een fijne aanwijzer beschikbaar is. Een touchscreen-laptop heeft een
+  // trackpad of muis, dus `any-pointer: fine` is daar waar; een telefoon heeft
+  // dat niet. Bij twijfel laten we de keuze staan: de capability-check geeft
+  // daarna alsnog een eerlijk, concreet antwoord.
   useEffect(() => {
     if (typeof window === 'undefined') return
     try {
-      const coarse = window.matchMedia?.('(pointer: coarse)')?.matches ?? false
-      setLikelyMobile(Boolean(coarse))
+      const coarsePrimary = window.matchMedia?.('(pointer: coarse)')?.matches ?? false
+      const anyFinePointer = window.matchMedia?.('(any-pointer: fine)')?.matches ?? false
+      setLikelyMobile(coarsePrimary && !anyFinePointer)
     } catch {
       setLikelyMobile(false)
     }
