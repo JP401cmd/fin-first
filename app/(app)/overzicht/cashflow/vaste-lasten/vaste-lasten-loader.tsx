@@ -138,11 +138,12 @@ export function VasteLastenFallback() {
           <div className="h-5 w-20 bg-[var(--subtle)]" />
         </div>
 
-        {/* Tabbalk — alleen onder md, net als in het origineel. */}
+        {/* Tabbalk — alleen onder md, net als in het origineel. Knop = py-2 +
+            een 11px-regel (16,5px) → 33px. */}
         <div className="border-b border-[var(--border-ed)] px-5 pb-3 pt-3 md:hidden">
           <div className="flex gap-1 rounded-[var(--r)] bg-[var(--subtle)] p-1">
-            <div className="h-[25px] flex-1 rounded-[var(--r-sm)] bg-[var(--paper)]" />
-            <div className="h-[25px] flex-1 rounded-[var(--r-sm)] bg-[var(--paper)]" />
+            <div className="h-[33px] flex-1 rounded-[var(--r-sm)] bg-[var(--paper)]" />
+            <div className="h-[33px] flex-1 rounded-[var(--r-sm)] bg-[var(--paper)]" />
           </div>
         </div>
 
@@ -159,9 +160,11 @@ export function VasteLastenFallback() {
                     key={row}
                     className="flex items-center justify-between rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-3"
                   >
+                    {/* Twee regels van 20px + 16px = 36px; de balken zijn iets
+                        korter zodat de 4px `space-y-1` binnen die 36px valt. */}
                     <div className="min-w-0 flex-1 space-y-1">
-                      <div className="h-5 w-2/3 bg-[var(--subtle)]" />
-                      <div className="h-4 w-1/3 bg-[var(--subtle)]" />
+                      <div className="h-[18px] w-2/3 bg-[var(--subtle)]" />
+                      <div className="h-[14px] w-1/3 bg-[var(--subtle)]" />
                     </div>
                     <div className="ml-3 h-5 w-16 shrink-0 bg-[var(--subtle)]" />
                   </div>
@@ -177,11 +180,12 @@ export function VasteLastenFallback() {
 
         {/* Totaalregel + actie-rij (min-h-[44px] knoppen). */}
         <div className="border-t border-[var(--border-ed)] px-5 py-4">
+          {/* Rechts: `text-base`-regel (24px) + `text-xs`-regel (16px) = 40px. */}
           <div className="flex items-start justify-between">
             <div className="h-5 w-36 bg-[var(--subtle)]" />
-            <div className="space-y-1 text-right">
-              <div className="ml-auto h-6 w-24 bg-[var(--subtle)]" />
-              <div className="ml-auto h-4 w-20 bg-[var(--subtle)]" />
+            <div className="text-right">
+              <div className="ml-auto h-[22px] w-24 bg-[var(--subtle)]" />
+              <div className="ml-auto mt-1 h-[14px] w-20 bg-[var(--subtle)]" />
             </div>
           </div>
           <div className="mt-3 flex min-h-[44px] items-center justify-center gap-3">
