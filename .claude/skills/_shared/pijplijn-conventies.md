@@ -4,7 +4,11 @@
 
 ## Rol van de hoofdchat — orchestrator
 
-De hoofdchat voert de pijplijn uit als **orchestrator**, niet als uitvoerder: hij zet subagents en skills in voor het inhoudelijke werk, bewaakt volgorde, samenhang en kwaliteit tussen de stappen, en beschermt zijn eigen contextvenster door te delegeren. Zelf doet hij alleen triviale lijm en snelle checks; onderzoek, bouw, test en review lopen via de gespecialiseerde agents — parallel waar stappen onafhankelijk zijn.
+De hoofdchat voert de pijplijn uit als **orchestrator**: hij bewaakt volgorde, samenhang en kwaliteit tussen de stappen, en delegeert waar dat wat oplevert. Delegeren loont bij échte parallelliteit (onafhankelijke werkstromen) en bij context-zware klussen (grote leesrondes, lange bouwstappen); elke agent-spawn kost ~0,5M tokens aan opstart-context vóór hij iets doet. Klein sequentieel werk binnen één domein — een gerichte fix, een tweak van enkele bestanden, een snelle verificatie — doet de hoofdchat daarom zelf, met dezelfde verificatieplicht als een agent. Parallel dispatchen waar stappen onafhankelijk zijn.
+
+**Agent-budget.** Elke pijplijn-skill noemt een agent-budget: het aantal subagent-runs dat voor een normale run van die skill volstaat. Daarbinnen blijven is de norm. Meer agents inzetten mag alleen met een expliciete motivering vooraf aan de gebruiker (welke omstandigheid — bv. een migratie plus een tweede surface — het extra werk nodig maakt).
+
+**Gebundelde eindreview.** De afsluitende review van een run is één `code-review`-agent die in dezelfde opdracht drie lenzen meekrijgt: correctheid/kwaliteit, UI-consistentie (bij geraakte UI) en de security-lens. Geen drie aparte review-spawns. Eén uitzondering blijft hard: raakt de wijziging auth, RLS, een migratie, een nieuwe route met datatoegang of partner-/huishouddata, dan draait de `security-specialist` zijn ship-gate-checklist als aparte run — die gate wordt niet wegbezuinigd.
 
 **Cross-brok-integratie is expliciet de taak van de orchestrator.** Wordt een feature in onafhankelijke brokken/agents opgeknipt, dan valideert elke brok alleen zíchzelf: `tsc` en de losse unit-tests kunnen groen zijn terwijl de samengevoegde output tegen de spec of tegen zusterelementen kapot is. Denk aan constanten/props die brok X definieert en brok Y consumeert, of een interactie-affordance (klik-vs-sleep-guard, aria-patroon, statuskleur) die op meerdere gelijksoortige elementen hóórt te staan maar in één brok vergeten is. Na de bouwstappen legt de orchestrator (of een gerichte review-agent) de geïntegreerde output daarom naast de spec én naast de zusterelementen — niet alleen de per-brok-rapporten vertrouwen.
 
@@ -34,15 +38,16 @@ Een RLS-leak-check die alleen eigenaar-isolatie test (gebruiker A ziet geen rije
 
 Subagents en hoofdchat werken in dezelfde working tree, vaak náást parallelle sessies van de gebruiker. Daarom: nooit `git stash`, `git checkout -- <pad>`, `git reset` of andere tree-brede operaties als onderdeel van bouwen of testen — die vernietigen andermans ongecommitte werk. Alleen gerichte edits binnen de opdracht-scope. De oude staat van een bestand vergelijk je met `git show HEAD:<pad>` of `git diff -- <pad>`, niet door de tree terug te zetten. Bestanden die je niet zelf hebt gewijzigd blijven onaangeraakt.
 
-## Slotstap — zelfverbetering (altijd in overleg met de gebruiker)
+## Slotstap — zelfverbetering (opt-in, niet elke run)
 
-Sluit elke run af met een korte retrospectief:
+De zelfverbeterings-slotstap draait **alleen** wanneer één van deze twee dingen waar is: (a) de gebruiker vraagt erom, of (b) tijdens de run is een concreet defect in een definitie gebleken — een misrouting, een instructie die aantoonbaar verkeerd uitpakte, of een subagent-rapport met een expliciete "Verbetervoorstel"-sectie. Is geen van beide het geval, dan eindigt de run zonder retrospectief — een standaard "kijk elke keer of er iets te verbeteren valt"-rondje is zelf overhead.
 
-1. **Verzamel** de "Verbetervoorstel"-secties uit de eindrapporten van de ingezette subagents, plus eigen observaties over de pijplijn: overbodige of ontbrekende stap, verkeerde routering, onduidelijke instructie, een agent-definitie die tekortschoot. Kijk expliciet naar **token-efficiëntie**: had hetzelfde resultaat gekund met minder gelezen context, minder of kortere agent-runs of compactere rapporten — en welke instructie-aanpassing zou dat de volgende keer afdwingen?
-2. **Leg betekenisvolle voorstellen expliciet aan de gebruiker voor** — wat, waarom, en de exacte tekstwijziging in `.claude/skills/*` of `.claude/agents/*` — bij voorkeur als keuzevraag (doorvoeren / aanpassen / afwijzen).
-3. **Alleen na expliciet akkoord doorvoeren**, in een aparte commit met prefix `self-improve:`. Geen akkoord of geen voorstel? Niets wijzigen — nooit stilzwijgend aan definities sleutelen. Ook het "verheffen van een gevalideerde tweak tot conventie" (vastleggen in een skill/agent-definitie of CLAUDE.md) loopt via dít protocol — nooit mid-run.
+Draait de slotstap wél, dan geldt:
 
-Houd het schaars: één scherp voorstel per run is het maximum; geen voorstel is prima.
+1. **Leg het voorstel expliciet aan de gebruiker voor** — wat, waarom, en de exacte tekstwijziging in `.claude/skills/*` of `.claude/agents/*` — bij voorkeur als keuzevraag (doorvoeren / aanpassen / afwijzen). Kijk daarbij expliciet naar **token-efficiëntie**: had hetzelfde resultaat gekund met minder gelezen context, minder of kortere agent-runs of compactere rapporten?
+2. **Alleen na expliciet akkoord doorvoeren**, in een aparte commit met prefix `self-improve:`. Geen akkoord of geen voorstel? Niets wijzigen — nooit stilzwijgend aan definities sleutelen. Ook het "verheffen van een gevalideerde tweak tot conventie" (vastleggen in een skill/agent-definitie of CLAUDE.md) loopt via dít protocol — nooit mid-run.
+
+Houd het schaars: één scherp voorstel per run is het maximum.
 
 ### Verbetervoorstel-protocol voor subagents
 

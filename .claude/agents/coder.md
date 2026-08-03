@@ -2,7 +2,7 @@
 name: coder
 description: "Use this agent when you need to implement new features, write new code, refactor existing code, or make any code changes to the codebase. This agent should be invoked for tasks requiring high-quality, production-ready code implementation.\\n\\nExamples:\\n\\n<example>\\nContext: User requests a new feature implementation\\nuser: \"Add a function to validate email addresses\"\\nassistant: \"I'll use the coder agent to implement a high-quality email validation function that follows the project's patterns and best practices.\"\\n<Task tool invocation to launch coder agent>\\n</example>\\n\\n<example>\\nContext: User needs a new API endpoint\\nuser: \"Create a REST endpoint for user authentication\"\\nassistant: \"Let me invoke the coder agent to implement this authentication endpoint with proper security practices and project standards.\"\\n<Task tool invocation to launch coder agent>\\n</example>\\n\\n<example>\\nContext: User asks for a React component\\nuser: \"Build a data table component with sorting and filtering\"\\nassistant: \"I'll launch the coder agent to create this component following the project's neobrutalism design system and established React patterns.\"\\n<Task tool invocation to launch coder agent>\\n</example>\\n\\n<example>\\nContext: User requests code refactoring\\nuser: \"Refactor the database module to use connection pooling\"\\nassistant: \"I'll use the coder agent to carefully refactor this module while maintaining all existing functionality and improving performance.\"\\n<Task tool invocation to launch coder agent>\\n</example>"
 model: opus
-effort: xhigh
+effort: high
 color: orange
 ---
 

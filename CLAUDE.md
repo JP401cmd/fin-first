@@ -9,7 +9,7 @@ You have MCP tools available for feature management. Use them directly by callin
 **Codebase Work:**
 - Read, modify, create, and delete source code files
 - Run bash commands (tsc, vitest, supabase migrations, git, etc.)
-- Spawn sub-agents (Agent tool) to parallelize independent work and protect the main context window — use them liberally when a task fans out into multiple file-changes that don't depend on each other
+- Spawn sub-agents (Agent tool) to parallelize independent work and protect the main context window — but weigh the cost: every spawn pays ~0,5M tokens aan opstart-context vóór hij iets doet. Spawn bij échte parallelliteit (3+ onafhankelijke werkstromen) of context-bescherming (grote leesklussen); klein sequentieel werk binnen één domein doet de hoofdthread zelf
 - Look up documentation online
 
 **Feature Management:**
@@ -26,7 +26,7 @@ You have MCP tools available for feature management. Use them directly by callin
 ## Working Style
 
 - Default to actually implementing what the user asks for. The earlier "backlog only" constraint is removed — users typically want execution, not deferral.
-- For large multi-feature builds (3+ independent surfaces), **spawn parallel sub-agents** rather than serializing the work in the main thread. Examples: separate agents for migrations, API routes, UI surfaces, sociale features, admin views. Use `run_in_background: true` for true parallelism.
+- For large multi-feature builds (3+ independent surfaces), **spawn parallel sub-agents** rather than serializing the work in the main thread. Examples: separate agents for migrations, API routes, UI surfaces, sociale features, admin views. Use `run_in_background: true` for true parallelism. Voor kleiner werk geldt het omgekeerde: sequentieel werk in één domein blijft in de hoofdthread — een agent-keten voor werk zonder parallelliteit is puur setup-overhead.
 - Always run `npx tsc --noEmit` (and relevant vitest paths) after a multi-file change to catch regressions before reporting "done".
 - Always include a final user-facing summary of what changed and what's next.
 
@@ -42,9 +42,15 @@ Elke inhoudelijke opdracht routeert via de bijpassende pijplijn-skill — niet a
 
 **Uitzondering — juridische pagina's:** raakt de wijziging `/privacy`, `/voorwaarden` of `/wft`, dan nooit via `kleine-aanpassing` — hoe klein ook. Altijd via de Grenswachter-route (juridische toets), met een aantekening waaróm de tekst wijzigt (brief-formaat, één pagina). Zie de org-site: `trifinity-org/site/werkstromen.html#stroom-03`.
 
-**Proportionaliteit bij defecten — diagnose eerst.** Een defect blijft via `bug-fix` lopen, maar begin altijd zelf: lees de betrokken code en verifieer gemelde teksten/bedragen met een grep vóór je een agent start. Is de oorzaak daarmee hard én lokaal — één bestand, geen gedeeld contract, geen nieuw veld — neem dan de fast-path (stap 0 van de skill): falende test, fix, verificatie. De volledige pijplijn (`bug-reporter`, `requirement-specialist`, `architect`) pas bij een gedeeld contract, een rekenmotor, een nieuw bundel-/DB-veld, meerdere surfaces, of wanneer live accountdata nodig is om te bewijzen wát er fout is. Bij twijfel: volledige pijplijn.
+**Proportionaliteit bij defecten — diagnose eerst.** Een defect blijft via `bug-fix` lopen, maar begin altijd zelf: lees de betrokken code en verifieer gemelde teksten/bedragen met een grep vóór je een agent start. Is de oorzaak daarmee hard én lokaal — één bestand, geen gedeeld contract, geen nieuw veld — neem dan de fast-path (stap 0 van de skill): falende test, fix, verificatie. De volledige pijplijn (`bug-reporter`, `requirement-specialist`, `architect`) pas bij een gedeeld contract, een rekenmotor, een nieuw bundel-/DB-veld, meerdere surfaces, of wanneer live accountdata nodig is om te bewijzen wát er fout is. Bij twijfel: fast-path — en escaleer alsnog op het moment dat je tijdens de uitvoering daadwerkelijk een gedeeld contract, migratie, rekenmotor of tweede surface raakt (dat is een observatie, geen inschatting vooraf).
 
 **Harde regel: een vervolgbericht binnen een lopende sessie telt als een nieuwe opdracht.** Een bugmelding die ná feature-werk komt start opnieuw `bug-fix`; een nieuwe tweak start opnieuw `kleine-aanpassing`. Sla de skill NIET over omdat je al middenin een sessie zit, al code aan het lezen bent, of de vorige stap een andere skill gebruikte. Bij twijfel tussen "klein vs. defect vs. uitbreiding": kies de skill die past bij de aard van de vraag, niet de makkelijkste. Begin pas met onderzoeken/implementeren ná het invoken van de skill.
+
+### Tokenzuinigheid (verplicht)
+
+- **Sessies knippen.** Is een opdracht afgerond en begint de gebruiker over iets ongerelateerds: stel voor om een verse sessie (of `/clear`) te starten. Elke beurt in een lange sessie herleest de complete historie; een sessie van dagen kost per vraag een veelvoud van dezelfde vraag in een verse sessie.
+- **Agent-budget per skill.** Elke pijplijn-skill noemt een agent-budget (aantal subagent-runs). Daarbinnen blijven is de norm; erboven mag alleen met een expliciete motivering vooraf aan de gebruiker ("dit raakt X en Y, daarom ook agent Z").
+- **Eén gebundelde eindreview.** De afsluitende review is één `code-review`-run die correctheid, UI-consistentie én de security-lens in dezelfde opdracht meeneemt — geen drie aparte review-spawns. Een aparte `security-specialist`-run blijft verplicht wanneer de wijziging auth, RLS, een migratie, een nieuwe route met datatoegang of partner-/huishouddata raakt.
 
 ### Organisatieopzet (verwijzing)
 
@@ -148,6 +154,7 @@ Er is één norm voor hoe de frontend aan data komt (ADR 0058). Drie paden, elk 
 - **Client-direct toegestaan, afgebakend tot drie gevallen:** (1) **eigen-rij preferences** (profiles/appearance/widget-prefs) — own-row read-modify-write via de anon-RLS-client, spiegel `app/api/appearance` (nooit service-role); (2) **auth** (`supabase.auth.*`); (3) **realtime** (`.channel()`/`postgres_changes`) — de **initiële** load blijft via loader/API. Alles daarbuiten hoort server-side.
 - **On-demand/lazy client-read** (modals, tab-lazy) die écht niet in de loader-bundel past: via een API-route (`fetch`), toekomstig fundament = één gedeelde `useApiQuery`-hook met TTL-cache (hergebruik egress-lessen: poll 60s→10min + TTL). `.insert().select('id')` returning is **geen** read-for-display en valt buiten de meetlat.
 - **Lint-gate:** `npm run check:client-reads` (`scripts/check-client-data-reads.mjs`, ook in pre-push) flagt **nieuwe** directe client-reads voor weergavedata buiten de grandfather-allowlist. De ~47 bestaande lezers staan op die allowlist; **Fase b** faseert ze per domein uit (assets → budgets → cash → horizon → debts/belasting → beheer). Voeg NIETS aan de allowlist toe zonder motivatie — dat is precies de overtreding die de gate hoort te vangen.
+- **Kolomregel (tweede gate-regel, niet-allowlistbaar):** in een `'use client'`-bestand is `select('*')` op `assets`, `bank_accounts`, `bank_connection_accounts` of `bank_connections` **verboden** — die tabellen dragen `*_encrypted` (ciphertext) en `*_hash` (blind index onder een server-only sleutel = stabiele correlatiesleutel), en op `assets` is de SELECT-policy bovendien huishoud-gedeeld, dus `*` levert daar het materiaal van de **partner**. Vraag een expliciete kolomlijst op; voor `assets` is dat `ASSET_CLIENT_COLUMNS` uit `lib/asset-data.ts`. Deze regel staat bewust **los van de ALLOWLIST** (die grandfathert per bestand, niet per kolom — precies waarom beide lekken met de hand gevonden moesten worden). De `COLUMN_RULE_RESIDUE`-lijst in dat script mag alleen krimpen: een entry die geen overtreding meer is, maakt de gate hard rood. **De gate is hier een vangrail, geen dekkingsbewijs** — hij scant alleen de *letterlijke* `.from('assets').select('*')` ín een bestand dat zélf `'use client'` draagt. Dezelfde `select('*')` in een gedeelde lib-helper die door clientcode wordt aangeroepen (`lib/household/perspective-loader.ts`) of in een server-loader waarvan het resultaat als prop naar een clientcomponent gaat (die prop serialiseert Next volledig in de RSC-payload) blijft onzichtbaar. De regel geldt dus óók dáár, maar niets dwingt hem af: controleer met de hand.
 
 ## Project Specification
 

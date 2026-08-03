@@ -10,6 +10,8 @@ Bouwt een nieuwe functionaliteit via de gespecialiseerde subagents. Nadruk: eers
 
 Geef het idee mee als argument; is het vaag, laat de `business-owner` het eerst scherpen.
 
+**Agent-budget: ≤8** voor een normale nieuwe functie (waarde/requirements/architectuur waar nodig, bouwspecialisten, tester, gebundelde review, docs-keepers). Meer alleen met expliciete motivering vooraf (zie de gedeelde conventies) — bijvoorbeeld bij meerdere onafhankelijke oppervlakken die parallel gebouwd worden.
+
 ## Gedeelde conventies (verplicht)
 
 Lees en volg `.claude/skills/_shared/pijplijn-conventies.md`: orchestrator-rol (hoofdchat delegeert; bij een gestrande subagent eerst diens deelstaat per toegewezen deeltaak inventariseren), voortgangsritme (vóór/na elke stap melden, nooit >5 min stilte), git-hygiëne in de gedeelde werkboom (nooit `git stash`/`checkout --`/`reset`) en de zelfverbeterings-slotstap (definitie-wijzigingen alleen ná expliciet akkoord, aparte `self-improve:`-commit). Deze regels gelden onverkort.
@@ -42,11 +44,11 @@ Hergebruik bestaande componenten en bronnen; **geen parallelle berekening of twe
 ### 6. Testen — `tester`
 De `tester` schrijft unit-/component-tests en (waar end-to-end) een regression-suite-case, **getoetst aan de acceptatiecriteria** uit stap 2. Dekt randgevallen (nul/negatief inkomen, tekort, oneindige vrijheid, lege/laad-states, rolgrenzen). Draait `tsc`, lint en relevante tests groen — echte output.
 
-### 7. Review — `code-review` + `ux-review-expert` + `security-specialist`
-`code-review` voor correctheid/kwaliteit; `ux-review-expert` voor UI-consistentie en gebruikerservaring tegen het designsysteem. Raakt de feature data-toegang, auth, routes, AI-context, secrets of admin-paden (bij twijfel: ja), dan draait de `security-specialist` zijn ship-gate-checklist — een 🔴-bevinding blokkeert tot opgelost.
+### 7. Review — één gebundelde `code-review`-run (+ `security-specialist` bij de harde triggers)
+Eén `code-review`-agent beoordeelt correctheid/kwaliteit én — in dezelfde opdracht — de UI-consistentie-lens tegen het designsysteem en de security-lens; geen aparte `ux-review-expert`-spawn naast de code-review (zie de gedeelde conventies). Raakt de feature auth, RLS, een migratie, routes met datatoegang, AI-context, secrets of admin-paden (bij een echt nieuwe feature is dat meestal zo), dan draait de `security-specialist` zijn ship-gate-checklist als aparte run — een 🔴-bevinding blokkeert tot opgelost.
 
 ### 8. Architectuur- & UAT-definities bijwerken — `architecture-docs-keeper` + `uat-docs-keeper` + fit-review `architect`
 `architecture-docs-keeper` werkt de vier views van `/beheer/architectuur` bij (ArchiMate-topologie/relaties/flows, HLD-capability, ERD via migraties, Berekeningen) en regenereert facts (`npm run arch:diagram`); suites groen. Parallel landt `uat-docs-keeper` de acceptatiecriteria (Given/When/Then) uit stap 2 in de UAT-definities: een scenario in `lib/uat/catalog.ts` + een `AcceptanceCriterion` in `lib/uat/acceptance/<zone>.ts` + een node in `flows/<zone>.ts`, zodat de nieuwe functie bij ship al in de UAT-plaat staat — **definities vastleggen, niet uitvoeren (dat is `/uat`)**. De `architect` doet de eind-fit-review: past het, klopt de ADR, is een concern nodig of opgelost.
 
 ## Afronding
-Lever op: de feature(s) in de backlog, het requirement-spec, het architectuurbesluit (ADR), wat gebouwd is, groene tests/reviews en de bijgewerkte platen. Benoem next steps en restrisico. Sluit daarna af met de zelfverbeterings-slotstap uit de gedeelde conventies.
+Lever op: de feature(s) in de backlog, het requirement-spec, het architectuurbesluit (ADR), wat gebouwd is, groene tests/reviews en de bijgewerkte platen. Benoem next steps en restrisico. De zelfverbeterings-slotstap draait alleen onder de opt-in-condities uit de gedeelde conventies.

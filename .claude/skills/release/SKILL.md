@@ -87,4 +87,4 @@ Een groene lokale build is geen groene Vercel-build (andere env, NFT-excludes, r
 | "De deploy zal wel goed gaan, lokaal bouwde het" | Vercel-build ≠ lokale build (env/NFT/regio) — stap 10 bestaat omdat dit hier eerder misging. |
 
 ## Afronding
-Rapporteer per poort het bewijs (commando + uitkomst), de security-bevindingen en hun status, en wat er bewust is overgeslagen met reden. "Alles groen" zonder output is geen afronding. Sluit daarna af met de zelfverbeterings-slotstap uit de gedeelde conventies.
+Rapporteer per poort het bewijs (commando + uitkomst), de security-bevindingen en hun status, en wat er bewust is overgeslagen met reden. "Alles groen" zonder output is geen afronding. De zelfverbeterings-slotstap draait alleen onder de opt-in-condities uit de gedeelde conventies.

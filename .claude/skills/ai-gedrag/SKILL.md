@@ -43,4 +43,4 @@ De `tester` legt élk voorbeeldgeval uit stap 1 vast als testcase — categorisa
 - Vermeld dat beheerders via `ai_system_prompt_override` het volledige prompt kunnen overschrijven — de default moet op zichzelf coherent blijven (admin-auditview).
 
 ## Afronding
-Lever op: de geciteerde prompt-diff met redenering, de voorbeeldgevallen als regressietests (groen), het bewijs dat de invarianten en eerder gedrag intact zijn, en eventuele overdracht aan plumbing/`ai-feature` als de oorzaak daar lag. Sluit daarna af met de zelfverbeterings-slotstap uit de gedeelde conventies.
+Lever op: de geciteerde prompt-diff met redenering, de voorbeeldgevallen als regressietests (groen), het bewijs dat de invarianten en eerder gedrag intact zijn, en eventuele overdracht aan plumbing/`ai-feature` als de oorzaak daar lag. De zelfverbeterings-slotstap draait alleen onder de opt-in-condities uit de gedeelde conventies.

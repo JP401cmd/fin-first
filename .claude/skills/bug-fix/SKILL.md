@@ -10,6 +10,8 @@ Lost een bug op via de gespecialiseerde subagents, in een vaste volgorde met con
 
 Geef de bug-omschrijving mee als argument; ontbreekt die, vraag er eerst naar.
 
+**Agent-budget:** fast-path 0–1 agents (hooguit een `tester`); volledige pijplijn ≤6 (rapport, verwachting/triage waar structureel, specialist-fix, tester, gebundelde review). Meer alleen met expliciete motivering vooraf (zie de gedeelde conventies).
+
 ## Gedeelde conventies (verplicht)
 
 Lees en volg `.claude/skills/_shared/pijplijn-conventies.md`: orchestrator-rol (hoofdchat delegeert; bij een gestrande subagent eerst diens deelstaat per toegewezen deeltaak inventariseren), voortgangsritme (vóór/na elke stap melden, nooit >5 min stilte), git-hygiëne in de gedeelde werkboom (nooit `git stash`/`checkout --`/`reset`) en de zelfverbeterings-slotstap (definitie-wijzigingen alleen ná expliciet akkoord, aparte `self-improve:`-commit). Deze regels gelden onverkort.
@@ -20,20 +22,22 @@ Aanvulling bij het gestrande-subagent-protocol in deze pijplijn: compile-clean �
 
 **Afslag vooraf — AI-gedrag?** Blijkt de gemelde "bug" een AI-gedragsafwijking — verkeerde categorisatie, toon, lengte of antwoorden van de AI — verlaat dan deze pijplijn en start **`/ai-gedrag`**, ook al is het als bug gemeld. Deze pijplijn is voor defecten in code/data/UI, niet voor hoe de bestaande AI zich gedraagt.
 
-### 0. Fast-path-poort — al firsthand gediagnosticeerd? (zelf, geen agent)
-Levert de opdracht de bug al **firsthand gediagnosticeerd** aan — oorzaak, exacte locatie(s) én fix-richting, niet slechts een symptoom — handel stap 1–3 (rapport, verwachting, triage) dan af als een **korte bevestiging in de hoofdthread** i.p.v. drie aparte subagent-runs, en ga direct naar stap 4 (falende test). Dit bespaart 2–3 subagent-runs en context bij een al-doorgrond probleem. Voorwaarden: de **firsthand-verificatieplicht blijft hard** (lees zelf de betrokken regels/diff, draai zelf `tsc`/de relevante tests — vertrouw geen aangeleverde diagnose blind), en blijkt de diagnose bij die verificatie tóch onvolledig of fout, val dan terug op de volledige stappen 1–3. Bij twijfel over de diagnose: niet de fast-path nemen.
+### 0. Fast-path-poort — eerst zelf diagnosticeren (zelf, geen agent)
+**Dit is de standaard-ingang, niet de uitzondering.** Begin élke bug in de hoofdthread: lees de betrokken code, verifieer gemelde teksten/bedragen met een grep, reproduceer waar dat snel kan. Is de oorzaak daarmee **hard én lokaal** — één bestand (of een strak clusterje), geen gedeeld contract, geen nieuw bundel-/DB-veld, geen rekenmotor — neem dan de fast-path: handel stap 1–3 af als korte bevestiging in de hoofdthread en ga direct naar stap 4 (falende test), fix en verificatie in de hoofdthread. De volledige pijplijn is er voor bugs die een gedeeld contract, een rekenmotor, meerdere surfaces of live accountdata raken. **Bij twijfel over de route: fast-path** — escaleer alsnog op het moment dat je tijdens de uitvoering daadwerkelijk zo'n criterium raakt (dat is een observatie, geen inschatting vooraf).
+
+Levert de opdracht al een diagnose aan, dan blijft de **firsthand-verificatieplicht hard**: lees zelf de betrokken regels/diff en draai zelf `tsc`/de relevante tests vóór je erop bouwt — vertrouw geen aangeleverde diagnose blind. Blijkt de diagnose bij die verificatie onvolledig of fout, val dan terug op de volledige stappen 1–3.
 
 **Omgevingsdefect-afslag.** Blijkt tijdens de snelle checks dat het defect in de **omgeving** zit (dev-server, cache, poort, env-vars) en niet in code of data — bv. routes die 404'en terwijl de bestanden bestaan, `tsc` schoon is en de tests groen zijn: diagnosticeer en herstel dan in de hoofdthread, verifieer firsthand (browser/HTTP, niet alleen een aanname), sla stappen 2–8 over en leg de gotcha vast (memory/docs). Een falende vitest is dan niet van toepassing — het bewijs is het herstelde gedrag in de echte omgeving.
 
-### 1. Rapporteren & reproduceren — `bug-reporter`
+### 1. Rapporteren & reproduceren — `bug-reporter` (alleen op de volledige pijplijn)
 Zet de `bug-reporter` in voor een volledig rapport: titel, samenvatting, omgeving/context, **deterministische repro-stappen**, verwacht vs. werkelijk gedrag, **geraakte use cases/user journeys**, impact & ernst, vermoedelijke oorzaak/locatie en bewijs. Lever een **minimale repro** op.
 - Kun je niet reproduceren? Stop en meld dat terug met de condities — niet blind gaan fixen.
 
-### 2. Verwachting vastleggen — `requirement-specialist`
-Laat de `requirement-specialist` definiëren wat "gefixt" betekent: het correcte gedrag met **acceptatiecriteria (Given/When/Then)** en de Definition of Done. Dit is de meetlat voor stap 6.
+### 2. Verwachting vastleggen — `requirement-specialist` (alleen wanneer structureel)
+Raakt de bug een gedeeld contract, een rekenmotor of meerdere surfaces, laat dan de `requirement-specialist` definiëren wat "gefixt" betekent: het correcte gedrag met **acceptatiecriteria (Given/When/Then)** en de Definition of Done — de meetlat voor stap 6. Bij een lokale bug legt de hoofdthread de verwachting zelf vast, in twee zinnen in de falende test van stap 4 (Given/When/Then in de testnaam/docstring) — geen aparte agent.
 
-### 3. Architectuur-impact triage — `architect` (kort)
-Laat de `architect` snel bepalen of de bug **structureel** is (raakt domeingrenzen, single-source-of-truth, RLS-model, een ADR). Zo ja: bepaal of de fix een ontwerpkeuze raakt en welke platen/ADR's straks mee moeten. Zo nee: noteer "lokaal, geen architectuurimpact" en ga door.
+### 3. Architectuur-impact triage — `architect` (kort; alleen wanneer structureel)
+Bij dezelfde structurele triggers: laat de `architect` snel bepalen of de fix een ontwerpkeuze raakt en welke platen/ADR's straks mee moeten. Bij een lokale bug noteert de hoofdthread zelf "lokaal, geen architectuurimpact" en gaat door.
 - **Raakt de fix een functie die een union-type of meerdere modes/varianten bedient** (bv. `DownsizeConfig | ReverseMortgageConfig`, een flag-gated v1/v2-pad, een mode-enum)? Benoem dan expliciet *alle* varianten die die functie bedient en bepaal per variant of het nieuwe gedrag gewenst is — en eis in stap 4/6 een **regressietest per variant**, niet alleen voor de variant uit het bugrapport. Zo voorkom je "de genoemde case gefixt, de zuster-case geregresseerd".
 
 ### 4. Falende test vastleggen — `tester`
@@ -56,11 +60,11 @@ De `tester` draait de test uit stap 4 (nu **groen**) plus de bredere relevante s
 
 - **Scope-grens bij blootgelegde drift.** Legt een **nieuw toegevoegde CI-wrapper** voor een al-bestaande in-app suite pre-existing drift bloot (asserties die achterlopen op code/types/data), fix dan **alleen** de drift die direct aan de huidige bug verbonden is. Los-staande drift in dezelfde of een ándere suite is een **aparte follow-up** — rek de scope van de bugfix er niet mee op (draai een halve aanzet terug en houd de fix atomair), maar benoem de drift expliciet als aanbeveling in de afronding. Zo voorkom je dat één bug een ongerelateerde suite-opschoning in sleept.
 
-### 7. Review — `code-review` (+ conditioneel `ux-review-expert` / `security-specialist`)
-`code-review` beoordeelt de fix op correctheid, neveneffecten en kwaliteit; geef hem de blast-radius-regel uit stap 5 mee (welke consumers het gewijzigde veld/symbool lezen) — valideren is goedkoper dan reconstrueren. Bij een UI-bug ook `ux-review-expert` voor consistentie/UX. Raakt de fix data-toegang, auth, routes of partner-privacy — of wás de bug zelf een lek — dan draait de `security-specialist` zijn ship-gate-checklist vóór afronding.
+### 7. Review — één gebundelde `code-review`-run (+ `security-specialist` alleen bij de harde triggers)
+Eén `code-review`-agent beoordeelt de fix op correctheid, neveneffecten en kwaliteit, en krijgt in dezelfde opdracht de **UI-consistentie-lens** (bij een UI-bug) en de **security-lens** mee — geen drie aparte review-spawns (zie de gedeelde conventies). Geef hem de blast-radius-regel uit stap 5 mee (welke consumers het gewijzigde veld/symbool lezen) — valideren is goedkoper dan reconstrueren. Eén uitzondering blijft hard: raakt de fix auth, RLS, een migratie, een route met datatoegang of partner-/huishouddata — of wás de bug zelf een lek — dan draait de `security-specialist` zijn ship-gate-checklist als aparte run vóór afronding.
 
 ### 8. Architectuur-fit & platen — `architect` (+ `architecture-docs-keeper` indien structureel)
 Was stap 3 "structureel"? Dan reviewt de `architect` of de fit klopt en zorgt hij dat de vier views van `/beheer/architectuur` meebewegen — gedelegeerd aan `architecture-docs-keeper` (`npm run arch:diagram`, suites groen), inclusief een ADR/concern-update (concern verwíjderen als het risico is opgelost). Lokale bug zonder impact? Sla over.
 
 ## Afronding
-Sluit af met: het bugrapport, de bron-oorzaak, wat gewijzigd is, het bewijs (groene test + regressiecase) en eventuele architectuur/plaat-updates. Bij restrisico of out-of-scope bevindingen: benoem waar het stokt. Sluit daarna af met de zelfverbeterings-slotstap uit de gedeelde conventies.
+Sluit af met: het bugrapport, de bron-oorzaak, wat gewijzigd is, het bewijs (groene test + regressiecase) en eventuele architectuur/plaat-updates. Bij restrisico of out-of-scope bevindingen: benoem waar het stokt. De zelfverbeterings-slotstap draait alleen onder de opt-in-condities uit de gedeelde conventies.

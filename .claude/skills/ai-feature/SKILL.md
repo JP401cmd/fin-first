@@ -62,4 +62,4 @@ Unit-tests voor de pure delen (schema's, context-builders, tools) en regressieca
 Nieuwe service/integratie/datastroom op de ArchiMate-plaat, capability in de HLD, en facts regenereren. `architect` bevestigt de fit.
 
 ## Afronding
-Lever op: de werkende AI-functionaliteit, de guardrail-checklist (zie boven) afgevinkt, het tokenverbruik gelogd onder de juiste feature-naam (zichtbaar in `/beheer/ai-verbruik`), groene tests en eventuele plaat/ADR-updates. Sluit daarna af met de zelfverbeterings-slotstap uit de gedeelde conventies.
+Lever op: de werkende AI-functionaliteit, de guardrail-checklist (zie boven) afgevinkt, het tokenverbruik gelogd onder de juiste feature-naam (zichtbaar in `/beheer/ai-verbruik`), groene tests en eventuele plaat/ADR-updates. De zelfverbeterings-slotstap draait alleen onder de opt-in-condities uit de gedeelde conventies.

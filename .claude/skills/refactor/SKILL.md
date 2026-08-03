@@ -53,4 +53,4 @@ Met als expliciete reviewvraag: is dit een pure move? Elke inhoudelijke wijzigin
 Pure herindeling raakt de platen meestal niet, maar: stond er een **aandachtspunt** over dit doelwit in `lib/architecture/archimate-concerns.ts`? Verwijder het zodra opgelost. `npm run arch:diagram` voor de feiten/churn.
 
 ## Afronding
-Lever op: de nieuwe structuur (welke bestanden ontstonden, hoeveel regels het doelwit nog telt), het vangnet dat nu bestaat, en expliciet **welke verificaties bewijzen dat het gedrag identiek is**. Restpunten (bewust uitgestelde verbeteringen) als aparte lijst — die zijn vervolgwerk, geen onderdeel van deze refactor. Sluit daarna af met de zelfverbeterings-slotstap uit de gedeelde conventies.
+Lever op: de nieuwe structuur (welke bestanden ontstonden, hoeveel regels het doelwit nog telt), het vangnet dat nu bestaat, en expliciet **welke verificaties bewijzen dat het gedrag identiek is**. Restpunten (bewust uitgestelde verbeteringen) als aparte lijst — die zijn vervolgwerk, geen onderdeel van deze refactor. De zelfverbeterings-slotstap draait alleen onder de opt-in-condities uit de gedeelde conventies.
