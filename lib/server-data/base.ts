@@ -37,10 +37,18 @@
 //     en dedupe. Aggregaties/type-maps blijven in de loaders.
 //
 // NIET hier thuis: perspectief/household-overlays (loadPerspectiveDataServer),
-// dashboard-specifieke tabellen (net_worth_snapshots, life_events, actions,
-// recommendations, goals, investment_holdings, budget_rollovers/_amounts) en de
-// recurring-detectie-fetch in lib/vaste-lasten-summary.ts (eigen kolomset +
-// venster). Die blijven loader-lokaal.
+// dashboard-specifieke tabellen (life_events, actions, recommendations, goals,
+// investment_holdings, budget_rollovers/_amounts) en de recurring-detectie-fetch
+// in lib/vaste-lasten-summary.ts (eigen kolomset + venster). Die blijven
+// loader-lokaal.
+//
+// `net_worth_snapshots` stond op die uitsluitingslijst zolang alleen de
+// dashboard-loader het 12-maands-venster las; sinds de forecast-laag
+// (lib/cashflow-kpis.ts, T2.5) diezelfde rijen nodig heeft, is het een gedeelde
+// fetcher geworden — zie punt 8. De ANDERE snapshot-lezing
+// (lib/core-data-loader.ts: 24 rijen, meer kolommen, geen datumvenster) is een
+// eigen query en hoort hier bewust niet: die samenvoegen zou een kolomset en een
+// venster verbreden zonder consument.
 
 import { cache } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -214,3 +222,34 @@ export const getEarliestIncomeDate = cache(async (supabase: SupabaseClient) => {
     .limit(1)
     .maybeSingle()
 })
+
+// ── 8. Netto-vermogen-snapshots (12-maands venster) ────────────────────────
+/**
+ * De maandelijkse netto-vermogen-snapshots binnen het rollende 12-maands-venster
+ * `[localMonthStartMonthsAgo(now, 11), ∞)`, oplopend op datum, hooguit 12 rijen.
+ *
+ * Voedt op dit moment twee paden, en dat is precies waarom hij hier staat:
+ *  · `lib/dashboard-data-loader.ts` — `netWorthHistory`, `savingsHistory`, de
+ *    snapshot-`fire_age` en de net-worth-delta-fallback op de spaarquote;
+ *  · `lib/cashflow-kpis.ts#loadForecastSectionData` — `savingsHistory` + diezelfde
+ *    delta-fallback, zonder de rest van de dashboard-bundel (T2.5).
+ *
+ * De ondergrens is tijdzone-veilig via `localMonthStartMonthsAgo` (het TZ-lint
+ * verbiedt `toISOString()` op maandgrenzen) en levert exact dezelfde
+ * `YYYY-MM-01`-datum als het `Date.UTC(jaar, maand − 11, 1).toISOString()` dat de
+ * dashboard-loader hier had: beide bouwen de grens uit de LOKALE jaar/maand van
+ * `now` en zetten de dag op 01.
+ *
+ * BEWUST `.limit(12)` behouden: de snapshot-cron schrijft één rij per maand, dus
+ * 12 dekt het venster — maar de kolom is niet uniek per maand en de dashboard-
+ * loader las er altijd hooguit 12. Weglaten zou de historie-reeksen stil kunnen
+ * verlengen bij een account met dubbele snapshots in één maand.
+ */
+export const getNetWorthSnapshots12m = cache(async (supabase: SupabaseClient) =>
+  supabase
+    .from('net_worth_snapshots')
+    .select('snapshot_date, net_worth, fire_age, savings_rate')
+    .gte('snapshot_date', localMonthStartMonthsAgo(new Date(), 11))
+    .order('snapshot_date', { ascending: true })
+    .limit(12),
+)

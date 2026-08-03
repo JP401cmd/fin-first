@@ -30,16 +30,30 @@
 
 import { cache } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { getOwnProfile, getBudgets, getCurrentMonthTx } from '@/lib/server-data/base'
+import {
+  getOwnProfile,
+  getBudgets,
+  getCurrentMonthTx,
+  getActiveAssets,
+  getActiveDebts,
+  getEarliestIncomeDate,
+  getNetWorthSnapshots12m,
+} from '@/lib/server-data/base'
 import {
   getTxAgg12m,
   aggIncomeByMonth,
   aggExpenseByMonthAbs,
+  aggSumPositief,
+  aggSumNegatiefAbs,
   isRealAggRow,
   type TxMonthAggregateRow,
 } from '@/lib/server-data/tx-aggregates'
 import { resolveEffectiveIncomeExpenses, type IncomeExpenseSources } from '@/lib/effective-financials'
-import { localMonthBounds } from '@/lib/month-range'
+import { localMonthBounds, localMonthStartMonthsAgo } from '@/lib/month-range'
+import { computeSavingsRate6m, computeDebtAflossingMonthly } from '@/lib/savings-source'
+import { computeSavingsRateFromNetWorthDelta } from '@/lib/core-metrics'
+import { computeExpectedAnnualAppreciation, type Asset } from '@/lib/asset-data'
+import type { Debt } from '@/lib/debt-data'
 
 // ── Invoervormen ────────────────────────────────────────────────────────────
 
@@ -57,6 +71,22 @@ export interface MonthTxRow {
   amount: number | string
   budget_id?: string | null
   transaction_type?: string | null
+}
+
+/**
+ * De snapshot-kolommen die de forecast-laag nodig heeft (subset van de
+ * `net_worth_snapshots`-rij zoals `getNetWorthSnapshots12m` 'm ophaalt).
+ */
+export interface NetWorthSnapshotRow {
+  snapshot_date: string
+  net_worth: number
+  savings_rate?: number | null
+}
+
+/** Eén punt in een maandreeks (sparkline-vorm: `{ month, value }`). */
+export interface MonthValue {
+  month: string
+  value: number
 }
 
 /** Budgetlimiet + besteding per budget-type, genormaliseerd naar één maand. */
@@ -243,6 +273,191 @@ export function currentMonthKey(now: Date): string {
   return localMonthBounds(now).start.slice(0, 7)
 }
 
+// ── Afleidingen voor de forecast-samenvatting (T2.5) ────────────────────────
+//
+// Alles hieronder is — net als de blokken erboven — VERPLAATST uit
+// `loadDashboardData`, niet nagebouwd. Die loader consumeert exact deze functies,
+// zodat er per afleiding één implementatie bestaat.
+
+/**
+ * Een `Map<'YYYY-MM', bedrag>` als oplopende reeks `{ month, value }`.
+ *
+ * Verplaatst uit `loadDashboardData` (was de lokale `toSortedHistory`, ~r1439).
+ * De sortering is lexicografisch op de maandsleutel — voor `YYYY-MM` is dat
+ * gelijk aan chronologisch, óók over een jaargrens heen.
+ */
+export function toSortedMonthHistory(byMonth: Map<string, number>): MonthValue[] {
+  return Array.from(byMonth.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([month, value]) => ({ month, value }))
+}
+
+/**
+ * Uitgaven per maand (Σ |negatieve bedragen|, transfer-gefilterd) als oplopende
+ * reeks — de bron van `DashboardData.expenseHistory` en van de uitgaventrend-
+ * sparkline op /overzicht/cashflow/forecast.
+ *
+ * Verplaatst uit `loadDashboardData` (was ~r1409-1412). Uit het MAANDAGGREGAAT,
+ * niet uit rauwe rijen: een aggregaat kan niet stil op `max_rows` afkappen.
+ */
+export function deriveExpenseHistory(txAgg12: TxMonthAggregateRow[]): MonthValue[] {
+  return toSortedMonthHistory(aggExpenseByMonthAbs(txAgg12, { realOnly: true }))
+}
+
+/**
+ * Spaarquote-historie: het percentage per snapshot-maand.
+ *
+ * Verplaatst uit `loadDashboardData` (was ~r1330-1335). LET OP DE BRON: deze
+ * reeks komt uit `net_worth_snapshots.savings_rate` — de opgeslagen quote per
+ * maand — en NIET uit de transactie-aggregaten. De maandsleutel is dus de volle
+ * `snapshot_date` (`YYYY-MM-DD`), niet een `YYYY-MM`-aggregaatsleutel; dat is
+ * bestaand gedrag waar de sparkline alleen `value` van leest.
+ *
+ * Rijen zónder `savings_rate` vallen weg (een snapshot van vóór de kolom, of een
+ * schrijver die 'm niet zette) — bewust géén 0-fallback: een 0 % zou als échte
+ * meting in de sparkline landen.
+ */
+export function deriveSavingsHistory(snapshots: NetWorthSnapshotRow[]): MonthValue[] {
+  return snapshots
+    .filter(s => s.savings_rate != null)
+    .map(s => ({ month: s.snapshot_date, value: Number(s.savings_rate) }))
+}
+
+/**
+ * Aantal maanden werkelijke data (1-6) voor de extrapolatie in de 6-maands
+ * spaarquote: het aantal kalendermaanden tussen de vroegste inkomsten-transactie
+ * en nu, geklemd op [1, 6]. Geen inkomsten-datum → 6 (geen extrapolatie).
+ *
+ * Verplaatst uit `loadDashboardData` (was ~r807-814); `lib/lever-scores-loader.ts`
+ * en `lib/horizon-data-loader.ts` dragen dezelfde afleiding inline.
+ */
+export function deriveDataMonths6(now: Date, earliestIncomeDate: string | null | undefined): number {
+  if (!earliestIncomeDate) return 6
+  const earliest = new Date(earliestIncomeDate)
+  return Math.max(1, Math.min(6,
+    (now.getFullYear() - earliest.getFullYear()) * 12 +
+    (now.getMonth() - earliest.getMonth())
+  ))
+}
+
+/** De budget-ID's (parent + child) van één type, uit de gedeelde type-map. */
+export function budgetIdsOfType(budgetTypeMap: Map<string, string>, type: BudgetType): Set<string> {
+  const ids = new Set<string>()
+  for (const [id, t] of budgetTypeMap) if (t === type) ids.add(id)
+  return ids
+}
+
+/** De 6-maands sommen die de canonieke spaarquote voeden, uit het maandaggregaat. */
+export interface SavingsRate6mWindow {
+  income6m: number
+  expenses6m: number
+  savingsBudgetSpent6m: number
+}
+
+/**
+ * Het 6-maands sub-venster op het 12-maands maandaggregaat: inkomsten, uitgaven
+ * en spaarbudget-stortingen, alle drie transfer-gefilterd.
+ *
+ * Verplaatst uit `loadDashboardData` (was ~r792-805). Zes KALENDERmaanden
+ * inclusief de huidige = vijf maanden terug (`getMonth() - 6` telde er zeven —
+ * die off-by-one is hier bewust meeverhuisd, niet "hersteld"). De ondergrens komt
+ * uit `localMonthStartMonthsAgo` (TZ-veilig) en wordt op maandsleutel-niveau
+ * toegepast: die grens is altijd de 1e van de maand, dus `date >= grens` is exact
+ * `maand >= grens.slice(0,7)`.
+ */
+export function deriveSavingsRate6mWindow(
+  now: Date,
+  txAgg12: TxMonthAggregateRow[],
+  savingsBudgetIds: Set<string>,
+): SavingsRate6mWindow {
+  const sinceMonth = localMonthStartMonthsAgo(now, 5).slice(0, 7)
+  return {
+    income6m: aggSumPositief(txAgg12, { realOnly: true, sinceMonth }),
+    expenses6m: aggSumNegatiefAbs(txAgg12, { realOnly: true, sinceMonth }),
+    savingsBudgetSpent6m: aggSumNegatiefAbs(txAgg12, {
+      realOnly: true,
+      sinceMonth,
+      budgetIds: savingsBudgetIds,
+    }),
+  }
+}
+
+export interface SavingsRate6mInput extends SavingsRate6mWindow {
+  /** `computeDebtAflossingMonthly(debts) × 6`. */
+  debtAflossing6m: number
+  /** 1-6, uit `deriveDataMonths6`. */
+  dataMonths: number
+  /** EFFECTIVE maandinkomen (ADR 0073) — profiel-fallback én noemer van de delta-tak. */
+  effectiveMonthlyIncome: number
+  /** EFFECTIVE maanduitgaven (ADR 0073) — alleen voor de profiel-fallback. */
+  effectiveMonthlyExpenses: number
+  /** 12-maands netto-vermogen-snapshots (oplopend) voor de delta-tak. */
+  netWorthSnapshots: NetWorthSnapshotRow[]
+  /** Actieve bezittingen — ALLEEN gelezen wanneer de delta-tak aanslaat. */
+  assets: Asset[]
+}
+
+export interface SavingsRate6mOutcome {
+  /** ONAFGEROND (de bundel rondt zelf af op één decimaal bij het teruggeven). */
+  savingsRate6m: number
+  /** De aggregaat-formule gaf 0 → er is teruggevallen op profiel of net-worth-delta. */
+  isEstimate: boolean
+  /** Geëxtrapoleerde 6m-inkomsten — het inkomen-anker van het normale pad. */
+  extIncome6: number
+}
+
+/**
+ * De canonieke 6-maands spaarquote MÉT haar twee fallbacks, in de volgorde
+ * waarin `loadDashboardData` ze altijd al toepaste:
+ *
+ *  1. `computeSavingsRate6m` — extrapolatie <6m data, spaarbudget-stortingen uit
+ *     de uitgaven-term, schuldaflossing erbij (lib/savings-source.ts), plús de
+ *     PROFIEL-fallback `(inkomen − uitgaven) / inkomen` wanneer de aggregaat-
+ *     formule 0 gaf;
+ *  2. de NET-VERMOGEN-DELTA-tak — slaat aan als (1) `isEstimate` is (aggregaat 0),
+ *     er ≥2 snapshots zijn én het effectieve maandinkomen > 0. Overschrijft dan de
+ *     profiel-fallback met `computeSavingsRateFromNetWorthDelta`: de netto-
+ *     vermogensgroei over de snapshot-periode, minus de verwachte koerswinst op
+ *     beleggingen (dat is geen sparen), gedeeld door het maandinkomen.
+ *
+ * Verplaatst uit `loadDashboardData` (was ~r827-855) — regel voor regel, inclusief
+ * twee eigenschappen die geen "verbetering" mogen krijgen zonder eigen besluit:
+ *
+ *  · `computeExpectedAnnualAppreciation` draait ALLEEN binnen de tak. Buiten de
+ *    tak worden de assets dus niet gelezen; dat scheelt niets in queries maar
+ *    houdt het gedrag identiek.
+ *  · `isEstimate` blijft de uitkomst van de AGGREGAAT-formule — ook wanneer de
+ *    delta-tak een getal levert. De bundel exporteert 'm als
+ *    `savingsRateIsEstimate` ("dit is geen transactie-quote") en gebruikt 'm om
+ *    het inkomen-anker van `monthlySavingsAmount` te kiezen.
+ */
+export function resolveSavingsRate6m(input: SavingsRate6mInput): SavingsRate6mOutcome {
+  const savings6m = computeSavingsRate6m({
+    income6m: input.income6m,
+    expenses6m: input.expenses6m,
+    savingsBudgetSpent6m: input.savingsBudgetSpent6m,
+    debtAflossing6m: input.debtAflossing6m,
+    dataMonths: input.dataMonths,
+    fallbackMonthlyIncome: input.effectiveMonthlyIncome,
+    fallbackMonthlyExpenses: input.effectiveMonthlyExpenses,
+  })
+
+  let savingsRate6m = savings6m.savingsRate6m
+  if (savings6m.isEstimate && input.netWorthSnapshots.length >= 2 && input.effectiveMonthlyIncome > 0) {
+    const expectedAnnualAppreciation = computeExpectedAnnualAppreciation(input.assets)
+    const deltaResult = computeSavingsRateFromNetWorthDelta(
+      input.netWorthSnapshots,
+      input.effectiveMonthlyIncome,
+      { expectedAnnualAppreciation },
+    )
+    if (deltaResult) {
+      savingsRate6m = deltaResult.rate
+    }
+  }
+
+  return { savingsRate6m, isEstimate: savings6m.isEstimate, extIncome6: savings6m.extIncome6 }
+}
+
 // ── De loader ───────────────────────────────────────────────────────────────
 
 /**
@@ -321,5 +536,121 @@ export const loadCashflowKpis = cache(async (supabase: SupabaseClient): Promise<
     currentMonthExpenses,
     monthlyIncome,
     monthlyExpenses,
+  }
+})
+
+/**
+ * Precies wat `CashflowSection` uit de bundel leest — niets meer.
+ *
+ * Bewust een APART type naast `CashflowCardScalars`: dat type dient de vier
+ * hefboom-kaarten en moet smal blijven. `DashboardData` is hier structureel aan
+ * toewijsbaar, dus een caller die de volle bundel doorgeeft blijft compileren.
+ */
+export interface CashflowSectionScalars {
+  /** EFFECTIVE maandinkomen (`income_source='manual'` wint) — ADR 0073. */
+  monthlyIncome: number
+  /** EFFECTIVE maanduitgaven (`expenses_source='manual'` wint) — ADR 0073. */
+  monthlyExpenses: number
+  /** Canonieke 6-maands spaarquote (%), afgerond op één decimaal. */
+  savingsRate6m: number
+  /** Spaarquote per snapshot-maand (uit `net_worth_snapshots.savings_rate`). */
+  savingsHistory: MonthValue[]
+  /** Uitgaven per maand uit het 12-maands maandaggregaat. */
+  expenseHistory: MonthValue[]
+}
+
+/**
+ * De vijf velden die `CashflowSection` (/overzicht/cashflow/forecast) nodig heeft,
+ * uit ACHT gedeelde fetches — zonder de rest van `loadDashboardData` (~40 queries
+ * in 5-6 seriële golven plus een koude horizon-tak met bisectie-solve).
+ *
+ * ── WAAROM APART VAN `loadCashflowKpis` ────────────────────────────────────
+ * De vier extra fetches (schulden, bezittingen, vroegste-inkomsten-datum,
+ * snapshots) hangen UITSLUITEND aan `savingsRate6m` en `savingsHistory`. Ze in
+ * `loadCashflowKpis` schuiven zou de hub en de vaste-lasten-pagina — die alleen
+ * de zeven kaart-scalars lezen — vier queries duurder maken voor niets. Alle acht
+ * fetches zijn `cache()`-gedeeld, dus op een request waar beide loaders draaien
+ * overlappen ze volledig.
+ *
+ * ── HERKOMST PER VELD (consume, don't recompute) ───────────────────────────
+ *  · `monthlyIncome`/`monthlyExpenses` — EFFECTIVE grondslag, exact zoals
+ *    `loadCashflowKpis` 'm afleidt (rauwe maand-pass → `resolveEffective…`).
+ *  · `savingsRate6m` — `resolveSavingsRate6m`: de canonieke keten
+ *    (`computeSavingsRate6m` + profiel-fallback + net-vermogen-delta-tak),
+ *    afgerond op één decimaal zoals de bundel dat doet. Dit is HETZELFDE getal als
+ *    op /overzicht en in het instellingenblok; wijkt het af, dan toont de app twee
+ *    spaarquotes.
+ *  · `savingsHistory` — `net_worth_snapshots.savings_rate`, NIET de transactie-
+ *    aggregaten (zie `deriveSavingsHistory`).
+ *  · `expenseHistory` — het 12-maands maandaggregaat.
+ *
+ * ── WAT HIER BEWUST NIET GEBEURT ───────────────────────────────────────────
+ * De EFFECTIEVE spaarquote (`resolveSavingsSource`, waar `expenses_source =
+ * 'manual'` de transactiequote overrulet) is een ANDER getal dan `savingsRate6m`,
+ * en de bundel houdt ze uit elkaar: de kaart toont de 6-maands transactiequote,
+ * de gezondheidsscore oordeelt op de effectieve. Die splitsing verhuist hier niet
+ * mee — `CashflowSection` las altijd al `savingsRate6m`.
+ *
+ * RLS: MOET met de anon/authenticated client worden aangeroepen — nooit met
+ * getServiceClient(). Zie de koptekst van lib/server-data/base.ts.
+ */
+export const loadForecastSectionData = cache(async (supabase: SupabaseClient): Promise<CashflowSectionScalars> => {
+  // `now` VÓÓR de fetches bemonsteren — zelfde reden als in `loadCashflowKpis`.
+  const now = new Date()
+
+  const [
+    profileResult,
+    budgetsResult,
+    txResult,
+    txAgg12Result,
+    debtsResult,
+    assetsResult,
+    earliestIncomeResult,
+    snapshotsResult,
+  ] = await Promise.all([
+    getOwnProfile(supabase),
+    getBudgets(supabase),
+    getCurrentMonthTx(supabase),
+    getTxAgg12m(supabase),
+    getActiveDebts(supabase),
+    getActiveAssets(supabase),
+    getEarliestIncomeDate(supabase),
+    getNetWorthSnapshots12m(supabase),
+  ])
+
+  const profile = (profileResult.data ?? null) as (Record<string, unknown> & IncomeExpenseSources) | null
+  const budgets = (budgetsResult.data ?? []) as unknown as BudgetRowForTotals[]
+  const monthTx = (txResult.data ?? []) as unknown as MonthTxRow[]
+  const txAgg12 = (txAgg12Result.data ?? []) as TxMonthAggregateRow[]
+  const debts = (debtsResult.data ?? []) as unknown as Debt[]
+  const assets = (assetsResult.data ?? []) as unknown as Asset[]
+  const snapshots = (snapshotsResult.data ?? []) as unknown as NetWorthSnapshotRow[]
+
+  // EFFECTIVE grondslag uit de rauwe maand-rijen (ADR 0073).
+  const realMonth = deriveRealMonthTotals(monthTx)
+  const { income: monthlyIncome, expenses: monthlyExpenses } =
+    resolveEffectiveIncomeExpenses(profile ?? {}, realMonth.income, realMonth.expenses)
+
+  // 6-maands sub-venster op het aggregaat, met de spaarbudget-correctie.
+  const savingsBudgetIds = budgetIdsOfType(buildBudgetTypeMap(budgets), 'savings')
+  const window6m = deriveSavingsRate6mWindow(now, txAgg12, savingsBudgetIds)
+
+  const { savingsRate6m } = resolveSavingsRate6m({
+    ...window6m,
+    debtAflossing6m: computeDebtAflossingMonthly(debts) * 6,
+    dataMonths: deriveDataMonths6(now, (earliestIncomeResult.data as { date?: string | null } | null)?.date),
+    effectiveMonthlyIncome: monthlyIncome,
+    effectiveMonthlyExpenses: monthlyExpenses,
+    netWorthSnapshots: snapshots,
+    assets,
+  })
+
+  return {
+    monthlyIncome,
+    monthlyExpenses,
+    // Zelfde afronding als `DashboardData.savingsRate6m` — één decimaal.
+    savingsRate6m: Math.round(savingsRate6m * 10) / 10,
+    savingsHistory: deriveSavingsHistory(snapshots),
+    expenseHistory: deriveExpenseHistory(txAgg12),
   }
 })
