@@ -67,7 +67,7 @@ import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import { buildPensionProjection } from '@/lib/pension/pension-projection'
 import { resolveFireAssumptions, type FireAssumptionRow } from '@/lib/fire-assumptions'
 import { getAowLeeftijden } from '@/lib/reference-cache'
-import { type Asset } from '@/lib/asset-data'
+import type { Asset } from '@/lib/asset-data'
 import { computeAssetsByType, computeLiquidPot, monthsCoveredFrom } from '@/lib/dashboard-wealth-weighting'
 import { resolveEmergencyFund } from '@/lib/emergency-fund'
 import { loadVasteLastenSummary } from '@/lib/vaste-lasten-summary'
@@ -1433,8 +1433,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   )
   let debtHistory = debtSaldoHistory
   if (debtHistory.length === 0) {
-    const debtBudgetIds = new Set<string>()
-    for (const [id, type] of budgetTypeMap) if (type === 'debt') debtBudgetIds.add(id)
+    const debtBudgetIds = budgetIdsOfType(budgetTypeMap, 'debt')
     const debtMonthAgg = aggAbsByMonthForBudgets(txAgg12, debtBudgetIds, { realOnly: true })
     debtHistory = toSortedMonthHistory(debtMonthAgg)
   }
