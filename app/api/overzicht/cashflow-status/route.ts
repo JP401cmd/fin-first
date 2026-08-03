@@ -38,9 +38,10 @@ import {
  * perspectief stuurt `loadCashflowData`, precies zoals op de pagina;
  * `loadCashflowKpis` is — net als `loadDashboardData` hiervoor — persoonlijk.
  *
- * Egress: deze route is bewust LAZY — de bijbehorende client-hook fetcht hem
- * alleen op /overzicht/cashflow*-routes (zie use-cashflow-card-statuses.ts), niet
- * op elke pagina.
+ * Egress: deze route is bewust LAZY — hij wordt alleen gefetcht op de
+ * /overzicht/cashflow-SUB-routes (zie use-cashflow-card-statuses.ts). Op de HUB
+ * valt hij helemaal weg: die pagina berekent de kaarten toch al server-side en
+ * seedt de dots via `<CashflowStatusSeed>`.
  *
  * TTL-cache (lib/cashflow-status-cache.ts): bovenop die lazy-gating vouwt een
  * korte per-gebruiker+perspectief-cache herhaalde bezoeken samen — React

@@ -21,6 +21,7 @@ import { PerspectiveProvider } from '@/components/app/perspective-provider'
 import { NotificationProvider } from '@/components/app/notifications/notification-provider'
 import { NotificationModal } from '@/components/app/notifications/notification-panel'
 import { ResponsiveShell } from '@/components/app/shell/responsive-shell'
+import { CashflowStatusProvider } from '@/components/app/cashflow-status-provider'
 import type { SidebarSignals } from '@/components/app/shell/shell-contexts'
 import { PlatformBanner } from '@/components/app/platform-banner'
 import { parsePlatformStatus } from '@/lib/platform-status'
@@ -484,21 +485,28 @@ export default async function AppLayout({
                       </a>
                       <FeatureAccessProvider data={featureAccess} activeModules={activeModules}>
                         <CommandPaletteProvider role={profile?.role ?? 'user'}>
-                          <ResponsiveShell
-                            email={user.email ?? ''}
-                            role={profile?.role ?? 'user'}
-                            sidebarMetrics={{
-                              netWorth: sidebarNetWorth,
-                              actionCount: sidebarActionCount,
-                              activeAppKeys: sidebarActiveAppKeys,
-                              categoryAppLinks: sidebarCategoryAppLinks,
-                              leverScores: sidebarLeverScores,
-                              sidebarSignals,
-                            }}
-                          >
-                            <PlatformBanner status={platformStatus} />
-                            {children}
-                          </ResponsiveShell>
+                          {/* Deelt de vier cashflow-kaartstatussen tussen de
+                              sidebar-dots (in de Sidebar) en de server-seed van
+                              de cashflow-hub (in de pagina) — twee zustertakken
+                              die alleen via een gedeelde voorouder bij elkaar
+                              komen. Zie cashflow-status-provider.tsx. */}
+                          <CashflowStatusProvider>
+                            <ResponsiveShell
+                              email={user.email ?? ''}
+                              role={profile?.role ?? 'user'}
+                              sidebarMetrics={{
+                                netWorth: sidebarNetWorth,
+                                actionCount: sidebarActionCount,
+                                activeAppKeys: sidebarActiveAppKeys,
+                                categoryAppLinks: sidebarCategoryAppLinks,
+                                leverScores: sidebarLeverScores,
+                                sidebarSignals,
+                              }}
+                            >
+                              <PlatformBanner status={platformStatus} />
+                              {children}
+                            </ResponsiveShell>
+                          </CashflowStatusProvider>
                         </CommandPaletteProvider>
                         {/* ChatPanel MOET binnen FeatureAccessProvider blijven:
                             het leest de AI-abonnementsstatus via useModuleAccess()

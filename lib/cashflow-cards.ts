@@ -17,9 +17,10 @@ export type CashflowCardKey = 'budget' | 'transacties' | 'vaste-lasten' | 'forec
 
 /**
  * De vier kaartstatussen als platte payload — het wire-contract van
- * `GET /api/overzicht/cashflow-status` en daarmee van de sidebar-status-dots
- * (`useCashflowCardStatuses`). Woont hier omdat dit de module is die de
- * statussen produceert; route, TTL-cache en hook consumeren allemaal DEZE vorm.
+ * `GET /api/overzicht/cashflow-status` én van de server-seed op de hub, en
+ * daarmee van de sidebar-status-dots (`useCashflowStatusContext`). Woont hier
+ * omdat dit de module is die de statussen produceert; route, TTL-cache, seed en
+ * sidebar consumeren allemaal DEZE vorm.
  */
 export interface CashflowCardStatuses {
   budget: LeverageStatus

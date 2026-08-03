@@ -2,7 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { loadCashflowKpis } from '@/lib/cashflow-kpis'
 import { loadCashflowData } from '@/lib/cashflow-data-loader'
 import { loadVasteLastenSummary } from '@/lib/vaste-lasten-summary'
-import { buildCashflowCards } from '@/lib/cashflow-cards'
+import { buildCashflowCards, cashflowCardStatuses } from '@/lib/cashflow-cards'
+import { CashflowStatusSeed } from '@/components/app/cashflow-status-provider'
 import { CashflowLandingCards } from '@/components/overview/cashflow-landing-cards'
 import { InflationImpactCard } from '@/components/overview/inflation-impact-card'
 import { HideInSimple } from '@/components/app/hide-in-simple'
@@ -21,6 +22,13 @@ import type { Perspective } from '@/lib/household-data'
  * `loadDashboardData` (~40 queries plus een koude horizon-tak met bisectie-solve).
  * De cashflow-hub gebruikte de bundel nergens anders voor; dit is de enige
  * callsite die 'm hier had.
+ *
+ * DE SIDEBAR-DOTS LIFTEN MEE (T2.3): dezelfde kaarten voeden via
+ * `<CashflowStatusSeed>` de vier status-dots onder Cashflow in de sidebar. Op de
+ * hub vervalt daarmee de tweede request naar /api/overzicht/cashflow-status —
+ * die route bestaat nog uitsluitend voor de sub-pagina's, die de kaarten niet
+ * server-side hebben. De projectie kaart→status loopt via `cashflowCardStatuses`,
+ * gedeeld met die route, zodat dot en kaart per constructie gelijk blijven.
  *
  * DE INFLATIEKAART HOORT HIER (stap 3): hij hangt aan `cashflow.baselineExpenses`
  * uit diezelfde `loadCashflowData`. Hem in een eigen `<Suspense>` zetten zou een
@@ -43,6 +51,11 @@ export async function CashflowCardsLoader({ perspective }: { perspective: Perspe
 
   return (
     <>
+      {/* Seedt de sidebar-status-dots met de statussen van DEZE kaarten (zelfde
+          array, zelfde projectie) — daardoor fetcht de hub `/api/overzicht/
+          cashflow-status` niet. Rendert niets. */}
+      <CashflowStatusSeed statuses={cashflowCardStatuses(cards)} />
+
       <section className="mx-auto max-w-6xl px-4 sm:px-6">
         <CashflowLandingCards cards={cards} />
       </section>
