@@ -24,6 +24,10 @@ import { componentBody, stripComments } from '@/test/helpers/page-source'
 
 const PAGE_SRC = readFileSync(path.resolve(__dirname, 'page.tsx'), 'utf-8')
 const LOADER_SRC = readFileSync(path.resolve(__dirname, 'vaste-lasten-loader.tsx'), 'utf-8')
+const CLIENT_SRC = readFileSync(
+  path.resolve(__dirname, '../../../../../components/overview/vaste-lasten-client.tsx'),
+  'utf-8',
+)
 
 const PAGE_SIGNATURE = 'export default async function OverzichtCashflowVasteLastenPage'
 
@@ -96,5 +100,28 @@ describe('vaste-lasten-loader — draait op de slanke KPI-laag (ADR 0077)', () =
   it('houdt de kalender in dezelfde grens — één wachtpunt op één load', () => {
     expect(src).toContain('<CashflowKalender')
     expect(src).toContain('<VasteLastenClient')
+    // En géén tweede grens erómheen: de kalender hangt aan `cashflow.recurrings`
+    // uit dezelfde `loadCashflowData`, dus een eigen <Suspense> zou een tweede
+    // wachtpunt op één load zijn. Zonder deze regel houdt precies die wijziging
+    // de test groen.
+    expect(src).not.toContain('<Suspense')
+  })
+})
+
+describe('/overzicht/cashflow/vaste-lasten — precies één pagina-aanhef', () => {
+  it('de client rendert geen tweede PageOpening', () => {
+    // De kicker + H1 zijn bij T2.4 uit vaste-lasten-client.tsx naar de
+    // server-pagina verhuisd (LCP-kandidaat, hangt van geen data af). Zet iemand
+    // de `<PageOpening>` daar terug — bij een merge, of uit een "hij hoort toch
+    // bij dit blok"-reflex — dan shipt de pagina twee <h1>'s zonder dat een van
+    // de asserties hierboven iets merkt: die kijken alleen naar page.tsx en de
+    // loader. De client is de enige andere plek waar een kop kan ontstaan
+    // (`VasteLastenClient` heeft precies één consument: de loader).
+    //
+    // Het tag-einde in het patroon is nodig, niet cosmetisch: `<PageOpening` is
+    // een prefix van `<PageOpeningFigure`, en dát sub-composiet hoort hier juist
+    // wél te staan (het cijferblok). Een kale substring-check zou de test
+    // permanent rood houden om de verkeerde reden.
+    expect(stripComments(CLIENT_SRC)).not.toMatch(/<PageOpening[\s/>]/)
   })
 })

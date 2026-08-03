@@ -102,6 +102,16 @@ export async function VasteLastenLoader({ perspective }: { perspective: Perspect
  *    `HideInSimple` — in Eenvoudig renderen ze helemaal niet — en allebei ver onder
  *    de vouw. Een vaste reservering zou voor de Eenvoudig-modus een permanent gat
  *    zijn; dezelfde afweging als de inflatiekaart op de hub.
+ *
+ * WAT WÉL GERESERVEERD WORDT HOEWEL HET KAN ONTBREKEN — de aandeel-meter.
+ * `CompactMeter` rendert alleen bij `insights.hasData` (vaste-lasten-client.tsx),
+ * dus voor een account zonder gedetecteerde vaste lasten klapt hier ~40px dicht,
+ * bóven de vouw. Toch gereserveerd, om dezelfde reden als de KPI-regel in
+ * `CashflowCardsFallback` op de hub: reserveren kiest de veelvoorkomende kant.
+ * Wie geen enkele vaste last heeft ziet sowieso de lege staat van de
+ * analyse-kaart (~400px skeleton → een compacte "nog niets gevonden"-tekst); die
+ * 40px weglaten zou zijn instroom niet shift-vrij maken, en zou iedereen mét
+ * vaste lasten een groei van 40px kosten.
  */
 export function VasteLastenFallback() {
   return (

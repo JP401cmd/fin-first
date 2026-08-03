@@ -30,6 +30,25 @@ describe('componentBody — scoping van de await-telling', () => {
     expect(body).not.toContain('loadDashboardData')
   })
 
+  it('slaat een gedestructureerde parameterlijst over en pakt het échte lichaam', () => {
+    // Zonder haakjes-matching zou de "body" `{ searchParams }` zijn: nul awaits,
+    // en dan wordt "precies één await" groen om de verkeerde reden. Dit is de
+    // normaalvorm zodra een pagina searchParams/params leest, dus de gedeelde
+    // helper komt 'm gegarandeerd een keer tegen.
+    const synthetic = [
+      'export default async function Page({ searchParams }: { searchParams: Promise<X> }) {',
+      '  const perspective = await getServerPerspective()',
+      '  return <div>{perspective}</div>',
+      '}',
+    ].join('\n')
+
+    const body = componentBody(synthetic, 'export default async function Page')
+
+    expect(body.match(/\bawait\b/g) ?? []).toHaveLength(1)
+    expect(body).toContain('getServerPerspective()')
+    expect(body).not.toContain('searchParams:')
+  })
+
   it('telt geneste blokken mee tot de matchende sluit-accolade', () => {
     const synthetic = [
       'export default async function Page() {',

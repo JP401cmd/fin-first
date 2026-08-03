@@ -23,7 +23,18 @@ import { expect } from 'vitest'
  * De eigenschap zelf staat vastgepind in `page-source.test.ts`.
  */
 
-/** Strip block- en regelcommentaar, zodat proza in de kop niet meetelt. */
+/**
+ * Strip block- en regelcommentaar, zodat proza in de kop niet meetelt.
+ *
+ * BEPERKING: regelcommentaar wordt alleen aan het REGELBEGIN herkend — de regex
+ * ankert op `^` met hooguit witruimte ervoor. Een TRAILING comment, bv.
+ * `const x = 1` gevolgd door een dubbele slash en "niet via loadDashboardData",
+ * blijft dus staan en kan een import-assertie vals doen falen. Dat is de veilige
+ * kant (een valse positief, nooit een stilzwijgende verzwakking), en bewust zo:
+ * een dubbele slash middenin een regel is net zo goed een URL of een regex, en
+ * die wegknippen zou juist wél code kunnen verminken. Loop je ertegenaan,
+ * verplaats dan het commentaar naar zijn eigen regel.
+ */
 export function stripComments(src: string): string {
   return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '')
 }
@@ -34,9 +45,21 @@ export function stripComments(src: string): string {
  * met een slice tot EOF is "precies één await" gescoped op bestandspositie, en
  * zou de assertie stil verbreden zodra er iets áchter de component wordt gezet.
  *
- * Het commentaar gaat er eerst af, en de bron bevat geen accolades binnen
- * string-literals — zou dat veranderen, dan loopt de teller uit de pas en faalt
- * deze helper luid (geen sluitende accolade gevonden) in plaats van stil door.
+ * De body begint ná de PARAMETERLIJST, niet bij de eerste `{` na de signature.
+ * Dat is geen detail: een page-component met gedestructureerde props
+ * (`function Page({ searchParams })` — de normaalvorm zodra een pagina
+ * searchParams/params leest) zet daar een accolade die niets met het lichaam te
+ * maken heeft. Zonder de haakjes-matching zou de "body" dan de parameterlijst
+ * zijn: de await-telling komt op 0 uit en de test wordt groen om de verkeerde
+ * reden. Vandaar eerst `(` … `)` matchen, dan pas naar `{` zoeken.
+ *
+ * Twee bekende grenzen, allebei luid en niet stil:
+ *  · De bron mag geen accolades/haakjes binnen string-literals dragen — zou dat
+ *    veranderen, dan loopt de teller uit de pas en faalt deze helper met "geen
+ *    matchende sluitende accolade" i.p.v. door te gaan.
+ *  · Een inline object-return-type (`): { a: number } {`) zou de eerste `{` ná de
+ *    parameterlijst opeisen. Komt in page-components niet voor; verschijnt het
+ *    toch, dan valt dat direct op in de gestripte body.
  *
  * @param src        De volledige bestandsbron (mét commentaar).
  * @param signature  Begin van de functie-declaratie, bv.
@@ -47,8 +70,26 @@ export function componentBody(src: string, signature: string): string {
   const start = stripped.indexOf(signature)
   expect(start, `functie-declaratie "${signature}" niet gevonden`).toBeGreaterThan(-1)
 
-  const open = stripped.indexOf('{', start)
-  expect(open, 'geen openende accolade na de signature').toBeGreaterThan(-1)
+  // Eerst de parameterlijst overslaan — zie de doc-comment hierboven.
+  const paramsOpen = stripped.indexOf('(', start)
+  expect(paramsOpen, 'geen parameterlijst na de signature').toBeGreaterThan(-1)
+
+  let parenDepth = 0
+  let paramsClose = -1
+  for (let i = paramsOpen; i < stripped.length; i++) {
+    if (stripped[i] === '(') parenDepth++
+    else if (stripped[i] === ')') {
+      parenDepth--
+      if (parenDepth === 0) {
+        paramsClose = i
+        break
+      }
+    }
+  }
+  expect(paramsClose, 'geen matchende sluit-haak voor de parameterlijst').toBeGreaterThan(-1)
+
+  const open = stripped.indexOf('{', paramsClose)
+  expect(open, 'geen openende accolade na de parameterlijst').toBeGreaterThan(-1)
 
   let depth = 0
   for (let i = open; i < stripped.length; i++) {
