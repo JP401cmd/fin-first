@@ -8,7 +8,8 @@
  * selecteren; pad B is de nieuwe loader met zijn vier fetches. Als de extractie
  * ook maar één afleiding zou hebben verschoven, wijkt hier een veld af.
  *
- * De nep-database is bewust datum- en cap-getrouw:
+ * De nep-database (`test/helpers/fake-supabase.ts`, gedeeld met de forecast-
+ * pariteitstest) is bewust datum- en cap-getrouw:
  *   • `.gte/.lt/.eq/...` op transacties worden ECHT toegepast, zodat
  *     maandgrenzen (fixture 4) betekenis hebben;
  *   • elk `from(...)`-antwoord wordt op 1000 rijen afgekapt — precies wat
@@ -23,9 +24,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import type { SupabaseClient } from '@supabase/supabase-js'
 import type { DashboardData } from '@/lib/types/dashboard'
-import { buildMonthAggregatesFromRows } from '@/lib/server-data/tx-aggregates'
+import { makeSupabase, type FakeDb, type Row } from '@/test/helpers/fake-supabase'
 import { loadDashboardData } from '@/lib/dashboard-data-loader'
 import {
   loadCashflowKpis,
@@ -38,97 +38,6 @@ import {
   type BudgetRowForTotals,
   type MonthTxRow,
 } from '@/lib/cashflow-kpis'
-
-// ── Nep-database ────────────────────────────────────────────────────────────
-
-type Row = Record<string, unknown>
-type Filter = { op: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'in'; col: string; val: unknown }
-
-/** De PostgREST-cap uit supabase/config.toml — geldt voor élk tabel-antwoord. */
-const MAX_ROWS = 1000
-
-function applyFilters(rows: Row[], filters: Filter[]): Row[] {
-  return rows.filter((r) =>
-    filters.every((f) => {
-      const v = r[f.col]
-      switch (f.op) {
-        case 'eq': return v === f.val
-        case 'neq': return v !== f.val
-        case 'gt': return (v as never) > (f.val as never)
-        case 'gte': return (v as never) >= (f.val as never)
-        case 'lt': return (v as never) < (f.val as never)
-        case 'lte': return (v as never) <= (f.val as never)
-        case 'in': return Array.isArray(f.val) && (f.val as unknown[]).includes(v)
-      }
-    }),
-  )
-}
-
-interface FakeDb {
-  profile: Row
-  budgets: Row[]
-  transactions: Row[]
-}
-
-function makeSupabase(db: FakeDb): { client: SupabaseClient; tableQueries: () => number; rpcCalls: () => string[] } {
-  let tableQueries = 0
-  const rpcCalls: string[] = []
-
-  const tables: Record<string, Row[]> = {
-    profiles: [db.profile],
-    budgets: db.budgets,
-    transactions: db.transactions,
-  }
-
-  function builder(table: string) {
-    const rows = tables[table] ?? []
-    const filters: Filter[] = []
-    let limit = MAX_ROWS
-    let offset = 0
-    const settle = () => {
-      const out = applyFilters(rows, filters).slice(offset)
-      // PostgREST kapt af op min(client-limit, max_rows) — een client-`.limit()`
-      // bóven max_rows is een no-op, exact zoals in productie.
-      return { data: out.slice(0, Math.min(limit, MAX_ROWS)), error: null }
-    }
-    const q: Record<string, unknown> = {}
-    const passthrough = ['select', 'order', 'not', 'or', 'is', 'filter', 'contains', 'overlaps', 'match', 'textSearch']
-    for (const m of passthrough) q[m] = () => q
-    for (const op of ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'in'] as const) {
-      q[op] = (col: string, val: unknown) => { filters.push({ op, col, val }); return q }
-    }
-    q.limit = (n: number) => { limit = n; return q }
-    // `.range(from, to)` is inclusief aan beide kanten — de paginatie in
-    // lib/vaste-lasten-summary.ts leunt erop, dus de mock moet 'm echt uitvoeren
-    // (anders paginert die lus eeuwig door).
-    q.range = (from: number, to: number) => { offset = from; limit = to - from + 1; return q }
-    q.single = () => Promise.resolve({ data: settle().data[0] ?? null, error: null })
-    q.maybeSingle = () => Promise.resolve({ data: settle().data[0] ?? null, error: null })
-    q.then = (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
-      Promise.resolve(settle()).then(res, rej)
-    return q
-  }
-
-  const client = {
-    auth: { getUser: async () => ({ data: { user: { id: 'user-parity' } }, error: null }) },
-    from: (table: string) => { tableQueries++; return builder(table) },
-    rpc: async (fn: string, args: Record<string, unknown> = {}) => {
-      rpcCalls.push(fn)
-      if (fn === 'tx_month_aggregate') {
-        // Een aggregaat kent de rij-cap NIET: het telt in de database.
-        const from = String(args.p_from ?? '')
-        const to = String(args.p_to ?? '')
-        const inWindow = db.transactions.filter(
-          (t) => String(t.date) >= from && String(t.date) < to,
-        ) as { amount: number; date: string; budget_id?: string | null; transaction_type?: string | null }[]
-        return { data: buildMonthAggregatesFromRows(inWindow), error: null }
-      }
-      return { data: [], error: null }
-    },
-  } as unknown as SupabaseClient
-
-  return { client, tableQueries: () => tableQueries, rpcCalls: () => rpcCalls }
-}
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
 
