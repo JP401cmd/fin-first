@@ -113,14 +113,19 @@ export default function BeheerTestdataPage() {
         }
       }
 
-      // 5. Insert template budgets
+      // 5. Insert template budgets.
+      // Plain `insert` — géén `upsert(onConflict)`: de unieke index op budgets is
+      // een EXPRESSIE-index (user_id, slug, COALESCE(parent_id, '000…')) en die is
+      // via PostgREST's kolom-only `on_conflict` principieel niet te targeten (42P10).
+      // Stap 1-4 hierboven hebben alle budgetten al verwijderd, dus insert volstaat.
+      // Zelfde patroon als lib/seed-persona.ts:822-827.
       const budgets = template.getBudgets()
       let insertedCount = 0
 
       for (const parent of budgets) {
         const { data: parentRow, error: parentError } = await supabase
           .from('budgets')
-          .upsert({
+          .insert({
             user_id: user.id,
             name: parent.name,
             slug: parent.slug,
@@ -131,7 +136,7 @@ export default function BeheerTestdataPage() {
             is_essential: parent.is_essential,
             priority_score: parent.priority_score,
             sort_order: parent.sort_order,
-          }, { onConflict: 'user_id, slug' })
+          })
           .select('id')
           .single()
 
@@ -150,7 +155,7 @@ export default function BeheerTestdataPage() {
             budget_type: parent.budget_type,
             sort_order: idx,
           }))
-          const { data: inserted } = await supabase.from('budgets').upsert(childRows, { onConflict: 'user_id, slug' }).select('id')
+          const { data: inserted } = await supabase.from('budgets').insert(childRows).select('id')
           insertedCount += inserted?.length ?? 0
         }
       }

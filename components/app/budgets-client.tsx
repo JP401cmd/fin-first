@@ -30,7 +30,7 @@ import {
   Pill,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { getDefaultBudgets, BUDGET_SLUGS, type Budget, type BudgetWithChildren } from '@/lib/budget-data'
+import { BUDGET_SLUGS, type Budget, type BudgetWithChildren } from '@/lib/budget-data'
 import type { BudgetsPageData, BudgetGoal } from '@/lib/budgets-data-loader'
 import { BudgetIcon, formatCurrency, getTypeColors, isOverPositive, computeBarSegments, iconMap, iconOptions, type BudgetType } from '@/components/app/budget-shared'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
@@ -1396,20 +1396,17 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
       if (signal?.aborted) return // Discard stale results
       if (fetchError) throw fetchError
 
-      // SEED-GUARD: seeden mag NOOIT triggeren wanneer er alleen gedeelde
-      // budgetten zijn (de query is nu ongefilterd, dus `data` bevat eigen +
-      // gedeeld; een lege set betekent écht "nog geen budgetten" → seed defaults).
-      if (!data || data.length === 0) {
-        await seedBudgets(supabase)
-        return
-      }
-
+      // GEEN client-side seed meer: budgetten worden uitsluitend server-side
+      // aangemaakt (`/api/budgetteren/setup`, onboarding, module-activatie).
+      // Een lege set is hier dus een geldige eindtoestand — de first-use lege
+      // staat verderop ("Nog geen budgetten" + CTA) vangt 'm op. Zie ADR 0058:
+      // muteren hoort niet vanuit een `'use client'`-bestand.
       // Apply privacy filtering in household mode (Feature #537).
       // Privacy komt uit de foundation-context (geen eigen
       // /api/household/partner-privacy-roundtrip meer). De directe budgets-query
       // levert via RLS al alleen eigen-persoonlijk + gedeeld; deze filter is een
       // extra vangnet wanneer de partner 'budgets' op 'hidden' heeft staan.
-      let filteredBudgetData = data as Budget[]
+      let filteredBudgetData = (data ?? []) as Budget[]
       if (perspective === 'household' && partnerPrivacy?.budgets === 'hidden') {
         const { data: { user } } = await supabase.auth.getUser()
         if (signal?.aborted) return
@@ -1467,56 +1464,6 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
       .order('sort_order', { ascending: true })
     if (data) setGoals(data as Goal[])
   }, [])
-
-  async function seedBudgets(supabase: ReturnType<typeof createClient>) {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-
-    // Guard: check if budgets already exist (race condition protection)
-    const { count } = await supabase.from('budgets').select('id', { count: 'exact', head: true })
-    if (count && count > 0) { await loadBudgets(); return }
-
-    const defaults = getDefaultBudgets()
-
-    for (const parent of defaults) {
-      const { data: parentData, error: parentError } = await supabase
-        .from('budgets')
-        .upsert({
-          user_id: user.id,
-          name: parent.name,
-          slug: parent.slug,
-          icon: parent.icon,
-          description: parent.description,
-          default_limit: parent.default_limit,
-          budget_type: parent.budget_type,
-          is_essential: parent.is_essential,
-          priority_score: parent.priority_score,
-          sort_order: parent.sort_order,
-        }, { onConflict: 'user_id, slug' })
-        .select('id')
-        .single()
-
-      if (parentError || !parentData) continue
-
-      if (parent.children) {
-        const childRows = parent.children.map((child, idx) => ({
-          user_id: user.id,
-          parent_id: parentData.id,
-          name: child.name,
-          slug: child.slug,
-          icon: child.icon,
-          description: child.description,
-          default_limit: child.default_limit,
-          budget_type: parent.budget_type,
-          sort_order: idx,
-        }))
-
-        await supabase.from('budgets').upsert(childRows, { onConflict: 'user_id, slug' })
-      }
-    }
-
-    await loadBudgets()
-  }
 
   // Track whether we should skip the initial fetch (when server data was provided)
   const skipInitialFetch = useRef(!!initialData)
