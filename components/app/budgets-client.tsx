@@ -977,9 +977,14 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
   const [partnerBudgets, setPartnerBudgets] = useState<PartnerBudgetRow[]>([])
   const [loading, setLoading] = useState(!initialData)
   const [error, setError] = useState<string | null>(null)
-  // Pas ná de eerste volledige load (incl. eventueel auto-seeden) waar — de
-  // first-use lege staat mag niet flitsen terwijl de seed-cyclus nog loopt.
-  const [initialLoadDone, setInitialLoadDone] = useState(false)
+  // Gate voor de first-use lege staat: die mag pas renderen als we weten dát er
+  // niets is, niet zolang we nog laden. Server-gehydrateerd (`initialData`) is
+  // die zekerheid er al bij mount — en beide routes geven `initialData` áltijd
+  // mee (core/budgets + overzicht/cashflow/budget), waardoor `skipInitialFetch`
+  // hieronder de client-fetch overslaat. Zou dit op `false` blijven staan, dan
+  // werd de vlag op dat pad nooit gezet en bleef de pagina onder de toolbar
+  // leeg (alle type-secties zijn `.length > 0`-gated).
+  const [initialLoadDone, setInitialLoadDone] = useState(!!initialData)
 
   // Pane-state komt rechtstreeks uit `searchParams` (één bron-of-truth, plan §2.7).
   // Geen lokale `selectedBudgetId` meer; openen/sluiten gebeurt via router.replace
@@ -1396,11 +1401,20 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
       if (signal?.aborted) return // Discard stale results
       if (fetchError) throw fetchError
 
-      // GEEN client-side seed meer: budgetten worden uitsluitend server-side
-      // aangemaakt (`/api/budgetteren/setup`, onboarding, module-activatie).
-      // Een lege set is hier dus een geldige eindtoestand — de first-use lege
-      // staat verderop ("Nog geen budgetten" + CTA) vangt 'm op. Zie ADR 0058:
-      // muteren hoort niet vanuit een `'use client'`-bestand.
+      // GEEN seed meer vanuit dit bestand: het oude `seedBudgets` mikte met
+      // `upsert(onConflict: 'user_id, slug')` op een sleutel die niet bestaat
+      // (expressie-index, migratie 20260319000001) en recurseerde daardoor
+      // onbegrensd met `loadBudgets`. Een lege set is hier nu een geldige
+      // eindtoestand — de first-use lege staat verderop ("Nog geen budgetten"
+      // + CTA) vangt 'm op.
+      //
+      // Let op: dit betekent NIET dat budgetten uitsluitend server-side worden
+      // aangemaakt. Server-side gebeurt het in `/api/budgetteren/setup` en
+      // `/api/onboarding/save-own-data`; client-side bestaan `budget-form.tsx`
+      // (:341/:370/:422 — de component achter de CTA hierboven) en
+      // `module-activation-modal.tsx` (:685) nog. Ook dit bestand update
+      // budgets nog client-side (:2967, :4336). Die client-writes staan open
+      // onder ADR 0058 fase b; de seed-schuld is dus versmald, niet weg.
       // Apply privacy filtering in household mode (Feature #537).
       // Privacy komt uit de foundation-context (geen eigen
       // /api/household/partner-privacy-roundtrip meer). De directe budgets-query

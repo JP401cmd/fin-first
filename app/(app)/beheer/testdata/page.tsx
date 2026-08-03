@@ -117,10 +117,15 @@ export default function BeheerTestdataPage() {
       // Plain `insert` — géén `upsert(onConflict)`: de unieke index op budgets is
       // een EXPRESSIE-index (user_id, slug, COALESCE(parent_id, '000…')) en die is
       // via PostgREST's kolom-only `on_conflict` principieel niet te targeten (42P10).
-      // Stap 1-4 hierboven hebben alle budgetten al verwijderd, dus insert volstaat.
+      // Stap 1-4 hierboven ruimen eerst op, dus er valt niets te "upserten".
       // Zelfde patroon als lib/seed-persona.ts:822-827.
+      //
+      // NB: de select op stap 1 filtert niet op `user_id` en leunt dus op RLS —
+      // die levert eigen én gedeelde huishoudbudgetten. De opruiming is daarmee
+      // niet strikt eigen-scoped (pre-existent, hier niet gewijzigd).
       const budgets = template.getBudgets()
       let insertedCount = 0
+      const failures: string[] = []
 
       for (const parent of budgets) {
         const { data: parentRow, error: parentError } = await supabase
@@ -140,7 +145,13 @@ export default function BeheerTestdataPage() {
           .select('id')
           .single()
 
-        if (parentError || !parentRow) continue
+        // Stil overslaan mag niet meer: vóór de fix faalde deze insert altijd
+        // (42P10), dus was "0 ingevoegd" het enige signaal. Nu het pad werkt is
+        // een gedeeltelijke mislukking anders niet van succes te onderscheiden.
+        if (parentError || !parentRow) {
+          failures.push(`${parent.slug}: ${parentError?.message ?? 'geen rij teruggekregen'}`)
+          continue
+        }
         insertedCount++
 
         if (parent.children && parent.children.length > 0) {
@@ -155,12 +166,19 @@ export default function BeheerTestdataPage() {
             budget_type: parent.budget_type,
             sort_order: idx,
           }))
-          const { data: inserted } = await supabase.from('budgets').insert(childRows).select('id')
+          const { data: inserted, error: childError } = await supabase
+            .from('budgets')
+            .insert(childRows)
+            .select('id')
+          if (childError) failures.push(`${parent.slug} (subbudgetten): ${childError.message}`)
           insertedCount += inserted?.length ?? 0
         }
       }
 
       setTemplateResult({ name: template.name, inserted: insertedCount })
+      if (failures.length > 0) {
+        setTemplateError(`${failures.length} budget(ten) niet aangemaakt — ${failures.join('; ')}`)
+      }
     } catch (e) {
       setTemplateError(e instanceof Error ? e.message : 'Onbekende fout')
     } finally {

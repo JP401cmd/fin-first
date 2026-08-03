@@ -9,11 +9,18 @@
  * 42P10/400. Bovendien was `loadBudgets ⇄ seedBudgets` een onbegrensde
  * wederzijdse recursie zolang de pagina open stond.
  *
- * Budgetten worden nu uitsluitend server-side aangemaakt
- * (`app/api/budgetteren/setup/route.ts`,
- * `app/api/onboarding/save-own-data/route.ts`,
- * `components/app/module-activation-modal.tsx`) — allemaal met plain
- * `insert`. Deze test pint de AFWEZIGHEID van het client-side seedpad.
+ * Deze test pint de AFWEZIGHEID van het seedpad in dit bestand, plus de
+ * afwezigheid van het kapotte upsert-patroon repo-breed.
+ *
+ * NB — dit betekent niet dat budgetten uitsluitend server-side worden
+ * aangemaakt. Server-side: `app/api/budgetteren/setup/route.ts` en
+ * `app/api/onboarding/save-own-data/route.ts`. Client-side bestaan
+ * `components/app/budget-form.tsx` (:341/:370/:422) en
+ * `components/app/module-activation-modal.tsx` (:685) nog, net als de
+ * update-paden in budgets-client zelf. Die staan open onder ADR 0058
+ * fase b; de seed-schuld is versmald, niet weggewerkt. Vandaar dat de
+ * `insert`-assertie hieronder bewust op dít bestand is gescoped en niet
+ * repo-breed — repo-breed geldt alleen het upsert/onConflict-verbod.
  *
  * `budgets-client.tsx` is >5000 regels met zware Supabase-effects; de
  * bestaande `budgets-client.test.tsx` documenteert al dat volledig
@@ -25,8 +32,44 @@ import { describe, it, expect } from 'vitest'
 import * as fs from 'fs'
 import * as path from 'path'
 
+/**
+ * Comments strippen vóór het scannen. Deze test bewaakt CODE, niet proza:
+ * een uitleg-comment die het kapotte patroon letterlijk citeert (juist om de
+ * volgende lezer te waarschuwen) is geen overtreding. Zonder deze stap straft
+ * de gate precies de documentatie af die we willen hebben — dat gebeurde
+ * meteen bij de eerste uitleg-comment in budgets-client.tsx.
+ *
+ * Bewust conservatief: alleen block-comments en HELE comment-regels. Een
+ * trailing `// ...` op een coderegel blijft staan, zodat we nooit per ongeluk
+ * een stuk echte code wegknippen (en dus een overtreding missen).
+ */
+function stripComments(src: string): string {
+  return src
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n')
+    .filter((line) => {
+      const t = line.trim()
+      return !t.startsWith('//') && !t.startsWith('*')
+    })
+    .join('\n')
+}
+
+/**
+ * Bouwt een regex voor een geketende `.from('budgets')….<method>(`.
+ *
+ * De tempered `(?:(?!\.from\()[\s\S])` is essentieel: het zoekvenster mag GEEN
+ * tweede `.from(` bevatten. Zonder die rem koppelt de scan een `.from('budgets')`
+ * aan een `.upsert(` van een héél andere tabel verderop — dat gebeurde precies
+ * bij `app/api/budgetteren/setup/route.ts`, waar een legitieme
+ * `.from('user_feature_visits').upsert(…)` binnen het venster viel en de gate
+ * ten onrechte rood kleurde.
+ */
+function chainedCall(method: string): RegExp {
+  return new RegExp(`\\.from\\(\\s*['"]budgets['"]\\s*\\)(?:(?!\\.from\\()[\\s\\S]){0,300}?\\.${method}\\(`)
+}
+
 const SOURCE_PATH = path.join(process.cwd(), 'components', 'app', 'budgets-client.tsx')
-const source = fs.readFileSync(SOURCE_PATH, 'utf-8')
+const source = stripComments(fs.readFileSync(SOURCE_PATH, 'utf-8'))
 
 describe('budgets-client.tsx — geen client-side seedpad (regressie)', () => {
   it('bevat geen seedBudgets-functie of -aanroep meer', () => {
@@ -34,15 +77,11 @@ describe('budgets-client.tsx — geen client-side seedpad (regressie)', () => {
   })
 
   it('bevat geen upsert op tabel `budgets` (de bron van de 42P10/400)', () => {
-    // Chained call over meerdere regels, evt. met tussenliggende comments:
-    // `.from('budgets')` ... `.upsert(`.
-    const chainedUpsert = /\.from\(\s*['"]budgets['"]\s*\)[\s\S]{0,300}?\.upsert\(/
-    expect(source).not.toMatch(chainedUpsert)
+    expect(source).not.toMatch(chainedCall('upsert'))
   })
 
-  it('bevat geen insert op tabel `budgets` vanuit de client (server-side only, ADR 0058)', () => {
-    const chainedInsert = /\.from\(\s*['"]budgets['"]\s*\)[\s\S]{0,300}?\.insert\(/
-    expect(source).not.toMatch(chainedInsert)
+  it('bevat geen insert op tabel `budgets` vanuit dit bestand (ADR 0058)', () => {
+    expect(source).not.toMatch(chainedCall('insert'))
   })
 
   it('bevat niet meer de kapotte on_conflict-kolomcombinatie', () => {
@@ -86,9 +125,17 @@ describe('budgets — geen enkele upsert(onConflict) op de expressie-index (regr
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const full = path.join(dir, entry.name)
       if (entry.isDirectory()) {
-        if (entry.name === 'node_modules' || entry.name === '.next') continue
+        // Fixtures/mocks en buildmappen overslaan: die mogen het kapotte
+        // patroon letterlijk citeren zonder de gate rood te kleuren.
+        if (['node_modules', '.next', '__fixtures__', '__mocks__', 'fixtures'].includes(entry.name)) continue
         collect(full, out)
-      } else if (/\.(ts|tsx|mjs)$/.test(entry.name) && path.resolve(full) !== SELF) {
+      } else if (
+        /\.(ts|tsx|mjs)$/.test(entry.name) &&
+        // Testbestanden zelf uitsluiten — een toekomstige test of doc-in-code
+        // die het patroon aanhaalt is geen overtreding.
+        !/\.test\.(ts|tsx)$/.test(entry.name) &&
+        path.resolve(full) !== SELF
+      ) {
         out.push(full)
       }
     }
@@ -107,14 +154,17 @@ describe('budgets — geen enkele upsert(onConflict) op de expressie-index (regr
   })
 
   it('nergens een upsert op tabel `budgets`', () => {
-    const chainedUpsert = /\.from\(\s*['"]budgets['"]\s*\)[\s\S]{0,300}?\.upsert\(/
-    const offenders = files.filter((f) => chainedUpsert.test(fs.readFileSync(f, 'utf-8')))
+    const offenders = files.filter((f) =>
+      chainedCall('upsert').test(stripComments(fs.readFileSync(f, 'utf-8'))),
+    )
     expect(offenders.map((f) => path.relative(process.cwd(), f))).toEqual([])
   })
 
   it("nergens de kapotte conflict-kolomcombinatie 'user_id, slug'", () => {
     const broken = /onConflict:\s*['"]user_id,\s*slug['"]/
-    const offenders = files.filter((f) => broken.test(fs.readFileSync(f, 'utf-8')))
+    const offenders = files.filter((f) =>
+      broken.test(stripComments(fs.readFileSync(f, 'utf-8'))),
+    )
     expect(offenders.map((f) => path.relative(process.cwd(), f))).toEqual([])
   })
 })
