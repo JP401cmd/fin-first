@@ -6,10 +6,10 @@
  * Achtergrond: het client-side seedpad is verwijderd uit `loadBudgets()`
  * (zie `budgets-client-no-seed.test.ts`). De aanname was dat de bestaande
  * first-use lege staat (`initialLoadDone && budgets.length === 0 &&
- * partnerBudgets.length === 0`, rond regel 2341) dat vangt. Die aanname
+ * partnerBudgets.length === 0`) dat vangt. Die aanname
  * klopte maar half: `initialLoadDone` stond op `useState(false)` en werd
  * alleen gezet in de `finally` van `loadBudgets()`. `skipInitialFetch`
- * (rond regel 1483) slaat die fetch echter over zodra `initialData` bestaat
+ * slaat die fetch echter over zodra `initialData` bestaat
  * — en BEIDE routes (`app/(app)/core/budgets/page.tsx` en
  * `app/(app)/overzicht/cashflow/budget/page.tsx`) geven `initialData` altijd
  * mee. Gevolg: op het pad dat de app daadwerkelijk gebruikt bleef
@@ -37,7 +37,7 @@
  * hebben zelf al veilige defaults buiten hun Provider en hoeven niet gemockt.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, screen, cleanup } from '@testing-library/react'
+import { render, screen, cleanup, act } from '@testing-library/react'
 
 // ── Chainbare Supabase-stub — genoeg om de mount-effects (profiles/
 //    bank_accounts/auth.getUser/transactions/household_members) te voeden
@@ -133,12 +133,30 @@ afterEach(() => {
 })
 
 describe('BudgetsPage — first-use lege staat (regressie: initialLoadDone bij server-gehydrateerd pad)', () => {
-  it('toont "Nog geen budgetten" + CTA "Maak je eerste budget" wanneer initialData.budgets leeg is', () => {
+  it('toont "Nog geen budgetten" + CTA "Maak je eerste budget" wanneer initialData.budgets leeg is', async () => {
     render(<BudgetsPage initialData={EMPTY_INITIAL_DATA} />)
 
+    // BEWUST asserten op de EERSTE render, vóór enige client-fetch resolvet.
+    // Dát is de regressie: server-gehydrateerd moet de lege staat er meteen
+    // staan. Wikkel je de `render` zelf in `act(async …)`, dan flushen de
+    // mount-effects, verandert `loadBudgets` van identiteit (zijn useCallback
+    // hangt o.a. aan `partnerPrivacy`, dat ná een fetch binnenkomt), draait de
+    // effect-hook alsnog en zet diens `finally` `initialLoadDone` op true —
+    // waarna de test ook ZONDER de fix groen is. Dat is precies gebeurd tijdens
+    // het opschonen van de act-waarschuwingen; de bijt-proef ving het.
     expect(screen.getByText('Nog geen budgetten')).toBeInTheDocument()
     expect(
       screen.getByRole('button', { name: 'Maak je eerste budget' }),
     ).toBeInTheDocument()
+
+    // Pas ná de asserties de openstaande mount-effects (profiles,
+    // bank_accounts, auth.getUser, transactions, household_members via de
+    // Proxy-stub) laten uitlopen. Zonder deze flush landen hun state-updates
+    // rond `cleanup` en logt React 15× "An update to BudgetsPage inside a test
+    // was not wrapped in act(...)" — ~7 kB stderr die een échte waarschuwing
+    // in dit bestand onvindbaar maakt.
+    await act(async () => {
+      await Promise.resolve()
+    })
   })
 })

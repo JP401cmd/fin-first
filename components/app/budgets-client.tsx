@@ -1412,9 +1412,11 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
       // aangemaakt. Server-side gebeurt het in `/api/budgetteren/setup` en
       // `/api/onboarding/save-own-data`; client-side bestaan `budget-form.tsx`
       // (:341/:370/:422 — de component achter de CTA hierboven) en
-      // `module-activation-modal.tsx` (:685) nog. Ook dit bestand update
-      // budgets nog client-side (:2967, :4336). Die client-writes staan open
-      // onder ADR 0058 fase b; de seed-schuld is dus versmald, niet weg.
+      // `module-activation-modal.tsx` nog. Ook dit bestand update budgets nog
+      // client-side, in `moveBudget()` (sort_order) en in `handleSave()` van
+      // de budget-detailpane. Die client-writes staan open onder ADR 0058
+      // fase b; de seed-schuld is dus versmald, niet weg.
+      // (Symbolische verwijzingen, bewust geen regelnummers — die verschuiven.)
       // Apply privacy filtering in household mode (Feature #537).
       // Privacy komt uit de foundation-context (geen eigen
       // /api/household/partner-privacy-roundtrip meer). De directe budgets-query

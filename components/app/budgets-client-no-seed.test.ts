@@ -14,10 +14,11 @@
  *
  * NB — dit betekent niet dat budgetten uitsluitend server-side worden
  * aangemaakt. Server-side: `app/api/budgetteren/setup/route.ts` en
- * `app/api/onboarding/save-own-data/route.ts`. Client-side bestaan
- * `components/app/budget-form.tsx` (:341/:370/:422) en
- * `components/app/module-activation-modal.tsx` (:685) nog, net als de
- * update-paden in budgets-client zelf. Die staan open onder ADR 0058
+ * `app/api/onboarding/save-own-data/route.ts`. Client-side inserten
+ * `components/app/budget-form.tsx` (de component achter de CTA van de lege
+ * staat) en `components/app/module-activation-modal.tsx` nog, net als de
+ * update-paden in budgets-client zelf (`moveBudget`, `handleSave`).
+ * Die staan open onder ADR 0058
  * fase b; de seed-schuld is versmald, niet weggewerkt. Vandaar dat de
  * `insert`-assertie hieronder bewust op dít bestand is gescoped en niet
  * repo-breed — repo-breed geldt alleen het upsert/onConflict-verbod.
