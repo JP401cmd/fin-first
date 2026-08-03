@@ -194,6 +194,20 @@ describe('LOCAL_CHAT_DNA — fin-actie-fence-instructie', () => {
     expect(LOCAL_CHAT_DNA).toContain('Hooguit één blok per antwoord')
   })
 
+  it('verbiedt een actiekaart bij een beleggings-/productvraag — óók bij een passende kans', () => {
+    // DE FAALMODUS DIE TELT. `titlesMatch` (parse-intent.ts) koppelt de kaart aan
+    // een titel die LETTERLIJK in het overzicht staat — en het overzicht bevat
+    // echte kansen als 'Zet overtollig spaargeld aan het werk' en
+    // 'Versneld aflossen: <schuld>' (lib/aandachtspunten.ts). Die guard is dus
+    // fail-closed op de TITEL, niet op de VRAAG: op "moet ik in ETF's stappen?"
+    // zou een compliance-antwoord in proza tóch een actiekaart kunnen krijgen die
+    // als impliciet beleggingsadvies leest. De prompt moet dat expliciet
+    // uitsluiten, inclusief het "maar er staat een passende kans"-geval.
+    expect(LOCAL_CHAT_DNA).toMatch(/kopen, verkopen, beleggen, crypto, aflossen-versus-beleggen/)
+    expect(LOCAL_CHAT_DNA).toMatch(/GEEN blok, ook niet als er een passende kans in het overzicht staat/)
+    expect(LOCAL_CHAT_DNA).toMatch(/uitsluitend in proza/)
+  })
+
   it('vraagt de titel WOORDELIJK over te nemen (daarop koppelt resolveFinActionIntent)', () => {
     expect(LOCAL_CHAT_DNA).toMatch(/titel exact uit het overzicht/)
     expect(LOCAL_CHAT_DNA).toContain('woordelijk over')

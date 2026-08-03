@@ -1,7 +1,7 @@
 {
   "generatedAt": "2026-08-03T00:00:00.000Z",
   "dnaSubBudget": 2000,
-  "dnaEstimatedTokens": 651,
+  "dnaEstimatedTokens": 708,
   "sources": [
     {
       "file": "lib/ai/dna/base.ts",
@@ -19,7 +19,7 @@
       "constant": "LOCAL_CHAT_DNA",
       "file": "lib/ai/local/local-chat-prompt.ts",
       "subBudget": 2000,
-      "estimatedTokens": 651,
+      "estimatedTokens": 708,
       "sources": [
         {
           "file": "lib/ai/dna/base.ts",
@@ -37,7 +37,7 @@
       "constant": "LOCAL_BRIEFING_DNA",
       "file": "lib/ai/local/local-briefing-prompt.ts",
       "subBudget": 600,
-      "estimatedTokens": 207,
+      "estimatedTokens": 227,
       "sources": [
         {
           "file": "lib/briefing/redactie.ts",
@@ -69,7 +69,7 @@
       "constant": "LOCAL_WHATIF_DNA",
       "file": "lib/ai/local/local-whatif-prompt.ts",
       "subBudget": 800,
-      "estimatedTokens": 219,
+      "estimatedTokens": 249,
       "sources": [
         {
           "file": "lib/ai/whatif-suggest-prompt.ts",
@@ -83,7 +83,7 @@
       "constant": "LOCAL_RECOMMENDATIONS_DNA",
       "file": "lib/ai/local/local-recommendations-prompt.ts",
       "subBudget": 1000,
-      "estimatedTokens": 617,
+      "estimatedTokens": 675,
       "sources": [
         {
           "file": "lib/ai/dna/recommendations.ts",
@@ -101,7 +101,7 @@
       "constant": "LOCAL_NEWS_DNA",
       "file": "lib/ai/local/local-news-prompt.ts",
       "subBudget": 700,
-      "estimatedTokens": 442,
+      "estimatedTokens": 445,
       "sources": [
         {
           "file": "lib/news-system-prompt.ts",
@@ -161,7 +161,7 @@
       "constant": "LOCAL_PENSION_DNA",
       "file": "lib/ai/local/local-pension-prompt.ts",
       "subBudget": 600,
-      "estimatedTokens": 276,
+      "estimatedTokens": 286,
       "sources": [
         {
           "file": "lib/ai/pension-parse-prompt.ts",

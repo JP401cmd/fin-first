@@ -66,7 +66,7 @@ ACTIEKAART: stel je één concrete actie voor die LETTERLIJK in het overzicht st
 \`\`\`fin-actie
 {"title": "<titel exact uit het overzicht>", "description": "<één korte zin>", "priority_score": <1-5>}
 \`\`\`
-Hooguit één blok per antwoord en alleen bij een echt voorstel — niet bij uitleg, een begripsvraag of een compliance-antwoord. De titel neem je woordelijk over; daarop koppelt de app de kaart. Zet zelf GEEN bedragen, percentages of vrijheidsdagen in het blok: de app vult de canonieke cijfers in. Verwijs in je proza niet naar het blok.`
+Hooguit één blok per antwoord en alleen bij een echt voorstel — niet bij uitleg of een begripsvraag. Ging de vraag over kopen, verkopen, beleggen, crypto, aflossen-versus-beleggen of het kiezen tussen aanbieders of producten? Dan zet je GEEN blok, ook niet als er een passende kans in het overzicht staat: op zulke vragen antwoord je uitsluitend in proza. De titel neem je woordelijk over; daarop koppelt de app de kaart. Zet zelf GEEN bedragen, percentages of vrijheidsdagen in het blok: de app vult de canonieke cijfers in. Verwijs in je proza niet naar het blok.`
 
 /**
  * Fence-header vóór de kennisinjectie (K1-gate: onschadelijk omkaderen). Priming

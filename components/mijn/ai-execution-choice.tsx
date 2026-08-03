@@ -99,7 +99,12 @@ export function AiExecutionChoice({
         ? 'lokale-cat-reden-mobiel'
         : undefined
 
-  const activeHeaderClass = 'font-semibold text-[var(--module-active-700)]'
+  // Alléén kleur wisselt; het gewicht komt uit de basis-className (`font-normal`).
+  // Hier ook `font-semibold` meegeven zou twee font-weight-utilities met gelijke
+  // specificiteit tegen elkaar zetten — welke wint hangt dan af van Tailwinds
+  // scanvolgorde, niet van de volgorde in deze string. Bovendien horen
+  // tabelkoppen in de krant-stijl niet bold te zijn.
+  const activeHeaderClass = 'text-[var(--module-active-700)]'
   const idleHeaderClass = 'text-[var(--ink-3)]'
 
   return (
@@ -152,11 +157,19 @@ export function AiExecutionChoice({
           aria-describedby={describedById}
           disabled={disabled}
           onClick={onToggle}
-          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-wil-500 disabled:cursor-not-allowed disabled:opacity-50 ${privacyMode ? 'bg-wil-500' : 'bg-zinc-300'}`}
+          // De baan is visueel 24px hoog, maar dat is een te klein raakvlak op een
+          // telefoon. Verticale padding brengt het klikgebied op 44px zonder de
+          // baan groter te maken; de negatieve marge houdt de uitlijning intact.
+          // Zelfde oplossing als components/core/app-toggle-section.tsx.
+          className={`group relative -my-2.5 inline-flex min-h-11 shrink-0 cursor-pointer items-center py-2.5 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50`}
         >
           <span
-            className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${privacyMode ? 'translate-x-6' : 'translate-x-1'}`}
-          />
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 group-focus-visible:ring-2 group-focus-visible:ring-wil-500 group-focus-visible:ring-offset-2 ${privacyMode ? 'bg-wil-500' : 'bg-[var(--border-md)]'}`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${privacyMode ? 'translate-x-6' : 'translate-x-1'}`}
+            />
+          </span>
         </button>
       </div>
 

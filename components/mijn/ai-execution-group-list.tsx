@@ -229,22 +229,28 @@ export function AiExecutionGroupList({
 
                 {isOpen && (
                   <div id={panelId} className="space-y-3 px-1 pb-4">
-                    {/* Wat kan lokaal wel/niet — ook als de groep nu op cloud staat,
-                        zodat je vóór het omzetten weet wat je inlevert. */}
+                    {/* Wat kan lokaal wel/niet — als VOORUITBLIK, dus alleen zolang
+                        de groep nog op cloud staat: dan weet je wat je inlevert
+                        vóór je omzet. Draait de groep al lokaal, dan staat die
+                        opsomming hierboven al permanent in beeld ("Wat je hierbij
+                        inlevert") en zou hem hier herhalen de uitgeklapte staat
+                        alleen maar rommelig maken. */}
                     {group.lokaal === 'gedeeltelijk' ? (
-                      <div>
-                        <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--ink-3)]">
-                          Wat kan er lokaal niet?
-                        </p>
-                        <ul className="mt-1.5 space-y-1 text-xs leading-relaxed text-[var(--ink-2)]">
-                          {group.beperkingen.map((b) => (
-                            <li key={b} className="flex items-start gap-2">
-                              <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-warning" />
-                              <span>{b}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
+                      toontVerlies ? null : (
+                        <div>
+                          <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--ink-3)]">
+                            Wat kan er lokaal niet?
+                          </p>
+                          <ul className="mt-1.5 space-y-1 text-xs leading-relaxed text-[var(--ink-2)]">
+                            {group.beperkingen.map((b) => (
+                              <li key={b} className="flex items-start gap-2">
+                                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-warning" />
+                                <span>{b}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )
                     ) : (
                       <p className="text-xs leading-relaxed text-[var(--ink-2)]">
                         Dit onderdeel werkt volledig lokaal — je levert er niets voor in, behalve dat het

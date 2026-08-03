@@ -14,6 +14,33 @@ export interface ParitySourceFact {
   inSync: boolean
 }
 
+/**
+ * Eén gecondenseerd prompt-artefact met zijn eigen sub-budget en bron-hashes.
+ *
+ * Er was er lang maar één (de chat-DNA), en de pagina toonde die dan ook op
+ * topniveau. Inmiddels heeft elke lokale functie er een — briefing, rapport,
+ * wat-als, aanbevelingen, nieuws, rekenhulp, extractie, aangifte, pensioen — elk
+ * met een eigen budget dat het model kan verdringen als het overloopt. Eén
+ * artefact tonen en negen verzwijgen zou een halve waarheid zijn.
+ */
+export interface ParityArtefactFact {
+  id: string
+  label: string
+  /** Naam van de geëxporteerde constante, bv. LOCAL_CHAT_DNA. */
+  constant: string
+  /** Bestand waarin die constante staat. */
+  file: string
+  subBudget: number
+  estimatedTokens: number
+  /** 'live' = uit de bron geëxtraheerd; 'manifest-fallback' = extractie faalde. */
+  tokenSource: string
+  /** Past het artefact binnen zijn eigen sub-budget? */
+  withinBudget: boolean
+  /** Zijn alle bron-DNA's van dit artefact nog gelijk aan de baseline? */
+  inSync: boolean
+  sources: ParitySourceFact[]
+}
+
 /** Het uitgelezen parity-rapport in een stabiele, kleine vorm. */
 export interface ParityFacts {
   /** ISO-tijd van de laatste scan; '' als er nog nooit een scan draaide. */
@@ -28,8 +55,12 @@ export interface ParityFacts {
   dnaEstimatedTokens: number
   /** 'live' = uit de bron geëxtraheerd; 'manifest-fallback' = extractie faalde; '' = onbekend. */
   dnaTokenSource: string
-  /** Per bron-DNA de hash-vergelijking. */
+  /** Per bron-DNA de hash-vergelijking (van het chat-artefact — legacy topniveau). */
   sources: ParitySourceFact[]
+  /** Passen ALLE artefacten binnen hun eigen sub-budget? */
+  budgetsOk: boolean
+  /** Alle gecondenseerde prompt-artefacten, in manifest-volgorde. */
+  artefacts: ParityArtefactFact[]
   /**
    * Afgeleide vlag: er is nog nooit een parity-scan gedraaid (leeg/afwezig
    * rapport). De page herkent hieraan de neutrale lege-staat.
@@ -62,7 +93,24 @@ const EMPTY_PARITY: ParityFacts = {
   dnaEstimatedTokens: 0,
   dnaTokenSource: '',
   sources: [],
+  budgetsOk: true,
+  artefacts: [],
   neverGenerated: true,
+}
+
+/** Leest de bron-hashes van één artefact (of het legacy topniveau) uit. */
+function readSources(raw: unknown): ParitySourceFact[] {
+  return asArray(raw)
+    .map((s) => {
+      const ss = asRecord(s)
+      return {
+        file: asString(ss.file),
+        storedSha256: asString(ss.storedSha256),
+        liveSha256: asString(ss.liveSha256),
+        inSync: asBool(ss.inSync),
+      }
+    })
+    .filter((s) => s.file)
 }
 
 /**
@@ -78,17 +126,30 @@ export function selectParityFacts(raw: unknown): ParityFacts {
   // Geen scan-tijd → beschouw als "nog nooit gegenereerd" (lege-staat).
   if (!generatedAt) return EMPTY_PARITY
 
-  const sources: ParitySourceFact[] = asArray(root.sources)
-    .map((s) => {
-      const ss = asRecord(s)
+  const sources = readSources(root.sources)
+
+  const artefacts: ParityArtefactFact[] = asArray(root.artefacts)
+    .map((a) => {
+      const aa = asRecord(a)
+      const id = asString(aa.id)
       return {
-        file: asString(ss.file),
-        storedSha256: asString(ss.storedSha256),
-        liveSha256: asString(ss.liveSha256),
-        inSync: asBool(ss.inSync),
+        id,
+        // Valt terug op het id, zodat een artefact zonder label niet als lege
+        // rij in de beheerlijst verschijnt.
+        label: asString(aa.label) || id,
+        constant: asString(aa.constant),
+        file: asString(aa.file),
+        subBudget: asNumber(aa.subBudget),
+        estimatedTokens: asNumber(aa.estimatedTokens),
+        tokenSource: asString(aa.tokenSource),
+        // Defensieve default: een rapport zónder deze vlag (ouder formaat) mag
+        // geen vals alarm geven. Drift en overloop hebben eigen signalen.
+        withinBudget: aa.withinBudget === undefined ? true : asBool(aa.withinBudget),
+        inSync: asBool(aa.inSync),
+        sources: readSources(aa.sources),
       }
     })
-    .filter((s) => s.file)
+    .filter((a) => a.id)
 
   return {
     generatedAt,
@@ -98,6 +159,9 @@ export function selectParityFacts(raw: unknown): ParityFacts {
     dnaEstimatedTokens: asNumber(root.dnaEstimatedTokens),
     dnaTokenSource: asString(root.dnaTokenSource),
     sources,
+    // Ouder rapport zonder deze vlag → niet als overschrijding tonen.
+    budgetsOk: root.budgetsOk === undefined ? true : asBool(root.budgetsOk),
+    artefacts,
     neverGenerated: false,
   }
 }

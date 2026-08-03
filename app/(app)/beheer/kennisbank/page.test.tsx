@@ -89,6 +89,87 @@ describe('/beheer/kennisbank server-page — split + PromptParityBlock', () => {
     expect(screen.getByText('ongewijzigd')).toBeTruthy() // base.ts-rij
   })
 
+  // Er is niet langer één gecondenseerd artefact maar tien — elk met een eigen
+  // sub-budget dat het contextvenster kan verdringen. Eén tonen en negen
+  // verzwijgen zou een halve waarheid zijn; deze tests pinnen dat vast.
+  it('toont elk artefact met zijn eigen tokenverbruik en bronnen', async () => {
+    await renderPageWithParity({
+      generatedAt: '2026-08-03T00:00:00.000Z',
+      inSync: true,
+      budgetsOk: true,
+      dnaSubBudget: 2000,
+      dnaEstimatedTokens: 651,
+      dnaTokenSource: 'live',
+      sources: [],
+      artefacts: [
+        {
+          id: 'chat',
+          label: 'Lokale chat-DNA',
+          constant: 'LOCAL_CHAT_DNA',
+          file: 'lib/ai/local/local-chat-prompt.ts',
+          subBudget: 2000,
+          estimatedTokens: 651,
+          tokenSource: 'live',
+          withinBudget: true,
+          inSync: true,
+          sources: [{ file: 'lib/ai/dna/base.ts', storedSha256: 'a', liveSha256: 'a', inSync: true }],
+        },
+        {
+          id: 'briefing',
+          label: 'Lokale briefing-DNA',
+          constant: 'LOCAL_BRIEFING_DNA',
+          file: 'lib/ai/local/local-briefing-prompt.ts',
+          subBudget: 600,
+          estimatedTokens: 207,
+          tokenSource: 'live',
+          withinBudget: true,
+          inSync: true,
+          sources: [{ file: 'lib/briefing/redactie.ts', storedSha256: 'c', liveSha256: 'c', inSync: true }],
+        },
+      ],
+    })
+
+    expect(screen.getByText('Lokale chat-DNA')).toBeTruthy()
+    expect(screen.getByText('Lokale briefing-DNA')).toBeTruthy()
+    expect(screen.getByText('651/2000')).toBeTruthy()
+    expect(screen.getByText('207/600')).toBeTruthy()
+    expect(screen.getByText('LOCAL_BRIEFING_DNA')).toBeTruthy()
+    expect(screen.getByText('redactie.ts')).toBeTruthy()
+  })
+
+  // Sub-budget-overschrijding is een ANDERE faalmodus dan drift: de bronnen
+  // kunnen ongewijzigd zijn terwijl de gecondenseerde tekst te groot is
+  // geworden. Die moet apart zichtbaar zijn, ook als alles "in sync" staat.
+  it('meldt een sub-budget-overschrijding los van drift', async () => {
+    await renderPageWithParity({
+      generatedAt: '2026-08-03T00:00:00.000Z',
+      inSync: true,
+      budgetsOk: false,
+      dnaSubBudget: 600,
+      dnaEstimatedTokens: 900,
+      dnaTokenSource: 'live',
+      sources: [],
+      artefacts: [
+        {
+          id: 'briefing',
+          label: 'Lokale briefing-DNA',
+          constant: 'LOCAL_BRIEFING_DNA',
+          file: 'lib/ai/local/local-briefing-prompt.ts',
+          subBudget: 600,
+          estimatedTokens: 900,
+          tokenSource: 'live',
+          withinBudget: false,
+          inSync: true,
+          sources: [],
+        },
+      ],
+    })
+
+    expect(screen.getByText('In sync'), 'bronnen zijn ongewijzigd').toBeTruthy()
+    expect(screen.getByText(/passen niet meer binnen hun eigen sub-budget/)).toBeTruthy()
+    expect(screen.getByText('900/600')).toBeTruthy()
+  })
+
   it('manifest-fallback tokenbron → waarschuwingstekst zichtbaar', async () => {
     await renderPageWithParity({
       generatedAt: '2026-07-24T22:21:28.487Z',

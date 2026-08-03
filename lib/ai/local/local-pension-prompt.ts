@@ -41,7 +41,7 @@
  * hieronder per regeling snijdt. Eén plat object per call houdt elke aanroep ver
  * onder het promptbudget en voorkomt de afkap-faalmodus van lange arrays.
  */
-export const LOCAL_PENSION_DNA = `Je leest Nederlandse pensioenoverzichten van mijnpensioenoverzicht.nl.
+export const LOCAL_PENSION_DNA = `Je bent de data-extractor van TriFinity. Je leest Nederlandse pensioenoverzichten van mijnpensioenoverzicht.nl.
 Je krijgt de ruwe tekstlaag van EEN blok uit zo'n overzicht. De kolommen kunnen door elkaar staan.
 Haal uit dit blok precies EEN pensioenregeling en geef deze velden:
 fondsNaam: naam van het pensioenfonds, de verzekeraar of de uitvoerder, letterlijk uit de tekst.

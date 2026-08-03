@@ -53,15 +53,33 @@ describe('LOCAL_NEWS_DNA — budget en invarianten', () => {
     expect(tokens).toBeLessThanOrEqual(450)
   })
 
-  it('draagt de Wft-compliance-alinea VERBATIM uit LOCAL_CHAT_DNA', () => {
+  it('draagt de Wft-kernclausule van LOCAL_CHAT_DNA én de nieuws-eigen aanscherping', () => {
     // Publieksgerichte tekst over keuzes met geld: de Wft-grens geldt onverkort.
-    // Herschrijven mag alleen via ai-specialist-prompt-dna, en dan op beide plekken.
+    //
+    // NIET MEER VERBATIM (bewust, via de ai-specialist-prompt-dna-route). De
+    // chat-alinea instrueert wat te doen "bij zulke VRAGEN" — maar in de
+    // nieuwsredactie krijgt het model nooit een vraag; het SCHRIJFT over een
+    // artikel dat over aandelen, crypto of een aanbieder kan gaan. De verbatim
+    // koppeling liet daarmee juist de faalmodus open die hier telt: een
+    // IMPACT-regel als "dit is een goed moment om in te stappen". De kernclausule
+    // blijft identiek; de handelingsinstructie is nieuws-specifiek gemaakt.
     const start = LOCAL_CHAT_DNA.indexOf('COMPLIANCE (Nederlandse wet, Wft)')
     expect(start).toBeGreaterThan(-1)
-    const compliance = LOCAL_CHAT_DNA.slice(start).split('\n\n')[0].trim()
+    const chatCompliance = LOCAL_CHAT_DNA.slice(start).split('\n\n')[0].trim()
 
-    expect(compliance).toContain('NOOIT individueel beleggingsadvies')
-    expect(LOCAL_NEWS_DNA).toContain(compliance)
+    // 1. De kernclausule is woordelijk gedeeld met de chat-DNA.
+    const kern =
+      'je geeft NOOIT individueel beleggingsadvies — geen koop- of verkoopaanbevelingen voor specifieke aandelen, crypto of andere instrumenten, ook niet indirect.'
+    expect(chatCompliance).toContain(kern)
+    expect(LOCAL_NEWS_DNA).toContain(kern)
+
+    // 2. Nieuws-specifiek: nooit aanzetten tot handelen, ook niet impliciet.
+    expect(LOCAL_NEWS_DNA).toMatch(/ook niet tussen de regels door/)
+    expect(LOCAL_NEWS_DNA).toMatch(/instappen, uitstappen, kopen, verkopen of overstappen/)
+
+    // 3. De verwijzing naar de erkende adviseur blijft staan.
+    expect(LOCAL_NEWS_DNA).toContain('AFM-geregistreerd')
+    expect(LOCAL_NEWS_DNA).toContain('Belastinguitleg is informatief, nooit bindend advies.')
   })
 
   it('zet de getallenregel vóór de compliance-alinea', () => {

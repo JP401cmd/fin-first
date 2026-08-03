@@ -133,60 +133,146 @@ function PromptParityBlock({
         </div>
       )}
 
-      {/* Bronbestanden — per bron in-sync/drift (status-stoplicht) */}
-      <ul className="space-y-1.5">
-        {parity.sources.map((source) => (
-          <li
-            key={source.file}
-            className="flex items-center gap-2.5 rounded-lg border border-[var(--border-md)] bg-[var(--subtle)]/40 px-3 py-2"
-          >
-            <span
-              role="img"
-              aria-label={source.inSync ? 'in sync' : 'drift'}
-              className="h-2.5 w-2.5 shrink-0 rounded-full"
-              style={{ backgroundColor: source.inSync ? 'var(--positive)' : 'var(--negative)' }}
-            />
-            <FileCode2 className="h-4 w-4 shrink-0 text-[var(--ink-4)]" aria-hidden="true" />
-            <span className="min-w-0 flex-1 truncate font-mono text-[13px] text-[var(--ink-2)]">
-              {baseName(source.file)}
-            </span>
-            <span className="shrink-0 text-xs text-[var(--ink-4)]">
-              {source.inSync ? 'ongewijzigd' : 'gewijzigd'}
-            </span>
-          </li>
-        ))}
-      </ul>
-
-      {/* Tokenschatting t.o.v. het sub-budget + volle contextvenster */}
-      <div className="space-y-2">
-        <div className="flex items-center gap-2 text-sm text-[var(--ink-2)]">
-          <Gauge className="h-4 w-4 shrink-0 text-[var(--ink-3)]" aria-hidden="true" />
-          <span>
-            Gecondenseerde DNA: geschat{' '}
-            <strong className="font-mono tabular-nums">{parity.dnaEstimatedTokens}</strong> /{' '}
-            <span className="font-mono tabular-nums">{parity.dnaSubBudget}</span> tokens sub-budget
-            <span className="text-[var(--ink-4)]">
-              {' '}
-              (van <span className="font-mono tabular-nums">{contextBudget}</span> tokens volledig
-              contextvenster)
-            </span>
-            {tokenFallback && (
-              <span className="text-[var(--warning)]">
-                {' '}
-                — schatting uit manifest-baseline; DNA-tekst niet gevonden
-              </span>
-            )}
-          </span>
+      {/* Sub-budget-overschrijding: een eigen faalmodus, los van drift. Een
+          artefact dat over zijn budget groeit, verdringt in het contextvenster
+          van 8192 tokens juist de gegevens waar het over moet praten. */}
+      {!parity.budgetsOk && (
+        <div className="flex gap-3 rounded-lg border border-[color-mix(in_oklch,var(--warning)_45%,transparent)] bg-[var(--warning-bg)] px-4 py-3 text-sm text-[var(--ink-2)]">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--warning)]" aria-hidden="true" />
+          <p>
+            Eén of meer artefacten passen niet meer binnen hun eigen sub-budget. Kort de
+            gecondenseerde tekst in via de skill{' '}
+            <span className="font-mono text-[13px]">lokale-prompt-parity</span>, of verhoog het
+            budget bewust — maar bedenk dat elke token hier ten koste gaat van de ruimte voor het
+            gesprek zelf.
+          </p>
         </div>
-        {/* Subtiele balk: DNA-omvang binnen het sub-budget (geen module-accent) */}
-        <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--subtle)]">
-          <div className="h-full rounded-full bg-[var(--ink-3)]" style={{ width: `${tokenPct}%` }} />
-        </div>
-      </div>
-
-      {scanMoment && (
-        <p className="text-xs text-[var(--ink-4)]">Laatste parity-scan: {scanMoment}</p>
       )}
+
+      {/* Per artefact: status, tokenverbruik t.o.v. het eigen sub-budget, en de
+          bronnen waarvan het is afgeleid. */}
+      {parity.artefacts.length > 0 ? (
+        <ul className="space-y-2">
+          {parity.artefacts.map((artefact) => {
+            const pct =
+              artefact.subBudget > 0
+                ? Math.min(100, Math.round((artefact.estimatedTokens / artefact.subBudget) * 100))
+                : 0
+            return (
+              <li
+                key={artefact.id}
+                className="space-y-2 rounded-lg border border-[var(--border-md)] bg-[var(--subtle)]/40 px-3 py-2.5"
+              >
+                <div className="flex items-center gap-2.5">
+                  <span
+                    role="img"
+                    aria-label={artefact.inSync ? 'in sync' : 'drift'}
+                    className="h-2.5 w-2.5 shrink-0 rounded-full"
+                    style={{
+                      backgroundColor: artefact.inSync ? 'var(--positive)' : 'var(--negative)',
+                    }}
+                  />
+                  <span className="min-w-0 flex-1 truncate text-sm text-[var(--ink)]">
+                    {artefact.label}
+                  </span>
+                  <span
+                    className={`shrink-0 font-mono text-xs tabular-nums ${
+                      artefact.withinBudget ? 'text-[var(--ink-4)]' : 'text-[var(--warning)]'
+                    }`}
+                  >
+                    {artefact.estimatedTokens}/{artefact.subBudget}
+                    {artefact.tokenSource === 'manifest-fallback' && ' ~'}
+                  </span>
+                </div>
+
+                <div className="h-1 w-full overflow-hidden rounded-full bg-[var(--subtle)]">
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      width: `${pct}%`,
+                      backgroundColor: artefact.withinBudget ? 'var(--ink-3)' : 'var(--warning)',
+                    }}
+                  />
+                </div>
+
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--ink-4)]">
+                  <span className="inline-flex items-center gap-1.5">
+                    <FileCode2 className="h-3.5 w-3.5" aria-hidden="true" />
+                    <span className="font-mono">{artefact.constant}</span>
+                  </span>
+                  {artefact.sources.map((source) => (
+                    <span key={source.file} className="inline-flex items-center gap-1">
+                      <span
+                        role="img"
+                        aria-label={source.inSync ? 'ongewijzigd' : 'gewijzigd'}
+                        className="h-1.5 w-1.5 rounded-full"
+                        style={{
+                          backgroundColor: source.inSync ? 'var(--positive)' : 'var(--negative)',
+                        }}
+                      />
+                      <span className="font-mono">{baseName(source.file)}</span>
+                    </span>
+                  ))}
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      ) : (
+        /* Terugval voor een ouder rapport zónder artefactenlijst: de oude,
+           enkelvoudige weergave, VOLLEDIG — inclusief de bronlijst. Een oud
+           rapport mag geen informatie verliezen omdat het formaat is
+           uitgebreid; dat zou drift onzichtbaar maken precies wanneer de scan
+           achterloopt. */
+        <div className="space-y-3">
+          <ul className="space-y-1.5">
+            {parity.sources.map((source) => (
+              <li
+                key={source.file}
+                className="flex items-center gap-2.5 rounded-lg border border-[var(--border-md)] bg-[var(--subtle)]/40 px-3 py-2"
+              >
+                <span
+                  role="img"
+                  aria-label={source.inSync ? 'in sync' : 'drift'}
+                  className="h-2.5 w-2.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: source.inSync ? 'var(--positive)' : 'var(--negative)' }}
+                />
+                <FileCode2 className="h-4 w-4 shrink-0 text-[var(--ink-4)]" aria-hidden="true" />
+                <span className="min-w-0 flex-1 truncate font-mono text-[13px] text-[var(--ink-2)]">
+                  {baseName(source.file)}
+                </span>
+                <span className="shrink-0 text-xs text-[var(--ink-4)]">
+                  {source.inSync ? 'ongewijzigd' : 'gewijzigd'}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <div className="flex items-center gap-2 text-sm text-[var(--ink-2)]">
+            <Gauge className="h-4 w-4 shrink-0 text-[var(--ink-3)]" aria-hidden="true" />
+            <span>
+              Gecondenseerde DNA: geschat{' '}
+              <strong className="font-mono tabular-nums">{parity.dnaEstimatedTokens}</strong> /{' '}
+              <span className="font-mono tabular-nums">{parity.dnaSubBudget}</span> tokens sub-budget
+              {tokenFallback && (
+                <span className="text-[var(--warning)]">
+                  {' '}
+                  — schatting uit manifest-baseline; DNA-tekst niet gevonden
+                </span>
+              )}
+            </span>
+          </div>
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--subtle)]">
+            <div className="h-full rounded-full bg-[var(--ink-3)]" style={{ width: `${tokenPct}%` }} />
+          </div>
+        </div>
+      )}
+
+      <p className="text-xs text-[var(--ink-4)]">
+        Elk sub-budget telt mee in hetzelfde contextvenster van{' '}
+        <span className="font-mono tabular-nums">{contextBudget}</span> tokens dat het lokale model
+        deelt met je gegevens en het gesprek.
+        {scanMoment && <> Laatste parity-scan: {scanMoment}.</>}
+      </p>
     </section>
   )
 }
