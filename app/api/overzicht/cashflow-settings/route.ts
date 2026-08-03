@@ -2,11 +2,6 @@ import { NextResponse } from 'next/server'
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { loadCashflowSettingsData } from '@/lib/cashflow-settings-data'
 import { unauthorized, serverError } from '@/lib/api/respond'
-import {
-  cashflowSettingsCacheKey,
-  readCashflowSettingsCache,
-  writeCashflowSettingsCache,
-} from '@/lib/cashflow-settings-cache'
 
 /**
  * GET /api/overzicht/cashflow-settings
@@ -23,18 +18,35 @@ import {
  *
  * DATAPAD (ADR 0058): dit is de "lazy client-read die écht niet in de
  * loader-bundel past" — dus via een API-route, niet via de browser-client.
- * Read-route, dus auth via `getAuthClaims` (ADR 0052, lokale JWT-verificatie
- * zonder `/auth/v1/user`-roundtrip). Geen body → geen zod. Foutvorm via
+ * Read-route, dus auth via `getAuthClaims` (ADR 0052): dat verifieert de JWT
+ * lokaal tegen de JWKS en houdt de 401-tak dus roundtrip-vrij. Op het
+ * doorlaat-pad doet `loadCashflowSettingsData` intern alsnog een
+ * `getCachedUser()` → `auth.getUser()`, dus daar is de winst nul — de reden om
+ * `getAuthClaims` te gebruiken is uniformiteit met de andere read-routes, niet
+ * een besparing die deze route niet maakt. Geen body → geen zod. Foutvorm via
  * lib/api/respond.ts (ADR 0044).
+ *
+ * `!claims?.sub` (en niet `!claims`) is bewust strenger dan de zusterroute: een
+ * token zonder `sub` heeft geen bruikbare identiteit, en de loader zou dan
+ * op een lege user-scope draaien.
  *
  * SINGLE SOURCE: dezelfde `loadCashflowSettingsData` die de pagina eerder
  * server-side aanriep — geen tweede afleiding, dus geen drift. `lib/box1-income.ts`
  * blijft die loader ook direct gebruiken.
  *
- * TTL-cache (lib/cashflow-settings-cache.ts): per gebruiker, kort. Bij een hit
- * gaat `loadCoreData` NIET aan. Dat lost het herhaalde bezoek op, niet het
- * eerste — en bewust server-side, want een browser-cache overleeft een
- * uitlog/inlog in hetzelfde tabblad (zie de kop van die module).
+ * GEEN TTL-CACHE, BEWUST (review T2.2). De eerste opzet had er één, spiegel van
+ * lib/cashflow-status-cache.ts. Dat is hier fout: het blok dat deze route voedt
+ * is een INVOERSCHERM — het schrijft `net_monthly_income`,
+ * `estimated_monthly_expenses`, `income_source` en `expenses_source` weg via
+ * `PUT /api/parameters` (cashflow-instellingen-blok.tsx). Een cache vóór precies
+ * die velden geeft: bedrag aanpassen → wegnavigeren → binnen het venster terug →
+ * remount → verse fetch → cache-hit → het OUDE bedrag. Dat leest als "mijn
+ * wijziging is niet bewaard". De optimistische lokale state dekt dat binnen één
+ * mount af, maar juist niet over de remount heen — en de remount is wat de
+ * lazy-fetch nieuw introduceert. De zustercache mag dit hebben (statuskleuren
+ * zijn cosmetisch); een invoerveld is een andere klasse. De winst van stap 2.2
+ * zit al volledig in het LAZY zijn van de read (~25 queries van het hub-request
+ * af); de TTL voegde daar niets aan toe en kostte correctheid.
  */
 export async function GET() {
   try {
@@ -42,12 +54,6 @@ export async function GET() {
     const claims = await getAuthClaims(supabase)
     if (!claims?.sub) {
       return unauthorized()
-    }
-
-    const key = cashflowSettingsCacheKey(claims.sub)
-    const cached = readCashflowSettingsCache(key)
-    if (cached.hit) {
-      return NextResponse.json(cached.data)
     }
 
     const data = await loadCashflowSettingsData(supabase)
@@ -58,8 +64,13 @@ export async function GET() {
       return unauthorized()
     }
 
-    writeCashflowSettingsCache(key, data)
-    return NextResponse.json(data)
+    return NextResponse.json(data, {
+      // Inkomens- en uitgavenbedragen: nergens laten hangen. De route is al
+      // dynamisch en er is geen concreet lekpad, maar dit is de goedkoopste
+      // vorm van die garantie — en het sluit meteen uit dat een browser- of
+      // proxy-cache de rol overneemt die hierboven bewust is weggehaald.
+      headers: { 'Cache-Control': 'private, no-store' },
+    })
   } catch (err) {
     return serverError(err, 'cashflow-settings:GET')
   }

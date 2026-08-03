@@ -166,8 +166,10 @@ describe('CashflowInstellingenBlokLazy — mislukte fetch', () => {
 
     await scrollIntoView()
 
+    // Leeg, niet "leeg-met-padding": het component draagt zijn eigen
+    // <section>-wrapper, dus bij een fout blijft er geen dode ruimte staan.
     await waitFor(() => {
-      expect(container.querySelector('[aria-hidden="true"]')).toBeNull()
+      expect(container).toBeEmptyDOMElement()
     })
     expect(screen.queryByTestId('instellingen-blok')).toBeNull()
   })
@@ -178,8 +180,10 @@ describe('CashflowInstellingenBlokLazy — mislukte fetch', () => {
 
     await scrollIntoView()
 
+    // Leeg, niet "leeg-met-padding": het component draagt zijn eigen
+    // <section>-wrapper, dus bij een fout blijft er geen dode ruimte staan.
     await waitFor(() => {
-      expect(container.querySelector('[aria-hidden="true"]')).toBeNull()
+      expect(container).toBeEmptyDOMElement()
     })
   })
 })

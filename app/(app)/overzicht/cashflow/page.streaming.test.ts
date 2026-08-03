@@ -41,12 +41,57 @@ function stripComments(src: string): string {
   return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '')
 }
 
-/** Het lichaam van de default-exported page-component. */
+/**
+ * Het lichaam van de default-exported page-component — tot de MATCHENDE
+ * accolade, niet tot het einde van het bestand. Dat verschil telt: met een slice
+ * tot EOF is "precies één await" gescoped op bestandspositie, en zou de assertie
+ * stil verbreden zodra er iets áchter de component wordt gezet.
+ *
+ * Het commentaar is er al af, en de bron bevat geen accolades binnen
+ * string-literals — zou dat veranderen, dan loopt de teller uit de pas en faalt
+ * deze helper luid (geen sluitende accolade gevonden) in plaats van stil door.
+ */
 function componentBody(src: string): string {
-  const start = src.indexOf('export default async function OverzichtCashflowPage')
+  const stripped = stripComments(src)
+  const start = stripped.indexOf('export default async function OverzichtCashflowPage')
   expect(start, 'default-export page-component niet gevonden').toBeGreaterThan(-1)
-  return stripComments(src.slice(start))
+
+  const open = stripped.indexOf('{', start)
+  expect(open, 'geen openende accolade na de signature').toBeGreaterThan(-1)
+
+  let depth = 0
+  for (let i = open; i < stripped.length; i++) {
+    if (stripped[i] === '{') depth++
+    else if (stripped[i] === '}') {
+      depth--
+      if (depth === 0) return stripped.slice(open, i + 1)
+    }
+  }
+  throw new Error('geen matchende sluitende accolade voor OverzichtCashflowPage')
 }
+
+describe('componentBody — scoping van de await-telling', () => {
+  it('telt alleen binnen de functie, niet in wat erachter staat', () => {
+    // Zonder accolade-matching (slice tot EOF) zou dit er twee zien en zou de
+    // "precies één await"-assertie hieronder stil verwateren zodra iemand een
+    // helper onder de component zet.
+    const synthetic = [
+      'export default async function OverzichtCashflowPage() {',
+      '  const perspective = await getServerPerspective()',
+      '  return <div>{perspective}</div>',
+      '}',
+      '',
+      'async function helperDieErAchterStaat(supabase) {',
+      '  return await loadDashboardData(supabase)',
+      '}',
+    ].join('\n')
+
+    const body = componentBody(synthetic)
+
+    expect(body.match(/\bawait\b/g) ?? []).toHaveLength(1)
+    expect(body).not.toContain('loadDashboardData')
+  })
+})
 
 describe('/overzicht/cashflow — geen zware await boven de return', () => {
   const body = componentBody(PAGE_SRC)

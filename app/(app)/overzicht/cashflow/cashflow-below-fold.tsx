@@ -249,14 +249,18 @@ const SETTINGS_PREFETCH_MARGIN = '300px 0px'
  * ADR 0058 kent hier de uitzondering "on-demand/lazy client-read die écht niet in
  * de bundel past": dan via een API-route, niet via de browser-client. Dat is
  * `GET /api/overzicht/cashflow-settings`. Het is een ruil, geen gratis winst: wie
- * wél naar beneden scrolt betaalt nu een extra roundtrip. De TTL-cache achter die
- * route (per gebruiker, kort) beperkt dat tot de latency, niet tot de queries.
+ * wél naar beneden scrolt betaalt nu een extra roundtrip, élke keer — die route
+ * heeft bewust geen cache, want hij levert precies de velden die dít blok ook
+ * wegschrijft (zie de kop van de route).
  *
- * Bij een mislukte fetch rendert het blok NIETS — geen eeuwige skeleton en geen
- * blok met nullen (dat zou als "je verdient €0" lezen).
+ * Bij een mislukte fetch rendert dit component NIETS — geen eeuwige skeleton en
+ * geen blok met nullen (dat zou als "je verdient €0" lezen). Daarom draagt het
+ * component zijn eigen `<section>`-wrapper in plaats van er een op de pagina
+ * omheen te laten zetten: die zou met zijn `pb-8 pt-2` anders als lege ruimte
+ * blijven staan waar niets meer komt.
  */
 export function CashflowInstellingenBlokLazy() {
-  const anchorRef = useRef<HTMLDivElement | null>(null)
+  const anchorRef = useRef<HTMLElement | null>(null)
   const startedRef = useRef(false)
   const unmountedRef = useRef(false)
   const [state, setState] = useState<
@@ -316,13 +320,22 @@ export function CashflowInstellingenBlokLazy() {
     }
   }, [])
 
+  // Mislukt: helemaal weg, inclusief de sectie-padding. De observer is dan al
+  // losgekoppeld, dus het verdwijnen van het anker maakt niets meer stuk.
+  // Mislukt: helemaal weg, inclusief de sectie-padding. De observer is dan al
+  // losgekoppeld, dus het verdwijnen van het anker maakt niets meer stuk.
+  if (state.status === 'failed') return null
+
   return (
-    <div ref={anchorRef}>
+    // Instellingen (inkomen, spaarquote, uitgaven) zijn óók in Eenvoudig
+    // zichtbaar — bewust géén HideInSimple. Het blok bevat alleen die drie
+    // kern-instellingen, die de gebruiker in beide modi wil kunnen zien.
+    <section ref={anchorRef} className="mx-auto max-w-6xl px-4 pb-8 pt-2 sm:px-6">
       {state.status === 'ready' ? (
         <DynCashflowInstellingenBlok data={state.data} />
-      ) : state.status === 'pending' ? (
+      ) : (
         <CashflowInstellingenBlokSkeleton />
-      ) : null}
-    </div>
+      )}
+    </section>
   )
 }

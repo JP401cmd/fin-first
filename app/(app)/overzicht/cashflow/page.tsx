@@ -101,12 +101,9 @@ export default async function OverzichtCashflowPage() {
         <CashOverviewLoader />
       </Suspense>
 
-      {/* Instellingen (inkomen, spaarquote, uitgaven) zijn óók in Eenvoudig
-          zichtbaar — bewust géén HideInSimple. Het blok bevat alleen die drie
-          kern-instellingen, die de gebruiker in beide modi wil kunnen zien. */}
-      <section className="mx-auto max-w-6xl px-4 pb-8 pt-2 sm:px-6">
-        <CashflowInstellingenBlokLazy />
-      </section>
+      {/* Draagt zijn eigen <section>-wrapper: bij een mislukte fetch rendert het
+          component niets, en dan hoort ook de sectie-padding te verdwijnen. */}
+      <CashflowInstellingenBlokLazy />
     </>
   )
 }

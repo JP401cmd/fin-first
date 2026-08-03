@@ -1,26 +1,25 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { CashflowSettingsData } from '@/lib/cashflow-settings-data'
-import { __resetCashflowSettingsCache } from '@/lib/cashflow-settings-cache'
 
 /**
  * GET /api/overzicht/cashflow-settings — de lazy data-route van het
  * instellingen-blok onderaan /overzicht/cashflow (perf Task 2.2, stap 5).
  *
- * Vier eigenschappen die er echt toe doen, en die geen van alle uit de
- * loader zelf volgen:
+ * Vier eigenschappen die er echt toe doen, en die geen van alle uit de loader
+ * zelf volgen:
  *
  *  1. **Auth-gate**: zonder claims 401 met de app-brede tekst 'Niet ingelogd'
- *     (ADR 0044). De route staat op een bundel met inkomens- en
- *     uitgavenbedragen; dit is de enige poort ervoor.
+ *     (ADR 0044), zónder de loader aan te raken. De route staat op een bundel
+ *     met inkomens- en uitgavenbedragen; dit is de enige poort ervoor. De gate
+ *     eist bovendien een `sub`, niet alleen een claims-object.
  *  2. **Geen lege bundel bij een null-loader**: dan óók 401. Een lege bundel
  *     zou als "je verdient €0" renderen — stiller en verwarrender dan een fout.
- *  3. **TTL-cache**: het tweede verzoek binnen het venster draait `loadCoreData`
- *     NIET opnieuw. Dat is de hele reden dat de cache bestaat; zonder assertie
- *     zou een weggevallen cache-read alleen als "traag" merkbaar zijn.
- *  4. **Cross-account-isolatie**: de sleutel bevat de user-id, dus gebruiker B
- *     krijgt nooit de gecachete bundel van gebruiker A. Dit is de reden dat de
- *     TTL server-side staat en niet in de browser (zie lib/cashflow-settings-
- *     cache.ts) — een test die dat niet vastpint, laat de motivatie los hangen.
+ *  3. **Verse data per verzoek**: er zit BEWUST geen cache voor deze route. Het
+ *     blok dat 'm consumeert schrijft dezelfde velden ook weg; een TTL-venster
+ *     zou een zojuist opgeslagen bedrag na een remount terugdraaien naar de
+ *     oude waarde. Deze test is de vangrail die verhindert dat zo'n cache
+ *     terugsluipt.
+ *  4. **Geen rauwe fout naar de client**, en de response draagt `no-store`.
  */
 
 const { mockCreateClient, mockGetAuthClaims, mockLoadSettings } = vi.hoisted(() => ({
@@ -46,7 +45,6 @@ function bundle(netMonthlyIncome: number): CashflowSettingsData {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  __resetCashflowSettingsCache()
   mockCreateClient.mockResolvedValue({})
 })
 
@@ -65,6 +63,15 @@ describe('GET /api/overzicht/cashflow-settings — auth', () => {
     expect(mockLoadSettings).not.toHaveBeenCalled()
   })
 
+  it('geeft 401 bij claims zonder sub — een token zonder identiteit telt niet', async () => {
+    mockGetAuthClaims.mockResolvedValue({ email: 'x@y.nl' })
+
+    const res = await GET()
+
+    expect(res.status).toBe(401)
+    expect(mockLoadSettings).not.toHaveBeenCalled()
+  })
+
   it('geeft 401 — geen lege bundel — wanneer de loader null teruggeeft', async () => {
     mockGetAuthClaims.mockResolvedValue({ sub: 'user-a' })
     mockLoadSettings.mockResolvedValue(null)
@@ -75,7 +82,7 @@ describe('GET /api/overzicht/cashflow-settings — auth', () => {
   })
 })
 
-describe('GET /api/overzicht/cashflow-settings — payload + TTL-cache', () => {
+describe('GET /api/overzicht/cashflow-settings — payload', () => {
   it('levert de loader-bundel ongewijzigd door', async () => {
     mockGetAuthClaims.mockResolvedValue({ sub: 'user-a' })
     mockLoadSettings.mockResolvedValue(bundle(4200))
@@ -86,28 +93,28 @@ describe('GET /api/overzicht/cashflow-settings — payload + TTL-cache', () => {
     expect(await res.json()).toEqual({ netMonthlyIncome: 4200 })
   })
 
-  it('draait de loader niet opnieuw bij een tweede verzoek binnen de TTL', async () => {
+  it('stuurt de bundel als private, no-store', async () => {
     mockGetAuthClaims.mockResolvedValue({ sub: 'user-a' })
     mockLoadSettings.mockResolvedValue(bundle(4200))
 
-    await GET()
-    const second = await GET()
-
-    expect(mockLoadSettings).toHaveBeenCalledTimes(1)
-    expect(await second.json()).toEqual({ netMonthlyIncome: 4200 })
-  })
-
-  it('houdt de cache per gebruiker gescheiden', async () => {
-    mockGetAuthClaims.mockResolvedValue({ sub: 'user-a' })
-    mockLoadSettings.mockResolvedValue(bundle(4200))
-    await GET()
-
-    mockGetAuthClaims.mockResolvedValue({ sub: 'user-b' })
-    mockLoadSettings.mockResolvedValue(bundle(1900))
     const res = await GET()
 
+    expect(res.headers.get('cache-control')).toBe('private, no-store')
+  })
+
+  it('leest ELK verzoek vers — geen cache voor een bundel die het blok zelf bewerkt', async () => {
+    // Het instellingen-blok schrijft net_monthly_income / estimated_monthly_expenses
+    // weg via PUT /api/parameters. Zou deze route een TTL-cache krijgen, dan
+    // toont een remount binnen dat venster het bedrag van vóór de bewerking.
+    mockGetAuthClaims.mockResolvedValue({ sub: 'user-a' })
+    mockLoadSettings.mockResolvedValueOnce(bundle(4200)).mockResolvedValueOnce(bundle(5100))
+
+    const first = await GET()
+    const second = await GET()
+
     expect(mockLoadSettings).toHaveBeenCalledTimes(2)
-    expect(await res.json()).toEqual({ netMonthlyIncome: 1900 })
+    expect(await first.json()).toEqual({ netMonthlyIncome: 4200 })
+    expect(await second.json()).toEqual({ netMonthlyIncome: 5100 })
   })
 })
 
