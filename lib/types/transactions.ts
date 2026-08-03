@@ -3,10 +3,10 @@
 // UI→lib is. Zuiver type-only.
 
 /**
- * Smalle rij-vorm die de cashflow-Sankey + geldstroom-weergaven gebruiken.
+ * Smalle rij-vorm die de geldstroom-weergaven gebruiken.
  *
- * Afnemers: `lib/cashflow-data-loader.ts`, `components/overview/cashflow-sankey.tsx`
- * en `components/overview/transacties-geldstroom.tsx`.
+ * Afnemers: `lib/cashflow-data-loader.ts` en
+ * `components/overview/transacties-geldstroom.tsx`.
  */
 export type TransactionRow = {
   id: string
