@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { loadCashflowData } from '@/lib/cashflow-data-loader'
-import { loadDashboardData } from '@/lib/dashboard-data-loader'
+import { loadCashflowKpis } from '@/lib/cashflow-kpis'
 import { loadVasteLastenSummary } from '@/lib/vaste-lasten-summary'
 import { buildVasteLastenInsights } from '@/lib/vaste-lasten-insights'
 import { getServerPerspective } from '@/lib/household/server-perspective'
@@ -22,20 +22,34 @@ export const metadata: Metadata = {
  * /overzicht/cashflow/vaste-lasten — losse Vaste-lasten-pagina (was de
  * "Vaste lasten"-tab). Abonnementen-/vaste-kosten-analyse + kalender van
  * terugkerende transacties.
+ *
+ * GEEN DASHBOARD-BUNDEL (perf Task 2.4, stap 1). Deze pagina las uit
+ * `loadDashboardData` precies TWEE scalars — `monthlyIncome` en
+ * `monthlyExpenses` — en betaalde daarvoor ~40 queries in 5-6 seriële golven
+ * plus een koude horizon-tak met bisectie-solve. Beide velden zitten op
+ * `CashflowCardScalars` uit de slanke KPI-laag (lib/cashflow-kpis.ts, ADR 0077):
+ * vier `cache()`-gedeelde fetches, dezelfde verplaatste afleidingen, geen tweede
+ * rekenweg.
+ *
+ * De EFFECTIVE grondslag blijft de grondslag (ADR 0073): `monthlyIncome`/
+ * `monthlyExpenses` laten `income_source = 'manual'` de profielinschatting
+ * winnen. Dat is bewust — een structureel aandeel ("hoeveel van mijn inkomen
+ * ligt vast?") meet je tegen een stabiel maandinkomen, niet tegen een
+ * half-afgelopen maand. Vervangen door `currentMonth*` zou precies de bug van
+ * ADR 0073 terugzetten.
  */
 export default async function OverzichtCashflowVasteLastenPage() {
   const supabase = await createClient()
   const perspective = await getServerPerspective()
-  const [dashboardResult, cashflow, summary] = await Promise.all([
-    loadDashboardData(supabase),
+  const [kpis, cashflow, summary] = await Promise.all([
+    loadCashflowKpis(supabase),
     loadCashflowData(supabase, perspective),
     loadVasteLastenSummary(supabase),
   ])
-  const { dashboardData } = dashboardResult
   const insights = buildVasteLastenInsights({
     summary,
-    monthlyIncome: dashboardData.monthlyIncome,
-    monthlyExpenses: dashboardData.monthlyExpenses,
+    monthlyIncome: kpis.monthlyIncome,
+    monthlyExpenses: kpis.monthlyExpenses,
   })
 
   return (
