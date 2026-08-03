@@ -49,6 +49,17 @@ import type { CashflowCardStatuses } from '@/lib/cashflow-cards'
  * gebeurt synchroon vóór de refresh), dus de route leest meteen het nieuwe
  * perspectief en de TTL-cache is per perspectief gesleuteld → gegarandeerd vers.
  *
+ * …EN DAAROM WACHT DE EERSTE FETCH TOT HET PERSPECTIEF BEKEND IS. De
+ * PerspectiveProvider begint op `'personal'` en resolvet het echte perspectief
+ * pas ná een `/api/perspective`-roundtrip. Met perspectief in de deps zou die
+ * mount-flip bij een huishoud-/partnergebruiker een tweede effect-run geven: één
+ * speculatief verzoek op `'personal'` dat gegarandeerd wordt weggegooid, plus het
+ * echte — en beide zijn cache-MISSES (de sleutel bevat het perspectief), dus
+ * allebei de volle loaderset. `perspective === null` betekent hier "nog niet
+ * bekend" en gate't het effect. De ruil is bewust: iedereen wacht één roundtrip
+ * langer op de dots, en niemand betaalt een weggegooid verzoek van ~11 queries.
+ * Statuskleuren in de zijbalk zijn niet kritiek genoeg voor die verspilling.
+ *
  * Defensief: zolang er geen seed/antwoord is blijven alle statussen 'neutral'
  * (progressive enhancement) — precies de staat die de dots vandaag ook tijdens
  * de fetch tonen. Tijdens een lopende her-fetch blijven de VORIGE kleuren staan
@@ -77,12 +88,14 @@ function coerce(value: unknown): LeverageStatus {
 /**
  * @param seed De server-berekende statussen van de hub, of null. Wordt alleen op
  *   `CASHFLOW_HUB_ROUTE` gelezen; elders is hij per definitie afwezig.
- * @param perspective Het actieve client-perspectief. Wijzigt het, dan haalt deze
- *   hook de statussen opnieuw op (zie de kop).
+ * @param perspective Het OPGELOSTE client-perspectief, of `null` zolang dat nog
+ *   niet bekend is. Bij `null` wordt er niet gefetcht (geen speculatief verzoek
+ *   dat de mount-flip toch weggooit); bij een wijziging wordt opnieuw opgehaald.
+ *   Zie de kop.
  */
 export function useCashflowCardStatuses(
   seed: CashflowCardStatuses | null,
-  perspective: string,
+  perspective: string | null,
 ): CashflowCardStatuses {
   const pathname = usePathname() ?? '/'
   // Trailing slash strippen vóór de routevergelijking (Next normaliseert 'm weg,
@@ -97,9 +110,11 @@ export function useCashflowCardStatuses(
   const [fetched, setFetched] = useState<CashflowCardStatuses>(NEUTRAL_CASHFLOW_STATUSES)
 
   useEffect(() => {
-    if (!onCashflowRoute || isHub) {
+    if (!onCashflowRoute || isHub || perspective === null) {
       // Off-route: niet fetchen; dots blijven neutral. Op de hub: de pagina
-      // seedt de statussen zelf (zie de kop) — ook daar geen request.
+      // seedt de statussen zelf (zie de kop) — ook daar geen request. En zolang
+      // het perspectief nog niet opgelost is: wachten, want een verzoek op de
+      // voorlopige 'personal'-waarde wordt bij de flip toch weggegooid.
       return
     }
     let cancelled = false

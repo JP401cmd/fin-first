@@ -33,7 +33,10 @@ import type { CashflowCardStatuses } from '@/lib/cashflow-cards'
  * zodat een perspectiefwissel de sub-pagina's opnieuw laat ophalen. Zonder dat
  * zouden de dots daar op het vorige perspectief blijven staan (een wissel doet
  * alleen `router.refresh()` — clientstate overleeft), terwijl de hub via zijn
- * seed wél zou meebewegen: precies de asymmetrie die dit voorkomt.
+ * seed wél zou meebewegen: precies de asymmetrie die dit voorkomt. Zolang het
+ * perspectief nog niet opgelost is gaat er `null` in en wacht de eerste fetch —
+ * anders betaalt elke huishoud-/partnergebruiker bij een harde load een tweede,
+ * weggegooid verzoek.
  *
  * De seed blijft na een route-wissel staan. Ga je hub → sub → hub, dan tonen de
  * dots heel even de statussen van het vorige hub-bezoek tot het gestreamde blok
@@ -72,8 +75,14 @@ export function CashflowStatusProvider({ children }: { children: React.ReactNode
   // Het perspectief hoort bij de statussen: een wissel doet slechts een zachte
   // `router.refresh()`, die de sub-pagina's niet opnieuw laat fetchen zolang het
   // perspectief niet in de deps van de hook zit. Zie de kop van de hook.
-  const { perspective } = usePerspective()
-  const statuses = useCashflowCardStatuses(seed, perspective)
+  //
+  // `loading` → `null`: de PerspectiveProvider begint op 'personal' en resolvet
+  // het echte perspectief pas ná een roundtrip. Zonder deze gate zou een
+  // huishoud-/partnergebruiker bij elke harde load op een sub-pagina TWEE
+  // verzoeken doen — één speculatief op 'personal' dat de flip weggooit — en
+  // beide zijn cache-misses. Eén roundtrip later dots is de betere ruil.
+  const { perspective, loading: perspectiveLoading } = usePerspective()
+  const statuses = useCashflowCardStatuses(seed, perspectiveLoading ? null : perspective)
 
   return (
     <CashflowStatusContext.Provider value={statuses}>

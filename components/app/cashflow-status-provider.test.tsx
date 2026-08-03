@@ -18,7 +18,10 @@ import type { CashflowCardStatuses } from '@/lib/cashflow-cards'
  *  4. buiten de cashflow-routes raakt hij het endpoint niet aan;
  *  5. bij een PERSPECTIEFWISSEL haalt de sub-pagina opnieuw op (die wissel doet
  *     alleen een zachte `router.refresh()`, dus zonder het perspectief in de deps
- *     zouden de dots op het vorige perspectief blijven staan);
+ *     zouden de dots op het vorige perspectief blijven staan) — maar zolang het
+ *     perspectief nog niet OPGELOST is gaat er geen speculatief verzoek uit, en
+ *     tijdens de her-fetch blijven de vorige kleuren staan i.p.v. naar grijs te
+ *     vallen (beide bewuste keuzes, hier vastgepind);
  *  6. over een route-OVERGANG heen lekt er niets: de gefetchte waarden van een
  *     sub-pagina verschijnen niet op de hub, en een blijvende seed niet op een
  *     sub-pagina.
@@ -75,7 +78,9 @@ let fetchSpy: ReturnType<typeof vi.fn>
 beforeEach(() => {
   fetchSpy = vi.fn(async () => ({ ok: true, json: async () => FROM_API }) as Response)
   global.fetch = fetchSpy as unknown as typeof fetch
-  mockUsePerspective.mockReturnValue({ perspective: 'personal' })
+  // Default: perspectief al opgelost. Tests die de mount-flip nabootsen zetten
+  // `loading: true` en flippen daarna zelf.
+  mockUsePerspective.mockReturnValue({ perspective: 'personal', loading: false })
 })
 
 afterEach(() => {
@@ -234,7 +239,7 @@ describe('CashflowStatusProvider — perspectiefwissel', () => {
       vasteLasten: 'good',
       forecast: 'warn',
     }
-    mockUsePerspective.mockReturnValue({ perspective: 'household' })
+    mockUsePerspective.mockReturnValue({ perspective: 'household', loading: false })
     fetchSpy.mockResolvedValue({
       ok: true,
       json: async () => HOUSEHOLD_STATUSES,
@@ -244,10 +249,48 @@ describe('CashflowStatusProvider — perspectiefwissel', () => {
         <StatusProbe />
       </CashflowStatusProvider>,
     )
+
+    // BEWUSTE KEUZE, hier vastgepind: tijdens de her-fetch blijven de VORIGE
+    // kleuren staan i.p.v. naar neutraal te vallen. Eén begrensd verzoek lang de
+    // oude kleuren is iets anders dan de bug die tot een routewissel persisteerde;
+    // een grijze flits bij elke perspectiefwissel is de slechtere ruil.
+    expect(probe()).toBe('warn/good/bad/neutral')
+
     await act(async () => {})
 
     expect(fetchSpy).toHaveBeenCalledTimes(2)
     expect(probe()).toBe('bad/bad/good/warn')
+  })
+
+  // De PerspectiveProvider begint op 'personal' en resolvet het echte perspectief
+  // pas ná een roundtrip. Zonder gate zou die mount-flip bij een huishoud-
+  // gebruiker een weggegooid eerste verzoek opleveren — en beide verzoeken zijn
+  // cache-misses, dus twee volle loadersets voor één paginabezoek.
+  it('doet geen speculatief verzoek zolang het perspectief nog niet bekend is', async () => {
+    mockUsePathname.mockReturnValue('/overzicht/cashflow/budget')
+    mockUsePerspective.mockReturnValue({ perspective: 'personal', loading: true })
+    const { rerender } = render(
+      <CashflowStatusProvider>
+        <StatusProbe />
+      </CashflowStatusProvider>,
+    )
+    await act(async () => {})
+
+    expect(fetchSpy).not.toHaveBeenCalled()
+    expect(probe()).toBe(NEUTRAL)
+
+    // De roundtrip landt: het echte perspectief is 'household'.
+    mockUsePerspective.mockReturnValue({ perspective: 'household', loading: false })
+    rerender(
+      <CashflowStatusProvider>
+        <StatusProbe />
+      </CashflowStatusProvider>,
+    )
+    await act(async () => {})
+
+    // Eén verzoek voor dit paginabezoek, niet twee.
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    expect(probe()).toBe('warn/good/bad/neutral')
   })
 
   // De hub blijft ook ná een wissel op nul fetches: daar hertekent de zachte
@@ -269,7 +312,7 @@ describe('CashflowStatusProvider — perspectiefwissel', () => {
       vasteLasten: 'good',
       forecast: 'warn',
     }
-    mockUsePerspective.mockReturnValue({ perspective: 'household' })
+    mockUsePerspective.mockReturnValue({ perspective: 'household', loading: false })
     rerender(
       <CashflowStatusProvider>
         <CashflowStatusSeed statuses={HOUSEHOLD_SEED} />
