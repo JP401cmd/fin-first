@@ -65,19 +65,32 @@ export const VASTE_LASTEN_CACHE_TTL_MS = 30 * 60_000
  *  - een verschoven venstergrens bij een maandwissel (`windowStart`);
  *  - een nieuwe of gewijzigde bevestigde vaste last, inclusief hernoemen,
  *    bedrag wijzigen en op 'excluded' zetten (`recurring`, op inhoud);
- *  - een import (`txCount` + `txMaxCreatedAt`).
+ *  - een import (`txCount` + `txMaxCreatedAt`);
+ *  - een boeking die als overboeking wordt gemarkeerd (`txTransferCount`) — de
+ *    detectie gooit die rijen weg, dus dat verandert de uitkomst zonder dat het
+ *    totale aantal rijen of een van de maxima beweegt.
  *
  * WAT HIJ NIET SLUITEND ZIET: een bewerking op een BESTAANDE transactierij die
- * het aantal en de maxima ongemoeid laat. `txMaxUpdatedAt` vangt dat op voor de
- * paden die `updated_at` meeschrijven (het transactieformulier, de
- * categorisatie), maar er is geen trigger op die kolom, dus dat signaal is
- * best-effort en geen garantie. Bewust aanvaard: zo'n bewerking verschuift een
- * gemiddelde over minstens drie voorvallen — de TTL is daar het vangnet voor.
+ * het aantal, de transfer-telling en de maxima ongemoeid laat — dus een
+ * gewijzigd bedrag, datum, omschrijving of tegenpartij. `txMaxUpdatedAt` vangt
+ * dat op voor de paden die `updated_at` meeschrijven (het transactieformulier,
+ * de categorisatie), maar er is geen trigger op die kolom, dus dat signaal is
+ * best-effort en geen garantie voor een toekomstig pad dat de kolom vergeet.
+ * Bewust aanvaard: zo'n bewerking verschuift een gemiddelde over minstens drie
+ * voorvallen — de TTL is daar het vangnet voor.
+ *
+ * OOK NIET: het VERSTRIJKEN VAN TIJD. `end_date`-verval van een bevestigde vaste
+ * last (`isRecurringExpired`) hangt aan "vandaag", en "vandaag" zit hier niet in —
+ * bewust, want dan zou de vingerafdruk elke dag kantelen zonder datawijziging.
+ * Een item dat vandaag afloopt blijft dus meetellen tot de eerstvolgende
+ * datawijziging of het einde van de TTL.
  */
 export interface VasteLastenFingerprintInput {
   /** Ondergrens van het 12-maandsvenster (`YYYY-MM-01`). */
   windowStart: string
   txCount: number | null
+  /** Aantal rijen in het venster dat de detectie wegfiltert als overboeking. */
+  txTransferCount: number | null
   txMaxDate: string | null
   txMaxCreatedAt: string | null
   txMaxUpdatedAt: string | null
@@ -95,10 +108,14 @@ export interface VasteLastenFingerprintInput {
 
 /**
  * Stabiele 64-bits digest (twee onafhankelijke 32-bits accumulatoren, plus de
- * lengte van de invoer). Bewust pure JS en geen `node:crypto`: dit bestand hangt
- * aan een loader die ook in een niet-Node-runtime geladen kan worden. Een botsing
- * zou een verouderde samenvatting opleveren; met 64 bits tegen één opgeslagen
- * vingerafdruk per gebruiker is die kans binnen een TTL-venster verwaarloosbaar.
+ * lengte van de invoer). Handgerold en niet `node:crypto`, omdat de eis hier
+ * bescheiden is: er staat per gebruiker precies ÉÉN vingerafdruk opgeslagen en
+ * die wordt direct vergeleken. Er is dus geen verjaardagsprobleem over een grote
+ * verzameling — alleen de kans dat twee opeenvolgende toestanden van dezelfde
+ * gebruiker toevallig op dezelfde 64 bits landen, en dat is verwaarloosbaar. De
+ * gevaarlijkere botsingsklasse (twee verschillende toestanden die dezelfde
+ * INVOERTEKST opleveren) wordt afgesloten door de JSON-omkadering hieronder, niet
+ * door het aantal bits.
  */
 function digest(input: string): string {
   let h1 = 0x811c9dc5
@@ -139,6 +156,7 @@ export function vasteLastenFingerprint(input: VasteLastenFingerprintInput): stri
     JSON.stringify([
       input.windowStart,
       input.txCount,
+      input.txTransferCount,
       input.txMaxDate,
       input.txMaxCreatedAt,
       input.txMaxUpdatedAt,
@@ -147,6 +165,15 @@ export function vasteLastenFingerprint(input: VasteLastenFingerprintInput): stri
   )
 }
 
+/**
+ * Bovengrens op het aantal entries. Nodig omdat een verlopen entry alleen wordt
+ * opgeruimd als díé gebruiker terugkomt: een instance die veel verschillende
+ * gebruikers ziet zou anders elke entry tot het einde van zijn leven vasthouden.
+ * De statuscaches hiernaast hebben deze grens niet — daar is er niets te
+ * spiegelen, dus hier staat hij nieuw.
+ */
+export const VASTE_LASTEN_CACHE_MAX_ENTRIES = 500
+
 interface CacheEntry {
   fingerprint: string
   summary: VasteLastenSummary
@@ -154,6 +181,27 @@ interface CacheEntry {
 }
 
 const store = new Map<string, CacheEntry>()
+
+/**
+ * Maak plaats voor één nieuwe entry: eerst alles wat toch al verlopen is, en pas
+ * als dat niet genoeg oplevert de entry die het eerst zou vervallen. Draait
+ * alleen op de grens, dus niet op de hete weg.
+ */
+function makeRoom(now: number): void {
+  for (const [key, entry] of store) {
+    if (entry.expiresAt <= now) store.delete(key)
+  }
+  if (store.size < VASTE_LASTEN_CACHE_MAX_ENTRIES) return
+  let oudsteKey: string | null = null
+  let oudste = Infinity
+  for (const [key, entry] of store) {
+    if (entry.expiresAt < oudste) {
+      oudste = entry.expiresAt
+      oudsteKey = key
+    }
+  }
+  if (oudsteKey !== null) store.delete(oudsteKey)
+}
 
 /**
  * Uitkomst van een cache-lezing. Discriminated union, net als bij de
@@ -172,6 +220,12 @@ export type VasteLastenCacheRead =
  * ándere vingerafdruk blijft staan: de aanroeper schrijft er direct hierna
  * overheen, dus opruimen levert niets op, en een lezing die een geldige entry
  * vernietigt is een verrassing die niemand van een `read` verwacht.
+ *
+ * LET OP — de samenvatting komt BIJ REFERENTIE terug, niet als kopie. Twee
+ * verzoeken die dezelfde entry raken krijgen dus hetzelfde object; behandel het
+ * als bevroren. Geen enkele huidige consument muteert de arrays erin (nagelopen),
+ * en kopiëren zou de winst deels weer weggeven — maar wie hier straks in gaat
+ * sorteren of pushen, muteert de cache van iedereen binnen dat TTL-venster.
  */
 export function readVasteLastenCache(
   userId: string,
@@ -196,6 +250,7 @@ export function writeVasteLastenCache(
   now: number = Date.now(),
   ttlMs: number = VASTE_LASTEN_CACHE_TTL_MS,
 ): void {
+  if (!store.has(userId) && store.size >= VASTE_LASTEN_CACHE_MAX_ENTRIES) makeRoom(now)
   store.set(userId, { fingerprint, summary, expiresAt: now + ttlMs })
 }
 

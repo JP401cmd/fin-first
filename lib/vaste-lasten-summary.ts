@@ -92,11 +92,22 @@ type RecurringTxRow = {
  * huishouden-inclusief (eigen rijen OF `ownership = 'shared'` binnen het
  * huishouden). Vastpinnen op de eigen user_id laat de gedeelde partnerrijen stil
  * wegvallen uit het vaste-lastentotaal — een gedragswijziging, geen optimalisatie.
+ *
+ * `complete` MELDT OF DE OPHAAL HEEL IS. Een paginafout wordt hier al sinds jaar
+ * en dag geslikt: we geven terug wat we tot dan toe hadden, en het volgende
+ * verzoek probeerde het gewoon opnieuw. Met de vingerafdruk-cache (T3.3) erachter
+ * is dat niet meer onschuldig — de vingerafdrukronde is dan wél geslaagd, dus een
+ * afgekapte uitkomst zou onder een GELDIGE vingerafdruk worden vastgepind en tot
+ * de volgende datawijziging of het einde van de TTL geserveerd. Bij een fout op
+ * de eerste pagina is dat het ergst: nul rijen betekent dat de detectie helemaal
+ * wordt overgeslagen, en dan zou één storing de automatisch gedetecteerde vaste
+ * lasten een half uur lang laten verdwijnen. De aanroeper onthoudt daarom alleen
+ * een HELE uitkomst.
  */
 async function fetchAllRecurringTx(
   supabase: SupabaseClient,
   startDateStr: string,
-): Promise<RecurringTxRow[]> {
+): Promise<{ rows: RecurringTxRow[]; complete: boolean }> {
   const PAGE = 1000
   const rows: RecurringTxRow[] = []
   let cursor: { date: string; id: string } | null = null
@@ -115,7 +126,7 @@ async function fetchAllRecurringTx(
       .order('date', { ascending: true })
       .order('id', { ascending: true })
       .limit(PAGE)
-    if (error) break
+    if (error) return { rows, complete: false }
     const batch = (data ?? []) as RecurringTxRow[]
     rows.push(...batch)
     if (batch.length < PAGE) break
@@ -123,7 +134,7 @@ async function fetchAllRecurringTx(
     // De cursor schuift altijd strikt op: de OR sluit de cursorrij zelf uit.
     cursor = { date: last.date, id: last.id }
   }
-  return rows
+  return { rows, complete: true }
 }
 
 const SUBSCRIPTION_CATEGORIES: RecurringCategory[] = ['subscription']
@@ -212,26 +223,49 @@ async function loadFingerprintRound(
     return { value: row?.[column] ?? null, error }
   }
 
-  const [countResult, maxDate, maxCreated, maxUpdated, recurringResult] = await Promise.all([
-    supabase.from('transactions').select('id', { count: 'exact', head: true }).gte('date', startDateStr),
-    maxOf('date'),
-    maxOf('created_at'),
-    maxOf('updated_at'),
-    supabase
-      .from('recurring_transactions')
-      .select('id, counterparty_name, amount, name, frequency, category_override, end_date')
-      .eq('is_active', true),
-  ])
+  const [countResult, transferCount, maxDate, maxCreated, maxUpdated, recurringResult] =
+    await Promise.all([
+      supabase
+        .from('transactions')
+        .select('id', { count: 'exact', head: true })
+        .gte('date', startDateStr),
+      // Het aantal rijen dat de detectie WEGGOOIT (`transaction_type` is
+      // 'transfer'/'joint_transfer'). Zonder deze telling ziet de vingerafdruk
+      // niet dat iemand een boeking als overboeking markeert — het totale aantal
+      // rijen blijft dan gelijk, de datums ook, en de twee paden die dit doen
+      // (app/api/own-accounts/reclassify, components/app/transfer-confirm-sheet)
+      // schrijven geen `updated_at` mee. Dat is een bewuste gebruikersactie met
+      // een zichtbaar gevolg voor het vaste-lastentotaal, dus die hoort niet in
+      // een TTL-venster te blijven hangen.
+      supabase
+        .from('transactions')
+        .select('id', { count: 'exact', head: true })
+        .gte('date', startDateStr)
+        .in('transaction_type', ['transfer', 'joint_transfer']),
+      maxOf('date'),
+      maxOf('created_at'),
+      maxOf('updated_at'),
+      supabase
+        .from('recurring_transactions')
+        .select('id, counterparty_name, amount, name, frequency, category_override, end_date')
+        .eq('is_active', true),
+    ])
 
   const recurring = (recurringResult.data ?? []) as RecurringRow[]
   const failed =
-    countResult.error || maxDate.error || maxCreated.error || maxUpdated.error || recurringResult.error
+    countResult.error ||
+    transferCount.error ||
+    maxDate.error ||
+    maxCreated.error ||
+    maxUpdated.error ||
+    recurringResult.error
   if (failed) return { fingerprint: null, recurring }
 
   return {
     fingerprint: vasteLastenFingerprint({
       windowStart: startDateStr,
       txCount: countResult.count ?? null,
+      txTransferCount: transferCount.count ?? null,
       txMaxDate: maxDate.value,
       txMaxCreatedAt: maxCreated.value,
       txMaxUpdatedAt: maxUpdated.value,
@@ -278,20 +312,33 @@ export const loadVasteLastenSummary = cache(
       const cached = readVasteLastenCache(user.id, fingerprint)
       if (cached.hit) return cached.summary
     }
-    /** Legt de uitkomst vast onder de zojuist gemeten vingerafdruk. */
-    const remember = (summary: VasteLastenSummary): VasteLastenSummary => {
-      if (fingerprint) writeVasteLastenCache(user.id, fingerprint, summary)
-      return summary
-    }
 
-    const [transactions, budgetResult] = await Promise.all([
+    const [txFetch, budgetResult] = await Promise.all([
       fetchAllRecurringTx(supabase, startDateStr),
       supabase
         .from('budgets')
         .select('id, name, parent_id, budget_type')
         .order('sort_order', { ascending: true }),
     ])
+    const transactions = txFetch.rows
     const budgets = budgetResult.data ?? []
+
+    /**
+     * Legt de uitkomst vast onder de zojuist gemeten vingerafdruk — maar alléén
+     * als de ophaal HEEL was. Een afgekapte ophaal levert een te laag totaal (of,
+     * bij een fout op pagina 1, helemaal geen detectie), en dát een half uur
+     * vastpinnen onder een geldige vingerafdruk maakt één storing zichtbaar veel
+     * erger dan hij is. Dezelfde faaldiscipline als in `loadFingerprintRound`:
+     * gedegradeerde invoer wordt niet onthouden.
+     *
+     * Een fout op `budgets` telt hier bewust NIET mee: die lijst kan de uitkomst
+     * niet beïnvloeden (zie ADR 0078 — `detectRecurringTransactions` leest de
+     * parameter niet en `VasteLastenItem` draagt geen budget-afgeleid veld).
+     */
+    const remember = (summary: VasteLastenSummary): VasteLastenSummary => {
+      if (fingerprint && txFetch.complete) writeVasteLastenCache(user.id, fingerprint, summary)
+      return summary
+    }
 
     // Confirmed recurring items uit DB (alleen uitgaven: amount < 0), exclusief
     // door de gebruiker als 'excluded' gemarkeerde items.

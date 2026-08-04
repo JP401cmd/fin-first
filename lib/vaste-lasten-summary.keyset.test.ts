@@ -29,7 +29,7 @@ vi.mock('@/lib/recurring-detection', async (importOriginal) => {
 })
 
 import { detectRecurringTransactions, type TransactionForDetection } from '@/lib/recurring-detection'
-import { makeSupabase, MAX_ROWS, type Row } from '@/test/helpers/fake-supabase'
+import { makeSupabase, withFailingTxFetches, MAX_ROWS, type Row } from '@/test/helpers/fake-supabase'
 import { __resetVasteLastenCache } from '@/lib/vaste-lasten-cache'
 import { loadVasteLastenSummary } from './vaste-lasten-summary'
 
@@ -186,8 +186,25 @@ describe('fetchAllRecurringTx — keyset-paginatie levert het volledige venster'
 
     // 1182 filler + 12 tweeling + 6 gelijkspel = 1200 rijen → pagina 1 zit vol
     // (1000), pagina 2 levert er 200 en is daarmee de laatste. Daarvóór staan de
-    // vier aggregaten van de vingerafdrukronde (T3.3): count + drie maxima.
-    expect(fake.tableQueriesFor('transactions')).toBe(4 + 2)
+    // vijf aggregaten van de vingerafdrukronde (T3.3): twee tellingen + drie maxima.
+    expect(fake.tableQueriesFor('transactions')).toBe(5 + 2)
+  })
+
+  it('een halve ophaal wordt niet onthouden: het volgende verzoek leest het hele venster', async () => {
+    const db = client()
+    // Pagina 1 slaagt (1000 rijen), pagina 2 valt om → een AFGEKAPT venster. De
+    // vingerafdrukronde slaagt wel, dus zonder de completeness-guard zou dit te
+    // lage totaal onder een geldige vingerafdruk vastgepind worden.
+    const supabase = withFailingTxFetches(db, [2])
+
+    await loadVasteLastenSummary(supabase)
+    const afgekapt = detectSpy.mock.calls[0][0] as TransactionForDetection[]
+    expect(afgekapt).toHaveLength(MAX_ROWS)
+
+    await loadVasteLastenSummary(supabase)
+    const heel = detectSpy.mock.calls[1][0] as TransactionForDetection[]
+    expect(heel).toHaveLength(TRANSACTIES.length)
+    expect(heel.map((t) => t.id)).toEqual(CANONIEK.map((r) => r.id))
   })
 })
 

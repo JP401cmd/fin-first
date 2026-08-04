@@ -23,9 +23,15 @@ vi.mock('@/lib/recurring-detection', async (importOriginal) => {
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { detectRecurringTransactions } from '@/lib/recurring-detection'
-import { makeSupabase, type FakeSupabase, type Row } from '@/test/helpers/fake-supabase'
+import {
+  makeSupabase,
+  withFailingTxFetches,
+  type FakeSupabase,
+  type Row,
+} from '@/test/helpers/fake-supabase'
 import {
   VASTE_LASTEN_CACHE_TTL_MS,
+  VASTE_LASTEN_CACHE_MAX_ENTRIES,
   vasteLastenFingerprint,
   readVasteLastenCache,
   writeVasteLastenCache,
@@ -51,6 +57,7 @@ const SAMENVATTING: VasteLastenSummary = {
 const BASIS_INPUT: VasteLastenFingerprintInput = {
   windowStart: '2025-07-01',
   txCount: 240,
+  txTransferCount: 12,
   txMaxDate: '2026-06-14',
   txMaxCreatedAt: '2026-06-14T22:00:00Z',
   txMaxUpdatedAt: '2026-06-14T22:00:00Z',
@@ -120,6 +127,23 @@ describe('A — de cache zelf', () => {
     expect(readVasteLastenCache('u1', 'fp-oud').hit).toBe(false)
     expect(readVasteLastenCache('u1', 'fp-nieuw').hit).toBe(true)
   })
+
+  it('begrenst het aantal entries: bij een volle cache sneuvelt de eerstvervallende', () => {
+    const t0 = 1_000_000
+    for (let i = 0; i < VASTE_LASTEN_CACHE_MAX_ENTRIES; i++) {
+      // Oplopende schrijftijd ⇒ oplopende vervaltijd; 'u0' vervalt als eerste.
+      writeVasteLastenCache(`u${i}`, FP, SAMENVATTING, t0 + i)
+    }
+    expect(readVasteLastenCache('u0', FP, t0).hit).toBe(true)
+
+    writeVasteLastenCache('nieuw', FP, SAMENVATTING, t0 + VASTE_LASTEN_CACHE_MAX_ENTRIES)
+
+    // Zonder begrenzing blijft een entry van een gebruiker die nooit terugkomt
+    // tot in het oneindige staan — de read ruimt alleen op wat híj tegenkomt.
+    expect(readVasteLastenCache('u0', FP, t0).hit).toBe(false)
+    expect(readVasteLastenCache('u1', FP, t0).hit).toBe(true)
+    expect(readVasteLastenCache('nieuw', FP, t0).hit).toBe(true)
+  })
 })
 
 describe('B — waar de vingerafdruk op reageert', () => {
@@ -164,6 +188,17 @@ describe('B — waar de vingerafdruk op reageert', () => {
 
   it('kantelt bij een verschoven venstergrens (maandwissel)', () => {
     expect(vasteLastenFingerprint({ ...BASIS_INPUT, windowStart: '2025-08-01' })).not.toBe(BASIS)
+  })
+
+  it('kantelt als een boeking als overboeking wordt gemarkeerd', () => {
+    // Het TOTALE aantal rijen blijft gelijk — alleen de transfer-telling schuift
+    // op. De twee paden die dit doen (own-accounts/reclassify,
+    // transfer-confirm-sheet) schrijven geen `updated_at` mee, dus zonder deze
+    // component ziet de vingerafdruk er niets van.
+    const na = { ...BASIS_INPUT, txTransferCount: BASIS_INPUT.txTransferCount! + 1 }
+    expect(na.txCount).toBe(BASIS_INPUT.txCount)
+    expect(na.txMaxUpdatedAt).toBe(BASIS_INPUT.txMaxUpdatedAt)
+    expect(vasteLastenFingerprint(na)).not.toBe(BASIS)
   })
 
   it('kantelt NIET door de volgorde waarin de recurring-rijen binnenkomen', () => {
@@ -246,9 +281,9 @@ describe('C — op het loaderpad', () => {
     const tweede = await loadVasteLastenSummary(db.client)
 
     expect(detectSpy).toHaveBeenCalledTimes(1)
-    // De tweede ronde kost precies de vier aggregaten van de vingerafdruk — geen
-    // enkele paginatie-query erbij.
-    expect(db.tableQueriesFor('transactions') - naEerste).toBe(4)
+    // De tweede ronde kost precies de vijf aggregaten van de vingerafdruk (twee
+    // tellingen + drie maxima) — geen enkele paginatie-query erbij.
+    expect(db.tableQueriesFor('transactions') - naEerste).toBe(5)
     expect(db.tableQueriesFor('budgets')).toBe(1)
     expect(tweede).toEqual(eerste)
     expect(tweede.totalMonthly).toBeGreaterThan(0)
@@ -290,6 +325,44 @@ describe('C — op het loaderpad', () => {
 
     expect(detectSpy).toHaveBeenCalledTimes(2)
     expect(tweede.totalMonthlySubscriptions).toBe(0)
+  })
+
+  it('een boeking als overboeking markeren laat het dure pad opnieuw draaien', async () => {
+    const voor = fake(transacties())
+    await loadVasteLastenSummary(voor.client)
+    expect(detectSpy).toHaveBeenCalledTimes(1)
+
+    // Exact dezelfde rijenset, één rij nu een overboeking. Het aantal rijen, de
+    // datums en `updated_at` bewegen NIET mee — alleen de transfer-telling. Deze
+    // getuige loopt end-to-end en dekt daarmee óók de bedrading: een
+    // vingerafdruk die het veld wel kent maar de query niet doet, valt hier om.
+    const rijen = transacties().map((r) =>
+      r.id === 'tx-huur-0' ? { ...r, transaction_type: 'transfer' } : r,
+    )
+    expect(rijen).toHaveLength(transacties().length)
+    const na = fake(rijen)
+    await loadVasteLastenSummary(na.client)
+
+    expect(detectSpy).toHaveBeenCalledTimes(2)
+  })
+
+  it('een mislukte ophaal wordt NIET onthouden — de detectie komt terug zodra het weer lukt', async () => {
+    const db = fake(transacties())
+    // Alleen de EERSTE ophaalpoging faalt; de vingerafdrukronde slaagt beide
+    // keren, dus zonder de completeness-guard zou de afgekapte uitkomst onder een
+    // geldige vingerafdruk worden vastgepind.
+    const client = withFailingTxFetches(db, [1])
+
+    const eerste = await loadVasteLastenSummary(client)
+    // Nul rijen ⇒ de `< 3`-tak: alleen de bevestigde vaste last, geen detectie.
+    expect(detectSpy).toHaveBeenCalledTimes(0)
+    expect(eerste.count).toBe(1)
+
+    const tweede = await loadVasteLastenSummary(client)
+
+    expect(detectSpy).toHaveBeenCalledTimes(1)
+    expect(tweede.count).toBeGreaterThan(eerste.count)
+    expect(tweede.totalMonthly).toBeGreaterThan(eerste.totalMonthly)
   })
 
   it('valt de vingerafdrukronde om, dan wordt de cache overgeslagen', async () => {

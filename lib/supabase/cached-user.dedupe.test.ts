@@ -108,6 +108,7 @@ function makeCountingSupabase() {
     const b: any = {
       select: () => b,
       eq: () => b,
+      in: () => b,
       gte: () => b,
       lte: () => b,
       order: () => b,

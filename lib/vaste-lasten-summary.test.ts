@@ -36,6 +36,10 @@ function makeSupabase(recurrings: RecurringRow[]): SupabaseClient {
       gte: () => b,
       order: () => b,
       eq: () => b,
+      // De vingerafdrukronde telt apart hoeveel rijen als overboeking zijn
+      // gemarkeerd (`.in('transaction_type', …)`); passthrough volstaat hier,
+      // want deze mock levert toch nul transacties.
+      in: () => b,
       // De keyset-paginatie (fetchAllRecurringTx) eindigt de keten op .limit();
       // één pagina met de volledige rijenset is genoeg voor deze deterministische
       // mock, want `transactions` is hier leeg en de lus stopt na de eerste ronde.

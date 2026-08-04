@@ -71,12 +71,25 @@ doorwerken.
 |---|---|
 | ondergrens van het venster | de maandwissel die het venster laat opschuiven |
 | `count(*)` op transacties in het venster | rijen erbij of eraf, inclusief een import |
+| `count(*)` op de **overboekingen** in het venster | een boeking die als overboeking wordt gemarkeerd |
 | `max(date)` | een verse of teruggedateerde boeking aan de rand |
 | `max(created_at)` | een import die per saldo evenveel rijen oplevert |
 | `max(updated_at)` | een **bewerkte** bestaande rij — best-effort, zie hieronder |
 | de actieve `recurring_transactions`, op **inhoud** | elke bewerking aan een bevestigde vaste last |
 
-Twee keuzes verdienen toelichting.
+Drie keuzes verdienen toelichting.
+
+**De overboeking-telling is geen luxe.** `detectRecurringTransactions` gooit
+rijen met `transaction_type` `'transfer'`/`'joint_transfer'` wég vóór het
+groeperen. Markeert iemand een boeking als overboeking, dan verandert het
+vaste-lastentotaal — terwijl het aantal rijen, de datums en `created_at`
+allemaal gelijk blijven. De twee paden die dit doen
+(`app/api/own-accounts/reclassify`, `components/app/transfer-confirm-sheet.tsx`)
+schrijven bovendien géén `updated_at` mee, dus ook dat signaal zwijgt. Zonder een
+eigen telling zou een bewuste gebruikersactie met zichtbaar gevolg tot een half
+uur in een TTL-venster blijven hangen. `count(*)` met
+`.in('transaction_type', ['transfer','joint_transfer'])` is één extra parallelle
+telling en sluit dat af.
 
 **De recurring-tak is een inhoudsdigest, geen telling.** Een `count(*)` op
 actieve regels — de eerste opzet — ziet niet dat iemand een vaste last hernoemt,
@@ -139,14 +152,25 @@ ongewijzigd, alleen de opslag verhuist.
 
 ## Gevolgen
 
-- **Wat de vingerafdruk niet sluitend ziet:** een bewerking op een BESTAANDE
-  transactierij die het aantal en de maxima ongemoeid laat. `max(updated_at)`
-  vangt dat op voor de paden die die kolom meeschrijven (het transactieformulier,
-  de categorisatie), maar er is geen trigger op `transactions.updated_at`, dus
-  dat signaal is best-effort en geen garantie. Bewust aanvaard: zo'n bewerking
-  verschuift een gemiddelde over minstens drie voorvallen. De TTL (30 minuten) is
-  daar het vangnet voor — bewust ruimer dan de 45 s van de statuscaches, omdat de
-  vingerafdruk hier het echte mechanisme is.
+- **Wat de vingerafdruk niet sluitend ziet (1) — een bewerkte transactierij.**
+  Een wijziging aan bedrag, datum, omschrijving of tegenpartij van een BESTAANDE
+  rij laat aantal, overboeking-telling en maxima ongemoeid. `max(updated_at)`
+  vangt dat op voor de paden die die kolom meeschrijven (`transaction-form.tsx`,
+  `cash-account-view.tsx`), maar er is geen trigger op `transactions.updated_at`,
+  dus het is best-effort. Het eerlijke restrisico is een **toekomstig pad dat de
+  kolom vergeet** — niet de bestaande schrijvers die 'm overslaan: `category-rules.ts`,
+  `ai-categorize-sheet.tsx` en `transfer-matching.ts` raken alleen `budget_id`,
+  `category_source` en `linked_transfer_id`, en geen daarvan bereikt
+  `VasteLastenItem`. De TTL (30 minuten) is het vangnet — bewust ruimer dan de
+  45 s van de statuscaches, omdat de vingerafdruk hier het echte mechanisme is.
+- **Wat de vingerafdruk niet sluitend ziet (2) — het verstrijken van tijd.** Het
+  vervallen van een `end_date` op een bevestigde vaste last (`isRecurringExpired`)
+  hangt aan "vandaag", en "vandaag" zit bewust NIET in de vingerafdruk: anders
+  zou hij elke dag kantelen zonder dat er data veranderde, en dat is precies de
+  hitrate die dit besluit koopt. Een item dat vandaag afloopt telt dus mee tot de
+  eerstvolgende datawijziging of het einde van de TTL. Past binnen dezelfde
+  aanvaarde staleness; wordt het ooit storend, dan is de goedkoopste oplossing de
+  kalenderdag (niet het tijdstip) als component toevoegen — één stap per etmaal.
 - **Op een misser** kost de vingerafdrukronde één extra, seriële roundtrip vóór
   de zware fetch. Geaccepteerd: die ronde is aggregaten zonder payload, de
   download erna is megabytes.
@@ -154,6 +178,28 @@ ongewijzigd, alleen de opslag verhuist.
   volledig overgeslagen — niet gelezen én niet geschreven. Een half gevulde
   vingerafdruk zou anders stabiel genoeg kunnen lijken om een verkeerde
   samenvatting op vast te pinnen.
+- **Faalt de OPHAAL** (een paginafout), dan wordt de uitkomst niet onthouden.
+  `fetchAllRecurringTx` slikt een paginafout al sinds jaar en dag en geeft terug
+  wat hij tot dan toe had; zonder cache probeerde het volgende verzoek het gewoon
+  opnieuw. Mét cache is dat niet meer onschuldig: de vingerafdrukronde is dan wél
+  geslaagd, dus een afgekapt venster zou onder een GELDIGE vingerafdruk worden
+  vastgepind. Bij een fout op pagina 1 is dat het ergst — nul rijen betekent dat
+  de detectie wordt overgeslagen, en dan laat één storing de automatisch
+  gedetecteerde vaste lasten een half uur verdwijnen. De functie meldt daarom
+  `complete`, en er wordt alleen een HELE uitkomst onthouden. Een fout op
+  `budgets` telt hier bewust niet mee (die lijst kan de uitkomst niet
+  beïnvloeden — zie de `budgets`-motivering hierboven).
+- **De cache is begrensd op een vast aantal entries.** Een verlopen entry wordt
+  bij het lezen alleen opgeruimd als díé gebruiker terugkomt; een instance die
+  veel verschillende gebruikers ziet zou anders alles vasthouden. Bij het
+  schrijven op de grens sneuvelt eerst het verlopene, daarna de entry die het
+  eerst zou vervallen. De statuscaches hiernaast hebben deze grens niet — daar
+  viel niets te spiegelen, dus hij staat hier nieuw.
+- **De samenvatting komt bij REFERENTIE terug**, niet als kopie: twee verzoeken
+  die dezelfde entry raken krijgen hetzelfde object. Geen enkele huidige
+  consument muteert de arrays erin, maar wie er straks in gaat sorteren of pushen
+  muteert de cache van iedereen binnen dat TTL-venster. Behandel de uitkomst als
+  bevroren.
 - `lib/vaste-lasten-cache.test.ts` legt drie lagen vast: de cache zelf (hit/miss,
   TTL, cross-account, één entry per gebruiker), de samenstelling van de
   vingerafdruk (wat hem laat kantelen en wat niet), en het loaderpad met tellers —

@@ -2,7 +2,7 @@
  * Nep-Supabase voor de END-TO-END pariteitstests van de slanke cashflow-lagen
  * (`lib/cashflow-kpis.parity.test.ts`, `lib/cashflow-kpis.forecast-parity.test.ts`)
  * en voor de keyset-/cache-tests van de vaste-lastensamenvatting
- * (`lib/vaste-lasten-summary.keyset.test.ts`, `lib/vaste-lasten-summary.cache.test.ts`).
+ * (`lib/vaste-lasten-summary.keyset.test.ts`, `lib/vaste-lasten-cache.test.ts`).
  *
  * Die tests draaien BEIDE paden écht — de volledige `loadDashboardData` én de
  * slanke loader — tegen dezelfde nep-database. Dat werkt alleen als de mock
@@ -277,4 +277,61 @@ export function makeSupabase(db: FakeDb): FakeSupabase {
     tableQueriesFor: (table: string) => perTable.get(table) ?? 0,
     rpcCalls: () => rpcCalls,
   }
+}
+
+/**
+ * Laat de OPHAAL-queries op `transactions` met de opgegeven volgnummers (1-based,
+ * over alle aanroepen heen geteld) een PostgREST-fout teruggeven; de rest gaat
+ * gewoon door. `[1]` laat de eerste ophaalpoging falen, `[2]` de tweede pagina
+ * van de eerste poging.
+ *
+ * "Ophaal" = de query met de volledige kolomlijst (de gepagineerde fetch van
+ * `lib/vaste-lasten-summary.ts`), herkenbaar aan `counterparty_name` in de
+ * select. De aggregaten van de vingerafdrukronde vragen één kolom en blijven dus
+ * ongemoeid — precies het scenario dat ertoe doet: de goedkope ronde slaagt, de
+ * dure niet.
+ *
+ * Alleen `.select()` wordt onderschept; dat is altijd de eerste schakel van de
+ * keten, dus de rest loopt daarna over de echte builder (of over de foutketen).
+ */
+export function withFailingTxFetches(fake: FakeSupabase, pogingen: number[]): SupabaseClient {
+  const echt = fake.client.from.bind(fake.client)
+  const faalt = new Set(pogingen)
+  let ophaalPoging = 0
+  const foutKeten = () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const b: any = new Proxy(
+      {
+        then: (res: (v: unknown) => unknown) =>
+          Promise.resolve({ data: null, error: { message: 'ophaal mislukt' }, count: null }).then(res),
+      },
+      {
+        get: (target, prop) =>
+          prop in target ? (target as Record<string | symbol, unknown>)[prop] : () => b,
+      },
+    )
+    return b
+  }
+  return {
+    ...fake.client,
+    auth: fake.client.auth,
+    from: (naam: string) => {
+      const builder = echt(naam)
+      if (naam !== 'transactions') return builder
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return new Proxy(builder as any, {
+        get: (target, prop) => {
+          if (prop !== 'select') return Reflect.get(target, prop)
+          return (cols: string, opts?: unknown) => {
+            if (typeof cols === 'string' && cols.includes('counterparty_name')) {
+              ophaalPoging += 1
+              if (faalt.has(ophaalPoging)) return foutKeten()
+            }
+            return (target as { select: (c: string, o?: unknown) => unknown }).select(cols, opts)
+          }
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      }) as any
+    },
+  } as unknown as SupabaseClient
 }
