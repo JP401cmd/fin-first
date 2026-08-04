@@ -122,15 +122,22 @@ describe('planInitialFetch — grensgevallen', () => {
 })
 
 describe('toProviderRange', () => {
-  it('stuurt ook voor het blok tot vandaag een `to` mee, tot het einde van de dag', () => {
+  it('stuurt ook voor het blok tot vandaag een `to` mee, geklemd op vandaag', () => {
     // Data API v1 past het venster alleen toe als `from` én `to` er zijn; met
     // alleen `from` valt de provider terug op zijn standaard van ~88 dagen en
-    // levert hij rijen die VÓÓR het gevraagde startpunt liggen. Een kale
-    // `to=<vandaag>` is middernacht en zou vandaag juist afkappen, dus loopt de
-    // bovengrens tot het einde van de dag.
+    // levert hij rijen die VÓÓR het gevraagde startpunt liggen. De bovengrens
+    // mag tegelijk niet ná "nu" liggen — `<vandaag>T23:59:59Z` gaf 400
+    // invalid_date_range — dus is `today` de klem.
     expect(toProviderRange({ from: '2026-01-29', to: TODAY }, TODAY)).toEqual({
       from: '2026-01-29',
-      to: `${TODAY}T23:59:59Z`,
+      to: TODAY,
+    })
+  })
+
+  it('klemt een blok dat voorbij vandaag loopt terug op vandaag', () => {
+    expect(toProviderRange({ from: '2026-01-29', to: '2026-12-31' }, TODAY)).toEqual({
+      from: '2026-01-29',
+      to: TODAY,
     })
   })
 

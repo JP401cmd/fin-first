@@ -156,21 +156,32 @@ export function planInitialFetch(opts: PlanInitialFetchOptions): InitialFetchPla
 /**
  * Vertaal één blok naar de `from`/`to`-queryparameters van TrueLayer.
  *
- * **Beide grenzen gaan altijd mee.** Data API v1 past het venster alleen toe
- * als `from` én `to` er zijn; met alleen `from` valt de provider stilzwijgend
- * terug op zijn standaardvenster van ~88 dagen en levert hij rijen die vóór het
- * gevraagde startpunt liggen. Dat is geen theorie: een sync van 4 aug 2026 met
- * `from=2026-07-30` kreeg transacties vanaf 8 mei terug — exact 88 dagen. Op de
- * blok-lus (B8) is dat een STIL GAT: het nieuwste blok van zes maanden dekte
- * dan feitelijk 88 dagen, terwijl het volgende blok pas op −6 maanden begint.
+ * **Beide grenzen gaan altijd mee, allebei als kale datum.** Twee metingen op
+ * productie liggen hieraan ten grondslag, en samen sluiten ze de ruimte af:
  *
- * Een kale `to=<vandaag>` mag het echter niet worden: TrueLayer leest een kale
- * datum als middernacht UTC en zou dan alles wat vandaag geboekt is afkappen —
- * precies de transacties waarvoor de gebruiker synchroniseert. Vandaar een
- * expliciete bovengrens op het einde van de dag.
+ * - **`from` zonder `to` wordt genegeerd.** Data API v1 past het venster alleen
+ *   toe als béide er zijn; anders valt de provider terug op zijn standaard van
+ *   ~88 dagen. Een sync van 4 aug 2026 met `from=2026-07-30` kreeg transacties
+ *   vanaf 8 mei terug — exact 88 dagen. Op de blok-lus (B8) was dat een STIL
+ *   GAT: het nieuwste blok van zes maanden dekte feitelijk 88 dagen, terwijl
+ *   het volgende blok pas op −6 maanden begint.
+ * - **Een `to` in de toekomst wordt geweigerd.** De eerste reparatie zette de
+ *   bovengrens op `<vandaag>T23:59:59Z` om boekingen van vandaag niet af te
+ *   kappen. Die lag een paar uur ná "nu" en leverde `400 invalid_date_range`
+ *   (4 aug 2026, 21:13 UTC). Vandaar de klem op `today`.
+ *
+ * Lange vensters zijn niet het probleem: dezelfde rekening leverde eerder 3.086
+ * transacties over 19 maanden met expliciete datums.
+ *
+ * **Bekende prijs.** TrueLayer leest een kale datum als middernacht UTC, dus
+ * `to=<vandaag>` sluit vandaag uit. Boekingen van vandaag komen mee met de
+ * eerstvolgende sync: die start op de cursor (de nieuwste opgehaalde datum) en
+ * haalt de dag alsnog op. Dat is bewust de goedkope kant van de ruil — een dag
+ * vertraging op de staart weegt niet op tegen een venster dat de provider
+ * volledig negeert. Een preciezere bovengrens (`to` = het huidige tijdstip als
+ * ISO-tijdstempel) is denkbaar, maar niet ongetest te shippen: dat is exact het
+ * pad dat de 400 opleverde.
  */
 export function toProviderRange(block: FetchBlock, today: string): { from: string; to: string } {
-  return block.to >= today
-    ? { from: block.from, to: `${today}T23:59:59Z` }
-    : { from: block.from, to: block.to }
+  return { from: block.from, to: block.to > today ? today : block.to }
 }

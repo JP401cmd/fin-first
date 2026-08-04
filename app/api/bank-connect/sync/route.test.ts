@@ -381,11 +381,11 @@ describe('POST /api/bank-connect/sync — eerste ophaal (B8/B9)', () => {
     expect(body.provider_requests).toBe(expected.blocks.length + 1)
 
     // Nieuwste blok eerst, mét een volledig venster: `from` zonder `to` wordt
-    // door Data API v1 genegeerd (terugval op ~88 dagen), en een kale
-    // `to=<vandaag>` zou vandaag juist afkappen.
+    // door Data API v1 genegeerd (terugval op ~88 dagen), en een bovengrens ná
+    // "nu" wordt geweigerd (400 invalid_date_range). Dus geklemd op vandaag.
     const [, , , firstFrom, firstTo] = mockGetAccountTransactions.mock.calls[0]
     expect(firstFrom).toBe(expected.blocks[0].from)
-    expect(firstTo).toBe(`${TODAY}T23:59:59Z`)
+    expect(firstTo).toBe(TODAY)
 
     // Het oudste blok bepaalt hoe ver terug we zijn gegaan — méér dan de
     // TrueLayer-standaard van ~88 dagen.
