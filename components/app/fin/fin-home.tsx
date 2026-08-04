@@ -10,6 +10,7 @@ import { usePrivacyMode } from '@/components/app/use-privacy-mode'
 import { AiPrivacyIndicator } from '@/components/app/ai-privacy-indicator'
 import { useChatContext } from '@/components/app/chat/chat-provider'
 import { useOverlayOpen } from '@/lib/hooks/use-scroll-lock'
+import { isImmersiveRoute } from '@/lib/shell/immersive-routes'
 import { useCoachSuggestion } from '@/lib/hooks/use-coach-suggestion'
 import { useTypewriter } from '@/lib/hooks/use-typewriter'
 import { CoachMelding } from './coach-melding'
@@ -137,6 +138,10 @@ export function FinHome({
   // Verberg zodra een overlay/modal open is — de FAB mag niet door de
   // halftransparante backdrop heen over de sheet-CTA verschijnen.
   if (overlayOpen) return null
+  // Idem op een immersieve taakflow (bv. de check-in-wizard): die zet zijn
+  // eigen primaire actie sticky onderaan, waar de bubbel er pal bovenop stond.
+  // Zie lib/shell/immersive-routes.ts.
+  if (isImmersiveRoute(pathname)) return null
 
   const fabAria = localBlocked
     ? 'Open chat met Fin — let op: lokale AI werkt niet op dit toestel'

@@ -1,10 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { Search, LayoutGrid, X } from 'lucide-react'
 import { useCommandPalette } from '@/components/command-palette/command-palette-provider'
 import { useOverlayOpen } from '@/lib/overlay-signal'
+import { isImmersiveRoute } from '@/lib/shell/immersive-routes'
 import { NavMenuSheet } from './nav-menu-sheet'
 
 /**
@@ -36,6 +37,10 @@ export function FloatingNavButton() {
   // (`belowFloatingNav`) — de pill is dáár de toggle — dus `menuOpen` houdt de
   // pill zichtbaar. Zie CLAUDE.md §Modal-conventie.
   const overlayOpen = useOverlayOpen()
+  // …en op een immersieve taakflow (bv. de check-in-wizard), die zijn eigen
+  // sticky primaire actie onderaan zet. Zie lib/shell/immersive-routes.ts.
+  const pathname = usePathname()
+  const hidden = overlayOpen || isImmersiveRoute(pathname)
 
   const handleAction = (action: 'open-chat' | 'open-account' | 'open-search') => {
     if (action === 'open-search') {
@@ -70,9 +75,9 @@ export function FloatingNavButton() {
           // dus verbergen geeft géén layout-sprong, en de knop verdwijnt netjes
           // uit tab-order + pointer-events zolang een overlay open is. NavMenu
           // (belowFloatingNav) meldt zich niet aan, dus blijft de pill zichtbaar.
-          visibility: overlayOpen ? 'hidden' : undefined,
+          visibility: hidden ? 'hidden' : undefined,
         }}
-        aria-hidden={overlayOpen || undefined}
+        aria-hidden={hidden || undefined}
         data-mobile-floating-nav="true"
       >
         <div className="flex items-stretch gap-px rounded-full bg-stone-900 p-1 shadow-[0_8px_24px_rgba(0,0,0,0.25),0_2px_8px_rgba(0,0,0,0.15)]">

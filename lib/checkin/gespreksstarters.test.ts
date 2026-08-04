@@ -159,6 +159,7 @@ function baseInput(over: Partial<GespreksstartersInput> = {}): GespreksstartersI
     audience: 'household',
     monthIndex: 0,
     netWorth: 100000,
+    totalAssets: 100000,
     netWorthTrend: 0,
     prevNetWorth: 100000,
     monthlyIncome: 4000,
@@ -263,11 +264,49 @@ describe('nieuwe detectoren B', () => {
     }))
     expect(ids(out)).toContain('doel-deadline')
   })
-  it('vermogensconcentratie fires when top asset > 60% of net worth', () => {
+  it('vermogensconcentratie fires when top asset > 60% of total assets', () => {
     const out = buildGespreksstarters(baseInput({
-      netWorth: 100000, topAsset: { name: 'Eigen huis', value: 75000 },
+      netWorth: 100000, totalAssets: 100000, topAsset: { name: 'Eigen huis', value: 75000 },
     }))
     expect(ids(out)).toContain('vermogensconcentratie')
+  })
+
+  // Given een woning van €1.000.000 met een hypotheek, zodat het netto vermogen
+  // (€559.353) kleiner is dan die ene bezitting — When de concentratie wordt
+  // bepaald — Then is het aandeel een percentage van de BEZITTINGEN (≤100%),
+  // niet van het netto vermogen (dat gaf 179%: rekenkundig onmogelijk).
+  it('vermogensconcentratie rekent tegen bezittingen, nooit boven 100%', () => {
+    const out = buildGespreksstarters(baseInput({
+      netWorth: 559353,
+      totalAssets: 1030000,
+      topAsset: { name: 'Mijn woning', value: 1000000 },
+    }))
+    const hit = out.find(o => o.id === 'vermogensconcentratie')
+    expect(hit).toBeDefined()
+    const pct = Number(/(\d+)%/.exec(`${hit!.vraag} ${hit!.context}`)?.[1])
+    expect(pct).toBe(97)
+    expect(pct).toBeLessThanOrEqual(100)
+  })
+
+  // Een bezitting kan door afrondings-/inclusieverschillen nét boven het
+  // bezittingentotaal uitkomen; het aandeel blijft dan op 100% staan.
+  it('vermogensconcentratie klemt het aandeel op 100%', () => {
+    const out = buildGespreksstarters(baseInput({
+      netWorth: 200000, totalAssets: 500000,
+      topAsset: { name: 'Mijn woning', value: 505000 },
+    }))
+    const hit = out.find(o => o.id === 'vermogensconcentratie')
+    expect(hit).toBeDefined()
+    expect(`${hit!.vraag} ${hit!.context}`).toContain('100%')
+  })
+
+  // Zonder bezittingentotaal (0) is er geen deelbare grondslag — dan zwijgt de
+  // detector liever dan een onzinnig percentage te tonen.
+  it('vermogensconcentratie zwijgt zonder bezittingentotaal', () => {
+    const out = buildGespreksstarters(baseInput({
+      netWorth: -50000, totalAssets: 0, topAsset: { name: 'Mijn woning', value: 1000 },
+    }))
+    expect(ids(out)).not.toContain('vermogensconcentratie')
   })
   it('mijlpaal-nadering fires when net worth within 5% under next milestone', () => {
     const out = buildGespreksstarters(baseInput({ netWorth: 96000 })) // next 100k, 4% remaining

@@ -162,6 +162,14 @@ export interface GespreksstartersInput {
   monthIndex: number
 
   netWorth: number
+  /**
+   * Brutobezit: som van de actieve bezittingen (gewogen met
+   * net_worth_inclusion_pct) plus losse bankrekeningen — dus vóór aftrek van
+   * schulden. Dit is de enige juiste noemer voor een AANDEEL-vraag: `netWorth`
+   * is bezit MÍNUS schulden, dus een woning met hypotheek is groter dan het
+   * netto vermogen en leverde percentages boven de 100% op.
+   */
+  totalAssets: number
   netWorthTrend: number          // laatste − vorige snapshot
   prevNetWorth: number
   monthlyIncome: number
@@ -678,21 +686,27 @@ const detectDoelDeadline: Detector = (i) => {
   }]
 }
 
+// Aandeel van de grootste bezitting in het TOTALE BEZIT — niet in het netto
+// vermogen. Netto vermogen is bezit min schulden, dus een woning van €1,0 mln
+// met hypotheek "was" 179% van een netto vermogen van €559k: een aandeel dat
+// rekenkundig niet kan bestaan. De noemer is daarom `totalAssets` (bruto), en
+// het aandeel wordt geklemd op 100% zodat afrondings-/inclusieverschillen
+// tussen de post en het totaal nooit opnieuw boven de 100% uitkomen.
 const detectVermogensconcentratie: Detector = (i) => {
-  if (!i.topAsset || i.netWorth <= 0) return []
-  const pct = (i.topAsset.value / i.netWorth) * 100
+  if (!i.topAsset || i.totalAssets <= 0) return []
+  const pct = clamp((i.topAsset.value / i.totalAssets) * 100, 0, 100)
   if (pct < 60) return []
   return [{
     id: 'vermogensconcentratie', theme: 'vermogen', sentiment: 'neutral',
     score: clamp(pct - 50, 10, 70),
     variants: [
       (v) => ({
-        vraag: `"${i.topAsset!.name}" is ${pct.toFixed(0)}% van ${v.poss} vermogen. Voelt die concentratie comfortabel, of ${v.wil} ${v.subj} meer spreiding?`,
-        context: `${formatEUR(i.topAsset!.value)} van ${formatEUR(i.netWorth)} netto vermogen.`,
+        vraag: `"${i.topAsset!.name}" is ${pct.toFixed(0)}% van ${v.poss} bezittingen. Voelt die concentratie comfortabel, of ${v.wil} ${v.subj} meer spreiding?`,
+        context: `${formatEUR(i.topAsset!.value)} van ${formatEUR(i.totalAssets)} aan bezittingen.`,
         actie: `Bespreek ${v.samen} of spreiding gewenst is.`,
       }),
       (v) => ({
-        vraag: `Het grootste deel van ${v.poss} vermogen (${pct.toFixed(0)}%) zit in "${i.topAsset!.name}". Wat als die waarde sterk schommelt?`,
+        vraag: `Het grootste deel van ${v.poss} bezittingen (${pct.toFixed(0)}%) zit in "${i.topAsset!.name}". Wat als die waarde sterk schommelt?`,
         context: `Concentratie: ${pct.toFixed(0)}% in één post.`,
         actie: `Weeg ${v.samen} het risico van die concentratie.`,
       }),

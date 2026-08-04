@@ -61,9 +61,12 @@ export async function GET() {
   // met net_worth_inclusion_pct, plus losse bankrekeningen als cash.
   const assets = assetsRes.data || []
   const unlinkedCash = unlinkedCashTotal(bankRes.data)
-  const totalAssets = assets.reduce(
-    (s, a) => s + (a.current_value || 0) * ((a.net_worth_inclusion_pct ?? 100) / 100), 0,
-  ) + unlinkedCash
+  // Gewogen waarde per post — dezelfde weging als het totaal, zodat een
+  // aandeel-vraag ("hoeveel % zit in X?") teller en noemer op één grondslag
+  // vergelijkt.
+  const weightedValue = (a: { current_value: number | null; net_worth_inclusion_pct: number | null }) =>
+    (a.current_value || 0) * ((a.net_worth_inclusion_pct ?? 100) / 100)
+  const totalAssets = assets.reduce((s, a) => s + weightedValue(a), 0) + unlinkedCash
   const activeDebts = ((debtsRes.data || []) as Debt[]).filter(d => d.is_active)
   const totalDebts = activeDebts.reduce(
     (s, d) => s + (d.current_balance || 0) * ((d.net_worth_inclusion_pct ?? 100) / 100), 0,
@@ -149,15 +152,15 @@ export async function GET() {
   // maar niet daarvóór binnen het venster (dus pas vorige maand begonnen).
   const newRecurring = detectNewRecurring(recurringRes.data || [], monthStart, prevMonthStart)
 
-  // Grootste bezitting
+  // Grootste bezitting — op gewogen waarde, gelijk aan `totalAssets`.
   const topAsset = assets.length > 0
-    ? assets.reduce((top, a) => (a.current_value || 0) > (top.current_value || 0) ? a : top)
+    ? assets.reduce((top, a) => weightedValue(a) > weightedValue(top) ? a : top)
     : null
 
   const input: GespreksstartersInput = {
     audience: perspective.hasHousehold ? 'household' : 'solo',
     monthIndex: currentYear * 12 + currentMonth,
-    netWorth, netWorthTrend, prevNetWorth,
+    netWorth, totalAssets, netWorthTrend, prevNetWorth,
     monthlyIncome, monthlyExpenses, prevMonthIncome, prevMonthExpenses,
     monthlySavings, prevMonthlySavings, savingsRate6m, dailyExpenses,
     goals: (goalsRes.data || []).map(g => ({
@@ -169,7 +172,7 @@ export async function GET() {
     completedActionsFreedomDays, pendingActionsCount,
     fireAge, prevFireAge,
     expensesByCategory, newRecurring,
-    topAsset: topAsset ? { name: topAsset.name, value: topAsset.current_value || 0 } : null,
+    topAsset: topAsset ? { name: topAsset.name, value: weightedValue(topAsset) } : null,
   }
 
   return NextResponse.json({ starters: buildGespreksstarters(input) })

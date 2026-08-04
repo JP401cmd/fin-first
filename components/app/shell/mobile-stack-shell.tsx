@@ -56,6 +56,7 @@
 
 import { useEffect, useRef, useState, type ReactNode, type Ref } from 'react'
 import { usePathname } from 'next/navigation'
+import { isImmersiveRoute } from '@/lib/shell/immersive-routes'
 import { useNavStack, type StackEntry, type BottomBarConfig, type TopBarKind } from './nav-stack-provider'
 import { resolveRouteTitle } from '@/lib/nav-config'
 import { useIsLgUp } from '@/lib/hooks/use-media-query'
@@ -150,6 +151,14 @@ function Tray({
   // frame). De tray valt terug op document-flow; TopBar/BottomBar zijn hidden.
   const trayDesktop = forceVisible ? '' : ' lg:static lg:block lg:bg-transparent'
   const mainDesktop = forceVisible ? '' : ' lg:flex-none lg:overflow-visible lg:pl-[264px]'
+  // `--mobile-nav-clearance` houdt onderin ruimte vrij vóór de zwevende
+  // nav-pill. Op een immersieve taakflow is die pill verborgen
+  // (lib/shell/immersive-routes.ts), dus is de reservering niet alleen
+  // overbodig maar schadelijk: de padding verkleint de scrollport, waardoor
+  // een `sticky bottom-0`-voettekst 76px bóven de onderrand blijft hangen met
+  // doorlopende content eronder.
+  const immersive = isImmersiveRoute(usePathname())
+  const mainClearance = immersive ? '' : ' pb-[var(--mobile-nav-clearance)]'
 
   return (
     <div
@@ -177,7 +186,7 @@ function Tray({
           dus op desktop is de padding automatisch 0. */}
       <main
         ref={mainRef}
-        className={`flex-1 overflow-y-auto pb-[var(--mobile-nav-clearance)]${mainDesktop}`}
+        className={`flex-1 overflow-y-auto${mainClearance}${mainDesktop}`}
       >
         {children}
       </main>

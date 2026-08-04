@@ -956,13 +956,39 @@ const tests: TestCase[] = [
     },
   },
   {
+    id: 'checkin-gespreksstarters-concentratie-grondslag',
+    name: 'Gespreksstarters: vermogensconcentratie meet tegen bezittingen', category: CAT,
+    description: 'Aandeel van de grootste post staat op het brutobezit, dus nooit boven 100%',
+    priority: 'high', estimatedDurationMs: 100,
+    fn() {
+      // Woning van €1,0 mln met hypotheek: het netto vermogen is kleiner dan die
+      // ene post. Op de netto-noemer gaf dat 179% — een aandeel dat niet kan.
+      const out = buildGespreksstarters({
+        audience: 'solo', monthIndex: 0,
+        netWorth: 559353, totalAssets: 1030000, netWorthTrend: 0, prevNetWorth: 559353,
+        monthlyIncome: 4000, monthlyExpenses: 3000, prevMonthIncome: 4000, prevMonthExpenses: 3000,
+        monthlySavings: 1000, prevMonthlySavings: 1000, savingsRate6m: 20, dailyExpenses: 100,
+        goals: [], totalDebts: 0, debtCount: 0,
+        completedActionsThisMonth: 0, completedActionsFreedomDays: 0, pendingActionsCount: 0,
+        fireAge: null, prevFireAge: null, expensesByCategory: [], newRecurring: [],
+        topAsset: { name: 'Mijn woning', value: 1000000 },
+      })
+      const hit = out.find(s => s.id === 'vermogensconcentratie')
+      assertDefined(hit, 'vermogensconcentratie verschijnt bij een dominante post')
+      const text = `${hit!.vraag} ${hit!.context}`
+      const pct = Number(/(\d+)%/.exec(text)?.[1])
+      assertEqual(pct, 97, 'aandeel = grootste post / bezittingen')
+      assert(pct <= 100, 'aandeel blijft binnen 100%')
+    },
+  },
+  {
     id: 'checkin-gespreksstarters-voice-contract', name: 'Gespreksstarters: solo vs huishouden aanspreekvorm', category: CAT,
     description: 'Solo-output lekt geen "jullie"; huishouden gebruikt "jullie"',
     priority: 'high', estimatedDurationMs: 100,
     fn() {
       const base: GespreksstartersInput = {
         audience: 'solo', monthIndex: 0,
-        netWorth: 100000, netWorthTrend: 4000, prevNetWorth: 96000,
+        netWorth: 100000, totalAssets: 115000, netWorthTrend: 4000, prevNetWorth: 96000,
         monthlyIncome: 4000, monthlyExpenses: 3000, prevMonthIncome: 4000, prevMonthExpenses: 3000,
         monthlySavings: 1000, prevMonthlySavings: 1000, savingsRate6m: 20, dailyExpenses: 100,
         goals: [], totalDebts: 15000, debtCount: 1,

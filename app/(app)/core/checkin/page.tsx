@@ -663,7 +663,10 @@ function CheckinPageContent() {
   const isLastStep = currentIdx === STEPS.length - 1
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-6 sm:py-10">
+    // Geen `pb-*` op de wrapper: de sticky voettekst onderaan moet tot de
+    // onderrand van de container kunnen plakken, anders laat hij 24–40px vóór
+    // het einde van de pagina al los.
+    <div className="mx-auto max-w-2xl px-4 pt-6 sm:pt-10">
       {/* ── Header — editorial blueprint met kicker-streep ─────────── */}
       <div className="relative mb-6 flex items-center gap-3">
         <PageInfoButton
@@ -762,7 +765,17 @@ function CheckinPageContent() {
       </div>
 
       {/* ── Navigation buttons ─────────────────────────────────────── */}
-      <div className="mt-8 flex items-center justify-between">
+      {/* Sticky voettekst: Vorige/Volgende/Afronden blijven in beeld terwijl de
+          stap-inhoud eronder doorscrolt. `-mx-4` trekt de balk vol-breed door de
+          padding van de pagina heen, zodat de content er niet half achter
+          doorschemert. Alleen safe-area-padding onderin en GEEN
+          `--mobile-nav-clearance`: op deze route wijken de zwevende nav-pill en
+          de Fin-bubbel (lib/shell/immersive-routes.ts), dus die ruimte hoeft
+          niet vrijgehouden te worden. */}
+      <div
+        className="sticky bottom-0 z-10 mt-8 -mx-4 flex items-center justify-between gap-3 border-t border-[var(--border-ed)] bg-[var(--paper)] px-4 pt-3"
+        style={{ paddingBottom: 'calc(0.75rem + var(--safe-area-bottom, 0px))' }}
+      >
         <button
           type="button"
           onClick={goPrev}
