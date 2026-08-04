@@ -69,3 +69,59 @@ policies zijn functioneel behouden (via OR meegenomen bij merges).
   worden — verwacht, geen regressie.
 - Geen nieuwe tabellen/FK's → ERD (`architecture.json.tableRelations`) ongewijzigd; geen
   `arch:diagram`-regeneratie nodig.
+
+## Addendum (2026-08-04) — `user_household_id()` alsnog in een initplan
+
+Migratie `20260804055846_perf_rls_household_initplan_en_shared_index.sql`.
+
+**Wat er nog openstond.** De rewrite hierboven wikkelde `auth.<fn>()`, maar liet de tweede
+helper in dezelfde policies **kaal** staan: `household_id = user_household_id()` op de
+SELECT-policies van `transactions`, `recurring_transactions` en `transaction_splits`. Dat is
+geen slordigheid maar een blinde vlek van het meetinstrument: de Supabase-advisor herkent
+alleen `auth.*`/`current_setting`, dus `auth_rls_initplan` stond al op 0 en bleef daar —
+vóór én ná deze migratie. De advisor kón dit dus niet vinden; alleen `EXPLAIN` maakt het
+zichtbaar. Waarom het bijt: `user_household_id()` is `STABLE SECURITY DEFINER`, en Postgres
+inlinet SECURITY DEFINER-functies nooit en constant-foldt `STABLE` niet. Zonder
+scalar-subquery-wrapper wordt hij dus geëvalueerd voor elke rij waar de eerste OR-tak
+(`auth.uid() = user_id`) niet al waar is — precies de partnerrijen in een huishouden.
+
+**Besluit.** `user_household_id()` → `(select public.user_household_id())` in die drie
+SELECT-policies (`transaction_splits` heeft twee subselects, maar slechts één droeg de
+helper). Plus een partiële index `idx_transactions_household_shared_date
+(household_id, date desc) where ownership = 'shared'` voor de gedeelde OR-tak.
+
+**Waarom de semantiek identiek is.** De functie levert per definitie één scalaire waarde
+(`LIMIT 1`), dus `(select f())` geeft exact dezelfde waarde — inclusief `NULL` voor een
+gebruiker zonder huishouden, en `household_id = NULL` blijft `NULL` (niet-waar). Hij is
+`STABLE`, dus binnen één query kan de uitkomst niet wijzigen: één evaluatie geeft dezelfde
+rijenset als N evaluaties per rij. Hij is read-only, dus er zijn geen neveneffecten die van
+het aantal aanroepen afhangen. Rolset, policynamen en de `WITH CHECK`-kant bleven
+onaangeroerd; er is geen tak toegevoegd, verwijderd of verbreed. Empirisch bevestigd met een
+huishouden-fixture (in een teruggedraaide transactie): de zichtbare rij-**ID's** vóór en ná
+zijn byte-identiek (`md5` over de geordende id-lijst, 10.156 transacties → dezelfde
+`63c906e5…`; 19 recurrings → dezelfde `81d446c8…`).
+
+**Effect (zelfde fixture, warme cache, identieke uitvoer van 642 rijen).**
+Kaal `user_household_id()`: `Buffers: shared hit=1696`, 12,2 ms. Gewikkeld: `InitPlan 2`
+één keer geëvalueerd (`Buffers: shared hit=2`) en `Buffers: shared hit=557`, 2,4 ms —
+67% minder buffers, ~5× sneller. Voor solo-gebruikers (vandaag 100% van de productiedata:
+0 huishoudens, 0 gedeelde rijen) blijft het plan qua vorm identiek en kost de InitPlan
+1 buffer: 178 → 175 buffers, geen regressie.
+
+**Wat níét waar bleek.** De partiële index wordt door het policy-plan (nog) **niet** gekozen:
+de planner verkiest één scan op `idx_transactions_date` plus een filter boven een BitmapOr
+zodra de huishouden-tak een Param is. De index is wél correct en optimaal zodra
+`household_id` een literal is (`Index Scan …_shared_date`, index-cond op household_id én
+date, géén Sort, 0,5 ms) — maar het huidige partner-pad (`household_partner_items`) filtert
+op `ownership = 'personal'` en raakt hem dus evenmin. Hij blijft staan als vooruitgeschoven
+post (partieel, vandaag 0 rijen, verwaarloosbare schrijfkosten) en zal als `unused_index`
+(INFO) opduiken. Dat is bewust, en het aandachtspunt
+`idx-transactions-user-date-drift-remote` blijft staan: `idx_transactions_user_date` staat
+nog steeds niet op remote, wat de expliciete `Sort` in al deze plannen verklaart.
+
+**Verificatie.** Advisors vóór/ná gelijk (`auth_rls_initplan` 0 → 0 — het instrument dekt
+dit patroon niet). Twee-gebruikers-RLS-simulatie ná: eigenaar-isolatie 0 vreemde rijen op
+alle drie tabellen; partner ziet de 1.503 gedeelde rijen en **0** van de 9.235 privérijen;
+geen rijen uit een ander huishouden; `anon` 0 rijen **zonder fout** op alle drie tabellen.
+`db-model`- + household-vitest groen (op de 2 pre-existente `partner-items-projection`-
+failures na, die van een ander traject zijn).
