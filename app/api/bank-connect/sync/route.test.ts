@@ -380,11 +380,12 @@ describe('POST /api/bank-connect/sync — eerste ophaal (B8/B9)', () => {
     // limiet, niet onze 10/dag-rem.
     expect(body.provider_requests).toBe(expected.blocks.length + 1)
 
-    // Nieuwste blok eerst, en dat blok gaat zónder `to` naar de provider: een
-    // kale datum leest TrueLayer als middernacht en zou vandaag afkappen.
+    // Nieuwste blok eerst, mét een volledig venster: `from` zonder `to` wordt
+    // door Data API v1 genegeerd (terugval op ~88 dagen), en een kale
+    // `to=<vandaag>` zou vandaag juist afkappen.
     const [, , , firstFrom, firstTo] = mockGetAccountTransactions.mock.calls[0]
     expect(firstFrom).toBe(expected.blocks[0].from)
-    expect(firstTo).toBeUndefined()
+    expect(firstTo).toBe(`${TODAY}T23:59:59Z`)
 
     // Het oudste blok bepaalt hoe ver terug we zijn gegaan — méér dan de
     // TrueLayer-standaard van ~88 dagen.
@@ -419,6 +420,43 @@ describe('POST /api/bank-connect/sync — eerste ophaal (B8/B9)', () => {
     expect(mockGetAccountTransactions.mock.calls[0][3]).toBe('2026-07-17')
     expect(body.fetch_mode).toBe('incremental')
     expect(body.provider_requests).toBe(2) // één blok + de saldo-call
+  })
+
+  it('behandelt een LEGE rekening met een achtergebleven cursor als eerste ophaal', async () => {
+    // Verwijderen + opnieuw koppelen hergebruikt de koppelrij op identiteit
+    // (`external_account_id`, bewust zonder `is_active`-filter — zie de
+    // precedentieketen in de callback), en die rij draagt haar `sync_cursor`
+    // mee. De drager is dan een verse, lege rekening: de cursor beschrijft
+    // historie die er niet meer is. Alleen op de cursor afgaan maakt daar een
+    // incrementele sync van, en de volle terugblik (B8) draait nooit.
+    const { client } = makeSupabase([], { connAccount: { sync_cursor: '2026-07-30' } })
+    mockCreateClient.mockResolvedValue(client)
+
+    const res = await POST(request())
+    const body = await res.json()
+
+    const expected = planInitialFetch({ today: TODAY })
+    expect(body.fetch_mode).toBe('historical')
+    expect(mockGetAccountTransactions).toHaveBeenCalledTimes(expected.blocks.length)
+    expect(body.fetched_from).toBe(expected.blocks[expected.blocks.length - 1].from)
+  })
+
+  it('blijft op een GEVULDE rekening de cursor volgen', async () => {
+    // De keerzijde van de test hierboven: draagt de rekening wél historie, dan
+    // is de cursor het geldige startpunt en blijft het één verzoek.
+    const hash = await computeHash('2026-07-01', -1.7, 'Kosten betaalrekening')
+    const { client } = makeSupabase(
+      [{ id: 'tx-b', user_id: USER_ID, account_id: ACCOUNT_B, date: '2026-07-20', import_hash: hash, bank_seq: null }],
+      { connAccount: { sync_cursor: '2026-07-25' } },
+    )
+    mockCreateClient.mockResolvedValue(client)
+
+    const res = await POST(request())
+    const body = await res.json()
+
+    expect(mockGetAccountTransactions).toHaveBeenCalledTimes(1)
+    expect(mockGetAccountTransactions.mock.calls[0][3]).toBe('2026-07-25')
+    expect(body.fetch_mode).toBe('cursor')
   })
 
   it('behoudt bij een provider-limiet op blok 3 de rijen uit blok 1 en 2, zonder 500', async () => {

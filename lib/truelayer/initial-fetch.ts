@@ -156,11 +156,21 @@ export function planInitialFetch(opts: PlanInitialFetchOptions): InitialFetchPla
 /**
  * Vertaal één blok naar de `from`/`to`-queryparameters van TrueLayer.
  *
- * `to` wordt weggelaten zodra het blok tot vandaag loopt. TrueLayer leest een
- * kale datum als middernacht UTC, dus `to=<vandaag>` zou alles wat vandaag
- * geboekt is afkappen — precies de transacties waarvoor de gebruiker
- * synchroniseert. Zonder `to` levert de provider tot "nu".
+ * **Beide grenzen gaan altijd mee.** Data API v1 past het venster alleen toe
+ * als `from` én `to` er zijn; met alleen `from` valt de provider stilzwijgend
+ * terug op zijn standaardvenster van ~88 dagen en levert hij rijen die vóór het
+ * gevraagde startpunt liggen. Dat is geen theorie: een sync van 4 aug 2026 met
+ * `from=2026-07-30` kreeg transacties vanaf 8 mei terug — exact 88 dagen. Op de
+ * blok-lus (B8) is dat een STIL GAT: het nieuwste blok van zes maanden dekte
+ * dan feitelijk 88 dagen, terwijl het volgende blok pas op −6 maanden begint.
+ *
+ * Een kale `to=<vandaag>` mag het echter niet worden: TrueLayer leest een kale
+ * datum als middernacht UTC en zou dan alles wat vandaag geboekt is afkappen —
+ * precies de transacties waarvoor de gebruiker synchroniseert. Vandaar een
+ * expliciete bovengrens op het einde van de dag.
  */
-export function toProviderRange(block: FetchBlock, today: string): { from: string; to?: string } {
-  return block.to >= today ? { from: block.from } : { from: block.from, to: block.to }
+export function toProviderRange(block: FetchBlock, today: string): { from: string; to: string } {
+  return block.to >= today
+    ? { from: block.from, to: `${today}T23:59:59Z` }
+    : { from: block.from, to: block.to }
 }

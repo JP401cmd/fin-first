@@ -442,6 +442,22 @@ export async function GET(req: Request) {
       // de consent horen wél door te gaan), maar wél in de log, en de saldo-stap
       // hieronder wordt overgeslagen: een saldo op een rekening zonder koppelrij is
       // een cijfer dat niemand meer kan verklaren.
+      // ── De cursor hoort bij de DRAGER, niet bij de koppelrij ─────────────────
+      // Schakel 1 hergebruikt de bestaande rij inclusief haar `sync_cursor`.
+      // Verhuist die rij naar een ándere `bank_account_id` — verwijderen en
+      // opnieuw koppelen levert een verse rekening op — dan beschrijft de cursor
+      // historie die op de nieuwe drager niet bestaat. De sync leest 'm dan als
+      // "dit is niet de eerste ophaal" en slaat de volle terugblik (B8) over:
+      // de gebruiker koppelt juist opnieuw óm zijn historie te halen en houdt
+      // één venster vanaf de oude cursor over (waargenomen 4 aug 2026).
+      //
+      // Nullen dus zodra de drager wisselt; `last_synced_at` gaat mee, want een
+      // synchronisatiemoment van een andere rekening is hier een onwaarheid.
+      // Blijft de drager gelijk (de gewone herautorisatie elke 90 dagen), dan
+      // blijft de cursor staan — dáár is hij juist correct en voorkomt hij een
+      // onnodige volledige ophaal tegen de bank-eigen verzoeklimiet.
+      const carrierChanged = !!existingLink && existingLink.bank_account_id !== bankAccountId
+
       const linkWrite = existingLink
         ? await supabase
             .from('bank_connection_accounts')
@@ -453,6 +469,7 @@ export async function GET(req: Request) {
               iban_hash: iban ? blindIndex(iban) : null,
               account_name: accountName,
               is_active: true,
+              ...(carrierChanged ? { sync_cursor: null, last_synced_at: null } : {}),
               updated_at: new Date().toISOString(),
             })
             .eq('id', existingLink.id)

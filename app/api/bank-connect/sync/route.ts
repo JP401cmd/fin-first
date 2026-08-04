@@ -237,15 +237,33 @@ export async function POST(req: Request) {
     // twee uur conservatief, en het nieuwste blok gaat sowieso zónder `to` naar
     // de provider (zie toProviderRange).
     const today = new Date().toISOString().split('T')[0]
-    const isFirstFetch = !date_from && !connAccount.sync_cursor
+
+    // De cursor alléén is geen betrouwbaar antwoord op "is dit de eerste
+    // ophaal". De koppelrij wordt bij een herkoppeling hergebruikt op identiteit
+    // (`external_account_id`, bewust zonder `is_active`-filter — zie de
+    // precedentieketen in de callback) en neemt haar `sync_cursor` dan mee, óók
+    // wanneer de gebruiker de rekening tussendoor heeft verwijderd. De cursor
+    // beschrijft in dat geval historie die niet meer bestaat, en de volle
+    // terugblik (B8) draaide daardoor nooit: de gebruiker koppelt opnieuw juist
+    // om zijn historie op te halen en houdt één venster vanaf de oude cursor
+    // over. Waargenomen op 4 aug 2026.
+    //
+    // De DRAGER is de waarheid: staat er geen enkele transactie op de rekening,
+    // dan is dit per definitie een eerste ophaal, wat de cursor ook beweert.
+    // Daarom wordt het startpunt altijd gelezen — één goedkope query op
+    // `(user_id, account_id)` met `limit(1)` — in plaats van alleen op het
+    // cursor-loze pad.
+    const newestExistingDate = date_from
+      ? null
+      : await loadNewestTransactionDate(supabase, {
+          userId: user.id,
+          accountId: connAccount.bank_account_id,
+        })
+    const isFirstFetch = !date_from && (!connAccount.sync_cursor || newestExistingDate === null)
     let blocks: FetchBlock[]
     let fetchMode: 'incremental' | 'historical' | 'cursor' = 'cursor'
 
     if (isFirstFetch) {
-      const newestExistingDate = await loadNewestTransactionDate(supabase, {
-        userId: user.id,
-        accountId: connAccount.bank_account_id,
-      })
       const plan = planInitialFetch({ today, newestExistingDate })
       blocks = plan.blocks
       fetchMode = plan.mode

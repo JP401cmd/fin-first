@@ -677,6 +677,79 @@ describe('GET /api/bank-connect/callback — fase 5: schakel 1 (identiteit) wint
   })
 })
 
+/**
+ * De sync-cursor hoort bij de DRAGER, niet bij de koppelrij.
+ *
+ * Schakel 1 hergebruikt de bestaande rij op `external_account_id` (bewust zonder
+ * `is_active`-filter) inclusief haar `sync_cursor`. Landt die rij op een ándere
+ * rekening — verwijderen en opnieuw koppelen levert een verse drager op — dan
+ * beschrijft de cursor historie die daar niet staat, en leest de sync-route hem
+ * als "niet de eerste ophaal": de volle terugblik (B8) wordt overgeslagen terwijl
+ * de gebruiker juist opnieuw koppelt óm zijn historie te halen.
+ */
+describe('GET /api/bank-connect/callback — sync-cursor volgt de drager', () => {
+  it('nult de cursor wanneer de hergebruikte koppelrij op een andere rekening landt', async () => {
+    const stub = makeQueuedSupabaseStub({
+      bank_connections: [{ data: pendingConnection() }, { data: null }, ORPHAN_SOURCE()],
+      bank_connection_accounts: [
+        // Schakel 1 treft de rij van de vórige koppeling; haar drager is bij het
+        // verwijderen losgelaten.
+        { data: { id: 'link-1', bank_account_id: null } },
+        NO_OCCUPYING_LINKS,
+        { data: null }, // stap 4: bestaande koppelrij bijwerken
+        { data: [] }, // orphan cleanup
+      ],
+      bank_accounts: [
+        { data: null }, // schakel 3: geen iban_hash-treffer
+        { data: { id: 'ba-nieuw' } }, // schakel 4: verse rekening
+      ],
+      assets: [{ data: { id: 'asset-nieuw' } }],
+      profiles: [{ data: { onboarding_completed: true } }],
+    })
+
+    wire(stub, [TL_ACCOUNT_WITH_IBAN])
+
+    const res = await GET(requestFor(CALLBACK_URL))
+
+    expect(res.headers.get('location')).toBe(`${ORIGIN}/core/cash/connect/success`)
+
+    const link = linkWrites(stub)[0]
+    expect(link.op).toBe('update')
+    expect(link.data.bank_account_id).toBe('ba-nieuw')
+    expect(link.data.sync_cursor).toBeNull()
+    // Een synchronisatiemoment van een andere rekening is hier een onwaarheid.
+    expect(link.data.last_synced_at).toBeNull()
+  })
+
+  it('laat de cursor staan bij een gewone herautorisatie op dezelfde rekening', async () => {
+    // De keerzijde: elke 90 dagen herautoriseren mag géén volledige ophaal tegen
+    // de bank-eigen verzoeklimiet uitlokken. Blijft de drager gelijk, dan is de
+    // cursor juist correct.
+    const stub = makeQueuedSupabaseStub({
+      bank_connections: [{ data: pendingConnection() }, { data: null }, ORPHAN_SOURCE()],
+      bank_connection_accounts: [
+        { data: { id: 'link-1', bank_account_id: 'ba-zelfde' } },
+        { data: [{ id: 'link-1', bank_account_id: 'ba-zelfde', bank_connections: { provider_name: 'ING' } }] },
+        { data: null },
+        { data: [] },
+      ],
+      bank_accounts: [carrierWithAsset('ba-zelfde')],
+      assets: [activeAssetFor('ba-zelfde')],
+      profiles: [{ data: { onboarding_completed: true } }],
+    })
+
+    wire(stub, [TL_ACCOUNT_WITH_IBAN])
+
+    await GET(requestFor(CALLBACK_URL))
+
+    const link = linkWrites(stub)[0]
+    expect(link.op).toBe('update')
+    expect(link.data.bank_account_id).toBe('ba-zelfde')
+    expect(link.data).not.toHaveProperty('sync_cursor')
+    expect(link.data).not.toHaveProperty('last_synced_at')
+  })
+})
+
 describe('GET /api/bank-connect/callback — fase 5: schakel 3 (iban_hash)', () => {
   it('bij link_intent = herautoriseren bindt de voorkeur alsnog — schakel 2 is daar een val-terug (fase 7)', async () => {
     // **Amendement op fase 5, besluit 3**, na de security-review van fase 7. Daar

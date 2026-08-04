@@ -122,9 +122,16 @@ describe('planInitialFetch — grensgevallen', () => {
 })
 
 describe('toProviderRange', () => {
-  it('laat `to` weg voor het blok dat tot vandaag loopt', () => {
-    // Anders kapt TrueLayer (kale datum = middernacht) alles van vandaag af.
-    expect(toProviderRange({ from: '2026-01-29', to: TODAY }, TODAY)).toEqual({ from: '2026-01-29' })
+  it('stuurt ook voor het blok tot vandaag een `to` mee, tot het einde van de dag', () => {
+    // Data API v1 past het venster alleen toe als `from` én `to` er zijn; met
+    // alleen `from` valt de provider terug op zijn standaard van ~88 dagen en
+    // levert hij rijen die VÓÓR het gevraagde startpunt liggen. Een kale
+    // `to=<vandaag>` is middernacht en zou vandaag juist afkappen, dus loopt de
+    // bovengrens tot het einde van de dag.
+    expect(toProviderRange({ from: '2026-01-29', to: TODAY }, TODAY)).toEqual({
+      from: '2026-01-29',
+      to: `${TODAY}T23:59:59Z`,
+    })
   })
 
   it('houdt `to` voor historische blokken', () => {
@@ -132,5 +139,18 @@ describe('toProviderRange', () => {
       from: '2025-07-29',
       to: '2026-01-29',
     })
+  })
+
+  it('geeft nooit een venster zonder bovengrens terug', () => {
+    // De eigenschap achter beide gevallen hierboven: elk blok dat naar de
+    // provider gaat draagt een volledig venster. Zonder `to` is `from` een
+    // wens die de provider stilzwijgend negeert.
+    for (const block of [
+      { from: '2026-01-29', to: TODAY },
+      { from: '2025-07-29', to: '2026-01-29' },
+      { from: TODAY, to: TODAY },
+    ]) {
+      expect(toProviderRange(block, TODAY).to).toBeTruthy()
+    }
   })
 })
