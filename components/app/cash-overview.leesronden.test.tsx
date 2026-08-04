@@ -15,7 +15,7 @@
  *     komen uit die ene datum.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { DisplayModeProvider } from '@/lib/hooks/use-display-mode'
 import { CashOverview, budgetTrackedBankByAsset } from './cash-overview'
 
@@ -58,6 +58,23 @@ const BANK_ROWS = [
   },
 ]
 
+/**
+ * Cash-bezitting van de gedeelde huishoudrekening, zoals de perspectief-loader
+ * 'm ook in het PERSOONLIJKE perspectief levert (RLS geeft eigen + gedeeld).
+ * Zijn `bank_accounts`-rij valt daar juist wél buiten de kaartenlijst — dat
+ * verschil is de kern van de map-invariant.
+ */
+const GEDEELD_CASH_ASSET = {
+  id: 'asset-gedeeld',
+  name: 'Gezamenlijke rekening',
+  asset_type: 'cash',
+  is_active: true,
+  current_value: 2000,
+  ownership: 'shared',
+  _provenance: 'gezamenlijk',
+  _myShareFraction: 0.5,
+}
+
 // ── Module-mocks ─────────────────────────────────────────────────────────────
 
 vi.mock('next/navigation', () => ({
@@ -82,6 +99,19 @@ vi.mock('@/lib/own-accounts-ibans', async (importOriginal) => ({
 
 vi.mock('@/lib/load-entity-sparklines', () => ({
   loadEntitySparklines: () => Promise.resolve({}),
+}))
+
+// De rekeningdetail-overlay (lazy geladen) en het bezittings-paneel zijn de twee
+// bestemmingen van een klik op een rekeningkaart. Als stubs zijn ze
+// onderscheidbaar zonder hun echte gewicht mee te slepen.
+vi.mock('@/components/app/cash-account-view', () => ({
+  CashAccountView: ({ accountId }: { accountId: string }) => (
+    <div data-testid="rekeningdetail">{accountId}</div>
+  ),
+}))
+
+vi.mock('@/components/app/core/assets/asset-pane', () => ({
+  AssetPane: () => <div data-testid="bezittingspaneel" />,
 }))
 
 vi.mock('@/lib/household/perspective-loader', async (importOriginal) => ({
@@ -211,6 +241,24 @@ describe('CashOverview — bank_accounts in één leesronde', () => {
       .find((o) => o.name === 'in')
     expect(inOp?.args[0]).toBe('account_id')
     expect(inOp?.args[1]).toEqual(['ba-eigen'])
+  })
+
+  it('een gedeelde rekening opent de rekeningdetail, niet het bezittings-paneel', async () => {
+    // De invariant achter het weghalen van het server-side ownership-filter:
+    // de map moet de gedeelde huishoudrekening kennen, óók in het persoonlijke
+    // perspectief waar zijn `bank_accounts`-rij níét in de kaartenlijst valt.
+    // Zou de map uit de versmalde set gebouwd worden, dan levert
+    // `detailBankAccountIdForAsset` niets en opent deze klik het bezittings-
+    // paneel — een echte gedragsregressie, die deze test vangt.
+    perspectiveData.value = { assets: [GEDEELD_CASH_ASSET] }
+    renderOverzicht({ showAllCashAccounts: true, embedded: true })
+    await settle()
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: /Gezamenlijke rekening openen/ }),
+    )
+    expect(await screen.findByTestId('rekeningdetail')).toHaveTextContent('ba-gedeeld')
+    expect(screen.queryByTestId('bezittingspaneel')).not.toBeInTheDocument()
   })
 
   it('bouwt de asset→rekening-map uit de ongefilterde set, inclusief gedeeld', () => {

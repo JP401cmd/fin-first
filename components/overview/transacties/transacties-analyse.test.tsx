@@ -46,11 +46,8 @@ vi.mock('@/lib/supabase/client', () => ({
   }),
 }))
 
-// loadPerspectiveTransactions: hangt ook — we willen geen data-state. De rest
-// van de module blijft echt; `windowPerspectiveItems` wordt tijdens de render
-// aangeroepen om de heatmap uit de gedeelde set te snijden.
-vi.mock('@/lib/household/perspective-loader', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@/lib/household/perspective-loader')>()),
+// loadPerspectiveTransactions: hangt ook — we willen geen data-state.
+vi.mock('@/lib/household/perspective-loader', () => ({
   loadPerspectiveTransactions: () => new Promise(() => {}),
 }))
 

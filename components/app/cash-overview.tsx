@@ -200,13 +200,18 @@ export function CashOverview({
   })
 
   // Datum van de recentste transactie, perspectief-gescoped en los van de
-  // geselecteerde maand. `undefined` = nog aan het laden, `null` = er is er
+  // geselecteerde maand. `null` = nog aan het laden; `date: null` = er is er
   // geen. Beantwoordt twee vragen die vroeger elk hun eigen query deden:
   //   • staat er in een ándere maand wél iets? (sprong naar de recentste maand)
   //   • was er de laatste 90 dagen enige activiteit? (lege-staat van het blok)
   // Eén `max(date)` volstaat voor allebei: bestaat er een rij op of ná de
   // 90-dagengrens, dan ligt de recentste rij daar per definitie ook op of ná.
-  const [latestTxDate, setLatestTxDate] = useState<string | null | undefined>(undefined)
+  //
+  // De 90-dagengrens reist mee in dezelfde state: hij hoort bij het antwoord.
+  // De oude query rekende 'm uit op het moment van ophalen; los meememo'en zou
+  // 'm op mount bevriezen en op een tab die een dagovergang meemaakt uit de pas
+  // laten lopen met de datum waarmee hij vergeleken wordt.
+  const [latestTx, setLatestTx] = useState<{ date: string | null; cutoff: string } | null>(null)
 
   // Kassabon state
   const [showIncomeReceipt, setShowIncomeReceipt] = useState(false)
@@ -357,7 +362,23 @@ export function CashOverview({
       const ibanFor = ibanById(ibanResult.accounts)
       const visible =
         perspective === 'personal' ? rows.filter((a) => a.ownership === 'personal') : rows
-      setAccounts(visible.map((a) => ({ ...a, iban: ibanFor.get(a.id) ?? null })))
+      // Veld voor veld i.p.v. een spread: de join-blob (`linked_asset`) is er
+      // enkel voor de map hieronder en hoort niet in `accounts`-state mee te
+      // liften. Zo blijft de statevorm exact het `Account`-type.
+      setAccounts(
+        visible.map((row) => ({
+          id: row.id,
+          name: row.name,
+          iban: ibanFor.get(row.id) ?? null,
+          bank_name: row.bank_name,
+          account_type: row.account_type,
+          balance: row.balance,
+          is_active: row.is_active,
+          sort_order: row.sort_order,
+          linked_asset_id: row.linked_asset_id,
+          ownership: row.ownership,
+        })),
+      )
       if (wide) setBankByAsset(budgetTrackedBankByAsset(rows))
     }
   }, [perspective, showAllCashAccounts])
@@ -556,7 +577,7 @@ export function CashOverview({
     loadHistorical()
   }, [loadHistorical])
 
-  // Eén leesronde voor beide bestaans-vragen (zie `latestTxDate`).
+  // Eén leesronde voor beide bestaans-vragen (zie `latestTx`).
   useEffect(() => {
     let cancelled = false
     const loadLatest = async () => {
@@ -568,30 +589,33 @@ export function CashOverview({
         .limit(1)
       if (perspective === 'personal') query = query.eq('ownership', 'personal')
       const { data } = await query
-      if (!cancelled) setLatestTxDate(data && data.length > 0 ? (data[0].date as string) : null)
+      // 90-dagengrens, lokaal opgebouwd (NIET via toISOString: dat schuift in
+      // UTC+ tijdzones een dag terug).
+      const cutoff = new Date()
+      cutoff.setDate(cutoff.getDate() - 90)
+      const cutoffStr = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, '0')}-${String(cutoff.getDate()).padStart(2, '0')}`
+      if (!cancelled) {
+        setLatestTx({
+          date: data && data.length > 0 ? (data[0].date as string) : null,
+          cutoff: cutoffStr,
+        })
+      }
     }
     loadLatest()
     return () => { cancelled = true }
   }, [perspective])
 
-  // 90-dagengrens, lokaal opgebouwd (NIET via toISOString: dat schuift in UTC+
-  // tijdzones een dag terug). Eén keer per mount vastgezet, zoals de query dat
-  // vroeger per aanroep deed.
-  const recentActivityCutoff = useMemo(() => {
-    const cutoff = new Date()
-    cutoff.setDate(cutoff.getDate() - 90)
-    return `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, '0')}-${String(cutoff.getDate()).padStart(2, '0')}`
-  }, [])
+  const latestTxDate = latestTx?.date ?? null
 
   // Was er de afgelopen 90 dagen enige transactie-activiteit? Bepaalt of het
   // hele geldstroom-blok getoond wordt of vervangen door een lege-staat
   // call-to-action. null = nog aan het laden (toon dan het normale blok).
   const hasRecentActivity =
-    latestTxDate === undefined ? null : latestTxDate !== null && latestTxDate >= recentActivityCutoff
+    latestTx === null ? null : latestTx.date !== null && latestTx.date >= latestTx.cutoff
 
   // Staat er buiten de geselecteerde maand wél iets? De render combineert dit
   // met `transactions.length === 0`.
-  const hasOtherMonthTx = latestTxDate != null
+  const hasOtherMonthTx = latestTxDate !== null
 
   function goToLatestTransaction() {
     if (!latestTxDate) return

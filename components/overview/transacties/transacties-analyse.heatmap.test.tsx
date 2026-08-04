@@ -9,7 +9,7 @@
  * vrolijk twee keer downloadt.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { DisplayModeProvider } from '@/lib/hooks/use-display-mode'
 import {
   resolveHeatmapWindow,
@@ -149,6 +149,66 @@ describe('TransactiesAnalyse — bron van de heatmap', () => {
     // De heatmap kreeg exact het heatmap-venster uit de gedeelde set: de twee
     // randdagen wél, de twee buren erbuiten niet.
     expect(screen.getByTestId('heatmap-ids')).toHaveTextContent('rand-start,rand-eind')
+  })
+
+  it('terugnavigeren naar een dekkende periode toont geen afgeknotte heatmap', async () => {
+    // Van april 2026 (dekt niet — het periode-einde ligt vóór het heatmap-einde)
+    // naar mei 2026 (dekt exact). De dekkingsvlag klapt om zodra de gebruiker
+    // klikt, maar de rijen in state zijn dan nog die van het smallere venster.
+    // Wordt de heatmap uit die stále set gesneden, dan verdwijnen de recentste
+    // maanden — als niveau-0-cellen, niet te onderscheiden van "niets uitgegeven".
+    const DEKKEND = resolveFetchWindow(resolvePeriodWindow('month', -1, NOW))
+    const VOLLEDIG = [row('rand-start', HEATMAP.start), row('midden', '2026-01-15'), row('rand-eind', HEATMAP.end)]
+    // Wat het SMALLE venster oplevert: het heatmap-einde zit er niet in.
+    const SMAL = [row('rand-start', HEATMAP.start), row('midden', '2026-01-15')]
+    // Wat het DEKKENDE venster oplevert — inclusief een rij die er buiten valt
+    // en dus weggesneden moet worden.
+    const RUIM = [row('voor', '2025-05-20'), ...VOLLEDIG]
+
+    let releaseDekkend: (() => void) | null = null
+    loadPerspectiveTransactions.mockImplementation(
+      (_c: unknown, _p: unknown, opts?: { since?: string; until?: string }) => {
+        const res = (transactions: Row[]) => ({
+          perspective: 'personal',
+          context: {},
+          transactions,
+          partnerMonthlyIncome: null,
+        })
+        if (isHeatmapWindow(opts)) return Promise.resolve(res(VOLLEDIG))
+        if (opts?.since === DEKKEND.since && opts?.until === DEKKEND.until) {
+          // Vasthouden zodat we de tussentoestand kunnen observeren.
+          return new Promise((resolve) => {
+            releaseDekkend = () => resolve(res(RUIM))
+          })
+        }
+        return Promise.resolve(res(SMAL))
+      },
+    )
+
+    searchParams.value = new URLSearchParams('maand=2026-04')
+    renderPagina()
+    await waitFor(() =>
+      expect(screen.getByTestId('heatmap-ids')).toHaveTextContent('rand-start,midden,rand-eind'),
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Volgende periode' }))
+
+    // Tussentoestand: de nieuwe, dekkende fetch is onderweg. De heatmap moet de
+    // laatst bekende VOLLEDIGE set blijven tonen, niet de stále smalle set.
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(screen.getByTestId('heatmap-ids')).toHaveTextContent('rand-start,midden,rand-eind')
+
+    // En na afloop komt hij uit de nieuwe set — met de buitenstaander eruit.
+    await act(async () => {
+      releaseDekkend?.()
+      await Promise.resolve()
+    })
+    await waitFor(() =>
+      expect(screen.getByTestId('heatmap-ids')).toHaveTextContent('rand-start,midden,rand-eind'),
+    )
+    expect(screen.getByTestId('heatmap-ids')).not.toHaveTextContent('voor')
   })
 
   it('ver terug gebladerd: eigen download, heatmap uit die eigen set', async () => {
