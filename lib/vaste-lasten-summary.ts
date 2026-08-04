@@ -65,10 +65,15 @@ type RecurringTxRow = {
  * WAAROM (date, id) EN NIET ALLEEN `id`: de primaire sleutel is een random UUID.
  * Ordenen op `id` laat de planner de samengestelde (user_id, date)-index los en
  * de PK-index in willekeurige heap-volgorde aflopen, met datum én RLS als filter
- * — hij gooit dan een veelvoud weg van wat hij teruggeeft. Onder rolsimulatie
- * gemeten was die vorm duurder in zowel gelezen buffers als tijd dan de OFFSET-
- * variant die hij moest vervangen; met de samengestelde cursor is het juist
- * duidelijk goedkoper. (Meetwaarden staan in het taakrapport, buiten deze repo.)
+ * — hij gooit dan een veelvoud weg van wat hij teruggeeft. Gemeten met EXPLAIN
+ * (ANALYZE, BUFFERS) op productie was die vorm duurder in zowel gelezen buffers
+ * als tijd dan de OFFSET-variant die hij moest vervangen; met de samengestelde
+ * cursor is het juist duidelijk goedkoper. LET OP bij hermeten: die plannen liepen
+ * als tabel-eigenaar, dus ZONDER de RLS-predicaten. De verhouding tussen de drie
+ * vormen is structureel (een random-UUID-ordening kan de (user_id, date)-index
+ * per definitie niet gebruiken) en de huishouden-OR maakt de OFFSET-variant onder
+ * RLS juist duurder, niet goedkoper — maar de absolute getallen zijn niet wat een
+ * gebruiker ziet. (Meetwaarden staan in het taakrapport, buiten deze repo.)
  *
  * GEDRAGSNEUTRAAL: de rijen komen in exact dezelfde volgorde binnen als hiervoor,
  * want de sorteersleutel (date, id) is ongewijzigd — alleen de manier waarop we
