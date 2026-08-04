@@ -35,9 +35,12 @@ function makeSupabase(recurrings: RecurringRow[]): SupabaseClient {
       gte: () => b,
       order: () => b,
       eq: () => b,
-      // Paginatie-fetch (fetchAllRecurringTx) eindigt de keten op .range(); één
-      // pagina met de volledige rijenset is genoeg voor deze deterministische mock.
-      range: () => b,
+      // De keyset-paginatie (fetchAllRecurringTx) eindigt de keten op .limit();
+      // één pagina met de volledige rijenset is genoeg voor deze deterministische
+      // mock, want `transactions` is hier leeg en de lus stopt na de eerste ronde.
+      // De cursor-`.or()` komt dus niet langs. Voor een échte
+      // paginatie-/volgorde-getuige: lib/vaste-lasten-summary.keyset.test.ts.
+      limit: () => b,
       then: (resolve: (v: { data: unknown[]; error: null }) => unknown) =>
         resolve({ data: rows, error: null }),
     }

@@ -32,12 +32,45 @@ type RecurringTxRow = {
 }
 
 /**
- * Haal ALLE 12-maands transactie-rijen op via paginatie. PostgREST kapt elk
- * antwoord af op `max_rows` (config.toml = 1000) — een enkele `.limit(n)` boven
- * die grens is een NO-OP. Voor recurring-detectie moeten we élke transactie zien,
- * anders mist de detectie (en dus het vaste-lasten-totaal) transacties bij
- * tx-rijke gebruikers. Totale order op (date, id) zodat de paginatie geen rijen
- * overslaat of dubbel telt op een paginagrens met gelijke datums.
+ * Haal ALLE 12-maands transactie-rijen op via KEYSET-paginatie op (date, id).
+ * PostgREST kapt elk antwoord af op `max_rows` (config.toml = 1000) — een enkele
+ * `.limit(n)` boven die grens is een NO-OP. Voor recurring-detectie moeten we
+ * élke transactie zien, anders mist de detectie (en dus het vaste-lasten-totaal)
+ * transacties bij tx-rijke gebruikers.
+ *
+ * WAAROM KEYSET EN NIET `.range()` (T3.2): met OFFSET moest de database voor elke
+ * volgende pagina het hele venster opnieuw opbouwen en sorteren om er de eerste
+ * `from` rijen van weg te gooien. De huishouden-OR in de RLS-policy dwingt boven-
+ * dien een BitmapOr af, en een bitmapscan levert geen gesorteerde uitvoer — dus
+ * die sortering is er écht, elke pagina opnieuw. De cursor hieronder tilt in
+ * plaats daarvan de ondergrens van het venster mee op: elke volgende pagina leest
+ * strikt minder dan de vorige.
+ *
+ * WAAROM (date, id) EN NIET ALLEEN `id`: de primaire sleutel is een random UUID.
+ * Ordenen op `id` laat de planner de samengestelde (user_id, date)-index los en
+ * de PK-index in willekeurige heap-volgorde aflopen, met datum én RLS als filter
+ * — hij gooit dan een veelvoud weg van wat hij teruggeeft. Onder rolsimulatie
+ * gemeten was die vorm duurder in zowel gelezen buffers als tijd dan de OFFSET-
+ * variant die hij moest vervangen; met de samengestelde cursor is het juist
+ * duidelijk goedkoper. (Meetwaarden staan in het taakrapport, buiten deze repo.)
+ *
+ * GEDRAGSNEUTRAAL: de rijen komen in exact dezelfde volgorde binnen als hiervoor,
+ * want de sorteersleutel (date, id) is ongewijzigd — alleen de manier waarop we
+ * de pagina's afbakenen verandert. Dat is niet louter cosmetisch: de detectie
+ * sorteert per groep zelf op datum (`lib/recurring-detection.ts`, `sortedTx`),
+ * maar `getMostCommon` breekt gelijkspel op de VOLGORDE VAN BINNENKOMST, en de
+ * eindsortering op (confidence, bedrag) doet dat ook — via een stabiele sort, dus
+ * op de volgorde waarin de groepen zijn ontdekt. Twee even vaak voorkomende
+ * omschrijvingen, of twee vaste lasten met hetzelfde bedrag en dezelfde
+ * betrouwbaarheid, zouden bij een andere aanlevervolgorde dus stil kunnen
+ * omwisselen. Door (date, id) te behouden is dat geen open eind maar een
+ * uitgesloten geval — vastgelegd in lib/vaste-lasten-summary.keyset.test.ts.
+ *
+ * GEEN expliciete `.eq('user_id', ...)`: die zou de planner weliswaar een
+ * geordende Index Scan gunnen, maar de SELECT-policy op `transactions` is
+ * huishouden-inclusief (eigen rijen OF `ownership = 'shared'` binnen het
+ * huishouden). Vastpinnen op de eigen user_id laat de gedeelde partnerrijen stil
+ * wegvallen uit het vaste-lastentotaal — een gedragswijziging, geen optimalisatie.
  */
 async function fetchAllRecurringTx(
   supabase: SupabaseClient,
@@ -45,18 +78,29 @@ async function fetchAllRecurringTx(
 ): Promise<RecurringTxRow[]> {
   const PAGE = 1000
   const rows: RecurringTxRow[] = []
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await supabase
+  let cursor: { date: string; id: string } | null = null
+  for (;;) {
+    // De cursorwaarden komen uit een DATE- en een UUID-kolom, dus uit een
+    // vastliggende tekenset — ze kunnen de PostgREST-filtergrammatica hieronder
+    // niet breken.
+    const base = supabase
       .from('transactions')
       .select('id, date, amount, description, counterparty_name, is_income, budget_id, transaction_type')
-      .gte('date', startDateStr)
+      .gte('date', cursor ? cursor.date : startDateStr)
+    const scoped = cursor
+      ? base.or(`date.gt.${cursor.date},and(date.eq.${cursor.date},id.gt.${cursor.id})`)
+      : base
+    const { data, error } = await scoped
       .order('date', { ascending: true })
       .order('id', { ascending: true })
-      .range(from, from + PAGE - 1)
+      .limit(PAGE)
     if (error) break
     const batch = (data ?? []) as RecurringTxRow[]
     rows.push(...batch)
     if (batch.length < PAGE) break
+    const last = batch[batch.length - 1]
+    // De cursor schuift altijd strikt op: de OR sluit de cursorrij zelf uit.
+    cursor = { date: last.date, id: last.id }
   }
   return rows
 }
