@@ -73,16 +73,17 @@ alter policy "View own or shared transaction splits" on public.transaction_split
 -- idx_transactions_household (household_id) — zonder date en zonder ownership. Die
 -- levert dus ALLE huishoudrijen ooit, waarna date/ownership als recheck-filter draaien
 -- en de ORDER BY date DESC een expliciete sort wordt over het bitmapresultaat.
--- Gemeten met een huishoud-fixture (6-maands venster, 1503 gedeelde partnerrijen):
--- de gedeelde tak leverde 2175 indexrijen en het plan las 1519 gedeelde buffers.
+-- Gemeten met een huishoud-fixture in een teruggedraaide transactie (6-maands venster):
+-- de gedeelde tak leverde ruim meer indexrijen dan relevant en het plan las een
+-- veelvoud aan gedeelde buffers.
 --
 -- Deze index dekt exact de policy-tak: partial op ownership = 'shared', met keys
 -- (household_id, date desc) — equality op household_id, range op date en de
 -- sorteervolgorde in één index.
 --
 -- BEWUST GEEN `concurrently`: apply_migration draait transactioneel en CONCURRENTLY is
--- daar niet toegestaan. De tabel is klein (37.002 rijen / 15 MB) en het partial-
--- predikaat matcht op dit moment 0 rijen, dus de SHARE-lock duurt milliseconden.
+-- daar niet toegestaan. De tabel is op dit moment bescheiden van omvang en het partial-
+-- predikaat matcht vooralsnog geen enkele rij, dus de SHARE-lock duurt milliseconden.
 create index if not exists idx_transactions_household_shared_date
   on public.transactions (household_id, date desc)
   where ownership = 'shared';
