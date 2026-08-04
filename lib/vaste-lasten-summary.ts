@@ -231,12 +231,24 @@ async function loadFingerprintRound(
         .gte('date', startDateStr),
       // Het aantal rijen dat de detectie WEGGOOIT (`transaction_type` is
       // 'transfer'/'joint_transfer'). Zonder deze telling ziet de vingerafdruk
-      // niet dat iemand een boeking als overboeking markeert — het totale aantal
-      // rijen blijft dan gelijk, de datums ook, en de twee paden die dit doen
-      // (app/api/own-accounts/reclassify, components/app/transfer-confirm-sheet)
-      // schrijven geen `updated_at` mee. Dat is een bewuste gebruikersactie met
-      // een zichtbaar gevolg voor het vaste-lastentotaal, dus die hoort niet in
-      // een TTL-venster te blijven hangen.
+      // niet dat iemand een boeking als overboeking markeert: het totale aantal
+      // rijen blijft gelijk, de datums ook, en géén van de paden die dit doen
+      // schrijft `updated_at` mee — dus ook dat signaal zwijgt. Dat is een
+      // bewuste gebruikersactie met een zichtbaar gevolg voor het
+      // vaste-lastentotaal, dus die hoort niet in een TTL-venster te blijven
+      // hangen.
+      //
+      // Minstens VIER update-paden zetten dit veld om op een bestaande rij:
+      // app/api/own-accounts/reclassify (batch), transfer-confirm-sheet (per
+      // boeking), lib/category-rules.ts (directe toewijzing én de retro-set) en
+      // ai-categorize-sheet.tsx (bulk-toewijzing én handleSave). Daarnaast zijn
+      // er insert-paden (manual-transfer-sheet.tsx) die `txCount` sowieso al
+      // bewegen.
+      //
+      // Tel die lijst NIET na als je hier iets wijzigt: deze telling meet
+      // DB-STAAT, niet schrijvers. De dekking volgt uit de gemeten staat en niet
+      // uit een inventarisatie, dus elk toekomstig pad dat `transaction_type`
+      // omzet is er per constructie al door gedekt. (ADR 0078.)
       supabase
         .from('transactions')
         .select('id', { count: 'exact', head: true })
