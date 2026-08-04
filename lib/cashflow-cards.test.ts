@@ -41,7 +41,6 @@ function baseDashboard(overrides: Partial<DashboardData>): DashboardData {
 }
 
 const EMPTY_CASHFLOW: CashflowData = {
-  transactions: [],
   monthLabel: 'juli 2026',
   fullName: null,
   recurrings: [],

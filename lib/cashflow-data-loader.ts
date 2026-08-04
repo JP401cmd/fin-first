@@ -1,10 +1,16 @@
 // lib/cashflow-data-loader.ts
 // Server-side data loader voor de cashflow-pagina's onder /overzicht/cashflow.
 //
-// Factort het transactions/recurrings/baseline/bank-accounts-blok dat voorheen
-// inline in app/(app)/overzicht/cashflow/page.tsx stond. Wordt gedeeld door de
-// landingspagina (kaart-KPI's), de Transacties-pagina, de Vaste-lasten-pagina
-// en de Forecast-pagina. React `cache()` dedupt per request.
+// Factort het recurrings/baseline/bank-accounts-blok dat voorheen inline in
+// app/(app)/overzicht/cashflow/page.tsx stond. Wordt gedeeld door de
+// landingspagina (kaart-KPI's), de Vaste-lasten-pagina en de Forecast-pagina.
+// React `cache()` dedupt per request.
+//
+// GEEN TRANSACTIE-FEED. De loader leverde ooit ook een 3-maands rijen-feed met
+// een naam-decoratie erbij; die uitvoer had geen enkele lezer meer en is
+// verwijderd. De transactie-as wordt hier alleen nog geaggregeerd (baseline +
+// incassodag-afleiding) en verlaat de loader niet per rij. Wie rijen wil toont,
+// haalt ze op waar ze getoond worden — niet via deze bundel.
 //
 // Huishouden-perspectief (plan Onderdeel 4): de transactie-as komt uit
 // loadPerspectiveTransactions (single source of truth voor ownership/privacy).
@@ -17,7 +23,6 @@
 import { cache } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getCachedUser } from '@/lib/supabase/cached-user'
-import type { TransactionRow } from '@/lib/types/transactions'
 import { withDerivedDayOfMonth, type RecurringTransaction, type DayDerivationTx } from '@/lib/recurring-data'
 import { getOwnProfile } from '@/lib/server-data/base'
 import { loadPerspectiveTransactionsServer } from '@/lib/household/perspective-loader-server'
@@ -27,8 +32,6 @@ import type { OwnershipType, Perspective } from '@/lib/household-data'
 // ── Result type ───────────────────────────────────────────────
 
 export interface CashflowData {
-  /** Laatste 3 maanden transacties (voor de Transacties-pagina). */
-  transactions: TransactionRow[]
   /** Huidige maand-label, bv. "juni 2026". */
   monthLabel: string | undefined
   /** Profielnaam — gebruikt door VasteLastenLoader. */
@@ -58,7 +61,6 @@ export interface CashflowData {
 }
 
 const EMPTY: CashflowData = {
-  transactions: [],
   monthLabel: undefined,
   fullName: null,
   recurrings: [],
@@ -86,28 +88,6 @@ function shareOf(item: PerspectiveItem, perspective: Perspective): number {
   return 1
 }
 
-/**
- * Maximaal aantal id's per decoratie-batch (zie de feed-sectie onderaan).
- * PostgREST zet `in.(…)` in de query-STRING, dus een ongebonden id-lijst loopt
- * tegen de URL-lengtegrens van proxies/CDN aan.
- *
- * Reken mee vóór je dit verhoogt: een UUID kost in de URL ~39 bytes (36 tekens +
- * scheiding/escaping), dus 100 id's ≈ 3,9 kB plus de basis-URL. Tegen een
- * gangbare 8 kB-proxygrens is dat ongeveer een factor 2 marge — genoeg, maar
- * geen vrijbrief. Verdubbelen zit al tegen de grens aan.
- */
-const DECORATION_BATCH_SIZE = 100
-
-/**
- * Hoeveel decoratie-batches er tegelijk onderweg mogen zijn.
- *
- * Ongebonden `Promise.all` over álle batches vuurt bij een lange feed tientallen
- * gelijktijdige verzoeken af vanuit één render — precies de omstandigheid waarin
- * er één omvalt. Golven van vijf houden de winst (parallel) zonder de connectie-
- * pool van één request te overspoelen.
- */
-const DECORATION_CONCURRENCY = 5
-
 // ── Loader ────────────────────────────────────────────────────
 
 export const loadCashflowData = cache(async (
@@ -117,10 +97,6 @@ export const loadCashflowData = cache(async (
   const user = await getCachedUser(supabase)
   if (!user) return EMPTY
 
-  // 3-maands venster voor de transactie-feed (display).
-  const since = new Date()
-  since.setMonth(since.getMonth() - 3)
-  const sinceIso = since.toISOString().split('T')[0]
   // Baseline-venster voor forecast: laatste 6 maanden gemiddeld inkomen +
   // uitgaven. Zelfde 6m-periode als de health-score (consistentie).
   const sixMonthsAgo = new Date()
@@ -128,8 +104,8 @@ export const loadCashflowData = cache(async (
   const sixMonthsAgoIso = sixMonthsAgo.toISOString().split('T')[0]
 
   // Eén perspectief-gestempelde transactie-set over het 6-maands baseline-
-  // venster (het 3-maands feed-venster is een subset). Ownership/privacy zijn
-  // door de loader/RPC al toegepast.
+  // venster. Ownership/privacy zijn door de loader/RPC al toegepast. De set
+  // wordt hier alleen geaggregeerd — er verlaat geen enkele rij deze loader.
   const [
     perspectiveTx,
     profileResult,
@@ -268,103 +244,6 @@ export const loadCashflowData = cache(async (
   // Account-count blijft het aantal zichtbare gekoppelde rekeningen.
   const accountCount = scopedAccounts.length
 
-  // ── Display-transacties (feed) ───────────────────────────────────────────
-  // De perspectief-loader is de bron-of-waarheid voor WELKE rijen tellen
-  // (ownership/privacy); een tweede query levert alleen nog de account-/
-  // categorienaam erbij. Volgorde is hier de crux: eerst vaststellen wélke rijen
-  // de feed toont, dán precies die rijen decoreren.
-  //
-  // Vroeger stond het andersom — een venster-query met een vaste `.limit(...)`
-  // waarvan de uitkomst per ID op de feed werd gemapt. Voor wie meer rijen in
-  // het 3-maands venster had dan die limiet, vielen de OUDSTE feed-rijen buiten
-  // de join en verloren stil hun rekening- en categorienaam: geen fout, geen
-  // signaal, alleen ontbrekende data. Selecteren op de feed-ID's zelf maakt die
-  // afkap per constructie onmogelijk, en vraagt tegelijk minder op dan voorheen.
-  const feedRows: PerspectiveItem[] = []
-  for (const t of perspectiveTx.transactions) {
-    if (t._aggregated) continue
-    // Leeg/ontbrekend id → niet toonbaar én niet decoreerbaar (ongewijzigd).
-    if (t.id == null || String(t.id) === '') continue
-    if (String(t.date ?? '') < sinceIso) continue
-    feedRows.push(t)
-  }
-
-  // Partner-PERSOONLIJKE rijen komen uit de privacy-gated RPC en bestaan niet
-  // onder de eigen RLS. Die vragen we bewust NIET op: naamloos is voor hen het
-  // bedoelde privacy-gedrag, geen ontbrekende data. Gedeelde rijen horen er wél
-  // bij, óók als ze op naam van de partner staan — daarom geen `user_id`-filter
-  // op de query hieronder.
-  const decorateIds = feedRows
-    .filter((t) => t._provenance !== 'partner')
-    .map((t) => String(t.id))
-
-  const displayById = new Map<string, Record<string, unknown>>()
-  if (decorateIds.length > 0) {
-    const batches: string[][] = []
-    for (let i = 0; i < decorateIds.length; i += DECORATION_BATCH_SIZE) {
-      batches.push(decorateIds.slice(i, i + DECORATION_BATCH_SIZE))
-    }
-    // In golven, niet allemaal tegelijk — zie DECORATION_CONCURRENCY.
-    for (let i = 0; i < batches.length; i += DECORATION_CONCURRENCY) {
-      const wave = batches.slice(i, i + DECORATION_CONCURRENCY)
-      const decorated = await Promise.all(
-        wave.map((ids) =>
-          supabase
-            .from('transactions')
-            // Alleen de naam-kolommen: datum/omschrijving/bedrag komen uit de
-            // perspectief-set, die ze al perspectief-correct gestempeld draagt.
-            .select('id, bank_accounts(name), budgets(name)')
-            .in('id', ids),
-        ),
-      )
-      decorated.forEach((res, j) => {
-        // Een gefaalde batch is GEEN stille aangelegenheid. Hij laat een blok
-        // naamloze rijen verspreid door een lange feed achter, visueel niet te
-        // onderscheiden van de partner-rijen die legitiem naamloos zijn — precies
-        // het faalbeeld van de afkap-bug die deze code dichtte, terug via een
-        // smallere deur. De feed blijft bewust staan (de naam is verrijking, geen
-        // inhoud), maar de storing moet in de logs vindbaar zijn i.p.v. eruit te
-        // zien als ontbrekende data. Alleen server-side: de melding bereikt de
-        // gebruiker nooit (AVG/security, ADR 0044).
-        if (res.error) {
-          console.error(
-            `[cashflow:decorate] naam-decoratie faalde voor ${wave[j].length} rijen: ${res.error.message}`,
-          )
-          return
-        }
-        for (const r of (res.data ?? []) as Array<Record<string, unknown>>) {
-          displayById.set(String(r.id), r)
-        }
-      })
-    }
-  }
-
-  const transactions: TransactionRow[] = []
-  for (const t of feedRows) {
-    const id = String(t.id)
-
-    const joinRow = displayById.get(id)
-    const bankField = joinRow
-      ? (joinRow as { bank_accounts?: { name?: string } | { name?: string }[] | null }).bank_accounts
-      : undefined
-    const accountName = Array.isArray(bankField) ? bankField[0]?.name : bankField?.name
-    const budgetField = joinRow
-      ? (joinRow as { budgets?: { name?: string } | { name?: string }[] | null }).budgets
-      : undefined
-    const categoryName = Array.isArray(budgetField) ? budgetField[0]?.name : budgetField?.name
-
-    const frac = shareOf(t, perspective)
-    transactions.push({
-      id,
-      date: String(t.date ?? ''),
-      description: String(t.description ?? ''),
-      category: categoryName ?? null,
-      amount: Number(t.amount) * frac,
-      account_name: accountName ?? null,
-    })
-  }
-  transactions.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
-
   const fullName = (profileResult.data as { full_name?: string | null } | null)?.full_name ?? null
   const monthLabel = new Intl.DateTimeFormat('nl-NL', {
     month: 'long',
@@ -372,7 +251,6 @@ export const loadCashflowData = cache(async (
   }).format(new Date())
 
   return {
-    transactions,
     monthLabel,
     fullName,
     recurrings: recurringsWithDays,
