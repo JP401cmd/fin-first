@@ -1,7 +1,7 @@
 import { registerCategory, registerTests } from '../test-registry'
 import { assert, assertEqual, assertNotNull } from '../assert'
 import type { TestCase } from '../test-types'
-import { authenticatedFetch } from '../server-runner'
+import { authenticatedFetch, unauthenticatedFetch } from '../server-runner'
 
 const CAT = 'beheer.bank-connect'
 
@@ -12,9 +12,7 @@ async function fetchNoRedirect(path: string): Promise<Response> {
   return authenticatedFetch(path, { redirect: 'manual' })
 }
 
-/** Fetch JSON from an API path */
-async function fetchJson(path: string, init?: RequestInit): Promise<{ status: number; body: Record<string, unknown> }> {
-  const res = await authenticatedFetch(path, init)
+async function toJson(res: Response): Promise<{ status: number; body: Record<string, unknown> }> {
   let body: Record<string, unknown> = {}
   try {
     body = await res.json()
@@ -24,9 +22,60 @@ async function fetchJson(path: string, init?: RequestInit): Promise<{ status: nu
   return { status: res.status, body }
 }
 
+/** Fetch JSON from an API path */
+async function fetchJson(path: string, init?: RequestInit): Promise<{ status: number; body: Record<string, unknown> }> {
+  return toJson(await authenticatedFetch(path, init))
+}
+
+/** Fetch JSON WITHOUT auth — voor guard-tests die een 403 moeten bewijzen. */
+async function fetchJsonAnon(path: string, init?: RequestInit): Promise<{ status: number; body: Record<string, unknown> }> {
+  return toJson(await unauthenticatedFetch(path, init))
+}
+
+/**
+ * Schrijf één app_settings-sleutel, laat de aanroeper de response beoordelen en
+ * zet daarna ALTIJD de oorspronkelijke waarde terug.
+ *
+ * Deze suite draait als superadmin (`defaultRole: 'superadmin'`) tegen de echte
+ * app_settings — er is geen aparte test-database. Een PUT hier is dus een
+ * mutatie van de live configuratie van de bankkoppeling. Zonder herstel blijft
+ * de testwaarde staan: een run op 31-07-2026 zette `truelayer_environment` op
+ * `sandbox` en liet die zo, waarna /core/cash/connect alleen nog de
+ * sandbox-provider "Mock" toonde — in productie én lokaal, want beide praten
+ * met hetzelfde Supabase-project.
+ */
+async function putSettingAndRestore(
+  key: string,
+  testValue: string,
+  check: (putRes: { status: number; body: Record<string, unknown> }) => void,
+): Promise<void> {
+  const before = await fetchJson('/api/admin/settings')
+  const original = before.body[key]
+
+  const putRes = await fetchJson('/api/admin/settings', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ [key]: testValue }),
+  })
+
+  try {
+    check(putRes)
+  } finally {
+    // Alleen herstellen als de PUT daadwerkelijk landde (200). Bij 403 is er
+    // niets geschreven en zou een herstel-PUT ook niets doen.
+    if (putRes.status === 200) {
+      await fetchJson('/api/admin/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [key]: typeof original === 'string' ? original : '' }),
+      })
+    }
+  }
+}
+
 // ── Tests ───────────────────────────────────────────────────────────────────
 
-const tests: TestCase[] = [
+export const tests: TestCase[] = [
   // ── Step 1: TrueLayer toggle enabled/disabled opslaan via PUT /api/admin/settings ──
   {
     id: 'bank-connect-toggle-save',
@@ -59,17 +108,13 @@ const tests: TestCase[] = [
         `Expected truelayer_enabled to be 'true', 'false', or empty, got ${JSON.stringify(enabled)}`,
       )
 
-      // Try saving with PUT
-      const putRes = await fetchJson('/api/admin/settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ truelayer_enabled: 'false' }),
+      // Try saving with PUT — en zet de oorspronkelijke waarde daarna terug.
+      await putSettingAndRestore('truelayer_enabled', 'false', (putRes) => {
+        assert(
+          putRes.status === 200 || putRes.status === 403,
+          `Expected 200 or 403 from PUT /api/admin/settings, got ${putRes.status}`,
+        )
       })
-
-      assert(
-        putRes.status === 200 || putRes.status === 403,
-        `Expected 200 or 403 from PUT /api/admin/settings, got ${putRes.status}`,
-      )
     },
   },
 
@@ -172,17 +217,15 @@ const tests: TestCase[] = [
         `Expected truelayer_environment to be 'sandbox' or 'production', got ${JSON.stringify(env)}`,
       )
 
-      // Try saving sandbox mode
-      const putRes = await fetchJson('/api/admin/settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ truelayer_environment: 'sandbox' }),
+      // Try saving sandbox mode — en zet de oorspronkelijke omgeving daarna
+      // terug. Blijft 'sandbox' staan, dan valt de providerlijst app-breed
+      // terug op de ene sandbox-bank ("Mock").
+      await putSettingAndRestore('truelayer_environment', 'sandbox', (putRes) => {
+        assert(
+          putRes.status === 200 || putRes.status === 403,
+          `Expected 200 or 403, got ${putRes.status}`,
+        )
       })
-
-      assert(
-        putRes.status === 200 || putRes.status === 403,
-        `Expected 200 or 403, got ${putRes.status}`,
-      )
     },
   },
 
@@ -332,28 +375,18 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 2000,
     async fn() {
-      // Without admin cookies, both GET and PUT should return 403
-      const getRes = await fetchJson('/api/admin/settings')
-      const putRes = await fetchJson('/api/admin/settings', {
+      // Deze suite draait als superadmin (defaultRole), dus een geauthenticeerde
+      // fetch bewijst de guard niet — die krijgt juist 200 en zou de PUT ook
+      // echt uitvoeren. De guard toets je alleen ZONDER auth.
+      const getRes = await fetchJsonAnon('/api/admin/settings')
+      const putRes = await fetchJsonAnon('/api/admin/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ truelayer_enabled: 'true' }),
       })
 
-      // Both should be 403 (non-admin) or 200 (if test runner is admin)
-      assert(
-        getRes.status === 200 || getRes.status === 403,
-        `GET settings: expected 200 or 403, got ${getRes.status}`,
-      )
-      assert(
-        putRes.status === 200 || putRes.status === 403,
-        `PUT settings: expected 200 or 403, got ${putRes.status}`,
-      )
-
-      // If one is 403, both should be 403 (consistent auth)
-      if (getRes.status === 403) {
-        assertEqual(putRes.status, 403, 'PUT should also be 403 when GET is 403')
-      }
+      assertEqual(getRes.status, 403, 'GET settings zonder admin')
+      assertEqual(putRes.status, 403, 'PUT settings zonder admin')
     },
   },
 
