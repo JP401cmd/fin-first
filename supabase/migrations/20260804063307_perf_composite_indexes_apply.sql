@@ -1,0 +1,43 @@
+-- Performance: toepassing van de samengestelde index die de meting haalt.
+--
+-- ACHTERGROND: supabase/migrations/20260504000001_perf_composite_indexes.sql maakt vijf
+-- samengestelde indexen aan en is nooit op productie toegepast ("Re-run on production when
+-- ready"). Dat bestand blijft als historie staan; deze migratie is de toepassing.
+--
+-- Opdracht was: meten per index, en alleen toepassen wat aantoonbaar helpt. Van de vijf
+-- haalt er één de meting. De andere vier zijn bewust NIET toegepast; de onderbouwing staat
+-- hieronder zodat niemand dit over een half jaar opnieuw hoeft uit te zoeken.
+--
+-- WEL TOEGEPAST
+--   idx_transactions_user_date (user_id, date desc)
+--   De enige tabel van betekenisvolle omvang (tienduizenden rijen). Zonder deze index moet
+--   de planner een BitmapAnd bouwen uit de losse user_id- en date-indexen: die leverden in
+--   de meting respectievelijk ~12.700 en ~3.400 indexrijen om er ~600 uit over te houden.
+--   Met de samengestelde index wordt dat een enkele Bitmap Index Scan met
+--   Index Cond ((user_id = ...) AND (date >= ...)) die direct de ~600 rijen oplevert.
+--   Gemeten onder rolsimulatie, 6-maandsvenster: 332 -> 169 gedeelde buffers (-49%),
+--   heapblokken 299 -> 165. Dit pad draait 11 à 13 keer per cashflow-request.
+--   LET OP: de expliciete Sort blijft bestaan. De huishouden-tak in de RLS-policy maakt er
+--   een BitmapOr van, en een bitmapscan levert geen gesorteerde uitvoer. De winst zit dus in
+--   minder gelezen rijen/buffers, niet in het wegvallen van de sortering.
+--
+-- NIET TOEGEPAST, met reden
+--   idx_net_worth_snapshots_user_date (user_id, snapshot_date desc)
+--     Redundant: net_worth_snapshots_user_id_snapshot_date_key (UNIQUE, user_id,
+--     snapshot_date) bestaat al met dezelfde leidende kolommen. Een btree scant ook
+--     achteruit, dus DESC voegt niets toe.
+--   idx_valuations_user_type_date (user_id, entity_type, valuation_date desc)
+--     valuations_user_entity_date_key (UNIQUE) dekt de (user_id, entity_type)-prefix al en
+--     werd in de vooraf-meting ook daadwerkelijk gekozen. Tabel beslaat een enkel heapblok.
+--   idx_goals_user_active (user_id, is_completed, sort_order)
+--     Wordt wel gekozen, maar de geschatte kosten zijn identiek (4.43 vs 4.43) en de tabel
+--     beslaat een enkel heapblok. Het gemeten tijdsverschil is cachegedrag, geen werk.
+--   idx_life_events_user_active_sort (user_id, is_active, sort_order)
+--     De planner negeert 'm: identieke Seq Scan voor en na, geschatte kosten gaan zelfs
+--     omhoog (16.84 -> 18.18) doordat de tabel een index extra draagt.
+--
+-- BEWUST GEEN `concurrently`: apply_migration draait transactioneel, waar CONCURRENTLY niet
+-- is toegestaan. De tabel is bescheiden van omvang, dus de SHARE-lock duurt sub-seconde.
+
+create index if not exists idx_transactions_user_date
+  on public.transactions (user_id, date desc);
