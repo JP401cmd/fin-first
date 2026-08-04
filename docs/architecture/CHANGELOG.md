@@ -606,3 +606,8 @@
 
 - **API-routes** toegevoegd: /api/bank-accounts/[id], /api/own-accounts/ibans
 - **Componenten (aantal)** toegevoegd: +1
+
+## 2026-08-04
+
+- **API-routes** toegevoegd: /api/overzicht/cashflow-settings
+- **Componenten (aantal)** toegevoegd: +3
