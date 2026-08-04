@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-04T06:05:42.883Z",
+  "generatedAt": "2026-08-04T06:34:20.823Z",
   "generatedDate": "2026-08-04",
   "repo": {
     "name": "fin",
@@ -191,7 +191,7 @@
     "routesProduction": 101,
     "api": 271,
     "tables": 86,
-    "migrations": 179,
+    "migrations": 180,
     "integrations": 25,
     "components": 850,
     "providers": 12,
@@ -7623,7 +7623,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 179
+    "migrationCount": 180
   },
   "tablesByDomain": [
     {
@@ -16162,24 +16162,9 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-08-02",
-    "hasChanges": true,
-    "sections": [
-      {
-        "label": "API-routes",
-        "added": [
-          "/api/overzicht/cashflow-settings"
-        ],
-        "removed": []
-      },
-      {
-        "label": "Componenten (aantal)",
-        "added": [
-          "+3"
-        ],
-        "removed": []
-      }
-    ]
+    "previousDate": "2026-08-04",
+    "hasChanges": false,
+    "sections": []
   },
   "statsHistory": [
     {

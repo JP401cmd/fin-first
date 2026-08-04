@@ -611,3 +611,7 @@
 
 - **API-routes** toegevoegd: /api/overzicht/cashflow-settings
 - **Componenten (aantal)** toegevoegd: +3
+
+## 2026-08-04
+
+- Geen wijzigingen.
