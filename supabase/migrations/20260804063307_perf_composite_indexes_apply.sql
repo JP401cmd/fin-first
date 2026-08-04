@@ -10,16 +10,20 @@
 --
 -- WEL TOEGEPAST
 --   idx_transactions_user_date (user_id, date desc)
---   De enige tabel van betekenisvolle omvang (tienduizenden rijen). Zonder deze index moet
---   de planner een BitmapAnd bouwen uit de losse user_id- en date-indexen: die leverden in
---   de meting respectievelijk ~12.700 en ~3.400 indexrijen om er ~600 uit over te houden.
---   Met de samengestelde index wordt dat een enkele Bitmap Index Scan met
---   Index Cond ((user_id = ...) AND (date >= ...)) die direct de ~600 rijen oplevert.
---   Gemeten onder rolsimulatie, 6-maandsvenster: 332 -> 169 gedeelde buffers (-49%),
---   heapblokken 299 -> 165. Dit pad draait 11 à 13 keer per cashflow-request.
---   LET OP: de expliciete Sort blijft bestaan. De huishouden-tak in de RLS-policy maakt er
---   een BitmapOr van, en een bitmapscan levert geen gesorteerde uitvoer. De winst zit dus in
---   minder gelezen rijen/buffers, niet in het wegvallen van de sortering.
+--   De enige tabel van betekenisvolle omvang. Zonder deze index moet de planner een
+--   BitmapAnd bouwen uit de losse user_id- en date-indexen: beide leveren een veelvoud aan
+--   indexrijen op om er een fractie van over te houden. Met de samengestelde index wordt dat
+--   een enkele Bitmap Index Scan met Index Cond ((user_id = ...) AND (date >= ...)) die
+--   direct de gevraagde rijen oplevert. Gemeten onder rolsimulatie op een 6-maandsvenster:
+--   ruwweg een halvering van zowel de gelezen buffers als de heapblokken. Dit pad draait
+--   11 à 13 keer per cashflow-request. (Exacte meetwaarden staan in het taakrapport, buiten
+--   deze repo.)
+--   LET OP: de expliciete Sort blijft bestaan. Zolang een query voor de gebruikersafbakening
+--   alleen op RLS leunt, maakt de huishouden-OR er een BitmapOr van, en een bitmapscan levert
+--   geen gesorteerde uitvoer. De winst zit dus in minder gelezen rijen, niet in het wegvallen
+--   van de sortering. Draagt een query wel een expliciete .eq('user_id', ...), dan mag de
+--   planner een gewone Index Scan nemen en de RLS-OR naar een Filter degraderen — dan bedient
+--   de indexordening de ORDER BY wel.
 --
 -- NIET TOEGEPAST, met reden
 --   idx_net_worth_snapshots_user_date (user_id, snapshot_date desc)
@@ -27,8 +31,13 @@
 --     snapshot_date) bestaat al met dezelfde leidende kolommen. Een btree scant ook
 --     achteruit, dus DESC voegt niets toe.
 --   idx_valuations_user_type_date (user_id, entity_type, valuation_date desc)
---     valuations_user_entity_date_key (UNIQUE) dekt de (user_id, entity_type)-prefix al en
---     werd in de vooraf-meting ook daadwerkelijk gekozen. Tabel beslaat een enkel heapblok.
+--     NIET omdat de bestaande UNIQUE gelijkwaardig zou zijn: valuations_user_entity_date_key
+--     is (user_id, entity_type, entity_id, valuation_date), met entity_id TUSSEN de prefix en
+--     de datum, dus die kan nooit ordening op valuation_date leveren. Wel omdat: de enige
+--     queryvorm die het geordende pad zou kunnen pakken (/api/valuations, met expliciete
+--     user_id) geen productie-aanroeper heeft; de hete vormen leunen voor de afbakening op
+--     RLS alleen en houden daardoor sowieso een Sort; en nergens staat een range-filter op
+--     valuation_date. De bestaande index dekt de (user_id, entity_type)-lookup al af.
 --   idx_goals_user_active (user_id, is_completed, sort_order)
 --     Wordt wel gekozen, maar de geschatte kosten zijn identiek (4.43 vs 4.43) en de tabel
 --     beslaat een enkel heapblok. Het gemeten tijdsverschil is cachegedrag, geen werk.

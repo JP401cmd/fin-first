@@ -104,11 +104,12 @@ daar draagt de structurele redenering (identieke booleaanse structuur, zelfde he
 bewijs — niet de meting.
 
 **Effect (zelfde fixture, warme cache, bit-identieke uitvoer).**
-Kaal `user_household_id()`: `Buffers: shared hit=1696`, 12,2 ms. Gewikkeld: `InitPlan 2`
-één keer geëvalueerd (`Buffers: shared hit=2`) en `Buffers: shared hit=557`, 2,4 ms —
-67% minder buffers, ~5× sneller. Voor solo-gebruikers — op dit moment nog het volledige
-gebruikersbestand, er zijn nog geen huishoudens — blijft het plan qua vorm identiek en
-kost de InitPlan 1 buffer: 178 → 175 buffers, geen regressie.
+Kaal `user_household_id()` evalueert de helper per rij; gewikkeld verschijnt `InitPlan 2`
+dat één keer draait (twee buffers) en waarnaar de filter via `(InitPlan 2).col1` verwijst.
+Netto ruwweg tweederde minder gelezen buffers en een vervijfvoudiging van de snelheid op de
+fixture. Voor solo-gebruikers — op dit moment nog het volledige gebruikersbestand, er zijn
+nog geen huishoudens — blijft het plan qua vorm identiek en kost de InitPlan één buffer;
+geen regressie. (Exacte meetwaarden staan in het taakrapport, buiten deze repo.)
 
 **Wat níét waar bleek.** De partiële index wordt door het policy-plan (nog) **niet** gekozen:
 de planner verkiest één scan op `idx_transactions_date` plus een filter boven een BitmapOr
@@ -116,11 +117,20 @@ zodra de huishouden-tak een Param is. De index is wél correct en optimaal zodra
 `household_id` een literal is (`Index Scan …_shared_date`, index-cond op household_id én
 date, géén Sort, 0,5 ms) — maar het huidige partner-pad (`household_partner_items`) filtert
 op `ownership = 'personal'` en raakt hem dus evenmin. Hij blijft staan als vooruitgeschoven
-post (partieel, vandaag 0 rijen, verwaarloosbare schrijfkosten) en zal als `unused_index`
-(INFO) opduiken — hij is partieel en matcht vooralsnog geen enkele rij, dus de
-schrijfkosten zijn verwaarloosbaar. Dat is bewust, en het aandachtspunt
-`idx-transactions-user-date-drift-remote` blijft staan: `idx_transactions_user_date` staat
-nog steeds niet op remote, wat de expliciete `Sort` in al deze plannen verklaart.
+post — hij is partieel en matcht vooralsnog geen enkele rij, dus de schrijfkosten zijn
+verwaarloosbaar. Dat is bewust.
+
+**Waar de expliciete `Sort` vandaan komt (naderhand vastgesteld, T3.1b).** Aanvankelijk
+werd die toegeschreven aan een ontbrekende samengestelde index op `(user_id, date)`. Dat
+bleek onjuist: die index is inmiddels toegepast (migratie
+`20260804063307_perf_composite_indexes_apply`) en de `Sort` bleef staan. De echte oorzaak is
+deze policy zelf. Zolang een query voor de gebruikersafbakening **alleen op RLS leunt**,
+maakt de huishouden-`OR` er een `BitmapOr` van, en een bitmapscan levert geen gesorteerde
+uitvoer — dus moet er altijd expliciet gesorteerd worden, met of zonder passende index.
+Draagt de query daarentegen een **expliciete** `.eq('user_id', …)`, dan mag de planner een
+gewone `Index Scan` nemen en de RLS-`OR` naar een `Filter` degraderen; dán kan de
+indexordening de `ORDER BY` wél bedienen. Dat is de goedkope uitweg voor wie een sortering
+wil vermijden: filter expliciet op `user_id` in plaats van het aan RLS over te laten.
 
 **Verificatie.** Advisors vóór/ná gelijk (`auth_rls_initplan` 0 → 0 — het instrument dekt
 dit patroon niet). Twee-gebruikers-RLS-simulatie ná: eigenaar-isolatie 0 vreemde rijen op

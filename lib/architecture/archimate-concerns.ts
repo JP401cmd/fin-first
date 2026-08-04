@@ -159,15 +159,6 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
     elementIds: ['t-bankconnect', 'do-transactie'],
     reviewedAt: '2026-07-30',
   },
-  {
-    id: 'idx-transactions-user-date-drift-remote',
-    title: 'idx_transactions_user_date staat in de repo maar niet op remote',
-    detail:
-      'supabase/migrations/20260504000001_perf_composite_indexes.sql definieert deze index, maar pg_indexes op remote toont hem niet (wel de losse idx_transactions_user_id en idx_transactions_date). De hotste query van de app draait dus zonder de samengestelde index die ervoor bedoeld was, en de eerste-ophaal-strategie (B8/ADR 0072) vergroot het transactievolume per rekening fors — een prestatiemeting ná die fase kan hierdoor misleidend zijn. Migratie opnieuw toepassen op remote (of expliciet vervangen als hij inmiddels overbodig is) sluit dit punt.',
-    severity: 'debt',
-    elementIds: ['t-supabase', 'do-transactie'],
-    reviewedAt: '2026-07-30',
-  },
 ]
 
 /** Aandachtspunten die een specifiek element raken. */
