@@ -18,7 +18,21 @@ const TYPE_ICON: Record<TxKind, typeof CreditCard | null> = {
   bijschrijving: ArrowDownLeft, betaalverzoek: ArrowLeftRight, bankkosten: Landmark, onbekend: null,
 }
 
-export type AccountOption = { id: string; name: string; bankName: string | null; ibanTail: string | null; connected: boolean }
+export type AccountOption = {
+  id: string
+  name: string
+  bankName: string | null
+  ibanTail: string | null
+  connected: boolean
+  /**
+   * De archief-rekening: de verzamelplek voor boekingen van verwijderde
+   * rekeningen (ADR 0082). Mag hier WÉL als filter verschijnen — anders is er
+   * geen enkele plek waar je je bewaarde boekingen terugziet — maar NOOIT als
+   * doel om een nieuwe transactie op te boeken. Die scheiding maakt
+   * `transacties-analyse.tsx` met `bookableAccounts`.
+   */
+  isArchive?: boolean
+}
 type Direction = 'all' | 'expense' | 'income'
 type SortKey = 'date' | 'amount' | 'merchant'
 

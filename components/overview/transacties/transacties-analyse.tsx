@@ -178,7 +178,15 @@ export function TransactiesAnalyse() {
   const [budgets, setBudgets] = useState<Budget[]>([])
   const [accountMap, setAccountMap] = useState<Map<string, string>>(new Map())
   const [accounts, setAccounts] = useState<AccountOption[]>([])
-  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null)
+  // Deeplink `?rekening=<id>` — gebruikt door de archief-regel op
+  // /overzicht/cashflow, die anders naar niets kon wijzen. Zelfde vorm als de
+  // `?maand=`-deeplink hierboven: eenmalig bij mount, daarna stuurt de
+  // chip-rij de state. Géén validatie op bestaan: is het id onzin, dan filtert
+  // de tijdlijn op nul rijen en zet de gebruiker 'm met één klik terug op
+  // "Alle rekeningen" — een fout-scherm is hier zwaarder dan het probleem.
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(
+    () => searchParams.get('rekening') || null,
+  )
   const [loading, setLoading] = useState(true)
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -237,10 +245,15 @@ export function TransactiesAnalyse() {
             until: fetchWindow.until,
           }),
           supabase.from('budgets').select('*').order('sort_order', { ascending: true }),
+          // Actieve rekeningen PLUS het archief. Het archief draagt bewust
+          // `is_active = false` (ADR 0082) en viel daardoor uit deze lijst —
+          // waarmee bewaarde boekingen nergens meer terug te vinden waren. Hij
+          // hoort hier als filter thuis, maar niet in de kiezer waarmee je een
+          // nieuwe transactie boekt; die scheiding maakt `bookableAccounts`.
           supabase
             .from('bank_accounts')
-            .select('id, name, bank_name, sort_order')
-            .eq('is_active', true)
+            .select('id, name, bank_name, sort_order, is_archive_bucket')
+            .or('is_active.eq.true,is_archive_bucket.eq.true')
             .order('sort_order', { ascending: true }),
           supabase
             .from('bank_connection_accounts')
@@ -271,19 +284,25 @@ export function TransactiesAnalyse() {
           name: string
           bank_name: string | null
           sort_order: number | null
+          is_archive_bucket: boolean | null
         }>
         const ibanFor = ibanById(ibanResult.accounts)
         const accMap = new Map<string, string>()
         const accList: AccountOption[] = []
         for (const a of accRows) {
-          accMap.set(a.id, a.name)
+          const isArchive = a.is_archive_bucket === true
+          // Korte chip-naam. De DB-naam is "Archief — verwijderde rekeningen";
+          // die past niet in een filterchip naast de rekeningnamen.
+          const label = isArchive ? 'Archief' : a.name
+          accMap.set(a.id, label)
           const iban = ibanFor.get(a.id) ?? null
           accList.push({
             id: a.id,
-            name: a.name,
-            bankName: a.bank_name ?? null,
-            ibanTail: iban ? iban.replace(/\s/g, '').slice(-4) : null,
-            connected: connectedIds.has(a.id),
+            name: label,
+            bankName: isArchive ? null : (a.bank_name ?? null),
+            ibanTail: isArchive ? null : (iban ? iban.replace(/\s/g, '').slice(-4) : null),
+            connected: isArchive ? false : connectedIds.has(a.id),
+            isArchive,
           })
         }
 
@@ -474,14 +493,24 @@ export function TransactiesAnalyse() {
     setReloadKey((k) => k + 1) // her-trigger het laad-effect
   }, [])
 
+  /**
+   * De rekeningen waarop je écht kunt boeken — `accounts` minus het archief.
+   *
+   * Het archief staat bewust wél in `accounts` (anders is er geen filter en
+   * geen naam bij een bewaarde boeking), maar een nieuwe transactie erop
+   * boeken mag niet: het is een verzamelplek voor het verleden, hij is
+   * `is_active = false` en zou daarna nergens meer opduiken.
+   */
+  const bookableAccounts = useMemo(() => accounts.filter((a) => !a.isArchive), [accounts])
+
   // "Nieuwe transactie": 1 rekening → direct openen; >1 → eerst kiezen.
   const openAdd = useCallback(() => {
-    if (accounts.length === 1) {
-      setAddAccountId(accounts[0].id)
-    } else if (accounts.length > 1) {
+    if (bookableAccounts.length === 1) {
+      setAddAccountId(bookableAccounts[0].id)
+    } else if (bookableAccounts.length > 1) {
       setPickerOpen(true)
     }
-  }, [accounts])
+  }, [bookableAccounts])
 
   const initialLoading = loading && !hasLoadedOnce
 
@@ -491,7 +520,7 @@ export function TransactiesAnalyse() {
       {/* Actie-rij: transactie toevoegen + importeren + bank koppelen.
           Spiegelt de "Snelle acties" van de cashflow-pagina (De Kern → kern-*). */}
       <div className={`flex flex-wrap items-center gap-2${error ? ' opacity-60 pointer-events-none' : ''}`}>
-        {accounts.length > 0 && (
+        {bookableAccounts.length > 0 && (
           <button
             onClick={openAdd}
             className="inline-flex cursor-pointer items-center gap-2 rounded-[var(--r)] bg-kern-600 px-4 py-2 text-sm font-medium text-white transition-colors duration-150 hover:bg-kern-700"
@@ -645,7 +674,7 @@ export function TransactiesAnalyse() {
       {pickerOpen && (
         <BottomSheet open onClose={() => setPickerOpen(false)} title="Kies een rekening" size="md">
           <div className="space-y-2 py-1">
-            {accounts.map((a) => (
+            {bookableAccounts.map((a) => (
               <button
                 key={a.id}
                 onClick={() => {

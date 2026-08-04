@@ -41,6 +41,12 @@ vi.mock('@/lib/supabase/client', () => ({
       select: () => ({
         order: () => ({ eq: () => new Promise(() => {}) }),
         eq: () => ({ eq: () => ({ order: () => new Promise(() => {}) }) }),
+        // De rekening-lijst haalt sinds ADR 0082 óók de archief-rekening op met
+        // `.or('is_active.eq.true,is_archive_bucket.eq.true')`. Zonder deze tak
+        // gaf de keten `undefined` en belandde de laadronde in het catch-blok:
+        // de test slaagde dan nog steeds, maar via de foutweg in plaats van via
+        // het hangende promise dat ze wíl observeren.
+        or: () => ({ order: () => new Promise(() => {}) }),
       }),
     }),
   }),

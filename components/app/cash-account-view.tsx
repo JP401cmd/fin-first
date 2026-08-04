@@ -1337,9 +1337,18 @@ export function CashAccountView({
       const deleted = json?.deletedTransactions ?? 0
       const stopped = json?.stoppedRecurrings ?? 0
       const parts: string[] = []
-      if (choice === 'keep' && moved > 0) {
-        parts.push(`${moved} ${moved === 1 ? 'boeking staat' : 'boekingen staan'} nu in je archief`)
-      } else if (choice === 'delete' && deleted > 0) {
+      if (choice === 'keep') {
+        // Óók iets zeggen bij NUL verplaatste boekingen. Wie "bewaren" kiest en
+        // daarna nergens iets ziet veranderen, concludeert dat het misging — het
+        // archief is namelijk onzichtbaar zolang het leeg is (bewust: het draagt
+        // `is_active = false` en heeft geen bezitting, zie ADR 0082). Meestal
+        // was de rekening simpelweg leeg, en dat is een antwoord; stilte niet.
+        parts.push(
+          moved > 0
+            ? `${moved} ${moved === 1 ? 'boeking staat' : 'boekingen staan'} nu in je archief, onderaan je rekeningen`
+            : 'Er stonden geen boekingen op deze rekening, dus er is niets verplaatst',
+        )
+      } else if (deleted > 0) {
         parts.push(`${deleted} ${deleted === 1 ? 'boeking is' : 'boekingen zijn'} gewist`)
       }
       // De RPC behandelt terugkerende regels ANDERS per keuze: bij bewaren

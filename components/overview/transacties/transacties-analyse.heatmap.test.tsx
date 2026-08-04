@@ -43,7 +43,12 @@ vi.mock('@/components/app/perspective-provider', () => ({
 // lopen niet hierlangs maar via de (gemockte) perspectief-loader.
 vi.mock('@/lib/supabase/client', () => {
   const builder: Record<string, unknown> = {}
-  for (const method of ['select', 'order', 'eq', 'gte', 'lte', 'limit', 'range', 'in']) {
+  // `or` staat er sinds de rekening-lijst óók de archief-rekening ophaalt
+  // (`is_active.eq.true,is_archive_bucket.eq.true`). Ontbreekt een methode in
+  // deze lijst, dan geeft de keten `undefined` terug en faalt de hele
+  // laadronde stil — de component rendert dan nooit, en de test faalt op een
+  // ontbrekend element in plaats van op de echte oorzaak.
+  for (const method of ['select', 'order', 'eq', 'or', 'gte', 'lte', 'limit', 'range', 'in']) {
     builder[method] = () => builder
   }
   builder.single = () => Promise.resolve({ data: null, error: null })

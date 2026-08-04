@@ -194,6 +194,20 @@ export function CashOverview({
    * alleen bij `accountIds` (zie onder), niet bij `accounts`.
    */
   const [archiveAccountId, setArchiveAccountId] = useState<string | null>(null)
+  /**
+   * Hoeveel boekingen er in het archief staan. `null` = onbekend of nul.
+   *
+   * Waarom dit getal er is: de verwijderbevestiging belóóft dat bewaarde
+   * boekingen in je historie en budgetten blijven staan, en tot nu toe was dat
+   * nergens te controleren — het archief draagt `is_active = false` en heeft
+   * bewust geen bezitting, dus het verschijnt in geen enkele rekeninglijst. Wie
+   * "bewaren" koos zag dus letterlijk niets gebeuren, wat leest als "het werkte
+   * niet". Dit getal maakt de belofte verifieerbaar zonder het archief tot
+   * rekening te promoveren: het blijft buiten `accounts`, buiten `totalBalance`
+   * en buiten elk saldo — alleen de aggregatie-ids kennen het (zie
+   * `archiveAccountId`).
+   */
+  const [archiveTxCount, setArchiveTxCount] = useState<number | null>(null)
   const [cashAssets, setCashAssets] = useState<StampedAsset[]>([])
   /**
    * De id van de ingelogde gebruiker, uit dezelfde perspectief-bundel die de
@@ -419,7 +433,22 @@ export function CashOverview({
     }
     // Geen archief (nog nooit een rekening verwijderd) → gewoon null; de
     // aggregatie draait dan exact zoals voorheen.
-    setArchiveAccountId(((archiveResult?.data as { id?: string } | null)?.id) ?? null)
+    const archiveId = ((archiveResult?.data as { id?: string } | null)?.id) ?? null
+    setArchiveAccountId(archiveId)
+
+    // Alleen tellen als er een archief is. `head: true` haalt geen rijen op —
+    // we willen het aantal, niet de boekingen zelf. Bij twijfel (count null,
+    // of een fout) tonen we niets: een archiefregel zonder betrouwbaar aantal
+    // voegt geen zekerheid toe, en dat is juist waarvoor hij bestaat.
+    if (!archiveId) {
+      setArchiveTxCount(null)
+      return
+    }
+    const { count, error: countError } = await supabase
+      .from('transactions')
+      .select('id', { count: 'exact', head: true })
+      .eq('account_id', archiveId)
+    setArchiveTxCount(countError ? null : (count ?? null))
   }, [perspective, showAllCashAccounts])
 
   // Laadt ALLE cash-rekeningen (bank-gekoppeld én handmatige cash-assets) —
@@ -1161,6 +1190,40 @@ export function CashOverview({
                 )
               })}
         </div>
+        )}
+
+        {/* Archief — alleen zichtbaar zodra er iets in staat.
+
+            Bewust een eigen regel en géén rekening-kaart: het archief ÍS geen
+            rekening. Het heeft per definitie saldo 0, geen bezitting en geen
+            detailscherm, en het mag nooit in `totalBalance` of in het app-brede
+            "losse rekening"-predicaat belanden (zie ADR 0082). Een kaart zou
+            precies die dingen suggereren — en klikken zou op een scherm landen
+            dat alleen actieve rekeningen kent. Als regel doet hij één ding, en
+            dat is het ding dat ontbrak: bevestigen dat je bewaarde boekingen er
+            nog zijn. */}
+        {archiveTxCount !== null && archiveTxCount > 0 && archiveAccountId && (
+          <Link
+            href={`/overzicht/cashflow/transacties?rekening=${archiveAccountId}`}
+            className="group mt-3 flex items-center justify-between gap-3 rounded-[var(--r)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)] px-4 py-3 transition-colors hover:border-[var(--ink-3)] sm:mt-4"
+            data-testid="cashflow-archief"
+          >
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-[var(--ink-2)]">
+                Archief — verwijderde rekeningen
+              </p>
+              <p className="mt-0.5 text-xs text-[var(--ink-3)]">
+                Blijft meetellen in je historie en budgetten, niet in je saldo.
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <span className="font-mono text-xs tabular-nums text-[var(--ink-3)]">
+                {archiveTxCount.toLocaleString('nl-NL')}{' '}
+                {archiveTxCount === 1 ? 'boeking' : 'boekingen'}
+              </span>
+              <ArrowRight className="h-4 w-4 text-[var(--ink-4)] transition-colors group-hover:text-[var(--ink-2)]" />
+            </div>
+          </Link>
         )}
       </section>
       )}
