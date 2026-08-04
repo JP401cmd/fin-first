@@ -85,6 +85,14 @@ function shareOf(item: PerspectiveItem, perspective: Perspective): number {
   return 1
 }
 
+/**
+ * Maximaal aantal id's per decoratie-batch (zie de feed-sectie onderaan).
+ * PostgREST zet `in.(…)` in de query-STRING, dus een ongebonden id-lijst loopt
+ * tegen de URL-lengtegrens van proxies/CDN aan. Klein genoeg om ruim onder die
+ * grens te blijven, groot genoeg om het aantal roundtrips laag te houden.
+ */
+const DECORATION_BATCH_SIZE = 100
+
 // ── Loader ────────────────────────────────────────────────────
 
 export const loadCashflowData = cache(async (
@@ -112,7 +120,6 @@ export const loadCashflowData = cache(async (
     profileResult,
     recurResult,
     accountsResult,
-    displayTxResult,
   ] = await Promise.all([
     loadPerspectiveTransactionsServer(supabase, perspective, { since: sixMonthsAgoIso }),
     supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle(),
@@ -128,15 +135,6 @@ export const loadCashflowData = cache(async (
       .from('bank_accounts')
       .select('id, balance, name, ownership, user_id')
       .eq('is_active', true),
-    // Join-gedecoreerde rijen (account-naam + categorie) voor de feed-weergave.
-    // We filteren ze hieronder op de ID's die de perspectief-loader teruggeeft,
-    // zodat de getoonde lijst ownership/privacy respecteert.
-    supabase
-      .from('transactions')
-      .select('id, date, description, amount, bank_accounts(name), budgets(name)')
-      .gte('date', sinceIso)
-      .order('date', { ascending: false })
-      .limit(500),
   ])
 
   const ctx = perspectiveTx.context
@@ -235,20 +233,60 @@ export const loadCashflowData = cache(async (
 
   // ── Display-transacties (feed) ───────────────────────────────────────────
   // De perspectief-loader is de bron-of-waarheid voor WELKE rijen tellen
-  // (ownership/privacy). De join-gedecoreerde query levert de account-/categorie-
-  // naam; we mappen die per ID op de perspectief-set. Partner-persoonlijke rijen
-  // (privacy='full') staan NIET in de join-query (die draait onder de eigen RLS),
-  // dus die tonen we zonder account-/categorie-naam.
-  const displayRows = (displayTxResult.data ?? []) as Array<Record<string, unknown>>
-  const displayById = new Map<string, Record<string, unknown>>()
-  for (const r of displayRows) displayById.set(String(r.id), r)
-
-  const transactions: TransactionRow[] = []
+  // (ownership/privacy); een tweede query levert alleen nog de account-/
+  // categorienaam erbij. Volgorde is hier de crux: eerst vaststellen wélke rijen
+  // de feed toont, dán precies die rijen decoreren.
+  //
+  // Vroeger stond het andersom — een venster-query met een vaste `.limit(...)`
+  // waarvan de uitkomst per ID op de feed werd gemapt. Voor wie meer rijen in
+  // het 3-maands venster had dan die limiet, vielen de OUDSTE feed-rijen buiten
+  // de join en verloren stil hun rekening- en categorienaam: geen fout, geen
+  // signaal, alleen ontbrekende data. Selecteren op de feed-ID's zelf maakt die
+  // afkap per constructie onmogelijk, en vraagt tegelijk minder op dan voorheen.
+  const feedRows: PerspectiveItem[] = []
   for (const t of perspectiveTx.transactions) {
     if (t._aggregated) continue
-    const id = t.id != null ? String(t.id) : null
-    if (!id) continue
+    // Leeg/ontbrekend id → niet toonbaar én niet decoreerbaar (ongewijzigd).
+    if (t.id == null || String(t.id) === '') continue
     if (String(t.date ?? '') < sinceIso) continue
+    feedRows.push(t)
+  }
+
+  // Partner-PERSOONLIJKE rijen komen uit de privacy-gated RPC en bestaan niet
+  // onder de eigen RLS. Die vragen we bewust NIET op: naamloos is voor hen het
+  // bedoelde privacy-gedrag, geen ontbrekende data. Gedeelde rijen horen er wél
+  // bij, óók als ze op naam van de partner staan — daarom geen `user_id`-filter
+  // op de query hieronder.
+  const decorateIds = feedRows
+    .filter((t) => t._provenance !== 'partner')
+    .map((t) => String(t.id))
+
+  const displayById = new Map<string, Record<string, unknown>>()
+  if (decorateIds.length > 0) {
+    const batches: string[][] = []
+    for (let i = 0; i < decorateIds.length; i += DECORATION_BATCH_SIZE) {
+      batches.push(decorateIds.slice(i, i + DECORATION_BATCH_SIZE))
+    }
+    const decorated = await Promise.all(
+      batches.map((ids) =>
+        supabase
+          .from('transactions')
+          // Alleen de naam-kolommen: datum/omschrijving/bedrag komen uit de
+          // perspectief-set, die ze al perspectief-correct gestempeld draagt.
+          .select('id, bank_accounts(name), budgets(name)')
+          .in('id', ids),
+      ),
+    )
+    for (const res of decorated) {
+      for (const r of (res.data ?? []) as Array<Record<string, unknown>>) {
+        displayById.set(String(r.id), r)
+      }
+    }
+  }
+
+  const transactions: TransactionRow[] = []
+  for (const t of feedRows) {
+    const id = String(t.id)
 
     const joinRow = displayById.get(id)
     const bankField = joinRow

@@ -2,8 +2,9 @@
  * ACCOUNTCOUNT ZONDER DE VOLLE LOADER (T1.7).
  *
  * /overzicht/cashflow/transacties draaide `loadCashflowData` — perspectief-keten,
- * 6 maanden transactiepaginatie, recurring-detectie en een 500-rijen join-fetch —
- * om er precies één integer uit te lezen: `accountCount`, voor de koppel-banner.
+ * 6 maanden transactiepaginatie, recurring-detectie en een naam-decoratie per
+ * getoonde feed-rij — om er precies één integer uit te lezen: `accountCount`,
+ * voor de koppel-banner.
  * `loadAccountCount` haalt datzelfde getal met één count-query op.
  *
  * De correctheidskern is de SCOPING, niet de snelheid. Daarom twee lagen:

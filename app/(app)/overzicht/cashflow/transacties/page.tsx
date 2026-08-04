@@ -24,8 +24,8 @@ export const metadata: Metadata = {
  * Dat aantal komt uit `loadAccountCount` — één perspectief-gescopede count-query
  * op bank_accounts. Voorheen draaide deze pagina daarvoor de volledige
  * `loadCashflowData` (perspectief-keten, 6 maanden transacties, recurrings, een
- * 500-rijen join-fetch) om er precies één integer uit te lezen; de rest van die
- * bundel wordt op deze route nergens gebruikt.
+ * naam-decoratie per getoonde feed-rij) om er precies één integer uit te lezen;
+ * de rest van die bundel wordt op deze route nergens gebruikt.
  */
 export default async function OverzichtCashflowTransactiesPage() {
   const supabase = await createClient()
