@@ -619,3 +619,7 @@
 ## 2026-08-04
 
 - Geen wijzigingen.
+
+## 2026-08-04
+
+- **Componenten (aantal)** toegevoegd: +2

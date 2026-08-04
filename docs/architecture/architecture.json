@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-04T06:55:38.552Z",
+  "generatedAt": "2026-08-04T12:06:07.620Z",
   "generatedDate": "2026-08-04",
   "repo": {
     "name": "fin",
@@ -193,7 +193,7 @@
     "tables": 86,
     "migrations": 180,
     "integrations": 25,
-    "components": 850,
+    "components": 852,
     "providers": 12,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -8077,11 +8077,11 @@
     }
   ],
   "components": {
-    "total": 850,
+    "total": 852,
     "groups": [
       {
         "group": "app",
-        "count": 334,
+        "count": 335,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -8139,6 +8139,7 @@
           "cash-account-view",
           "cash-account-view.test",
           "cash-overview",
+          "cash-overview.leesronden.test",
           "cashflow-forecast-chart",
           "cashflow-status-provider",
           "cashflow-status-provider.test",
@@ -8421,7 +8422,7 @@
       },
       {
         "group": "overview",
-        "count": 137,
+        "count": 138,
         "items": [
           "aandachtspunt-actie-button",
           "atomic-cards",
@@ -8542,6 +8543,7 @@
           "transactie-tijdlijn",
           "transactie-tijdlijn.test",
           "transacties-analyse",
+          "transacties-analyse.heatmap.test",
           "transacties-analyse.test",
           "transacties-geldstroom",
           "transacties-geldstroom.test",
@@ -15132,6 +15134,18 @@
       ],
       "summary": "`/overzicht/cashflow` heeft een TTFB-p75 van 8,8 s (desktop) en 22,3 s (mobiel). De dominante oorzaak is niet de pagina zelf maar haar databron: `buildCashflowCards` (`lib/cashflow-cards.ts`) krijgt de volledige `DashboardData` binnen en gebruikt daaruit precies **zeven scalars**",
       "file": "docs/adr/0077-slanke-cashflow-kpi-laag.md"
+    },
+    {
+      "id": "0078-vingerafdruk-cache-op-de-vaste-lastendetectie",
+      "title": "De vaste-lastendetectie draait alleen opnieuw als haar invoer veranderd is — een vingerafdruk beslist dat, geen klok",
+      "status": "aanvaard",
+      "date": "2026-08-04",
+      "elements": [
+        "as-budget",
+        "fn-budgetteren"
+      ],
+      "summary": "`loadVasteLastenSummary` haalt per request het volledige 12-maands transactievenster op en laat daar een regex-zware detectie overheen lopen, op minstens vier oppervlakken. De uitkomst verandert tussen twee requests bijna nooit. Er komt daarom een procescache voor die uitkomst, w",
+      "file": "docs/adr/0078-vingerafdruk-cache-op-de-vaste-lastendetectie.md"
     }
   ],
   "churn": {
@@ -15139,7 +15153,7 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 117
+        "commits": 118
       },
       {
         "path": "lib/ai",
@@ -16163,8 +16177,16 @@
   "diff": {
     "baseline": false,
     "previousDate": "2026-08-04",
-    "hasChanges": false,
-    "sections": []
+    "hasChanges": true,
+    "sections": [
+      {
+        "label": "Componenten (aantal)",
+        "added": [
+          "+2"
+        ],
+        "removed": []
+      }
+    ]
   },
   "statsHistory": [
     {
@@ -16401,7 +16423,7 @@
     {
       "date": "2026-08-04",
       "api": 271,
-      "components": 850,
+      "components": 852,
       "tables": 86,
       "routesProduction": 101
     }
