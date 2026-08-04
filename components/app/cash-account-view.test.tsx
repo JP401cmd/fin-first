@@ -24,9 +24,79 @@ const fixtures = vi.hoisted(() => {
     is_active: true,
     sort_order: 0,
     ownership: 'personal',
+    // Eigenaar van de rij. Draagt de eigenaar-guard op het ⋮-menu: zonder
+    // `user_id` kan het scherm niet weten of de kijker mag muteren en verbergt
+    // het de knoppen.
+    user_id: 'u1',
+    is_archive_bucket: false,
     // Vereist voor de "Budgetteren uitschakelen"-flow (loadLinkedAsset draait
     // alleen wanneer een companion-rij een linked_asset_id draagt).
     linked_asset_id: 'asset-1',
+  }
+  /**
+   * Een rekening waarvan de companion-rij GEDEACTIVEERD is
+   * (`is_active: false`) — de toestand die `syncBankAccountCompanion` achterlaat
+   * zodra budgetteren voor die rekening uit gaat. De rij bestaat nog, inclusief
+   * `linked_asset_id`; alleen de budget-as staat uit.
+   */
+  const inactiveAccount = {
+    id: 'acc-2',
+    name: 'credit card',
+    iban: 'NL02BANK0987654321',
+    bank_name: 'ICS',
+    account_type: 'checking',
+    balance: 1,
+    is_active: false,
+    sort_order: 1,
+    ownership: 'personal',
+    user_id: 'u1',
+    is_archive_bucket: false,
+    linked_asset_id: 'asset-2',
+  }
+  /**
+   * Een GEDEELDE rekening waarvan de partner (`user_id: 'u2'`) de eigenaar is.
+   *
+   * Dit is de rij uit het bewezen faalscenario: in het perspectief 'huishouden'
+   * versmalt `loadAccount` niet naar de eigen rijen, dus deze rekening opent
+   * gewoon bij de partner — terwijl zowel de UPDATE-policy op `bank_accounts`
+   * als de verwijder-RPC strikt eigen-rij zijn.
+   *
+   * Bewust `is_active: false`, zodat de rij buiten de brede (actief-only)
+   * rekeningenlijst valt en de overige tests exact dezelfde data houden; hij
+   * komt binnen via de gerichte lookup op `id`, net als `inactiveAccount`.
+   */
+  const partnerAccount = {
+    id: 'acc-3',
+    name: 'Gezamenlijke rekening',
+    iban: 'NL03BANK0000000003',
+    bank_name: 'Testbank',
+    account_type: 'checking',
+    balance: 500,
+    is_active: false,
+    sort_order: 2,
+    ownership: 'shared',
+    user_id: 'u2',
+    is_archive_bucket: false,
+    linked_asset_id: null,
+  }
+  /**
+   * De archief-rekening: de bak waar boekingen naartoe verhuizen bij
+   * "transacties bewaren". Verwijdert zichzelf niet (TF409 in
+   * `delete_bank_account`), staat daarom op `is_active: false`.
+   */
+  const archiveAccount = {
+    id: 'acc-4',
+    name: 'Archief — verwijderde rekeningen',
+    iban: null,
+    bank_name: null,
+    account_type: 'other',
+    balance: 0,
+    is_active: false,
+    sort_order: 9999,
+    ownership: 'personal',
+    user_id: 'u1',
+    is_archive_bucket: true,
+    linked_asset_id: null,
   }
   const linkedAsset = {
     id: 'asset-1',
@@ -64,8 +134,16 @@ const fixtures = vi.hoisted(() => {
     user_id: 'u1',
     notes: null,
   }
-  return { account, linkedAsset, budget, tx }
+  return { account, inactiveAccount, partnerAccount, archiveAccount, linkedAsset, budget, tx }
 })
+
+/**
+ * Het actieve perspectief, per test omzetbaar. Default 'personal' — de
+ * eigenaar-guard op het ⋮-menu is alleen te reproduceren in 'huishouden', want
+ * daar (en alleen daar) laat `loadAccount` de gedeelde rekening van de partner
+ * door. `afterEach` zet 'm terug.
+ */
+const perspectiveState = vi.hoisted(() => ({ current: 'personal' as 'personal' | 'household' }))
 
 // ── Mutatie-log: registreert elke .update()/.delete() die de component via de
 //    supabase-client-mock uitvoert, zodat tests kunnen bewijzen dat een flow
@@ -85,12 +163,29 @@ let queryLog: QueryCall[] = []
 // ── Supabase-client-mock: een chainbare, thenable query-builder die per
 //    tabel de juiste rijen teruggeeft. Genoeg om de mount-loaders te voeden. ──
 function makeSupabase() {
-  const dataFor = (table: string): unknown => {
+  /**
+   * `bank_accounts` is de ENIGE tabel waarvoor de mock `.eq()`-filters echt
+   * toepast. Reden: de rekeningdetail doet twee verschillende leesrondes op die
+   * tabel — een brede op `is_active = true` (voedt de overboekingskeuze) en een
+   * gerichte op `id` voor de rekening zelf. Een mock die filters negeert kan die
+   * twee niet uit elkaar houden en zou een gedeactiveerde rekening óók in de
+   * brede lijst laten opduiken — precies het onderscheid dat hier getest wordt.
+   * De overige tabellen leveren hun vaste fixture; daar voegt filteren niets toe.
+   */
+  const allBankAccounts = [
+    fixtures.account,
+    fixtures.inactiveAccount,
+    fixtures.partnerAccount,
+    fixtures.archiveAccount,
+  ]
+  const dataFor = (table: string, filters: Array<[string, unknown]>): unknown => {
     switch (table) {
       case 'transactions':
         return [fixtures.tx]
       case 'bank_accounts':
-        return [fixtures.account]
+        return allBankAccounts.filter((row) =>
+          filters.every(([col, val]) => !(col in row) || (row as Record<string, unknown>)[col] === val),
+        )
       case 'budgets':
         return [fixtures.budget]
       case 'profiles':
@@ -103,19 +198,26 @@ function makeSupabase() {
         return []
     }
   }
-  function builder(table: string, isSingle = false): Record<string, unknown> {
+  function builder(
+    table: string,
+    isSingle = false,
+    filters: Array<[string, unknown]> = [],
+  ): Record<string, unknown> {
     const target: Record<string, unknown> = {
-      single: () => builder(table, true),
+      single: () => builder(table, true, filters),
+      // `maybeSingle` narrowt net als `single`: de gerichte rekening-lookup
+      // gebruikt 'm, en zonder narrowing kreeg die een array terug.
+      maybeSingle: () => builder(table, true, filters),
       update: (payload: Record<string, unknown>) => {
         mutationLog.push({ table, op: 'update', payload })
-        return builder(table, isSingle)
+        return builder(table, isSingle, filters)
       },
       delete: () => {
         mutationLog.push({ table, op: 'delete' })
-        return builder(table, isSingle)
+        return builder(table, isSingle, filters)
       },
       then: (resolve: (v: { data: unknown; error: null }) => unknown) => {
-        let data = dataFor(table)
+        let data = dataFor(table, filters)
         if (isSingle && Array.isArray(data)) data = data[0] ?? null
         return Promise.resolve(resolve({ data, error: null }))
       },
@@ -127,7 +229,9 @@ function makeSupabase() {
         // (chainbare) builder terug — en legt zichzelf vast in `queryLog`.
         return (...args: unknown[]) => {
           queryLog.push({ table, method: prop, args })
-          return builder(table, isSingle)
+          const next: Array<[string, unknown]> =
+            prop === 'eq' ? [...filters, [String(args[0]), args[1]]] : filters
+          return builder(table, isSingle, next)
         }
       },
     })
@@ -153,7 +257,7 @@ vi.mock('next/navigation', () => ({
 
 // Provider-hooks: vaste, stabiele waarden (geen household, geen partner-privacy).
 vi.mock('@/components/app/perspective-provider', () => ({
-  usePerspective: () => ({ perspective: 'personal' }),
+  usePerspective: () => ({ perspective: perspectiveState.current }),
   usePerspectiveAbort: () => undefined,
 }))
 vi.mock('@/components/app/ownership-toggle', () => ({
@@ -196,7 +300,14 @@ function ownAccountIbansResponse() {
     ok: true,
     status: 200,
     json: async () => ({
-      accounts: [{ id: fixtures.account.id, iban: fixtures.account.iban, is_active: true }],
+      // Ook de gedeactiveerde rekening: de route filtert `is_active` bewust
+      // niet (zie app/api/own-accounts/ibans/route.ts), en de rekeningdetail
+      // haalt zijn leesbare IBAN hiervandaan — óók voor een rekening waarvoor
+      // budgetteren uit staat.
+      accounts: [
+        { id: fixtures.account.id, iban: fixtures.account.iban, is_active: true },
+        { id: fixtures.inactiveAccount.id, iban: fixtures.inactiveAccount.iban, is_active: false },
+      ],
       unreadable: 0,
     }),
   } as unknown as Response
@@ -228,6 +339,7 @@ function setupEnv() {
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
+  perspectiveState.current = 'personal'
 })
 
 describe('CashAccountView — transactierij toegankelijkheid (B-01)', () => {
@@ -409,6 +521,413 @@ describe('CashAccountView — koppelingen komen van de server, niet uit de brows
  * PostgREST 400 geven, en deze loader zet bij een fout stil `null` (het
  * bewerkscherm verdwijnt dan geruisloos).
  */
+/**
+ * Een rekening waarvoor budgetteren UIT staat moet nog steeds te openen zijn.
+ *
+ * Budgetteren uitzetten verwijdert niets: `syncBankAccountCompanion` zet
+ * uitsluitend `bank_accounts.is_active = false` en laat de rij én
+ * `linked_asset_id` staan. `loadAccount` zocht de rekening echter alleen in de
+ * lijst die op `is_active = true` gefilterd is — de brede lijst die de
+ * overboekingskeuze voedt — en viel daardoor terug op "Rekening niet gevonden".
+ *
+ * Gevolg in de app: na budgetteren uitzetten was de rekening niet meer te zien
+ * of te bewerken, en dezelfde 404 blokkeerde de herstelroute van een rekening
+ * met een kwijtgeraakte bankverbinding (juist het scherm mét het herstelpad).
+ *
+ * De brede lijst blijft bewust actief-only; de rekening zelf komt uit een
+ * gerichte lookup op `id`.
+ */
+describe('CashAccountView — rekening met budgetteren uit (gedeactiveerde companion)', () => {
+  it('laadt de rekening en toont haar naam in plaats van "Rekening niet gevonden"', async () => {
+    setupEnv()
+    render(<CashAccountView accountId="acc-2" />)
+
+    expect(await screen.findByRole('heading', { name: 'credit card' })).toBeInTheDocument()
+    expect(screen.queryByText('Rekening niet gevonden')).not.toBeInTheDocument()
+  })
+
+  it('houdt de brede rekeningenlijst op actieve rekeningen', async () => {
+    setupEnv()
+    render(<CashAccountView accountId="acc-2" />)
+
+    await screen.findByRole('heading', { name: 'credit card' })
+    // De brede leesronde (overboekingskeuze, eigen-rekeningherkenning) blijft
+    // filteren; de gerichte lookup mag dat filter juist NIET dragen.
+    const bankAccountEqs = queryLog.filter((q) => q.table === 'bank_accounts' && q.method === 'eq')
+    expect(bankAccountEqs.some((q) => q.args[0] === 'is_active' && q.args[1] === true)).toBe(true)
+    expect(bankAccountEqs.some((q) => q.args[0] === 'id' && q.args[1] === 'acc-2')).toBe(true)
+  })
+})
+
+/**
+ * "Rekening verwijderen" — het enige destructieve pad op dit scherm.
+ *
+ * Twee dingen moeten vastliggen, want beide zijn stil te breken:
+ *  1. De mutatie loopt via `DELETE /api/bank-accounts/<id>` met de gekozen
+ *     transactie-behandeling in de body — nooit een client-directe
+ *     `bank_accounts.delete()` (die botst op de FK van
+ *     `bank_connection_accounts` en laat een half doorgevoerde mutatie achter).
+ *  2. "Bewaren" staat voorgeselecteerd. Zou de default omslaan naar
+ *     verwijderen, dan wist één misklik onherstelbaar de historie.
+ */
+describe('CashAccountView — rekening verwijderen', () => {
+  type DeleteCall = { url: string; body: unknown }
+
+  /**
+   * Fetch-stub met de twee routes van deze flow: de impact-GET en de DELETE.
+   * `deleteResponse` laat een test de foutstatus forceren.
+   */
+  function setupDeleteEnv(
+    deleteResponse: { ok: boolean; status: number; json: () => Promise<unknown> } = {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        id: 'acc-1',
+        movedTransactions: 12,
+        deletedTransactions: 0,
+        stoppedRecurrings: 2,
+      }),
+    },
+  ) {
+    setupEnv()
+    const deleteCalls: DeleteCall[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (input === '/api/own-accounts/ibans') return ownAccountIbansResponse()
+        if (input === '/api/bank-accounts/acc-1' && init?.method === 'DELETE') {
+          deleteCalls.push({ url: String(input), body: JSON.parse(String(init.body)) })
+          return deleteResponse as unknown as Response
+        }
+        if (input === '/api/bank-accounts/acc-1' && !init?.method) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              id: 'acc-1',
+              name: 'Betaalrekening',
+              transactionCount: 12,
+              recurringCount: 2,
+              hasBankLink: false,
+              isArchiveBucket: false,
+            }),
+          } as unknown as Response
+        }
+        return { ok: false, status: 404, json: async () => ({}) } as unknown as Response
+      }) as unknown as typeof fetch,
+    )
+    return deleteCalls
+  }
+
+  /** Opent ⋮ → "Rekening verwijderen" en wacht tot de bevestiging staat. */
+  async function openConfirm() {
+    fireEvent.click(await screen.findByTitle('Instellingen'))
+    fireEvent.click(await screen.findByText('Rekening verwijderen'))
+    await screen.findByText('Rekening verwijderen?')
+  }
+
+  /**
+   * De actieknop in de sticky footer (het menu-item heet hetzelfde).
+   *
+   * Wacht standaard tot de knop ook echt klikbaar is: hij staat bewust dicht
+   * zolang de impact-GET loopt (de hele route bestaat om het aantal te tonen).
+   * `{ enabled: false }` levert 'm ongeacht die toestand — voor de tests die
+   * juist de dichte knop bewijzen.
+   */
+  async function confirmButton({ enabled = true }: { enabled?: boolean } = {}) {
+    const last = () =>
+      screen.getAllByRole('button', { name: 'Rekening verwijderen' }).slice(-1)[0]
+    await screen.findAllByRole('button', { name: 'Rekening verwijderen' })
+    if (enabled) await waitFor(() => expect(last()).not.toBeDisabled())
+    return last()
+  }
+
+  it('toont "Rekening verwijderen" in het instellingenmenu van één rekening', async () => {
+    setupDeleteEnv()
+    render(<CashAccountView accountId="acc-1" />)
+
+    fireEvent.click(await screen.findByTitle('Instellingen'))
+    expect(await screen.findByText('Rekening verwijderen')).toBeInTheDocument()
+  })
+
+  it('toont het instellingenmenu niet in de gecombineerde weergave', async () => {
+    setupDeleteEnv()
+    render(<CashAccountView />)
+
+    await screen.findByRole('heading', { name: 'Alle rekeningen' })
+    expect(screen.queryByTitle('Instellingen')).not.toBeInTheDocument()
+    expect(screen.queryByText('Rekening verwijderen')).not.toBeInTheDocument()
+  })
+
+  it('opent de bevestiging met "Transacties bewaren" voorgeselecteerd', async () => {
+    setupDeleteEnv()
+    render(<CashAccountView accountId="acc-1" />)
+    await openConfirm()
+
+    const keep = screen.getByRole('radio', { name: /Transacties bewaren/ })
+    const remove = screen.getByRole('radio', { name: /Transacties verwijderen/ })
+    expect(keep).toBeChecked()
+    expect(remove).not.toBeChecked()
+  })
+
+  it('stuurt { transactions: "keep" } naar de DELETE-route en muteert bank_accounts niet client-direct', async () => {
+    const deleteCalls = setupDeleteEnv()
+    render(<CashAccountView accountId="acc-1" />)
+    await openConfirm()
+
+    fireEvent.click(await confirmButton())
+
+    await waitFor(() => expect(deleteCalls).toHaveLength(1))
+    expect(deleteCalls[0].url).toBe('/api/bank-accounts/acc-1')
+    expect(deleteCalls[0].body).toEqual({ transactions: 'keep' })
+
+    // De kern van de regressie: geen client-directe delete op bank_accounts.
+    expect(mutationLog.some((m) => m.table === 'bank_accounts' && m.op === 'delete')).toBe(false)
+  })
+
+  it('stuurt { transactions: "delete" } zodra de gebruiker daarvoor kiest', async () => {
+    const deleteCalls = setupDeleteEnv()
+    render(<CashAccountView accountId="acc-1" />)
+    await openConfirm()
+
+    fireEvent.click(screen.getByRole('radio', { name: /Transacties verwijderen/ }))
+    // De wis-tak is type-to-confirm: zonder de overgetypte naam blijft de knop
+    // dicht (apart getest hieronder).
+    fireEvent.change(screen.getByLabelText(/om te bevestigen/), {
+      target: { value: fixtures.account.name },
+    })
+    fireEvent.click(await confirmButton())
+
+    await waitFor(() => expect(deleteCalls).toHaveLength(1))
+    expect(deleteCalls[0].body).toEqual({ transactions: 'delete' })
+    expect(mutationLog.some((m) => m.table === 'bank_accounts' && m.op === 'delete')).toBe(false)
+  })
+
+  it('houdt de bevestiging open met de servertekst wanneer de route faalt', async () => {
+    setupDeleteEnv({
+      ok: false,
+      status: 409,
+      // Platte envelope (ADR 0044): `error` is een string.
+      json: async () => ({ error: 'Deze rekening heeft nog een actieve bankkoppeling' }),
+    })
+    render(<CashAccountView accountId="acc-1" />)
+    await openConfirm()
+
+    fireEvent.click(await confirmButton())
+
+    expect(
+      await screen.findByText('Deze rekening heeft nog een actieve bankkoppeling'),
+    ).toBeInTheDocument()
+    // Niet stil falen én niet half doorgevoerd: de bevestiging blijft staan.
+    expect(screen.getByText('Rekening verwijderen?')).toBeInTheDocument()
+  })
+
+  /**
+   * Type-to-confirm op de wis-tak (designsysteem: "nooit één-tap destructive").
+   *
+   * Eén klik met `deleteTxChoice === 'delete'` wist definitief élke boeking van
+   * die rekening — in de praktijk duizenden. Bij "bewaren" verhuist de historie
+   * en is er niets onomkeerbaars aan de boekingen; dáár zou dezelfde frictie
+   * alleen maar afstompen. De asymmetrie is dus de kern van deze test.
+   */
+  it('houdt de rode knop dicht tot de rekeningnaam letterlijk is overgetypt', async () => {
+    setupDeleteEnv()
+    render(<CashAccountView accountId="acc-1" />)
+    await openConfirm()
+
+    // Bewaren-tak: geen type-to-confirm, geen invoerveld.
+    expect(await confirmButton()).not.toBeDisabled()
+    expect(screen.queryByLabelText(/om te bevestigen/)).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('radio', { name: /Transacties verwijderen/ }))
+    expect(await confirmButton({ enabled: false })).toBeDisabled()
+
+    const input = screen.getByLabelText(/om te bevestigen/)
+    // Bijna goed is niet goed: exact-match, case-sensitive (net als
+    // components/app/confirm-destructive.tsx).
+    fireEvent.change(input, { target: { value: 'betaalrekening' } })
+    expect(await confirmButton({ enabled: false })).toBeDisabled()
+
+    fireEvent.change(input, { target: { value: fixtures.account.name } })
+    await waitFor(async () => expect(await confirmButton({ enabled: false })).not.toBeDisabled())
+
+    // En terug naar bewaren: de knop is daar zonder overtypen gewoon open.
+    fireEvent.click(screen.getByRole('radio', { name: /Transacties bewaren/ }))
+    expect(await confirmButton()).not.toBeDisabled()
+  })
+
+  /**
+   * De hele impact-GET bestaat om te tonen hoevéél er verdwijnt. Een klik vóór
+   * dat getal binnen is, bevestigt iets wat de gebruiker nog niet gelezen heeft.
+   */
+  it('houdt de rode knop dicht zolang de aantallen nog binnenkomen', async () => {
+    setupEnv()
+    let releaseImpact: () => void = () => {}
+    const impactGate = new Promise<void>((resolve) => { releaseImpact = resolve })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (input === '/api/own-accounts/ibans') return ownAccountIbansResponse()
+        if (input === '/api/bank-accounts/acc-1' && !init?.method) {
+          await impactGate
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              id: 'acc-1',
+              name: 'Betaalrekening',
+              transactionCount: 12,
+              recurringCount: 2,
+              hasBankLink: false,
+              isArchiveBucket: false,
+            }),
+          } as unknown as Response
+        }
+        return { ok: false, status: 404, json: async () => ({}) } as unknown as Response
+      }) as unknown as typeof fetch,
+    )
+
+    render(<CashAccountView accountId="acc-1" />)
+    await openConfirm()
+
+    expect(screen.getByText(/Aantallen ophalen/)).toBeInTheDocument()
+    expect(await confirmButton({ enabled: false })).toBeDisabled()
+
+    releaseImpact()
+
+    await waitFor(async () => expect(await confirmButton({ enabled: false })).not.toBeDisabled())
+    expect(screen.queryByText(/Aantallen ophalen/)).not.toBeInTheDocument()
+  })
+
+  /**
+   * De RPC behandelt terugkerende regels ANDERS per keuze: bewaren =
+   * deactiveren + meeverhuizen, wissen = verwijderen (stap 7 van
+   * `20260804102500_delete_bank_account_rpc.sql`). De copy zei in beide
+   * gevallen "stopgezet" — de gebruiker koos over transacties en verloor
+   * ongemerkt ook zijn terugkerende regels.
+   */
+  it('noemt terugkerende regels stopgezet bij bewaren en verwijderd bij wissen', async () => {
+    setupDeleteEnv()
+    render(<CashAccountView accountId="acc-1" />)
+    await openConfirm()
+
+    expect(
+      await screen.findByText(/2 terugkerende regels van deze rekening worden stopgezet\./),
+    ).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('radio', { name: /Transacties verwijderen/ }))
+
+    expect(
+      await screen.findByText(
+        /2 terugkerende regels van deze rekening worden definitief verwijderd\./,
+      ),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByText(/2 terugkerende regels van deze rekening worden stopgezet\./),
+    ).not.toBeInTheDocument()
+  })
+
+  it('noemt de terugkerende regels ook in de body van de wis-keuze', async () => {
+    setupDeleteEnv()
+    render(<CashAccountView accountId="acc-1" />)
+    await openConfirm()
+
+    expect(
+      screen.getByText(/De boekingen én de terugkerende regels van deze rekening worden definitief gewist/),
+    ).toBeInTheDocument()
+  })
+
+  /**
+   * De vraag boven de radiogroep stond op `sr-only`: schermlezers hoorden 'm,
+   * ziende gebruikers zagen twee kaders zonder kop.
+   */
+  it('toont de vraag boven de keuze ook zichtbaar', async () => {
+    setupDeleteEnv()
+    render(<CashAccountView accountId="acc-1" />)
+    await openConfirm()
+
+    const legend = screen.getByText('Wat gebeurt er met je boekingen?')
+    expect(legend).toBeInTheDocument()
+    expect(legend).not.toHaveClass('sr-only')
+  })
+
+  /**
+   * Een mislukte impact-GET mag niet in stilte tot een lege bevestiging leiden.
+   * 404 = "bestaat niet of is niet van jou" (de route filtert op `user_id`);
+   * doorklikken zou eindigen in TF404 → "Rekening niet gevonden" onder de kop
+   * "Rekening verwijderen?".
+   */
+  it('blokkeert de bevestiging met uitleg wanneer de impact-GET 404 geeft', async () => {
+    setupEnv()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        if (input === '/api/own-accounts/ibans') return ownAccountIbansResponse()
+        return { ok: false, status: 404, json: async () => ({}) } as unknown as Response
+      }) as unknown as typeof fetch,
+    )
+    render(<CashAccountView accountId="acc-1" />)
+    await openConfirm()
+
+    expect(
+      await screen.findByText(/Deze rekening is niet \(meer\) van jou of bestaat niet meer/),
+    ).toBeInTheDocument()
+    expect(await confirmButton({ enabled: false })).toBeDisabled()
+  })
+})
+
+/**
+ * Eigenaar-guard op het ⋮-menu (H2).
+ *
+ * In het perspectief 'huishouden' versmalt `loadAccount` niet naar de eigen
+ * rijen, dus partner B opent hier de GEDEELDE rekening van A. Zowel de
+ * UPDATE-policy op `bank_accounts` als de verwijder-RPC zijn strikt eigen-rij:
+ * B's klik op "Rekening verwijderen" liep via een 404 op de impact-GET (stil
+ * geslikt → bevestiging zonder aantallen) naar TF404 → "Rekening niet
+ * gevonden". Een knop die per definitie nooit kan slagen hoort er niet te
+ * staan.
+ */
+describe('CashAccountView — mutatie-affordances alleen voor de eigenaar', () => {
+  it('toont geen instellingenmenu op de gedeelde rekening van de partner', async () => {
+    setupEnv()
+    perspectiveState.current = 'household'
+    render(<CashAccountView accountId="acc-3" />)
+
+    await screen.findByRole('heading', { name: 'Gezamenlijke rekening' })
+    expect(screen.queryByTitle('Instellingen')).not.toBeInTheDocument()
+    expect(screen.queryByText('Rekening verwijderen')).not.toBeInTheDocument()
+    expect(screen.queryByText('Rekening bewerken')).not.toBeInTheDocument()
+  })
+
+  it('toont het menu wél op je eigen rekening in hetzelfde perspectief', async () => {
+    setupEnv()
+    perspectiveState.current = 'household'
+    render(<CashAccountView accountId="acc-1" />)
+
+    await screen.findByRole('heading', { name: 'Betaalrekening' })
+    fireEvent.click(await screen.findByTitle('Instellingen'))
+    expect(await screen.findByText('Rekening verwijderen')).toBeInTheDocument()
+  })
+})
+
+/**
+ * Het archief verwijdert zichzelf niet: stap 2 van `delete_bank_account`
+ * weigert met TF409. De route levert dat oordeel al mee (`isArchiveBucket`);
+ * dit scherm consumeert het nu, in plaats van te leunen op de fout achteraf.
+ */
+describe('CashAccountView — de archief-rekening biedt geen verwijder-ingang', () => {
+  it('verbergt "Rekening verwijderen" maar houdt "Rekening bewerken"', async () => {
+    setupEnv()
+    render(<CashAccountView accountId="acc-4" />)
+
+    await screen.findByRole('heading', { name: 'Archief — verwijderde rekeningen' })
+    fireEvent.click(await screen.findByTitle('Instellingen'))
+
+    expect(await screen.findByText('Rekening bewerken')).toBeInTheDocument()
+    expect(screen.queryByText('Rekening verwijderen')).not.toBeInTheDocument()
+  })
+})
+
 describe('CashAccountView — companion-asset zonder plaintext rekeningnummer', () => {
   it('noemt account_number niet in de assets-select', async () => {
     setupEnv()

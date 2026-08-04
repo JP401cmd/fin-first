@@ -157,7 +157,7 @@ const criteria: AcceptanceCriterion[] = [
     assertion: {
       kind: 'exact',
       expected: 'happyPath=1579000; grootsteVerwijderd=1025000',
-      source: 'PERSONAS.compleet totale waarde minus current_value van de verwijderde asset (soft delete — is_active=false, buiten de totalValue-reduce)',
+      source: 'PERSONAS.compleet totale waarde minus current_value van de verwijderde asset (soft delete — is_active=false, buiten de totalValue-reduce) via `DELETE /api/assets/[id]` (app/api/assets/[id]/route.ts) — sinds de omzetting naar een API-route géén client-directe update meer',
     },
   },
   {

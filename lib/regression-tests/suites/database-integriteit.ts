@@ -208,15 +208,27 @@ const tests: TestCase[] = [
     id: 'db-fk-transactions-bank-accounts',
     name: 'FK: transactions → bank_accounts (account_id)',
     category: CAT,
-    description: 'Transactions reference bank_accounts via account_id (ON DELETE SET NULL)',
+    description: 'Transactions reference bank_accounts via account_id (NOT NULL, ON DELETE CASCADE)',
     priority: 'critical',
     estimatedDurationMs: 200,
     fn() {
-      // Verify the Transaction type has account_id as nullable (SET NULL on delete)
+      // `transactions.account_id` is NOT NULL en de FK staat op ON DELETE
+      // CASCADE — gemeten tegen `pg_constraint` op 04-08-2026 en gecodificeerd
+      // in `20260804110000_codify_bank_account_cascade_fks.sql`. Het
+      // migratiebestand `20260215000000:219` zegt SET NULL en liep achter; deze
+      // test nam die lezing over en legde daarmee een onmogelijke toestand
+      // vast (een "wees" met `account_id = null` kan de DB niet eens opslaan).
+      //
+      // Het gevolg dat deze test nu bewaakt is het omgekeerde en veel
+      // scherpere: een verwijderde rekening neemt haar boekingen MEE, buiten
+      // RLS om. Vandaar dat er geen kaal `bank_accounts.delete()` mag bestaan —
+      // verwijderen loopt uitsluitend via `public.delete_bank_account()`, dat
+      // eerst met `count_foreign_rows_on_bank_account()` weigert (TF410) zodra
+      // er rijen van een andere gebruiker aan de rekening hangen.
       const tx = {
         id: crypto.randomUUID(),
         user_id: 'u1',
-        account_id: crypto.randomUUID(), // FK to bank_accounts
+        account_id: crypto.randomUUID(), // FK to bank_accounts, NOT NULL
         budget_id: null,
         amount: -50,
         date: '2025-06-01',
@@ -225,10 +237,12 @@ const tests: TestCase[] = [
         counterparty_iban: null,
         transaction_type: 'expense',
       }
-      assertDefined(tx.account_id, 'account_id is defined')
-      // account_id is nullable — when bank account is deleted, it becomes null (SET NULL)
-      const txOrphan = { ...tx, account_id: null }
-      assertEqual(txOrphan.account_id, null, 'account_id can be null (SET NULL)')
+      assertDefined(tx.account_id, 'account_id is altijd gevuld (NOT NULL)')
+      assertEqual(
+        typeof tx.account_id,
+        'string',
+        'account_id draagt een rekening-id — CASCADE laat geen wees met null achter',
+      )
     },
   },
 

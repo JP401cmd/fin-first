@@ -1,13 +1,13 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo, useDeferredValue } from 'react'
+import { useEffect, useState, useCallback, useId, useMemo, useDeferredValue } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Plus, Upload, ArrowUpRight, ArrowDownLeft,
   Wallet, Tag, Settings2, Repeat, Search, Filter, RotateCcw, AlertCircle,
   Link2, ArrowLeftRight, HelpCircle, GitFork, Pencil, Sparkles, ArrowLeft,
-  MoreVertical, ToggleLeft, Save, Check,
+  MoreVertical, ToggleLeft, Save, Check, Trash2,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { isOwnAccountTransfer } from '@/lib/parsers/categorize'
@@ -39,12 +39,16 @@ import { Users, TrendingUp, TrendingDown, Minus, Shield } from 'lucide-react'
 import { SettlementOverview } from '@/components/app/settlement-overview'
 import { UncategorizedTransactionsBanner } from '@/components/app/uncategorized-transactions-banner'
 import { AICategorizeSheet } from '@/components/app/ai-categorize-sheet'
-import { AccountFormModal, ACCOUNT_TYPES, type Account } from '@/components/app/account-form-modal'
+// `AccountFormModal` zelf wordt hier niet meer gerenderd (het bewerken loopt via
+// het AssetEditForm-sheet); alleen de gedeelde constanten/types komen hiervandaan.
+import { ACCOUNT_TYPES, type Account } from '@/components/app/account-form-modal'
 import { fetchOwnAccountIbansStrict, ibanById } from '@/lib/own-accounts-ibans'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
 import { Kicker } from '@/components/editorial'
+import { Button } from '@/components/editorial/button'
+import { useOptionalToast } from '@/components/app/toast-provider'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { ValuationModal } from '@/components/core/assets-client'
 import { DensityToggle, useListDensity } from '@/components/app/density-toggle'
@@ -95,6 +99,25 @@ type DetectedPattern = {
 }
 
 /**
+ * De rekening zoals dít scherm haar leest: de gedeelde `Account`-vorm plus de
+ * twee velden die alleen hier nodig zijn.
+ *
+ *  - `user_id` — draagt de eigenaar-guard op het ⋮-menu. Zonder deze kolom kán
+ *    het scherm de vraag "mag deze kijker muteren?" niet stellen en toont het
+ *    knoppen die per definitie nooit kunnen slagen (zie `canMutateAccount`).
+ *  - `is_archive_bucket` — het archief verwijdert zichzelf niet (TF409 in
+ *    `delete_bank_account`). Dat oordeel hoort vóór de knop, niet erachter.
+ *
+ * Bewust lokaal en niet op de gedeelde `Account`-type: de andere consumers
+ * (overboekingskeuze, formulier) vragen deze kolommen niet op, en een veld op
+ * het gedeelde type suggereert dat het er altijd is.
+ */
+type AccountRow = Account & {
+  user_id?: string | null
+  is_archive_bucket?: boolean | null
+}
+
+/**
  * CashAccountView — Full cash account detail view.
  * Without accountId: combined view showing all accounts aggregated.
  * With accountId: single account detail view.
@@ -133,8 +156,12 @@ export function CashAccountView({
 }) {
   const isCombined = !accountId
   const router = useRouter()
+  // Optionele variant: dit component wordt ook buiten een ToastProvider
+  // gerenderd (component-tests, losse embeds). Zonder provider degradeert de
+  // bevestigings-toast stil i.p.v. de hele weergave te laten crashen.
+  const { addToast } = useOptionalToast()
   const featureAccessCtx = useFeatureAccess()
-  const [account, setAccount] = useState<Account | null>(null)
+  const [account, setAccount] = useState<AccountRow | null>(null)
   const [allAccounts, setAllAccounts] = useState<Account[]>([])
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [budgets, setBudgets] = useState<Budget[]>([])
@@ -153,7 +180,6 @@ export function CashAccountView({
   const [editTransaction, setEditTransaction] = useState<Transaction | null>(null)
   const [showSankey, setShowSankey] = useState(true)
   const [showAICategorize, setShowAICategorize] = useState(false)
-  const [showAccountForm, setShowAccountForm] = useState(false)
   const [recurrings, setRecurrings] = useState<RecurringTransaction[]>([])
   const [showRecurring, setShowRecurring] = useState(true)
   const [editRecurring, setEditRecurring] = useState<RecurringTransaction | null>(null)
@@ -263,6 +289,57 @@ export function CashAccountView({
     count: number
     newOwnership: 'personal' | 'shared'
   } | null>(null)
+
+  // ── Rekening verwijderen ────────────────────────────────────────────────
+  //
+  // Onomkeerbaar, dus: eigen bevestiging (ShellOverlay kind="confirm"
+  // destructive), eigen fout-state, en de impact wordt vóóraf bij de server
+  // opgehaald i.p.v. uit lokale lijsten geraden (die tonen alleen de gekozen
+  // maand). `impact.transactionCount`/`recurringCount` mogen `null` zijn —
+  // de server kon het aantal dan niet betrouwbaar vaststellen. In dat geval
+  // tonen we géén getal en laten we de betreffende zin weg: "0 boekingen"
+  // liegen is erger dan zwijgen vlak voor een onomkeerbare stap.
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleteImpact, setDeleteImpact] = useState<{
+    transactionCount: number | null
+    recurringCount: number | null
+    hasBankLink: boolean
+    /**
+     * Het archief kan zichzelf niet verwijderen (TF409 in
+     * `delete_bank_account`). De route levert dit oordeel al mee; we consumeren
+     * het hier als tweede grendel achter de menu-guard, zodat een verouderde
+     * of ontbrekende kolomwaarde op de rekeningrij niet alsnog in een kansloze
+     * rode knop eindigt.
+     */
+    isArchiveBucket: boolean
+  } | null>(null)
+  const [deleteImpactLoading, setDeleteImpactLoading] = useState(false)
+  /**
+   * Waarom de impact-GET niet gelukt is — nooit stil.
+   *
+   *  - `'missing'`: 404/403. De route filtert op `user_id`, dus dit betekent
+   *    "bestaat niet of is niet van jou". Doorklikken kán dan niet slagen; de
+   *    bevestiging blokkeert i.p.v. een rode knop aan te bieden die met
+   *    "Rekening niet gevonden" eindigt.
+   *  - `'unknown'`: netwerk/serverfout. De keuze blijft uitvoerbaar (de DELETE
+   *    is een ander verzoek), maar we zwijgen niet over de ontbrekende
+   *    aantallen — anders leest een lege bevestiging als "er is niets".
+   */
+  const [deleteImpactError, setDeleteImpactError] = useState<'missing' | 'unknown' | null>(null)
+  /** Voorgeselecteerd op 'keep': bewaren is de aanbevolen, herstelbare keuze. */
+  const [deleteTxChoice, setDeleteTxChoice] = useState<'keep' | 'delete'>('keep')
+  /**
+   * Type-to-confirm op de wis-tak. De gebruiker tikt de rekeningnaam letterlijk
+   * over voordat de rode knop activeert — exact-match en case-sensitive, net als
+   * `components/app/confirm-destructive.tsx` (dezelfde bewuste frictie-stap; we
+   * trimmen niet, wat je plakt is wat je stuurt). Alleen bij 'delete': bij
+   * 'bewaren' is er niets onomkeerbaars aan de boekingen.
+   */
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+  /** Label→input-koppeling voor het type-to-confirm-veld (uniek per instantie). */
+  const deleteConfirmInputId = useId()
 
   const hasActiveFilters = filterSearch !== '' || filterType !== 'all' || filterBudgetId !== 'all'
 
@@ -374,7 +451,7 @@ export function CashAccountView({
       // hieronder.
       let accountsQuery = supabase
         .from('bank_accounts')
-        .select('id, name, bank_name, account_type, balance, is_active, sort_order, linked_asset_id, ownership')
+        .select('id, name, bank_name, account_type, balance, is_active, sort_order, linked_asset_id, ownership, user_id, is_archive_bucket')
         .eq('is_active', true)
         .order('sort_order', { ascending: true })
       if (perspective === 'personal') {
@@ -402,7 +479,7 @@ export function CashAccountView({
       if (!allData) throw new Error('Geen rekeningen gevonden')
 
       const ibanFor = ibanById(ownAccountIbans)
-      const allAccounts = (allData as Account[]).map((a) => ({ ...a, iban: ibanFor.get(a.id) ?? null }))
+      const allAccounts = (allData as AccountRow[]).map((a) => ({ ...a, iban: ibanFor.get(a.id) ?? null }))
       setAllAccounts(allAccounts)
 
       if (isCombined) {
@@ -421,7 +498,34 @@ export function CashAccountView({
         // Uit de MERGED lijst, niet uit `allData`: anders draagt `account.iban`
         // weer de plaintext-kolomwaarde (en na Stage B niets), waar zowel de
         // IBAN-regel onder de rekeningnaam als het bewerkformulier op leunen.
-        const target = allAccounts.find((a) => a.id === accountId)
+        //
+        // Zit de rekening NIET in die lijst, dan is dat nog geen 404: de lijst
+        // hierboven is bewust actief-only (ze voedt de overboekingskeuze en de
+        // eigen-rekeningherkenning), terwijl "budgetteren uit" de companion-rij
+        // juist laat staan met `is_active = false` (`syncBankAccountCompanion`).
+        // Zonder de gerichte lookup hieronder werd zo'n rekening onbewerkbaar —
+        // en bleef ook de herstelroute van een rekening met een kwijtgeraakte
+        // bankverbinding op "Rekening niet gevonden" hangen, terwijl juist dít
+        // scherm het herstelpad draagt.
+        let target = allAccounts.find((a) => a.id === accountId) ?? null
+        if (!target) {
+          // Zelfde expliciete kolomlijst als hierboven: `select('*')` op
+          // `bank_accounts` zou `iban_encrypted` en de blind index `iban_hash`
+          // naar de browser sturen.
+          let targetQuery = supabase
+            .from('bank_accounts')
+            .select('id, name, bank_name, account_type, balance, is_active, sort_order, linked_asset_id, ownership, user_id, is_archive_bucket')
+            .eq('id', accountId!)
+          if (perspective === 'personal') {
+            targetQuery = targetQuery.eq('ownership', 'personal')
+          }
+          const { data: targetRow } = await targetQuery.maybeSingle()
+          if (signal?.aborted) return
+          if (targetRow) {
+            const row = targetRow as AccountRow
+            target = { ...row, iban: ibanFor.get(row.id) ?? null }
+          }
+        }
         if (!target) {
           setError('Rekening niet gevonden')
           setLoading(false)
@@ -995,7 +1099,6 @@ export function CashAccountView({
       return
     }
 
-    setShowAccountForm(false)
     loadAccount()
   }
 
@@ -1128,6 +1231,148 @@ export function CashAccountView({
     }
   }
 
+  /**
+   * Opent de verwijder-bevestiging en haalt de impact op bij de server.
+   *
+   * Het bewerk-sheet gaat hier expliciet dicht (net als bij de ontkoppel-
+   * bevestiging): blijft het open, dan praat een straks verdwenen `account`
+   * tegen een nog gemounte editor.
+   *
+   * Een mislukte impact-fetch blokkeert de flow niet — de bevestiging toont
+   * dan alleen de zinnen die sowieso waar zijn, en het bankkoppeling-oordeel
+   * valt terug op `accountIsBankLinked`, het bestaande oordeel van dit scherm
+   * (dezelfde vraag, niet een tweede afleiding erbovenop). Maar ze faalt nooit
+   * STIL: 404/403 betekent "niet (meer) van jou" en zet de rode knop dicht
+   * (`deleteBlockedReason`), andere fouten leveren een zichtbare melding dat
+   * de aantallen ontbreken.
+   */
+  async function openDeleteConfirm() {
+    if (!account) return
+    setShowSettingsMenu(false)
+    setShowAssetEdit(false)
+    setDeleteTxChoice('keep')
+    setDeleteConfirmText('')
+    setDeleteError(null)
+    setDeleteImpact(null)
+    setDeleteImpactError(null)
+    setShowDeleteConfirm(true)
+    setDeleteImpactLoading(true)
+    try {
+      const res = await fetch(`/api/bank-accounts/${account.id}`)
+      if (res.ok) {
+        const json = (await res.json().catch(() => null)) as {
+          transactionCount?: number | null
+          recurringCount?: number | null
+          hasBankLink?: boolean
+          isArchiveBucket?: boolean
+        } | null
+        if (json) {
+          setDeleteImpact({
+            transactionCount: json.transactionCount ?? null,
+            recurringCount: json.recurringCount ?? null,
+            hasBankLink: json.hasBankLink === true,
+            isArchiveBucket: json.isArchiveBucket === true,
+          })
+        } else {
+          // 200 zonder bruikbare body: geen aantallen, dus ook geen zwijgen.
+          setDeleteImpactError('unknown')
+        }
+      } else if (res.status === 404 || res.status === 403) {
+        // De route filtert op `user_id`: dit is "bestaat niet of is niet van
+        // jou". De DELETE zou hetzelfde oordeel geven, dus we bieden die knop
+        // niet aan.
+        setDeleteImpactError('missing')
+      } else {
+        setDeleteImpactError('unknown')
+      }
+    } catch {
+      setDeleteImpactError('unknown')
+    } finally {
+      setDeleteImpactLoading(false)
+    }
+  }
+
+  /**
+   * Verwijdert deze rekening — het model volgt `handleDisconnectTracking`.
+   *
+   * Eén schrijver: `DELETE /api/bank-accounts/<id>` met de gekozen
+   * transactie-behandeling in de body. Nooit een client-directe
+   * `bank_accounts.delete()` — die botst op de FK van
+   * `bank_connection_accounts` en laat een half doorgevoerde mutatie achter
+   * (exact de regressie die de toggle-budget-route eerder opruimde).
+   *
+   * Bij een fout blijft de bevestiging staan mét de reden erin: de gebruiker
+   * moet kunnen zien dat er niets is gebeurd, niet een leeg scherm krijgen.
+   */
+  async function handleDeleteAccount() {
+    if (!account) return
+    const accountName = account.name
+    const choice = deleteTxChoice
+    setDeleting(true)
+    setDeleteError(null)
+    try {
+      const res = await fetch(`/api/bank-accounts/${account.id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transactions: choice }),
+      })
+      // Platte envelope (ADR 0044): `error` is een string, geen object.
+      const json = (await res.json().catch(() => null)) as {
+        error?: string
+        movedTransactions?: number
+        deletedTransactions?: number
+        stoppedRecurrings?: number
+      } | null
+      if (!res.ok) {
+        setDeleteError(json?.error || 'Verwijderen is niet gelukt. Probeer het opnieuw.')
+        return
+      }
+
+      setShowDeleteConfirm(false)
+
+      // Bevestiging in de taal van de gemaakte keuze, met de tellingen uit de
+      // respons — niet uit de vooraf opgehaalde impact (die kan tussen openen
+      // en bevestigen verouderd zijn).
+      const moved = json?.movedTransactions ?? 0
+      const deleted = json?.deletedTransactions ?? 0
+      const stopped = json?.stoppedRecurrings ?? 0
+      const parts: string[] = []
+      if (choice === 'keep' && moved > 0) {
+        parts.push(`${moved} ${moved === 1 ? 'boeking staat' : 'boekingen staan'} nu in je archief`)
+      } else if (choice === 'delete' && deleted > 0) {
+        parts.push(`${deleted} ${deleted === 1 ? 'boeking is' : 'boekingen zijn'} gewist`)
+      }
+      // De RPC behandelt terugkerende regels ANDERS per keuze: bij bewaren
+      // worden ze gedeactiveerd en verhuizen ze mee naar het archief, bij
+      // wissen worden ze verwijderd (stap 7 van
+      // `20260804102500_delete_bank_account_rpc.sql`). Eén tekst voor beide
+      // gevallen zou de wis-keuze zachter voorstellen dan ze is.
+      if (stopped > 0) {
+        parts.push(
+          choice === 'keep'
+            ? `${stopped} terugkerende ${stopped === 1 ? 'regel is' : 'regels zijn'} stopgezet`
+            : `${stopped} terugkerende ${stopped === 1 ? 'regel is' : 'regels zijn'} verwijderd`,
+        )
+      }
+      addToast({
+        type: 'success',
+        title: `${accountName} is verwijderd`,
+        message: parts.length > 0 ? `${parts.join(' · ')}.` : undefined,
+      })
+
+      // Geen anker meegeven: `/core/assets/cash/[accountId]` leidt door naar
+      // `/overzicht/cashflow#rekening-<assetId>`, en dat anker bestaat na deze
+      // verwijdering niet meer.
+      if (onNavigateToAccount) onNavigateToAccount(undefined)
+      else router.push('/overzicht/cashflow')
+      router.refresh()
+    } catch {
+      setDeleteError('Verwijderen is niet gelukt. Probeer het opnieuw.')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   async function detectPatterns() {
     if (!accountId) return
     setDetectingPatterns(true)
@@ -1192,6 +1437,57 @@ export function CashAccountView({
       </div>
     )
   }
+
+  // ── Eigenaar-guard op de mutatie-affordances (⋮-menu) ─────────────────────
+  //
+  // Spiegelt `canMutate` in `components/app/core/assets/asset-pane.tsx`: een
+  // knop die per definitie nooit kan slagen is een kapotte affordance.
+  //
+  // De conditie zit op `user_id` en niet op `ownership`: in het perspectief
+  // 'huishouden' versmalt `loadAccount` niet naar de eigen rijen, dus partner B
+  // ziet hier de GEDEELDE rekening van A. Zowel de UPDATE-policy op
+  // `bank_accounts` als de verwijder-RPC zijn strikt eigen-rij (TF404 op
+  // `ba.user_id = auth.uid()`) — B's klik eindigde daarom in een bevestiging
+  // zonder aantallen, gevolgd door "Rekening niet gevonden" onder de kop
+  // "Rekening verwijderen?".
+  //
+  // Zonder `currentUserId` (auth-check nog onderweg of stilgevallen) valt de
+  // guard bewust OPEN: 'm dichtzetten zou het menu voor élke solo-gebruiker
+  // laten flikkeren, en dat is een grotere regressie dan de kapotte knop. De
+  // route blijft in dat geval het vangnet.
+  const canMutateAccount = !currentUserId || account.user_id === currentUserId
+  /**
+   * Het archief (`is_archive_bucket`) verwijdert zichzelf niet — stap 2 van
+   * `delete_bank_account` weigert met TF409. Dat oordeel hoort vóór de knop:
+   * het menu-item verdwijnt hier, en de bevestiging heeft nog een tweede
+   * grendel op het routeveld `isArchiveBucket` (zie `deleteBlockedReason`).
+   */
+  const accountIsArchiveBucket = account.is_archive_bucket === true
+
+  // ── Grendels op de rode knop in de verwijder-bevestiging ─────────────────
+  //
+  // `'missing'`  — de impact-GET gaf 404/403: deze rekening is niet (meer) van
+  //                jou. De DELETE geeft hetzelfde oordeel, dus de knop blijft
+  //                dicht i.p.v. te eindigen in "Rekening niet gevonden".
+  // `'archive'`  — de route meldt het archief; de RPC weigert met TF409.
+  const deleteBlockedReason: 'missing' | 'archive' | null =
+    deleteImpactError === 'missing'
+      ? 'missing'
+      : (deleteImpact?.isArchiveBucket || accountIsArchiveBucket)
+        ? 'archive'
+        : null
+  /**
+   * Type-to-confirm alleen op de wis-tak: één klik wist dáár definitief élke
+   * boeking van deze rekening (in de praktijk duizenden). Bij "bewaren"
+   * verhuist de historie en is er niets onomkeerbaars aan de boekingen, dus
+   * daar zou dezelfde frictie alleen maar afstompen.
+   */
+  const deleteNameConfirmed = deleteTxChoice !== 'delete' || deleteConfirmText === account.name
+  // Ook dicht zolang de aantallen onderweg zijn: de hele impact-GET bestaat om
+  // te tonen hoevéél er verdwijnt — een klik vóór dat getal binnen is,
+  // bevestigt iets wat de gebruiker nog niet gelezen heeft.
+  const deleteConfirmDisabled =
+    deleting || deleteImpactLoading || deleteBlockedReason !== null || !deleteNameConfirmed
 
   const { activeModules: cashViewModules } = featureAccessCtx
   const hasBudgetterenModule = cashViewModules.includes('budgetteren')
@@ -1301,7 +1597,12 @@ export function CashAccountView({
                     {allAccounts.length} rekeningen
                   </span>
                 )}
-                {!isCombined && (
+                {/* Het hele menu hangt achter de eigenaar-guard: zowel
+                    "bewerken" (PATCH → eigen-rij UPDATE-policy) als
+                    "verwijderen" (RPC → TF404 op andermans rij) is voor een
+                    niet-eigenaar kansloos. Eén affordance minder is beter dan
+                    twee knoppen die stil weigeren. */}
+                {!isCombined && canMutateAccount && (
                   <div className="relative">
                     <button
                       onClick={() => setShowSettingsMenu(v => !v)}
@@ -1321,6 +1622,23 @@ export function CashAccountView({
                             <Settings2 className="h-4 w-4" />
                             Rekening bewerken
                           </button>
+                          {/* Destructief pad, visueel gescheiden van het
+                              bewerken erboven. Kleur via de semantische
+                              tokens (`text-negative`), niet via een
+                              Tailwind-standaardkleur — zie de kleurconventie
+                              in CLAUDE.md. */}
+                          {!accountIsArchiveBucket && (
+                            <>
+                              <div className="my-1 border-t border-[var(--border-ed)]" />
+                              <button
+                                onClick={() => { void openDeleteConfirm() }}
+                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-negative hover:bg-negative-bg"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                                Rekening verwijderen
+                              </button>
+                            </>
+                          )}
                         </div>
                       </>
                     )}
@@ -2531,6 +2849,203 @@ export function CashAccountView({
               {disconnecting ? 'Uitschakelen…' : 'Uitschakelen'}
             </button>
           </div>
+        </div>
+      </ShellOverlay>
+
+      {/* Rekening verwijderen — onomkeerbaar, dus ShellOverlay kind="confirm"
+          met `destructive` en de knoppen in de sticky `footer` (óók op klein
+          scherm; CLAUDE.md modal-conventie).
+
+          Bewust ÉÉN radiogroep + één primaire knop, geen twee gelijkwaardige
+          knoppen naast elkaar: die zouden de onherstelbare optie hetzelfde
+          gewicht geven als de aanbevolen, en één misklik is dan definitief.
+          Met radio's leest de gebruiker zijn keuze nog één keer terug.
+
+          Er staat nergens "je kunt dit later ongedaan maken" — dat kan de
+          database niet waarmaken. */}
+      <ShellOverlay
+        open={showDeleteConfirm}
+        onClose={() => {
+          if (deleting) return
+          setShowDeleteConfirm(false)
+          setDeleteError(null)
+        }}
+        kind="confirm"
+        destructive
+        title="Rekening verwijderen?"
+        footer={
+          <div className="flex items-center gap-2">
+            {/* Rode primaire actie: de gedeelde `Button`-primitive kent geen
+                destructive-variant, dus hetzelfde recept als de reset-
+                bevestiging op /mijn/geavanceerd (bg-negative, min-h-11). */}
+            <button
+              type="button"
+              disabled={deleteConfirmDisabled}
+              aria-busy={deleting || undefined}
+              onClick={() => { void handleDeleteAccount() }}
+              className="inline-flex min-h-11 flex-1 items-center justify-center bg-negative px-5 text-sm font-medium text-white transition-colors hover:bg-negative/90 disabled:cursor-not-allowed disabled:opacity-60"
+              style={{ fontFamily: 'var(--font-inter, system-ui, sans-serif)' }}
+            >
+              {deleting ? 'Verwijderen …' : 'Rekening verwijderen'}
+            </button>
+            <Button
+              variant="secondary"
+              className="flex-1"
+              disabled={deleting}
+              onClick={() => { setShowDeleteConfirm(false); setDeleteError(null) }}
+            >
+              Annuleren
+            </Button>
+          </div>
+        }
+      >
+        <div className="p-5">
+          <p className="text-sm leading-relaxed text-[var(--ink-2)]">
+            <span className="font-semibold text-[var(--ink)]">{account.name}</span> verdwijnt uit
+            je rekeningen. Het saldo telt daarna niet meer mee in je vermogen.
+            {(deleteImpact?.hasBankLink ?? accountIsBankLinked) && ' De bankkoppeling wordt hierbij verbroken.'}
+          </p>
+
+          <fieldset className="mt-5" disabled={deleting}>
+            {/* Zichtbare vraag boven de keuze: de radio's zijn zonder kop twee
+                kaders zonder aanleiding. Kicker-typografie (mono, uppercase,
+                letterspacing) zoals elders op dit scherm. */}
+            <legend className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--ink-3)]">
+              Wat gebeurt er met je boekingen?
+            </legend>
+            <div className="space-y-2">
+            {([
+              {
+                value: 'keep' as const,
+                label: 'Transacties bewaren',
+                suffix: ' — aanbevolen',
+                body: 'Je boekingen blijven in je historie en in je budgetten staan. Ze verhuizen naar een archief dat je niet apart hoeft bij te houden. Terugkerende regels van deze rekening worden stopgezet en verhuizen mee.',
+              },
+              {
+                value: 'delete' as const,
+                label: 'Transacties verwijderen',
+                suffix: '',
+                // Noemt bewust ook de terugkerende regels: de RPC verwijdert
+                // die op deze tak (stap 7), terwijl de keuze op het eerste
+                // gezicht alleen over boekingen lijkt te gaan.
+                body: 'De boekingen én de terugkerende regels van deze rekening worden definitief gewist. Je uitgaven- en spaarcijfers van eerdere maanden veranderen daardoor.',
+              },
+            ]).map((opt) => {
+              const selected = deleteTxChoice === opt.value
+              return (
+                <label
+                  key={opt.value}
+                  className={`flex cursor-pointer gap-3 border p-3 transition-colors ${
+                    selected
+                      ? 'border-[var(--ink)] bg-[var(--subtle)]'
+                      : 'border-[var(--border-ed)] hover:bg-[var(--subtle)]'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="delete-transactions"
+                    value={opt.value}
+                    checked={selected}
+                    onChange={() => setDeleteTxChoice(opt.value)}
+                    className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--ink)]"
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold text-[var(--ink)]">
+                      {opt.label}
+                      {opt.suffix && (
+                        <span className="font-normal text-[var(--ink-3)]">{opt.suffix}</span>
+                      )}
+                      {/* Geen getal tonen wanneer de server het aantal niet
+                          betrouwbaar kon vaststellen (null) — "0 boekingen"
+                          zou een onjuiste geruststelling zijn. */}
+                      {typeof deleteImpact?.transactionCount === 'number' && (
+                        <span className="ml-1.5 font-mono text-xs font-normal tabular-nums text-[var(--ink-3)]">
+                          ({deleteImpact.transactionCount}{' '}
+                          {deleteImpact.transactionCount === 1 ? 'boeking' : 'boekingen'})
+                        </span>
+                      )}
+                    </span>
+                    <span className="mt-1 block text-xs leading-relaxed text-[var(--ink-3)]">
+                      {opt.body}
+                    </span>
+                  </span>
+                </label>
+              )
+            })}
+            </div>
+
+            {/* Type-to-confirm — alleen op de wis-tak. Zelfde recept als
+                `confirm-destructive.tsx`: exact-match, case-sensitive, geen
+                trim. De rode knop blijft dicht tot de naam klopt. */}
+            {deleteTxChoice === 'delete' && (
+              <div className="mt-3 border border-[var(--border-ed)] bg-[var(--subtle)] p-3">
+                <label htmlFor={deleteConfirmInputId} className="block text-xs leading-relaxed text-[var(--ink-2)]">
+                  Typ{' '}
+                  <span className="border border-[var(--border-ed)] bg-[var(--paper)] px-1 py-[1px] font-mono text-[var(--ink)]">
+                    {account.name}
+                  </span>{' '}
+                  om te bevestigen dat de boekingen weg mogen.
+                </label>
+                <input
+                  id={deleteConfirmInputId}
+                  type="text"
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
+                  className="mt-2 w-full border border-[var(--border-md)] bg-[var(--paper)] px-3 py-2.5 font-mono text-[15px] text-[var(--ink)] outline-none focus:border-[var(--ink-2)] focus:ring-2 focus:ring-[var(--ink-2)]/20 disabled:opacity-60"
+                  style={{ minHeight: 44 }}
+                />
+              </div>
+            )}
+          </fieldset>
+
+          {deleteImpactLoading && (
+            <p className="mt-3 text-xs text-[var(--ink-4)]">Aantallen ophalen …</p>
+          )}
+
+          {/* Terugkerende regels: bewaren = stopzetten (en mee naar het
+              archief), wissen = definitief verwijderen. Eén tekst voor beide
+              zou de wis-keuze zachter voorstellen dan ze is. */}
+          {typeof deleteImpact?.recurringCount === 'number' && deleteImpact.recurringCount > 0 && (
+            <p className="mt-3 text-xs leading-relaxed text-[var(--ink-3)]">
+              {deleteImpact.recurringCount} terugkerende{' '}
+              {deleteImpact.recurringCount === 1 ? 'regel' : 'regels'} van deze rekening
+              {deleteImpact.recurringCount === 1 ? ' wordt' : ' worden'}{' '}
+              {deleteTxChoice === 'keep' ? 'stopgezet' : 'definitief verwijderd'}.
+            </p>
+          )}
+
+          {/* Een mislukte impact-GET mag niet in stilte tot een lege
+              bevestiging leiden. 404/403 = "niet (meer) van jou": dan blokkeren
+              we. Andere fouten: de keuze blijft uitvoerbaar, maar we zeggen
+              erbij dat de aantallen ontbreken. */}
+          {deleteBlockedReason === 'missing' && (
+            <p role="alert" className="mt-4 text-sm font-medium text-negative">
+              Deze rekening is niet (meer) van jou of bestaat niet meer. Ververs de pagina om te
+              zien wat er nu staat.
+            </p>
+          )}
+          {deleteBlockedReason === 'archive' && (
+            <p role="alert" className="mt-4 text-sm leading-relaxed text-[var(--ink-2)]">
+              Dit is je archief. Daar staan de boekingen van eerder verwijderde rekeningen, dus
+              het archief kan zichzelf niet verwijderen.
+            </p>
+          )}
+          {deleteBlockedReason === null && deleteImpactError === 'unknown' && !deleteImpactLoading && (
+            <p role="status" className="mt-3 text-xs leading-relaxed text-[var(--ink-3)]">
+              De aantallen konden niet worden opgehaald. Wat je hierboven kiest, wordt wél
+              uitgevoerd — dus kies bewust.
+            </p>
+          )}
+
+          {deleteError && (
+            <p role="alert" className="mt-4 text-sm font-medium text-negative">
+              {deleteError}
+            </p>
+          )}
         </div>
       </ShellOverlay>
 

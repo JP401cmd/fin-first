@@ -109,6 +109,22 @@ function addItemCta(type: AssetType): string {
 interface AssetCategoryPageProps {
   /** Validated AssetType — server-component heeft `notFound()` gedraaid bij invalid type. */
   type: AssetType
+  /**
+   * De id van de ingelogde gebruiker, door de server-page meegegeven.
+   *
+   * Waarvoor: `<AssetPane />` verbergt Bewerken en Verwijderen op een rij die
+   * niet van jou is. Lezen op `assets` is huishoud-verbreed, schrijven is strikt
+   * eigen-rij — een gedeelde bezitting van je partner staat dus wél in de lijst
+   * maar is niet te muteren. Zonder deze prop blijft de knop zichtbaar en krijg
+   * je pas bij het indrukken een 404 terug; dat is eerlijk, maar een knop die
+   * nooit kan slagen hoort er niet te staan.
+   *
+   * Bewust vanuit de server doorgegeven en niet uit een client-context: deze
+   * pagina laadt geen perspectief-bundel, en de identiteit is server-side al
+   * bekend (`supabase.auth.getUser()`). Een extra client-fetch alleen om een
+   * knop te verbergen is de verkeerde ruil.
+   */
+  currentUserId?: string
   /** Initiële assets, server-side geladen. Client kan deze later updaten. */
   initialAssets: Asset[]
   /**
@@ -137,7 +153,7 @@ interface AssetCategoryPageProps {
    * heeft én een bijbehorende rij in `bank_accounts` (1:1 koppeling), dan
    * navigeren we bij een klik op de asset-card naar de cash-detail-pagina
    * (`/core/assets/cash/[bankAccountId]`). Zonder koppeling valt de klik
-   * terug op de bestaande `<AssetDetailFlow />` bottom-sheet.
+   * terug op de bestaande `<AssetPane />` detail-flow.
    */
   bankAccountByAssetId?: Record<string, string>
   /**
@@ -280,6 +296,7 @@ interface AssetCategoryPageProps {
  */
 export function AssetCategoryPage({
   type,
+  currentUserId,
   initialAssets,
   initialBudgetsData,
   initialHoldingsData,
@@ -491,20 +508,22 @@ export function AssetCategoryPage({
     : false
 
   // Klik op een asset: voor cash met `has_budget_tracking=true` én een
-  // gekoppelde bank-account-rij navigeren we naar de volledige
-  // cash-detail-pagina — daar zit de transactie-historie, herhalingen,
-  // import en bewerken bij elkaar. In alle andere gevallen openen we de
-  // lokale BottomSheet (lichte preview met optionele deep-link naar de
-  // bewerk-flow). Zo blijven niet-getrackte cash-assets en alle andere
-  // asset-types netjes binnen het bestaande BottomSheet-patroon.
+  // gekoppelde bank-account-rij navigeren we naar de cashflow-pagina — daar zit
+  // de transactie-historie, herhalingen, import en bewerken bij elkaar. In alle
+  // andere gevallen openen we de lokale BottomSheet (lichte preview met
+  // optionele deep-link naar de bewerk-flow). Zo blijven niet-getrackte
+  // cash-assets en alle andere asset-types netjes binnen het bestaande
+  // BottomSheet-patroon.
+  //
+  // Rechtstreeks naar de anker-URL, niet meer via `/core/assets/cash/[accId]`:
+  // die route is opgegaan in de cashflow-landing en is nog slechts een redirect
+  // die het bank-account-id terugvertaalt naar exact dit anker. De extra hop
+  // voegt niets toe — het bezit-id hebben we hier al.
   const openAssetDetail = useCallback(
     (asset: Asset) => {
-      if (asset.has_budget_tracking) {
-        const accId = bankAccountByAssetId?.[asset.id]
-        if (accId) {
-          router.push(`/core/assets/cash/${accId}`)
-          return
-        }
+      if (asset.has_budget_tracking && bankAccountByAssetId?.[asset.id]) {
+        router.push(`/overzicht/cashflow#rekening-${asset.id}`)
+        return
       }
       setSelectedAssetId(asset.id)
     },
@@ -659,6 +678,7 @@ export function AssetCategoryPage({
       {selectedAsset && (
         <AssetPane
           asset={selectedAsset}
+          currentUserId={currentUserId}
           onClose={() => setSelectedAssetId(null)}
           onChanged={() => router.refresh()}
         />

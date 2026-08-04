@@ -932,6 +932,9 @@ export function DebtsClient({ toolbarFilter, debtTypeFilter, initialData, showPa
         userAssets={userAssets}
         allDebts={realDebts}
         dailyExpenses={0}
+        // Eigenaar-guard op Bewerken/Verwijderen — die mutaties zijn strikt
+        // eigen-rij, ook bij een gedeelde schuld van de partner.
+        currentUserId={ctx?.userId}
         onClose={() => setSelectedDebtId(null)}
         onChanged={() => {
           loadDebts()

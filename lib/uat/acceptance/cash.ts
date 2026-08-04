@@ -743,6 +743,19 @@ const criteria: AcceptanceCriterion[] = [
       source: 'app/(app)/overzicht/cashflow/page.tsx + lib/cashflow-cards.ts#buildCashflowCards — echte productiefunctie, aangeroepen op literaire invoer; zie cash-checks.ts',
     },
   },
+  {
+    workflow: 'WF-CASH-52',
+    scenarioId: 'UAT-CASH-52',
+    titel: 'Betaalrekening verwijderen: "Bewaren" archiveert de historie, "Verwijderen" wist ze, ontkoppeling/opschoning is atomair (ADR 0082)',
+    kriticiteit: 'KERN',
+    given: 'Een actief gekoppelde betaalrekening met transactiehistorie, terugkerende regels en een gekoppeld cash-bezit (`linked_asset_id`, `has_budget_tracking=true`). De gebruiker opent het ⋮-menu op de rekeningweergave en kiest "Verwijderen"; de bevestiging (`ShellOverlay kind="confirm" destructive`) toont de impact-preview uit `GET /api/bank-accounts/[id]` (transactionCount/recurringCount/hasBankLink) en de radiokeuze "Transacties bewaren" (voorgeselecteerd) vs. "Transacties verwijderen".',
+    when: 'De gebruiker bevestigt met `DELETE /api/bank-accounts/[id]`, body `{ transactions: \'keep\' }` resp. `{ transactions: \'delete\' }`; de route roept in beide gevallen uitsluitend `public.delete_bank_account` aan (één RPC, alles-of-niets, geen losse `.update()`/`.delete()` in de handler zelf).',
+    then: 'Bij "Bewaren" verhuizen de boekingen naar de per-gebruiker archief-rekening (`bank_accounts.is_archive_bucket`, lazy aangemaakt, `is_active=false`, `balance=0`, geen eigen UI) — ze blijven meetellen in historie en budgetten en de geldstroomcijfers van eerdere maanden veranderen NIET. Bij "Verwijderen" worden de boekingen definitief gewist, waardoor uitgaven-/spaarcijfers van eerdere maanden wél veranderen. In beide gevallen: een actieve bankkoppeling verliest `bank_account_id`/`is_active=false` op de koppelrij (de rij zelf blijft bestaan, wordt niet verwijderd), openstaande terugkerende regels van die rekening worden stopgezet, en het gekoppelde cash-bezit wordt gedeactiveerd (`assets.is_active=false`, `has_budget_tracking=false`) zodat het saldo niet meer meetelt in netto vermogen, horizon en FIRE. Weigeringen: de archief-rekening zelf kan niet verwijderd worden (`TF409` → 409 "De archiefrekening kan niet verwijderd worden."); een rekening waarop boekingen ÓF terugkerende regels van een andere gebruiker staan wordt geweigerd (`TF410` → 409, exacte tekst "Er staan boekingen of terugkerende regels van je partner op deze rekening. Laat die eerst verplaatsen of verwijderen; daarna kun je de rekening opruimen."). Die weigering hangt bewust NIET aan `ownership=\'shared\'` maar aan het werkelijk bestaan van vreemde rijen, geteld door `public.count_foreign_rows_on_bank_account` (SECURITY DEFINER, buiten RLS): beide FK\'s naar `bank_accounts` staan op ON DELETE CASCADE, een RI-cascade omzeilt RLS, en een `ownership=\'personal\'`-boeking van de partner is via de SELECT-policy onzichtbaar maar wordt wél vernietigd. De rekening op persoonlijk zetten is daarom géén uitweg meer (en wordt niet meer geadviseerd). Faalt de RPC halverwege, dan is er dankzij de transactie niets gewijzigd — geen half opgeruimde rekening.',
+    assertion: {
+      kind: 'ui-only',
+      source: 'app/api/bank-accounts/[id]/route.ts (DELETE — RPC-call naar public.delete_bank_account, géén eigen update/delete) + de RPC-migratie zelf (bank_account_id/is_active op bank_connection_accounts, recurring_transactions stopzetten, assets.is_active/has_budget_tracking, archief-rekening bij keep) — DB-transactie over meerdere tabellen, geen pure functie zonder Supabase; docs/adr/0082-bankrekening-verwijderen-alleen-op-gebruikersopdracht.md',
+    },
+  },
 ]
 
 export const CASH_ACCEPTANCE: AcceptanceSet = {

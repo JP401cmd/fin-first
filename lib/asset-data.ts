@@ -189,11 +189,10 @@ export type AssetSource = 'manual' | 'aangifte_import' | 'broker_csv' | 'bank_ps
 //                                sturen: `AssetForm` haalt bij een cash-bezit
 //                                zelf één `select('account_number')` op voor die
 //                                ene rij, en LAAT DE KOLOM UIT DE SAVE-PAYLOAD
-//                                zolang die fetch niet terug is. De twee
-//                                één-rij-reloads (asset-pane, asset-detail-flow)
-//                                vragen 'm daarnaast expliciet bij als
-//                                `${ASSET_CLIENT_COLUMNS}, account_number`.
-//                                Lijst-lezingen nooit.
+//                                zolang die fetch niet terug is. Verder vraagt
+//                                niets de kolom nog op: de één-rij-reload in
+//                                `asset-pane.tsx` gebruikt bewust de kále
+//                                `ASSET_CLIENT_COLUMNS`, en lijst-lezingen nooit.
 //
 // De lijst is verder één-op-één de `Asset`-interface hierboven, want alle
 // clientlezers casten hun rijen naar precies dat type. Groeit `Asset` met een

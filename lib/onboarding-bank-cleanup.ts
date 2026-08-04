@@ -26,9 +26,25 @@ import type { SupabaseClient } from '@supabase/supabase-js'
  *    2 met `iban = ''` — de rijen die het oude filter raakte — en 11 met
  *    `iban IS NULL`. `iban_encrypted IS NULL` matcht ze alle 13.
  *  - Van die 11 extra rijen dragen er vijf transacties: 8.758, 8.125, 7.975,
- *    1.980 en 172 stuks. `transactions.account_id` heeft ON DELETE **CASCADE**,
- *    dus de naïeve vertaling zou bij een herhaalde onboarding ruim 27.000
- *    transacties meesleuren. Stil, want de delete-fout wordt niet gelezen.
+ *    1.980 en 172 stuks. `transactions.account_id` is ON DELETE **CASCADE** met
+ *    een `NOT NULL`-kolom, dus die ruim 27.000 boekingen zouden bij de delete
+ *    onherroepelijk MEEVERDWIJNEN. Stil, want de delete-fout wordt niet gelezen.
+ *
+ *    Gemeten tegen `pg_constraint` op 04-08-2026, niet tegen het
+ *    migratiebestand — dat is hier het hele punt.
+ *    `20260215000000_create_base_tables.sql:219` zégt `ON DELETE SET NULL`, en
+ *    een eerdere correctieronde heeft deze docstring op dat citaat "recht"
+ *    gezet naar SET NULL. Dat was verkeerd om: de repo liep achter op de
+ *    werkelijkheid (drift van dezelfde klasse als ADR 0045, nu gecodificeerd in
+ *    `20260804110000_codify_bank_account_cascade_fks.sql`). De oorspronkelijke
+ *    CASCADE-lezing hieronder — en de fail-closed-logica die er in dit bestand
+ *    omheen is gebouwd — was en is de juiste.
+ *
+ *    Het verschil is niet cosmetisch. Onder SET NULL is de schade herstelbaar
+ *    (de rijen bestaan nog, alleen hun rekening is leeg); onder CASCADE bestaan
+ *    ze niet meer. En omdat een RI-cascade buiten RLS om draait, zou hij ook
+ *    boekingen wissen die deze gebruiker zelf niet mag aanraken — bijvoorbeeld
+ *    die van de huishoud-partner op een gedeelde rekening.
  *  - Eén van die rijen hangt aan een `bank_connection_accounts`-rij. Die FK heeft
  *    géén ON DELETE-clausule (= NO ACTION), dus de delete zou er hard op
  *    stuklopen — en omdat een `DELETE` één statement is, zou dan óók geen enkele
@@ -58,6 +74,24 @@ import type { SupabaseClient } from '@supabase/supabase-js'
  * bevatten. De DELETE-policy is eigen-rij en zou 'm weigeren, dus er lekt niets —
  * maar de opruiming zou dan wél stil minder doen dan ze rapporteert. Eigenaarschap
  * hoort hier expliciet in de query.
+ *
+ * ## Waarom de archief-rekening er expliciet buiten valt
+ *
+ * `bank_accounts.is_archive_bucket` (zie
+ * `supabase/migrations/20260804102000_bank_accounts_archive_bucket.sql`) markeert
+ * de verzamelplek voor boekingen van verwijderde rekeningen. Een VERS archief —
+ * aangemaakt door een verwijdering waarbij de gebruiker nog geen transacties had —
+ * voldoet aan alle drie de "leeg"-criteria hierboven: geen IBAN, geen transacties,
+ * geen bankkoppeling. Zonder uitsluiting zou de eerstvolgende onboarding-opslag
+ * hem dus hard verwijderen, en dan is de volgende verwijdering ineens weer de
+ * eerste die een archief aanmaakt. Erger nog zodra er wél iets in staat: het
+ * archief is per definitie de rekening waarvan de gebruiker de geschiedenis
+ * bewust wilde behouden.
+ *
+ * De uitsluiting staat op TWEE plekken, met opzet: in de kandidaat-query (zodat
+ * de bucket nooit in de lijst belandt) en in `selectEmptyBankAccountIds` (zodat
+ * de regel ook geldt voor een toekomstige aanroeper die zijn eigen query
+ * schrijft).
  */
 
 /** De velden die de kandidaat-selectie nodig heeft. */
@@ -65,6 +99,8 @@ export interface BankAccountCleanupCandidate {
   id: string
   /** `null` = deze rekening heeft geen rekeningnummer (lege invoer wordt nooit versleuteld). */
   iban_encrypted: string | null
+  /** `true` = de archief-rekening; nooit opruimen, ongeacht hoe leeg ze lijkt. */
+  is_archive_bucket: boolean | null
 }
 
 /**
@@ -80,6 +116,7 @@ export function selectEmptyBankAccountIds(
   accountIdsWithConnection: ReadonlySet<string>,
 ): string[] {
   return candidates
+    .filter((row) => row.is_archive_bucket !== true)
     .filter((row) => row.iban_encrypted === null || row.iban_encrypted === undefined)
     .filter((row) => !accountIdsWithTransactions.has(row.id))
     .filter((row) => !accountIdsWithConnection.has(row.id))
@@ -103,10 +140,15 @@ export async function deleteEmptyOnboardingBankAccounts(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<number> {
+  // `is_archive_bucket` staat zowel in de projectie als in het filter: het filter
+  // houdt de bucket uit de kandidatenlijst, de projectie zorgt dat
+  // `selectEmptyBankAccountIds` het veld ook echt ziet in plaats van `undefined`
+  // (dan zou de tweede, defensieve uitsluiting daar niets doen).
   const { data, error } = await supabase
     .from('bank_accounts')
-    .select('id, iban_encrypted')
+    .select('id, iban_encrypted, is_archive_bucket')
     .eq('user_id', userId)
+    .eq('is_archive_bucket', false)
 
   if (error) {
     console.error('[onboarding-bank-cleanup] kandidaten niet te lezen — opruiming overgeslagen:', error)
@@ -114,6 +156,8 @@ export async function deleteEmptyOnboardingBankAccounts(
   }
 
   const withoutIban = ((data ?? []) as BankAccountCleanupCandidate[]).filter(
+    (row) => row.is_archive_bucket !== true,
+  ).filter(
     (row) => row.iban_encrypted === null || row.iban_encrypted === undefined,
   )
   if (withoutIban.length === 0) return 0
@@ -134,8 +178,12 @@ export async function deleteEmptyOnboardingBankAccounts(
       // `count: 'exact', head: true` leidt het aantal af uit de Content-Range-
       // header; wordt die door een proxy gestript of verandert het Prefer-gedrag,
       // dan is `error` null én `count` null. Zou dat als 0 tellen, dan is een
-      // rekening met duizenden transacties opeens "leeg" en neemt de delete ze
-      // via ON DELETE CASCADE mee. Beide twijfelgevallen dus fail-closed.
+      // rekening met duizenden transacties opeens "leeg" en zijn die boekingen
+      // na de delete WEG: `transactions.account_id` is ON DELETE CASCADE
+      // (gemeten tegen `pg_constraint`, 04-08-2026 — het migratiebestand
+      // `20260215000000:219` zegt SET NULL en loopt achter; zie de
+      // module-docstring en `20260804110000`). Onherstelbaar dus, en via de
+      // cascade ook buiten RLS om. Beide twijfelgevallen fail-closed.
       return [id, txError || count === null || count === undefined ? 1 : count] as const
     }),
   )

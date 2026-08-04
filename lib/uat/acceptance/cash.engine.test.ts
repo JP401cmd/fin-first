@@ -103,7 +103,11 @@ describe('UAT Cash — acceptatiecriteria dekking', () => {
     // 50 → 51: bugfix-toevoeging (docs/adr/0073-grondslag-in-de-veldnaam.md)
     // — WF-CASH-51 (cashflow-landingskaarten: Budget-KPI = resterend,
     // Transacties-KPI = gerealiseerde huidige maand).
-    expect(workflows.length).toBe(51)
+    // 51 → 52: nieuwe functionaliteit (docs/adr/0082-bankrekening-verwijderen-
+    // alleen-op-gebruikersopdracht.md) — WF-CASH-52 (betaalrekening
+    // verwijderen: bewaren archiveert, verwijderen wist, atomaire
+    // ontkoppeling/opschoning via public.delete_bank_account).
+    expect(workflows.length).toBe(52)
   })
 
   it('elk criterium heeft een geldige assertion.kind', () => {

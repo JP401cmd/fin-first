@@ -1094,6 +1094,10 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
           daardoor in elke context worden ingezet. */}
       <AssetPane
         asset={selectedAsset}
+        // Eigenaar-guard op Bewerken/Verwijderen — die mutaties zijn strikt
+        // eigen-rij. `SOLO_ASSETS_CONTEXT` valt terug op een lege string; die
+        // moet `undefined` worden, anders matcht hij nooit een echte user_id.
+        currentUserId={hhContext.userId || undefined}
         onClose={() => setSelectedAssetId(null)}
         onChanged={() => {
           loadAssets()
@@ -1258,7 +1262,7 @@ export function AssetDetailModal({
   allAssets?: Asset[]
   /**
    * Typed crypto-holdings die bij dit asset horen (R5). Geladen door
-   * `<AssetDetailFlow />` via `loadCryptoHoldingsForAsset()`. Bij `undefined`
+   * `<AssetPane />` via `loadCryptoHoldingsForAsset()`. Bij `undefined`
    * is de fetch nog niet gedaan; bij `[]` zijn er gewoon 0 holdings (legitiem
    * voor handmatig ingevoerde "Crypto-portfolio €X" zonder details).
    */
@@ -2856,8 +2860,8 @@ export function AssetForm({
   /**
    * Initiële externe-koppeling voor de R2 "Externe koppeling"-sectie. Alleen
    * relevant voor crypto-assets — voor andere types is dit altijd `null` en
-   * wordt de sectie niet gerenderd. Wordt door `<AssetDetailFlow />`
-   * meegegeven uit de batch-fetch bij modal-open.
+   * wordt de sectie niet gerenderd. Wordt door `<AssetPane />`
+   * meegegeven uit de batch-fetch bij pane-open.
    */
   initialConnection?: import('@/lib/connections-data').AssetConnectionSummary | null
   /**
@@ -3279,8 +3283,27 @@ export function AssetForm({
     let assetId: string | undefined
 
     if (isEdit && asset) {
-      const { error: updateErr } = await supabase.from('assets').update(row).eq('id', asset.id)
+      // `.eq('user_id')` + `.select()` zijn hier geen dubbelop maar de enige
+      // manier om een geweigerde schrijfactie te ZIEN. Lezen op `assets` is
+      // huishoud-verbreed, schrijven is strikt eigen-rij — een gedeelde
+      // bezitting van de partner staat dus wél in de lijst. Zonder `.select()`
+      // levert zo'n update `error: null` over 0 rijen en gedraagt het formulier
+      // zich als geslaagd terwijl er niets is gewijzigd: precies de valse
+      // succesmelding die ADR 0082 voor verwijderen dichtzette. Hier is het
+      // dezelfde klasse, één klik verderop.
+      const { data: updated, error: updateErr } = await supabase
+        .from('assets')
+        .update(row)
+        .eq('id', asset.id)
+        .eq('user_id', user.id)
+        .select('id')
+        .maybeSingle()
       if (updateErr) { console.error('ASSET UPDATE FAILED:', updateErr); setSaving(false); return }
+      if (!updated) {
+        console.error('ASSET UPDATE AFFECTED 0 ROWS (niet je eigen bezitting?):', asset.id)
+        setSaving(false)
+        return
+      }
       assetId = asset.id
 
       // Auto-track valuation when current_value changes

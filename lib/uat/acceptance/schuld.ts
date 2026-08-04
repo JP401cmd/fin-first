@@ -176,7 +176,7 @@ const criteria: AcceptanceCriterion[] = [
     assertion: {
       kind: 'exact',
       expected: 'happyPath=368070; categorieen=10; hypotheekVerwijderd=18270',
-      source: 'PERSONAS.lisa Σcurrent_balance minus de verwijderde schuld (soft delete → buiten de som)',
+      source: 'PERSONAS.lisa Σcurrent_balance minus de verwijderde schuld (HARD delete via DELETE /api/debts/[id] — niet te verwarren met WF-SCHULD-08, waar aflossen is_active=false zet; de route ruimt ook valuations + balance_snapshots op, zodat de bevestigingstekst klopt)',
     },
   },
   {

@@ -54,17 +54,24 @@ let ibanResponse: { mode: 'resolved'; value: string | null } | { mode: 'pending'
 }
 
 function makeSupabase() {
-  function builder(table: string): Record<string, unknown> {
+  // `chain` draagt de tot dan toe aangeroepen methodes van DEZE keten mee.
+  // Nodig sinds de asset-update `.select('id').maybeSingle()` gebruikt om een
+  // door RLS geweigerde schrijfactie te kunnen zíen (0 rijen i.p.v. een stille
+  // "gelukt"). `maybeSingle` moet dan wél een rij teruggeven, anders concludeert
+  // het formulier terecht dat de update niets raakte en breekt het af.
+  function builder(table: string, chain: string[] = []): Record<string, unknown> {
     const isIbanLookup = () =>
       table === 'assets' &&
       queryLog.some((q) => q.table === 'assets' && q.method === 'select' && q.args[0] === 'account_number')
+    const isWrite = () => chain.includes('update') || chain.includes('insert')
 
     const target: Record<string, unknown> = {
       then: (resolve: (v: { data: unknown[]; error: null }) => unknown) =>
         Promise.resolve(resolve({ data: [], error: null })),
-      single: async () => ({ data: null, error: null }),
+      single: async () => ({ data: isWrite() ? { id: 'a1' } : null, error: null }),
       maybeSingle: () => {
         if (isIbanLookup() && ibanResponse.mode === 'pending') return new Promise(() => {})
+        if (isWrite()) return Promise.resolve({ data: { id: 'a1' }, error: null })
         return Promise.resolve({
           data: isIbanLookup() ? { account_number: (ibanResponse as { value: string | null }).value } : null,
           error: null,
@@ -78,7 +85,7 @@ function makeSupabase() {
           queryLog.push({ table, method: prop, args })
           // `update(...)`/`insert(...)` eindigen op `.eq(...)` → die keten moet
           // awaitable blijven; de Proxy-builder is dat via `then`.
-          return builder(table)
+          return builder(table, [...chain, prop])
         }
       },
     })

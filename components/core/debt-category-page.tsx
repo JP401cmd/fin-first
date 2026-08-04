@@ -523,6 +523,9 @@ export function DebtCategoryPage({
           valuations={valuationsByDebtId[selectedDebt.id]}
           userAssets={userAssets}
           allDebts={debts}
+          // Eigenaar-guard op Bewerken/Verwijderen — die mutaties zijn strikt
+          // eigen-rij, ook bij een gedeelde schuld van de partner.
+          currentUserId={ctx?.userId}
           onClose={() => setSelectedDebtId(null)}
           onChanged={() => router.refresh()}
         />

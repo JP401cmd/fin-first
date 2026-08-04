@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import {
   ChevronLeft, ChevronRight, Wallet,
-  Upload, Link2, ArrowRight, ExternalLink,
+  Upload, Link2, ArrowRight,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { type Account } from '@/components/app/account-form-modal'
@@ -137,7 +137,32 @@ export function CashOverview({
   bankLinks?: CashBankLink[]
 }) {
   const [accounts, setAccounts] = useState<Account[]>([])
+  /**
+   * De archief-rekening (`bank_accounts.is_archive_bucket = true`) — de bak
+   * waar boekingen naartoe verhuizen wanneer je een rekening verwijdert en
+   * kiest voor "transacties bewaren".
+   *
+   * Die rij staat bewust op `is_active = false`, zodat hij nergens als
+   * bezitting of saldo meetelt. Daardoor valt hij ook buiten `accounts`
+   * hierboven — en dus buiten de kaartenlijst, waar hij niet hoort.
+   *
+   * Maar de geldstroom-AGGREGATIE moet 'm wél meenemen. "Bewaren" belooft dat
+   * je historie klopt; zou het archief buiten de aggregatie vallen, dan zouden
+   * de uitgaven- en spaarcijfers van AFGELOPEN maanden veranderen door een
+   * verwijdering van vandaag. Daarom leeft dit id apart en voegt het zich
+   * alleen bij `accountIds` (zie onder), niet bij `accounts`.
+   */
+  const [archiveAccountId, setArchiveAccountId] = useState<string | null>(null)
   const [cashAssets, setCashAssets] = useState<StampedAsset[]>([])
+  /**
+   * De id van de ingelogde gebruiker, uit dezelfde perspectief-bundel die de
+   * rekeningen levert. `<AssetPane />` verbergt daarmee Bewerken en Verwijderen
+   * op een rij die niet van jou is: lezen op `assets` is huishoud-verbreed,
+   * schrijven is strikt eigen-rij, dus een gedeelde rekening van je partner
+   * staat hier wél maar is niet te muteren. Geen extra fetch — de loader weet
+   * dit al.
+   */
+  const [currentUserId, setCurrentUserId] = useState<string | undefined>(undefined)
   const [bankByAsset, setBankByAsset] = useState<Record<string, string>>({}) // asset.id -> bank_account.id (budget-tracked)
   // Per-asset waardeverloop (12 maandwaarden) voor de breuklijn-overlay op de
   // rekening-kaarten — zelfde bron als de bezittingen-pagina (`assets-client`),
@@ -303,17 +328,31 @@ export function CashOverview({
     // regel onder de rekeningnaam, dus de niet-strikte variant met een eigen
     // terugval volstaat: zonder IBAN toont de kaart alleen de banknaam, en dat
     // mag het rekeningoverzicht niet laten vallen.
-    const [{ data }, ibanResult] = await Promise.all([
+    // De archief-rekening in dezelfde ronde. Geen `is_active`-filter en geen
+    // perspectief-filter: de rij staat per definitie op `is_active = false` en
+    // draagt de bewaarde historie van élke verwijderde rekening. Hij gaat NIET
+    // naar `accounts` (dus niet naar de kaartenlijst), alleen naar de
+    // aggregatie-ids — zie `archiveAccountId`.
+    const archiveQuery = supabase
+      .from('bank_accounts')
+      .select('id')
+      .eq('is_archive_bucket', true)
+      .maybeSingle()
+    const [{ data }, ibanResult, archiveResult] = await Promise.all([
       q,
       fetchOwnAccountIbans().catch((err) => {
         console.warn('[cash-overview] IBANs niet beschikbaar:', err)
         return { accounts: [], unreadable: 0 }
       }),
+      archiveQuery,
     ])
     if (data) {
       const ibanFor = ibanById(ibanResult.accounts)
       setAccounts((data as Account[]).map((a) => ({ ...a, iban: ibanFor.get(a.id) ?? null })))
     }
+    // Geen archief (nog nooit een rekening verwijderd) → gewoon null; de
+    // aggregatie draait dan exact zoals voorheen.
+    setArchiveAccountId(((archiveResult?.data as { id?: string } | null)?.id) ?? null)
   }, [perspective])
 
   // Laadt ALLE cash-rekeningen (bank-gekoppeld én handmatige cash-assets) —
@@ -333,6 +372,7 @@ export function CashOverview({
       (a) => (a as { asset_type?: string }).asset_type === 'cash' && (a as { is_active?: boolean }).is_active !== false,
     )
     setCashAssets(cash)
+    setCurrentUserId(pd.context.userId || undefined)
 
     // Alleen nog de asset→bank_account-map voor de klik-flow (welke kaart opent
     // de rekeningdetail i.p.v. het bezittings-paneel). De KOPPELSTATUS werd hier
@@ -382,7 +422,14 @@ export function CashOverview({
   // budget-tracked rekeningen zijn, slaan we de transactions-query over —
   // anders levert `.in('account_id', [])` een 400 op en ruisen we de
   // server onnodig met een lege query.
-  const accountIds = useMemo(() => accounts.map((a) => a.id), [accounts])
+  // De archief-rekening voedt WEL de aggregatie maar staat NIET in de
+  // kaartenlijst (`accounts`): zonder hem zouden de geldstroomcijfers van
+  // afgelopen maanden veranderen zodra iemand een rekening verwijdert met
+  // "transacties bewaren" — precies wat die keuze belooft niet te doen.
+  const accountIds = useMemo(
+    () => (archiveAccountId ? [...accounts.map((a) => a.id), archiveAccountId] : accounts.map((a) => a.id)),
+    [accounts, archiveAccountId],
+  )
 
   const loadTransactions = useCallback(async () => {
     if (accountIds.length === 0) {
@@ -930,6 +977,21 @@ export function CashOverview({
       .sort((a, b) => b.amount - a.amount)
   }, [expenseReceiptBudgetId, budgets, nonTransferTx])
 
+  // Titel van het rekeningdetail-paneel. `accounts` draagt alleen ACTIEVE
+  // rekeningen, dus zodra budgetteren voor een rekening uit gaat (de companion
+  // krijgt `is_active = false`) viel de titel terug op het generieke "Rekening" —
+  // terwijl het paneel wél die rekening toont. De cash-bezitting kent de naam nog
+  // wel: zoek 'm via de koppelrij (bank_account → asset) en houd `accounts` als
+  // eerste bron, zodat de gewone gevallen ongewijzigd blijven.
+  const detailAccountTitle = useMemo(() => {
+    if (!detailAccountId) return 'Rekening'
+    const fromAccounts = accounts.find((a) => a.id === detailAccountId)?.name
+    if (fromAccounts) return fromAccounts
+    const assetId = bankLinkRowForAccount(bankLinks, detailAccountId)?.assetId
+    const fromAsset = assetId ? cashAssets.find((a) => a.id === assetId)?.name : undefined
+    return fromAsset ?? 'Rekening'
+  }, [detailAccountId, accounts, bankLinks, cashAssets])
+
   if (loading) {
     return (
       <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
@@ -1415,27 +1477,21 @@ export function CashOverview({
       </BottomSheet>
 
       {/* === Nested account detail modal (embedded mode) === */}
-      {/* Gemigreerd naar <ShellOverlay kind="sheet"> (ADR 0039). De
-          "Open volledig"-deeplink staat als header-action naast de titel; de
-          X-sluitknop levert de shell zelf. */}
+      {/* Gemigreerd naar <ShellOverlay kind="sheet"> (ADR 0039). De X-sluitknop
+          levert de shell zelf.
+
+          Hier stond een "Open volledig"-header-action naar
+          `/core/assets/cash/[id]`. Die route is inmiddels puur een redirect terug
+          naar /overzicht/cashflow (de per-rekening detailpagina is ín deze pagina
+          opgegaan), dus de knop bracht je waar je al was — een lus. Verwijderd
+          i.p.v. omgeleid: er ís geen ruimer scherm meer om naartoe te openen. */}
       {embedded && (
         <ShellOverlay
           open={Boolean(detailAccountId)}
           onClose={() => setDetailAccountId(null)}
           kind="sheet"
           size="full"
-          title={accounts.find((a) => a.id === detailAccountId)?.name ?? 'Rekening'}
-          actions={
-            detailAccountId ? (
-              <Link
-                href={`/core/assets/cash/${detailAccountId}`}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-ed)] px-3 py-1.5 text-xs font-medium text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)]"
-              >
-                <ExternalLink className="h-3.5 w-3.5" />
-                Open volledig
-              </Link>
-            ) : undefined
-          }
+          title={detailAccountTitle}
         >
           {detailAccountId && (
             /* De koppeltoestand reist mee als prop: de rekeningdetail leest 'm
@@ -1462,6 +1518,7 @@ export function CashOverview({
       {editingAsset && (
         <AssetPane
           asset={editingAsset}
+          currentUserId={currentUserId}
           onClose={() => setEditingAsset(null)}
           onChanged={() => { void loadAllCashRekeningen() }}
         />

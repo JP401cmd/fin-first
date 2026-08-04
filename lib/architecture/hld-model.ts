@@ -85,6 +85,7 @@ export function buildHldModel(): HldModel {
         items: [
           { title: 'Gratis weten waar je staat vóór je een account maakt', desc: 'Doe de Vrijheidscheck: een paar vragen en je krijgt meteen je vrijheidsrapport — pas daarna kies je of je een account aanmaakt.' },
           { title: 'Je bank koppelen of een bestand importeren', desc: 'Transacties komen automatisch binnen — geen handwerk.' },
+          { title: 'Een rekening opruimen die je niet meer gebruikt', desc: 'Verwijder een oude of dubbele rekening en kies zelf wat er met je boekingen gebeurt: bewaren — dan blijven je historie en budgetten van eerdere maanden precies kloppen — of definitief wissen. Een bankkoppeling wordt vanzelf verbroken.' },
           { title: 'Al je uitgaven en inkomsten op een rij', desc: 'Overzichtelijk, met categorieën en grootste posten.' },
           { title: 'Budgetten maken en bewaken', desc: 'Zie per categorie hoeveel je deze maand nog hebt — en als je een transactie tijdens het slepen nergens kwijt kunt, maak je meteen een nieuw budget aan, zonder de sleepmodus te verlaten.' },
           { title: 'Zien hoeveel je overhoudt', desc: 'Je spaarquote: welk deel van je inkomen je spaart.' },

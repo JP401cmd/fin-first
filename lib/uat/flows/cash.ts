@@ -13,6 +13,9 @@
 // i.p.v. het `wf`-veld, zie cash.engine.test.ts-normalisatie). WF-CASH-32
 // ("Vraag Fin"-wizard: bulk-kaart + groepskeuzes + verliesvrij stoppen,
 // feature #881) is een latere dekkingscontrole-toevoeging, net als WF-CASH-31.
+// WF-CASH-52 (betaalrekening verwijderen, ADR 0082) is de nieuwste
+// dekkingscontrole-toevoeging, dezelfde soort achteraf-uitbreiding als
+// WF-CASH-31/32/33..51 hierboven.
 //
 // Het proces leest links→rechts: landing (4 hefboom-kaarten) → verkennen
 // (maand-geldstroom/kassabon/rekeningen/instellingen/inflatie/status) →
@@ -61,6 +64,7 @@ export const CASH_FLOW: UatFlow = {
     { id: 'splitsen', scenarioId: 'UAT-CASH-13', label: 'WF-CASH-13 · Splitsen over meerdere budgetten', kind: 'action', stage: 3, lane: 'transacties', subOf: 'toevoegen' },
     { id: 'verwijderen', scenarioId: 'UAT-CASH-14', label: 'WF-CASH-14 · Transactie verwijderen', kind: 'action', stage: 3, lane: 'transacties', subOf: 'toevoegen' },
     { id: 'tegenpartij', scenarioId: 'UAT-CASH-15', label: 'WF-CASH-15 · Tegenpartij analyseren', kind: 'screen', stage: 3, lane: 'transacties' },
+    { id: 'rekeningverwijderen', scenarioId: 'UAT-CASH-52', label: 'WF-CASH-52 · Betaalrekening verwijderen (bewaren/verwijderen, ADR 0082)', kind: 'action', stage: 3, lane: 'transacties', subOf: 'rekeningen' },
 
     // ── 4 · vaste lasten ──────────────────────────────────────────────────
     { id: 'vastelasten', scenarioId: 'UAT-CASH-16', label: 'WF-CASH-16 · Vaste lasten: totaal/aandeel/vrijheidstijd', kind: 'screen', stage: 4, lane: 'vastelasten' },
@@ -135,6 +139,7 @@ export const CASH_FLOW: UatFlow = {
     { from: 'toevoegen', to: 'splitsen' },
     { from: 'toevoegen', to: 'verwijderen' },
     { from: 'inzichten', to: 'tegenpartij' },
+    { from: 'rekeningen', to: 'rekeningverwijderen' },
 
     // vaste lasten
     { from: 'hefboom', to: 'vastelasten' },
@@ -182,6 +187,7 @@ export const CASH_FLOW: UatFlow = {
     { from: 'splitsen', to: 'uitkomst' },
     { from: 'verwijderen', to: 'uitkomst' },
     { from: 'tegenpartij', to: 'uitkomst' },
+    { from: 'rekeningverwijderen', to: 'uitkomst' },
     { from: 'opzeggen', to: 'uitkomst' },
     { from: 'aianalyse', to: 'uitkomst' },
     { from: 'watals', to: 'uitkomst' },

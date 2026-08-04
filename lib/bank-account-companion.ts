@@ -164,11 +164,20 @@ export async function syncBankAccountCompanion(
   // status`. Daaruit volgen twee harde invarianten die de vorige implementatie
   // allebei brak (besluit B1b):
   //
-  //  1. `bank_accounts` is de identiteitsrij en wordt nooit verwijderd.
-  //     `bank_connection_accounts.bank_account_id` verwijst ernaar met ON
-  //     DELETE NO ACTION, dus de delete faalde zodra er ooit een bankkoppeling
-  //     op zat — terwijl `assets.has_budget_tracking` al weggeschreven was:
-  //     een half toegepaste mutatie zonder foutmelding.
+  //  1. `bank_accounts` wordt nooit verwijderd door een SYSTEEMPAD — en een
+  //     toggle is een systeempad. `bank_connection_accounts.bank_account_id`
+  //     verwijst ernaar met ON DELETE NO ACTION, dus de delete faalde zodra er
+  //     ooit een bankkoppeling op zat — terwijl `assets.has_budget_tracking` al
+  //     weggeschreven was: een half toegepaste mutatie zonder foutmelding.
+  //
+  //     Sinds ADR 0082 bestaat er wél één pad dat de rij écht verwijdert:
+  //     `DELETE /api/bank-accounts/[id]`, op expliciete gebruikersopdracht, via
+  //     de RPC `public.delete_bank_account` die eerst élke verwijzing
+  //     gecontroleerd opruimt (koppelrijen vrijgeven, transacties verplaatsen
+  //     of wissen, terugkerende regels stopzetten, cash-bezit deactiveren) en
+  //     pas dan de rij weghaalt — alles-of-niets, in één transactie. Dat is
+  //     precies het tegenovergestelde van wat hier misging, en het verandert
+  //     niets aan deze functie: budgetteren uitzetten blijft deactiveren.
   //  2. `linked_asset_id` (UNIQUE) is een permanente 1-op-1-binding en wordt
   //     nooit genuld. Meerdere surfaces lezen "losse" rekeningen als
   //     `is_active AND linked_asset_id IS NULL` en tellen dat saldo BOVENOP de

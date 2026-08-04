@@ -93,7 +93,9 @@ const MUTATION_IN_CHAIN = /\.(insert|update|upsert|delete)\(/
 const ALLOWLIST = new Set([
   // — Fase b, slice 1: assets —
   'components/core/assets-client.tsx',
-  'components/core/asset-detail-flow.tsx',
+  // `components/core/asset-detail-flow.tsx` stond hier tot aug 2026; het bestand
+  // had nul call-sites en is verwijderd. Entry mee weggehaald, anders meldt de
+  // stale-check hem terecht.
   'components/app/core/assets/asset-pane.tsx',
   'components/core/rebalancing-settings-section.tsx',
   'app/(app)/core/assets/revalue/page.tsx',

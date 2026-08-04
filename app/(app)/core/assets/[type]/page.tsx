@@ -319,6 +319,7 @@ export default async function AssetCategoryServerPage({
       <NavStackMeta title={ASSET_TYPE_LABELS[type] ?? 'Bezittingen'} bottomBar={{ kind: 'tabs' }} />
       <AssetCategoryPage
         type={type}
+        currentUserId={user.id}
         initialAssets={assets}
         initialBudgetsData={budgetsData ?? undefined}
         initialHoldingsData={holdingsData ?? undefined}

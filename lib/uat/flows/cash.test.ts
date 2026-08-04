@@ -71,11 +71,15 @@ describe('CASH_FLOW — curatie-integriteit', () => {
     // 50 → 51: bugfix-toevoeging (docs/adr/0073-grondslag-in-de-veldnaam.md)
     // — WF-CASH-51 (de cashflow-landingskaarten: Budget-KPI = resterend i.p.v.
     // plafond, Transacties-KPI = gerealiseerde huidige maand i.p.v. effective).
-    const expected = Array.from({ length: 51 }, (_, i) => `UAT-CASH-${String(i + 1).padStart(2, '0')}`)
+    // 51 → 52: nieuwe functionaliteit (docs/adr/0082-bankrekening-verwijderen-
+    // alleen-op-gebruikersopdracht.md) — WF-CASH-52 (betaalrekening
+    // verwijderen: bewaren archiveert, verwijderen wist, atomaire
+    // ontkoppeling/opschoning via public.delete_bank_account).
+    const expected = Array.from({ length: 52 }, (_, i) => `UAT-CASH-${String(i + 1).padStart(2, '0')}`)
     for (const id of expected) {
       expect(covered.has(id), `${id} moet als flow-knoop voorkomen`).toBe(true)
     }
-    expect(covered.size).toBe(51)
+    expect(covered.size).toBe(52)
   })
 
   it('de domeinoverschrijdende cross-knopen dekken BUDGET/OVZ/TOEK/WILL/BEZIT/MIJN', () => {

@@ -15,10 +15,10 @@
  *     in beide modi met één klik open is — UX-skill regel: kern-actie
  *     mag niet wegvallen achter een mode-switch.
  *
- * Data-loading is intentioneel symmetrisch met `asset-detail-flow.tsx`:
- * dezelfde batch-fetch (valuations, mortgages, allAssets, bankAccounts,
- * connection, holdings) zodat de view- en edit-modi alle context hebben die
- * ze in de oude BottomSheet-flow ook hadden.
+ * Data-loading gebeurt in één batch-fetch (valuations, mortgages, allAssets,
+ * bankAccounts, connection, holdings) zodat de view- en edit-modi alle context
+ * hebben die ze in de oude BottomSheet-flow (`asset-detail-flow.tsx`, verwijderd)
+ * ook hadden.
  */
 
 import { useCallback, useEffect, useState } from 'react'
@@ -64,13 +64,19 @@ interface MortgageRow {
 interface AssetPaneProps {
   /** Wanneer null is de pane gesloten. */
   asset: Asset | null
+  /**
+   * Auth-uid van de kijker, voor de eigenaar-guard op Bewerken/Verwijderen.
+   * Optioneel omdat niet elke call-site 'm (nog) doorgeeft — zie `canMutate`
+   * hieronder voor wat er dan gebeurt.
+   */
+  currentUserId?: string
   /** Sluit-callback. URL-state cleanup gebeurt in de parent. */
   onClose: () => void
   /** Aangeroepen na save / herwaardering / delete (router.refresh of loader). */
   onChanged?: () => void
 }
 
-export function AssetPane({ asset, onClose, onChanged }: AssetPaneProps) {
+export function AssetPane({ asset, currentUserId, onClose, onChanged }: AssetPaneProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { addToast } = useToast()
@@ -81,8 +87,7 @@ export function AssetPane({ asset, onClose, onChanged }: AssetPaneProps) {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
-  // Context-data — geladen on-demand bij mode='view' / 'edit'. Symmetrisch
-  // met `asset-detail-flow.tsx` zodat beide flows dezelfde data zien.
+  // Context-data — geladen on-demand bij mode='view' / 'edit'.
   const [currentAsset, setCurrentAsset] = useState<Asset | null>(asset)
   const [valuations, setValuations] = useState<Valuation[]>([])
   const [mortgages, setMortgages] = useState<MortgageRow[]>([])
@@ -107,8 +112,16 @@ export function AssetPane({ asset, onClose, onChanged }: AssetPaneProps) {
   useEffect(() => {
     setCurrentAsset(asset)
     if (asset) {
+      // De deeplink mag de eigenaar-guard NIET omzeilen. `canMutate` verderop
+      // verbergt alleen de Bewerken-ingang; `?edit=1` zet de mode rechtstreeks
+      // en landt dus buiten die ingang om alsnog in een werkend formulier — op
+      // een rij die RLS daarna stil weigert (0 rijen, geen fout). Dat is exact
+      // de "stil verkeerd"-klasse die deze pane voor verwijderen dichtzette.
+      // Zelfde conditie als `canMutate`, hier noodgedwongen herhaald omdat die
+      // pas ná de vroege return berekend kan worden.
+      const mayEdit = !currentUserId || asset.user_id === currentUserId
       const wantsEdit = searchParams.get('edit') === '1'
-      setMode(wantsEdit ? 'edit' : 'view')
+      setMode(wantsEdit && mayEdit ? 'edit' : 'view')
       setEditActions(null)
       setRevaluationOpen(false)
     }
@@ -224,8 +237,8 @@ export function AssetPane({ asset, onClose, onChanged }: AssetPaneProps) {
     const profile = profileRes.data
     setBudgetingActive(profile?.budgeting_active !== false)
 
-    // Daily-expense schatting voor freedom-time badge — symmetrisch met
-    // asset-detail-flow.tsx (jaarlijkse essentiële budgetten / 365).
+    // Daily-expense schatting voor freedom-time badge (jaarlijkse essentiële
+    // budgetten / 365).
     const essentialBudgets = essentialBudgetsRes.data ?? []
     const childBudgets = (childBudgetsRes.data ?? []) as Array<{
       parent_id: string | null
@@ -281,30 +294,58 @@ export function AssetPane({ asset, onClose, onChanged }: AssetPaneProps) {
     if (data) setCurrentAsset(data as Asset)
   }, [currentAsset])
 
+  // Verwijderen loopt via `DELETE /api/assets/[id]` (ADR 0058: muteren gaat via
+  // een API-route). De oude client-update deed `.update({ is_active: false })`
+  // zonder `user_id`-filter en zonder `.select()`; op een huishoud-gedeelde rij
+  // van de partner blokkeerde RLS de schrijfactie, maar 0 geraakte rijen levert
+  // `error: null` — succes-toast, pane dicht, niets gebeurd. De route geeft daar
+  // nu een eerlijke 404 op.
   const handleDelete = useCallback(async () => {
     if (!currentAsset) return
     setDeleting(true)
+    const finishSuccessfully = () => {
+      setConfirmDelete(false)
+      onClose()
+      onChanged?.()
+      router.refresh()
+    }
     try {
-      const supabase = createClient()
-      const { error } = await supabase
-        .from('assets')
-        .update({ is_active: false })
-        .eq('id', currentAsset.id)
-      if (error) throw error
+      const res = await fetch(`/api/assets/${currentAsset.id}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        // Met de eigenaar-guard op de knop betekent 404 nog maar één ding: de
+        // bezitting bestond al niet meer (dubbele klik, ander tabblad). Dat is
+        // geen fout voor de gebruiker — opruimen en neutraal melden.
+        if (res.status === 404) {
+          addToast({
+            type: 'info',
+            title: `${currentAsset.name} was al verwijderd`,
+            message: 'Je overzicht is bijgewerkt.',
+          })
+          finishSuccessfully()
+          return
+        }
+        // Tekst komt uit de server-veilige error-envelope (ADR 0044), nooit uit
+        // een rauwe driver-/DB-melding.
+        addToast({
+          type: 'error',
+          title: 'Verwijderen mislukt',
+          message: typeof data?.error === 'string' ? data.error : 'Probeer het later opnieuw.',
+        })
+        return
+      }
       addToast({
         type: 'success',
         title: `${currentAsset.name} verwijderd`,
         message: 'Je kunt deze bezitting later weer toevoegen.',
       })
-      setConfirmDelete(false)
-      onClose()
-      onChanged?.()
-      router.refresh()
-    } catch (e) {
+      finishSuccessfully()
+    } catch {
+      // Alleen netwerk-/parse-fouten komen hier; geen `e.message` in de UI.
       addToast({
         type: 'error',
         title: 'Verwijderen mislukt',
-        message: e instanceof Error ? e.message : 'Onbekende fout',
+        message: 'Geen verbinding met de server. Probeer het opnieuw.',
       })
     } finally {
       setDeleting(false)
@@ -312,6 +353,20 @@ export function AssetPane({ asset, onClose, onChanged }: AssetPaneProps) {
   }, [currentAsset, addToast, onClose, onChanged, router])
 
   if (!currentAsset) return null
+
+  // Eigenaar-guard voor de destructieve/mutatie-affordances. De conditie zit
+  // bewust op `user_id` en niet op provenance: `deriveProvenance` geeft
+  // 'gezamenlijk' voor élk `ownership === 'shared'`-item ongeacht eigenaar,
+  // terwijl de UPDATE-policy op `assets` strikt eigen-rij is
+  // (`auth.uid() = user_id`). Een gedeelde bezitting van de partner is dus wél
+  // 'gezamenlijk' en tóch niet te bewerken of te verwijderen — een knop die per
+  // definitie nooit kan slagen is een kapotte affordance.
+  //
+  // Zonder `currentUserId` valt de guard bewust OPEN: call-sites die de uid nog
+  // niet doorgeven zouden anders de knop voor élke solo-gebruiker verbergen, en
+  // dat is een grotere regressie dan de kapotte affordance. De route blijft in
+  // dat geval het vangnet met een eerlijke 404.
+  const canMutate = !currentUserId || currentAsset.user_id === currentUserId
 
   const mortgageForAsset = mortgages.find((m) => m.linked_asset_id === currentAsset.id)
   const mortgageProp = mortgageForAsset
@@ -331,7 +386,7 @@ export function AssetPane({ asset, onClose, onChanged }: AssetPaneProps) {
           disabled: !editActions.canSave,
           loading: editActions.saving,
         }
-      : mode === 'view'
+      : mode === 'view' && canMutate
         ? {
             label: 'Bewerken',
             onClick: () => setMode('edit'),
@@ -350,7 +405,8 @@ export function AssetPane({ asset, onClose, onChanged }: AssetPaneProps) {
         }
 
   // Header-actions slot — herwaarderen-icon in edit-mode (zodat het in
-  // beide modi bereikbaar is) en delete-icon in view-mode.
+  // beide modi bereikbaar is) en delete-icon in view-mode. Het delete-icon
+  // verdwijnt zodra de rij niet van de kijker is (zie `canMutate`).
   const headerActions =
     mode === 'edit' ? (
       <button
@@ -362,17 +418,17 @@ export function AssetPane({ asset, onClose, onChanged }: AssetPaneProps) {
       >
         <RefreshCw className="h-4 w-4" />
       </button>
-    ) : (
+    ) : canMutate ? (
       <button
         type="button"
         onClick={() => setConfirmDelete(true)}
-        className="inline-flex h-8 w-8 items-center justify-center rounded-full text-red-600 hover:bg-red-50"
+        className="inline-flex h-8 w-8 items-center justify-center rounded-full text-negative hover:bg-negative/10"
         aria-label="Bezitting verwijderen"
         title="Verwijderen"
       >
         <Trash2 className="h-4 w-4" />
       </button>
-    )
+    ) : undefined
 
   return (
     <>
@@ -469,7 +525,7 @@ export function AssetPane({ asset, onClose, onChanged }: AssetPaneProps) {
               type="button"
               onClick={handleDelete}
               disabled={deleting}
-              className="border border-red-600 bg-red-600 px-4 py-3 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+              className="border border-negative bg-negative px-4 py-3 text-sm font-semibold text-white hover:bg-negative/90 disabled:opacity-50"
               style={{ minHeight: 44 }}
             >
               {deleting ? 'Verwijderen…' : 'Verwijderen'}

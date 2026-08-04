@@ -15,7 +15,7 @@
  */
 
 import { useState, useEffect } from 'react'
-import { Edit3, RefreshCw, Trash2, AlertTriangle, Users, Scale } from 'lucide-react'
+import { Edit3, RefreshCw, AlertTriangle, Users, Scale } from 'lucide-react'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
 import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
@@ -49,7 +49,10 @@ export function DebtDetailModal({
   onClose,
   onEdit,
   onRevalue,
-  onDelete,
+  // `onDelete` staat bewust in het prop-contract maar wordt hier NIET meer
+  // gedestructureerd: de verwijder-affordance en de bevestiging leven sinds
+  // aug 2026 volledig in `<DebtPane>`. De prop blijft bestaan omdat de pane 'm
+  // meegeeft (debt-pane.tsx) en het contract daarmee stabiel blijft.
   embedded = false,
 }: {
   debt: Debt
@@ -69,7 +72,6 @@ export function DebtDetailModal({
    */
   embedded?: boolean
 }) {
-  const [confirmDelete, setConfirmDelete] = useState(false)
   const [showHvB, setShowHvB] = useState(false)
   const { perspective } = usePerspective()
   const [partnerSplit, setPartnerSplit] = useState<{
@@ -459,66 +461,23 @@ export function DebtDetailModal({
               <Edit3 className="h-3.5 w-3.5" />
               Bewerken
             </button>
-            {/* Delete-trigger — opent een confirm-overlay (plan §5.3, driewegregel
-                kind="confirm"). Vorige inline-toggle werd vervangen omdat een
-                onomkeerbare actie hoort in een echte confirm-modal met focus-trap
-                en duidelijke destructive-framing. */}
-            <button
-              onClick={() => setConfirmDelete(true)}
-              className="inline-flex items-center justify-center gap-1.5 rounded-[var(--r)] border border-red-200 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50"
-              aria-label="Schuld verwijderen"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
           </div>
         )}
     </>
   )
 
   // Sibling-overlays die zowel in standalone als embedded mode beschikbaar
-  // moeten zijn (delete-confirm, HvB-vergelijker). Worden naast de pane
-  // gerenderd zodat ze los van de host-overlay sluiten/openen.
+  // moeten zijn (HvB-vergelijker). Worden naast de pane gerenderd zodat ze los
+  // van de host-overlay sluiten/openen.
+  //
+  // Hier stond tot aug 2026 óók een delete-confirm-overlay. Die was
+  // onbereikbaar: deze component wordt uitsluitend door `<DebtPane>` gerenderd
+  // en altijd met `embedded`, terwijl de enige knop die 'm opende in het
+  // `{!embedded && …}`-blok hierboven zat. De echte bevestiging staat in
+  // `debt-pane.tsx`; de `onDelete`-prop blijft bestaan omdat de pane 'm
+  // doorgeeft aan de detail-body.
   const siblings = (
     <>
-      {/* Delete-confirm-overlay — kind="confirm" volgens plan §5.3.
-          Smal centered modal met focus-trap; primaire CTA destructive. */}
-      <ShellOverlay
-        open={confirmDelete}
-        onClose={() => setConfirmDelete(false)}
-        kind="confirm"
-        title="Schuld verwijderen?"
-        destructive
-      >
-        <div className="space-y-4 p-5">
-          <p className="font-serif text-base leading-relaxed text-[var(--ink-2)]">
-            <strong className="text-[var(--ink)]">{debt.name}</strong> en alle bijbehorende
-            waardehistorie en koppelingen worden definitief verwijderd. Deze actie kan
-            niet ongedaan worden gemaakt.
-          </p>
-          <div className="flex flex-col-reverse gap-2 pt-3 sm:flex-row sm:justify-end">
-            <button
-              type="button"
-              onClick={() => setConfirmDelete(false)}
-              className="border border-[var(--border-md)] bg-[var(--paper)] px-4 py-3 text-sm font-medium text-[var(--ink)] hover:bg-[var(--subtle)]"
-              style={{ minHeight: 44 }}
-            >
-              Annuleren
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setConfirmDelete(false)
-                onDelete()
-              }}
-              className="border border-red-600 bg-red-600 px-4 py-3 text-sm font-semibold text-white hover:bg-red-700"
-              style={{ minHeight: 44 }}
-            >
-              Definitief verwijderen
-            </button>
-          </div>
-        </div>
-      </ShellOverlay>
-
       {/* Hypotheek vs Beleggen comparison modal */}
       {showHvB && debt.debt_type === 'mortgage' && (() => {
         // Map Dutch repayment types to HvB engine types

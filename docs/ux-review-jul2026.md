@@ -186,7 +186,7 @@ W3.1 Token-uitbreiding `--warning` + `--positive-bg`/`--negative-bg` [besloten] 
 - C-05 S2/P2 geen min/inputmode op eenheden/prijs (holding-transaction-log:661-702)
 - C-06 S2/P1 labels zonder htmlFor/id (holding-transaction-log:627-716)
 - C-07 S2/P2[VRAAG] WOZ/rente/jaar zonder hint (lib/asset-data.ts:656)
-- C-08 S2/P1 rauwe err.message 4 plekken (asset-pane:297, debt-pane:121, revalue:251, holding-log:144)
+- C-08 S2/P1 rauwe err.message 4 plekken — DEELS DICHT (04-08-2026): asset-pane en debt-pane lopen nu via DELETE /api/{assets,debts}/[id] en tonen `data.error`; open blijven revalue:251 en holding-log:144
 - C-Δ S3/P3 negatief bedrag in revalue-regex (revalue:167)
 
 **Toekomst (D):**
