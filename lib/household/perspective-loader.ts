@@ -130,20 +130,35 @@ export async function loadPerspectiveContext(
 
   const householdId = me.household_id as string
 
-  const { data: household } = await supabase
-    .from('households')
-    .select('name, split_mode, custom_split_pct, primary_payer_id, budget_model')
-    .eq('id', householdId)
-    .maybeSingle()
+  // Deze keten staat vóór ÁLLE domein-queries van een render, dus elke
+  // roundtrip erin telt dubbel. De huishoud-rij en de member-profiles-RPC
+  // hangen niet van elkaar af — de eerste heeft alleen het `householdId` uit de
+  // members-read hierboven nodig, de tweede neemt geen argument — en stonden
+  // puur door schrijfvolgorde achter elkaar. Naast elkaar dus.
+  //
+  // BEWUST NIET meegenomen: de income-budgetten verderop. Die query is
+  // CONDITIONEEL op `splitMode === 'income_ratio'`, en dat veld komt pas uit
+  // `households`. Meenemen zou 'm voor ELK huishouden speculatief draaien —
+  // voor de default-splitsing een extra roundtrip én een read zonder afnemer.
+  // Afhankelijk blijft afhankelijk; zie perspective-loader-parallel.test.ts.
+  const [householdResult, memberProfilesResult] = await Promise.all([
+    supabase
+      .from('households')
+      .select('name, split_mode, custom_split_pct, primary_payer_id, budget_model')
+      .eq('id', householdId)
+      .maybeSingle(),
+    // Profiles RLS is own-only; lees de partnernaam via de huishoud-RPC
+    // (anders blijft de naam leeg en valt de badge terug op "Partner").
+    supabase.rpc('household_member_profiles'),
+  ])
 
+  const household = householdResult.data
   const splitMode = (household?.split_mode ?? 'equal') as SplitMode
   const customSplitPct = household?.custom_split_pct ?? null
   const primaryPayerId = household?.primary_payer_id ?? null
   const budgetModel = (household?.budget_model ?? 'separate') as 'separate' | 'household'
 
-  // Profiles RLS is own-only; lees de partnernaam via de huishoud-RPC
-  // (anders blijft de naam leeg en valt de badge terug op "Partner").
-  const { data: memberProfiles } = await supabase.rpc('household_member_profiles')
+  const memberProfiles = memberProfilesResult.data
   const partnerProfile =
     (memberProfiles as Array<{ id: string; full_name: string | null }> | null)?.find(
       (m) => m.id === partner.user_id,
