@@ -96,6 +96,11 @@ function makeClient(tables: Record<string, Record<string, unknown>[]> = { bank_a
       order: () => b,
       limit: () => b,
       maybeSingle: () => Promise.resolve({ data: rows()[0] ?? null, error: null }),
+      // `loadCashflowData` leest de profielrij via de gedeelde basisdata-laag
+      // (`getOwnProfile` → `.single()`). Zonder fixture-rij is `data` null —
+      // dezelfde vorm die PostgREST bij nul rijen teruggeeft, en precies wat de
+      // loader met `?? null` afvangt.
+      single: () => Promise.resolve({ data: rows()[0] ?? null, error: null }),
       then: (resolve: (v: { data: unknown; count?: number; error: null }) => unknown) => {
         const matched = rows()
         return Promise.resolve(
@@ -230,8 +235,9 @@ describe('loadAccountCount — gedragspin tegen loadCashflowData', () => {
     await loadCashflowData(viaLoader.supabase, 'personal')
     await loadAccountCount(viaCount.supabase, 'personal')
 
-    // De loader raakt bank_accounts plus profiles, recurring_transactions en de
-    // join-fetch op transactions; de helper precies één tabel.
+    // De loader raakt bank_accounts plus profiles en recurring_transactions
+    // (de feed-decoratie blijft hier uit: de gestubde perspectief-set is leeg);
+    // de helper precies één tabel.
     expect(viaLoader.queries.length).toBeGreaterThan(1)
     expect(viaCount.queries.map((q) => q.table)).toEqual(['bank_accounts'])
   })

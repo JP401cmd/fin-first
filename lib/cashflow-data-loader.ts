@@ -19,6 +19,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { getCachedUser } from '@/lib/supabase/cached-user'
 import type { TransactionRow } from '@/lib/types/transactions'
 import { withDerivedDayOfMonth, type RecurringTransaction, type DayDerivationTx } from '@/lib/recurring-data'
+import { getOwnProfile } from '@/lib/server-data/base'
 import { loadPerspectiveTransactionsServer } from '@/lib/household/perspective-loader-server'
 import { type PerspectiveItem } from '@/lib/household/perspective-loader'
 import type { OwnershipType, Perspective } from '@/lib/household-data'
@@ -122,8 +123,21 @@ export const loadCashflowData = cache(async (
     accountsResult,
   ] = await Promise.all([
     loadPerspectiveTransactionsServer(supabase, perspective, { since: sixMonthsAgoIso }),
-    supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle(),
+    // Eigen profielrij uit de GEDEELDE basisdata-laag. Op elke cashflow-pagina
+    // draait `loadCashflowKpis`/`loadForecastSectionData` in dezelfde render en
+    // die lezen 'm al; `cache()` maakt hier dus een hele roundtrip vrij. De
+    // vroegere `.eq('id', user.id)` vervalt — profiles-RLS is own-only — en de
+    // bredere kolomset kost niets: het is één rij, en de loader leest er nog
+    // steeds alleen `full_name` uit.
+    getOwnProfile(supabase),
     // RLS levert eigen-persoonlijk + ALLE gedeelde recurrings van het huishouden.
+    //
+    // BLIJFT LOADER-LOKAAL. De basisdata-laag heeft geen recurring-fetcher, en er
+    // één toevoegen levert pas iets op als óók `lib/vaste-lasten-summary.ts` 'm
+    // consumeert — de enige andere lezer in deze render. Die leest een smalle
+    // 7-kolomsselectie; hem op deze `*` zetten verbreedt zijn egress en raakt het
+    // fingerprint-gecachte detectiepad, voor precies één bespaarde query op één
+    // van de vier cashflow-pagina's. Dat is geen gratis winst.
     supabase
       .from('recurring_transactions')
       .select('*')
@@ -131,6 +145,13 @@ export const loadCashflowData = cache(async (
     // Liquide saldo voor cumulatief-startpunt — RLS levert eigen + gedeeld.
     // ⚠️ géén partner_split_pct selecteren: die kolom bestaat niet op
     // bank_accounts en PostgREST laat de hele query dan stil falen (saldo 0).
+    //
+    // BLIJFT LOADER-LOKAAL. De gedeelde `getUnlinkedBankAccounts` is een ANDERE
+    // RIJENSET: die filtert op `linked_asset_id IS NULL` (de grondslag "welk geld
+    // telt náást de assets mee", lib/unlinked-cash.ts) en levert geen
+    // `ownership`/`user_id` — precies de twee kolommen waarop de
+    // perspectief-scoping hieronder draait. Omzetten zou `startingBalance` en
+    // `accountCount` numeriek veranderen.
     supabase
       .from('bank_accounts')
       .select('id, balance, name, ownership, user_id')
