@@ -153,11 +153,22 @@ interface TxQuery {
  * worden echt toegepast op de eigen-RLS-rijenset. Alleen zó kan de test rood
  * staan op de oude code én groen op de nieuwe.
  */
-function makeClient(joinRows: JoinRow[] = ownRlsRows()) {
+function makeClient(
+  joinRows: JoinRow[] = ownRlsRows(),
+  /**
+   * Laat een decoratie-batch falen zoals PostgREST dat doet: `{ data: null,
+   * error }`. Krijgt de batch-index mee zodat een test één specifieke batch kan
+   * laten omvallen en de rest kan laten slagen.
+   */
+  failBatch: (batchIndex: number) => boolean = () => false,
+) {
   const txQueries: TxQuery[] = []
+  let inFlight = 0
+  let maxInFlight = 0
 
   function builder(table: string) {
     const q: TxQuery = { columns: null, gteDate: null, inIds: null, limit: null, ordered: false }
+    const batchIndex = table === 'transactions' ? txQueries.length : -1
     if (table === 'transactions') txQueries.push(q)
 
     const resolve = (): Record<string, unknown>[] => {
@@ -199,8 +210,23 @@ function makeClient(joinRows: JoinRow[] = ownRlsRows()) {
       },
       single: () => Promise.resolve({ data: { full_name: 'Testgebruiker' }, error: null }),
       maybeSingle: () => Promise.resolve({ data: { full_name: 'Testgebruiker' }, error: null }),
-      then: (res: (v: { data: unknown; error: null }) => unknown) =>
-        Promise.resolve(res({ data: resolve(), error: null })),
+      // Resolutie op een macrotask (niet synchroon), zodat de GOLF-structuur van
+      // de loader waarneembaar is: alles wat gelijktijdig onderweg is, is
+      // opgehoogd vóór de eerste afronding. Daarmee meet `maxInFlight` echt de
+      // fan-out en niet de aanroepvolgorde.
+      then: (res: (v: { data: unknown; error: unknown }) => unknown) => {
+        const payload =
+          batchIndex >= 0 && failBatch(batchIndex)
+            ? { data: null, error: { message: 'batch-storing (fixture)' } }
+            : { data: resolve(), error: null }
+        if (batchIndex < 0) return Promise.resolve(res(payload))
+        inFlight += 1
+        maxInFlight = Math.max(maxInFlight, inFlight)
+        return new Promise<void>((r) => setTimeout(r, 0)).then(() => {
+          inFlight -= 1
+          return res(payload)
+        })
+      },
     }
     return b
   }
@@ -211,7 +237,7 @@ function makeClient(joinRows: JoinRow[] = ownRlsRows()) {
     rpc: () => Promise.resolve({ data: [], error: null }),
   } as unknown as SupabaseClient
 
-  return { supabase, txQueries }
+  return { supabase, txQueries, stats: () => ({ maxInFlight }) }
 }
 
 beforeEach(() => {
@@ -265,6 +291,11 @@ describe('loadCashflowData — feed-decoratie kapt niet af', () => {
     expect(gedeeld?.category).toBe('Wonen')
   })
 
+  // LET OP wat deze test wél en niet bewijst: hij pint vast dat de loader geen
+  // namen VERZINT voor rijen die de eigen RLS niet teruggeeft. Hij bewijst NIET
+  // dat de `_provenance`-filter bestaat — die rijen zitten niet in de
+  // RLS-fixture, dus ze blijven ook zonder filter naamloos. Dat bewijs zit in de
+  // bedradings-assertie verderop (`expect(gevraagd).toEqual(decorableIds())`).
   it('laat partner-persoonlijke rijen bewust naamloos (privacy, geen defect)', async () => {
     const { supabase } = makeClient()
     const { transactions } = await loadCashflowData(supabase, 'household')
@@ -304,7 +335,14 @@ describe('loadCashflowData — decoratie volgt de getoonde ids', () => {
     expect(txQueries.length).toBeGreaterThan(1)
 
     const gevraagd = txQueries.flatMap((q) => q.inIds ?? []).sort()
-    // Geen partner-id's (onzichtbaar onder eigen RLS) en niets buiten het venster.
+    // ⚠️ DIT IS DE DRAGENDE ASSERTIE VOOR DE `_provenance`-FILTER — de enige.
+    // De uitkomst-test "laat partner-persoonlijke rijen bewust naamloos" bewijst
+    // 'm NIET: die rijen zitten sowieso niet in de eigen-RLS-fixture, dus ze
+    // blijven ook naamloos als de filter verdwijnt (nagemeten: filter weghalen
+    // laat álles groen behalve deze regel). Zwak deze assertie dus niet af en
+    // verwijder 'm niet zonder vervanging — dan test niets meer dat partner-
+    // id's buiten de decoratie-query blijven.
+    // Tevens: niets buiten het 3-maands venster.
     expect(gevraagd).toEqual(decorableIds())
   })
 
@@ -315,6 +353,16 @@ describe('loadCashflowData — decoratie volgt de getoonde ids', () => {
     for (const q of txQueries) {
       expect(q.columns).toBe('id, bank_accounts(name), budgets(name)')
     }
+  })
+
+  it('houdt de fan-out begrensd — niet alle batches tegelijk', async () => {
+    const { supabase, txQueries, stats } = makeClient()
+    await loadCashflowData(supabase, 'household')
+
+    // Er zijn ruim meer batches dan de golfbreedte; zonder begrenzing zou
+    // maxInFlight gelijk zijn aan het totale aantal batches.
+    expect(txQueries.length).toBeGreaterThan(5)
+    expect(stats().maxInFlight).toBeLessThanOrEqual(5)
   })
 
   it('doet géén decoratie-query als de feed leeg is', async () => {
@@ -344,5 +392,82 @@ describe('loadCashflowData — decoratie volgt de getoonde ids', () => {
     const { transactions } = await loadCashflowData(supabase, 'personal')
     expect(transactions).toEqual([])
     expect(txQueries).toEqual([])
+  })
+})
+
+// ── Faalgedrag ─────────────────────────────────────────────────
+
+/**
+ * Een gefaalde batch mag niet stil zijn. Vóór de id-decoratie was de decoratie
+ * één alles-of-niets-query: een fout liet de HELE feed naamloos — zichtbaar
+ * kapot. Nu laat één gefaalde batch een blok naamloze rijen middenin een lange
+ * feed achter, visueel niet te onderscheiden van de partner-rijen die legitiem
+ * naamloos zijn. Dat is precies het faalbeeld van de bug die deze code dichtte,
+ * terug via een smallere deur — dus het moet in de logs vindbaar zijn.
+ */
+describe('loadCashflowData — een gefaalde decoratie-batch is luidruchtig, niet stil', () => {
+  it('logt server-side met een grep-bare tag', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      // Alleen de tweede batch valt om.
+      const { supabase } = makeClient(ownRlsRows(), (i) => i === 1)
+      await loadCashflowData(supabase, 'household')
+
+      expect(spy).toHaveBeenCalledTimes(1)
+      const [melding] = spy.mock.calls[0]
+      expect(String(melding)).toContain('[cashflow:decorate]')
+      expect(String(melding)).toContain('batch-storing (fixture)')
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
+  it('laat de overige batches gewoon hun namen leveren', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const { supabase } = makeClient(ownRlsRows(), (i) => i === 1)
+      const { transactions } = await loadCashflowData(supabase, 'household')
+
+      const eigenRijen = transactions.filter((t) => !PARTNER_IDS.includes(t.id))
+      const metNaam = eigenRijen.filter((t) => t.account_name != null)
+      const zonderNaam = eigenRijen.filter((t) => t.account_name == null)
+
+      // Precies één batch kwijt: de rest is er gewoon.
+      expect(zonderNaam.length).toBeGreaterThan(0)
+      expect(zonderNaam.length).toBeLessThanOrEqual(100)
+      expect(metNaam.length).toBe(eigenRijen.length - zonderNaam.length)
+      expect(metNaam.length).toBeGreaterThan(zonderNaam.length)
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
+  it('houdt élke feed-rij zichtbaar — de naam is verrijking, geen inhoud', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      // Álles valt om: de zwaarst denkbare storing.
+      const { supabase } = makeClient(ownRlsRows(), () => true)
+      const { transactions } = await loadCashflowData(supabase, 'household')
+
+      expect(transactions).toHaveLength(OWN_ROWS + 1 + PARTNER_IDS.length)
+      for (const rij of transactions) {
+        expect(rij.account_name).toBeNull()
+        // Bedrag en omschrijving komen uit de perspectief-set en blijven staan.
+        expect(rij.description).not.toBe('')
+      }
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
+  it('lekt geen DB-fouttekst naar de teruggegeven data (AVG/ADR 0044)', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const { supabase } = makeClient(ownRlsRows(), () => true)
+      const data = await loadCashflowData(supabase, 'household')
+      expect(JSON.stringify(data)).not.toContain('batch-storing')
+    } finally {
+      spy.mockRestore()
+    }
   })
 })

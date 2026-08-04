@@ -89,10 +89,24 @@ function shareOf(item: PerspectiveItem, perspective: Perspective): number {
 /**
  * Maximaal aantal id's per decoratie-batch (zie de feed-sectie onderaan).
  * PostgREST zet `in.(…)` in de query-STRING, dus een ongebonden id-lijst loopt
- * tegen de URL-lengtegrens van proxies/CDN aan. Klein genoeg om ruim onder die
- * grens te blijven, groot genoeg om het aantal roundtrips laag te houden.
+ * tegen de URL-lengtegrens van proxies/CDN aan.
+ *
+ * Reken mee vóór je dit verhoogt: een UUID kost in de URL ~39 bytes (36 tekens +
+ * scheiding/escaping), dus 100 id's ≈ 3,9 kB plus de basis-URL. Tegen een
+ * gangbare 8 kB-proxygrens is dat ongeveer een factor 2 marge — genoeg, maar
+ * geen vrijbrief. Verdubbelen zit al tegen de grens aan.
  */
 const DECORATION_BATCH_SIZE = 100
+
+/**
+ * Hoeveel decoratie-batches er tegelijk onderweg mogen zijn.
+ *
+ * Ongebonden `Promise.all` over álle batches vuurt bij een lange feed tientallen
+ * gelijktijdige verzoeken af vanuit één render — precies de omstandigheid waarin
+ * er één omvalt. Golven van vijf houden de winst (parallel) zonder de connectie-
+ * pool van één request te overspoelen.
+ */
+const DECORATION_CONCURRENCY = 5
 
 // ── Loader ────────────────────────────────────────────────────
 
@@ -123,12 +137,14 @@ export const loadCashflowData = cache(async (
     accountsResult,
   ] = await Promise.all([
     loadPerspectiveTransactionsServer(supabase, perspective, { since: sixMonthsAgoIso }),
-    // Eigen profielrij uit de GEDEELDE basisdata-laag. Op elke cashflow-pagina
-    // draait `loadCashflowKpis`/`loadForecastSectionData` in dezelfde render en
-    // die lezen 'm al; `cache()` maakt hier dus een hele roundtrip vrij. De
-    // vroegere `.eq('id', user.id)` vervalt — profiles-RLS is own-only — en de
-    // bredere kolomset kost niets: het is één rij, en de loader leest er nog
-    // steeds alleen `full_name` uit.
+    // Eigen profielrij uit de GEDEELDE basisdata-laag. Op de drie
+    // pagina-callsites draait `loadCashflowKpis`/`loadForecastSectionData` in
+    // dezelfde render en die lezen 'm al; `cache()` maakt daar een hele
+    // roundtrip vrij. Op de twee niet-render-callsites (de cashflow-status-route
+    // en lib/page-status/compute.ts) is `cache()` een passthrough — daar is dit
+    // neutraal, niet goedkoper. De vroegere `.eq('id', user.id)` vervalt —
+    // profiles-RLS is own-only — en de bredere kolomset kost niets: het is één
+    // rij, en de loader leest er nog steeds alleen `full_name` uit.
     getOwnProfile(supabase),
     // RLS levert eigen-persoonlijk + ALLE gedeelde recurrings van het huishouden.
     //
@@ -288,20 +304,38 @@ export const loadCashflowData = cache(async (
     for (let i = 0; i < decorateIds.length; i += DECORATION_BATCH_SIZE) {
       batches.push(decorateIds.slice(i, i + DECORATION_BATCH_SIZE))
     }
-    const decorated = await Promise.all(
-      batches.map((ids) =>
-        supabase
-          .from('transactions')
-          // Alleen de naam-kolommen: datum/omschrijving/bedrag komen uit de
-          // perspectief-set, die ze al perspectief-correct gestempeld draagt.
-          .select('id, bank_accounts(name), budgets(name)')
-          .in('id', ids),
-      ),
-    )
-    for (const res of decorated) {
-      for (const r of (res.data ?? []) as Array<Record<string, unknown>>) {
-        displayById.set(String(r.id), r)
-      }
+    // In golven, niet allemaal tegelijk — zie DECORATION_CONCURRENCY.
+    for (let i = 0; i < batches.length; i += DECORATION_CONCURRENCY) {
+      const wave = batches.slice(i, i + DECORATION_CONCURRENCY)
+      const decorated = await Promise.all(
+        wave.map((ids) =>
+          supabase
+            .from('transactions')
+            // Alleen de naam-kolommen: datum/omschrijving/bedrag komen uit de
+            // perspectief-set, die ze al perspectief-correct gestempeld draagt.
+            .select('id, bank_accounts(name), budgets(name)')
+            .in('id', ids),
+        ),
+      )
+      decorated.forEach((res, j) => {
+        // Een gefaalde batch is GEEN stille aangelegenheid. Hij laat een blok
+        // naamloze rijen verspreid door een lange feed achter, visueel niet te
+        // onderscheiden van de partner-rijen die legitiem naamloos zijn — precies
+        // het faalbeeld van de afkap-bug die deze code dichtte, terug via een
+        // smallere deur. De feed blijft bewust staan (de naam is verrijking, geen
+        // inhoud), maar de storing moet in de logs vindbaar zijn i.p.v. eruit te
+        // zien als ontbrekende data. Alleen server-side: de melding bereikt de
+        // gebruiker nooit (AVG/security, ADR 0044).
+        if (res.error) {
+          console.error(
+            `[cashflow:decorate] naam-decoratie faalde voor ${wave[j].length} rijen: ${res.error.message}`,
+          )
+          return
+        }
+        for (const r of (res.data ?? []) as Array<Record<string, unknown>>) {
+          displayById.set(String(r.id), r)
+        }
+      })
     }
   }
 
