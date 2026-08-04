@@ -29,6 +29,14 @@ import type { Perspective } from '@/lib/household-data'
  * Geen sessie of een fout op de query → 0, net als het EMPTY-pad respectievelijk
  * de `data ?? []`-terugval van `loadCashflowData`. Auth hoeft niet apart gecheckt
  * te worden: zonder geldige sessie levert RLS eenvoudigweg nul rijen.
+ *
+ * Een gefaalde telling is wél LUIDRUCHTIG in de logs. De 0-terugval is pariteit
+ * met de oude loader en blijft staan (de banner mag niet klappen op een storing),
+ * maar 0 is hier niet neutraal: het toont "koppel je rekening" aan iemand die er
+ * wél heeft, en dit is sinds de omzetting het enige serverwerk op die pagina —
+ * er is geen andere query meer die de storing zou verraden. Zelfde vorm als de
+ * decoratie-storing die deze branch eerder luidruchtig maakte. Alleen
+ * server-side: de melding bereikt de gebruiker nooit (AVG/security, ADR 0044).
  */
 export async function loadAccountCount(
   supabase: SupabaseClient,
@@ -44,6 +52,11 @@ export async function loadAccountCount(
   }
 
   const { count, error } = await query
-  if (error) return 0
+  if (error) {
+    console.error(
+      `[cashflow:account-count] telling faalde (perspectief ${perspective}): ${error.message}`,
+    )
+    return 0
+  }
   return count ?? 0
 }

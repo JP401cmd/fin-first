@@ -180,6 +180,22 @@ describe('loadAccountCount — filterkeuze per perspectief', () => {
   })
 })
 
+/**
+ * Een client waarvan de count-query een DB-fout teruggeeft. `.eq()` is
+ * thenable, net als in `makeClient`, zodat de keten met of zonder
+ * ownership-filter in beide perspectieven op dezelfde fout uitkomt.
+ */
+function failingClient(): SupabaseClient {
+  const failing = {
+    eq: () => failing,
+    then: (resolve: (v: { count: null; error: { message: string } }) => unknown) =>
+      Promise.resolve(resolve({ count: null, error: { message: 'boom' } })),
+  }
+  return {
+    from: () => ({ select: () => failing }),
+  } as unknown as SupabaseClient
+}
+
 describe('loadAccountCount — uitkomst', () => {
   it.each([
     { perspective: 'personal' as const, expected: 3 },
@@ -198,17 +214,50 @@ describe('loadAccountCount — uitkomst', () => {
   })
 
   it('valt bij een query-fout terug op 0 (zoals de data ?? []-terugval van de loader)', async () => {
-    const supabase = {
-      from: () => ({
-        select: () => ({
-          eq: () => ({
-            then: (resolve: (v: { count: null; error: { message: string } }) => unknown) =>
-              Promise.resolve(resolve({ count: null, error: { message: 'boom' } })),
-          }),
-        }),
-      }),
-    } as unknown as SupabaseClient
-    expect(await loadAccountCount(supabase, 'personal')).toBe(0)
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      expect(await loadAccountCount(failingClient(), 'personal')).toBe(0)
+    } finally {
+      spy.mockRestore()
+    }
+  })
+})
+
+// ── Faalgedrag ─────────────────────────────────────────────────
+
+/**
+ * De 0-terugval hierboven is pariteit met de oude loader en blijft, maar 0 is
+ * op deze pagina niet neutraal: het toont "koppel je rekening" aan iemand die
+ * er wél heeft. Sinds de omzetting is dit het ENIGE serverwerk op
+ * /overzicht/cashflow/transacties — er is geen tweede query meer die de storing
+ * zou verraden. Dus moet hij in de logs vindbaar zijn, en nergens anders.
+ */
+describe('loadAccountCount — een gefaalde telling is luidruchtig, niet stil', () => {
+  it('logt server-side met een grep-bare tag', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      await loadAccountCount(failingClient(), 'partner')
+
+      expect(spy).toHaveBeenCalledTimes(1)
+      const [melding] = spy.mock.calls[0]
+      expect(String(melding)).toContain('[cashflow:account-count]')
+      // Het perspectief hoort erbij: de scoping verschilt per perspectief, dus
+      // zonder dat is de melding niet terug te leiden naar de query die faalde.
+      expect(String(melding)).toContain('partner')
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
+  it('zwijgt op het geslaagde pad', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const { supabase } = makeClient()
+      await loadAccountCount(supabase, 'personal')
+      expect(spy).not.toHaveBeenCalled()
+    } finally {
+      spy.mockRestore()
+    }
   })
 })
 
