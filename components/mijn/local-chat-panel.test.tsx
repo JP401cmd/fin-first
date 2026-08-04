@@ -48,6 +48,9 @@ const OVERVIEW: LocalChatOverview = {
   jaarruimte: null,
   kansen: [],
   openstaandeActies: [],
+  budgetten: null,
+  uitgavenpatronen: [],
+  terugkerend: null,
 }
 
 const CAPABLE = { ok: true, reasons: [], shaderF16: true, deviceMemoryGb: 16 }

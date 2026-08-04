@@ -198,14 +198,21 @@ export function AiExecutionChoice({
       {/* Alleen als de tier er wél is — anders stapelt dit op het upsell-blok.
           Deze melding kondigt aan wat er waarschijnlijk gaat gebeuren; de
           schakelaar blijft bruikbaar en de echte toets volgt na de klik. Zie de
-          toelichting bij `likelyMobile` in local-categorization-settings.tsx. */}
+          toelichting bij `likelyMobile` in local-categorization-settings.tsx.
+
+          De tekst noemt bewust de JUISTE reden. Hij zei eerder dat het model op
+          een telefoon "niet in het grafisch geheugen past" — dat is door de
+          meting van 19 juli weerlegd: het pást en het draait vlot (2,6 s per
+          transactie, sneller dan menige laptop). Wat er misgaat is de UITVOER.
+          Zie lib/ai/local/output-proof.ts. */}
       {aiEnabled && hasAiTier && likelyMobile && (
         <div id="lokale-cat-reden-mobiel" className="flex items-start gap-3 bg-[var(--subtle)] p-4">
           <MonitorSmartphone className="mt-0.5 h-4 w-4 shrink-0 text-[var(--ink-3)]" aria-hidden="true" />
           <p className="text-sm leading-relaxed text-[var(--ink-2)]">
-            Dit lijkt een telefoon of tablet, en daar past het model meestal niet in het grafisch geheugen —
-            we hebben het gemeten: er komt geen bruikbaar antwoord uit. Je kunt het gerust proberen: we
-            controleren je apparaat vóór er iets gedownload wordt, en zeggen dan precies wat er ontbreekt.
+            Dit lijkt een telefoon of tablet. Snél genoeg zijn die meestal wel — dat hebben we gemeten —
+            maar de grafische chip van veel telefoons rekent het model op dit moment stuk, en dan komt er
+            onzin uit. Probeer het gerust: na de download doet je toestel een korte proef, en lokaal draaien
+            gaat alleen aan als die slaagt.
           </p>
         </div>
       )}

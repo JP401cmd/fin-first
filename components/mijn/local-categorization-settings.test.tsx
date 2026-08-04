@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { AiExecutionSettings } from './local-categorization-settings'
+import { writeProofVerdict } from '@/lib/ai/local/proof-verdict'
 import type { AiExecutionGroup, AiExecutionMode } from '@/lib/ai/execution-groups'
 
 /**
@@ -29,6 +30,8 @@ const mocks = vi.hoisted(() => ({
   getLocalModelState: vi.fn(),
   downloadLocalModel: vi.fn(),
   deleteLocalModel: vi.fn(),
+  proveLocalModel: vi.fn(),
+  selectLocalModel: vi.fn(),
 }))
 
 vi.mock('@/lib/ai/local/webgpu-capability', () => ({
@@ -38,6 +41,8 @@ vi.mock('@/lib/ai/local/model-manager', () => ({
   getLocalModelState: mocks.getLocalModelState,
   downloadLocalModel: mocks.downloadLocalModel,
   deleteLocalModel: mocks.deleteLocalModel,
+  proveLocalModel: mocks.proveLocalModel,
+  selectLocalModel: mocks.selectLocalModel,
   LOCAL_MODEL_DOWNLOAD_GB: 3.2,
 }))
 
@@ -100,6 +105,13 @@ beforeEach(() => {
   mocks.getLocalModelState.mockReset()
   mocks.downloadLocalModel.mockReset()
   mocks.deleteLocalModel.mockReset()
+  // Default: dit toestel haalt de uitvoer-toets. Cases die het tegendeel testen
+  // zetten 'm zelf om. Bewaarde oordelen mogen niet tussen tests doorlekken.
+  mocks.proveLocalModel.mockReset()
+  mocks.proveLocalModel.mockResolvedValue({ ok: true, reasons: [], results: [] })
+  mocks.selectLocalModel.mockReset()
+  mocks.selectLocalModel.mockResolvedValue(undefined)
+  localStorage.clear()
   profileRow = { ai_enabled: true, privacy_mode: false, active_subscriptions: ['ai'] }
   fetchMock = vi.fn().mockImplementation(async (url: unknown) => {
     if (typeof url === 'string' && url.startsWith('/api/ai-execution-prefs')) {
@@ -240,34 +252,65 @@ describe('AiExecutionSettings', () => {
     expect(privacyModeCalls()).toHaveLength(0)
   })
 
-  it('happy path: capability ok → consent → download → POST true', async () => {
+  // ── De twee stappen ─────────────────────────────────────────────────────
+  //
+  // Downloaden en testen zaten aan elkaar vast; bij een zakking was niet te
+  // zien wát er misging. Het zijn nu twee eigen handelingen met een eigen knop.
+  it('stap 1 haalt alleen het model op — nog geen proef, nog geen aanzetten', async () => {
     mocks.getLocalModelState.mockResolvedValue({ state: 'niet-gedownload', bytes: null })
     mocks.checkLocalAiCapability.mockResolvedValue({ ok: true, reasons: [] })
-    mocks.downloadLocalModel.mockImplementation(async (onProgress?: (p: unknown) => void) => {
-      onProgress?.({ loadedBytes: 3.2e9, totalBytes: 3.2e9 })
-    })
+    mocks.downloadLocalModel.mockResolvedValue(undefined)
 
     render(<AiExecutionSettings />)
-    const toggle = await screen.findByRole('switch', { name: /Lokaal waar mogelijk/i })
-
-    fireEvent.click(toggle)
-
-    // Consent-stap verschijnt.
-    const downloadBtn = await screen.findByRole('button', { name: /Download & zet aan/i })
-    // Specifiek de kop (de bullet bevat óók "eenmalige download") → geen ambigue match.
-    expect(screen.getByRole('heading', { name: /Eenmalige download/i })).toBeTruthy()
-
-    fireEvent.click(downloadBtn)
+    fireEvent.click(await screen.findByRole('button', { name: /Model downloaden/i }))
 
     await waitFor(() => expect(mocks.downloadLocalModel).toHaveBeenCalledTimes(1))
+    expect(mocks.proveLocalModel, 'stap 2 hoort een eigen handeling te zijn').not.toHaveBeenCalled()
+    expect(privacyModeCalls(), 'bestanden zijn nog geen werkend geheel').toEqual([])
+  })
+
+  it('stap 2 slaagt → dan pas gaat lokaal draaien aan', async () => {
+    mocks.getLocalModelState.mockResolvedValue({ state: 'klaar', bytes: 2.0e9 })
+    mocks.checkLocalAiCapability.mockResolvedValue({ ok: true, reasons: [] })
+
+    render(<AiExecutionSettings />)
+    fireEvent.click(await screen.findByRole('button', { name: /Toestel testen/i }))
+
+    await waitFor(() => expect(mocks.proveLocalModel).toHaveBeenCalledTimes(1))
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
         '/api/privacy-mode',
         expect.objectContaining({ method: 'POST', body: JSON.stringify({ enabled: true }) }),
       ),
     )
-    // Model staat nu klaar → beheer-blok verschijnt.
-    await screen.findByText(/Model staat klaar op dit toestel/i)
+    expect(mocks.downloadLocalModel, 'het model stond er al').not.toHaveBeenCalled()
+  })
+
+  // TRANSPARANTIE: de proef beslist of dit toestel meedoet, dus moet zichtbaar
+  // zijn wát er gevraagd is en wát het model antwoordde. Dat is niet theoretisch
+  // — de eerste versie verwierp een prima toestel op een quizvraag.
+  it('een gezakte proef toont het echte antwoord en zet niets aan', async () => {
+    mocks.getLocalModelState.mockResolvedValue({ state: 'klaar', bytes: 2.0e9 })
+    mocks.checkLocalAiCapability.mockResolvedValue({ ok: true, reasons: [] })
+    mocks.proveLocalModel.mockResolvedValue({
+      ok: false,
+      reasons: ['Bij de proef ging het mis.'],
+      results: [{ id: 'echo-woord', raw: 'ですです', reason: 'het gevraagde woord kwam niet terug' }],
+    })
+
+    render(<AiExecutionSettings />)
+    fireEvent.click(await screen.findByRole('button', { name: /Toestel testen/i }))
+
+    expect(await screen.findByText(/ですです/)).toBeTruthy()
+    expect(screen.getByText(/het gevraagde woord kwam niet terug/i)).toBeTruthy()
+    expect(privacyModeCalls()).toEqual([])
+  })
+
+  it('de proefvragen staan er vóór je hem draait', async () => {
+    mocks.getLocalModelState.mockResolvedValue({ state: 'klaar', bytes: 2.0e9 })
+    render(<AiExecutionSettings />)
+    expect(await screen.findByText(/één woord exact teruggeven/i)).toBeTruthy()
+    expect(screen.getByText(/een hele zin foutloos teruggeven/i)).toBeTruthy()
   })
 
   it('verwijderen: deleteLocalModel + POST false', async () => {

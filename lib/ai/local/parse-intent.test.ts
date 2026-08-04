@@ -33,6 +33,9 @@ function makeOverview(overrides: Partial<LocalChatOverview> = {}): LocalChatOver
       { titel: 'Verlaag je energiekosten', besparingPerJaar: 600, vrijheidsdagen: 7 },
     ],
     openstaandeActies: [{ titel: 'Zeg dubbele streamingdienst op', vrijheidsdagen: 4, status: 'open' }],
+    budgetten: null,
+    uitgavenpatronen: [],
+    terugkerend: null,
     ...overrides,
   }
 }

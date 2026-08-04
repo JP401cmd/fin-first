@@ -31,6 +31,9 @@ const OVERVIEW: LocalChatOverview = {
   jaarruimte: { onbenut: 22155, besparing: 12409, vrijheidsdagen: 108 },
   kansen: [],
   openstaandeActies: [],
+  budgetten: null,
+  uitgavenpatronen: [],
+  terugkerend: null,
 }
 
 const ARTICLE: LocalNewsSource = {

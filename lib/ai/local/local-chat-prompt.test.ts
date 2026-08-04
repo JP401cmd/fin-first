@@ -27,6 +27,9 @@ const OVERVIEW: LocalChatOverview = {
     { titel: 'Bespaar op boodschappen', besparingPerJaar: 600, vrijheidsdagen: 5, deadline: '31 dec' },
   ],
   openstaandeActies: [{ titel: 'Benut je jaarruimte', vrijheidsdagen: 108, status: 'open' }],
+  budgetten: null,
+  uitgavenpatronen: [],
+  terugkerend: null,
 }
 
 function knowledgeItem(over: Partial<LocalKnowledgeItem>): LocalKnowledgeItem {
@@ -127,6 +130,90 @@ describe('buildLocalChatSystemPrompt — verrijking (jaarruimte, kansen, acties)
   })
 })
 
+// ── C2b: context-parity met de cloud-Fin ────────────────────────────────────
+//
+// De aanleiding is een echte gebruikersvraag: "kun jij mijn budgetten en
+// transacties zien?" — waarop de lokale Fin nee moest zeggen terwijl de
+// cloud-Fin budgetten, patronen en abonnementen gewoon opsomde.
+describe('buildLocalChatSystemPrompt — budgetten, patronen en terugkerende lasten', () => {
+  const MET_C2B: LocalChatOverview = {
+    ...OVERVIEW,
+    budgetten: {
+      categorieen: [
+        { naam: 'Vaste lasten', limiet: 1950, besteed: 1180 },
+        { naam: 'Dagelijkse uitgaven', limiet: 900, besteed: 640 },
+      ],
+      overschrijdingen: [{ naam: 'Energie', besteed: 220, limiet: 200 }],
+    },
+    uitgavenpatronen: [
+      { categorie: 'Boodschappen', gemiddeldPerMaand: 225 },
+      { categorie: 'Brandstof', gemiddeldPerMaand: 183 },
+    ],
+    terugkerend: {
+      abonnementenAantal: 14,
+      abonnementenPerMaand: 163,
+      vasteLastenAantal: 4,
+      vasteLastenPerMaand: 332,
+      grootste: [{ naam: 'Hypotheek', perMaand: 1000 }],
+    },
+  }
+
+  it('toont de budgetten van deze maand met besteed én limiet', () => {
+    const prompt = buildLocalChatSystemPrompt({ overview: MET_C2B, question: 'hoi', knowledgeItems: [] })
+    expect(prompt).toContain('Budgetten deze maand')
+    expect(prompt).toContain('Vaste lasten €1.180/€1.950')
+    expect(prompt).toContain('Dagelijkse uitgaven €640/€900')
+  })
+
+  it('benoemt de subbudgetten die op of over hun limiet zitten', () => {
+    const prompt = buildLocalChatSystemPrompt({ overview: MET_C2B, question: 'hoi', knowledgeItems: [] })
+    expect(prompt).toContain('op of over hun limiet')
+    expect(prompt).toContain('Energie €220 van €200')
+  })
+
+  it('toont de gemiddelde maanduitgaven per categorie', () => {
+    const prompt = buildLocalChatSystemPrompt({ overview: MET_C2B, question: 'hoi', knowledgeItems: [] })
+    expect(prompt).toContain('Boodschappen €225/mnd')
+    expect(prompt).toContain('Brandstof €183/mnd')
+  })
+
+  it('toont abonnementen en vaste lasten met aantal en maandtotaal', () => {
+    const prompt = buildLocalChatSystemPrompt({ overview: MET_C2B, question: 'hoi', knowledgeItems: [] })
+    expect(prompt).toContain('14 abonnementen €163/mnd')
+    expect(prompt).toContain('4 vaste lasten €332/mnd')
+    expect(prompt).toContain('Hypotheek €1.000/mnd')
+  })
+
+  it('laat alle drie de blokken weg wanneer er niets is', () => {
+    const prompt = buildLocalChatSystemPrompt({ overview: OVERVIEW, question: 'hoi', knowledgeItems: [] })
+    expect(prompt).not.toContain('Budgetten deze maand')
+    expect(prompt).not.toContain('Gemiddelde uitgaven per maand')
+    expect(prompt).not.toContain('Terugkerend:')
+  })
+
+  // DE HARDE GRENS. Het venster is 8.192 tokens voor DNA, overzicht, kennisbank,
+  // vraag, antwoord én de hele gespreksgeschiedenis samen. Wat hier bij komt,
+  // gaat af van de ruimte voor het gesprek zelf — dus de drie nieuwe blokken
+  // moeten samen klein blijven. Schatting op tekens/4, gelijk aan het
+  // parity-harnas.
+  // Het gemelde antwoord was "als AI-coach heb ik geen directe toegang tot je
+  // persoonlijke bankrekeningen of transacties". Dat was wáár zolang de context
+  // die data niet droeg; nu zou dezelfde zin onjuist zijn. De DNA zegt het
+  // daarom expliciet — mét de eerlijke keerzijde voor wat er écht niet in staat.
+  it('de DNA verbiedt te beweren dat budgetten en lasten onzichtbaar zijn', () => {
+    expect(LOCAL_CHAT_DNA).toContain('zeg dus nooit dat je die niet kunt zien')
+    expect(LOCAL_CHAT_DNA).toMatch(/Staat er iets NIET in het overzicht/)
+  })
+
+  it('de drie nieuwe blokken kosten samen minder dan 250 tokens', () => {
+    const zonder = buildLocalChatSystemPrompt({ overview: OVERVIEW, question: 'hoi', knowledgeItems: [] })
+    const met = buildLocalChatSystemPrompt({ overview: MET_C2B, question: 'hoi', knowledgeItems: [] })
+    const extraTokens = Math.ceil((met.length - zonder.length) / 4)
+    expect(extraTokens).toBeGreaterThan(0)
+    expect(extraTokens, `kostte ${extraTokens} tokens`).toBeLessThan(250)
+  })
+})
+
 describe('buildLocalChatSystemPrompt — gefencede kennisinjectie', () => {
   it('voegt een gefenced kennisblok toe wanneer de vraag een item raakt', () => {
     const prompt = buildLocalChatSystemPrompt({
@@ -190,8 +277,28 @@ describe('LOCAL_CHAT_DNA — fin-actie-fence-instructie', () => {
     expect(LOCAL_CHAT_DNA).toContain('priority_score')
   })
 
-  it('vraagt om precies één blok, alleen bij een echt voorstel', () => {
-    expect(LOCAL_CHAT_DNA).toContain('Hooguit één blok per antwoord')
+  // De DEFAULT is geen blok, en dat moet vóór de template staan. Dit is geen
+  // stijlkwestie maar gemeten gedrag: met de template eerst en de beperking
+  // erna emitteerde het model bij vrijwel élk antwoord een actiekaart — ook bij
+  // pure uitleg. Een 2B-model leest sequentieel en volgt het laatste, meest
+  // concrete format-voorschrift; dezelfde les als bij de kennis-fence.
+  it('zet de default (GEEN blok) vóór de template', () => {
+    expect(LOCAL_CHAT_DNA).toContain('standaard zet je GEEN blok')
+
+    const defaultPos = LOCAL_CHAT_DNA.indexOf('standaard zet je GEEN blok')
+    const templatePos = LOCAL_CHAT_DNA.indexOf('```fin-actie')
+    expect(defaultPos, 'de beperking moet vóór het format staan').toBeLessThan(templatePos)
+  })
+
+  it('sluit uitleg- en begripsvragen expliciet uit', () => {
+    expect(LOCAL_CHAT_DNA).toMatch(/Geen blok bij uitleg, een begripsvraag/)
+    // Het gemelde geval: "kun jij mijn budgetten en transacties zien?" kreeg een
+    // actiekaart terwijl het antwoord puur uitleg was.
+    expect(LOCAL_CHAT_DNA).toMatch(/een vraag over wat je wel of niet kunt zien/)
+  })
+
+  it('vraagt om precies één blok wanneer er wél een bij hoort', () => {
+    expect(LOCAL_CHAT_DNA).toMatch(/precies één/)
   })
 
   it('verbiedt een actiekaart bij een beleggings-/productvraag — óók bij een passende kans', () => {

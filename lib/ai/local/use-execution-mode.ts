@@ -35,6 +35,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { checkLocalAiCapability } from './webgpu-capability'
 import { getLocalModelState } from './model-manager'
 import { resolveLocalReadiness } from './local-readiness'
+import { readProofVerdict } from './proof-verdict'
+import { useExecutionPrefsVersion } from '@/lib/ai/execution-prefs-signal'
 import type { AiExecutionGroup, AiExecutionMode } from '@/lib/ai/execution-groups'
 
 export type ExecutionStatus = 'resolving' | 'cloud' | 'lokaal' | 'blocked'
@@ -132,6 +134,11 @@ async function fetchPrefs(group: AiExecutionGroup): Promise<ExecutionPrefs | nul
  */
 export function useExecutionMode(group: AiExecutionGroup, active = true): ExecutionModeState {
   const [nonce, setNonce] = useState(0)
+  // Wijzigt iemand de keuze ergens anders in de boom (de popover in de chat, de
+  // groepenlijst, de hoofdschakelaar), dan hoort ELKE lezer opnieuw te bepalen —
+  // niet alleen degene die toevallig een refresh-callback had. Zonder dit bleef
+  // bijvoorbeeld het waarschuwingsicoon op de Fin-knop staan tot een herlaad.
+  const prefsVersion = useExecutionPrefsVersion()
 
   // De uitkomst draagt de invoer waarvoor hij geldt. Daardoor hoeft er bij een
   // wisseling van groep/activering niets synchroon teruggezet te worden: zolang
@@ -140,7 +147,7 @@ export function useExecutionMode(group: AiExecutionGroup, active = true): Execut
   // effect zou hetzelfde bedoelen maar één render te laat komen: heel even zou
   // de vorige uitkomst nog gelden, en precies dat venster is waar een oppervlak
   // ten onrechte 'cloud' zou kunnen lezen.
-  const key = `${group}|${active ? 1 : 0}|${nonce}`
+  const key = `${group}|${active ? 1 : 0}|${nonce}|${prefsVersion}`
   const [resolved, setResolved] = useState<{
     key: string
     value: Omit<ExecutionModeState, 'refresh'>
@@ -229,6 +236,28 @@ export function useExecutionMode(group: AiExecutionGroup, active = true): Execut
         return
       }
 
+      // ── Uitvoer-toets: een bewaarde ZAKKING blokkeert ────────────────────
+      // De capability-check kijkt of het toestel het model KAN draaien; de
+      // uitvoer-toets of er iets BRUIKBAARS uit komt. Dat tweede is geen
+      // theoretisch verschil: een gemeten telefoon haalde de GPU-lat met gemak
+      // en leverde 0% bruikbare uitvoer (zie output-proof.ts).
+      //
+      // Een ONTBREKEND oordeel blokkeert bewust NIET. De poort staat op
+      // /mijn/privacy — daar wordt het oordeel geveld vóór lokaal aan mag — en
+      // hier alleen het vangnet. Afwezig-als-blokkade zou bovendien elk toestel
+      // stilzetten dat het model al had staan voordat deze toets bestond.
+      const verdict = readProofVerdict()
+      if (verdict && !verdict.ok) {
+        setState({
+          status: 'blocked',
+          message: `${verdict.reasons[0] ?? 'De proef op dit toestel is niet geslaagd.'} Lokale AI blijft daarom uit op dit apparaat; via Mijn → Privacy kun je de proef opnieuw draaien.`,
+          intended: 'lokaal',
+          canUseCloud: false,
+          canUseLocal: false,
+        })
+        return
+      }
+
       // Lokaal gewenst — kan dit toestel het ook? Capability en modelstaat samen,
       // want ze geven verschillende, concreet verschillende adviezen.
       const [cap, model] = await Promise.all([checkLocalAiCapability(), getLocalModelState()])
@@ -258,10 +287,11 @@ export function useExecutionMode(group: AiExecutionGroup, active = true): Execut
     return () => {
       cancelled = true
     }
-    // `key` is afgeleid van precies group/active/nonce; die drie blijven de
-    // echte afhankelijkheden, zodat het effect niet per render opnieuw draait.
+    // `key` is afgeleid van precies group/active/nonce/prefsVersion; die vier
+    // blijven de echte afhankelijkheden, zodat het effect niet per render
+    // opnieuw draait.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [group, active, nonce])
+  }, [group, active, nonce, prefsVersion])
 
   return { ...state, refresh }
 }

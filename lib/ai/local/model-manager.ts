@@ -7,6 +7,10 @@
 // Bewust dynamische import van de runtime: de zware LiteRT-LM/WASM-bundel komt
 // pas binnen bij een echte download/inferentie, niet bij het lezen van de staat.
 
+import type { ProofOptions, ProofOutcome } from './output-proof'
+import { storeSelectedLocalModelId } from './selected-model'
+import type { LocalModelId } from './model-catalog'
+
 export type LocalModelState = 'niet-gedownload' | 'downloaden' | 'klaar' | 'fout'
 
 export type LocalModelProgress = {
@@ -76,6 +80,50 @@ export async function downloadLocalModel(onProgress: (p: LocalModelProgress) => 
     transientState = 'fout'
     throw err
   }
+}
+
+/**
+ * Draai de uitvoer-toets op dit toestel: laadt (of hergebruikt) de sessie en
+ * legt het model drie korte proefvragen voor. Zie output-proof.ts voor waarom
+ * dit náást de capability-check nodig is — kort gezegd: een toestel kan de
+ * GPU-lat halen en tóch onzin produceren, en alleen deze toets ziet dat.
+ *
+ * Werpt nooit: een engine die niet wil laden is voor de gebruiker hetzelfde als
+ * een toestel dat zakt, en verdient dus ook een leesbare reden.
+ */
+export async function proveLocalModel(opts?: ProofOptions): Promise<ProofOutcome> {
+  try {
+    const { loadModelSession } = await import('./litert-runtime')
+    const { runLocalOutputProof } = await import('./output-proof')
+    const session = await loadModelSession()
+    return await runLocalOutputProof(session, opts)
+  } catch (err) {
+    console.error('[lokale-ai] uitvoer-toets kon niet draaien:', err)
+    return {
+      ok: false,
+      reasons: ['Het model kon op dit toestel niet gestart worden voor de proef.'],
+      results: [],
+    }
+  }
+}
+
+/**
+ * Kies een ander lokaal model op dit toestel.
+ *
+ * Meer dan een voorkeur wegschrijven: de geladen engine draait nog de óúde
+ * bundel, dus die moet weg. Zonder die teardown zou de volgende inferentie
+ * stilzwijgend het vorige model gebruiken terwijl de UI het nieuwe toont —
+ * precies het soort onzichtbare afwijking waar de uitvoer-toets over gaat.
+ *
+ * Het bewaarde proefoordeel hoeft hier niet gewist: dat is aan het model-URL
+ * gekoppeld en telt vanzelf niet meer mee (zie proof-verdict.ts).
+ */
+export async function selectLocalModel(id: LocalModelId): Promise<void> {
+  const changed = storeSelectedLocalModelId(id)
+  if (!changed) return
+  const { disposeSession } = await import('./litert-runtime')
+  await disposeSession()
+  transientState = null
 }
 
 /** Verwijder het model uit de cache en ontkoppel de sessie ("model verwijderen"). */

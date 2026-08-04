@@ -8,6 +8,7 @@ import {
   type AiExecutionGroup,
   type AiExecutionMode,
 } from '@/lib/ai/execution-groups'
+import { notifyExecutionPrefsChanged } from '@/lib/ai/execution-prefs-signal'
 
 /**
  * AiExecutionGroupList — de keuze "waar draait de AI?" PER FUNCTIONALITEIT.
@@ -121,6 +122,9 @@ export function AiExecutionGroupList({
         if (!res.ok) throw new Error('save failed')
         const data = (await res.json()) as PrefsResponse
         applyResponse(data)
+        // Lezers elders (de chat, het waarschuwingsicoon op de Fin-knop, de
+        // privacy-indicatoren) bepalen hierop opnieuw — zie execution-prefs-signal.
+        notifyExecutionPrefsChanged()
       } catch {
         setSaveError('Deze keuze kon niet worden opgeslagen. Probeer het zo nog eens.')
       } finally {

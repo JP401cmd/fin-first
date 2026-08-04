@@ -34,6 +34,9 @@ const OVERVIEW: LocalChatOverview = {
   jaarruimte: null,
   kansen: [],
   openstaandeActies: [],
+  budgetten: null,
+  uitgavenpatronen: [],
+  terugkerend: null,
 }
 
 /** Mock-sessie die `reply` in vaste stukjes streamt via `onDelta`. */
@@ -642,3 +645,4 @@ describe('LocalChatTransport — kennis per beurt (onderwerpwissel)', () => {
     expect(sends[2]).toContain('forfaitair rendement') // retry op verse sessie → opnieuw mee
   })
 })
+

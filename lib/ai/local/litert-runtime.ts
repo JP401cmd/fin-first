@@ -28,6 +28,9 @@
 // ECHTE package-typen af te leiden wordt een Early-Preview-API-breuk een
 // compile-fout i.p.v. een stille runtime-verrassing.
 import type { Engine } from '@litert-lm/core'
+import { DEFAULT_LOCAL_MODEL_ID, resolveLocalModel } from './model-catalog'
+import { getSelectedLocalModel } from './selected-model'
+import { withRuntimeLogFilter } from './runtime-log-filter'
 
 export type LocalChatMessage = { role: 'system' | 'user'; content: string }
 
@@ -41,11 +44,15 @@ export type LocalModelLoadProgress = {
  * Directe download-URL van de ongegate, Apache-2.0 web-build van Gemma 4 E2B-it
  * in het .litertlm-formaat (~2,0 GB, HF litert-community). We cachen 'm zelf in
  * Cache Storage (zie hieronder) en serveren 'm daarna als Blob aan Engine.create.
+ *
+ * BLIJFT DE STANDAARD, is niet meer de enige: sinds de catalogus
+ * (model-catalog.ts) kan een toestel ook op E4B staan. Alles hieronder leest
+ * daarom het GEKOZEN model; deze constante is de URL van de standaardkeuze en
+ * blijft bestaan omdat er elders naar verwezen wordt.
  */
-export const LOCAL_MODEL_URL =
-  'https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it-web.litertlm'
+export const LOCAL_MODEL_URL = resolveLocalModel(DEFAULT_LOCAL_MODEL_ID).url
 
-/** Cache-Storage-cachenaam; key = LOCAL_MODEL_URL. */
+/** Cache-Storage-cachenaam; key = de URL van het gekozen model. */
 const CACHE_NAME = 'litert-lm-model'
 
 /**
@@ -54,6 +61,10 @@ const CACHE_NAME = 'litert-lm-model'
  * NIET het DNA-condensatiebudget — dat losstaande, veel kleinere sub-budget
  * (waarbinnen `LOCAL_CHAT_DNA` gecondenseerd wordt) staat als `dnaSubBudget` in
  * `lib/ai/local/parity-manifest.json`.
+ *
+ * Bewust gelijk voor élk model in de catalogus: het venster is de maat waarop de
+ * gecondenseerde DNA en het parity-manifest geschreven zijn, en dat mag niet
+ * stilzwijgend meebewegen met een modelkeuze.
  */
 export const LOCAL_MODEL_TOKEN_BUDGET = 8192
 
@@ -139,12 +150,13 @@ async function loadCore(): Promise<LitertModule> {
  * dat GEEN run-blokker: we loggen het en gaan door met de al gedownloade Blob.
  */
 async function getModelBlob(onProgress?: (p: LocalModelLoadProgress) => void): Promise<Blob> {
-  const file = LOCAL_MODEL_URL.split('/').pop() ?? undefined
+  const modelUrl = getSelectedLocalModel().url
+  const file = modelUrl.split('/').pop() ?? undefined
   const cache = typeof caches !== 'undefined' ? await caches.open(CACHE_NAME) : null
 
   // ── Warm pad: uit cache ─────────────────────────────────────────────────────
   if (cache) {
-    const hit = await cache.match(LOCAL_MODEL_URL)
+    const hit = await cache.match(modelUrl)
     if (hit) {
       const blob = await hit.blob()
       onProgress?.({ loadedBytes: blob.size, totalBytes: blob.size, file })
@@ -153,7 +165,7 @@ async function getModelBlob(onProgress?: (p: LocalModelLoadProgress) => void): P
   }
 
   // ── Cold pad: streaming-download met eigen byteteller ───────────────────────
-  const resp = await fetch(LOCAL_MODEL_URL)
+  const resp = await fetch(modelUrl)
   if (!resp.ok || !resp.body) {
     throw new Error(`Model-download faalde: HTTP ${resp.status} ${resp.statusText}`)
   }
@@ -193,7 +205,7 @@ async function getModelBlob(onProgress?: (p: LocalModelLoadProgress) => void): P
   if (cache) {
     try {
       await cache.put(
-        LOCAL_MODEL_URL,
+        modelUrl,
         new Response(blob, { headers: { 'content-type': 'application/octet-stream' } }),
       )
     } catch (err) {
@@ -254,8 +266,19 @@ async function buildSession(onProgress?: (p: LocalModelLoadProgress) => void): P
     // NO-EGRESS: pin de WASM-bron op de eigen origin VÓÓR Engine.create. Anders
     // laadt de interne getOrLoadGlobalLiteRtLm() van de jsdelivr-CDN. Idempotent
     // (zelfde pad → hergebruik), dus veilig na een disposeSession/re-load.
-    await core.getOrLoadGlobalLiteRtLm(LOCAL_WASM_PATH)
-    engine = await core.Engine.create({ model: blob, mainExecutorSettings: { maxNumTokens: LOCAL_MODEL_TOKEN_BUDGET } })
+    //
+    // Het niveaufilter staat om béíde aanroepen heen: de runtime schrijft zijn
+    // opstart-INFO ("Creating LiteRT environment", "RegisterAccelerator … GPU
+    // WebGPU", "CPU accelerator registered") naar console.error, waar de
+    // dev-overlay het als foutmelding toont. Zonder filter verdwijnt de kanarie
+    // hieronder tussen die ruis. Zie runtime-log-filter.ts.
+    engine = await withRuntimeLogFilter(async () => {
+      await core.getOrLoadGlobalLiteRtLm(LOCAL_WASM_PATH)
+      return core.Engine.create({
+        model: blob,
+        mainExecutorSettings: { maxNumTokens: LOCAL_MODEL_TOKEN_BUDGET },
+      })
+    })
   } catch (err) {
     // Kanarie voor LiteRT-LM issue #2572 (weight-cache "Access is denied" op de
     // native tak) en overige init-fouten: integraal loggen vóór doorgooien.
@@ -279,8 +302,10 @@ async function buildSession(onProgress?: (p: LocalModelLoadProgress) => void): P
       .map((m) => m.content)
       .join('\n\n')
 
-    // Door de gedeelde wachtrij: één generatie tegelijk op de GPU.
-    return runExclusive(async () => {
+    // Door de gedeelde wachtrij: één generatie tegelijk op de GPU. Het
+    // niveaufilter dempt ook hier de runtime-INFO (zie runtime-log-filter.ts) —
+    // de kanarie in de catch blijft onaangeroerd doorkomen.
+    return runExclusive(() => withRuntimeLogFilter(async () => {
     try {
       // VERSE conversatie per aanroep: systeemprompt als preface, geen historie.
       const conversation = await engine.createConversation({
@@ -315,7 +340,7 @@ async function buildSession(onProgress?: (p: LocalModelLoadProgress) => void): P
       console.error('[lokale-ai] inferentie mislukt:', err)
       throw err
     }
-    })
+    }))
   }
 
   return { generate }
@@ -440,23 +465,35 @@ export async function createChatSession(systemPrompt: string): Promise<LocalChat
 }
 
 /**
- * Zit het model in de Cache Storage? De .litertlm-bundel is één Cache-API-entry
- * onder LOCAL_MODEL_URL: compleet-of-afwezig. Cache-API-entries zijn ATOMAIR —
+ * Zit het model in de Cache Storage? Zonder argument: het GEKOZEN model. Met een
+ * `modelUrl`: dat specifieke model — nodig om in een compacte keuzelijst te
+ * kunnen tonen welke bundels er al staan en welke nog een download vergen.
+ *
+ * De .litertlm-bundel is één Cache-API-entry per model-URL:
+ * compleet-of-afwezig. Cache-API-entries zijn ATOMAIR —
  * dit vervangt de partial-eviction-les van 19 jul (de ONNX-shard-runtime kon
  * selectief ge-evict raken; één bundel-entry kan dat niet).
  */
-export async function isModelCached(): Promise<boolean> {
+export async function isModelCached(modelUrl?: string): Promise<boolean> {
   if (typeof caches === 'undefined') return false
   try {
     const cache = await caches.open(CACHE_NAME)
-    return (await cache.match(LOCAL_MODEL_URL)) !== undefined
+    return (await cache.match(modelUrl ?? getSelectedLocalModel().url)) !== undefined
   } catch {
     /* geen cache-toegang → behandel als niet-gecacht */
     return false
   }
 }
 
-/** Wis de model-cache; volgende laad is weer "cold". Retourneert of er iets is gewist. */
+/**
+ * Wis de model-cache; volgende laad is weer "cold". Retourneert of er iets is
+ * gewist.
+ *
+ * Wist BEWUST de hele cache en niet alleen de entry van het gekozen model: dit
+ * hangt aan de knop "model verwijderen", en wie ~3 GB opruimt verwacht dat álle
+ * bundels weg zijn — ook die van een model waar hij eerder mee experimenteerde
+ * en dat nu niet geselecteerd staat. Anders blijft er onzichtbaar ruimte bezet.
+ */
 export async function clearModelCache(): Promise<boolean> {
   if (typeof caches === 'undefined') return false
   try {

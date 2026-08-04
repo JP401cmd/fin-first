@@ -52,21 +52,30 @@ import {
  *  - de titel moet WOORDELIJK uit het overzicht komen: `titlesMatch` koppelt de
  *    intent daarop aan een canonieke bron. Geen match = geen kaart (fail-closed).
  *
+ * VOLGORDE IS HIER GEDRAG (4 aug 2026). De eerste versie zette de template vóór
+ * de beperking ("…zet dan één blok: <template>. Hooguit één blok en alleen bij
+ * een echt voorstel — niet bij uitleg"). Een 2B-model leest sequentieel en volgt
+ * het meest concrete, meest recente format-voorschrift: het emitteerde daardoor
+ * bij vrijwel élk antwoord een kaart, ook bij pure uitleg. Dezelfde les als bij
+ * de kennis-fence hierboven — een guard die ná de instructie komt, komt te laat.
+ * Nu staat de DEFAULT (geen blok) vooraan, dan de uitzonderingen, en pas daarna
+ * de template.
+ *
  * LET OP bij bewerken: de drie backticks van de fence staan als `\\``-escapes in
  * deze template-literal. `scripts/ai-parity/scan.mjs#extractConstantText` kent die
  * escapes (en telt ze als één teken); een andere quoting breekt de tokenmeting.
  */
 export const LOCAL_CHAT_DNA = `Je bent Fin, de AI-coach van TriFinity, een persoonlijke financiële vrijheidsnavigator. KERNFILOSOFIE: Geld is opgeslagen tijd — elke euro vertegenwoordigt een stukje levenstijd. Vertaal financiën naar tijd. Vrijheidstijd is DE taal: bedragen van betekenis druk je óók uit in vrijheidsdagen (dagtarief staat in het overzicht). Zeg nooit 'je mag nog €X uitgeven' maar 'als je €X belegt win je Y dagen vrijheid'. Gebruik 'vrijgekocht' i.p.v. 'gespaard'. Focus op kansen, niet schaarste.
 
-REGELS: Verzin NOOIT zelf cijfers, percentages of rekenregels — alle getallen komen uit het FINANCIEEL OVERZICHT hieronder; herbereken niets en hanteer geen vaste aannames zoals een vaste 4%-regel (de gebruiker heeft een persoonlijk veilig opnamepercentage). Vraagt de gebruiker om een concrete tip of kans, gebruik dan de KANSEN, de JAARRUIMTE-lever en de OPENSTAANDE ACTIES uit het overzicht als je eerste bron: kies één concrete kans en druk het effect uit in euro's én vrijheidsdagen. Staat die kans al bij de openstaande acties, benoem dat eerlijk ("je hebt dit al als actie staan"). COMPLIANCE (Nederlandse wet, Wft): je geeft NOOIT individueel beleggingsadvies — geen koop- of verkoopaanbevelingen voor specifieke aandelen, crypto of andere instrumenten, ook niet indirect. Bij zulke vragen: leg vriendelijk uit dat je geen beleggingsadvies mag geven, en bied wél educatieve uitleg over het concept en verwijs naar de eigen doelen/buffer van de gebruiker en, voor een persoonlijke keuze, naar een erkend (AFM-geregistreerd) financieel adviseur. Belastinguitleg is informatief, nooit bindend advies.
+REGELS: Verzin NOOIT zelf cijfers, percentages of rekenregels — alle getallen komen uit het FINANCIEEL OVERZICHT hieronder; herbereken niets en hanteer geen vaste aannames zoals een vaste 4%-regel (de gebruiker heeft een persoonlijk veilig opnamepercentage). Vraagt de gebruiker om een concrete tip of kans, gebruik dan de KANSEN, de JAARRUIMTE-lever en de OPENSTAANDE ACTIES uit het overzicht als je eerste bron: kies één concrete kans en druk het effect uit in euro's én vrijheidsdagen. Staat die kans al bij de openstaande acties, benoem dat eerlijk ("je hebt dit al als actie staan"). Het overzicht bevat ook de budgetten van deze maand, de gemiddelde uitgaven per categorie en de terugkerende lasten: zeg dus nooit dat je die niet kunt zien. Staat er iets NIET in het overzicht (bijvoorbeeld losse transacties), zeg dan eerlijk dat je dát niet ziet — verzin het niet. COMPLIANCE (Nederlandse wet, Wft): je geeft NOOIT individueel beleggingsadvies — geen koop- of verkoopaanbevelingen voor specifieke aandelen, crypto of andere instrumenten, ook niet indirect. Bij zulke vragen: leg vriendelijk uit dat je geen beleggingsadvies mag geven, en bied wél educatieve uitleg over het concept en verwijs naar de eigen doelen/buffer van de gebruiker en, voor een persoonlijke keuze, naar een erkend (AFM-geregistreerd) financieel adviseur. Belastinguitleg is informatief, nooit bindend advies.
 
 TOON: Nederlands, je/jij, empowerend, nooit veroordelend, eerlijk maar optimistisch. Kort en bondig, max 120 woorden. Geen markdown-headers, geen emoji's, geen horizontale lijnen. Begin met een directe kern, dan detail. Gebruik **vet** voor kerngetallen. Schrijf vlot, correct en natuurlijk Nederlands; kies bij twijfel over een formulering de eenvoudige variant.
 
-ACTIEKAART: stel je één concrete actie voor die LETTERLIJK in het overzicht staat (een KANS, de JAARRUIMTE-lever of een OPENSTAANDE ACTIE), zet dan ná je proza precies één blok:
+ACTIEKAART: standaard zet je GEEN blok. De meeste antwoorden hebben er geen. Zet er alleen één wanneer de gebruiker vraagt wat hij kán doen — om een tip, een kans, een volgende stap — ÉN je één concrete actie voorstelt die LETTERLIJK in het overzicht staat (een KANS, de JAARRUIMTE-lever of een OPENSTAANDE ACTIE). Geen blok bij uitleg, een begripsvraag, een vraag over wat je wel of niet kunt zien, een vervolgvraag binnen hetzelfde onderwerp, of een antwoord waarin je niets voorstelt. Ging de vraag over kopen, verkopen, beleggen, crypto, aflossen-versus-beleggen of het kiezen tussen aanbieders of producten? Dan zet je GEEN blok, ook niet als er een passende kans in het overzicht staat: op zulke vragen antwoord je uitsluitend in proza. Hoort er wél een blok bij, zet dan ná je proza precies één:
 \`\`\`fin-actie
 {"title": "<titel exact uit het overzicht>", "description": "<één korte zin>", "priority_score": <1-5>}
 \`\`\`
-Hooguit één blok per antwoord en alleen bij een echt voorstel — niet bij uitleg of een begripsvraag. Ging de vraag over kopen, verkopen, beleggen, crypto, aflossen-versus-beleggen of het kiezen tussen aanbieders of producten? Dan zet je GEEN blok, ook niet als er een passende kans in het overzicht staat: op zulke vragen antwoord je uitsluitend in proza. De titel neem je woordelijk over; daarop koppelt de app de kaart. Zet zelf GEEN bedragen, percentages of vrijheidsdagen in het blok: de app vult de canonieke cijfers in. Verwijs in je proza niet naar het blok.`
+De titel neem je woordelijk over; daarop koppelt de app de kaart. Zet zelf GEEN bedragen, percentages of vrijheidsdagen in het blok: de app vult de canonieke cijfers in. Verwijs in je proza niet naar het blok.`
 
 /**
  * Fence-header vóór de kennisinjectie (K1-gate: onschadelijk omkaderen). Priming
@@ -132,6 +141,56 @@ function renderOverview(overview: LocalChatOverview): string {
       const besp = k.besparingPerJaar > 0 ? ` — bespaart ~${euro(k.besparingPerJaar)}/jaar${dagen}` : ''
       const dl = k.deadline ? ` — deadline: ${k.deadline}` : ''
       lines.push(`  · ${k.titel}${besp}${dl}`)
+    }
+  }
+
+  // ── C2b: budgetten, patronen en terugkerende lasten ────────────────────────
+  //
+  // De aanleiding is letterlijk een gebruikersvraag: "kun jij mijn budgetten en
+  // transacties zien?" — waarop de lokale Fin nee moest zeggen terwijl de cloud
+  // het wél kon. Dit is de reden dat er überhaupt een chat in deze app zit.
+  //
+  // De vorm is bewust DICHT: één regel per blok met scheidingstekens in plaats
+  // van een lijst per categorie. Alles wat hier staat gaat af van de ruimte voor
+  // het gesprek zelf — het venster is 8.192 tokens voor DNA, overzicht,
+  // kennisbank, vraag, antwoord én de hele historie samen.
+  if (overview.budgetten) {
+    const b = overview.budgetten
+    if (b.categorieen.length > 0) {
+      const cats = b.categorieen
+        .map((c) => `${c.naam} ${euro(c.besteed)}/${euro(c.limiet)}`)
+        .join(' · ')
+      lines.push(`- Budgetten deze maand (besteed/limiet): ${cats}`)
+    }
+    if (b.overschrijdingen.length > 0) {
+      const over = b.overschrijdingen
+        .map((o) => `${o.naam} ${euro(o.besteed)} van ${euro(o.limiet)}`)
+        .join(' · ')
+      lines.push(`- Let op, deze zitten op of over hun limiet: ${over}`)
+    }
+  }
+
+  if (overview.uitgavenpatronen.length > 0) {
+    const p = overview.uitgavenpatronen
+      .map((x) => `${x.categorie} ${euro(x.gemiddeldPerMaand)}/mnd`)
+      .join(' · ')
+    lines.push(`- Gemiddelde uitgaven per maand (12+ maanden historie): ${p}`)
+  }
+
+  if (overview.terugkerend) {
+    const t = overview.terugkerend
+    const delen: string[] = []
+    if (t.abonnementenAantal > 0) {
+      delen.push(`${t.abonnementenAantal} abonnementen ${euro(t.abonnementenPerMaand)}/mnd`)
+    }
+    if (t.vasteLastenAantal > 0) {
+      delen.push(`${t.vasteLastenAantal} vaste lasten ${euro(t.vasteLastenPerMaand)}/mnd`)
+    }
+    if (delen.length > 0) lines.push(`- Terugkerend: ${delen.join(' · ')}`)
+    if (t.grootste.length > 0) {
+      lines.push(
+        `  · grootste posten: ${t.grootste.map((g) => `${g.naam} ${euro(g.perMaand)}/mnd`).join(' · ')}`,
+      )
     }
   }
 

@@ -47,11 +47,21 @@ import { collectAandachtspunten } from '@/lib/aandachtspunten-loader'
 import { type Aandachtspunt, JAARRUIMTE_AANDACHTSPUNT_ID } from '@/lib/aandachtspunten'
 import { loadActionedAandachtspuntIds } from '@/lib/aandachtspunten-actions'
 import { getCachedUser } from '@/lib/supabase/cached-user'
+import { loadBudgetSummary, type BudgetSummary } from '@/lib/ai/context/budget-summary'
+import { loadVasteLastenSummary, type VasteLastenSummary } from '@/lib/vaste-lasten-summary'
+import { buildCategorySpending } from '@/lib/spending-patterns'
+import { localMonthStartMonthsAgo } from '@/lib/month-range'
 
 /** Belastingjaar voor de jaarruimte-afleiding (gelijk aan de cloud tax-context). */
 const TAX_YEAR = 2026 as const
 /** Max. aantal kansen/acties in het compacte overzicht — een klein 8k-model niet overladen. */
 const MAX_ITEMS = 3
+/** Max. uitgavenpatronen (categorieën) — de grootste posten dragen het gesprek. */
+const MAX_PATRONEN = 5
+/** Historievenster voor de patronen, gelijk aan de cloud spending-patterns-context. */
+const PATROON_MAANDEN = 17
+/** Minimaal aantal maanden data vóór een gemiddelde iets betekent (cloud-pariteit). */
+const MIN_PATROON_MAANDEN = 6
 
 /**
  * Compacte noodbuffer-stand: het liquide potje in maanden dekking (canonieke
@@ -140,6 +150,51 @@ export interface LocalChatOverview {
   kansen: LocalChatKans[]
   /** Openstaande acties van de gebruiker, max 3. Leeg = geen. */
   openstaandeActies: LocalChatActie[]
+  /** Budgetten van deze maand (hoofdcategorieën), of null zonder budgetten. */
+  budgetten: LocalChatBudgetten | null
+  /** Gemiddelde maanduitgave per categorie over 12+ maanden, max 5. Leeg = geen. */
+  uitgavenpatronen: LocalChatPatroon[]
+  /** Abonnementen + vaste lasten, of null wanneer er niets terugkerends is. */
+  terugkerend: LocalChatTerugkerend | null
+}
+
+/** Eén hoofdbudget deze maand: besteed t.o.v. limiet. */
+export interface LocalChatBudgetCategorie {
+  naam: string
+  /** Maandlimiet in EUR. */
+  limiet: number
+  /** Deze maand besteed in EUR. */
+  besteed: number
+}
+
+/**
+ * Budgetten deze maand, bewust op HOOFDCATEGORIE-niveau. De cloud toont ook alle
+ * subbudgetten; dat zijn al gauw dertig regels, en die passen niet in een venster
+ * dat óók de DNA, de kennisbank, de vraag, het antwoord én de hele
+ * gespreksgeschiedenis moet dragen. Wat een gebruiker nodig heeft om verder te
+ * praten is het beeld plus de uitschieters — vandaar `overschrijdingen`.
+ */
+export interface LocalChatBudgetten {
+  categorieen: LocalChatBudgetCategorie[]
+  /** Subbudgetten die op of over hun limiet zitten, max 3 — de uitschieters. */
+  overschrijdingen: { naam: string; besteed: number; limiet: number }[]
+}
+
+/** Gemiddelde maanduitgave in één categorie (12+ maanden historie). */
+export interface LocalChatPatroon {
+  categorie: string
+  /** Gemiddeld per maand in EUR. */
+  gemiddeldPerMaand: number
+}
+
+/** Terugkerende lasten: abonnementen en vaste lasten, met hun maandtotalen. */
+export interface LocalChatTerugkerend {
+  abonnementenAantal: number
+  abonnementenPerMaand: number
+  vasteLastenAantal: number
+  vasteLastenPerMaand: number
+  /** De grootste posten (beide soorten door elkaar), max 3. */
+  grootste: { naam: string; perMaand: number }[]
 }
 
 /** Vrijgekochte-tijd string uit hele jaren + maanden (zelfde vorm als de context-formatter). */
@@ -194,6 +249,99 @@ async function loadOpenActions(supabase: SupabaseClient): Promise<OpenActionRow[
 }
 
 /**
+ * Dicht de laatste bekende parity-kloof met de cloud-Fin: budgetten van deze
+ * maand. Consumeert `loadBudgetSummary` — DEZELFDE extractor die
+ * `buildKernContext` leest — en dunt alleen uit voor het venster: hoofdcategorieën
+ * plus de subbudgetten die daadwerkelijk over hun limiet gaan.
+ */
+function toBudgetten(summary: BudgetSummary): LocalChatBudgetten | null {
+  if (!summary.hasBudgets) return null
+
+  const categorieen = summary.parents
+    .filter((p) => p.type !== 'income')
+    .map((p) => ({ naam: p.name, limiet: Math.round(p.limit), besteed: Math.round(p.spent) }))
+
+  // De uitschieters over álle hoofdcategorieën heen, zwaarste eerst: dát is waar
+  // een gesprek over budgetten in de praktijk over gaat.
+  const overschrijdingen = summary.parents
+    .flatMap((p) => p.children)
+    .filter((c) => c.limit > 0 && c.status !== 'OK')
+    .sort((a, b) => b.pct - a.pct)
+    .slice(0, MAX_ITEMS)
+    .map((c) => ({ naam: c.name, besteed: Math.round(c.spent), limiet: Math.round(c.limit) }))
+
+  if (categorieen.length === 0 && overschrijdingen.length === 0) return null
+  return { categorieen, overschrijdingen }
+}
+
+/**
+ * Abonnementen en vaste lasten uit `loadVasteLastenSummary` — exact dezelfde
+ * detectie als de Vaste-lasten-pagina, de cashflow-kaart en de cloud-context.
+ */
+function toTerugkerend(summary: VasteLastenSummary): LocalChatTerugkerend | null {
+  if (summary.count === 0) return null
+  const grootste = [...summary.subscriptions, ...summary.vasteKosten]
+    .sort((a, b) => b.monthlyAmount - a.monthlyAmount)
+    .slice(0, MAX_ITEMS)
+    .map((i) => ({ naam: i.name, perMaand: Math.round(i.monthlyAmount) }))
+
+  return {
+    abonnementenAantal: summary.subscriptions.length,
+    abonnementenPerMaand: Math.round(summary.totalMonthlySubscriptions),
+    vasteLastenAantal: summary.vasteKosten.length,
+    vasteLastenPerMaand: Math.round(summary.totalMonthlyVasteKosten),
+    grootste,
+  }
+}
+
+/**
+ * Gemiddelde maanduitgave per categorie over 12+ maanden, via de canonieke
+ * `buildCategorySpending` (dezelfde motor als de cloud spending-patterns-context).
+ *
+ * Faal-zacht en pariteits-bewust: minder dan {@link MIN_PATROON_MAANDEN} maanden
+ * data → geen patronen, precies zoals de cloudbuilder. Een gemiddelde over twee
+ * maanden is geen patroon maar ruis, en ruis in een 8k-venster is duur.
+ */
+async function loadUitgavenpatronen(supabase: SupabaseClient): Promise<LocalChatPatroon[]> {
+  try {
+    const startDate = localMonthStartMonthsAgo(new Date(), PATROON_MAANDEN)
+    const [budgetsResult, transactionsResult] = await Promise.all([
+      supabase
+        .from('budgets')
+        .select('id, name, icon, parent_id, budget_type, is_essential, default_limit')
+        .order('sort_order', { ascending: true }),
+      supabase
+        .from('transactions')
+        .select('budget_id, amount, date, is_income, transaction_type')
+        .gte('date', startDate)
+        .not('budget_id', 'is', null),
+    ])
+
+    const budgets = budgetsResult.data ?? []
+    const transactions = (transactionsResult.data ?? []).filter(
+      (t) =>
+        (t as { transaction_type?: string | null }).transaction_type !== 'transfer' &&
+        (t as { transaction_type?: string | null }).transaction_type !== 'joint_transfer',
+    )
+    if (budgets.length === 0 || transactions.length === 0) return []
+
+    const maanden = new Set(transactions.map((t) => String(t.date).slice(0, 7)))
+    if (maanden.size < MIN_PATROON_MAANDEN) return []
+
+    return buildCategorySpending(
+      transactions as { budget_id: string; amount: number; date: string; is_income: boolean }[],
+      budgets as { id: string; name: string; icon: string; parent_id: string | null; budget_type: string; is_essential: boolean }[],
+    )
+      .filter((c) => c.averageMonthly > 0)
+      .sort((a, b) => b.averageMonthly - a.averageMonthly)
+      .slice(0, MAX_PATRONEN)
+      .map((c) => ({ categorie: c.budgetName, gemiddeldPerMaand: Math.round(c.averageMonthly) }))
+  } catch {
+    return []
+  }
+}
+
+/**
  * Bouw het compacte overzicht voor de lokale chat uit de canonieke bronnen.
  * Leest uitsluitend `loadCoreData` + canonieke engines — geen eigen sommen.
  */
@@ -201,7 +349,21 @@ export async function buildLocalChatOverview(supabase: SupabaseClient): Promise<
   // Alles parallel voor de latentie. De verrijkings-fan-out (aandachtspunten/acties)
   // draait óók in de zeldzame no-data-tak, waar we 'm daarna weggooien — bewust
   // geruild tegen de parallelliteit; het overzicht wordt per chat-open één keer gebouwd.
-  const [coreData, profileResult, aandachtspunten, actieRows, actionedIds] = await Promise.all([
+  const [
+    coreData,
+    profileResult,
+    aandachtspunten,
+    actieRows,
+    actionedIds,
+    // ── C2b: de drie bronnen waar de cloud-Fin wél over kon praten en de
+    // lokale niet. Alle drie via een GEDEELDE loader, geen tweede optelling:
+    // budgetten via dezelfde extractor als buildKernContext, terugkerende
+    // lasten via dezelfde detectie als de Vaste-lasten-pagina, patronen via
+    // dezelfde motor als de cloud spending-patterns-context.
+    budgetSummary,
+    vasteLasten,
+    uitgavenpatronen,
+  ] = await Promise.all([
     loadCoreData(supabase),
     supabase
       .from('profiles')
@@ -217,6 +379,11 @@ export async function buildLocalChatOverview(supabase: SupabaseClient): Promise<
     // tax-context, zodat "benut je jaarruimte" op élk oppervlak verdwijnt zodra
     // de gebruiker de actie nam.
     loadActionedAandachtspuntIds(supabase),
+    // Alle drie falen zacht (interne try/catch → lege waarde), zodat één
+    // haperende sectie het overzicht nooit sloopt.
+    loadBudgetSummary(supabase),
+    loadVasteLastenSummary(supabase).catch(() => null),
+    loadUitgavenpatronen(supabase),
   ])
 
   const { rawFinancials, healthScoreInput } = coreData
@@ -289,6 +456,9 @@ export async function buildLocalChatOverview(supabase: SupabaseClient): Promise<
       jaarruimte: null,
       kansen: [],
       openstaandeActies: [],
+      budgetten: null,
+      uitgavenpatronen: [],
+      terugkerend: null,
     }
   }
 
@@ -321,5 +491,8 @@ export async function buildLocalChatOverview(supabase: SupabaseClient): Promise<
     jaarruimte,
     kansen,
     openstaandeActies,
+    budgetten: toBudgetten(budgetSummary),
+    uitgavenpatronen,
+    terugkerend: vasteLasten ? toTerugkerend(vasteLasten) : null,
   }
 }

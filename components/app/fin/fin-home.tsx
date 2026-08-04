@@ -4,6 +4,9 @@ import './fin-home.css'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { FinDots } from '@/components/app/fin-dots'
+import { AlertTriangle } from 'lucide-react'
+import { useExecutionMode } from '@/lib/ai/local/use-execution-mode'
+import { usePrivacyMode } from '@/components/app/use-privacy-mode'
 import { AiPrivacyIndicator } from '@/components/app/ai-privacy-indicator'
 import { useChatContext } from '@/components/app/chat/chat-provider'
 import { useOverlayOpen } from '@/lib/hooks/use-scroll-lock'
@@ -117,14 +120,29 @@ export function FinHome({
     open()
   }, [dismiss, open])
 
+  // ── Waarschuwing: lokaal gekozen, maar hier niet bruikbaar ──────────────────
+  //
+  // Wie op één toestel lokaal aanzet, staat op ÉLK toestel op lokaal — die keuze
+  // hoort bij zijn profiel, terwijl de modelbundel in één browser staat. Op dat
+  // tweede toestel gebeurde er in de chat niets herkenbaars, en dat las als
+  // "geen reactie". Nu is het al aan de knop te zien, vóór je hem opent.
+  //
+  // De GPU-probe kost iets, dus hij draait alleen wanneer privé-modus
+  // daadwerkelijk aanstaat; op cloud (de standaard) verandert er niets.
+  const privacyMode = usePrivacyMode()
+  const exec = useExecutionMode('gesprek', privacyMode === true)
+  const localBlocked = exec.status === 'blocked'
+
   if (isOpen) return null
   // Verberg zodra een overlay/modal open is — de FAB mag niet door de
   // halftransparante backdrop heen over de sheet-CTA verschijnen.
   if (overlayOpen) return null
 
-  const fabAria = postponedReady > 0
-    ? `Open chat met Fin — ${postponedReady} uitgestelde tip${postponedReady === 1 ? '' : 's'} klaar`
-    : 'Open chat met Fin'
+  const fabAria = localBlocked
+    ? 'Open chat met Fin — let op: lokale AI werkt niet op dit toestel'
+    : postponedReady > 0
+      ? `Open chat met Fin — ${postponedReady} uitgestelde tip${postponedReady === 1 ? '' : 's'} klaar`
+      : 'Open chat met Fin'
 
   return (
     <div className={`willhome willhome--${mode}`}>
@@ -154,7 +172,16 @@ export function FinHome({
         <FinDots size={36} state={finState} />
       </div>
 
-      {mode === 'bubble' && <AiPrivacyIndicator size={12} className="wh-privacy" />}
+      {/* Eén plek rechtsboven: normaal het privacy-schildje, maar zodra lokaal
+          hier niet kán, wint de waarschuwing — dat is het dringender bericht. */}
+      {mode === 'bubble' &&
+        (localBlocked ? (
+          <span className="wh-warning" title={exec.message ?? 'Lokale AI werkt niet op dit toestel'}>
+            <AlertTriangle size={10} aria-hidden />
+          </span>
+        ) : (
+          <AiPrivacyIndicator size={12} className="wh-privacy" />
+        ))}
     </div>
   )
 }

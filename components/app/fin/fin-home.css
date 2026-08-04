@@ -36,6 +36,20 @@
 }
 .wh-privacy { position: absolute; top: -0.25rem; right: -0.25rem; }
 
+/* Waarschuwing op de FAB: lokaal gekozen, maar op dít toestel niet bruikbaar.
+   Zonder dit signaal ontdek je pas ná het openen van de chat dat er niets kan —
+   en op een toestel waar het model ontbreekt voelde dat als "geen reactie".
+   Stoplicht-semantiek, dus bewust GEEN module-accentkleur. */
+.wh-warning {
+  position: absolute; top: -0.25rem; right: -0.25rem;
+  display: flex; align-items: center; justify-content: center;
+  width: 1rem; height: 1rem;
+  border-radius: 9999px; background: var(--warning);
+  color: #fff;
+  outline: 2px solid var(--paper);
+  box-shadow: 0 1px 4px rgba(0,0,0,.2);
+}
+
 .wh-melding-face { transform-origin: bottom right; animation: wh-melding-in 520ms cubic-bezier(.2,.8,.2,1); }
 @keyframes wh-melding-in { from { opacity: 0; transform: translateY(10px) scale(.93); } to { opacity: 1; transform: none; } }
 

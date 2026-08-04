@@ -1,109 +1,56 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { section, formatCurrency } from './formatter'
-import { localMonthBounds } from '@/lib/month-range'
+import { loadBudgetSummary, type BudgetSummaryParent } from './budget-summary'
 
 /**
  * Kern-specific context: budgets, spending vs limits, recent patterns.
- * Uses real Supabase data.
+ *
+ * De OPTELLING zelf woont sinds C2b in `budget-summary.ts`, omdat de lokale
+ * Fin-chat exact dezelfde cijfers nodig heeft. Deze builder is nu puur de
+ * CLOUD-WEERGAVE van die gedeelde samenvatting; de regels (maandvenster,
+ * overboekingen eruit, kind-bij-ouder) staan daar één keer.
  */
 export async function buildKernContext(supabase: SupabaseClient): Promise<string> {
-  // Get current month boundaries (tijdzone-veilig). monthEnd is exclusief =
-  // de 1e van de volgende maand; gebruik dus .lt(monthEnd) i.p.v. .lte op de
-  // laatste dag (zelfde venster, geen vorige-maand-lek).
-  const now = new Date()
-  const { start: monthStart, end: monthEnd } = localMonthBounds(now)
+  const summary = await loadBudgetSummary(supabase)
 
-  // Fetch budgets (parents and children) + this month's transactions with budget_id
-  const [budgetsResult, transactionsResult] = await Promise.all([
-    supabase
-      .from('budgets')
-      .select('id, parent_id, name, default_limit, budget_type, is_essential')
-      .order('sort_order', { ascending: true }),
-    supabase
-      .from('transactions')
-      .select('budget_id, amount, is_income, transaction_type')
-      .gte('date', monthStart)
-      .lt('date', monthEnd)
-      .not('budget_id', 'is', null),
-  ])
-
-  const budgets = budgetsResult.data ?? []
-  const transactions = transactionsResult.data ?? []
-
-  if (budgets.length === 0) {
+  if (!summary.hasBudgets) {
     return section('BUDGETTEN DEZE MAAND', 'Nog geen budgetten ingesteld.')
   }
 
-  // Build spending per budget_id (exclude own-account transfers)
-  const spendingByBudget: Record<string, number> = {}
-  for (const t of transactions) {
-    if (!t.budget_id) continue
-    if ((t as { transaction_type?: string | null }).transaction_type === 'transfer' ||
-        (t as { transaction_type?: string | null }).transaction_type === 'joint_transfer') continue
-    const amt = Math.abs(Number(t.amount))
-    spendingByBudget[t.budget_id] = (spendingByBudget[t.budget_id] ?? 0) + amt
-  }
-
-  // Organize into parent > children structure
-  const parents = budgets.filter((b) => !b.parent_id)
-  const children = budgets.filter((b) => b.parent_id)
-
   const budgetLines: string[] = []
 
-  for (const parent of parents) {
-    if (parent.budget_type === 'income') continue
-    const parentChildren = children.filter((c) => c.parent_id === parent.id)
-    let parentSpent = 0
-    const childLines: string[] = []
-
-    for (const child of parentChildren) {
-      const spent = spendingByBudget[child.id] ?? 0
-      parentSpent += spent
-      const limit = Number(child.default_limit)
-      const pct = limit > 0 ? Math.round((spent / limit) * 100) : 0
-      const status = pct >= 100 ? 'OVER' : pct >= 80 ? 'BIJNA' : 'OK'
-      childLines.push(`  ${child.name}: ${formatCurrency(spent)}/${formatCurrency(limit)} (${pct}% ${status})`)
-    }
-
-    // Also check spending directly on parent
-    const parentDirectSpent = spendingByBudget[parent.id] ?? 0
-    parentSpent += parentDirectSpent
-
-    budgetLines.push(`${parent.name}: ${formatCurrency(parentSpent)}/${formatCurrency(Number(parent.default_limit))}`)
-    budgetLines.push(...childLines)
-  }
-
-  // Savings summary
-  const savingsParents = parents.filter((b) => b.budget_type === 'savings')
-  for (const savingsParent of savingsParents) {
-    const savingsChildren = children.filter((c) => c.parent_id === savingsParent.id)
-    const savingsLines: string[] = []
-    for (const child of savingsChildren) {
-      const spent = spendingByBudget[child.id] ?? 0
-      savingsLines.push(`${child.name}: ${formatCurrency(spent)} gereserveerd`)
-    }
-    if (savingsLines.length > 0) {
-      budgetLines.push('')
-      budgetLines.push(...savingsLines)
+  for (const parent of summary.parents) {
+    if (parent.type === 'income') continue
+    budgetLines.push(`${parent.name}: ${formatCurrency(parent.spent)}/${formatCurrency(parent.limit)}`)
+    for (const child of parent.children) {
+      budgetLines.push(
+        `  ${child.name}: ${formatCurrency(child.spent)}/${formatCurrency(child.limit)} (${child.pct}% ${child.status})`,
+      )
     }
   }
 
-  // Debt summary
-  const debtParents = parents.filter((b) => b.budget_type === 'debt')
-  for (const debtParent of debtParents) {
-    const debtChildren = children.filter((c) => c.parent_id === debtParent.id)
-    const debtLines: string[] = []
-    for (const child of debtChildren) {
-      const spent = spendingByBudget[child.id] ?? 0
-      const limit = Number(child.default_limit)
-      const pct = limit > 0 ? Math.round((spent / limit) * 100) : 0
-      debtLines.push(`${child.name}: ${formatCurrency(spent)} afgelost van ${formatCurrency(limit)} doel (${pct}%)`)
-    }
-    if (debtLines.length > 0) {
-      budgetLines.push('')
-      budgetLines.push(...debtLines)
-    }
-  }
+  appendTypeBlock(budgetLines, summary.parents, 'savings', (child) =>
+    `${child.name}: ${formatCurrency(child.spent)} gereserveerd`,
+  )
+  appendTypeBlock(budgetLines, summary.parents, 'debt', (child) =>
+    `${child.name}: ${formatCurrency(child.spent)} afgelost van ${formatCurrency(child.limit)} doel (${child.pct}%)`,
+  )
 
   return section('BUDGETTEN DEZE MAAND', budgetLines.join('\n'))
+}
+
+/** Spaar- of schuldblok: één lege regel, dan één regel per kind. */
+function appendTypeBlock(
+  lines: string[],
+  parents: BudgetSummaryParent[],
+  type: 'savings' | 'debt',
+  render: (child: BudgetSummaryParent['children'][number]) => string,
+): void {
+  for (const parent of parents.filter((p) => p.type === type)) {
+    const childLines = parent.children.map(render)
+    if (childLines.length > 0) {
+      lines.push('')
+      lines.push(...childLines)
+    }
+  }
 }

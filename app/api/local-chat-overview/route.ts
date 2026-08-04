@@ -62,7 +62,14 @@ export async function GET() {
     return NextResponse.json(overview, {
       // Korte privé-cache: per-gebruiker verschillend en tier-gated, dus nooit
       // in een gedeelde/CDN-cache. Spiegelt /api/local-knowledge.
-      headers: { 'Cache-Control': 'private, max-age=300' },
+      // GEEN CACHE — bewust. Dit overzicht wordt precies één keer per
+      // chat-opening opgehaald en zit daarna ingebakken in de systeem-preface van
+      // de LiteRT-conversatie, die na de eerste beurt vastligt. Een cache van vijf
+      // minuten bovenop die sessie-bevriezing betekende dat je een gesprek kon
+      // beginnen met cijfers die al vijf minuten oud waren, en daar vervolgens een
+      // half uur mee doorpraten. Het openen is het ENIGE moment waarop dit
+      // ververst; dat moment moet dus vers zijn.
+      headers: { 'Cache-Control': 'no-store' },
     })
   } catch (err) {
     return serverError(err, 'local-chat-overview:GET')

@@ -8,6 +8,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { useChatContext } from './chat-provider'
 import { LocalChatTransport } from '@/lib/ai/local/local-chat-transport'
 import { useExecutionMode } from '@/lib/ai/local/use-execution-mode'
+import { ChatSettingsPopover } from './chat-settings-popover'
 import type { LocalChatOverview } from '@/lib/ai/local/local-chat-context'
 import type { LocalKnowledgeItem } from '@/lib/ai/local/knowledge-context'
 import { useModuleAccess } from '@/components/app/feature-access-provider'
@@ -1092,6 +1093,10 @@ export function ChatPanel() {
             </div>
           </div>
           <div className="flex items-center gap-1">
+            {/* Instellingen — naast het pin-icoon. Compacte bediening van de
+                bestemming van dit gesprek, het lokale model en de overige
+                functies; de volledige uitleg blijft op /mijn/privacy. */}
+            <ChatSettingsPopover onChanged={exec.refresh} />
             {/* Pin toggle — desktop only */}
             <button
               onClick={togglePin}

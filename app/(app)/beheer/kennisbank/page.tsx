@@ -4,6 +4,7 @@ import parityData from '@/docs/ai-parity/parity.json'
 import { LOCAL_MODEL_TOKEN_BUDGET } from '@/lib/ai/local/litert-runtime'
 import { selectParityFacts, type ParityFacts } from '@/lib/ai/local/parity-facts'
 import { KennisbankClient } from './kennisbank-client'
+import { LocalAiGateBlock } from './local-ai-gate-block'
 
 // De parity-feiten (welke bron-DNA in sync is met de gecondenseerde lokale
 // LOCAL_CHAT_DNA, plus de tokenschatting) komen uit de gegenereerde snapshot
@@ -18,6 +19,7 @@ export default function BeheerKennisbankPage() {
 
   return (
     <div className="space-y-6">
+      <LocalAiGateBlock />
       <PromptParityBlock parity={parity} contextBudget={LOCAL_MODEL_TOKEN_BUDGET} />
       <KennisbankClient />
     </div>

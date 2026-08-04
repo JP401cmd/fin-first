@@ -8,9 +8,21 @@ import {
   getLocalModelState,
   downloadLocalModel,
   deleteLocalModel,
+  proveLocalModel,
+  selectLocalModel,
   type LocalModelState,
   type LocalModelProgress,
 } from '@/lib/ai/local/model-manager'
+import { readProofVerdict, writeProofVerdict, clearProofVerdict } from '@/lib/ai/local/proof-verdict'
+import type { ProofOutcome } from '@/lib/ai/local/output-proof'
+import { getSelectedLocalModelId } from '@/lib/ai/local/selected-model'
+import {
+  LOCAL_MODEL_CATALOG,
+  resolveLocalModel,
+  type LocalModelId,
+} from '@/lib/ai/local/model-catalog'
+import { DEFAULT_GATE_CONFIG, parseGateConfig, type LocalAiGateConfig } from '@/lib/ai/local/gate-config'
+import { notifyExecutionPrefsChanged } from '@/lib/ai/execution-prefs-signal'
 import { AiExecutionChoice } from './ai-execution-choice'
 import { AiExecutionGroupList } from './ai-execution-group-list'
 import { LocalModelSection, progressPercent, type LocalModelPhase } from './local-model-section'
@@ -67,9 +79,28 @@ async function writePrivacyMode(enabled: boolean): Promise<boolean> {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ enabled }),
     })
+    // De hoofdschakelaar raakt élk oppervlak dat de uitvoerkeuze leest: de chat,
+    // het waarschuwingsicoon op de Fin-knop, de privacy-indicatoren. Zonder dit
+    // sein blijven die op de oude stand staan tot een herlaad.
+    if (res.ok) notifyExecutionPrefsChanged()
     return res.ok
   } catch {
     return false
+  }
+}
+
+/**
+ * De beheer-instelbare toelatingsdrempel. Faalt de lezing, dan geldt de STRENGE
+ * standaard — een netwerkhapering mag de poort nooit soepeler maken.
+ */
+async function fetchGateConfig(): Promise<LocalAiGateConfig> {
+  try {
+    const res = await fetch('/api/local-ai-gate')
+    if (!res.ok) return DEFAULT_GATE_CONFIG
+    const data = (await res.json()) as { config?: unknown }
+    return parseGateConfig(data.config)
+  } catch {
+    return DEFAULT_GATE_CONFIG
   }
 }
 
@@ -108,6 +139,11 @@ export function AiExecutionSettings() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [likelyMobile, setLikelyMobile] = useState(false)
   const [storagePersisted, setStoragePersisted] = useState<boolean | null>(null)
+  const [proofOutcome, setProofOutcome] = useState<ProofOutcome | null>(null)
+  // De beheer-instelbare toelatingsdrempel. Start op de STRENGE standaard: gaat
+  // de fetch mis, dan is dat de veilige stand (nooit stil soepeler worden).
+  const [gate, setGate] = useState<LocalAiGateConfig>(DEFAULT_GATE_CONFIG)
+  const [modelId, setModelId] = useState<LocalModelId>(getSelectedLocalModelId)
 
   // Toestel-hint: ADVISEREND, nooit blokkerend.
   //
@@ -159,6 +195,15 @@ export function AiExecutionSettings() {
         .eq('id', user.id)
         .single()
 
+      // Eerst de beheer-instelling, dan pas de modelstaat: welke bundel er
+      // "klaar" staat hangt af van WELK model er geldt, en dat kan beheer
+      // dichtzetten op een andere dan de gebruiker eerder koos.
+      const config = await fetchGateConfig()
+      const effectiveModelId = config.allowUserModelChoice
+        ? getSelectedLocalModelId()
+        : config.modelId
+      await selectLocalModel(effectiveModelId)
+
       let ready = false
       try {
         const state = await getLocalModelState()
@@ -170,6 +215,8 @@ export function AiExecutionSettings() {
       const persisted = await readStoragePersisted()
 
       if (!active) return
+      setGate(config)
+      setModelId(effectiveModelId)
       if (data?.ai_enabled != null) setAiEnabled(data.ai_enabled as boolean)
       setPrivacyMode(Boolean(data?.privacy_mode))
       // Tier-afleiding via de canonieke helper — geen eigen array-includes.
@@ -184,12 +231,71 @@ export function AiExecutionSettings() {
     }
   }, [supabase])
 
-  const busy = phase === 'checking' || phase === 'downloading'
+  const busy = phase === 'checking' || phase === 'downloading' || phase === 'proving'
 
-  const runDownload = useCallback(async (setPrivacyAfter: boolean) => {
+  /**
+   * STAP 2 — de uitvoer-toets: het laatste woord over dit toestel.
+   *
+   * Draait als EIGEN handeling, losgekoppeld van de download. Die twee zaten
+   * eerst aan elkaar vast, waardoor bij een zakking niet te zien was wát er nu
+   * eigenlijk misging — en het zijn twee heel verschillende dingen: het één
+   * haalt bestanden op, het ander stelt een vraag aan je grafische chip.
+   *
+   * Slaagt hij, dan pas gaat `privacy_mode` aan: pas hier weten we of er iets
+   * BRUIKBAARS uit komt, en dat is precies wat de capability-check niet ziet.
+   * Het oordeel wordt per toestel bewaard, zodat een geslaagd apparaat niet elke
+   * keer opnieuw een halve minuut staat te proefdraaien.
+   */
+  const runProof = useCallback(async () => {
+    setErrorMsg(null)
+    setProofOutcome(null)
+    setPhase('proving')
+    const outcome = await proveLocalModel({ minPassed: gate.minPassed, timeoutMs: gate.timeoutMs })
+    writeProofVerdict(outcome, new Date().toISOString())
+    setProofOutcome(outcome)
+
+    if (!outcome.ok) {
+      // FAIL-CLOSED: niet aanzetten, en ook geen stille cloud-uitwijk.
+      setPhase('proof-failed')
+      return
+    }
+
+    const ok = await writePrivacyMode(true)
+    if (ok) setPrivacyMode(true)
+    setPhase('idle')
+  }, [gate.minPassed, gate.timeoutMs])
+
+  /**
+   * Van model wisselen. De bundel van het nieuwe model staat er meestal nog niet,
+   * en een oordeel over het vorige zegt niets over dit — dus allebei opnieuw
+   * bepalen. `selectLocalModel` gooit onderwater de geladen engine weg.
+   */
+  const onSelectModel = useCallback(async (id: LocalModelId) => {
+    setModelId(id)
+    setProofOutcome(null)
+    setCapabilityReasons(null)
+    setErrorMsg(null)
+    await selectLocalModel(id)
+    try {
+      setModelReady(isModelReady(await getLocalModelState()))
+    } catch {
+      setModelReady(false)
+    }
+    setPhase('idle')
+  }, [])
+
+  /**
+   * STAP 1 — het model naar dit toestel halen. Meer niet: geen proef, geen
+   * `privacy_mode`. Wie hier klaar is heeft bestanden, nog geen werkend geheel.
+   */
+  const runDownload = useCallback(async () => {
     setErrorMsg(null)
     setCapabilityReasons(null)
+    setProofOutcome(null)
     setProgress(null)
+    // Een verse bundel verdient een vers oordeel: het oude zegt niets meer over
+    // wat er straks staat.
+    clearProofVerdict()
     setPhase('downloading')
     try {
       await downloadLocalModel((p: LocalModelProgress) => setProgress(p))
@@ -202,10 +308,6 @@ export function AiExecutionSettings() {
       setModelReady(true)
       // Herlees de bescherming: persist() hierboven kan 'm net hebben aangezet.
       setStoragePersisted(await readStoragePersisted())
-      if (setPrivacyAfter) {
-        const ok = await writePrivacyMode(true)
-        if (ok) setPrivacyMode(true)
-      }
       setPhase('idle')
     } catch {
       // Eerlijke melding, geen retry-loop — de gebruiker start zelf opnieuw.
@@ -233,6 +335,7 @@ export function AiExecutionSettings() {
     // Aanzetten: eerst capability-check, vóór er iets gedownload wordt.
     setCapabilityReasons(null)
     setErrorMsg(null)
+    setProofOutcome(null)
     setPhase('checking')
     const cap: LocalAiCapability = await checkLocalAiCapability()
     if (!cap.ok) {
@@ -240,15 +343,32 @@ export function AiExecutionSettings() {
       setPhase('idle')
       return
     }
-    // Model staat er al → direct aanzetten zonder opnieuw te downloaden.
+    // Model staat er al → geen download nodig. Wel eerst het oordeel over dít
+    // toestel: bewaard gezakt = meteen de reden tonen (niet opnieuw een halve
+    // minuut proefdraaien), bewaard geslaagd = direct aan, nog niet beproefd =
+    // nú beproeven. Dat laatste is ook het pad voor toestellen die het model al
+    // hadden staan vóór deze toets bestond.
     if (modelReady) {
-      const ok = await writePrivacyMode(true)
-      if (ok) setPrivacyMode(true)
-      setPhase('idle')
+      const verdict = readProofVerdict()
+      if (verdict && !verdict.ok) {
+        setProofOutcome({ ok: false, reasons: verdict.reasons, results: [] })
+        setPhase('proof-failed')
+        return
+      }
+      if (verdict?.ok) {
+        const ok = await writePrivacyMode(true)
+        if (ok) setPrivacyMode(true)
+        setPhase('idle')
+        return
+      }
+      await runProof()
       return
     }
-    setPhase('consent')
-  }, [aiEnabled, likelyMobile, busy, privacyMode, modelReady, hasAiTier])
+    // Model staat er nog niet: de twee stappen staan al in beeld, stap 1 is de
+    // eerstvolgende handeling. Geen aparte consent-fase meer — de uitleg bij
+    // stap 1 stáát er, en de knop is de instemming.
+    setPhase('idle')
+  }, [aiEnabled, busy, privacyMode, modelReady, hasAiTier, runProof])
 
   const onDeleteModel = useCallback(async () => {
     try {
@@ -256,6 +376,9 @@ export function AiExecutionSettings() {
     } catch {
       /* zelfs bij een fout volgt de UI de status: het model is niet meer bruikbaar */
     }
+    // Het oordeel gold dít model op dít toestel; zonder model is het niets waard.
+    clearProofVerdict()
+    setProofOutcome(null)
     setModelReady(false)
     const ok = await writePrivacyMode(false)
     if (ok) setPrivacyMode(false)
@@ -296,6 +419,8 @@ export function AiExecutionSettings() {
             {phase === 'checking' && 'Bezig met controleren of je toestel geschikt is.'}
             {phase === 'downloading' &&
               `Model downloaden${progress ? `, ${Math.round(progressPercent(progress))} procent` : ''}.`}
+            {phase === 'proving' && 'Bezig met proefdraaien op dit toestel.'}
+            {phase === 'proof-failed' && 'De proef is niet geslaagd; lokaal draaien blijft uit.'}
             {phase === 'error' && 'De download is niet gelukt.'}
           </p>
 
@@ -308,12 +433,13 @@ export function AiExecutionSettings() {
             privacyMode={privacyMode}
             aiEnabled={aiEnabled}
             hasAiTier={hasAiTier}
-            likelyMobile={likelyMobile}
             storagePersisted={storagePersisted}
-            onConsentConfirm={() => runDownload(true)}
-            onConsentCancel={() => setPhase('idle')}
-            onRetry={() => runDownload(true)}
-            onRedownload={() => runDownload(false)}
+            proof={proofOutcome}
+            model={resolveLocalModel(modelId)}
+            modelChoices={gate.allowUserModelChoice ? LOCAL_MODEL_CATALOG : null}
+            onSelectModel={onSelectModel}
+            onDownload={runDownload}
+            onProve={runProof}
             onDelete={onDeleteModel}
           />
         </div>

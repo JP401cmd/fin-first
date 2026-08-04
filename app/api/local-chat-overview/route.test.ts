@@ -120,7 +120,12 @@ describe('GET /api/local-chat-overview — gate-drieluik', () => {
     const res = await GET()
 
     expect(res.status).toBe(200)
-    expect(res.headers.get('Cache-Control')).toBe('private, max-age=300')
+    // GEEN CACHE (eigenaarsbesluit 4 aug 2026). Dit overzicht zit na het openen
+    // ingebakken in de systeem-preface van de LiteRT-conversatie, die na de
+    // eerste beurt vastligt: het openen is het ENIGE verversmoment. Een cache
+    // van vijf minuten daarbovenop liet je een gesprek beginnen met cijfers die
+    // al vijf minuten oud waren — en daar vervolgens een half uur mee doorpraten.
+    expect(res.headers.get('Cache-Control')).toBe('no-store')
     const json = await res.json()
     expect(json).toEqual(OVERVIEW)
     expect(mockCheckTierGate).toHaveBeenCalledWith(supabase, USER.id, 'ai')
