@@ -110,9 +110,13 @@ wijziging, op beide paden tegelijk.
   >1000-rijen-getuige en een maandgrens-fixture.
 - `loadCashflowKpis` is RLS-client-only, net als de fetchers eronder: nooit met
   `getServiceClient()` aanroepen.
-- De omzetting van `app/(app)/overzicht/cashflow/page.tsx` en
-  `app/api/overzicht/cashflow-status/route.ts` naar de slanke laag is bewust een
-  **volgende** stap; dit besluit legt alleen de fundering.
+- **Alle vier de cashflow-oppervlakken draaien inmiddels op de slanke laag.** Dit
+  besluit legde de fundering; de omzetting volgde in dezelfde reeks. De hub gaat
+  via `components/overview/cashflow-cards-loader.tsx` (T2.2), de sidebar-dots via
+  `app/api/overzicht/cashflow-status/route.ts` (T2.3), de vaste-lasten-pagina via
+  `app/(app)/overzicht/cashflow/vaste-lasten/vaste-lasten-loader.tsx` (T2.4) en de
+  forecast-pagina via `loadForecastSectionData` (T2.5, zie de uitbreiding
+  hieronder). Geen van deze vier raakt `loadDashboardData` nog aan.
 
 ## Uitbreiding — de forecast-pagina (T2.5, 4 aug 2026)
 
