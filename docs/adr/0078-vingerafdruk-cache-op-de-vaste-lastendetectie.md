@@ -81,15 +81,28 @@ Drie keuzes verdienen toelichting.
 
 **De overboeking-telling is geen luxe.** `detectRecurringTransactions` gooit
 rijen met `transaction_type` `'transfer'`/`'joint_transfer'` wég vóór het
-groeperen. Markeert iemand een boeking als overboeking, dan verandert het
-vaste-lastentotaal — terwijl het aantal rijen, de datums en `created_at`
-allemaal gelijk blijven. De twee paden die dit doen
-(`app/api/own-accounts/reclassify`, `components/app/transfer-confirm-sheet.tsx`)
-schrijven bovendien géén `updated_at` mee, dus ook dat signaal zwijgt. Zonder een
-eigen telling zou een bewuste gebruikersactie met zichtbaar gevolg tot een half
-uur in een TTL-venster blijven hangen. `count(*)` met
-`.in('transaction_type', ['transfer','joint_transfer'])` is één extra parallelle
-telling en sluit dat af.
+groeperen (`lib/recurring-detection.ts`). Markeert iemand een boeking als
+overboeking, dan verandert het vaste-lastentotaal — terwijl het aantal rijen, de
+datums en `created_at` allemaal gelijk blijven.
+
+Dat is bovendien geen randgeval: er zijn **minstens vier update-paden** die
+`transaction_type` op een BESTAANDE rij omzetten, en géén ervan schrijft
+`updated_at` mee, dus ook dat signaal zwijgt:
+
+- `app/api/own-accounts/reclassify/route.ts` — batchgewijs;
+- `components/app/transfer-confirm-sheet.tsx` — per boeking;
+- `lib/category-rules.ts` — zowel de directe toewijzing als de retro-set, zodra
+  de gebruiker "dit is een eigen rekening" kiest;
+- `components/app/ai-categorize-sheet.tsx` — de bulk-toewijzing en `handleSave`.
+
+Daarnaast zijn er insert-paden die meteen een overboeking wegschrijven
+(`components/app/manual-transfer-sheet.tsx`); die bewegen `txCount` sowieso al.
+
+De telling meet **DB-staat, niet schrijvers**, en is dus schrijver-agnostisch:
+elk pad dat `transaction_type` omzet — bestaand of toekomstig — is er per
+constructie door gedekt. `count(*)` met
+`.in('transaction_type', ['transfer','joint_transfer'])` is daarvoor één extra
+parallelle telling.
 
 **De recurring-tak is een inhoudsdigest, geen telling.** Een `count(*)` op
 actieve regels — de eerste opzet — ziet niet dat iemand een vaste last hernoemt,
@@ -111,6 +124,15 @@ budget toevoegen, hernoemen of verwijderen kan de uitkomst dus niet veranderen,
 en een extra `count(*)` erop zou alleen kosten toevoegen en de hitrate verlagen.
 **Zodra `VasteLastenSummary` wél een budget-afgeleid veld gaat dragen, moet deze
 keuze opnieuw.**
+
+Let wel: dit argument rust op een parameter die vandaag ongebruikt is, terwijl
+zijn eigen docstring "Budget list for category matching" belooft — precies de
+soort belofte die iemand later inlost. **Niets in de suite pint die
+herzieningstrigger vast.** Gaat `detectRecurringTransactions` `budgets` alsnog
+lezen, dan verandert er niets zichtbaars behalve dat een budgetwijziging stil
+binnen een TTL-venster kan blijven hangen én dat een `budgets`-fout stil
+cachebaar wordt (`remember()` weegt die bewust niet mee, om dezelfde reden). Wie
+die parameter in gebruik neemt, moet hier terugkomen.
 
 ### Het perspectief zit NIET in de sleutel
 
@@ -158,11 +180,17 @@ ongewijzigd, alleen de opslag verhuist.
   vangt dat op voor de paden die die kolom meeschrijven (`transaction-form.tsx`,
   `cash-account-view.tsx`), maar er is geen trigger op `transactions.updated_at`,
   dus het is best-effort. Het eerlijke restrisico is een **toekomstig pad dat de
-  kolom vergeet** — niet de bestaande schrijvers die 'm overslaan: `category-rules.ts`,
-  `ai-categorize-sheet.tsx` en `transfer-matching.ts` raken alleen `budget_id`,
-  `category_source` en `linked_transfer_id`, en geen daarvan bereikt
-  `VasteLastenItem`. De TTL (30 minuten) is het vangnet — bewust ruimer dan de
-  45 s van de statuscaches, omdat de vingerafdruk hier het echte mechanisme is.
+  kolom vergeet**. Van de bestaande schrijvers die `updated_at` overslaan blijft
+  er namelijk niets onder de radar: `transfer-matching.ts` raakt alleen
+  `linked_transfer_id`, en de `budget_id`/`category_source`-schrijfacties van
+  `category-rules.ts` en `ai-categorize-sheet.tsx` bereiken `VasteLastenItem`
+  evenmin — hun `transaction_type`-schrijfacties dóén dat wél, en díé worden
+  gedekt door de overboeking-telling hierboven. De TTL (30 minuten) is het
+  vangnet — bewust ruimer dan de 45 s van de statuscaches, omdat de vingerafdruk
+  hier het echte mechanisme is.
+- **Wat de overboeking-telling niet ziet:** een +1/−1 binnen hetzelfde venster —
+  één rij gemarkeerd én één ontmarkt binnen dezelfde TTL houdt de telling gelijk.
+  Aanvaard: dat vergt twee tegengestelde handelingen binnen een half uur.
 - **Wat de vingerafdruk niet sluitend ziet (2) — het verstrijken van tijd.** Het
   vervallen van een `end_date` op een bevestigde vaste last (`isRecurringExpired`)
   hangt aan "vandaag", en "vandaag" zit bewust NIET in de vingerafdruk: anders
