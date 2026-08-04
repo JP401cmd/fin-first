@@ -14,6 +14,10 @@
  * De `user_id` komt NOOIT uit de payload — uitsluitend uit de geverifieerde
  * sessie (getClaims, lokale JWT-verificatie, ADR 0052). Schrijven gaat via de
  * service-role: `web_vitals` heeft bewust geen insert-policy voor sessies.
+ *
+ * Datzelfde geldt voor `environment`: die wordt hier server-side uit VERCEL_ENV
+ * afgeleid, zodat dev- en productiemetingen in de p75 gescheiden blijven en
+ * niemand zijn metingen als 'production' kan laten tellen.
  */
 
 import { z } from 'zod'
@@ -116,6 +120,14 @@ export async function POST(request: Request) {
         device: m.device ?? null,
         viewport_bucket: m.viewportBucket ?? null,
         effective_type: m.effectiveType ?? null,
+        // Server-side bepaald, net als user_id — bewust NIET in het zod-schema,
+        // zodat een `environment` in de body domweg wordt weggestript en een
+        // client zijn metingen nooit als 'production' kan laten meetellen.
+        // Vercel zet 'production'|'preview'|'development'; lokaal is het leeg.
+        // `||` en niet `??`: een lege string is hier net zo goed "niet gezet",
+        // en zou anders als environment '' wegschrijven — een rij die in geen
+        // enkele omgevingsselectie meer terugkomt.
+        environment: process.env.VERCEL_ENV || 'development',
       })
     if (error) {
       return serverError(error, 'web-vitals:POST')

@@ -59,8 +59,8 @@ Will-chat (`components/app/will/will-home.tsx`) is volledig ink/paper.
 
 **G3 — Charts hardcoden hexen; de kleur-hooks liggen ongebruikt.**
 `useModuleHex()` bestaat maar heeft 0 afnemers; `getBudgetHex`/`getPhaseHex`
-idem. Voorbeelden: `cashflow-sankey.tsx:38-57` (12 vaste categorie-hexen +
-surplus-groen `#10b981`), cashflow-kalender (vast rood/groen),
+idem. Voorbeelden: `horizon-cashflow-sankey.tsx` (vaste categorie-hexen),
+cashflow-kalender (vast rood/groen),
 `mini-networth-chart.tsx` (goede `var(--module-active-*)`-aanpak, maar met
 hardcoded hex-fallbacks die bij refactors stilletjes kunnen gaan "winnen").
 

@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { __resetVasteLastenCache } from '@/lib/vaste-lasten-cache'
 import { loadVasteLastenSummary } from './vaste-lasten-summary'
 
 /**
@@ -35,9 +36,16 @@ function makeSupabase(recurrings: RecurringRow[]): SupabaseClient {
       gte: () => b,
       order: () => b,
       eq: () => b,
-      // Paginatie-fetch (fetchAllRecurringTx) eindigt de keten op .range(); één
-      // pagina met de volledige rijenset is genoeg voor deze deterministische mock.
-      range: () => b,
+      // De vingerafdrukronde telt apart hoeveel rijen als overboeking zijn
+      // gemarkeerd (`.in('transaction_type', …)`); passthrough volstaat hier,
+      // want deze mock levert toch nul transacties.
+      in: () => b,
+      // De keyset-paginatie (fetchAllRecurringTx) eindigt de keten op .limit();
+      // één pagina met de volledige rijenset is genoeg voor deze deterministische
+      // mock, want `transactions` is hier leeg en de lus stopt na de eerste ronde.
+      // De cursor-`.or()` komt dus niet langs. Voor een échte
+      // paginatie-/volgorde-getuige: lib/vaste-lasten-summary.keyset.test.ts.
+      limit: () => b,
       then: (resolve: (v: { data: unknown[]; error: null }) => unknown) =>
         resolve({ data: rows, error: null }),
     }
@@ -50,6 +58,10 @@ function makeSupabase(recurrings: RecurringRow[]): SupabaseClient {
 }
 
 describe('loadVasteLastenSummary — bundel/widget-contract', () => {
+  // De vaste-lastencache (T3.3) leeft op moduleniveau en overleeft dus een `it`.
+  // Elke test hoort de loader écht te draaien, niet de vorige uitkomst te lezen.
+  beforeEach(() => __resetVasteLastenCache())
+
   it('telt alleen uitgaven; recurring inkomen en excluded tellen niet mee', async () => {
     const supabase = makeSupabase([
       { id: 'r1', counterparty_name: 'Verhuurder', amount: -100, name: 'Huur', frequency: 'monthly', category_override: 'vaste_kosten' },

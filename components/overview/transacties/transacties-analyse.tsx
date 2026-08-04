@@ -9,6 +9,8 @@ import { usePerspective } from '@/components/app/perspective-provider'
 import {
   resolvePeriodWindow,
   resolveHeatmapWindow,
+  resolveFetchWindow,
+  heatmapWindowCovered,
   summarizeFlow,
   newCounterparties,
   counterpartyKey,
@@ -17,6 +19,7 @@ import {
 } from '@/lib/transaction-insights'
 import {
   loadPerspectiveTransactions,
+  windowPerspectiveItems,
   type PerspectiveItem,
 } from '@/lib/household/perspective-loader'
 import type { Perspective } from '@/lib/household-data'
@@ -49,7 +52,10 @@ import { TransactieDetailSheet } from './transactie-detail-sheet'
  *
  * Fetcht het venster [prevSince, until] in één keer zodat de huidige én vorige
  * periode beschikbaar zijn (voor de trend), plus een lichte prior-query voor de
- * "nieuwe tegenpartijen". Klik op een transactie → bestaand TransactionForm;
+ * "nieuwe tegenpartijen". De uitgaven-heatmap heeft een eigen, vast
+ * 12-maands-venster dat daar normaal volledig binnen valt; in dat geval wordt
+ * hij uit dezelfde ruwe set gesneden in plaats van een tweede keer gedownload.
+ * Klik op een transactie → bestaand TransactionForm;
  * klik op een tegenpartij → bestaande CounterpartyAnalysisPanel.
  */
 
@@ -113,16 +119,6 @@ function mapRow(
   }
 }
 
-function monthsBefore(iso: string, months: number): string {
-  // Lokaal rekenen (geen UTC-round-trip) — consistent met transaction-insights.
-  const [y, m, d] = iso.split('-').map(Number)
-  const dt = new Date(y, m - 1 - months, d)
-  const yy = dt.getFullYear()
-  const mm = String(dt.getMonth() + 1).padStart(2, '0')
-  const dd = String(dt.getDate()).padStart(2, '0')
-  return `${yy}-${mm}-${dd}`
-}
-
 const WEEKDAY_FULL = [
   'Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag',
 ]
@@ -166,7 +162,19 @@ export function TransactiesAnalyse() {
   })
 
   const [rawTxns, setRawTxns] = useState<PerspectiveItem[]>([])
-  const [rawHeatmap, setRawHeatmap] = useState<PerspectiveItem[]>([])
+  // Rijen van het VASTE heatmap-venster. Bewust eigen state en géén afleiding
+  // van `rawTxns`: de dekkingsvraag hoort bij het venster dat de rijen hééft
+  // opgeleverd, niet bij het venster dat op dit moment wordt aangevraagd. Een
+  // memo op het aangevraagde venster klapt om zodra de gebruiker navigeert,
+  // terwijl `rawTxns` dan nog de vorige — mogelijk smallere — set bevat; de
+  // heatmap zou de ontbrekende maanden als "niets uitgegeven" tonen.
+  //
+  // Beide schrijvers zetten daarom alléén een VOLLEDIGE heatmapset: het
+  // hoofd-effect wanneer zijn eigen venster de heatmap omvatte, het
+  // heatmap-effect met zijn eigen fetch. Tussendoor blijft de laatst bekende
+  // volledige set staan — en die blijft geldig, want het heatmap-venster ligt
+  // vast voor de levensduur van het component.
+  const [heatmapRows, setHeatmapRows] = useState<PerspectiveItem[]>([])
   const [budgets, setBudgets] = useState<Budget[]>([])
   const [accountMap, setAccountMap] = useState<Map<string, string>>(new Map())
   const [accounts, setAccounts] = useState<AccountOption[]>([])
@@ -192,6 +200,28 @@ export function TransactiesAnalyse() {
   // Vast heatmap-venster: 12 maanden t/m vorige maand (los van de periode-keuze).
   const heatmapWindow = useMemo(() => resolveHeatmapWindow(new Date()), [])
 
+  // Eén perspectief-correct venster: 12 maanden vóór de periode t/m het
+  // periode-einde. Dekt de huidige periode (gauge/feed), de vorige periode
+  // (trend) én de prior-historie (nieuwe-tegenpartij-detectie) in één keer,
+  // zónder een losse RLS-query die het perspectief zou omzeilen.
+  const fetchWindow = useMemo(() => resolveFetchWindow(periodWindow), [periodWindow])
+
+  // Valt het hele heatmap-venster binnen dat ophaal-venster? Dan snijden we de
+  // heatmap uit dezelfde ruwe set en blijft de tweede, vrijwel volledig
+  // overlappende download achterwege. Alleen bij een ver terug-genavigeerde
+  // periode (het heatmap-venster steekt er dan aan de recente kant bovenuit)
+  // is een eigen fetch nog nodig.
+  //
+  // LET OP: dit gaat over het AANGEVRAAGDE venster — precies goed voor de vraag
+  // "moet ik zo meteen zelf ophalen?", en precies verkeerd voor de vraag "mag ik
+  // de rijen die ik nú in state heb uitsnijden?". Die tweede vraag wordt niet
+  // hier maar in het laad-effect beantwoord, waar het venster en de rijen uit
+  // dezelfde aanroep komen (zie `heatmapRows`).
+  const heatmapCovered = useMemo(
+    () => heatmapWindowCovered(fetchWindow, heatmapWindow),
+    [fetchWindow, heatmapWindow],
+  )
+
   // ── Data laden bij periode-/perspectief-wissel ──────────────────────────
   useEffect(() => {
     let cancelled = false
@@ -200,16 +230,11 @@ export function TransactiesAnalyse() {
 
     async function load() {
       const supabase = createClient()
-      // Eén perspectief-correct venster: 12 maanden vóór de periode t/m het
-      // periode-einde. Dekt de huidige periode (gauge/feed), de vorige periode
-      // (trend) én de prior-historie (nieuwe-tegenpartij-detectie) in één keer,
-      // zónder een losse RLS-query die het perspectief zou omzeilen.
-      const fetchSince = monthsBefore(periodWindow.since, 12)
       try {
         const [txResult, budgetsResult, accountsResult, connectionsResult, ibanResult] = await Promise.all([
           loadPerspectiveTransactions(supabase, perspective, {
-            since: fetchSince,
-            until: periodWindow.until,
+            since: fetchWindow.since,
+            until: fetchWindow.until,
           }),
           supabase.from('budgets').select('*').order('sort_order', { ascending: true }),
           supabase
@@ -263,6 +288,20 @@ export function TransactiesAnalyse() {
         }
 
         setRawTxns(txResult.transactions)
+        // Omvatte HET VENSTER VAN DEZE AANROEP de heatmap? Dan is de heatmap een
+        // deelverzameling van wat we net binnenkregen en snijden we 'm er hier
+        // uit — met de vensterregel van de loader zelf, dus gegarandeerd
+        // dezelfde rijen als een eigen fetch. Omvatte het venster de heatmap
+        // niet, dan raken we `heatmapRows` niet aan: dan heeft het effect
+        // hieronder een eigen, volledige set opgehaald (of doet dat nog).
+        if (heatmapCovered) {
+          setHeatmapRows(
+            windowPerspectiveItems(txResult.transactions, {
+              since: heatmapWindow.start,
+              until: heatmapWindow.end,
+            }),
+          )
+        }
         setBudgets((budgetsResult.data ?? []) as Budget[])
         setAccountMap(accMap)
         setAccounts(accList)
@@ -278,10 +317,13 @@ export function TransactiesAnalyse() {
     return () => {
       cancelled = true
     }
-  }, [perspective, periodWindow.since, periodWindow.until, reloadKey])
+  }, [perspective, fetchWindow, heatmapCovered, heatmapWindow.start, heatmapWindow.end, reloadKey])
 
   // ── Heatmap-data: vast 12-maands-venster, los van de periode-keuze ────────
+  // Alleen nodig wanneer het ophaal-venster hierboven het heatmap-venster niet
+  // dekt; anders levert het laad-effect de heatmap uit dezelfde ruwe set.
   useEffect(() => {
+    if (heatmapCovered) return
     let cancelled = false
     async function loadHeatmap() {
       const supabase = createClient()
@@ -291,16 +333,16 @@ export function TransactiesAnalyse() {
           until: heatmapWindow.end,
         })
         if (cancelled) return
-        setRawHeatmap(res.transactions)
+        setHeatmapRows(res.transactions)
       } catch {
-        if (!cancelled) setRawHeatmap([])
+        if (!cancelled) setHeatmapRows([])
       }
     }
     loadHeatmap()
     return () => {
       cancelled = true
     }
-  }, [perspective, heatmapWindow.start, heatmapWindow.end, reloadKey])
+  }, [perspective, heatmapCovered, heatmapWindow.start, heatmapWindow.end, reloadKey])
 
   // ── Afgeleide data ──────────────────────────────────────────────────────
   const budgetMap = useMemo(() => {
@@ -331,10 +373,10 @@ export function TransactiesAnalyse() {
   // dagweergave bij een klik op een cel.
   const heatmapTxns = useMemo(
     () =>
-      rawHeatmap
+      heatmapRows
         .map((t) => mapRow(t, perspective, budgetMap, accountMap))
         .filter((t): t is AnalysisTransaction => t !== null),
-    [rawHeatmap, perspective, budgetMap, accountMap],
+    [heatmapRows, perspective, budgetMap, accountMap],
   )
 
   // Tegenpartijen die vóór de periode al voorkwamen (zelfde perspectief-lens) —

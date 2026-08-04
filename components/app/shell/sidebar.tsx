@@ -59,10 +59,8 @@ import {
 import { useNotifications } from '@/components/app/notifications/notification-provider'
 import { useNewsUnread } from '@/lib/hooks/use-news-unread'
 import { hasSubscription } from '@/lib/feature-registry'
-import {
-  useCashflowCardStatuses,
-  type CashflowCardStatuses,
-} from '@/lib/hooks/use-cashflow-card-statuses'
+import { useCashflowStatusContext } from '@/components/app/cashflow-status-provider'
+import type { CashflowCardStatuses } from '@/lib/cashflow-cards'
 
 const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
 const SOURCE_SERIF = 'var(--font-source-serif, Georgia, serif)'
@@ -829,10 +827,11 @@ type FreshnessLabels = { on: string; off: string }
 
 // Cashflow-children (SubTagStrip): status-mirror i.p.v. freshness. Elke child-
 // href mapt op een sleutel in CashflowCardStatuses, gevuld door
-// `useCashflowCardStatuses()` (→ /api/overzicht/cashflow-status →
-// buildCashflowCards). Hierdoor toont elke dot EXACT dezelfde LeverageStatus als
-// de bijbehorende cashflow-landingskaart (Budget/Transacties/Vaste lasten/
-// Forecast) — één bron, geen drift.
+// `useCashflowStatusContext()` (op de hub: de server-seed van de pagina; op de
+// sub-pagina's: /api/overzicht/cashflow-status). Beide paden lopen door
+// buildCashflowCards + cashflowCardStatuses, dus elke dot toont EXACT dezelfde
+// LeverageStatus als de bijbehorende cashflow-landingskaart (Budget/Transacties/
+// Vaste lasten/Forecast) — één bron, geen drift.
 const CASHFLOW_STATUS_BY_HREF: Record<string, keyof CashflowCardStatuses> = {
   '/overzicht/cashflow/budget': 'budget',
   '/overzicht/cashflow/transacties': 'transacties',
@@ -886,10 +885,12 @@ function SubTagStrip({
   sidebarSignals?: SidebarSignals
 }) {
   const pathname = usePathname() ?? '/'
-  // Cashflow-kaartstatussen: één hook-call op strip-niveau (Rules of Hooks),
-  // gedeeld door alle vier cashflow-children. De hook is lazy — fetcht alleen op
-  // een /overzicht/cashflow*-route en retourneert anders neutrale statussen.
-  const cashflowStatuses = useCashflowCardStatuses()
+  // Cashflow-kaartstatussen uit de gedeelde CashflowStatusProvider (app-layout):
+  // één bron voor alle vier cashflow-children. Die provider is lazy — op de hub
+  // consumeert hij de server-seed van de pagina (geen request), op de
+  // sub-pagina's fetcht hij /api/overzicht/cashflow-status, en daarbuiten blijven
+  // de statussen neutraal.
+  const cashflowStatuses = useCashflowStatusContext()
   // Dimmed-state op non-active modules: een toon lichter zodat de actieve
   // module visueel blijft dominen, maar de sub-pages wel scanbaar zijn.
   const baseColorClass = dimmed ? 'text-[var(--ink-3)]' : 'text-[var(--ink-2)]'

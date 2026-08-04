@@ -26,8 +26,8 @@ import type { FireProjection, FireCountdown } from '@/lib/horizon-data'
 import { loadNewsPreview } from '@/lib/news-preview'
 import { computeNextSteps } from '@/lib/next-steps/engine'
 
-import { computeEffectiveExpenses, computeFireTarget, computeFreedomProgressWithBasis, inclHomeTargetFromScalar, computeSavingsRateFromNetWorthDelta } from '@/lib/core-metrics'
-import { localMonthStart, localMonthStartMonthsAgo } from '@/lib/month-range'
+import { computeEffectiveExpenses, computeFireTarget, computeFreedomProgressWithBasis, inclHomeTargetFromScalar } from '@/lib/core-metrics'
+import { localMonthStart } from '@/lib/month-range'
 import {
   getActiveAssets,
   getActiveDebts,
@@ -37,6 +37,7 @@ import {
   getCurrentMonthTx,
   getTx12m,
   getEarliestIncomeDate,
+  getNetWorthSnapshots12m,
 } from '@/lib/server-data/base'
 import { localDateStr } from '@/lib/budget-period'
 import {
@@ -66,7 +67,7 @@ import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import { buildPensionProjection } from '@/lib/pension/pension-projection'
 import { resolveFireAssumptions, type FireAssumptionRow } from '@/lib/fire-assumptions'
 import { getAowLeeftijden } from '@/lib/reference-cache'
-import { computeExpectedAnnualAppreciation, type Asset } from '@/lib/asset-data'
+import type { Asset } from '@/lib/asset-data'
 import { computeAssetsByType, computeLiquidPot, monthsCoveredFrom } from '@/lib/dashboard-wealth-weighting'
 import { resolveEmergencyFund } from '@/lib/emergency-fund'
 import { loadVasteLastenSummary } from '@/lib/vaste-lasten-summary'
@@ -88,13 +89,13 @@ import {
 import { formatCurrency, calculateFreedomTime, formatFreedomTimeString, dailyExpenseRate, roundCents } from '@/lib/format'
 import { recentDailyExpenseRateFromRows } from '@/lib/expense-rate'
 import {
-  fetchTxMonthAggregate,
+  getTxAgg12m,
   aggSumPositief,
-  aggSumNegatiefAbs,
   aggIncomeByMonth,
   aggExpenseByMonthAbs,
   aggAbsByMonthForBudgets,
   aggToExpenseRows,
+  isRealAggRow,
   type TxMonthAggregateRow,
 } from '@/lib/server-data/tx-aggregates'
 import { fetchActionsKpiAggregate } from '@/lib/server-data/actions-aggregate'
@@ -117,13 +118,36 @@ import {
   type CategoryAppLink,
 } from '@/lib/category-app-nav'
 import { resolveEffectiveIncomeExpenses } from './effective-financials'
-import { resolveSavingsSource, savingsRateFromAggregates, computeSavingsRate6m, computeDebtAflossingMonthly, monthlySavingsFromRate } from './savings-source'
+import {
+  buildBudgetTypeMap,
+  budgetIdsOfType,
+  deriveBudgetTotals,
+  deriveBudgetScore,
+  deriveRealMonthTotals,
+  resolveBudgetingActive,
+  currentMonthKey,
+  toSortedMonthHistory,
+  deriveSavingsHistory,
+  deriveDataMonths6,
+  deriveSavingsRate6mWindow,
+  resolveSavingsRate6m,
+  BUDGET_TYPES,
+  type NetWorthSnapshotRow,
+} from '@/lib/cashflow-kpis'
+import { resolveSavingsSource, savingsRateFromAggregates, computeDebtAflossingMonthly, monthlySavingsFromRate } from './savings-source'
 import { buildHealthScoreInput } from '@/lib/health-score-input'
 import { computeHealthScoreWithTrend, type HealthScore } from '@/lib/financial-health'
 
-/** Filter out own-account transfers from income/expense calculations */
-const isRealTx = (t: { transaction_type?: string | null }) =>
-  t.transaction_type !== 'transfer' && t.transaction_type !== 'joint_transfer'
+/**
+ * Filter out own-account transfers from income/expense calculations.
+ *
+ * Delegeert naar `isRealAggRow` (lib/server-data/tx-aggregates.ts), dat exact
+ * dezelfde transfer-definitie draagt als de `realOnly`-vlag op de
+ * aggregaat-reducers. Vroeger stond de vergelijking hier ook letterlijk
+ * uitgeschreven: twee eigenaren van "wat telt als echte transactie" die
+ * toevallig overeenkwamen. ADR 0083 claimt er één — dit maakt die claim waar.
+ */
+const isRealTx = isRealAggRow
 
 // ── Result type ────────────────────────────────────────────────
 
@@ -299,7 +323,14 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     supabase.from('life_events').select('id, name, event_type, target_age, target_date, one_time_cost, monthly_cost_change, monthly_income_change, duration_months, icon, is_active, sort_order, is_indexed, linked_asset_id, metadata').eq('is_active', true).order('sort_order', { ascending: true }).limit(50),
     supabase.from('recommendations').select('id, title, freedom_days_per_year, priority_score, recommendation_type, status').in('status', ['pending', 'postponed']),
     supabase.from('goals').select('id, name, goal_type, current_value, target_value, target_date, color, icon, metadata, linked_asset_id, linked_debt_id').eq('is_completed', false).order('sort_order', { ascending: true }),
-    supabase.from('net_worth_snapshots').select('snapshot_date, net_worth, fire_age, savings_rate').gte('snapshot_date', twelveMonthsAgo).order('snapshot_date', { ascending: true }).limit(12),
+    // Gedeelde `cache()`-fetcher (lib/server-data/base.ts): exact hetzelfde
+    // venster/kolomset/limiet als de vroegere inline-query — de ondergrens komt
+    // alleen niet meer uit het TZ-onveilige `Date.UTC(...).toISOString()` maar
+    // uit `localMonthStartMonthsAgo` (zelfde YYYY-MM-01). Delen doet er hier toe:
+    // `loadForecastSectionData` (lib/cashflow-kpis.ts) leest dezelfde rijen voor
+    // `savingsHistory` + de net-worth-delta-fallback, dus op een request waar
+    // beide draaien is dit één query in plaats van twee.
+    getNetWorthSnapshots12m(supabase),
     // 12-maands transactievenster → income12 / vroegste-inkomen / 6-maands /
     // sovereignty / vorige-maand via JS-slicing hieronder (byte-identiek; die
     // vensters zijn subsets van [twelveMonthsAgo, monthEnd)).
@@ -312,7 +343,10 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     // 12-/6-mnd inkomen/uitgaven/spaarquote/dagtarief te laag voor >1000-tx-gebruikers).
     // Een aggregaat levert enkele rijen en kan niet afkappen. RLS-breed (eigen +
     // gedeeld huishouden), identiek aan de vroegere fetches die op RLS leunden.
-    fetchTxMonthAggregate(supabase, { from: twelveMonthsAgo, to: monthEnd }),
+    // Gedeelde `cache()`-fetcher: exact hetzelfde venster [twelveMonthsAgo, monthEnd),
+    // maar core-data-loader raakt dezelfde cache-entry → op de cashflow-hub (waar
+    // beide loaders draaien) nog één RPC i.p.v. twee.
+    getTxAgg12m(supabase),
     // Tabel-split (migratie 20260502000003): dashboard-widgets tonen
     // investment-tracker data; crypto loopt via de exchange-sync.
     // Eén ongefilterde superset-query i.p.v. drie losse investment_holdings-fetches
@@ -470,7 +504,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   const favBudgetsData = allBudgetsRaw.filter(b => b.is_favorite)
 
   // Read profile fields from the combined profile query
-  const budgetingActive = (profileResult.data as Record<string, unknown> | null)?.budgeting_active !== false
+  const budgetingActive = resolveBudgetingActive(profileResult.data as Record<string, unknown> | null)
   const profileFullName = (profileResult.data as Record<string, unknown> | null)?.full_name as string | null ?? null
   // ai_enabled column may not exist yet (migration pending) — default to true
   const profileAiEnabled = (profileResult.data as Record<string, unknown> | null)?.ai_enabled !== false
@@ -481,15 +515,11 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   const activeModules: string[] = [...ALL_MODULES]
   const hasVermogen = activeModules.includes('vermogensregistratie')
 
-  // Core calculations
-  let monthlyIncome = 0
-  let monthlyExpenses = 0
-  for (const tx of txResult.data ?? []) {
-    if (!isRealTx(tx)) continue
-    const amt = Number(tx.amount)
-    if (amt > 0) monthlyIncome += amt
-    else monthlyExpenses += Math.abs(amt)
-  }
+  // Core calculations — de rauwe huidige-maand-pass (mét transfer-filter) die de
+  // EFFECTIVE grondslag voedt. Gedeelde helper (lib/cashflow-kpis.ts) zodat de
+  // slanke cashflow-KPI-laag exact dezelfde pass draait (ADR 0083).
+  const { income: monthlyIncome, expenses: monthlyExpenses } =
+    deriveRealMonthTotals(txResult.data ?? [])
 
   // Fallback to profile estimates for users without transactions
   const profileMonthlyExpenses = Number(profileResult.data?.estimated_monthly_expenses ?? 0)
@@ -545,51 +575,18 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
 
   // Budget totals per type — limiet en werkelijke besteding
   const allParentBudgets = allParentBudgetsData as { id: string; name: string; icon: string; budget_type: string; default_limit: number; interval: string; is_favorite: boolean; alert_threshold: number }[]
-  // Map: budget_id → budget_type (voor zowel parent als child budgetten)
-  const budgetTypeMap = new Map<string, string>()
-  for (const b of allParentBudgets) budgetTypeMap.set(b.id, b.budget_type)
-  for (const c of allChildren) {
-    const parentType = budgetTypeMap.get(c.parent_id ?? '')
-    if (parentType) budgetTypeMap.set(c.id, parentType)
-  }
-
-  const BUDGET_TYPES = ['income', 'expense', 'savings', 'debt'] as const
-  const budgetLimits: Record<string, number> = { income: 0, expense: 0, savings: 0, debt: 0 }
-  for (const b of allParentBudgets) {
-    const type = b.budget_type as string
-    if (!BUDGET_TYPES.includes(type as typeof BUDGET_TYPES[number])) continue
-    const children = allChildren.filter(c => c.parent_id === b.id)
-    const limit = children.length > 0
-      ? children.reduce((sum, c) => sum + Number(c.default_limit), 0)
-      : Number(b.default_limit)
-    const monthlyLimit = b.interval === 'monthly' ? limit
-      : b.interval === 'quarterly' ? limit / 3
-      : limit / 12
-    budgetLimits[type] = (budgetLimits[type] ?? 0) + monthlyLimit
-  }
-
-  const budgetSpent: Record<string, number> = { income: 0, expense: 0, savings: 0, debt: 0 }
-  for (const tx of txResult.data ?? []) {
-    const amt = Number(tx.amount)
-    const budgetId = (tx as { budget_id?: string | null }).budget_id
-    if (!budgetId) continue
-    const type = budgetTypeMap.get(budgetId)
-    if (!type || !BUDGET_TYPES.includes(type as typeof BUDGET_TYPES[number])) continue
-    budgetSpent[type] = (budgetSpent[type] ?? 0) + Math.abs(amt)
-  }
-
-  const budgetTotals = {
-    income:  { limit: budgetLimits.income,  spent: budgetSpent.income },
-    expense: { limit: budgetLimits.expense, spent: budgetSpent.expense },
-    savings: { limit: budgetLimits.savings, spent: budgetSpent.savings },
-    debt:    { limit: budgetLimits.debt,    spent: budgetSpent.debt },
-  }
+  // Map budget_id → budget_type (parent + child) en de limiet/besteding-oprol per
+  // type: beide wonen als pure helpers in lib/cashflow-kpis.ts, zodat de slanke
+  // cashflow-KPI-laag EXACT deze afleiding consumeert i.p.v. hem na te bouwen
+  // (ADR 0083). Hier is dat een zuivere verplaatsing — de map voedt verderop nog
+  // de spaar- en schuld-budget-ID-sets.
+  const budgetTypeMap = buildBudgetTypeMap(allBudgetsRaw)
+  const budgetTotals = deriveBudgetTotals(allBudgetsRaw, txResult.data ?? [])
 
   // ── Savings-budget ID set (for spaarquote correction) ─────
-  const savingsBudgetIds = new Set<string>()
-  for (const [id, type] of budgetTypeMap) {
-    if (type === 'savings') savingsBudgetIds.add(id)
-  }
+  // Gedeelde helper: de forecast-laag leidt dezelfde set af voor exact dezelfde
+  // spaarbudget-correctie op de 6-maands quote.
+  const savingsBudgetIds = budgetIdsOfType(budgetTypeMap, 'savings')
 
   // Current month: savings-budget spend (absolute)
   let monthlySavingsBudgetSpent = 0
@@ -804,71 +801,48 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   }
 
   // ── 6-month rolling average savings rate ─────────────────────
-  // 6 kalendermaanden incl. de huidige = 5 maanden terug (getMonth()-6 telde 7 maanden — off-by-one)
-  const sixMonthsAgo = localMonthStartMonthsAgo(now, 5)
-  // 6-maands sub-venster op maand-niveau ('YYYY-MM'). sixMonthsAgo is de 1e van de
-  // maand, dus `date >= sixMonthsAgo` == `maand >= sixMonthsAgoMonth` (exact).
-  const sixMonthsAgoMonth = sixMonthsAgo.slice(0, 7)
+  // Het 6-maands sub-venster op het maandaggregaat (transfer-gefilterd, mét de
+  // spaarbudget-correctie) woont als pure helper in lib/cashflow-kpis.ts, zodat de
+  // forecast-laag EXACT dit venster consumeert i.p.v. het na te bouwen (ADR 0083).
+  // 6 kalendermaanden incl. de huidige = 5 maanden terug (getMonth()-6 telde er 7 —
+  // off-by-one), en de grens is TZ-veilig via localMonthStartMonthsAgo.
+  const { income6m, expenses6m, savingsBudgetSpent6m } =
+    deriveSavingsRate6mWindow(now, txAgg12, savingsBudgetIds)
 
-  // Transfer-gefilterd (realOnly:true), 6-maands sub-venster — byte-identiek aan
-  // de vroegere rij-reducties over income12/expense12.
-  const income6m = aggSumPositief(txAgg12, { realOnly: true, sinceMonth: sixMonthsAgoMonth })
-  const expenses6m = aggSumNegatiefAbs(txAgg12, { realOnly: true, sinceMonth: sixMonthsAgoMonth })
-  const savingsBudgetSpent6m = aggSumNegatiefAbs(txAgg12, {
-    realOnly: true,
-    sinceMonth: sixMonthsAgoMonth,
-    budgetIds: savingsBudgetIds,
-  })
-
-  let dataMonths6 = 6
-  if (earliestIncomeDateD) {
-    const earliest = new Date(earliestIncomeDateD)
-    dataMonths6 = Math.max(1, Math.min(6,
-      (now.getFullYear() - earliest.getFullYear()) * 12 +
-      (now.getMonth() - earliest.getMonth())
-    ))
-  }
+  // Maanden werkelijke data (1-6) voor de extrapolatie — zelfde gedeelde helper.
+  const dataMonths6 = deriveDataMonths6(now, earliestIncomeDateD)
 
   // Compute debt aflossing total (only active debts with include_aflossing_in_savings,
   // weighted by net_worth_inclusion_pct) — gedeelde canonieke helper.
   const debtAflossingMonthly = computeDebtAflossingMonthly((debtsResult.data ?? []) as unknown as Debt[])
   const debtAflossing6m = debtAflossingMonthly * 6
 
-  // Canonieke 6-maands spaarquote — gedeelde helper (extrapolatie <6m data +
-  // savingsRateFromAggregates + profiel-fallback). Spaarbudgetten tellen als sparen
-  // (uit de uitgaven-term), schuldaflossing erbij. Byte-identiek aan de vroegere
-  // inline-versie; nu single-sourced met horizon/core/lever-scores. `isEstimate`
-  // = aggregaat gaf 0 (vóór profiel-fallback) → stuurt de net-worth-delta-fallback
-  // + het inkomen-anker (extIncome6/6 vs. effectiveMonthlyIncome).
-  const savings6m = computeSavingsRate6m({
+  // Canonieke 6-maands spaarquote MÉT haar twee fallbacks (profiel-schatting en
+  // net-vermogen-delta) — gedeelde helper `resolveSavingsRate6m` in
+  // lib/cashflow-kpis.ts, die op zijn beurt `computeSavingsRate6m`
+  // (lib/savings-source.ts) en `computeSavingsRateFromNetWorthDelta`
+  // (lib/core-metrics.ts) aan elkaar knoopt. Verplaatst, niet herschreven: de
+  // forecast-pagina leest dit kerngetal nu buiten deze bundel om, en twee kopieën
+  // van deze keten zouden precies de dubbele spaarquote geven die de
+  // "consume, don't recompute"-regel moet voorkomen.
+  //
+  // `isEstimate` = de AGGREGAAT-formule gaf 0 (vóór élke fallback) → stuurt zowel
+  // de delta-tak binnen de helper als, hieronder, het inkomen-anker van
+  // `monthlySavingsAmount` (extIncome6/6 vs. effectiveMonthlyIncome).
+  const savings6m = resolveSavingsRate6m({
     income6m,
     expenses6m,
     savingsBudgetSpent6m,
     debtAflossing6m,
     dataMonths: dataMonths6,
-    fallbackMonthlyIncome: effectiveMonthlyIncome,
-    fallbackMonthlyExpenses: effectiveMonthlyExpenses,
+    effectiveMonthlyIncome,
+    effectiveMonthlyExpenses,
+    netWorthSnapshots: (netWorthSnapshotsResult.data ?? []) as unknown as NetWorthSnapshotRow[],
+    assets: (assetsResult.data ?? []) as Asset[],
   })
   const extIncome6 = savings6m.extIncome6
   const savingsRateIsEstimate = savings6m.isEstimate
-  let savingsRate6m = savings6m.savingsRate6m
-
-  // Try net-worth-delta method when still on estimate and snapshots are available
-  // (matches core-data-loader fallback for consistency)
-  const earlySnapshotRows = netWorthSnapshotsResult.data ?? []
-  if (savingsRateIsEstimate && earlySnapshotRows.length >= 2 && effectiveMonthlyIncome > 0) {
-    // Verwachte koerswinst op beleggingen — geen sparen, dus afhalen voor een
-    // eerlijker fallback-quote. Gedeelde helper (expected_return is een %, dus /100).
-    const expectedAnnualAppreciation = computeExpectedAnnualAppreciation((assetsResult.data ?? []) as Asset[])
-    const deltaResult = computeSavingsRateFromNetWorthDelta(
-      earlySnapshotRows as { snapshot_date: string; net_worth: number }[],
-      effectiveMonthlyIncome,
-      { expectedAnnualAppreciation },
-    )
-    if (deltaResult) {
-      savingsRate6m = deltaResult.rate
-    }
-  }
+  const savingsRate6m = savings6m.savingsRate6m
 
   // Canoniek maandspaarbedrag op DEZELFDE grondslag als savingsRate6m (6m-geëxtra-
   // poleerd, incl. spaarbudgetten + schuldaflossing). Zo geldt altijd
@@ -1342,13 +1316,9 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     month: s.snapshot_date as string,
     value: Number(s.net_worth),
   }))
-  // Savings rate history from snapshots (percentage per month)
-  const savingsHistory = snapshotRows
-    .filter(s => (s as { savings_rate?: number | null }).savings_rate != null)
-    .map(s => ({
-      month: s.snapshot_date as string,
-      value: Number((s as { savings_rate?: number | null }).savings_rate),
-    }))
+  // Savings rate history from snapshots (percentage per month) — gedeelde helper
+  // (lib/cashflow-kpis.ts) zodat de forecast-laag dezelfde reeks ziet.
+  const savingsHistory = deriveSavingsHistory(snapshotRows as unknown as NetWorthSnapshotRow[])
 
   // ── Noodfonds (canonieke resolver) ──────────────────────────────
   // Eén bron voor de noodfonds-bundel (hieronder) én de score-norm: 3 × netto
@@ -1421,11 +1391,11 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   )
 
   // Expense history: Σ |negatieve bedragen| per maand, transfer-gefilterd — uit het
-  // maandaggregaat (byte-identiek aan de vroegere rij-bucket).
+  // maandaggregaat (byte-identiek aan de vroegere rij-bucket). De map zelf wordt
+  // hieronder nog hergebruikt (currentMonthExpenses + savingsByMonth), dus alleen
+  // de sortering/vorm loopt via de gedeelde helper.
   const expenseByMonth = aggExpenseByMonthAbs(txAgg12, { realOnly: true })
-  const expenseHistory = Array.from(expenseByMonth.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([month, value]) => ({ month, value }))
+  const expenseHistory = toSortedMonthHistory(expenseByMonth)
 
   // Income history: positieve transacties per maand, transfer-gefilterd.
   const incomeByMonth = aggIncomeByMonth(txAgg12, { realOnly: true })
@@ -1435,11 +1405,13 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // effective/manual-override die `monthlyIncome`/`monthlyExpenses` voedt (zie
   // resolveEffectiveIncomeExpenses). Bewust een slice van HETZELFDE canonieke
   // maandaggregaat als de historieën hierboven — geen vierde eigen tel-lus, en
-  // een aggregaat kan niet stil op max_rows afkappen. `monthStart` is al
-  // 'YYYY-MM-DD' van de 1e van deze maand, dus slice(0,7) == de aggregaat-sleutel.
-  const currentMonthKey = monthStart.slice(0, 7)
-  const currentMonthIncome = incomeByMonth.get(currentMonthKey) ?? 0
-  const currentMonthExpenses = expenseByMonth.get(currentMonthKey) ?? 0
+  // een aggregaat kan niet stil op max_rows afkappen. De maandsleutel komt uit de
+  // gedeelde `currentMonthKey`-helper (lib/cashflow-kpis.ts) — byte-identiek aan
+  // het vroegere `monthStart.slice(0, 7)`, en gedeeld met de cashflow-KPI-laag
+  // zodat beide paden per definitie dezelfde maand lezen (ADR 0083).
+  const monthKey = currentMonthKey(now)
+  const currentMonthIncome = incomeByMonth.get(monthKey) ?? 0
+  const currentMonthExpenses = expenseByMonth.get(monthKey) ?? 0
 
   // Savings history: income minus expenses per month (using all transactions)
   const savingsByMonth = new Map<string, number>()
@@ -1449,11 +1421,6 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     const exp = expenseByMonth.get(month) ?? 0
     savingsByMonth.set(month, Math.max(0, inc - exp))
   }
-
-  const toSortedHistory = (m: Map<string, number>) =>
-    Array.from(m.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([month, value]) => ({ month, value }))
 
   // Schuldtrend (widgetreview, Optie B): het openstaand schuldSALDO per maand uit de
   // balance_snapshots — een dalend saldo is "goed" (schuld = vrijheid die je
@@ -1466,16 +1433,15 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   )
   let debtHistory = debtSaldoHistory
   if (debtHistory.length === 0) {
-    const debtBudgetIds = new Set<string>()
-    for (const [id, type] of budgetTypeMap) if (type === 'debt') debtBudgetIds.add(id)
+    const debtBudgetIds = budgetIdsOfType(budgetTypeMap, 'debt')
     const debtMonthAgg = aggAbsByMonthForBudgets(txAgg12, debtBudgetIds, { realOnly: true })
-    debtHistory = toSortedHistory(debtMonthAgg)
+    debtHistory = toSortedMonthHistory(debtMonthAgg)
   }
 
   const budgetTypeHistory = {
-    income:  toSortedHistory(incomeByMonth),
-    expense: toSortedHistory(expenseByMonth),
-    savings: toSortedHistory(savingsByMonth),
+    income:  toSortedMonthHistory(incomeByMonth),
+    expense: toSortedMonthHistory(expenseByMonth),
+    savings: toSortedMonthHistory(savingsByMonth),
     debt:    debtHistory,
   }
 
@@ -1684,11 +1650,10 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // ── Month Summary: derived from existing calculations ────────
   // Use 6-month rolling average for consistency across the app
   const savingsRate = savingsRate6m
-  // Budget score: average % of budgets within limit (0-100)
-  const budgetScoreEntries = Object.values(budgetTotals).filter(v => v.limit > 0)
-  const budgetScore = budgetScoreEntries.length > 0
-    ? Math.round(budgetScoreEntries.reduce((s, v) => s + Math.min(100, (1 - Math.max(0, v.spent - v.limit) / v.limit) * 100), 0) / budgetScoreEntries.length)
-    : 100
+  // Budget score: average % of budgets within limit (0-100) — gedeelde helper
+  // (lib/cashflow-kpis.ts), zodat de cashflow-KPI-laag dezelfde dekkings-score
+  // consumeert i.p.v. hem na te rekenen (ADR 0083).
+  const budgetScore = deriveBudgetScore(budgetTotals)
   // Net worth delta from snapshots
   const prevSnapshot = snapshotRows.length >= 2 ? snapshotRows[snapshotRows.length - 2] : null
   const netWorthDeltaComputed = prevSnapshot ? netWorth - Number(prevSnapshot.net_worth) : null

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
-import { loadCashflowData } from '@/lib/cashflow-data-loader'
+import { loadAccountCount } from '@/lib/account-count'
 import { getServerPerspective } from '@/lib/household/server-perspective'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { KoppelRekeningBanner } from '@/components/overview/koppel-rekening-banner'
@@ -19,12 +19,18 @@ export const metadata: Metadata = {
  * /overzicht/cashflow/transacties — periode-gestuurde transactie-analyse.
  * De analyse is een client-component (TransactiesAnalyse) die zélf data ophaalt
  * per gekozen periode; de server levert enkel het accountCount voor de
- * koppel-banner (uit de gedeelde, gecachte cashflow-loader).
+ * koppel-banner.
+ *
+ * Dat aantal komt uit `loadAccountCount` — één perspectief-gescopede count-query
+ * op bank_accounts. Voorheen draaide deze pagina daarvoor de volledige
+ * `loadCashflowData` (perspectief-keten, 6 maanden transacties, recurrings, een
+ * naam-decoratie per getoonde feed-rij) om er precies één integer uit te lezen;
+ * de rest van die bundel wordt op deze route nergens gebruikt.
  */
 export default async function OverzichtCashflowTransactiesPage() {
   const supabase = await createClient()
   const perspective = await getServerPerspective()
-  const { accountCount } = await loadCashflowData(supabase, perspective)
+  const accountCount = await loadAccountCount(supabase, perspective)
 
   return (
     <>

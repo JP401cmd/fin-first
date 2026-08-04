@@ -2,7 +2,7 @@
 
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { MaskedAmount } from '@/components/app/masked-amount'
-import type { DashboardData } from '@/components/widgets/widget-renderer'
+import type { CashflowSectionScalars } from '@/lib/cashflow-kpis'
 import type { RecurringItem } from './vaste-kosten-analyse'
 import type { CancellationMetadata } from '@/lib/cancellation-types'
 
@@ -61,7 +61,13 @@ function MiniSparkline({
 // ── Section ─────────────────────────────────────────────────────
 
 interface CashflowSectionProps {
-  data: DashboardData
+  /**
+   * Precies de vijf velden die dit component leest — niet de volle
+   * `DashboardData`. Het type is structureel, dus een caller die alsnog de hele
+   * bundel doorgeeft blijft compileren; de smalle vorm maakt zichtbaar dat de
+   * pagina hiervoor geen dashboard-bundel meer hoeft te laden (ADR 0083).
+   */
+  data: CashflowSectionScalars
   /**
    * Legacy FinLanding-props. De samenvatting rendert alleen op basis van
    * `data`; deze blijven optioneel zodat bestaande callers blijven

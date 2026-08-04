@@ -1,11 +1,16 @@
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { loadDashboardData } from '@/lib/dashboard-data-loader'
+import { loadCashflowKpis } from '@/lib/cashflow-kpis'
 import { loadCashflowData } from '@/lib/cashflow-data-loader'
 import { loadVasteLastenSummary } from '@/lib/vaste-lasten-summary'
 import { getServerPerspective } from '@/lib/household/server-perspective'
-import { buildCashflowCards } from '@/lib/cashflow-cards'
-import type { LeverageStatus } from '@/lib/leverage-status'
+import { buildCashflowCards, cashflowCardStatuses } from '@/lib/cashflow-cards'
+import { unauthorized, serverError } from '@/lib/api/respond'
+import {
+  cashflowStatusCacheKey,
+  readCashflowStatusCache,
+  writeCashflowStatusCache,
+} from '@/lib/cashflow-status-cache'
 
 /**
  * GET /api/overzicht/cashflow-status
@@ -14,45 +19,62 @@ import type { LeverageStatus } from '@/lib/leverage-status'
  * Forecast) als `LeverageStatus`, voor de sidebar-status-dots onder Cashflow.
  *
  * SINGLE SOURCE: dit endpoint roept EXACT dezelfde loaders + `buildCashflowCards`
- * aan als de cashflow-landingspagina (app/(app)/overzicht/cashflow/page.tsx) en
- * geeft per kaart `{key, status}` terug. Daardoor toont de sidebar-dot
+ * + `cashflowCardStatuses` aan als de cashflow-landingspagina
+ * (components/overview/cashflow-cards-loader.tsx). Daardoor toont de sidebar-dot
  * gegarandeerd dezelfde status als de kaart — geen herberekening, geen drift.
  *
- * Perspectief-bewust via `getServerPerspective()` (dezelfde cookie als de
- * pagina), zodat de statussen ook in huishouden-/partner-weergave kloppen.
+ * SLANKE KPI-LAAG (ADR 0083 · perf Task 2.3): de eerste input komt uit
+ * `loadCashflowKpis` — de vier `cache()`-gedeelde fetches waar de zeven scalars
+ * van `buildCashflowCards` aan hangen — en niet meer uit de volle
+ * `loadDashboardData` (~40 queries in 5-6 seriële golven plus een KOUDE
+ * horizon-tak van nog eens ~17 queries mét bisectie-solve). Vier statuskleuren
+ * kosten daarmee ~10 queries in plaats van ~60. De statussen blijven per
+ * constructie identiek: zelfde `buildCashflowCards`, zelfde drie inputs, alleen
+ * de eerste uit een slankere loader (pariteit vastgelegd in
+ * lib/cashflow-kpis.parity.test.ts).
  *
- * Egress: deze route is bewust LAZY — de bijbehorende client-hook fetcht hem
- * alleen op /overzicht/cashflow*-routes (zie use-cashflow-card-statuses.ts), niet
- * op elke pagina. De zware loaders (~25 + 6m + 12m queries) blijven zo van de
- * globale layout af.
+ * Perspectief-bewust via `getServerPerspective()` (dezelfde cookie als de
+ * pagina), zodat de statussen ook in huishouden-/partner-weergave kloppen. Het
+ * perspectief stuurt `loadCashflowData`, precies zoals op de pagina;
+ * `loadCashflowKpis` is — net als `loadDashboardData` hiervoor — persoonlijk.
+ *
+ * Egress: deze route is bewust LAZY — hij wordt alleen gefetcht op de
+ * /overzicht/cashflow-SUB-routes (zie use-cashflow-card-statuses.ts). Op de HUB
+ * valt hij helemaal weg: die pagina berekent de kaarten toch al server-side en
+ * seedt de dots via `<CashflowStatusSeed>`.
+ *
+ * TTL-cache (lib/cashflow-status-cache.ts): bovenop die lazy-gating vouwt een
+ * korte per-gebruiker+perspectief-cache herhaalde bezoeken samen — React
+ * `cache()` overleeft immers geen request-grens. Bij een hit gaan de drie loaders
+ * NIET aan. Bewust géén expliciete invalidatie (per-instance Map →
+ * schijnzekerheid); een verse mutatie toont maximaal één TTL-venster een
+ * verouderde dot.
  */
 export async function GET() {
   try {
     const supabase = await createClient()
     const claims = await getAuthClaims(supabase)
     if (!claims) {
-      return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+      return unauthorized()
     }
 
     const perspective = await getServerPerspective()
-    const [dashboardResult, cashflow, vasteLasten] = await Promise.all([
-      loadDashboardData(supabase),
+    const key = cashflowStatusCacheKey(claims.sub, perspective)
+    const cached = readCashflowStatusCache(key)
+    if (cached.hit) {
+      return NextResponse.json(cached.statuses)
+    }
+
+    const [kpis, cashflow, vasteLasten] = await Promise.all([
+      loadCashflowKpis(supabase),
       loadCashflowData(supabase, perspective),
       loadVasteLastenSummary(supabase),
     ])
-    const cards = buildCashflowCards(dashboardResult.dashboardData, cashflow, vasteLasten)
+    const statuses = cashflowCardStatuses(buildCashflowCards(kpis, cashflow, vasteLasten))
+    writeCashflowStatusCache(key, statuses)
 
-    const byKey = (k: string): LeverageStatus =>
-      cards.find((c) => c.key === k)?.status ?? 'neutral'
-
-    return NextResponse.json({
-      budget: byKey('budget'),
-      transacties: byKey('transacties'),
-      vasteLasten: byKey('vaste-lasten'),
-      forecast: byKey('forecast'),
-    })
+    return NextResponse.json(statuses)
   } catch (err) {
-    console.error('[/api/overzicht/cashflow-status]', err)
-    return NextResponse.json({ error: 'Interne fout' }, { status: 500 })
+    return serverError(err, 'cashflow-status:GET')
   }
 }

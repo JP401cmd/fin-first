@@ -8,10 +8,9 @@ import type { AnalysisTransaction } from '@/lib/transaction-insights'
 import { DensityToggle, useListDensity, type ListDensity } from '@/components/app/density-toggle'
 
 /**
- * Smalle rij-vorm die de cashflow-Sankey + geldstroom-weergaven gebruiken.
+ * Smalle rij-vorm die de geldstroom-weergaven gebruiken.
  *
- * BEWAAR DEZE EXPORT: `lib/cashflow-data-loader.ts`,
- * `components/overview/cashflow-sankey.tsx` en
+ * BEWAAR DEZE EXPORT: `lib/cashflow-data-loader.ts` en
  * `components/overview/transacties-geldstroom.tsx` importeren dit type. De feed
  * zelf draait inmiddels op het rijkere `AnalysisTransaction`-type (zie props),
  * maar `TransactionRow` blijft bestaan voor die afnemers.

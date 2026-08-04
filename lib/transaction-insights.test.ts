@@ -9,6 +9,8 @@ import {
   periodTrend,
   counterpartyKey,
   resolveHeatmapWindow,
+  resolveFetchWindow,
+  heatmapWindowCovered,
   spendByDay,
   buildHeatmapWeeks,
   type AnalysisTransaction,
@@ -267,6 +269,65 @@ describe('resolveHeatmapWindow (12 maanden t/m vorige maand)', () => {
     const w = resolveHeatmapWindow(new Date(2026, 0, 10))
     expect(w.start).toBe('2025-01-01')
     expect(w.end).toBe('2025-12-31')
+  })
+})
+
+// ── resolveFetchWindow + heatmapWindowCovered ────────────────────────────────
+//
+// De analysepagina beslist hiermee of de heatmap uit de gedeelde ruwe set
+// gesneden mag worden of een eigen download nodig heeft. De cases hieronder
+// lopen door de ECHTE keten (resolvePeriodWindow → resolveFetchWindow →
+// heatmapWindowCovered), niet door nagebouwde vensters.
+
+describe('resolveFetchWindow', () => {
+  it('rekent 12 maanden terug vanaf de periodestart, einde blijft het periode-einde', () => {
+    const p = resolvePeriodWindow('month', 0, NOW)
+    expect(p.since).toBe('2026-06-01')
+    expect(resolveFetchWindow(p)).toEqual({ since: '2025-06-01', until: '2026-06-30' })
+  })
+
+  it('rekent lokaal, ook over een jaargrens heen (geen UTC-drift)', () => {
+    const p = resolvePeriodWindow('30d', 0, new Date(2026, 0, 15))
+    expect(p.since).toBe('2025-12-17')
+    expect(resolveFetchWindow(p).since).toBe('2024-12-17')
+  })
+})
+
+describe('heatmapWindowCovered', () => {
+  const heatmap = resolveHeatmapWindow(NOW) // 2025-06-01 t/m 2026-05-31
+
+  it.each(['30d', 'month', 'quarter', 'year'] as const)(
+    'huidige periode (%s) omvat het heatmap-venster → geen tweede download',
+    (kind) => {
+      const fetched = resolveFetchWindow(resolvePeriodWindow(kind, 0, NOW))
+      expect(heatmapWindowCovered(fetched, heatmap)).toBe(true)
+    },
+  )
+
+  it('twee maanden terug gebladerd → recentste heatmap-maanden vallen buiten beeld', () => {
+    // De since-kant blijft ruim genoeg (2025-04-01 ≤ 2025-06-01); alleen het
+    // periode-einde (2026-04-30) valt vóór het heatmap-einde (2026-05-31).
+    const fetched = resolveFetchWindow(resolvePeriodWindow('month', -2, NOW))
+    expect(fetched.since <= heatmap.start).toBe(true)
+    expect(heatmapWindowCovered(fetched, heatmap)).toBe(false)
+  })
+
+  it('één maand terug gebladerd → sluit exact aan op het heatmap-einde', () => {
+    const fetched = resolveFetchWindow(resolvePeriodWindow('month', -1, NOW))
+    expect(fetched.until).toBe(heatmap.end)
+    expect(heatmapWindowCovered(fetched, heatmap)).toBe(true)
+  })
+
+  it('een te late start valt óók buiten dekking (beide randen tellen)', () => {
+    expect(
+      heatmapWindowCovered({ since: '2025-06-02', until: '2026-06-30' }, heatmap),
+    ).toBe(false)
+  })
+
+  it('randen zijn inclusief: exact gelijke start én einde dekken', () => {
+    expect(
+      heatmapWindowCovered({ since: heatmap.start, until: heatmap.end }, heatmap),
+    ).toBe(true)
   })
 })
 

@@ -607,35 +607,10 @@
 - **API-routes** toegevoegd: /api/bank-accounts/[id], /api/own-accounts/ibans
 - **Componenten (aantal)** toegevoegd: +1
 
-## 2026-08-02
-
-- **Componenten (aantal)** toegevoegd: +1
-
-## 2026-08-02
-
-- **API-routes** toegevoegd: /api/ai-execution-prefs, /api/local-news-edition, /api/local-news-sources, /api/local-tips, /api/local-tips-candidates
-- **Componenten (aantal)** toegevoegd: +10
-
-## 2026-08-02
-
-- **Componenten (aantal)** toegevoegd: +1
-
-## 2026-08-03
-
-- **Componenten (aantal)** toegevoegd: +1
-
-## 2026-08-03
-
-- **API-routes** toegevoegd: /api/admin/local-ai-gate, /api/assets/account-number, /api/local-ai-gate
-
 ## 2026-08-04
 
-- **API-routes** toegevoegd: /api/assets/[id], /api/debts/[id]
-- **Componenten (aantal)** toegevoegd: +1
-
-## 2026-08-04
-
-- **Componenten (aantal)** toegevoegd: +1
+- **API-routes** toegevoegd: /api/overzicht/cashflow-settings
+- **Componenten (aantal)** toegevoegd: +3
 
 ## 2026-08-04
 
@@ -647,12 +622,9 @@
 
 ## 2026-08-04
 
-- Geen wijzigingen.
+- **Componenten (aantal)** toegevoegd: +2
 
 ## 2026-08-04
 
-- **API-routes** toegevoegd: /api/local-chat-live
-
-## 2026-08-04
-
-- **API-routes** verwijderd: /api/local-chat-live
+- **API-routes** toegevoegd: /api/admin/local-ai-gate, /api/ai-execution-prefs, /api/assets/[id], /api/assets/account-number, /api/debts/[id], /api/local-ai-gate, /api/local-news-edition, /api/local-news-sources, /api/local-tips, /api/local-tips-candidates
+- **Componenten (aantal)** toegevoegd: +14

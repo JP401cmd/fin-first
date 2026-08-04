@@ -43,6 +43,22 @@ const PERIODS = [7, 28, 90] as const
 const DEFAULT_DAYS = 28
 const DEFAULT_METRIC: WebVitalMetric = 'LCP'
 
+// Omgevingsfilter (kolom `web_vitals.environment`, server-side uit VERCEL_ENV).
+// Default is productie: alleen daar zijn de metingen representatief, en alleen
+// zo zijn vóór/na-vergelijkingen schoon. 'alles' schakelt het filter uit
+// (p_environment => null) en toont óók de ongelabelde historie van vóór de
+// knip-datum 2026-08-02. Lokaal in dit bestand, net als PERIODS: er is geen
+// gedeeld contract met de client-reporter (die verstuurt geen omgeving).
+const ENVIRONMENTS = [
+  { value: 'production', label: 'Productie' },
+  { value: 'preview', label: 'Preview' },
+  { value: 'development', label: 'Lokaal' },
+  { value: 'alles', label: 'Alles' },
+] as const
+type EnvironmentFilter = (typeof ENVIRONMENTS)[number]['value']
+const DEFAULT_ENVIRONMENT: EnvironmentFilter = 'production'
+const KNIP_DATUM = '2 augustus 2026'
+
 // Menselijke duiding per metric, zonder module-accent te introduceren.
 const METRIC_LABEL: Record<WebVitalMetric, string> = {
   LCP: 'Grootste inhoud',
@@ -78,6 +94,10 @@ function fmtDay(iso: string): string {
 
 function isMetric(value: string | undefined): value is WebVitalMetric {
   return (WEB_VITAL_METRICS as readonly string[]).includes(value ?? '')
+}
+
+function isEnvironment(value: string | undefined): value is EnvironmentFilter {
+  return ENVIRONMENTS.some((e) => e.value === value)
 }
 
 // ── Lokale UI-helpers (spiegel van /beheer/ai-verbruik) ──────────
@@ -156,7 +176,7 @@ function Td({
 export default async function BeheerWebprestatiesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ dagen?: string; metric?: string }>
+  searchParams: Promise<{ dagen?: string; metric?: string; omgeving?: string }>
 }) {
   const supabase = await createClient()
   if (!(await isSuperAdmin(supabase))) {
@@ -167,6 +187,17 @@ export default async function BeheerWebprestatiesPage({
   const requested = Number(params.dagen)
   const dagen = (PERIODS as readonly number[]).includes(requested) ? requested : DEFAULT_DAYS
   const metric: WebVitalMetric = isMetric(params.metric) ? params.metric : DEFAULT_METRIC
+  const omgeving: EnvironmentFilter = isEnvironment(params.omgeving)
+    ? params.omgeving
+    : DEFAULT_ENVIRONMENT
+
+  // null = geen filter (toont alle omgevingen én de ongelabelde historie).
+  const pEnvironment = omgeving === 'alles' ? null : omgeving
+
+  // Eén plek waar de querystring wordt gebouwd, zodat een chip nooit stilletjes
+  // een van de andere twee filters laat vallen.
+  const linkTo = (next: Partial<{ dagen: number; metric: string; omgeving: string }>) =>
+    `/beheer/webprestaties?dagen=${next.dagen ?? dagen}&metric=${next.metric ?? metric}&omgeving=${next.omgeving ?? omgeving}`
 
   const service = getServiceClient()
 
@@ -174,9 +205,14 @@ export default async function BeheerWebprestatiesPage({
   // kan `error` teruggeven — dan behandelen we die bron als leeg i.p.v. te
   // crashen of een rauwe fout te tonen.
   const [summaryRes, dailyRes, routeRes] = await Promise.all([
-    service.rpc('web_vitals_p75_summary', { p_days: dagen }),
-    service.rpc('web_vitals_p75_daily', { p_days: dagen }),
-    service.rpc('web_vitals_p75_by_route', { p_metric: metric, p_days: dagen, p_min_samples: 5 }),
+    service.rpc('web_vitals_p75_summary', { p_days: dagen, p_environment: pEnvironment }),
+    service.rpc('web_vitals_p75_daily', { p_days: dagen, p_environment: pEnvironment }),
+    service.rpc('web_vitals_p75_by_route', {
+      p_metric: metric,
+      p_days: dagen,
+      p_min_samples: 5,
+      p_environment: pEnvironment,
+    }),
   ])
 
   // Een echte storing (RPC/tabel ontbreekt, grant kwijt) mag op een
@@ -218,12 +254,12 @@ export default async function BeheerWebprestatiesPage({
         </p>
       </div>
 
-      {/* Periode-switcher (metric blijft behouden) */}
-      <div className="mb-6 flex gap-2">
+      {/* Periode-switcher (metric + omgeving blijven behouden) */}
+      <div className="mb-3 flex gap-2">
         {PERIODS.map((p) => (
           <Link
             key={p}
-            href={`/beheer/webprestaties?dagen=${p}&metric=${metric}`}
+            href={linkTo({ dagen: p })}
             className={`min-h-[36px] border px-4 py-1.5 text-sm transition-colors ${
               p === dagen
                 ? 'border-[var(--ink)] font-medium text-[var(--ink)]'
@@ -235,6 +271,29 @@ export default async function BeheerWebprestatiesPage({
         ))}
       </div>
 
+      {/* Omgeving-switcher — bewust búiten de data-conditie: staat productie leeg,
+          dan moet je nog steeds naar 'Alles' of 'Lokaal' kunnen wisselen. */}
+      <div className="mb-2 flex flex-wrap gap-2">
+        {ENVIRONMENTS.map((e) => (
+          <Link
+            key={e.value}
+            href={linkTo({ omgeving: e.value })}
+            className={`min-h-[36px] border px-4 py-1.5 text-sm transition-colors ${
+              e.value === omgeving
+                ? 'border-[var(--ink)] font-medium text-[var(--ink)]'
+                : 'border-[var(--border-ed)] text-[var(--ink-3)] hover:border-[var(--border-md)]'
+            }`}
+          >
+            {e.label}
+          </Link>
+        ))}
+      </div>
+      <p className="mb-6 max-w-[70ch] text-xs text-[var(--ink-4)]">
+        Metingen dragen sinds {KNIP_DATUM} een omgevingslabel, zodat lokale ontwikkelmetingen de
+        productie-p75 niet meer vervuilen. Oudere metingen hebben dat label niet en vallen daarom
+        buiten elke omgevingskeuze — die zie je alleen onder <span className="font-medium">Alles</span>.
+      </p>
+
       {!hasAnyData ? (
         <div className="border border-dashed border-[var(--border-ed)] bg-[var(--paper)] px-6 py-12 text-center">
           <p className="text-sm text-[var(--ink-2)]">
@@ -243,7 +302,9 @@ export default async function BeheerWebprestatiesPage({
           <p className="mx-auto mt-1.5 max-w-[46ch] text-sm text-[var(--ink-4)]">
             {sourceUnavailable
               ? 'De web_vitals-tabel en aggregatie-RPC’s bestaan nog niet op deze omgeving (migratie nog niet toegepast). Zodra die live zijn, verschijnen hier de metingen.'
-              : 'De meting start zodra bezoekers metingen versturen; dan verschijnen hier de p75-waarden per metric, route en device.'}
+              : omgeving === 'alles'
+                ? 'De meting start zodra bezoekers metingen versturen; dan verschijnen hier de p75-waarden per metric, route en device.'
+                : `Er zijn nog geen gelabelde metingen voor deze omgeving in de gekozen periode. Metingen van vóór ${KNIP_DATUM} vind je onder “Alles”.`}
           </p>
         </div>
       ) : (
@@ -278,7 +339,7 @@ export default async function BeheerWebprestatiesPage({
               {WEB_VITAL_METRICS.map((m) => (
                 <Link
                   key={m}
-                  href={`/beheer/webprestaties?dagen=${dagen}&metric=${m}`}
+                  href={linkTo({ metric: m })}
                   title={METRIC_LABEL[m]}
                   className={`min-h-[36px] border px-4 py-1.5 text-sm transition-colors ${
                     m === metric

@@ -1,11 +1,12 @@
 // lib/cashflow-cards.ts
 // Bouwt de vier hefboom-stijl kaarten voor de cashflow-landingspagina
 // (/overzicht/cashflow): Budget, Transacties, Vaste lasten, Forecast. Elke
-// kaart krijgt een status, een KPI en uitklap-detail — afgeleid uit data die
-// de pagina toch al laadt (DashboardData + CashflowData). Pure module zodat de
-// server-page hem kan aanroepen; de client rendert de serialiseerbare output.
+// kaart krijgt een status, een KPI en uitklap-detail — afgeleid uit data die de
+// pagina toch al laadt (CashflowCardScalars + CashflowData + de vaste-lasten-
+// samenvatting). Pure module zodat de server-page hem kan aanroepen; de client
+// rendert de serialiseerbare output.
 
-import type { DashboardData } from '@/lib/types/dashboard'
+import type { CashflowCardScalars } from '@/lib/cashflow-kpis'
 import type { CashflowData } from '@/lib/cashflow-data-loader'
 import type { VasteLastenSummary } from '@/lib/vaste-lasten-summary'
 import { buildForecast } from '@/lib/cashflow-forecast-math'
@@ -13,6 +14,20 @@ import { pillarStatus, type LeverageStatus } from '@/lib/leverage-status'
 import { formatCurrency } from '@/lib/format'
 
 export type CashflowCardKey = 'budget' | 'transacties' | 'vaste-lasten' | 'forecast'
+
+/**
+ * De vier kaartstatussen als platte payload — het wire-contract van
+ * `GET /api/overzicht/cashflow-status` én van de server-seed op de hub, en
+ * daarmee van de sidebar-status-dots (`useCashflowStatusContext`). Woont hier
+ * omdat dit de module is die de statussen produceert; route, TTL-cache, seed en
+ * sidebar consumeren allemaal DEZE vorm.
+ */
+export interface CashflowCardStatuses {
+  budget: LeverageStatus
+  transacties: LeverageStatus
+  vasteLasten: LeverageStatus
+  forecast: LeverageStatus
+}
 
 export interface CashflowCard {
   key: CashflowCardKey
@@ -25,6 +40,28 @@ export interface CashflowCard {
   subText: string | null
   /** Uitklap-detail: secundaire waarde + 1-regel inzicht + deeplink-label. */
   detail: { label: string; value: string; tip: string; actionLabel: string }
+}
+
+/**
+ * Projecteer de vier kaarten op hun statussen — de ENIGE plek waar
+ * `CashflowCard[]` in `CashflowCardStatuses` wordt omgezet.
+ *
+ * Twee oppervlakken consumeren deze projectie op exact dezelfde kaart-array: de
+ * API-route (`GET /api/overzicht/cashflow-status`, voor de sidebar-dots op de
+ * sub-pagina's) en de server-seed op de cashflow-hub
+ * (`components/overview/cashflow-cards-loader.tsx`). Zo kan een dot per
+ * constructie niet van zijn kaart afwijken: dezelfde `buildCashflowCards`-
+ * uitkomst, dezelfde projectie, geen tweede sleutel-mapping die kan wegdrijven.
+ */
+export function cashflowCardStatuses(cards: CashflowCard[]): CashflowCardStatuses {
+  const byKey = (k: CashflowCardKey): LeverageStatus =>
+    cards.find((c) => c.key === k)?.status ?? 'neutral'
+  return {
+    budget: byKey('budget'),
+    transacties: byKey('transacties'),
+    vasteLasten: byKey('vaste-lasten'),
+    forecast: byKey('forecast'),
+  }
 }
 
 const BASE = '/overzicht/cashflow'
@@ -107,16 +144,24 @@ export function forecastCardStatus(input: {
   return input.netPerMonth > 0 ? 'good' : input.netPerMonth < 0 ? 'bad' : 'warn'
 }
 
+/**
+ * De eerste parameter is bewust `CashflowCardScalars` (lib/cashflow-kpis.ts) en
+ * niet de volledige `DashboardData`: dit zijn exact de zeven scalars die de
+ * kaarten lezen. `DashboardData` is er structureel aan toewijsbaar, dus elke
+ * bestaande callsite die de volle bundel doorgeeft blijft ongewijzigd werken —
+ * terwijl een oppervlak dat alleen de kaarten nodig heeft de slanke
+ * `loadCashflowKpis` kan voeden i.p.v. de hele dashboard-loader (ADR 0083).
+ */
 export function buildCashflowCards(
-  dashboardData: DashboardData,
+  kpis: CashflowCardScalars,
   cashflow: CashflowData,
   vasteLastenSummary: VasteLastenSummary,
 ): CashflowCard[] {
   // ── Budget ──────────────────────────────────────────────────
-  const budgetLimit = dashboardData.budgetTotals.expense.limit
-  const budgetSpent = dashboardData.budgetTotals.expense.spent
-  const budgetScore = dashboardData.monthSummary.budgetScore
-  const budgetActive = dashboardData.budgetingActive && budgetLimit > 0
+  const budgetLimit = kpis.budgetTotals.expense.limit
+  const budgetSpent = kpis.budgetTotals.expense.spent
+  const budgetScore = kpis.monthSummary.budgetScore
+  const budgetActive = kpis.budgetingActive && budgetLimit > 0
   // Wat er van het maandbudget OVER is — een moment-opname van deze maand, geen
   // maandplafond (dus geen '/mnd'-suffix). Negatief = over budget; de duiding
   // daarvan komt uit `subText` (status bad → 'Boven budget'), niet uit een eigen
@@ -125,7 +170,7 @@ export function buildCashflowCards(
   // Grondslag uitsluitend budgetTotals.expense — savings-budgetten tellen niet mee.
   const budgetRemaining = budgetLimit - budgetSpent
   const budgetStatus: LeverageStatus = budgetCardStatus({
-    budgetingActive: dashboardData.budgetingActive,
+    budgetingActive: kpis.budgetingActive,
     expenseLimit: budgetLimit,
     budgetScore,
   })
@@ -155,14 +200,14 @@ export function buildCashflowCards(
 
   // ── Transacties ─────────────────────────────────────────────
   // GRONDSLAG: de GEREALISEERDE huidige kalendermaand uit transacties. LET OP —
-  // `dashboardData.monthlyIncome/monthlyExpenses` zijn de EFFECTIVE waarden
+  // `kpis.monthlyIncome/monthlyExpenses` zijn de EFFECTIVE waarden
   // (resolveEffectiveIncomeExpenses): bij profiles.income_source/expenses_source
   // = 'manual' winnen de handmatige profielbedragen, dus die mogen hier NIET
   // gebruikt worden — de kaart zou dan een profielinschatting tonen i.p.v. wat
   // deze maand werkelijk gebeurde. KPI, spaarquote, tip en status draaien
   // allemaal op ditzelfde paar, anders spreekt de tip de KPI tegen.
-  const currentMonthIncome = dashboardData.currentMonthIncome
-  const currentMonthExpenses = dashboardData.currentMonthExpenses
+  const currentMonthIncome = kpis.currentMonthIncome
+  const currentMonthExpenses = kpis.currentMonthExpenses
   const monthlyNet = currentMonthIncome - currentMonthExpenses
   const hasTx = currentMonthIncome > 0 || currentMonthExpenses > 0
   const rate = currentMonthIncome > 0 ? (monthlyNet / currentMonthIncome) * 100 : null
@@ -203,7 +248,7 @@ export function buildCashflowCards(
   // structureel aandeel hoort tegen een stabiel maandinkomen te worden gemeten,
   // niet tegen een half-afgelopen kalendermaand (die het aandeel vroeg in de
   // maand kunstmatig naar 100%+ zou duwen).
-  const effectiveMonthlyIncome = dashboardData.monthlyIncome
+  const effectiveMonthlyIncome = kpis.monthlyIncome
   const vasteRatio = effectiveMonthlyIncome > 0 ? vastePerMonth / effectiveMonthlyIncome : null
   const vasteStatus: LeverageStatus = vasteLastenCardStatus({
     totalMonthly: vastePerMonth,

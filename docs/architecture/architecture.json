@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-04T13:06:43.909Z",
+  "generatedAt": "2026-08-04T14:46:51.930Z",
   "generatedDate": "2026-08-04",
   "repo": {
     "name": "fin",
@@ -189,12 +189,12 @@
   "stats": {
     "routes": 146,
     "routesProduction": 101,
-    "api": 280,
+    "api": 281,
     "tables": 86,
-    "migrations": 183,
+    "migrations": 186,
     "integrations": 25,
-    "components": 862,
-    "providers": 11,
+    "components": 866,
+    "providers": 12,
     "contextBuilders": 9,
     "briefingTools": 0,
     "coachLayers": 4,
@@ -3779,6 +3779,14 @@
       ]
     },
     {
+      "url": "/api/overzicht/cashflow-settings",
+      "file": "app/api/overzicht/cashflow-settings/route.ts",
+      "domain": "overzicht",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
       "url": "/api/overzicht/cashflow-status",
       "file": "app/api/overzicht/cashflow-status/route.ts",
       "domain": "overzicht",
@@ -5949,6 +5957,38 @@
       ]
     },
     {
+      "domain": "overzicht",
+      "label": "overzicht",
+      "count": 3,
+      "routes": [
+        {
+          "url": "/api/overzicht/cashflow-settings",
+          "file": "app/api/overzicht/cashflow-settings/route.ts",
+          "domain": "overzicht",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/overzicht/cashflow-status",
+          "file": "app/api/overzicht/cashflow-status/route.ts",
+          "domain": "overzicht",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/overzicht/page-status",
+          "file": "app/api/overzicht/page-status/route.ts",
+          "domain": "overzicht",
+          "methods": [
+            "GET",
+            "PUT"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "questionnaires",
       "label": "Vragenlijsten",
       "count": 3,
@@ -6099,30 +6139,6 @@
             "GET",
             "PUT",
             "DELETE"
-          ]
-        }
-      ]
-    },
-    {
-      "domain": "overzicht",
-      "label": "overzicht",
-      "count": 2,
-      "routes": [
-        {
-          "url": "/api/overzicht/cashflow-status",
-          "file": "app/api/overzicht/cashflow-status/route.ts",
-          "domain": "overzicht",
-          "methods": [
-            "GET"
-          ]
-        },
-        {
-          "url": "/api/overzicht/page-status",
-          "file": "app/api/overzicht/page-status/route.ts",
-          "domain": "overzicht",
-          "methods": [
-            "GET",
-            "PUT"
           ]
         }
       ]
@@ -7821,7 +7837,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 183
+    "migrationCount": 186
   },
   "tablesByDomain": [
     {
@@ -8226,6 +8242,10 @@
   ],
   "providers": [
     {
+      "name": "CashflowStatusProvider",
+      "source": "@/components/app/cashflow-status-provider"
+    },
+    {
       "name": "ChatProvider",
       "source": "@/components/app/chat/chat-provider"
     },
@@ -8271,11 +8291,11 @@
     }
   ],
   "components": {
-    "total": 862,
+    "total": 866,
     "groups": [
       {
         "group": "app",
-        "count": 337,
+        "count": 341,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -8327,13 +8347,17 @@
           "budget-sparkline",
           "budget-tree",
           "budgets-client",
+          "budgets-client-empty-state.test",
           "budgets-client.test",
           "budgetteren.config",
           "carrier-correction",
           "cash-account-view",
           "cash-account-view.test",
           "cash-overview",
+          "cash-overview.leesronden.test",
           "cashflow-forecast-chart",
+          "cashflow-status-provider",
+          "cashflow-status-provider.test",
           "categorize-row",
           "categorize-wizard",
           "categorize-wizard.test",
@@ -8652,6 +8676,7 @@
           "box3-tegenbewijs-card",
           "briefing-panel",
           "briefing-panel.test",
+          "cashflow-cards-loader",
           "cashflow-forecast",
           "cashflow-forecast.test",
           "cashflow-instellingen-blok",
@@ -8660,8 +8685,6 @@
           "cashflow-kalender.test",
           "cashflow-landing-cards",
           "cashflow-landing-cards.test",
-          "cashflow-sankey",
-          "cashflow-sankey.test",
           "checkin-banner",
           "checkin-banner.test",
           "compound-insight-card",
@@ -8742,6 +8765,7 @@
           "transactie-tijdlijn",
           "transactie-tijdlijn.test",
           "transacties-analyse",
+          "transacties-analyse.heatmap.test",
           "transacties-analyse.test",
           "transacties-geldstroom",
           "transacties-geldstroom.test",
@@ -15547,6 +15571,30 @@
       ],
       "summary": "Zusje van ADR 0011 (\"ON DELETE SET NULL voor referentie-data, CASCADE voor levenscyclus-data\"). Daar ging het over wat de *database* bij een verwijdering mag meenemen; hier over wie überhaupt mag verwijderen, en wat er met de geschiedenis gebeurt die aan de verwijderde rij hing.",
       "file": "docs/adr/0082-bankrekening-verwijderen-alleen-op-gebruikersopdracht.md"
+    },
+    {
+      "id": "0083-slanke-cashflow-kpi-laag",
+      "title": "Een slanke cashflow-KPI-laag ontstaat door extractie van de bestaande afleidingen, niet door herberekening",
+      "status": "aanvaard",
+      "date": "2026-08-03",
+      "elements": [
+        "as-budget",
+        "fn-budgetteren"
+      ],
+      "summary": "`/overzicht/cashflow` heeft een TTFB-p75 van 8,8 s (desktop) en 22,3 s (mobiel). De dominante oorzaak is niet de pagina zelf maar haar databron: `buildCashflowCards` (`lib/cashflow-cards.ts`) krijgt de volledige `DashboardData` binnen en gebruikt daaruit precies **zeven scalars**",
+      "file": "docs/adr/0083-slanke-cashflow-kpi-laag.md"
+    },
+    {
+      "id": "0084-vingerafdruk-cache-op-de-vaste-lastendetectie",
+      "title": "De vaste-lastendetectie draait alleen opnieuw als haar invoer veranderd is — een vingerafdruk beslist dat, geen klok",
+      "status": "aanvaard",
+      "date": "2026-08-04",
+      "elements": [
+        "as-budget",
+        "fn-budgetteren"
+      ],
+      "summary": "`loadVasteLastenSummary` haalt per request het volledige 12-maands transactievenster op en laat daar een regex-zware detectie overheen lopen, op minstens vier oppervlakken. De uitkomst verandert tussen twee requests bijna nooit. Er komt daarom een procescache voor die uitkomst, w",
+      "file": "docs/adr/0084-vingerafdruk-cache-op-de-vaste-lastendetectie.md"
     }
   ],
   "churn": {
@@ -15558,7 +15606,7 @@
       },
       {
         "path": "lib/ai",
-        "commits": 58
+        "commits": 59
       },
       {
         "path": "app/(app)/toekomst",
@@ -15601,7 +15649,7 @@
       },
       {
         "file": "components/app/budgets-client.tsx",
-        "loc": 5082,
+        "loc": 5045,
         "commits": 31
       },
       {
@@ -15621,7 +15669,7 @@
       },
       {
         "file": "lib/dashboard-data-loader.ts",
-        "loc": 2660,
+        "loc": 2625,
         "commits": 47
       },
       {
@@ -16579,10 +16627,26 @@
     "sections": [
       {
         "label": "API-routes",
-        "added": [],
-        "removed": [
-          "/api/local-chat-live"
-        ]
+        "added": [
+          "/api/admin/local-ai-gate",
+          "/api/ai-execution-prefs",
+          "/api/assets/[id]",
+          "/api/assets/account-number",
+          "/api/debts/[id]",
+          "/api/local-ai-gate",
+          "/api/local-news-edition",
+          "/api/local-news-sources",
+          "/api/local-tips",
+          "/api/local-tips-candidates"
+        ],
+        "removed": []
+      },
+      {
+        "label": "Componenten (aantal)",
+        "added": [
+          "+14"
+        ],
+        "removed": []
       }
     ]
   },
@@ -16813,22 +16877,15 @@
     },
     {
       "date": "2026-08-02",
-      "api": 275,
-      "components": 859,
-      "tables": 86,
-      "routesProduction": 101
-    },
-    {
-      "date": "2026-08-03",
-      "api": 278,
-      "components": 860,
+      "api": 270,
+      "components": 847,
       "tables": 86,
       "routesProduction": 101
     },
     {
       "date": "2026-08-04",
-      "api": 280,
-      "components": 862,
+      "api": 281,
+      "components": 866,
       "tables": 86,
       "routesProduction": 101
     }

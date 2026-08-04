@@ -886,7 +886,6 @@ NEWFILEUID:NONE
         currentMonthExpenses: 3500,
       }
       const cashflow: CashflowData = {
-        transactions: [],
         monthLabel: undefined,
         fullName: null,
         recurrings: [],

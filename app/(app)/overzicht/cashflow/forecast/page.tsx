@@ -1,11 +1,8 @@
 import type { Metadata } from 'next'
-import { createClient } from '@/lib/supabase/server'
-import { loadDashboardData } from '@/lib/dashboard-data-loader'
-import { loadCashflowData } from '@/lib/cashflow-data-loader'
+import { Suspense } from 'react'
 import { getServerPerspective } from '@/lib/household/server-perspective'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
-import { CashflowSection } from '@/components/fin/cashflow-section'
-import { CashflowForecast } from '@/components/overview/cashflow-forecast'
+import { ForecastLoader, ForecastFallback } from './forecast-loader'
 import { PageOpening } from '@/components/editorial'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { PageStatusDot } from '@/components/app/page-status-dot'
@@ -19,17 +16,33 @@ export const metadata: Metadata = {
 /**
  * /overzicht/cashflow/forecast — losse Forecast-pagina (was de "Forecast"-tab).
  * Toont eerst de cashflow-samenvatting (spaarquote 6m, maandelijks netto,
- * uitgaventrend — verhuisd vanaf de cashflow-landing) en daaronder de
- * 6-maands-projectietabel.
+ * uitgaventrend) en daaronder de 6-maands-projectietabel. Gestreamd in blokken
+ * (perf Task 2.5, zelfde vorm als de hub en de vaste-lasten-pagina).
+ *
+ * ── BLOK 1 (direct, in de eerste byte) ──────────────────────────────────────
+ * `NavStackMeta`, de twee header-controls en de `PageOpening` (kicker + titel +
+ * deck). De LCP-kandidaat is de TITEL, en die hangt van niets af — hij staat dus
+ * in het eerste antwoord i.p.v. achter de traagste loader.
+ *
+ * **`getServerPerspective()` — een cookie-read — is het ENIGE await boven de
+ * return, en dat moet zo blijven.** Streaming werkt alleen als er geen zware
+ * await boven staat: één `await createClient()`/`loadX()` erbij en de hele
+ * pagina wacht weer, terwijl de `<Suspense>`-grens er nog "correct" uitziet.
+ * De loader haalt zijn supabase-client daarom zélf op (`createClient()` is
+ * React-`cache()`-gewrapt → dezelfde instantie, geen dubbele cookie-read).
+ *
+ * ── GESTREAMD BLOK ──────────────────────────────────────────────────────────
+ *  · `ForecastLoader` — `loadForecastSectionData` + `loadCashflowData` → de
+ *    samenvattingskaarten en de projectietabel. De volle `loadDashboardData` is
+ *    hier VERDWENEN: `CashflowSection` leest vijf velden en die levert de slanke
+ *    laag (ADR 0083), inclusief het kerngetal `savingsRate6m` uit dezelfde
+ *    canonieke keten die /overzicht en het instellingenblok voedt.
+ *
+ * Dynamiek blijft: geen `revalidate`, geen ISR, geen cache-headers. De winst is
+ * minder werk vóór de eerste byte, niet stale HTML.
  */
 export default async function OverzichtCashflowForecastPage() {
-  const supabase = await createClient()
   const perspective = await getServerPerspective()
-  const [dashboardResult, cashflow] = await Promise.all([
-    loadDashboardData(supabase),
-    loadCashflowData(supabase, perspective),
-  ])
-  const { dashboardData } = dashboardResult
 
   return (
     <>
@@ -49,13 +62,13 @@ export default async function OverzichtCashflowForecastPage() {
           titleAfter=" bouw je op?"
           deck="Je spaarquote, je maandelijkse overschot en de komende zes maanden — samen laten ze zien hoe snel je vrijheid groeit."
         />
-        <CashflowSection data={dashboardData} />
-        <CashflowForecast
-          recurrings={cashflow.recurrings}
-          baselineIncome={cashflow.baselineIncome}
-          baselineExpenses={cashflow.baselineExpenses}
-          startingBalance={cashflow.startingBalance}
-        />
+
+        {/* Het gestreamde blok draagt zijn eigen `space-y-6`, zodat de afstand
+            tussen samenvatting en projectietabel gelijk blijft aan de afstand
+            tussen aanhef en samenvatting. */}
+        <Suspense fallback={<ForecastFallback />}>
+          <ForecastLoader perspective={perspective} />
+        </Suspense>
       </div>
     </>
   )

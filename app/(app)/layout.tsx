@@ -21,6 +21,7 @@ import { PerspectiveProvider } from '@/components/app/perspective-provider'
 import { NotificationProvider } from '@/components/app/notifications/notification-provider'
 import { NotificationModal } from '@/components/app/notifications/notification-panel'
 import { ResponsiveShell } from '@/components/app/shell/responsive-shell'
+import { CashflowStatusProvider } from '@/components/app/cashflow-status-provider'
 import type { SidebarSignals } from '@/components/app/shell/shell-contexts'
 import { PlatformBanner } from '@/components/app/platform-banner'
 import { parsePlatformStatus } from '@/lib/platform-status'
@@ -154,7 +155,14 @@ export default async function AppLayout({
     getActiveDebts(supabase),
     // transactions: 3-maand-window voor `computeFeatureAccess` (income/expense
     // signalen voor phase-detectie).
-    supabase.from('transactions').select('amount, is_income').eq('user_id', user.id).gte('date', dateStr),
+    // Expliciete `.limit(1000)` = de PostgREST-cap (supabase/config.toml
+    // max_rows = 1000): een client-`.limit()` boven die grens is een no-op, dus dit
+    // maakt de bestaande stille afkap zichtbaar i.p.v. impliciet. Byte-identiek aan
+    // de vroegere ongelimiteerde query (die óók op 1000 werd afgekapt). Voor een
+    // tx-rijke gebruiker telt de phase-detectie dus maar een deel van het venster;
+    // de structurele route is het maandaggregaat (ADR 0050 — kan per definitie niet
+    // afkappen) of keyset-paginatie.
+    supabase.from('transactions').select('amount, is_income').eq('user_id', user.id).gte('date', dateStr).limit(1000),
     // Sidebar-metric: openstaande acties (Wil-module). Status-filter spiegelt
     // `openActions` uit fin-data-loader.ts (open + postponed). Head-only +
     // count: 'exact' = geen rows-payload, alleen totaal.
@@ -477,21 +485,28 @@ export default async function AppLayout({
                       </a>
                       <FeatureAccessProvider data={featureAccess} activeModules={activeModules}>
                         <CommandPaletteProvider role={profile?.role ?? 'user'}>
-                          <ResponsiveShell
-                            email={user.email ?? ''}
-                            role={profile?.role ?? 'user'}
-                            sidebarMetrics={{
-                              netWorth: sidebarNetWorth,
-                              actionCount: sidebarActionCount,
-                              activeAppKeys: sidebarActiveAppKeys,
-                              categoryAppLinks: sidebarCategoryAppLinks,
-                              leverScores: sidebarLeverScores,
-                              sidebarSignals,
-                            }}
-                          >
-                            <PlatformBanner status={platformStatus} />
-                            {children}
-                          </ResponsiveShell>
+                          {/* Deelt de vier cashflow-kaartstatussen tussen de
+                              sidebar-dots (in de Sidebar) en de server-seed van
+                              de cashflow-hub (in de pagina) — twee zustertakken
+                              die alleen via een gedeelde voorouder bij elkaar
+                              komen. Zie cashflow-status-provider.tsx. */}
+                          <CashflowStatusProvider>
+                            <ResponsiveShell
+                              email={user.email ?? ''}
+                              role={profile?.role ?? 'user'}
+                              sidebarMetrics={{
+                                netWorth: sidebarNetWorth,
+                                actionCount: sidebarActionCount,
+                                activeAppKeys: sidebarActiveAppKeys,
+                                categoryAppLinks: sidebarCategoryAppLinks,
+                                leverScores: sidebarLeverScores,
+                                sidebarSignals,
+                              }}
+                            >
+                              <PlatformBanner status={platformStatus} />
+                              {children}
+                            </ResponsiveShell>
+                          </CashflowStatusProvider>
                         </CommandPaletteProvider>
                         {/* ChatPanel MOET binnen FeatureAccessProvider blijven:
                             het leest de AI-abonnementsstatus via useModuleAccess()

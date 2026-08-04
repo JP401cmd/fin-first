@@ -24,7 +24,7 @@
 //   • `_myShareFraction` — het aandeel (0-1) dat in dit perspectief telt
 //   • `_aggregated` — true voor een privacy-'totalen'-aggregaatrij (van de RPC)
 
-import type { SupabaseClient } from '@supabase/supabase-js'
+import type { SupabaseClient, User } from '@supabase/supabase-js'
 import { ASSET_CLIENT_COLUMNS } from '@/lib/asset-data'
 import {
   computeSharePct,
@@ -96,13 +96,26 @@ const SOLO_CONTEXT = (userId: string): PerspectiveContext => ({
  * Resolve het huishoud-perspectief van de huidige gebruiker: partner,
  * split-modus, aandeel-% en de privacy-instellingen van de partner.
  * Solo-gebruikers krijgen een `hasHousehold:false`-context met 100% aandeel.
+ *
+ * `preloadedUser` is een optionele, al-geresolveerde gebruiker. Server-loaders
+ * geven hier de request-gecachte `getCachedUser(supabase)` mee (zie
+ * perspective-loader-server.ts) zodat de blokkerende `/auth/v1/user`-roundtrip
+ * die vóór álle queries hieronder staat gedeeld wordt met de andere loaders in
+ * dezelfde render. Dit bestand is DUAL-USE: zónder het argument resolvet de
+ * functie de gebruiker zelf — byte-identiek aan voorheen, en dat is het pad dat
+ * de browser-consumenten (budgets-client, cash-overview, …) lopen.
+ *
+ * Een expliciete `null` betekent "al gecheckt, niemand ingelogd" en leidt tot
+ * dezelfde `Not authenticated`-fout als een zelf-geresolveerde lege sessie —
+ * zonder er nóg een roundtrip aan te wagen. Alleen `undefined` (= argument
+ * weggelaten) triggert het zelf-resolven.
  */
 export async function loadPerspectiveContext(
   supabase: SupabaseClient,
+  preloadedUser?: User | null,
 ): Promise<PerspectiveContext> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user =
+    preloadedUser !== undefined ? preloadedUser : (await supabase.auth.getUser()).data.user
   if (!user) throw new Error('Not authenticated')
 
   const { data: members } = await supabase
@@ -117,20 +130,35 @@ export async function loadPerspectiveContext(
 
   const householdId = me.household_id as string
 
-  const { data: household } = await supabase
-    .from('households')
-    .select('name, split_mode, custom_split_pct, primary_payer_id, budget_model')
-    .eq('id', householdId)
-    .maybeSingle()
+  // Deze keten staat vóór ÁLLE domein-queries van een render, dus elke
+  // roundtrip erin telt dubbel. De huishoud-rij en de member-profiles-RPC
+  // hangen niet van elkaar af — de eerste heeft alleen het `householdId` uit de
+  // members-read hierboven nodig, de tweede neemt geen argument — en stonden
+  // puur door schrijfvolgorde achter elkaar. Naast elkaar dus.
+  //
+  // BEWUST NIET meegenomen: de income-budgetten verderop. Die query is
+  // CONDITIONEEL op `splitMode === 'income_ratio'`, en dat veld komt pas uit
+  // `households`. Meenemen zou 'm voor ELK huishouden speculatief draaien —
+  // voor de default-splitsing een extra roundtrip én een read zonder afnemer.
+  // Afhankelijk blijft afhankelijk; zie perspective-loader-parallel.test.ts.
+  const [householdResult, memberProfilesResult] = await Promise.all([
+    supabase
+      .from('households')
+      .select('name, split_mode, custom_split_pct, primary_payer_id, budget_model')
+      .eq('id', householdId)
+      .maybeSingle(),
+    // Profiles RLS is own-only; lees de partnernaam via de huishoud-RPC
+    // (anders blijft de naam leeg en valt de badge terug op "Partner").
+    supabase.rpc('household_member_profiles'),
+  ])
 
+  const household = householdResult.data
   const splitMode = (household?.split_mode ?? 'equal') as SplitMode
   const customSplitPct = household?.custom_split_pct ?? null
   const primaryPayerId = household?.primary_payer_id ?? null
   const budgetModel = (household?.budget_model ?? 'separate') as 'separate' | 'household'
 
-  // Profiles RLS is own-only; lees de partnernaam via de huishoud-RPC
-  // (anders blijft de naam leeg en valt de badge terug op "Partner").
-  const { data: memberProfiles } = await supabase.rpc('household_member_profiles')
+  const memberProfiles = memberProfilesResult.data
   const partnerProfile =
     (memberProfiles as Array<{ id: string; full_name: string | null }> | null)?.find(
       (m) => m.id === partner.user_id,
@@ -325,6 +353,33 @@ export async function loadPerspectiveData(
 
 // ── Cashflow-loader (transacties + partner-inkomen) ────────────────────────
 
+/**
+ * Beperk een reeds samengestelde perspectief-lijst tot [since, until] (beide
+ * inclusief). Dit is exact de vensterregel die `loadPerspectiveTransactions`
+ * zelf op zijn resultaat toepast — geëxporteerd zodat een consument die al een
+ * RUIMER venster in handen heeft er een smaller venster uit kan snijden zónder
+ * een tweede download, met gegarandeerd dezelfde uitkomst als een eigen fetch.
+ *
+ * De twee uitzonderingen zijn niet cosmetisch en horen bij die garantie:
+ *  • een privacy-'totalen'-aggregaatrij (`_aggregated`) draagt geen datum en
+ *    passeert altijd — de partner-RPC is immers niet datum-begrensd;
+ *  • een rij zonder `date` passeert eveneens, in plaats van stil te verdwijnen.
+ */
+export function windowPerspectiveItems(
+  rows: PerspectiveItem[],
+  opts?: { since?: string; until?: string },
+): PerspectiveItem[] {
+  if (!opts?.since && !opts?.until) return rows
+  return rows.filter((r) => {
+    if (r._aggregated) return true
+    const date = r.date as string | undefined
+    if (!date) return true
+    if (opts.since && date < opts.since) return false
+    if (opts.until && date > opts.until) return false
+    return true
+  })
+}
+
 export interface PerspectiveTransactions {
   perspective: Perspective
   context: PerspectiveContext
@@ -405,17 +460,8 @@ export async function loadPerspectiveTransactions(
   // begrensd. Pas dezelfde [since, until]-window toe op de SAMENGESTELDE lijst
   // zodat partnerrijen het venster respecteren. Privacy-'totalen'-aggregaten
   // (`_aggregated`) dragen geen `date` en passeren altijd.
-  const inWindow = (rows: PerspectiveItem[]): PerspectiveItem[] => {
-    if (!opts?.since && !opts?.until) return rows
-    return rows.filter((r) => {
-      if (r._aggregated) return true
-      const date = r.date as string | undefined
-      if (!date) return true
-      if (opts.since && date < opts.since) return false
-      if (opts.until && date > opts.until) return false
-      return true
-    })
-  }
+  const inWindow = (rows: PerspectiveItem[]): PerspectiveItem[] =>
+    windowPerspectiveItems(rows, opts)
 
   if (!context.hasHousehold || perspective === 'personal') {
     return {

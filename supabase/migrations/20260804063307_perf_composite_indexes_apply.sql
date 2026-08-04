@@ -1,0 +1,52 @@
+-- Performance: toepassing van de samengestelde index die de meting haalt.
+--
+-- ACHTERGROND: supabase/migrations/20260504000001_perf_composite_indexes.sql maakt vijf
+-- samengestelde indexen aan en is nooit op productie toegepast ("Re-run on production when
+-- ready"). Dat bestand blijft als historie staan; deze migratie is de toepassing.
+--
+-- Opdracht was: meten per index, en alleen toepassen wat aantoonbaar helpt. Van de vijf
+-- haalt er één de meting. De andere vier zijn bewust NIET toegepast; de onderbouwing staat
+-- hieronder zodat niemand dit over een half jaar opnieuw hoeft uit te zoeken.
+--
+-- WEL TOEGEPAST
+--   idx_transactions_user_date (user_id, date desc)
+--   De enige tabel van betekenisvolle omvang. Zonder deze index moet de planner een
+--   BitmapAnd bouwen uit de losse user_id- en date-indexen: beide leveren een veelvoud aan
+--   indexrijen op om er een fractie van over te houden. Met de samengestelde index wordt dat
+--   een enkele Bitmap Index Scan met Index Cond ((user_id = ...) AND (date >= ...)) die
+--   direct de gevraagde rijen oplevert. Gemeten onder rolsimulatie op een 6-maandsvenster:
+--   ruwweg een halvering van zowel de gelezen buffers als de heapblokken. Dit pad draait
+--   11 à 13 keer per cashflow-request. (Exacte meetwaarden staan in het taakrapport, buiten
+--   deze repo.)
+--   LET OP: de expliciete Sort blijft bestaan. Zolang een query voor de gebruikersafbakening
+--   alleen op RLS leunt, maakt de huishouden-OR er een BitmapOr van, en een bitmapscan levert
+--   geen gesorteerde uitvoer. De winst zit dus in minder gelezen rijen, niet in het wegvallen
+--   van de sortering. Draagt een query wel een expliciete .eq('user_id', ...), dan mag de
+--   planner een gewone Index Scan nemen en de RLS-OR naar een Filter degraderen — dan bedient
+--   de indexordening de ORDER BY wel.
+--
+-- NIET TOEGEPAST, met reden
+--   idx_net_worth_snapshots_user_date (user_id, snapshot_date desc)
+--     Redundant: net_worth_snapshots_user_id_snapshot_date_key (UNIQUE, user_id,
+--     snapshot_date) bestaat al met dezelfde leidende kolommen. Een btree scant ook
+--     achteruit, dus DESC voegt niets toe.
+--   idx_valuations_user_type_date (user_id, entity_type, valuation_date desc)
+--     NIET omdat de bestaande UNIQUE gelijkwaardig zou zijn: valuations_user_entity_date_key
+--     is (user_id, entity_type, entity_id, valuation_date), met entity_id TUSSEN de prefix en
+--     de datum, dus die kan nooit ordening op valuation_date leveren. Wel omdat: de enige
+--     queryvorm die het geordende pad zou kunnen pakken (/api/valuations, met expliciete
+--     user_id) geen productie-aanroeper heeft; de hete vormen leunen voor de afbakening op
+--     RLS alleen en houden daardoor sowieso een Sort; en nergens staat een range-filter op
+--     valuation_date. De bestaande index dekt de (user_id, entity_type)-lookup al af.
+--   idx_goals_user_active (user_id, is_completed, sort_order)
+--     Wordt wel gekozen, maar de geschatte kosten zijn identiek (4.43 vs 4.43) en de tabel
+--     beslaat een enkel heapblok. Het gemeten tijdsverschil is cachegedrag, geen werk.
+--   idx_life_events_user_active_sort (user_id, is_active, sort_order)
+--     De planner negeert 'm: identieke Seq Scan voor en na, geschatte kosten gaan zelfs
+--     omhoog (16.84 -> 18.18) doordat de tabel een index extra draagt.
+--
+-- BEWUST GEEN `concurrently`: apply_migration draait transactioneel, waar CONCURRENTLY niet
+-- is toegestaan. De tabel is bescheiden van omvang, dus de SHARE-lock duurt sub-seconde.
+
+create index if not exists idx_transactions_user_date
+  on public.transactions (user_id, date desc);

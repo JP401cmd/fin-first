@@ -1,10 +1,16 @@
 // lib/cashflow-data-loader.ts
 // Server-side data loader voor de cashflow-pagina's onder /overzicht/cashflow.
 //
-// Factort het transactions/recurrings/baseline/bank-accounts-blok dat voorheen
-// inline in app/(app)/overzicht/cashflow/page.tsx stond. Wordt gedeeld door de
-// landingspagina (kaart-KPI's), de Transacties-pagina, de Vaste-lasten-pagina
-// en de Forecast-pagina. React `cache()` dedupt per request.
+// Factort het recurrings/baseline/bank-accounts-blok dat voorheen inline in
+// app/(app)/overzicht/cashflow/page.tsx stond. Wordt gedeeld door de
+// landingspagina (kaart-KPI's), de Vaste-lasten-pagina en de Forecast-pagina.
+// React `cache()` dedupt per request.
+//
+// GEEN TRANSACTIE-FEED. De loader leverde ooit ook een 3-maands rijen-feed met
+// een naam-decoratie erbij; die uitvoer had geen enkele lezer meer en is
+// verwijderd. De transactie-as wordt hier alleen nog geaggregeerd (baseline +
+// incassodag-afleiding) en verlaat de loader niet per rij. Wie rijen wil toont,
+// haalt ze op waar ze getoond worden — niet via deze bundel.
 //
 // Huishouden-perspectief (plan Onderdeel 4): de transactie-as komt uit
 // loadPerspectiveTransactions (single source of truth voor ownership/privacy).
@@ -17,8 +23,8 @@
 import { cache } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getCachedUser } from '@/lib/supabase/cached-user'
-import type { TransactionRow } from '@/lib/types/transactions'
 import { withDerivedDayOfMonth, type RecurringTransaction, type DayDerivationTx } from '@/lib/recurring-data'
+import { getOwnProfile } from '@/lib/server-data/base'
 import { loadPerspectiveTransactionsServer } from '@/lib/household/perspective-loader-server'
 import { type PerspectiveItem } from '@/lib/household/perspective-loader'
 import type { OwnershipType, Perspective } from '@/lib/household-data'
@@ -26,8 +32,6 @@ import type { OwnershipType, Perspective } from '@/lib/household-data'
 // ── Result type ───────────────────────────────────────────────
 
 export interface CashflowData {
-  /** Laatste 3 maanden transacties (voor de Transacties-pagina). */
-  transactions: TransactionRow[]
   /** Huidige maand-label, bv. "juni 2026". */
   monthLabel: string | undefined
   /** Profielnaam — gebruikt door VasteLastenLoader. */
@@ -57,7 +61,6 @@ export interface CashflowData {
 }
 
 const EMPTY: CashflowData = {
-  transactions: [],
   monthLabel: undefined,
   fullName: null,
   recurrings: [],
@@ -94,10 +97,6 @@ export const loadCashflowData = cache(async (
   const user = await getCachedUser(supabase)
   if (!user) return EMPTY
 
-  // 3-maands venster voor de transactie-feed (display).
-  const since = new Date()
-  since.setMonth(since.getMonth() - 3)
-  const sinceIso = since.toISOString().split('T')[0]
   // Baseline-venster voor forecast: laatste 6 maanden gemiddeld inkomen +
   // uitgaven. Zelfde 6m-periode als de health-score (consistentie).
   const sixMonthsAgo = new Date()
@@ -105,18 +104,32 @@ export const loadCashflowData = cache(async (
   const sixMonthsAgoIso = sixMonthsAgo.toISOString().split('T')[0]
 
   // Eén perspectief-gestempelde transactie-set over het 6-maands baseline-
-  // venster (het 3-maands feed-venster is een subset). Ownership/privacy zijn
-  // door de loader/RPC al toegepast.
+  // venster. Ownership/privacy zijn door de loader/RPC al toegepast. De set
+  // wordt hier alleen geaggregeerd — er verlaat geen enkele rij deze loader.
   const [
     perspectiveTx,
     profileResult,
     recurResult,
     accountsResult,
-    displayTxResult,
   ] = await Promise.all([
     loadPerspectiveTransactionsServer(supabase, perspective, { since: sixMonthsAgoIso }),
-    supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle(),
+    // Eigen profielrij uit de GEDEELDE basisdata-laag. Op de drie
+    // pagina-callsites draait `loadCashflowKpis`/`loadForecastSectionData` in
+    // dezelfde render en die lezen 'm al; `cache()` maakt daar een hele
+    // roundtrip vrij. Op de twee niet-render-callsites (de cashflow-status-route
+    // en lib/page-status/compute.ts) is `cache()` een passthrough — daar is dit
+    // neutraal, niet goedkoper. De vroegere `.eq('id', user.id)` vervalt —
+    // profiles-RLS is own-only — en de bredere kolomset kost niets: het is één
+    // rij, en de loader leest er nog steeds alleen `full_name` uit.
+    getOwnProfile(supabase),
     // RLS levert eigen-persoonlijk + ALLE gedeelde recurrings van het huishouden.
+    //
+    // BLIJFT LOADER-LOKAAL. De basisdata-laag heeft geen recurring-fetcher, en er
+    // één toevoegen levert pas iets op als óók `lib/vaste-lasten-summary.ts` 'm
+    // consumeert — de enige andere lezer in deze render. Die leest een smalle
+    // 7-kolomsselectie; hem op deze `*` zetten verbreedt zijn egress en raakt het
+    // fingerprint-gecachte detectiepad, voor precies één bespaarde query op één
+    // van de vier cashflow-pagina's. Dat is geen gratis winst.
     supabase
       .from('recurring_transactions')
       .select('*')
@@ -124,19 +137,17 @@ export const loadCashflowData = cache(async (
     // Liquide saldo voor cumulatief-startpunt — RLS levert eigen + gedeeld.
     // ⚠️ géén partner_split_pct selecteren: die kolom bestaat niet op
     // bank_accounts en PostgREST laat de hele query dan stil falen (saldo 0).
+    //
+    // BLIJFT LOADER-LOKAAL. De gedeelde `getUnlinkedBankAccounts` is een ANDERE
+    // RIJENSET: die filtert op `linked_asset_id IS NULL` (de grondslag "welk geld
+    // telt náást de assets mee", lib/unlinked-cash.ts) en levert geen
+    // `ownership`/`user_id` — precies de twee kolommen waarop de
+    // perspectief-scoping hieronder draait. Omzetten zou `startingBalance` en
+    // `accountCount` numeriek veranderen.
     supabase
       .from('bank_accounts')
       .select('id, balance, name, ownership, user_id')
       .eq('is_active', true),
-    // Join-gedecoreerde rijen (account-naam + categorie) voor de feed-weergave.
-    // We filteren ze hieronder op de ID's die de perspectief-loader teruggeeft,
-    // zodat de getoonde lijst ownership/privacy respecteert.
-    supabase
-      .from('transactions')
-      .select('id, date, description, amount, bank_accounts(name), budgets(name)')
-      .gte('date', sinceIso)
-      .order('date', { ascending: false })
-      .limit(500),
   ])
 
   const ctx = perspectiveTx.context
@@ -233,45 +244,6 @@ export const loadCashflowData = cache(async (
   // Account-count blijft het aantal zichtbare gekoppelde rekeningen.
   const accountCount = scopedAccounts.length
 
-  // ── Display-transacties (feed) ───────────────────────────────────────────
-  // De perspectief-loader is de bron-of-waarheid voor WELKE rijen tellen
-  // (ownership/privacy). De join-gedecoreerde query levert de account-/categorie-
-  // naam; we mappen die per ID op de perspectief-set. Partner-persoonlijke rijen
-  // (privacy='full') staan NIET in de join-query (die draait onder de eigen RLS),
-  // dus die tonen we zonder account-/categorie-naam.
-  const displayRows = (displayTxResult.data ?? []) as Array<Record<string, unknown>>
-  const displayById = new Map<string, Record<string, unknown>>()
-  for (const r of displayRows) displayById.set(String(r.id), r)
-
-  const transactions: TransactionRow[] = []
-  for (const t of perspectiveTx.transactions) {
-    if (t._aggregated) continue
-    const id = t.id != null ? String(t.id) : null
-    if (!id) continue
-    if (String(t.date ?? '') < sinceIso) continue
-
-    const joinRow = displayById.get(id)
-    const bankField = joinRow
-      ? (joinRow as { bank_accounts?: { name?: string } | { name?: string }[] | null }).bank_accounts
-      : undefined
-    const accountName = Array.isArray(bankField) ? bankField[0]?.name : bankField?.name
-    const budgetField = joinRow
-      ? (joinRow as { budgets?: { name?: string } | { name?: string }[] | null }).budgets
-      : undefined
-    const categoryName = Array.isArray(budgetField) ? budgetField[0]?.name : budgetField?.name
-
-    const frac = shareOf(t, perspective)
-    transactions.push({
-      id,
-      date: String(t.date ?? ''),
-      description: String(t.description ?? ''),
-      category: categoryName ?? null,
-      amount: Number(t.amount) * frac,
-      account_name: accountName ?? null,
-    })
-  }
-  transactions.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
-
   const fullName = (profileResult.data as { full_name?: string | null } | null)?.full_name ?? null
   const monthLabel = new Intl.DateTimeFormat('nl-NL', {
     month: 'long',
@@ -279,7 +251,6 @@ export const loadCashflowData = cache(async (
   }).format(new Date())
 
   return {
-    transactions,
     monthLabel,
     fullName,
     recurrings: recurringsWithDays,

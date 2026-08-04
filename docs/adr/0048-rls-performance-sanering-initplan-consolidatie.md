@@ -69,3 +69,72 @@ policies zijn functioneel behouden (via OR meegenomen bij merges).
   worden — verwacht, geen regressie.
 - Geen nieuwe tabellen/FK's → ERD (`architecture.json.tableRelations`) ongewijzigd; geen
   `arch:diagram`-regeneratie nodig.
+
+## Addendum (2026-08-04) — `user_household_id()` alsnog in een initplan
+
+Migratie `20260804055846_perf_rls_household_initplan_en_shared_index.sql`.
+
+**Wat er nog openstond.** De rewrite hierboven wikkelde `auth.<fn>()`, maar liet de tweede
+helper in dezelfde policies **kaal** staan: `household_id = user_household_id()` op de
+SELECT-policies van `transactions`, `recurring_transactions` en `transaction_splits`. Dat is
+geen slordigheid maar een blinde vlek van het meetinstrument: de Supabase-advisor herkent
+alleen `auth.*`/`current_setting`, dus `auth_rls_initplan` stond al op 0 en bleef daar —
+vóór én ná deze migratie. De advisor kón dit dus niet vinden; alleen `EXPLAIN` maakt het
+zichtbaar. Waarom het bijt: `user_household_id()` is `STABLE SECURITY DEFINER`, en Postgres
+inlinet SECURITY DEFINER-functies nooit en constant-foldt `STABLE` niet. Zonder
+scalar-subquery-wrapper wordt hij dus geëvalueerd voor elke rij waar de eerste OR-tak
+(`auth.uid() = user_id`) niet al waar is — precies de partnerrijen in een huishouden.
+
+**Besluit.** `user_household_id()` → `(select public.user_household_id())` in die drie
+SELECT-policies (`transaction_splits` heeft twee subselects, maar slechts één droeg de
+helper). Plus een partiële index `idx_transactions_household_shared_date
+(household_id, date desc) where ownership = 'shared'` voor de gedeelde OR-tak.
+
+**Waarom de semantiek identiek is.** De functie levert per definitie één scalaire waarde
+(`LIMIT 1`), dus `(select f())` geeft exact dezelfde waarde — inclusief `NULL` voor een
+gebruiker zonder huishouden, en `household_id = NULL` blijft `NULL` (niet-waar). Hij is
+`STABLE`, dus binnen één query kan de uitkomst niet wijzigen: één evaluatie geeft dezelfde
+rijenset als N evaluaties per rij. Hij is read-only, dus er zijn geen neveneffecten die van
+het aantal aanroepen afhangen. Rolset, policynamen en de `WITH CHECK`-kant bleven
+onaangeroerd; er is geen tak toegevoegd, verwijderd of verbreed. Empirisch bevestigd met een
+huishouden-fixture (in een teruggedraaide transactie): de zichtbare rij-**ID's** vóór en ná
+zijn byte-identiek (`md5` over de geordende id-lijst) op `transactions` en
+`recurring_transactions`. Op `transaction_splits` leverde de fixture geen rijen op, dus
+daar draagt de structurele redenering (identieke booleaanse structuur, zelfde helper) het
+bewijs — niet de meting.
+
+**Effect (zelfde fixture, warme cache, bit-identieke uitvoer).**
+Kaal `user_household_id()` evalueert de helper per rij; gewikkeld verschijnt `InitPlan 2`
+dat één keer draait (twee buffers) en waarnaar de filter via `(InitPlan 2).col1` verwijst.
+Netto ruwweg tweederde minder gelezen buffers en een vervijfvoudiging van de snelheid op de
+fixture. Voor solo-gebruikers — op dit moment nog het volledige gebruikersbestand, er zijn
+nog geen huishoudens — blijft het plan qua vorm identiek en kost de InitPlan één buffer;
+geen regressie. (Exacte meetwaarden staan in het taakrapport, buiten deze repo.)
+
+**Wat níét waar bleek.** De partiële index wordt door het policy-plan (nog) **niet** gekozen:
+de planner verkiest één scan op `idx_transactions_date` plus een filter boven een BitmapOr
+zodra de huishouden-tak een Param is. De index is wél correct en optimaal zodra
+`household_id` een literal is (`Index Scan …_shared_date`, index-cond op household_id én
+date, géén Sort, 0,5 ms) — maar het huidige partner-pad (`household_partner_items`) filtert
+op `ownership = 'personal'` en raakt hem dus evenmin. Hij blijft staan als vooruitgeschoven
+post — hij is partieel en matcht vooralsnog geen enkele rij, dus de schrijfkosten zijn
+verwaarloosbaar. Dat is bewust.
+
+**Waar de expliciete `Sort` vandaan komt (naderhand vastgesteld, T3.1b).** Aanvankelijk
+werd die toegeschreven aan een ontbrekende samengestelde index op `(user_id, date)`. Dat
+bleek onjuist: die index is inmiddels toegepast (migratie
+`20260804063307_perf_composite_indexes_apply`) en de `Sort` bleef staan. De echte oorzaak is
+deze policy zelf. Zolang een query voor de gebruikersafbakening **alleen op RLS leunt**,
+maakt de huishouden-`OR` er een `BitmapOr` van, en een bitmapscan levert geen gesorteerde
+uitvoer — dus moet er altijd expliciet gesorteerd worden, met of zonder passende index.
+Draagt de query daarentegen een **expliciete** `.eq('user_id', …)`, dan mag de planner een
+gewone `Index Scan` nemen en de RLS-`OR` naar een `Filter` degraderen; dán kan de
+indexordening de `ORDER BY` wél bedienen. Dat is de goedkope uitweg voor wie een sortering
+wil vermijden: filter expliciet op `user_id` in plaats van het aan RLS over te laten.
+
+**Verificatie.** Advisors vóór/ná gelijk (`auth_rls_initplan` 0 → 0 — het instrument dekt
+dit patroon niet). Twee-gebruikers-RLS-simulatie ná: eigenaar-isolatie 0 vreemde rijen op
+alle drie tabellen; partner ziet uitsluitend de gedeelde rijen en **0** privérijen;
+geen rijen uit een ander huishouden; `anon` 0 rijen **zonder fout** op alle drie tabellen.
+`db-model`- + household-vitest groen (op de 2 pre-existente `partner-items-projection`-
+failures na, die van een ander traject zijn).

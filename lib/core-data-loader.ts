@@ -49,7 +49,7 @@ import { resolveEffectiveIncomeExpenses } from './effective-financials'
 import { resolveSavingsSource, savingsRateFromAggregates } from './savings-source'
 import { fetchLatestSnapshotsByMonth } from '@/lib/server-data/snapshot-aggregates'
 import {
-  fetchTxMonthAggregate,
+  getTxAgg12m,
   aggSumPositief,
   aggSumNegatiefAbs,
   aggIncomeByMonth,
@@ -403,8 +403,10 @@ export const loadCoreData = cache(async function loadCoreData(
     // /overzicht via dezelfde RPC al het juiste getal toonde. Een aggregaat levert
     // per definitie enkele rijen en kan niet afkappen.
     // RLS-breed (eigen + gedeeld huishouden) — identiek aan de vervangen fetches,
-    // en hetzelfde venster/dezelfde aanroep als dashboard-data-loader.
-    fetchTxMonthAggregate(supabase, { from: twelveMonthsAgo, to: monthEnd }),
+    // en hetzelfde venster/dezelfde aanroep als dashboard-data-loader. Sinds de
+    // `cache()`-wrap is dat letterlijk dezelfde aanroep: op de cashflow-hub draaien
+    // beide loaders in één request en delen ze deze ene RPC (zie getTxAgg12m).
+    getTxAgg12m(supabase),
     supabase
       .from('budgets')
       .select('id, name, default_limit, interval, budget_type, is_essential')
@@ -761,7 +763,14 @@ export const loadCoreData = cache(async function loadCoreData(
     // velden voor de emergency-resolver; hasGoals blijft "heeft ≥1 doel" (incl.
     // voltooid), de emergency-target filtert client-side op niet-voltooid.
     supabase.from('goals').select('id, goal_type, target_value, metadata, is_completed'),
-    supabase.from('transactions').select('budget_id, amount').gte('date', sixMonthsAgoForBudgets).lt('date', monthEnd),
+    // Expliciete `.limit(1000)` = de PostgREST-cap (supabase/config.toml
+    // max_rows = 1000): een client-`.limit()` boven die grens is een no-op, dus dit
+    // maakt de bestaande stille afkap zichtbaar i.p.v. impliciet. Byte-identiek aan
+    // de vroegere ongelimiteerde query (die óók op 1000 werd afgekapt). Voor een
+    // tx-rijke gebruiker kapt dit 6-maands venster dus stil af; de structurele route
+    // is het maandaggregaat (ADR 0050 — kan per definitie niet afkappen, en draait
+    // hierboven al als `txAgg12` op een ruimer venster) of keyset-paginatie.
+    supabase.from('transactions').select('budget_id, amount').gte('date', sixMonthsAgoForBudgets).lt('date', monthEnd).limit(1000),
     // Holdings from tracked assets for portfolio card. Na de tabel-split
     // (migratie 20260502000003) zit deze data alleen in `investment_holdings`
     // — crypto-holdings hebben (nog) geen `daily_change_percent` en worden
