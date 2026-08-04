@@ -623,3 +623,36 @@
 ## 2026-08-03
 
 - **Componenten (aantal)** toegevoegd: +1
+
+## 2026-08-03
+
+- **API-routes** toegevoegd: /api/admin/local-ai-gate, /api/assets/account-number, /api/local-ai-gate
+
+## 2026-08-04
+
+- **API-routes** toegevoegd: /api/assets/[id], /api/debts/[id]
+- **Componenten (aantal)** toegevoegd: +1
+
+## 2026-08-04
+
+- **Componenten (aantal)** toegevoegd: +1
+
+## 2026-08-04
+
+- Geen wijzigingen.
+
+## 2026-08-04
+
+- Geen wijzigingen.
+
+## 2026-08-04
+
+- Geen wijzigingen.
+
+## 2026-08-04
+
+- **API-routes** toegevoegd: /api/local-chat-live
+
+## 2026-08-04
+
+- **API-routes** verwijderd: /api/local-chat-live

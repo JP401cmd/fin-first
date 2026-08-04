@@ -1,10 +1,10 @@
 {
-  "generatedAt": "2026-08-03T13:18:29.193Z",
+  "generatedAt": "2026-08-04T13:00:42.836Z",
   "manifestGeneratedAt": "2026-08-03T00:00:00.000Z",
   "inSync": true,
   "budgetsOk": true,
   "dnaSubBudget": 2000,
-  "dnaEstimatedTokens": 708,
+  "dnaEstimatedTokens": 847,
   "dnaTokenSource": "live",
   "sources": [
     {
@@ -27,7 +27,7 @@
       "constant": "LOCAL_CHAT_DNA",
       "file": "lib/ai/local/local-chat-prompt.ts",
       "subBudget": 2000,
-      "estimatedTokens": 708,
+      "estimatedTokens": 847,
       "tokenSource": "live",
       "withinBudget": true,
       "inSync": true,

@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-03T09:36:55.421Z",
-  "generatedDate": "2026-08-03",
+  "generatedAt": "2026-08-04T13:06:43.909Z",
+  "generatedDate": "2026-08-04",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -189,11 +189,11 @@
   "stats": {
     "routes": 146,
     "routesProduction": 101,
-    "api": 275,
+    "api": 280,
     "tables": 86,
-    "migrations": 179,
+    "migrations": 183,
     "integrations": 25,
-    "components": 860,
+    "components": 862,
     "providers": 11,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -2124,6 +2124,15 @@
       ]
     },
     {
+      "url": "/api/admin/local-ai-gate",
+      "file": "app/api/admin/local-ai-gate/route.ts",
+      "domain": "admin",
+      "methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
       "url": "/api/admin/local-knowledge",
       "file": "app/api/admin/local-knowledge/route.ts",
       "domain": "admin",
@@ -2483,6 +2492,23 @@
       ]
     },
     {
+      "url": "/api/assets/[id]",
+      "file": "app/api/assets/[id]/route.ts",
+      "domain": "assets",
+      "methods": [
+        "DELETE"
+      ]
+    },
+    {
+      "url": "/api/assets/account-number",
+      "file": "app/api/assets/account-number/route.ts",
+      "domain": "assets",
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
       "url": "/api/assets/has-holdings",
       "file": "app/api/assets/has-holdings/route.ts",
       "domain": "assets",
@@ -2535,7 +2561,9 @@
       "file": "app/api/bank-accounts/[id]/route.ts",
       "domain": "bank-accounts",
       "methods": [
-        "PATCH"
+        "GET",
+        "PATCH",
+        "DELETE"
       ]
     },
     {
@@ -2893,6 +2921,14 @@
       "domain": "daily-expense-rate",
       "methods": [
         "GET"
+      ]
+    },
+    {
+      "url": "/api/debts/[id]",
+      "file": "app/api/debts/[id]/route.ts",
+      "domain": "debts",
+      "methods": [
+        "DELETE"
       ]
     },
     {
@@ -3485,6 +3521,14 @@
       "url": "/api/investment/holdings/[id]/detail",
       "file": "app/api/investment/holdings/[id]/detail/route.ts",
       "domain": "investment",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "url": "/api/local-ai-gate",
+      "file": "app/api/local-ai-gate/route.ts",
+      "domain": "local-ai-gate",
       "methods": [
         "GET"
       ]
@@ -4295,7 +4339,7 @@
     {
       "domain": "admin",
       "label": "Beheer",
-      "count": 42,
+      "count": 43,
       "routes": [
         {
           "url": "/api/admin/ai-features",
@@ -4412,6 +4456,15 @@
           "domain": "admin",
           "methods": [
             "POST"
+          ]
+        },
+        {
+          "url": "/api/admin/local-ai-gate",
+          "file": "app/api/admin/local-ai-gate/route.ts",
+          "domain": "admin",
+          "methods": [
+            "GET",
+            "PUT"
           ]
         },
         {
@@ -5157,6 +5210,70 @@
       ]
     },
     {
+      "domain": "assets",
+      "label": "Bezittingen",
+      "count": 7,
+      "routes": [
+        {
+          "url": "/api/assets/[id]",
+          "file": "app/api/assets/[id]/route.ts",
+          "domain": "assets",
+          "methods": [
+            "DELETE"
+          ]
+        },
+        {
+          "url": "/api/assets/account-number",
+          "file": "app/api/assets/account-number/route.ts",
+          "domain": "assets",
+          "methods": [
+            "GET",
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/assets/has-holdings",
+          "file": "app/api/assets/has-holdings/route.ts",
+          "domain": "assets",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/assets/toggle-budget",
+          "file": "app/api/assets/toggle-budget/route.ts",
+          "domain": "assets",
+          "methods": [
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/assets/toggle-holdings",
+          "file": "app/api/assets/toggle-holdings/route.ts",
+          "domain": "assets",
+          "methods": [
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/assets/toggle-rental",
+          "file": "app/api/assets/toggle-rental/route.ts",
+          "domain": "assets",
+          "methods": [
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/assets/toggle-woonbalans",
+          "file": "app/api/assets/toggle-woonbalans/route.ts",
+          "domain": "assets",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "holdings",
       "label": "Beleggingen",
       "count": 7,
@@ -5528,53 +5645,6 @@
           "domain": "checkin",
           "methods": [
             "GET"
-          ]
-        }
-      ]
-    },
-    {
-      "domain": "assets",
-      "label": "Bezittingen",
-      "count": 5,
-      "routes": [
-        {
-          "url": "/api/assets/has-holdings",
-          "file": "app/api/assets/has-holdings/route.ts",
-          "domain": "assets",
-          "methods": [
-            "GET"
-          ]
-        },
-        {
-          "url": "/api/assets/toggle-budget",
-          "file": "app/api/assets/toggle-budget/route.ts",
-          "domain": "assets",
-          "methods": [
-            "POST"
-          ]
-        },
-        {
-          "url": "/api/assets/toggle-holdings",
-          "file": "app/api/assets/toggle-holdings/route.ts",
-          "domain": "assets",
-          "methods": [
-            "POST"
-          ]
-        },
-        {
-          "url": "/api/assets/toggle-rental",
-          "file": "app/api/assets/toggle-rental/route.ts",
-          "domain": "assets",
-          "methods": [
-            "POST"
-          ]
-        },
-        {
-          "url": "/api/assets/toggle-woonbalans",
-          "file": "app/api/assets/toggle-woonbalans/route.ts",
-          "domain": "assets",
-          "methods": [
-            "POST"
           ]
         }
       ]
@@ -5958,6 +6028,29 @@
       ]
     },
     {
+      "domain": "debts",
+      "label": "Schulden",
+      "count": 2,
+      "routes": [
+        {
+          "url": "/api/debts/[id]",
+          "file": "app/api/debts/[id]/route.ts",
+          "domain": "debts",
+          "methods": [
+            "DELETE"
+          ]
+        },
+        {
+          "url": "/api/debts/toggle-hypotheekplanner",
+          "file": "app/api/debts/toggle-hypotheekplanner/route.ts",
+          "domain": "debts",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "goals",
       "label": "Doelen",
       "count": 2,
@@ -6276,7 +6369,9 @@
           "file": "app/api/bank-accounts/[id]/route.ts",
           "domain": "bank-accounts",
           "methods": [
-            "PATCH"
+            "GET",
+            "PATCH",
+            "DELETE"
           ]
         }
       ]
@@ -6473,21 +6568,6 @@
           "domain": "daily-expense-rate",
           "methods": [
             "GET"
-          ]
-        }
-      ]
-    },
-    {
-      "domain": "debts",
-      "label": "Schulden",
-      "count": 1,
-      "routes": [
-        {
-          "url": "/api/debts/toggle-hypotheekplanner",
-          "file": "app/api/debts/toggle-hypotheekplanner/route.ts",
-          "domain": "debts",
-          "methods": [
-            "POST"
           ]
         }
       ]
@@ -6719,6 +6799,21 @@
           "url": "/api/investment/holdings/[id]/detail",
           "file": "app/api/investment/holdings/[id]/detail/route.ts",
           "domain": "investment",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "local-ai-gate",
+      "label": "local-ai-gate",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/local-ai-gate",
+          "file": "app/api/local-ai-gate/route.ts",
+          "domain": "local-ai-gate",
           "methods": [
             "GET"
           ]
@@ -7726,7 +7821,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 179
+    "migrationCount": 183
   },
   "tablesByDomain": [
     {
@@ -8176,11 +8271,11 @@
     }
   ],
   "components": {
-    "total": 860,
+    "total": 862,
     "groups": [
       {
         "group": "app",
-        "count": 335,
+        "count": 337,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -8255,6 +8350,8 @@
           "chat-prompt-deeplink",
           "chat-prompt-deeplink.test",
           "chat-provider",
+          "chat-settings-popover",
+          "chat-settings-popover.test",
           "chat-visualization-card",
           "coach-melding",
           "coach-melding.test",
@@ -8762,7 +8859,7 @@
       },
       {
         "group": "core",
-        "count": 68,
+        "count": 67,
         "items": [
           "account-source-icon",
           "account-source-icon.test",
@@ -8771,7 +8868,6 @@
           "app-toggle-section",
           "asset-app-chip",
           "asset-category-page",
-          "asset-detail-flow",
           "asset-edit-broker-section",
           "asset-edit-connection-section",
           "asset-form-iban.test",
@@ -8901,7 +8997,7 @@
       },
       {
         "group": "mijn",
-        "count": 34,
+        "count": 35,
         "items": [
           "abonnement-section",
           "account-basis-section",
@@ -8929,6 +9025,7 @@
           "local-chat-panel",
           "local-chat-panel.test",
           "local-model-section",
+          "local-setup-steps",
           "mijn-overview",
           "mijn-overview.test",
           "module-accent-picker",
@@ -9629,6 +9726,18 @@
         {
           "name": "bank_accounts",
           "write": true
+        },
+        {
+          "name": "bank_connection_accounts",
+          "write": false
+        },
+        {
+          "name": "recurring_transactions",
+          "write": false
+        },
+        {
+          "name": "transactions",
+          "write": false
         }
       ],
       "bank-connect": [
@@ -9911,7 +10020,15 @@
       ],
       "debts": [
         {
+          "name": "balance_snapshots",
+          "write": true
+        },
+        {
           "name": "debts",
+          "write": true
+        },
+        {
+          "name": "valuations",
           "write": true
         }
       ],
@@ -10182,6 +10299,12 @@
         },
         {
           "name": "investment_transactions",
+          "write": false
+        }
+      ],
+      "local-ai-gate": [
+        {
+          "name": "app_settings",
           "write": false
         }
       ],
@@ -11343,6 +11466,8 @@
           "label": "Bezittingen",
           "write": true,
           "routes": [
+            "/api/assets/[id]",
+            "/api/assets/account-number",
             "/api/assets/toggle-holdings",
             "/api/assets/toggle-rental",
             "/api/assets/toggle-woonbalans"
@@ -11585,6 +11710,7 @@
           "label": "Schulden",
           "write": true,
           "routes": [
+            "/api/debts/[id]",
             "/api/debts/toggle-hypotheekplanner"
           ]
         },
@@ -11761,6 +11887,14 @@
           ]
         },
         {
+          "domain": "bank-accounts",
+          "label": "bank-accounts",
+          "write": false,
+          "routes": [
+            "/api/bank-accounts/[id]"
+          ]
+        },
+        {
           "domain": "budget-trends",
           "label": "budget-trends",
           "write": false,
@@ -11920,6 +12054,7 @@
             "/api/admin/checkins",
             "/api/admin/coach",
             "/api/admin/extraction-prompt",
+            "/api/admin/local-ai-gate",
             "/api/admin/local-knowledge",
             "/api/admin/news-ingest",
             "/api/admin/news-prompt",
@@ -12080,6 +12215,14 @@
           "write": false,
           "routes": [
             "/api/bank-connect/providers"
+          ]
+        },
+        {
+          "domain": "local-ai-gate",
+          "label": "local-ai-gate",
+          "write": false,
+          "routes": [
+            "/api/local-ai-gate"
           ]
         },
         {
@@ -12729,6 +12872,50 @@
           ]
         }
       ],
+      "recurring_transactions": [
+        {
+          "domain": "recurring",
+          "label": "recurring",
+          "write": true,
+          "routes": [
+            "/api/recurring",
+            "/api/recurring/[id]"
+          ]
+        },
+        {
+          "domain": "bank-accounts",
+          "label": "bank-accounts",
+          "write": false,
+          "routes": [
+            "/api/bank-accounts/[id]"
+          ]
+        },
+        {
+          "domain": "cashflow-forecast",
+          "label": "cashflow-forecast",
+          "write": false,
+          "routes": [
+            "/api/cashflow-forecast"
+          ]
+        },
+        {
+          "domain": "detect-recurring",
+          "label": "detect-recurring",
+          "write": false,
+          "routes": [
+            "/api/detect-recurring"
+          ]
+        },
+        {
+          "domain": "subscriptions",
+          "label": "subscriptions",
+          "write": false,
+          "routes": [
+            "/api/subscriptions/analyse-ai",
+            "/api/subscriptions/detect-ai"
+          ]
+        }
+      ],
       "bank_connection_accounts": [
         {
           "domain": "bank-connect",
@@ -12742,6 +12929,14 @@
             "/api/bank-connect/linked-accounts",
             "/api/bank-connect/relink",
             "/api/bank-connect/sync"
+          ]
+        },
+        {
+          "domain": "bank-accounts",
+          "label": "bank-accounts",
+          "write": false,
+          "routes": [
+            "/api/bank-accounts/[id]"
           ]
         },
         {
@@ -12874,6 +13069,14 @@
       ],
       "valuations": [
         {
+          "domain": "debts",
+          "label": "Schulden",
+          "write": true,
+          "routes": [
+            "/api/debts/[id]"
+          ]
+        },
+        {
           "domain": "snapshots",
           "label": "Snapshots",
           "write": true,
@@ -12997,42 +13200,6 @@
           "write": true,
           "routes": [
             "/api/calculators/[id]/report"
-          ]
-        }
-      ],
-      "recurring_transactions": [
-        {
-          "domain": "recurring",
-          "label": "recurring",
-          "write": true,
-          "routes": [
-            "/api/recurring",
-            "/api/recurring/[id]"
-          ]
-        },
-        {
-          "domain": "cashflow-forecast",
-          "label": "cashflow-forecast",
-          "write": false,
-          "routes": [
-            "/api/cashflow-forecast"
-          ]
-        },
-        {
-          "domain": "detect-recurring",
-          "label": "detect-recurring",
-          "write": false,
-          "routes": [
-            "/api/detect-recurring"
-          ]
-        },
-        {
-          "domain": "subscriptions",
-          "label": "subscriptions",
-          "write": false,
-          "routes": [
-            "/api/subscriptions/analyse-ai",
-            "/api/subscriptions/detect-ai"
           ]
         }
       ],
@@ -13256,6 +13423,34 @@
           "write": false,
           "routes": [
             "/api/crypto/holdings/[id]/detail"
+          ]
+        }
+      ],
+      "balance_snapshots": [
+        {
+          "domain": "debts",
+          "label": "Schulden",
+          "write": true,
+          "routes": [
+            "/api/debts/[id]"
+          ]
+        },
+        {
+          "domain": "onboarding",
+          "label": "Onboarding",
+          "write": true,
+          "routes": [
+            "/api/onboarding/aangifte-import"
+          ]
+        },
+        {
+          "domain": "snapshots",
+          "label": "Snapshots",
+          "write": false,
+          "routes": [
+            "/api/snapshots/balances",
+            "/api/snapshots/entity-backfill",
+            "/api/snapshots/group-history"
           ]
         }
       ],
@@ -13498,26 +13693,6 @@
           ]
         }
       ],
-      "balance_snapshots": [
-        {
-          "domain": "onboarding",
-          "label": "Onboarding",
-          "write": true,
-          "routes": [
-            "/api/onboarding/aangifte-import"
-          ]
-        },
-        {
-          "domain": "snapshots",
-          "label": "Snapshots",
-          "write": false,
-          "routes": [
-            "/api/snapshots/balances",
-            "/api/snapshots/entity-backfill",
-            "/api/snapshots/group-history"
-          ]
-        }
-      ],
       "user_own_ibans": [
         {
           "domain": "own-accounts",
@@ -13584,6 +13759,7 @@
       "actions",
       "app_settings",
       "assets",
+      "balance_snapshots",
       "bank_accounts",
       "budgets",
       "debts",
@@ -13595,7 +13771,8 @@
       "questionnaire_sessions",
       "recommendations",
       "transactions",
-      "user_feature_visits"
+      "user_feature_visits",
+      "valuations"
     ]
   },
   "tableRelations": {
@@ -15343,6 +15520,33 @@
       ],
       "summary": "De persoonlijke nieuwseditie kan on-device via de lokale AI-runtime worden samengesteld, maar niet zoals het cloudpad dat doet. In plaats van één `streamObject`-call over de hele set bronartikelen loopt de generatie map-reduce: eerst een scoring-pass per artikel, dan een schrijf-",
       "file": "docs/adr/0080-lokale-nieuwseditie-map-reduce.md"
+    },
+    {
+      "id": "0081-lokale-ai-toelating-op-gemeten-uitvoer",
+      "title": "Een toestel wordt tot lokale AI toegelaten op gemeten uitvoer, niet op capaciteit",
+      "status": "aanvaard",
+      "date": "2026-08-04",
+      "elements": [
+        "t-lokale-ai",
+        "as-import",
+        "as-coach",
+        "as-nieuws"
+      ],
+      "summary": "Of een apparaat lokale AI mag draaien, wordt niet meer bepaald door wat het apparaat *is* (telefoon of desktop) en ook niet door wat de GPU *belooft* (WebGPU, shader-f16, buffergrootte), maar door wat er daadwerkelijk uit het model komt: drie korte proefgeneraties ná de download,",
+      "file": "docs/adr/0081-lokale-ai-toelating-op-gemeten-uitvoer.md"
+    },
+    {
+      "id": "0082-bankrekening-verwijderen-alleen-op-gebruikersopdracht",
+      "title": "Een bankrekening verdwijnt alleen op expliciete gebruikersopdracht — systeempaden deactiveren, en de transactiehistorie overleeft in een archiefrekening",
+      "status": "aanvaard",
+      "date": "2026-08-04",
+      "elements": [
+        "do-transactie",
+        "do-bezitting",
+        "t-supabase"
+      ],
+      "summary": "Zusje van ADR 0011 (\"ON DELETE SET NULL voor referentie-data, CASCADE voor levenscyclus-data\"). Daar ging het over wat de *database* bij een verwijdering mag meenemen; hier over wie überhaupt mag verwijderen, en wat er met de geschiedenis gebeurt die aan de verwijderde rij hing.",
+      "file": "docs/adr/0082-bankrekening-verwijderen-alleen-op-gebruikersopdracht.md"
     }
   ],
   "churn": {
@@ -15354,7 +15558,7 @@
       },
       {
         "path": "lib/ai",
-        "commits": 56
+        "commits": 58
       },
       {
         "path": "app/(app)/toekomst",
@@ -15369,16 +15573,16 @@
         "commits": 15
       },
       {
+        "path": "app/api/assets",
+        "commits": 10
+      },
+      {
         "path": "lib/horizon-data.ts",
         "commits": 10
       },
       {
         "path": "lib/fire-simulation.ts",
         "commits": 8
-      },
-      {
-        "path": "app/api/assets",
-        "commits": 7
       },
       {
         "path": "app/api/budgets",
@@ -15398,17 +15602,17 @@
       {
         "file": "components/app/budgets-client.tsx",
         "loc": 5082,
-        "commits": 32
+        "commits": 31
       },
       {
         "file": "components/core/assets-client.tsx",
-        "loc": 4359,
-        "commits": 43
+        "loc": 4486,
+        "commits": 46
       },
       {
         "file": "components/app/cash-account-view.tsx",
-        "loc": 2920,
-        "commits": 18
+        "loc": 3435,
+        "commits": 19
       },
       {
         "file": "lib/release-notes.ts",
@@ -15423,7 +15627,7 @@
       {
         "file": "app/(app)/core/cash/import/page.tsx",
         "loc": 2298,
-        "commits": 21
+        "commits": 20
       },
       {
         "file": "lib/test-personas.ts",
@@ -16370,15 +16574,15 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-08-02",
+    "previousDate": "2026-08-04",
     "hasChanges": true,
     "sections": [
       {
-        "label": "Componenten (aantal)",
-        "added": [
-          "+1"
-        ],
-        "removed": []
+        "label": "API-routes",
+        "added": [],
+        "removed": [
+          "/api/local-chat-live"
+        ]
       }
     ]
   },
@@ -16616,8 +16820,15 @@
     },
     {
       "date": "2026-08-03",
-      "api": 275,
+      "api": 278,
       "components": 860,
+      "tables": 86,
+      "routesProduction": 101
+    },
+    {
+      "date": "2026-08-04",
+      "api": 280,
+      "components": 862,
       "tables": 86,
       "routesProduction": 101
     }
