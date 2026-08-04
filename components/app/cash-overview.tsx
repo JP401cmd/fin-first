@@ -85,6 +85,48 @@ type StampedAsset = Asset & { _provenance?: Provenance; _myShareFraction?: numbe
 const EMPTY_BANK_LINKS: CashBankLink[] = []
 
 /**
+ * Kolommen van `bank_accounts` die dit oppervlak leest. Expliciet, nooit
+ * `select('*')`: die stuurde óók `iban_encrypted` en `iban_hash` naar de
+ * browser. De ciphertext is zonder sleutel onschadelijk, maar de blind index is
+ * een stabiele gelijkheids-identifier afgeleid van een server-only sleutel —
+ * die hoort niet in browsercache, devtools of een error-reporter
+ * (securityreview 30 juli). De leesbare IBAN komt uit `/api/own-accounts/ibans`.
+ */
+const BANK_ACCOUNT_COLUMNS =
+  'id, name, bank_name, account_type, balance, is_active, sort_order, linked_asset_id, ownership'
+
+/**
+ * Dezelfde kolommen plus het ene veld dat de asset→rekening-map nodig heeft.
+ * Alleen in de brede modus opgevraagd: daarbuiten heeft niemand de map, en dan
+ * hoort de join er ook niet te zijn.
+ */
+const BANK_ACCOUNT_COLUMNS_WITH_TRACKING =
+  `${BANK_ACCOUNT_COLUMNS}, linked_asset:assets!bank_accounts_linked_asset_id_fkey(has_budget_tracking)`
+
+/** Rij zoals hij uit de gecombineerde leesronde komt. */
+type BankAccountRow = Account & {
+  linked_asset?: { has_budget_tracking?: boolean | null } | null
+}
+
+/**
+ * asset.id → bank_account.id, maar alléén voor budget-getrackte rekeningen.
+ * Bepaalt welke rekeningkaart de rekeningdetail opent i.p.v. het
+ * bezittings-paneel. Draait op de ONGEFILTERDE set: een gedeelde
+ * huishoudrekening kan als bezitting in het persoonlijke perspectief staan
+ * terwijl zijn `bank_accounts`-rij daar niet in valt.
+ */
+export function budgetTrackedBankByAsset(
+  rows: Pick<BankAccountRow, 'id' | 'linked_asset_id' | 'linked_asset'>[],
+): Record<string, string> {
+  const map: Record<string, string> = {}
+  for (const b of rows) {
+    if (!b.linked_asset_id) continue
+    if (b.linked_asset?.has_budget_tracking === true) map[b.linked_asset_id] = b.id
+  }
+  return map
+}
+
+/**
  * Welke koppeltoestand krijgt déze rekeningkaart te zien?
  *
  * Twee keer `undefined` (= geen symbool), elk om een eigen reden:
@@ -157,15 +199,14 @@ export function CashOverview({
     return new Date(now.getFullYear(), now.getMonth(), 1)
   })
 
-  // Other-month transaction indicator state
-  const [hasOtherMonthTx, setHasOtherMonthTx] = useState(false)
-  const [latestTxDate, setLatestTxDate] = useState<string | null>(null)
-
-  // Of er de afgelopen 90 dagen enige transactie-activiteit was (gelogd of
-  // binnengekomen) — los van de geselecteerde maand. Bepaalt of het hele
-  // geldstroom-blok getoond wordt of vervangen door een lege-staat
-  // call-to-action. null = nog aan het laden (toon dan het normale blok).
-  const [hasRecentActivity, setHasRecentActivity] = useState<boolean | null>(null)
+  // Datum van de recentste transactie, perspectief-gescoped en los van de
+  // geselecteerde maand. `undefined` = nog aan het laden, `null` = er is er
+  // geen. Beantwoordt twee vragen die vroeger elk hun eigen query deden:
+  //   • staat er in een ándere maand wél iets? (sprong naar de recentste maand)
+  //   • was er de laatste 90 dagen enige activiteit? (lege-staat van het blok)
+  // Eén `max(date)` volstaat voor allebei: bestaat er een rij op of ná de
+  // 90-dagengrens, dan ligt de recentste rij daar per definitie ook op of ná.
+  const [latestTxDate, setLatestTxDate] = useState<string | null | undefined>(undefined)
 
   // Kassabon state
   const [showIncomeReceipt, setShowIncomeReceipt] = useState(false)
@@ -283,25 +324,27 @@ export function CashOverview({
     // is precies het soort aanname waarop iemand een `user_id`-filter toevoegt en
     // daarmee de gedeelde huishoudrekening stil uit beeld haalt. In 'personal'
     // versmalt het extra ownership-filter hieronder wél tot je niet-gedeelde
-    // rekeningen. Handmatige cash-assets zonder bank_accounts-rij vallen sowieso
+    // rekeningen — in de query, of (brede modus) op de opgehaalde rijen; zie
+    // hieronder. Handmatige cash-assets zonder bank_accounts-rij vallen sowieso
     // buiten deze query.
-    // Expliciete kolomlijst i.p.v. `select('*')`: die stuurde óók `iban_encrypted`
-    // en `iban_hash` naar de browser. De ciphertext is zonder sleutel onschadelijk,
-    // maar de blind index is een stabiele gelijkheids-identifier afgeleid van een
-    // server-only sleutel — die hoort niet in browsercache, devtools of een
-    // error-reporter (securityreview 30 juli). De leesbare IBAN komt hieronder uit
-    // de route.
+    // Eén leesronde voor twee afnemers (zie BANK_ACCOUNT_COLUMNS voor de
+    // kolomkeuze): de rekeningkaarten hieronder én — in de brede modus — de
+    // asset→rekening-map. Die map heeft de ONGEFILTERDE set nodig, dus daar
+    // versmalt het persoonlijke perspectief pas ná het ophalen. Dat levert
+    // exact dezelfde rekeningen op als het `ownership`-filter in de query
+    // (`ownership` staat in de kolomlijst), maar scheelt een tweede rondje.
+    const wide = showAllCashAccounts
     let q = supabase
       .from('bank_accounts')
-      .select('id, name, bank_name, account_type, balance, is_active, sort_order, linked_asset_id, ownership')
+      .select(wide ? BANK_ACCOUNT_COLUMNS_WITH_TRACKING : BANK_ACCOUNT_COLUMNS)
       .eq('is_active', true)
       .order('sort_order', { ascending: true })
-    if (perspective === 'personal') q = q.eq('ownership', 'personal')
-    // De IBAN in de `select('*')` hierboven is de plaintext-kolom die in Stage B
-    // verdwijnt; ontsleutelen kan alleen server-side. Hier dient hij puur als
-    // regel onder de rekeningnaam, dus de niet-strikte variant met een eigen
-    // terugval volstaat: zonder IBAN toont de kaart alleen de banknaam, en dat
-    // mag het rekeningoverzicht niet laten vallen.
+    if (perspective === 'personal' && !wide) q = q.eq('ownership', 'personal')
+    // De plaintext-IBAN verdwijnt in Stage B en ontsleutelen kan alleen
+    // server-side. Hier dient hij puur als regel onder de rekeningnaam, dus de
+    // niet-strikte variant met een eigen terugval volstaat: zonder IBAN toont de
+    // kaart alleen de banknaam, en dat mag het rekeningoverzicht niet laten
+    // vallen.
     const [{ data }, ibanResult] = await Promise.all([
       q,
       fetchOwnAccountIbans().catch((err) => {
@@ -310,10 +353,14 @@ export function CashOverview({
       }),
     ])
     if (data) {
+      const rows = data as unknown as BankAccountRow[]
       const ibanFor = ibanById(ibanResult.accounts)
-      setAccounts((data as Account[]).map((a) => ({ ...a, iban: ibanFor.get(a.id) ?? null })))
+      const visible =
+        perspective === 'personal' ? rows.filter((a) => a.ownership === 'personal') : rows
+      setAccounts(visible.map((a) => ({ ...a, iban: ibanFor.get(a.id) ?? null })))
+      if (wide) setBankByAsset(budgetTrackedBankByAsset(rows))
     }
-  }, [perspective])
+  }, [perspective, showAllCashAccounts])
 
   // Laadt ALLE cash-rekeningen (bank-gekoppeld én handmatige cash-assets) —
   // los van `has_budget_tracking`. Voedt de asset-gedreven rekeningenlijst die
@@ -333,22 +380,12 @@ export function CashOverview({
     )
     setCashAssets(cash)
 
-    // Alleen nog de asset→bank_account-map voor de klik-flow (welke kaart opent
-    // de rekeningdetail i.p.v. het bezittings-paneel). De KOPPELSTATUS werd hier
-    // vroeger uit een tweede query op `bank_connection_accounts` afgeleid; die
-    // is weg. Hij komt nu via `bankLinks` uit `loadCashBankLinks()` op de
-    // server, dezelfde bron die `CashAccountView` leest — anders staan er twee
-    // afleidingen van hetzelfde feit naast elkaar (fase 7, ADR 0058).
-    const { data: banks } = await supabase
-      .from('bank_accounts')
-      .select('id, linked_asset_id, linked_asset:assets!bank_accounts_linked_asset_id_fkey(has_budget_tracking)')
-      .eq('is_active', true)
-    const map: Record<string, string> = {}
-    for (const b of (banks ?? []) as Array<{ id: string; linked_asset_id: string | null; linked_asset?: { has_budget_tracking?: boolean | null } | null }>) {
-      if (!b.linked_asset_id) continue
-      if (b.linked_asset?.has_budget_tracking === true) map[b.linked_asset_id] = b.id
-    }
-    setBankByAsset(map)
+    // De asset→bank_account-map voor de klik-flow (welke kaart opent de
+    // rekeningdetail i.p.v. het bezittings-paneel) stond hier vroeger als eigen
+    // `bank_accounts`-query. Die is weg: `loadAccounts` leest die tabel toch al
+    // en levert de map nu uit dezelfde rijen. De KOPPELSTATUS was daarvóór al
+    // vertrokken naar `bankLinks` uit `loadCashBankLinks()` op de server,
+    // dezelfde bron die `CashAccountView` leest (fase 7, ADR 0058).
   }, [showAllCashAccounts, perspective])
 
   // Waardeverloop-sparklines voor de rekening-kaarten — exact dezelfde fetch
@@ -519,60 +556,42 @@ export function CashOverview({
     loadHistorical()
   }, [loadHistorical])
 
-  // Check if transactions exist in other months when current month is empty
+  // Eén leesronde voor beide bestaans-vragen (zie `latestTxDate`).
   useEffect(() => {
-    if (transactions.length > 0) {
-      setHasOtherMonthTx(false)
-      setLatestTxDate(null)
-      return
-    }
-    const checkOtherMonths = async () => {
+    let cancelled = false
+    const loadLatest = async () => {
       const supabase = createClient()
       let query = supabase
         .from('transactions')
         .select('date')
         .order('date', { ascending: false })
         .limit(1)
-      if (perspective === 'personal') {
-        query = query.eq('ownership', 'personal')
-      }
-      const { data } = await query
-      if (data && data.length > 0) {
-        setHasOtherMonthTx(true)
-        setLatestTxDate(data[0].date)
-      } else {
-        setHasOtherMonthTx(false)
-        setLatestTxDate(null)
-      }
-    }
-    checkOtherMonths()
-  }, [transactions.length, perspective])
-
-  // Globale check (los van de geselecteerde maand): is er in de laatste 90
-  // dagen enige transactie gelogd of binnengekomen? Zelfde perspectief-scoping
-  // als de andere-maand-check hierboven. Bepaalt de lege-staat van het
-  // geldstroom-blok.
-  useEffect(() => {
-    let cancelled = false
-    const checkRecentActivity = async () => {
-      const supabase = createClient()
-      const cutoff = new Date()
-      cutoff.setDate(cutoff.getDate() - 90)
-      // Lokale YYYY-MM-DD grens (NIET via toISOString: dat schuift in UTC+
-      // tijdzones een dag terug).
-      const cutoffStr = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, '0')}-${String(cutoff.getDate()).padStart(2, '0')}`
-      let query = supabase
-        .from('transactions')
-        .select('id')
-        .gte('date', cutoffStr)
-        .limit(1)
       if (perspective === 'personal') query = query.eq('ownership', 'personal')
       const { data } = await query
-      if (!cancelled) setHasRecentActivity((data?.length ?? 0) > 0)
+      if (!cancelled) setLatestTxDate(data && data.length > 0 ? (data[0].date as string) : null)
     }
-    checkRecentActivity()
+    loadLatest()
     return () => { cancelled = true }
   }, [perspective])
+
+  // 90-dagengrens, lokaal opgebouwd (NIET via toISOString: dat schuift in UTC+
+  // tijdzones een dag terug). Eén keer per mount vastgezet, zoals de query dat
+  // vroeger per aanroep deed.
+  const recentActivityCutoff = useMemo(() => {
+    const cutoff = new Date()
+    cutoff.setDate(cutoff.getDate() - 90)
+    return `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, '0')}-${String(cutoff.getDate()).padStart(2, '0')}`
+  }, [])
+
+  // Was er de afgelopen 90 dagen enige transactie-activiteit? Bepaalt of het
+  // hele geldstroom-blok getoond wordt of vervangen door een lege-staat
+  // call-to-action. null = nog aan het laden (toon dan het normale blok).
+  const hasRecentActivity =
+    latestTxDate === undefined ? null : latestTxDate !== null && latestTxDate >= recentActivityCutoff
+
+  // Staat er buiten de geselecteerde maand wél iets? De render combineert dit
+  // met `transactions.length === 0`.
+  const hasOtherMonthTx = latestTxDate != null
 
   function goToLatestTransaction() {
     if (!latestTxDate) return
