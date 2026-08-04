@@ -326,6 +326,40 @@ export function resolveHeatmapWindow(now: Date): HeatmapWindow {
   return { start: iso(start), end: iso(end) }
 }
 
+/** Zelfde ISO-datum, `months` maanden eerder; lokaal gerekend (geen UTC-round-trip). */
+function monthsBefore(isoDate: string, months: number): string {
+  const d = parseLocalDate(isoDate)
+  return iso(new Date(d.getFullYear(), d.getMonth() - months, d.getDate()))
+}
+
+/**
+ * Het venster dat de analysepagina in één keer ophaalt: 12 maanden vóór de
+ * periode t/m het periode-einde. Dekt de huidige periode, de vorige periode
+ * (trend) én de prior-historie (nieuwe-tegenpartij-detectie) — en normaal ook
+ * het heatmap-venster, zie {@link heatmapWindowCovered}.
+ */
+export function resolveFetchWindow(period: PeriodWindow): { since: string; until: string } {
+  return { since: monthsBefore(period.since, 12), until: period.until }
+}
+
+/**
+ * Omvat het opgehaalde venster het heatmap-venster volledig?
+ *
+ * De analysepagina haalt één ruim venster op (12 maanden vóór de periode t/m
+ * het periode-einde). Zolang dát venster het vaste heatmap-venster omsluit, is
+ * de heatmap er een deelverzameling van en hoeft hij niet apart gedownload te
+ * worden. BEIDE randen tellen: terugbladeren verschuift `until` naar het
+ * verleden en laat de recentste heatmap-maanden buiten beeld vallen, ook al
+ * blijft `since` ver genoeg terug liggen. ISO 'yyyy-mm-dd' vergelijkt
+ * lexicografisch gelijk aan chronologisch, dus stringvergelijking volstaat.
+ */
+export function heatmapWindowCovered(
+  fetched: { since: string; until: string },
+  heatmap: HeatmapWindow,
+): boolean {
+  return fetched.since <= heatmap.start && fetched.until >= heatmap.end
+}
+
 /** Uitgaven per kalenderdag (ISO 'yyyy-mm-dd' → bedrag); transfers/inkomsten uitgesloten. */
 export function spendByDay(txns: AnalysisTransaction[]): Map<string, number> {
   const m = new Map<string, number>()

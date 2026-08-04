@@ -353,6 +353,33 @@ export async function loadPerspectiveData(
 
 // ── Cashflow-loader (transacties + partner-inkomen) ────────────────────────
 
+/**
+ * Beperk een reeds samengestelde perspectief-lijst tot [since, until] (beide
+ * inclusief). Dit is exact de vensterregel die `loadPerspectiveTransactions`
+ * zelf op zijn resultaat toepast — geëxporteerd zodat een consument die al een
+ * RUIMER venster in handen heeft er een smaller venster uit kan snijden zónder
+ * een tweede download, met gegarandeerd dezelfde uitkomst als een eigen fetch.
+ *
+ * De twee uitzonderingen zijn niet cosmetisch en horen bij die garantie:
+ *  • een privacy-'totalen'-aggregaatrij (`_aggregated`) draagt geen datum en
+ *    passeert altijd — de partner-RPC is immers niet datum-begrensd;
+ *  • een rij zonder `date` passeert eveneens, in plaats van stil te verdwijnen.
+ */
+export function windowPerspectiveItems(
+  rows: PerspectiveItem[],
+  opts?: { since?: string; until?: string },
+): PerspectiveItem[] {
+  if (!opts?.since && !opts?.until) return rows
+  return rows.filter((r) => {
+    if (r._aggregated) return true
+    const date = r.date as string | undefined
+    if (!date) return true
+    if (opts.since && date < opts.since) return false
+    if (opts.until && date > opts.until) return false
+    return true
+  })
+}
+
 export interface PerspectiveTransactions {
   perspective: Perspective
   context: PerspectiveContext
@@ -433,17 +460,8 @@ export async function loadPerspectiveTransactions(
   // begrensd. Pas dezelfde [since, until]-window toe op de SAMENGESTELDE lijst
   // zodat partnerrijen het venster respecteren. Privacy-'totalen'-aggregaten
   // (`_aggregated`) dragen geen `date` en passeren altijd.
-  const inWindow = (rows: PerspectiveItem[]): PerspectiveItem[] => {
-    if (!opts?.since && !opts?.until) return rows
-    return rows.filter((r) => {
-      if (r._aggregated) return true
-      const date = r.date as string | undefined
-      if (!date) return true
-      if (opts.since && date < opts.since) return false
-      if (opts.until && date > opts.until) return false
-      return true
-    })
-  }
+  const inWindow = (rows: PerspectiveItem[]): PerspectiveItem[] =>
+    windowPerspectiveItems(rows, opts)
 
   if (!context.hasHousehold || perspective === 'personal') {
     return {
