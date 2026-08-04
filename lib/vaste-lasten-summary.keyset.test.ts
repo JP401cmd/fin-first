@@ -30,6 +30,7 @@ vi.mock('@/lib/recurring-detection', async (importOriginal) => {
 
 import { detectRecurringTransactions, type TransactionForDetection } from '@/lib/recurring-detection'
 import { makeSupabase, MAX_ROWS, type Row } from '@/test/helpers/fake-supabase'
+import { __resetVasteLastenCache } from '@/lib/vaste-lasten-cache'
 import { loadVasteLastenSummary } from './vaste-lasten-summary'
 
 const detectSpy = vi.mocked(detectRecurringTransactions)
@@ -146,6 +147,10 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(NU)
   detectSpy.mockClear()
+  // Elke test gebruikt dezelfde fixture en dus dezelfde vingerafdruk: zonder deze
+  // wis zou de tweede test de vaste-lastencache raken en de paginatie helemaal
+  // niet meer draaien (T3.3). De cache heeft een eigen suite.
+  __resetVasteLastenCache()
 })
 
 afterEach(() => {
@@ -180,8 +185,9 @@ describe('fetchAllRecurringTx — keyset-paginatie levert het volledige venster'
     await loadVasteLastenSummary(fake.client)
 
     // 1182 filler + 12 tweeling + 6 gelijkspel = 1200 rijen → pagina 1 zit vol
-    // (1000), pagina 2 levert er 200 en is daarmee de laatste.
-    expect(fake.tableQueriesFor('transactions')).toBe(2)
+    // (1000), pagina 2 levert er 200 en is daarmee de laatste. Daarvóór staan de
+    // vier aggregaten van de vingerafdrukronde (T3.3): count + drie maxima.
+    expect(fake.tableQueriesFor('transactions')).toBe(4 + 2)
   })
 })
 

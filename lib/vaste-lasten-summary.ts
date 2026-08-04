@@ -18,6 +18,22 @@ import { isRecurringExpired } from '@/lib/recurring-data'
 import { localMonthStartMonthsAgo } from '@/lib/month-range'
 import { roundCents } from '@/lib/format'
 import { getCachedUser } from '@/lib/supabase/cached-user'
+import {
+  vasteLastenFingerprint,
+  readVasteLastenCache,
+  writeVasteLastenCache,
+} from '@/lib/vaste-lasten-cache'
+
+/** De bevestigde vaste lasten zoals de samenvatting ze leest. */
+type RecurringRow = {
+  id: string
+  counterparty_name: string | null
+  amount: number | string | null
+  name: string
+  frequency: string | null
+  category_override: string | null
+  end_date: string | null
+}
 
 /** Kolomset die `detectRecurringTransactions` nodig heeft (getrimd). */
 type RecurringTxRow = {
@@ -160,6 +176,67 @@ function toMonthly(amount: number, frequency: string): number {
 }
 
 /**
+ * Eén goedkope ronde die de vingerafdruk van het detectie-invoermateriaal
+ * ophaalt: één telling plus drie maxima over het transactievenster, en de
+ * (kleine, begrensde) actieve recurring-rijen — die laatste hebben we op een miss
+ * tóch nodig, dus ze kosten geen extra roundtrip. Alles parallel: de latency is
+ * er één, niet vijf.
+ *
+ * De vensterafbakening is identiek aan die van de ophaal (`.gte('date', ...)`) en
+ * loopt door dezelfde RLS-policy, dus de vingerafdruk meet exact de rijenset die
+ * de detectie straks te zien krijgt — inclusief de gedeelde huishoudrijen.
+ *
+ * `error` op welk onderdeel dan ook levert `null` op: de aanroeper slaat de cache
+ * dan volledig over. Een half gevulde vingerafdruk zou anders stabiel genoeg
+ * kunnen lijken om een verkeerde samenvatting op vast te pinnen.
+ */
+async function loadFingerprintRound(
+  supabase: SupabaseClient,
+  startDateStr: string,
+): Promise<{ fingerprint: string | null; recurring: RecurringRow[] }> {
+  // `order(kolom desc).limit(1)` is de PostgREST-vorm van `max(kolom)`: één rij,
+  // één kolom, geen payload van betekenis.
+  const maxOf = async (column: 'date' | 'created_at' | 'updated_at') => {
+    const { data, error } = await supabase
+      .from('transactions')
+      .select(column)
+      .gte('date', startDateStr)
+      .order(column, { ascending: false })
+      .limit(1)
+    const row = (data ?? [])[0] as Record<string, string | null> | undefined
+    return { value: row?.[column] ?? null, error }
+  }
+
+  const [countResult, maxDate, maxCreated, maxUpdated, recurringResult] = await Promise.all([
+    supabase.from('transactions').select('id', { count: 'exact', head: true }).gte('date', startDateStr),
+    maxOf('date'),
+    maxOf('created_at'),
+    maxOf('updated_at'),
+    supabase
+      .from('recurring_transactions')
+      .select('id, counterparty_name, amount, name, frequency, category_override, end_date')
+      .eq('is_active', true),
+  ])
+
+  const recurring = (recurringResult.data ?? []) as RecurringRow[]
+  const failed =
+    countResult.error || maxDate.error || maxCreated.error || maxUpdated.error || recurringResult.error
+  if (failed) return { fingerprint: null, recurring }
+
+  return {
+    fingerprint: vasteLastenFingerprint({
+      windowStart: startDateStr,
+      txCount: countResult.count ?? null,
+      txMaxDate: maxDate.value,
+      txMaxCreatedAt: maxCreated.value,
+      txMaxUpdatedAt: maxUpdated.value,
+      recurring,
+    }),
+    recurring,
+  }
+}
+
+/**
  * Detecteert vaste lasten uit de laatste 12 maanden transactie-historie +
  * confirmed recurring_transactions. Queries zijn RLS-gescoped op de ingelogde
  * gebruiker. `cache()` dedupt per request.
@@ -168,6 +245,15 @@ function toMonthly(amount: number, frequency: string): number {
  * cashflow-hub draait deze loader naast de dashboard-/cashflow-loaders, die
  * dezelfde helper gebruiken. Een rauwe `auth.getUser()` zou hier een extra,
  * BLOKKERENDE `/auth/v1/user`-roundtrip vóór de `Promise.all` hieronder zetten.
+ *
+ * VINGERAFDRUK-CACHE (T3.3, lib/vaste-lasten-cache.ts): vóór het dure pad draait
+ * één goedkope ronde die vaststelt óf het invoermateriaal veranderd is. Zo niet,
+ * dan komt de vorige samenvatting terug en blijven zowel de meerpagina-download
+ * als de regex-zware detectie staan. React `cache()` blijft eronder liggen voor
+ * de deduplicatie BINNEN één request; deze cache overbrugt requests. Op een miss
+ * kost de vingerafdrukronde één extra, seriële roundtrip vóór de zware fetch —
+ * bewust geaccepteerd: die roundtrip is aggregaten zonder payload, de download
+ * erna is megabytes.
  */
 export const loadVasteLastenSummary = cache(
   async (supabase: SupabaseClient): Promise<VasteLastenSummary> => {
@@ -179,18 +265,27 @@ export const loadVasteLastenSummary = cache(
     // grens in NL een dag terug).
     const startDateStr = localMonthStartMonthsAgo(now, 11)
 
-    const [transactions, recurringResult, budgetResult] = await Promise.all([
+    const { fingerprint, recurring: existingRecurrings } = await loadFingerprintRound(
+      supabase,
+      startDateStr,
+    )
+    if (fingerprint) {
+      const cached = readVasteLastenCache(user.id, fingerprint)
+      if (cached.hit) return cached.summary
+    }
+    /** Legt de uitkomst vast onder de zojuist gemeten vingerafdruk. */
+    const remember = (summary: VasteLastenSummary): VasteLastenSummary => {
+      if (fingerprint) writeVasteLastenCache(user.id, fingerprint, summary)
+      return summary
+    }
+
+    const [transactions, budgetResult] = await Promise.all([
       fetchAllRecurringTx(supabase, startDateStr),
-      supabase
-        .from('recurring_transactions')
-        .select('id, counterparty_name, amount, name, frequency, category_override, end_date')
-        .eq('is_active', true),
       supabase
         .from('budgets')
         .select('id, name, parent_id, budget_type')
         .order('sort_order', { ascending: true }),
     ])
-    const existingRecurrings = recurringResult.data ?? []
     const budgets = budgetResult.data ?? []
 
     // Confirmed recurring items uit DB (alleen uitgaven: amount < 0), exclusief
@@ -234,14 +329,14 @@ export const loadVasteLastenSummary = cache(
       )
       const totalSubs = subs.reduce((s, i) => s + i.monthlyAmount, 0)
       const totalVK = vk.reduce((s, i) => s + i.monthlyAmount, 0)
-      return {
+      return remember({
         subscriptions: subs,
         vasteKosten: vk,
         totalMonthlySubscriptions: roundCents(totalSubs),
         totalMonthlyVasteKosten: roundCents(totalVK),
         totalMonthly: roundCents(totalSubs + totalVK),
         count: subs.length + vk.length,
-      }
+      })
     }
 
     const allDetected = detectRecurringTransactions(
@@ -255,7 +350,14 @@ export const loadVasteLastenSummary = cache(
         budget_id: t.budget_id ?? null,
         transaction_type: t.transaction_type ?? null,
       })),
-      existingRecurrings,
+      // Exact de drie velden die de detector declareert (hij gebruikt er de
+      // genormaliseerde namen-set mee); `amount` is in de DB NUMERIC en dus
+      // nullable, dus hier expliciet genormaliseerd i.p.v. impliciet `any`.
+      existingRecurrings.map((r) => ({
+        counterparty_name: r.counterparty_name,
+        amount: Number(r.amount),
+        name: r.name,
+      })),
       budgets,
     )
 
@@ -308,13 +410,13 @@ export const loadVasteLastenSummary = cache(
     const totalSubs = subscriptions.reduce((s, i) => s + i.monthlyAmount, 0)
     const totalVK = vasteKosten.reduce((s, i) => s + i.monthlyAmount, 0)
 
-    return {
+    return remember({
       subscriptions,
       vasteKosten,
       totalMonthlySubscriptions: roundCents(totalSubs),
       totalMonthlyVasteKosten: roundCents(totalVK),
       totalMonthly: roundCents(totalSubs + totalVK),
       count: subscriptions.length + vasteKosten.length,
-    }
+    })
   },
 )

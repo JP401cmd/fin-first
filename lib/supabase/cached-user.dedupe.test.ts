@@ -18,7 +18,7 @@
  * React dat doet. De rest van de react-export blijft intact.
  */
 
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 vi.mock('react', async (importOriginal) => ({
@@ -47,6 +47,7 @@ vi.mock('@/lib/core-data-loader', () => ({
 import { loadVasteLastenSummary } from '@/lib/vaste-lasten-summary'
 import { loadCashflowSettingsData } from '@/lib/cashflow-settings-data'
 import { getCachedPerspectiveContext } from '@/lib/household/perspective-loader-server'
+import { __resetVasteLastenCache } from '@/lib/vaste-lasten-cache'
 import { getCachedUser } from './cached-user'
 
 /**
@@ -132,6 +133,11 @@ function makeCountingSupabase() {
 }
 
 describe('auth-dedupe op het cashflow-datapad', () => {
+  // Elke test hier gebruikt dezelfde gebruiker en dezelfde rijen, dus dezelfde
+  // vingerafdruk. Zonder deze wis zou de tweede test de vaste-lastencache (T3.3)
+  // raken en niet meer het loaderpad meten dat hij beschrijft.
+  beforeEach(() => __resetVasteLastenCache())
+
   it('de drie loaders delen samen ÉÉN auth.getUser()-roundtrip', async () => {
     const { supabase, counts } = makeCountingSupabase()
 

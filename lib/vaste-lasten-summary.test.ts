@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { __resetVasteLastenCache } from '@/lib/vaste-lasten-cache'
 import { loadVasteLastenSummary } from './vaste-lasten-summary'
 
 /**
@@ -53,6 +54,10 @@ function makeSupabase(recurrings: RecurringRow[]): SupabaseClient {
 }
 
 describe('loadVasteLastenSummary — bundel/widget-contract', () => {
+  // De vaste-lastencache (T3.3) leeft op moduleniveau en overleeft dus een `it`.
+  // Elke test hoort de loader écht te draaien, niet de vorige uitkomst te lezen.
+  beforeEach(() => __resetVasteLastenCache())
+
   it('telt alleen uitgaven; recurring inkomen en excluded tellen niet mee', async () => {
     const supabase = makeSupabase([
       { id: 'r1', counterparty_name: 'Verhuurder', amount: -100, name: 'Huur', frequency: 'monthly', category_override: 'vaste_kosten' },
