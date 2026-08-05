@@ -75,7 +75,7 @@ export function OptimizerStanding({
           className="mt-1.5 max-w-[64ch] text-sm italic leading-snug text-[var(--ink-2)]"
           style={{ fontFamily: SOURCE_SERIF }}
         >
-          De referentie waar elk scenario tegen afzet: je Box 3-mix, wat je dit jaar betaalt en
+          De referentie waar elke keuze tegen afzet: je Box 3-mix, wat je dit jaar betaalt en
           hoeveel van je vrijstelling je benut.
         </p>
       </div>

@@ -375,7 +375,7 @@ function GeenKansen({ hasPartner }: { hasPartner: boolean }) {
           className="mx-auto max-w-[54ch] text-center text-base italic leading-snug text-[var(--ink-2)]"
           style={{ fontFamily: SOURCE_SERIF }}
         >
-          Op dit moment vinden we geen scenario dat je Box 3-heffing verlaagt. Dat kan goed nieuws
+          Op dit moment vinden we geen keuze die je Box 3-heffing verlaagt. Dat kan goed nieuws
           zijn — je zit fiscaal al gunstig
           {hasPartner ? '' : ', of je vermogen valt (nog) onder het heffingsvrije vermogen'}.
         </p>

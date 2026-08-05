@@ -76,7 +76,7 @@ export function OptimizerCompare({
           className="text-[22px] sm:text-[26px] font-black leading-tight tracking-[-0.02em] text-[var(--ink)]"
           style={{ fontFamily: PLAYFAIR }}
         >
-          Elke kans op{' '}
+          Elke keuze op{' '}
           <em className="font-normal italic" style={{ color: 'var(--module-active-700)' }}>
             één
           </em>{' '}
@@ -86,7 +86,7 @@ export function OptimizerCompare({
           className="mt-1.5 max-w-[64ch] text-sm italic leading-snug text-[var(--ink-2)]"
           style={{ fontFamily: SOURCE_SERIF }}
         >
-          Alle doorgerekende kansen naast elkaar — wat ze per saldo opleveren, in euro’s én in
+          Alle doorgerekende keuzes naast elkaar — wat ze per saldo opleveren, in euro’s én in
           vrijheidsdagen. De grootste kans staat ín de vergelijking, niet erboven.
         </p>
       </div>
@@ -111,7 +111,7 @@ export function OptimizerCompare({
           className="max-w-[62ch] text-sm italic leading-snug text-[var(--ink-2)]"
           style={{ fontFamily: SOURCE_SERIF }}
         >
-          In deze stand blijft er geen kans over. Er is nu geen scenario dat je heffing verlaagt
+          In deze stand blijft er geen kans over. Er is nu geen keuze die je heffing verlaagt
           zónder verwacht rendement in te leveren.
         </p>
       ) : (
@@ -365,11 +365,11 @@ function Separator() {
   )
 }
 
-/** Waaróm een kans geen verloop heeft — kwalitatieve tekst; het jaartal volgt
+/** Waaróm een keuze geen verloop heeft — kwalitatieve tekst; het jaartal volgt
  *  het actieve belastingjaar (`year`-prop), net als de aanname-chips. */
 function trajectoryNote(o: Opportunity, year: TaxYear): string | null {
   if (o.trajectory) return null
-  if (o.kind === 'jaarruimte') return 'n.v.t. — deze kans zit in Box 1'
+  if (o.kind === 'jaarruimte') return 'n.v.t. — deze keuze zit in Box 1'
   if (o.strategy?.kind === 'partnerverdeling') return `verdeling is voor ${year} doorgerekend`
   return null
 }
@@ -422,7 +422,7 @@ function CompareTable({
       <div ref={scrollerRef} onScroll={onScroll} className="overflow-x-auto border-t border-[var(--ink)]">
         <table className="w-full min-w-[720px] border-collapse text-[12.5px]">
           <caption className="sr-only">
-            Vergelijking van de doorgerekende fiscale kansen, met “niets doen” als referentie.
+            Vergelijking van de doorgerekende fiscale keuzes, met “niets doen” als referentie.
           </caption>
           <thead>
             <tr>

@@ -881,9 +881,9 @@ describe('Box3OptimizerClient — katern III: inzoomen per kans', () => {
 
     expect(toggle.getAttribute('aria-expanded')).toBe('true')
     expect(screen.getByText('Verwacht misgelopen rendement')).toBeTruthy()
-    expect(screen.getByText('Belastingbesparing in dit scenario')).toBeTruthy()
+    expect(screen.getByText('Belastingbesparing bij deze keuze')).toBeTruthy()
     // Negatief netto effect → feitelijke verdict-regel, geen imperatief.
-    expect(screen.getByText(/kost dit scenario je geld/i)).toBeTruthy()
+    expect(screen.getByText(/kost deze keuze je geld/i)).toBeTruthy()
   })
 
   it('houdt maximaal één kans tegelijk open', () => {
@@ -930,7 +930,7 @@ describe('Box3OptimizerClient — lege staten', () => {
 
     render(<Box3OptimizerClient sections={[]} standing={standing} hasPartner={false} />)
 
-    expect(screen.getByText(/geen scenario dat je Box 3-heffing verlaagt/i)).toBeTruthy()
+    expect(screen.getByText(/geen keuze die je Box 3-heffing verlaagt/i)).toBeTruthy()
     expect(screen.getByRole('button', { name: /Bespreek .* met Fin/i })).toBeTruthy()
     // Geen groene bedragen: de netto-effect-as ontbreekt volledig.
     expect(screen.queryByText('Netto effect per jaar')).toBeNull()

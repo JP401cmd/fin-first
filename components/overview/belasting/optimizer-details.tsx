@@ -89,14 +89,14 @@ export function OptimizerDetails({
         >
           Inzoomen per{' '}
           <em className="font-normal italic" style={{ color: 'var(--module-active-700)' }}>
-            kans
+            keuze
           </em>
         </h2>
         <p
           className="mt-1.5 max-w-[64ch] text-sm italic leading-snug text-[var(--ink-2)]"
           style={{ fontFamily: SOURCE_SERIF }}
         >
-          Eén kans tegelijk uitgeklapt, de rest compact. Elke uitwerking volgt dezelfde opbouw:
+          Eén keuze tegelijk uitgeklapt, de rest compact. Elke uitwerking volgt dezelfde opbouw:
           de rekening, de aannames en de kanttekening.
         </p>
       </div>
@@ -220,7 +220,7 @@ function Box3Uitwerking({
               amount={`${fc(s.currentTax)}/jr`}
             />
             <ReceiptRow
-              label="Belastingbesparing in dit scenario"
+              label="Belastingbesparing bij deze keuze"
               amount={`− ${fc(opportunity.savings)}`}
               color="var(--positive)"
             />
@@ -259,7 +259,7 @@ function Box3Uitwerking({
             background: 'color-mix(in srgb, var(--negative) 6%, var(--paper))',
           }}
         >
-          Per saldo <strong style={{ color: 'var(--negative)' }}>kost dit scenario je geld</strong>.
+          Per saldo <strong style={{ color: 'var(--negative)' }}>kost deze keuze je geld</strong>.
           Het staat in de vergelijking omdat het je heffing wél verlaagt — tegen deze aannames koop
           je er geen vrijheid mee terug.
         </div>

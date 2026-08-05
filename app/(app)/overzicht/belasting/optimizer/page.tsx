@@ -56,7 +56,7 @@ export default async function BelastingOptimizerPage() {
           titleBefore="Van belasting berekenen naar "
           emphasis="optimaliseren"
           titleAfter=""
-          deck="Eerst zie je waar je nu staat en wat elke fiscale kans per saldo oplevert — in euro’s én in vrijheidsdagen. Daarna zoom je per kans in op de uitwerking."
+          deck="Eerst zie je waar je nu staat en wat elke fiscale keuze per saldo oplevert — in euro’s én in vrijheidsdagen. Daarna zoom je per keuze in op de uitwerking."
         />
       </div>
 
