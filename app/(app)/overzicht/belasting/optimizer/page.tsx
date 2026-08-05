@@ -91,7 +91,7 @@ export default async function BelastingOptimizerPage() {
 
   // Scenario-generatie is doel-onafhankelijk (één keer); de ranking per doel
   // gebeurt server-side (verplaatst uit de client nu de doel-kiezer weg is).
-  const { baseline, strategies } = generateBox3Strategies({
+  const { baseline, strategies, shiftCurve } = generateBox3Strategies({
     goalId: DEFAULT_GOAL_ID,
     year: YEAR,
     dailyExpenses: box3.dailyExpenses,
@@ -122,7 +122,17 @@ export default async function BelastingOptimizerPage() {
       case 'box3-minimaal':
       case 'box3-geen-rendementsverlies': {
         const ranked = rankStrategies(strategies, goal.id)
-        return { kind: 'box3', goalId: goal.id, goal, baseline, ranked, best: pickBest(ranked, goal.id) }
+        return {
+          kind: 'box3',
+          goalId: goal.id,
+          goal,
+          baseline,
+          ranked,
+          best: pickBest(ranked, goal.id),
+          // Doel-onafhankelijk: dezelfde doorgerekende curve voedt de
+          // verkenner-slider, ongeacht op welk doel de sectie gerankt is.
+          shiftCurve,
+        }
       }
       case 'jaarruimte-maximaal':
         return {
@@ -135,6 +145,11 @@ export default async function BelastingOptimizerPage() {
           hasData: grossYearlyIncome > 0,
           besparing: jaarruimteSaving,
           freedomDays: jaarruimteFreedomDays,
+          // Netto == bruto voor deze kans; de "geen rendementsverlies"-aanname
+          // staat bij het `GoalSection`-type gedocumenteerd — hier alleen
+          // doorgeven, geen eigen som.
+          netEffect: jaarruimteSaving,
+          netFreedomDays: jaarruimteFreedomDays,
         }
       case 'levenslang-minimaal':
         return {

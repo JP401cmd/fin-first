@@ -8,11 +8,26 @@
 // basis van de canonieke Box 3-/Box 1-motoren). Dit bestand mapt en sorteert
 // alleen — geen forfaits, geen dag-conversie, geen netto-effect-som.
 
-import type { GoalSection, OptimizerStrategy, OptimizerTopChoice } from '@/lib/tax-optimizer/types'
+import type {
+  GoalSection,
+  OptimizerStrategy,
+  OptimizerTopChoice,
+  ShiftCurvePoint,
+  TaxTrajectory,
+} from '@/lib/tax-optimizer/types'
 import { JAARRUIMTE_TITLE, JAARRUIMTE_CAVEAT } from '@/lib/tax-optimizer/rank'
 
 /** Redactionele driepunts-score (● ● ○) — kwalitatief, geen rekenwaarde. */
 export type Dots = 1 | 2 | 3
+
+/**
+ * Gearceerd negatief-patroon (2px `--negative` + 3px 30%-tint, 45°) — ÉÉN
+ * recept voor alle "kost je geld"-vlakken: de netto-effect-balken (katern II)
+ * én de verkenner-legenda (katern III). De SVG-`<pattern>` in de verkenner
+ * spiegelt ditzelfde recept (5px-tegel: 2px streep + 30%-tint-achtergrond).
+ */
+export const NEGATIVE_HATCH_CSS =
+  'repeating-linear-gradient(45deg, var(--negative) 0, var(--negative) 2px, color-mix(in srgb, var(--negative) 30%, transparent) 2px, color-mix(in srgb, var(--negative) 30%, transparent) 5px)'
 
 // Eén bron voor de jaarruimte-teksten (lib/tax-optimizer/rank.ts) — het
 // top-blok en de kansen-rij kunnen zo nooit uit elkaar drijven.
@@ -48,6 +63,19 @@ export interface Opportunity {
   /** "Moeite" — 1 = een vinkje bij de aangifte, 3 = flink wat werk. */
   effortDots: Dots
   effortNote: string | null
+  /**
+   * Heffing over de jaren (2025 · 2026 · ≈2028) voor deze kans — GELEVERD door
+   * `lib/tax-optimizer`. null = niet doorgerekend voor deze kans (de
+   * partnerverdeling is alleen voor het lopende jaar doorgerekend; de
+   * jaarruimte-kans zit in Box 1 en heeft geen Box 3-verloop).
+   */
+  trajectory: TaxTrajectory | null
+  /**
+   * De doorgerekende shift-curve — alleen bij de samenstelling-shift. Voedt de
+   * verkenner-slider in katern III. Elk punt is GELEVERD; de client interpoleert
+   * niet en rekent niets bij.
+   */
+  shiftCurve: ShiftCurvePoint[] | null
   /** De onderliggende Box 3-strategie (voor de kassabon in katern III). */
   strategy: OptimizerStrategy | null
 }
@@ -73,7 +101,10 @@ function box3Conditions(strategy: OptimizerStrategy): Pick<
   }
 }
 
-function toOpportunity(strategy: OptimizerStrategy): Opportunity {
+function toOpportunity(
+  strategy: OptimizerStrategy,
+  shiftCurve: ShiftCurvePoint[] | null,
+): Opportunity {
   return {
     id: strategy.id,
     kind: 'box3',
@@ -88,6 +119,9 @@ function toOpportunity(strategy: OptimizerStrategy): Opportunity {
     optimizedTax: strategy.optimizedTax,
     detail: strategy.detail,
     caveat: strategy.caveat,
+    trajectory: strategy.trajectory,
+    // De curve hoort bij het shift-scenario; andere scenario's kennen 'm niet.
+    shiftCurve: strategy.kind === 'samenstelling-shift' ? shiftCurve : null,
     strategy,
     ...box3Conditions(strategy),
   }
@@ -106,15 +140,18 @@ function jaarruimteOpportunity(
     description:
       'Een lijfrente-inleg verlaagt je belastbaar inkomen in Box 1 tegen je marginale tarief.',
     savings: section.besparing,
-    // De jaarruimte-kans kost geen verwacht rendement: het bedrag blijft belegd
-    // binnen de lijfrente. Netto = de geleverde besparing.
     returnCostEur: 0,
-    netEffect: section.besparing,
-    netFreedomDays: section.freedomDays,
+    // GELEVERD door de sectie (de "geen rendementsverlies"-aanname is bij
+    // `GoalSection` gedocumenteerd) — hier geen eigen afleiding.
+    netEffect: section.netEffect,
+    netFreedomDays: section.netFreedomDays,
     hasReturnCost: false,
     optimizedTax: null,
     detail: [],
     caveat: JAARRUIMTE_CAVEAT,
+    // Box 1-kans: geen Box 3-verloop, geen shift-curve.
+    trajectory: null,
+    shiftCurve: null,
     freedomDots: 1,
     freedomNote: 'vast tot pensioen, uitkering later belast',
     effortDots: 2,
@@ -136,6 +173,10 @@ export function buildOpportunities(sections: GoalSection[]): {
     (s): s is Extract<GoalSection, { kind: 'box3' }> => s.kind === 'box3',
   )
   const baseline = box3Sections[0]?.baseline ?? null
+  // Beide Box 3-doelen dragen dezelfde (server-gegenereerde) curve; we nemen de
+  // eerste die er één heeft.
+  const shiftCurve =
+    box3Sections.find((s) => (s.shiftCurve?.length ?? 0) > 0)?.shiftCurve ?? null
 
   const seen = new Map<string, OptimizerStrategy>()
   for (const section of box3Sections) {
@@ -143,7 +184,7 @@ export function buildOpportunities(sections: GoalSection[]): {
       if (!seen.has(strategy.id)) seen.set(strategy.id, strategy)
     }
   }
-  const opportunities = [...seen.values()].map(toOpportunity)
+  const opportunities = [...seen.values()].map((s) => toOpportunity(s, shiftCurve))
 
   const jaarruimte = sections.find(
     (s): s is Extract<GoalSection, { kind: 'jaarruimte' }> => s.kind === 'jaarruimte',

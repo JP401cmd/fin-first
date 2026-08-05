@@ -23,6 +23,7 @@ export {
   baselineStrategy,
   synthBox3Input,
   buildCurrentStanding,
+  SHIFT_CURVE_STEPS,
 } from './box3-strategies'
 export {
   rankStrategies,
@@ -45,7 +46,7 @@ export { OPTIMIZER_DISCLAIMER, OPTIMIZER_DISCLAIMER_SHORT } from './compliance'
  * (tests, server-side eindresultaat).
  */
 export function buildBox3Optimizer(input: Box3OptimizerInput): CompareResult {
-  const { baseline, strategies } = generateBox3Strategies(input)
+  const { baseline, strategies, shiftCurve } = generateBox3Strategies(input)
   const ranked = rankStrategies(strategies, input.goalId)
   const best = pickBest(ranked, input.goalId)
   return {
@@ -56,6 +57,7 @@ export function buildBox3Optimizer(input: Box3OptimizerInput): CompareResult {
     hasPartner: input.hasPartner,
     baseline,
     strategies: ranked,
+    shiftCurve,
     best,
     disclaimer: OPTIMIZER_DISCLAIMER,
   }

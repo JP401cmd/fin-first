@@ -1,15 +1,24 @@
-import { describe, it, expect } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { render, screen, fireEvent, within } from '@testing-library/react'
 import { Box3OptimizerClient } from './optimizer-client'
+
+// Privacy-maskering: default zichtbaar, individuele tests zetten 'm aan.
+// Zelfde idioom als netto-vermogen-widget.test.tsx.
+const mockPrivacy = { masked: false }
+vi.mock('@/lib/hooks/use-privacy', () => ({
+  useMaskedAmounts: () => mockPrivacy,
+}))
 import { generateBox3Strategies, synthBox3Input } from '@/lib/tax-optimizer/box3-strategies'
 import { buildCurrentStanding, pickBest } from '@/lib/tax-optimizer'
 import { calculateBox3 } from '@/lib/box3-data'
+import { MASKED_AMOUNT_PLACEHOLDER } from '@/lib/format'
 import { GOAL_BY_ID } from '@/lib/tax-optimizer/goals'
 import type {
   GoalSection,
   OptimizerCurrentStanding,
   OptimizerStrategy,
   OptimizerTopChoice,
+  ShiftCurvePoint,
 } from '@/lib/tax-optimizer/types'
 
 /**
@@ -27,6 +36,10 @@ function euroPattern(amount: number): RegExp {
 const DAILY_EXPENSES = 100
 const YEAR = 2026 as const
 
+beforeEach(() => {
+  mockPrivacy.masked = false
+})
+
 /**
  * Fixture uit de ÉCHTE motor (calculateBox3 + generateBox3Strategies +
  * buildCurrentStanding) — geen handgeschreven objecten. Zo pinnen de tests
@@ -40,10 +53,11 @@ const YEAR = 2026 as const
 function buildFixture(): {
   baseline: OptimizerStrategy
   shift: OptimizerStrategy
+  shiftCurve: ShiftCurvePoint[]
   standing: OptimizerCurrentStanding
 } {
   const current = calculateBox3(synthBox3Input(0, 300_000, 0, false, DAILY_EXPENSES, YEAR))
-  const { baseline, strategies } = generateBox3Strategies({
+  const { baseline, strategies, shiftCurve } = generateBox3Strategies({
     goalId: 'box3-minimaal',
     year: YEAR,
     dailyExpenses: DAILY_EXPENSES,
@@ -62,8 +76,16 @@ function buildFixture(): {
   expect(shift.savings).toBeGreaterThan(0)
   expect(shift.returnCostEur).toBeGreaterThan(0)
   expect(shift.netEffect).toBeLessThan(0)
+  // …en dat er een curve mét meerdere doorgerekende punten uitkomt, anders
+  // bewijzen de verkenner-tests hieronder niets.
+  if (!shiftCurve || shiftCurve.length < 2) {
+    throw new Error('fixture-fout: generateBox3Strategies leverde geen bruikbare shiftCurve op')
+  }
+  // Het verloop is de basis van de nieuwe "Verloop"-rij in de vergelijking.
+  expect(baseline.trajectory).not.toBeNull()
+  expect(shift.trajectory).not.toBeNull()
 
-  return { baseline, shift, standing: buildCurrentStanding(current, DAILY_EXPENSES) }
+  return { baseline, shift, shiftCurve, standing: buildCurrentStanding(current, DAILY_EXPENSES) }
 }
 
 function box3Section(
@@ -71,8 +93,9 @@ function box3Section(
   baseline: OptimizerStrategy,
   ranked: OptimizerStrategy[],
   best: OptimizerStrategy | null,
+  shiftCurve: ShiftCurvePoint[] | null = null,
 ): GoalSection {
-  return { kind: 'box3', goalId, goal: GOAL_BY_ID[goalId], baseline, ranked, best }
+  return { kind: 'box3', goalId, goal: GOAL_BY_ID[goalId], baseline, ranked, shiftCurve, best }
 }
 
 function jaarruimteSection(besparing: number, freedomDays: number): GoalSection {
@@ -86,6 +109,8 @@ function jaarruimteSection(besparing: number, freedomDays: number): GoalSection 
     hasData: true,
     besparing,
     freedomDays,
+    netEffect: besparing,
+    netFreedomDays: freedomDays,
   }
 }
 
@@ -218,6 +243,32 @@ describe('Box3OptimizerClient — katern II: de vergelijking', () => {
     expect(screen.getByText(/geen kans over/i)).toBeTruthy()
   })
 
+  it('toont voor de jaarruimte-kans de netto-velden van de SECTIE, niet een eigen afleiding', () => {
+    const { baseline, shift, standing } = buildFixture()
+    // Netto-velden bewust ONGELIJK aan besparing/freedomDays: leidt de client
+    // netto weer zelf af, dan valt deze test om.
+    const jaarruimte: GoalSection = {
+      ...(jaarruimteSection(1_800, 18) as Extract<GoalSection, { kind: 'jaarruimte' }>),
+      netEffect: 1_242,
+      netFreedomDays: 12,
+    }
+
+    render(
+      <Box3OptimizerClient
+        sections={[box3Section('box3-minimaal', baseline, [shift], shift), jaarruimte]}
+        standing={standing}
+        hasPartner={false}
+      />,
+    )
+
+    // Netto-effect-as én de netto-sluitrij tonen het geleverde netEffect…
+    expect(screen.getAllByText(euroPattern(1_242)).length).toBeGreaterThan(0)
+    // …de vrijheidsdagen komen uit netFreedomDays…
+    expect(screen.getByText(/≈ 12 vrijheidsdagen/)).toBeTruthy()
+    // …en de bruto besparing blijft apart zichtbaar.
+    expect(screen.getAllByText(euroPattern(1_800)).length).toBeGreaterThan(0)
+  })
+
   it('toont de Wft-callout één keer, onder de vergelijking', () => {
     const { baseline, shift, standing } = buildFixture()
 
@@ -244,6 +295,7 @@ describe('Box3OptimizerClient — katern II: de vergelijking', () => {
  */
 function buildTwoOpportunityFixture(): {
   section: GoalSection
+  baseline: OptimizerStrategy
   shift: OptimizerStrategy
   partner: OptimizerStrategy
   standing: OptimizerCurrentStanding
@@ -258,7 +310,7 @@ function buildTwoOpportunityFixture(): {
     dailyExpenses: DAILY_EXPENSES,
     year: YEAR,
   })
-  const { baseline, strategies } = generateBox3Strategies({
+  const { baseline, strategies, shiftCurve } = generateBox3Strategies({
     goalId: 'box3-minimaal',
     year: YEAR,
     dailyExpenses: DAILY_EXPENSES,
@@ -277,9 +329,19 @@ function buildTwoOpportunityFixture(): {
   expect(shift.netEffect).toBeLessThan(0)
   expect(partner.netEffect).toBe(partner.savings)
   expect(partner.netEffect).toBeGreaterThan(0)
+  // De partnerverdeling is bewust niet over de jaren doorgerekend — dat is de
+  // "—"-kolom die de verloop-rij hieronder moet tonen.
+  expect(partner.trajectory).toBeNull()
 
   return {
-    section: box3Section('box3-minimaal', baseline, strategies, pickBest(strategies, 'box3-minimaal')),
+    section: box3Section(
+      'box3-minimaal',
+      baseline,
+      strategies,
+      pickBest(strategies, 'box3-minimaal'),
+      shiftCurve,
+    ),
+    baseline,
     shift,
     partner,
     standing: buildCurrentStanding(current, DAILY_EXPENSES),
@@ -306,6 +368,282 @@ describe('Box3OptimizerClient — sorteer-toggle wijzigt de kolomvolgorde', () =
     const after = opportunityHeaderTitles()
     expect(after[0]).toContain(shift.title)
     expect(after[1]).toContain(partner.title)
+  })
+})
+
+describe('Box3OptimizerClient — katern II: de verloop-rij', () => {
+  it('toont per kolom de geleverde 2025 · 2026 · ≈2028-heffing uit het trajectory', () => {
+    const { baseline, shift, shiftCurve, standing } = buildFixture()
+
+    render(
+      <Box3OptimizerClient
+        sections={[box3Section('box3-minimaal', baseline, [shift], shift, shiftCurve)]}
+        standing={standing}
+        hasPartner={false}
+      />,
+    )
+
+    expect(screen.getByText('Verloop')).toBeTruthy()
+    expect(screen.getByText(/2028 = indicatie beoogd stelsel/)).toBeTruthy()
+
+    const row = screen.getByText('Heffing over de jaren').closest('tr')
+    expect(row).toBeTruthy()
+
+    // De cellen tonen exact de GELEVERDE jaartal-waarden — baseline én kans.
+    for (const t of [baseline.trajectory!, shift.trajectory!]) {
+      expect(row!.textContent).toMatch(euroPattern(t.tax2026))
+      if (t.tax2025 !== null) expect(row!.textContent).toMatch(euroPattern(t.tax2025))
+      if (t.tax2028Indicatie !== null) {
+        expect(row!.textContent).toMatch(euroPattern(t.tax2028Indicatie))
+      }
+    }
+    // De 2028-waarde draagt de indicatie-prefix.
+    expect(row!.textContent).toContain('≈')
+  })
+
+  it('toont "—" met een notitie voor de partnerverdeling (geen meerjarig verloop)', () => {
+    const { section, standing } = buildTwoOpportunityFixture()
+
+    render(<Box3OptimizerClient sections={[section]} standing={standing} hasPartner={true} />)
+
+    const row = screen.getByText('Heffing over de jaren').closest('tr')
+    expect(row).toBeTruthy()
+    expect(row!.textContent).toContain('—')
+    expect(row!.textContent).toContain('verdeling is voor 2026 doorgerekend')
+  })
+
+  it('toont "n.v.t." voor de jaarruimte-kans (die kans zit in Box 1)', () => {
+    const { baseline, shift, shiftCurve, standing } = buildFixture()
+
+    render(
+      <Box3OptimizerClient
+        sections={[
+          box3Section('box3-minimaal', baseline, [shift], shift, shiftCurve),
+          jaarruimteSection(1_800, 18),
+        ]}
+        standing={standing}
+        hasPartner={false}
+      />,
+    )
+
+    const row = screen.getByText('Heffing over de jaren').closest('tr')
+    expect(row!.textContent).toContain('n.v.t.')
+  })
+})
+
+/**
+ * "Heffing over de jaren" en "Netto effect (per jaar)" komen bewust in zowel
+ * katern II (vergelijkingstabel) als katern III (uitwerking) voor — één woord
+ * per concept. Queries in katern III scopen we daarom op het detail-paneel.
+ */
+function detailBody(id = 'samenstelling-shift'): HTMLElement {
+  const el = document.getElementById(`optimizer-detail-body-${id}`)
+  if (!el) throw new Error(`fixture-fout: detail-paneel ${id} is niet open`)
+  return el as HTMLElement
+}
+
+describe('Box3OptimizerClient — katern III: de shift-verkenner', () => {
+  it('rendert curve + slider en toont de waarden van het GELEVERDE curvepunt', () => {
+    const { baseline, shift, shiftCurve, standing } = buildFixture()
+    // Meet vóór je assert: bepaal welk punt de verkenner als default kiest —
+    // het hoogste netEffect, of punt 0 als er geen positief netto punt is.
+    let bestIndex = 0
+    let best = -Infinity
+    shiftCurve.forEach((p, i) => {
+      if (p.netEffect > best) {
+        best = p.netEffect
+        bestIndex = i
+      }
+    })
+    const expectedIndex = best > 0 ? bestIndex : 0
+    const point = shiftCurve[expectedIndex]
+
+    render(
+      <Box3OptimizerClient
+        sections={[box3Section('box3-minimaal', baseline, [shift], shift, shiftCurve)]}
+        standing={standing}
+        hasPartner={false}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Toon uitwerking/i }))
+
+    const body = detailBody()
+    const slider = within(body).getByRole('slider', { name: /Hoeveel verschuiven/i })
+    expect(slider.getAttribute('max')).toBe(String(shiftCurve.length - 1))
+    expect((slider as HTMLInputElement).value).toBe(String(expectedIndex))
+
+    // De uitlezing komt uit het curvepunt zelf — geen client-side som.
+    expect(body.textContent).toMatch(euroPattern(point.shifted))
+    expect(body.textContent).toMatch(euroPattern(point.savings))
+    expect(within(body).getByText('Rendementskosten')).toBeTruthy()
+    expect(within(body).getByText('Netto effect')).toBeTruthy()
+  })
+
+  it('schuift naar een ander GELEVERD punt en toont diens waarden', () => {
+    const { baseline, shift, shiftCurve, standing } = buildFixture()
+    const target = shiftCurve.length - 1
+    const point = shiftCurve[target]
+
+    render(
+      <Box3OptimizerClient
+        sections={[box3Section('box3-minimaal', baseline, [shift], shift, shiftCurve)]}
+        standing={standing}
+        hasPartner={false}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Toon uitwerking/i }))
+    const body = detailBody()
+    const slider = within(body).getByRole('slider', { name: /Hoeveel verschuiven/i })
+    fireEvent.change(slider, { target: { value: String(target) } })
+
+    expect(slider.getAttribute('aria-valuetext')).toMatch(euroPattern(point.shifted))
+    expect(body.textContent).toMatch(euroPattern(point.shifted))
+    expect(body.textContent).toMatch(euroPattern(point.returnCostEur))
+  })
+
+  it('laat de kassabon de VOLLEDIGE shift tonen, met een notitie dat de slider een verkenning is', () => {
+    const { baseline, shift, shiftCurve, standing } = buildFixture()
+
+    render(
+      <Box3OptimizerClient
+        sections={[box3Section('box3-minimaal', baseline, [shift], shift, shiftCurve)]}
+        standing={standing}
+        hasPartner={false}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Toon uitwerking/i }))
+
+    // De kassabon blijft op de geleverde strategy staan (alles verschoven).
+    const body = detailBody()
+    const receipt = within(body).getByText('Netto effect per jaar').closest('div')!
+    expect(receipt.textContent).toMatch(euroPattern(Math.abs(shift.netEffect)))
+    expect(
+      within(body).getByText(/verkenner verkent tussenstanden.*volledige verschuiving/i),
+    ).toBeTruthy()
+  })
+
+  it('toont de verloop-strip met de drie geleverde jaar-waarden in het detail', () => {
+    const { baseline, shift, shiftCurve, standing } = buildFixture()
+    const t = shift.trajectory!
+
+    render(
+      <Box3OptimizerClient
+        sections={[box3Section('box3-minimaal', baseline, [shift], shift, shiftCurve)]}
+        standing={standing}
+        hasPartner={false}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Toon uitwerking/i }))
+
+    const body = detailBody()
+    const strip = within(body).getByText('Heffing over de jaren').parentElement!
+    expect(strip.textContent).toMatch(euroPattern(t.tax2026))
+    if (t.tax2028Indicatie !== null) {
+      expect(strip.textContent).toMatch(euroPattern(t.tax2028Indicatie))
+    }
+    expect(within(body).getByText('indicatie beoogd stelsel')).toBeTruthy()
+  })
+
+  it('toont geen verkenner wanneer er geen curve geleverd is', () => {
+    const { baseline, shift, standing } = buildFixture()
+
+    render(
+      <Box3OptimizerClient
+        sections={[box3Section('box3-minimaal', baseline, [shift], shift, null)]}
+        standing={standing}
+        hasPartner={false}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Toon uitwerking/i }))
+
+    const body = detailBody()
+    expect(within(body).queryByRole('slider')).toBeNull()
+    expect(within(body).queryByText('Verkenning')).toBeNull()
+    // De kassabon staat er onverkort.
+    expect(within(body).getByText('Netto effect per jaar')).toBeTruthy()
+  })
+})
+
+describe('Box3OptimizerClient — privacy-maskering op de Fase 2-onderdelen (verloop-rij + verkenner)', () => {
+  it('maskeert de verloop-rij (katern II) en de shift-verkenner (katern III) — geen kale bedragen', () => {
+    mockPrivacy.masked = true
+    const { baseline, shift, shiftCurve, standing } = buildFixture()
+
+    render(
+      <Box3OptimizerClient
+        sections={[box3Section('box3-minimaal', baseline, [shift], shift, shiftCurve)]}
+        standing={standing}
+        hasPartner={false}
+      />,
+    )
+
+    // ── Katern II: de verloop-rij toont bullets, geen jaartal-bedragen. ──
+    const verloopRow = screen.getByText('Heffing over de jaren').closest('tr')
+    expect(verloopRow).toBeTruthy()
+    expect(verloopRow!.textContent).toContain(MASKED_AMOUNT_PLACEHOLDER)
+    // Geen enkel €-teken: alle bedragen in deze rij komen uitsluitend via `fc`
+    // (geen literal '€' elders in optimizer-compare.tsx), dus dit is de
+    // scherpste vangrail — een gemiste fc-aanroep zou hier meteen breken.
+    expect(verloopRow!.textContent).not.toContain('€')
+    // Geen van de drie geleverde jaarbedragen lekt als kaal getal.
+    for (const amount of [
+      baseline.trajectory!.tax2025,
+      baseline.trajectory!.tax2026,
+      baseline.trajectory!.tax2028Indicatie,
+      shift.trajectory!.tax2025,
+      shift.trajectory!.tax2026,
+      shift.trajectory!.tax2028Indicatie,
+    ]) {
+      if (amount === null) continue
+      expect(verloopRow!.textContent).not.toMatch(euroPattern(amount))
+    }
+
+    // ── Katern III: kassabon + slider-uitlezing. ──
+    //
+    // BEWUST GESCOPED tot de `fc`-gedreven rekening en de verkenner-uitlezing
+    // (dl), niet het hele detail-paneel: `opportunity.description`/`detail`/
+    // `caveat` bakken hun bedragen server-side via `formatCurrency` (niet via
+    // de client-`fc`) en zijn dus AL vóór Fase 2 nooit gemaskeerd — een
+    // vastgesteld, niet in deze taak gefixt gedrag (zie eindrapport). Een
+    // blanket "geen €" op `body` zou hier vals rood geven op bestaand gedrag,
+    // niet op de nieuwe onderdelen.
+    fireEvent.click(screen.getByRole('button', { name: /Toon uitwerking/i }))
+    const body = detailBody()
+
+    const receiptLabel = within(body).getByText('rekening')
+    const receipt = receiptLabel.nextElementSibling as HTMLElement
+    expect(receipt).toBeTruthy()
+    expect(receipt.textContent).toContain(MASKED_AMOUNT_PLACEHOLDER)
+    expect(receipt.textContent).not.toContain('€')
+
+    const slider = within(body).getByRole('slider', { name: /Hoeveel verschuiven/i })
+    // De aria-valuetext (schermlezer-uitlezing) draagt ook geen kaal bedrag.
+    expect(slider.getAttribute('aria-valuetext')).toContain(MASKED_AMOUNT_PLACEHOLDER)
+    expect(slider.getAttribute('aria-valuetext')).not.toMatch(/€\s*\d/)
+
+    // De verkenner-uitlezing (Verschoven · Besparing · Rendementskosten ·
+    // Netto effect) is volledig `fc`-gedreven en dus volledig gemaskeerd.
+    const verkennerDl = within(body).getByText('Verschoven').closest('dl') as HTMLElement
+    expect(verkennerDl).toBeTruthy()
+    expect(verkennerDl.textContent).toContain(MASKED_AMOUNT_PLACEHOLDER)
+    expect(verkennerDl.textContent).not.toContain('€')
+
+    // Geen van de curvepunt-bedragen lekt ongemaskeerd in díe twee gescopede
+    // regio's (receipt + dl) — het echte lek-oppervlak van de nieuwe UI.
+    for (const region of [receipt, verkennerDl]) {
+      for (const point of shiftCurve) {
+        if (point.shifted > 0) expect(region.textContent).not.toMatch(euroPattern(point.shifted))
+        if (point.savings > 0) expect(region.textContent).not.toMatch(euroPattern(point.savings))
+        if (point.returnCostEur > 0) {
+          expect(region.textContent).not.toMatch(euroPattern(point.returnCostEur))
+        }
+      }
+    }
   })
 })
 

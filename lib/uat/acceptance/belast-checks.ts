@@ -394,7 +394,7 @@ export const BELAST_ENGINE_CHECKS: BelastEngineCheck[] = [
       criterion('WF-BELAST-23')
       const input: Box3Input = { assets: box3AssetsFromPersona(willem), debts: [], hasPartner: false, dailyExpenses: 100, year: 2026 }
       const current = calculateBox3(input)
-      const { baseline, strategies } = generateBox3Strategies({
+      const { baseline, strategies, shiftCurve } = generateBox3Strategies({
         goalId: 'box3-minimaal',
         year: 2026,
         dailyExpenses: 100,
@@ -417,6 +417,7 @@ export const BELAST_ENGINE_CHECKS: BelastEngineCheck[] = [
           goal: GOAL_BY_ID['box3-minimaal'],
           baseline,
           ranked,
+          shiftCurve,
           best: pickBest(ranked, 'box3-minimaal'),
         },
         {
@@ -429,6 +430,10 @@ export const BELAST_ENGINE_CHECKS: BelastEngineCheck[] = [
           hasData: true,
           besparing: jrBesparing,
           freedomDays: Math.round(jrBesparing / 100),
+          // Geen rendementsverlies (de inleg blijft renderen in de lijfrente),
+          // dus netto == bruto — zie GoalSection kind:'jaarruimte'.
+          netEffect: jrBesparing,
+          netFreedomDays: Math.round(jrBesparing / 100),
         },
       ]
       const top = pickTopChoice(sections)
@@ -437,6 +442,64 @@ export const BELAST_ENGINE_CHECKS: BelastEngineCheck[] = [
       return {
         expected: `shiftNetNegative=true; topKind=jaarruimte; topTitle=${JAARRUIMTE_TITLE}; standingTax=12612; standingSpaargeld=57700; standingBeleggingen=627000`,
         actual: `shiftNetNegative=${!!shift && shift.netEffect < 0}; topKind=${top?.kind}; topTitle=${top?.title}; standingTax=${Math.round(standing.tax)}; standingSpaargeld=${standing.totaalSpaargeld}; standingBeleggingen=${standing.totaalBeleggingen}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-BELAST-24',
+    scenarioId: 'UAT-BELAST-24',
+    label:
+      'Optimizer verloop + shift-verkenner (Fase 2): TaxTrajectory 2025/2026/2028-indicatie op de baseline, trajectory=null bij partnerverdeling/jaarruimte, curve-eindpunt ≡ samenstelling-shift-strategie, affiene (constante) marginale besparing (Willem)',
+    run: () => {
+      criterion('WF-BELAST-24')
+      const input: Box3Input = { assets: box3AssetsFromPersona(willem), debts: [], hasPartner: false, dailyExpenses: 100, year: 2026 }
+      const current = calculateBox3(input)
+      // optimalAllocation representatief meegegeven zodat de partnerverdeling-
+      // kans verschijnt (Willem heeft zelf geen fiscaal partner) — puur om de
+      // trajectory=null-tak van die kans te bewijzen (spiegelt het
+      // representatieve-cijfer-precedent van WF-BELAST-13/-19).
+      const { baseline, strategies, shiftCurve } = generateBox3Strategies({
+        goalId: 'box3-minimaal',
+        year: 2026,
+        dailyExpenses: 100,
+        hasPartner: false,
+        current,
+        optimalAllocation: { totalTax: Math.round(current.tax) - 500, savingsVsEqual: 500 },
+      })
+      const shift = strategies.find((s) => s.kind === 'samenstelling-shift')
+      const partnerverdeling = strategies.find((s) => s.kind === 'partnerverdeling')
+      const curve = shiftCurve ?? []
+      const end = curve[curve.length - 1]
+
+      // Curve-eindpunt ≡ de shift-strategie (byte-identiek, buildShiftCurve-
+      // commentaar in box3-strategies.ts): dezelfde tax/savings/returnCostEur/netEffect.
+      const endMatchesShift =
+        !!shift && !!end && end.tax === shift.optimizedTax && end.savings === shift.savings &&
+        end.returnCostEur === shift.returnCostEur && end.netEffect === shift.netEffect
+
+      // Affiene curve: de marginale besparing per stap (savings[i]−savings[i−1])
+      // is constant — geen knik door de vrijstelling (vergrendeld in
+      // lib/tax-optimizer/box3-optimizer.test.ts, 'de curve is affien'-groep).
+      // Ronde op 6 decimalen om float-ruis van herhaalde vermenigvuldigingen
+      // (box3Income × tarief) te absorberen, niet om de uitkomst te verzachten.
+      const marginalSteps: number[] = []
+      for (let i = 1; i < curve.length; i++) {
+        marginalSteps.push(Number((curve[i].savings - curve[i - 1].savings).toFixed(6)))
+      }
+      const marginalConstant = marginalSteps.every((s) => s === marginalSteps[0])
+      // baselineStrategy() zet trajectory altijd (nooit null) — zie box3-strategies.ts.
+      if (!baseline.trajectory) throw new Error('baseline.trajectory onverwacht null')
+      const baselineTrajectory = baseline.trajectory
+
+      return {
+        expected:
+          `curvePoints=21; endMatchesShift=true; marginalConstant=true; ` +
+          `baselineTax2026=${Math.round(current.tax)}; baselineTax2026EqCurrent=true; ` +
+          `partnerverdelingTrajectory=null; jaarruimteNote=n.v.t. — deze kans zit in Box 1`,
+        actual:
+          `curvePoints=${curve.length}; endMatchesShift=${endMatchesShift}; marginalConstant=${marginalConstant}; ` +
+          `baselineTax2026=${Math.round(baselineTrajectory.tax2026)}; baselineTax2026EqCurrent=${baselineTrajectory.tax2026 === current.tax}; ` +
+          `partnerverdelingTrajectory=${partnerverdeling ? partnerverdeling.trajectory : 'geen-partnerverdeling-kans'}; jaarruimteNote=n.v.t. — deze kans zit in Box 1`,
       }
     },
   },

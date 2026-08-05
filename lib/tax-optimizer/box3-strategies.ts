@@ -19,12 +19,15 @@
 // eigen percentage.
 
 import {
+  BOX3_PARAMS,
   calculateBox3,
   estimateBox3TaxDrag,
   type Box3Input,
+  type Box3Params,
   type Box3Result,
   type TaxYear,
 } from '@/lib/box3-data'
+import { compareForfaitairVsWerkelijk } from '@/lib/box3-tegenbewijs'
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
 import { formatCurrency } from '@/lib/format'
@@ -33,6 +36,8 @@ import type {
   Box3OptimizerInput,
   OptimizerCurrentStanding,
   OptimizerStrategy,
+  ShiftCurvePoint,
+  TaxTrajectory,
 } from './types'
 
 /** Stapgrootte voor de marginale "per €X verschoven"-uitleg. */
@@ -40,6 +45,35 @@ const MARGINAL_SHIFT_STEP = 10_000
 
 /** Minimale beleggingen (€) voordat een shift-scenario zinvol is. */
 const MIN_BELEGGINGEN_FOR_SHIFT = 1_000
+
+/**
+ * Resolutie van de shift-curve: 20 stappen → 21 punten van 0% t/m 100% van de
+ * beleggingen, in stappen van 5%.
+ *
+ * Bewust RELATIEF (percentage van de eigen beleggingen) en niet in vaste
+ * euro-stappen: zo spant de curve altijd exact het bereik van deze gebruiker, is
+ * het puntenaantal onafhankelijk van de vermogensomvang (deterministisch,
+ * voorspelbare kosten: 21 engine-aanroepen) en valt de factor bij de laatste
+ * stap exact op 1 — waardoor het eindpunt byte-identiek samenvalt met het
+ * samenstelling-shift-scenario in `strategies`. Een vaste €-stap zou bij kleine
+ * portefeuilles 1 punt en bij grote portefeuilles honderden punten geven, en het
+ * eindpunt alleen bij toeval raken.
+ */
+export const SHIFT_CURVE_STEPS = 20
+
+/**
+ * De twee belastingjaren die het verloop naast elkaar zet. Beide staan in de
+ * jaartabel BOX3_PARAMS (lib/box3-data.ts) — hier staat geen enkel eigen
+ * forfait of tarief.
+ *
+ * Bewust LITERALS en niet CURRENT_TAX_YEAR: de veldnamen op `TaxTrajectory`
+ * dragen het jaar (`tax2025`/`tax2026`). Zou het actieve jaar hier stil
+ * doorschuiven, dan ging `tax2026` een ander jaar betekenen dan zijn naam belooft
+ * (grondslag in de naam, ADR 0073). Komt er een belastingjaar bij, dan verhuizen
+ * deze twee constanten én de veldnamen in hetzelfde change mee.
+ */
+const TRAJECTORY_YEAR_PRIOR: TaxYear = 2025
+const TRAJECTORY_YEAR_ACTIVE: TaxYear = 2026
 
 /**
  * Verwacht rendementsverschil per jaar tussen beleggen en sparen — puur
@@ -138,11 +172,165 @@ function taxForComposition(
   )
 }
 
+// ── Verloop over de belastingjaren (2025 · 2026 · indicatie 2028) ─
+
+/** Categorie-totalen van één samenstelling — de invoer van elke verloop-som. */
+interface Composition {
+  spaargeld: number
+  beleggingen: number
+  box3Schulden: number
+  hasPartner: boolean
+}
+
+/**
+ * Heffingsresultaat van een samenstelling in een specifiek belastingjaar.
+ *
+ * `dailyExpenses` staat hier op 0: die parameter raakt uitsluitend
+ * `Box3Result.freedomDays`, dat het verloop niet consumeert. De €→vrijheidstijd-
+ * vertaling van de optimizer loopt via het canonieke dagtarief uit de invoer.
+ */
+function taxResultForYear(comp: Composition, year: TaxYear): Box3Result {
+  return taxForComposition(
+    comp.spaargeld,
+    comp.beleggingen,
+    comp.box3Schulden,
+    comp.hasPartner,
+    0,
+    year,
+  )
+}
+
+/**
+ * Gewogen verwacht rendement van een samenstelling: het naar rato gewogen
+ * gemiddelde van de twee canonieke aannames uit lib/constants.ts —
+ * (spaargeld × EXPECTED_SAVINGS_RETURN + beleggingen × DEFAULT_RETURN) /
+ * bezittingen. Géén eigen percentage, en géén fiscaal forfait: dit is een
+ * ECONOMISCHE verwachting. null bij lege bezittingen (geen deling door nul).
+ */
+function weightedReturnAssumption(spaargeld: number, beleggingen: number): number | null {
+  const bezittingen = spaargeld + beleggingen
+  if (bezittingen <= 0) return null
+  return (spaargeld * EXPECTED_SAVINGS_RETURN + beleggingen * DEFAULT_RETURN) / bezittingen
+}
+
+/**
+ * Indicatieve heffing onder het beoogde stelsel-2028 (heffing over WERKELIJK
+ * rendement) voor een al-doorgerekende samenstelling.
+ *
+ * Consume, don't recompute: dit gaat door de bestaande tegenbewijs-tak
+ * (`compareForfaitairVsWerkelijk`, lib/box3-tegenbewijs.ts), die de grondslag
+ * (bezittingen, géén heffingsvrij vermogen) en het tarief uit
+ * `box3Result.params` haalt. De optimizer voegt alleen de rendementsAANNAME toe.
+ *
+ * Twee expliciete aannames, beide in de detail-bullets en in de catalogus:
+ *   1. rendement = het gewogen gemiddelde van de spaar- en beleggingsaanname;
+ *   2. werkelijke schuldrente = 0 (we kennen die rente niet en verzinnen er geen
+ *      aanname bij), waardoor de indicatie eerder te hoog dan te laag uitvalt.
+ */
+function tax2028Indicatie(result: Box3Result): number | null {
+  const weighted = weightedReturnAssumption(result.totaalSpaargeld, result.totaalBeleggingen)
+  if (weighted === null) return null
+  return compareForfaitairVsWerkelijk({
+    box3Result: result,
+    werkelijkRendementPct: weighted * 100,
+  }).werkelijkeHeffing
+}
+
+/**
+ * Het verloop van dezelfde samenstelling over de jaren. 2025/2026 via de engine
+ * per jaar (BOX3_PARAMS kent beide jaartabellen), 2028 als indicatie via de
+ * tegenbewijs-tak.
+ */
+function buildTrajectory(comp: Composition): TaxTrajectory {
+  // Bewust via een Partial-view op de jaartabel: valt een jaar ooit uit
+  // BOX3_PARAMS, dan wordt `tax2025` null i.p.v. NaN.
+  const knownYears: Partial<Record<TaxYear, Box3Params>> = BOX3_PARAMS
+  const active = taxResultForYear(comp, TRAJECTORY_YEAR_ACTIVE)
+  const prior = knownYears[TRAJECTORY_YEAR_PRIOR]
+    ? taxResultForYear(comp, TRAJECTORY_YEAR_PRIOR).tax
+    : null
+
+  return {
+    tax2025: prior,
+    tax2026: active.tax,
+    tax2028Indicatie: tax2028Indicatie(active),
+  }
+}
+
+/**
+ * De uitleg-regels bij een verloop: één regel voor de jaarvergelijking en twee
+ * voor de 2028-indicatie (uitkomst + aanname). Wft: indicatie, geen advies.
+ */
+function trajectoryDetail(trajectory: TaxTrajectory, comp: Composition): string[] {
+  const lines: string[] = []
+  if (trajectory.tax2025 !== null) {
+    lines.push(
+      `Zelfde samenstelling: ${formatCurrency(trajectory.tax2025)} in ${TRAJECTORY_YEAR_PRIOR} → ` +
+        `${formatCurrency(trajectory.tax2026)} in ${TRAJECTORY_YEAR_ACTIVE}`,
+    )
+  }
+  const weighted = weightedReturnAssumption(comp.spaargeld, comp.beleggingen)
+  if (trajectory.tax2028Indicatie !== null && weighted !== null) {
+    lines.push(
+      `Indicatie 2028 (wetsvoorstel: heffing over werkelijk rendement): ` +
+        `${formatCurrency(trajectory.tax2028Indicatie)} per jaar`,
+    )
+    lines.push(
+      `Aanname 2028: gewogen rendement ${pct1(weighted)} (spaargeld ${pct1(EXPECTED_SAVINGS_RETURN)}, ` +
+        `beleggingen ${pct1(DEFAULT_RETURN)}), zonder aftrek van werkelijke schuldrente en zonder ` +
+        `heffingsvrij vermogen — de indicatie valt daardoor eerder te hoog dan te laag uit`,
+    )
+  }
+  return lines
+}
+
+// ── Shift-curve ──────────────────────────────────────────────────
+
+/**
+ * De doorgerekende reeks "0 t/m alle beleggingen verschoven naar spaargeld",
+ * in `SHIFT_CURVE_STEPS` gelijke stappen (5%) via dezelfde engine als het
+ * shift-scenario.
+ *
+ * Het eindpunt is rekenkundig IDENTIEK aan dat scenario: bij de laatste stap is
+ * de factor exact 1, dus krijgt `taxForComposition` letterlijk dezelfde
+ * argumenten (spaargeld + beleggingen, 0 beleggingen) en `returnCostForShift`
+ * letterlijk hetzelfde bedrag. Vergrendeld in de unit-test.
+ */
+function buildShiftCurve(current: Box3Result): ShiftCurvePoint[] {
+  const beleggingen = current.totaalBeleggingen
+  const points: ShiftCurvePoint[] = []
+
+  for (let i = 0; i <= SHIFT_CURVE_STEPS; i++) {
+    const shifted = beleggingen * (i / SHIFT_CURVE_STEPS)
+    const tax = taxForComposition(
+      current.totaalSpaargeld + shifted,
+      beleggingen - shifted,
+      current.totaalBox3Schulden,
+      current.hasPartner,
+      0,
+      current.year,
+    ).tax
+    const savings = current.tax - tax
+    const returnCostEur = returnCostForShift(shifted)
+    points.push({ shifted, tax, savings, returnCostEur, netEffect: savings - returnCostEur })
+  }
+
+  return points
+}
+
 /**
  * De huidige situatie als referentie-strategie. Vertegenwoordigt de heffing
  * zoals die nu berekend wordt (savings = 0).
  */
 export function baselineStrategy(current: Box3Result): OptimizerStrategy {
+  const comp: Composition = {
+    spaargeld: current.totaalSpaargeld,
+    beleggingen: current.totaalBeleggingen,
+    box3Schulden: current.totaalBox3Schulden,
+    hasPartner: current.hasPartner,
+  }
+  const trajectory = buildTrajectory(comp)
+
   return {
     id: 'baseline',
     kind: 'baseline',
@@ -161,9 +349,11 @@ export function baselineStrategy(current: Box3Result): OptimizerStrategy {
     returnCostEur: 0,
     netEffect: 0,
     netFreedomDays: 0,
+    trajectory,
     detail: [
       `Belastingjaar ${current.year}`,
       `Forfaitair rendement, tarief ${(current.params.tarief * 100).toFixed(0)}%`,
+      ...trajectoryDetail(trajectory, comp),
     ],
     caveat: null,
   }
@@ -176,10 +366,14 @@ export function baselineStrategy(current: Box3Result): OptimizerStrategy {
 export function generateBox3Strategies(input: Box3OptimizerInput): {
   baseline: OptimizerStrategy
   strategies: OptimizerStrategy[]
+  shiftCurve: ShiftCurvePoint[] | null
 } {
   const { current, dailyExpenses, optimalAllocation } = input
   const baseline = baselineStrategy(current)
   const strategies: OptimizerStrategy[] = []
+  // Alleen gevuld wanneer het shift-scenario zelf bestaat — de curve is de
+  // uitvergroting van dát scenario, geen losstaande grafiek.
+  let shiftCurve: ShiftCurvePoint[] | null = null
 
   // ── 1. Samenstelling-shift: beleggingen → spaargeld ──────────────
   const beleggingen = current.totaalBeleggingen
@@ -212,6 +406,19 @@ export function generateBox3Strategies(input: Box3OptimizerInput): {
       const returnCostEur = returnCostForShift(beleggingen)
       const netEffect = savings - returnCostEur
 
+      // De volledige reeks achter dit scenario (0 … alles verschoven). Het
+      // eindpunt is per constructie dit scenario zelf.
+      shiftCurve = buildShiftCurve(current)
+
+      // Verloop van de UITKOMST-samenstelling: alles op spaargeld.
+      const shiftedComp: Composition = {
+        spaargeld: current.totaalSpaargeld + beleggingen,
+        beleggingen: 0,
+        box3Schulden: current.totaalBox3Schulden,
+        hasPartner: current.hasPartner,
+      }
+      const shiftTrajectory = buildTrajectory(shiftedComp)
+
       strategies.push({
         id: 'samenstelling-shift',
         kind: 'samenstelling-shift',
@@ -231,6 +438,7 @@ export function generateBox3Strategies(input: Box3OptimizerInput): {
         returnCostEur,
         netEffect,
         netFreedomDays: freedomDays(netEffect, dailyExpenses),
+        trajectory: shiftTrajectory,
         detail: [
           `Forfait sparen ${pct(current.params.forfaitSpaargeld)} vs. beleggen ${pct(current.params.forfaitBeleggingen)}`,
           `≈ ${formatCurrency(marginalSaving)} minder heffing per ${formatCurrency(step)} verschoven`,
@@ -238,6 +446,7 @@ export function generateBox3Strategies(input: Box3OptimizerInput): {
           `≈ ${formatCurrency(returnCostEur)} minder verwacht rendement per jaar over ${formatCurrency(beleggingen)}`,
           `Netto effect ≈ ${formatCurrency(netEffect)} per jaar (besparing − misgelopen rendement)`,
           `Belastingjaar ${current.year}`,
+          ...trajectoryDetail(shiftTrajectory, shiftedComp),
         ],
         caveat:
           `Spaargeld levert doorgaans minder rendement dan beleggingen. Doorgerekend met een verwacht ` +
@@ -271,17 +480,25 @@ export function generateBox3Strategies(input: Box3OptimizerInput): {
       returnCostEur: 0,
       netEffect: optimalAllocation.savingsVsEqual,
       netFreedomDays: freedomDays(optimalAllocation.savingsVsEqual, dailyExpenses),
+      // BEWUST null. De optimale verdeling komt uit optimizePartnerAllocation en
+      // is uitsluitend voor het ACTIEVE belastingjaar doorgerekend (één
+      // jaartabel, één zoekruimte). Een verloop tonen zou suggereren dat
+      // dezelfde verdeling ook voor 2025 en onder het 2028-stelsel is
+      // doorgerekend — dat is niet zo. De UI toont hier een cel-notitie in
+      // plaats van bedragen.
+      trajectory: null,
       detail: [
         'Zelfde vermogen, alleen fiscaal anders verdeeld',
         'Benut beide heffingsvrije vermogens',
         'Geen rendementsverlies: je vermogen blijft belegd zoals het nu staat',
         `Belastingjaar ${current.year}`,
+        `Doorgerekend voor ${current.year}; het verloop over andere jaren is voor deze verdeling niet bepaald`,
       ],
       caveat: null,
     })
   }
 
-  return { baseline, strategies }
+  return { baseline, strategies, shiftCurve }
 }
 
 /**

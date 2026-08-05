@@ -38,6 +38,51 @@ export interface TaxOptimizerGoal {
   available: boolean
 }
 
+// ── Verloop over de belastingjaren ───────────────────────────────
+//
+// Hetzelfde vermogen, drie momenten: het vorige belastingjaar, het actieve jaar
+// en een INDICATIE onder het beoogde stelsel-2028 (heffing over werkelijk
+// rendement). Alle drie komen uit de canonieke motoren — 2025/2026 uit
+// `calculateBox3` op de jaartabel BOX3_PARAMS, de 2028-indicatie uit de
+// tegenbewijs-tak (`compareForfaitairVsWerkelijk`, lib/box3-tegenbewijs.ts).
+// Er staat GEEN eigen tarief- of forfait-constante in de optimizer.
+//
+// Het jaar zit bewust in de VELDNAAM (grondslag in de naam, ADR 0073): komt er
+// een belastingjaar bij (BOX3_PARAMS + CURRENT_TAX_YEAR), dan verhuizen deze
+// namen mee — een stil doorschuivend "actief jaar" achter een vaste veldnaam is
+// precies de drift die dit contract wil voorkomen.
+
+export interface TaxTrajectory {
+  /** Heffing in belastingjaar 2025 voor dezelfde samenstelling; null = niet bepaalbaar. */
+  tax2025: number | null
+  /** Heffing in belastingjaar 2026 (het actieve jaar). */
+  tax2026: number
+  /** Indicatieve heffing onder het beoogde 2028-stelsel (werkelijk rendement × tarief); null = n.v.t. */
+  tax2028Indicatie: number | null
+}
+
+// ── Shift-curve (samenstelling-verloop) ──────────────────────────
+//
+// De doorgerekende reeks "wat gebeurt er met de heffing als ik X van mijn
+// beleggingen naar spaargeld verschuif". Een PUNTENREEKS uit dezelfde engine als
+// het samenstelling-shift-scenario (`calculateBox3`) — de UI interpoleert alleen
+// visueel en rekent zelf niets. Het laatste punt (alles verschoven) valt per
+// constructie exact samen met dat scenario in `strategies`: zelfde `tax`,
+// `savings`, `returnCostEur` en `netEffect` (vergrendeld in de unit-test).
+
+export interface ShiftCurvePoint {
+  /** Verschoven bedrag van beleggingen → spaargeld (€), 0 … totaalBeleggingen. */
+  shifted: number
+  /** Heffing bij deze samenstelling (€/jr). */
+  tax: number
+  /** Huidige heffing − tax. */
+  savings: number
+  /** shifted × (DEFAULT_RETURN − EXPECTED_SAVINGS_RETURN), ≥ 0, hele euro's. */
+  returnCostEur: number
+  /** savings − returnCostEur (kan negatief zijn). */
+  netEffect: number
+}
+
 // ── Strategieën ──────────────────────────────────────────────────
 
 export type OptimizerStrategyKind =
@@ -90,6 +135,15 @@ export interface OptimizerStrategy {
   netEffect: number
   /** netEffect in vrijheidsdagen (afgerond; 0 wanneer netEffect ≤ 0 of dailyExpenses ≤ 0). */
   netFreedomDays: number
+
+  /**
+   * Dezelfde samenstelling over de belastingjaren heen (2025 · 2026 ·
+   * indicatie 2028). null = niet doorgerekend voor dit scenario — geldt voor de
+   * partnerverdeling: die is uitsluitend voor het ACTIEVE jaar geoptimaliseerd
+   * (optimizePartnerAllocation draait op één jaartabel), dus een verloop zou een
+   * verdeling suggereren die voor 2025/2028 niet is doorgerekend.
+   */
+  trajectory: TaxTrajectory | null
 
   /** Uitlegbaarheid: aanname, regeling, jaar — één regel per punt. */
   detail: string[]
@@ -159,6 +213,11 @@ export interface CompareResult {
   /** Niet-baseline scenario's, gerankt volgens het gekozen doel. */
   strategies: OptimizerStrategy[]
   /**
+   * De doorgerekende reeks "0 … alle beleggingen verschoven". null = geen
+   * shift-scenario (te weinig beleggingen, geen heffing, of geen besparing).
+   */
+  shiftCurve: ShiftCurvePoint[] | null
+  /**
    * Het best passende scenario met een positieve besparing, of null wanneer er
    * geen scenario is dat de heffing verlaagt (voor dit doel).
    */
@@ -186,6 +245,11 @@ export type GoalSection =
       baseline: OptimizerStrategy
       /** Niet-baseline scenario's, server-side gerankt volgens dit doel. */
       ranked: OptimizerStrategy[]
+      /**
+       * De doorgerekende shift-reeks (0 … alle beleggingen) achter het
+       * samenstelling-scenario. null = geen shift-scenario voor deze gebruiker.
+       */
+      shiftCurve: ShiftCurvePoint[] | null
       /** Beste scenario met positieve besparing voor dit doel, of null. */
       best: OptimizerStrategy | null
     }
@@ -209,6 +273,16 @@ export type GoalSection =
       besparing: number
       /** `besparing` uitgedrukt in vrijheidsdagen (savings / dag-uitgaven). */
       freedomDays: number
+      /**
+       * Netto effect (€/jr) van deze kans. GEEN rendementsverlies — de inleg
+       * blijft renderen in de lijfrente, alleen het fiscale regime verschuift —
+       * dus netEffect = besparing. Deze sectie is de ENIGE houder van dat
+       * gelijkteken: `pickTopChoice` consumeert dit veld en leidt het niet
+       * opnieuw af (anders zou de aanname op twee plekken wonen).
+       */
+      netEffect: number
+      /** `netEffect` in vrijheidsdagen — zonder rendementsverlies gelijk aan `freedomDays`. */
+      netFreedomDays: number
     }
   | {
       kind: 'preview'

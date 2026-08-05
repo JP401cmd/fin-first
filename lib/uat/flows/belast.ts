@@ -92,6 +92,7 @@ export const BELAST_FLOW: UatFlow = {
     { id: 'box3-partner', scenarioId: 'UAT-BELAST-19', label: 'WF-BELAST-19 · Box 3-vermogen verdelen met fiscale partner', kind: 'screen', stage: 3, lane: 'box3', subOf: 'box3' },
     { id: 'peildatum', scenarioId: 'UAT-BELAST-21', label: 'WF-BELAST-21 · Peildatum, arbitragevenster & 2028-stelsel', kind: 'screen', stage: 3, lane: 'box3', subOf: 'box3' },
     { id: 'optimizer', scenarioId: 'UAT-BELAST-23', label: 'WF-BELAST-23 · Fiscale optimizer (leidende kans op netto effect, vergelijking, huidige stand)', kind: 'screen', stage: 3, lane: 'box3', subOf: 'box3' },
+    { id: 'optimizer-verloop', scenarioId: 'UAT-BELAST-24', label: 'WF-BELAST-24 · Verloop over de jaren (2025·2026·≈2028) & shift-verkenner', kind: 'screen', stage: 3, lane: 'box3', subOf: 'optimizer' },
 
     // ── 4 · actie & partnerdata ───────────────────────────────────────────
     { id: 'actie', scenarioId: 'UAT-BELAST-04', label: 'WF-BELAST-04 · Belastingkans toevoegen als actie', kind: 'action', stage: 4, lane: 'doorwerking' },
@@ -152,7 +153,9 @@ export const BELAST_FLOW: UatFlow = {
     { from: 'tegenbewijs', to: 'actie' },
     { from: 'box3-partner', to: 'actie' },
     { from: 'box3-partner', to: 'x-mijn', kind: 'cross', label: 'partnerverdeling (privacy-gated)' },
+    { from: 'optimizer', to: 'optimizer-verloop' },
     { from: 'optimizer', to: 'actie' },
+    { from: 'optimizer-verloop', to: 'actie' },
 
     // samenvloeien → uitkomst
     { from: 'box1', to: 'uitkomst' },

@@ -1,6 +1,6 @@
 /**
- * Acceptatiecriteria — domein Belasting (WF-BELAST-01..19, 21, 23 /
- * UAT-BELAST-01..19, 21, 23).
+ * Acceptatiecriteria — domein Belasting (WF-BELAST-01..19, 21, 23..24 /
+ * UAT-BELAST-01..19, 21, 23..24).
  *
  * Bron: `lib/uat/catalog.ts` (bron-van-waarheid voor WELKE scenario's bestaan)
  * + de Box 1/2/3-rekenmotoren. Cijfers zijn ONAFHANKELIJK narekend uit
@@ -12,13 +12,15 @@
  * (box3-tegenbewijs.ts), `computeJaarruimte` (jaarruimte.ts), en sinds de
  * herbouw van /overzicht/belasting/optimizer (Fase 1) ook `pickTopChoice`/
  * `generateBox3Strategies`/`rankStrategies`/`buildCurrentStanding`
- * (lib/tax-optimizer/*)).
+ * (lib/tax-optimizer/*)); sinds Fase 2 plak A ook de verloop-rij
+ * (`TaxTrajectory`/`buildTrajectory`) en de shift-verkenner
+ * (`ShiftCurvePoint[]`/`buildShiftCurve`) uit hetzelfde bestand.
  *
  * BEWUST WEGGELATEN (verwijsregels, bestaan NIET als los BELAST-scenario in de
  * catalogus — spiegelt WF-SCHULD-19):
  *  - WF-BELAST-20 (perspectief wisselen) → dekt UAT-NAV (perspectief-switcher).
  *  - WF-BELAST-22 (pagina-uitleg (i) + statuspunt) → dekt UAT-NAV.
- * Deze set heeft dus PRECIES 21 criteria (WF-BELAST-01..19, 21, 23).
+ * Deze set heeft dus PRECIES 22 criteria (WF-BELAST-01..19, 21, 23..24).
  *
  * JAARTAL — alle drie de box-subpagina's + de hub draaien op 2026:
  *   - box1/page.tsx: `resolveBox1GrossIncome(..., 2026)` + `computeBox1Tax(..., year:2026)`
@@ -377,6 +379,26 @@ const criteria: AcceptanceCriterion[] = [
         'shiftNetNegative=true; topKind=jaarruimte; topTitle=Benut je jaarruimte (lijfrente); standingTax=12612; standingSpaargeld=57700; standingBeleggingen=627000',
       source:
         'lib/tax-optimizer/box3-strategies.ts#generateBox3Strategies (samenstelling-shift, returnCostEur/netEffect) + rank.ts#pickTopChoice (netEffect≤0 valt af, netFreedomDays wint) + box3-strategies.ts#buildCurrentStanding, op het echte Box3Result van Willem (calculateBox3, year 2026); jaarruimte-kans representatief via computeJaarruimte/jaarruimteBesparing op het bruto-inkomen van persona compleet (zelfde representatieve-cijfer-precedent als WF-BELAST-13)',
+    },
+  },
+  {
+    workflow: 'WF-BELAST-24',
+    scenarioId: 'UAT-BELAST-24',
+    titel: 'Fiscale optimizer (Fase 2): verloop over de jaren en de shift-verkenner',
+    kriticiteit: 'KERN',
+    persona: 'willem',
+    given:
+      'Persona Willem geladen op /overzicht/belasting/optimizer. Katern II ("De vergelijking") toont ná de netto-sluitrij een "Verloop"-groep met per kans de heffing 2025 · 2026 · ≈2028-indicatie (`TaxTrajectory` op `OptimizerStrategy`, `buildTrajectory` in box3-strategies.ts — 2025/2026 via `calculateBox3` per jaar op dezelfde samenstelling, 2028-indicatie via `compareForfaitairVsWerkelijk` met het gewogen rendement (spaargeld×EXPECTED_SAVINGS_RETURN + beleggingen×DEFAULT_RETURN)/bezittingen). Katern III (kans-detail) toont bij de samenstelling-shift-kans de shift-verkenner: een SVG met 21 doorgerekende punten (`ShiftCurvePoint[]`, SHIFT_CURVE_STEPS=20, 5%-stappen van 0–100% van de beleggingen) en een index-based snap-slider — géén client-interpolatie.',
+    when:
+      'De gebruiker leest de Verloop-rij voor "Niets doen" en voor elke kans, en opent daarna de shift-verkenner in het kans-detail van de samenstelling-shift-kans.',
+    then:
+      'De baseline-trajectory (Willems huidige samenstelling) heeft tax2026 gelijk aan de al bekende Box3-heffing (€12.612, `buildTrajectory` hergebruikt dezelfde `calculateBox3`-uitkomst voor het actieve jaar — geen tweede som). Kansen zonder doorgerekend verloop tonen een streepje met een vaste notitie i.p.v. een verzonnen cijfer: de partnerverdeling-kans (trajectory bewust `null` — "verdeling is voor 2026 doorgerekend", een andere jaartabel/zoekruimte is niet doorgerekend) en de jaarruimte-kans (trajectory `null` — "n.v.t. — deze kans zit in Box 1", buiten Box 3). De shift-verkenner telt 21 punten; het rechter-uiterste punt (100% verschoven) is byte-identiek aan de samenstelling-shift-strategie uit katern II (zelfde tax/savings/returnCostEur/netEffect — het scenario in de kassabon en het curve-eindpunt zijn dezelfde aanroep). BELANGRIJK inhoudelijk feit: de curve is AFFIEN — de marginale besparing per verschoven euro is constant over alle 20 stappen; de heffingsvrije vrijstelling werkt als schaalfactor op grondslagSparen, niet als knik in de curve. Dit is vergrendeld in `lib/tax-optimizer/box3-optimizer.test.ts` ("de curve is affien") — een toekomstige "knik bij de vrijstelling"-verwachting is dus GEEN bug.',
+    assertion: {
+      kind: 'exact',
+      expected:
+        'curvePoints=21; endMatchesShift=true; marginalConstant=true; baselineTax2026=12612; baselineTax2026EqCurrent=true; partnerverdelingTrajectory=null; jaarruimteNote=n.v.t. — deze kans zit in Box 1',
+      source:
+        'lib/tax-optimizer/box3-strategies.ts#generateBox3Strategies (buildTrajectory + buildShiftCurve) + #baselineStrategy, op het echte Box3Result van Willem (calculateBox3, year 2026); trajectory=null-gevallen spiegelen components/overview/belasting/optimizer-compare.tsx#trajectoryNote; affiene curve vergrendeld in lib/tax-optimizer/box3-optimizer.test.ts',
     },
   },
 ]

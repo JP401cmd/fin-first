@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { calculateBox3, estimateBox3TaxDrag } from '@/lib/box3-data'
+import { BOX3_PARAMS, calculateBox3, estimateBox3TaxDrag } from '@/lib/box3-data'
+import { compareForfaitairVsWerkelijk } from '@/lib/box3-tegenbewijs'
 import { DEFAULT_RETURN, EXPECTED_SAVINGS_RETURN } from '@/lib/constants'
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
@@ -13,9 +14,11 @@ import {
   synthBox3Input,
   GOAL_BY_ID,
   OPTIMIZER_DISCLAIMER,
+  SHIFT_CURVE_STEPS,
   type Box3OptimizerInput,
   type GoalSection,
   type OptimizerStrategy,
+  type ShiftCurvePoint,
 } from './index'
 
 // ── Fixtures ─────────────────────────────────────────────────────
@@ -182,6 +185,27 @@ function householdInput(goalId: Box3OptimizerInput['goalId']): Box3OptimizerInpu
   }
 }
 
+/** Household ZONDER beleggingen (alleen spaargeld) — er is dus geen shift-hefboom mogelijk. */
+function partnerOnlyHouseholdInput(
+  goalId: Box3OptimizerInput['goalId'] = 'box3-minimaal',
+): Box3OptimizerInput {
+  const combined = calculateBox3({
+    assets: [asset({ id: 'a1', asset_type: 'savings', current_value: 300_000 })],
+    debts: [],
+    hasPartner: true,
+    dailyExpenses: 100,
+    year: 2026,
+  })
+  return {
+    goalId,
+    year: 2026,
+    dailyExpenses: 100,
+    hasPartner: true,
+    current: combined,
+    optimalAllocation: { totalTax: 4_000, savingsVsEqual: 650 },
+  }
+}
+
 describe('tax-optimizer — partnerverdeling', () => {
   it('consumeert de scalaire optimale verdeling zonder rendementskosten', () => {
     const { strategies } = generateBox3Strategies(householdInput('box3-minimaal'))
@@ -199,6 +223,25 @@ describe('tax-optimizer — partnerverdeling', () => {
     input.optimalAllocation = { totalTax: 5_000, savingsVsEqual: 0 }
     const { strategies } = generateBox3Strategies(input)
     expect(strategies.find((s) => s.kind === 'partnerverdeling')).toBeUndefined()
+  })
+
+  it('zonder beleggingen: alléén de partnerverdeling bestaat, shiftCurve is null door de hele keten', () => {
+    const input = partnerOnlyHouseholdInput()
+    // Meet vóór je assert: bevestig dat de fixture geen beleggingen draagt, dus
+    // de shift-drempel (MIN_BELEGGINGEN_FOR_SHIFT) per definitie niet haalt.
+    expect(input.current.totaalBeleggingen).toBe(0)
+
+    const { strategies, shiftCurve } = generateBox3Strategies(input)
+    expect(strategies).toHaveLength(1)
+    expect(strategies[0].kind).toBe('partnerverdeling')
+    expect(strategies[0].savings).toBe(650)
+    // Geen shift-scenario → de curve (die de shift uitvergroot) bestaat niet.
+    expect(shiftCurve).toBeNull()
+
+    // Door de hele keten: buildBox3Optimizer draagt dezelfde null door.
+    const result = buildBox3Optimizer(input)
+    expect(result.shiftCurve).toBeNull()
+    expect(result.strategies.map((s) => s.kind)).toEqual(['partnerverdeling'])
   })
 })
 
@@ -426,13 +469,32 @@ function box3Section(
   goalId: 'box3-minimaal' | 'box3-geen-rendementsverlies',
   baseline: OptimizerStrategy,
   strategies: OptimizerStrategy[],
+  shiftCurve: ShiftCurvePoint[] | null = null,
 ): Extract<GoalSection, { kind: 'box3' }> {
   const ranked = rankStrategies(strategies, goalId)
-  return { kind: 'box3', goalId, goal: GOAL_BY_ID[goalId], baseline, ranked, best: pickBest(ranked, goalId) }
+  return {
+    kind: 'box3',
+    goalId,
+    goal: GOAL_BY_ID[goalId],
+    baseline,
+    ranked,
+    shiftCurve,
+    best: pickBest(ranked, goalId),
+  }
 }
 
-function jaarruimteSection(besparing: number, opts?: { hasData?: boolean }): GoalSection {
+/**
+ * De jaarruimte-sectie zoals de page 'm vult: geen rendementsverlies, dus
+ * netEffect = besparing en netFreedomDays = freedomDays. `opts.netEffect`
+ * bestaat alleen om te BEWIJZEN dat pickTopChoice de sectie-velden consumeert
+ * i.p.v. ze zelf af te leiden.
+ */
+function jaarruimteSection(
+  besparing: number,
+  opts?: { hasData?: boolean; netEffect?: number },
+): Extract<GoalSection, { kind: 'jaarruimte' }> {
   const dailyExpenses = 100
+  const netEffect = opts?.netEffect ?? besparing
   return {
     kind: 'jaarruimte',
     goalId: 'jaarruimte-maximaal',
@@ -443,6 +505,8 @@ function jaarruimteSection(besparing: number, opts?: { hasData?: boolean }): Goa
     hasData: opts?.hasData ?? true,
     besparing,
     freedomDays: Math.round(besparing / dailyExpenses),
+    netEffect,
+    netFreedomDays: netEffect > 0 ? Math.round(netEffect / dailyExpenses) : 0,
   }
 }
 
@@ -569,6 +633,400 @@ describe('tax-optimizer — pickTopChoice (leidende kans op NETTO effect)', () =
   })
 })
 
+// ── Shift-curve (fase 2b) ────────────────────────────────────────
+//
+// TOLERANTIEKEUZE. Waar de curve tegen het shift-SCENARIO wordt gelegd is de eis
+// EXACT (`toBe`, nul tolerantie): beide paden roepen dezelfde engine met
+// letterlijk dezelfde argumenten aan, dus elk verschil is een divergerend
+// codepad, geen afrondingsruis. Waar de curve tegen een algebraïsche
+// herleiding wordt gelegd (marginale stap) is de tolerantie ABSOLUUT en
+// sub-cent (toBeCloseTo(…, 6) ≈ € 0,0000005): de vergeleken grootheden zijn
+// euro-bedragen per stap van orde € 10–170, waar float-herordening ~1e-10 ruis
+// geeft. Een RELATIEVE tolerantie zou hier juist blind zijn voor de foutklasse
+// die ertoe doet — een stap met besparing ≈ 0 (volledig benutte vrijstelling
+// ontbreekt) haalt elke procentuele marge.
+
+describe('tax-optimizer — shift-curve', () => {
+  it('eindpunt is EXACT het samenstelling-shift-scenario', () => {
+    const input = soloOptimizerInput()
+    const { strategies, shiftCurve } = generateBox3Strategies(input)
+    const shift = strategies.find((s) => s.kind === 'samenstelling-shift')!
+
+    expect(shiftCurve).not.toBeNull()
+    const end = shiftCurve![shiftCurve!.length - 1]
+    expect(end.shifted).toBe(input.current.totaalBeleggingen)
+    expect(end.tax).toBe(shift.optimizedTax)
+    expect(end.savings).toBe(shift.savings)
+    expect(end.returnCostEur).toBe(shift.returnCostEur)
+    expect(end.netEffect).toBe(shift.netEffect)
+  })
+
+  it('startpunt is de huidige situatie: niets verschoven, niets bespaard', () => {
+    const input = soloOptimizerInput()
+    const { shiftCurve } = generateBox3Strategies(input)
+    const start = shiftCurve![0]
+    expect(start.shifted).toBe(0)
+    expect(start.tax).toBe(input.current.tax)
+    expect(start.savings).toBe(0)
+    expect(start.returnCostEur).toBe(0)
+    expect(start.netEffect).toBe(0)
+  })
+
+  it('vaste stapindeling: 21 punten van 0% t/m 100% van de beleggingen', () => {
+    const input = soloOptimizerInput()
+    const { shiftCurve } = generateBox3Strategies(input)
+    expect(SHIFT_CURVE_STEPS).toBe(20)
+    expect(shiftCurve).toHaveLength(SHIFT_CURVE_STEPS + 1)
+    // Relatieve stappen van 5% — het bereik spant altijd exact de eigen beleggingen.
+    shiftCurve!.forEach((p, i) => {
+      expect(p.shifted).toBeCloseTo((input.current.totaalBeleggingen * i) / SHIFT_CURVE_STEPS, 6)
+    })
+  })
+
+  it('`shifted` loopt strikt op en `savings` blijft niet-negatief en niet-dalend', () => {
+    const { shiftCurve } = generateBox3Strategies(soloOptimizerInput())
+    for (let i = 1; i < shiftCurve!.length; i++) {
+      expect(shiftCurve![i].shifted).toBeGreaterThan(shiftCurve![i - 1].shifted)
+      expect(shiftCurve![i].savings).toBeGreaterThanOrEqual(shiftCurve![i - 1].savings)
+      // Meer verschuiven = meer misgelopen rendement, dus een dalend netto effect.
+      expect(shiftCurve![i].netEffect).toBeLessThanOrEqual(shiftCurve![i - 1].netEffect)
+    }
+    for (const p of shiftCurve!) {
+      expect(p.savings).toBeGreaterThanOrEqual(0)
+      expect(p.returnCostEur).toBeGreaterThanOrEqual(0)
+      expect(p.netEffect).toBeCloseTo(p.savings - p.returnCostEur, 9)
+    }
+  })
+
+  it('elk punt = savings − returnCostEur, met returnCostEur in hele euro’s', () => {
+    const { shiftCurve } = generateBox3Strategies(soloOptimizerInput())
+    const gap = DEFAULT_RETURN - EXPECTED_SAVINGS_RETURN
+    for (const p of shiftCurve!) {
+      expect(p.returnCostEur).toBe(Math.round(p.shifted * gap))
+      expect(Number.isInteger(p.returnCostEur)).toBe(true)
+    }
+  })
+
+  it('curve-consistentie-invariant: elk punt sluit op zowel het startpunt als zichzelf', () => {
+    // netEffect === savings − returnCostEur (het saldo van dit punt) ÉN
+    // savings === curve[0].tax − punt.tax (de besparing is per definitie de
+    // heffing van het startpunt minus de heffing van dit punt) — voor ELK punt,
+    // niet alleen start/eind. Absolute, sub-cent tolerantie (zelfde som, andere
+    // float-volgorde) — zie de tolerantie-toelichting boven dit describe-blok.
+    const { shiftCurve } = generateBox3Strategies(soloOptimizerInput())
+    const start = shiftCurve![0]
+    for (const p of shiftCurve!) {
+      expect(p.netEffect).toBeCloseTo(p.savings - p.returnCostEur, 6)
+      expect(p.savings).toBeCloseTo(start.tax - p.tax, 6)
+    }
+  })
+
+  it('geen shift-scenario → geen curve (null)', () => {
+    const noInvest = calculateBox3({
+      assets: [asset({ id: 'a1', asset_type: 'savings', current_value: 200_000 })],
+      debts: [],
+      hasPartner: false,
+      dailyExpenses: 100,
+      year: 2026,
+    })
+    const { strategies, shiftCurve } = generateBox3Strategies({
+      goalId: 'box3-minimaal',
+      year: 2026,
+      dailyExpenses: 100,
+      hasPartner: false,
+      current: noInvest,
+    })
+    expect(strategies.find((s) => s.kind === 'samenstelling-shift')).toBeUndefined()
+    expect(shiftCurve).toBeNull()
+  })
+
+  it('is deterministisch (zelfde invoer → identieke reeks)', () => {
+    const a = generateBox3Strategies(soloOptimizerInput()).shiftCurve
+    const b = generateBox3Strategies(soloOptimizerInput()).shiftCurve
+    expect(a).toEqual(b)
+  })
+})
+
+// ── Het vrijstellings-effect op de curve ─────────────────────────
+//
+// BEVINDING (bewust vastgelegd, wijkt af van de oorspronkelijke verwachting van
+// een KNIK in de curve): een samenstelling-shift laat het TOTAAL aan bezittingen
+// ongemoeid, dus `rendementsgrondslag` en daarmee `grondslagSparen =
+// max(0, rendementsgrondslag − heffingsvrijVermogen)` veranderen NIET over de
+// curve. In calculateBox3 is de heffing dan
+//
+//   tax = grondslagSparen × (voordeelUitSparen / rendementsgrondslag) × tarief
+//
+// waarin alleen `voordeelUitSparen` lineair meebeweegt met het verschoven bedrag.
+// De curve is dus AFFIEN en de marginale besparing per stap CONSTANT — een knik
+// op deze as bestaat in deze motor niet, bij geen enkele fixture.
+//
+// De vrijstelling is wél zichtbaar, als SCHAALFACTOR: de marginale besparing is
+// (grondslagSparen / rendementsgrondslag) × het bedrag dat je zonder vrijstelling
+// zou besparen. Zit je net boven de vrijstelling, dan levert verschuiven maar een
+// fractie op van wat het forfaitverschil suggereert. Dat is de eigenschap die we
+// hier vergrendelen — zodat niemand later een niet-bestaande knik "terugbouwt".
+
+/** Solo 2026: € 10.000 spaargeld + € 55.000 beleggingen — net boven de vrijstelling. */
+function nearExemptionSoloInput(): Box3OptimizerInput {
+  const current = calculateBox3({
+    assets: [
+      asset({ id: 'a1', asset_type: 'savings', current_value: 10_000 }),
+      asset({ id: 'a2', asset_type: 'investment', current_value: 55_000 }),
+    ],
+    debts: [],
+    hasPartner: false,
+    dailyExpenses: 100,
+    year: 2026,
+  })
+  return { goalId: 'box3-minimaal', year: 2026, dailyExpenses: 100, hasPartner: false, current }
+}
+
+/** Solo 2026: € 1 mln + € 1 mln — de vrijstelling is verwaarloosbaar klein. */
+function farAboveExemptionSoloInput(): Box3OptimizerInput {
+  const current = calculateBox3({
+    assets: [
+      asset({ id: 'a1', asset_type: 'savings', current_value: 1_000_000 }),
+      asset({ id: 'a2', asset_type: 'investment', current_value: 1_000_000 }),
+    ],
+    debts: [],
+    hasPartner: false,
+    dailyExpenses: 100,
+    year: 2026,
+  })
+  return { goalId: 'box3-minimaal', year: 2026, dailyExpenses: 100, hasPartner: false, current }
+}
+
+/** Marginale besparing per curve-stap. */
+function marginalSteps(curve: ShiftCurvePoint[]): number[] {
+  return curve.slice(1).map((p, i) => p.savings - curve[i].savings)
+}
+
+describe('tax-optimizer — vrijstellings-effect op de shift-curve', () => {
+  it('de marginale besparing per stap is constant (de curve is affien)', () => {
+    const { shiftCurve } = generateBox3Strategies(nearExemptionSoloInput())
+    const steps = marginalSteps(shiftCurve!)
+    for (const s of steps) {
+      // Absolute, sub-cent tolerantie: zelfde som, andere float-volgorde.
+      expect(s).toBeCloseTo(steps[0], 6)
+    }
+  })
+
+  it('de vrijstelling schaalt de besparing: net boven de vrijstelling levert verschuiven maar een fractie op', () => {
+    const input = nearExemptionSoloInput()
+    const { shiftCurve } = generateBox3Strategies(input)
+    const c = input.current
+    const params = BOX3_PARAMS[2026]
+    const stepBedrag = c.totaalBeleggingen / SHIFT_CURVE_STEPS
+
+    // Zonder vrijstellings-effect zou elke stap dit opleveren…
+    const zonderVrijstellingsEffect =
+      stepBedrag * (params.forfaitBeleggingen - params.forfaitSpaargeld) * params.tarief
+    // …maar de heffing schaalt met grondslagSparen / rendementsgrondslag.
+    const benuttingsFactor = c.grondslagSparen / c.rendementsgrondslag
+    expect(benuttingsFactor).toBeLessThan(0.15) // vrijstelling nog nauwelijks "op"
+
+    const steps = marginalSteps(shiftCurve!)
+    expect(steps[0]).toBeCloseTo(zonderVrijstellingsEffect * benuttingsFactor, 6)
+    // Concreet: een fractie van het bedrag dat het forfaitverschil suggereert.
+    expect(steps[0]).toBeLessThan(zonderVrijstellingsEffect * 0.15)
+  })
+
+  it('ver boven de vrijstelling nadert de besparing per stap het volle forfaitverschil', () => {
+    const input = farAboveExemptionSoloInput()
+    const { shiftCurve } = generateBox3Strategies(input)
+    const c = input.current
+    const params = BOX3_PARAMS[2026]
+    const stepBedrag = c.totaalBeleggingen / SHIFT_CURVE_STEPS
+    const zonderVrijstellingsEffect =
+      stepBedrag * (params.forfaitBeleggingen - params.forfaitSpaargeld) * params.tarief
+    const benuttingsFactor = c.grondslagSparen / c.rendementsgrondslag
+    expect(benuttingsFactor).toBeGreaterThan(0.97)
+
+    const steps = marginalSteps(shiftCurve!)
+    expect(steps[0]).toBeCloseTo(zonderVrijstellingsEffect * benuttingsFactor, 6)
+    expect(steps[0]).toBeGreaterThan(zonderVrijstellingsEffect * 0.97)
+  })
+
+  it('de curve blijft ook bij de kleine fixture op het scenario aansluiten', () => {
+    const { strategies, shiftCurve } = generateBox3Strategies(nearExemptionSoloInput())
+    const shift = strategies.find((s) => s.kind === 'samenstelling-shift')!
+    const end = shiftCurve![shiftCurve!.length - 1]
+    expect(end.tax).toBe(shift.optimizedTax)
+    expect(end.savings).toBe(shift.savings)
+  })
+})
+
+// ── Verloop over de belastingjaren (fase 2c) ─────────────────────
+
+describe('tax-optimizer — trajectory (2025 · 2026 · indicatie 2028)', () => {
+  it('baseline: 2025 en 2026 komen uit de engine per jaar en verschillen', () => {
+    const input = soloOptimizerInput()
+    const { baseline } = generateBox3Strategies(input)
+    const t = baseline.trajectory!
+    expect(t).not.toBeNull()
+
+    const jaar2025 = calculateBox3(realSoloInput(2025))
+    const jaar2026 = calculateBox3(realSoloInput(2026))
+    expect(t.tax2025).toBe(jaar2025.tax)
+    expect(t.tax2026).toBe(jaar2026.tax)
+    // Gewijzigde jaarparameters (forfait sparen 1,37%→1,28%, beleggen
+    // 5,88%→6,00%, vrijstelling €57.684→€59.357) → een ander bedrag.
+    expect(t.tax2025).not.toBe(t.tax2026)
+    // Het actieve jaar sluit aan op de huidige heffing.
+    expect(t.tax2026).toBe(input.current.tax)
+  })
+
+  it('2028-indicatie = gewogen rendement × tarief, exact via de tegenbewijs-tak', () => {
+    const input = soloOptimizerInput()
+    const { baseline } = generateBox3Strategies(input)
+    const c = input.current
+
+    const gewogen =
+      (c.totaalSpaargeld * EXPECTED_SAVINGS_RETURN + c.totaalBeleggingen * DEFAULT_RETURN) /
+      (c.totaalSpaargeld + c.totaalBeleggingen)
+
+    // EXACT tegen de canonieke tak — zelfde functie, zelfde invoer.
+    const viaTegenbewijs = compareForfaitairVsWerkelijk({
+      box3Result: c,
+      werkelijkRendementPct: gewogen * 100,
+    }).werkelijkeHeffing
+    expect(baseline.trajectory!.tax2028Indicatie).toBe(viaTegenbewijs)
+
+    // …en algebraïsch: (spaargeld × 1,3% + beleggingen × 7,0%) × tarief.
+    // Absolute tolerantie (1e-6 €) omdat dezelfde producten in een andere
+    // volgorde worden opgeteld; een relatieve marge zou op dit bedrag (± €2.000)
+    // een fout van tientallen centen door laten.
+    const closedForm =
+      (c.totaalSpaargeld * EXPECTED_SAVINGS_RETURN + c.totaalBeleggingen * DEFAULT_RETURN) *
+      c.params.tarief
+    expect(baseline.trajectory!.tax2028Indicatie).toBeCloseTo(closedForm, 6)
+    expect(baseline.trajectory!.tax2028Indicatie).toBeCloseTo(2_138.4, 6) // 5.940 × 36%
+  })
+
+  it('shift-scenario: het verloop rekent op de UITKOMST-samenstelling (alles op spaargeld)', () => {
+    const input = soloOptimizerInput()
+    const { strategies } = generateBox3Strategies(input)
+    const shift = strategies.find((s) => s.kind === 'samenstelling-shift')!
+    const t = shift.trajectory!
+    const c = input.current
+    const alles = c.totaalSpaargeld + c.totaalBeleggingen
+
+    // 2026 van het verloop == de doorgerekende uitkomst van het scenario zelf.
+    expect(t.tax2026).toBe(shift.optimizedTax)
+    // 2025 op dezelfde (verschoven) samenstelling.
+    expect(t.tax2025).toBe(
+      calculateBox3(synthBox3Input(alles, 0, c.totaalBox3Schulden, false, 0, 2025)).tax,
+    )
+    // 2028-indicatie: alles staat op spaargeld → gewogen rendement = spaaraanname.
+    expect(t.tax2028Indicatie).toBeCloseTo(alles * EXPECTED_SAVINGS_RETURN * c.params.tarief, 6)
+    expect(t.tax2028Indicatie!).toBeLessThan(baselineTax2028(input))
+  })
+
+  it('partnerverdeling: geen verloop (null) — alleen het actieve jaar is doorgerekend', () => {
+    const { strategies } = generateBox3Strategies(householdInput('box3-minimaal'))
+    const partner = strategies.find((s) => s.kind === 'partnerverdeling')!
+    expect(partner.trajectory).toBeNull()
+    expect(partner.detail.some((d) => d.includes('verloop over andere jaren'))).toBe(true)
+  })
+
+  it('leeg vermogen → geen 2028-indicatie (geen deling door nul)', () => {
+    const empty = calculateBox3({ assets: [], debts: [], hasPartner: false, dailyExpenses: 100, year: 2026 })
+    const { baseline } = generateBox3Strategies({
+      goalId: 'box3-minimaal',
+      year: 2026,
+      dailyExpenses: 100,
+      hasPartner: false,
+      current: empty,
+    })
+    expect(baseline.trajectory!.tax2028Indicatie).toBeNull()
+    expect(baseline.trajectory!.tax2026).toBe(0)
+    expect(baseline.trajectory!.tax2025).toBe(0)
+  })
+
+  it('legt verloop én 2028-aanname uit in de detail-regels (uitlegbaarheid)', () => {
+    const { baseline } = generateBox3Strategies(soloOptimizerInput())
+    expect(baseline.detail.some((d) => d.startsWith('Zelfde samenstelling:'))).toBe(true)
+    expect(baseline.detail.some((d) => d.startsWith('Indicatie 2028'))).toBe(true)
+    const aanname = baseline.detail.find((d) => d.startsWith('Aanname 2028'))
+    expect(aanname).toBeDefined()
+    expect(aanname).toContain('1,3%')
+    expect(aanname).toContain('7,0%')
+    expect(aanname).toContain('zonder aftrek van werkelijke schuldrente')
+    // Het dóminante conservatisme moet gebruiker-zichtbaar zijn: de
+    // tegenbewijs-motor kent geen heffingsvrij vermogen, waardoor de indicatie
+    // juist bij kleine vermogens fors te hoog kan uitvallen (review H1).
+    expect(aanname).toContain('zonder heffingsvrij vermogen')
+    expect(aanname).toContain('eerder te hoog dan te laag')
+  })
+
+  it('het verloop staat los van het geselecteerde jaar (2026 blijft 2026)', () => {
+    // Zelfde samenstelling, maar de gebruiker kijkt naar belastingjaar 2025.
+    const current2025 = calculateBox3(realSoloInput(2025))
+    const { baseline } = generateBox3Strategies({
+      goalId: 'box3-minimaal',
+      year: 2025,
+      dailyExpenses: 100,
+      hasPartner: false,
+      current: current2025,
+    })
+    const t = baseline.trajectory!
+    expect(t.tax2025).toBe(current2025.tax)
+    expect(t.tax2026).toBe(calculateBox3(realSoloInput(2026)).tax)
+    expect(t.tax2026).not.toBe(t.tax2025)
+  })
+})
+
+/** De 2028-indicatie van de baseline — hulpje voor de vergelijking hierboven. */
+function baselineTax2028(input: Box3OptimizerInput): number {
+  return generateBox3Strategies(input).baseline.trajectory!.tax2028Indicatie!
+}
+
+// ── Jaarruimte-sectievelden (fase 2e) ────────────────────────────
+
+describe('tax-optimizer — jaarruimte-sectievelden', () => {
+  it('pickTopChoice CONSUMEERT netEffect/netFreedomDays uit de sectie', () => {
+    const input = tinySavingSoloInput()
+    const { baseline, strategies, shiftCurve } = generateBox3Strategies(input)
+    const section = box3Section('box3-minimaal', baseline, strategies, shiftCurve)
+
+    // Sectie met een netEffect dat BEWUST afwijkt van de bruto besparing: leidt
+    // pickTopChoice het netto effect zelf af, dan zou hier 1.200 uitkomen.
+    const top = pickTopChoice([section, jaarruimteSection(1_200, { netEffect: 300 })])!
+    expect(top.kind).toBe('jaarruimte')
+    expect(top.savings).toBe(1_200) // bruto blijft bruto
+    expect(top.freedomDays).toBe(12) // bruto vrijheidsdagen
+    expect(top.netEffect).toBe(300) // uit de sectie, niet afgeleid
+  })
+
+  it('rankt op de netto sectie-velden, niet op de bruto besparing', () => {
+    const input = householdInput('box3-minimaal')
+    const { baseline, strategies, shiftCurve } = generateBox3Strategies(input)
+    const section = box3Section('box3-minimaal', baseline, strategies, shiftCurve)
+    // Bruto € 5.000 oogt groter dan de partnerverdeling (€ 800), maar netto
+    // € 100 (1 vrijheidsdag) verliest.
+    const top = pickTopChoice([section, jaarruimteSection(5_000, { netEffect: 100 })])!
+    expect(top.kind).toBe('box3')
+    expect(top.netEffect).toBe(800)
+  })
+
+  it('netto ≤ 0 → de jaarruimte-kans valt af, ook bij een positieve bruto besparing', () => {
+    const input = tinySavingSoloInput()
+    const { baseline, strategies, shiftCurve } = generateBox3Strategies(input)
+    const section = box3Section('box3-minimaal', baseline, strategies, shiftCurve)
+    expect(pickTopChoice([section, jaarruimteSection(1_200, { netEffect: 0 })])).toBeNull()
+  })
+
+  it('zonder rendementsverlies vallen netto en bruto samen (de normale vulling)', () => {
+    const section = jaarruimteSection(1_200)
+    expect(section.netEffect).toBe(section.besparing)
+    expect(section.netFreedomDays).toBe(section.freedomDays)
+    const top = pickTopChoice([section])!
+    expect(top.netEffect).toBe(1_200)
+    expect(top.savings).toBe(1_200)
+  })
+})
+
 // ── Regressie: bestaand gedrag ongewijzigd ───────────────────────
 //
 // Vergrendelt dat de netto-effect-uitbreiding puur ADDITIEF is: dezelfde
@@ -615,5 +1073,45 @@ describe('tax-optimizer — regressie op bestaand gedrag', () => {
     for (const s of strategies) {
       expect(s.hasReturnCost).toBe(s.returnCostEur > 0)
     }
+  })
+
+  // Fase 2 is ADDITIEF: curve + verloop komen erbij, de Fase 1-getallen niet aan.
+  it('fase 2 laat de Fase 1-bedragen van de solo-fixture ongemoeid', () => {
+    const input = soloOptimizerInput()
+    const { baseline, strategies } = generateBox3Strategies(input)
+    const shift = strategies.find((s) => s.kind === 'samenstelling-shift')!
+
+    expect(baseline.savings).toBe(0)
+    expect(baseline.netEffect).toBe(0)
+    expect(shift.returnCostEur).toBe(3_990) // € 70.000 × 5,7%
+    expect(shift.netEffect).toBeCloseTo(shift.savings - 3_990, 9)
+    expect(shift.netFreedomDays).toBe(0)
+    expect(shift.freedomDays).toBe(Math.round(shift.savings / 100))
+    // Het verloop verandert de uitkomst-heffing van het scenario niet.
+    expect(shift.optimizedTax).toBe(shift.trajectory!.tax2026)
+  })
+
+  it('het € 47-scenario blijft geen topkans, mét curve op de sectie', () => {
+    const input = tinySavingSoloInput()
+    const { baseline, strategies, shiftCurve } = generateBox3Strategies(input)
+    const shift = strategies.find((s) => s.kind === 'samenstelling-shift')!
+    expect(Math.round(shift.savings)).toBe(47)
+    expect(shift.returnCostEur).toBe(359)
+
+    const section = box3Section('box3-minimaal', baseline, strategies, shiftCurve)
+    expect(section.shiftCurve).not.toBeNull()
+    expect(section.best?.kind).toBe('samenstelling-shift') // bruto-winnaar, ongewijzigd
+    expect(pickTopChoice([section])).toBeNull()
+  })
+
+  it('buildBox3Optimizer draagt de curve mee en blijft deterministisch', () => {
+    const input = householdInput('box3-minimaal')
+    const a = buildBox3Optimizer(input)
+    const b = buildBox3Optimizer(input)
+    expect(a).toEqual(b)
+    expect(a.shiftCurve).toHaveLength(SHIFT_CURVE_STEPS + 1)
+    expect(a.shiftCurve![SHIFT_CURVE_STEPS].tax).toBe(
+      a.strategies.find((s) => s.kind === 'samenstelling-shift')!.optimizedTax,
+    )
   })
 })

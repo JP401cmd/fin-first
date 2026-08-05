@@ -12,6 +12,7 @@ import type {
   GoalSection,
   OptimizerStrategy,
   OptimizerTopChoice,
+  ShiftCurvePoint,
 } from '@/lib/tax-optimizer/types'
 import type { Asset } from '@/lib/asset-data'
 import {
@@ -56,6 +57,25 @@ function householdInput(goalId: Box3OptimizerInput['goalId']): Box3OptimizerInpu
   }
 }
 
+/** Household ZONDER beleggingen — geen shift-hefboom mogelijk, alleen partnerverdeling. */
+function partnerOnlyHouseholdInput(): Box3OptimizerInput {
+  const current = calculateBox3({
+    assets: [asset({ id: 'a1', asset_type: 'savings', current_value: 300_000 })],
+    debts: [],
+    hasPartner: true,
+    dailyExpenses: 100,
+    year: 2026,
+  })
+  return {
+    goalId: 'box3-minimaal',
+    year: 2026,
+    dailyExpenses: 100,
+    hasPartner: true,
+    current,
+    optimalAllocation: { totalTax: 4_000, savingsVsEqual: 650 },
+  }
+}
+
 /** Solo-fixture: shift bespaart bruto ~€47 maar kost ~€359 rendement (netto negatief, geen kosteloos alternatief). */
 function tinySavingSoloInput(): Box3OptimizerInput {
   const current = calculateBox3({
@@ -75,13 +95,23 @@ function box3Section(
   goalId: 'box3-minimaal' | 'box3-geen-rendementsverlies',
   baseline: OptimizerStrategy,
   strategies: OptimizerStrategy[],
+  shiftCurve: ShiftCurvePoint[] | null = null,
 ): Extract<GoalSection, { kind: 'box3' }> {
   const ranked = rankStrategies(strategies, goalId)
-  return { kind: 'box3', goalId, goal: GOAL_BY_ID[goalId], baseline, ranked, best: pickBest(ranked, goalId) }
+  return {
+    kind: 'box3',
+    goalId,
+    goal: GOAL_BY_ID[goalId],
+    baseline,
+    ranked,
+    shiftCurve,
+    best: pickBest(ranked, goalId),
+  }
 }
 
 function jaarruimteSection(besparing: number, opts?: { hasData?: boolean }): GoalSection {
   const dailyExpenses = 100
+  const freedomDays = Math.round(besparing / dailyExpenses)
   return {
     kind: 'jaarruimte',
     goalId: 'jaarruimte-maximaal',
@@ -91,7 +121,9 @@ function jaarruimteSection(besparing: number, opts?: { hasData?: boolean }): Goa
     dailyExpenses,
     hasData: opts?.hasData ?? true,
     besparing,
-    freedomDays: Math.round(besparing / dailyExpenses),
+    freedomDays,
+    netEffect: besparing,
+    netFreedomDays: freedomDays,
   }
 }
 
@@ -114,6 +146,8 @@ function opp(
     freedomNote: null,
     effortDots: 1,
     effortNote: null,
+    trajectory: null,
+    shiftCurve: null,
     strategy: null,
     ...partial,
   }
@@ -276,6 +310,64 @@ describe('optimizer-model — buildOpportunities', () => {
     const metKans = buildOpportunities([section, jaarruimteSection(900)])
     expect(metKans.opportunities.some((o) => o.kind === 'jaarruimte')).toBe(true)
     expect(metKans.opportunities.find((o) => o.kind === 'jaarruimte')?.id).toBe('jaarruimte-maximaal')
+  })
+
+  it('hangt de geleverde shift-curve alléén aan de samenstelling-shift-kans', () => {
+    const input = householdInput('box3-minimaal')
+    const { baseline, strategies, shiftCurve } = generateBox3Strategies(input)
+    // Meet vóór je assert: de motor levert hier écht een curve.
+    expect(shiftCurve).not.toBeNull()
+    expect(shiftCurve!.length).toBeGreaterThan(1)
+
+    const section = box3Section('box3-minimaal', baseline, strategies, shiftCurve)
+    const { opportunities } = buildOpportunities([section])
+
+    const shift = opportunities.find((o) => o.id === 'samenstelling-shift')
+    const partner = opportunities.find((o) => o.id === 'partnerverdeling')
+    expect(shift?.shiftCurve).toBe(shiftCurve)
+    expect(partner?.shiftCurve).toBeNull()
+  })
+
+  it('geeft het geleverde trajectory één-op-één door (jaarruimte-kans heeft er geen)', () => {
+    const input = householdInput('box3-minimaal')
+    const { baseline, strategies } = generateBox3Strategies(input)
+    const section = box3Section('box3-minimaal', baseline, strategies)
+    const { opportunities } = buildOpportunities([section, jaarruimteSection(900)])
+
+    for (const strategy of strategies) {
+      const match = opportunities.find((o) => o.id === strategy.id)
+      expect(match?.trajectory).toBe(strategy.trajectory)
+    }
+    expect(opportunities.find((o) => o.kind === 'jaarruimte')?.trajectory).toBeNull()
+  })
+
+  it('neemt netEffect en netFreedomDays van de jaarruimte-sectie over (geen eigen afleiding)', () => {
+    // Sectie-velden bewust ONGELIJK aan `besparing`/`freedomDays`, zodat de test
+    // faalt zodra de client de netto-waarden weer zelf zou afleiden.
+    const section: GoalSection = {
+      ...(jaarruimteSection(900) as Extract<GoalSection, { kind: 'jaarruimte' }>),
+      netEffect: 742,
+      netFreedomDays: 7,
+    }
+    const { opportunities } = buildOpportunities([section])
+    const jaarruimte = opportunities.find((o) => o.kind === 'jaarruimte')
+    expect(jaarruimte?.netEffect).toBe(742)
+    expect(jaarruimte?.netFreedomDays).toBe(7)
+  })
+
+  it('zonder shift-scenario (alleen partnerverdeling): shiftCurve is null door de hele keten', () => {
+    const input = partnerOnlyHouseholdInput()
+    const { baseline, strategies, shiftCurve } = generateBox3Strategies(input)
+    // Meet vóór je assert: bevestig dat de motor hier écht geen shift/curve levert.
+    expect(strategies.map((s) => s.kind)).toEqual(['partnerverdeling'])
+    expect(shiftCurve).toBeNull()
+
+    const section = box3Section('box3-minimaal', baseline, strategies, shiftCurve)
+    const { opportunities } = buildOpportunities([section])
+
+    expect(opportunities).toHaveLength(1)
+    expect(opportunities[0].id).toBe('partnerverdeling')
+    expect(opportunities[0].shiftCurve).toBeNull()
   })
 
   it('slaat preview-secties over (geen crash, geen opportunity)', () => {

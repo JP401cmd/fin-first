@@ -91,8 +91,12 @@ export const JAARRUIMTE_CAVEAT =
  * dezelfde lijst nog een netto-positieve hefboom (partnerverdeling) staat. Die
  * zou anders stil uit de leidende kans vallen.
  *
- * De jaarruimte-kandidaat heeft geen rendementsverlies — de inleg blijft
- * renderen in de lijfrente — dus netEffect = besparing.
+ * De jaarruimte-kandidaat leest zijn netto velden (`netEffect`/`netFreedomDays`)
+ * uit de SECTIE. De aanname erachter — geen rendementsverlies, want de inleg
+ * blijft renderen in de lijfrente, dus netEffect = besparing — is gedocumenteerd
+ * bij het type (GoalSection kind:'jaarruimte') en woont daarmee op één plek.
+ * Vroeger leidde deze functie `netEffect: jaarruimte.besparing` zelf af; dat was
+ * een tweede houder van diezelfde aanname.
  */
 export function pickTopChoice(sections: GoalSection[]): OptimizerTopChoice | null {
   const candidates: { choice: OptimizerTopChoice; netFreedomDays: number }[] = []
@@ -126,22 +130,24 @@ export function pickTopChoice(sections: GoalSection[]): OptimizerTopChoice | nul
   const jaarruimte = sections.find(
     (s): s is Extract<GoalSection, { kind: 'jaarruimte' }> => s.kind === 'jaarruimte',
   )
-  if (jaarruimte && jaarruimte.hasData && jaarruimte.besparing > 0) {
+  // Zelfde toelatingseis als de Box 3-kandidaten hierboven: NETTO > 0. Voor
+  // jaarruimte valt dat samen met besparing > 0 (geen rendementsverlies), maar
+  // het criterium blijft één en hetzelfde — netto.
+  if (jaarruimte && jaarruimte.hasData && jaarruimte.netEffect > 0) {
     candidates.push({
       choice: {
         goalId: jaarruimte.goalId,
         title: JAARRUIMTE_TITLE,
         savings: jaarruimte.besparing,
         freedomDays: jaarruimte.freedomDays,
-        // Geen rendementsverlies: de inleg blijft renderen in de lijfrente.
-        netEffect: jaarruimte.besparing,
+        // Sectie-velden, geen lokale afleiding: de "geen rendementsverlies"-
+        // aanname staat bij het type, niet hier.
+        netEffect: jaarruimte.netEffect,
         caveat: JAARRUIMTE_CAVEAT,
         kind: 'jaarruimte',
         opportunityId: jaarruimte.goalId,
       },
-      // Zonder rendementsverlies vallen netto en bruto vrijheidsdagen samen —
-      // we consumeren het sectie-veld i.p.v. het opnieuw te delen.
-      netFreedomDays: jaarruimte.freedomDays,
+      netFreedomDays: jaarruimte.netFreedomDays,
     })
   }
 

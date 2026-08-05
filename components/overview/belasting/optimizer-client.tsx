@@ -133,6 +133,7 @@ export function Box3OptimizerClient({
             onSortModeChange={setSortMode}
             onOpenDetail={openDetail}
             fc={fc}
+            year={year}
           />
           {/* Fallback hangt aan de SERVER-waarheid (topChoice), niet aan de
               gefilterde weergave: in de stand "zonder rendementsverlies" kan de

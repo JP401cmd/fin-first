@@ -5,12 +5,14 @@ import { SectionLabel, TogglePill, HighlightMark } from '@/components/editorial'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import {
   SORT_MODES,
+  NEGATIVE_HATCH_CSS,
   shortCaveat,
   type Opportunity,
   type SortMode,
   type Dots,
 } from './optimizer-model'
-import type { OptimizerStrategy } from '@/lib/tax-optimizer/types'
+import type { OptimizerStrategy, TaxTrajectory } from '@/lib/tax-optimizer/types'
+import type { TaxYear } from '@/lib/box3-data'
 
 const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
 const SOURCE_SERIF = 'var(--font-source-serif, Georgia, serif)'
@@ -53,6 +55,7 @@ export function OptimizerCompare({
   onSortModeChange,
   onOpenDetail,
   fc,
+  year,
 }: {
   baseline: OptimizerStrategy | null
   /** Al gesorteerd/gefilterd volgens `sortMode`. */
@@ -62,6 +65,8 @@ export function OptimizerCompare({
   onSortModeChange: (mode: SortMode) => void
   onOpenDetail: (id: string) => void
   fc: (v: number) => string
+  /** Actief belastingjaar — voedt o.a. de partnerverdeling-verloopnotitie. */
+  year: TaxYear
 }) {
   return (
     <section id="optimizer-vergelijking" className="scroll-mt-24">
@@ -122,6 +127,7 @@ export function OptimizerCompare({
             winner={winner}
             onOpenDetail={onOpenDetail}
             fc={fc}
+            year={year}
           />
         </>
       )}
@@ -216,8 +222,7 @@ function NetEffectBars({
                         right: '50%',
                         width,
                         transition: barTransition,
-                        backgroundImage:
-                          'repeating-linear-gradient(45deg, var(--negative) 0, var(--negative) 2px, color-mix(in srgb, var(--negative) 30%, transparent) 2px, color-mix(in srgb, var(--negative) 30%, transparent) 5px)',
+                        backgroundImage: NEGATIVE_HATCH_CSS,
                       }
                 }
               />
@@ -250,8 +255,8 @@ function NetEffectBars({
   )
 }
 
-/** Groepskop-rij binnen de vergelijkingstabel. */
-function GroupRow({ label, span }: { label: string; span: number }) {
+/** Groepskop-rij binnen de vergelijkingstabel, met optionele kop-notitie. */
+function GroupRow({ label, span, note }: { label: string; span: number; note?: string }) {
   return (
     <tr>
       <td
@@ -259,6 +264,14 @@ function GroupRow({ label, span }: { label: string; span: number }) {
         className="border-b border-[var(--rule-soft)] pt-4 pb-1.5 font-mono text-[9.5px] uppercase tracking-[0.18em] text-[var(--ink-3)]"
       >
         {label}
+        {note && (
+          <span
+            className="ml-2 text-[10.5px] font-normal italic normal-case tracking-normal text-[var(--ink-3)]"
+            style={{ fontFamily: SOURCE_SERIF }}
+          >
+            {note}
+          </span>
+        )}
       </td>
     </tr>
   )
@@ -276,6 +289,83 @@ function CellNote({ children }: { children: React.ReactNode }) {
   )
 }
 
+/**
+ * Eén jaar-waarde uit het verloop. Het jaartal staat visueel één keer in de
+ * rijkop (2025 · 2026 · ≈ 2028); voor schermlezers herhalen we het per waarde,
+ * anders leest de cel als drie losse bedragen zonder context.
+ */
+function YearValue({
+  year,
+  value,
+  fc,
+  approx = false,
+}: {
+  year: string
+  value: number | null
+  fc: (v: number) => string
+  approx?: boolean
+}) {
+  return (
+    <span className={`whitespace-nowrap ${approx ? 'text-[var(--ink-3)]' : ''}`}>
+      <span className="sr-only">{year}: </span>
+      {value === null ? '—' : `${approx ? '≈ ' : ''}${fc(value)}`}
+    </span>
+  )
+}
+
+/**
+ * Verloop-cel: 2025 · 2026 · ≈2028 uit het GELEVERDE `trajectory`. Zonder
+ * trajectory een em-streepje met de reden — de kans is dan niet over de jaren
+ * doorgerekend (partnerverdeling) of speelt buiten Box 3 (jaarruimte).
+ */
+function TrajectoryTd({
+  trajectory,
+  note = null,
+  fc,
+  style,
+}: {
+  trajectory: TaxTrajectory | null
+  note?: string | null
+  fc: (v: number) => string
+  style?: React.CSSProperties
+}) {
+  if (!trajectory) {
+    return (
+      <Td muted style={style}>
+        —{note && <CellNote>{note}</CellNote>}
+      </Td>
+    )
+  }
+  return (
+    <Td style={style}>
+      <span className="inline-flex flex-wrap items-baseline justify-end gap-x-1.5">
+        <YearValue year="2025" value={trajectory.tax2025} fc={fc} />
+        <Separator />
+        <YearValue year="2026" value={trajectory.tax2026} fc={fc} />
+        <Separator />
+        <YearValue year="2028, indicatie" value={trajectory.tax2028Indicatie} fc={fc} approx />
+      </span>
+    </Td>
+  )
+}
+
+function Separator() {
+  return (
+    <span aria-hidden className="text-[var(--ink-4)]">
+      ·
+    </span>
+  )
+}
+
+/** Waaróm een kans geen verloop heeft — kwalitatieve tekst; het jaartal volgt
+ *  het actieve belastingjaar (`year`-prop), net als de aanname-chips. */
+function trajectoryNote(o: Opportunity, year: TaxYear): string | null {
+  if (o.trajectory) return null
+  if (o.kind === 'jaarruimte') return 'n.v.t. — deze kans zit in Box 1'
+  if (o.strategy?.kind === 'partnerverdeling') return `verdeling is voor ${year} doorgerekend`
+  return null
+}
+
 const WINNER_TINT = 'color-mix(in srgb, var(--positive) 6%, transparent)'
 
 /**
@@ -289,12 +379,14 @@ function CompareTable({
   winner,
   onOpenDetail,
   fc,
+  year,
 }: {
   baseline: OptimizerStrategy | null
   opportunities: Opportunity[]
   winner: Opportunity | null
   onOpenDetail: (id: string) => void
   fc: (v: number) => string
+  year: TaxYear
 }) {
   const scrollerRef = useRef<HTMLDivElement | null>(null)
   const [scrolled, setScrolled] = useState(false)
@@ -433,6 +525,29 @@ function CompareTable({
                 >
                   {signed(o.netEffect, fc)}
                 </Td>
+              ))}
+            </tr>
+
+            {/* Verloop staat ná de netto-sluitrij: die blijft daarmee de
+                zwaarste rij van het geld-deel, en het meerjarig verloop leest
+                als context erna — niet als onderbreking ervóór. */}
+            <GroupRow label="Verloop" span={cols} note="2028 = indicatie beoogd stelsel" />
+            <tr>
+              <Th>
+                Heffing over de jaren
+                <span className="mt-0.5 block font-mono text-[9.5px] uppercase tracking-[0.12em] text-[var(--ink-4)]">
+                  2025 · 2026 · ≈ 2028
+                </span>
+              </Th>
+              <TrajectoryTd trajectory={baseline?.trajectory ?? null} fc={fc} />
+              {opportunities.map((o) => (
+                <TrajectoryTd
+                  key={o.id}
+                  trajectory={o.trajectory}
+                  note={trajectoryNote(o, year)}
+                  fc={fc}
+                  style={winnerCell(o)}
+                />
               ))}
             </tr>
 
