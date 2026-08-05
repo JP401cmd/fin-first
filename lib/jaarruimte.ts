@@ -254,6 +254,45 @@ export function estimateFactorAFromSalary(
   return Math.round(factorA * 100) / 100
 }
 
+/**
+ * Schat het tot nu toe **opgebouwde bruto werkgeverspensioen per maand**
+ * (ex AOW) uit het bruto jaarsalaris en het aantal jaren pensioenopbouw —
+ * de "help me schatten"-route van de onboarding-pensioenstap.
+ *
+ * Compositie van {@link estimateFactorAFromSalary} (géén eigen formule):
+ * opgebouwd jaarpensioen ≈ factor A × dienstjaren, met factor A = opbouw% ×
+ * (salaris − franchise). Aannames: het huidige salaris als benadering van het
+ * middelloon over de hele loopbaan, en het fiscale MAXIMUM-opbouwpercentage
+ * (1,875%, art. 18a Wet LB) — veel regelingen bouwen langzamer op, dus de
+ * uitkomst is eerder een boven- dan een ondergrens ("grof mag — later
+ * aanpasbaar"; de UI-hint benoemt dit expliciet).
+ *
+ * **Indicatie, geen UPO-getal.** Werkelijke regelingen wijken af in franchise,
+ * opbouwpercentage en salarisverloop; een mijnpensioen.nl-upload wint altijd.
+ *
+ * @param grossYearlySalary  Bruto jaarsalaris (incl. vakantiegeld) in €.
+ * @param yearsWorked        Jaren pensioenopbouw via werkgever(s), geklemd op [0, 60].
+ * @param opts               Doorgegeven aan {@link estimateFactorAFromSalary}.
+ * @returns Geschat opgebouwd bruto pensioen per maand in € (≥ 0, hele euro's).
+ */
+export function estimateAccruedPensionMonthly(
+  grossYearlySalary: number,
+  yearsWorked: number,
+  opts: {
+    year?: JaarruimteJaar
+    franchise?: number
+    opbouwPct?: number
+  } = {},
+): number {
+  if (!Number.isFinite(grossYearlySalary) || grossYearlySalary <= 0) return 0
+  if (!Number.isFinite(yearsWorked)) return 0
+  const years = Math.min(Math.max(0, yearsWorked), 60)
+  if (years <= 0) return 0
+
+  const factorA = estimateFactorAFromSalary(grossYearlySalary, opts)
+  return Math.round((factorA * years) / 12)
+}
+
 /** Resultaat van {@link resolvePensionFactorA}. */
 export interface ResolvedPensionFactorA {
   /**

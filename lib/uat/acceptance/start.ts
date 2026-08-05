@@ -297,13 +297,13 @@ const criteria: AcceptanceCriterion[] = [
     scenarioId: 'UAT-START-20',
     titel: 'Pensioen opgeven tijdens onboarding (schatting, upload of overslaan)',
     kriticiteit: 'KERN',
-    given: 'De pensioen-stap (groep 5/7): schatting-pad met ingangsleeftijd-invoer, geklemd tussen 50 en 75 met default 67.',
+    given: 'De pensioen-stap (groep 5/7): schatting-pad met ingangsleeftijd-invoer, geklemd tussen 50 en 75, met de AOW-leeftijd van de gebruiker als fallback (placeholder + hint tonen die leeftijd; een inschat-hulp kan het bedrag vullen uit bruto jaarsalaris × jaren opbouw).',
     when: 'De gebruiker vult een geldige ingangsleeftijd binnen het bereik (75, de bovengrens) resp. laat het veld leeg/ongeldig in.',
-    then: 'Een geldige waarde binnen [50,75] (bv. 75) wordt ongewijzigd overgenomen; een ontbrekende/ongeldige waarde valt terug op de default 67.',
+    then: 'Een geldige waarde binnen [50,75] (bv. 75) wordt ongewijzigd overgenomen; een ontbrekende/ongeldige waarde valt terug op de AOW-leeftijd van de gebruiker (uit `aow_leeftijd` o.b.v. geboortedatum, bv. 68); zonder geboortedatum/AOW-rijen blijft 67 de laatste fallback.',
     assertion: {
       kind: 'exact',
-      expected: 'ingangsleeftijdGeldig=75; ingangsleeftijdDefault=67',
-      source: 'app/(onboarding)/onboarding/page.tsx r610-620 (isFinite(parsedAge) && parsedAge>=50 && parsedAge<=75 ? parsedAge : 67, gemirrord) — zie start-checks.ts',
+      expected: 'ingangsleeftijdGeldig=75; ingangsleeftijdAowFallback=68; ingangsleeftijdDefault=67',
+      source: 'app/(onboarding)/onboarding/page.tsx buildPensionParseResult(p, fallbackAge) — leeg/ongeldig → geklemde AOW-fallback, anders 67 (gemirrord) — zie start-checks.ts',
     },
   },
   {
@@ -343,7 +343,7 @@ const criteria: AcceptanceCriterion[] = [
     then: 'Groene herstel-melding, terug op de opgeslagen stap — MAAR naam/geboortedatum/bedragen zijn bewust leeg (alleen stap-positie/keuzes hersteld); een poging om direct af te ronden wordt door de finish-guard teruggestuurd naar de eerste onvolledige verplichte stap.',
     assertion: {
       kind: 'ui-only',
-      source: 'app/(onboarding)/onboarding/draft-persistence.ts (serializeDraft/sanitizeStoredDraft/firstIncompleteRequiredStep), geen cijfermatige uitkomst',
+      source: 'app/(onboarding)/onboarding/draft-persistence.ts (serializeDraft/sanitizeStoredDraft/firstIncompleteRequiredStep) + app/(onboarding)/onboarding/page.tsx (restoreChecked-poort: persisteren mag pas ná de restore-poging), geen cijfermatige uitkomst',
     },
   },
   {

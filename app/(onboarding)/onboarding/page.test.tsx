@@ -571,6 +571,28 @@ describe('onboarding buildPensionParseResult', () => {
     expect(result!.regelingen[0].ingangLeeftijd).toBe(67)
   })
 
+  it('lege startAge + expliciete AOW-fallback → ingangLeeftijd = AOW-leeftijd', () => {
+    const result = buildPensionParseResult(
+      { mode: 'estimate', grossMonthly: '1200', startAge: '', parseResult: null },
+      68,
+    )
+    expect(result!.regelingen[0].ingangLeeftijd).toBe(68)
+  })
+
+  it('ingevulde startAge wint van de AOW-fallback; onzinnige fallback klemt op 67', () => {
+    const explicit = buildPensionParseResult(
+      { mode: 'estimate', grossMonthly: '1200', startAge: '63', parseResult: null },
+      68,
+    )
+    expect(explicit!.regelingen[0].ingangLeeftijd).toBe(63)
+
+    const weird = buildPensionParseResult(
+      { mode: 'estimate', grossMonthly: '1200', startAge: '', parseResult: null },
+      120,
+    )
+    expect(weird!.regelingen[0].ingangLeeftijd).toBe(67)
+  })
+
   it('returns null for an empty/zero estimate', () => {
     expect(
       buildPensionParseResult({ mode: 'estimate', grossMonthly: '', startAge: '', parseResult: null }),

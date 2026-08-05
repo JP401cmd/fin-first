@@ -383,6 +383,8 @@ export function QuickAddWizard({
         // valt dan terug op de type-defaults).
         repayment_type: draft.repayment_type ?? null,
         start_date: draft.start_date ?? null,
+        // Looptijd-leningen-only: werkelijke aflossing per maand (optioneel).
+        monthly_payment: draft.monthly_payment ?? null,
         linked_asset_id: linkedAssetId ?? draft.linked_asset_id ?? null,
       }
       void submitQuickAdd({ kind: 'debt', debt: complete })
@@ -466,6 +468,9 @@ export function QuickAddWizard({
           // eigen woning) krijgt dezelfde aflossingsvorm/ingangsdatum-velden.
           repayment_type: debtDraft.repayment_type ?? null,
           start_date: debtDraft.start_date ?? null,
+          // Looptijd-leningen-only (bv. autolening bij een voertuig):
+          // werkelijke aflossing per maand (optioneel).
+          monthly_payment: debtDraft.monthly_payment ?? null,
         },
       })
     }

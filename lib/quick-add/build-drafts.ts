@@ -235,8 +235,14 @@ export function buildAssetDraft(input: AssetQuickInput): AssetDraft {
   }
 }
 
-/** Default rente (%) als de user het veld leeg laat. */
-function defaultInterestRate(debt_type: DebtType): number {
+/**
+ * Default rente (%) als de user het veld leeg laat. Geëxporteerd zodat de
+ * aflossing-hint in de wizard (`DebtAflossingField`) met exact dezelfde
+ * rente-default rekent als de uiteindelijke draft — anders toont de hint bij
+ * een geleegd rente-veld (bv. dga_schuld: 0% vs 2,5%) een ander maandbedrag
+ * dan wat er werkelijk wordt opgeslagen.
+ */
+export function defaultInterestRate(debt_type: DebtType): number {
   if (debt_type === 'credit_card') return 14
   if (debt_type === 'dga_schuld') return 2.5
   return 0
@@ -256,6 +262,7 @@ export function buildDebtDraft(input: DebtQuickInput): DebtDraft {
     linked_asset_id,
     repayment_type: inputRepayment,
     start_date: inputStartDate,
+    monthly_payment: inputMonthlyPayment,
   } = input
 
   // Startdatum: user-invoer (hypotheek) wint van "vandaag". Een ongeldige of
@@ -284,9 +291,22 @@ export function buildDebtDraft(input: DebtQuickInput): DebtDraft {
     if (rente != null) interest_rate = rente
   }
 
-  // Bereken monthly_payment met type-specifieke uitzonderingen.
+  // Bereken monthly_payment met type-specifieke uitzonderingen. Een expliciet
+  // door de gebruiker opgegeven aflossing (het optionele wizard-veld voor
+  // looptijd-leningen) wint van élk berekend pad — de werkelijke aflossing van
+  // een lopende lening klopt per definitie beter dan de schatting uit
+  // saldo/rente/default-looptijd.
+  const explicitMonthly =
+    typeof inputMonthlyPayment === 'number' &&
+    Number.isFinite(inputMonthlyPayment) &&
+    inputMonthlyPayment >= 0
+      ? inputMonthlyPayment
+      : null
+
   let monthly_payment: number
-  if (debt_type === 'payment_plan' && userProvidedMonthly != null) {
+  if (explicitMonthly != null) {
+    monthly_payment = Math.round(explicitMonthly * 100) / 100
+  } else if (debt_type === 'payment_plan' && userProvidedMonthly != null) {
     monthly_payment = Math.round(userProvidedMonthly * 100) / 100
   } else if (debt_type === 'belastingschuld') {
     // Totaalbedrag / 12 als eenjarig aflosschema (lineair, 1 jaar).

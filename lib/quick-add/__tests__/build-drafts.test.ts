@@ -277,4 +277,71 @@ describe('buildDebtDraft', () => {
     expect(draft.include_aflossing_in_savings).toBe(true)
     expect(draft.interest_rate).toBe(3.2)
   })
+
+  // ── Expliciete aflossing per maand (monthly_payment) ─────────────────
+
+  it('car_loan: expliciete monthly_payment wint van de berekende default', () => {
+    const draft = buildDebtDraft({
+      debt_type: 'car_loan',
+      name: 'Autolening',
+      current_balance: 28700,
+      field3: 6.5,
+      monthly_payment: 450,
+    })
+    expect(draft.monthly_payment).toBe(450)
+    expect(draft.minimum_payment).toBe(450)
+    // Overige afleiding blijft intact (rente, looptijd 5j).
+    expect(draft.interest_rate).toBe(6.5)
+    expect(draft.end_date).toBe(addYearsIso(todayIso(), 5))
+  })
+
+  it('car_loan: zonder monthly_payment blijft de berekende default staan (regressie)', () => {
+    const withField = buildDebtDraft({
+      debt_type: 'car_loan',
+      name: 'Autolening',
+      current_balance: 28700,
+      field3: 6.5,
+    })
+    const withNull = buildDebtDraft({
+      debt_type: 'car_loan',
+      name: 'Autolening',
+      current_balance: 28700,
+      field3: 6.5,
+      monthly_payment: null,
+    })
+    // null = niet ingevuld → identiek aan weglaten (annuïteit over 5 jaar).
+    expect(withNull.monthly_payment).toBe(withField.monthly_payment)
+    expect(withField.monthly_payment).toBeGreaterThan(0)
+  })
+
+  it('monthly_payment=0 is een expliciete keuze (geen terugval op de default)', () => {
+    // Bv. een familielening die tijdelijk niet wordt afgelost.
+    const draft = buildDebtDraft({
+      debt_type: 'familielening',
+      name: 'Lening ouders',
+      current_balance: 20000,
+      monthly_payment: 0,
+    })
+    expect(draft.monthly_payment).toBe(0)
+    expect(draft.minimum_payment).toBe(0)
+  })
+
+  it('payment_plan: field3 (maandbedrag) blijft werken; expliciete monthly_payment wint zelfs daar', () => {
+    const viaField3 = buildDebtDraft({
+      debt_type: 'payment_plan',
+      name: 'Regeling',
+      current_balance: 2400,
+      field3: 100,
+    })
+    expect(viaField3.monthly_payment).toBe(100)
+
+    const viaBoth = buildDebtDraft({
+      debt_type: 'payment_plan',
+      name: 'Regeling',
+      current_balance: 2400,
+      field3: 100,
+      monthly_payment: 125,
+    })
+    expect(viaBoth.monthly_payment).toBe(125)
+  })
 })

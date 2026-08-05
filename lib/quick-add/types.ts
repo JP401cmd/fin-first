@@ -75,6 +75,16 @@ export interface DebtQuickInput {
    * de twee koppel-mechanismen (DB-id vs. client-token) elkaar niet bijten.
    */
   linked_client_ref?: string | null
+  /**
+   * Werkelijke aflossing per maand (€) — optioneel uitgevraagd voor de
+   * looptijd-leningen in `DEBT_MONTHLY_PAYMENT_FIELD_TYPES` (autolening,
+   * persoonlijke lening, studielening, familielening, DGA-schuld). Vult de
+   * bestaande `debts.monthly_payment`-kolom; `undefined`/`null` ⇒
+   * `buildDebtDraft` valt terug op de berekende default
+   * (`computeDefaultMonthlyPayment`). Types met een eigen maandbedrag-pad
+   * (payment_plan via field3, belastingschuld, creditcard) laten dit leeg.
+   */
+  monthly_payment?: number | null
 }
 
 export type QuickAddInput =

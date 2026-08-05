@@ -42,17 +42,26 @@ function Host({
   onNext = vi.fn(),
   onSkip = vi.fn(),
   samenwonend = false,
+  aowAge,
+  onData,
 }: {
   onNext?: () => void
   onSkip?: () => void
   samenwonend?: boolean
+  aowAge?: number
+  /** Spy op elke draft-update — voor asserts op de toegepaste schatting. */
+  onData?: (data: PensionDraft) => void
 }) {
   const [data, setData] = useState<PensionDraft>(INITIAL_PENSION_DRAFT)
   return (
     <OnboardingPensioen
       data={data}
-      onChange={setData}
+      onChange={(next) => {
+        setData(next)
+        onData?.(next)
+      }}
       samenwonend={samenwonend}
+      aowAge={aowAge}
       onNext={onNext}
       onSkip={onSkip}
       onBack={vi.fn()}
@@ -95,5 +104,80 @@ describe('OnboardingPensioen', () => {
     expect(footerButton('Verder').disabled).toBe(true)
     fireEvent.click(screen.getByTestId('pension-upload'))
     expect(footerButton('Verder').disabled).toBe(false)
+  })
+
+  // ── Inschat-hulp (salaris × NL-opbouw × jaren) ─────────────────────────
+
+  it('inschat-hulp: salaris + jaren → "Neem over" vult bedrag én zet ingangsleeftijd op de AOW-leeftijd', () => {
+    const updates: PensionDraft[] = []
+    render(<Host aowAge={68} onData={(d) => updates.push(d)} />)
+    fireEvent.click(screen.getByText('Schat het zelf'))
+    fireEvent.click(screen.getByText(/Help me schatten/))
+
+    fireEvent.change(screen.getByLabelText(/Bruto jaarsalaris/i), {
+      target: { value: '50000' },
+    })
+    fireEvent.change(screen.getByLabelText(/Jaren pensioenopbouw/i), {
+      target: { value: '15' },
+    })
+
+    // Indicatie verschijnt met de geformuleerde AOW-leeftijd in de zin
+    // (default-label "68 jaar" — display-drift-lock: nooit een kale ceil).
+    expect(screen.getByText(/vanaf je AOW-leeftijd \(68 jaar\)/)).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Neem over' }))
+    const last = updates[updates.length - 1]
+    // Zelfde canonieke helper als de component gebruikt (lib/jaarruimte):
+    // €50.000, 15 jaar → > 0 en gelijk aan het draft-bedrag.
+    expect(Number(last.grossMonthly)).toBeGreaterThan(0)
+    expect(last.startAge).toBe('68')
+    // "Verder" is nu enabled — de schatting telt als ingevulde waarde.
+    expect(footerButton('Verder').disabled).toBe(false)
+  })
+
+  it('inschat-hulp: salaris onder de AOW-franchise toont de €0-uitleg zonder overneem-knop', () => {
+    render(<Host />)
+    fireEvent.click(screen.getByText('Schat het zelf'))
+    fireEvent.click(screen.getByText(/Help me schatten/))
+
+    fireEvent.change(screen.getByLabelText(/Bruto jaarsalaris/i), {
+      target: { value: '15000' },
+    })
+    fireEvent.change(screen.getByLabelText(/Jaren pensioenopbouw/i), {
+      target: { value: '10' },
+    })
+
+    expect(screen.getByText(/Onder de AOW-franchise/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Neem over' })).toBeNull()
+  })
+
+  it('leeftijdsveld: placeholder en hint volgen de aangeleverde AOW-leeftijd', () => {
+    render(<Host aowAge={68} />)
+    fireEvent.click(screen.getByText('Schat het zelf'))
+    const age = screen.getByLabelText(/Verwachte ingangsleeftijd/i) as HTMLInputElement
+    expect(age.placeholder).toBe('68')
+    expect(screen.getByText(/Leeg laten = je AOW-leeftijd \(68 jaar\)/)).toBeTruthy()
+  })
+
+  it('leeftijdsveld: een expliciet aowAgeLabel ("67 jaar en 3 maanden") wint van de default', () => {
+    render(
+      <OnboardingPensioen
+        data={{ ...INITIAL_PENSION_DRAFT, mode: 'estimate' }}
+        onChange={vi.fn()}
+        samenwonend={false}
+        aowAge={68}
+        aowAgeLabel="67 jaar en 3 maanden"
+        onNext={vi.fn()}
+        onSkip={vi.fn()}
+        onBack={vi.fn()}
+      />,
+    )
+    // Functionele waarde (ceil, 68) blijft de placeholder; de lopende tekst
+    // toont de exacte SVB-formulering.
+    const age = screen.getByLabelText(/Verwachte ingangsleeftijd/i) as HTMLInputElement
+    expect(age.placeholder).toBe('68')
+    expect(
+      screen.getByText(/Leeg laten = je AOW-leeftijd \(67 jaar en 3 maanden\)/),
+    ).toBeTruthy()
   })
 })

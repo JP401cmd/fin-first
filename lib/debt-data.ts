@@ -1048,6 +1048,23 @@ export const DEBT_QUICK_ADD_FIELD3: Record<DebtType, DebtField3Kind> = {
 }
 
 /**
+ * Schuldtypes waarvoor de quick-add-wizard een optioneel "Aflossing per
+ * maand"-veld toont: looptijd-leningen met een vast maandbedrag dat de
+ * gebruiker doorgaans kent (uit het leningcontract of de afschrijving).
+ * Bewust NIET: mortgage (eigen aflossingsvorm/ingangsdatum-velden),
+ * payment_plan (field3 ís het maandbedrag), belastingschuld (vast
+ * 12-maandsschema) en creditcard/doorlopend krediet (geen vaste aflossing).
+ * Leeg laten ⇒ `buildDebtDraft` valt terug op `computeDefaultMonthlyPayment`.
+ */
+export const DEBT_MONTHLY_PAYMENT_FIELD_TYPES: readonly DebtType[] = [
+  'car_loan',
+  'personal_loan',
+  'student_loan',
+  'familielening',
+  'dga_schuld',
+] as const
+
+/**
  * Bereken de default maandbedrag voor een schuld op basis van saldo,
  * rente, looptijd en aflossingstype. Gebruikt door `buildDebtDraft`,
  * maar kan later ook door `debt-form.tsx` worden hergebruikt als

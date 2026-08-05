@@ -31,6 +31,7 @@ import {
 } from '@/components/onboarding/onboarding-uitgaven-pensioen'
 import { OnboardingKlaar } from '@/components/onboarding/onboarding-klaar'
 import { applyPensionParseResult } from '@/lib/pension/apply-parse-result'
+import { formatAowAge, lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import type { PensionParseResult } from '@/app/api/pension/parse/route'
 import { SPAARDOEL_PRESETS, type SpaardoelPresetKey } from '@/lib/onboarding-presets'
 import { INITIAL_HORIZON_DATA } from '@/components/onboarding/onboarding-horizon'
@@ -607,17 +608,29 @@ function parseSpaardoelAmount(s: string): number {
  *
  * - `upload` → het reeds geparste resultaat (mijnpensioen JSON / AI-PDF).
  * - `estimate` → één synthetische ouderdomspensioen-regeling uit het bruto
- *   maandbedrag (+ optionele ingangsleeftijd, default 67, geklemd 50–75).
+ *   maandbedrag (+ optionele ingangsleeftijd; leeg = `fallbackAge` — de
+ *   AOW-leeftijd van de gebruiker, default 67 — geklemd 50–75).
  * - Niets ingevuld / overgeslagen → `null` (geen write).
  */
-export function buildPensionParseResult(p: PensionDraft): PensionParseResult | null {
+export function buildPensionParseResult(
+  p: PensionDraft,
+  fallbackAge: number = 67,
+): PensionParseResult | null {
   if (p.mode === 'upload' && p.parseResult) return p.parseResult
   if (p.mode === 'estimate') {
     const gross = parseBedragInput(p.grossMonthly)
     if (!isFinite(gross) || gross <= 0) return null
+    // Fallback zelf ook klemmen op 50–75 zodat een gekke aanroep nooit een
+    // onmogelijke ingangsleeftijd in life_events schrijft.
+    const safeFallback =
+      isFinite(fallbackAge) && fallbackAge >= 50 && fallbackAge <= 75
+        ? Math.round(fallbackAge)
+        : 67
     const parsedAge = p.startAge ? parseInt(p.startAge, 10) : NaN
     const ingangLeeftijd =
-      isFinite(parsedAge) && parsedAge >= 50 && parsedAge <= 75 ? parsedAge : 67
+      isFinite(parsedAge) && parsedAge >= 50 && parsedAge <= 75
+        ? parsedAge
+        : safeFallback
     return {
       aowBedrag: null,
       regelingen: [
@@ -672,6 +685,13 @@ export default function OnboardingPage() {
   const [saveMessageIdx, setSaveMessageIdx] = useState(0)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [restoredNotice, setRestoredNotice] = useState(false)
+  // Poort voor het persisteer-effect. Het check-effect hieronder leest het
+  // localStorage-draft pas ná een `await` (getUser + profielquery); zonder
+  // deze poort zou het persisteer-effect al in dezelfde mount-commit het
+  // verse, lege begin-draft over het bestaande draft heen schrijven — de
+  // hervat-voortgang was daarmee weg vóórdat de restore-poging 'm kon lezen
+  // (WF-START-23). Blijft dus `false` tot de restore-poging is afgerond.
+  const [restoreChecked, setRestoreChecked] = useState(false)
 
   // PSD2 bank connect return state — detected via query params from callback redirect.
   // Uses useState instead of useSearchParams to avoid Suspense boundary requirement.
@@ -682,6 +702,13 @@ export default function OnboardingPage() {
   // als ruis). De show-beslissing wordt in de check-effect onderaan genomen
   // — initial false zodat SSR en eerste paint geen popup tonen.
   const [showWelcomePopup, setShowWelcomePopup] = useState(false)
+
+  // AOW-leeftijd-referentierijen voor de pensioenstap (inschat-hulp: verwachte
+  // ingangsleeftijd = AOW-leeftijd). Zelfde bron als save-own-data server-side
+  // (`aow_leeftijd`); publieke referentietabel, geen gebruikersdata — dit
+  // bestand staat als geheel op de datapad-allowlist. Leeg = fallback
+  // NL_AOW_AGE in de component.
+  const [aowRows, setAowRows] = useState<AowLeeftijdRow[]>([])
 
   const activeStepOrder = useMemo(() => computeStepOrder(), [])
 
@@ -714,6 +741,13 @@ export default function OnboardingPage() {
   // Check if already onboarded + restore from localStorage
   useEffect(() => {
     async function check() {
+      // NB: de twee vroege returns hieronder laten `restoreChecked` bewust op
+      // `false` staan. Beide navigeren wég van deze pagina, en in beide
+      // gevallen zou het openzetten van de poort schadelijk zijn: bij
+      // `!user` persisteren we onboarding-voortgang voor een niet-ingelogde
+      // bezoeker, en bij `onboarding_completed` zou het persisteer-effect het
+      // draft dat we net met `clearLocalStorage()` wisten meteen opnieuw
+      // aanmaken. De poort dicht laten is daar de correcte eindtoestand.
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
         window.location.href = '/login'
@@ -731,6 +765,25 @@ export default function OnboardingPage() {
         clearLocalStorage()
         router.replace('/overzicht')
         return
+      }
+
+      // AOW-leeftijd-referentie voor de pensioenstap — best-effort: bij een
+      // fout of lege tabel valt de component terug op NL_AOW_AGE (67).
+      // NB de Supabase-client throwt niet bij een query-fout; expliciet
+      // loggen, anders wordt een tabel-/RLS-regressie hier stil geslikt
+      // (het bug-mechanisme waar aow-surface-consistency.test.ts voor waakt).
+      try {
+        const { data: rows, error: aowErr } = await supabase
+          .from('aow_leeftijd')
+          .select('id, birth_date_from, birth_date_through, aow_years, aow_months, is_definitive, source')
+          .order('birth_date_from', { ascending: true })
+        if (aowErr) {
+          console.warn('[onboarding] aow_leeftijd read faalde:', aowErr.code, aowErr.message)
+        } else if (rows && rows.length > 0) {
+          setAowRows(rows as AowLeeftijdRow[])
+        }
+      } catch {
+        // netwerkfout — fallback op NL_AOW_AGE
       }
 
       // Try to restore previously entered data from localStorage. Sinds de
@@ -774,6 +827,11 @@ export default function OnboardingPage() {
         setShowWelcomePopup(true)
       }
 
+      // Restore-poging is afgerond (met of zonder herstelde draft) — vanaf nu
+      // mag het persisteer-effect schrijven. Staat in dezelfde React-batch als
+      // de eventuele RESTORE_STATE-dispatch hierboven, dus het effect ziet
+      // meteen de herstelde staat en niet de lege beginstaat.
+      setRestoreChecked(true)
       setLoading(false)
     }
     check()
@@ -792,11 +850,29 @@ export default function OnboardingPage() {
     setShowWelcomePopup(false)
   }, [])
 
+  // AOW-leeftijd van deze gebruiker voor de pensioenstap. Twee vormen, bewust
+  // gescheiden (display-drift-lock, zie pensioen-aow-widget): `userAowAge` is
+  // de FUNCTIONELE hele-jaren-waarde (Math.ceil, zelfde conventie als
+  // aow_target_age in save-own-data) voor ingangsleeftijd/placeholder;
+  // `userAowAgeLabel` is de exacte weergave ("67 jaar en 3 maanden",
+  // formatAowAge) voor alle lopende tekst. Zonder geboortedatum of rijen:
+  // NL_AOW_AGE-fallback via lookupAowAge.
+  const { userAowAge, userAowAgeLabel } = useMemo(() => {
+    const aow = lookupAowAge(aowRows, state.identity.date_of_birth || null)
+    return {
+      userAowAge: Math.ceil(aow.fractional),
+      userAowAgeLabel: formatAowAge(aow),
+    }
+  }, [aowRows, state.identity.date_of_birth])
+
   // Persist state to localStorage on every step change (except saving/success).
+  // Gated op `restoreChecked`: schrijven vóórdat de restore-poging klaar is
+  // wist het bestaande draft (zie de poort-toelichting bij de state-declaratie).
   useEffect(() => {
+    if (!restoreChecked) return
     if (['saving', 'success'].includes(state.step)) return
     saveToLocalStorage(state)
-  }, [state])
+  }, [state, restoreChecked])
 
   // ── Handlers ─────────────────────────────────────────────────
 
@@ -1035,7 +1111,7 @@ export default function OnboardingPage() {
       // exposure). Best-effort: een mislukte pensioen-write mag de geslaagde
       // onboarding-save niet terugdraaien — we loggen en gaan door.
       try {
-        const pensionResult = buildPensionParseResult(state.pension)
+        const pensionResult = buildPensionParseResult(state.pension, userAowAge)
         if (pensionResult && userIdRef.current) {
           const outcome = await applyPensionParseResult({
             supabase,
@@ -1082,7 +1158,7 @@ export default function OnboardingPage() {
     } finally {
       setSaving(false)
     }
-  }, [saving, state, activeStepOrder])
+  }, [saving, state, activeStepOrder, userAowAge])
 
   // Defined after handleSaveOwnData so the safety-net branch below can call it
   // without tripping the no-use-before-define rule. goToNext is wired into
@@ -1402,6 +1478,8 @@ export default function OnboardingPage() {
               data={state.pension}
               onChange={(data) => dispatch({ type: 'SET_PENSION', data })}
               samenwonend={state.identity.household_type !== 'solo'}
+              aowAge={userAowAge}
+              aowAgeLabel={userAowAgeLabel}
               onNext={goToNext}
               onBack={goToBack}
               onSkip={() => {

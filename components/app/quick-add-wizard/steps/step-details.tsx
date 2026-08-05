@@ -12,9 +12,12 @@ import {
 import {
   DEBT_DEFAULT_NAMES,
   DEBT_DEFAULT_REPAYMENT_TYPE,
+  DEBT_MONTHLY_PAYMENT_FIELD_TYPES,
   DEBT_QUICK_ADD_FIELD3,
   DEBT_QUICK_ADD_LABELS,
+  DEFAULT_TERM_YEARS_PER_TYPE,
   REPAYMENT_TYPE_LABELS,
+  computeDefaultMonthlyPayment,
   type DebtField3Kind,
   type DebtType,
   type RepaymentType,
@@ -27,6 +30,7 @@ import {
   AssetQuickInputSchema,
   DebtQuickInputSchema,
 } from '@/lib/quick-add/validation'
+import { defaultInterestRate } from '@/lib/quick-add/build-drafts'
 import type { AssetQuickInput, DebtQuickInput } from '@/lib/quick-add/types'
 import type { AssetDraftState, DebtDraftState } from '../wizard-reducer'
 
@@ -80,6 +84,7 @@ type FieldErrors = {
   name?: string
   amount?: string
   field3?: string
+  monthlyPayment?: string
 }
 
 function getCurrentYear(): number {
@@ -230,6 +235,17 @@ export function StepDetails(props: StepDetailsProps) {
       if (value != null && value < 0) next.field3 = 'Bedrag mag niet negatief zijn'
     }
 
+    // Aflossing per maand (looptijd-leningen): het formulier is noValidate,
+    // dus min={0} op de input blokkeert niets — zonder deze check strandt een
+    // negatieve waarde pas op de zod-validatie bij de (eind)save, met een
+    // generieke fout i.p.v. een veldfout.
+    if (!isAsset && DEBT_MONTHLY_PAYMENT_FIELD_TYPES.includes(typeKey as DebtType)) {
+      const mp = (props.draft as DebtDraftState).monthly_payment
+      if (typeof mp === 'number' && mp < 0) {
+        next.monthlyPayment = 'Bedrag mag niet negatief zijn'
+      }
+    }
+
     return next
   }
 
@@ -279,7 +295,7 @@ export function StepDetails(props: StepDetailsProps) {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setTouched({ name: true, amount: true, field3: true })
+    setTouched({ name: true, amount: true, field3: true, monthlyPayment: true })
     const nextErrors = validateAll()
     if (Object.keys(nextErrors).length === 0) {
       props.onSubmit()
@@ -289,6 +305,7 @@ export function StepDetails(props: StepDetailsProps) {
   const showNameError = touched.name && currentErrors.name
   const showAmountError = touched.amount && currentErrors.amount
   const showField3Error = touched.field3 && currentErrors.field3
+  const showMonthlyPaymentError = touched.monthlyPayment && currentErrors.monthlyPayment
 
   const submitLabel = props.submitLabel ?? 'Toevoegen'
 
@@ -417,6 +434,23 @@ export function StepDetails(props: StepDetailsProps) {
           repaymentType={(props.draft as DebtDraftState).repayment_type ?? undefined}
           startDate={(props.draft as DebtDraftState).start_date ?? undefined}
           onChange={(props as DebtProps).onChange}
+          palette={palette}
+        />
+      )}
+
+      {/* Looptijd-leningen (autolening, persoonlijke lening, studielening,
+          familielening, DGA-schuld): optionele werkelijke aflossing per maand.
+          Vult debts.monthly_payment; leeg ⇒ buildDebtDraft berekent de default
+          uit saldo/rente/looptijd (computeDefaultMonthlyPayment). */}
+      {!isAsset && DEBT_MONTHLY_PAYMENT_FIELD_TYPES.includes(typeKey as DebtType) && (
+        <DebtAflossingField
+          idBase={nameListId}
+          debtType={typeKey as DebtType}
+          balance={typeof draftAmount === 'number' ? draftAmount : null}
+          rateRaw={field3Raw}
+          onChange={(props as DebtProps).onChange}
+          onBlur={() => setTouched((t) => ({ ...t, monthlyPayment: true }))}
+          error={showMonthlyPaymentError ? currentErrors.monthlyPayment : undefined}
           palette={palette}
         />
       )}
@@ -632,6 +666,114 @@ function SavingsRenteField({ idBase, value, onChange, palette }: SavingsRenteFie
       </div>
       <p className="mt-1 text-[11px] text-[var(--ink-4)] leading-relaxed">
         De werkelijke spaarrente van je bank. Laat staan als je het niet weet.
+      </p>
+    </div>
+  )
+}
+
+// ── Looptijd-lening-extra: aflossing per maand ────────────────────
+//
+// Eén optioneel veld dat alleen verschijnt bij de schuldtypes in
+// `DEBT_MONTHLY_PAYMENT_FIELD_TYPES`. Schrijft rechtstreeks naar
+// `DebtQuickInput.monthly_payment`. Blijft leeg ⇒ `buildDebtDraft` berekent
+// de default uit saldo/rente/looptijd via `computeDefaultMonthlyPayment` —
+// die schatting tonen we als hint zodat de gebruiker ziet wat er wordt
+// opgeslagen als hij niets invult (zelfde patroon als SavingsRenteField).
+
+interface DebtAflossingFieldProps {
+  idBase: string
+  debtType: DebtType
+  /** Huidig saldo uit het bedrag-veld — voor de default-schatting in de hint. */
+  balance: number | null
+  /** Rauwe rente-invoer (field3) — voor dezelfde schatting. */
+  rateRaw: string
+  onChange: (patch: Partial<DebtQuickInput>) => void
+  onBlur: () => void
+  error: string | undefined
+  palette: (typeof PALETTE)['asset'] | (typeof PALETTE)['debt']
+}
+
+function DebtAflossingField({
+  idBase,
+  debtType,
+  balance,
+  rateRaw,
+  onChange,
+  onBlur,
+  error,
+  palette,
+}: DebtAflossingFieldProps) {
+  const aflossingId = `${idBase}-aflossing`
+  const [raw, setRaw] = useState<string>('')
+
+  // Dezelfde default die buildDebtDraft zou berekenen wanneer het veld leeg
+  // blijft — geconsumeerd uit de canonieke helpers, niet herberekend. Een
+  // geleegd rente-veld valt op dezelfde per-type rente-default terug als de
+  // draft (defaultInterestRate — bv. dga_schuld 2,5%), anders zou de hint
+  // een ander bedrag beloven dan wat er wordt opgeslagen.
+  const rate = parseNumberInput(rateRaw)
+  const defaultEstimate =
+    balance != null && balance > 0
+      ? computeDefaultMonthlyPayment(
+          balance,
+          rate ?? defaultInterestRate(debtType),
+          DEFAULT_TERM_YEARS_PER_TYPE[debtType],
+          DEBT_DEFAULT_REPAYMENT_TYPE[debtType],
+        )
+      : null
+
+  const borderClass = error
+    ? 'border-[var(--negative)] focus:border-[var(--negative)] focus:ring-1 focus:ring-[var(--negative)]'
+    : `border-[var(--border-ed)] focus:ring-1 ${palette.focusBorder}`
+
+  return (
+    <div>
+      <label
+        htmlFor={aflossingId}
+        className="mb-1.5 block text-xs font-medium text-[var(--ink-2)]"
+      >
+        Aflossing per maand{' '}
+        <span className="font-normal text-[var(--ink-4)]">(optioneel)</span>
+      </label>
+      <div className="relative">
+        <span
+          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm tabular-nums text-[var(--ink-4)]"
+          aria-hidden="true"
+        >
+          &euro;
+        </span>
+        <input
+          id={aflossingId}
+          type="number"
+          inputMode="decimal"
+          step={10}
+          min={0}
+          value={raw}
+          placeholder={defaultEstimate != null && defaultEstimate > 0 ? String(Math.round(defaultEstimate)) : undefined}
+          onChange={(e) => {
+            setRaw(e.target.value)
+            onChange({ monthly_payment: parseNumberInput(e.target.value) ?? null })
+          }}
+          onBlur={onBlur}
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? `${aflossingId}-error` : undefined}
+          className={`w-full border bg-[var(--paper)] py-2.5 pl-8 pr-3 font-mono text-base tabular-nums text-[var(--ink)] outline-none transition-colors ${borderClass}`}
+        />
+      </div>
+      {error && (
+        <p
+          id={`${aflossingId}-error`}
+          role="alert"
+          className="mt-1 text-[11px] text-[var(--negative)]"
+        >
+          {error}
+        </p>
+      )}
+      <p className="mt-1 text-[11px] text-[var(--ink-4)] leading-relaxed">
+        Wat je nu maandelijks aflost (zie je leningcontract of afschrijving).
+        {defaultEstimate != null && defaultEstimate > 0
+          ? ` Leeg laten = schatting van €${Math.round(defaultEstimate)} per maand.`
+          : ' Leeg laten mag — dan schatten we het voor je.'}
       </p>
     </div>
   )

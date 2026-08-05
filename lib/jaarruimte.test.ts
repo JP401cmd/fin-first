@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   computeJaarruimte,
   jaarruimteBesparing,
+  estimateAccruedPensionMonthly,
   estimateFactorAFromSalary,
   resolvePensionFactorA,
   JAARRUIMTE_OPBOUW_PCT,
@@ -310,6 +311,41 @@ describe('estimateFactorAFromSalary — salaris-gebaseerde schatter', () => {
     const factorA = estimateFactorAFromSalary(50_000, { year: 2026 })
     const jr = computeJaarruimte(50_000, factorA, 2026)
     expect(jr.jaarruimte).toBe(5624)
+  })
+})
+
+// ── estimateAccruedPensionMonthly — onboarding "help me schatten" ──────────────
+describe('estimateAccruedPensionMonthly', () => {
+  it('componeert factor A × jaren / 12 — bekende case 2026', () => {
+    // €50.000 salaris → factor A 578,03 (zie schatter-case hierboven).
+    // 15 jaar opbouw: 578,03 × 15 / 12 = 722,53... → Math.round = 723 €/mnd.
+    const monthly = estimateAccruedPensionMonthly(50_000, 15, { year: 2026 })
+    const factorA = estimateFactorAFromSalary(50_000, { year: 2026 })
+    expect(monthly).toBe(Math.round((factorA * 15) / 12))
+    expect(monthly).toBe(723)
+  })
+
+  it('salaris onder de franchise → €0 (geen negatieve opbouw)', () => {
+    expect(
+      estimateAccruedPensionMonthly(JAARRUIMTE_FRANCHISE_2026 - 1_000, 20, {
+        year: 2026,
+      }),
+    ).toBe(0)
+  })
+
+  it('0 of negatieve jaren → €0; jaren worden geklemd op 60', () => {
+    expect(estimateAccruedPensionMonthly(50_000, 0)).toBe(0)
+    expect(estimateAccruedPensionMonthly(50_000, -5)).toBe(0)
+    // 120 jaar wordt geklemd op 60 — identiek aan 60.
+    expect(estimateAccruedPensionMonthly(50_000, 120)).toBe(
+      estimateAccruedPensionMonthly(50_000, 60),
+    )
+  })
+
+  it('ongeldige invoer (NaN/negatief salaris) → €0', () => {
+    expect(estimateAccruedPensionMonthly(Number.NaN, 10)).toBe(0)
+    expect(estimateAccruedPensionMonthly(-40_000, 10)).toBe(0)
+    expect(estimateAccruedPensionMonthly(50_000, Number.NaN)).toBe(0)
   })
 })
 

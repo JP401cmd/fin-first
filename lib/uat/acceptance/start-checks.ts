@@ -86,9 +86,17 @@ function spaarquotePreview(maandinkomen: number, maanduitgaven: number): number 
 }
 
 /** Mirror van de ingangsleeftijd-klem in app/(onboarding)/onboarding/page.tsx
- *  r610-620: geldig binnen [50,75] blijft ongewijzigd, anders default 67. */
-function resolveIngangsleeftijd(raw: number | undefined): number {
-  return raw !== undefined && Number.isFinite(raw) && raw >= 50 && raw <= 75 ? raw : 67
+ *  (buildPensionParseResult): geldig binnen [50,75] blijft ongewijzigd, anders
+ *  de AOW-fallback (de AOW-leeftijd van de gebruiker, zelf ook geklemd op
+ *  [50,75]; zonder geboortedatum/AOW-rijen 67). */
+function resolveIngangsleeftijd(raw: number | undefined, aowFallback = 67): number {
+  const safeFallback =
+    Number.isFinite(aowFallback) && aowFallback >= 50 && aowFallback <= 75
+      ? Math.round(aowFallback)
+      : 67
+  return raw !== undefined && Number.isFinite(raw) && raw >= 50 && raw <= 75
+    ? raw
+    : safeFallback
 }
 
 /** Mirror van `netWorthForKlaar` (app/(onboarding)/onboarding/page.tsx): directe
@@ -216,14 +224,17 @@ export const START_ENGINE_CHECKS: StartEngineCheck[] = [
   {
     workflow: 'WF-START-20',
     scenarioId: 'UAT-START-20',
-    label: 'Pensioen-ingangsleeftijd-klem (geldige bovengrens 75 vs. ontbrekende invoer → default 67)',
+    label: 'Pensioen-ingangsleeftijd-klem (geldige bovengrens 75 vs. ontbrekende invoer → AOW-fallback)',
     run: () => {
       criterion('WF-START-20')
-      const geldig = resolveIngangsleeftijd(75)
-      const ontbrekend = resolveIngangsleeftijd(undefined)
+      const geldig = resolveIngangsleeftijd(75, 68)
+      // Ontbrekend → AOW-leeftijd van de gebruiker (hier 68); zonder
+      // AOW-data blijft 67 de laatste fallback.
+      const ontbrekendMetAow = resolveIngangsleeftijd(undefined, 68)
+      const ontbrekendZonderAow = resolveIngangsleeftijd(undefined)
       return {
-        expected: 'ingangsleeftijdGeldig=75; ingangsleeftijdDefault=67',
-        actual: `ingangsleeftijdGeldig=${geldig}; ingangsleeftijdDefault=${ontbrekend}`,
+        expected: 'ingangsleeftijdGeldig=75; ingangsleeftijdAowFallback=68; ingangsleeftijdDefault=67',
+        actual: `ingangsleeftijdGeldig=${geldig}; ingangsleeftijdAowFallback=${ontbrekendMetAow}; ingangsleeftijdDefault=${ontbrekendZonderAow}`,
       }
     },
   },

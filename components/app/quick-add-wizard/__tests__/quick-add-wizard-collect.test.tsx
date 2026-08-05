@@ -111,6 +111,103 @@ describe('QuickAddWizard — collect-modus, eigen woning', () => {
     expect((screen.getByLabelText('Rente (%)') as HTMLInputElement).value).toBe('2.5')
   })
 
+  it('autolening: optioneel aflossing-veld → monthly_payment in de collect-payload', async () => {
+    const onCollect = vi.fn()
+    render(
+      <QuickAddWizard
+        open
+        onClose={vi.fn()}
+        initialIntent="debt"
+        initialDebtType="car_loan"
+        mode="collect"
+        onCollect={onCollect}
+      />,
+    )
+
+    // Autolening heeft géén default-naam (anders dan hypotheek) — invullen dus.
+    fireEvent.change(screen.getByLabelText('Naam'), { target: { value: 'Auto' } })
+    fireEvent.change(screen.getByLabelText('Huidig saldo'), { target: { value: '28700' } })
+    fireEvent.change(screen.getByLabelText(/Aflossing per maand/), { target: { value: '450' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Toevoegen' }))
+
+    await waitFor(() => expect(onCollect).toHaveBeenCalledTimes(1))
+    const arg = onCollect.mock.calls[0][0] as QuickAddInput
+    expect(arg.kind).toBe('debt')
+    if (arg.kind === 'debt') {
+      expect(arg.debt.debt_type).toBe('car_loan')
+      expect(arg.debt.current_balance).toBe(28700)
+      expect(arg.debt.monthly_payment).toBe(450)
+    }
+  })
+
+  it('autolening: aflossing-veld leeg laten → geen monthly_payment in de payload (default-pad)', async () => {
+    const onCollect = vi.fn()
+    render(
+      <QuickAddWizard
+        open
+        onClose={vi.fn()}
+        initialIntent="debt"
+        initialDebtType="car_loan"
+        mode="collect"
+        onCollect={onCollect}
+      />,
+    )
+
+    fireEvent.change(screen.getByLabelText('Naam'), { target: { value: 'Auto' } })
+    fireEvent.change(screen.getByLabelText('Huidig saldo'), { target: { value: '12000' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Toevoegen' }))
+
+    await waitFor(() => expect(onCollect).toHaveBeenCalledTimes(1))
+    const arg = onCollect.mock.calls[0][0] as QuickAddInput
+    if (arg.kind === 'debt') {
+      expect(arg.debt.monthly_payment == null).toBe(true)
+    }
+  })
+
+  it('autolening: negatieve aflossing blokkeert submit met een veldfout (noValidate-vangnet)', async () => {
+    const onCollect = vi.fn()
+    render(
+      <QuickAddWizard
+        open
+        onClose={vi.fn()}
+        initialIntent="debt"
+        initialDebtType="car_loan"
+        mode="collect"
+        onCollect={onCollect}
+      />,
+    )
+
+    fireEvent.change(screen.getByLabelText('Naam'), { target: { value: 'Auto' } })
+    fireEvent.change(screen.getByLabelText('Huidig saldo'), { target: { value: '10000' } })
+    const aflossing = screen.getByLabelText(/Aflossing per maand/)
+    fireEvent.change(aflossing, { target: { value: '-50' } })
+
+    // Zelfde patroon als de overige velden: de submit-knop disable't live op
+    // de fout, en de veldfout verschijnt bij blur (touched).
+    expect(
+      (screen.getByRole('button', { name: 'Toevoegen' }) as HTMLButtonElement).disabled,
+    ).toBe(true)
+    fireEvent.blur(aflossing)
+    expect(await screen.findByText('Bedrag mag niet negatief zijn')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Toevoegen' }))
+    expect(onCollect).not.toHaveBeenCalled()
+  })
+
+  it('creditcard: géén aflossing-veld (type buiten DEBT_MONTHLY_PAYMENT_FIELD_TYPES)', () => {
+    render(
+      <QuickAddWizard
+        open
+        onClose={vi.fn()}
+        initialIntent="debt"
+        initialDebtType="credit_card"
+        mode="collect"
+        onCollect={vi.fn()}
+      />,
+    )
+    expect(screen.queryByLabelText(/Aflossing per maand/)).toBeNull()
+  })
+
   it('"Nee, overslaan" → geeft alleen het huis terug (huis zonder hypotheek blijft geldig)', async () => {
     const onCollect = vi.fn()
     renderCollect(onCollect)

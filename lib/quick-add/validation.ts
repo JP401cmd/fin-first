@@ -95,6 +95,15 @@ export const DebtQuickInputSchema = z.object({
   // Onboarding-only koppel-token (zie DebtQuickInput.linked_client_ref). Geen
   // UUID — matcht met AssetQuickInput.client_ref, niet met een DB-id.
   linked_client_ref: z.string().max(64).nullable().optional(),
+  // Looptijd-leningen-only: werkelijke aflossing per maand (€). Optioneel
+  // zodat andere schuldtypes (en oudere call-sites) ongemoeid blijven;
+  // `buildDebtDraft` valt terug op de berekende default wanneer dit ontbreekt.
+  monthly_payment: z
+    .number()
+    .finite()
+    .min(0, 'Bedrag mag niet negatief zijn')
+    .nullable()
+    .optional(),
 })
 
 /** Debt payload inside `asset_with_debt` — no `linked_asset_id` (server-set). */
