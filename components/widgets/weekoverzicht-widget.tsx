@@ -21,6 +21,20 @@ function nlNum(value: number, decimals = 0): string {
 
 // Day labels in Dutch: ma, di, wo, do, vr, za, zo
 
+/**
+ * Breedte van de dagstaven-sparkline: n staven met (n−1) tussenruimtes ertussen.
+ *
+ * De naïeve vorm `n * (BAR_W + GAP) - GAP` trekt altijd één tussenruimte af,
+ * óók als er geen staven zijn. Bij n = 0 levert dat een NEGATIEVE breedte op,
+ * die als ongeldige viewBox in de DOM belandt ("0 0 -3 70" / "0 0 -8 88") —
+ * de browser weigert de SVG dan te renderen. Door de leegte hier af te vangen
+ * kan een negatieve dimensie niet meer ontstaan, ongeacht de aanroeper.
+ */
+function sparklineWidth(barCount: number, barW: number, gap: number): number {
+  if (barCount <= 0) return 0
+  return barCount * (barW + gap) - gap
+}
+
 function DeltaIndicator({ current, previous, compact = false }: { current: number; previous: number; compact?: boolean }) {
   if (previous <= 0) return null
   const delta = current - previous
@@ -106,7 +120,7 @@ export const WeekoverzichtWidget = memo(function WeekoverzichtWidget({ size, dat
   if (size === 'half') {
     const BAR_W = 14
     const GAP = 3
-    const CHART_W = dailyExpenses.length * (BAR_W + GAP) - GAP
+    const CHART_W = sparklineWidth(dailyExpenses.length, BAR_W, GAP)
     const CHART_H = 56
     const budgetLineY = weekBudget > 0 ? CHART_H - (((weekBudget / 7) / maxDaily) * CHART_H) : -1
 
@@ -130,6 +144,10 @@ export const WeekoverzichtWidget = memo(function WeekoverzichtWidget({ size, dat
             )}
           </div>
           <div className="flex-1 min-w-0 flex flex-col justify-center">
+            {CHART_W === 0 ? (
+              // Geen dag-buckets: een 0-brede sparkline zou een lege plek geven.
+              <p className="text-center text-[10px] text-[var(--ink-4)]">Geen dagdata deze week</p>
+            ) : (
             <svg width="100%" height={CHART_H + 14} viewBox={`0 0 ${CHART_W} ${CHART_H + 14}`} preserveAspectRatio="xMidYMid meet" className="w-full">
               {budgetLineY >= 0 && (
                 <line x1={0} y1={budgetLineY} x2={CHART_W} y2={budgetLineY} stroke="var(--border-md)" strokeWidth={1} strokeDasharray="3 2" />
@@ -151,6 +169,7 @@ export const WeekoverzichtWidget = memo(function WeekoverzichtWidget({ size, dat
                 )
               })}
             </svg>
+            )}
           </div>
         </div>
       </WidgetShell>
@@ -160,7 +179,7 @@ export const WeekoverzichtWidget = memo(function WeekoverzichtWidget({ size, dat
   // Full: chart + top categories with prev-week deltas + prev week comparison
   const BAR_W = 28
   const GAP = 8
-  const CHART_W = dailyExpenses.length * (BAR_W + GAP) - GAP
+  const CHART_W = sparklineWidth(dailyExpenses.length, BAR_W, GAP)
   const CHART_H = 72
   const budgetLineY = weekBudget > 0 ? CHART_H - (((weekBudget / 7) / maxDaily) * CHART_H) : -1
 
@@ -201,6 +220,10 @@ export const WeekoverzichtWidget = memo(function WeekoverzichtWidget({ size, dat
         </div>
 
         {/* Daily bar chart */}
+        {CHART_W === 0 ? (
+          // Geen dag-buckets: een 0-brede sparkline zou een lege plek geven.
+          <p className="text-center text-[11px] text-[var(--ink-4)]">Geen dagdata deze week</p>
+        ) : (
         <svg width="100%" height={CHART_H + 16} viewBox={`0 0 ${CHART_W} ${CHART_H + 16}`} preserveAspectRatio="xMidYMid meet" className="w-full">
           {budgetLineY >= 0 && (
             <line x1={0} y1={budgetLineY} x2={CHART_W} y2={budgetLineY} stroke="var(--border-md)" strokeWidth={1} strokeDasharray="4 3" />
@@ -226,6 +249,7 @@ export const WeekoverzichtWidget = memo(function WeekoverzichtWidget({ size, dat
             )
           })}
         </svg>
+        )}
 
         <div className="border-t border-dashed border-[var(--border-ed)]" />
 

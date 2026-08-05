@@ -209,6 +209,44 @@ describe('GezondheidScoreWidget — full: Bespreek met Fin i.p.v. verbeterpunten
     expect(screen.queryByText('Verbeterpunten')).toBeNull()
   })
 
+  // ── Regressie WF-BEHEER-29-bug3 ────────────────────────────────
+  //
+  // De full-size kaart gaf 'onClick' aan WidgetShell, waardoor die een native
+  // <button> om de hele kaart rendert. Binnen die kaart staan echter zowel de
+  // 'Bespreek met Fin'-knop (<button>) als de 'Bekijk details'-link (<a>).
+  // Geneste interactieve elementen zijn ongeldige HTML: React logde
+  // "button cannot be a descendant of button" en browsers sluiten de
+  // buitenste button voortijdig af, wat het klikgedrag onvoorspelbaar maakt.
+  // De kassabon hangt nu aan de score zelf ("elk getal is klikbaar").
+
+  it('nest geen interactieve elementen in elkaar (geldige HTML, geen hydratiefout)', () => {
+    const { container } = render(<GezondheidScoreWidget size="full" data={bundleWith(health)} />)
+
+    const interactief = container.querySelectorAll('button, a[href]')
+    expect(interactief.length).toBeGreaterThan(0)
+
+    for (const el of Array.from(interactief)) {
+      const genesteldIn = el.parentElement?.closest('button, a[href]')
+      expect(
+        genesteldIn,
+        `<${el.tagName.toLowerCase()}> staat genest in <${genesteldIn?.tagName.toLowerCase()}> — ongeldige HTML`,
+      ).toBeNull()
+    }
+  })
+
+  it('de kaart zelf is geen knop meer, maar de score opent nog wél de kassabon', () => {
+    render(<GezondheidScoreWidget size="full" data={bundleWith(health)} />)
+
+    // Toetsenbordpad intact: een echte, benoemde knop op de score.
+    const scoreKnop = screen.getByRole('button', { name: /opbouw van je financiële gezondheid/i })
+    expect(scoreKnop.getAttribute('aria-haspopup')).toBe('dialog')
+
+    // De kassabon (BottomSheet, via portal) is dicht tot je 'm opent.
+    expect(screen.queryByText('Financiële Gezondheid')).toBeNull()
+    fireEvent.click(scoreKnop)
+    expect(screen.getByText('Financiële Gezondheid')).toBeTruthy()
+  })
+
   it('geeft score-, label- en zwakste-pijler-context door aan de Fin-chat', () => {
     openWithMessageMock.mockClear()
     render(<GezondheidScoreWidget size="full" data={bundleWith(health)} />)

@@ -457,9 +457,21 @@ export const GezondheidScoreWidget = memo(function GezondheidScoreWidget({ size,
       : `Alle pijlers staan er goed voor; de laagste is ${weakest[0].name} (${weakest[0].score}/100).`
 
   return (
-    <WidgetShell module="horizon" size={size} kicker="Gezondheid" onClick={() => setShowKassabon(true)}>
-      {/* Top row: gauge + label + trend */}
-      <div className="flex items-start gap-3">
+    /* Bewust GEEN onClick op de WidgetShell in deze branch: full-size bevat
+       zowel een knop ("Bespreek met Fin") als een link ("Bekijk details"), en
+       een <button>/<a> binnen een <button> is ongeldige HTML — dat gaf een
+       React-hydratiefout en onvoorspelbaar klikgedrag. De kassabon hangt nu
+       aan de score zelf, conform "elk getal is klikbaar". */
+    <WidgetShell module="horizon" size={size} kicker="Gezondheid">
+      {/* Top row: gauge + label + trend — tevens de kassabon-trigger.
+          Bevat zelf geen interactieve kinderen, dus dit is een geldige knop. */}
+      <button
+        type="button"
+        onClick={() => setShowKassabon(true)}
+        aria-haspopup="dialog"
+        aria-label={`Toon de opbouw van je financiële gezondheid (${health.total} van 100)`}
+        className="flex w-full items-start gap-3 text-left transition-opacity hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+      >
         <HealthGauge score={health.total} sz={80} />
         <div className="flex-1 pt-2">
           <p className={`font-mono text-lg font-semibold ${color}`}>{health.label}</p>
@@ -473,7 +485,7 @@ export const GezondheidScoreWidget = memo(function GezondheidScoreWidget({ size,
             )}
           </div>
         </div>
-      </div>
+      </button>
 
       {/* Radar chart + pillar bars side by side */}
       <div className="mt-2 flex gap-3">
@@ -488,14 +500,13 @@ export const GezondheidScoreWidget = memo(function GezondheidScoreWidget({ size,
       </div>
 
       {/* Bespreek met Fin — neemt de zwakste-pijler-context mee de chat in.
-          stopPropagation: de knop staat binnen de klikbare WidgetShell-<button>
-          (opent de BottomSheet); zonder stop zou één klik beide openen. */}
+          Geen stopPropagation meer nodig: de kaart is zelf niet langer
+          klikbaar, dus er is geen container-onClick om te onderdrukken. */}
       <div className="mt-2">
         <BesprekMetWillButton
           onderwerp={`Mijn financiële gezondheid (${health.total}/100 — ${health.label})`}
           detail={finDetail}
           vraag="Waar kan ik het meeste vrijheidstijd winnen, en welke stap zet ik als eerste?"
-          stopPropagation
           className="w-full justify-center"
         />
       </div>

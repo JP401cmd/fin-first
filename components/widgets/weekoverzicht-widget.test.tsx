@@ -97,4 +97,55 @@ describe('WeekoverzichtWidget', () => {
     )
     expect(overColored).toHaveLength(0)
   })
+
+  // ── Regressie WF-BEHEER-29-bug4 ──────────────────────────────────
+  //
+  // De sparkline-breedte was `n * (BAR_W + GAP) - GAP`, wat bij n = 0 een
+  // NEGATIEVE breedte gaf: viewBox "0 0 -3 70" (half) en "0 0 -8 88" (full).
+  // De browser weigert zo'n SVG te renderen ("A negative value is not valid").
+  // De lege dagenlijst ontstaat zodra de weekoverzicht-compute uit staat —
+  // de standaardstaat van elk account dat het widget niet zelf aanzette,
+  // zichtbaar op /beheer/widget-galerij.
+  describe('lege dagenlijst (geen dag-buckets)', () => {
+    const leeg = makeData({ weekExpenses: 0, weekBudget: 0, dailyExpenses: [] })
+
+    for (const size of ['half', 'full'] as const) {
+      it(`${size}: rendert geen enkele negatieve viewBox-dimensie`, () => {
+        const { container } = render(<WeekoverzichtWidget size={size} data={leeg} />)
+
+        for (const svg of Array.from(container.querySelectorAll('svg'))) {
+          const viewBox = svg.getAttribute('viewBox')
+          if (!viewBox) continue
+          const waarden = viewBox.trim().split(/\s+/).map(Number)
+          for (const waarde of waarden) {
+            expect(Number.isFinite(waarde), `viewBox "${viewBox}" bevat een niet-numerieke waarde`).toBe(true)
+          }
+          // Breedte en hoogte (index 2 en 3) mogen nooit negatief zijn.
+          expect(waarden[2], `viewBox "${viewBox}" heeft een negatieve breedte`).toBeGreaterThanOrEqual(0)
+          expect(waarden[3], `viewBox "${viewBox}" heeft een negatieve hoogte`).toBeGreaterThanOrEqual(0)
+        }
+      })
+
+      it(`${size}: toont een expliciete lege staat i.p.v. een lege grafiek`, () => {
+        render(<WeekoverzichtWidget size={size} data={leeg} />)
+        expect(screen.getByText('Geen dagdata deze week')).toBeInTheDocument()
+      })
+    }
+
+    it('houdt de sparkline intact zodra er wél dagen zijn', () => {
+      const dailyExpenses = ['ma', 'di', 'wo'].map((label, i) => ({
+        day: `2026-07-0${i + 1}`,
+        label,
+        amount: 30,
+      }))
+      const { container } = render(
+        <WeekoverzichtWidget size="full" data={makeData({ weekExpenses: 90, weekBudget: 0, dailyExpenses })} />,
+      )
+      expect(screen.queryByText('Geen dagdata deze week')).toBeNull()
+      // 3 staven × (28 + 8) − 8 = 100 → de tussenruimte telt (n−1) keer mee.
+      // De grafiek is de enige svg met width="100%" (de rest zijn lucide-iconen).
+      const chart = container.querySelector('svg[width="100%"]')
+      expect(chart?.getAttribute('viewBox')).toBe('0 0 100 88')
+    })
+  })
 })
