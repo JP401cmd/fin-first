@@ -255,8 +255,16 @@ function NetEffectBars({
   )
 }
 
-/** Groepskop-rij binnen de vergelijkingstabel, met optionele kop-notitie. */
-function GroupRow({ label, span, note }: { label: string; span: number; note?: string }) {
+/**
+ * Groepskop-rij binnen de vergelijkingstabel, met optionele kop-notitie.
+ *
+ * `GroupRow`/`CellNote`/`Th`/`Td` zijn de gedeelde tabel-primitives van de
+ * optimizer-katernen: katern II (hier) én katern IV (de levenslange varianten,
+ * `optimizer-levenslang.tsx`) tekenen dezelfde vergelijkingstabel. Ze worden
+ * daarom geëxporteerd i.p.v. per katern gekopieerd — één recept voor dotted
+ * ritme, rechts-uitgelijnde mono-cellen en de dubbele sluitstreep.
+ */
+export function GroupRow({ label, span, note }: { label: string; span: number; note?: string }) {
   return (
     <tr>
       <td
@@ -277,8 +285,8 @@ function GroupRow({ label, span, note }: { label: string; span: number; note?: s
   )
 }
 
-/** Celnotitie in cursieve serif onder een waarde. */
-function CellNote({ children }: { children: React.ReactNode }) {
+/** Celnotitie in cursieve serif onder een waarde. Gedeeld met katern IV. */
+export function CellNote({ children }: { children: React.ReactNode }) {
   return (
     <span
       className="mt-0.5 block text-[10.5px] font-normal italic normal-case tracking-normal text-[var(--ink-3)]"
@@ -598,7 +606,8 @@ function CompareTable({
   )
 }
 
-function Th({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+/** Attribuut-rijkop (links, serif). Gedeeld met katern IV. */
+export function Th({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
     <th
       scope="row"
@@ -610,7 +619,8 @@ function Th({ children, className = '' }: { children: React.ReactNode; className
   )
 }
 
-function Td({
+/** Waarde-cel (rechts, mono, tabular-nums). Gedeeld met katern IV. */
+export function Td({
   children,
   muted = false,
   className = '',

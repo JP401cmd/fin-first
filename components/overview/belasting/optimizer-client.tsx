@@ -14,6 +14,7 @@ import type { TaxYear } from '@/lib/box3-data'
 import { OptimizerStanding } from './optimizer-standing'
 import { OptimizerCompare } from './optimizer-compare'
 import { OptimizerDetails } from './optimizer-details'
+import { OptimizerLevenslang } from './optimizer-levenslang'
 import {
   buildOpportunities,
   findWinner,
@@ -61,9 +62,10 @@ function scrollToId(id: string) {
 }
 
 /**
- * Box3OptimizerClient — het oppervlak van de fiscale optimizer, in vier
- * katernen: waar je nu staat (I), de vergelijking (II), inzoomen per kans (III)
- * en de voetnoten (IV). Vergelijken komt eerst; het detail volgt op aanvraag.
+ * Box3OptimizerClient — het oppervlak van de fiscale optimizer, in katernen:
+ * waar je nu staat (I), de vergelijking (II), inzoomen per kans (III), je
+ * pensioenpot over de hele looptijd (IV) en de voetnoten. Vergelijken komt
+ * eerst; het detail volgt op aanvraag.
  *
  * De scenario-generatie, de ranking, de netto-effect-velden en de topkans komen
  * server-side uit `lib/tax-optimizer` (die op zijn beurt de canonieke Box 3-/
@@ -82,6 +84,7 @@ export function Box3OptimizerClient({
   year = 2026,
   expectedReturn = DEFAULT_RETURN,
   expectedReturnIsPersonal = false,
+  dailyExpenses = 0,
 }: {
   sections: GoalSection[]
   topChoice?: OptimizerTopChoice | null
@@ -100,6 +103,12 @@ export function Box3OptimizerClient({
   expectedReturn?: number
   /** true = eigen profiel-instelling; false = de app-standaard. */
   expectedReturnIsPersonal?: boolean
+  /**
+   * Canonieke dag-uitgaven (`loadFiscaleKansen(...).dailyExpenses`) — de enige
+   * €→vrijheidstijd-grondslag van deze pagina. Voedt katern IV; 0 = onbekend,
+   * dan blijft de vrijheidstijd-vertaling daar achterwege.
+   */
+  dailyExpenses?: number
 }) {
   const { masked } = useMaskedAmounts()
   const fc = (v: number) => formatMaskedCurrency(v, masked)
@@ -118,10 +127,6 @@ export function Box3OptimizerClient({
   const jaarruimteSection = sections.find(
     (s): s is Extract<GoalSection, { kind: 'jaarruimte' }> => s.kind === 'jaarruimte',
   )
-  const previewSection = sections.find(
-    (s): s is Extract<GoalSection, { kind: 'preview' }> => s.kind === 'preview',
-  )
-
   const openDetail = (id: string) => {
     setOpenId(id)
     scrollToId(`optimizer-detail-${id}`)
@@ -251,8 +256,17 @@ export function Box3OptimizerClient({
         year={year}
       />
 
-      {/* ── Katern IV: voetnoten ────────────────────────────────────── */}
-      <div className="mt-14 grid grid-cols-2 gap-6 border-t-4 border-double border-[var(--ink)] pt-6 md:grid-cols-4">
+      <hr className="my-11 border-t border-[var(--border-ed)]" />
+
+      {/* ── Katern IV ───────────────────────────────────────────────
+          Het vierde fiscale doel is niet langer een "binnenkort"-belofte maar
+          een echte, doorgerekende sectie. De drie kernel-solves draaien
+          client-side achter een expliciete actie — daarom staat hier alleen de
+          bedrading (dagtarief + maskering), niet de uitkomst. */}
+      <OptimizerLevenslang fc={fc} dailyExpenses={dailyExpenses} />
+
+      {/* ── Voetnoten ───────────────────────────────────────────────── */}
+      <div className="mt-14 grid grid-cols-2 gap-6 border-t-4 border-double border-[var(--ink)] pt-6 md:grid-cols-3">
         {/* Zelfde grootheid als de chip bovenaan, dus dezelfde bron: server-
             geleverd `expectedReturn`. Zou hier nog de constante staan, dan
             sprak de voetnoot de chip tegen zodra iemand zijn eigen rendement
@@ -266,10 +280,6 @@ export function Box3OptimizerClient({
         <FooterNote kicker="Methode">
           Elke heffing komt uit de canonieke Box 3-motor; de jaarruimte-besparing is
           marginaal-correct via de Box 1-motor. Geen eigen sommen op deze pagina.
-        </FooterNote>
-        <FooterNote kicker="Binnenkort">
-          {previewSection?.previewNote ??
-            'Laagste belastingdruk over je hele leven: onttrekkingsvolgordes over spaargeld, beleggingen, pensioen en lijfrente. Nog niet doorgerekend.'}
         </FooterNote>
         <FooterNote kicker="Geen advies">{OPTIMIZER_DISCLAIMER}</FooterNote>
       </div>

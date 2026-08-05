@@ -28,6 +28,12 @@ export const metadata: Metadata = {
  * De pagina VERGELIJKT eerst en zoomt daarna pas in: de client zet alle kansen
  * (Box 3-scenario's + de Box 1-jaarruimte) op één netto-effect-as en biedt de
  * uitwerking per kans op aanvraag.
+ *
+ * Katern IV (de levenslange variantensweep) haalt zijn invoer NIET hier op maar
+ * via `GET /api/belasting/varianten-sweep`, achter een expliciete klik. Dat
+ * scheelt élke bezoeker een extra kernel-solve in de TTFB én houdt de rauwe
+ * kernel-context uit de RSC-payload van iedere paginaweergave; zie de route zelf
+ * voor de volledige motivering.
  */
 export default async function BelastingOptimizerPage() {
   const supabase = await createClient()
@@ -63,6 +69,7 @@ export default async function BelastingOptimizerPage() {
         year={kansen.year}
         expectedReturn={kansen.expectedReturn}
         expectedReturnIsPersonal={kansen.expectedReturnIsPersonal}
+        dailyExpenses={kansen.dailyExpenses}
       />
     </>
   )

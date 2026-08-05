@@ -953,8 +953,31 @@ describe('Box3OptimizerClient — lege staten', () => {
   })
 })
 
-describe('Box3OptimizerClient — katern IV: voetnoten', () => {
-  it('sluit af met aannames, methode, binnenkort en geen-advies', () => {
+describe('Box3OptimizerClient — voetnoten', () => {
+  it('sluit af met aannames, methode en geen-advies', () => {
+    const { baseline, shift, standing } = buildFixture()
+
+    render(
+      <Box3OptimizerClient
+        sections={[box3Section('box3-minimaal', baseline, [shift], shift)]}
+        standing={standing}
+        hasPartner={false}
+      />,
+    )
+
+    expect(screen.getByText('Aannames')).toBeTruthy()
+    expect(screen.getByText('Methode')).toBeTruthy()
+    expect(screen.getByText('Geen advies')).toBeTruthy()
+  })
+})
+
+/**
+ * Het vierde fiscale doel wás een "binnenkort"-voetnoot (de `preview`-sectie) en
+ * is nu een echte, doorgerekende sectie. Deze suite pint de bedrading: de
+ * belofte is weg, de sectie staat er, en ze rekent pas na een expliciete klik.
+ */
+describe('Box3OptimizerClient — katern IV: de levenslange varianten', () => {
+  it('vervangt de "binnenkort"-belofte door de echte sectie, achter een actie', () => {
     const { baseline, shift, standing } = buildFixture()
     const preview: GoalSection = {
       kind: 'preview',
@@ -968,13 +991,31 @@ describe('Box3OptimizerClient — katern IV: voetnoten', () => {
         sections={[box3Section('box3-minimaal', baseline, [shift], shift), preview]}
         standing={standing}
         hasPartner={false}
+        dailyExpenses={DAILY_EXPENSES}
       />,
     )
 
-    expect(screen.getByText('Aannames')).toBeTruthy()
-    expect(screen.getByText('Methode')).toBeTruthy()
-    expect(screen.getByText('Binnenkort')).toBeTruthy()
-    expect(screen.getByText('Geen advies')).toBeTruthy()
-    expect(screen.getByText(/onttrekkingsvolgordes/i)).toBeTruthy()
+    // De niet-doorgerekende belofte is verdwenen…
+    expect(screen.queryByText('Binnenkort')).toBeNull()
+    expect(screen.queryByText(/Straks vergelijkt TriFinity/i)).toBeNull()
+    // …en de echte sectie staat er, nog zonder tabel.
+    expect(screen.getByRole('heading', { name: /Wanneer je je pensioenpot/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Reken de drie varianten door/i })).toBeTruthy()
+    expect(mockFetch).not.toHaveBeenCalled()
+  })
+
+  it('houdt de Wft-callout op één exemplaar, ook mét de nieuwe sectie', () => {
+    const { baseline, shift, standing } = buildFixture()
+
+    render(
+      <Box3OptimizerClient
+        sections={[box3Section('box3-minimaal', baseline, [shift], shift)]}
+        standing={standing}
+        hasPartner={false}
+        dailyExpenses={DAILY_EXPENSES}
+      />,
+    )
+
+    expect(screen.getAllByText('Indicatie, geen advies.').length).toBe(1)
   })
 })
