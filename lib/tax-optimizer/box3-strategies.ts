@@ -14,9 +14,16 @@
 //
 // NETTO EFFECT (2026-08): elk scenario draagt naast de bruto belastingbesparing
 // óók het verwachte misgelopen rendement (`returnCostEur`) en het saldo daarvan
-// (`netEffect` / `netFreedomDays`). De rendementsaannames komen UITSLUITEND uit
-// lib/constants.ts (DEFAULT_RETURN / EXPECTED_SAVINGS_RETURN) — hier staat geen
-// eigen percentage.
+// (`netEffect` / `netFreedomDays`).
+//
+// DE TWEE RENDEMENTSAANNAMES — hier staat geen eigen percentage:
+//   · beleggen → PER GEBRUIKER via `input.expectedReturn` (canoniek
+//     `resolveFireParams(...).grossReturn`, lib/fire-params.ts → profiel-
+//     instelling `profiles.expected_return`), met DEFAULT_RETURN als terugval.
+//     Weglaten reproduceert exact het gedrag van vóór die parameter.
+//   · sparen  → de CONSTANTE EXPECTED_SAVINGS_RETURN (lib/constants.ts). Voor
+//     de spaarrente bestaat geen gebruikersinstelling, dus daar is een constante
+//     de juiste plek; zodra die er wél komt, verhuist ook die naar de invoer.
 
 import {
   BOX3_PARAMS,
@@ -76,11 +83,20 @@ const TRAJECTORY_YEAR_PRIOR: TaxYear = 2025
 const TRAJECTORY_YEAR_ACTIVE: TaxYear = 2026
 
 /**
- * Verwacht rendementsverschil per jaar tussen beleggen en sparen — puur
- * afgeleid uit de twee canonieke aannames in lib/constants.ts (2026 ≈ 5,7
- * procentpunt). Géén eigen constante.
+ * Verwacht rendementsverschil per jaar tussen beleggen en sparen, PER RUN
+ * afgeleid: het verwachte beleggingsrendement van deze gebruiker minus de
+ * spaarrente-aanname. Géén module-constante meer — dat was precies de plek waar
+ * de hardcoded 7% de profiel-instelling overschreef.
+ *
+ * GEKLEMD OP 0. Zet een gebruiker zijn verwachte rendement op of onder de
+ * spaarrente-aanname (bv. 1,0% terwijl sparen op 1,3% staat), dan is er geen
+ * misgelopen rendement bij verschuiven — géén negatieve "winst" die de
+ * belastingbesparing kunstmatig zou opblazen en het scenario onterecht
+ * bovenaan de netto-ranking zou zetten.
  */
-const RETURN_GAP = DEFAULT_RETURN - EXPECTED_SAVINGS_RETURN
+function returnGapFor(expectedReturn: number): number {
+  return Math.max(0, expectedReturn - EXPECTED_SAVINGS_RETURN)
+}
 
 function freedomDays(savings: number, dailyExpenses: number): number {
   if (dailyExpenses <= 0 || savings <= 0) return 0
@@ -89,11 +105,11 @@ function freedomDays(savings: number, dailyExpenses: number): number {
 
 /**
  * Verwacht misgelopen rendement (€/jaar, hele euro's) wanneer `amount` van
- * beleggen naar sparen verschuift. Nooit negatief.
+ * beleggen naar sparen verschuift. Nooit negatief — het gat is al geklemd.
  */
-function returnCostForShift(amount: number): number {
+function returnCostForShift(amount: number, returnGap: number): number {
   if (amount <= 0) return 0
-  return Math.max(0, Math.round(amount * RETURN_GAP))
+  return Math.max(0, Math.round(amount * returnGap))
 }
 
 function pct(value: number): string {
@@ -202,15 +218,24 @@ function taxResultForYear(comp: Composition, year: TaxYear): Box3Result {
 
 /**
  * Gewogen verwacht rendement van een samenstelling: het naar rato gewogen
- * gemiddelde van de twee canonieke aannames uit lib/constants.ts —
- * (spaargeld × EXPECTED_SAVINGS_RETURN + beleggingen × DEFAULT_RETURN) /
+ * gemiddelde van de twee aannames —
+ * (spaargeld × EXPECTED_SAVINGS_RETURN + beleggingen × expectedReturn) /
  * bezittingen. Géén eigen percentage, en géén fiscaal forfait: dit is een
  * ECONOMISCHE verwachting. null bij lege bezittingen (geen deling door nul).
+ *
+ * Bewust het ONGEKLEMDE `expectedReturn` (niet het gat): een gebruiker die 1,0%
+ * verwacht, verwacht die 1,0% ook echt op zijn beleggingen — de 2028-indicatie
+ * moet dat lagere werkelijke rendement tonen. Klemmen hoort alleen bij het
+ * VERSCHIL dat een shift kost.
  */
-function weightedReturnAssumption(spaargeld: number, beleggingen: number): number | null {
+function weightedReturnAssumption(
+  spaargeld: number,
+  beleggingen: number,
+  expectedReturn: number,
+): number | null {
   const bezittingen = spaargeld + beleggingen
   if (bezittingen <= 0) return null
-  return (spaargeld * EXPECTED_SAVINGS_RETURN + beleggingen * DEFAULT_RETURN) / bezittingen
+  return (spaargeld * EXPECTED_SAVINGS_RETURN + beleggingen * expectedReturn) / bezittingen
 }
 
 /**
@@ -227,8 +252,12 @@ function weightedReturnAssumption(spaargeld: number, beleggingen: number): numbe
  *   2. werkelijke schuldrente = 0 (we kennen die rente niet en verzinnen er geen
  *      aanname bij), waardoor de indicatie eerder te hoog dan te laag uitvalt.
  */
-function tax2028Indicatie(result: Box3Result): number | null {
-  const weighted = weightedReturnAssumption(result.totaalSpaargeld, result.totaalBeleggingen)
+function tax2028Indicatie(result: Box3Result, expectedReturn: number): number | null {
+  const weighted = weightedReturnAssumption(
+    result.totaalSpaargeld,
+    result.totaalBeleggingen,
+    expectedReturn,
+  )
   if (weighted === null) return null
   return compareForfaitairVsWerkelijk({
     box3Result: result,
@@ -241,7 +270,7 @@ function tax2028Indicatie(result: Box3Result): number | null {
  * per jaar (BOX3_PARAMS kent beide jaartabellen), 2028 als indicatie via de
  * tegenbewijs-tak.
  */
-function buildTrajectory(comp: Composition): TaxTrajectory {
+function buildTrajectory(comp: Composition, expectedReturn: number): TaxTrajectory {
   // Bewust via een Partial-view op de jaartabel: valt een jaar ooit uit
   // BOX3_PARAMS, dan wordt `tax2025` null i.p.v. NaN.
   const knownYears: Partial<Record<TaxYear, Box3Params>> = BOX3_PARAMS
@@ -253,7 +282,7 @@ function buildTrajectory(comp: Composition): TaxTrajectory {
   return {
     tax2025: prior,
     tax2026: active.tax,
-    tax2028Indicatie: tax2028Indicatie(active),
+    tax2028Indicatie: tax2028Indicatie(active, expectedReturn),
   }
 }
 
@@ -261,7 +290,11 @@ function buildTrajectory(comp: Composition): TaxTrajectory {
  * De uitleg-regels bij een verloop: één regel voor de jaarvergelijking en twee
  * voor de 2028-indicatie (uitkomst + aanname). Wft: indicatie, geen advies.
  */
-function trajectoryDetail(trajectory: TaxTrajectory, comp: Composition): string[] {
+function trajectoryDetail(
+  trajectory: TaxTrajectory,
+  comp: Composition,
+  expectedReturn: number,
+): string[] {
   const lines: string[] = []
   if (trajectory.tax2025 !== null) {
     lines.push(
@@ -269,15 +302,17 @@ function trajectoryDetail(trajectory: TaxTrajectory, comp: Composition): string[
         `${formatCurrency(trajectory.tax2026)} in ${TRAJECTORY_YEAR_ACTIVE}`,
     )
   }
-  const weighted = weightedReturnAssumption(comp.spaargeld, comp.beleggingen)
+  const weighted = weightedReturnAssumption(comp.spaargeld, comp.beleggingen, expectedReturn)
   if (trajectory.tax2028Indicatie !== null && weighted !== null) {
     lines.push(
       `Indicatie 2028 (wetsvoorstel: heffing over werkelijk rendement): ` +
         `${formatCurrency(trajectory.tax2028Indicatie)} per jaar`,
     )
+    // Het GETOONDE percentage is het GEBRUIKTE percentage: `expectedReturn` is
+    // de profiel-instelling waarmee deze regel ook werkelijk is doorgerekend.
     lines.push(
       `Aanname 2028: gewogen rendement ${pct1(weighted)} (spaargeld ${pct1(EXPECTED_SAVINGS_RETURN)}, ` +
-        `beleggingen ${pct1(DEFAULT_RETURN)}), zonder aftrek van werkelijke schuldrente en zonder ` +
+        `beleggingen ${pct1(expectedReturn)}), zonder aftrek van werkelijke schuldrente en zonder ` +
         `heffingsvrij vermogen — de indicatie valt daardoor eerder te hoog dan te laag uit`,
     )
   }
@@ -296,7 +331,7 @@ function trajectoryDetail(trajectory: TaxTrajectory, comp: Composition): string[
  * argumenten (spaargeld + beleggingen, 0 beleggingen) en `returnCostForShift`
  * letterlijk hetzelfde bedrag. Vergrendeld in de unit-test.
  */
-function buildShiftCurve(current: Box3Result): ShiftCurvePoint[] {
+function buildShiftCurve(current: Box3Result, returnGap: number): ShiftCurvePoint[] {
   const beleggingen = current.totaalBeleggingen
   const points: ShiftCurvePoint[] = []
 
@@ -311,7 +346,7 @@ function buildShiftCurve(current: Box3Result): ShiftCurvePoint[] {
       current.year,
     ).tax
     const savings = current.tax - tax
-    const returnCostEur = returnCostForShift(shifted)
+    const returnCostEur = returnCostForShift(shifted, returnGap)
     points.push({ shifted, tax, savings, returnCostEur, netEffect: savings - returnCostEur })
   }
 
@@ -321,15 +356,22 @@ function buildShiftCurve(current: Box3Result): ShiftCurvePoint[] {
 /**
  * De huidige situatie als referentie-strategie. Vertegenwoordigt de heffing
  * zoals die nu berekend wordt (savings = 0).
+ *
+ * `expectedReturn` raakt hier alleen de 2028-indicatie in het verloop (de
+ * gewogen rendementsaanname); de heffing 2025/2026 is puur fiscaal en staat er
+ * volledig los van. Weglaten → DEFAULT_RETURN (regressie-terugval).
  */
-export function baselineStrategy(current: Box3Result): OptimizerStrategy {
+export function baselineStrategy(
+  current: Box3Result,
+  expectedReturn: number = DEFAULT_RETURN,
+): OptimizerStrategy {
   const comp: Composition = {
     spaargeld: current.totaalSpaargeld,
     beleggingen: current.totaalBeleggingen,
     box3Schulden: current.totaalBox3Schulden,
     hasPartner: current.hasPartner,
   }
-  const trajectory = buildTrajectory(comp)
+  const trajectory = buildTrajectory(comp, expectedReturn)
 
   return {
     id: 'baseline',
@@ -353,7 +395,7 @@ export function baselineStrategy(current: Box3Result): OptimizerStrategy {
     detail: [
       `Belastingjaar ${current.year}`,
       `Forfaitair rendement, tarief ${(current.params.tarief * 100).toFixed(0)}%`,
-      ...trajectoryDetail(trajectory, comp),
+      ...trajectoryDetail(trajectory, comp, expectedReturn),
     ],
     caveat: null,
   }
@@ -369,7 +411,12 @@ export function generateBox3Strategies(input: Box3OptimizerInput): {
   shiftCurve: ShiftCurvePoint[] | null
 } {
   const { current, dailyExpenses, optimalAllocation } = input
-  const baseline = baselineStrategy(current)
+  // Eén afleiding per run, hier bovenaan: het verwachte beleggingsrendement van
+  // deze gebruiker (profiel-instelling via resolveFireParams) met de constante
+  // als terugval, en het daaruit volgende — op 0 geklemde — rendementsgat.
+  const expectedReturn = input.expectedReturn ?? DEFAULT_RETURN
+  const returnGap = returnGapFor(expectedReturn)
+  const baseline = baselineStrategy(current, expectedReturn)
   const strategies: OptimizerStrategy[] = []
   // Alleen gevuld wanneer het shift-scenario zelf bestaat — de curve is de
   // uitvergroting van dát scenario, geen losstaande grafiek.
@@ -403,12 +450,12 @@ export function generateBox3Strategies(input: Box3OptimizerInput): {
 
       // Verwacht misgelopen rendement over het VERSCHOVEN bedrag (= de huidige
       // beleggingen, want dit scenario schuift alles naar spaargeld).
-      const returnCostEur = returnCostForShift(beleggingen)
+      const returnCostEur = returnCostForShift(beleggingen, returnGap)
       const netEffect = savings - returnCostEur
 
       // De volledige reeks achter dit scenario (0 … alles verschoven). Het
       // eindpunt is per constructie dit scenario zelf.
-      shiftCurve = buildShiftCurve(current)
+      shiftCurve = buildShiftCurve(current, returnGap)
 
       // Verloop van de UITKOMST-samenstelling: alles op spaargeld.
       const shiftedComp: Composition = {
@@ -417,7 +464,7 @@ export function generateBox3Strategies(input: Box3OptimizerInput): {
         box3Schulden: current.totaalBox3Schulden,
         hasPartner: current.hasPartner,
       }
-      const shiftTrajectory = buildTrajectory(shiftedComp)
+      const shiftTrajectory = buildTrajectory(shiftedComp, expectedReturn)
 
       strategies.push({
         id: 'samenstelling-shift',
@@ -434,7 +481,12 @@ export function generateBox3Strategies(input: Box3OptimizerInput): {
         savings,
         freedomDays: freedomDays(savings, dailyExpenses),
         isBaseline: false,
-        hasReturnCost: true,
+        // AFGELEID, niet hardgecodeerd: de kwalitatieve vlag blijft het
+        // ja/nee-spiegelbeeld van het bedrag. Zet een gebruiker zijn verwachte
+        // rendement op of onder de spaarrente-aanname, dan kost verschuiven hem
+        // in verwachting niets — en is deze shift dus terecht ook voor het doel
+        // "geen rendementsverlies" een kosteloze hefboom.
+        hasReturnCost: returnCostEur > 0,
         returnCostEur,
         netEffect,
         netFreedomDays: freedomDays(netEffect, dailyExpenses),
@@ -442,15 +494,15 @@ export function generateBox3Strategies(input: Box3OptimizerInput): {
         detail: [
           `Forfait sparen ${pct(current.params.forfaitSpaargeld)} vs. beleggen ${pct(current.params.forfaitBeleggingen)}`,
           `≈ ${formatCurrency(marginalSaving)} minder heffing per ${formatCurrency(step)} verschoven`,
-          `Verwacht rendement ${pct1(DEFAULT_RETURN)} vs. spaarrente-aanname ${pct1(EXPECTED_SAVINGS_RETURN)}`,
+          `Verwacht rendement ${pct1(expectedReturn)} vs. spaarrente-aanname ${pct1(EXPECTED_SAVINGS_RETURN)}`,
           `≈ ${formatCurrency(returnCostEur)} minder verwacht rendement per jaar over ${formatCurrency(beleggingen)}`,
           `Netto effect ≈ ${formatCurrency(netEffect)} per jaar (besparing − misgelopen rendement)`,
           `Belastingjaar ${current.year}`,
-          ...trajectoryDetail(shiftTrajectory, shiftedComp),
+          ...trajectoryDetail(shiftTrajectory, shiftedComp, expectedReturn),
         ],
         caveat:
           `Spaargeld levert doorgaans minder rendement dan beleggingen. Doorgerekend met een verwacht ` +
-          `beleggingsrendement van ${pct1(DEFAULT_RETURN)} en een spaarrente-aanname van ${pct1(EXPECTED_SAVINGS_RETURN)}: ` +
+          `beleggingsrendement van ${pct1(expectedReturn)} en een spaarrente-aanname van ${pct1(EXPECTED_SAVINGS_RETURN)}: ` +
           `tegenover ${formatCurrency(savings)} minder heffing staat ongeveer ${formatCurrency(returnCostEur)} minder ` +
           `verwacht rendement per jaar — netto ${formatCurrency(netEffect)} per jaar.`,
       })

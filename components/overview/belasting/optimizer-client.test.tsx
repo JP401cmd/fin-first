@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, within } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, fireEvent, within, waitFor } from '@testing-library/react'
 import { Box3OptimizerClient } from './optimizer-client'
 
 // Privacy-maskering: default zichtbaar, individuele tests zetten 'm aan.
@@ -8,9 +8,18 @@ const mockPrivacy = { masked: false }
 vi.mock('@/lib/hooks/use-privacy', () => ({
   useMaskedAmounts: () => mockPrivacy,
 }))
+
+// De rendement-chip opent de gedeelde VoorkeurBewerkenSheet; die roept na
+// opslaan `router.refresh()` aan zodat de server de scenario's opnieuw
+// doorrekent met de nieuwe aanname.
+const mockRefresh = vi.fn()
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ refresh: mockRefresh }),
+}))
 import { generateBox3Strategies, synthBox3Input } from '@/lib/tax-optimizer/box3-strategies'
 import { buildCurrentStanding, pickBest } from '@/lib/tax-optimizer'
 import { calculateBox3 } from '@/lib/box3-data'
+import { DEFAULT_RETURN } from '@/lib/constants'
 import { MASKED_AMOUNT_PLACEHOLDER } from '@/lib/format'
 import { GOAL_BY_ID } from '@/lib/tax-optimizer/goals'
 import type {
@@ -36,8 +45,23 @@ function euroPattern(amount: number): RegExp {
 const DAILY_EXPENSES = 100
 const YEAR = 2026 as const
 
+/** Schrijfpad van de editor: PUT /api/parameters (geen client-directe DB-write). */
+const mockFetch = vi.fn()
+
 beforeEach(() => {
   mockPrivacy.masked = false
+  mockRefresh.mockReset()
+  mockFetch.mockReset()
+  mockFetch.mockResolvedValue({
+    ok: true,
+    status: 200,
+    json: async () => ({ success: true }),
+  } as unknown as Response)
+  vi.stubGlobal('fetch', mockFetch)
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
 })
 
 /**
@@ -135,7 +159,7 @@ describe('Box3OptimizerClient — katern I: waar je nu staat', () => {
     expect(screen.getAllByText(euroPattern(standing.totaalBeleggingen)).length).toBeGreaterThan(0)
   })
 
-  it('toont de aannames waarop de vergelijking rust als read-only chips', () => {
+  it('toont de aannames waarop de vergelijking rust als chips', () => {
     const { baseline, shift, standing } = buildFixture()
 
     render(
@@ -150,6 +174,196 @@ describe('Box3OptimizerClient — katern I: waar je nu staat', () => {
     expect(screen.getByText('verwacht rendement beleggen')).toBeTruthy()
     expect(screen.getByText('spaarrente-aanname')).toBeTruthy()
     expect(screen.getByText('belastingjaar')).toBeTruthy()
+  })
+})
+
+/**
+ * De rendement-chip toonde `DEFAULT_RETURN` (7,0%) uit lib/constants.ts, terwijl
+ * de server de scenario's met de PROFIEL-instelling van de gebruiker doorrekent.
+ * Het getoonde percentage moet het gebruikte percentage zijn — daarom leest de
+ * chip nu uitsluitend de geleverde prop.
+ */
+describe('Box3OptimizerClient — de rendementsaanname is de GEBRUIKTE aanname', () => {
+  function renderMetRendement(expectedReturn: number, isPersonal: boolean) {
+    const { baseline, shift, standing } = buildFixture()
+    return render(
+      <Box3OptimizerClient
+        sections={[box3Section('box3-minimaal', baseline, [shift], shift)]}
+        standing={standing}
+        hasPartner={false}
+        year={YEAR}
+        expectedReturn={expectedReturn}
+        expectedReturnIsPersonal={isPersonal}
+      />,
+    )
+  }
+
+  /** De rendement-chip als element (knop-variant: opent de inline editor). */
+  function rendementChip(): HTMLButtonElement {
+    const el = screen.getByText('verwacht rendement beleggen').closest('button')
+    if (!el) throw new Error('fixture-fout: de rendement-chip is geen knop')
+    return el as HTMLButtonElement
+  }
+
+  /** De aannames-voetnoot uit katern IV — dezelfde grootheid, tweede plek. */
+  function aannamesVoetnoot(): HTMLElement {
+    return screen.getByText('Aannames').parentElement as HTMLElement
+  }
+
+  it('toont de geleverde eigen instelling (5,5%) — niet de constante 7,0%', () => {
+    renderMetRendement(0.055, true)
+
+    // Chip: het GETOONDE percentage is het GELEVERDE percentage.
+    expect(rendementChip().textContent).toContain('5,5%')
+    expect(rendementChip().textContent).not.toContain('7,0%')
+    expect(rendementChip().textContent).toContain('eigen instelling')
+
+    // Voetnoot (katern IV) draagt dezelfde grootheid en moet dus hetzelfde
+    // zeggen — anders spreekt de pagina zichzelf tegen.
+    expect(aannamesVoetnoot().textContent).toContain('5,5%')
+    expect(aannamesVoetnoot().textContent).not.toContain('7,0%')
+    expect(aannamesVoetnoot().textContent).toContain('je eigen instelling')
+  })
+
+  it('markeert de app-standaard als standaard, met hetzelfde percentage', () => {
+    renderMetRendement(DEFAULT_RETURN, false)
+
+    expect(rendementChip().textContent).toContain('7,0%')
+    expect(rendementChip().textContent).toContain('standaard')
+    expect(rendementChip().textContent).not.toContain('eigen instelling')
+    expect(aannamesVoetnoot().textContent).toContain('7,0%')
+    expect(aannamesVoetnoot().textContent).toContain('(standaard)')
+  })
+
+  it('maakt de rendement-chip een toegankelijke bewerk-knop', () => {
+    renderMetRendement(0.055, true)
+    const chip = rendementChip()
+
+    // Het aria-label VERVANGT de accessible name, dus het moet de waarde en de
+    // herkomst dragen — anders is dit de enige chip op de rij waarvan een
+    // screenreader-gebruiker het percentage niet hoort.
+    const naam = chip.getAttribute('aria-label') ?? ''
+    expect(naam).toContain('verwacht rendement beleggen')
+    expect(naam).toContain('5,5%')
+    expect(naam).toContain('eigen instelling')
+    expect(naam).toContain('aanpassen')
+    expect(screen.getByRole('button', { name: /5,5%.*aanpassen/ })).toBeTruthy()
+    // 44px touch-target op klein scherm; op desktop blijft de chip compact.
+    expect(chip.className).toContain('min-h-[44px]')
+    expect(chip.className).toContain('sm:min-h-0')
+    // Zichtbare focus-ring.
+    expect(chip.className).toContain('focus-visible:outline')
+    // De chip zelf bewerkt niet inline — hij opent de editor.
+    expect(chip.querySelector('input')).toBeNull()
+  })
+
+  it('laat de twee andere chips read-only (geen knop, geen herkomst-markering)', () => {
+    renderMetRendement(0.055, true)
+
+    expect(screen.getByText('spaarrente-aanname').closest('button')).toBeNull()
+    expect(screen.getByText('belastingjaar').closest('button')).toBeNull()
+    // De spaarrente blijft de constante — daar bestaat geen instelling voor.
+    expect(screen.getAllByText('1,3%').length).toBeGreaterThan(0)
+  })
+
+  it('valt zonder prop terug op de app-standaard (regressie: geen kale/NaN-chip)', () => {
+    const { baseline, shift, standing } = buildFixture()
+    render(
+      <Box3OptimizerClient
+        sections={[box3Section('box3-minimaal', baseline, [shift], shift)]}
+        standing={standing}
+        hasPartner={false}
+        year={YEAR}
+      />,
+    )
+
+    expect(rendementChip().textContent).toContain('7,0%')
+    expect(rendementChip().textContent).toContain('standaard')
+  })
+})
+
+/**
+ * De chip is een inline editor: hij opent dezelfde `VoorkeurBewerkenSheet` als
+ * /toekomst/voorkeuren, met dezelfde kolom en hetzelfde schrijfpad
+ * (PUT /api/parameters). Deze suite pint de bedrading: openen, startwaarde,
+ * opslaan-als-fractie, en dat een serverfout de envelope-tekst toont.
+ */
+describe('Box3OptimizerClient — inline editor voor de rendements-aanname', () => {
+  function renderEnOpen(expectedReturn = 0.055) {
+    const { baseline, shift, standing } = buildFixture()
+    render(
+      <Box3OptimizerClient
+        sections={[box3Section('box3-minimaal', baseline, [shift], shift)]}
+        standing={standing}
+        hasPartner={false}
+        year={YEAR}
+        expectedReturn={expectedReturn}
+        expectedReturnIsPersonal
+      />,
+    )
+    // De accessible name draagt de waarde én de herkomst; match op het
+    // onderscheidende deel i.p.v. op een vaste string.
+    fireEvent.click(screen.getByRole('button', { name: /verwacht rendement.*aanpassen/i }))
+  }
+
+  it('opent de editor bij een klik op de chip, gestart op de GELEVERDE waarde', () => {
+    renderEnOpen(0.055)
+
+    expect(screen.getByRole('dialog')).toBeTruthy()
+    // 0,055 → 5.5 procent: de editor start op wat de server heeft gebruikt,
+    // niet op een constante.
+    const input = screen.getByRole('spinbutton') as HTMLInputElement
+    expect(input.value).toBe('5.5')
+    // Grenzen volgen de API-band voor expected_return.
+    expect(input.getAttribute('min')).toBe('1')
+    expect(input.getAttribute('max')).toBe('15')
+  })
+
+  it('legt uit dat dezelfde aanname de Toekomst-projectie voedt', () => {
+    renderEnOpen()
+    expect(screen.getByText(/projectie op Toekomst/i)).toBeTruthy()
+    // Secundaire uitgang: beheer van álle aannames blijft vindbaar.
+    expect(
+      screen.getByRole('link', { name: /Beheer al je aannames/i }).getAttribute('href'),
+    ).toBe('/toekomst/voorkeuren')
+  })
+
+  it('slaat op via PUT /api/parameters met de fractie, sluit en refresht', async () => {
+    renderEnOpen(0.055)
+
+    const input = screen.getByRole('spinbutton')
+    fireEvent.change(input, { target: { value: '6.5' } })
+    fireEvent.submit(document.querySelector('form')!)
+
+    await waitFor(() => expect(mockRefresh).toHaveBeenCalled())
+
+    const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe('/api/parameters')
+    expect(init.method).toBe('PUT')
+    expect(JSON.parse(String(init.body))).toEqual({ expected_return: 0.065 })
+    // De editor gaat dicht. De sheet blijft bewust GEMOUNT (open-prop i.p.v.
+    // conditioneel renderen, zodat de focus-trap de focus terugzet op de chip),
+    // dus het dialoog-element verdwijnt pas ná de sluit-animatie — vandaar
+    // waitFor in plaats van een directe assertie.
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+
+  it('toont bij een serverfout de envelope-tekst, géén rauwe DB-message, en blijft open', async () => {
+    renderEnOpen(0.055)
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      json: async () => ({ error: 'Verwacht rendement moet tussen 1% en 15% liggen' }),
+    } as unknown as Response)
+
+    fireEvent.submit(document.querySelector('form')!)
+
+    await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy())
+    const text = screen.getByRole('alert').textContent ?? ''
+    expect(text).toContain('Verwacht rendement moet tussen 1% en 15% liggen')
+    expect(text).not.toMatch(/violates|constraint|PGRST|relation/i)
+    expect(screen.getByRole('dialog')).toBeTruthy()
+    expect(mockRefresh).not.toHaveBeenCalled()
   })
 })
 

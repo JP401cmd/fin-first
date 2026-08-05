@@ -77,7 +77,12 @@ export interface ShiftCurvePoint {
   tax: number
   /** Huidige heffing − tax. */
   savings: number
-  /** shifted × (DEFAULT_RETURN − EXPECTED_SAVINGS_RETURN), ≥ 0, hele euro's. */
+  /**
+   * shifted × rendementsgat, ≥ 0, hele euro's. Het gat is
+   * `max(0, verwacht beleggingsrendement − EXPECTED_SAVINGS_RETURN)`, waarbij
+   * het verwachte rendement de PROFIEL-instelling van deze gebruiker is
+   * (`Box3OptimizerInput.expectedReturn`) met DEFAULT_RETURN als terugval.
+   */
   returnCostEur: number
   /** savings − returnCostEur (kan negatief zijn). */
   netEffect: number
@@ -200,6 +205,28 @@ export interface Box3OptimizerInput {
    * de per-partner-splitsing — zodat er geen partner-private bedragen lekken.
    */
   optimalAllocation?: Pick<PartnerAllocation, 'totalTax' | 'savingsVsEqual'>
+  /**
+   * Verwacht bruto beleggingsrendement van DEZE gebruiker, als fractie
+   * (bv. 0.055 = 5,5%). Canonieke bron = `resolveFireParams(...).grossReturn`
+   * (lib/fire-params.ts), dat `profiles.expected_return` leest en op
+   * DEFAULT_RETURN terugvalt — precies dezelfde aanname waarmee de
+   * FIRE-/horizon-projectie rekent.
+   *
+   * Weglaten → DEFAULT_RETURN. Die terugval is de REGRESSIE-garantie: elke
+   * aanroeper die dit veld (nog) niet vult, krijgt byte-identiek het gedrag van
+   * vóór deze parameter.
+   *
+   * Waarom een parameter en geen import: de optimizer beweerde met een
+   * hardcoded 7% dat een samenstelling-shift rendement kost, terwijl de
+   * Toekomst-pagina van dezelfde gebruiker met bv. 5% rekende. Eén grootheid,
+   * twee bronnen — en omdat het netto effect de RANGSCHIKKING en de "grootste
+   * kans" bepaalt, kon die drift de uitkomst kantelen.
+   *
+   * NB: de spaarkant blijft de constante EXPECTED_SAVINGS_RETURN. Daar is
+   * bewust GEEN gebruikersinstelling voor (`profiles` kent geen spaarrente-veld),
+   * dus die aanname hoort in lib/constants.ts en niet in dit contract.
+   */
+  expectedReturn?: number
 }
 
 export interface CompareResult {

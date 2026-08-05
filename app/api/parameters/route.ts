@@ -2,6 +2,7 @@ import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { sanitizeCashSettingsInput } from '@/lib/cashflow-settings'
 import { loadParameterSavingsRateTarget } from '@/lib/cashflow-settings-data'
+import { bandError, isWithinBand } from '@/lib/parameters-band'
 
 // ── GET — Lees berekeningsparameters uit profiles ─────────────────────
 
@@ -80,19 +81,22 @@ export async function PUT(request: NextRequest) {
   // cashflow-pagina deelpatches sturen (bv. alleen net_monthly_income) zonder
   // dat de parameters-validatie afketst op ontbrekende velden. De parameters-
   // instellingenpagina stuurt beide altijd mee, dus die blijft identiek werken.
+  // Banden uit de GEDEELDE bron (lib/parameters-band.ts) — dezelfde module die
+  // de bewerk-sheet gebruikt voor zijn client-side feedback, zodat de twee niet
+  // uit elkaar kunnen lopen.
   let expectedReturn: number | undefined
   if (body.expected_return !== undefined) {
     const n = Number(body.expected_return)
-    if (isNaN(n) || n < 0.01 || n > 0.15) {
-      return NextResponse.json({ error: 'Verwacht rendement moet tussen 1% en 15% liggen' }, { status: 400 })
+    if (!isWithinBand('expected_return', n)) {
+      return NextResponse.json({ error: bandError('expected_return') }, { status: 400 })
     }
     expectedReturn = n
   }
   let inflationRate: number | undefined
   if (body.inflation_rate !== undefined) {
     const n = Number(body.inflation_rate)
-    if (isNaN(n) || n < 0 || n > 0.08) {
-      return NextResponse.json({ error: 'Inflatie moet tussen 0% en 8% liggen' }, { status: 400 })
+    if (!isWithinBand('inflation_rate', n)) {
+      return NextResponse.json({ error: bandError('inflation_rate') }, { status: 400 })
     }
     inflationRate = n
   }

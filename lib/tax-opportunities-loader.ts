@@ -17,6 +17,8 @@
 //   · onbenutte ruimte              → `computeJaarruimte`
 //   · besparing van de inleg        → `jaarruimteBesparing` (ADR 0040/0041)
 //   · Box 1-heffing                 → `computeBox1Tax`
+//   · verwacht beleggingsrendement  → `horizonData.fireParams.grossReturn`
+//                                     (resolveFireParams, lib/fire-params.ts)
 // Hier staat geen forfait, geen tarief en geen tweede €→dagen-conversie.
 //
 // ADR 0036 — uitsluitend GEAGGREGEERDE scalars verlaten deze loader. De
@@ -33,6 +35,7 @@ import { resolveBox1GrossIncome } from '@/lib/box1-income'
 import { computeBox1Tax } from '@/lib/box1-tax'
 import { dailyExpenseRate } from '@/lib/format'
 import { computeJaarruimte, jaarruimteBesparing, type JaarruimteResult } from '@/lib/jaarruimte'
+import { DEFAULT_RETURN } from '@/lib/constants'
 import type { TaxYear } from '@/lib/box3-data'
 import {
   generateBox3Strategies,
@@ -98,6 +101,40 @@ export interface FiscaleKansen {
   box3PerspectiveTax: number | null
   /** Canonieke dag-uitgaven bij deze grondslag (€→vrijheidstijd). */
   dailyExpenses: number
+  /**
+   * Het verwachte bruto beleggingsrendement waarmee de scenario's hierboven
+   * ZIJN doorgerekend (fractie, bv. 0.055). Komt uit `resolveFireParams` via
+   * `horizonData.fireParams.grossReturn` — dus de profiel-instelling
+   * `profiles.expected_return`, of DEFAULT_RETURN wanneer die leeg is.
+   *
+   * Meegegeven zodat het oppervlak het GEBRUIKTE percentage kan tonen in plaats
+   * van de constante nog eens zelf te importeren (dat was de bug: de chip zei
+   * 7,0% terwijl de projectie van dezelfde gebruiker met 5% rekende).
+   */
+  expectedReturn: number
+  /**
+   * true = `expectedReturn` is een eigen profiel-instelling; false = de
+   * app-standaard DEFAULT_RETURN. Bepaald door vergelijking met die constante,
+   * zodat de UI het onderscheid kan tonen zonder zelf het profiel te lezen.
+   *
+   * Randgeval 1: zet een gebruiker zijn rendement handmatig op exact 7,0%, dan
+   * leest dit false. Dat is de juiste kant om op te falen.
+   *
+   * Randgeval 2, ANDERSOM en nog niet opgelost: `loadHorizonData` schuift een
+   * beheerde jaarlaag uit `fire_assumptions` ín het profielveld vóórdat
+   * `resolveFireParams` draait. `grossReturn` is dus "profielwaarde óf
+   * beheerderswaarde-voor-dat-jaar óf DEFAULT_RETURN", en zodra een beheerder
+   * het jaargetal op iets anders dan 7,0% zet, leest dit veld `true` voor
+   * IEDEREEN die zelf niets heeft ingesteld — dan claimt de chip "eigen
+   * instelling" waar niets eigen is. Vandaag latent (de seed is exact 0.07).
+   * Echt oplossen vraagt een herkomst-vlag die vanaf `horizon-data-loader.ts`
+   * meereist (de shadow gebeurt daar, en `rawProfile` is post-shadow) — bewust
+   * apart gehouden, staat op de restpuntenlijst.
+   *
+   * In beide gevallen geldt: het getoonde percentage is hoe dan ook het
+   * GEBRUIKTE percentage; alleen de herkomst-markering kan onnauwkeurig zijn.
+   */
+  expectedReturnIsPersonal: boolean
 
   // ── Box 1 (EIGEN persoon — jaarruimte is per-persoon, ADR 0036) ──
   /** Bruto jaarinkomen uit de canonieke bron (handmatige override wint). */
@@ -160,6 +197,19 @@ async function loadFiscaleKansenInner(
   const canonicalDaily =
     dailyExpenseRate(horizonData.effectiveInput?.monthlyExpenses ?? 0) || box3.dailyExpenses
 
+  // ── Verwacht beleggingsrendement (aanname achter het netto effect) ────
+  // CONSUMEER `fireParams`, leid niet opnieuw af: `loadHorizonData` heeft
+  // `resolveFireParams(profile)` al gedraaid, dus `grossReturn` ís de
+  // geresolvede gebruikerswaarde (profiel-instelling, of DEFAULT_RETURN als
+  // terugval). Een tweede `resolveFireParams`-aanroep hier zou dezelfde
+  // grootheid een tweede bron geven — precies de drift die deze wijziging
+  // opheft: de optimizer rekende met een hardcoded 7% terwijl de
+  // FIRE-/horizon-projectie van dezelfde gebruiker met zijn eigen percentage
+  // rekende, waardoor het netto effect (en dus de rangschikking en de
+  // "grootste kans") structureel verkeerd kon uitvallen.
+  const expectedReturn = horizonData.fireParams.grossReturn
+  const expectedReturnIsPersonal = expectedReturn !== DEFAULT_RETURN
+
   // Scenario-generatie is doel-onafhankelijk (één keer); de ranking per doel
   // gebeurt server-side.
   const { baseline, strategies, shiftCurve } = generateBox3Strategies({
@@ -169,6 +219,7 @@ async function loadFiscaleKansenInner(
     hasPartner: current.hasPartner,
     current,
     optimalAllocation,
+    expectedReturn,
   })
 
   // ── Box 1-inputs voor het jaarruimte-doel ─────────────────────────────
@@ -268,6 +319,8 @@ async function loadFiscaleKansenInner(
     box3PerspectiveTax:
       perspective === 'household' ? box3.combined?.tax ?? null : box3.personal.tax,
     dailyExpenses: canonicalDaily,
+    expectedReturn,
+    expectedReturnIsPersonal,
     grossYearly,
     pensionFactorA,
     jaarruimte,

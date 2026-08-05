@@ -1115,3 +1115,240 @@ describe('tax-optimizer — regressie op bestaand gedrag', () => {
     )
   })
 })
+
+// ── Verwacht rendement = profiel-instelling (Fase 2 plak C) ──────
+//
+// DE BUG. Het misgelopen rendement werd berekend met de HARDCODED constante
+// DEFAULT_RETURN (7%), terwijl `profiles.expected_return` al bestaat en via
+// resolveFireParams de hele FIRE-/horizon-projectie voedt. Een gebruiker die 5%
+// heeft ingesteld zag zijn Toekomst-pagina met 5% rekenen, terwijl de optimizer
+// beweerde dat verschuiven hem 7% rendement kost. Omdat `returnCostEur` het
+// NETTO effect bepaalt, kantelde die drift de rangschikking en de "grootste
+// kans" — dat is wat het `rangschikking kantelt`-blok hieronder zichtbaar maakt.
+//
+// TOLERANTIEKEUZE. Waar twee engine-paden met dezelfde argumenten worden
+// vergeleken (regressie-terugval, curve-eindpunt ≡ scenario) is de eis EXACT
+// (`toBe`/`toEqual`, nul tolerantie): elk verschil is een divergerend codepad,
+// geen afrondingsruis. Waar een engine-uitkomst tegen een algebraïsche
+// herleiding wordt gelegd (returnCostEur, de 2028-indicatie) is de tolerantie
+// ABSOLUUT en sub-cent (toBeCloseTo(…, 6)): dezelfde producten in een andere
+// optelvolgorde geven ~1e-10 float-ruis. Een RELATIEVE marge is hier juist
+// verkeerd — de rand die ertoe doet is `gat = 0` (bedragen exact 0), waar elke
+// procentuele marge blind voor is.
+
+/** Een bewust afwijkende profiel-instelling: 4,0% i.p.v. de standaard 7,0%. */
+const EIGEN_RENDEMENT = 0.04
+
+describe('tax-optimizer — verwacht rendement komt uit het profiel', () => {
+  it('REGRESSIE: `expectedReturn` weglaten is byte-identiek aan expliciet DEFAULT_RETURN', () => {
+    const input = householdInput('box3-minimaal')
+    const zonder = generateBox3Strategies(input)
+    const metDefault = generateBox3Strategies({ ...input, expectedReturn: DEFAULT_RETURN })
+    // Alles: baseline (incl. 2028-indicatie), scenario's (incl. detail/caveat-
+    // teksten) én de volledige curve. Geen enkele bestaande aanroeper verschuift.
+    expect(zonder).toEqual(metDefault)
+  })
+
+  it('returnCostEur schaalt mee met de ingestelde waarde (gat = rendement − spaarrente)', () => {
+    const base = soloOptimizerInput()
+    expect(base.current.totaalBeleggingen).toBe(70_000)
+
+    const eigen = generateBox3Strategies({ ...base, expectedReturn: EIGEN_RENDEMENT })
+    const shift = eigen.strategies.find((s) => s.kind === 'samenstelling-shift')!
+
+    // 70.000 × (4,0% − 1,3%) = 70.000 × 2,7% = 1.890 — niet de 3.990 van 7%.
+    expect(shift.returnCostEur).toBe(Math.round(70_000 * (EIGEN_RENDEMENT - EXPECTED_SAVINGS_RETURN)))
+    expect(shift.returnCostEur).toBe(1_890)
+    expect(shift.returnCostEur).not.toBe(3_990)
+
+    // De FISCALE kant staat er volledig los van: dezelfde besparing, dezelfde
+    // heffing — alleen de economische aanname verschoof.
+    const standaard = generateBox3Strategies(base).strategies.find(
+      (s) => s.kind === 'samenstelling-shift',
+    )!
+    expect(shift.savings).toBe(standaard.savings)
+    expect(shift.optimizedTax).toBe(standaard.optimizedTax)
+    // …dus is het netto effect precies het verschil in rendementskosten.
+    expect(shift.netEffect - standaard.netEffect).toBeCloseTo(
+      standaard.returnCostEur - shift.returnCostEur,
+      6,
+    )
+  })
+
+  it('de detail-bullets en de caveat tonen het GEBRUIKTE percentage, niet 7,0%', () => {
+    const { strategies } = generateBox3Strategies({
+      ...soloOptimizerInput(),
+      expectedReturn: EIGEN_RENDEMENT,
+    })
+    const shift = strategies.find((s) => s.kind === 'samenstelling-shift')!
+
+    expect(shift.detail.some((d) => d.includes('4,0%') && d.includes('1,3%'))).toBe(true)
+    expect(shift.detail.some((d) => d.includes('7,0%'))).toBe(false)
+    expect(shift.caveat).toContain('4,0%')
+    expect(shift.caveat).not.toContain('7,0%')
+    // …ook in de 2028-aanname-regel van het verloop.
+    const aanname = shift.detail.find((d) => d.startsWith('Aanname 2028'))
+    expect(aanname).toBeDefined()
+    expect(aanname).not.toContain('7,0%')
+  })
+
+  it('de 2028-indicatie beweegt mee met de ingestelde waarde', () => {
+    const base = soloOptimizerInput()
+    const c = base.current
+    const { baseline } = generateBox3Strategies({ ...base, expectedReturn: EIGEN_RENDEMENT })
+
+    // Gesloten vorm: (spaargeld × 1,3% + beleggingen × 4,0%) × tarief.
+    const closedForm =
+      (c.totaalSpaargeld * EXPECTED_SAVINGS_RETURN + c.totaalBeleggingen * EIGEN_RENDEMENT) *
+      c.params.tarief
+    expect(baseline.trajectory!.tax2028Indicatie).toBeCloseTo(closedForm, 6)
+
+    // …en exact via de canonieke tegenbewijs-tak (zelfde functie, zelfde invoer).
+    const gewogen =
+      (c.totaalSpaargeld * EXPECTED_SAVINGS_RETURN + c.totaalBeleggingen * EIGEN_RENDEMENT) /
+      (c.totaalSpaargeld + c.totaalBeleggingen)
+    expect(baseline.trajectory!.tax2028Indicatie).toBe(
+      compareForfaitairVsWerkelijk({ box3Result: c, werkelijkRendementPct: gewogen * 100 })
+        .werkelijkeHeffing,
+    )
+
+    // Lager verwacht rendement → lagere heffing over werkelijk rendement.
+    const standaard = generateBox3Strategies(base).baseline.trajectory!.tax2028Indicatie!
+    expect(baseline.trajectory!.tax2028Indicatie!).toBeLessThan(standaard)
+
+    // De FISCALE jaren blijven onaangeroerd — die kennen geen rendementsaanname.
+    expect(baseline.trajectory!.tax2025).toBe(
+      generateBox3Strategies(base).baseline.trajectory!.tax2025,
+    )
+    expect(baseline.trajectory!.tax2026).toBe(c.tax)
+  })
+
+  it('de curve-eindpunt-identiteit blijft gelden onder een afwijkend rendement', () => {
+    const { strategies, shiftCurve } = generateBox3Strategies({
+      ...soloOptimizerInput(),
+      expectedReturn: EIGEN_RENDEMENT,
+    })
+    const shift = strategies.find((s) => s.kind === 'samenstelling-shift')!
+    const end = shiftCurve![shiftCurve!.length - 1]
+
+    // EXACT — beide paden roepen dezelfde engine met dezelfde argumenten aan.
+    expect(end.returnCostEur).toBe(shift.returnCostEur)
+    expect(end.netEffect).toBe(shift.netEffect)
+    expect(end.tax).toBe(shift.optimizedTax)
+    expect(end.savings).toBe(shift.savings)
+
+    // Élk punt rekent met hetzelfde gat — geen enkel punt is achtergebleven op 7%.
+    const gap = EIGEN_RENDEMENT - EXPECTED_SAVINGS_RETURN
+    for (const p of shiftCurve!) {
+      expect(p.returnCostEur).toBe(Math.round(p.shifted * gap))
+    }
+  })
+
+  it('het gat klemt op 0 bij een rendement onder de spaarrente-aanname', () => {
+    // Een uiterst voorzichtige gebruiker: 0,5% verwacht rendement, terwijl de
+    // spaarrente-aanname op 1,3% staat. Verschuiven kost hem dan niets — géén
+    // negatieve "winst" die de belastingbesparing kunstmatig opblaast.
+    const { strategies, shiftCurve } = generateBox3Strategies({
+      ...soloOptimizerInput(),
+      expectedReturn: 0.005,
+    })
+    const shift = strategies.find((s) => s.kind === 'samenstelling-shift')!
+
+    expect(shift.returnCostEur).toBe(0)
+    expect(shift.netEffect).toBe(shift.savings)
+    expect(shift.netEffect).toBeGreaterThan(0)
+    // De kwalitatieve vlag spiegelt het bedrag — ook aan deze rand.
+    expect(shift.hasReturnCost).toBe(false)
+    expect(shift.hasReturnCost).toBe(shift.returnCostEur > 0)
+    // Geen enkel curvepunt draagt kosten, en niets wordt negatief.
+    for (const p of shiftCurve!) {
+      expect(p.returnCostEur).toBe(0)
+      expect(p.netEffect).toBe(p.savings)
+      expect(p.netEffect).toBeGreaterThanOrEqual(0)
+    }
+  })
+
+  it('exact op de spaarrente-aanname is het gat 0 (grens, niet negatief)', () => {
+    const { strategies } = generateBox3Strategies({
+      ...soloOptimizerInput(),
+      expectedReturn: EXPECTED_SAVINGS_RETURN,
+    })
+    const shift = strategies.find((s) => s.kind === 'samenstelling-shift')!
+    expect(shift.returnCostEur).toBe(0)
+    expect(shift.netEffect).toBe(shift.savings)
+  })
+})
+
+// ── De bug zichtbaar: de rangschikking kantelt ───────────────────
+//
+// Solo-fixture ver boven de vrijstelling (€1 mln spaargeld + €1 mln
+// beleggingen), waar de besparing per verschoven euro ≈ (6,00% − 1,28%) × 36%
+// ≈ 1,70 procentpunt is. Bij 7,0% verwacht rendement is het gat 5,7 pp → de
+// shift is netto FORS negatief en valt als kans af. Bij 2,0% is het gat 0,7 pp
+// → dezelfde shift is netto POSITIEF en wordt de grootste kans. Zonder deze fix
+// zag de 2%-gebruiker "geen kans" waar er wél één was.
+
+describe('tax-optimizer — de ingestelde waarde kantelt de rangschikking', () => {
+  const LAAG_RENDEMENT = 0.02
+
+  it('bij 7,0% is de shift netto-negatief en is er GEEN topkans; bij 2,0% wint diezelfde shift', () => {
+    const base = farAboveExemptionSoloInput()
+
+    // ── Standaardaanname (7,0%) ──
+    const std = generateBox3Strategies(base)
+    const stdShift = std.strategies.find((s) => s.kind === 'samenstelling-shift')!
+    // Meet vóór je assert: bruto is dit een kans van formaat…
+    expect(stdShift.savings).toBeGreaterThan(0)
+    // …maar het misgelopen rendement is een veelvoud daarvan.
+    expect(stdShift.returnCostEur).toBe(
+      Math.round(base.current.totaalBeleggingen * (DEFAULT_RETURN - EXPECTED_SAVINGS_RETURN)),
+    )
+    expect(stdShift.netEffect).toBeLessThan(0)
+    expect(stdShift.netFreedomDays).toBe(0)
+    const stdSection = box3Section('box3-minimaal', std.baseline, std.strategies)
+    expect(pickTopChoice([stdSection])).toBeNull()
+
+    // ── Eigen instelling (2,0%) ──
+    const laag = generateBox3Strategies({ ...base, expectedReturn: LAAG_RENDEMENT })
+    const laagShift = laag.strategies.find((s) => s.kind === 'samenstelling-shift')!
+    expect(laagShift.returnCostEur).toBe(
+      Math.round(base.current.totaalBeleggingen * (LAAG_RENDEMENT - EXPECTED_SAVINGS_RETURN)),
+    )
+    // Zelfde fiscale besparing, ander netto oordeel — dát is de bug.
+    expect(laagShift.savings).toBe(stdShift.savings)
+    expect(laagShift.netEffect).toBeGreaterThan(0)
+    expect(laagShift.netFreedomDays).toBeGreaterThan(0)
+
+    const laagSection = box3Section('box3-minimaal', laag.baseline, laag.strategies)
+    const top = pickTopChoice([laagSection])
+    expect(top).not.toBeNull()
+    expect(top!.kind).toBe('box3')
+    expect(top!.opportunityId).toBe('samenstelling-shift')
+    expect(top!.netEffect).toBe(laagShift.netEffect)
+  })
+
+  it('de winnaar tussen twee kansen kan omslaan met de ingestelde waarde', () => {
+    // Dezelfde grote shift, nu met een partnerverdeling van € 800 ernaast. De
+    // allocatie-scalars zijn representatief meegegeven (zelfde precedent als
+    // WF-BELAST-24) — puur om twee kansen naast elkaar te zetten; `current`
+    // blijft het solo-resultaat, en dat is ook wat de engine leest
+    // (generateBox3Strategies gebruikt `current.hasPartner`, niet input.hasPartner).
+    const base: Box3OptimizerInput = {
+      ...farAboveExemptionSoloInput(),
+      hasPartner: true,
+      optimalAllocation: { totalTax: 5_000, savingsVsEqual: 800 },
+    }
+
+    // 7,0%: de shift is netto-negatief → de kosteloze partnerverdeling wint.
+    const std = generateBox3Strategies(base)
+    const stdTop = pickTopChoice([box3Section('box3-minimaal', std.baseline, std.strategies)])!
+    expect(stdTop.opportunityId).toBe('partnerverdeling')
+    expect(stdTop.netEffect).toBe(800)
+
+    // 2,0%: dezelfde shift is netto-positief en overtreft de € 800 ruimschoots.
+    const laag = generateBox3Strategies({ ...base, expectedReturn: LAAG_RENDEMENT })
+    const laagTop = pickTopChoice([box3Section('box3-minimaal', laag.baseline, laag.strategies)])!
+    expect(laagTop.opportunityId).toBe('samenstelling-shift')
+    expect(laagTop.netEffect).toBeGreaterThan(800)
+  })
+})

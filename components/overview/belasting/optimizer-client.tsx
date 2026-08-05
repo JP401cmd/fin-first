@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { formatMaskedCurrency } from '@/lib/format'
+import { VoorkeurBewerkenSheet } from '@/components/future/voorkeur-bewerken-sheet'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { ScenarioCallout, OrnamentColophon } from '@/components/editorial'
 import { BesprekMetWillButton } from '@/components/app/chat/bespreek-met-fin-button'
@@ -21,6 +22,21 @@ import {
 } from './optimizer-model'
 
 const SOURCE_SERIF = 'var(--font-source-serif, Georgia, serif)'
+
+/**
+ * Waar het verwachte beleggingsrendement WOONT: `profiles.expected_return`,
+ * beheerd via de markt-aannames op /toekomst/voorkeuren. Dezelfde instelling
+ * voedt de FIRE-/horizon-projectie én het netto effect hier.
+ *
+ * De chip is nu een inline editor: hij opent dezelfde `VoorkeurBewerkenSheet`
+ * (kolom 'expected_return') die /toekomst/voorkeuren gebruikt — dus één editor,
+ * één schrijfpad (PUT /api/parameters), één waarheid. Dat is géén tweede
+ * bewerkpunt maar hetzelfde bewerkpunt, hier bereikbaar op de plek waar je de
+ * aanname tegenkomt. De route hieronder blijft als secundaire uitgang binnen de
+ * sheet ("beheer al je aannames"), zodat de samenhang met Toekomst zichtbaar
+ * blijft zonder een tweede editor.
+ */
+const RENDEMENT_INSTELLING_HREF = '/toekomst/voorkeuren'
 
 /** Percentage in NL-notatie uit een fractie (0,07 → "7,0%"). */
 function fractionPct(fraction: number, digits = 1): string {
@@ -64,6 +80,8 @@ export function Box3OptimizerClient({
   hasPartner,
   perspectiveAware = false,
   year = 2026,
+  expectedReturn = DEFAULT_RETURN,
+  expectedReturnIsPersonal = false,
 }: {
   sections: GoalSection[]
   topChoice?: OptimizerTopChoice | null
@@ -72,12 +90,23 @@ export function Box3OptimizerClient({
   hasPartner: boolean
   perspectiveAware?: boolean
   year?: TaxYear
+  /**
+   * Het verwachte beleggingsrendement waarmee de server de scenario's ECHT
+   * heeft doorgerekend (`loadFiscaleKansen(...).expectedReturn`). Weergave-only:
+   * de chip toont dit percentage in plaats van de constante nog eens zelf te
+   * importeren — anders kan het getoonde percentage van het gebruikte gaan
+   * afwijken zodra een gebruiker zijn eigen rendement instelt.
+   */
+  expectedReturn?: number
+  /** true = eigen profiel-instelling; false = de app-standaard. */
+  expectedReturnIsPersonal?: boolean
 }) {
   const { masked } = useMaskedAmounts()
   const fc = (v: number) => formatMaskedCurrency(v, masked)
 
   const [sortMode, setSortMode] = useState<SortMode>('netto')
   const [openId, setOpenId] = useState<string | null>(null)
+  const [rendementOpen, setRendementOpen] = useState(false)
 
   const { baseline, opportunities } = useMemo(() => buildOpportunities(sections), [sections])
   const sorted = useMemo(
@@ -103,12 +132,57 @@ export function Box3OptimizerClient({
 
   return (
     <section className="mx-auto max-w-6xl px-4 pb-14 sm:px-6 sm:pb-20">
-      {/* ── Aannames waarop de vergelijking rust (bewerkbaar volgt later) ── */}
+      {/* ── Aannames waarop de vergelijking rust ─────────────────────────
+          Het getoonde rendement is het GEBRUIKTE rendement: server-geleverd via
+          `expectedReturn`, niet lokaal uit een constante gelezen. De chip opent
+          de editor voor diezelfde instelling. De spaarrente-aanname blijft een
+          constante — daar bestaat (nog) geen gebruikersinstelling voor, dus daar
+          valt niets te beheren. */}
       <div className="mb-9 flex flex-wrap gap-2">
-        <AannameChip label="verwacht rendement beleggen" value={fractionPct(DEFAULT_RETURN)} />
+        <AannameChip
+          label="verwacht rendement beleggen"
+          value={fractionPct(expectedReturn)}
+          note={expectedReturnIsPersonal ? 'eigen instelling' : 'standaard'}
+          onEdit={() => setRendementOpen(true)}
+          editLabel="aanpassen"
+          title={
+            expectedReturnIsPersonal
+              ? 'Je eigen verwachte rendement uit je toekomst-voorkeuren. Dezelfde aanname voedt je projectie op Toekomst. Klik om aan te passen.'
+              : 'De standaardaanname van TriFinity. Klik om je eigen verwachte rendement in te stellen; dezelfde aanname voedt je projectie op Toekomst.'
+          }
+        />
         <AannameChip label="spaarrente-aanname" value={fractionPct(EXPECTED_SAVINGS_RETURN)} />
         <AannameChip label="belastingjaar" value={String(year)} />
       </div>
+
+      {/* Dezelfde editor als op /toekomst/voorkeuren — zelfde kolom, zelfde
+          schrijfpad (PUT /api/parameters), zelfde servernorm (1–15%). Na
+          opslaan doet de sheet `router.refresh()`: de server rekent de
+          scenario's, de curve, het verloop, de ranking én de topkans opnieuw
+          door met de nieuwe aanname (de kansen-loader is React-`cache()`-
+          gewrapt, en die cache is request-gescoped — een refresh is een nieuw
+          request en levert dus verse data).
+
+          `minPct`/`maxPct` geven we bewust NIET mee: de sheet-default ís de
+          servernorm (lib/parameters-band.ts, gedeeld met de route). Ze hier
+          herhalen zou een derde kopie van dezelfde band introduceren. */}
+      {/* Bewust ONVOORWAARDELIJK gemount met een `open`-prop: bij conditioneel
+          mounten draait de focus-trap-cleanup niet en landt een
+          toetsenbordgebruiker na sluiten op `<body>` in plaats van terug op de
+          chip. */}
+      <VoorkeurBewerkenSheet
+          open={rendementOpen}
+          title="Verwacht rendement beleggen"
+          column="expected_return"
+          currentValuePct={expectedReturn * 100}
+          stepPct={0.1}
+          helperText="Dezelfde aanname voedt je projectie op Toekomst: pas je 'm hier aan, dan verschuift daar ook je FIRE-datum en je vrijheidstijd. Wereldwijde aandelen-historie: ~6-8%. Conservatief: 4-5%."
+          secondaryLink={{
+            href: RENDEMENT_INSTELLING_HREF,
+            label: 'Beheer al je aannames op Toekomst › Voorkeuren',
+          }}
+          onClose={() => setRendementOpen(false)}
+        />
 
       {/* ── Katern I ────────────────────────────────────────────────── */}
       <OptimizerStanding
@@ -179,8 +253,13 @@ export function Box3OptimizerClient({
 
       {/* ── Katern IV: voetnoten ────────────────────────────────────── */}
       <div className="mt-14 grid grid-cols-2 gap-6 border-t-4 border-double border-[var(--ink)] pt-6 md:grid-cols-4">
+        {/* Zelfde grootheid als de chip bovenaan, dus dezelfde bron: server-
+            geleverd `expectedReturn`. Zou hier nog de constante staan, dan
+            sprak de voetnoot de chip tegen zodra iemand zijn eigen rendement
+            instelt. */}
         <FooterNote kicker="Aannames">
-          Verwacht rendement beleggen {fractionPct(DEFAULT_RETURN)}, spaarrente-aanname{' '}
+          Verwacht rendement beleggen {fractionPct(expectedReturn)}
+          {expectedReturnIsPersonal ? ' (je eigen instelling)' : ' (standaard)'}, spaarrente-aanname{' '}
           {fractionPct(EXPECTED_SAVINGS_RETURN)}, belastingjaar {year}. De vergelijking rekent
           met deze uitgangspunten.
         </FooterNote>
@@ -202,13 +281,67 @@ export function Box3OptimizerClient({
   )
 }
 
-/** Read-only aanname-chip. Bewerkbaar maken volgt in een volgende fase. */
-function AannameChip({ label, value }: { label: string; value: string }) {
-  return (
-    <span className="inline-flex items-baseline gap-1.5 border border-[var(--border-ed)] bg-[var(--paper)] px-2.5 py-1.5 font-mono text-[11px] text-[var(--ink-2)]">
+/**
+ * Aanname-chip. Read-only span, tenzij er een `onEdit` is: dan wordt dezelfde
+ * chip een knop die de editor voor die aanname opent — bewerken waar je de
+ * aanname tegenkomt, zonder de pagina te verlaten.
+ *
+ * Styling blijft ongewijzigd (mono, `--border-ed`, paper-bg); de knop-variant
+ * krijgt alleen een 44px touch-target op klein scherm (`sm:min-h-0` houdt 'm op
+ * desktop visueel identiek aan de read-only chips ernaast), een zichtbare
+ * focus-ring en een onderstreepte waarde als klikbaarheids-affordance.
+ */
+function AannameChip({
+  label,
+  value,
+  note,
+  onEdit,
+  editLabel,
+  title,
+}: {
+  label: string
+  value: string
+  /** Kleine herkomst-markering, bv. "eigen instelling". */
+  note?: string
+  /** Aanwezig → de chip wordt een knop die de editor van deze aanname opent. */
+  onEdit?: () => void
+  /** Wat er gebeurt bij klikken, bv. "aanpassen" — sluit de accessible name af. */
+  editLabel?: string
+  title?: string
+}) {
+  const base =
+    'inline-flex items-baseline gap-1.5 border border-[var(--border-ed)] bg-[var(--paper)] px-2.5 py-1.5 font-mono text-[11px] text-[var(--ink-2)]'
+  const body = (
+    <>
       {label}
       <b className="font-medium tabular-nums text-[var(--ink)]">{value}</b>
-    </span>
+      {note ? <span className="text-[9.5px] text-[var(--ink-3)]">· {note}</span> : null}
+    </>
+  )
+
+  if (!onEdit) {
+    return (
+      <span className={base} title={title}>
+        {body}
+      </span>
+    )
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onEdit}
+      // Een aria-label VERVANGT de accessible name, dus de waarde en de
+      // herkomst moeten erin — anders hoort een screenreader-gebruiker als
+      // enige chip op de rij niet wélk percentage er staat. `title` wordt
+      // bovendien niet voorgelezen (aria-label wint) en is onbereikbaar op
+      // touch, dus die kan de inhoud niet dragen.
+      aria-label={`${label} ${value}${note ? `, ${note}` : ''}${editLabel ? ` — ${editLabel}` : ''}`}
+      title={title}
+      className={`${base} min-h-[44px] items-center text-left underline decoration-dotted decoration-from-font underline-offset-4 transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink-3)] sm:min-h-0 sm:items-baseline`}
+    >
+      {body}
+    </button>
   )
 }
 

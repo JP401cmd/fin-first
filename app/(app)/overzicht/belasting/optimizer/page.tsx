@@ -61,6 +61,8 @@ export default async function BelastingOptimizerPage() {
         hasPartner={kansen.hasPartner}
         perspectiveAware={kansen.perspectiveAware}
         year={kansen.year}
+        expectedReturn={kansen.expectedReturn}
+        expectedReturnIsPersonal={kansen.expectedReturnIsPersonal}
       />
     </>
   )
