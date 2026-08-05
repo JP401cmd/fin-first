@@ -36,7 +36,7 @@ Een RLS-leak-check die alleen eigenaar-isolatie test (gebruiker A ziet geen rije
 
 ## Git-hygiëne in de gedeelde werkboom
 
-Subagents en hoofdchat werken in dezelfde working tree, vaak náást parallelle sessies van de gebruiker. Daarom: nooit `git stash`, `git checkout -- <pad>`, `git reset` of andere tree-brede operaties als onderdeel van bouwen of testen — die vernietigen andermans ongecommitte werk. Alleen gerichte edits binnen de opdracht-scope. De oude staat van een bestand vergelijk je met `git show HEAD:<pad>` of `git diff -- <pad>`, niet door de tree terug te zetten. Bestanden die je niet zelf hebt gewijzigd blijven onaangeraakt.
+Subagents en hoofdchat werken in dezelfde working tree, vaak náást parallelle sessies van de gebruiker. Daarom een expliciete verbodslijst: `git stash` (in élke vorm), `git checkout -- <pad>` / `git checkout .`, `git reset` en `git clean` — **nooit, ook niet "even tijdelijk" voor een lokale check of diagnose met de belofte het direct terug te zetten.** Precies die constructie is in aug 2026 misgegaan: een `stash → check → pop`-keten haalde de pop niet (command-timeout) en liet de werkboom uitgekleed achter, inclusief het ongecommitte werk van parallelle sessies. Een schone-baseline-vraag beantwoord je altijd read-only: `git show HEAD:<pad>`, `git diff -- <pad>`, of een tijdelijke kopie in de scratchpad. Alleen gerichte edits binnen de opdracht-scope; bestanden die je niet zelf hebt gewijzigd blijven onaangeraakt.
 
 ## Slotstap — zelfverbetering (opt-in, niet elke run)
 
