@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { computeYearlyMustExpenses, computeRetirementExpenses, type BudgetRow, type ChildBudgetRow } from './budget-utils'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { annualAmount, computeYearlyMustExpenses, computeRetirementExpenses, type BudgetRow, type ChildBudgetRow } from './budget-utils'
 import { PERSONAS } from './test-personas'
 
 /**
@@ -286,4 +288,73 @@ describe('computeRetirementExpenses — overige methodes en fallback-ketens', ()
     expect(computeRetirementExpenses('essential_budgets', 0, 60000, null, 20000)).toBe(20000)
     expect(computeRetirementExpenses('essential_budgets', 0, 60000)).toBe(0)
   })
+})
+
+/**
+ * `annualAmount` is de ENIGE toegestane jaarconversie van een budget-limiet:
+ * monthly ×12, quarterly ×4, yearly ×1.
+ *
+ * De bug die dit slot vergrendelt: zes call-sites die `yearlyMustExpenses`
+ * (→ `fireTarget` = yearlyMustExpenses / effectiveSwr) zelf uitrekenden deden
+ * `interval === 'yearly' ? limit : limit * 12`. Daarmee telde een QUARTERLY
+ * budget ×12 in plaats van ×4 — 3× te hoog, wat het FIRE-doel opblies en het
+ * vrijheids-% verlaagde. De `budgets.interval`-kolom staat quarterly expliciet
+ * toe (CHECK IN ('monthly','quarterly','yearly')), dus dit is bereikbaar
+ * gebruikersgedrag, geen theoretisch geval.
+ */
+describe('annualAmount — de canonieke jaarconversie van een budget-limiet', () => {
+  it('quarterly telt ×4 (€100/kwartaal = €400/jaar)', () => {
+    expect(annualAmount(100, 'quarterly')).toBe(400)
+  })
+
+  it('monthly telt ×12 en yearly ×1', () => {
+    expect(annualAmount(100, 'monthly')).toBe(1200)
+    expect(annualAmount(100, 'yearly')).toBe(100)
+  })
+
+  it('een onbekend/ontbrekend interval telt als jaarbedrag (×1)', () => {
+    // Gepind gedrag, geen toevalligheid: de DB-default is 'monthly' en de CHECK
+    // laat alleen monthly/quarterly/yearly toe, dus dit pad is in de praktijk
+    // onbereikbaar. Zou het ooit bereikbaar worden, dan is ×1 de conservatieve
+    // (niet-opblazende) keuze én identiek aan wat computeYearlyMustExpenses en
+    // /api/household/fire-projections al deden.
+    expect(annualAmount(100, null)).toBe(100)
+    expect(annualAmount(100, undefined)).toBe(100)
+    expect(annualAmount(100, 'eenmalig')).toBe(100)
+  })
+
+  it('rekent lineair door op 0 en negatieve limieten (geen clamping)', () => {
+    expect(annualAmount(0, 'quarterly')).toBe(0)
+    expect(annualAmount(-50, 'quarterly')).toBe(-200)
+  })
+})
+
+/**
+ * Anti-drift-grendel — géén tweede jaarconversie buiten `annualAmount`.
+ *
+ * Deze vijf bestanden bouwen `yearlyMustExpenses` op uit essentiële budgetten en
+ * delen dat door de effectieve SWR tot een `fireTarget`; drie ervan SCHRIJVEN de
+ * uitkomst als `freedom_percentage` naar de database. Ze consumeren daarom de
+ * canonieke conversie in plaats van 'm te herhalen (CLAUDE.md "consume, don't
+ * recompute"). Het patroon hieronder is exact de foutvorm die de bug was — een
+ * copy-paste-terugkeer ervan maakt deze test rood.
+ */
+describe('anti-drift-grendel — call-sites consumeren annualAmount', () => {
+  const CALL_SITE_FILES = [
+    ['app', 'api', 'report', 'route.ts'],
+    ['app', 'api', 'snapshots', 'route.ts'],
+    ['app', 'api', 'snapshots', 'cron', 'route.ts'],
+    ['app', 'api', 'snapshots', 'auto', 'route.ts'],
+    ['lib', 'holdings-data-loader.ts'],
+  ]
+
+  it.each(CALL_SITE_FILES.map(parts => [parts.join('/'), parts] as const))(
+    '%s bevat geen eigen jaarconversie meer en importeert annualAmount',
+    (_label, parts) => {
+      const src = readFileSync(join(process.cwd(), ...parts), 'utf8')
+      // De foutvorm: alles wat niet 'yearly' is ×12 → quarterly 3× te hoog.
+      expect(src).not.toMatch(/interval === 'yearly'\s*\?\s*limit\s*:\s*limit \* 12/)
+      expect(src).toMatch(/\bannualAmount\b/)
+    },
+  )
 })

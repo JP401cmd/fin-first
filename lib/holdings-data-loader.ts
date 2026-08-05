@@ -14,6 +14,7 @@
 import { cache } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getCachedUser } from '@/lib/supabase/cached-user'
+import { annualAmount } from '@/lib/budget-utils'
 import { loadHoldingsPnL, attachPnLToHoldings } from '@/lib/holdings-pnl-enrichment'
 
 // ── Types ──────────────────────────────────────────────────────
@@ -67,10 +68,8 @@ export const loadHoldingsData = cache(async (supabase: SupabaseClient): Promise<
   ])
 
   const yearlyEssentialExpenses = (essentialBudgets ?? []).reduce(
-    (s: number, b: { default_limit: number | string; interval: string }) => {
-      const limit = Number(b.default_limit) || 0
-      return s + (b.interval === 'yearly' ? limit : limit * 12)
-    },
+    (s: number, b: { default_limit: number | string; interval: string }) =>
+      s + annualAmount(Number(b.default_limit) || 0, b.interval),
     0,
   )
 

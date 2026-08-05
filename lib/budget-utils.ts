@@ -26,7 +26,24 @@ export interface MustExpenseItem {
 
 const EXCLUDED_BUDGET_TYPES = ['archive', 'income', 'savings']
 
-function annualAmount(limit: number, interval: string | null | undefined): number {
+/**
+ * De ENIGE toegestane jaarconversie van een budget-limiet: monthly ×12,
+ * quarterly ×4, yearly (en elk onbekend/ontbrekend interval) ×1.
+ *
+ * Elke call-site die essentiële budgetten optelt tot `yearlyMustExpenses` — en
+ * dus tot `fireTarget` = yearlyMustExpenses / effectiveSwr — consumeert deze
+ * functie en herhaalt de conversie NIET. Zes call-sites deden dat wel, met
+ * `interval === 'yearly' ? limit : limit * 12`; daarmee telde een QUARTERLY
+ * budget ×12 in plaats van ×4 (3× te hoog), wat het FIRE-doel opblies en het
+ * vrijheids-% verlaagde. `budgets.interval` staat quarterly expliciet toe
+ * (CHECK IN ('monthly','quarterly','yearly')), dus dat was bereikbaar
+ * gebruikersgedrag. Regressieslot: lib/budget-utils.test.ts.
+ *
+ * NB de fallback is bewust ×1, niet ×12: onbekend/ontbrekend interval telt als
+ * jaarbedrag (conservatief, niet-opblazend). De DB-default is 'monthly' en de
+ * CHECK laat niets anders toe, dus dat pad is in de praktijk onbereikbaar.
+ */
+export function annualAmount(limit: number, interval: string | null | undefined): number {
   if (interval === 'monthly') return limit * 12
   if (interval === 'quarterly') return limit * 4
   return limit // yearly / eenmalig

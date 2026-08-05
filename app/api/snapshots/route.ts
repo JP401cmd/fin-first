@@ -10,6 +10,7 @@ import {
   type HealthScoreTransaction,
 } from '@/lib/health-score-input'
 import { resolveFireParams } from '@/lib/fire-params'
+import { annualAmount } from '@/lib/budget-utils'
 import { computeSovereigntyLevel } from '@/lib/feature-phases'
 import { captureBalanceSnapshots } from '@/lib/balance-snapshot'
 import { logError } from '@/lib/log-error'
@@ -70,10 +71,10 @@ export async function GET() {
       .single(),
   ])
 
-  const yearlyMustExpenses = (budgetsRes.data ?? []).reduce((s, b) => {
-    const limit = Number(b.default_limit) || 0
-    return s + (b.interval === 'yearly' ? limit : limit * 12)
-  }, 0)
+  const yearlyMustExpenses = (budgetsRes.data ?? []).reduce(
+    (s, b) => s + annualAmount(Number(b.default_limit) || 0, b.interval),
+    0,
+  )
   const fireSwr = resolveFireParams(profileRes.data ?? {}).effectiveSwr
   const fireTarget = yearlyMustExpenses > 0 ? yearlyMustExpenses / fireSwr : 0
 
@@ -222,10 +223,7 @@ export async function POST() {
   const allBudgets = budgetsResult.data ?? []
   const yearlyMustExpenses = allBudgets
     .filter(b => b.is_essential && b.budget_type === 'expense' && b.parent_id === null)
-    .reduce((s, b) => {
-      const limit = Number(b.default_limit) || 0
-      return s + (b.interval === 'yearly' ? limit : limit * 12)
-    }, 0)
+    .reduce((s, b) => s + annualAmount(Number(b.default_limit) || 0, b.interval), 0)
 
   const fireParams = resolveFireParams(profileResult.data ?? {})
   const fireSwr = fireParams.effectiveSwr

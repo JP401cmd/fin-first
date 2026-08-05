@@ -2,7 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { unauthorized, forbidden, serverError, errorResponse } from '@/lib/api/respond'
 import { isCloudAllowed, PRIVACY_GATE_CODE } from '@/lib/ai/privacy-gate'
 import { recordAiUsage } from '@/lib/ai-credits'
-import { computeFireProjection, type FinancialInput } from '@/lib/horizon-data'
+import type { FinancialInput } from '@/lib/horizon-data'
+import { computeScalarFireProjection } from '@/lib/horizon-kernel/scalar-router'
 import { computeNetWorthProjection } from '@/lib/net-worth-projection'
 import { buildCategorySpending, patternsToInsights, detectSeasonalPatterns, detectTrends, detectAnomalies } from '@/lib/spending-patterns'
 import { generateText } from 'ai'
@@ -10,6 +11,7 @@ import { getModel } from '@/lib/ai/config'
 import type { ReportData, ReportConfig, HistoricalPeriodSummary } from '@/lib/report-data'
 import { checkTierGate } from '@/lib/require-tier'
 import { resolveFireParams } from '@/lib/fire-params'
+import { annualAmount } from '@/lib/budget-utils'
 import { computeFreedomProgressWithBasis, inclHomeTargetFromScalar } from '@/lib/core-metrics'
 import { resolveSavingsSource, savingsRateFromAggregates, computeDebtAflossingMonthly } from '@/lib/savings-source'
 import { getRecentDailyExpenseRate } from '@/lib/expense-rate'
@@ -343,10 +345,7 @@ export async function GET(request: Request) {
     // gedeeld door de gebruikers-effectiveSwr (was: vaste NL_SWR).
     const yearlyMustExpenses = allBudgets
       .filter(b => b.is_essential && b.budget_type === 'expense' && !b.parent_id)
-      .reduce((s, b) => {
-        const limit = Number(b.default_limit) || 0
-        return s + (b.interval === 'yearly' ? limit : limit * 12)
-      }, 0)
+      .reduce((s, b) => s + annualAmount(Number(b.default_limit) || 0, b.interval), 0)
     const fireTarget = yearlyMustExpenses > 0 ? yearlyMustExpenses / fireParams.effectiveSwr : 0
 
     // Total assets & debts (weighted by net_worth_inclusion_pct)
@@ -600,7 +599,7 @@ export async function GET(request: Request) {
     const monthlySavingsForFire = baseAnnualSavings / 12
 
     try {
-      // computeFireProjection leidt het maandsurplus af uit monthlyIncome −
+      // De scalar-invoer leidt het maandsurplus af uit monthlyIncome −
       // monthlyExpenses. Met yearlyMustExpenses > 0 hangt de interne fireTarget
       // alleen aan yearlyMustExpenses × swr (computeEffectiveExpenses negeert
       // monthlyExpenses), dus we mogen income/expenses uitdrukken als het
@@ -619,12 +618,27 @@ export async function GET(request: Request) {
         yearlyMustExpenses: yearlyMustExpensesHorizon,
         dateOfBirth: profile?.date_of_birth || null,
       }
-      const fp = computeFireProjection(
-        horizonInput,
-        fireParams.grossReturn,
-        fireParams.effectiveSwr,
-        fireParams.inflationRate,
-      )
+      // CONSUME, DON'T RECOMPUTE (CLAUDE.md): de FIRE-LEEFTIJD/-datum komt uit de
+      // horizon-kernel via de scalar-router — dezelfde motor die de bundel
+      // (`loadDashboardData` → `fireProjResult`), de deelbare vrijheidskaart en
+      // /toekomst gebruiken. Vóór deze fix riep het rapport de legacy scalar
+      // `computeFireProjection` rechtstreeks aan; die is behoefte-onafhankelijk
+      // (gesloten-vorm uitgaven/SWR) en gaf op een representatief profiel ~4,8
+      // jaar verschil met de kernel — een PDF die de app tegensprak.
+      //
+      // `monthlyPassiveIncome` blijft bewust scalar-afgeleid: de router
+      // documenteert expliciet dat alleen de TIJD-velden uit de kernel-solve
+      // komen; de statische ratio-/weergavevelden blijven de scalar-formules.
+      // Geen strategyOptions → de router kiest 'perpetual' (uitgaven/SWR), exact
+      // de grondslag van het `fireTarget` dat dit rapport hierboven zelf
+      // hanteert. Nette degradatie naar de scalar-formule (geen dob / negatief
+      // netto vermogen / kern-fout) zit in de router zelf.
+      const fp = computeScalarFireProjection({
+        input: horizonInput,
+        annualReturn: fireParams.grossReturn,
+        swrOverride: fireParams.effectiveSwr,
+        inflationOverride: fireParams.inflationRate,
+      }).result
       fireDate = fp.fireDate
       fireAge = fp.fireAge
       monthlyPassiveIncome = Math.round(fp.monthlyPassiveIncome)
