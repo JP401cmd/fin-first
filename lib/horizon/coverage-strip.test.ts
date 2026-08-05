@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildCoverageStrip, coveragePctForRow, spendablePortfolio } from './coverage-strip'
+import { buildCoverageStrip, coveragePctForRow, decomposeRow, spendablePortfolio } from './coverage-strip'
 import type { UnifiedProjectionRow } from '../unified-projection'
 import { NL_SWR } from '../constants'
 import type { Asset, AssetType } from '../asset-data'
@@ -100,6 +100,121 @@ describe('buildCoverageStrip', () => {
     const ages = buildCoverageStrip(rows).map(n => n.age)
     expect(ages).toContain(63) // brug begint
     expect(ages).toContain(67) // AOW-instap
+  })
+})
+
+// ── Samenstelling: waar de dekking vandaan komt ─────────────────────────────
+//
+// De uitsplitsing is een herschikking van de termen die de dekkingsformule al
+// berekent, geen tweede som. Deze suite pint de invarianten vast die dat borgen:
+// de drie aandelen tellen op tot 100, groen+goud valt exact samen met het
+// getoonde dekkingspercentage, en de euro's sommeren tot de bruto behoefte.
+describe('decomposeRow — samenstelling van de dekking', () => {
+  /** De invarianten die op ELKE rij met samenstelling moeten gelden. */
+  function verwachtInvarianten(row: UnifiedProjectionRow) {
+    const { coveragePct, samenstelling: s } = decomposeRow(row)
+    expect(s, 'deze rij hoort een samenstelling te hebben').toBeDefined()
+    expect(s!.inkomenPct + s!.rendementPct + s!.interenPct).toBe(100)
+    expect(s!.inkomenPct + s!.rendementPct).toBe(Math.min(coveragePct, 100))
+    expect(s!.inkomen + s!.rendement + s!.interen).toBeCloseTo(s!.brutoNeed, 6)
+    for (const v of [s!.inkomenPct, s!.rendementPct, s!.interenPct, s!.overschotPct, s!.inkomen, s!.rendement, s!.interen, s!.overschot]) {
+      expect(v).toBeGreaterThanOrEqual(0)
+    }
+    return s!
+  }
+
+  it('brug zonder inkomen: alles wat niet uit veilig rendement komt is interen', () => {
+    const spendable = 200_000
+    const totaalNeed = 40_000
+    const row = mkRow({
+      age: 64,
+      phase: 'transition',
+      withdrawal: 95_000, // feitelijke onttrekking mag de uitsplitsing niet raken
+      withdrawalNeed: { totaalNeed } as UnifiedProjectionRow['withdrawalNeed'],
+      grossIncomeBySource: { salaris: 0, gebeurtenisBaten: 0 },
+      assetBuckets: { investment: { endValue: spendable } } as unknown as UnifiedProjectionRow['assetBuckets'],
+    })
+
+    const s = verwachtInvarianten(row)
+    const veilig = NL_SWR * spendable
+    expect(s.inkomenPct).toBe(0)
+    expect(s.rendement).toBeCloseTo(veilig, 6)
+    expect(s.interen).toBeCloseTo(totaalNeed - veilig, 6)
+    expect(s.interenPct).toBe(100 - coveragePctForRow(row))
+    expect(s.overschotPct).toBe(0)
+  })
+
+  it('opbouwjaar: inkomen dekt de volle besteding, de inleg is het overschot', () => {
+    const row = mkRow({ age: 40, phase: 'accumulation', grossIncome: 50_000, savings: 15_000 })
+
+    const s = verwachtInvarianten(row)
+    expect(s.brutoNeed).toBe(35_000) // besteding = inkomen − inleg
+    expect(s.inkomenPct).toBe(100)
+    expect(s.rendementPct).toBe(0) // geen veilige-onttrekkings-term in deze fase
+    expect(s.interenPct).toBe(0)
+    expect(s.overschot).toBe(15_000) // exact de inleg
+    expect(s.overschotPct).toBe(coveragePctForRow(row) - 100)
+  })
+
+  it('opbouwjaar met ontsparen (negatieve inleg) toont wél interen', () => {
+    // Besteding 50k tegenover 40k inkomen → 20% van de besteding komt uit de pot.
+    const row = mkRow({ age: 40, phase: 'accumulation', grossIncome: 40_000, savings: -10_000 })
+
+    const s = verwachtInvarianten(row)
+    expect(s.brutoNeed).toBe(50_000)
+    expect(s.inkomenPct).toBe(80)
+    expect(s.interenPct).toBe(20)
+    expect(s.interen).toBe(10_000)
+    expect(s.overschotPct).toBe(0)
+  })
+
+  it('inkomen bóven de behoefte: bol vol groen, het meerdere wordt overschot (geen interen)', () => {
+    const row = mkRow({
+      age: 70,
+      phase: 'withdrawal',
+      withdrawalNeed: { totaalNeed: 40_000 } as UnifiedProjectionRow['withdrawalNeed'],
+      grossIncomeBySource: { salaris: 0, gebeurtenisBaten: 50_000 },
+      assetBuckets: { investment: { endValue: 300_000 } } as unknown as UnifiedProjectionRow['assetBuckets'],
+    })
+
+    const s = verwachtInvarianten(row)
+    expect(s.inkomenPct).toBe(100)
+    expect(s.rendementPct).toBe(0) // restNeed = 0 ⇒ geen veilige onttrekking nodig
+    expect(s.interen).toBe(0)
+    expect(s.overschot).toBe(10_000)
+    expect(s.overschotPct).toBe(25)
+  })
+
+  it('geen bestedingsbehoefte om te verdelen ⇒ geen samenstelling (bol valt terug op effen)', () => {
+    // Beide guard-takken: accumulatie zonder inkomens-/inleg-data, en een
+    // post-FIRE-rij zonder bruto behoefte. Beide geven 100% als vormbehoud —
+    // dat is geen échte volledige dekking, dus er valt niets uit te splitsen.
+    for (const row of [
+      mkRow({ age: 45, phase: 'accumulation' }),
+      mkRow({ age: 70, phase: 'withdrawal', withdrawalNeed: { totaalNeed: 0, partnerBijdrage: 0 } as UnifiedProjectionRow['withdrawalNeed'] }),
+    ]) {
+      const { coveragePct, samenstelling } = decomposeRow(row)
+      expect(coveragePct).toBe(100)
+      expect(samenstelling).toBeUndefined()
+    }
+  })
+
+  it('buildCoverageStrip geeft de samenstelling mee in elke knoop', () => {
+    const nodes = buildCoverageStrip([
+      mkRow({ age: 60, phase: 'accumulation', grossIncome: 60_000, savings: 20_000 }),
+      mkRow({
+        age: 64,
+        phase: 'transition',
+        withdrawalNeed: { totaalNeed: 40_000 } as UnifiedProjectionRow['withdrawalNeed'],
+        grossIncomeBySource: { salaris: 0, gebeurtenisBaten: 0 },
+        assetBuckets: { investment: { endValue: 200_000 } } as unknown as UnifiedProjectionRow['assetBuckets'],
+      }),
+    ])
+    expect(nodes.length).toBeGreaterThan(0)
+    for (const n of nodes) {
+      expect(n.samenstelling).toBeDefined()
+      expect(n.samenstelling!.inkomenPct + n.samenstelling!.rendementPct).toBe(Math.min(n.coveragePct, 100))
+    }
   })
 })
 
@@ -280,4 +395,32 @@ describe('coveragePctForRow — partnerinkomen mag maar ÉÉN keer tellen', () =
     const verwacht = verwachteDekking(row!)
     expect(coveragePctForRow(row!)).toBe(verwacht)
   })
+
+  it('bridge-representatief — de samenstelling houdt over ELKE echte rij stand (geen tweede formule)', () => {
+    const assets: Asset[] = [
+      makeAsset({ id: 'sav', asset_type: 'savings', current_value: 40_000 }),
+      makeAsset({ id: 'etf', asset_type: 'investment', current_value: 220_000, expected_return: 6 }),
+    ]
+    const debts: Debt[] = [makeDebt({ id: 'loan', debt_type: 'personal_loan', current_balance: 5_000, interest_rate: 5, monthly_payment: 150 })]
+    const partner: KernelAdapterPartner = { profile: partnerProfile() }
+
+    const input = buildKernelInputFromApp({ profile: pinnedProfile(), assets, debts, partner })
+    const { assetSlotMeta, debtSlotMeta } = buildKernelSlotMeta(assets, debts, new Set())
+    const ctx: KernelBridgeContext = { input, yearlyExpenses: 3_500 * 12, assetSlotMeta, debtSlotMeta }
+    const result = kernelToUnifiedResult(solveFire(input), ctx)
+
+    let metSamenstelling = 0
+    for (const row of result.rows) {
+      const { coveragePct, samenstelling: s } = decomposeRow(row)
+      // De wrapper mag nooit een ander getal geven dan de decompositie zelf.
+      expect(coveragePctForRow(row)).toBe(coveragePct)
+      if (!s) continue
+      metSamenstelling++
+      expect(s.inkomenPct + s.rendementPct + s.interenPct).toBe(100)
+      expect(s.inkomenPct + s.rendementPct).toBe(Math.min(coveragePct, 100))
+      expect(s.inkomen + s.rendement + s.interen).toBeCloseTo(s.brutoNeed, 6)
+    }
+    expect(metSamenstelling, 'een echte run hoort rijen met een verdeelbare behoefte op te leveren').toBeGreaterThan(0)
+  })
+
 })

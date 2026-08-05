@@ -4,13 +4,53 @@
  * PURE afleiding uit het bestaande per-jaar UnifiedProjectionRow-contract
  * (lib/unified-projection.ts, gevuld door de horizon-kernel-bridge) — GEEN
  * eigen rekenmotor, geen financiële constanten. Voor elk gesampled leeftijdsjaar
- * wordt bepaald welk deel van de behoefte (`withdrawalNeed.totaalNeed`) gedekt
- * wordt door inkomen (`grossIncomeBySource`) + de gerealiseerde onttrekking
- * (`withdrawal`).
+ * wordt bepaald welk deel van de bruto behoefte gedekt wordt door vaste inkomsten
+ * (`grossIncomeBySource`) plus een VEILIGE onttrekking (NL_SWR × belegbaar
+ * vermogen) — bewust niet de gerealiseerde `withdrawal`, die het opeten van
+ * vermogen zou maskeren.
+ *
+ * Elke knoop draagt naast dat percentage ook de uitsplitsing waaruit het is
+ * opgebouwd (`CoverageSamenstelling`: inkomen / rendement / interen), zodat de
+ * strook kan tonen óf en hoeveel er ingeteerd wordt. Dat is dezelfde som, anders
+ * gepresenteerd — `decomposeRow` levert beide in één keer.
  */
 
 import type { UnifiedProjectionRow } from '@/lib/unified-projection'
 import { NL_SWR } from '@/lib/constants'
+
+/**
+ * Waar de dekking van een jaar VANDAAN komt — de drie termen die
+ * `coveragePctForRow` al berekent, apart geëxposeerd i.p.v. opgeteld tot één
+ * getal. **Read-only weergavedecompositie**, geen tweede berekening: dezelfde
+ * `decomposeRow` levert het percentage én deze uitsplitsing, dus bol en getal
+ * kunnen per constructie niet uit elkaar lopen. Spiegelt het precedent van
+ * `WithdrawalNeedBreakdown` (lib/unified-projection.ts).
+ *
+ * De percentages zijn hele getallen die exact tot 100 optellen, met
+ * `inkomenPct + rendementPct === min(coveragePct, 100)` — het rode aandeel is
+ * dus precies het deel dat niet gedekt is. `overschotPct` staat daar los van
+ * (dat is het deel bóven de 100%, dus wat je spaart) en telt niet mee in de 100.
+ */
+export interface CoverageSamenstelling {
+  /** Noemer: de bruto jaarbehoefte (accumulatie: de besteding = inkomen − inleg). */
+  brutoNeed: number
+  /** Aandeel gedekt uit vaste inkomsten (salaris/AOW/pensioen), 0–100. */
+  inkomenPct: number
+  /** Aandeel gedekt uit veilig opneembaar rendement (NL_SWR × belegbaar), 0–100. */
+  rendementPct: number
+  /** Restant dat uit de pot moet komen — interen, 0–100. */
+  interenPct: number
+  /** Deel bóven de 100% (wat je spaart), in %-punten van `brutoNeed`. 0 = geen overschot. */
+  overschotPct: number
+  /** Euro-equivalent van `inkomenPct` — het inkomen dat de behoefte dekt (gecapt op brutoNeed). */
+  inkomen: number
+  /** Euro-equivalent van `rendementPct` — de veilige onttrekking. */
+  rendement: number
+  /** Euro-equivalent van `interenPct` — wat er uit het vermogen moet komen. */
+  interen: number
+  /** Euro-equivalent van `overschotPct` — inkomen boven de behoefte (inleg/sparen). */
+  overschot: number
+}
 
 /** Eén knoop in de dekkingsgraad-strook. */
 export interface CoverageNode {
@@ -27,6 +67,13 @@ export interface CoverageNode {
   coveragePct: number
   /** Stoplichtstatus, afgeleid van coveragePct (zie COVERAGE_STATUS_*-drempels). */
   status: 'green' | 'amber' | 'red'
+  /**
+   * Uitsplitsing van de dekking. **Optioneel**: ontbreekt wanneer er geen
+   * bestedingsbehoefte te verdelen is (`brutoNeed ≤ 0` — de 100%-guard-tak,
+   * o.a. rijen zonder inkomens-/inleg-data in synthetische fixtures). De UI
+   * valt dan terug op een effen bol.
+   */
+  samenstelling?: CoverageSamenstelling
 }
 
 /**
@@ -146,6 +193,23 @@ export function spendablePortfolio(row: UnifiedProjectionRow): number {
  * als de levensinkomenstrook, single-sourced (één home). Gedrag byte-identiek.
  */
 export function coveragePctForRow(row: UnifiedProjectionRow): number {
+  return decomposeRow(row).coveragePct
+}
+
+/**
+ * De dekking van één rij als percentage **plus** de uitsplitsing waaruit dat
+ * percentage is opgebouwd (`CoverageSamenstelling`). Dit is de enige plek waar
+ * de termen worden afgeleid; `coveragePctForRow` is er een dunne wrapper omheen,
+ * zodat er geen tweede formule kan ontstaan die uit de pas loopt met de eerste.
+ *
+ * `samenstelling` is `undefined` in de twee guard-takken (geen besteding /
+ * geen bruto-behoefte): daar is er niets te verdelen, en de 100%-uitkomst is
+ * een vormbehoud voor data-loze rijen, geen echte volledige dekking.
+ */
+export function decomposeRow(row: UnifiedProjectionRow): {
+  coveragePct: number
+  samenstelling?: CoverageSamenstelling
+} {
   if (row.phase === 'accumulation') {
     // Opbouwjaren: je spaart, dus je inkomen dekt méér dan je besteding. Dekking
     // = inkomen ÷ besteding × 100, met besteding = inkomen − inleg (savings). Het
@@ -155,8 +219,20 @@ export function coveragePctForRow(row: UnifiedProjectionRow): number {
     const inkomen = row.grossIncome ?? 0
     const inleg = row.savings ?? 0
     const besteding = inkomen - inleg
-    if (besteding <= 0) return 100
-    return Math.round((inkomen / besteding) * 100)
+    if (besteding <= 0) return { coveragePct: 100 }
+    const coveragePct = Math.round((inkomen / besteding) * 100)
+    // Geen veilige-onttrekkings-term in deze fase: de dekking komt volledig uit
+    // inkomen. Bij negatieve inleg (ontsparen) dekt het inkomen de besteding niet
+    // en verschijnt er wél interen — de algemene decompositie vangt dat vanzelf.
+    return {
+      coveragePct,
+      samenstelling: buildSamenstelling({
+        coveragePct,
+        brutoNeed: besteding,
+        vasteInkomsten: inkomen,
+        veiligeOnttrekking: 0,
+      }),
+    }
   }
 
   const totaalNeed = row.withdrawalNeed?.totaalNeed ?? 0
@@ -164,7 +240,7 @@ export function coveragePctForRow(row: UnifiedProjectionRow): number {
   // Bruto-behoefte: draai de partner-nettering terug zodat de partner niet ook via
   // de behoefte meetelt — hij telt zo alleen nog als inkomen (exact één keer).
   const brutoNeed = totaalNeed + partnerBijdrage
-  if (brutoNeed <= 0) return 100
+  if (brutoNeed <= 0) return { coveragePct: 100 }
 
   const salaris = row.grossIncomeBySource?.salaris ?? 0
   const gebeurtenisBaten = row.grossIncomeBySource?.gebeurtenisBaten ?? 0
@@ -173,7 +249,57 @@ export function coveragePctForRow(row: UnifiedProjectionRow): number {
   const restNeed = Math.max(0, brutoNeed - vasteInkomsten)
   const veiligeOnttrekking = Math.min(NL_SWR * spendablePortfolio(row), restNeed)
 
-  return Math.round(((vasteInkomsten + veiligeOnttrekking) / brutoNeed) * 100)
+  const coveragePct = Math.round(((vasteInkomsten + veiligeOnttrekking) / brutoNeed) * 100)
+  return {
+    coveragePct,
+    samenstelling: buildSamenstelling({ coveragePct, brutoNeed, vasteInkomsten, veiligeOnttrekking }),
+  }
+}
+
+/**
+ * Verdeelt de behoefte over inkomen / rendement / interen — puur herschikking van
+ * de termen die de dekkingsformule hierboven al heeft.
+ *
+ * De percentages worden bewust NIET los afgerond: `inkomenPct` wordt afgerond en
+ * `rendementPct` vult aan tot `min(coveragePct, 100)`, waarna `interenPct` de rest
+ * tot 100 pakt. Zo geldt altijd `inkomenPct + rendementPct + interenPct === 100`
+ * én valt het groen+goud-aandeel exact samen met het getoonde dekkingspercentage —
+ * geen bol die 99% vult naast een label dat 100% zegt.
+ *
+ * GEEN clamp op negatieve invoer, en dat is een keuze: alle drie de bronnen zijn
+ * bij constructie ≥ 0, dus een clamp zou dode code zijn die suggereert dat het
+ * kan. `gebeurtenisBaten` sommeert alleen posten met `bedrag > 0` (kernel-tabel
+ * cf.ts), `salaris` valt post-FIRE weg via de FIRE-gate in de bridge i.p.v.
+ * negatief te worden, en de slotwaarden achter `spendablePortfolio` lopen door een
+ * `Math.max(0, …)` in bez.ts. Wordt een van die drie ooit ondertekend, dan is dát
+ * de bug — niet deze functie, die 'm dan zichtbaar maakt in plaats van verbergt.
+ */
+function buildSamenstelling(p: {
+  coveragePct: number
+  brutoNeed: number
+  vasteInkomsten: number
+  veiligeOnttrekking: number
+}): CoverageSamenstelling {
+  const { coveragePct, brutoNeed, vasteInkomsten, veiligeOnttrekking } = p
+
+  const inkomen = Math.min(vasteInkomsten, brutoNeed)
+  const overschot = Math.max(0, vasteInkomsten - brutoNeed)
+  const interen = Math.max(0, brutoNeed - inkomen - veiligeOnttrekking)
+
+  const gedektPct = Math.min(coveragePct, 100)
+  const inkomenPct = Math.min(Math.round((inkomen / brutoNeed) * 100), gedektPct)
+
+  return {
+    brutoNeed,
+    inkomenPct,
+    rendementPct: gedektPct - inkomenPct,
+    interenPct: 100 - gedektPct,
+    overschotPct: Math.max(0, coveragePct - 100),
+    inkomen,
+    rendement: veiligeOnttrekking,
+    interen,
+    overschot,
+  }
 }
 
 /**
@@ -212,7 +338,7 @@ export function buildCoverageStrip(
     .sort((a, b) => a - b)
     .map((age) => {
       const row = nearestRow(rows, age)
-      const coveragePct = coveragePctForRow(row)
-      return { age, coveragePct, status: coverageStatus(coveragePct) }
+      const { coveragePct, samenstelling } = decomposeRow(row)
+      return { age, coveragePct, status: coverageStatus(coveragePct), samenstelling }
     })
 }

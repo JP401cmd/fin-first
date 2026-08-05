@@ -331,6 +331,23 @@
   --score-warn: oklch(0.67 0.17 66);
   --score-bad:  oklch(0.57 0.22 27);
 
+  /* ── Dekkings-herkomst (levensinkomenstrook) ──
+     Waar de dekking van een jaar vandaan komt, in kwaliteitsvolgorde: eigen
+     inkomen → veilig opneembaar rendement → interen op het vermogen. Bewust
+     GEEN stoplicht-status: in dezelfde widget draagt het percentage wél een
+     status, en één amber die twee dingen betekent leest verkeerd. Ook bewust
+     niet --positive/--negative: die staan op gelijke lichtheid (L 0.50) en
+     vallen bij deuteranopie samen (ΔE 2,4 — onbruikbaar naast elkaar). Deze
+     drie zijn gemeten op onderlinge scheidbaarheid: ΔE ≥ 9 op élk paar onder
+     deutan/protan/tritan, alle drie ≥ 3:1 contrast op --paper. Wijzig ze niet
+     los van elkaar — het is een getoetste set, geen losse kleurkeuzes.
+     --coverage-overschot is dezelfde groenfamilie een stap donkerder: het
+     overschot ís inkomen, maar moet als aparte boog van de bol te scheiden zijn. */
+  --coverage-inkomen:   #0f9c70;
+  --coverage-rendement: #a87c22;
+  --coverage-interen:   #9e2b2b;
+  --coverage-overschot: #0a6b4c;
+
   --safe-area-top: env(safe-area-inset-top, 0px);
   --safe-area-bottom: env(safe-area-inset-bottom, 0px);
   --safe-area-left: env(safe-area-inset-left, 0px);
@@ -547,6 +564,18 @@
   --color-score-ok:   var(--score-ok);
   --color-score-warn: var(--score-warn);
   --color-score-bad:  var(--score-bad);
+
+  /* ── Dekkings-herkomst (bg-coverage-inkomen, border-coverage-overschot, …) ──
+     Deze mapping is NIET optioneel: de bouw snoeit custom properties uit :root
+     die nergens ín de CSS worden gerefereerd. Een token dat alleen vanuit een
+     JSX-inline-style (`style={{ background: 'var(--coverage-inkomen)' }}`) of
+     een conic-gradient wordt gelezen, haalt de gecompileerde stylesheet dus
+     niet — het valt stil weg en de kleur wordt transparant. Elke nieuwe token
+     hierboven hoort daarom óók hier te staan. Bewaakt door globals-tokens.test.ts. */
+  --color-coverage-inkomen:   var(--coverage-inkomen);
+  --color-coverage-rendement: var(--coverage-rendement);
+  --color-coverage-interen:   var(--coverage-interen);
+  --color-coverage-overschot: var(--coverage-overschot);
 }
 
 /* Landing page animations */
