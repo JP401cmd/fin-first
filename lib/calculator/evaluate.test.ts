@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  clampToInputRange,
   evaluateCalculator,
   resolveInitialInputs,
   validateFormulas,
@@ -217,6 +218,122 @@ describe('resolveInitialInputs', () => {
     })
     const init = resolveInitialInputs(d, {})
     expect(init.schuld).toBe(100000)
+  })
+})
+
+/**
+ * WF-REKEN-01-bug1 — een prefill-waarde is RUWE gebruikersdata en hoeft niet
+ * binnen het bereik te vallen van het veld dat 'm erft. Vóór de fix erfde
+ * "Maandelijks bedrag" (min: 50) letterlijk een negatief maandoverschot, wat
+ * negatieve eindwaarden én NEGATIEVE VRIJHEIDSTIJD opleverde — regelrecht in
+ * strijd met "geld is opgeslagen tijd" — plus een slider-desync (de HTML-range
+ * klemt alleen de visuele thumb, niet de React-waarde).
+ */
+describe('resolveInitialInputs — prefill klemt naar het veldbereik', () => {
+  it('klemt een prefill ONDER min naar min (het gemelde geval: negatief maandoverschot)', () => {
+    const d = def({
+      inputs: [
+        { key: 'maandbedrag', label: 'Maandelijks bedrag', kind: 'euro', default: 300, min: 50, max: 2000, prefill: 'monthly_surplus' },
+      ],
+    })
+    const init = resolveInitialInputs(d, { monthly_surplus: -3485 })
+    expect(init.maandbedrag).toBe(50)
+  })
+
+  it('klemt een prefill BOVEN max naar max (de zuster-case, niet alleen de min-kant)', () => {
+    const d = def({
+      inputs: [
+        { key: 'schuld', label: 'Schuld', kind: 'euro', default: 200000, min: 0, max: 1500000, prefill: 'mortgage_balance' },
+      ],
+    })
+    const init = resolveInitialInputs(d, { mortgage_balance: 2400000 })
+    expect(init.schuld).toBe(1500000)
+  })
+
+  it('laat een prefill BINNEN het bereik ongemoeid', () => {
+    const d = def({
+      inputs: [
+        { key: 'maandbedrag', label: 'M', kind: 'euro', default: 300, min: 50, max: 2000, prefill: 'monthly_surplus' },
+      ],
+    })
+    expect(resolveInitialInputs(d, { monthly_surplus: 900 }).maandbedrag).toBe(900)
+  })
+
+  it('klemt niet aan een kant die de definitie niet vastlegt (min/max zijn optioneel)', () => {
+    // Alleen een max → een negatieve waarde blijft negatief. Een rekenhulp mag
+    // bewust een negatief veld hebben; de klem is het veldbereik, geen 0-vloer.
+    const d = def({
+      inputs: [
+        { key: 'saldo', label: 'Saldo', kind: 'euro', default: 0, max: 1000, prefill: 'monthly_surplus' },
+      ],
+    })
+    expect(resolveInitialInputs(d, { monthly_surplus: -3485 }).saldo).toBe(-3485)
+  })
+
+  it('laat de prefill-WAARDE zelf ongemoeid — alleen het veld dat ’m consumeert klemt', () => {
+    // monthly_surplus mag en moet negatief kunnen zijn: dat IS het feit over de
+    // gebruiker (uitgaven > inkomen). Formules die de prefill-key rechtstreeks
+    // lezen moeten die waarheid blijven zien.
+    const d = def({
+      inputs: [
+        { key: 'maandbedrag', label: 'M', kind: 'euro', default: 300, min: 50, max: 2000, prefill: 'monthly_surplus' },
+      ],
+      outputs: [
+        { key: 'ruw', label: 'Ruw overschot', formula: 'monthly_surplus', format: 'euro' },
+        { key: 'veld', label: 'Veldwaarde', formula: 'maandbedrag', format: 'euro' },
+      ],
+    })
+    const init = resolveInitialInputs(d, { monthly_surplus: -3485 })
+    const r = evaluateCalculator(d, init, { monthly_surplus: -3485 })
+    expect(r.values.a.ruw).toBe(-3485)
+    expect(r.values.a.veld).toBe(50)
+  })
+})
+
+describe('clampToInputRange', () => {
+  const field = { key: 'x', label: 'X', kind: 'euro' as const, default: 100, min: 50, max: 2000 }
+
+  it('klemt aan beide kanten en laat binnen-bereik ongemoeid', () => {
+    expect(clampToInputRange(-3485, field)).toBe(50)
+    expect(clampToInputRange(99999, field)).toBe(2000)
+    expect(clampToInputRange(900, field)).toBe(900)
+  })
+
+  it('respecteert de grenzen zelf (inclusief)', () => {
+    expect(clampToInputRange(50, field)).toBe(50)
+    expect(clampToInputRange(2000, field)).toBe(2000)
+  })
+
+  it('laat NaN passeren i.p.v. ’m stil naar een grens te schuiven', () => {
+    expect(Number.isNaN(clampToInputRange(NaN, field))).toBe(true)
+  })
+})
+
+/**
+ * Regressie op de ECHTE prefab uit het bugrapport: de rekenhulp mag met een
+ * negatief maandoverschot geen negatieve eindwaarde meer produceren, want die
+ * vertaalt in de UI naar negatieve vrijheidstijd.
+ */
+describe('prefab "Aflossen vs. beleggen" — geen negatieve uitkomsten bij een negatief overschot', () => {
+  it('levert positieve eindwaarden voor elk scenario', async () => {
+    const { PREFAB_CALCULATORS } = await import('./prefab-definitions')
+    const prefab = PREFAB_CALCULATORS.find((p) => p.definition.name === 'Aflossen vs. beleggen')
+    expect(prefab, 'prefab "Aflossen vs. beleggen" niet gevonden').toBeTruthy()
+    const d = prefab!.definition
+
+    const prefill = { monthly_surplus: -3485, mortgage_balance: 250000, monthly_expenses: 4200 }
+    const init = resolveInitialInputs(d, prefill)
+    expect(init.maandbedrag).toBe(50) // geklemd naar min, niet -3485
+
+    const r = evaluateCalculator(d, init, prefill)
+    expect(r.errors).toEqual([])
+    for (const scenario of d.scenarios) {
+      for (const output of d.outputs) {
+        const v = r.values[scenario.key]?.[output.key]
+        if (v == null) continue
+        expect(v, `${scenario.key}.${output.key} moet niet-negatief zijn`).toBeGreaterThanOrEqual(0)
+      }
+    }
   })
 })
 

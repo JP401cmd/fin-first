@@ -1,5 +1,5 @@
 import { Parser } from './safe-eval'
-import type { CalculatorDefinition } from './types'
+import type { CalculatorDefinition, CalculatorInput } from './types'
 import type { PrefillValues } from './user-data-keys'
 
 /**
@@ -417,8 +417,40 @@ function topoSortOutputs(
 }
 
 /**
+ * Klem een waarde binnen het gedefinieerde veldbereik `[min, max]`.
+ *
+ * `min`/`max` zijn OPTIONEEL op `CalculatorInput`; ontbreekt een grens, dan
+ * blijft die kant ongemoeid (geen impliciete 0-vloer — een rekenhulp mag
+ * bewust een negatief veld hebben zolang de definitie dat toestaat).
+ * NaN passeert onveranderd: beide vergelijkingen zijn dan false, en een
+ * NaN-prefill hoort verderop als reken-fout zichtbaar te worden, niet stil
+ * naar een grenswaarde te schuiven.
+ */
+export function clampToInputRange(value: number, input: CalculatorInput): number {
+  let out = value
+  if (input.min != null && out < input.min) out = input.min
+  if (input.max != null && out > input.max) out = input.max
+  return out
+}
+
+/**
  * Resolveer de start-input-waarden: prefill-key indien aanwezig in de
  * data, anders de gedefinieerde default.
+ *
+ * BUG-VANGRAIL (WF-REKEN-01-bug1): een prefill-waarde is RUWE gebruikersdata
+ * en hoeft niet binnen het bereik van het veld te vallen dat 'm erft. Bij een
+ * negatief maandoverschot (uitgaven > inkomen) erfde "Maandelijks bedrag"
+ * letterlijk −€3.485 terwijl het veld `min: 50` draagt. Gevolg: negatieve
+ * eindwaarden, NEGATIEVE VRIJHEIDSTIJD ("−17 jr 11 mnd", regelrecht in strijd
+ * met "geld is opgeslagen tijd") en een slider-desync — de HTML-range klemt
+ * alleen de VISUELE thumb naar min/max, de React-waarde bleef de rauwe −3.485.
+ *
+ * De klem hoort hier, op het punt waar een brondatum een VELDWAARDE wordt:
+ * dat is één plek voor alle prefabs en alle prefill-keys tegelijk (ook de
+ * nog niet gemelde zustergevallen zoals een negatief `net_worth` of een
+ * `mortgage_balance` boven zijn max). De prefill-waarde zélf blijft
+ * ongewijzigd — `monthly_surplus` mag en moet negatief kunnen zijn, want dat
+ * IS het feit over de gebruiker; alleen het veld dat 'm consumeert klemt.
  */
 export function resolveInitialInputs(
   definition: CalculatorDefinition,
@@ -427,7 +459,7 @@ export function resolveInitialInputs(
   const out: Record<string, number> = {}
   for (const input of definition.inputs) {
     if (input.prefill && prefill[input.prefill] != null) {
-      out[input.key] = prefill[input.prefill]
+      out[input.key] = clampToInputRange(prefill[input.prefill], input)
     } else {
       out[input.key] = input.default
     }

@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { Trophy, AlertTriangle, Info } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import {
+  clampToInputRange,
   evaluateCalculator,
   resolveInitialInputs,
 } from '@/lib/calculator/evaluate'
@@ -53,16 +54,27 @@ function formatOutput(value: number | null, format: OutputFormat, unit?: string)
  * naar "aangepast" zodra de gebruiker de slider beweegt — zo blijft
  * zichtbaar dat dit veld OORSPRONKELIJK uit eigen data kwam, maar dat
  * de gebruiker het bewust heeft bijgesteld.
+ *
+ * DERDE STAAT — "bijgesteld" (WF-REKEN-01-bug1): valt de ruwe prefill BUITEN
+ * het veldbereik, dan klemt `resolveInitialInputs` 'm naar min/max. Zonder
+ * deze staat zou dat systeem-ingrijpen als "aangepast door jou" verschijnen
+ * (de gebruiker deed niets) én zou "uit jouw data" bij een ongeklemde lezing
+ * suggereren dat −€3.485 zijn werkelijke maandinleg is. We vergelijken de
+ * huidige waarde daarom met de GEKLEMDE prefill, en melden de klem apart.
  */
 function PrefillIndicator({
+  input,
   prefillValue,
   currentValue,
 }: {
+  input: CalculatorInput
   prefillValue: number | undefined
   currentValue: number
 }) {
   if (prefillValue == null) return null
-  const isModified = Math.abs(prefillValue - currentValue) > 1e-9
+  const clamped = clampToInputRange(prefillValue, input)
+  const wasClamped = Math.abs(clamped - prefillValue) > 1e-9
+  const isModified = Math.abs(clamped - currentValue) > 1e-9
   if (isModified) {
     return (
       <span
@@ -70,6 +82,16 @@ function PrefillIndicator({
         className="inline-block text-[8.5px] uppercase tracking-[0.1em] font-semibold text-[var(--ink-3)] border border-dashed border-[var(--border-ed)] px-1 py-0.5 "
       >
         aangepast
+      </span>
+    )
+  }
+  if (wasClamped) {
+    return (
+      <span
+        title={`Uit jouw data (${displayInputValue(input.kind, prefillValue)}), maar buiten het bereik van dit veld — bijgesteld naar ${displayInputValue(input.kind, clamped)}. Pas met de slider aan.`}
+        className="inline-block text-[8.5px] uppercase tracking-[0.1em] font-semibold text-[var(--ink-3)] bg-[var(--subtle)] border border-[var(--border-ed)] px-1 py-0.5 "
+      >
+        bijgesteld
       </span>
     )
   }
@@ -104,7 +126,7 @@ function InputField({
         <div className="flex items-center justify-between gap-2 mb-1">
           <span className="text-xs font-semibold text-[var(--ink-2)] inline-flex items-center gap-1.5">
             {input.label}
-            <PrefillIndicator prefillValue={prefillValue} currentValue={value} />
+            <PrefillIndicator input={input} prefillValue={prefillValue} currentValue={value} />
           </span>
           <button
             type="button"
@@ -134,7 +156,7 @@ function InputField({
         <div className="flex items-baseline justify-between gap-2 mb-1.5">
           <span className="text-xs font-semibold text-[var(--ink-2)] inline-flex items-center gap-1.5">
             {input.label}
-            <PrefillIndicator prefillValue={prefillValue} currentValue={value} />
+            <PrefillIndicator input={input} prefillValue={prefillValue} currentValue={value} />
           </span>
         </div>
         <div className="inline-flex border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
@@ -166,15 +188,14 @@ function InputField({
   }
 
   // Numerieke sliders / inputs
-  const display =
-    input.kind === 'percent' ? `${(value * 100).toFixed(1)}%` : formatInputDisplay(input.kind, value)
+  const display = displayInputValue(input.kind, value)
   const hasRange = input.min != null && input.max != null
   return (
     <label className="block">
       <div className="flex items-baseline justify-between gap-2 mb-1">
         <span className="text-xs font-semibold text-[var(--ink-2)] inline-flex items-center gap-1.5">
           {input.label}
-          <PrefillIndicator prefillValue={prefillValue} currentValue={value} />
+          <PrefillIndicator input={input} prefillValue={prefillValue} currentValue={value} />
         </span>
         <span className="text-xs font-mono text-[var(--ink)] tabular-nums">{display}</span>
       </div>
@@ -228,6 +249,15 @@ function formatInputDisplay(kind: CalculatorInput['kind'], value: number): strin
   if (kind === 'euro') return formatCurrency(Math.round(value))
   if (kind === 'years') return `${value} jr`
   return value.toLocaleString('nl-NL')
+}
+
+/**
+ * Weergave zoals de gebruiker het veld ziet — inclusief de percent-conventie
+ * (opgeslagen als fractie 0-1, getoond als %). Eén helper zodat de sliderwaarde
+ * en de prefill-tooltip niet uiteenlopen (0,04 vs. 4,0%).
+ */
+function displayInputValue(kind: CalculatorInput['kind'], value: number): string {
+  return kind === 'percent' ? `${(value * 100).toFixed(1)}%` : formatInputDisplay(kind, value)
 }
 
 function stepFor(kind: CalculatorInput['kind']): number {
