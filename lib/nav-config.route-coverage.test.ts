@@ -78,7 +78,10 @@ const LEGACY_BACKING_ROUTES: readonly string[] = [
   '/core/belasting',
   '/core/budgets',
   '/core/budgets/new',
-  '/core/cash',
+  // NB: '/core/cash' en '/horizon/whatif' staan hier bewust NIET (meer). Ze
+  // hebben geen page.tsx meer maar redirecten op de routing-laag
+  // (next.config.ts) — ze bestaan dus niet als route op schijf en zouden hier
+  // als dode entry gelden. Zie next.config.test.ts voor het waarom (React #310).
   '/core/cash/connect',
   '/core/cash/connect/callback',
   '/core/cash/connect/success',
@@ -92,7 +95,6 @@ const LEGACY_BACKING_ROUTES: readonly string[] = [
   '/horizon/samengestelde-interest',
   '/horizon/inflatie-koopkracht',
   '/horizon/uitgaven-na-pensioen',
-  '/horizon/whatif',
 ]
 
 describe('nav-config — route-titel-dekking (SSoT)', () => {

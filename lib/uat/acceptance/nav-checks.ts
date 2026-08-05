@@ -237,7 +237,10 @@ export const NAV_ENGINE_CHECKS: NavEngineCheck[] = [
       const dashboardNaarOverzicht = redirects.some((r) => r.source === '/dashboard' && r.destination === '/overzicht')
       const coreAssetsGeenRedirect = !redirects.some((r) => r.source === '/core/assets')
       return {
-        expected: 'aantalRedirects=16; coreNaarOverzicht=true; dashboardNaarOverzicht=true; coreAssetsGeenRedirect=true',
+        // 19 = 16 + de drie regels die /core/cash en /horizon/whatif van een
+        // runtime-`redirect()`-pagina naar de routing-laag verhuisden (React
+        // #310-fix; zie het redirect-blok in next.config.ts).
+        expected: 'aantalRedirects=19; coreNaarOverzicht=true; dashboardNaarOverzicht=true; coreAssetsGeenRedirect=true',
         actual: `aantalRedirects=${redirects.length}; coreNaarOverzicht=${coreNaarOverzicht}; dashboardNaarOverzicht=${dashboardNaarOverzicht}; coreAssetsGeenRedirect=${coreAssetsGeenRedirect}`,
       }
     },

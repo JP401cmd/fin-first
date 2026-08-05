@@ -108,12 +108,15 @@ const nextConfig: NextConfig = {
    * namen (Kern/Wil/Horizon/Identity) naar de nieuwe architectuur
    * (Overzicht/Toekomst/Mijn).
    *
-   * Sub-routes (bv. /core/assets/holdings/[id], /horizon/whatif) blijven
-   * werken op hun huidige paden totdat ze individueel gemigreerd zijn —
-   * alleen exact-matches voor de hoofdpagina's redirecten nu.
+   * Sub-routes (bv. /core/assets/holdings/[id]) blijven werken op hun
+   * huidige paden totdat ze individueel gemigreerd zijn — alleen
+   * exact-matches voor de hoofdpagina's redirecten nu. /horizon/whatif en
+   * /core/cash zijn inmiddels wél gemigreerd (zie het #310-blok hieronder).
    *
-   * `permanent: false` tijdens migratie (308 met method-preservation) zodat
-   * we later naar `permanent: true` kunnen wisselen zonder SEO-rommel.
+   * `permanent: false` tijdens migratie (307 Temporary Redirect, met
+   * method-preservation) zodat we later naar `permanent: true` (308) kunnen
+   * wisselen zonder SEO-rommel — en zodat browsers de migratie-URL's niet
+   * blijvend cachen zolang we nog kunnen terugdraaien.
    *
    * /will redirect naar /overzicht: WillLanding wordt nu gerenderd op
    * /overzicht (zie app/(app)/overzicht/page.tsx) dus de oude route is
@@ -149,6 +152,37 @@ const nextConfig: NextConfig = {
       // compact als Box3Detail op /overzicht/belasting (zelfde pure
       // box3-data-engine via /api/household/box3). Index redirect.
       { source: '/core/belasting', destination: '/overzicht/belasting', permanent: false },
+
+      // ── Legacy-routes die géén React-tree meer renderen (React #310) ─────
+      // Deze twee waren server-componenten die bij élke render meteen
+      // `redirect()` aanriepen. Dat lijkt onschuldig, maar het duwt de
+      // client-router bij een SPA-navigatie het harde-navigatie-pad in
+      // (`pushRef.mpaNavigation`). Next.js' eigen AppRouter gooit in dat pad
+      // middenin zijn hook-lijst (`throw unresolvedThenable`,
+      // node_modules/next/dist/client/components/app-router.js) en rendert bij
+      // een volgende render wél alle hooks — "Rendered more hooks than during
+      // the previous render", React #310. Next erkent dat zelf in de comment
+      // ernaast: "violates the rules of hooks".
+      //
+      // Bewijs uit productie (error_logs): élk React #310-event ooit — 4 op
+      // /core/cash, 2 op /horizon/whatif — kwam van precies deze twee routes;
+      // nul op een echte pagina. Op de routing-laag redirecten haalt de
+      // trigger weg: er wordt geen React-boom meer gebouwd om vervolgens weg
+      // te gooien, en het scheelt bovendien een RSC-round-trip.
+      { source: '/core/cash', destination: '/overzicht/cashflow', permanent: false },
+
+      // Volgorde is functioneel: de dreamgate-variant moet vóór de
+      // catch-all staan, anders vangt de tweede regel hem af. Spiegelt de
+      // twee takken van de oude server-component 1-op-1 — met `via=dreamgate`
+      // toont /toekomst/whatif de volledige ervaring, zonder valt hij terug
+      // op de tijdas met de what-if-modal open.
+      {
+        source: '/horizon/whatif',
+        has: [{ type: 'query', key: 'via', value: 'dreamgate' }],
+        destination: '/toekomst/whatif?via=dreamgate',
+        permanent: false,
+      },
+      { source: '/horizon/whatif', destination: '/toekomst?whatif=open', permanent: false },
 
       // Parameters-migratie (beslissing 5): eindstrategie/onttrekking/
       // inflatie/rendement leven inline onder de Voorkeuren-tab op

@@ -116,10 +116,18 @@ export default function WhatIfPage() {
   const searchParams = useSearchParams()
   const viaDreamgate = useRef(searchParams.get('via') === 'dreamgate')
 
-  // Clean up the ?via=dreamgate query param after mount
+  // Clean up the ?via=dreamgate query param after mount.
+  //
+  // Schrijf de CANONIEKE route terug, niet de legacy `/horizon/whatif`. Next
+  // patcht `history.replaceState` en neemt de weggeschreven URL over als
+  // `canonicalUrl` van de router; met een legacy-pad ging de router dus denken
+  // dat hij op een route stond die alleen nog redirect. Die desync tussen
+  // router-URL en werkelijk gerenderde route is precies wat de client-router
+  // het harde-navigatie-pad (`pushRef.mpaNavigation`) in duwt — de bron van
+  // React #310 (zie het redirect-blok in next.config.ts).
   useEffect(() => {
     if (viaDreamgate.current) {
-      window.history.replaceState(null, '', '/horizon/whatif')
+      window.history.replaceState(null, '', '/toekomst/whatif')
     }
   }, [])
 

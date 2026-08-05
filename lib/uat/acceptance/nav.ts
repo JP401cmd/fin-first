@@ -234,10 +234,13 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'OVERIG',
     given: 'De redirect-lijst in `next.config.ts`.',
     when: '`nextConfig.redirects()` wordt aangeroepen.',
-    then: '/core → /overzicht, /horizon → /toekomst, /identity → /mijn, /will → /overzicht, /dashboard → /overzicht, /core/budgets → /overzicht/cashflow, /overzicht/acties → /overzicht/tips zitten allemaal in de lijst; een diepere legacy-subroute zonder regel (bv. /core/assets) heeft GEEN redirect-entry (blijft live backing-UI).',
+    then: '/core → /overzicht, /horizon → /toekomst, /identity → /mijn, /will → /overzicht, /dashboard → /overzicht, /core/budgets → /overzicht/cashflow, /core/cash → /overzicht/cashflow, /horizon/whatif (twee takken: met/zonder ?via=dreamgate), /overzicht/acties → /overzicht/tips zitten allemaal in de lijst; een diepere legacy-subroute zonder regel (bv. /core/assets) heeft GEEN redirect-entry (blijft live backing-UI).',
     assertion: {
       kind: 'exact',
-      expected: 'aantalRedirects=16; coreNaarOverzicht=true; dashboardNaarOverzicht=true; coreAssetsGeenRedirect=true',
+      // 19 = 16 + de drie regels die /core/cash en /horizon/whatif van een
+      // runtime-`redirect()`-pagina naar de routing-laag verhuisden (React
+      // #310-fix; zie het redirect-blok in next.config.ts).
+      expected: 'aantalRedirects=19; coreNaarOverzicht=true; dashboardNaarOverzicht=true; coreAssetsGeenRedirect=true',
       source: 'next.config.ts#redirects — échte productieconfiguratie, geen mirror',
     },
   },
