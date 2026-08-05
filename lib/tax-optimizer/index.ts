@@ -6,7 +6,10 @@
 //
 // Publieke API: buildBox3Optimizer (volledige server-side compute) +
 // generateBox3Strategies / rankStrategies / pickBest voor het split-pad
-// (scenario's één keer serveren, ranking client-side per doel-wissel).
+// (scenario's één keer serveren, ranking client-side per doel-wissel), plus de
+// twee pure afleidingen voor het vergelijkingsoppervlak: buildCurrentStanding
+// (de "waar sta je nu"-kolom) en pickTopChoice (de leidende kans, op NETTO
+// effect gekozen).
 
 import { generateBox3Strategies } from './box3-strategies'
 import { rankStrategies, pickBest } from './rank'
@@ -15,8 +18,19 @@ import { OPTIMIZER_DISCLAIMER } from './compliance'
 import type { Box3OptimizerInput, CompareResult } from './types'
 
 export * from './types'
-export { generateBox3Strategies, baselineStrategy, synthBox3Input } from './box3-strategies'
-export { rankStrategies, pickBest } from './rank'
+export {
+  generateBox3Strategies,
+  baselineStrategy,
+  synthBox3Input,
+  buildCurrentStanding,
+} from './box3-strategies'
+export {
+  rankStrategies,
+  pickBest,
+  pickTopChoice,
+  JAARRUIMTE_TITLE,
+  JAARRUIMTE_CAVEAT,
+} from './rank'
 export {
   TAX_OPTIMIZER_GOALS,
   GOAL_BY_ID,

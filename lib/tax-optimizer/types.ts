@@ -79,13 +79,50 @@ export interface OptimizerStrategy {
    * True wanneer het scenario werkelijk rendement kost (bv. beleggingen naar
    * spaargeld schuiven verlaagt de heffing maar doorgaans ook het verwachte
    * rendement). Het doel 'box3-geen-rendementsverlies' deprioriteert deze.
+   *
+   * Blijft de KWALITATIEVE vlag (ja/nee) waar `rankStrategies` op sorteert; het
+   * BEDRAG staat in `returnCostEur`.
    */
   hasReturnCost: boolean
+  /** Verwacht misgelopen rendement in €/jr (≥ 0). 0 = geen rendementsimpact. */
+  returnCostEur: number
+  /** savings − returnCostEur. Kan negatief zijn. */
+  netEffect: number
+  /** netEffect in vrijheidsdagen (afgerond; 0 wanneer netEffect ≤ 0 of dailyExpenses ≤ 0). */
+  netFreedomDays: number
 
   /** Uitlegbaarheid: aanname, regeling, jaar — één regel per punt. */
   detail: string[]
   /** Afweging die de gebruiker zelf moet maken. null = geen kanttekening. */
   caveat: string | null
+}
+
+// ── Huidige stand (referentiepaneel) ─────────────────────────────
+//
+// De "waar sta je nu"-kolom van de vergelijking: puur AFGELEID uit het bestaande
+// `Box3Result` (lib/box3-data.ts) — geen tweede forfait-som, geen eigen
+// tarief-constanten. Uitsluitend geaggregeerde/combined cijfers; nooit een
+// per-partner-splitsing (ADR 0036).
+
+export interface OptimizerCurrentStanding {
+  /** Heffing nu (€/jr) — `Box3Result.tax`. */
+  tax: number
+  /** `tax` omgerekend in vrijheidsdagen per jaar (0 bij dailyExpenses ≤ 0). */
+  taxFreedomDays: number
+  /** Totaal spaargeld in Box 3 (€). */
+  totaalSpaargeld: number
+  /** Totaal beleggingen in Box 3 (€). */
+  totaalBeleggingen: number
+  /** Totaal Box 3-schulden (€, vóór schuldendrempel). */
+  totaalBox3Schulden: number
+  /** Toegepaste vrijstelling (heffingsvrij vermogen; partners = dubbel). */
+  heffingsvrijVermogen: number
+  /** Hoeveel van de vrijstelling daadwerkelijk benut is, 0..100. */
+  vrijstellingBenutPct: number
+  /** Heffing als % van het Box 3-vermogen (spaargeld + beleggingen). */
+  effectieveDrukPct: number
+  /** Fiscaal partner van toepassing (dubbele vrijstelling/drempel). */
+  hasPartner: boolean
 }
 
 // ── Invoer / uitvoer ─────────────────────────────────────────────
@@ -185,24 +222,34 @@ export type GoalSection =
 //
 // De optimizer opent met ÉÉN duidelijke aanbeveling: de opportuniteit met de
 // hoogste impact over ALLE doelen heen. Server-side afgeleid uit dezelfde
-// kandidaten die de secties eronder voeden (box3-`best` van het
-// grootste-besparing-doel + de jaarruimte-opportuniteit) — geen herberekening,
-// geen nieuwe rekenwaarden. Gekozen op de meeste teruggekochte vrijheidsdagen
-// (savings als tiebreak); kandidaten met savings ≤ 0 vallen af. Geen kandidaat
-// → null (neutrale variant).
+// kandidaten die de secties eronder voeden (de Box 3-scenario's + de
+// jaarruimte-opportuniteit) — geen herberekening, geen nieuwe rekenwaarden.
+//
+// Keuzecriterium is NETTO (zie `pickTopChoice`, lib/tax-optimizer/rank.ts):
+// kandidaten met `netEffect ≤ 0` vallen af, daarna wint de meeste NETTO
+// teruggekochte vrijheidsdagen (`netEffect` als tiebreak). Geen kandidaat → null
+// (neutrale variant). Voorheen werd op BRUTO besparing gekozen — daardoor kon
+// "€ 47 besparing" als grootste kans bovenaan staan terwijl de onderliggende
+// shift per saldo honderden euro's rendement kost.
 
 export interface OptimizerTopChoice {
   goalId: TaxOptimizerGoalId
   /** Titel van de leidende kans (strategie-titel of jaarruimte-label). */
   title: string
-  /** Jaarlijkse belastingbesparing (€). */
+  /** Jaarlijkse belastingbesparing (€) — BRUTO, vóór rendementsverlies. */
   savings: number
-  /** `savings` in vrijheidsdagen. */
+  /** `savings` in vrijheidsdagen — dus de BRUTO besparing, niet `netEffect`. */
   freedomDays: number
+  /** Netto effect (€/jr) van deze kans — savings − verwacht rendementsverlies. */
+  netEffect: number
   /** Eerlijke kanttekening (rendementskosten / vastzetten tot pensioen). null = geen. */
   caveat: string | null
   /** Welke fiscale as: bepaalt de accent-kleur van het top-blok. */
   kind: 'box3' | 'jaarruimte'
-  /** In-page anchor naar de bijbehorende sectie ("optimizer-box3" / "optimizer-jaarruimte"). */
-  anchorId: string
+  /**
+   * Id van de winnende kans: het strategie-id voor Box 3 ('samenstelling-shift'
+   * / 'partnerverdeling'), het doel-id 'jaarruimte-maximaal' voor jaarruimte.
+   * De client koppelt de winnaar-badge hierop aan de rij in de vergelijking.
+   */
+  opportunityId: string
 }

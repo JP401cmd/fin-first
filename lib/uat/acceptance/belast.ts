@@ -1,6 +1,6 @@
 /**
- * Acceptatiecriteria — domein Belasting (WF-BELAST-01..19, 21 /
- * UAT-BELAST-01..19, 21).
+ * Acceptatiecriteria — domein Belasting (WF-BELAST-01..19, 21, 23 /
+ * UAT-BELAST-01..19, 21, 23).
  *
  * Bron: `lib/uat/catalog.ts` (bron-van-waarheid voor WELKE scenario's bestaan)
  * + de Box 1/2/3-rekenmotoren. Cijfers zijn ONAFHANKELIJK narekend uit
@@ -9,13 +9,16 @@
  * rekenfuncties: `computeBox1Tax`/`grossFromNet` (box1-tax.ts),
  * `calculateBox2`/`VPB_PARAMS` (box2-data.ts), `calculateBox3`/
  * `calculatePartnerSplit` (box3-data.ts), `compareForfaitairVsWerkelijk`
- * (box3-tegenbewijs.ts), `computeJaarruimte` (jaarruimte.ts)).
+ * (box3-tegenbewijs.ts), `computeJaarruimte` (jaarruimte.ts), en sinds de
+ * herbouw van /overzicht/belasting/optimizer (Fase 1) ook `pickTopChoice`/
+ * `generateBox3Strategies`/`rankStrategies`/`buildCurrentStanding`
+ * (lib/tax-optimizer/*)).
  *
  * BEWUST WEGGELATEN (verwijsregels, bestaan NIET als los BELAST-scenario in de
  * catalogus — spiegelt WF-SCHULD-19):
  *  - WF-BELAST-20 (perspectief wisselen) → dekt UAT-NAV (perspectief-switcher).
  *  - WF-BELAST-22 (pagina-uitleg (i) + statuspunt) → dekt UAT-NAV.
- * Deze set heeft dus PRECIES 20 criteria (WF-BELAST-01..19, 21).
+ * Deze set heeft dus PRECIES 21 criteria (WF-BELAST-01..19, 21, 23).
  *
  * JAARTAL — alle drie de box-subpagina's + de hub draaien op 2026:
  *   - box1/page.tsx: `resolveBox1GrossIncome(..., 2026)` + `computeBox1Tax(..., year:2026)`
@@ -354,6 +357,26 @@ const criteria: AcceptanceCriterion[] = [
     assertion: {
       kind: 'ui-only',
       source: 'BOX3_TOOLTIPS.peildatum + hub-stelselradar — statische educatieve tekst, geen rekenmotor',
+    },
+  },
+  {
+    workflow: 'WF-BELAST-23',
+    scenarioId: 'UAT-BELAST-23',
+    titel: 'Fiscale optimizer: leidende kans op netto effect, vergelijking en huidige stand',
+    kriticiteit: 'KERN',
+    persona: 'willem',
+    given:
+      'Persona Willem geladen op /overzicht/belasting/optimizer (single, geen fiscaal partner → geen partnerverdeling-kans). Katern I ("Waar je nu staat") toont `standing = buildCurrentStanding(current, dailyExpenses)` op het Box 3-resultaat van Willem (spaargeld €57.700, beleggingen €627.000, heffing €12.612 — zie WF-BELAST-17). Katern II rankt de Box 3-scenario\'s + de jaarruimte-kans; katern IV toont precies één Wft-callout (`OPTIMIZER_DISCLAIMER_SHORT` = "Indicatie, geen advies.").',
+    when:
+      'De gebruiker leest de leidende kans bovenaan, opent de vergelijkingstabel ("Niets doen" als eerste kolom, bruto besparing / rendementseffect / netto effect als aparte rijen) en de figures-strip in katern I.',
+    then:
+      'Willems enige Box 3-kans (alle beleggingen naar spaargeld) heeft een NEGATIEF netto effect: de bruto belastingbesparing weegt niet op tegen het verwachte misgelopen rendement (`returnCostEur` = round(beleggingen × (DEFAULT_RETURN − EXPECTED_SAVINGS_RETURN))) — die kans wordt daarom NOOIT als leidende kans getoond (`pickTopChoice` filtert elke kandidaat met netEffect ≤ 0). Is er daarnaast een netto-positieve kans (bv. de jaarruimte-kans, die geen rendementsverlies kent), dan wint díe de leidende plek. `buildCurrentStanding` spiegelt katern I 1-op-1 op het echte `Box3Result` (tax/spaargeld/beleggingen ongewijzigd overgenomen, geen eigen som). Katern IV toont precies één disclaimer.',
+    assertion: {
+      kind: 'exact',
+      expected:
+        'shiftNetNegative=true; topKind=jaarruimte; topTitle=Benut je jaarruimte (lijfrente); standingTax=12612; standingSpaargeld=57700; standingBeleggingen=627000',
+      source:
+        'lib/tax-optimizer/box3-strategies.ts#generateBox3Strategies (samenstelling-shift, returnCostEur/netEffect) + rank.ts#pickTopChoice (netEffect≤0 valt af, netFreedomDays wint) + box3-strategies.ts#buildCurrentStanding, op het echte Box3Result van Willem (calculateBox3, year 2026); jaarruimte-kans representatief via computeJaarruimte/jaarruimteBesparing op het bruto-inkomen van persona compleet (zelfde representatieve-cijfer-precedent als WF-BELAST-13)',
     },
   },
 ]

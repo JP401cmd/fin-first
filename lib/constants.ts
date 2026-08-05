@@ -26,6 +26,31 @@ import { BOX3_PARAMS, CURRENT_TAX_YEAR } from '@/lib/box3-data'
 /** Default expected annual return on investments — 7% nominal, long-term global equity average. */
 export const DEFAULT_RETURN = 0.07
 
+/**
+ * Verwachte nominale spaarrente — 1,3% per jaar.
+ *
+ * De tegenhanger van `DEFAULT_RETURN` (7% verwacht beleggingsrendement) zodra een
+ * scenario vermogen VERSCHUIFT van beleggen naar sparen: het verwachte
+ * rendementsverschil is `DEFAULT_RETURN − EXPECTED_SAVINGS_RETURN` (2026 ≈ 5,7
+ * procentpunt). De fiscale-strategie-optimizer gebruikt dat verschil om het NETTO
+ * effect van een samenstelling-shift te tonen (belastingbesparing − verwacht
+ * misgelopen rendement). Zonder die aanname oogt "€ 47 minder Box 3-heffing" als
+ * pure winst, terwijl dezelfde shift per saldo honderden tot duizenden euro's
+ * verwacht rendement kost.
+ *
+ * Waarom 1,3%: dat ligt op het niveau van het forfaitair rendement SPAREN dat de
+ * Belastingdienst voor 2026 hanteert (1,28% — `BOX3_PARAMS[2026].forfaitSpaargeld`).
+ * Dat forfait wordt jaarlijks vastgesteld op de gerealiseerde gemiddelde
+ * spaarrente en is daarmee de best onderbouwde publieke schatting die voorhanden
+ * is; 1,3% is de afgeronde, uitlegbare vorm daarvan.
+ *
+ * Bewust NIET afgeleid van `BOX3_PARAMS[...].forfaitSpaargeld`: dat forfait is een
+ * FISCALE grootheid (wettelijk vastgesteld, terugkijkend), terwijl dit — net als
+ * DEFAULT_RETURN — een ECONOMISCHE verwachting is. Stelt de wetgever het forfait
+ * om fiscale redenen bij, dan mag de rendementsaanname niet stil meebewegen.
+ */
+export const EXPECTED_SAVINGS_RETURN = 0.013
+
 /** Default annual portfolio volatility for Monte Carlo simulations — 15%. */
 export const DEFAULT_VOLATILITY = 0.15
 

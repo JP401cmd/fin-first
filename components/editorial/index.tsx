@@ -420,6 +420,9 @@ export function TogglePill({
   return (
     <Comp
       type={onClick ? 'button' : undefined}
+      // Interactieve pills dragen hun stand ook voor schermlezers — de
+      // aan/uit-stand is anders puur een achtergrondkleur.
+      aria-pressed={onClick ? on : undefined}
       onClick={onClick}
       className={`inline-flex items-center px-2 py-0.5 rounded-full font-mono text-[10px] font-semibold uppercase tracking-[0.15em] border ${
         on ? onClasses : offClasses

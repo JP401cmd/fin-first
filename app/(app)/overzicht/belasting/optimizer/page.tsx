@@ -8,11 +8,16 @@ import { getServerPerspective } from '@/lib/household/server-perspective'
 import { loadPerspectiveBox3 } from '@/lib/household-tax'
 import { loadHorizonData } from '@/lib/horizon-data-loader'
 import { resolveBox1GrossIncome } from '@/lib/box1-income'
-import { generateBox3Strategies, DEFAULT_GOAL_ID } from '@/lib/tax-optimizer'
+import {
+  generateBox3Strategies,
+  DEFAULT_GOAL_ID,
+  buildCurrentStanding,
+  pickTopChoice,
+} from '@/lib/tax-optimizer'
 import { rankStrategies, pickBest } from '@/lib/tax-optimizer/rank'
 import { TAX_OPTIMIZER_GOALS } from '@/lib/tax-optimizer/goals'
 import { computeJaarruimte, jaarruimteBesparing } from '@/lib/jaarruimte'
-import type { GoalSection, OptimizerTopChoice } from '@/lib/tax-optimizer/types'
+import type { GoalSection } from '@/lib/tax-optimizer/types'
 import { Box3OptimizerClient } from '@/components/overview/belasting/optimizer-client'
 
 export const metadata: Metadata = {
@@ -32,15 +37,17 @@ const YEAR = 2026
  * uit de bestaande engine `calculateBox3` — géén nieuwe rekenkern, geen forfait-
  * constanten hier.
  *
- * Alle fiscale doelen staan GESTAPELD onder elkaar (geen doel-kiezer meer). De
- * zware scenario-generatie én de ranking-per-doel draaien server-side; de page
- * bouwt één `GoalSection` per doel en de client rendert ze puur. We geven ALLEEN
- * geaggregeerde uitkomsten door — nooit de per-partner-splitsing — zodat er geen
- * partner-private bedragen lekken.
+ * De pagina VERGELIJKT eerst en zoomt daarna pas in: de client zet alle kansen
+ * (Box 3-scenario's + de Box 1-jaarruimte) op één netto-effect-as en biedt de
+ * uitwerking per kans op aanvraag. De zware scenario-generatie én de
+ * ranking-per-doel draaien server-side; de page bouwt één `GoalSection` per doel
+ * en de client rendert ze puur. We geven ALLEEN geaggregeerde uitkomsten door —
+ * nooit de per-partner-splitsing — zodat er geen partner-private bedragen lekken.
  *
- * Doelen: twee Box 3-doelen (scenario-vergelijking), jaarruimte-maximaal (Box 1,
- * via de bestaande JaarruimteCard, per persoon — ADR 0036) en een preview-doel
- * (levenslange belastingdruk, nog niet doorgerekend).
+ * Doelen: twee Box 3-doelen (leveren dezelfde scenario's, anders gerankt),
+ * jaarruimte-maximaal (Box 1, via de bestaande JaarruimteCard, per persoon —
+ * ADR 0036) en een preview-doel (levenslange belastingdruk, nog niet
+ * doorgerekend; verschijnt als voetnoot "Binnenkort").
  */
 export default async function BelastingOptimizerPage() {
   const supabase = await createClient()
@@ -61,16 +68,26 @@ export default async function BelastingOptimizerPage() {
 
   const box3 = await loadPerspectiveBox3(supabase, perspective, YEAR, currentUserName)
 
-  // Huidige situatie: huishouden → gecombineerd (fiscaal partners), anders het
-  // eigen resultaat. Partnerverdeling alleen wanneer de loader een optimale
-  // verdeling leverde (household mét gedeeld partner-vermogen).
-  const current = box3.combined ?? box3.personal
-  const optimalAllocation = box3.optimalAllocation
-    ? {
-        totalTax: box3.optimalAllocation.totalTax,
-        savingsVsEqual: box3.optimalAllocation.savingsVsEqual,
-      }
-    : undefined
+  // ÉÉN grondslag voor de hele vergelijking, bepaald door het gekozen
+  // perspectief (zelfde regel als box3-detail.tsx): alleen de huishoud-weergave
+  // rekent op het gecombineerde resultaat; persoonlijk én partner-weergave
+  // gebruiken het perspectief-eigen resultaat (`box3.personal` ís in
+  // partner-weergave het resultaat van de partner). Zo staan er nooit
+  // huishoudcijfers zonder huishoud-markering in katern I, en klopt het
+  // dagtarief (dailyExpensesByPerspective) bij de heffing die het deelt.
+  const useHouseholdBasis = perspective === 'household' && !!box3.combined
+  const current = useHouseholdBasis ? box3.combined! : box3.personal
+  // De partnerverdeling is een HUISHOUD-hefboom: zijn grondslag (heffing van
+  // het hele huishouden) mag niet naast een persoonlijke baseline in dezelfde
+  // vergelijking staan. Alleen doorgeven op de huishoud-grondslag — en dan nog
+  // uitsluitend de twee geaggregeerde scalars (ADR 0036).
+  const optimalAllocation =
+    useHouseholdBasis && box3.optimalAllocation
+      ? {
+          totalTax: box3.optimalAllocation.totalTax,
+          savingsVsEqual: box3.optimalAllocation.savingsVsEqual,
+        }
+      : undefined
 
   // Scenario-generatie is doel-onafhankelijk (één keer); de ranking per doel
   // gebeurt server-side (verplaatst uit de client nu de doel-kiezer weg is).
@@ -134,51 +151,13 @@ export default async function BelastingOptimizerPage() {
     }
   })
 
-  // ── Leidende aanbeveling ("Je grootste kans nu") ──────────────────────
-  // Kandidaten uit dezelfde, al-gerankte data — geen herberekening. De box3-
-  // kandidaat is de winnaar van het grootste-besparing-doel; de jaarruimte-
-  // kandidaat is de volledige-benutting-besparing. Kies op de meeste
-  // vrijheidsdagen (savings als tiebreak); sla savings ≤ 0 over.
-  // De kandidaten lezen uit de al-gebouwde secties (single source): geen
-  // parallelle houders van hetzelfde getal — de jaarruimte-besparing komt uit
-  // het sectie-veld, dat op zijn beurt uit `jaarruimteBesparing` is afgeleid.
-  const box3MinBest =
-    sections.find(
-      (s): s is Extract<GoalSection, { kind: 'box3' }> =>
-        s.kind === 'box3' && s.goalId === 'box3-minimaal',
-    )?.best ?? null
-  const jaarruimteSection = sections.find(
-    (s): s is Extract<GoalSection, { kind: 'jaarruimte' }> => s.kind === 'jaarruimte',
-  )
-
-  const topCandidates: OptimizerTopChoice[] = []
-  if (box3MinBest && box3MinBest.savings > 0) {
-    topCandidates.push({
-      goalId: 'box3-minimaal',
-      title: box3MinBest.title,
-      savings: box3MinBest.savings,
-      freedomDays: box3MinBest.freedomDays,
-      caveat: box3MinBest.caveat,
-      kind: 'box3',
-      anchorId: 'optimizer-box3',
-    })
-  }
-  if (jaarruimteSection && jaarruimteSection.hasData && jaarruimteSection.besparing > 0) {
-    topCandidates.push({
-      goalId: 'jaarruimte-maximaal',
-      title: 'Benut je jaarruimte (lijfrente)',
-      savings: jaarruimteSection.besparing,
-      freedomDays: jaarruimteSection.freedomDays,
-      caveat:
-        'Je zet dit bedrag vast tot je pensioen; de latere uitkering wordt belast, meestal tegen een lager tarief.',
-      kind: 'jaarruimte',
-      anchorId: 'optimizer-jaarruimte',
-    })
-  }
-  const topChoice: OptimizerTopChoice | null =
-    topCandidates.sort(
-      (a, b) => b.freedomDays - a.freedomDays || b.savings - a.savings,
-    )[0] ?? null
+  // ── Leidende kans + huidige situatie ──────────────────────────────────
+  // Beide komen uit de canonieke optimizer-laag: `pickTopChoice` kiest de kans
+  // met het hoogste netto effect uit dezelfde, al-gebouwde secties (geen
+  // parallelle houders van hetzelfde getal), en `buildCurrentStanding` levert de
+  // referentie-cijfers van katern I uit het Box 3-resultaat.
+  const topChoice = pickTopChoice(sections)
+  const standing = buildCurrentStanding(current, box3.dailyExpenses)
 
   const perspectiveAware = box3.hasHousehold && !!box3.combined && perspective !== 'personal'
 
@@ -197,15 +176,17 @@ export default async function BelastingOptimizerPage() {
           titleBefore="Van belasting berekenen naar "
           emphasis="optimaliseren"
           titleAfter=""
-          deck="Al je fiscale doelen onder elkaar. TriFinity rekent per doel de scenario’s door en zet ze naast elkaar — in euro’s én in vrijheidsdagen — zodat je ziet waar ruimte ligt om vrijheid terug te kopen."
+          deck="Eerst zie je waar je nu staat en wat elke fiscale kans per saldo oplevert — in euro’s én in vrijheidsdagen. Daarna zoom je per kans in op de uitwerking."
         />
       </div>
 
       <Box3OptimizerClient
         sections={sections}
         topChoice={topChoice}
+        standing={standing}
         hasPartner={current.hasPartner}
         perspectiveAware={perspectiveAware}
+        year={YEAR}
       />
     </>
   )

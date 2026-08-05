@@ -40,6 +40,16 @@ import {
 import type { Asset, AssetType } from '@/lib/asset-data'
 import { compareForfaitairVsWerkelijk } from '@/lib/box3-tegenbewijs'
 import { computeJaarruimte, jaarruimteBesparing } from '@/lib/jaarruimte'
+import {
+  generateBox3Strategies,
+  rankStrategies,
+  pickBest,
+  pickTopChoice,
+  buildCurrentStanding,
+  GOAL_BY_ID,
+  JAARRUIMTE_TITLE,
+  type GoalSection,
+} from '@/lib/tax-optimizer'
 import { BELAST_ACCEPTANCE } from './belast'
 import type { AcceptanceCriterion } from './types'
 
@@ -372,6 +382,61 @@ export const BELAST_ENGINE_CHECKS: BelastEngineCheck[] = [
       return {
         expected: 'partner1Tax=5707; partner2Tax=5707; totaleTax=11415; soloTax=12612',
         actual: `partner1Tax=${split.partner1Tax}; partner2Tax=${split.partner2Tax}; totaleTax=${split.totalTax}; soloTax=${Math.round(solo.tax)}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-BELAST-23',
+    scenarioId: 'UAT-BELAST-23',
+    label:
+      'Optimizer pickTopChoice: netto-negatieve Box 3-kans (Willem) valt af, netto-positieve jaarruimte-kans wint; buildCurrentStanding spiegelt Box3Result',
+    run: () => {
+      criterion('WF-BELAST-23')
+      const input: Box3Input = { assets: box3AssetsFromPersona(willem), debts: [], hasPartner: false, dailyExpenses: 100, year: 2026 }
+      const current = calculateBox3(input)
+      const { baseline, strategies } = generateBox3Strategies({
+        goalId: 'box3-minimaal',
+        year: 2026,
+        dailyExpenses: 100,
+        hasPartner: false,
+        current,
+      })
+      const ranked = rankStrategies(strategies, 'box3-minimaal')
+      const shift = ranked.find((s) => s.kind === 'samenstelling-shift')
+
+      // Representatief (zelfde precedent als WF-BELAST-13): jaarruimte-kans op
+      // het bruto-inkomen van persona compleet — netto-positief want zonder
+      // rendementsverlies (netEffect = besparing).
+      const jrJaarruimte = computeJaarruimte(tessaGross, 0, 2026).jaarruimte
+      const jrBesparing = jaarruimteBesparing(tessaGross, jrJaarruimte, 2026)
+
+      const sections: GoalSection[] = [
+        {
+          kind: 'box3',
+          goalId: 'box3-minimaal',
+          goal: GOAL_BY_ID['box3-minimaal'],
+          baseline,
+          ranked,
+          best: pickBest(ranked, 'box3-minimaal'),
+        },
+        {
+          kind: 'jaarruimte',
+          goalId: 'jaarruimte-maximaal',
+          goal: GOAL_BY_ID['jaarruimte-maximaal'],
+          grossYearlyIncome: tessaGross,
+          pensionFactorA: 0,
+          dailyExpenses: 100,
+          hasData: true,
+          besparing: jrBesparing,
+          freedomDays: Math.round(jrBesparing / 100),
+        },
+      ]
+      const top = pickTopChoice(sections)
+      const standing = buildCurrentStanding(current, 100)
+
+      return {
+        expected: `shiftNetNegative=true; topKind=jaarruimte; topTitle=${JAARRUIMTE_TITLE}; standingTax=12612; standingSpaargeld=57700; standingBeleggingen=627000`,
+        actual: `shiftNetNegative=${!!shift && shift.netEffect < 0}; topKind=${top?.kind}; topTitle=${top?.title}; standingTax=${Math.round(standing.tax)}; standingSpaargeld=${standing.totaalSpaargeld}; standingBeleggingen=${standing.totaalBeleggingen}`,
       }
     },
   },

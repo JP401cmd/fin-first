@@ -2,10 +2,12 @@ import { describe, it, expect } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { Box3OptimizerClient } from './optimizer-client'
 import { generateBox3Strategies, synthBox3Input } from '@/lib/tax-optimizer/box3-strategies'
+import { buildCurrentStanding, pickBest } from '@/lib/tax-optimizer'
 import { calculateBox3 } from '@/lib/box3-data'
 import { GOAL_BY_ID } from '@/lib/tax-optimizer/goals'
 import type {
   GoalSection,
+  OptimizerCurrentStanding,
   OptimizerStrategy,
   OptimizerTopChoice,
 } from '@/lib/tax-optimizer/types'
@@ -18,34 +20,33 @@ import type {
  * match op een `€\s*<bedrag>`-regex i.p.v. de exacte geformatteerde string.
  */
 function euroPattern(amount: number): RegExp {
-  // formatCurrency (Intl, 0 decimalen) rondt af — spiegel dat hier, anders
-  // wijkt een niet-geheel bedrag (bv. cent-resten uit de belastingmotor) af.
   const digits = Math.round(amount).toLocaleString('nl-NL').replace(/\./g, '\\.')
   return new RegExp(`€\\s*${digits}`)
 }
 
+const DAILY_EXPENSES = 100
+const YEAR = 2026 as const
+
 /**
- * Regressietest voor de "geen rendementsverlies"-presentatie (Doel II,
- * box3-geen-rendementsverlies): een rendement-kostende samenstelling-shift mag
- * NOOIT als groene winst getoond worden — hij hoort gedempt met de
- * "kost rendement"-marker, terwijl de stand "grootste besparing" (box3-minimaal)
- * dezelfde shift wél als "grootste kans" toont.
+ * Fixture uit de ÉCHTE motor (calculateBox3 + generateBox3Strategies +
+ * buildCurrentStanding) — geen handgeschreven objecten. Zo pinnen de tests
+ * zowel "de weergave klopt" als "de motor levert de velden waar de weergave op
+ * rust" (netto effect, rendementskosten, huidige situatie).
  *
- * De fixture-strategie komt uit de échte motor (generateBox3Strategies +
- * calculateBox3), niet uit een handgeschreven mkStrategy-object — zo pint deze
- * test zowel "de presentatielogica klopt" als "de motor levert daadwerkelijk
- * een hasReturnCost:true-scenario" vast.
+ * Groot beleggingen-blok zonder spaargeld: garandeert een "beleggingen →
+ * spaargeld"-shift die de heffing verlaagt (lager forfait) maar verwacht
+ * rendement kost — dus een NEGATIEF netto effect.
  */
-function buildShiftStrategy(): { baseline: OptimizerStrategy; shift: OptimizerStrategy } {
-  const dailyExpenses = 100
-  const year = 2026 as const
-  // Groot beleggingen-blok, geen spaargeld: garandeert dat de "beleggingen →
-  // spaargeld"-shift een positieve besparing oplevert (lager forfait).
-  const current = calculateBox3(synthBox3Input(0, 300_000, 0, false, dailyExpenses, year))
+function buildFixture(): {
+  baseline: OptimizerStrategy
+  shift: OptimizerStrategy
+  standing: OptimizerCurrentStanding
+} {
+  const current = calculateBox3(synthBox3Input(0, 300_000, 0, false, DAILY_EXPENSES, YEAR))
   const { baseline, strategies } = generateBox3Strategies({
-    goalId: 'box3-geen-rendementsverlies',
-    year,
-    dailyExpenses,
+    goalId: 'box3-minimaal',
+    year: YEAR,
+    dailyExpenses: DAILY_EXPENSES,
     hasPartner: false,
     current,
   })
@@ -56,259 +57,372 @@ function buildShiftStrategy(): { baseline: OptimizerStrategy; shift: OptimizerSt
     )
   }
   // Meet vóór je assert: bevestig dat de motor écht een rendement-kostend
-  // scenario met positieve besparing teruggeeft, i.p.v. dat aan te nemen.
+  // scenario met positieve besparing én negatief netto effect teruggeeft.
   expect(shift.hasReturnCost).toBe(true)
   expect(shift.savings).toBeGreaterThan(0)
-  return { baseline, shift }
+  expect(shift.returnCostEur).toBeGreaterThan(0)
+  expect(shift.netEffect).toBeLessThan(0)
+
+  return { baseline, shift, standing: buildCurrentStanding(current, DAILY_EXPENSES) }
 }
 
-describe('Box3OptimizerClient — "geen rendementsverlies"-presentatie (regressie)', () => {
-  it('toont een rendement-kostend scenario gedempt met de "kost rendement"-marker en de kosteloze-besparing-labels, zonder "grootste kans"', () => {
-    const { baseline, shift } = buildShiftStrategy()
-    const section: GoalSection = {
-      kind: 'box3',
-      goalId: 'box3-geen-rendementsverlies',
-      goal: GOAL_BY_ID['box3-geen-rendementsverlies'],
-      baseline,
-      ranked: [shift],
-      best: null,
-    }
+function box3Section(
+  goalId: 'box3-minimaal' | 'box3-geen-rendementsverlies',
+  baseline: OptimizerStrategy,
+  ranked: OptimizerStrategy[],
+  best: OptimizerStrategy | null,
+): GoalSection {
+  return { kind: 'box3', goalId, goal: GOAL_BY_ID[goalId], baseline, ranked, best }
+}
 
-    render(<Box3OptimizerClient sections={[section]} hasPartner={false} />)
+function jaarruimteSection(besparing: number, freedomDays: number): GoalSection {
+  return {
+    kind: 'jaarruimte',
+    goalId: 'jaarruimte-maximaal',
+    goal: GOAL_BY_ID['jaarruimte-maximaal'],
+    grossYearlyIncome: 60_000,
+    pensionFactorA: 0,
+    dailyExpenses: DAILY_EXPENSES,
+    hasData: true,
+    besparing,
+    freedomDays,
+  }
+}
 
-    // Marker "kost rendement — zie Grootste besparing" (ScenarioBars-annotatie + compacte rij)
-    expect(screen.getAllByText(/kost rendement/i).length).toBeGreaterThan(0)
-
-    // FiguresStrip-labels horend bij "geen kosteloze winnaar"
-    expect(screen.getByText('Laagst haalbaar (kosteloos)')).toBeTruthy()
-    expect(screen.getByText(/geen kosteloze besparing/i)).toBeTruthy()
-
-    // Geen "grootste kans"-badge: er is geen kosteloze winnaar (best === null)
-    expect(screen.queryByText('grootste kans')).toBeNull()
-
-    // Het besparingsbedrag zelf draagt niet de positieve/groene styling
-    const amountEl = screen.getByText(euroPattern(shift.savings))
-    expect(amountEl.style.color).not.toBe('var(--positive)')
-    expect(amountEl.style.color).toBe('var(--ink-3)')
-  })
-
-  it('toont dezelfde shift-strategie in "box3-minimaal" (stand grootste besparing) wél groen als "grootste kans" — contrast', () => {
-    const { baseline, shift } = buildShiftStrategy()
-    const section: GoalSection = {
-      kind: 'box3',
-      goalId: 'box3-minimaal',
-      goal: GOAL_BY_ID['box3-minimaal'],
-      baseline,
-      ranked: [shift],
-      best: shift,
-    }
-
-    render(<Box3OptimizerClient sections={[section]} hasPartner={false} />)
-
-    expect(screen.getByText('grootste kans')).toBeTruthy()
-    // Geen gedempte marker hier — dit is de stand grootste besparing, geen
-    // rendementsverlies-framing.
-    expect(screen.queryByText(/kost rendement/i)).toBeNull()
-
-    // Het besparingsbedrag komt hier terug in de ScenarioBars-annotatie én in het
-    // winnaar-kaart-bedrag (best === shift). De FiguresStrip-winnaarcel draagt de
-    // kleur op de wrapper (niet op de tekst-node) en valt buiten deze filter;
-    // filter daarom op de elementen die de kleur daadwerkelijk zelf dragen.
-    const amountEls = screen.getAllByText(euroPattern(shift.savings))
-    const styledEls = amountEls.filter((el) => el.style.color !== '')
-    expect(styledEls.length).toBeGreaterThan(0)
-    for (const el of styledEls) {
-      expect(el.style.color).toBe('var(--positive)')
-    }
-  })
-})
-
-/**
- * De pagina LEIDT met één aanbeveling ("Je grootste kans nu") en voegt de twee
- * Box 3-doelen samen tot één katern met een toggle. Deze tests pinnen de nieuwe
- * structuur: de topChoice-prop rendert de leidende kaart met vrijheidstijd-
- * framing + in-page anchor, en de toggle wisselt tussen de twee al-geleverde
- * box3-standen.
- */
-describe('Box3OptimizerClient — leidende aanbeveling + samengevoegde Box 3-katern', () => {
-  it('rendert het "Je grootste kans nu"-blok met titel, kanttekening en een in-page Bekijk-anchor', () => {
-    const { baseline, shift } = buildShiftStrategy()
-    const section: GoalSection = {
-      kind: 'box3',
-      goalId: 'box3-minimaal',
-      goal: GOAL_BY_ID['box3-minimaal'],
-      baseline,
-      ranked: [shift],
-      best: shift,
-    }
-    const topChoice: OptimizerTopChoice = {
-      goalId: 'box3-minimaal',
-      // Bewust een titel die niet met de strategie-titel botst, zodat de
-      // heading-query het top-blok eenduidig raakt.
-      title: 'Verlaag je Box 3-heffing dit jaar',
-      savings: shift.savings,
-      freedomDays: shift.freedomDays,
-      caveat: 'Dit scenario kost verwacht rendement.',
-      kind: 'box3',
-      anchorId: 'optimizer-box3',
-    }
-
-    render(<Box3OptimizerClient sections={[section]} topChoice={topChoice} hasPartner={false} />)
-
-    expect(screen.getByText(/Je grootste kans nu/i)).toBeTruthy()
-    expect(
-      screen.getByRole('heading', { name: 'Verlaag je Box 3-heffing dit jaar' }),
-    ).toBeTruthy()
-    expect(screen.getByText(/Dit scenario kost verwacht rendement/i)).toBeTruthy()
-    // Vrijheidstijd-framing: de teruggekochte vrijheidsdagen worden benoemd.
-    expect(screen.getAllByText(/vrijheidsdagen/i).length).toBeGreaterThan(0)
-    // "Bekijk"-anchor scrollt naar de bijbehorende sectie.
-    const link = screen.getByRole('link', { name: /Bekijk/i })
-    expect(link.getAttribute('href')).toBe('#optimizer-box3')
-  })
-
-  it('toont een neutrale variant zonder groen bedrag wanneer er geen topChoice is', () => {
-    const { baseline, shift } = buildShiftStrategy()
-    const section: GoalSection = {
-      kind: 'box3',
-      goalId: 'box3-minimaal',
-      goal: GOAL_BY_ID['box3-minimaal'],
-      baseline,
-      ranked: [shift],
-      best: shift,
-    }
-
-    render(<Box3OptimizerClient sections={[section]} topChoice={null} hasPartner={false} />)
-
-    expect(screen.getByText(/geen directe besparingskans/i)).toBeTruthy()
-    // Wél de Fin-knop om de situatie te bespreken.
-    expect(screen.getByRole('button', { name: /Bespreek .* met Fin/i })).toBeTruthy()
-  })
-
-  it('voegt beide Box 3-standen samen tot één katern met een werkende toggle', () => {
-    const { baseline, shift } = buildShiftStrategy()
-    const minimaal: GoalSection = {
-      kind: 'box3',
-      goalId: 'box3-minimaal',
-      goal: GOAL_BY_ID['box3-minimaal'],
-      baseline,
-      ranked: [shift],
-      best: shift,
-    }
-    const geenVerlies: GoalSection = {
-      kind: 'box3',
-      goalId: 'box3-geen-rendementsverlies',
-      goal: GOAL_BY_ID['box3-geen-rendementsverlies'],
-      baseline,
-      ranked: [shift],
-      best: null,
-    }
-
-    render(<Box3OptimizerClient sections={[minimaal, geenVerlies]} hasPartner={false} />)
-
-    // Eén gedeelde katern-kop (geen twee losse box3-secties meer).
-    expect(screen.getByRole('heading', { name: 'Box 3-vermogen' })).toBeTruthy()
-
-    // Default = "Grootste besparing": winnaar zichtbaar, geen gedempte marker.
-    expect(screen.getByText('grootste kans')).toBeTruthy()
-    expect(screen.queryByText(/kost rendement/i)).toBeNull()
-
-    // Wissel via de IN-SECTIE-toggle (exacte a11y-naam onderscheidt 'm van de
-    // gelijknamige doel-chip, die de langere aria-label draagt): nu de gedempte
-    // marker, geen winnaar.
-    fireEvent.click(screen.getByRole('button', { name: 'Zonder rendementsverlies' }))
-    expect(screen.getAllByText(/kost rendement/i).length).toBeGreaterThan(0)
-    expect(screen.queryByText('grootste kans')).toBeNull()
-  })
-
-  it('rendert de vier doel-chips als navigatie', () => {
-    const { baseline, shift } = buildShiftStrategy()
-    const minimaal: GoalSection = {
-      kind: 'box3',
-      goalId: 'box3-minimaal',
-      goal: GOAL_BY_ID['box3-minimaal'],
-      baseline,
-      ranked: [shift],
-      best: shift,
-    }
-    const geenVerlies: GoalSection = {
-      kind: 'box3',
-      goalId: 'box3-geen-rendementsverlies',
-      goal: GOAL_BY_ID['box3-geen-rendementsverlies'],
-      baseline,
-      ranked: [shift],
-      best: null,
-    }
-    const jaarruimte: GoalSection = {
-      kind: 'jaarruimte',
-      goalId: 'jaarruimte-maximaal',
-      goal: GOAL_BY_ID['jaarruimte-maximaal'],
-      grossYearlyIncome: 50_000,
-      pensionFactorA: 0,
-      dailyExpenses: 100,
-      hasData: true,
-      besparing: 0,
-      freedomDays: 0,
-    }
-    const preview: GoalSection = {
-      kind: 'preview',
-      goalId: 'levenslang-minimaal',
-      goal: GOAL_BY_ID['levenslang-minimaal'],
-      previewNote: 'Binnenkort.',
-    }
+describe('Box3OptimizerClient — katern I: waar je nu staat', () => {
+  it('pint de getoonde referentie-cijfers op de canonieke buildCurrentStanding-uitvoer', () => {
+    const { baseline, shift, standing } = buildFixture()
 
     render(
       <Box3OptimizerClient
-        sections={[minimaal, geenVerlies, jaarruimte, preview]}
+        sections={[box3Section('box3-minimaal', baseline, [shift], shift)]}
+        standing={standing}
         hasPartner={false}
       />,
     )
 
-    // De vier chips zijn echte buttons met een navigatie-aria-label.
-    expect(
-      screen.getByRole('button', { name: /Ga naar Box 3, gesorteerd op grootste besparing/i }),
-    ).toBeTruthy()
-    expect(
-      screen.getByRole('button', {
-        name: /Ga naar Box 3, gesorteerd zonder rendementsverlies/i,
-      }),
-    ).toBeTruthy()
-    expect(screen.getByRole('button', { name: /Ga naar Jaarruimte/i })).toBeTruthy()
-    expect(screen.getByRole('button', { name: /Ga naar Levenslange druk/i })).toBeTruthy()
+    expect(screen.getByText('Heffing nu')).toBeTruthy()
+    // Het getoonde bedrag is exact de heffing uit de motor.
+    expect(screen.getAllByText(euroPattern(standing.tax)).length).toBeGreaterThan(0)
+    // Vrijheidstijd-framing: de heffing in dagen, uit hetzelfde standing-veld.
+    expect(screen.getByText(`${standing.taxFreedomDays} dagen`)).toBeTruthy()
+    // Vermogensmix uit standing (beleggingen-only fixture).
+    expect(screen.getAllByText(euroPattern(standing.totaalBeleggingen)).length).toBeGreaterThan(0)
   })
 
-  it('een Box 3-chip zet de gedeelde toggle-stand (chip stuurt de sectie aan)', () => {
-    const { baseline, shift } = buildShiftStrategy()
-    const minimaal: GoalSection = {
-      kind: 'box3',
-      goalId: 'box3-minimaal',
-      goal: GOAL_BY_ID['box3-minimaal'],
-      baseline,
-      ranked: [shift],
-      best: shift,
-    }
-    const geenVerlies: GoalSection = {
-      kind: 'box3',
-      goalId: 'box3-geen-rendementsverlies',
-      goal: GOAL_BY_ID['box3-geen-rendementsverlies'],
-      baseline,
-      ranked: [shift],
-      best: null,
-    }
+  it('toont de aannames waarop de vergelijking rust als read-only chips', () => {
+    const { baseline, shift, standing } = buildFixture()
 
-    render(<Box3OptimizerClient sections={[minimaal, geenVerlies]} hasPartner={false} />)
-
-    // Default = grootste besparing: winnaar zichtbaar.
-    expect(screen.getByText('grootste kans')).toBeTruthy()
-
-    // Klik de "Zonder rendementsverlies"-CHIP (via de navigatie-aria-label): de
-    // gedeelde stand schakelt en de sectie toont de gedempte marker.
-    fireEvent.click(
-      screen.getByRole('button', {
-        name: /Ga naar Box 3, gesorteerd zonder rendementsverlies/i,
-      }),
+    render(
+      <Box3OptimizerClient
+        sections={[box3Section('box3-minimaal', baseline, [shift], shift)]}
+        standing={standing}
+        hasPartner={false}
+        year={YEAR}
+      />,
     )
-    expect(screen.getAllByText(/kost rendement/i).length).toBeGreaterThan(0)
+
+    expect(screen.getByText('verwacht rendement beleggen')).toBeTruthy()
+    expect(screen.getByText('spaarrente-aanname')).toBeTruthy()
+    expect(screen.getByText('belastingjaar')).toBeTruthy()
+  })
+})
+
+describe('Box3OptimizerClient — katern II: de vergelijking', () => {
+  it('zet elke kans op één netto-effect-as en toont het geleverde netto effect (niet de bruto besparing)', () => {
+    const { baseline, shift, standing } = buildFixture()
+
+    render(
+      <Box3OptimizerClient
+        sections={[box3Section('box3-minimaal', baseline, [shift], shift)]}
+        standing={standing}
+        hasPartner={false}
+      />,
+    )
+
+    // Het netto effect (besparing − misgelopen rendement) staat er, met teken.
+    expect(screen.getAllByText(euroPattern(Math.abs(shift.netEffect))).length).toBeGreaterThan(0)
+    // De bruto besparing blijft zichtbaar als attribuut in de tabel.
+    expect(screen.getAllByText(euroPattern(shift.savings)).length).toBeGreaterThan(0)
+    // De rendementskosten staan als eigen rij (eigen as, geen samengesteld cijfer).
+    expect(screen.getByText('Verwacht rendementseffect')).toBeTruthy()
+    expect(screen.getAllByText(euroPattern(shift.returnCostEur)).length).toBeGreaterThan(0)
+  })
+
+  it('zet "Niets doen" als eerste kolom en de netto-effect-rij als sluitrij', () => {
+    const { baseline, shift, standing } = buildFixture()
+
+    render(
+      <Box3OptimizerClient
+        sections={[box3Section('box3-minimaal', baseline, [shift], shift)]}
+        standing={standing}
+        hasPartner={false}
+      />,
+    )
+
+    const headers = screen.getAllByRole('columnheader')
+    // [0] = lege hoek-cel voor de attribuut-kolom, [1] = de referentie.
+    expect(headers[1].textContent).toContain('Niets doen')
+    expect(headers[2].textContent).toContain(shift.title)
+
+    const nettoRow = screen.getByText('Netto effect per jaar').closest('tr')
+    expect(nettoRow).toBeTruthy()
+    expect(nettoRow?.querySelector('.border-double')).toBeTruthy()
+  })
+
+  it('markeert de topkans in de rij zelf met een badge én een motiveringsregel', () => {
+    const { baseline, shift, standing } = buildFixture()
+    const jaarruimte = jaarruimteSection(1_800, 18)
+    const topChoice: OptimizerTopChoice = {
+      goalId: 'jaarruimte-maximaal',
+      title: 'Benut je jaarruimte (lijfrente)',
+      savings: 1_800,
+      netEffect: 1_800,
+      freedomDays: 18,
+      caveat: 'Je zet dit bedrag vast tot je pensioen.',
+      kind: 'jaarruimte',
+      opportunityId: 'jaarruimte-maximaal',
+    }
+
+    render(
+      <Box3OptimizerClient
+        sections={[box3Section('box3-minimaal', baseline, [shift], shift), jaarruimte]}
+        topChoice={topChoice}
+        standing={standing}
+        hasPartner={false}
+      />,
+    )
+
+    expect(screen.getByText('grootste kans')).toBeTruthy()
+    expect(screen.getByText(/hoogste netto voordeel/i)).toBeTruthy()
+    // Geen losse "Je grootste kans nu"-hero meer boven de vergelijking.
+    expect(screen.queryByText(/Je grootste kans nu/i)).toBeNull()
+  })
+
+  it('filtert met de stand "Zonder rendementsverlies" de rendement-kostende kans weg', () => {
+    const { baseline, shift, standing } = buildFixture()
+
+    render(
+      <Box3OptimizerClient
+        sections={[box3Section('box3-minimaal', baseline, [shift], shift)]}
+        standing={standing}
+        hasPartner={false}
+      />,
+    )
+
+    expect(screen.getAllByText(shift.title).length).toBeGreaterThan(0)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Zonder rendementsverlies' }))
+
+    expect(screen.queryAllByText(shift.title).length).toBe(0)
+    expect(screen.getByText(/geen kans over/i)).toBeTruthy()
+  })
+
+  it('toont de Wft-callout één keer, onder de vergelijking', () => {
+    const { baseline, shift, standing } = buildFixture()
+
+    render(
+      <Box3OptimizerClient
+        sections={[box3Section('box3-minimaal', baseline, [shift], shift)]}
+        standing={standing}
+        hasPartner={false}
+      />,
+    )
+
+    expect(screen.getAllByText('Indicatie, geen advies.').length).toBe(1)
+  })
+})
+
+/**
+ * Household-fixture met TWEE kansen die onder 'netto' en 'besparing' echt
+ * verschillend geordend zijn: de shift bespaart bruto meer maar kost per saldo
+ * rendement (netEffect < 0), de partnerverdeling bespaart bruto minder maar
+ * kost niets (netEffect = savings > 0). Zo bewijst de test dat de sorteer-
+ * toggle de kolomvolgorde in de vergelijkingstabel echt omdraait — een pure
+ * `sortOpportunities`-unit-test dekt de sorteerlogica, niet de bedrading naar
+ * de DOM.
+ */
+function buildTwoOpportunityFixture(): {
+  section: GoalSection
+  shift: OptimizerStrategy
+  partner: OptimizerStrategy
+  standing: OptimizerCurrentStanding
+} {
+  const current = calculateBox3({
+    assets: [
+      { id: 'a1', asset_type: 'savings', current_value: 150_000, is_active: true } as never,
+      { id: 'a2', asset_type: 'investment', current_value: 150_000, is_active: true } as never,
+    ],
+    debts: [],
+    hasPartner: true,
+    dailyExpenses: DAILY_EXPENSES,
+    year: YEAR,
+  })
+  const { baseline, strategies } = generateBox3Strategies({
+    goalId: 'box3-minimaal',
+    year: YEAR,
+    dailyExpenses: DAILY_EXPENSES,
+    hasPartner: true,
+    current,
+    optimalAllocation: { totalTax: 5_000, savingsVsEqual: 800 },
+  })
+  const shift = strategies.find((s) => s.kind === 'samenstelling-shift')
+  const partner = strategies.find((s) => s.kind === 'partnerverdeling')
+  if (!shift || !partner) {
+    throw new Error('fixture-fout: verwacht zowel een shift- als een partnerverdeling-scenario')
+  }
+  // Meet vóór je assert: bevestig dat de fixture de twee sorteerstanden echt
+  // uit elkaar trekt, anders bewijst de klik-test niets.
+  expect(shift.savings).toBeGreaterThan(partner.savings)
+  expect(shift.netEffect).toBeLessThan(0)
+  expect(partner.netEffect).toBe(partner.savings)
+  expect(partner.netEffect).toBeGreaterThan(0)
+
+  return {
+    section: box3Section('box3-minimaal', baseline, strategies, pickBest(strategies, 'box3-minimaal')),
+    shift,
+    partner,
+    standing: buildCurrentStanding(current, DAILY_EXPENSES),
+  }
+}
+
+describe('Box3OptimizerClient — sorteer-toggle wijzigt de kolomvolgorde', () => {
+  it('"Netto effect" (default) zet de partnerverdeling vóór de shift; "Grootste besparing" draait dat om', () => {
+    const { section, shift, partner, standing } = buildTwoOpportunityFixture()
+
+    render(<Box3OptimizerClient sections={[section]} standing={standing} hasPartner={true} />)
+
+    const opportunityHeaderTitles = () =>
+      screen.getAllByRole('columnheader').slice(2).map((h) => h.textContent ?? '')
+
+    // Default sortMode = 'netto': partnerverdeling (netto positief) eerst.
+    const before = opportunityHeaderTitles()
+    expect(before[0]).toContain(partner.title)
+    expect(before[1]).toContain(shift.title)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Grootste besparing' }))
+
+    // Na de toggle: de shift (grotere bruto besparing) staat nu vooraan.
+    const after = opportunityHeaderTitles()
+    expect(after[0]).toContain(shift.title)
+    expect(after[1]).toContain(partner.title)
+  })
+})
+
+describe('Box3OptimizerClient — katern III: inzoomen per kans', () => {
+  it('begint ingeklapt en toont na openen de kassabon met het netto effect', () => {
+    const { baseline, shift, standing } = buildFixture()
+
+    render(
+      <Box3OptimizerClient
+        sections={[box3Section('box3-minimaal', baseline, [shift], shift)]}
+        standing={standing}
+        hasPartner={false}
+      />,
+    )
+
+    const toggle = screen.getByRole('button', { name: /Toon uitwerking/i })
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+    expect(screen.queryByText('Verwacht misgelopen rendement')).toBeNull()
+
+    fireEvent.click(toggle)
+
+    expect(toggle.getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByText('Verwacht misgelopen rendement')).toBeTruthy()
+    expect(screen.getByText('Belastingbesparing in dit scenario')).toBeTruthy()
+    // Negatief netto effect → feitelijke verdict-regel, geen imperatief.
+    expect(screen.getByText(/kost dit scenario je geld/i)).toBeTruthy()
+  })
+
+  it('houdt maximaal één kans tegelijk open', () => {
+    const { baseline, shift, standing } = buildFixture()
+    const jaarruimte = jaarruimteSection(1_800, 18)
+
+    render(
+      <Box3OptimizerClient
+        sections={[box3Section('box3-minimaal', baseline, [shift], shift), jaarruimte]}
+        standing={standing}
+        hasPartner={false}
+      />,
+    )
+
+    const toggles = screen.getAllByRole('button', { name: /Toon uitwerking/i })
+    expect(toggles.length).toBe(2)
+
+    fireEvent.click(toggles[0])
+    expect(screen.getAllByRole('button', { name: /Verberg/i }).length).toBe(1)
+
+    fireEvent.click(screen.getAllByRole('button', { name: /Toon uitwerking/i })[0])
+    expect(screen.getAllByRole('button', { name: /Verberg/i }).length).toBe(1)
+  })
+
+  it('opent de uitwerking vanuit de vergelijkingstabel', () => {
+    const { baseline, shift, standing } = buildFixture()
+
+    render(
+      <Box3OptimizerClient
+        sections={[box3Section('box3-minimaal', baseline, [shift], shift)]}
+        standing={standing}
+        hasPartner={false}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Bekijk uitwerking/i }))
+    expect(screen.getByText('Verwacht misgelopen rendement')).toBeTruthy()
+  })
+})
+
+describe('Box3OptimizerClient — lege staten', () => {
+  it('toont zonder doorgerekende kansen een neutrale variant met de Fin-knop', () => {
+    const { standing } = buildFixture()
+
+    render(<Box3OptimizerClient sections={[]} standing={standing} hasPartner={false} />)
+
+    expect(screen.getByText(/geen scenario dat je Box 3-heffing verlaagt/i)).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Bespreek .* met Fin/i })).toBeTruthy()
+    // Geen groene bedragen: de netto-effect-as ontbreekt volledig.
+    expect(screen.queryByText('Netto effect per jaar')).toBeNull()
+  })
+
+  it('toont zonder topkans geen badge, wél de Fin-fallback', () => {
+    const { baseline, shift, standing } = buildFixture()
+
+    render(
+      <Box3OptimizerClient
+        sections={[box3Section('box3-minimaal', baseline, [shift], shift)]}
+        topChoice={null}
+        standing={standing}
+        hasPartner={false}
+      />,
+    )
+
     expect(screen.queryByText('grootste kans')).toBeNull()
+    expect(screen.getByRole('button', { name: /Bespreek .* met Fin/i })).toBeTruthy()
+  })
+})
+
+describe('Box3OptimizerClient — katern IV: voetnoten', () => {
+  it('sluit af met aannames, methode, binnenkort en geen-advies', () => {
+    const { baseline, shift, standing } = buildFixture()
+    const preview: GoalSection = {
+      kind: 'preview',
+      goalId: 'levenslang-minimaal',
+      goal: GOAL_BY_ID['levenslang-minimaal'],
+      previewNote: 'Straks vergelijkt TriFinity de onttrekkingsvolgordes.',
+    }
+
+    render(
+      <Box3OptimizerClient
+        sections={[box3Section('box3-minimaal', baseline, [shift], shift), preview]}
+        standing={standing}
+        hasPartner={false}
+      />,
+    )
+
+    expect(screen.getByText('Aannames')).toBeTruthy()
+    expect(screen.getByText('Methode')).toBeTruthy()
+    expect(screen.getByText('Binnenkort')).toBeTruthy()
+    expect(screen.getByText('Geen advies')).toBeTruthy()
+    expect(screen.getByText(/onttrekkingsvolgordes/i)).toBeTruthy()
   })
 })
