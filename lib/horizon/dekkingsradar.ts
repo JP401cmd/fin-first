@@ -1,21 +1,29 @@
 /**
- * Dekkingsradar — vijf-assige "haalbaarheid van je plan"-radar voor /toekomst (ronde 3).
+ * Dekkingsradar — vierassige "haalbaarheid van je plan"-radar voor /toekomst.
  *
  * PURE consume-laag: leest UITSLUITEND bestaande, elders berekende grootheden (de
- * unified-projection-rijen uit de horizon-kernel-bridge, de Monte-Carlo-percentielen,
- * het kernel-verkoopmoment, de FIRE-uitkomsten) en zet ze om naar vijf assen met een
- * dekkings-% + stoplichtstatus. GEEN eigen rekenmotor, GEEN financiële constanten —
- * de veilige-onttrekking/belegbaar-per-rij-grondslag komt single-sourced uit
- * `lib/horizon/coverage-strip.ts` (`spendablePortfolio` / `coveragePctForRow`).
+ * unified-projection-rijen uit de horizon-kernel-bridge — het stop-pad wint zodra een
+ * stopleeftijd gezet is — het kernel-verkoopmoment en de FIRE-uitkomsten) en zet ze om
+ * naar vier assen met een dekkings-% + stoplichtstatus. GEEN eigen rekenmotor, GEEN
+ * financiële constanten — de veilige-onttrekking/belegbaar-per-rij-grondslag komt
+ * single-sourced uit `lib/horizon/coverage-strip.ts` (`spendablePortfolio` /
+ * `coveragePctForRow`).
+ *
+ * De vroegere vijfde as (marktrisico, Monte-Carlo-p10 ÷ benodigd) is bewust verwijderd
+ * tot er een solide, doelscenario-consistente bron is: de lichte MC-run draaide op de
+ * basis-grondslag (zonder stopkeuze/draaiknoppen) en `requiredFirePortfolio` is bij een
+ * geforceerde stop geen doelbedrag maar de stand op dat moment — de ratio verloor zijn
+ * betekenis zodra een stop gezet was.
  *
  * "Grove eerste versie" (bewust): de wonen- en eindstrategie-assen zijn eerste,
  * expliciet gedocumenteerde definities (zie de per-as JSDoc). De i-teksten in de UI
- * benoemen dat. Een as die niet bepaalbaar is levert `pct: null` (+ `status: null`) met
- * een `detail` dat uitlegt waarom.
+ * benoemen dat. Een as die écht niet bepaalbaar is levert `pct: null` (+ `status: null`)
+ * met een `detail` dat uitlegt waarom — de UI toont die reden inline. Waar "niet van
+ * toepassing" inhoudelijk "volledig gedekt" betekent (geen brugperiode, geen eigen
+ * brug-behoefte) levert de as bewust 100 mét uitleg, geen kaal streepje.
  */
 
 import type { UnifiedProjectionRow } from '@/lib/unified-projection'
-import type { MonteCarloResult } from '@/lib/horizon-data'
 import type { HousingStrategyConfig, HousingStrategyTrigger } from '@/lib/housing-strategy'
 import type { KernelHousingSale } from '@/lib/horizon-kernel/bridge'
 import type { FireEndStrategy } from '@/lib/fire-strategy'
@@ -37,8 +45,8 @@ const WONEN_GEEN_VERKOOP_PCT = 100
 const WONEN_GEPLANDE_VERKOOP_PCT = 95
 const WONEN_NOODVERKOOP_PCT = 85
 
-/** Eindstrategie-as: clamp-bovengrens en bonus/malus per jaar restbesteding (presentatie). */
-const EINDSTRATEGIE_PCT_MAX = 200
+/** Presentatie-cap voor ratio-assen (brug/eindstrategie): uitschieters boven 200% zeggen niets extra's. */
+const RADAR_PCT_MAX = 200
 const EINDSTRATEGIE_DEPLETE_PUNTEN_PER_JAAR = 10
 
 /** Assleutel van de radar. */
@@ -46,14 +54,13 @@ export type RadarAsKey =
   | 'brug-tot-aow'
   | 'pensioeninkomen'
   | 'wonen'
-  | 'marktrisico'
   | 'eindstrategie'
 
 /** Eén as van de dekkingsradar. */
 export interface RadarAs {
   key: RadarAsKey
   label: string
-  /** Dekkings-% (ruw, niet altijd geclampt — zie per-as); `null` = niet bepaalbaar. */
+  /** Dekkings-% (afgerond; ratio-assen geclampt op 0–200 — zie per-as); `null` = niet bepaalbaar. */
   pct: number | null
   /** Stoplichtstatus afgeleid van `pct`; `null` wanneer `pct === null`. */
   status: 'rood' | 'amber' | 'groen' | null
@@ -64,7 +71,6 @@ export interface RadarAs {
 /** Invoer voor `computeDekkingsradar` — allemaal elders berekende grootheden. */
 export interface DekkingsradarInput {
   rows: readonly UnifiedProjectionRow[]
-  mcResult?: MonteCarloResult | null
   currentAge: number
   fireAgeFractional: number | null
   aowAgeFractional: number
@@ -112,15 +118,19 @@ function housingTrigger(config: HousingStrategyConfig): HousingStrategyTrigger |
 
 const round = (n: number) => Math.round(n)
 
-/** Bouwt een as met de afgeleide status. */
+/** Bouwt een as met de afgeleide status — op het AFGERONDE percentage, zodat badge-getal
+ *  en stoplichtkleur nooit uiteenlopen (rauw 99,6 toonde eerder "100%" in amber). */
 function as(key: RadarAsKey, label: string, pct: number | null, detail: string): RadarAs {
-  return { key, label, pct: pct === null ? null : round(pct), status: statusFromPct(pct), detail }
+  const rounded = pct === null ? null : round(pct)
+  return { key, label, pct: rounded, status: statusFromPct(rounded), detail }
 }
 
 /**
- * As 1 — BRUG TOT AOW: kan het belegbare vermogen op de FIRE-rij de volledige
- * bestedingsbehoefte (Σ `withdrawalNeed.totaalNeed`) tijdens de brugjaren FIRE→AOW
- * overbruggen? pct = belegbaar@FIRE ÷ Σ-behoefte-brug × 100. Geen brug (FIRE ≥ AOW) → null.
+ * As 1 — BRUG TOT AOW: kan het belegbare vermogen op de stop-/FIRE-rij de volledige
+ * bestedingsbehoefte (Σ `withdrawalNeed.totaalNeed`) tijdens de brugjaren stop→AOW
+ * overbruggen? pct = belegbaar@stop ÷ Σ-behoefte-brug × 100, gecapt op 200 (presentatie).
+ * Geen brugperiode (stop ≥ AOW) of geen eigen brug-behoefte ⇒ er valt niets te
+ * overbruggen ⇒ bewust 100 mét uitleg — alleen "FIRE onbereikbaar" blijft null.
  */
 function axisBrugTotAow(input: DekkingsradarInput): RadarAs {
   const label = 'Brug tot AOW'
@@ -130,50 +140,66 @@ function axisBrugTotAow(input: DekkingsradarInput): RadarAs {
   if (input.rows.length === 0) {
     return as('brug-tot-aow', label, null, 'Geen projectierijen beschikbaar.')
   }
-  if (input.fireAgeFractional >= input.aowAgeFractional) {
-    return as('brug-tot-aow', label, null, 'Geen brug — je bereikt vrijheid op of na je AOW-leeftijd.')
+  const stopAge = input.fireAgeFractional
+  if (stopAge >= input.aowAgeFractional) {
+    return as('brug-tot-aow', label, 100, 'Geen brugperiode — je stopt op of na je AOW-leeftijd, er valt niets te overbruggen.')
   }
-  const pot = spendablePortfolio(nearestRow(input.rows, input.fireAgeFractional))
+  // Leeg brugvenster ≠ "behoefte gedekt": zonder rijen tussen stop en AOW valt er
+  // niets te meten — dat is een échte n.v.t. (null), geen conventie-100.
+  const brugRows = input.rows.filter((r) => r.age >= stopAge && r.age < input.aowAgeFractional)
+  if (brugRows.length === 0) {
+    return as('brug-tot-aow', label, null, 'Geen jaren tussen je stop en je AOW in de projectie.')
+  }
+  const pot = spendablePortfolio(nearestRow(input.rows, stopAge))
   let sumNeed = 0
-  for (const row of input.rows) {
-    if (row.age >= input.fireAgeFractional && row.age < input.aowAgeFractional) {
-      // Bewust de NETTO totaalNeed (partner al afgetrokken): deze as is een pure
-      // pot/behoefte-ratio en crediteert géén salaris-/partnerinkomen in de teller —
-      // anders dan coveragePctForRow, die dat wél doet en dáárom door brutoNeed
-      // (totaalNeed + partnerBijdrage) deelt. "Harmoniseren" naar bruto zou de
-      // partner hier dubbel bestraffen.
-      sumNeed += row.withdrawalNeed?.totaalNeed ?? 0
-    }
+  for (const row of brugRows) {
+    // Bewust de NETTO totaalNeed (partner al afgetrokken): deze as is een pure
+    // pot/behoefte-ratio en crediteert géén salaris-/partnerinkomen in de teller —
+    // anders dan coveragePctForRow, die dat wél doet en dáárom door brutoNeed
+    // (totaalNeed + partnerBijdrage) deelt. "Harmoniseren" naar bruto zou de
+    // partner hier dubbel bestraffen.
+    sumNeed += row.withdrawalNeed?.totaalNeed ?? 0
   }
   if (sumNeed <= 0) {
-    return as('brug-tot-aow', label, null, 'Geen gedefinieerde brug-behoefte in de jaren tot je AOW.')
+    return as('brug-tot-aow', label, 100, 'Geen eigen brug-behoefte — je hebt in de brugjaren geen eigen bestedingsbehoefte (bijvoorbeeld omdat een partnerinkomen ze dekt).')
   }
-  const pct = (pot / sumNeed) * 100
+  const pct = clamp((pot / sumNeed) * 100, 0, RADAR_PCT_MAX)
   return as(
     'brug-tot-aow',
     label,
     pct,
-    `Belegbaar bij vrijheid €${round(pot)} moet de brugjaren tot AOW (behoefte €${round(sumNeed)}) dekken.`,
+    `Belegbaar bij je stop €${round(pot)} moet de brugjaren tot AOW (behoefte €${round(sumNeed)}) dekken.`,
   )
 }
 
 /**
  * As 2 — PENSIOENINKOMEN: hoe goed dekt je vaste inkomen (AOW/pensioen) + een veilige
- * onttrekking je besteding ná de AOW-leeftijd? Gemiddelde `coveragePctForRow` over de
- * post-AOW-rijen (dezelfde dekkingsgraad-formule als de levensinkomenstrook).
+ * onttrekking je besteding in de jaren waarin je écht gestopt bent? Gemiddelde
+ * `coveragePctForRow` (dezelfde dekkingsgraad-formule als de levensinkomenstrook) over
+ * de rijen vanaf max(AOW-leeftijd, stopleeftijd): wie in het doelscenario vóórbij de
+ * AOW doorwerkt, krijgt de werkjaren (accumulation-dekking ≥ 100 door het
+ * spaarquote-effect) niet in het pensioengemiddelde gemengd.
  */
 function axisPensioeninkomen(input: DekkingsradarInput): RadarAs {
   const label = 'Pensioeninkomen'
-  const postAow = input.rows.filter((r) => r.age >= input.aowAgeFractional)
-  if (postAow.length === 0) {
-    return as('pensioeninkomen', label, null, 'Geen jaren ná je AOW-leeftijd in de projectie.')
+  const vanaf = Math.max(input.aowAgeFractional, input.fireAgeFractional ?? Number.NEGATIVE_INFINITY)
+  const naStop = vanaf > input.aowAgeFractional
+  const post = input.rows.filter((r) => r.age >= vanaf)
+  if (post.length === 0) {
+    return as(
+      'pensioeninkomen',
+      label,
+      null,
+      naStop ? 'Geen jaren ná je stopleeftijd in de projectie.' : 'Geen jaren ná je AOW-leeftijd in de projectie.',
+    )
   }
-  const avg = postAow.reduce((s, r) => s + coveragePctForRow(r), 0) / postAow.length
+  const avg = post.reduce((s, r) => s + coveragePctForRow(r), 0) / post.length
+  const venster = naStop ? `stopleeftijd (${round(vanaf)})` : 'AOW-leeftijd'
   return as(
     'pensioeninkomen',
     label,
     avg,
-    `Gemiddeld dekt je pensioeninkomen ${round(avg)}% van je besteding ná je AOW-leeftijd.`,
+    `Gemiddeld dekt je pensioeninkomen ${round(avg)}% van je besteding ná je ${venster}.`,
   )
 }
 
@@ -212,41 +238,7 @@ function axisWonen(input: DekkingsradarInput): RadarAs {
 }
 
 /**
- * As 4 — MARKTRISICO: houdt het plan stand bij tegenwind? p10 (10e-percentiel-vermogen)
- * op de FIRE-leeftijd ÷ benodigd FIRE-vermogen × 100. Zonder Monte-Carlo-overlay niet
- * bepaalbaar (null) — de UI-laag regelt een eigen lichte MC-run; deze helper blijft puur.
- */
-function axisMarktrisico(input: DekkingsradarInput): RadarAs {
-  const label = 'Marktrisico'
-  if (!input.mcResult) {
-    return as('marktrisico', label, null, 'Zet de Monte-Carlo-overlay aan om het marktrisico te meten.')
-  }
-  if (input.fireAgeFractional === null) {
-    return as('marktrisico', label, null, 'FIRE-leeftijd onbekend — marktrisico niet te plaatsen.')
-  }
-  if (input.requiredFirePortfolio <= 0) {
-    return as('marktrisico', label, null, 'Geen benodigd FIRE-vermogen bekend.')
-  }
-  const p10 = input.mcResult.percentiles.p10
-  if (p10.length === 0) {
-    return as('marktrisico', label, null, 'Monte-Carlo-percentielen ontbreken.')
-  }
-  const rawIdx = Math.round(input.fireAgeFractional - input.currentAge)
-  const clamped = rawIdx < 0 || rawIdx > p10.length - 1
-  const idx = clamp(rawIdx, 0, p10.length - 1)
-  const p10AtFire = p10[idx] ?? 0
-  const pct = (p10AtFire / input.requiredFirePortfolio) * 100
-  const rand = clamped ? ' (FIRE-leeftijd buiten de Monte-Carlo-horizon — geklemd op de rand.)' : ''
-  return as(
-    'marktrisico',
-    label,
-    pct,
-    `Bij tegenwind (10e-percentiel) is er op je vrijheidsleeftijd €${round(p10AtFire)} t.o.v. het doel van €${round(input.requiredFirePortfolio)}.${rand}`,
-  )
-}
-
-/**
- * As 5 — EINDSTRATEGIE (GROVE EERSTE VERSIE): haalt het plan zijn eind-doel?
+ * As 4 — EINDSTRATEGIE (GROVE EERSTE VERSIE): haalt het plan zijn eind-doel?
  *  - `deplete` (opeten): eindvermogen ≥ 0 → 100+ (bonus naar rato van resterende jaren
  *    besteding); tekort → <100 naar rato van het tekort (±10 punten per jaar besteding).
  *  - anders (legacy/perpetual/pensioen): eindvermogen ÷ doel-eindvermogen × 100; zonder
@@ -265,7 +257,7 @@ function axisEindstrategie(input: DekkingsradarInput): RadarAs {
   if (input.endStrategy === 'deplete') {
     const base = Math.max(input.jaarBesteding, 1)
     const jarenOver = eind / base
-    const pct = clamp(100 + jarenOver * EINDSTRATEGIE_DEPLETE_PUNTEN_PER_JAAR, 0, EINDSTRATEGIE_PCT_MAX)
+    const pct = clamp(100 + jarenOver * EINDSTRATEGIE_DEPLETE_PUNTEN_PER_JAAR, 0, RADAR_PCT_MAX)
     const detail =
       eind >= 0
         ? `Opeten-strategie: aan het eind blijft €${round(eind)} over (≈ ${jarenOver.toFixed(1)} jaar besteding).`
@@ -274,7 +266,7 @@ function axisEindstrategie(input: DekkingsradarInput): RadarAs {
   }
 
   if (input.targetEndPortfolio != null && input.targetEndPortfolio > 0) {
-    const pct = clamp((eind / input.targetEndPortfolio) * 100, 0, EINDSTRATEGIE_PCT_MAX)
+    const pct = clamp((eind / input.targetEndPortfolio) * 100, 0, RADAR_PCT_MAX)
     return as(
       'eindstrategie',
       label,
@@ -285,7 +277,7 @@ function axisEindstrategie(input: DekkingsradarInput): RadarAs {
 
   // Perpetual/behoud (of geen positief doel): pot moet behouden blijven.
   const base = Math.max(input.requiredFirePortfolio, 1)
-  const pct = clamp((eind / base) * 100, 0, EINDSTRATEGIE_PCT_MAX)
+  const pct = clamp((eind / base) * 100, 0, RADAR_PCT_MAX)
   return as(
     'eindstrategie',
     label,
@@ -295,15 +287,14 @@ function axisEindstrategie(input: DekkingsradarInput): RadarAs {
 }
 
 /**
- * Bouwt de vijf-assige dekkingsradar. Vaste as-volgorde (stabiele UI):
- * brug-tot-aow · pensioeninkomen · wonen · marktrisico · eindstrategie.
+ * Bouwt de vierassige dekkingsradar. Vaste as-volgorde (stabiele UI):
+ * brug-tot-aow · pensioeninkomen · wonen · eindstrategie.
  */
 export function computeDekkingsradar(input: DekkingsradarInput): RadarAs[] {
   return [
     axisBrugTotAow(input),
     axisPensioeninkomen(input),
     axisWonen(input),
-    axisMarktrisico(input),
     axisEindstrategie(input),
   ]
 }

@@ -4,7 +4,6 @@ import type {
   UnifiedProjectionRow,
   WithdrawalNeedBreakdown,
 } from '@/lib/unified-projection'
-import type { MonteCarloResult } from '@/lib/horizon-data'
 import { computeDekkingsradar, type DekkingsradarInput, type RadarAsKey } from './dekkingsradar'
 
 function bucket(endValue: number): AssetBucketDetail {
@@ -52,7 +51,6 @@ function makeRow(age: number, extra: Partial<UnifiedProjectionRow> = {}): Unifie
 function baseInput(over: Partial<DekkingsradarInput> = {}): DekkingsradarInput {
   return {
     rows: [],
-    mcResult: null,
     currentAge: 40,
     fireAgeFractional: 55,
     aowAgeFractional: 67,
@@ -70,13 +68,12 @@ function baseInput(over: Partial<DekkingsradarInput> = {}): DekkingsradarInput {
 const ax = (radar: ReturnType<typeof computeDekkingsradar>, key: RadarAsKey) => radar.find((a) => a.key === key)!
 
 describe('computeDekkingsradar — vorm', () => {
-  it('levert altijd 5 assen in vaste volgorde', () => {
+  it('levert altijd 4 assen in vaste volgorde (marktrisico verwijderd tot er een solide bron is)', () => {
     const radar = computeDekkingsradar(baseInput())
     expect(radar.map((a) => a.key)).toEqual([
       'brug-tot-aow',
       'pensioeninkomen',
       'wonen',
-      'marktrisico',
       'eindstrategie',
     ])
   })
@@ -97,16 +94,43 @@ describe('as: brug-tot-aow', () => {
     expect(a.status).toBe('groen')
   })
 
-  it('FIRE ≥ AOW → geen brug (null)', () => {
+  it('stop op/na AOW → geen brugperiode nodig → 100 (groen) met uitleg', () => {
+    // Given een stopleeftijd op of ná de AOW-leeftijd, When de as berekend wordt,
+    // Then is er niets te overbruggen → volledig gedekt (100), niet "niet bepaalbaar".
     const a = ax(computeDekkingsradar(baseInput({ rows: [makeRow(68)], fireAgeFractional: 68, aowAgeFractional: 67 })), 'brug-tot-aow')
-    expect(a.pct).toBeNull()
-    expect(a.status).toBeNull()
-    expect(a.detail).toMatch(/geen brug/i)
+    expect(a.pct).toBe(100)
+    expect(a.status).toBe('groen')
+    expect(a.detail).toMatch(/geen brugperiode/i)
   })
 
-  it('FIRE onbereikbaar (null) → null', () => {
+  it('geen eigen brug-behoefte (Σ totaalNeed ≤ 0, bv. partner dekt alles) → 100 met uitleg', () => {
+    const rows = [makeRow(55, { withdrawalNeed: need(0) }), makeRow(60, { withdrawalNeed: need(0) })]
+    const a = ax(computeDekkingsradar(baseInput({ rows, fireAgeFractional: 55, aowAgeFractional: 67 })), 'brug-tot-aow')
+    expect(a.pct).toBe(100)
+    expect(a.status).toBe('groen')
+    expect(a.detail).toMatch(/brug-behoefte/i)
+  })
+
+  it('uitschieter wordt op 200 gecapt (presentatie, zoals eindstrategie)', () => {
+    // Eén brugjaar met kleine behoefte en een grote pot → rauwe ratio ~1300%.
+    const rows = [makeRow(66, { assetBuckets: { investment: bucket(260_000) }, withdrawalNeed: need(20_000) })]
+    const a = ax(computeDekkingsradar(baseInput({ rows, fireAgeFractional: 66, aowAgeFractional: 67 })), 'brug-tot-aow')
+    expect(a.pct).toBe(200)
+    expect(a.status).toBe('groen')
+  })
+
+  it('FIRE onbereikbaar (null) → null, mét reden in detail', () => {
     const a = ax(computeDekkingsradar(baseInput({ rows: [makeRow(60)], fireAgeFractional: null })), 'brug-tot-aow')
     expect(a.pct).toBeNull()
+    expect(a.detail).toMatch(/niet bereikbaar/i)
+  })
+
+  it('leeg brugvenster (geen rijen tussen stop en AOW) → null, géén vals groen 100', () => {
+    // Given alleen rijen buiten [stop, AOW), When de as berekend wordt, Then valt er
+    // niets te meten — dat is n.v.t. mét reden, niet "behoefte gedekt".
+    const a = ax(computeDekkingsradar(baseInput({ rows: [makeRow(70)], fireAgeFractional: 55, aowAgeFractional: 67 })), 'brug-tot-aow')
+    expect(a.pct).toBeNull()
+    expect(a.detail).toMatch(/geen jaren tussen/i)
   })
 })
 
@@ -132,6 +156,38 @@ describe('as: pensioeninkomen', () => {
   it('geen post-AOW-rijen → null', () => {
     const a = ax(computeDekkingsradar(baseInput({ rows: [makeRow(60)], aowAgeFractional: 67 })), 'pensioeninkomen')
     expect(a.pct).toBeNull()
+  })
+
+  it('stop ná AOW → venster start op de stopleeftijd; werkjaren tellen niet mee', () => {
+    // Given een doelscenario met stop 75 (> AOW 67), When de as berekend wordt,
+    // Then middelt hij alléén de rijen vanaf 75 — de accumulation-rijen 67–74
+    // (dekking ≥ 100 door het spaarquote-effect) vertekenen het pensioenbeeld niet.
+    const rows = [
+      makeRow(70, { phase: 'accumulation', grossIncome: 60_000, savings: 20_000 }), // dekking 150
+      makeRow(76, { withdrawalNeed: need(30_000), grossIncomeBySource: { salaris: 0, gebeurtenisBaten: 21_000 } }), // dekking 70
+    ]
+    const a = ax(computeDekkingsradar(baseInput({ rows, fireAgeFractional: 75, aowAgeFractional: 67 })), 'pensioeninkomen')
+    expect(a.pct).toBe(70)
+    expect(a.status).toBe('rood')
+    expect(a.detail).toMatch(/stopleeftijd/i)
+  })
+
+  it('stop ná AOW zonder rijen ná de stop → null met reden', () => {
+    const rows = [makeRow(70, { phase: 'accumulation', grossIncome: 60_000, savings: 20_000 })]
+    const a = ax(computeDekkingsradar(baseInput({ rows, fireAgeFractional: 75, aowAgeFractional: 67 })), 'pensioeninkomen')
+    expect(a.pct).toBeNull()
+  })
+
+  it('status volgt het afgeronde percentage (99,5 → "100%" → groen, geen amber-100)', () => {
+    // Twee rijen met dekking 100 en 99 → rauw gemiddelde 99,5; de badge toont het
+    // afgeronde "100%", dus de status moet daar ook bij horen (groen).
+    const rows = [
+      makeRow(67, { withdrawalNeed: need(30_000), grossIncomeBySource: { salaris: 0, gebeurtenisBaten: 30_000 } }),
+      makeRow(70, { withdrawalNeed: need(30_000), grossIncomeBySource: { salaris: 0, gebeurtenisBaten: 29_700 } }),
+    ]
+    const a = ax(computeDekkingsradar(baseInput({ rows, aowAgeFractional: 67 })), 'pensioeninkomen')
+    expect(a.pct).toBe(100)
+    expect(a.status).toBe('groen')
   })
 })
 
@@ -166,42 +222,6 @@ describe('as: wonen', () => {
     })), 'wonen')
     expect(a.pct).toBe(85)
     expect(a.detail).toMatch(/afgedwongen/i)
-  })
-})
-
-describe('as: marktrisico', () => {
-  it('geen Monte-Carlo → null met hint', () => {
-    const a = ax(computeDekkingsradar(baseInput({ mcResult: null })), 'marktrisico')
-    expect(a.pct).toBeNull()
-    expect(a.detail).toMatch(/monte-carlo-overlay aan/i)
-  })
-
-  it('happy — p10@FIRE ÷ benodigd × 100', () => {
-    const p10 = Array.from({ length: 41 }, (_, i) => i * 20_000) // idx 15 = 300k
-    const mc: MonteCarloResult = {
-      simulations: 1000,
-      years: 40,
-      percentiles: { p10, p25: p10, p50: p10, p75: p10, p90: p10 },
-      fireAges: [],
-      fireProb: 0,
-      p10FireAge: null,
-      p50FireAge: null,
-      p90FireAge: null,
-    }
-    // currentAge 40, fireAge 55 → idx 15 → p10 300k ÷ 250k = 120% → groen.
-    const a = ax(computeDekkingsradar(baseInput({ mcResult: mc, currentAge: 40, fireAgeFractional: 55, requiredFirePortfolio: 250_000 })), 'marktrisico')
-    expect(a.pct).toBe(120)
-    expect(a.status).toBe('groen')
-  })
-
-  it('requiredFirePortfolio 0 → null', () => {
-    const p10 = [100_000]
-    const mc: MonteCarloResult = {
-      simulations: 1, years: 0, percentiles: { p10, p25: p10, p50: p10, p75: p10, p90: p10 },
-      fireAges: [], fireProb: 0, p10FireAge: null, p50FireAge: null, p90FireAge: null,
-    }
-    const a = ax(computeDekkingsradar(baseInput({ mcResult: mc, requiredFirePortfolio: 0 })), 'marktrisico')
-    expect(a.pct).toBeNull()
   })
 })
 

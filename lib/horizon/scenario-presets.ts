@@ -36,7 +36,7 @@ import {
 } from '@/lib/horizon-kernel/convergentie-router'
 import { buildKernelInputFromApp, deriveEigenHuisIds, type KernelAdapterInput } from '@/lib/horizon-kernel/adapter'
 import { evaluateFireAt } from '@/lib/horizon-kernel/solver'
-import { kernelToUnifiedResult, buildKernelSlotMeta } from '@/lib/horizon-kernel/bridge'
+import { kernelToUnifiedResult, buildKernelSlotMeta, type KernelHousingSale } from '@/lib/horizon-kernel/bridge'
 import { DEFAULT_FIRE_STRATEGY } from '@/lib/fire-strategy'
 import { DEFAULT_DOWNSIZE_CONFIG } from '@/lib/housing-strategy'
 import { computeLaagsteBuffer, type LaagsteBuffer } from '@/lib/horizon/laagste-buffer'
@@ -165,6 +165,12 @@ export interface ForcedStopPathInput {
 export interface ForcedStopPathResult {
   result: SimResult
   unifiedRows: UnifiedProjectionRow[]
+  /**
+   * Verkoopmoment eigen woning ín dit stop-pad (of `null`). Meegegeven zodat consumers
+   * (o.a. de Dekkingsradar-wonen-as) het verkoop-verdict uit hetzelfde scenario lezen
+   * als de rijen — de hoofd-run kan een noodverkoop tonen die het stop-pad niet kent.
+   */
+  kernelHousingSale: KernelHousingSale | null
 }
 
 /**
@@ -209,7 +215,11 @@ export function runForcedStopPath(input: ForcedStopPathInput): ForcedStopPathRes
       assetSlotMeta,
       debtSlotMeta,
     })
-    return { result: toSimResult(kernelUnified), unifiedRows: kernelUnified.rows }
+    return {
+      result: toSimResult(kernelUnified),
+      unifiedRows: kernelUnified.rows,
+      kernelHousingSale: kernelUnified.kernelHousingSale ?? null,
+    }
   } catch {
     return null
   }

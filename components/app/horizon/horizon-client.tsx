@@ -249,7 +249,7 @@ interface HouseholdHeroData {
 
 /**
  * Zichtbaarheids-gate (Task 4.2): `true` zodra het gegeven element (bijna) in beeld komt.
- * Gebruikt om de zware duiding-secties (dekkingsradar-MC + scenario-presets) pas te laten
+ * Gebruikt om de zware duiding-secties (scenario-presets) pas te laten
  * rekenen wanneer de gebruiker er (dreigt te) scrollen — niet meer eager in idle. Blijft
  * `true` na de eerste keer (unobserve): een eenmaal-berekende sectie hoeft niet te herrekenen
  * op scroll-terug. SSR-veilig: `IntersectionObserver` ontbreekt server-side → `true`
@@ -397,9 +397,6 @@ export default function HorizonPage({
   // Monte Carlo overlay state
   const [mcExpanded, setMcExpanded] = useState(false)
   const [mcData, setMcData] = useState<MonteCarloResult | null>(null)
-  // Lichte MC-run (500 sims) puur voor de dekkingsradar-marktrisico-as; null zolang de
-  // volledige MC-overlay al draait (mcExpanded) — dan hergebruikt de radar mcData.
-  const [radarMc, setRadarMc] = useState<MonteCarloResult | null>(null)
   // Scenario's-naast-elkaar (5 preset-kaarten) — deferred doorgerekend op de BASIS-grondslag.
   const [scenarioPresets, setScenarioPresets] = useState<ScenarioPresetResult[] | null>(null)
   const [scenarioPresetsLoading, setScenarioPresetsLoading] = useState(false)
@@ -564,7 +561,7 @@ export default function HorizonPage({
       : null,
   )
   const verkenSectionRef = useRef<HTMLElement | null>(null)
-  // Zichtbaarheids-gate voor de zware duiding-secties (dekkingsradar-MC + scenario-presets):
+  // Zichtbaarheids-gate voor de zware duiding-secties (scenario-presets):
   // die rekenen pas via de worker wanneer de "Wat het betekent"-sectie (bijna) in beeld komt
   // (Task 4.2), i.p.v. eager in idle. Ref hangt aan de altijd-gemounte sectie in volledige
   // weergave.
@@ -1517,24 +1514,6 @@ export default function HorizonPage({
     setScenarioStopAge(prev => (prev !== next ? next : prev))
   }, [scenarioVerwachtSettled, scenarioStopKoppel])
 
-  // ── Dekkingsradar: lichte MC-run (500 sims), via de worker bij zichtbaarheid ──────────
-  // Enkel wanneer de volledige weergave actief is, de duiding-sectie (bijna) in beeld komt
-  // (`duidingInView`, Task 4.2) én de zware MC-overlay NIET al draait (dan hergebruikt de
-  // radar-memo `mcData`). Draait via de web worker (of synchrone fallback), niet op de main
-  // thread; opgeruimd bij unmount/dep-wissel.
-  useEffect(() => {
-    if (displayMode !== 'full' || mcData || !duidingInView) { setRadarMc(null); return }
-    if (!effectiveInput || !simResult || currentAge == null) return
-    const years = Math.max(simResult.displayEndAge - currentAge, 10)
-    let cancelled = false
-    runMonteCarloAsync(effectiveInput, 500, years)
-      .then((res) => { if (!cancelled) setRadarMc(res) })
-      .catch((err) => console.warn('[horizon-worker] radar-run faalde', err))
-    return () => { cancelled = true }
-    // effectiveInput is een stabiele state-ref (=input via useState) — muteert alleen bij een
-    // data-herlaad, niet per render, dus geen re-runstorm. Daarmee zijn alle deps compleet.
-  }, [displayMode, mcData, duidingInView, simResult, currentAge, effectiveInput])
-
   // ── Scenario's naast elkaar: 5 preset-kaarten, via de worker bij zichtbaarheid ─────────
   // De context hangt UITSLUITEND van de basis-data af (geen scenario-overrides): profiel +
   // basis-lifeEvents + basis-jaaruitgaven, verwachtFireAge = basis-FIRE. De vijf volle
@@ -2045,22 +2024,25 @@ export default function HorizonPage({
   // de motor óók als permanente uitgavenwijziging telt (`monthly_cost_change` op een vrije
   // Geb-rij). De spaarquote-slider valt daar per 29-jul BUITEN: die is inkomensgebonden en
   // loopt via het FIRE-gegate salaris-kanaal, dus hij verlaagt het FIRE-doelbedrag niet en
-  // mag hier de onttrekkings-bestedingsgrenzen evenmin verlagen (`scenarioMonthlySpendDelta`
+  // mag hier de onttrekkings-bestedingsgrondslag evenmin verlagen (`scenarioMonthlySpendDelta`
   // past dezelfde `isSliderWorkEvent`-gate toe). Basis zonder scenario.
   const activeMonthlySpend =
     (effectiveInput?.monthlyExpenses ?? 0) + (hasScenario ? scenarioMonthlySpendDelta(scenarioSliderEvents) : 0)
-  const guardrailBounds = useMemo(
-    () => computeGuardrailBounds({ plannedMonthlySpend: activeMonthlySpend }),
-    [activeMonthlySpend],
-  )
-  // ── Dekkingsradar-assen (ronde 3) — pure consume-laag over de duiding-rijen ──────
+  // Gelande stopleeftijd van de stop-run — de duiding (radar-assen, subtitle, fasebalk)
+  // leest deze i.p.v. de rauwe slider-state: tijdens het slepen loopt scenarioStopAge vóór
+  // op de deferred stopPad-run, en de duiding hoort bij de rijen die er al stáán (zelfde
+  // les als doel-lijn-bron.ts: alles uit hetzelfde result-object). Fallback op de
+  // slider-stand voor het theoretische geval dat de geforceerde run geen leeftijd meldt.
+  const duidingStopAge = stopPad != null ? (stopPad.result.fireAgeFractional ?? scenarioStopAge) : null
+  // ── Dekkingsradar-assen — pure consume-laag over de duiding-rijen ──────
   // Alle grootheden komen elders vandaan: de duiding-rijen (stop-pad wint), de actieve-pad
-  // FIRE/benodigd-vermogen/doel-eindvermogen, de lichte MC-run (of de volle als die draait),
-  // en de canonieke bestedingsgrondslag (activeMonthlySpend×12, zoals het kompas). null =
-  // nog geen leeftijd/rijen → blok blijft verborgen. Bij een expliciete stop meet de radar
-  // vanaf jouw stopleeftijd: stopPad wint dan óók voor de FIRE-leeftijd (= scenarioStopAge)
-  // en het benodigd-/doel-eindvermogen (uit stopPad.result), zodat de assen bij het gekozen
-  // stopmoment horen i.p.v. bij het verwacht-FIRE-moment.
+  // FIRE/benodigd-vermogen/doel-eindvermogen en de canonieke bestedingsgrondslag
+  // (activeMonthlySpend×12). null = nog geen leeftijd/rijen → blok blijft verborgen.
+  // Bij een expliciete stop meet de radar vanaf jouw stopleeftijd: stopPad wint dan óók
+  // voor de FIRE-leeftijd (= duidingStopAge, de gelande stop-run-leeftijd), het benodigd-/
+  // doel-eindvermogen (uit stopPad.result) én het woning-verkoopmoment — de sale-bron volgt altijd de rijen-bron
+  // (stop-pad → scenario → hoofd-run), anders duidt de wonen-as een noodverkoop uit het
+  // verkeerde scenario.
   const radarAssen = useMemo<RadarAs[] | null>(() => {
     if (currentAge == null) return null
     const rows = duidingUnifiedRows ?? []
@@ -2076,21 +2058,25 @@ export default function HorizonPage({
       : hasScenario && scenario != null
         ? scenario.result.targetEndPortfolio
         : (simResult?.targetEndPortfolio ?? null)
+    const radarHousingSale = stopPad != null
+      ? stopPad.kernelHousingSale
+      : hasScenario && scenario != null
+        ? scenario.kernelHousingSale
+        : kernelHousingSale
     return computeDekkingsradar({
       rows,
-      mcResult: radarMc ?? mcData,
       currentAge,
-      fireAgeFractional: stopPad != null ? scenarioStopAge : scenarioVerwachtFireAge,
+      fireAgeFractional: stopPad != null ? duidingStopAge : scenarioVerwachtFireAge,
       aowAgeFractional: userAowAge.fractional,
       requiredFirePortfolio: requiredFire,
       targetEndPortfolio: targetEnd,
       endStrategy: strat.strategy,
       housingStrategy: initialData.housingStrategy,
       hasEigenHuis: initialData.housingContext.hasEigenHuis,
-      kernelHousingSale,
+      kernelHousingSale: radarHousingSale,
       jaarBesteding: activeMonthlySpend * 12,
     })
-  }, [duidingUnifiedRows, radarMc, mcData, currentAge, scenarioVerwachtFireAge, stopPad, scenarioStopAge, userAowAge.fractional, hasScenario, scenario, simResult, fireStrategy, initialData.housingStrategy, initialData.housingContext.hasEigenHuis, kernelHousingSale, activeMonthlySpend])
+  }, [duidingUnifiedRows, currentAge, scenarioVerwachtFireAge, stopPad, duidingStopAge, userAowAge.fractional, hasScenario, scenario, simResult, fireStrategy, initialData.housingStrategy, initialData.housingContext.hasEigenHuis, kernelHousingSale, activeMonthlySpend])
   // Cijferbar-waarden bij de actieve leeftijd (hover/playback); consumeert de
   // unified-rij + format-helpers, herberekent niets.
   const readoutData = useMemo(() => {
@@ -5247,14 +5233,13 @@ export default function HorizonPage({
       )}
 
       {/* === KATERN III — Wat het betekent ===
-          Eén katern-kaart: SectionLabel + één card-editorial met de vier delen
-          (Levensinkomenstrook / Guardrail-kompas / Dekkingsradar / Scenario's) als
-          interne segmenten, gescheiden door hairlines. Label én kaart renderen zodra
-          ten minste één segment rendert (per-segment-condities blijven ongewijzigd). */}
+          Eén katern-kaart: SectionLabel + één card-editorial met de drie delen
+          (Levensinkomenstrook / Dekkingsradar / Scenario's) als interne segmenten,
+          gescheiden door hairlines. Label én kaart renderen zodra ten minste één
+          segment rendert (per-segment-condities blijven ongewijzigd). */}
       {(() => {
         const heeftKaternIII =
           coverageNodes.length > 0 ||
-          (effectiveInput?.monthlyExpenses ?? 0) > 0 ||
           radarAssen !== null ||
           scenarioPresets !== null ||
           scenarioPresetsLoading
@@ -5284,69 +5269,57 @@ export default function HorizonPage({
                         const first = coverageNodes[0].age
                         const last = coverageNodes[coverageNodes.length - 1].age
                         const span = Math.max(1, last - first)
-                        // Fasegrens = het gekozen stopmoment zodra een expliciete stop gezet is (stopPad),
-                        // zodat de opbouw/brug-grens én de dekkingsdip in de strook op dezelfde leeftijd
-                        // vallen; anders het verwacht-FIRE-moment.
+                        // Fasegrens = het gekozen stopmoment zodra een expliciete stop gezet is —
+                        // de GELANDE stop-run-leeftijd (duidingStopAge), zodat de opbouw/brug-grens
+                        // én de dekkingsdip in de strook bij dezelfde rijen horen; anders het
+                        // verwacht-FIRE-moment.
                         const fire = Math.round(
-                          stopPad != null && scenarioStopAge != null
-                            ? scenarioStopAge
+                          stopPad != null && duidingStopAge != null
+                            ? duidingStopAge
                             : (simResult?.fireAgeFractional ?? simResult?.fireAge ?? first),
                         )
                         const aow = Math.round(userAowAge?.fractional ?? fire)
                         const pct = (a: number) => Math.max(0, Math.min(100, ((a - first) / span) * 100))
+                        // Onttrekking begint pas op max(stop, AOW): wie vóórbij de AOW
+                        // doorwerkt heeft geen brug én nog geen onttrekking — anders
+                        // tellen de segmentbreedtes op tot >100% en spreekt de balk de
+                        // (nog groene) opbouw-stippen 67–74 tegen.
                         const segments = [
                           { label: 'Opbouw', color: 'var(--hor-t, #8a6e42)', widthPct: pct(fire) },
                           { label: 'Brug FIRE → AOW', color: 'var(--color-horizon-500)', widthPct: Math.max(0, pct(aow) - pct(fire)) },
-                          { label: 'Onttrekking', color: 'var(--kern-t, #58362d)', widthPct: Math.max(0, 100 - pct(aow)) },
+                          { label: 'Onttrekking', color: 'var(--kern-t, #58362d)', widthPct: Math.max(0, 100 - pct(Math.max(fire, aow))) },
                         ]
-                        return <LevensinkomenStrook nodes={coverageNodes} activeAge={lifelineAge} segments={segments} />
+                        // 0%-brede fasen niet meegeven: anders toont de legenda een
+                        // "Brug FIRE → AOW"-swatch bij een band die niet bestaat (stop ≥ AOW).
+                        return <LevensinkomenStrook nodes={coverageNodes} activeAge={lifelineAge} segments={segments.filter((s) => s.widthPct > 0)} />
                       })()}
                     </div>
                   )}
 
-                  {/* === 4c. Guardrail-kompas (bestedingsgrenzen) === */}
-                  {(effectiveInput?.monthlyExpenses ?? 0) > 0 && (
-                    <div className="p-4 sm:p-5">
-                      <div className="mb-1">
-                        <Kicker className="mb-1">Guardrail-kompas</Kicker>
-                        <div className="flex items-center gap-2">
-                          <h2 className="font-display text-[14px] font-semibold leading-snug text-[var(--ink)]">Hoeveel kun je veilig uitgeven?</h2>
-                          {hasScenario && !(usePartnerMainLine || useHouseholdMainLine) && <ScenarioChip doelActief={doelActief} onBeforeScroll={() => setVerkenOpen(true)} />}
-                        </div>
-                      </div>
-                      <p className="mb-3 font-sans text-[12px] text-[var(--ink-3)]">
-                        Bij welk maandbedrag je meer of minder kunt uitgeven.
-                      </p>
-                      <GuardrailKompas
-                        levels={{
-                          teWeinig: guardrailBounds.teWeinig,
-                          veilig: guardrailBounds.veilig,
-                          gepland: guardrailBounds.gepland,
-                          meevaller: guardrailBounds.meevaller,
-                        }}
-                        you={guardrailBounds.you}
-                      />
-                    </div>
-                  )}
-
-                  {/* === 4d. Dekkingsradar (vijf dekkingsratio's) === */}
+                  {/* === 4c. Dekkingsradar (vier dekkingsratio's) === */}
                   {radarAssen !== null && (
                     <div className="p-4 sm:p-5">
                       <div className="mb-1">
                         <Kicker className="mb-1">Dekkingsradar</Kicker>
                         <div className="flex items-center gap-2">
                           <h2 className="font-display text-[14px] font-semibold leading-snug text-[var(--ink)]">Hoe stevig staat je plan?</h2>
-                          {hasScenario && !(usePartnerMainLine || useHouseholdMainLine) && <ScenarioChip doelActief={doelActief} onBeforeScroll={() => setVerkenOpen(true)} />}
+                          {(hasScenario || hasStopKeuze) && !(usePartnerMainLine || useHouseholdMainLine) && <ScenarioChip doelActief={doelActief} hasScenario={hasScenario} onBeforeScroll={() => setVerkenOpen(true)} />}
                         </div>
                       </div>
+                      {/* De grondslag hoort in beeld: op wélk scenario (en welke stopleeftijd) rekenen
+                          deze assen? Zelfde gelande bron als de assen zelf (duidingStopAge). */}
                       <p className="mb-3 font-sans text-[12px] text-[var(--ink-3)]">
-                        Vijf dekkingsratio&apos;s — op elk front.
+                        {stopPad != null && duidingStopAge != null
+                          ? `Vier dekkingsratio’s — gerekend op je doelscenario: stoppen op ${formatAge(duidingStopAge)} jr.`
+                          : scenarioVerwachtFireAge != null
+                            ? `Vier dekkingsratio’s — gerekend op je verwachte pad (vrij rond ${formatAge(scenarioVerwachtFireAge)} jr).`
+                            : 'Vier dekkingsratio’s — op elk front.'}
                       </p>
                       <Dekkingsradar assen={radarAssen} />
                     </div>
                   )}
 
-                  {/* === 4e. Scenario's naast elkaar (5 preset-kaarten, tegen je basispad) === */}
+                  {/* === 4d. Scenario's naast elkaar (5 preset-kaarten, tegen je basispad) === */}
                   {(scenarioPresets !== null || scenarioPresetsLoading) && (
                     <div className="p-4 sm:p-5">
                       <div className="mb-1">

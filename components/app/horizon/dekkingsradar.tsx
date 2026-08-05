@@ -1,12 +1,13 @@
 'use client'
 
 /**
- * Dekkingsradar — vijf-assige "haalbaarheid van je plan"-radar voor /toekomst (ronde 3, ⑦).
+ * Dekkingsradar — vierassige "haalbaarheid van je plan"-radar voor /toekomst.
  *
  * Presentational blok (INHOUD van een card-editorial; kicker+H2-kop levert de wiring
- * in horizon-client, net als GuardrailKompas/LevensinkomenStrook). Links een SVG-radar
- * (pentagoon, 5 assen), rechts de dimensielijst met stoplicht-badges + een cap-regel die
- * de zwakste bepaalbare as benoemt. De vijf assen worden ELDERS berekend
+ * in horizon-client, net als LevensinkomenStrook). Links een SVG-radar
+ * (4 assen), rechts de dimensielijst met stoplicht-badges + een cap-regel die
+ * de zwakste bepaalbare as benoemt; een as zonder waarde toont zijn reden inline.
+ * De assen worden ELDERS berekend
  * (`lib/horizon/dekkingsradar.ts#computeDekkingsradar`) en als prop doorgegeven.
  *
  * Kleur-conventie: de radarvulling is NEUTRAAL (ink-tint, lage opacity) — de
@@ -22,7 +23,7 @@ import { InlineInfoDisclosure } from '@/components/editorial'
 const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
 
 export interface DekkingsradarProps {
-  /** De vijf assen (berekend in lib/horizon/dekkingsradar.ts). */
+  /** De assen (berekend in lib/horizon/dekkingsradar.ts). */
   assen: RadarAs[]
 }
 
@@ -33,7 +34,7 @@ const MAX_RADIUS = 78
 const SHAPE_MAX_PCT = 150
 const RING_LEVELS = [50, 100, 150] as const
 
-/** Hoek (graden) van as i: bovenaan starten, met de klok mee (5 assen → 72° per stap). */
+/** Hoek (graden) van as i: bovenaan starten, met de klok mee (360° ÷ aantal assen per stap). */
 function axisAngleDeg(i: number, count: number): number {
   return -90 + (i * 360) / count
 }
@@ -70,13 +71,11 @@ const BADGE_TINT: Record<NonNullable<RadarAs['status']>, string> = {
 /** Per-as definitie voor de i-uitleg (eerlijk over de grove eerste-versie-keuzes). */
 const AXIS_DEFINITIES: Record<RadarAsKey, string> = {
   'brug-tot-aow':
-    'belegbaar vermogen op de FIRE-rij ÷ som van de bestedingsbehoefte over de brugjaren (FIRE→AOW).',
+    'belegbaar vermogen op je stopmoment ÷ som van de bestedingsbehoefte over de brugjaren (stop→AOW). Geen brugperiode of geen eigen brug-behoefte: 100% (er valt niets te overbruggen).',
   pensioeninkomen:
-    'gemiddelde dekkingsgraad (vaste inkomsten + veilige onttrekking ÷ besteding) over de jaren vanaf AOW.',
+    'gemiddelde dekkingsgraad (vaste inkomsten + veilige onttrekking ÷ besteding) over de jaren vanaf je AOW-leeftijd — of vanaf je stopleeftijd als die later ligt (werkjaren tellen niet mee).',
   wonen:
     'eerste versie op strategie-niveau — geen huis: n.v.t.; huis zonder geplande verkoop: 100%; geplande downsize: 95%; verkoop afgedwongen door de liquide stand: 85%.',
-  marktrisico:
-    'het 10e-percentiel-vermogen (Monte-Carlo) op je FIRE-leeftijd ÷ je benodigde FIRE-vermogen. Zonder MC-data: n.v.t.',
   eindstrategie:
     'verwacht eindvermogen t.o.v. je eind-doel (bij interen: is er aan het eind nog over) — let op: gerekend op je volledige netto vermogen inclusief woning.',
 }
@@ -108,14 +107,14 @@ export function Dekkingsradar({ assen }: DekkingsradarProps) {
     <div ref={ref}>
       <InlineInfoDisclosure label="Uitleg dekkingsradar">
         <div className="mb-1.5 font-semibold text-[var(--ink)]" style={{ fontFamily: PLAYFAIR }}>
-          Hoe de vijf percentages ontstaan
+          Hoe de percentages ontstaan
         </div>
         <p className="m-0 mb-2">
           elke as = behaald ÷ benodigd × 100%.{' '}
           <b className="text-emerald-700">≥100 groen</b> ·{' '}
           <b className="text-amber-700">90–99 amber</b> ·{' '}
           <b className="text-red-700">&lt;90 rood</b>. Een as die niet bepaalbaar is toont
-          &ldquo;–&rdquo;.
+          &ldquo;–&rdquo; met de reden eronder.
         </p>
         <ul className="m-0 list-none space-y-1.5 p-0">
           {assen.map((a) => (
@@ -127,7 +126,7 @@ export function Dekkingsradar({ assen }: DekkingsradarProps) {
       </InlineInfoDisclosure>
 
       <div className="flex flex-col gap-6 md:flex-row md:items-center md:gap-8">
-        {/* Links — SVG-radar (pentagoon) */}
+        {/* Links — SVG-radar (ruit, 4 assen) */}
         <div className="mx-auto w-full max-w-[260px] shrink-0 md:mx-0 md:w-[260px]">
           <svg
             viewBox="0 0 200 200"
@@ -208,33 +207,48 @@ export function Dekkingsradar({ assen }: DekkingsradarProps) {
             {assen.map((a) => (
               <li
                 key={a.key}
-                className="flex items-center justify-between gap-3 border-b border-[var(--border-ed)] py-2.5 last:border-b-0"
+                className="border-b border-[var(--border-ed)] py-2.5 last:border-b-0"
               >
-                <span className="min-w-0 truncate text-[13.5px] text-[var(--ink)]">{a.label}</span>
-                {a.status === null ? (
-                  <span
-                    className="shrink-0 text-[13px] font-semibold tabular-nums text-[var(--ink-4)]"
-                    aria-label={`${a.label}: niet bepaalbaar`}
-                  >
-                    –
-                  </span>
-                ) : (
-                  <span
-                    className={`shrink-0 rounded-full border px-2 py-0.5 text-[12px] font-semibold tabular-nums ${BADGE_TINT[a.status]}`}
-                  >
-                    {a.pct}%
-                  </span>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="min-w-0 truncate text-[13.5px] text-[var(--ink)]">{a.label}</span>
+                  {a.status === null ? (
+                    <span
+                      className="shrink-0 text-[13px] font-semibold tabular-nums text-[var(--ink-4)]"
+                      aria-label={`${a.label}: niet bepaalbaar`}
+                    >
+                      –
+                    </span>
+                  ) : (
+                    <span
+                      className={`shrink-0 rounded-full border px-2 py-0.5 text-[12px] font-semibold tabular-nums ${BADGE_TINT[a.status]}`}
+                    >
+                      {a.pct}%
+                    </span>
+                  )}
+                </div>
+                {/* Niet bepaalbaar? De reden hoort in beeld, niet verstopt achter de i. */}
+                {a.status === null && (
+                  <p className="m-0 mt-1 text-[12px] leading-snug text-[var(--ink-4)]">{a.detail}</p>
                 )}
               </li>
             ))}
           </ul>
 
+          {/* Cap-regel: benoem de zwakste as alléén als er echt iets knelt (< 100%) —
+              een conventie-100 ("geen brugperiode") tot zwakste plek kronen leest als
+              een probleem dat er niet is. */}
           {zwakste && (
             <p className="mt-3 text-[12.5px] leading-relaxed text-[var(--ink-3)]">
-              <b className="text-[var(--ink)]">
-                {zwakste.label} ({zwakste.pct}%)
-              </b>{' '}
-              is de zwakste plek — {zwakste.detail}
+              {(zwakste.pct as number) < 100 ? (
+                <>
+                  <b className="text-[var(--ink)]">
+                    {zwakste.label} ({zwakste.pct}%)
+                  </b>{' '}
+                  is de zwakste plek — {zwakste.detail}
+                </>
+              ) : (
+                <>Alle bepaalbare assen zijn volledig gedekt (≥ 100%).</>
+              )}
             </p>
           )}
         </div>

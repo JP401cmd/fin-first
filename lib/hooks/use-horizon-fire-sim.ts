@@ -62,6 +62,10 @@ export interface HorizonScenarioOverrides {
 export interface HorizonScenarioResult {
   result: SimResult
   unifiedRows: UnifiedProjectionRow[]
+  /** Verkoopmoment eigen woning ín deze scenario-run (of `null`) — zelfde contract als
+   *  `ForcedStopPathResult.kernelHousingSale`, zodat duiding-consumers (Dekkingsradar)
+   *  het verkoop-verdict uit dezelfde run lezen als de rijen. */
+  kernelHousingSale: KernelHousingSale | null
 }
 
 /**
@@ -494,6 +498,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
     return {
       result: toSimResult(outcome.result),
       unifiedRows: outcome.result.rows,
+      kernelHousingSale: outcome.result.kernelHousingSale ?? null,
     }
   }, [runSyncKernel, deferredKernelInput, deferredScenarioOverrides])
 
@@ -589,7 +594,13 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
     runKernelAsync(rawContext).then((outcome) => {
       if (cancelled || reqId !== scenarioReqIdRef.current) return
       setAsyncScenario(
-        outcome.ok ? { result: toSimResult(outcome.result), unifiedRows: outcome.result.rows } : null,
+        outcome.ok
+          ? {
+              result: toSimResult(outcome.result),
+              unifiedRows: outcome.result.rows,
+              kernelHousingSale: outcome.result.kernelHousingSale ?? null,
+            }
+          : null,
       )
     })
     return () => { cancelled = true }
