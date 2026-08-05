@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { isSuperAdmin } from '@/lib/admin'
-import { WIDGET_PRESETS, type WidgetPreset } from '@/lib/widget-presets'
+import { WIDGET_PRESETS, sanitizeStoredPresets, type WidgetPreset } from '@/lib/widget-presets'
 import { WIDGET_CATALOG } from '@/lib/widget-catalog'
 import { unauthorized, forbidden, serverError } from '@/lib/api/respond'
 
@@ -40,13 +40,18 @@ export async function GET() {
         // Use stored name/description/icon but fall back to hardcoded widgets
         // if stored widgets array is empty (admin may have only edited metadata)
         const hardcodedMap = new Map(WIDGET_PRESETS.map(p => [p.id, p]))
-        presets = parsed.map((stored: WidgetPreset) => {
+        const merged = parsed.map((stored: WidgetPreset) => {
           const hardcoded = hardcodedMap.get(stored.id)
           if (hardcoded && (!stored.widgets || stored.widgets.length === 0)) {
             return { ...stored, widgets: hardcoded.widgets }
           }
           return stored
         })
+        // Filter wees-ids van inmiddels verwijderde widgets uit de opgeslagen
+        // blob. Zonder dit toont de beheer-UI de kale id en laat het dashboard
+        // het slot stilzwijgend vallen — de gebruiker krijgt dan minder
+        // widgets dan het getoonde aantal. Zie sanitizeStoredPresets().
+        presets = sanitizeStoredPresets(merged)
       }
     } catch {
       // use hardcoded defaults on parse error

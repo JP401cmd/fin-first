@@ -19,9 +19,9 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { WIDGET_CATALOG, type WidgetModule, type WidgetSize, getWidgetDef } from '@/lib/widget-catalog'
-import type { WidgetPreset } from '@/lib/widget-presets'
+import { isKnownPresetWidgetId, type WidgetPreset } from '@/lib/widget-presets'
 import type { WidgetPref } from '@/lib/widget-catalog'
-import { Pencil, GripVertical, X, Plus, ChevronDown } from 'lucide-react'
+import { Pencil, GripVertical, X, Plus, ChevronDown, AlertTriangle } from 'lucide-react'
 
 const MODULE_COLORS: Record<WidgetModule, { border: string; bg: string; text: string }> = {
   kern:    { border: 'border-amber-300', bg: 'bg-amber-50', text: 'text-amber-700' },
@@ -151,6 +151,10 @@ function SortableWidgetItem({
   }
 
   const def = getWidgetDef(widget.id)
+  // Wees-id: staat niet in WIDGET_CATALOG én is geen dynamische favoriet.
+  // De GET-route filtert deze normaal al weg; dit is het vangnet zodat een
+  // onbekende widget nooit meer als kale id zonder uitleg blijft staan.
+  const isUnknown = !isKnownPresetWidgetId(widget.id)
   const allowed = def?.sizes ?? (['quarter', 'half', 'full'] as WidgetSize[])
   const sizeOptions: { key: WidgetSize; label: string }[] = [
     { key: 'quarter', label: 'S' },
@@ -179,9 +183,18 @@ function SortableWidgetItem({
         <GripVertical className="h-3.5 w-3.5" />
       </button>
 
-      {/* Widget name */}
+      {/* Widget name — bij een onbekend id de id tonen mét waarschuwing,
+          zodat de beheerder ziet dat deze regel niet op het dashboard rendert */}
       <span className="min-w-0 flex-1 truncate">
-        {widgetNames.get(widget.id) ?? widget.id}
+        {isUnknown ? (
+          <span className="inline-flex items-center gap-1 text-negative">
+            <AlertTriangle className="h-3 w-3 shrink-0" aria-hidden="true" />
+            <span className="truncate font-mono">{widget.id}</span>
+            <span className="shrink-0 font-sans">— onbekende widget, wordt niet getoond</span>
+          </span>
+        ) : (
+          widgetNames.get(widget.id) ?? widget.id
+        )}
       </span>
 
       {/* Order badge */}
