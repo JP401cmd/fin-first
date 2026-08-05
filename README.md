@@ -14,7 +14,7 @@ onafhankelijkheid.
 
 ## Vereisten
 
-- **Node.js 20+** en npm
+- **Node.js 24** (zie `.nvmrc`; ook de runtime op Vercel) en npm
 - **Supabase CLI** (`npx supabase …` werkt zonder globale install)
 - Een **Supabase-project** (cloud) *of* een lokale stack via `npx supabase start` (vereist Docker)
 

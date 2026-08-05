@@ -14,15 +14,15 @@ echo "=========================================="
 
 # Check Node.js
 if ! command -v node &> /dev/null; then
-    echo "ERROR: Node.js is not installed. Please install Node.js 20+ first."
+    echo "ERROR: Node.js is not installed. Please install Node.js 24 (see .nvmrc) first."
     exit 1
 fi
 
 NODE_VERSION=$(node -v | cut -d'v' -f2 | cut -d'.' -f1)
 echo "Node.js version: $(node -v)"
 
-if [ "$NODE_VERSION" -lt 18 ]; then
-    echo "ERROR: Node.js 18+ required. Current: $(node -v)"
+if [ "$NODE_VERSION" -lt 24 ]; then
+    echo "ERROR: Node.js 24+ required (see .nvmrc). Current: $(node -v)"
     exit 1
 fi
 
