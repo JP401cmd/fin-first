@@ -43,6 +43,11 @@ import {
   type FutureCashflow,
   type MonteCarloResult,
 } from '@/lib/horizon-data'
+import {
+  runVariantenSweep,
+  type VariantenSweepResultaat,
+  type VariantenSweepSnapshot,
+} from '@/lib/tax-lifetime/varianten-sweep'
 
 /**
  * Eén reken-verzoek aan de kernel-worker. `id` multiplext parallelle runs
@@ -55,6 +60,13 @@ export type KernelWorkerRequest =
   | { readonly id: number; readonly kind: 'projection'; readonly rawContext: ConvergentieRawContext }
   | { readonly id: number; readonly kind: 'stoppad'; readonly input: ForcedStopPathInput }
   | { readonly id: number; readonly kind: 'presets'; readonly ctx: ScenarioPresetContext }
+  /**
+   * Fiscale variantensweep (Fase 3): DRIE kernel-solves + de levenslange
+   * belastingreeks erbovenop. Bewust één request i.p.v. drie `projection`-requests:
+   * zo blijft de ranking-logica bij de solves én kruist alleen de compacte uitkomst
+   * de `postMessage`-grens — niet 3 × ~50 vette `UnifiedProjectionRow`s.
+   */
+  | { readonly id: number; readonly kind: 'taxvarianten'; readonly snapshot: VariantenSweepSnapshot }
   | {
       readonly id: number
       readonly kind: 'mc'
@@ -71,6 +83,7 @@ export type KernelWorkerResponse =
   | { readonly id: number; readonly ok: true; readonly kind: 'projection'; readonly result: ConvergentieProjectionOutcome }
   | { readonly id: number; readonly ok: true; readonly kind: 'stoppad'; readonly result: ForcedStopPathResult | null }
   | { readonly id: number; readonly ok: true; readonly kind: 'presets'; readonly result: ScenarioPresetResult[] }
+  | { readonly id: number; readonly ok: true; readonly kind: 'taxvarianten'; readonly result: VariantenSweepResultaat }
   | { readonly id: number; readonly ok: true; readonly kind: 'mc'; readonly result: MonteCarloResult }
   | { readonly id: number; readonly ok: false; readonly error: string }
 
@@ -96,6 +109,13 @@ export function executeKernelRequest(req: KernelWorkerRequest): KernelWorkerResp
         return { id: req.id, ok: true, kind: 'stoppad', result: runForcedStopPath(req.input) }
       case 'presets':
         return { id: req.id, ok: true, kind: 'presets', result: runScenarioPresets(req.ctx) }
+      case 'taxvarianten':
+        return {
+          id: req.id,
+          ok: true,
+          kind: 'taxvarianten',
+          result: runVariantenSweep(req.snapshot),
+        }
       case 'mc':
         return {
           id: req.id,

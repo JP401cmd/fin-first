@@ -38,6 +38,10 @@ import type {
   ScenarioPresetResult,
 } from '@/lib/horizon/scenario-presets'
 import type { FinancialInput, FutureCashflow, MonteCarloResult } from '@/lib/horizon-data'
+import type {
+  VariantenSweepResultaat,
+  VariantenSweepSnapshot,
+} from '@/lib/tax-lifetime/varianten-sweep'
 
 /**
  * Is een echte `Worker` beschikbaar? False in jsdom (tests) en tijdens SSR
@@ -168,6 +172,23 @@ export async function runScenarioPresetsAsync(
   const res = await dispatch({ id: claimId(), kind: 'presets', ctx })
   if (res.ok && res.kind === 'presets') return res.result
   return []
+}
+
+/**
+ * Fiscale variantensweep (3 kernel-solves) via de worker, of — als er geen worker
+ * is (jsdom/SSR/oude runtime) — synchroon via dezelfde dispatch.
+ *
+ * `null` bij een onverwachte response-vorm. BEWUST géén synchroon-herberekenen-
+ * vangnet zoals `runKernelAsync`: dat zou drie solves alsnog op de main thread
+ * zetten. De aanroeper toont dan zijn foutstaat en de gebruiker kan het opnieuw
+ * vragen — de sweep zit sowieso achter een expliciete actie.
+ */
+export async function runVariantenSweepAsync(
+  snapshot: VariantenSweepSnapshot,
+): Promise<VariantenSweepResultaat | null> {
+  const res = await dispatch({ id: claimId(), kind: 'taxvarianten', snapshot })
+  if (res.ok && res.kind === 'taxvarianten') return res.result
+  return null
 }
 
 /** Monte-Carlo (radar/overlay) via de worker (of synchrone fallback). */
