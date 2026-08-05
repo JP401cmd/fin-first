@@ -52,9 +52,16 @@ export function StepType({ intent, onSelect }: StepTypeProps) {
 
   return (
     <>
+      {/*
+        Gelabelde knoppengroep — bewust `role="group"` en GEEN `role="list"`.
+        Een `role="listitem"` op de tegels zou de impliciete "button"-rol
+        overschrijven (AT kondigt dan een niet-interactief lijstitem aan), en
+        `role="list"` zonder listitem-kinderen is een kapotte lijst. Dit is een
+        keuzegrid van knoppen, geen leeslijst.
+      */}
       <div
         className="grid grid-cols-2 gap-2.5 sm:grid-cols-3"
-        role="list"
+        role="group"
         aria-label={
           intent === 'asset' ? 'Kies een type bezitting' : 'Kies een type schuld'
         }
@@ -63,7 +70,6 @@ export function StepType({ intent, onSelect }: StepTypeProps) {
           <button
             key={row.type}
             type="button"
-            role="listitem"
             onClick={() => onSelect(row.type)}
             className="group relative flex min-h-[88px] flex-col items-start gap-2 border border-[var(--border-ed)] bg-[var(--paper)] p-3.5 pl-4 text-left transition-all hover:-translate-y-px hover:border-[var(--ink-3)] hover:shadow-[var(--s1)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
           >

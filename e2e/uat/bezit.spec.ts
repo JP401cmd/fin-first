@@ -62,13 +62,13 @@ test.describe('UAT-BEZIT-05 — Bezitting toevoegen (QuickAdd-wizard)', () => {
     // opent direct op de type-keuze, geen "bezit of schuld"-stap).
     await page.getByRole('button', { name: 'Bezitting toevoegen' }).click()
 
-    // TODO test-id: components/app/quick-add-wizard/steps/step-type.tsx
-    // zet bewust `role="listitem"` op elke `<button>` (stap 63-68) — dat
-    // OVERSCHRIJFT de impliciete "button"-rol in de a11y-tree. Een
-    // `getByRole('button', { name: 'Spaargeld' })` matcht dus NIETS; de
-    // juiste rol is "listitem". Een `data-testid="asset-type-savings"`
-    // zou deze rol-verrassing voor toekomstige tests wegnemen.
-    await page.getByRole('listitem', { name: 'Spaargeld' }).click()
+    // TODO test-id: de type-tegels in
+    // components/app/quick-add-wizard/steps/step-type.tsx zijn gewone
+    // `<button>`s binnen een `role="group"` (het foutieve `role="listitem"`
+    // dat de button-rol overschreef is verwijderd). De locator hangt nu nog
+    // aan de zichtbare label-tekst; een `data-testid="asset-type-savings"`
+    // zou 'm ongevoelig maken voor copy-wijzigingen.
+    await page.getByRole('button', { name: 'Spaargeld' }).click()
 
     // step-details.tsx: "Naam" en "Huidige waarde" zijn correct met
     // <label htmlFor>/<input id> gekoppeld (regel 295-360) — getByLabel
