@@ -90,11 +90,13 @@ export function ChartStaticLayersInner({
     mainStrokeAcc,
     mainStrokeDec,
     bridgeStroke,
+    liquidStroke,
     baselinePath,
     accPath,
     decPath,
     bridgePath,
     withdrawalPath,
+    liquidPath,
     allPath,
     scenarioPaths,
     householdPaths,
@@ -108,12 +110,26 @@ export function ChartStaticLayersInner({
   const accOpacity = emphasis === null || emphasis === 'accumulation' || emphasis === 'fire' ? 1 : DIMMED
   const decOpacity = emphasis === null || emphasis === 'withdrawal' ? 1 : DIMMED
 
-  // Bij de dubbele-woning-grondslag (fireTargetInclHome gezet) tekenen we ALLEEN
-  // de incl.-woninglijn. De excl./liquide-lijn (`fireTarget` = requiredFirePortfolio)
-  // valt weg: de hoofdlijn plot het totale netto vermogen (incl. huis), dus een
-  // liquide-drempel op diezelfde as voegt niets toe en geeft alleen ruis. Het
-  // excl.-getal blijft wél in het KPI-blok staan — enkel de grafiek-lijn verdwijnt.
-  const showExclTargetLine = fireTargetInclHome == null || fireTargetInclHome <= 0
+  // Elke lijn hoort bij precies één drempel.
+  //
+  // Zónder besteedbaar-lijn plot de grafiek alléén het totale netto vermogen
+  // (incl. huis). Een liquide-drempel (`fireTarget` = requiredFirePortfolio,
+  // Prognose!J) hoort dan bij geen enkele getekende lijn en geeft alleen ruis —
+  // vandaar dat 'ie bij de dubbele-woning-grondslag wegvalt ten gunste van de
+  // incl.-woninglijn (`fireTargetInclHome`, Prognose!I).
+  //
+  // MÉT besteedbaar-lijn (`liquidPath`) ligt dat om: er staan dan twee lijnen op
+  // twee grondslagen, dus horen er ook twee drempels bij. Onderdrukken we de
+  // J-drempel dan, dan vergelijkt de gebruiker de besteedbaar-lijn (J) met de
+  // enige zichtbare drempel (I) — precies de grondslagvermenging die CLAUDE.md
+  // verbiedt, nu op de marker in plaats van op de as.
+  const showExclTargetLine =
+    fireTargetInclHome == null || fireTargetInclHome <= 0 || liquidPath != null
+  // Zodra er twee lijnen op twee grondslagen staan is "doel" te vaag: benoem
+  // expliciet bij welke lijn de drempel hoort, in hetzelfde woordpaar als de
+  // legenda, de tooltip en de doel-KPI's ("met je huis" / "zonder je huis").
+  // Eén lijn ⇒ één grondslag ⇒ het korte "doel" blijft.
+  const exclTargetLabel = liquidPath != null ? 'doel zonder je huis' : 'doel'
 
   return (
     <>
@@ -141,10 +157,10 @@ export function ChartStaticLayersInner({
           fill="var(--ink-4)" fontFamily="var(--font-dm-mono, monospace)">{age}</text>
       ))}
 
-      {/* FIRE doelbedrag — horizontale dashed lijn (hidden in pensioen mode).
-          Alleen in NIET-dual-modus: bij de dubbele-woning-grondslag vervalt deze
-          liquide-lijn (zie `showExclTargetLine` hierboven) en blijft enkel de
-          incl.-woninglijn over. */}
+      {/* FIRE doelbedrag (liquide/besteedbaar, Prognose!J) — horizontale dashed
+          lijn (hidden in pensioen mode). Verschijnt zodra er géén incl.-woning-
+          drempel is, óf zodra de besteedbaar-lijn getekend wordt: die lijn heeft
+          deze drempel nodig (zie `showExclTargetLine` hierboven). */}
       {!isPensioenMode && showExclTargetLine && fireTarget != null && fireTarget > 0 && (
         <>
           <line
@@ -157,7 +173,7 @@ export function ChartStaticLayersInner({
             fontSize={8} fill="var(--hor-t, #8a6e42)" textAnchor="end"
             fontFamily="var(--font-inter, sans-serif)" fontWeight={600}
           >
-            doel
+            {exclTargetLabel}
           </text>
           <text
             x={PAD.left + innerW - 2} y={PAD.top + yScale(fireTarget) - 1}
@@ -187,7 +203,7 @@ export function ChartStaticLayersInner({
             fontSize={8} fill="var(--hor-t, #8a6e42)" textAnchor="end"
             fontFamily="var(--font-inter, sans-serif)" fontWeight={600}
           >
-            doel incl. woning
+            doel met je huis
           </text>
           <text
             x={PAD.left + innerW - 2} y={PAD.top + yScale(fireTargetInclHome) - 1}
@@ -486,6 +502,30 @@ export function ChartStaticLayersInner({
             )}
           </g>
         )
+      )}
+
+      {/* Besteedbaar (liquide) vermogen — tweede grondslag naast de hoofdlijn.
+          Bewust ACHTER de hoofdlijn en dunner/gestippeld: de totaallijn blijft de
+          dominante lijn, deze toont het deel waar je écht bij kunt.
+          GESTIPPELD ("2 3"), niet gestreept: de horizontale doellijnen zijn óók
+          bruin-gestreept ("6 3") en de besteedbaar-lijn loopt op het post-FIRE-
+          plateau vlak, dus vlak langs die drempels. Een punt-ritme leest daar
+          onmiskenbaar anders dan een streep-ritme, óók zonder kleurwaarneming.
+          Reveal via opacity-fade i.p.v. het canonieke pathLength/strokeDasharray="1"-
+          reveal: één strokeDasharray-attribuut kan niet én de reveal-lengte én het
+          zichtbare stipje zijn (zelfde reden als de wat-als-lijn hierboven). */}
+      {liquidPath && (
+        <path
+          d={liquidPath}
+          fill="none"
+          stroke={liquidStroke}
+          strokeWidth={1.8}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeDasharray="2 3"
+          opacity={hasEntered ? 0.9 : 0}
+          style={{ transition: hasEntered ? 'opacity 0.6s ease 0.3s' : 'none' }}
+        />
       )}
 
       {/* Accumulation path — horizon goud */}

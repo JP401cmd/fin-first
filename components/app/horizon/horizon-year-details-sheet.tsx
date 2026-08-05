@@ -46,7 +46,9 @@ import {
   DEBT_TYPE_LABELS,
   DEBT_TYPE_COLORS,
   type Debt,
+  type DebtType,
 } from '@/lib/debt-data'
+import { syntheticDebtDescriptor } from '@/lib/horizon/synthetic-debts'
 import type { LifeEvent } from '@/lib/horizon-data'
 import type { SimCashflow, SimRow } from '@/lib/fire-simulation'
 import type {
@@ -379,8 +381,19 @@ function AssetTypeRow({
 }
 
 /** Eén schuld-rij — toont eindsaldo + rente/aflossing dat jaar. */
+/**
+ * Presentatie-vorm van één schuldregel. Bewust NIET `Debt`: de rij kan ook een
+ * synthetische modelpot zijn (tekort-lening/opeethypotheek) zonder databaserij.
+ * `debtType` dient hier uitsluitend voor icoon + kleur.
+ */
+export interface DebtRowPresentation {
+  name: string
+  typeLabel: string
+  debtType: DebtType
+}
+
 function DebtRow({
-  debt,
+  presentation,
   endBalance,
   interestPaid,
   principalPaid,
@@ -388,7 +401,7 @@ function DebtRow({
   currentAge,
   inflation,
 }: {
-  debt: Debt
+  presentation: DebtRowPresentation
   endBalance: number
   interestPaid: number
   principalPaid: number
@@ -402,19 +415,19 @@ function DebtRow({
       <div className="flex min-w-0 items-start gap-2.5">
         <span
           className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
-          style={{ backgroundColor: `color-mix(in oklch, ${DEBT_TYPE_COLORS[debt.debt_type]} 18%, transparent)` }}
+          style={{ backgroundColor: `color-mix(in oklch, ${DEBT_TYPE_COLORS[presentation.debtType]} 18%, transparent)` }}
           aria-hidden="true"
         >
-          <span style={{ color: DEBT_TYPE_COLORS[debt.debt_type] }}>
-            {renderLucideIcon(DEBT_TYPE_ICONS[debt.debt_type], { size: 12 })}
+          <span style={{ color: DEBT_TYPE_COLORS[presentation.debtType] }}>
+            {renderLucideIcon(DEBT_TYPE_ICONS[presentation.debtType], { size: 12 })}
           </span>
         </span>
         <div className="min-w-0">
           <p className="truncate text-[13px] font-semibold text-[var(--ink)]">
-            {debt.name || DEBT_TYPE_LABELS[debt.debt_type]}
+            {presentation.name}
           </p>
           <p className="mt-0.5 text-[10px] uppercase tracking-wider text-[var(--ink-4)]">
-            {DEBT_TYPE_LABELS[debt.debt_type]}
+            {presentation.typeLabel}
           </p>
           {(principalPaid > 0 || interestPaid > 0) && (
             <p className="mt-1 text-[10px] text-[var(--ink-3)]">
@@ -634,17 +647,60 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
   }, [row])
 
   // ── Debt-rijen: alleen actief in dit jaar (saldo of aflossing/rente > 0) ─
+  //
+  // Dit is een KASSABON: de sectiekop toont `row.totalDebts` en de regels eronder
+  // moeten daarmee reconciliëren. `debtBalances` bevat naast echte `Debt`-ids ook
+  // SYNTHETISCHE modelpotten ('tekort-lening', 'opeethypotheek') die geen
+  // databaserij hebben. Die eruit filteren gaf een kop van €1,12 mln boven een
+  // lijst waarin dat bedrag nergens voorkwam — dus renderen we ze mee, met het
+  // label uit de gedeelde map (`lib/horizon/synthetic-debts.ts`).
   const debtsById = useMemo(() => new Map(debts.map(d => [d.id, d])), [debts])
   const debtRows = useMemo(() => {
     if (!row) return []
     return Object.entries(row.debtBalances)
-      .map(([id, detail]) => ({ id, detail, debt: debtsById.get(id) }))
-      .filter(({ detail, debt }) =>
-        debt != null &&
+      .map(([id, detail]) => {
+        const debt = debtsById.get(id)
+        const synthetic = syntheticDebtDescriptor(id)
+        const presentation: DebtRowPresentation | null = debt
+          ? {
+              name: debt.name || DEBT_TYPE_LABELS[debt.debt_type],
+              typeLabel: DEBT_TYPE_LABELS[debt.debt_type],
+              debtType: debt.debt_type,
+            }
+          : synthetic
+            ? { name: synthetic.name, typeLabel: synthetic.typeLabel, debtType: synthetic.debtType }
+            : null
+        return { id, detail, presentation }
+      })
+      .filter(({ detail, presentation }) =>
+        presentation != null &&
         (Math.abs(detail.endBalance) >= 0.5 ||
           Math.abs(detail.principalPaid) >= 0.5 ||
           Math.abs(detail.interestPaid) >= 0.5),
-      ) as Array<{ id: string; detail: UnifiedProjectionRow['debtBalances'][string]; debt: Debt }>
+      ) as Array<{
+        id: string
+        detail: UnifiedProjectionRow['debtBalances'][string]
+        presentation: DebtRowPresentation
+      }>
+  }, [row, debtsById])
+
+  // Sluitregel voor sleutels die we NIET thuis kunnen brengen: geen `Debt`-rij én
+  // geen bekende modelpot. Vandaag hoort dat €0 te zijn, maar een derde
+  // synthetische pot die aan `SYNTHETIC_DEBT_LABELS` wordt vergeten mag nooit meer
+  // stil uit de lijst verdwijnen — dan verschijnt hij als benoemde restregel in
+  // plaats van als gat tussen kop en regels. Bewust gerekend uit de ONBEKENDE
+  // entries, niet uit `totalDebts − Σ getoond`: dat laatste zou ook afgaan op een
+  // verschil tussen kop-totaal en potten, en dat is een rekenmotor-eigenschap —
+  // niet iets wat deze weergave hoort te maskeren met een restpost.
+  // Drempel gelijk aan de ruisfilter hierboven, zodat afrondingscenten niets doen.
+  const debtRest = useMemo(() => {
+    if (!row) return 0
+    let unresolved = 0
+    for (const [id, detail] of Object.entries(row.debtBalances)) {
+      if (debtsById.has(id) || syntheticDebtDescriptor(id) != null) continue
+      unresolved += detail.endBalance
+    }
+    return Math.abs(unresolved) >= 0.5 ? unresolved : 0
   }, [row, debtsById])
 
   // ── Gebeurtenissen voor dit jaar (life events + AOW apart) ──────
@@ -838,7 +894,7 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
             </section>
 
             {/* ── Sectie 2: Schulden ───────────────────────────── */}
-            {debtRows.length > 0 && (
+            {(debtRows.length > 0 || debtRest !== 0) && (
               <section>
                 <SectionHead
                   label="Schulden"
@@ -851,10 +907,10 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
                   }
                 />
                 <ul className="mt-1">
-                  {debtRows.map(({ id, detail, debt }) => (
+                  {debtRows.map(({ id, detail, presentation }) => (
                     <DebtRow
                       key={id}
-                      debt={debt}
+                      presentation={presentation}
                       endBalance={detail.endBalance}
                       interestPaid={detail.interestPaid}
                       principalPaid={detail.principalPaid}
@@ -863,6 +919,17 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
                       inflation={inflationRate}
                     />
                   ))}
+                  {debtRest !== 0 && (
+                    <DebtRow
+                      presentation={{ name: 'Overige schulden', typeLabel: 'Overig', debtType: 'other' }}
+                      endBalance={debtRest}
+                      interestPaid={0}
+                      principalPaid={0}
+                      age={age!}
+                      currentAge={currentAge}
+                      inflation={inflationRate}
+                    />
+                  )}
                 </ul>
               </section>
             )}

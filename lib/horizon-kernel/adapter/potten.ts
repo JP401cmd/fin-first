@@ -6,12 +6,13 @@
  * mapping (categorie, Box 3-type, investering-vlag, getypte rollen) gebeurt HIER.
  *
  * ## Getypte rollen i.p.v. posities (contract)
- * De kern lokaliseert het eigen huis, de hypotheek en de tekort-lening via
- * `pot.rol` (niet via een vaste positie) — zie `engine.ts`/`tables/*`. Maar de
- * fysieke `slot`-index is wél betekenisdragend: `Bez` schrijft `slots[pot.slot]` en
- * `S` leest `potBySlot(slot)`. De adapter kent daarom vaste fysieke slots toe die het
+ * De kern lokaliseert het eigen huis, de hypotheek, de opeethypotheek en de
+ * tekort-lening via `pot.rol` (niet via een vaste positie) — zie `engine.ts`/`tables/*`.
+ * Maar de fysieke `slot`-index is wél betekenisdragend: `Bez` schrijft `slots[pot.slot]`
+ * en `S` leest `potBySlot(slot)`. De adapter kent daarom vaste fysieke slots toe die het
  * Excel-contract spiegelen (`Controle!K8/K9`): huis = slot 2, hypotheek = slot 0,
- * opeethypotheek = slot 3 (gereserveerd), tekort-lening = slot 6.
+ * opeethypotheek = slot 3 (alléén bij woning-strategie 'Opeethypotheek'),
+ * tekort-lening = slot 6.
  *
  * ## Fysieke slot-capaciteit (snede 2b: ontgrensd)
  * Bezittingen zijn effectief **onbeperkt**: `Bez` adresseert per `pot.slot` en sommeert
@@ -38,6 +39,7 @@ import type {
   DebtPot,
   DebtRol,
   PotLiquidatie,
+  WoningStrategieParams,
 } from '../types'
 import { HORIZON_MONTHS } from '../types'
 import type { EventMappingNotice } from './events'
@@ -45,7 +47,7 @@ import type { EventMappingNotice } from './events'
 // ── Gereserveerde fysieke slots (spiegel Excel-contract) ─────────────────────────
 const HOUSE_SLOT = 2 // bens rij 6 — eigen huis (rol 'eigenHuis')
 const HYPOTHEEK_SLOT = 0 // bens rij 17 — hypotheek (rol 'hypotheek')
-const OPEET_SLOT = 3 // bens rij 20 — opeethypotheek (gereserveerd, niet in deze snede gevuld)
+const OPEET_SLOT = 3 // bens rij 20 — opeethypotheek (rol 'opeethypotheek', alleen in opeet-modus)
 const TEKORT_SLOT = 6 // bens rij 23 — tekort-lening (rol 'tekortLening', altijd aanwezig)
 
 // ── Categorie-mapping (compile-time totaal-dekkend via Record) ────────────────────
@@ -334,17 +336,40 @@ export function assignDebtSlots(
 }
 
 /**
- * Schulden → `DebtPot[]` + de altijd-aanwezige tekort-lening. De eerste actieve
- * hypotheek die aan een eigen huis is gekoppeld (`linked_asset_id`) krijgt slot 0 +
- * rol 'hypotheek'; overige schulden vullen 1/2/4/5 (slot 3 = opeet gereserveerd,
- * 6 = tekort). De tekort-lening bestaat altijd: rol 'tekortLening', startsaldo 0,
- * rente = `tekortLeningRente` (V7). `startwaarde` = `current_balance × inclusion_pct`
- * (V6); `aflossingEur` = geplande jaaraflossing (× inclusion_pct).
+ * Weergavenaam van de synthetische opeethypotheek-pot. Spiegelt de fixture-naam
+ * (`bens!A20` = "Opeethypotheek (auto — P!B57)") zonder de Excel-celverwijzing.
+ */
+const OPEET_POT_NAAM = 'Opeethypotheek'
+
+/**
+ * Schulden → `DebtPot[]` + de altijd-aanwezige tekort-lening (+ de opeethypotheek in
+ * de opeet-modus). De eerste actieve hypotheek die aan een eigen huis is gekoppeld
+ * (`linked_asset_id`) krijgt slot 0 + rol 'hypotheek'; overige schulden vullen 1/2/4/5
+ * (slot 3 = opeet, 6 = tekort). De tekort-lening bestaat altijd: rol 'tekortLening',
+ * startsaldo 0, rente = `tekortLeningRente` (V7). `startwaarde` = `current_balance ×
+ * inclusion_pct` (V6); `aflossingEur` = geplande jaaraflossing (× inclusion_pct).
+ *
+ * ## Opeethypotheek-pot (slot 3) — waarom die hier hoort
+ * `woning` is het reeds-gebouwde kern-woningblok (`params.ts#buildWoning`, dus één
+ * `parseHousingStrategy`-parse voor de hele adapter). Bij selector 'Opeethypotheek'
+ * krijgt slot 3 een pot met rol 'opeethypotheek' — precies wat `tables/s.ts` nodig
+ * heeft om die slot te evolueren (`pot?.rol === 'opeethypotheek' && opeetMode`).
+ * ZONDER die pot bleef S!P structureel 0, terwijl `bridge.ts` de maandopname (Bez!BE)
+ * wél als kasstroom boekte: de schuld verscheen nooit, de leen-cap in de BE-formule
+ * (`MAX(0, BD/(1+rente/12) − S!P(m−1))`) knelde nooit en de opeethypotheek gedroeg
+ * zich als gratis geld. Vorm exact gespiegeld op het oracle-fixture
+ * (`huis-opeethypotheek`, bens rij 20: startsaldo 0, geen aflossing, rente = P!B66,
+ * niet-liquide, géén payoff-vrijval, categorie 'Woning' / 'Geen Box 3 schuld'), zodat
+ * app- en oracle-pad dezelfde pot-vorm voeden.
+ *
+ * In elke andere woning-modus wordt slot 3 NIET gevuld → `DebtPot[]` byte-identiek aan
+ * vóór deze fix.
  */
 export function buildSchuldPotten(
   debts: readonly Debt[],
   eigenHuisIds: ReadonlySet<string>,
   tekortLeningRente: number,
+  woning: WoningStrategieParams,
 ): DebtPot[] {
   const pots: DebtPot[] = []
   for (const { debt: d, slot, isHypotheek } of assignDebtSlots(debts, eigenHuisIds)) {
@@ -363,6 +388,23 @@ export function buildSchuldPotten(
       liquide: false, // schulden zijn niet-liquide bezit; de kern gebruikt dit niet als toewijsdoel
       inSparenNaAflossing: mapInSparenNaAflossing(d),
       rol,
+    })
+  }
+
+  // Opeethypotheek op slot 3 (contract), alléén in de opeet-modus (zie functie-doc).
+  if (woning.selector === 'Opeethypotheek') {
+    pots.push({
+      slot: OPEET_SLOT,
+      naam: OPEET_POT_NAAM,
+      box3Type: 'Geen Box 3 schuld', // bens!F20 — eigenwoningschuld, dus box 1
+      categorie: 'Woning', // bens!I20
+      startwaarde: 0, // bens!B20 — de schuld ontstaat pas bij de eerste opname
+      aflossingPct: 0, // bens!C20 — aflossingsvrij (rente stapelt op het saldo)
+      aflossingEur: 0, // bens!D20
+      rente: woning.opeetRentePerJaar, // bens!E20 = P!B66
+      liquide: false, // bens!G20 = 'nee'
+      inSparenNaAflossing: false, // bens!H20 = 'Nee'
+      rol: 'opeethypotheek',
     })
   }
 

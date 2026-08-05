@@ -67,6 +67,8 @@ import type {
 import type { SolveFireResult, SolverStatus } from './solver'
 import type { KernelProjection } from './engine'
 import { computeEs, type EindstrategieCode } from './tables/es'
+import type { GebPostHelpers } from './tables/geb'
+import { inflationIndex } from './scaffold'
 import type { AssetCategorie, KernelInput } from './types'
 import { assignAssetSlots, assignDebtSlots } from './adapter/potten'
 
@@ -79,6 +81,16 @@ const ASSET_ORDER: readonly AssetCategorie[] = [
   'Eigen huis',
   'Overig',
 ]
+
+/** Index van de kern-categorie 'Pensioen' binnen `ASSET_ORDER` (= Verdeling-volgorde). */
+const PENSIOEN_CAT_INDEX = ASSET_ORDER.indexOf('Pensioen')
+
+// ── Geb-rijtoewijzing voor de Box 1-stromen (structuur.md / tables/geb.ts) ──────
+/** Geb rij 14 — AOW (netto binnengekomen; `NL_AOW_MONTHLY` is een netto SVB-bedrag). */
+const GEB_ROW_AOW = 14
+/** Geb rij 15-20 — pensioen-multipot (bruto, in de kernel-cashflow onbelast geboekt). */
+const GEB_ROW_PENSIOEN_FIRST = 15
+const GEB_ROW_PENSIOEN_LAST = 20
 
 /**
  * Representatief app-`AssetType` per kern-categorie — de INVERSE van
@@ -258,6 +270,50 @@ function buildSlotGroups(ctx: KernelBridgeContext): SlotGroups {
   }
 }
 
+// ── Box 1-stroom-posten (weergave; één keer per bridge-run verzameld) ────────
+
+/**
+ * De Geb-posten die CF!H voedt, gesplitst naar AOW (rij 14) en pensioen
+ * (rij 15-20). Puur een SUB-SELECTIE van dezelfde posten-verzameling die
+ * `engine.ts#buildGebPosten` aan CF meegeeft — geen tweede afleiding: de
+ * bedragen/vensters komen ongewijzigd uit `proj.gebAutoRows` en worden met exact
+ * de CF!H-conditie (`bedrag > 0 && sIdx ≤ m ≤ eIdx`) en dezelfde inflatie-index
+ * verbruikt. Alleen weergave; geen rekeninput.
+ */
+interface Box1GebPosts {
+  readonly aow: readonly GebPostHelpers[]
+  readonly pensioen: readonly GebPostHelpers[]
+}
+
+function collectBox1GebPosts(proj: KernelProjection): Box1GebPosts {
+  const aow: GebPostHelpers[] = []
+  const pensioen: GebPostHelpers[] = []
+  for (const row of proj.gebAutoRows) {
+    const target =
+      row.gebRow === GEB_ROW_AOW
+        ? aow
+        : row.gebRow >= GEB_ROW_PENSIOEN_FIRST && row.gebRow <= GEB_ROW_PENSIOEN_LAST
+          ? pensioen
+          : null
+    if (target === null) continue
+    // CF!H telt alléén de POSITIEVE posten (baten); negatieve posten zijn kosten
+    // en lopen via Af!D. Lege posten dragen bn=0 en vallen hier dus ook af.
+    for (const h of row.helpers) if (h.bn > 0) target.push(h)
+  }
+  return { aow, pensioen }
+}
+
+/**
+ * Σ koopkracht-nu-bedrag van de in maand m ACTIEVE posten — de CF!H-conditie
+ * (`sIdx ≤ m ≤ eIdx`) vóór de ×idx-indexatie. Optellen-dan-indexeren spiegelt
+ * de volgorde in `computeCF` (`baten` opgeteld, daarna `× idx`).
+ */
+function activeGebSum(posts: readonly GebPostHelpers[], m: number): number {
+  let sum = 0
+  for (const p of posts) if (p.sIdx <= m && m <= p.eIdx) sum += p.bn
+  return sum
+}
+
 // ── Per-blok aggregatie ──────────────────────────────────────────────────────
 
 /** Voeg een deel-bedrag toe aan de bucket van `type` (maakt de bucket zo nodig aan). */
@@ -294,6 +350,7 @@ function buildRow(
   lastInHorizonMonth: number,
   fireMonth: number,
   cumBox3Prev: number,
+  box1Posts: Box1GebPosts,
 ): UnifiedProjectionRow {
   const { input } = ctx
   const startAge = Math.round(input.startLeeftijd)
@@ -316,6 +373,10 @@ function buildRow(
   const totalAssets = endProg && !endProg.beyondHorizon ? endProg.totaalBezittingen : 0
   const totalDebts = endProg && !endProg.beyondHorizon ? endProg.totaalSchulden : 0
   const netWorth = endProg && !endProg.beyondHorizon ? endProg.nettoVermogen : 0
+  // Prognose!J op dezelfde blok-eindmaand als netWorth (Prognose!I) — de LIQUIDE
+  // grondslag die `requiredFirePortfolio` (= J@FIRE) ook gebruikt. Doorgeleid, niet
+  // herberekend: geen eigen "netto vermogen − niet-liquide"-som in een consument.
+  const nettoLiquide = endProg && !endProg.beyondHorizon ? endProg.nettoLiquide : 0
 
   // ── Per-bucket start/end (waarde op blok-randen) ───────────────────────────
   for (const slot of groups.assetSlots) {
@@ -355,6 +416,16 @@ function buildRow(
   const opeetMode = input.woning.selector === 'Opeethypotheek'
   let opeetOpname = 0
   let opeetCap = 0
+  // Box 1-stromen (read-only weergaveveld, spread-gated): de deelstromen waaruit
+  // een Box 1-RAPPORTAGE NAAST de projectie haar grondslag opbouwt. Jaar-sommen,
+  // nominaal. AOW/pensioen komen uit dezelfde Geb-posten × idx die CF!H optelt;
+  // de pensioen-onttrekking uit de Verdeling-eindtoewijzing op categorie
+  // 'Pensioen'; de partner-baten uit PT!K. GEEN van deze vier voedt een pot-
+  // mutatie — de kern-trajectorie is onaangeroerd (oracle-parity intact).
+  let box1AowNetto = 0
+  let box1PensioenUitkeringBruto = 0
+  let box1PensioenOnttrekkingBruto = 0
+  let box1PartnerBatenNetto = 0
 
   for (let m = monthStart; m <= monthEnd; m++) {
     const bez = proj.bez[m]
@@ -387,6 +458,11 @@ function buildRow(
         const bedrag = verdeling.onttrekking.eind[i] ?? 0
         if (bedrag <= 0) continue
         withdrawal += bedrag
+        // Box 1-weergave: de onttrekking uit de kern-categorie 'Pensioen' is de
+        // enige onttrekkings-tak die (bruto) Box 1-inkomen vormt; hier direct
+        // afgetakt zodat de consument 'm niet uit `withdrawalByType` (app-type-
+        // gesleuteld, meta-afhankelijk) hoeft te reconstrueren.
+        if (i === PENSIOEN_CAT_INDEX) box1PensioenOnttrekkingBruto += bedrag
         distributeWithdrawal(withdrawalByType, groups, proj, m, ASSET_ORDER[i], bedrag)
       }
     }
@@ -413,6 +489,18 @@ function buildRow(
     if (cf !== undefined && !cf.beyondHorizon) {
       incomeSalaris += cf.inkomen - (m >= fireMonth ? cf.basissalaris : 0)
       incomeGebeurtenisBaten += cf.gebeurtenisBaten
+      // Box 1-deelstromen uit exact dezelfde CF!H-optelling (zelfde conditie,
+      // zelfde `inflationIndex`, zelfde horizon-guard) — geen tweede afleiding
+      // van AOW/pensioen uit het profiel (ADR 0086).
+      const aowBn = activeGebSum(box1Posts.aow, m)
+      const pensioenBn = activeGebSum(box1Posts.pensioen, m)
+      if (aowBn !== 0 || pensioenBn !== 0) {
+        const gebIdx = inflationIndex(input, m)
+        box1AowNetto += aowBn * gebIdx
+        box1PensioenUitkeringBruto += pensioenBn * gebIdx
+      }
+      // PT!K — dezelfde bron die CF!D via `cf.inkomen` al meetelt.
+      box1PartnerBatenNetto += proj.pt[m]?.totaal ?? 0
     }
     oneTimeNet += bez.woning.verkoopopbrengst
     cashflowNet += bez.woning.opeetOpname - (af !== undefined ? af.totaalAfname : 0)
@@ -447,8 +535,10 @@ function buildRow(
   for (const pot of input.schuldPotten) {
     const slot = pot.slot
     const endBalance = sSlotSaldo(proj, monthEnd, slot)
-    if (pot.rol === 'tekortLening') {
-      // V7: alleen tonen zodra de tekort-lening is aangesproken (saldo > 0).
+    if (pot.rol === 'tekortLening' || pot.rol === 'opeethypotheek') {
+      // Synthetische potten (géén app-`Debt`, dus geen `debtSlotMeta`-id): alleen tonen
+      // zodra ze zijn aangesproken (saldo > 0). V7 voor de tekort-lening; identiek voor
+      // de opeethypotheek, die pas vanaf de opname-startleeftijd een saldo krijgt.
       if (endBalance <= 0) continue
     }
     const startBalance =
@@ -466,7 +556,9 @@ function buildRow(
     const key =
       pot.rol === 'tekortLening'
         ? 'tekort-lening'
-        : debtMetaBySlot.get(slot) ?? `slot-${slot}`
+        : pot.rol === 'opeethypotheek'
+          ? 'opeethypotheek'
+          : debtMetaBySlot.get(slot) ?? `slot-${slot}`
     debtBalances[key] = { startBalance, interestPaid, principalPaid, endBalance }
   }
 
@@ -493,6 +585,7 @@ function buildRow(
     totalDebts,
     netWorth,
     startNetWorth,
+    nettoLiquide,
     grossIncome,
     savings,
     withdrawal,
@@ -523,6 +616,19 @@ function buildRow(
           grossIncomeBySource: {
             salaris: incomeSalaris,
             gebeurtenisBaten: incomeGebeurtenisBaten,
+          },
+        }
+      : {}),
+    ...(box1AowNetto !== 0 ||
+    box1PensioenUitkeringBruto !== 0 ||
+    box1PensioenOnttrekkingBruto !== 0 ||
+    box1PartnerBatenNetto !== 0
+      ? {
+          box1Streams: {
+            aowNetto: box1AowNetto,
+            pensioenUitkeringBruto: box1PensioenUitkeringBruto,
+            pensioenOnttrekkingBruto: box1PensioenOnttrekkingBruto,
+            partnerBatenNetto: box1PartnerBatenNetto,
           },
         }
       : {}),
@@ -621,9 +727,10 @@ export function kernelToUnifiedResult(
   // ── Rijen: één per jaar-blok t/m de laatste in-horizon-maand ───────────────
   const kLast = Math.floor(lastInHorizonMonth / 12)
   const rows: UnifiedProjectionRow[] = []
+  const box1Posts = collectBox1GebPosts(proj)
   let cumBox3 = 0
   for (let k = 0; k <= kLast; k++) {
-    const row = buildRow(proj, groups, ctx, k, lastInHorizonMonth, fireMonth, cumBox3)
+    const row = buildRow(proj, groups, ctx, k, lastInHorizonMonth, fireMonth, cumBox3, box1Posts)
     cumBox3 = row.cumulativeBox3
     rows.push(row)
   }
@@ -737,6 +844,11 @@ export function kernelToUnifiedResult(
  * `kernelToUnifiedResult` doorgeeft (= `solve.fireAge`, NIET op de startleeftijd
  * geclampt). Een op `currentAge` geklemde waarde maakt de conditie altijd waar en
  * laat de misleiding bestaan.
+ *
+ * Tweede consumer: de scalar-router (`scalar-router.ts#computeScalarFireProjection`)
+ * past sinds 2026-08-05 exact dezelfde regel toe op zijn reached_now-mapping (met
+ * `kernelInput.startLeeftijd` als startAge) — verplaats/wijzig deze helper dus niet
+ * als bridge-intern detail.
  *
  * Pure functie; `null`/`undefined`/niet-eindig → `false` (val terug op reached_at).
  */

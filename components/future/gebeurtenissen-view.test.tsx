@@ -297,6 +297,8 @@ function makeRow(age: number, over: Partial<UnifiedProjectionRow> = {}): Unified
     totalDebts: 0,
     netWorth: 0,
     startNetWorth: 0,
+    // Mock-rij: volledig liquide (Prognose!J == I) tenzij een test `nettoLiquide` zet.
+    nettoLiquide: 0,
     grossIncome: 0,
     savings: 0,
     withdrawal: 0,

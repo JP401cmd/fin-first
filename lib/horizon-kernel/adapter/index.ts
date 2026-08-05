@@ -35,7 +35,6 @@ import type { AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import type { TaxYear } from '@/lib/box3-data'
 import { resolveFireParams } from '@/lib/fire-params'
 import { resolvePotRules } from '@/lib/pot-rules'
-import { parseHousingStrategy } from '@/lib/housing-strategy'
 import type { KernelInput } from '../types'
 import { buildAssetPotten, buildPotLiquidaties, buildSchuldPotten, deriveEigenHuisIds } from './potten'
 import { buildTsParams } from './prio-overgang'
@@ -118,9 +117,15 @@ export function buildKernelInputFromAppWithNotices(input: KernelAdapterInput): K
   // V7: tekort-lening-rente uit het profiel (deficit_loan_rate) of Excel-default.
   const deficitLoanRate = resolveDeficitLoanRate(profile)
   const assetPotten = buildAssetPotten(assets)
-  const schuldPotten = buildSchuldPotten(debts, eigenHuisIds, deficitLoanRate)
+  // Woning-strategie (P!B57-B67) — ÉÉN parse voor de drie consumenten: de opeethypotheek-
+  // pot (slot 3 + opeetrente), de niet-liquide-vlag in de TS-laag en het kern-woningblok
+  // zelf. `buildWoning` doet de `parseHousingStrategy` intern; een tweede losse parse hier
+  // zou een tweede bron zijn. `selector === 'Meerekenen'` ⟺ `mode === 'include_full'`
+  // (HOUSING_MODE_TO_SELECTOR is totaal over de vier modi die parseHousingStrategy oplevert).
+  const woning = buildWoning(profile.housing_strategy_config)
+  const schuldPotten = buildSchuldPotten(debts, eigenHuisIds, deficitLoanRate, woning)
 
-  const woningMeerekenen = parseHousingStrategy(profile.housing_strategy_config).mode === 'include_full'
+  const woningMeerekenen = woning.selector === 'Meerekenen'
   const ts = buildTsParams(resolvePotRules(profile), assetPotten, schuldPotten, woningMeerekenen)
 
   // Event-laag (snede 2): guard-gepartitioneerde routering naar de gebeurtenis-blokken.
@@ -167,7 +172,7 @@ export function buildKernelInputFromAppWithNotices(input: KernelAdapterInput): K
     tekortLeningRente: deficitLoanRate,
     strategie: buildStrategieSelectors(),
     eindstrategie: buildEindstrategie(profile),
-    woning: buildWoning(profile.housing_strategy_config),
+    woning,
     onttrekkingsprofiel: buildOnttrekkingsprofiel(profile),
     onzekerheid: buildOnzekerheid(persoon.startjaar),
 

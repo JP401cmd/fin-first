@@ -84,6 +84,8 @@ function makeYearRow(overrides: Partial<UnifiedProjectionRow> = {}): UnifiedProj
     totalDebts: 20000,
     netWorth: 530000,
     startNetWorth: 529000,
+    // Mock-rij: volledig liquide (Prognose!J == I) tenzij een test `nettoLiquide` zet.
+    nettoLiquide: 530000,
     grossIncome: 0,
     savings: 0,
     withdrawal: 174000,
@@ -174,6 +176,65 @@ describe('HorizonYearDetailsSheet — rendement & Box 3 per type', () => {
     // zowel de rendement- als de box3-uitsplitsing → minstens 2×).
     const beleggingen = screen.getAllByText('Beleggingen')
     expect(beleggingen.length).toBeGreaterThanOrEqual(2)
+  })
+})
+
+// ── Schulden-kassabon: kop-totaal reconcilieert met de regels ────────
+
+/**
+ * Review-bevinding H3: de rekenmotor boekt de opeethypotheek als synthetische
+ * pot `debtBalances['opeethypotheek']` (géén `Debt`-rij). Die zit wél in
+ * `row.totalDebts` maar werd uit de regellijst gefilterd → kop van €1,12 mln
+ * boven een lijst waarin dat bedrag nergens voorkwam.
+ */
+describe('HorizonYearDetailsSheet — Schulden-kassabon reconcilieert', () => {
+  const OPEET_ROW = makeYearRow({
+    debtBalances: {
+      opeethypotheek: {
+        startBalance: 1_050_000,
+        interestPaid: 58_000,
+        principalPaid: 0,
+        endBalance: 1_120_000,
+      },
+    },
+    totalDebts: 1_120_000,
+  })
+
+  it('rendert de synthetische opeethypotheek-pot met een leesbaar label', () => {
+    renderSheet(OPEET_ROW)
+    expect(screen.getByText('Opeethypotheek')).toBeTruthy()
+    // Nooit meer de UUID-afkapping van de sleutel.
+    expect(screen.queryByText('opeethyp')).toBeNull()
+  })
+
+  it('kop-totaal is gelijk aan de som van de getoonde regels (geen gat)', () => {
+    renderSheet(OPEET_ROW)
+    // De kop toont het totaal; de enige regel toont exact hetzelfde bedrag.
+    // Beide via dezelfde formatter → minstens twee voorkomens van het bedrag.
+    const bedragen = screen.getAllByText((_, el) => {
+      const t = el?.textContent?.replace(/ /g, ' ') ?? ''
+      return el?.children.length === 0 && /1\.120\.000/.test(t)
+    })
+    expect(bedragen.length).toBeGreaterThanOrEqual(2)
+    // Geen restregel nodig: de bon klopt zonder sluitpost.
+    expect(screen.queryByText('Overige schulden')).toBeNull()
+  })
+
+  it('een onbekende pot verdwijnt niet stil maar sluit de bon als restregel', () => {
+    renderSheet(
+      makeYearRow({
+        debtBalances: {
+          'onbekende-modelpot-xyz': {
+            startBalance: 0,
+            interestPaid: 0,
+            principalPaid: 0,
+            endBalance: 40_000,
+          },
+        },
+        totalDebts: 40_000,
+      }),
+    )
+    expect(screen.getByText('Overige schulden')).toBeTruthy()
   })
 })
 

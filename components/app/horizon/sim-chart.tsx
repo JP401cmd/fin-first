@@ -272,6 +272,7 @@ export const SimChart = memo(function SimChart({
   onEventDragMove,
   emphasis = null,
   targetInflationFactors,
+  liquidPoints,
   disableCrosshair = false,
   hoverAge,
   onHoverAge,
@@ -348,6 +349,14 @@ export const SimChart = memo(function SimChart({
    *  nominale eindwaarde (`targetEndPortfolio`). Zonder deze prop blijft de
    *  doellijn vlak (byte-identiek voor call-sites zonder unifiedRows). */
   targetInflationFactors?: { age: number; factor: number }[]
+  /** Tweede vermogenslijn: het BESTEEDBARE (liquide) vermogen als `[leeftijd,
+   *  bedrag]`-punten (consume-only uit `UnifiedProjectionRow.nettoLiquide`, zie
+   *  `lib/horizon/liquid-wealth-line.ts`). Zet je 'm, dan tekent de grafiek een
+   *  dunne gestippelde lijn onder de totaallijn ("zonder je huis"), met een eigen
+   *  legenda-entry en een extra regel in de hover-tooltip. Alleen zinvol wanneer
+   *  de gebruiker een eigen woning heeft; anders weglaten → byte-identiek voor
+   *  alle bestaande callers. */
+  liquidPoints?: [number, number][]
   /** Onderdruk de crosshair-tooltip (bv. in de tips-modus van /toekomst). */
   disableCrosshair?: boolean
   /** Controlled hover-leeftijd. Aanwezig → parent bezit de hover-state (cijferbar/
@@ -407,6 +416,7 @@ export const SimChart = memo(function SimChart({
         planningMode,
         eventOverlay,
         targetInflationFactors,
+        liquidPoints,
         containerW,
       }),
     [
@@ -430,11 +440,12 @@ export const SimChart = memo(function SimChart({
       planningMode,
       eventOverlay,
       targetInflationFactors,
+      liquidPoints,
       containerW,
     ],
   )
 
-  const { W, H, PAD, innerW, innerH, minAge, maxAge, xScale, yScale, allPts, mainStrokeAcc, mainStrokeDec } = geometry
+  const { W, H, PAD, innerW, innerH, minAge, maxAge, xScale, yScale, allPts, mainStrokeAcc, mainStrokeDec, liquidStroke, liquidPath } = geometry
 
   // ── Crosshair tooltip handlers ──────────────────────────────────────────
   const handleOverlayMouseMove = useCallback((e: React.MouseEvent<SVGRectElement>) => {
@@ -546,6 +557,10 @@ export const SimChart = memo(function SimChart({
         // Vertical position: roughly at chart midpoint
         const pctY = (PAD.top + innerH * 0.2) / H
 
+        // Besteedbaar (liquide) vermogen op de gehoverde leeftijd — consume-only
+        // uit dezelfde puntenreeks die de tweede lijn tekent.
+        const liquidAtHover = liquidPoints?.find(([a]) => a === hoveredAge)?.[1] ?? null
+
         // Collect drijvers (positive factors)
         const drijvers: { label: string; value: number }[] = []
         if (hoveredRow.growth > 0) drijvers.push({ label: 'Rendement', value: hoveredRow.growth })
@@ -597,11 +612,29 @@ export const SimChart = memo(function SimChart({
               {/* Separator */}
               <div className="my-1" style={{ height: 1, background: 'var(--ink-3)', opacity: 0.4 }} />
 
-              {/* Vermogen */}
+              {/* Vermogen. Staat er een tweede grondslag onder, dan draagt deze
+                  regel de kwalificatie uit hetzelfde woordpaar als de legenda en
+                  de doellijnen ("met je huis" / "zonder je huis"); anders blijft
+                  het gewoon "Vermogen". */}
               <div className="flex items-baseline justify-between" style={{ fontSize: 10, color: 'var(--paper)' }}>
-                <span>Vermogen</span>
+                <span>{liquidAtHover !== null ? 'Met je huis' : 'Vermogen'}</span>
                 <span className="font-mono tabular-nums font-semibold">{fmtAbs(hoveredRow.startPortfolio)}</span>
               </div>
+
+              {/* Het vermogen zonder je huis op dezelfde leeftijd — alleen wanneer
+                  de tweede lijn getekend wordt (zelfde as-conventie, dus exact
+                  hetzelfde moment als het getal hierboven). */}
+              {liquidAtHover !== null && (
+                <div className="flex items-baseline justify-between mt-0.5" style={{ fontSize: 10, color: 'var(--paper)', opacity: 0.85 }}>
+                  <span className="flex items-center gap-1">
+                    <svg width="12" height="6" className="shrink-0" aria-hidden="true">
+                      <line x1="0" y1="3" x2="12" y2="3" stroke={liquidStroke} strokeWidth={1.8} strokeDasharray="2 3" strokeLinecap="round" />
+                    </svg>
+                    Zonder je huis
+                  </span>
+                  <span className="font-mono tabular-nums">{fmtAbs(liquidAtHover)}</span>
+                </div>
+              )}
 
               {/* Drijvers section */}
               {drijvers.length > 0 && (
@@ -710,11 +743,12 @@ export const SimChart = memo(function SimChart({
         )
       })()}
 
-      {/* Wat-als-legenda — "Jouw pad" (hoofdlijn) + de gestippelde ink-wat-als-
-          lijn, met optioneel FIRE-leeftijdssuffix. Staat bewust bovenaan (direct
-          onder de grafiek), vóór de ghost-/household-rijen. Alleen zichtbaar bij
-          een variant:'scenario'-overlay → byte-identiek voor bestaande callers. */}
-      {scenarioVariant && (
+      {/* Hoofdlijn-legenda — "Jouw pad" + optioneel de gestippelde ink-wat-als-
+          lijn en de besteedbaar-lijn, met optioneel FIRE-leeftijdssuffix. Staat
+          bewust bovenaan (direct onder de grafiek), vóór de ghost-/household-
+          rijen. Alleen zichtbaar bij een variant:'scenario'-overlay of een
+          besteedbaar-lijn → byte-identiek voor bestaande callers. */}
+      {(scenarioVariant || liquidPath) && (
         <div className="mt-1.5 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 px-4">
           <div className="flex items-center gap-1.5">
             <svg width="20" height="8" className="shrink-0">
@@ -722,6 +756,9 @@ export const SimChart = memo(function SimChart({
             </svg>
             <span className="text-[10px] font-medium text-[var(--ink-3)]">
               Jouw pad
+              {/* Kwalificatie alleen als er een tweede grondslag naast staat —
+                  zelfde woordpaar als de doellijnen en de doel-KPI's. */}
+              {liquidPath && <span className="ml-1 text-[var(--ink-4)]">· met je huis</span>}
               {(fireAgeFractional ?? fireAge) !== null && (
                 <span className="ml-1 font-mono text-[var(--ink-4)]">
                   ({Math.round((fireAgeFractional ?? fireAge) as number)}j)
@@ -729,23 +766,35 @@ export const SimChart = memo(function SimChart({
               )}
             </span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <svg width="20" height="8" className="shrink-0">
-              <line x1="0" y1="4" x2="20" y2="4" stroke="var(--ink-2)" strokeWidth={2.25} strokeDasharray="6 4" strokeLinecap="round" />
-            </svg>
-            <span className="text-[10px] font-medium text-[var(--ink-3)]">
-              {scenarioVariant.label}
-              {scenarioVariant.fireAgeFractional != null && (
-                <span className="ml-1 font-mono text-[var(--ink-4)]">
-                  {/* Stop-suffix met dezelfde formatter als de Vrijheidsas-cijferrij:
-                      "63,5" blijft "63,5" — één grootheid, één weergave (review M4). */}
-                  {scenarioVariant.ageLabel === 'stop'
-                    ? `(stop ${formatAge(scenarioVariant.fireAgeFractional)})`
-                    : `(${Math.round(scenarioVariant.fireAgeFractional)}j)`}
-                </span>
-              )}
-            </span>
-          </div>
+          {scenarioVariant && (
+            <div className="flex items-center gap-1.5">
+              <svg width="20" height="8" className="shrink-0">
+                <line x1="0" y1="4" x2="20" y2="4" stroke="var(--ink-2)" strokeWidth={2.25} strokeDasharray="6 4" strokeLinecap="round" />
+              </svg>
+              <span className="text-[10px] font-medium text-[var(--ink-3)]">
+                {scenarioVariant.label}
+                {scenarioVariant.fireAgeFractional != null && (
+                  <span className="ml-1 font-mono text-[var(--ink-4)]">
+                    {/* Stop-suffix met dezelfde formatter als de Vrijheidsas-cijferrij:
+                        "63,5" blijft "63,5" — één grootheid, één weergave (review M4). */}
+                    {scenarioVariant.ageLabel === 'stop'
+                      ? `(stop ${formatAge(scenarioVariant.fireAgeFractional)})`
+                      : `(${Math.round(scenarioVariant.fireAgeFractional)}j)`}
+                  </span>
+                )}
+              </span>
+            </div>
+          )}
+          {liquidPath && (
+            <div className="flex items-center gap-1.5">
+              <svg width="20" height="8" className="shrink-0">
+                <line x1="0" y1="4" x2="20" y2="4" stroke={liquidStroke} strokeWidth={1.8} strokeDasharray="2 3" strokeLinecap="round" />
+              </svg>
+              <span className="text-[10px] font-medium text-[var(--ink-3)]">
+                Zonder je huis
+              </span>
+            </div>
+          )}
         </div>
       )}
 

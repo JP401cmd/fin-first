@@ -93,6 +93,14 @@ export type SimChartGeometryInput = {
   planningMode?: 'fire' | 'pensioen'
   eventOverlay?: ChartEventOverlay[]
   targetInflationFactors?: { age: number; factor: number }[]
+  /**
+   * Tweede vermogenslijn: het BESTEEDBARE (liquide) vermogen als `[leeftijd,
+   * bedrag]`-punten, op dezelfde as-conventie als de hoofdlijn. Alleen gezet bij
+   * de eigen-woningstrategieën waar totaal en besteedbaar blijvend uiteenlopen
+   * (zie `lib/horizon/liquid-wealth-line.ts`); anders undefined → geen extra lijn
+   * en byte-identieke uitvoer voor alle bestaande callers.
+   */
+  liquidPoints?: [number, number][]
   /** Gemeten containerbreedte (px, uit de ResizeObserver in de component). */
   containerW: number
 }
@@ -177,6 +185,8 @@ export type SimChartGeometry = {
   /** Kleur van de derde band (Overgang FIRE→AOW): een horizon-tussentint die
    *  leesbaar afsteekt tegen de donkere opbouw- en afbouwlijnen op `--paper`. */
   bridgeStroke: string
+  /** Kleur van de besteedbaar-lijn (zie `liquidPath`). */
+  liquidStroke: string
   COLOR_OPBOUW: string
   COLOR_AFBOUW: string
   // Voorberekende paden (d-strings)
@@ -187,6 +197,9 @@ export type SimChartGeometry = {
   bridgePath: string | null
   /** Onttrekking vanaf AOW (alleen in `threeBandFire`; anders null). */
   withdrawalPath: string | null
+  /** Besteedbaar (liquide) vermogen — tweede grondslag naast de hoofdlijn.
+   *  null zonder `liquidPoints` (byte-identiek voor bestaande callers). */
+  liquidPath: string | null
   allPath: string | null
   scenarioPaths: ScenarioPathGeometry[]
   householdPaths: HouseholdPathGeometry[]
@@ -225,6 +238,7 @@ export function buildSimChartGeometry(input: SimChartGeometryInput): SimChartGeo
     planningMode = 'fire',
     eventOverlay,
     targetInflationFactors,
+    liquidPoints,
     containerW,
   } = input
 
@@ -300,9 +314,16 @@ export function buildSimChartGeometry(input: SimChartGeometryInput): SimChartGeo
   const hhMax = householdOverlays?.length
     ? Math.max(...householdOverlays.flatMap(o => o.points.filter(inRange).map(([, v]) => v)))
     : 0
+  // De besteedbaar-lijn ligt normaal ónder de totaallijn, maar telt hier tóch mee
+  // in de schaal zodat de y-as beide lijnen hoe dan ook omvat (0 = geen lijn →
+  // geen effect op de bestaande schaal).
+  const visibleLiquidPts = (liquidPoints ?? []).filter(inRange)
+  const liquidMax = visibleLiquidPts.length > 0
+    ? Math.max(...visibleLiquidPts.map(([, v]) => v))
+    : 0
   const rawMax = visibleAllPts.length > 0
-    ? Math.max(...visibleAllPts.map(([, v]) => v), fireTarget ?? 0, fireTargetInclHome ?? 0, baselineMax, overlayMax, mcMax, hhMax)
-    : Math.max(1, overlayMax, mcMax, hhMax)
+    ? Math.max(...visibleAllPts.map(([, v]) => v), fireTarget ?? 0, fireTargetInclHome ?? 0, baselineMax, overlayMax, mcMax, hhMax, liquidMax)
+    : Math.max(1, overlayMax, mcMax, hhMax, liquidMax)
   const maxVal = Math.max(rawMax, 1) * 1.08
 
   const xScale = (age: number) =>
@@ -447,6 +468,14 @@ export function buildSimChartGeometry(input: SimChartGeometryInput): SimChartGeo
   // niet-tekst) — horizon-500 haalde maar 2,3:1. Het OVERGANG-tekstlabel heeft een
   // hógere drempel (4,5:1) en gebruikt daarom apart horizon-700 (zie sim-chart.tsx).
   const bridgeStroke = 'var(--color-horizon-600, #ab8449)'
+  // Besteedbaar (liquide) vermogen: één grootheid, twee grondslagen — dus bewust
+  // dezelfde horizon-familie als de hoofdlijn, één tint lichter (horizon-600, als
+  // LIJN 3,2:1 op --paper → boven de 3:1-grafiekdrempel). Het ONDERSCHEID leunt
+  // niet op kleur maar op de streepstijl + dunnere lijn (zie chart-static-layers),
+  // zodat de lijn ook zonder kleurwaarneming te herkennen is. Deelt de tint met
+  // `bridgeStroke`; die is altijd doorgetrokken en dikker, en zit bovendien in het
+  // verlengde van de hoofdlijn — vandaar geen verwarring.
+  const liquidStroke = 'var(--color-horizon-600, #ab8449)'
 
   // Veilige bovengrens voor in-plot labels (doellijn-/FIRE-label) zodat ze niet
   // omhoog in de gereserveerde icoon-marge boven het plot kruipen en daar met de
@@ -622,6 +651,7 @@ export function buildSimChartGeometry(input: SimChartGeometryInput): SimChartGeo
   const decPath = !threeBandFire && decPts.length > 1 ? pointsToPath(decPts) : null
   const bridgePath = threeBandFire && bridgePts.length > 1 ? pointsToPath(bridgePts) : null
   const withdrawalPath = threeBandFire && withdrawalPts.length > 1 ? pointsToPath(withdrawalPts) : null
+  const liquidPath = (liquidPoints?.length ?? 0) > 1 ? pointsToPath(liquidPoints!) : null
   const allPath = fireAge === null && allPts.length > 1 ? pointsToPath(allPts) : null
 
   // Depletion-zone (AOW-stop-modus): eerste leeftijd waarop het portfolio ≤ 0.
@@ -669,6 +699,7 @@ export function buildSimChartGeometry(input: SimChartGeometryInput): SimChartGeo
     mainStrokeAcc,
     mainStrokeDec,
     bridgeStroke,
+    liquidStroke,
     COLOR_OPBOUW,
     COLOR_AFBOUW,
     baselinePath,
@@ -676,6 +707,7 @@ export function buildSimChartGeometry(input: SimChartGeometryInput): SimChartGeo
     decPath,
     bridgePath,
     withdrawalPath,
+    liquidPath,
     allPath,
     scenarioPaths,
     householdPaths,

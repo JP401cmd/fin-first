@@ -756,6 +756,8 @@ function makeUnifiedRow(overrides: Partial<UnifiedProjectionRow> & { age: number
     totalDebts: overrides.totalDebts ?? 0,
     netWorth: overrides.netWorth ?? 0,
     startNetWorth: overrides.startNetWorth ?? 0,
+    // Mock-rij: volledig liquide (Prognose!J == I) tenzij expliciet overschreven.
+    nettoLiquide: overrides.nettoLiquide ?? overrides.netWorth ?? 0,
     grossIncome: overrides.grossIncome ?? 0,
     savings: overrides.savings ?? 0,
     withdrawal: overrides.withdrawal ?? 0,

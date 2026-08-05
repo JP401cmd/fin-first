@@ -18,11 +18,19 @@ import {
   buildAssetPotten,
   buildSchuldPotten,
   buildOnttrekkingsprofiel,
+  buildWoning,
   mapInSparenNaAflossing,
   type KernelAdapterProfile,
 } from './index'
 import type { AssetCategorie, DebtCategorie } from '../types'
 import { EXCEL_TEKORT_LENING_RENTE } from './defaults'
+
+/**
+ * Woningblok voor de pot-tests: 'Meerekenen' (de app-default) — géén opeethypotheek,
+ * dus slot 3 blijft leeg. De opeet-tak van `buildSchuldPotten` heeft een eigen suite
+ * (`opeethypotheek-pot.test.ts`).
+ */
+const WONING_MEEREKENEN = buildWoning({ mode: 'include_full' })
 
 // ── Factories (volledige DB-shape, overschrijfbaar) ──────────────────────────────
 
@@ -167,7 +175,7 @@ describe('potten — totalen behouden (V6-schaling)', () => {
       makeDebt({ id: 'd1', debt_type: 'personal_loan', current_balance: 10_000 }),
       makeDebt({ id: 'd2', debt_type: 'student_loan', current_balance: 20_000, net_worth_inclusion_pct: 80 }),
     ]
-    const pots = buildSchuldPotten(debts, new Set(), EXCEL_TEKORT_LENING_RENTE)
+    const pots = buildSchuldPotten(debts, new Set(), EXCEL_TEKORT_LENING_RENTE, WONING_MEEREKENEN)
     const userDebtTotal = pots.filter((p) => p.rol !== 'tekortLening').reduce((s, p) => s + p.startwaarde, 0)
     expect(userDebtTotal).toBeCloseTo(10_000 + 20_000 * 0.8, 6)
   })
@@ -197,14 +205,14 @@ describe('potten — getypte rollen bezet op het contract-slot', () => {
   })
 
   it('gekoppelde hypotheek → rol hypotheek op slot 0', () => {
-    const pots = buildSchuldPotten(debts, eigenHuisIds, EXCEL_TEKORT_LENING_RENTE)
+    const pots = buildSchuldPotten(debts, eigenHuisIds, EXCEL_TEKORT_LENING_RENTE, WONING_MEEREKENEN)
     const hyp = pots.filter((p) => p.rol === 'hypotheek')
     expect(hyp).toHaveLength(1)
     expect(hyp[0].slot).toBe(0)
   })
 
   it('tekort-lening bestaat altijd: rol tekortLening, slot 6, startsaldo 0, V7-rente', () => {
-    const pots = buildSchuldPotten(debts, eigenHuisIds, EXCEL_TEKORT_LENING_RENTE)
+    const pots = buildSchuldPotten(debts, eigenHuisIds, EXCEL_TEKORT_LENING_RENTE, WONING_MEEREKENEN)
     const tekort = pots.filter((p) => p.rol === 'tekortLening')
     expect(tekort).toHaveLength(1)
     expect(tekort[0].slot).toBe(6)
@@ -214,7 +222,7 @@ describe('potten — getypte rollen bezet op het contract-slot', () => {
   })
 
   it('reguliere schuld vermijdt de gereserveerde slots 0/3/6', () => {
-    const pots = buildSchuldPotten(debts, eigenHuisIds, EXCEL_TEKORT_LENING_RENTE)
+    const pots = buildSchuldPotten(debts, eigenHuisIds, EXCEL_TEKORT_LENING_RENTE, WONING_MEEREKENEN)
     const loan = pots.find((p) => p.naam === 'personal_loan')
     expect(loan).toBeDefined()
     expect([1, 2, 4, 5]).toContain(loan!.slot)
@@ -245,6 +253,7 @@ describe('potten — categorie-mapping dekt elk type', () => {
         [makeDebt({ id: t, debt_type: t, current_balance: 1_000 })],
         new Set(),
         EXCEL_TEKORT_LENING_RENTE,
+        WONING_MEEREKENEN,
       )
       const userPot = pots.find((p) => p.rol !== 'tekortLening')!
       expect(DEBT_CATEGORIEEN).toContain(userPot.categorie)
@@ -259,14 +268,14 @@ describe('potten — inSparenNaAflossing is de INVERSE van include_aflossing_in_
   it('aflossing al in sparen (true) → geen payoff-vrijval (false)', () => {
     const d = makeDebt({ id: 'd', debt_type: 'mortgage', current_balance: 1000, include_aflossing_in_savings: true })
     expect(mapInSparenNaAflossing(d)).toBe(false)
-    const [pot] = buildSchuldPotten([d], new Set(), EXCEL_TEKORT_LENING_RENTE)
+    const [pot] = buildSchuldPotten([d], new Set(), EXCEL_TEKORT_LENING_RENTE, WONING_MEEREKENEN)
     expect(pot.inSparenNaAflossing).toBe(false)
   })
 
   it('aflossing als kost (false) → payoff-vrijval (true)', () => {
     const d = makeDebt({ id: 'd', debt_type: 'mortgage', current_balance: 1000, include_aflossing_in_savings: false })
     expect(mapInSparenNaAflossing(d)).toBe(true)
-    const [pot] = buildSchuldPotten([d], new Set(), EXCEL_TEKORT_LENING_RENTE)
+    const [pot] = buildSchuldPotten([d], new Set(), EXCEL_TEKORT_LENING_RENTE, WONING_MEEREKENEN)
     expect(pot.inSparenNaAflossing).toBe(true)
   })
 })

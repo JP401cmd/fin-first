@@ -222,6 +222,137 @@ describe('SimChart — wat-als-variant rendert dashed ink-lijn + stip + legenda'
   })
 })
 
+// ── Besteedbaar-lijn (tweede grondslag naast het totale netto vermogen) ─────
+
+/**
+ * richProps + de besteedbaar-punten (liquide vermogen, uit `nettoLiquide`).
+ * Waarde = leeftijd × €10.000 zodat de tooltip-assertie exact te voorspellen is;
+ * de reeks start op 41 (hoofdlijn start op 40 — de kernel levert geen beginstand
+ * voor het liquide vermogen).
+ */
+function besteedbaarProps() {
+  return {
+    ...richProps(),
+    liquidPoints: Array.from({ length: 25 }, (_, i): [number, number] => [
+      41 + i,
+      (41 + i) * 10_000,
+    ]),
+  }
+}
+
+/** De besteedbaar-lijn: horizon-600, dunner (1.8) én GESTIPPELD ("2 3"). */
+function besteedbaarPath(container: HTMLElement) {
+  return Array.from(container.querySelectorAll('path')).find(
+    p =>
+      p.getAttribute('stroke') === 'var(--color-horizon-600, #ab8449)' &&
+      p.getAttribute('stroke-dasharray') === '2 3',
+  )
+}
+
+describe('SimChart — besteedbaar-lijn naast de totale vermogenslijn', () => {
+  it('tekent een dunne gestreepte horizon-lijn zodra liquidPoints gezet is', () => {
+    const { container } = render(<SimChart {...besteedbaarProps()} />)
+    const path = besteedbaarPath(container)
+    expect(path).toBeTruthy()
+    expect(path!.getAttribute('d')).toBeTruthy()
+    // Ook zonder kleurwaarneming te onderscheiden: dunner dan de 2.5px-hoofdlijn.
+    expect(path!.getAttribute('stroke-width')).toBe('1.8')
+  })
+
+  it('legenda benoemt beide lijnen in één woordpaar (met/zonder je huis)', () => {
+    const { getByText } = render(<SimChart {...besteedbaarProps()} />)
+    expect(getByText('Jouw pad')).toBeTruthy()
+    expect(getByText('· met je huis')).toBeTruthy()
+    expect(getByText('Zonder je huis')).toBeTruthy()
+  })
+
+  it('hover-tooltip zet beide grondslagen onder elkaar in datzelfde woordpaar', () => {
+    const { container, getByText, getAllByText } = render(<SimChart {...besteedbaarProps()} />)
+    const overlay = overlayRectOf(container)
+    // W=600, PAD.left=60, innerW=524, leeftijdsbereik 40–65 →
+    // x=120 ⇒ 40 + (60/524)·25 = 42,9 ⇒ afgerond leeftijd 43.
+    fireEvent.mouseMove(overlay, { clientX: 120, clientY: 100 })
+    expect(getByText('Leeftijd 43')).toBeTruthy()
+    expect(getByText('Met je huis')).toBeTruthy()
+    // "Zonder je huis" staat nu zowel in de legenda als in de tooltip.
+    expect(getAllByText('Zonder je huis').length).toBe(2)
+    expect(getByText('€430K')).toBeTruthy() // 43 × €10.000
+    // Geen derde register meer voor dezelfde grondslag.
+    expect(container.textContent).not.toContain('Besteedbaar')
+  })
+
+  it('zonder liquidPoints blijft alles ongewijzigd (geen lijn, geen legenda, geen kwalificatie)', () => {
+    const { container, queryByText } = render(<SimChart {...richProps()} />)
+    expect(besteedbaarPath(container)).toBeUndefined()
+    expect(queryByText('Zonder je huis')).toBeNull()
+    expect(queryByText('Jouw pad')).toBeNull()
+    expect(container.textContent).not.toContain('met je huis')
+  })
+
+  it('zonder tweede lijn houdt de tooltip het gewone label "Vermogen"', () => {
+    const { container, getByText, queryByText } = render(<SimChart {...richProps()} />)
+    fireEvent.mouseMove(overlayRectOf(container), { clientX: 120, clientY: 100 })
+    expect(getByText('Vermogen')).toBeTruthy()
+    expect(queryByText('Met je huis')).toBeNull()
+  })
+
+  it('leest niet als een streeplijn: punt-ritme, niet het "6 3" van de doellijnen', () => {
+    const { container } = render(<SimChart {...besteedbaarProps()} fireTargetInclHome={950_000} />)
+    const path = besteedbaarPath(container)!
+    expect(path.getAttribute('stroke-dasharray')).toBe('2 3')
+    // Geen enkele doellijn deelt dit ritme (die staan op "6 3").
+    const doellijnen = Array.from(container.querySelectorAll('line')).filter(
+      l => l.getAttribute('stroke-dasharray') === '6 3',
+    )
+    expect(doellijnen.length).toBeGreaterThan(0)
+    for (const l of doellijnen) {
+      expect(l.getAttribute('stroke-dasharray')).not.toBe(path.getAttribute('stroke-dasharray'))
+    }
+  })
+})
+
+// ── H1: elke lijn hoort bij precies één drempel ─────────────────────────────
+
+describe('SimChart — doellijnen horen bij de getekende lijnen', () => {
+  const INCL = 950_000
+
+  it('tekent bij een besteedbaar-lijn BEIDE drempels, elk expliciet benoemd', () => {
+    const { getByText } = render(
+      <SimChart {...besteedbaarProps()} fireTargetInclHome={INCL} />,
+    )
+    // J-drempel (hoort bij de besteedbaar-lijn) + I-drempel (hoort bij het totaal).
+    expect(getByText('doel zonder je huis')).toBeTruthy()
+    expect(getByText('doel met je huis')).toBeTruthy()
+  })
+
+  it('zonder besteedbaar-lijn blijft de J-drempel onderdrukt (ongewijzigd gedrag)', () => {
+    const { getByText, queryByText } = render(
+      <SimChart {...richProps()} fireTargetInclHome={INCL} />,
+    )
+    expect(getByText('doel met je huis')).toBeTruthy()
+    expect(queryByText('doel zonder je huis')).toBeNull()
+    expect(queryByText('doel')).toBeNull()
+  })
+
+  it('één lijn, één grondslag → de drempel houdt het korte label "doel"', () => {
+    const { getByText, queryByText } = render(<SimChart {...richProps()} />)
+    expect(getByText('doel')).toBeTruthy()
+    expect(queryByText('doel zonder je huis')).toBeNull()
+    expect(queryByText('doel met je huis')).toBeNull()
+  })
+
+  it('besteedbaar-lijn zónder incl.-woningdoel (bv. volledig meetellen): één drempel, wél benoemd', () => {
+    // Bij include_full/downsize levert de loader geen `fireTargetInclHome`, maar de
+    // tweede lijn staat er sinds het eigenaarsbesluit wél. De enige drempel hoort
+    // dan bij die tweede lijn en moet dat ook zeggen — anders leest de gebruiker
+    // een J-drempel als het doel van de I-lijn.
+    const { getByText, queryByText } = render(<SimChart {...besteedbaarProps()} />)
+    expect(getByText('doel zonder je huis')).toBeTruthy()
+    expect(queryByText('doel')).toBeNull()
+    expect(queryByText('doel met je huis')).toBeNull()
+  })
+})
+
 // ── AC-2: alleen de crosshair-laag reageert ─────────────────────────────────
 
 describe('SimChart — hover herbouwt geometrie noch statische laag (AC-2)', () => {

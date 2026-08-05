@@ -44,6 +44,8 @@ function makeRow(overrides: Partial<UnifiedProjectionRow> & { age: number; year?
     totalDebts: 0,
     netWorth: overrides.netWorth ?? 500_000,
     startNetWorth: overrides.startNetWorth ?? 500_000,
+    // Synthetische rij: volledig liquide (Prognose!J == I) — geen eigen woning in beeld.
+    nettoLiquide: overrides.nettoLiquide ?? overrides.netWorth ?? 500_000,
     grossIncome: 0,
     savings: overrides.savings ?? 0,
     withdrawal: overrides.withdrawal ?? 30_000,

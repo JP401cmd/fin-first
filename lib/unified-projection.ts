@@ -120,6 +120,68 @@ export interface GrossIncomeBySource {
   gebeurtenisBaten: number
 }
 
+/**
+ * Box 1-relevante inkomensstromen per jaarrij — **read-only WEERGAVEVELD**,
+ * spread-gated door de kernel-bridge (zelfde patroon als `withdrawalNeed` /
+ * `grossIncomeBySource`). GEEN rekeninput, GEEN terugkoppeling in de cashflow:
+ * de kernel is Excel-oracle-bewezen (ADR 0032) en blijft dat — Box 1 is een
+ * RAPPORTAGELAAG NAAST de projectie, geen tabel erín.
+ *
+ * ## Waarom dit veld moet bestaan
+ * `grossIncomeBySource.gebeurtenisBaten` (CF!H) is een MENGSEL waaruit de
+ * Box 1-grondslag niet terug te winnen is:
+ *  - **AOW** (Geb rij 14) komt daar **NETTO** binnen — `NL_AOW_MONTHLY`
+ *    (lib/constants.ts) is het netto SVB-bedrag;
+ *  - **pensioen** (Geb rij 15-20) komt daar **BRUTO** binnen en wordt in de
+ *    kernel-cashflow **onbelast** geboekt.
+ * Beide zitten in dezelfde som. Ze in een consument opnieuw uit het profiel
+ * afleiden zou een tweede AOW-/pensioen-afleiding zijn — precies de drift die
+ * ADR 0086 opruimde. Daarom levert de bridge de deelstromen apart, uit dezelfde
+ * kernel-cellen die CF!H voedt.
+ *
+ * ## Grondslag per veld (ADR 0073: de grondslag zit in de naam)
+ * Alle bedragen zijn **jaar-sommen over de in-horizon maanden van het blok** en
+ * **NOMINAAL** (de kernel deflateert niet; deel door `row.inflationFactor` voor
+ * koopkracht-nu). `aowNetto + pensioenUitkeringBruto ≤ grossIncomeBySource
+ * .gebeurtenisBaten` — het zijn deelsommen van dezelfde CF!H-optelling (tot op
+ * float-associativiteit gelijk aan hun aandeel daarin).
+ *
+ * Aanwezig alléén wanneer minstens één stroom ≠ 0, zodat de rij-vorm in jaren
+ * zónder AOW/pensioen/partner identiek blijft.
+ */
+export interface Box1Streams {
+  /**
+   * Jaar-som Geb **rij 14** (AOW) × inflatie-index — **NETTO** binnengekomen.
+   * Wie hier Box 1 over wil rekenen moet éérst terug naar bruto
+   * (`grossFromNet`), want de heffing is op dit bedrag al ingehouden.
+   */
+  aowNetto: number
+  /**
+   * Jaar-som Geb **rij 15-20** (pensioen-multipot) × inflatie-index — **BRUTO**,
+   * en in de kernel-cashflow onbelast geboekt. Over dít bedrag is nog geen
+   * enkele euro Box 1 verrekend.
+   */
+  pensioenUitkeringBruto: number
+  /**
+   * Jaar-som van de Verdeling-eindtoewijzing op de kern-categorie **'Pensioen'**
+   * — de daadwerkelijke onttrekking uit pensioen-potten (de "lever" van de
+   * optimizer). BRUTO en onbelast geboekt, net als de uitkering hierboven.
+   *
+   * Bewust de KERN-categorie en niet `withdrawalByType`: die is op app-`AssetType`
+   * gesleuteld en bundelt `retirement` + `levensverzekering` pas ná de
+   * slot-meta-mapping (die in het fixture-pad ontbreekt).
+   */
+  pensioenOnttrekkingBruto: number
+  /**
+   * Jaar-som PT!K — partner-bijdrage (werk-/AOW-/pensioeninkomen van de partner),
+   * **NETTO**. Staat hier UITSLUITEND zodat een Box 1-rapportage de partner
+   * aantoonbaar en testbaar kan UITSLUITEN: Box 1 is per persoon en het
+   * partner-inkomen wordt niet als bruto grootheid vastgehouden (ADR 0036), dus
+   * elke partner-Box 1 zou verzonnen zijn. Niet gebruiken als heffingsgrondslag.
+   */
+  partnerBatenNetto: number
+}
+
 // ── Unified Projection Row ──────────────────────────────────────────────────
 
 /**
@@ -151,6 +213,16 @@ export interface UnifiedProjectionRow {
   netWorth: number
   /** Netto vermogen aan het BEGIN van het jaar (totalAssets - totalDebts vóór mutaties) */
   startNetWorth: number
+  /**
+   * Prognose!J op de blok-eindmaand: netto LIQUIDE vermogen (excl. niet-liquide bezit
+   * zoals de eigen woning). Dezelfde grondslag als `requiredFirePortfolio`.
+   *
+   * GRONDSLAG-WAARSCHUWING: dit is NIET `netWorth`. `netWorth` (Prognose!I) telt het
+   * niet-liquide bezit mee, `nettoLiquide` (Prognose!J) niet — meng ze nooit op één
+   * Y-as of marker (CLAUDE.md-conventie). Gebruik dit veld voor "besteedbaar/liquide
+   * vermogen" naast de FIRE-doellijn, die op dezelfde J-grondslag staat.
+   */
+  nettoLiquide: number
 
   // ── Kasstromen ────────────────────────────────────────────
   /**
@@ -213,6 +285,18 @@ export interface UnifiedProjectionRow {
    * Zie `GrossIncomeBySource`. Geen rekeninput.
    */
   grossIncomeBySource?: GrossIncomeBySource
+  /**
+   * Box 1-relevante inkomensstromen (AOW netto / pensioen bruto / pensioen-
+   * onttrekking bruto / partner netto) — read-only WEERGAVEVELD, gezet door de
+   * kernel-bridge en **alléén wanneer minstens één stroom ≠ 0**. Zie
+   * `Box1Streams`. Geen rekeninput, géén terugkoppeling in de cashflow.
+   *
+   * BEWUST GEEN `totalBox1`/`cumulativeBox1`/`cumulativeTotalTax` op deze rij:
+   * de kernel berekent GEEN Box 1: zo'n veld zou suggereren van wel. Het
+   * aggregaat leeft in `lib/tax-lifetime` (`LifetimeTaxSeries`), dat déze
+   * stromen consumeert.
+   */
+  box1Streams?: Box1Streams
 }
 
 // ── Unified Projection Input ────────────────────────────────────────────────

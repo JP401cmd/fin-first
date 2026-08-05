@@ -60,6 +60,7 @@ import {
   type WithdrawalProfiel,
 } from '@/lib/withdrawal-strategy'
 import type { LifeEvent, WerkMetadata } from '@/lib/horizon-data'
+import type { UnifiedProjectionRow } from '@/lib/unified-projection'
 import { buildCompleetHorizonFixture, buildCompleetKernelProfileBase } from './persona-fixture'
 
 // ── Marges ───────────────────────────────────────────────────
@@ -204,6 +205,24 @@ export interface ComboExpectation {
  *  (e) **Spaargrondslag** = netto jaarinkomen − geschatte jaaruitgaven ((7600−4100)×12 =
  *      42.000).
  *
+ * ## Opeethypotheek-fix (A-reverse) — waarom de goldens NIET bewogen
+ * Bij de fix "de adapter boekt de opeethypotheek-schuld op slot 3" (voorheen kwam de
+ * maandopname wél als kasstroom binnen maar ontstond er nooit een schuld) was de
+ * verwachting dat `A-reverse` zou verschuiven: de schuld drukt het vermogen, dus FIRE
+ * later en/of doelbedrag hoger. Empirisch bewogen beide goldens **niet één cent**, en dat
+ * is correct: op deze deplete-baseline valt FIRE op 42,08 jr (B93-doel=0-quirk, oorzaak c)
+ * terwijl de opeet-opname pas op leeftijd 67 begint. Beide golden-metrieken worden op de
+ * FIRE-MAAND gemeten (vrijheidsleeftijd; doelbedrag = Prognose!J@FIRE) en zijn dus
+ * structureel blind voor alles ~25 jaar later. De fix bijt wél hard ná FIRE — op de
+ * persona groeit de opeetschuld van €23k (67 jr) naar €1,12 mln (90 jr) en loopt het
+ * netto vermogen op 90 jr €363k lager dan vóór de fix (€1,57 mln vs. €1,93 mln bij
+ * 'woning meetellen', waar de reeksen vóór de fix samenvielen).
+ * **Gevolg voor deze matrix:** de goldens alléén dekken de opeet-mechaniek niet. Daarom
+ * draagt `ComboActual` sinds die fix `opeetSchuldEind` + een invariant per combinatie
+ * ("Opeethypotheek boekt een schuld" resp. "geen opeetschuld buiten de opeet-strategie").
+ * Beweegt er ooit tóch een golden bij een reverse-combinatie, dan is dat een echte
+ * FIRE-moment-verschuiving — herijk 'm dan bewust.
+ *
  * ## Groep C/D op de PERPETUAL-baseline (scope-besluit)
  * Op de deplete-baseline vallen groep C (onttrekkingsprofiel) en D (werk-strategie)
  * degeneratief samen (8× 42,083 / €1.102.575): de kernel-deplete-FIRE is voor deze
@@ -245,6 +264,18 @@ export interface ComboActual {
   targetEndPortfolio: number
   implicitWithdrawalRate: number
   strategy: string
+  /**
+   * Eindsaldo van de opeethypotheek-schuld (`debtBalances['opeethypotheek']`) op de
+   * laatste projectierij; 0 buiten de opeet-strategie.
+   *
+   * WAAROM DIT VELD BESTAAT: de twee golden-metrieken (vrijheidsleeftijd + doelbedrag)
+   * worden gemeten op de FIRE-MAAND, en die ligt op deze persona ~25 jaar vóór de
+   * opeet-startleeftijd (67). Ze zijn daardoor structureel BLIND voor alles wat de
+   * opeethypotheek ná FIRE doet — de bug waarbij de opeetschuld helemaal niet werd
+   * geboekt (adapter vulde slot 3 nooit) liet de goldens exact ongemoeid. Dit veld geeft
+   * de reverse-combinatie een eigen, discriminerende invariant.
+   */
+  opeetSchuldEind: number
 }
 
 export interface Check {
@@ -317,6 +348,7 @@ function werkEventFor(werk: ComboWerk, fx: ReturnType<typeof buildCompleetHorizo
 
 /** Vertaal een `UnifiedProjectionResult`-achtige naar het `ComboActual`-contract. */
 function toActual(r: {
+  rows: readonly UnifiedProjectionRow[]
   fireAgeFractional: number | null
   fireReachable: boolean
   requiredFirePortfolio: number
@@ -325,6 +357,9 @@ function toActual(r: {
   implicitWithdrawalRate: number
   strategy: string
 }): ComboActual {
+  // Consume-only: de bridge levert de opeetschuld als eigen `debtBalances`-sleutel
+  // (synthetische pot, géén app-`Debt`-id) — hier alleen uitlezen, niet herleiden.
+  const laatste = r.rows[r.rows.length - 1]
   return {
     fireAgeFractional: r.fireAgeFractional,
     fireReachable: r.fireReachable,
@@ -333,6 +368,7 @@ function toActual(r: {
     targetEndPortfolio: r.targetEndPortfolio,
     implicitWithdrawalRate: r.implicitWithdrawalRate,
     strategy: r.strategy,
+    opeetSchuldEind: laatste?.debtBalances['opeethypotheek']?.endBalance ?? 0,
   }
 }
 
@@ -455,6 +491,25 @@ function invariantChecks(combo: ComboDef, actual: ComboActual, currentAge: numbe
     pass: Number.isFinite(actual.requiredFirePortfolio) && actual.requiredFirePortfolio > 0,
     detail: fmtEur(actual.requiredFirePortfolio),
   })
+
+  // Opeethypotheek: de opname MOET een schuld boeken. De twee golden-metrieken meten op
+  // de FIRE-maand (~25 jr vóór de opeet-startleeftijd) en zijn daarvoor blind — deze
+  // invariant is de enige die de opeet-mechaniek zelf raakt. Zonder de schuldpot op
+  // slot 3 (adapter) blijft S!P structureel 0 terwijl de opname wél als kasstroom
+  // binnenkomt: gratis geld, en deze check wordt rood.
+  if (combo.config.housing.mode === 'reverse_mortgage') {
+    checks.push({
+      name: 'Opeethypotheek boekt een schuld (S!P > 0 aan het eind)',
+      pass: Number.isFinite(actual.opeetSchuldEind) && actual.opeetSchuldEind > 0,
+      detail: `eindsaldo opeethypotheek ${fmtEur(actual.opeetSchuldEind)}`,
+    })
+  } else {
+    checks.push({
+      name: 'Geen opeetschuld buiten de opeet-strategie',
+      pass: actual.opeetSchuldEind === 0,
+      detail: `eindsaldo opeethypotheek ${fmtEur(actual.opeetSchuldEind)}`,
+    })
+  }
 
   // Impliciete SWR binnen redelijke bandbreedte. Pensioen is bewust uitgezonderd:
   // die mode verankert FIRE op de AOW-leeftijd en rapporteert een afwijkende

@@ -9,6 +9,7 @@ import type { UnifiedProjectionRow, AssetBucketDetail } from '@/lib/unified-proj
 import { ASSET_TYPE_LABELS, type AssetType } from '@/lib/asset-data'
 import { DEBT_TYPE_LABELS } from '@/lib/debt-data'
 import type { Debt } from '@/lib/debt-data'
+import { resolveDebtLabel } from '@/lib/horizon/synthetic-debts'
 import { MaskedAmount } from '@/components/app/masked-amount'
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -223,7 +224,10 @@ function DetailPanel({ row, d, debtLabelMap, colSpan }: DetailPanelProps) {
                       {activeDebts.map(([debtId, db]) => (
                         <tr key={debtId} className="border-b border-dashed border-[var(--border-ed)] last:border-0">
                           <td className="py-1 text-[var(--ink-2)]">
-                            {debtLabelMap[debtId] ?? debtId.slice(0, 8)}
+                            {/* Gedeelde resolver: echte schuld → synthetische modelpot
+                                (tekort-lening/opeethypotheek) → pas dán de UUID-afkapping.
+                                Zonder die middelste stap las de gebruiker hier "opeethyp". */}
+                            {resolveDebtLabel(debtId, debtLabelMap)}
                           </td>
                           <td className="py-1 text-right font-mono tabular-nums text-[var(--ink)]">
                             {<MaskedAmount value={d(db.startBalance)} tone="horizon" />}
