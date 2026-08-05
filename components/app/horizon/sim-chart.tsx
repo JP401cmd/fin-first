@@ -14,6 +14,7 @@ import {
   type HouseholdPartnerOverlay,
 } from '@/lib/horizon/sim-chart-geometry'
 import { ChartStaticLayers } from './chart-static-layers'
+import { formatAge } from './vrijheidsas'
 
 // ── Types ───────────────────────────────────────────────────────────────────
 //
@@ -736,7 +737,11 @@ export const SimChart = memo(function SimChart({
               {scenarioVariant.label}
               {scenarioVariant.fireAgeFractional != null && (
                 <span className="ml-1 font-mono text-[var(--ink-4)]">
-                  ({Math.round(scenarioVariant.fireAgeFractional)}j)
+                  {/* Stop-suffix met dezelfde formatter als de Vrijheidsas-cijferrij:
+                      "63,5" blijft "63,5" — één grootheid, één weergave (review M4). */}
+                  {scenarioVariant.ageLabel === 'stop'
+                    ? `(stop ${formatAge(scenarioVariant.fireAgeFractional)})`
+                    : `(${Math.round(scenarioVariant.fireAgeFractional)}j)`}
                 </span>
               )}
             </span>

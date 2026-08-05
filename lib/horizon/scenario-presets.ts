@@ -144,8 +144,21 @@ export interface ForcedStopPathInput {
   yearlyExpenses: number
   /** Geforceerde stopleeftijd (fractioneel). */
   stopAge: number
-  /** Eindleeftijd-horizon voor de deplete-eindstrategie; geclampt op ≥ 90. */
+  /** Eindleeftijd-horizon voor de deplete-eindstrategie; geclampt op ≥ 90. Genegeerd bij `endStrategy: 'inherit'`. */
   fireEndAge?: number
+  /**
+   * Welke EINDSTRATEGIE de geforceerde run draagt. Additief/optioneel — afwezig ⇒
+   * `'deplete'` = het bestaande gedrag (alle bestaande callers blijven byte-identiek).
+   *  - `'deplete'` — forceer `fire_end_strategy:'deplete'` + `fire_end_age:max(fireEndAge,90)`:
+   *    de eerlijke "wat als je dan echt stopt en je vermogen opeet"-vorm (preset-stopkaarten).
+   *  - `'inherit'` — laat de twee geforceerde profielvelden WEG, zodat het profiel z'n eigen
+   *    eindstrategie (perpetual/legacy/pensioen/deplete + eigen `fire_end_age`) draagt. Nodig
+   *    zodra de run als DOEL-LIJN naast de hoofdlijn wordt getekend: met een geforceerde
+   *    deplete zou de stippellijn bij een perpetual-/legacy-gebruiker naar 0 duiken naast een
+   *    stijgende hoofdlijn én eerder eindigen. Voor de default-gebruiker (deplete met
+   *    `fire_end_age ≥ 90`) is `'inherit'` gedrags-identiek aan `'deplete'`.
+   */
+  endStrategy?: 'deplete' | 'inherit'
 }
 
 /** Uitkomst van een geforceerde stop-run (spiegelt het scenario-/hoofd-pad minimaal). */
@@ -155,23 +168,29 @@ export interface ForcedStopPathResult {
 }
 
 /**
- * Het GEFORCEERDE-run-recept: forceert een FIRE-moment op `stopAge` met een
- * deplete-op-eindleeftijd-eindstrategie (`fire_end_strategy: 'deplete'`,
- * `fire_end_age: max(fireEndAge, 90)`) — de eerlijke "wat als je dan echt stopt en je
- * vermogen opeet tot je eindleeftijd"-vorm. Dit is exact het recept van de AOW-stop-sim
+ * Het GEFORCEERDE-run-recept: forceert een FIRE-moment op `stopAge` — `evaluateFireAt`,
+ * één kernel-run, geen bisectie. Dit is exact het recept van de AOW-stop-sim
  * (`horizon-client.tsx`), hier single-sourced zodat de hook-stopPad én de scenario-stop-
- * kaarten dezelfde ene motor-orkestratie delen (`evaluateFireAt` = één kernel-run, geen
- * bisectie). Een kern-fout → `null` (zichtbare degradatie, geen tweede motor).
+ * kaarten dezelfde ene motor-orkestratie delen. Een kern-fout → `null` (zichtbare
+ * degradatie, geen tweede motor).
+ *
+ * De EINDSTRATEGIE volgt `input.endStrategy` (default `'deplete'` = ongewijzigd gedrag):
+ *  - `'deplete'` — forceert `fire_end_strategy:'deplete'` + `fire_end_age:max(fireEndAge,90)`:
+ *    de eerlijke "wat als je dan echt stopt en je vermogen opeet tot je eindleeftijd"-vorm
+ *    (preset-stopkaarten, AOW-stop-sim).
+ *  - `'inherit'` — laat beide geforceerde velden WEG; het profiel draagt z'n eigen
+ *    eindstrategie én eigen `fire_end_age` (zie `ForcedStopPathInput.endStrategy`).
  */
 export function runForcedStopPath(input: ForcedStopPathInput): ForcedStopPathResult | null {
+  const endStrategy = input.endStrategy ?? 'deplete'
   const endAge = Math.max(input.fireEndAge ?? DEFAULT_FIRE_STRATEGY.endAge, 90)
   try {
+    const basisProfiel = buildConvergentieAdapterProfile(input.profile)
     const adapterInput: KernelAdapterInput = {
-      profile: {
-        ...buildConvergentieAdapterProfile(input.profile),
-        fire_end_strategy: 'deplete',
-        fire_end_age: endAge,
-      },
+      profile:
+        endStrategy === 'inherit'
+          ? basisProfiel
+          : { ...basisProfiel, fire_end_strategy: 'deplete', fire_end_age: endAge },
       assets: input.assets,
       debts: input.debts,
       lifeEvents: input.lifeEvents,

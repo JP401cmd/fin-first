@@ -13,7 +13,7 @@
  *          + slider + driezone-band waarop je de héle reis afleest — basis → verwacht →
  *          laatst als markers, de stop-marker als jouw ambitie, en de marge als overspanning
  *          tussen verwacht en stop (bracket + zone-woord) + de onzekerheidszin.
- *   ONDER  volle-breedte cijferrij met de drie grootheden (Basis- / Doel- of Wat-als- /
+ *   ONDER  volle-breedte cijferrij met de drie grootheden (Basis-vrijheid / Verwacht vrij /
  *          Geambieerde vrijheid). Dit is de énige Figure-gestileerde plek voor de leeftijd-
  *          en marge-getallen; de band toont het marge-getal daarnaast als ruimtelijk
  *          bracket-label (datalabel op de visualisatie, geen tweede figure).
@@ -204,13 +204,18 @@ export interface VrijheidsasProps {
   zone: StopMargeZone | null
   /** stopAge − verwacht (jaren); null = verwacht onbereikbaar. */
   margeJaren: number | null
-  /** Er is een doel vastgelegd — kicker "Doel-vrijheid" i.p.v. "Wat-als-vrijheid" + i-zin. */
+  /** Er is een doel vastgelegd — toont de doel-i-zin onder de kop. */
   doelActief?: boolean
   /** Linker-vlak-inhoud (draaiknoppen + rendement-per-groep) uit horizon-client. */
   draaiknoppen?: ReactNode
 }
 
-function formatAge(v: number | null): string {
+/**
+ * Leeftijd-formatter van de cijferrij ("52,1", "54"). Geëxporteerd zodat de
+ * ingeklapte KATERN II-samenvatting in horizon-client exact dezelfde weergave
+ * gebruikt als de Figure-drieslag hieronder (één bron, geen drift).
+ */
+export function formatAge(v: number | null): string {
   if (v === null) return '—'
   const rounded = Math.round(v * 10) / 10
   return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1).replace('.', ',')
@@ -300,8 +305,6 @@ export function Vrijheidsas({
         }
       : null
   const onzekerheidDegenereert = onzekerheid !== null && onzekerheid.vroegst === onzekerheid.laatst
-
-  const watAlsKicker = doelActief ? 'Doel-vrijheid' : 'Wat-als-vrijheid'
 
   return (
     <div>
@@ -555,8 +558,11 @@ export function Vrijheidsas({
         <Figure kicker="Basis-vrijheid" value={formatAge(baseFireAge)} unit="jr" />
         {/* Geen delta-sub meer: de "X mnd eerder/later vrij"-duiding staat één keer, op de
             stopleeftijd-regel in het rechter vlak (zie de module-doc bovenaan). */}
+        {/* "Verwacht vrij" — de streep: wanneer je vrij kúnt zijn (basis, of het
+            wat-als/doel-pad als dat draait). Het DOEL is voortaan de stopleeftijd
+            rechts ("Geambieerde vrijheid"), dus deze kicker draagt die naam niet meer. */}
         <Figure
-          kicker={watAlsKicker}
+          kicker="Verwacht vrij"
           value={formatAge(hasScenario ? verwachtFireAge : baseFireAge)}
           unit="jr"
           highlight={hasScenario}

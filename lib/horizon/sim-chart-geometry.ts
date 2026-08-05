@@ -31,6 +31,11 @@ export type ScenarioOverlay = {
    *  `variant: 'scenario'`: plaatst een FIRE-stip op de wat-als-lijn (exact op
    *  de lijn via interpolatie, net als de hoofd-/household-lijn). */
   fireAgeFractional?: number | null
+  /** Hoe de legenda `fireAgeFractional` benoemt: `'fire'` (default, huidig gedrag)
+   *  toont "(57j)" — de gesolvede FIRE-leeftijd van de wat-als-run; `'stop'` toont
+   *  "(stop 63)" — de lijn is dan het geforceerde stop-pad tot je gekozen
+   *  stopleeftijd (ADR 0085). Geen geometrie-effect: puur legenda-vorm. */
+  ageLabel?: 'stop' | 'fire'
   /** `'scenario'` = de live "wat-als"-lijn: zwaarder gestippeld, in inkt, met
    *  FIRE-stip en eigen legenda-/tooltip-presentatie. Zonder dit veld
    *  (undefined) rendert de overlay byte-identiek als de bestaande dunne

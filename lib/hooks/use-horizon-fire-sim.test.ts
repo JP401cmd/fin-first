@@ -324,14 +324,15 @@ describe('useHorizonFireSim — wat-als-scenario (2e run)', () => {
 // stabiel; en het stop-pad schrijft NOOIT een eigen snapshot.
 
 describe('useHorizonFireSim — gekozen-stop-pad (3e run)', () => {
-  it('zonder stopPadAge ⇒ stopPad === null (hoofdgedrag ongewijzigd)', () => {
+  it('zonder stopPadAge ⇒ stopPad === null (hoofdgedrag ongewijzigd), stopPadPending false in rust', () => {
     const { result, unmount } = renderHook(() => useHorizonFireSim(makeParams()))
     expect(result.current.stopPad).toBeNull()
     expect(result.current.result).not.toBeNull()
+    expect(result.current.stopPadPending).toBe(false)
     unmount()
   })
 
-  it('stopPadAge gezet ⇒ stopPad deep-equals een directe runForcedStopPath op dezelfde context', () => {
+  it('stopPadAge gezet ⇒ stopPad deep-equals een directe runForcedStopPath op dezelfde context, pending settelt naar false', () => {
     const stopAge = 60
     const expected = runForcedStopPath({
       profile: PROFILE,
@@ -342,11 +343,21 @@ describe('useHorizonFireSim — gekozen-stop-pad (3e run)', () => {
       yearlyExpenses: 30_000, // zoals buildHorizonInput 'm afleidt (yearlyMustExpenses)
       stopAge,
       fireEndAge: FIRE_STRATEGY.endAge,
+      // De hook draait het stop-pad op de EIGEN eindstrategie van het profiel ('inherit'),
+      // niet op de geforceerde deplete van de preset-stopkaarten. Beide kanten van deze
+      // vergelijking wijzigen mee — het contract "hook == gedeeld recept" blijft gepind.
+      endStrategy: 'inherit',
     })
     expect(expected).not.toBeNull()
 
     const { result, unmount } = renderHook(() => useHorizonFireSim(makeParams({ stopPadAge: stopAge })))
     expect(result.current.stopPad).toEqual(expected)
+    // In de synchrone tak (jsdom heeft geen kernel-worker, dus useWorker=false) settelt
+    // useDeferredValue binnen dezelfde act()-flush — een transiënt "true" middenin een
+    // rerender is met dit synchrone renderHook-patroon niet waarneembaar (geprobeerd:
+    // console-probe op stopPadAge 60→61 bleef `false` vóór én na rerender). Deze assert
+    // pint daarom het settled-gedrag: géén valse "bijwerken…"-indicator in rust.
+    expect(result.current.stopPadPending).toBe(false)
     unmount()
   })
 
@@ -410,6 +421,11 @@ describe('useHorizonFireSim — gekozen-stop-pad (3e run)', () => {
 // coverage-strip-forced-stop.test.ts); dit bewijst dat het GEDRAG ook via de hook zelf
 // klopt — mét dezelfde 20x-verkleinde persona-fixture (brugperiode tussen de geforceerde
 // stopleeftijd en de AOW-fallback zonder salaris die de portefeuille niet volledig dekt).
+//
+// De fixture is bewust `fire_end_strategy: 'perpetual'`; sinds de hook het stop-pad op
+// `endStrategy: 'inherit'` draait, rekent deze run dus óók perpetual. De INTENTIE van beide
+// asserts is de post-FIRE-salaris-gate (en het dekkingsgat dat daaruit volgt) — niet de
+// eindstrategie. Beide houden onder inherit ongewijzigd stand.
 
 const HOOK_PINNED_AGE = 42
 const HOOK_SCALE = 20

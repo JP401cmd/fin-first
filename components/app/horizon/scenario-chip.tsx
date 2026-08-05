@@ -15,12 +15,17 @@ export const VERKEN_SECTION_ID = 'verken-je-aannames'
 export function ScenarioChip({
   className = '',
   doelActief = false,
+  onBeforeScroll,
 }: {
   className?: string
   doelActief?: boolean
+  /** Vlak vóór de scroll aangeroepen — horizon-client klapt hiermee de (standaard
+   *  ingeklapte) doelsectie open zodat de klik niet op een dichte regel landt. */
+  onBeforeScroll?: () => void
 }) {
   const scrollToSection = () => {
     if (typeof document === 'undefined') return
+    onBeforeScroll?.()
     document
       .getElementById(VERKEN_SECTION_ID)
       ?.scrollIntoView({ behavior: 'smooth', block: 'start' })

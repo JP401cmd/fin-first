@@ -128,8 +128,9 @@ export interface HorizonFireSimResult {
    */
   scenario?: HorizonScenarioResult | null
   /**
-   * Gekozen-stop-pad (ronde 3) — de geforceerde "wat als je op `stopPadAge` echt stopt en
-   * je vermogen opeet"-projectie. `null` = geen `stopPadAge` gezet, of loading/null-pad, of
+   * Gekozen-stop-pad (ronde 3) — de geforceerde "wat als je op `stopPadAge` echt stopt"-
+   * projectie, met de EIGEN eindstrategie van het profiel (`endStrategy: 'inherit'`,
+   * ADR 0085). `null` = geen `stopPadAge` gezet, of loading/null-pad, of
    * een kern-fout (zichtbare degradatie, geen tweede motor). Berekend in een EIGEN useMemo
    * die op de hoofd-input + de scenario-overrides + `stopPadAge` keyt; de hoofd- en scenario-
    * memo herrekenen hierdoor NOOIT, en dit pad schrijft NOOIT naar `net_worth_snapshots`.
@@ -145,6 +146,15 @@ export interface HorizonFireSimResult {
    * altijd een concrete `boolean`; `?` houdt bestaande volledige result-literals compileerbaar.
    */
   scenarioPending?: boolean
+  /**
+   * Spiegel van `scenarioPending`, maar voor het gekozen-stop-pad: true zolang de deferred
+   * stopleeftijd (of de deferred hoofd-/scenario-input waarop het stop-pad meelift) nog
+   * achterloopt op de live waarde, of — in de worker-tak — zolang de stop-run nog niet
+   * geland is terwijl er wél een `stopPadAge` staat. Consumenten dempen hiermee de doel-lijn
+   * tijdens het slepen ("bijwerken…"). Additief/optioneel in het TYPE — de hook zet altijd
+   * een concrete `boolean`.
+   */
+  stopPadPending?: boolean
   /**
    * True zolang de worker de hoofd-run nog niet heeft opgeleverd (progressieve first paint,
    * Task 4.2). In de synchrone tak (jsdom/SSR — geen Worker) altijd `false` (de kernel draait
@@ -274,6 +284,13 @@ function buildInputFromBundle(p: KernelInputBundle) {
  * Assembleert de `ForcedStopPathInput` voor het gekozen-stop-pad — gedeeld door de synchrone
  * en de worker-tak zodat beide exact dezelfde ACTIEVE context (incl. scenario-overrides) en
  * eindstrategie gebruiken. `profile` wordt expliciet doorgegeven (caller heeft 'm al geguard).
+ *
+ * `endStrategy: 'inherit'`: dit ENE stop-pad voedt zowel de duiding (dekkingsradar,
+ * levensinkomenstrook) als straks de doel-lijn in de grafiek, en moet daarom hetzelfde
+ * verhaal vertellen als de hoofdlijn — dus de EIGEN eindstrategie van het profiel, niet een
+ * geforceerde deplete. Voor de default-gebruiker (deplete, `fire_end_age ≥ 90`) is dat
+ * gedrags-identiek; voor perpetual/legacy verschuift de duiding bewust naar de eigen
+ * strategie. De preset-stopkaarten blijven op de default (`'deplete'`).
  */
 function buildStopPadInput(
   p: KernelInputBundle,
@@ -292,6 +309,7 @@ function buildStopPadInput(
     yearlyExpenses,
     stopAge,
     fireEndAge: p.fireStrategy?.endAge ?? DEFAULT_FIRE_STRATEGY.endAge,
+    endStrategy: 'inherit',
   }
 }
 
@@ -485,8 +503,9 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
   // → een stopPadAge-wijziging laat die NOOIT herrekenen. Zonder stopPadAge ⇒ null (geen 3e
   // kernel-run). Anders: het geforceerde-run-recept (runForcedStopPath, één home) op de
   // ACTIEVE context — mét scenario-overrides indien aanwezig (exact dezelfde context-
-  // assemblage als de scenario-memo) — met een deplete-op-eindleeftijd-eindstrategie. Dit is
-  // de eerlijke "wat als je dan echt stopt en je vermogen opeet"-vorm. `yearlyExpenses` komt
+  // assemblage als de scenario-memo) — met `endStrategy: 'inherit'`: de run erft de eigen
+  // eindstrategie van het profiel (ADR 0085), zodat stop-lijn en duiding dezelfde
+  // eindsemantiek dragen als de hoofdlijn. `yearlyExpenses` komt
   // — net als de hoofd-/scenario-run — uit buildHorizonInput (baseline; hangt niet van
   // assets/events af). Kern-context ontbreekt of kern-fout ⇒ null (zichtbare degradatie).
   const syncStopPad = useMemo<HorizonStopPadResult | null>(() => {
@@ -613,6 +632,16 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
     deferredScenarioOverrides !== scenarioOverrides ||
     (useWorker && scenarioActive && scenario == null)
 
+  // Zelfde vorm voor het gekozen-stop-pad. Het stop-pad keyt op de hoofd-input ÉN de
+  // overrides ÉN de stopleeftijd, dus alle drie de deferred-vergelijkingen tellen mee;
+  // in de worker-tak telt daarbovenop "run nog niet geland terwijl er een stopleeftijd is".
+  const stopPadActive = deferredStopPadAge != null && Number.isFinite(deferredStopPadAge)
+  const stopPadPending =
+    deferredKernelInput !== kernelInput ||
+    deferredScenarioOverrides !== scenarioOverrides ||
+    deferredStopPadAge !== stopPadAge ||
+    (useWorker && stopPadActive && stopPad == null)
+
   // Verfijnstaat: de worker heeft de hoofd-run nog niet opgeleverd terwijl er wél een
   // berekenbare invoer is (progressieve first paint). In de synchrone tak nooit true.
   const isRefining = useWorker && simResult == null && horizonInput != null && kernelRawProfile != null
@@ -660,7 +689,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
   }, [simResult])
 
   if (!params || !horizonInput) {
-    return { result: null, cashflows: [], isLoading: true, error: profileError ?? null, unifiedRows: null, effectiveLifeEvents: [], kernelStatus: null, kernelMaandHint: null, kernelHousingSale: null, kernelPensionPots: null, scenario: null, stopPad: null, scenarioPending: false, isRefining: false, firstPaintFireAge: null, firstPaintFreedomPct: null, firstPaintRequiredPortfolio: null }
+    return { result: null, cashflows: [], isLoading: true, error: profileError ?? null, unifiedRows: null, effectiveLifeEvents: [], kernelStatus: null, kernelMaandHint: null, kernelHousingSale: null, kernelPensionPots: null, scenario: null, stopPad: null, scenarioPending: false, stopPadPending: false, isRefining: false, firstPaintFireAge: null, firstPaintFreedomPct: null, firstPaintRequiredPortfolio: null }
   }
 
   return {
@@ -677,6 +706,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
     scenario: scenario ?? null,
     stopPad: stopPad ?? null,
     scenarioPending,
+    stopPadPending,
     isRefining,
     // First-paint-scalars alléén zolang de worker-run nog niet geland is (`result === null`);
     // daarna wint `result`. In de synchrone tak is `result` er meteen → altijd null.

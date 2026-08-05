@@ -156,3 +156,83 @@ describe('runForcedStopPath — geforceerd stopmoment', () => {
     expect(run!.result.strategy).toBe('deplete')
   })
 })
+
+// ── endStrategy: 'deplete' (default) vs. 'inherit' ───────────────────────────
+//
+// `'inherit'` laat de twee geforceerde profielvelden (`fire_end_strategy`, `fire_end_age`)
+// weg zodat het profiel z'n eigen eindstrategie draagt — nodig zodra de stop-run als
+// doel-lijn naast de hoofdlijn wordt getekend. Default blijft `'deplete'`, zodat elke
+// bestaande caller (preset-stopkaarten, AOW-stop-sim) byte-identiek blijft.
+
+describe('runForcedStopPath — endStrategy', () => {
+  const STOP_AGE = Math.round(VERWACHT_FIRE) + 1
+
+  function run(over: Partial<Parameters<typeof runForcedStopPath>[0]> = {}) {
+    return runForcedStopPath({
+      profile,
+      assets: fx.assets,
+      debts: fx.debts,
+      lifeEvents: fx.lifeEvents,
+      aowRows: [],
+      yearlyExpenses: 30_000,
+      stopAge: STOP_AGE,
+      fireEndAge: 90,
+      ...over,
+    })
+  }
+
+  it('REGRESSIE-ANKER: zonder endStrategy ≡ expliciet "deplete" (bestaande callers ongewijzigd)', () => {
+    const zonder = run()
+    const expliciet = run({ endStrategy: 'deplete' })
+    expect(zonder).not.toBeNull()
+    // Volledige uitkomst — rijen én alle FIRE-scalars.
+    expect(expliciet).toEqual(zonder)
+  })
+
+  it('inherit + perpetual-profiel: eigen strategie, eigen eindpunt (100), geen deplete-doel', () => {
+    // Het fixture-profiel is `fire_end_strategy: 'perpetual'` met `fire_end_age: 90`.
+    const geforceerd = run()
+    const geerfd = run({ endStrategy: 'inherit' })
+    expect(geerfd).not.toBeNull()
+
+    expect(geforceerd!.result.strategy).toBe('deplete')
+    expect(geerfd!.result.strategy).toBe('perpetual')
+    // Perpetual loopt door tot het einde van de kern-horizon (100) — net als de hoofdlijn —
+    // in plaats van tot de geforceerde deplete-eindleeftijd (90). Dít is wat de doel-lijn
+    // nodig heeft: `clipRowsToPlanEnd(rows, displayEndAge)` kapt 'm anders 10 jaar te vroeg af.
+    expect(geerfd!.result.displayEndAge).toBe(100)
+    expect(geforceerd!.result.displayEndAge).toBe(90)
+
+    // "Geen deplete-uitputting" = het doel-eindvermogen is niet 0: deplete stuurt op
+    // vermogen-op bij de eindleeftijd, perpetual houdt het kapitaal in stand.
+    expect(geforceerd!.result.targetEndPortfolio).toBe(0)
+    expect(geerfd!.result.targetEndPortfolio).toBeGreaterThan(0)
+
+    // En het perpetuale pad blijft t/m het eigen eindpunt positief.
+    const laatsteRij = geerfd!.unifiedRows[geerfd!.unifiedRows.length - 1]
+    expect(laatsteRij.netWorth).toBeGreaterThan(0)
+  })
+
+  it('inherit verandert de DUIDING, niet het pad: identieke rijen bij een geforceerde stop', () => {
+    // Bij een GEFORCEERDE stop (`evaluateFireAt`) is het pad volledig bepaald door de
+    // invoer + het gedwongen FIRE-moment; de eindstrategie (en `fire_end_age`) is een
+    // SOLVE-criterium en raakt de projectie zelf niet. `'inherit'` wisselt dus uitsluitend
+    // de duiding (strategie/doelbedrag) en het weergave-eindpunt — een belangrijk gegeven
+    // voor de doel-lijn: de lijn verandert niet van vorm, alleen van eindpunt.
+    expect(run({ endStrategy: 'inherit' })!.unifiedRows).toEqual(run()!.unifiedRows)
+  })
+
+  it('inherit + deplete-93-profiel ≡ de default-run met dezelfde eindleeftijd', () => {
+    // Draagt het profiel zélf al de deplete-eindstrategie (met `fire_end_age` ≥ 90), dan
+    // schrijft `'deplete'` exact hetzelfde voor als wat het profiel al zegt ⇒ identiek.
+    const depleteProfiel: ConvergentieRawProfileRow = {
+      ...profile,
+      fire_end_strategy: 'deplete',
+      fire_end_age: 93,
+    }
+    const geforceerd = run({ profile: depleteProfiel, fireEndAge: 93 })
+    const geerfd = run({ profile: depleteProfiel, fireEndAge: 93, endStrategy: 'inherit' })
+    expect(geerfd).not.toBeNull()
+    expect(geerfd).toEqual(geforceerd)
+  })
+})

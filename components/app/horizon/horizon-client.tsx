@@ -92,13 +92,14 @@ import { PerspectiveContextLabel } from '@/components/app/perspective-context-la
 import { PensionParseSummaryCard, PensionInstructionPanel, computeCumulativeImpacts, type SnapshotForTrend } from '@/components/app/horizon/horizon-helpers'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { PageInfoButton, GlossaryTerm, SectionLabel, Kicker } from '@/components/editorial'
-import { Vrijheidsas, computeCoupledStopAge } from '@/components/app/horizon/vrijheidsas'
+import { Vrijheidsas, computeCoupledStopAge, formatAge, formatMargeShort } from '@/components/app/horizon/vrijheidsas'
 import { ScenarioChip, VERKEN_SECTION_ID } from '@/components/app/horizon/scenario-chip'
 import { Dekkingsradar } from '@/components/app/horizon/dekkingsradar'
 import { ScenarioKaarten } from '@/components/app/horizon/scenario-kaarten'
 import { computeDekkingsradar, type RadarAs } from '@/lib/horizon/dekkingsradar'
 import { type ScenarioPresetResult } from '@/lib/horizon/scenario-presets'
 import { computeStopMarge } from '@/lib/horizon/stop-marge'
+import { selectDoelLijnBron } from '@/lib/horizon/doel-lijn-bron'
 import {
   scenarioMonthlySpendDelta,
   buildCategorieReturnGroups,
@@ -194,7 +195,8 @@ const HealthScoreReceipt = dynamic(() =>
   { ssr: false }
 )
 import { PensionPdfUpload, uploadPensionPdfToStorage } from '@/components/app/horizon/pension-pdf-upload'
-import { SimChart, buildScenarioVariants, buildScenarioPathsFromSim, SCENARIO_VARIANTS, type ScenarioOverlay, type MonteCarloOverlay, type HouseholdPartnerOverlay } from '@/components/app/horizon/sim-chart'
+import { SimChart, buildScenarioVariants, SCENARIO_VARIANTS, type ScenarioOverlay, type MonteCarloOverlay, type HouseholdPartnerOverlay } from '@/components/app/horizon/sim-chart'
+import { computeVerwachtingsband } from '@/components/app/horizon/verwachtingsband'
 import { ZoomableChartContainer } from '@/components/app/horizon/zoomable-chart-container'
 import { EventsTimeline } from '@/components/app/horizon/events-timeline'
 import { EventClusterSheet } from '@/components/app/horizon/event-cluster-sheet'
@@ -581,6 +583,12 @@ export default function HorizonPage({
   const [doelSaving, setDoelSaving] = useState(false)
   // "Doel loslaten"-bevestiging (gedeelde ShellOverlay-confirm i.p.v. window.confirm).
   const [doelLoslatenOpen, setDoelLoslatenOpen] = useState(false)
+  // KATERN II ("Jouw doel" / "Wat als je draait") — standaard INGEKLAPT, in
+  // béíde weergavemodi (bewuste afwijking van het DepthSection-gedrag waar
+  // Volledig standaard opent): de sectie is een werkbank, geen leesstof. De
+  // ingeklapte regel toont een 1-regel-samenvatting; ?whatif=open en de
+  // ScenarioChip klappen eerst open vóór de scroll. Ephemeral, geen persist.
+  const [verkenOpen, setVerkenOpen] = useState(false)
 
   // Saved scenario overlay state (multi-select)
   const [savedScenarios, setSavedScenarios] = useState<SavedScenario[]>([])
@@ -743,11 +751,18 @@ export default function HorizonPage({
     return () => clearTimeout(t)
   }, [firstDragHintVisible])
 
-  // Afgeleid: is er een actief wat-als-scenario? (≥1 afwijkende slider of rendement-delta;
-  // stopAge telt bewust NIET mee — dat verschuift alleen de marge-marker, niet de projectie.)
+  // Afgeleid: is er een actief wat-als-scenario? (≥1 afwijkende slider of rendement-delta.)
+  // `stopAge` telt bewust NIET mee voor de scenario-RUN — die blijft de gesolvede "wanneer
+  // kán ik vrij zijn"-projectie. Voor de gestippelde DOEL-LIJN telt de stopkeuze wél mee
+  // (ADR 0085): dan wint het geforceerde stop-pad als bron. Zie `doelLijnBron` verderop.
   const hasScenario = scenarioSliderEvents.length > 0 || Object.keys(scenarioReturnDeltas).length > 0
+  /** Staat er een gekozen stopleeftijd? (Koppelmodus schrijft óók `scenarioStopAge`.) */
+  const hasStopKeuze = scenarioStopAge != null
   // Is er een doel vastgelegd? Stuurt de doel-taal (kop/chip/as/legenda) en de sectie-states.
   const doelActief = doelBlok != null
+  /** Naam van de gestippelde tweede lijn — drieslag: vastgelegd doel → live wat-als →
+   *  alleen een gekozen stopleeftijd. Eén bron voor pill, aria-label en legenda. */
+  const doelLijnLabel = doelActief ? 'Doel' : hasScenario ? 'Wat-als' : 'Stopkeuze'
   // Overrides voor de gescheiden 2e run in de hook; null ⇒ geen scenario-run.
   const scenarioOverrides = useMemo<HorizonScenarioOverrides | null>(() => {
     if (!hasScenario) return null
@@ -774,7 +789,7 @@ export default function HorizonPage({
   // Fase 2b (#495): gemigreerd naar runUnifiedProjection() met per-asset-type rendement
   // Task 4.2: de kernel-runs draaien in een web worker (met synchrone jsdom/SSR-fallback);
   // `firstPaint*` levert de server-scalars zolang de worker-run nog niet geland is.
-  const { result: simResult, cashflows: simCashflows, error: simError, unifiedRows, effectiveLifeEvents, kernelStatus, kernelMaandHint, kernelHousingSale, scenario, stopPad, scenarioPending, firstPaintFireAge, firstPaintFreedomPct, firstPaintRequiredPortfolio } = useHorizonFireSim(
+  const { result: simResult, cashflows: simCashflows, error: simError, unifiedRows, effectiveLifeEvents, kernelStatus, kernelMaandHint, kernelHousingSale, scenario, stopPad, scenarioPending, stopPadPending, firstPaintFireAge, firstPaintFreedomPct, firstPaintRequiredPortfolio } = useHorizonFireSim(
     input
       ? {
           horizonInput: input,
@@ -1560,8 +1575,11 @@ export default function HorizonPage({
   }, [displayMode, duidingInView, kernelRawProfile, simResult?.fireAgeFractional, currentAge, debts, events, aowRows, fireStrategy, initialData])
 
   // Deeplink `?whatif=open` (en ScenarioChip-klik) → scroll naar de slider-lab.
+  // De sectie start ingeklapt — eerst openklappen, dan scrollen, anders landt
+  // de gebruiker op een dichte regel zonder sliders.
   useEffect(() => {
     if (!whatIfInlineOpen) return
+    setVerkenOpen(true)
     const t = setTimeout(
       () => verkenSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
       120,
@@ -2508,25 +2526,52 @@ export default function HorizonPage({
     return results
   }, [selectedScenarioIds, savedScenarios, initialData, kernelRawProfile, debts, aowRows])
 
-  // ── Wat-als-lijn (2e projectielijn, plan §E) ────────────────────────────────
-  // Gebouwd uit de gescheiden scenario-run; gestippelde ink-lijn + FIRE-stip via
-  // `variant: 'scenario'` (chart-static-layers). Kleur wordt genegeerd (inkt vast).
-  // Alleen wanneer de toggle aan staat én er een actief scenario is.
+  // ── Doel-/wat-als-lijn (2e projectielijn, plan §E + ADR 0085) ───────────────
+  // De BRON kiest `selectDoelLijnBron`: het geforceerde stop-pad wanneer er een
+  // (betekenisvolle) stopleeftijd staat — opbouw tot je stopleeftijd, daarna
+  // onttrekking — anders de gesolvede scenario-run. Rijen, stip én ruis-drempel
+  // komen altijd uit dezelfde (deferred) run; de rauwe `scenarioStopAge` is hier
+  // bewust GEEN dependency, zodat een 0,5-slider-tick de chart-identiteit niet
+  // per tick ververst (review M1). Losgekoppeld van de zichtbaarheids-toggle,
+  // zodat de pill dezelfde waarheid leest als de lijn (review H1 — geen dode knop).
+  const doelLijnBron = useMemo(
+    () =>
+      selectDoelLijnBron({
+        stopPad,
+        // Zonder actief wat-als bestaat er geen scenario-lijn (gedrag van vóór ADR 0085).
+        scenario: hasScenario ? scenario : null,
+        stopKeuzeActief: hasStopKeuze,
+        verwachtFireAge: scenarioVerwachtFireAge,
+        hasScenario,
+        isPensioenMode,
+      }),
+    [stopPad, hasScenario, scenario, hasStopKeuze, scenarioVerwachtFireAge, isPensioenMode],
+  )
+  /** Is er écht iets te tekenen als tweede, gestippelde lijn? Stuurt ALLEEN de
+   *  toggle-pill en de overlay — dezelfde bron-waarheid, dus nooit een zichtbare
+   *  pill zonder lijn. Alle overige consumenten blijven op `hasScenario`. */
+  const hasDoelLijn = doelLijnBron != null
+
+  // Gestippelde ink-lijn + FIRE-stip via `variant: 'scenario'` (chart-static-layers);
+  // kleur wordt genegeerd (inkt vast). Alleen wanneer de toggle aan staat.
   const scenarioLineOverlay = useMemo<ScenarioOverlay | null>(() => {
-    if (!(showScenarioLine && hasScenario && scenario != null)) return null
+    if (!showScenarioLine || doelLijnBron == null) return null
     return {
       name: 'wat-als',
-      label: doelActief ? 'Jouw doel' : 'Jouw wat-als',
+      // "Jouw doel" · "Jouw wat-als" · "Jouw stopkeuze" (zelfde drieslag als de pill).
+      label: `Jouw ${doelLijnLabel.toLowerCase()}`,
       color: 'var(--ink-2)',
       // Clip op dezelfde `displayEndAge` als de hoofdlijn (zie displaySimRows) — anders
-      // loopt de gestippelde wat-als-lijn een jaar verder door dan de basislijn.
-      points: clipRowsToPlanEnd(scenario.result.rows, displayEndAge).map(
+      // loopt de gestippelde lijn een jaar verder door dan de basislijn.
+      points: clipRowsToPlanEnd(doelLijnBron.rows, displayEndAge).map(
         r => [r.age, r.endPortfolio] as [number, number],
       ),
       variant: 'scenario',
-      fireAgeFractional: scenario.result.fireAgeFractional,
+      fireAgeFractional: doelLijnBron.fireAgeFractional,
+      // Stop-bron ⇒ legenda toont "(stop 63)" i.p.v. de gesolvede "(57j)".
+      ageLabel: doelLijnBron.bron === 'stop' ? 'stop' : 'fire',
     }
-  }, [showScenarioLine, hasScenario, scenario, displayEndAge, doelActief])
+  }, [showScenarioLine, doelLijnBron, displayEndAge, doelLijnLabel])
 
   // Gememoized samenstelling voor de SimChart-prop: een inline spread op de
   // callsite gaf per render een verse array-identiteit, waardoor de memo() van
@@ -2546,31 +2591,23 @@ export default function HorizonPage({
   )
 
   // ── Vrijheidsas + stop-marge (plan §D) ──────────────────────────────────────
-  // "laatst" = FIRE-leeftijd van de VOORZICHTIGE variant (pessimist, −0,02) van het
-  // ACTIEVE pad — consume uit `buildScenarioPathsFromSim` (géén extra kernel-run).
+  // De verwachtingsband ("waarschijnlijk vrij tussen vroegst en laatst") van het ACTIEVE
+  // pad — ÉÉN memo, ÉÉN `buildScenarioPathsFromSim`-aanroep, beide randen eruit (consume,
+  // géén extra kernel-run). De grondslag-keuze (drempel = requiredFireNetWorth, want de
+  // rijen dragen netto vermogen INCL. eigen woning) leeft in `computeVerwachtingsband`.
   const scenarioBaseFireAge = simResult?.fireAgeFractional ?? null
-  const laatstFireAge = useMemo(() => {
-    const rows = hasScenario && scenario != null ? scenario.result.rows : (simResult?.rows ?? [])
-    const fireTarget = hasScenario && scenario != null
-      ? scenario.result.requiredFirePortfolio
-      : (simResult?.requiredFirePortfolio ?? 0)
-    if (rows.length === 0 || !(fireTarget > 0)) return null
-    const paths = buildScenarioPathsFromSim(rows, fireParams.grossReturn, fireTarget)
-    return paths[0]?.fireAge ?? null // index 0 = 'pessimist' (Voorzichtig)
-  }, [hasScenario, scenario, simResult, fireParams.grossReturn])
-
-  // "vroegst" = FIRE-leeftijd van de OPTIMISTISCHE variant (+0,02) van het ACTIEVE pad —
-  // spiegelt `laatstFireAge`, maar dan de andere rand van de verwachtingsband (index 2 =
-  // 'optimist'; buildScenarioPathsFromSim → [pessimist, baseline, optimist]).
-  const vroegstFireAge = useMemo(() => {
-    const rows = hasScenario && scenario != null ? scenario.result.rows : (simResult?.rows ?? [])
-    const fireTarget = hasScenario && scenario != null
-      ? scenario.result.requiredFirePortfolio
-      : (simResult?.requiredFirePortfolio ?? 0)
-    if (rows.length === 0 || !(fireTarget > 0)) return null
-    const paths = buildScenarioPathsFromSim(rows, fireParams.grossReturn, fireTarget)
-    return paths[2]?.fireAge ?? null // index 2 = 'optimist' (Optimistisch)
-  }, [hasScenario, scenario, simResult, fireParams.grossReturn])
+  const verwachtingsband = useMemo(
+    () =>
+      computeVerwachtingsband(
+        hasScenario && scenario != null ? scenario.result : simResult,
+        fireParams.grossReturn,
+      ),
+    [hasScenario, scenario, simResult, fireParams.grossReturn],
+  )
+  /** Late rand: FIRE-leeftijd van de VOORZICHTIGE variant (pessimist, −0,02). */
+  const laatstFireAge = verwachtingsband.laatstFireAge
+  /** Vroege rand: FIRE-leeftijd van de OPTIMISTISCHE variant (+0,02). */
+  const vroegstFireAge = verwachtingsband.vroegstFireAge
 
   // Effectieve stopleeftijd — de slider werkt controlled op dit getal; is er nog niets
   // gekozen dan default naar de (afgeronde) verwacht-FIRE, anders currentAge+1.
@@ -2592,6 +2629,26 @@ export default function HorizonPage({
       }),
     [effectiveStopAge, scenarioVerwachtFireAge, laatstFireAge, scenarioBaseFireAge],
   )
+
+  // 1-regel-samenvatting voor de ingeklapte KATERN II-regel ("Jouw doel" /
+  // "Wat als je draait"). Consumeert uitsluitend al afgeleide waarden —
+  // verwachte vrijheidsleeftijd, gekozen stopleeftijd, marge — met dezelfde
+  // formatters als de Vrijheidsas-cijferrij (formatAge/formatMargeShort):
+  // geen eigen som, geen tweede weergave van hetzelfde getal.
+  const verkenSamenvatting = useMemo(() => {
+    if (currentAge === null) {
+      return doelActief
+        ? 'Je vastgelegde doel — klap uit voor de details'
+        : 'Draai aan je aannames — je basislijn blijft staan'
+    }
+    const delen: string[] = []
+    if (scenarioVerwachtFireAge !== null) delen.push(`vrij op ${formatAge(scenarioVerwachtFireAge)} jr`)
+    delen.push(`stop ${effectiveStopAge}`)
+    if (stopMarge.margeJaren !== null) delen.push(`marge ${formatMargeShort(stopMarge.margeJaren)}`)
+    const cijfers = delen.join(' · ')
+    if (doelActief) return `Vastgelegd doel — ${cijfers}`
+    return hasScenario ? `Wat-als actief — ${cijfers}` : `Verken je pad — ${cijfers}`
+  }, [currentAge, doelActief, hasScenario, scenarioVerwachtFireAge, effectiveStopAge, stopMarge])
 
   // Slepen aan de stop-slider legt (bij koppel aan) een nieuwe vast te houden marge vast.
   // Vergrendelen alléén tegen de bezonken verwacht-waarde (nooit de basis-fallback).
@@ -4242,6 +4299,7 @@ export default function HorizonPage({
                     barchart-mode i.p.v. uitgrijzen: minder visuele ruis,
                     en de gebruiker kan altijd terug-toggelen naar 'Pad'. */}
                 {chartMode === 'vermogenspad' && (
+                  <>
                   <HideInSimple>
                     <button
                       type="button"
@@ -4283,39 +4341,45 @@ export default function HorizonPage({
                         </span>
                       )}
                     </button>
-                    {/* ── Wat-als-lijn toggle (alleen bij actief scenario) ── */}
-                    {hasScenario && (
-                      <>
-                      <button
-                        type="button"
-                        onClick={() => setShowScenarioLine(prev => !prev)}
-                        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                          showScenarioLine
-                            ? 'border-horizon-300 bg-horizon-50 text-horizon-700'
-                            : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
-                        }`}
-                        aria-pressed={showScenarioLine}
-                        aria-label="Wat-als-lijn tonen"
-                        title="Wat-als-lijn"
-                      >
-                        {/* Ink-dash-swatch (zelfde SVG als legenda/ScenarioChip) draagt de
-                            wat-als-identiteit; de pill volgt verder de horizon-chroom van de rij. */}
-                        <svg width="20" height="8" viewBox="0 0 20 8" aria-hidden className="shrink-0">
-                          <line x1="0" y1="4" x2="20" y2="4" stroke="var(--ink-2)" strokeWidth="2" strokeDasharray="6 4" />
-                        </svg>
-                        <span className="hidden sm:inline">Wat-als</span>
-                        {scenarioFireDeltaLabel && (
-                          <span className="ml-0.5 font-mono text-[10px] tabular-nums opacity-75">
-                            {scenarioFireDeltaLabel}
-                          </span>
-                        )}
-                      </button>
-                      <span aria-live="polite" className="font-mono text-[10px] text-[var(--ink-3)]">
-                        {showScenarioLine && scenarioPending ? 'bijwerken…' : ''}
-                      </span>
-                      </>
-                    )}
+                  {/* ── Doel-/wat-als-lijn toggle (alleen wanneer er écht een
+                      gestippelde lijn te tonen is — zelfde bron-waarheid als de
+                      overlay, ADR 0085). Binnen HideInSimple, net als de andere
+                      chart-overlay-toggles (Eenvoudig-modus blijft ongewijzigd). */}
+                  {hasDoelLijn && (
+                    <>
+                    <button
+                      type="button"
+                      onClick={() => setShowScenarioLine(prev => !prev)}
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                        showScenarioLine
+                          ? 'border-horizon-300 bg-horizon-50 text-horizon-700'
+                          : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
+                      }`}
+                      aria-pressed={showScenarioLine}
+                      aria-label={`${doelLijnLabel}-lijn tonen`}
+                      title={`${doelLijnLabel}-lijn`}
+                    >
+                      {/* Ink-dash-swatch (zelfde SVG als legenda/ScenarioChip) draagt de
+                          wat-als-identiteit; de pill volgt verder de horizon-chroom van de rij. */}
+                      <svg width="20" height="8" viewBox="0 0 20 8" aria-hidden className="shrink-0">
+                        <line x1="0" y1="4" x2="20" y2="4" stroke="var(--ink-2)" strokeWidth="2" strokeDasharray="6 4" />
+                      </svg>
+                      <span className="hidden sm:inline">{doelLijnLabel}</span>
+                      {/* Delta t.o.v. de basislijn is alleen betekenisvol bij een echt
+                          wat-als; een stop-only-lijn zou hier "gelijk" tonen. */}
+                      {hasScenario && scenarioFireDeltaLabel && (
+                        <span className="ml-0.5 font-mono text-[10px] tabular-nums opacity-75">
+                          {scenarioFireDeltaLabel}
+                        </span>
+                      )}
+                    </button>
+                    <span aria-live="polite" className="font-mono text-[10px] text-[var(--ink-3)]">
+                      {showScenarioLine && (scenarioPending || stopPadPending) ? 'bijwerken…' : ''}
+                    </span>
+                    </>
+                  )}
                   </HideInSimple>
+                  </>
                 )}
 
                 {/* ── Levensgebeurtenissen toggle ── */}
@@ -4637,7 +4701,7 @@ export default function HorizonPage({
                             // visueel bij elkaar horen. FIRE-annotaties blijven goud (COLOR_OPBOUW).
                             mainLineColor={(usePartnerMainLine || useHouseholdMainLine) ? COLOR_PARTNER_EVENT : undefined}
                             scenarioOverlays={(isAowStopActive || usePartnerMainLine || useHouseholdMainLine) ? undefined : combinedScenarioOverlays}
-                            scenarioPending={scenarioPending}
+                            scenarioPending={scenarioPending || stopPadPending}
                             monteCarloOverlay={(isAowStopActive || usePartnerMainLine || useHouseholdMainLine) ? undefined : monteCarloOverlay}
                             dailyExpenseRate={(effectiveInput?.yearlyMustExpenses ?? 0) / 365}
                             householdOverlays={householdOverlays ?? undefined}
@@ -4928,9 +4992,24 @@ export default function HorizonPage({
         >
           <SectionLabel num="II">{doelActief ? 'Jouw doel' : 'Wat als je draait'}</SectionLabel>
           <div className="mb-1 flex flex-wrap items-start justify-between gap-3">
-            <h2 className="label-editorial text-[var(--ink-2)]">
-              {doelActief ? 'Jouw doelsituatie' : 'Verken je aannames'}
-            </h2>
+            {/* Kop = toggle. De sectie start INGEKLAPT (beide weergavemodi);
+                het chevron volgt het DepthSection-gebaar, de typografie blijft
+                de editorial sectiekop. Actieknoppen alleen in open stand. */}
+            <button
+              type="button"
+              onClick={() => setVerkenOpen(prev => !prev)}
+              aria-expanded={verkenOpen}
+              className="group flex min-w-0 items-center gap-1.5 text-left"
+            >
+              <h2 className="label-editorial text-[var(--ink-2)]">
+                {doelActief ? 'Jouw doelsituatie' : 'Verken je aannames'}
+              </h2>
+              <ChevronDown
+                aria-hidden
+                className={`h-3.5 w-3.5 shrink-0 text-[var(--ink-3)] transition-transform duration-200 motion-reduce:transition-none group-hover:text-[var(--ink-2)] ${verkenOpen ? 'rotate-180' : ''}`}
+              />
+            </button>
+            {verkenOpen && (
             <div className="flex shrink-0 flex-wrap items-center gap-1.5">
               {doelActief ? (
                 <>
@@ -4974,12 +5053,25 @@ export default function HorizonPage({
                 </>
               )}
             </div>
+            )}
           </div>
-          <p className="mb-3 font-sans text-[12px] text-[var(--ink-3)]">
-            {doelActief
-              ? 'Dit is je vastgelegde doel — de gestippelde lijn in de grafiek is Jouw doel. Draai gerust verder; leg opnieuw vast of herstel je doel wanneer je klaar bent.'
-              : 'Draai aan je aannames — je basislijn blijft staan; je wat-als verschijnt als gestippelde lijn in de grafiek en kleurt de blokken hieronder.'}
-          </p>
+          {verkenOpen ? (
+            <p className="mb-3 font-sans text-[12px] text-[var(--ink-3)]">
+              {doelActief
+                ? 'Dit is je vastgelegde doel — de gestippelde lijn in de grafiek is Jouw doel en loopt door tot je gekozen stopleeftijd. Draai gerust verder; leg opnieuw vast of herstel je doel wanneer je klaar bent.'
+                : 'Draai aan je aannames — je basislijn blijft staan; je wat-als verschijnt als gestippelde lijn in de grafiek en kleurt de blokken hieronder.'}
+            </p>
+          ) : (
+            /* Ingeklapte regel — 1-regel-samenvatting, klik = uitklappen. */
+            <button
+              type="button"
+              onClick={() => setVerkenOpen(true)}
+              aria-label="Doelsectie uitklappen"
+              className="mb-1 block w-full text-left font-sans text-[12px] text-[var(--ink-3)] transition-colors hover:text-[var(--ink-2)]"
+            >
+              {verkenSamenvatting}
+            </button>
+          )}
 
           {/* (c) Concept gewijzigd — smalle banner boven de sectie-inhoud.
               role="status" + aria-live="polite" zodat de wijziging voor
@@ -5013,6 +5105,11 @@ export default function HorizonPage({
             </div>
           )}
 
+          {/* Uitgeklapte sectie-inhoud: afwijkings-badges + de werkbank-kaart.
+              De concept-gewijzigd-banner hierboven blijft bewust ALTIJD zichtbaar
+              (ook ingeklapt): die draagt de herstel-/vastleg-acties. */}
+          {verkenOpen && (
+          <>
           {/* Dichtgeklapte-kop-afwijkingssamenvatting (DeltaBadge-hergebruik). */}
           {hasScenario && whatIfBaseline && (
             <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
@@ -5123,6 +5220,8 @@ export default function HorizonPage({
               </button>
             </div>
           </div>
+          </>
+          )}
         </section>
 
         {/* Vastleg-/bijwerk-sheet (BottomSheet, boven de nav-pill). */}
@@ -5175,7 +5274,7 @@ export default function HorizonPage({
                         <Kicker className="mb-1">Levensinkomenstrook</Kicker>
                         <div className="flex items-center gap-2">
                           <h2 className="font-display text-[14px] font-semibold leading-snug text-[var(--ink)]">Dekt je inkomen straks je uitgaven?</h2>
-                          {hasScenario && !(usePartnerMainLine || useHouseholdMainLine) && <ScenarioChip doelActief={doelActief} />}
+                          {hasScenario && !(usePartnerMainLine || useHouseholdMainLine) && <ScenarioChip doelActief={doelActief} onBeforeScroll={() => setVerkenOpen(true)} />}
                         </div>
                       </div>
                       <p className="mb-3 font-sans text-[12px] text-[var(--ink-3)]">
@@ -5212,7 +5311,7 @@ export default function HorizonPage({
                         <Kicker className="mb-1">Guardrail-kompas</Kicker>
                         <div className="flex items-center gap-2">
                           <h2 className="font-display text-[14px] font-semibold leading-snug text-[var(--ink)]">Hoeveel kun je veilig uitgeven?</h2>
-                          {hasScenario && !(usePartnerMainLine || useHouseholdMainLine) && <ScenarioChip doelActief={doelActief} />}
+                          {hasScenario && !(usePartnerMainLine || useHouseholdMainLine) && <ScenarioChip doelActief={doelActief} onBeforeScroll={() => setVerkenOpen(true)} />}
                         </div>
                       </div>
                       <p className="mb-3 font-sans text-[12px] text-[var(--ink-3)]">
@@ -5237,7 +5336,7 @@ export default function HorizonPage({
                         <Kicker className="mb-1">Dekkingsradar</Kicker>
                         <div className="flex items-center gap-2">
                           <h2 className="font-display text-[14px] font-semibold leading-snug text-[var(--ink)]">Hoe stevig staat je plan?</h2>
-                          {hasScenario && !(usePartnerMainLine || useHouseholdMainLine) && <ScenarioChip doelActief={doelActief} />}
+                          {hasScenario && !(usePartnerMainLine || useHouseholdMainLine) && <ScenarioChip doelActief={doelActief} onBeforeScroll={() => setVerkenOpen(true)} />}
                         </div>
                       </div>
                       <p className="mb-3 font-sans text-[12px] text-[var(--ink-3)]">

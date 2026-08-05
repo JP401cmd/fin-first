@@ -135,7 +135,7 @@ describe('Vrijheidsas rendering', () => {
     render(<Vrijheidsas {...baseProps} />)
     // De drieslag blijft over…
     expect(screen.getByText('Basis-vrijheid')).toBeInTheDocument()
-    expect(screen.getByText('Wat-als-vrijheid')).toBeInTheDocument()
+    expect(screen.getByText('Verwacht vrij')).toBeInTheDocument()
     expect(screen.getByText('Geambieerde vrijheid')).toBeInTheDocument()
     // …en de gedupliceerde figures zijn weg.
     expect(screen.queryByText('FIRE-leeftijd · verwacht')).not.toBeInTheDocument()
@@ -143,9 +143,10 @@ describe('Vrijheidsas rendering', () => {
     expect(screen.queryByText('Stopleeftijd')).not.toBeInTheDocument()
   })
 
-  it('hernoemt de middelste grootheid naar "Doel-vrijheid" wanneer er een doel actief is', () => {
+  it('houdt de middelste kicker "Verwacht vrij" — ook met een actief doel (het doel is de stopleeftijd rechts)', () => {
     render(<Vrijheidsas {...baseProps} doelActief />)
-    expect(screen.getByText('Doel-vrijheid')).toBeInTheDocument()
+    expect(screen.getByText('Verwacht vrij')).toBeInTheDocument()
+    expect(screen.queryByText('Doel-vrijheid')).not.toBeInTheDocument()
     expect(screen.queryByText('Wat-als-vrijheid')).not.toBeInTheDocument()
   })
 
