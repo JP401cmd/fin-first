@@ -205,13 +205,32 @@ describe('computeLifetimeTax — aow-vlag per rij', () => {
    * `computeBox1Tax` past de **arbeidskorting** toe op het volledige
    * `grossYearlyIncome`, ook als dat pensioen/AOW is. Fiscaal is pensioen géén
    * arbeidsinkomen, dus de motor OVERSCHAT de korting en daarmee ONDERSCHAT hij
-   * de heffing op een pensioen-gedreven plan. Dit is een eigenschap van de enige
-   * tariefmotor van de app (`lib/box1-tax.ts`), niet van deze rapportagelaag —
-   * hem hier omzeilen zou een tweede tariefimplementatie zijn (verboden). Deze
-   * test legt de huidige uitkomst vast zodat een latere correctie in box1-tax.ts
-   * een BEWUSTE, zichtbare wijziging is in plaats van een stille verschuiving.
+   * `box1Totaal`. Dit is een eigenschap van de enige tariefmotor van de app
+   * (`lib/box1-tax.ts`), niet van deze rapportagelaag — hem hier omzeilen zou een
+   * tweede tariefimplementatie zijn (verboden). Deze tests leggen de huidige
+   * uitkomst vast zodat een latere correctie in box1-tax.ts een BEWUSTE,
+   * zichtbare wijziging is in plaats van een stille verschuiving.
+   *
+   * DRIE gevallen, want de afwijking is NIET uniform:
+   *  (a) `aow: true` zonder AOW-inkomen — de milde kant, was al gepind;
+   *  (b) `aow: false` — de kant die de RANGSCHIKKING stuurt: "pensioen vroeg"
+   *      concentreert onttrekkingen in pre-AOW-jaren, en dáár is de afwijking
+   *      verreweg het grootst (volle niet-AOW-arbeidskorting, max €5.685, tegen
+   *      de veel kleinere AOW-variant, max €2.840);
+   *  (c) AOW + een HOOG pensioen — daar draait het teken om, doordat de korting
+   *      op het totaalinkomen is uitgefaseerd terwijl hij op het AOW-only-been
+   *      nog meetelt. Zonder dit geval zou "de reeks onderschat altijd" als
+   *      waarheid vastliggen.
    */
-  it('BEKENDE AFWIJKING: arbeidskorting wordt (nog) óók over pensioeninkomen gegeven', () => {
+  /** Heffing zoals die zónder de (fiscaal onterechte) arbeidskorting zou zijn. */
+  const juisteHeffing = (gross: number, aow: boolean): number => {
+    if (!(gross > 0)) return 0
+    const r = computeBox1Tax({ grossYearlyIncome: gross, year: YEAR, aow })
+    const terecht = Math.min(r.algemeneHeffingskorting + r.iack, r.heffingVoorKortingen)
+    return Math.max(0, r.heffingVoorKortingen - terecht)
+  }
+
+  it('BEKENDE AFWIJKING (a) ná AOW zonder AOW-inkomen: arbeidskorting óók over pensioen', () => {
     const r = computeLifetimeTax([row({ age: 70, pensioenOnttrekkingBruto: 30_000 })], {
       aowLeeftijd: AOW_LEEFTIJD,
       year: YEAR,
@@ -223,6 +242,50 @@ describe('computeLifetimeTax — aow-vlag per rij', () => {
     })
     expect(zonderKortingen.arbeidskorting).toBeGreaterThan(0) // ← de afwijking zelf
     expect(r.box1NietVerrekend).toBe(zonderKortingen.tax)
+    // …en hoe groot hij is: ± €2.687 te laag op dit niveau.
+    expect(r.box1NietVerrekend - juisteHeffing(30_000, true)).toBeCloseTo(-2_687, -1)
+  })
+
+  it('BEKENDE AFWIJKING (b) vóór de AOW is de afwijking ruim twee keer zo groot', () => {
+    const opts = { aowLeeftijd: AOW_LEEFTIJD, year: YEAR }
+    const voor = computeLifetimeTax([row({ age: 60, pensioenOnttrekkingBruto: 30_000 })], opts)
+      .rows[0]
+    const na = computeLifetimeTax([row({ age: 70, pensioenOnttrekkingBruto: 30_000 })], opts).rows[0]
+    expect(voor.aowGerechtigd).toBe(false)
+
+    const afwijkingVoor = voor.box1NietVerrekend - juisteHeffing(30_000, false)
+    const afwijkingNa = na.box1NietVerrekend - juisteHeffing(30_000, true)
+
+    // Beide onderschatten, maar de pre-AOW-kant fors zwaarder — en dát is de kant
+    // waar "pensioen vroeg" zijn onttrekkingen concentreert.
+    expect(afwijkingVoor).toBeCloseTo(-5_381, -1)
+    expect(afwijkingNa).toBeCloseTo(-2_687, -1)
+    expect(Math.abs(afwijkingVoor)).toBeGreaterThan(Math.abs(afwijkingNa) * 1.9)
+  })
+
+  it('BEKENDE AFWIJKING (c) bij AOW + hoog pensioen KEERT het teken om (niet systematisch)', () => {
+    const opts = { aowLeeftijd: AOW_LEEFTIJD, year: YEAR }
+    const AOW_NETTO = 16_000
+    const brutoAow = grossFromNet(AOW_NETTO, YEAR, { aow: true })
+
+    const bescheiden = computeLifetimeTax(
+      [row({ age: 70, aowNetto: AOW_NETTO, pensioenOnttrekkingBruto: 30_000 })],
+      opts,
+    ).rows[0]
+    const hoog = computeLifetimeTax(
+      [row({ age: 70, aowNetto: AOW_NETTO, pensioenOnttrekkingBruto: 150_000 })],
+      opts,
+    ).rows[0]
+
+    // De reeks rapporteert een VERSCHIL van twee motoraanroepen; beide benen
+    // dragen hun eigen te hoge korting, dus het saldo hoeft niet negatief te zijn.
+    const juistVerschil = (pensioen: number) =>
+      juisteHeffing(brutoAow + pensioen, true) - juisteHeffing(brutoAow, true)
+
+    expect(bescheiden.box1NietVerrekend - juistVerschil(30_000)).toBeLessThan(0) // te laag
+    expect(hoog.box1NietVerrekend - juistVerschil(150_000)).toBeGreaterThan(0) // te HOOG
+    expect(bescheiden.box1NietVerrekend - juistVerschil(30_000)).toBeCloseTo(-1_669, -1)
+    expect(hoog.box1NietVerrekend - juistVerschil(150_000)).toBeCloseTo(1_150, -1)
   })
 
   it('de vlag kantelt exact op age === aowLeeftijd', () => {
@@ -230,6 +293,47 @@ describe('computeLifetimeTax — aow-vlag per rij', () => {
     const rows = [66, 67, 68].map((age) => row({ age, pensioenOnttrekkingBruto: 30_000 }))
     const series = computeLifetimeTax(rows, opts)
     expect(series.rows.map((r) => r.aowGerechtigd)).toEqual([false, true, true])
+  })
+
+  /**
+   * `row.age` is GEHEEL (bridge: `Math.round(startLeeftijd) + jaarindex`), de
+   * AOW-leeftijd is dat niet (67,25 / 67,5). Met een rechtstreekse `age >=
+   * aowLeeftijd` is `67 >= 67,25` onwaar en wordt het SCHARNIERJAAR als niet-AOW
+   * gerekend: volle schijf 1 inclusief AOW-premie plus de grote niet-AOW-
+   * arbeidskorting. Beide bestaande tests ontweken dit met een geheel getal.
+   */
+  it('een FRACTIONELE aowLeeftijd kantelt de vlag op hetzelfde raster als row.age', () => {
+    const rijen = [66, 67, 68].map((age) => row({ age, pensioenOnttrekkingBruto: 30_000 }))
+    const opts = { year: YEAR }
+
+    // 67,25 rondt naar 67 → het jaar waarin de AOW ingaat telt als AOW-jaar.
+    expect(
+      computeLifetimeTax(rijen, { ...opts, aowLeeftijd: 67.25 }).rows.map((r) => r.aowGerechtigd),
+    ).toEqual([false, true, true])
+
+    // 67,5 rondt naar 68 → de kanteling schuift een jaar op, maar valt nooit
+    // tússen het raster in.
+    expect(
+      computeLifetimeTax(rijen, { ...opts, aowLeeftijd: 67.5 }).rows.map((r) => r.aowGerechtigd),
+    ).toEqual([false, false, true])
+
+    // De onafgeronde invoer blijft herleidbaar in de uitvoer.
+    expect(computeLifetimeTax(rijen, { ...opts, aowLeeftijd: 67.25 }).aowLeeftijd).toBe(67.25)
+  })
+
+  it('op de fractionele AOW-leeftijd rekent het scharnierjaar met het AOW-tarief', () => {
+    const rij = [row({ age: 67, pensioenOnttrekkingBruto: 30_000 })]
+    const scharnier = computeLifetimeTax(rij, { aowLeeftijd: 67.25, year: YEAR }).rows[0]
+    const nietAow = computeLifetimeTax(rij, { aowLeeftijd: 70, year: YEAR }).rows[0]
+
+    // Zonder de afronding zou het scharnierjaar de niet-AOW-heffing dragen —
+    // aantoonbaar een ándere (fors hogere) uitkomst, geen afrondingsverschil.
+    expect(scharnier.aowGerechtigd).toBe(true)
+    expect(nietAow.aowGerechtigd).toBe(false)
+    expect(scharnier.box1NietVerrekend).toBeLessThan(nietAow.box1NietVerrekend)
+    expect(scharnier.box1NietVerrekend).toBe(
+      computeBox1Tax({ grossYearlyIncome: 30_000, year: YEAR, aow: true }).tax,
+    )
   })
 
   it('een niet-standaard aowLeeftijd wordt gerespecteerd (geen hardcode 67)', () => {

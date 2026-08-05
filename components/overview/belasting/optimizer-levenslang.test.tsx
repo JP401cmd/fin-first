@@ -167,7 +167,11 @@ describe('OptimizerLevenslang — vóór de klik rekent er niets', () => {
 
     const kop = screen.getByRole('heading', { level: 2 })
     expect(kop.textContent).toMatch(/Wanneer je je pensioenpot\s*aanspreekt/i)
-    expect(screen.getByText(/Je pensioen komt belast binnen, je spaargeld niet/i)).toBeTruthy()
+    // Het deck moet de eerste tabelrij ("Box 3, opgeteld") niet tegenspreken:
+    // spaargeld en beleggingen zijn niet onbelast, ze lopen via box 3.
+    expect(screen.getByText(/Je pensioen wordt belast als inkomen/i)).toBeTruthy()
+    expect(screen.getByText(/je spaargeld en beleggingen via box 3/i)).toBeTruthy()
+    expect(screen.queryByText(/je spaargeld niet\./i)).toBeNull()
     expect(screen.queryByText(/laagste belastingdruk over je hele leven/i)).toBeNull()
   })
 })
@@ -232,7 +236,7 @@ describe('OptimizerLevenslang — na de klik', () => {
     expect(within(gediskwalificeerd).queryByText('laagste druk')).toBeNull()
   })
 
-  it('toont bij een negatieve buffer die reden (en geen badge)', async () => {
+  it('toont bij een uitgeputte buffer die reden (en geen badge)', async () => {
     const ruwe = [
       ruw('huidige-volgorde', 'Jouw huidige volgorde', {
         box3: 120_000,
@@ -247,12 +251,14 @@ describe('OptimizerLevenslang — na de klik', () => {
         box1: 20_000,
         fire: 57,
         belegbaar: 0,
+        // €0 = uitgeput. Bewust niet negatief: dát is de stand die de kern écht
+        // oplevert (een tekort landt als Tekort-lening, niet als negatief bezit).
+        buffer: 0,
         netto: 300_000,
-        buffer: -5_000,
       }),
     ]
     const resultaat = finaliseerVarianten(ruwe, 2026)
-    expect(resultaat.varianten[1].diskwalificatie).toBe('negatieve-buffer')
+    expect(resultaat.varianten[1].diskwalificatie).toBe('buffer-uitgeput')
     expect(resultaat.winnaarId).toBe('huidige-volgorde')
 
     mockSweep.mockResolvedValue(resultaat)
@@ -261,7 +267,7 @@ describe('OptimizerLevenslang — na de klik', () => {
     await waitFor(() => expect(screen.getByRole('table')).toBeTruthy())
 
     const kol = kolom('Pensioen zo laat mogelijk')
-    expect(kol.textContent).toMatch(/belegbaar vermogen zakt onderweg onder nul/i)
+    expect(kol.textContent).toMatch(/belegbaar vermogen raakt onderweg op/i)
     expect(within(kol).queryByText('laagste druk')).toBeNull()
   })
 
@@ -318,7 +324,7 @@ describe('OptimizerLevenslang — na de klik', () => {
     expect(screen.queryByText(/∞/)).toBeNull()
   })
 
-  it('toont de vijf kanttekeningen, met het gebruikte Box 1-jaar', async () => {
+  it('toont de zes kanttekeningen, met het gebruikte Box 1-jaar', async () => {
     const resultaat = fixture()
     mockSweep.mockResolvedValue(resultaat)
     renderSectie()
@@ -328,13 +334,19 @@ describe('OptimizerLevenslang — na de klik', () => {
 
     const lijst = screen.getByText('Kanttekeningen').parentElement!.querySelector('ul')
     expect(lijst).toBeTruthy()
-    expect(lijst!.querySelectorAll('li').length).toBe(5)
+    expect(lijst!.querySelectorAll('li').length).toBe(6)
     const tekst = lijst!.textContent ?? ''
     expect(tekst).toMatch(/náást de projectie, niet erin/i)
     expect(tekst).toMatch(/gewogen gelijktijdige opname/i)
     expect(tekst).toMatch(/Lijfrente is niet apart te sturen/i)
     expect(tekst).toMatch(/Box 1 is per persoon/i)
     expect(tekst).toMatch(new RegExp(`schijven en heffingskortingen zijn die van ${resultaat.box1Jaar}`, 'i'))
+    // De zesde: de arbeidskorting-afwijking stuurt de rangschikking (het effect is
+    // het grootst vóór de AOW), dus die hoort de lezer te zien — mét beide kanten,
+    // want de afwijking is niet systematisch één kant op.
+    expect(tekst).toMatch(/arbeidskorting nu ook toe over pensioeninkomen/i)
+    expect(tekst).toMatch(/vóór je AOW/i)
+    expect(tekst).toMatch(/te hoog/i)
   })
 
   it('memoïseert op de invoer-hash: een tweede klik rekent niet opnieuw', async () => {
@@ -426,6 +438,59 @@ describe('OptimizerLevenslang — laad- en foutstaten', () => {
 
     await waitFor(() => expect(screen.getByText(/Er ging iets mis bij het doorrekenen/i)).toBeTruthy())
     expect(screen.queryByRole('table')).toBeNull()
+  })
+
+  /**
+   * Z1 — de GEMENGDE staat: één variant faalt terwijl de rest slaagt. Die haalt de
+   * tabel wél (de foutstaat vereist dat élke variant faalt), en zonder de kern-fout-
+   * uitgang in `bepaalDiskwalificatie` zette de kolomkop twee boodschappen naast
+   * elkaar: "je FIRE-moment valt later dan nu" én "niet doorgerekend voor jouw
+   * plan" — een feitelijke uitspraak over een run die nooit heeft gedraaid.
+   */
+  it('een variant met kern-fout toont ENKEL "niet doorgerekend", geen FIRE-uitspraak', async () => {
+    const gemengd = finaliseerVarianten(
+      [
+        ruw('huidige-volgorde', 'Jouw huidige volgorde', {
+          box3: 120_000,
+          box1: 40_000,
+          fire: 58,
+          belegbaar: 250_000,
+          netto: 600_000,
+          buffer: 30_000,
+        }),
+        {
+          ...ruw('pensioen-laatst', 'Pensioen zo laat mogelijk', {
+            box3: 0,
+            box1: 0,
+            fire: null,
+            belegbaar: 0,
+            netto: 0,
+            buffer: 0,
+          }),
+          levenslangeBox3Nominaal: null,
+          levenslangeBox1NietVerrekendNominaal: null,
+          levenslangeTotaleDrukNominaal: null,
+          eindvermogenBelegbaarNominaal: null,
+          eindvermogenNettoNominaal: null,
+          laagsteBuffer: null,
+          kernelFout: 'kernel leverde geen jaarrijen',
+        },
+      ],
+      2026,
+    )
+    expect(gemengd.varianten[1].diskwalificatie).toBeNull()
+
+    mockSweep.mockResolvedValue(gemengd)
+    renderSectie()
+    fireEvent.click(startKnop())
+    await waitFor(() => expect(screen.getByRole('table')).toBeTruthy())
+
+    const kol = kolom('Pensioen zo laat mogelijk')
+    expect(kol.textContent).toMatch(/Niet doorgerekend voor jouw plan/i)
+    expect(kol.textContent).not.toMatch(/Telt niet mee/i)
+    expect(kol.textContent).not.toMatch(/FIRE-moment valt later/i)
+    // De geslaagde referentie blijft gewoon de winnaar.
+    expect(gemengd.winnaarId).toBe('huidige-volgorde')
   })
 
   it('toont bij een ontbrekend toekomstplan een lege staat met uitgang, geen fout', async () => {

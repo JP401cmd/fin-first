@@ -124,7 +124,7 @@ export function buildHldModel(): HldModel {
           { title: 'Zien hoeveel je mag inleggen voor je pensioen', desc: 'Je jaarruimte, nauwkeurig berekend — inclusief je eigen UPO-factor A (werkgeverspensioen) als je dat invult.' },
           { title: 'Checken of de tegenbewijsregeling gunstiger is', desc: 'Werkelijk rendement versus het forfait in box 3.' },
           { title: 'Je fiscale kansen doorgerekend zien', desc: 'De fiscale optimizer zet je mogelijkheden onder elkaar — de mix sparen/beleggen in box 3, de verdeling met je fiscale partner en je jaarruimte — in euro\'s én vrijheidsdagen. Een indicatie, geen advies.' },
-          { title: 'Zien wat de plek van je pensioenpot kost', desc: 'Je pensioen komt belast binnen, je spaargeld niet. De optimizer vergelijkt drie plekken voor je pensioenpot in je opnamevolgorde — je huidige volgorde, pensioen zo laat mogelijk en pensioen vroeg — op wat het je over je hele leven aan belasting kost, in euro\'s én vrijheidstijd.' },
+          { title: 'Zien wat de plek van je pensioenpot kost', desc: 'Je pensioen wordt belast als inkomen, je spaargeld en beleggingen via box 3. De optimizer vergelijkt drie plekken voor je pensioenpot in je opnamevolgorde — je huidige volgorde, pensioen zo laat mogelijk en pensioen vroeg — op wat het je over je hele leven aan belasting kost, in euro\'s én vrijheidstijd.' },
         ],
       },
       {

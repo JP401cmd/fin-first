@@ -142,9 +142,10 @@ export function OptimizerLevenslang({
           className="mt-1.5 max-w-[64ch] text-sm italic leading-snug text-[var(--ink-2)]"
           style={{ fontFamily: SOURCE_SERIF }}
         >
-          Je pensioen komt belast binnen, je spaargeld niet. Waar je pensioenpot in de rij staat,
-          verandert daarom je belasting over de hele looptijd — hier zie je het verschil, in euro’s
-          en in vrijheidstijd.
+          Je pensioen wordt belast als inkomen, je spaargeld en beleggingen via box 3. Waar je
+          pensioenpot in de rij staat, verschuift daarom niet alleen je belasting over de hele
+          looptijd, maar ook waar die neerslaat — hier zie je het verschil, in euro’s en in
+          vrijheidstijd.
         </p>
       </div>
 
@@ -285,7 +286,7 @@ function Fout({ onRetry }: { onRetry: () => void }) {
 // ── De vergelijking ──────────────────────────────────────────────
 
 const DISKWALIFICATIE_TEKST: Record<VariantDiskwalificatie, string> = {
-  'negatieve-buffer': 'Telt niet mee: je belegbaar vermogen zakt onderweg onder nul.',
+  'buffer-uitgeput': 'Telt niet mee: je belegbaar vermogen raakt onderweg op.',
   'fire-later-dan-referentie': 'Telt niet mee: je FIRE-moment valt later dan nu.',
 }
 
@@ -570,10 +571,19 @@ function Bedrag({
 // ── Kanttekeningen ───────────────────────────────────────────────
 
 /**
- * De vijf kanttekeningen bij deze vergelijking — zelfde register als de
+ * De zes kanttekeningen bij deze vergelijking — zelfde register als de
  * 2028-indicatie in `lib/tax-optimizer/box3-strategies.ts`: benoem de aanname,
  * benoem welke kant hij op valt, en noem het een indicatie. Geen advies, geen
  * gebiedende wijs.
+ *
+ * De zesde gaat over de arbeidskorting-afwijking in `lib/box1-tax.ts` (zie de
+ * module-doc van `lib/tax-lifetime/lifetime-tax.ts`). Die staat er omdat de
+ * afwijking niet neutraal is tussen de vergeleken varianten: hij is het grootst in
+ * de jaren vóór de AOW, en dat is precies waar "pensioen vroeg" zijn onttrekkingen
+ * concentreert. Bewust ZONDER euro-bedragen: de afwijking hangt af van het
+ * inkomensniveau en draait bij hoge pensioeninkomens zelfs van teken, dus één
+ * getal zou hier een precisie suggereren die er niet is (de gemeten reeks staat
+ * gepind in `lib/tax-lifetime/lifetime-tax.test.ts`).
  */
 function Kanttekeningen({ box1Jaar }: { box1Jaar: number }) {
   const punten = [
@@ -582,6 +592,7 @@ function Kanttekeningen({ box1Jaar }: { box1Jaar: number }) {
     'Lijfrente is niet apart te sturen — die valt in het model samen met je bedrijfspensioen in één pot.',
     'Box 1 is per persoon; de belasting van je partner zit hier niet in.',
     `De schijven en heffingskortingen zijn die van ${box1Jaar}; in het model groeien ze mee met de inflatie.`,
+    'De box 1-heffing is een indicatie: het model kent de arbeidskorting nu ook toe over pensioeninkomen, terwijl dat fiscaal geen arbeidsinkomen is. In het gangbare bereik valt de heffing daardoor te laag uit — het sterkst in de jaren vóór je AOW, en dus bij vroeg onttrekken; bij een hoog pensioeninkomen valt ze juist iets te hoog uit.',
   ]
 
   return (

@@ -77,27 +77,38 @@ function profielMet(potRules: PotRulesConfig): ConvergentieRawProfileRow {
   return { ...buildCompleetKernelProfileBase(PINNED_AGE), pot_rules: potRulesToRaw(potRules) }
 }
 
-/** Minimale variant-uitkomst voor de pure rangschik-tests. */
+/**
+ * Minimale variant-uitkomst voor de pure rangschik-tests.
+ *
+ * `totaal: null` = KERN-FOUT, en dan spiegelt deze helper `runVariant`'s `leeg()`:
+ * élk getal staat op `null`, óók `fireAgeFractional`. Anders zou hij een staat
+ * fabriceren die de sweep nooit produceert (een gefaalde run mét FIRE-leeftijd) —
+ * precies de staat waarin de FIRE-tak stilletjes goed leek te gaan.
+ */
 function uitkomst(p: {
   id: VariantId
   totaal: number | null
   fire?: number | null
   buffer?: number | null
 }): VariantUitkomst {
+  const kernFout = p.totaal === null
   return {
     id: p.id,
     label: p.id,
     onttrekkingOverlay: p.id === REFERENTIE_VARIANT_ID ? null : { Pensioen: 5 },
     isReferentie: p.id === REFERENTIE_VARIANT_ID,
     levenslangeBox3Nominaal: p.totaal,
-    levenslangeBox1NietVerrekendNominaal: 0,
+    levenslangeBox1NietVerrekendNominaal: kernFout ? null : 0,
     levenslangeTotaleDrukNominaal: p.totaal,
-    fireAgeFractional: p.fire === undefined ? 60 : p.fire,
-    eindvermogenNettoNominaal: 100_000,
-    eindvermogenBelegbaarNominaal: 80_000,
-    laagsteBuffer: p.buffer === undefined || p.buffer === null ? null : { bedrag: p.buffer, age: 70 },
+    fireAgeFractional: kernFout ? null : p.fire === undefined ? 60 : p.fire,
+    eindvermogenNettoNominaal: kernFout ? null : 100_000,
+    eindvermogenBelegbaarNominaal: kernFout ? null : 80_000,
+    laagsteBuffer:
+      kernFout || p.buffer === undefined || p.buffer === null
+        ? null
+        : { bedrag: p.buffer, age: 70 },
     diskwalificatie: null,
-    kernelFout: p.totaal === null ? 'kern-fout' : null,
+    kernelFout: kernFout ? 'kern-fout' : null,
   }
 }
 
@@ -234,24 +245,62 @@ describe('rangschikking', () => {
     expect(bepaalDiskwalificatie(haaltFire, refZonderFire)).toBeNull()
   })
 
-  it('een negatieve laagste buffer diskwalificeert — óók de referentie', () => {
+  it('een uitgeputte laagste buffer diskwalificeert — óók de referentie', () => {
     const gefinaliseerd = finaliseerVarianten(
       [
-        uitkomst({ id: 'huidige-volgorde', totaal: 100_000, buffer: -5_000 }),
+        // €0 = uitgeput. Dít is de stand die de kern écht kan produceren; de oude
+        // drempel (`< 0`) liet 'm ongemoeid.
+        uitkomst({ id: 'huidige-volgorde', totaal: 100_000, buffer: 0 }),
         uitkomst({ id: 'pensioen-laatst', totaal: 200_000, buffer: 10_000 }),
         uitkomst({ id: 'pensioen-eerst', totaal: 150_000, buffer: -1 }),
       ],
       CURRENT_TAX_YEAR,
     )
     expect(gefinaliseerd.winnaarId).toBe('pensioen-laatst')
-    expect(gefinaliseerd.varianten[0].diskwalificatie).toBe('negatieve-buffer')
-    expect(gefinaliseerd.varianten[2].diskwalificatie).toBe('negatieve-buffer')
+    expect(gefinaliseerd.varianten[0].diskwalificatie).toBe('buffer-uitgeput')
+    expect(gefinaliseerd.varianten[2].diskwalificatie).toBe('buffer-uitgeput')
   })
 
-  it('bij beide overtredingen wint de negatieve buffer als reden', () => {
+  it('bij beide overtredingen wint de uitgeputte buffer als reden', () => {
     const ref = uitkomst({ id: 'huidige-volgorde', totaal: 100_000, fire: 58, buffer: 10_000 })
-    const beide = uitkomst({ id: 'pensioen-laatst', totaal: 1, fire: 62, buffer: -1 })
-    expect(bepaalDiskwalificatie(beide, ref)).toBe('negatieve-buffer')
+    const beide = uitkomst({ id: 'pensioen-laatst', totaal: 1, fire: 62, buffer: 0 })
+    expect(bepaalDiskwalificatie(beide, ref)).toBe('buffer-uitgeput')
+  })
+
+  it('de uitputtingsdrempel is een ruisband, geen bufferminimum', () => {
+    const ref = uitkomst({ id: 'huidige-volgorde', totaal: 100_000, fire: 58, buffer: 10_000 })
+    // Een cent restant leest als "op"; een euro is gewoon vermogen.
+    expect(
+      bepaalDiskwalificatie(uitkomst({ id: 'pensioen-laatst', totaal: 1, fire: 58, buffer: 0.005 }), ref),
+    ).toBe('buffer-uitgeput')
+    expect(
+      bepaalDiskwalificatie(uitkomst({ id: 'pensioen-laatst', totaal: 1, fire: 58, buffer: 1 }), ref),
+    ).toBeNull()
+  })
+
+  /**
+   * Z1 — een variant die niet DRAAIDE mag geen inhoudelijke reden krijgen. Zonder
+   * de kern-fout-uitgang valt `bepaalDiskwalificatie` door naar de FIRE-tak (waar
+   * `fireAgeFractional: null` als "later" telt) en zet de kop twee tegenstrijdige
+   * boodschappen naast elkaar: "je FIRE-moment valt later dan nu" én "niet
+   * doorgerekend voor jouw plan". Het eerste is een uitspraak over een run die
+   * nooit heeft plaatsgevonden. Bestond alleen als álle varianten faalden.
+   */
+  it('Z1 — een kern-fout naast een geslaagde referentie krijgt GEEN diskwalificatie-reden', () => {
+    const gefinaliseerd = finaliseerVarianten(
+      [
+        uitkomst({ id: 'huidige-volgorde', totaal: 200_000, fire: 58, buffer: 10_000 }),
+        uitkomst({ id: 'pensioen-laatst', totaal: null }), // kern-fout: alles null
+        uitkomst({ id: 'pensioen-eerst', totaal: 190_000, fire: 58, buffer: 10_000 }),
+      ],
+      CURRENT_TAX_YEAR,
+    )
+    const gefaald = gefinaliseerd.varianten[1]
+    expect(gefaald.kernelFout).toBe('kern-fout')
+    expect(gefaald.fireAgeFractional).toBeNull()
+    expect(gefaald.diskwalificatie).toBeNull()
+    // …en hij blijft buiten de ranking, precies zoals daarvoor.
+    expect(gefinaliseerd.winnaarId).toBe('pensioen-eerst')
   })
 
   it('gelijkspel binnen de ruisband gaat naar de referentie', () => {
@@ -269,7 +318,7 @@ describe('rangschikking', () => {
     expect(
       kiesWinnaar([
         uitkomst({ id: 'huidige-volgorde', totaal: null }),
-        { ...uitkomst({ id: 'pensioen-laatst', totaal: 1 }), diskwalificatie: 'negatieve-buffer' },
+        { ...uitkomst({ id: 'pensioen-laatst', totaal: 1 }), diskwalificatie: 'buffer-uitgeput' },
       ]),
     ).toBeNull()
   })
@@ -414,6 +463,82 @@ describe('variantensweep end-to-end (echte kernel-runs)', () => {
   it('de uitkomst is structured-clone-veilig (worker-grens)', () => {
     expect(() => structuredClone(resultaat)).not.toThrow()
     expect(() => structuredClone(snapshot)).not.toThrow()
+  })
+})
+
+// ── 6. Het buffer-veto is BEREIKBAAR (de reden dat de drempel verschoof) ─────
+
+/**
+ * De oorspronkelijke drempel was `laagsteBuffer.bedrag < 0`. Die kon per
+ * constructie nooit afgaan: `computeLaagsteBuffer` minimaliseert
+ * `spendablePortfolio`, een SOM van bucket-`endValue`s die nooit met schulden
+ * wordt verrekend — een tekort landt als Tekort-lening (schuld), niet als negatief
+ * bezit. Een variant die de portefeuille volledig leegtrekt haalde daardoor
+ * `bedrag === 0`, passeerde het veto, en kon met de minste Box 3 de badge "laagste
+ * druk" krijgen: precies het geval dat het veto moest afvangen.
+ *
+ * De pure test hierboven (die de buffer met de hand op 0 zet) bewijst alleen dat
+ * de VERGELIJKING werkt. Deze proef bewijst dat de kern die stand ook echt
+ * OPLEVERT, en dat de oude drempel hem aantoonbaar zou hebben gemist.
+ *
+ * De leegtrek-fixture is dezelfde persona zónder inkomen en met een structureel
+ * hogere uitgave: een permanent tekort dat de kern jaar na jaar uit de potten
+ * dekt. Louter de uitgaven verhogen volstond NIET — dat duwt FIRE alleen maar
+ * verder weg, waarna de persona blijft werken en de buffer juist nooit daalt.
+ */
+const leegtrekAssets = [
+  { ...fx.assets.find((a) => a.asset_type === 'savings')!, current_value: 50_000, monthly_contribution: 0 },
+  { ...fx.assets.find((a) => a.asset_type === 'retirement')!, current_value: 300_000, monthly_contribution: 0 },
+]
+
+const leegtrekSnapshot: VariantenSweepSnapshot = {
+  ...snapshot,
+  rawContext: {
+    ...snapshot.rawContext,
+    // Alleen spaargeld + de pensioenpot. De volledige persona heeft óók bezit dat
+    // wél als belegbaar telt maar in de praktijk nooit wordt aangesproken (een
+    // deelneming, een vordering, een levensverzekering); dat groeit harder dan het
+    // tekort het leegtrekt, waardoor de som nooit de bodem raakt. Voor een proef
+    // op de BEREIKBAARHEID van het veto is die ruis alleen maar afleiding.
+    assets: leegtrekAssets,
+    debts: [],
+    profile: {
+      ...basisProfiel,
+      net_monthly_income: 0,
+      estimated_monthly_expenses: 15_000,
+      yearly_essential_expenses: 180_000,
+    },
+    yearlyExpenses: 180_000,
+  },
+}
+
+describe('buffer-veto is bereikbaar op een echte kernel-run', () => {
+  const leeg = runVariantenSweep(leegtrekSnapshot)
+  const ref = leeg.varianten.find((v) => v.isReferentie)!
+
+  it('de kern levert een UITGEPUTTE (niet negatieve) laagste buffer', () => {
+    expect(ref.kernelFout).toBeNull()
+    expect(ref.laagsteBuffer).not.toBeNull()
+    const bedrag = ref.laagsteBuffer!.bedrag
+    // De bodem van deze grootheid is nul: er wordt niets met schulden verrekend.
+    expect(bedrag).toBeGreaterThanOrEqual(0)
+    expect(bedrag).toBeLessThanOrEqual(0.01)
+  })
+
+  it('BIJT-PROEF — de oude drempel (< 0) had dit plan laten passeren', () => {
+    const bedrag = ref.laagsteBuffer!.bedrag
+    expect(bedrag < 0).toBe(false) // ← wat het oude veto testte
+    expect(ref.diskwalificatie).toBe('buffer-uitgeput') // ← wat het nu doet
+  })
+
+  it('een leeggetrokken plan kan de winnaar niet zijn', () => {
+    const winnaar = leeg.varianten.find((v) => v.id === leeg.winnaarId) ?? null
+    if (winnaar !== null) expect(winnaar.diskwalificatie).toBeNull()
+    for (const v of leeg.varianten) {
+      if ((v.laagsteBuffer?.bedrag ?? Number.POSITIVE_INFINITY) <= 0.01) {
+        expect(v.id).not.toBe(leeg.winnaarId)
+      }
+    }
   })
 })
 

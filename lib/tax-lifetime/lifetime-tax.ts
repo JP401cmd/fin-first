@@ -43,9 +43,20 @@
  *
  * ## Twee expliciete modelkeuzes (beide getest)
  * 1. **`aow` per rij**, niet blanket `true`: `aowGerechtigd = row.age >=
- *    aowLeeftijd`. In de jaren vóór de AOW-leeftijd geldt het volle schijf-1-
- *    tarief inclusief AOW-premie (17,9 pp hoger). Blanket `true` zou de heffing
- *    op vroeg-onttrokken pensioen fors onderschatten.
+ *    Math.round(aowLeeftijd)`. In de jaren vóór de AOW-leeftijd geldt het volle
+ *    schijf-1-tarief inclusief AOW-premie (17,9 pp hoger). Blanket `true` zou de
+ *    heffing op vroeg-onttrokken pensioen fors onderschatten.
+ *
+ *    **Waarom `Math.round` op de AOW-leeftijd.** `row.age` is een GEHEEL getal:
+ *    de kernel-bridge zet `age = Math.round(startLeeftijd) + jaarindex`. De
+ *    AOW-leeftijd is dat níét — `HorizonFireSim.aowAgeFractional` levert 67,25 of
+ *    67,5. Een rechtstreekse `row.age >= aowLeeftijd` maakt `67 >= 67,25` onwaar
+ *    en behandelt uitgerekend het SCHARNIERJAAR als een niet-AOW-jaar: volle
+ *    schijf 1 inclusief AOW-premie, plus de grote niet-AOW-arbeidskorting. De
+ *    vergelijking loopt daarom op dezelfde granulariteit als de rij, met dezelfde
+ *    afrondingsconventie die de bridge op de startleeftijd gebruikt.
+ *    `LifetimeTaxSeries.aowLeeftijd` blijft de FRACTIONELE waarde dragen — dat is
+ *    de invoer, niet de rasterkeuze.
  * 2. **Schijven groeien mee met de inflatie.** `BOX1_PARAMS` kent alleen
  *    2025/2026; bevroren schijfgrenzen tegen nominaal geïndexeerde inkomens
  *    schuiven een plan over 30 jaar kunstmatig de hogere schijven in. Daarom:
@@ -57,12 +68,40 @@
  * ## Bekende afwijking in de tariefmotor (gemeld, niet omzeild)
  * `computeBox1Tax` berekent de **arbeidskorting** over het volledige
  * `grossYearlyIncome`, dus óók over AOW/pensioen. Fiscaal is dat geen
- * arbeidsinkomen: de korting valt te hoog uit en de heffing daarmee te LAAG —
- * deze reeks is op dat punt conservatief (onderschat de last). De correctie
- * hoort in `lib/box1-tax.ts` (arbeidsinkomen als eigen invoer), niet hier: een
- * eigen tarief-variant zou een tweede tariefimplementatie zijn. De huidige
- * uitkomst is gepind in `lifetime-tax.test.ts` ("BEKENDE AFWIJKING"), zodat een
- * latere correctie een zichtbare, bewuste wijziging is.
+ * arbeidsinkomen: de korting valt te hoog uit en `box1Totaal` daarmee te laag.
+ *
+ * **De afwijking is NIET systematisch één kant op** — deze reeks rapporteert een
+ * VERSCHIL van twee motoraanroepen (`box1Totaal − box1AlVerrekend`), en beide
+ * benen dragen hun eigen te hoge korting. Gemeten tegen `BOX1_PARAMS[2026]`, met
+ * "juist" = dezelfde motor zónder arbeidskorting:
+ *
+ * | AOW netto | pensioen | vóór AOW | ná AOW |
+ * |-----------|----------|----------|--------|
+ * | € 0       | € 30.000 | −€ 5.381 | −€ 2.687 |
+ * | € 0       | € 150.000| € 0      | € 0      |
+ * | € 16.000  | € 30.000 | −€ 3.270 | −€ 1.669 |
+ * | € 16.000  | € 150.000| +€ 2.364 | +€ 1.150 |
+ *
+ * Zodra de arbeidskorting op het TOTAALinkomen is uitgefaseerd (afbouw vanaf
+ * €45.592, nul vanaf ≈ €133k) terwijl hij op het AOW-only-been nog volop meetelt,
+ * keert het teken om: het verschil valt dan te HOOG uit.
+ *
+ * **"Conservatief" is hier het verkeerde woord.** In het gangbare bereik
+ * onderschat de reeks de last, en een onderschatte last laat een plan er BETER
+ * uitzien dan het is — dat valt in het voordeel van de gebruiker uit, wat het
+ * tegenovergestelde van conservatief is.
+ *
+ * **De bias is gekoppeld aan de as die de sweep vergelijkt.** Hij is verreweg het
+ * grootst in de jaren vóór de AOW (bovenste rij: −€5.381 tegen −€2.687), en dat is
+ * precies waar de variant "pensioen vroeg" zijn onttrekkingen concentreert. De
+ * afwijking laat de VERGELIJKING dus niet ongemoeid: over tien tot vijftien
+ * vroeg-onttrekkingsjaren telt ze op tot een orde die de tabel zelf als uitkomst
+ * toont. Vandaar de zesde kanttekening op het scherm (`optimizer-levenslang.tsx`).
+ *
+ * De correctie hoort in `lib/box1-tax.ts` (arbeidsinkomen als eigen invoer), niet
+ * hier: een eigen tarief-variant zou een tweede tariefimplementatie zijn. De
+ * huidige uitkomst is aan BEIDE kanten gepind in `lifetime-tax.test.ts` ("BEKENDE
+ * AFWIJKING"), zodat een latere correctie een zichtbare, bewuste wijziging is.
  *
  * ## Partner: volledig uitgesloten (ADR 0036)
  * Box 1 is per persoon en het partner-inkomen wordt niet als BRUTO grootheid
@@ -107,7 +146,9 @@ export interface LifetimeTaxRowInput {
 export interface LifetimeTaxOptions {
   /**
    * AOW-leeftijd van de gebruiker (`KernelInput.persoon.aowLeeftijd`). Enige
-   * bron voor de per-rij AOW-vlag; deze module leidt 'm nooit zelf af.
+   * bron voor de per-rij AOW-vlag; deze module leidt 'm nooit zelf af. Mag
+   * FRACTIONEEL zijn (67,25 / 67,5) — de vlag rondt af naar het rij-raster, de
+   * waarde zelf wordt onafgerond doorgegeven in `LifetimeTaxSeries.aowLeeftijd`.
    */
   readonly aowLeeftijd: number
   /**
@@ -124,7 +165,10 @@ export interface LifetimeTaxYearRow {
   /** Jaar-index, 1-op-1 met de invoerrij. */
   readonly year: number
   readonly age: number
-  /** `age >= aowLeeftijd` — koos de AOW-schijventabel (geen AOW-premie). */
+  /**
+   * `age >= Math.round(aowLeeftijd)` — koos de AOW-schijventabel (geen
+   * AOW-premie). Afgerond omdat `age` een geheel jaar is; zie de module-doc.
+   */
   readonly aowGerechtigd: boolean
   /** De deflator die deze rij gebruikte (doorgegeven, voor herleidbaarheid). */
   readonly inflationFactor: number
@@ -234,7 +278,10 @@ export function computeLifetimeTax(
     // `streams.partnerBatenNetto` wordt BEWUST niet gelezen — zie module-doc
     // (ADR 0036: Box 1 is per persoon, partner-bruto bestaat niet in dit model).
 
-    const aowGerechtigd = row.age >= opts.aowLeeftijd
+    // `row.age` is geheel (bridge: Math.round(startLeeftijd) + jaarindex), de
+    // AOW-leeftijd fractioneel (67,25 / 67,5). Zonder dezelfde afronding zou
+    // `67 >= 67,25` onwaar zijn en het scharnierjaar als niet-AOW-jaar rekenen.
+    const aowGerechtigd = row.age >= Math.round(opts.aowLeeftijd)
 
     // ── Reëel rekenen (schijven groeien mee met de inflatie) ─────────────────
     const aowNettoReal = aowNetto / factor

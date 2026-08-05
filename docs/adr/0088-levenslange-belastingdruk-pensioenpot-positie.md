@@ -53,9 +53,11 @@ preset die pensioen-sturing belooft — een vertaalartefact, geen fiscale
 waarheid.
 
 De sweep (`lib/tax-lifetime/varianten-sweep.ts`) gebruikt daarom de V5-overlay
-`categorie_prios.onttrekking` (`sanitizeCategoriePrios`, schaal 1..5) rechtstreeks,
-vóór de preset-vertaling: prio 1 = als eerste aanspreken, prio 5 = reserve/echt
-achtergesteld. Dat is een knop die wél fiscaal onderscheid maakt.
+`categorie_prios.onttrekking` (`sanitizeCategoriePrios`, schaal 1..5) rechtstreeks.
+`buildTsParams` legt die overlay ÓVER de orde-afleiding heen (`overlayBezitPrio`,
+`prio-overgang.ts`) — dáárom wint hij van de klem, en dáárom is hij een knop die
+wél fiscaal onderscheid maakt: prio 1 = als eerste aanspreken, prio 5 =
+reserve/echt achtergesteld.
 
 **De klem in `orderedGroupsToPrio` zelf blijft bewust ongemoeid.** Hem verruimen
 (bv. naar `Math.min(i + 1, 5)`) zou stil de onttrekkingsvolgorde van élke
@@ -79,16 +81,32 @@ vervolgfasen-lijst.
 
 Primair op de laagste `levenslangeTotaleDrukNominaal`, met twee vetorechten: een
 variant die FIRE later zet dan de referentie kan nooit winnen (ADR 0040 —
-belasting besparen door later vrij te zijn is geen winst), en een variant met
-een negatieve laagste buffer (`computeLaagsteBuffer`) is onhaalbaar, niet
-goedkoop. Zie de docstrings in `varianten-sweep.ts` voor de volledige regels
-(gelijkspel-tolerantie, eindvermogen verplicht meegeleverd in twee expliciete
-grondslagen).
+belasting besparen door later vrij te zijn is geen winst), en een variant
+waarvan de laagste buffer (`computeLaagsteBuffer`) onderweg UITGEPUT raakt is
+onhaalbaar, niet goedkoop. Zie de docstrings in `varianten-sweep.ts` voor de
+volledige regels (gelijkspel-tolerantie, eindvermogen verplicht meegeleverd in
+twee expliciete grondslagen).
+
+**Correctie (eindreview Fase 3).** Dit tweede veto stond hier — en in de code en
+in `calculations.ts` — beschreven als "een negatieve laagste buffer", en zo was
+het ook geïmplementeerd (`bedrag < 0`). Die drempel kon per constructie nooit
+afgaan: `computeLaagsteBuffer` minimaliseert `spendablePortfolio`, een som van
+bucket-`endValue`s die nooit met schulden wordt verrekend — een tekort landt als
+Tekort-lening (schuld), niet als negatief bezit. Een variant die de portefeuille
+volledig leegtrok bereikte dus `bedrag === 0`, passeerde het veto en kon met de
+minste Box 3 de badge "laagste druk" krijgen: exact het geval dat het veto moest
+afvangen. De drempel is verlegd naar UITPUTTING (`<= 0`, met een ruisband van één
+cent) en de diskwalificatie heet nu `buffer-uitgeput`. Bewust géén relatieve
+drempel ten opzichte van de jaarbehoefte: nul is de bodem van deze grootheid en
+daarmee een feit uit het rij-contract, terwijl "hoeveel buffer is genoeg" een
+norm zou zijn die deze laag niet mag verzinnen. Een reachability-test met een
+leegtrek-fixture (`varianten-sweep.test.ts`) bewijst nu dát de diskwalificatie
+afgaat op een echte kernel-run.
 
 ## Gevolgen
 
-- Twee nieuwe rekenmotoren geregistreerd in `lib/architecture/calculations.ts`:
-  `levenslange-belastingdruk` (nieuw, domein Belasting) en de bijgewerkte
+- Eén nieuwe rekenmotor geregistreerd in `lib/architecture/calculations.ts`
+  (`levenslange-belastingdruk`, domein Belasting), plus een bijgewerkte
   `fiscale-optimizer`-entry (vierde katern niet langer "binnenkort").
 - Nieuw aandachtspunt `box1-buiten-kernel-cashflow` in
   `lib/architecture/archimate-concerns.ts` — blijft staan tot Box 1 (met een
@@ -96,8 +114,10 @@ grondslagen).
 - Nieuwe datastroom op de ArchiMate-plaat: `as-planning -> as-belasting`
   (de optimizer consumeert projectierijen uit de horizon-kernel), plus de
   nieuwe route `/api/belasting/varianten-sweep`.
-- HLD-praatplaat: de vierde belasting-capability ("wanneer je je pensioenpot
-  aanspreekt") gaat van impliciet/afwezig naar een echte "ik wil…"-regel.
+- HLD-praatplaat: de vijfde belasting-capability ("wanneer je je pensioenpot
+  aanspreekt") gaat van impliciet/afwezig naar een echte "ik wil…"-regel. (Het
+  gaat om het vierde KATERN op de optimizer-pagina, maar om het vijfde item in
+  de belasting-groep van `hld-model.ts` — twee verschillende tellingen.)
 
 ## Vier resterende beperkingen (bewust buiten deze fase)
 
@@ -114,10 +134,29 @@ grondslagen).
    uitsluitend om die uitsluiting aantoonbaar en testbaar te maken.
 4. **Arbeidskorting-afwijking in de tariefmotor.** `computeBox1Tax` berekent de
    arbeidskorting over het volledige `grossYearlyIncome`, dus ook over
-   AOW/pensioen — fiscaal geen arbeidsinkomen. De heffing valt daardoor
-   systematisch te laag uit (de reeks is conservatief). Gemeld en gepind in
-   `lib/tax-lifetime/lifetime-tax.test.ts` ("BEKENDE AFWIJKING"); de correctie
-   hoort in `lib/box1-tax.ts`, niet in de rapportagelaag.
+   AOW/pensioen — fiscaal geen arbeidsinkomen.
+
+   De afwijking is **niet systematisch één kant op**, en **"conservatief" is er
+   het verkeerde woord voor**. De reeks rapporteert een VERSCHIL van twee
+   motoraanroepen (`box1Totaal − box1AlVerrekend`) en beide benen dragen hun
+   eigen te hoge korting. In het gangbare bereik onderschat de reeks de last —
+   wat het plan er BETER laat uitzien dan het is, dus in het voordeel van de
+   gebruiker, het tegenovergestelde van conservatief. Bij een hoog
+   pensioeninkomen keert het teken om en valt de heffing juist te hoog uit,
+   doordat de korting op het totaalinkomen is uitgefaseerd terwijl hij op het
+   AOW-only-been nog meetelt.
+
+   **De bias laat de VERGELIJKING niet ongemoeid.** Hij is verreweg het grootst
+   in de jaren vóór de AOW (waar de volle niet-AOW-arbeidskorting van max
+   €5.685 geldt in plaats van de AOW-variant van max €2.840), en dat is precies
+   waar de variant "pensioen vroeg" zijn onttrekkingen concentreert. Die variant
+   wordt dus structureel te gunstig voorgesteld ten opzichte van de andere twee —
+   een richtingseffect op de rangschikking, niet alleen op het niveau. De
+   gemeten reeks staat in de module-doc van `lib/tax-lifetime/lifetime-tax.ts`;
+   de uitkomst is aan BEIDE kanten gepind in `lifetime-tax.test.ts` ("BEKENDE
+   AFWIJKING"); de gebruiker leest het als zesde kanttekening onder katern IV.
+   De correctie hoort in `lib/box1-tax.ts` (arbeidsinkomen als eigen invoer),
+   niet in de rapportagelaag.
 
 ## Alternatieven
 

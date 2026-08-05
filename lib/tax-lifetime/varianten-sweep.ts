@@ -39,9 +39,12 @@
  *  - **Veto 1 (ADR 0040)**: een variant die FIRE later zet dan de referentie kan
  *    nooit #1 zijn. Wordt wél getoond, met `diskwalificatie`-markering. Belasting
  *    besparen door later vrij te zijn is geen winst.
- *  - **Veto 2**: een negatieve laagste buffer (`computeLaagsteBuffer` — de gedeelde
- *    dekkings-grondslag, geen eigen bufferberekening). Een plan dat onderweg door
- *    nul zakt is niet goedkoop maar onhaalbaar. Geldt óók voor de referentie.
+ *  - **Veto 2**: een UITGEPUTTE laagste buffer (`computeLaagsteBuffer` — de gedeelde
+ *    dekkings-grondslag, geen eigen bufferberekening). Een plan dat onderweg zijn
+ *    belegbaar vermogen opmaakt is niet goedkoop maar onhaalbaar. Geldt óók voor de
+ *    referentie. **De drempel is UITPUTTING (≤ 0), niet "negatief"** — zie
+ *    `BUFFER_UITPUTTING_TOLERANTIE_EUR` voor waarom die eerste formulering het veto
+ *    onbereikbaar maakte.
  *  - **Eindvermogen is verplicht meegeleverd.** Een NOMINALE levenslange-belasting-
  *    ranking beloont "eerder door je geld heen zijn": wie z'n vermogen sneller
  *    opmaakt betaalt minder Box 3 en wint de as. Zonder het eindvermogen ernaast is
@@ -89,6 +92,37 @@ export const FIRE_LATER_TOLERANTIE_JAAR = 1e-6
  * Bij gelijkspel wint de referentie (niet wisselen zonder aantoonbare winst).
  */
 export const GELIJKSPEL_TOLERANTIE_EUR = 0.5
+
+/**
+ * Float-ruisband (€) op de uitputtings-drempel van de laagste buffer.
+ *
+ * **Waarom er überhaupt een drempel nodig was.** Het veto testte oorspronkelijk
+ * `laagsteBuffer.bedrag < 0`. Dat kon per constructie nooit afgaan:
+ * `computeLaagsteBuffer` neemt het minimum van `spendablePortfolio`, en dat is een
+ * SOM van bucket-`endValue`s (`lib/horizon/coverage-strip.ts`) die nooit met
+ * schulden wordt verrekend — een tekort landt in de kern als Tekort-lening (een
+ * schuld), niet als negatief bezit. De canonieke test zegt het in zijn naam:
+ * `lib/horizon/laagste-buffer.test.ts` — "negatief kan niet, maar €0-dieptepunt
+ * (uitgeput) wordt gevonden". Het veto stond dus als werkende waarborg
+ * gedocumenteerd terwijl precies het geval dat het moest vangen — een variant die
+ * de portefeuille leegtrekt en daardoor de minste Box 3 betaalt — er ongehinderd
+ * doorheen kwam en de badge "laagste druk" kon krijgen.
+ *
+ * **Waarom uitputting (≤ 0) en niet een relatieve drempel t.o.v. de jaarbehoefte.**
+ * Nul is de bodem van deze grootheid, niet een willekeurig punt op een schaal: is
+ * de som van de belegbare potten nul, dan is er niets meer om uit te onttrekken en
+ * loopt de rest van het plan per definitie op geleend geld. Dat is een FEIT uit het
+ * rij-contract. Een relatieve drempel ("minder dan een half jaar behoefte over")
+ * zou daarentegen een NORM zijn — een nieuwe financiële aanname over hoeveel buffer
+ * genoeg is, die deze laag niet mag verzinnen en die bovendien een behoefte-grootheid
+ * vergt die de sweep niet draagt.
+ *
+ * Deze constante is uitsluitend de ruisband eromheen: één cent, zodat een restant
+ * van €0,000000001 uit de kernel-optelling niet als "er is nog vermogen" leest. Net
+ * als de twee toleranties hierboven is dit een VERGELIJK-tolerantie, geen financiële
+ * aanname.
+ */
+export const BUFFER_UITPUTTING_TOLERANTIE_EUR = 0.01
 
 // ── Varianten ────────────────────────────────────────────────────────────────
 
@@ -144,8 +178,8 @@ export interface VariantenSweepSnapshot {
 
 /** Waarom een variant niet als winnaar in aanmerking komt. */
 export type VariantDiskwalificatie =
-  /** Laagste belegbare buffer zakt onder nul — onhaalbaar plan, niet "goedkoop". */
-  | 'negatieve-buffer'
+  /** Laagste belegbare buffer raakt onderweg op — onhaalbaar plan, niet "goedkoop". */
+  | 'buffer-uitgeput'
   /** FIRE valt later dan bij de referentie (ADR 0040). */
   | 'fire-later-dan-referentie'
 
@@ -286,9 +320,15 @@ function runVariant(snapshot: VariantenSweepSnapshot, spec: VariantSpec): Varian
 /**
  * Bepaal of een variant is uitgesloten als winnaar.
  *
- * Volgorde is BETEKENISVOL: de negatieve buffer wint van het FIRE-veto wanneer
- * beide gelden. "Je plan zakt onderweg door nul" is een hardere en eerlijkere
- * boodschap dan "je bent later vrij" — het tweede is een gevolg, niet de kwaal.
+ * Een variant die niet DRAAIDE krijgt geen enkele diskwalificatie: bij een
+ * kern-fout staat élk getal op `null` (inclusief `fireAgeFractional`), en zonder
+ * deze uitgang zou de FIRE-tak "null telt als +∞" toeslaan en de kop laten zeggen
+ * dat je FIRE-moment later valt — een feitelijke uitspraak over een run die nooit
+ * heeft plaatsgevonden. `kernelFout` is de reden; die toont de UI apart.
+ *
+ * Volgorde is BETEKENISVOL: de uitgeputte buffer wint van het FIRE-veto wanneer
+ * beide gelden. "Je geld raakt onderweg op" is een hardere en eerlijkere boodschap
+ * dan "je bent later vrij" — het tweede is een gevolg, niet de kwaal.
  *
  * Het FIRE-veto meet tégen de referentie; die kan er dus per definitie niet aan
  * vallen. `null` FIRE (onbereikbaar) telt als +∞: een variant die FIRE niet haalt
@@ -298,7 +338,14 @@ export function bepaalDiskwalificatie(
   variant: VariantUitkomst,
   referentie: VariantUitkomst | undefined,
 ): VariantDiskwalificatie | null {
-  if (variant.laagsteBuffer !== null && variant.laagsteBuffer.bedrag < 0) return 'negatieve-buffer'
+  if (variant.kernelFout !== null) return null
+  // Uitputting, niet "negatief": zie BUFFER_UITPUTTING_TOLERANTIE_EUR.
+  if (
+    variant.laagsteBuffer !== null &&
+    variant.laagsteBuffer.bedrag <= BUFFER_UITPUTTING_TOLERANTIE_EUR
+  ) {
+    return 'buffer-uitgeput'
+  }
   if (variant.isReferentie || referentie === undefined) return null
 
   const ref = referentie.fireAgeFractional
