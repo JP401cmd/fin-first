@@ -10,10 +10,9 @@ describe('buildTaxOverview — total & null-handling', () => {
     expect(r.box3Tax).toBe(2_000)
   })
 
-  it('lege input → total 0, lege opportunities, lege distributie', () => {
+  it('lege input → total 0, lege distributie', () => {
     const r = buildTaxOverview({ box1Tax: null, box2Tax: null, box3Tax: null })
     expect(r.total).toBe(0)
-    expect(r.opportunities).toEqual([])
     expect(r.distribution).toEqual({ box1: 0, box2: 0, box3: 0 })
     expect(r.effectiveRate).toBeNull()
     expect(r.marginalRate).toBeNull()
@@ -88,94 +87,13 @@ describe('buildTaxOverview — freedomDays', () => {
   })
 })
 
-describe('buildTaxOverview — opportunities', () => {
-  it('genereert kansen uit signalen met juiste box/href/deadline', () => {
-    const r = buildTaxOverview({
-      box1Tax: 10_000,
-      box2Tax: null,
-      box3Tax: 2_000,
-      dailyExpenses: 100,
-      jaarruimte: { amount: 4_000, savings: 1_500 },
-      tegenbewijs: { savings: 800 },
-      partnerAllocatie: { savings: 300 },
-    })
-    const byId = Object.fromEntries(r.opportunities.map(o => [o.id, o]))
-
-    expect(byId.jaarruimte).toMatchObject({
-      box: 1,
-      savings: 1_500,
-      deadline: '31 dec',
-      href: '/overzicht/belasting/box1#jaarruimte-uitleg',
-      freedomDays: 15,
-    })
-    expect(byId.tegenbewijs).toMatchObject({
-      box: 3,
-      savings: 800,
-      href: '/overzicht/belasting/box3',
-    })
-    expect(byId['partner-allocatie']).toMatchObject({
-      box: 3,
-      savings: 300,
-      href: '/overzicht/belasting/box3',
-    })
-  })
-
-  it('sorteert opportunities op savings desc', () => {
-    const r = buildTaxOverview({
-      box1Tax: 10_000,
-      box2Tax: null,
-      box3Tax: 2_000,
-      jaarruimte: { amount: 4_000, savings: 1_500 },
-      tegenbewijs: { savings: 800 },
-      partnerAllocatie: { savings: 300 },
-    })
-    const savings = r.opportunities.map(o => o.savings)
-    expect(savings).toEqual([...savings].sort((a, b) => b - a))
-    expect(savings).toEqual([1_500, 800, 300])
-  })
-
-  it('negeert signalen zonder betekenisvolle savings (>0)', () => {
-    const r = buildTaxOverview({
-      box1Tax: 10_000,
-      box2Tax: null,
-      box3Tax: null,
-      jaarruimte: { amount: 0, savings: 0 },
-      tegenbewijs: { savings: 0 },
-      partnerAllocatie: { savings: 0 },
-    })
-    expect(r.opportunities).toEqual([])
-  })
-
-  it('toont DGA-leengrens als box-2 waarschuwing (savings 0) onderaan', () => {
-    const r = buildTaxOverview({
-      box1Tax: 10_000,
-      box2Tax: 5_000,
-      box3Tax: null,
-      jaarruimte: { amount: 4_000, savings: 1_500 },
-      dgaLeningExcess: 120_000,
-    })
-    const dga = r.opportunities.find(o => o.id === 'dga-leengrens')
-    expect(dga).toMatchObject({
-      box: 2,
-      savings: 0,
-      freedomDays: 0,
-      deadline: '31 dec',
-      href: '/overzicht/belasting/box2',
-    })
-    // savings 0 → sorteert achter de jaarruimte-kans.
-    expect(r.opportunities[r.opportunities.length - 1].id).toBe('dga-leengrens')
-  })
-
-  it('toont DGA-leengrens niet bij excess ≤ 0 of ontbrekend', () => {
-    const geen = buildTaxOverview({
-      box1Tax: 10_000,
-      box2Tax: 5_000,
-      box3Tax: null,
-      dgaLeningExcess: 0,
-    })
-    expect(geen.opportunities.find(o => o.id === 'dga-leengrens')).toBeUndefined()
-
-    const ontbreekt = buildTaxOverview({ box1Tax: 10_000, box2Tax: 5_000, box3Tax: null })
-    expect(ontbreekt.opportunities.find(o => o.id === 'dga-leengrens')).toBeUndefined()
-  })
-})
+// De kansen-tak is uit `buildTaxOverview` verwijderd (ADR 0086): de enige
+// producent is `lib/tax-optimizer/opportunities.ts`. De dekking die hier stond
+// (jaarruimte/tegenbewijs/partner-allocatie/DGA-signalen → sortering op
+// savings) is dus geen verlies maar een VERHUIZING: `buildOpportunities` +
+// `toTaxOpportunities` worden gedekt door lib/tax-optimizer/opportunities.test.ts
+// (toelatingsregel netEffect > 0, sortering, routing/deadline per soort) en de
+// samenstelling uit de secties door components/overview/belasting/
+// optimizer-model.test.ts. Twee van de vier oude takken (tegenbewijs,
+// DGA-leengrens) werden bovendien door geen enkele runtime-consument gevoed —
+// die dekking bewaakte dode code.

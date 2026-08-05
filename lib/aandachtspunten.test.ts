@@ -15,7 +15,7 @@ import {
   type Aandachtspunt,
   type BudgetBenchmarkLike,
 } from './aandachtspunten'
-import type { TaxOpportunity } from './tax-overview'
+import type { TaxOpportunity } from './tax-optimizer'
 import type { Debt } from './debt-data'
 import type { Asset } from './asset-data'
 
@@ -79,24 +79,26 @@ function makeAsset(overrides: Partial<Asset>): Asset {
 // ── taxOpportunitiesToAandachtspunten ────────────────────────
 
 describe('taxOpportunitiesToAandachtspunten', () => {
-  it('mapt opportunities 1-op-1 met tax: namespace en domain tax', () => {
+  it('mapt opportunities met tax: namespace, domain tax en de NETTO velden', () => {
     const opps: TaxOpportunity[] = [
       {
         id: 'jaarruimte',
         title: 'Benut je jaarruimte',
         box: 1,
         savings: 1200,
-        freedomDays: 12,
+        netEffect: 1200,
+        netFreedomDays: 12,
         deadline: '31 dec',
         href: '/overzicht/belasting/box1',
       },
       {
-        id: 'tegenbewijs',
-        title: 'Tegenbewijs werkelijk rendement',
+        id: 'samenstelling-shift',
+        title: 'Meer spaargeld, minder beleggingen',
         box: 3,
         savings: 500,
-        freedomDays: 5,
-        href: '/overzicht/belasting/box3',
+        netEffect: 120,
+        netFreedomDays: 1,
+        href: '/overzicht/belasting/optimizer',
       },
     ]
 
@@ -111,8 +113,13 @@ describe('taxOpportunitiesToAandachtspunten', () => {
       deadline: '31 dec',
       href: '/overzicht/belasting/box1',
     })
-    expect(result[1].id).toBe('tax:tegenbewijs')
+    expect(result[1].id).toBe('tax:samenstelling-shift')
     expect(result[1].deadline).toBeUndefined()
+    // Grondslag: `savings`/`freedomDays` van een aandachtspunt zijn de NETTO
+    // velden van de kans — een scenario dat rendement kost mag zijn bruto
+    // besparing niet als opbrengst opvoeren.
+    expect(result[1].savings).toBe(120)
+    expect(result[1].freedomDays).toBe(1)
   })
 
   it('levert lege array bij geen opportunities', () => {

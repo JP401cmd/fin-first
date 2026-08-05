@@ -1,25 +1,25 @@
 /**
- * Tax overview — pure, perspectief-onafhankelijke aggregator.
+ * Tax overview — pure, perspectief-onafhankelijke aggregator van de DRUK.
  *
  * Vat al-berekende box-resultaten (Box 1/2/3) samen tot één overzicht voor de
- * belasting-hub (C1/C2/C4) én Fin. Doet GEEN Supabase-calls en GEEN eigen
+ * belasting-hub (C1/C2) én Fin. Doet GEEN Supabase-calls en GEEN eigen
  * box-berekeningen: hij krijgt reeds berekende cijfers binnen en aggregeert.
+ *
+ * SCOPE — ALLEEN DRUK, GEEN KANSEN (ADR 0086). Deze aggregator bouwde tot
+ * voor kort óók een tweede, armere kansen-lijst uit losse signalen
+ * (jaarruimte/tegenbewijs/partner-allocatie/DGA-leengrens). Die tak is
+ * verwijderd: een savings-only lijst kan niet zien dat een scenario per saldo
+ * rendement kóst, en er stonden twee producenten van hetzelfde begrip naast
+ * elkaar. De enige producent van fiscale kansen is nu
+ * `lib/tax-optimizer/opportunities.ts`, geladen via
+ * `lib/tax-opportunities-loader.ts` — daar wonen ook het type `TaxOpportunity`
+ * en de €→vrijheidsdagen-vertaling van een kans.
  *
  * Geen Supabase/React-imports. Volgt het pure-engine-patroon van box3-data.ts.
  * Geld-formattering hoort hier NIET — alle bedragen komen als getallen terug.
  */
 
 // ── Types ────────────────────────────────────────────────────
-
-export interface TaxOpportunity {
-  id: string
-  title: string
-  box: 1 | 2 | 3
-  savings: number
-  freedomDays: number
-  deadline?: string
-  href: string
-}
 
 /** Aandeel per box als percentage 0-100 (som ~100). */
 export interface TaxDistribution {
@@ -35,11 +35,6 @@ export interface TaxOverviewInput {
   grossYearlyIncome?: number | null
   marginalRate?: number | null
   dailyExpenses?: number
-  jaarruimte?: { amount: number; savings: number } | null
-  tegenbewijs?: { savings: number } | null
-  partnerAllocatie?: { savings: number } | null
-  /** Bedrag boven EUR 500k DGA-leengrens; >0 → leengrens-kans/waarschuwing. */
-  dgaLeningExcess?: number | null
 }
 
 export interface TaxOverviewResult {
@@ -53,14 +48,6 @@ export interface TaxOverviewResult {
   marginalRate: number | null
   /** total / dailyExpenses, afgerond (0 als dailyExpenses ontbreekt). */
   freedomDays: number
-  /** Gesorteerd op savings desc. */
-  opportunities: TaxOpportunity[]
-}
-
-// ── Helpers ──────────────────────────────────────────────────
-
-function freedomDaysFor(savings: number, dailyExpenses: number): number {
-  return dailyExpenses > 0 ? Math.round(savings / dailyExpenses) : 0
 }
 
 // ── Aggregator ───────────────────────────────────────────────
@@ -89,66 +76,7 @@ export function buildTaxOverview(input: TaxOverviewInput): TaxOverviewResult {
   const marginalRate = input.marginalRate ?? null
 
   const dailyExpenses = input.dailyExpenses ?? 0
-  const freedomDays = freedomDaysFor(total, dailyExpenses)
-
-  // Build opportunities from the provided signals.
-  const opportunities: TaxOpportunity[] = []
-
-  // Jaarruimte — Box 1 (lijfrente-aftrek), deadline 31 dec.
-  if (input.jaarruimte && input.jaarruimte.savings > 0) {
-    const savings = input.jaarruimte.savings
-    opportunities.push({
-      id: 'jaarruimte',
-      title: 'Benut je jaarruimte',
-      box: 1,
-      savings,
-      freedomDays: freedomDaysFor(savings, dailyExpenses),
-      deadline: '31 dec',
-      href: '/overzicht/belasting/box1#jaarruimte-uitleg',
-    })
-  }
-
-  // Tegenbewijs werkelijk rendement — Box 3.
-  if (input.tegenbewijs && input.tegenbewijs.savings > 0) {
-    const savings = input.tegenbewijs.savings
-    opportunities.push({
-      id: 'tegenbewijs',
-      title: 'Tegenbewijs werkelijk rendement',
-      box: 3,
-      savings,
-      freedomDays: freedomDaysFor(savings, dailyExpenses),
-      href: '/overzicht/belasting/box3',
-    })
-  }
-
-  // Partner-allocatie — Box 3 (optimale verdeling vermogen).
-  if (input.partnerAllocatie && input.partnerAllocatie.savings > 0) {
-    const savings = input.partnerAllocatie.savings
-    opportunities.push({
-      id: 'partner-allocatie',
-      title: 'Verdeel vermogen optimaal met je partner',
-      box: 3,
-      savings,
-      freedomDays: freedomDaysFor(savings, dailyExpenses),
-      href: '/overzicht/belasting/box3',
-    })
-  }
-
-  // DGA-leengrens — Box 2 (waarschuwing/kans). savings = 0 maar wel tonen.
-  if (input.dgaLeningExcess != null && input.dgaLeningExcess > 0) {
-    opportunities.push({
-      id: 'dga-leengrens',
-      title: 'Lening boven de DGA-leengrens',
-      box: 2,
-      savings: 0,
-      freedomDays: 0,
-      deadline: '31 dec',
-      href: '/overzicht/belasting/box2',
-    })
-  }
-
-  // Sort by savings desc (DGA-waarschuwing met savings 0 zakt naar onder).
-  opportunities.sort((a, b) => b.savings - a.savings)
+  const freedomDays = dailyExpenses > 0 ? Math.round(total / dailyExpenses) : 0
 
   return {
     box1Tax,
@@ -159,6 +87,5 @@ export function buildTaxOverview(input: TaxOverviewInput): TaxOverviewResult {
     effectiveRate,
     marginalRate,
     freedomDays,
-    opportunities,
   }
 }

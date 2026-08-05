@@ -12,19 +12,23 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
  * Bedrijfspensioen-signaal: een actief life_event met `event_type === 'pension'`
  * én `metadata.pensioenType === 'bedrijf'` in de loader-bundel (`horizonData.events`).
  *
- * `loadHorizonData`, `computeBox1Tax` en `loadPerspectiveBox3` worden gemockt
- * (DB/zware afhankelijkheden); `buildTaxOverview`, `computeJaarruimte` en
- * `taxOpportunitiesToAandachtspunten` blijven ECHT zodat het demping-pad
- * end-to-end wordt uitgeoefend.
+ * De DB-randen worden gemockt (`loadHorizonData`, `loadPerspectiveBox3`,
+ * `resolveBox1GrossIncome`) plus `computeBox1Tax` als goedkope, monotone
+ * tariefmotor. De hele kansen-KETEN blijft ECHT: `loadFiscaleKansen` →
+ * `computeJaarruimte` → `jaarruimteBesparing` → `buildOpportunities` →
+ * `toTaxOpportunities` → `taxOpportunitiesToAandachtspunten`, zodat het
+ * demping-pad end-to-end wordt uitgeoefend op de echte kansen-producent.
  */
 
 import type { LifeEvent } from './horizon-data'
 import type { HorizonPageData } from './horizon-data-loader'
 import type { Aandachtspunt } from './aandachtspunten'
+import { calculateBox3 } from './box3-data'
 
 const loadHorizonDataMock = vi.fn()
 const computeBox1TaxMock = vi.fn()
 const loadPerspectiveBox3Mock = vi.fn()
+const resolveBox1GrossIncomeMock = vi.fn()
 
 vi.mock('./horizon-data-loader', () => ({
   loadHorizonData: (...args: unknown[]) => loadHorizonDataMock(...args),
@@ -35,6 +39,31 @@ vi.mock('./box1-tax', () => ({
 vi.mock('./household-tax', () => ({
   loadPerspectiveBox3: (...args: unknown[]) => loadPerspectiveBox3Mock(...args),
 }))
+vi.mock('./box1-income', () => ({
+  resolveBox1GrossIncome: (...args: unknown[]) => resolveBox1GrossIncomeMock(...args),
+}))
+
+/**
+ * Minimaal Box 3-resultaat: leeg vermogen → `generateBox3Strategies` produceert
+ * geen enkel scenario (te weinig beleggingen, geen heffing), zodat de
+ * jaarruimte-kans als enige belasting-aandachtspunt overblijft en de asserties
+ * hieronder ondubbelzinnig zijn.
+ */
+function emptyBox3() {
+  return {
+    dailyExpenses: 100,
+    hasHousehold: false,
+    // Echte engine-uitvoer i.p.v. een handgeschreven object: `Box3Result`
+    // draagt o.a. `params` (tarief/forfaits) die de strategie-generator leest.
+    personal: calculateBox3({
+      assets: [],
+      debts: [],
+      hasPartner: false,
+      dailyExpenses: 100,
+      year: 2026,
+    }),
+  }
+}
 
 import { collectAandachtspunten } from './aandachtspunten-loader'
 
@@ -55,7 +84,10 @@ function makeSupabase() {
       resolve({ data: [], error: null }),
   }
   return {
-    auth: { getUser: () => Promise.resolve({ data: { user: null }, error: null }) },
+    // Er IS een gebruiker (de kansen-loader heeft er één nodig voor de
+    // Box 1-bron); alle tabellen blijven leeg, dus de budget-/schuld-/asset-
+    // producenten leveren nog steeds niets.
+    auth: { getUser: () => Promise.resolve({ data: { user: { id: 'u1' } }, error: null }) },
     from: () => emptyQuery,
   } as never
 }
@@ -122,10 +154,14 @@ function pensionEvent(pensioenType: string): LifeEvent {
   } as LifeEvent
 }
 
+/** Bruto-jaarinkomen dat de (gemockte) canonieke Box 1-bron teruggeeft. */
+const GROSS_YEARLY = 120_000
+
 /**
- * Bouw een HorizonPageData-mock met alleen de velden die collectTaxAandachtspunten
- * leest. Gezond inkomen → jaarruimte > 0 zodat het aandachtspunt zónder demping
- * verschijnt; de demping-flags sturen de uitkomst.
+ * Bouw een HorizonPageData-mock met alleen de velden die de belasting-producent
+ * en de kansen-loader lezen. Het bruto inkomen komt niet meer hiervandaan maar
+ * uit `resolveBox1GrossIncome`; wat hier telt zijn de factor-A-flags die de
+ * demping sturen.
  */
 function makeHorizonData(opts: {
   pensioenFactorAKnown: boolean
@@ -155,13 +191,15 @@ describe('collectTaxAandachtspunten — jaarruimte-demping', () => {
     // Variabele (niet-vlakke) mock: `jaarruimteBesparing` (ADR 0040/0041) roept
     // `computeBox1Tax` intern TWEE keer aan (bruto en bruto − inleg) en neemt het
     // verschil. Een vlakke `mockReturnValue` gaf voor beide calls hetzelfde getal
-    // → delta 0 → savings 0 → buildTaxOverview's `savings > 0`-gate hield het
-    // jaarruimte-aandachtspunt overal buiten. Deze mock is monotoon in het bruto-
-    // inkomen (net als de echte motor) zodat een positieve besparing overblijft.
+    // → delta 0 → savings 0 → de `netEffect > 0`-toelatingsregel van
+    // `toTaxOpportunities` hield het jaarruimte-aandachtspunt overal buiten.
+    // Deze mock is monotoon in het bruto-inkomen (net als de echte motor) zodat
+    // een positieve besparing overblijft.
     computeBox1TaxMock.mockImplementation((input: { grossYearlyIncome: number }) => ({
       tax: Math.round(input.grossYearlyIncome * 0.3697),
     }))
-    loadPerspectiveBox3Mock.mockResolvedValue({ personal: { tax: 0 } })
+    loadPerspectiveBox3Mock.mockResolvedValue(emptyBox3())
+    resolveBox1GrossIncomeMock.mockResolvedValue({ grossYearly: GROSS_YEARLY })
   })
 
   it('(a) bedrijfspensioen + ONBEKENDE factor A → géén jaarruimte-aandachtspunt', async () => {
@@ -234,7 +272,8 @@ describe('collectAandachtspunten — actie-kruising (suppressie)', () => {
     computeBox1TaxMock.mockImplementation((input: { grossYearlyIncome: number }) => ({
       tax: Math.round(input.grossYearlyIncome * 0.3697),
     }))
-    loadPerspectiveBox3Mock.mockResolvedValue({ personal: { tax: 0 } })
+    loadPerspectiveBox3Mock.mockResolvedValue(emptyBox3())
+    resolveBox1GrossIncomeMock.mockResolvedValue({ grossYearly: GROSS_YEARLY })
     // Gezond inkomen + bekende factor A → tax:jaarruimte verschijnt normaal.
     loadHorizonDataMock.mockResolvedValue(
       makeHorizonData({

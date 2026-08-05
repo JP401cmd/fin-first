@@ -2,13 +2,13 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Sparkles, ArrowRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
+import { getCachedUser } from '@/lib/supabase/cached-user'
 import { loadHorizonData } from '@/lib/horizon-data-loader'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import {
   BelastingBoxCards,
   type BelastingBoxCard,
 } from '@/components/overview/belasting-box-cards'
-import { computeJaarruimte, box1JaarruimteStatus, jaarruimteBesparing } from '@/lib/jaarruimte'
 import { dailyExpenseRate } from '@/lib/format'
 import { hasBox2Relevance } from '@/lib/box2-relevance'
 import { computeBox3TaxableInput, box3TaxStatus } from '@/lib/box3-taxable-input'
@@ -17,10 +17,11 @@ import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { PageStatusDot } from '@/components/app/page-status-dot'
 import { PAGE_INFO } from '@/lib/page-info-content'
 import { getServerPerspective } from '@/lib/household/server-perspective'
-import { loadPerspectiveBox3 } from '@/lib/household-tax'
 import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
-import { computeBox1Tax, deriveMarginaalTarief } from '@/lib/box1-tax'
+import { deriveMarginaalTarief } from '@/lib/box1-tax'
 import { buildTaxOverview } from '@/lib/tax-overview'
+import { loadFiscaleKansen, type FiscaleKansen } from '@/lib/tax-opportunities-loader'
+import type { LeverageStatus } from '@/lib/leverage-status'
 import { getTaxDeadlines } from '@/lib/tax-calendar'
 import { HubTotaleDruk } from '@/components/overview/belasting/hub-totale-druk'
 import { HubVerdeling } from '@/components/overview/belasting/hub-verdeling'
@@ -66,62 +67,77 @@ export const metadata: Metadata = {
 export default async function OverzichtBelastingPage() {
   const supabase = await createClient()
   const perspective = await getServerPerspective()
-  const horizonData = await loadHorizonData(supabase)
+
+  // ── Fiscale kansen + Box 1/Box 3-grondslag (ÉÉN loader) ────────
+  // `loadFiscaleKansen` is de enige samensteller van fiscale kansen (ADR 0086):
+  // dezelfde uitkomst voedt de optimizer-pagina, deze hub en de aandachtspunten.
+  // Hij levert hier drie dingen: de kansenlijst (sectie II), de canonieke Box 1-
+  // grondslag (bruto → heffing + jaarruimte) en de perspectief-correcte Box 3-
+  // heffing.
+  //
+  // LET OP — deze catch dekt MEER dan de vroegere try/catch rond
+  // `loadPerspectiveBox3`. Box 1 kwam voorheen uit de sync `box1JaarruimteStatus`
+  // en kon niet falen; nu hangt die tak aan dezelfde bron. Faalt de loader, dan
+  // verdwijnt niet alleen de kansen-sectie: `box1Tax` wordt null, waardoor de
+  // "totale druk" alléén Box 3 telt, en de Box 1-kaart valt terug op
+  // "Inkomen onbekend". Daarom loggen we de fout server-side met een grep-bare
+  // tag i.p.v. 'm stil te slikken — een te laag totaal zonder spoor is erger dan
+  // een ontbrekende sectie.
+  //
+  // De drie onafhankelijke bronnen draaien PARALLEL. Dat is hier geen
+  // micro-optimalisatie: de kansen-loader trekt de canonieke Box 1-bron
+  // (resolveBox1GrossIncome → loadCashflowSettingsData → loadCoreData) die deze
+  // hub voorheen niet raakte. Serieel zou dat een tweede zware wachtblok
+  // achter de horizon-bundel plakken; parallel valt het grotendeels in
+  // dezelfde tijdsloot (de gedeelde fetchers in lib/server-data/base.ts en
+  // loadCoreData zijn `cache()`-gewrapt, dus overlappende tabellen worden
+  // binnen deze render sowieso één keer gehaald).
+  const [horizonData, kansen, user] = await Promise.all([
+    loadHorizonData(supabase),
+    loadFiscaleKansen(supabase, perspective, CURRENT_TAX_YEAR).catch(
+      (err): FiscaleKansen | null => {
+        console.error('belasting-hub:kansen', err)
+        return null
+      },
+    ),
+    // Gedeelde, request-gecachte auth-roundtrip (dezelfde die de kansen-loader
+    // en de overige loaders gebruiken) i.p.v. een eigen `auth.getUser()`.
+    getCachedUser(supabase),
+  ])
 
   // Box 3 is de ÉNIGE box die we op de hub perspectief-bewust kunnen tonen:
   // NL-belasting is per-persoon, maar fiscaal partners verdelen Box 3-vermogen,
-  // dus een huishoud-/partner-totaal is fiscaal zinvol. We hergebruiken exact de
-  // loader van de Box 3-subpagina (`loadPerspectiveBox3` → `loadPerspectiveData`
-  // → ONGEWIJZIGDE `calculateBox3`). Box 1 (jaarruimte) en Box 2 blijven
-  // per-persoon — de deep box1-pagina toont zelf al een 2-koloms huishoudbeeld.
+  // dus een huishoud-/partner-totaal is fiscaal zinvol. Box 1 (jaarruimte) en
+  // Box 2 blijven per-persoon — de deep box1-pagina toont zelf al een 2-koloms
+  // huishoudbeeld.
   // Personal: de CANONIEKE calculateBox3-heffing uit de loader-bundel
-  // (horizonData.box3Tax) — dezelfde motor als de Box 3-subpagina. NIET langer de
+  // (horizonData.box3Tax) — dezelfde motor als de Box 3-subpagina. NIET de
   // healthScoreInput.taxData-proxy (buildTaxData), die schulden negeerde (incl. de
   // eigenwoninghypotheek → Box 1) en zo een positieve KPI toonde náást een "geen
-  // belasting"-kaartstatus. Household/partner overschrijft hieronder via loadPerspectiveBox3.
-  let box3Tax: number | null = horizonData.box3Tax
-  let box3PerspectiveAware = false
-  // Optimale partner-allocatie levert een Box 3-besparingssignaal voor C4 — in
-  // household-view berekent loadPerspectiveBox3 dit als `savingsVsEqual`.
-  let partnerAllocatieSavings = 0
-  if (perspective !== 'personal') {
-    try {
-      const box3Data = await loadPerspectiveBox3(supabase, perspective, CURRENT_TAX_YEAR)
-      // household → gecombineerd huishoud-totaal; partner → partner-resultaat
-      // (loadPerspectiveBox3 zet `personal` in partner-view op het partner-
-      // resultaat). Bij graceful degradation (partner deelt geen vermogen) is
-      // `combined` undefined → val terug op het eigen Box 3-bedrag.
-      const perspectiveTax =
-        perspective === 'household'
-          ? box3Data.combined?.tax ?? null
-          : box3Data.personal.tax
-      if (perspectiveTax != null) {
-        box3Tax = perspectiveTax
-        box3PerspectiveAware = !(perspective === 'household' && box3Data.combined == null)
-      }
-      partnerAllocatieSavings = box3Data.optimalAllocation?.savingsVsEqual ?? 0
-    } catch {
-      // Perspectief-laden faalt (geen huishouden / RLS) → behoud eigen Box 3.
-    }
-  }
+  // belasting"-kaartstatus. Household/partner overschrijft met de perspectief-
+  // heffing uit de kansen-loader (dezelfde `loadPerspectiveBox3` als voorheen);
+  // bij graceful degradation (partner deelt geen vermogen) is die null → val
+  // terug op het eigen Box 3-bedrag.
+  const perspectiveTax = perspective !== 'personal' ? kansen?.box3PerspectiveTax ?? null : null
+  const box3Tax: number | null = perspectiveTax ?? horizonData.box3Tax
+  const box3PerspectiveAware = perspectiveTax != null
 
-  // Aanmerkelijk belang (Box 2): relevant zodra de gebruiker een deelneming,
-  // DGA-vordering óf DGA-schuld heeft — dezelfde detectie-breedte als de Box 2-
-  // engine (lib/box2-relevance.ts), zodat de status klopt voor de ~99%
-  // niet-DGA's én een DGA met excessief-lenen-positie niet ten onrechte als
-  // "geen aanmerkelijk belang" verschijnt.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  const hasAanmerkelijkBelang = user ? await hasBox2Relevance(supabase, user.id) : false
-
-  // Huishoudtype voor de Box 3-statushelper: exact dezelfde bron (rauwe
-  // profiles.household_type, vocabulaire 'solo'|'samen'|'gezin') die de sidebar-
-  // layout aan computeLeverScores/box3TaxStatus voert, zodat de partner-detectie
-  // — en dus de Box 3-status — 1-op-1 matcht met de sidebar-dot.
-  const householdTypeRes = user
-    ? await supabase.from('profiles').select('household_type').eq('id', user.id).maybeSingle()
-    : null
+  // Twee user-gebonden vervolgvragen, óók parallel:
+  //  · Aanmerkelijk belang (Box 2): relevant zodra de gebruiker een deelneming,
+  //    DGA-vordering óf DGA-schuld heeft — dezelfde detectie-breedte als de
+  //    Box 2-engine (lib/box2-relevance.ts), zodat de status klopt voor de ~99%
+  //    niet-DGA's én een DGA met excessief-lenen-positie niet ten onrechte als
+  //    "geen aanmerkelijk belang" verschijnt.
+  //  · Huishoudtype voor de Box 3-statushelper: exact dezelfde bron (rauwe
+  //    profiles.household_type, vocabulaire 'solo'|'samen'|'gezin') die de
+  //    sidebar-layout aan computeLeverScores/box3TaxStatus voert, zodat de
+  //    partner-detectie — en dus de Box 3-status — 1-op-1 matcht met de dot.
+  const [hasAanmerkelijkBelang, householdTypeRes] = await Promise.all([
+    user ? hasBox2Relevance(supabase, user.id) : Promise.resolve(false),
+    user
+      ? supabase.from('profiles').select('household_type').eq('id', user.id).maybeSingle()
+      : Promise.resolve(null),
+  ])
   const householdType =
     (householdTypeRes?.data?.household_type as string | undefined) ?? undefined
 
@@ -131,45 +147,35 @@ export default async function OverzichtBelastingPage() {
   const monthlyExpenses = horizonData.effectiveInput?.monthlyExpenses ?? 0
   const dailyExpenses = monthlyExpenses > 0 ? dailyExpenseRate(monthlyExpenses) : 100
 
-  // Box 1-schatting: netto-maandinkomen ≈ bruto × (1 − marginaal_tarief),
-  // dus bruto ≈ netto / (1 − marginaal). We leiden zo het bruto-jaarinkomen af
-  // en voeden dat aan de pure Box 1-engine (`computeBox1Tax`) voor een
-  // accuratere heffing dan een platte bruto × marginaal — voldoende voor de
-  // KPI-tegel, niet voor aangifte.
-  // Box 1-status + bruto jaarinkomen via de gedeelde helper (box1JaarruimteStatus)
-  // — dezelfde bron die de sidebar-Box-1-dot in app/(app)/layout.tsx leest, zodat
-  // kaart-status == sidebar-status. De helper leidt grossYearly af uit
-  // netto-maandinkomen / (1 − marginaal); we hergebruiken die grossYearly voor de
-  // KPI-heffing (computeBox1Tax) zodat er geen tweede afleiding ontstaat.
-  const netMonthly = horizonData.effectiveInput?.monthlyIncome ?? 0
+  // Marginaal tarief voor de effectieve-druk-annotatie (C1/C2).
   const marg = horizonData.fireParams?.marginaalTarief ?? deriveMarginaalTarief()
-  const { status: box1Status, grossYearly } = box1JaarruimteStatus({
-    netMonthly,
-    marginaalTarief: marg,
-  })
-  let box1Tax: number | null = null
-  if (grossYearly > 0) {
-    const box1 = computeBox1Tax({ grossYearlyIncome: grossYearly, year: 2026, dailyExpenses })
-    box1Tax = Math.round(box1.tax)
-  }
 
-  // Jaarruimte-detail voor de hub-secties hieronder (besparing C4). Factor A
-  // (werkgeverspensioen-aangroei) wordt afgetrokken via dezelfde canonieke bron
-  // als de box1-deeppage en de aandachtspunten-tip: `horizonData.pensioenFactorA`
-  // (resolvePensionFactorA → 0 bij onbekend, het echte UPO/geschatte getal bij
-  // bekend), en de bespaar-FORMULE is de gedeelde `jaarruimteBesparing`-helper.
-  // LET OP — de bruto-GRONDSLAG divergeert bewust: de hub deelt zijn grossYearly
-  // met de sidebar-Box-1-dot (box1JaarruimteStatus: netto/(1−marg), sync, geen
-  // DB-read), terwijl de box1-deeppage en de optimizer `resolveBox1GrossIncome`
-  // gebruiken (grossFromNet-schijfinversie + handmatige override). Bekende,
-  // gedocumenteerde divergentie (lib/uat/acceptance/belast.ts, WF-BELAST-01);
-  // harmonisatie = open follow-up.
-  const jaarruimte = computeJaarruimte(grossYearly, horizonData.pensioenFactorA)
-  const box1StatusText = !jaarruimte.hasData
-    ? 'Inkomen onbekend'
+  // ── Box 1: bruto, heffing, jaarruimte en KAART-STATUS uit ÉÉN bron ────
+  // Alles komt uit `loadFiscaleKansen` → `resolveBox1GrossIncome` +
+  // `computeJaarruimte` + `computeBox1Tax`. Dat is de CANONIEKE Box 1-grondslag,
+  // dezelfde die de box1-deeppage en de optimizer gebruiken (grossFromNet-
+  // schijfinversie + handmatige `profiles.box1_gross_income`-override).
+  //
+  // BEWUST NIET LANGER `box1JaarruimteStatus`. Die helper is een SYNC
+  // status-heuristiek (netto/(1−marginaal), geen DB-read) die in het shell-pad
+  // van élke route hangt en daarom de sidebar-dot blijft voeden — maar hij kent
+  // de handmatige bruto-override niet. Twee gevolgen die deze hub daarmee
+  // erfde: wie zijn bruto op /box1 corrigeerde zag dat hier niet terug, en de
+  // kaart-status kwam uit een factor-A-loze aanroep terwijl de kaart-TEKST
+  // factor A wél meenam — dezelfde kaart kon "Ruimte benut" tonen naast een
+  // oranje statuspunt. Restverschil met de sidebar-dot is nu bewust en
+  // gedocumenteerd (lib/jaarruimte.ts#box1JaarruimteStatus).
+  const grossYearly = kansen?.grossYearly ?? 0
+  const box1Tax = kansen?.box1Tax ?? null
+  const jaarruimte = kansen?.jaarruimte ?? null
+  // Status EN statustekst uit één afleiding: de dot en het bijschrift op
+  // dezelfde kaart mogen elkaar nooit tegenspreken (precies de fout die deze
+  // wijziging opheft).
+  const [box1Status, box1StatusText]: [LeverageStatus, string] = !jaarruimte?.hasData
+    ? ['neutral', 'Inkomen onbekend']
     : jaarruimte.jaarruimte > 0
-      ? 'Onbenutte jaarruimte'
-      : 'Ruimte benut'
+      ? ['warn', 'Onbenutte jaarruimte']
+      : ['good', 'Ruimte benut']
 
   // Box 3-status uit de canonieke tax-lever-bron (box3-taxable-input.ts) —
   // dezelfde helper die de sidebar-Box-3-dot voedt, zodat kaart == sidebar.
@@ -191,14 +197,10 @@ export default async function OverzichtBelastingPage() {
           ? 'Box 3-actie nodig'
           : null
 
-  // ── Hub-overzicht (C1/C2/C4/C7) ────────────────────────────────
-  // Jaarruimte-besparing = marginaal-correct Box 1-belastingverschil van de
-  // volledige inleg (schijfovergangen + heffingskorting-afbouw), via de gedeelde
-  // `jaarruimteBesparing`-helper (ADR 0040/0041) — niet de vlakke ruimte × marginaal.
-  const jaarruimteSavings = jaarruimte.hasData
-    ? jaarruimteBesparing(grossYearly, jaarruimte.jaarruimte, 2026)
-    : 0
-
+  // ── Hub-overzicht (C1/C2/C7) — alleen de DRUK ──────────────────
+  // `buildTaxOverview` aggregeert nog uitsluitend de belastingdruk; de kansen
+  // komen uit `loadFiscaleKansen` (ADR 0086), niet meer uit losse signalen hier.
+  //
   // Box 2 bewust BUITEN het totaal: we laden de echte Box 2-heffing niet op de
   // hub (per-persoon, vereist eigen berekening). Bij aanmerkelijk belang
   // annoteren we het totaal met "excl. Box 2".
@@ -209,12 +211,6 @@ export default async function OverzichtBelastingPage() {
     grossYearlyIncome: grossYearly > 0 ? grossYearly : null,
     marginalRate: marg,
     dailyExpenses,
-    jaarruimte:
-      jaarruimte.hasData && jaarruimte.jaarruimte > 0
-        ? { amount: jaarruimte.jaarruimte, savings: jaarruimteSavings }
-        : null,
-    partnerAllocatie:
-      partnerAllocatieSavings > 0 ? { savings: partnerAllocatieSavings } : null,
   })
 
   // Fiscale kalender — runtime-klok als 'now' (server-component mag dat).
@@ -347,11 +343,14 @@ export default async function OverzichtBelastingPage() {
           </div>
         </Reveal>
 
-        {/* II · De kansen */}
-        {overview.opportunities.length > 0 && (
+        {/* II · De kansen — uit de gedeelde kansen-loader (ADR 0086). Alleen
+            kansen met een POSITIEF netto effect halen deze lijst; een scenario
+            dat per saldo meer rendement kost dan het aan belasting bespaart
+            hoort hier niet als "besparingskans" te staan. */}
+        {kansen && kansen.taxOpportunities.length > 0 && (
           <Reveal className="pt-12 sm:pt-16">
             <SectionLabel num="II">De kansen</SectionLabel>
-            <HubKansen opportunities={overview.opportunities} />
+            <HubKansen opportunities={kansen.taxOpportunities} />
           </Reveal>
         )}
 

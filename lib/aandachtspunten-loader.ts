@@ -4,8 +4,9 @@
  * `collectAandachtspunten(supabase)` voert drie producenten uit (belasting,
  * budget, schulden) met EXACT dezelfde pure rekenkern als de UI-surfaces:
  *
- *   tax    → spiegelt /overzicht/belasting (computeBox1Tax + loadPerspectiveBox3
- *            + computeJaarruimte → buildTaxOverview → opportunities).
+ *   tax    → consumeert `loadFiscaleKansen` — DEZELFDE kansen-loader als de
+ *            belasting-hub en de optimizer (ADR 0086), plus een eigen
+ *            bedrijfspensioen-demping als FILTER op die lijst.
  *   budget → spiegelt lib/ai/context/wil-context.ts (NIBUD-benchmark-assemblage).
  *   debt   → actieve schulden met betekenisvolle rente.
  *
@@ -26,13 +27,12 @@ import {
   debtsToAandachtspunten,
   assetsToAandachtspunten,
   filterActionedAandachtspunten,
+  JAARRUIMTE_AANDACHTSPUNT_ID,
 } from './aandachtspunten'
 import { loadActionedAandachtspuntIds } from './aandachtspunten-actions'
 import { dailyExpenseRate } from './format'
-import { buildTaxOverview } from './tax-overview'
-import { computeBox1Tax, deriveMarginaalTarief } from './box1-tax'
-import { loadPerspectiveBox3 } from './household-tax'
-import { computeJaarruimte, jaarruimteBesparing } from './jaarruimte'
+import { loadFiscaleKansen } from './tax-opportunities-loader'
+import { CURRENT_TAX_YEAR } from './box3-data'
 import { loadHorizonData } from './horizon-data-loader'
 import {
   getNibudHouseholdType,
@@ -52,47 +52,30 @@ import type { Asset } from './asset-data'
 // ── Belasting-producent ──────────────────────────────────────
 
 /**
- * Bouw de belasting-kansen server-side op met dezelfde pure functies als de
- * belasting-hub. Schat bruto-jaarinkomen uit netto-maandinkomen × marginaal,
- * voedt computeBox1Tax + loadPerspectiveBox3 + computeJaarruimte aan
- * buildTaxOverview en zet de opportunities om naar aandachtspunten.
+ * Belasting-aandachtspunten = de gedeelde fiscale kansen, gefilterd.
+ *
+ * CONSUME, DON'T RECOMPUTE (ADR 0086): dit blok stelde vroeger zijn eigen
+ * kansen samen — inclusief een eigen kopie van de bruto-formule
+ * (netto × 12 / (1 − marginaal)) en een tweede `buildTaxOverview`-aanroep. Dat
+ * was een derde afleiding van dezelfde kans naast de hub en de optimizer. Nu
+ * komt de lijst kant-en-klaar uit `loadFiscaleKansen` (perspectief 'personal',
+ * zoals voorheen) en doet deze producent nog exact één ding van zichzelf: de
+ * bedrijfspensioen-demping, als FILTER op de geleverde lijst.
  */
+// BEKENDE BEPERKING (opvolgactie, zie aandachtspunt `bruto-box1-grondslag-meervoudig`):
+// deze producent degradeert alles-of-niets. Vóór ADR 0086 zat er een try/catch om
+// alléén de Box 3-read, zodat een falende huishoud-/RLS-read de jaarruimte-tip
+// liet staan. Nu deelt de hele producent één `loadFiscaleKansen`-aanroep; elke
+// throw daarbinnen laat `safe()` hieronder een lege lijst teruggeven, waardoor
+// ÁLLE fiscale aandachtspunten stil verdwijnen uit /overzicht, de briefing, de
+// totaalplan-rapportage én de Fin-contexten. Herstellen vraagt een nullable
+// Box 3-tak in de loader (`standing` wordt dan optioneel), wat door de
+// optimizer-keten rimpelt — bewust apart gehouden van deze plak.
 async function collectTaxAandachtspunten(supabase: SupabaseClient): Promise<Aandachtspunt[]> {
-  const horizonData = await loadHorizonData(supabase)
-
-  const monthlyExpenses = horizonData.effectiveInput?.monthlyExpenses ?? 0
-  const dailyExpenses = monthlyExpenses > 0 ? dailyExpenseRate(monthlyExpenses) : 100
-
-  // Box 1-schatting: bruto ≈ netto / (1 − marginaal).
-  let box1Tax: number | null = null
-  let grossYearly = 0
-  const netMonthly = horizonData.effectiveInput?.monthlyIncome ?? 0
-  const marg = horizonData.fireParams?.marginaalTarief ?? deriveMarginaalTarief()
-  if (netMonthly > 0 && marg > 0 && marg < 1) {
-    grossYearly = (netMonthly * 12) / (1 - marg)
-    const box1 = computeBox1Tax({ grossYearlyIncome: grossYearly, year: 2026, dailyExpenses })
-    box1Tax = Math.round(box1.tax)
-  }
-
-  // Box 3 (perspectief 'personal' — persoonlijk resultaat). Fallback = de
-  // canonieke calculateBox3-heffing uit de loader-bundel (horizonData.box3Tax),
-  // NIET de simplistische healthScoreInput.taxData-proxy (die schulden negeerde).
-  let box3Tax: number | null = horizonData.box3Tax
-  try {
-    const box3Data = await loadPerspectiveBox3(supabase, 'personal', 2026)
-    if (box3Data.personal?.tax != null) box3Tax = box3Data.personal.tax
-  } catch {
-    // Box 3-perspectief faalt → behoud de canonieke loader-waarde.
-  }
-
-  // Jaarruimte-besparing = marginaal-correct Box 1-belastingverschil van de inleg
-  // (schijfovergangen + heffingskorting-afbouw) via de gedeelde `jaarruimteBesparing`-
-  // helper (ADR 0040/0041), niet de vlakke ruimte × marginaal. Factor A komt uit de
-  // loader-bundel (profiles.pension_factor_a via resolvePensionFactorA).
-  const jaarruimte = computeJaarruimte(grossYearly, horizonData.pensioenFactorA)
-  const jaarruimteSavings = jaarruimte.hasData
-    ? jaarruimteBesparing(grossYearly, jaarruimte.jaarruimte, 2026)
-    : 0
+  const [horizonData, kansen] = await Promise.all([
+    loadHorizonData(supabase),
+    loadFiscaleKansen(supabase, 'personal', CURRENT_TAX_YEAR),
+  ])
 
   // Demping: werknemer mét bedrijfspensioen + ONBEKENDE factor A.
   // Bij onbekende factor A rekent de loader met 0 → de jaarruimte komt op de
@@ -103,6 +86,9 @@ async function collectTaxAandachtspunten(supabase: SupabaseClient): Promise<Aand
   // EXPLICIETE factor A (incl. 0 voor zzp → isKnown=true) of geen
   // bedrijfspensioen blijft de tip ongewijzigd. De box1-hub toont de kans wél
   // (daar beheert de gebruiker 'm); deze demping zit bewust alléén hier.
+  //
+  // Het is met opzet een FILTER en geen herberekening: we onderdrukken de
+  // geleverde kans, we bouwen 'm niet met andere aannames opnieuw op.
   const hasBedrijfspensioen = horizonData.events.some(
     (ev) =>
       ev.event_type === 'pension' &&
@@ -110,20 +96,13 @@ async function collectTaxAandachtspunten(supabase: SupabaseClient): Promise<Aand
   )
   const dampenJaarruimte = !horizonData.pensioenFactorAKnown && hasBedrijfspensioen
 
-  const overview = buildTaxOverview({
-    box1Tax,
-    box2Tax: null,
-    box3Tax,
-    grossYearlyIncome: grossYearly > 0 ? grossYearly : null,
-    marginalRate: marg,
-    dailyExpenses,
-    jaarruimte:
-      !dampenJaarruimte && jaarruimte.hasData && jaarruimte.jaarruimte > 0
-        ? { amount: jaarruimte.jaarruimte, savings: jaarruimteSavings }
-        : null,
-  })
-
-  return taxOpportunitiesToAandachtspunten(overview.opportunities)
+  // Filter ná de conversie: de `tax:`-namespacing woont in
+  // `taxOpportunitiesToAandachtspunten` en hoort hier niet nog eens opgebouwd
+  // te worden (één prefix-bron).
+  const punten = taxOpportunitiesToAandachtspunten(kansen.taxOpportunities)
+  return dampenJaarruimte
+    ? punten.filter((a) => a.id !== JAARRUIMTE_AANDACHTSPUNT_ID)
+    : punten
 }
 
 // ── Budget-producent ─────────────────────────────────────────

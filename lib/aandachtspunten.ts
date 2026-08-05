@@ -15,7 +15,7 @@
  * testbaar zonder DB (zie aandachtspunten.test.ts).
  */
 
-import type { TaxOpportunity } from './tax-overview'
+import type { TaxOpportunity } from './tax-optimizer'
 import type { Debt } from './debt-data'
 import type { Asset, AssetType } from './asset-data'
 
@@ -215,16 +215,25 @@ export function collectActionedIds(
 // ── Adapters (PURE) ──────────────────────────────────────────
 
 /**
- * Belasting-kansen (uit `buildTaxOverview(...).opportunities`) → aandachtspunten.
- * Behoudt savings/freedomDays/deadline/href 1-op-1; id krijgt 'tax:'-namespace.
+ * Belasting-kansen (uit `loadFiscaleKansen(...).taxOpportunities`) →
+ * aandachtspunten. Deadline/href 1-op-1; id krijgt 'tax:'-namespace.
+ *
+ * GRONDSLAG — NETTO. `Aandachtspunt.savings` is de cross-domein vergelijkbare
+ * "wat levert dit je op"-grootheid: hij sorteert de gebundelde lijst en landt
+ * ongewijzigd in een actie. Voor een fiscale kans is dat `netEffect`
+ * (belastingbesparing mínus verwacht misgelopen rendement), niet de bruto
+ * belastingbesparing — anders zou een Box 3-verschuiving die per saldo geld
+ * kost bovenaan de aandachtspunten kunnen staan. Bruto en netto in één rij
+ * mengen (bruto euro's naast netto vrijheidsdagen) zou bovendien binnen dezelfde
+ * regel niet kloppen. De producent laat alleen kansen met `netEffect > 0` door.
  */
 export function taxOpportunitiesToAandachtspunten(opps: TaxOpportunity[]): Aandachtspunt[] {
   return opps.map((opp) => ({
     id: `tax:${opp.id}`,
     domain: 'tax' as const,
     title: opp.title,
-    savings: opp.savings,
-    freedomDays: opp.freedomDays,
+    savings: opp.netEffect,
+    freedomDays: opp.netFreedomDays,
     deadline: opp.deadline,
     href: opp.href,
   }))

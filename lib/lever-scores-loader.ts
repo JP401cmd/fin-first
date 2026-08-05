@@ -28,7 +28,7 @@ import {
   box3TaxStatus,
   type Box3TaxableInput,
 } from '@/lib/box3-taxable-input'
-import { box1JaarruimteStatus } from '@/lib/jaarruimte'
+import { box1JaarruimteStatus, resolvePensionFactorA } from '@/lib/jaarruimte'
 import { resolveEffectiveIncomeExpenses } from '@/lib/effective-financials'
 import { resolveFireParams } from '@/lib/fire-params'
 import { computeSavingsRate6m, computeDebtAflossingMonthly } from '@/lib/savings-source'
@@ -101,6 +101,9 @@ interface LeverScoresProfile {
   expected_return?: number | null
   inflation_rate?: number | null
   box3_method?: string | null
+  /** Jaarlijkse pensioenaangroei (factor A) — voedt de Box 1-statusdot. */
+  pension_factor_a?: number | null
+  pension_factor_a_source?: string | null
 }
 
 type AssetRow = {
@@ -403,9 +406,14 @@ export const loadLeverScores = cache(async function loadLeverScores(
     monthTxExpenses,
   )
   const box1MarginaalTarief = resolveFireParams(profile).marginaalTarief
+  // Factor A meegeven: zonder werkgeverspensioen-aftrek meldde de dot een
+  // "onbenutte jaarruimte"-kans terwijl de Belasting-kaart (die factor A wél
+  // meeneemt) "ruimte benut" toonde. `getOwnProfile` doet select('*'), dus de
+  // kolom ligt er al — geen extra query.
   const { status: box1Status } = box1JaarruimteStatus({
     netMonthly: box1MonthlyIncome,
     marginaalTarief: box1MarginaalTarief,
+    factorA: resolvePensionFactorA(profile).factorA,
   })
 
   return { scores, taxInput, box3Status, box1Status, netWorth, budgetsOver }

@@ -77,10 +77,10 @@ const criteria: AcceptanceCriterion[] = [
     persona: 'compleet',
     given: 'Persona Tessa Compleet geladen; /overzicht/belasting toont drie box-kaarten + de "De druk"-sectie (Box 1 + Box 3, excl. Box 2).',
     when: 'De gebruiker leest het hub-totaal (som Box 1 + Box 3) en de verdeling per box.',
-    then: 'Het hub-totaal = `buildTaxOverview(box1Tax, null, box3Tax).total` = box1Tax + box3Tax (Box 2 bewust null → buiten het totaal bij aanmerkelijk belang); de verdeling telt op tot 100%; freedomDays = round(total / daguitgaven). Géén hard cijfer: box1Tax leunt op de HUB-bruto-bron (netMonthly×12/(1−marg), ander getal dan de subpagina — zie kop). Box3Tax kwam voorheen uit de `healthScoreInput.taxData`-proxy (buildTaxData), die schulden — incl. de eigenwoninghypotheek — negeerde; sinds deze release leest de hub `horizonData.box3Tax` (dezelfde canonieke `calculateBox3`-uitkomst als de Box 3-subpagina, personal-perspectief) en overschrijft `loadPerspectiveBox3` dat bij household/partner. Daarom nog steeds een consistentie-toets op de aggregatie (box1 blijft een andere bron dan de subpagina), maar box3Tax zelf is nu A=B met /overzicht/belasting/box3 i.p.v. een aparte schatting.',
+    then: 'Het hub-totaal = `buildTaxOverview(box1Tax, null, box3Tax).total` = box1Tax + box3Tax (Box 2 bewust null → buiten het totaal bij aanmerkelijk belang); de verdeling telt op tot 100%; freedomDays = round(total / daguitgaven). Box3Tax kwam voorheen uit de `healthScoreInput.taxData`-proxy (buildTaxData), die schulden — incl. de eigenwoninghypotheek — negeerde; de hub leest nu `horizonData.box3Tax` (dezelfde canonieke `calculateBox3`-uitkomst als de Box 3-subpagina, personal-perspectief) en overschrijft dat bij household/partner met de perspectief-heffing uit de gedeelde kansen-loader. Box1Tax is sinds ADR 0086 óók A=B met de subpagina: de hub leest de CANONIEKE bruto-bron (`resolveBox1GrossIncome` — schijfinversie + handmatige override) i.p.v. de sync status-heuristiek `box1JaarruimteStatus` (netMonthly×12/(1−marg)). Die heuristiek voedt nog uitsluitend de sidebar-dot; het restverschil rond de grens `jaarruimte = 0` is bewust en gedocumenteerd.',
     assertion: {
       kind: 'consistency',
-      source: 'lib/tax-overview.ts#buildTaxOverview — aggregatie-invariant total = box1+box2+box3, distribution som = 100, freedomDays = round(total/daily); box1Tax leunt op de loader-afgeleide netMonthly (effectiveInput, hub-vs-subpagina bron-divergentie blijft); box3Tax = horizonData.box3Tax (canonieke calculateBox3, A=B met de Box 3-subpagina) via app/(app)/overzicht/belasting/page.tsx + loadPerspectiveBox3 voor household/partner. tax-overview.test.ts dekt de aggregator exact.',
+      source: 'lib/tax-overview.ts#buildTaxOverview — aggregatie-invariant total = box1+box2+box3, distribution som = 100, freedomDays = round(total/daily); box1Tax = computeBox1Tax over resolveBox1GrossIncome via lib/tax-opportunities-loader.ts#loadFiscaleKansen (A=B met /overzicht/belasting/box1); box3Tax = horizonData.box3Tax resp. de perspectief-heffing uit dezelfde loader (canonieke calculateBox3, A=B met /overzicht/belasting/box3). tax-overview.test.ts dekt de aggregator exact.',
     },
   },
   {
@@ -103,12 +103,12 @@ const criteria: AcceptanceCriterion[] = [
     titel: 'Besparingskansen bekijken en doorklikken',
     kriticiteit: 'KERN',
     persona: 'compleet',
-    given: 'Persona Tessa geladen; de hub-sectie "De kansen" toont `overview.opportunities` (jaarruimte / tegenbewijs / partner-allocatie / DGA-leengrens).',
-    when: 'De gebruiker bekijkt de kansen-lijst en klikt een kans door naar de betreffende box.',
-    then: 'De kansen zijn gesorteerd op `savings` desc; de DGA-leengrens-kans (savings 0, waarschuwing) zakt naar onderen; elke kans linkt naar de juiste box-`href`. Alleen de deterministische SORTERING/richting is toetsbaar — welke kansen verschijnen leunt op loader-signalen (jaarruimte/tegenbewijs/partner).',
+    given: 'Persona Tessa geladen; de hub-sectie "De kansen" toont `loadFiscaleKansen(...).taxOpportunities` — dezelfde kansen als de fiscale optimizer (jaarruimte-lijfrente / samenstelling-shift / fiscale partnerverdeling), niet meer de aparte signalen-lijst van buildTaxOverview.',
+    when: 'De gebruiker bekijkt de kansen-lijst en klikt een kans door (Box 1-jaarruimte → box1-uitleg, Box 3-scenario → de optimizer).',
+    then: 'De kansen zijn gesorteerd op NETTO effect desc (bruto besparing als tiebreak) en de kop-euro per regel is dat netto effect; kansen met `netEffect ≤ 0` staan er NIET — een Box 3-verschuiving die meer verwacht rendement kost dan ze belasting bespaart is geen besparingskans. De "waarschuwing zonder besparing"-variant (DGA-leengrens, savings 0) bestaat daarmee niet meer. Alleen de deterministische SORTERING/toelating is toetsbaar — welke kansen verschijnen leunt op loader-afgeleide signalen.',
     assertion: {
       kind: 'direction',
-      source: 'lib/tax-overview.ts#buildTaxOverview — opportunities.sort((a,b)=>b.savings−a.savings); de aanwezigheid van elke kans hangt van loader-afgeleide signalen af → richting i.p.v. exact',
+      source: 'lib/tax-optimizer/opportunities.ts#toTaxOpportunities — filter(netEffect > 0) + sort((a,b)=>b.netEffect−a.netEffect || b.savings−a.savings), gedekt door lib/tax-optimizer/opportunities.test.ts; de aanwezigheid van elke kans hangt van loader-afgeleide signalen af → richting i.p.v. exact',
     },
   },
   {

@@ -25,6 +25,15 @@ export interface ArchiConcern {
 
 export const ARCHI_CONCERNS: ArchiConcern[] = [
   {
+    id: 'bruto-box1-grondslag-meervoudig',
+    title: 'Het bruto Box 1-inkomen wordt nog op drie manieren afgeleid',
+    detail:
+      'ADR 0086 maakte `resolveBox1GrossIncome` (handmatige override + schijfinversie) de canonieke bruto-Box 1-waarde voor hub, box1-subpagina en optimizer. Twee afleidingen staan daar nog naast: `box1JaarruimteStatus` (netto/(1−marginaal), bewust behouden als goedkope status-heuristiek voor de sidebar-dot, die sync moet blijven omdat hij in het shell-pad van élke route hangt) en `estimateGrossYearly` in lib/jaarruimte-facts.ts (fixed-point, voedt de cloud- én lokale Fin-context). Bekend gevolg: bij income_source=auto kan de dot rond de grens jaarruimte=0 van de kaart verschillen. Tweede, losse kant van hetzelfde punt: `resolveBox1GrossIncome` leest de override PAS ná de dure schatting, en trekt daarvoor `loadCoreData` (~18 queries) binnen voor één scalar — dat kost de belasting-hub ~20 extra queries per bezoek (op de AI-paden is loadCoreData al gecached, dus daar valt het mee). Twee opvolgacties: override-first met lazy estimate, en een smalle `loadEstimatedNetYearly` naast loadCashflowSettingsData. Verwijder dit punt zodra de drie afleidingen één bron delen én de zware koppeling weg is.',
+    severity: 'debt',
+    elementIds: ['as-belasting'],
+    reviewedAt: '2026-08-05',
+  },
+  {
     id: 'gedeelde-bankrekening-ongewogen',
     title: 'Gedeelde bankrekening telt bij béíde partners voor 100%',
     detail:

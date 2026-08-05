@@ -33,6 +33,13 @@ export {
   JAARRUIMTE_CAVEAT,
 } from './rank'
 export {
+  buildOpportunities,
+  toTaxOpportunities,
+  type Dots,
+  type Opportunity,
+  type TaxOpportunity,
+} from './opportunities'
+export {
   TAX_OPTIMIZER_GOALS,
   GOAL_BY_ID,
   DEFAULT_GOAL_ID,

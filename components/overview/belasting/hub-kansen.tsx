@@ -1,25 +1,28 @@
 import Link from 'next/link'
 import { ArrowRight, Clock } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
-import type { TaxOpportunity } from '@/lib/tax-overview'
+import type { TaxOpportunity } from '@/lib/tax-optimizer'
 import { Kicker, ScenarioCallout } from '@/components/editorial'
 import { AandachtspuntActieButton } from './aandachtspunt-actie-button'
 
 const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
 
 /**
- * HubKansen (C4) — "next best action": de grootste belasting-besparingskansen,
- * geordend op €-besparing (de hub levert ze al gesorteerd via
- * `buildTaxOverview.opportunities`).
+ * HubKansen (C4) — "next best action": de grootste fiscale kansen, geordend op
+ * NETTO effect (de hub levert ze al gesorteerd via `loadFiscaleKansen` →
+ * `toTaxOpportunities`, ADR 0086).
  *
- * Elke regel: box-streep (functionele kleur) + box-label + titel + €-besparing
- * (Playfair) + vrijheidsdagen + (optionele) deadline + doorklik-link naar de
- * bijbehorende box-subpagina. De bredere balk = meer besparing (relatief t.o.v.
- * de grootste kans), zodat het oog meteen naar de zwaarste hefboom wordt
- * getrokken.
+ * Elke regel: box-streep (functionele kleur) + box-label + titel + netto effect
+ * (Playfair) + vrijheidsdagen + (optionele) deadline + doorklik-link. De
+ * bredere balk = groter netto effect (relatief t.o.v. de grootste kans), zodat
+ * het oog meteen naar de zwaarste hefboom wordt getrokken.
  *
- * DGA-leengrens komt als kans met savings=0 binnen (waarschuwing, geen
- * besparing) — die toont geen balk en geen vrijheidsdagen, alleen de regel.
+ * GRONDSLAG: de kop-euro is `netEffect` (belastingbesparing MÍNUS verwacht
+ * misgelopen rendement) — de grootheid waarop je kunt beslissen, en dezelfde
+ * waarop de lijst gesorteerd is. De bruto belastingbesparing blijft als context
+ * onder de regel staan zodra beide verschillen. De producent laat alleen kansen
+ * met `netEffect > 0` door, dus er is hier geen "waarschuwing zonder
+ * besparing"-variant meer.
  *
  * Bewust presentationeel/server-compatible (geen hooks, geen fetching).
  */
@@ -36,9 +39,10 @@ const BOX_BADGE: Record<1 | 2 | 3, { label: string; color: string }> = {
 export function HubKansen({ opportunities }: { opportunities: TaxOpportunity[] }) {
   if (opportunities.length === 0) return null
 
-  // Schaal op de grootste besparing zodat de balklengtes onderling
-  // vergelijkbaar zijn (>=1 voorkomt deling door nul bij enkel savings=0).
-  const maxSavings = Math.max(...opportunities.map((o) => o.savings), 1)
+  // Schaal op het grootste NETTO effect — dezelfde grootheid waarop de lijst
+  // gesorteerd is, zodat een lagere regel nooit een langere balk krijgt.
+  // (>=1 voorkomt deling door nul.)
+  const maxNetEffect = Math.max(...opportunities.map((o) => o.netEffect), 1)
 
   return (
     <article className="bg-[var(--paper)] border border-[var(--border-ed)] p-5 sm:p-6">
@@ -47,8 +51,10 @@ export function HubKansen({ opportunities }: { opportunities: TaxOpportunity[] }
       <ul className="mt-4 border-t border-[var(--rule-soft)]">
         {opportunities.map((opp) => {
           const badge = BOX_BADGE[opp.box]
-          const pct = Math.min(Math.max((opp.savings / maxSavings) * 100, 0), 100)
-          const hasSavings = opp.savings > 0
+          const pct = Math.min(Math.max((opp.netEffect / maxNetEffect) * 100, 0), 100)
+          // Verschillen bruto en netto, dan kost dit scenario verwacht
+          // rendement — dan tonen we de belastingbesparing als context.
+          const showGrossContext = opp.savings !== opp.netEffect
 
           return (
             <li key={opp.id} className="border-b border-[var(--rule-soft)] last:border-b-0">
@@ -77,32 +83,33 @@ export function HubKansen({ opportunities }: { opportunities: TaxOpportunity[] }
                       </span>
                     </div>
 
-                    {/* Besparing (Playfair) + vrijheidstijd */}
-                    {hasSavings ? (
-                      <div className="mt-2 flex items-baseline gap-3 flex-wrap text-xs text-[var(--ink-2)]">
-                        <span className="inline-flex items-baseline gap-1.5">
-                          <span className="text-[var(--ink-3)]">tot</span>
-                          <span
-                            className="font-black tabular-nums text-lg leading-none text-[var(--positive)]"
-                            style={{ fontFamily: PLAYFAIR }}
-                          >
-                            {formatCurrency(opp.savings)}
-                          </span>
-                          <span className="text-[var(--ink-3)]">besparing</span>
+                    {/* Netto effect (Playfair) + vrijheidstijd */}
+                    <div className="mt-2 flex items-baseline gap-3 flex-wrap text-xs text-[var(--ink-2)]">
+                      <span className="inline-flex items-baseline gap-1.5">
+                        <span className="text-[var(--ink-3)]">tot</span>
+                        <span
+                          className="font-black tabular-nums text-lg leading-none text-[var(--positive)]"
+                          style={{ fontFamily: PLAYFAIR }}
+                        >
+                          {formatCurrency(opp.netEffect)}
                         </span>
-                        {opp.freedomDays > 0 && (
-                          <span className="inline-flex items-center gap-1 text-[var(--ink-3)]">
-                            <Clock className="h-3 w-3 shrink-0" aria-hidden="true" />
-                            {opp.freedomDays} vrijheidsdagen
-                          </span>
-                        )}
-                      </div>
-                    ) : (
-                      <p
-                        className="mt-2 italic text-xs text-[var(--ink-3)]"
-                        style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
-                      >
-                        Aandachtspunt — beoordeel voor jaareinde.
+                        <span className="text-[var(--ink-3)]">netto per jaar</span>
+                      </span>
+                      {opp.netFreedomDays > 0 && (
+                        <span className="inline-flex items-center gap-1 text-[var(--ink-3)]">
+                          <Clock className="h-3 w-3 shrink-0" aria-hidden="true" />
+                          {opp.netFreedomDays} vrijheidsdagen
+                        </span>
+                      )}
+                    </div>
+
+                    {/* --ink-3, niet --ink-4: deze regel draagt betekenisvolle
+                        financiële inhoud, geen decoratie — ink-4 haalt op
+                        --paper geen AA-contrast. */}
+                    {showGrossContext && (
+                      <p className="mt-1 text-[11px] text-[var(--ink-3)]">
+                        waarvan {formatCurrency(opp.savings)} belastingbesparing — de rest
+                        gaat op aan verwacht misgelopen rendement.
                       </p>
                     )}
 
@@ -112,15 +119,13 @@ export function HubKansen({ opportunities }: { opportunities: TaxOpportunity[] }
                       </p>
                     )}
 
-                    {/* Besparings-balk (relatief op de grootste kans) — scherp. */}
-                    {hasSavings && (
-                      <div className="mt-2.5 h-1.5 w-full overflow-hidden bg-[var(--subtle)]">
-                        <div
-                          className="h-full"
-                          style={{ width: `${pct}%`, backgroundColor: badge.color }}
-                        />
-                      </div>
-                    )}
+                    {/* Netto-effect-balk (relatief op de grootste kans) — scherp. */}
+                    <div className="mt-2.5 h-1.5 w-full overflow-hidden bg-[var(--subtle)]">
+                      <div
+                        className="h-full"
+                        style={{ width: `${pct}%`, backgroundColor: badge.color }}
+                      />
+                    </div>
                   </div>
 
                   <ArrowRight
@@ -132,14 +137,17 @@ export function HubKansen({ opportunities }: { opportunities: TaxOpportunity[] }
 
               {/* "Voeg toe als actie" — deterministisch via het acties-systeem.
                   Buiten de Link gehouden (geen genest interactief element) en
-                  uitgelijnd onder de regel-content (pl-4 matcht de Link-padding). */}
+                  uitgelijnd onder de regel-content (pl-4 matcht de Link-padding).
+                  savings/freedomDays = de NETTO velden, identiek aan wat
+                  `taxOpportunitiesToAandachtspunten` op de aandachtspunten-lijst
+                  zet — dezelfde kans levert zo langs beide routes dezelfde actie. */}
               <div className="pb-4 pl-4 -mt-1">
                 <AandachtspuntActieButton
                   id={`tax:${opp.id}`}
                   domain="tax"
                   title={opp.title}
-                  savings={opp.savings}
-                  freedomDays={opp.freedomDays}
+                  savings={opp.netEffect}
+                  freedomDays={opp.netFreedomDays}
                   deadline={opp.deadline}
                   href={opp.href}
                 />

@@ -370,20 +370,36 @@ export function resolvePensionFactorA(
  *  - good:    ruimte volledig benut
  *
  * Geeft óók de afgeleide `grossYearly` terug zodat de pagina die kan hergebruiken
- * (geen tweede afleiding → geen drift). Factor A = 0 (status-heuristiek).
+ * (geen tweede afleiding → geen drift).
+ *
+ * BEWUST EEN STATUS-HEURISTIEK, GEEN CANONIEKE WAARDE. Deze helper is sync en
+ * doet geen DB-read, juist omdat hij in het shell-pad van élke route hangt (de
+ * sidebar-dot). De canonieke bruto-/jaarruimtewaarde is
+ * `resolveBox1GrossIncome` + `computeJaarruimte` — die kent de handmatige
+ * bruto-override en de schijfinversie, en voedt de Belasting-hub en de
+ * box1-subpagina. Bekend restverschil: bij `income_source = 'auto'` rekent de
+ * canonieke bron met een 12-maands-extrapolatie waar deze heuristiek de huidige
+ * maand × 12 neemt, dus rond de grens `jaarruimte = 0` kan de dot van de kaart
+ * verschillen.
+ *
+ * `factorA` (jaarlijkse pensioenaangroei) is optioneel met default 0 — zonder
+ * die parameter negeerde de status het werkgeverspensioen volledig, waardoor
+ * dezelfde kaart "Ruimte benut" kon tonen naast een oranje aandachts-dot.
  */
 export function box1JaarruimteStatus(input: {
   /** Netto maandinkomen (effectief — manual of transactie-afgeleid). */
   netMonthly: number
   /** Marginaal IB-tarief (0–1; schijf-1- of topschijf-tarief, jaar-afgeleid). */
   marginaalTarief: number
+  /** Jaarlijkse pensioenaangroei (factor A, €). Default 0 = geen werkgeverspensioen. */
+  factorA?: number
 }): { status: LeverageStatus; grossYearly: number } {
-  const { netMonthly, marginaalTarief } = input
+  const { netMonthly, marginaalTarief, factorA = 0 } = input
   const grossYearly =
     netMonthly > 0 && marginaalTarief > 0 && marginaalTarief < 1
       ? (netMonthly * 12) / (1 - marginaalTarief)
       : 0
-  const jaarruimte = computeJaarruimte(grossYearly, 0)
+  const jaarruimte = computeJaarruimte(grossYearly, factorA)
   const status: LeverageStatus = !jaarruimte.hasData
     ? 'neutral'
     : jaarruimte.jaarruimte > 0
