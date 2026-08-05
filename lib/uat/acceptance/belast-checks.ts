@@ -50,6 +50,29 @@ import {
   JAARRUIMTE_TITLE,
   type GoalSection,
 } from '@/lib/tax-optimizer'
+import {
+  WITHDRAWAL_ORDER_PRESETS,
+  POT_RULES_DEFAULTS,
+  resolvePotRules,
+  type PotRulesConfig,
+} from '@/lib/pot-rules'
+import { buildTsParams } from '@/lib/horizon-kernel/adapter/prio-overgang'
+import type { AssetPot, DebtPot, TsBezitCategorie } from '@/lib/horizon-kernel/types'
+import type { ConvergentieRawProfileRow } from '@/lib/horizon-kernel/convergentie-router'
+import {
+  buildCompleetHorizonFixture,
+  buildCompleetKernelProfileBase,
+} from '@/lib/regression-tests/horizon-strategie/persona-fixture'
+import {
+  VARIANT_SPECS,
+  REFERENTIE_VARIANT_ID,
+  buildVariantProfile,
+  bepaalDiskwalificatie,
+  runVariantenSweep,
+  type VariantId,
+  type VariantUitkomst,
+  type VariantenSweepSnapshot,
+} from '@/lib/tax-lifetime/varianten-sweep'
 import { BELAST_ACCEPTANCE } from './belast'
 import type { AcceptanceCriterion } from './types'
 
@@ -164,6 +187,68 @@ const eigenHuisHypotheek = compleet.debts.find(
 )!
 const hypSaldo = Number(eigenHuisHypotheek.current_balance)
 const hypRente = estimateMortgageRente(hypSaldo, Number(eigenHuisHypotheek.interest_rate))
+
+// ── Variantensweep-fixture (Fase 3-optimizer, WF-BELAST-25) ────────────────
+
+/** Gepinde leeftijd, spiegelt PINNED_AGE in varianten-sweep.test.ts. */
+const SWEEP_PINNED_AGE = 42
+
+/** Lege pot-/schuldlijst voor de prio-vector-afleiding (die leest alleen de regels). */
+const GEEN_POTTEN: readonly AssetPot[] = []
+const GEEN_SCHULDEN: readonly DebtPot[] = []
+
+/** Onttrekkings-prio per kernel-categorie, zoals de kern ze na `buildTsParams` ziet. */
+function onttrekkingsPrios(potRules: PotRulesConfig): Record<string, number> {
+  const params = buildTsParams(potRules, GEEN_POTTEN, GEEN_SCHULDEN, true)
+  const out: Record<string, number> = {}
+  for (const c of params.bezitCategorien as readonly TsBezitCategorie[]) {
+    out[c.categorie] = c.prioOnttrekking
+  }
+  return out
+}
+
+/** Minimale, volledig getypeerde variant-stub voor de pure vetoregel-toetsen. */
+function leegVariant(id: VariantId): VariantUitkomst {
+  return {
+    id,
+    label: id,
+    onttrekkingOverlay: id === REFERENTIE_VARIANT_ID ? null : { Pensioen: 5 },
+    isReferentie: id === REFERENTIE_VARIANT_ID,
+    levenslangeBox3Nominaal: null,
+    levenslangeBox1NietVerrekendNominaal: null,
+    levenslangeTotaleDrukNominaal: null,
+    fireAgeFractional: null,
+    eindvermogenNettoNominaal: null,
+    eindvermogenBelegbaarNominaal: null,
+    laagsteBuffer: null,
+    diskwalificatie: null,
+    kernelFout: null,
+  }
+}
+
+// Echte end-to-end sweep-fixture (persona 'compleet', deplete-strategie zodat de
+// onttrekkingsvolgorde er daadwerkelijk toe doet) — spiegelt varianten-sweep.test.ts.
+const sweepFixture = buildCompleetHorizonFixture(SWEEP_PINNED_AGE)
+const sweepAssetsMetPensioen = sweepFixture.assets.map((a) =>
+  a.asset_type === 'retirement' ? { ...a, current_value: 300000 } : a,
+)
+const sweepProfiel: ConvergentieRawProfileRow = {
+  ...buildCompleetKernelProfileBase(SWEEP_PINNED_AGE),
+  fire_end_strategy: 'deplete',
+  fire_end_age: 90,
+  housing_strategy_config: { mode: 'include_full' },
+}
+const sweepSnapshot: VariantenSweepSnapshot = {
+  rawContext: {
+    profile: sweepProfiel,
+    assets: sweepAssetsMetPensioen,
+    debts: sweepFixture.debts,
+    lifeEvents: sweepFixture.lifeEvents,
+    aowRows: [],
+    yearlyExpenses: sweepFixture.financialInput.yearlyMustExpenses,
+  },
+  aowLeeftijd: 67,
+}
 
 // ── Checks — één per 'exact'-workflow in BELAST_ACCEPTANCE ──────────────────
 
@@ -500,6 +585,72 @@ export const BELAST_ENGINE_CHECKS: BelastEngineCheck[] = [
           `curvePoints=${curve.length}; endMatchesShift=${endMatchesShift}; marginalConstant=${marginalConstant}; ` +
           `baselineTax2026=${Math.round(baselineTrajectory.tax2026)}; baselineTax2026EqCurrent=${baselineTrajectory.tax2026 === current.tax}; ` +
           `partnerverdelingTrajectory=${partnerverdeling ? partnerverdeling.trajectory : 'geen-partnerverdeling-kans'}; jaarruimteNote=n.v.t. — deze kans zit in Box 1`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-BELAST-25',
+    scenarioId: 'UAT-BELAST-25',
+    label:
+      'Variantensweep (Fase 3): prio-vectoren per variant + de V1-val bij de presets, vetovolgorde (buffer-uitgeput > fire-later), kernelFout krijgt geen diskwalificatie, eindvermogen op beide grondslagen uit een echte sweep-run',
+    run: () => {
+      criterion('WF-BELAST-25')
+
+      // (b) De drie sweep-varianten leveren aantoonbaar VERSCHILLENDE prio-
+      // vectoren op `categorie_prios.onttrekking.Pensioen`; de twee presets die
+      // ná de kernel-klem (min(i+1,4)) samenvallen doen dat NIET (de V1-val).
+      const basisProfielVoorPrio: ConvergentieRawProfileRow = {
+        ...buildCompleetKernelProfileBase(SWEEP_PINNED_AGE),
+        pot_rules: undefined,
+      }
+      const vectoren = VARIANT_SPECS.map((spec) =>
+        onttrekkingsPrios(resolvePotRules(buildVariantProfile(basisProfielVoorPrio, spec))),
+      )
+      const variantOverlaysDiffer =
+        vectoren[1].Pensioen === 5 && vectoren[2].Pensioen === 1 && vectoren[0].Pensioen === 4
+
+      const liquideEerst = WITHDRAWAL_ORDER_PRESETS.find((p) => p.id === 'liquide-eerst')!
+      const pensioenSparen = WITHDRAWAL_ORDER_PRESETS.find((p) => p.id === 'pensioen-sparen')!
+      const presetA = onttrekkingsPrios({ ...POT_RULES_DEFAULTS, withdrawalOrderGroups: liquideEerst.order })
+      const presetB = onttrekkingsPrios({ ...POT_RULES_DEFAULTS, withdrawalOrderGroups: pensioenSparen.order })
+      const presetsCollide = JSON.stringify(presetA) === JSON.stringify(presetB)
+
+      // (c) Vetovolgorde: buffer-uitgeput gaat vóór fire-later-dan-referentie —
+      // en een kernelFout-variant krijgt GEEN diskwalificatie-reden.
+      const referentieStub: VariantUitkomst = {
+        ...leegVariant('huidige-volgorde'),
+        levenslangeTotaleDrukNominaal: 100000,
+        fireAgeFractional: 58,
+        laagsteBuffer: { bedrag: 10000, age: 70 },
+        kernelFout: null,
+      }
+      const beideOvertredingen: VariantUitkomst = {
+        ...leegVariant('pensioen-laatst'),
+        levenslangeTotaleDrukNominaal: 1,
+        fireAgeFractional: 62,
+        laagsteBuffer: { bedrag: 0, age: 70 },
+        kernelFout: null,
+      }
+      const vetoOrder = bepaalDiskwalificatie(beideOvertredingen, referentieStub)
+
+      const kernFoutVariant: VariantUitkomst = { ...leegVariant('pensioen-laatst'), kernelFout: 'kern-fout' }
+      const kernelFoutNoDisq = bepaalDiskwalificatie(kernFoutVariant, referentieStub) === null
+
+      // (d) Eindvermogen op BEIDE grondslagen, per variant, uit een echte sweep.
+      const resultaat = runVariantenSweep(sweepSnapshot)
+      const eindvermogenCompleet = resultaat.varianten.every(
+        (v) =>
+          Number.isFinite(v.eindvermogenNettoNominaal as number) &&
+          Number.isFinite(v.eindvermogenBelegbaarNominaal as number),
+      )
+      const nettoGteBelegbaar = resultaat.varianten.every(
+        (v) => (v.eindvermogenNettoNominaal as number) >= (v.eindvermogenBelegbaarNominaal as number) - 1,
+      )
+
+      return {
+        expected:
+          'prioReferentie=4; prioLaatst=5; prioEerst=1; variantOverlaysDiffer=true; presetsCollide=true; vetoOrder=buffer-uitgeput; kernelFoutNoDisq=true; eindvermogenCompleet=true; nettoGteBelegbaar=true',
+        actual: `prioReferentie=${vectoren[0].Pensioen}; prioLaatst=${vectoren[1].Pensioen}; prioEerst=${vectoren[2].Pensioen}; variantOverlaysDiffer=${variantOverlaysDiffer}; presetsCollide=${presetsCollide}; vetoOrder=${vetoOrder}; kernelFoutNoDisq=${kernelFoutNoDisq}; eindvermogenCompleet=${eindvermogenCompleet}; nettoGteBelegbaar=${nettoGteBelegbaar}`,
       }
     },
   },

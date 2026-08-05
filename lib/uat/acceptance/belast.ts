@@ -14,13 +14,17 @@
  * `generateBox3Strategies`/`rankStrategies`/`buildCurrentStanding`
  * (lib/tax-optimizer/*)); sinds Fase 2 plak A ook de verloop-rij
  * (`TaxTrajectory`/`buildTrajectory`) en de shift-verkenner
- * (`ShiftCurvePoint[]`/`buildShiftCurve`) uit hetzelfde bestand.
+ * (`ShiftCurvePoint[]`/`buildShiftCurve`) uit hetzelfde bestand; sinds Fase 3
+ * ook katern IV — de variantensweep (`runVariantenSweep`/`finaliseerVarianten`/
+ * `bepaalDiskwalificatie`/`kiesWinnaar`, lib/tax-lifetime/varianten-sweep.ts)
+ * bovenop de levenslange-belastingreeks (`computeLifetimeTax`,
+ * lib/tax-lifetime/lifetime-tax.ts).
  *
  * BEWUST WEGGELATEN (verwijsregels, bestaan NIET als los BELAST-scenario in de
  * catalogus — spiegelt WF-SCHULD-19):
  *  - WF-BELAST-20 (perspectief wisselen) → dekt UAT-NAV (perspectief-switcher).
  *  - WF-BELAST-22 (pagina-uitleg (i) + statuspunt) → dekt UAT-NAV.
- * Deze set heeft dus PRECIES 22 criteria (WF-BELAST-01..19, 21, 23..24).
+ * Deze set heeft dus PRECIES 23 criteria (WF-BELAST-01..19, 21, 23..25).
  *
  * JAARTAL — alle drie de box-subpagina's + de hub draaien op 2026:
  *   - box1/page.tsx: `resolveBox1GrossIncome(..., 2026)` + `computeBox1Tax(..., year:2026)`
@@ -399,6 +403,26 @@ const criteria: AcceptanceCriterion[] = [
         'curvePoints=21; endMatchesShift=true; marginalConstant=true; baselineTax2026=12612; baselineTax2026EqCurrent=true; partnerverdelingTrajectory=null; jaarruimteNote=n.v.t. — deze kans zit in Box 1',
       source:
         'lib/tax-optimizer/box3-strategies.ts#generateBox3Strategies (buildTrajectory + buildShiftCurve) + #baselineStrategy, op het echte Box3Result van Willem (calculateBox3, year 2026); trajectory=null-gevallen spiegelen components/overview/belasting/optimizer-compare.tsx#trajectoryNote; affiene curve vergrendeld in lib/tax-optimizer/box3-optimizer.test.ts',
+    },
+  },
+  {
+    workflow: 'WF-BELAST-25',
+    scenarioId: 'UAT-BELAST-25',
+    titel: 'Fiscale optimizer (Fase 3): drie onttrekkingsvolgordes over je hele looptijd vergeleken',
+    kriticiteit: 'KERN',
+    persona: 'compleet',
+    given:
+      'Persona Tessa Compleet geladen op /overzicht/belasting/optimizer. Katern IV ("Wanneer je je pensioenpot aanspreekt") is ALTIJD zichtbaar maar rekent pas na een expliciete klik op "Reken de drie varianten door" (fasen uitnodiging → bezig → klaar/geen-plan/fout); vóór die klik gebeurt er geen `/api/belasting/varianten-sweep`-fetch en geen kernel-run. Na de klik draaien drie kernel-solves client-side via de kernel-worker (`runVariantenSweepAsync`, lazy geïmporteerd) op de server-geleverde snapshot.',
+    when:
+      'De gebruiker start de sweep en leest de vergelijkingstabel (Box 3 / Box 1 die de cashflow niet inhield / totale druk, eindvermogen, "je bent vrij vanaf", verschil met de referentie) en de kanttekeningen eronder.',
+    then:
+      'De drie varianten (`huidige-volgorde` = referentie/ongewijzigde `pot_rules`, `pensioen-laatst` = prio 5 op `categorie_prios.onttrekking.Pensioen`, `pensioen-eerst` = prio 1) leveren aantoonbaar VERSCHILLENDE onttrekkings-prio-vectoren op — anders dan de vier `WITHDRAWAL_ORDER_PRESETS`, waar `liquide-eerst` en `pensioen-sparen` ná de kernel-klem (`min(i+1,4)` in `orderedGroupsToPrio`) op precies dezelfde vector samenvallen (de mapping-val die deze sweep vermijdt door de V5-categorie-overlay te gebruiken, niet de presets). Rangschikking: laagste `levenslangeTotaleDrukNominaal`, met twee vetorechten in VASTE volgorde — een uitgeputte laagste buffer (`bedrag ≤ 0,01`, `BUFFER_UITPUTTING_TOLERANTIE_EUR`) gaat vóór "FIRE later dan de referentie"; treft een variant beide, dan is het buffer-veto de getoonde reden. Een variant met `kernelFout` (alle getallen `null`) krijgt GEEN diskwalificatie-reden — dat zou een uitspraak zijn over een run die nooit heeft gedraaid — en telt niet mee in de ranking. Elke variant draagt het eindvermogen op BEIDE grondslagen (`eindvermogenNettoNominaal` incl. niet-liquide bezit, `eindvermogenBelegbaarNominaal` — dezelfde grondslag als de laagste buffer, netto altijd ≥ belegbaar); de tabel toont bewust alleen de belegbare grondslag, nooit de twee gemengd op één as. Onder de tabel staan zes kanttekeningen (was vijf vóór Fase 3); de zesde gaat over de arbeidskorting-afwijking in `computeBox1Tax` (kent de korting ook toe over pensioeninkomen, wat de heffing in het gangbare bereik onderschat — het sterkst vóór de AOW-leeftijd, precies waar "pensioen vroeg" onttrekt).',
+    assertion: {
+      kind: 'exact',
+      expected:
+        'prioReferentie=4; prioLaatst=5; prioEerst=1; variantOverlaysDiffer=true; presetsCollide=true; vetoOrder=buffer-uitgeput; kernelFoutNoDisq=true; eindvermogenCompleet=true; nettoGteBelegbaar=true',
+      source:
+        'lib/tax-lifetime/varianten-sweep.ts#VARIANT_SPECS/buildVariantProfile/resolvePotRules (prio-vectoren, via lib/horizon-kernel/adapter/prio-overgang.ts#buildTsParams) + #bepaalDiskwalificatie (vetovolgorde + kernelFout-uitgang) + #runVariantenSweep (eindvermogen op beide grondslagen, echte kernel-fixture persona compleet); "zes kanttekeningen" is UI-tekst in components/overview/belasting/optimizer-levenslang.tsx en niet machine-toetsbaar vanuit deze reken-check.',
     },
   },
 ]
