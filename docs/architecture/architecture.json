@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-04T14:46:51.930Z",
-  "generatedDate": "2026-08-04",
+  "generatedAt": "2026-08-05T20:07:51.583Z",
+  "generatedDate": "2026-08-05",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -187,13 +187,13 @@
     }
   },
   "stats": {
-    "routes": 146,
-    "routesProduction": 101,
-    "api": 281,
+    "routes": 144,
+    "routesProduction": 99,
+    "api": 282,
     "tables": 86,
-    "migrations": 186,
+    "migrations": 187,
     "integrations": 25,
-    "components": 866,
+    "components": 877,
     "providers": 12,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -593,12 +593,6 @@
       "isTest": false
     },
     {
-      "url": "/core/cash",
-      "file": "app/(app)/core/cash/page.tsx",
-      "group": "kern",
-      "isTest": false
-    },
-    {
       "url": "/core/cash/connect",
       "file": "app/(app)/core/cash/connect/page.tsx",
       "group": "kern",
@@ -703,12 +697,6 @@
     {
       "url": "/horizon/uitgaven-na-pensioen",
       "file": "app/(app)/horizon/uitgaven-na-pensioen/page.tsx",
-      "group": "horizon",
-      "isTest": false
-    },
-    {
-      "url": "/horizon/whatif",
-      "file": "app/(app)/horizon/whatif/page.tsx",
       "group": "horizon",
       "isTest": false
     },
@@ -1702,12 +1690,6 @@
         "isTest": false
       },
       {
-        "url": "/core/cash",
-        "file": "app/(app)/core/cash/page.tsx",
-        "group": "kern",
-        "isTest": false
-      },
-      {
         "url": "/core/cash/connect",
         "file": "app/(app)/core/cash/connect/page.tsx",
         "group": "kern",
@@ -1784,12 +1766,6 @@
       {
         "url": "/horizon/uitgaven-na-pensioen",
         "file": "app/(app)/horizon/uitgaven-na-pensioen/page.tsx",
-        "group": "horizon",
-        "isTest": false
-      },
-      {
-        "url": "/horizon/whatif",
-        "file": "app/(app)/horizon/whatif/page.tsx",
         "group": "horizon",
         "isTest": false
       },
@@ -2652,6 +2628,14 @@
       "domain": "belasting",
       "methods": [
         "PUT"
+      ]
+    },
+    {
+      "url": "/api/belasting/varianten-sweep",
+      "file": "app/api/belasting/varianten-sweep/route.ts",
+      "domain": "belasting",
+      "methods": [
+        "GET"
       ]
     },
     {
@@ -6045,6 +6029,29 @@
       ]
     },
     {
+      "domain": "belasting",
+      "label": "belasting",
+      "count": 2,
+      "routes": [
+        {
+          "url": "/api/belasting/box1-income",
+          "file": "app/api/belasting/box1-income/route.ts",
+          "domain": "belasting",
+          "methods": [
+            "PUT"
+          ]
+        },
+        {
+          "url": "/api/belasting/varianten-sweep",
+          "file": "app/api/belasting/varianten-sweep/route.ts",
+          "domain": "belasting",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "check",
       "label": "check",
       "count": 2,
@@ -6388,21 +6395,6 @@
             "GET",
             "PATCH",
             "DELETE"
-          ]
-        }
-      ]
-    },
-    {
-      "domain": "belasting",
-      "label": "belasting",
-      "count": 1,
-      "routes": [
-        {
-          "url": "/api/belasting/box1-income",
-          "file": "app/api/belasting/box1-income/route.ts",
-          "domain": "belasting",
-          "methods": [
-            "PUT"
           ]
         }
       ]
@@ -7837,7 +7829,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 186
+    "migrationCount": 187
   },
   "tablesByDomain": [
     {
@@ -8291,11 +8283,11 @@
     }
   ],
   "components": {
-    "total": 866,
+    "total": 877,
     "groups": [
       {
         "group": "app",
-        "count": 341,
+        "count": 347,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -8305,6 +8297,7 @@
           "action-edit-modal",
           "action-form",
           "action-list-modal",
+          "add-item-cta",
           "ai-categorize-sheet",
           "ai-categorize-sheet.test",
           "ai-privacy-indicator",
@@ -8314,7 +8307,10 @@
           "ai-vaste-kosten-sheet",
           "ai-vaste-kosten-sheet.test",
           "analysis-section",
+          "app-link-gate",
+          "app-link-gate.test",
           "app-setup-gate",
+          "app-setup-gate.test",
           "app-setup-section",
           "aspiration-questionnaire",
           "asset-pane",
@@ -8444,7 +8440,6 @@
           "goal-form",
           "goal-form.test",
           "grafiek-uitleg-walkthrough",
-          "guardrail-kompas",
           "head-scripts",
           "health-score-receipt",
           "health-score-receipt.test",
@@ -8533,6 +8528,7 @@
           "phase-bar",
           "phase-chart-zoom",
           "phase-detail-table",
+          "phase-detail-table.test",
           "phase-discuss-button",
           "phase-intro",
           "phase-modal-onttrekking",
@@ -8555,6 +8551,7 @@
           "responsive-shell.characterization.test",
           "sankey-diagram",
           "scenario-chip",
+          "scenario-chip.test",
           "scenario-kaarten",
           "scenario-kaarten.test",
           "scenario-overlay-picker",
@@ -8586,6 +8583,7 @@
           "step-header",
           "step-link-debt",
           "step-type",
+          "step-type.test",
           "strategie-modal",
           "stress-test-section",
           "success-banner",
@@ -8642,7 +8640,7 @@
       },
       {
         "group": "overview",
-        "count": 140,
+        "count": 145,
         "items": [
           "aandachtspunt-actie-button",
           "atomic-cards",
@@ -8743,6 +8741,11 @@
           "off-track-doelen-lijst.test",
           "optimizer-client",
           "optimizer-client.test",
+          "optimizer-compare",
+          "optimizer-details",
+          "optimizer-levenslang",
+          "optimizer-levenslang.test",
+          "optimizer-standing",
           "overzicht-hero",
           "overzicht-secondary",
           "overzicht-secondary-loader",
@@ -11950,8 +11953,7 @@
             "/api/checkin/aandachtspunten",
             "/api/checkin/budgets",
             "/api/checkin/gespreksstarters",
-            "/api/checkin/overview",
-            "/api/checkin/upcoming"
+            "/api/checkin/overview"
           ]
         },
         {
@@ -15595,6 +15597,54 @@
       ],
       "summary": "`loadVasteLastenSummary` haalt per request het volledige 12-maands transactievenster op en laat daar een regex-zware detectie overheen lopen, op minstens vier oppervlakken. De uitkomst verandert tussen twee requests bijna nooit. Er komt daarom een procescache voor die uitkomst, w",
       "file": "docs/adr/0084-vingerafdruk-cache-op-de-vaste-lastendetectie.md"
+    },
+    {
+      "id": "0085-doel-lijn-tot-gekozen-stopleeftijd",
+      "title": "De gestippelde doel-lijn op /toekomst loopt door tot de gekozen stopleeftijd, niet tot de gesolvede FIRE",
+      "status": "aanvaard",
+      "date": "2026-08-05",
+      "elements": [
+        "as-planning",
+        "fn-toekomstplannen"
+      ],
+      "summary": "De gestippelde \"Jouw doel\"/\"Jouw wat-als\"-lijn op /toekomst eindigde tot nu toe op de **gesolvede** scenario-FIRE — de vroegst mogelijke vrijheidsleeftijd onder de gedraaide knoppen. De Vrijheidsas laat de gebruiker echter een eigen **stopleeftijd** kiezen (marge/risicobereidheid",
+      "file": "docs/adr/0085-doel-lijn-tot-gekozen-stopleeftijd.md"
+    },
+    {
+      "id": "0086-canonieke-fiscale-kansen-en-bruto-box1-grondslag",
+      "title": "Fiscale kansen komen uit één producent (lib/tax-optimizer), en resolveBox1GrossIncome is de canonieke bruto-Box 1-grondslag",
+      "status": "aanvaard",
+      "date": "2026-08-05",
+      "elements": [
+        "as-belasting"
+      ],
+      "summary": "TriFinity toonde fiscale besparingskansen op drie oppervlakken — de belasting-hub, de fiscale optimizer en de aandachtspunten — met **twee onafhankelijke producenten** en **vier afleidingen van hetzelfde bruto Box 1-inkomen**. Besluit: `lib/tax-optimizer` wordt de enige producent",
+      "file": "docs/adr/0086-canonieke-fiscale-kansen-en-bruto-box1-grondslag.md"
+    },
+    {
+      "id": "0087-dekkingsradar-doelscenario",
+      "title": "De Dekkingsradar is doelscenario-consistent: vier assen, stop-pad-grondslag overal, en n.v.t. krijgt betekenis",
+      "status": "aanvaard",
+      "date": "2026-08-05",
+      "elements": [
+        "as-planning",
+        "fn-toekomstplannen",
+        "as-vermogen"
+      ],
+      "summary": "De Dekkingsradar op /toekomst rekende sinds ADR 0085 op het gekozen-stop-pad, maar drie assen mengden stiekem grootheden uit de basis-run en de labeling zei er niets over. Bij een extreme marge (stop 75, verwacht 57,5) leverde dat tegenstrijdige duiding op. Besluit (met de produc",
+      "file": "docs/adr/0087-dekkingsradar-doelscenario.md"
+    },
+    {
+      "id": "0088-levenslange-belastingdruk-pensioenpot-positie",
+      "title": "Levenslange belastingdruk (Fase 3): Box 1 als rapportagelaag náást de kernel, sturen via categorie_prios, scope versmald tot de pensioenpot-positie",
+      "status": "aanvaard",
+      "date": "2026-08-05",
+      "elements": [
+        "as-belasting",
+        "as-planning"
+      ],
+      "summary": "ADR 0040 (fiscale-strategie-optimizer, Box 3-MVP) noemde de \"onttrekkingsvolgorde-as\" als openstaande vervolgfase: een kernel-preset-sweep, doel = laagste levenslange Box 3 + FIRE-leeftijd-behoud. Die formulering wees op twee dingen die bij het bouwen niet hielden: (1) de horizon",
+      "file": "docs/adr/0088-levenslange-belastingdruk-pensioenpot-positie.md"
     }
   ],
   "churn": {
@@ -15602,7 +15652,7 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 108
+        "commits": 124
       },
       {
         "path": "lib/ai",
@@ -15644,23 +15694,23 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 8279,
-        "commits": 90
+        "loc": 8384,
+        "commits": 92
       },
       {
         "file": "components/app/budgets-client.tsx",
         "loc": 5045,
-        "commits": 31
+        "commits": 34
       },
       {
         "file": "components/core/assets-client.tsx",
         "loc": 4486,
-        "commits": 46
+        "commits": 44
       },
       {
         "file": "components/app/cash-account-view.tsx",
-        "loc": 3435,
-        "commits": 19
+        "loc": 3444,
+        "commits": 20
       },
       {
         "file": "lib/release-notes.ts",
@@ -15670,7 +15720,7 @@
       {
         "file": "lib/dashboard-data-loader.ts",
         "loc": 2625,
-        "commits": 47
+        "commits": 52
       },
       {
         "file": "app/(app)/core/cash/import/page.tsx",
@@ -15678,9 +15728,9 @@
         "commits": 20
       },
       {
-        "file": "lib/test-personas.ts",
-        "loc": 2216,
-        "commits": 10
+        "file": "app/(app)/core/checkin/page.tsx",
+        "loc": 2225,
+        "commits": 9
       }
     ]
   },
@@ -16447,6 +16497,12 @@
         "name": "verwerkersregister",
         "description": "Gebruik bij elke nieuwe of gewijzigde externe dienst die persoonsgegevens raakt (nieuwe SDK, mail-, analytics- of betaalpartij), bij het kwartaalmoment naast de BTW-administratie, en bij een AVG-vraag over wie wat verwerkt. Houdt het register bij; welke verwerker, welke gegevens, welk doel, welke grondslag, welke overeenkomst.",
         "steps": []
+      },
+      {
+        "id": "woonstrategie-check",
+        "name": "woonstrategie-check",
+        "description": "Gebruik na wijzigingen aan de horizon-kernel, lib/housing-strategy.ts, de horizon-loaders of de Toekomst-grafiek (sim-chart/wealth-composition), bij twijfel of de vier eigen-woningstrategieën (meetellen, uitsluiten, verkopen, opeethypotheek) nog correct doorrekenen, of als periodieke visuele regressie-check bovenop de matrix-vitest. Ook wanneer iemand vraagt \"check de woonstrategieën\" of een rapport met schermafbeeldingen per strategie wil.",
+        "steps": []
       }
     ]
   },
@@ -16622,29 +16678,20 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-08-04",
+    "previousDate": "2026-08-05",
     "hasChanges": true,
     "sections": [
       {
         "label": "API-routes",
         "added": [
-          "/api/admin/local-ai-gate",
-          "/api/ai-execution-prefs",
-          "/api/assets/[id]",
-          "/api/assets/account-number",
-          "/api/debts/[id]",
-          "/api/local-ai-gate",
-          "/api/local-news-edition",
-          "/api/local-news-sources",
-          "/api/local-tips",
-          "/api/local-tips-candidates"
+          "/api/belasting/varianten-sweep"
         ],
         "removed": []
       },
       {
         "label": "Componenten (aantal)",
         "added": [
-          "+14"
+          "+3"
         ],
         "removed": []
       }
@@ -16888,6 +16935,13 @@
       "components": 866,
       "tables": 86,
       "routesProduction": 101
+    },
+    {
+      "date": "2026-08-05",
+      "api": 282,
+      "components": 877,
+      "tables": 86,
+      "routesProduction": 99
     }
   ]
 }

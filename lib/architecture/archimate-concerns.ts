@@ -25,6 +25,15 @@ export interface ArchiConcern {
 
 export const ARCHI_CONCERNS: ArchiConcern[] = [
   {
+    id: 'volledige-profielrij-naar-de-client',
+    title: 'De hele profiles-rij serialiseert naar de browser in kernel-snapshots',
+    detail:
+      'Server-gebouwde kernel-snapshots dragen `rawContext.profile` = de VOLLEDIGE `profiles`-rij: `getOwnProfile` doet `select(\'*\')` (lib/server-data/base.ts) en die rij wordt gespread in lib/horizon-data-loader.ts. De kernel gebruikt daar ~25 velden van (buildConvergentieAdapterProfile); de rest is dode payload — waaronder `full_name`, `marketplace_display_name`, `financial_context` (vrije tekst over de situatie van de gebruiker), `briefing_snapshot`, `role`, `commercial_tier` en `gross_annual_income`. Geen cross-user-lek (één own-row RLS-policy, live geverifieerd 2026-08-05) en géén nieuwe klasse: dit loopt al via `RegelSimSnapshot.rawContext` naar /toekomst/voorkeuren. Sinds aug 2026 komt er een tweede kanaal bij: GET /api/belasting/varianten-sweep. Waarom het telt: identiteit plus vrije-tekst-context worden opvraagbaar in één authenticated GET-URL — zichtbaar in een HAR-dump in een supportticket, in een toekomstige client-side error-reporter die fetch-bodies meepakt, of voor XSS elders in de app die dan één URL hoeft te raken. De gate `check:client-reads` ziet dit pad niet (die scant client-bestanden, geen server-gebouwde props). Fix hoort NIET per route maar als gedeelde `PROFILE_KERNEL_COLUMNS`-kolomlijst in de geest van ASSET_CLIENT_COLUMNS, toegepast op de profiel-bron; dat dicht beide kanalen tegelijk. Verwijder dit punt zodra die kolomlijst bestaat en beide snapshots erop draaien.',
+    severity: 'debt',
+    elementIds: ['as-planning', 'as-belasting', 't-supabase'],
+    reviewedAt: '2026-08-05',
+  },
+  {
     id: 'schema-drift-buiten-migraties',
     title: 'Schema-elementen op productie die in geen enkele migratie staan',
     detail:
@@ -176,6 +185,15 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
     severity: 'debt',
     elementIds: ['t-bankconnect', 'do-transactie'],
     reviewedAt: '2026-07-30',
+  },
+  {
+    id: 'box1-buiten-kernel-cashflow',
+    title: 'De levenslange Box 1-heffing wordt gerapporteerd, niet in mindering gebracht',
+    detail:
+      'Fase 3 van de fiscale optimizer (ADR 0088) leidt de levenslange Box 1-druk af uit de projectierijen (lib/tax-lifetime/lifetime-tax.ts#computeLifetimeTax, Box1Streams via lib/horizon-kernel/bridge.ts) NÁÁST de horizon-kernel-cashflow, bewust niet erin: de kernel is Excel-oracle-bewezen (ADR 0032) en een terugkoppeling zou een buiten-oracle-extensie zijn met regressierisico op iedere bestaande projectie. De heffing die dit oplevert (box1NietVerrekend) vloeit dus NIET terug in de kernel-cashflow — het model rekent niet mee dat een gebruiker extra bruto moet opnemen om die belasting te kunnen betalen. Concreet gevolg: de getoonde bedragen op /overzicht/belasting/optimizer (katern IV) en de variantensweep (lib/tax-lifetime/varianten-sweep.ts) onderschatten de benodigde bruto-opname van elk plan met een pensioenuitkering of -onttrekking. Gemeld op het scherm zelf (een van de vijf Kanttekeningen in components/overview/belasting/optimizer-levenslang.tsx), geen stille aanname. Blijft staan tot Box 1 — met een eigen pariteitsbewijs tegen het Excel-oracle — daadwerkelijk de kernel in gaat; verwijder dit punt pas dan.',
+    severity: 'debt',
+    elementIds: ['as-belasting', 'as-planning'],
+    reviewedAt: '2026-08-05',
   },
 ]
 

@@ -543,6 +543,7 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     'as-vermogen->sp-vermogen': { payload: 'Bezittingen, schulden, posities en koersen', mechanism: 'rest', cadence: 'on-demand', contractDomains: ['assets', 'debts', 'holdings', 'crypto', 'prices', 'rebalancing', 'valuations'] },
     'as-belasting->sp-belasting': { payload: 'Box 1/2/3-druk, jaarruimte en tegenbewijs', mechanism: 'compute', cadence: 'on-demand', contractDomains: ['belasting'], note: 'Voornamelijk pure rekenmotoren in lib/; één API-route exposeert box1-inkomen.' },
     'as-planning->sp-plannen': { payload: 'FIRE-projecties, scenario’s en opnamestrategie', mechanism: 'compute', cadence: 'on-demand', contractDomains: ['scenarios', 'whatif', 'fire-settings', 'withdrawal-strategy', 'pot-rules', 'toekomst-doel'] },
+    'as-planning->as-belasting': { payload: 'Unified-projectierijen van de canonieke Horizon-run (Box1Streams: AOW netto, pensioenuitkering/-onttrekking bruto; totalBox3/cumulativeBox3) — de invoer voor de levenslange-belastingdruk-rapportagelaag en de variantensweep over de pensioenpot-positie (ADR 0088)', mechanism: 'compute', cadence: 'on-demand', contractDomains: ['belasting'], note: 'GEEN terugkoppeling: de fiscale rapportagelaag (lib/tax-lifetime/) leest de kernel-rijen en berekent bovenop, maar niets vloeit terug in de kernel-cashflow (zie aandachtspunt box1-buiten-kernel-cashflow). De drie kernel-solves van de variantensweep draaien client-side in de bestaande kernel-worker (kind: "taxvarianten"), achter GET /api/belasting/varianten-sweep dat uitsluitend de serialiseerbare invoer levert.' },
     'as-coach->sp-inzicht': { payload: 'Aanbevelingen, volgende stappen en aandachtspunten', mechanism: 'rest', cadence: 'on-demand', contractDomains: ['ai', 'next-steps', 'briefing', 'perspective'] },
     'as-nieuws->sp-nieuws': { payload: 'Nieuwsfeed en meldingen', mechanism: 'rest', cadence: 'daily', contractDomains: ['news', 'notifications'] },
     'as-rapport->sp-delen': { payload: 'Rapporten, snapshots, export en freedom-card', mechanism: 'rest', cadence: 'on-demand', contractDomains: ['report', 'snapshots', 'export', 'share'] },
@@ -608,6 +609,12 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
   })
   // Huishouden-dienst bedient het deelproces 'Delen & rapporteren' (en dwarsdoorsnijdend de rest)
   addEdge({ from: 'as-huishouden', to: 'sp-delen', type: 'serving', fromSide: 'L', toSide: 'R', midX: 545 })
+
+  // Planningsdienst levert projectierijen aan de belastingdienst (Fase 3, ADR
+  // 0088): de fiscale rapportagelaag rekent NAAST de kernel-rijen, niet erin
+  // (geen terugkoppeling — vandaar 'serving', geen access-relatie).
+  // as-planning staat direct onder as-belasting (zelfde x, opeenvolgende rij).
+  addEdge({ from: 'as-planning', to: 'as-belasting', type: 'serving', fromSide: 'T', toSide: 'B', label: 'Levert projectierijen' })
 
   // Vrijheidscheck-dienst bedient het publieke instroomproces
   addEdge({ from: 'as-vrijheidscheck', to: 'sp-vrijheidscheck', type: 'serving', fromSide: 'L', toSide: 'R', label: 'Bedient' })

@@ -265,5 +265,37 @@ if (!hasFixtures) {
       const metPartner = res.rows.filter((r) => (r.box1Streams?.partnerBatenNetto ?? 0) > 0)
       expect(metPartner.length).toBeGreaterThan(0)
     })
+
+    /**
+     * VANGRAIL (security-gate Fase 3). `partnerBatenNetto` reist mee op élke
+     * projectierij, en die rijen belanden op /overzicht, in de fiscale sweep en
+     * — via computeHorizonFireTarget — in de AI-context. Op het
+     * convergentie-pad is partner-inkomen vandaag STRUCTUREEL nul, niet "per
+     * afspraak nul": `computeConvergentieProjection` bouwt de kernel-invoer
+     * zonder `partner`-veld, de adapter valt terug op NEUTRAL_PARTNER
+     * (`aanwezig: false`) en `tables/pt.ts` retourneert dan `totaal: 0`.
+     *
+     * Zou iemand ooit `partner:` aan die aanroep toevoegen, dan zou partner-
+     * inkomen in één commit stil naar al die oppervlakken lekken — zónder dat
+     * een bestaande test omvalt. Deze test pint die eigenschap vast op het pad
+     * waar het telt; de huishoud-tak (buildPartnerParams) heeft zijn eigen,
+     * privacy-gedegradeerde route (ADR 0036) en valt hier bewust buiten.
+     */
+    it('VANGRAIL: op het convergentie-pad is partnerBatenNetto altijd 0', () => {
+      const file = sortedFixtureFiles().find((f) => fixtureName(f) === 'partner-aan')
+      expect(file).toBeDefined()
+      if (!file) return
+      const input = buildKernelInput(loadFixture(file))
+      // Reproduceer wat computeConvergentieProjection doet: kernel-invoer
+      // ZONDER partner-tak. Elke rij hoort dan een nul-partnerbaat te dragen.
+      const zonderPartner: KernelInput = {
+        ...input,
+        partner: { ...input.partner, aanwezig: false },
+      }
+      const res = kernelToUnifiedResult(solveFire(zonderPartner), { input: zonderPartner })
+      for (const row of res.rows) {
+        expect(row.box1Streams?.partnerBatenNetto ?? 0, `jaar ${row.year}`).toBe(0)
+      }
+    })
   })
 }
