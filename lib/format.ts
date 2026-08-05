@@ -425,8 +425,68 @@ export function formatDateShort(iso: string): string {
   return `${d.getUTCDate()} ${NL_MONTH_ABBR[d.getUTCMonth()]} ${d.getUTCFullYear()}`
 }
 
+const AMSTERDAM_TZ = 'Europe/Amsterdam'
+
+/**
+ * Kalenderdelen van een moment in Europe/Amsterdam — losgekoppeld van de
+ * tijdzone waarin de runtime toevallig draait.
+ *
+ * Waarom niet de gewone `getHours()/getDate()`-getters: die lezen de LOKALE
+ * tijdzone. De server draait op Vercel in UTC en de browser in
+ * Europe/Amsterdam, dus dezelfde `Date` gaf server-side een ander uur (en soms
+ * een andere kalenderdag) dan client-side. Voor tekst die zowel in de SSR-HTML
+ * als in de eerste client-render staat is dat een React #418
+ * hydration-mismatch — precies de bug die `lib/overview/greeting.ts` eerder
+ * voor de begroeting oploste. Zelfde TZ-projectregel: uur- en daggrenzen via
+ * `Intl.DateTimeFormat` met expliciete `timeZone`, nooit uit een UTC-afknip.
+ */
+const AMSTERDAM_PARTS_FMT = new Intl.DateTimeFormat('en-US', {
+  timeZone: AMSTERDAM_TZ,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+})
+
+interface AmsterdamParts {
+  year: number
+  /** 1-12 */
+  month: number
+  day: number
+  hour: number
+  minute: number
+  /** 0 = zondag, conform NL_DAY_ABBR. */
+  weekday: number
+}
+
+function amsterdamParts(d: Date): AmsterdamParts {
+  const parts = AMSTERDAM_PARTS_FMT.formatToParts(d)
+  const value = (type: Intl.DateTimeFormatPartTypes) =>
+    Number.parseInt(parts.find((p) => p.type === type)?.value ?? '0', 10)
+
+  const year = value('year')
+  const month = value('month')
+  const day = value('day')
+  // Sommige runtimes geven met `hour12: false` '24' terug om middernacht.
+  const hour = value('hour') % 24
+  const minute = value('minute')
+
+  // Weekdag uit de Amsterdamse kalenderdatum zelf (via een UTC-anker), zodat de
+  // uitkomst niet van de locale-weekdagnaam of van de runtime-tijdzone afhangt.
+  const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay()
+
+  return { year, month, day, hour, minute, weekday }
+}
+
 /**
  * Format a date in newspaper (krant) style — no relative timestamps.
+ *
+ * Alle kalender- en klokgrenzen worden in Europe/Amsterdam bepaald, zodat de
+ * uitkomst uitsluitend van het MOMENT afhangt en niet van de tijdzone van de
+ * runtime. Server-render en eerste client-render leveren daardoor identieke
+ * tekst (geen React #418).
  *
  * Rules:
  * - Vandaag:     HH:mm             (bijv. 13:30)
@@ -440,15 +500,14 @@ export function formatTimestamp(date: Date | string | number, now?: Date): strin
 
   if (isNaN(d.getTime())) return ''
 
+  const a = amsterdamParts(d)
+  const r = amsterdamParts(ref)
+
   const pad = (n: number) => String(n).padStart(2, '0')
-  const hhmm = `${pad(d.getHours())}:${pad(d.getMinutes())}`
+  const hhmm = `${pad(a.hour)}:${pad(a.minute)}`
 
   // Same calendar day → time only
-  if (
-    d.getFullYear() === ref.getFullYear() &&
-    d.getMonth() === ref.getMonth() &&
-    d.getDate() === ref.getDate()
-  ) {
+  if (a.year === r.year && a.month === r.month && a.day === r.day) {
     return hhmm
   }
 
@@ -456,19 +515,19 @@ export function formatTimestamp(date: Date | string | number, now?: Date): strin
   const diffMs = ref.getTime() - d.getTime()
   const diffDays = diffMs / (1000 * 60 * 60 * 24)
   if (diffDays > 0 && diffDays < 7) {
-    return `${NL_DAY_ABBR[d.getDay()]} ${hhmm}`
+    return `${NL_DAY_ABBR[a.weekday]} ${hhmm}`
   }
 
   // Same month & year → d MMM
-  if (d.getFullYear() === ref.getFullYear() && d.getMonth() === ref.getMonth()) {
-    return `${d.getDate()} ${NL_MONTH_ABBR[d.getMonth()]}`
+  if (a.year === r.year && a.month === r.month) {
+    return `${a.day} ${NL_MONTH_ABBR[a.month - 1]}`
   }
 
   // Same year → d MMM (no year suffix needed in current year context)
-  if (d.getFullYear() === ref.getFullYear()) {
-    return `${d.getDate()} ${NL_MONTH_ABBR[d.getMonth()]}`
+  if (a.year === r.year) {
+    return `${a.day} ${NL_MONTH_ABBR[a.month - 1]}`
   }
 
   // Older → d MMM yyyy
-  return `${d.getDate()} ${NL_MONTH_ABBR[d.getMonth()]} ${d.getFullYear()}`
+  return `${a.day} ${NL_MONTH_ABBR[a.month - 1]} ${a.year}`
 }

@@ -4,6 +4,7 @@ import {
   calculateFreedomTime,
   formatFreedomTimeString,
   formatWithFreedom,
+  formatTimestamp,
   roundCents,
   roundEuro,
   roundTenths,
@@ -209,6 +210,91 @@ describe('afronders spiegelen de vervangen lokale helpers exact (gedragsbehoud)'
     for (const n of [0, 1.4, 1.6, -2.5, 450000.49, NaN, Infinity]) {
       expect(roundEuro(n)).toBe(oldRound0(n))
     }
+  })
+})
+
+describe('formatTimestamp — tijdzone-deterministisch (React #418 hydration-mismatch)', () => {
+  // Productiebug: 41 × "Minified React error #418" (hydration-mismatch op TEKST)
+  // op /overzicht, over 4 gebruikers. Bron: de dateline "Bijgewerkt {…}" in
+  // components/overview/briefing-panel.tsx, die formatTimestamp aanroept.
+  //
+  // formatTimestamp las de datumdelen met LOKALE getters (getHours/getDate/…).
+  // De server draait op Vercel in UTC, de browser in Europe/Amsterdam — dus
+  // rende de server "Bijgewerkt 08:00" en de client "Bijgewerkt 10:00".
+  //
+  // De invariant die deze suite bewaakt: de uitkomst hangt UITSLUITEND van het
+  // moment af, niet van de tijdzone van de runtime. Server-render en eerste
+  // client-render leveren daardoor per definitie dezelfde tekst.
+  //
+  // Zelfde TZ-projectregel als lib/overview/greeting.ts (de eerder gefixte
+  // #418 op dezelfde pagina): uur- en daggrenzen in Europe/Amsterdam bepalen,
+  // nooit uit een UTC-afknip.
+
+  /** Draait `fn` alsof de runtime in tijdzone `tz` staat (Node herleest TZ per Date-operatie). */
+  function withTZ<T>(tz: string, fn: () => T): T {
+    const prev = process.env.TZ
+    process.env.TZ = tz
+    try {
+      return fn()
+    } finally {
+      process.env.TZ = prev
+    }
+  }
+
+  it('geeft dezelfde tekst op een UTC-server als in een Europe/Amsterdam-browser', () => {
+    const refreshedAt = '2026-08-04T08:00:00.000Z'
+    const now = new Date('2026-08-04T12:00:00.000Z')
+
+    const serverText = withTZ('UTC', () => formatTimestamp(refreshedAt, now))
+    const clientText = withTZ('Europe/Amsterdam', () => formatTimestamp(refreshedAt, now))
+
+    expect(clientText).toBe(serverText)
+    // En wel de Amsterdamse wandkloktijd (CEST = UTC+2), niet de UTC-tijd.
+    expect(serverText).toBe('10:00')
+  })
+
+  it('kiest dezelfde dag-tak rond de Amsterdamse middernacht (server vs. client)', () => {
+    // 22:30Z op 4 aug = 00:30 Amsterdam op 5 aug. In UTC valt dit op een ANDERE
+    // kalenderdag dan de referentie, in Amsterdam op dezelfde → de buggy versie
+    // koos server-side de "dag + tijd"-tak ("di 22:30") en client-side de
+    // "vandaag"-tak ("00:30"): een maximaal zichtbare tekst-mismatch.
+    const refreshedAt = '2026-08-04T22:30:00.000Z'
+    const now = new Date('2026-08-05T09:00:00.000Z')
+
+    const serverText = withTZ('UTC', () => formatTimestamp(refreshedAt, now))
+    const clientText = withTZ('Europe/Amsterdam', () => formatTimestamp(refreshedAt, now))
+
+    expect(clientText).toBe(serverText)
+    expect(serverText).toBe('00:30')
+  })
+
+  it('formatteert de oudere takken (dag / maand / jaar) ook tijdzone-onafhankelijk', () => {
+    const now = new Date('2026-08-05T09:00:00.000Z')
+    // Ruim een week terug, zelfde jaar → "d MMM" in Amsterdamse kalender.
+    const older = '2026-07-20T23:30:00.000Z' // = 21 juli 01:30 Amsterdam
+    const vorigJaar = '2025-12-31T23:30:00.000Z' // = 1 jan 2026 00:30 Amsterdam
+
+    expect(withTZ('UTC', () => formatTimestamp(older, now))).toBe(
+      withTZ('Europe/Amsterdam', () => formatTimestamp(older, now)),
+    )
+    expect(withTZ('Europe/Amsterdam', () => formatTimestamp(older, now))).toBe('21 jul')
+
+    // Valt in Amsterdam al in 2026 (= het jaar van `now`), dus zonder jaarsuffix.
+    expect(withTZ('UTC', () => formatTimestamp(vorigJaar, now))).toBe(
+      withTZ('Europe/Amsterdam', () => formatTimestamp(vorigJaar, now)),
+    )
+    expect(withTZ('Europe/Amsterdam', () => formatTimestamp(vorigJaar, now))).toBe('1 jan')
+  })
+
+  it('gebruikt de Amsterdamse weekdag-afkorting voor de "deze week"-tak', () => {
+    // 2026-08-01T23:30Z = zondag 2 aug 01:30 Amsterdam (zaterdag in UTC).
+    const refreshedAt = '2026-08-01T23:30:00.000Z'
+    const now = new Date('2026-08-05T09:00:00.000Z')
+
+    expect(withTZ('UTC', () => formatTimestamp(refreshedAt, now))).toBe(
+      withTZ('Europe/Amsterdam', () => formatTimestamp(refreshedAt, now)),
+    )
+    expect(withTZ('Europe/Amsterdam', () => formatTimestamp(refreshedAt, now))).toBe('zo 01:30')
   })
 })
 
