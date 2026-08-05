@@ -9,6 +9,7 @@
  */
 
 import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { CAPTION_AMOUNT_TOKEN } from '@/lib/benchmark-report-data'
 import type {
   BenchmarkReportData,
   BenchmarkMetric,
@@ -73,10 +74,6 @@ function freedomDelta(deltaEur: number, dailyRate: number): string | null {
   const tijd = formatFreedomTimeString(bd, 'short')
   if (tijd === '0d') return null
   return deltaEur >= 0 ? `${tijd} voorsprong` : `${tijd} achterstand`
-}
-
-function eur(n: number): string {
-  return new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
 }
 
 export function buildBenchmarkReport(args: BuildBenchmarkArgs): BenchmarkReportData {
@@ -210,11 +207,13 @@ function buildNetWorthMetric(
   userValue: number | null, median: number, mean: number, dailyRate: number,
 ): BenchmarkMetric {
   let caption = 'Voeg bezittingen toe om je vermogen te vergelijken.'
+  let captionAmountEur: number | null = null
   let deltaFreedom: string | null = null
   if (userValue != null) {
     const d = userValue - median
     deltaFreedom = freedomDelta(d, dailyRate)
-    caption = `${eur(Math.abs(d))} ${d >= 0 ? 'boven' : 'onder'} de mediaan van jouw doelgroep`
+    captionAmountEur = Math.abs(d)
+    caption = `${CAPTION_AMOUNT_TOKEN} ${d >= 0 ? 'boven' : 'onder'} de mediaan van jouw doelgroep`
       + (deltaFreedom ? ` — ${deltaFreedom}.` : '.')
   }
   const curveMax = Math.round(Math.max(userValue ?? 0, mean, median) * 1.6) || 1
@@ -222,7 +221,7 @@ function buildNetWorthMetric(
     key: 'net_worth', label: 'Netto vermogen', unit: 'eur',
     userValue, referenceValue: median, referenceMean: mean,
     higherIsBetter: true, tier: 'measured', deltaFreedom,
-    caption,
+    caption, captionAmountEur,
     explanation: 'De mediaan is het middelste vermogen in jouw doelgroep: de helft heeft meer, de helft '
       + 'minder. Het NL-gemiddelde ligt hoger doordat een kleine groep zeer rijke huishoudens het optrekt — '
       + 'daarom is de mediaan een eerlijker ijkpunt. De leeftijdscijfers komen van CBS; de verdeling naar '
@@ -235,17 +234,21 @@ function buildNetWorthMetric(
 
 function buildIncomeMetric(userValue: number | null, median: number): BenchmarkMetric {
   let caption = 'Vul je geschatte jaarinkomen in je profiel in om te vergelijken.'
+  let captionAmountEur: number | null = null
   if (userValue != null) {
     const d = userValue - median
-    caption = Math.abs(d) < 500
-      ? 'Rond de referentie van jouw doelgroep.'
-      : `${eur(Math.abs(d))} ${d >= 0 ? 'boven' : 'onder'} de referentie van jouw doelgroep.`
+    if (Math.abs(d) < 500) {
+      caption = 'Rond de referentie van jouw doelgroep.'
+    } else {
+      captionAmountEur = Math.abs(d)
+      caption = `${CAPTION_AMOUNT_TOKEN} ${d >= 0 ? 'boven' : 'onder'} de referentie van jouw doelgroep.`
+    }
   }
   const curveMax = Math.round(Math.max(userValue ?? 0, median) * 2.5) || 1
   return {
     key: 'income', label: 'Geschat jaarinkomen', unit: 'eur',
     userValue, referenceValue: median, higherIsBetter: true, tier: 'measured',
-    caption,
+    caption, captionAmountEur,
     explanation: 'De referentie is het gemiddeld besteedbaar inkomen voor jouw leeftijdsgroep, geraamd naar '
       + 'jouw huishoudtype via de CBS-equivalentiefactoren (CBS publiceert het inkomen per leeftijd '
       + 'gestandaardiseerd — herrekend naar een alleenstaande — en niet per leeftijd × huishoudtype). We '

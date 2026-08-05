@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { buildBenchmarkReport, type BenchmarkUserMetrics, type BuildBenchmarkArgs } from '@/lib/benchmark/build-benchmark'
 import type { BenchmarkCohort } from '@/lib/benchmark/cohort'
+import { CAPTION_AMOUNT_TOKEN, resolveMetricCaption } from '@/lib/benchmark-report-data'
+import { formatMaskedCurrency, MASKED_AMOUNT_PLACEHOLDER } from '@/lib/format'
 
 // Vaste "vandaag" voor alle tests.
 const NOW = new Date('2026-06-15')
@@ -331,5 +333,45 @@ describe('buildBenchmarkReport — fire_age caption-varianten', () => {
     )
     const m = report.metrics.find(m => m.key === 'fire_age')!
     expect(m.caption).toMatch(/niet in zicht/)
+  })
+})
+
+// ── Test 7: caption lekt geen persoonlijk EUR-bedrag (WF-RAPP-13) ──
+
+describe('buildBenchmarkReport — caption is maskeerbaar', () => {
+  it('net_worth en income bakken het bedrag niet in de zin maar leveren het apart', () => {
+    const report = buildBenchmarkReport(makeArgs())
+    for (const key of ['net_worth', 'income'] as const) {
+      const m = report.metrics.find(x => x.key === key)!
+      expect(m.caption).toContain(CAPTION_AMOUNT_TOKEN)
+      // Geen server-geformatteerd EUR-bedrag meer in de zin zelf.
+      expect(m.caption).not.toContain('€')
+      expect(m.captionAmountEur).toBe(Math.abs(m.userValue! - m.referenceValue!))
+    }
+  })
+
+  it('resolveMetricCaption maskeert het bedrag wanneer de privacy-toggle aan staat', () => {
+    const report = buildBenchmarkReport(makeArgs())
+    const nw = report.metrics.find(m => m.key === 'net_worth')!
+    const masked = resolveMetricCaption(nw, v => formatMaskedCurrency(v, true))
+    const open = resolveMetricCaption(nw, v => formatMaskedCurrency(v, false))
+
+    expect(masked).toContain(MASKED_AMOUNT_PLACEHOLDER)
+    expect(masked).not.toContain('€')
+    expect(masked).not.toContain(CAPTION_AMOUNT_TOKEN)
+    expect(masked).not.toContain(String(nw.captionAmountEur))
+    expect(open).toContain('€')
+    expect(open).toContain('boven de mediaan van jouw doelgroep')
+  })
+
+  it('income zonder noemenswaardig verschil heeft geen bedrag om te maskeren', () => {
+    // userValue vlak bij de cohort-mediaan → "Rond de referentie…" zonder bedrag.
+    const report = buildBenchmarkReport(makeArgs())
+    const median = report.metrics.find(m => m.key === 'income')!.referenceValue!
+    const gelijk = buildBenchmarkReport(makeArgs({ user: { ...fullUser, yearlyIncome: median } }))
+    const m = gelijk.metrics.find(x => x.key === 'income')!
+    expect(m.captionAmountEur).toBeNull()
+    expect(m.caption).not.toContain(CAPTION_AMOUNT_TOKEN)
+    expect(resolveMetricCaption(m, v => formatMaskedCurrency(v, true))).toBe(m.caption)
   })
 })

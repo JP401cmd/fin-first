@@ -25,6 +25,7 @@ import { formatFireAge } from '@/lib/horizon-data'
 import { ScenarioCallout, SectionLabel, OrnamentColophon, PageInfoButton } from '@/components/editorial'
 import { PAGE_INFO } from '@/lib/page-info-content'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
+import { resolveMetricCaption } from '@/lib/benchmark-report-data'
 import type {
   BenchmarkReportData,
   BenchmarkMetric,
@@ -333,9 +334,10 @@ export default function BenchmarkPage() {
                     </span>
                   </button>
 
-                  {/* Delta-regel */}
+                  {/* Delta-regel — het persoonlijke EUR-bedrag wordt hier pas
+                      geformatteerd, met de masked-aware `fc` (privacy-toggle). */}
                   <p className="mt-1.5 font-source-serif text-[15px] italic" style={{ color: VIZ.purple }}>
-                    {metric.caption}
+                    {resolveMetricCaption(metric, fc)}
                   </p>
 
                   {/* Curve */}

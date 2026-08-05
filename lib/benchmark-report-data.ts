@@ -45,8 +45,23 @@ export interface BenchmarkMetric {
   tier: BenchmarkTier
   /** Vrijheidstijd-duiding van het verschil, indien zinvol (bv. vermogen/inkomen). */
   deltaFreedom?: string | null
-  /** Korte redactionele duiding van waar je staat. */
+  /**
+   * Korte redactionele duiding van waar je staat.
+   *
+   * Bevat NOOIT een geformatteerd persoonlijk EUR-bedrag: dat zou de
+   * privacy-maskering omzeilen, want de maskeerstand is client-only
+   * (localStorage, zie `lib/hooks/use-privacy.tsx`) en dus onbekend op het
+   * moment dat de server deze zin bakt. Een persoonlijk bedrag staat als
+   * `CAPTION_AMOUNT_TOKEN` in de tekst en apart in `captionAmountEur`;
+   * render de zin altijd via `resolveMetricCaption`.
+   */
   caption: string
+  /**
+   * Het persoonlijke EUR-bedrag dat als `CAPTION_AMOUNT_TOKEN` in `caption` is
+   * uitgespaard (rauw, ongeformatteerd). `null`/afwezig = de caption bevat geen
+   * persoonlijk bedrag.
+   */
+  captionAmountEur?: number | null
   /**
    * Langere, klikbare toelichting (wat betekent de mediaan/het gemiddelde, hoe is
    * de referentie tot stand gekomen). Getoond in de detail-sheet bij klik op het cijfer.
@@ -58,6 +73,30 @@ export interface BenchmarkMetric {
    */
   curve?: { mode: number; max: number; spread: number }
   source: BenchmarkSource
+}
+
+/**
+ * Plaatshouder voor een persoonlijk EUR-bedrag in `BenchmarkMetric.caption`.
+ *
+ * De builder draait server-side en kent de privacy-maskering niet (die is
+ * client-only), dus bakt hij het bedrag niet in de zin maar zet hij deze token
+ * neer. De client vult 'm met de masked-aware formatter. Vergeet een consument
+ * dat, dan valt dat meteen op (de token wordt zichtbaar) in plaats van dat er
+ * stilzwijgend een bedrag lekt.
+ */
+export const CAPTION_AMOUNT_TOKEN = '{bedrag}'
+
+/**
+ * Render de caption van een metric: vult `CAPTION_AMOUNT_TOKEN` met het
+ * persoonlijke bedrag, geformatteerd door de meegegeven (masked-aware)
+ * formatter — in de app `formatMaskedCurrency(v, masked)`.
+ */
+export function resolveMetricCaption(
+  metric: Pick<BenchmarkMetric, 'caption' | 'captionAmountEur'>,
+  formatEur: (value: number) => string,
+): string {
+  if (metric.captionAmountEur == null) return metric.caption
+  return metric.caption.split(CAPTION_AMOUNT_TOKEN).join(formatEur(metric.captionAmountEur))
 }
 
 /**

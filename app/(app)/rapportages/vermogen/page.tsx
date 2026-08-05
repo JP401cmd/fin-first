@@ -41,6 +41,7 @@ import type {
   VermogenVerhuurSection,
   VermogenHypotheekSection,
 } from '@/lib/vermogen-report-data'
+import { buildAssetDetailParts, buildDebtDetailParts } from './detail-parts'
 
 /**
  * Masked-aware currency formatter hook. Pattern identical to balans/budget
@@ -71,95 +72,12 @@ function formatPct(value: number | null, fractionDigits = 1): string {
   return `${value.toFixed(fractionDigits)}%`
 }
 
-function formatDateNL(iso: string | null): string {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return '—'
-  return d.toLocaleDateString('nl-NL', { year: 'numeric', month: 'long', day: 'numeric' })
-}
-
-// ── Asset detail-regels ────────────────────────────────────────────
-
-/**
- * Bouw een korte detail-regel met de type-specifieke kenmerken van een
- * asset. Spec sectie 2.2 iv: type-specifieke regels in `text-[11px]
- * text-[var(--ink-3)]`.
- *
- * Returnt een array van losse details zodat de UI ze met `·` kan
- * scheiden — overslaan van lege velden is dan ook makkelijk.
- */
-/**
- * Gebruikelijk-loon-minimum 2025 voor DGA's met een AB-belang in een
- * holding-BV (Wet IB 1964 art. 12a). Wordt in spec §7 open vraag 2 als
- * "ruling-loon-schatting" gevraagd op deelneming-items met
- * `subtype === 'holding_bv'`. Geen profile-veld nodig — minimum-vuistregel.
- */
-const GEBRUIKELIJK_LOON_MIN_2025 = 56_000
-
-function buildAssetDetailParts(item: VermogenAssetItem): string[] {
-  const parts: string[] = []
-  if (item.wozValue != null && item.wozValue > 0) {
-    // Formateer WOZ los want het is altijd in EUR.
-    parts.push(`WOZ ${new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(item.wozValue)}`)
-  }
-  if (item.addressLine) parts.push(item.addressLine)
-  if (item.rentalIncomeYearly != null && item.rentalIncomeYearly > 0) {
-    parts.push(`Verhuur ${new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(item.rentalIncomeYearly)}/jr`)
-  }
-  if (item.retirementProvider) {
-    const labels: Record<string, string> = {
-      bedrijfspensioenfonds: 'Bedrijfspensioenfonds',
-      verzekeraar: 'Verzekeraar',
-      ppi: 'PPI',
-    }
-    parts.push(labels[item.retirementProvider] ?? item.retirementProvider)
-  }
-  if (item.riskProfile) {
-    const riskLabels: Record<string, string> = { laag: 'Laag risico', middel: 'Middel risico', hoog: 'Hoog risico' }
-    parts.push(riskLabels[item.riskProfile] ?? item.riskProfile)
-  }
-  if (item.tickerSymbol) parts.push(item.tickerSymbol)
-  if (item.institution) parts.push(item.institution)
-  if (item.kvkNumber) parts.push(`KvK ${item.kvkNumber}`)
-  if (item.ownershipPercentage != null) parts.push(`Belang ${item.ownershipPercentage}%`)
-  if (item.annualDividend != null && item.annualDividend > 0) {
-    parts.push(`Dividend ${new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(item.annualDividend)}/jr`)
-  }
-  // Ruling-loon-schatting voor holding-BV's (spec §7 open vraag 2,
-  // aanbeveling: doe (a) en (b). Hier (a) — feitelijke registratie op
-  // deelneming-item. Minimum gebruikelijk loon 2025 = €56.000 als
-  // wettelijk referentiepunt; werkelijk loon kan hoger zijn afhankelijk
-  // van vergelijkbaar dienstverband.
-  if (item.subtype === 'holding_bv') {
-    parts.push(`Gebruikelijk loon ≥ ${new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(GEBRUIKELIJK_LOON_MIN_2025)}/jr (min. 2025)`)
-  }
-  if (item.depreciationRate != null && item.depreciationRate > 0) {
-    parts.push(`Afschrijving ${item.depreciationRate}%/jr`)
-  }
-  if (item.expiryDate) parts.push(`Vervalt ${formatDateNL(item.expiryDate)}`)
-  if (item.beneficiary) parts.push(`Begunstigde: ${item.beneficiary}`)
-  if (item.linkedAssetName) parts.push(`Gekoppeld aan ${item.linkedAssetName}`)
-  return parts
-}
-
-function buildDebtDetailParts(item: VermogenDebtItem): string[] {
-  const parts: string[] = []
-  if (item.subtypeLabel) parts.push(item.subtypeLabel)
-  if (item.fixedRateEndDate) parts.push(`Rente-vast tot ${formatDateNL(item.fixedRateEndDate)}`)
-  if (item.isTaxDeductible === true) parts.push('Renteaftrek')
-  if (item.draagkrachtmetingDate) parts.push(`Draagkrachtmeting ${formatDateNL(item.draagkrachtmetingDate)}`)
-  if (item.taxYear) parts.push(`Belastingjaar ${item.taxYear}`)
-  if (item.hasPaymentPlan) parts.push('Betalingsregeling')
-  if (item.hasWrittenAgreement) parts.push('Schriftelijke overeenkomst')
-  return parts
-}
-
 // ── Sub-components ──────────────────────────────────────────────────
 
 /** Eén regel in een asset-categorie-tabel, met inline detail-regel eronder. */
 function AssetRow({ item }: { item: VermogenAssetItem }) {
   const fc = useFc()
-  const details = buildAssetDetailParts(item)
+  const details = buildAssetDetailParts(item, fc)
 
   return (
     <div className="border-b border-dashed border-[var(--rule-soft)] py-2 last:border-b-0">
