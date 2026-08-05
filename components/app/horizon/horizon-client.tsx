@@ -254,8 +254,11 @@ interface HouseholdHeroData {
  * `true` na de eerste keer (unobserve): een eenmaal-berekende sectie hoeft niet te herrekenen
  * op scroll-terug. SSR-veilig: `IntersectionObserver` ontbreekt server-side → `true`
  * (degradeert naar het oude altijd-berekenen-gedrag, geen regressie).
+ * `remountKey`: mount het geobserveerde element pas later (conditioneel gerenderd),
+ * geef dan de mount-conditie mee — een wissel re-runt het effect zodat de observer
+ * alsnog aanhaakt (een ref-wissel triggert zelf géén effect).
  */
-function useInViewOnce(ref: RefObject<HTMLElement | null>, rootMargin = '600px'): boolean {
+function useInViewOnce(ref: RefObject<HTMLElement | null>, rootMargin = '600px', remountKey: unknown = null): boolean {
   const [inView, setInView] = useState(false)
   useEffect(() => {
     if (inView) return
@@ -273,7 +276,7 @@ function useInViewOnce(ref: RefObject<HTMLElement | null>, rootMargin = '600px')
     )
     obs.observe(el)
     return () => obs.disconnect()
-  }, [ref, rootMargin, inView])
+  }, [ref, rootMargin, inView, remountKey])
   return inView
 }
 
@@ -561,12 +564,6 @@ export default function HorizonPage({
       : null,
   )
   const verkenSectionRef = useRef<HTMLElement | null>(null)
-  // Zichtbaarheids-gate voor de zware duiding-secties (scenario-presets):
-  // die rekenen pas via de worker wanneer de "Wat het betekent"-sectie (bijna) in beeld komt
-  // (Task 4.2), i.p.v. eager in idle. Ref hangt aan de altijd-gemounte sectie in volledige
-  // weergave.
-  const duidingSectionRef = useRef<HTMLElement | null>(null)
-  const duidingInView = useInViewOnce(duidingSectionRef)
 
   // ── Vastgelegd doelscenario ("verkennen wordt richten", ronde 4) ─────────────
   // Client-state, gehydrateerd uit de pref. GEEN her-read na de route-respons: het blok
@@ -586,6 +583,14 @@ export default function HorizonPage({
   // ingeklapte regel toont een 1-regel-samenvatting; ?whatif=open en de
   // ScenarioChip klappen eerst open vóór de scroll. Ephemeral, geen persist.
   const [verkenOpen, setVerkenOpen] = useState(false)
+
+  // Zichtbaarheids-gate voor de zware duiding-secties (scenario-presets):
+  // die rekenen pas via de worker wanneer de "Wat het betekent"-sectie (bijna) in beeld komt
+  // (Task 4.2), i.p.v. eager in idle. De duiding-sectie klapt mee met KATERN II
+  // (doel dicht = duiding dicht) en mount dus pas bij openklappen — verkenOpen
+  // als remountKey laat de observer dan alsnog aanhaken.
+  const duidingSectionRef = useRef<HTMLElement | null>(null)
+  const duidingInView = useInViewOnce(duidingSectionRef, '600px', verkenOpen)
 
   // Saved scenario overlay state (multi-select)
   const [savedScenarios, setSavedScenarios] = useState<SavedScenario[]>([])
@@ -4327,10 +4332,12 @@ export default function HorizonPage({
                         </span>
                       )}
                     </button>
+                  </HideInSimple>
                   {/* ── Doel-/wat-als-lijn toggle (alleen wanneer er écht een
                       gestippelde lijn te tonen is — zelfde bron-waarheid als de
-                      overlay, ADR 0085). Binnen HideInSimple, net als de andere
-                      chart-overlay-toggles (Eenvoudig-modus blijft ongewijzigd). */}
+                      overlay, ADR 0085). Bewust BUITEN HideInSimple: de doellijn
+                      zelf rendert in béíde weergavemodi, dus ook in Eenvoudig
+                      hoort de gebruiker 'm aan/uit te kunnen zetten. */}
                   {hasDoelLijn && (
                     <>
                     <button
@@ -4364,7 +4371,6 @@ export default function HorizonPage({
                     </span>
                     </>
                   )}
-                  </HideInSimple>
                   </>
                 )}
 
@@ -5244,6 +5250,13 @@ export default function HorizonPage({
           scenarioPresets !== null ||
           scenarioPresetsLoading
         if (!heeftKaternIII) return null
+        // De duiding klapt mee met KATERN II ("Jouw doel"): is die sectie
+        // zichtbaar maar dichtgeklapt, dan blijft ook "Wat het betekent"
+        // verborgen — doel dicht = alles dicht. In partner-/huishouden-view
+        // bestaat KATERN II niet; dan blijft de duiding gewoon staan.
+        const katernIIZichtbaar =
+          !(usePartnerMainLine || useHouseholdMainLine) && (displayMode === 'full' || doelActief)
+        if (katernIIZichtbaar && !verkenOpen) return null
         return (
           <>
             <HideInSimple>

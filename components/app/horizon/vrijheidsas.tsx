@@ -92,7 +92,7 @@ const ZONE_BORDER: Record<StopMargeZone, string> = {
 /** Eén korte duidende zin per zone (mockup-toon), getoond onder de band. */
 const ZONE_NOTE: Record<StopMargeZone, string> = {
   tekort: 'je stopt vóór de streep — dit plan komt geld tekort',
-  krap: 'net na de streep — houdbaar, maar dun',
+  krap: 'na de streep, maar niet voorzichtig gerekend gedekt — houdbaar, maar dun',
   stevig: 'ruim voorbij de voorzichtige rand — robuust',
 }
 
@@ -127,7 +127,11 @@ export const MARGE_BAND_MIN_AMBER_PCT = 6
  * - rood loopt tot de verwacht-streep;
  * - amber (de buffer) van verwacht tot de voorzichtige rand (laatst), maar minstens
  *   `minAmberPct` breed zodat de labels op de rand van amber altijd van elkaar liggen;
- * - groen vult de rest.
+ * - groen vult de rest — behálve wanneer de voorzichtige rand ontbreekt
+ *   (`laatstPct = null`: de voorzichtige variant haalt het doel nooit). Dan loopt
+ *   amber door tot het einde: `computeStopMarge` claimt in dat geval bewust nooit
+ *   'stevig', dus een groen vlak zou een robuustheid beloven die de classificatie
+ *   weigert (band en zone-label spraken elkaar anders tegen).
  * `verwachtPct`/`laatstPct` zijn al posities (0–100) — hier wordt niets aan de FIRE-
  * leeftijden of marge herrekend.
  */
@@ -138,8 +142,8 @@ export function computeMargeBandPct(
 ): { amberStartPct: number; amberEndPct: number } {
   const clamp = (n: number) => Math.max(0, Math.min(100, n))
   const start = clamp(verwachtPct)
-  const rawLaatst = laatstPct == null ? start : clamp(laatstPct)
-  const end = clamp(Math.max(rawLaatst, start + minAmberPct))
+  if (laatstPct == null) return { amberStartPct: start, amberEndPct: 100 }
+  const end = clamp(Math.max(clamp(laatstPct), start + minAmberPct))
   return { amberStartPct: start, amberEndPct: end }
 }
 

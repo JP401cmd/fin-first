@@ -110,6 +110,18 @@ describe('computeMargeBandPct (strakke amber-buffer)', () => {
     expect(amberStartPct).toBe(98)
     expect(amberEndPct).toBe(100)
   })
+
+  it('zonder voorzichtige rand (laatst = null) toont de band géén groen — amber tot het einde', () => {
+    // Given: de voorzichtige variant haalt het doel nooit (laatst = null) — computeStopMarge
+    //        claimt dan bewust nooit 'stevig' (zone blijft 'krap', hoe ver de stop ook ligt).
+    // When:  de band wordt berekend met de verwacht-streep midden op de as.
+    // Then:  alles ná de streep blijft amber; een groen vlak zou "stevig" beloven waar de
+    //        classificatie dat expliciet weigert (screenshot-bug aug 2026: stop +3,3 jr
+    //        "ruim in het groen" met label 'krap').
+    const { amberStartPct, amberEndPct } = computeMargeBandPct(66, null)
+    expect(amberStartPct).toBe(66)
+    expect(amberEndPct).toBe(100)
+  })
 })
 
 describe('clampLabelPct (zwevende band-labels binnen het vlak)', () => {
