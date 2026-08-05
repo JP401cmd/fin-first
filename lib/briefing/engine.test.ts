@@ -540,6 +540,50 @@ describe('buildBriefingEntries — finance-verrijking', () => {
     expect(nw?.text).toMatch(/30 dagen vrijheid/)
   })
 
+  // WF-CANON-06: het dagtarief is een canoniek registergetal (nr 6) dat de
+  // briefing moet CONSUMEREN uit de bundel, niet zelf mag herrekenen. De
+  // widgets lezen `data.dailyExpenseRate` (12-maands rolling, KRUIS-20); de
+  // briefing rekende het lokaal op de LOSSE huidige maand, waardoor hetzelfde
+  // bedrag op één pagina twee verschillende vrijheidsdagen opleverde.
+  it('canoniek dailyExpenseRate wint van de lokale maand-herberekening', () => {
+    const result = buildBriefingEntries(
+      emptyInput({
+        now: financeNow,
+        finance: {
+          netWorthHistory: [
+            { month: '2026-08', value: 100000 },
+            { month: '2026-09', value: 103000 },
+          ],
+          // Losse maand zou €3000×12/365 = €98,63/dag geven → 30 dagen.
+          monthlyExpenses: 3000,
+          // Canonieke rolling dagbasis wijkt bewust af → €3000/€150 = 20 dagen.
+          dailyExpenseRate: 150,
+        },
+      }),
+    )
+    const nw = result.find((e) => e.id === 'finance:networth')
+    expect(nw?.text).toMatch(/20 dagen vrijheid/)
+    expect(nw?.text).not.toMatch(/30 dagen vrijheid/)
+  })
+
+  it('zonder dailyExpenseRate blijft de maand-fallback gelden', () => {
+    const result = buildBriefingEntries(
+      emptyInput({
+        now: financeNow,
+        finance: {
+          netWorthHistory: [
+            { month: '2026-08', value: 100000 },
+            { month: '2026-09', value: 103000 },
+          ],
+          monthlyExpenses: 3000,
+        },
+      }),
+    )
+    expect(result.find((e) => e.id === 'finance:networth')?.text).toMatch(
+      /30 dagen vrijheid/,
+    )
+  })
+
   it('vermogensdaling → heads_up', () => {
     const result = buildBriefingEntries(
       emptyInput({

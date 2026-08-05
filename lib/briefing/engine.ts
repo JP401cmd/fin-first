@@ -120,8 +120,16 @@ export interface GoalProgressInput {
 export interface BriefingFinanceInput {
   /** Maandelijkse vermogenssnapshots (oplopend) — voor de delta deze maand. */
   netWorthHistory?: { month: string; value: number }[]
-  /** Maanduitgaven — basis voor vrijheidsdagen-omrekening (/30 = dagbasis). */
+  /** Maanduitgaven — basis voor de déze-maand-observaties (surplus, budgetdruk).
+   *  NIET de bron voor de vrijheidsdagen-omrekening: gebruik `dailyExpenseRate`. */
   monthlyExpenses?: number
+  /** Canoniek dagtarief (€/dag, 12-maands rolling) uit `DashboardData` —
+   *  registergetal 6 (WF-CANON-06). Dít is de bron voor élke euro→vrijheidsdagen-
+   *  omrekening in de briefing, zodat de tekst hetzelfde aantal dagen noemt als
+   *  de widgets, die `data.dailyExpenseRate` lezen (KRUIS-20). Consume, don't
+   *  recompute. Ontbreekt het veld, dan valt de engine terug op de losse
+   *  maanduitgaven — bewust alleen voor fixtures/callers zonder de bundel. */
+  dailyExpenseRate?: number
   /** Maandinkomen — basis voor de maand-observatie (déze-maand-surplus). */
   monthlyIncome?: number
   /** Canonieke 6-maands spaarquote (%) incl. spaarbudgetten + schuldaflossing —
@@ -482,13 +490,20 @@ function freedomDaysLabel(amount: number, dailyExpense: number): string {
  */
 function buildFinanceEntries(finance: BriefingFinanceInput, now: Date): BriefingEntry[] {
   const out: BriefingEntry[] = []
-  // Canonieke dagbasis: jaaruitgaven/365 (= maanduitgaven×12/365), exact zoals
-  // calculateFreedomTime in lib/format.ts en core-metrics. Niet maand/30
-  // (= jaar/360), wat ~1,4% afweek van de rest van de app.
+  // Canonieke dagbasis: CONSUMEER het rolling `dailyExpenseRate` uit de bundel
+  // (registergetal 6, WF-CANON-06) — exact wat de widgets lezen, zodat hetzelfde
+  // bedrag overal evenveel vrijheidsdagen oplevert. De lokale som op de LOSSE
+  // huidige maand is nog slechts fallback voor callers/fixtures zonder bundel;
+  // als hoofdroute liet ze de briefing een ander dagtarief noemen dan de
+  // CASHFLOW-widget op dezelfde pagina. Formule van de fallback blijft
+  // jaaruitgaven/365 (= maand×12/365), zoals calculateFreedomTime in
+  // lib/format.ts — niet maand/30 (= jaar/360), wat ~1,4% afweek.
   const dailyExp =
-    finance.monthlyExpenses && finance.monthlyExpenses > 0
-      ? (finance.monthlyExpenses * 12) / 365
-      : 0
+    finance.dailyExpenseRate && finance.dailyExpenseRate > 0
+      ? finance.dailyExpenseRate
+      : finance.monthlyExpenses && finance.monthlyExpenses > 0
+        ? (finance.monthlyExpenses * 12) / 365
+        : 0
 
   // 1. Vermogensgroei/-daling deze maand (uit de laatste twee snapshots).
   const hist = finance.netWorthHistory ?? []

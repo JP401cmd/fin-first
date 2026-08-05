@@ -119,6 +119,10 @@ export function buildOverviewBriefingInput(
       netWorthHistory: dashboardData.netWorthHistory,
       monthlyExpenses: dashboardData.monthlyExpenses,
       monthlyIncome: dashboardData.monthlyIncome,
+      // Canoniek dagtarief (12-maands rolling) — dezelfde bron als de widgets
+      // consumeren, zodat de briefing-tip nooit een ander aantal vrijheidsdagen
+      // noemt dan de CASHFLOW-widget op dezelfde pagina (WF-CANON-06).
+      dailyExpenseRate: dashboardData.dailyExpenseRate,
       // Canonieke 6m-spaarquote (incl. spaarbudgetten + aflossing) — zit al in
       // DashboardData. De engine gebruikt dít voor elke spaarquote-presentatie
       // i.p.v. een 1-maands surplus, zodat de briefing nooit een ander
