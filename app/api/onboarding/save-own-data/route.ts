@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { unauthorized, serverError } from '@/lib/api/respond'
+import { PARAMETER_BANDS } from '@/lib/parameters-band'
 import { NL_AOW_AGE, NL_AOW_MONTHLY } from '@/lib/horizon-data'
 import { HORIZON_SETUP_COMPLETED_SLUG } from '@/lib/horizon-data-loader'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
@@ -399,9 +400,23 @@ const bodySchema = z.object({
     number_of_children: z.number().int().min(0).default(0),
     net_monthly_income: z.number().min(0).default(0),
     estimated_monthly_expenses: z.number().positive().optional(),
-    // FIRE parameters (optional, with sensible defaults)
-    expected_return: z.number().min(0.01).max(0.20).optional(),
-    inflation_rate: z.number().min(0).max(0.10).optional(),
+    // FIRE parameters (optional, with sensible defaults).
+    // Banden uit de GEDEELDE bron (lib/parameters-band.ts) — dezelfde die
+    // PUT /api/parameters en de bewerk-sheet gebruiken, en die sinds
+    // 20260805120000 óók als CHECK-constraint op de kolom staat. Stonden hier
+    // eerder ruimer (0,20 resp. 0,10): één kolom met twee normen, en na de
+    // migratie zou een waarde daartussen hard falen op de constraint in plaats
+    // van een nette validatiefout te geven.
+    expected_return: z
+      .number()
+      .min(PARAMETER_BANDS.expected_return.min)
+      .max(PARAMETER_BANDS.expected_return.max)
+      .optional(),
+    inflation_rate: z
+      .number()
+      .min(PARAMETER_BANDS.inflation_rate.min)
+      .max(PARAMETER_BANDS.inflation_rate.max)
+      .optional(),
     retirement_expense_method: z.enum(['essential_budgets', 'custom_amount', 'current_income']).optional(),
     retirement_custom_amount: z.number().min(0).optional(),
     fire_end_strategy: z.enum(['perpetual', 'legacy', 'deplete', 'pensioen']).optional(),

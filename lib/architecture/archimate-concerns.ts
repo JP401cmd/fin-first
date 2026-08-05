@@ -25,6 +25,15 @@ export interface ArchiConcern {
 
 export const ARCHI_CONCERNS: ArchiConcern[] = [
   {
+    id: 'schema-drift-buiten-migraties',
+    title: 'Schema-elementen op productie die in geen enkele migratie staan',
+    detail:
+      'Bij het schrijven van 20260805120000 (band op de markt-aannames) bleken drie live schema-feiten nergens in supabase/migrations/ voor te komen: de CHECK-constraints `profiles_expected_return_check` (0,01–0,15) en `profiles_inflation_rate_check` (0–0,08), en de signup-trigger `on_auth_user_created` → `public.handle_new_user()` (die bij elke aanmelding een kale profielrij inserteert). Daarbovenop zeggen de repo-bestanden `expected_return NUMERIC DEFAULT 7` waar live `0.07` staat — een percentage waar een fractie hoort. Dat is out-of-band DDL zonder spiegel-migratie: ADR 0045 besluit 4 verbiedt dat, maar niets vangt het. Concreet risico: een ontwerp of review dat op de migratiemap steunt, redeneert op een schema dat niet bestaat — precies wat hier gebeurde (de eerste opzet van die migratie zou een dubbele constraint hebben toegevoegd en de defaults van élke nieuwe aanmelding hebben gekanteld). 20260805120000 codificeert de twee constraints en de defaults alsnog; de trigger niet. Losstaand: een schone `supabase db reset` uit deze repo faalt al op 20260611130000, dat `revoke execute on function public.handle_new_user()` doet terwijl geen enkele migratie die functie aanmaakt — er redeneren dus migraties over reset-veiligheid die niemand kan uitoefenen. Verwijder dit punt zodra de trigger is gecodificeerd, de reset-route werkt en er een terugkerende drift-check bestaat (schema-diff live vs. repo).',
+    severity: 'debt',
+    elementIds: ['t-supabase'],
+    reviewedAt: '2026-08-05',
+  },
+  {
     id: 'bruto-box1-grondslag-meervoudig',
     title: 'Het bruto Box 1-inkomen wordt nog op drie manieren afgeleid',
     detail:

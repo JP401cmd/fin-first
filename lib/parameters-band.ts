@@ -13,11 +13,20 @@
 // `*_PCT`-helpers hieronder — zet hier nooit een percentage neer, want de
 // kolommen zelf dragen fracties.
 //
-// Deze band is de applicatie-norm. Hij is (nog) GEEN databasegrens: op
-// `profiles` staat geen CHECK-constraint, en de RLS-policy is
-// kolom-onafhankelijk own-row schrijfbaar. Een gebruiker met zijn eigen token
-// kan de route dus omzeilen. Zolang die constraint ontbreekt, is dit een norm
-// voor onze eigen code — niet een grens tegen de gebruiker.
+// Deze band is óók een DATABASEGRENS. Op `profiles` staan de constraints
+// `profiles_expected_return_check` en `profiles_inflation_rate_check` met exact
+// deze waarden (geverifieerd tegen pg_constraint op 05-08-2026; gecodificeerd in
+// supabase/migrations/20260805120000_profiles_markt_aannames_band.sql, die ze
+// idempotent aanmaakt voor een verse database).
+//
+// Dat is hier geen luxe maar noodzaak: de RLS-policy op `profiles` is
+// `FOR ALL USING (auth.uid() = id)` — kolom-onafhankelijk — dus een gebruiker
+// met de anon-key en zijn eigen token kan élke route omzeilen met een directe
+// PostgREST-call. Zonder constraint zou deze band alleen een norm voor onze
+// eigen code zijn. Via de huishoudprojectie reikt `expected_return` bovendien
+// tot de projectie die de PARTNER ziet.
+//
+// Wijzig je de band hier, wijzig dan óók de constraint (nieuwe migratie).
 
 /** De profielkolommen met een bewerkbare markt-aanname. */
 export type ParameterBandColumn = 'expected_return' | 'inflation_rate'
