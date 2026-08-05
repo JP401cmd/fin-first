@@ -428,7 +428,7 @@ export default function ConnectBankPage() {
               <div>
                 <p className="text-sm font-medium text-[var(--ink-2)]">Veilige verbinding</p>
                 <p className="text-xs text-[var(--ink-3)]">
-                  Je inloggegevens worden nooit met ons gedeeld. De verbinding loopt via TrueLayer, een door de FCA gereguleerde dienst.
+                  Je inloggegevens worden nooit met ons gedeeld. De verbinding loopt via TrueLayer, een gereguleerde betaaldienstverlener met een PSD2-vergunning voor rekeninginformatie.
                 </p>
               </div>
             </div>

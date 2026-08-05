@@ -110,7 +110,7 @@ Schrijf alle content voor de 4 onderwerpen van reis-stap 1.
 #### Cash rekeningen
 
 **Beschrijving (niveau 1):**
-> Verbind je betaal- en spaarrekeningen via een beveiligde banklink (TrueLayer, FCA-gereguleerd) of voeg ze handmatig toe. TriFinity haalt saldi en transacties automatisch op — elke rekening telt direct mee in je nettovermogen. Je ziet meteen hoeveel dagen vrijheid er op je rekeningen staan.
+> Verbind je betaal- en spaarrekeningen via een beveiligde banklink (TrueLayer, gereguleerde betaaldienstverlener met PSD2-vergunning) of voeg ze handmatig toe. TriFinity haalt saldi en transacties automatisch op — elke rekening telt direct mee in je nettovermogen. Je ziet meteen hoeveel dagen vrijheid er op je rekeningen staan.
 >
 > Geen banklink? Importeer handmatig via MT940, CSV of OFX. Voor de grote Nederlandse banken (ABN AMRO, ING, Bunq, Wise) herkent TriFinity het formaat automatisch. Na import categoriseert de AI elke transactie op basis van 24 patronen met een betrouwbaarheidsscore. Maak regels aan voor vaste tegenpartijen zodat toekomstige imports vanzelf kloppen. Dubbele transacties worden automatisch herkend en interne overboekingen tellen niet mee als uitgaven.
 

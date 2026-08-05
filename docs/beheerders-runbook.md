@@ -81,6 +81,41 @@ ingedeeld in vier groepen: **Technisch beheer**, **Functioneel beheer**, **Test 
   `https://fin-first.vercel.app/callback` — het juiste pad
   `https://fin-first.vercel.app/api/bank-connect/callback` moet daar nog bij vóór livegang.
 
+### Consent-tekst op het bankkoppelscherm (Data use description)
+De zin die de gebruiker leest vlak vóór hij zijn bank autoriseert, staat **niet in deze repo maar
+in de TrueLayer-console**: *Product UI → Data UI → Data use description*. Dit is de bron van die
+tekst; wijzig hem daar en werk deze regels bij, zodat er één afgesproken formulering is.
+
+- **Kies "Custom description", geen preset.** De presets (Credit Affordability, Income
+  Verification, Rental Affordability, Cashback, Rewards, Tax …) beschrijven een doel dat wij níet
+  hebben. Een onjuist doel op het consentscherm is een doelbindingsprobleem (AVG), niet alleen een
+  toonkwestie. Komt er ooit tóch een preset in beeld: *Personal Finance Management* is de enige die
+  in de buurt komt.
+- **Het veld is een doelzin, geen volledige zin.** TrueLayer plakt hem in een vast frame:
+  *"To {{data use description}}, TrueLayer need permission to access the following information and
+  share it with TriFinity."* Begin dus met een werkwoord in de onbepaalde wijs, zonder hoofdletter
+  en zonder punt.
+- **Afgesproken tekst (NL, te plakken):**
+
+  > je uitgaven, saldo's en vermogen automatisch bij te houden in TriFinity en te laten zien hoeveel vrijheidstijd je geld waard is
+
+- **Kortere variant** (als het veld of de preview de zin afkapt):
+
+  > je uitgaven en vermogen automatisch bij te houden in TriFinity
+
+- **Engelse variant** (kies deze als je één tekst wilt die in élke taalversie van het dialoog
+  klopt; het veld wordt niet vertaald):
+
+  > keep your spending, balances and net worth up to date in TriFinity and show you how much freedom time your money is worth
+
+- **De tekst moet blijven kloppen met wat we écht opvragen** — `accounts`, `balance`,
+  `transactions`, `offline_access` (zie `lib/truelayer/client.ts`). Geen identiteits-, inkomens- of
+  kredietdoel noemen: dat vragen we niet op. En geen advies beloven (Wft-grens: inzicht mag,
+  advies niet).
+- **Na opslaan:** de console toont rechts een live preview van het autorisatiescherm — lees de
+  volledige zin daar één keer na. Wijzigingen kunnen enkele minuten duren en gelden voor álle
+  UI's van die app, dus zet hem in **sandbox én live** apart.
+
 ---
 
 ## Monitoring
