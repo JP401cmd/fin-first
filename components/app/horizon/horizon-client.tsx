@@ -203,6 +203,7 @@ import { ZoomableChartContainer } from '@/components/app/horizon/zoomable-chart-
 import { EventsTimeline } from '@/components/app/horizon/events-timeline'
 import { EventClusterSheet } from '@/components/app/horizon/event-cluster-sheet'
 import { PhaseBar } from '@/components/app/horizon/phase-bar'
+import { faseAtAge } from '@/lib/horizon/phase-bar-segments'
 import { CHART_PAD } from '@/lib/chart-constants'
 import { buildBreakdown } from '@/lib/income-expense-breakdown'
 import { WealthCompositionChart } from '@/components/app/horizon/wealth-composition-chart'
@@ -2108,10 +2109,23 @@ export default function HorizonPage({
     const dRate = dailyExpenseRate(effectiveInput?.monthlyExpenses ?? 0)
     const freedomTime = formatFreedomTimeString(calculateFreedomTime(Math.max(0, row.netWorth), dRate), 'short')
     const isAcc = row.phase === 'accumulation'
-    const phaseLabel = isAcc ? 'Opbouw' : row.phase === 'transition' ? 'Brug FIRE → AOW' : 'Onttrekking'
-    const phaseColor = isAcc
+    // Fase uit dezelfde bron als de fasebalk (buildSegments): kernel-rijen
+    // kennen geen 'transition' (bridge.ts), dus row.phase ziet Overgang niet.
+    const faseId = (simResult != null
+      ? faseAtAge({
+          currentAge: currentAge ?? rows[0].age,
+          fireAge: isAowStopActive ? Math.ceil(userAowAge.fractional) : simResult.fireAge,
+          fireAgeFractional: isAowStopActive ? userAowAge.fractional : simResult.fireAgeFractional,
+          aowAge: userAowAge.fractional,
+          endAge: displayEndAge ?? rows[rows.length - 1].age + 1,
+          fireReachable: simResult.fireReachable,
+          isPensioenMode: isAowStopActive || isPensioenMode,
+        }, row.age)?.id
+      : null) ?? (isAcc ? 'opbouw' : 'onttrekking')
+    const phaseLabel = faseId === 'opbouw' ? 'Opbouw' : faseId === 'overgang' ? 'Overgang' : 'Onttrekking'
+    const phaseColor = faseId === 'opbouw'
       ? 'var(--hor-t, #8a6e42)'
-      : row.phase === 'transition'
+      : faseId === 'overgang'
         ? 'var(--color-horizon-500)'
         : 'var(--kern-t, #58362d)'
     return {
@@ -2126,7 +2140,7 @@ export default function HorizonPage({
         ? Math.max(0, row.savings) / 12
         : (row.withdrawalNeed?.totaalNeed ?? (effectiveInput?.monthlyExpenses ?? 0) * 12) / 12,
     }
-  }, [displayUnifiedRows, lifelineAge, currentAge, effectiveInput])
+  }, [displayUnifiedRows, lifelineAge, currentAge, effectiveInput, simResult, isAowStopActive, userAowAge.fractional, displayEndAge, isPensioenMode])
 
   // "Speel af": animeer de actieve leeftijd van de eerste naar de laatste rij.
   useEffect(() => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeStopMarge } from './stop-marge'
+import { computeStopMarge, resolveVoorzichtigeRand, TERUGVAL_RAND_JAREN } from './stop-marge'
 
 describe('computeStopMarge — driezone (tekort/krap/stevig)', () => {
   it('stop < verwacht → tekort', () => {
@@ -113,15 +113,27 @@ describe('computeStopMarge — randgevallen', () => {
     expect(r).toEqual({ margeJaren: null, zone: null, deltaVsBasis: null })
   })
 
-  it("laatst === null → nooit 'stevig'; stop ≥ verwacht wordt conservatief 'krap'", () => {
+  it("laatst === null → terugval-rand op verwacht + TERUGVAL_RAND_JAREN: 'krap' binnen de rand, 'stevig' erop/erna", () => {
+    // De voorzichtige variant haalt het doel binnen de planperiode niet (het pessimist-pad
+    // volgt het kasstroompatroon van de hoofdsim en kruist na de hoofd-FIRE vrijwel nooit
+    // meer). Dat is structureel gangbaar — de zone mag dan niet permanent 'krap' blijven:
+    // vanaf een marge van TERUGVAL_RAND_JAREN telt de stop als 'stevig'.
     const krap = computeStopMarge({
-      stopAge: 70, // ver voorbij verwacht, maar voorzichtige variant haalt het nooit
+      stopAge: 52 + TERUGVAL_RAND_JAREN - 0.5, // binnen de terugval-rand
       verwachtFireAgeFractional: 52,
       laatstFireAgeFractional: null,
       baseFireAgeFractional: 52,
     })
     expect(krap.zone).toBe('krap')
-    expect(krap.margeJaren).toBe(18)
+
+    const stevig = computeStopMarge({
+      stopAge: 52 + TERUGVAL_RAND_JAREN, // precies op de terugval-rand
+      verwachtFireAgeFractional: 52,
+      laatstFireAgeFractional: null,
+      baseFireAgeFractional: 52,
+    })
+    expect(stevig.zone).toBe('stevig')
+    expect(stevig.margeJaren).toBe(TERUGVAL_RAND_JAREN)
 
     const tekort = computeStopMarge({
       stopAge: 50,
@@ -130,6 +142,14 @@ describe('computeStopMarge — randgevallen', () => {
       baseFireAgeFractional: 52,
     })
     expect(tekort.zone).toBe('tekort')
+  })
+
+  it('resolveVoorzichtigeRand: echte rand (geclamped op verwacht) wint; zonder rand de terugval; zonder verwacht null', () => {
+    // Eén bron voor band én zone — de UI-band en computeStopMarge mogen niet drijven.
+    expect(resolveVoorzichtigeRand(52, 55)).toBe(55)
+    expect(resolveVoorzichtigeRand(52, 50)).toBe(52) // defensieve clamp
+    expect(resolveVoorzichtigeRand(52, null)).toBe(52 + TERUGVAL_RAND_JAREN)
+    expect(resolveVoorzichtigeRand(null, 55)).toBeNull()
   })
 
   it('laatst < verwacht wordt defensief geclamped (laatst = max(laatst, verwacht))', () => {

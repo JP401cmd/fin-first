@@ -111,13 +111,11 @@ describe('computeMargeBandPct (strakke amber-buffer)', () => {
     expect(amberEndPct).toBe(100)
   })
 
-  it('zonder voorzichtige rand (laatst = null) toont de band géén groen — amber tot het einde', () => {
-    // Given: de voorzichtige variant haalt het doel nooit (laatst = null) — computeStopMarge
-    //        claimt dan bewust nooit 'stevig' (zone blijft 'krap', hoe ver de stop ook ligt).
-    // When:  de band wordt berekend met de verwacht-streep midden op de as.
-    // Then:  alles ná de streep blijft amber; een groen vlak zou "stevig" beloven waar de
-    //        classificatie dat expliciet weigert (screenshot-bug aug 2026: stop +3,3 jr
-    //        "ruim in het groen" met label 'krap').
+  it('zonder rand-positie (laatstPct = null) loopt amber defensief door tot het einde', () => {
+    // De ontbrekende voorzichtige rand wordt normaal stroomopwaarts opgelost via
+    // resolveVoorzichtigeRand (terugval-rand op verwacht + TERUGVAL_RAND_JAREN), zodat de
+    // band wél groen draagt. Krijgt deze pure functie tóch een null-positie binnen
+    // (defensief pad), dan geen groen verzinnen: amber tot het einde.
     const { amberStartPct, amberEndPct } = computeMargeBandPct(66, null)
     expect(amberStartPct).toBe(66)
     expect(amberEndPct).toBe(100)
@@ -222,6 +220,29 @@ describe('Vrijheidsas rendering', () => {
   it('toont de zone-duidende zin onder de band', () => {
     render(<Vrijheidsas {...baseProps} zone="stevig" />)
     expect(screen.getByText('ruim voorbij de voorzichtige rand — robuust')).toBeInTheDocument()
+  })
+
+  it('toont zonder voorzichtige rand (laatst = null) wél groen — terugval-rand op verwacht + 3 jr', () => {
+    // Given: de voorzichtige variant haalt het doel binnen de planperiode niet (laatst = null).
+    // When:  de band rendert (verwacht midden op de as, stop erna).
+    // Then:  amber beslaat de terugval-rand (3 jr na verwacht) en daarna is de band groen —
+    //        groen is weer bereikbaar (screenshot-bug 6 aug 2026: 0% groen bij marge +7,4 jr);
+    //        het 'laatst'-label blijft weg, want er is geen echte voorzichtige FIRE-leeftijd.
+    const { container } = render(
+      <Vrijheidsas {...baseProps} laatstFireAge={null} zone="stevig" margeJaren={5} />,
+    )
+    const groen = container.querySelector('.bg-emerald-500') as HTMLElement | null
+    expect(groen).not.toBeNull()
+    expect(parseFloat(groen!.style.width)).toBeGreaterThan(0)
+    expect(screen.queryByText('laatst')).not.toBeInTheDocument()
+  })
+
+  it("gebruikt bij 'stevig' zonder voorzichtige rand de eerlijke terugval-duidingszin", () => {
+    // Geen "voorzichtige rand"-claim wanneer die rand niet bestaat — dat was precies het
+    // vals-groen-bezwaar; de terugval-zin belooft houdbaarheid, geen voorzichtige dekking.
+    render(<Vrijheidsas {...baseProps} laatstFireAge={null} zone="stevig" />)
+    expect(screen.getByText('ruim na de streep — ook met flinke tegenwind houdbaar')).toBeInTheDocument()
+    expect(screen.queryByText('ruim voorbij de voorzichtige rand — robuust')).not.toBeInTheDocument()
   })
 
   it('toont de stopleeftijd-slider met aria-label + marge-context in aria-valuetext', () => {

@@ -31,6 +31,31 @@ export interface PhaseBarProps {
   visibleMaxAge?: number       // zoom viewport end (clip segments to this)
 }
 
+/**
+ * Fase op een gegeven leeftijd, afgeleid uit dezélfde segmenten als de
+ * fasebalk (single source: buildSegments). De kernel-rijen kennen geen
+ * 'transition' (zie lib/horizon-kernel/bridge.ts "fase & fireAge"), dus
+ * consumenten zoals de cijferbar (LifelineReadout) mogen de Overgang-fase
+ * niet uit row.phase afleiden — die komt hiervandaan.
+ *
+ * Grens-conventie: een leeftijd hoort bij het segment waar
+ * startAge <= age < endAge; op/voorbij het einde van het laatste segment
+ * geldt het laatste, vóór het eerste segment het eerste.
+ */
+export function faseAtAge(
+  params: Omit<PhaseBarProps, 'onSegmentClick' | 'visibleMinAge' | 'visibleMaxAge'>,
+  age: number,
+): PhaseSegment | null {
+  const segments = buildSegments(params)
+  if (segments.length === 0) return null
+  for (const seg of segments) {
+    if (age >= seg.startAge && age < seg.endAge) return seg
+  }
+  return age >= segments[segments.length - 1].endAge
+    ? segments[segments.length - 1]
+    : segments[0]
+}
+
 export function buildSegments({
   currentAge,
   fireAge,

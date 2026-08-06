@@ -7,7 +7,7 @@
  * Feature #468
  */
 import { describe, it, expect } from 'vitest'
-import { buildSegments, type FaseId } from '@/lib/horizon/phase-bar-segments'
+import { buildSegments, faseAtAge, type FaseId } from '@/lib/horizon/phase-bar-segments'
 import { PERSONAS, PERSONA_KEYS, type PersonaKey } from '@/lib/test-personas'
 import { computeFireProjection, ageAtDate } from '@/lib/horizon-data'
 import { NL_AOW_AGE } from '@/lib/constants'
@@ -95,6 +95,52 @@ describe('PhaseBar buildSegments — segment counts', () => {
     })
     expect(segments).toHaveLength(1)
     expect(segments[0].id).toBe('onttrekking')
+  })
+})
+
+// ── Tests: faseAtAge — cijferbar consumeert de fasebalk-bron ───
+// Given een gebruiker met FIRE op 62.8 (fractioneel) en AOW op 67, When de
+// cijferbar (LifelineReadout) de fase op een leeftijd in de Overgang-band
+// bepaalt, Then is dat 'overgang' — niet 'onttrekking'. De kernel-rijen
+// kennen geen 'transition' (zie lib/horizon-kernel/bridge.ts, "fase &
+// fireAge"), dus row.phase kan deze vraag niet beantwoorden; de fase moet
+// uit dezelfde segmenten komen als de fasebalk (buildSegments).
+
+describe('faseAtAge — fase op een leeftijd, zelfde bron als de fasebalk', () => {
+  const params = {
+    currentAge: 46, fireAge: 63, fireAgeFractional: 62.8, aowAge: 67,
+    endAge: 89, fireReachable: true, isPensioenMode: false,
+  }
+
+  it('leeftijd 64 tussen FIRE (62.8) en AOW (67) → overgang (de gemelde bug)', () => {
+    expect(faseAtAge(params, 64)?.id).toBe('overgang')
+  })
+
+  it('leeftijd vóór FIRE → opbouw; 62 valt nog vóór de fractionele grens 62.8', () => {
+    expect(faseAtAge(params, 55)?.id).toBe('opbouw')
+    expect(faseAtAge(params, 62)?.id).toBe('opbouw')
+  })
+
+  it('leeftijd 63 ligt ná de fractionele FIRE-grens 62.8 → overgang', () => {
+    expect(faseAtAge(params, 63)?.id).toBe('overgang')
+  })
+
+  it('op en na AOW → onttrekking, ook voorbij het einde van de balk', () => {
+    expect(faseAtAge(params, 67)?.id).toBe('onttrekking')
+    expect(faseAtAge(params, 70)?.id).toBe('onttrekking')
+    expect(faseAtAge(params, 95)?.id).toBe('onttrekking')
+  })
+
+  it('pensioen-modus kent geen Overgang → leeftijd 64 is dan onttrekking', () => {
+    expect(faseAtAge({ ...params, isPensioenMode: true }, 64)?.id).toBe('onttrekking')
+  })
+
+  it('FIRE onbereikbaar → alles is opbouw', () => {
+    expect(faseAtAge({ ...params, fireAge: null, fireAgeFractional: null, fireReachable: false }, 64)?.id).toBe('opbouw')
+  })
+
+  it('leeftijd vóór het eerste segment valt terug op het eerste segment', () => {
+    expect(faseAtAge(params, 40)?.id).toBe('opbouw')
   })
 })
 

@@ -19,7 +19,7 @@ const SOURCE_SERIF = 'var(--font-source-serif, Georgia, serif)'
 export interface LifelineReadoutProps {
   age: number
   year: number
-  /** "Opbouw" | "Brug FIRE → AOW" | "Onttrekking" */
+  /** "Opbouw" | "Overgang" | "Onttrekking" — zelfde labels als de fasebalk. */
   phaseLabel: string
   /** CSS-kleurwaarde (hex of var()) voor de fase-pill — parent levert via getPhaseHex. */
   phaseColor: string

@@ -33,6 +33,7 @@
 
 import type { ReactNode } from 'react'
 import type { StopMargeZone } from '@/lib/horizon/stop-marge'
+import { resolveVoorzichtigeRand, TERUGVAL_RAND_JAREN } from '@/lib/horizon/stop-marge'
 import { InlineInfoDisclosure } from '@/components/editorial'
 
 const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
@@ -96,6 +97,13 @@ const ZONE_NOTE: Record<StopMargeZone, string> = {
   stevig: 'ruim voorbij de voorzichtige rand — robuust',
 }
 
+/**
+ * 'stevig'-zin wanneer de voorzichtige rand een TERUGVAL is (`laatst = null`, rand op
+ * verwacht + TERUGVAL_RAND_JAREN): geen "voorzichtige rand"-claim voeren voor een rand
+ * die niet bestaat — dat was precies het vals-groen-bezwaar. Houdbaarheid beloven mag wél.
+ */
+const STEVIG_TERUGVAL_NOTE = 'ruim na de streep — ook met flinke tegenwind houdbaar'
+
 // ── Marge-eenheid-helper (getest) ─────────────────────────────────────────────
 
 /**
@@ -125,13 +133,14 @@ export const MARGE_BAND_MIN_AMBER_PCT = 6
 /**
  * Rood/amber/groen-grenzen (in % van de as-span) voor de driezone-marge-band.
  * - rood loopt tot de verwacht-streep;
- * - amber (de buffer) van verwacht tot de voorzichtige rand (laatst), maar minstens
+ * - amber (de buffer) van verwacht tot de voorzichtige rand, maar minstens
  *   `minAmberPct` breed zodat de labels op de rand van amber altijd van elkaar liggen;
- * - groen vult de rest — behálve wanneer de voorzichtige rand ontbreekt
- *   (`laatstPct = null`: de voorzichtige variant haalt het doel nooit). Dan loopt
- *   amber door tot het einde: `computeStopMarge` claimt in dat geval bewust nooit
- *   'stevig', dus een groen vlak zou een robuustheid beloven die de classificatie
- *   weigert (band en zone-label spraken elkaar anders tegen).
+ * - groen vult de rest.
+ * De voorzichtige rand komt stroomopwaarts uit `resolveVoorzichtigeRand` (stop-marge.ts):
+ * de echte laatst-leeftijd, of de terugval-rand verwacht + TERUGVAL_RAND_JAREN wanneer de
+ * voorzichtige variant het doel nooit haalt — dezelfde rand als de zone-classificatie,
+ * zodat band en zone-woord niet kunnen drijven. Krijgt deze functie tóch `laatstPct = null`
+ * binnen (defensief pad), dan loopt amber door tot het einde — geen groen verzinnen.
  * `verwachtPct`/`laatstPct` zijn al posities (0–100) — hier wordt niets aan de FIRE-
  * leeftijden of marge herrekend.
  */
@@ -263,11 +272,11 @@ export function Vrijheidsas({
   const showStopDelta = hasScenario && reachable && delta.tone !== 'none'
 
   // Marge-band-grenzen (rood/amber/groen), met strakke amber-buffer rond de verwacht-streep.
+  // De rand komt uit resolveVoorzichtigeRand — echte laatst-leeftijd, of de terugval-rand
+  // (verwacht + TERUGVAL_RAND_JAREN) wanneer de voorzichtige variant het doel nooit haalt.
   const verwachtPos = verwachtFireAge !== null ? posOf(verwachtFireAge) : null
-  const bandLaatstPct =
-    laatstFireAge !== null && verwachtFireAge !== null
-      ? posOf(Math.max(laatstFireAge, verwachtFireAge))
-      : null
+  const voorzichtigeRand = resolveVoorzichtigeRand(verwachtFireAge, laatstFireAge)
+  const bandLaatstPct = voorzichtigeRand !== null ? posOf(voorzichtigeRand) : null
   const band =
     reachable && verwachtPos !== null
       ? computeMargeBandPct(verwachtPos, bandLaatstPct)
@@ -325,7 +334,7 @@ export function Vrijheidsas({
           <b className="text-red-700">Rood</b> — je wilt stoppen vóór je vrij bent.{' '}
           <b className="text-amber-700">Amber</b> — haalbaar op de verwachting, maar niet in een
           voorzichtig scenario. <b className="text-emerald-700">Groen</b> — ook voorzichtig gerekend
-          gedekt.
+          gedekt, of ten minste {TERUGVAL_RAND_JAREN} jaar voorbij de streep.
         </p>
         <p className="m-0 mt-2">
           Op de <b className="text-[var(--ink)]">band</b> lees je de hele reis af:{' '}
@@ -520,7 +529,7 @@ export function Vrijheidsas({
           {/* zone-duidende zin — vervangt de verwijderde Marge-figure als duiding onder de band */}
           {zone && (
             <p className={`mt-3 font-mono text-[10px] leading-snug ${ZONE_TEXT[zone]}`}>
-              {ZONE_NOTE[zone]}
+              {zone === 'stevig' && laatstFireAge === null ? STEVIG_TERUGVAL_NOTE : ZONE_NOTE[zone]}
             </p>
           )}
 
