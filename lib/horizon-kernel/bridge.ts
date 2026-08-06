@@ -229,6 +229,15 @@ interface SlotGroups {
   /** Box 3-spaar-slots resp. -investering-slots (voor de box3Drag-apportionering). */
   readonly spaarSlots: readonly number[]
   readonly investSlots: readonly number[]
+  /**
+   * Slots waarvan de kern-categorie in TS!H als **niet-liquide** is gevlagd — d.w.z.
+   * de categorieën die `Prognose!J` (= I − (L − M)) uit het besteedbare vermogen
+   * knipt. Vandaag is dat uitsluitend 'Eigen huis', en alléén bij een niet-meetellen-
+   * woonstrategie (`adapter/prio-overgang.ts`); bij 'Meerekenen' is de set leeg.
+   * Bron = dezelfde `input.ts.bezitCategorien[].nietLiquide`-vlag die `prognose.ts`
+   * gebruikt — geen tweede, driftende afleiding uit de woning-selector.
+   */
+  readonly nietLiquideSlots: ReadonlySet<number>
   /** Fysiek slot → app-`AssetType` (meta-first, anders categorie-rep-type). */
   typeOfSlot(slot: number): AssetType
   /** ASSET_ORDER-index van een categorie. */
@@ -240,17 +249,24 @@ function buildSlotGroups(ctx: KernelBridgeContext): SlotGroups {
   const metaBySlot = new Map<number, AssetType>()
   for (const m of ctx.assetSlotMeta ?? []) metaBySlot.set(m.slot, m.assetType)
 
+  // TS!H per bezit-categorie (op de `categorie`-sleutel, niet op array-positie —
+  // zelfde uitkomst als de index-uitlijning in `prognose.ts`, maar drift-vrij).
+  const nietLiquideCategorien = new Set<AssetCategorie>()
+  for (const c of input.ts.bezitCategorien) if (c.nietLiquide) nietLiquideCategorien.add(c.categorie)
+
   const catOfSlot = new Map<number, AssetCategorie>()
   const slotsByCategorie: number[][] = ASSET_ORDER.map(() => [])
   const spaarSlots: number[] = []
   const investSlots: number[] = []
   const assetSlots: number[] = []
+  const nietLiquideSlots = new Set<number>()
   for (const pot of input.assetPotten) {
     assetSlots.push(pot.slot)
     catOfSlot.set(pot.slot, pot.categorie)
     slotsByCategorie[ASSET_ORDER.indexOf(pot.categorie)].push(pot.slot)
     if (pot.box3Type === 'Box 3 spaar') spaarSlots.push(pot.slot)
     else if (pot.box3Type === 'Box 3 investering') investSlots.push(pot.slot)
+    if (nietLiquideCategorien.has(pot.categorie)) nietLiquideSlots.add(pot.slot)
   }
 
   return {
@@ -258,6 +274,7 @@ function buildSlotGroups(ctx: KernelBridgeContext): SlotGroups {
     slotsByCategorie,
     spaarSlots,
     investSlots,
+    nietLiquideSlots,
     typeOfSlot(slot: number): AssetType {
       const t = metaBySlot.get(slot)
       if (t !== undefined) return t
@@ -393,6 +410,12 @@ function buildRow(
   let savings = 0
   let withdrawal = 0
   let totalGrowth = 0
+  // Rendement van de NIET-LIQUIDE slots (Prognose!J-grondslag; zie
+  // `SlotGroups.nietLiquideSlots`). Wordt onder de loop van `totalGrowth`
+  // afgetrokken tot `totalGrowthLiquide` — het deel van het rendement dat
+  // daadwerkelijk besteedbaar is. `totalGrowth` zelf blijft het canonieke,
+  // ongewijzigde totaal-anker (Σ Bez!totaalRendement).
+  let growthNietLiquide = 0
   let totalBox3 = 0
   // grossIncome-splitsing (read-only weergaveveld): CF!D resp. CF!H apart. De
   // jaar-`grossIncome` wordt uit deze twee opgeteld → `salaris + gebeurtenisBaten
@@ -442,6 +465,7 @@ function buildRow(
       const type = groups.typeOfSlot(slot)
       addBucket(assetBuckets, type, 'growth', cell.rendement)
       addBucket(assetBuckets, type, 'contributions', cell.inleg)
+      if (groups.nietLiquideSlots.has(slot)) growthNietLiquide += cell.rendement
     }
     totalGrowth += bez.totaalRendement
     savings += bez.totaalInleg
@@ -593,6 +617,7 @@ function buildRow(
     cashflowNet,
     oneTimeNet,
     totalGrowth,
+    totalGrowthLiquide: totalGrowth - growthNietLiquide,
     totalBox3,
     cumulativeBox3: cumBox3Prev + totalBox3,
     inflationFactor: Math.pow(1 + input.inflatie, k),

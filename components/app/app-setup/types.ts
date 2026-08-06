@@ -5,7 +5,7 @@
 // individuele configs hoeven alleen hun secties en payload-shape te
 // definiëren.
 
-import type { ReactNode } from 'react'
+import type { ComponentType } from 'react'
 import type { AppSetupKey } from '@/lib/app-setup-status'
 
 /**
@@ -25,8 +25,18 @@ export interface AppSetupSection<TState> {
   title: string
   /** Sub-uitleg onder de titel, max 1 zin. Optioneel. */
   hint?: string
-  /** Inhoudelijke render. */
-  render: (props: AppSetupSectionRenderProps<TState>) => ReactNode
+  /**
+   * Inhoudelijke sectie-body. Wordt door de gate als React-component
+   * gemount (eigen fiber) — mag dus vrij hooks gebruiken. Nooit door een
+   * consumer als gewone functie aanroepen: dat schendt de hook-regels
+   * zodra de sectie eigen state heeft (zie app-setup-gate.tsx).
+   *
+   * MOET een stabiele, module-level component-referentie zijn — géén
+   * inline arrow (`render: (p) => <Foo {...p}/>`): een nieuwe identiteit
+   * per render remount de sectie en wist zijn interne state. Het
+   * `ComponentType`-type legt die intentie vast.
+   */
+  render: ComponentType<AppSetupSectionRenderProps<TState>>
 }
 
 /**

@@ -11,7 +11,7 @@
  *   - de pure concept-detectie (`isDoelConceptGewijzigd`) voor de "je draait aan je doel"-banner;
  *   - de categorie→asset_type rendement-delta-expansie voor `applyReturnDeltasToAssets`;
  *   - de gewogen baseline-rendementen per bezeten categorie voor de Marktbias-UI;
- *   - de som van de scenario-bestedingsdelta (guardrail-kompas + dekkingsradar), met
+ *   - de som van de scenario-bestedingsdelta (dekkingsradar), met
  *     dezelfde slider-werk-gate als de motor (`isSliderWorkEvent`).
  *
  * Eén bron voor de categorie-mapping: `ASSET_TYPE_TO_CATEGORIE` uit de kernel-adapter
@@ -441,13 +441,12 @@ export function buildCategorieReturnGroups(assets: readonly Asset[]): AssetGroup
   return groups
 }
 
-// ── Scenario-bestedingsdelta (guardrail-kompas) ──────────────────────────────
+// ── Scenario-bestedingsdelta (dekkingsradar) ─────────────────────────────────
 
 /**
  * Som van de maandelijkse bestedingsdelta's (`monthly_cost_change`) van de scenario-
- * events. Voedt `computeGuardrailBounds` via `activeMonthlySpend = monthlyExpenses + delta`
- * (guardrail-kompas) én `jaarBesteding = activeMonthlySpend × 12` (dekkingsradar) —
- * allebei ONTTREKKINGS-grootheden ("hoeveel kun je veilig uitgeven?"). Uitgezette events
+ * events. Voedt `jaarBesteding = activeMonthlySpend × 12` (dekkingsradar) — een
+ * ONTTREKKINGS-grootheid ("hoeveel kun je veilig uitgeven?"). Uitgezette events
  * (`whatIfDisabled`/`is_active === false`) tellen niet mee.
  *
  * **SLIDER-WERK-GATE (29-jul, één grondslag over alle oppervlakken).** Events die de
@@ -455,12 +454,12 @@ export function buildCategorieReturnGroups(assets: readonly Asset[]): AssetGroup
  * o.a. de spaarquote-slider) tellen hier NIET mee. Reden: sinds het eigenaarsbesluit
  * verlaagt de spaarquote-slider de uitgave-ná-FIRE niet meer in de motor (het
  * FIRE-doelbedrag blijft gelijk), dus mag hij de onttrekkings-bestedingsgrenzen hier
- * evenmin verlagen — anders zou het kompas een lagere veilige besteding tonen dan het
+ * evenmin verlagen — anders zou de radar een lagere veilige besteding meten dan het
  * doelbedrag waarop de motor solvet. Zelfde predicaat als de motor, géén tweede
  * afleiding. Presets (`preset:*`) en échte `lifestyle_adjustment`-events dragen géén
  * slider-origin en tellen dus gewoon mee — precies zoals ze in de motor een permanente
  * Geb-rij blijven. NB: de /toekomst-call-site voert vandaag uitsluitend slider-events
- * aan (delta ⇒ 0, kompas op de baseline); de preset-/lifestyle-tak is forward-looking
+ * aan (delta ⇒ 0, radar op de baseline); de preset-/lifestyle-tak is forward-looking
  * voor het moment dat /toekomst ook DB-/preset-events in de scenario-set meegeeft.
  */
 export function scenarioMonthlySpendDelta(events: readonly WhatIfEvent[]): number {

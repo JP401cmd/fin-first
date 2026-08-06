@@ -63,6 +63,7 @@ import {
 } from '@/lib/freedom-milestones'
 import type { Asset } from '@/lib/asset-data'
 import { buildKernelInputFromApp, type KernelAdapterInput, type KernelAdapterProfile } from '@/lib/horizon-kernel/adapter'
+import { isKernelReachedNowDisplay } from '@/lib/horizon-kernel/bridge'
 import { solveFire, type SolverStatus } from '@/lib/horizon-kernel/solver'
 import { runKernelProjection } from '@/lib/horizon-kernel/engine'
 import { prognoseI } from '@/lib/horizon-kernel/gap'
@@ -274,9 +275,17 @@ export function computeScalarFireProjection(
     // De statische ratio-/weergavevelden blijven de scalar-formules (goedkoop, puur,
     // deterministisch); alleen de tijd-velden komen uit de kernel-solve.
     const base = runScalarFallback(params)
-    const solve = solveFire(buildKernelInputFromApp(buildScalarAdapterInput(params)))
+    const kernelInput = buildKernelInputFromApp(buildScalarAdapterInput(params))
+    const solve = solveFire(kernelInput)
 
-    if (solve.status === 'unreachable_within_horizon') {
+    // B93-doel=0-quirk (deplete, en legacy met doelbedrag 0): de solver-status is dan
+    // triviaal 'reached_now' (Prognose!J(0) ≥ 0), óók wanneer de bisectie een echte,
+    // latere FIRE-maand vond — én wanneer de horizon-check faalde (parkeerstand op de
+    // horizon, gap < 0). De kern blijft Excel-exact (zie solver.ts); dit is dezelfde
+    // WEERGAVE-regel als bridge.ts#isKernelReachedNowDisplay: een reached_now-stand
+    // met gap < 0 is de verhulde parkeerstand → Niet haalbaar.
+    const verhuldeParkeerstand = solve.status === 'reached_now' && solve.gap < 0
+    if (solve.status === 'unreachable_within_horizon' || verhuldeParkeerstand) {
       return {
         result: {
           ...base,
@@ -291,10 +300,15 @@ export function computeScalarFireProjection(
       }
     }
 
-    // reached_now → deriveCountdown geeft 'Bereikt!' (fireAge ≤ currentAge);
+    // reached_now én de bisectie landde op ~ de startmaand → deriveCountdown geeft
+    // 'Bereikt!' (fireAge ≤ currentAge). Een reached_now met een LATERE bisectie-maand
+    // is de doel=0-quirk → toon de echte gevonden maand (solve.fireAge), zodat bv. de
+    // benchmark-peer geen "nu al vrij" rapporteert op een mediaan-vermogen.
     // reached_at/pension_shortfall → aftellen naar de gevonden/pensioen-leeftijd.
     const currentAge = params.input.dateOfBirth ? ageAtDate(params.input.dateOfBirth) : null
-    const fireAge = solve.status === 'reached_now' ? currentAge : solve.fireAge
+    const echtNuBereikt = solve.status === 'reached_now'
+      && isKernelReachedNowDisplay(solve.fireAge, kernelInput.startLeeftijd)
+    const fireAge = echtNuBereikt ? currentAge : solve.fireAge
     const countdown = deriveCountdown(fireAge, currentAge)
     return {
       result: {

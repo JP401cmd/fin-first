@@ -86,6 +86,10 @@ export const ASSET_TYPE_TO_CATEGORIE: Record<AssetType, AssetCategorie> = {
 /**
  * Debt-type → Excel-schuldcategorie. De categorie 'Tekort' is gereserveerd voor de
  * synthetische tekort-lening en wordt NOOIT uit een gebruikersschuld afgeleid.
+ *
+ * NB: `mortgage` → 'Woning' is de BASIS-mapping; `isNietEigenWoningHypotheek`
+ * overrulet 'm naar 'Overig' voor een hypotheek die aantoonbaar op een ánder
+ * (actief) bezit rust dan de eigen woning — zie die helper.
  */
 const DEBT_TYPE_TO_CATEGORIE: Record<DebtType, DebtCategorie> = {
   mortgage: 'Woning',
@@ -99,6 +103,46 @@ const DEBT_TYPE_TO_CATEGORIE: Record<DebtType, DebtCategorie> = {
   belastingschuld: 'Overig',
   payment_plan: 'Overig',
   other: 'Overig',
+}
+
+/**
+ * Rust deze hypotheek aantoonbaar op een ÁNDER (actief) bezit dan de eigen woning?
+ * Dan hoort hij NIET in schuldcategorie 'Woning'.
+ *
+ * ## Waarom deze discriminator bestaat (liquiditeits-as ≠ fiscale as)
+ * De kern gebruikt de schuldcategorie 'Woning' uitsluitend als **liquiditeits**-as:
+ * bij een niet-meetellen-woonstrategie zet `prio-overgang.ts` de vlag
+ * `nietLiquide` op bezit-categorie 'Eigen huis' én schuld-categorie 'Woning', en
+ * `Prognose!J = I − (L − M)` telt die schuld weer terug bij het liquide vermogen.
+ * Dat klopt alleen zolang 'Woning' precies het EIGEN-WONINGBLOK is. Een
+ * beleggingshypotheek op een verhuurd pand hoorde daar altijd al niet in: het pand
+ * zelf staat in categorie 'Vastgoed' (liquide, blijft in J), dus zijn hypotheek
+ * terugtellen overschat de besteedbare pot → FIRE te vroeg, doelbedrag te laag.
+ *
+ * **`classifyDebt` (box3-data.ts) is bewust NIET de discriminator.** Dat is de
+ * FISCALE as (eigenwoningschuld box 1 vs. box 3-schuld) en die valt hier niet mee
+ * samen: `classifyDebt` zet een ÓNGELINKTE hypotheek in box 3, terwijl hij hier
+ * conservatief 'Woning' moet blijven. Er bestaan echte gebruikers met een
+ * ongelinkte eigen-woninghypotheek; die op 'Overig' zetten zou J structureel
+ * ONDERschatten (FIRE te laat). Vandaar de asymmetrie: alleen een EXPLICIETE
+ * koppeling aan een bekend, actief, niet-`eigen_huis`-bezit haalt de hypotheek uit
+ * 'Woning'; ongelinkt of gelinkt-aan-onbekend blijft 'Woning'.
+ *
+ * Pure functie; raakt `assignDebtSlots`/rol 'hypotheek'/slot 0 NIET (die blijven
+ * op de eigen-woningkoppeling staan — verkooppad en opeet-overwaarde draaien op
+ * rol/slot, niet op categorie).
+ */
+export function isNietEigenWoningHypotheek(
+  d: Debt,
+  eigenHuisIds: ReadonlySet<string>,
+  activeAssetIds: ReadonlySet<string>,
+): boolean {
+  return (
+    d.debt_type === 'mortgage' &&
+    d.linked_asset_id != null &&
+    activeAssetIds.has(d.linked_asset_id) &&
+    !eigenHuisIds.has(d.linked_asset_id)
+  )
 }
 
 /** Categorieën met scenarioband-/MC-gevoeligheid (bens!F = 1). */
@@ -364,12 +408,21 @@ const OPEET_POT_NAAM = 'Opeethypotheek'
  *
  * In elke andere woning-modus wordt slot 3 NIET gevuld → `DebtPot[]` byte-identiek aan
  * vóór deze fix.
+ *
+ * ## `activeAssetIds` — de categorie van een hypotheek volgt het gekoppelde bezit
+ * De ids van álle ACTIEVE bezittingen (niet alleen de eigen woning). Alleen daarmee
+ * kan `isNietEigenWoningHypotheek` het onderscheid maken tussen "gelinkt aan een
+ * bekend, ander bezit" (→ 'Overig') en "ongelinkt of gelinkt aan iets onbekends"
+ * (→ conservatief 'Woning'); zie die helper voor het waarom. Weggelaten →
+ * lege set → élke hypotheek blijft 'Woning' (= het gedrag van vóór deze fix), zodat
+ * losse pot-tests en niet-app-paden ongewijzigd blijven.
  */
 export function buildSchuldPotten(
   debts: readonly Debt[],
   eigenHuisIds: ReadonlySet<string>,
   tekortLeningRente: number,
   woning: WoningStrategieParams,
+  activeAssetIds: ReadonlySet<string> = new Set(),
 ): DebtPot[] {
   const pots: DebtPot[] = []
   for (const { debt: d, slot, isHypotheek } of assignDebtSlots(debts, eigenHuisIds)) {
@@ -380,7 +433,9 @@ export function buildSchuldPotten(
       slot,
       naam: d.name ?? null,
       box3Type: debtBox3Type(classifyDebt(d, new Set(eigenHuisIds)).inBox3),
-      categorie: DEBT_TYPE_TO_CATEGORIE[d.debt_type as DebtType] ?? 'Overig',
+      categorie: isNietEigenWoningHypotheek(d, eigenHuisIds, activeAssetIds)
+        ? 'Overig'
+        : DEBT_TYPE_TO_CATEGORIE[d.debt_type as DebtType] ?? 'Overig',
       startwaarde: Number(d.current_balance ?? 0) * factor,
       aflossingPct: 0, // altijd via de €-vorm (aflossingEur) — geen dubbele bron
       aflossingEur: plannedMonthlyAflossing(d) * 12 * factor,

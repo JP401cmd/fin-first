@@ -66,6 +66,14 @@ export interface OpbouwData {
   /**
    * Totaal rendement dat het vermogen over de opbouwfase verdient (Σ SimRow.growth over de
    * accumulation-rijen). 0 bij 0 opbouwjaren.
+   *
+   * GRONDSLAG (bewust TOTAAL, niet liquide): `SimRow.growth` = `totalGrowth`, dus
+   * inclusief de waardestijging van een niet-liquide eigen woning. Dat is hier
+   * correct: dit hoofdstuk vertelt het verhaal van de VERMOGENSLIJN (netWorth /
+   * Prognose!I, óók incl. woning) — "wat je vermogen verdiende". Het besteedbare
+   * tegendeel (`UnifiedProjectionRow.totalGrowthLiquide`) hoort in de
+   * vermogensSTROMEN-weergaven (IE-strip, Sankey, jaar-detailkassabon), niet hier;
+   * die twee mengen zou de som van dit hoofdstuk laten afwijken van de lijn erboven.
    */
   cumulativeGrowth: number
   /**

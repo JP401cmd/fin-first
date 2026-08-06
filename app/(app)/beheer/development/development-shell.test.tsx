@@ -35,10 +35,13 @@ describe('DevelopmentShell — view-switcher', () => {
         /pijplijnen/i.test(node.textContent ?? '') &&
         /agents/i.test(node.textContent ?? ''),
     )
-    const scoped = within(line)
-    expect(scoped.getByText(String(model.counts.skills))).toBeInTheDocument()
-    expect(scoped.getByText(String(model.counts.pijplijnen))).toBeInTheDocument()
-    expect(scoped.getByText(String(model.counts.agents))).toBeInTheDocument()
+    // Assert op de tekst mét label: losse getByText(String(count))-queries
+    // worden dubbelzinnig zodra twee counts toevallig gelijk zijn (bv. 19
+    // agents én 19 skills).
+    const text = (line.textContent ?? '').replace(/\s+/g, ' ')
+    expect(text).toContain(`${model.counts.skills} skills`)
+    expect(text).toContain(`${model.counts.pijplijnen} pijplijnen`)
+    expect(text).toContain(`${model.counts.agents} agents`)
   })
 
   it('klik op "Ons team" toont de teamgroepen', () => {

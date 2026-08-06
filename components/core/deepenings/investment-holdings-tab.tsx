@@ -1,10 +1,13 @@
 'use client'
 
+import { TrendingUp } from 'lucide-react'
 import HoldingsPage from '@/components/core/holdings-client'
 import type { HoldingsPageData } from '@/lib/holdings-data-loader'
+import type { Asset } from '@/lib/asset-data'
 import type { DeepeningTabProps } from '../category-deepening-registry'
 import { ModuleTipStrip } from '../module-tip-strip'
 import { AppSetupGate } from '@/components/app/app-setup/app-setup-gate'
+import { AppLinkGate } from '@/components/app/app-setup/app-link-gate'
 import { useIsAppSetupCompleted } from '@/components/app/app-setup/use-is-setup-completed'
 
 // ── Component ────────────────────────────────────────────────
@@ -27,14 +30,20 @@ import { useIsAppSetupCompleted } from '@/components/app/app-setup/use-is-setup-
  * levert horizontale padding via `asset-category-page.tsx` regel 494.
  * Geen breakout meer nodig.
  */
-export function InvestmentHoldingsTab({ moduleActive, initialData }: DeepeningTabProps) {
+export function InvestmentHoldingsTab({ moduleActive, initialData, assets, currentUserId }: DeepeningTabProps) {
   // Splits op de outer-prop: bij module-uit zien we de actieve tak nooit.
   if (!moduleActive) {
     return <InvestmentHoldingsTeaser />
   }
   // Cast op het eindpunt: registry-laag is generiek (`unknown`), hier
   // weten we welke shape we verwachten van de server-loader.
-  return <InvestmentHoldingsActive initialData={initialData as HoldingsPageData | undefined} />
+  return (
+    <InvestmentHoldingsActive
+      initialData={initialData as HoldingsPageData | undefined}
+      assets={assets}
+      currentUserId={currentUserId}
+    />
+  )
 }
 
 // ── Teaser-tak (module uit) ──────────────────────────────────
@@ -66,6 +75,8 @@ function InvestmentHoldingsTeaser() {
 
 interface InvestmentHoldingsActiveProps {
   initialData?: HoldingsPageData
+  assets?: Asset[]
+  currentUserId?: string
 }
 
 /**
@@ -75,10 +86,41 @@ interface InvestmentHoldingsActiveProps {
  * `initialData` ontbreekt valt HoldingsPage terug op zijn eigen client-side
  * fetch — geen losse skeleton hier nodig.
  */
-function InvestmentHoldingsActive({ initialData }: InvestmentHoldingsActiveProps) {
+function InvestmentHoldingsActive({ initialData, assets, currentUserId }: InvestmentHoldingsActiveProps) {
   const setupCompleted = useIsAppSetupCompleted('aandelen_holdings')
   if (setupCompleted === null) return <AppSetupSkeleton />
   if (setupCompleted === false) return <AppSetupGate appKey="aandelen_holdings" />
+
+  // Setup voltooid maar geen enkele belegging (meer) gekoppeld aan de app
+  // (`has_holdings_tracking`) → koppelscherm. Kandidaten komen uit de
+  // server-bundel van de host; opslaan schrijft dezelfde vlag als de
+  // instelling op de bezitting zelf (/api/assets/toggle-holdings).
+  // Alleen éígen beleggingen als kandidaat: lezen is huishoud-verbreed, maar
+  // de toggle-write is strikt eigen-rij — een partner-rij zou altijd falen.
+  const investmentAssets = assets ?? []
+  const linkableAssets = currentUserId
+    ? investmentAssets.filter((a) => a.user_id === currentUserId)
+    : investmentAssets
+  if (!investmentAssets.some((a) => a.has_holdings_tracking)) {
+    return (
+      <AppLinkGate
+        kicker="Bezittingen koppelen"
+        title="Koppel je beleggingen"
+        intro="De Holdings-app volgt alleen de beleggingen die je koppelt. Kies hieronder welke beleggingen je in deze app wilt bijhouden."
+        itemNoun="belegging"
+        icon={TrendingUp}
+        candidates={linkableAssets.map((a) => ({
+          id: a.id,
+          name: a.name,
+          value: Number(a.current_value),
+        }))}
+        endpoint="/api/assets/toggle-holdings"
+        emptyCopy="Je hebt nog geen belegging geregistreerd. Voeg er eerst één toe op de Posities-tab — daarna kun je 'm hier aan de app koppelen."
+        emptyCtaLabel="Voeg belegging toe"
+      />
+    )
+  }
+
   return <HoldingsPage initialData={initialData} />
 }
 

@@ -62,6 +62,7 @@ export const SCHULD_FLOW: UatFlow = {
     // ── 3 · hypotheek-verdieping ──────────────────────────────────────────
     { id: 'koppel', scenarioId: 'UAT-SCHULD-15', label: 'WF-SCHULD-15 · Woning koppelen & LTV zien', kind: 'screen', stage: 3, lane: 'hypotheek' },
     { id: 'planner', scenarioId: 'UAT-SCHULD-12', label: 'WF-SCHULD-12 · Hypotheekplanner activeren', kind: 'action', stage: 3, lane: 'hypotheek' },
+    { id: 'planner-koppel', scenarioId: 'UAT-SCHULD-23', label: 'WF-SCHULD-23 · Koppelscherm (nul gekoppeld)', kind: 'screen', stage: 3, lane: 'hypotheek', subOf: 'planner' },
     { id: 'gebruik', scenarioId: 'UAT-SCHULD-13', label: 'WF-SCHULD-13 · Hypotheekplanner (equity, amortisatie, mijlpalen)', kind: 'screen', stage: 3, lane: 'hypotheek', subOf: 'planner' },
     { id: 'vergelijk', scenarioId: 'UAT-SCHULD-14', label: 'WF-SCHULD-14 · Hypotheek vs. beleggen vergelijken', kind: 'screen', stage: 3, lane: 'hypotheek', subOf: 'planner' },
     { id: 'x-bezit', label: 'Eigen woning / onderpand (BEZIT-asset)', kind: 'cross', stage: 3, lane: 'hypotheek', crossZone: 'BEZIT' },
@@ -121,6 +122,7 @@ export const SCHULD_FLOW: UatFlow = {
     { from: 'categorie', to: 'koppel', kind: 'branch', label: 'hypotheek' },
     { from: 'koppel', to: 'x-bezit', kind: 'cross', label: 'woning als onderpand (LTV)' },
     { from: 'koppel', to: 'planner' },
+    { from: 'planner', to: 'planner-koppel' },
     { from: 'planner', to: 'gebruik' },
     { from: 'planner', to: 'vergelijk' },
     { from: 'gebruik', to: 'box1', kind: 'branch', label: 'renteaftrek' },

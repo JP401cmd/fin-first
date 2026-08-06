@@ -69,6 +69,10 @@ import {
   getFireEligibleNetWorth,
   isHomeExcludedFromFire,
 } from '@/lib/housing-strategy'
+import {
+  shouldShowLiquidWealthLine,
+  buildLiquidWealthPoints,
+} from '@/lib/horizon/liquid-wealth-line'
 import { applyHousingToComposition } from '@/lib/horizon/wealth-composition-housing'
 import { detectDeficitLoanFromRows } from '@/lib/horizon/deficit-loan-display'
 import { KassabonShell } from '@/components/app/kassabon-shell'
@@ -77,9 +81,7 @@ import { HideInSimple } from '@/components/app/hide-in-simple'
 import { HorizonTrendGrid } from '@/components/app/horizon/horizon-trend-grid'
 import { LifelineReadout } from '@/components/app/horizon/lifeline-readout'
 import { LevensinkomenStrook } from '@/components/app/horizon/levensinkomen-strook'
-import { GuardrailKompas } from '@/components/app/horizon/guardrail-kompas'
 import { buildCoverageStrip } from '@/lib/horizon/coverage-strip'
-import { computeGuardrailBounds } from '@/lib/horizon/guardrail-bounds'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import {
   buildHouseholdProjectionInput,
@@ -1904,6 +1906,15 @@ export default function HorizonPage({
     fireTargetInclHome != null && fireTargetInclHome > 0 &&
     fireTargetExclHome != null && fireTargetExclHome > 0
 
+  // Tweede vermogenslijn in Pad-modus: het vermogen ZONDER JE HUIS naast het
+  // totaal. Alleen bij een eigen woning ÉN een niet-meetellen-strategie — bij
+  // `include_full` is niets niet-liquide en valt de lijn pixel-exact samen met de
+  // totaallijn (J ≡ I). Zie de uitleg in `lib/horizon/liquid-wealth-line.ts`.
+  const showLiquidWealthLine = shouldShowLiquidWealthLine(
+    initialData.housingContext,
+    initialData.housingStrategy.mode,
+  )
+
   // Doelbedrag dat bij de voortgangsbalk-grondslag hoort: incl. woning
   // (fireTargetInclHome = requiredFireNetWorth) tenzij de woning is uitgesloten
   // (exclude_from_fire) → dan het liquide excl.-doel. Consistent met de noemer
@@ -2001,8 +2012,8 @@ export default function HorizonPage({
 
   // ── Doorwerking wat-als in de duidingsblokken (plan §F) ─────────────────────
   // De scenario-rijen worden identiek geclipt als de basisrijen; bij een actief
-  // scenario voeden ze de strook + het kompas i.p.v. de basisrijen (chip + reset
-  // maken dat zichtbaar). Cijferbar, PhaseBar en hero-KPI's blijven basis.
+  // scenario voeden ze de strook + de dekkingsradar i.p.v. de basisrijen (chip +
+  // reset maken dat zichtbaar). Cijferbar, PhaseBar en hero-KPI's blijven basis.
   const scenarioDisplayRows = useMemo(
     () => (scenario != null ? clipRowsToPlanEnd(scenario.unifiedRows, displayEndAge) : null),
     [scenario, displayEndAge],
@@ -2019,7 +2030,7 @@ export default function HorizonPage({
     [stopPad, displayEndAge, activeUnifiedRows],
   )
 
-  // ── Uitgebreide-view blokken (levensinkomenstrook + guardrail-kompas + cijferbar) ──
+  // ── Uitgebreide-view blokken (levensinkomenstrook + dekkingsradar + cijferbar) ──
   // Alles consumeert de bestaande unified-rijen / config — geen herberekening.
   const coverageNodes = useMemo(
     () => buildCoverageStrip(duidingUnifiedRows ?? []),
@@ -2163,6 +2174,18 @@ export default function HorizonPage({
   const targetInflationFactors = useMemo(
     () => displayUnifiedRows.map(r => ({ age: r.age, factor: r.inflationFactor })),
     [displayUnifiedRows],
+  )
+
+  // Besteedbaar-vermogenspunten voor de tweede lijn in Pad-modus. Consume-only:
+  // `nettoLiquide` (Prognose!J) komt rechtstreeks uit de kernel-rijen — geen eigen
+  // som "totaal − overwaarde". Zelfde clip als de hoofdlijn, dus beide lijnen
+  // lopen tot dezelfde eindleeftijd. undefined = geen lijn.
+  const liquidWealthPoints = useMemo(
+    () =>
+      showLiquidWealthLine && displayUnifiedRows.length > 1
+        ? buildLiquidWealthPoints(displayUnifiedRows)
+        : undefined,
+    [showLiquidWealthLine, displayUnifiedRows],
   )
 
   // "Huis wordt nooit verkocht"-melding (Wft-veilig, beschrijvend). Verschijnt
@@ -3779,7 +3802,7 @@ export default function HorizonPage({
               </div>
               {!hasPerspectiveHero && showDualFireTarget ? (
                 <>
-                  {/* Doel incl. woning — het grote doel; kwalificatie inline zodat de kaart even hoog blijft als de buur-KPI's */}
+                  {/* Doel MET je huis — het grote doel; kwalificatie inline zodat de kaart even hoog blijft als de buur-KPI's */}
                   <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                     <div
                       className="text-[24px] sm:text-[28px] font-black leading-none tracking-[-0.02em]"
@@ -3791,10 +3814,10 @@ export default function HorizonPage({
                       className="italic text-[11px] text-[var(--ink-3)]"
                       style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
                     >
-                      incl. woning
+                      met je huis
                     </span>
                   </div>
-                  {/* Doel excl. woning (liquide) — het kleinere doel in horizon-accent, inline kwalificatie */}
+                  {/* Doel ZONDER je huis (liquide) — het kleinere doel in horizon-accent, inline kwalificatie */}
                   <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 mt-1.5">
                     <div
                       className="text-[16px] sm:text-[18px] font-black leading-none tracking-[-0.02em] text-[var(--module-active-800)]"
@@ -3806,7 +3829,7 @@ export default function HorizonPage({
                       className="italic text-[11px] text-[var(--ink-3)]"
                       style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
                     >
-                      excl. woning
+                      zonder je huis
                     </span>
                   </div>
                 </>
@@ -3979,7 +4002,7 @@ export default function HorizonPage({
               </div>
               {!hasPerspectiveHero && showDualFireTarget ? (
                 <>
-                  {/* Doel incl. woning — het grote doel; kwalificatie inline zodat de kaart even hoog blijft als de buur-KPI's */}
+                  {/* Doel MET je huis — het grote doel; kwalificatie inline zodat de kaart even hoog blijft als de buur-KPI's */}
                   <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
                     <div
                       className="text-[18px] font-black leading-none tracking-[-0.02em]"
@@ -3991,10 +4014,10 @@ export default function HorizonPage({
                       className="italic text-[10px] text-[var(--ink-3)]"
                       style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
                     >
-                      incl. woning
+                      met je huis
                     </span>
                   </div>
-                  {/* Doel excl. woning (liquide) — het kleinere doel in horizon-accent, inline kwalificatie */}
+                  {/* Doel ZONDER je huis (liquide) — het kleinere doel in horizon-accent, inline kwalificatie */}
                   <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 mt-1">
                     <div
                       className="text-[13px] font-black leading-none tracking-[-0.02em] text-[var(--module-active-800)]"
@@ -4006,7 +4029,7 @@ export default function HorizonPage({
                       className="italic text-[10px] text-[var(--ink-3)]"
                       style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
                     >
-                      excl. woning
+                      zonder je huis
                     </span>
                   </div>
                 </>
@@ -4534,6 +4557,15 @@ export default function HorizonPage({
                 }
               </ChartOverlayExplainer>
 
+              {/* Waarom de twee lijnen uit elkaar lopen — feitelijk, geen advies. */}
+              <ChartOverlayExplainer
+                active={chartMode === 'vermogenspad' && !!liquidWealthPoints && !usePartnerMainLine && !useHouseholdMainLine && !isAowStopActive}
+              >
+                De lijn <em>zonder je huis</em> toont het deel van je vermogen waar
+                je direct bij kunt. Je huis zit daar niet in — daardoor kan de lijn
+                met je huis doorgroeien terwijl die andere lijn daalt.
+              </ChartOverlayExplainer>
+
               <ChartOverlayExplainer active={chartMode === 'vermogensopbouw'}>
                 In <em>opbouw</em>-modus zie je de samenstelling van je vermogen —
                 hoeveel komt uit eigen bijdragen, hoeveel uit <GlossaryTerm term="rendement">rendement</GlossaryTerm>, en hoe
@@ -4687,6 +4719,10 @@ export default function HorizonPage({
                             // Meegroeiende doellijn alleen op de basis-projectie (niet op
                             // partner-/huishoud-/AOW-stop-lijnen — die hebben eigen rijen).
                             targetInflationFactors={(usePartnerMainLine || useHouseholdMainLine || isAowStopActive) ? undefined : targetInflationFactors}
+                            // Besteedbaar-lijn alleen op de basis-projectie: partner-/
+                            // huishoud-/AOW-stop-lijnen tekenen andere rijen, waar deze
+                            // punten niet bij horen.
+                            liquidPoints={(usePartnerMainLine || useHouseholdMainLine || isAowStopActive) ? undefined : liquidWealthPoints}
                             mainLineLabel={useHouseholdMainLine ? 'Gezamenlijk' : usePartnerMainLine ? (partnerName ?? 'Partner') : undefined}
                             // Partner- én huishoud-projectie krijgen dezelfde teal als de
                             // partner-event-markers, zodat de lijn + de partner-gebeurtenissen
@@ -5272,7 +5308,7 @@ export default function HorizonPage({
                         <Kicker className="mb-1">Levensinkomenstrook</Kicker>
                         <div className="flex items-center gap-2">
                           <h2 className="font-display text-[14px] font-semibold leading-snug text-[var(--ink)]">Dekt je inkomen straks je uitgaven?</h2>
-                          {hasScenario && !(usePartnerMainLine || useHouseholdMainLine) && <ScenarioChip doelActief={doelActief} onBeforeScroll={() => setVerkenOpen(true)} />}
+                          {(hasScenario || hasStopKeuze) && !(usePartnerMainLine || useHouseholdMainLine) && <ScenarioChip doelActief={doelActief} hasScenario={hasScenario} onBeforeScroll={() => setVerkenOpen(true)} />}
                         </div>
                       </div>
                       <p className="mb-3 font-sans text-[12px] text-[var(--ink-3)]">
@@ -7725,8 +7761,11 @@ export default function HorizonPage({
                 <span className="font-sans text-sm text-[var(--ink-2)]">Huidig netto vermogen</span>
                 <span className="tabular-nums text-[var(--ink)]">{<MaskedAmount value={(effectiveInput?.totalAssets ?? 0) - (effectiveInput?.totalDebts ?? 0)} tone="horizon" />}</span>
               </div>
-              {initialData.housingStrategy.mode !== 'include_full' &&
-                initialData.housingContext.hasEigenHuis && (
+              {/* Zelfde conditie als de besteedbaar-vermogenslijn: eigen woning ÉN een
+                  niet-meetellen-strategie (bij include_full is J ≡ I, dus "belegbaar"
+                  zou hier het totaal herhalen). Consumeert de gedeelde helper i.p.v.
+                  de conditie letterlijk te dupliceren. */}
+              {showLiquidWealthLine && (
                   <div className="flex justify-between py-0.5">
                     <span
                       className="font-sans text-sm text-[var(--ink-2)]"

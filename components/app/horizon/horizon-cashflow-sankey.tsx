@@ -68,7 +68,17 @@ interface SourceItem {
   amount: number
 }
 
-/** Synthesize breakdown van SimRow-totalen als unifiedRows ontbreken. */
+/**
+ * Synthesize breakdown van SimRow-totalen als unifiedRows ontbreken.
+ *
+ * GRONDSLAG-NOTE (bewust TOTAAL). `row.growth` is `SimRow.growth` = de TOTALE
+ * `totalGrowth`, dus inclusief de waardestijging van een niet-liquide eigen woning.
+ * De HOOFDROUTE van deze Sankey loopt via `buildBreakdown(unifiedRows, …)` en toont
+ * daar sinds 2026-08-05 wél het besteedbare `totalGrowthLiquide`. Dit is uitsluitend
+ * de legacy-terugval voor het geval `unifiedRows` ontbreekt; `SimRow` draagt het
+ * liquide veld niet (het contract blijft bewust op het totaal — zie `toSimRow`), dus
+ * hier is geen splitsing mogelijk. Bekende, geaccepteerde afwijking op dat ene pad.
+ */
 function synthesizeFromSimRow(row: SimRow): { income: SourceItem[]; expense: SourceItem[] } {
   const income: SourceItem[] = []
   const expense: SourceItem[] = []

@@ -15,6 +15,7 @@
 //   - Wanneer `aandelenregistratie` uit staat tonen we een teaser + tip-
 //     strip met deeplink. De full-app wordt nooit gemount.
 
+import { Coins } from 'lucide-react'
 import type {
   CryptoHoldingRow,
   CryptoTransactionRow,
@@ -25,10 +26,12 @@ import type {
   CryptoVolatilityMetric,
   CryptoFeesSummary,
 } from '@/lib/crypto-holdings-data'
+import type { Asset } from '@/lib/asset-data'
 import { CryptoHoldingsPage } from './crypto-holdings/crypto-holdings-page'
 import type { DeepeningTabProps } from '../category-deepening-registry'
 import { ModuleTipStrip } from '../module-tip-strip'
 import { AppSetupGate } from '@/components/app/app-setup/app-setup-gate'
+import { AppLinkGate } from '@/components/app/app-setup/app-link-gate'
 import { useIsAppSetupCompleted } from '@/components/app/app-setup/use-is-setup-completed'
 
 // ── Initial-data shape ─────────────────────────────────────────────────
@@ -74,21 +77,60 @@ function isBundle(value: CryptoInitialData): value is CryptoInitialBundle {
 
 // ── Component ──────────────────────────────────────────────────────────
 
-export function CryptoHoldingsTab({ moduleActive, initialData }: DeepeningTabProps) {
+export function CryptoHoldingsTab({ moduleActive, initialData, assets, currentUserId }: DeepeningTabProps) {
   if (!moduleActive) {
     return <CryptoHoldingsTeaser />
   }
-  return <CryptoHoldingsActive initialData={initialData} />
+  return <CryptoHoldingsActive initialData={initialData} assets={assets} currentUserId={currentUserId} />
 }
 
 // ── Actieve tak (module aan) ───────────────────────────────────────────
 
-function CryptoHoldingsActive({ initialData }: { initialData: unknown }) {
+function CryptoHoldingsActive({
+  initialData,
+  assets,
+  currentUserId,
+}: {
+  initialData: unknown
+  assets?: Asset[]
+  currentUserId?: string
+}) {
   // Onafhankelijk van de aandelen-setup — crypto en aandelen-holdings
   // hebben elk een eigen gate-marker.
   const setupCompleted = useIsAppSetupCompleted('crypto_holdings')
   if (setupCompleted === null) return <AppSetupSkeleton />
   if (setupCompleted === false) return <AppSetupGate appKey="crypto_holdings" />
+
+  // Setup ooit voltooid maar geen enkele crypto-bezitting (meer) gekoppeld
+  // (`has_holdings_tracking`) → koppelscherm i.p.v. een doodlopende
+  // empty-state. De kandidaten komen uit de server-bundel van de host;
+  // opslaan schrijft dezelfde vlag als de instelling op de bezitting zelf
+  // (/api/assets/toggle-holdings) en ververst daarna de bundel.
+  // Alleen éígen bezittingen als kandidaat: lezen is huishoud-verbreed, maar
+  // de toggle-write is strikt eigen-rij — een partner-rij zou altijd falen.
+  const cryptoAssets = assets ?? []
+  const linkableAssets = currentUserId
+    ? cryptoAssets.filter((a) => a.user_id === currentUserId)
+    : cryptoAssets
+  if (!cryptoAssets.some((a) => a.has_holdings_tracking)) {
+    return (
+      <AppLinkGate
+        kicker="Bezittingen koppelen"
+        title="Koppel je crypto-bezittingen"
+        intro="De Crypto-holdings-app volgt alleen de bezittingen die je koppelt. Kies hieronder welke crypto-bezittingen je in deze app wilt bijhouden."
+        itemNoun="bezitting"
+        icon={Coins}
+        candidates={linkableAssets.map((a) => ({
+          id: a.id,
+          name: a.name,
+          value: Number(a.current_value),
+        }))}
+        endpoint="/api/assets/toggle-holdings"
+        emptyCopy="Je hebt nog geen crypto-bezitting geregistreerd. Voeg er eerst één toe op de Posities-tab — daarna kun je 'm hier aan de app koppelen."
+        emptyCtaLabel="Voeg crypto-bezitting toe"
+      />
+    )
+  }
 
   // Cast op het eindpunt: registry-laag is generiek (`unknown`); hier weten
   // we welke shapes legitiem zijn.

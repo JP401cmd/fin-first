@@ -186,9 +186,13 @@ export interface ComboExpectation {
  *  (b) **`requiredFirePortfolio` = Prognose!J@FIRE** (nominaal benodigd liquide op de
  *      FIRE-maand).
  *  (c) **Liquide-grondslag (dominant op deze persona).** De kernel telt ÁLLE categorieën
- *      behalve 'Eigen huis' als FIRE-eligible liquide (Prognose!J = I − niet-liquide;
- *      `adapter/prio-overgang.ts` vlagt enkel Eigen huis, en dan alléén bij woning-
- *      uitsluiten). Het verhuurde appartement (Vastgoed), het BV-belang (Overig), pensioen,
+ *      behalve 'Eigen huis' als FIRE-eligible liquide (Prognose!J = I − (L − M);
+ *      `adapter/prio-overgang.ts` vlagt aan de BEZIT-kant enkel 'Eigen huis' (→ L) en aan
+ *      de SCHULD-kant enkel 'Woning' (→ M), en beide alléén bij woning-uitsluiten —
+ *      `nietLiquide = !woningMeerekenen`, regels 182 resp. 197). Die schuld-kant is niet
+ *      cosmetisch: hij bepaalt WELKE hypotheken weer bij het besteedbare vermogen worden
+ *      opgeteld, en was precies de bron van de beleggingshypotheek-fix hieronder.
+ *      Het verhuurde appartement (Vastgoed), het BV-belang (Overig), pensioen,
  *      kapitaalverzekering en vordering tellen dus VOL mee in de FIRE-pot. Combineer dat met
  *      de rijke persona (~€1,18 mln netto vermogen, €48k pensioenuitgaven → ~4% aanvangs-
  *      onttrekking) én 7% nominaal rendement, dan is de opmaak-strategie (deplete) op de
@@ -221,7 +225,10 @@ export interface ComboExpectation {
  * draagt `ComboActual` sinds die fix `opeetSchuldEind` + een invariant per combinatie
  * ("Opeethypotheek boekt een schuld" resp. "geen opeetschuld buiten de opeet-strategie").
  * Beweegt er ooit tóch een golden bij een reverse-combinatie, dan is dat een echte
- * FIRE-moment-verschuiving — herijk 'm dan bewust.
+ * FIRE-moment-verschuiving — herijk 'm dan bewust. **Tenzij de J-GRONDSLAG zelf
+ * wijzigt**: dan verschuift het doelbedrag zonder dat het FIRE-moment beweegt (het
+ * doelbedrag ís Prognose!J@FIRE). Precies dat gebeurde bij de beleggingshypotheek-fix
+ * — zie de sectie hieronder.
  *
  * ## Groep C/D op de PERPETUAL-baseline (scope-besluit)
  * Op de deplete-baseline vallen groep C (onttrekkingsprofiel) en D (werk-strategie)
@@ -231,13 +238,47 @@ export interface ComboExpectation {
  *   - Groep C discrimineert: oplopend 42,08 < afnemend 43,17 < vast 45,58 < guardrails 47,50.
  *   - Groep D discrimineert: combi 44,92 < groei 45,42 < geen 45,58 < deeltijd 46,42.
  *
+ * ## Beleggingshypotheek-fix (groep A, herijkt 2026-08-05) — waarom A-exclude/
+ * A-downsize/A-reverse WÉL bewogen
+ * `adapter/potten.ts` mapte élke `mortgage` op schuldcategorie 'Woning', óók de
+ * **beleggingshypotheek van €110.000 op het verhuurde appartement** die deze persona
+ * draagt (`lib/test-personas.ts`, aflossingsvrij, 3,6%). Bij een niet-meetellen-
+ * woonstrategie vlagt `adapter/prio-overgang.ts` categorie 'Woning' als niet-liquide,
+ * waardoor `Prognose!J = I − (L − M)` die €110k weer BIJTELDE bij het besteedbare
+ * vermogen — terwijl het appartement zelf (categorie 'Vastgoed') gewoon liquide in J
+ * bleef staan. De besteedbare pot werd zo €110k overschat. `isNietEigenWoningHypotheek`
+ * haalt een hypotheek die expliciet aan een bekend, actief, niet-`eigen_huis`-bezit
+ * gekoppeld is uit 'Woning' (ongelinkt blijft bewust 'Woning' — zie die helper).
+ *
+ * **Richting van de verschuiving (allemaal verklaard, geen drift):**
+ *   - `A-reverse`: doelbedrag −€110.000 exact (950.670 → 840.670), FIRE
+ *     ONgewijzigd op 42,083. De opeet-baseline is "reached now" (B93-doel=0-quirk,
+ *     oorzaak c), dus J wordt op de eerste maand gemeten — vóór enige amortisatie —
+ *     en de correctie is exact het startsaldo van de beleggingshypotheek.
+ *   - `A-exclude`: FIRE 42,833 → 43,083 (+3 mnd), doelbedrag 1.020.880 → 934.697
+ *     (−€86.183, −8,4%).
+ *   - `A-downsize`: FIRE 42,417 → 42,667 (+3 mnd), doelbedrag 981.649 → 895.119
+ *     (−€86.530, −8,8%).
+ *     Bij deze twee is J op élke maand €110k lager, dus de bisectie heeft ~3 maanden
+ *     langer nodig → **FIRE later**. Het gerapporteerde doelbedrag is `Prognose!J@FIRE`
+ *     (dezelfde grondslag), dus dat daalt met €110k MINUS de J-aangroei over die drie
+ *     extra maanden (rendement + inleg ≈ €24k) → netto ≈ −€86k. De hypotheek zelf is
+ *     aflossingsvrij en amortiseert niet via de geplande aflossing (extra aflossing uit
+ *     de surplus-waterval kán nu wél — zie de bijwerking hieronder).
+ *   - `A-include_full` en groep B/C/D staan op 'Meerekenen' (niets is niet-liquide,
+ *     J ≡ I) resp. gebruiken die baseline → **byte-identiek ongewijzigd**, zoals verwacht.
+ *
+ * **Gewenste bijwerking (niet onderdrukt):** de pand-hypotheek zit bij niet-meetellen
+ * niet langer in de niet-liquide schuldcategorie, dus de schuldCap in de Verdeling-
+ * waterval blokkeert extra aflossing er niet meer op.
+ *
  * GENERATED:GOLDEN:START
  */
 export const EXPECTED: Record<string, ComboExpectation> = {
   'A-include_full': { fireAgeFractional: 42.083, doelbedrag: 1102575 },
-  'A-exclude': { fireAgeFractional: 42.833, doelbedrag: 1020880 },
-  'A-downsize': { fireAgeFractional: 42.417, doelbedrag: 981649 },
-  'A-reverse': { fireAgeFractional: 42.083, doelbedrag: 950670 },
+  'A-exclude': { fireAgeFractional: 43.083, doelbedrag: 934697 },
+  'A-downsize': { fireAgeFractional: 42.667, doelbedrag: 895119 },
+  'A-reverse': { fireAgeFractional: 42.083, doelbedrag: 840670 },
   'B-deplete': { fireAgeFractional: 42.083, doelbedrag: 1102575 },
   'B-legacy': { fireAgeFractional: 42.083, doelbedrag: 1102575 },
   'B-perpetual': { fireAgeFractional: 45.583, doelbedrag: 1530312 },

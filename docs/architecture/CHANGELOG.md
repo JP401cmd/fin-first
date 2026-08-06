@@ -628,3 +628,21 @@
 
 - **API-routes** toegevoegd: /api/admin/local-ai-gate, /api/ai-execution-prefs, /api/assets/[id], /api/assets/account-number, /api/debts/[id], /api/local-ai-gate, /api/local-news-edition, /api/local-news-sources, /api/local-tips, /api/local-tips-candidates
 - **Componenten (aantal)** toegevoegd: +14
+
+## 2026-08-05
+
+- **Schermen** verwijderd: /core/cash, /horizon/whatif
+- **Componenten (aantal)** toegevoegd: +8
+
+## 2026-08-05
+
+- Geen wijzigingen.
+
+## 2026-08-05
+
+- **API-routes** toegevoegd: /api/belasting/varianten-sweep
+- **Componenten (aantal)** toegevoegd: +3
+
+## 2026-08-06
+
+- Geen wijzigingen.

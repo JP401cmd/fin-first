@@ -123,7 +123,13 @@ export function buildKernelInputFromAppWithNotices(input: KernelAdapterInput): K
   // zou een tweede bron zijn. `selector === 'Meerekenen'` ⟺ `mode === 'include_full'`
   // (HOUSING_MODE_TO_SELECTOR is totaal over de vier modi die parseHousingStrategy oplevert).
   const woning = buildWoning(profile.housing_strategy_config)
-  const schuldPotten = buildSchuldPotten(debts, eigenHuisIds, deficitLoanRate, woning)
+  // Ids van álle actieve bezittingen: nodig om een hypotheek die op een ánder bezit
+  // rust (beleggingshypotheek op een verhuurd pand) uit schuldcategorie 'Woning' te
+  // houden — die categorie is de niet-liquide-as van het eigen-woningblok, en een
+  // pand-hypotheek terugtellen in Prognose!J overschat de besteedbare pot. Zie
+  // `potten.ts#isNietEigenWoningHypotheek` (ongelinkt/onbekend blijft bewust 'Woning').
+  const activeAssetIds = new Set(assets.filter((a) => a.is_active !== false).map((a) => a.id))
+  const schuldPotten = buildSchuldPotten(debts, eigenHuisIds, deficitLoanRate, woning, activeAssetIds)
 
   const woningMeerekenen = woning.selector === 'Meerekenen'
   const ts = buildTsParams(resolvePotRules(profile), assetPotten, schuldPotten, woningMeerekenen)
@@ -221,6 +227,7 @@ export {
   buildPotLiquidaties,
   buildSchuldPotten,
   deriveEigenHuisIds,
+  isNietEigenWoningHypotheek,
   mapInSparenNaAflossing,
   type DebtSlot,
   type LiquidatieContext,

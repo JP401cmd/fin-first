@@ -47,8 +47,13 @@ export function AppSetupGate({ appKey }: { appKey: AppSetupKey }) {
 }
 
 // ── Inner — typed op TState voor de hook ─────────────────────
+//
+// Geëxporteerd voor de regressietest (app-setup-gate.test.tsx) die met een
+// synthetische config vastlegt dat secties als component gemount worden:
+// sectie-interne state moet async updates renderen én parent-re-renders
+// overleven zonder remount. Productie-code gebruikt alleen <AppSetupGate>.
 
-function AppSetupGateInner<TState>({ config }: { config: AppSetupConfig<TState> }) {
+export function AppSetupGateInner<TState>({ config }: { config: AppSetupConfig<TState> }) {
   const { state, setState, save, saving, errorMsg, validation } =
     useAppSetupState(config)
 
@@ -72,20 +77,28 @@ function AppSetupGateInner<TState>({ config }: { config: AppSetupConfig<TState> 
 
       {/* ── Secties met dashed divider ─────────────────── */}
       <div className="space-y-8">
-        {config.sections.map((section, index) => (
-          <Fragment key={section.id}>
-            {index > 0 && (
-              <div className="border-t border-dashed border-[var(--border-ed)]" />
-            )}
-            <AppSetupSection
-              kicker={section.kicker}
-              title={section.title}
-              hint={section.hint}
-            >
-              {section.render({ state, setState })}
-            </AppSetupSection>
-          </Fragment>
-        ))}
+        {config.sections.map((section, index) => {
+          // Als élément mounten, nooit als functie aanroepen: secties zoals
+          // CryptoAssetSelector bezitten eigen hooks. Een directe aanroep
+          // hangt die hooks aan déze fiber en laat de React Compiler de
+          // aanroep memoïseren — waarna een sectie-interne state-update de
+          // hooks overslaat (React #300, prod-crash op de app-tabs).
+          const SectionBody = section.render
+          return (
+            <Fragment key={section.id}>
+              {index > 0 && (
+                <div className="border-t border-dashed border-[var(--border-ed)]" />
+              )}
+              <AppSetupSection
+                kicker={section.kicker}
+                title={section.title}
+                hint={section.hint}
+              >
+                <SectionBody state={state} setState={setState} />
+              </AppSetupSection>
+            </Fragment>
+          )
+        })}
       </div>
 
       {/* ── Validatie- en error-banner ─────────────────── */}

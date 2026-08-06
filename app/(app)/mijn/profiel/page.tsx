@@ -32,8 +32,6 @@ export default function ProfielPage() {
   const [numberOfChildren, setNumberOfChildren] = useState(0)
   const [childrenAges, setChildrenAges] = useState<number[]>([])
   const [housingType, setHousingType] = useState<string | null>(null)
-  const [energyLabel, setEnergyLabel] = useState<string | null>(null)
-  const [hasCar, setHasCar] = useState(false)
   const [netMonthlyIncome, setNetMonthlyIncome] = useState<string>('')
   const [childAgeInput, setChildAgeInput] = useState('')
 
@@ -63,8 +61,6 @@ export default function ProfielPage() {
         setNumberOfChildren(data.number_of_children ?? 0)
         setChildrenAges(data.children_ages ?? [])
         setHousingType(data.housing_type ?? null)
-        setEnergyLabel(data.energy_label ?? null)
-        setHasCar(data.has_car ?? false)
         setNetMonthlyIncome(data.net_monthly_income ? String(data.net_monthly_income) : '')
         // Kleuren (module/budget/phase) NIET hier laden — de layout zet ze al
         // server-side in de provider. Opnieuw zetten via de persisterende
@@ -99,8 +95,6 @@ export default function ProfielPage() {
         number_of_children: numberOfChildren,
         children_ages: childrenAges,
         housing_type: housingType,
-        energy_label: energyLabel,
-        has_car: hasCar,
         net_monthly_income: netMonthlyIncome ? Number(netMonthlyIncome) : null,
         updated_at: new Date().toISOString(),
       })
@@ -139,7 +133,7 @@ export default function ProfielPage() {
       }
     }
     setSaving(false)
-  }, [supabase, addToast, fullName, dateOfBirth, country, householdType, marketplaceDisplayName, numberOfChildren, childrenAges, housingType, energyLabel, hasCar, netMonthlyIncome])
+  }, [supabase, addToast, fullName, dateOfBirth, country, householdType, marketplaceDisplayName, numberOfChildren, childrenAges, housingType, netMonthlyIncome])
 
   if (loading) {
     return (
@@ -360,45 +354,6 @@ export default function ProfielPage() {
               <option value="huur_vrij">Huur (vrije sector)</option>
               <option value="koop">Koopwoning</option>
             </select>
-          </div>
-
-          <div>
-            <label htmlFor="energyLabel" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
-              Energielabel
-            </label>
-            <select
-              id="energyLabel"
-              value={energyLabel ?? ''}
-              onChange={(e) => setEnergyLabel(e.target.value || null)}
-              className="w-full border border-[var(--border-md)] bg-[var(--subtle)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
-            >
-              <option value="">Selecteer...</option>
-              {['A++', 'A+', 'A', 'B', 'C', 'D', 'E', 'F', 'G'].map(label => (
-                <option key={label} value={label}>{label}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <span className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">Auto</span>
-            <div className="flex gap-2">
-              {[
-                { value: false, label: 'Nee' },
-                { value: true, label: 'Ja' },
-              ].map((opt) => (
-                <button
-                  key={String(opt.value)}
-                  onClick={() => setHasCar(opt.value)}
-                  className={`flex-1 border px-3 py-2 text-sm font-medium transition-colors ${
-                    hasCar === opt.value
-                      ? 'border-zinc-900 bg-zinc-900 text-white'
-                      : 'border-[var(--border-md)] bg-[var(--subtle)] text-[var(--ink-2)] hover:border-zinc-400'
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
           </div>
 
           <div>

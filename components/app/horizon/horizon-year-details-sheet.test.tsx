@@ -179,6 +179,103 @@ describe('HorizonYearDetailsSheet — rendement & Box 3 per type', () => {
   })
 })
 
+// ── Rendement-kassabon: liquide vs. niet-besteedbaar (defect A) ──────
+
+/**
+ * Review-bevinding M1/M2. `totalGrowth` telt óók de waardestijging van een
+ * niet-liquide eigen woning; die is geen besteedbaar inkomen. De hoofdregel toont
+ * daarom `totalGrowthLiquide` en het verschil krijgt een eigen NEUTRALE regel, zodat
+ * de kassabon nog steeds op `totalGrowth` sluit én de eigen-woningsubrij niet twee
+ * keer verschijnt.
+ */
+const HUIS_GROWTH_ROW = makeYearRow({
+  assetBuckets: {
+    investment: { startValue: 494000, growth: 6000, contributions: 0, box3Drag: 3000, endValue: 500000 },
+    eigen_huis: { startValue: 396000, growth: 4000, contributions: 0, box3Drag: 0, endValue: 400000 },
+  },
+  totalGrowth: 10000,
+  totalGrowthLiquide: 6000,
+})
+
+/** Het `<li>` van een CostsRow, opgezocht via zijn label. */
+function costsRowFor(label: string | RegExp): HTMLElement {
+  const el = screen.getByText(label).closest('li')
+  expect(el).toBeTruthy()
+  return el as HTMLElement
+}
+
+describe('HorizonYearDetailsSheet — rendement liquide vs. niet-besteedbaar', () => {
+  it('toont het besteedbare deel als hoofdregel en de woningwaardestijging als aparte neutrale regel', () => {
+    renderSheet(HUIS_GROWTH_ROW)
+
+    const hoofd = costsRowFor('Rendement portfolio')
+    expect(hoofd.textContent).toContain('6.000')
+
+    const neutraal = costsRowFor('Waardestijging eigen woning (niet besteedbaar)')
+    expect(neutraal.textContent).toContain('4.000')
+
+    // Geen dubbeltelling: de eigen-woningsubrij hangt ONDER de neutrale regel,
+    // niet onder het besteedbare rendement.
+    expect(within(hoofd).queryByText('Eigen woning')).toBeNull()
+    expect(within(neutraal).getByText('Eigen woning')).toBeTruthy()
+    // …en de beleggingssubrij hangt wél onder de hoofdregel.
+    expect(within(hoofd).getByText('Beleggingen')).toBeTruthy()
+
+    // Kassabon sluit: 6.000 (liquide) + 4.000 (niet besteedbaar) = totalGrowth 10.000.
+    expect(HUIS_GROWTH_ROW.totalGrowthLiquide! + 4000).toBe(HUIS_GROWTH_ROW.totalGrowth)
+    // Geen restregel nodig zolang eigen_huis het hele verschil dekt.
+    expect(screen.queryByText('Overig niet-besteedbaar')).toBeNull()
+  })
+
+  it('valt terug op de oude weergave zonder totalGrowthLiquide — geen neutrale regel', () => {
+    const { totalGrowthLiquide: _weg, ...zonderVeld } = HUIS_GROWTH_ROW
+    renderSheet(zonderVeld as UnifiedProjectionRow)
+
+    const hoofd = costsRowFor('Rendement portfolio')
+    // Volledige totalGrowth op de hoofdregel…
+    expect(hoofd.textContent).toContain('10.000')
+    // …met de eigen-woningsubrij er gewoon onder (pre-fix-gedrag).
+    expect(within(hoofd).getByText('Eigen woning')).toBeTruthy()
+    expect(screen.queryByText('Waardestijging eigen woning (niet besteedbaar)')).toBeNull()
+    expect(screen.queryByText('Waardedaling eigen woning (niet besteedbaar)')).toBeNull()
+  })
+
+  it('sluit met "Overig niet-besteedbaar" als de subrijen het verschil niet dekken', () => {
+    // Niet-liquide verschil = 10.000 − 6.000 = 4.000, maar de eigen-woningbucket
+    // draagt er maar 3.000 van → 1.000 restant mag niet stil verdwijnen.
+    renderSheet(
+      makeYearRow({
+        assetBuckets: {
+          investment: { startValue: 494000, growth: 6000, contributions: 0, box3Drag: 3000, endValue: 500000 },
+          eigen_huis: { startValue: 397000, growth: 3000, contributions: 0, box3Drag: 0, endValue: 400000 },
+        },
+        totalGrowth: 10000,
+        totalGrowthLiquide: 6000,
+      }),
+    )
+    const neutraal = costsRowFor('Waardestijging eigen woning (niet besteedbaar)')
+    expect(neutraal.textContent).toContain('4.000')
+    const rest = within(neutraal).getByText('Overig niet-besteedbaar')
+    expect(rest).toBeTruthy()
+    expect(rest.closest('li')!.textContent).toContain('1.000')
+  })
+
+  it('noemt een negatief niet-liquide verschil een waardeDALING', () => {
+    renderSheet(
+      makeYearRow({
+        assetBuckets: {
+          investment: { startValue: 490000, growth: 10000, contributions: 0, box3Drag: 3000, endValue: 500000 },
+          eigen_huis: { startValue: 404000, growth: -4000, contributions: 0, box3Drag: 0, endValue: 400000 },
+        },
+        totalGrowth: 6000,
+        totalGrowthLiquide: 10000,
+      }),
+    )
+    expect(screen.getByText('Waardedaling eigen woning (niet besteedbaar)')).toBeTruthy()
+    expect(screen.queryByText('Waardestijging eigen woning (niet besteedbaar)')).toBeNull()
+  })
+})
+
 // ── Schulden-kassabon: kop-totaal reconcilieert met de regels ────────
 
 /**

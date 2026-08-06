@@ -35,6 +35,15 @@ function cx(...classes: (string | undefined | false | null)[]) {
   return classes.filter(Boolean).join(' ')
 }
 
+// GRONDSLAG-NOTE — de rendement-kolom staat BEWUST op `row.totalGrowth` (TOTAAL),
+// niet op het besteedbare `row.totalGrowthLiquide`. Deze tabel is een
+// VERMOGENSbalans per jaar: de kolommen ernaast (bezittingen, schulden, netto
+// vermogen) staan allemaal op de netWorth-grondslag (Prognose!I, incl. een
+// niet-liquide eigen woning), en de kolomtotaal-rij sommeert in diezelfde
+// grondslag. Het liquide rendement hoort in de vermogensSTROMEN-weergaven
+// (IE-strip, Sankey, jaar-detailkassabon); hier zou het de rij niet meer laten
+// sluiten. Zie `UnifiedProjectionRow.totalGrowthLiquide` in lib/unified-projection.ts.
+
 /** Deflate a nominal value to real terms */
 function deflate(value: number, factor: number, showReal: boolean): number {
   return showReal ? value / factor : value
@@ -493,6 +502,8 @@ export function PhaseDetailTable({
                         </>
                       ) : (
                         <>
+                          {/* TOTAAL rendement (incl. niet-liquide woning) — bewust, zie
+                              de GRONDSLAG-note bovenaan deze module. */}
                           <FinTable.Td numeric color={colorClass(row.totalGrowth)}>
                             {<MaskedAmount value={d(row.totalGrowth)} tone="horizon" />}
                           </FinTable.Td>
@@ -595,6 +606,8 @@ export function PhaseDetailTable({
                   ) : (
                     <>
                       {(() => {
+                        // Kolomtotaal op dezelfde TOTAAL-grondslag als de rijen erboven
+                        // (incl. niet-liquide woning) — zie de GRONDSLAG-note bovenaan.
                         const totalGrowth = rows.reduce((sum, r) => sum + r.totalGrowth, 0)
                         const totalWithdrawal = rows.reduce((sum, r) => sum + r.withdrawal, 0)
                         const totalAow = rows.reduce((sum, r) => sum + (r.phase !== 'accumulation' ? r.grossIncome : 0), 0)

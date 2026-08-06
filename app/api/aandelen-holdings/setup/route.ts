@@ -10,15 +10,17 @@ import { unauthorized, serverError } from '@/lib/api/respond'
  *
  * Body: {
  *   selectedAssetIds: string[] (uuid),
- *   brokers: string[],
- *   inputMethod: 'manual' | 'csv' | 'api'
+ *   brokers?: string[],
+ *   inputMethod?: 'manual' | 'csv' | 'api'
  * }
  *
  * Wat deze route doet:
- *  1. Slaat broker-voorkeur + inputMethod op in `profiles.aandelen_input_method`
- *     en `profiles.aandelen_brokers` (jsonb). Bij ontbrekende kolommen
- *     (migratie nog niet toegepast) wordt gracieus gedegradeerd — alleen
- *     de feature-visit-marker wordt dan gezet zodat de gate verdwijnt.
+ *  1. Slaat — indien meegegeven — broker-voorkeur + inputMethod op in
+ *     `profiles.aandelen_input_method` en `profiles.aandelen_brokers` (jsonb).
+ *     Sinds de versimpelde setup (aug 2026, alleen bezittingen-selectie)
+ *     stuurt de gate deze velden niet meer mee; ze blijven optioneel
+ *     geaccepteerd voor oudere clients. Bij ontbrekende kolommen wordt
+ *     gracieus gedegradeerd.
  *  2. Markeert de geselecteerde investment-assets met `has_holdings_tracking = true`
  *     en alle andere investment-assets op false (absolute selectie).
  *  3. Schrijft de feature-visit-marker.
@@ -26,8 +28,8 @@ import { unauthorized, serverError } from '@/lib/api/respond'
 
 const bodySchema = z.object({
   selectedAssetIds: z.array(z.string().uuid()).min(1),
-  brokers: z.array(z.string()).min(1),
-  inputMethod: z.enum(['manual', 'csv', 'api']),
+  brokers: z.array(z.string()).optional(),
+  inputMethod: z.enum(['manual', 'csv', 'api']).optional(),
 })
 
 export async function POST(req: Request) {
@@ -55,26 +57,27 @@ export async function POST(req: Request) {
   const { selectedAssetIds, brokers, inputMethod } = parsed.data
 
   try {
-    // ── 1. Voorkeur opslaan op profile ─────────────────────────
+    // ── 1. Voorkeur opslaan op profile (alleen als een client ze meestuurt) ──
     // Bij ontbrekende kolommen retry zonder die kolom; de marker blijft
     // staan ook als de voorkeuren niet bewaard worden.
-    const profileUpdate: Record<string, unknown> = {
-      aandelen_input_method: inputMethod,
-      aandelen_brokers: brokers,
-    }
-    const { error: profErr } = await supabase
-      .from('profiles')
-      .update(profileUpdate)
-      .eq('id', user.id)
-    if (profErr) {
-      const msg = profErr.message ?? ''
-      const onlyMissing =
-        msg.includes('aandelen_input_method') || msg.includes('aandelen_brokers')
-      if (!onlyMissing) {
-        throw new Error(`Profile-update mislukt: ${msg}`)
+    if (brokers !== undefined || inputMethod !== undefined) {
+      const profileUpdate: Record<string, unknown> = {}
+      if (inputMethod !== undefined) profileUpdate.aandelen_input_method = inputMethod
+      if (brokers !== undefined) profileUpdate.aandelen_brokers = brokers
+      const { error: profErr } = await supabase
+        .from('profiles')
+        .update(profileUpdate)
+        .eq('id', user.id)
+      if (profErr) {
+        const msg = profErr.message ?? ''
+        const onlyMissing =
+          msg.includes('aandelen_input_method') || msg.includes('aandelen_brokers')
+        if (!onlyMissing) {
+          throw new Error(`Profile-update mislukt: ${msg}`)
+        }
+        // Migratie ontbreekt — best-effort: skip profile-update, ga door.
+        console.warn('[aandelen-holdings-setup] profile-kolommen ontbreken, voortzetten zonder voorkeur')
       }
-      // Migratie ontbreekt — best-effort: skip profile-update, ga door.
-      console.warn('[aandelen-holdings-setup] profile-kolommen ontbreken, voortzetten zonder voorkeur')
     }
 
     // ── 2. Tracking-flags op investment-assets (clear-all-then-mark-selected) ──

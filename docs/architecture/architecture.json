@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-05T20:07:51.583Z",
-  "generatedDate": "2026-08-05",
+  "generatedAt": "2026-08-06T06:00:05.282Z",
+  "generatedDate": "2026-08-06",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -15652,7 +15652,7 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 124
+        "commits": 125
       },
       {
         "path": "lib/ai",
@@ -15694,7 +15694,7 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 8384,
+        "loc": 8403,
         "commits": 92
       },
       {
@@ -15705,7 +15705,7 @@
       {
         "file": "components/core/assets-client.tsx",
         "loc": 4486,
-        "commits": 44
+        "commits": 43
       },
       {
         "file": "components/app/cash-account-view.tsx",
@@ -16679,23 +16679,8 @@
   "diff": {
     "baseline": false,
     "previousDate": "2026-08-05",
-    "hasChanges": true,
-    "sections": [
-      {
-        "label": "API-routes",
-        "added": [
-          "/api/belasting/varianten-sweep"
-        ],
-        "removed": []
-      },
-      {
-        "label": "Componenten (aantal)",
-        "added": [
-          "+3"
-        ],
-        "removed": []
-      }
-    ]
+    "hasChanges": false,
+    "sections": []
   },
   "statsHistory": [
     {
@@ -16938,6 +16923,13 @@
     },
     {
       "date": "2026-08-05",
+      "api": 282,
+      "components": 877,
+      "tables": 86,
+      "routesProduction": 99
+    },
+    {
+      "date": "2026-08-06",
       "api": 282,
       "components": 877,
       "tables": 86,

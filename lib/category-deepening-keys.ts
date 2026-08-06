@@ -39,6 +39,22 @@ export interface DeepeningTabProps {
    * dat de registry een union van alle module-data types moet kennen.
    */
   initialData?: unknown
+  /**
+   * Server-geladen assets van de huidige categorie (asset-hosts). Tabs
+   * gebruiken dit o.a. om te bepalen of er al bezittingen aan de app zijn
+   * gekoppeld (`has_holdings_tracking`) en om het koppelscherm te voeden —
+   * zonder eigen client-read (datapad-conventie ADR 0058). Debt-hosts laten
+   * dit leeg; de hypotheekplanner-tab laadt zijn schulden zelf.
+   */
+  assets?: Asset[]
+  /**
+   * Id van de ingelogde gebruiker. Lezen op assets/debts is huishoud-verbreed
+   * maar de koppel-writes (`/api/assets/toggle-holdings`,
+   * `/api/debts/toggle-hypotheekplanner`) zijn strikt eigen-rij — het
+   * koppelscherm (`AppLinkGate`) mag daarom alleen éígen items als kandidaat
+   * aanbieden. Zonder deze prop tonen tabs de ongefilterde lijst (legacy).
+   */
+  currentUserId?: string
 }
 
 export interface DeepeningEntry {

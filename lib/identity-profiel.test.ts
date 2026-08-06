@@ -19,8 +19,6 @@ function loadProfileFromRow(data: Record<string, unknown>) {
     numberOfChildren: (data.number_of_children as number) ?? 0,
     childrenAges: (data.children_ages as number[]) ?? [],
     housingType: (data.housing_type as string | null) ?? null,
-    energyLabel: (data.energy_label as string | null) ?? null,
-    hasCar: (data.has_car as boolean) ?? false,
     netMonthlyIncome: data.net_monthly_income ? String(data.net_monthly_income) : '',
   }
 }
@@ -34,8 +32,6 @@ function buildUpsertPayload(state: {
   numberOfChildren: number
   childrenAges: number[]
   housingType: string | null
-  energyLabel: string | null
-  hasCar: boolean
   netMonthlyIncome: string
 }) {
   return {
@@ -46,8 +42,6 @@ function buildUpsertPayload(state: {
     number_of_children: state.numberOfChildren,
     children_ages: state.childrenAges,
     housing_type: state.housingType,
-    energy_label: state.energyLabel,
-    has_car: state.hasCar,
     net_monthly_income: state.netMonthlyIncome ? Number(state.netMonthlyIncome) : null,
   }
 }
@@ -64,8 +58,6 @@ describe('Profiel — Laden bestaand profiel', () => {
       number_of_children: 2,
       children_ages: [5, 8],
       housing_type: 'koop',
-      energy_label: 'B',
-      has_car: true,
       net_monthly_income: 4500,
     }
 
@@ -77,8 +69,6 @@ describe('Profiel — Laden bestaand profiel', () => {
     expect(profile.numberOfChildren).toBe(2)
     expect(profile.childrenAges).toEqual([5, 8])
     expect(profile.housingType).toBe('koop')
-    expect(profile.energyLabel).toBe('B')
-    expect(profile.hasCar).toBe(true)
     expect(profile.netMonthlyIncome).toBe('4500')
   })
 
@@ -91,8 +81,6 @@ describe('Profiel — Laden bestaand profiel', () => {
     expect(profile.numberOfChildren).toBe(0)
     expect(profile.childrenAges).toEqual([])
     expect(profile.housingType).toBeNull()
-    expect(profile.energyLabel).toBeNull()
-    expect(profile.hasCar).toBe(false)
     expect(profile.netMonthlyIncome).toBe('')
   })
 })
@@ -109,8 +97,6 @@ describe('Profiel — Opslaan (upsert payload)', () => {
       numberOfChildren: 1,
       childrenAges: [3],
       housingType: 'huur_vrij',
-      energyLabel: 'A',
-      hasCar: false,
       netMonthlyIncome: '3200',
     })
 
@@ -121,8 +107,6 @@ describe('Profiel — Opslaan (upsert payload)', () => {
     expect(payload.number_of_children).toBe(1)
     expect(payload.children_ages).toEqual([3])
     expect(payload.housing_type).toBe('huur_vrij')
-    expect(payload.energy_label).toBe('A')
-    expect(payload.has_car).toBe(false)
     expect(payload.net_monthly_income).toBe(3200)
   })
 
@@ -135,8 +119,6 @@ describe('Profiel — Opslaan (upsert payload)', () => {
       numberOfChildren: 0,
       childrenAges: [],
       housingType: null,
-      energyLabel: null,
-      hasCar: false,
       netMonthlyIncome: '',
     })
 
@@ -215,17 +197,10 @@ describe('Profiel — Kinderen velden', () => {
 
 // ── Step 5: Woningtype ──────────────────────────────────────────────────
 
-describe('Profiel — Woningtype en energielabel', () => {
+describe('Profiel — Woningtype', () => {
   it('supports 3 housing types', () => {
     const types = ['huur_sociaal', 'huur_vrij', 'koop']
     expect(types).toHaveLength(3)
-  })
-
-  it('supports energy labels A++ through G', () => {
-    const labels = ['A++', 'A+', 'A', 'B', 'C', 'D', 'E', 'F', 'G']
-    expect(labels).toHaveLength(9)
-    expect(labels[0]).toBe('A++')
-    expect(labels[labels.length - 1]).toBe('G')
   })
 
   it('empty selection maps to null', () => {

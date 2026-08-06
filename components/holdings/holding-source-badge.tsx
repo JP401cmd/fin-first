@@ -12,7 +12,7 @@
 //       hele bezittingen-overzicht.
 //
 // Klikbaar:
-//   - Exchange/wallet → /identity/koppelingen (focus via #connection-<id> hash)
+//   - Exchange/wallet → /mijn/koppelingen (focus via #connection-<id> hash)
 //   - CSV-broker     → /core/assets/holdings/import
 //   - Manual         → niet-klikbaar (en het component rendert niets, omdat
 //                      handmatig invoer per definitie geen badge nodig heeft;
@@ -126,11 +126,11 @@ export function HoldingSourceBadge({
 
   if (source.kind === 'exchange') {
     label = EXCHANGE_LABEL[source.exchangeId]
-    href = `/identity/koppelingen#exchange-${source.connectionId}`
+    href = `/mijn/koppelingen#exchange-${source.connectionId}`
   } else if (source.kind === 'wallet') {
     label = CHAIN_LABEL[source.walletChain]
     Icon = Wallet
-    href = `/identity/koppelingen#wallet-${source.walletAddressId}`
+    href = `/mijn/koppelingen#wallet-${source.walletAddressId}`
   } else {
     // CSV-broker
     label = CSV_BROKER_LABEL[source.broker] ?? source.broker

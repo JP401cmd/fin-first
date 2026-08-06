@@ -314,7 +314,7 @@ const criteria: AcceptanceCriterion[] = [
     persona: 'compleet',
     given: 'Persona Tessa Compleet geladen; "Holdings bijhouden" gezet op de crypto-asset; 2 coins handmatig toegevoegd: BTC 0,5@ gem. €25.000/huidig €58.000; ETH 3@ gem. €2.000/huidig €3.200.',
     when: 'De gebruiker bekijkt de KPI-strip en het verdelings-paneel "Per coin".',
-    then: 'Totale waarde €38.600 (BTC €29.000 + ETH €9.600); indicatieve Box 3-heffing €833,76 (38.600×6%×36%); ongerealiseerd P&L totaal €20.100 (BTC €16.500 + ETH €3.600); verdeling BTC 75,13% / ETH 24,87%.',
+    then: 'Totale waarde €38.600 (BTC €29.000 + ETH €9.600); indicatieve Box 3-heffing €833,76 (38.600×6%×36%); ongerealiseerd P&L totaal €20.100 (BTC €16.500 + ETH €3.600); verdeling BTC 75,13% / ETH 24,87%. Regressie: deze tab crashte eerder in productie met React #300 (error-boundary "Je gegevens zijn veilig") zodra de setup-gate een sectie-interne state-update kreeg; secties in AppSetupGate worden nu als echte componenten gemount, geen crash meer.',
     assertion: {
       kind: 'exact',
       expected: 'totaal=38600; box3Indicatief=833.76; unrealizedTotal=20100; btcPct=75.13; ethPct=24.87',
@@ -363,6 +363,19 @@ const criteria: AcceptanceCriterion[] = [
       kind: 'exact',
       expected: 'sharePct=50; eigenAandeel=10000; huishoudPerspectief=20000',
       source: 'lib/household-data.ts#computeSharePct({splitMode:"equal", customSplitPct:null, primaryPayerId:null}, userId) → 50, toegepast op een gedeeld bezit van €20.000',
+    },
+  },
+  {
+    workflow: 'WF-BEZIT-25',
+    scenarioId: 'UAT-BEZIT-25',
+    titel: 'Koppelscherm bij nul gekoppelde bezittingen (crypto-/aandelen-holdings-app)',
+    kriticiteit: 'BELANGRIJK',
+    given: 'De eenmalige app-setup van de Crypto-holdings-app resp. Aandelen-holdings-app is voltooid, maar geen enkele bezitting van het juiste type heeft `has_holdings_tracking` aan (alle crypto- resp. investment-bezittingen ontkoppeld of nog geen enkele toegevoegd).',
+    when: 'De gebruiker opent de tab "Crypto holdings" (/overzicht/bezittingen/crypto?tab=crypto-holdings, canoniek /core/assets/crypto) resp. "Aandelen holdings" (/overzicht/bezittingen/investment?tab=aandelen-holdings).',
+    then: '`AppLinkGate` toont een hero-band "Bezittingen koppelen" + checkbox-lijst met kandidaten (naam + bedrag) i.p.v. een doodlopende empty-state; de knop "Koppelen" blijft disabled zonder selectie. Opslaan POST\'t per geselecteerd item `{id, enabled:true}` naar `/api/assets/toggle-holdings` (dezelfde vlag als de instelling op de bezitting zelf) en ververst de tab, waarna de normale holdings-app rendert. Zijn er geen kandidaten van het juiste type (nul crypto- resp. investment-bezittingen), dan toont het scherm i.p.v. de checkbox-lijst een voeg-eerst-toe-tekst met CTA naar de items-tab. Zijdelings: de losstaande "Geen crypto-posities"-empty-state (wél gekoppeld, nul holdings-rijen) linkt sinds deze release naar `/mijn/koppelingen` i.p.v. het verwijderde `/identity/koppelingen`.',
+    assertion: {
+      kind: 'ui-only',
+      source: 'components/app/app-setup/app-link-gate.tsx (generiek koppelscherm) + components/core/deepenings/crypto-holdings-tab.tsx / investment-holdings-tab.tsx (filter has_holdings_tracking===false op alle assets van het type → candidates; endpoint /api/assets/toggle-holdings)',
     },
   },
 ]

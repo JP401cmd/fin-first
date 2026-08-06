@@ -323,7 +323,6 @@ export const ROADMAP_VALIDATED_STRENGTHS: string[] = [
   'Huishouden-fundament',
   'Box 3-tegenbewijs',
   'Onttrekkingsstrategieën ín de engine (Guyton-Klinger guardrails)',
-  'Guardrail-kompas (≙ Boldins Spending Guardrails Insight)',
 ]
 
 export interface RoadmapSource {

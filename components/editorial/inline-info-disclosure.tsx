@@ -3,9 +3,9 @@
 /**
  * InlineInfoDisclosure — de gedeelde "i"-uitklapknop + inline uitleg-paneel voor de
  * duidingsblokken op /toekomst (dekkingsradar, scenario-kaarten, vrijheidsas,
- * guardrail-kompas, levensinkomenstrook). Eén bron voor de vijf voorheen gedupliceerde
- * kopieën: een ronde "i"-knop rechtsboven (aria-expanded) die een inline paneel met de
- * `children` open/dicht klapt.
+ * levensinkomenstrook). Eén bron voor de voorheen gedupliceerde kopieën: een ronde
+ * "i"-knop rechtsboven (aria-expanded) die een inline paneel met de `children`
+ * open/dicht klapt.
  *
  * De knop draagt — anders dan de oude kopieën — een expliciete focus-ring
  * (`focus-visible:outline`), zodat toetsenbord-focus zichtbaar is. Kleur en typografie

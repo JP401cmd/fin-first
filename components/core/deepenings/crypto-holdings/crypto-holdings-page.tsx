@@ -258,14 +258,14 @@ function CryptoHoldingsEmpty() {
       </p>
       <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
         <a
-          href="/identity/koppelingen"
+          href="/mijn/koppelingen"
           className="inline-flex h-11 items-center gap-2 border border-kern-300 bg-kern-50 px-4 text-sm font-medium text-kern-700 transition-colors hover:bg-kern-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
         >
           <Plug className="h-4 w-4" aria-hidden="true" />
           Koppel exchange
         </a>
         <a
-          href="/identity/koppelingen"
+          href="/mijn/koppelingen"
           className="inline-flex h-11 items-center gap-2 border border-[var(--border-ed)] bg-[var(--paper)] px-4 text-sm font-medium text-[var(--ink-2)] transition-colors hover:border-[var(--border-md)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
         >
           <Wallet className="h-4 w-4" aria-hidden="true" />

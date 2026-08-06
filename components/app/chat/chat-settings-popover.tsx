@@ -30,9 +30,15 @@ import { notifyExecutionPrefsChanged } from '@/lib/ai/execution-prefs-signal'
  *
  * GEEN TWEEDE WAARHEID. Alles loopt door dezelfde bronnen als het volledige
  * scherm: `/api/ai-execution-prefs` voor de keuze per functionaliteit,
- * `/api/local-ai-gate` voor wat beheer toestaat, en `selectLocalModel` voor het
- * model op dit toestel. Deze popover is een tweede BEDIENING, geen tweede
- * administratie.
+ * `/api/local-ai-gate` voor wat beheer toestaat (inclusief welk cloud-model
+ * centraal actief is), en `selectLocalModel` voor het model op dit toestel.
+ * Deze popover is een tweede BEDIENING, geen tweede administratie.
+ *
+ * DE INHOUD VOLGT DE KEUZE VAN DIT GESPREK. Staat het gesprek op CLOUD, dan is
+ * een lijst lokale modellen misleidend — je ziet dan het cloud-model dat beheer
+ * voor iedereen heeft ingesteld (alleen-lezen; kiezen kan alleen in /beheer).
+ * Staat het gesprek op LOKAAL, dan verschijnen het lokale model op dit toestel
+ * en de per-functie-keuzes — het lokale bedieningspaneel zoals het was.
  *
  * WAT HIER BEWUST NIET KAN: een model van 2 à 3 GB binnenhalen. Dat hoort bij de
  * consent-stap, de voortgangsbalk en de uitvoer-toets op /mijn/privacy — niet in
@@ -43,6 +49,13 @@ import { notifyExecutionPrefsChanged } from '@/lib/ai/execution-prefs-signal'
 type PrefsResponse = {
   prefs?: Partial<Record<AiExecutionGroup, AiExecutionMode>>
   modes?: Record<AiExecutionGroup, AiExecutionMode>
+}
+
+/** Het centraal (via /beheer) ingestelde cloud-model, zoals de gate-route het teruggeeft. */
+type CloudModelInfo = {
+  provider: string
+  label: string
+  modelId: string
 }
 
 /** De groep waar dit venster zelf op draait — die krijgt de ereplaats bovenaan. */
@@ -56,6 +69,7 @@ export function ChatSettingsPopover({ onChanged }: { onChanged?: () => void }) {
   const [saving, setSaving] = useState<AiExecutionGroup | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [gate, setGate] = useState<LocalAiGateConfig>(DEFAULT_GATE_CONFIG)
+  const [cloudModel, setCloudModel] = useState<CloudModelInfo | null>(null)
   const [modelId, setModelId] = useState<LocalModelId>(getSelectedLocalModelId)
   /** Welke modellen staan er daadwerkelijk op dit toestel? */
   const [cached, setCached] = useState<Record<string, boolean>>({})
@@ -100,8 +114,15 @@ export function ChatSettingsPopover({ onChanged }: { onChanged?: () => void }) {
           setError('Je keuzes konden niet geladen worden.')
         }
         if (gateRes.ok) {
-          const data = (await gateRes.json()) as { config?: unknown }
-          if (active) setGate(parseGateConfig(data.config))
+          const data = (await gateRes.json()) as { config?: unknown; cloudModel?: CloudModelInfo }
+          if (active) {
+            setGate(parseGateConfig(data.config))
+            setCloudModel(
+              data.cloudModel && typeof data.cloudModel.modelId === 'string'
+                ? data.cloudModel
+                : null,
+            )
+          }
         }
       } catch {
         if (active) setError('Je keuzes konden niet geladen worden.')
@@ -157,6 +178,8 @@ export function ChatSettingsPopover({ onChanged }: { onChanged?: () => void }) {
   }, [cached])
 
   const canPickModel = gate.allowUserModelChoice && LOCAL_MODEL_CATALOG.length > 1
+  /** De keuze van dit gesprek bepaalt wat de rest van de popover toont. */
+  const chatMode = modes?.[CHAT_GROUP] ?? null
 
   return (
     <div ref={wrapRef} className="relative">
@@ -190,8 +213,25 @@ export function ChatSettingsPopover({ onChanged }: { onChanged?: () => void }) {
             onChange={(mode) => setMode(CHAT_GROUP, mode)}
           />
 
-          {/* ── Model ── */}
-          {canPickModel && (
+          {/* ── Cloud: het model dat beheer voor iedereen instelde (alleen-lezen) ── */}
+          {chatMode === 'cloud' && cloudModel && (
+            <>
+              <p className="mb-1.5 mt-4 font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink-4)]">
+                Cloud-model
+              </p>
+              <div className="border border-[var(--rule-soft)] px-2.5 py-1.5 text-xs">
+                <span className="block truncate text-[var(--ink)]" title={cloudModel.modelId}>
+                  {cloudModel.modelId}
+                </span>
+                <span className="block text-[10px] text-[var(--ink-4)]">
+                  {cloudModel.label} · ingesteld door beheer
+                </span>
+              </div>
+            </>
+          )}
+
+          {/* ── Lokaal: het model op dit toestel ── */}
+          {chatMode === 'lokaal' && canPickModel && (
             <>
               <p className="mb-1.5 mt-4 font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink-4)]">
                 Lokaal model
@@ -226,25 +266,29 @@ export function ChatSettingsPopover({ onChanged }: { onChanged?: () => void }) {
             </>
           )}
 
-          {/* ── Overige functies ── */}
-          <p className="mb-1.5 mt-4 font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink-4)]">
-            Overige functies
-          </p>
-          <ul className="space-y-1.5">
-            {OTHER_GROUPS.map((group) => (
-              <li key={group.id} className="flex items-center justify-between gap-2">
-                <span className="min-w-0 flex-1 truncate text-xs text-[var(--ink-2)]" title={group.label}>
-                  {group.label}
-                </span>
-                <ModeSwitch
-                  compact
-                  value={modes?.[group.id] ?? null}
-                  busy={saving === group.id}
-                  onChange={(mode) => setMode(group.id, mode)}
-                />
-              </li>
-            ))}
-          </ul>
+          {/* ── Lokaal: de keuze per functie — het lokale bedieningspaneel ── */}
+          {chatMode === 'lokaal' && (
+            <>
+              <p className="mb-1.5 mt-4 font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink-4)]">
+                Overige functies
+              </p>
+              <ul className="space-y-1.5">
+                {OTHER_GROUPS.map((group) => (
+                  <li key={group.id} className="flex items-center justify-between gap-2">
+                    <span className="min-w-0 flex-1 truncate text-xs text-[var(--ink-2)]" title={group.label}>
+                      {group.label}
+                    </span>
+                    <ModeSwitch
+                      compact
+                      value={modes?.[group.id] ?? null}
+                      busy={saving === group.id}
+                      onChange={(mode) => setMode(group.id, mode)}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
 
           {error && <p className="mt-3 text-[11px] text-[var(--negative)]">{error}</p>}
 

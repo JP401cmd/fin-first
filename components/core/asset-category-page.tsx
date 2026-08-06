@@ -626,6 +626,8 @@ export function AssetCategoryPage({
             <ActiveDeepeningComponent
               type={type}
               moduleActive={activeDeepeningModuleActive}
+              assets={assets}
+              currentUserId={currentUserId}
               initialData={
                 type === 'cash'
                   ? initialBudgetsData

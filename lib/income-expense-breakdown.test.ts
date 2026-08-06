@@ -15,23 +15,11 @@ import type {
   UnifiedProjectionRow,
   WithdrawalNeedBreakdown,
   GrossIncomeBySource,
-  AssetBucketDetail,
 } from './unified-projection'
 import type { SimRow } from './fire-simulation'
 import type { Debt } from './debt-data'
 
 // ── Fixture-helpers ─────────────────────────────────────────────────
-
-function bucket(partial: Partial<AssetBucketDetail>): AssetBucketDetail {
-  return {
-    startValue: 0,
-    growth: 0,
-    contributions: 0,
-    box3Drag: 0,
-    endValue: 0,
-    ...partial,
-  }
-}
 
 function makeRow(partial: Partial<UnifiedProjectionRow>): UnifiedProjectionRow {
   return {
@@ -128,6 +116,20 @@ describe('buildBreakdown — rauw rendement (inkomsten-kant)', () => {
       totalGrowth: 10000,
       totalBox3: 3000,
     })
+    const { rows } = buildBreakdown([row], [makeSimRow(60, 'accumulation')])
+    expect(rows[0].incomeBySource['growth']).toBe(10000)
+  })
+})
+
+describe('buildBreakdown — totalGrowthLiquide (defect A: rendement exclusief niet-liquide bezit)', () => {
+  it('gebruikt totalGrowthLiquide i.p.v. totalGrowth wanneer het veld aanwezig is (bv. eigen huis uitgesloten)', () => {
+    const row = makeRow({ phase: 'accumulation', totalGrowth: 10000, totalGrowthLiquide: 6000 })
+    const { rows } = buildBreakdown([row], [makeSimRow(60, 'accumulation')])
+    expect(rows[0].incomeBySource['growth']).toBe(6000)
+  })
+
+  it('valt terug op totalGrowth wanneer totalGrowthLiquide ontbreekt (geen regressie)', () => {
+    const row = makeRow({ phase: 'accumulation', totalGrowth: 10000 })
     const { rows } = buildBreakdown([row], [makeSimRow(60, 'accumulation')])
     expect(rows[0].incomeBySource['growth']).toBe(10000)
   })

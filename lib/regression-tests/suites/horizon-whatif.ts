@@ -111,12 +111,17 @@ const tests: TestCase[] = [
     id: 'whatif-route-exists',
     name: 'What-if pagina route bestaat',
     category: CAT,
-    description: '/horizon/whatif route is gedefinieerd als client page',
+    description: '/toekomst/whatif is de canonieke what-if-pagina (/horizon/whatif redirect)',
     priority: 'critical',
     estimatedDurationMs: 50,
     async fn() {
-      // Verify the page module exports a default component
-      const mod = await import('@/app/(app)/horizon/whatif/page')
+      // De canonieke route is /toekomst/whatif. De legacy /horizon/whatif heeft
+      // bewust GEEN page.tsx meer: die redirect nu op de routing-laag
+      // (next.config.ts). Een server-component die bij render meteen
+      // `redirect()` aanriep duwde de client-router het harde-navigatie-pad in
+      // en liet Next' eigen AppRouter met React #310 crashen — zie
+      // next.config.test.ts voor de volledige onderbouwing.
+      const mod = await import('@/app/(app)/toekomst/whatif/page')
       assertNotNull(mod.default, 'default export')
       assertType(mod.default, 'function', 'component is function')
     },

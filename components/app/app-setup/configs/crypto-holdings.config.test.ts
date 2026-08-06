@@ -1,13 +1,16 @@
 /**
  * Unit tests voor de pure functies in `cryptoHoldingsSetupConfig`.
  *
- * Dekt de gedragswijziging uit juni 2026: selectie-gebaseerde setup
- * (selectedAssetIds verplicht ≥1). Geen React, geen Supabase-netwerk.
+ * Dekt de versimpelde setup (aug 2026): alléén bezittingen-selectie —
+ * gelijkgetrokken met aandelen-holdings en hypotheekplanner. De eerdere
+ * bronnen-/invoermethode-/uitleg-stappen zijn vervallen; validate en
+ * buildPayload kennen die velden niet meer. Geen React, geen
+ * Supabase-netwerk.
  *
  * Gemockte modules zijn alleen nodig omdat de config-file React-componenten
- * (die next/link + createClient gebruiken) in hetzelfde bestand definieert.
- * De te testen logica (initialState / validate / buildPayload) heeft die
- * afhankelijkheden zelf niet.
+ * (die next/navigation + createClient gebruiken) in hetzelfde bestand
+ * definieert. De te testen logica (initialState / validate / buildPayload)
+ * heeft die afhankelijkheden zelf niet.
  */
 
 import { describe, it, expect, vi } from 'vitest'
@@ -19,6 +22,9 @@ vi.mock('@/lib/supabase/client', () => ({
 vi.mock('next/link', () => ({
   default: ({ children }: { children: unknown }) => children,
 }))
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/core/assets/crypto',
+}))
 
 // ── Subject ─────────────────────────────────────────────────────────────────
 import { cryptoHoldingsSetupConfig } from './crypto-holdings.config'
@@ -26,35 +32,11 @@ import { cryptoHoldingsSetupConfig } from './crypto-holdings.config'
 // Alias voor leesbaarheid
 const { initialState, validate, buildPayload } = cryptoHoldingsSetupConfig
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-/** Geeft een volledig geldige state terug. */
-function validState() {
-  return {
-    selectedAssetIds: ['asset-btc'],
-    sources: ['bitvavo'],
-    inputMethod: 'manual' as const,
-    acknowledgedTxLogging: true,
-  }
-}
-
 // ── initialState ─────────────────────────────────────────────────────────────
 
 describe('cryptoHoldingsSetupConfig — initialState', () => {
   it('bevat selectedAssetIds als lege array', () => {
     expect(initialState().selectedAssetIds).toEqual([])
-  })
-
-  it('bevat sources als lege array', () => {
-    expect(initialState().sources).toEqual([])
-  })
-
-  it('bevat inputMethod als null', () => {
-    expect(initialState().inputMethod).toBeNull()
-  })
-
-  it('bevat acknowledgedTxLogging als false', () => {
-    expect(initialState().acknowledgedTxLogging).toBe(false)
   })
 
   it('elke aanroep geeft een verse object-instantie', () => {
@@ -68,44 +50,22 @@ describe('cryptoHoldingsSetupConfig — initialState', () => {
 
 describe('cryptoHoldingsSetupConfig — validate', () => {
   it('faalt wanneer selectedAssetIds leeg is', () => {
-    const result = validate({ ...validState(), selectedAssetIds: [] })
+    const result = validate({ selectedAssetIds: [] })
     expect(result.ok).toBe(false)
     expect(result.reason?.toLowerCase()).toMatch(/bezitting/)
   })
 
-  it('faalt wanneer sources leeg is', () => {
-    const result = validate({ ...validState(), sources: [] })
-    expect(result.ok).toBe(false)
-  })
-
-  it('faalt wanneer inputMethod null is', () => {
-    const result = validate({ ...validState(), inputMethod: null })
-    expect(result.ok).toBe(false)
-  })
-
-  it('faalt wanneer acknowledgedTxLogging false is', () => {
-    const result = validate({ ...validState(), acknowledgedTxLogging: false })
-    expect(result.ok).toBe(false)
-  })
-
-  it('slaagt met één selectedAssetId en alle verplichte velden gezet', () => {
-    const result = validate(validState())
+  it('slaagt met één selectedAssetId — geen andere verplichte velden meer', () => {
+    const result = validate({ selectedAssetIds: ['asset-btc'] })
     expect(result.ok).toBe(true)
     expect(result.reason).toBeUndefined()
   })
 
   it('slaagt met meerdere selectedAssetIds', () => {
     const result = validate({
-      ...validState(),
       selectedAssetIds: ['asset-btc', 'asset-eth', 'asset-sol'],
     })
     expect(result.ok).toBe(true)
-  })
-
-  it('slaagt met alle inputMethod-varianten', () => {
-    for (const method of ['manual', 'csv', 'api'] as const) {
-      expect(validate({ ...validState(), inputMethod: method }).ok).toBe(true)
-    }
   })
 })
 
@@ -113,28 +73,19 @@ describe('cryptoHoldingsSetupConfig — validate', () => {
 
 describe('cryptoHoldingsSetupConfig — buildPayload', () => {
   it('bevat selectedAssetIds', () => {
-    const payload = buildPayload(validState()) as Record<string, unknown>
+    const payload = buildPayload({ selectedAssetIds: ['asset-btc'] }) as Record<string, unknown>
     expect(payload.selectedAssetIds).toEqual(['asset-btc'])
   })
 
-  it('bevat sources', () => {
-    const payload = buildPayload(validState()) as Record<string, unknown>
-    expect(payload.sources).toEqual(['bitvavo'])
-  })
-
-  it('bevat inputMethod', () => {
-    const payload = buildPayload(validState()) as Record<string, unknown>
-    expect(payload.inputMethod).toBe('manual')
-  })
-
   it('stuurt meerdere selectedAssetIds correct door', () => {
-    const state = { ...validState(), selectedAssetIds: ['asset-btc', 'asset-eth'] }
-    const payload = buildPayload(state) as Record<string, unknown>
+    const payload = buildPayload({
+      selectedAssetIds: ['asset-btc', 'asset-eth'],
+    }) as Record<string, unknown>
     expect(payload.selectedAssetIds).toEqual(['asset-btc', 'asset-eth'])
   })
 
-  it('bevat acknowledgedTxLogging NIET (privacy — client-only veld)', () => {
-    const payload = buildPayload(validState()) as Record<string, unknown>
-    expect(Object.keys(payload)).not.toContain('acknowledgedTxLogging')
+  it('bevat uitsluitend selectedAssetIds — de vervallen setup-velden komen niet meer mee', () => {
+    const payload = buildPayload({ selectedAssetIds: ['asset-btc'] }) as Record<string, unknown>
+    expect(Object.keys(payload)).toEqual(['selectedAssetIds'])
   })
 })

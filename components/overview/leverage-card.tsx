@@ -40,6 +40,7 @@ export function LeverageCard({
   subAmount,
   href,
   tooltip,
+  compact = false,
   expandable = false,
   expanded = false,
   onToggleExpand,
@@ -63,6 +64,13 @@ export function LeverageCard({
   subAmount?: React.ReactNode
   href: string
   tooltip?: string
+  /**
+   * Compacte 1-regel-variant: alleen icon-chip + label, heel de kaart een link —
+   * géén KPI, substext, status-dot of chevron. Gebruikt door de /toekomst-
+   * navkaarten in de Eenvoudig-weergave; /overzicht geeft dit niet mee →
+   * byte-identiek default-gedrag.
+   */
+  compact?: boolean
   /** Toont de chevron-toggle wanneer true. */
   expandable?: boolean
   expanded?: boolean
@@ -70,6 +78,23 @@ export function LeverageCard({
   /** Uitklap-content — alleen gerenderd wanneer `expanded`. */
   children?: React.ReactNode
 }) {
+  if (compact) {
+    return (
+      <div className="group relative rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-3 transition-all hover:border-[var(--ink-3)] hover:shadow-sm">
+        <Link href={href} title={tooltip} className="flex items-center gap-2.5">
+          <div
+            className={`w-8 h-8 shrink-0 rounded-lg flex items-center justify-center ${tint}`}
+          >
+            <Icon className="w-4 h-4" />
+          </div>
+          <span className="truncate text-sm sm:text-base font-semibold text-[var(--ink)]">
+            {label}
+          </span>
+        </Link>
+      </div>
+    )
+  }
+
   return (
     <div
       className={[

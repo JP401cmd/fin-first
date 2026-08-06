@@ -52,7 +52,7 @@ describe('BEZIT_FLOW — curatie-integriteit', () => {
       BEZIT_FLOW.nodes.map((n) => n.scenarioId).filter((id): id is string => Boolean(id)),
     )
     // WF-BEZIT-19 en -20 hebben bewust geen eigen scenario (cross naar MIJN).
-    const expected = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 21, 22, 23, 24].map(
+    const expected = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 21, 22, 23, 24, 25].map(
       (n) => `UAT-BEZIT-${String(n).padStart(2, '0')}`,
     )
     for (const id of expected) {

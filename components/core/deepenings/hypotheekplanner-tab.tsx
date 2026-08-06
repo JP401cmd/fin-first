@@ -30,7 +30,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Building2, Shield, Percent } from 'lucide-react'
+import { Building2, Landmark, Shield, Percent } from 'lucide-react'
 import { ASSET_CLIENT_COLUMNS, type Asset } from '@/lib/asset-data'
 import {
   type Debt,
@@ -46,6 +46,7 @@ import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import type { DeepeningTabProps } from '../category-deepening-registry'
 import { ModuleTipStrip } from '../module-tip-strip'
 import { AppSetupGate } from '@/components/app/app-setup/app-setup-gate'
+import { AppLinkGate } from '@/components/app/app-setup/app-link-gate'
 import { useIsAppSetupCompleted } from '@/components/app/app-setup/use-is-setup-completed'
 import { DebtPayoffStrategy } from './debt-payoff-strategy'
 import { EquityBuildupBar } from './hypotheekplanner/equity-buildup-bar'
@@ -85,20 +86,26 @@ function remainingMonths(debt: Debt): number {
  * Top-level entry. Splitst op `moduleActive` zodat de actieve tak (incl.
  * Supabase-fetch) nooit mount wanneer Toekomstplannen uit staat.
  */
-export function HypotheekplannerTab({ type, moduleActive }: DeepeningTabProps) {
+export function HypotheekplannerTab({ type, moduleActive, currentUserId }: DeepeningTabProps) {
   if (!moduleActive) {
     return <HypotheekplannerTeaser />
   }
-  return <HypotheekplannerGated type={type} />
+  return <HypotheekplannerGated type={type} currentUserId={currentUserId} />
 }
 
 // ── Gate-laag (setup-check) ──────────────────────────────────
 
-function HypotheekplannerGated({ type }: { type: AssetType | DebtType }) {
+function HypotheekplannerGated({
+  type,
+  currentUserId,
+}: {
+  type: AssetType | DebtType
+  currentUserId?: string
+}) {
   const setupCompleted = useIsAppSetupCompleted('hypotheekplanner')
   if (setupCompleted === null) return <SkeletonBox />
   if (setupCompleted === false) return <AppSetupGate appKey="hypotheekplanner" />
-  return <HypotheekplannerActive type={type} />
+  return <HypotheekplannerActive type={type} currentUserId={currentUserId} />
 }
 
 // ── Teaser-tak (module uit) ──────────────────────────────────
@@ -136,28 +143,45 @@ interface LoadedData {
   house: Asset | null
   /** Andere getrackte schulden — voor de DebtPayoffStrategy lookup. */
   otherTrackedDebts: Debt[]
+  /**
+   * Actieve hypotheken zónder planner-koppeling — voedt het koppelscherm
+   * wanneer er geen enkele hypotheek (meer) getrackt is.
+   */
+  untrackedMortgages: Debt[]
   /** Foutmelding (overschrijft alle andere fields). */
   error: string | null
 }
 
-function HypotheekplannerActive({ type }: { type: AssetType | DebtType }) {
+function HypotheekplannerActive({
+  type,
+  currentUserId,
+}: {
+  type: AssetType | DebtType
+  currentUserId?: string
+}) {
   const [data, setData] = useState<LoadedData | null>(null)
+  // Bump = opnieuw laden. Het koppelscherm verhoogt deze na een succesvolle
+  // koppeling zodat de planner direct met de zojuist gekoppelde hypotheek
+  // rendert (de data leeft in deze client-fetch, niet in de server-bundel).
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     let aborted = false
+    setData(null)
     void (async () => {
       try {
         const supabase = createClient()
         // We laden in één keer alle relevante rijen — de Hypotheekplanner
         // heeft beide entiteiten nodig en multi-app andere getrackte
-        // schulden voor de DebtPayoffStrategy.
+        // schulden voor de DebtPayoffStrategy. Bewust álle actieve
+        // hypotheken (ook zonder planner-vlag): de niet-getrackte voeden
+        // het koppelscherm.
         const [mortgageRes, debtsRes, assetsRes] = await Promise.all([
           supabase
             .from('debts')
             .select('*')
             .eq('debt_type', 'mortgage')
             .eq('is_active', true)
-            .eq('has_hypotheekplanner_tracking', true)
             .order('current_balance', { ascending: false }),
           // Aflosstrategie is sinds de v2-refactor globaal: alle actieve
           // schulden tellen mee als "andere getrackte schulden" in de
@@ -184,7 +208,20 @@ function HypotheekplannerActive({ type }: { type: AssetType | DebtType }) {
         if (debtsRes.error) throw debtsRes.error
         if (assetsRes.error) throw assetsRes.error
 
-        const allMortgages = (mortgageRes.data ?? []) as Debt[]
+        const allMortgageRows = (mortgageRes.data ?? []) as Debt[]
+        // De planner zelf werkt uitsluitend op gekóppelde hypotheken —
+        // zelfde semantiek als vóór de koppelscherm-uitbreiding.
+        const allMortgages = allMortgageRows.filter(
+          (m) => m.has_hypotheekplanner_tracking,
+        )
+        // Alleen éígen hypotheken als koppel-kandidaat: lezen is huishoud-
+        // verbreed, maar `/api/debts/toggle-hypotheekplanner` schrijft strikt
+        // eigen-rij — een partner-hypotheek zou altijd op een 500 stuklopen.
+        const untrackedMortgages = allMortgageRows.filter(
+          (m) =>
+            !m.has_hypotheekplanner_tracking &&
+            (!currentUserId || m.user_id === currentUserId),
+        )
         const allHouses = (assetsRes.data ?? []) as Asset[]
 
         // Entry-routing: vanuit asset-pagina starten we vanaf het huis,
@@ -214,6 +251,7 @@ function HypotheekplannerActive({ type }: { type: AssetType | DebtType }) {
           mortgage,
           house,
           otherTrackedDebts: (debtsRes.data ?? []) as Debt[],
+          untrackedMortgages,
           error: null,
         })
       } catch (err) {
@@ -222,6 +260,7 @@ function HypotheekplannerActive({ type }: { type: AssetType | DebtType }) {
           mortgage: null,
           house: null,
           otherTrackedDebts: [],
+          untrackedMortgages: [],
           error: err instanceof Error ? err.message : 'Onbekende fout',
         })
       }
@@ -229,10 +268,37 @@ function HypotheekplannerActive({ type }: { type: AssetType | DebtType }) {
     return () => {
       aborted = true
     }
-  }, [type])
+  }, [type, reloadKey, currentUserId])
 
   if (data === null) return <SkeletonBox />
   if (data.error !== null) return <ErrorBox detail={data.error} />
+
+  // Pad 0 — hypotheek-entry zonder gekoppelde hypotheek: koppelscherm.
+  // Zelfde vlag als de instelling op de hypotheek zelf
+  // (has_hypotheekplanner_tracking, via /api/debts/toggle-hypotheekplanner);
+  // na koppelen herlaadt de tab zijn eigen fetch. Zonder kandidaten toont
+  // de gate een voeg-eerst-toe-CTA naar de items-tab. De eigen_huis-entry
+  // houdt zijn bestaande woonbalans-paden (Pad 1/2 hieronder).
+  if (type === 'mortgage' && !data.mortgage) {
+    return (
+      <AppLinkGate
+        kicker="Hypotheek koppelen"
+        title="Koppel je hypotheek aan de planner"
+        intro="De Hypotheekplanner werkt alleen met de hypotheek die je koppelt. Kies hieronder welke hypotheek je in de planner wilt volgen."
+        itemNoun="hypotheek"
+        icon={Landmark}
+        candidates={data.untrackedMortgages.map((m) => ({
+          id: m.id,
+          name: m.name,
+          value: Number(m.current_balance),
+        }))}
+        endpoint="/api/debts/toggle-hypotheekplanner"
+        emptyCopy="Je hebt nog geen hypotheek geregistreerd. Voeg er eerst één toe bij je schulden — daarna kun je 'm hier aan de planner koppelen."
+        emptyCtaLabel="Voeg hypotheek toe"
+        onLinked={() => setReloadKey((k) => k + 1)}
+      />
+    )
+  }
 
   // Pad 1: gebruiker landde op asset-pagina maar er is geen hypotheek
   // gekoppeld → toon noot met instructie. We tonen GEEN equity-bar omdat

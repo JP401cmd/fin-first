@@ -8,20 +8,22 @@ import { APP_SETUP_SLUGS } from '@/lib/app-setup-status'
  * POST /api/hypotheekplanner/setup — Eerste-keer setup voor de
  * Hypotheekplanner-app.
  *
- * Body: { mortgageId: string (uuid), strategy: 'aflossen' | 'beleggen' | 'mix' }
+ * Body: { mortgageId: string (uuid), strategy?: 'aflossen' | 'beleggen' | 'mix' }
  *
  * Wat deze route doet:
  *  1. Markeert de gekozen mortgage met `has_hypotheekplanner_tracking = true`
  *     en alle andere mortgages op false (max één planner-mortgage tegelijk).
- *  2. Schrijft de strategy-voorkeur op de mortgage in
- *     `debts.hypotheekplanner_strategy`. Bij ontbrekende kolom: gracieuze
- *     degradatie — strategie blijft impliciet via UI-state.
+ *  2. Schrijft — indien meegegeven — de strategy-voorkeur op de mortgage in
+ *     `debts.hypotheekplanner_strategy`. Sinds de versimpelde setup
+ *     (aug 2026, alleen hypotheek-keuze) stuurt de gate dit veld niet meer
+ *     mee; het blijft optioneel geaccepteerd voor oudere clients. Bij
+ *     ontbrekende kolom: gracieuze degradatie.
  *  3. Schrijft de feature-visit-marker.
  */
 
 const bodySchema = z.object({
   mortgageId: z.string().uuid(),
-  strategy: z.enum(['aflossen', 'beleggen', 'mix']),
+  strategy: z.enum(['aflossen', 'beleggen', 'mix']).optional(),
 })
 
 export async function POST(req: Request) {
@@ -58,8 +60,10 @@ export async function POST(req: Request) {
     if (clearErr) throw new Error(`Mortgages bijwerken mislukt: ${clearErr.message}`)
 
     const update: Record<string, unknown> = { has_hypotheekplanner_tracking: true }
-    // Strategy-veld is optioneel-bestaande kolom; retry zonder bij missing-column.
-    update.hypotheekplanner_strategy = strategy
+    // Strategy alleen wegschrijven wanneer een (oudere) client 'm meestuurt;
+    // het veld is bovendien een optioneel-bestaande kolom — retry zonder bij
+    // missing-column.
+    if (strategy !== undefined) update.hypotheekplanner_strategy = strategy
     const { error: markErr } = await supabase
       .from('debts')
       .update(update)

@@ -341,9 +341,10 @@ export function ToekomstNavCards(props: {
 }) {
   const allCards = buildNavCards(props)
 
-  // In Eenvoudig-modus vervalt de drilldown-chevron: de extra diepte is dan
-  // niet gewenst (hard-hide via de `expandable`-prop op /toekomst-niveau —
-  // /overzicht regelt z'n eigen chevron-logica los hiervan).
+  // In Eenvoudig-modus renderen de kaarten COMPACT (1 regel: icoon + titel,
+  // géén KPI/substext/status-dot) en vervalt de drilldown-chevron — de extra
+  // diepte is dan niet gewenst (via de `compact`-/`expandable`-props op
+  // /toekomst-niveau; /overzicht regelt z'n eigen kaarten los hiervan).
   const { mode } = useDisplayMode()
   const simple = mode === 'simple'
 
@@ -360,7 +361,14 @@ export function ToekomstNavCards(props: {
   return (
     <nav
       aria-label="Toekomst-navigatie"
-      className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3"
+      className={
+        simple
+          ? // Compact (Eenvoudig): 3 one-liner-kaarten — gestapeld op mobiel
+            // (labels als "Gebeurtenissen" blijven dan één regel), naast
+            // elkaar vanaf sm.
+            'grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3'
+          : 'grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3'
+      }
     >
       {cards.map((card) => {
         const { key, label, href, Icon, tint, kpi, status, subText, detail } = card
@@ -375,6 +383,7 @@ export function ToekomstNavCards(props: {
             status={status}
             subText={subText}
             href={href}
+            compact={simple}
             expandable={!simple}
             expanded={expanded}
             onToggleExpand={() => setExpandedKey(expanded ? null : key)}

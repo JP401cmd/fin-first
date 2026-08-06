@@ -15,6 +15,7 @@ import { solveFire } from '../index'
 import { runKernelUnified } from '../run-unified'
 import {
   buildKernelInputFromApp,
+  buildKernelInputFromAppWithNotices,
   buildAssetPotten,
   buildSchuldPotten,
   buildOnttrekkingsprofiel,
@@ -419,5 +420,93 @@ describe('buildKernelInputFromApp — integraal', () => {
 
     const result = solveFire(input)
     expect(Number.isFinite(result.fireAge)).toBe(true)
+  })
+})
+
+// ── Hypotheekcategorie volgt het gekoppelde bezit (defect B) ─────────────────────
+//
+// `potten.ts#DEBT_TYPE_TO_CATEGORIE` mapt `mortgage` naar categorie 'Woning' als
+// basis-mapping; `potten.ts#isNietEigenWoningHypotheek` overrulet dat naar 'Overig'
+// zodra de hypotheek expliciet (`linked_asset_id`) aan een bekende, ACTIEVE asset is
+// gekoppeld die GEEN `eigen_huis` is (bv. een verhuurd pand) — die schuld hoort niet
+// bij de niet-liquide-as van het eigen-woningblok. Een ongelinkte hypotheek, of een
+// hypotheek gelinkt aan een onbekende/inactieve asset, blijft conservatief 'Woning'
+// (zie de helper-doc voor de asymmetrie t.o.v. `classifyDebt`). `assignDebtSlots`/
+// rol 'hypotheek'/slot 0 volgen uitsluitend de eigen-woning-koppeling en blijven
+// door deze categorie-overrule ongewijzigd.
+describe('potten — hypotheekcategorie volgt het gekoppelde bezit (defect B)', () => {
+  const house = makeAsset({ id: 'house', asset_type: 'eigen_huis', current_value: 400_000 })
+  const pand = makeAsset({ id: 'pand', asset_type: 'real_estate', current_value: 200_000 })
+  const pandInactief = makeAsset({
+    id: 'pand-inactief',
+    asset_type: 'real_estate',
+    current_value: 150_000,
+    is_active: false,
+  })
+
+  const hypEigenWoning = makeDebt({
+    id: 'hyp-eigen',
+    name: 'Hypotheek eigen woning',
+    debt_type: 'mortgage',
+    current_balance: 300_000,
+    linked_asset_id: 'house',
+  })
+  const hypBelegging = makeDebt({
+    id: 'hyp-beleg',
+    name: 'Hypotheek verhuurd pand',
+    debt_type: 'mortgage',
+    current_balance: 110_000,
+    linked_asset_id: 'pand',
+  })
+  const hypOngelinkt = makeDebt({
+    id: 'hyp-los',
+    name: 'Hypotheek zonder koppeling',
+    debt_type: 'mortgage',
+    current_balance: 50_000,
+    linked_asset_id: null,
+  })
+  const hypInactiefPand = makeDebt({
+    id: 'hyp-inactief',
+    name: 'Hypotheek op afgestoten pand',
+    debt_type: 'mortgage',
+    current_balance: 40_000,
+    linked_asset_id: 'pand-inactief',
+  })
+
+  function build() {
+    return buildKernelInputFromAppWithNotices({
+      profile: pinnedProfile(),
+      assets: [house, pand, pandInactief],
+      debts: [hypEigenWoning, hypBelegging, hypOngelinkt, hypInactiefPand],
+    }).input
+  }
+
+  it('hypotheek gelinkt aan de eigen woning → categorie Woning, rol hypotheek, slot 0', () => {
+    const pots = build().schuldPotten
+    const pot = pots.find((p) => p.naam === hypEigenWoning.name)!
+    expect(pot.categorie).toBe('Woning')
+    expect(pot.rol).toBe('hypotheek')
+    expect(pot.slot).toBe(0)
+  })
+
+  it('hypotheek gelinkt aan een verhuurd pand (real_estate, geen eigen huis) → categorie Overig, geen hypotheek-rol', () => {
+    const pots = build().schuldPotten
+    const pot = pots.find((p) => p.naam === hypBelegging.name)!
+    expect(pot.categorie).toBe('Overig')
+    expect(pot.rol).toBeNull()
+  })
+
+  it('ongelinkte hypotheek blijft categorie Woning', () => {
+    const pots = build().schuldPotten
+    const pot = pots.find((p) => p.naam === hypOngelinkt.name)!
+    expect(pot.categorie).toBe('Woning')
+    expect(pot.rol).toBeNull()
+  })
+
+  it('hypotheek gelinkt aan een INACTIEVE asset blijft categorie Woning (conservatieve fallback)', () => {
+    const pots = build().schuldPotten
+    const pot = pots.find((p) => p.naam === hypInactiefPand.name)!
+    expect(pot.categorie).toBe('Woning')
+    expect(pot.rol).toBeNull()
   })
 })

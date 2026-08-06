@@ -22,6 +22,7 @@ import {
   type ScalarFireParams,
 } from './scalar-router'
 import {
+  ageAtDate,
   computeFireProjection,
   computeFireRange,
   type FinancialInput,
@@ -294,6 +295,83 @@ describe('kernel-tak', () => {
     expect(outcome.result.pessimistic.annualReturn).toBeCloseTo(0.01, 10)
     expect(outcome.result.expected.annualReturn).toBeCloseTo(0.02, 10)
     expect(outcome.result.optimistic.annualReturn).toBeCloseTo(0.04, 10)
+  })
+
+  it('deplete: fireAge is de bisectie-uitkomst (echte spend-down-maand), niet de huidige leeftijd', () => {
+    // B93-doel=0-quirk: bij 'deplete' is het doelbedrag 0 → de solver-status is
+    // triviaal 'reached_now', maar de bisectie vindt wél een echte FIRE-maand.
+    // De router hoort die maand te tonen (weergave-regel als
+    // bridge.ts#isKernelReachedNowDisplay), niet "nu al bereikt".
+    // Profiel: €100k pot, €1.500/mnd sparen, €30k/jr uitgaven, deplete tot 90 —
+    // overduidelijk NIET nu al vol te houden tot 90.
+    const outcome = computeScalarFireProjection(makeParams())
+    expect(outcome.engine).toBe('kernel')
+    expect(outcome.kernelStatus).toBe('reached_now') // kern blijft Excel-exact
+    expect(outcome.result.fireAge).not.toBeNull()
+    expect(outcome.result.fireAge!).toBeGreaterThan(45) // ruim ná de huidige leeftijd (~40)
+    expect(outcome.result.fireAge!).toBeLessThan(90)
+    expect(outcome.result.fireDate).not.toBe('Bereikt!')
+  })
+
+  it('deplete met ruim toereikende pot: "nu al bereikt" blijft de huidige leeftijd', () => {
+    // Genuine reached-now: de bisectie landt op start + 1 maand → weergave = huidige
+    // leeftijd ("Bereikt!" via deriveCountdown). Dit gedrag mag de quirk-fix niet raken.
+    const outcome = computeScalarFireProjection(
+      makeParams({ input: makeInput({ totalAssets: 5_000_000, totalDebts: 0 }) }),
+    )
+    expect(outcome.engine).toBe('kernel')
+    // Exact currentAge (ageAtDate), níet start + 1 maand — dat onderscheidt de
+    // "echt nu bereikt"-weergave van een doorgegeven bisectie-maand.
+    expect(outcome.result.fireAge).toBe(ageAtDate(DOB_40))
+    expect(outcome.result.fireDate).toBe('Bereikt!')
+  })
+
+  it('deplete die structureel ontspaart: fireAge landt ná de eindleeftijd, niet op "Bereikt!"', () => {
+    // Uitgaven > inkomen met een minipot: geen enkele FIRE-maand vóór de eindleeftijd
+    // draagt de afbouw — de bisectie landt dan nét ná de eindleeftijd (≈ endAge + 1
+    // maand; de tekort-lening houdt Prognose!J op de vloer, dus gap ≥ 0). De doel=0-
+    // quirk verhulde dit vóór de weergave-regel als "nu al bereikt" (fireAge = 40).
+    // NB — OPEN BESLUIT (geen gewenst-gedrag-pin): of "fireAge ≥ eindleeftijd" als
+    // "Niet haalbaar" getoond moet worden is een nog niet genomen weergave-besluit
+    // (zelfde procedure als de gap-besluiten); deze test pint alléén dat het geen
+    // "Bereikt!" meer is. Wordt dat besluit genomen, herijk dan deze verwachting.
+    const outcome = computeScalarFireProjection(
+      makeParams({
+        input: makeInput({
+          totalAssets: 5_000,
+          totalDebts: 0,
+          monthlyIncome: 2_500,
+          monthlyExpenses: 3_000,
+        }),
+      }),
+    )
+    expect(outcome.engine).toBe('kernel')
+    expect(outcome.result.fireAge).not.toBeNull()
+    expect(outcome.result.fireAge!).toBeGreaterThanOrEqual(90) // ná de deplete-eindleeftijd
+    expect(outcome.result.fireDate).not.toBe('Bereikt!')
+  })
+
+  it('deplete op de horizon-eindleeftijd met structureel tekort: verhulde parkeerstand → "Niet haalbaar"', () => {
+    // Met endAge = 100 valt de eindleeftijd samen met de horizon: de bisectie kan
+    // niet meer "voorbij" de eindleeftijd ontsnappen en de gap wordt negatief,
+    // maar de doel=0-quirk meldt de stand nog steeds als 'reached_now'. De
+    // weergave-regel herkent die verhulde parkeerstand (gap < 0) → Niet haalbaar.
+    const outcome = computeScalarFireProjection(
+      makeParams({
+        input: makeInput({
+          totalAssets: 5_000,
+          totalDebts: 0,
+          monthlyIncome: 2_500,
+          monthlyExpenses: 3_500,
+        }),
+        strategyOptions: { strategy: 'deplete', endAge: 100 },
+      }),
+    )
+    expect(outcome.engine).toBe('kernel')
+    expect(outcome.kernelStatus).toBe('reached_now') // de quirk-status — kern blijft Excel-exact
+    expect(outcome.result.fireAge).toBeNull()
+    expect(outcome.result.fireDate).toBe('Niet haalbaar')
+    expect(outcome.result.countdownDays).toBe(0)
   })
 
   it('mijlpalen op de kernel: zelfde doel-/weergavesemantiek, monotone maanden', () => {

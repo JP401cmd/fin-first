@@ -11,27 +11,16 @@
  * not-recompute"-lock hieronder herbouwt daarom de KERNEL-aanroep, niet de scalar-
  * formule rechtstreeks — anders vergelijkt de lock met de verkeerde bron.
  *
- * GEVONDEN KERN-QUIRK (gerapporteerd, NIET gefixt — buiten scope van deze
- * test-migratie, zie `lib/horizon-kernel/solver.ts` regel ~26-29): de solver-status
- * volgt de Excel-oracle-formule 1-op-1, inclusief een bewuste "doel=0"-eigenaardigheid:
- * `B93 status = IF(Prognose!J(0) ≥ B36, reached_now, ...)`. Voor de `'deplete'`-
- * eindstrategie is `B36` (doelbedrag) per definitie **0** (geen legacy/perpetual-
- * doel) — dus `J(0) ≥ 0` is ALTIJD waar zodra het startvermogen niet-negatief is,
- * ongeacht of de werkelijke afbouw-wiskunde (de bisectie vindt hier zelf
- * `summary.fireAge ≈ 69,17`!) het spend-down-plan daadwerkelijk zou dragen. Gevolg:
- * `computeReferencePeer` — die bewust `strategy: 'deplete'` kiest (zie de module-
- * doc in reference-peer.ts) — rapporteert voor VRIJWEL ELKE peer met een niet-
- * negatief mediaan-vermogen `fireAge = currentAge` ("nu al FIRE"), oftewel de
- * `fireAge`-kolom van de benchmark is voor de deplete-tak effectief altijd "vandaag"
- * en zegt niets over vermogen/leeftijd-ordening. Dit is dezelfde soort kernel-tak
- * die vermoedelijk ook de fireAge-afwijkingen elders in FASE 6 verklaart (zie
- * `lib/fire-withdrawal-integration.test.ts` voor het aparte exponentiële-groei-
- * defect — dit is een ANDER, specifiek deplete/reached_now-mechanisme).
- * `freedomPct` blijft WEL betrouwbaar: dat veld is een STATISCHE scalar-formule
- * (`runScalarFallback`) die de kernel-tak nooit overschrijft (zie de module-doc van
- * `computeScalarFireProjection`) — de sanity-tests hieronder zijn daarom herijkt op
- * `freedomPct` in plaats van `fireAge` voor de vermogens-ordening, en de quirk zelf
- * is expliciet gepind zodat een toekomstige kernel-fix hier zichtbaar wordt.
+ * B93-doel=0-QUIRK & DE WEERGAVE-REGEL: de solver-status volgt de Excel-oracle-
+ * formule 1-op-1, inclusief de "doel=0"-eigenaardigheid — voor `'deplete'` is het
+ * doelbedrag `B36` per definitie 0, dus de status is triviaal `reached_now` zodra
+ * het startvermogen niet-negatief is. De scalar-router past daarom dezelfde
+ * weergave-regel toe als de bridge (`bridge.ts#isKernelReachedNowDisplay`): alleen
+ * wanneer de bisectie daadwerkelijk op ~ de startmaand landt geldt "nu al bereikt";
+ * anders is `solve.fireAge` (de echte gevonden spend-down-maand) de uitkomst, en is
+ * een reached_now-stand met gap < 0 "Niet haalbaar". De peer-`fireAge` is daarmee
+ * weer een betekenisvolle maat (test 1b); `freedomPct` blijft de statische
+ * scalar-formule (zie de module-doc van `computeScalarFireProjection`).
  */
 import { describe, it, expect } from 'vitest'
 import { computeReferencePeer } from '@/lib/benchmark/reference-peer'
@@ -136,18 +125,28 @@ describe('computeReferencePeer — consume-not-recompute lock', () => {
   })
 })
 
-// ── Test 1b: gedocumenteerde kern-quirk — deplete + reached_now (NIET gefixt) ──
+// ── Test 1b: peer-vrijheidsleeftijd is een echte spend-down-uitkomst ──
 
-describe('computeReferencePeer — gedocumenteerde deplete/reached_now-quirk (kern-defect, gepind)', () => {
-  it('fireAge == currentAge (midAge) voor een peer met een niet-negatief mediaan-vermogen', () => {
-    // Zie de module-doc bovenaan: `solveFire` markeert 'deplete' als reached_now
-    // zodra het startvermogen ≥ 0 is (doelbedrag B36 = 0 voor deplete) — ongeacht of
-    // de afbouw-wiskunde het plan daadwerkelijk draagt. Dit pint dat GEDRAG (niet de
-    // wenselijkheid ervan) zodat een toekomstige kernel-fix hier zichtbaar rood wordt.
+describe('computeReferencePeer — fireAge is de bisectie-uitkomst, niet de eigen leeftijd', () => {
+  it('fireAge > midAge voor een mediaan-peer (35-45): €120k draagt geen spend-down tot 90', () => {
+    // De B93-doel=0-quirk (deplete → doelbedrag 0 → solver-status triviaal
+    // 'reached_now') mag hier niet doorlekken: de scalar-router toont de échte
+    // bisectie-maand (weergave-regel als bridge.ts#isKernelReachedNowDisplay).
     const ref = getCohortReference('35-45', null)
     expect(ref.netWorthMedian).toBeGreaterThanOrEqual(0)
     const result = computeReferencePeer(ref, 40, NOW)
-    expect(result.fireAge).toBe(40)
+    expect(result.fireAge).not.toBeNull()
+    expect(result.fireAge!).toBeGreaterThan(41)
+  })
+
+  it('fireAge > midAge voor de 45-55/alleenstaand-peer (€65.590 mediaan) — regressie benchmark-melding aug 2026', () => {
+    // Gemeld defect: de spiegel toonde "typische peer: 50 jaar" — exact de midAge —
+    // terwijl €65.590 met €458/mnd inleg overduidelijk geen spend-down vanaf nu tot
+    // 90 draagt. De peer hoort een echte, latere vrijheidsleeftijd te krijgen.
+    const ref = getCohortReference('45-55', 'alleenstaand')
+    const result = computeReferencePeer(ref, 50, NOW)
+    expect(result.fireAge).not.toBeNull()
+    expect(result.fireAge!).toBeGreaterThan(51)
   })
 })
 

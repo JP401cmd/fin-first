@@ -597,3 +597,35 @@ if (!hasFixtures) {
     }, 60_000)
   })
 }
+
+// ── totalGrowthLiquide — rendement exclusief niet-liquide bezit (defect A) ───────
+//
+// `bridge.ts#buildRow` sommeert `totalGrowth` over ALLE bezit-slots, inclusief een
+// niet-liquide eigen huis (bv. bij `exclude_from_fire`, TS!nietLiquide). Consumenten
+// die dat tonen als besteedbaar "Rendement" (`income-expense-breakdown.ts`) mogen
+// die woning-waardestijging niet als instroom meetellen — ze is niet onttrekbaar.
+// Elke jaar-rij draagt daarom ook `totalGrowthLiquide` = totalGrowth minus het
+// rendement van de nietLiquide bezit-categorieën (bij `exclude_from_fire`: het
+// eigen huis; bij `include_full` is niets nietLiquide → liquide === totaal).
+describe('bridge — totalGrowthLiquide (defect A: rendement exclusief niet-liquide bezit)', () => {
+  it('exclude_from_fire: totalGrowthLiquide < totalGrowth, verschil ≈ huis-rendement', () => {
+    const { ctx, solve } = synthContext({ housing_strategy_config: { mode: 'exclude_from_fire' } })
+    const result = kernelToUnifiedResult(solve, ctx)
+    const row = result.rows[0]
+
+    expect(typeof row.totalGrowthLiquide).toBe('number')
+    expect(row.totalGrowthLiquide as number).toBeLessThan(row.totalGrowth)
+
+    const huisGrowth = row.assetBuckets.eigen_huis?.growth ?? 0
+    expect(huisGrowth).toBeGreaterThan(0) // sanity: het huis maakt dit jaar echt rendement
+    expect(row.totalGrowth - (row.totalGrowthLiquide as number)).toBeCloseTo(huisGrowth, 2)
+  })
+
+  it('include_full: totalGrowthLiquide === totalGrowth (niets is niet-liquide)', () => {
+    const { ctx, solve } = synthContext({ housing_strategy_config: { mode: 'include_full' } })
+    const result = kernelToUnifiedResult(solve, ctx)
+    const row = result.rows[0]
+
+    expect(row.totalGrowthLiquide).toBeCloseTo(row.totalGrowth, 6)
+  })
+})

@@ -215,11 +215,11 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'BELANGRIJK',
     persona: 'lisa',
     given: 'Persona Lisa geladen (hypotheek-vlag has_hypotheekplanner_tracking staat UIT).',
-    when: 'De gebruiker vinkt "Hypotheekplanner" aan en doorloopt de eenmalige setup (asset kiezen, strategie, bevestiging).',
-    then: 'De planner-tab verschijnt en de setup blokkeert tot de bevestiging is aangevinkt. Pure UI-/flag-workflow zonder cijfermatige uitkomst.',
+    when: 'De gebruiker vinkt "Hypotheekplanner" aan en doorloopt de eenmalige setup: alléén de hypotheek-keuze (versimpeld aug 2026 — de eerdere strategie- en bevestigings-stappen zijn vervallen; onder de selector staat een "Voeg hypotheek toe"-knop).',
+    then: 'De planner-tab verschijnt en de Voltooien-knop blokkeert tot een hypotheek is geselecteerd. Pure UI-/flag-workflow zonder cijfermatige uitkomst.',
     assertion: {
       kind: 'ui-only',
-      source: 'flag-toggle + setup-wizard; geen persona-cijfer te herleiden',
+      source: 'flag-toggle + setup-gate (components/app/app-setup/configs/hypotheekplanner.config.tsx, één sectie); geen persona-cijfer te herleiden',
     },
   },
   {
@@ -354,6 +354,19 @@ const criteria: AcceptanceCriterion[] = [
       kind: 'exact',
       expected: 'aantalAandachtspunten=6; besparingSom=436.20',
       source: 'lib/aandachtspunten.ts#debtsToAandachtspunten op PERSONAS.lisa.debts (filter interest_rate >= DEBT_INTEREST_THRESHOLD=4; savings = balance×rate/100); DSTI-teller €2.135 exact, DSTI-percentage bewust direction-only (jitter-noemer)',
+    },
+  },
+  {
+    workflow: 'WF-SCHULD-23',
+    scenarioId: 'UAT-SCHULD-23',
+    titel: 'Koppelscherm bij nul gekoppelde hypotheken (hypotheekplanner)',
+    kriticiteit: 'BELANGRIJK',
+    given: 'Hypotheekplanner-setup ooit voltooid (useIsAppSetupCompleted(\'hypotheekplanner\') = true), maar geen enkele actieve hypotheek heeft `has_hypotheekplanner_tracking` aan — de mortgage-entry vindt dus geen gekoppelde hypotheek (`data.mortgage === null`).',
+    when: 'De gebruiker opent de hypotheek-entry van de planner (/overzicht/schulden/mortgage?tab=hypotheekplanner).',
+    then: '`AppLinkGate` toont een hero-band "Hypotheek koppelen" + checkbox-lijst met de niet-gekoppelde hypotheken (naam + saldo) i.p.v. de oude "Nog niets getrackt"-doodlopende staat. Opslaan POST\'t per selectie `{id, enabled:true}` naar `/api/debts/toggle-hypotheekplanner` en verhoogt de tab-eigen `reloadKey`, waarna de planner met de zojuist gekoppelde hypotheek rendert (client-fetch, geen server-bundel-refresh nodig). Zonder kandidaten (geen enkele hypotheek geregistreerd) toont het scherm een voeg-eerst-toe-CTA naar de schulden-items-tab. De eigen_huis-entry (asset-pagina, `type==="eigen_huis"`) is ongewijzigd en behoudt zijn bestaande "Nog niets getrackt"/"Geen gekoppelde hypotheek"-paden — alleen de mortgage-entry kreeg het koppelscherm.',
+    assertion: {
+      kind: 'ui-only',
+      source: 'components/core/deepenings/hypotheekplanner-tab.tsx (HypotheekplannerActive, Pad 0: type===\'mortgage\' && !data.mortgage) + components/app/app-setup/app-link-gate.tsx; endpoint app/api/debts/toggle-hypotheekplanner/route.ts',
     },
   },
 ]

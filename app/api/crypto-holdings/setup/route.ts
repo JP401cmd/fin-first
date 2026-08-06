@@ -10,14 +10,17 @@ import { unauthorized, serverError } from '@/lib/api/respond'
  *
  * Body: {
  *   selectedAssetIds: string[] (uuid),
- *   sources: string[],
- *   inputMethod: 'manual' | 'csv' | 'api'
+ *   sources?: string[],
+ *   inputMethod?: 'manual' | 'csv' | 'api'
  * }
  *
  * Wat deze route doet:
- *  1. Slaat bron-voorkeur + inputMethod op in `profiles.crypto_input_method`
- *     en `profiles.crypto_sources` (jsonb). Gracieuze fallback bij
- *     ontbrekende kolommen — zelfde patroon als aandelen-setup.
+ *  1. Slaat — indien meegegeven — bron-voorkeur + inputMethod op in
+ *     `profiles.crypto_input_method` en `profiles.crypto_sources` (jsonb).
+ *     Sinds de versimpelde setup (aug 2026, alleen bezittingen-selectie)
+ *     stuurt de gate deze velden niet meer mee; ze blijven optioneel
+ *     geaccepteerd voor oudere clients. Gracieuze fallback bij ontbrekende
+ *     kolommen — zelfde patroon als aandelen-setup.
  *  2. Markeert de geselecteerde crypto-assets met `has_holdings_tracking = true`
  *     en alle andere crypto-assets op false (absolute selectie).
  *  3. Schrijft de feature-visit-marker.
@@ -25,8 +28,8 @@ import { unauthorized, serverError } from '@/lib/api/respond'
 
 const bodySchema = z.object({
   selectedAssetIds: z.array(z.string().uuid()).min(1),
-  sources: z.array(z.string()).min(1),
-  inputMethod: z.enum(['manual', 'csv', 'api']),
+  sources: z.array(z.string()).optional(),
+  inputMethod: z.enum(['manual', 'csv', 'api']).optional(),
 })
 
 export async function POST(req: Request) {
@@ -54,22 +57,24 @@ export async function POST(req: Request) {
   const { selectedAssetIds, sources, inputMethod } = parsed.data
 
   try {
-    const profileUpdate: Record<string, unknown> = {
-      crypto_input_method: inputMethod,
-      crypto_sources: sources,
-    }
-    const { error: profErr } = await supabase
-      .from('profiles')
-      .update(profileUpdate)
-      .eq('id', user.id)
-    if (profErr) {
-      const msg = profErr.message ?? ''
-      const onlyMissing =
-        msg.includes('crypto_input_method') || msg.includes('crypto_sources')
-      if (!onlyMissing) {
-        throw new Error(`Profile-update mislukt: ${msg}`)
+    // Voorkeuren alleen wegschrijven wanneer een (oudere) client ze meestuurt.
+    if (sources !== undefined || inputMethod !== undefined) {
+      const profileUpdate: Record<string, unknown> = {}
+      if (inputMethod !== undefined) profileUpdate.crypto_input_method = inputMethod
+      if (sources !== undefined) profileUpdate.crypto_sources = sources
+      const { error: profErr } = await supabase
+        .from('profiles')
+        .update(profileUpdate)
+        .eq('id', user.id)
+      if (profErr) {
+        const msg = profErr.message ?? ''
+        const onlyMissing =
+          msg.includes('crypto_input_method') || msg.includes('crypto_sources')
+        if (!onlyMissing) {
+          throw new Error(`Profile-update mislukt: ${msg}`)
+        }
+        console.warn('[crypto-holdings-setup] profile-kolommen ontbreken, voortzetten zonder voorkeur')
       }
-      console.warn('[crypto-holdings-setup] profile-kolommen ontbreken, voortzetten zonder voorkeur')
     }
 
     // ── Tracking-flags op crypto-assets (clear-all-then-mark-selected) ──

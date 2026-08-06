@@ -499,6 +499,7 @@ export function DebtCategoryPage({
             <ActiveDeepeningComponent
               type={type}
               moduleActive={activeDeepeningModuleActive}
+              currentUserId={ctx?.userId}
             />
           ) : null}
         </div>

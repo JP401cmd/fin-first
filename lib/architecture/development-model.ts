@@ -129,6 +129,10 @@ export const SKILL_CURATION: Record<string, SkillCuration> = {
     kind: 'tooling',
     tagline: 'De Wft/AVG-poort vóór elke publieke uiting, AI-wijziging en SEO-pagina: inzicht mag, vergunningsplichtig advies niet — plus de claimlijst, en altijd een beslisbare uitkomst (goedkeuren · aanpassen · afwijzen).',
   },
+  'woonstrategie-check': {
+    kind: 'tooling',
+    tagline: 'Live-verificatie van de vier eigen-woningstrategieën in de Toekomst-grafiek: gekalibreerd seed-account (FIRE ≈ 60, interen), per strategie Pad + Opbouw via chromedev, invarianten-toets bovenop de matrix-goldens, rapport met oordeel.',
+  },
 }
 
 // ── Curatie: groepen + agents ───────────────────────────────────────────────-

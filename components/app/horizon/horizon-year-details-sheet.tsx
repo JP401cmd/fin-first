@@ -623,13 +623,55 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
   }, [row])
 
   // ── Rendement per asset-type (RAUW), |bedrag| ≥ €0,50, aflopend ─────
-  const rendementRows = useMemo(() => {
+  //
+  // GRONDSLAG-SPLITSING (kassabon blijft sommeren). `totalGrowth` telt het rendement
+  // van ÁLLE potten, dus ook de waardestijging van de eigen woning. Bij een
+  // niet-meetellen-woonstrategie is die waardestijging géén besteedbaar inkomen (ze
+  // zit niet in Prognose!J en is niet onttrekbaar) — als "Rendement portfolio" tonen
+  // zou hem als bestedingsruimte laten lezen. De kernel-bridge levert daarom
+  // `totalGrowthLiquide`; het verschil krijgt hier een eigen, NEUTRALE regel zodat de
+  // kassabon nog steeds op `totalGrowth` sluit. Bij 'Meerekenen' (of een rij zonder
+  // het veld) is het verschil 0 en is de weergave identiek aan voorheen.
+  const growthLiquide = row ? row.totalGrowthLiquide ?? row.totalGrowth : 0
+  const growthNietLiquide = row ? row.totalGrowth - growthLiquide : 0
+  const splitGrowth = Math.abs(growthNietLiquide) >= 0.5
+
+  const allRendementRows = useMemo(() => {
     if (!row) return []
     return (Object.entries(row.assetBuckets) as Array<[AssetType, AssetBucketDetail]>)
       .map(([type, b]) => ({ type, amount: b.growth }))
       .filter(x => Math.abs(x.amount) >= 0.5)
       .sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount))
   }, [row])
+
+  // Sub-rijen van de LIQUIDE hoofdregel: zodra we splitsen valt de eigen-woningrij
+  // onder de neutrale regel hieronder — anders zou hetzelfde rendement twee keer in
+  // de uitsplitsing verschijnen.
+  const rendementRows = useMemo(
+    () => (splitGrowth ? allRendementRows.filter(x => x.type !== 'eigen_huis') : allRendementRows),
+    [allRendementRows, splitGrowth],
+  )
+  const woningRendementRows = useMemo(
+    () => (splitGrowth ? allRendementRows.filter(x => x.type === 'eigen_huis') : []),
+    [allRendementRows, splitGrowth],
+  )
+
+  // Sluitregel voor het niet-besteedbare deel — spiegelt `debtRest` hieronder.
+  // De neutrale regel toont `growthNietLiquide` (= totalGrowth − totalGrowthLiquide,
+  // afgeleid uit de nietLiquide-VLAG in de kernel), terwijl de sub-rijen op
+  // app-`AssetType` gesleuteld zijn. Vandaag dekt `eigen_huis` dat verschil volledig
+  // (de enige nietLiquide-categorie is 'Eigen huis'), maar zodra er ooit een tweede
+  // niet-liquide categorie bij komt, of een sub-rij onder de €0,50-ruisfilter valt,
+  // zou het restant stil tussen kop en regels verdwijnen. Bewust gerekend uit het
+  // VERSCHIL kop − Σ regels, niet uit een tweede afleiding van de vlag.
+  const woningRest = useMemo(
+    () =>
+      splitGrowth
+        ? growthNietLiquide - woningRendementRows.reduce((s, x) => s + x.amount, 0)
+        : 0,
+    [splitGrowth, growthNietLiquide, woningRendementRows],
+  )
+  const showWoningRest = Math.abs(woningRest) >= 0.5
 
   // ── Box 3-toerekening per asset-type, |bedrag| ≥ €0,50, aflopend ────
   const box3Rows = useMemo(() => {
@@ -997,12 +1039,16 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
                     ))}
                   </CostsRow>
                 )}
-                {row.totalGrowth !== 0 && (
+                {Math.abs(growthLiquide) >= 0.5 && (
                   <CostsRow
-                    label={row.totalGrowth >= 0 ? 'Rendement portfolio' : 'Verlies portfolio'}
-                    sublabel="rauw rendement per vermogenstype"
-                    amount={row.totalGrowth}
-                    tone={row.totalGrowth >= 0 ? 'income' : 'expense'}
+                    label={growthLiquide >= 0 ? 'Rendement portfolio' : 'Verlies portfolio'}
+                    sublabel={
+                      splitGrowth
+                        ? 'rauw rendement per vermogenstype (besteedbaar deel)'
+                        : 'rauw rendement per vermogenstype'
+                    }
+                    amount={growthLiquide}
+                    tone={growthLiquide >= 0 ? 'income' : 'expense'}
                     age={age!}
                     currentAge={currentAge}
                     inflation={inflationRate}
@@ -1019,6 +1065,49 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
                           />
                         ))
                       : undefined}
+                  </CostsRow>
+                )}
+                {splitGrowth && (
+                  <CostsRow
+                    label={
+                      growthNietLiquide >= 0
+                        ? 'Waardestijging eigen woning (niet besteedbaar)'
+                        : 'Waardedaling eigen woning (niet besteedbaar)'
+                    }
+                    sublabel={
+                      growthNietLiquide >= 0
+                        ? 'verhoogt je vermogen, niet je bestedingsruimte'
+                        : 'verlaagt je vermogen, niet je bestedingsruimte'
+                    }
+                    amount={growthNietLiquide}
+                    tone="neutral"
+                    age={age!}
+                    currentAge={currentAge}
+                    inflation={inflationRate}
+                  >
+                    {woningRendementRows.length > 0 || showWoningRest ? (
+                      <>
+                        {woningRendementRows.map(({ type, amount }) => (
+                          <ReceiptSubRow
+                            key={type}
+                            label={ASSET_TYPE_LABELS[type]}
+                            signed={amount}
+                            age={age!}
+                            currentAge={currentAge}
+                            inflation={inflationRate}
+                          />
+                        ))}
+                        {showWoningRest && (
+                          <ReceiptSubRow
+                            label="Overig niet-besteedbaar"
+                            signed={woningRest}
+                            age={age!}
+                            currentAge={currentAge}
+                            inflation={inflationRate}
+                          />
+                        )}
+                      </>
+                    ) : undefined}
                   </CostsRow>
                 )}
                 {row.cashflowNet !== 0 && (

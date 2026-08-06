@@ -55,7 +55,7 @@ describe('SCHULD_FLOW — curatie-integriteit', () => {
     // bewust geen eigen SCHULD-scenario/knoop.
     const expected = [
       ...Array.from({ length: 18 }, (_, i) => i + 1), // 1..18
-      20, 21, 22,
+      20, 21, 22, 23,
     ].map((n) => `UAT-SCHULD-${String(n).padStart(2, '0')}`)
     for (const id of expected) {
       expect(covered.has(id), `${id} moet als flow-knoop voorkomen`).toBe(true)

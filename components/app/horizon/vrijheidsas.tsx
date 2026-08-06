@@ -312,7 +312,7 @@ export function Vrijheidsas({
 
   return (
     <div>
-      {/* i-uitleg (patroon LevensinkomenStrook/GuardrailKompas) */}
+      {/* i-uitleg (patroon LevensinkomenStrook/Dekkingsradar) */}
       <InlineInfoDisclosure label="Uitleg vrijheidsas">
         <div className="mb-1.5 font-semibold text-[var(--ink)]" style={{ fontFamily: PLAYFAIR }}>
           Zo lees je deze twee vragen

@@ -211,8 +211,17 @@ export function buildBreakdown(
     // box3-genet was); de kernel levert `totalGrowth` nu al rauw, dus opplussen
     // zou het rendement met het box3-bedrag opblazen (dubbeltelling — box3 zit
     // óók in de aparte Box 3-expensepost).
-    if (uRow.totalGrowth > 0) {
-      incomeBySource['growth'] = Math.round(uRow.totalGrowth)
+    //
+    // GRONDSLAG: dit is een VERMOGENSSTROMEN-view, dus we tonen het BESTEEDBARE
+    // rendement — `totalGrowthLiquide` (rendement exclusief de niet-liquide
+    // categorieën, vandaag de eigen woning bij een niet-meetellen-woonstrategie).
+    // `totalGrowth` telt de waardestijging van het huis mee; die euro's duwen de
+    // vermogenslijn omhoog maar zijn niet onttrekbaar — ze hier als instroom tonen
+    // is de tweede dubbeltelling (naast de box3-opplussing hierboven). Fallback op
+    // `totalGrowth` voor rijen zonder het veld (bij 'Meerekenen' zijn ze gelijk).
+    const growth = uRow.totalGrowthLiquide ?? uRow.totalGrowth
+    if (growth > 0) {
+      incomeBySource['growth'] = Math.round(growth)
     }
 
     // Salaris/werk + AOW & pensioen — bruto-inkomen-bronnen uit de bridge-split
@@ -331,6 +340,16 @@ export function buildBreakdown(
 /**
  * Simplified breakdown using only SimRow data (no debt interest detail).
  * Used when UnifiedProjectionRow data is not available.
+ *
+ * GRONDSLAG-NOTE (bekende afwijking t.o.v. `buildBreakdown`). De 'growth'-instroom
+ * komt hier uit `SimRow.growth` = de TOTALE `totalGrowth`, inclusief de
+ * waardestijging van een niet-liquide eigen woning. De rijke route hierboven
+ * consumeert sinds 2026-08-05 het besteedbare `totalGrowthLiquide`. `SimRow` draagt
+ * dat veld bewust niet (het is het vermogens-/compositiecontract, dat op de
+ * netWorth-grondslag incl. woning staat), dus de enige consument van dit pad — de
+ * wat-als-pagina, die alleen `SimRow[]` heeft — toont het rendement nog op het
+ * totaal. Structureel op te lossen door `SimRow` het liquide veld te laten dragen;
+ * dat raakt het bredere simulatie-contract en valt buiten deze fix.
  */
 export function buildBreakdownFromSimRows(rows: SimRow[]): BreakdownResult {
   if (!rows.length) {

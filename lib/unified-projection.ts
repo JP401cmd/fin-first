@@ -245,6 +245,24 @@ export interface UnifiedProjectionRow {
   oneTimeNet: number
   /** Totaal rendement over alle asset types */
   totalGrowth: number
+  /**
+   * Rendement over alleen de LIQUIDE bezittingen — `totalGrowth` minus het rendement
+   * van de categorieën die de kern als niet-liquide vlagt (TS!H; vandaag uitsluitend
+   * 'Eigen huis', en alléén bij een niet-meetellen-woonstrategie). Optioneel omdat
+   * test-/preview-rijfabrieken het veld mogen weglaten; de kernel-bridge zet het altijd.
+   *
+   * GRONDSLAG-WAARSCHUWING (spiegel van `nettoLiquide` hierboven): dit is het deel van
+   * het rendement dat daadwerkelijk BESTEEDBAAR is en dus als instroom in een
+   * vermogensstromen-/kassabonweergave hoort. `totalGrowth` telt de waardestijging van
+   * de eigen woning mee; die euro's duwen wél de vermogenslijn (Prognose!I) omhoog maar
+   * zijn geen onttrekbaar inkomen — ze als "Rendement portfolio" tonen is een
+   * weergave-dubbeltelling. Bij `include_full` is niets niet-liquide en geldt
+   * `totalGrowthLiquide === totalGrowth` exact (net als J ≡ I).
+   *
+   * `toSimRow`/`SimRow.growth` blijven bewust op het TOTAAL staan: die voeden de
+   * vermogens-/compositiegrafieken, die op de netWorth-grondslag (incl. woning) staan.
+   */
+  totalGrowthLiquide?: number
   /** Totale Box 3 belasting dit jaar (som van alle asset types) */
   totalBox3: number
   /** Cumulatieve Box 3 belasting tot en met dit jaar */
@@ -568,7 +586,24 @@ export function toSimRow(row: UnifiedProjectionRow): SimRow {
 
   // Vermogensstromen: flows to/from net worth
   // Bruto rendement = netto rendement + Box 3 (totalGrowth is already net of box3)
-  const grossGrowth = row.totalGrowth + row.totalBox3
+  //
+  // GRONDSLAG: `flowIn`/`flowOut` zijn STROMEN-velden (besteedbare in-/uitstroom),
+  // geen compositievelden. Ze voeden de IE-grafiek in 'Lijnen'-modus (de default),
+  // de wat-als-pagina en het surplus-gap-widget/-chart — alle drie tonen "wat komt
+  // er binnen". De waardestijging van een niet-liquide eigen woning komt daar NIET
+  // binnen: die euro's zijn niet onttrekbaar. Daarom telt de instroom het
+  // BESTEEDBARE rendement (`totalGrowthLiquide`), met terugval op `totalGrowth` voor
+  // rijen zonder het veld (bij woonstrategie 'Meerekenen' zijn ze gelijk).
+  // `SimRow.growth` hieronder blijft BEWUST het totaal — dat is het
+  // vermogens-/compositieveld op de netWorth-grondslag (incl. woning).
+  // NB: de UITSTROOMKANT blijft bewust op kasbasis — `totalDebtInterest`
+  // sommeert álle schuldrente, óók die van de eigen-woninghypotheek (rente is
+  // echte kasuitstroom, waardestijging geen kasinstroom). `flowIn − flowOut` is
+  // daarmee géén spiegel van `nettoLiquide` en van geen enkele
+  // vermogensgrootheid de delta — puur een stromenbeeld.
+  // Er is geen reconciliatie-invariant tussen flowIn/flowOut en netWorth die dit
+  // breekt (geverifieerd: geen consument leidt eindvermogen uit flowIn af).
+  const grossGrowth = (row.totalGrowthLiquide ?? row.totalGrowth) + row.totalBox3
   // Totale schuldrente
   let totalDebtInterest = 0
   for (const detail of Object.values(row.debtBalances)) {

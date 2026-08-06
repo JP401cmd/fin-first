@@ -46,6 +46,7 @@ export const BEZIT_FLOW: UatFlow = {
 
     // ── 3 · verdieping · beleggingen ──────────────────────────────────────
     { id: 'holdings', scenarioId: 'UAT-BEZIT-12', label: 'WF-BEZIT-12 · Aandelen-holdings-app', kind: 'screen', stage: 3, lane: 'verdieping' },
+    { id: 'holdings-koppel', scenarioId: 'UAT-BEZIT-25', label: 'WF-BEZIT-25 · Koppelscherm (nul gekoppeld)', kind: 'screen', stage: 3, lane: 'verdieping', subOf: 'holdings' },
     { id: 'verversen', scenarioId: 'UAT-BEZIT-13', label: 'WF-BEZIT-13 · Koersen verversen', kind: 'action', stage: 3, lane: 'verdieping', subOf: 'holdings' },
     { id: 'holding-add', scenarioId: 'UAT-BEZIT-14', label: 'WF-BEZIT-14 · Holding toevoegen', kind: 'action', stage: 3, lane: 'verdieping', subOf: 'holdings' },
     { id: 'transactie', scenarioId: 'UAT-BEZIT-15', label: 'WF-BEZIT-15 · Transactie registreren', kind: 'action', stage: 3, lane: 'verdieping', subOf: 'holdings' },
@@ -57,6 +58,7 @@ export const BEZIT_FLOW: UatFlow = {
 
     // ── 3 · verdieping · crypto ───────────────────────────────────────────
     { id: 'crypto', scenarioId: 'UAT-BEZIT-21', label: 'WF-BEZIT-21 · Crypto-holdings-app', kind: 'screen', stage: 3, lane: 'verdieping' },
+    { id: 'crypto-koppel', scenarioId: 'UAT-BEZIT-25', label: 'WF-BEZIT-25 · Koppelscherm (nul gekoppeld)', kind: 'screen', stage: 3, lane: 'verdieping', subOf: 'crypto' },
     { id: 'koppeling', label: 'WF-BEZIT-20 · Exchange-/wallet-koppeling', kind: 'cross', stage: 3, lane: 'verdieping', subOf: 'crypto', crossZone: 'MIJN' },
     { id: 'typed-crypto', scenarioId: 'UAT-BEZIT-22', label: 'WF-BEZIT-22 · Typed crypto-coin', kind: 'screen', stage: 3, lane: 'verdieping', subOf: 'crypto' },
 
@@ -101,6 +103,7 @@ export const BEZIT_FLOW: UatFlow = {
     { from: 'categorie', to: 'verhuur', kind: 'branch' },
 
     // beleggingen sub-hub → kinderen (rail)
+    { from: 'holdings', to: 'holdings-koppel' },
     { from: 'holdings', to: 'verversen' },
     { from: 'holdings', to: 'holding-add' },
     { from: 'holdings', to: 'transactie' },
@@ -111,6 +114,7 @@ export const BEZIT_FLOW: UatFlow = {
     { from: 'holdings', to: 'typed-inv' },
 
     // crypto sub-hub → kinderen (rail)
+    { from: 'crypto', to: 'crypto-koppel' },
     { from: 'crypto', to: 'koppeling', kind: 'cross' },
     { from: 'crypto', to: 'typed-crypto' },
 
