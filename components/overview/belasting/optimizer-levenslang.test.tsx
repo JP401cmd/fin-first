@@ -70,6 +70,8 @@ function ruw(
     fire: number | null
     belegbaar: number
     netto: number
+    /** Resterende pensioenpot — eigen grondslag, bewust los van `belegbaar`. */
+    pensioen: number
     buffer: number
   },
 ): VariantUitkomst {
@@ -84,6 +86,7 @@ function ruw(
     fireAgeFractional: v.fire,
     eindvermogenNettoNominaal: v.netto,
     eindvermogenBelegbaarNominaal: v.belegbaar,
+    eindvermogenPensioenNominaal: v.pensioen,
     laagsteBuffer: { bedrag: v.buffer, age: 72 },
     diskwalificatie: null,
     kernelFout: null,
@@ -104,6 +107,7 @@ function fixture() {
       fire: 58,
       belegbaar: 250_000,
       netto: 600_000,
+      pensioen: 310_000,
       buffer: 30_000,
     }),
     ruw('pensioen-laatst', 'Pensioen zo laat mogelijk', {
@@ -112,6 +116,7 @@ function fixture() {
       fire: 58,
       belegbaar: 280_000,
       netto: 640_000,
+      pensioen: 420_000,
       buffer: 25_000,
     }),
     ruw('pensioen-eerst', 'Pensioen vroeg', {
@@ -120,6 +125,7 @@ function fixture() {
       fire: 61,
       belegbaar: 190_000,
       netto: 540_000,
+      pensioen: 95_000,
       buffer: 12_000,
     }),
   ]
@@ -244,6 +250,7 @@ describe('OptimizerLevenslang — na de klik', () => {
         fire: 58,
         belegbaar: 250_000,
         netto: 600_000,
+        pensioen: 310_000,
         buffer: 30_000,
       }),
       ruw('pensioen-laatst', 'Pensioen zo laat mogelijk', {
@@ -255,6 +262,7 @@ describe('OptimizerLevenslang — na de klik', () => {
         // oplevert (een tekort landt als Tekort-lening, niet als negatief bezit).
         buffer: 0,
         netto: 300_000,
+        pensioen: 45_000,
       }),
     ]
     const resultaat = finaliseerVarianten(ruwe, 2026)
@@ -271,7 +279,7 @@ describe('OptimizerLevenslang — na de klik', () => {
     expect(within(kol).queryByText('laagste druk')).toBeNull()
   })
 
-  it('toont bij elke variant het eindvermogen — op ÉÉN benoemde grondslag', async () => {
+  it('toont het eindvermogen op TWEE benoemde grondslagen, in aparte rijen', async () => {
     const resultaat = fixture()
     mockSweep.mockResolvedValue(resultaat)
     renderSectie()
@@ -279,17 +287,83 @@ describe('OptimizerLevenslang — na de klik', () => {
     fireEvent.click(startKnop())
     await waitFor(() => expect(screen.getByRole('table')).toBeTruthy())
 
-    const rij = screen.getByText(/Belegbaar vermogen aan het eind/i).closest('tr')
-    expect(rij).toBeTruthy()
-    expect(rij!.textContent).toMatch(/zonder je huis en ander niet-liquide bezit/i)
+    const belegbaarRij = screen.getByText(/Belegbaar vermogen aan het eind/i).closest('tr')
+    expect(belegbaarRij).toBeTruthy()
+    expect(belegbaarRij!.textContent).toMatch(/zonder je huis en ander niet-liquide bezit/i)
+    // Het onderschrift mag GEEN disjunctheid beloven ("je pensioen staat
+    // hieronder" o.i.d.). Een `levensverzekering` mapt op kern-categorie
+    // 'Pensioen' maar staat niet in NON_SPENDABLE_ASSET_TYPES, dus die polis zit
+    // in béíde regels — op de persona-fixture is dat 87% van de winnaar-cel.
+    // Zo'n zin zou de lezer uitnodigen de twee regels op te tellen en het
+    // vermogen te overschatten: dezelfde leesfout als het defect dat deze rij
+    // repareert, alleen omgekeerd van teken.
+    expect(belegbaarRij!.textContent).not.toMatch(/pensioen staat hieronder/i)
     for (const v of resultaat.varianten) {
-      expect(rij!.textContent).toMatch(euroPattern(v.eindvermogenBelegbaarNominaal!))
+      expect(belegbaarRij!.textContent).toMatch(euroPattern(v.eindvermogenBelegbaarNominaal!))
     }
-    // De tweede grondslag (netto incl. niet-liquide bezit) staat NERGENS in de
-    // tabel — twee vermogensgrondslagen mogen niet op één as belanden.
+
+    const pensioenRij = screen.getByText(/Resterende pensioenpot/i).closest('tr')
+    expect(pensioenRij).toBeTruthy()
+    expect(pensioenRij).not.toBe(belegbaarRij)
     for (const v of resultaat.varianten) {
+      expect(pensioenRij!.textContent).toMatch(euroPattern(v.eindvermogenPensioenNominaal!))
+    }
+
+    // De twee grondslagen worden NOOIT opgeteld tot één getal (ze overlappen met
+    // de levensverzekering-pot) en de derde grondslag — netto vermogen incl.
+    // niet-liquide bezit — staat nergens in deze tabel.
+    for (const v of resultaat.varianten) {
+      const som = v.eindvermogenBelegbaarNominaal! + v.eindvermogenPensioenNominaal!
+      expect(screen.queryAllByText(euroPattern(som)).length).toBe(0)
       expect(screen.queryAllByText(euroPattern(v.eindvermogenNettoNominaal!)).length).toBe(0)
     }
+  })
+
+  /**
+   * Het gemelde defect, op de weergavelaag. De cijfers zijn de GEMETEN standen van
+   * de persona-fixture: de winnaar ("pensioen zo laat mogelijk") staat op de
+   * belegbare regel het laagst terwijl hij verreweg het meeste overhoudt — omdat
+   * zijn vermogen in de pensioenpot zit die die regel per constructie overslaat.
+   * Zonder de tweede regel oogde die winnaar € 1,35 mln armer dan de referentie.
+   */
+  it('BUG-ANKER — een winnaar met weinig belegbaar toont zijn pensioenpot ernaast', async () => {
+    const resultaat = finaliseerVarianten(
+      [
+        ruw('huidige-volgorde', 'Jouw huidige volgorde', {
+          box3: 300_000,
+          box1: 104_671,
+          fire: 58,
+          belegbaar: 138_168,
+          netto: 4_847_281,
+          pensioen: 1_664_321,
+          buffer: 20_000,
+        }),
+        ruw('pensioen-laatst', 'Pensioen zo laat mogelijk', {
+          box3: 200_000,
+          box1: 106_931,
+          fire: 58,
+          belegbaar: 68_092,
+          netto: 5_799_903,
+          pensioen: 3_672_936,
+          buffer: 15_000,
+        }),
+      ],
+      2026,
+    )
+    expect(resultaat.winnaarId).toBe('pensioen-laatst')
+
+    mockSweep.mockResolvedValue(resultaat)
+    renderSectie()
+    fireEvent.click(startKnop())
+    await waitFor(() => expect(screen.getByRole('table')).toBeTruthy())
+
+    const belegbaarRij = screen.getByText(/Belegbaar vermogen aan het eind/i).closest('tr')
+    const pensioenRij = screen.getByText(/Resterende pensioenpot/i).closest('tr')
+    // Laag op de belegbare regel…
+    expect(belegbaarRij!.textContent).toMatch(euroPattern(68_092))
+    // …maar de pensioenregel laat zien waar het geld wél staat.
+    expect(pensioenRij!.textContent).toMatch(euroPattern(3_672_936))
+    expect(pensioenRij!.textContent).toMatch(euroPattern(1_664_321))
   })
 
   it('vertaalt het verschil met de referentie naar vrijheidstijd', async () => {
@@ -324,7 +398,7 @@ describe('OptimizerLevenslang — na de klik', () => {
     expect(screen.queryByText(/∞/)).toBeNull()
   })
 
-  it('toont de zes kanttekeningen, met het gebruikte Box 1-jaar', async () => {
+  it('toont de zeven kanttekeningen, met het gebruikte Box 1-jaar', async () => {
     const resultaat = fixture()
     mockSweep.mockResolvedValue(resultaat)
     renderSectie()
@@ -334,7 +408,7 @@ describe('OptimizerLevenslang — na de klik', () => {
 
     const lijst = screen.getByText('Kanttekeningen').parentElement!.querySelector('ul')
     expect(lijst).toBeTruthy()
-    expect(lijst!.querySelectorAll('li').length).toBe(6)
+    expect(lijst!.querySelectorAll('li').length).toBe(7)
     const tekst = lijst!.textContent ?? ''
     expect(tekst).toMatch(/náást de projectie, niet erin/i)
     expect(tekst).toMatch(/gewogen gelijktijdige opname/i)
@@ -347,6 +421,13 @@ describe('OptimizerLevenslang — na de klik', () => {
     expect(tekst).toMatch(/arbeidskorting nu ook toe over pensioeninkomen/i)
     expect(tekst).toMatch(/vóór je AOW/i)
     expect(tekst).toMatch(/te hoog/i)
+    // De zevende: de levensverzekering zit in BEIDE regels onder "wat er
+    // overblijft" (mapt op kern-categorie 'Pensioen', maar staat niet in
+    // NON_SPENDABLE_ASSET_TYPES). Zolang die asymmetrie openstaat is dit de enige
+    // plek waar de gebruiker de overlap te horen krijgt — het scherm toont anders
+    // twee regels die optelbaar lijken en het niet zijn.
+    expect(tekst).toMatch(/levensverzekering/i)
+    expect(tekst).toMatch(/niet bij elkaar op te tellen/i)
   })
 
   it('memoïseert op de invoer-hash: een tweede klik rekent niet opnieuw', async () => {
@@ -418,6 +499,7 @@ describe('OptimizerLevenslang — laad- en foutstaten', () => {
             fire: null,
             belegbaar: 0,
             netto: 0,
+            pensioen: 0,
             buffer: 0,
           }),
           levenslangeBox3Nominaal: null,
@@ -425,6 +507,7 @@ describe('OptimizerLevenslang — laad- en foutstaten', () => {
           levenslangeTotaleDrukNominaal: null,
           eindvermogenBelegbaarNominaal: null,
           eindvermogenNettoNominaal: null,
+          eindvermogenPensioenNominaal: null,
           laagsteBuffer: null,
           kernelFout: 'kernel leverde geen jaarrijen',
         },
@@ -456,6 +539,7 @@ describe('OptimizerLevenslang — laad- en foutstaten', () => {
           fire: 58,
           belegbaar: 250_000,
           netto: 600_000,
+          pensioen: 310_000,
           buffer: 30_000,
         }),
         {
@@ -465,6 +549,7 @@ describe('OptimizerLevenslang — laad- en foutstaten', () => {
             fire: null,
             belegbaar: 0,
             netto: 0,
+            pensioen: 0,
             buffer: 0,
           }),
           levenslangeBox3Nominaal: null,
@@ -472,6 +557,7 @@ describe('OptimizerLevenslang — laad- en foutstaten', () => {
           levenslangeTotaleDrukNominaal: null,
           eindvermogenBelegbaarNominaal: null,
           eindvermogenNettoNominaal: null,
+          eindvermogenPensioenNominaal: null,
           laagsteBuffer: null,
           kernelFout: 'kernel leverde geen jaarrijen',
         },

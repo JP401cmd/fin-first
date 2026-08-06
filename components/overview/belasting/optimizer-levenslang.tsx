@@ -40,11 +40,25 @@ const SNAPSHOT_ENDPOINT = '/api/belasting/varianten-sweep'
  * De rangschikking loopt op NOMINALE levenslange belasting. Die as beloont
  * "eerder door je geld heen zijn": wie z'n vermogen sneller opmaakt, betaalt
  * minder Box 3 en wint. Daarom staat het eindvermogen als harde eis in dezelfde
- * tabel. We tonen bewust ÉÉN grondslag — `eindvermogenBelegbaarNominaal`,
- * dezelfde grondslag als de laagste buffer — en labelen die expliciet. Het
- * netto eindvermogen (incl. niet-liquide bezit, bv. een huis) is een ándere
- * grootheid en staat daarom niet in deze kolommen (CLAUDE.md: nooit twee
- * vermogensgrondslagen op één as).
+ * tabel.
+ *
+ * ## Twee vermogensregels, twee grondslagen, nooit opgeteld
+ * "Wat er overblijft" toont twee APARTE regels, elk met zijn eigen label:
+ *  - `eindvermogenBelegbaarNominaal` — dezelfde grondslag als de laagste buffer
+ *    en het buffer-veto (`spendablePortfolio`);
+ *  - `eindvermogenPensioenNominaal` — de resterende pensioenpot (kern-categorie
+ *    'Pensioen').
+ *
+ * Die tweede regel MOET erbij: de belegbare grondslag slaat de pensioenpot per
+ * constructie over, terwijl deze sectie nu juist gaat over waar die pot in de
+ * onttrekkingsvolgorde staat. Zonder hem eindigde de variant "pensioen zo laat
+ * mogelijk" zichtbaar het armst — precies de variant die het meeste overhoudt —
+ * en kon het scherm zijn eigen vraag niet beantwoorden.
+ *
+ * De twee worden nooit bij elkaar opgeteld en nooit op één as gezet (CLAUDE.md);
+ * ze overlappen bovendien met de levensverzekering-pot (zie
+ * `lib/horizon/pensioen-pot.ts`). Het netto eindvermogen incl. niet-liquide bezit
+ * (bv. een huis) is een dérde grootheid en staat hier bewust niet.
  *
  * Wft: geen "je bespaart € X" (het is een verschil tussen twee indicaties), geen
  * gebiedende wijs, geen aanbevolen volgorde. De enige callout op de pagina blijft
@@ -232,7 +246,7 @@ function Bezig() {
 }
 
 /** Rijhoogtes van de tabel-skeleton (kop + drie groepen met hun rijen). */
-const SKELETON_BREEDTES = ['100%', '82%', '82%', '64%', '90%', '76%', '58%']
+const SKELETON_BREEDTES = ['100%', '82%', '82%', '64%', '90%', '76%', '70%', '58%']
 
 /**
  * De canonieke Horizon-run is niet mogelijk (geen geboortedatum/profielrij).
@@ -467,11 +481,15 @@ function VariantenTabel({
               })}
             </tr>
 
-            <GroupRow label="Wat er overblijft" span={cols} />
+            <GroupRow
+              label="Wat er overblijft"
+              span={cols}
+              note="twee aparte grondslagen — niet bij elkaar optellen"
+            />
             <tr>
               <Th>
                 Belegbaar vermogen aan het eind
-                <span className="mt-0.5 block font-mono text-[9.5px] uppercase tracking-[0.12em] text-[var(--ink-4)]">
+                <span className="mt-0.5 block font-mono text-[9.5px] uppercase leading-snug tracking-[0.12em] text-[var(--ink-4)]">
                   zonder je huis en ander niet-liquide bezit
                 </span>
               </Th>
@@ -481,6 +499,33 @@ function VariantenTabel({
                 return (
                   <Td key={v.id} muted={eind === null} style={winnaarCel(v)}>
                     {eind === null ? '—' : fc(eind)}
+                    {tijd && <CellNote>≈ {tijd} vrijheid</CellNote>}
+                  </Td>
+                )
+              })}
+            </tr>
+            {/* Aparte grondslag, bewust NIET opgeteld bij de regel hierboven:
+                het belegbaar vermogen slaat de pensioenpot over, dus zonder deze
+                regel oogt "pensioen zo laat mogelijk" armer dan hij is.
+
+                Het onderschrift hierboven belóóft geen disjunctheid ("je pensioen
+                staat hieronder" o.i.d.) en mag dat ook niet: een `levensverzekering`
+                mapt op kern-categorie 'Pensioen' maar staat NIET in
+                NON_SPENDABLE_ASSET_TYPES, dus die polis zit in béíde regels. Zie
+                lib/horizon/pensioen-pot.ts. */}
+            <tr>
+              <Th>
+                Resterende pensioenpot
+                <span className="mt-0.5 block font-mono text-[9.5px] uppercase leading-snug tracking-[0.12em] text-[var(--ink-4)]">
+                  wat er in je pensioenpotten achterblijft — hier komt nog Box 1 overheen
+                </span>
+              </Th>
+              {varianten.map((v) => {
+                const pot = v.eindvermogenPensioenNominaal
+                const tijd = vrijheid(pot, dailyExpenses)
+                return (
+                  <Td key={v.id} muted={pot === null} style={winnaarCel(v)}>
+                    {pot === null ? '—' : fc(pot)}
                     {tijd && <CellNote>≈ {tijd} vrijheid</CellNote>}
                   </Td>
                 )
@@ -590,6 +635,7 @@ function Kanttekeningen({ box1Jaar }: { box1Jaar: number }) {
     'De heffing is berekend náást de projectie, niet erin: het model rekent niet mee dat je extra bruto moet opnemen om die belasting te betalen. Je werkelijke opname ligt dus hoger, en het verschil tussen de varianten is een indicatie — geen uitkomst.',
     'Een “volgorde” is in het model geen strikte rij maar een gewogen gelijktijdige opname: een pot met een hogere prioriteit levert per euro ongeveer twee keer zoveel als de pot erna. Alleen “als laatste” is echt achtergesteld.',
     'Lijfrente is niet apart te sturen — die valt in het model samen met je bedrijfspensioen in één pot.',
+    'Heb je een levensverzekering? Die telt in het model zowel bij je belegbaar vermogen als bij je pensioenpot. De twee regels onder “wat er overblijft” overlappen daardoor en zijn niet bij elkaar op te tellen.',
     'Box 1 is per persoon; de belasting van je partner zit hier niet in.',
     `De schijven en heffingskortingen zijn die van ${box1Jaar}; in het model groeien ze mee met de inflatie.`,
     'De box 1-heffing is een indicatie: het model kent de arbeidskorting nu ook toe over pensioeninkomen, terwijl dat fiscaal geen arbeidsinkomen is. In het gangbare bereik valt de heffing daardoor te laag uit — het sterkst in de jaren vóór je AOW, en dus bij vroeg onttrekken; bij een hoog pensioeninkomen valt ze juist iets te hoog uit.',

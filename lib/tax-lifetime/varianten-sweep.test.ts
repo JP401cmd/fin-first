@@ -1,5 +1,5 @@
 /**
- * De variantensweep — bewijst de vijf claims waarop deze laag staat of valt:
+ * De variantensweep — bewijst de zes claims waarop deze laag staat of valt:
  *
  *  1. **De V1-val.** De vier `WITHDRAWAL_ORDER_PRESETS` zijn GEEN geldige sweep-as:
  *     `liquide-eerst` en `pensioen-sparen` vallen ná de kernel-mapping samen op één
@@ -13,6 +13,10 @@
  *     belasting-ranking "eerder door je geld heen zijn").
  *  5. End-to-end op een echte persona-fixture: drie kernel-runs, een volledig
  *     ingevuld contract, en de pensioen-knop die echt BIJT.
+ *  6. De resterende PENSIOENPOT komt mee, op de kern-categorie 'Pensioen'
+ *     (`retirement` én `levensverzekering`). Zonder dat getal toont katern IV
+ *     alleen het belegbaar vermogen — dat de pensioenpot per definitie overslaat —
+ *     en oogt de winnaar van een pensioen-uitstel-variant miljoenen armer.
  *
  * Tolerantie-keuze: waar de claim een IDENTITEIT is (referentie ≡ ongewijzigde
  * run, prio-vectoren gelijk/ongelijk) wordt EXACT vergeleken — een tolerantie zou
@@ -103,6 +107,7 @@ function uitkomst(p: {
     fireAgeFractional: kernFout ? null : p.fire === undefined ? 60 : p.fire,
     eindvermogenNettoNominaal: kernFout ? null : 100_000,
     eindvermogenBelegbaarNominaal: kernFout ? null : 80_000,
+    eindvermogenPensioenNominaal: kernFout ? null : 40_000,
     laagsteBuffer:
       kernFout || p.buffer === undefined || p.buffer === null
         ? null
@@ -463,6 +468,100 @@ describe('variantensweep end-to-end (echte kernel-runs)', () => {
   it('de uitkomst is structured-clone-veilig (worker-grens)', () => {
     expect(() => structuredClone(resultaat)).not.toThrow()
     expect(() => structuredClone(snapshot)).not.toThrow()
+  })
+})
+
+// ── 5b. De resterende pensioenpot komt mee (katern IV, "Wat er overblijft") ──
+
+/**
+ * Katern IV vergelijkt drie PLEKKEN VOOR DE PENSIOENPOT, maar de enige vermogensrij
+ * was `eindvermogenBelegbaarNominaal` = `spendablePortfolio`, en die slaat de
+ * pensioenpot bewust over (`NON_SPENDABLE_ASSET_TYPES`). De winnaar oogde daardoor
+ * miljoenen armer — precies de kant die de weglating voorspelt — en het scherm kon
+ * zijn eigen vraag niet beantwoorden.
+ *
+ * De grondslag van het nieuwe veld is de KERN-categorie 'Pensioen', niet het app-type
+ * `retirement`: de kernel-adapter mapt `retirement` ÉN `levensverzekering` op die ene
+ * categorie (`ASSET_TYPE_TO_CATEGORIE`), en dát is de categorie waar de
+ * onttrekkings-overlay van deze sweep op stuurt. Een veld dat alleen `retirement`
+ * telt zou de pot onderschatten met precies het deel dat de lever óók verschuift.
+ *
+ * Tolerantie-keuze: de som-identiteit wordt EXACT vergeleken (`toBe`). Het is geen
+ * meting maar dezelfde optelling van dezelfde twee floats; een tolerantie zou hier
+ * precies de foutklasse verbergen die de test moet vangen (een ontbrekende term).
+ */
+describe('resterende pensioenpot per variant', () => {
+  const resultaat = runVariantenSweep(snapshot)
+  const [referentie, laatst, eerst] = resultaat.varianten
+
+  it('elke variant levert de resterende pensioenpot mee', () => {
+    for (const v of resultaat.varianten) {
+      expect(v.kernelFout).toBeNull()
+      expect(Number.isFinite(v.eindvermogenPensioenNominaal as number)).toBe(true)
+      expect(v.eindvermogenPensioenNominaal as number).toBeGreaterThanOrEqual(0)
+    }
+  })
+
+  it('VOLGT DE KERN-CATEGORIE — retirement ÉN levensverzekering, niet alleen retirement', () => {
+    const direct = computeConvergentieProjection({ rawContext: snapshot.rawContext })
+    expect(direct.ok).toBe(true)
+    if (!direct.ok) return
+    const laatsteRij = direct.result.rows[direct.result.rows.length - 1]
+
+    const retirementEind = laatsteRij.assetBuckets.retirement?.endValue ?? 0
+    const levensverzekeringEind = laatsteRij.assetBuckets.levensverzekering?.endValue ?? 0
+
+    // Zonder een levensverzekering-restant bewijst deze test niets: dan zou een
+    // retirement-only implementatie er net zo goed doorheen komen.
+    expect(levensverzekeringEind).toBeGreaterThan(0)
+
+    expect(referentie.eindvermogenPensioenNominaal).toBe(retirementEind + levensverzekeringEind)
+    expect(referentie.eindvermogenPensioenNominaal as number).toBeGreaterThan(retirementEind)
+  })
+
+  it('de pensioen-lever verschuift de pot aantoonbaar (laatst > huidig > eerst)', () => {
+    expect(laatst.eindvermogenPensioenNominaal as number).toBeGreaterThan(
+      referentie.eindvermogenPensioenNominaal as number,
+    )
+    expect(referentie.eindvermogenPensioenNominaal as number).toBeGreaterThan(
+      eerst.eindvermogenPensioenNominaal as number,
+    )
+  })
+
+  /**
+   * Het gemelde defect, als anker. "Pensioen zo laat mogelijk" wint de belasting-as
+   * én houdt het MEESTE vermogen over, maar staat op de belegbare rij het LAAGST —
+   * omdat z'n vermogen in de pensioenpot zit die die rij overslaat.
+   *
+   * De optelling hieronder is uitsluitend een RICHTINGSTOETS, geen getoonde
+   * grondslag: `levensverzekering` zit vandaag in béide termen (zie de bevinding bij
+   * `NON_SPENDABLE_ASSET_TYPES`), dus de som telt dat deel dubbel. De twee rijen op
+   * het scherm blijven daarom apart en worden nooit opgeteld.
+   */
+  it('BUG-ANKER — de winnaar oogt armer op de belegbare rij, maar houdt het meeste over', () => {
+    expect(laatst.eindvermogenBelegbaarNominaal as number).toBeLessThan(
+      referentie.eindvermogenBelegbaarNominaal as number,
+    )
+    expect(laatst.eindvermogenPensioenNominaal as number).toBeGreaterThan(
+      referentie.eindvermogenPensioenNominaal as number,
+    )
+    const samen = (v: VariantUitkomst) =>
+      (v.eindvermogenBelegbaarNominaal as number) + (v.eindvermogenPensioenNominaal as number)
+    expect(samen(laatst)).toBeGreaterThan(samen(referentie))
+  })
+
+  it('een kern-fout levert null, geen 0 (de leeg()-tak)', () => {
+    const stuk = runVariantenSweep({
+      ...snapshot,
+      rawContext: {
+        ...snapshot.rawContext,
+        profile: { ...basisProfiel, date_of_birth: null },
+      },
+    })
+    for (const v of stuk.varianten) {
+      expect(v.kernelFout).not.toBeNull()
+      expect(v.eindvermogenPensioenNominaal).toBeNull()
+    }
   })
 })
 

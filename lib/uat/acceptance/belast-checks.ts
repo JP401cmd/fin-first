@@ -57,6 +57,9 @@ import {
   type PotRulesConfig,
 } from '@/lib/pot-rules'
 import { buildTsParams } from '@/lib/horizon-kernel/adapter/prio-overgang'
+import { ASSET_TYPE_TO_CATEGORIE } from '@/lib/horizon-kernel/adapter/potten'
+import { PENSIOEN_CATEGORIE, pensioenPortfolio } from '@/lib/horizon/pensioen-pot'
+import type { UnifiedProjectionRow } from '@/lib/unified-projection'
 import type { AssetPot, DebtPot, TsBezitCategorie } from '@/lib/horizon-kernel/types'
 import type { ConvergentieRawProfileRow } from '@/lib/horizon-kernel/convergentie-router'
 import {
@@ -220,6 +223,7 @@ function leegVariant(id: VariantId): VariantUitkomst {
     fireAgeFractional: null,
     eindvermogenNettoNominaal: null,
     eindvermogenBelegbaarNominaal: null,
+    eindvermogenPensioenNominaal: null,
     laagsteBuffer: null,
     diskwalificatie: null,
     kernelFout: null,
@@ -592,7 +596,7 @@ export const BELAST_ENGINE_CHECKS: BelastEngineCheck[] = [
     workflow: 'WF-BELAST-25',
     scenarioId: 'UAT-BELAST-25',
     label:
-      'Variantensweep (Fase 3): prio-vectoren per variant + de V1-val bij de presets, vetovolgorde (buffer-uitgeput > fire-later), kernelFout krijgt geen diskwalificatie, eindvermogen op beide grondslagen uit een echte sweep-run',
+      'Variantensweep (Fase 3): prio-vectoren per variant + de V1-val bij de presets, vetovolgorde (buffer-uitgeput > fire-later), kernelFout krijgt geen diskwalificatie, eindvermogen op alle drie de grondslagen (incl. de resterende pensioenpot op de kern-categorie) uit een echte sweep-run',
     run: () => {
       criterion('WF-BELAST-25')
 
@@ -636,7 +640,11 @@ export const BELAST_ENGINE_CHECKS: BelastEngineCheck[] = [
       const kernFoutVariant: VariantUitkomst = { ...leegVariant('pensioen-laatst'), kernelFout: 'kern-fout' }
       const kernelFoutNoDisq = bepaalDiskwalificatie(kernFoutVariant, referentieStub) === null
 
-      // (d) Eindvermogen op BEIDE grondslagen, per variant, uit een echte sweep.
+      // (d) Eindvermogen op alle DRIE de grondslagen, per variant, uit een echte
+      // sweep — inclusief de resterende pensioenpot. Die derde is geen extraatje:
+      // `spendablePortfolio` slaat de pensioenpot per constructie over, dus zonder
+      // dat getal toont katern IV de variant die het pensioen uitstelt als de
+      // armste terwijl ze juist het meeste overhoudt.
       const resultaat = runVariantenSweep(sweepSnapshot)
       const eindvermogenCompleet = resultaat.varianten.every(
         (v) =>
@@ -646,11 +654,39 @@ export const BELAST_ENGINE_CHECKS: BelastEngineCheck[] = [
       const nettoGteBelegbaar = resultaat.varianten.every(
         (v) => (v.eindvermogenNettoNominaal as number) >= (v.eindvermogenBelegbaarNominaal as number) - 1,
       )
+      const pensioenpotCompleet = resultaat.varianten.every((v) =>
+        Number.isFinite(v.eindvermogenPensioenNominaal as number),
+      )
+      // De pot volgt de lever: prio 5 (uitstellen) houdt meer over dan de
+      // ongewijzigde volgorde, en die weer meer dan prio 1 (vroeg opnemen).
+      const [refV, laatstV, eerstV] = resultaat.varianten
+      const pensioenpotVolgtLever =
+        (laatstV.eindvermogenPensioenNominaal as number) > (refV.eindvermogenPensioenNominaal as number) &&
+        (refV.eindvermogenPensioenNominaal as number) > (eerstV.eindvermogenPensioenNominaal as number)
+      // …en de grondslag is de KERN-CATEGORIE, niet het app-type `retirement`:
+      // `levensverzekering` mapt op dezelfde categorie en moet meetellen.
+      // Bewust een AANROEP van de échte functie op een rij met béíde
+      // pensioentypen, niet alleen een vergelijking van twee map-entries: die
+      // eerdere opzet bleef groen als `pensioenPortfolio` uitsluitend
+      // `retirement` zou tellen — precies de fout die dit criterium moet vangen.
+      // Het niet-pensioentype hoort er NIET in: dat bewijst dat de functie op de
+      // categorie filtert en niet simpelweg alles optelt.
+      const proefRij = {
+        assetBuckets: {
+          retirement: { endValue: 1_000 },
+          levensverzekering: { endValue: 250 },
+          investment: { endValue: 9_000 },
+        },
+      } as unknown as UnifiedProjectionRow
+      const pensioenpotVolgtCategorie =
+        pensioenPortfolio(proefRij) === 1_250 &&
+        ASSET_TYPE_TO_CATEGORIE.retirement === PENSIOEN_CATEGORIE &&
+        ASSET_TYPE_TO_CATEGORIE.levensverzekering === PENSIOEN_CATEGORIE
 
       return {
         expected:
-          'prioReferentie=4; prioLaatst=5; prioEerst=1; variantOverlaysDiffer=true; presetsCollide=true; vetoOrder=buffer-uitgeput; kernelFoutNoDisq=true; eindvermogenCompleet=true; nettoGteBelegbaar=true',
-        actual: `prioReferentie=${vectoren[0].Pensioen}; prioLaatst=${vectoren[1].Pensioen}; prioEerst=${vectoren[2].Pensioen}; variantOverlaysDiffer=${variantOverlaysDiffer}; presetsCollide=${presetsCollide}; vetoOrder=${vetoOrder}; kernelFoutNoDisq=${kernelFoutNoDisq}; eindvermogenCompleet=${eindvermogenCompleet}; nettoGteBelegbaar=${nettoGteBelegbaar}`,
+          'prioReferentie=4; prioLaatst=5; prioEerst=1; variantOverlaysDiffer=true; presetsCollide=true; vetoOrder=buffer-uitgeput; kernelFoutNoDisq=true; eindvermogenCompleet=true; nettoGteBelegbaar=true; pensioenpotCompleet=true; pensioenpotVolgtLever=true; pensioenpotVolgtCategorie=true',
+        actual: `prioReferentie=${vectoren[0].Pensioen}; prioLaatst=${vectoren[1].Pensioen}; prioEerst=${vectoren[2].Pensioen}; variantOverlaysDiffer=${variantOverlaysDiffer}; presetsCollide=${presetsCollide}; vetoOrder=${vetoOrder}; kernelFoutNoDisq=${kernelFoutNoDisq}; eindvermogenCompleet=${eindvermogenCompleet}; nettoGteBelegbaar=${nettoGteBelegbaar}; pensioenpotCompleet=${pensioenpotCompleet}; pensioenpotVolgtLever=${pensioenpotVolgtLever}; pensioenpotVolgtCategorie=${pensioenpotVolgtCategorie}`,
       }
     },
   },

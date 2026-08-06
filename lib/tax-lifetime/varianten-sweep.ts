@@ -48,10 +48,13 @@
  *  - **Eindvermogen is verplicht meegeleverd.** Een NOMINALE levenslange-belasting-
  *    ranking beloont "eerder door je geld heen zijn": wie z'n vermogen sneller
  *    opmaakt betaalt minder Box 3 en wint de as. Zonder het eindvermogen ernaast is
- *    de winnaar misleidend. Daarom twee expliciet benoemde grondslagen (ADR 0073):
- *    `eindvermogenNettoNominaal` (volledig netto vermogen, incl. niet-liquide bezit)
- *    en `eindvermogenBelegbaarNominaal` (dezelfde grondslag als de laagste buffer).
- *    Meng ze nooit op één as.
+ *    de winnaar misleidend. Daarom DRIE expliciet benoemde grondslagen (ADR 0073):
+ *    `eindvermogenNettoNominaal` (volledig netto vermogen, incl. niet-liquide bezit),
+ *    `eindvermogenBelegbaarNominaal` (dezelfde grondslag als de laagste buffer) en
+ *    `eindvermogenPensioenNominaal` (de resterende pensioenpot — kern-categorie
+ *    'Pensioen'). Die derde is geen luxe: de belegbare grondslag slaat de pensioenpot
+ *    per constructie over, dus juist de variant die het pensioen uitstelt oogt er
+ *    armer door. Meng ze nooit op één as en tel ze nooit bij elkaar op.
  *
  * ## Wat deze laag NIET is
  * Geen `TaxOpportunity`. `toTaxOpportunities()` voedt de hub én de aandachtspunten
@@ -75,6 +78,7 @@ import {
 } from '@/lib/horizon-kernel/convergentie-router'
 import { computeLaagsteBuffer, type LaagsteBuffer } from '@/lib/horizon/laagste-buffer'
 import { spendablePortfolio } from '@/lib/horizon/coverage-strip'
+import { pensioenPortfolio } from '@/lib/horizon/pensioen-pot'
 import { computeLifetimeTax } from './lifetime-tax'
 
 // ── Drempels (vergelijk-toleranties, GEEN financiële aanname) ────────────────
@@ -212,6 +216,25 @@ export interface VariantUitkomst {
   readonly eindvermogenNettoNominaal: number | null
   /** Belegbaar vermogen op de laatste rij — zelfde grondslag als `laagsteBuffer`. */
   readonly eindvermogenBelegbaarNominaal: number | null
+  /**
+   * Resterende PENSIOENPOT op de laatste rij (`pensioenPortfolio`): de kern-categorie
+   * 'Pensioen', dus `retirement` ÉN `levensverzekering` — exact de categorie waar de
+   * onttrekkings-overlay van deze sweep op stuurt.
+   *
+   * **Waarom dit veld naast het belegbaar vermogen MOET staan.** Deze sweep vergelijkt
+   * drie plekken voor de pensioenpot, terwijl `eindvermogenBelegbaarNominaal`
+   * (`spendablePortfolio`) de pensioenpot per constructie overslaat
+   * (`NON_SPENDABLE_ASSET_TYPES`). Een variant die het pensioen uitstelt eindigt
+   * daardoor met een fors LAGER belegbaar vermogen — niet omdat ze armer is, maar
+   * omdat haar vermogen in de pot staat die die grondslag niet telt. Zonder dit getal
+   * kan katern IV zijn eigen vraag niet beantwoorden.
+   *
+   * GRONDSLAG-WAARSCHUWING: dit is een DERDE grondslag naast netto en belegbaar, geen
+   * uitsplitsing daarvan. Nooit optellen bij `eindvermogenBelegbaarNominaal` — die
+   * telt `levensverzekering` vandaag óók mee (zie `lib/horizon/pensioen-pot.ts`), dus
+   * de som zou dat deel dubbel tellen. Apart tonen, apart labelen.
+   */
+  readonly eindvermogenPensioenNominaal: number | null
   /** Dieptepunt van het belegbaar vermogen (`computeLaagsteBuffer`). */
   readonly laagsteBuffer: LaagsteBuffer | null
 
@@ -280,6 +303,7 @@ function runVariant(snapshot: VariantenSweepSnapshot, spec: VariantSpec): Varian
     fireAgeFractional: null,
     eindvermogenNettoNominaal: null,
     eindvermogenBelegbaarNominaal: null,
+    eindvermogenPensioenNominaal: null,
     laagsteBuffer: null,
     diskwalificatie: null,
     kernelFout,
@@ -311,6 +335,7 @@ function runVariant(snapshot: VariantenSweepSnapshot, spec: VariantSpec): Varian
     fireAgeFractional: outcome.result.fireAgeFractional,
     eindvermogenNettoNominaal: laatste.netWorth,
     eindvermogenBelegbaarNominaal: spendablePortfolio(laatste),
+    eindvermogenPensioenNominaal: pensioenPortfolio(laatste),
     laagsteBuffer: computeLaagsteBuffer(rows),
   }
 }
