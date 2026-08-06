@@ -468,7 +468,7 @@ function CompareTable({
           <tbody>
             <GroupRow label="Belasting" span={cols} />
             <tr>
-              <Th>Heffing na scenario</Th>
+              <Th>Heffing na deze keuze</Th>
               <Td>{fc(baseTax)}/jr</Td>
               {opportunities.map((o) => (
                 <Td key={o.id} style={winnerCell(o)}>
