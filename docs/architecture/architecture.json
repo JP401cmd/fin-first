@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-06T06:00:05.282Z",
+  "generatedAt": "2026-08-06T06:43:55.352Z",
   "generatedDate": "2026-08-06",
   "repo": {
     "name": "fin",
@@ -15694,8 +15694,8 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 8403,
-        "commits": 92
+        "loc": 8417,
+        "commits": 93
       },
       {
         "file": "components/app/budgets-client.tsx",
@@ -16343,6 +16343,12 @@
         ]
       },
       {
+        "id": "optimizer-check",
+        "name": "optimizer-check",
+        "description": "Gebruik na wijzigingen aan lib/tax-optimizer/**, lib/tax-lifetime/**, de Box 3-motor, de kansen-loader of de optimizer-katernen, bij twijfel of de fiscale keuzes nog kloppen op het scherm, of als periodieke visuele regressie-check bovenop de vitest-suites. Ook wanneer iemand vraagt \"check de optimizer\", \"leg de belastingstrategieën naast elkaar\" of een rapport met schermafbeeldingen per keuze wil.",
+        "steps": []
+      },
+      {
         "id": "playwright-cli",
         "name": "playwright-cli",
         "description": "Automates browser interactions for web testing, form filling, screenshots, and data extraction. Use when the user needs to navigate websites, interact with web pages, fill forms, take screenshots, test web applications, or extract information from web pages.",
@@ -16678,7 +16684,7 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-08-05",
+    "previousDate": "2026-08-06",
     "hasChanges": false,
     "sections": []
   },

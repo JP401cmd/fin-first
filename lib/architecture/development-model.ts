@@ -133,6 +133,10 @@ export const SKILL_CURATION: Record<string, SkillCuration> = {
     kind: 'tooling',
     tagline: 'Live-verificatie van de vier eigen-woningstrategieën in de Toekomst-grafiek: gekalibreerd seed-account (FIRE ≈ 60, interen), per strategie Pad + Opbouw via chromedev, invarianten-toets bovenop de matrix-goldens, rapport met oordeel.',
   },
+  'optimizer-check': {
+    kind: 'tooling',
+    tagline: 'Live-verificatie van de fiscale keuzes op de optimizer: seed-account met beleggingen, pensioen én jaarruimte, katern I–IV via chromedev uitgelezen uit de DOM, invarianten-toets bovenop de vitest-suites — gericht op het gat tussen motor en scherm.',
+  },
 }
 
 // ── Curatie: groepen + agents ───────────────────────────────────────────────-
