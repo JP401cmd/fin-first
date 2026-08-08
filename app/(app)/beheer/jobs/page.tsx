@@ -65,6 +65,13 @@ const JOB_CATALOG = [
     path: '/api/cron/retention',
     description: 'Purget log-/usage-rijen ouder dan de vastgelegde bewaartermijn (error_logs/mail_log 12m, job_runs 6m, contract_events/ai_token_usage/ai_usage 24m) en verlopen lead_intakes (90d). Zie ADR 0059.',
   },
+  {
+    key: 'user-reports-notion-sync',
+    label: 'Meldingen → Notion-sync',
+    schedule: 'Dagelijks 06:00',
+    path: '/api/cron/user-reports-notion-sync',
+    description: 'Herstelt meldingen van testgebruikers (bug/vraag/aanbeveling) die live niet naar de Notion-queue gepusht konden worden; stopt na 5 pogingen per melding.',
+  },
 ] as const
 
 const dateTimeFmt = new Intl.DateTimeFormat('nl-NL', {

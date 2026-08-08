@@ -26,6 +26,13 @@ import { buildForecast, FORECAST_MONTHS } from '@/lib/cashflow-forecast-math'
  *
  * Gebruikt geen Monte Carlo of inflatie; voor scenario-diepere
  * forecasting verwijst de footer naar /toekomst Tijdas.
+ *
+ * euro-view: exempt (D12) — de vooruitblik loopt 6 maanden en rekent bewust
+ * ZONDER inflatie (`lib/cashflow-forecast-math.ts`): de bedragen zijn de
+ * huidige maandlasten en -inkomsten, doorgetrokken. Ze staan dus al in euro's
+ * van vandaag en er is geen kernelrij met een `inflationFactor` om mee te
+ * deflateren. Op een half jaar zou een koopkrachtcorrectie bovendien kleiner
+ * zijn dan de ruis in de baseline zelf.
  */
 
 export function CashflowForecast({

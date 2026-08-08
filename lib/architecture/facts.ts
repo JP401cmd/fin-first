@@ -126,56 +126,12 @@ function asNumber(v: unknown): number {
   return typeof v === 'number' && Number.isFinite(v) ? v : 0
 }
 
-/**
- * Leest defensief de `claudeTeam`-sleutel uit de gegenereerde snapshot. Geeft
- * altijd een geldig (eventueel leeg) `ClaudeTeamFacts`-object terug, zodat
- * `buildDevelopmentModel` nooit op een ontbrekende/oude snapshot stukloopt.
- * Vorm volgt `scripts/architecture/generate.mjs` → architecture.json.claudeTeam.
- */
-export function selectClaudeTeam(raw: unknown): {
-  agents: Array<{ id: string; name: string; description: string; model?: string; color?: string }>
-  skills: Array<{
-    id: string
-    name: string
-    description: string
-    steps: Array<{ index: number; title: string; agents: string[] }>
-  }>
-} {
-  const root = asRecord(raw)
-  const team = asRecord(root.claudeTeam)
-
-  const agents = asArray(team.agents).map((a) => {
-    const aa = asRecord(a)
-    const model = asString(aa.model)
-    const color = asString(aa.color)
-    return {
-      id: asString(aa.id),
-      name: asString(aa.name) || asString(aa.id),
-      description: asString(aa.description),
-      ...(model ? { model } : {}),
-      ...(color ? { color } : {}),
-    }
-  }).filter((a) => a.id)
-
-  const skills = asArray(team.skills).map((s) => {
-    const ss = asRecord(s)
-    return {
-      id: asString(ss.id),
-      name: asString(ss.name) || asString(ss.id),
-      description: asString(ss.description),
-      steps: asArray(ss.steps).map((st) => {
-        const stt = asRecord(st)
-        return {
-          index: asNumber(stt.index),
-          title: asString(stt.title),
-          agents: asArray(stt.agents).map(asString).filter(Boolean),
-        }
-      }),
-    }
-  }).filter((s) => s.id)
-
-  return { agents, skills }
-}
+// Noot (besluit 02): `selectClaudeTeam` is hier verwijderd toen /beheer/development
+// eruit ging — de enige consument. De gescande feiten (`architecture.json.claudeTeam`,
+// door `scanClaudeTeam()` in generate.mjs) en de curatie (`lib/architecture/
+// development-model.ts` + de CI-gate `development-model.test.ts`) blijven bestaan;
+// die test leest `claudeTeam` rechtstreeks uit de snapshot. De leesvorm is de
+// teamplaat op de org-site (trifinity-org/site/team.html).
 
 /** Gescande integratie-client-feiten (architecture.json.integrationClients). */
 export interface IntegrationClientFact {

@@ -98,11 +98,12 @@ const criteria: AcceptanceCriterion[] = [
     titel: 'Vertrouwens- en juridische informatie lezen en contact opnemen',
     kriticiteit: 'OVERIG',
     given: 'Uitgelogde browser.',
-    when: 'De bezoeker opent /veiligheid, /privacy, /wft en /contact en klikt de e-mailkaart.',
-    then: 'Elke pagina laadt; /privacy en /wft tonen de concept-banner; de mailto-link opent de mailclient.',
+    when: 'De bezoeker opent /veiligheid, /privacy, /wft en /contact en bekijkt de e-mailkaart.',
+    then: 'Elke pagina laadt; /privacy en /wft tonen de concept-banner; de e-mailkaart op /contact is GEEN mailto-link maar toont de invulplek "[support-e-mailadres — volgt]" met de uitleg dat TriFinity nog geen eigen domein heeft.',
     assertion: {
       kind: 'ui-only',
-      source: 'statische content + mailto-link, geen cijfermatige uitkomst',
+      source:
+        'app/privacy/page.tsx + app/voorwaarden/page.tsx + app/contact/page.tsx (statische content) + lib/legal-contact.ts#LEGAL_CONTACT (address = null ⇒ placeholder i.p.v. mailto), geen cijfermatige uitkomst',
     },
   },
   {

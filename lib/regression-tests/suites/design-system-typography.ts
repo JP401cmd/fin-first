@@ -45,6 +45,12 @@ const tests: TestCase[] = [
   // design tokens. Coverage moved to component-level checks elsewhere —
   // these monolith string-grep tests were removed during the Kern
   // refactor (cleanup task #10).
+  //
+  // CoreHero zelf roept `formatCurrency` niet meer rechtstreeks aan — het
+  // hoofdbedrag gaat via `formatMaskedCurrency` (lib/format.ts, privacy-
+  // masking) en secundaire bedragen via <MaskedAmount> (die formatCurrency
+  // intern gebruikt maar het letterlijke woord niet in core-hero.tsx zet).
+  // De canonieke formatter voor dit component is dus formatMaskedCurrency.
   {
     id: 'typo-core-hero-font-mono',
     name: 'core-hero: bedragen gebruiken font-mono',
@@ -56,12 +62,12 @@ const tests: TestCase[] = [
       const src = readSourceFile('components/core/core-hero.tsx')
       assert(src.length > 0, 'core-hero.tsx kon niet gelezen worden')
 
-      const formatCurrencyMatches = src.match(/formatCurrency/g) || []
+      const formatCurrencyMatches = src.match(/formatMaskedCurrency/g) || []
       const fontMonoMatches = src.match(/font-mono/g) || []
 
       assertGreaterThan(
         formatCurrencyMatches.length, 0,
-        'core-hero moet formatCurrency aanroepen',
+        'core-hero moet formatMaskedCurrency aanroepen',
       )
       assertGreaterThan(
         fontMonoMatches.length, 0,

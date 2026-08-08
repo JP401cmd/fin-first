@@ -9,6 +9,19 @@ import {
   type PersonaBudget,
 } from '@/lib/test-personas'
 import { BUDGET_TEMPLATES, type BudgetTemplate, type SeedBudget } from '@/lib/budget-templates'
+import { STRATEGY_LABELS } from '@/lib/fire-strategy'
+import type { WidgetSize } from '@/lib/widget-catalog'
+
+// Canonieke, uitputtende WidgetSize-allowlist — het Record-patroon dwingt via
+// TypeScript af dat elke waarde uit lib/widget-catalog.ts hier vertegenwoordigd
+// is (een nieuwe/verwijderde size geeft een compile-fout, geen stille drift).
+const VALID_WIDGET_SIZES: Record<WidgetSize, true> = {
+  mini: true,
+  quarter: true,
+  half: true,
+  full: true,
+  xl: true,
+}
 
 const CAT = 'beheer.testdata'
 
@@ -18,14 +31,17 @@ const tests: TestCase[] = [
   // ──────────────── Persona seeding: data completeness ────────────────
   {
     id: 'td-personas-available',
-    name: 'Alle 4 persona\'s beschikbaar',
+    name: 'Alle 5 persona\'s beschikbaar',
     category: CAT,
-    description: 'PERSONA_KEYS bevat alle 4 persona sleutels',
+    // PERSONA_KEYS is uitgebreid met 'compleet' (Tessa) — de horizon-strategie-
+    // regressiefixture, bewust apart van de 4 beheerbare landing-testaccounts
+    // (zie lib/test-personas.ts, TEST_USER_PERSONA_KEYS-comment). 4 → 5.
+    description: 'PERSONA_KEYS bevat alle 5 persona sleutels (incl. de \'compleet\'-regressiefixture)',
     priority: 'critical',
     estimatedDurationMs: 10,
     fn() {
-      assertEqual(PERSONA_KEYS.length, 4, '4 persona keys')
-      const expected: PersonaKey[] = ['daan', 'lisa', 'willem', 'marijke']
+      assertEqual(PERSONA_KEYS.length, 5, '5 persona keys')
+      const expected: PersonaKey[] = ['daan', 'lisa', 'willem', 'marijke', 'compleet']
       for (const key of expected) {
         assert(PERSONA_KEYS.includes(key), `${key} in PERSONA_KEYS`)
         assertNotNull(PERSONAS[key], `PERSONAS[${key}] bestaat`)
@@ -335,8 +351,12 @@ const tests: TestCase[] = [
           assert(p.inflation_rate >= 0 && p.inflation_rate < 1, `${key} inflation_rate 0-1: ${p.inflation_rate}`)
         }
         if (p.fire_end_strategy != null) {
+          // Canonieke bron: lib/fire-strategy.ts STRATEGY_LABELS (4 modi,
+          // incl. 'pensioen' — opbouw tot AOW, daarna onttrekking). Lezen
+          // i.p.v. hardcoden voorkomt dat deze allowlist opnieuw achterloopt
+          // wanneer een strategie bijkomt/verdwijnt.
           assert(
-            ['perpetual', 'legacy', 'deplete'].includes(p.fire_end_strategy),
+            Object.keys(STRATEGY_LABELS).includes(p.fire_end_strategy),
             `${key} fire_end_strategy geldig: ${p.fire_end_strategy}`,
           )
         }
@@ -415,7 +435,7 @@ const tests: TestCase[] = [
         for (const w of prefs.widgets) {
           assertNotNull(w.id, `${key} widget id`)
           assert(typeof w.enabled === 'boolean', `${key} widget ${w.id} enabled`)
-          assert(['quarter', 'half', 'full'].includes(w.size), `${key} widget ${w.id} size: ${w.size}`)
+          assert(w.size in VALID_WIDGET_SIZES, `${key} widget ${w.id} size: ${w.size}`)
           assert(typeof w.order === 'number', `${key} widget ${w.id} order`)
         }
       }

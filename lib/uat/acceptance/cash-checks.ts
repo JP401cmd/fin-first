@@ -65,6 +65,15 @@ import {
   parseBankSyncPrevious,
   formatBankSyncCorrectionNote,
 } from '@/lib/truelayer/balance-valuation'
+import {
+  computePeriodOutcome,
+  computeStreaks,
+  computeSpendLimitTrend,
+  resolveSpendLimitPeriods,
+  type SpendLimitAggregateRow,
+  type SpendLimitPeriodOutcome,
+} from '@/lib/spend-limits/engine'
+import { spendLimitCounterpartyKey, counterpartyMatchesKey } from '@/lib/spend-limits/counterparty-key'
 import { CASH_ACCEPTANCE } from './cash'
 import type { AcceptanceCriterion } from './types'
 
@@ -541,9 +550,22 @@ NEWFILEUID:NONE
       const ofxTxns = await parseOFX(ofxContent)
       const sumBij = (txns: { amount: number }[]) => txns.filter((t) => t.amount > 0).reduce((s, t) => s + t.amount, 0)
       const sumAf = (txns: { amount: number }[]) => Math.abs(txns.filter((t) => t.amount < 0).reduce((s, t) => s + t.amount, 0))
+      // WF-CASH-23-bug1 (17 jul 2026): de MT940/OFX-parsers zetten ooit de rauwe
+      // bank-typecode (bv. "NTRF"/"DEBIT") in `transaction_type` — die kolom heeft
+      // een DB-CHECK-constraint op een vaste enum en elke insert faalde. De fix
+      // (lib/parsers/mt940.ts / ofx.ts) laat `transaction_type` altijd `null` en
+      // legt de rauwe code in `bank_code`. De eerdere assertie (alleen count/som)
+      // ving dit niet — bewezen met een bijt-proef (bug teruggezet, deze check
+      // rood). Assert daarom expliciet beide velden voor elke geparste rij.
+      const allTxns = [...mt940Txns, ...ofxTxns]
+      const transactionTypeAlwaysNull = allTxns.every((t) => t.transaction_type === null)
+      const mt940BankCodeOk = mt940Txns.every((t) => t.bank_code === 'NTRF')
+      const ofxBankCodeOk =
+        ofxTxns[0]?.bank_code === 'DEBIT' && ofxTxns[1]?.bank_code === 'CREDIT' && ofxTxns[2]?.bank_code === 'DEBIT'
       return {
-        expected: 'mt940Count=3; mt940Bij=2500; mt940Af=895; ofxCount=3; ofxBij=2500; ofxAf=895',
-        actual: `mt940Count=${mt940Txns.length}; mt940Bij=${fx(sumBij(mt940Txns), 0)}; mt940Af=${fx(sumAf(mt940Txns), 0)}; ofxCount=${ofxTxns.length}; ofxBij=${fx(sumBij(ofxTxns), 0)}; ofxAf=${fx(sumAf(ofxTxns), 0)}`,
+        expected:
+          'mt940Count=3; mt940Bij=2500; mt940Af=895; ofxCount=3; ofxBij=2500; ofxAf=895; transactionTypeAlwaysNull=true; mt940BankCodeOk=true; ofxBankCodeOk=true',
+        actual: `mt940Count=${mt940Txns.length}; mt940Bij=${fx(sumBij(mt940Txns), 0)}; mt940Af=${fx(sumAf(mt940Txns), 0)}; ofxCount=${ofxTxns.length}; ofxBij=${fx(sumBij(ofxTxns), 0)}; ofxAf=${fx(sumAf(ofxTxns), 0)}; transactionTypeAlwaysNull=${transactionTypeAlwaysNull}; mt940BankCodeOk=${mt940BankCodeOk}; ofxBankCodeOk=${ofxBankCodeOk}`,
       }
     },
   },
@@ -912,6 +934,135 @@ NEWFILEUID:NONE
       return {
         expected: `budgetKpi=${formatCurrency(-250)}; transKpi=${formatCurrency(-500)}`,
         actual: `budgetKpi=${budget?.kpi}; transKpi=${transacties?.kpi}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-CASH-53',
+    scenarioId: 'UAT-CASH-53',
+    label: 'Grenzenpot-motor (engine.ts): kwartaal/jaar-containment, isNearLimit-guards, streaks, trend-randgevallen, refund-flip, tegenpartij-parity — allemaal op synthetische invoer, geen mirror',
+    run: () => {
+      criterion('WF-CASH-53')
+
+      const agg = (month: string, sumNegatief: number, sumPositief = 0): SpendLimitAggregateRow => ({
+        month,
+        transactionType: null,
+        sumPositief,
+        sumNegatief,
+        count: 1,
+      })
+
+      // (a) Kwartaal- en jaar-containment: de buurperiode net erbuiten telt niet mee.
+      const now = new Date(2026, 7, 15) // 15 aug 2026 — binnen Q3 2026
+      const [quarterSlice] = resolveSpendLimitPeriods('quarter', now, 1)
+      const quarterOutcome = computePeriodOutcome(
+        quarterSlice,
+        [agg('2026-06', -1000), agg('2026-07', -300), agg('2026-08', -250), agg('2026-09', -200)],
+        900,
+      )
+      const [yearSlice] = resolveSpendLimitPeriods('year', now, 1)
+      const yearRows: SpendLimitAggregateRow[] = [agg('2025-12', -5000)]
+      for (let m = 1; m <= 12; m++) yearRows.push(agg(`2026-${String(m).padStart(2, '0')}`, -100))
+      const yearOutcome = computePeriodOutcome(yearSlice, yearRows, 5000)
+
+      // (b) isNearLimit-guards: een nulgrens meldt nooit "bijna over", en
+      // 'exceeded' sluit 'near' altijd uit, ongeacht het percentage.
+      const zeroLimitOutcome = computePeriodOutcome(
+        { periodKey: 'z', label: 'z', since: '2026-01-01', until: '2026-01-31', isOpen: false },
+        [],
+        0,
+      )
+      const exceededOutcome = computePeriodOutcome(
+        { periodKey: 'e', label: 'e', since: '2026-01-01', until: '2026-01-31', isOpen: false },
+        [agg('2026-01', -100)],
+        50,
+      )
+
+      // (c) Streaks: de lopende periode telt niet mee; een enkele overschrijding
+      // breekt de reeks, de reeks daarna telt opnieuw op vanaf 0.
+      const mk = (periodKey: string, month: string, negatief: number, limit: number): SpendLimitPeriodOutcome =>
+        computePeriodOutcome({ periodKey, label: periodKey, since: `${month}-01`, until: `${month}-28`, isOpen: false }, [agg(month, negatief)], limit)
+      const closedPeriods = [
+        mk('p1', '2020-01', -50, 100),
+        mk('p2', '2020-02', -80, 100),
+        mk('p3', '2020-03', -150, 100),
+        mk('p4', '2020-04', -10, 100),
+        mk('p5', '2020-05', -20, 100),
+        mk('p6', '2020-06', -30, 100),
+      ]
+      const streaks = computeStreaks(closedPeriods)
+
+      // (d) Trend-randgevallen (geen NaN, geen "Infinity%"): < 3 afgesloten →
+      // recent=null; < 6 afgesloten → prior=null (los van elkaar getoetst);
+      // prior=0 & recent=0 → stable/0; prior=0 & recent>0 → worsening/null;
+      // |wijziging| < 5% → stable, ondanks een niet-nul verschil.
+      const mkFlat = (key: string, matched: number): SpendLimitPeriodOutcome =>
+        computePeriodOutcome({ periodKey: key, label: key, since: '2021-01-01', until: '2021-01-31', isOpen: false }, [agg('2021-01', -matched)], 1_000_000)
+      const trendTooFewClosed = computeSpendLimitTrend([mkFlat('t1', 100), mkFlat('t2', 100)])
+      const trendUnder6Closed = computeSpendLimitTrend([mkFlat('t1', 100), mkFlat('t2', 100), mkFlat('t3', 100), mkFlat('t4', 100)])
+      const trendStableZero = computeSpendLimitTrend([
+        mkFlat('u1', 0), mkFlat('u2', 0), mkFlat('u3', 0),
+        mkFlat('u4', 0), mkFlat('u5', 0), mkFlat('u6', 0),
+      ])
+      const trendWorseningFromZero = computeSpendLimitTrend([
+        mkFlat('v1', 0), mkFlat('v2', 0), mkFlat('v3', 0),
+        mkFlat('v4', 100), mkFlat('v5', 100), mkFlat('v6', 100),
+      ])
+      const trendStableSmallChange = computeSpendLimitTrend([
+        mkFlat('w1', 1000), mkFlat('w2', 1000), mkFlat('w3', 1000),
+        mkFlat('w4', 970), mkFlat('w5', 970), mkFlat('w6', 970),
+      ])
+      const trendImproving = computeSpendLimitTrend([
+        mkFlat('x1', 1000), mkFlat('x2', 1000), mkFlat('x3', 1000),
+        mkFlat('x4', 800), mkFlat('x5', 800), mkFlat('x6', 800),
+      ])
+
+      // (e) Refund-flip: dezelfde periode, met een refund erbij, klapt retroactief
+      // van 'exceeded' naar 'within' — er wordt niets opgeslagen, alleen herrekend.
+      const beforeRefund = computePeriodOutcome(
+        { periodKey: 'r', label: 'r', since: '2026-01-01', until: '2026-01-31', isOpen: false },
+        [agg('2026-01', -120)],
+        100,
+      )
+      const afterRefund = computePeriodOutcome(
+        { periodKey: 'r', label: 'r', since: '2026-01-01', until: '2026-01-31', isOpen: false },
+        [agg('2026-01', -120), agg('2026-01', 0, 40)],
+        100,
+      )
+
+      // (f) Tegenpartij-parity-helpers (spiegel van public.spend_limit_counterparty_key).
+      const key = spendLimitCounterpartyKey('Shell Amsterdam #57')
+      const matchesShell = counterpartyMatchesKey('Shell Amsterdam #57', 'SHELL')
+      const matchesBol = counterpartyMatchesKey('Bol.com', 'SHELL')
+      const emptyKeyNeverMatches = counterpartyMatchesKey('Shell Amsterdam #57', '')
+
+      return {
+        expected:
+          'quarterMatched=750; quarterNear=true; quarterHeadroom=150; quarterTxCount=3; ' +
+          'yearMatched=1200; yearNear=false; yearTxCount=12; ' +
+          'zeroLimitNear=false; zeroLimitStatus=within; exceededNear=false; exceededStatus=exceeded; ' +
+          'currentStreak=3; longestStreak=3; exceededPeriodCount=1; closedPeriodCount=6; lastWithin=p6; ' +
+          'tooFewRecent=null; tooFewDirection=unknown; ' +
+          'under6Recent=100; under6Prior=null; under6Direction=unknown; ' +
+          'stableZeroDirection=stable; stableZeroPct=0; ' +
+          'worseningFromZeroDirection=worsening; worseningFromZeroPct=null; ' +
+          'stableSmallChangeDirection=stable; ' +
+          'improvingDirection=improving; ' +
+          'refundFlip: exceeded→within; ' +
+          'key=SHELLAMSTERDAM57; matchesShell=true; matchesBol=false; emptyKeyNeverMatches=false',
+        actual:
+          `quarterMatched=${quarterOutcome.periodMatchedAmount}; quarterNear=${quarterOutcome.isNearLimit}; quarterHeadroom=${quarterOutcome.periodHeadroom}; quarterTxCount=${quarterOutcome.matchedTransactionCount}; ` +
+          `yearMatched=${yearOutcome.periodMatchedAmount}; yearNear=${yearOutcome.isNearLimit}; yearTxCount=${yearOutcome.matchedTransactionCount}; ` +
+          `zeroLimitNear=${zeroLimitOutcome.isNearLimit}; zeroLimitStatus=${zeroLimitOutcome.status}; exceededNear=${exceededOutcome.isNearLimit}; exceededStatus=${exceededOutcome.status}; ` +
+          `currentStreak=${streaks.currentStreak}; longestStreak=${streaks.longestStreak}; exceededPeriodCount=${streaks.exceededPeriodCount}; closedPeriodCount=${streaks.closedPeriodCount}; lastWithin=${streaks.lastWithinPeriodKey}; ` +
+          `tooFewRecent=${trendTooFewClosed.recentAvgMatchedAmount}; tooFewDirection=${trendTooFewClosed.direction}; ` +
+          `under6Recent=${trendUnder6Closed.recentAvgMatchedAmount}; under6Prior=${trendUnder6Closed.priorAvgMatchedAmount}; under6Direction=${trendUnder6Closed.direction}; ` +
+          `stableZeroDirection=${trendStableZero.direction}; stableZeroPct=${trendStableZero.avgMatchedAmountChangePct}; ` +
+          `worseningFromZeroDirection=${trendWorseningFromZero.direction}; worseningFromZeroPct=${trendWorseningFromZero.avgMatchedAmountChangePct}; ` +
+          `stableSmallChangeDirection=${trendStableSmallChange.direction}; ` +
+          `improvingDirection=${trendImproving.direction}; ` +
+          `refundFlip: ${beforeRefund.status}→${afterRefund.status}; ` +
+          `key=${key}; matchesShell=${matchesShell}; matchesBol=${matchesBol}; emptyKeyNeverMatches=${emptyKeyNeverMatches}`,
       }
     },
   },

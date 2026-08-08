@@ -11,6 +11,7 @@ export type JobKey =
   | 'briefing-email'
   | 'web-vitals-retention'
   | 'retention'
+  | 'user-reports-notion-sync'
 
 /**
  * Schrijf één uitvoering van een achtergrondtaak weg in `job_runs`.

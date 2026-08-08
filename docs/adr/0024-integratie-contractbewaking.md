@@ -26,9 +26,10 @@ bijhouden in hoofd of losse notities.
 
 Drie bestaande patronen in de codebase sturen de oplossing:
 
-- `/beheer/architectuur` en `/beheer/development`: *feiten gescand, betekenis gecureerd,
-  zelf-actualiserend* — de genereer-scanner levert de feiten, een gecureerd model levert de
-  betekenis, de pagina combineert beide.
+- `/beheer/architectuur` (en destijds `/beheer/development`, per besluit 02 verwijderd —
+  de scan/curatie bleef, alleen het venster ging eruit): *feiten gescand, betekenis
+  gecureerd, zelf-actualiserend* — de genereer-scanner levert de feiten, een gecureerd
+  model levert de betekenis, de weergave combineert beide.
 - `job_runs`: operator-telemetrie-tabel voor dagelijkse cron-resultaten, geen user_id,
   superadmin-only SELECT, service-role INSERT.
 - `lead_intakes` privacy-patroon: alleen structurele namen (kolom, header), nooit

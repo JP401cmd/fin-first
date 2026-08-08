@@ -58,6 +58,8 @@ import type {
 } from '@/lib/unified-projection'
 import { cashflowsForYear } from '@/lib/horizon/cashflows-for-year'
 import { HorizonCashflowSankey } from '@/components/app/horizon/horizon-cashflow-sankey'
+import { deflate } from '@/lib/euro-display'
+import { useEuroView } from '@/lib/hooks/use-euro-view'
 
 // ── Privacy-aware EUR-formatter (custom hook keeps the masked-toggle live) ──
 
@@ -66,23 +68,33 @@ function useFc() {
   return useCallback((v: number) => formatMaskedCurrency(v, masked), [masked])
 }
 
-// ── Helpers ───────────────────────────────────────────────────────
+// ── Deflatie-grondslag ────────────────────────────────────────────
+//
+// ÉÉN grondslag voor de hele kassabon: de kernelfactor die de projectierij zelf
+// draagt (`UnifiedProjectionRow.inflationFactor` = (1 + inflatie)^k, jaar 0 → 1).
+// Er staat hier bewust geen eigen `(1 + i)^(age − currentAge)` meer — dat was een
+// tweede, parallelle afleiding van hetzelfde getal (CLAUDE.md: consume, don't
+// recompute). `inflationRate` blijft alleen nog het percentage in de duiding-regel
+// voeden, niet de deflatie zelf.
 
-/** Deflateer een nominaal bedrag van toekomstige `age` terug naar `currentAge`. */
-function presentValue(
-  nominal: number,
-  age: number,
-  currentAge: number,
-  inflation: number,
-): number {
-  const years = age - currentAge
-  if (years <= 0 || inflation === 0) return nominal
-  return nominal / Math.pow(1 + inflation, years)
+/**
+ * Valt er iets te deflateren? De kernelfactor is 1.0 in jaar 0 en groeit daarna;
+ * alles ≤ 1 betekent dus "geen inflatie-afstand tot vandaag" — de kernel-tegenhanger
+ * van de oude `age <= currentAge || inflation === 0`-conditie.
+ */
+function hasDeflation(factor: number): boolean {
+  return Number.isFinite(factor) && factor > 1
 }
 
-function deflationFactor(years: number, inflation: number): number {
-  if (years <= 0 || inflation === 0) return 1
-  return 1 / Math.pow(1 + inflation, years)
+/**
+ * Formatteer een bedrag van dit jaar in de ACTIEVE euro-weergave: precies één
+ * deling door de kernelfactor in `'real'`, identiteit in `'nominal'`. Elk bedrag in
+ * deze sheet loopt hierlangs, zodat geen enkel bedrag twee keer gedeflateerd raakt.
+ */
+function useYearFc(factor: number) {
+  const fc = useFc()
+  const { view } = useEuroView()
+  return useCallback((v: number) => fc(deflate(v, factor, view)), [fc, factor, view])
 }
 
 // ── Onttrekkings-kassabon (behoefte-decompositie) ─────────────────
@@ -213,21 +225,18 @@ function SectionHead({
   )
 }
 
-/** Secundaire regel onder een bedrag: "≈ €X vandaag" deflatie-tip. */
-function PvLine({
-  nominal,
-  age,
-  currentAge,
-  inflation,
-}: {
-  nominal: number
-  age: number
-  currentAge: number
-  inflation: number
-}) {
+/**
+ * Secundaire regel onder een bedrag: "≈ €X vandaag" deflatie-tip.
+ *
+ * Alleen zinvol in de NOMINALE weergave: staat de app al op "huidige euro's", dan
+ * is het hoofdbedrag zélf al gedeflateerd en zou deze regel hetzelfde getal
+ * herhalen — of, erger, uitnodigen tot een tweede deling.
+ */
+function PvLine({ nominal, factor }: { nominal: number; factor: number }) {
   const fc = useFc()
-  if (age <= currentAge || inflation === 0) return null
-  const pv = presentValue(nominal, age, currentAge, inflation)
+  const { view } = useEuroView()
+  if (view === 'real' || !hasDeflation(factor)) return null
+  const pv = deflate(nominal, factor, 'real')
   const sign = pv < 0 ? '−' : ''
   return (
     <p className="mt-0.5 text-right font-mono text-[10px] tabular-nums text-[var(--ink-3)]">
@@ -249,20 +258,17 @@ function ReceiptSubRow({
   label,
   sublabel,
   signed,
-  age,
-  currentAge,
-  inflation,
+  factor,
   variant = 'component',
 }: {
   label: string
   sublabel?: string
   signed: number
-  age: number
-  currentAge: number
-  inflation: number
+  /** Kernelfactor van dit jaar (`row.inflationFactor`). */
+  factor: number
   variant?: 'component' | 'total' | 'deficit'
 }) {
-  const fc = useFc()
+  const fc = useYearFc(factor)
   const sign = signed < 0 ? '−' : '+'
   const isTotal = variant === 'total'
   const amountTone =
@@ -298,7 +304,7 @@ function ReceiptSubRow({
           <span aria-hidden="true">{sign}</span>
           {fc(Math.abs(signed))}
         </span>
-        <PvLine nominal={signed} age={age} currentAge={currentAge} inflation={inflation} />
+        <PvLine nominal={signed} factor={factor} />
       </div>
     </li>
   )
@@ -312,9 +318,7 @@ function AssetTypeRow({
   contributions,
   box3Drag,
   phase,
-  age,
-  currentAge,
-  inflation,
+  factor,
 }: {
   type: AssetType
   endValue: number
@@ -322,11 +326,10 @@ function AssetTypeRow({
   contributions: number
   box3Drag: number
   phase: 'opbouw' | 'afbouw' | 'overgang'
-  age: number
-  currentAge: number
-  inflation: number
+  /** Kernelfactor van dit jaar (`row.inflationFactor`). */
+  factor: number
 }) {
-  const fc = useFc()
+  const fc = useYearFc(factor)
   const showContribution = phase !== 'afbouw' && contributions > 0
   return (
     <li className="flex items-start justify-between gap-3 border-b border-dotted border-[var(--border-ed)]/70 py-2.5 last:border-b-0">
@@ -374,7 +377,7 @@ function AssetTypeRow({
         <p className="font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
           {fc(endValue)}
         </p>
-        <PvLine nominal={endValue} age={age} currentAge={currentAge} inflation={inflation} />
+        <PvLine nominal={endValue} factor={factor} />
       </div>
     </li>
   )
@@ -397,19 +400,16 @@ function DebtRow({
   endBalance,
   interestPaid,
   principalPaid,
-  age,
-  currentAge,
-  inflation,
+  factor,
 }: {
   presentation: DebtRowPresentation
   endBalance: number
   interestPaid: number
   principalPaid: number
-  age: number
-  currentAge: number
-  inflation: number
+  /** Kernelfactor van dit jaar (`row.inflationFactor`). */
+  factor: number
 }) {
-  const fc = useFc()
+  const fc = useYearFc(factor)
   return (
     <li className="flex items-start justify-between gap-3 border-b border-dotted border-[var(--border-ed)]/70 py-2.5 last:border-b-0">
       <div className="flex min-w-0 items-start gap-2.5">
@@ -452,7 +452,7 @@ function DebtRow({
         <p className="font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
           {fc(endBalance)}
         </p>
-        <PvLine nominal={endBalance} age={age} currentAge={currentAge} inflation={inflation} />
+        <PvLine nominal={endBalance} factor={factor} />
       </div>
     </li>
   )
@@ -464,22 +464,19 @@ function CostsRow({
   sublabel,
   amount,
   tone,
-  age,
-  currentAge,
-  inflation,
+  factor,
   children,
 }: {
   label: string
   sublabel?: string
   amount: number
   tone: 'expense' | 'income' | 'neutral'
-  age: number
-  currentAge: number
-  inflation: number
+  /** Kernelfactor van dit jaar (`row.inflationFactor`). */
+  factor: number
   /** Optionele kassabon-uitsplitsing onder de hoofdregel (ReceiptSubRow-lijst). */
   children?: React.ReactNode
 }) {
-  const fc = useFc()
+  const fc = useYearFc(factor)
   const sign = amount < 0 ? '−' : amount > 0 ? '+' : ''
   const toneClass =
     tone === 'expense'
@@ -501,7 +498,7 @@ function CostsRow({
             {sign}
             {fc(Math.abs(amount))}
           </p>
-          <PvLine nominal={amount} age={age} currentAge={currentAge} inflation={inflation} />
+          <PvLine nominal={amount} factor={factor} />
         </div>
       </div>
       {children && (
@@ -595,12 +592,20 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
   fireAge,
   onChangeAge,
 }: HorizonYearDetailsSheetProps) {
-  const fc = useFc()
-
   const row = useMemo(
     () => (age != null ? unifiedRows.find(r => r.age === age) : null),
     [age, unifiedRows],
   )
+
+  // De deflator van dit jaar komt uit de kernelrij zelf. Geen rij (geen data voor
+  // deze leeftijd) → 1.0, oftewel geen deflatie: liever het nominale bedrag dan een
+  // bedrag op een zelf-verzonnen grondslag.
+  const factor = row?.inflationFactor ?? 1
+  const { view } = useEuroView()
+  const fc = useYearFc(factor)
+  // Rauwe formatter voor de "≈ … vandaag"-hints: die dragen hun eigen, expliciete
+  // deflatie en mogen dus NIET nog eens door `fc` (dat zou dubbel delen).
+  const fcRaw = useFc()
 
   // Kalenderjaar berekenen op basis van delta. Werkt zonder dob: huidige
   // kalenderjaar + (age − currentAge) is voldoende voor de header-meta.
@@ -610,8 +615,13 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
   }, [age, currentAge])
 
   const yearsFromNow = age != null ? age - currentAge : 0
-  const factor = deflationFactor(yearsFromNow, inflationRate)
-  const showPv = yearsFromNow > 0 && inflationRate > 0
+  // Weergave-factor in de duiding-regel: de kernelfactor is (1 + i)^k, de klassieke
+  // "deflatie-factor ×0,37" is het omgekeerde daarvan. Afgeleid uit dezelfde bron met één
+  // deling (deflate van één euro) — niet opnieuw uit inflatie en jaren berekend.
+  const displayFactor = deflate(1, factor, 'real')
+  // De "≈ €X vandaag"-hint hoort alleen bij de nominale weergave; in 'real' staan de
+  // hoofdbedragen zelf al in euro's van vandaag.
+  const showPvHint = view === 'nominal' && hasDeflation(factor)
 
   // ── Asset-rijen: sorteer op eindwaarde DESC, filter <€0,50 ruis ─
   const assetRows = useMemo(() => {
@@ -796,8 +806,11 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
     return `${yearLabel} — ${age}j (${delta})`
   }, [age, calendarYear, yearsFromNow])
 
-  const deflationContext = showPv
-    ? `Inflatie ${(inflationRate * 100).toFixed(1)}% · deflatie-factor ×${factor.toFixed(2)}`
+  // In 'real' benoemt de duiding-regel expliciet dát de bedragen al omgerekend zijn;
+  // in 'nominal' blijft de tekst ongewijzigd.
+  const contextPrefix = view === 'real' ? "Bedragen in euro's van vandaag · inflatie" : 'Inflatie'
+  const deflationContext = hasDeflation(factor)
+    ? `${contextPrefix} ${(inflationRate * 100).toFixed(1)}% · deflatie-factor ×${displayFactor.toFixed(2)}`
     : yearsFromNow === 0
       ? 'Huidige waarde'
       : `${yearsFromNow} jaar van nu`
@@ -885,12 +898,7 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
             >
               {fc(netWorth)}
             </p>
-            <PvLine
-              nominal={netWorth}
-              age={age ?? currentAge}
-              currentAge={currentAge}
-              inflation={inflationRate}
-            />
+            <PvLine nominal={netWorth} factor={factor} />
           </div>
         </div>
 
@@ -906,8 +914,8 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
                 label="Opbouw — bezittingen"
                 total={fc(totalAssets)}
                 totalPv={
-                  showPv
-                    ? `≈ ${fc(presentValue(totalAssets, age!, currentAge, inflationRate))} vandaag`
+                  showPvHint
+                    ? `≈ ${fcRaw(deflate(totalAssets, factor, 'real'))} vandaag`
                     : null
                 }
               />
@@ -926,9 +934,7 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
                       contributions={bucket.contributions}
                       box3Drag={bucket.box3Drag}
                       phase={phase}
-                      age={age!}
-                      currentAge={currentAge}
-                      inflation={inflationRate}
+                      factor={factor}
                     />
                   ))}
                 </ul>
@@ -943,8 +949,8 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
                   total={fc(totalDebts)}
                   totalTone="negative"
                   totalPv={
-                    showPv
-                      ? `≈ ${fc(presentValue(totalDebts, age!, currentAge, inflationRate))} vandaag`
+                    showPvHint
+                      ? `≈ ${fcRaw(deflate(totalDebts, factor, 'real'))} vandaag`
                       : null
                   }
                 />
@@ -956,9 +962,7 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
                       endBalance={detail.endBalance}
                       interestPaid={detail.interestPaid}
                       principalPaid={detail.principalPaid}
-                      age={age!}
-                      currentAge={currentAge}
-                      inflation={inflationRate}
+                      factor={factor}
                     />
                   ))}
                   {debtRest !== 0 && (
@@ -967,9 +971,7 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
                       endBalance={debtRest}
                       interestPaid={0}
                       principalPaid={0}
-                      age={age!}
-                      currentAge={currentAge}
-                      inflation={inflationRate}
+                      factor={factor}
                     />
                   )}
                 </ul>
@@ -986,9 +988,7 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
                     sublabel="fictief rendement × tarief · toerekening per bezitting"
                     amount={-row.totalBox3}
                     tone="expense"
-                    age={age!}
-                    currentAge={currentAge}
-                    inflation={inflationRate}
+                    factor={factor}
                   >
                     {box3Rows.length > 0
                       ? box3Rows.map(({ type, amount }) => (
@@ -996,9 +996,7 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
                             key={type}
                             label={ASSET_TYPE_LABELS[type]}
                             signed={-amount}
-                            age={age!}
-                            currentAge={currentAge}
-                            inflation={inflationRate}
+                            factor={factor}
                           />
                         ))
                       : undefined}
@@ -1010,9 +1008,7 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
                     sublabel="vanuit inkomen naar bezittingen"
                     amount={row.savings}
                     tone="income"
-                    age={age!}
-                    currentAge={currentAge}
-                    inflation={inflationRate}
+                    factor={factor}
                   />
                 )}
                 {row.withdrawal > 0 && (
@@ -1021,9 +1017,7 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
                     sublabel="dekt jaarlijkse uitgaven na FIRE"
                     amount={-row.withdrawal}
                     tone="expense"
-                    age={age!}
-                    currentAge={currentAge}
-                    inflation={inflationRate}
+                    factor={factor}
                   >
                     {withdrawalReceipt?.map(line => (
                       <ReceiptSubRow
@@ -1032,9 +1026,7 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
                         sublabel={line.sublabel}
                         signed={line.signed}
                         variant={line.kind}
-                        age={age!}
-                        currentAge={currentAge}
-                        inflation={inflationRate}
+                        factor={factor}
                       />
                     ))}
                   </CostsRow>
@@ -1049,9 +1041,7 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
                     }
                     amount={growthLiquide}
                     tone={growthLiquide >= 0 ? 'income' : 'expense'}
-                    age={age!}
-                    currentAge={currentAge}
-                    inflation={inflationRate}
+                    factor={factor}
                   >
                     {rendementRows.length > 0
                       ? rendementRows.map(({ type, amount }) => (
@@ -1059,9 +1049,7 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
                             key={type}
                             label={ASSET_TYPE_LABELS[type]}
                             signed={amount}
-                            age={age!}
-                            currentAge={currentAge}
-                            inflation={inflationRate}
+                            factor={factor}
                           />
                         ))
                       : undefined}
@@ -1081,9 +1069,7 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
                     }
                     amount={growthNietLiquide}
                     tone="neutral"
-                    age={age!}
-                    currentAge={currentAge}
-                    inflation={inflationRate}
+                    factor={factor}
                   >
                     {woningRendementRows.length > 0 || showWoningRest ? (
                       <>
@@ -1092,18 +1078,14 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
                             key={type}
                             label={ASSET_TYPE_LABELS[type]}
                             signed={amount}
-                            age={age!}
-                            currentAge={currentAge}
-                            inflation={inflationRate}
+                            factor={factor}
                           />
                         ))}
                         {showWoningRest && (
                           <ReceiptSubRow
                             label="Overig niet-besteedbaar"
                             signed={woningRest}
-                            age={age!}
-                            currentAge={currentAge}
-                            inflation={inflationRate}
+                            factor={factor}
                           />
                         )}
                       </>
@@ -1116,9 +1098,7 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
                     sublabel="recurring life-events (excl. AOW)"
                     amount={row.cashflowNet}
                     tone={row.cashflowNet >= 0 ? 'income' : 'expense'}
-                    age={age!}
-                    currentAge={currentAge}
-                    inflation={inflationRate}
+                    factor={factor}
                   />
                 )}
                 {row.oneTimeNet !== 0 && (
@@ -1127,9 +1107,7 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
                     sublabel="erfenis, verkoop, eenmalige uitgave"
                     amount={row.oneTimeNet}
                     tone={row.oneTimeNet >= 0 ? 'income' : 'expense'}
-                    age={age!}
-                    currentAge={currentAge}
-                    inflation={inflationRate}
+                    factor={factor}
                   />
                 )}
               </ul>
@@ -1159,9 +1137,7 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
                         </p>
                         <PvLine
                           nominal={eventBreakdown.aowAmount}
-                          age={age!}
-                          currentAge={currentAge}
-                          inflation={inflationRate}
+                          factor={factor}
                         />
                       </div>
                     </li>
@@ -1195,9 +1171,7 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
                         </p>
                         <PvLine
                           nominal={evt.amount}
-                          age={age!}
-                          currentAge={currentAge}
-                          inflation={inflationRate}
+                          factor={factor}
                         />
                       </div>
                     </li>

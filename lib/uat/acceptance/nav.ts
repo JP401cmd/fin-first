@@ -1,27 +1,36 @@
 /**
- * Acceptatiecriteria — domein Navigatie & shell (WF-NAV-01..26 / UAT-NAV-01..12,14..26).
+ * Acceptatiecriteria — domein Navigatie & shell (WF-NAV-01..27 / UAT-NAV-01..12,14..27).
  *
  * Spiegelt exact de aanpak van `budget.ts`/`start.ts`/`will.ts`/`cash.ts`/`ovz.ts`.
  * Bron: `docs/uat/uat-plan.md` Deel 1 (workflow-definities WF-NAV-01..26) +
- * Deel 2 §2.8 (UAT-NAV-01..12,14..26).
+ * Deel 2 §2.8 (UAT-NAV-01..12,14..26). WF-NAV-27 (euro-weergave-toggle) is
+ * NIEUW t.o.v. het UAT-plan — toegevoegd voor de wave-2/3-euro-weergave-uitrol
+ * (Notion-kaart 39cf9e8d-568a-80fb-8a99-e090c080b964, brok H), spiegelt géén
+ * document-workflow.
  *
  * WF-NAV-13 (uitloggen) heeft BEWUST GEEN eigen criterium hier — het UAT-plan
  * wijst door naar UAT-START-15 ("géén eigen scenario"); de catalogus bevat dan
  * ook geen UAT-NAV-13. NAV is dus, net als SCHULD/TOEK/WILL/OVZ, NIET
- * aaneengesloten op WF-nummer, maar WEL 1-op-1 met de 25 catalogus-scenario's
- * (01..12, 14..26).
+ * aaneengesloten op WF-nummer, maar WEL 1-op-1 met de 26 catalogus-scenario's
+ * (01..12, 14..27).
  *
  * KERN-BEVINDING (bepaalt exact/consistency/ui-only): NAV is cross-cutting
  * app-brede bediening zonder eigen pagina's — het meeste is UI/interactie
  * zonder berekening ("Rekenend: nee" staat letterlijk bij 16 van de 25
- * workflows in het plan). Negen criteria zijn wél 'exact' op échte,
- * client-veilige routing-/config-functies (`deriveTabFromPath`,
- * `resolveRouteTitle`, `next.config.ts#redirects`, `SIMPLE_HIDDEN_NAV_HREFS`,
- * `buildActionItems`, `STACK_DEPTH_LIMIT`) — allemaal de daadwerkelijke
+ * plan-workflows). Tien criteria zijn wél 'exact' op échte, client-veilige
+ * routing-/config-functies (`deriveTabFromPath`, `resolveRouteTitle`,
+ * `next.config.ts#redirects`, `SIMPLE_HIDDEN_NAV_HREFS`, `buildActionItems`,
+ * `STACK_DEPTH_LIMIT`, `euroViewLabel`) — allemaal de daadwerkelijke
  * productiefuncties, op één na: `resolveTabRedirect` leeft in een Server
  * Component met server-only imports en wordt daarom gemirrord (zie
  * nav-checks.ts). Één criterium (status-dots) is 'consistency' (A=B tussen
  * dot en landingskaart, geen eigen formule).
+ *
+ * WF-NAV-27 (euro-weergave-toggle, wave 2/3): het label-flip-gedrag en
+ * `euroViewLabel` zijn 'exact' na te rekenen; de cross-device-persistentie
+ * zelf (server-side `profiles.euro_view`, `PUT /api/euro-view`) is een
+ * LIVE-vereiste en staat daarom als toelichting in `then`, niet in de
+ * geautomatiseerde assertie.
  *
  * AL-GEDOCUMENTEERDE BEVINDINGEN (uit het UAT-plan zelf, GEEN nieuwe bugs van
  * deze sessie — expliciet vermeld in de betreffende criteria hieronder):
@@ -373,6 +382,20 @@ const criteria: AcceptanceCriterion[] = [
     assertion: {
       kind: 'ui-only',
       source: 'app/(app)/not-found.tsx + app/not-found.tsx + app/(app)/error.tsx — reeds bekende bevinding, geen eigen berekening',
+    },
+  },
+  {
+    workflow: 'WF-NAV-27',
+    scenarioId: 'UAT-NAV-27',
+    titel: 'App-brede euro-weergave: palet-toggle, label-flip, cross-device persistentie',
+    kriticiteit: 'BELANGRIJK',
+    given: 'De ⌘K-actie "action:toggle-euro-view" (naast de weergavemodus-actie, WF-NAV-10) en `euroViewLabel` (lib/euro-display.ts, wave 1).',
+    when: 'De gebruiker roept de toggle-actie aan bij `euroView=\'nominal\'` resp. `\'real\'`, en opent de app nadien op een tweede apparaat.',
+    then: 'Het actie-label flipt: bij nominaal toont de palette "Toon huidige euro\'s" (icoon Wallet), bij reëel "Toon toekomstige euro\'s" (icoon CalendarClock) — nooit de huidige stand als label (dat zou een no-op suggereren). De EuroViewBadge/command-palette-label gebruikt hetzelfde `euroViewLabel()` als de badge elders (géén los label-format). Cross-device: de keuze staat op `profiles.euro_view` (own-row, `PUT /api/euro-view`) en wordt server-side in de layout ingelezen — dat schrijf-/leespad is een LIVE-vereiste, niet in een pure module na te rekenen (server-only createClient-import), en wordt daarom als toelichting genoemd, niet in de geautomatiseerde assertie.',
+    assertion: {
+      kind: 'exact',
+      expected: "labelNominal=Toon huidige euro's; labelReal=Toon toekomstige euro's; euroViewLabelNominal=Toekomstige euro's; euroViewLabelReal=Huidige euro's",
+      source: 'lib/command-palette/actions.ts#buildActionItems + lib/euro-display.ts#euroViewLabel + app/api/euro-view/route.ts — échte productiefuncties (route alleen genoemd voor het cross-device-schrijfpad, niet geïmporteerd — server-only) — zie nav-checks.ts',
     },
   },
 ]

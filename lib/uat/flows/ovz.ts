@@ -48,6 +48,7 @@ export const OVZ_FLOW: UatFlow = {
     { id: 'gezondheidsscore', scenarioId: 'UAT-OVZ-03', label: 'WF-OVZ-03 · Gezondheidsscore + kassabon', kind: 'screen', stage: 1, lane: 'verkennen' },
     { id: 'vermogensverloop', scenarioId: 'UAT-OVZ-04', label: 'WF-OVZ-04 · Vermogensverloop + historie invoeren', kind: 'screen', stage: 1, lane: 'verkennen' },
     { id: 'toekomstprojectie', scenarioId: 'UAT-OVZ-05', label: 'WF-OVZ-05 · Toekomstprojectie vanaf de hub', kind: 'screen', stage: 1, lane: 'verkennen' },
+    { id: 'euroweergave', scenarioId: 'UAT-OVZ-22', label: "WF-OVZ-22 · Euro-weergave: widgets & mini-grafiek", kind: 'action', stage: 1, lane: 'verkennen', subOf: 'vermogensverloop' },
 
     // ── 2 · doelen & vrijheid ─────────────────────────────────────────────
     { id: 'widgetbeslis', label: 'Default-blok (doelen+vrijheidsstrip) of eigen widgets?', kind: 'decision', stage: 2 },
@@ -90,6 +91,7 @@ export const OVZ_FLOW: UatFlow = {
     { from: 'hefboom', to: 'drilldown' },
     { from: 'hefboom', to: 'gezondheidsscore' },
     { from: 'hefboom', to: 'vermogensverloop' },
+    { from: 'vermogensverloop', to: 'euroweergave' },
     { from: 'hefboom', to: 'toekomstprojectie' },
     { from: 'toekomstprojectie', to: 'x-toek', kind: 'cross' },
 
@@ -126,6 +128,7 @@ export const OVZ_FLOW: UatFlow = {
     { from: 'drilldown', to: 'uitkomst' },
     { from: 'gezondheidsscore', to: 'uitkomst' },
     { from: 'vermogensverloop', to: 'uitkomst' },
+    { from: 'euroweergave', to: 'uitkomst' },
     { from: 'vrijheidsstrip', to: 'uitkomst' },
     { from: 'widgets', to: 'uitkomst' },
     { from: 'delen', to: 'uitkomst' },

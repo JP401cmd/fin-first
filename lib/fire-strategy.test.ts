@@ -3,6 +3,8 @@ import {
   isFinanciallyFree,
   isRetiredView,
   resolveFreedomFraming,
+  resolveFreedomAgeView,
+  fireAgeForDisplay,
   type FreedomStateInput,
 } from './fire-strategy'
 
@@ -128,5 +130,94 @@ describe('resolveFreedomFraming', () => {
     expect(
       resolveFreedomFraming({ freedomPct: 100, currentAge: 50, fireAge: 50, strategy: 'perpetual', aowAge: 67 }),
     ).toBe('free')
+  })
+})
+
+describe('fireAgeForDisplay', () => {
+  it('rondt af op hele jaren', () => {
+    expect(fireAgeForDisplay(45.3)).toBe(45)
+    expect(fireAgeForDisplay(44.5)).toBe(45)
+    expect(fireAgeForDisplay(44.49)).toBe(44)
+  })
+
+  it('geeft null bij ontbrekende of niet-finite invoer', () => {
+    expect(fireAgeForDisplay(null)).toBeNull()
+    expect(fireAgeForDisplay(undefined)).toBeNull()
+    expect(fireAgeForDisplay(NaN)).toBeNull()
+  })
+})
+
+/**
+ * WF-CANON-03 — de seam die drempel en weergave uit elkaar houdt.
+ *
+ * De eerdere fix leefde in de AANROEPER (overzicht-secondary-loader) en was
+ * daardoor onbewaakt: de bug opnieuw introduceren liet alle suites groen. Deze
+ * tests toetsen de seam zelf, zodat afronden vóór de drempelvergelijking wél
+ * rood wordt.
+ */
+describe('resolveFreedomAgeView (seam: drempel vs. weergave)', () => {
+  // DE BIJTENDE TEST. 45,3 rondt af naar 45; met currentAge 45 zou een
+  // afgeronde drempel `45 >= 45` waar maken en de framing naar 'free' trekken —
+  // tot zes maanden vóór de daadwerkelijke FIRE-maand. Wie in deze helper vóór
+  // de drempel afrondt, maakt deze test rood.
+  it('rondt af voor WEERGAVE maar toetst de DREMPEL fractioneel', () => {
+    const view = resolveFreedomAgeView({
+      fireAgeFractional: 45.3,
+      freedomPct: 99.4,
+      currentAge: 45,
+      strategy: 'deplete',
+    })
+    expect(view.fireAgeDisplay).toBe(45)
+    expect(view.framing).toBe('building')
+    // Contrast: mét afronding vóór de drempel zou exact dit scenario 'free' zijn.
+    expect(
+      resolveFreedomFraming({ freedomPct: 99.4, currentAge: 45, fireAge: 45, strategy: 'deplete' }),
+    ).toBe('free')
+  })
+
+  it("slaat om naar 'free' zodra de fractionele leeftijd echt is gepasseerd", () => {
+    const view = resolveFreedomAgeView({
+      fireAgeFractional: 45.3,
+      freedomPct: 99.4,
+      currentAge: 46,
+      strategy: 'deplete',
+      aowAge: 67,
+    })
+    expect(view.framing).toBe('free')
+    expect(view.fireAgeDisplay).toBe(45)
+  })
+
+  it("geeft strategie en AOW door aan de framing ('pensioen')", () => {
+    const view = resolveFreedomAgeView({
+      fireAgeFractional: 67.2,
+      freedomPct: 100,
+      currentAge: 68,
+      strategy: 'pensioen',
+      aowAge: 67,
+    })
+    expect(view.framing).toBe('pensioen')
+    expect(view.fireAgeDisplay).toBe(67)
+  })
+
+  it("null-projectie: geen weergave-leeftijd, framing blijft 'building'", () => {
+    const view = resolveFreedomAgeView({
+      fireAgeFractional: null,
+      freedomPct: 40,
+      currentAge: 40,
+    })
+    expect(view.fireAgeDisplay).toBeNull()
+    expect(view.framing).toBe('building')
+  })
+
+  it('freedomPct ≥ 100 blijft vrij, ongeacht de leeftijd-drempel', () => {
+    const view = resolveFreedomAgeView({
+      fireAgeFractional: 55.8,
+      freedomPct: 100,
+      currentAge: 45,
+      strategy: 'deplete',
+      aowAge: 67,
+    })
+    expect(view.framing).toBe('free')
+    expect(view.fireAgeDisplay).toBe(56)
   })
 })

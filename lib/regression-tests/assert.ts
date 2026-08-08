@@ -21,6 +21,27 @@ export function assertEqual<T>(actual: T, expected: T, label?: string): void {
   }
 }
 
+/**
+ * Vergelijk twee getallen met een ABSOLUTE tolerantie.
+ *
+ * Bewuste keuze absoluut i.p.v. relatief: dit is de assertie voor "dit ís het
+ * getal X, op IEEE-754-representatie na". Een relatieve tolerantie degenereert
+ * precies rond nul (een legitieme waarde voor rentes, deltas en saldi) en zou
+ * daar élke afwijking doorlaten. Kies `epsilon` daarom expliciet per grootheid:
+ * ruim boven de verwachte drijvendekomma-ruis, ruim ónder het kleinste verschil
+ * dat inhoudelijk iets betekent — anders vangt de assertie niets meer.
+ *
+ * NIET gebruiken om een echt gedragsverschil weg te poetsen: dan hoort de
+ * verwachting bijgesteld (of de motor gerepareerd), niet de tolerantie opgerekt.
+ */
+export function assertClose(actual: number, expected: number, epsilon: number, label?: string): void {
+  if (!Number.isFinite(actual) || Math.abs(actual - expected) > epsilon) {
+    throw new AssertionError(
+      `${label ? label + ': ' : ''}Expected ${expected} ± ${epsilon}, got ${actual}`,
+    )
+  }
+}
+
 export function assertNotNull<T>(value: T | null | undefined, label?: string): asserts value is T {
   if (value === null || value === undefined) {
     throw new AssertionError(`${label ? label + ': ' : ''}Expected non-null value`)

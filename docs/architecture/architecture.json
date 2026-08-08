@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-06T07:57:14.114Z",
-  "generatedDate": "2026-08-06",
+  "generatedAt": "2026-08-08T18:27:43.630Z",
+  "generatedDate": "2026-08-08",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -187,14 +187,14 @@
     }
   },
   "stats": {
-    "routes": 144,
+    "routes": 141,
     "routesProduction": 99,
-    "api": 282,
-    "tables": 86,
-    "migrations": 187,
+    "api": 289,
+    "tables": 88,
+    "migrations": 197,
     "integrations": 25,
-    "components": 877,
-    "providers": 12,
+    "components": 896,
+    "providers": 14,
     "contextBuilders": 9,
     "briefingTools": 0,
     "coachLayers": 4,
@@ -283,18 +283,6 @@
     {
       "url": "/beheer/coach",
       "file": "app/(app)/beheer/coach/page.tsx",
-      "group": "beheer",
-      "isTest": false
-    },
-    {
-      "url": "/beheer/development",
-      "file": "app/(app)/beheer/development/page.tsx",
-      "group": "beheer",
-      "isTest": false
-    },
-    {
-      "url": "/beheer/doelen",
-      "file": "app/(app)/beheer/doelen/page.tsx",
       "group": "beheer",
       "isTest": false
     },
@@ -409,12 +397,6 @@
     {
       "url": "/beheer/releases",
       "file": "app/(app)/beheer/releases/page.tsx",
-      "group": "beheer",
-      "isTest": false
-    },
-    {
-      "url": "/beheer/roadmap",
-      "file": "app/(app)/beheer/roadmap/page.tsx",
       "group": "beheer",
       "isTest": false
     },
@@ -1154,18 +1136,6 @@
         "isTest": false
       },
       {
-        "url": "/beheer/development",
-        "file": "app/(app)/beheer/development/page.tsx",
-        "group": "beheer",
-        "isTest": false
-      },
-      {
-        "url": "/beheer/doelen",
-        "file": "app/(app)/beheer/doelen/page.tsx",
-        "group": "beheer",
-        "isTest": false
-      },
-      {
         "url": "/beheer/email",
         "file": "app/(app)/beheer/email/page.tsx",
         "group": "beheer",
@@ -1276,12 +1246,6 @@
       {
         "url": "/beheer/releases",
         "file": "app/(app)/beheer/releases/page.tsx",
-        "group": "beheer",
-        "isTest": false
-      },
-      {
-        "url": "/beheer/roadmap",
-        "file": "app/(app)/beheer/roadmap/page.tsx",
         "group": "beheer",
         "isTest": false
       },
@@ -2884,6 +2848,14 @@
       ]
     },
     {
+      "url": "/api/cron/user-reports-notion-sync",
+      "file": "app/api/cron/user-reports-notion-sync/route.ts",
+      "domain": "cron",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
       "url": "/api/crypto-holdings/setup",
       "file": "app/api/crypto-holdings/setup/route.ts",
       "domain": "crypto-holdings",
@@ -2957,6 +2929,14 @@
       ]
     },
     {
+      "url": "/api/euro-view",
+      "file": "app/api/euro-view/route.ts",
+      "domain": "euro-view",
+      "methods": [
+        "PUT"
+      ]
+    },
+    {
       "url": "/api/export",
       "file": "app/api/export/route.ts",
       "domain": "export",
@@ -3007,25 +2987,6 @@
         "GET",
         "POST",
         "PATCH",
-        "DELETE"
-      ]
-    },
-    {
-      "url": "/api/goals-guide/settings",
-      "file": "app/api/goals-guide/settings/route.ts",
-      "domain": "goals-guide",
-      "methods": [
-        "GET",
-        "PUT"
-      ]
-    },
-    {
-      "url": "/api/goals-guide/steps",
-      "file": "app/api/goals-guide/steps/route.ts",
-      "domain": "goals-guide",
-      "methods": [
-        "GET",
-        "PUT",
         "DELETE"
       ]
     },
@@ -4129,6 +4090,56 @@
       ]
     },
     {
+      "url": "/api/spend-limit-alias",
+      "file": "app/api/spend-limit-alias/route.ts",
+      "domain": "spend-limit-alias",
+      "methods": [
+        "PUT"
+      ]
+    },
+    {
+      "url": "/api/spend-limits",
+      "file": "app/api/spend-limits/route.ts",
+      "domain": "spend-limits",
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "url": "/api/spend-limits/[id]",
+      "file": "app/api/spend-limits/[id]/route.ts",
+      "domain": "spend-limits",
+      "methods": [
+        "PATCH",
+        "DELETE"
+      ]
+    },
+    {
+      "url": "/api/spend-limits/[id]/breakdown",
+      "file": "app/api/spend-limits/[id]/breakdown/route.ts",
+      "domain": "spend-limits",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "url": "/api/spend-limits/counterparties",
+      "file": "app/api/spend-limits/counterparties/route.ts",
+      "domain": "spend-limits",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "url": "/api/spend-limits/preview",
+      "file": "app/api/spend-limits/preview/route.ts",
+      "domain": "spend-limits",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
       "url": "/api/spending-patterns",
       "file": "app/api/spending-patterns/route.ts",
       "domain": "spending-patterns",
@@ -4225,6 +4236,14 @@
       "domain": "uitgaven-na-pensioen",
       "methods": [
         "GET"
+      ]
+    },
+    {
+      "url": "/api/user-reports",
+      "file": "app/api/user-reports/route.ts",
+      "domain": "user-reports",
+      "methods": [
+        "POST"
       ]
     },
     {
@@ -5642,6 +5661,55 @@
       ]
     },
     {
+      "domain": "spend-limits",
+      "label": "spend-limits",
+      "count": 5,
+      "routes": [
+        {
+          "url": "/api/spend-limits",
+          "file": "app/api/spend-limits/route.ts",
+          "domain": "spend-limits",
+          "methods": [
+            "GET",
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/spend-limits/[id]",
+          "file": "app/api/spend-limits/[id]/route.ts",
+          "domain": "spend-limits",
+          "methods": [
+            "PATCH",
+            "DELETE"
+          ]
+        },
+        {
+          "url": "/api/spend-limits/[id]/breakdown",
+          "file": "app/api/spend-limits/[id]/breakdown/route.ts",
+          "domain": "spend-limits",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/spend-limits/counterparties",
+          "file": "app/api/spend-limits/counterparties/route.ts",
+          "domain": "spend-limits",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/spend-limits/preview",
+          "file": "app/api/spend-limits/preview/route.ts",
+          "domain": "spend-limits",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "subscriptions",
       "label": "subscriptions",
       "count": 5,
@@ -6075,6 +6143,29 @@
       ]
     },
     {
+      "domain": "cron",
+      "label": "cron",
+      "count": 2,
+      "routes": [
+        {
+          "url": "/api/cron/retention",
+          "file": "app/api/cron/retention/route.ts",
+          "domain": "cron",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/cron/user-reports-notion-sync",
+          "file": "app/api/cron/user-reports-notion-sync/route.ts",
+          "domain": "cron",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "debts",
       "label": "Schulden",
       "count": 2,
@@ -6120,32 +6211,6 @@
           "methods": [
             "GET",
             "POST"
-          ]
-        }
-      ]
-    },
-    {
-      "domain": "goals-guide",
-      "label": "goals-guide",
-      "count": 2,
-      "routes": [
-        {
-          "url": "/api/goals-guide/settings",
-          "file": "app/api/goals-guide/settings/route.ts",
-          "domain": "goals-guide",
-          "methods": [
-            "GET",
-            "PUT"
-          ]
-        },
-        {
-          "url": "/api/goals-guide/steps",
-          "file": "app/api/goals-guide/steps/route.ts",
-          "domain": "goals-guide",
-          "methods": [
-            "GET",
-            "PUT",
-            "DELETE"
           ]
         }
       ]
@@ -6521,21 +6586,6 @@
       ]
     },
     {
-      "domain": "cron",
-      "label": "cron",
-      "count": 1,
-      "routes": [
-        {
-          "url": "/api/cron/retention",
-          "file": "app/api/cron/retention/route.ts",
-          "domain": "cron",
-          "methods": [
-            "GET"
-          ]
-        }
-      ]
-    },
-    {
       "domain": "crypto-holdings",
       "label": "Crypto",
       "count": 1,
@@ -6637,6 +6687,21 @@
           "domain": "dividends",
           "methods": [
             "GET"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "euro-view",
+      "label": "euro-view",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/euro-view",
+          "file": "app/api/euro-view/route.ts",
+          "domain": "euro-view",
+          "methods": [
+            "PUT"
           ]
         }
       ]
@@ -7221,6 +7286,21 @@
       ]
     },
     {
+      "domain": "spend-limit-alias",
+      "label": "spend-limit-alias",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/spend-limit-alias",
+          "file": "app/api/spend-limit-alias/route.ts",
+          "domain": "spend-limit-alias",
+          "methods": [
+            "PUT"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "spending-patterns",
       "label": "spending-patterns",
       "count": 1,
@@ -7324,6 +7404,21 @@
           "domain": "uitgaven-na-pensioen",
           "methods": [
             "GET"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "user-reports",
+      "label": "user-reports",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/user-reports",
+          "file": "app/api/user-reports/route.ts",
+          "domain": "user-reports",
+          "methods": [
+            "POST"
           ]
         }
       ]
@@ -7777,6 +7872,10 @@
         "migration": "supabase/migrations/20260717140000_signup_email_allowlist.sql"
       },
       {
+        "name": "spend_limits",
+        "migration": "supabase/migrations/20260808110000_create_spend_limits.sql"
+      },
+      {
         "name": "target_allocations",
         "migration": "supabase/migrations/20260316100001_add_holdings_classification_and_target_allocations.sql"
       },
@@ -7813,6 +7912,10 @@
         "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
       },
       {
+        "name": "user_reports",
+        "migration": "supabase/migrations/20260806104500_create_user_reports.sql"
+      },
+      {
         "name": "user_streaks",
         "migration": "supabase/migrations/20260215000001_create_new_tables.sql"
       },
@@ -7829,7 +7932,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 187
+    "migrationCount": 197
   },
   "tablesByDomain": [
     {
@@ -7952,6 +8055,10 @@
           "migration": "supabase/migrations/20260717140000_signup_email_allowlist.sql"
         },
         {
+          "name": "spend_limits",
+          "migration": "supabase/migrations/20260808110000_create_spend_limits.sql"
+        },
+        {
           "name": "tier_assignments_log",
           "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
         },
@@ -7970,6 +8077,10 @@
         {
           "name": "user_own_ibans",
           "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
+        },
+        {
+          "name": "user_reports",
+          "migration": "supabase/migrations/20260806104500_create_user_reports.sql"
         },
         {
           "name": "web_vitals",
@@ -8250,6 +8361,10 @@
       "source": "@/lib/hooks/use-display-mode"
     },
     {
+      "name": "EuroViewProvider",
+      "source": "@/lib/hooks/use-euro-view"
+    },
+    {
       "name": "FeatureAccessProvider",
       "source": "@/components/app/feature-access-provider"
     },
@@ -8278,22 +8393,27 @@
       "source": "@/lib/hooks/use-privacy"
     },
     {
+      "name": "SpendLimitAliasProvider",
+      "source": "@/lib/hooks/use-spend-limit-alias"
+    },
+    {
       "name": "ToastProvider",
       "source": "@/components/app/toast-provider"
     }
   ],
   "components": {
-    "total": 877,
+    "total": 896,
     "groups": [
       {
         "group": "app",
-        "count": 347,
+        "count": 354,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
           "action-board",
           "action-board.test",
           "action-card",
+          "action-card.test",
           "action-edit-modal",
           "action-form",
           "action-list-modal",
@@ -8475,11 +8595,16 @@
           "lever-compass.deeplinks.test",
           "life-events-in-phase",
           "lifeline-readout",
+          "lifeline-readout.test",
           "log-timeline",
           "manual-transfer-sheet",
           "markdown-helpers",
           "masked-amount",
           "masked-amount.test",
+          "melding-form",
+          "melding-type-kiezer",
+          "melding-view",
+          "melding-view.test",
           "milestone-celebration",
           "milestone-celebration.test",
           "mobile-app-strip",
@@ -8531,6 +8656,7 @@
           "phase-detail-table.test",
           "phase-discuss-button",
           "phase-intro",
+          "phase-modal-kassabon.euro-view.test",
           "phase-modal-onttrekking",
           "phase-modal-opbouw",
           "phase-modal-overgang",
@@ -8640,7 +8766,7 @@
       },
       {
         "group": "overview",
-        "count": 145,
+        "count": 152,
         "items": [
           "aandachtspunt-actie-button",
           "atomic-cards",
@@ -8757,6 +8883,13 @@
           "schulden-filter",
           "schulden-filter.test",
           "schulden-view",
+          "spend-limit-heatmap",
+          "spend-limit-performance-pane",
+          "spend-limit-performance-pane.test",
+          "spend-limit-period-chart",
+          "spend-limit-period-chart.test",
+          "spend-limits-section",
+          "spend-limits-section.test",
           "tax-gauge",
           "tax-timeline",
           "tips-acties-page",
@@ -8791,7 +8924,7 @@
       },
       {
         "group": "widgets",
-        "count": 89,
+        "count": 91,
         "items": [
           "abonnementen-widget",
           "acties-widget",
@@ -8858,6 +8991,8 @@
           "sim-vermogenspad-widget.test",
           "spaarquote-widget",
           "spaarquote-widget.test",
+          "spend-limit-widget",
+          "spend-limit-widget.test",
           "surplus-gap-widget",
           "swr-monitor-widget",
           "vaste-lasten-widget",
@@ -8886,7 +9021,7 @@
       },
       {
         "group": "core",
-        "count": 67,
+        "count": 68,
         "items": [
           "account-source-icon",
           "account-source-icon.test",
@@ -8930,6 +9065,7 @@
           "debt-detail-sheet",
           "debt-payoff-strategy",
           "equity-buildup-bar",
+          "euro-view-badge",
           "fire-progress-strip",
           "holding-row",
           "holdings-client",
@@ -9024,7 +9160,7 @@
       },
       {
         "group": "mijn",
-        "count": 35,
+        "count": 36,
         "items": [
           "abonnement-section",
           "account-basis-section",
@@ -9060,7 +9196,8 @@
           "palette-picker",
           "palette-picker.test",
           "privacy-overview",
-          "privacy-overview.test"
+          "privacy-overview.test",
+          "spend-limit-alias-picker"
         ]
       },
       {
@@ -9298,6 +9435,13 @@
         "count": 1,
         "items": [
           "housing-strategy-section"
+        ]
+      },
+      {
+        "group": "legal",
+        "count": 1,
+        "items": [
+          "legal-email"
         ]
       }
     ]
@@ -10019,6 +10163,12 @@
           "write": false
         }
       ],
+      "cron": [
+        {
+          "name": "user_reports",
+          "write": false
+        }
+      ],
       "crypto": [
         {
           "name": "crypto_transactions",
@@ -10074,6 +10224,12 @@
         }
       ],
       "display-mode": [
+        {
+          "name": "profiles",
+          "write": true
+        }
+      ],
+      "euro-view": [
         {
           "name": "profiles",
           "write": true
@@ -10145,12 +10301,6 @@
         {
           "name": "valuations",
           "write": false
-        }
-      ],
-      "goals-guide": [
-        {
-          "name": "app_settings",
-          "write": true
         }
       ],
       "guide-help": [
@@ -10513,6 +10663,10 @@
           "write": false
         },
         {
+          "name": "spend_limits",
+          "write": false
+        },
+        {
           "name": "target_allocations",
           "write": false
         },
@@ -10800,6 +10954,22 @@
         },
         {
           "name": "valuations",
+          "write": true
+        }
+      ],
+      "spend-limit-alias": [
+        {
+          "name": "profiles",
+          "write": true
+        }
+      ],
+      "spend-limits": [
+        {
+          "name": "budgets",
+          "write": false
+        },
+        {
+          "name": "spend_limits",
           "write": true
         }
       ],
@@ -11102,6 +11272,14 @@
           ]
         },
         {
+          "domain": "euro-view",
+          "label": "euro-view",
+          "write": true,
+          "routes": [
+            "/api/euro-view"
+          ]
+        },
+        {
           "domain": "feature-preferences",
           "label": "feature-preferences",
           "write": true,
@@ -11222,6 +11400,14 @@
             "/api/snapshots",
             "/api/snapshots/auto",
             "/api/snapshots/cron"
+          ]
+        },
+        {
+          "domain": "spend-limit-alias",
+          "label": "spend-limit-alias",
+          "write": true,
+          "routes": [
+            "/api/spend-limit-alias"
           ]
         },
         {
@@ -12117,15 +12303,6 @@
           ]
         },
         {
-          "domain": "goals-guide",
-          "label": "goals-guide",
-          "write": true,
-          "routes": [
-            "/api/goals-guide/settings",
-            "/api/goals-guide/steps"
-          ]
-        },
-        {
           "domain": "guide-help",
           "label": "guide-help",
           "write": true,
@@ -12765,6 +12942,14 @@
             "/api/snapshots",
             "/api/snapshots/auto",
             "/api/snapshots/cron"
+          ]
+        },
+        {
+          "domain": "spend-limits",
+          "label": "spend-limits",
+          "write": false,
+          "routes": [
+            "/api/spend-limits/preview"
           ]
         },
         {
@@ -13442,6 +13627,16 @@
           ]
         }
       ],
+      "user_reports": [
+        {
+          "domain": "cron",
+          "label": "cron",
+          "write": false,
+          "routes": [
+            "/api/cron/user-reports-notion-sync"
+          ]
+        }
+      ],
       "crypto_transactions": [
         {
           "domain": "crypto",
@@ -13690,6 +13885,27 @@
           "write": false,
           "routes": [
             "/api/report/budget"
+          ]
+        }
+      ],
+      "spend_limits": [
+        {
+          "domain": "spend-limits",
+          "label": "spend-limits",
+          "write": true,
+          "routes": [
+            "/api/spend-limits",
+            "/api/spend-limits/[id]",
+            "/api/spend-limits/[id]/breakdown",
+            "/api/spend-limits/preview"
+          ]
+        },
+        {
+          "domain": "notifications",
+          "label": "notifications",
+          "write": false,
+          "routes": [
+            "/api/notifications"
           ]
         }
       ],
@@ -14082,6 +14298,11 @@
         "from": "settlement_entries",
         "to": "transactions",
         "column": "related_transaction_id"
+      },
+      {
+        "from": "spend_limits",
+        "to": "budgets",
+        "column": "budget_id"
       },
       {
         "from": "transaction_splits",
@@ -14557,6 +14778,16 @@
       },
       "fire_assumptions": {
         "user": false,
+        "household": false,
+        "rls": true
+      },
+      "user_reports": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "spend_limits": {
+        "user": true,
         "household": false,
         "rls": true
       }
@@ -15645,6 +15876,71 @@
       ],
       "summary": "ADR 0040 (fiscale-strategie-optimizer, Box 3-MVP) noemde de \"onttrekkingsvolgorde-as\" als openstaande vervolgfase: een kernel-preset-sweep, doel = laagste levenslange Box 3 + FIRE-leeftijd-behoud. Die formulering wees op twee dingen die bij het bouwen niet hielden: (1) de horizon",
       "file": "docs/adr/0088-levenslange-belastingdruk-pensioenpot-positie.md"
+    },
+    {
+      "id": "0089-grenzenpotten-on-the-fly-en-naamneutraal",
+      "title": "Grenzenpotten: naamneutraal `spend_limits`, on-the-fly berekend, en één letterlijk spiegelbare tegenpartij-normalisatie",
+      "status": "aanvaard",
+      "date": "2026-08-08",
+      "elements": [
+        "as-budget",
+        "fn-budgetteren"
+      ],
+      "summary": "Een \"Grenzenpot\" maakt zichtbaar hoeveel iemand uitgeeft **boven** een zelfgekozen grens, zonder dat daar een spaardoel aan hangt: bijvoorbeeld maximaal €50 per maand aan tankstations, en alles daarboven is de overschrijding. Het is uitdrukkelijk geen budget dat \"op\" kan en geen ",
+      "file": "docs/adr/0089-grenzenpotten-on-the-fly-en-naamneutraal.md"
+    },
+    {
+      "id": "0090-euro-weergave-nominaal-reeel",
+      "title": "Euro-weergave \"toekomstige ⇄ huidige euro's\" — deflatie aan de render-grens op de kernelfactor",
+      "status": "aanvaard",
+      "date": "2026-08-08",
+      "elements": [
+        "do-meta",
+        "app-comp",
+        "as-planning",
+        "fn-toekomstplannen"
+      ],
+      "summary": "Geprojecteerde bedragen op `/toekomst` staan in **toekomstige euro's**: de horizon-kernel rekent nominaal-throughout (ADR 0032, Excel-oracle op maandbasis). Een vermogen van €1,2 mln op leeftijd 67 is dus niet de koopkracht van vandaag. Gebruikers willen kunnen wisselen naar **hu",
+      "file": "docs/adr/0090-euro-weergave-nominaal-reeel.md"
+    },
+    {
+      "id": "0091-grafieken-onder-bedragmaskering",
+      "title": "Grafieken onder bedragmaskering: geometrie blijft, bedragen verdwijnen, verhoudingen mogen",
+      "status": "aanvaard",
+      "date": "2026-08-08",
+      "elements": [
+        "as-budget",
+        "fn-budgetteren"
+      ],
+      "summary": "De app kent een privacy-maskering voor euro-bedragen (`useMaskedAmounts`, `formatMaskedCurrency`, `<MaskedAmount>`). Wat dat voor een **grafiek** precies betekent — mag een as-tick een bedrag tonen? een referentielijn? een percentage? — was tot nu toe niet vastgelegd. ADR 0089 st",
+      "file": "docs/adr/0091-grafieken-onder-bedragmaskering.md"
+    },
+    {
+      "id": "0092-grenzenpot-fase-2-5",
+      "title": "Grenzenpot fase 2–5: kalenderperiodes uit maandaggregaten, één prestatieweergave, widget als projectie",
+      "status": "aanvaard",
+      "date": "2026-08-08",
+      "elements": [
+        "as-budget",
+        "fn-budgetteren"
+      ],
+      "summary": "ADR 0089 leverde fase 1: één grenzenpot per budget of tegenpartij, per kalendermaand, beheerd vanaf de transactiepagina, on-the-fly berekend. Vier fases bouwen daarop voort: een prestatieweergave met grafiek/heatmap/uitsplitsing (fase 2), een dashboard-widget (fase 3), tegenparti",
+      "file": "docs/adr/0092-grenzenpot-fase-2-5.md"
+    },
+    {
+      "id": "0093-euro-weergave-deflatieklassen-en-render-grens",
+      "title": "Euro-weergave wave 2+3 — deflatie-klassen, twee kruis-regimes, de render-grens en de kernelfactor-naad",
+      "status": "aanvaard",
+      "date": "2026-08-08",
+      "elements": [
+        "as-planning",
+        "as-vermogen",
+        "fn-toekomstplannen",
+        "app-comp",
+        "do-meta"
+      ],
+      "summary": "ADR 0090 (wave 1) legde het choke point en de scalar-voorkeur vast, maar liet de dekking van `/toekomst`, de fase-kassabons, `/overzicht` en de AI-context expliciet open (gefaseerd). Dit besluit is die uitwerking: hoe een bedrag zijn deflatie-klasse krijgt, hoe dubbele deflatie e",
+      "file": "docs/adr/0093-euro-weergave-deflatieklassen-en-render-grens.md"
     }
   ],
   "churn": {
@@ -15680,7 +15976,7 @@
       },
       {
         "path": "lib/fire-simulation.ts",
-        "commits": 8
+        "commits": 7
       },
       {
         "path": "app/api/budgets",
@@ -15694,8 +15990,8 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 8417,
-        "commits": 94
+        "loc": 8852,
+        "commits": 92
       },
       {
         "file": "components/app/budgets-client.tsx",
@@ -15705,7 +16001,7 @@
       {
         "file": "components/core/assets-client.tsx",
         "loc": 4486,
-        "commits": 43
+        "commits": 41
       },
       {
         "file": "components/app/cash-account-view.tsx",
@@ -15719,8 +16015,8 @@
       },
       {
         "file": "lib/dashboard-data-loader.ts",
-        "loc": 2625,
-        "commits": 52
+        "loc": 2690,
+        "commits": 51
       },
       {
         "file": "app/(app)/core/cash/import/page.tsx",
@@ -16074,9 +16370,27 @@
         ]
       },
       {
+        "id": "change-request",
+        "name": "change-request",
+        "description": "Gebruik bij elke wijziging aan de draaiende omgeving die een PR-diff niet laat zien — een cron erbij of eraf, een env-var of secret, third-party-config (Supabase, Vercel, mailprovider, bankprovider), of een handmatige actie op productie. Vier vragen vooraf en één aantekening in het beheerders-runbook. Niet voor migraties (schemawijziging), een gewone deploy (release) of een nieuwe verwerker (verwerkersregister).",
+        "steps": []
+      },
+      {
+        "id": "competitive-brief",
+        "name": "competitive-brief",
+        "description": "Gebruik wanneer je wilt weten waar TriFinity staat ten opzichte van de rest — vóór een positioneringskeuze, bij een nieuwe landingtekst die een belofte doet, of als periodieke ronde langs vergelijkers, bankeigen tools en FIRE-apps. Levert niet een opsomming van wat anderen doen, maar het gat waar zij ophouden.",
+        "steps": []
+      },
+      {
         "id": "compliance-check",
         "name": "compliance-check",
         "description": "Gebruik vóór elke publicatie van publieke tekst (landing, SEO-pagina, funnel, social post, deelbaar asset), vóór elke wijziging aan prompt-DNA of AI-gedrag, bij elk /nieuws- of briefing-item dat over keuzes met geld gaat, en bij elke nieuwe claim over veiligheid, opslag of rendement. Toetst aan de Wft-grens (inzicht mag, vergunningsplichtig advies niet) en de claimlijst, en levert een beslisbare uitkomst — goedkeuren, aanpassen of afwijzen.",
+        "steps": []
+      },
+      {
+        "id": "content-creation",
+        "name": "content-creation",
+        "description": "Gebruik voor elk nieuw publiek stuk tekst — landingcopy, een root-route, een /nieuws-item, de wekelijkse briefing-mail of een deelbaar asset. Twee modi: volledig (van briefing tot gepubliceerde tekst) en snel (concept op een korte briefing). Zorgt dat toon, claims en ontwerp uit hun canonieke bronnen komen en dat de compliance-poort vóór publicatie wordt gehaald.",
         "steps": []
       },
       {
@@ -16164,6 +16478,12 @@
         ]
       },
       {
+        "id": "fiscale-wijzigingslog",
+        "name": "fiscale-wijzigingslog",
+        "description": "Gebruik bij elk signaal dat de fiscale regels veranderen — Prinsjesdag, een Kamerbrief of wetsvoorstel over het Box 3-traject richting 2028, een eindejaarsbesluit, of nieuwe jaarcijfers van de Belastingdienst. Ook bij het vaste kwartaalmoment en vóór elke release die de rekenkern raakt. Legt de wijziging vast met bron en status, wijst aan wat er in lib/box3-data.ts en de bewijslast meebeweegt, en koppelt hem aan een ADR.",
+        "steps": []
+      },
+      {
         "id": "frontend-design",
         "name": "frontend-design",
         "description": "Create distinctive, production-grade frontend interfaces for NON-APP surfaces — marketing-/landingpagina's, artifacts, posters, one-off demo's. Voor in-app TriFinity-UI (app/(app)/**, components/**) is de ui-ux-skill de single source of truth en overrulet die deze skill volledig. Genereert creatief, gepolijst design dat generieke AI-esthetiek vermijdt.",
@@ -16179,6 +16499,12 @@
         "id": "incidentprotocol",
         "name": "incidentprotocol",
         "description": "Gebruik bij elk productie-incident of signaal daarvan — nieuwe fouten op /beheer/errors, een gefaalde cron (job_runs of de cron-alert-mail), een Vercel-alarm, een site die niet reageert, of een gebruikersmelding die naar een storing ruikt. Beantwoordt binnen tien minuten de drie vragen die de route bepalen: herstellen, repareren, of óók de meldplichtklok starten.",
+        "steps": []
+      },
+      {
+        "id": "juridische-brief",
+        "name": "juridische-brief",
+        "description": "Gebruik wanneer een juridisch punt beslisbaar op papier moet — de verplichte wijzigingsaantekening bij /privacy, /voorwaarden of /wft, of elke keuze die de eigenaar moet maken zonder zelf jurist te worden. Levert één pagina met de vraag, de opties en het gevolg per optie, plus een aanbeveling.",
         "steps": []
       },
       {
@@ -16230,6 +16556,18 @@
         ]
       },
       {
+        "id": "legal-response",
+        "name": "legal-response",
+        "description": "Gebruik voor het schrijven van het antwoord aan iemand van buiten met een juridisch getinte vraag, klacht of verzoek — een inzage- of verwijderverzoek, een klacht over een verkeerd getal, een vraag of wij advies geven, een melding van een beveiligingsonderzoeker. Levert de tekst; de afhandeling zelf loopt via de bestaande procedures en API's.",
+        "steps": []
+      },
+      {
+        "id": "legal-risk-assessment",
+        "name": "legal-risk-assessment",
+        "description": "Gebruik bij een juridisch randgeval waar geen bestaande poort of procedure een antwoord op geeft — een nieuwe claimcategorie, een escalatie waarin een gebruiker een verkeerd bedrag zag, een incident dat een datalek kán zijn, een verzoek dat verder gaat dan de standaardroute. Weegt kans maal gevolg, benoemt de terugvaloptie, en bepaalt of het zelf af te handelen is of naar een jurist moet.",
+        "steps": []
+      },
+      {
         "id": "lokale-prompt-parity",
         "name": "lokale-prompt-parity",
         "description": "Gereedschap om de gecondenseerde lokale Fin-DNA (LOCAL_CHAT_DNA) in sync te houden met de cloud-bron-DNA — drift detecteren via het gecommitte parity-manifest, opnieuw condenseren binnen het sub-budget met behoud van de harde invarianten, en pas na eigenaar-review shippen.",
@@ -16268,6 +16606,12 @@
             "agents": []
           }
         ]
+      },
+      {
+        "id": "merkstem",
+        "name": "merkstem",
+        "description": "Gebruik vóór het schrijven of wijzigen van elke tekst die naar buiten gaat of die de app namens ons uitspreekt — landingcopy, /nieuws, de briefing-mail, SEO-pagina's, en elke wijziging aan het prompt-DNA of de on-device prompts. Wijst aan waar de toon en de toegestane claims canoniek staan, welke vier oppervlakken dezelfde stem moeten dragen, in welke volgorde je ze raakt, en hoe je drift tussen die oppervlakken detecteert.",
+        "steps": []
       },
       {
         "id": "new-feature",
@@ -16489,8 +16833,93 @@
             "index": 11,
             "title": "Deploy-verificatie & rollback-pad",
             "agents": []
+          },
+          {
+            "index": 12,
+            "title": "Slotstap",
+            "agents": []
           }
         ]
+      },
+      {
+        "id": "schemawijziging",
+        "name": "schemawijziging",
+        "description": "Pijplijn voor een MIGRATIE, RLS-POLICY of BACKFILL in TriFinity — een nieuwe tabel of kolom, een gewijzigd eigenaarschap, een datacorrectie op bestaande rijen. Gebruik deze skill zodra een wijziging supabase/migrations/ raakt. Niet voor gedrag zonder schemawijziging (extend-feature / bug-fix) en niet voor een pure herstructurering van code (refactor).",
+        "steps": [
+          {
+            "index": 1,
+            "title": "Afbakenen",
+            "agents": [
+              "supabase-db-specialist",
+              "architect"
+            ]
+          },
+          {
+            "index": 2,
+            "title": "Vangnet",
+            "agents": [
+              "tester"
+            ]
+          },
+          {
+            "index": 3,
+            "title": "De migratie",
+            "agents": [
+              "supabase-db-specialist"
+            ]
+          },
+          {
+            "index": 4,
+            "title": "Backfill",
+            "agents": [
+              "supabase-db-specialist"
+            ]
+          },
+          {
+            "index": 5,
+            "title": "Leak-check",
+            "agents": [
+              "security-specialist"
+            ]
+          },
+          {
+            "index": 6,
+            "title": "De terugweg (vóóraf opschrijven, niet \"rollback\")",
+            "agents": []
+          },
+          {
+            "index": 7,
+            "title": "Ontsluiting",
+            "agents": [
+              "coder",
+              "security-specialist"
+            ]
+          },
+          {
+            "index": 8,
+            "title": "Platen bijwerken",
+            "agents": [
+              "architecture-docs-keeper"
+            ]
+          },
+          {
+            "index": 9,
+            "title": "Vrijgeven",
+            "agents": []
+          }
+        ]
+      },
+      {
+        "id": "seo-pagina",
+        "name": "seo-pagina",
+        "description": "Gebruik bij het maken of herzien van een publieke pagina die één zoekvraag volledig beantwoordt — een vindbaarheidspagina, geen blogpost. Regelt de volgorde (eerst de vraag, dan de tekst, dan de poort, dan de bouw), de drie harde grenzen, en de bestanden die je aanraakt zodat de pagina daadwerkelijk vindbaar is.",
+        "steps": []
+      },
+      {
+        "id": "ticket-triage",
+        "name": "ticket-triage",
+        "description": "Gebruik op het vaste kijkmoment en bij elke binnenkomende melding van een gebruiker — een bug, een vraag, een wens, een foutmelding of feedback. Ordent de stapel: ontdubbelen, module en ernst bepalen, één uitgang kiezen, en de melder iets laten horen. Het ritme en de uitgangen staan in het beheerders-runbook; deze skill is het hoe.",
+        "steps": []
       },
       {
         "id": "ui-ux",
@@ -16508,6 +16937,12 @@
         "id": "woonstrategie-check",
         "name": "woonstrategie-check",
         "description": "Gebruik na wijzigingen aan de horizon-kernel, lib/housing-strategy.ts, de horizon-loaders of de Toekomst-grafiek (sim-chart/wealth-composition), bij twijfel of de vier eigen-woningstrategieën (meetellen, uitsluiten, verkopen, opeethypotheek) nog correct doorrekenen, of als periodieke visuele regressie-check bovenop de matrix-vitest. Ook wanneer iemand vraagt \"check de woonstrategieën\" of een rapport met schermafbeeldingen per strategie wil.",
+        "steps": []
+      },
+      {
+        "id": "zoekvraag-onderzoek",
+        "name": "zoekvraag-onderzoek",
+        "description": "Gebruik vóórdat je besluit waaróver een publieke pagina, een /nieuws-item of een FAQ-antwoord gaat — de onderzoeksstap vóór seo-pagina. Zoekt uit welke vragen Nederlanders werkelijk stellen over vermogen en FIRE, en welke daarvan wij binnen de Wft-grens mogen beantwoorden. Ook te gebruiken als periodieke ronde om het vragenregister bij te werken.",
         "steps": []
       }
     ]
@@ -16684,9 +17119,17 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-08-06",
-    "hasChanges": false,
-    "sections": []
+    "previousDate": "2026-08-08",
+    "hasChanges": true,
+    "sections": [
+      {
+        "label": "Componenten (aantal)",
+        "added": [
+          "+1"
+        ],
+        "removed": []
+      }
+    ]
   },
   "statsHistory": [
     {
@@ -16936,9 +17379,23 @@
     },
     {
       "date": "2026-08-06",
-      "api": 282,
-      "components": 877,
-      "tables": 86,
+      "api": 284,
+      "components": 881,
+      "tables": 87,
+      "routesProduction": 99
+    },
+    {
+      "date": "2026-08-07",
+      "api": 284,
+      "components": 883,
+      "tables": 87,
+      "routesProduction": 99
+    },
+    {
+      "date": "2026-08-08",
+      "api": 289,
+      "components": 896,
+      "tables": 88,
       "routesProduction": 99
     }
   ]

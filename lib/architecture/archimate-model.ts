@@ -320,8 +320,8 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     {
       id: 'as-coach', x: 560, y: row(5), w: 220, h: 66, kind: 'appsvc',
       title: 'Inzicht- & coachingsdienst',
-      lead: 'Fin (AI-coach), aanbevelingen, volgende stappen, aandachtspunten-bus en de briefing-kaarten. Elk van deze diensten kan on-device draaien via t-lokale-ai in plaats van via de AI-gateway — dezelfde functie, ander transport. De gebruiker kiest dat per uitvoergroep op /mijn/privacy (ADR 0056, 0078).',
-      items: ['/api/ai/*', '/api/briefing', '/api/next-steps', 'lib/coach-suggestions'],
+      lead: 'Fin (AI-coach), aanbevelingen, volgende stappen, aandachtspunten-bus en de briefing-kaarten. Elk van deze diensten kan on-device draaien via t-lokale-ai in plaats van via de AI-gateway — dezelfde functie, ander transport. De gebruiker kiest dat per uitvoergroep op /mijn/privacy (ADR 0056, 0078). Draagt ook de gebruikersmelding (bug/vraag/aanbeveling) die vanuit het gesprek met Fin te openen is — Supabase blijft de bron, een dagelijkse cron duwt onverstuurde meldingen best-effort door naar de Trifinity-queue in Notion.',
+      items: ['/api/ai/*', '/api/briefing', '/api/next-steps', '/api/user-reports', 'lib/coach-suggestions'],
     },
     {
       id: 'as-nieuws', x: 560, y: row(6), w: 220, h: 66, kind: 'appsvc',
@@ -409,6 +409,12 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
       lead: 'LiteRT-LM (@litert-lm/core, Early Preview) + Gemma 4 E2B web-bundel, volledig on-device: de inferentie zelf (categorisatie-voorstellen, chat-redenering) verlaat het toestel niet en gaat nooit naar een AI-provider of derde partij — dát blijft de privacygarantie (ADR 0043), niet een absolute "niets verlaat het toestel"-claim. Sinds 19 jul 2026 runtime-swap vanaf Transformers.js/ONNX (L1-meting: betrouwbaarder + sneller op dezelfde iGPU-realiteit) — desktop-only, assistief (review-UI-only, geen automatische toepassing) blijft ongewijzigd. Dezelfde runtime bedient sinds C1b ook een experimentele lokale Fin-chat (/mijn/lokale-chat): vragen over eigen cijfers, antwoord blijft on-device, gegrond op een door beheer gecureerde kennisbank (categorieën + verloopbewaking, relevantie-ranking met een harde items-cap) die het kleine model NL-begrippenkennis meegeeft zonder het te overladen. Sinds C2c kan de chat een tekst-geparst actievoorstel emitten; alleen ná expliciete gebruikersbevestiging kruist een actie-label (titel/omschrijving — geen financiële cijfers, die zijn canoniek/UI-afgeleid) terug naar TriFinity’s eigen server via POST /api/ai/actions (ADR "C2c: lokaal tekst-geparst actievoorstel als tool-calling-substituut") — geen AI-provider, geen derde partij, en de inferentie blijft on-device. Dezelfde runtime stelt sinds ADR 0080 ook de persoonlijke nieuwseditie samen — niet als één modelcall (dat past niet binnen het 8.192-tokenvenster van Gemma 4 E2B) maar map-reduce: eerst scoort een pass elk voorgeselecteerd bronartikel apart, dan schrijft een tweede pass proza voor uitsluitend de 0-8 overlevers. Het model typt zelf nooit `sourceUrl`/`sourceName`/`category`/`date` — die reizen 1-op-1 mee uit de bronrij — en een nummer-guard verwerpt elk bedrag in de persoonlijke impactzin dat niet in het bronartikel of het financiële overzicht van de gebruiker staat. De browser is hier de auteur; de server hervalideert de aangeleverde editie tegen dezelfde bronrijen vóór het opslaan (POST /api/local-news-edition) — omgekeerde vertrouwensrelatie t.o.v. het cloudpad, waar de server zelf genereert.',
       items: ['LiteRT-LM (@litert-lm/core 0.14.0)', 'Gemma 4 E2B web-bundel', 'WebGPU', 'privacy_mode + ai_execution_prefs (7 groepen)', 'Lokale kennisbank (app_settings.local_knowledge)'],
     },
+    {
+      id: 't-notion', x: 1250, y: row(7), w: 185, h: 66, kind: 'tech',
+      title: 'Meldingen-sync (Notion)',
+      lead: 'Dagelijkse cron (06:00) die onverstuurde gebruikersmeldingen (bug/vraag/aanbeveling) best-effort naar de bestaande Trifinity-queue in Notion pusht, zodat de triage-skills (/trifinity-next, /trifinity-drain) ze meteen oppakken. Supabase blijft de bron van waarheid; de syncstatus staat op de rij zelf.',
+      items: ['app/api/cron/user-reports-notion-sync', 'lib/user-reports/notion.ts', 'notion_sync_status'],
+    },
 
     // ── Data ──
     {
@@ -472,10 +478,16 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
       lead: 'Operator-telemetrie voor contractdrift van externe koppelingen en bestandsimports. Bevat uitsluitend structurele metadata (kolom-/header-namen + fingerprint-hash) — nooit financiële waarden. Superadmin-only SELECT; INSERT via RPC `increment_contract_event` (service-role, anti-spam dedup op `(kind, surface, fingerprint)`). Zichtbaar op /beheer/integraties — tab "Contracten" (ADR 0024).',
       items: ['contract_events'],
     },
+    {
+      id: 'do-melding', x: 1096, y: 1252, w: 138, h: 56, kind: 'data',
+      title: 'Gebruikersmelding',
+      lead: 'Bug/vraag/aanbeveling van een testgebruiker, met optioneel een screenshot (privé-bucket, signed URL) en de Notion-syncstatus. Een RPC (`reserve_user_report_slot`) begrenst het aantal meldingen per gebruiker.',
+      items: ['user_reports'],
+    },
 
     // ── Externe partijen ──
     {
-      id: 'ext-group', x: 1449, y: 216, w: 192, h: 576, kind: 'group',
+      id: 'ext-group', x: 1449, y: 216, w: 192, h: 650, kind: 'group',
       title: 'Externe partijen',
       lead: 'Off-platform diensten die TriFinity inkoppelt via de technologielaag.',
       items: [],
@@ -522,6 +534,12 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
       lead: 'Hosting, edge en observability.',
       items: ['Vercel'],
     },
+    {
+      id: 'ext-notion', x: 1465, y: 779, w: 160, h: 56, kind: 'ext',
+      title: 'Notion',
+      lead: 'De bestaande Trifinity-werkqueue: testgebruikersmeldingen landen hier als kaartje voor de triage-skills.',
+      items: ['Notion API'],
+    },
   ]
 
   // ── Informatie-uitwisseling per relatie (gecureerd) ──
@@ -537,6 +555,7 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     't-marktdata->app-comp': { payload: 'Koersen, fundamentals en wallet-/exchange-saldi', mechanism: 'rest', cadence: 'daily', contractDomains: ['integrations', 'prices'] },
     't-platform->app-comp': { payload: 'Hosting, edge-rendering en offline service-worker-cache', mechanism: 'build', cadence: 'build' },
     't-lokale-ai->app-comp': { payload: 'Lokale categorisatie-voorstellen, chat-antwoorden en (sinds ADR 0080) een lokaal samengestelde nieuwseditie — de inferentie blijft on-device. Terug naar de eigen server kruist alleen wat de gebruiker bevestigde of wat de server zelf hervalideert: een bevestigd actie-label (géén cijfers, C2c) via POST /api/ai/actions, en de nieuwseditie via POST /api/local-news-edition (server herbouwt bronvelden en klemt de editie tegen de aangeboden bronrijen — de browser is auteur, niet de bron van waarheid)', mechanism: 'compute', cadence: 'on-demand' },
+    't-notion->app-comp': { payload: 'Leest onverstuurde user_reports-rijen en zet notion_sync_status na een gepushte of mislukte poging', mechanism: 'rest', cadence: 'daily', contractDomains: ['user-reports'], note: 'Dagelijkse cron 06:00 (vercel.json); Supabase blijft de bron, de push is best-effort en herstelbaar. app_settings.notion_api_token/notion_reports_data_source_id staan op de SELECT-denylist (concern app-settings-select-denylist).' },
     // Applicatieservice → bedrijfsproces
     'as-import->sp-registreren': { payload: 'Transacties, saldi en terugkerende lasten', mechanism: 'rest', cadence: 'on-demand', contractDomains: ['bank-connect', 'recurring', 'detect-recurring', 'own-accounts', 'bank-accounts'], note: 'De IBAN van een rekening leeft versleuteld (`iban_encrypted` + blind index `iban_hash`); de sleutels zijn server-only. Daarom lezen en schrijven de clientschermen hem via `own-accounts/ibans` en `bank-accounts/[id]` in plaats van rechtstreeks op de tabel — die IBAN is niet alleen een label maar de identifier waarmee overboekingen tussen eigen rekeningen worden herkend.' },
     'as-budget->sp-budget': { payload: 'Budgetten, varianties, trends en dagtempo', mechanism: 'rest', cadence: 'on-demand', contractDomains: ['budgets', 'budget-trends', 'budget-variance', 'daily-expense-rate', 'cashflow-forecast'] },
@@ -557,11 +576,13 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     'ext-brokers->t-marktdata': { payload: 'Aandelenposities en saldi (Trading 212 read-only of CSV-snapshot per investment-asset)', mechanism: 'rest', cadence: 'daily', contractDomains: ['integrations'] },
     'ext-marktdata->t-marktdata': { payload: 'Koersen en fundamentals', mechanism: 'rest', cadence: 'daily' },
     'ext-vercel->t-platform': { payload: 'Hosting, edge en observability', mechanism: 'build', cadence: 'build' },
+    'ext-notion->t-notion': { payload: 'Trifinity-werkqueue: nieuwe/bijgewerkte meldingkaartjes', mechanism: 'rest', cadence: 'daily' },
     // Contractbewaking: import- en vermogens-/integratiedienst schrijven drift-events
     'as-import->do-contract-events': { payload: 'Formaat-drift-events (header-namen + fingerprint-hash) bij CSV/MT940/OFX/JSON-uploads met afwijkend formaat', mechanism: 'rpc', cadence: 'on-demand', note: 'Via RPC increment_contract_event (service-role, SECURITY DEFINER). Nooit transactiewaarden — alleen structurele metadata. Fout-stil (try/catch) zodat een drift-log de upload niet breekt (ADR 0024).' },
     'as-vermogen->do-contract-events': { payload: 'API-response-drift-events (zod-canary: veldnamen bij schema-schending) van exchange-/broker-/marktdata-clients', mechanism: 'rpc', cadence: 'daily', note: 'Zod safeParse na res.json(); bij falen recordContractEvent met issues-paden; dan permissieve cast zodat sync doorgaat. Prioriteit: Bitvavo > Trading 212 > TrueLayer (ADR 0024).' },
     // Applicatie ↔ data
     'app-comp->data-cont': { payload: 'Alle informatieobjecten — lezen en schrijven', mechanism: 'rpc', cadence: 'realtime', note: 'Elke query loopt server-side met Row Level Security op auth.uid().' },
+    'as-coach->do-melding': { payload: 'Gebruikersmelding (bug/vraag/aanbeveling) + optionele screenshot-referentie; leest de eigen syncstatus terug', mechanism: 'rest', cadence: 'on-demand', contractDomains: ['user-reports'], note: 'RPC reserve_user_report_slot begrenst het aantal per gebruiker; own-row RLS.' },
     // Actor → proces
     'b-actor->b-main': { payload: 'Stuurt het proces, kiest modules', mechanism: 'process', cadence: 'on-demand' },
     'b-partner->b-main': { payload: 'Deelt financiën via huishouden-koppeling', mechanism: 'process', cadence: 'on-demand' },
@@ -642,7 +663,7 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
   addEdge({ from: 'app-comp', to: 'm-soeverein', type: 'realization', fromSide: 'T', toSide: 'B', fromOffset: 1100, toOffset: 1220 })
 
   // Technologie bedient de applicatie
-  const techs = ['t-supabase', 't-aigateway', 't-bankconnect', 't-bankimport', 't-marktdata', 't-platform', 't-lokale-ai']
+  const techs = ['t-supabase', 't-aigateway', 't-bankconnect', 't-bankimport', 't-marktdata', 't-platform', 't-lokale-ai', 't-notion']
   techs.forEach((t, i) => {
     const n = nodes.find((x) => x.id === t)!
     addEdge({ from: t, to: 'app-comp', type: 'serving', fromSide: 'L', toSide: 'R', toOffset: n.y + n.h / 2, label: i === 0 ? 'Bedient' : undefined })
@@ -657,6 +678,7 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     ['ext-brokers', 't-marktdata', 1448],
     ['ext-marktdata', 't-marktdata', 1456],
     ['ext-vercel', 't-platform'],
+    ['ext-notion', 't-notion'],
   ]
   extPairs.forEach(([ext, tech, midX]) => {
     addEdge({ from: ext, to: tech, type: 'serving', fromSide: 'L', toSide: 'R', midX })
@@ -671,6 +693,9 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
   // Contractbewaking: import-dienst schrijft formaat-drift; vermogens-dienst schrijft API-response-drift
   addEdge({ from: 'as-import', to: 'do-contract-events', type: 'access', fromSide: 'B', toSide: 'T', via: [[670, 1252]] })
   addEdge({ from: 'as-vermogen', to: 'do-contract-events', type: 'access', fromSide: 'B', toSide: 'T', via: [[670, 1252]] })
+
+  // Inzicht- & coachingsdienst legt de gebruikersmelding vast (own-row)
+  addEdge({ from: 'as-coach', to: 'do-melding', type: 'access', fromSide: 'B', toSide: 'T', readWrite: true, via: [[700, 1220]] })
 
   return { width: 1660, height: 1370, nodes, edges }
 }

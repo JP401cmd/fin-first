@@ -5,6 +5,8 @@ import { getServerPerspective } from '@/lib/household/server-perspective'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { KoppelRekeningBanner } from '@/components/overview/koppel-rekening-banner'
 import { TransactiesAnalyse } from '@/components/overview/transacties/transacties-analyse'
+import { SpendLimitsSection } from '@/components/overview/transacties/spend-limits-section'
+import { loadSpendLimitsSection } from '@/lib/spend-limits/loader'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { PageStatusDot } from '@/components/app/page-status-dot'
 import { PageOpening } from '@/components/editorial'
@@ -26,11 +28,32 @@ export const metadata: Metadata = {
  * `loadCashflowData` (perspectief-keten, 6 maanden transacties, recurrings, een
  * naam-decoratie per getoonde feed-rij) om er precies één integer uit te lezen;
  * de rest van die bundel wordt op deze route nergens gebruikt.
+ *
+ * DEEPLINK NAAR ÉÉN GRENZENPOT (D7 / FR-B1-09): `?limit=<uuid>` opent de
+ * prestatieweergave van die pot, `&periode=<periodKey>` selecteert er meteen een
+ * periode in. De server leest de parameters alleen — valideren gebeurt in de
+ * sectie tegen de potten die de loader daadwerkelijk teruggaf, zodat een onbekend
+ * of gearchiveerd id stilzwijgend niets doet in plaats van een foutpagina op te
+ * leveren. In Next 16 zijn `searchParams` een Promise; vandaar de `await`.
  */
-export default async function OverzichtCashflowTransactiesPage() {
+export default async function OverzichtCashflowTransactiesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ limit?: string | string[]; periode?: string | string[] }>
+}) {
+  const { limit, periode } = await searchParams
+  // Een herhaalde query-parameter (`?limit=a&limit=b`) komt als array binnen —
+  // dan is er geen eenduidige bedoeling en openen we niets.
+  const openLimitId = typeof limit === 'string' && limit.length > 0 ? limit : null
+  const openPeriodKey = typeof periode === 'string' && periode.length > 0 ? periode : null
+
   const supabase = await createClient()
   const perspective = await getServerPerspective()
   const accountCount = await loadAccountCount(supabase, perspective)
+  // Grenzenpotten worden SERVER-SIDE geladen (ADR 0058) en als props doorgegeven;
+  // de sectie herrekent zelf niets. De loader is goedkoop voor wie geen pot heeft:
+  // één geïndexeerde query op spend_limits, en pas daarna de aggregaat-RPC's.
+  const spendLimits = await loadSpendLimitsSection(supabase)
 
   return (
     <>
@@ -53,6 +76,11 @@ export default async function OverzichtCashflowTransactiesPage() {
         />
         <KoppelRekeningBanner accountCount={accountCount} />
         <TransactiesAnalyse />
+        <SpendLimitsSection
+          data={spendLimits}
+          openLimitId={openLimitId}
+          openPeriodKey={openPeriodKey}
+        />
       </div>
     </>
   )

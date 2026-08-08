@@ -9,11 +9,18 @@
  *
  * De meeste checks roepen ÉCHTE productiefuncties aan (calculateBox3,
  * scoreDSTI/scoreAssetConcentration, pillarStatus, computeGoalProgress,
- * computeFreedomTotal, compareCompound). Twee mirrors met bronregel-verwijzing
- * (spiegelt de mirrors in start/will/cash-checks.ts):
+ * computeFreedomTotal, compareCompound, buildSimNetWorthRows, deflate).
+ * Twee mirrors met bronregel-verwijzing (spiegelt de mirrors in
+ * start/will/cash-checks.ts):
  *  - `scoreDebtRatio` (lib/financial-health.ts — NIET geëxporteerd)
  *  - de postpone-/uitstel-termijn (POSTPONE_DAYS=14 resp. weken×7, identiek
  *    patroon aan de WILL-mirror)
+ *
+ * WF-OVZ-22 (euro-weergave, wave 2/3): `buildSimNetWorthRows` (nominaal, D7)
+ * levert sinds brok E `inflationFactor` op elke rij zelf (single-source join
+ * op leeftijd, al door de aanroeper gedaan); deze check deflateert het
+ * resultaat met `deflate()` (lib/euro-display.ts) op die rij-eigen factor —
+ * géén losse leeftijd→factor-map nodig.
  */
 
 import { calculateBox3 } from '@/lib/box3-data'
@@ -24,6 +31,9 @@ import { pillarStatus } from '@/lib/leverage-status'
 import { computeGoalProgress, type Goal } from '@/lib/goal-data'
 import { computeFreedomTotal, computeFreedomDelta } from '@/lib/briefing/overview-briefing'
 import { compareCompound } from '@/lib/compound-projection'
+import { buildSimNetWorthRows } from '@/lib/horizon/networth-rows'
+import { DEFAULT_HOUSING_STRATEGY } from '@/lib/housing-strategy'
+import { deflate } from '@/lib/euro-display'
 import { OVZ_ACCEPTANCE } from './ovz'
 import type { AcceptanceCriterion } from './types'
 
@@ -320,6 +330,40 @@ export const OVZ_ENGINE_CHECKS: OvzEngineCheck[] = [
       return {
         expected: 'uitgesteldTot=2026-07-19; zichtbaarAantal=5; totaalN=7',
         actual: `uitgesteldTot=${uitgesteldTot}; zichtbaarAantal=${zichtbaar.length}; totaalN=${acties.length}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-OVZ-22',
+    scenarioId: 'UAT-OVZ-22',
+    label: "Mini-vermogensgrafiek in huidige euro's (buildSimNetWorthRows + deflate): naad zonder knik",
+    run: () => {
+      criterion('WF-OVZ-22')
+      // Synthetische kernelrijen — euro-inflatie heft de portefeuillegroei
+      // exact op, zodat het REËLE netto vermogen op elke leeftijd €500.000
+      // blijft (identiek aan currentNetWorth, jaar-0-factor 1.0 → geen knik).
+      // `inflationFactor` reist mee op de rij zelf (brok E-contract) — de
+      // deflatie ná de reconcile-offset gebeurt met de rij-eigen factor via
+      // `deflate()`, niet met een los opgebouwde leeftijd-map. Factoren zijn
+      // machten van 2 (i.p.v. bv. 1,1/1,21): deling door een macht van 2 is in
+      // IEEE-754 altijd exact — geen drijvendekomma-afrondingsruis in de assertie.
+      const currentNetWorth = 500000
+      const rows = buildSimNetWorthRows({
+        simRows: [
+          { age: 60, endPortfolio: 500000, inflationFactor: 1 },
+          { age: 61, endPortfolio: 1000000, inflationFactor: 2 },
+          { age: 62, endPortfolio: 2000000, inflationFactor: 4 },
+        ],
+        currentNetWorth,
+        housingStrategy: DEFAULT_HOUSING_STRATEGY, // include_full → geen huis-overwaarde-optelling
+        assets: [],
+        debts: [],
+        dateOfBirth: null,
+      })
+      const deflated = rows.map((r) => deflate(r.netWorth, r.inflationFactor, 'real'))
+      return {
+        expected: 'real60=500000; real61=500000; real62=500000; jaar0GelijkAanCurrentNetWorth=true',
+        actual: `real60=${deflated[0]}; real61=${deflated[1]}; real62=${deflated[2]}; jaar0GelijkAanCurrentNetWorth=${deflated[0] === currentNetWorth}`,
       }
     },
   },

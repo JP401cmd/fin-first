@@ -174,6 +174,10 @@ const HoldingFavWidget = dynamic(
   () => import('./holding-fav-widget').then(m => ({ default: m.HoldingFavWidget })),
   { loading: WidgetLoadingFallback }
 )
+const SpendLimitWidget = dynamic(
+  () => import('./spend-limit-widget').then(m => ({ default: m.SpendLimitWidget })),
+  { loading: WidgetLoadingFallback }
+)
 const MeldingenWidget = dynamic(
   () => import('./meldingen-widget').then(m => ({ default: m.MeldingenWidget })),
   { loading: WidgetLoadingFallback }
@@ -316,6 +320,25 @@ export function WidgetRenderer({ id, size, data, features }: WidgetRendererProps
     return (
       <WidgetErrorBoundary widgetId={id}>
         <HoldingFavWidget size={size} holding={holding} dailyExp={dailyExp} />
+      </WidgetErrorBoundary>
+    )
+  }
+
+  // Dynamische grenzenpot-widgets. BEWUST GEEN module-gate: een tegenpartij-regel
+  // werkt volledig zonder budgetten, en de widget bestaat alleen omdat de gebruiker
+  // zélf een pot aanmaakte — dat ís de gate (FR-B2-06, AC-B2-09).
+  if (id.startsWith('spend_limit:')) {
+    const limitId = id.slice('spend_limit:'.length)
+    const limit = data.spendLimitWidgets?.find(s => s.id === limitId)
+    // Pot gearchiveerd/verdwenen tussen twee loads: netjes niets renderen i.p.v.
+    // een lege tegel — de loader ruimt de pref bij de volgende bundel op.
+    if (!limit) return null
+    // Canoniek 12-mnd rolling dagtarief uit de bundel (consume-don't-recompute);
+    // fallback op de maand-conversie voor mock-/empty-bundels.
+    const dailyExp = data.dailyExpenseRate ?? dailyExpenseRate(data.monthlyExpenses)
+    return (
+      <WidgetErrorBoundary widgetId={id}>
+        <SpendLimitWidget size={size} limit={limit} dailyExp={dailyExp} />
       </WidgetErrorBoundary>
     )
   }

@@ -625,7 +625,7 @@ const tests: TestCase[] = [
       // Dynamic prefixes should be accepted
       assert(!validIds.has('budget_fav:test'), 'dynamic id not in catalog')
       assert(!validIds.has('holding_fav:test'), 'dynamic holding not in catalog')
-      // The route filters to validIds + budget_fav: + holding_fav: prefixes
+      // The route filters to validIds + budget_fav: + holding_fav: + spend_limit: prefixes
     },
   },
 

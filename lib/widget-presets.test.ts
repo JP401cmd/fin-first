@@ -34,6 +34,13 @@ describe('isKnownPresetWidgetId', () => {
     expect(isKnownPresetWidgetId('holding_fav:ae42-asml')).toBe(true)
   })
 
+  it('accepteert dynamische grenzenpot-ids', () => {
+    // Zonder deze prefix saneert de preset-LEZER opgeslagen presets met
+    // pot-widgets stil weg — de gebruiker krijgt dan minder widgets dan de
+    // preset belooft, zonder foutindicatie.
+    expect(isKnownPresetWidgetId('spend_limit:7c2a-tankstations')).toBe(true)
+  })
+
   it('wijst de verwijderde widget-ids uit deze bug af', () => {
     expect(isKnownPresetWidgetId('passief_inkomen')).toBe(false)
     expect(isKnownPresetWidgetId('jouw_pad')).toBe(false)
@@ -70,12 +77,13 @@ describe('sanitizePresetWidgets', () => {
     expect(sanitizePresetWidgets(stored)).toBe(stored)
   })
 
-  it('behoudt dynamische favorieten naast catalogus-widgets', () => {
+  it('behoudt dynamische favorieten en grenzenpotten naast catalogus-widgets', () => {
     const stored = [
       pref('fire_prognose', 1),
       pref('budget_fav:abc', 2),
       pref('jouw_pad', 3),
       pref('holding_fav:xyz', 4),
+      pref('spend_limit:POT-1', 5),
     ]
 
     const result = sanitizePresetWidgets(stored)
@@ -84,8 +92,9 @@ describe('sanitizePresetWidgets', () => {
       'fire_prognose',
       'budget_fav:abc',
       'holding_fav:xyz',
+      'spend_limit:POT-1',
     ])
-    expect(result.map(w => w.order)).toEqual([1, 2, 3])
+    expect(result.map(w => w.order)).toEqual([1, 2, 3, 4])
   })
 
   it('geeft een lege lijst terug als alle ids onbekend zijn', () => {

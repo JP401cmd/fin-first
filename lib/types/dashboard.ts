@@ -10,6 +10,7 @@ import type { FeeAnalysis } from '@/lib/fee-analysis'
 import type { FireEndStrategy } from '@/lib/fire-strategy'
 import type { HealthScore } from '@/lib/financial-health'
 import type { NewsPreview } from '@/lib/news-preview'
+import type { SpendLimitWidgetData } from '@/lib/spend-limits/widget-data'
 
 export interface TopAction {
   id: string
@@ -300,7 +301,18 @@ export interface DashboardData {
   freedomMilestones: FreedomMilestoneResult | null
   // Horizon: simplified sim rows for vermogenspad chart (age + portfolio + phase).
   // Reeds weergave-geclipt t/m eindleeftijd − 1 (clipRowsToPlanEnd), spiegel van /horizon.
-  simRows: { age: number; endPortfolio: number; phase: string; flowIn: number; flowOut: number; oneTimeNet: number }[] | null
+  //
+  // GRONDSLAG (ADR 0090): alle bedragen zijn NOMINAAL — in de euro's van het
+  // projectiejaar zelf. `inflationFactor` is de canonieke weergave-deflator van
+  // diezelfde kernelrij (jaar 0 = exact 1.0); de loader joint hem op leeftijd uit
+  // `HorizonFireSim.unifiedRows`. Wil een oppervlak "huidige euro's" tonen, dan
+  // deelt het `endPortfolio` hierdoor via `lib/euro-display.ts` — in een
+  // render-memo, nooit terug de bundel in (nominaal = ongesuffixt in de datalaag,
+  // gedeflateerd draagt een `view`-prefix en leeft alleen in de render).
+  // Optioneel/additief: hand-gebouwde mock-/fixture-bundels zonder dit veld blijven
+  // geldig; ontbreekt hij, dan geldt de bestaande `factorAtAge`-conventie
+  // "geen factor → 1" (= nominaal tonen), nooit een verzonnen getal.
+  simRows: { age: number; endPortfolio: number; phase: string; flowIn: number; flowOut: number; oneTimeNet: number; inflationFactor?: number }[] | null
   // Horizon: kernel-eindleeftijd (SimResult.displayEndAge) — de leeftijd die /horizon als
   // aslabel toont (deplete/legacy = fire_end_age, perpetual/pensioen = horizon-cap 100).
   // Widgets tonen dit i.p.v. een hardcoded '90j'. null als de sim niet kon draaien of bij
@@ -310,7 +322,13 @@ export interface DashboardData {
   // niet-liquide assets die uit de FIRE-pot zijn gefilterd). Náást simRows/endPortfolio,
   // zodat de /overzicht-vermogensgrafiek de projectielijn continu houdt met het
   // Vandaag-punt (= volledig netto vermogen incl. huis). null als de sim niet kon draaien.
-  simNetWorthRows: { age: number; netWorth: number }[] | null
+  //
+  // GRONDSLAG (ADR 0090): `netWorth` is NOMINAAL en al her-ankerd op het Vandaag-punt
+  // (de reconcile-offset in `buildSimNetWorthRows`, in nominale ruimte). `inflationFactor`
+  // is de weergave-deflator van diezelfde kernelrij; deel er pas ná de her-ankering mee,
+  // dan blijft de naad historie↔projectie knikvrij (jaar 0 draagt factor 1.0).
+  // Optioneel/additief om dezelfde reden als bij `simRows` hierboven.
+  simNetWorthRows: { age: number; netWorth: number; inflationFactor?: number }[] | null
   // Horizon: requiredFirePortfolio uit runSimulation (null als geen birth_date)
   simRequiredPortfolio: number | null
   // Horizon: FIRE-doel INCL. eigen woning (Prognose!I@FIRE) — spiegelt simRequiredPortfolio
@@ -367,6 +385,21 @@ export interface DashboardData {
   }[]
   // Favorite holdings for dynamic mini-widgets
   favoriteHoldings: FavoriteHolding[]
+  /**
+   * Grenzenpotten voor de dynamische `spend_limit:<id>`-widgets — de COMPACTE
+   * projectie (`toSpendLimitWidgetData`), niet het volle `SpendLimitReport`: dat
+   * draagt tot 13 periode-uitkomsten per pot en zou bij élke /overzicht-load in
+   * de RSC-payload belanden.
+   *
+   * Bevat álle niet-gearchiveerde potten (actief én gepauzeerd, herkenbaar aan
+   * `isActive`): injectie van een nieuwe widget-pref gebeurt alleen voor actieve
+   * potten, maar de stale-opruiming mag een pref niet wissen omdat de gebruiker
+   * de pot even pauzeerde (FR-B2-03/04).
+   *
+   * Optioneel/additief — spiegelt `dailyExpenseRate`/`recentMonthlyExpenses`:
+   * mock-/empty-bundels zonder dit veld gedragen zich als "geen potten".
+   */
+  spendLimitWidgets?: SpendLimitWidgetData[]
   // All budgets (parents + children, non-archive) for auto-dashboard wizard
   allBudgets: {
     id: string

@@ -134,6 +134,24 @@ describe('buildDashboardLayout', () => {
     expect(countCells(prefs)).toBe(16)
   })
 
+  it('genereert zelf geen grenzenpot-widgets (die komen uit de loader-injectie)', () => {
+    // De wizard kent alleen catalogus-widgets + geselecteerde budget-favorieten.
+    // Grenzenpotten verschijnen langs een ánder pad (de dashboard-loader spuit
+    // per actieve pot een `spend_limit:<id>`-pref in). De prefix-tak in
+    // `lookupSizes` is daarom een VANGRAIL voor de upgrade-passes: zou een
+    // pot-id hier ooit binnenkomen, dan mag hij niet op de generieke fallback
+    // belanden en stil naar een niet-ondersteunde maat groeien.
+    const answers: AutoDashboardAnswers = {
+      focuses: ['budget_cashflow'],
+      modulePreference: 'kern',
+      gridSize: 'medium',
+      detailLevel: 'balanced',
+      selectedBudgetFavIds: [],
+    }
+    const prefs = buildDashboardLayout(answers, WIDGET_CATALOG, ALL_FEATURES_ENABLED, NO_FAVS)
+    expect(prefs.some(p => p.id.startsWith('spend_limit:'))).toBe(false)
+  })
+
   it('combines multiple focuses additively', () => {
     const doubleFocus: AutoDashboardAnswers = {
       focuses: ['budget_cashflow', 'fire_freedom'],

@@ -8,10 +8,22 @@
  *
  * Model: de `.hero-readout` uit de Toekomst-mockup. Editorial Finance-stijl:
  * ingetogen tokens, Playfair-leeswaarden, horizon-accent voor vrijheidstijd.
+ *
+ * EURO-WEERGAVE: dit component kent de weergave NIET en mag dat ook niet. Het
+ * ontvangt `netWorth`, `monthlyAmount` en `freedomTime` al omgezet uit het
+ * render-grensblok van `horizon-client.tsx` (chart-feed-regime, D4). Zou het hier
+ * zelf `useEuroView()` lezen, dan bestonden er twee omzetplekken voor hetzelfde
+ * bedrag — en een dubbel gedeeld bedrag ziet er op het scherm plausibel uit.
+ *
+ * BEDRAGMASKERING (ADR 0091) werkt precies andersom en komt WEL hiervandaan: uit
+ * `useMaskedAmounts()` (fallback-context, dus geen provider nodig in tests), niet
+ * uit een prop. `LifelineReadoutProps` blijft daardoor ongewijzigd en elke caller
+ * erft de maskering zonder eigen wijziging — spiegelt `sim-chart.tsx`.
  */
 
 import type { ReactNode } from 'react'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency, MASKED_AMOUNT_PLACEHOLDER } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 
 const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
 const SOURCE_SERIF = 'var(--font-source-serif, Georgia, serif)'
@@ -58,6 +70,7 @@ export function LifelineReadout({
   monthlyAmount,
   isResting,
 }: LifelineReadoutProps) {
+  const { masked } = useMaskedAmounts()
   return (
     <div
       className="flex flex-wrap items-stretch overflow-hidden rounded-xl border border-[var(--border-ed)] bg-[var(--paper)]"
@@ -85,9 +98,13 @@ export function LifelineReadout({
         </span>
       </div>
 
-      <Cell label="Netto vermogen">{formatCurrency(netWorth)}</Cell>
-      <Cell label="Vrij besteedbaar" accent>{freedomTime}</Cell>
-      <Cell label={monthlyLabel}>{formatCurrency(monthlyAmount)}</Cell>
+      <Cell label="Netto vermogen">{formatMaskedCurrency(netWorth, masked)}</Cell>
+      {/* Vrijheidstijd is lineair in het vermogen hierboven (bedrag ÷ dagtarief,
+          zie horizon-client.tsx "Cijferbar"), dus uit "6 jr 5 mnd" plus een
+          bekend dagtarief is het gemaskeerde bedrag terug te rekenen. ADR 0091
+          laag 4: zo'n afgeleide tijdswaarde maskeert mee. */}
+      <Cell label="Vrij besteedbaar" accent>{masked ? MASKED_AMOUNT_PLACEHOLDER : freedomTime}</Cell>
+      <Cell label={monthlyLabel}>{formatMaskedCurrency(monthlyAmount, masked)}</Cell>
     </div>
   )
 }

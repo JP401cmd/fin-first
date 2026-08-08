@@ -55,13 +55,33 @@ import {
 
 export interface SimNetWorthRow {
   age: number
-  /** Geprojecteerd VOLLEDIG netto vermogen (FIRE-pot + niet-liquide assets). */
+  /**
+   * Geprojecteerd VOLLEDIG netto vermogen (FIRE-pot + niet-liquide assets).
+   *
+   * NOMINAAL — in de euro's van het projectiejaar zelf. Géén `netWorthNominal`-
+   * suffix (ADR 0090 / D6): nominaal is de enige grondslag die in de datalaag
+   * bestaat, en een suffix zou suggereren dat er ergens ook een `netWorthReal`
+   * ligt. Het signaal dat deze rij nominaal is, is de buurman hieronder.
+   */
   netWorth: number
+  /**
+   * Canonieke WEERGAVE-deflator van deze rij (`UnifiedProjectionRow
+   * .inflationFactor`, jaar 0 = exact 1.0). Puur doorgegeven — deze helper
+   * gebruikt hem NIET in enige som (zie de reconcile-offset hieronder).
+   *
+   * Consument: het renderende component deelt `netWorth` hierdoor wanneer de
+   * gebruiker "huidige euro's" kiest — ná de her-ankering, nooit ervoor.
+   */
+  inflationFactor: number
 }
 
 export interface BuildSimNetWorthRowsParams {
-  /** Per-jaar FIRE-portefeuille uit de engine (endPortfolio = LedgerRow nettoVermogen, nominaal). */
-  simRows: { age: number; endPortfolio: number }[]
+  /**
+   * Per-jaar FIRE-portefeuille uit de engine (endPortfolio = LedgerRow nettoVermogen, nominaal),
+   * mét de weergave-deflator van diezelfde kernelrij. De aanroeper joint die factor op
+   * LEEFTIJD uit `HorizonFireSim.unifiedRows`; hier wordt hij alleen doorgegeven.
+   */
+  simRows: { age: number; endPortfolio: number; inflationFactor: number }[]
   /** Volledig netto vermogen vandaag (incl. huis) — het Vandaag-punt / historie-grondslag. */
   currentNetWorth: number
   /** Housing-strategie van de gebruiker. */
@@ -116,12 +136,28 @@ export function buildSimNetWorthRows(p: BuildSimNetWorthRowsParams): SimNetWorth
     return Math.max(0, currentValue - balance)
   }
 
-  // Ruwe reeks: endPortfolio + huisbijdrage per jaar.
-  const raw = rows.map((r) => ({ age: r.age, value: r.endPortfolio + houseEquityAt(r.age) }))
+  // Ruwe reeks: endPortfolio + huisbijdrage per jaar. `inflationFactor` reist mee
+  // als passagier — hij zit in GEEN ENKELE som hieronder.
+  const raw = rows.map((r) => ({
+    age: r.age,
+    value: r.endPortfolio + houseEquityAt(r.age),
+    inflationFactor: r.inflationFactor,
+  }))
 
   // Reconcile-offset: veranker jaar 0 op currentNetWorth (zelfde "vandaag"-grondslag
   // als het Vandaag-punt + historie). Vlakke euro-verschuiving over alle rijen.
+  //
+  // GRONDSLAG (ADR 0090 / D7 — hier ligt de grens): deze offset is een bedrag van
+  // VANDAAG en wordt in NOMINALE ruimte toegepast. Deflateren gebeurt pas in het
+  // renderende component, ná deze her-ankering. Omgekeerd (eerst delen, dan
+  // ankeren) zou het Vandaag-punt laten verschuiven en een knik op de naad
+  // historie↔projectie opleveren. Omdat rij 0 factor 1.0 draagt, is
+  // `netWorth / inflationFactor` in jaar 0 exact `currentNetWorth`.
   const offset = p.currentNetWorth - raw[0].value
 
-  return raw.map((r) => ({ age: r.age, netWorth: r.value + offset }))
+  return raw.map((r) => ({
+    age: r.age,
+    netWorth: r.value + offset,
+    inflationFactor: r.inflationFactor,
+  }))
 }

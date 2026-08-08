@@ -23,6 +23,8 @@ function makeCtx(overrides: Partial<ActionRunContext> = {}): ActionRunContext {
     privacyMasked: false,
     toggleDisplayMode: vi.fn(),
     displayMode: 'simple',
+    toggleEuroView: vi.fn(),
+    euroView: 'nominal',
     triggerPricesSync: vi.fn(),
     currentPerspective: 'personal',
     availablePerspectives: PERSPECTIVES,
@@ -110,5 +112,41 @@ describe('buildActionItems — perspectief-acties', () => {
 
     const withModule = buildActionItems(makeCtx(), ['vermogensregistratie'])
     expect(withModule.find((i) => i.id === 'action:sync-prices')).toBeDefined()
+  })
+})
+
+describe('buildActionItems — euro-weergave', () => {
+  function euroItem(ctx: ActionRunContext) {
+    const item = buildActionItems(ctx, []).find((i) => i.id === 'action:toggle-euro-view')
+    if (!item) throw new Error('action:toggle-euro-view ontbreekt in het register')
+    return item
+  }
+
+  it('biedt in nominaal de stap naar huidige euro’s aan', () => {
+    expect(euroItem(makeCtx({ euroView: 'nominal' })).label).toBe("Toon huidige euro's")
+  })
+
+  it('biedt in reële weergave de stap terug naar toekomstige euro’s aan', () => {
+    expect(euroItem(makeCtx({ euroView: 'real' })).label).toBe("Toon toekomstige euro's")
+  })
+
+  it('roept de toggle aan en sluit het palet', () => {
+    const toggleEuroView = vi.fn()
+    const closePalette = vi.fn()
+    const item = euroItem(makeCtx({ toggleEuroView, closePalette }))
+    // Een action-item is per definitie een runner, geen href — als `run` ontbreekt
+    // is de actie stuk, dus dat is hier een echte assertie en geen type-formaliteit.
+    expect(item.run).toBeDefined()
+    expect(item.href).toBeUndefined()
+    item.run!()
+    expect(toggleEuroView).toHaveBeenCalledTimes(1)
+    expect(closePalette).toHaveBeenCalledTimes(1)
+  })
+
+  it('staat direct onder de weergavemodus-actie', () => {
+    const ids = buildActionItems(makeCtx(), []).map((i) => i.id)
+    expect(ids.indexOf('action:toggle-euro-view')).toBe(
+      ids.indexOf('action:toggle-display-mode') + 1,
+    )
   })
 })

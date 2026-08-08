@@ -104,9 +104,17 @@ export function getWidgetPreset(id: string): WidgetPreset | undefined {
 // RLS-beleid op app_settings schrijven tot superadmin beperkt — een
 // self-heal-write zou voor gewone gebruikers simpelweg falen.
 
-/** Dynamische favoriet-widgets hebben bewust geen catalogus-entry. */
+/**
+ * Dynamische widgets (favorieten + grenzenpotten) hebben bewust geen
+ * catalogus-entry. Ontbreekt een prefix hier, dan saneert de preset-LEZER
+ * opgeslagen presets met zulke widgets stil weg.
+ */
 function isDynamicWidgetId(id: string): boolean {
-  return id.startsWith('budget_fav:') || id.startsWith('holding_fav:')
+  return (
+    id.startsWith('budget_fav:') ||
+    id.startsWith('holding_fav:') ||
+    id.startsWith('spend_limit:')
+  )
 }
 
 /**

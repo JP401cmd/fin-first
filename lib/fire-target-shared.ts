@@ -36,6 +36,7 @@ import {
 import type { SimResult } from '@/lib/fire-simulation'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
 import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
+import type { FactorRow } from '@/lib/euro-display'
 
 /**
  * Beide FIRE-doel-grondslagen uit ÉÉN kernel-run (ADR 0034).
@@ -95,6 +96,29 @@ export interface HorizonFireSim {
   aowAgeInt: number
   /** Fractionele AOW-leeftijd (weergave). */
   aowAgeFractional: number
+  /**
+   * Kernelrijen van DEZE run, teruggebracht tot de canonieke WEERGAVE-DEFLATOR
+   * per jaar: `UnifiedProjectionRow.inflationFactor` (jaar 0 = exact 1.0).
+   *
+   * Waaróm deze naad bestaat (ADR 0090, besluit "de factor verlaat de kernel via
+   * `computeHorizonFireSim`"): `SimResult`/`SimRow` dragen de factor NIET, terwijl
+   * `UnifiedProjectionResult.rows` dat wél doen — die blijven vandaag binnen deze
+   * functie. Zonder deze naad zou elke server-consument (de /overzicht-bundel, de
+   * AI-context) de factor zelf moeten narekenen met een eigen `Math.pow(1 + i, n)`.
+   * Dát is precies de drift die de euro-weergave opheft: CONSUME, DON'T RECOMPUTE.
+   *
+   * Bewust COMPACT (`{ age, inflationFactor }`) en niet de volledige
+   * `UnifiedProjectionRow[]`: de rijen reizen mee in de RSC-payload naar de client
+   * en de rest van de rij is daar niet nodig. `SimRow` uitbreiden is verworpen —
+   * dat type wordt óók door niet-kernel-paden (stubs, previews, what-if) gemaakt,
+   * waar de factor verzonnen zou moeten worden.
+   *
+   * CONSUME-ONLY: voer deze rijen aan `buildFactorByAge` / `factorAtAge` /
+   * `buildFactorByOffset` (`lib/euro-display.ts`). Deel er nooit met de hand mee.
+   * Leeg wanneer de run geen rijen opleverde — de helpers vallen dan terug op
+   * factor 1 (= geen deflatie), nooit op een verzonnen getal.
+   */
+  unifiedRows: FactorRow[]
 }
 
 /**
@@ -183,6 +207,17 @@ export const computeHorizonFireSim = cache(async function computeHorizonFireSim(
   const outcome = computeConvergentieProjection({ rawContext })
   if (!outcome.ok) return null
 
+  // Weergave-deflator per jaar uit DEZELFDE run (geen tweede bron, geen eigen som):
+  // lees `inflationFactor` van de kernelrijen en gooi de rest weg. De `?? []`-tak
+  // dekt gedegradeerde/stub-resultaten die deze naad bereiken zonder rijen te
+  // zetten — dezelfde tolerantie die `requiredFireNetWorth?` al draagt. Zonder
+  // rijen is er geen factor en valt élke consument terug op 1 (= nominaal tonen),
+  // wat exact het bestaande `factorAtAge`-gedrag is.
+  const unifiedRows: FactorRow[] = (outcome.result.rows ?? []).map((row) => ({
+    age: row.age,
+    inflationFactor: row.inflationFactor,
+  }))
+
   return {
     sim: toSimResult(outcome.result),
     rawContext,
@@ -190,6 +225,7 @@ export const computeHorizonFireSim = cache(async function computeHorizonFireSim(
     withdrawalStrategy: data.withdrawalStrategy,
     aowAgeInt: built.aowAgeInt,
     aowAgeFractional,
+    unifiedRows,
   }
 })
 

@@ -16,7 +16,7 @@ import { getOrCreateWeeklySnapshot, canRefreshToday } from '@/lib/briefing/snaps
 import { loadTopMarketBriefing } from '@/lib/briefing/news-market'
 import { collectAandachtspunten } from '@/lib/aandachtspunten-loader'
 import type { Aandachtspunt } from '@/lib/aandachtspunten'
-import { resolveFreedomFraming } from '@/lib/fire-strategy'
+import { resolveFreedomAgeView, fireAgeForDisplay } from '@/lib/fire-strategy'
 import { PageStatusSeed } from '@/components/app/page-status-provider'
 import { computePageStatusInfo, readMinimizedLevel } from '@/lib/page-status/compute'
 import type { BriefingWeekHistoryItem } from '@/components/overview/briefing-panel'
@@ -193,23 +193,19 @@ export async function OverzichtSecondaryLoader({
   }
 
   // Vrijheidsleeftijd voor de Vrijheid-strip (de mini-vermogen-grafiek zelf
-  // laadt los, zie OverzichtNetWorthChartLoader). Afgerond — dit is WEERGAVE.
-  const fireAge =
-    dashboardData.fireAgeFractional != null
-      ? Math.round(dashboardData.fireAgeFractional)
-      : null
-
-  // Afgeleide vrijheids-/pensioenframing via de gedeelde, consume-only vlag
-  // (ADR 0009): geen herberekening — freedomPct/currentAge komen uit blok 1,
-  // fireAge + strategie hieruit.
-  // DREMPEL, niet weergave: `isFinanciallyFree` vergelijkt `currentAge >= fireAge`,
-  // dus hier gaat de FRACTIONELE leeftijd in (zoals /toekomst al deed). Met de
-  // afgeronde waarde trok 44,92 omhoog naar 45 en triggerde "financieel vrij" tot
-  // 6 maanden vóór de daadwerkelijke FIRE-maand (WF-CANON-03).
-  const freedomFraming = resolveFreedomFraming({
+  // laadt los, zie OverzichtNetWorthChartLoader) én de afgeleide vrijheids-/
+  // pensioenframing. Consume-only (ADR 0009): geen herberekening — freedomPct/
+  // currentAge komen uit blok 1, de leeftijd uit de bundel.
+  //
+  // Beide komen uit ÉÉN seam (`resolveFreedomAgeView`): die neemt alleen de
+  // FRACTIONELE leeftijd aan, toetst daarmee de drempel (`currentAge >= fireAge`)
+  // en rondt alleen de weergave af. Rond hier dus niets zelf af en geef
+  // `fireAgeDisplay` nooit door aan een drempel — dat was WF-CANON-03, waarbij
+  // een afgeronde 45,3 "financieel vrij" tot 6 maanden te vroeg liet omslaan.
+  const { fireAgeDisplay, framing: freedomFraming } = resolveFreedomAgeView({
+    fireAgeFractional: dashboardData.fireAgeFractional ?? null,
     freedomPct,
     currentAge,
-    fireAge: dashboardData.fireAgeFractional ?? null,
     strategy: horizonData?.fireStrategy?.strategy,
   })
 
@@ -228,7 +224,7 @@ export async function OverzichtSecondaryLoader({
         goalProgresses={finData.goalProgresses}
         freedomPct={freedomPct}
         currentAge={currentAge}
-        fireAge={fireAge}
+        fireAge={fireAgeDisplay}
         freedomFraming={freedomFraming}
         briefingEntries={briefingEntries}
         briefingRefreshedAt={briefingRefreshedAt}
@@ -282,10 +278,9 @@ export async function OverzichtNetWorthChartLoader({
 }) {
   const { dashboardData } = await loadDashboardData(supabase)
 
-  const fireAge =
-    dashboardData.fireAgeFractional != null
-      ? Math.round(dashboardData.fireAgeFractional)
-      : null
+  // WEERGAVE-only: de grafiekmarker. Via dezelfde seam als de Vrijheid-strip,
+  // zodat afronden op één plek gebeurt en nooit een drempel voedt.
+  const fireAge = fireAgeForDisplay(dashboardData.fireAgeFractional)
   // Canoniek dagtarief (EUR/dag) uit de bundel — consume-don't-recompute
   // (KRUIS-20); alleen bij ontbreken vertaalt de helper de maanduitgaven.
   const dailyExpense = dashboardData.dailyExpenseRate ?? dailyExpenseRate(dashboardData.monthlyExpenses)

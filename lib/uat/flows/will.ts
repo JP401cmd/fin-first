@@ -50,6 +50,7 @@ export const WILL_FLOW: UatFlow = {
     { id: 'badge', scenarioId: 'UAT-WILL-06', label: 'WF-WILL-06 · Uitgestelde tips heropakken via de badge', kind: 'action', stage: 1, lane: 'chat' },
     { id: 'bespreek', scenarioId: 'UAT-WILL-07', label: 'WF-WILL-07 · "Bespreek met Fin" vanaf een onderwerp', kind: 'action', stage: 1, lane: 'chat' },
     { id: 'deeplink', scenarioId: 'UAT-WILL-08', label: 'WF-WILL-08 · Chat starten via ?prompt=-deeplink', kind: 'action', stage: 1, lane: 'chat' },
+    { id: 'melding', scenarioId: 'UAT-WILL-24', label: 'WF-WILL-24 · Melding maken vanuit de chat (bug/vraag/wens)', kind: 'action', stage: 1, lane: 'chat' },
 
     // ── 2 · meldingen ─────────────────────────────────────────────────────
     { id: 'bel', scenarioId: 'UAT-WILL-10', label: 'WF-WILL-10 · Meldingen checken via de bel', kind: 'screen', stage: 2, lane: 'meldingen' },
@@ -82,6 +83,7 @@ export const WILL_FLOW: UatFlow = {
     { from: 'nav', to: 'krant' },
     { from: 'nav', to: 'coachmelding' },
     { from: 'coachmelding', to: 'vraag', label: 'klik op de meldingstekst opent de chat' },
+    { from: 'nav', to: 'melding', label: 'megafoon-toggle, buiten alle AI-gates' },
 
     // chat-kern (beslispunt: hoe de chat wordt geopend)
     { from: 'chatbeslis', to: 'vraag', kind: 'branch', label: 'vrije vraag' },
@@ -121,6 +123,7 @@ export const WILL_FLOW: UatFlow = {
     { from: 'actie-lokaal', to: 'uitkomst' },
     { from: 'pin', to: 'uitkomst' },
     { from: 'fouth', to: 'uitkomst' },
+    { from: 'melding', to: 'uitkomst' },
     { from: 'opvolgen', to: 'uitkomst' },
     { from: 'voorkeuren', to: 'uitkomst' },
     { from: 'briefingmelding', to: 'uitkomst' },

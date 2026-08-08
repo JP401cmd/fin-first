@@ -9,6 +9,7 @@ import { NL_AOW_AGE, NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND, NL_SWR } from '
 import { computeEffectiveSwr } from '@/lib/fire-params'
 import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
+import { useEuroView } from '@/lib/hooks/use-euro-view'
 
 interface Props {
   size: WidgetSize
@@ -16,8 +17,24 @@ interface Props {
   href?: string
 }
 
+// euro-view: exempt (D12) — de bedragen in dit widget zijn GEEN kernelrijen en
+// dragen dus geen canonieke deflator:
+//   • AOW-bedragen zijn vaste jaarcijfers (lib/constants.ts, "bedragen in 2026")
+//     → al euro's van vandaag; delen zou ze een tweede keer deflateren;
+//   • het AOW-vermogensequivalent (jaarinkomen / SWR), "zelf aanvullen" en de
+//     FIRE-pot-regels rekenen met de uitgaven van VANDAAG → idem;
+//   • `data.fireTarget` is het 25×-doel op de huidige uitgaven (computeFireTarget),
+//     niet het nominale sim-doel op de FIRE-leeftijd — ook al in huidige euro's;
+//   • het aanvullend pensioen komt uit de eigen pensioenprojectie (mijnpensioen
+//     "TeBereiken"), een projectiemotor náást de kernel — daar bestaat geen
+//     canonieke jaarfactor voor (D12, vervolgkaart "projectiemotoren naast de
+//     kernel").
+// Dít is de enige regel die WEL in toekomstige euro's staat, dus in 'real'
+// benoemt de voetnoot hieronder dat expliciet — de paginabadge mag nergens
+// liegen (D11: uitzonderingen markeren, niet de regel).
 export const PensioenAowWidget = memo(function PensioenAowWidget({ size, data, href }: Props) {
   const currentAge = data.currentAge
+  const { view: euroView } = useEuroView()
   // HIGH-1: cohort-correcte AOW-leeftijd uit de bundel (loader → lookupAowAge op de
   // aow_leeftijd-tabel). NL_AOW_AGE alleen als fallback wanneer de bundel geen leeftijd
   // heeft (mock/ontbrekende dob). Nooit meer de hardcoded 67 als het cohort hoger is.
@@ -35,6 +52,15 @@ export const PensioenAowWidget = memo(function PensioenAowWidget({ size, data, h
   // pensioen-events geïmporteerd → widget blijft AOW-only.
   const pensionMonthly = data.pensionMonthlyGross ?? null
   const hasPension = pensionMonthly != null && pensionMonthly > 0
+
+  // Grondslag-noot, alleen in 'huidige euro's' (NFR-D2-stijl: geen ruis in de
+  // standaardweergave, dus in 'nominal' is dit widget byte-identiek aan vandaag).
+  const euroViewNote =
+    euroView === 'real'
+      ? hasPension
+        ? " Deze bedragen volgen de weergaveschakelaar niet: de AOW staat in euro's van 2026, je aanvullend pensioen in toekomstige euro's."
+        : " Deze bedragen volgen de weergaveschakelaar niet: ze staan al in euro's van 2026."
+      : ''
 
   // Coverage: what percentage of monthly expenses does AOW cover?
   const aowCoveragePct = exp > 0 ? Math.min(100, (aowMonthly / exp) * 100) : 0
@@ -179,7 +205,7 @@ export const PensioenAowWidget = memo(function PensioenAowWidget({ size, data, h
 
             <p className="mt-auto pt-2 border-t border-[var(--border-ed)] font-serif italic text-[10px] text-[var(--ink-4)]">
               Bedragen in 2026. AOW stijgt mee met minimumloon; aanvullend pensioen o.b.v. je
-              pensioenoverzicht.
+              pensioenoverzicht.{euroViewNote}
             </p>
           </div>
         ) : (
@@ -303,7 +329,7 @@ export const PensioenAowWidget = memo(function PensioenAowWidget({ size, data, h
         )}
 
         <p className="mt-2 pt-1.5 border-t border-[var(--border-ed)] font-serif italic text-[10px] text-[var(--ink-4)]">
-          Bedragen in 2026. AOW stijgt mee met minimumloon.
+          Bedragen in 2026. AOW stijgt mee met minimumloon.{euroViewNote}
         </p>
       </WidgetShell>
     )

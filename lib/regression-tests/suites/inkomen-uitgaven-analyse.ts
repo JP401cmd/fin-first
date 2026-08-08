@@ -154,7 +154,7 @@ const tests: TestCase[] = [
   },
   {
     id: 'ie-breakdown-ret-withdrawal', name: 'Levensonderhoud in pensioenfase (buildBreakdown-fallback)', category: CAT,
-    description: 'Zie ie-breakdown-acc-savings voor de productiebevinding. Toetst de withdrawal-fallback: expenseBySource.withdrawal = row.withdrawal, layer-label = Levensonderhoud.',
+    description: 'Zie ie-breakdown-acc-savings voor de productiebevinding. Toetst de withdrawal-fallback: expenseBySource.withdrawal = row.withdrawal, layer-label = Levensonderhoud via onttrekking (sinds 81c40513a, na de box3-ontdubbeling).',
     priority: 'high', estimatedDurationMs: 100,
     fn() {
       const r = runStd()
@@ -170,10 +170,14 @@ const tests: TestCase[] = [
       const withdrawalAmount = bdRow!.expenseBySource['withdrawal']
       assertNotNull(withdrawalAmount, 'withdrawal fallback-item gevonden')
 
-      // The label for withdrawal is "Levensonderhoud" (not "Onttrekking")
+      // Label is "Levensonderhoud via onttrekking" sinds commit 81c40513a
+      // ("jaar-detail — ... + eerlijke geldstroom"): Box 3 werd ontdubbeld uit
+      // de onttrekking en staat nu als eigen kassabon-post ernaast, dus het
+      // withdrawal-label maakt expliciet dat dit alleen het niet-fiscale deel is
+      // (zie de comment bij FIXED_LABELS.withdrawal in income-expense-breakdown.ts).
       const withdrawalLayer = bd.expenseLayers.find(l => l.id === 'withdrawal')
       assertNotNull(withdrawalLayer, 'withdrawal layer aanwezig')
-      assertEqual(withdrawalLayer!.label, 'Levensonderhoud', 'withdrawal label is Levensonderhoud')
+      assertEqual(withdrawalLayer!.label, 'Levensonderhoud via onttrekking', 'withdrawal label is Levensonderhoud via onttrekking')
 
       assertLessThanOrEqual(
         Math.abs(withdrawalAmount! - rawRow.withdrawal), 1,

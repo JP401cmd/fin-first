@@ -283,7 +283,6 @@ Eigen layout `app/(app)/beheer/layout.tsx`. Alleen toegankelijk voor `profiles.r
 | `/beheer/welkom`                     | `app/(app)/beheer/welkom/page.tsx`                       | Functioneel — welkomstgids-schermen.                      |
 | `/beheer/coach`                      | `app/(app)/beheer/coach/page.tsx`                        | Functioneel — coach-suggestieregels.                      |
 | `/beheer/briefing`                   | `app/(app)/beheer/briefing/page.tsx`                     | Functioneel — briefing-redactieregels.                    |
-| `/beheer/doelen`                     | `app/(app)/beheer/doelen/page.tsx`                       | Functioneel — doelgids-stappen.                           |
 | `/beheer/nieuws`                     | `app/(app)/beheer/nieuws/page.tsx`                       | Functioneel — nieuwsbronnen & ingest.                     |
 | `/beheer/vragenlijsten`              | `app/(app)/beheer/vragenlijsten/page.tsx`                | Functioneel — vragenlijsten-editor.                       |
 | `/beheer/aow-leeftijd`               | `app/(app)/beheer/aow-leeftijd/page.tsx`                 | Functioneel — AOW-leeftijd opzoektabel.                   |
@@ -299,6 +298,10 @@ Eigen layout `app/(app)/beheer/layout.tsx`. Alleen toegankelijk voor `profiles.r
 | `/beheer/blueprints/[type]`          | `app/(app)/beheer/blueprints/[type]/page.tsx`            | Ter info — blueprint-detail per type.                     |
 
 Verwijderd (juni 2026): `/beheer/features` en `/beheer/tiers` (redirect-aliassen), `/beheer/meldingen` (deprecation-plakkaat), `/beheer/test-deferred`, `/beheer/will-avatar`, `/beheer/widgets-test`, `/beheer/propositie`, `/beheer/roadmap` en `/beheer/toegang` (feature-gating opgeruimd).
+
+Verwijderd (augustus 2026, WF-BEHEER-12-bug1): `/beheer/doelen` (doelgids-stappen) — samen met `lib/briefing/goal-guide-steps.ts`, `lib/hooks/use-goal-guide-state.ts` en beide `/api/goals-guide/*`-routes. Die tak had sinds ADR 0007 nul UI-consumers; de **Welkomstgids** (`/beheer/welkom` → `components/overview/welcome-guide-banner.tsx`) is de live vervanger van doel-gebonden begeleiding.
+
+Verwijderd (augustus 2026, besluit 02 — beheer-opschoning): `/beheer/roadmap` (de latere, statische gap-analyse; inhoud verhuisd naar de Notion-werkqueue) en `/beheer/development` (teamopstelling; leesvorm is nu de teamplaat op de org-site, `trifinity-org/site/team.html`). De scan-/curatielaag eronder — `scanClaudeTeam()`, `architecture.json.claudeTeam` en `lib/architecture/development-model.ts` + de CI-gate `development-model.test.ts` — is bewust blijven staan.
 
 Navigatie binnen Beheer: twee-niveau groepsnav (groepen boven, tools van de actieve groep eronder) op toolpagina's; `/beheer` zelf is de hub en toont geen nav.
 

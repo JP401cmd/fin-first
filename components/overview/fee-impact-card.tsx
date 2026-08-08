@@ -20,6 +20,14 @@ export const FEE_IMPACT_ID = 'fee-impact'
  *
  * Slider: gebruiker schuift met extra-fee tussen 0% en 1.5%. Default 0.5%
  * matcht het plan-citaat.
+ *
+ * euro-view: exempt (D12) — net als de CompoundInsightCard rekent deze kaart op
+ * `lib/compound-projection.ts` met een vast rendement en een vaste horizon: een
+ * illustratie van het KOSTEN-effect, geen kernel-projectie van jouw plan. Er is
+ * dus geen `inflationFactor` per jaar beschikbaar en de bedragen volgen de
+ * euro-weergave bewust niet. Wat de kaart laat zien is bovendien een verschil
+ * tussen twee even-nominale reeksen; dat verschil verandert niet van betekenis
+ * door een weergaveschakelaar.
  */
 
 const BASE_GROWTH_RATE = 0.07 // belegd lange-termijn ~7%

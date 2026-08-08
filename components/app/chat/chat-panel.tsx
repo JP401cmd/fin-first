@@ -18,7 +18,8 @@ import { FinDots } from '@/components/app/fin-dots'
 import { ActionEditModal } from '@/components/app/action-edit-modal'
 import type { Action, ActionStatus } from '@/lib/recommendation-data'
 import { renderMarkdown, findToolInvocation, TOOL_LOADING_STATES, TOOL_OUTPUT_STATES, type MessagePart } from './markdown-helpers'
-import { X, Send, Loader2, Zap, Check, AlertTriangle, RefreshCw, Pin, PinOff, ShieldCheck, Sparkles, Clock, ThumbsDown, Cpu } from 'lucide-react'
+import { X, Send, Loader2, Zap, Check, AlertTriangle, RefreshCw, Pin, PinOff, ShieldCheck, Sparkles, Clock, ThumbsDown, Cpu, Megaphone } from 'lucide-react'
+import { MeldingView } from './melding/melding-view'
 import type { SuggestRecommendationResult } from '@/lib/ai/tools/suggest-recommendation'
 import { ChatVisualizationCard } from './chat-visualization-card'
 import '@/components/app/fin/fin-home.css' // wh-melding-in keyframe (corner-grow entree, gedeeld met FinHome)
@@ -505,6 +506,16 @@ export function ChatPanel() {
   // Modal state
   const [editAction, setEditAction] = useState<Action | null>(null)
 
+  // Chat- of meldmodus. Het gesprek (useChat-state) leeft in dit component en
+  // blijft dus staan terwijl de gebruiker een melding maakt.
+  const [mode, setMode] = useState<'chat' | 'melding'>('chat')
+  // Loopt er een verzending in MeldingView? Die state woont dáár, maar de drie
+  // knoppen die het component kunnen weghalen (megafoon, sluitkruis, mobiele
+  // backdrop) wonen hier — dus spiegelen we 'm en zetten we ze op slot. Zonder
+  // die blokkade verdwijnt een trage upload halverwege, ziet de gebruiker geen
+  // bevestiging en meldt hij hetzelfde nóg een keer.
+  const [meldingBezig, setMeldingBezig] = useState(false)
+
   // Dynamic domain: route-aware and gated by active modules
   const pathname = usePathname()
   const { activeModules, subscriptions } = useModuleAccess()
@@ -675,6 +686,21 @@ export function ChatPanel() {
     if (isOpen) {
       setTimeout(() => inputRef.current?.focus(), 100)
     }
+  }, [isOpen])
+
+  // Bij sluiten terug naar de chat: het venster hoort de volgende keer weer als
+  // gesprek te openen, niet halverwege een meldformulier.
+  //
+  // Bewust GEEN "weet je het zeker?" bij een half ingevuld formulier. Het gaat om
+  // twee à drie velden van hooguit een minuut, niets onomkeerbaars — en sluiten
+  // en de megafoon-toggle zijn juist de vluchtroutes die je zonder drempel wilt
+  // houden. Een bevestiging dáárop is de "dubbele bevestiging" die de
+  // UI-conventie verbiedt. Het geval dat écht schaadde (een verzending die
+  // halverwege verdampt) is hierboven met `meldingBezig` geblokkeerd. Wil je de
+  // ingevulde tekst tóch bewaren, dan is het juiste antwoord een bewaard concept
+  // (formulierstate omhoog tillen), niet een waarschuwingsvenster.
+  useEffect(() => {
+    if (!isOpen) setMode('chat')
   }, [isOpen])
 
   // Auto-send pending message (notificatie "Vraag AI" + "Vraag Fin"-knoppen).
@@ -1053,6 +1079,22 @@ export function ChatPanel() {
     clearError()
   }, [clearError])
 
+  // Sluiten mag alles behalve een lopende verzending afkappen. Geldt voor het
+  // sluitkruis én de mobiele backdrop — die laatste is juist de knop die je per
+  // ongeluk raakt terwijl je op een trage upload wacht.
+  const veiligSluiten = useCallback(() => {
+    if (meldingBezig) return
+    close()
+  }, [meldingBezig, close])
+
+  // Eén label voor de megafoon: hij schakelt heen én terug, dus "Melding maken"
+  // liegt zodra je in meldmodus staat.
+  const meldingKnopLabel = meldingBezig
+    ? 'Je melding wordt verstuurd'
+    : mode === 'melding'
+      ? 'Terug naar de chat'
+      : 'Melding maken'
+
   // De launcher (FAB) leeft nu in FinHome — die toont de bubbel én opent de chat.
   // Wanneer de chat gesloten is, rendert ChatPanel niets.
   if (!isOpen) return null
@@ -1066,7 +1108,7 @@ export function ChatPanel() {
     <>
       {/* Mobile backdrop (not shown when pinned) */}
       {!isPinned && (
-        <div className="fixed inset-0 z-40 bg-black/20 md:hidden" onClick={close} />
+        <div className="fixed inset-0 z-40 bg-black/20 md:hidden" onClick={veiligSluiten} />
       )}
 
       {/* Panel */}
@@ -1088,15 +1130,35 @@ export function ChatPanel() {
                 )}
               </div>
               <span className="text-xs text-[var(--ink-3)]">
-                {isLocalMode ? 'Draait op je toestel' : config.subtitle}
+                {mode === 'melding'
+                  ? 'Melding maken'
+                  : isLocalMode
+                    ? 'Draait op je toestel'
+                    : config.subtitle}
               </span>
             </div>
           </div>
           <div className="flex items-center gap-1">
+            {/* Melding maken — bug, vraag of aanbeveling. Bewust náást de
+                instellingen: melden hoort bij het venster waar je toch al zit,
+                en werkt óók zonder AI-abonnement. */}
+            <button
+              type="button"
+              onClick={() => setMode((m) => (m === 'melding' ? 'chat' : 'melding'))}
+              disabled={meldingBezig}
+              aria-label={meldingKnopLabel}
+              aria-pressed={mode === 'melding'}
+              title={meldingKnopLabel}
+              className={`touch-target flex items-center justify-center rounded-lg hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent ${
+                mode === 'melding' ? 'text-wil-700' : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
+              }`}
+            >
+              <Megaphone className="h-4 w-4" />
+            </button>
             {/* Instellingen — naast het pin-icoon. Compacte bediening van de
                 bestemming van dit gesprek, het lokale model en de overige
                 functies; de volledige uitleg blijft op /mijn/privacy. */}
-            <ChatSettingsPopover onChanged={exec.refresh} />
+            {mode === 'chat' && <ChatSettingsPopover onChanged={exec.refresh} />}
             {/* Pin toggle — desktop only */}
             <button
               onClick={togglePin}
@@ -1106,12 +1168,26 @@ export function ChatPanel() {
             >
               {isPinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
             </button>
-            <button onClick={close} className="touch-target rounded-lg text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]">
+            <button
+              onClick={veiligSluiten}
+              disabled={meldingBezig}
+              aria-label={meldingBezig ? 'Je melding wordt verstuurd' : 'Sluiten'}
+              title={meldingBezig ? 'Je melding wordt verstuurd' : 'Sluiten'}
+              className="touch-target rounded-lg text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+            >
               <X className="h-5 w-5" />
             </button>
           </div>
         </div>
 
+        {/* Meldmodus vervangt het HELE inhoudsgebied — bewust boven alle
+            AI-gates (upsell, Wft, lokaal-geblokkeerd). Een testgebruiker zonder
+            AI-abonnement moet kunnen melden; het gesprek zelf blijft intact,
+            want de useChat-state hangt aan dit component, niet aan deze tak. */}
+        {mode === 'melding' ? (
+          <MeldingView onClose={() => setMode('chat')} onBezigChange={setMeldingBezig} />
+        ) : (
+        <>
         {/* Geen AI-abonnement → upsell i.p.v. chat. Bewust vóór de Wft-gate en
             het invoerveld: een non-abonnee kan niets versturen (spiegelt de
             server-403) en ziet meteen "dit is een betaalde functie" + CTA. */}
@@ -1294,6 +1370,8 @@ export function ChatPanel() {
         >
           Geen financieel advies — uitsluitend educatief en informatief.
         </p>
+        </>
+        )}
         </>
         )}
       </div>

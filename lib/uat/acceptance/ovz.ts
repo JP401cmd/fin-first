@@ -1,16 +1,18 @@
 /**
- * Acceptatiecriteria — domein Overzicht-hub (WF-OVZ-01..21 / UAT-OVZ-01..16,19..21).
+ * Acceptatiecriteria — domein Overzicht-hub (WF-OVZ-01..22 / UAT-OVZ-01..16,19..22).
  *
  * Spiegelt exact de aanpak van `budget.ts`/`start.ts`/`will.ts`/`cash.ts`. Bron:
  * `docs/uat/uat-plan.md` Deel 1 (workflow-definities WF-OVZ-01..21) + Deel 2
- * §2.8 (UAT-OVZ-01..16, 19..21).
+ * §2.8 (UAT-OVZ-01..16, 19..21). WF-OVZ-22 (euro-weergave, wave 2/3) is NIEUW
+ * t.o.v. het UAT-plan — toegevoegd voor de euro-weergave-uitrol (Notion-kaart
+ * 39cf9e8d-568a-80fb-8a99-e090c080b964, brok H), spiegelt géén document-workflow.
  *
  * WF-OVZ-17 en WF-OVZ-18 hebben BEWUST GEEN eigen criterium hier — het UAT-plan
  * wijst ze door naar UAT-NAV-19 (huishoud-/partnerweergave) resp. UAT-NAV-10
  * (Eenvoudige weergave) ("Géén eigen scenario — steekproef-oppervlak"); de
  * catalogus bevat dan ook geen UAT-OVZ-17/18. OVZ is dus, net als SCHULD/TOEK/
- * WILL, NIET aaneengesloten op WF-nummer, maar WEL 1-op-1 met de 19
- * catalogus-scenario's (01..16, 19..21).
+ * WILL, NIET aaneengesloten op WF-nummer, maar WEL 1-op-1 met de 20
+ * catalogus-scenario's (01..16, 19..22).
  *
  * OMGEKEERDE VERWIJZING (belangrijk): WF-WILL-21/22 wezen in `will.ts` door
  * naar UAT-OVZ-19/20/21 — dit bestand is dus de daadwerkelijke, volledige
@@ -145,7 +147,7 @@ const criteria: AcceptanceCriterion[] = [
     then: 'De nieuwe indeling is server-side opgeslagen (PUT /api/widgets) en overleeft een herlaad; "alles leegmaken" herstelt de defaults (Voortgang doelen + Vrijheidsstrip). Puur een configuratie-workflow, geen eigen berekening. Let op (widget-gated berekenen): de widget-exclusieve data (week-overzicht, heatmap, huishoud-activiteit) wordt alleen berekend zolang die widget actief is — een NÉT aangezette week-/heatmap-/huishouden-widget kan tot de eerstvolgende data-refresh leeg zijn; briefing-voedende motoren (backtest/kosten/hvb) blijven altijd draaien. Reverse-sync bij favoriet-widgets: het verwijderen van een `holding_fav:*`/`budget_fav:*`-widget zet ook de favorietstatus van de onderliggende holding/budget terug (PATCH /api/holdings/[id] resp. PUT /api/budgets/favorites, gevolgd door router.refresh) — favoriet- en widgetweergave lopen nooit uit de pas. Onderaan de grid staat in bewerkmodus een tweede "Gereed"-knop die dezelfde afsluit-flow aanroept als de knop bovenaan (hero-rail), zodat afsluiten niet terugscrollen vereist.',
     assertion: {
       kind: 'ui-only',
-      source: 'components/widgets/draggable-widget-grid.tsx + lib/widget-catalog.ts — configuratie-workflow, geen cijfermatige uitkomst',
+      source: 'components/widgets/draggable-widget-grid.tsx + lib/widget-catalog.ts + app/api/widgets/route.ts — configuratie-workflow, geen cijfermatige uitkomst',
     },
   },
   {
@@ -295,6 +297,20 @@ const criteria: AcceptanceCriterion[] = [
       kind: 'exact',
       expected: 'uitgesteldTot=2026-07-19; zichtbaarAantal=5; totaalN=7',
       source: 'components/app/action-board.tsx r114-119 (uitstel-datum-mirror, identiek patroon aan WILL/CASH) + priority_score/sort_order-sortering — zie ovz-checks.ts',
+    },
+  },
+  {
+    workflow: 'WF-OVZ-22',
+    scenarioId: 'UAT-OVZ-22',
+    titel: "Overzicht-widgets en de mini-vermogensgrafiek volgen de euro-weergave, naad zonder knik",
+    kriticiteit: 'BELANGRIJK',
+    given: "`buildSimNetWorthRows` levert per jaar het geprojecteerde volledige netto vermogen (nominaal, D7); synthetische kernelrijen waarvan de euro-inflatie exact de portefeuillegroei opheft (leeftijd 60→factor 1/€500.000, 61→2/€1.000.000, 62→4/€2.000.000 — machten van 2, exact deelbaar in IEEE-754) — zo blijft het REËLE netto vermogen op elke leeftijd €500.000, precies gelijk aan `currentNetWorth`.",
+    when: "De mini-vermogensgrafiek/widgets deflateren het projectiedeel via `deflate()` op de rij-eigen `inflationFactor` (die sinds brok E op elke `buildSimNetWorthRows`-uitvoerrij meereist), NA de bestaande reconcile-offset (D7 — de offset blijft nominaal, deflatie gebeurt pas op het resultaat).",
+    then: 'Jaar 0 (huidige leeftijd, factor 1.0) gedeflateerd is exact gelijk aan `currentNetWorth` — geen knik op de naad tussen historie en projectie. Elke volgende leeftijd deflateert met zíjn eigen factor, niet met een globale/vaste factor. Dit is de kern-eis van AC-F1/T11: de rij-eigen factor (`buildSimNetWorthRows` + `deflate`) i.p.v. een geherimplementeerde deflatie op de widget zelf.',
+    assertion: {
+      kind: 'exact',
+      expected: 'real60=500000; real61=500000; real62=500000; jaar0GelijkAanCurrentNetWorth=true',
+      source: 'lib/horizon/networth-rows.ts#buildSimNetWorthRows + lib/euro-display.ts#deflate — échte productiefuncties, synthetische kernelrijen (geen mirror) — zie ovz-checks.ts',
     },
   },
 ]

@@ -10,8 +10,8 @@
  * OVZ is — net als SCHULD/TOEK/WILL — NIET aaneengesloten op WF-nummer:
  * WF-OVZ-17/18 hebben geen eigen UAT-OVZ-scenario (→ gedekt door UAT-NAV-19
  * resp. UAT-NAV-10) en ontbreken dus terecht in de catalogus voor zone OVZ.
- * De 19 criteria hier zijn wél 1-op-1 met de 19 catalogus-scenario's
- * (UAT-OVZ-01..16, 19..21).
+ * De 20 criteria hier zijn wél 1-op-1 met de 20 catalogus-scenario's
+ * (UAT-OVZ-01..16, 19..22).
  */
 
 import { describe, it, expect } from 'vitest'
@@ -34,11 +34,11 @@ function criterion(workflow: string): AcceptanceCriterion {
 }
 
 describe('UAT Ovz — acceptatiecriteria dekking', () => {
-  it('heeft precies één criterium per catalogus-OVZ-scenario (19 stuks, WF-OVZ-17/18 bestaan niet in de catalogus)', () => {
+  it('heeft precies één criterium per catalogus-OVZ-scenario (20 stuks, WF-OVZ-17/18 bestaan niet in de catalogus)', () => {
     const workflows = OVZ_ACCEPTANCE.criteria.map((c) => c.workflow).sort()
     expect(workflows).toEqual(catalogOvzWorkflows)
     expect(new Set(workflows).size).toBe(catalogOvzWorkflows.length)
-    expect(workflows.length).toBe(19)
+    expect(workflows.length).toBe(20)
   })
 
   it('elk criterium heeft een geldige assertion.kind', () => {
@@ -64,7 +64,7 @@ describe('UAT Ovz — acceptatiecriteria dekking', () => {
       .sort()
     const checkWorkflows = OVZ_ENGINE_CHECKS.map((c) => c.workflow).sort()
     expect(checkWorkflows).toEqual(exactWorkflows)
-    expect(exactWorkflows.length).toBe(10)
+    expect(exactWorkflows.length).toBe(11)
   })
 
   it('markeert de kernel-/directionele/config-workflows met de juiste kind', () => {

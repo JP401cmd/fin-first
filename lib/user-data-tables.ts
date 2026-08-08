@@ -79,6 +79,22 @@ export const SESSION_WIPE_TABLES: readonly string[] = [
   'user_own_ibans',
   '_legacy_holdings',
   '_legacy_holding_transactions',
+  // Uitgavenplafonds per tegenpartij. Draagt `user_id` + VRIJE TEKST (`name`,
+  // `purpose`) en `counterparty_key` — een genormaliseerde tegenpartijnaam die
+  // een persoonsnaam KAN zijn (huurbaas, oppas, ex-partner). Dus persoonsgegeven:
+  // hoort in de export (art. 15/20) én in de wis. SESSIE-partitie en niet de
+  // service-partitie omdat de tabel een eigen-rij DELETE-policy heeft
+  // ("spend_limits own delete", `user_id = (select auth.uid())`, TO authenticated)
+  // — GEMETEN tegen pg_policies op 08-08-2026, niet uit de migratie overgenomen.
+  // Daarin verschilt hij van `user_reports`, dat juist géén DELETE-policy heeft.
+  // LET OP — deze entry maakt de EXPORT compleet, de WIS nog niet:
+  // EXPORT_SESSION_TABLES wordt generiek geconsumeerd (app/api/account/export),
+  // maar `deleteAllUserData` (lib/seed-persona.ts) somt zijn FK-veilige batches
+  // met de HAND op en itereert deze lijst NIET. Zolang daar geen
+  // deleteTable(supabase, 'spend_limits', userId) bij staat, overleeft een pot
+  // een reset/verwijdering. De dekkings-vitest ziet dat niet — die bewaakt de
+  // partitie, niet het wispad. Gemeld bij fix-brok FIX2-SEC (08-08-2026).
+  'spend_limits',
 ] as const
 
 /**
@@ -90,6 +106,14 @@ export const SESSION_WIPE_TABLES: readonly string[] = [
 export const SERVICE_WIPE_TABLES: readonly string[] = [
   'net_worth_history', // alleen service_role-policy
   'feedback', // geen eigen-rij DELETE-policy
+  // Meldingen (bug/vraag/aanbeveling) uit het chatvenster. Bewust géén eigen-rij
+  // DELETE-policy: 20260806104500_create_user_reports.sql geeft alleen own INSERT,
+  // own-or-superadmin SELECT en superadmin UPDATE — een verzonden melding is geen
+  // bewerkbaar document. Via de sessie-client zou een delete dus een STILLE no-op
+  // zijn, exact zoals bij `feedback`. LET OP: het screenshot in de privé bucket
+  // `user-report-screenshots` en een reeds gepusht Notion-kaartje volgen deze wis
+  // NIET (geen FK op storage.objects) — dat blijven aparte opruimstappen.
+  'user_reports',
 ] as const
 
 /**
@@ -142,8 +166,17 @@ export const ADMIN_EXPORT_TABLES: readonly string[] = [
 
 /**
  * Canonieke inventaris: álle public-tabellen met een `user_id`-kolom
- * (geverifieerd tegen information_schema, 2026-07-21). Drift-baken voor de
- * dekkings-vitest. Zie de regenereer-query in de header-docstring.
+ * (geverifieerd tegen information_schema, laatst 2026-08-08). Drift-baken voor
+ * de dekkings-vitest. Zie de regenereer-query in de header-docstring.
+ *
+ * BEWUST NIET IN DEZE LIJST, met reden — anders is de claim "álle" onwaar:
+ *   `backup_tx_rabobank0596_20260804` — een ad-hoc BACKUP-tabel (geen
+ *   applicatietabel) die op 08-08-2026 live 355 rijen met `user_id` bevatte,
+ *   met RLS aan maar NUL policies. Hij is dus onbereikbaar voor sessie-clients,
+ *   maar valt daarmee óók buiten export én buiten de full-delete: na een
+ *   AVG-wissing blijven die rijen mét user_id staan. Opruimen of alsnog
+ *   indelen is een expliciete beslissing die buiten dit bestand hoort te
+ *   worden genomen; zie de melding bij fix-brok FIX2-SEC (08-08-2026).
  */
 export const ALL_USER_SCOPED_TABLES: readonly string[] = [
   '_legacy_holding_transactions',
@@ -188,10 +221,12 @@ export const ALL_USER_SCOPED_TABLES: readonly string[] = [
   'recommendations',
   'recurring_transactions',
   'report_configs',
+  'spend_limits',
   'target_allocations',
   'transactions',
   'user_feature_visits',
   'user_own_ibans',
+  'user_reports',
   'valuations',
   'wallet_addresses',
   'web_vitals',

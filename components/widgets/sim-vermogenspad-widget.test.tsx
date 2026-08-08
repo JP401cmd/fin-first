@@ -3,6 +3,8 @@ import { render, screen } from '@testing-library/react'
 import { SimVermogenspadWidget } from './sim-vermogenspad-widget'
 import type { DashboardData } from './widget-renderer'
 import { WEERBAARHEID_DISPLAY_MAX } from '@/lib/constants'
+import { EuroViewProvider } from '@/lib/hooks/use-euro-view'
+import { formatCurrency } from '@/lib/format'
 
 // jsdom mist ResizeObserver (WidgetShell), IntersectionObserver + matchMedia
 // (useInViewAnimation). De as-labels renderen los van de animatie, maar de
@@ -170,5 +172,77 @@ describe('SimVermogenspadWidget — slaagkans-badge consumeert data.backtestSucc
     render(<SimVermogenspadWidget size="full" data={data} />)
     expect(screen.getByText('Slaagkans 99%')).toBeInTheDocument()
     expect(screen.queryByText('Slaagkans 100%')).not.toBeInTheDocument()
+  })
+})
+
+/**
+ * Euro-weergave (wave 3, brok F). Het vermogenspad is klasse F: elk punt hoort
+ * bij ÉÉN projectiejaar en volgt dus de kernelfactor van díé rij. Deze tests
+ * pinnen de GERENDERDE waarde tegen `endPortfolio / inflationFactor` van de
+ * betreffende rij — niet tegen "er staat een getal". Een verkeerde factor
+ * (bijvoorbeeld één globale, of die van het verkeerde jaar) levert een bedrag
+ * op dat er nog steeds plausibel uitziet; alleen narekenen vangt dat.
+ */
+describe('SimVermogenspadWidget — euro-weergave', () => {
+  /** Rijen met een oplopende factor (2%/jaar, jaar 0 = 1.0), zoals de loader levert. */
+  function makeFactorRows(): SimRow[] {
+    return makeSimRows(46, 92, 60).map((r, i) => ({
+      ...r,
+      inflationFactor: Math.pow(1.02, i),
+    }))
+  }
+
+  it("deelt elk pad-punt door de factor van zijn EIGEN jaar in 'real'", () => {
+    const rows = makeFactorRows()
+    const endRow = rows[rows.length - 1]
+    const expectedEnd = endRow.endPortfolio / (endRow.inflationFactor ?? 1)
+    // De factor van het verkeerde jaar (bv. de eerste rij = 1.0) zou het
+    // nominale bedrag opleveren — die mag er dus juist NIET staan.
+    expect(Math.round(expectedEnd)).not.toBe(endRow.endPortfolio)
+
+    const { container } = render(
+      <EuroViewProvider initialView="real">
+        <SimVermogenspadWidget size="full" data={makeData({ simRows: rows })} />
+      </EuroViewProvider>,
+    )
+    expect(container.textContent).toContain(formatCurrency(expectedEnd))
+    expect(container.textContent).not.toContain(formatCurrency(endRow.endPortfolio))
+  })
+
+  it("laat het pad in 'nominal' onaangeroerd (byte-identiek aan productie)", () => {
+    const rows = makeFactorRows()
+    const endRow = rows[rows.length - 1]
+    const { container } = render(
+      <EuroViewProvider initialView="nominal">
+        <SimVermogenspadWidget size="full" data={makeData({ simRows: rows })} />
+      </EuroViewProvider>,
+    )
+    expect(container.textContent).toContain(formatCurrency(endRow.endPortfolio))
+  })
+
+  it('zonder EuroViewProvider is het beeld identiek aan de nominale weergave', () => {
+    const rows = makeFactorRows()
+    const withProvider = render(
+      <EuroViewProvider initialView="nominal">
+        <SimVermogenspadWidget size="full" data={makeData({ simRows: rows })} />
+      </EuroViewProvider>,
+    )
+    const withProviderText = withProvider.container.textContent
+    withProvider.unmount()
+
+    const without = render(<SimVermogenspadWidget size="full" data={makeData({ simRows: rows })} />)
+    expect(without.container.textContent).toBe(withProviderText)
+  })
+
+  it('rijen zonder inflationFactor (oudere/mock-bundel) blijven ongedeeld', () => {
+    // "Geen factor → 1" is de bestaande conventie; nooit een verzonnen getal.
+    const rows = makeSimRows(46, 92, 60)
+    const endRow = rows[rows.length - 1]
+    const { container } = render(
+      <EuroViewProvider initialView="real">
+        <SimVermogenspadWidget size="full" data={makeData({ simRows: rows })} />
+      </EuroViewProvider>,
+    )
+    expect(container.textContent).toContain(formatCurrency(endRow.endPortfolio))
   })
 })

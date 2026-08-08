@@ -100,8 +100,14 @@ const KNOWN_WIDGET_IDS = new Set(WIDGET_CATALOG.map(w => w.id))
 function isWidgetVisible(pref: WidgetPref, features: FeatureAccessMap, data: DashboardData): boolean {
   // Onbekende/verwijderde widget-id in opgeslagen prefs (bv. na het schrappen
   // van een widget): negeer 'm netjes i.p.v. een lege grid-tegel te tonen.
-  // Dynamische favorieten (budget_fav:*/holding_fav:*) staan niet in de catalogus.
-  if (!KNOWN_WIDGET_IDS.has(pref.id) && !pref.id.startsWith('budget_fav:') && !pref.id.startsWith('holding_fav:')) {
+  // Dynamische favorieten (budget_fav:*/holding_fav:*) en grenzenpotten
+  // (spend_limit:*) staan niet in de catalogus.
+  if (
+    !KNOWN_WIDGET_IDS.has(pref.id) &&
+    !pref.id.startsWith('budget_fav:') &&
+    !pref.id.startsWith('holding_fav:') &&
+    !pref.id.startsWith('spend_limit:')
+  ) {
     return false
   }
   if (!isWidgetAccessible(pref.id, features)) return false
@@ -116,6 +122,13 @@ function isWidgetVisible(pref: WidgetPref, features: FeatureAccessMap, data: Das
   if (pref.id.startsWith('budget_fav:')) {
     const budgetId = pref.id.slice('budget_fav:'.length)
     if (!data.favoriteBudgets.find(b => b.id === budgetId)) return false
+  }
+  // Stale grenzenpotten: pot gearchiveerd/verdwenen. BEWUST GEEN budgetingActive-
+  // gate hierboven: een tegenpartij-pot werkt volledig zonder budgetten (AC-B2-09).
+  // De bundel draagt óók gepauzeerde potten, zodat pauzeren de widget niet wist.
+  if (pref.id.startsWith('spend_limit:')) {
+    const limitId = pref.id.slice('spend_limit:'.length)
+    if (!data.spendLimitWidgets?.find(s => s.id === limitId)) return false
   }
   return true
 }
@@ -296,6 +309,11 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, categoryAppL
   }, [data.favoriteBudgets, router])
 
   const handleHide = useCallback((widgetId: string) => {
+    // BEWUST GEEN reverse-sync voor `spend_limit:*`. Het equivalent van "favoriet
+    // uitzetten" zou daar het ARCHIVEREN van de pot zijn — een destructieve actie
+    // op een gedragsnorm mét historie, uitgelokt door een kruisje op een tegel.
+    // Verbergen persisteert hier uitsluitend `enabled:false`; archiveren blijft in
+    // de sectie achter de bevestigings-overlay (FR-B2-05).
     if (widgetId.startsWith('holding_fav:') || widgetId.startsWith('budget_fav:')) {
       syncFavoriteRemoval(widgetId)
     }
@@ -351,8 +369,9 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, categoryAppL
 
   // Bulk: vul dashboard met alle toegankelijke widgets op de gekozen grootte.
   // Vervangt de huidige indeling (na bevestiging via dialoog). Behoudt
-  // dynamische favorieten (budget_fav:*, holding_fav:*) en hergroottet ze
-  // mee zodat de gehele dashboard-lay-out consistent is.
+  // dynamische favorieten (budget_fav:*, holding_fav:*) én grenzenpotten
+  // (spend_limit:*) en hergroottet ze mee zodat de gehele dashboard-lay-out
+  // consistent is.
   const handleFillAll = useCallback(async (size: WidgetSize) => {
     const fillable = WIDGET_CATALOG.filter(w => {
       if (!isWidgetAccessible(w.id, features)) return false
@@ -366,7 +385,14 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, categoryAppL
       order: i,
     }))
     for (const w of activeWidgets) {
-      if (w.id.startsWith('budget_fav:') || w.id.startsWith('holding_fav:')) {
+      // Grenzenpotten horen hier net zo goed bij als de favorieten: zonder deze
+      // tak wist "vul dashboard" de pot-widget stil (hij staat niet in
+      // WIDGET_CATALOG, dus de fill-lijst hierboven bevat hem niet).
+      if (
+        w.id.startsWith('budget_fav:') ||
+        w.id.startsWith('holding_fav:') ||
+        w.id.startsWith('spend_limit:')
+      ) {
         // Clamp naar de toegestane maten van deze favoriet — voorkomt dat een
         // niet-ondersteunde fill-size (bv. mini) in de fallback-render valt.
         const favSizes = getWidgetSizes(w.id)

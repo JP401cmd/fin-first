@@ -11,7 +11,7 @@
  * `lib/uat/catalog.ts` bevat dan ook geen UAT-WILL-21/22 (het volgnummer na 20
  * is UAT-WILL-23, zie hieronder) — dit domein is dus, net als SCHULD/TOEK, NIET
  * volledig aaneengesloten op WF-nummer, maar WEL 1-op-1 met de catalogus-
- * scenario's die daadwerkelijk bestaan (20 + UAT-WILL-23 = 21).
+ * scenario's die daadwerkelijk bestaan (20 + UAT-WILL-23 + UAT-WILL-24 = 22).
  *
  * UAT-WILL-23 (lokaal actievoorstel toevoegen, backlog #886 C2c): het on-device
  * pad hergebruikt de bestaande `ActionSuggestionCard`/`POST /api/ai/actions` van
@@ -19,6 +19,12 @@
  * `lib/ai/local/local-chat-transport.ts` (fail-closed bij parse-miss/geen
  * canonieke match) — vandaar een eigen workflow i.p.v. een uitbreiding van
  * WF-WILL-03.
+ *
+ * UAT-WILL-24 (melding maken vanuit de chat, release 8 aug 2026): nieuwe
+ * meldmodus in chat-panel.tsx (megafoon-toggle) → components/app/chat/melding/**
+ * → POST /api/user-reports. Bewust BUITEN alle AI-gates (werkt zonder
+ * AI-abonnement); de 5/uur-rem en de best-effort Notion-push (met dagelijkse
+ * retry-cron, /beheer/jobs) zijn de deterministische randvoorwaarden.
  *
  * KERN-BEVINDING (bepaalt exact vs. ui-only — zie ook de zone-specifieke notitie
  * op de Notion-kaart): dit domein combineert twee toetsbaarheidsprofielen.
@@ -339,6 +345,23 @@ const criteria: AcceptanceCriterion[] = [
       kind: 'ui-only',
       source:
         'lib/ai/local/local-chat-transport.ts (parseFinActionIntent/resolveFinActionIntent/finActionIntentHash — fail-closed bij parse-miss/geen canonieke match) + components/app/chat/chat-panel.tsx (data-finActie-rendering, handleAddAction met metadata.origin op "local-chat") + app/api/ai/actions/route.ts (metadata vrije record, het bron-veld op waarde "chat") — procestoets: de canonieke cijfers zelf zijn deterministisch resolved, maar of/wanneer het model een blok emit is niet hand-forceerbaar in UAT',
+    },
+  },
+  {
+    workflow: 'WF-WILL-24',
+    scenarioId: 'UAT-WILL-24',
+    titel: 'Een melding maken vanuit de chat (bug/vraag/wens)',
+    kriticiteit: 'BELANGRIJK',
+    given:
+      'Een ingelogde gebruiker (met of zonder AI-abonnement — meldmodus staat bewust BUITEN alle AI-gates) heeft de chat open en klikt de megafoon-toggle. Op de achtergrond geldt een rem van 5 meldingen per rollend uur per gebruiker, afgedwongen in de RPC `public.reserve_user_report_slot` (advisory lock, dus race-vrij).',
+    when:
+      'De gebruiker kiest een type (bug/vraag/aanbeveling), vult het formulier in — bug/vraag verplicht een scherm, een aanbeveling juist NIET (en toont geen scherm-/verwachting-/toestemmingsveld) — voegt optioneel een screenshot toe (niet bij aanbeveling; PNG/JPEG/WebP tot 4 MB) en verstuurt. Tijdens het versturen probeert hij te sluiten (kruisje of mobiele backdrop) of de megafoon nogmaals te klikken.',
+    then:
+      'Sluiten en de megafoon-toggle zijn geblokkeerd zolang de verzending loopt (`meldingBezig`) — geen halve/dubbele melding. Het gesprek zelf (useChat-state) blijft intact wanneer de gebruiker terug naar chatmodus schakelt; de melding wordt pas geschreven bij "versturen", nooit tussentijds. Bij een 6e melding binnen het lopende uur wijst de server het verzoek af (HTTP 429, Nederlandse foutmelding "al veel meldingen... probeer het over een uur"); de eerste 5 lukken. Server-side validatie (zod) geeft bij een ontbrekend scherm op bug/vraag, een te korte omschrijving (<5 tekens) of een niet-toegestaan veld bij een aanbeveling een Nederlandse foutmelding, nooit de rauwe zod-tekst. Bij succes toont de meldmodus een bevestigingsstap; de rij komt eerst in Supabase (`user_reports`) te staan en pas daarna, best-effort, als Notion-kaartje — een falende Notion-push verliest de melding dus niet en wordt de volgende dag door de cron (UAT-BEHEER-31 → `/beheer/jobs`, job "Meldingen → Notion-sync") opnieuw geprobeerd.',
+    assertion: {
+      kind: 'ui-only',
+      source:
+        'components/app/chat/chat-panel.tsx (megafoon-toggle, veiligSluiten/meldingBezig-blokkade) + components/app/chat/melding/melding-view.tsx + melding-form.tsx + melding-type-kiezer.tsx + app/api/user-reports/route.ts (ReportSchema/zod-validatie, dutchValidationMessage, RPC reserve_user_report_slot voor de 5/uur-rem, best-effort pushReportToNotion) + app/api/cron/user-reports-notion-sync/route.ts (retry-cron) — procestoets/randvoorwaarden, geen AI-inhoud',
     },
   },
 ]

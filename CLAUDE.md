@@ -37,6 +37,7 @@ Elke inhoudelijke opdracht routeert via de bijpassende pijplijn-skill — niet a
 - **defect / "werkt niet" / "klopt niet" / "is niet juist" / bug** → `bug-fix`
 - **kleine wens / "kun je … aanpassen/kleiner/mooier/anders"** → `kleine-aanpassing`
 - **uitbreiding van iets bestaands** → `extend-feature` · **iets nieuws** → `new-feature` · **herstructureren zonder gedragswijziging** → `refactor`
+- **migratie / nieuwe tabel of kolom / RLS-policy / backfill** → `schemawijziging`
 - **nieuwe AI-functionaliteit** → `ai-feature` · **hoe de AI antwoordt/zich gedraagt** → `ai-gedrag`
 - **"ship het" / af / live** → `release`
 
@@ -89,8 +90,8 @@ Volledig **gescand** — niets handmatig. `scanTableRelations` in `generate.mjs`
 ### View 4 — Praatplaat (HLD, gebruikersperspectief)
 **Gecureerd** in `lib/architecture/hld-model.ts`: het verhaal van de app in gewone taal, zodat een **leek het begrijpt als functionaliteiten** ("dit kan de app voor je doen"). Geen techniek/lagen — wel `capabilityGroups` (functionaliteiten per gebruikersdoel, in "ik wil…"-taal), de reis, Will, de soevereiniteitsfasen (als motivatie, niet gating — ADR 0001) en de uitkomst (vrijheid). Werk dit bij wanneer **functionaliteit verschijnt/verdwijnt/van naam verandert**. De `modules` komen uit `MODULE_CATALOG` (gesynct); `validateHldModel` (getest) bewaakt die sync + coherentie. Bewust een HTML-praatplaat (geen SVG/export) — bedoeld om mee te presenteren.
 
-### Beheer › Development (Claude-team)
-`/beheer/development` (tabs Skills/Ons team) toont de teamopstelling: subagents (`.claude/agents/*`) en skill-pijplijnen (`.claude/skills/*`). Zelfde principe: feiten gescand door `scanClaudeTeam()` in `generate.mjs` → `architecture.json.claudeTeam` (regenereer met `npm run arch:diagram`); betekenis gecureerd in `lib/architecture/development-model.ts` (`TEAM_GROUPS`/`AGENT_CURATION`/`SKILL_CURATION`). **Voeg je een agent of skill toe (of hernoem/verwijder je er één), deel 'm daar in** — `development-model.test.ts` wordt anders rood. Deze pagina is interne meta/naslag en hoort bewust NIET in de ArchiMate-topologie, HLD of Berekeningen.
+### Claude-team (curatie-gate)
+Subagents (`.claude/agents/*`) en skill-pijplijnen (`.claude/skills/*`) volgen hetzelfde principe: feiten gescand door `scanClaudeTeam()` in `generate.mjs` → `architecture.json.claudeTeam` (regenereer met `npm run arch:diagram`); betekenis gecureerd in `lib/architecture/development-model.ts` (`TEAM_GROUPS`/`AGENT_CURATION`/`SKILL_CURATION`). **Voeg je een agent of skill toe (of hernoem/verwijder je er één), deel 'm daar in** — `development-model.test.ts` wordt anders rood, en daarmee de CI (ADR 0066). Er is bewust **géén in-app venster** meer (besluit 02, aug 2026): de leesvorm is de **teamplaat op de org-site** (`trifinity-org/site/team.html`, bouwen met `node site/build.mjs`). Die plaat leest `docs/architecture/architecture.json` én parseert `lib/architecture/development-model.ts` letterlijk — beide bestanden blijven dus bestaan; alleen de route `/beheer/development` is weg. Dit is interne meta/naslag en hoort bewust NIET in de ArchiMate-topologie, HLD of Berekeningen.
 
 ## Kleurconventie — module-accenten (verplicht bij UI-werk)
 

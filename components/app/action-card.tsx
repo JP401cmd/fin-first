@@ -10,6 +10,7 @@ import {
   ACTION_SOURCE_LABELS,
 } from '@/lib/recommendation-data'
 import type { CancellationMetadata } from '@/lib/cancellation-types'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import { tagToLever, type LeverId } from '@/lib/lever-mapping'
 
 // ── Lever icon config (consistent with kompas) ────────────────────────────────
@@ -90,6 +91,13 @@ export function ActionCard({ action, onStatusChange, onUpdate, onCancellationOpe
   }, [showLongPressMenu])
 
   const sourceBadge = getSourceBadgeClasses(action.source)
+
+  // Opzeg-actie: het maandbedrag zit bewust NIET in de omschrijving maar in de
+  // metadata, zodat het hier live (en dus maskeerbaar) gerenderd kan worden.
+  const cancellation =
+    action.metadata?.type === 'subscription_cancellation'
+      ? (action.metadata as CancellationMetadata)
+      : null
 
   // Lever icon — derived from linked recommendation type or fallback to cashflow
   const leverId = action.recommendation?.recommendation_type
@@ -351,15 +359,21 @@ export function ActionCard({ action, onStatusChange, onUpdate, onCancellationOpe
         )}
 
         {/* Cancellation shortcut — hidden by default, visible on hover/tap */}
-        {action.metadata?.type === 'subscription_cancellation' && onCancellationOpen && (
-          <div className="mt-1.5 hidden group-hover:block group-focus-within:block" onClick={(e) => e.stopPropagation()}>
+        {cancellation && onCancellationOpen && (
+          <div className="mt-1.5 hidden items-center gap-2 group-hover:flex group-focus-within:flex" onClick={(e) => e.stopPropagation()}>
             <button
               type="button"
-              onClick={() => onCancellationOpen(action.metadata as CancellationMetadata)}
+              onClick={() => onCancellationOpen(cancellation)}
               className="touch-target font-serif text-[11px] italic text-wil-600 transition-colors hover:text-wil-800"
             >
               Open opzegbrief →
             </button>
+            {typeof cancellation.monthly_amount === 'number' && (
+              <span className="text-[11px] text-[var(--ink-3)]">
+                <MaskedAmount value={cancellation.monthly_amount} tone="wil" className="text-[11px]" />
+                /mnd
+              </span>
+            )}
           </div>
         )}
 

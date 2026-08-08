@@ -1,7 +1,14 @@
 import { createClient } from '@supabase/supabase-js'
+import { getServiceClient } from '@/lib/supabase/service'
 import type { TestReport, TestSuiteConfig, TestResult } from './test-types'
 import { loadAllTests } from './test-registry'
-import { runTestSuite, type TestProgressCallback, setRoleSwitcher, clearRoleSwitcher } from './test-runner'
+import {
+  runTestSuite,
+  type TestProgressCallback,
+  setRoleSwitcher,
+  clearRoleSwitcher,
+  setInitialRunnerRole,
+} from './test-runner'
 import { seedTestData, cleanupTestData } from './test-seed'
 
 // ── Server-side Regression Test Runner ──────────────────────────────────────
@@ -79,11 +86,11 @@ export function getBaseUrl(): string {
   if (_baseUrl) return _baseUrl
   return process.env.NEXT_PUBLIC_SITE_URL || `http://localhost:${process.env.PORT || 3000}`
 }
-let _supabaseUrl: string = ''
-let _supabaseAnonKey: string = ''
 let _accessToken: string = ''
 let _testUserId: string = ''
 let _currentRole: 'superadmin' | 'user' = 'user'
+/** De rol die het testaccount had vóór de run — daar zetten we 'm ook op terug. */
+let _initialRole: 'superadmin' | 'user' = 'user'
 
 // ── Cookie credentials (set during test suite init) ─────────────────────────
 let _cookieName: string = ''
@@ -162,49 +169,113 @@ export function unauthenticatedFetch(
 
 // ── Role switching for admin vs normal-user tests ────────────────────────────
 //
-// The test account is 'user' by default in the database. Tests that verify
-// admin-only features (beheer pages, admin API endpoints) need 'superadmin'
-// access. The test runner auto-switches via requiredRole/defaultRole on
-// TestCase/TestCategory, then restores to 'user' after the test.
+// Tests that verify admin-only features (beheer pages, admin API endpoints)
+// need 'superadmin'; tests die juist het NIET-admin-gedrag afdekken hebben
+// 'user' nodig. Het testrunner-engine wisselt automatisch via requiredRole/
+// defaultRole op TestCase/TestCategory.
+//
+// De wissel loopt via de SERVICE-ROLE-client. Reden: de self-service PATCH die
+// hier eerder stond ging via het anon/authenticated bearer-token van het
+// testaccount zelf en liep daarmee tegen de anti-privilege-escalatie-trigger
+// `guard_profiles_role()` (migraties 20260717132003 + 20260720081332) aan —
+// terecht, want die trigger is een bewuste security-fix. De trigger stelt alles
+// buiten 'authenticated'/'anon' expliciet vrij, dus service-role mag wél. Zonder
+// die route kon de suite GEEN ENKEL niet-admin-gedrag testen.
+//
+// DEV-ONLY: zie assertHarnessEnvironment() hieronder.
 
 /**
- * Switch the test account's profile.role in the database.
- * Uses the Supabase REST API directly with the authenticated session.
+ * Weiger elke service-role-actie van de regressieharness buiten lokale
+ * development.
+ *
+ * Drie onafhankelijke lagen houden dit pad uit productie:
+ *   1. BUILD-TIME — `runServerTestSuite` heeft precies één aanroeper,
+ *      `app/api/regression/run/route.ts`, en die opent met
+ *      `if (process.env.NODE_ENV !== 'development') return forbidden(...)`.
+ *      Next/Turbopack vouwt die constante bij `next build` weg: in de
+ *      productiebundel is de handler letterlijk gereduceerd tot een
+ *      onvoorwaardelijke 403 en is deze module niet eens meegebundeld.
+ *      Runtime-env of headers kunnen daar niet meer aan tornen.
+ *   2. PROXY — /api/regression/* valt onder de `/api/`-protected-prefix in
+ *      lib/supabase/proxy.ts en staat niet in publicPaths: 401 zonder sessie.
+ *   3. RUNTIME (hier) — het vangnet voor een consument die de build-time-gate
+ *      niet heeft, bv. een script of test die deze module direct importeert.
+ *      NODE_ENV én de Vercel-systeemvariabelen worden los gecontroleerd, zodat
+ *      één verkeerd gezette env-var de gate niet opent.
+ */
+function assertHarnessEnvironment(): void {
+  if (process.env.NODE_ENV !== 'development') {
+    throw new Error(
+      'De regressieharness draait uitsluitend in development ' +
+      `(NODE_ENV='${process.env.NODE_ENV}').`,
+    )
+  }
+  if (process.env.VERCEL || process.env.VERCEL_ENV) {
+    throw new Error(
+      'De regressieharness draait niet op een Vercel-deployment ' +
+      `(VERCEL_ENV='${process.env.VERCEL_ENV}').`,
+    )
+  }
+}
+
+/**
+ * Switch the test account's profile.role in the database via de service-role.
+ *
+ * De update is hard gescopet op `_testUserId` — de id uit de geverifieerde
+ * signInWithPassword-respons van REGRESSION_TEST_EMAIL. Er komt geen
+ * client-input aan te pas; er is dus geen pad waarlangs een andere rij geraakt
+ * kan worden.
  *
  * @param role - The role to set ('user' or 'superadmin')
  * @returns true if the switch succeeded, false otherwise
  */
 async function switchTestAccountRole(role: 'superadmin' | 'user'): Promise<boolean> {
-  if (!_supabaseUrl || !_supabaseAnonKey || !_accessToken || !_testUserId) {
-    console.warn('[server-runner] Role switch unavailable: missing credentials')
+  if (!_testUserId) {
+    console.warn('[server-runner] Role switch unavailable: geen testaccount-id')
     return false
   }
 
   try {
-    const fetchFn = _originalFetch ?? globalThis.fetch
-    const res = await fetchFn(
-      `${_supabaseUrl}/rest/v1/profiles?id=eq.${_testUserId}`,
-      {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${_accessToken}`,
-          'apikey': _supabaseAnonKey,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=minimal',
-        },
-        body: JSON.stringify({ role }),
-      },
-    )
-    if (res.ok || res.status === 204) {
-      _currentRole = role
-      return true
+    assertHarnessEnvironment()
+    const service = getServiceClient()
+    const { error } = await service.from('profiles').update({ role }).eq('id', _testUserId)
+    if (error) {
+      console.warn(`[server-runner] Role switch to '${role}' failed:`, error.message)
+      return false
     }
-    console.warn(`[server-runner] Role switch to '${role}' failed: ${res.status} ${res.statusText}`)
-    return false
+    _currentRole = role
+    return true
   } catch (err) {
     console.warn(`[server-runner] Role switch to '${role}' error:`, err)
     return false
   }
+}
+
+/**
+ * Lees de WERKELIJKE rol van het testaccount uit de database.
+ *
+ * De runner nam deze stand vroeger hard aan ('user'). Klopte die aanname niet,
+ * dan sloeg de short-circuit in ensureRole() toe en werd er nooit gewisseld —
+ * waardoor elke `requiredRole: 'user'`-test alsnog als superadmin draaide en
+ * misleidend rood werd. Aannemen mag hier dus niet; we lezen.
+ */
+async function readTestAccountRole(): Promise<'superadmin' | 'user'> {
+  assertHarnessEnvironment()
+  const service = getServiceClient()
+  const { data, error } = await service
+    .from('profiles')
+    .select('role')
+    .eq('id', _testUserId)
+    .maybeSingle()
+
+  if (error || !data) {
+    throw new Error(
+      'Kon de rol van het regressietest-account niet uitlezen: ' +
+      `${error?.message ?? 'geen profielrij gevonden'}. ` +
+      'Zonder geverifieerde beginrol kan de suite geen betrouwbaar rolgebonden signaal geven.',
+    )
+  }
+  return data.role === 'superadmin' ? 'superadmin' : 'user'
 }
 
 /**
@@ -290,6 +361,20 @@ export async function runServerTestSuite(
   config: ServerRunConfig = {},
   onResult?: (result: TestResult) => void,
 ): Promise<TestReport> {
+  // ── 0. Dev-only gate ───────────────────────────────────────────────────
+  // Vóór élke setup: deze harness logt in met een testaccount, seedt data en
+  // wisselt rollen via de service-role. Niets daarvan mag ooit buiten lokale
+  // development draaien. Zie assertHarnessEnvironment() voor de drie lagen.
+  assertHarnessEnvironment()
+
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error(
+      'SUPABASE_SERVICE_ROLE_KEY ontbreekt. De regressieharness wisselt de rol van het ' +
+      'testaccount via de service-role (de anti-escalatie-trigger op profiles blokkeert ' +
+      'terecht elke self-service rolwijziging).',
+    )
+  }
+
   // ── 1. Validate environment ────────────────────────────────────────────
   const email = process.env.REGRESSION_TEST_EMAIL
   const password = process.env.REGRESSION_TEST_PASSWORD
@@ -352,8 +437,6 @@ export async function runServerTestSuite(
   // Expose credentials for authenticatedFetch(), unauthenticatedFetch() and role-switching helpers
   _originalFetch = originalFetch
   _baseUrl = baseUrl
-  _supabaseUrl = supabaseUrl
-  _supabaseAnonKey = supabaseAnonKey
   _accessToken = accessToken
   _testUserId = authData.user.id
   _cookieName = cookieName
@@ -406,17 +489,24 @@ export async function runServerTestSuite(
     console.warn('[server-runner] Test data seeding warning:', seedErr)
   }
 
-  // ── 6. Confirm 'user' role (default in database) ─────────────────────
-  // The test account is 'user' in the database. No role switch needed at startup.
-  // Tests/categories that need admin access declare requiredRole: 'superadmin'
-  // or defaultRole: 'superadmin' and the test runner auto-switches.
-  _currentRole = 'user'
-
-  // Register role-switching callback with the test runner
-  setRoleSwitcher(switchTestAccountRole)
-
   // ── 7. Load tests and run ──────────────────────────────────────────────
+  // Alles vanaf hier staat in de try, zodat het finally-blok de gepatchte
+  // globals en de oorspronkelijke rol hoe dan ook herstelt — ook als het
+  // uitlezen van de beginrol faalt.
   try {
+    // ── 6. Beginrol UITLEZEN (nooit aannemen) ──────────────────────────
+    // De rol van het testaccount wordt uit de database gelezen en aan de
+    // testrunner doorgegeven. Nam de runner dit aan, dan short-circuit'te
+    // ensureRole() op een verkeerde stand en draaide een
+    // `requiredRole: 'user'`-test alsnog als superadmin — vals rood op precies
+    // de tests die het niet-admin-gedrag moeten bewaken.
+    _initialRole = await readTestAccountRole()
+    _currentRole = _initialRole
+    setInitialRunnerRole(_initialRole)
+
+    // Register role-switching callback with the test runner
+    setRoleSwitcher(switchTestAccountRole)
+
     await loadAllTests()
 
     const suiteConfig: Partial<TestSuiteConfig> = {}
@@ -442,23 +532,27 @@ export async function runServerTestSuite(
     clearRoleSwitcher()
 
     // ── 9. Restore original globals ────────────────────────────────────
-    // Ensure role is restored to 'user' (the DB default) before cleanup
-    if (_currentRole !== 'user') {
-      await switchTestAccountRole('user').catch(() => {
-        console.error('[server-runner] Failed to restore user role during cleanup')
-      })
+    // Zet de rol terug op de stand die we bij aanvang UITLAZEN, niet op een
+    // aangenomen 'user'. Anders degradeert een run het testaccount stilletjes
+    // en is de volgende run weer niet reproduceerbaar.
+    if (_currentRole !== _initialRole) {
+      const restored = await switchTestAccountRole(_initialRole)
+      if (!restored) {
+        console.error(
+          `[server-runner] CRITICAL: kon de rol van het testaccount niet terugzetten naar '${_initialRole}'.`,
+        )
+      }
     }
 
     globalThis.fetch = originalFetch
     _originalFetch = null
     _baseUrl = ''
-    _supabaseUrl = ''
-    _supabaseAnonKey = ''
     _accessToken = ''
     _testUserId = ''
     _cookieName = ''
     _cookieValue = ''
     _currentRole = 'user'
+    _initialRole = 'user'
 
     if (originalLocalStorage !== undefined) {
       Object.defineProperty(globalThis, 'localStorage', {

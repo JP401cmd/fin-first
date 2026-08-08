@@ -2,6 +2,8 @@
 
 import { useState, useEffect, memo, useCallback } from 'react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+import { MASKED_AMOUNT_PLACEHOLDER } from '@/lib/format'
 import type { SimRow } from '@/lib/fire-simulation'
 import type { BreakdownResult, BreakdownRow, BreakdownLayer } from '@/lib/income-expense-breakdown'
 
@@ -9,7 +11,20 @@ import type { BreakdownResult, BreakdownRow, BreakdownLayer } from '@/lib/income
 
 const PAD = { top: 16, right: 16, bottom: 28, left: 60 }
 
-function fmtY(val: number): string {
+/**
+ * Euro-label voor as-ticks en tooltips.
+ *
+ * `masked` is een VERPLICHTE parameter, geen optionele: elk bedrag in deze
+ * grafiek loopt hier langs, en een vergeten argument zou precies het lek
+ * terugbrengen dat ADR 0091 hier dicht (de Y-as toonde bedragen dwars door de
+ * bedragmaskering heen). Spiegelt `fmtAbs` in `sim-chart.tsx`.
+ *
+ * Let op: op de AS wordt deze functie onder maskering helemaal niet aangeroepen
+ * — daar verdwijnt de tick volledig (ADR 0091: "bullets op een as zijn ruis").
+ * De bullets zijn er voor tooltip-regels, waar het label ernaast wél context geeft.
+ */
+function fmtY(val: number, masked: boolean): string {
+  if (masked) return MASKED_AMOUNT_PLACEHOLDER
   const abs = Math.abs(val)
   if (abs >= 1_000_000) return `€${(val / 1_000_000).toFixed(1)}M`
   if (abs >= 1_000) return `€${Math.round(val / 1_000)}k`
@@ -49,6 +64,10 @@ export const IncomeExpenseChart = memo(function IncomeExpenseChart({
   ghostColor?: string
 }) {
   const { ref, hasEntered, animationComplete } = useInViewAnimation({ duration: 1200 })
+  // Bedragmaskering (ADR 0091) komt uit de hook, NIET uit een prop: de hook
+  // heeft een fallback-context, dus het propcontract van dit component blijft
+  // ongewijzigd en elke bestaande caller erft de fix zonder eigen wijziging.
+  const { masked } = useMaskedAmounts()
 
   const [containerW, setContainerW] = useState(600)
   useEffect(() => {
@@ -126,6 +145,7 @@ export const IncomeExpenseChart = memo(function IncomeExpenseChart({
           isPensioenMode={isPensioenMode}
           aowAgeFractional={aowAgeFractional}
           isDesktop={isDesktop}
+          masked={masked}
         />
       </div>
     )
@@ -147,6 +167,7 @@ export const IncomeExpenseChart = memo(function IncomeExpenseChart({
         baselineRows={baselineRows}
         ghostOverlayRows={ghostOverlayRows}
         ghostColor={ghostColor}
+        masked={masked}
       />
     </div>
   )
@@ -167,7 +188,7 @@ function LinesView({
   rows, W, H, innerW, innerH, minAge, maxAge, xScale, hasEntered,
   hoveredAge, svgHandlers,
   fireAge, isPensioenMode, aowAgeFractional,
-  baselineRows, ghostOverlayRows, ghostColor,
+  baselineRows, ghostOverlayRows, ghostColor, masked,
 }: {
   rows: SimRow[]
   W: number; H: number; innerW: number; innerH: number
@@ -182,8 +203,13 @@ function LinesView({
   baselineRows?: SimRow[]
   ghostOverlayRows?: SimRow[]
   ghostColor?: string
+  /** Bedragmaskering (ADR 0091) — geometrie blijft, euro-LABELS verdwijnen. */
+  masked: boolean
 }) {
   const visibleRows = rows.filter(r => r.age >= minAge && r.age < maxAge)
+  // EURO-WEERGAVE: `rows` (en `breakdownResult`/`ghostOverlayRows`) komen al omgezet
+  // binnen uit het render-grensblok van `horizon-client.tsx` — chart-feed-regime (D4).
+  // Dit component blijft euro-weergave-onwetend: het is een tekenmachine.
   const incomePts: [number, number][] = visibleRows.map(r => [r.age, r.flowIn])
   const expensePts: [number, number][] = visibleRows.map(r => [r.age, r.flowOut])
 
@@ -273,9 +299,12 @@ function LinesView({
           <line key={val} x1={PAD.left} x2={PAD.left + innerW} y1={y} y2={y}
             stroke="var(--border-ed)" strokeWidth={1} strokeDasharray="4 4" />
         ))}
-        {yTicks.map(({ val, y }) => (
+        {/* Y-as-labels — onder maskering VOLLEDIG weg (ADR 0091: "bullets op een
+            as zijn ruis, geen informatie"). De gridlijnen hierboven blijven
+            staan, dus de verhoudingen in de grafiek blijven leesbaar. */}
+        {!masked && yTicks.map(({ val, y }) => (
           <text key={val} x={PAD.left - 5} y={y + 4} textAnchor="end" fontSize={9}
-            fill="var(--ink-4)" fontFamily="var(--font-dm-mono, monospace)">{fmtY(val)}</text>
+            fill="var(--ink-4)" fontFamily="var(--font-dm-mono, monospace)">{fmtY(val, masked)}</text>
         ))}
         {xTickAges.map(age => (
           <text key={age} x={PAD.left + xScale(age)} y={H - 4} textAnchor="middle" fontSize={9}
@@ -369,15 +398,17 @@ function LinesView({
                 Leeftijd {hoveredAge}
               </text>
               <text x={tx + 6} y={ty + 26} fontSize={7.5} fill="var(--horizon-400, #c4a06b)" fontFamily="var(--font-dm-mono, monospace)">
-                Aanvulling: {fmtY(inc)}
+                Aanvulling: {fmtY(inc, masked)}
               </text>
               <text x={tx + 6} y={ty + 37} fontSize={7.5} fill="var(--kern-400, #a07860)" fontFamily="var(--font-dm-mono, monospace)">
-                Onttrekking: {fmtY(exp)}
+                Onttrekking: {fmtY(exp, masked)}
               </text>
+              {/* Het losse `+` verdwijnt onder maskering (ADR 0091): de richting
+                  staat al in het woord "groei"/"daling" ernaast. */}
               <text x={tx + 6} y={ty + 48} fontSize={7.5}
                 fill={diff >= 0 ? 'var(--horizon-400, #c4a06b)' : 'var(--kern-400, #a07860)'}
                 fontFamily="var(--font-dm-mono, monospace)" fontWeight={600}>
-                {diff >= 0 ? '+' : ''}{fmtY(Math.abs(diff))} {diff >= 0 ? 'netto groei' : 'netto daling'}
+                {diff >= 0 && !masked ? '+' : ''}{fmtY(Math.abs(diff), masked)} {diff >= 0 ? 'netto groei' : 'netto daling'}
               </text>
             </g>
           )
@@ -407,7 +438,7 @@ function LinesView({
 function BreakdownView({
   breakdownResult, W, H, innerW, innerH, minAge, maxAge, xScale,
   hasEntered, hoveredAge, svgHandlers,
-  fireAge, isPensioenMode, aowAgeFractional, isDesktop,
+  fireAge, isPensioenMode, aowAgeFractional, isDesktop, masked,
 }: {
   breakdownResult: BreakdownResult
   W: number; H: number; innerW: number; innerH: number
@@ -420,6 +451,8 @@ function BreakdownView({
   isPensioenMode: boolean
   aowAgeFractional?: number
   isDesktop: boolean
+  /** Bedragmaskering (ADR 0091) — staafgeometrie blijft, euro-LABELS verdwijnen. */
+  masked: boolean
 }) {
   const { rows, incomeLayers, expenseLayers } = breakdownResult
   const visibleRows = rows.filter(r => r.age >= minAge && r.age < maxAge)
@@ -498,10 +531,11 @@ function BreakdownView({
         <line x1={PAD.left} x2={PAD.left + innerW} y1={yZero} y2={yZero}
           stroke="var(--border-md)" strokeWidth={1.5} />
 
-        {/* Y-axis labels */}
-        {yTicks.map(({ val, y }) => (
+        {/* Y-axis labels — onder maskering volledig weg (ADR 0091); de gridlijnen
+            en de nullijn hierboven blijven, dus de verhoudingen blijven leesbaar. */}
+        {!masked && yTicks.map(({ val, y }) => (
           <text key={val} x={PAD.left - 5} y={y + 4} textAnchor="end" fontSize={9}
-            fill="var(--ink-4)" fontFamily="var(--font-dm-mono, monospace)">{fmtY(Math.abs(val))}</text>
+            fill="var(--ink-4)" fontFamily="var(--font-dm-mono, monospace)">{fmtY(Math.abs(val), masked)}</text>
         ))}
 
         {/* X-axis labels */}
@@ -649,7 +683,7 @@ function BreakdownView({
                     </text>
                     <text x={tx + tooltipW - 8} y={itemY} textAnchor="end" fontSize={8}
                       fill="var(--paper)" fontFamily="var(--font-dm-mono, monospace)">
-                      {fmtY(item.value)}
+                      {fmtY(item.value, masked)}
                     </text>
                   </g>
                 )
@@ -667,7 +701,7 @@ function BreakdownView({
                     </text>
                     <text x={tx + tooltipW - 8} y={itemY} textAnchor="end" fontSize={8}
                       fill="var(--paper)" fontFamily="var(--font-dm-mono, monospace)">
-                      {fmtY(item.value)}
+                      {fmtY(item.value, masked)}
                     </text>
                   </g>
                 )
@@ -685,10 +719,13 @@ function BreakdownView({
                       fill="var(--paper)" fontFamily="var(--font-inter, sans-serif)">
                       {surplus >= 0 ? 'Netto aanvulling' : 'Netto onttrekking'}
                     </text>
+                    {/* Het losse +/− verdwijnt onder maskering (ADR 0091): de
+                        richting staat al in het label "Netto aanvulling"/
+                        "Netto onttrekking" ernaast. */}
                     <text x={tx + tooltipW - 8} y={totalY + 14} textAnchor="end" fontSize={8}
                       fontWeight={700} fill={surplus >= 0 ? '#c4b5fd' : '#fcd34d'}
                       fontFamily="var(--font-dm-mono, monospace)">
-                      {surplus >= 0 ? '+' : '-'}{fmtY(Math.abs(surplus))}
+                      {masked ? '' : surplus >= 0 ? '+' : '-'}{fmtY(Math.abs(surplus), masked)}
                     </text>
                   </g>
                 )

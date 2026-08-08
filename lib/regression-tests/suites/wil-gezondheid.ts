@@ -284,8 +284,14 @@ const tests: TestCase[] = [
   },
   {
     id: 'health-emergency-three',
-    name: 'Noodfonds: 3 maanden → score 60',
-    description: '3 months emergency coverage yields pillar score 60',
+    name: 'Noodfonds: 3 maanden (= norm) → score 100',
+    description: '3 months emergency coverage yields pillar score 100 — sinds commit ' +
+      'afe822e04 ("fix(gezondheid): noodbuffer tegen 3x salaris...", eigenaar-besluit ' +
+      '29 jul 2026) is de norm TARGET_EMERGENCY_SALARY_MONTHS = 3 (niet meer 6× ' +
+      'maanduitgaven). scoreEmergencyFund geeft 100 zodra monthsCovered >= target; ' +
+      'bij geen expliciete emergencyTargetMonths is dat exact 3. Dit toetst de ' +
+      'grens-op-de-norm-zelf (>=), los van health-emergency-six dat ruim-boven-de-norm ' +
+      '(6, 12) toetst.',
     category: CAT,
     priority: 'high',
     estimatedDurationMs: 10,
@@ -295,7 +301,7 @@ const tests: TestCase[] = [
         true,
       )
       const pillar = score.pillars.find(p => p.id === 'emergency_fund')!
-      assertEqual(pillar.score, 60, '3 months → score 60')
+      assertEqual(pillar.score, 100, '3 months (== target) → score 100')
     },
   },
   {

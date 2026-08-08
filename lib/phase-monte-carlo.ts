@@ -24,7 +24,13 @@ export interface MonteCarloPhaseInput {
   /** Life event cashflows actief gedurende deze fase */
   cashflows?: SimCashflow[]
   currentAge: number
-  /** Portfolio moet boven dit bedrag blijven voor "succes" (default 0) */
+  /**
+   * Portfolio moet boven dit bedrag blijven voor "succes" (default 0).
+   *
+   * De toets gebeurt op de ONGECLAMPTE stand (zie `runPhaseMonteCarlo`), dus
+   * de default 0 betekent: "de portefeuille is nooit tekortgeschoten". Voor
+   * elke waarde > 0 is dat identiek aan een toets op de geclampte stand.
+   */
   targetMinPortfolio?: number
   /** Box 3 drag (default: BOX3_DRAG uit constants) */
   box3Drag?: number
@@ -41,7 +47,10 @@ export interface MonteCarloPhaseResult {
     p75: number[]
     p90: number[]
   }
-  /** Fractie simulaties waar portfolio >= targetMinPortfolio elk jaar (0-1) */
+  /**
+   * Fractie simulaties waar de (ongeclampte) portefeuille elk jaar
+   * >= targetMinPortfolio bleef (0-1).
+   */
   successRate: number
   medianEndPortfolio: number
   p10EndPortfolio: number
@@ -212,15 +221,21 @@ export function runPhaseMonteCarlo(
       const cfAmount = resolveCashflowsForAge(cashflows, age)
       portfolio += cfAmount
 
+      // Succes-tracking VÓÓR de clamp. De clamp hieronder tilt elk tekort naar
+      // 0, dus ná de clamp is `portfolio < 0` per definitie onwaar en zou de
+      // default targetMinPortfolio = 0 élke simulatie geslaagd verklaren — óók
+      // een volledig leeggelopen portefeuille (mediaan eindstand € 0 bij 100%
+      // slagingskans). Voor elke targetMinPortfolio > 0 is deze toets identiek
+      // aan de oude: clampen kan een waarde alleen naar 0 tillen, en 0 ligt
+      // altijd onder een positieve drempel.
+      if (portfolio < targetMinPortfolio) {
+        everBelowMin = true
+      }
+
       // Portfolio kan niet onder nul zakken
       portfolio = Math.max(0, portfolio)
 
       path.push(Math.round(portfolio))
-
-      // Succes-tracking: portfolio onder minimum?
-      if (portfolio < targetMinPortfolio) {
-        everBelowMin = true
-      }
 
       // FIRE-tracking voor opbouwfase
       if (fireTarget != null && !hasFired && portfolio >= fireTarget) {
@@ -422,12 +437,14 @@ function runMCWithForcedReturns(
       portfolio = portfolio * (1 + annualReturn)
       portfolio += yearlyCashflow
       portfolio += resolveCashflowsForAge(cashflows, age)
-      portfolio = Math.max(0, portfolio)
-      path.push(Math.round(portfolio))
 
+      // Toets vóór de clamp — zelfde reden als in runPhaseMonteCarlo.
       if (portfolio < targetMinPortfolio) {
         everBelowMin = true
       }
+
+      portfolio = Math.max(0, portfolio)
+      path.push(Math.round(portfolio))
     }
 
     allPaths.push(path)
@@ -565,13 +582,13 @@ export function runCashBufferAnalysis(
           portfolio += input.yearlyCashflow // negatief getal
         }
 
-        portfolio = Math.max(0, portfolio)
-        const totalValue = portfolio + remainingBuffer
-        path.push(Math.round(totalValue))
-
-        if (totalValue < targetMinPortfolio) {
+        // Toets vóór de clamp — zelfde reden als in runPhaseMonteCarlo.
+        if (portfolio + remainingBuffer < targetMinPortfolio) {
           everBelowMin = true
         }
+
+        portfolio = Math.max(0, portfolio)
+        path.push(Math.round(portfolio + remainingBuffer))
       }
 
       allPaths.push(path)

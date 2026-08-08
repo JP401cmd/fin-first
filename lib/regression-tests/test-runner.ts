@@ -19,10 +19,39 @@ let _roleSwitchFn: RoleSwitchFn | null = null
 let _currentRunnerRole: 'superadmin' | 'user' = 'user'
 
 /**
+ * Fout bij een mislukte rolwissel — infrastructuur, geen assertion-failure.
+ *
+ * Wordt door runSingleTest als status 'error' gerapporteerd (niet 'fail'),
+ * zodat een kapotte harness zichtbaar verschilt van een echte regressie in de
+ * toegangscontrole. Precies dat onderscheid ging verloren toen ensureRole()
+ * een mislukte wissel stil negeerde.
+ */
+export class RoleSwitchError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'RoleSwitchError'
+  }
+}
+
+/**
  * Register the role-switching function (called by server-runner during setup).
  */
 export function setRoleSwitcher(fn: RoleSwitchFn): void {
   _roleSwitchFn = fn
+}
+
+/**
+ * Leg de WERKELIJK uitgelezen beginrol van het testaccount vast.
+ *
+ * De runner nam vroeger hard aan dat het account 'user' was. Klopte die aanname
+ * niet (het account stond op 'superadmin'), dan gaf de short-circuit in
+ * ensureRole() — `targetRole === _currentRunnerRole` — bij elke
+ * `requiredRole: 'user'`-test een vals negatief: de rolwissel werd nooit
+ * aangeroepen en de test draaide alsnog als superadmin. De server-runner leest
+ * de rol daarom uit de database en zet 'm hier.
+ */
+export function setInitialRunnerRole(role: 'superadmin' | 'user'): void {
+  _currentRunnerRole = role
 }
 
 /**
@@ -46,15 +75,26 @@ function resolveTestRole(test: TestCase): TestRole {
 
 /**
  * Switch the test account role if needed before running a test.
- * Returns the role that was set (or the current role if no switch was needed).
+ *
+ * HARD-FAIL-VANGNET: mislukt de wissel, dan gooien we. Stil doorgaan met de
+ * oude rol is precies hoe de testdekking van niet-admin-gedrag verdween — de
+ * test draaide dan als superadmin en meldde een misleidend 'Gefaald' op de
+ * categorie die een echte toegangscontrole-regressie moet vangen. Hetzelfde
+ * patroon dat withUserRole()/withSuperadminRole() in server-runner.ts al
+ * hanteren.
  */
 async function ensureRole(targetRole: TestRole): Promise<void> {
   if (targetRole === 'any' || !_roleSwitchFn) return
   if (targetRole === _currentRunnerRole) return
   const switched = await _roleSwitchFn(targetRole)
-  if (switched) {
-    _currentRunnerRole = targetRole
+  if (!switched) {
+    throw new RoleSwitchError(
+      `Kon de testrol niet wisselen naar '${targetRole}' (huidige rol: '${_currentRunnerRole}'). ` +
+      'De test is overgeslagen omdat hij anders onder de verkeerde rol zou draaien ' +
+      'en een misleidend resultaat zou geven.',
+    )
   }
+  _currentRunnerRole = targetRole
 }
 
 /** Generate a short unique run ID */
@@ -97,11 +137,15 @@ async function runSingleTest(
     const duration = performance.now() - start
     const error = err instanceof Error ? err : new Error(String(err))
     const isTimeout = error.message.includes('timed out')
+    // Een mislukte rolwissel is een harness-/infrastructuurfout, geen
+    // assertion-failure: rapporteer 'error' zodat hij niet als regressie in de
+    // toegangscontrole gelezen wordt.
+    const isInfra = isTimeout || error instanceof RoleSwitchError
     return {
       testId: test.id,
       testName: test.name,
       category: test.category,
-      status: isTimeout ? 'error' : 'fail',
+      status: isInfra ? 'error' : 'fail',
       durationMs: Math.round(duration),
       errorMessage: error.message,
       errorStack: error.stack,

@@ -840,8 +840,15 @@ export async function DELETE(req: Request): Promise<Response> {
 // `app/api/module-guide/progress/route.ts` to stay compatible.
 //
 // Best-effort: any failure here is logged but does not block the import.
-// The shape matches the GOAL_PROGRESS_KEY_PREFIX convention from
-// `lib/briefing/goal-guide-steps.ts` (`goal:vermogen-overzicht`).
+//
+// NOTE (8 aug 2026): the `goal:<slug>` key convention originally came from
+// `lib/briefing/goal-guide-steps.ts`, which was removed together with
+// /beheer/doelen (dead branch, zero UI consumers since ADR 0007). The key
+// below is therefore a plain literal now. No live surface reads
+// `goal:vermogen-overzicht` — the Welcome guide uses `welcome:guide`
+// (lib/welcome-guide.ts). This write is kept because removing it touches a
+// live onboarding route beyond the confirmed cleanup scope; it is tracked
+// on the follow-up card for the remaining guide-state dead code.
 
 interface ModuleGuideProgressEntry {
   completedSteps: string[]

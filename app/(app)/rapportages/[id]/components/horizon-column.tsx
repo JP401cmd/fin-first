@@ -10,6 +10,15 @@ import { SectionLabel } from '@/components/editorial'
 import { ReportSparkline } from './report-sparkline'
 import { Flame, Calendar, TrendingUp } from 'lucide-react'
 
+/**
+ * euro-view: exempt (D13) — een rapportage is een GEDEELD artefact. Twee
+ * mensen die hetzelfde rapport openen (of dezelfde PDF naast elkaar leggen)
+ * moeten dezelfde bedragen zien; die mogen niet afhangen van de
+ * weergavevoorkeur van wie op "exporteren" drukte. Rapportage, de deelbare
+ * freedom-card en de briefing tonen daarom ALTIJD nominaal (toekomstige
+ * euro's), met de grondslag in de tekst — ongeacht `profiles.euro_view`.
+ * Bewuste uitzondering op de app-brede schakelaar, geen omissie.
+ */
 export function HorizonColumn({
   horizon,
   accentColor = '#c4a06b',

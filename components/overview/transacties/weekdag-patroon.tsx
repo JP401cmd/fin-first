@@ -2,7 +2,8 @@
 
 import { useMemo } from 'react'
 import { Kicker } from '@/components/editorial'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { spendByWeekday, type AnalysisTransaction } from '@/lib/transaction-insights'
 
 /**
@@ -12,6 +13,11 @@ import { spendByWeekday, type AnalysisTransaction } from '@/lib/transaction-insi
  * Met `onSelectWeekday` is elke kolom klikbaar → weekdag-weergave van de
  * transacties in de gekozen periode. Presentational: rekent enkel
  * `spendByWeekday` over de input.
+ *
+ * PRIVACY: de staafhoogtes blijven altijd staan (geometrie draagt verhoudingen,
+ * geen bedragen), maar het bedrag in de native `title`-tooltip maskeert mee —
+ * één regel per tooltip, dezelfde canonieke maskeringsregel als de rest van deze
+ * sectie-familie.
  */
 
 const WEEKDAY_LABELS = ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo']
@@ -26,6 +32,7 @@ export function WeekdagPatroon({
   onSelectWeekday?: (index: number) => void
 }) {
   const byWeekday = useMemo(() => spendByWeekday(transactions), [transactions])
+  const { masked } = useMaskedAmounts()
 
   const max = Math.max(...byWeekday, 0)
   const hasData = max > 0
@@ -74,7 +81,7 @@ export function WeekdagPatroon({
                   type="button"
                   onClick={() => onSelectWeekday(i)}
                   aria-label={`${WEEKDAY_FULL[i]} bekijken`}
-                  title={`${WEEKDAY_FULL[i]}: ${formatCurrency(value)}`}
+                  title={`${WEEKDAY_FULL[i]}: ${formatMaskedCurrency(value, masked)}`}
                   className={`${shared} rounded-none transition-colors hover:bg-[var(--subtle)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]`}
                   style={{ height: '100%' }}
                 >
@@ -87,7 +94,7 @@ export function WeekdagPatroon({
                 key={WEEKDAY_LABELS[i]}
                 className={shared}
                 style={{ height: '100%' }}
-                title={`${WEEKDAY_FULL[i]}: ${formatCurrency(value)}`}
+                title={`${WEEKDAY_FULL[i]}: ${formatMaskedCurrency(value, masked)}`}
               >
                 {bar}
               </div>

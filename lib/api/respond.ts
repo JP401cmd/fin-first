@@ -53,6 +53,42 @@ export function conflict(message: string, code?: string): NextResponse {
 }
 
 /**
+ * Vormt een onbekende fout om tot één leesbare LOGREGEL (server-side).
+ *
+ * Waarom dit meer is dan `String(err)`: een `PostgrestError` van supabase-js is
+ * GEEN `Error`-instantie maar een plat object `{ message, details, hint, code }`.
+ * `String(…)` maakt daar `[object Object]` van — precies het nuttigste deel van
+ * een DB-fout verdween dus uit de logs, op elke plek waar een `.from()`-fout
+ * werd doorgegeven. Vandaar de expliciete uitlezing van die vorm.
+ *
+ * Blijft server-only: de aanroeper stuurt nooit de uitkomst hiervan naar de
+ * client (zie `serverError`).
+ */
+function describeError(err: unknown): string {
+  if (err instanceof Error) return err.message
+  if (err && typeof err === 'object') {
+    const shaped = err as { message?: unknown; code?: unknown; details?: unknown; hint?: unknown }
+    if (typeof shaped.message === 'string') {
+      // Volgorde = aflopende bruikbaarheid bij het debuggen van een DB-fout.
+      const parts = [
+        shaped.message,
+        typeof shaped.code === 'string' ? `code=${shaped.code}` : null,
+        typeof shaped.details === 'string' ? `details=${shaped.details}` : null,
+        typeof shaped.hint === 'string' ? `hint=${shaped.hint}` : null,
+      ].filter(Boolean)
+      return parts.join(' · ')
+    }
+    // Geen message-veld: JSON is nog altijd leesbaarder dan [object Object].
+    try {
+      return JSON.stringify(err)
+    } catch {
+      return String(err)
+    }
+  }
+  return String(err)
+}
+
+/**
  * 500 — onverwachte serverfout. Logt de ECHTE fout server-side met `tag`
  * (grep-baar, geen PII naar de client) en retourneert een generieke tekst.
  * Optioneel `status` voor evidente upstream-fouten (502/503).
@@ -63,8 +99,7 @@ export function serverError(
   clientMessage = 'Er ging iets mis. Probeer het later opnieuw.',
   status = 500,
 ): NextResponse {
-  const detail = err instanceof Error ? err.message : String(err)
   const stack = err instanceof Error ? err.stack : undefined
-  console.error(`[${tag}] ${detail}`, stack ?? '')
+  console.error(`[${tag}] ${describeError(err)}`, stack ?? '')
   return errorResponse(clientMessage, status, 'server_error')
 }

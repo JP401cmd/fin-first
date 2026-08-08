@@ -33,6 +33,7 @@ import { useFocusTrap } from '@/lib/hooks/use-focus-trap'
 import { useChatContext } from '@/components/app/chat/chat-provider'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
+import { useEuroView } from '@/lib/hooks/use-euro-view'
 import { useGlobalSync } from '@/components/sync/global-sync-provider'
 import { useModuleAccess } from '@/components/app/feature-access-provider'
 import { usePerspective } from '@/components/app/perspective-provider'
@@ -104,6 +105,7 @@ export function CommandPalette({ open, onClose, role }: CommandPaletteProps) {
   const { open: openChat } = useChatContext()
   const { masked, toggle: togglePrivacy } = useMaskedAmounts()
   const { mode: displayMode, toggle: toggleDisplayMode } = useDisplayMode()
+  const { view: euroView, toggle: toggleEuroView } = useEuroView()
   const { triggerGlobalSync } = useGlobalSync()
   const {
     perspective: currentPerspective,
@@ -121,6 +123,8 @@ export function CommandPalette({ open, onClose, role }: CommandPaletteProps) {
       privacyMasked: masked,
       toggleDisplayMode,
       displayMode,
+      toggleEuroView,
+      euroView,
       triggerPricesSync: async () => {
         await triggerGlobalSync({ exchanges: [], wallets: [], pricesOnly: true })
       },
@@ -136,6 +140,8 @@ export function CommandPalette({ open, onClose, role }: CommandPaletteProps) {
       masked,
       toggleDisplayMode,
       displayMode,
+      toggleEuroView,
+      euroView,
       triggerGlobalSync,
       currentPerspective,
       availablePerspectives,

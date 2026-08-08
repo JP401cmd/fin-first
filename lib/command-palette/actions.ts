@@ -5,8 +5,9 @@
 
 import {
   MessageSquare, Eye, EyeOff, RefreshCw, LogOut, User, Users, UserCheck,
-  Layers, PanelTopClose, type LucideIcon,
+  Layers, PanelTopClose, CalendarClock, Wallet, type LucideIcon,
 } from 'lucide-react'
+import type { EuroView } from '@/lib/euro-display'
 import type { ModuleId } from '@/lib/module-registry'
 import type { Perspective, PerspectiveOption } from '@/lib/types/perspective'
 import type { CommandItem, CommandModuleContext } from './types'
@@ -29,6 +30,10 @@ export type ActionRunContext = {
   toggleDisplayMode: () => void
   /** Huidige weergavemodus — bepaalt label "Volledige/Eenvoudige weergave tonen". */
   displayMode: 'simple' | 'full'
+  /** Toggle de profiel-brede euro-weergave (toekomstige ⇄ huidige euro's). */
+  toggleEuroView: () => void
+  /** Huidige euro-weergave — bepaalt het label van de toggle-actie. */
+  euroView: EuroView
   /** Trigger een prices-only sync (geen bank-/exchange-koppelingen vereist). */
   triggerPricesSync: () => Promise<void> | void
   /** Huidig actief perspectief (personal/household/partner). */
@@ -91,6 +96,23 @@ const ACTIONS: ActionDef[] = [
     module: 'globaal',
     build: (ctx) => () => {
       ctx.toggleDisplayMode()
+      ctx.closePalette()
+    },
+  },
+  {
+    // Staat bewust direct onder de weergavemodus-actie: beide zijn profiel-brede
+    // weergavekeuzes die cross-device meereizen.
+    id: 'action:toggle-euro-view',
+    getLabel: (ctx) =>
+      ctx.euroView === 'nominal' ? "Toon huidige euro's" : "Toon toekomstige euro's",
+    getSublabel: (ctx) =>
+      ctx.euroView === 'nominal'
+        ? 'Projecties in koopkracht van vandaag'
+        : 'Projecties in de euro’s van dat jaar',
+    getIcon: (ctx) => (ctx.euroView === 'nominal' ? Wallet : CalendarClock),
+    module: 'globaal',
+    build: (ctx) => () => {
+      ctx.toggleEuroView()
       ctx.closePalette()
     },
   },

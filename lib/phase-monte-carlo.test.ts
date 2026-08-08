@@ -67,6 +67,52 @@ describe('runPhaseMonteCarlo — withdrawal AOW netting (C1)', () => {
   })
 })
 
+describe('runPhaseMonteCarlo — depletie-detectie bij de default targetMinPortfolio', () => {
+  // De succes-toets stond ooit ná `portfolio = Math.max(0, portfolio)`. Daardoor
+  // was `portfolio < 0` per definitie onwaar en gaf de default
+  // targetMinPortfolio = 0 ALTIJD successRate 1 — ook voor een portefeuille die
+  // tot € 0 leegliep. monte-carlo-onttrekken en sorr-analyse lazen die default
+  // rechtstreeks en toonden dus onvoorwaardelijk "slagingskans 100%".
+  const deterministic = {
+    startPortfolio: 100_000,
+    yearsInPhase: 10,
+    expectedReturn: 0.05,
+    volatility: 0, // deterministisch: elke simulatie is identiek
+    inflationRate: 0,
+    currentAge: 67,
+    box3Drag: 0,
+  }
+
+  it('meldt een leeggelopen portefeuille als mislukt (default targetMinPortfolio)', () => {
+    const result = runPhaseMonteCarlo({ ...deterministic, yearlyCashflow: -50_000 })
+    expect(result.medianEndPortfolio).toBe(0) // volledig opgedroogd
+    expect(result.successRate).toBe(0) // ... en dat moet de slagingskans óók zeggen
+  })
+
+  it('houdt een portefeuille die nooit tekortschiet op 100% (default targetMinPortfolio)', () => {
+    const result = runPhaseMonteCarlo({ ...deterministic, yearlyCashflow: -1_000 })
+    expect(result.medianEndPortfolio).toBeGreaterThan(deterministic.startPortfolio)
+    expect(result.successRate).toBe(1)
+  })
+
+  it('laat een positieve targetMinPortfolio ongemoeid (gedragsbehoud)', () => {
+    // Golden gemeten vóór de verplaatsing van de toets: clampen kan een waarde
+    // alleen naar 0 tillen, en 0 ligt altijd onder een positieve drempel — dus
+    // voor targetMinPortfolio > 0 is vóór/ná de clamp per constructie identiek.
+    const result = runPhaseMonteCarlo({
+      startPortfolio: 500_000,
+      yearsInPhase: 20,
+      yearlyCashflow: -30_000,
+      expectedReturn: 0.07,
+      volatility: 0.15,
+      inflationRate: 0.02,
+      currentAge: 60,
+      targetMinPortfolio: 1,
+    }, 200)
+    expect(result.successRate).toBe(0.65)
+  })
+})
+
 describe('findCriticalSWR — AOW netted exactly once (C1)', () => {
   const base = {
     startPortfolio: 200_000,

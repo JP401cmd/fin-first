@@ -22,6 +22,8 @@
     "parity:check": "node scripts/ai-parity/scan.mjs --check",
     "check:client-reads": "node scripts/check-client-data-reads.mjs",
     "uat:stale": "node scripts/uat/stale-scan.mjs",
+    "litert:check": "node scripts/litert/release-check.mjs",
+    "herstelproef:check": "node --env-file=.env.local scripts/herstelproef-check.mjs",
     "db:pull": "npx supabase db pull",
     "db:push": "npx supabase db push",
     "db:diff": "npx supabase db diff",

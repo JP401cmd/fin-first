@@ -1,4 +1,4 @@
-import { Wallet, RefreshCw, Compass, Bell, CheckCircle2, Sparkles, Mail } from 'lucide-react'
+import { Wallet, RefreshCw, Compass, Bell, CheckCircle2, Sparkles, Mail, Gauge } from 'lucide-react'
 
 // ── Temporal Balance levels ──────────────────────────────────────────
 
@@ -158,6 +158,10 @@ export const NOTIFICATION_TYPES = [
   { type: 'horizon', label: 'Toekomst', description: 'FIRE-aandachtspunten en vrijheidswaarschuwingen', icon: Compass },
   { type: 'holding_alert', label: 'Prijs-alerts', description: 'Holdings prijs- en allocatie-alerts', icon: Bell },
   { type: 'briefing', label: 'Briefing', description: 'Je wekelijkse briefing met je vrijheidswinst', icon: Sparkles },
+  // Bewust NIET meeliftend op 'budget': wie budget-alerts uitzet, zet daarmee
+  // niet zijn zelfgekozen uitgavengrenzen uit. Naamneutraal gelabeld, want de
+  // gebruiker kiest zelf hoe dit concept heet (grenzenpot/schaamtepot).
+  { type: 'spend_limit', label: 'Je eigen grenzen', description: 'Als je een zelfgekozen uitgavengrens nadert, overschrijdt of juist volhoudt', icon: Gauge },
 ] as const
 
 /**

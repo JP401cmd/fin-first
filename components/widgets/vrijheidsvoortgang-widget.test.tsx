@@ -3,6 +3,8 @@ import { render, screen } from '@testing-library/react'
 import { VrijheidsvoortgangWidget } from './vrijheidsvoortgang-widget'
 import type { DashboardData } from './widget-renderer'
 import { formatCurrency } from '@/lib/format'
+import { EuroViewProvider } from '@/lib/hooks/use-euro-view'
+import { deflate, factorAtAge } from '@/lib/euro-display'
 
 // Stuurbaar perspectief — default personal (zelfde als buiten de provider).
 const mockPerspective = { perspective: 'personal' as string, partnerName: null as string | null }
@@ -219,6 +221,73 @@ describe('VrijheidsvoortgangWidget — full-size zonder mijlpaal-datumlijstje', 
     expect(screen.getByText('60.0%')).toBeInTheDocument()
     // De gemengde-grondslag delta (bv. de gemelde +19,8%) is verwijderd.
     expect(screen.queryByText(/deze mnd/i)).not.toBeInTheDocument()
+  })
+
+  it('paar-invariant: doel-label en "Nog te gaan" delen de noemer van het getoonde percentage', () => {
+    // Runtime-assertie op de INTERNE consistentie van het voortgangs-paar: het
+    // percentage in de ring, het doel achter "van" en het restbedrag komen uit
+    // één en dezelfde breuk (FIRE-eligible vermogen ÷ doelportfolio). Loopt er
+    // één van de drie op een andere grondslag, dan spreken twee getallen op
+    // hetzelfde vlak elkaar tegen — precies de bevinding die deze fix opheft.
+    const eligible = 300_000
+    const doel = 500_000
+    const pct = (eligible / doel) * 100 // 60,0%
+    const data = makeData({
+      netWorth: eligible,
+      fireEligibleNetWorth: eligible,
+      simRequiredPortfolio: doel,
+      fireTarget: doel,
+      freedomPct: pct,
+      netWorthDelta: null,
+    })
+    const { container } = render(<VrijheidsvoortgangWidget size="full" data={data} />)
+
+    expect(screen.getByText(`${pct.toFixed(1)}%`)).toBeInTheDocument()
+    // Het doel achter "van" is exact de noemer van dat percentage…
+    expect(container.textContent).toContain(formatCurrency(doel))
+    // …en "Nog te gaan" is exact het gat tot diezelfde noemer.
+    expect(container.textContent).toContain(formatCurrency(doel - eligible))
+  })
+
+  it("houdt het paar ook in 'huidige euro's' nominaal — met de grondslag benoemd", () => {
+    // Het doel-label hoort bij de NOMINALE freedomPct-noemer, dus het gaat niet
+    // door `deflate()`. Zou het dat wél doen, dan zou de zichtbare breuk met
+    // exact de FIRE-jaarfactor van de ring afwijken (hier ≈ 1,49×).
+    const doel = 500_000
+    const rows = Array.from({ length: 21 }, (_, k) => ({
+      age: 40 + k,
+      endPortfolio: 0,
+      phase: 'accumulation' as const,
+      flowIn: 0,
+      flowOut: 0,
+      oneTimeNet: 0,
+      inflationFactor: Math.pow(1.02, k),
+    }))
+    const data = makeData({
+      netWorth: 300_000,
+      fireEligibleNetWorth: 300_000,
+      simRequiredPortfolio: doel,
+      fireTarget: doel,
+      freedomPct: 60,
+      fireAgeFractional: 60,
+      simRows: rows as unknown as DashboardData['simRows'],
+    })
+    const gedeflateerd = deflate(
+      doel,
+      factorAtAge(rows.map(r => ({ age: r.age, inflationFactor: r.inflationFactor })), 60),
+      'real',
+    )
+    expect(Math.round(gedeflateerd)).not.toBe(doel)
+
+    const { container } = render(
+      <EuroViewProvider initialView="real">
+        <VrijheidsvoortgangWidget size="full" data={data} />
+      </EuroViewProvider>,
+    )
+    expect(container.textContent).toContain(formatCurrency(doel))
+    expect(container.textContent).not.toContain(formatCurrency(gedeflateerd))
+    // De uitzondering staat er ook voor de lezer bij.
+    expect(container.textContent).toContain("in toekomstige euro's")
   })
 
   it('huishouden-perspectief: geen per-user groei, wel het household-%', () => {

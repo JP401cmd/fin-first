@@ -7,6 +7,15 @@ build/CI-flow (zie `package.json`):
 - `scripts/audit-kpi-actions.mjs` — KPI-/actie-audit.
 - `scripts/copy-pdfjs-worker.mjs` — kopieert de pdf.js-worker (postinstall/build).
 
+Terugkerende, handmatig of via een routine aangeroepen checks (geen build/CI,
+wél onderhouden en getest):
+
+- `scripts/perf/route-sizes.mjs` — bundle-budget per route (`npm run perf:route-sizes`).
+- `scripts/litert/release-check.mjs` — is er een nieuwere `@litert-lm/core` dan
+  onze pin, en noemt de changelog de Adreno-GPU-correctheidsfix?
+  (`npm run litert:check`). Signaleert alleen — heropent de bouwfase van de
+  mobiele lokale AI (L3) nooit zelf; zie de docblock in het script.
+
 Alle overige bestanden zijn ad-hoc probes/one-offs; leun er niet op en commit
 er geen nieuwe met ingebedde keys.
 

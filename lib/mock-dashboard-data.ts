@@ -11,6 +11,25 @@ import type { FeeAnalysis } from '@/lib/fee-analysis'
 
 const months = ['2025-09', '2025-10', '2025-11', '2025-12', '2026-01', '2026-02']
 
+/** Mock-inflatie — één bron voor zowel `inflationRate` als de factorreeks hieronder. */
+const MOCK_INFLATION_RATE = 0.02
+/** Leeftijd waarop de mock-projectie start (= `fireProjBase.currentAge`). */
+const MOCK_START_AGE = 35
+
+/**
+ * Weergave-deflator per mock-projectiejaar — een OPLOPENDE reeks, nooit een rij
+ * enen: met factor 1 overal zou "huidige euro's" op de demo-/widgettestroute stil
+ * uitgeschakeld lijken terwijl de schakelaar wel omgaat.
+ *
+ * Fixture-waarde, geen weergave-berekening — de regel "nooit een eigen `Math.pow`"
+ * geldt voor renderpaden, niet voor de fixture-bron. In productie komt deze factor
+ * uit `UnifiedProjectionRow.inflationFactor` via `HorizonFireSim.unifiedRows`.
+ * Jaar 0 is hier exact 1.0, net als in de kernel.
+ */
+function mockInflationFactor(age: number): number {
+  return Math.pow(1 + MOCK_INFLATION_RATE, age - MOCK_START_AGE)
+}
+
 const fireProjBase = {
   fireTarget: 625000,
   netWorth: 187500,
@@ -150,22 +169,28 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
   freedomMilestones,
   simRows: Array.from({ length: 10 }, (_, i) => {
     const isAccumulation = i < 6
+    const age = MOCK_START_AGE + i * 3
     return {
-      age: 35 + i * 3,
+      age,
       endPortfolio: 187500 + i * 52000,
       phase: i < 6 ? 'opbouw' : i < 8 ? 'transitie' : 'onttrekking',
       flowIn: isAccumulation ? 28000 : 6000,
       flowOut: isAccumulation ? 12000 : 32000,
       oneTimeNet: 0,
+      inflationFactor: mockInflationFactor(age),
     }
   }),
   // Kernel-eindleeftijd (SimResult.displayEndAge) — spiegelt fireEndAge in deze mock.
   displayEndAge: 90,
   // include_full-achtige mock: geprojecteerd VOLLEDIG netto vermogen ≡ endPortfolio.
-  simNetWorthRows: Array.from({ length: 10 }, (_, i) => ({
-    age: 35 + i * 3,
-    netWorth: 187500 + i * 52000,
-  })),
+  simNetWorthRows: Array.from({ length: 10 }, (_, i) => {
+    const age = MOCK_START_AGE + i * 3
+    return {
+      age,
+      netWorth: 187500 + i * 52000,
+      inflationFactor: mockInflationFactor(age),
+    }
+  }),
   simRequiredPortfolio: 580000,
   backtestSuccessRate: 87,
   backtestNamedPaths: [
@@ -346,7 +371,7 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
   weeklyFreedomDaysWon: 3,
   completionRatio: 73,
   willpowerScore: 'B',
-  inflationRate: 0.02,
+  inflationRate: MOCK_INFLATION_RATE,
   grossReturn: 0.07,
   currentAge: 35,
   favoriteHoldings: [

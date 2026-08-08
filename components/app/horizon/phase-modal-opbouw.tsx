@@ -26,6 +26,7 @@ import { PhaseDiscussButton } from '@/components/app/horizon/phase-analysis/phas
 import { RegimeKaart } from '@/components/app/horizon/phase-analysis/regime-kaart'
 import { ReceiptRow } from '@/components/app/horizon/phase-analysis/receipt-row'
 import { formatCurrency } from '@/lib/format'
+import { useEuroView } from '@/lib/hooks/use-euro-view'
 import { DEFAULT_VOLATILITY } from '@/lib/constants'
 import type { UnifiedProjectionRow, AssetBucketDetail } from '@/lib/unified-projection'
 import { ASSET_TYPE_LABELS, type AssetType, type Asset } from '@/lib/asset-data'
@@ -125,11 +126,22 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
   dateOfBirth,
 }: PhaseModalOpbouwProps) {
   const [assumptionsOpen, setAssumptionsOpen] = useState(false)
+  // De weergave komt uit de hook, NOOIT uit een prop: `horizon-client.tsx` geeft
+  // de rekenrijen nominaal en onveranderd door (kruis-regime "rekenrijen", D4),
+  // zodat er hier geen tweede, al gedeflateerde bron kan ontstaan.
+  const { view: euroView } = useEuroView()
 
   // Filter to accumulation phase rows
   const accumulationRows = rows.filter(r => r.phase === 'accumulation')
 
   // ── Waterval-kassabon aggregaten ────────────────────────────────────────
+  // euro-view: klasse C (cumulatief over meerdere jaren) — dit HELE blok blijft
+  // NOMINAAL, inclusief `startVermogen`, `eindVermogen` en de kopregel hieronder.
+  // Reden: `start + inleg + rendement − box3 + events ≈ eind` is een identiteit
+  // over kruis-jaar-sommen. Elke term met zijn eigen jaarfactor delen laat het
+  // verschil in de rij vallen die "Afronding" heet — op 30 jaar is dat geen
+  // afronding maar tienduizenden euro's onder het minst opvallende label. In
+  // 'real' draagt het blok daarom één grondslag-regel i.p.v. gedeelde bedragen.
   const totalInleg = accumulationRows.reduce((sum, r) => sum + r.savings, 0)
   const totalRendement = accumulationRows.reduce((sum, r) => sum + r.totalGrowth, 0)
   const totalBox3 = accumulationRows.reduce((sum, r) => sum + r.totalBox3, 0)
@@ -272,6 +284,9 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
         )}
 
         {/* 2. Fase-header — compact summary line + top-level "Bespreek met Fin" */}
+        {/* euro-view: klasse C — dit is de KOPREGEL van het waterval-identiteitsblok
+            hieronder (start- en eindterm van dezelfde optelling) en blijft daarom
+            in elke weergave nominaal, samen met de kassabon. */}
         <div className="text-center">
           <p className="font-sans text-sm font-bold text-[var(--ink)] sm:text-base">
             Opbouw &middot; {<MaskedAmount value={Math.round(startVermogen)} tone="horizon" />} &rarr; {<MaskedAmount value={Math.round(eindVermogen)} tone="horizon" />} &middot; {yearsAccumulation} jaar
@@ -291,6 +306,11 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
             <p className="mt-0.5 font-sans text-[10px] text-[var(--ink-3)]">
               Opbouwfase &middot; {Math.round(yearsAccumulation)} jaar
             </p>
+            {euroView === 'real' && (
+              <p className="mt-1 font-sans text-[10px] italic text-[var(--ink-3)]">
+                Deze optelling loopt over meerdere jaren en staat in toekomstige euro&rsquo;s.
+              </p>
+            )}
           </div>
 
           {/* Waterval receipt rows */}

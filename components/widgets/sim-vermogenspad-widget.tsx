@@ -1,6 +1,6 @@
 'use client'
 
-import { memo } from 'react'
+import { memo, useMemo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
@@ -8,6 +8,8 @@ import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { useEuroView } from '@/lib/hooks/use-euro-view'
+import { buildFactorByAge, deflateRowsByAge } from '@/lib/euro-display'
 
 interface Props {
   size: WidgetSize
@@ -19,6 +21,21 @@ export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size,
   const { simRows, fireAgeFractional, displayEndAge, backtestSuccessRate } = data
   const { masked } = useMaskedAmounts()
   const { ref, hasEntered } = useInViewAnimation({ duration: 600 })
+
+  // ── EURO-WEERGAVE ─────────────────────────────────────────────────────────
+  // Elk pad-punt is klasse F: een bedrag dat bij ÉÉN projectiejaar hoort, dus
+  // per rij gedeeld door de kernelfactor van díé rij — nooit door één globale
+  // factor (dat zou de curve stelselmatig kantelen). Eén aanroep van de
+  // gedeelde helper i.p.v. per callsite delen: in 'nominal' komt exact dezelfde
+  // array-REFERENTIE terug, dus het beeld en de memo-keten blijven identiek.
+  const { view: euroView } = useEuroView()
+  const viewSimRows = useMemo(() => {
+    if (simRows == null) return simRows
+    const factorByAge = buildFactorByAge(
+      simRows.map(r => ({ age: r.age, inflationFactor: r.inflationFactor ?? 1 })),
+    )
+    return deflateRowsByAge(simRows, factorByAge, ['endPortfolio'], euroView)
+  }, [simRows, euroView])
 
   // Slaagkans-badge — consumeert het canonieke backtest-signaal (`data.backtestSuccessRate`,
   // dezelfde bron als de `backtesting_score`-widget), NIET een lokaal afgeleide drawdown.
@@ -40,8 +57,8 @@ export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size,
 
   // ── Mini-size: FIRE portfolio amount ────────────────────
   if (size === 'mini') {
-    const fireRow = simRows && fireAgeFractional != null
-      ? simRows.find(r => r.age >= fireAgeFractional)
+    const fireRow = viewSimRows && fireAgeFractional != null
+      ? viewSimRows.find(r => r.age >= fireAgeFractional)
       : null
     const firePortfolio = fireRow?.endPortfolio
     return (
@@ -56,7 +73,7 @@ export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size,
     )
   }
 
-  if (!simRows || simRows.length === 0) {
+  if (!viewSimRows || viewSimRows.length === 0) {
     if (size === 'quarter') {
       return (
         <WidgetShell module="horizon" size={size} kicker="Vermogenspad" href={href}>
@@ -76,14 +93,14 @@ export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size,
     const qW = 120
     const qH = 40
     const qPad = 2
-    const qMaxVal = Math.max(...simRows.map(r => r.endPortfolio), 1)
-    const qMinAge = simRows[0].age
-    const qMaxAge = simRows[simRows.length - 1].age
+    const qMaxVal = Math.max(...viewSimRows.map(r => r.endPortfolio), 1)
+    const qMinAge = viewSimRows[0].age
+    const qMaxAge = viewSimRows[viewSimRows.length - 1].age
     const qAgeSpan = qMaxAge - qMinAge || 1
     const qToX = (age: number) => qPad + ((age - qMinAge) / qAgeSpan) * (qW - qPad * 2)
     const qToY = (val: number) => qH - qPad - (Math.max(val, 0) / qMaxVal) * (qH - qPad * 2)
 
-    const accRows = simRows.filter(r => r.phase === 'accumulation')
+    const accRows = viewSimRows.filter(r => r.phase === 'accumulation')
     const qPath = accRows.length > 1
       ? accRows.map((r, i) => `${i === 0 ? 'M' : 'L'}${qToX(r.age).toFixed(1)},${qToY(r.endPortfolio).toFixed(1)}`).join(' ')
       : ''
@@ -132,7 +149,7 @@ export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size,
           </svg>
           <div className="mt-0.5 flex items-center justify-between">
             <p className="text-[var(--ink)]">
-              <MaskedAmount value={simRows[simRows.length - 1].endPortfolio} tone="horizon" className="text-[11px] font-semibold" />
+              <MaskedAmount value={viewSimRows[viewSimRows.length - 1].endPortfolio} tone="horizon" className="text-[11px] font-semibold" />
             </p>
             {fireAgeFractional != null && (
               <p className="text-[10px] text-horizon-600 font-mono font-semibold">
@@ -148,9 +165,9 @@ export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size,
   const W = 240
   const H = size === 'full' ? 80 : 72 // max 80px for full-size SVG constraint
   const pad = 4
-  const maxVal = Math.max(...simRows.map(r => r.endPortfolio), 1)
-  const minAge = simRows[0].age
-  const maxAge = simRows[simRows.length - 1].age
+  const maxVal = Math.max(...viewSimRows.map(r => r.endPortfolio), 1)
+  const minAge = viewSimRows[0].age
+  const maxAge = viewSimRows[viewSimRows.length - 1].age
   const ageSpan = maxAge - minAge || 1
   // Eind-aslabel = kernel-eindleeftijd (SimResult.displayEndAge, wat /horizon toont),
   // niet de hardcoded 90. Fallback op de laatste (reeds geclipte) simRow-leeftijd voor
@@ -160,10 +177,10 @@ export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size,
   const toX = (age: number) => pad + ((age - minAge) / ageSpan) * (W - pad * 2)
   const toY = (val: number) => H - pad - (Math.max(val, 0) / maxVal) * (H - pad * 2)
 
-  const accumulationRows = simRows.filter(r => r.phase === 'accumulation')
-  const retirementRows = simRows.filter(r => r.phase === 'retirement')
+  const accumulationRows = viewSimRows.filter(r => r.phase === 'accumulation')
+  const retirementRows = viewSimRows.filter(r => r.phase === 'retirement')
 
-  const buildPath = (rows: typeof simRows) => {
+  const buildPath = (rows: NonNullable<typeof viewSimRows>) => {
     if (rows.length === 0) return ''
     return rows.map((r, i) => `${i === 0 ? 'M' : 'L'}${toX(r.age).toFixed(1)},${toY(r.endPortfolio).toFixed(1)}`).join(' ')
   }

@@ -17,8 +17,10 @@ import { useState, useMemo, useEffect } from 'react'
 import { Bot, X, BookmarkCheck } from 'lucide-react'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { createClient } from '@/lib/supabase/client'
-import { formatCurrency } from '@/lib/format'
-import type { CancellationMetadata } from '@/lib/cancellation-types'
+import {
+  buildCancellationActionDescription,
+  type CancellationMetadata,
+} from '@/lib/cancellation-types'
 import { MaskedAmount } from '@/components/app/masked-amount'
 
 type SubscriptionItem = {
@@ -138,7 +140,10 @@ ${nameVal}`
           source: 'manual',
           status: 'open',
           title: `Afronden van opzeggen ${subscription.name} abonnement`,
-          description: `Opzegbrief klaargezet voor ${subscription.name} (${formatCurrency(subscription.monthlyAmount)}/mnd). Open deze actie om de opzegging af te ronden.`,
+          // Bedrag NIET in de omschrijving bakken — het staat apart in
+          // euro_impact_monthly + metadata.monthly_amount en wordt live
+          // (en dus maskeerbaar) gerenderd op de actiekaart.
+          description: buildCancellationActionDescription(subscription.name),
           freedom_days_impact: 0,
           euro_impact_monthly: subscription.monthlyAmount,
           metadata,

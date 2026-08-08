@@ -17,6 +17,7 @@ import { SimChart } from '@/components/app/horizon/sim-chart'
 import { ZoomableChartContainer } from '@/components/app/horizon/zoomable-chart-container'
 import { GrafiekUitlegWalkthrough } from '@/components/app/horizon/grafiek-uitleg/grafiek-uitleg-walkthrough'
 import { formatCurrency, formatWithFreedom, dailyExpenseRate } from '@/lib/format'
+import { useEuroView } from '@/lib/hooks/use-euro-view'
 import { formatFireAge } from '@/lib/horizon-data'
 import type { SimResult, SimCashflow } from '@/lib/fire-simulation'
 import type { UnifiedProjectionRow } from '@/lib/unified-projection'
@@ -125,6 +126,14 @@ export const SimChartModal = memo(function SimChartModal({
   const [tableExpanded, setTableExpanded] = useState(false)
   // "Onder de motorkap" — technische onderbouwing, default ingeklapt (verhaal voorop).
   const [motorkapExpanded, setMotorkapExpanded] = useState(false)
+  // euro-view: dit oppervlak is de ONDERBOUWING van de simulatie zoals de kernel
+  // hem rekent — nominaal-throughout (ADR 0032). Elk bedrag hieronder hoort bij
+  // die berekening: de invoerparameters, de jaar-op-jaar tabel en de formules
+  // ("Portfolio sluit op €X (geïndexeerd)"). Deflateren zou de onderbouwing niet
+  // meer laten kloppen met de motor die eronder draait. Dit component doet dus
+  // GEEN eigen deflatie; het toont in 'real' één grondslag-regel zodat de
+  // paginabadge op /toekomst nergens liegt (D11: uitzonderingen dragen een noot).
+  const { view: euroView } = useEuroView()
 
   if (!simResult) return null
 
@@ -171,6 +180,9 @@ export const SimChartModal = memo(function SimChartModal({
                   forModal
                   strategy={strategy}
                   targetEndPortfolio={targetEndPortfolio}
+                  // euro-view: exempt — nominale bron van de meegroeiende doellijn.
+                  // Deze grafiek hoort bij de onderbouwing hierboven en toont dus
+                  // dezelfde nominale ruimte als de kassabon; geen omzetting.
                   targetInflationFactors={unifiedRows?.map(r => ({ age: r.age, factor: r.inflationFactor }))}
                   visibleMinAge={visibleMin}
                   visibleMaxAge={visibleMax}
@@ -241,6 +253,11 @@ export const SimChartModal = memo(function SimChartModal({
                   : `vaste onttrekking \u00b7 einddatum leeftijd ${displayEndAge}`
                 : `einddatum leeftijd ${displayEndAge}`}
             </p>
+            {euroView === 'real' && (
+              <p className="mt-1 font-sans text-[10px] italic text-[var(--ink-3)]">
+                Deze onderbouwing volgt de simulatie en staat in toekomstige euro&rsquo;s.
+              </p>
+            )}
           </div>
 
           {/* Uitleg */}

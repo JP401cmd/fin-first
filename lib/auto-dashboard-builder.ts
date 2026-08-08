@@ -318,10 +318,14 @@ function pickSmallestFittingSize(
   return null
 }
 
-/** Look up allowed sizes for a widget (handles budget_fav:* and holding_fav:* dynamically) */
+/** Look up allowed sizes for a widget (handles budget_fav:*, holding_fav:* and spend_limit:* dynamically) */
 function lookupSizes(id: string, catalog: WidgetDef[]): WidgetSize[] {
   if (id.startsWith('budget_fav:')) return ['quarter', 'half', 'full']
   if (id.startsWith('holding_fav:')) return ['quarter', 'half', 'full']
+  // De auto-builder vult een raster met quarter/half/full-blokken; xl doet hier
+  // niet mee (net als bij de favorieten), maar de tak moet bestaan zodat een
+  // grenzenpot-widget niet op de generieke fallback belandt.
+  if (id.startsWith('spend_limit:')) return ['quarter', 'half', 'full']
   const def = catalog.find(w => w.id === id)
   return def?.sizes ?? ['quarter', 'half', 'full']
 }

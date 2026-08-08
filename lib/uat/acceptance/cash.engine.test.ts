@@ -71,7 +71,7 @@ function criterion(workflow: string): AcceptanceCriterion {
 }
 
 describe('UAT Cash — acceptatiecriteria dekking', () => {
-  it('heeft precies één criterium per catalogus-CASH-scenario (01..51, geen gaten)', () => {
+  it('heeft precies één criterium per catalogus-CASH-scenario (01..54, geen gaten)', () => {
     const workflows = CASH_ACCEPTANCE.criteria.map((c) => c.workflow).sort()
     expect(workflows).toEqual(catalogCashWorkflows)
     expect(new Set(workflows).size).toBe(catalogCashWorkflows.length)
@@ -107,7 +107,10 @@ describe('UAT Cash — acceptatiecriteria dekking', () => {
     // alleen-op-gebruikersopdracht.md) — WF-CASH-52 (betaalrekening
     // verwijderen: bewaren archiveert, verwijderen wist, atomaire
     // ontkoppeling/opschoning via public.delete_bank_account).
-    expect(workflows.length).toBe(52)
+    // 52 → 54: grenzenpotten fase 2-5 (ADR 0089/0092, requirement-delta 8 aug
+    // 2026) — WF-CASH-53 (motor, 'exact') en WF-CASH-54 (beheren/pane/widget/
+    // preview/alias/meldingen, 'ui-only' — persona-jitter sluit 'exact' uit).
+    expect(workflows.length).toBe(54)
   })
 
   it('elk criterium heeft een geldige assertion.kind', () => {
@@ -168,7 +171,13 @@ describe('UAT Cash — acceptatiecriteria dekking', () => {
     // nieuw oppervlak app/(app)/overzicht/cashflow/page.tsx) — WF-CASH-51
     // (buildCashflowCards, échte productiefunctie op literaire invoer) is
     // 'exact' en krijgt een CASH_ENGINE_CHECKS-rij.
-    expect(exactWorkflows.length).toBe(31)
+    // 31 → 32: grenzenpotten fase 2-5 (ADR 0089/0092) — WF-CASH-53
+    // (resolveSpendLimitPeriods/computePeriodOutcome/computeStreaks/
+    // computeSpendLimitTrend/spendLimitCounterpartyKey, echte productiefuncties
+    // op synthetische invoer) is 'exact' en krijgt een CASH_ENGINE_CHECKS-rij;
+    // WF-CASH-54 (beheren/pane/widget/preview/alias/meldingen) blijft
+    // 'ui-only' — persona-jitter sluit 'exact' uit voor dat criterium.
+    expect(exactWorkflows.length).toBe(32)
   })
 
   it('markeert de jitter-gebonden/AI/gebonden randgevallen met de juiste kind', () => {

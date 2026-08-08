@@ -1,8 +1,15 @@
 /**
  * Acceptatiecriteria — domein KRUIS (cross-module consistentie & doorwerking,
- * UAT-KRUIS-01..26). Bron: `docs/uat/uat-plan.md` Deel 1 (WF-KRUIS-01..25) + Deel 2
+ * UAT-KRUIS-01..27). Bron: `docs/uat/uat-plan.md` Deel 1 (WF-KRUIS-01..25) + Deel 2
  * §2.8 (de uitgeschreven scenario's) + de SSoT-tabel bovenaan §2.8 die per
  * kerngetal de canonieke bron aanwijst.
+ *
+ * UAT-KRUIS-27 (euro-weergave, wave 2/3) is NIEUW t.o.v. het UAT-plan —
+ * toegevoegd voor de euro-weergave-uitrol (Notion-kaart
+ * 39cf9e8d-568a-80fb-8a99-e090c080b964, brok H): één FIRE-doelbedrag,
+ * identiek gedeflateerd op TOEK/OVZ/NAV. `kind: 'consistency'` (géén
+ * engine-check in kruis-checks.ts — de drie oppervlakken zelf zijn de toets,
+ * niet één geïsoleerde formule).
  *
  * KERNCONVENTIE (de "consume, don't recompute"-regel uit CLAUDE.md als toets):
  * KRUIS bewijst NIET één pagina, maar de belofte dat HETZELFDE kerngetal overal
@@ -410,6 +417,20 @@ const criteria: AcceptanceCriterion[] = [
       source: 'consistentie-eis: end-to-end reis houdt elk kerngetal consistent over alle haltes (de gecombineerde SSoT-bronnen van WF-KRUIS-01..24); mutaties alleen via expliciete bron-acties.',
     },
   },
+  {
+    workflow: 'WF-KRUIS-27',
+    scenarioId: 'UAT-KRUIS-27',
+    titel: "Consistentie: hetzelfde FIRE-doel identiek gedeflateerd op /toekomst-hero, /overzicht-widget en mini-chart-label",
+    kriticiteit: 'KERN',
+    persona: 'willem',
+    given: "Euro-weergave op 'real' (Notion-kaart 39cf9e8d-568a-80fb-8a99-e090c080b964, brok B/F/H). Eén canonieke deflator per leeftijd (`lib/euro-display.ts#buildFactorByAge`, gevoed uit dezelfde kernelrijen — géén tweede bron, D1).",
+    when: 'De gebruiker leest het gedeflateerde FIRE-doelbedrag achtereenvolgens op de /toekomst-hero (brok B, `sim-chart.tsx`-props via `horizon-client.tsx`), op de /overzicht-widget (brok F, o.a. `vrijheidsvoortgang-widget.tsx`) en op het mini-chart-/palette-label-oppervlak (`lib/command-palette/actions.ts#buildActionItems` + `EuroViewBadge`).',
+    then: 'Het getoonde bedrag is op de drie oppervlakken identiek tot op afronding — dezelfde `deflate(fireTarget, factorAtAge(unifiedRows, fireAge), \'real\')`-aanroep op dezelfde kernelrijen, nooit een tweede/eigen herberekening per widget (NFR-X1/X2). Dit is de kern-eis van AC-F4/T13: zonder deze rij kunnen drie oppervlakken elk voor zich "groen" zijn en toch onderling verschillen.',
+    assertion: {
+      kind: 'consistency',
+      source: 'components/app/horizon/horizon-client.tsx (TOEK-hero, brok B) + components/widgets/vrijheidsvoortgang-widget.tsx (OVZ-widget, brok F) + lib/command-palette/actions.ts#buildActionItems (badge-/label-oppervlak, NAV) — alle drie consumeren lib/euro-display.ts#deflate, geen eigen berekening; kruisZones = TOEK/OVZ/NAV (catalog.ts)',
+    },
+  },
 ]
 
 export const KRUIS_ACCEPTANCE: AcceptanceSet = {
@@ -419,8 +440,8 @@ export const KRUIS_ACCEPTANCE: AcceptanceSet = {
 
 /**
  * De KRUIS-scenario-nummers die een acceptatiecriterium HOREN te hebben — de
- * catalogus dekt UAT-KRUIS-01..26 (25 = AI-tier-gate; 26 = nieuwe volledige
- * gebruikersreis, catalog `wf: null`, hier als synthetisch WF-KRUIS-26). Gebruikt
- * door de dekkings-meta-test.
+ * catalogus dekt UAT-KRUIS-01..27 (25 = AI-tier-gate; 26 = nieuwe volledige
+ * gebruikersreis, catalog `wf: null`, hier als synthetisch WF-KRUIS-26; 27 =
+ * euro-weergave-consistentie, wave 2/3). Gebruikt door de dekkings-meta-test.
  */
-export const KRUIS_EXPECTED_WORKFLOW_NUMBERS: number[] = Array.from({ length: 26 }, (_, i) => i + 1)
+export const KRUIS_EXPECTED_WORKFLOW_NUMBERS: number[] = Array.from({ length: 27 }, (_, i) => i + 1)

@@ -4,11 +4,12 @@ import {
   MarketingPageShell,
   MarketingSection,
 } from '@/components/landing/marketing-page-shell'
+import { LegalEmail } from '@/components/legal/legal-email'
 
 export const metadata: Metadata = {
   title: 'Contact — TriFinity',
   description:
-    'Neem contact op met TriFinity. E-mail is het snelste kanaal voor vragen over je privé-account, je gegevens of de app.',
+    'Contact met TriFinity. De app zit in een besloten testfase; het publieke e-mailadres volgt zodra TriFinity een eigen internetdomein heeft.',
 }
 
 export default function ContactPage() {
@@ -16,29 +17,33 @@ export default function ContactPage() {
     <MarketingPageShell kicker="Neem contact op" title="We horen graag van je">
       <MarketingSection>
         <p>
-          Vragen, feedback of een verzoek over je gegevens? E-mail is ons
-          primaire en snelste kanaal. Laat weten waar je tegenaan loopt, dan
-          helpen we je verder.
+          Vragen, feedback of een verzoek over je gegevens? TriFinity zit in een
+          besloten testfase en heeft nog geen eigen internetdomein. Daarom staat
+          hier nog geen e-mailadres: we noemen liever geen mailbox die vandaag
+          geen post kan ontvangen. Zodra het domein er is, vind je het adres
+          hier.
         </p>
       </MarketingSection>
 
       <MarketingSection heading="E-mail">
-        <a
-          href="mailto:support@trifinity.nl"
-          className="inline-flex items-center gap-3 rounded-[var(--r-lg)] border border-[var(--border-md)] bg-[var(--paper)] px-5 py-4 transition-all hover:border-[var(--ink-3)] hover:shadow-[var(--s0)]"
-        >
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)]">
-            <Mail className="h-4 w-4 text-[var(--ink-2)]" aria-hidden="true" />
+        <div className="inline-flex items-center gap-3 rounded-[var(--r-lg)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)] px-5 py-4">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)]">
+            <Mail className="h-4 w-4 text-[var(--ink-3)]" aria-hidden="true" />
           </span>
           <span>
             <span className="block font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink-3)]">
-              Stuur een bericht
+              Nog niet beschikbaar
             </span>
-            <span className="block font-mono text-base text-[var(--ink)]">
-              support@trifinity.nl
+            <span className="block font-mono text-base text-[var(--ink-3)]">
+              <LegalEmail kind="support" />
             </span>
           </span>
-        </a>
+        </div>
+        <p>
+          Doe je mee aan de besloten testfase? Gebruik dan het kanaal waarlangs
+          je je uitnodiging hebt gekregen — dat is op dit moment de snelste weg
+          naar ons.
+        </p>
       </MarketingSection>
 
       <MarketingSection heading="Waarvoor je terecht kunt">
@@ -48,13 +53,8 @@ export default function ContactPage() {
           </li>
           <li className="border-l-2 border-[var(--border-md)] pl-4">
             AVG-verzoeken: inzage, correctie, export of verwijdering van je
-            gegevens — mail hiervoor{' '}
-            <a
-              href="mailto:privacy@trifinity.nl"
-              className="font-semibold text-kern-700 underline hover:text-kern-800"
-            >
-              privacy@trifinity.nl
-            </a>{' '}
+            gegevens — inzage, export en verwijdering doe je zelf in de app; voor
+            alles daarbuiten geldt hetzelfde tijdelijke kanaal als hierboven
             (zie ook onze{' '}
             <a
               href="/privacy"

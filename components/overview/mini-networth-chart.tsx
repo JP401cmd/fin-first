@@ -4,6 +4,10 @@ import { memo, useId, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+import { useEuroView } from '@/lib/hooks/use-euro-view'
+import { deflate, factorAtAge } from '@/lib/euro-display'
+import { fireAgeForDisplay } from '@/lib/fire-strategy'
+import { EuroViewBadge } from '@/components/core/euro-view-badge'
 import { computeConfidenceBand } from '@/lib/confidence-band'
 import { SubtotalLine } from '@/components/editorial/subtotal-line'
 import { NetWorthHistorySheet, type HistoryPoint } from './networth-history-sheet'
@@ -79,8 +83,14 @@ function MiniNetWorthChartComponent({
    * niet-liquide assets) uit de loader (`DashboardData.simNetWorthRows`).
    * Wanneer aanwezig: de chart gebruikt deze waardes 1:1 — continu met het
    * Vandaag-punt. Wanneer afwezig (sim mislukt op server): empty-state-CTA.
+   *
+   * GRONDSLAG (ADR 0090): `netWorth` is NOMINAAL en al her-ankerd op het
+   * Vandaag-punt; `inflationFactor` is de canonieke weergave-deflator van
+   * diezelfde kernelrij (jaar 0 = 1.0). OPTIONEEL — mock-/oudere bundels
+   * dragen hem niet; consumeer met `?? 1` (= geen deflatie), nooit met een
+   * zelfberekende `Math.pow`.
    */
-  simNetWorthRows?: { age: number; netWorth: number }[] | null
+  simNetWorthRows?: { age: number; netWorth: number; inflationFactor?: number }[] | null
   /**
    * Vereist FIRE-portfolio bij vrijheidsmoment uit de simulatie — het LIQUIDE
    * vrijheidsdoel (€). Bewust APART van de netto-vermogen-as: het wordt als los
@@ -119,6 +129,10 @@ function MiniNetWorthChartComponent({
   // Hooks vóór elke early-return aangeroepen (rules-of-hooks). De numerieke
   // chart-coördinaten blijven ongemoeid; alleen de zichtbare bedrag-tekst maskt.
   const { masked } = useMaskedAmounts()
+  // Euro-weergave: 'nominal' (= exact het huidige beeld) of 'real' (koopkracht
+  // van vandaag). Buiten een EuroViewProvider valt de hook terug op 'nominal',
+  // dus bestaande tests en oppervlakken zonder provider blijven byte-identiek.
+  const { view: euroView } = useEuroView()
   const [historyOpen, setHistoryOpen] = useState(false)
   // Unieke gradient-id per instantie — voorkomt botsende SVG-defs wanneer
   // de chart meermaals op één pagina staat.
@@ -175,9 +189,22 @@ function MiniNetWorthChartComponent({
     )
     const anchorOffset =
       projRowsInRange.length > 0 ? currentNetWorth - projRowsInRange[0].netWorth : 0
+    // ── EURO-WEERGAVE — D7-volgorde (hard, niet onderhandelbaar) ─────────────
+    // Eerst her-ankeren in NOMINALE ruimte, DAARNA pas delen door de rij-eigen
+    // kernelfactor. Andersom (eerst delen, dan ankeren) verschuift het
+    // Vandaag-punt: de offset is in nominale euro's uitgedrukt en zou dan door
+    // een factor gedeeld worden die niet bij hem hoort. Jaar 0 draagt factor
+    // 1.0, dus in beide views valt het eerste projectiepunt exact samen met het
+    // Vandaag-punt — dát is wat de naad historie↔projectie knikvrij houdt.
     const projection: { age: number; value: number }[] = [
+      // euro-view: exempt — het Vandaag-punt is GEREALISEERD vermogen
+      // (currentNetWorth) en staat dus per definitie al in euro's van vandaag.
+      // Nooit delen (D12); dat zou de naad juist een knik geven.
       { age: startAge, value: currentNetWorth },
-      ...projRowsInRange.map((r) => ({ age: r.age, value: r.netWorth + anchorOffset })),
+      ...projRowsInRange.map((r) => ({
+        age: r.age,
+        value: deflate(r.netWorth + anchorOffset, r.inflationFactor ?? 1, euroView),
+      })),
     ]
     // Dedupe identieke leeftijden (currentAge kan al in simRows zitten);
     // hou de eerste — currentNetWorth is de waarheid voor vandaag.
@@ -198,6 +225,11 @@ function MiniNetWorthChartComponent({
     const endLabel = isPensioenMode ? 'Pensioen' : 'Vrijheid'
 
     // ── Historie: minimaal 3 maanden ─────────────────────────────────
+    // euro-view: exempt — alles links van Vandaag is GEREALISEERD vermogen en
+    // staat al in euro's van (ongeveer) vandaag; er is geen kernelrij en dus
+    // geen canonieke deflator voor het verleden (D12). Ook het geschatte
+    // back-cast-segment blijft nominaal: het is een terugrekening op het
+    // spaarritme, geen projectie in toekomstige euro's.
     // Echte waarderingen (max 12 maanden, bron = net_worth_snapshots) als
     // werkelijkheid. Zijn er minder dan 3, dan vullen we de oudere maanden
     // aan met een GESCHAT verloop: back-cast vanaf het oudste bekende punt
@@ -426,6 +458,7 @@ function MiniNetWorthChartComponent({
     isPensioenMode,
     simNetWorthRows,
     monthlySavings,
+    euroView,
   ])
 
   if (geometry === null) {
@@ -476,16 +509,50 @@ function MiniNetWorthChartComponent({
   // Liquide vrijheidsdoel (€) — APART, expliciet gelabeld. Niet op de as.
   // Blijft in de body: hangt af van de privacy-toggle (`masked`), niet van de
   // geometrie.
+  //
+  // euro-view: klasse S (FIRE-leeftijd). Dit is hetzelfde bedrag dat /toekomst
+  // als `fireTarget` toont (simResult.requiredFirePortfolio), dus het MOET met
+  // dezelfde deflator omgezet worden: de kernelfactor op de vrijheidsleeftijd,
+  // niet een generieke "factor van nu". Dat is precies wat UAT-KRUIS-27 /
+  // AC-F4 bewaakt — twee oppervlakken, één bedrag, één deflator.
+  //
+  // LEEFTIJDSBRON: de lookup loopt door de canonieke weergave-seam
+  // `fireAgeForDisplay` (= Math.round), net als op /toekomst. De kernelrijen
+  // staan op hele leeftijden en `factorAtAge` pakt de dichtstbijzijnde rij —
+  // waarbij een leeftijd exact op .5 naar BENEDEN valt (eerste kleinste afstand
+  // wint) terwijl afronden naar BOVEN gaat. Zonder deze normalisatie hangt de
+  // gekozen factor-rij dus af van of de aanroeper een fractionele of een al
+  // afgeronde leeftijd doorgeeft, en lezen /overzicht en /toekomst hetzelfde
+  // doelbedrag met een andere deflator. De marker-/astekst blijft ongemoeid:
+  // die gebruikt `fireAge` zoals binnengekomen.
+  const freedomTargetFactor = factorAtAge(
+    (simNetWorthRows ?? []).map((r) => ({ age: r.age, inflationFactor: r.inflationFactor ?? 1 })),
+    fireAgeForDisplay(fireAge),
+  )
+  const viewSimRequiredPortfolio =
+    simRequiredPortfolio == null
+      ? null
+      : deflate(simRequiredPortfolio, freedomTargetFactor, euroView)
   const freedomTargetLabel =
-    !fireReached && simRequiredPortfolio != null && simRequiredPortfolio > 0
-      ? `Vrijheidsdoel ${formatMaskedCurrency(simRequiredPortfolio, masked)} liquide`
+    !fireReached && viewSimRequiredPortfolio != null && viewSimRequiredPortfolio > 0
+      ? `Vrijheidsdoel ${formatMaskedCurrency(viewSimRequiredPortfolio, masked)} liquide`
       : null
 
   return (
     <div className="flex flex-col rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-3 sm:p-4 transition-all h-full">
       <header className="mb-2 flex items-baseline justify-between gap-3">
-        <span className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
-          Netto vermogen door de tijd
+        <span className="flex items-center gap-2 min-w-0">
+          <span className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
+            Netto vermogen door de tijd
+          </span>
+          {/* De ÉNE euro-weergave-badge van /overzicht (D11). Bewust hier, inline
+              in de hero-band, en NIET in de absolute header-controls-stack: die
+              reeks ligt vast op `i` right-4 · statuspunt right-[52px] ·
+              insight-toggle right-[84px] (CLAUDE.md) en een vierde control zou
+              'm breken. In 'nominal' rendert de badge `null` — geen ruis op het
+              standaardbeeld. De widgets eronder dragen bewust géén eigen badge;
+              acht badges naast elkaar is ruis, deze ene geldt paginabreed. */}
+          <EuroViewBadge className="shrink-0" />
         </span>
         <span className="text-xs font-mono tabular-nums text-[var(--ink-3)]">
           {fireReached

@@ -9,9 +9,10 @@
  *
  * WILL is — net als SCHULD/TOEK — NIET aaneengesloten op WF-nummer: WF-WILL-21/22
  * hebben geen eigen UAT-WILL-scenario (→ gedekt door UAT-OVZ-19/20/21) en
- * ontbreken dus terecht in de catalogus voor zone WILL. De 21 criteria hier
+ * ontbreken dus terecht in de catalogus voor zone WILL. De 22 criteria hier
  * zijn wél 1-op-1 met de catalogus-scenario's UAT-WILL-01..20 + UAT-WILL-23
- * (lokaal actievoorstel, backlog #886 C2c).
+ * (lokaal actievoorstel, backlog #886 C2c) + UAT-WILL-24 (melding maken vanuit
+ * de chat, release 8 aug 2026).
  */
 
 import { describe, it, expect } from 'vitest'
@@ -40,11 +41,11 @@ function criterion(workflow: string): AcceptanceCriterion {
 }
 
 describe('UAT Fin — acceptatiecriteria dekking', () => {
-  it('heeft precies één criterium per catalogus-WILL-scenario (21 stuks: 01..20 + 23, WF-WILL-21/22 bestaan niet in de catalogus)', () => {
+  it('heeft precies één criterium per catalogus-WILL-scenario (22 stuks: 01..20 + 23 + 24, WF-WILL-21/22 bestaan niet in de catalogus)', () => {
     const workflows = WILL_ACCEPTANCE.criteria.map((c) => c.workflow).sort()
     expect(workflows).toEqual(catalogWillWorkflows)
     expect(new Set(workflows).size).toBe(catalogWillWorkflows.length)
-    expect(workflows.length).toBe(21)
+    expect(workflows.length).toBe(22)
   })
 
   it('elk criterium heeft een geldige assertion.kind', () => {

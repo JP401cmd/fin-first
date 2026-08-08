@@ -18,6 +18,10 @@ interface KoopkrachtErosieProps {
 
 // ── Component ────────────────────────────────────────────────────────────────
 
+// euro-view: exempt — deze analyse zet nominaal NAAST reëel; het verschil tussen
+// die twee is precies wat ze laat zien. Ze volgt daarom niet de globale
+// euro-weergave (die zou één van beide kanten van de vergelijking wegnemen).
+
 /**
  * Koopkrachterosie analyse: shows the difference between nominal and real
  * (inflation-adjusted) portfolio value over the accumulation phase.

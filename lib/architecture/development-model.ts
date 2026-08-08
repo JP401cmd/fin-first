@@ -1,8 +1,11 @@
 // ── Development-view: het Claude-team van TriFinity ──────────────────────────
-// De /beheer/development-pagina laat zien hoe dit project gebouwd wordt: welke
-// gespecialiseerde subagents er zijn en welke skill-pijplijnen ze in volgorde
-// inzetten. Eén principe (net als de architectuurplaat): *feiten gescand,
-// betekenis gecureerd, zelf-actualiserend*.
+// Toont hoe dit project gebouwd wordt: welke gespecialiseerde subagents er zijn
+// en welke skill-pijplijnen ze in volgorde inzetten. Eén principe (net als de
+// architectuurplaat): *feiten gescand, betekenis gecureerd, zelf-actualiserend*.
+//
+// Leesvorm: de teamplaat op de org-site (trifinity-org/site/team.html), die dit
+// bestand letterlijk parseert. Het in-app venster /beheer/development is per
+// besluit 02 (aug 2026) verwijderd; de curatie-gate hieronder bleef bestaan.
 //
 //   FEITEN   — scripts/architecture/generate.mjs → architecture.json.claudeTeam
 //              (agents + skills + pijplijn-stappen, rechtstreeks van .claude/)
@@ -88,6 +91,11 @@ export const SKILL_CURATION: Record<string, SkillCuration> = {
     kind: 'pijplijn',
     tagline: 'Stuur het gedrag van de AI bij — een evaluatie-loop van voorbeelden naar chirurgische prompt-aanpassing.',
   },
+  schemawijziging: {
+    kind: 'pijplijn',
+    tagline:
+      'Migratie, RLS-policy of backfill doorvoeren zonder stil een bedrag of een grens te verschuiven — met een vangnet vooraf, een leak-check op eigenaar én anon, DDL gescheiden van backfill, en de terugweg vóóraf opgeschreven (append-only: corrigeren gebeurt vooruit).',
+  },
   // tooling
   'lokale-prompt-parity': {
     kind: 'tooling',
@@ -121,6 +129,11 @@ export const SKILL_CURATION: Record<string, SkillCuration> = {
     kind: 'tooling',
     tagline: 'Kwartaaloefening die bewijst dat een back-up echt terug te zetten is: naar een aparte omgeving, met controlepunten tot op bedrag-niveau en een geklokte hersteltijd — een ongeteste back-up is geen back-up.',
   },
+  'change-request': {
+    kind: 'tooling',
+    tagline:
+      'De poort voor wijzigingen die een PR-diff niet toont — een cron, een env-var, third-party-config, een handmatige productie-actie: vier vragen vooraf (wat, wat als het misgaat, hoe zie je het, hoe terug) en één aantekening in het runbook, omdat Vercel op push deployt (ADR 0066).',
+  },
   verwerkersregister: {
     kind: 'tooling',
     tagline: 'Wie verwerkt wat en op welke grond: nieuwe dienst éérst in het register, kwartaalcontrole naast de BTW-administratie, per verwerker gegevens, doel, grondslag en overeenkomst.',
@@ -128,6 +141,56 @@ export const SKILL_CURATION: Record<string, SkillCuration> = {
   'compliance-check': {
     kind: 'tooling',
     tagline: 'De Wft/AVG-poort vóór elke publieke uiting, AI-wijziging en SEO-pagina: inzicht mag, vergunningsplichtig advies niet — plus de claimlijst, en altijd een beslisbare uitkomst (goedkeuren · aanpassen · afwijzen).',
+  },
+  'fiscale-wijzigingslog': {
+    kind: 'tooling',
+    tagline:
+      'De wacht op fiscale wijzigingen die de rekenkern stil onwaar maken: kijken op de wetgevingskalender (Prinsjesdag, Box 3 richting 2028), vastleggen met bron en status, en vier plekken die meebewegen — BOX3_PARAMS, de afgeleiden, de Berekeningen-curatie en de bewijslast — elk met een ADR.',
+  },
+  'legal-risk-assessment': {
+    kind: 'tooling',
+    tagline:
+      'Risico wegen vóór publicatie of na een incident, juist waar geen procedure past: kans × gevolg, de terugvaloptie, en de grens waarboven een jurist erbij moet — uitkomst als bedrijfsbesluit in Notion, niet in een spec.',
+  },
+  'juridische-brief': {
+    kind: 'tooling',
+    tagline:
+      'Eén pagina die een juridisch punt beslisbaar maakt — de vraag, de opties, het gevolg per optie — en tevens het verplichte formaat voor de wijzigingsaantekening bij /privacy, /voorwaarden en /wft.',
+  },
+  'legal-response': {
+    kind: 'tooling',
+    tagline:
+      'De tekst voor een externe vraag, klacht of verzoek — bovenop de bestaande machinerie (avg-verzoek + export-/verwijder-API), in de merkstem en binnen de Wft-grens; nooit een tweede afhandelproces.',
+  },
+  'content-creation': {
+    kind: 'tooling',
+    tagline:
+      'Publieke stukken maken — landingcopy, /nieuws en de briefing-mail — in twee modi (volledig of snel concept op briefing), met de compliance-poort vóór publicatie en toon, claims en ontwerp uit hun canonieke bronnen in plaats van opnieuw opgeschreven.',
+  },
+  'competitive-brief': {
+    kind: 'tooling',
+    tagline:
+      'Wat de anderen beloven en vooral waar zij zwijgen: de uitkomst is niet een opsomming maar het gat — de decumulatiekant en de vertaling van bedragen naar tijd, waar de Nederlandse markt ophoudt.',
+  },
+  'ticket-triage': {
+    kind: 'tooling',
+    tagline:
+      'De stapel meldingen ordenen: ontdubbelen, module en ernst zetten, één uitgang kiezen en de melder iets laten horen — met de AVG- en lek-klokken vooraan (die lopen vanaf kennisname) en de regel dat een verkeerd bedrag altijd het hoogste niveau is. Ritme en uitgangen staan in het beheerders-runbook.',
+  },
+  'seo-pagina': {
+    kind: 'tooling',
+    tagline:
+      'Werkwijze voor een publieke pagina die één zoekvraag volledig beantwoordt: eerst de vraag, dan de tekst, dan de compliance-poort, dan de bouw — met drie harde grenzen (route naar /check, geen contact-belofte tot F1) en de sitemap-registratie die anders stil wordt vergeten.',
+  },
+  'zoekvraag-onderzoek': {
+    kind: 'tooling',
+    tagline:
+      'De onderzoeksstap vóór elke publieke pagina: twee filters over elkaar — wordt de vraag gesteld en slecht beantwoord, en mogen wij hem binnen de Wft-grens beantwoorden — met een register waarin ook de afgewezen vragen blijven staan.',
+  },
+  merkstem: {
+    kind: 'tooling',
+    tagline:
+      'Eén stem over vier oppervlakken (landingcopy, /nieuws + briefing, cloud-DNA, on-device DNA): wijst aan waar toon en claims canoniek staan — base.ts en de claimlijst van compliance-check — in welke volgorde je ze wijzigt, en hoe je drift detecteert met het bestaande parity-mechanisme.',
   },
   'woonstrategie-check': {
     kind: 'tooling',

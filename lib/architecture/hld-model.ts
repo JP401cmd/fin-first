@@ -88,6 +88,7 @@ export function buildHldModel(): HldModel {
           { title: 'Een rekening opruimen die je niet meer gebruikt', desc: 'Verwijder een oude of dubbele rekening en kies zelf wat er met je boekingen gebeurt: bewaren — dan blijven je historie en budgetten van eerdere maanden precies kloppen — of definitief wissen. Een bankkoppeling wordt vanzelf verbroken.' },
           { title: 'Al je uitgaven en inkomsten op een rij', desc: 'Overzichtelijk, met categorieën en grootste posten.' },
           { title: 'Budgetten maken en bewaken', desc: 'Zie per categorie hoeveel je deze maand nog hebt — en als je een transactie tijdens het slepen nergens kwijt kunt, maak je meteen een nieuw budget aan, zonder de sleepmodus te verlaten.' },
+          { title: 'Jezelf een grens stellen op één categorie of winkel', desc: 'Zet een Grenzenpot op een budget of een tegenpartij — bijvoorbeeld maximaal €50 per maand aan tanken, of per kwartaal of jaar als dat beter past. Je ziet per periode hoeveel eroverheen ging, hoeveel ruimte je nog hebt, en hoeveel periodes op rij je binnen je eigen grens bleef — en zie hoe je het doet, ook op je startscherm, met een seintje als je eroverheen gaat. Wil je het liever "Schaamtepot" noemen? Dat kies je zelf. Geen spaardoel, alleen jouw grens.' },
           { title: 'Zien hoeveel je overhoudt', desc: 'Je spaarquote: welk deel van je inkomen je spaart.' },
           { title: 'Je bezittingen en schulden bijhouden', desc: 'Van spaargeld tot huis en hypotheek — je netto vermogen in beeld.' },
           { title: 'Je broker koppelen of je portefeuille importeren', desc: 'Trading 212 koppelen of een bestand inladen — je aandelen en fondsen kloppen automatisch, net als bij je crypto.' },
@@ -113,6 +114,7 @@ export function buildHldModel(): HldModel {
           { title: 'Kant-en-klare paden naast elkaar zien', desc: 'Vijf voorgerekende scenario\'s naast je basispad, met een seintje bij het pad dat de minste buffer overhoudt.' },
           { title: 'Mijn doorgerekende toekomst vastleggen als doel', desc: 'Sta je op een "wat als"-stand die klopt? Maak er met één klik je doelsituatie van — spaarquote, salaris, rendement en vrijheidsleeftijd worden echte doelen die meegroeien met je cijfers, terug te vinden bij je doelen.' },
           { title: 'Je hele plan als één deelbaar document', desc: 'Het totaalplan bundelt je aannames, je vermogensprojectie naar volledige vrijheid, de slagingskans onder marktschommelingen en concrete inzichten in één rapport — deelbaar als PDF met je partner of adviseur, met alle cijfers uit dezelfde rekenmotor als Toekomst en Overzicht.' },
+          { title: 'Zien wat een toekomstig bedrag vandaag waard is', desc: 'Zet je grafiek op /overzicht en /toekomst om naar wat de bedragen vandaag waard zijn; wat je al hebt of al hebt uitgegeven verandert niet mee.' },
         ],
       },
       {
@@ -137,6 +139,7 @@ export function buildHldModel(): HldModel {
           { title: 'Tips op het juiste moment', desc: 'Aandachtspunten die je met één tik tot actie maakt.' },
           { title: 'Je vragen beantwoorden', desc: 'Vraag Fin alles over je eigen situatie.' },
           { title: 'Je dagelijkse gesprek met Fin, ook privé', desc: 'Zet je privacy-modus aan, dan beantwoordt Fin je vragen met een AI die lokaal op je toestel draait — dezelfde chat, maar je vraag en je cijfers verlaten het toestel niet. Experimenteel en alleen op desktop.' },
+          { title: 'Iets melden vanuit je gesprek met Fin', desc: 'Een bug, een vraag of een idee — meteen vanuit de chat, desgewenst met een screenshot. Komt direct bij ons team terecht.' },
         ],
       },
       {

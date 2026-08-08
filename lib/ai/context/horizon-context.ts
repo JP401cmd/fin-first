@@ -5,6 +5,25 @@ import { WEALTH_GROUPS, WEALTH_GROUP_LABELS, type WealthGroup } from '@/lib/weal
 import { section, formatCurrency } from './formatter'
 
 /**
+ * Grondslag van élk projectiebedrag in deze context, plus een expliciet
+ * omreken-verbod voor het model.
+ *
+ * De hele AI-context is en blijft NOMINAAL (euro-weergave besluit D14): de
+ * gebruikersvoorkeur `profiles.euro_view` bereikt het model nooit, en de contexten
+ * kern/wil/belasting kennen sowieso geen kernelfactor — een half-gedeflateerde
+ * context is erger dan een consequent nominale. Wat het model dan wél nodig heeft
+ * is (a) te weten op welke grondslag het leest en (b) het verbod om zelf om te
+ * rekenen. Zonder dat verbod verzint een taalmodel zijn eigen `(1 + i)^n` —
+ * precies de consume-don't-recompute-overtreding die de euro-weergave opheft. Waar de omrekening zinvol én canoniek beschikbaar is,
+ * staat ze al kant-en-klaar in de context (het FIRE-doel in `shared-context.ts`).
+ *
+ * Bewust één losse regel en géén eigen sectie/kop: dit is grondslag bij de
+ * bestaande cijfers, geen nieuw onderwerp — en context-tekst kost tokens.
+ */
+const GRONDSLAG_PROJECTIEBEDRAGEN =
+  "Alle projectiebedragen staan in toekomstige euro's (nominaal). Reken zelf nooit om naar huidige euro's — gebruik alleen bedragen die hier letterlijk staan."
+
+/**
  * Horizon-specific context: assets, debts, projections.
  * Uses real Supabase data.
  */
@@ -34,7 +53,11 @@ export async function buildHorizonContext(supabase: SupabaseClient): Promise<str
     return section('VERMOGEN & PROJECTIES', 'Nog geen assets of schulden geregistreerd.')
   }
 
-  const parts: string[] = []
+  // Grondslag vóór de cijfers: het model leest 'm dan vóór het eerste bedrag.
+  // Statisch — niet afhankelijk van de weergavevoorkeur van de gebruiker, want die
+  // gaat bewust niet mee naar het model. De no-data-tak hierboven draagt 'm niet:
+  // daar staat geen enkel projectiebedrag om een grondslag over te hebben.
+  const parts: string[] = [GRONDSLAG_PROJECTIEBEDRAGEN]
 
   // Asset breakdown
   if (assets.length > 0) {
@@ -77,6 +100,10 @@ export async function buildHorizonContext(supabase: SupabaseClient): Promise<str
   }
 
   // 5-year portfolio projection
+  // euro-view: exempt — `projectPortfolio` is een EIGEN motor náást de horizon-kernel
+  // (euro-weergave besluit D12) en draagt dus geen canonieke `inflationFactor`. Er komt
+  // hier bewust geen tweede, reële variant bij: dat zou een deflator vereisen die deze
+  // motor niet heeft. Het bedrag valt onder de grondslag-regel bovenaan deze context.
   if (assets.length > 0) {
     const projection = projectPortfolio(assets, 60)
     const proj5y = projection[projection.length - 1]

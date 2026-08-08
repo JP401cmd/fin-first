@@ -47,6 +47,13 @@ import { EntityBackfillEditor } from './entity-backfill-editor'
  * worden gemarkeerd met het label "geschat"; handmatig vastgelegde
  * maandstanden met "handmatig", zodat de gebruiker werkelijkheid van
  * benadering kan onderscheiden.
+ *
+ * euro-view: exempt (D12) — dit venster kijkt uitsluitend TERUG. Elke stand,
+ * elke maand-op-maand-delta en de periode-delta zijn gerealiseerde bedragen
+ * (snapshots of handmatig vastgelegde maandstanden), dus al euro's van (grofweg)
+ * vandaag; er bestaat geen projectierij en dus geen `inflationFactor` om mee te
+ * deflateren. Historische bedragen alsnog door een toekomstfactor delen zou
+ * het verleden verkleinen dat de gebruiker zélf heeft ingevoerd.
  */
 
 export interface HistoryPoint {

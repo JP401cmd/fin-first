@@ -104,3 +104,8 @@ __pycache__/
 
 # Persoonlijke Claude-permissies — nooit committen
 .claude/settings.local.json
+
+# Uitvoer van de herstelproef-controle (scripts/herstelproef-check.mjs) — tellingen
+# en hashes van een specifiek moment; hoort in het runbook, niet in de repo.
+nulmeting*.json
+herstelproef-*.json

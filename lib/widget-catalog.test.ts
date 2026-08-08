@@ -20,6 +20,7 @@ import {
   getWidgetSizes,
   HOLDING_FAV_SIZES,
   BUDGET_FAV_SIZES,
+  SPEND_LIMIT_SIZES,
   type WidgetPrefs,
 } from './widget-catalog'
 
@@ -150,6 +151,25 @@ describe('mergeWidgetPrefs — favoriet-prefs (budget_fav: / holding_fav:)', () 
     expect(favs.find(w => w.id === 'budget_fav:sparen')?.enabled).toBe(false)
   })
 
+  it('spend_limit:* pref in saved blijft aanwezig na merge', () => {
+    // Zonder deze preserve-tak gooit élke merge de pot-pref weg, waarna de
+    // loader-injectie 'm meteen weer als enabled terugzet — een bewuste
+    // "widget uit"-keuze zou dan nooit blijven staan.
+    const saved: WidgetPrefs = {
+      widgets: [
+        { id: 'netto_vermogen', enabled: true, size: 'half', order: 0 },
+        { id: 'spend_limit:POT-1', enabled: true, size: 'xl', order: 40 },
+        { id: 'spend_limit:POT-2', enabled: false, size: 'quarter', order: 41 },
+      ],
+    }
+    const result = mergeWidgetPrefs(saved)
+    const pots = result.widgets.filter(w => w.id.startsWith('spend_limit:'))
+    expect(pots.length).toBe(2)
+    expect(pots.find(w => w.id === 'spend_limit:POT-1')?.size).toBe('xl')
+    // Een uitgezette pot-widget blijft uitgezet (overleeft pauzeren/hervatten).
+    expect(pots.find(w => w.id === 'spend_limit:POT-2')?.enabled).toBe(false)
+  })
+
   /**
    * Loader-pad: de server-loader injecteert budget_fav:/holding_fav: prefs
    * in de opgeslagen WidgetPrefs vóórdat mergeWidgetPrefs wordt aangeroepen.
@@ -170,6 +190,14 @@ describe('getWidgetSizes — dynamische favorieten', () => {
     expect(BUDGET_FAV_SIZES).toContain('xl')
   })
 
+  it('spend_limit:* levert de grenzenpot-maten, inclusief xl (Double)', () => {
+    expect(getWidgetSizes('spend_limit:POT-1')).toEqual(SPEND_LIMIT_SIZES)
+    expect(SPEND_LIMIT_SIZES).toContain('xl')
+    // `mini` staat bewust NIET in de kiezer: die ontstaat alleen via
+    // downsizeForMobile(quarter → mini).
+    expect(SPEND_LIMIT_SIZES).not.toContain('mini')
+  })
+
   it('statische catalog-widget levert zijn eigen sizes', () => {
     const def = WIDGET_CATALOG[0]
     expect(getWidgetSizes(def.id)).toEqual(def.sizes)
@@ -187,6 +215,8 @@ describe('getWidgetSizes — dynamische favorieten', () => {
     expect(clamp('holding_fav:abc', 'xl')).toBe('xl')
     expect(clamp('budget_fav:xyz', 'xl')).toBe('xl')
     expect(clamp('budget_fav:xyz', 'mini')).toBe('quarter')
+    expect(clamp('spend_limit:POT-1', 'xl')).toBe('xl')
+    expect(clamp('spend_limit:POT-1', 'mini')).toBe('quarter')
   })
 })
 

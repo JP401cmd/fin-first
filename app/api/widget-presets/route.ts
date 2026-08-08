@@ -150,8 +150,11 @@ export async function PUT(req: Request) {
       }
 
       const wId = widget.id as string
-      // Allow budget_fav: and holding_fav: dynamic widget IDs
-      const isDynamic = wId?.startsWith('budget_fav:') || wId?.startsWith('holding_fav:')
+      // Allow budget_fav:, holding_fav: and spend_limit: dynamic widget IDs
+      const isDynamic =
+        wId?.startsWith('budget_fav:') ||
+        wId?.startsWith('holding_fav:') ||
+        wId?.startsWith('spend_limit:')
       if (!wId || (!VALID_WIDGET_IDS.has(wId) && !isDynamic)) {
         return NextResponse.json(
           { error: `Preset "${p.id}": unknown widget ID "${wId}"` },

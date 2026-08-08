@@ -2,6 +2,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { computeCoreData, type FinancialInput } from '@/lib/core-metrics'
 import { loadCoreData } from '@/lib/core-data-loader'
 import { isFinanciallyFree } from '@/lib/fire-strategy'
+import { computeHorizonFireSim, type HorizonFireSim } from '@/lib/fire-target-shared'
+import { deflate, factorAtAge } from '@/lib/euro-display'
 import { buildWillFinancialFacts } from './fin-financial-facts'
 import { section, formatCurrency, formatFreedomTime, formatPercentage } from './formatter'
 
@@ -11,6 +13,53 @@ const TEMPORAL_LABELS: Record<number, string> = {
   3: 'De Architect (level 3) — Optimaliseert bewust, gulden middenweg',
   4: 'De Stoïcijn (level 4) — Snelheid > Comfort, streng en doelgericht',
   5: 'De Essentialist (level 5) — Minimalistisch voor maximale snelheid',
+}
+
+/**
+ * De FIRE-doel-regel: het nominale bedrag, met de canonieke omrekening ernáást.
+ *
+ * WAAROM BEIDE BEDRAGEN (ADR 0090-vervolg, euro-weergave besluit D14): de
+ * gebruiker kan het scherm op "huidige euro's" hebben staan terwijl deze context
+ * — net als élk ander cijfer hier — nominaal is. Dan zegt het scherm €650k en Fin
+ * €1,2 mln over hetzelfde doel. Die scheefstand lossen we op door het tweede
+ * bedrag ER BIJ te zetten, niet door de context te deflateren.
+ *
+ * WAAROM DE VOORKEUR ZELF NIET MEEGAAT: `profiles.euro_view` bereikt het model
+ * bewust nooit. Een weergavevoorkeur zónder cijfers verleidt een taalmodel tot een
+ * eigen `(1 + i)^n` — de zuiverste consume-don't-recompute-overtreding die er is.
+ * Het model krijgt hier dus geen keuze, maar twee kant-en-klare feiten.
+ *
+ * WANNEER GEEN TWEEDE BEDRAG — drie voorwaarden, alle drie nodig:
+ *  1. HET DOEL MOET NOMINAAL ZIJN. `goalUitKernel` (= `FinFacts.fireDoelUitKernel`)
+ *     zegt of het bedrag door de kernel op de FIRE-maand is geprojecteerd. De
+ *     terugvalpaden — het 25×-doel op de HUIDIGE jaaruitgaven en de scalar-
+ *     benadering die het kernel-doel ophoogt met de overwaarde van VANDAAG — staan
+ *     al (deels) in euro's van vandaag; die nóg eens deflateren levert een
+ *     materieel te laag tweede bedrag. Zo'n terugval kan samenvallen met een
+ *     geslaagde run mét rijen (`computeHorizonFireTarget` nult doelen weg bij
+ *     `<= 0`), dus de rijenlijst alleen is géén herkomstbewijs.
+ *  2. De kernel moet rijen leveren (zonder rijen is er geen deflator).
+ *  3. De factor moet ná formatteren een ánder bedrag opleveren; "≈ € X in geld van
+ *     vandaag" met hetzelfde getal is vals-precies — het suggereert een omrekening
+ *     die niet heeft plaatsgevonden. De vergelijking loopt daarom op de
+ *     GEFORMATTEERDE bedragen.
+ *
+ * CONSUME, DON'T RECOMPUTE: de factor komt uit `run.unifiedRows` (de kernelrijen
+ * van DEZELFDE run die het doelbedrag leverde), via `factorAtAge`/`deflate` uit
+ * `lib/euro-display.ts`. Nooit een eigen som hier.
+ */
+function formatFireGoalLine(nominalGoal: number, run: HorizonFireSim | null, goalUitKernel: boolean): string {
+  const nominal = formatCurrency(nominalGoal)
+  const rows = run?.unifiedRows ?? []
+  if (!goalUitKernel || rows.length === 0) return `FIRE-doel: ${nominal}`
+
+  // De FIRE-leeftijd is het moment waar dit doelbedrag bij hoort (klasse S).
+  // Fractioneel wint: `factorAtAge` pakt dan de dichtstbijzijnde rij.
+  const fireAge = run?.sim.fireAgeFractional ?? run?.sim.fireAge ?? null
+  const inTodaysMoney = formatCurrency(deflate(nominalGoal, factorAtAge(rows, fireAge), 'real'))
+  if (inTodaysMoney === nominal) return `FIRE-doel: ${nominal}`
+
+  return `FIRE-doel: ${nominal} (toekomstige euro's; ≈ ${inTodaysMoney} in geld van vandaag)`
 }
 
 /**
@@ -28,12 +77,19 @@ const TEMPORAL_LABELS: Record<number, string> = {
  * eigen rij.
  */
 export async function buildSharedContext(supabase: SupabaseClient): Promise<string> {
-  const [coreData, profileResult] = await Promise.all([
+  const [coreData, profileResult, horizonRun] = await Promise.all([
     loadCoreData(supabase),
     supabase
       .from('profiles')
       .select('temporal_balance, household_type, financial_context, housing_strategy_config')
       .maybeSingle(),
+    // DEZELFDE canonieke FIRE-run die `loadCoreData` al consumeert
+    // (`computeHorizonFireTarget` → `computeHorizonFireSim`, React-`cache()`'d).
+    // Binnen dit request is dit dus geen tweede kernel-run en geen extra query;
+    // we hebben 'm hier alleen voor `unifiedRows` — de canonieke weergave-deflator
+    // per jaar, die `HorizonFireTargets` niet draagt. Faalt de run, dan blijft de
+    // FIRE-doel-regel exact zoals hij vandaag is.
+    computeHorizonFireSim(supabase).catch(() => null),
   ])
 
   const profile = profileResult.data
@@ -94,8 +150,11 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
     `Vrijgekochte tijd: ${formatFreedomTime(facts.freedomYears, facts.freedomMonths)}`,
     `Vrijheids-%: ${formatPercentage(freedomPercentage)}`,
     // Toon het FIRE-doel op dezelfde grondslag als het Vrijheids-% — zo zijn
-    // teller, noemer en doelbedrag onderling consistent.
-    `FIRE-doel: ${formatCurrency(displayFireGoal ?? core.fireTarget)}`,
+    // teller, noemer en doelbedrag onderling consistent. Kwam het doel uit de
+    // kernel, dan is het bedrag nominaal (toekomstige euro's) en staat de
+    // omrekening naar geld van vandaag er letterlijk bij; op een terugvalpad blijft
+    // het bij het kale bedrag — zie `formatFireGoalLine`.
+    formatFireGoalLine(displayFireGoal ?? core.fireTarget, horizonRun, facts.fireDoelUitKernel),
     `Verwachte FIRE-datum: ${core.expectedFireDate || 'onbekend'}`,
     `Maandinkomen: ${formatCurrency(rawFinancials.monthlyIncome)} | Maanduitgaven: ${formatCurrency(rawFinancials.monthlyExpenses)}`,
     monthlyMustExpenses > 0 ? `Must-uitgaven (essentieel): ${formatCurrency(monthlyMustExpenses)}/mnd` : null,

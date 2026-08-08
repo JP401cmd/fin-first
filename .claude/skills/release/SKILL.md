@@ -74,6 +74,15 @@ Een groene lokale build is geen groene Vercel-build (andere env, NFT-excludes, r
 2. **Smoke op productie**: de nieuwe/geraakte flow één keer echt doorlopen en `mcp__supabase__get_logs` checken op nieuwe errors.
 3. **Rollback-pad bij een kapotte deploy**: `git revert` van de commit(s) + push (geen force-push, geen reset op gedeelde history). Het schema blijft staan — migraties zijn forward-only; idempotente, additieve migraties (stap 4) zijn er precies zodat de oude code naast het nieuwe schema blijft werken. Meld de gebruiker wat er terugrolde en waarom.
 
+### 12. Slotstap — wat merkt de gebruiker hiervan?
+Schrijf in **drie regels mensentaal** op wat deze release voor een gebruiker betekent — geen commit-taal, geen bestandsnamen. Bewaar ze bij de release; ze zijn het ruwe materiaal voor de vrijgavenotities zodra het testerspanel opengaat.
+
+- Wat kan iemand nu wat eerst niet kon, of wat werkt er nu wél goed?
+- Is het alleen intern (refactor, migratie, tooling)? Dan: "geen zichtbare verandering" — ook dat is een geldig antwoord, en korter dan het verzinnen van een voordeel.
+- **Doet de tekst een nieuwe belofte over veiligheid, opslag of rendement, dan is het een claim** → `compliance-check` vóórdat er iets naar buiten gaat.
+
+Toon volgt `merkstem`, die de canonieke bron aanwijst — schrijf hier geen eigen toonlijst. Dit is géén tweede UAT-oordeel: stap 7 vraagt of een getest oppervlak geraakt is en schrijft naar `lib/uat/**`; deze stap vraagt wat een mens ervan merkt en schrijft alleen proza bij de release. De twee antwoorden mogen verschillen ("geen UAT-impact" naast een zichtbare verbetering, of andersom) — dat is geen tegenspraak. Niet publiceren op `/nieuws`: dat is de financiële-nieuwsfeed, geen productchangelog.
+
 ## Rationalisaties die de pijplijn niet passeren
 
 | Gedachte | Werkelijkheid |
@@ -84,7 +93,7 @@ Een groene lokale build is geen groene Vercel-build (andere env, NFT-excludes, r
 | "Migratie is idempotent, gewoon toepassen" | Remote drift is hier de norm; eerst schema-effect vergelijken (stap 4.1). |
 | "Security n.v.t., het is alleen UI" | UI lekt ook: masking, partner-privacy, client-side data. Bij twijfel draaien. |
 | "Push maar vast, dan staat het veilig" | Push naar master ís de deploy. Veiligstellen doe je op een branch. |
-| "De deploy zal wel goed gaan, lokaal bouwde het" | Vercel-build ≠ lokale build (env/NFT/regio) — stap 10 bestaat omdat dit hier eerder misging. |
+| "De deploy zal wel goed gaan, lokaal bouwde het" | Vercel-build ≠ lokale build (env/NFT/regio) — stap 11 bestaat omdat dit hier eerder misging. |
 
 ## Afronding
 Rapporteer per poort het bewijs (commando + uitkomst), de security-bevindingen en hun status, en wat er bewust is overgeslagen met reden. "Alles groen" zonder output is geen afronding. De zelfverbeterings-slotstap draait alleen onder de opt-in-condities uit de gedeelde conventies.

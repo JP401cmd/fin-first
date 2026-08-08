@@ -37,6 +37,10 @@ interface ComputedState {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+// euro-view: exempt — deze analyse deflateert bewust zélf, en bovendien SELECTIEF:
+// alleen het niet-geïndexeerde onttrekkingsdeel erodeert, de AOW niet. Dat verschil
+// is de boodschap; een globale euro-weergave zou beide kanten gelijk behandelen.
+
 /**
  * Compute purchasing power erosion rows at 5-year intervals.
  *

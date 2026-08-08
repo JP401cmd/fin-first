@@ -38,6 +38,12 @@ const anchorY = PAD_TOP + (H - PAD_TOP - PAD_BOTTOM) * 0.55
  *
  * CONSUME, DON'T RECOMPUTE: toont uitsluitend reeds-berekende blok-1-waarden
  * (`currentNetWorth`, `netWorthExclHome`) — geen eigen som, geen projectie.
+ *
+ * euro-view: exempt (D12) — trap 1 toont uitsluitend GEREALISEERD vermogen van
+ * vandaag; er is hier nog geen projectierij en dus geen kernelfactor. Beide
+ * bedragen staan per definitie al in huidige euro's en deflateren nooit. De
+ * euro-weergave-badge zit bewust op de volle grafiek (trap 2, MiniNetWorthChart)
+ * en niet hier: pas dáár verschijnen er omgerekende bedragen.
  */
 export function MiniNetWorthChartAnchor({
   currentNetWorth,

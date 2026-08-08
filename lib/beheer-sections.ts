@@ -19,7 +19,6 @@ import {
   Gauge,
   GitBranch,
   GitCompareArrows,
-  Goal,
   History,
   Images,
   Inbox,
@@ -32,7 +31,6 @@ import {
   MailCheck,
   MessageSquare,
   MessageCircle,
-  Milestone,
   Network,
   Newspaper,
   Activity,
@@ -44,7 +42,6 @@ import {
   Sparkles,
   UserCheck,
   Users,
-  Workflow,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -177,12 +174,6 @@ export const BEHEER_GROUPS: BeheerGroup[] = [
         icon: CalendarClock,
       },
       {
-        label: 'Doelen',
-        href: '/beheer/doelen',
-        description: 'Doelgids-stappen die Fin per doel volgt.',
-        icon: Goal,
-      },
-      {
         label: 'Nieuws',
         href: '/beheer/nieuws',
         description: 'Bronnen, RSS-feeds, ingest en artikelendatabase.',
@@ -271,12 +262,6 @@ export const BEHEER_GROUPS: BeheerGroup[] = [
         icon: FileSearch,
       },
       {
-        label: 'Roadmap functionaliteiten',
-        href: '/beheer/roadmap',
-        description: 'Gap-analyse uit marktonderzoek: gewenste functies per belofte-pijler.',
-        icon: Milestone,
-      },
-      {
         label: 'Grafiek-werking (tijdelijk)',
         href: '/beheer/grafiek-werking',
         description: 'Functionele referentie van de FIRE-grafiek: fases, voorkeuren, strategieën en het beperkingenregister.',
@@ -332,12 +317,6 @@ export const BEHEER_GROUPS: BeheerGroup[] = [
         href: '/beheer/architectuur',
         description: 'Interactieve ArchiMate-plaat van de applicatie.',
         icon: Network,
-      },
-      {
-        label: 'Development',
-        href: '/beheer/development',
-        description: 'Het agent-team en de skill-pijplijnen waarmee TriFinity gebouwd wordt.',
-        icon: Workflow,
       },
       {
         label: 'Audit-trail',

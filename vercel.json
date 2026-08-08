@@ -24,6 +24,10 @@
     {
       "path": "/api/cron/retention",
       "schedule": "45 3 * * *"
+    },
+    {
+      "path": "/api/cron/user-reports-notion-sync",
+      "schedule": "0 6 * * *"
     }
   ]
 }

@@ -21,6 +21,15 @@ interface Props {
 // Study 4%, NL_SWR = NL-standaard na Box 3 + inflatie (beweegt met het belastingjaar
 // mee). Nooit lokaal hardcoden — "consume, don't recompute".
 
+// euro-view: exempt (D12) — dit widget kent geen enkel PROJECTIE-bedrag. Alles
+// wat hier in euro's staat is een grootheid van VANDAAG: `netWorth` (huidig
+// vermogen), `monthlyExpenses` (huidige uitgaven) en het passieve inkomen dat
+// daaruit volgt (`netWorth × SWR / 12`). Die staan per definitie al in huidige
+// euro's; ze door een kernelfactor delen zou ze een tweede keer deflateren en
+// een te laag bedrag tonen. De SWR, de multiplier en de onttrekkingsvoet zijn
+// bovendien ratio's (klasse R) en deflateren sowieso nooit. Dit oppervlak
+// verandert dus niet mee met de euro-weergave — bewust, niet vergeten.
+
 function swrStatus(swr: number): { color: string; label: string; bg: string } {
   if (swr >= 0.04) return { color: 'text-positive', label: 'Veilig', bg: 'bg-positive/20' }
   if (swr >= 0.03) return { color: 'text-positive', label: 'Goed', bg: 'bg-positive/10' }

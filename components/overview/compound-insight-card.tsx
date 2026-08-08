@@ -25,6 +25,13 @@ export const COMPOUND_INSIGHT_ID = 'compound-insight'
  * Showcase-criterium: card alleen renderen wanneer hasDramaticDelta=true
  * (= ambitious is ≥5% groter dan conservative). Voorkomt dat we users
  * zonder cash of zonder lange horizon irrelevante content tonen.
+ *
+ * euro-view: exempt (D12) — deze kaart is een ILLUSTRATIEF rekenvoorbeeld op
+ * `lib/compound-projection.ts` (twee vaste rentes, vaste 30-jaars horizon), geen
+ * projectie van jouw plan. Er is dus geen kernelrij en geen canonieke
+ * jaarfactor om mee te deflateren; een zelfbedachte deflator zou precies de
+ * "eigen Math.pow" zijn die CLAUDE.md verbiedt. De bedragen bewegen daarom niet
+ * mee met de euro-weergave — bewust, niet vergeten.
  */
 
 const CONSERVATIVE_RATE = 0.005 // spaarrente ~0.5%

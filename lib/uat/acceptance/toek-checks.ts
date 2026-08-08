@@ -28,6 +28,8 @@
  *   - `lib/budget-utils.ts`   — pure rekenhelpers (o.a. computeRetirementExpenses;
  *                                al client-gebundeld via reken-checks.ts).
  *   - `lib/test-personas.ts`  — al elders in de browser-runtime gebruikt.
+ *   - `lib/euro-display.ts`   — pure presentatie-deflatoren (WF-TOEK-33,
+ *                                euro-weergave wave 2/3); géén Supabase-/Next-imports.
  */
 
 import { PERSONAS } from '@/lib/test-personas'
@@ -36,6 +38,7 @@ import { computeAowMonthly } from '@/lib/horizon-data'
 import { computeGoalProgress, type Goal } from '@/lib/goal-data'
 import { computeRetirementExpenses } from '@/lib/budget-utils'
 import { EXCEL_TEKORT_LENING_RENTE } from '@/lib/horizon-kernel/adapter/defaults'
+import { deflate, factorAtAge, buildFactorByAge, deflateRowsByAge } from '@/lib/euro-display'
 import { TOEK_ACCEPTANCE } from './toek'
 import type { AcceptanceCriterion } from './types'
 
@@ -223,6 +226,39 @@ export const TOEK_ENGINE_CHECKS: ToekEngineCheck[] = [
       return {
         expected: 'floorPct=80; ceilingPct=120; cutStepPct=10; strategie=pensioen; nalatenschap=200000',
         actual: `floorPct=${fx(floorPct, 0)}; ceilingPct=${fx(ceilingPct, 0)}; cutStepPct=${fx(cutStepPct, 0)}; strategie=${cfg.strategy}; nalatenschap=${cfg.legacyAmount}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-TOEK-33',
+    scenarioId: 'UAT-TOEK-33',
+    label: "Render-grens deflatie (deflate + factorAtAge + deflateRowsByAge): exact één keer gedeeld op synthetische kernelrijen",
+    run: () => {
+      criterion('WF-TOEK-33')
+      // Synthetische kernelrijen (leeftijd, endPortfolio) — opgezet zodat euro-
+      // inflatie en portefeuillegroei elkaar exact opheffen: het reële bedrag
+      // (koopkracht van vandaag) blijft op elke leeftijd €100.000. Factoren zijn
+      // bewust machten van 2 (i.p.v. bv. 1,1/1,21): deling door een macht van 2
+      // is in IEEE-754 altijd exact — geen drijvendekomma-afrondingsruis in de
+      // assertie (110000/1.1 is bv. 99999,999999999985, geen 100000).
+      const rows = [
+        { age: 50, endPortfolio: 100000 },
+        { age: 51, endPortfolio: 200000 },
+        { age: 52, endPortfolio: 400000 },
+      ]
+      const factorRows = [
+        { age: 50, inflationFactor: 1 },
+        { age: 51, inflationFactor: 2 },
+        { age: 52, inflationFactor: 4 },
+      ]
+      const factorByAge = buildFactorByAge(factorRows)
+      const nominal = deflateRowsByAge(rows, factorByAge, ['endPortfolio'], 'nominal')
+      const real = deflateRowsByAge(rows, factorByAge, ['endPortfolio'], 'real')
+      const nominalSameRef = nominal === rows
+      const singleDeflate = deflate(400000, factorAtAge(factorRows, 52), 'real')
+      return {
+        expected: 'nominalSameRef=true; real50=100000; real51=100000; real52=100000; singleDeflate=100000',
+        actual: `nominalSameRef=${nominalSameRef}; real50=${real[0].endPortfolio}; real51=${real[1].endPortfolio}; real52=${real[2].endPortfolio}; singleDeflate=${singleDeflate}`,
       }
     },
   },

@@ -30,13 +30,21 @@ function makeEvent(overrides: Partial<LifeEvent> & { name: string }): LifeEvent 
   }
 }
 
+// ── Sign-conventie voor one_time_cost (DB/cashflow-conventie, zie
+// lib/horizon/life-events-catalog.ts#computeLifeEventNetImpact en
+// lib/horizon/event-pane-edit-form.ts: `one_time_cost >= 0 ? 'expense' : 'income'`):
+// POSITIEF = kost (drukt de vrijheidsimpact), NEGATIEF = inkomst (verhoogt 'm.
+// Vóór commit 9b6882a0c gold het omgekeerde (positief = inkomst); de formule is
+// toen bewust omgedraaid om aan te sluiten op de catalogus-defaults (bv.
+// inheritance.defaultCost/house_sale.defaultCost = -50_000) en het bewerk-formulier.
+
 // ── Opbouwen events (positive net impact) ───────────────────────────────────
 
 const erfenis: LifeEvent = makeEvent({
   name: 'Erfenis',
   event_type: 'inheritance',
   target_age: 55,
-  one_time_cost: 100_000, // positive = income
+  one_time_cost: -100_000, // negatief = inkomst (ontvangen erfenis)
   duration_months: 0,
 })
 
@@ -52,7 +60,7 @@ const huisVerkoop: LifeEvent = makeEvent({
   name: 'Huis verkoop',
   event_type: 'house_sale',
   target_age: 60,
-  one_time_cost: 250_000,
+  one_time_cost: -250_000, // negatief = inkomst (overwaarde-vrijval)
   duration_months: 0,
 })
 
@@ -62,7 +70,7 @@ const kinderen: LifeEvent = makeEvent({
   name: 'Kinderen',
   event_type: 'children',
   target_age: 35,
-  one_time_cost: -5_000,
+  one_time_cost: 5_000, // positief = kost (babyuitzet)
   monthly_cost_change: 500,
   duration_months: 216, // 18 years
 })
@@ -71,7 +79,7 @@ const verbouwing: LifeEvent = makeEvent({
   name: 'Verbouwing',
   event_type: 'renovation',
   target_age: 40,
-  one_time_cost: -50_000,
+  one_time_cost: 50_000, // positief = kost
   duration_months: 0,
 })
 
@@ -79,7 +87,7 @@ const wereldreis: LifeEvent = makeEvent({
   name: 'Wereldreis',
   event_type: 'world_trip',
   target_age: 45,
-  one_time_cost: -30_000,
+  one_time_cost: 30_000, // positief = kost (vertrekkosten)
   duration_months: 12,
   monthly_cost_change: 1500,
 })
@@ -310,12 +318,12 @@ const tests: TestCase[] = [
     fn: () => {
       const noAge: LifeEvent = makeEvent({
         name: 'Ongedateerd',
-        one_time_cost: -10_000, // investeren
+        one_time_cost: 10_000, // positief = kost → investeren
         target_age: null,
       })
       const withAge: LifeEvent = makeEvent({
         name: 'Gedateerd',
-        one_time_cost: -20_000, // investeren
+        one_time_cost: 20_000, // positief = kost → investeren
         target_age: 50,
       })
 

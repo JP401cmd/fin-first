@@ -396,8 +396,12 @@ export async function deleteAllUserData(
     deleteTable(supabase, 'actions', userId),
     deleteTable(supabase, 'transactions', userId),
     deleteTable(supabase, 'budget_amounts', userId),
+    // spend_limits vóór budgets (batch 3): budget-potten cascaden weliswaar mee,
+    // maar tegenpartij-potten (budget_id NULL) zouden een reset anders overleven —
+    // en de tabel staat in SESSION_WIPE_TABLES (AVG-wis, zie lib/user-data-tables.ts).
+    deleteTable(supabase, 'spend_limits', userId),
   ])
-  const batch2Tables = ['actions', 'transactions', 'budget_amounts']
+  const batch2Tables = ['actions', 'transactions', 'budget_amounts', 'spend_limits']
   for (let i = 0; i < batch2Tables.length; i++) {
     summary[batch2Tables[i]] = batch2Results[i]
   }

@@ -85,7 +85,7 @@
 2. Condenseren binnen het token-budget met harde invarianten: **Wft-/compliance-regels letterlijk behouden**, filosofie/toon/cijferdiscipline behouden, kennisbank-fencing intact — vorm mag krimpen, bedoeling nooit.
 3. Doelbestand(en) bijwerken (`lib/ai/local/local-chat-prompt.ts`, later evt. meer) + **parity-manifest** schrijven: per lokale prompt de bronbestanden, bronhashes, datum en tokenschatting.
 4. Kwaliteitspoort: prompt-tests draaien + de C1a-proefset (10 vragen incl. Wft-valstrikken); **eigenaar-review verplicht vóór ship** — promptwijziging = gedragswijziging.
-5. Skill indelen in `development-model.ts` (SKILL_CURATION) — verschijnt daarmee automatisch op `/beheer/development`.
+5. Skill indelen in `development-model.ts` (SKILL_CURATION) — anders wordt `development-model.test.ts` rood; de skill verschijnt daarmee automatisch op de teamplaat van de org-site.
 
 **P2 — beheer-inzicht · ~0,5-1 sessie:** blok "Prompt-parity" op `/beheer/kennisbank` (het lokale-AI-beheerhuis): per lokale prompt de bronnen, de laatste parity-run, tokenschatting t.o.v. het 8.192-budget en een **in-sync/drift-badge** (bronprompt gewijzigd sinds de laatste run ⇒ oranje "parity verlopen — draai de skill"). Feiten **gescand build-time** (`npm run parity:scan` → JSON, zelfde patroon als `arch:diagram`; runtime-fs kan niet op Vercel), betekenis gecureerd in het manifest. Registreren in `lib/beheer-sections.ts`.
 

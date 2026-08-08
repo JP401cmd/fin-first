@@ -31,6 +31,7 @@ import type { SimCashflow } from '@/lib/fire-simulation'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
 import { BOX3_DRAG } from '@/lib/constants'
 import { formatCurrency } from '@/lib/format'
+import { useEuroView } from '@/lib/hooks/use-euro-view'
 import { ReceiptRow } from '@/components/app/horizon/phase-analysis/receipt-row'
 import { MaskedAmount } from '@/components/app/masked-amount'
 
@@ -118,6 +119,11 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
   const transitionRows = rows.filter(r => r.phase === 'transition')
 
   // ── Waterval-kassabon aggregaten van unified rows ──────────────────────
+  // euro-view: klasse C (cumulatief over meerdere jaren) — dit HELE blok blijft
+  // NOMINAAL, inclusief `startVermogen`, `eindVermogen` en de kopregel. Zie de
+  // uitleg in `phase-modal-opbouw.tsx`: per-term deflatie laat het verschil in de
+  // afrondingsrij vallen en liegt daar waar het het minst opvalt. De grondslag
+  // staat in 'real' als één regel in de kassabon-kop.
   const hasTransitionRows = transitionRows.length > 0
 
   // Use startNetWorth (net worth = assets - debts) instead of totalAssets from bucket values
@@ -264,6 +270,8 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
         )}
 
         {/* 2. Fase-header — compact summary line + top-level discuss button */}
+        {/* euro-view: klasse C — kopregel van het waterval-identiteitsblok
+            hieronder; blijft in elke weergave nominaal, samen met de kassabon. */}
         <div className="text-center">
           <p className="font-sans text-sm font-bold text-[var(--ink)] sm:text-base">
             Overgang &middot; {<MaskedAmount value={Math.round(startVermogen)} tone="horizon" />} &rarr; {<MaskedAmount value={Math.round(eindVermogen)} tone="horizon" />} &middot; {durationYears} jaar
@@ -502,6 +510,9 @@ function GapAnalysisKassabon({
   dekkingVoldoende: boolean
   coverageBuffer: number
 }) {
+  // Weergave uit de hook, niet uit een prop (D4) — buiten een provider is dit
+  // 'nominal' en is deze kassabon byte-identiek aan de huidige productie.
+  const { view: euroView } = useEuroView()
   return (
     <KassabonShell>
       {/* Header */}
@@ -512,6 +523,11 @@ function GapAnalysisKassabon({
         <p className="mt-0.5 font-sans text-[10px] text-[var(--ink-3)]">
           FIRE ({Math.round(fireAge)}) tot AOW ({Math.round(aowAge)}) &middot; {durationYears} jaar zonder AOW
         </p>
+        {euroView === 'real' && (
+          <p className="mt-1 font-sans text-[10px] italic text-[var(--ink-3)]">
+            Deze optelling loopt over meerdere jaren en staat in toekomstige euro&rsquo;s.
+          </p>
+        )}
       </div>
 
       {/* Waterfall receipt rows */}
@@ -599,6 +615,8 @@ function ShortfallAnalysis({
   yearlyExpenses: number
 }) {
   const shortfallPerYear = Math.max(yearlyExpenses - yearlyAowIncome, 0)
+  // Weergave uit de hook, niet uit een prop (D4) — buiten een provider 'nominal'.
+  const { view: euroView } = useEuroView()
 
   return (
     <KassabonShell>
@@ -610,6 +628,11 @@ function ShortfallAnalysis({
         <p className="mt-0.5 font-sans text-[10px] text-[var(--ink-3)]">
           AOW ({Math.round(aowAge)}) tot FIRE ({Math.round(fireAge)}) &middot; {durationYears} jaar met AOW
         </p>
+        {euroView === 'real' && (
+          <p className="mt-1 font-sans text-[10px] italic text-[var(--ink-3)]">
+            Deze optelling loopt over meerdere jaren en staat in toekomstige euro&rsquo;s.
+          </p>
+        )}
       </div>
 
       {/* Waterfall receipt rows */}

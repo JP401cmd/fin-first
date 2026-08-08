@@ -1,12 +1,14 @@
 'use client'
 
-import { memo } from 'react'
+import { memo, useMemo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
 import { CheckCircle2, Circle, Flag, Users, UserCheck } from 'lucide-react'
 import { usePerspective } from '@/components/app/perspective-provider'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
+import { useEuroView } from '@/lib/hooks/use-euro-view'
+import { buildFactorByAge, deflateRowsByAge } from '@/lib/euro-display'
 
 // Zuivere weergave-formattering van een door de motor geleverd aantal maanden
 // (FreedomMilestone.monthsAway) → vrijheidstijd. Geen financiële herberekening:
@@ -45,6 +47,23 @@ export const VrijheidsMijlpalenWidget = memo(function VrijheidsMijlpalenWidget({
   const isPartnerView = perspective === 'partner' && data.partnerOverrides?.fireTarget != null
   const ov = isHouseholdView ? data.householdOverrides! : isPartnerView ? data.partnerOverrides! : null
   const isShared = isHouseholdView || isPartnerView
+
+  // ── EURO-WEERGAVE ─────────────────────────────────────────────────────────
+  // Dit widget toont bewust GEEN mijlpaal-bedrag: mijlpalen zijn percentages
+  // van het FIRE-doel (klasse R) en de markers hangen aan de TIJD-as, niet aan
+  // een bedrag (zie de sparkline-noot hieronder). Het enige wat in euro's staat
+  // is de vermogenspad-lijn zelf — klasse F, per punt de kernelfactor van zijn
+  // eigen jaar, zodat deze lijn dezelfde vorm houdt als in het
+  // Vermogenspad-widget. In 'nominal' komt dezelfde array-referentie terug.
+  const { view: euroView } = useEuroView()
+  const viewSimRows = useMemo(() => {
+    const rows = data.simRows
+    if (rows == null) return rows
+    const factorByAge = buildFactorByAge(
+      rows.map(r => ({ age: r.age, inflationFactor: r.inflationFactor ?? 1 })),
+    )
+    return deflateRowsByAge(rows, factorByAge, ['endPortfolio'], euroView)
+  }, [data.simRows, euroView])
 
   const { freedomPct } = data
   // Vrijheids-% = canonieke grondslag (ADR 0009). Eigen perspectief:
@@ -136,7 +155,7 @@ export const VrijheidsMijlpalenWidget = memo(function VrijheidsMijlpalenWidget({
     // die mag niet op één as/marker gemengd worden. De marker markeert louter
     // WANNEER de mijlpaal langs je vermogenspad valt. Per-user cadans → in
     // huishouden/partner-perspectief geen markers (net als de datums).
-    const rows = data.simRows
+    const rows = viewSimRows
     const showSparkline = rows != null && rows.length > 1
     const W = 620
     const SPARK_H = 96
@@ -172,7 +191,7 @@ export const VrijheidsMijlpalenWidget = memo(function VrijheidsMijlpalenWidget({
         }
         return rows[rows.length - 1].endPortfolio
       }
-      const buildPath = (rs: typeof rows) =>
+      const buildPath = (rs: NonNullable<typeof rows>) =>
         rs.length === 0
           ? ''
           : rs.map((r, i) => `${i === 0 ? 'M' : 'L'}${toX(r.age).toFixed(1)},${toY(r.endPortfolio).toFixed(1)}`).join(' ')

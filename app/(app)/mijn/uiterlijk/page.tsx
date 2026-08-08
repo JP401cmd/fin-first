@@ -6,6 +6,7 @@ import { FontPicker } from '@/components/mijn/font-picker'
 import { ModuleAccentPicker } from '@/components/mijn/module-accent-picker'
 import { BudgetTintPicker } from '@/components/mijn/budget-tint-picker'
 import { CategoryTintPicker } from '@/components/mijn/category-tint-picker'
+import { SpendLimitAliasPicker } from '@/components/mijn/spend-limit-alias-picker'
 
 export const metadata: Metadata = {
   title: 'Uiterlijk — TriFinity',
@@ -61,7 +62,7 @@ export default function MijnUiterlijkPage() {
                 Geavanceerd
               </span>
               <span className="mt-0.5 block text-sm text-[var(--ink-2)]">
-                Accentkleuren, budget-tints en categoriekaart-tinten
+                Accentkleuren, budget-tints, categoriekaart-tinten en naamgeving
                 fijnregelen
               </span>
             </span>
@@ -85,6 +86,12 @@ export default function MijnUiterlijkPage() {
 
           <div className="mt-4 border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
             <CategoryTintPicker />
+          </div>
+
+          {/* Naamgeving — de weergavenaam voor grenzenpotten. Puur cosmetisch
+              (ADR 0089 besluit 1) en bewust de ENIGE plek waar deze keuze staat. */}
+          <div className="mt-4 border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
+            <SpendLimitAliasPicker />
           </div>
         </details>
 

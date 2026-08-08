@@ -4,7 +4,7 @@
 
 **Methode:** deep-research-harnas (103 agents, 5 zoeksporen, 21 bronnen gefetcht, 105 claims geëxtraheerd, top-25 adversarieel geverifieerd met 3 stemmen per claim → **20 bevestigd, 5 weerlegd**). Anders dan het juni-onderzoek is dit keer óók de TriFinity-kant **tegen de codebase geverifieerd** — elke "wij missen X"-uitspraak hieronder is gecheckt tegen de werkelijke code per 12 juli 2026.
 
-**Relatie tot eerder werk:** dit is een refresh + verdieping van het juni-2026-onderzoek dat de roadmap in `lib/roadmap-functionaliteiten.ts` (zichtbaar op `/beheer/roadmap`) opleverde, en vult de Boldin-inspiratielijst (`docs/reviews/external-boldin-2026-05-08-features.md`) aan.
+**Relatie tot eerder werk:** dit is een refresh + verdieping van het juni-2026-onderzoek dat de roadmap in `lib/roadmap-functionaliteiten.ts` (zichtbaar op `/beheer/roadmap`) opleverde — beide zijn per besluit 02 (aug 2026) verwijderd, de roadmap-items staan sindsdien als kaarten in de Notion-werkqueue en dít document is de blijvende bron — en vult de Boldin-inspiratielijst (`docs/reviews/external-boldin-2026-05-08-features.md`) aan.
 
 ---
 

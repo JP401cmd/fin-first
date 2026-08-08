@@ -167,68 +167,75 @@ const tests: TestCase[] = [
 
   // ── Startpagina routing ──────────────────────────────────────────────────
 
+  // getHomePath is nu de simpele, canonieke variant in lib/module-registry.ts:
+  //   nieuws-only → '/nieuws' (dedicated news-only page), alle andere combinaties
+  //   → '/overzicht'. De oude IA (/core, /will, /berichten) en de inzicht_acties-
+  //   prioriteit bestaan niet meer (canonieke routes: lib/nav-config.ts).
   {
     id: 'mod-home-budget',
-    name: "getHomePath(['budgetteren']) === '/core'",
-    description: 'Alleen budgetteren actief → startpagina is /core (kern overzicht)',
+    name: "getHomePath(['budgetteren']) === '/overzicht'",
+    description: 'Alleen budgetteren actief → startpagina is /overzicht',
     category: CAT,
     priority: 'high',
     estimatedDurationMs: 50,
     fn() {
       const path = getHomePath(['budgetteren'])
-      assertEqual(path, '/core', 'home path for budgetteren')
+      assertEqual(path, '/overzicht', 'home path for budgetteren')
     },
   },
 
   {
     id: 'mod-home-assets',
-    name: "getHomePath(['vermogensregistratie']) === '/core'",
-    description: 'Alleen vermogensregistratie actief → startpagina is /core (kern overzicht)',
+    name: "getHomePath(['vermogensregistratie']) === '/overzicht'",
+    description: 'Alleen vermogensregistratie actief → startpagina is /overzicht',
     category: CAT,
     priority: 'high',
     estimatedDurationMs: 50,
     fn() {
       const path = getHomePath(['vermogensregistratie'])
-      assertEqual(path, '/core', 'home path for vermogensregistratie')
+      assertEqual(path, '/overzicht', 'home path for vermogensregistratie')
     },
   },
 
   {
     id: 'mod-home-dashboard',
-    name: 'getHomePath met inzicht_acties === /wil',
-    description: 'inzicht_acties activeert de rijkste startpagina /wil',
+    name: 'getHomePath met inzicht_acties === /overzicht',
+    description: 'inzicht_acties heeft geen aparte startpagina meer (/will bestaat niet meer, ADR 0001) — landt op /overzicht zoals elke andere combinatie',
     category: CAT,
     priority: 'high',
     estimatedDurationMs: 50,
     fn() {
-      // inzicht_acties has highest priority in getHomePath regardless of other modules
+      // inzicht_acties had ooit voorrang naar /will; die route en prioriteit
+      // zijn verwijderd. getHomePath kent geen speciale casus meer buiten
+      // nieuws-only — alles landt op /overzicht.
       const withInzicht: ModuleId[] = ['budgetteren', 'inzicht_acties']
-      assertEqual(getHomePath(withInzicht), '/will', 'home path with inzicht_acties')
+      assertEqual(getHomePath(withInzicht), '/overzicht', 'home path with inzicht_acties')
 
       // Also works with vermogensregistratie
       const withAssets: ModuleId[] = ['vermogensregistratie', 'inzicht_acties']
-      assertEqual(getHomePath(withAssets), '/will', 'home path with inzicht_acties + assets')
+      assertEqual(getHomePath(withAssets), '/overzicht', 'home path with inzicht_acties + assets')
     },
   },
 
   {
     id: 'mod-home-news-only',
-    name: "getHomePath(['nieuws']) === '/berichten'",
-    description: 'Alleen nieuws actief → startpagina is /berichten (nieuws-only pad)',
+    name: "getHomePath(['nieuws']) === '/nieuws'",
+    description: 'Alleen nieuws actief → startpagina is /nieuws (nieuws-only pad, lib/nav-config.ts)',
     category: CAT,
     priority: 'high',
     estimatedDurationMs: 50,
     fn() {
-      // A user with only the nieuws module active lands on /berichten
-      assertEqual(getHomePath(['nieuws']), '/berichten', 'home path for news-only')
+      // A user with only the nieuws module active lands on /nieuws
+      assertEqual(getHomePath(['nieuws']), '/nieuws', 'home path for news-only')
 
-      // inzicht_acties still takes priority over nieuws when combined
+      // nieuws-only is the ONLY special case; any other combination (even with
+      // inzicht_acties) is just the fallback '/overzicht'.
       const withInzicht: ModuleId[] = ['nieuws', 'budgetteren', 'inzicht_acties']
-      assertEqual(getHomePath(withInzicht), '/will', 'nieuws + inzicht_acties still routes to /will')
+      assertEqual(getHomePath(withInzicht), '/overzicht', 'nieuws + inzicht_acties routes to /overzicht (not news-only: length > 1)')
 
-      // nieuws + budgetteren (no inzicht_acties) routes to /core, not /berichten
+      // nieuws + budgetteren (no inzicht_acties) also routes to /overzicht
       const withBudget: ModuleId[] = ['nieuws', 'budgetteren']
-      assertEqual(getHomePath(withBudget), '/core', 'nieuws + budgetteren routes to /core')
+      assertEqual(getHomePath(withBudget), '/overzicht', 'nieuws + budgetteren routes to /overzicht')
     },
   },
 

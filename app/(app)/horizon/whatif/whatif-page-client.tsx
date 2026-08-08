@@ -9,6 +9,16 @@ import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 
 /**
+ * euro-view: exempt (D12) — dit is de LEGACY backing-route `/horizon/whatif`;
+ * de levende wat-als leeft in `/toekomst` (horizon-client.tsx), waar de
+ * euro-weergave via de render-grens loopt. Deze route krijgt bewust geen
+ * investering buiten deze markering: hem half omzetten zou een tweede,
+ * afwijkend deflatie-pad opleveren voor dezelfde cijfers. Valt onder het
+ * bestaande aandachtspunt `legacy-backing-routes`; bedragen blijven hier
+ * nominaal (toekomstige euro's), net als vandaag.
+ */
+
+/**
  * Masked-aware currency formatter hook. Returns a stable callback that
  * yields either the masked placeholder or a formatted EUR string based on
  * the global privacy toggle.

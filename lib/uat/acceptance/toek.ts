@@ -1,9 +1,16 @@
 /**
- * Acceptatiecriteria — domein Toekomst (WF-TOEK-01..26,28,29,30,32 /
- * UAT-TOEK-01..26,28,29,30,32). WF-TOEK-27 (uitgave-na-pensioen) en WF-TOEK-31
- * (tijdas in huishoud-/partnerperspectief) zijn bewust GEEN eigen criterium: ze
- * zijn in de catalogus verwijsregels naar UAT-REKEN-23/24 resp. UAT-NAV-19 en
- * horen daar getoetst te worden (spiegelt lib/uat/catalog.ts).
+ * Acceptatiecriteria — domein Toekomst (WF-TOEK-01..26,28,29,30,32,33,34 /
+ * UAT-TOEK-01..26,28,29,30,32,33,34). WF-TOEK-27 (uitgave-na-pensioen) en
+ * WF-TOEK-31 (tijdas in huishoud-/partnerperspectief) zijn bewust GEEN eigen
+ * criterium: ze zijn in de catalogus verwijsregels naar UAT-REKEN-23/24 resp.
+ * UAT-NAV-19 en horen daar getoetst te worden (spiegelt lib/uat/catalog.ts).
+ *
+ * WF-TOEK-33/34 (euro-weergave, wave 2/3) zijn NIEUW t.o.v. het UAT-plan —
+ * toegevoegd voor de wave-2/3-euro-weergave-uitrol (Notion-kaart
+ * 39cf9e8d-568a-80fb-8a99-e090c080b964, brok H): 33 toetst de deflatie-math
+ * (exact, pure `lib/euro-display.ts`-functies), 34 toetst de ADR-0091-
+ * maskeringslaag op de grafiek (ui-only, geen cijfer). Beide spiegelen géén
+ * document-workflow.
  *
  * KERNCONVENTIE (uat2-toek.md): de tijdas is KERNEL-ZWAAR. Vrijwel elk getal
  * (FIRE-leeftijd/-datum, benodigd vermogen, projectiepaden, SWR) komt uit de
@@ -453,6 +460,35 @@ const criteria: AcceptanceCriterion[] = [
       source: 'consistentie-eis: kassabon "Financiële Gezondheid" === gezondheidsgetal elders (consume-only, één bron); actiestatus gedeeld met De Wil.',
     },
   },
+  {
+    workflow: 'WF-TOEK-33',
+    scenarioId: 'UAT-TOEK-33',
+    titel: "/toekomst in huidige euro's: grafiek, hero-cijfers, fasetabel — exact één keer gedeeld",
+    kriticiteit: 'KERN',
+    persona: 'willem',
+    given: 'Kernelrijen met een oplopende `inflationFactor` per leeftijd (jaar 0 = 1.0, wave 1/ADR 0032) — synthetisch, hand-narekenbaar met machten van 2 om drijvendekomma-afrondingsruis in de assertie te vermijden: leeftijd 50→factor 1, 51→2, 52→4 (endPortfolio resp. €100.000/€200.000/€400.000).',
+    when: 'De gebruiker zet de euro-weergave-toggle op "Huidige euro\'s"; `horizon-client.tsx` deflateert de chart-rijen/hero-cijfers via `deflateRowsByAge`/`deflate` op de kernelfactor van de bijbehorende leeftijd (render-grens, D3).',
+    then: 'In `\'nominal\'` levert `deflateRowsByAge` exact dezelfde array-referentie terug (geen re-render-cascade, AC-A1). In `\'real\'` deelt elk bedrag door de factor van zíjn eigen leeftijd — bij deze synthetische reeks (die zo is opgezet dat euro-inflatie en portefeuillegroei elkaar exact opheffen) blijft het reële bedrag op elke leeftijd €100.000: `deflate(400000, factorAtAge(rows,52), \'real\')` geeft hetzelfde getal als `deflateRowsByAge` op leeftijd 52. Dit is de kern-eis van D3/NFR-X2: precies één deling op het pad van kernelrij naar scherm, nergens een tweede.',
+    assertion: {
+      kind: 'exact',
+      expected: 'nominalSameRef=true; real50=100000; real51=100000; real52=100000; singleDeflate=100000',
+      source: 'lib/euro-display.ts#deflate + factorAtAge + deflateRowsByAge (échte productiefuncties, synthetische kernelrijen — geen mirror)',
+    },
+  },
+  {
+    workflow: 'WF-TOEK-34',
+    scenarioId: 'UAT-TOEK-34',
+    titel: 'Bedragmaskering op de vrijheidsgrafiek (geometrie blijft, bedragen weg)',
+    kriticiteit: 'BELANGRIJK',
+    persona: 'willem',
+    given: 'Privacy-maskering aan (`useMaskedAmounts`, ADR 0091) op de /toekomst-grafiek, ongeacht euro-weergave.',
+    when: 'De gebruiker zet "Bedragen verbergen" aan terwijl de grafiek open staat, met of zonder de euro-weergave-toggle op "Huidige euro\'s".',
+    then: 'Gridlijnen, nullijn, de positie van elke doellijn, de vermogenslijn, de Monte-Carlo-band, de FIRE-stip en de crosshair-lijn/-stip blijven ONVERANDERD (laag 1, geometrie). Elk euro-bedrag — in zichtbare `<text>` én in `title`/`aria-label` — wordt vervangen door de gemaskeerde placeholder; een los `+`/`−`-teken vóór een gemaskeerd bedrag verdwijnt (richting blijft via kleur/icoon/groepskop). Maskering en euro-weergave zijn onafhankelijke assen (NFR-X4): masked+real tegelijk faalt niet stil naar één van beide. Pure UI-/privacy-laag, geen cijfermatige uitkomst om na te rekenen.',
+    assertion: {
+      kind: 'ui-only',
+      source: 'components/app/horizon/sim-chart.tsx + chart-static-layers.tsx (ADR 0091-maskeringslaag; euro-weergave via lib/euro-display.ts — géén cijfer hier, zie UAT-TOEK-33 voor de deflatie-math)',
+    },
+  },
 ]
 
 export const TOEK_ACCEPTANCE: AcceptanceSet = {
@@ -467,5 +503,5 @@ export const TOEK_ACCEPTANCE: AcceptanceSet = {
  */
 export const TOEK_EXPECTED_WORKFLOW_NUMBERS: number[] = [
   ...Array.from({ length: 26 }, (_, i) => i + 1), // 1..26
-  28, 29, 30, 32,
+  28, 29, 30, 32, 33, 34,
 ]

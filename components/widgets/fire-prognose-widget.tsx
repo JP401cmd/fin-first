@@ -1,6 +1,6 @@
 'use client'
 
-import { memo } from 'react'
+import { memo, useMemo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import { Compass, Users, UserCheck } from 'lucide-react'
@@ -8,6 +8,8 @@ import type { DashboardData } from './widget-renderer'
 import { NL_AOW_AGE } from '@/lib/horizon-data'
 import { weightedExpectedReturn, INVESTMENT_ASSET_TYPES } from '@/lib/dashboard-wealth-weighting'
 import { usePerspective } from '@/components/app/perspective-provider'
+import { useEuroView } from '@/lib/hooks/use-euro-view'
+import { buildFactorByAge, deflateRowsByAge } from '@/lib/euro-display'
 
 interface Props {
   size: WidgetSize
@@ -27,6 +29,23 @@ export const FirePrognoseWidget = memo(function FirePrognoseWidget({ size, data,
 
   const { fireProjResult, freedomPct, fireAgeFractional, simFireCountdown } = data
   const personalCd = simFireCountdown ?? fireProjResult
+
+  // ── EURO-WEERGAVE ─────────────────────────────────────────────────────────
+  // Dit widget toont zelf géén geprojecteerd EURO-bedrag als tekst (countdown,
+  // leeftijd en percentages zijn klasse R — die deflateren nooit). Wat er wél
+  // in euro's staat is de mini-vermogenspad-lijn onderin: elk punt is klasse F
+  // en volgt de kernelfactor van zijn eigen jaar. Zonder deze omzetting zou de
+  // lijn hier een andere vorm hebben dan diezelfde lijn in het
+  // Vermogenspad-widget ernaast zodra de weergave op 'huidige euro's' staat.
+  const { view: euroView } = useEuroView()
+  const viewSimRows = useMemo(() => {
+    const rows = data.simRows
+    if (rows == null) return rows
+    const factorByAge = buildFactorByAge(
+      rows.map(r => ({ age: r.age, inflationFactor: r.inflationFactor ?? 1 })),
+    )
+    return deflateRowsByAge(rows, factorByAge, ['endPortfolio'], euroView)
+  }, [data.simRows, euroView])
 
   // Effective freedom percentage + fractional FIRE age honour the perspective.
   const effectivePct = ov?.freedomPct ?? freedomPct
@@ -252,8 +271,8 @@ export const FirePrognoseWidget = memo(function FirePrognoseWidget({ size, data,
       )}
 
       {/* Mini vermogenspad for full-size — per-user simulation path only */}
-      {size === 'full' && !isShared && data.simRows && data.simRows.length > 1 && (() => {
-        const rows = data.simRows!
+      {size === 'full' && !isShared && viewSimRows && viewSimRows.length > 1 && (() => {
+        const rows = viewSimRows
         const accRows = rows.filter(r => r.phase === 'accumulation')
         if (accRows.length < 2) return null
         const W = 240

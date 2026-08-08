@@ -198,12 +198,16 @@ const tests: TestCase[] = [
     id: 'ds-active-nav-bg-tint',
     name: 'Actieve nav-tab heeft achtergrondtint (bg-*-50/40)',
     category: CAT,
-    description: 'app-header.tsx activeClasses bevat bg-[module]-50/40 achtergrondkleur op actieve tab',
+    // app-header.tsx bestaat niet meer — de nav is verplaatst naar
+    // components/app/shell/bottom-nav-tabs.tsx (mobiele tabbar) +
+    // nav-menu-sheet.tsx (zie CLAUDE.md-vermelding in de opdracht die deze
+    // suite herstelde). bottom-nav-tabs.tsx draagt dezelfde bg-*-50/40 tint.
+    description: 'bottom-nav-tabs.tsx activeClasses bevat bg-[module]-50/40 achtergrondkleur op actieve tab',
     priority: 'medium',
     estimatedDurationMs: 10,
     fn() {
-      const src = readSourceFile('components/app/app-header.tsx')
-      assert(src.length > 0, 'app-header.tsx kon niet gelezen worden')
+      const src = readSourceFile('components/app/shell/bottom-nav-tabs.tsx')
+      assert(src.length > 0, 'bottom-nav-tabs.tsx kon niet gelezen worden')
 
       // Verify each module has a bg-*-50/40 class in activeClasses
       assert(src.includes('bg-kern-50/40'), 'Actieve kern-tab mist bg-kern-50/40 achtergrond')

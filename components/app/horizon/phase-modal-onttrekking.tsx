@@ -11,6 +11,7 @@ import { ChevronRight, ChevronDown } from 'lucide-react'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { formatCurrency } from '@/lib/format'
+import { useEuroView } from '@/lib/hooks/use-euro-view'
 import { PhaseIntro } from '@/components/app/horizon/phase-analysis/phase-intro'
 import { PhaseDiscussButton } from '@/components/app/horizon/phase-analysis/phase-discuss-button'
 import { RegimeKaart, sumIncomeBySource } from '@/components/app/horizon/phase-analysis/regime-kaart'
@@ -103,6 +104,9 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
   currentAge,
 }: PhaseModalOnttrekkingProps) {
   const [assumptionsOpen, setAssumptionsOpen] = useState(false)
+  // Weergave uit de hook, nooit uit een prop: `horizon-client.tsx` passeert de
+  // rekenrijen nominaal en onveranderd (kruis-regime "rekenrijen", D4).
+  const { view: euroView } = useEuroView()
 
   // Filter to withdrawal phase rows
   const withdrawalRows = useMemo(
@@ -119,6 +123,12 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
   const title = `Onttrekkingsfase \u00b7 ${Math.round(startAge)} \u2192 ${Math.round(endAge)} jaar`
 
   // ── Cumulative aggregates from unified rows ──────────────────────────────
+  // euro-view: klasse C (cumulatief over meerdere jaren) — deze aggregaten en de
+  // kassabon eromheen blijven NOMINAAL, inclusief `startPortfolio`,
+  // `endPortfolio` en de kopregel. Zie `phase-modal-opbouw.tsx`: per-term
+  // deflatie breekt de identiteit en dumpt het residu in de afrondingsrij. In
+  // 'real' draagt het blok één grondslag-regel.
+  //
   // The receipt follows the TRUE wealth identity (verified against the unified
   // projection rows): eindvermogen = startvermogen + rendement
   //   − portfolio-onttrekking − Box 3 ± eenmalige kasstromen.
@@ -286,6 +296,8 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
         )}
 
         {/* 2. Fase-header */}
+        {/* euro-view: klasse C — kopregel van het waterval-identiteitsblok
+            hieronder; blijft in elke weergave nominaal, samen met de kassabon. */}
         <div className="text-center">
           <p className="font-sans text-sm font-bold text-[var(--ink)] sm:text-base">
             Onttrekken &middot; {<MaskedAmount value={Math.round(startPortfolio)} tone="horizon" />} &rarr; {<MaskedAmount value={Math.round(endPortfolio)} tone="horizon" />} &middot; {durationYears} jaar
@@ -305,6 +317,11 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
             <p className="mt-0.5 font-sans text-[10px] text-[var(--ink-3)]">
               {strategyLabel} &middot; {durationYears} jaar
             </p>
+            {euroView === 'real' && (
+              <p className="mt-1 font-sans text-[10px] italic text-[var(--ink-3)]">
+                Deze optelling loopt over meerdere jaren en staat in toekomstige euro&rsquo;s.
+              </p>
+            )}
           </div>
 
           {/* Extended receipt rows — vermogensidentiteit (geen AOW/pensioen als

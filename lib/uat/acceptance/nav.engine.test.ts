@@ -9,9 +9,9 @@
  *
  * NAV is — net als SCHULD/TOEK/WILL/OVZ — NIET aaneengesloten op WF-nummer:
  * WF-NAV-13 (uitloggen) heeft geen eigen UAT-NAV-scenario (→ gedekt door
- * UAT-START-15) en ontbreekt dus terecht in de catalogus voor zone NAV. De 25
- * criteria hier zijn wél 1-op-1 met de 25 catalogus-scenario's
- * (UAT-NAV-01..12, 14..26).
+ * UAT-START-15) en ontbreekt dus terecht in de catalogus voor zone NAV. De 26
+ * criteria hier zijn wél 1-op-1 met de 26 catalogus-scenario's
+ * (UAT-NAV-01..12, 14..27).
  */
 
 import { describe, it, expect } from 'vitest'
@@ -34,11 +34,11 @@ function criterion(workflow: string): AcceptanceCriterion {
 }
 
 describe('UAT Nav — acceptatiecriteria dekking', () => {
-  it('heeft precies één criterium per catalogus-NAV-scenario (25 stuks, WF-NAV-13 bestaat niet in de catalogus)', () => {
+  it('heeft precies één criterium per catalogus-NAV-scenario (26 stuks, WF-NAV-13 bestaat niet in de catalogus)', () => {
     const workflows = NAV_ACCEPTANCE.criteria.map((c) => c.workflow).sort()
     expect(workflows).toEqual(catalogNavWorkflows)
     expect(new Set(workflows).size).toBe(catalogNavWorkflows.length)
-    expect(workflows.length).toBe(25)
+    expect(workflows.length).toBe(26)
   })
 
   it('elk criterium heeft een geldige assertion.kind', () => {
@@ -64,7 +64,7 @@ describe('UAT Nav — acceptatiecriteria dekking', () => {
       .sort()
     const checkWorkflows = NAV_ENGINE_CHECKS.map((c) => c.workflow).sort()
     expect(checkWorkflows).toEqual(exactWorkflows)
-    expect(exactWorkflows.length).toBe(9)
+    expect(exactWorkflows.length).toBe(10)
   })
 
   it('markeert het status-dot-consistentiecriterium en de gebonden/procesworkflows met de juiste kind', () => {

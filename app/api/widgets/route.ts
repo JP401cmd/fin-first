@@ -3,14 +3,20 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { unauthorized } from '@/lib/api/respond'
 import type { WidgetPref, WidgetSize } from '@/lib/widget-catalog'
-import { WIDGET_CATALOG, getWidgetDef } from '@/lib/widget-catalog'
+import { WIDGET_CATALOG, getWidgetSizes } from '@/lib/widget-catalog'
 
 /** Server-side size-sanitering: mini wordt nooit gepersisteerd (→ quarter) en
- *  'xl' (Double) is opt-in — alleen geldig als de catalog-def 'm toestaat. */
+ *  'xl' (Double) is opt-in — alleen geldig als de canonieke matenbron 'm toestaat.
+ *
+ *  LET OP: dit MOET `getWidgetSizes` zijn en niet `getWidgetDef(id)?.sizes`.
+ *  Dynamische id's (`spend_limit:*`, `budget_fav:*`, `holding_fav:*`) hebben per
+ *  ontwerp geen catalog-def, dus met `getWidgetDef` viel 'xl' hier server-side
+ *  STIL terug naar 'half' — de gebruiker koos Double, kreeg Half, zonder enige
+ *  foutmelding. `getWidgetSizes` is de enige bron die de prefix-takken kent. */
 function sanitizeSize(id: string, size: unknown): WidgetSize {
   if (size === 'quarter' || size === 'full') return size
   if (size === 'mini') return 'quarter'
-  if (size === 'xl' && getWidgetDef(id)?.sizes.includes('xl')) return 'xl'
+  if (size === 'xl' && getWidgetSizes(id).includes('xl')) return 'xl'
   return 'half'
 }
 
@@ -25,10 +31,15 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'Invalid payload' }, { status: 400 })
     }
 
-    // Validate widget ids against catalog + dynamic budget_fav: prefix
+    // Validate widget ids against catalog + dynamische prefixen
     const validIds = new Set(WIDGET_CATALOG.map(w => w.id))
     const sanitized: WidgetPref[] = body.widgets
-      .filter(w => validIds.has(w.id) || w.id.startsWith('budget_fav:') || w.id.startsWith('holding_fav:'))
+      .filter(w =>
+        validIds.has(w.id) ||
+        w.id.startsWith('budget_fav:') ||
+        w.id.startsWith('holding_fav:') ||
+        w.id.startsWith('spend_limit:')
+      )
       .map(w => ({
         id: w.id,
         enabled: Boolean(w.enabled),

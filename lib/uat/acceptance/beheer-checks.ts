@@ -6,10 +6,10 @@
  * regressiesuite (`lib/regression-tests/suites/uat-beheer.ts`).
  *
  * BEHEER is een admin-tooling-zone ZONDER rekenkern: er zijn **geen 'exact'-
- * criteria** (0). De 33 criteria zijn 9 × `consistency` (een getal komt aantoonbaar
+ * criteria** (0). De 36 criteria zijn 13 × `consistency` (een getal komt aantoonbaar
  * uit een andere bron — bv. de architectuur-plaat-tellingen uit architecture.json,
  * de KPI-counts, de UAT-plaat-aggregatie), 2 × `oracle` (horizon-strategie/-kernel,
- * verifieerbaar via hun eigen transparantie-UI) en 22 × `ui-only`. Geen van die
+ * verifieerbaar via hun eigen transparantie-UI) en 21 × `ui-only`. Geen van die
  * kinds levert een deterministisch, in een pure vitest herleidbaar cijfer, dus deze
  * lijst is bewust **leeg** — de verificatie gebeurt live (Chrome DevTools) resp. via
  * de oracle-UI's, niet in de engine-suite. Zie `beheer.engine.test.ts` voor de

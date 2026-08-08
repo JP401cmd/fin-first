@@ -51,6 +51,7 @@ export const NAV_FLOW: UatFlow = {
     // ── 2 · weergave & privacy ────────────────────────────────────────────
     { id: 'weergavemodus', scenarioId: 'UAT-NAV-10', label: 'WF-NAV-10 · Weergavemodus Eenvoudig ↔ Volledig', kind: 'action', stage: 2, lane: 'weergave' },
     { id: 'privacy', scenarioId: 'UAT-NAV-11', label: 'WF-NAV-11 · Bedragen maskeren', kind: 'action', stage: 2, lane: 'weergave' },
+    { id: 'euroweergave', scenarioId: 'UAT-NAV-27', label: 'WF-NAV-27 · Euro-weergave: toekomstig ↔ huidig', kind: 'action', stage: 2, lane: 'weergave' },
 
     // ── 3 · sessie & uitloggen ────────────────────────────────────────────
     { id: 'sessieverlopen', scenarioId: 'UAT-NAV-12', label: 'WF-NAV-12 · Sessie verlopen: inline herinloggen', kind: 'action', stage: 3, lane: 'sessie' },
@@ -104,6 +105,7 @@ export const NAV_FLOW: UatFlow = {
     // weergave & privacy
     { from: 'paletteacties', to: 'weergavemodus' },
     { from: 'paletteacties', to: 'privacy' },
+    { from: 'paletteacties', to: 'euroweergave' },
 
     // sessie & uitloggen
     { from: 'nav', to: 'sessieverlopen' },
@@ -140,6 +142,7 @@ export const NAV_FLOW: UatFlow = {
     { from: 'palettedata', to: 'uitkomst' },
     { from: 'weergavemodus', to: 'uitkomst' },
     { from: 'privacy', to: 'uitkomst' },
+    { from: 'euroweergave', to: 'uitkomst' },
     { from: 'sessieverlopen', to: 'uitkomst' },
     { from: 'navstack', to: 'uitkomst' },
     { from: 'tabdeeplink', to: 'uitkomst' },

@@ -79,6 +79,7 @@ export async function updateSession(request: NextRequest) {
     '/api/snapshots/cron',
     '/api/holdings/refresh-prices/cron',
     '/api/cron/retention', // AVG-retentie (Arch F3, ADR 0059)
+    '/api/cron/user-reports-notion-sync', // retry van gemiste Notion-pushes (meldingen)
     '/api/web-vitals/retention/cron', // web_vitals-retentie (feature 885)
     '/api/news-ingest/cron', // dagelijkse nieuws-ingest
     '/api/briefing/email/cron', // wekelijkse briefing-mail

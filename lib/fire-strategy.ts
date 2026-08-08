@@ -144,6 +144,62 @@ export function resolveFreedomFraming(input: FreedomStateInput): FreedomFraming 
   return 'free'
 }
 
+// ── Seam: DREMPEL vs. WEERGAVE van de vrijheidsleeftijd ────────────────────
+//
+// De vrijheidsleeftijd heeft twee rollen die makkelijk verwisseld raken:
+//  - DREMPEL  — `currentAge >= fireAge` in `isFinanciallyFree`. Moet de
+//               FRACTIONELE waarde zijn (`fireAgeFractional` uit de bundel).
+//  - WEERGAVE — het getal dat als vrijheidsleeftijd op het scherm staat
+//               (strip-label, grafiekmarker). Dat hoort afgerond.
+//
+// Ze zíjn verwisseld geweest (WF-CANON-03): een afgeronde 45,3 werd 45, en bij
+// een currentAge van 45 sloeg "financieel vrij" daardoor tot zes maanden te
+// vroeg om. De fix daarvan leefde in de AANROEPER en was daarmee onbewaakt —
+// `fireAge: fireAge` is een compilerende, plausibel ogende shorthand die geen
+// enkele test rood maakt.
+//
+// Daarom leiden aanroepers beide waarden af uit deze ene helper, die alléén de
+// fractionele leeftijd als invoer accepteert. Rond in aanroepers niet zelf af.
+
+/**
+ * Vrijheidsleeftijd voor WEERGAVE: afgerond op hele jaren. Nooit als drempel
+ * gebruiken — daarvoor is de fractionele waarde nodig (zie `FreedomStateInput`).
+ */
+export function fireAgeForDisplay(fireAgeFractional: number | null | undefined): number | null {
+  if (fireAgeFractional == null || !Number.isFinite(fireAgeFractional)) return null
+  return Math.round(fireAgeFractional)
+}
+
+/** Invoer voor `resolveFreedomAgeView` — bewust ALLEEN de fractionele leeftijd. */
+export interface FreedomAgeViewInput extends Omit<FreedomStateInput, 'fireAge'> {
+  /** Fractionele vrijheids-/FIRE-leeftijd uit de bundel (`fireAgeFractional`). */
+  fireAgeFractional: number | null
+}
+
+export interface FreedomAgeView {
+  /** Afgerond — uitsluitend voor weergave. */
+  fireAgeDisplay: number | null
+  /** Framing, bepaald op de fractionele drempel. */
+  framing: FreedomFraming
+}
+
+/**
+ * Leidt de weergave-leeftijd én de framing af uit één fractionele invoer, zodat
+ * een aanroeper de twee rollen niet meer kan verwisselen. Bewaakt door
+ * `fire-strategy.test.ts` ("rondt af voor WEERGAVE maar toetst de DREMPEL
+ * fractioneel").
+ */
+export function resolveFreedomAgeView({
+  fireAgeFractional,
+  ...rest
+}: FreedomAgeViewInput): FreedomAgeView {
+  const state: FreedomStateInput = { ...rest, fireAge: fireAgeFractional }
+  return {
+    fireAgeDisplay: fireAgeForDisplay(fireAgeFractional),
+    framing: resolveFreedomFraming(state),
+  }
+}
+
 /**
  * Resolve the fire strategy with feature_preferences fallback.
  * When the DB CHECK constraint doesn't yet include 'pensioen', the fire-settings API

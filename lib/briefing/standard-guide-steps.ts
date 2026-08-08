@@ -78,7 +78,8 @@ export const STANDARD_GUIDE_STEPS = DEFAULT_STANDARD_GUIDE_STEPS
  * Get standard-guide steps met optionele override-array uit app_settings.
  * Returnt de override wanneer aanwezig en valide, anders de defaults.
  *
- * Spiegelt het patroon van `getGoalGuideSteps()`. Admin-API-route
+ * Spiegelde het patroon van `getGoalGuideSteps()` (verwijderd 8 aug 2026 met
+ * /beheer/doelen). Admin-API-route
  * (`/api/standard-guide/steps`) gebruikt deze getter om de actuele lijst
  * terug te geven. User-facing (`StandaardStappenplanCard`) gebruikt
  * vooralsnog de defaults — gelijk aan goal/module-guide bestaande

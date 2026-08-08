@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Shield, Eye, EyeOff, Server, FileText } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
+import { LegalEmail } from '@/components/legal/legal-email'
 
 /**
  * AiPrivacySettings — AI-toggle, financiële toelichting en de
@@ -446,18 +447,18 @@ export function AiPrivacySettings() {
             <h3 className="mb-2 text-sm font-semibold text-[var(--ink)]">5. Contact</h3>
             <p className="text-sm text-[var(--ink-2)] leading-relaxed">
               Heb je vragen over je privacy of wil je een van je rechten uitoefenen? Neem contact op via{' '}
-              <a
-                href="mailto:privacy@trifinity.nl"
+              <LegalEmail
+                kind="privacy"
                 className="font-medium text-wil-600 hover:text-wil-700 underline underline-offset-2"
-              >
-                privacy@trifinity.nl
-              </a>
+              />
+              . Dat adres volgt zodra TriFinity een eigen internetdomein heeft; zolang de app in
+              besloten testfase is, loopt contact via degene die je je uitnodiging heeft gestuurd.
             </p>
           </div>
 
           <div className="border-t border-[var(--border-ed)] pt-4">
             <p className="text-xs text-[var(--ink-4)]">
-              Versie 2.0 — concept, laatst bijgewerkt: 4 juli 2026. De volledige, actuele
+              Versie 2.1 — concept, laatst bijgewerkt: 7 augustus 2026. De volledige, actuele
               privacyverklaring staat op{' '}
               <a
                 href="/privacy"

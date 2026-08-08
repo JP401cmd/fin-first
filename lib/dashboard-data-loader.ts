@@ -56,6 +56,7 @@ import { WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
 import { computeScalarFireProjection, computeScalarFireRange, computeScalarFreedomMilestones, type ScalarFireParams } from '@/lib/horizon-kernel/scalar-router'
 import { computeHorizonFireSim } from '@/lib/fire-target-shared'
 import { buildSimNetWorthRows } from '@/lib/horizon/networth-rows'
+import { buildFactorByAge } from '@/lib/euro-display'
 import { clipRowsToPlanEnd } from '@/lib/horizon/clip-rows-to-plan-end'
 import type { RegelSimSnapshot } from '@/lib/future/regel-sim'
 import { resolvePotRules, POT_RULES_DEFAULTS, type PotRulesConfig } from '@/lib/pot-rules'
@@ -103,6 +104,8 @@ import { fetchLatestSnapshotsByMonth } from '@/lib/server-data/snapshot-aggregat
 import { buildDebtSaldoHistory } from '@/lib/load-debt-balance-history'
 import { computeSovereigntyLevel, levelToPhaseId } from '@/lib/feature-phases'
 import { mergeWidgetPrefs, type WidgetSize } from '@/lib/widget-catalog'
+import { loadSpendLimitsSection } from '@/lib/spend-limits/loader'
+import { toSpendLimitWidgetData } from '@/lib/spend-limits/widget-data'
 import { computePortfolioFees, computeFeeImpactOnFire } from '@/lib/fee-analysis'
 import {
   computeDrift,
@@ -746,6 +749,31 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   const rawWidgetPrefs = profileResult.data?.widget_prefs as WidgetPrefs | null
   const widgetPrefs = mergeWidgetPrefs(rawWidgetPrefs)
 
+  // ── Grenzenpotten (spend limits) ────────────────────────────────────────────
+  // COMPUTE-GATE: `loadSpendLimitsSection` doet zijn config-query áltijd eerst en
+  // stopt daar wanneer je geen pot hebt — één goedkope, indexed query voor
+  // verreweg de meeste accounts. `withBudgetOptions: false` slaat de keuzelijst
+  // van het formulier over (die hoort op de transactiepagina, niet hier);
+  // `withDailyExpenseRate: false` slaat de dagtarief-afleiding over omdat de
+  // widget die uit DEZE bundel haalt (`dailyExpenseRate ?? dailyExpenseRate(monthlyExpenses)`).
+  //
+  // BEWUST NIET SAMENGEVOEGD met de 12-maands `getTxAgg12m`-cache hierboven
+  // (NFR-B2-03): spend-limits kijkt 13 maanden / 9 kwartalen / 4 jaar terug en
+  // snijdt op kalenderperiode-grenzen. Zou de widget uit de 12-maands cache
+  // lezen, dan kan dezelfde pot op /overzicht een ander getal tonen dan op de
+  // transactiepagina. De extra RPC is de prijs van één canoniek venster.
+  const spendLimitsSection = await loadSpendLimitsSection(supabase, now, {
+    withBudgetOptions: false,
+    withDailyExpenseRate: false,
+  })
+  // Projectie, geen berekening: `toSpendLimitWidgetData` selecteert uit het
+  // rapport dat de motor al produceerde (consume, don't recompute).
+  const spendLimitWidgets = spendLimitsSection.limits.map(l =>
+    toSpendLimitWidgetData(l, {
+      aggregateTruncationSuspected: spendLimitsSection.aggregateTruncationSuspected,
+    }),
+  )
+
   // Inject dynamic favorite budget widget prefs (merge with saved positions)
   const savedFavIds = new Set(widgetPrefs.widgets.filter(w => w.id.startsWith('budget_fav:')).map(w => w.id))
   const currentFavIds = new Set(favoriteBudgets.map(b => `budget_fav:${b.id}`))
@@ -771,13 +799,34 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       order: lowestOrder - 200 + i,
     }))
 
+  // Inject dynamic spend-limit widget prefs (spiegel van de favoriet-injectie).
+  // INJECTIE alleen voor ACTIEVE potten: een gepauzeerde pot krijgt geen nieuwe
+  // widget. De STALE-set hieronder bevat juist álle niet-gearchiveerde potten
+  // (actief én gepauzeerd), zodat pauzeren de opgeslagen pref niet wist en een
+  // bewuste "widget uit"-keuze (enabled:false) een pauze/hervat-cyclus overleeft
+  // (FR-B2-03/04, AC-B2-02). Alleen archiveren ruimt de pref op (AC-B2-03).
+  const savedSpendLimitIds = new Set(
+    widgetPrefs.widgets.filter(w => w.id.startsWith('spend_limit:')).map(w => w.id),
+  )
+  const currentSpendLimitIds = new Set(spendLimitWidgets.map(s => `spend_limit:${s.id}`))
+  const newSpendLimitPrefs: WidgetPref[] = spendLimitWidgets
+    .filter(s => s.isActive && !savedSpendLimitIds.has(`spend_limit:${s.id}`))
+    .map((s, i) => ({
+      id: `spend_limit:${s.id}`,
+      enabled: true,
+      size: 'quarter' as WidgetSize,
+      order: lowestOrder - 300 + i,
+    }))
+
   // Combine: catalog widgets + saved fav prefs (only if still favorited) + new fav prefs
   const allWidgetPrefs = [
     ...widgetPrefs.widgets
       .filter(w => !w.id.startsWith('budget_fav:') || currentFavIds.has(w.id))
-      .filter(w => !w.id.startsWith('holding_fav:') || currentHoldingFavIds.has(w.id)),
+      .filter(w => !w.id.startsWith('holding_fav:') || currentHoldingFavIds.has(w.id))
+      .filter(w => !w.id.startsWith('spend_limit:') || currentSpendLimitIds.has(w.id)),
     ...newFavPrefs,
     ...newHoldingFavPrefs,
+    ...newSpendLimitPrefs,
   ]
   const activeWidgets = allWidgetPrefs
     .filter(w => w.enabled)
@@ -1001,12 +1050,16 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // Horizon extra: sim rows for vermogenspad chart
   // Uses runUnifiedProjection() — the same engine as the horizon page — for per-asset-type
   // rendement, per-schuld aflossing, and proper Box 3 per asset category.
-  let simRows: { age: number; endPortfolio: number; phase: string; flowIn: number; flowOut: number; oneTimeNet: number }[] | null = null
+  // `inflationFactor` is hier BEWUST verplicht (anders dan op de bundel, waar hij
+  // optioneel is voor hand-gebouwde fixtures): zo dwingt de compiler af dat de
+  // join hieronder daadwerkelijk gebeurt en er nooit een factor-loze rij de
+  // /overzicht-bundel in glipt.
+  let simRows: { age: number; endPortfolio: number; phase: string; flowIn: number; flowOut: number; oneTimeNet: number; inflationFactor: number }[] | null = null
   // Geprojecteerd VOLLEDIG netto vermogen per jaar (FIRE-pot + meegroeiende
   // niet-liquide assets die uit de FIRE-pot gefilterd zijn). Náást endPortfolio,
   // zodat de /overzicht-grafiek de Vandaag→projectie-lijn continu houdt met het
   // Vandaag-punt (= volledig netto vermogen incl. huis). Zie buildSimNetWorthRows.
-  let simNetWorthRows: { age: number; netWorth: number }[] | null = null
+  let simNetWorthRows: { age: number; netWorth: number; inflationFactor: number }[] | null = null
   let simRequiredPortfolio: number | null = null
   // FIRE-doel INCL. eigen woning (Prognose!I@FIRE) — spiegelt simRequiredPortfolio (liquide,
   // Prognose!J@FIRE). Puur uit de sim (requiredFireNetWorth via de kernel-bridge), geen eigen som.
@@ -1048,6 +1101,12 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
         // is terminale modelmarge en hoort niet in beeld). Zonder deze clip toonde de
         // /overzicht-widget één jaar méér dan de canonieke /horizon-pagina. clipRowsToPlanEnd
         // is puur/idempotent; simNetWorthRows erft de clip (bouwt hierop voort).
+        // Weergave-deflator erbij (ADR 0090): `SimRow` draagt `inflationFactor` NIET,
+        // de kernelrijen wél. `shared.unifiedRows` is diezelfde run, compact. JOIN OP
+        // LEEFTIJD, niet op index — `clipRowsToPlanEnd` knipt de reeks hieronder, dus
+        // posities lopen niet gegarandeerd gelijk; leeftijd is de enige sleutel die
+        // dat overleeft. Géén eigen `Math.pow`: de factor wordt gelezen, niet berekend.
+        const factorByAge = buildFactorByAge(shared.unifiedRows)
         simRows = clipRowsToPlanEnd(simResult.rows, simResult.displayEndAge).map(r => ({
           age: r.age,
           endPortfolio: r.endPortfolio,
@@ -1055,6 +1114,9 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
           flowIn: r.flowIn,
           flowOut: r.flowOut,
           oneTimeNet: r.oneTimeNet,
+          // Ontbrekende of onbruikbare factor ⇒ 1 = geen deflatie. Zelfde conventie
+          // als `factorAtAge`: liever het nominale bedrag dan een verkeerd bedrag.
+          inflationFactor: factorByAge.get(r.age) ?? 1,
         }))
         // Geprojecteerd VOLLEDIG netto vermogen per jaar (incl. niet-liquide assets). De
         // horizon-kernel houdt het eigen huis voor ÉLKE housing-modus in het grootboek
@@ -2520,6 +2582,9 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     favoriteBudgets,
     topBudgets,
     favoriteHoldings,
+    // Alle niet-gearchiveerde grenzenpotten (actief én gepauzeerd) als compacte
+    // projectie — voedt de `spend_limit:<id>`-widgets én hun stale-check.
+    spendLimitWidgets,
     allBudgets,
     // Real widget data from queries and computations
     notifications,

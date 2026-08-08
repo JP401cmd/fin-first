@@ -52,14 +52,19 @@ describe('BEHEER_FLOW — curatie-integriteit', () => {
     expect(crossNodes.length).toBe(0)
   })
 
-  it("dekt alle 37 BEHEER-scenario's (01..37, contiguous — geen verwijsregels)", () => {
+  it("dekt alle 36 BEHEER-scenario's (01..37 met één gat: 12 is vervallen)", () => {
     const covered = new Set(
       BEHEER_FLOW.nodes.map((n) => n.scenarioId).filter((id): id is string => Boolean(id)),
     )
-    const expected = Array.from({ length: 37 }, (_, i) => `UAT-BEHEER-${String(i + 1).padStart(2, '0')}`)
+    // UAT-BEHEER-12 (doelgids) is vervallen op 8 aug 2026; het nummer wordt
+    // bewust niet hergebruikt, want scenario-ID's sleutelen opgeslagen UAT-
+    // resultaten in Supabase. De catalogus is de bron van waarheid.
+    const expected = UAT_SCENARIOS.filter((s) => s.zone === 'BEHEER').map((s) => s.id)
+    expect(expected).not.toContain('UAT-BEHEER-12')
     for (const id of expected) {
       expect(covered.has(id), `${id} moet als flow-knoop voorkomen`).toBe(true)
     }
-    expect(covered.size).toBe(37)
+    expect(covered.size).toBe(36)
+    expect(expected.length).toBe(36)
   })
 })

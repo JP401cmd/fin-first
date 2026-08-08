@@ -161,10 +161,10 @@ export const CryptoSparkline = memo(function CryptoSparkline({
       data-trend={trend}
       aria-label={
         trend === 'up'
-          ? 'Prijs hoger dan een week geleden'
+          ? 'Prijs gestegen over de weergegeven periode'
           : trend === 'down'
-            ? 'Prijs lager dan een week geleden'
-            : 'Prijs ongeveer gelijk aan een week geleden'
+            ? 'Prijs gedaald over de weergegeven periode'
+            : 'Prijs ongeveer gelijk over de weergegeven periode'
       }
     >
       <svg

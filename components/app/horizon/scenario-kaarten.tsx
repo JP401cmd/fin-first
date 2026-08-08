@@ -9,6 +9,11 @@
  * tinten, géén module-accent), het preset-label als serif-titel, en drie meet-rijen
  * (stoppen · maandruimte-of-delta · laagste buffer). Bedragen tabular-nums; de laagste
  * buffer is een BEDRAG en gaat daarom altijd via `MaskedAmount` (masking-plicht).
+ *
+ * EURO-WEERGAVE: dit component rekent niets om. `laagsteBuffer.bedrag` komt al
+ * omgezet binnen uit het render-grensblok van `horizon-client.tsx` (klasse S op
+ * `laagsteBuffer.age`). `maandruimteOfDelta` is de INSTELLING van de kaart
+ * (−€300/mnd, +€250/mnd) — een bedrag van vandaag en dus per definitie exempt.
  */
 
 import { formatCurrency } from '@/lib/format'

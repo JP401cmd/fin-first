@@ -47,7 +47,7 @@ describe('TOEK_FLOW — curatie-integriteit', () => {
     }
   })
 
-  it('dekt de verwachte statusdragende WF-TOEK-scenario\'s (01..26,28,29,30,32)', () => {
+  it('dekt de verwachte statusdragende WF-TOEK-scenario\'s (01..26,28,29,30,32,33,34)', () => {
     const covered = new Set(
       TOEK_FLOW.nodes.map((n) => n.scenarioId).filter((id): id is string => Boolean(id)),
     )
@@ -55,7 +55,7 @@ describe('TOEK_FLOW — curatie-integriteit', () => {
     // verwijsregels en hebben bewust geen eigen TOEK-scenario/knoop.
     const expected = [
       ...Array.from({ length: 26 }, (_, i) => i + 1), // 1..26
-      28, 29, 30, 32,
+      28, 29, 30, 32, 33, 34,
     ].map((n) => `UAT-TOEK-${String(n).padStart(2, '0')}`)
     for (const id of expected) {
       expect(covered.has(id), `${id} moet als flow-knoop voorkomen`).toBe(true)

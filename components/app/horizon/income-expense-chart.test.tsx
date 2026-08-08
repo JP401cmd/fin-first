@@ -1,6 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { IncomeExpenseChart } from './income-expense-chart'
+import { MASKED_AMOUNT_PLACEHOLDER } from '@/lib/format'
 import type { SimRow } from '@/lib/fire-simulation'
 
 vi.mock('@/lib/hooks/use-in-view-animation', () => ({
@@ -11,6 +12,13 @@ vi.mock('@/lib/hooks/use-in-view-animation', () => ({
   }),
 }))
 
+// Stuurbare privacy-mock — default zichtbaar; per test op masked te zetten
+// (zelfde patroon als sim-chart.test.tsx).
+const mockPrivacy = { masked: false }
+vi.mock('@/lib/hooks/use-privacy', () => ({
+  useMaskedAmounts: () => mockPrivacy,
+}))
+
 class MockResizeObserver {
   observe = vi.fn()
   unobserve = vi.fn()
@@ -18,6 +26,7 @@ class MockResizeObserver {
 }
 
 beforeEach(() => {
+  mockPrivacy.masked = false
   global.ResizeObserver = MockResizeObserver as unknown as typeof ResizeObserver
 })
 
@@ -392,5 +401,162 @@ describe('IncomeExpenseChart — breakdown mode', () => {
 
     // Breakdown mode uses a taller viewBox than lines mode
     expect(mobileHeight).toBeGreaterThan(linesHeight)
+  })
+})
+
+// ── Bedragmaskering (ADR 0091) ──────────────────────────────────────────────
+//
+// Given een gebruiker die op /toekomst "Bedragen verbergen" aanzet, When de
+// subgrafiek "Inkomen & Uitgaven" rendert (lijnen én bronnen), Then draagt geen
+// enkel <text>, title of aria-label nog een euro-bedrag: de Y-as-ticks
+// verdwijnen volledig (ADR 0091: "bullets op een as zijn ruis"), tooltips tonen
+// de bullets, en de geometrie — gridlijnen, staven, paden — blijft identiek.
+
+/** Rijen met echte jaarstromen, zodat de Y-as en de tooltip bedragen dragen. */
+function makeFlowRows(count: number, startAge: number): SimRow[] {
+  return Array.from({ length: count }, (_, i) => ({
+    ...makeRows(1, startAge + i)[0],
+    flowIn: 115_000 - i * 1_000,
+    flowOut: 76_000 + i * 500,
+  }))
+}
+
+/** Alle tekst die een gebruiker of screenreader kan oppikken. */
+function leesbareTeksten(container: HTMLElement): string[] {
+  const uit: string[] = []
+  container.querySelectorAll('text, title').forEach(el => uit.push(el.textContent ?? ''))
+  container.querySelectorAll('[aria-label], [title]').forEach(el => {
+    uit.push(el.getAttribute('aria-label') ?? '')
+    uit.push(el.getAttribute('title') ?? '')
+  })
+  return uit.filter(Boolean)
+}
+
+function pathDs(container: HTMLElement): (string | null)[] {
+  return Array.from(container.querySelectorAll('path')).map(p => p.getAttribute('d'))
+}
+
+function lijnPosities(container: HTMLElement): string[] {
+  return Array.from(container.querySelectorAll('line')).map(
+    l => `${l.getAttribute('x1')}|${l.getAttribute('x2')}|${l.getAttribute('y1')}|${l.getAttribute('y2')}`,
+  )
+}
+
+function rectPosities(container: HTMLElement): string[] {
+  return Array.from(container.querySelectorAll('rect')).map(
+    r => `${r.getAttribute('x')}|${r.getAttribute('y')}|${r.getAttribute('width')}|${r.getAttribute('height')}`,
+  )
+}
+
+const BOUNDING_RECT = {
+  left: 0, top: 0, right: 600, bottom: 120, width: 600, height: 120, x: 0, y: 0,
+  toJSON: () => ({}),
+} as DOMRect
+
+/** x=120 ⇒ 35 + ((120−60)/524)·9 = 36,03 ⇒ afgerond leeftijd 36. */
+const HOVER_X = 120
+
+function linesProps() {
+  return { rows: makeFlowRows(10, 35), currentAge: 35, endAge: 44 } as const
+}
+
+function breakdownProps() {
+  return {
+    rows: makeFlowRows(5, 35),
+    currentAge: 35,
+    endAge: 39,
+    viewMode: 'breakdown' as const,
+    breakdownResult: makeBreakdownResult(35, 5),
+  }
+}
+
+describe('IncomeExpenseChart — bedragmaskering (ADR 0091)', () => {
+  let rectSpy: ReturnType<typeof vi.spyOn>
+
+  beforeEach(() => {
+    rectSpy = vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue(BOUNDING_RECT)
+  })
+
+  afterEach(() => {
+    rectSpy.mockRestore()
+  })
+
+  it('lijnenmodus ongemaskeerd: de Y-as draagt euro-ticks (het vertrekpunt)', () => {
+    const { container } = render(<IncomeExpenseChart {...linesProps()} />)
+    const bedragen = leesbareTeksten(container).filter(t => t.includes('€'))
+    expect(bedragen.length).toBeGreaterThanOrEqual(4) // vier Y-ticks
+  })
+
+  it('lijnenmodus gemaskeerd: geen euroteken in text, title of aria-label', () => {
+    mockPrivacy.masked = true
+    const { container } = render(<IncomeExpenseChart {...linesProps()} />)
+    fireEvent.mouseMove(container.querySelector('svg')!, { clientX: HOVER_X, clientY: 60 })
+
+    for (const tekst of leesbareTeksten(container)) {
+      expect(tekst).not.toContain('€')
+    }
+    expect(container.textContent).not.toContain('€')
+  })
+
+  it('lijnenmodus gemaskeerd: geen bedrag-ticks op de as, x-as-leeftijden blijven', () => {
+    const { container: zichtbaar } = render(<IncomeExpenseChart {...linesProps()} />)
+    const tellingZichtbaar = zichtbaar.querySelectorAll('text').length
+
+    mockPrivacy.masked = true
+    const { container: gemaskeerd } = render(<IncomeExpenseChart {...linesProps()} />)
+    // De vier Y-ticks vallen weg — niet vervangen door bullets (ADR 0091).
+    expect(gemaskeerd.querySelectorAll('text').length).toBe(tellingZichtbaar - 4)
+    for (const el of Array.from(gemaskeerd.querySelectorAll('text'))) {
+      expect(el.textContent ?? '').not.toContain(MASKED_AMOUNT_PLACEHOLDER)
+    }
+    expect(gemaskeerd.textContent).toContain('40') // x-as-leeftijd blijft (laag 3)
+  })
+
+  it('lijnenmodus gemaskeerd: de tooltip toont bullets, labels en leeftijd blijven', () => {
+    mockPrivacy.masked = true
+    const { container } = render(<IncomeExpenseChart {...linesProps()} />)
+    fireEvent.mouseMove(container.querySelector('svg')!, { clientX: HOVER_X, clientY: 60 })
+
+    const teksten = leesbareTeksten(container)
+    expect(teksten.some(t => t.includes('Leeftijd 36'))).toBe(true)
+    expect(teksten.filter(t => t.includes(MASKED_AMOUNT_PLACEHOLDER)).length).toBeGreaterThanOrEqual(3)
+    // Richting blijft in het woord, niet in een los teken vóór de bullets.
+    expect(container.textContent).toContain('netto')
+    expect(container.textContent).not.toContain(`+${MASKED_AMOUNT_PLACEHOLDER}`)
+  })
+
+  it('lijnenmodus: geometrie identiek met en zonder maskering', () => {
+    const { container: zichtbaar } = render(<IncomeExpenseChart {...linesProps()} />)
+    const padenZichtbaar = pathDs(zichtbaar)
+    const lijnenZichtbaar = lijnPosities(zichtbaar)
+
+    mockPrivacy.masked = true
+    const { container: gemaskeerd } = render(<IncomeExpenseChart {...linesProps()} />)
+    expect(pathDs(gemaskeerd)).toEqual(padenZichtbaar)
+    expect(lijnPosities(gemaskeerd)).toEqual(lijnenZichtbaar)
+  })
+
+  it('bronnenmodus gemaskeerd: geen euroteken, staafgeometrie ongewijzigd', () => {
+    const { container: zichtbaar } = render(<IncomeExpenseChart {...breakdownProps()} />)
+    expect(leesbareTeksten(zichtbaar).some(t => t.includes('€'))).toBe(true)
+    const rectsZichtbaar = rectPosities(zichtbaar)
+
+    mockPrivacy.masked = true
+    const { container: gemaskeerd } = render(<IncomeExpenseChart {...breakdownProps()} />)
+    fireEvent.mouseMove(gemaskeerd.querySelector('svg')!, { clientX: HOVER_X, clientY: 60 })
+
+    for (const tekst of leesbareTeksten(gemaskeerd)) {
+      expect(tekst).not.toContain('€')
+    }
+    expect(rectPosities(gemaskeerd).slice(0, rectsZichtbaar.length)).toEqual(rectsZichtbaar)
+    // De legenda-labels (bronnen) blijven volledig leesbaar.
+    expect(gemaskeerd.textContent).toContain('Besparingen')
+  })
+
+  it('het propcontract blijft ongewijzigd: maskering komt uit de hook, niet uit een prop', () => {
+    // @ts-expect-error — `masked` is GEEN prop van IncomeExpenseChart: zou dit
+    // compileren, dan was het propcontract stilzwijgend verbreed.
+    const metMasked = <IncomeExpenseChart {...linesProps()} masked />
+    expect(metMasked).toBeTruthy()
   })
 })

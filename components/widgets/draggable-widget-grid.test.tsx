@@ -497,6 +497,125 @@ describe('DraggableWidgetGrid — Double (xl) size', () => {
   })
 })
 
+// ── Grenzenpotten (spend_limit:*) ───────────────────────────────────────────
+//
+// De pot-widget is een DYNAMISCHE id zonder catalog-entry. Drie dingen die
+// daardoor stil kunnen breken en hier gepind worden:
+//   1. zichtbaarheid zonder budgetteren (een tegenpartij-regel werkt volledig
+//      zonder budgetten — een budgeting-gate zou 'm onterecht verbergen);
+//   2. "vul dashboard" bewaart de tegel (hij staat niet in WIDGET_CATALOG en
+//      zou zonder preserve-tak stil verdwijnen);
+//   3. verbergen doet GEEN reverse-sync — het equivalent van "favoriet uit"
+//      zou hier het archiveren van een gedragsnorm mét historie zijn.
+describe('DraggableWidgetGrid — grenzenpot-widgets', () => {
+  beforeEach(() => {
+    mockIsMobile = false
+    mockFetch.mockResolvedValue({ ok: true })
+  })
+
+  const potData: DashboardData = {
+    ...mockData,
+    budgetingActive: false,
+    spendLimitWidgets: [
+      {
+        id: 'POT-1',
+        name: 'Tankstations',
+        ruleType: 'counterparty',
+        period: 'month',
+        isActive: true,
+        limitAmount: 200,
+        currentPeriodKey: '2026-08',
+        currentPeriodLabel: 'augustus 2026',
+        currentMatchedAmount: 120,
+        currentHeadroom: 80,
+        currentOverAmount: 0,
+        status: 'within',
+        isNearLimit: false,
+        currentStreak: 4,
+        longestStreak: 7,
+        closedPeriodCount: 12,
+        exceededPeriodCount: 3,
+        withinPeriodCount: 9,
+        sparkClosedMatchedAmounts: [100, 130, 90],
+        trendDirection: 'improving',
+        aggregateTruncationSuspected: false,
+      },
+    ],
+  }
+
+  it('is zichtbaar met de budgetteren-module uit (geen budgeting-gate)', () => {
+    const prefs = makePrefs(['spend_limit:POT-1'])
+    render(<DraggableWidgetGrid initialPrefs={prefs} allPrefs={prefs} data={potData} />)
+    expect(screen.getByTestId('widget-item-spend_limit:POT-1')).toBeInTheDocument()
+  })
+
+  it('verdwijnt zodra de pot niet meer in de bundel zit (gearchiveerd)', () => {
+    const prefs = makePrefs(['spend_limit:POT-1'])
+    const archived: DashboardData = { ...potData, spendLimitWidgets: [] }
+    render(<DraggableWidgetGrid initialPrefs={prefs} allPrefs={prefs} data={archived} />)
+    expect(screen.queryByTestId('widget-item-spend_limit:POT-1')).not.toBeInTheDocument()
+  })
+
+  it('blijft staan bij een GEPAUZEERDE pot (pauzeren wist de widget niet)', () => {
+    const prefs = makePrefs(['spend_limit:POT-1'])
+    const paused: DashboardData = {
+      ...potData,
+      spendLimitWidgets: [{ ...potData.spendLimitWidgets![0], isActive: false }],
+    }
+    render(<DraggableWidgetGrid initialPrefs={prefs} allPrefs={prefs} data={paused} />)
+    expect(screen.getByTestId('widget-item-spend_limit:POT-1')).toBeInTheDocument()
+  })
+
+  it('"vul dashboard" bewaart de pot-widget i.p.v. hem stil te wissen', async () => {
+    const prefs = makePrefs(['spend_limit:POT-1'])
+    render(
+      <DraggableWidgetGrid
+        initialPrefs={prefs}
+        allPrefs={prefs}
+        data={potData}
+        editMode={true}
+        onEditModeChange={() => {}}
+      />
+    )
+    const fillBtn = await screen.findByTestId('fill-all-half-btn')
+    await act(async () => { fillBtn.click() })
+    mockFetch.mockClear()
+    await act(async () => { screen.getByTestId('bulk-action-confirm').click() })
+
+    const saveCall = mockFetch.mock.calls.find(([url]) => url === '/api/widgets')
+    expect(saveCall).toBeTruthy()
+    const body = JSON.parse((saveCall![1] as RequestInit).body as string) as {
+      widgets: { id: string; enabled: boolean }[]
+    }
+    const pot = body.widgets.find(w => w.id === 'spend_limit:POT-1')
+    expect(pot).toBeTruthy()
+    expect(pot!.enabled).toBe(true)
+  })
+
+  it('verbergen persisteert enabled:false en doet GEEN reverse-sync naar de pot', async () => {
+    const prefs = makePrefs(['spend_limit:POT-1'])
+    render(
+      <DraggableWidgetGrid
+        initialPrefs={prefs}
+        allPrefs={prefs}
+        data={potData}
+        editMode={true}
+        onEditModeChange={() => {}}
+      />
+    )
+    const hideBtn = await screen.findByRole('button', { name: 'Verberg spend_limit:POT-1 widget' })
+    mockFetch.mockClear()
+    await act(async () => { hideBtn.click() })
+
+    // Geen enkele mutatie op de pot zelf (archiveren/pauzeren): alleen de
+    // widget-prefs mogen bewegen.
+    expect(
+      mockFetch.mock.calls.some(([url]) => String(url).startsWith('/api/spend-limits'))
+    ).toBe(false)
+    expect(mockFetch.mock.calls.some(([url]) => url === '/api/budgets/favorites')).toBe(false)
+  })
+})
+
 // ── Regressietest — content rendert altijd onvoorwaardelijk ────────────────
 //
 // Historie: ooit zat alle grid-content achter een collapse-gate

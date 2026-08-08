@@ -209,7 +209,18 @@ import { buildBreakdown } from '@/lib/income-expense-breakdown'
 import { WealthCompositionChart } from '@/components/app/horizon/wealth-composition-chart'
 import { unifiedRowsToStackedRows, type StackedRow } from '@/lib/wealth-composition'
 import { clipRowsToPlanEnd } from '@/lib/horizon/clip-rows-to-plan-end'
-import { parseFireStrategy, DEFAULT_FIRE_STRATEGY, type FireStrategyConfig, STRATEGY_LABELS, resolveFreedomFraming } from '@/lib/fire-strategy'
+import {
+  buildFactorByAge,
+  buildFactorByOffset,
+  deflate,
+  deflatePoints,
+  deflateRowsByAge,
+  deflateSeriesByOffset,
+  factorAtAge,
+} from '@/lib/euro-display'
+import { useEuroView } from '@/lib/hooks/use-euro-view'
+import { EuroViewBadge } from '@/components/core/euro-view-badge'
+import { parseFireStrategy, DEFAULT_FIRE_STRATEGY, type FireStrategyConfig, STRATEGY_LABELS, resolveFreedomFraming, fireAgeForDisplay } from '@/lib/fire-strategy'
 import { toSimResult } from '@/lib/unified-projection'
 import { buildHorizonInput } from '@/lib/horizon/build-input'
 import type { PreviewBaseline } from '@/lib/strategy-preview'
@@ -281,6 +292,67 @@ function useInViewOnce(ref: RefObject<HTMLElement | null>, rootMargin = '600px',
     return () => obs.disconnect()
   }, [ref, rootMargin, inView, remountKey])
   return inView
+}
+
+/**
+ * De euro-velden van `SimRow` — expliciet, nooit "alles wat een getal is".
+ * `age` en `phase` zijn geen euro's en mogen dus nooit meegedeeld worden
+ * (klasse R resp. metadata, zie ADR 0090 / het deflatieklasse-besluit D1).
+ */
+const SIM_ROW_MONEY_FIELDS = [
+  'startPortfolio',
+  'growth',
+  'savings',
+  'withdrawal',
+  'cashflowNet',
+  'oneTimeNet',
+  'endPortfolio',
+  'grossIncome',
+  'grossExpenses',
+  'flowIn',
+  'flowOut',
+] as const satisfies readonly (keyof SimRow)[]
+
+/**
+ * De euro-velden van `StackedRow` (vermogensopbouw-staven) — jaarstanden per
+ * vermogensgroep, klasse S op de eigen leeftijd-as. `age` is klasse R en blijft
+ * er bewust buiten. Bewaakt door horizon-client.euro-view.test.ts.
+ */
+const STACKED_ROW_MONEY_FIELDS = [
+  'spaargeld',
+  'beleggingen',
+  'pensioen',
+  'vastgoed',
+  'overig',
+  'schulden',
+] as const satisfies readonly (keyof StackedRow)[]
+
+/**
+ * Deflator-map voor een feed die zijn EIGEN leeftijd-as draagt (partner- en
+ * huishoudlijn). Positie `k` in zo'n reeks is jaar `k` vanaf vandaag, maar
+ * `rows[k].age` is de leeftijd van de PARTNER. Een `factorByAge`-lookup op die
+ * leeftijd pakt daarom de verkeerde jaarfactor zodra de partner niet even oud
+ * is — en het resultaat oogt plausibel, dus je ziet het niet.
+ *
+ * Deze helper hangt daarom de jaarfactor van jaar `k` (uit de EIGEN kernelrijen)
+ * aan de leeftijd die dezelfde positie in de vreemde reeks draagt, zodat
+ * `deflateRowsByAge` er alsnog op sleutelt. Er wordt hier niets gedeeld en niets
+ * uitgerekend — alleen omgesleuteld.
+ *
+ * Geëxporteerd omdat dit de enige plek is waar een verkeerde sleutelkeuze
+ * ONZICHTBAAR fout gaat: het bedrag blijft plausibel. Zo'n fout moet in een test
+ * vast te pinnen zijn, niet alleen in een review op te merken.
+ */
+export function factorMapByPosition(
+  rows: readonly { age: number }[],
+  factorByOffset: readonly number[],
+): Map<number, number> {
+  const map = new Map<number, number>()
+  rows.forEach((row, index) => {
+    const factor = factorByOffset[index]
+    if (factor !== undefined) map.set(row.age, factor)
+  })
+  return map
 }
 
 export default function HorizonPage({
@@ -2185,7 +2257,11 @@ export default function HorizonPage({
   // Voedt de meegroeiende erfenis/koopkracht-doellijn in SimChart: het reële
   // doel-van-nu groeit met inflatie mee naar de nominale eindwaarde. Geen eigen
   // inflatie-som. Geclipt zodat de doellijn niet tot het (verborgen) laatste jaar loopt.
+  // Dit is de NOMINALE bron van de meegroeiende doellijn, geen weergave-omzetting.
+  // De euro-weergave grijpt pas aan in het render-grensblok, waar dit in 'real'
+  // een unit-factorlijst wordt (`viewTargetInflationFactors`, N2b).
   const targetInflationFactors = useMemo(
+    // euro-view: exempt — nominale bron; de omzetting leeft in het render-grensblok.
     () => displayUnifiedRows.map(r => ({ age: r.age, factor: r.inflationFactor })),
     [displayUnifiedRows],
   )
@@ -2228,7 +2304,13 @@ export default function HorizonPage({
     const realLegacyTarget =
       fireStrategy?.strategy === 'legacy' && (fireStrategy.legacyAmount ?? 0) > 0
         ? Math.round(fireStrategy.legacyAmount)
+        // Dit bedrag is PER DEFINITIE het reële erfenisdoel ("je doel in geld van
+        // vandaag"), ongeacht de gekozen weergave: geen omzetting, maar de
+        // betekenis van de melding zelf. In 'real' nóg een keer delen zou het doel
+        // stilletjes verkleinen — precies de dubbele deflatie die dit werk uitsluit.
+        // euro-view: exempt — reëel by design, ongeacht de weergave.
         : lastRow.inflationFactor > 0
+          // euro-view: exempt — zelfde reden als hierboven: dit is het doel-van-nu.
           ? Math.round((simResult?.targetEndPortfolio ?? 0) / lastRow.inflationFactor)
           : 0
     return {
@@ -3579,6 +3661,316 @@ export default function HorizonPage({
     await loadData()
   }
 
+  // ── EURO-WEERGAVE: DE RENDER-GRENS ─────────────────────────────────────────
+  //   Alles hierboven is NOMINAAL. Alles hieronder consumeert `view*`-waarden.
+  //   Buiten dit blok staat in dit bestand géén deflate()/deflateRowsByAge()/
+  //   deflatePoints()/deflateSeriesByOffset() en geen deling door inflationFactor.
+  //
+  //   WAAROM ÉÉN BLOK: dit bestand is >8000 regels. Verspreide deflatie is hier
+  //   niet reviewbaar, en een bedrag dat twee keer gedeeld wordt ziet er op het
+  //   scherm nog steeds plausibel uit. Eén grens + één factorbron + het merk
+  //   `InEuroView<T>` (compile-fout bij een tweede omzetting) is de enige
+  //   bescherming die schaalt. Bewaakt door `horizon-client.euro-view.test.ts`.
+  //
+  //   NAAMCONVENTIE (hard): nominaal = ongesuffixt (`displaySimRows`,
+  //   `targetInflationFactors`), gedeflateerd = `view`-prefix (`viewSimRows`).
+  //   De JSX verwijst voor euro-bedragen uitsluitend naar `view*`.
+  //
+  //   TWEE KRUIS-REGIMES (D4): chart-feeds en puntbedragen kruisen de grens in
+  //   VIEW-SPACE en gemerkt; rekenrijen (`UnifiedProjectionRow[]` naar de
+  //   fase-modals, `PhaseDetailTable`, `HorizonYearDetailsSheet`,
+  //   `WealthCompositionChart`) kruisen NOMINAAL en onveranderd — die
+  //   componenten lezen `useEuroView()` zelf en deflateren per klasse. Zij
+  //   dragen kruis-jaar-identiteiten (kassabons) die een blanket-deling breekt.
+  const { view: euroView } = useEuroView()
+
+  // Twee sleutelvormen van ÉÉN bron (`displayUnifiedRows`, dus automatisch de
+  // wat-als-rijen zodra een wat-als actief is — de deflator volgt de what-if-
+  // inflatie, nooit de basisinflatie uit het profiel):
+  //   • op leeftijd  → de eigen lijn en alles wat op de eigen leeftijd-as loopt
+  //   • op jaar-offset → feeds waarvan de x-as NIET de eigen leeftijd is
+  //                      (partner, huishouden, Monte-Carlo-band)
+  const factorByAge = useMemo(() => buildFactorByAge(displayUnifiedRows), [displayUnifiedRows])
+  const factorByOffset = useMemo(() => buildFactorByOffset(displayUnifiedRows), [displayUnifiedRows])
+
+  // ── Chart-feeds: rijen ────────────────────────────────────────────────────
+  // In 'nominal' geven de helpers dezelfde array-REFERENTIE terug, zodat de
+  // memo-/React.memo-keten van dit bestand niet in een re-render-cascade valt.
+  const viewDisplaySimRows = useMemo(
+    () => deflateRowsByAge(displaySimRows, factorByAge, SIM_ROW_MONEY_FIELDS, euroView),
+    [displaySimRows, factorByAge, euroView],
+  )
+  const viewDisplayEffectiveSimRows = useMemo(
+    () => deflateRowsByAge(displayEffectiveSimRows, factorByAge, SIM_ROW_MONEY_FIELDS, euroView),
+    [displayEffectiveSimRows, factorByAge, euroView],
+  )
+  // Vermogensopbouw-staven (WealthCompositionChart): jaarstanden per groep op de
+  // eigen leeftijd-as ⇒ leeftijd-sleutel. Deze feed draagt zelf geen deflate/
+  // inflationFactor en was daardoor onzichtbaar voor grendel-regels 2 en 3 —
+  // de bron-test pint 'm sindsdien expliciet op de callsite.
+  const viewWealthCompositionRows = useMemo(
+    () => deflateRowsByAge(wealthCompositionRows, factorByAge, STACKED_ROW_MONEY_FIELDS, euroView),
+    [wealthCompositionRows, factorByAge, euroView],
+  )
+  // Partner-/huishoudlijn: eigen leeftijd-as ⇒ op POSITIE sleutelen (K4).
+  const viewPartnerLineRows = useMemo(
+    () =>
+      partnerLine == null
+        ? null
+        : deflateRowsByAge(
+            partnerLine.rows,
+            factorMapByPosition(partnerLine.rows, factorByOffset),
+            SIM_ROW_MONEY_FIELDS,
+            euroView,
+          ),
+    [partnerLine, factorByOffset, euroView],
+  )
+  const viewHouseholdMainLineRows = useMemo(
+    () =>
+      householdMainLine == null
+        ? null
+        : deflateRowsByAge(
+            householdMainLine.rows,
+            factorMapByPosition(householdMainLine.rows, factorByOffset),
+            SIM_ROW_MONEY_FIELDS,
+            euroView,
+          ),
+    [householdMainLine, factorByOffset, euroView],
+  )
+
+  // ── Chart-feeds: puntenreeksen ────────────────────────────────────────────
+  // Besteedbaar-lijn: `buildLiquidWealthPoints` plot de waarde van rij `age` op
+  // `age + 1` (zie lib/horizon/liquid-wealth-line.ts). De factor hoort dus bij
+  // het BRONJAAR — vandaar de expliciete `x - 1`-sleutel. Zonder die sleutel
+  // deflateert deze lijn stil één jaar te ver.
+  const viewLiquidWealthPoints = useMemo(
+    () =>
+      liquidWealthPoints == null
+        ? undefined
+        : deflatePoints(liquidWealthPoints, factorByAge, euroView, x => x - 1),
+    [liquidWealthPoints, factorByAge, euroView],
+  )
+  // Scenario-overlays lopen op de EIGEN leeftijd-as (wat-als/stop-pad/ghosts van
+  // dezelfde gebruiker) ⇒ leeftijd-sleutel.
+  const viewCombinedScenarioOverlays = useMemo(
+    () =>
+      euroView === 'nominal'
+        ? combinedScenarioOverlays
+        : combinedScenarioOverlays.map(o => ({
+            ...o,
+            points: deflatePoints(o.points, factorByAge, euroView),
+          })),
+    [combinedScenarioOverlays, factorByAge, euroView],
+  )
+  // Spookrand van het eerste opgeslagen scenario in de Inkomsten&Uitgaven-strook:
+  // eigen leeftijd-as, `SimRow[]` ⇒ leeftijd-sleutel.
+  const viewGhostOverlayRows = useMemo(() => {
+    const rows = scenarioOverlayDataList[0]?.rows
+    return rows == null ? undefined : deflateRowsByAge(rows, factorByAge, SIM_ROW_MONEY_FIELDS, euroView)
+  }, [scenarioOverlayDataList, factorByAge, euroView])
+
+  // Huishoud-/partner-overlays: vreemde leeftijd-as ⇒ positie-sleutel (K4).
+  const viewHouseholdOverlays = useMemo(
+    () =>
+      householdOverlays == null || euroView === 'nominal'
+        ? householdOverlays
+        : householdOverlays.map(o => ({
+            ...o,
+            points: deflatePoints(
+              o.points,
+              factorMapByPosition(
+                o.points.map(([age]) => ({ age })),
+                factorByOffset,
+              ),
+              euroView,
+            ),
+          })),
+    [householdOverlays, factorByOffset, euroView],
+  )
+  // Monte-Carlo-band: `number[]` geïndexeerd op jaar-offset vanaf `startAge`.
+  const viewMonteCarloOverlay = useMemo(
+    () =>
+      monteCarloOverlay == null || euroView === 'nominal'
+        ? monteCarloOverlay
+        : {
+            ...monteCarloOverlay,
+            p10: deflateSeriesByOffset(monteCarloOverlay.p10, factorByOffset, euroView),
+            p25: deflateSeriesByOffset(monteCarloOverlay.p25, factorByOffset, euroView),
+            p50: deflateSeriesByOffset(monteCarloOverlay.p50, factorByOffset, euroView),
+            p75: deflateSeriesByOffset(monteCarloOverlay.p75, factorByOffset, euroView),
+            p90: deflateSeriesByOffset(monteCarloOverlay.p90, factorByOffset, euroView),
+          },
+    [monteCarloOverlay, factorByOffset, euroView],
+  )
+
+  // ── Puntbedragen (klasse S — stock op één leeftijd) ───────────────────────
+  // De factor hoort bij de leeftijd waar het bedrag bij hoort, niet bij "nu".
+  //
+  // ÉÉN leeftijdsbron voor élke FIRE-moment-factor, en die loopt door de
+  // canonieke weergave-seam `fireAgeForDisplay` (= Math.round). Waarom: de
+  // kernelrijen staan op HELE leeftijden, en `factorAtAge` pakt bij een
+  // tussenliggende leeftijd de dichtstbijzijnde rij — waarbij een leeftijd exact
+  // op .5 naar BENEDEN valt (eerste kleinste afstand wint, rijen oplopend).
+  // /overzicht voedt zijn lookup met de al-afgeronde weergave-leeftijd uit
+  // diezelfde seam en zou dan naar BOVEN vallen: twee oppervlakken, hetzelfde
+  // bedrag, twee deflatoren. Normaliseren bij de bron houdt het rij-keuzegedrag
+  // los van de vraag of de aanroeper fractioneel of afgerond aanlevert
+  // (AC-F4 / UAT-KRUIS-27).
+  const fireFactorAge = useMemo(
+    () => fireAgeForDisplay(simResult?.fireAgeFractional ?? simResult?.fireAge ?? null),
+    [simResult],
+  )
+  const viewFireTarget = useMemo(
+    () =>
+      simResult == null
+        ? undefined
+        : deflate(
+            simResult.requiredFirePortfolio,
+            factorAtAge(displayUnifiedRows, fireFactorAge),
+            euroView,
+          ),
+    [simResult, displayUnifiedRows, fireFactorAge, euroView],
+  )
+  const viewFireTargetInclHome = useMemo(
+    () =>
+      fireTargetInclHome == null
+        ? null
+        : deflate(
+            fireTargetInclHome,
+            factorAtAge(displayUnifiedRows, fireFactorAge),
+            euroView,
+          ),
+    [fireTargetInclHome, displayUnifiedRows, fireFactorAge, euroView],
+  )
+  const viewTargetEndPortfolio = useMemo(
+    () =>
+      simResult == null
+        ? undefined
+        : deflate(simResult.targetEndPortfolio, factorAtAge(displayUnifiedRows, chartEndAge), euroView),
+    [simResult, displayUnifiedRows, chartEndAge, euroView],
+  )
+  // N2b — het geschreven contract met de grafiek (brok C). De geometrie tekent
+  // ZONDER factorlijst géén doellijn (`sim-chart-geometry.ts`: geen factoren ⇒
+  // `targetLine === null`), dus `undefined` doorgeven zou de erfenis-/koopkracht-
+  // lijn in 'real' laten VERDWIJNEN i.p.v. vlak leggen. We leveren daarom een
+  // UNIT-factorlijst: dezelfde leeftijdenreeks met factor 1 overal. Dan geldt in
+  // de geometrie `endFactor = 1` ⇒ `realTargetNow = het gedeflateerde doel` ⇒ een
+  // vlakke polyline op het reële doel-van-nu, met nul wijziging in de geometrie.
+  const viewTargetInflationFactors = useMemo(
+    () =>
+      euroView === 'nominal'
+        ? targetInflationFactors
+        : targetInflationFactors.map(f => ({ age: f.age, factor: 1 })),
+    [targetInflationFactors, euroView],
+  )
+
+  // ── Hero-KPI's: puntbedragen op een specifieke leeftijd ───────────────────
+  // De FIRE-doelen horen bij de FIRE-leeftijd, "vermogen op AOW" en de
+  // maandonttrekking bij de AOW-leeftijd. Een generieke "factor van nu" zou hier
+  // stelselmatig te weinig deflateren; de leeftijd is juist wat het bedrag zijn
+  // koopkracht geeft.
+  // Zelfde genormaliseerde leeftijdsbron als `viewFireTarget` hierboven — anders
+  // zouden twee FIRE-doelbedragen op dezelfde pagina op een andere rij landen.
+  const fireFactor = useMemo(
+    () => factorAtAge(displayUnifiedRows, fireFactorAge),
+    [displayUnifiedRows, fireFactorAge],
+  )
+  const aowFactor = useMemo(
+    () => factorAtAge(displayUnifiedRows, userAowAge.fractional),
+    [displayUnifiedRows, userAowAge.fractional],
+  )
+  const viewFireTargetExclHome = fireTargetExclHome == null ? null : deflate(fireTargetExclHome, fireFactor, euroView)
+  const viewBalkVrijheidDoel = deflate(balkVrijheidDoel, fireFactor, euroView)
+  const viewEffectiveFireTarget = deflate(effectiveFireTarget, fireFactor, euroView)
+  const viewPortfolioAtAow = portfolioAtAow == null ? null : deflate(portfolioAtAow, aowFactor, euroView)
+  const viewMonthlyWithdrawalAtAow =
+    monthlyWithdrawalAtAow == null ? null : deflate(monthlyWithdrawalAtAow, aowFactor, euroView)
+
+  // ── Cijferbar (LifelineReadout) ───────────────────────────────────────────
+  // `netWorth` is klasse S op de gehoverde leeftijd, `monthlyAmount` klasse F in
+  // datzelfde jaar — beide dus met de factor van díé rij. De vrijheidstijd volgt
+  // het bedrag automatisch: het dagtarief is per definitie een grootheid van
+  // VANDAAG en deflateert nooit (D15). Zou je de noemer "voor de consistentie"
+  // ook aanpakken, dan pas je de deflatie twee keer toe.
+  const viewReadoutData = useMemo(() => {
+    if (readoutData == null) return null
+    if (euroView === 'nominal') return readoutData
+    const factor = factorAtAge(displayUnifiedRows, readoutData.age)
+    const netWorth = deflate(readoutData.netWorth, factor, euroView)
+    return {
+      ...readoutData,
+      netWorth,
+      monthlyAmount: deflate(readoutData.monthlyAmount, factor, euroView),
+      freedomTime: formatFreedomTimeString(
+        calculateFreedomTime(Math.max(0, netWorth), dailyExpenseRate(effectiveInput?.monthlyExpenses ?? 0)),
+        'short',
+      ),
+    }
+  }, [readoutData, displayUnifiedRows, euroView, effectiveInput])
+
+  // ── Inkomsten & uitgaven-strook (bronnen-breakdown) ───────────────────────
+  // Elke waarde is een jaarstroom in één projectiejaar (klasse F) ⇒ de factor van
+  // díé rij. De `*BySource`-records lopen per sleutel door `deflate()` — geen
+  // handgerolde deling, zodat de onbruikbare-factor-regel (0/NaN/∞ ⇒ ongemoeid)
+  // óók hier geldt. Zonder dit zou wisselen tussen 'totalen' en 'bronnen' twee
+  // verschillende grondslagen in dezelfde grafiek tonen.
+  const viewIeBreakdownResult = useMemo(() => {
+    if (ieBreakdownResult == null || euroView === 'nominal') return ieBreakdownResult
+    const deflateRecord = (record: Record<string, number>, factor: number) =>
+      Object.fromEntries(
+        Object.entries(record).map(([key, value]) => [key, deflate(value, factor, euroView)]),
+      )
+    return {
+      ...ieBreakdownResult,
+      rows: ieBreakdownResult.rows.map(row => {
+        const factor = factorByAge.get(row.age) ?? 1
+        return {
+          ...row,
+          incomeBySource: deflateRecord(row.incomeBySource, factor),
+          expenseBySource: deflateRecord(row.expenseBySource, factor),
+          totalIncome: deflate(row.totalIncome, factor, euroView),
+          totalExpenses: deflate(row.totalExpenses, factor, euroView),
+          surplus: deflate(row.surplus, factor, euroView),
+        }
+      }),
+    }
+  }, [ieBreakdownResult, factorByAge, euroView])
+
+  // ── Scenario-kaarten ──────────────────────────────────────────────────────
+  // `laagsteBuffer` is klasse S: één bedrag op één leeftijd (de kaart toont die
+  // leeftijd er letterlijk naast, "op 63") ⇒ de factor van díé leeftijd.
+  // `maandruimteOfDelta` blijft ongemoeid: dat is de INSTELLING van de kaart
+  // (−€300/mnd, +€250/mnd) — een bedrag van vandaag, geen projectiebedrag.
+  // De status-flag (BASIS/GROEN/AMBER/ROOD) blijft op de nominale buffers staan:
+  // die vergelijkt de PLANNEN onderling en is geen euro (klasse R).
+  const viewScenarioPresets = useMemo(
+    () =>
+      scenarioPresets == null || euroView === 'nominal'
+        ? scenarioPresets
+        : scenarioPresets.map(kaart => ({
+            ...kaart,
+            laagsteBuffer:
+              kaart.laagsteBuffer == null
+                ? null
+                : {
+                    ...kaart.laagsteBuffer,
+                    bedrag: deflate(
+                      kaart.laagsteBuffer.bedrag,
+                      factorAtAge(displayUnifiedRows, kaart.laagsteBuffer.age),
+                      euroView,
+                    ),
+                  },
+          })),
+    [scenarioPresets, displayUnifiedRows, euroView],
+  )
+
+  // ── EINDE EURO-WEERGAVE ────────────────────────────────────────────────────
+
+  // De foutstaat-guard staat bewust ONDER het render-grensblok: alle hooks van
+  // dit component moeten in elke render in dezelfde volgorde draaien, dus geen
+  // enkele `useMemo` mag achter een early return liggen. De memo's hierboven zijn
+  // stuk voor stuk null-safe en hebben geen neveneffecten, dus dit verandert
+  // niets aan wat de gebruiker ziet.
   if (!fire || !range || !healthScore) {
     return (
       <div className="mx-auto max-w-6xl py-5 sm:py-12 px-4 sm:px-6">
@@ -3822,7 +4214,7 @@ export default function HorizonPage({
                       className="text-[24px] sm:text-[28px] font-black leading-none tracking-[-0.02em]"
                       style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
                     >
-                      <MaskedAmount value={fireTargetInclHome!} tone="horizon" monoWhenVisible={false} />
+                      <MaskedAmount value={viewFireTargetInclHome!} tone="horizon" monoWhenVisible={false} />
                     </div>
                     <span
                       className="italic text-[11px] text-[var(--ink-3)]"
@@ -3837,7 +4229,7 @@ export default function HorizonPage({
                       className="text-[16px] sm:text-[18px] font-black leading-none tracking-[-0.02em] text-[var(--module-active-800)]"
                       style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
                     >
-                      <MaskedAmount value={fireTargetExclHome!} tone="horizon" monoWhenVisible={false} />
+                      <MaskedAmount value={viewFireTargetExclHome!} tone="horizon" monoWhenVisible={false} />
                     </div>
                     <span
                       className="italic text-[11px] text-[var(--ink-3)]"
@@ -3855,7 +4247,7 @@ export default function HorizonPage({
                   >
                     {hasPerspectiveHero
                       ? <MaskedAmount value={perspectiveHero!.fireTarget} tone="horizon" monoWhenVisible={false} />
-                      : <MaskedAmount value={isPensioenMode ? (portfolioAtAow ?? 0) : balkVrijheidDoel} tone="horizon" monoWhenVisible={false} />}
+                      : <MaskedAmount value={isPensioenMode ? (viewPortfolioAtAow ?? 0) : viewBalkVrijheidDoel} tone="horizon" monoWhenVisible={false} />}
                   </div>
                   <div
                     className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
@@ -3884,8 +4276,8 @@ export default function HorizonPage({
                 className="text-[24px] sm:text-[28px] font-black leading-none tracking-[-0.02em] tabular-nums"
                 style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
               >
-                {isPensioenMode && monthlyWithdrawalAtAow != null
-                  ? <MaskedAmount value={Math.round(monthlyWithdrawalAtAow)} tone="horizon" monoWhenVisible={false} />
+                {isPensioenMode && viewMonthlyWithdrawalAtAow != null
+                  ? <MaskedAmount value={Math.round(viewMonthlyWithdrawalAtAow)} tone="horizon" monoWhenVisible={false} />
                   : isKernelDepleteRate
                     ? 'Interen'
                     : simResult?.implicitWithdrawalRate != null
@@ -3949,6 +4341,18 @@ export default function HorizonPage({
                 style={{ width: `${hasPerspectiveHero ? Math.max(Math.min(perspectiveHero!.freedomPercentage, 100), 0) : effectiveFreedomPct}%` }}
               />
             </div>
+            {/* euro-view: exempt — hoort bij de nominale freedomPct-noemer.
+                Het balk-label is geen losstaand doelbedrag maar het RECHTER-EIND
+                van de balk hierboven: het is de noemer waartegen de vulling
+                (`effectiveFreedomPct`, canoniek uit computeFreedomProgressWithBasis
+                op de NOMINALE `requiredNetWorthInclHome`) is gemeten. Zetten we
+                hier het gedeflateerde doel neer, dan leest het paar twee
+                grondslagen tegelijk: een balk op 40% naast een bedrag waarvan de
+                breuk 59% is. Percentage + label zijn daarom één eenheid en
+                blijven samen nominaal — identiek aan het voortgangs-paar van de
+                Vrijheidsvoortgang-widget op /overzicht. De KPI-tegel "benodigd"
+                hierboven is wél een losstaand doelbedrag en deflateert gewoon
+                (`viewBalkVrijheidDoel`, gepind in horizon-client.euro-view.test.ts). */}
             <div className="mt-2 flex justify-between text-xs text-[var(--ink-4)]">
               <span>0%</span>
               <span className="font-mono">
@@ -4022,7 +4426,7 @@ export default function HorizonPage({
                       className="text-[18px] font-black leading-none tracking-[-0.02em]"
                       style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
                     >
-                      <MaskedAmount value={fireTargetInclHome!} tone="horizon" monoWhenVisible={false} />
+                      <MaskedAmount value={viewFireTargetInclHome!} tone="horizon" monoWhenVisible={false} />
                     </div>
                     <span
                       className="italic text-[10px] text-[var(--ink-3)]"
@@ -4037,7 +4441,7 @@ export default function HorizonPage({
                       className="text-[13px] font-black leading-none tracking-[-0.02em] text-[var(--module-active-800)]"
                       style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
                     >
-                      <MaskedAmount value={fireTargetExclHome!} tone="horizon" monoWhenVisible={false} />
+                      <MaskedAmount value={viewFireTargetExclHome!} tone="horizon" monoWhenVisible={false} />
                     </div>
                     <span
                       className="italic text-[10px] text-[var(--ink-3)]"
@@ -4055,7 +4459,7 @@ export default function HorizonPage({
                   >
                     {hasPerspectiveHero
                       ? <MaskedAmount value={perspectiveHero!.fireTarget} tone="horizon" monoWhenVisible={false} />
-                      : <MaskedAmount value={isPensioenMode ? (portfolioAtAow ?? 0) : balkVrijheidDoel} tone="horizon" monoWhenVisible={false} />}
+                      : <MaskedAmount value={isPensioenMode ? (viewPortfolioAtAow ?? 0) : viewBalkVrijheidDoel} tone="horizon" monoWhenVisible={false} />}
                   </div>
                   <div
                     className="italic text-[10px] text-[var(--ink-3)] mt-1"
@@ -4082,8 +4486,8 @@ export default function HorizonPage({
                 className="text-[18px] font-black leading-none tracking-[-0.02em]"
                 style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
               >
-                {isPensioenMode && monthlyWithdrawalAtAow != null
-                  ? <MaskedAmount value={Math.round(monthlyWithdrawalAtAow)} tone="horizon" monoWhenVisible={false} />
+                {isPensioenMode && viewMonthlyWithdrawalAtAow != null
+                  ? <MaskedAmount value={Math.round(viewMonthlyWithdrawalAtAow)} tone="horizon" monoWhenVisible={false} />
                   : isKernelDepleteRate
                     ? 'Interen'
                     : simResult?.implicitWithdrawalRate != null
@@ -4286,6 +4690,12 @@ export default function HorizonPage({
 
               {/* ── Overlay toggles boven de grafiek ── */}
               <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                {/* Euro-weergave-status van de grafiek. Rendert `null` in 'nominal'
+                    (het huidige beeld heeft geen badge nodig) en is in 'real'
+                    meteen de weg terug — één klik en de bedragen staan weer
+                    nominaal. Géén tweede as-label: dat zou in 'real' een dubbele
+                    markering zijn en in 'nominal' een lege belofte (D11). */}
+                <EuroViewBadge />
                 {/* AOW-stop toggle — alleen bij shortfall scenario (FIRE > AOW) */}
                 {isShortfallScenario && (
                   <>
@@ -4625,17 +5035,17 @@ export default function HorizonPage({
               {/* Cijferbar boven de grafiek — beweegt mee met hover/playback en
                   vervangt de zwevende tooltip. Alleen volledige weergave + pad-modus. */}
               <HideInSimple>
-                {chartMode === 'vermogenspad' && readoutData && (
+                {chartMode === 'vermogenspad' && viewReadoutData && (
                   <div className="mb-2">
                     <LifelineReadout
-                      age={readoutData.age}
-                      year={readoutData.year}
-                      phaseLabel={readoutData.phaseLabel}
-                      phaseColor={readoutData.phaseColor}
-                      netWorth={readoutData.netWorth}
-                      freedomTime={readoutData.freedomTime}
-                      monthlyLabel={readoutData.monthlyLabel}
-                      monthlyAmount={readoutData.monthlyAmount}
+                      age={viewReadoutData.age}
+                      year={viewReadoutData.year}
+                      phaseLabel={viewReadoutData.phaseLabel}
+                      phaseColor={viewReadoutData.phaseColor}
+                      netWorth={viewReadoutData.netWorth}
+                      freedomTime={viewReadoutData.freedomTime}
+                      monthlyLabel={viewReadoutData.monthlyLabel}
+                      monthlyAmount={viewReadoutData.monthlyAmount}
                       isResting={lifelineAge === null}
                     />
                   </div>
@@ -4716,37 +5126,46 @@ export default function HorizonPage({
                             hoverAge={lifelineAge}
                             onHoverAge={setLifelineAge}
                             hideValueTooltip={displayMode === 'full'}
-                            rows={useHouseholdMainLine ? householdMainLine!.rows : usePartnerMainLine ? partnerLine!.rows : (isAowStopActive ? displayEffectiveSimRows : displaySimRows)}
+                            rows={useHouseholdMainLine ? viewHouseholdMainLineRows! : usePartnerMainLine ? viewPartnerLineRows! : (isAowStopActive ? viewDisplayEffectiveSimRows : viewDisplaySimRows)}
                             fireAge={useHouseholdMainLine ? householdMainLine!.fireAge : usePartnerMainLine ? partnerLine!.fireAge : (isAowStopActive ? Math.ceil(userAowAge.fractional) : simResult.fireAge)}
                             fireAgeFractional={useHouseholdMainLine ? householdMainLine!.fireAgeFractional : usePartnerMainLine ? partnerLine!.fireAgeFractional : (isAowStopActive ? userAowAge.fractional : simResult.fireAgeFractional)}
                             currentAge={useHouseholdMainLine ? (householdMainLine!.currentAge ?? currentAge ?? 30) : usePartnerMainLine ? (partnerLine!.currentAge ?? currentAge ?? 30) : (currentAge ?? 30)}
                             endAge={chartEndAge!}
+                            // euro-view: exempt — `cashflows` levert géén zichtbaar bedrag in
+                            // SimChart (de prop wordt daar gedestructureerd maar nergens in de
+                            // teken-body gebruikt; de tooltip-bedragen komen alle uit `rows`).
+                            // Nominaal doorgeven is dus het juiste én het gedrag-neutrale pad.
                             cashflows={simCashflows}
-                            fireTarget={simResult.requiredFirePortfolio}
+                            fireTarget={viewFireTarget}
                             // Tweede doellijn (incl. woning) alleen op de basis-projectie,
                             // net als targetInflationFactors — niet op partner-/huishoud-/
                             // AOW-stop-lijnen. Bij de dubbele-woning-grondslag (downsize/
                             // opeethypotheek/uitsluiten); anders undefined → één doellijn.
-                            fireTargetInclHome={(usePartnerMainLine || useHouseholdMainLine || isAowStopActive) ? undefined : (showDualFireTarget ? fireTargetInclHome! : undefined)}
+                            fireTargetInclHome={(usePartnerMainLine || useHouseholdMainLine || isAowStopActive) ? undefined : (showDualFireTarget ? viewFireTargetInclHome! : undefined)}
                             strategy={simResult.strategy}
-                            targetEndPortfolio={simResult.targetEndPortfolio}
+                            targetEndPortfolio={viewTargetEndPortfolio}
                             // Meegroeiende doellijn alleen op de basis-projectie (niet op
                             // partner-/huishoud-/AOW-stop-lijnen — die hebben eigen rijen).
-                            targetInflationFactors={(usePartnerMainLine || useHouseholdMainLine || isAowStopActive) ? undefined : targetInflationFactors}
+                            targetInflationFactors={(usePartnerMainLine || useHouseholdMainLine || isAowStopActive) ? undefined : viewTargetInflationFactors}
                             // Besteedbaar-lijn alleen op de basis-projectie: partner-/
                             // huishoud-/AOW-stop-lijnen tekenen andere rijen, waar deze
                             // punten niet bij horen.
-                            liquidPoints={(usePartnerMainLine || useHouseholdMainLine || isAowStopActive) ? undefined : liquidWealthPoints}
+                            liquidPoints={(usePartnerMainLine || useHouseholdMainLine || isAowStopActive) ? undefined : viewLiquidWealthPoints}
                             mainLineLabel={useHouseholdMainLine ? 'Gezamenlijk' : usePartnerMainLine ? (partnerName ?? 'Partner') : undefined}
                             // Partner- én huishoud-projectie krijgen dezelfde teal als de
                             // partner-event-markers, zodat de lijn + de partner-gebeurtenissen
                             // visueel bij elkaar horen. FIRE-annotaties blijven goud (COLOR_OPBOUW).
                             mainLineColor={(usePartnerMainLine || useHouseholdMainLine) ? COLOR_PARTNER_EVENT : undefined}
-                            scenarioOverlays={(isAowStopActive || usePartnerMainLine || useHouseholdMainLine) ? undefined : combinedScenarioOverlays}
+                            scenarioOverlays={(isAowStopActive || usePartnerMainLine || useHouseholdMainLine) ? undefined : viewCombinedScenarioOverlays}
                             scenarioPending={scenarioPending || stopPadPending}
-                            monteCarloOverlay={(isAowStopActive || usePartnerMainLine || useHouseholdMainLine) ? undefined : monteCarloOverlay}
+                            monteCarloOverlay={(isAowStopActive || usePartnerMainLine || useHouseholdMainLine) ? undefined : viewMonteCarloOverlay}
+                            // euro-view: exempt — het dagtarief (€→vrijheidstijd) is per
+                            // definitie een grootheid van VANDAAG en deflateert nooit (D15).
+                            // Deflateert het bedrag wél, dan volgt de vrijheidstijd
+                            // automatisch mee; ook de noemer aanpakken zou de deflatie
+                            // twee keer toepassen.
                             dailyExpenseRate={(effectiveInput?.yearlyMustExpenses ?? 0) / 365}
-                            householdOverlays={householdOverlays ?? undefined}
+                            householdOverlays={viewHouseholdOverlays ?? undefined}
                             visibleMinAge={visibleMin}
                             visibleMaxAge={visibleMax}
                             aowAgeFractional={userAowAge.fractional}
@@ -4773,7 +5192,7 @@ export default function HorizonPage({
                           aria-hidden={chartMode !== 'vermogensopbouw'}
                         >
                           <WealthCompositionChart
-                            stackedRows={wealthCompositionRows}
+                            stackedRows={viewWealthCompositionRows}
                             currentAge={currentAge ?? 30}
                             endAge={chartEndAge!}
                             visibleMinAge={visibleMin}
@@ -4848,7 +5267,7 @@ export default function HorizonPage({
                         }}
                       >
                         <IncomeExpenseChart
-                          rows={isAowStopActive ? displayEffectiveSimRows : displaySimRows}
+                          rows={isAowStopActive ? viewDisplayEffectiveSimRows : viewDisplaySimRows}
                           currentAge={currentAge ?? 30}
                           endAge={chartEndAge!}
                           visibleMinAge={visibleMin}
@@ -4857,8 +5276,8 @@ export default function HorizonPage({
                           planningMode={planningMode}
                           aowAgeFractional={userAowAge.fractional}
                           viewMode={ieViewMode}
-                          breakdownResult={ieBreakdownResult}
-                          ghostOverlayRows={scenarioOverlayDataList[0]?.rows}
+                          breakdownResult={viewIeBreakdownResult}
+                          ghostOverlayRows={viewGhostOverlayRows}
                           ghostColor={scenarioOverlayDataList[0]?.color}
                         />
                       </div>
@@ -5392,7 +5811,7 @@ export default function HorizonPage({
                       <p className="mb-3 font-sans text-[12px] text-[var(--ink-3)]">
                         Vijf paden — één basispad, verbeteringen en één waarschuwing; elk pad wordt afgezet tegen je basispad.
                       </p>
-                      <ScenarioKaarten kaarten={scenarioPresets ?? []} isLoading={scenarioPresetsLoading} />
+                      <ScenarioKaarten kaarten={viewScenarioPresets ?? []} isLoading={scenarioPresetsLoading} />
                     </div>
                   )}
                 </div>
@@ -7810,16 +8229,19 @@ export default function HorizonPage({
                   <span className="tabular-nums text-[var(--ink)]">{aowAgeFormatted}</span>
                 </div>
               )}
-              {isPensioenMode && portfolioAtAow != null && (
+              {/* Beide zijn puntbedragen op de AOW-leeftijd (klasse S resp. F) en
+                  moeten hetzelfde tonen als de KPI hierboven — anders spreekt de
+                  onderbouwing de kaart tegen. */}
+              {isPensioenMode && viewPortfolioAtAow != null && (
                 <div className="flex justify-between py-0.5">
                   <span className="font-sans text-sm text-[var(--ink-2)]">Vermogen op AOW</span>
-                  <span className="tabular-nums text-[var(--ink)]">{<MaskedAmount value={Math.round(portfolioAtAow)} tone="horizon" />}</span>
+                  <span className="tabular-nums text-[var(--ink)]">{<MaskedAmount value={Math.round(viewPortfolioAtAow)} tone="horizon" />}</span>
                 </div>
               )}
-              {isPensioenMode && monthlyWithdrawalAtAow != null && (
+              {isPensioenMode && viewMonthlyWithdrawalAtAow != null && (
                 <div className="flex justify-between py-0.5">
                   <span className="font-sans text-sm text-[var(--ink-2)]">Mnd. onttrekking</span>
-                  <span className="tabular-nums text-[var(--ink)]">{<MaskedAmount value={Math.round(monthlyWithdrawalAtAow)} tone="horizon" />}</span>
+                  <span className="tabular-nums text-[var(--ink)]">{<MaskedAmount value={Math.round(viewMonthlyWithdrawalAtAow)} tone="horizon" />}</span>
                 </div>
               )}
               {!isPensioenMode && (
@@ -7956,10 +8378,10 @@ export default function HorizonPage({
                 <span className="font-sans text-sm text-[var(--ink-2)]">Opnamerate (SWR)</span>
                 <span className="tabular-nums text-[var(--ink)]">{(fireSwr * 100).toFixed(2)}%</span>
               </div>
-              {isPensioenMode && monthlyWithdrawalAtAow != null && (
+              {isPensioenMode && viewMonthlyWithdrawalAtAow != null && (
                 <div className="flex justify-between py-0.5">
                   <span className="font-sans text-sm text-[var(--ink-2)]">Mnd. onttrekking op AOW</span>
-                  <span className="tabular-nums text-[var(--ink)]">{<MaskedAmount value={Math.round(monthlyWithdrawalAtAow)} tone="horizon" />}</span>
+                  <span className="tabular-nums text-[var(--ink)]">{<MaskedAmount value={Math.round(viewMonthlyWithdrawalAtAow)} tone="horizon" />}</span>
                 </div>
               )}
               {!isPensioenMode && simResult?.requiredFirePortfolio != null && (
@@ -7971,11 +8393,13 @@ export default function HorizonPage({
 
             <div className="mt-2 flex justify-between border-t-2 border-[var(--ink)] pt-2 font-bold">
               <span className="text-[var(--ink)]">{isPensioenMode ? 'Verwacht vermogen' : 'Benodigd'}</span>
-              <span className="tabular-nums text-[var(--ink)]">{<MaskedAmount value={isPensioenMode ? (portfolioAtAow ?? 0) : effectiveFireTarget} tone="horizon" />}</span>
+              <span className="tabular-nums text-[var(--ink)]">{<MaskedAmount value={isPensioenMode ? (viewPortfolioAtAow ?? 0) : viewEffectiveFireTarget} tone="horizon" />}</span>
             </div>
 
             <div className="mt-3 flex justify-center">
-              <FreedomTimeBadge amount={isPensioenMode ? (portfolioAtAow ?? 0) : effectiveFireTarget} />
+              {/* De vrijheidstijd volgt automatisch het (eventueel gedeflateerde)
+                  bedrag — het dagtarief zelf blijft een grootheid van vandaag (D15). */}
+              <FreedomTimeBadge amount={isPensioenMode ? (viewPortfolioAtAow ?? 0) : viewEffectiveFireTarget} />
             </div>
 
             <div className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
@@ -8209,6 +8633,12 @@ export default function HorizonPage({
                       Klassiek: SWR = Jaaruitgaven ÷ Doelvermogen = {<MaskedAmount value={yearlyExp} tone="horizon" />} ÷ {<MaskedAmount value={Math.round(yearlyExp / fireSwr)} tone="horizon" />} = {ingesteldPct.toFixed(2)}%
                     </p>
                     <p className="mt-0.5">
+                      {/* euro-view: exempt — deze regel toont een DELING die op het
+                          scherm moet kloppen: een uitgavenbedrag van vandaag gedeeld
+                          door het simulatie-vermogen levert het getoonde percentage.
+                          Deflateer je alleen de noemer, dan klopt de zichtbare som niet
+                          meer. De grondslag van de teller en de noemer verschilt hier
+                          bewust; dat is de definitie van de opnamerate. */}
                       Impliciet: Jaaruitgaven ÷ Simulatie-vermogen = {<MaskedAmount value={yearlyExp} tone="horizon" />} ÷ {<MaskedAmount value={Math.round(simResult.requiredFirePortfolio)} tone="horizon" />} = {implicitPct.toFixed(2)}%
                     </p>
                   </div>
@@ -8227,6 +8657,9 @@ export default function HorizonPage({
                 <div className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
                   <p>
                     <strong className="font-semibold text-[var(--ink-3)]">Formule:</strong>{' '}
+                    {/* euro-view: exempt — zelfde reden als de impliciete regel: dit is
+                        een zichtbare deling die moet uitkomen op het getoonde
+                        percentage, niet een los te lezen doelbedrag. */}
                     SWR = Jaaruitgaven ÷ Doelvermogen = {<MaskedAmount value={effectiveInput?.yearlyMustExpenses ?? 0} tone="horizon" />} ÷ {<MaskedAmount value={effectiveFireTarget} tone="horizon" />}
                   </p>
                 </div>
@@ -8282,6 +8715,8 @@ export default function HorizonPage({
             open={activeModal === 'simulations'}
             onClose={() => setActiveModal(null)}
             precomputedMc={mcData}
+            // euro-view: exempt — dit is INVOER voor een tweede simulatie, geen
+            // weergavebedrag. Een gedeflateerd doel zou daar een andere som opleveren.
             authoritativeFireTarget={effectiveFireTarget}
             defaultProjYears={
               simResult && currentAge != null

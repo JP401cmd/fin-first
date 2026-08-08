@@ -9,6 +9,11 @@ import { resolveFireParams } from '@/lib/fire-params'
 import { calculateFreedomTime } from '@/lib/format'
 import { decryptIbanForLabel } from '@/lib/truelayer/cash-asset-backfill'
 import { buildBankSignalNotification } from '@/lib/notifications/bank-signalen'
+import {
+  decideSpendLimitEvents,
+  parseSpendLimitEventGate,
+} from '@/lib/notifications/spend-limit'
+import { loadSpendLimitsSection } from '@/lib/spend-limits/loader'
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -21,6 +26,7 @@ export type NotificationType =
   | 'holding_alert'
   | 'briefing'
   | 'budget_model_proposal'
+  | 'spend_limit'
 
 /**
  * Eén koppelrij met de embed erbij. PostgREST levert een to-one embed soms als
@@ -110,6 +116,7 @@ export async function GET(request: NextRequest) {
       partner_transaction: true, horizon: true,
       holding_alert: true, briefing: true,
       budget_model_proposal: true,
+      spend_limit: true,
     }
     const prefs: Record<string, boolean> = prefsRes.data?.value
       ? { ...defaultPrefs, ...JSON.parse(prefsRes.data.value) }
@@ -480,6 +487,88 @@ export async function GET(request: NextRequest) {
       }
     } catch (err) {
       console.error('Weekly briefing notification error:', err)
+    }
+
+    // ── 4d. Grenzenpotten (eigen uitgavengrenzen) ────────────────────
+    // Vier events: `near`/`exceeded` als LIVE status over de lopende periode
+    // (geen gate — ze verdwijnen vanzelf bij status- of periodewissel), plus de
+    // eenmalige `recovered` en `streak_milestone` over de laatst afgesloten
+    // periode. Alle beslislogica staat puur in lib/notifications/spend-limit.ts;
+    // hier gebeurt alleen I/O.
+    //
+    // WAAROM COMPUTE-ON-READ EN GEEN CRON: de spend-limits-RPC's zijn SECURITY
+    // INVOKER en de loader verbiedt service-role. Een cron-generator kan de
+    // canonieke loader dus niet hergebruiken en zou nieuwe SQL of per-gebruiker-
+    // impersonatie vergen — een tweede berekenpad naast de motor. Compute-on-read
+    // is hier niet alleen goedkoper, het is de enige variant die de "één som"-regel
+    // intact laat. (Een cron zou bovendien een omgevingswijziging zijn.)
+    //
+    // De voorkeur-check staat hier — vóór de voorcheck en vóór het zetten van de
+    // dedupe-gate — zodat een uitgezette melding de gate niet "opbrandt": zet de
+    // gebruiker het type later aan, dan ziet hij de melding alsnog.
+    if (computeSlow && prefs.spend_limit !== false) try {
+      // Goedkope, indexed voorcheck: de overgrote meerderheid heeft geen pot en
+      // betaalt dan precies deze ene query in plaats van de volle loader. De GET
+      // is al zwaar (~22 queries per verse poll); dit is een voorwaarde, geen
+      // optimalisatie.
+      const { data: activeLimitProbe } = await supabase
+        .from('spend_limits')
+        .select('id')
+        .eq('is_active', true)
+        .eq('is_archived', false)
+        .limit(1)
+
+      if ((activeLimitProbe?.length ?? 0) > 0) {
+        const spendLimitGateKey = `spend_limit_events_${user.id}`
+
+        // Meldingen tonen geen bedrag-in-tijd en geen budgetkeuzelijst, dus beide
+        // opties uit: dat scheelt de profiel-/maandtransactie-fetches en de
+        // budgets-query op een pad dat ze niet gebruikt.
+        const [spendLimitSection, spendLimitGateRow, aliasRow] = await Promise.all([
+          loadSpendLimitsSection(supabase, new Date(), {
+            withBudgetOptions: false,
+            withDailyExpenseRate: false,
+          }),
+          supabase
+            .from('app_settings')
+            .select('value')
+            .eq('key', spendLimitGateKey)
+            .maybeSingle(),
+          // Moment-in-tijd: de tekst wordt met de alias van NU samengesteld en
+          // daarna als string bewaard. Eén kolom, alleen wanneer er potten zijn.
+          supabase
+            .from('profiles')
+            .select('spend_limit_alias')
+            .eq('id', user.id)
+            .maybeSingle(),
+        ])
+
+        const spendLimitDecision = decideSpendLimitEvents({
+          limits: spendLimitSection.limits,
+          alias: (aliasRow.data as { spend_limit_alias?: string | null } | null)?.spend_limit_alias ?? null,
+          gate: parseSpendLimitEventGate(spendLimitGateRow.data?.value ?? null),
+          enabled: true,
+        })
+
+        if (spendLimitDecision.gateChanged) {
+          await supabase
+            .from('app_settings')
+            .upsert(
+              { key: spendLimitGateKey, value: JSON.stringify(spendLimitDecision.gate) },
+              { onConflict: 'key' },
+            )
+        }
+
+        for (const event of spendLimitDecision.events) {
+          slow.push({
+            ...event.notification,
+            createdAt: now,
+            read: readIds.includes(event.notification.id),
+          })
+        }
+      }
+    } catch (err) {
+      console.error('Spend limit notification error:', err)
     }
 
     // ── 6. Partner transaction notifications ─────────────────────────
@@ -1135,7 +1224,7 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    const validTypes = ['budget', 'sync', 'recommendation', 'partner_transaction', 'horizon', 'holding_alert', 'briefing', 'budget_model_proposal']
+    const validTypes = ['budget', 'sync', 'recommendation', 'partner_transaction', 'horizon', 'holding_alert', 'briefing', 'budget_model_proposal', 'spend_limit']
     const sanitized: Record<string, boolean> = {}
     for (const key of validTypes) {
       sanitized[key] = preferences[key] !== false

@@ -31,6 +31,7 @@ const JOB_LABELS: Record<JobKey, string> = {
   'briefing-email': 'Briefing-e-mail',
   'web-vitals-retention': 'Webprestaties-retentie',
   retention: 'AVG-bewaartermijnen',
+  'user-reports-notion-sync': 'Meldingen → Notion-sync',
 }
 
 function defaultRecipient(): string | null {

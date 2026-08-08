@@ -15,6 +15,8 @@ import {
 } from '@/lib/horizon/sim-chart-geometry'
 import { ChartStaticLayers } from './chart-static-layers'
 import { formatAge } from './vrijheidsas'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+import { MASKED_AMOUNT_PLACEHOLDER } from '@/lib/format'
 
 // ── Types ───────────────────────────────────────────────────────────────────
 //
@@ -24,8 +26,17 @@ import { formatAge } from './vrijheidsas'
 // onveranderd vanuit dit component kunnen blijven importeren.
 export type { ScenarioOverlay, MonteCarloOverlay, HouseholdPartnerOverlay }
 
-/** Format an absolute value for the crosshair tooltip (no sign prefix) */
-function fmtAbs(val: number): string {
+/**
+ * Format an absolute value for the crosshair tooltip (no sign prefix).
+ *
+ * `masked` is een VERPLICHTE parameter, geen optionele: elk bedrag in deze
+ * grafiek loopt hier langs, en een vergeten argument zou precies het lek
+ * terugbrengen dat ADR 0091 hier dicht (de crosshair toonde bedragen door de
+ * bedragmaskering heen). Onder maskering verdwijnt het bedrag volledig —
+ * geen afgeronde variant, geen bandbreedte-hint (laag 2 van ADR 0091).
+ */
+function fmtAbs(val: number, masked: boolean): string {
+  if (masked) return MASKED_AMOUNT_PLACEHOLDER
   const abs = Math.abs(val)
   if (abs >= 1_000_000) return `€${(abs / 1_000_000).toFixed(1)}M`
   if (abs >= 1_000) return `€${Math.round(abs / 1_000)}K`
@@ -347,7 +358,15 @@ export const SimChart = memo(function SimChart({
    *  (1+inflatie)^jaar). Wanneer aanwezig tekent de legacy/perpetual-doellijn
    *  als OPLOPENDE lijn: het reële doel-van-nu groeit met inflatie mee naar de
    *  nominale eindwaarde (`targetEndPortfolio`). Zonder deze prop blijft de
-   *  doellijn vlak (byte-identiek voor call-sites zonder unifiedRows). */
+   *  doellijn vlak (byte-identiek voor call-sites zonder unifiedRows).
+   *
+   *  EURO-WEERGAVE (contract met de render-grens in `horizon-client.tsx`): in
+   *  huidige euro's levert de aanroeper een UNIT-factorlijst (dezelfde
+   *  leeftijden, `factor: 1` overal) bij een al gedeflateerde
+   *  `targetEndPortfolio`. De lijn wordt dan vlak op het reële doel-van-nu en
+   *  blijft AANWEZIG. `undefined` doorgeven zou de doellijn juist volledig
+   *  laten verdwijnen (de geometrie geeft dan `targetLine === null`) — dat is
+   *  nadrukkelijk niet de bedoeling. */
   targetInflationFactors?: { age: number; factor: number }[]
   /** Tweede vermogenslijn: het BESTEEDBARE (liquide) vermogen als `[leeftijd,
    *  bedrag]`-punten (consume-only uit `UnifiedProjectionRow.nettoLiquide`, zie
@@ -368,6 +387,11 @@ export const SimChart = memo(function SimChart({
   hideValueTooltip?: boolean
 }) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 1200, forModal })
+  // Bedragmaskering (ADR 0091) komt uit de hook, NIET uit een prop: de hook
+  // heeft een fallback-context, dus `SimChartProps` blijft ongewijzigd en elke
+  // bestaande caller (sim-chart-widget, whatif, grafiek-uitleg, de
+  // Vrijheidscheck-rapportkolom) erft de fix zonder eigen wijziging.
+  const { masked } = useMaskedAmounts()
   const [internalHoveredAge, setInternalHoveredAge] = useState<number | null>(null)
   // Controlled-of-intern: de parent kan de hover-leeftijd bezitten (cijferbar/playback
   // op /toekomst). Afwezige `hoverAge` → interne state, byte-identiek voor bestaande callers.
@@ -514,6 +538,7 @@ export const SimChart = memo(function SimChart({
         <ChartStaticLayers
           geometry={geometry}
           hasEntered={hasEntered}
+          masked={masked}
           emphasis={emphasis}
           baselineEmphasis={baselineEmphasis}
           showDepletionWarning={showDepletionWarning}
@@ -618,7 +643,7 @@ export const SimChart = memo(function SimChart({
                   het gewoon "Vermogen". */}
               <div className="flex items-baseline justify-between" style={{ fontSize: 10, color: 'var(--paper)' }}>
                 <span>{liquidAtHover !== null ? 'Met je huis' : 'Vermogen'}</span>
-                <span className="font-mono tabular-nums font-semibold">{fmtAbs(hoveredRow.startPortfolio)}</span>
+                <span className="font-mono tabular-nums font-semibold">{fmtAbs(hoveredRow.startPortfolio, masked)}</span>
               </div>
 
               {/* Het vermogen zonder je huis op dezelfde leeftijd — alleen wanneer
@@ -632,7 +657,7 @@ export const SimChart = memo(function SimChart({
                     </svg>
                     Zonder je huis
                   </span>
-                  <span className="font-mono tabular-nums">{fmtAbs(liquidAtHover)}</span>
+                  <span className="font-mono tabular-nums">{fmtAbs(liquidAtHover, masked)}</span>
                 </div>
               )}
 
@@ -643,7 +668,11 @@ export const SimChart = memo(function SimChart({
                   {drijvers.map(d => (
                     <div key={d.label} className="flex items-baseline justify-between mt-0.5" style={{ fontSize: 9 }}>
                       <span style={{ color: '#6ee7b7' }}>&#9650; {d.label}</span>
-                      <span className="font-mono tabular-nums" style={{ color: '#6ee7b7' }}>+{fmtAbs(d.value)}</span>
+                      {/* Het losse '+' verdwijnt onder maskering: richting mag
+                          alleen via het ▲-icoon, de groepskop en de kleur —
+                          nooit via een teken naast een gemaskeerd bedrag
+                          (ADR 0091, laag 3). */}
+                      <span className="font-mono tabular-nums" style={{ color: '#6ee7b7' }}>{masked ? '' : '+'}{fmtAbs(d.value, masked)}</span>
                     </div>
                   ))}
                 </>
@@ -656,7 +685,8 @@ export const SimChart = memo(function SimChart({
                   {drukkers.map(d => (
                     <div key={d.label} className="flex items-baseline justify-between mt-0.5" style={{ fontSize: 9 }}>
                       <span style={{ color: '#fca5a5' }}>&#9660; {d.label}</span>
-                      <span className="font-mono tabular-nums" style={{ color: '#fca5a5' }}>{'−'}{fmtAbs(d.value)}</span>
+                      {/* Idem: het losse '−' verdwijnt onder maskering (ADR 0091, laag 3). */}
+                      <span className="font-mono tabular-nums" style={{ color: '#fca5a5' }}>{masked ? '' : '−'}{fmtAbs(d.value, masked)}</span>
                     </div>
                   ))}
                 </>
@@ -687,7 +717,7 @@ export const SimChart = memo(function SimChart({
                           fontWeight: p.label === 'p50' ? 600 : 400,
                         }}
                       >
-                        {fmtAbs(p.value)}
+                        {fmtAbs(p.value, masked)}
                       </span>
                     </div>
                   ))}
@@ -725,10 +755,12 @@ export const SimChart = memo(function SimChart({
                             <span className="truncate max-w-[80px]">{v.label}</span>
                           </span>
                           <span className="font-mono tabular-nums" style={{ color: 'var(--paper)' }}>
-                            {fmtAbs(v.value)}
+                            {fmtAbs(v.value, masked)}
                             {isWatals && Math.abs(delta) >= 1 && (
+                              // Ook hier: onder maskering blijft alleen de kleur
+                              // de richting dragen, niet een los ±-teken.
                               <span className="ml-1" style={{ color: delta >= 0 ? '#6ee7b7' : '#fca5a5' }}>
-                                {delta >= 0 ? '+' : '−'}{fmtAbs(delta)}
+                                {masked ? '' : delta >= 0 ? '+' : '−'}{fmtAbs(delta, masked)}
                               </span>
                             )}
                           </span>

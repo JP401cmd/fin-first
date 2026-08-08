@@ -13,6 +13,10 @@ interface Props {
   href?: string
 }
 
+// euro-view: exempt — deze widget deflateert bewust zélf: het koopkrachtverlies
+// ÍS de boodschap (een didactische €1.000-curve, geen projectiebedrag). Hij volgt
+// daarom niet de globale euro-weergave; dat zou de erosie juist wegpoetsen.
+
 /**
  * Reële (koopkracht-gecorrigeerde) waarde van €1.000 na `year` jaar inflatie.
  * Canonieke discontering: reële waarde = nominaal / (1 + inflatie)^jaar — dezelfde

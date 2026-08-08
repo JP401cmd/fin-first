@@ -8,8 +8,8 @@ describe('BEHEER_GROUPS', () => {
     expect(BEHEER_GROUPS.map((g) => g.id)).toEqual(['technisch', 'functioneel', 'test', 'info'])
   })
 
-  it('bevat 43 tools met unieke routes onder /beheer/', () => {
-    expect(allTools).toHaveLength(43)
+  it('bevat 40 tools met unieke routes onder /beheer/', () => {
+    expect(allTools).toHaveLength(40)
     const hrefs = allTools.map((t) => t.href)
     expect(new Set(hrefs).size).toBe(hrefs.length)
     for (const href of hrefs) {
@@ -44,6 +44,15 @@ describe('BEHEER_GROUPS', () => {
       '/beheer/propositie',
       // C5-c: de v1↔v2 parity-inspector is verwijderd (v2 is de enige engine).
       '/beheer/horizon-tabellen',
+      // Besluit 02 (beheer-opschoning): de roadmap-naslag verhuisde naar Notion;
+      // de teamopstelling leest voortaan alleen nog van de org-site (team.html).
+      // De curatie-gate zelf (development-model.ts + .test.ts) blijft bestaan.
+      '/beheer/roadmap',
+      '/beheer/development',
+      // WF-BEHEER-12-bug1: de doelgids had sinds ADR 0007 nul UI-consumers
+      // (dode configuratie). De Welkomstgids (/beheer/welkom) is de live
+      // vervanger van doel-gebonden begeleiding.
+      '/beheer/doelen',
     ]) {
       expect(hrefs).not.toContain(removed)
     }

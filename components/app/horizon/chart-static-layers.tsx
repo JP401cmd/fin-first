@@ -24,6 +24,11 @@ import type { SimChartGeometry } from '@/lib/horizon/sim-chart-geometry'
 export type ChartStaticLayersProps = {
   geometry: SimChartGeometry
   hasEntered: boolean
+  /** Bedragmaskering (ADR 0091). Komt uit `useMaskedAmounts()` in `SimChart` en
+   *  reist als gewone prop hierheen, zodat de `React.memo`-vergelijking 'm
+   *  meeneemt (geen stale maskering na een flip van de privacy-toggle).
+   *  Geometrie blijft onder maskering identiek; alleen euro-LABELS verdwijnen. */
+  masked: boolean
   emphasis: 'accumulation' | 'withdrawal' | 'fire' | null
   baselineEmphasis: 'ghost' | 'compare'
   showDepletionWarning?: boolean
@@ -50,9 +55,24 @@ export type ChartStaticLayersProps = {
  *  niet puur op kleur/contrast leunt (a11y). */
 const DIMMED = 0.30
 
+/** Bedrag-notatie van het erfenis-/koopkracht-doellijnLABEL: miljoenen met één
+ *  decimaal, anders hele duizendtallen.
+ *
+ *  Bewust één functie voor het eindlabel én het "€… nu"-sublabel: de "toont de
+ *  tweede regel hetzelfde getal?"-vraag hoort op het niveau te lopen waarop de
+ *  gebruiker het verschil ziet — de GETOONDE tekst, niet de rauwe waarde.
+ *  (De horizontale FIRE-doellijnen hierboven hebben hun eigen, fijnere
+ *  M-notatie met twee decimalen en horen bewust niet bij dit paar.) */
+function targetAmountLabel(val: number): string {
+  return val >= 1_000_000
+    ? `€${(val / 1_000_000).toFixed(1)}M`
+    : `€${Math.round(val / 1000)}k`
+}
+
 export function ChartStaticLayersInner({
   geometry,
   hasEntered,
+  masked,
   emphasis,
   baselineEmphasis,
   showDepletionWarning,
@@ -131,6 +151,13 @@ export function ChartStaticLayersInner({
   // Eén lijn ⇒ één grondslag ⇒ het korte "doel" blijft.
   const exclTargetLabel = liquidPath != null ? 'doel zonder je huis' : 'doel'
 
+  // Labelpaar van de meegroeiende erfenis/koopkracht-doellijn: het eindlabel
+  // (nominale waarde op de laatste zichtbare leeftijd) en het "€… nu"-sublabel
+  // (hetzelfde doel in geld van vandaag). Beide door dezelfde formatter, zodat
+  // de onderdrukkingsconditie hieronder op de getoonde tekst kan vergelijken.
+  const targetEndLabel = targetLine ? targetAmountLabel(targetLine.labelVal) : null
+  const targetNowLabel = targetLine ? targetAmountLabel(targetLine.realTargetNow) : null
+
   return (
     <>
       {/* Grid lines */}
@@ -139,8 +166,11 @@ export function ChartStaticLayersInner({
           stroke="var(--border-ed)" strokeWidth={1} strokeDasharray="4 4" />
       ))}
 
-      {/* Y-axis labels */}
-      {yTicks.map(({ val, y }) => (
+      {/* Y-axis labels — onder maskering VOLLEDIG weg (ADR 0091: "bullets op een
+          as zijn ruis, geen informatie"). De gridlijnen hierboven blijven staan,
+          dus de verhoudingen in de grafiek blijven leesbaar; alleen de bedragen
+          bij de as verdwijnen. */}
+      {!masked && yTicks.map(({ val, y }) => (
         <text key={val} x={PAD.left - 5} y={y + 4} textAnchor="end" fontSize={9}
           fill="var(--ink-4)" fontFamily="var(--font-dm-mono, monospace)">
           {val >= 1_000_000
@@ -168,22 +198,27 @@ export function ChartStaticLayersInner({
             y1={PAD.top + yScale(fireTarget)} y2={PAD.top + yScale(fireTarget)}
             stroke="var(--hor-t, #8a6e42)" strokeWidth={1.5} strokeDasharray="6 3" opacity={0.6}
           />
+          {/* Woordlabel blijft altijd staan (de lijn moet benoembaar blijven);
+              onder maskering schuift 'ie in het lege bedrag-slot zodat er geen
+              zwevend label boven de lijn hangt. */}
           <text
-            x={PAD.left + innerW - 2} y={PAD.top + yScale(fireTarget) - 9}
+            x={PAD.left + innerW - 2} y={PAD.top + yScale(fireTarget) - (masked ? 4 : 9)}
             fontSize={8} fill="var(--hor-t, #8a6e42)" textAnchor="end"
             fontFamily="var(--font-inter, sans-serif)" fontWeight={600}
           >
             {exclTargetLabel}
           </text>
-          <text
-            x={PAD.left + innerW - 2} y={PAD.top + yScale(fireTarget) - 1}
-            fontSize={7.5} fill="var(--hor-t, #8a6e42)" textAnchor="end"
-            fontFamily="var(--font-dm-mono, monospace)"
-          >
-            {fireTarget >= 1_000_000
-              ? `€${(fireTarget / 1_000_000).toFixed(2)}M`
-              : `€${Math.round(fireTarget / 1000)}k`}
-          </text>
+          {!masked && (
+            <text
+              x={PAD.left + innerW - 2} y={PAD.top + yScale(fireTarget) - 1}
+              fontSize={7.5} fill="var(--hor-t, #8a6e42)" textAnchor="end"
+              fontFamily="var(--font-dm-mono, monospace)"
+            >
+              {fireTarget >= 1_000_000
+                ? `€${(fireTarget / 1_000_000).toFixed(2)}M`
+                : `€${Math.round(fireTarget / 1000)}k`}
+            </text>
+          )}
         </>
       )}
 
@@ -199,21 +234,23 @@ export function ChartStaticLayersInner({
             stroke="var(--hor-t, #8a6e42)" strokeWidth={1.5} strokeDasharray="6 3" opacity={0.6}
           />
           <text
-            x={PAD.left + innerW - 2} y={PAD.top + yScale(fireTargetInclHome) - 9}
+            x={PAD.left + innerW - 2} y={PAD.top + yScale(fireTargetInclHome) - (masked ? 4 : 9)}
             fontSize={8} fill="var(--hor-t, #8a6e42)" textAnchor="end"
             fontFamily="var(--font-inter, sans-serif)" fontWeight={600}
           >
             doel met je huis
           </text>
-          <text
-            x={PAD.left + innerW - 2} y={PAD.top + yScale(fireTargetInclHome) - 1}
-            fontSize={7.5} fill="var(--hor-t, #8a6e42)" textAnchor="end"
-            fontFamily="var(--font-dm-mono, monospace)"
-          >
-            {fireTargetInclHome >= 1_000_000
-              ? `€${(fireTargetInclHome / 1_000_000).toFixed(2)}M`
-              : `€${Math.round(fireTargetInclHome / 1000)}k`}
-          </text>
+          {!masked && (
+            <text
+              x={PAD.left + innerW - 2} y={PAD.top + yScale(fireTargetInclHome) - 1}
+              fontSize={7.5} fill="var(--hor-t, #8a6e42)" textAnchor="end"
+              fontFamily="var(--font-dm-mono, monospace)"
+            >
+              {fireTargetInclHome >= 1_000_000
+                ? `€${(fireTargetInclHome / 1_000_000).toFixed(2)}M`
+                : `€${Math.round(fireTargetInclHome / 1000)}k`}
+            </text>
+          )}
         </>
       )}
 
@@ -234,19 +271,40 @@ export function ChartStaticLayersInner({
               fontSize={8} fill="var(--kern-t, #58362d)" textAnchor="end"
               fontFamily="var(--font-inter, sans-serif)" fontWeight={600}
             >
-              {strategy === 'perpetual' ? 'koopkracht' : 'erfenis'} {targetLine.labelVal >= 1_000_000
-                ? `€${(targetLine.labelVal / 1_000_000).toFixed(1)}M`
-                : `€${Math.round(targetLine.labelVal / 1000)}k`}
+              {/* Woordlabel blijft, bedrag verdwijnt onder maskering. */}
+              {strategy === 'perpetual' ? 'koopkracht' : 'erfenis'}{masked ? '' : ` ${targetEndLabel}`}
             </text>
-            <text
-              x={Math.max(PAD.left + 44, PAD.left + xScale(targetLine.labelAge) - 2)} y={Math.max(labelSafeTopY + 16, PAD.top + yScale(targetLine.labelVal) - 4)}
-              fontSize={7} fill="var(--kern-t, #58362d)" textAnchor="end"
-              fontFamily="var(--font-dm-mono, monospace)" opacity={0.85}
-            >
-              {targetLine.realTargetNow >= 1_000_000
-                ? `€${(targetLine.realTargetNow / 1_000_000).toFixed(1)}M nu`
-                : `€${Math.round(targetLine.realTargetNow / 1000)}k nu`}
-            </text>
+            {/* Het "€… nu"-sublabel vertelt wat de nominale eindwaarde in geld
+                van vandaag is. Twee gevallen waarin het niets toevoegt:
+                  · maskering aan → het is een bedrag, dus het verdwijnt;
+                  · het sublabel zou LETTERLIJK dezelfde tekst tonen als het
+                    eindlabel erboven → een tweede "nu"-regel met exact hetzelfde
+                    getal is ruis.
+                De conditie loopt op de GETOONDE tekst, niet op de rauwe waarde:
+                dat is precies wat de regel hierboven belooft, en €201.400 en
+                €201.000 lezen allebei als "€201k". Bewust géén view-prop: zo
+                blijft dit component euro-weergave-onwetend en verandert
+                `SimChartProps` niet.
+
+                BEWUSTE UITZONDERING — 0% inflatie. In huidige euro's levert de
+                aanroeper een unit-factorlijst bij een al gedeflateerd doel (N2b),
+                dus labelVal === realTargetNow en het sublabel valt weg. Een
+                wat-als met inflatie 0% in TOEKOMSTIGE euro's levert exact
+                dezelfde invoer (`inflationFactor = (1+0)^k = 1`, zie
+                `lib/horizon-kernel/bridge.ts`) en dus ook geen sublabel. Dat
+                onderscheid is per constructie niet te maken zonder de weergave
+                hierheen te lekken — en het is inhoudelijk juist: zónder inflatie
+                ís de eindwaarde het bedrag-van-nu, dus een tweede regel met
+                hetzelfde getal voegt ook daar niets toe. */}
+            {!masked && targetNowLabel !== targetEndLabel && (
+              <text
+                x={Math.max(PAD.left + 44, PAD.left + xScale(targetLine.labelAge) - 2)} y={Math.max(labelSafeTopY + 16, PAD.top + yScale(targetLine.labelVal) - 4)}
+                fontSize={7} fill="var(--kern-t, #58362d)" textAnchor="end"
+                fontFamily="var(--font-dm-mono, monospace)" opacity={0.85}
+              >
+                {`${targetNowLabel} nu`}
+              </text>
+            )}
           </>
         ) : (
           <>
@@ -260,9 +318,9 @@ export function ChartStaticLayersInner({
               fontSize={8} fill="var(--kern-t, #58362d)" textAnchor="end"
               fontFamily="var(--font-inter, sans-serif)" fontWeight={600}
             >
-              {strategy === 'perpetual' ? 'koopkracht' : 'erfenis'} {targetEndPortfolio >= 1_000_000
-                ? `€${(targetEndPortfolio / 1_000_000).toFixed(1)}M`
-                : `€${Math.round(targetEndPortfolio / 1000)}k`}
+              {/* Zelfde labelfamilie als de meegroeiende variant hierboven —
+                  dezelfde formatter, dus letterlijk dezelfde tekst. */}
+              {strategy === 'perpetual' ? 'koopkracht' : 'erfenis'}{masked ? '' : ` ${targetAmountLabel(targetEndPortfolio)}`}
             </text>
           </>
         )

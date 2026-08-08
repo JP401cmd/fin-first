@@ -567,6 +567,19 @@ export const BUDGET_FAV_SIZES: WidgetSize[] = ['quarter', 'half', 'full', 'xl']
 /** Allowed sizes for dynamic holding_fav:* widgets (geen mini; xl = Double, desktop-only) */
 export const HOLDING_FAV_SIZES: WidgetSize[] = ['quarter', 'half', 'full', 'xl']
 
+/**
+ * Toegestane maten voor dynamische `spend_limit:*`-widgets (grenzenpotten).
+ *
+ * Bewust GEEN `_fav`-suffix in de prefix: een grenzenpot is geen favoriet van een
+ * andere entiteit maar een zelfstandige, door de gebruiker aangemaakte norm — het
+ * aanmaken ervan ís de keuze om 'm te zien (ADR 0089, naamneutraliteit).
+ *
+ * `mini` staat hier bewust NIET in (net als bij de favorieten): hij is niet
+ * kiesbaar, maar ontstaat op mobiel via `downsizeForMobile(quarter → mini)`. De
+ * widget MOET daarom wél een mini-rendertak hebben.
+ */
+export const SPEND_LIMIT_SIZES: WidgetSize[] = ['quarter', 'half', 'full', 'xl']
+
 /** Get the widget definition by id */
 export function getWidgetDef(id: string): WidgetDef | undefined {
   return WIDGET_CATALOG.find(w => w.id === id)
@@ -574,12 +587,15 @@ export function getWidgetDef(id: string): WidgetDef | undefined {
 
 /**
  * Canonieke toegestane maten voor een widget-id — inclusief de dynamische
- * favorieten (`budget_fav:*`, `holding_fav:*`) die geen catalog-entry hebben.
- * Eén bron zodat de maatkiezer, fill-all-clamp en auto-builder niet driften.
+ * favorieten (`budget_fav:*`, `holding_fav:*`, `spend_limit:*`) die geen
+ * catalog-entry hebben.
+ * Eén bron zodat de maatkiezer, fill-all-clamp, de server-side size-sanitering
+ * (app/api/widgets) en de auto-builder niet driften.
  */
 export function getWidgetSizes(id: string): WidgetSize[] {
   if (id.startsWith('budget_fav:')) return BUDGET_FAV_SIZES
   if (id.startsWith('holding_fav:')) return HOLDING_FAV_SIZES
+  if (id.startsWith('spend_limit:')) return SPEND_LIMIT_SIZES
   return getWidgetDef(id)?.sizes ?? ['quarter', 'half', 'full']
 }
 
@@ -622,9 +638,18 @@ export function mergeWidgetPrefs(saved: WidgetPrefs | null): WidgetPrefs {
     return { id: def.id, enabled: false, size: def.defaultSize, order: 100 + i }
   })
 
-  // Preserve dynamic widget prefs (budget_fav:*, holding_fav:*) from saved data
+  // Preserve dynamic widget prefs (budget_fav:*, holding_fav:*, spend_limit:*)
+  // from saved data. Zonder deze lus gooit élke merge de opgeslagen pref weg —
+  // inclusief een bewuste "widget uit"-keuze (enabled:false), die daarna door de
+  // loader-injectie meteen weer als enabled zou terugkomen.
   for (const w of saved.widgets) {
-    if (w.id.startsWith('budget_fav:') || w.id.startsWith('holding_fav:')) merged.push(w)
+    if (
+      w.id.startsWith('budget_fav:') ||
+      w.id.startsWith('holding_fav:') ||
+      w.id.startsWith('spend_limit:')
+    ) {
+      merged.push(w)
+    }
   }
 
   return { widgets: merged }

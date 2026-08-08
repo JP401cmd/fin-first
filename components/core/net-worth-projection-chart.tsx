@@ -13,6 +13,15 @@
 // Y-as: vermogen in EUR
 // Rekent met real return (rendement − inflatie) zodat de projectie
 // in koopkracht-termen is.
+//
+// euro-view: exempt (D12) — dit is een EIGEN projectiemotor náást de
+// horizon-kernel: de reeks wordt hier lokaal opgebouwd (nominaal + reëel per
+// punt) en er is dus geen `UnifiedProjectionRow.inflationFactor` om mee te
+// deflateren. De profielbrede euro-weergave (lib/euro-display.ts) grijpt hier
+// bewust NIET op in: hem toch toepassen zou het reeds-reële pad een tweede keer
+// deflateren — precies de dubbele deflatie die ADR 0090 uitsluit. Het saneren
+// van deze motor (kernel als enige bron) is een aparte kaart, geen
+// weergave-wijziging: zie het aandachtspunt "projectiemotoren naast de kernel".
 
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'

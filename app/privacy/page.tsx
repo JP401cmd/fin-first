@@ -4,6 +4,7 @@ import {
   MarketingSection,
   MarketingDisclaimer,
 } from '@/components/landing/marketing-page-shell'
+import { LegalEmail } from '@/components/legal/legal-email'
 
 export const metadata: Metadata = {
   title: 'Privacy — TriFinity',
@@ -88,6 +89,12 @@ const SUBVERWERKERS: {
     wanneer: 'Alleen wanneer de app je een e-mail stuurt.',
   },
   {
+    naam: 'Notion',
+    rol: 'Triage en afhandeling van meldingen die je zelf instuurt: je omschrijving, je e-mailadres, de technische context (scherm, route, browser) en een eventuele schermafbeelding komen als kaartje in ons interne werkoverzicht',
+    locatie: 'VS',
+    wanneer: 'Alleen wanneer je zelf een melding verstuurt.',
+  },
+  {
     naam: 'Polar',
     rol: 'Betalingen en abonnementsbeheer',
     locatie: 'EU-gericht platform',
@@ -127,13 +134,17 @@ export default function PrivacyPage() {
           , [rechtsvorm], gevestigd te [vestigingsadres], ingeschreven bij de
           Kamer van Koophandel onder nummer [KvK-nummer]. Voor alle vragen en
           verzoeken over je gegevens is er één kanaal:{' '}
-          <a
-            href="mailto:privacy@trifinity.nl"
-            className="font-semibold text-kern-700 underline hover:text-kern-800"
-          >
-            privacy@trifinity.nl
-          </a>
-          .
+          <LegalEmail kind="privacy" />.
+        </p>
+        <p>
+          Dat adres staat er bewust nog niet ingevuld. TriFinity heeft nog geen
+          eigen internetdomein, en we zetten hier geen e-mailadres neer dat
+          vandaag geen post kan ontvangen. Zolang deze verklaring een concept is
+          (zie de melding hierboven), is de app niet algemeen beschikbaar: je
+          kunt alleen op uitnodiging een account aanmaken, en een verzoek over je
+          gegevens loopt via degene die je die uitnodiging heeft gestuurd. Zodra
+          het domein er is, vullen we het adres hier in en vervalt deze
+          alinea.
         </p>
         <p>
           Ben je het niet eens met hoe we met je gegevens omgaan, dan heb je
@@ -317,14 +328,7 @@ export default function PrivacyPage() {
             <strong className="font-semibold text-[var(--ink)]">Vrijheidscheck-gegevens</strong>{' '}
             — niet-geconverteerde intakes worden automatisch opgeschoond;
             maak je een account, dan volgen ze de levensduur van je account.
-            Wil je ze eerder kwijt, mail{' '}
-            <a
-              href="mailto:privacy@trifinity.nl"
-              className="font-semibold text-kern-700 underline hover:text-kern-800"
-            >
-              privacy@trifinity.nl
-            </a>
-            .
+            Wil je ze eerder kwijt, gebruik dan het contactkanaal uit sectie 1.
           </li>
           <li className="border-l-2 border-[var(--border-md)] pl-4">
             <strong className="font-semibold text-[var(--ink)]">AI-aanbieders</strong>{' '}
@@ -362,14 +366,7 @@ export default function PrivacyPage() {
             — download je kern-financiële gegevens (transacties, budgetten,
             vermogensverloop, bezittingen, schulden en doelen) als CSV,
             rechtstreeks vanuit de app. Wil je een volledige kopie van ál je
-            gegevens, mail{' '}
-            <a
-              href="mailto:privacy@trifinity.nl"
-              className="font-semibold text-kern-700 underline hover:text-kern-800"
-            >
-              privacy@trifinity.nl
-            </a>
-            .
+            gegevens, vraag die dan aan via het contactkanaal uit sectie 1.
           </li>
           <li className="border-l-2 border-[var(--border-md)] pl-4">
             <strong className="font-semibold text-[var(--ink)]">Verwijdering</strong>{' '}
@@ -383,15 +380,9 @@ export default function PrivacyPage() {
           </li>
         </ul>
         <p>
-          Voor elk ander verzoek: mail{' '}
-          <a
-            href="mailto:privacy@trifinity.nl"
-            className="font-semibold text-kern-700 underline hover:text-kern-800"
-          >
-            privacy@trifinity.nl
-          </a>
-          . We reageren binnen één maand. En nogmaals: een klacht kan altijd
-          bij de Autoriteit Persoonsgegevens.
+          Voor elk ander verzoek gebruik je het contactkanaal uit sectie 1. We
+          reageren binnen één maand. En nogmaals: een klacht kan altijd bij de
+          Autoriteit Persoonsgegevens.
         </p>
       </MarketingSection>
 
@@ -413,14 +404,7 @@ export default function PrivacyPage() {
           abonnement — niet je data.
         </p>
         <p className="font-serif text-sm italic text-[var(--ink-3)]">
-          Versie 2.0 — concept, 4 juli 2026. Vragen? Mail{' '}
-          <a
-            href="mailto:privacy@trifinity.nl"
-            className="font-semibold not-italic text-kern-700 underline hover:text-kern-800"
-          >
-            privacy@trifinity.nl
-          </a>{' '}
-          of gebruik de{' '}
+          Versie 2.1 — concept, 7 augustus 2026. Vragen? Gebruik de{' '}
           <a
             href="/contact"
             className="font-semibold not-italic text-kern-700 underline hover:text-kern-800"

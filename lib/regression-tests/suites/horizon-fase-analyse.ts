@@ -60,14 +60,65 @@ function makeRow(overrides: Partial<UnifiedProjectionRow> & { age: number; year?
   return base
 }
 
-/** Build a 20-year withdrawal-phase row sequence for stress tests. */
+/**
+ * Parameters die ALLE stresstests in deze suite aan de motor doorgeven.
+ * `makeStressRows` genereert zijn rijen met exact dezelfde aannames — zie daar.
+ */
+const STRESS_PARAMS = {
+  expectedReturn: 0.07,
+  inflationRate: 0.02,
+  yearlyExpenses: 30_000,
+} as const
+
+/**
+ * Box 3-drag die de synthetische rijen dragen. De motor leest deze niet als
+ * parameter maar leidt 'm per rij af als `|totalBox3| / startNetWorth`
+ * (lib/phase-stress-test.ts#deriveBox3DragRate) — de fixture moet 'm dus
+ * consistent in de rijen zetten.
+ */
+const STRESS_BOX3_DRAG = 0.02
+
+/** Jaarlijkse onttrekking in de synthetische rijen. */
+const STRESS_WITHDRAWAL = STRESS_PARAMS.yearlyExpenses
+
+/**
+ * Tolerantie voor de nul-schok-identiteit in `phase-stress-inflation-reduces`.
+ *
+ * ABSOLUUT (euro's), niet relatief — de toegestane afwijking komt uit een
+ * vaste, aftelbare bron en schaalt niet met de portefeuille: de fixture zet
+ * `totalBox3` als hele euro's in elke rij (zoals echte rijen), de motor leidt
+ * de drag-rate daaruit af (`|totalBox3| / startNetWorth`), en die afronding is
+ * per rij hooguit € 0,50. Over 20 rijen, doorgerold tegen ten hoogste 1,05^20
+ * ≈ 2,65, is de bovengrens 20 × € 0,50 × 2,65 ≈ € 27 → afgerond € 30.
+ * Gemeten residu is € 2; het signaal dat de test daarnaast moet zien (het
+ * inflatie-effect) is € 94.021 — ruim 3.000× groter, dus de tolerantie kan de
+ * echte foutklasse (fixture en motor met verschillende groeimodellen) niet
+ * wegpoetsen.
+ */
+const NO_SHOCK_TOLERANCE_EUR = 30
+
+/**
+ * Build a 20-year withdrawal-phase row sequence for stress tests.
+ *
+ * CONTRACT met de stresstest-motor: `forwardCascade` hersimuleert een rij-reeks
+ * als `nw + nw × (expectedReturn − box3DragRate) + savings − withdrawal + …`.
+ * `totalGrowth` is daarin BRUTO rendement en `totalBox3` de aparte Box 3-post —
+ * precies zoals de echte kernel-rijen (lib/horizon-kernel/bridge.ts:
+ * `totalGrowth += bez.totaalRendement`, `totalBox3 += belN`).
+ *
+ * Deze fixture moet dat model dus VOLGEN, anders meet een stresstest het
+ * verschil tussen fixture en motor i.p.v. het effect van de schok. Vandaar
+ * bruto groei op STRESS_PARAMS.expectedReturn (niet op een al-netto 5%) met
+ * Box 3 apart eraf: netto compoundeert de reeks op 0,07 − 0,02 = 5%, gelijk aan
+ * wat de motor ervan maakt.
+ */
 function makeStressRows(startNw: number = 500_000, years: number = 20): UnifiedProjectionRow[] {
   const rows: UnifiedProjectionRow[] = []
   let nw = startNw
   for (let i = 0; i < years; i++) {
-    const growth = nw * 0.05 // ~5% net return
-    const withdrawal = 30_000
-    const box3 = nw * 0.02
+    const growth = nw * STRESS_PARAMS.expectedReturn // BRUTO rendement
+    const withdrawal = STRESS_WITHDRAWAL
+    const box3 = nw * STRESS_BOX3_DRAG
     const startNwThisYear = nw
     nw = nw + growth - withdrawal - box3
     rows.push(makeRow({
@@ -157,6 +208,21 @@ const tests: TestCase[] = [
       }
       const result = runPhaseMonteCarlo(drainInput, 200)
       assertLessThan(result.successRate, 0.5, 'lage slagingskans bij drainage')
+
+      // Tweezijdig: een absolute drempel alléén zou óók groen blijven als de
+      // motor voor élke invoer 0 teruggeeft (de spiegelvariant van de bug die
+      // deze test jarenlang rood hield: successRate structureel 1 omdat de
+      // depletie-toets ná de clamp op nul stond). Daarom ernaast de eigenschap
+      // die er echt toe doet: dezelfde portefeuille met een BESCHEIDEN
+      // onttrekking moet merkbaar hoger scoren. Dat is bovendien
+      // seed-ongevoelig — het is een vergelijking tussen twee runs met exact
+      // dezelfde seed-reeks, geen absoluut getal van één specifieke seed.
+      const modest = runPhaseMonteCarlo({ ...drainInput, yearlyCashflow: -2_000 }, 200)
+      assertGreaterThan(
+        modest.successRate - result.successRate,
+        0.4,
+        `bescheiden onttrekking (${modest.successRate}) scoort merkbaar hoger dan drainage (${result.successRate})`,
+      )
     },
   },
   {
@@ -193,11 +259,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 200,
     fn() {
       const rows = makeStressRows()
-      const results = runPhaseStressTests(rows, {
-        expectedReturn: 0.07,
-        inflationRate: 0.02,
-        yearlyExpenses: 30_000,
-      })
+      const results = runPhaseStressTests(rows, { ...STRESS_PARAMS })
       // Find the market_crash result
       const crash = results.find(r => r.scenario.type === 'market_crash')
       assertNotNull(crash, 'market_crash scenario gevonden')
@@ -214,11 +276,33 @@ const tests: TestCase[] = [
     estimatedDurationMs: 200,
     fn() {
       const rows = makeStressRows()
-      const results = runPhaseStressTests(rows, {
-        expectedReturn: 0.07,
-        inflationRate: 0.02,
-        yearlyExpenses: 30_000,
-      })
+
+      // Contract-vangnet vóór de eigenlijke assertie: een inflatie-"schok" die
+      // gelijk is aan de basisinflatie heeft per definitie delta 0, dus de
+      // motor moet dan de basisreeks reproduceren. Faalt dit, dan meten de
+      // stresstests hieronder het verschil tussen fixture en motormodel in
+      // plaats van het effect van de schok — precies de drift die deze test
+      // ooit rood maakte (fixture compoundeerde netto 3%, motor 5%; basis
+      // €96.944 tegen een "gestreste" €240.645, dus de schok leek het
+      // eindvermogen te VERHOGEN).
+      const noShock = applyStressScenario(
+        rows,
+        {
+          type: 'prolonged_inflation',
+          label: 'nul-schok',
+          description: 'controle: schok gelijk aan basisinflatie ⇒ delta 0',
+          durationYears: 10,
+          magnitude: STRESS_PARAMS.inflationRate,
+        },
+        { ...STRESS_PARAMS },
+      )
+      assertLessThanOrEqual(
+        Math.abs(noShock.endPortfolio - noShock.baseEndPortfolio),
+        NO_SHOCK_TOLERANCE_EUR,
+        `fixture volgt het motormodel (nul-schok ${noShock.endPortfolio} ≈ basis ${noShock.baseEndPortfolio})`,
+      )
+
+      const results = runPhaseStressTests(rows, { ...STRESS_PARAMS })
       const inflation = results.find(r => r.scenario.type === 'prolonged_inflation')
       assertNotNull(inflation, 'prolonged_inflation scenario gevonden')
       assertLessThan(inflation.endPortfolio, inflation.baseEndPortfolio, 'inflatie verlaagt eindvermogen')
@@ -233,11 +317,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 200,
     fn() {
       const rows = makeStressRows()
-      const results = runPhaseStressTests(rows, {
-        expectedReturn: 0.07,
-        inflationRate: 0.02,
-        yearlyExpenses: 30_000,
-      })
+      const results = runPhaseStressTests(rows, { ...STRESS_PARAMS })
       const longerLife = results.find(r => r.scenario.type === 'longer_life')
       assertNotNull(longerLife, 'longer_life scenario gevonden')
       // Living longer means either lower end portfolio or depletion
@@ -259,11 +339,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 300,
     fn() {
       const rows = makeStressRows()
-      const stressParams = {
-        expectedReturn: 0.07,
-        inflationRate: 0.02,
-        yearlyExpenses: 30_000,
-      }
+      const stressParams = { ...STRESS_PARAMS }
 
       // Stap 1: Run market_crash, noteer delta A
       const crashScenario = PRESET_STRESS_SCENARIOS.find(s => s.type === 'market_crash')!

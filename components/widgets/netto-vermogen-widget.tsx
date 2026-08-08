@@ -289,7 +289,7 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
                   <text x={sparkline.forecastEndX - 1} y={sparkline.forecastEndLabelY} fill="var(--ink-4)" fontSize="7" fontFamily="var(--font-mono), ui-monospace, monospace" textAnchor="end" opacity={hasEntered ? 0.7 : 0} style={{ transition: hasEntered ? 'opacity 400ms ease-out 600ms' : 'none' }}>{formatMaskedCurrency(sparkline.forecastEndValue, masked)}</text>
                 </svg>
                 <div className="flex justify-between mt-0.5">
-                  <span className="font-mono text-[9px] tabular-nums" style={{ color: 'var(--ink-4)' }}>12m geleden</span>
+                  <span className="font-mono text-[9px] tabular-nums" style={{ color: 'var(--ink-4)' }}>-12m</span>
                   <span className="font-mono text-[9px] tabular-nums" style={{ color: 'var(--ink-4)' }}>+6m indicatief</span>
                 </div>
               </div>
@@ -458,7 +458,7 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
             {showAxisLabels && (
               <div className="flex justify-between mt-1">
                 <span className="font-mono text-[9px] tabular-nums" style={{ color: 'var(--ink-4)' }}>
-                  12m geleden
+                  -12m
                 </span>
                 <span className="font-mono text-[9px] tabular-nums" style={{ color: 'var(--ink-4)' }}>
                   +6m indicatief

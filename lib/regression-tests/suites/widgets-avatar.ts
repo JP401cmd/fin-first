@@ -8,7 +8,18 @@ const CAT = 'widgets.avatar'
 // ── Constants ───────────────────────────────────────────────────────────────
 
 const ALL_MODULES: WidgetModule[] = ['kern', 'wil', 'horizon', 'cross']
-const ALL_SIZES: WidgetSize[] = ['mini', 'quarter', 'half', 'full']
+// Uitputtende WidgetSize-allowlist via het Record-exhaustiveness-patroon: een
+// nieuwe/verwijderde size in lib/widget-catalog.ts (bv. de latere toevoeging
+// van 'xl' als opt-in "Double"-formaat) geeft hier een compile-fout i.p.v.
+// stille drift tussen deze suite en de canonieke type-definitie.
+const ALL_SIZES_MAP: Record<WidgetSize, true> = {
+  mini: true,
+  quarter: true,
+  half: true,
+  full: true,
+  xl: true,
+}
+const ALL_SIZES: WidgetSize[] = Object.keys(ALL_SIZES_MAP) as WidgetSize[]
 const FIN_STATES = ['idle', 'talking', 'thinking', 'listening', 'streaming', 'success', 'error'] as const
 const FIN_SIZES = [24, 48, 80, 120] as const
 

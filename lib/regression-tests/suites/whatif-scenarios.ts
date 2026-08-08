@@ -1,6 +1,6 @@
 import { registerCategory, registerTests } from '../test-registry'
 import {
-  assert, assertEqual, assertNotNull, assertGreaterThan,
+  assert, assertEqual, assertClose, assertNotNull, assertGreaterThan,
   assertGreaterThanOrEqual, assertType,
 } from '../assert'
 import type { TestCase } from '../test-types'
@@ -22,6 +22,18 @@ const BASE_OVERRIDES: WhatIfOverrides = {
   monthlyIncome: 4000, workDaysPerWeek: 5, savingsRate: 37,
   expectedReturn: 7, extraContribution: 0,
 }
+
+/**
+ * Tolerantie voor `WhatIfOverrides.expectedReturn` (een percentage op schaal
+ * 0–100, géén geldbedrag). ABSOLUUT gekozen: de enige verwachte afwijking is de
+ * IEEE-754-representatie van de decimaal→procent-conversie in
+ * buildBaselineOverrides (`grossReturn * 100`, ulp ≈ 1e-15 op deze schaal), en
+ * een relatieve tolerantie zou degenereren bij een rendement van 0%. 1e-9 ligt
+ * zes ordes boven die ruis en acht ordes ónder het kleinste verschil dat de UI
+ * überhaupt toont (0,1 procentpunt, `toFixed(1)`) — een echte aannamewijziging
+ * valt er dus nog steeds doorheen.
+ */
+const RETURN_PCT_EPSILON = 1e-9
 
 const tests: TestCase[] = [
   // Test 1: FIRE age delta detection
@@ -97,7 +109,15 @@ const tests: TestCase[] = [
       const b = buildBaselineOverrides(BASE_INPUT, 0.07)
       assertEqual(b.monthlyIncome, 4000, 'income')
       assertEqual(b.workDaysPerWeek, 5, 'workdays')
-      assertEqual(b.expectedReturn, 7, 'return as percentage')
+      // buildBaselineOverrides doet één legitieme conversie: `grossReturn * 100`.
+      // In IEEE-754 is 0.07 * 100 === 7.000000000000001, dus een strikte
+      // gelijkheid faalt hier op representatie, niet op gedrag. Bewust GEEN
+      // afronding in de motor: de baseline-waarde stroomt als
+      // `overrides.expectedReturn / 100` terug de projectie in, en die op een
+      // 0,1%-raster kwantiseren zou het wat-als-scenario laten afwijken van de
+      // hoofdprojectie voor iedere gebruiker met een rendement dat geen ronde
+      // tiende is (bv. 6,85%). Bron: lib/whatif-overrides.ts#buildBaselineOverrides.
+      assertClose(b.expectedReturn, 7, RETURN_PCT_EPSILON, 'return as percentage')
       assertEqual(b.extraContribution, 0, 'no extra')
       assertGreaterThanOrEqual(b.savingsRate, 0, 'savings rate >= 0')
     },

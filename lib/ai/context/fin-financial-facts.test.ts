@@ -22,6 +22,22 @@ vi.mock('@/lib/aandachtspunten-loader', () => ({
 vi.mock('@/lib/supabase/cached-user', () => ({
   getCachedUser: () => Promise.resolve(null),
 }))
+// Sinds de euro-weergave haalt `buildSharedContext` de kernelfactor op via
+// `computeHorizonFireSim` (voor de "≈ in geld van vandaag"-regel). De echte
+// aanroep draait de horizon-loader en crasht op de stub-supabase (mist .order())
+// met unhandled rejections. Mock op null = de gedegradeerde tak (geen ≈-regel),
+// waarmee de FIRE-doel-regel byte-identiek blijft aan de pre-euro-weergave — en
+// dat is precies wat deze cijferpariteit-test wil vastpinnen.
+//
+// ALLEEN DEZE ENE EXPORT VERVANGEN: de module draagt óók `computeHorizonFireTarget`
+// (die `loadCoreData` gebruikt) en `HorizonFireSim`. Een factory zónder
+// `importOriginal` maakt elke andere export `undefined`, waardoor een toekomstige
+// importgraaf-wijziging hier omvalt met een TypeError in plaats van een leesbare
+// assertie. Spread het origineel en overschrijf alleen wat de test nodig heeft.
+vi.mock('@/lib/fire-target-shared', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/fire-target-shared')>()),
+  computeHorizonFireSim: () => Promise.resolve(null),
+}))
 
 import { buildWillFinancialFacts, type FinFactsProfile } from './fin-financial-facts'
 import { buildSharedContext } from './shared-context'
@@ -115,6 +131,9 @@ describe('buildWillFinancialFacts — pure extractor', () => {
     expect(facts.vrijheidsPct).toBe(80)
     expect(facts.displayFireGoal).toBe(500_000)
     expect(facts.fireDoel).toBe(500_000)
+    // Zonder eigen woning verschuift `inclHomeTargetFromScalar` niets: het getal ís
+    // het kernel-doel, dus nominaal → omrekenbaar naar geld van vandaag.
+    expect(facts.fireDoelUitKernel).toBe(true)
     expect(facts.spaarquotePct).toBe(25)
     expect(facts.swr).toBe(0.0288)
     // dagtarief = maanduitgaven × 12 / 365 = 3000×12/365.
@@ -132,6 +151,8 @@ describe('buildWillFinancialFacts — pure extractor', () => {
     // FIRE-doel deelt DEZELFDE terugval-grondslag als het vrijheids-%.
     expect(facts.displayFireGoal).toBeCloseTo(fallbackTarget, 6)
     expect(facts.fireDoel).toBeCloseTo(fallbackTarget, 6)
+    // 25× op de HUIDIGE jaaruitgaven = al geld van vandaag → niet deflateerbaar.
+    expect(facts.fireDoelUitKernel).toBe(false)
   })
 
   // ── WF-KRUIS-23: Fin consumeert de kernel-INCL.-waarde i.p.v. te benaderen ──
@@ -161,6 +182,8 @@ describe('buildWillFinancialFacts — pure extractor', () => {
     )
     // Expliciet: NIET de oude scalar-benadering (500k + 150k overwaarde).
     expect(facts.displayFireGoal).not.toBe(650_000)
+    // Op de FIRE-maand geprojecteerd → nominaal, dus omrekenbaar.
+    expect(facts.fireDoelUitKernel).toBe(true)
   })
 
   it('kernel-INCL.-doel ontbreekt (run gefaald): terugval op de scalar-benadering blijft', () => {
@@ -172,6 +195,8 @@ describe('buildWillFinancialFacts — pure extractor', () => {
     expect(facts.vrijheidsPct).toBe(
       computeFreedomProgress({ fireEligibleNetWorth: 400_000, requiredPortfolio: 650_000 }),
     )
+    // Kernel-doel + overwaarde van VANDAAG = mengsel, geen nominaal kernelbedrag.
+    expect(facts.fireDoelUitKernel).toBe(false)
   })
 
   it('exclude_from_fire: eigen woning gefilterd, doel op EXCL.-grondslag', () => {
@@ -186,6 +211,21 @@ describe('buildWillFinancialFacts — pure extractor', () => {
     expect(facts.vrijheidsPct).toBe(50)
     expect(facts.displayFireGoal).toBe(500_000)
     expect(facts.fireDoel).toBe(500_000)
+    // EXCL.-tak toont het kernel-portefeuilledoel zelf → nominaal.
+    expect(facts.fireDoelUitKernel).toBe(true)
+  })
+
+  it('exclude_from_fire zónder kernel-doel: 25×-terugval is niet kernel-nominaal', () => {
+    const facts = buildWillFinancialFacts(
+      makeCoreData({
+        fireTargetFromHorizon: null,
+        fullAssets: [HOUSE_ASSET] as unknown as CorePageData['fullAssets'],
+        fullDebts: [MORTGAGE_DEBT] as unknown as CorePageData['fullDebts'],
+      }),
+      { housing_strategy_config: { mode: 'exclude_from_fire' } },
+    )
+    expect(facts.displayFireGoal).toBeCloseTo(24_000 / 0.0288, 6)
+    expect(facts.fireDoelUitKernel).toBe(false)
   })
 
   it('geen financiële data: hasData=false, nul-cijfers, SWR blijft reëel', () => {
@@ -209,6 +249,7 @@ describe('buildWillFinancialFacts — pure extractor', () => {
     expect(facts.vrijheidsPct).toBe(0)
     expect(facts.displayFireGoal).toBeNull()
     expect(facts.fireDoel).toBe(0)
+    expect(facts.fireDoelUitKernel).toBe(false)
     expect(facts.spaarquotePct).toBe(0)
     expect(facts.dagtarief).toBe(0)
     expect(facts.swr).toBe(0.0288)

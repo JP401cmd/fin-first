@@ -15,7 +15,9 @@
 // feature #881) is een latere dekkingscontrole-toevoeging, net als WF-CASH-31.
 // WF-CASH-52 (betaalrekening verwijderen, ADR 0082) is de nieuwste
 // dekkingscontrole-toevoeging, dezelfde soort achteraf-uitbreiding als
-// WF-CASH-31/32/33..51 hierboven.
+// WF-CASH-31/32/33..51 hierboven. WF-CASH-53/54 (grenzenpotten fase 2-5,
+// ADR 0089/0092: kwartaal/jaar-periodes, prestatieweergave, widget,
+// match-preview, alias, meldingen) zijn de nieuwste toevoeging.
 //
 // Het proces leest links→rechts: landing (4 hefboom-kaarten) → verkennen
 // (maand-geldstroom/kassabon/rekeningen/instellingen/inflatie/status) →
@@ -65,6 +67,8 @@ export const CASH_FLOW: UatFlow = {
     { id: 'verwijderen', scenarioId: 'UAT-CASH-14', label: 'WF-CASH-14 · Transactie verwijderen', kind: 'action', stage: 3, lane: 'transacties', subOf: 'toevoegen' },
     { id: 'tegenpartij', scenarioId: 'UAT-CASH-15', label: 'WF-CASH-15 · Tegenpartij analyseren', kind: 'screen', stage: 3, lane: 'transacties' },
     { id: 'rekeningverwijderen', scenarioId: 'UAT-CASH-52', label: 'WF-CASH-52 · Betaalrekening verwijderen (bewaren/verwijderen, ADR 0082)', kind: 'action', stage: 3, lane: 'transacties', subOf: 'rekeningen' },
+    { id: 'grenzenpotberekenen', scenarioId: 'UAT-CASH-53', label: 'WF-CASH-53 · Grenzenpot berekenen en reeks (kwartaal/jaar-periodes, trend, isNearLimit)', kind: 'action', stage: 3, lane: 'transacties' },
+    { id: 'grenzenpotbeheren', scenarioId: 'UAT-CASH-54', label: 'WF-CASH-54 · Grenzenpot beheren, prestatieweergave, widget, match-preview & alias (budget-regel: zie de BUDGET-kruisverwijzing)', kind: 'action', stage: 3, lane: 'transacties', subOf: 'grenzenpotberekenen' },
 
     // ── 4 · vaste lasten ──────────────────────────────────────────────────
     { id: 'vastelasten', scenarioId: 'UAT-CASH-16', label: 'WF-CASH-16 · Vaste lasten: totaal/aandeel/vrijheidstijd', kind: 'screen', stage: 4, lane: 'vastelasten' },
@@ -140,6 +144,9 @@ export const CASH_FLOW: UatFlow = {
     { from: 'toevoegen', to: 'verwijderen' },
     { from: 'inzichten', to: 'tegenpartij' },
     { from: 'rekeningen', to: 'rekeningverwijderen' },
+    { from: 'hefboom', to: 'grenzenpotberekenen' },
+    { from: 'grenzenpotberekenen', to: 'grenzenpotbeheren' },
+    { from: 'grenzenpotbeheren', to: 'x-will', kind: 'cross', label: 'melding' },
 
     // vaste lasten
     { from: 'hefboom', to: 'vastelasten' },
@@ -188,6 +195,8 @@ export const CASH_FLOW: UatFlow = {
     { from: 'verwijderen', to: 'uitkomst' },
     { from: 'tegenpartij', to: 'uitkomst' },
     { from: 'rekeningverwijderen', to: 'uitkomst' },
+    { from: 'grenzenpotberekenen', to: 'uitkomst' },
+    { from: 'grenzenpotbeheren', to: 'uitkomst' },
     { from: 'opzeggen', to: 'uitkomst' },
     { from: 'aianalyse', to: 'uitkomst' },
     { from: 'watals', to: 'uitkomst' },

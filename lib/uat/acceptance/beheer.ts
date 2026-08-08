@@ -237,22 +237,12 @@ const criteria: AcceptanceCriterion[] = [
         'app/(app)/beheer/briefing/page.tsx + lib/briefing/directives.ts (isDirectiveActive/DIRECTIVE_METRICS); API /api/admin/briefing-directives — redactieregels, geen cijfermatige uitkomst',
     },
   },
-  {
-    workflow: 'WF-BEHEER-12',
-    scenarioId: 'UAT-BEHEER-12',
-    titel: 'Doelgids-stappen per doel beheren',
-    kriticiteit: 'BELANGRIJK',
-    given: '/beheer/doelen (doelgids-stappen die Fin per doel volgt).',
-    when:
-      'De beheerder bewerkt stappen inline (Enter, met validatie), herordent (pijlen), voegt toe/verwijdert en slaat op (of Reset naar DEFAULT_GOAL_GUIDE_STEPS).',
-    then:
-      'De stappen sturen de doel-begeleiding van Fin; een lege/ongeldige stap geeft een validatiefout in de cel en wordt niet doorgevoerd. Geen eigen berekening.',
-    assertion: {
-      kind: 'ui-only',
-      source:
-        'app/(app)/beheer/doelen/page.tsx + lib/briefing/goal-guide-steps.ts + lib/goals/catalog.ts (GOAL_LABELS) — inhoudsbeheer, geen cijfermatige uitkomst',
-    },
-  },
+  // WF-BEHEER-12 ("Doelgids-stappen per doel beheren") is VERVALLEN — 8 aug 2026.
+  // De doelgids had sinds ADR 0007 nul UI-consumers; /beheer/doelen en de
+  // onderliggende routes/hook zijn verwijderd. Doel-gebonden begeleiding loopt
+  // via de Welkomstgids (WF-BEHEER-10 aan beheerkant, ovz.ts aan gebruikerskant).
+  // Het nummer 12 blijft bewust ONGEBRUIKT: scenario-ID's zijn de sleutel van
+  // opgeslagen UAT-resultaten in Supabase — hernummeren zou die historie breken.
   {
     workflow: 'WF-BEHEER-13',
     scenarioId: 'UAT-BEHEER-13',
@@ -346,7 +336,7 @@ const criteria: AcceptanceCriterion[] = [
     assertion: {
       kind: 'ui-only',
       source:
-        'app/(app)/beheer/widget-presets/page.tsx + lib/widget-catalog.ts + lib/widget-presets.ts; API /api/widget-presets — samenstellen/ordenen, geen cijfermatige uitkomst',
+        'app/(app)/beheer/widget-presets/page.tsx + lib/widget-catalog.ts + lib/widget-presets.ts + app/api/widget-presets/route.ts — samenstellen/ordenen, geen cijfermatige uitkomst',
     },
   },
   {
@@ -567,7 +557,7 @@ const criteria: AcceptanceCriterion[] = [
     assertion: {
       kind: 'ui-only',
       source:
-        'app/(app)/beheer/{audit,errors,email,jobs}/page.tsx — alleen-lezen logboeken, geen cijfermatige uitkomst',
+        'app/(app)/beheer/audit/page.tsx + app/(app)/beheer/errors/page.tsx + app/(app)/beheer/email/page.tsx + app/(app)/beheer/jobs/page.tsx (JOB_CATALOG, incl. cron "Meldingen → Notion-sync") — alleen-lezen logboeken, geen cijfermatige uitkomst',
     },
   },
   {
@@ -592,7 +582,7 @@ const criteria: AcceptanceCriterion[] = [
     titel: 'Statische naslag bekijken',
     kriticiteit: 'OVERIG',
     given:
-      '/beheer/{releases, roadmap, widget-audit, blueprints, grafiek-werking, development} (alleen-lezen naslag).',
+      '/beheer/{releases, widget-audit, blueprints, grafiek-werking} (alleen-lezen naslag). Roadmap en Development zijn per besluit 02 verwijderd: de roadmap-inhoud staat in Notion, de teamopstelling op de org-site.',
     when:
       'De beheerder opent de naslagpagina’s (releases uitklappen; een blueprint-archetype → /beheer/blueprints/[type]).',
     then:
@@ -600,7 +590,7 @@ const criteria: AcceptanceCriterion[] = [
     assertion: {
       kind: 'ui-only',
       source:
-        'app/(app)/beheer/{releases,roadmap,widget-audit,blueprints,grafiek-werking,development}/… — statische/gescande naslag, geen cijfermatige uitkomst',
+        'app/(app)/beheer/{releases,widget-audit,blueprints,grafiek-werking}/… — statische/gescande naslag, geen cijfermatige uitkomst',
     },
   },
   {

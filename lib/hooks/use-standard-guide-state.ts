@@ -24,10 +24,10 @@ interface ProgressApiResponse {
  * /api/module-guide/progress endpoint en gebruikt `STANDARD_GUIDE_MODULE_ID`
  * (= 'standard:guide') als JSONB-key — parallel aan de `goal:<slug>` convention.
  *
- * TODO: useStandardGuideState en useGoalGuideState fetchen onafhankelijk
- * van elkaar dezelfde endpoint. Voor de MVP is dat acceptabel (2 calls bij
- * eerste render van de strook). Een gedeelde provider/context kan dit later
- * naar 1 call brengen.
+ * LET OP (8 aug 2026): de zusterhook `useGoalGuideState` is verwijderd samen
+ * met /beheer/doelen — die tak had nul UI-consumers. Deze hook heeft die
+ * óók niet; hij staat op de nominatie voor dezelfde opruiming, maar viel
+ * buiten de bevestigde scope van dat besluit.
  */
 export function useStandardGuideState() {
   const [state, setState] = useState<ProgressState>({})

@@ -49,6 +49,8 @@ export const TOEK_FLOW: UatFlow = {
     { id: 'fasebalk', scenarioId: 'UAT-TOEK-12', label: 'WF-TOEK-12 · Fase-balk (drie levensfasen)', kind: 'screen', stage: 2, lane: 'aflezen' },
     { id: 'markers', scenarioId: 'UAT-TOEK-16', label: 'WF-TOEK-16 · Markers & natuurlijke mijlpalen', kind: 'screen', stage: 2, lane: 'aflezen' },
     { id: 'verdieping', scenarioId: 'UAT-TOEK-32', label: 'WF-TOEK-32 · Verdieping: trends & geplande acties', kind: 'screen', stage: 2, lane: 'aflezen' },
+    { id: 'euroweergave', scenarioId: 'UAT-TOEK-33', label: "WF-TOEK-33 · Huidige euro's: grafiek/hero/fasetabel", kind: 'action', stage: 2, lane: 'aflezen', subOf: 'grafiek' },
+    { id: 'maskering', scenarioId: 'UAT-TOEK-34', label: 'WF-TOEK-34 · Bedragmaskering op de grafiek', kind: 'action', stage: 2, lane: 'aflezen', subOf: 'grafiek' },
 
     // ── 2 · navigeren & delen ─────────────────────────────────────────────
     { id: 'navkaarten', scenarioId: 'UAT-TOEK-28', label: 'WF-TOEK-28 · Navigatiekaarten (drilldown)', kind: 'screen', stage: 2, lane: 'navigeren' },
@@ -110,6 +112,8 @@ export const TOEK_FLOW: UatFlow = {
     { from: 'tijdas', to: 'grafiek' },
     { from: 'grafiek', to: 'jaardetail' },
     { from: 'grafiek', to: 'details' },
+    { from: 'grafiek', to: 'euroweergave' },
+    { from: 'grafiek', to: 'maskering' },
     { from: 'tijdas', to: 'fasebalk' },
     { from: 'tijdas', to: 'markers' },
     { from: 'tijdas', to: 'verdieping' },

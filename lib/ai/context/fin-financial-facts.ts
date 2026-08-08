@@ -68,6 +68,14 @@ export interface FinFacts {
   displayFireGoal: number | null
   /** Weer te geven FIRE-doel = `displayFireGoal ?? core.fireTarget`. Ongerond. */
   fireDoel: number
+  /**
+   * Staat `fireDoel` in door de kernel op de FIRE-maand geprojecteerde
+   * (TOEKOMSTIGE) euro's? Alleen dan mag een consument het bedrag met de
+   * kernel-deflator naar geld van vandaag omrekenen — zie de herkomst-toelichting
+   * bij de afleiding hieronder. False bij elk terugvalpad dat (deels) al in euro's
+   * van VANDAAG staat, en bij geen data.
+   */
+  fireDoelUitKernel: boolean
   /** Canonieke 6-maands spaarquote (%). 0 wanneer er geen data is. */
   spaarquotePct: number
   /** Persoonlijk veilig opnamepercentage (SWR) als rauw decimaal, bv. 0.0288. */
@@ -104,6 +112,7 @@ export function buildWillFinancialFacts(coreData: CorePageData, profile: FinFact
       vrijheidsPct: 0,
       displayFireGoal: null,
       fireDoel: 0,
+      fireDoelUitKernel: false,
       spaarquotePct: 0,
       swr: effectiveSwr,
       dagtarief: 0,
@@ -160,6 +169,31 @@ export function buildWillFinancialFacts(coreData: CorePageData, profile: FinFact
     ? requiredPortfolio
     : (requiredNetWorthInclHome ?? requiredPortfolio)
 
+  // ── Herkomst van het getoonde doel (euro-weergave D14) ─────────────────────
+  // Alleen een doel dat de KERNEL op de FIRE-maand projecteerde staat in
+  // toekomstige euro's en mag dus met de kernel-deflator naar geld van vandaag
+  // worden omgerekend. Twee terugvalpaden staan (deels) al in euro's van VANDAAG
+  // en mogen dat NIET — ze kunnen bovendien samenvallen met een geslaagde run mét
+  // rijen, want `computeHorizonFireTarget` nult beide doelen weg bij `<= 0`:
+  //   • het 25×-doel (`core.fireTarget` = huidige jaaruitgaven ÷ SWR) zodra
+  //     `fireTargetFromHorizon` null is;
+  //   • de scalar-benadering (`inclHomeTargetFromScalar`) zodra
+  //     `fireNetWorthTargetFromHorizon` null is én ze het kernel-doel ophoogt met
+  //     de overwaarde van VANDAAG.
+  // Zonder eigen woning (of bij een volledig meetellende woning) verschuift die
+  // scalar níets — `netWorth === fireEligibleNetWorth`, dus het getal ís het
+  // kernel-doel zelf. Die gelijkheid is precies wat de derde tak hieronder test,
+  // zodat de gewone huis-loze gebruiker zijn omrekening houdt.
+  const portfolioUitKernel = coreData.fireTargetFromHorizon != null
+  const fireDoelUitKernel =
+    displayFireGoal == null
+      ? false
+      : homeExcludedFromFire
+        ? portfolioUitKernel
+        : coreData.fireNetWorthTargetFromHorizon != null
+          ? true
+          : portfolioUitKernel && displayFireGoal === requiredPortfolio
+
   return {
     hasData: true,
     nettoVermogen: core.netWorth,
@@ -168,6 +202,7 @@ export function buildWillFinancialFacts(coreData: CorePageData, profile: FinFact
     vrijheidsPct,
     displayFireGoal,
     fireDoel: displayFireGoal ?? core.fireTarget,
+    fireDoelUitKernel,
     spaarquotePct: coreData.savingsRate6m,
     swr: effectiveSwr,
     dagtarief: dailyExpenseRate(rawFinancials.monthlyExpenses),

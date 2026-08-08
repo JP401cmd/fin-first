@@ -13,7 +13,7 @@
 |---|---|---|
 | Canonieke nav-routes | 43 | Actief, in `nav-config`/command-palette |
 | Legacy backing-routes (`/core/*`, `/horizon/*`, `/will`, `/identity`, `/dashboard`) | 46 | Deels redirect, **deels load-bearing** (zie hieronder) |
-| Beheer (admin, role-gated) | 37 | Actief via `beheer-sections.ts` + command-palette |
+| Beheer (admin, role-gated) | 40 | Actief via `beheer-sections.ts` + command-palette (aug 2026: `/beheer/roadmap` + `/beheer/development` verwijderd via besluit 02, `/beheer/doelen` via WF-BEHEER-12-bug1) |
 | `/test-*` (regressie/dev) | ~185 | Bewust, in prod geblokkeerd via proxy |
 | Public/auth/marketing | ~7 | Ingangsroutes |
 

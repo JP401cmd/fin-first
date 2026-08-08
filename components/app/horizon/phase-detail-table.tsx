@@ -5,6 +5,8 @@ import { ChevronRight, ChevronDown } from 'lucide-react'
 import { FinTable } from '@/components/app/fin-table'
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+import { deflate } from '@/lib/euro-display'
+import { useEuroView } from '@/lib/hooks/use-euro-view'
 import type { UnifiedProjectionRow, AssetBucketDetail } from '@/lib/unified-projection'
 import { ASSET_TYPE_LABELS, type AssetType } from '@/lib/asset-data'
 import { DEBT_TYPE_LABELS } from '@/lib/debt-data'
@@ -44,10 +46,11 @@ function cx(...classes: (string | undefined | false | null)[]) {
 // (IE-strip, Sankey, jaar-detailkassabon); hier zou het de rij niet meer laten
 // sluiten. Zie `UnifiedProjectionRow.totalGrowthLiquide` in lib/unified-projection.ts.
 
-/** Deflate a nominal value to real terms */
-function deflate(value: number, factor: number, showReal: boolean): number {
-  return showReal ? value / factor : value
-}
+// DEFLATIE-GRONDSLAG — `deflate` komt uit `lib/euro-display.ts` en deelt door de
+// kernelfactor die de rij zélf draagt (`row.inflationFactor`). Er staat hier
+// bewust geen eigen `(1 + i)^n` meer: één grondslag, één deling per bedrag.
+// De weergave-keuze zelf is profiel-breed (`useEuroView`), niet lokaal — twee
+// bronnen naast elkaar zouden drift én dubbele deflatie opleveren.
 
 /** Format currency with optional color class for positive/negative */
 function colorClass(value: number): string | undefined {
@@ -315,9 +318,13 @@ export function PhaseDetailTable({
   debts,
 }: PhaseDetailTableProps) {
   const { masked } = useMaskedAmounts()
+  const { view, toggle } = useEuroView()
   const [expanded, setExpanded] = useState(false)
-  const [showReal, setShowReal] = useState(false)
   const [expandedAge, setExpandedAge] = useState<number | null>(null)
+
+  // Alleen voor de weergave-conditionals (pill-label, voetnoot); álle bedragen
+  // lopen via `deflate(..., view)` zodat er precies één deling plaatsvindt.
+  const showReal = view === 'real'
 
   // Build debt label lookup map (memoized)
   const debtLabelMap = useMemo(() => buildDebtLabelMap(debts), [debts])
@@ -345,6 +352,14 @@ export function PhaseDetailTable({
   }
 
   const isAccumulation = phase === 'accumulation'
+
+  // Deflator voor de kolomTOTALEN in de footer. Een som over meerdere jaren heeft
+  // strikt genomen geen enkele factor; we tonen 'm in de koopkracht van het LAATSTE
+  // jaar van de fase — dezelfde keuze als voorheen, nu op één plek en met de
+  // kernelfactor van die rij (nooit een eigen (1 + i)^n). `deflate` is in de
+  // nominale weergave de identiteit, dus deze factor doet daar per definitie niets:
+  // elk bedrag ondergaat precies één deling, en alleen in 'real'.
+  const totalsFactor = rows[rows.length - 1].inflationFactor
 
   // Count total columns for colSpan on detail row
   // Base: Lft + Begin + Events + Box3 + Eind = 5
@@ -382,9 +397,18 @@ export function PhaseDetailTable({
         </button>
 
         {expanded && (
+          // Geen lokale override meer: deze pill schakelt de PROFIEL-BREDE
+          // euro-weergave om. Zo tonen deze tabel en elk ander oppervlak
+          // dezelfde grondslag en kan er geen dubbele deflatie ontstaan.
           <button
             type="button"
-            onClick={() => setShowReal(!showReal)}
+            onClick={toggle}
+            aria-pressed={showReal}
+            title={
+              showReal
+                ? "Bedragen in euro's van vandaag — klik voor toekomstige euro's"
+                : "Bedragen in toekomstige euro's — klik voor euro's van vandaag"
+            }
             className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 rounded-full border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-1.5 text-[11px] font-medium text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] sm:min-h-0 sm:min-w-0 sm:px-2.5 sm:py-0.5 sm:text-[10px]"
           >
             {showReal ? 'Reëel' : 'Nominaal'}
@@ -438,7 +462,7 @@ export function PhaseDetailTable({
             <FinTable.Body zebra>
               {rows.map((row) => {
                 const f = row.inflationFactor
-                const d = (v: number) => deflate(v, f, showReal)
+                const d = (v: number) => deflate(v, f, view)
                 const isRowExpanded = expandedAge === row.age
 
                 // Aggregate growth by savings vs investment for rendement columns
@@ -548,9 +572,10 @@ export function PhaseDetailTable({
                   {/* Empty cell for chevron column */}
                   <FinTable.Td>&nbsp;</FinTable.Td>
                   <FinTable.Td bold>Σ</FinTable.Td>
+                  {/* Begin-saldo hoort bij de EERSTE rij → diens eigen kernelfactor. */}
                   <FinTable.Td numeric>{<MaskedAmount value={deflate(
                     rows[0].startNetWorth,
-                    rows[0].inflationFactor, showReal
+                    rows[0].inflationFactor, view
                   )} tone="horizon" />}</FinTable.Td>
 
                   {isAccumulation ? (
@@ -558,10 +583,9 @@ export function PhaseDetailTable({
                       {showAssetDetail ? (
                         assetTypes.map(t => {
                           const total = rows.reduce((sum, r) => sum + (r.assetBuckets[t]?.growth ?? 0), 0)
-                          const avgFactor = rows[rows.length - 1].inflationFactor
                           return (
                             <FinTable.Td key={t} numeric bold color={colorClass(total)}>
-                              {<MaskedAmount value={deflate(total, showReal ? avgFactor : 1, showReal)} tone="horizon" />}
+                              {<MaskedAmount value={deflate(total, totalsFactor, view)} tone="horizon" />}
                             </FinTable.Td>
                           )
                         })
@@ -579,14 +603,13 @@ export function PhaseDetailTable({
                                 }
                               }
                             }
-                            const avgFactor = rows[rows.length - 1].inflationFactor
                             return (
                               <>
                                 <FinTable.Td numeric bold color={colorClass(totalSavingsGrowth)}>
-                                  {<MaskedAmount value={deflate(totalSavingsGrowth, showReal ? avgFactor : 1, showReal)} tone="horizon" />}
+                                  {<MaskedAmount value={deflate(totalSavingsGrowth, totalsFactor, view)} tone="horizon" />}
                                 </FinTable.Td>
                                 <FinTable.Td numeric bold color={colorClass(totalInvestmentGrowth)}>
-                                  {<MaskedAmount value={deflate(totalInvestmentGrowth, showReal ? avgFactor : 1, showReal)} tone="horizon" />}
+                                  {<MaskedAmount value={deflate(totalInvestmentGrowth, totalsFactor, view)} tone="horizon" />}
                                 </FinTable.Td>
                               </>
                             )
@@ -595,10 +618,9 @@ export function PhaseDetailTable({
                       )}
                       {(() => {
                         const totalSavings = rows.reduce((sum, r) => sum + r.savings, 0)
-                        const avgFactor = rows[rows.length - 1].inflationFactor
                         return (
                           <FinTable.Td numeric bold color={colorClass(totalSavings)}>
-                            {<MaskedAmount value={deflate(totalSavings, showReal ? avgFactor : 1, showReal)} tone="horizon" />}
+                            {<MaskedAmount value={deflate(totalSavings, totalsFactor, view)} tone="horizon" />}
                           </FinTable.Td>
                         )
                       })()}
@@ -611,17 +633,16 @@ export function PhaseDetailTable({
                         const totalGrowth = rows.reduce((sum, r) => sum + r.totalGrowth, 0)
                         const totalWithdrawal = rows.reduce((sum, r) => sum + r.withdrawal, 0)
                         const totalAow = rows.reduce((sum, r) => sum + (r.phase !== 'accumulation' ? r.grossIncome : 0), 0)
-                        const avgFactor = rows[rows.length - 1].inflationFactor
                         return (
                           <>
                             <FinTable.Td numeric bold color={colorClass(totalGrowth)}>
-                              {<MaskedAmount value={deflate(totalGrowth, showReal ? avgFactor : 1, showReal)} tone="horizon" />}
+                              {<MaskedAmount value={deflate(totalGrowth, totalsFactor, view)} tone="horizon" />}
                             </FinTable.Td>
                             <FinTable.Td numeric bold color={totalWithdrawal > 0.5 ? 'text-[var(--negative)]' : undefined}>
-                              {totalWithdrawal > 0 ? `−${formatMaskedCurrency(deflate(totalWithdrawal, showReal ? avgFactor : 1, showReal), masked).replace('€', '€ ').trim()}` : formatMaskedCurrency(0, masked)}
+                              {totalWithdrawal > 0 ? `−${formatMaskedCurrency(deflate(totalWithdrawal, totalsFactor, view), masked).replace('€', '€ ').trim()}` : formatMaskedCurrency(0, masked)}
                             </FinTable.Td>
                             <FinTable.Td numeric bold color={totalAow > 0.5 ? 'text-[var(--positive)]' : undefined}>
-                              {<MaskedAmount value={deflate(totalAow, showReal ? avgFactor : 1, showReal)} tone="horizon" />}
+                              {<MaskedAmount value={deflate(totalAow, totalsFactor, view)} tone="horizon" />}
                             </FinTable.Td>
                           </>
                         )
@@ -632,18 +653,19 @@ export function PhaseDetailTable({
                   {(() => {
                     const totalEvents = rows.reduce((sum, r) => sum + r.cashflowNet + r.oneTimeNet, 0)
                     const totalBox3 = rows.reduce((sum, r) => sum + r.totalBox3, 0)
-                    const avgFactor = rows[rows.length - 1].inflationFactor
                     const endNetWorth = rows[rows.length - 1].netWorth
                     return (
                       <>
                         <FinTable.Td numeric bold color={colorClass(totalEvents)}>
-                          {<MaskedAmount value={deflate(totalEvents, showReal ? avgFactor : 1, showReal)} tone="horizon" />}
+                          {<MaskedAmount value={deflate(totalEvents, totalsFactor, view)} tone="horizon" />}
                         </FinTable.Td>
                         <FinTable.Td numeric bold color={totalBox3 > 0.5 ? 'text-[var(--negative)]' : undefined}>
-                          {totalBox3 > 0 ? `−${formatMaskedCurrency(deflate(totalBox3, showReal ? avgFactor : 1, showReal), masked).replace('€', '€ ').trim()}` : formatMaskedCurrency(0, masked)}
+                          {totalBox3 > 0 ? `−${formatMaskedCurrency(deflate(totalBox3, totalsFactor, view), masked).replace('€', '€ ').trim()}` : formatMaskedCurrency(0, masked)}
                         </FinTable.Td>
+                        {/* Eind-saldo is een PUNTbedrag op de laatste rij — zelfde factor,
+                            maar hier is dat de factor die er hoort te staan. */}
                         <FinTable.Td numeric bold color={colorClass(endNetWorth)}>
-                          {<MaskedAmount value={deflate(endNetWorth, rows[rows.length - 1].inflationFactor, showReal)} tone="horizon" />}
+                          {<MaskedAmount value={deflate(endNetWorth, totalsFactor, view)} tone="horizon" />}
                         </FinTable.Td>
                       </>
                     )

@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { buildSimNetWorthRows } from './networth-rows'
+import { deflate } from '@/lib/euro-display'
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
 import {
@@ -86,15 +87,26 @@ const currentAge = 40
 const fireAge = 52
 
 /**
+ * Weergave-deflator per fixture-jaar. Spiegelt de kernel: jaar 0 = exact 1.0,
+ * daarna oplopend. Fixture-waarde, geen weergave-berekening.
+ */
+const TEST_INFLATION = 0.025
+function factorAt(age: number): number {
+  return Math.pow(1 + TEST_INFLATION, age - currentAge)
+}
+
+type FixtureRow = { age: number; endPortfolio: number; inflationFactor: number }
+
+/**
  * Bouw een gefilterd `endPortfolio`-pad (zónder huis): het LIQUIDE deel groeit
  * van currentNetWorth − overwaarde naar boven. Dit is wat de engine voor
  * exclude_from_fire teruggeeft.
  */
-function buildEndPortfolioFiltered(): { age: number; endPortfolio: number }[] {
-  const rows: { age: number; endPortfolio: number }[] = []
+function buildEndPortfolioFiltered(): FixtureRow[] {
+  const rows: FixtureRow[] = []
   let v = 100_000 // start liquide (beleggingen)
   for (let age = currentAge; age <= fireAge; age++) {
-    rows.push({ age, endPortfolio: Math.round(v) })
+    rows.push({ age, endPortfolio: Math.round(v), inflationFactor: factorAt(age) })
     v = v * 1.06 + 15_000
   }
   return rows
@@ -104,12 +116,18 @@ function buildEndPortfolioFiltered(): { age: number; endPortfolio: number }[] {
  * Bouw een VOLLEDIG `endPortfolio`-pad (mét huis): voor de niet-filterende modi
  * geeft de engine het volledige netto vermogen terug.
  */
-function buildEndPortfolioFull(): { age: number; endPortfolio: number }[] {
+function buildEndPortfolioFull(): FixtureRow[] {
   return buildEndPortfolioFiltered().map((r) => ({
     age: r.age,
     // Voeg de overwaarde-van-nu erbij als ruwe benadering van "huis zit erin".
     endPortfolio: r.endPortfolio + houseEquityNow,
+    inflationFactor: r.inflationFactor,
   }))
+}
+
+/** Zelfde bedragen, alle factoren maal `k` — om te bewijzen dat ze nergens meerekenen. */
+function scaleFactors(rows: FixtureRow[], k: number): FixtureRow[] {
+  return rows.map((r) => ({ ...r, inflationFactor: r.inflationFactor * k }))
 }
 
 // currentNetWorth = volledig netto vermogen vandaag (liquide + overwaarde).
@@ -278,6 +296,171 @@ describe('buildSimNetWorthRows — kernel-tak (houseInLedger): huis al in het gr
     const omitted = buildSimNetWorthRows(base)
     const explicitFalse = buildSimNetWorthRows({ ...base, houseInLedger: false })
     expect(omitted).toEqual(explicitFalse)
+  })
+})
+
+/* ───────────────────────────────────────────────────────────────────────────
+ * Euro-weergave (ADR 0090) — `inflationFactor` reist mee, de wiskunde niet.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * AC-E5 — BYTE-IDENTIEKE RECONCILE-OFFSET.
+ *
+ * Deze arrays zijn vastgelegd door de implementatie te draaien VÓÓR
+ * `inflationFactor` bestond, met exact deze fixtures en een vastgezette klok.
+ * Ze zijn dus geen her-afleiding van de huidige code maar een foto van de oude:
+ * wijkt één cent af, dan heeft het doorgeven van de factor de her-ankering
+ * geraakt en is de grens uit D7 (offset nominaal, deflatie pas in de render)
+ * gebroken. Regenereren mag alleen bij een bewuste wijziging aan de offset zelf.
+ *
+ * De klok staat vast omdat `buildSimNetWorthRows` de huidige leeftijd uit de
+ * geboortedatum leest (`ageAtDate`) en de huisbijdrage daarop projecteert —
+ * zonder pin zouden deze goldens in januari 2027 vanzelf verschuiven.
+ */
+const GOLDEN_CLOCK = new Date('2026-08-08T12:00:00Z')
+
+/** include_full (volledig endPortfolio-pad) — reconcile-offset ≈ 0. */
+const GOLDEN_INCLUDE_FULL = [
+  300000, 321000, 343260, 366856, 391867, 418379, 446482,
+  476271, 507847, 541318, 576797, 614404, 654269,
+]
+
+/** exclude_from_fire zónder houseInLedger — meegroeiende overwaarde erbij. */
+const GOLDEN_EXCLUDE_FROM_FIRE = [
+  300000, 336499.15, 374638.7, 414504.31000000006, 456184.924,
+  499776.72128000006, 545380.1677056, 593101.007059712, 643051.2524009063,
+  695350.2074489244, 750122.4979979029, 807500.023357861, 867625.0178250181,
+]
+
+/** kernel-tak (houseInLedger) — huis zit al in endPortfolio, niets bijtellen. */
+const GOLDEN_HOUSE_IN_LEDGER = GOLDEN_INCLUDE_FULL
+
+describe('buildSimNetWorthRows — euro-weergave: factor erbij, reconcile-offset ongemoeid', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(GOLDEN_CLOCK)
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('AC-E5: include_full — netWorth-reeks byte-identiek aan vóór de contractuitbreiding', () => {
+    const out = buildSimNetWorthRows({
+      simRows: buildEndPortfolioFull(),
+      currentNetWorth,
+      housingStrategy: { mode: 'include_full' },
+      assets,
+      debts,
+      dateOfBirth: DOB,
+    })
+    expect(out.map((r) => r.netWorth)).toEqual(GOLDEN_INCLUDE_FULL)
+  })
+
+  it('AC-E5: exclude_from_fire — netWorth-reeks byte-identiek (offset + huisbijdrage ongewijzigd)', () => {
+    const out = buildSimNetWorthRows({
+      simRows: buildEndPortfolioFiltered(),
+      currentNetWorth,
+      housingStrategy: { mode: 'exclude_from_fire' },
+      assets,
+      debts,
+      dateOfBirth: DOB,
+    })
+    expect(out.map((r) => r.netWorth)).toEqual(GOLDEN_EXCLUDE_FROM_FIRE)
+  })
+
+  it('AC-E5: kernel-tak (houseInLedger) — netWorth-reeks byte-identiek', () => {
+    const out = buildSimNetWorthRows({
+      simRows: buildEndPortfolioFull(),
+      currentNetWorth,
+      housingStrategy: { mode: 'exclude_from_fire' },
+      houseInLedger: true,
+      assets,
+      debts,
+      dateOfBirth: DOB,
+    })
+    expect(out.map((r) => r.netWorth)).toEqual(GOLDEN_HOUSE_IN_LEDGER)
+  })
+
+  it('AC-E5: een ANDERE factorreeks levert exact dezelfde netWorth-reeks op', () => {
+    // De scherpste vorm van "de factor zit in geen enkele som": verdubbel de hele
+    // reeks factoren en eis dat er nul euro beweegt. Zou `inflationFactor` ergens
+    // in de offset of de huisbijdrage lekken, dan wijkt dit meteen af.
+    const base = {
+      currentNetWorth,
+      housingStrategy: { mode: 'exclude_from_fire' } as HousingStrategyConfig,
+      assets,
+      debts,
+      dateOfBirth: DOB,
+    }
+    const normal = buildSimNetWorthRows({ ...base, simRows: buildEndPortfolioFiltered() })
+    const doubled = buildSimNetWorthRows({
+      ...base,
+      simRows: scaleFactors(buildEndPortfolioFiltered(), 2),
+    })
+    expect(doubled.map((r) => r.netWorth)).toEqual(normal.map((r) => r.netWorth))
+  })
+
+  it('AC-E1: rij 0 draagt factor exact 1 (vandaag = vandaag)', () => {
+    const out = buildSimNetWorthRows({
+      simRows: buildEndPortfolioFull(),
+      currentNetWorth,
+      housingStrategy: { mode: 'include_full' },
+      assets,
+      debts,
+      dateOfBirth: DOB,
+    })
+    expect(out[0].inflationFactor).toBe(1)
+  })
+
+  it('AC-E2: jaar 0 gedeflateerd == currentNetWorth (knikvrije naad historie↔projectie)', () => {
+    const out = buildSimNetWorthRows({
+      simRows: buildEndPortfolioFiltered(),
+      currentNetWorth,
+      housingStrategy: { mode: 'exclude_from_fire' },
+      assets,
+      debts,
+      dateOfBirth: DOB,
+    })
+    // Deflateren gebeurt in de render, met deze factor. Jaar 0 moet daar exact op
+    // het Vandaag-punt uitkomen — dat is precies wat D7's volgorde garandeert.
+    expect(deflate(out[0].netWorth, out[0].inflationFactor, 'real')).toBeCloseTo(currentNetWorth, 6)
+  })
+
+  it('de factor wordt per rij ONGEWIJZIGD doorgegeven (geen herschaling, geen her-indexering)', () => {
+    const simRows = buildEndPortfolioFiltered()
+    const out = buildSimNetWorthRows({
+      simRows,
+      currentNetWorth,
+      housingStrategy: { mode: 'exclude_from_fire' },
+      assets,
+      debts,
+      dateOfBirth: DOB,
+    })
+    expect(out.map((r) => r.inflationFactor)).toEqual(simRows.map((r) => r.inflationFactor))
+    // en de leeftijd-koppeling blijft één-op-één (join-fouten schuiven een jaar op)
+    expect(out.map((r) => r.age)).toEqual(simRows.map((r) => r.age))
+  })
+
+  it('onbruikbare factoren (0 / negatief / NaN) reizen ongemoeid mee — afvangen hoort aan de render-grens', () => {
+    const simRows = buildEndPortfolioFiltered()
+    simRows[1].inflationFactor = 0
+    simRows[2].inflationFactor = -1
+    simRows[3].inflationFactor = Number.NaN
+    const out = buildSimNetWorthRows({
+      simRows,
+      currentNetWorth,
+      housingStrategy: { mode: 'exclude_from_fire' },
+      assets,
+      debts,
+      dateOfBirth: DOB,
+    })
+    // Deze helper repareert niets en crasht niet: `deflate`/`buildFactorByAge`
+    // vangen het onbruikbare geval af (bedrag blijft nominaal).
+    expect(out[1].inflationFactor).toBe(0)
+    expect(out[2].inflationFactor).toBe(-1)
+    expect(Number.isNaN(out[3].inflationFactor)).toBe(true)
+    expect(out.map((r) => r.netWorth)).toEqual(GOLDEN_EXCLUDE_FROM_FIRE)
+    expect(deflate(out[1].netWorth, out[1].inflationFactor, 'real')).toBe(out[1].netWorth)
   })
 })
 

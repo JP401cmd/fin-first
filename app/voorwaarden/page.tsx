@@ -4,6 +4,7 @@ import {
   MarketingSection,
   MarketingDisclaimer,
 } from '@/components/landing/marketing-page-shell'
+import { LegalEmail } from '@/components/legal/legal-email'
 
 export const metadata: Metadata = {
   title: 'Algemene voorwaarden — TriFinity',
@@ -36,12 +37,19 @@ export default function VoorwaardenPage() {
           de app vertaalt die naar overzicht, budgetten en
           toekomstprojecties — uitgedrukt in vrijheid in tijd. De dienst wordt
           aangeboden door JPS Holding, [rechtsvorm], gevestigd te
-          [vestigingsadres], KvK [KvK-nummer]. Vragen? Mail{' '}
+          [vestigingsadres], KvK [KvK-nummer].
+        </p>
+        <p>
+          Het support-adres — <LegalEmail kind="support" /> — vullen we in zodra
+          TriFinity een eigen internetdomein heeft; we noemen hier bewust geen
+          mailbox die vandaag geen post kan ontvangen. Tot die tijd is de app
+          alleen op uitnodiging te gebruiken en loopt contact via degene die je
+          die uitnodiging heeft gestuurd. Zie ook de{' '}
           <a
-            href="mailto:support@trifinity.nl"
+            href="/contact"
             className="font-semibold text-kern-700 underline hover:text-kern-800"
           >
-            support@trifinity.nl
+            contactpagina
           </a>
           .
         </p>
@@ -148,7 +156,7 @@ export default function VoorwaardenPage() {
           leggen we voor aan de bevoegde rechter in Nederland.
         </p>
         <p className="font-serif text-sm italic text-[var(--ink-3)]">
-          Versie 2.0 — concept, 4 juli 2026.
+          Versie 2.1 — concept, 7 augustus 2026.
         </p>
       </MarketingSection>
     </MarketingPageShell>

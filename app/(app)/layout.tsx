@@ -13,6 +13,9 @@ import { ToastProvider } from '@/components/app/toast-provider'
 import { GlobalSyncProvider } from '@/components/sync/global-sync-provider'
 import { PrivacyProvider } from '@/lib/hooks/use-privacy'
 import { DisplayModeProvider, type DisplayMode } from '@/lib/hooks/use-display-mode'
+import { EuroViewProvider, type EuroView } from '@/lib/hooks/use-euro-view'
+import { SpendLimitAliasProvider } from '@/lib/hooks/use-spend-limit-alias'
+import { DEFAULT_SPEND_LIMIT_ALIAS, type SpendLimitAlias } from '@/lib/spend-limits/copy'
 import { SessionMonitor } from '@/components/app/session-monitor'
 import { ErrorReporter } from '@/components/app/error-reporter'
 import { AutoSnapshotTrigger } from '@/components/app/auto-snapshot-trigger'
@@ -461,6 +464,14 @@ export default async function AppLayout({
       <MobilePreviewFrame>
         <PrivacyProvider>
         <DisplayModeProvider initialMode={(profile?.display_mode as DisplayMode) ?? 'simple'}>
+        <EuroViewProvider initialView={(profile?.euro_view as EuroView) ?? 'nominal'}>
+        {/* Weergavenaam voor grenzenpotten (puur cosmetisch, ADR 0089 besluit 1).
+            SSR-seed uit de eigen profielrij zodat de eerste render meteen de
+            gekozen naam toont; een profielrij van vóór de migratie levert
+            `undefined` en valt terug op de default. */}
+        <SpendLimitAliasProvider
+          initialAlias={(profile?.spend_limit_alias as SpendLimitAlias) ?? DEFAULT_SPEND_LIMIT_ALIAS}
+        >
         <ToastProvider>
           <SessionMonitor />
           <ErrorReporter />
@@ -537,6 +548,8 @@ export default async function AppLayout({
             </ChatProvider>
           </PerspectiveProvider>
         </ToastProvider>
+        </SpendLimitAliasProvider>
+        </EuroViewProvider>
         </DisplayModeProvider>
         </PrivacyProvider>
       </MobilePreviewFrame>

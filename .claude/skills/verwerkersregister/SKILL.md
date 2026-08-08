@@ -26,8 +26,10 @@ In **Notion · TriFinity** (de bedrijfsbak) — het is een levend bedrijfsdocume
 ## Onderhoud — twee vaste momenten
 
 1. **Het kwartaalmoment**, naast de BTW-administratie: elke stack-factuur is twee dingen tegelijk — een kostenpost voor De Ondernemer en een verwerker voor De Grenswachter (stroom 08). Loop de facturen langs het register: klopt de lijst nog, staat elke `laatst gecontroleerd` op dit kwartaal?
+
+   **En één stap verder — is het beleid ook uitgevoerd?** Een register dat klopt bewijst alleen dat je de afspraak kent, niet dat je hem nakomt. Controleer daarom in dezelfde ronde de bewaartermijnen: draaide de retentie-cron (`/api/cron/retention`, dagelijks, termijnen single-sourced in `lib/retention.ts`) en staat hij groen in `job_runs` / op `/beheer/jobs`? Een cron die stil faalt, laat gegevens staan die je hebt beloofd te wissen — dat is een AVG-tekortkoming die je nergens anders ziet.
 2. **Bij elke `change-request`** die een externe dienst toevoegt of wijzigt: register eerst.
 
 ## Verwijzing
 
-Stroom 08 en 13 in `trifinity-org/org_plan/30-werkstromen.md`. Verwant: `compliance-tracking`, `change-request`, `avg-verzoek` (het register is nodig voor een volledig inzage-antwoord), `cash-flow-snapshot`.
+Stroom 08 en 13 in `trifinity-org/org_plan/30-werkstromen.md`. Verwant: `change-request`, `avg-verzoek` (het register is nodig voor een volledig inzage-antwoord), `cash-flow-snapshot`.

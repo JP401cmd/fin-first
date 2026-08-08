@@ -4,6 +4,7 @@ import { useCallback, memo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Lightbulb, Clock } from 'lucide-react'
 import { useChatContext } from '@/components/app/chat/chat-provider'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import type { ListDensity } from '@/components/app/density-toggle'
 import type { Notification, NotificationType } from '@/app/api/notifications/route'
 
@@ -30,6 +31,9 @@ const MODULE_MAP: Record<NotificationType, ModuleInfo> = {
   holding_alert:       { label: 'Belegging',   colorVar: 'var(--kern)',   textVar: 'var(--kern-t)',   lightVar: 'var(--kern-l)', mediumVar: 'var(--kern-m)' },
   briefing:            { label: 'Briefing',    colorVar: 'var(--will)',   textVar: 'var(--will-t)',   lightVar: 'var(--will-l)', mediumVar: 'var(--will-m)' },
   budget_model_proposal: { label: 'Huishouden', colorVar: 'var(--will)',   textVar: 'var(--will-t)',   lightVar: 'var(--will-l)', mediumVar: 'var(--will-m)' },
+  // Naamneutraal label: de gebruiker kiest zelf hoe dit concept heet, dus staat
+  // de naam alleen in de melding zelf (samengesteld uit lib/spend-limits/copy.ts).
+  spend_limit:         { label: 'Je grens',    colorVar: 'var(--kern)',   textVar: 'var(--kern-t)',   lightVar: 'var(--kern-l)', mediumVar: 'var(--kern-m)' },
 }
 
 /**
@@ -140,6 +144,33 @@ export const NotificationItem = memo(function NotificationItem({ notification, o
         {!isCompact && (
           <p className="mt-0.5 line-clamp-2 font-[family-name:var(--font-source-serif)] text-[13px] leading-snug text-[var(--ink-3)]">
             {notification.description}
+          </p>
+        )}
+
+        {/* Bedragen bij een grens-melding — NOOIT in de zin zelf.
+            Bedragmaskering is client-side en per call-site opt-in, dus een bedrag
+            dat in `title`/`description` is ingebakken blijft onder de privacy-
+            toggle zichtbaar. Daarom draagt de melding de getallen apart mee
+            (lib/notifications/spend-limit.ts) en renderen we ze hier live —
+            hetzelfde patroon als de opzeg-actie na migratie 20260807120000
+            (ADR 0091, laag 2). */}
+        {!isCompact && notification.type === 'spend_limit' && notification.metadata != null && (
+          <p className="mt-1 font-[family-name:var(--font-inter)] text-[11px] text-[var(--ink-3)]">
+            {notification.metadata.over != null && (
+              <>
+                <MaskedAmount value={Number(notification.metadata.over)} tone="kern" /> boven
+                {' · '}
+              </>
+            )}
+            {notification.metadata.headroom != null && (
+              <>
+                <MaskedAmount value={Number(notification.metadata.headroom)} tone="kern" /> ruimte
+                {' · '}
+              </>
+            )}
+            <MaskedAmount value={Number(notification.metadata.matched)} tone="kern" />
+            {' van '}
+            <MaskedAmount value={Number(notification.metadata.limit)} tone="kern" />
           </p>
         )}
 

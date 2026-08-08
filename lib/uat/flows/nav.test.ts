@@ -47,18 +47,18 @@ describe('NAV_FLOW — curatie-integriteit', () => {
     }
   })
 
-  it('dekt alle 25 WF-NAV-scenario\'s (01..12, 14..26 — WF-NAV-13 bestaat niet in de catalogus)', () => {
+  it('dekt alle 26 WF-NAV-scenario\'s (01..12, 14..27 — WF-NAV-13 bestaat niet in de catalogus)', () => {
     const covered = new Set(
       NAV_FLOW.nodes.map((n) => n.scenarioId).filter((id): id is string => Boolean(id)),
     )
     const expected = [
       ...Array.from({ length: 12 }, (_, i) => i + 1),
-      ...Array.from({ length: 13 }, (_, i) => i + 14),
+      ...Array.from({ length: 14 }, (_, i) => i + 14),
     ].map((n) => `UAT-NAV-${String(n).padStart(2, '0')}`)
     for (const id of expected) {
       expect(covered.has(id), `${id} moet als flow-knoop voorkomen`).toBe(true)
     }
-    expect(covered.size).toBe(25)
+    expect(covered.size).toBe(26)
   })
 
   it('de domeinoverschrijdende cross-knopen dekken START/OVZ/WILL/MIJN', () => {

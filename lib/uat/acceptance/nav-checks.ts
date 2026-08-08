@@ -32,6 +32,7 @@ import { deriveTabFromPath, isTabRoot, STACK_DEPTH_LIMIT } from '@/lib/nav/tab-p
 import { resolveRouteTitle, SIMPLE_HIDDEN_NAV_HREFS } from '@/lib/nav-config'
 import { getAllPageItems, filterPagesByModules } from '@/lib/command-palette/navigation-index'
 import { buildActionItems, type ActionRunContext } from '@/lib/command-palette/actions'
+import { euroViewLabel } from '@/lib/euro-display'
 import type { PerspectiveOption } from '@/lib/types/perspective'
 import nextConfig from '@/next.config'
 import { NAV_ACCEPTANCE } from './nav'
@@ -164,6 +165,8 @@ export const NAV_ENGINE_CHECKS: NavEngineCheck[] = [
         privacyMasked: false,
         toggleDisplayMode: () => {},
         displayMode: 'full',
+        toggleEuroView: () => {},
+        euroView: 'nominal',
         triggerPricesSync: () => {},
         currentPerspective: 'personal',
         availablePerspectives: perspectives,
@@ -257,6 +260,39 @@ export const NAV_ENGINE_CHECKS: NavEngineCheck[] = [
       return {
         expected: 'badge0=; badge5=5; badge12=9+',
         actual: `badge0=${badge0}; badge5=${badge5}; badge12=${badge12}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-NAV-27',
+    scenarioId: 'UAT-NAV-27',
+    label: 'Euro-weergave-toggle (buildActionItems): label-flip nominal↔real + euroViewLabel',
+    run: () => {
+      criterion('WF-NAV-27')
+      // Minimale ActionRunContext — alleen euroView wisselt; de overige velden
+      // zijn no-op-callbacks/vaste waarden (spiegelt de WF-NAV-09-check hierboven).
+      const baseCtx: ActionRunContext = {
+        router: { push: () => {} },
+        closePalette: () => {},
+        openChat: () => {},
+        togglePrivacy: () => {},
+        privacyMasked: false,
+        toggleDisplayMode: () => {},
+        displayMode: 'full',
+        toggleEuroView: () => {},
+        euroView: 'nominal',
+        triggerPricesSync: () => {},
+        currentPerspective: 'personal',
+        availablePerspectives: [],
+        setPerspective: () => {},
+      }
+      const toggleItem = (ctx: ActionRunContext) =>
+        buildActionItems(ctx, []).find((i) => i.id === 'action:toggle-euro-view')!
+      const labelNominal = toggleItem(baseCtx).label
+      const labelReal = toggleItem({ ...baseCtx, euroView: 'real' }).label
+      return {
+        expected: "labelNominal=Toon huidige euro's; labelReal=Toon toekomstige euro's; euroViewLabelNominal=Toekomstige euro's; euroViewLabelReal=Huidige euro's",
+        actual: `labelNominal=${labelNominal}; labelReal=${labelReal}; euroViewLabelNominal=${euroViewLabel('nominal')}; euroViewLabelReal=${euroViewLabel('real')}`,
       }
     },
   },

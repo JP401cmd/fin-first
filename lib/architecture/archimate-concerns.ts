@@ -82,10 +82,37 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
     id: 'horizon-god-component',
     title: 'horizon-client.tsx is een god-component',
     detail:
-      'Eén client van ~6900 regels draagt /toekomst zonder eigen tests. Decompositie loopt (stap 1 HorizonTrendGrid klaar); tot dan is dit het grootste wijzigingsrisico van de app.',
+      'Eén client van 8800 regels (wc -l, 2026-08-08 — na de euro-weergave-render-grens van ADR 0093) draagt /toekomst zonder eigen tests. Decompositie loopt (stap 1 HorizonTrendGrid klaar); tot dan is dit het grootste wijzigingsrisico van de app.',
     severity: 'debt',
     elementIds: ['fn-toekomstplannen', 'as-planning'],
-    reviewedAt: '2026-07-21',
+    reviewedAt: '2026-08-08',
+  },
+  {
+    id: 'projectiemotoren-naast-de-kernel',
+    title: 'Eigen projectiemotoren náást de horizon-kernel, buiten de euro-weergave-toggle',
+    detail:
+      'De euro-weergave-toggle (ADR 0093) volgt de kernel: alleen oppervlakken met een kernelrij onder zich (UnifiedProjectionRow.inflationFactor) kunnen meebewegen tussen nominaal en huidige euro\'s. Vier oppervlakken draaien een EIGEN projectiemotor náást de kernel en hebben dus geen canonieke factor — ze zijn `// euro-view: exempt` gemarkeerd, niet gedeflateerd: `components/core/net-worth-projection-chart.tsx` (eigen compound-projectie), `components/overview/compound-insight-card.tsx` + `fee-impact-card.tsx` (lib/compound-projection.ts, illustratief rekenvoorbeeld met slider) en — het vierde geval, niet voorzien in het oorspronkelijke ontwerp — de aanvullend-pensioenprojectie achter `DashboardData.pensionMonthlyGross` in `components/widgets/pensioen-aow-widget.tsx`. Dit is een structurele klasse, geen losse voetnoten: elke motor náást de kernel is een toekomstige plek waar "€ vandaag" en "€ toekomstig" impliciet door elkaar kunnen lopen zodra iemand er zonder dit punt te lezen een tweede weergave aan toevoegt. Opvolging is een rekenmotor-sanering (aparte productkaart), geen presentatiewerk — vermeng de twee soorten besluiten niet. Verwijder dit punt zodra die sanering deze vier motoren onder de kernel brengt of ze expliciet en blijvend als losstaand besluit.',
+    severity: 'debt',
+    elementIds: ['as-planning', 'as-vermogen', 'fn-toekomstplannen'],
+    reviewedAt: '2026-08-08',
+  },
+  {
+    id: 'kassabon-cumulatief-buiten-euro-weergave',
+    title: 'Fase-kassabons blijven altijd nominaal — geen "koopkracht van vandaag"-variant',
+    detail:
+      'De drie fase-modal-kassabons (opbouw/overgang/onttrekking) dragen elk een waterval-optelidentiteit over meerdere jaren (start + inleg + rendement − Box 3 + events ≈ eind). Die identiteit is klasse C (cumulatief) en heeft geen canonieke per-jaar-deflator: per term deflateren zou de sluitende som breken en het verschil in de afrondingsrij laten vallen (ADR 0093, D2). Besluit: het hele blok blijft nominaal, met in \'real\' één zichtbare grondslag-regel — geen bedrag verandert. Dat is een bewuste beperking, geen bug: een gebruiker die de kassabon in koopkracht van vandaag wil lezen, kan dat nu niet. Opvolging is een aparte productkaart ("kassabon in koopkracht van vandaag", ADR 0093 verworpen alternatief B) die een expliciet nieuw begrip (een aparte koopkracht-effect-regel) introduceert in plaats van de bestaande toggle te forceren. Verwijder dit punt zodra die kaart landt.',
+    severity: 'debt',
+    elementIds: ['fn-toekomstplannen', 'as-planning'],
+    reviewedAt: '2026-08-08',
+  },
+  {
+    id: 'chart-event-marker-label-maskeringslek',
+    title: 'Event-marker aria-labels kunnen bedragen onder maskering lekken',
+    detail:
+      'De bedragmaskering op de vrijheidsgrafiek (ADR 0091/0093) dekt alle euro-labels van sim-chart.tsx en chart-static-layers.tsx zelf, inclusief hun title/aria-label. `components/app/horizon/chart-event-markers.tsx` zet echter `aria-label={`Open ${p.label}`}` met een label dat van de AANROEPER komt (`ChartEventOverlay.label`); dat component weet zelf niet of de string een bedrag bevat. Zet een caller ooit een euro-bedrag in een event-label, dan lekt dat door de maskering heen zonder dat sim-chart of chart-static-layers het kunnen zien. Vandaag geen bekende callsite die dat doet — dit is een structurele opening, geen actief lek. Verwijder dit punt zodra chart-event-markers een `masked`-parameter accepteert (of alle bestaande/toekomstige callers aantoonbaar nooit een bedrag in het label zetten, vastgelegd in een test).',
+    severity: 'debt',
+    elementIds: ['as-planning', 'fn-toekomstplannen'],
+    reviewedAt: '2026-08-08',
   },
   {
     id: 'public-intake-write',
@@ -203,6 +230,24 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
     severity: 'debt',
     elementIds: ['as-belasting', 'as-planning'],
     reviewedAt: '2026-08-05',
+  },
+  {
+    id: 'app-settings-select-denylist',
+    title: 'De SELECT-policy op app_settings is een fail-open denylist',
+    detail:
+      'app_settings draagt naast gewone beheerinstellingen ook de externe geheimen van de app, en de SELECT-policy voor rol `authenticated` beschermt die met een DENYLIST in plaats van een allowlist. Live geverifieerd predicaat (06-08-2026): `key !~* \'<uuid-regex>\' AND key <> ALL (ARRAY[\'anthropic_api_key\',\'openai_api_key\',\'mistral_api_key\',\'truelayer_client_id\',\'truelayer_client_secret\'])`. Alles wat géén UUID bevat en niet LETTERLIJK in die hardcoded array staat, is dus leesbaar voor elke ingelogde gebruiker. Gevolg: een nieuw geheim is standaard LEKKEND en moet met de hand aan de array worden toegevoegd — en dat is nu voor de tweede keer nodig gebleken (eerst de TrueLayer-sleutels, nu de Notion-sleutels `notion_api_token` en `notion_reports_data_source_id` voor de meldingen-push). Wat dit scherper maakt dan gewone schuld: het lek ontstaat niet bij het schrijven van de code maar op het moment dat IEMAND DE KOPPELING INRICHT — het geheim wordt via de beheer-UI in de rij gezet, lang nadat de review voorbij is. Er is dus geen moment waarop een PR-review of een test dit vangt; niets in de repo weet welke keys er live bestaan. De structurele oplossing is de policy omkeren naar een ALLOWLIST: standaard dicht, en expliciet openzetten wat een gewone gebruiker mag lezen (de publieke instellingen). Dat is een APARTE beslissing — hij is hier BEWUST NIET genomen, want hij vraagt een inventarisatie van élke key die de client vandaag leest plus een migratie, en een fout daarin breekt stil functionaliteit in plaats van hem te lekken. Tot die omkering er is, geldt: elke nieuwe key in app_settings die een geheim draagt MOET in dezelfde PR aan de denylist worden toegevoegd. Verwijder dit punt zodra de policy een allowlist is.',
+    severity: 'risk',
+    elementIds: ['t-supabase', 't-aigateway', 't-bankconnect'],
+    reviewedAt: '2026-08-06',
+  },
+  {
+    id: 'grenzenpot-sql-ts-parity-zonder-test',
+    title: 'Grenzenpot: SQL↔TS-parity-contract is alleen door discipline geborgd',
+    detail:
+      'De tegenpartij-normalisatie bestaat twee keer — `public.spend_limit_counterparty_key` (SQL, COLLATE "C") en `spendLimitCounterpartyKey` (TS). De som komt uit SQL, de uitleg uit TS. Er is geen geautomatiseerde test die beide naast elkaar uitvoert; de borging is een comment, een CHECK-constraint (`counterparty_key ~ \'^[0-9A-Z]+$\'`) en review-discipline (ADR 0089 besluit 3). Fase 2–4 (uitsplitsing via `tx_counterparty_name_breakdown`, match-preview via `findOverlappingLimits`) leunt zwaarder op dat contract dan fase 1: er hangt nu een derde consument aan dezelfde sleutel. GEDICHT (was hier gemeld): migratie `20260808170000_tx_counterparty_name_breakdown_transfer_parity.sql` voegt aan `tx_counterparty_name_breakdown` hetzelfde `transaction_type`-filter toe als `computePeriodOutcome` (`isRealAggRow`) — de uitsplitsing beschrijft nu dezelfde verzameling als het canonieke periodebedrag; de rest-bucket-klem op 0 blijft staan als vangnet tegen de top-50-afkap, niet meer tegen deze asymmetrie. Wat blijft staan: het SQL↔TS-parity-PAAR (`spend_limit_counterparty_key` ↔ `spendLimitCounterpartyKey`, en nu ook het transaction_type-predikaat zelf) is nog altijd alleen met de hand geborgd — er is geen geautomatiseerde test die beide talen naast elkaar uitvoert. Verwijder dit punt zodra er een geautomatiseerde parity-test bestaat.',
+    severity: 'debt',
+    elementIds: ['as-budget'],
+    reviewedAt: '2026-08-08',
   },
 ]
 

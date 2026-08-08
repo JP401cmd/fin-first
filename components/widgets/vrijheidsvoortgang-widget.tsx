@@ -8,6 +8,7 @@ import { Compass, Users, UserCheck } from 'lucide-react'
 import type { DashboardData } from './widget-renderer'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { usePerspective } from '@/components/app/perspective-provider'
+import { useEuroView } from '@/lib/hooks/use-euro-view'
 
 interface Props {
   size: WidgetSize
@@ -28,10 +29,35 @@ export const VrijheidsvoortgangWidget = memo(function VrijheidsvoortgangWidget({
   const { fireTarget, freedomPct, fireEligibleNetWorth, fireProjResult, simRequiredPortfolio } = data
   // Headline figures honour the active perspective; everything per-user
   // (growth/forecast/milestone dates) stays guarded below.
+  // euro-view: exempt — gerealiseerd vermogen van vandaag, staat al in huidige
+  // euro's. Nooit deflateren (D12).
   const netWorth = ov?.netWorth ?? data.netWorth
+
+  // ── EURO-WEERGAVE — het voortgangs-PAAR blijft NOMINAAL ───────────────────
+  // euro-view: exempt — hoort bij de nominale freedomPct-noemer.
+  //
+  // Dit widget toont GEEN losstaand doelbedrag: élk bedrag hieronder hangt aan
+  // het voortgangs-paar (balk/ring + "van €X" + "Nog te gaan"). Het percentage
+  // komt canoniek uit de bundel (`freedomPct`, noemer = het NOMINALE
+  // `simRequiredNetWorth`) en mag hier niet herrekend worden ('consume, don't
+  // recompute'). Zou het doel-label wél naar huidige euro's worden omgerekend,
+  // dan zou de zichtbare verhouding "vermogen van doel" van de ring afwijken met
+  // exact de deflator op de vrijheidsleeftijd — bij 2% inflatie en 20 jaar tot
+  // vrijheid ≈ 1,49×, dus een ring op 40% naast een breuk die 59% leest. Het
+  // paar is daarom één eenheid en staat in één grondslag.
+  //
+  // Losstaande doelbedragen buiten een paar deflateren wél: het vrijheidsdoel-
+  // label van de mini-vermogensgrafiek op /overzicht draagt geen percentage en
+  // gaat dus gewoon door `deflate()` (AC-F4 / UAT-KRUIS-27).
+  const { view: euroView } = useEuroView()
   // Personal still prefers the sim-required portfolio; household/partner FIRE
   // targets come straight from the persisted summary so they match /toekomst.
   const effectiveFire = ov?.fireTarget ?? simRequiredPortfolio ?? fireTarget
+  // Korte inline-noot (D11/FR-F5): staat de pagina in "huidige euro's", dan is
+  // dít bedrag de uitzondering. Een niet-omgerekend bedrag zónder noot zou daar
+  // stilzwijgend een tweede grondslag op het scherm zetten; met noot is de
+  // uitzondering leesbaar. In 'nominal' (de standaard) rendert er niets extra.
+  const showsNominalTarget = euroView === 'real'
   // Vrijheids-% = canonieke grondslag (ADR 0009). Eigen perspectief: data.freedomPct
   // (FIRE-eligible vermogen ÷ benodigde portfolio — huis gefilterd). Huishouden/
   // partner: ov.freedomPct (household-engine heeft bewust een eigen grondslag).
@@ -179,6 +205,11 @@ export const VrijheidsvoortgangWidget = memo(function VrijheidsvoortgangWidget({
 
   // Restbedrag tot volledige vrijheid — zelfde canonieke paar als effectivePct
   // (FIRE-eligible vermogen vs. doelportfolio), puur presentationeel.
+  //
+  // euro-view: exempt — derde lid van hetzelfde paar. "Nog te gaan" is het gat
+  // tot het doel-label, dus het deelt per definitie diens (nominale) grondslag:
+  // zo blijft de zichtbare optelling "vermogen + nog te gaan = doel" kloppen én
+  // sluit ze aan op het percentage in de ring.
   const remainingToFullFreedom = Math.max(effectiveFire - freedomEligibleNetWorth, 0)
 
   // SVG donut ring — geometrie in vaste viewBox-eenheden; de wéérgave-grootte
@@ -203,6 +234,7 @@ export const VrijheidsvoortgangWidget = memo(function VrijheidsvoortgangWidget({
         <>
           van <MaskedAmount value={effectiveFire} tone="ink" className="text-[10px]" />
           {simRequiredPortfolio ? ' (sim)' : ''}
+          {showsNominalTarget ? " · in toekomstige euro's" : ''}
         </>
       ),
     },

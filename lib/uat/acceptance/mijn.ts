@@ -285,7 +285,7 @@ const criteria: AcceptanceCriterion[] = [
     then: 'Cloud: `POST /api/onboarding/aangifte-extract` vult bezittingen/schulden in één keer; staat "Documenten lezen" op lokaal, dan geeft deze route vóór elke dataophaling een 403 (`assertCloudAllowed`, geen stille terugval) en leest de browser de PDF zelf uit via `extractAangifteDataLocal` (on-device, geen enkel gegeven verlaat het toestel) — mét dezelfde BSN-strip als defense-in-depth; ontbreekt het lokale model nog, dan blokkeert de upload met een duidelijke melding i.p.v. alsnog naar de cloud te vallen. Een import-verwijdering op peildatum ruimt in beide gevallen exact die batch op (alles-of-niets per peildatum), zonder handmatig ingevoerde items te raken.',
     assertion: {
       kind: 'ui-only',
-      source: 'app/api/onboarding/aangifte-extract/route.ts (assertCloudAllowed op groep "documenten") + components/aangifte/upload-step.tsx (useExecutionMode-gate, extractAangifteDataLocal on-device pad) + import-verwijdering per peildatum, geen deterministisch scenario-cijfer',
+      source: 'app/api/onboarding/aangifte-extract/route.ts (assertCloudAllowed op groep "documenten") + components/aangifte/upload-step.tsx (useExecutionMode-gate, extractAangifteDataLocal on-device pad) + app/api/onboarding/aangifte-import/route.ts (DELETE — import-verwijdering per peildatum, alles-of-niets), geen deterministisch scenario-cijfer',
     },
   },
   {

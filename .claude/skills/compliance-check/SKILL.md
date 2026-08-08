@@ -37,7 +37,7 @@ description: Gebruik vóór elke publicatie van publieke tekst (landing, SEO-pag
 
 ## De uitzonderingsroute
 
-`/privacy`, `/voorwaarden` en `/wft` wijzigen **nooit** via `kleine-aanpassing` — altijd via deze poort, met een `brief`-aantekening (één pagina: wat wijzigt, waarom, gevolg). Deze regel staat ook in `CLAUDE.md` en in de poort van `kleine-aanpassing` zelf.
+`/privacy`, `/voorwaarden` en `/wft` wijzigen **nooit** via `kleine-aanpassing` — altijd via deze poort, met een `juridische-brief`-aantekening (één pagina: wat wijzigt, waarom, gevolg). Deze regel staat ook in `CLAUDE.md` en in de poort van `kleine-aanpassing` zelf.
 
 ## De uitkomst — een besluit, geen gevoel
 
@@ -51,4 +51,4 @@ Leg de uitkomst vast als aantekening in **Notion · Juridische toetsen**: datum,
 
 ## Verwijzing
 
-Stromen 02, 03, 04, 09 en 10 in `trifinity-org/org_plan/30-werkstromen.md` — dit is de [poort] die daar getekend staat. Verwant: `legal-risk-assessment`, `brief`, `zoekvraag-onderzoek` (de goedkope eerste Wft-filter op onderwerpkeuze), `ai-gedrag` (prompt-DNA passeert deze poort vóór `brand-review`).
+Stromen 02, 03, 04, 09 en 10 in `trifinity-org/org_plan/30-werkstromen.md` — dit is de [poort] die daar getekend staat. Verwant: `legal-risk-assessment`, `juridische-brief`, `zoekvraag-onderzoek` (de goedkope eerste Wft-filter op onderwerpkeuze), `ai-gedrag` (prompt-DNA passeert deze poort vóór `brand-review`).

@@ -654,3 +654,77 @@
 ## 2026-08-06
 
 - Geen wijzigingen.
+
+## 2026-08-06
+
+- **API-routes** toegevoegd: /api/cron/user-reports-notion-sync, /api/user-reports
+- **Tabellen** toegevoegd: user_reports
+- **Componenten (aantal)** toegevoegd: +2
+
+## 2026-08-06
+
+- **Componenten (aantal)** toegevoegd: +2
+
+## 2026-08-07
+
+- **Componenten (aantal)** toegevoegd: +2
+
+## 2026-08-07
+
+- Geen wijzigingen.
+
+## 2026-08-07
+
+- Geen wijzigingen.
+
+## 2026-08-07
+
+- **Schermen** verwijderd: /beheer/development, /beheer/roadmap
+
+## 2026-08-07
+
+- Geen wijzigingen.
+
+## 2026-08-07
+
+- Geen wijzigingen.
+
+## 2026-08-08
+
+- Geen wijzigingen.
+
+## 2026-08-08
+
+- Geen wijzigingen.
+
+## 2026-08-08
+
+- Geen wijzigingen.
+
+## 2026-08-08
+
+- Geen wijzigingen.
+
+## 2026-08-08
+
+- Geen wijzigingen.
+
+## 2026-08-08
+
+- **Schermen** verwijderd: /beheer/doelen
+- **API-routes** verwijderd: /api/goals-guide/settings, /api/goals-guide/steps
+
+## 2026-08-08
+
+- **API-routes** toegevoegd: /api/spend-limits, /api/spend-limits/[id], /api/spend-limits/counterparties
+- **Tabellen** toegevoegd: spend_limits
+- **Componenten (aantal)** toegevoegd: +1
+
+## 2026-08-08
+
+- **API-routes** toegevoegd: /api/euro-view, /api/spend-limit-alias, /api/spend-limits/[id]/breakdown, /api/spend-limits/preview
+- **Componenten (aantal)** toegevoegd: +11
+
+## 2026-08-08
+
+- **Componenten (aantal)** toegevoegd: +1
