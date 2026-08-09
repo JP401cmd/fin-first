@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { ArrowRight, Plus, Upload, Link2, ChevronRight } from 'lucide-react'
+import { ArrowRight, Plus, Upload, Link2, ChevronRight, MoreHorizontal } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { usePerspective } from '@/components/app/perspective-provider'
 import {
@@ -28,9 +28,11 @@ import { fetchOwnAccountIbans, ibanById } from '@/lib/own-accounts-ibans'
 import { TransactieTijdlijn, type AccountOption } from './transactie-tijdlijn'
 import { TransactionForm } from '@/components/app/transaction-form'
 import { HideInSimple } from '@/components/app/hide-in-simple'
+import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { BottomSheet } from '@/components/app/bottom-sheet'
+import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { CounterpartyAnalysisPanel } from '@/components/app/counterparty-analysis-panel'
-import { PeriodeSelector } from './periode-selector'
+import { PeriodeSelector, resolvePeriodForMode } from './periode-selector'
 import { GeldstroomGauge } from './geldstroom-gauge'
 import { TopTegenpartijen } from './top-tegenpartijen'
 import { GrootsteUitgaven } from './grootste-uitgaven'
@@ -144,15 +146,17 @@ function formatDayTitle(iso: string): string {
 export function TransactiesAnalyse() {
   const { perspective } = usePerspective()
   const searchParams = useSearchParams()
+  const { mode } = useDisplayMode()
+  const simple = mode === 'simple'
 
   // Deeplink vanaf de geldstroom-banner (/overzicht/cashflow) opent een
   // specifieke kalendermaand via `?maand=YYYY-MM` → periode 'month' + de offset
   // (aantal maanden) t.o.v. de huidige maand. Eénmalig bij mount uitgelezen;
   // daarna stuurt de periode-selector de state. Geen param → huidig gedrag (30d).
-  const [period, setPeriod] = useState<PeriodKind>(() =>
+  const [selectedPeriod, setSelectedPeriod] = useState<PeriodKind>(() =>
     /^\d{4}-\d{2}$/.test(searchParams.get('maand') ?? '') ? 'month' : '30d',
   )
-  const [offset, setOffset] = useState(() => {
+  const [selectedOffset, setSelectedOffset] = useState(() => {
     const maand = searchParams.get('maand')
     if (!maand || !/^\d{4}-\d{2}$/.test(maand)) return 0
     const [y, m] = maand.split('-').map(Number)
@@ -160,6 +164,14 @@ export function TransactiesAnalyse() {
     const now = new Date()
     return (y - now.getFullYear()) * 12 + (m - 1 - now.getMonth())
   })
+
+  // TXN-2: Eenvoudig kent alleen '30d' en 'year'. Een bewaarde keuze die daar
+  // geen tab heeft (bv. 'month' uit Volledig of uit de `?maand=`-deeplink) valt
+  // terug op '30d' — met offset 0, want de kalenderpositie van een maand zegt
+  // niets over een rollend 30-dagen-venster. De KEUZE zelf blijft in state
+  // staan, dus terugschakelen naar Volledig levert weer exact dat maandvenster.
+  const period = resolvePeriodForMode(selectedPeriod, mode)
+  const offset = period === selectedPeriod ? selectedOffset : 0
 
   const [rawTxns, setRawTxns] = useState<PerspectiveItem[]>([])
   // Rijen van het VASTE heatmap-venster. Bewust eigen state en géén afleiding
@@ -197,6 +209,8 @@ export function TransactiesAnalyse() {
   // BottomSheet, bij precies 1 rekening openen we de form direct.
   const [addAccountId, setAddAccountId] = useState<string | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
+  // "…"-menu met de beheer-acties; bestaat alleen in Eenvoudig (TXN-1).
+  const [moreOpen, setMoreOpen] = useState(false)
   const [drillCp, setDrillCp] = useState<{ name: string; iban: string | null } | null>(null)
   const [listDetail, setListDetail] = useState<
     { kind: 'day'; date: string } | { kind: 'weekday'; index: number } | null
@@ -467,11 +481,11 @@ export function TransactiesAnalyse() {
 
   // ── Handlers ─────────────────────────────────────────────────────────────
   const onPeriodChange = useCallback((p: PeriodKind) => {
-    setPeriod(p)
-    setOffset(0)
+    setSelectedPeriod(p)
+    setSelectedOffset(0)
   }, [])
   const onOffsetChange = useCallback((delta: number) => {
-    setOffset((o) => Math.min(0, o + delta))
+    setSelectedOffset((o) => Math.min(0, o + delta))
   }, [])
 
   const openEdit = useCallback(async (tx: AnalysisTransaction) => {
@@ -518,7 +532,13 @@ export function TransactiesAnalyse() {
   return (
     <div className="space-y-5">
       {/* Actie-rij: transactie toevoegen + importeren + bank koppelen.
-          Spiegelt de "Snelle acties" van de cashflow-pagina (De Kern → kern-*). */}
+          Spiegelt de "Snelle acties" van de cashflow-pagina (De Kern → kern-*).
+
+          TXN-1 — in EENVOUDIG staat hier één primaire knop; importeren en bank
+          koppelen zijn beheer-acties die je zelden doet en verhuizen naar het
+          "…"-menu. Ze verdwijnen dus niet, ze staan één klik verderop (zelfde
+          gedachte als de kassabon-deep-dives). In VOLLEDIG staan alle drie de
+          knoppen ongewijzigd naast elkaar. */}
       <div className={`flex flex-wrap items-center gap-2${error ? ' opacity-60 pointer-events-none' : ''}`}>
         {bookableAccounts.length > 0 && (
           <button
@@ -529,20 +549,34 @@ export function TransactiesAnalyse() {
             Nieuwe transactie
           </button>
         )}
-        <Link
-          href="/core/cash/import"
-          className="inline-flex items-center gap-2 rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
-        >
-          <Upload className="h-4 w-4" />
-          Importeer transacties
-        </Link>
-        <Link
-          href="/core/cash/connect"
-          className="inline-flex items-center gap-2 rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
-        >
-          <Link2 className="h-4 w-4" />
-          Bank koppelen
-        </Link>
+        <HideInSimple>
+          <Link
+            href="/core/cash/import"
+            className="inline-flex items-center gap-2 rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+          >
+            <Upload className="h-4 w-4" />
+            Importeer transacties
+          </Link>
+          <Link
+            href="/core/cash/connect"
+            className="inline-flex items-center gap-2 rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+          >
+            <Link2 className="h-4 w-4" />
+            Bank koppelen
+          </Link>
+        </HideInSimple>
+        {simple && (
+          <button
+            type="button"
+            onClick={() => setMoreOpen(true)}
+            aria-haspopup="dialog"
+            aria-label="Meer acties"
+            title="Meer acties"
+            className="inline-flex cursor-pointer items-center justify-center rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] transition-colors duration-150 hover:bg-[var(--subtle)]"
+          >
+            <MoreHorizontal className="h-4 w-4" aria-hidden />
+          </button>
+        )}
       </div>
 
       <Card>
@@ -700,6 +734,37 @@ export function TransactiesAnalyse() {
           </div>
         </BottomSheet>
       )}
+
+      {/* "…"-menu (alleen Eenvoudig): de beheer-acties uit de actie-rij.
+          Via ShellOverlay — één overlay-systeem (ADR 0039), dus geen
+          hand-rolled dropdown en geen eigen z-index. `simple &&` in de
+          open-conditie zodat een modus-wissel het menu meteen opruimt. */}
+      <ShellOverlay
+        open={simple && moreOpen}
+        onClose={() => setMoreOpen(false)}
+        kind="sheet"
+        size="sm"
+        title="Meer acties"
+      >
+        <div className="space-y-2 p-5">
+          <Link
+            href="/core/cash/import"
+            onClick={() => setMoreOpen(false)}
+            className="flex w-full items-center gap-3 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 text-sm font-medium text-[var(--ink)] transition-colors duration-150 hover:bg-[var(--subtle)]"
+          >
+            <Upload className="h-4 w-4 shrink-0 text-[var(--ink-3)]" aria-hidden />
+            Importeer transacties
+          </Link>
+          <Link
+            href="/core/cash/connect"
+            onClick={() => setMoreOpen(false)}
+            className="flex w-full items-center gap-3 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 text-sm font-medium text-[var(--ink)] transition-colors duration-150 hover:bg-[var(--subtle)]"
+          >
+            <Link2 className="h-4 w-4 shrink-0 text-[var(--ink-3)]" aria-hidden />
+            Bank koppelen
+          </Link>
+        </div>
+      </ShellOverlay>
 
       {/* Tegenpartij-analyse */}
       {drillCp && (

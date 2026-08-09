@@ -7,6 +7,7 @@ import { ModuleAccentPicker } from '@/components/mijn/module-accent-picker'
 import { BudgetTintPicker } from '@/components/mijn/budget-tint-picker'
 import { CategoryTintPicker } from '@/components/mijn/category-tint-picker'
 import { SpendLimitAliasPicker } from '@/components/mijn/spend-limit-alias-picker'
+import { DisplayModePicker } from '@/components/mijn/display-mode-picker'
 
 export const metadata: Metadata = {
   title: 'Uiterlijk — TriFinity',
@@ -36,11 +37,20 @@ export default function MijnUiterlijkPage() {
           titleBefore="Hoe ziet TriFinity "
           emphasis="eruit"
           titleAfter="?"
-          deck="Wissel tussen de paletten — van warm cream tot knapperig krant-wit — en de typografie. Je keuze wordt opgeslagen en geldt voor alle pagina's. Fijnregelen kan onder “Geavanceerd”."
+          deck="Kies hoeveel je wilt zien — eenvoudig of volledig — en wissel tussen de paletten, van warm cream tot knapperig krant-wit, en de typografie. Je keuze wordt opgeslagen en geldt voor alle pagina's. Fijnregelen kan onder “Geavanceerd”."
         />
 
-        {/* Essentieel — Palet wisselt het complete token-systeem in één klik. */}
+        {/*
+          Essentieel — de weergavekeuze staat bewust BOVENAAN: hij bepaalt
+          hoeveel van de app je überhaupt ziet, en was tot nu toe alleen via ⌘K
+          te vinden (APP-1 uit docs/eenvoudige-weergave-audit.md).
+        */}
         <div className="border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
+          <DisplayModePicker />
+        </div>
+
+        {/* Essentieel — Palet wisselt het complete token-systeem in één klik. */}
+        <div className="mt-4 border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
           <PalettePicker />
         </div>
 

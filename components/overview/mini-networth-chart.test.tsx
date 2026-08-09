@@ -1,7 +1,8 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render as rtlRender, screen, fireEvent } from '@testing-library/react'
 import type { ReactElement } from 'react'
 import { MiniNetWorthChart } from './mini-networth-chart'
+import { DisplayModeProvider, type DisplayMode } from '@/lib/hooks/use-display-mode'
 import { PrivacyProvider, PRIVACY_MASKED_STORAGE_KEY } from '@/lib/hooks/use-privacy'
 import { MASKED_AMOUNT_PLACEHOLDER, formatCurrency } from '@/lib/format'
 import { EuroViewProvider } from '@/lib/hooks/use-euro-view'
@@ -40,6 +41,17 @@ global.ResizeObserver = MockResizeObserver as unknown as typeof ResizeObserver
  * valideren render-states + reeks-injectie + Vrijheid-marker + het aparte
  * liquide-vrijheidsdoel-label + de twee klikzones + geschatte historie.
  */
+
+/**
+ * De chart leest sinds OVZ-4 (eenvoudige weergave, fase 1) `useDisplayMode()`
+ * voor de legenda-versobering. Buiten een provider valt die hook bewust terug
+ * op 'simple'; de tests hieronder beschrijven het VOLLEDIG-beeld, dus rendert
+ * deze wrapper standaard binnen een 'full'-provider. De Eenvoudig-variant heeft
+ * een eigen describe-blok dat expliciet `'simple'` meegeeft.
+ */
+function render(ui: ReactElement, mode: DisplayMode = 'full') {
+  return rtlRender(<DisplayModeProvider initialMode={mode}>{ui}</DisplayModeProvider>)
+}
 
 function buildHistory(values: number[]): { month: string; value: number }[] {
   return values.map((value, i) => {
@@ -309,6 +321,57 @@ describe('MiniNetWorthChart — projectie-render met simRows', () => {
       />,
     )
     expect(screen.getByText(/Onzekerheid \(P40–P60\)/i)).toBeTruthy()
+  })
+
+  /**
+   * OVZ-4 (eenvoudige weergave, fase 1): de legenda verliest het percentiel-
+   * jargon en de vier regels vallen terug op "Verloop" + "Bandbreedte". De
+   * grafiek zelf verandert niet — alleen wat eronder staat.
+   */
+  it('Eenvoudig: legenda toont "Verloop" + "Bandbreedte", geen P40–P60', () => {
+    render(
+      <MiniNetWorthChart
+        netWorthHistory={buildHistory([90_000, 95_000, 100_000])}
+        currentNetWorth={100_000}
+        currentAge={35}
+        fireAge={52}
+        endAge={67}
+        simNetWorthRows={buildSimRows(35, 52, 100_000)}
+      />,
+      'simple',
+    )
+    expect(screen.getByText('Verloop')).toBeTruthy()
+    expect(screen.getByText('Bandbreedte')).toBeTruthy()
+    expect(screen.queryByText(/P40/)).toBeNull()
+    expect(screen.queryByText(/^Historisch/)).toBeNull()
+    expect(screen.queryByText('Projectie')).toBeNull()
+  })
+
+  it('Eenvoudig: geen kaal leeftijdsgetal meer in kop en legenda ("verloop tot 90")', () => {
+    // fireAge <= currentAge → vrijheid bereikt: dit is precies de stand waarin
+    // de kop "Vrijheid bereikt — verloop tot 90" toonde en de legenda "Tot 90".
+    render(
+      <MiniNetWorthChart
+        netWorthHistory={buildHistory([90_000, 95_000, 100_000])}
+        currentNetWorth={100_000}
+        currentAge={62}
+        fireAge={55}
+        endAge={90}
+        simNetWorthRows={buildSimRows(62, 90, 100_000)}
+      />,
+      'simple',
+    )
+    expect(screen.getByText(/Vrijheid bereikt$/)).toBeTruthy()
+    expect(screen.queryByText(/verloop tot/i)).toBeNull()
+    // "Tot 90" mag alléén nog als <text>-annotatie ÍN de grafiek staan (dat is
+    // de as-markering bij de eindmarker, net als "Vandaag (45)"); buiten de SVG
+    // — in kop of legenda — hoort het kale leeftijdsgetal niet meer thuis.
+    const totEindleeftijd = screen.queryAllByText(/Tot 90/)
+    expect(totEindleeftijd.length).toBeGreaterThan(0)
+    expect(totEindleeftijd.every((el) => el.tagName.toLowerCase() === 'text')).toBe(true)
+    // De horizon-marker houdt wél een legenda-regel — anders zweeft er een
+    // gekleurde streep zonder betekenis in de grafiek.
+    expect(screen.getByText('Tot je eindleeftijd')).toBeTruthy()
   })
 
   it('historische curve render als stippellijn (strokeDasharray)', () => {
@@ -674,15 +737,17 @@ describe("MiniNetWorthChart — euro-weergave (huidige euro's)", () => {
     }
   })
 
-  it('laat de euro-weergave-badge alleen zien in huidige euro’s', () => {
-    const rows = buildFactorRows()
-    const nominal = renderMiniChart(rows, 'nominal')
-    expect(nominal.container.querySelectorAll('button[aria-label*="Weergave"]').length).toBe(0)
-    nominal.unmount()
-
-    const real = renderMiniChart(rows, 'real')
-    // Precies ÉÉN badge op dit oppervlak (D11: één badge per pagina).
-    expect(real.container.querySelectorAll('button[aria-label*="Weergave"]').length).toBe(1)
+  it('draagt zelf geen euro-weergave-status — die hangt app-breed in de sidebar', () => {
+    // ADR 0094: de weergave-status staat op één plek (`SidebarEuroViewBadge`,
+    // altijd zichtbaar) en de schakelaar in het zoekscherm; grafieken dragen
+    // geen eigen badge meer. Deze assertie is de vangrail tegen terugkeer van
+    // een per-grafiek-markering — in BEIDE standen, want juist in 'real' stond
+    // hij er vroeger wél.
+    for (const view of ['nominal', 'real'] as const) {
+      const { container, unmount } = renderMiniChart(buildFactorRows(), view)
+      expect(container.querySelectorAll('button[aria-label*="Weergave"]').length).toBe(0)
+      unmount()
+    }
   })
 })
 

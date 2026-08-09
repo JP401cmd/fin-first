@@ -14,8 +14,10 @@ import {
 } from '@/lib/leverage-status'
 
 /**
- * BelastingBoxCards — drie klikbare box-kaarten op de Belasting-landing
- * (/overzicht/belasting). Spiegelt nu visueel én functioneel 1-op-1 de
+ * BelastingBoxCards — de klikbare box-kaarten op de Belasting-landing
+ * (/overzicht/belasting). Twee of drie, afhankelijk van of Box 2 relevant is
+ * (BEL-1; de pagina beslist dat, zie ./box-cards.ts). Spiegelt visueel én
+ * functioneel 1-op-1 de
  * vier-hefbomen-rij op /overzicht (components/overview/overzicht-hero/
  * hefbomen-nav.tsx → HefbomenNav) door dezelfde gedeelde shell te HERGEBRUIKEN
  * (components/overview/leverage-card.tsx → LeverageCard) — net als
@@ -100,18 +102,26 @@ export function BelastingBoxCards({ cards }: { cards: BelastingBoxCard[] }) {
     if (simple) setExpandedKey(null)
   }, [simple])
 
+  // BEL-1: zonder aanmerkelijk belang levert de hub twee kaarten aan (de Box 2-
+  // tegel vervalt). Kolommen en kicker volgen dus het AANTAL kaarten — anders
+  // bleef er op desktop een lege derde kolom staan en zou de kicker "De drie
+  // boxen" liegen. Beide class-varianten staan als literal in de bron zodat
+  // Tailwind ze meeneemt.
+  const gridCols = cards.length <= 2 ? 'sm:grid-cols-2' : 'sm:grid-cols-3'
+  const kicker = cards.length <= 2 ? 'De twee boxen' : 'De drie boxen'
+
   // De editorial masthead op de hub-pagina is dé hero; deze rij hoeft alleen
   // nog een rustige kicker. Het jaartotaal is bewust verdwenen (het staat als
   // grote uitkomst in Sectie I, en "excl. Box 2" in de Sectie I-callout).
   return (
     <section className="mx-auto max-w-6xl px-4 sm:px-6 pt-6 pb-2">
       <div className="mb-4">
-        <Kicker>De drie boxen</Kicker>
+        <Kicker>{kicker}</Kicker>
       </div>
 
       <nav
-        aria-label="Drie belastingboxen"
-        className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4"
+        aria-label="Belastingboxen"
+        className={`grid grid-cols-1 ${gridCols} gap-3 sm:gap-4`}
       >
         {cards.map((card) => {
           const { number, label, href, tax, status, statusText } = card

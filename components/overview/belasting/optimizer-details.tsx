@@ -348,7 +348,14 @@ function VerloopStrip({
       <div className="font-mono text-[9.5px] uppercase tracking-[0.20em] text-[var(--ink-3)]">
         Heffing over de jaren
       </div>
-      <FiguresStrip cols={3} figures={figures} />
+      {/* APP-7: dit is een reeks (verloop), geen KPI-rangorde — de eerste twee
+          cellen zouden juist het eindpunt wegkappen. In Eenvoudig daarom het
+          lopende jaar + de indicatie voor het beoogde stelsel: nu → straks. */}
+      <FiguresStrip
+        cols={3}
+        figures={figures}
+        simpleFigures={[figures[1], figures[2]]}
+      />
     </div>
   )
 }

@@ -246,16 +246,26 @@ export function deflatePoints(
  * Gebruik deze helper zodra de positie in de reeks de tijd draagt en de x-as
  * NIET de leeftijd van de gebruiker is. Ontbreekt de factor op die index, of is
  * hij onbruikbaar, dan blijft het bedrag ongemoeid.
+ *
+ * `indexOf` mapt de reeks-index naar de index in `factorByOffset` — de
+ * offset-tegenhanger van `keyOf` in `deflatePoints`, en nodig om dezelfde val te
+ * vermijden: draagt index `i` een waarde die op de hoofdlijn uit BRONjaar `i−1`
+ * komt (zoals de Monte-Carlo-band, die de eindstand van jaar-blok `i−1` op
+ * leeftijd `startAge + i` tekent), dan hoort daar de factor van dát bronjaar bij.
+ * Zonder de sleutel deflateert zo'n reeks stil één jaar te ver en zakt hij ~π
+ * onder de lijn die hij hoort te omvatten. Weglaten = identiteit (ongewijzigd
+ * gedrag voor reeksen waarvan index én bronjaar samenvallen).
  */
 export function deflateSeriesByOffset(
   series: readonly (number & NotYetInEuroView)[],
   factorByOffset: readonly number[],
   view: EuroView,
+  indexOf?: (i: number) => number,
 ): InEuroView<number>[] {
   if (view === 'nominal') return series as InEuroView<number>[]
 
   return series.map((value, index) => {
-    const factor = factorByOffset[index]
+    const factor = factorByOffset[indexOf ? indexOf(index) : index]
     if (factor === undefined || !isUsableFactor(factor)) return value as InEuroView<number>
     return (value / factor) as InEuroView<number>
   })

@@ -9,6 +9,7 @@ import {
   BelastingBoxCards,
   type BelastingBoxCard,
 } from '@/components/overview/belasting-box-cards'
+import { buildBelastingBoxCards } from './box-cards'
 import { dailyExpenseRate } from '@/lib/format'
 import { hasBox2Relevance } from '@/lib/box2-relevance'
 import { computeBox3TaxableInput, box3TaxStatus } from '@/lib/box3-taxable-input'
@@ -46,15 +47,19 @@ export const metadata: Metadata = {
 /**
  * /overzicht/belasting — vierde hefboom-verdieping, nu als **landing/hub**.
  *
- * De pagina toont drie klikbare box-kaarten in hefbomen-stijl (icoon +
- * status + KPI), elk doorlinkend naar de eigen box-subpagina:
+ * De pagina toont klikbare box-kaarten in hefbomen-stijl (icoon + status +
+ * KPI), elk doorlinkend naar de eigen box-subpagina:
  *  - /overzicht/belasting/box1 — Werk + woning (jaarruimte-actie)
- *  - /overzicht/belasting/box2 — Aanmerkelijk belang (DGA)
+ *  - /overzicht/belasting/box2 — Aanmerkelijk belang (DGA), ALLEEN bij
+ *    aanmerkelijk belang (BEL-1); de route blijft altijd bereikbaar
  *  - /overzicht/belasting/box3 — Sparen + beleggen (forfaitair rendement)
+ *
+ * Welke kaarten er staan bepaalt `buildBelastingBoxCards` (./box-cards.ts) —
+ * een pure functie, zodat die regel testbaar is zonder deze loader-pagina.
  *
  * Status per kaart wordt server-side bepaald:
  *  - Box 1: onbenutte jaarruimte = kans (amber) / benut (groen) / onbekend
- *  - Box 2: aanwezigheid van een deelneming-asset
+ *  - Box 2: neutraal (de hub rekent Box 2 bewust niet door)
  *  - Box 3: de tax_optimization-pillar uit de gezondheidsscore
  *
  * Box-data bronnen (KPI's):
@@ -216,35 +221,19 @@ export default async function OverzichtBelastingPage() {
   // Fiscale kalender — runtime-klok als 'now' (server-component mag dat).
   const deadlines = getTaxDeadlines(new Date(), 2026)
 
-  const cards: BelastingBoxCard[] = [
-    {
-      number: '1',
-      label: 'Werk + woning',
-      href: '/overzicht/belasting/box1',
-      tax: box1Tax,
-      status: box1Status,
-      statusText: box1StatusText,
-      subtitle: 'Loon, ondernemerswinst en eigen huis.',
-    },
-    {
-      number: '2',
-      label: 'Aanmerkelijk belang',
-      href: '/overzicht/belasting/box2',
-      tax: null,
-      status: 'neutral',
-      statusText: hasAanmerkelijkBelang ? 'Aanmerkelijk belang' : 'Geen aanmerkelijk belang',
-      subtitle: 'DGA / aandeelhouder ≥ 5%.',
-    },
-    {
-      number: '3',
-      label: 'Sparen + beleggen',
-      href: '/overzicht/belasting/box3',
-      tax: box3Tax,
-      status: box3Status,
-      statusText: box3StatusText,
-      subtitle: 'Cash, beleggingen en crypto — forfaitair.',
-    },
-  ]
+  // Kaart-samenstelling in één pure functie (app/(app)/overzicht/belasting/
+  // box-cards.ts) zodat de BEL-1-regel — Box 2 alleen bij aanmerkelijk belang —
+  // testbaar is zonder deze hele loader-pagina na te bootsen. Alle cijfers en
+  // statussen zijn hierboven al afgeleid; de builder rekent niets.
+  const cards: BelastingBoxCard[] = buildBelastingBoxCards({
+    box1Tax,
+    box1Status,
+    box1StatusText,
+    box3Tax,
+    box3Status,
+    box3StatusText,
+    hasAanmerkelijkBelang,
+  })
 
   return (
     <>
@@ -288,11 +277,10 @@ export default async function OverzichtBelastingPage() {
             <Sparkles className="h-5 w-5 text-[var(--color-box3-700)]" aria-hidden="true" />
           </span>
           <span className="min-w-0 flex-1">
+            {/* BEL-2: de "nieuw"-badge is vervallen — de optimizer is geen
+                introductie meer maar een vast onderdeel van de hub. */}
             <span className="flex items-center gap-2">
               <span className="text-base font-semibold text-[var(--ink)]">Fiscale optimizer</span>
-              <span className="rounded-full border border-[var(--rule-soft)] px-1.5 py-0.5 text-[9px] uppercase tracking-[0.1em] font-mono text-[var(--ink-3)]">
-                nieuw
-              </span>
             </span>
             <span className="mt-0.5 block text-sm leading-snug text-[var(--ink-2)]">
               Kies een fiscaal doel en vergelijk doorgerekende Box 3-scenario’s — in euro’s en vrijheidsdagen.

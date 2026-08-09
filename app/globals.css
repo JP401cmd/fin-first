@@ -377,6 +377,25 @@
   }
 }
 
+/* Pillenrij die nooit op twee regels valt — zie components/app/pill-row.tsx.
+   Die component meet of alle pillen mét label op één regel passen en zet
+   `data-compact="true"` als dat niet zo is; dan vallen álle labels weg en
+   houdt de rij alleen iconen over. De regel staat hier (en niet als Tailwind
+   arbitrary-variant op de component) omdat het de garantie hard en zichtbaar
+   maakt: één plek, geen kans dat een niet-gegenereerde variant 'm stil sloopt. */
+[data-pill-row][data-compact='true'] [data-pill-label] {
+  display: none;
+}
+
+/* Pillen mogen NIET krimpen. In een `flex-nowrap`-rij is `flex-shrink: 1` de
+   default: de pillen zouden zichzelf platdrukken tot alles nét past, waardoor
+   (a) de tekst gaat afbreken en (b) de inhoud nooit voorbij de rechterrand van
+   de rij komt — de meting zou dus altijd "past prima" zeggen en de labels nooit
+   laten vallen. Met shrink 0 loopt de rij écht over en doet de meting zijn werk. */
+[data-pill-row] > * {
+  flex-shrink: 0;
+}
+
 @theme inline {
   /* ── Scherpe hoeken (editorial) ── */
   --radius-xs: 0px;

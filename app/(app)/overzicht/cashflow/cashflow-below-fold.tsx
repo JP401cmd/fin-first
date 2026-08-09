@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
+import { DepthSection } from '@/components/app/depth-section'
+import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import type { CashflowSettingsData } from '@/lib/cashflow-settings-data'
 import type { CashBankLink } from '@/lib/bank-connection-status'
 
@@ -329,13 +331,51 @@ export function CashflowInstellingenBlokLazy() {
   return (
     // Instellingen (inkomen, spaarquote, uitgaven) zijn óók in Eenvoudig
     // zichtbaar — bewust géén HideInSimple. Het blok bevat alleen die drie
-    // kern-instellingen, die de gebruiker in beide modi wil kunnen zien.
+    // kern-instellingen, die de gebruiker in beide modi wil kunnen zien; in
+    // Eenvoudig staan ze alleen achter een disclosure (CF-4, hieronder).
     <section ref={anchorRef} className="mx-auto max-w-6xl px-4 pb-8 pt-2 sm:px-6">
       {state.status === 'ready' ? (
-        <DynCashflowInstellingenBlok data={state.data} />
+        <CashflowInstellingenDisclosure data={state.data} />
       ) : (
         <CashflowInstellingenBlokSkeleton />
       )}
     </section>
+  )
+}
+
+/**
+ * CF-4 — het instellingenblok als disclosure, in Eenvoudig standaard DICHT.
+ *
+ * Waarom `DepthSection` en geen `HideInSimple`: instellingen zijn geen diepte
+ * die je mag wegnemen, het zijn drie waarden die de gebruiker moet kúnnen
+ * bijstellen. Hard verbergen zou de enige ingang naar zijn inkomen/uitgaven op
+ * deze pagina dichtzetten. `DepthSection` is precies het inklappen-met-behoud
+ * dat ADR 0026 bedoelde en dat volgens §9 van de audit ongebruikt lag: dicht in
+ * 'simple', open in 'full', één klik ertussen.
+ *
+ * Waarom alleen in Eenvoudig gemónt en niet altijd: `DepthSection` zou in
+ * Volledig weliswaar open staan, maar dan mét kop-knop en kaartrand om het blok
+ * heen. "Volledig blijft ongewijzigd" is een acceptatiecriterium, dus daar
+ * rendert exact de bestaande boom — `hideHeading` blijft ongezet, dus ook de
+ * eigen kicker en sectie-marge van het blok blijven zoals ze waren.
+ *
+ * De lazy fetch hierboven blijft ongemoeid: het anker-`<section>` staat er ook
+ * ingeklapt, dus in-view laadt de data zoals voorheen en de disclosure opent
+ * meteen gevuld.
+ */
+function CashflowInstellingenDisclosure({ data }: { data: CashflowSettingsData }) {
+  const simple = useDisplayMode().mode === 'simple'
+
+  if (!simple) return <DynCashflowInstellingenBlok data={data} />
+
+  return (
+    <div className="mt-5 sm:mt-8">
+      <DepthSection
+        title="Instellingen & toekomst"
+        summary="Je inkomen, spaarquote en geschatte uitgaven"
+      >
+        <DynCashflowInstellingenBlok data={data} hideHeading />
+      </DepthSection>
+    </div>
   )
 }

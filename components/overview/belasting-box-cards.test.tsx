@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import type { ReactElement } from 'react'
 import { BelastingBoxCards, type BelastingBoxCard } from './belasting-box-cards'
+import { buildBelastingBoxCards } from '@/app/(app)/overzicht/belasting/box-cards'
 import { DisplayModeProvider } from '@/lib/hooks/use-display-mode'
 
 /**
@@ -223,5 +224,70 @@ describe('BelastingBoxCards — Eenvoudige weergave (display_mode simple)', () =
     expect(screen.getByText('Werk + woning')).toBeTruthy()
     expect(screen.getByText('Aanmerkelijk belang')).toBeTruthy()
     expect(screen.getByText('Sparen + beleggen')).toBeTruthy()
+  })
+})
+
+// ── BEL-1: twee kaarten zonder aanmerkelijk belang (alle modi) ────────────
+//
+// De kaartenrij komt van `buildBelastingBoxCards` — dezelfde pure functie die
+// de hub-pagina gebruikt. Zo pinnen deze tests de WEERGAVE op de canonieke
+// samenstelling in plaats van op een handgeschreven array die stil uit de pas
+// kan lopen (de beslissing zelf staat in app/(app)/overzicht/belasting/
+// box-cards.test.ts).
+
+describe('BelastingBoxCards — BEL-1: kaartenrij volgt aanmerkelijk belang', () => {
+  const zonderBox2 = buildBelastingBoxCards({
+    box1Tax: 12000,
+    box1Status: 'warn',
+    box1StatusText: 'Onbenutte jaarruimte',
+    box3Tax: 3500,
+    box3Status: 'good',
+    box3StatusText: 'Geen actie nodig',
+    hasAanmerkelijkBelang: false,
+  })
+
+  it('toont zonder aanmerkelijk belang twee kaarten, zonder Box 2-tegel', () => {
+    const { container } = renderFull(<BelastingBoxCards cards={zonderBox2} />)
+
+    expect(screen.getByText('Werk + woning')).toBeTruthy()
+    expect(screen.getByText('Sparen + beleggen')).toBeTruthy()
+    expect(screen.queryByText('Aanmerkelijk belang')).toBeNull()
+    expect(screen.queryByText('Geen aanmerkelijk belang')).toBeNull()
+    // Twee kaart-links, dus ook maar twee chevron-toggles.
+    expect(container.querySelectorAll('a').length).toBe(2)
+    expect(screen.getAllByRole('button', { name: /^Toon detail / }).length).toBe(2)
+    // De route naar Box 2 verdwijnt alleen als TEGEL — hij blijft bereikbaar
+    // via de navigatie; hier hoort hij simpelweg niet meer in de rij.
+    const hrefs = Array.from(container.querySelectorAll('a')).map((a) => a.getAttribute('href'))
+    expect(hrefs).not.toContain('/overzicht/belasting/box2')
+  })
+
+  it('vult bij twee kaarten de volle rij (geen lege derde kolom) en zegt "De twee boxen"', () => {
+    const { container } = renderFull(<BelastingBoxCards cards={zonderBox2} />)
+
+    const nav = container.querySelector('nav')!
+    expect(nav.className).toContain('sm:grid-cols-2')
+    expect(nav.className).not.toContain('sm:grid-cols-3')
+    expect(screen.getByText('De twee boxen')).toBeTruthy()
+    expect(screen.queryByText('De drie boxen')).toBeNull()
+  })
+
+  it('houdt bij drie kaarten de drie-koloms rij én de kicker "De drie boxen"', () => {
+    const metBox2 = buildBelastingBoxCards({
+      box1Tax: 12000,
+      box1Status: 'warn',
+      box1StatusText: 'Onbenutte jaarruimte',
+      box3Tax: 3500,
+      box3Status: 'good',
+      box3StatusText: 'Geen actie nodig',
+      hasAanmerkelijkBelang: true,
+    })
+    const { container } = renderFull(<BelastingBoxCards cards={metBox2} />)
+
+    const nav = container.querySelector('nav')!
+    expect(nav.className).toContain('sm:grid-cols-3')
+    expect(screen.getByText('De drie boxen')).toBeTruthy()
+    expect(screen.getByText('Aanmerkelijk belang')).toBeTruthy()
+    expect(container.querySelectorAll('a').length).toBe(3)
   })
 })

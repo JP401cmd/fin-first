@@ -55,7 +55,7 @@ const criteria: AcceptanceCriterion[] = [
     titel: 'Budget-vs-realisatie van de maand bekijken',
     kriticiteit: 'KERN',
     persona: 'lisa',
-    given: 'Persona Lisa geladen, lopende maand met transacties op meerdere budgetten.',
+    given: 'Persona Lisa geladen, lopende maand met transacties op meerdere budgetten. WEERGAVEMODUS: in **Eenvoudig** toont de KPI-strip alleen Inkomen + Uitgaven (APP-7-reductie, `alwaysFull`/`simpleFigures` op de overige cellen) en staat de weergave hard op de pil-modus; in **Volledig** blijft de volledige KPI-strip + de vrije keuze uit Boom/Ring/Heatmap/Pillen (WF-BUDGET-04) staan. De A=B-consistentie hieronder geldt op de cellen die ZICHTBAAR zijn — minder cellen in Eenvoudig verandert niets aan de gelijkheid tussen wat wél getoond wordt.',
     when: 'De gebruiker opent de budgetpagina en leest de KPI-strip, de boomweergave en het per-budget "besteed/limiet".',
     then: 'Volgens-plan/Werkelijk in de KPI-strip == de som van de boomweergave-realisatie == de per-budget realisatie op het detailpaneel — één gedeelde `loadSpending`-bron, geen tweede berekening per surface. De onderliggende bedragen zijn NIET hand-narekenbaar (transactie-generator gebruikt `Math.random()`-jitter).',
     assertion: {
@@ -69,8 +69,8 @@ const criteria: AcceptanceCriterion[] = [
     titel: 'Maand navigeren en periodemodus wisselen',
     kriticiteit: 'KERN',
     persona: 'lisa',
-    given: '"Nu" vastgezet op 15 juli 2026; gebruiker op de budgetpagina.',
-    when: 'De gebruiker navigeert naar maart 2026 (maand-modus), en schakelt daarna naar YTD en 12-maanden.',
+    given: '"Nu" vastgezet op 15 juli 2026; gebruiker op de budgetpagina. WEERGAVEMODUS (BUD-1): de periode-toggle (Maand/YTD/12 mnd) is alleen zichtbaar in **Volledig** — `BudgetPeriodToggle` rendert `null` in **Eenvoudig**, waar de periode hard op "Maand" staat (`effectivePeriodMode`) en de afkorting "YTD" dus niet in beeld komt (APP-5, jargonregel). Dit criterium (YTD/12-maanden kiezen) is dus alleen uitvoerbaar in Volledig; `computeBudgetPeriod` zelf is in beide modi identiek — Eenvoudig roept hem alleen nooit met een andere waarde dan "maand" aan.',
+    when: 'De gebruiker navigeert naar maart 2026 (maand-modus), en schakelt daarna naar YTD en 12-maanden — beide alleen bereikbaar in Volledig.',
     then: 'Maand-modus: bereik 2026-03-01 t/m 2026-04-01 (exclusief), 1 maand. YTD: bereik 2026-01-01 t/m 2026-08-01, 7 maanden (jan t/m lopende maand juli). 12-maanden: bereik 2025-08-01 t/m 2026-08-01, 12 maanden. Limieten schalen met `periodMonthCount`.',
     assertion: {
       kind: 'exact',
@@ -98,7 +98,7 @@ const criteria: AcceptanceCriterion[] = [
     titel: 'Budgetanalyse-hub raadplegen en doorklikken',
     kriticiteit: 'BELANGRIJK',
     persona: 'lisa',
-    given: 'Persona Lisa geladen (Inkomen €5.200; Vaste lasten €1.455, Dagelijkse uitgaven €900, Vervoer €265, Leuke dingen €300, Sparen&schulden €600, Schulden&aflossingen €50 — statische hoofdbudget-limieten).',
+    given: 'Persona Lisa geladen (Inkomen €5.200; Vaste lasten €1.455, Dagelijkse uitgaven €900, Vervoer €265, Leuke dingen €300, Sparen&schulden €600, Schulden&aflossingen €50 — statische hoofdbudget-limieten). WEERGAVEMODUS (BUD-3): de dekkingsgraad/alerts hieronder zijn de VOLLEDIGE hub-inhoud, ongewijzigd achter de disclosure-klik in beide modi. Alleen de INGEKLAPTE preview-regel bovenaan verschilt: in **Volledig** toont die tot 3 fragmenten (bv. "1 overschreden — 1 bijna vol — € 2.540 te verdelen"), in **Eenvoudig** wordt dat teruggeknepen tot 2 fragmenten (`HUB_PREVIEW_MAX_SIMPLE`) op één niet-afbrekende regel. Geen cijfermatig verschil, puur hoeveel van dezelfde snippets zichtbaar zijn vóór het uitklappen.',
     when: 'De gebruiker opent de analyse-hub en leest de dekkingsgraad en de alert-badges (80%/100%-drempels).',
     then: 'Dekkingsgraad = toegewezen/inkomen×100 = (1.455+900+265+300+600+50)/5.200×100 = 3.570/5.200×100 = 68,65%. Alert-drempels: expense-budget op 85% van limiet met drempel 80% → alert; op 75% → geen alert. Savings-budget op 50% van doel met drempel 100% → alert (te weinig gespaard); op 150% → geen alert.',
     assertion: {
@@ -259,8 +259,8 @@ const criteria: AcceptanceCriterion[] = [
     titel: 'Budgetbedragen van vorige maand kopiëren',
     kriticiteit: 'KERN',
     persona: 'lisa',
-    given: 'Persona Lisa geladen, vorige maand heeft afwijkende limieten t.o.v. de huidige.',
-    when: 'De gebruiker klikt "Kopieer vorige maand" in de planeditor.',
+    given: 'Persona Lisa geladen, vorige maand heeft afwijkende limieten t.o.v. de huidige. WEERGAVEMODUS (BUD-2): de knoppen "Kopieer vorige maand" én "Rapport" (in dezelfde actiebalk, `BudgetReportActions`) zijn beheer-diepte en staan alleen in **Volledig**; in **Eenvoudig** zijn ze hard verborgen (`HideInSimple`) — de route /rapportages/budget blijft rechtstreeks bereikbaar, alleen de knop niet. Dit criterium (klikken op "Kopieer vorige maand") is dus alleen uitvoerbaar in Volledig.',
+    when: 'De gebruiker klikt "Kopieer vorige maand" in de planeditor (Volledig).',
     then: 'Na de kopie zijn de limieten van de huidige maand gelijk aan die van de vorige maand — een A=B-consistentietoets, geen los cijfer (de vorige-maand-limieten zelf zijn testdata-afhankelijk).',
     assertion: {
       kind: 'consistency',
@@ -293,7 +293,7 @@ const criteria: AcceptanceCriterion[] = [
     assertion: {
       kind: 'exact',
       expected: 'maandenResterend=10; benodigdPerMaand=400; spaarProgress=33.33',
-      source: 'components/app/budgets-client.tsx r3327-3334 (inline, GEEN pure export) — getrouw gemirrord in budget-checks.ts met bronregel-verwijzing (geen eigen herimplementatie-aanname)',
+      source: 'components/app/budgets-client.tsx r3397-3403 (inline, GEEN pure export; regelnummer bijgewerkt na de "Eenvoudige weergave" fase-2-toevoegingen, formule ongewijzigd) — getrouw gemirrord in budget-checks.ts met bronregel-verwijzing (geen eigen herimplementatie-aanname)',
     },
   },
   {

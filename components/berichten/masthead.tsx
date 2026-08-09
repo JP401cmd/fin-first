@@ -14,6 +14,14 @@ interface MastheadProps {
   updatedAt?: string
   /** Grondslag-regel, bijv. "Gebaseerd op 38 bronartikelen" — transparantie over grounding */
   sourceNote?: string
+  /**
+   * Laat de editie-aanduiding links in de metaregel weg (NWS-1, Eenvoudig).
+   * Editienummer en jaargang zijn krant-folklore: leuk voor wie de metafoor
+   * herkent, betekenisloos voor wie gewoon wil weten wat er vandaag staat.
+   * `metaLeft` (het berichtencentrum) wint hier nog steeds van — dat is een
+   * live statusregel, geen editie-aanduiding.
+   */
+  hideEdition?: boolean
 }
 
 // Kapitaliseer de eerste letter — nl-NL geeft "maandag", krantdatelines zijn "Maandag …"
@@ -33,7 +41,7 @@ function formatUpdated(iso: string): string | null {
   return `Bijgewerkt ${when}`
 }
 
-export function Masthead({ editionNr, jaargang, dateline, metaLeft, articleCount, updatedAt, sourceNote }: MastheadProps) {
+export function Masthead({ editionNr, jaargang, dateline, metaLeft, articleCount, updatedAt, sourceNote, hideEdition = false }: MastheadProps) {
   const now = new Date()
   const rawDateline = dateline ?? now.toLocaleDateString('nl-NL', {
     weekday: 'long',
@@ -47,9 +55,11 @@ export function Masthead({ editionNr, jaargang, dateline, metaLeft, articleCount
   const launchDate = new Date(2026, 0, 1)
   const displayEditionNr = editionNr ?? Math.max(1, Math.floor((now.getTime() - launchDate.getTime()) / 86_400_000))
 
-  const leftMeta = metaLeft ?? (jaargang != null
-    ? `Jaargang ${jaargang} · Editie ${displayEditionNr}`
-    : `Editie ${displayEditionNr}`)
+  const leftMeta = metaLeft ?? (hideEdition
+    ? ''
+    : jaargang != null
+      ? `Jaargang ${jaargang} · Editie ${displayEditionNr}`
+      : `Editie ${displayEditionNr}`)
 
   // Colofon-regel: aantal artikelen + bijgewerkt-tijd (alleen tonen wat beschikbaar is)
   const colophonParts = [

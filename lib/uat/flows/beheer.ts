@@ -53,7 +53,7 @@ export const BEHEER_FLOW: UatFlow = {
     { id: 'fire-aannames-crud', scenarioId: 'UAT-BEHEER-35', label: 'WF-BEHEER-35 · FIRE-marktaannames jaarlaag toevoegen/bewerken/verwijderen', kind: 'action', stage: 3, lane: 'functioneel', subOf: 'sectie-func' },
     { id: 'widget-presets', scenarioId: 'UAT-BEHEER-17', label: 'WF-BEHEER-17 · Widget-presets samenstellen en ordenen', kind: 'screen', stage: 3, lane: 'functioneel', subOf: 'sectie-func' },
     { id: 'rekenhulp-mod', scenarioId: 'UAT-BEHEER-18', label: 'WF-BEHEER-18 · Rekenhulp-meldingen modereren', kind: 'screen', stage: 3, lane: 'functioneel', subOf: 'sectie-func' },
-    { id: 'feedback-afhandelen', scenarioId: 'UAT-BEHEER-19', label: 'WF-BEHEER-19 · Gebruikersfeedback afhandelen', kind: 'screen', stage: 3, lane: 'functioneel', subOf: 'sectie-func' },
+    { id: 'feedback-afhandelen', scenarioId: 'UAT-BEHEER-19', label: 'WF-BEHEER-19 · Feedback (archief) afhandelen', kind: 'screen', stage: 3, lane: 'functioneel', subOf: 'sectie-func' },
     { id: 'kennisbank', scenarioId: 'UAT-BEHEER-37', label: 'WF-BEHEER-37 · Kennisbank-items beheren + lokale prompt-parity-status', kind: 'screen', stage: 3, lane: 'functioneel', subOf: 'sectie-func' },
 
     // ── 3 · Test & ontwikkeling ───────────────────────────────────────────

@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import type { ReactElement } from 'react'
-import { HefbomenNav, HefbomenLegenda } from './hefbomen-nav'
+import { HefbomenNav } from './hefbomen-nav'
 import type { HealthScore } from '@/lib/financial-health'
 import type { HefbomenTotals } from './hefbomen-nav'
 import { PrivacyProvider, PRIVACY_MASKED_STORAGE_KEY } from '@/lib/hooks/use-privacy'
@@ -122,13 +122,16 @@ describe('HefbomenNav', () => {
     expect(screen.getByText('Tekort op rekening')).toBeTruthy()
   })
 
-  it('belasting-tegel toont altijd "Verken je Box 3-positie" (v2: proxy op health.total)', () => {
+  it('belasting-tegel toont altijd "Mogelijk betaal je meer dan nodig" (v2: proxy op health.total)', () => {
     // v2 (ADR 0010): belasting heeft pillarKey=null → valt terug op health.total als proxy.
     // tax_optimization bestaat niet meer als pijler. De belasting-tegel toont altijd
-    // de vaste educatieve tekst "Verken je Box 3-positie" (Wft-richtingaanwijzer).
+    // dezelfde vaste educatieve tekst (Wft-richtingaanwijzer) — sinds BEL-3 in
+    // gewone taal i.p.v. het jargon "Verken je Box 3-positie".
     const health = mockHealth({ total: 85 })
     render(<HefbomenNav health={health} />)
-    expect(screen.getByText('Verken je Box 3-positie')).toBeTruthy()
+    expect(screen.getByText('Mogelijk betaal je meer dan nodig')).toBeTruthy()
+    // Het oude jargon mag nergens meer opduiken op de tegel.
+    expect(screen.queryByText('Verken je Box 3-positie')).toBeNull()
   })
 
   it('rendert geen status-substext bij ontbrekende health (neutral)', () => {
@@ -429,18 +432,54 @@ describe('HefbomenNav — dubbele grondslag (excl. eigen woning subregel)', () =
   })
 })
 
-describe('HefbomenLegenda', () => {
-  it('rendert drie status-labels', () => {
-    render(<HefbomenLegenda />)
-    expect(screen.getByText('Op koers')).toBeTruthy()
-    expect(screen.getByText('Aandacht nodig')).toBeTruthy()
-    expect(screen.getByText('Actie vereist')).toBeTruthy()
+/**
+ * OVZ-2 (eenvoudige weergave, fase 1): in `simple` houden de tegels alléén
+ * hoofdcijfer + statuspunt over. De status-duiding en de dubbele-grondslag-
+ * regel verhuizen naar de duwpagina achter de tegel.
+ */
+describe('HefbomenNav — eenvoudige weergave (OVZ-2)', () => {
+  const totals: HefbomenTotals = {
+    bezittingen: 250_000,
+    schulden: 180_000,
+    cashflow: 12,
+    belasting: 1_200,
+  }
+  const housingSplit = { eigenHuisValue: 50_000, mortgageBalance: 20_000 }
+
+  it('toont geen status-substext meer', () => {
+    render(<HefbomenNav health={mockHealth()} totals={totals} simple />)
+    expect(screen.queryByText('Mogelijk betaal je meer dan nodig')).toBeNull()
+    expect(screen.queryByText(/gespreid/i)).toBeNull()
+    expect(screen.queryByText(/Schuldratio/)).toBeNull()
   })
 
-  it('elk label heeft een gekleurde dot', () => {
-    const { container } = render(<HefbomenLegenda />)
-    expect(container.querySelector('.bg-emerald-500')).toBeTruthy()
-    expect(container.querySelector('.bg-amber-500')).toBeTruthy()
-    expect(container.querySelector('.bg-red-500')).toBeTruthy()
+  it('toont geen "excl. eigen woning"-regel, ook niet als de dubbele grondslag actief is', () => {
+    render(
+      <HefbomenNav
+        health={mockHealth()}
+        totals={totals}
+        housingSplit={housingSplit}
+        simple
+      />,
+    )
+    expect(screen.queryByText(/excl\. eigen woning/i)).toBeNull()
+  })
+
+  it('houdt hoofdcijfer, statuspunt en de vier links intact', () => {
+    const { container } = render(
+      <HefbomenNav health={mockHealth()} totals={totals} simple />,
+    )
+    expect(container.querySelectorAll('a').length).toBe(4)
+    // Vier status-dots (één per tegel) — het stoplicht blijft het enige signaal.
+    expect(container.querySelectorAll('span[title][aria-hidden="true"]').length).toBe(4)
+    expect(container.textContent).toContain('12%')
+  })
+
+  it('laat de volledige weergave ongemoeid (substext + excl.-regel blijven)', () => {
+    render(
+      <HefbomenNav health={mockHealth()} totals={totals} housingSplit={housingSplit} />,
+    )
+    expect(screen.getByText('Mogelijk betaal je meer dan nodig')).toBeTruthy()
+    expect(screen.getAllByText(/excl\. eigen woning/i).length).toBe(2)
   })
 })

@@ -17,8 +17,9 @@
  *
  * ÉÉN BEWUSTE UITZONDERING (spiegelt de figures-strip-mirror in
  * `schuld-checks.ts`): WF-BUDGET-18 (spaardoel-voortgang) is een INLINE
- * client-calc in `components/app/budgets-client.tsx` (r3327-3334, géén pure
- * export). De formule wordt hier getrouw GEMIRRORD met bronregel-verwijzing —
+ * client-calc in `components/app/budgets-client.tsx` (r3397-3403, géén pure
+ * export — regelnummer bijgewerkt na de "Eenvoudige weergave" fase-2-toevoegingen,
+ * de formule zelf is ongewijzigd). De formule wordt hier getrouw GEMIRRORD met bronregel-verwijzing —
  * niet herïmplementeerd met eigen aannames — zodat een wijziging in de client
  * expliciet moet worden meegenomen in deze mirror (of andersom opvalt als de
  * cijfers uit de pas gaan lopen).
@@ -146,9 +147,11 @@ function makeDraft(overrides: Partial<DraftBudget> & { id: string; parentId: str
 }
 
 /** Mirror van de spaardoel-voortgangsformule in
- *  components/app/budgets-client.tsx (r3327-3334, doeltype 'spaardoel',
- *  GEEN pure export). `nowMs`/`goalDateMs` zijn expliciete parameters i.p.v.
- *  `Date.now()` zodat de check deterministisch is. */
+ *  components/app/budgets-client.tsx (r3397-3403, doeltype 'spaardoel',
+ *  GEEN pure export — regelnummer bijgewerkt na de "Eenvoudige weergave"
+ *  fase-2-toevoegingen bovenin het bestand, formule zelf ongewijzigd).
+ *  `nowMs`/`goalDateMs` zijn expliciete parameters i.p.v. `Date.now()` zodat
+ *  de check deterministisch is. */
 function spaardoelProgress(goalAmount: number, cumulativeCarry: number, nowMs: number, goalDateMs: number) {
   const maandenResterend = Math.max(1, (goalDateMs - nowMs) / (1000 * 60 * 60 * 24 * 30))
   const benodigdPerMaand = Math.max(0, (goalAmount - cumulativeCarry) / maandenResterend)

@@ -24,6 +24,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, act, fireEvent, within } from '@testing-library/react'
 import { PrivacyProvider } from '@/lib/hooks/use-privacy'
+import { DisplayModeProvider, type DisplayMode } from '@/lib/hooks/use-display-mode'
 import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import {
   SpendLimitAliasProvider,
@@ -110,17 +111,27 @@ function AliasSwitcher() {
   )
 }
 
+/**
+ * Standaard in VOLLEDIG. De periodekiezer is sinds TXN-3 modus-afhankelijk, en
+ * `useDisplayMode()` valt zonder provider terug op 'simple' — dan zouden deze
+ * suites stilzwijgend de gereduceerde variant meten in plaats van het volledige
+ * gedrag dat ze beschrijven.
+ */
 function renderSection(
   props: Partial<React.ComponentProps<typeof SpendLimitsSection>> = {},
   alias: 'grenzenpot' | 'schaamtepot' = 'grenzenpot',
+  mode: DisplayMode = 'full',
+  data: SpendLimitsSectionData = sectionData(),
 ) {
   return render(
-    <SpendLimitAliasProvider initialAlias={alias}>
-      <PrivacyProvider>
-        <AliasSwitcher />
-        <SpendLimitsSection data={sectionData()} {...props} />
-      </PrivacyProvider>
-    </SpendLimitAliasProvider>,
+    <DisplayModeProvider initialMode={mode}>
+      <SpendLimitAliasProvider initialAlias={alias}>
+        <PrivacyProvider>
+          <AliasSwitcher />
+          <SpendLimitsSection data={data} {...props} />
+        </PrivacyProvider>
+      </SpendLimitAliasProvider>
+    </DisplayModeProvider>,
   )
 }
 
@@ -298,6 +309,34 @@ describe('SpendLimitsSection — periodekiezer', () => {
     const extra = screen.getByText(/lengte van je reeks-context/i)
     expect(extra.textContent).toMatch(/van maand naar jaar/i)
     expect(extra.textContent).toMatch(/12 maanden naar 3 jaren/i)
+  })
+
+  // ── TXN-3: de keuze krimpt in Eenvoudig, de gegevens niet ────────────────
+  it('laat in Eenvoudig alleen "Per maand" over (TXN-3)', () => {
+    renderSection({}, 'grenzenpot', 'simple')
+    fireEvent.click(screen.getByRole('button', { name: /nieuwe grenzenpot/i }))
+
+    expect(screen.getByRole('button', { name: 'Per maand' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Per kwartaal' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Per jaar' })).toBeNull()
+    // De eenheid van het grensbedrag blijft die van de gekozen periode.
+    expect(screen.getByText(/Grensbedrag per maand/i)).toBeTruthy()
+  })
+
+  it('houdt in Eenvoudig de eigen periodesoort van een bestaande pot zichtbaar', () => {
+    // Een pot die in Volledig op kwartaal staat, mag in Eenvoudig niet
+    // stilzwijgend naar maand kantelen — dat zou bij de eerste keer opslaan de
+    // grens-eenheid én de reeks-context van de gebruiker veranderen. De tab
+    // blijft dus staan, náást maand; een rij zonder actieve tab kan zo niet
+    // ontstaan.
+    renderSection({}, 'grenzenpot', 'simple', sectionData({ limits: [pot({ period: 'quarter' })] }))
+    fireEvent.click(screen.getByRole('button', { name: 'Bewerken' }))
+
+    const kwartaal = screen.getByRole('button', { name: 'Per kwartaal' })
+    expect(kwartaal.getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button', { name: 'Per maand' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Per jaar' })).toBeNull()
+    expect(screen.getByText(/Grensbedrag per kwartaal/i)).toBeTruthy()
   })
 })
 

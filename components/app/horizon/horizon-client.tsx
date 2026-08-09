@@ -1,6 +1,6 @@
 ﻿'use client'
 
-import { useEffect, useState, useCallback, useRef, useMemo, type RefObject } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo, useDeferredValue, type RefObject } from 'react'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { useDreamTransition } from '@/components/app/horizon/dream-transition-context'
 import type { HorizonPageData } from '@/lib/horizon-data-loader'
@@ -21,9 +21,16 @@ import {
   LIFE_EVENT_CATALOG, nibudChildrenCost, berekenSchenkbelasting, berekenAutoMaandkosten, berekenErfbelasting, berekenKinderopvangNetto, kinderbijslagPerMaand, WERELDREIS_STIJL_PRESETS, VERBOUWING_TYPE_KOSTEN, STUDIE_TYPE_KOSTEN, BRUILOFT_BUDGET_PRESETS,
   type FinancialInput, type FireProjection, type FireRange,
   type LifeEvent, type LifeEventImpact,
-  type MonteCarloResult, type CatalogField,
+  type CatalogField,
   type UserDefinedCashflow,
 } from '@/lib/horizon-data'
+import type { MarktcheckOutcome } from '@/lib/horizon-kernel/marktcheck'
+import {
+  margeAnkerKort,
+  margeKort,
+  margeLegenda,
+  margeZin,
+} from '@/lib/horizon/marktcheck-copy'
 import { computeHealthScoreFromInputs, type HealthScore, type HealthScoreInput } from '@/lib/financial-health'
 import { computeEffectiveExpenses, computeFireTarget, computeFreedomProgressWithBasis, inclHomeTargetFromScalar } from '@/lib/core-metrics'
 import { computeEmergencyFundMonths } from '@/lib/health-score-input'
@@ -33,7 +40,7 @@ import { lookupAowAge, type AowLeeftijdRow, type AowAge } from '@/lib/aow-leefti
 import { shouldSkipKernelContextFetch, keepRefIfEqual } from '@/lib/horizon/kernel-context-sync'
 import { computeSuggestedEventValues, type SuggestedEventValues } from '@/lib/horizon/event-prefill'
 import { isKernelReachedNowDisplay, kernelToUnifiedResult, buildKernelSlotMeta } from '@/lib/horizon-kernel/bridge'
-import { buildConvergentieAdapterProfile, computeConvergentieProjection, type ConvergentieRawProfileRow } from '@/lib/horizon-kernel/convergentie-router'
+import { buildConvergentieAdapterProfile, computeConvergentieProjection, type ConvergentieRawContext, type ConvergentieRawProfileRow } from '@/lib/horizon-kernel/convergentie-router'
 import { buildKernelInputFromApp, deriveEigenHuisIds, type KernelAdapterInput } from '@/lib/horizon-kernel/adapter'
 import { evaluateFireAt } from '@/lib/horizon-kernel/solver'
 import { resolveFireParams, type FireParams } from '@/lib/fire-params'
@@ -71,6 +78,7 @@ import {
 } from '@/lib/housing-strategy'
 import {
   shouldShowLiquidWealthLine,
+  defaultLiquidWealthLineVisible,
   buildLiquidWealthPoints,
 } from '@/lib/horizon/liquid-wealth-line'
 import { applyHousingToComposition } from '@/lib/horizon/wealth-composition-housing'
@@ -121,7 +129,7 @@ import { DoelLoslatenConfirm } from '@/components/future/doel-loslaten-confirm'
 import { buildSliderEvent, readSliderValueFromEvents, type SliderKey } from '@/lib/scenario-events'
 import type { HorizonScenarioOverrides } from '@/lib/hooks/use-horizon-fire-sim'
 import type { AssetCategorie } from '@/lib/horizon-kernel/types'
-import { runMonteCarloAsync, runScenarioPresetsAsync } from '@/lib/horizon-kernel/worker/run-in-worker'
+import { runMarktcheckAsync, runScenarioPresetsAsync } from '@/lib/horizon-kernel/worker/run-in-worker'
 import { PAGE_INFO } from '@/lib/page-info-content'
 
 const ScenariosModal = dynamic(() =>
@@ -219,7 +227,7 @@ import {
   factorAtAge,
 } from '@/lib/euro-display'
 import { useEuroView } from '@/lib/hooks/use-euro-view'
-import { EuroViewBadge } from '@/components/core/euro-view-badge'
+import { PillRow } from '@/components/app/pill-row'
 import { parseFireStrategy, DEFAULT_FIRE_STRATEGY, type FireStrategyConfig, STRATEGY_LABELS, resolveFreedomFraming, fireAgeForDisplay } from '@/lib/fire-strategy'
 import { toSimResult } from '@/lib/unified-projection'
 import { buildHorizonInput } from '@/lib/horizon/build-input'
@@ -312,6 +320,45 @@ const SIM_ROW_MONEY_FIELDS = [
   'flowIn',
   'flowOut',
 ] as const satisfies readonly (keyof SimRow)[]
+
+/**
+ * De overige velden van `SimRow`, met per veld de reden dat ze NIET meedeflateren.
+ * Deze lijst bestaat alleen om de gard hieronder te laten werken.
+ *
+ *  - `age`   — klasse R (een leeftijd, geen euro; ADR 0090).
+ *  - `phase` — metadata (opbouw/opname).
+ *  - `incomeBreakdown` / `expenseBreakdown` — dragen WÉL bedragen, maar zijn geen
+ *    getalvelden: `deflateRowsByAge` deflateert alleen `typeof === 'number'` en
+ *    laat de items dus ongemoeid passeren. Vandaag inert (`toSimRow` vult ze niet,
+ *    de inkomsten/uitgaven-strook loopt via een eigen pad); `lib/unified-projection.test.ts`
+ *    grendelt dat vast, zodat het moment waarop de kernel ze wél gaat vullen als
+ *    falende test opvalt in plaats van als ongedeflateerd bedrag op het scherm.
+ */
+const SIM_ROW_NON_MONEY_FIELDS = [
+  'age',
+  'phase',
+  'incomeBreakdown',
+  'expenseBreakdown',
+] as const satisfies readonly (keyof SimRow)[]
+
+/**
+ * De gard die de ANDERE kant op werkt.
+ *
+ * `satisfies readonly (keyof SimRow)[]` controleert alleen dat de genoemde
+ * sleutels BESTAAN — niet dat alle geldvelden genoemd zijn. Een nieuw euro-veld
+ * op `SimRow` zou dus stil ongedeflateerd de rendergrens kruisen binnen een
+ * `InEuroView<SimRow>`, zónder compile-fout. Daarom eisen we hier dat beide
+ * lijsten SAMEN élk veld van `SimRow` dekken: een nieuw veld valt in geen van
+ * beide en laat `never` klappen, wat de auteur dwingt te kiezen tussen "dit is
+ * een euro" (meedeflateren) en "dit is het niet" (met reden hierboven).
+ */
+type OngeclassificeerdSimRowVeld = Exclude<
+  keyof SimRow,
+  (typeof SIM_ROW_MONEY_FIELDS)[number] | (typeof SIM_ROW_NON_MONEY_FIELDS)[number]
+>
+type AlleSimRowVeldenGeclassificeerd<T extends never> = T
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- puur een compile-gard; het type dráágt de controle
+type _SimRowDekking = AlleSimRowVeldenGeclassificeerd<OngeclassificeerdSimRowVeld>
 
 /**
  * De euro-velden van `StackedRow` (vermogensopbouw-staven) — jaarstanden per
@@ -472,9 +519,26 @@ export default function HorizonPage({
   const [scenariosExpanded, setScenariosExpanded] = useState(false)
   const [scenarioData, setScenarioData] = useState<ScenarioOverlay[] | null>(null)
 
-  // Monte Carlo overlay state
+  // Marktcheck-overlay ("Monte Carlo"-pil) — de geslaagde uitkomst van de
+  // kernel-marktcheck: percentielband op de netto-vermogensgrondslag + de
+  // RENDEMENT-MARGE (hoeveel het rendement mag tegenvallen voordat het plan
+  // omvalt, op een vaste stopleeftijd). Die marge verving het standhoud-
+  // percentage, dat op de gesolvede FIRE-leeftijd per constructie ~51% was.
+  // `mcPending` dekt de wachttijd (n volledige kernel-projecties in de worker).
   const [mcExpanded, setMcExpanded] = useState(false)
-  const [mcData, setMcData] = useState<MonteCarloResult | null>(null)
+  const [mcData, setMcData] = useState<Extract<MarktcheckOutcome, { ok: true }> | null>(null)
+  const [mcPending, setMcPending] = useState(false)
+  /** Laatste marktcheck-run mislukt (geen worker / kern-fout) → faal-affordance. */
+  const [mcFailed, setMcFailed] = useState(false)
+  /** Monotone generatie: alleen het antwoord van de NIEUWSTE aanvraag telt. */
+  const marktcheckGenRef = useRef(0)
+  /**
+   * Wachttijd vóór een marktcheck de worker in gaat. Ruim onder de duur van één
+   * run (2,6–5,1 s) maar lang genoeg om de tussenstanden van een marker-drag
+   * (`setEvents` per hele jaarstap) op te slokken, zodat er nooit meer dan één
+   * job per gebaar in de seriële worker-wachtrij belandt.
+   */
+  const MARKTCHECK_DEBOUNCE_MS = 400
   // Scenario's-naast-elkaar (5 preset-kaarten) — deferred doorgerekend op de BASIS-grondslag.
   const [scenarioPresets, setScenarioPresets] = useState<ScenarioPresetResult[] | null>(null)
   const [scenarioPresetsLoading, setScenarioPresetsLoading] = useState(false)
@@ -500,6 +564,15 @@ export default function HorizonPage({
   // Levensgebeurtenissen toggle — handmatig aangemaakte life events tonen/verbergen.
   // Default true. Persistent zoals natuurlijke mijlpalen.
   const [showLifeEvents, setShowLifeEvents] = useState(true)
+  // Besteedbaar-lijn ("Zonder je huis") toggle — de tweede vermogenslijn in
+  // Pad-modus. Standaardstand hangt aan de woonstrategie (zie
+  // `defaultLiquidWealthLineVisible`): AAN bij uitsluiten, UIT bij de andere
+  // twee. `initialData.housingStrategy` is een server-prop en dus stabiel over
+  // de hydratie heen → veilig als useState-initializer. De opgeslagen
+  // gebruikersvoorkeur (per apparaat, zoals de buur-pills) wint daarna.
+  const [showLiquidLine, setShowLiquidLine] = useState(() =>
+    defaultLiquidWealthLineVisible(initialData.housingStrategy.mode),
+  )
   // overlayPrefRestored: pas `true` nadat de localStorage-voorkeur ná hydratie is
   // ingelezen. Gate voor het auto-scroll-effect van de overlay — zo scrolt de
   // pre-restore default `overlayVisible={true}` op de eerste render NIET naar de
@@ -512,6 +585,10 @@ export default function HorizonPage({
       if (storedNat !== null) setShowNaturalMilestones(storedNat === 'true')
       const storedLife = localStorage.getItem('horizon_show_life_events')
       if (storedLife !== null) setShowLifeEvents(storedLife === 'true')
+      // Besteedbaar-lijn: géén key ⇒ de woonstrategie-afhankelijke default uit
+      // de useState-initializer blijft staan.
+      const storedLiquid = localStorage.getItem('horizon_show_liquid_line')
+      if (storedLiquid !== null) setShowLiquidLine(storedLiquid === 'true')
       // Overlay-zichtbaarheid: default AAN de eerste keer (geen key), daarna
       // de opgeslagen voorkeur. Onafhankelijk van de welkomsttekst-state.
       const storedOverlay = localStorage.getItem('horizon_overlay_visible')
@@ -584,6 +661,10 @@ export default function HorizonPage({
   const persistLifeEvents = useCallback((val: boolean) => {
     setShowLifeEvents(val)
     try { localStorage.setItem('horizon_show_life_events', String(val)) } catch { /* noop */ }
+  }, [])
+  const persistLiquidLine = useCallback((val: boolean) => {
+    setShowLiquidLine(val)
+    try { localStorage.setItem('horizon_show_liquid_line', String(val)) } catch { /* noop */ }
   }, [])
 
   // Kassabon modal state
@@ -949,6 +1030,28 @@ export default function HorizonPage({
       },
     }
   }, [input, fireStrategy, withdrawalStrategyConfig, fireParams.grossReturn, fireParams.inflationRate, userAowAge.fractional, debts, monthlySavingsOverride, initialData, kernelRawProfile, aowRows])
+
+  // ── Marktcheck-context ────────────────────────────────────────────────────
+  // De rauwe kernel-context voor de Monte-Carlo-band: de preview-baseline (die de
+  // convergentie-context al canoniek assembleert) + de events van de hoofdrun.
+  // BEWUST dezelfde `events` als `useHorizonFireSim` — niet `displayEvents` — zodat
+  // band en hoofdlijn per constructie van hetzelfde plan komen.
+  const marktcheckContext = useMemo<ConvergentieRawContext | null>(() => {
+    if (!eventPanePreviewBaseline) return null
+    return { ...eventPanePreviewBaseline.rawContext, lifeEvents: events }
+  }, [eventPanePreviewBaseline, events])
+  // De marktcheck is ~200× zwaarder dan de hoofdprojectie en deelt met haar één
+  // seriële worker. Hij draait daarom op de UITGESTELDE context — dezelfde keuze
+  // die `use-horizon-fire-sim` voor de (lichtere) hoofdlijn al maakt, en die
+  // /toekomst/whatif via `deferredWhatIfSimInput` ook al toepaste.
+  const deferredMarktcheckContext = useDeferredValue(marktcheckContext)
+  // Het ANKER van de rendement-marge: de gekozen stopleeftijd. Bewust de RAUWE
+  // keuze (`scenarioStopAge`, `null` = geen keuze) en niet `effectiveStopAge` —
+  // die valt terug op de afgeronde verwacht-FIRE, en een marge op de gesolvede
+  // leeftijd is per constructie ≈ 0 (dezelfde val als de 51%-kans). Zonder eigen
+  // keuze ankert de motor zelf op de AOW-leeftijd; de copy zegt dat ook.
+  // Uitgesteld om dezelfde reden als de context: één job per gebaar.
+  const deferredMarktcheckStopAge = useDeferredValue(scenarioStopAge)
 
   // Opgeslagen wat-als-scenario's voor de overlay-picker — deferred na first paint.
   // De picker rendert null bij een lege lijst en is zélf de open-trigger (bewezen
@@ -1521,22 +1624,61 @@ export default function HorizonPage({
     setScenarioData(buildScenarioVariants(simResult.rows, fireParams.grossReturn))
   }, [scenariosExpanded, simResult, fireParams.grossReturn])
 
-  // Monte-Carlo-overlay — alleen bij expand (de expand-klik is de zichtbaarheids-gate). Task
-  // 4.2: de 1000-sim-run draait via de web worker (of synchrone fallback), niet op de main
-  // thread; race-guard via de `cancelled`-closure (cleanup vóór re-run negeert stale resolves).
+  // ── Marktcheck-overlay (de "Monte Carlo"-pil) ───────────────────────────────
+  // Alleen bij expand (de expand-klik is de zichtbaarheids-gate). Draait
+  // `computeMarktcheck` in de web worker: n VOLLEDIGE kernel-projecties op EXACT
+  // dezelfde `ConvergentieRawContext` als de hoofdlijn, zodat de band de hele
+  // plan-curve volgt (opbouw, overgang én onttrekking) op dezelfde leeftijdsas en
+  // dezelfde grondslag (netto vermogen).
+  //
+  // DRIE REMMEN, want één marktcheck is ~200× duurder dan de hoofdprojectie en
+  // deelt met haar één seriële worker:
+  //  1. DEFERRED context — spiegel van `deferredKernelInput` in de hoofd-hook (en
+  //     van `deferredWhatIfSimInput` op /toekomst/whatif). Zonder dit draait de
+  //     zwaarste run op de rauwste waarde.
+  //  2. DEBOUNCE — een marker-drag muteert `events` per hele jaarstap. De
+  //     `cancelled`-closure negeert alleen het ANTWOORD; de worker rekent een
+  //     eenmaal verstuurde job volledig uit. Een drag over 20 jaar zou dus tot 20
+  //     jobs × 200 projecties in de wachtrij zetten, met de hoofdlijn erachter.
+  //     Deze rem zorgt dat zulke tussenstanden nooit verstuurd worden.
+  //  3. GENERATIE-GUARD — een nieuwere aanvraag VERVANGT de oudere: alleen het
+  //     antwoord met de hoogste generatie mag nog state schrijven.
   useEffect(() => {
-    if (!mcExpanded) { setMcData(null); return }
-    if (!effectiveInput || !simResult) return
-    const age = effectiveInput.dateOfBirth ? ageAtDate(effectiveInput.dateOfBirth) : null
-    if (age == null) return
-    const years = Math.max(simResult.displayEndAge - age, 10)
-    let cancelled = false
-    runMonteCarloAsync(effectiveInput, 1000, years)
-      .then((res) => { if (!cancelled) setMcData(res) })
-      .catch((err) => console.warn('[horizon-worker] MC-run faalde', err))
-    return () => { cancelled = true }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mcExpanded, simResult, input])
+    if (!mcExpanded) {
+      marktcheckGenRef.current += 1
+      setMcData(null); setMcPending(false); setMcFailed(false)
+      return
+    }
+    if (!deferredMarktcheckContext) {
+      // Context (tijdelijk) weg — niet blijven hangen op "…".
+      marktcheckGenRef.current += 1
+      setMcPending(false)
+      return
+    }
+    const gen = ++marktcheckGenRef.current
+    // Tijdens het herrekenen NOOIT de vorige band laten staan: die hoort bij het
+    // vorige plan en zou seconden lang over de al bijgewerkte hoofdlijn liggen —
+    // precies de "band en lijn zijn verschillende plannen"-fout die deze motor
+    // opruimt.
+    setMcData(null)
+    setMcFailed(false)
+    setMcPending(true)
+    const timer = setTimeout(() => {
+      runMarktcheckAsync(deferredMarktcheckContext, undefined, deferredMarktcheckStopAge)
+        .then((res) => {
+          if (gen !== marktcheckGenRef.current) return
+          const ok = res !== null && res.ok
+          setMcData(ok ? res : null)
+          setMcFailed(!ok)
+          setMcPending(false)
+        })
+        .catch((err) => {
+          if (gen === marktcheckGenRef.current) { setMcFailed(true); setMcPending(false) }
+          console.warn('[horizon-worker] marktcheck faalde', err)
+        })
+    }, MARKTCHECK_DEBOUNCE_MS)
+    return () => { clearTimeout(timer) }
+  }, [mcExpanded, deferredMarktcheckContext, deferredMarktcheckStopAge])
 
   const currentAge = effectiveInput?.dateOfBirth ? ageAtDate(effectiveInput.dateOfBirth) : null
 
@@ -2490,9 +2632,23 @@ export default function HorizonPage({
   // Scenario overlays for SimChart (only when expanded + data available)
   const scenarioOverlays = scenariosExpanded && scenarioData ? scenarioData : undefined
 
-  // Monte Carlo overlay for SimChart
-  const monteCarloOverlay: MonteCarloOverlay | undefined = mcExpanded && mcData && currentAge != null
-    ? { ...mcData.percentiles, startAge: currentAge }
+  // De rendement-marge van de marktcheck — één bron voor pil, legenda, explainer
+  // en aria-label (`lib/horizon/marktcheck-copy.ts` formuleert alle vier).
+  // `null` = degeneratie (geen onttrekkingsfase op het anker) ⇒ geen getal tonen.
+  const mcMarge = mcExpanded && mcData ? mcData.marge : null
+
+  // Marktcheck-band voor SimChart. `startAge` komt UIT de band (de kernel-as
+  // `round(startLeeftijd)`), niet uit een tweede leeftijdsberekening hier — anders
+  // kan de band één jaar naast de hoofdlijn komen te liggen.
+  const monteCarloOverlay: MonteCarloOverlay | undefined = mcExpanded && mcData
+    ? {
+        startAge: mcData.band.startAge,
+        p10: [...mcData.band.p10],
+        p25: [...mcData.band.p25],
+        p50: [...mcData.band.p50],
+        p75: [...mcData.band.p75],
+        p90: [...mcData.band.p90],
+      }
     : undefined
 
   // Wealth composition projection — directe mapping van UnifiedProjectionRow.assetBuckets
@@ -3750,6 +3906,15 @@ export default function HorizonPage({
         : deflatePoints(liquidWealthPoints, factorByAge, euroView, x => x - 1),
     [liquidWealthPoints, factorByAge, euroView],
   )
+  // Is er überhaupt een besteedbaar-lijn te tónen? Zelfde bron-waarheid als de
+  // `liquidPoints`-prop hieronder: geen punten (o.a. `include_full` — daar valt
+  // J exact samen met I) of een vreemde hoofdlijn (partner/huishouden/AOW-stop)
+  // ⇒ geen lijn, en dus ook geen pill. Bij "Meerekenen" verdwijnt de toggle
+  // daarmee volledig i.p.v. een lijn aan te bieden die al zichtbaar is.
+  const liquidLineAvailable =
+    liquidWealthPoints != null && !usePartnerMainLine && !useHouseholdMainLine && !isAowStopActive
+  // De lijn wordt getekend als 'ie kán én de gebruiker 'm aan heeft staan.
+  const liquidLineVisible = liquidLineAvailable && showLiquidLine
   // Scenario-overlays lopen op de EIGEN leeftijd-as (wat-als/stop-pad/ghosts van
   // dezelfde gebruiker) ⇒ leeftijd-sleutel.
   const viewCombinedScenarioOverlays = useMemo(
@@ -3788,19 +3953,27 @@ export default function HorizonPage({
     [householdOverlays, factorByOffset, euroView],
   )
   // Monte-Carlo-band: `number[]` geïndexeerd op jaar-offset vanaf `startAge`.
+  // BRONJAAR-SLEUTEL (`i - 1`), om dezelfde reden als de `x - 1` van de
+  // besteedbaar-lijn hierboven: band-index `i` staat op leeftijd `startAge + i`,
+  // maar draagt de EINDstand van jaar-blok `i − 1` — precies de waarde die de
+  // hoofdlijn daar tekent met `rows[i-1].inflationFactor = (1+π)^(i-1)`. Zonder
+  // de sleutel krijgt de band één jaar extra deflatie en zakt hij ~π onder de
+  // lijn die hij hoort te omvatten. Index 0 (de stand van vandaag) mapt naar
+  // factor[0] = 1 en blijft dus ongemoeid.
+  const mcBandSourceYear = useCallback((i: number) => Math.max(i - 1, 0), [])
   const viewMonteCarloOverlay = useMemo(
     () =>
       monteCarloOverlay == null || euroView === 'nominal'
         ? monteCarloOverlay
         : {
             ...monteCarloOverlay,
-            p10: deflateSeriesByOffset(monteCarloOverlay.p10, factorByOffset, euroView),
-            p25: deflateSeriesByOffset(monteCarloOverlay.p25, factorByOffset, euroView),
-            p50: deflateSeriesByOffset(monteCarloOverlay.p50, factorByOffset, euroView),
-            p75: deflateSeriesByOffset(monteCarloOverlay.p75, factorByOffset, euroView),
-            p90: deflateSeriesByOffset(monteCarloOverlay.p90, factorByOffset, euroView),
+            p10: deflateSeriesByOffset(monteCarloOverlay.p10, factorByOffset, euroView, mcBandSourceYear),
+            p25: deflateSeriesByOffset(monteCarloOverlay.p25, factorByOffset, euroView, mcBandSourceYear),
+            p50: deflateSeriesByOffset(monteCarloOverlay.p50, factorByOffset, euroView, mcBandSourceYear),
+            p75: deflateSeriesByOffset(monteCarloOverlay.p75, factorByOffset, euroView, mcBandSourceYear),
+            p90: deflateSeriesByOffset(monteCarloOverlay.p90, factorByOffset, euroView, mcBandSourceYear),
           },
-    [monteCarloOverlay, factorByOffset, euroView],
+    [monteCarloOverlay, factorByOffset, euroView, mcBandSourceYear],
   )
 
   // ── Puntbedragen (klasse S — stock op één leeftijd) ───────────────────────
@@ -4688,14 +4861,18 @@ export default function HorizonPage({
                 )
               })()}
 
-              {/* ── Overlay toggles boven de grafiek ── */}
-              <div className="mb-2 flex flex-wrap items-center gap-1.5">
-                {/* Euro-weergave-status van de grafiek. Rendert `null` in 'nominal'
-                    (het huidige beeld heeft geen badge nodig) en is in 'real'
-                    meteen de weg terug — één klik en de bedragen staan weer
-                    nominaal. Géén tweede as-label: dat zou in 'real' een dubbele
-                    markering zijn en in 'nominal' een lege belofte (D11). */}
-                <EuroViewBadge />
+              {/* ── Overlay toggles boven de grafiek ──
+                  `PillRow` houdt deze rij op ÉÉN regel: passen de labels niet,
+                  dan vallen ze allemaal weg en blijven de iconen over. Twee rijen
+                  pillen aten verticale ruimte die de grafiek zelf nodig heeft.
+                  Labels dragen daarom `data-pill-label`.
+
+                  De euro-weergave-badge stond hier; die is verhuisd naar de
+                  weergave-sectie bovenaan de sidebar (`SidebarEuroViewBadge`).
+                  De schakelaar zelf woont in het zoekscherm (⌘K) — één plek voor
+                  de status, één voor de knop, in plaats van een badge per
+                  grafiek. */}
+              <PillRow className="mb-2" ariaLabel="Grafiek-opties">
                 {/* AOW-stop toggle — alleen bij shortfall scenario (FIRE > AOW) */}
                 {isShortfallScenario && (
                   <>
@@ -4712,7 +4889,7 @@ export default function HorizonPage({
                       title="Doorgaan"
                     >
                       <TrendingUp className="h-3 w-3" />
-                      <span className="hidden sm:inline">Doorgaan</span>
+                      <span data-pill-label className="hidden sm:inline">Doorgaan</span>
                     </button>
                     <button
                       type="button"
@@ -4727,9 +4904,9 @@ export default function HorizonPage({
                       title="Stop op AOW"
                     >
                       <Landmark className="h-3 w-3" />
-                      <span className="hidden sm:inline">Stop op AOW</span>
+                      <span data-pill-label className="hidden sm:inline">Stop op AOW</span>
                     </button>
-                    <span className="mx-0.5 h-4 w-px bg-[var(--border-ed)]" />
+                    <span aria-hidden className="mx-0.5 h-4 w-px bg-[var(--border-ed)]" />
                   </>
                 )}
                 {/* Scenario- en Monte-Carlo-toggles zijn line-chart-overlays —
@@ -4751,7 +4928,7 @@ export default function HorizonPage({
                       title="Scenario's"
                     >
                       <GitBranch className="h-3 w-3" />
-                      <span className="hidden sm:inline">Scenario&apos;s</span>
+                      <span data-pill-label className="hidden sm:inline">Scenario&apos;s</span>
                       {scenarioData && scenariosExpanded && (
                         <span className="flex items-center gap-0.5">
                           {scenarioData.map(s => (
@@ -4768,14 +4945,29 @@ export default function HorizonPage({
                           ? 'border-horizon-300 bg-horizon-50 text-horizon-700'
                           : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
                       }`}
-                      aria-label="Monte Carlo simulatie tonen"
-                      title="Monte Carlo"
+                      aria-label={mcMarge
+                        ? `Marktcheck — ${margeZin(mcMarge)}`
+                        : 'Marktcheck tonen — hoeveel je rendement mag tegenvallen'}
+                      title={mcFailed
+                        ? 'Marktcheck kon niet worden doorgerekend'
+                        : mcMarge
+                          ? margeZin(mcMarge)
+                          : 'Marktcheck: je plan doorgerekend onder wisselende markten'}
+                      aria-busy={mcExpanded && mcPending}
                     >
                       <FlaskConical className="h-3 w-3" />
-                      <span className="hidden sm:inline">Monte Carlo</span>
-                      {mcData && mcExpanded && (
+                      <span data-pill-label className="hidden sm:inline">Marktcheck</span>
+                      {mcExpanded && mcPending && (
+                        <span className="font-mono text-[10px] tabular-nums opacity-60">…</span>
+                      )}
+                      {mcExpanded && !mcPending && mcFailed && (
+                        <span className="font-mono text-[10px] tabular-nums opacity-60">—</span>
+                      )}
+                      {/* De datawaarde blijft ook in de compacte pillenbalk staan (daar
+                          valt alleen het label weg) — vandaar de korte vorm. */}
+                      {mcExpanded && !mcPending && mcMarge && (
                         <span className="font-mono text-[10px] tabular-nums opacity-75">
-                          {Math.round(mcData.fireProb * 100)}%
+                          {margeKort(mcMarge)}
                         </span>
                       )}
                     </button>
@@ -4804,7 +4996,7 @@ export default function HorizonPage({
                       <svg width="20" height="8" viewBox="0 0 20 8" aria-hidden className="shrink-0">
                         <line x1="0" y1="4" x2="20" y2="4" stroke="var(--ink-2)" strokeWidth="2" strokeDasharray="6 4" />
                       </svg>
-                      <span className="hidden sm:inline">{doelLijnLabel}</span>
+                      <span data-pill-label className="hidden sm:inline">{doelLijnLabel}</span>
                       {/* Delta t.o.v. de basislijn is alleen betekenisvol bij een echt
                           wat-als; een stop-only-lijn zou hier "gelijk" tonen. */}
                       {hasScenario && scenarioFireDeltaLabel && (
@@ -4817,6 +5009,35 @@ export default function HorizonPage({
                       {showScenarioLine && (scenarioPending || stopPadPending) ? 'bijwerken…' : ''}
                     </span>
                     </>
+                  )}
+                  {/* ── Besteedbaar-lijn toggle ("Zonder je huis") ──
+                      Zusje van de Doel-pill hierboven, en om dezelfde reden buiten
+                      HideInSimple: de lijn rendert in béíde weergavemodi. Alleen
+                      zichtbaar zodra er écht een tweede lijn te tonen is
+                      (`liquidLineAvailable`) — bij "Meerekenen" valt J exact samen
+                      met I, dus daar verdwijnt de pill in plaats van een lijn aan te
+                      bieden die al zichtbaar is. */}
+                  {liquidLineAvailable && (
+                    <button
+                      type="button"
+                      onClick={() => persistLiquidLine(!showLiquidLine)}
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                        showLiquidLine
+                          ? 'border-horizon-300 bg-horizon-50 text-horizon-700'
+                          : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
+                      }`}
+                      aria-pressed={showLiquidLine}
+                      aria-label="Lijn zonder je huis tonen"
+                      title="Zonder je huis"
+                    >
+                      {/* Zelfde swatch als de legenda en de tooltip-regel: fijne
+                          horizon-streep. Kleur uit de module-token, niet uit een
+                          losse hex (`liquidStroke` in lib/horizon/sim-chart-geometry.ts). */}
+                      <svg width="20" height="8" viewBox="0 0 20 8" aria-hidden className="shrink-0">
+                        <line x1="0" y1="4" x2="20" y2="4" stroke="var(--color-horizon-600)" strokeWidth="1.8" strokeDasharray="2 3" strokeLinecap="round" />
+                      </svg>
+                      <span data-pill-label className="hidden sm:inline">Zonder je huis</span>
+                    </button>
                   )}
                   </>
                 )}
@@ -4835,7 +5056,7 @@ export default function HorizonPage({
                   title="Toon je eigen levensgebeurtenissen op de tijdlijn"
                 >
                   <Calendar className="h-3 w-3" />
-                  <span className="hidden sm:inline">Levensgebeurtenissen</span>
+                  <span data-pill-label className="hidden sm:inline">Levensgebeurtenissen</span>
                   {showLifeEvents && events.length > 0 && (
                     <span className="ml-0.5 font-mono text-[10px] tabular-nums opacity-75">
                       {events.length}
@@ -4857,7 +5078,7 @@ export default function HorizonPage({
                   title="Toon automatisch afgeleide mijlpalen (hypotheek afgelost, eerste miljoen, vermogen op, …)"
                 >
                   <Sparkles className="h-3 w-3" />
-                  <span className="hidden sm:inline">Natuurlijke mijlpalen</span>
+                  <span data-pill-label className="hidden sm:inline">Natuurlijke mijlpalen</span>
                   {showNaturalMilestones && naturalMilestones.length > 0 && (
                     <span className="ml-0.5 font-mono text-[10px] tabular-nums opacity-75">
                       {naturalMilestones.length}
@@ -4892,7 +5113,7 @@ export default function HorizonPage({
                         title={isPlaying ? 'Pauze' : 'Speel af'}
                       >
                         {isPlaying ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
-                        <span className="hidden sm:inline">{isPlaying ? 'Pauze' : 'Speel af'}</span>
+                        <span data-pill-label className="hidden sm:inline">{isPlaying ? 'Pauze' : 'Speel af'}</span>
                       </button>
                     </HideInSimple>
                   )}
@@ -4914,7 +5135,7 @@ export default function HorizonPage({
                         {mode === 'vermogenspad'
                           ? <TrendingUp className="h-3.5 w-3.5" />
                           : <BarChart3 className="h-3.5 w-3.5" />}
-                        <span className="hidden sm:inline">
+                        <span data-pill-label className="hidden sm:inline">
                           {mode === 'vermogenspad' ? 'Pad' : 'Opbouw'}
                         </span>
                       </button>
@@ -4949,7 +5170,7 @@ export default function HorizonPage({
                   }
                   align="right"
                 />
-              </div>
+              </PillRow>
 
               {/* ── Editorial quote-explainers per actieve overlay/optie ── */}
               <ChartOverlayExplainer active={isAowStopActive}>
@@ -4965,9 +5186,34 @@ export default function HorizonPage({
               </ChartOverlayExplainer>
 
               <ChartOverlayExplainer active={mcExpanded && !!mcData}>
-                <GlossaryTerm term="Monte_Carlo"><em>Monte Carlo</em></GlossaryTerm> simuleert duizend marktverlopen — de gradient-band
-                toont de range van uitkomsten, de centrale lijn de mediane uitkomst.
-                Het percentage is de geschatte kans dat je geld het volhoudt.
+                De <GlossaryTerm term="Monte_Carlo"><em>marktcheck</em></GlossaryTerm> rekent je hele plan
+                {mcData ? ` ${mcData.runs} ` : ' '}keer opnieuw door met een ander marktverloop —
+                opbouw, stoppen én onttrekking. De band toont waar je <GlossaryTerm term="netto_vermogen">netto vermogen</GlossaryTerm> dan
+                uitkomt: de middelste helft van de marktverlopen (p25–p75), met de mediaan
+                als lijn.
+                {mcMarge && (
+                  <> Het getal ernaast is je <em>speling</em>: {margeZin(mcMarge)}{' '}
+                  {mcMarge.anker === 'aow'
+                    ? 'Je hebt nog geen eigen stopleeftijd gekozen, dus rekenen we met je AOW-leeftijd — schuif de stopleeftijd en het getal beweegt mee.'
+                    : 'Schuif je stopleeftijd en je ziet direct wat een jaar langer of korter doorwerken aan speling oplevert.'}</>
+                )}
+                {!mcMarge && (
+                  <> Een speling-getal tonen we hier niet: op de gekozen stopleeftijd is er
+                  binnen dit plan geen onttrekkingsfase om te toetsen.</>
+                )}
+                {liquidWealthPoints != null && (
+                  <> Let op de <em>grondslag</em>: de band telt je huis mee, de speling kijkt
+                  alleen naar het geld waar je bij kunt — dezelfde grondslag als de lijn
+                  &ldquo;zonder je huis&rdquo;. Daardoor kan de band ruim boven nul eindigen
+                  terwijl de speling krap is: die overwaarde zit in je huis, niet in je
+                  portefeuille.</>
+                )}
+              </ChartOverlayExplainer>
+
+              <ChartOverlayExplainer active={mcExpanded && mcFailed}>
+                De <em>marktcheck</em> kon niet worden doorgerekend — er is nu geen band en geen
+                percentage. Je plan-lijn zelf klopt gewoon; alleen de doorrekening met wisselende
+                markten ontbreekt. Zet de pil uit en weer aan om het opnieuw te proberen.
               </ChartOverlayExplainer>
 
               <ChartOverlayExplainer active={scenarioOverlayDataList.length > 0}>
@@ -4983,7 +5229,7 @@ export default function HorizonPage({
 
               {/* Waarom de twee lijnen uit elkaar lopen — feitelijk, geen advies. */}
               <ChartOverlayExplainer
-                active={chartMode === 'vermogenspad' && !!liquidWealthPoints && !usePartnerMainLine && !useHouseholdMainLine && !isAowStopActive}
+                active={chartMode === 'vermogenspad' && liquidLineVisible}
               >
                 De lijn <em>zonder je huis</em> toont het deel van je vermogen waar
                 je direct bij kunt. Je huis zit daar niet in — daardoor kan de lijn
@@ -5149,8 +5395,11 @@ export default function HorizonPage({
                             targetInflationFactors={(usePartnerMainLine || useHouseholdMainLine || isAowStopActive) ? undefined : viewTargetInflationFactors}
                             // Besteedbaar-lijn alleen op de basis-projectie: partner-/
                             // huishoud-/AOW-stop-lijnen tekenen andere rijen, waar deze
-                            // punten niet bij horen.
-                            liquidPoints={(usePartnerMainLine || useHouseholdMainLine || isAowStopActive) ? undefined : viewLiquidWealthPoints}
+                            // punten niet bij horen. Bovendien achter de "Zonder je
+                            // huis"-pill (`liquidLineVisible`): uit ⇒ undefined, en dan
+                            // valt de bijbehorende J-drempel automatisch mee weg
+                            // (`showExclTargetLine` in chart-static-layers.tsx).
+                            liquidPoints={liquidLineVisible ? viewLiquidWealthPoints : undefined}
                             mainLineLabel={useHouseholdMainLine ? 'Gezamenlijk' : usePartnerMainLine ? (partnerName ?? 'Partner') : undefined}
                             // Partner- én huishoud-projectie krijgen dezelfde teal als de
                             // partner-event-markers, zodat de lijn + de partner-gebeurtenissen
@@ -5369,25 +5618,32 @@ export default function HorizonPage({
                   </div>
                 )}
 
-                {/* Monte Carlo legenda */}
+                {/* Marktcheck-legenda */}
                 {mcExpanded && mcData && (
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                    <span className="inline-flex items-center gap-1.5 text-[11px] text-[var(--ink-2)]">
-                      <span className="inline-block h-2.5 w-3.5 bg-[var(--hor-t,#8a6e42)] opacity-10" />
-                      p10–p90
-                    </span>
+                    {/* Alleen p25–p75 staat in de legenda: dat is sinds 2026-08-09
+                        ook exact wat er getekend wordt (en wat de Y-as bepaalt). */}
                     <span className="inline-flex items-center gap-1.5 text-[11px] text-[var(--ink-2)]">
                       <span className="inline-block h-2.5 w-3.5 bg-[var(--hor-t,#8a6e42)] opacity-[0.18]" />
                       p25–p75
                     </span>
-                    <span className="text-[11px] text-[var(--ink-2)]">
-                      FIRE kans <span className="font-mono tabular-nums font-medium text-[var(--ink)]">{Math.round(mcData.fireProb * 100)}%</span>
-                    </span>
-                    {mcData.p50FireAge != null && (
-                      <span className="text-[11px] text-[var(--ink-2)]">
-                        Mediaan <span className="font-mono tabular-nums text-[var(--ink-3)]">{Math.round(mcData.p50FireAge)}j</span>
+                    {mcMarge && (
+                      <span
+                        className="text-[11px] text-[var(--ink-2)]"
+                        title={liquidWealthPoints != null
+                          ? `${margeZin(mcMarge)} Gemeten op je besteedbaar vermogen (zonder je huis) — de band toont je netto vermogen mét huis.`
+                          : margeZin(mcMarge)}
+                      >
+                        {margeLegenda(mcMarge)}{' '}
+                        <span className="text-[var(--ink-4)]">
+                          {margeAnkerKort(mcMarge)}
+                          {liquidWealthPoints != null && ', zonder huis'}
+                        </span>
                       </span>
                     )}
+                    <span className="text-[11px] text-[var(--ink-2)]">
+                      <span className="font-mono tabular-nums text-[var(--ink-3)]">{mcData.runs}</span> marktverlopen
+                    </span>
                     <button
                       type="button"
                       onClick={() => setActiveModal('simulations')}
@@ -8714,7 +8970,11 @@ export default function HorizonPage({
             input={effectiveInput}
             open={activeModal === 'simulations'}
             onClose={() => setActiveModal(null)}
-            precomputedMc={mcData}
+            // BEWUST GEEN `precomputedMc` meer: de grafiek-band draait sinds de
+            // marktcheck-fix op de horizon-kernel (volledige plan-curve), deze
+            // modal nog op de losstaande `runMonteCarlo`-motor uit horizon-data.
+            // Data van de een in de ander tonen zou twee grondslagen mengen; de
+            // modal rekent zijn eigen, expliciet gelabelde FIRE-kans.
             // euro-view: exempt — dit is INVOER voor een tweede simulatie, geen
             // weergavebedrag. Een gedeflateerd doel zou daar een andere som opleveren.
             authoritativeFireTarget={effectiveFireTarget}

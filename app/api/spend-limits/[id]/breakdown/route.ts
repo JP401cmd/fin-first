@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import {
   SPEND_LIMIT_WINDOW_BY_PERIOD,
   computePeriodOutcome,
+  netSpendFromSums,
   resolveSpendLimitPeriods,
   type SpendLimitAggregateRow,
   type SpendLimitPeriodKind,
@@ -92,12 +93,6 @@ function toPeriodKind(raw: string | null | undefined): SpendLimitPeriodKind {
   return raw === 'quarter' || raw === 'year' ? raw : 'month'
 }
 
-/** Netto uitgave = −(negatieve som + positieve som), identiek aan de motor. */
-function netAmount(sumNegatief: number | string, sumPositief: number | string): number {
-  const raw = -(Number(sumNegatief) + Number(sumPositief))
-  return Object.is(raw, -0) ? 0 : raw
-}
-
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   if (!UUID_RE.test(id)) return badRequest('Ongeldig ID-formaat')
@@ -173,7 +168,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
   const names = ((namesResult.data ?? []) as NameBreakdownRow[]).map((r) => ({
     name: r.counterparty_name,
-    matchedAmount: netAmount(r.sum_negatief, r.sum_positief),
+    matchedAmount: netSpendFromSums(r.sum_negatief, r.sum_positief),
     count: Number(r.count),
   }))
 

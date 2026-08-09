@@ -58,6 +58,7 @@ import {
 } from 'lucide-react'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { ModalFooter } from '@/components/app/modal-footer'
+import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { useSpendLimitCopy } from '@/lib/hooks/use-spend-limit-alias'
@@ -789,10 +790,27 @@ function SpendLimitForm({
   dailyExpenseRate: number | null
   error: string | null
 }) {
+  const { mode } = useDisplayMode()
   const selectedBudget = budgetOptions.find((b) => b.id === form.budgetId)
   const rows = useMemo(() => budgetOptionRows(budgetOptions), [budgetOptions])
   const periodWords = PERIOD_WORDS[form.period]
   const periodChanged = form.originalPeriod !== null && form.originalPeriod !== form.period
+
+  /**
+   * TXN-3 — in EENVOUDIG is de maand de enige periodesoort die je kúnt kiezen;
+   * kwartaal en jaar zijn diepte en blijven aan Volledig. In VOLLEDIG staan alle
+   * drie ongewijzigd.
+   *
+   * Eén uitzondering, bewust: bewerk je een pot die in Volledig op kwartaal of
+   * jaar is gezet, dan blijft díé tab zichtbaar en actief. De keuze stilzwijgend
+   * naar 'maand' terugzetten zou de pot bij de eerste keer opslaan van eenheid
+   * laten wisselen — een gegevenswijziging, geen weergave-vereenvoudiging. Zo is
+   * er ook nooit een tab-rij zonder actieve tab.
+   */
+  const visiblePeriods = useMemo(
+    () => (mode === 'simple' ? PERIODS.filter((p) => p === 'month' || p === form.period) : PERIODS),
+    [mode, form.period],
+  )
 
   return (
     <div className="space-y-4 p-5 sm:p-6">
@@ -908,7 +926,7 @@ function SpendLimitForm({
           Over welke periode telt de grens?
         </legend>
         <div className="flex gap-2">
-          {PERIODS.map((p) => (
+          {visiblePeriods.map((p) => (
             <SegmentTab
               key={p}
               active={form.period === p}

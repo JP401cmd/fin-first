@@ -20,6 +20,7 @@ import {
   LeverCompassMobile,
 } from './lever-compass'
 import type { LeverScores } from '@/components/app/shell/lever-scores'
+import { DisplayModeProvider } from '@/lib/hooks/use-display-mode'
 
 function makeScores(): LeverScores {
   const entry = { score: 50, status: 'green' as const, detail: 'detail' }
@@ -62,7 +63,14 @@ describe('lever-compass deeplinks — canonieke /overzicht/*-routes', () => {
   })
 
   it('LeverCompassMobile: geen legacy-anker en geen legacy-route in het paneel', () => {
-    const { container, getByRole } = render(<LeverCompassMobile scores={makeScores()} />)
+    // Expliciet 'full': in Eenvoudig draagt de trigger één samengevat punt met
+    // een andere aria-label (NAV-6). Het PANEEL — waar deze test over gaat —
+    // is in beide modi identiek; zie lever-compass.simple-view.test.tsx.
+    const { container, getByRole } = render(
+      <DisplayModeProvider initialMode="full">
+        <LeverCompassMobile scores={makeScores()} />
+      </DisplayModeProvider>,
+    )
     // Paneel is standaard dicht — open het via de trigger-knop.
     fireEvent.click(getByRole('button', { name: 'Kompas openen' }))
     const hrefs = hrefsIn(container)

@@ -438,21 +438,15 @@ export function ChartStaticLayersInner({
               <stop offset="100%" stopColor="var(--color-horizon-600, #a07840)" stopOpacity="0.4" />
             </linearGradient>
           </defs>
-          {/* Outermost band: p10-p90 — lightest layer */}
-          {mcPaths.outermost && (
-            <path d={mcPaths.outermost} fill="url(#mc-band-gradient-v)" opacity={0.5} />
+          {/* Zichtbare band: p25–p75. p10–p90 wordt bewust NIET meer getekend —
+              die rand drukte de plan-lijn tot ~9% van de ashoogte plat. De
+              legenda en de Y-as (sim-chart-geometry: mcMax op p75) volgen dit. */}
+          {mcPaths.band && (
+            <path d={mcPaths.band} fill="url(#mc-band-gradient-v)" opacity={0.75} />
           )}
-          {/* Outer-mid band: p15-p85 — slightly denser */}
-          {mcPaths.outerMid && (
-            <path d={mcPaths.outerMid} fill="var(--color-horizon-600, #a07840)" opacity={0.06} />
-          )}
-          {/* Inner band: p25-p75 — medium density */}
-          {mcPaths.inner && (
-            <path d={mcPaths.inner} fill="var(--color-horizon-600, #a07840)" opacity={0.09} />
-          )}
-          {/* Inner-mid band: p35-p65 — densest fill near median */}
-          {mcPaths.innerMid && (
-            <path d={mcPaths.innerMid} fill="var(--color-horizon-600, #a07840)" opacity={0.1} />
+          {/* p35–p65 — dichter bij de mediaan, puur voor het verloop */}
+          {mcPaths.bandKern && (
+            <path d={mcPaths.bandKern} fill="var(--color-horizon-600, #a07840)" opacity={0.1} />
           )}
           {/* Median line: p50 — clear solid line */}
           {mcPaths.median && (

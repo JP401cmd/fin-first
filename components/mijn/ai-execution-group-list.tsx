@@ -68,6 +68,7 @@ export function AiExecutionGroupList({
   privacyMode,
   canChooseLocal,
   localBlockedReason,
+  hideHeading = false,
 }: {
   /** De hoofdschakelaar. Verandert die, dan halen we de opgeloste modi opnieuw op. */
   privacyMode: boolean
@@ -75,6 +76,12 @@ export function AiExecutionGroupList({
   canChooseLocal: boolean
   /** Korte uitleg wanneer `canChooseLocal` false is. */
   localBlockedReason?: string
+  /**
+   * Laat de eigen kicker + kop + intro én de kaartrand weg. Gebruikt wanneer de
+   * lijst al ín een `DepthSection` hangt (MIJN-4): die draagt daar zelf de titel
+   * en de rand, en twee koppen boven elkaar zouden lezen als twee lijsten.
+   */
+  hideHeading?: boolean
 }) {
   const [modes, setModes] = useState<Record<AiExecutionGroup, AiExecutionMode> | null>(null)
   const [prefs, setPrefs] = useState<Partial<Record<AiExecutionGroup, AiExecutionMode>>>({})
@@ -135,25 +142,29 @@ export function AiExecutionGroupList({
   )
 
   return (
-    <section className="border border-[var(--border-ed)] bg-[var(--paper)]">
-      <div className="space-y-4 px-4 py-6 sm:px-6">
-        <div className="space-y-2">
-          <Kicker>Per functionaliteit</Kicker>
-          <h2
-            className="text-[20px] font-bold leading-tight tracking-[-0.01em] text-[var(--ink)] sm:text-[24px]"
-            style={{ fontFamily: 'var(--font-playfair, serif)' }}
-          >
-            Liever per{' '}
-            <em className="font-normal italic" style={{ color: 'var(--module-active-700)' }}>
-              onderdeel
-            </em>{' '}
-            kiezen?
-          </h2>
-          <p className="text-sm leading-relaxed text-[var(--ink-2)]">
-            Elk onderdeel volgt je hoofdkeuze, tenzij je het hier anders zet. Klap een onderdeel open om te
-            zien wat er lokaal wél en niet kan.
-          </p>
-        </div>
+    <section
+      className={hideHeading ? '' : 'border border-[var(--border-ed)] bg-[var(--paper)]'}
+    >
+      <div className={hideHeading ? 'space-y-4' : 'space-y-4 px-4 py-6 sm:px-6'}>
+        {!hideHeading && (
+          <div className="space-y-2">
+            <Kicker>Per functionaliteit</Kicker>
+            <h2
+              className="text-[20px] font-bold leading-tight tracking-[-0.01em] text-[var(--ink)] sm:text-[24px]"
+              style={{ fontFamily: 'var(--font-playfair, serif)' }}
+            >
+              Liever per{' '}
+              <em className="font-normal italic" style={{ color: 'var(--module-active-700)' }}>
+                onderdeel
+              </em>{' '}
+              kiezen?
+            </h2>
+            <p className="text-sm leading-relaxed text-[var(--ink-2)]">
+              Elk onderdeel volgt je hoofdkeuze, tenzij je het hier anders zet. Klap een onderdeel open om te
+              zien wat er lokaal wél en niet kan.
+            </p>
+          </div>
+        )}
 
         {loadError && (
           <p role="alert" className="text-sm text-negative">

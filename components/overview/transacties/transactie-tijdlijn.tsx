@@ -389,6 +389,14 @@ function NoResultsEmpty({ onClear }: { onClear: () => void }) {
 }
 
 function AccountButton({ active, label, onClick, state }: { active: boolean; label: string; onClick: () => void; state?: BankLinkState }) {
+  /* TXN-4 — een rekeningnaam als "Betaalrekening gezamenlijk ABN AMRO" duwde de
+     chip-rij uit elkaar en maakte er op mobiel één regel per rekening van. De
+     naam wordt daarom VISUEEL afgekapt (CSS-ellipsis): de volledige tekst blijft
+     in de DOM staan, dus de accessible name en de voorlezer houden 'm compleet,
+     en de hover-titel spelt 'm uit voor muisgebruikers.
+     "Alle rekeningen" is een vaste, korte tekst — die krijgt geen titel (een
+     tooltip die de zichtbare tekst herhaalt is ruis) en geen afkapping. */
+  const isAccount = state !== undefined
   return (
     <button type="button" onClick={onClick} aria-pressed={active}
       /* Het symbool is `aria-hidden` (het zou als geneste naam nooit voorgelezen
@@ -407,7 +415,13 @@ function AccountButton({ active, label, onClick, state }: { active: boolean; lab
           Anders dan de kaarten tonen de chips ook "handmatig" — bestaand gedrag,
           bewust behouden (B4 raakt alleen de kaarten). */}
       {state !== undefined && <AccountSourceIcon state={state} inheritColor={active} />}
-      {label}
+      {isAccount ? (
+        <span title={label} className="max-w-[9rem] truncate sm:max-w-[13rem]">
+          {label}
+        </span>
+      ) : (
+        label
+      )}
     </button>
   )
 }

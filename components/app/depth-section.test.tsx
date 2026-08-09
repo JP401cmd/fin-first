@@ -93,4 +93,29 @@ describe('DepthSection', () => {
     renderInMode('full')
     expect(screen.getByTestId('depth-section-toggle').tagName).toBe('BUTTON')
   })
+
+  // De dichtgeklapte inhoud is alleen VISUEEL weg (`max-h-0 opacity-0
+  // overflow-hidden`). Zonder `inert` blijft ze in de tab-volgorde én in de
+  // toegankelijkheidsboom staan: een toetsenbordgebruiker tabt dan in knoppen die
+  // niemand ziet. Dat raakt het defaultpad — nieuwe accounts staan op Eenvoudig,
+  // waar de sectie dicht begint.
+  it('haalt de dichtgeklapte inhoud uit tab-volgorde en a11y-boom (inert)', () => {
+    render(
+      <DisplayModeProvider initialMode="simple">
+        <ToggleProbe />
+        <DepthSection title="Test">
+          <button type="button">verborgen knop</button>
+        </DepthSection>
+      </DisplayModeProvider>,
+    )
+    const content = screen.getByTestId('depth-section-content')
+    expect(content.hasAttribute('inert')).toBe(true)
+
+    // En weer bereikbaar zodra de sectie opengaat — anders zou `inert` de
+    // uitgeklapte inhoud onbedienbaar maken, wat erger is dan het origineel.
+    act(() => {
+      screen.getByTestId('mode-toggle').click()
+    })
+    expect(screen.getByTestId('depth-section-content').hasAttribute('inert')).toBe(false)
+  })
 })

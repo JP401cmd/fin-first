@@ -93,9 +93,9 @@ const criteria: AcceptanceCriterion[] = [
     titel: 'Via de box-kaarten navigeren (status + KPI + drilldown)',
     kriticiteit: 'BELANGRIJK',
     persona: 'compleet',
-    given: 'Persona Tessa geladen op /overzicht/belasting; drie box-kaarten met status-dot + statustekst + KPI.',
+    given: 'Persona Tessa geladen op /overzicht/belasting; de box-kaarten met status-dot + statustekst + KPI. Sinds BEL-1 verschijnt de Box 2-kaart ALLEEN bij aanmerkelijk belang (`hasBox2Relevance`): zonder deelneming/DGA-positie staan er twee kaarten (Werk + woning, Sparen + beleggen) in een twee-koloms rij met kicker "De twee boxen"; mét aanmerkelijk belang drie. Dit geldt in álle weergavemodi.',
     when: 'De gebruiker klikt Box 1 → subpagina, terug, Box 3 → subpagina.',
-    then: 'Elke kaart linkt naar de eigen subpagina (/overzicht/belasting/box1|2|3); de status-dot (op koers/aandacht/actie) volgt de canonieke status-helpers (box1JaarruimteStatus / hasBox2Relevance / box3TaxStatus). Pure navigatie/weergave zonder cijfermatige uitkomst.',
+    then: 'Elke getoonde kaart linkt naar de eigen subpagina (/overzicht/belasting/box1|2|3); de status-dot (op koers/aandacht/actie) volgt de canonieke status-helpers (box1JaarruimteStatus / hasBox2Relevance / box3TaxStatus). /overzicht/belasting/box2 blijft altijd bereikbaar via de navigatie, óók wanneer de tegel ontbreekt. Pure navigatie/weergave zonder cijfermatige uitkomst.',
     assertion: {
       kind: 'ui-only',
       source: 'client-side navigatie + server-side status-dots; geen hand-narekenbaar cijfer (de status-heuristiek leunt op loader-bundeldata)',
@@ -163,8 +163,8 @@ const criteria: AcceptanceCriterion[] = [
     titel: 'Box 1-druk inzien (hero, waterfall, heffingskortingen, marginale curve)',
     kriticiteit: 'KERN',
     persona: 'compleet',
-    given: 'Persona Tessa geladen; netto €7.600/mnd (net_monthly_income) → subpagina-bruto = grossFromNet(91.200, 2026) = €160.658; eigen woning WOZ €540.000 + gekoppelde hypotheek (rente €9.300).',
-    when: 'De gebruiker opent /overzicht/belasting/box1 en leest de druk-hero (Box 1-belasting, effectief/marginaal tarief, netto besteedbaar) + heffingskortingen.',
+    given: 'Persona Tessa geladen; netto €7.600/mnd (net_monthly_income) → subpagina-bruto = grossFromNet(91.200, 2026) = €160.658; eigen woning WOZ €540.000 + gekoppelde hypotheek (rente €9.300). WEERGAVEMODUS (BEL-4/APP-7): de vier onderstaande cijfers (effectief tarief, marginaal tarief, netto besteedbaar, "Geschat bruto") zijn zelf mode-onafhankelijk berekend — `computeBox1Tax` draait ongeacht modus. Wat ZICHTBAAR is op de figures-strip verschilt: in **Volledig** staan alle vier de cellen; in **Eenvoudig** kapt `FiguresStrip` af tot 2 (`simpleFigures`) — Effectief tarief + Netto besteedbaar (de vraag "wat kost het en wat houd ik over"); "Geschat bruto" (bewerkbaar, zie WF-BELAST-08) en het marginale tarief staan dan alleen in Volledig.',
+    when: 'De gebruiker opent /overzicht/belasting/box1 en leest de druk-hero (Box 1-belasting, effectief/marginaal tarief, netto besteedbaar) + heffingskortingen (in Eenvoudig: alleen effectief tarief + netto besteedbaar op de strip zelf; de overige waarden gelden ongewijzigd voor de rest van de hero/waterfall).',
     then: 'Bij bruto €160.658 met eigen woning: belastbaar inkomen €153.248 (160.658 − 7.410 eigenwoning-saldo); Box 1-belasting €65.790; effectief tarief 41,0%; marginaal tarief 49,5%; algemene heffingskorting €0 + arbeidskorting €0 (beide volledig afgebouwd bij dit DGA-inkomen); netto besteedbaar €94.868. (Bruto is de SUBPAGINA-bron; de hub gebruikt een andere bron — zie kop.)',
     assertion: {
       kind: 'exact',
@@ -178,7 +178,7 @@ const criteria: AcceptanceCriterion[] = [
     titel: 'Bruto-jaarinkomen voor Box 1 aanpassen',
     kriticiteit: 'KERN',
     persona: 'compleet',
-    given: 'Persona Tessa geladen; de "Geschat bruto"-figuur op de Box 1-hero is aanpasbaar (Box1GrossIncomeEditor).',
+    given: 'Persona Tessa geladen; de "Geschat bruto"-figuur op de Box 1-hero is aanpasbaar (Box1GrossIncomeEditor). WEERGAVEMODUS (BEL-4): deze cel staat op index 0 van de figures-strip en zit NIET in de `simpleFigures`-selectie (Effectief tarief + Netto besteedbaar) — dus alleen in **Volledig** zichtbaar/bewerkbaar. In **Eenvoudig** is deze editor niet bereikbaar via de strip.',
     when: 'De gebruiker leest de automatische schatting en zet daarna een handmatig bruto van €120.000.',
     then: 'De automatische schatting = grossFromNet(netto €91.200, 2026) = €160.658 (netto-inversie via de Box 1-motor; round-trip: het netto besteedbaar bij €160.658 ≈ €91.200 op €1 na). Bij handmatig bruto €120.000 wordt de Box 1-belasting €48.491 (herberekend zonder eigen woning-context in de editor-preview).',
     assertion: {

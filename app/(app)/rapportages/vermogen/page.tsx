@@ -656,7 +656,10 @@ export default function VermogenReportPage() {
       {/* ── Mini-hero — FiguresStrip met eigen vermogen als winner ──
          FiguresStrip rendert zijn eigen wrapper-div met `data-figures-strip`;
          de print-CSS gebruikt dat attribuut voor compactere kolommen. */}
+      {/* APP-7-opt-out: een rapportage is een gegenereerd (print)document —
+          het mag nooit cijfers verliezen door de weergavemodus van het scherm. */}
       <FiguresStrip
+        alwaysFull
         cols={4}
         figures={[
           {

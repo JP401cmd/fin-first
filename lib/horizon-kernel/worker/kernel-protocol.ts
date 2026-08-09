@@ -26,9 +26,15 @@
 
 import {
   computeConvergentieProjection,
+  computeMarktcheck,
   type ConvergentieRawContext,
   type ConvergentieProjectionOutcome,
 } from '@/lib/horizon-kernel/convergentie-router'
+import {
+  computeWhatifMarktcheck,
+  type WhatifRawContext,
+} from '@/lib/horizon-kernel/whatif-router'
+import type { MarktcheckOutcome } from '@/lib/horizon-kernel/marktcheck'
 import {
   runForcedStopPath,
   runScenarioPresets,
@@ -77,6 +83,28 @@ export type KernelWorkerRequest =
       readonly volatilityOverride?: number
       readonly cashflows?: FutureCashflow[]
     }
+  /**
+   * Marktcheck (Monte Carlo op de horizon-kernel): n VOLLEDIGE projecties op
+   * dezelfde `rawContext` als de hoofdprojectie. Bewust een eigen `kind` naast
+   * `'mc'` — die laatste is de losstaande legacy-motor die de fase-modals nog
+   * gebruiken; deze levert de percentielband die de Toekomst-grafiek tekent.
+   */
+  | {
+      readonly id: number
+      readonly kind: 'marktcheck'
+      readonly rawContext: ConvergentieRawContext
+      readonly maxRuns?: number
+      /** Anker van de rendement-marge (de stop-slider); zie `marktcheck.ts`. */
+      readonly stopAge?: number | null
+    }
+  /** Dezelfde marktcheck op de what-if-context (mét rendement-slider). */
+  | {
+      readonly id: number
+      readonly kind: 'whatif-marktcheck'
+      readonly rawContext: WhatifRawContext
+      readonly maxRuns?: number
+      readonly stopAge?: number | null
+    }
 
 /** Antwoord van de kernel-worker; `kind` spiegelt de request zodat de client typed uitpakt. */
 export type KernelWorkerResponse =
@@ -85,6 +113,8 @@ export type KernelWorkerResponse =
   | { readonly id: number; readonly ok: true; readonly kind: 'presets'; readonly result: ScenarioPresetResult[] }
   | { readonly id: number; readonly ok: true; readonly kind: 'taxvarianten'; readonly result: VariantenSweepResultaat }
   | { readonly id: number; readonly ok: true; readonly kind: 'mc'; readonly result: MonteCarloResult }
+  | { readonly id: number; readonly ok: true; readonly kind: 'marktcheck'; readonly result: MarktcheckOutcome }
+  | { readonly id: number; readonly ok: true; readonly kind: 'whatif-marktcheck'; readonly result: MarktcheckOutcome }
   | { readonly id: number; readonly ok: false; readonly error: string }
 
 /**
@@ -129,6 +159,28 @@ export function executeKernelRequest(req: KernelWorkerRequest): KernelWorkerResp
             req.volatilityOverride,
             req.cashflows,
           ),
+        }
+      case 'marktcheck':
+        return {
+          id: req.id,
+          ok: true,
+          kind: 'marktcheck',
+          result: computeMarktcheck({
+            rawContext: req.rawContext,
+            maxRuns: req.maxRuns,
+            stopAge: req.stopAge,
+          }),
+        }
+      case 'whatif-marktcheck':
+        return {
+          id: req.id,
+          ok: true,
+          kind: 'whatif-marktcheck',
+          result: computeWhatifMarktcheck({
+            rawContext: req.rawContext,
+            maxRuns: req.maxRuns,
+            stopAge: req.stopAge,
+          }),
         }
     }
   } catch (err) {

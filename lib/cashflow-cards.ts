@@ -38,6 +38,17 @@ export interface CashflowCard {
   kpi: string | null
   status: LeverageStatus
   subText: string | null
+  /**
+   * VENSTER-LABEL onder de KPI (CF-3) — de grondslag van het hoofdcijfer in
+   * gewone taal, bv. "in augustus tot nu toe". `null` = het cijfer draagt zijn
+   * venster al (vaste lasten: "/mnd") of er ís geen cijfer.
+   *
+   * Rendert in de `subAmount`-slot van `LeverageCard` — dezelfde gedempte
+   * 11px-regel waarin de hefbomen-rij op /overzicht haar grondslag ("excl.
+   * eigen woning · €X") kwijt kan. Het is bewust GEEN tweede statusregel:
+   * `subText` blijft het oordeel, dit is de meetlat eronder.
+   */
+  kpiWindow: string | null
   /** Uitklap-detail: secundaire waarde + 1-regel inzicht + deeplink-label. */
   detail: { label: string; value: string; tip: string; actionLabel: string }
 }
@@ -68,6 +79,33 @@ const BASE = '/overzicht/cashflow'
 
 function signed(value: number): string {
   return `${value >= 0 ? '+' : ''}${formatCurrency(value)}`
+}
+
+/**
+ * Het venster-label van de GEREALISEERDE huidige kalendermaand: "augustus tot
+ * nu toe" (CF-3 uit docs/eenvoudige-weergave-audit.md).
+ *
+ * ── WAT HET CIJFER WERKELIJK IS (geverifieerd in de loader, niet aangenomen) ──
+ * `loadCashflowKpis` (lib/cashflow-kpis.ts) vult `currentMonthIncome` /
+ * `currentMonthExpenses` met `aggIncomeByMonth` / `aggExpenseByMonthAbs` over
+ * `tx_month_aggregate`, opgezocht op ÉÉN sleutel: `currentMonthKey(now)`. Dat is
+ * de kalendermaand waarin `now` valt — dus de som over `[de 1e, de 1e van de
+ * volgende maand)`, transfers eruit (`realOnly: true`). De budget-`spent` loopt
+ * via `getCurrentMonthTx` (lib/server-data/base.ts) en gebruikt met
+ * `localMonthBounds` exact dezelfde grenzen.
+ *
+ * Daarom is "tot nu toe" de eerlijke lezing en niet een mooiere formulering van
+ * "deze maand": de maand loopt nog, het getal groeit tot de 1e. Precies dat
+ * onderscheidt het van de 30-DAGEN-cijfers op /overzicht/cashflow/transacties —
+ * dezelfde verwarring die ADR 0073 vastlegde, hier in de copy afgevangen in
+ * plaats van in de grondslag.
+ *
+ * `now` is een parameter en géén interne `new Date()`, zodat het label
+ * deterministisch te testen is naast de cijfers die het beschrijft.
+ */
+export function currentMonthWindowLabel(now: Date): string {
+  const month = new Intl.DateTimeFormat('nl-NL', { month: 'long' }).format(now)
+  return `${month} tot nu toe`
 }
 
 // ── Pure status-helpers (SINGLE SOURCE) ───────────────────────────────────
@@ -151,12 +189,24 @@ export function forecastCardStatus(input: {
  * bestaande callsite die de volle bundel doorgeeft blijft ongewijzigd werken —
  * terwijl een oppervlak dat alleen de kaarten nodig heeft de slanke
  * `loadCashflowKpis` kan voeden i.p.v. de hele dashboard-loader (ADR 0083).
+ *
+ * `now` is optioneel en defaultt op `new Date()` — exact de waarde die de
+ * forecast hier altijd al zelf bemonsterde. Hij is naar de signatuur getild
+ * zodat de forecast én het venster-label van CF-3 op DEZELFDE klok draaien en
+ * een test beide deterministisch kan pinnen. Bestaande callsites (de hub-loader
+ * en /api/overzicht/cashflow-status) blijven ongewijzigd werken.
  */
 export function buildCashflowCards(
   kpis: CashflowCardScalars,
   cashflow: CashflowData,
   vasteLastenSummary: VasteLastenSummary,
+  now: Date = new Date(),
 ): CashflowCard[] {
+  // Venster-label voor de maandcijfers (CF-3) — zie `currentMonthWindowLabel`
+  // voor de verificatie van wat `currentMonth*` en de budget-`spent` werkelijk
+  // meten.
+  const monthWindow = currentMonthWindowLabel(now)
+
   // ── Budget ──────────────────────────────────────────────────
   const budgetLimit = kpis.budgetTotals.expense.limit
   const budgetSpent = kpis.budgetTotals.expense.spent
@@ -188,11 +238,16 @@ export function buildCashflowCards(
           ? 'Let op je budget'
           : 'Boven budget'
       : 'Nog geen budget',
+    // BEWUST GEEN venster-regel onder de KPI: dit cijfer is een RESTANT
+    // (maandlimiet − wat er tot nu toe af is), geen som over het venster. Een
+    // "in augustus tot nu toe" eronder zou beschrijven wat het niet is. Het
+    // venster hoort hier bij de besteding, en die staat in `detail.tip`.
+    kpiWindow: null,
     detail: {
       label: 'Budgetdekking',
       value: budgetActive ? `${Math.round(budgetScore)}/100` : '—',
       tip: budgetActive
-        ? `${formatCurrency(budgetSpent)} van ${formatCurrency(budgetLimit)} besteed deze maand.`
+        ? `${formatCurrency(budgetSpent)} van ${formatCurrency(budgetLimit)} besteed in ${monthWindow}.`
         : 'Stel budgetten in om grip te krijgen op je uitgaven.',
       actionLabel: 'Bekijk budget',
     },
@@ -229,8 +284,15 @@ export function buildCashflowCards(
           ? 'Krap deze maand'
           : 'Tekort deze maand',
     status: txStatus,
+    // DE KAART WAAR CF-3 OM BEGONNEN IS. Dit netto-cijfer staat één klik
+    // verwijderd van de 30-dagen-cijfers op /overzicht/cashflow/transacties en
+    // was zonder venster niet van die cijfers te onderscheiden. `subText` doet
+    // het oordeel ("Tekort deze maand"), deze regel de meetlat.
+    kpiWindow: hasTx ? `in ${monthWindow}` : null,
     detail: {
-      label: 'Deze maand',
+      // Rendert in de kaart met `uppercase`, dus de kleine letter van
+      // `currentMonthWindowLabel` valt weg: "AUGUSTUS TOT NU TOE".
+      label: monthWindow,
       value: rate != null ? `${rate.toFixed(0)}% spaarquote` : '—',
       tip: `Inkomen ${formatCurrency(currentMonthIncome)} · uitgaven ${formatCurrency(currentMonthExpenses)}.`,
       actionLabel: 'Bekijk transacties',
@@ -267,6 +329,9 @@ export function buildCashflowCards(
         ? `${Math.round(vasteRatio * 100)}% van inkomen`
         : `${vasteCount} ${vasteCount === 1 ? 'post' : 'posten'}`,
     status: vasteStatus,
+    // De KPI draagt zijn venster al in de eenheid ("/mnd") — een tweede regel
+    // zou hetzelfde nog eens zeggen.
+    kpiWindow: null,
     detail: {
       label: 'Vaste lasten',
       value: hasVaste ? `${formatCurrency(Math.round(vastePerMonth * 12))}/jr` : '—',
@@ -283,7 +348,7 @@ export function buildCashflowCards(
     cashflow.baselineIncome,
     cashflow.baselineExpenses,
     cashflow.startingBalance,
-    new Date(),
+    now,
   )
   const netPerMonth = rows[0]?.net ?? 0
   const endBalance = rows[rows.length - 1]?.cumulative ?? cashflow.startingBalance
@@ -304,6 +369,9 @@ export function buildCashflowCards(
           ? 'Saldo daalt'
           : 'Stabiel',
     status: fcStatus,
+    // Vooruitkijkend cijfer, geen maandcijfer: het venster ("na N maanden")
+    // staat in `detail.tip`, waar het bij de horizon hoort.
+    kpiWindow: null,
     detail: {
       label: 'Netto per maand',
       value: signed(netPerMonth),

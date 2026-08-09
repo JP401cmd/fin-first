@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react'
-import { Wallet, Compass, User, Newspaper, Bell, MessageCircle, Settings } from 'lucide-react'
+import { Wallet, Compass, User, Newspaper, Bell, MessageCircle, Settings, Zap } from 'lucide-react'
 
 /**
  * Unified nav-config — single source of truth voor sidebar (desktop) én
@@ -161,10 +161,17 @@ export const OVERVIEW_APP_SUBROUTES: OverviewAppItem[] = [
 ]
 
 /**
- * Globale items — altijd beschikbaar onderaan het menu (krant, berichten,
+ * Globale items — altijd beschikbaar onderaan het menu (tips, krant, berichten,
  * coach-chat, account/settings). Verschijnen ook als topbar-iconen op desktop.
+ *
+ * "Tips & acties" staat vooraan en spiegelt daarmee `OVERIGE_BASE` in de
+ * desktop-sidebar (ADR 0095). Zonder die regel ontbrak de pagina volledig in
+ * de mobiele nav-sheet: daar was ze alleen bereikbaar via /overzicht-links,
+ * ⌘K, de gezondheidsscore-kassabon of een AI-actionUrl. Bewust géén badge —
+ * het numerieke ongelezen-getal blijft exclusief bij Berichten.
  */
 export const globalNav: GlobalNavItem[] = [
+  { label: 'Tips & acties', icon: Zap, href: '/overzicht/tips' },
   { label: 'Krant', icon: Newspaper, href: '/nieuws' },
   { label: 'Berichten', icon: Bell, href: '/berichten' },
   { label: 'Vraag Fin', icon: MessageCircle, action: 'open-chat' },
@@ -188,7 +195,11 @@ export const EXTRA_ROUTE_TITLES: Record<string, string> = {
   '/toekomst/uitgaven-na-pensioen': 'Uitgaven na pensioen',
   '/mijn/checkins': 'Check-ins',
   '/mijn/lokale-chat': 'Lokale chat',
-  '/mijn/feedback': 'Feedback',
+  // ADR 0096: geen inzendformulier meer maar een verwijspagina naar de
+  // meldmodus. De mobiele TopBar valt hierop terug (de pagina zet geen eigen
+  // <NavStackMeta>), dus deze titel moet "Melden" zeggen — net als ⌘K en de
+  // kop van de pagina zelf.
+  '/mijn/feedback': 'Melden',
   // Rapportages-familie — eigen routes buiten de nav-structuur. De titels
   // spiegelen exact de `<NavStackMeta title>` van elke pagina, zodat de
   // SSoT-fallback en de pagina niet uiteenlopen. De dynamische
@@ -203,11 +214,12 @@ export const EXTRA_ROUTE_TITLES: Record<string, string> = {
   '/rapportages/totaalplan': 'Totaalplan',
   // Cashflow-verdiepingen onder /overzicht/cashflow. /overzicht/cashflow zelf
   // en .../budget zitten al in de nav (navGroups resp. OVERVIEW_APP_SUBROUTES);
-  // deze drie + /overzicht/tips niet. Titels = de `<NavStackMeta title>` per pagina.
+  // deze drie niet. Titels = de `<NavStackMeta title>` per pagina.
+  // NB: /overzicht/tips stond hier tot ADR 0095 — die route zit nu in
+  // `globalNav` en levert zijn titel dus uit de nav-structuur zelf.
   '/overzicht/cashflow/forecast': 'Forecast',
   '/overzicht/cashflow/transacties': 'Transacties',
   '/overzicht/cashflow/vaste-lasten': 'Vaste lasten',
-  '/overzicht/tips': 'Tips & acties',
 }
 
 /**

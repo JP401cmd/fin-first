@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { render } from '@testing-library/react'
 import { Box2GecombineerdeDruk } from './box2-gecombineerde-druk'
+import { DisplayModeProvider } from '@/lib/hooks/use-display-mode'
 import { BOX2_PARAMS, VPB_PARAMS } from '@/lib/box2-data'
 import { BOX1_PARAMS } from '@/lib/box1-tax'
 
@@ -11,6 +12,14 @@ import { BOX1_PARAMS } from '@/lib/box1-tax'
  * komen. We renderen het component en bewijzen dat de getoonde percentages
  * één-op-één uit die bronnen zijn afgeleid. Zou iemand een tarief opnieuw
  * hardcoden dat later van de bron divergeert, dan valt deze test om.
+ *
+ * RENDEREN IN "VOLLEDIG" IS HIER LOAD-BEARING. `useDisplayMode()` valt búiten een
+ * `DisplayModeProvider` terug op 'simple' (zie lib/hooks/use-display-mode.tsx), en
+ * sinds APP-7 kapt `FiguresStrip` in Eenvoudig af op twee cellen — waardoor de
+ * cel "Box 1-loon" uit de `cols={3}`-strip verdwijnt. De test bleef desondanks
+ * groen omdat "49,5%" óók in de alinea erboven en in de scenariotabel staat: hij
+ * mat dus iets anders dan zijn eigen docstring belooft. Expliciet in 'full'
+ * renderen houdt de assertie op de strip die hij zegt te bewaken.
  */
 const YEAR = '2026' as const
 
@@ -27,7 +36,11 @@ describe('Box2GecombineerdeDruk — tarieven uit canonieke bron', () => {
   const box1Top = BOX1_PARAMS[YEAR].schijven[BOX1_PARAMS[YEAR].schijven.length - 1].tarief
 
   it('rendert de laagste/hoogste druk en de Box 1-referentie afgeleid uit de params', () => {
-    const { container } = render(<Box2GecombineerdeDruk />)
+    const { container } = render(
+      <DisplayModeProvider initialMode="full">
+        <Box2GecombineerdeDruk />
+      </DisplayModeProvider>,
+    )
     const text = container.textContent ?? ''
 
     const min = combined(vpbLaag, box2Laag)

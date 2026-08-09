@@ -11,7 +11,19 @@ import type { CashflowSettingsData } from '@/lib/cashflow-settings-data'
 
 type Sheet = null | 'income' | 'expenses' | 'savings'
 
-export function CashflowInstellingenBlok({ data }: { data: CashflowSettingsData }) {
+export function CashflowInstellingenBlok({
+  data,
+  hideHeading = false,
+}: {
+  data: CashflowSettingsData
+  /**
+   * Onderdrukt de eigen "Instellingen & toekomst"-kicker én de sectie-marge.
+   * Gezet wanneer het blok in een disclosure hangt die de titel al draagt (CF-4,
+   * Eenvoudige weergave — zie cashflow-below-fold.tsx); zonder dit staat de kop
+   * er twee keer. Default false → de bestaande render is byte-identiek.
+   */
+  hideHeading?: boolean
+}) {
   const computedIncome = Math.round(data.estimatedAnnualIncome / 12)
   const computedExpenses = data.computedMonthlyExpenses // transactie-berekend (NIET de manual estimatedMonthlyExpenses)
   // rawSavingsRate voedt de interactieve driehoek (recomputeTriple): rate =
@@ -93,8 +105,10 @@ export function CashflowInstellingenBlok({ data }: { data: CashflowSettingsData 
   }
 
   return (
-    <section className="mt-5 sm:mt-8">
-      <div className="mb-4"><Kicker>Instellingen &amp; toekomst</Kicker></div>
+    <section className={hideHeading ? undefined : 'mt-5 sm:mt-8'}>
+      {!hideHeading && (
+        <div className="mb-4"><Kicker>Instellingen &amp; toekomst</Kicker></div>
+      )}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
         <SettingCard icon={<TrendingUp className="h-4 w-4" />} label="Geschat jaarinkomen"
           value={<MaskedAmount value={triple.monthlyIncome * 12} tone="kern" />} manual={incomeManual}

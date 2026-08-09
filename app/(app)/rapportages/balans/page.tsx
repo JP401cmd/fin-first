@@ -270,7 +270,10 @@ export default function BalansPage() {
       </ScenarioCallout>
 
       {/* ── Mini-hero figures-strip — 4 hoofdgetallen, eigen vermogen als winnaar ── */}
+      {/* APP-7-opt-out: een rapportage is een gegenereerd (print)document —
+          het mag nooit cijfers verliezen door de weergavemodus van het scherm. */}
       <FiguresStrip
+        alwaysFull
         cols={4}
         figures={[
           {

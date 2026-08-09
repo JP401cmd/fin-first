@@ -74,9 +74,20 @@ export function DepthSection({ title, summary, children, icon }: DepthSectionPro
         />
       </button>
 
-      {/* Uitklapbare inhoud. */}
+      {/* Uitklapbare inhoud.
+          `inert` bij dicht is GEEN cosmetica: `max-h-0 opacity-0 overflow-hidden`
+          maakt de inhoud onzichtbaar maar laat 'm in de toegankelijkheidsboom én
+          in de tab-volgorde staan. Zonder dit tabt een toetsenbordgebruiker in
+          knoppen die niemand ziet (en die sheets openen die bij een dichtgeklapte
+          sectie horen), en leest een schermlezer het hele blok voor. Dat raakt het
+          defaultpad: nieuwe accounts staan op Eenvoudig, waar deze sectie dicht
+          begint. `inert` (React 19) haalt de subtree uit beide tegelijk en is
+          daarmee correcter dan `tabIndex={-1}`, dat alleen de tab-volgorde dekt.
+          Bewust NIET `hidden`/`visibility:hidden`: die zouden de uitklap-transitie
+          breken. */}
       <div
         data-testid="depth-section-content"
+        inert={!open}
         className={`transition-all duration-300 ease-in-out motion-reduce:transition-none ${
           open ? 'max-h-[5000px] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'
         }`}

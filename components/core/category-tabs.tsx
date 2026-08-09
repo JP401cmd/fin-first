@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -23,6 +24,20 @@ interface CategoryTabsProps {
   onChange: (key: string) => void
   /** Optionele extra classes voor de tab-list container. */
   className?: string
+  /**
+   * Opt-in BEZ-4-gedrag. Wanneer gezet, toont de weergavemodus "Eenvoudig"
+   * alleen deze basis-tab (de gewone items-lijst) — de verdiepings-tabs
+   * (aandelen-/crypto-holdings, verhuurrendement, hypotheekplanner) zijn
+   * Volledig-materiaal en verdwijnen uit de tablist.
+   *
+   * De ROUTE blijft bereikbaar: wie een `?tab=…`-deeplink kent, krijgt de
+   * verdieping gewoon te zien. Die actieve tab blijft dan óók in de tablist
+   * staan, zodat er een zichtbare weg terug naar de lijst is (en `activeKey`
+   * altijd een van de gerenderde tabs is — anders klopt de aria-state niet).
+   *
+   * In "Volledig" verandert er niets; zonder deze prop ook niet.
+   */
+  simpleBaseTabKey?: string
 }
 
 // ── Component ────────────────────────────────────────────────
@@ -48,8 +63,22 @@ export function CategoryTabs({
   activeKey,
   onChange,
   className = '',
+  simpleBaseTabKey,
 }: CategoryTabsProps) {
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([])
+  // Single source of truth voor de modus (geen prop-drilling van de rauwe
+  // waarde) — zie use-display-mode.tsx / ADR 0026.
+  const { mode } = useDisplayMode()
+
+  // Zichtbare tabs = alle tabs, behalve in Eenvoudig mét `simpleBaseTabKey`:
+  // dan alleen de basis-tab plus (bij een deeplink) de actieve verdieping.
+  // Alles hieronder — render én pijltjes-navigatie — werkt op deze lijst.
+  const visibleTabs = useMemo(() => {
+    if (!simpleBaseTabKey || mode !== 'simple') return tabs
+    return tabs.filter(
+      (tab) => tab.key === simpleBaseTabKey || tab.key === activeKey,
+    )
+  }, [tabs, simpleBaseTabKey, mode, activeKey])
 
   const focusTabAt = useCallback(
     (index: number) => {
@@ -63,7 +92,7 @@ export function CategoryTabs({
     (event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
       // Alleen pijlen links/rechts en home/end activeren navigatie — andere
       // toetsen (Enter, Space) volgen het standaard button-gedrag.
-      const last = tabs.length - 1
+      const last = visibleTabs.length - 1
       let nextIndex: number | null = null
 
       if (event.key === 'ArrowRight') nextIndex = index === last ? 0 : index + 1
@@ -73,26 +102,26 @@ export function CategoryTabs({
 
       if (nextIndex == null) return
       event.preventDefault()
-      const target = tabs[nextIndex]
+      const target = visibleTabs[nextIndex]
       if (!target) return
       onChange(target.key)
       focusTabAt(nextIndex)
     },
-    [focusTabAt, onChange, tabs],
+    [focusTabAt, onChange, visibleTabs],
   )
 
   // Houd de refs-array gesynchroniseerd met het aantal tabs zonder tijdens
   // render aan refs te raken — alle ref-mutaties in een useEffect.
   useEffect(() => {
-    if (tabRefs.current.length !== tabs.length) {
-      const next = new Array<HTMLButtonElement | null>(tabs.length).fill(null)
+    if (tabRefs.current.length !== visibleTabs.length) {
+      const next = new Array<HTMLButtonElement | null>(visibleTabs.length).fill(null)
       // Behoud bestaande nodes voor bestaande tabs zodat focus niet verspringt.
-      for (let i = 0; i < Math.min(tabs.length, tabRefs.current.length); i++) {
+      for (let i = 0; i < Math.min(visibleTabs.length, tabRefs.current.length); i++) {
         next[i] = tabRefs.current[i]
       }
       tabRefs.current = next
     }
-  }, [tabs.length])
+  }, [visibleTabs.length])
 
   return (
     <div
@@ -105,7 +134,7 @@ export function CategoryTabs({
         .filter(Boolean)
         .join(' ')}
     >
-      {tabs.map((tab, index) => {
+      {visibleTabs.map((tab, index) => {
         const isActive = tab.key === activeKey
         return (
           <button

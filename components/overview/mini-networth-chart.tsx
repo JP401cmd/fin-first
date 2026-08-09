@@ -5,9 +5,9 @@ import Link from 'next/link'
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { useEuroView } from '@/lib/hooks/use-euro-view'
+import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { deflate, factorAtAge } from '@/lib/euro-display'
 import { fireAgeForDisplay } from '@/lib/fire-strategy'
-import { EuroViewBadge } from '@/components/core/euro-view-badge'
 import { computeConfidenceBand } from '@/lib/confidence-band'
 import { SubtotalLine } from '@/components/editorial/subtotal-line'
 import { NetWorthHistorySheet, type HistoryPoint } from './networth-history-sheet'
@@ -133,6 +133,12 @@ function MiniNetWorthChartComponent({
   // van vandaag). Buiten een EuroViewProvider valt de hook terug op 'nominal',
   // dus bestaande tests en oppervlakken zonder provider blijven byte-identiek.
   const { view: euroView } = useEuroView()
+  // Weergavemodus — enige leespad is useDisplayMode() (SSoT). In 'simple'
+  // versobert alleen de LEGENDA en de kop-staart; de grafiek zelf (paden,
+  // band, markers) blijft byte-identiek. Buiten een provider: 'simple'-
+  // fallback zoals overal, maar /overzicht draait altijd binnen de provider.
+  const { mode: displayMode } = useDisplayMode()
+  const simple = displayMode === 'simple'
   const [historyOpen, setHistoryOpen] = useState(false)
   // Unieke gradient-id per instantie — voorkomt botsende SVG-defs wanneer
   // de chart meermaals op één pagina staat.
@@ -541,22 +547,20 @@ function MiniNetWorthChartComponent({
   return (
     <div className="flex flex-col rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-3 sm:p-4 transition-all h-full">
       <header className="mb-2 flex items-baseline justify-between gap-3">
-        <span className="flex items-center gap-2 min-w-0">
-          <span className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
-            Netto vermogen door de tijd
-          </span>
-          {/* De ÉNE euro-weergave-badge van /overzicht (D11). Bewust hier, inline
-              in de hero-band, en NIET in de absolute header-controls-stack: die
-              reeks ligt vast op `i` right-4 · statuspunt right-[52px] ·
-              insight-toggle right-[84px] (CLAUDE.md) en een vierde control zou
-              'm breken. In 'nominal' rendert de badge `null` — geen ruis op het
-              standaardbeeld. De widgets eronder dragen bewust géén eigen badge;
-              acht badges naast elkaar is ruis, deze ene geldt paginabreed. */}
-          <EuroViewBadge className="shrink-0" />
+        {/* Géén euro-weergave-badge meer hier. De weergave-status hangt sinds
+            aug 2026 app-breed bovenaan de sidebar (`SidebarEuroViewBadge`) en de
+            schakelaar in het zoekscherm (⌘K) — één statusplek en één knop, in
+            plaats van een badge per grafiek. Zie ADR 0094. */}
+        <span className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
+          Netto vermogen door de tijd
         </span>
+        {/* OVZ-4: in Eenvoudig vervalt de staart "— verloop tot 90". Tot welke
+            leeftijd de grafiek loopt staat in de pagina-'i' van /overzicht. */}
         <span className="text-xs font-mono tabular-nums text-[var(--ink-3)]">
           {fireReached
-            ? `${endLabel} bereikt — verloop tot ${finalAgeLabel}`
+            ? simple
+              ? `${endLabel} bereikt`
+              : `${endLabel} bereikt — verloop tot ${finalAgeLabel}`
             : `Vermogen bij ${endLabel.toLowerCase()} → ${formatMaskedCurrency(endValue, masked)}`}
         </span>
       </header>
@@ -767,8 +771,40 @@ function MiniNetWorthChartComponent({
       </div>
       <div className="mt-1 flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-3 flex-wrap text-[10px] text-[var(--ink-3)]">
+          {/* OVZ-4 — Eenvoudig: "Historisch" + "Projectie" smelten samen tot
+              één regel "Verloop". Het swatch vertelt het onderscheid zelf
+              (gestippeld = verleden, doorgetrokken = projectie) en de x-as
+              markeert Vandaag; twee losse woorden zijn dan overbodig. */}
+          {simple && (
+            <span
+              className="inline-flex items-center gap-1.5"
+              title="Links van Vandaag je werkelijke vermogen, rechts de projectie"
+            >
+              <svg width="16" height="2" aria-hidden="true">
+                <line
+                  x1="0"
+                  y1="1"
+                  x2="7"
+                  y2="1"
+                  stroke="var(--module-active-700)"
+                  strokeWidth="1.5"
+                  strokeDasharray="3 2"
+                />
+                <line
+                  x1="8"
+                  y1="1"
+                  x2="16"
+                  y2="1"
+                  stroke="var(--module-active-500)"
+                  strokeWidth="2"
+                />
+              </svg>
+              Verloop
+            </span>
+          )}
           {/* Historisch — stippellijn-indicator. Vermeldt "deels geschat"
               wanneer maanden zijn aangevuld met het spaarritme. */}
+          {!simple && (
           <span
             className="inline-flex items-center gap-1.5"
             title={
@@ -790,7 +826,9 @@ function MiniNetWorthChartComponent({
             </svg>
             {hasEstimatedHistory ? 'Historisch (deels geschat)' : 'Historisch'}
           </span>
+          )}
           {/* Projectie — doorlopende lijn-indicator. */}
+          {!simple && (
           <span
             className="inline-flex items-center gap-1.5"
             title={
@@ -811,10 +849,17 @@ function MiniNetWorthChartComponent({
             </svg>
             Projectie
           </span>
-          {/* Onzekerheidsband — gevuld rechthoekje. */}
+          )}
+          {/* Onzekerheidsband — gevuld rechthoekje. In Eenvoudig zonder
+              percentiel-jargon: "Bandbreedte" (APP-5-taalregel, hier alvast
+              toegepast op de enige P-notatie boven de vouw). */}
           <span
             className="inline-flex items-center gap-1.5"
-            title="P40–P60 bandbreedte op basis van marktvolatiliteit σ × √t"
+            title={
+              simple
+                ? 'De marge waarbinnen je vermogen zich waarschijnlijk beweegt'
+                : 'P40–P60 bandbreedte op basis van marktvolatiliteit σ × √t'
+            }
           >
             <span
               className="inline-block w-3 h-2 rounded-sm"
@@ -824,7 +869,7 @@ function MiniNetWorthChartComponent({
               }}
               aria-hidden="true"
             />
-            Onzekerheid (P40–P60)
+            {simple ? 'Bandbreedte' : 'Onzekerheid (P40–P60)'}
           </span>
           {/* Liquide vrijheidsdoel — APART van de netto-vermogen-as. De lijn toont
               je volledige vermogen (incl. huis); dit is het liquide bedrag dat je
@@ -856,7 +901,11 @@ function MiniNetWorthChartComponent({
                 style={{ background: 'var(--color-horizon-500)' }}
                 aria-hidden="true"
               />
-              {endMarkerText}
+              {/* OVZ-4 — Eenvoudig: geen kaal leeftijdsgetal ("Tot 90") in de
+                  legenda; die uitleg staat in de pagina-'i'. De marker houdt
+                  wél zijn legenda-regel, anders zweeft er een gekleurde streep
+                  in de grafiek zonder betekenis. */}
+              {simple ? (fireReached ? 'Tot je eindleeftijd' : 'Vrijheidsmoment') : endMarkerText}
             </span>
           )}
         </div>

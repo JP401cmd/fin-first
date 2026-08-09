@@ -10,6 +10,7 @@ import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 import { STRATEGY_LABELS } from '@/lib/fire-strategy'
 import { GlossaryTerm } from '@/components/editorial/glossary-term'
 import { HideInSimple } from '@/components/app/hide-in-simple'
+import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { VoorkeurBewerkenSheet } from './voorkeur-bewerken-sheet'
 import { AfbouwOverzichtCard } from './afbouw-overzicht-card'
 import { RegelBewerkenPane } from './regel-bewerken-pane'
@@ -27,6 +28,13 @@ import { WEALTH_GROUP_LABELS, type WealthGroup } from '@/lib/wealth-composition'
  * (pot-volgorde/verdeling/afname) tonen een illustratieve pot-flow-weergave.
  *
  * Daaronder: "Markt-aannames" (inflatie + bruto rendement) via VoorkeurBewerkenSheet.
+ *
+ * Weergavemodus "Eenvoudig" (audit TOE-3): alleen regel 1 & 2 — de twee keuzes
+ * die bepalen hóé lang je vermogen meegaat. De drie pot-regels (onttrekkings-
+ * volgorde, verdeling bij toename, onttrekking bij afname) en de markt-aannames
+ * zijn verfijning voor wie de projectie echt bijstuurt en staan alleen in
+ * Volledig. Puur presentatie: de regels blíjven gelden in de doorrekening en de
+ * deep-link ?regel=… blijft werken — ze zijn alleen niet in beeld.
  */
 
 const WITHDRAWAL_LABELS: Record<
@@ -114,6 +122,9 @@ export function VoorkeurenView({
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  // Weergavemodus: single source of truth — zelfde bron als HideInSimple.
+  const { mode } = useDisplayMode()
+  const simple = mode === 'simple'
   // Inline-editor state voor de markt-aannames (inflatie/rendement).
   const [editing, setEditing] = useState<
     | null
@@ -198,6 +209,9 @@ export function VoorkeurenView({
             }
             onEdit={openRegel('onttrekkingsstrategie')}
           />
+          {/* Pot-regels (3/4/5) — alleen Volledig. HideInSimple rendert een
+              fragment, dus de kaarten blijven directe grid-kinderen. */}
+          <HideInSimple>
           <VoorkeurCard
             label="Onttrekkingsvolgorde"
             value={formatGroupOrder(regelVoorkeuren.withdrawalOrderGroups)}
@@ -222,6 +236,7 @@ export function VoorkeurenView({
             badge="Potten"
             onEdit={openRegel('onttrekking-afname')}
           />
+          </HideInSimple>
         </div>
       </div>
 
@@ -301,8 +316,9 @@ export function VoorkeurenView({
       </HideInSimple>
 
       <p className="text-[11px] italic text-[var(--ink-3)]">
-        Klik op een regel of markt-aanname om uitleg, instellingen en impact te
-        zien en bij te werken.
+        {simple
+          ? 'Klik op een regel om uitleg, instellingen en impact te zien en bij te werken.'
+          : 'Klik op een regel of markt-aanname om uitleg, instellingen en impact te zien en bij te werken.'}
       </p>
 
       {/* Afbouw-overzicht — eindsaldo bij fireAge vs endAge. */}

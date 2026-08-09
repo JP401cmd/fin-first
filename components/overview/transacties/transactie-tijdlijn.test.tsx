@@ -99,6 +99,25 @@ describe('TransactieTijdlijn — rekening-filterpills', () => {
     expect(screen.getByRole('button', { name: 'Alle rekeningen' })).toBeInTheDocument()
   })
 
+  it('kapt een lange rekeningnaam visueel af en houdt de volledige naam bereikbaar (TXN-4)', () => {
+    const lang = 'Betaalrekening gezamenlijk ABN AMRO'
+    renderPills([account({ name: lang })])
+
+    // De volledige naam blijft in de DOM (accessible name + voorlezer) …
+    expect(
+      screen.getByRole('button', { name: `${lang} — ${accountSourceSuffix('linked')}` }),
+    ).toBeInTheDocument()
+    // … en is als hover-titel bereikbaar op het label zelf, dat visueel afkapt.
+    const labelSpan = screen.getByTitle(lang)
+    expect(labelSpan.textContent).toBe(lang)
+    expect(labelSpan.className).toContain('truncate')
+  })
+
+  it('geeft "Alle rekeningen" geen afkapping of titel — vaste, korte tekst', () => {
+    renderPills([account()])
+    expect(screen.queryByTitle('Alle rekeningen')).not.toBeInTheDocument()
+  })
+
   it('erft de tekstkleur alleen op de ACTIEVE pill', () => {
     // `inheritColor` op een inactieve pill gooit de tint weg die de toestand
     // draagt; dan moet een 12px Unlink het alleen van een 12px Link2 winnen.

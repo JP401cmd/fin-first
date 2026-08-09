@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react'
+import type { ReactElement } from 'react'
 import { Box3OptimizerClient } from './optimizer-client'
 
 // Privacy-maskering: default zichtbaar, individuele tests zetten 'm aan.
@@ -22,6 +23,7 @@ import { calculateBox3 } from '@/lib/box3-data'
 import { DEFAULT_RETURN } from '@/lib/constants'
 import { MASKED_AMOUNT_PLACEHOLDER } from '@/lib/format'
 import { GOAL_BY_ID } from '@/lib/tax-optimizer/goals'
+import { DisplayModeProvider } from '@/lib/hooks/use-display-mode'
 import type {
   GoalSection,
   OptimizerCurrentStanding,
@@ -44,6 +46,18 @@ function euroPattern(amount: number): RegExp {
 
 const DAILY_EXPENSES = 100
 const YEAR = 2026 as const
+
+/**
+ * Expliciete VOLLEDIGE weergave. `useDisplayMode()` valt buiten een
+ * `DisplayModeProvider` stil terug op 'simple' (ADR 0026), en sinds BEL-2 is dat
+ * een echt andere pagina: katern I, III en IV, de sorteerstanden en de
+ * "bekijk uitwerking"-uitgang bestaan daar niet. Elke test die de expert-laag
+ * bedoelt, rendert daarom hierdoorheen — anders blijft hij groen terwijl hij de
+ * verkeerde tak toetst.
+ */
+function renderFull(ui: ReactElement) {
+  return render(<DisplayModeProvider initialMode="full">{ui}</DisplayModeProvider>)
+}
 
 /** Schrijfpad van de editor: PUT /api/parameters (geen client-directe DB-write). */
 const mockFetch = vi.fn()
@@ -142,12 +156,17 @@ describe('Box3OptimizerClient — katern I: waar je nu staat', () => {
   it('pint de getoonde referentie-cijfers op de canonieke buildCurrentStanding-uitvoer', () => {
     const { baseline, shift, standing } = buildFixture()
 
+    // Expliciet in "Volledig": de figures-strip kapt in "Eenvoudig" af op twee
+    // cellen (APP-7). Zónder provider valt useDisplayMode() terug op 'simple',
+    // dus de modus hoort hier in de test te staan i.p.v. impliciet te zijn.
     render(
-      <Box3OptimizerClient
-        sections={[box3Section('box3-minimaal', baseline, [shift], shift)]}
-        standing={standing}
-        hasPartner={false}
-      />,
+      <DisplayModeProvider initialMode="full">
+        <Box3OptimizerClient
+          sections={[box3Section('box3-minimaal', baseline, [shift], shift)]}
+          standing={standing}
+          hasPartner={false}
+        />
+      </DisplayModeProvider>,
     )
 
     expect(screen.getByText('Heffing nu')).toBeTruthy()
@@ -157,6 +176,56 @@ describe('Box3OptimizerClient — katern I: waar je nu staat', () => {
     expect(screen.getByText(`${standing.taxFreedomDays} dagen`)).toBeTruthy()
     // Vermogensmix uit standing (beleggingen-only fixture).
     expect(screen.getAllByText(euroPattern(standing.totaalBeleggingen)).length).toBeGreaterThan(0)
+    // Volledig toont de expert-percentages erbij.
+    expect(screen.getByText('Effectieve druk')).toBeTruthy()
+    expect(screen.getByText('Heffingsvrij benut')).toBeTruthy()
+  })
+
+  it('eenvoudig: katern I valt in zijn geheel weg (BEL-2)', () => {
+    const { baseline, shift, standing } = buildFixture()
+
+    render(
+      <DisplayModeProvider initialMode="simple">
+        <Box3OptimizerClient
+          sections={[box3Section('box3-minimaal', baseline, [shift], shift)]}
+          standing={standing}
+          hasPartner={false}
+        />
+      </DisplayModeProvider>,
+    )
+
+    // BEL-2 vervangt de eerdere APP-7-stand op deze pagina. Die test pinde de
+    // strip-reductie ván katern I in Eenvoudig (welke twee cellen overleven);
+    // sinds katern I in Eenvoudig helemaal niet meer rendert, is die reductie
+    // hier onbereikbaar en zou de oude assertie groen blijven om de verkeerde
+    // reden. Wat nu telt: geen enkel spoor van "waar je nu staat".
+    expect(screen.queryByText('Heffing nu')).toBeNull()
+    expect(screen.queryByText('Kost je per jaar')).toBeNull()
+    expect(screen.queryByText('Effectieve druk')).toBeNull()
+    expect(screen.queryByText('Heffingsvrij benut')).toBeNull()
+  })
+
+  it('volledig: katern I staat er onverkort, met alle vier de cellen', () => {
+    const { baseline, shift, standing } = buildFixture()
+
+    // Expliciet 'full': buiten een provider valt useDisplayMode() terug op
+    // 'simple' (ADR 0026) en zou deze test de Eenvoudig-tak keuren.
+    render(
+      <DisplayModeProvider initialMode="full">
+        <Box3OptimizerClient
+          sections={[box3Section('box3-minimaal', baseline, [shift], shift)]}
+          standing={standing}
+          hasPartner={false}
+        />
+      </DisplayModeProvider>,
+    )
+
+    expect(screen.getByText('Heffing nu')).toBeTruthy()
+    expect(screen.getAllByText(euroPattern(standing.tax)).length).toBeGreaterThan(0)
+    expect(screen.getByText('Kost je per jaar')).toBeTruthy()
+    expect(screen.getByText(`${standing.taxFreedomDays} dagen`)).toBeTruthy()
+    expect(screen.getByText('Effectieve druk')).toBeTruthy()
+    expect(screen.getByText('Heffingsvrij benut')).toBeTruthy()
   })
 
   it('toont de aannames waarop de vergelijking rust als chips', () => {
@@ -441,7 +510,8 @@ describe('Box3OptimizerClient — katern II: de vergelijking', () => {
   it('filtert met de stand "Zonder rendementsverlies" de rendement-kostende kans weg', () => {
     const { baseline, shift, standing } = buildFixture()
 
-    render(
+    // Sorteerstanden zijn expert-bediening (BEL-2) → expliciet Volledig.
+    renderFull(
       <Box3OptimizerClient
         sections={[box3Section('box3-minimaal', baseline, [shift], shift)]}
         standing={standing}
@@ -566,7 +636,7 @@ describe('Box3OptimizerClient — sorteer-toggle wijzigt de kolomvolgorde', () =
   it('"Netto effect" (default) zet de partnerverdeling vóór de shift; "Grootste besparing" draait dat om', () => {
     const { section, shift, partner, standing } = buildTwoOpportunityFixture()
 
-    render(<Box3OptimizerClient sections={[section]} standing={standing} hasPartner={true} />)
+    renderFull(<Box3OptimizerClient sections={[section]} standing={standing} hasPartner={true} />)
 
     const opportunityHeaderTitles = () =>
       screen.getAllByRole('columnheader').slice(2).map((h) => h.textContent ?? '')
@@ -672,7 +742,7 @@ describe('Box3OptimizerClient — katern III: de shift-verkenner', () => {
     const expectedIndex = best > 0 ? bestIndex : 0
     const point = shiftCurve[expectedIndex]
 
-    render(
+    renderFull(
       <Box3OptimizerClient
         sections={[box3Section('box3-minimaal', baseline, [shift], shift, shiftCurve)]}
         standing={standing}
@@ -699,7 +769,7 @@ describe('Box3OptimizerClient — katern III: de shift-verkenner', () => {
     const target = shiftCurve.length - 1
     const point = shiftCurve[target]
 
-    render(
+    renderFull(
       <Box3OptimizerClient
         sections={[box3Section('box3-minimaal', baseline, [shift], shift, shiftCurve)]}
         standing={standing}
@@ -720,7 +790,7 @@ describe('Box3OptimizerClient — katern III: de shift-verkenner', () => {
   it('laat de kassabon de VOLLEDIGE shift tonen, met een notitie dat de slider een verkenning is', () => {
     const { baseline, shift, shiftCurve, standing } = buildFixture()
 
-    render(
+    renderFull(
       <Box3OptimizerClient
         sections={[box3Section('box3-minimaal', baseline, [shift], shift, shiftCurve)]}
         standing={standing}
@@ -743,7 +813,7 @@ describe('Box3OptimizerClient — katern III: de shift-verkenner', () => {
     const { baseline, shift, shiftCurve, standing } = buildFixture()
     const t = shift.trajectory!
 
-    render(
+    renderFull(
       <Box3OptimizerClient
         sections={[box3Section('box3-minimaal', baseline, [shift], shift, shiftCurve)]}
         standing={standing}
@@ -765,7 +835,7 @@ describe('Box3OptimizerClient — katern III: de shift-verkenner', () => {
   it('toont geen verkenner wanneer er geen curve geleverd is', () => {
     const { baseline, shift, standing } = buildFixture()
 
-    render(
+    renderFull(
       <Box3OptimizerClient
         sections={[box3Section('box3-minimaal', baseline, [shift], shift, null)]}
         standing={standing}
@@ -788,7 +858,8 @@ describe('Box3OptimizerClient — privacy-maskering op de Fase 2-onderdelen (ver
     mockPrivacy.masked = true
     const { baseline, shift, shiftCurve, standing } = buildFixture()
 
-    render(
+    // Katern III (de verkenner) leeft alleen in Volledig (BEL-2).
+    renderFull(
       <Box3OptimizerClient
         sections={[box3Section('box3-minimaal', baseline, [shift], shift, shiftCurve)]}
         standing={standing}
@@ -865,7 +936,7 @@ describe('Box3OptimizerClient — katern III: inzoomen per kans', () => {
   it('begint ingeklapt en toont na openen de kassabon met het netto effect', () => {
     const { baseline, shift, standing } = buildFixture()
 
-    render(
+    renderFull(
       <Box3OptimizerClient
         sections={[box3Section('box3-minimaal', baseline, [shift], shift)]}
         standing={standing}
@@ -890,7 +961,7 @@ describe('Box3OptimizerClient — katern III: inzoomen per kans', () => {
     const { baseline, shift, standing } = buildFixture()
     const jaarruimte = jaarruimteSection(1_800, 18)
 
-    render(
+    renderFull(
       <Box3OptimizerClient
         sections={[box3Section('box3-minimaal', baseline, [shift], shift), jaarruimte]}
         standing={standing}
@@ -911,7 +982,7 @@ describe('Box3OptimizerClient — katern III: inzoomen per kans', () => {
   it('opent de uitwerking vanuit de vergelijkingstabel', () => {
     const { baseline, shift, standing } = buildFixture()
 
-    render(
+    renderFull(
       <Box3OptimizerClient
         sections={[box3Section('box3-minimaal', baseline, [shift], shift)]}
         standing={standing}
@@ -986,7 +1057,7 @@ describe('Box3OptimizerClient — katern IV: de levenslange varianten', () => {
       previewNote: 'Straks vergelijkt TriFinity de onttrekkingsvolgordes.',
     }
 
-    render(
+    renderFull(
       <Box3OptimizerClient
         sections={[box3Section('box3-minimaal', baseline, [shift], shift), preview]}
         standing={standing}
@@ -1007,7 +1078,7 @@ describe('Box3OptimizerClient — katern IV: de levenslange varianten', () => {
   it('houdt de Wft-callout op één exemplaar, ook mét de nieuwe sectie', () => {
     const { baseline, shift, standing } = buildFixture()
 
-    render(
+    renderFull(
       <Box3OptimizerClient
         sections={[box3Section('box3-minimaal', baseline, [shift], shift)]}
         standing={standing}
@@ -1017,5 +1088,91 @@ describe('Box3OptimizerClient — katern IV: de levenslange varianten', () => {
     )
 
     expect(screen.getAllByText('Indicatie, geen advies.').length).toBe(1)
+  })
+})
+
+/**
+ * BEL-2 — de eenvoudige weergave houdt alléén katern II over (de vergelijking
+ * op één as) plus de Wft-callout en de voetnoten. Katern I (uitgangspunt), III
+ * (uitwerking per kans) en IV (levenslange varianten) zijn de expert-laag, net
+ * als de sorteerstanden en de "bekijk uitwerking"-uitgang in de tabel.
+ *
+ * Beide takken worden EXPLICIET gerenderd: zonder provider valt
+ * `useDisplayMode()` terug op 'simple' (ADR 0026), dus een impliciete render zou
+ * de Volledig-assertie stilzwijgend tegen de verkeerde tak leggen.
+ */
+describe('Box3OptimizerClient — BEL-2: Eenvoudig houdt alleen de vergelijking over', () => {
+  function renderMode(mode: 'simple' | 'full') {
+    const { baseline, shift, shiftCurve, standing } = buildFixture()
+    render(
+      <DisplayModeProvider initialMode={mode}>
+        <Box3OptimizerClient
+          sections={[
+            box3Section('box3-minimaal', baseline, [shift], shift, shiftCurve),
+            jaarruimteSection(1_800, 18),
+          ]}
+          standing={standing}
+          hasPartner={false}
+          year={YEAR}
+          dailyExpenses={DAILY_EXPENSES}
+        />
+      </DisplayModeProvider>,
+    )
+    return { baseline, shift, standing }
+  }
+
+  it('eenvoudig: katern II + voetnoten blijven, katern I/III/IV verdwijnen', () => {
+    const { shift } = renderMode('simple')
+
+    // Katern II staat er onverkort — inclusief de netto-effect-sluitrij en het
+    // GELEVERDE netto effect (geen "eenvoudige" herberekening).
+    expect(screen.getByText('De vergelijking')).toBeTruthy()
+    expect(screen.getByText('Netto effect per jaar')).toBeTruthy()
+    expect(screen.getAllByText(euroPattern(Math.abs(shift.netEffect))).length).toBeGreaterThan(0)
+
+    // Katern I weg (inclusief zijn figures-strip).
+    expect(screen.queryByText('Uitgangspunt')).toBeNull()
+    expect(screen.queryByText('Heffing nu')).toBeNull()
+    expect(screen.queryByText('Kost je per jaar')).toBeNull()
+
+    // Katern III weg — én de uitgang ernaartoe in de vergelijkingstabel.
+    expect(screen.queryByText('De uitwerking')).toBeNull()
+    expect(screen.queryAllByRole('button', { name: /Toon uitwerking/i }).length).toBe(0)
+    expect(screen.queryAllByRole('button', { name: /Bekijk uitwerking/i }).length).toBe(0)
+
+    // Katern IV weg.
+    expect(screen.queryByText('Over je hele looptijd')).toBeNull()
+    expect(screen.queryByRole('button', { name: /Reken de drie varianten door/i })).toBeNull()
+
+    // Voetnoten en de Wft-callout blijven — die dragen de aannames en de grens.
+    expect(screen.getByText('Aannames')).toBeTruthy()
+    expect(screen.getByText('Methode')).toBeTruthy()
+    expect(screen.getByText('Geen advies')).toBeTruthy()
+    expect(screen.getAllByText('Indicatie, geen advies.').length).toBe(1)
+  })
+
+  it('eenvoudig: de sorteerstanden zijn weg, de lijst staat op de default-stand', () => {
+    const { shift } = renderMode('simple')
+
+    expect(screen.queryByText('Sorteer op')).toBeNull()
+    for (const label of ['Netto effect', 'Grootste besparing', 'Zonder rendementsverlies']) {
+      expect(screen.queryByRole('button', { name: label })).toBeNull()
+    }
+    // Zonder bediening blijft de default 'netto' staan: er wordt niets
+    // weggefilterd, dus de rendement-kostende kans is gewoon zichtbaar.
+    expect(screen.getAllByText(shift.title).length).toBeGreaterThan(0)
+  })
+
+  it('volledig: katern I, III, IV, de sorteerstanden én de uitwerking-uitgang staan er wél', () => {
+    renderMode('full')
+
+    expect(screen.getByText('Uitgangspunt')).toBeTruthy()
+    expect(screen.getByText('Heffing nu')).toBeTruthy()
+    expect(screen.getByText('De uitwerking')).toBeTruthy()
+    expect(screen.getByText('Over je hele looptijd')).toBeTruthy()
+    expect(screen.getByText('Sorteer op')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Zonder rendementsverlies' })).toBeTruthy()
+    expect(screen.getAllByRole('button', { name: /Bekijk uitwerking/i }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('button', { name: /Toon uitwerking/i }).length).toBeGreaterThan(0)
   })
 })

@@ -63,6 +63,34 @@ export function shouldShowLiquidWealthLine(
 }
 
 /**
+ * Staat de besteedbaar-lijn STANDAARD aan? (Alleen betekenisvol wanneer
+ * `shouldShowLiquidWealthLine` al waar is — anders is er geen lijn en dus ook
+ * geen toggle.)
+ *
+ * De lijn zit sinds de "te druk"-melding achter een eigen pill naast de
+ * Doel-pill; de grafiek opent daardoor met twee lijnen in plaats van vijf (de
+ * J-drempel hangt code-technisch aan de lijn en valt automatisch mee weg — zie
+ * `showExclTargetLine` in components/app/horizon/chart-static-layers.tsx).
+ *
+ * De standaardstand hangt aan de woonstrategie, niet aan één vaste keuze:
+ *  - `exclude_from_fire` (selector "Uitsluiten") → **AAN**. Daar is zonder-woning
+ *    het hoofdverhaal: de voortgangsbalk en het vrijheids-% staan er al op die
+ *    grondslag (`homeExcludedFromProgress` in horizon-client), dus zónder de lijn
+ *    loopt de grafiek zichtbaar uit de pas met de balk eronder.
+ *  - `downsize` / `reverse_mortgage` → **UIT**. Daar is de totaallijn het
+ *    hoofdverhaal en is de besteedbaar-lijn verdieping die je erbij zet.
+ *  - `include_full` → n.v.t.; daar bestaat de lijn niet (J ≡ I).
+ *
+ * NB: dit is de *default*, geen dwang — de gebruikersvoorkeur (per apparaat)
+ * wint zodra die gezet is.
+ */
+export function defaultLiquidWealthLineVisible(
+  mode: HousingStrategyConfig['mode'],
+): boolean {
+  return mode === 'exclude_from_fire'
+}
+
+/**
  * Minimale rij-vorm die de lijn nodig heeft. `UnifiedProjectionRow` voldoet
  * hieraan structureel; het smalle type houdt deze module los van het volledige
  * projectiecontract (en dus testbaar zonder een complete rij te fabriceren).

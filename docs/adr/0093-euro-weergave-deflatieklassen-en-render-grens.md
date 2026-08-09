@@ -256,6 +256,12 @@ noemer consistent maken" zou de deflatie twee keer toepassen.
   header-controls-stack (`i` op `right-4`, statuspunt `right-[52px]`, insight-toggle `right-[84px]`,
   CLAUDE.md); een vierde control op vaste offsets breekt die documenteerde reeks, en acht
   widget-badges naast elkaar is ruis.
+
+  > **⚠️ De badge-PLAATSING hierboven is achterhaald — zie
+  > [ADR 0094](0094-euro-weergave-status-in-de-sidebar.md) (9 aug 2026).** `EuroViewBadge` is
+  > verwijderd; de weergave-status hangt app-breed bovenaan de sidebar. "Geen tweede as-label" en de
+  > redenering over de header-controls-stack blijven gelden — er komt juist géén vierde control bij.
+  > De overige punten van §12 (exempt-klassen, export-artefacten) zijn onverkort van kracht.
 - **Toggle volgt de kernel; eigen projectiemotoren zijn exempt.** Een oppervlak kan alleen meebewegen
   met een kernelrij onder zich. Exempt, met reden: `net-worth-projection-chart.tsx` (eigen
   compound-projectie), `compound-insight-card.tsx`/`fee-impact-card.tsx` (illustratief, geen

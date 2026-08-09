@@ -66,6 +66,7 @@ import type {
 } from '@/lib/unified-projection'
 import type { SolveFireResult, SolverStatus } from './solver'
 import type { KernelProjection } from './engine'
+import { jaarBlokEindMaand, laatsteJaarBlok, startNettoVermogen } from './jaarrand'
 import { computeEs, type EindstrategieCode } from './tables/es'
 import type { GebPostHelpers } from './tables/geb'
 import { inflationIndex } from './scaffold'
@@ -372,7 +373,10 @@ function buildRow(
   const { input } = ctx
   const startAge = Math.round(input.startLeeftijd)
   const monthStart = 12 * k
-  const monthEnd = Math.min(12 * k + 11, lastInHorizonMonth)
+  // Blok-rand uit de gedeelde bemonsteringsregel (`jaarrand.ts`) — dezelfde regel
+  // die de Monte-Carlo-marktcheck per verstoorde run gebruikt, zodat band en
+  // hoofdlijn per constructie op dezelfde leeftijdsas liggen.
+  const monthEnd = jaarBlokEindMaand(k, lastInHorizonMonth)
 
   const assetBuckets: Partial<Record<AssetType, AssetBucketDetail>> = {}
   const withdrawalByType: Partial<Record<AssetType, number>> = {}
@@ -381,10 +385,7 @@ function buildRow(
   // ── Standen (Prognose op blok-randen) ──────────────────────────────────────
   // startNetWorth: Prognose!I(12k−1); k=0 → beginwaarden uit de potten.
   const startNetWorth =
-    k === 0
-      ? input.assetPotten.reduce((s, p) => s + p.startwaarde, 0) -
-        input.schuldPotten.reduce((s, p) => s + p.startwaarde, 0)
-      : prognoseNetWorth(proj, monthStart - 1)
+    k === 0 ? startNettoVermogen(input) : prognoseNetWorth(proj, monthStart - 1)
 
   const endProg = proj.prognose[monthEnd]
   const totalAssets = endProg && !endProg.beyondHorizon ? endProg.totaalBezittingen : 0
@@ -750,7 +751,7 @@ export function kernelToUnifiedResult(
   const groups = buildSlotGroups(ctx)
 
   // ── Rijen: één per jaar-blok t/m de laatste in-horizon-maand ───────────────
-  const kLast = Math.floor(lastInHorizonMonth / 12)
+  const kLast = laatsteJaarBlok(lastInHorizonMonth)
   const rows: UnifiedProjectionRow[] = []
   const box1Posts = collectBox1GebPosts(proj)
   let cumBox3 = 0

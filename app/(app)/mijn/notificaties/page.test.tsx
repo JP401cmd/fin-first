@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import MijnNotificatiesPage from './page'
+import { DisplayModeProvider, type DisplayMode } from '@/lib/hooks/use-display-mode'
+import { NOTIFICATION_TYPES } from '@/lib/identity-constants'
 
 /**
  * Smoke-tests voor /mijn/notificaties — geëxtraheerd uit
@@ -110,5 +112,68 @@ describe('MijnNotificatiesPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Partner transacties')).toBeTruthy()
     })
+  })
+})
+
+/**
+ * MIJN-3 — in Eenvoudig drie hoofdschakelaars (meldingen in de app, briefing per
+ * e-mail, maandelijkse geldcheck-in) plus een "Alle meldingstypen"-disclosure
+ * met de losse push-types; in Volledig de vlakke lijst zoals hij was.
+ *
+ * Bron: docs/eenvoudige-weergave-audit.md §7 (/mijn).
+ */
+function renderInMode(mode: DisplayMode) {
+  return render(
+    <DisplayModeProvider initialMode={mode}>
+      <MijnNotificatiesPage />
+    </DisplayModeProvider>,
+  )
+}
+
+describe('MijnNotificatiesPage — Eenvoudige weergave (MIJN-3)', () => {
+  it("toont in 'simple' de drie hoofdschakelaars", async () => {
+    setupMocksWithUser()
+    renderInMode('simple')
+    await waitFor(() => {
+      expect(screen.getByText('Meldingen in de app')).toBeTruthy()
+    })
+    expect(screen.getByText('Briefing per e-mail')).toBeTruthy()
+    expect(screen.getByText('Maandelijkse geldcheck-in')).toBeTruthy()
+  })
+
+  it("zet in 'simple' de losse meldingstypen in een ingeklapte disclosure", async () => {
+    setupMocksWithUser()
+    renderInMode('simple')
+    const section = await screen.findByTestId('depth-section')
+    expect(section.getAttribute('data-collapsed')).toBe('true')
+    expect(within(section).getByTestId('depth-section-title').textContent).toBe(
+      'Alle meldingstypen',
+    )
+    // De types blijven bereikbaar (inklappen-met-behoud, geen hard-hide).
+    expect(within(section).getByText('Budget alerts')).toBeTruthy()
+    expect(within(section).getByText('Je eigen grenzen')).toBeTruthy()
+  })
+
+  it("toont in 'full' de vlakke lijst zonder disclosure en zonder hoofdschakelaar", async () => {
+    setupMocksWithUser()
+    renderInMode('full')
+    await waitFor(() => {
+      expect(screen.getByText('Budget alerts')).toBeTruthy()
+    })
+    expect(screen.queryByTestId('depth-section')).toBeNull()
+    expect(screen.queryByText('Meldingen in de app')).toBeNull()
+    // Alle zeven types staan er los.
+    for (const { label } of NOTIFICATION_TYPES) {
+      expect(screen.getByText(label)).toBeTruthy()
+    }
+  })
+
+  it("toont geen dubbele geldcheck-in-rij in 'simple'", async () => {
+    setupMocksWithUser()
+    renderInMode('simple')
+    await waitFor(() => {
+      expect(screen.getByText('Meldingen in de app')).toBeTruthy()
+    })
+    expect(screen.getAllByText('Maandelijkse geldcheck-in')).toHaveLength(1)
   })
 })

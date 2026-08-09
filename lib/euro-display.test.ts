@@ -375,6 +375,22 @@ describe('deflateSeriesByOffset', () => {
     const result = deflateSeriesByOffset([1000, 2000, 4000], [1, 0, 4], 'real')
     expect(result).toEqual([1000, 2000, 1000])
   })
+
+  it('zonder indexOf blijft het gedrag ongewijzigd (identiteit is de default)', () => {
+    const series = [1000, 2000, 4000]
+    expect(deflateSeriesByOffset(series, factorByOffset, 'real')).toEqual(
+      deflateSeriesByOffset(series, factorByOffset, 'real', (i) => i),
+    )
+  })
+
+  it('indexOf mapt naar het BRONjaar — de Monte-Carlo-band-sleutel (i − 1)', () => {
+    // De band draagt op index i de eindstand van jaar-blok i−1; die hoort bij de
+    // factor van dát bronjaar. Zonder de sleutel deflateert index 2 met factor 4
+    // i.p.v. 2 en zakt de band een heel jaar te ver.
+    const bronjaar = (i: number) => Math.max(i - 1, 0)
+    const result = deflateSeriesByOffset([1000, 2000, 4000], factorByOffset, 'real', bronjaar)
+    expect(result).toEqual([1000, 2000, 2000])
+  })
 })
 
 describe('buildFactorByOffset', () => {

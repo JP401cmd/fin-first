@@ -38,3 +38,28 @@ describe('NavMenuSheet — Eenvoudig-weergave verbergt Rekenhulp/Wat-Als', () =>
     expect(screen.getByText('Gebeurtenissen')).toBeInTheDocument()
   })
 })
+
+/**
+ * NAV-2 — in Eenvoudig klapt alleen de ACTIEVE hoofdpagina zijn sub-items uit;
+ * de andere hoofdpagina's blijven één regel. In Volledig blijft de hele boom in
+ * beeld. Actieve route in deze suite: /toekomst.
+ */
+describe('NavMenuSheet — NAV-2: alleen de actieve tak klapt uit', () => {
+  afterEach(cleanup)
+
+  it("toont in 'full' óók de sub-items van niet-actieve hoofdpagina's", () => {
+    renderSheet('full')
+    expect(screen.getByText('Bezittingen')).toBeInTheDocument()
+    expect(screen.getByText('Schulden')).toBeInTheDocument()
+  })
+
+  it("verbergt in 'simple' de sub-items van niet-actieve hoofdpagina's", () => {
+    renderSheet('simple')
+    expect(screen.queryByText('Bezittingen')).not.toBeInTheDocument()
+    expect(screen.queryByText('Schulden')).not.toBeInTheDocument()
+    // De hoofdpagina zelf blijft één regel — bereikbaar, niet uitgeklapt.
+    expect(screen.getByText('Overzicht')).toBeInTheDocument()
+    // De actieve tak (/toekomst) houdt zijn sub-items.
+    expect(screen.getByText('Doelen')).toBeInTheDocument()
+  })
+})

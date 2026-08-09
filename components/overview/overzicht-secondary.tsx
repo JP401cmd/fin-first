@@ -228,7 +228,11 @@ export function OverzichtSecondary({
         simpleMode={simple}
       />
 
-      {/* Drie "alles bekijken"-ingangen onder de briefing. */}
+      {/* Drie "alles bekijken"-ingangen onder de briefing. In Eenvoudig weg
+          (OVZ-3): de navigatie draagt deze drie bestemmingen al, en onderaan de
+          eerste pagina is een tweede linkenrij precies de drukte die de
+          eenvoudige weergave hoort weg te nemen. */}
+      {!simple && (
       <div className="mt-4 flex flex-wrap items-center justify-center gap-x-5 gap-y-1.5 print:hidden">
         <Link
           href="/overzicht/tips"
@@ -252,6 +256,7 @@ export function OverzichtSecondary({
           <ArrowRight className="w-3 h-3" aria-hidden="true" />
         </Link>
       </div>
+      )}
 
       {/* Filosofie-tagline als hero-footer — visueel afsluitend. */}
       <p className="mt-6 pb-4 text-center text-[11px] uppercase tracking-[0.18em] text-[var(--ink-3)] font-medium">

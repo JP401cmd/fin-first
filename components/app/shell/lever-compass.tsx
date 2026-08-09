@@ -25,6 +25,7 @@ import {
   Receipt,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 
 // Re-export types and computation from shared (non-client) module so that
 // existing imports from this file continue to work — but the actual logic
@@ -68,6 +69,28 @@ const STATUS_LABELS: Record<LeverStatus, string> = {
   amber: 'Aandacht',
   red: 'Zorg',
   neutral: 'Geen data',
+}
+
+// Ernst-volgorde voor het samenvatten van vier hefbomen tot één punt (NAV-6).
+// 'neutral' (geen data) is bewust de laagste: geen data is geen probleem, maar
+// het mag ook nooit een échte waarschuwing overstemmen.
+const STATUS_SEVERITY: Record<LeverStatus, number> = {
+  neutral: 0,
+  green: 1,
+  amber: 2,
+  red: 3,
+}
+
+/**
+ * De zwaarste status over alle vier de hefbomen — het ene punt dat in
+ * Eenvoudig-weergave in de plaats komt van de vier losse stippen. Exporteerbaar
+ * zodat de test hem tegen dezelfde bron kan houden.
+ */
+export function worstLeverStatus(scores: LeverScores): LeverStatus {
+  return LEVERS.reduce<LeverStatus>((worst, { key }) => {
+    const status = scores[key].status
+    return STATUS_SEVERITY[status] > STATUS_SEVERITY[worst] ? status : worst
+  }, 'neutral')
 }
 
 // ── Mini-tooltip (CSS-based, no portal) ─────────────────────────────────────
@@ -364,6 +387,12 @@ export function LeverCompassCollapsed({ scores }: { scores: LeverScores }) {
 export function LeverCompassMobile({ scores }: { scores: LeverScores }) {
   const [expanded, setExpanded] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+  // NAV-6 — in Eenvoudig één statuspunt in plaats van vier naamloze stippen.
+  // Vier ongelabelde kleuren naast elkaar in een 48px-balk zijn niet te lezen
+  // zonder ze aan te tikken; één punt zegt hetzelfde ("is er iets aan de hand?")
+  // en de vier namen staan waar ze thuishoren: in het paneel eronder.
+  const simple = useDisplayMode().mode === 'simple'
+  const worst = worstLeverStatus(scores)
 
   // Close on outside click
   useEffect(() => {
@@ -390,22 +419,39 @@ export function LeverCompassMobile({ scores }: { scores: LeverScores }) {
       <button
         type="button"
         onClick={() => setExpanded(prev => !prev)}
-        className="flex items-center gap-[3px] rounded-full px-1.5 py-1 transition-colors hover:bg-[var(--subtle)]"
-        aria-label={expanded ? 'Kompas sluiten' : 'Kompas openen'}
+        className={
+          simple
+            ? 'flex h-7 w-7 items-center justify-center rounded-full border border-[var(--border-ed)] bg-[var(--paper)] transition-colors hover:border-[var(--module-active-500)]'
+            : 'flex items-center gap-[3px] rounded-full px-1.5 py-1 transition-colors hover:bg-[var(--subtle)]'
+        }
+        aria-label={
+          expanded
+            ? 'Kompas sluiten'
+            : simple
+              ? `Kompas: ${STATUS_LABELS[worst].toLowerCase()} — open het kompas`
+              : 'Kompas openen'
+        }
         aria-expanded={expanded}
         aria-haspopup="dialog"
       >
-        {LEVERS.map(({ key }) => {
-          const entry = scores[key]
-          const colors = STATUS_COLORS[entry.status]
-          return (
-            <span
-              key={key}
-              className={`block w-[6px] h-[6px] rounded-full ${colors.dot}`}
-              aria-hidden
-            />
-          )
-        })}
+        {simple ? (
+          <span
+            className={`block h-2.5 w-2.5 rounded-full ${STATUS_COLORS[worst].dot}`}
+            aria-hidden
+          />
+        ) : (
+          LEVERS.map(({ key }) => {
+            const entry = scores[key]
+            const colors = STATUS_COLORS[entry.status]
+            return (
+              <span
+                key={key}
+                className={`block w-[6px] h-[6px] rounded-full ${colors.dot}`}
+                aria-hidden
+              />
+            )
+          })
+        )}
       </button>
 
       {/* Expanded panel */}

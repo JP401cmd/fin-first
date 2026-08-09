@@ -123,7 +123,11 @@ export function NavMenuSheet({ open, onClose, onAction }: NavMenuSheetProps) {
           const Icon = item.icon!
           const active = isActive(item.href)
           const c = colorClasses[item.color]
-          const subs = subRoutesFor(item.href)
+          // NAV-2 — in Eenvoudig klapt alleen de ACTIEVE hoofdpagina zijn
+          // sub-items uit; de rest blijft één regel. De routes zelf blijven
+          // bereikbaar: tik de hoofdpagina aan en zijn sub-items staan er.
+          // In Volledig blijft alles uitgeklapt (één blik op de hele boom).
+          const subs = displayMode === 'simple' && !active ? [] : subRoutesFor(item.href)
           return (
             <section key={item.href}>
               <Link

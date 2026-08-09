@@ -117,7 +117,15 @@ function statusSubText(key: HefboomKey, status: StatusCode, pillar?: HealthPilla
   if (key === 'belasting') {
     // Geen pijler meer (ADR 0010): valt terug op de totaal-score-proxy en is
     // bewust een richtingaanwijzer — geen handelingsadvies of besparingsbelofte.
-    return 'Verken je Box 3-positie'
+    //
+    // BEL-3 (eenvoudige-weergave-audit, categorie E): "Verken je Box 3-positie"
+    // was jargon — precies het soort zin waar de doelgroep van Eenvoudig op
+    // afhaakt. De vervanging blijft binnen de Wft-grens omdat elk van de drie
+    // eigenschappen behouden is: de hedge "Mogelijk" (geen vaststelling over
+    // déze gebruiker), géén bedrag of besparingsbelofte, en géén imperatief
+    // ("stort", "verschuif"). Wat overblijft is een richtingaanwijzer naar de
+    // eigen positie — dezelfde functie als de oude tekst, in gewone taal.
+    return 'Mogelijk betaal je meer dan nodig'
   }
   return null
 }
@@ -163,8 +171,9 @@ export function HefbomenNav({
   housingSplit?: HefbomenHousingSplit | null
   /**
    * Eenvoudige weergave (display_mode === 'simple'): verberg de chevron /
-   * uitklap-drill-down op de hefboomkaarten — de kaarten blijven dan rustige,
-   * klikbare tegels zonder collapse-affordance. Default false → ongewijzigd.
+   * uitklap-drill-down op de hefboomkaarten én de duidende regels eronder
+   * (status-substext + "excl. eigen woning · €X") — er blijft dan per tegel
+   * hoofdcijfer + statuspunt over (OVZ-2). Default false → ongewijzigd.
    */
   simple?: boolean
 }) {
@@ -204,7 +213,10 @@ export function HefbomenNav({
               ? `${formatMaskedCurrency(totalValue, masked)}/jr`
               : formatMaskedCurrency(totalValue, masked)
           : ''
-        const subText = statusSubText(key, status, pillar)
+        // OVZ-2: in de eenvoudige weergave dragen de tegels alléén het
+        // hoofdcijfer + het statuspunt. De status-duiding ("Beperkt gespreid",
+        // "Mogelijk betaal je meer dan nodig") verhuist naar de duwpagina.
+        const subText = simple ? null : statusSubText(key, status, pillar)
         const expanded = expandedKey === key
 
         const hasDrilldown = Boolean(pillar) || status !== 'neutral'
@@ -214,8 +226,11 @@ export function HefbomenNav({
         // (housingSplit non-null). Weging-consistent: huis/hypotheek zijn al
         // inclusion-gewogen in housingContext, dus dit IS de gefilterde gewogen
         // som. GEEN vrijheidstijd-trailing hier — de tegel blijft compact.
+        // OVZ-2: in Eenvoudig valt de hele dubbele-grondslag-regel weg (inclusief
+        // de uitlijn-placeholder) — er is dan geen enkele extra regel meer om
+        // tegen uit te lijnen, dus alle vier de tegels blijven vanzelf gelijk.
         let subAmount: React.ReactNode = null
-        if (housingSplit) {
+        if (housingSplit && !simple) {
           if (
             showTotal &&
             typeof totalValue === 'number' &&
@@ -249,6 +264,7 @@ export function HefbomenNav({
             status={status}
             subText={subText}
             subAmount={subAmount}
+            showSubRow={!simple}
             href={href}
             tooltip={tooltip}
             expandable={hasDrilldown && !simple}
@@ -305,25 +321,11 @@ function HefboomDetailCard({
   )
 }
 
-/**
- * Compacte legenda onder de hefbomen-rij. Mockup-stijl uitleg voor de
- * status-dots zodat gebruikers meteen weten wat groen/oranje/rood betekent.
+/*
+ * OVZ-1 (eenvoudige weergave, fase 1): de losse `HefbomenLegenda` — drie
+ * statuslabels onder de hefbomen-rij — is verwijderd. Hij werd nergens in de
+ * productie-UI gerenderd (alleen in zijn eigen unit-test) en de uitleg van
+ * groen/oranje/rood hoort volgens het audit-besluit éénmalig in de pagina-'i'
+ * van /overzicht: zie `PAGE_INFO['/overzicht']` in lib/page-info-content.ts.
+ * De status-dot zelf houdt zijn `title` uit `LEVERAGE_STATUS_LABEL`.
  */
-export function HefbomenLegenda() {
-  return (
-    <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 mt-3 mb-6 text-xs text-[var(--ink-3)]">
-      <span className="inline-flex items-center gap-1.5">
-        <span className="w-2 h-2 rounded-full bg-emerald-500" aria-hidden="true" />
-        Op koers
-      </span>
-      <span className="inline-flex items-center gap-1.5">
-        <span className="w-2 h-2 rounded-full bg-amber-500" aria-hidden="true" />
-        Aandacht nodig
-      </span>
-      <span className="inline-flex items-center gap-1.5">
-        <span className="w-2 h-2 rounded-full bg-red-500" aria-hidden="true" />
-        Actie vereist
-      </span>
-    </div>
-  )
-}

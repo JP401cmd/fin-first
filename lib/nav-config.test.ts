@@ -3,6 +3,7 @@ import {
   resolveRouteTitle,
   navGroups,
   mainNav,
+  globalNav,
   EXTRA_ROUTE_TITLES,
   SIMPLE_HIDDEN_NAV_HREFS,
 } from './nav-config'
@@ -30,7 +31,7 @@ describe('resolveRouteTitle', () => {
 
   it('resolveert EXTRA_ROUTE_TITLES (buiten de nav-structuur)', () => {
     expect(resolveRouteTitle('/mijn/checkins')).toBe('Check-ins')
-    expect(resolveRouteTitle('/mijn/feedback')).toBe('Feedback')
+    expect(resolveRouteTitle('/mijn/feedback')).toBe('Melden')
     expect(resolveRouteTitle('/toekomst/strategie')).toBe('Strategie')
     expect(resolveRouteTitle('/toekomst/inflatie-koopkracht')).toBe('Inflatie & koopkracht')
   })
@@ -42,6 +43,7 @@ describe('resolveRouteTitle', () => {
   it('resolveert globalNav-routes met een echte href', () => {
     expect(resolveRouteTitle('/nieuws')).toBe('Krant')
     expect(resolveRouteTitle('/berichten')).toBe('Berichten')
+    expect(resolveRouteTitle('/overzicht/tips')).toBe('Tips & acties')
   })
 
   it('normaliseert querystring, hash en trailing slash', () => {
@@ -77,6 +79,23 @@ describe('resolveRouteTitle', () => {
     for (const [href, label] of Object.entries(EXTRA_ROUTE_TITLES)) {
       expect(resolveRouteTitle(href)).toBe(label)
     }
+  })
+})
+
+describe('globalNav (mobiele nav-sheet + topbar-iconen)', () => {
+  // ADR 0095: "Tips & acties" ontbrak volledig in globalNav, waardoor de pagina
+  // op mobiel alleen via omwegen bereikbaar was. Deze assertie bijt: hij faalt
+  // zodra het item weer uit de lijst verdwijnt — resolveRouteTitle alleen zou
+  // dat NIET vangen (die viel eerder terug op EXTRA_ROUTE_TITLES).
+  it('bevat Tips & acties, zodat de mobiele nav-sheet de sidebar spiegelt', () => {
+    const tips = globalNav.find((item) => item.href === '/overzicht/tips')
+    expect(tips, '/overzicht/tips moet in globalNav staan (ADR 0095)').toBeDefined()
+    expect(tips!.label).toBe('Tips & acties')
+  })
+
+  it('registreert /overzicht/tips niet dubbel in EXTRA_ROUTE_TITLES', () => {
+    // EXTRA_ROUTE_TITLES is per contract voor routes BUITEN de nav-structuur.
+    expect(Object.keys(EXTRA_ROUTE_TITLES)).not.toContain('/overzicht/tips')
   })
 })
 

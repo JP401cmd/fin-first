@@ -1,6 +1,6 @@
 'use client'
 
-import { SectionLabel, FiguresStrip } from '@/components/editorial'
+import { SectionLabel, FiguresStrip, type FigureProps } from '@/components/editorial'
 import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
 import { VerdelingStaaf } from './verdeling-staaf'
 import { BOX3_PARAMS, type TaxYear } from '@/lib/box3-data'
@@ -57,6 +57,36 @@ export function OptimizerStanding({
   ]
   const mixTotal = segments.reduce((sum, s) => sum + Math.max(0, s.value), 0)
 
+  // De vier kerncijfers van dit katern — één bron, hieronder zowel voor de
+  // volledige strip als voor de Eenvoudig-selectie gebruikt.
+  const figures: FigureProps[] = [
+    {
+      kicker: 'Heffing nu',
+      amount: fc(standing.tax),
+      sub: `Box 3 · per jaar (${year})`,
+      // Hoofduitkomst van dit katern → verplichte highlight-marker
+      // (quality-checklist: één per sectie, alleen op het ankergetal).
+      variant: 'winner',
+    },
+    {
+      kicker: 'Effectieve druk',
+      amount: pct(standing.effectieveDrukPct),
+      sub: 'van je Box 3-vermogen',
+    },
+    {
+      kicker: 'Heffingsvrij benut',
+      amount: pct(standing.vrijstellingBenutPct, 0),
+      sub: `van ${fc(standing.heffingsvrijVermogen)}${
+        standing.hasPartner ? ' (samen met je fiscaal partner)' : ''
+      }`,
+    },
+    {
+      kicker: 'Kost je per jaar',
+      amount: `${standing.taxFreedomDays} dagen`,
+      sub: 'vrijheid, tegen je dagtarief',
+    },
+  ]
+
   return (
     <section id="optimizer-nu" className="scroll-mt-24">
       <SectionLabel num="I">Uitgangspunt</SectionLabel>
@@ -86,35 +116,15 @@ export function OptimizerStanding({
         </div>
       )}
 
+      {/* APP-7: in Eenvoudig blijven "Heffing nu" en "Kost je per jaar" staan —
+          bewust NIET de eerste twee. Het bedrag en zijn vrijheidstijd horen bij
+          elkaar; zou de dagen-cel wegvallen, dan toont dit katern een fors
+          bedrag zónder zijn vrijheidstijd-equivalent. De percentages
+          (effectieve druk, vrijstelling benut) zijn de expert-laag. */}
       <FiguresStrip
         cols={4}
-        figures={[
-          {
-            kicker: 'Heffing nu',
-            amount: fc(standing.tax),
-            sub: `Box 3 · per jaar (${year})`,
-            // Hoofduitkomst van dit katern → verplichte highlight-marker
-            // (quality-checklist: één per sectie, alleen op het ankergetal).
-            variant: 'winner',
-          },
-          {
-            kicker: 'Effectieve druk',
-            amount: pct(standing.effectieveDrukPct),
-            sub: 'van je Box 3-vermogen',
-          },
-          {
-            kicker: 'Heffingsvrij benut',
-            amount: pct(standing.vrijstellingBenutPct, 0),
-            sub: `van ${fc(standing.heffingsvrijVermogen)}${
-              standing.hasPartner ? ' (samen met je fiscaal partner)' : ''
-            }`,
-          },
-          {
-            kicker: 'Kost je per jaar',
-            amount: `${standing.taxFreedomDays} dagen`,
-            sub: 'vrijheid, tegen je dagtarief',
-          },
-        ]}
+        figures={figures}
+        simpleFigures={[figures[0], figures[3]]}
       />
 
       {mixTotal > 0 && (

@@ -1,11 +1,23 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import type { ReactElement } from 'react'
 import { CashflowForecast } from './cashflow-forecast'
+import { DisplayModeProvider, type DisplayMode } from '@/lib/hooks/use-display-mode'
 import type { RecurringTransaction } from '@/lib/recurring-data'
 
 /**
- * Tests voor CashflowForecast — 6-maanden vooruitblik tabel.
+ * Tests voor CashflowForecast — 6-maanden vooruitblik.
+ *
+ * LET OP DE MODUS. `useDisplayMode()` valt BUITEN een provider terug op
+ * 'simple' (zie lib/hooks/use-display-mode.tsx). Een `render(<CashflowForecast/>)`
+ * zonder provider test dus de Eenvoudig-tak, niet de tabel. Alle tabel-tests
+ * gaan daarom expliciet door `renderIn('full', …)` — anders zouden ze stil de
+ * verkeerde tak asserten zodra iemand aan de reductie sleutelt.
  */
+
+function renderIn(mode: DisplayMode, ui: ReactElement) {
+  return render(<DisplayModeProvider initialMode={mode}>{ui}</DisplayModeProvider>)
+}
 
 function makeRecurring(
   overrides: Partial<RecurringTransaction> = {},
@@ -35,7 +47,7 @@ function makeRecurring(
 
 describe('CashflowForecast — empty-state', () => {
   it('toont CTA wanneer geen baseline en geen recurrings', () => {
-    render(
+    renderIn('full',
       <CashflowForecast
         recurrings={[]}
         baselineIncome={0}
@@ -46,7 +58,7 @@ describe('CashflowForecast — empty-state', () => {
   })
 
   it('rendert tabel zodra baseline aanwezig is, ook zonder recurrings', () => {
-    render(
+    renderIn('full',
       <CashflowForecast
         recurrings={[]}
         baselineIncome={3000}
@@ -60,7 +72,7 @@ describe('CashflowForecast — empty-state', () => {
 
 describe('CashflowForecast — tabel-structuur', () => {
   it('rendert 6 rijen voor 6 maanden vooruit', () => {
-    const { container } = render(
+    const { container } = renderIn('full',
       <CashflowForecast
         recurrings={[]}
         baselineIncome={3000}
@@ -72,7 +84,7 @@ describe('CashflowForecast — tabel-structuur', () => {
   })
 
   it('rendert kolom-headers Maand / Verwacht in / Verwacht uit / Netto / Saldo', () => {
-    render(
+    renderIn('full',
       <CashflowForecast
         recurrings={[]}
         baselineIncome={3000}
@@ -87,7 +99,7 @@ describe('CashflowForecast — tabel-structuur', () => {
   })
 
   it('toont totaal-stats in header (Totaal in/uit/Overschot)', () => {
-    render(
+    renderIn('full',
       <CashflowForecast
         recurrings={[]}
         baselineIncome={3000}
@@ -100,7 +112,7 @@ describe('CashflowForecast — tabel-structuur', () => {
   })
 
   it('toont "Tekort" wanneer expenses > income', () => {
-    render(
+    renderIn('full',
       <CashflowForecast
         recurrings={[]}
         baselineIncome={1000}
@@ -113,7 +125,7 @@ describe('CashflowForecast — tabel-structuur', () => {
 
 describe('CashflowForecast — cumulatief saldo', () => {
   it('cumulatief saldo loopt op met overschot', () => {
-    const { container } = render(
+    const { container } = renderIn('full',
       <CashflowForecast
         recurrings={[]}
         baselineIncome={3000}
@@ -131,7 +143,7 @@ describe('CashflowForecast — cumulatief saldo', () => {
   })
 
   it('rendert negatief cumulatief saldo in rood', () => {
-    const { container } = render(
+    const { container } = renderIn('full',
       <CashflowForecast
         recurrings={[]}
         baselineIncome={1000}
@@ -145,9 +157,76 @@ describe('CashflowForecast — cumulatief saldo', () => {
   })
 })
 
+describe('CashflowForecast — Eenvoudig (FC-1): eindregel + sparkline', () => {
+  it('vervangt de tabel door één eindregel', () => {
+    const { container } = renderIn('simple',
+      <CashflowForecast
+        recurrings={[]}
+        baselineIncome={3000}
+        baselineExpenses={2000}
+        startingBalance={1000}
+      />,
+    )
+    expect(container.querySelector('table')).toBeNull()
+    expect(screen.getByText('Over 6 maanden')).toBeTruthy()
+    // Zelfde getal als "Saldo na 6m" in Volledig: 1000 + 6 × 1000 = 7000.
+    expect(screen.getByText(/7\.000/)).toBeTruthy()
+    expect(screen.getByText(/6\.000 erbij in die zes maanden/)).toBeTruthy()
+  })
+
+  it('toont de sparkline over het cumulatieve saldo', () => {
+    renderIn('simple',
+      <CashflowForecast
+        recurrings={[]}
+        baselineIncome={3000}
+        baselineExpenses={2000}
+      />,
+    )
+    const spark = screen.getByTestId('forecast-sparkline')
+    // Oplopend saldo → positieve richting; de reeks moet écht geplot zijn.
+    expect(spark.getAttribute('data-trend')).toBe('up')
+  })
+
+  it('framet een dalend saldo als "eraf", niet als "erbij"', () => {
+    renderIn('simple',
+      <CashflowForecast
+        recurrings={[]}
+        baselineIncome={1000}
+        baselineExpenses={3000}
+      />,
+    )
+    expect(screen.getByText(/eraf in die zes maanden/)).toBeTruthy()
+    expect(screen.getByTestId('forecast-sparkline').getAttribute('data-trend')).toBe('down')
+  })
+
+  it('houdt de lege staat gelijk in beide modi', () => {
+    renderIn('simple',
+      <CashflowForecast
+        recurrings={[]}
+        baselineIncome={0}
+        baselineExpenses={0}
+      />,
+    )
+    expect(screen.getByText(/vereist baseline-cijfers/i)).toBeTruthy()
+  })
+
+  it('toont in Volledig géén eindregel — de tabel blijft de vorm daar', () => {
+    const { container } = renderIn('full',
+      <CashflowForecast
+        recurrings={[]}
+        baselineIncome={3000}
+        baselineExpenses={2000}
+      />,
+    )
+    expect(container.querySelector('table')).not.toBeNull()
+    expect(screen.queryByText('Over 6 maanden')).toBeNull()
+    expect(screen.queryByTestId('forecast-sparkline')).toBeNull()
+  })
+})
+
 describe('CashflowForecast — recurring-aggregaat', () => {
   it('verhoogt outgoing bij negatieve recurring', () => {
-    render(
+    renderIn('full',
       <CashflowForecast
         recurrings={[makeRecurring({ amount: -100, frequency: 'monthly' })]}
         baselineIncome={3000}
@@ -159,7 +238,7 @@ describe('CashflowForecast — recurring-aggregaat', () => {
   })
 
   it('verhoogt incoming bij positieve recurring (bonus, dividend, etc.)', () => {
-    render(
+    renderIn('full',
       <CashflowForecast
         recurrings={[makeRecurring({ amount: 500, frequency: 'monthly' })]}
         baselineIncome={3000}
@@ -171,7 +250,7 @@ describe('CashflowForecast — recurring-aggregaat', () => {
   })
 
   it('jaarlijkse recurring deelt door 12', () => {
-    render(
+    renderIn('full',
       <CashflowForecast
         recurrings={[makeRecurring({ amount: -1200, frequency: 'yearly' })]}
         baselineIncome={3000}

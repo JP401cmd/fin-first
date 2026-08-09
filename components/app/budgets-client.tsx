@@ -526,10 +526,108 @@ export function BudgetViewToggle({
   )
 }
 
+/**
+ * De rechter actie-groep van de budget-actiebalk: "Rapport" (naar /rapportages)
+ * en "Kopieer vorige maand". Allebei beheer-diepte → in Eenvoudig volledig weg
+ * via `HideInSimple` (hard-hide; de routes blijven bereikbaar). Anders dan de
+ * toggle-groepen ernaast (`BudgetViewToggle`/`BudgetPeriodToggle`, die een
+ * meerkeuze terugbrengen tot één optie) krijgt dit blok géén `simple`-prop:
+ * het is een pure hard-hide, precies waar `HideInSimple` voor is, en het leest
+ * de modus dus rechtstreeks uit `useDisplayMode()` (één leespad). Geëxporteerd
+ * voor unit-tests. De `hidden sm:flex`-klasse blijft de bestaande mobiele keuze.
+ */
+export function BudgetReportActions({
+  showCopy,
+  copying,
+  onOpenReport,
+  onCopyLastMonth,
+}: {
+  showCopy: boolean
+  copying: boolean
+  onOpenReport: () => void
+  onCopyLastMonth: () => void
+}) {
+  return (
+    <HideInSimple>
+      <div className="hidden sm:flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onOpenReport}
+          className="inline-flex items-center gap-1.5 border border-[var(--border-ed)] bg-[var(--bg)] px-3 py-1 font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--ink-2)] transition-all hover:shadow-[var(--s0)] hover:-translate-y-px hover:text-[var(--ink)]"
+        >
+          <FileText className="h-3 w-3" />
+          Rapport
+        </button>
+        {showCopy && (
+          <button
+            type="button"
+            onClick={onCopyLastMonth}
+            disabled={copying}
+            title="Kopieer budgetbedragen van vorige maand"
+            className="inline-flex items-center gap-1.5 border border-[var(--border-ed)] bg-[var(--bg)] px-3 py-1 font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] disabled:opacity-50"
+          >
+            {copying ? (
+              <span className="h-3 w-3 animate-spin rounded-full border border-[var(--ink-3)] border-t-transparent" />
+            ) : (
+              <Save className="h-3 w-3" />
+            )}
+            Kopieer vorige maand
+          </button>
+        )}
+      </div>
+    </HideInSimple>
+  )
+}
+
+/**
+ * De periode-toggle (Maand / YTD / 12 mnd) in de actiebalk. In Eenvoudig-modus
+ * (`simple`) is de maand de énige periode → deze group rendert dan niet en de
+ * caller forceert `effectivePeriodMode='maand'`. Daarmee blijft de afkorting
+ * "YTD" ook volledig uit beeld in Eenvoudig (jargonregel: "dit jaar" i.p.v.
+ * "YTD"); in Volledig blijft het label ongewijzigd. Geëxporteerd voor
+ * unit-tests. `periodMode` blijft de gebruikers-keuze; in simple irrelevant.
+ */
+export function BudgetPeriodToggle({
+  simple,
+  periodMode,
+  onSelect,
+}: {
+  simple: boolean
+  periodMode: 'maand' | 'ytd' | '12m'
+  onSelect: (mode: 'maand' | 'ytd' | '12m') => void
+}) {
+  if (simple) return null
+  return (
+    /* Period toggle pill — donker actief, transparant rest */
+    <div className="ml-2 flex items-center gap-0.5 rounded-full border border-[var(--border-ed)] bg-[var(--bg)] p-0.5">
+      {(['maand', 'ytd', '12m'] as const).map((mode) => (
+        <button
+          key={mode}
+          onClick={() => onSelect(mode)}
+          className={`rounded-full px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.1em] transition-colors ${
+            periodMode === mode
+              ? 'bg-[var(--ink)] text-[var(--paper)]'
+              : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
+          }`}
+        >
+          {mode === 'maand' ? 'Maand' : mode === 'ytd' ? 'YTD' : '12 mnd'}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 type HubAlert = { id: string; name: string; spent: number; limit: number; pct: number; severity: 'over' | 'bijna' }
 
 // Aantal alerts dat ingeklapt zichtbaar is; de rest zit achter "toon meer".
 const HUB_ALERTS_COLLAPSED_MAX = 5
+
+// Aantal preview-fragmenten in de ingeklapte hub-kop. In Eenvoudig houden we de
+// samenvatting bewust op één korte, scanbare regel ("1 bijna vol, € 2.540 te
+// verdelen"); al het overige (KPI's incl. dekkingsgraad, alerts, inzichten) zit
+// achter dezelfde disclosure-klik. In Volledig blijft het op drie.
+const HUB_PREVIEW_MAX_SIMPLE = 2
+const HUB_PREVIEW_MAX_FULL = 3
 
 // Exported voor unit-tests (budget-hub.test.tsx); binnen de app alleen hier gebruikt.
 export function BudgetHub({
@@ -550,6 +648,7 @@ export function BudgetHub({
   coverageRatio,
   totalIncomeActual,
   budgetingActive,
+  simple = false,
 }: {
   hubAlerts: HubAlert[]
   dekkingsgraad: number
@@ -568,6 +667,12 @@ export function BudgetHub({
   coverageRatio: number
   totalIncomeActual: number
   budgetingActive: boolean
+  /**
+   * Eenvoudig-modus: knijpt de ingeklapte samenvatting terug tot één regel
+   * (max 2 fragmenten, niet-afbrekend). De inhoud van de hub zelf verandert
+   * niet — die blijft integraal achter de disclosure-klik staan.
+   */
+  simple?: boolean
 }) {
   const [expanded, setExpanded] = useState(false)
   const [alertsExpanded, setAlertsExpanded] = useState(false)
@@ -613,6 +718,7 @@ export function BudgetHub({
   if (!hasAnyContent) return null
 
   // Collapsed-header preview snippets — max 3 to keep the one-liner scannable
+  // (in Eenvoudig max 2, zie HUB_PREVIEW_MAX_SIMPLE).
   const previewSnippets: React.ReactNode[] = []
   if (overCount > 0) {
     previewSnippets.push(<span key="over" className="text-negative">{overCount} overschreden</span>)
@@ -635,7 +741,10 @@ export function BudgetHub({
       <span key="uncat" className="text-kern-600">{uncategorizedCount} ongecategoriseerd</span>
     )
   }
-  const visibleSnippets = previewSnippets.slice(0, 3)
+  const visibleSnippets = previewSnippets.slice(
+    0,
+    simple ? HUB_PREVIEW_MAX_SIMPLE : HUB_PREVIEW_MAX_FULL,
+  )
 
   // Grid-cols klasse afgeleid uit kpiCount (Tailwind heeft deze klassen statisch nodig)
   const gridColsClass =
@@ -662,11 +771,11 @@ export function BudgetHub({
         onClick={() => setExpanded(v => !v)}
         className="flex w-full items-center justify-between px-4 py-2.5 text-left"
       >
-        <div className="flex items-center gap-2">
+        <div className={`flex items-center gap-2 ${simple ? 'min-w-0' : ''}`}>
           <span className="rounded-full bg-wil-50 px-2 py-0.5 font-sans text-[9px] font-semibold uppercase tracking-[0.08em] text-wil-700">Fin</span>
           <span className="font-sans text-xs font-semibold text-[var(--ink-2)]">Budgetanalyse</span>
           {!expanded && visibleSnippets.length > 0 && (
-            <span className="font-sans text-[11px] text-[var(--ink-3)]">
+            <span className={`font-sans text-[11px] text-[var(--ink-3)] ${simple ? 'min-w-0 truncate' : ''}`}>
               {'— '}
               {visibleSnippets.map((snippet, i) => (
                 <span key={i}>
@@ -1006,12 +1115,22 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
   }, [])
   // Eenvoudig-modus (server-geseed via DisplayModeProvider, geen hydration-flash).
   // In simple: hoofdgetallen-blok verbergen, figures-strip → alleen Inkomen +
-  // Uitgaven, en de weergave geforceerd op de pil-modus (view-toggle verborgen).
+  // Uitgaven, de weergave geforceerd op de pil-modus (view-toggle verborgen),
+  // de periode geforceerd op de maand (periode-toggle verborgen), Rapport +
+  // "Kopieer vorige maand" verborgen, en de hub-samenvatting op één regel.
   // `viewMode`/setViewMode/localStorage blijven intact zodat de eigen keuze
   // terugkomt zodra de gebruiker weer naar Volledig schakelt.
   const simple = useDisplayMode().mode === 'simple'
   const effectiveViewMode: 'tree' | 'donut' | 'heatmap' | 'pill' = simple ? 'pill' : viewMode
   const [periodMode, setPeriodMode] = useState<'maand' | 'ytd' | '12m'>('maand')
+  // Periode in Eenvoudig: altijd de maand. Zelfde derived-pattern als
+  // `effectiveViewMode` — `periodMode`/setPeriodMode blijven de gebruikers-keuze,
+  // zodat wie in Volledig op YTD stond die keuze terugkrijgt zodra hij weer naar
+  // Volledig schakelt. Omdat élke consumer (datumbereik, kop, maand-nav,
+  // kopieer-knop, hub) `effectivePeriodMode` leest, kan Eenvoudig nooit op een
+  // YTD/12-maands staat blijven hangen — geen kapotte lege staat, en de
+  // afkorting "YTD" komt er per definitie niet in beeld.
+  const effectivePeriodMode: 'maand' | 'ytd' | '12m' = simple ? 'maand' : periodMode
   const [monthDate, setMonthDate] = useState(() => {
     // Deeplink vanaf de geldstroom-banner (/overzicht/cashflow) opent deze
     // pagina op de daar geselecteerde maand via `?maand=YYYY-MM`. Eénmalig bij
@@ -1133,8 +1252,8 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
   // Pure bron: lib/budget-period.ts. YTD/12m hangen aan de huidige datum (now),
   // niet aan de maand-selectie (monthDate) — zie computeBudgetPeriod.
   const { periodStart, periodEnd, periodMonthCount } = useMemo(
-    () => computeBudgetPeriod(periodMode, monthDate),
-    [monthDate, periodMode],
+    () => computeBudgetPeriod(effectivePeriodMode, monthDate),
+    [monthDate, effectivePeriodMode],
   )
 
   // Aliases so the rest of the file continues to work without renaming every reference
@@ -2151,9 +2270,9 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
           <div className="flex items-center gap-1">
             <button
               onClick={prevMonth}
-              disabled={periodMode !== 'maand'}
+              disabled={effectivePeriodMode !== 'maand'}
               aria-label="Vorige maand"
-              className={`p-1.5 text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)] ${periodMode !== 'maand' ? 'invisible pointer-events-none' : ''}`}
+              className={`p-1.5 text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)] ${effectivePeriodMode !== 'maand' ? 'invisible pointer-events-none' : ''}`}
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
@@ -2161,68 +2280,33 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
               className="inline-block min-w-0 px-2 text-center text-base font-bold capitalize text-[var(--ink)] sm:min-w-[13rem] sm:text-lg"
               style={{ fontFamily: 'var(--font-playfair, serif)' }}
             >
-              {periodMode === 'ytd'
+              {effectivePeriodMode === 'ytd'
                 ? // Jaar uit de berekende YTD-periode (huidig kalenderjaar), niet uit
                   // de maand-selectie — periodStart is `${huidigJaar}-01-01`.
                   `${periodStart.slice(0, 4)} YTD`
-                : periodMode === '12m'
+                : effectivePeriodMode === '12m'
                   ? 'Afgelopen 12 maanden'
                   : monthLabel}
             </h2>
             <button
               onClick={nextMonth}
-              disabled={periodMode !== 'maand'}
+              disabled={effectivePeriodMode !== 'maand'}
               aria-label="Volgende maand"
-              className={`p-1.5 text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)] ${periodMode !== 'maand' ? 'invisible pointer-events-none' : ''}`}
+              className={`p-1.5 text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)] ${effectivePeriodMode !== 'maand' ? 'invisible pointer-events-none' : ''}`}
             >
               <ChevronRight className="h-4 w-4" />
             </button>
 
-            {/* Period toggle pill — donker actief, transparant rest */}
-            <div className="ml-2 flex items-center gap-0.5 rounded-full border border-[var(--border-ed)] bg-[var(--bg)] p-0.5">
-              {(['maand', 'ytd', '12m'] as const).map((mode) => (
-                <button
-                  key={mode}
-                  onClick={() => setPeriodMode(mode)}
-                  className={`rounded-full px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.1em] transition-colors ${
-                    periodMode === mode
-                      ? 'bg-[var(--ink)] text-[var(--paper)]'
-                      : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
-                  }`}
-                >
-                  {mode === 'maand' ? 'Maand' : mode === 'ytd' ? 'YTD' : '12 mnd'}
-                </button>
-              ))}
-            </div>
+            <BudgetPeriodToggle simple={simple} periodMode={periodMode} onSelect={setPeriodMode} />
           </div>
 
-          {/* Rapport + kopieer-knoppen rechts */}
-          <div className="hidden sm:flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => router.push(`/rapportages/budget?month=${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}`)}
-              className="inline-flex items-center gap-1.5 border border-[var(--border-ed)] bg-[var(--bg)] px-3 py-1 font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--ink-2)] transition-all hover:shadow-[var(--s0)] hover:-translate-y-px hover:text-[var(--ink)]"
-            >
-              <FileText className="h-3 w-3" />
-              Rapport
-            </button>
-            {periodMode === 'maand' && (
-              <button
-                type="button"
-                onClick={copyFromLastMonth}
-                disabled={copyingMonth}
-                title="Kopieer budgetbedragen van vorige maand"
-                className="inline-flex items-center gap-1.5 border border-[var(--border-ed)] bg-[var(--bg)] px-3 py-1 font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] disabled:opacity-50"
-              >
-                {copyingMonth ? (
-                  <span className="h-3 w-3 animate-spin rounded-full border border-[var(--ink-3)] border-t-transparent" />
-                ) : (
-                  <Save className="h-3 w-3" />
-                )}
-                Kopieer vorige maand
-              </button>
-            )}
-          </div>
+          {/* Rapport + kopieer-knoppen rechts — beheer-diepte, alleen in Volledig. */}
+          <BudgetReportActions
+            showCopy={effectivePeriodMode === 'maand'}
+            copying={copyingMonth}
+            onOpenReport={() => router.push(`/rapportages/budget?month=${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}`)}
+            onCopyLastMonth={copyFromLastMonth}
+          />
         </div>
 
         {/* 4-koloms KPI-strip: Inkomen / Uitgaven / Sparen / Schulden.
@@ -2264,7 +2348,8 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
           openWithMessage={openWithMessage}
           totalIncome={totalIncome}
           teVerdelen={teVerdelen}
-          periodMode={periodMode}
+          periodMode={effectivePeriodMode}
+          simple={simple}
           onOpenPlanEditor={() => setShowPlanEditor(true)}
           onOpenBudget={(id) => openBudgetModal(id)}
           uncategorizedCount={uncategorizedCount}

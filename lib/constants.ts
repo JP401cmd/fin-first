@@ -54,6 +54,25 @@ export const EXPECTED_SAVINGS_RETURN = 0.013
 /** Default annual portfolio volatility for Monte Carlo simulations — 15%. */
 export const DEFAULT_VOLATILITY = 0.15
 
+/**
+ * Zoek-/weergavegrens voor de **rendement-marge** van de marktcheck
+ * (`lib/horizon-kernel/rendement-marge.ts`): de binaire zoektocht naar de
+ * rendement-verschuiving waarbij het plan omslaat loopt over
+ * `[−RENDEMENT_MARGE_GRENS, +RENDEMENT_MARGE_GRENS]` (decimaal; 0,15 = 15
+ * procentpunt per jaar).
+ *
+ * Waarom 15 procentpunt: het verwachte rendement is `DEFAULT_RETURN` (7%). Een
+ * verschuiving van −15pp betekent −8% nominaal rendement per jaar, LEVENSLANG —
+ * ruim voorbij elke historische 40-jaars periode van een gespreide portefeuille.
+ * Een marge daarbuiten is dus geen informatie meer maar "onverwoestbaar"; de
+ * uitkomst wordt daarom als begrensd gemarkeerd (`begrensd: 'boven' | 'onder'`)
+ * en de copy zegt "meer dan 15%" in plaats van een schijnprecies getal.
+ *
+ * Dit is een WEERGAVE-/zoekgrens, geen rekengrens: de gap-toets zelf werkt op
+ * elke shift. Verruimen kost alleen zoekbereik, geen correctheid.
+ */
+export const RENDEMENT_MARGE_GRENS = 0.15
+
 // ── Withdrawal Rates ────────────────────────────────────────────
 
 /** Classic Safe Withdrawal Rate — 4% rule (Trinity Study / Bengen 1994). */

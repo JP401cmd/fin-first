@@ -52,8 +52,12 @@ export function getFireProjectionTips(ctx: FireProjectionTipContext): string[] {
   }
 
   if (ctx.hasMonteCarlo) {
+    // Grondslag én breedte moeten kloppen met wat de grafiek écht tekent: sinds
+    // 2026-08-09 is dat de middelste helft (p25–p75) van maximaal
+    // MARKTCHECK_MAX_RUNS (200) doorgerekende marktverlopen — geen p10–p90 en
+    // geen "duizenden simulaties".
     tips.push(
-      'De gearceerde band is onzekerheid (p10–p90 uit duizenden simulaties)',
+      'De gearceerde band is de middelste helft van de doorgerekende marktverlopen (p25–p75)',
     )
   }
 

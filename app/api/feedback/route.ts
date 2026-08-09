@@ -1,35 +1,25 @@
-import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { unauthorized, serverError } from '@/lib/api/respond'
+import { gone } from '@/lib/api/respond'
 
-const CATEGORIES = ['bug', 'idea', 'question', 'other']
-
-/** POST /api/feedback — gebruiker stuurt feedback in. */
-export async function POST(req: Request) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) {
-    return unauthorized()
-  }
-
-  const body = await req.json().catch(() => ({}))
-  const message = String(body.message ?? '').trim().slice(0, 4000)
-  const category = CATEGORIES.includes(body.category) ? body.category : 'other'
-  if (!message) {
-    return NextResponse.json({ error: 'Bericht is verplicht' }, { status: 400 })
-  }
-
-  const { error } = await supabase.from('feedback').insert({
-    user_id: user.id,
-    email: user.email,
-    category,
-    message,
-  })
-  if (error) {
-    return serverError(error, 'feedback:POST')
-  }
-
-  return NextResponse.json({ ok: true })
+/**
+ * POST /api/feedback — GESLOTEN (ADR 0096).
+ *
+ * Melden loopt sinds 9 aug 2026 uitsluitend via de meldmodus in het gesprek
+ * met Fin (`POST /api/user-reports`): zod-validatie, 5 meldingen per rollend
+ * uur, optioneel scherm, en doorstroom naar de werkqueue. Dit endpoint schreef
+ * naar de tabel `feedback` — een tweede inbox die niemand structureel las.
+ *
+ * De route blijft bestaan en antwoordt bewust met **410 Gone** in plaats van
+ * 404: een 404 leest als defect en lokt een bugmelding uit. De tabel `feedback`
+ * en `/beheer/feedback` blijven ongemoeid als historisch archief (de tabel zit
+ * in de AVG-export via `lib/user-data-tables.ts` en heeft geen eigen-rij
+ * DELETE-policy).
+ *
+ * Er wordt hier bewust NIETS meer gelezen of geschreven — ook geen
+ * auth-check. Een gesloten endpoint hoort geen datapad meer te hebben, en een
+ * 401-vóór-410 zou de indruk wekken dat inloggen het weer opent.
+ */
+export async function POST() {
+  return gone(
+    'Melden gaat nu vanuit je gesprek met Fin: open de chat en tik op de megafoon.',
+  )
 }

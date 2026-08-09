@@ -23,6 +23,9 @@ import {
 } from '@/lib/ai/local/model-catalog'
 import { DEFAULT_GATE_CONFIG, parseGateConfig, type LocalAiGateConfig } from '@/lib/ai/local/gate-config'
 import { notifyExecutionPrefsChanged } from '@/lib/ai/execution-prefs-signal'
+import { AI_EXECUTION_GROUPS } from '@/lib/ai/execution-groups'
+import { DepthSection } from '@/components/app/depth-section'
+import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { AiExecutionChoice } from './ai-execution-choice'
 import { AiExecutionGroupList } from './ai-execution-group-list'
 import { LocalModelSection, progressPercent, type LocalModelPhase } from './local-model-section'
@@ -445,11 +448,61 @@ export function AiExecutionSettings() {
         </div>
       </section>
 
-      <AiExecutionGroupList
+      <AiExecutionGroupsSection
         privacyMode={privacyMode}
         canChooseLocal={canChooseLocal}
         localBlockedReason={localBlockedReason}
       />
     </section>
+  )
+}
+
+/**
+ * MIJN-4 — de zeven uitvoeringsgroepen in Eenvoudig standaard INGEKLAPT achter
+ * één samenvattende regel; in Volledig ongewijzigd.
+ *
+ * Waarom `DepthSection` en geen `HideInSimple`: dit is de enige plek waar je per
+ * functionaliteit kiest waar je gegevens heen gaan. Dat hard verbergen zou een
+ * privacy-keuze onbereikbaar maken voor iedereen die op de standaardmodus staat
+ * — precies wat je nooit wilt op deze pagina. Inklappen-met-behoud (ADR 0026)
+ * houdt de keuze één klik ver weg.
+ *
+ * Alleen in Eenvoudig gemónt: in Volledig zou `DepthSection` weliswaar open
+ * staan, maar mét een tweede kop-knop en kaartrand om de lijst heen. Daar
+ * rendert dus exact de bestaande boom, inclusief eigen kicker en kop.
+ */
+function AiExecutionGroupsSection({
+  privacyMode,
+  canChooseLocal,
+  localBlockedReason,
+}: {
+  privacyMode: boolean
+  canChooseLocal: boolean
+  localBlockedReason?: string
+}) {
+  const simple = useDisplayMode().mode === 'simple'
+
+  if (!simple) {
+    return (
+      <AiExecutionGroupList
+        privacyMode={privacyMode}
+        canChooseLocal={canChooseLocal}
+        localBlockedReason={localBlockedReason}
+      />
+    )
+  }
+
+  return (
+    <DepthSection
+      title="Liever per onderdeel kiezen?"
+      summary={`Zet ${AI_EXECUTION_GROUPS.length} onderdelen los van je hoofdkeuze`}
+    >
+      <AiExecutionGroupList
+        privacyMode={privacyMode}
+        canChooseLocal={canChooseLocal}
+        localBlockedReason={localBlockedReason}
+        hideHeading
+      />
+    </DepthSection>
   )
 }

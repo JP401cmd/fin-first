@@ -31,7 +31,23 @@ function isActive(pathname: string, href: string, basePath: string): boolean {
   return pathname.startsWith(href)
 }
 
-export function ModuleNav({ config }: { config: ModuleNavConfig }) {
+export function ModuleNav({
+  config,
+  hideOnBasePath = false,
+}: {
+  config: ModuleNavConfig
+  /**
+   * Verberg de tabbalk op de hub-route zelf (`config.basePath`). Bedoeld voor
+   * secties waar de hub al een volledig kaartengrid met dezelfde bestemmingen
+   * toont — dan is de tabbalk een letterlijke dubbeling van wat eronder staat
+   * (MIJN-1 uit docs/eenvoudige-weergave-audit.md). Op de subpagina's blijft de
+   * balk staan; daar is hij de enige zijwaartse navigatie.
+   *
+   * Geldt in BEIDE weergavemodi: dit is een dubbeling wegnemen, geen diepte
+   * verbergen — daarom bewust géén `useDisplayMode()` hier.
+   */
+  hideOnBasePath?: boolean
+}) {
   const pathname = usePathname()
   const styles = colorStyles[config.color]
   const { features } = useFeatureAccess()
@@ -39,6 +55,10 @@ export function ModuleNav({ config }: { config: ModuleNavConfig }) {
   const visibleItems = config.items.filter(
     item => !item.featureId || isFeatureAccessible(features, item.featureId)
   )
+
+  if (hideOnBasePath && isActive(pathname, config.basePath, config.basePath)) {
+    return null
+  }
 
   // Sticky-top=0: er is geen AppHeader meer op desktop én geen
   // pagina-bovenrand boven de tray-content op mobile. ModuleNav plakt

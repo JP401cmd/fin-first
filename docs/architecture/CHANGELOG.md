@@ -728,3 +728,15 @@
 ## 2026-08-08
 
 - **Componenten (aantal)** toegevoegd: +1
+
+## 2026-08-08
+
+- **Componenten (aantal)** toegevoegd: +2
+
+## 2026-08-08
+
+- **Componenten (aantal)** verwijderd: -1
+
+## 2026-08-08
+
+- Geen wijzigingen.

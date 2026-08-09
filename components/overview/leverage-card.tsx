@@ -41,6 +41,7 @@ export function LeverageCard({
   href,
   tooltip,
   compact = false,
+  showSubRow = true,
   expandable = false,
   expanded = false,
   onToggleExpand,
@@ -58,19 +59,43 @@ export function LeverageCard({
   /**
    * Optionele subtiele extra regel direct onder de KPI (gedempt, `--ink-3`) —
    * bv. de "excl. eigen woning · €X"-grondslag op de bezittingen-/schulden-
-   * hefboom. Alleen de hefbomen-rij op /overzicht vult dit; de cashflow-
-   * landingskaarten geven het niet mee → byte-identiek.
+   * hefboom, of het venster-label "in augustus tot nu toe" op de cashflow-
+   * landingskaart (CF-3).
+   *
+   * Wordt in BEIDE varianten getoond, ook in `compact`. Dat is bewust: CF-3
+   * bestaat om te voorkomen dat een maandcijfer verward wordt met de
+   * 30-dagen-cijfers op de transactiepagina, en die verwarring is er juist in
+   * Eenvoudig — waar de kaarten compact staan. Zou `compact` het label
+   * wegslikken, dan zou een item uit de eenvoudige-weergave-audit uitsluitend
+   * de VOLLEDIGE weergave verbeteren. (Besluit op de Fase 2-kaart, optie A.)
+   *
+   * Reikwijdte zonder extra prop: van de twee compacte gebruikers geeft alleen
+   * `cashflow-landing-cards` een `subAmount` mee; `toekomst-nav-cards` laat 'm
+   * leeg en rendert dus onveranderd. `hefbomen-nav` vult 'm wél maar zet nooit
+   * `compact`, dus die loopt langs de volledige tak. Een gating-prop zou hier
+   * dus alleen ruis toevoegen.
    */
   subAmount?: React.ReactNode
   href: string
   tooltip?: string
   /**
-   * Compacte 1-regel-variant: alleen icon-chip + label, heel de kaart een link —
-   * géén KPI, substext, status-dot of chevron. Gebruikt door de /toekomst-
-   * navkaarten in de Eenvoudig-weergave; /overzicht geeft dit niet mee →
-   * byte-identiek default-gedrag.
+   * Compacte variant: icon-chip + label (+ `subAmount` als die er is), heel de
+   * kaart een link — géén KPI, substext, status-dot of chevron. Gebruikt door de
+   * /toekomst-navkaarten en de cashflow-landingskaarten in de Eenvoudig-
+   * weergave; /overzicht geeft dit niet mee → byte-identiek default-gedrag.
    */
   compact?: boolean
+  /**
+   * Rendert de substext-rij onder de KPI. Default true — óók zonder `subText`,
+   * want de lege `min-h-[16px]`-placeholder houdt tegels met en zonder status-
+   * regel in dezelfde rij even hoog.
+   *
+   * Zet 'm op false wanneer GEEN ENKELE tegel in de rij een substext toont
+   * (eenvoudige weergave, OVZ-2): dan is de placeholder pure lege ruimte en
+   * blijven de tegels onderling nog steeds gelijk. Nooit per tegel mengen —
+   * dat is precies waar de placeholder voor bestaat.
+   */
+  showSubRow?: boolean
   /** Toont de chevron-toggle wanneer true. */
   expandable?: boolean
   expanded?: boolean
@@ -87,8 +112,18 @@ export function LeverageCard({
           >
             <Icon className="w-4 h-4" />
           </div>
-          <span className="truncate text-sm sm:text-base font-semibold text-[var(--ink)]">
-            {label}
+          {/* `min-w-0` op de tekstkolom houdt `truncate` werkend binnen de flex-rij. */}
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm sm:text-base font-semibold text-[var(--ink)]">
+              {label}
+            </span>
+            {/* Zelfde typografie als de subAmount-regel in de volledige tak, zodat
+                het venster-label in beide weergaven hetzelfde gewicht heeft. */}
+            {subAmount ? (
+              <span className="block truncate text-[11px] leading-tight text-[var(--ink-3)]">
+                {subAmount}
+              </span>
+            ) : null}
           </span>
         </Link>
       </div>
@@ -131,15 +166,17 @@ export function LeverageCard({
         {/* Subtext + chevron op één rij — chevron rechts naast de
             status-substext zodat de kaart niet hoger wordt en de primaire
             link (heel kaartje) intact blijft. */}
-        <div className="mt-1 flex items-end justify-between gap-2 min-h-[16px]">
-          {subText ? (
-            <span className={`text-[11px] font-medium ${leverageStatusTextClass(status)}`}>
-              {subText}
-            </span>
-          ) : (
-            <span />
-          )}
-        </div>
+        {showSubRow && (
+          <div className="mt-1 flex items-end justify-between gap-2 min-h-[16px]">
+            {subText ? (
+              <span className={`text-[11px] font-medium ${leverageStatusTextClass(status)}`}>
+                {subText}
+              </span>
+            ) : (
+              <span />
+            )}
+          </div>
+        )}
       </Link>
 
       {/* Chevron-toggle — kleine icon-only knop in rechter-onderhoek,

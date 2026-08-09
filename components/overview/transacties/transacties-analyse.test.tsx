@@ -10,12 +10,20 @@
  *     transactie" NIET zichtbaar; "Importeer transacties" en "Bank koppelen"
  *     WEL zichtbaar met de juiste hrefs.
  * (b) Hrefs zijn exact /core/cash/import en /core/cash/connect.
+ * (c) TXN-1 — de weergavemodus bepaalt hoevéél acties er in de rij staan:
+ *     Volledig houdt de drie knoppen naast elkaar, Eenvoudig laat er één staan
+ *     plus een "…"-menu waarin de andere twee te vinden blijven.
+ *
+ * De modus komt uit een échte `DisplayModeProvider` (het enige leespad); zonder
+ * provider zou `useDisplayMode()` op de 'simple'-fallback landen en zouden de
+ * Volledig-asserties stilzwijgend de verkeerde modus meten.
  *
  * We testen NIET de volledige render (GeldstroomGauge, heatmap, tijdlijn) —
  * die vereisen volledig geladen data en de bijbehorende sub-component-stubs.
  */
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent, within } from '@testing-library/react'
+import { DisplayModeProvider, type DisplayMode } from '@/lib/hooks/use-display-mode'
 import { TransactiesAnalyse } from './transacties-analyse'
 
 // ── Module-mocks ─────────────────────────────────────────────────────────────
@@ -57,29 +65,66 @@ vi.mock('@/lib/household/perspective-loader', () => ({
   loadPerspectiveTransactions: () => new Promise(() => {}),
 }))
 
+function renderAnalyse(mode: DisplayMode = 'full') {
+  return render(
+    <DisplayModeProvider initialMode={mode}>
+      <TransactiesAnalyse />
+    </DisplayModeProvider>,
+  )
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
-describe('TransactiesAnalyse — actie-rij', () => {
+describe('TransactiesAnalyse — actie-rij (Volledig)', () => {
   it('toont "Importeer transacties" en "Bank koppelen" bij 0 rekeningen', () => {
-    render(<TransactiesAnalyse />)
+    renderAnalyse()
     expect(screen.getByText('Importeer transacties')).toBeInTheDocument()
     expect(screen.getByText('Bank koppelen')).toBeInTheDocument()
   })
 
   it('verbergt "Nieuwe transactie" zolang er 0 rekeningen zijn', () => {
-    render(<TransactiesAnalyse />)
+    renderAnalyse()
     expect(screen.queryByText('Nieuwe transactie')).not.toBeInTheDocument()
   })
 
   it('link "Importeer transacties" verwijst naar /core/cash/import', () => {
-    const { container } = render(<TransactiesAnalyse />)
+    const { container } = renderAnalyse()
     const links = Array.from(container.querySelectorAll('a')).map((a) => a.getAttribute('href'))
     expect(links).toContain('/core/cash/import')
   })
 
   it('link "Bank koppelen" verwijst naar /core/cash/connect', () => {
-    const { container } = render(<TransactiesAnalyse />)
+    const { container } = renderAnalyse()
     const links = Array.from(container.querySelectorAll('a')).map((a) => a.getAttribute('href'))
     expect(links).toContain('/core/cash/connect')
+  })
+
+  it('kent geen "…"-menu — alle acties staan al in de rij', () => {
+    renderAnalyse()
+    expect(screen.queryByRole('button', { name: 'Meer acties' })).not.toBeInTheDocument()
+  })
+})
+
+describe('TransactiesAnalyse — actie-rij (Eenvoudig, TXN-1)', () => {
+  it('haalt importeren en bank koppelen uit de rij', () => {
+    renderAnalyse('simple')
+    expect(screen.queryByText('Importeer transacties')).not.toBeInTheDocument()
+    expect(screen.queryByText('Bank koppelen')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Meer acties' })).toBeInTheDocument()
+  })
+
+  it('houdt beide acties bereikbaar achter het "…"-menu, met dezelfde hrefs', () => {
+    renderAnalyse('simple')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Meer acties' }))
+
+    const menu = screen.getByRole('dialog')
+    const links = within(menu).getAllByRole('link')
+    expect(links.map((a) => a.getAttribute('href'))).toEqual([
+      '/core/cash/import',
+      '/core/cash/connect',
+    ])
+    expect(within(menu).getByText('Importeer transacties')).toBeInTheDocument()
+    expect(within(menu).getByText('Bank koppelen')).toBeInTheDocument()
   })
 })

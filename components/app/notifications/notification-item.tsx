@@ -158,7 +158,11 @@ export const NotificationItem = memo(function NotificationItem({ notification, o
           <p className="mt-1 font-[family-name:var(--font-inter)] text-[11px] text-[var(--ink-3)]">
             {notification.metadata.over != null && (
               <>
-                <MaskedAmount value={Number(notification.metadata.over)} tone="kern" /> boven
+                {/* "eroverheen", niet "boven": het bedrag bóven de grens heet in
+                    de hele app zo (widget, sectie, periodegrafiek, pane). "Boven
+                    je grens" blijft wél de STATUS-formulering — dat is een ander
+                    begrip (waar sta je) dan dit bedrag (hoeveel eroverheen). */}
+                <MaskedAmount value={Number(notification.metadata.over)} tone="kern" /> eroverheen
                 {' · '}
               </>
             )}

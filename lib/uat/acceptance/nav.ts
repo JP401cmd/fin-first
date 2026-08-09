@@ -119,12 +119,12 @@ const criteria: AcceptanceCriterion[] = [
     scenarioId: 'UAT-NAV-06',
     titel: 'Mobiele utility-cluster: kompas, privacy, nieuws, meldingen, account',
     kriticiteit: 'BELANGRIJK',
-    given: 'Mobiele TopBar-utility-cluster op een tab-root; kompas-deeplinks in `lever-compass.tsx`.',
-    when: 'De gebruiker tikt door het kompas-paneel naar "Bezittingen"/"Schulden"/"Cashflow".',
-    then: 'De kompas-deeplinks wijzen naar de canonieke /overzicht/*-routes: Bezittingen → /overzicht/bezittingen, Schulden → /overzicht/schulden, Cashflow → /overzicht/cashflow (geen legacy /core/* of /will#cashflow-ankerverlies meer). Geborgd in lever-compass.deeplinks.test.tsx.',
+    given: 'Mobiele TopBar-utility-cluster op een tab-root; kompas-deeplinks in `lever-compass.tsx`. Sinds fase 4 van de eenvoudige weergave hangt de TRIGGER aan de weergavemodus (NAV-6): in Volledig de vier gekleurde stippen naast elkaar, in Eenvoudig één samengevat statuspunt met de zwaarste status van de vier (rood > oranje > groen > geen data).',
+    when: 'De gebruiker tikt de kompas-trigger aan en gaat door het paneel naar "Bezittingen"/"Schulden"/"Cashflow".',
+    then: 'De kompas-deeplinks wijzen naar de canonieke /overzicht/*-routes: Bezittingen → /overzicht/bezittingen, Schulden → /overzicht/schulden, Cashflow → /overzicht/cashflow (geen legacy /core/* of /will#cashflow-ankerverlies meer). Het PANEEL is in beide modi identiek: alle vier de hefbomen mét naam, status en detail — de reductie zit uitsluitend in de trigger, dus er gaat geen informatie verloren. In Eenvoudig draagt het ene punt de status ook in zijn aria-label ("Kompas: aandacht — open het kompas"); "geen data" overstemt nooit een echte waarschuwing. Geborgd in lever-compass.deeplinks.test.tsx + lever-compass.simple-view.test.tsx.',
     assertion: {
       kind: 'ui-only',
-      source: 'components/app/shell/lever-compass.tsx (LEVERS-config) — canonieke routes; regressietest lever-compass.deeplinks.test.tsx',
+      source: 'components/app/shell/lever-compass.tsx (LEVERS-config + worstLeverStatus) — canonieke routes; regressietests lever-compass.deeplinks.test.tsx en lever-compass.simple-view.test.tsx',
     },
   },
   {
@@ -173,9 +173,9 @@ const criteria: AcceptanceCriterion[] = [
     scenarioId: 'UAT-NAV-10',
     titel: 'Weergavemodus Eenvoudig ↔ Volledig en doorwerking op navigatie en pagina\'s',
     kriticiteit: 'BELANGRIJK',
-    given: '`SIMPLE_HIDDEN_NAV_HREFS` = [\'/toekomst/rekenhulp\', \'/toekomst/whatif\'].',
+    given: '`SIMPLE_HIDDEN_NAV_HREFS` = [\'/toekomst/rekenhulp\', \'/toekomst/whatif\']. De modus is sinds fase 1 van de eenvoudige weergave op TWEE plekken te zetten: het keuzeblok bovenaan /mijn/uiterlijk (`DisplayModePicker`, APP-1) en de ⌘K-actie "action:toggle-display-mode" — beide schrijven via hetzelfde `PUT /api/display-mode`.',
     when: 'De sidebar/nav-sheet/⌘K filteren hun menu-items op deze lijst in Eenvoudige weergave.',
-    then: '/toekomst/rekenhulp en /toekomst/whatif zitten in de verberg-lijst (worden overal uit de menu-ingangen gefilterd); een niet-gelijste route (bv. /toekomst/doelen) blijft zichtbaar. Direct navigeren naar de URL blijft mogelijk (alleen de menu-ingang is gefilterd).',
+    then: '/toekomst/rekenhulp en /toekomst/whatif zitten in de verberg-lijst (worden overal uit de menu-ingangen gefilterd); een niet-gelijste route (bv. /toekomst/doelen) blijft zichtbaar. Direct navigeren naar de URL blijft mogelijk (alleen de menu-ingang is gefilterd). De ⌘K-omschrijving luidt "Meer/minder detail op elke pagina" — niet meer "Diepte-secties standaard tonen of inklappen" (dat gedrag bestaat niet; APP-3). Sinds fase 4 reduceert Eenvoudig de navigatie zelf ook: de nav-sheet klapt alleen de sub-items van de ACTIEVE hoofdpagina uit (NAV-2 — de rest blijft één regel; de desktop-sidebar deed dit structureel al), en naast "Het Overzicht" in de sidebar verdwijnt de netto-vermogen-badge (NAV-5 — een cijfer zonder context dat op de pagina zelf al staat). In Volledig blijven beide ongewijzigd.',
     assertion: {
       kind: 'exact',
       expected: 'rekenhulpVerborgen=true; whatifVerborgen=true; doelenZichtbaar=true',
@@ -391,7 +391,7 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'BELANGRIJK',
     given: 'De ⌘K-actie "action:toggle-euro-view" (naast de weergavemodus-actie, WF-NAV-10) en `euroViewLabel` (lib/euro-display.ts, wave 1).',
     when: 'De gebruiker roept de toggle-actie aan bij `euroView=\'nominal\'` resp. `\'real\'`, en opent de app nadien op een tweede apparaat.',
-    then: 'Het actie-label flipt: bij nominaal toont de palette "Toon huidige euro\'s" (icoon Wallet), bij reëel "Toon toekomstige euro\'s" (icoon CalendarClock) — nooit de huidige stand als label (dat zou een no-op suggereren). De EuroViewBadge/command-palette-label gebruikt hetzelfde `euroViewLabel()` als de badge elders (géén los label-format). Cross-device: de keuze staat op `profiles.euro_view` (own-row, `PUT /api/euro-view`) en wordt server-side in de layout ingelezen — dat schrijf-/leespad is een LIVE-vereiste, niet in een pure module na te rekenen (server-only createClient-import), en wordt daarom als toelichting genoemd, niet in de geautomatiseerde assertie.',
+    then: 'Het actie-label flipt: bij nominaal toont de palette "Toon huidige euro\'s" (icoon Wallet), bij reëel "Toon toekomstige euro\'s" (icoon CalendarClock) — nooit de huidige stand als label (dat zou een no-op suggereren). Het command-palette-label en de sidebar-status-indicator (`SidebarEuroViewBadge`, ADR 0094) gebruiken hetzelfde `euroViewLabel()` (géén los label-format). Cross-device: de keuze staat op `profiles.euro_view` (own-row, `PUT /api/euro-view`) en wordt server-side in de layout ingelezen — dat schrijf-/leespad is een LIVE-vereiste, niet in een pure module na te rekenen (server-only createClient-import), en wordt daarom als toelichting genoemd, niet in de geautomatiseerde assertie.',
     assertion: {
       kind: 'exact',
       expected: "labelNominal=Toon huidige euro's; labelReal=Toon toekomstige euro's; euroViewLabelNominal=Toekomstige euro's; euroViewLabelReal=Huidige euro's",

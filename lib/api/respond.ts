@@ -53,6 +53,17 @@ export function conflict(message: string, code?: string): NextResponse {
 }
 
 /**
+ * 410 — endpoint bestaat nog, maar is bewust gesloten (opvolger elders).
+ *
+ * Bewust géén 404: die leest als "kapot/verdwenen" en lokt een bugmelding uit.
+ * 410 zegt "dit was hier, het komt niet terug" — de `message` hoort daarom
+ * altijd naar de opvolger te wijzen (ADR 0096).
+ */
+export function gone(message: string, code = 'gone'): NextResponse {
+  return errorResponse(message, 410, code)
+}
+
+/**
  * Vormt een onbekende fout om tot één leesbare LOGREGEL (server-side).
  *
  * Waarom dit meer is dan `String(err)`: een `PostgrestError` van supabase-js is

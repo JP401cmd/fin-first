@@ -10,7 +10,13 @@ export const PAGE_INFO: Record<string, string> = {
   '/overzicht':
     'Hoe sta je er voor in één blik. ' +
     'Vier hefbomen (bezittingen, schulden, cashflow, belasting), je financiële gezondheidsscore, voortgang op je doelen en de wekelijkse briefing van Fin. ' +
-    'Klik op een hefboom voor verdieping.',
+    'Klik op een hefboom voor verdieping. ' +
+    // OVZ-1: de uitleg van de status-stippen staat hier éénmalig, in plaats van
+    // als vaste legenda onder de hefbomen-rij.
+    'Het stipje op een hefboom is een stoplicht: groen is op koers, oranje vraagt aandacht, rood vraagt actie. ' +
+    // OVZ-4: de duiding die uit de grafieklegenda is gehaald.
+    'De vermogensgrafiek loopt van je verleden tot je vrijheidsmoment — heb je dat al bereikt, dan loopt hij door tot je eindleeftijd. ' +
+    'De band om de lijn is de bandbreedte: de marge waarbinnen je vermogen zich waarschijnlijk beweegt.',
 
   '/overzicht/bezittingen':
     'Wat groeit voor je: cash, beleggingen, eigen huis en pensioen. ' +

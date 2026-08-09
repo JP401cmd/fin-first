@@ -3,12 +3,62 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { NOTIFICATION_TYPES, WEEKLY_BRIEFING_EMAIL_TOGGLE } from '@/lib/identity-constants'
-import { CalendarCheck, HandCoins } from 'lucide-react'
+import { Bell, CalendarCheck, HandCoins, type LucideIcon } from 'lucide-react'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { PageInfoButton, PageOpening } from '@/components/editorial'
+import { DepthSection } from '@/components/app/depth-section'
+import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { PAGE_INFO } from '@/lib/page-info-content'
 
 type PartnerNotifMode = 'all_shared' | 'threshold' | 'categories' | 'disabled'
+
+/**
+ * Eén schakelrij: icoon + label + uitleg + switch. Was viermaal bijna-identiek
+ * geïnlined; MIJN-3 voegt er een vijfde (de hoofdschakelaar) aan toe, dus hier
+ * één vorm die ze allemaal dragen.
+ */
+function NotifToggleRow({
+  Icon,
+  label,
+  description,
+  enabled,
+  onToggle,
+  disabled = false,
+}: {
+  Icon: LucideIcon
+  label: string
+  description: string
+  enabled: boolean
+  onToggle: () => void
+  disabled?: boolean
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 px-4 py-3">
+      <div className="flex items-center gap-3 min-w-0">
+        <Icon className="h-4 w-4 shrink-0 text-[var(--ink-3)]" />
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-[var(--ink-2)]">{label}</p>
+          <p className="text-xs text-[var(--ink-3)]">{description}</p>
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={onToggle}
+        disabled={disabled}
+        className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
+          enabled ? 'bg-zinc-900' : 'bg-zinc-300'
+        } ${disabled ? 'opacity-50' : ''}`}
+        aria-label={`${enabled ? 'Uit' : 'In'} schakelen: ${label}`}
+      >
+        <span
+          className={`inline-block h-3.5 w-3.5 rounded-full bg-[var(--paper)] transition-transform ${
+            enabled ? 'translate-x-4' : 'translate-x-0.5'
+          }`}
+        />
+      </button>
+    </div>
+  )
+}
 
 /**
  * /mijn/notificaties — geëxtraheerd uit het 1823-regel identity/instellingen
@@ -21,6 +71,7 @@ type PartnerNotifMode = 'all_shared' | 'threshold' | 'categories' | 'disabled'
  */
 export default function MijnNotificatiesPage() {
   const supabase = createClient()
+  const simple = useDisplayMode().mode === 'simple'
 
   const [notifPrefs, setNotifPrefs] = useState<Record<string, boolean>>({
     budget: true,
@@ -139,6 +190,32 @@ export default function MijnNotificatiesPage() {
   // ─ Handlers ───────────────────────────────────────────────────────────────
   const toggleNotifPref = useCallback((type: string) => {
     setNotifPrefs((prev) => ({ ...prev, [type]: !prev[type] }))
+  }, [])
+
+  // ─ MIJN-3: hoofdschakelaar over de push-types ─────────────────────────────
+  //
+  // In Eenvoudig staan de zeven losse types achter een disclosure; daarboven
+  // staat één regel "Meldingen in de app". Die regel is PRESENTATIE over
+  // dezelfde voorkeuren-blob — géén nieuw veld en géén tweede bron: aan =
+  // minstens één type aan, uitzetten = alle zeven uit, aanzetten = alle zeven
+  // aan. De gebruiker bevestigt met dezelfde "Opslaan"-knop als de losse types,
+  // dus het opslagpad blijft ongewijzigd (/api/notifications).
+  const notifOnCount = NOTIFICATION_TYPES.filter(
+    ({ type }) => notifPrefs[type] !== false,
+  ).length
+  const anyNotifOn = notifOnCount > 0
+
+  const toggleAllNotifPrefs = useCallback(() => {
+    setNotifPrefs((prev) => {
+      // Alles-uit wanneer er nog iets aan staat, anders alles-aan. `...prev`
+      // blijft staan zodat een sleutel die de server kent maar deze build niet
+      // (nieuwer meldingstype) niet stilzwijgend uit de blob verdwijnt.
+      const turnOff = NOTIFICATION_TYPES.some(({ type }) => prev[type] !== false)
+      return {
+        ...prev,
+        ...Object.fromEntries(NOTIFICATION_TYPES.map(({ type }) => [type, !turnOff])),
+      }
+    })
   }, [])
 
   const saveNotifPrefs = useCallback(async () => {
@@ -267,92 +344,101 @@ export default function MijnNotificatiesPage() {
             </div>
           ) : (
             <>
-              <div className="divide-y divide-zinc-100 border border-[var(--border-ed)]">
-                {NOTIFICATION_TYPES.map(({ type, label, description, icon: Icon }) => {
-                  const enabled = notifPrefs[type] !== false
-                  return (
-                    <div key={type} className="flex items-center justify-between gap-4 px-4 py-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <Icon className="h-4 w-4 shrink-0 text-[var(--ink-3)]" />
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-[var(--ink-2)]">{label}</p>
-                          <p className="text-xs text-[var(--ink-3)]">{description}</p>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => toggleNotifPref(type)}
-                        className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
-                          enabled ? 'bg-zinc-900' : 'bg-zinc-300'
-                        }`}
-                        aria-label={`${enabled ? 'Uit' : 'In'} schakelen: ${label}`}
-                      >
-                        <span
-                          className={`inline-block h-3.5 w-3.5 rounded-full bg-[var(--paper)] transition-transform ${
-                            enabled ? 'translate-x-4' : 'translate-x-0.5'
-                          }`}
-                        />
-                      </button>
-                    </div>
-                  )
-                })}
-              </div>
-
-              {/* Monthly check-in toggle */}
-              <div className="mt-4 border border-[var(--border-ed)]">
-                <div className="flex items-center justify-between gap-4 px-4 py-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <CalendarCheck className="h-4 w-4 shrink-0 text-[var(--ink-3)]" />
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-[var(--ink-2)]">Maandelijkse geldcheck-in</p>
-                      <p className="text-xs text-[var(--ink-3)]">Herinnering om elke maand je financiën te checken</p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => void toggleCheckin()}
-                    disabled={checkinSaving}
-                    className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
-                      checkinEnabled ? 'bg-zinc-900' : 'bg-zinc-300'
-                    } ${checkinSaving ? 'opacity-50' : ''}`}
-                    aria-label={checkinEnabled ? 'Schakel geldcheck-in uit' : 'Schakel geldcheck-in in'}
-                  >
-                    <span
-                      className={`inline-block h-3.5 w-3.5 rounded-full bg-[var(--paper)] transition-transform ${
-                        checkinEnabled ? 'translate-x-4' : 'translate-x-0.5'
-                      }`}
-                    />
-                  </button>
-                </div>
-              </div>
-
-              {/* Briefing per e-mail — aparte opt-in (profiles-kolom, default UIT) */}
-              <div className="mt-4 border border-[var(--border-ed)]">
-                <div className="flex items-center justify-between gap-4 px-4 py-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <WEEKLY_BRIEFING_EMAIL_TOGGLE.icon className="h-4 w-4 shrink-0 text-[var(--ink-3)]" />
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-[var(--ink-2)]">{WEEKLY_BRIEFING_EMAIL_TOGGLE.label}</p>
-                      <p className="text-xs text-[var(--ink-3)]">{WEEKLY_BRIEFING_EMAIL_TOGGLE.description}</p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => void toggleBriefingEmail()}
+              {/* MIJN-3 — in Eenvoudig staan de zeven meldingstypen achter één
+                  hoofdschakelaar + disclosure; de drie hoofdregels (meldingen in
+                  de app, briefing per e-mail, geldcheck-in) staan erboven. In
+                  Volledig blijft de vlakke lijst exact zoals hij was. */}
+              {simple ? (
+                <div className="border border-[var(--border-ed)] divide-y divide-[var(--border-ed)]">
+                  <NotifToggleRow
+                    Icon={Bell}
+                    label="Meldingen in de app"
+                    description={`Push-meldingen op je apparaat — ${notifOnCount} van ${NOTIFICATION_TYPES.length} typen aan`}
+                    enabled={anyNotifOn}
+                    onToggle={toggleAllNotifPrefs}
+                  />
+                  <NotifToggleRow
+                    Icon={WEEKLY_BRIEFING_EMAIL_TOGGLE.icon}
+                    label={WEEKLY_BRIEFING_EMAIL_TOGGLE.label}
+                    description={WEEKLY_BRIEFING_EMAIL_TOGGLE.description}
+                    enabled={briefingEmailEnabled}
+                    onToggle={() => void toggleBriefingEmail()}
                     disabled={briefingEmailSaving}
-                    className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
-                      briefingEmailEnabled ? 'bg-zinc-900' : 'bg-zinc-300'
-                    } ${briefingEmailSaving ? 'opacity-50' : ''}`}
-                    aria-label={briefingEmailEnabled ? 'Schakel briefing per e-mail uit' : 'Schakel briefing per e-mail in'}
-                  >
-                    <span
-                      className={`inline-block h-3.5 w-3.5 rounded-full bg-[var(--paper)] transition-transform ${
-                        briefingEmailEnabled ? 'translate-x-4' : 'translate-x-0.5'
-                      }`}
-                    />
-                  </button>
+                  />
+                  <NotifToggleRow
+                    Icon={CalendarCheck}
+                    label="Maandelijkse geldcheck-in"
+                    description="Herinnering om elke maand je financiën te checken"
+                    enabled={checkinEnabled}
+                    onToggle={() => void toggleCheckin()}
+                    disabled={checkinSaving}
+                  />
                 </div>
-              </div>
+              ) : (
+                <>
+                  <div className="divide-y divide-zinc-100 border border-[var(--border-ed)]">
+                    {NOTIFICATION_TYPES.map(({ type, label, description, icon: Icon }) => (
+                      <NotifToggleRow
+                        key={type}
+                        Icon={Icon}
+                        label={label}
+                        description={description}
+                        enabled={notifPrefs[type] !== false}
+                        onToggle={() => toggleNotifPref(type)}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Monthly check-in toggle */}
+                  <div className="mt-4 border border-[var(--border-ed)]">
+                    <NotifToggleRow
+                      Icon={CalendarCheck}
+                      label="Maandelijkse geldcheck-in"
+                      description="Herinnering om elke maand je financiën te checken"
+                      enabled={checkinEnabled}
+                      onToggle={() => void toggleCheckin()}
+                      disabled={checkinSaving}
+                    />
+                  </div>
+
+                  {/* Briefing per e-mail — aparte opt-in (profiles-kolom, default UIT) */}
+                  <div className="mt-4 border border-[var(--border-ed)]">
+                    <NotifToggleRow
+                      Icon={WEEKLY_BRIEFING_EMAIL_TOGGLE.icon}
+                      label={WEEKLY_BRIEFING_EMAIL_TOGGLE.label}
+                      description={WEEKLY_BRIEFING_EMAIL_TOGGLE.description}
+                      enabled={briefingEmailEnabled}
+                      onToggle={() => void toggleBriefingEmail()}
+                      disabled={briefingEmailSaving}
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Disclosure met de losse meldingstypen — alleen in Eenvoudig.
+                  Hard verbergen zou de enige ingang naar deze zeven keuzes
+                  dichtzetten; `DepthSection` klapt ze in mét behoud (ADR 0026). */}
+              {simple && (
+                <div className="mt-4">
+                  <DepthSection
+                    title="Alle meldingstypen"
+                    summary={`${notifOnCount} van ${NOTIFICATION_TYPES.length} aan`}
+                  >
+                    <div className="divide-y divide-[var(--border-ed)] border border-[var(--border-ed)]">
+                      {NOTIFICATION_TYPES.map(({ type, label, description, icon: Icon }) => (
+                        <NotifToggleRow
+                          key={type}
+                          Icon={Icon}
+                          label={label}
+                          description={description}
+                          enabled={notifPrefs[type] !== false}
+                          onToggle={() => toggleNotifPref(type)}
+                        />
+                      ))}
+                    </div>
+                  </DepthSection>
+                </div>
+              )}
 
               {/* Partner transacties — only when user has a household */}
               {hasHousehold && (

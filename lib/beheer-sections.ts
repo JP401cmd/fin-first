@@ -210,9 +210,12 @@ export const BEHEER_GROUPS: BeheerGroup[] = [
         icon: Inbox,
       },
       {
-        label: 'Feedback',
+        label: 'Feedback (archief)',
         href: '/beheer/feedback',
-        description: 'Wat gebruikers insturen: bugs, ideeën en vragen.',
+        // ADR 0096: het formulier op /mijn/feedback is gesloten. Deze inbox
+        // groeit niet meer — nieuwe meldingen komen binnen via de meldmodus
+        // (tabel user_reports → Notion-werkqueue).
+        description: 'Historisch archief van het oude feedbackformulier — nieuwe meldingen komen via de chat binnen.',
         icon: MessageSquare,
       },
     ],

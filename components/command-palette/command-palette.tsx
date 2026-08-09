@@ -42,7 +42,11 @@ import {
   getAdminPageItems,
   filterPagesByModules,
 } from '@/lib/command-palette/navigation-index'
-import { buildActionItems, type ActionRunContext } from '@/lib/command-palette/actions'
+import {
+  buildActionItems,
+  ACTIONS_LIMIT_VISIBLE,
+  type ActionRunContext,
+} from '@/lib/command-palette/actions'
 import { fuzzyScore } from '@/lib/command-palette/fuzzy'
 import { readRecents, pushRecent, recentsToCommandItems } from '@/lib/command-palette/recents'
 import type { CommandItem, EntitySearchResponse } from '@/lib/command-palette/types'
@@ -52,7 +56,6 @@ import { SIMPLE_HIDDEN_NAV_HREFS } from '@/lib/nav-config'
 
 const DEBOUNCE_MS = 200
 const PAGES_LIMIT_VISIBLE = 6
-const ACTIONS_LIMIT_VISIBLE = 4
 const MIN_QUERY_FOR_API = 2
 
 // Module → kleur-var. Determineert het accent-kleurtje per result-row.

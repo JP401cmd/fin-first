@@ -15,6 +15,7 @@ import { useExecutionMode } from '@/lib/ai/local/use-execution-mode'
 import type { LocalNewsProgress } from '@/lib/ai/local/local-news-resolver'
 import { LOCAL_NEWS_MAX_ITEMS } from '@/lib/ai/local/local-news-select'
 import { useLocalNewsEdition } from './use-local-news-edition'
+import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import type { NewsItem } from '@/lib/news-item'
 
 // ── News cache (client-side) ────────────────────────────────────────
@@ -229,6 +230,8 @@ function LocalUnavailableNotice({ message, onRetry }: { message: string; onRetry
 // `status === 'lokaal'`-vergelijking — dat is de fail-closed-garantie.
 
 export function NieuwsOnlyClient() {
+  // Weergavemodus — stuurt alleen de masthead-reductie (NWS-1) aan.
+  const simple = useDisplayMode().mode === 'simple'
   // ── News state ──
   const [newsItems, setNewsItems] = useState<NewsItem[]>([])
   const [newsLoading, setNewsLoading] = useState(false)
@@ -465,13 +468,17 @@ export function NieuwsOnlyClient() {
         description={PAGE_INFO['/nieuws']}
         className="absolute right-4 top-5 sm:right-6 sm:top-8"
       />
+      {/* NWS-1 — in Eenvoudig draagt de masthead alleen datum + "N artikelen".
+          Editienummer, jaargang en de bronartikelen-grondslag zijn transparantie
+          over hóé de krant tot stand komt; die horen bij Volledig. */}
       <Masthead
         editionNr={viewEditionNr}
         jaargang={viewJaargang}
+        hideEdition={simple}
         articleCount={newsTab === 'current' ? viewItems.length : undefined}
         updatedAt={newsTab === 'current' ? viewGeneratedAt : undefined}
         sourceNote={
-          newsTab === 'current' && viewSourceCount !== undefined
+          !simple && newsTab === 'current' && viewSourceCount !== undefined
             ? `Gebaseerd op ${viewSourceCount} ${viewSourceCount === 1 ? 'bronartikel' : 'bronartikelen'}`
             : undefined
         }

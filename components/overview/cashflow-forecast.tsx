@@ -5,6 +5,8 @@ import { TrendingDown, TrendingUp, Minus } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import type { RecurringTransaction } from '@/lib/recurring-data'
 import { buildForecast, FORECAST_MONTHS } from '@/lib/cashflow-forecast-math'
+import { useDisplayMode } from '@/lib/hooks/use-display-mode'
+import { ForecastSparkline } from './cashflow-forecast-sparkline'
 
 /**
  * CashflowForecast — 6-maanden-vooruitblik op kasstroom. Voor elke
@@ -33,6 +35,13 @@ import { buildForecast, FORECAST_MONTHS } from '@/lib/cashflow-forecast-math'
  * van vandaag en er is geen kernelrij met een `inflationFactor` om mee te
  * deflateren. Op een half jaar zou een koopkrachtcorrectie bovendien kleiner
  * zijn dan de ruis in de baseline zelf.
+ *
+ * WEERGAVEMODUS (FC-1, docs/eenvoudige-weergave-audit.md §7) — in "Eenvoudig"
+ * verdwijnen de vier kopstatistieken en de zes tabelrijen ten gunste van één
+ * eindregel ("Over 6 maanden") plus een sparkline over hetzelfde cumulatieve
+ * saldo. Presentatie-reductie, geen tweede rekenpad: beide modi lezen dezelfde
+ * `buildForecast`-rijen, en de eindregel toont exact het getal dat in Volledig
+ * als "Saldo na 6m" boven de tabel staat. In "Volledig" verandert er niets.
  */
 
 export function CashflowForecast({
@@ -50,6 +59,7 @@ export function CashflowForecast({
    *  Default 0 als onbekend. */
   startingBalance?: number
 }) {
+  const { mode } = useDisplayMode()
   const rows = useMemo(
     () =>
       buildForecast(
@@ -74,12 +84,7 @@ export function CashflowForecast({
     return (
       <div className="space-y-4">
         <header>
-          <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
-            Cashflow — forecast
-          </div>
-          <h2 className="font-serif text-xl text-[var(--ink)] mt-1">
-            6 maanden vooruit
-          </h2>
+          <ForecastHeading />
         </header>
         <div className="rounded-2xl border border-dashed border-[var(--border-md)] bg-[var(--paper)] p-6 text-center">
           <p className="text-sm text-[var(--ink-3)] italic leading-relaxed">
@@ -92,17 +97,52 @@ export function CashflowForecast({
     )
   }
 
+  // ── Eenvoudig (FC-1): één eindregel + sparkline i.p.v. de zes tabelrijen. ──
+  // Zelfde `rows`, zelfde `lastCumulative` als hieronder — alleen minder ervan
+  // in beeld. De tabel blijft in Volledig ongewijzigd staan.
+  if (mode === 'simple') {
+    return (
+      <div className="space-y-4">
+        <header>
+          <ForecastHeading />
+        </header>
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4">
+          <div>
+            <div className="text-[11px] text-[var(--ink-3)]">
+              Over {FORECAST_MONTHS} maanden
+            </div>
+            <div className="mt-1 font-serif text-2xl font-semibold tabular-nums text-[var(--ink)]">
+              {formatCurrency(lastCumulative)}
+            </div>
+            <div className="mt-1 text-[11px] italic text-[var(--ink-3)]">
+              {totalNet >= 0
+                ? `${formatCurrency(totalNet)} erbij in die zes maanden`
+                : `${formatCurrency(Math.abs(totalNet))} eraf in die zes maanden`}
+            </div>
+          </div>
+          <ForecastSparkline
+            values={rows.map((r) => r.cumulative)}
+            testId="forecast-sparkline"
+            className="shrink-0"
+          />
+        </div>
+        <p className="text-[11px] italic text-[var(--ink-3)]">
+          Een rechte doortrekking van je huidige inkomsten en lasten — zonder
+          inflatie of schommelingen op de beurs. Wil je scenario&apos;s zien, kijk
+          dan op{' '}
+          <a href="/toekomst" className="underline hover:text-[var(--ink-2)]">
+            Toekomst
+          </a>
+          .
+        </p>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4">
       <header className="flex items-baseline justify-between gap-4 flex-wrap">
-        <div>
-          <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
-            Cashflow — forecast
-          </div>
-          <h2 className="font-serif text-xl text-[var(--ink)] mt-1">
-            6 maanden vooruit
-          </h2>
-        </div>
+        <ForecastHeading />
         <div className="flex items-center gap-4 text-xs">
           <SummaryStat label="Totaal in" value={totalIn} positive />
           <SummaryStat label="Totaal uit" value={totalOut} negative />
@@ -181,6 +221,21 @@ export function CashflowForecast({
         </a>
         .
       </p>
+    </div>
+  )
+}
+
+/** Kicker + titel — identiek in de lege staat, in Eenvoudig en boven de tabel,
+ *  zodat het blok in elke modus onder dezelfde kop staat. */
+function ForecastHeading() {
+  return (
+    <div>
+      <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
+        Cashflow — forecast
+      </div>
+      <h2 className="font-serif text-xl text-[var(--ink)] mt-1">
+        {FORECAST_MONTHS} maanden vooruit
+      </h2>
     </div>
   )
 }

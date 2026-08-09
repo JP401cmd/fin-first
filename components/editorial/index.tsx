@@ -13,6 +13,7 @@
  */
 
 import type { ReactNode } from 'react'
+import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 
 // Re-export Button (gesanctioneerde CTA-primitive — ink/secondary/moment; ADR 0038)
 export { Button } from './button'
@@ -208,25 +209,66 @@ export interface FigureProps {
   href?: string
 }
 
+/** Max. aantal cellen dat een figures-strip in de weergavemodus "Eenvoudig"
+ *  toont (APP-7). App-brede norm: één regel hier i.p.v. tientallen losse
+ *  mode-ternaries op de call-sites. */
+export const SIMPLE_MAX_FIGURES = 2
+
 /** Figures-strip — 4-kolommen-summary voor kassabonnen, scenario-output,
  *  analyse-conclusie, jaaroverzicht-headers, asset-detail mini-hero.
  *  Top + bottom solid borders, verticale rule-soft dividers tussen kolommen.
  *  Eindresultaat-kolom (`variant: 'winner'`) krijgt highlight-marker.
- *  Cellen met `href` worden klikbaar — voor /core/-stijl klikbare summaries. */
+ *  Cellen met `href` worden klikbaar — voor /core/-stijl klikbare summaries.
+ *
+ *  WEERGAVEMODUS (APP-7): in "Eenvoudig" toont de strip maximaal
+ *  `SIMPLE_MAX_FIGURES` (=2) cellen en wordt `cols` naar 2 geforceerd. Dat is
+ *  pure presentatie-reductie — dezelfde reeds berekende `FigureProps` worden
+ *  alleen minder getoond; er wordt niets herberekend (consume, don't recompute).
+ *  In "Volledig" gedraagt de strip zich exact als voorheen.
+ *  - `simpleFigures`: expliciete keuze wélke cellen in Eenvoudig blijven staan,
+ *    voor strips waar "de eerste twee" niet de juiste twee zijn (bv. als de
+ *    uitkomst-cel achteraan staat). Wordt óók op 2 afgekapt.
+ *  - `alwaysFull`: opt-out voor oppervlakken waar reductie fout is — design-
+ *    system-previews (blueprints) en gegenereerde rapportages/print-documenten.
+ *    LET OP: `useDisplayMode()` valt búiten een `DisplayModeProvider` terug op
+ *    'simple'; een strip die buiten de app-boom rendert zou dus stil inkorten. */
 export function FiguresStrip({
   cols = 4,
   figures,
+  simpleFigures,
+  alwaysFull = false,
   className = '',
 }: {
   cols?: 2 | 3 | 4
   figures: FigureProps[]
+  /** Welke cellen in "Eenvoudig" blijven staan (max 2). Default: de eerste twee uit `figures`. */
+  simpleFigures?: FigureProps[]
+  /** Reductie uitschakelen — altijd alle `figures` tonen, ongeacht de modus. */
+  alwaysFull?: boolean
   className?: string
 }) {
+  const { mode } = useDisplayMode()
+  const reduce = mode === 'simple' && !alwaysFull
+  // `.filter(Boolean)` is het vangnet, geen opsmuk: call-sites bouwen
+  // `simpleFigures` index-gebaseerd (`[figures[1], figures[3]]`). Kort een latere
+  // edit de bron-array in, dan is de entry `undefined` en crasht
+  // `FiguresStripCell` op `figure.kicker` — een render-crash, geen typefout, want
+  // `FigureProps[]` dekt een gat in de index niet af. Liever één cel minder dan
+  // een witte pagina.
+  const shownFigures = reduce
+    ? (simpleFigures ?? figures).filter(Boolean).slice(0, SIMPLE_MAX_FIGURES)
+    : figures
+  const effectiveCols = reduce ? 2 : cols
+
   const colsClass =
-    cols === 2 ? 'sm:grid-cols-2' : cols === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-4'
+    effectiveCols === 2
+      ? 'sm:grid-cols-2'
+      : effectiveCols === 3
+      ? 'sm:grid-cols-3'
+      : 'sm:grid-cols-4'
   // 3-cols heeft geen even aantal op mobile; pas border-bottom-row-rule aan.
   const mobileRowBorderRule =
-    cols === 3
+    effectiveCols === 3
       ? '[&:nth-child(-n+2)]:border-b sm:[&:nth-child(-n+2)]:border-b-0'
       : '[&:nth-child(-n+2)]:border-b sm:[&:nth-child(-n+2)]:border-b-0'
   return (
@@ -238,7 +280,7 @@ export function FiguresStrip({
       data-figures-strip
       className={`grid grid-cols-2 ${colsClass} border-t border-b border-[var(--ink)] my-5 ${className}`}
     >
-      {figures.map((f, idx) => (
+      {shownFigures.map((f, idx) => (
         <FiguresStripCell key={idx} figure={f} mobileRowBorderRule={mobileRowBorderRule} />
       ))}
     </div>

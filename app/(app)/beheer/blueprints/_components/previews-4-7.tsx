@@ -233,7 +233,10 @@ export function ModalPreview() {
                 6 maanden — dat is €1.200 extra. We kunnen dat in 4 maanden
                 opbouwen door €300 per maand opzij te zetten.
               </p>
+              {/* APP-7-opt-out: blueprint-preview — toont de primitive bewust in
+                  zijn volle vorm, ongeacht de weergavemodus van de beheerder. */}
               <FiguresStrip
+                alwaysFull
                 cols={2}
                 figures={[
                   { kicker: 'Huidig', amount: '5,2 mnd', sub: '€ 12.000' },
@@ -285,7 +288,9 @@ export function KassabonPreview() {
         <HLNeg>−€ 12.450</HLNeg> aan onverwachte kosten kan dat halveren.
       </PullQuote>
 
+      {/* APP-7-opt-out: blueprint-preview (zie hierboven). */}
       <FiguresStrip
+        alwaysFull
         figures={[
           { kicker: 'Bruto huur cumulatief', amount: '€ 206.350', sub: '10 jaar inkomsten' },
           { kicker: 'Belasting box 1', amount: '€ 70.122', sub: '70% × 50,0%', variant: 'negative' },

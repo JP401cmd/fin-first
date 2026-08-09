@@ -13,6 +13,15 @@ import type { Perspective, PerspectiveOption } from '@/lib/types/perspective'
 import type { CommandItem, CommandModuleContext } from './types'
 
 /**
+ * Cap op het aantal algemene acties dat de palette zonder zoekterm toont.
+ * Leeft hier (bij het register) zodat de test kan bewaken dat elke kern-actie
+ * — inclusief 'Synchroniseer prijzen' — binnen de cap valt; een nieuwe actie
+ * toevoegen zonder de cap te verhogen drukt anders stilzwijgend de onderste
+ * actie uit de standaardlijst.
+ */
+export const ACTIONS_LIMIT_VISIBLE = 5
+
+/**
  * Capabilities die een action kan gebruiken. Wordt door de provider gebouwd
  * uit React contexts (`useChatContext`, `useMaskedAmounts`, `useGlobalSync`,
  * `useRouter`, `usePerspective`) en doorgegeven aan de `build`-factory.
@@ -91,7 +100,11 @@ const ACTIONS: ActionDef[] = [
     id: 'action:toggle-display-mode',
     getLabel: (ctx) =>
       ctx.displayMode === 'simple' ? 'Volledige weergave tonen' : 'Eenvoudige weergave tonen',
-    getSublabel: () => 'Diepte-secties standaard tonen of inklappen',
+    // Beschrijft wat de modus ECHT doet: HideInSimple haalt diepte-secties weg
+    // in Eenvoudig en zet ze terug in Volledig. De oude tekst ("Diepte-secties
+    // standaard tonen of inklappen") beloofde inklapbaar-maar-bereikbaar — dat
+    // gedrag bestaat niet (DepthSection is ongebruikt).
+    getSublabel: () => 'Meer/minder detail op elke pagina',
     getIcon: (ctx) => (ctx.displayMode === 'simple' ? Layers : PanelTopClose),
     module: 'globaal',
     build: (ctx) => () => {

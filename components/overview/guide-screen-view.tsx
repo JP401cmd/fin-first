@@ -40,6 +40,11 @@ import type { GuideIcon, WelcomeGuideScreen, WelcomeGuideStep } from '@/lib/welc
  * - layout 'list'    → verticale rijen.
  * Afgevinkte stappen worden groen en blijven staan (geen line-through).
  * readOnly = preview: vinkjes niet klikbaar, links niet-navigerend.
+ * compact  = eenvoudige weergave (APP-6): áltijd de lijst-layout, zonder
+ *            schermintro en zonder stapomschrijvingen — vier afvinkregels in
+ *            plaats van vier proceskaarten, zodat de gids op mobiel binnen ~⅓
+ *            van het eerste scherm blijft. De stappen zelf, hun vinkjes en hun
+ *            links veranderen niet; alleen wat eromheen staat.
  */
 
 // ── Icoon-map (naam → lucide-component) ─────────────────────────────────────
@@ -73,34 +78,48 @@ interface Props {
   completedStepIds: string[]
   onToggle?: (stepId: string) => void
   readOnly?: boolean
+  compact?: boolean
 }
 
-export function GuideScreenView({ screen, completedStepIds, onToggle, readOnly = false }: Props) {
+export function GuideScreenView({
+  screen,
+  completedStepIds,
+  onToggle,
+  readOnly = false,
+  compact = false,
+}: Props) {
   const done = new Set(completedStepIds)
   const steps = screen.steps.filter((s) => s.enabled)
+  const showIntro = Boolean(screen.intro) && !compact
 
   return (
     <div>
-      {(screen.title || screen.intro) && (
-        <header className="mb-4">
+      {(screen.title || showIntro) && (
+        <header className={compact ? 'mb-2' : 'mb-4'}>
           {screen.title && (
             <h3
-              className="text-lg sm:text-xl text-[var(--ink)]"
+              className={`text-[var(--ink)] ${compact ? 'text-base' : 'text-lg sm:text-xl'}`}
               style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
             >
               {screen.title}
             </h3>
           )}
-          {screen.intro && (
+          {showIntro && (
             <p className="mt-1 text-sm text-[var(--ink-3)] leading-snug">{screen.intro}</p>
           )}
         </header>
       )}
 
-      {screen.layout === 'process' ? (
+      {screen.layout === 'process' && !compact ? (
         <ProcessSteps steps={steps} done={done} onToggle={onToggle} readOnly={readOnly} />
       ) : (
-        <ListSteps steps={steps} done={done} onToggle={onToggle} readOnly={readOnly} />
+        <ListSteps
+          steps={steps}
+          done={done}
+          onToggle={onToggle}
+          readOnly={readOnly}
+          compact={compact}
+        />
       )}
     </div>
   )
@@ -176,11 +195,14 @@ function ListSteps({
   done,
   onToggle,
   readOnly,
+  compact = false,
 }: {
   steps: WelcomeGuideStep[]
   done: Set<string>
   onToggle?: (id: string) => void
   readOnly: boolean
+  /** Eenvoudige weergave: strakkere rijen, geen stapomschrijving (APP-6). */
+  compact?: boolean
 }) {
   return (
     <ul className="divide-y divide-[var(--border-ed)] rounded-xl border border-[var(--border-ed)] bg-[var(--paper)]">
@@ -189,7 +211,7 @@ function ListSteps({
         return (
           <li
             key={step.id}
-            className={`flex items-start gap-3 p-3.5 transition-colors ${
+            className={`flex gap-3 transition-colors ${compact ? 'items-center px-3 py-1.5' : 'items-start p-3.5'} ${
               isDone ? 'bg-emerald-50/40' : ''
             }`}
           >
@@ -197,9 +219,15 @@ function ListSteps({
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <StepIcon step={step} isDone={isDone} inline />
-                <p className="text-sm font-semibold leading-snug text-[var(--ink)]">{step.title}</p>
+                <p
+                  className={`font-semibold leading-snug text-[var(--ink)] ${
+                    compact ? 'text-[13px] truncate' : 'text-sm'
+                  }`}
+                >
+                  {step.title}
+                </p>
               </div>
-              {step.description && (
+              {step.description && !compact && (
                 <p className="mt-0.5 text-xs leading-snug text-[var(--ink-3)]">{step.description}</p>
               )}
             </div>

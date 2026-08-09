@@ -18,6 +18,7 @@ import {
   computePeriodOutcome,
   computeSpendLimitTrend,
   computeStreaks,
+  netSpendFromSums,
   resolveSpendLimitPeriods,
   sliceContainsMonth,
   type SpendLimitAggregateRow,
@@ -89,6 +90,35 @@ describe('resolveSpendLimitPeriods', () => {
     // Eén dag later is juli wél afgesloten.
     const later = resolveSpendLimitPeriods('month', new Date(2026, 7, 1), 2)
     expect(later.find((s) => s.periodKey === '2026-07')?.isOpen).toBe(false)
+  })
+})
+
+// ── De netto-regel zelf ─────────────────────────────────────────────────────
+
+describe('netSpendFromSums — de enige plek waar teken en nul-regel staan', () => {
+  it('keert het teken om: negatieve som + positieve som → netto UITGAVE', () => {
+    // De aggregaten leveren uitgaven negatief en ontvangsten positief.
+    expect(netSpendFromSums(-120, 20)).toBe(100)
+  })
+
+  it('levert een POSITIEVE nul bij een lege periode, nooit −0', () => {
+    // −(0 + 0) is in IEEE-754 een negatieve nul; die zou als "−€ 0" op het
+    // scherm belanden en maakt elke Object.is-vergelijking stroomafwaarts
+    // verrassend. Dít is de regel die eerder op drie plekken overgeschreven was.
+    expect(Object.is(netSpendFromSums(0, 0), -0)).toBe(false)
+    expect(netSpendFromSums(0, 0)).toBe(0)
+  })
+
+  it('laat een netto-ontvangst negatief staan — niet geklemd op 0', () => {
+    expect(netSpendFromSums(-20, 120)).toBe(-100)
+  })
+
+  it('leest de string-sommen die Postgres teruggeeft', () => {
+    expect(netSpendFromSums('-120.50', '20.50')).toBe(100)
+  })
+
+  it('poetst een rekenfout niet weg: NaN blijft NaN', () => {
+    expect(Number.isNaN(netSpendFromSums(Number.NaN, 0))).toBe(true)
   })
 })
 

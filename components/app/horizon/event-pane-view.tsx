@@ -13,7 +13,7 @@ import type { PreviewBaseline } from '@/lib/strategy-preview'
 import type { FireParams } from '@/lib/fire-params'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
 import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
-import { Kicker, FiguresStrip } from '@/components/editorial'
+import { Kicker, FiguresStrip, type FigureProps } from '@/components/editorial'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { isStrategyManagedEvent, STRATEGY_BADGE_LABEL } from '@/lib/strategy-events'
 import { formatCurrency } from '@/lib/format'
@@ -75,6 +75,102 @@ export function EventPaneView({
       : managed === 'pensioen'
         ? 'Pensioen-strategie'
         : 'Eigen-woning-strategie'
+
+  // De vier cellen van de gebeurtenis-strip: drie dimensies + de FIRE-delta.
+  const eventFigures: FigureProps[] = [
+    {
+      kicker: 'Eenmalig',
+      amount:
+        event.one_time_cost === 0 ? (
+          <span className="text-[var(--ink-4)] text-base font-normal italic">—</span>
+        ) : (
+          <MaskedAmount
+            value={Math.abs(event.one_time_cost)}
+            tone="horizon"
+            monoWhenVisible={false}
+            signPrefix={event.one_time_cost < 0 ? '+' : '-'}
+          />
+        ),
+      sub: event.one_time_cost === 0 ? undefined : event.one_time_cost < 0 ? 'inkomst' : 'uitgave',
+    },
+    {
+      kicker: 'Maandelijks',
+      amount:
+        event.monthly_cost_change > 0 ? (
+          <MaskedAmount
+            value={event.monthly_cost_change}
+            tone="horizon"
+            monoWhenVisible={false}
+            signPrefix="-"
+          />
+        ) : event.monthly_income_change > 0 ? (
+          <MaskedAmount
+            value={event.monthly_income_change}
+            tone="horizon"
+            monoWhenVisible={false}
+            signPrefix="+"
+          />
+        ) : (
+          <span className="text-[var(--ink-4)] text-base font-normal italic">—</span>
+        ),
+      sub:
+        event.monthly_cost_change > 0
+          ? 'uitgave'
+          : event.monthly_income_change > 0
+            ? 'inkomst'
+            : undefined,
+    },
+    {
+      kicker: 'Duur',
+      amount:
+        event.duration_months === 0 && (event.monthly_cost_change > 0 || event.monthly_income_change > 0) ? (
+          <span className="text-base">blijvend</span>
+        ) : event.duration_months > 0 ? (
+          <span>
+            {Math.round(event.duration_months / 12)}
+            <span className="text-base font-normal text-[var(--ink-3)] ml-1">jr</span>
+          </span>
+        ) : (
+          <span className="text-[var(--ink-4)] text-base font-normal italic">—</span>
+        ),
+      sub: event.is_indexed ? 'inflatie-gekoppeld' : undefined,
+    },
+    {
+      kicker: 'FIRE-impact',
+      variant: fireDeltaMonths != null && fireDeltaMonths > 0 ? 'negative' : 'winner',
+      amount:
+        fireDeltaMonths == null ? (
+          <span className="text-base">—</span>
+        ) : fireDeltaMonths === 0 ? (
+          <span className="text-base">geen</span>
+        ) : (
+          <span>
+            {fireDeltaMonths > 0 ? '+' : '−'}
+            {Math.abs(fireDeltaMonths)}
+            <span className="text-base font-normal text-[var(--ink-3)] ml-1">mnd</span>
+          </span>
+        ),
+      sub: fireDeltaMonths != null && fireDeltaMonths > 0 ? 'vertraging' : 'op tijd',
+    },
+  ]
+  // APP-7: in Eenvoudig blijven twee cellen staan — het bedrag dat déze
+  // gebeurtenis kost plus wat het met je FIRE-moment doet. "Duur" is dan detail.
+  // Puur een keuze uit dezelfde cellen — niets wordt opnieuw berekend.
+  const hasOneTime = event.one_time_cost !== 0
+  const hasMonthly = event.monthly_cost_change > 0 || event.monthly_income_change > 0
+  // MAAR: een gebeurtenis kan béíde dragen. Het canonieke voorbeeld uit
+  // `lib/event-impact.test.ts` is "tweede kind": € 5.000 eenmalig én € 350/mnd
+  // over 216 maanden. Zou je daar op "Eenmalig" afkappen, dan toont Eenvoudig
+  // € 5.000 en verzwijgt het € 75.600 — verreweg de grootste post. Dat is
+  // misleiden, niet vereenvoudigen (zelfde grond als de opt-out in
+  // `aspiration-questionnaire.tsx`). Draagt de gebeurtenis beide bedragen, dan
+  // blijft de strip dus volledig: "Duur" is daar bovendien geen detail meer maar
+  // de factor die het maandbedrag pas leesbaar maakt.
+  const bothAmounts = hasOneTime && hasMonthly
+  const simpleEventFigures: FigureProps[] = [
+    hasOneTime ? eventFigures[0] : eventFigures[1],
+    eventFigures[3],
+  ]
 
   return (
     // Outer padding wordt geleverd door SlideInPane (driewegregel — ui-ux skill).
@@ -138,82 +234,9 @@ export function EventPaneView({
       {/* FiguresStrip — drie dimensies + delta */}
       <FiguresStrip
         cols={4}
-        figures={[
-          {
-            kicker: 'Eenmalig',
-            amount:
-              event.one_time_cost === 0 ? (
-                <span className="text-[var(--ink-4)] text-base font-normal italic">—</span>
-              ) : (
-                <MaskedAmount
-                  value={Math.abs(event.one_time_cost)}
-                  tone="horizon"
-                  monoWhenVisible={false}
-                  signPrefix={event.one_time_cost < 0 ? '+' : '-'}
-                />
-              ),
-            sub: event.one_time_cost === 0 ? undefined : event.one_time_cost < 0 ? 'inkomst' : 'uitgave',
-          },
-          {
-            kicker: 'Maandelijks',
-            amount:
-              event.monthly_cost_change > 0 ? (
-                <MaskedAmount
-                  value={event.monthly_cost_change}
-                  tone="horizon"
-                  monoWhenVisible={false}
-                  signPrefix="-"
-                />
-              ) : event.monthly_income_change > 0 ? (
-                <MaskedAmount
-                  value={event.monthly_income_change}
-                  tone="horizon"
-                  monoWhenVisible={false}
-                  signPrefix="+"
-                />
-              ) : (
-                <span className="text-[var(--ink-4)] text-base font-normal italic">—</span>
-              ),
-            sub:
-              event.monthly_cost_change > 0
-                ? 'uitgave'
-                : event.monthly_income_change > 0
-                  ? 'inkomst'
-                  : undefined,
-          },
-          {
-            kicker: 'Duur',
-            amount:
-              event.duration_months === 0 && (event.monthly_cost_change > 0 || event.monthly_income_change > 0) ? (
-                <span className="text-base">blijvend</span>
-              ) : event.duration_months > 0 ? (
-                <span>
-                  {Math.round(event.duration_months / 12)}
-                  <span className="text-base font-normal text-[var(--ink-3)] ml-1">jr</span>
-                </span>
-              ) : (
-                <span className="text-[var(--ink-4)] text-base font-normal italic">—</span>
-              ),
-            sub: event.is_indexed ? 'inflatie-gekoppeld' : undefined,
-          },
-          {
-            kicker: 'FIRE-impact',
-            variant: fireDeltaMonths != null && fireDeltaMonths > 0 ? 'negative' : 'winner',
-            amount:
-              fireDeltaMonths == null ? (
-                <span className="text-base">—</span>
-              ) : fireDeltaMonths === 0 ? (
-                <span className="text-base">geen</span>
-              ) : (
-                <span>
-                  {fireDeltaMonths > 0 ? '+' : '−'}
-                  {Math.abs(fireDeltaMonths)}
-                  <span className="text-base font-normal text-[var(--ink-3)] ml-1">mnd</span>
-                </span>
-              ),
-            sub: fireDeltaMonths != null && fireDeltaMonths > 0 ? 'vertraging' : 'op tijd',
-          },
-        ]}
+        figures={eventFigures}
+        simpleFigures={simpleEventFigures}
+        alwaysFull={bothAmounts}
       />
 
       {/* Action-knoppen (Bewerken / Verwijderen) zitten in de pane-footer

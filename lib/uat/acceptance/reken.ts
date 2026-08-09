@@ -29,10 +29,12 @@
  * AL-GEDOCUMENTEERDE BUGS: geen bekend vanuit deze zone bij aanvang van deze
  * sessie (in tegenstelling tot RAPP). Twee al-genoemde randgevallen uit het
  * plan zelf worden narratief meegenomen: de prefab-formule-whitelist kent
- * GEEN `log`-functie (WF-REKEN-01/02, `evaluate.ts#WHITELIST_FNS`) en de
- * Monte Carlo-onzekerheidsband (WF-REKEN-18) draait op een losstaande legacy
- * `runMonteCarlo`-engine, niet op de horizon-kernel — dat is bewust
- * gedocumenteerd in het plan zelf, geen nieuwe bevinding.
+ * GEEN `log`-functie (WF-REKEN-01/02, `evaluate.ts#WHITELIST_FNS`). Het tweede
+ * randgeval — "de onzekerheidsband (WF-REKEN-18) draait op een losstaande
+ * legacy `runMonteCarlo`, niet op de horizon-kernel" — is OPGELOST op
+ * 2026-08-08: de band is sindsdien de kernel-marktcheck
+ * (`computeWhatifMarktcheck`). Sinds 2026-08-09 tekent hij p25–p75 i.p.v.
+ * p10–p90 en bepaalt p75 de Y-as; zie het criterium hieronder.
  *
  * GRONDSLAG-REGEL (CLAUDE.md): rekenhulpen zijn losgekoppeld van de FIRE-
  * projectie (WF-REKEN-01) totdat een uitkomst expliciet als levensgebeurtenis
@@ -280,10 +282,10 @@ const criteria: AcceptanceCriterion[] = [
     persona: 'tessa',
     given: 'Persona Tessa Compleet, volledige Wat-Als-pagina. Scope: uitsluitend het Wat-Als-oppervlak (tijdas-variant = UAT-TOEK-08).',
     when: 'De gebruiker zet "Onzekerheid" aan in Pad-modus en wisselt naar Opbouw.',
-    then: 'p10–p90-band rond de deterministische lijn, breder op langere termijn; band draait op de LOSSTAANDE legacy `runMonteCarlo`-engine (1.000 simulaties, 7%/15% volatiliteit) — GEEN horizon-kernel, dus geen oracle-vergelijking, wel de statistische sanity-check dat de band niet triviaal smal/breed is. "Onzekerheid"-knop verdwijnt in Opbouw-modus. Mobiel (<768px) → "Inkomen & Uitgaven" standaard dicht.',
+    then: 'p25–p75-band rond de deterministische lijn, breder op langere termijn. GETEKEND is sinds 2026-08-09 alléén de middelste helft (p25–p75, met p50 als lijn) en de Y-as schaalt daar ook op; p10–p90 bestaat nog in de data (tooltip, invariant) maar wordt niet meer getekend — die rand drukte de plan-lijn tot ~9% van de ashoogte plat. De pil-titel noemt daarom p25–p75. De band draait sinds 2026-08-08 op de MARKTCHECK (horizon-kernel): tot 200 VOLLEDIGE kernel-projecties op exact dezelfde what-if-context als de hoofdlijn (incl. rendement-slider), dus de band volgt óók de onttrekkingsfase i.p.v. de opbouw door te zetten. Grondslag = netto vermogen (Prognose!I), gelijk aan de hoofdlijn. Draait in de web worker; de band verschijnt met enkele seconden vertraging. "Onzekerheid"-knop verdwijnt in Opbouw-modus. Mobiel (<768px) → "Inkomen & Uitgaven" standaard dicht.',
     assertion: {
       kind: 'direction',
-      source: 'lib/horizon-data.ts#runMonteCarlo (losstaande legacy-engine, expliciet géén oracle-vergelijking per het UAT-plan) — statistische sanity-check',
+      source: 'lib/horizon-kernel/whatif-router.ts#computeWhatifMarktcheck → lib/horizon-kernel/wrappers/mc.ts#runMonteCarlo — statistische sanity-check (band niet triviaal smal/breed) plus de invariant "hoofdlijn binnen p10–p90"; de Y-as-keuze (mcMax op p75) is gepind in lib/horizon/sim-chart-geometry.test.ts',
     },
   },
   {

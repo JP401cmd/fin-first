@@ -35,8 +35,6 @@ import {
   formatFireAge,
   formatFireAgeShort,
   formatFireAgeDelta,
-  runMonteCarlo,
-  type MonteCarloResult,
 } from '@/lib/horizon-data'
 import { resolveFireParams } from '@/lib/fire-params'
 import { lookupAowAge, type AowLeeftijdRow, type AowAge } from '@/lib/aow-leeftijd'
@@ -50,7 +48,9 @@ import {
 } from '@/lib/unified-projection'
 import { buildHorizonInput } from '@/lib/horizon/build-input'
 import { type LifeEvent } from '@/lib/horizon-data'
-import { computeWhatifProjection } from '@/lib/horizon-kernel/whatif-router'
+import { computeWhatifProjection, type WhatifRawContext } from '@/lib/horizon-kernel/whatif-router'
+import type { MarktcheckOutcome } from '@/lib/horizon-kernel/marktcheck'
+import { runWhatifMarktcheckAsync } from '@/lib/horizon-kernel/worker/run-in-worker'
 import type { WhatifRawProfileRow } from '@/lib/horizon-kernel/adapter/whatif-varianten'
 import { WITHDRAWAL_DEFAULTS, resolveWithdrawalStrategy, type WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 import { type Asset, ASSET_CLIENT_COLUMNS, ASSET_TYPE_LABELS } from '@/lib/asset-data'
@@ -805,18 +805,51 @@ export default function WhatIfPage() {
     return result
   }, [pinnedScenarioIds, savedScenariosMirror, input, buildInputForEvents, baseline, rawProfile, fullAssets, fullDebts, aowRows])
 
-  // ── Monte Carlo overlay (when toggled on) ─────────────
-  const mcResult = useMemo<MonteCarloResult | null>(() => {
-    if (!mcEnabled || !input) return null
-    const yearsToShow = Math.max(20, 90 - (input.dateOfBirth ? ageAtDate(input.dateOfBirth) : 30))
-    return runMonteCarlo(input, 1000, yearsToShow)
-  }, [mcEnabled, input])
+  // ── Marktcheck-band ("Onzekerheid"-pil) ───────────────────────────────────
+  // Draait `computeWhatifMarktcheck` in de web worker: n VOLLEDIGE kernel-runs op
+  // EXACT dezelfde what-if-context als de hoofdlijn hierboven (inclusief de
+  // rendement-slider en de scenario-events), zodat de band de hele plan-curve
+  // volgt — opbouw, overgang én onttrekking — op dezelfde leeftijdsas en dezelfde
+  // grondslag (netto vermogen). Nooit synchroon: dat zijn tot 200 projecties op
+  // de main thread. Race-guard via de `cancelled`-closure.
+  const [mcResult, setMcResult] = useState<Extract<MarktcheckOutcome, { ok: true }> | null>(null)
+
+  const marktcheckContext = useMemo<WhatifRawContext | null>(() => {
+    const p = deferredWhatIfSimInput
+    if (!mcEnabled || !p.whatIfBuilt || !p.rawProfile) return null
+    return {
+      profile: p.rawProfile,
+      assets: p.fullAssets,
+      debts: p.fullDebts,
+      lifeEvents: p.scenarioActiveEvents,
+      aowRows: p.aowRows,
+      returnDeltaByAssetType: p.returnDeltas,
+      yearlyExpenses: p.whatIfBuilt.input.yearlyExpenses,
+    }
+  }, [mcEnabled, deferredWhatIfSimInput])
+
+  useEffect(() => {
+    if (!marktcheckContext) { setMcResult(null); return }
+    let cancelled = false
+    runWhatifMarktcheckAsync(marktcheckContext)
+      .then((res) => { if (!cancelled) setMcResult(res !== null && res.ok ? res : null) })
+      .catch((err) => console.warn('[horizon-worker] what-if-marktcheck faalde', err))
+    return () => { cancelled = true }
+  }, [marktcheckContext])
 
   const monteCarloOverlay = useMemo<MonteCarloOverlay | undefined>(() => {
-    if (!mcResult || !input) return undefined
-    const startAge = input.dateOfBirth ? ageAtDate(input.dateOfBirth) : 30
-    return { ...mcResult.percentiles, startAge }
-  }, [mcResult, input])
+    if (!mcResult) return undefined
+    // `startAge` komt UIT de band (de kernel-as), niet uit een tweede
+    // leeftijdsberekening — anders schuift de band langs de hoofdlijn.
+    return {
+      startAge: mcResult.band.startAge,
+      p10: [...mcResult.band.p10],
+      p25: [...mcResult.band.p25],
+      p50: [...mcResult.band.p50],
+      p75: [...mcResult.band.p75],
+      p90: [...mcResult.band.p90],
+    }
+  }, [mcResult])
 
   // ── Impact computation (per-event FIRE delta within the scenario) ──────────────
   const computeImpact = useCallback((eventId: string) => {
@@ -1344,7 +1377,9 @@ export default function WhatIfPage() {
                   }`}
                   aria-pressed={mcEnabled}
                   style={{ minHeight: 32 }}
-                  title="Toon p10-p90 onzekerheidsbanden (1000 simulaties)"
+                  title={mcResult
+                    ? `Marktcheck: je plan ${mcResult.runs}× doorgerekend met een ander marktverloop (p25–p75)`
+                    : 'Marktcheck: je plan doorgerekend met wisselende marktverlopen (p25–p75)'}
                 >
                   <Activity className="h-3 w-3" aria-hidden />
                   Onzekerheid

@@ -30,10 +30,13 @@ import {
   ChevronDown,
   ChevronsLeft,
   ChevronsRight,
+  CalendarClock,
   Lock,
   Activity,
   type LucideIcon,
 } from 'lucide-react'
+import { useEuroView } from '@/lib/hooks/use-euro-view'
+import { euroViewLabel } from '@/lib/euro-display'
 import { useModuleAccess } from '@/components/app/feature-access-provider'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { SIMPLE_HIDDEN_NAV_HREFS } from '@/lib/nav-config'
@@ -339,7 +342,7 @@ export function Sidebar({
         onToggle={() => setCollapsed(!collapsed)}
       />
 
-      <SidebarPerspectiveBadge collapsed={collapsed} />
+      <SidebarWeergaveSection collapsed={collapsed} />
 
       <ModulesSection
         collapsed={collapsed}
@@ -463,22 +466,30 @@ function SearchTrigger() {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Weergave-badge (perspectief: eigen / huishouden / partner)
+// Weergave-sectie (perspectief + euro-weergave)
 // ─────────────────────────────────────────────────────────────────
 
 /**
- * Toont de weergave-badge bovenaan de sidebar — alleen voor leden van een
- * huishouden (self-gating via PerspectiveSwitcher + isHousehold). Expanded:
- * kicker "Weergave" + pill. Collapsed: alleen de icoon-pill (gecentreerd).
+ * De weergave-sectie bovenaan de sidebar: één blok met de instellingen die
+ * bepalen WAT je op elk scherm leest.
+ *
+ *  - **Perspectief** (eigen / huishouden / partner) — alleen voor leden van een
+ *    huishouden (self-gating via PerspectiveSwitcher + isHousehold).
+ *  - **Euro-weergave** (toekomstige ⇄ huidige euro's) — altijd zichtbaar.
+ *
+ * Bewust één sectie met één kicker: het zijn allebei profiel-brede
+ * weergavekeuzes die cross-device meereizen, en twee losse "Weergave"-blokken
+ * boven elkaar zouden lezen als twee verschillende dingen.
  */
-function SidebarPerspectiveBadge({ collapsed }: { collapsed: boolean }) {
+function SidebarWeergaveSection({ collapsed }: { collapsed: boolean }) {
   const { isHousehold, loading } = usePerspective()
-  if (loading || !isHousehold) return null
+  const showPerspective = !loading && isHousehold
 
   if (collapsed) {
     return (
-      <div className="flex justify-center py-2 border-b border-[var(--border-ed)]">
-        <PerspectiveSwitcher compact menuAlign="left" />
+      <div className="flex flex-col items-center gap-1.5 py-2 border-b border-[var(--border-ed)]">
+        {showPerspective && <PerspectiveSwitcher compact menuAlign="left" />}
+        <SidebarEuroViewBadge collapsed />
       </div>
     )
   }
@@ -495,8 +506,71 @@ function SidebarPerspectiveBadge({ collapsed }: { collapsed: boolean }) {
           Weergave
         </span>
       </div>
-      <PerspectiveSwitcher menuAlign="left" />
+      <div className="flex flex-col items-start gap-1.5">
+        {showPerspective && <PerspectiveSwitcher menuAlign="left" />}
+        <SidebarEuroViewBadge />
+      </div>
     </div>
+  )
+}
+
+/**
+ * Euro-weergave-status: staat de app in *toekomstige* euro's (nominaal, de
+ * default) of in *huidige* euro's (koopkracht van vandaag)?
+ *
+ * WAAROM HIER, EN ALTIJD ZICHTBAAR. Dit is de enige app-brede instelling die
+ * de BETEKENIS van elk bedrag verandert zonder dat het bedrag zelf zegt welke
+ * meetlat geldt — "€ 1,65M" is een ander getal in beide standen. De knop zelf
+ * woont in het zoekscherm (⌘K → "Toon huidige/toekomstige euro's"); dit is de
+ * status die daarbij hoort, permanent in beeld. Dat is precies de splitsing die
+ * ProjectionLab en Boldin ook maken: de schakelaar in een weergave-/aannames-
+ * menu, niet als knop op elke grafiek. Vandaar dat de losse `EuroViewBadge` van
+ * de Toekomst-grafiek af is (gebruiker, aug 2026) — één status-plek, niet één
+ * per grafiek.
+ *
+ * NOMINAAL BLIJFT RUSTIG. In `'nominal'` (de default, exact het beeld van
+ * vandaag) staat de pill in neutrale ink zonder accent; in `'real'` krijgt hij
+ * het horizon-accent. Zo is de indicator altijd afleesbaar — de gebruiker vroeg
+ * expliciet om te zien of huidig óf toekomstig aanstaat — maar springt alleen de
+ * afwijkende stand eruit. Dat houdt de geest van ADR 0090 §8 overeind (nominaal
+ * = geen ruis) zonder de status te verzwijgen.
+ *
+ * Klikbaar: de pill is meteen de weg terug, net als de oude badge.
+ *
+ * Icoonkeuze volgt de command-palette (`lib/command-palette/actions.ts`):
+ * Wallet = huidige euro's, CalendarClock = toekomstige. Wallet is in dít bestand
+ * óók het module-icoon van Het Overzicht; dat is bewust geaccepteerd — één
+ * begrippenlijst over alle oppervlakken weegt zwaarder dan een uniek icoon per
+ * bestand, en de twee staan in verschillende secties met andere kleur en maat.
+ */
+function SidebarEuroViewBadge({ collapsed = false }: { collapsed?: boolean }) {
+  const { view, toggle } = useEuroView()
+  const isReal = view === 'real'
+  const Icon = isReal ? Wallet : CalendarClock
+  const label = euroViewLabel(view)
+  const hint = isReal
+    ? "Bedragen staan in koopkracht van vandaag. Klik voor toekomstige euro's."
+    : "Bedragen staan in de euro's van dat jaar. Klik voor huidige euro's."
+
+  const tint = isReal
+    ? 'border-horizon-300 bg-horizon-50 text-horizon-800'
+    : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:text-[var(--ink-2)] hover:bg-[var(--subtle)]/50'
+
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      aria-pressed={isReal}
+      aria-label={`Weergave: ${label}. ${hint}`}
+      title={`Weergave: ${label} — ${hint}`}
+      data-testid="sidebar-euro-view-badge"
+      className={`inline-flex items-center gap-1.5 rounded-full border transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--ink)] ${tint} ${
+        collapsed ? 'h-8 w-8 justify-center' : 'px-2.5 py-1 text-xs font-medium'
+      }`}
+    >
+      <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+      {!collapsed && <span className="truncate">{label}</span>}
+    </button>
   )
 }
 
@@ -526,8 +600,13 @@ function ModulesSection({
   // Netto vermogen is een saldo → honoreert de privacy-toggle (Bedragen
   // verbergen). Bij masked toont formatNetWorthShort de bullet-placeholder.
   const { masked } = useMaskedAmounts()
+  // NAV-5 — in Eenvoudig geen netto-vermogen-badge naast "Het Overzicht": een
+  // cijfer zonder context, dat op de pagina zelf al twee keer staat (hero +
+  // vermogensgrafiek). De navigatie is een wegwijzer, geen tweede dashboard.
+  // In Volledig blijft de badge staan.
+  const simple = useDisplayMode().mode === 'simple'
   const metrics: Record<NavModule, string> = {
-    kern: formatNetWorthShort(netWorth, masked),
+    kern: simple ? '·' : formatNetWorthShort(netWorth, masked),
     wil: actionCount > 0 ? `· ${actionCount}` : '·',
     horizon: '·',
   }

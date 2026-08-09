@@ -7,17 +7,21 @@
  *   - BudgetEditorialHeader  → hoofdgetallen-blok (plan/werkelijk) verbergen
  *   - BudgetFiguresStrip     → figures-strip naar Inkomen+Uitgaven beperken
  *   - BudgetViewToggle       → view-toggle-pillgroep verbergen (pil-only)
+ *   - BudgetPeriodToggle     → periode-schakel verbergen (maand-only, BUD-1)
+ *   - BudgetReportActions    → Rapport + "Kopieer vorige maand" verbergen (BUD-2)
  *
  * Elke render wordt expliciet in een DisplayModeProvider gewrapt: buiten een
  * provider valt useDisplayMode terug op 'simple', dus de full-mode spiegel-
  * tests MOETEN initialMode="full" zetten.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { DisplayModeProvider } from '@/lib/hooks/use-display-mode'
 import {
   BudgetEditorialHeader,
   BudgetFiguresStrip,
+  BudgetPeriodToggle,
+  BudgetReportActions,
   BudgetViewToggle,
 } from './budgets-client'
 
@@ -134,6 +138,89 @@ describe('BudgetFiguresStrip — Eenvoudig vs Volledig', () => {
     expect(screen.getByText('Schulden')).toBeTruthy()
     expect(screen.getByText('vrijheid opbouwen')).toBeTruthy()
     expect(screen.getByText('vrijheid terugkopen')).toBeTruthy()
+  })
+})
+
+describe('BudgetPeriodToggle — Eenvoudig vs Volledig (BUD-1)', () => {
+  it('simple: rendert geen periode-schakel — en dus nergens de afkorting "YTD"', () => {
+    const { container } = render(
+      <DisplayModeProvider initialMode="simple">
+        <BudgetPeriodToggle simple periodMode="maand" onSelect={() => {}} />
+      </DisplayModeProvider>,
+    )
+    expect(screen.queryByRole('button', { name: 'Maand' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'YTD' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '12 mnd' })).toBeNull()
+    // Jargonregel: "YTD" komt in Eenvoudig niet in beeld.
+    expect(container.textContent ?? '').not.toContain('YTD')
+    expect(container.firstChild).toBeNull()
+  })
+
+  it('simple: rendert óók niets wanneer de bewaarde keuze nog YTD is', () => {
+    // Regressie op de terugval: wie in Volledig op YTD stond en terugschakelt
+    // naar Eenvoudig mag geen YTD-schakel (of -label) meer zien. De caller zet
+    // `effectivePeriodMode` op 'maand'; de toggle zelf verdwijnt volledig.
+    const { container } = render(
+      <DisplayModeProvider initialMode="simple">
+        <BudgetPeriodToggle simple periodMode="ytd" onSelect={() => {}} />
+      </DisplayModeProvider>,
+    )
+    expect(container.firstChild).toBeNull()
+    expect(container.textContent ?? '').not.toContain('YTD')
+  })
+
+  it('full: toont Maand / YTD / 12 mnd en meldt de keuze terug', () => {
+    const onSelect = vi.fn()
+    render(
+      <DisplayModeProvider initialMode="full">
+        <BudgetPeriodToggle simple={false} periodMode="maand" onSelect={onSelect} />
+      </DisplayModeProvider>,
+    )
+    expect(screen.getByRole('button', { name: 'Maand' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'YTD' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '12 mnd' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'YTD' }))
+    expect(onSelect).toHaveBeenCalledWith('ytd')
+  })
+})
+
+describe('BudgetReportActions — Eenvoudig vs Volledig (BUD-2)', () => {
+  const ACTION_PROPS = {
+    showCopy: true,
+    copying: false,
+    onOpenReport: () => {},
+    onCopyLastMonth: () => {},
+  }
+
+  it('simple: verbergt "Rapport" en "Kopieer vorige maand"', () => {
+    const { container } = render(
+      <DisplayModeProvider initialMode="simple">
+        <BudgetReportActions {...ACTION_PROPS} />
+      </DisplayModeProvider>,
+    )
+    expect(screen.queryByRole('button', { name: 'Rapport' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Kopieer vorige maand/ })).toBeNull()
+    expect(container.firstChild).toBeNull()
+  })
+
+  it('full: toont "Rapport" en "Kopieer vorige maand"', () => {
+    render(
+      <DisplayModeProvider initialMode="full">
+        <BudgetReportActions {...ACTION_PROPS} />
+      </DisplayModeProvider>,
+    )
+    expect(screen.getByRole('button', { name: 'Rapport' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Kopieer vorige maand/ })).toBeTruthy()
+  })
+
+  it('full: zonder maand-periode blijft alleen "Rapport" over', () => {
+    render(
+      <DisplayModeProvider initialMode="full">
+        <BudgetReportActions {...ACTION_PROPS} showCopy={false} />
+      </DisplayModeProvider>,
+    )
+    expect(screen.getByRole('button', { name: 'Rapport' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Kopieer vorige maand/ })).toBeNull()
   })
 })
 

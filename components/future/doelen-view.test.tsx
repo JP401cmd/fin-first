@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import type { ReactElement } from 'react'
+import { render as rtlRender, screen, fireEvent } from '@testing-library/react'
 import { DoelenView } from './doelen-view'
+import { DisplayModeProvider, type DisplayMode } from '@/lib/hooks/use-display-mode'
 import type { GoalWithBudget } from '@/lib/fin-data-loader'
 
 // DoelenView mount DoelToevoegenSheet die next/navigation + supabase
@@ -18,7 +20,18 @@ vi.mock('@/lib/supabase/client', () => ({
 /**
  * Tests voor DoelenView — Doelen-tab op /toekomst met status-flags
  * (on-track / aandacht / off-track / behaald).
+ *
+ * VERPLICHTE PROVIDER (ADR 0026): `useDisplayMode()` valt BUITEN een
+ * DisplayModeProvider stilzwijgend terug op 'simple'. Zonder wrapper zou dit
+ * bestand ongemerkt de Eenvoudig-tak testen en groen blijven om de verkeerde
+ * reden. Deze helper rendert daarom expliciet in een modus; de default is
+ * 'full' omdat alle bestaande tests de Volledig-tak beschrijven.
  */
+function render(ui: ReactElement, mode: DisplayMode = 'full') {
+  return rtlRender(
+    <DisplayModeProvider initialMode={mode}>{ui}</DisplayModeProvider>,
+  )
+}
 
 function mockGoal(overrides: Partial<GoalWithBudget> = {}): GoalWithBudget {
   return {
@@ -318,5 +331,78 @@ describe('DoelenView — doelsituatie-groep', () => {
     // Eén handmatig doel → "1 actief doel"; parameter-doel zit in eigen groep.
     expect(screen.getByText('1 actief doel')).toBeTruthy()
     expect(screen.getByText('Jouw doelsituatie')).toBeTruthy()
+  })
+})
+
+// ── Weergavemodus: Eenvoudig vs. Volledig (audit TOE-2) ───────────────────
+
+/**
+ * TOE-2: in Eenvoudig verdwijnt de tweedeling "Jouw doelsituatie" vs.
+ * handmatige doelen en staat alles onder één kop "Je doelen". In Volledig
+ * blijft de tweedeling exact zoals hij was.
+ */
+describe('DoelenView — weergavemodus (TOE-2)', () => {
+  const gemengd = {
+    goals: [
+      paramGoal({ id: 'pf', name: 'Vrijheidsleeftijd', goal_type: 'fire_age' }),
+      mockGoal({ id: 'm1', name: 'Noodfonds' }),
+    ],
+    goalProgresses: [
+      { current: 54.5, target: 52, pct: 95, onTrack: true, eta: null },
+      { current: 20000, target: 50000, pct: 40, onTrack: false, eta: null },
+    ],
+  }
+
+  it('Eenvoudig: één lijst onder de kop "Je doelen", geen herkomst-scheiding', () => {
+    render(<DoelenView {...gemengd} />, 'simple')
+
+    expect(screen.getByText('Je doelen')).toBeTruthy()
+    expect(screen.queryByText('Jouw doelsituatie')).toBeNull()
+    expect(screen.queryByText('1 actief doel')).toBeNull()
+    // Precies één lijst-kop (h2) → er staat geen tweede groep meer.
+    expect(screen.getAllByRole('heading', { level: 2 }).length).toBe(1)
+    // Beide doelen staan er nog — samenvoegen is presentatie, geen filter.
+    expect(screen.getByText('Vrijheidsleeftijd')).toBeTruthy()
+    expect(screen.getByText('Noodfonds')).toBeTruthy()
+  })
+
+  it('Eenvoudig: beide doelen in één grid, doelsituatie-doel eerst', () => {
+    render(<DoelenView {...gemengd} />, 'simple')
+    const namen = screen
+      .getAllByRole('heading', { level: 3 })
+      .map((h) => h.textContent ?? '')
+    // Gedocumenteerde sorteerkeuze: doelsituatie eerst, dan handmatig.
+    expect(namen[0]).toContain('Vrijheidsleeftijd')
+    expect(namen[1]).toContain('Noodfonds')
+    // ... en ze staan in dezelfde grid-container (in Volledig zijn dat er twee).
+    const eersteGrid = screen
+      .getByText('Vrijheidsleeftijd')
+      .closest('div.grid') as HTMLElement | null
+    expect(eersteGrid).toBeTruthy()
+    expect(eersteGrid?.textContent).toContain('Noodfonds')
+  })
+
+  it('Eenvoudig: beide kaart-typen houden hun gedrag (lab-link én bewerken)', () => {
+    render(<DoelenView {...gemengd} />, 'simple')
+    expect(
+      screen.getByRole('link', { name: 'Bekijk Vrijheidsleeftijd in het lab' })
+        .getAttribute('href'),
+    ).toBe('/toekomst#verken-je-aannames')
+    expect(screen.getByRole('button', { name: 'Bewerk doel Noodfonds' })).toBeTruthy()
+  })
+
+  it('Eenvoudig: de groepsactie "Doelsituatie loslaten" is uit beeld', () => {
+    render(<DoelenView {...gemengd} />, 'simple')
+    expect(screen.queryByRole('button', { name: 'Doelsituatie-opties' })).toBeNull()
+  })
+
+  it('Volledig: de tweedeling blijft ongewijzigd', () => {
+    render(<DoelenView {...gemengd} />, 'full')
+    expect(screen.getByText('Jouw doelsituatie')).toBeTruthy()
+    expect(screen.getByText('1 actief doel')).toBeTruthy()
+    expect(screen.queryByText('Je doelen')).toBeNull()
+    // Twee koppen = twee groepen.
+    expect(screen.getAllByRole('heading', { level: 2 }).length).toBe(2)
+    expect(screen.getByRole('button', { name: 'Doelsituatie-opties' })).toBeTruthy()
   })
 })

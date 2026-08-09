@@ -672,57 +672,38 @@ export function DebtsClient({ toolbarFilter, debtTypeFilter, initialData, showPa
       </PageOpening>
 
       {/* Figures-strip (mini-hero) — Type 2 blueprint sectie 2 */}
-      {/* In Eenvoudig zonder de "Categorieën"-teller (cols 3). */}
-      {simple ? (
-        <FiguresStrip
-          cols={3}
-          figures={[
-            {
-              kicker: 'Totale schuld',
-              amount: <MaskedAmount value={totalBalance} tone="kern" />,
-              sub: `${activeDebts.length} schuld${activeDebts.length !== 1 ? 'en' : ''}`,
-              variant: 'winner',
-            },
-            {
-              kicker: 'Maandlasten',
-              amount: <MaskedAmount value={totalMonthlyPayment} tone="kern" />,
-              sub: 'per maand aflossen',
-            },
-            {
-              kicker: 'Rente (gewogen)',
-              amount: `${weightedAvgInterest.toLocaleString('nl-NL', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`,
-              sub: 'gemiddeld per jaar',
-            },
-          ]}
-        />
-      ) : (
-        <FiguresStrip
-          cols={4}
-          figures={[
-            {
-              kicker: 'Totale schuld',
-              amount: <MaskedAmount value={totalBalance} tone="kern" />,
-              sub: `${activeDebts.length} schuld${activeDebts.length !== 1 ? 'en' : ''}`,
-              variant: 'winner',
-            },
-            {
-              kicker: 'Maandlasten',
-              amount: <MaskedAmount value={totalMonthlyPayment} tone="kern" />,
-              sub: 'per maand aflossen',
-            },
-            {
-              kicker: 'Rente (gewogen)',
-              amount: `${weightedAvgInterest.toLocaleString('nl-NL', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`,
-              sub: 'gemiddeld per jaar',
-            },
-            {
-              kicker: 'Categorieën',
-              amount: `${(Object.keys(byType) as DebtType[]).filter((t) => byType[t]?.debts.length > 0).length}`,
-              sub: `type${(Object.keys(byType) as DebtType[]).filter((t) => byType[t]?.debts.length > 0).length === 1 ? '' : 's'} schuld`,
-            },
-          ]}
-        />
-      )}
+      {/* BEZ-3 / APP-7: de reductie zit in de primitive, niet hier. In
+          Eenvoudig kapt `FiguresStrip` af op de eerste twee cellen —
+          Totale schuld + Maandlasten; "Rente (gewogen)" en "Categorieën"
+          zijn beheer-diepte en blijven Volledig. Dezelfde reeds berekende
+          waarden, alleen minder cellen (geen tweede rekenpad). */}
+      <FiguresStrip
+        cols={4}
+        figures={[
+          {
+            kicker: 'Totale schuld',
+            amount: <MaskedAmount value={totalBalance} tone="kern" />,
+            sub: `${activeDebts.length} schuld${activeDebts.length !== 1 ? 'en' : ''}`,
+            variant: 'winner',
+          },
+          {
+            kicker: 'Maandlasten',
+            amount: <MaskedAmount value={totalMonthlyPayment} tone="kern" />,
+            sub: 'per maand aflossen',
+          },
+          {
+            kicker: 'Rente (gewogen)',
+            amount: `${weightedAvgInterest.toLocaleString('nl-NL', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`,
+            sub: 'gemiddeld per jaar',
+          },
+          {
+            kicker: 'Categorieën',
+            amount: `${(Object.keys(byType) as DebtType[]).filter((t) => byType[t]?.debts.length > 0).length}`,
+            sub: `type${(Object.keys(byType) as DebtType[]).filter((t) => byType[t]?.debts.length > 0).length === 1 ? '' : 's'} schuld`,
+          },
+        ]}
+      />
+
 
       {/* ═══ Subtotaal excl. eigen woning (dubbele grondslag) ═══════
           Eén subtieler subtotaal onder de figures-strip: dezelfde aandeel-

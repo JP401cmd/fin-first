@@ -190,8 +190,13 @@ type AssetsPageProps = {
   /** Filter-control die naast de Herwaarderen/Bezitting-toevoegen-knoppen
    *  rendert. Doorgegeven vanaf `/overzicht/bezittingen` zodat de filter
    *  visueel bij de toolbar zit (i.p.v. los daarboven). Optioneel zodat
-   *  `/core/assets` zonder filter blijft werken. */
-  toolbarFilter?: ReactNode
+   *  `/core/assets` zonder filter blijft werken.
+   *
+   *  Mag ook een render-functie zijn: die krijgt de LIVE telling van de
+   *  actieve bezittingen mee (`assetCount`, dezelfde die de deck als
+   *  "N bezittingen" toont) zodat de filter zelf kan besluiten of hij
+   *  zichtbaar is — zie de BEZ-2-drempel in `<BezittingenFilter>`. */
+  toolbarFilter?: ReactNode | ((ctx: { assetCount: number }) => ReactNode)
   /** Inspiratie-blokken (CompoundInsightCard, FeeImpactCard) die direct
    *  onder de toolbar rendert. Drempel-logica leeft op de page-server zodat
    *  deze component pure render-laag blijft. */
@@ -721,6 +726,13 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
     )
   }
 
+  // Render-functie-vorm van `toolbarFilter` krijgt de live telling mee; de
+  // ReactNode-vorm blijft ongewijzigd doorgegeven (legacy /core/assets).
+  const resolvedToolbarFilter =
+    typeof toolbarFilter === 'function'
+      ? toolbarFilter({ assetCount: activeAssets.length })
+      : toolbarFilter
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
       {/* ═══ Editorial pagina-opening (standaard-aanhef) ════════════
@@ -837,8 +849,8 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
           CTA rechts. flex-wrap zorgt dat op smalle schermen de filter onder
           de actie-knoppen vouwt zonder overlap. */}
       <div className="mb-5 flex flex-wrap items-center justify-end gap-2">
-        {toolbarFilter && (
-          <div className="mr-auto">{toolbarFilter}</div>
+        {resolvedToolbarFilter && (
+          <div className="mr-auto">{resolvedToolbarFilter}</div>
         )}
         <Link
           href={`/core/assets/revalue${pathname ? `?returnTo=${encodeURIComponent(pathname)}` : ''}`}

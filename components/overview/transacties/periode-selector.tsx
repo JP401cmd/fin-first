@@ -1,16 +1,25 @@
 'use client'
 
+import { useMemo } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { CategoryTabs } from '@/components/core/category-tabs'
+import { useDisplayMode, type DisplayMode } from '@/lib/hooks/use-display-mode'
 import type { PeriodKind } from '@/lib/transaction-insights'
 
 /**
  * PeriodeSelector — periode-keuze + kalender-navigatie voor de
  * transactie-analysepagina (/overzicht/cashflow/transacties).
  *
- * Presentational: alle state (period/offset/label/canGoForward) komt van de
- * orchestrator; dit component rendert enkel de controls en propt wijzigingen
- * terug via `onPeriodChange` / `onOffsetChange`.
+ * Presentational op één punt na: de weergavemodus leest hij zélf uit
+ * `useDisplayMode()` (het enige leespad — geen prop-drilling van de rauwe
+ * waarde). Alle overige state (period/offset/label/canGoForward) komt van de
+ * orchestrator; wijzigingen gaan terug via `onPeriodChange` / `onOffsetChange`.
+ *
+ * WEERGAVEMODUS (TXN-2): in **Eenvoudig** zijn er twee periodes — "30 dagen" en
+ * "Jaar". Maand en kwartaal zijn diepte: wie zijn geldstroom per kwartaal wil
+ * lezen, staat in Volledig. In **Volledig** staan alle vier de tabs
+ * ongewijzigd. Dit is puur een keuze-reductie: hoe een periode wordt berekend
+ * (`resolvePeriodWindow`) blijft in beide modi identiek.
  *
  * Design (Editorial Finance):
  * - Hergebruikt `CategoryTabs` (krant-kicker-stijl tab-strip) voor de
@@ -27,6 +36,27 @@ const PERIOD_TABS: { key: PeriodKind; label: string }[] = [
   { key: 'quarter', label: 'Kwartaal' },
   { key: 'year', label: 'Jaar' },
 ]
+
+/** De periodes die in Eenvoudig bestaan (TXN-2). Volgorde = tab-volgorde. */
+export const SIMPLE_PERIOD_KEYS: readonly PeriodKind[] = ['30d', 'year']
+
+/**
+ * De periode die in deze modus daadwerkelijk getoond kan worden.
+ *
+ * Nodig omdat de keuze bewaard blijft: wie in Volledig "Maand" koos (of via de
+ * `?maand=`-deeplink binnenkomt) en daarna naar Eenvoudig schakelt, heeft een
+ * periode geselecteerd die daar geen tab meer heeft. Zonder terugval zou de
+ * tab-strip niets actiefs tonen. We vallen terug op '30d' — het dichtstbijzijnde
+ * venster én de standaard van de pagina.
+ *
+ * Bewust een PURE functie op de bewaarde keuze in plaats van een effect dat de
+ * state overschrijft: terugschakelen naar Volledig levert zo weer exact de
+ * oorspronkelijke keuze op ("Volledig blijft ongewijzigd").
+ */
+export function resolvePeriodForMode(period: PeriodKind, mode: DisplayMode): PeriodKind {
+  if (mode !== 'simple') return period
+  return SIMPLE_PERIOD_KEYS.includes(period) ? period : '30d'
+}
 
 export function PeriodeSelector({
   period,
@@ -49,13 +79,24 @@ export function PeriodeSelector({
   // niet rechtstreeks uit. Void-referentie houdt de lint-regel tevreden.
   void offset
 
+  const { mode } = useDisplayMode()
+
+  // Eenvoudig: twee periodes. Volledig: alle vier — ongewijzigd.
+  const tabs = useMemo(
+    () =>
+      mode === 'simple'
+        ? PERIOD_TABS.filter((t) => SIMPLE_PERIOD_KEYS.includes(t.key))
+        : PERIOD_TABS,
+    [mode],
+  )
+
   // Het rollende 30-dagen-venster kent geen kalender-navigatie.
   const showNav = period !== '30d'
 
   return (
     <div className="space-y-2.5">
       <CategoryTabs
-        tabs={PERIOD_TABS}
+        tabs={tabs}
         activeKey={period}
         onChange={(key) => onPeriodChange(key as PeriodKind)}
       />

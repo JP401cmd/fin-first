@@ -720,7 +720,10 @@ export default function BudgetReportPage() {
       </ScenarioCallout>
 
       {/* ── Mini-hero figures-strip — 4 hoofdgetallen, vrijheid-impact als winnaar ── */}
+      {/* APP-7-opt-out: een rapportage is een gegenereerd (print)document —
+          het mag nooit cijfers verliezen door de weergavemodus van het scherm. */}
       <FiguresStrip
+        alwaysFull
         cols={4}
         figures={[
           {
@@ -754,7 +757,9 @@ export default function BudgetReportPage() {
       />
 
       {/* ── Ruimte & dekking — begrotingscontext, consumeert bestaande bundelvelden ── */}
+      {/* APP-7-opt-out: rapportage-document (zie hierboven). */}
       <FiguresStrip
+        alwaysFull
         cols={2}
         figures={[
           {

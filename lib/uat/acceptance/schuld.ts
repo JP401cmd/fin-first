@@ -51,9 +51,9 @@ const criteria: AcceptanceCriterion[] = [
     titel: 'Schuldenoverzicht bekijken: totalen, categorieën en kaarten',
     kriticiteit: 'KERN',
     persona: 'lisa',
-    given: 'Persona Lisa de Groot geladen (11 schulden, elk debt-type precies 1×), solo-perspectief.',
-    when: 'De gebruiker opent /overzicht/schulden en leest de figures-strip + categorie-groepen + de LTV-KPI op de Hypotheek-kaart.',
-    then: 'Totale schuld €368.270 (Σ current_balance), Maandlasten €2.135 (Σ monthly_payment), Rente (gewogen) 2,88% → "2,9%", Categorieën 11 (distinct debt_type); LTV hypotheek 350.000/385.000×100 = 90,9% → "91%" (tone neutral, 80–100%).',
+    given: 'Persona Lisa de Groot geladen (11 schulden, elk debt-type precies 1×), solo-perspectief. WEERGAVEMODUS (BEZ-3/APP-7): de vier onderstaande cijfers zijn zelf mode-onafhankelijk (dezelfde `totalBalance`/`weightedAvgInterest`-sommen). Wat ZICHTBAAR is op de figures-strip verschilt: in **Volledig** staan alle vier de cellen; in **Eenvoudig** kapt `FiguresStrip` af tot de eerste 2 — Totale schuld + Maandlasten — en blijven "Rente (gewogen)" en "Categorieën" (beheer-diepte) buiten beeld. De LTV-KPI op de Hypotheek-kaart staat los van de strip en is in beide modi ongewijzigd zichtbaar.',
+    when: 'De gebruiker opent /overzicht/schulden en leest de figures-strip + categorie-groepen + de LTV-KPI op de Hypotheek-kaart (Volledig: alle 4 strip-cellen; Eenvoudig: alleen Totale schuld + Maandlasten).',
+    then: 'Totale schuld €368.270 (Σ current_balance), Maandlasten €2.135 (Σ monthly_payment), Rente (gewogen) 2,88% → "2,9%", Categorieën 11 (distinct debt_type); LTV hypotheek 350.000/385.000×100 = 90,9% → "91%" (tone neutral, 80–100%). De laatste twee cijfers (Rente gewogen, Categorieën) zijn in Eenvoudig niet op de strip te lezen, maar blijven exact en narekenbaar — puur presentatie-reductie, geen tweede rekenpad.',
     assertion: {
       kind: 'exact',
       expected: 'totaleSchuld=368270; maandlasten=2135; gewogenRente=2.88; categorieen=11; ltvPct=91; ltvTone=neutral',

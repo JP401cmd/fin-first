@@ -70,6 +70,9 @@ function makeCashflowCard(
     kpi: null,
     status,
     subText,
+    // Venster-label onder de KPI (CF-3). Speelt in `resolve.ts` geen rol — dat
+    // leest `subText` (of anders `detail.tip`) als live cijfer — dus hier null.
+    kpiWindow: null,
     detail: { label: '', value: '', tip: '', actionLabel: '' },
   }
 }

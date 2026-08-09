@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation'
 import { useNotifications } from '@/components/app/notifications/notification-provider'
 import { NotificationItem } from '@/components/app/notifications/notification-item'
 import { DensityToggle, useListDensity, type ListDensity } from '@/components/app/density-toggle'
+import { HideInSimple } from '@/components/app/hide-in-simple'
 import { Bell, ChevronRight, CheckCheck, Newspaper } from 'lucide-react'
 import { Masthead } from './masthead'
 import { NewspaperFooter } from './newspaper-footer'
@@ -273,8 +274,14 @@ export function BerichtenClient() {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* BER-1 — de ruim/compact-schakelaar is fijnregeling van een lijst
+                die in Eenvoudig al rustig genoeg is; alleen in Volledig. De
+                opgeslagen keuze blijft staan en werkt door: alleen de knop is
+                weg, `density` wordt onverminderd op de items toegepast. */}
             {totalCount > 0 && (
-              <DensityToggle density={density} onChange={setDensity} />
+              <HideInSimple>
+                <DensityToggle density={density} onChange={setDensity} />
+              </HideInSimple>
             )}
             {historyUnread > 0 && (
               <button

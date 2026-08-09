@@ -128,7 +128,10 @@ export function ListPreview() {
             spaargeld
           </em>
         </h1>
+        {/* APP-7-opt-out: blueprint-preview — toont de primitive bewust in zijn
+            volle vorm, ongeacht de weergavemodus van de beheerder. */}
         <FiguresStrip
+          alwaysFull
           cols={2}
           figures={[
             { kicker: 'Totaal', amount: '€ 42.300', sub: 'incl. spaarrekening', variant: 'winner' },
@@ -253,7 +256,9 @@ export function DetailPreview() {
       </div>
 
       {/* FiguresStrip met afgeleide KPI's */}
+      {/* APP-7-opt-out: blueprint-preview (zie hierboven). */}
       <FiguresStrip
+        alwaysFull
         figures={[
           { kicker: 'Rente', amount: '2,10%', sub: 'jaarlijks variabel' },
           { kicker: 'Dit jaar', amount: '+€ 387', sub: 'rente bijgeschreven', variant: 'positive' },

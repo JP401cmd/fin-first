@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from 'react'
 import { SectionLabel, TogglePill, HighlightMark } from '@/components/editorial'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
+import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import {
   SORT_MODES,
   NEGATIVE_HATCH_CSS,
@@ -46,6 +47,13 @@ function DotsScore({ dots }: { dots: Dots }) {
  *
  * Puur presentatie: sorteren en filteren gebeurt op de GELEVERDE velden
  * (netEffect / savings / hasReturnCost) — er wordt hier niets herberekend.
+ *
+ * BEL-2 (eenvoudige weergave): in `simple` vervallen de sorteerstanden en de
+ * "bekijk uitwerking"-rij. De sorteerstanden zijn expert-bediening (en de stand
+ * "zonder rendementsverlies" filtert kansen wég — verwarrend zonder de
+ * bijbehorende uitleg); de uitwerking-uitgang zou naar katern III wijzen, dat in
+ * Eenvoudig niet bestaat. De vergelijking zelf — balken, tabel, verloop — blijft
+ * onverkort staan, op de server-default `sortMode` 'netto' (geen filter).
  */
 export function OptimizerCompare({
   baseline,
@@ -68,10 +76,15 @@ export function OptimizerCompare({
   /** Actief belastingjaar — voedt o.a. de partnerverdeling-verloopnotitie. */
   year: TaxYear
 }) {
+  const { mode } = useDisplayMode()
+  const simple = mode === 'simple'
+
   return (
     <section id="optimizer-vergelijking" className="scroll-mt-24">
       <SectionLabel num="II">De vergelijking</SectionLabel>
-      <div className="-mt-3 mb-4">
+      {/* Zonder de sorteerrij (Eenvoudig) draagt de kop zelf de witruimte naar
+          de balken, zodat er geen gat valt waar de bediening stond. */}
+      <div className={`-mt-3 ${simple ? 'mb-8' : 'mb-4'}`}>
         <h2
           className="text-[22px] sm:text-[26px] font-black leading-tight tracking-[-0.02em] text-[var(--ink)]"
           style={{ fontFamily: PLAYFAIR }}
@@ -91,20 +104,23 @@ export function OptimizerCompare({
         </p>
       </div>
 
-      {/* Sorteerstanden — min-h-[44px]-wrapper voor een volwaardig touch-target. */}
-      <div className="mb-5 flex min-h-[44px] flex-wrap items-center gap-2">
-        <span className="mr-1 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--ink-3)]">
-          Sorteer op
-        </span>
-        {SORT_MODES.map((m) => (
-          <TogglePill
-            key={m.id}
-            on={sortMode === m.id}
-            label={m.label}
-            onClick={() => onSortModeChange(m.id)}
-          />
-        ))}
-      </div>
+      {/* Sorteerstanden — min-h-[44px]-wrapper voor een volwaardig touch-target.
+          In Eenvoudig weg (BEL-2): de lijst staat dan op de default 'netto'. */}
+      {!simple && (
+        <div className="mb-5 flex min-h-[44px] flex-wrap items-center gap-2">
+          <span className="mr-1 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--ink-3)]">
+            Sorteer op
+          </span>
+          {SORT_MODES.map((m) => (
+            <TogglePill
+              key={m.id}
+              on={sortMode === m.id}
+              label={m.label}
+              onClick={() => onSortModeChange(m.id)}
+            />
+          ))}
+        </div>
+      )}
 
       {opportunities.length === 0 ? (
         <p
@@ -126,6 +142,7 @@ export function OptimizerCompare({
             opportunities={opportunities}
             winner={winner}
             onOpenDetail={onOpenDetail}
+            showDetailLink={!simple}
             fc={fc}
             year={year}
           />
@@ -386,6 +403,7 @@ function CompareTable({
   opportunities,
   winner,
   onOpenDetail,
+  showDetailLink,
   fc,
   year,
 }: {
@@ -393,6 +411,8 @@ function CompareTable({
   opportunities: Opportunity[]
   winner: Opportunity | null
   onOpenDetail: (id: string) => void
+  /** false in Eenvoudig: katern III bestaat daar niet, dus geen uitgang ernaartoe. */
+  showDetailLink: boolean
   fc: (v: number) => string
   year: TaxYear
 }) {
@@ -582,23 +602,25 @@ function CompareTable({
                 </Td>
               ))}
             </tr>
-            <tr>
-              <Th>
-                <span className="sr-only">Uitwerking</span>
-              </Th>
-              <Td muted>—</Td>
-              {opportunities.map((o) => (
-                <Td key={o.id} style={winnerCell(o)}>
-                  <button
-                    type="button"
-                    onClick={() => onOpenDetail(o.id)}
-                    className="inline-flex min-h-[44px] items-center font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)] underline underline-offset-2 transition-colors hover:text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
-                  >
-                    Bekijk uitwerking ↓
-                  </button>
-                </Td>
-              ))}
-            </tr>
+            {showDetailLink && (
+              <tr>
+                <Th>
+                  <span className="sr-only">Uitwerking</span>
+                </Th>
+                <Td muted>—</Td>
+                {opportunities.map((o) => (
+                  <Td key={o.id} style={winnerCell(o)}>
+                    <button
+                      type="button"
+                      onClick={() => onOpenDetail(o.id)}
+                      className="inline-flex min-h-[44px] items-center font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)] underline underline-offset-2 transition-colors hover:text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+                    >
+                      Bekijk uitwerking ↓
+                    </button>
+                  </Td>
+                ))}
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

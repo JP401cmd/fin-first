@@ -35,6 +35,11 @@ import {
   buildWhatifKernelAdapterInput,
   type WhatifRawProfileRow,
 } from '@/lib/horizon-kernel/adapter/whatif-varianten'
+import { buildKernelInputFromAppWithNotices } from '@/lib/horizon-kernel/adapter'
+import {
+  runMarktcheckOnKernelInput,
+  type MarktcheckOutcome,
+} from '@/lib/horizon-kernel/marktcheck'
 
 /**
  * Uitkomst van één what-if-run: het kernel-resultaat óf een expliciete fout.
@@ -99,6 +104,50 @@ export function computeWhatifProjection(
   } catch (err) {
     // Een kern-fout (bv. ontbrekende geboortedatum) mag de pagina nooit laten crashen
     // → expliciete fout met reden; de pagina toont zijn lege/fout-staat.
+    const message = err instanceof Error ? err.message : 'onbekende kernel-fout'
+    return { ok: false, reason: message }
+  }
+}
+
+/**
+ * De **marktcheck** voor /toekomst/whatif: dezelfde Monte-Carlo-band als op
+ * /toekomst, maar op de WHAT-IF-context — dus mét de rendement-slider en de
+ * scenario-events erin verwerkt, exact zoals `computeWhatifProjection` de
+ * hoofdlijn van die pagina rekent. Zo blijven band en lijn ook daar van hetzelfde
+ * plan; een band op de baseline zou onder een verschoven scenariolijn liggen.
+ */
+export function computeWhatifMarktcheck(params: {
+  readonly rawContext: WhatifRawContext
+  /** Optionele extra begrenzing; effectief is altijd ≤ `MARKTCHECK_MAX_RUNS`. */
+  readonly maxRuns?: number
+  /**
+   * De gekozen stopleeftijd — het anker van de rendement-marge. /toekomst/whatif
+   * kent geen stop-slider en geeft 'm niet mee; de marge valt daar dus terug op
+   * de AOW-leeftijd (dit oppervlak toont alleen de band, niet de marge).
+   */
+  readonly stopAge?: number | null
+}): MarktcheckOutcome {
+  const { rawContext } = params
+  try {
+    const mutatedAssets = applyReturnDeltasToAssets(
+      rawContext.assets,
+      rawContext.returnDeltaByAssetType,
+      rawContext.uniformReturnDelta,
+    )
+    const adapterInput = buildWhatifKernelAdapterInput({
+      profile: rawContext.profile,
+      assets: mutatedAssets,
+      debts: rawContext.debts,
+      lifeEvents: rawContext.lifeEvents,
+      aowRows: rawContext.aowRows,
+      taxYear: rawContext.taxYear,
+    })
+    const { input } = buildKernelInputFromAppWithNotices(adapterInput)
+    return runMarktcheckOnKernelInput(input, {
+      maxRuns: params.maxRuns,
+      stopAge: params.stopAge,
+    })
+  } catch (err) {
     const message = err instanceof Error ? err.message : 'onbekende kernel-fout'
     return { ok: false, reason: message }
   }

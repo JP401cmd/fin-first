@@ -156,9 +156,9 @@ export const GLOSSARY_ENTRIES: Record<string, GlossaryEntry> = {
   },
   Monte_Carlo: {
     name: 'Monte Carlo',
-    alternative: 'Kanssimulatie',
+    alternative: 'Marktcheck',
     explanation:
-      "Een simulatiemethode die duizenden mogelijke scenario's doorrekent met willekeurige rendementen. Geeft een kans van slagen in plaats van een enkel getal.",
+      'Een simulatiemethode die je plan een paar honderd keer opnieuw doorrekent, elke keer met een ander rendement. Geeft een kans van slagen in plaats van één enkel getal. De trekkingen liggen vast, dus dezelfde invoer geeft altijd dezelfde uitkomst.',
   },
   SORR: {
     name: 'SORR',

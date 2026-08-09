@@ -73,3 +73,21 @@ describe('toSimRow — flowIn draagt het BESTEEDBARE rendement (defect A / H1)',
     expect(sim.flowIn).toBe(0)
   })
 })
+
+describe('toSimRow — de breakdown-arrays blijven leeg (euro-weergave-grendel)', () => {
+  it('vult incomeBreakdown/expenseBreakdown niet', () => {
+    // WAAROM DEZE GRENDEL: `horizon-client.tsx` deflateert `SimRow` via
+    // `deflateRowsByAge`, en die raakt alleen velden met `typeof === 'number'`.
+    // De bedragen ín deze twee arrays zouden dus ONGEDEFLATEERD de rendergrens
+    // kruisen binnen een `InEuroView<SimRow>` — een fout die op het scherm
+    // plausibel oogt en die geen enkel type kan zien, want de velden bestaan al.
+    //
+    // Vandaag is dat inert: sinds de kernel-migratie vult `toSimRow` ze nooit en
+    // loopt de inkomsten/uitgaven-strook via een eigen pad. Gaat de mapping ze
+    // ooit wél vullen, dan valt dít om — en dan hoort de deflatie van die items
+    // eerst geregeld te zijn (zie SIM_ROW_NON_MONEY_FIELDS in horizon-client.tsx).
+    const sim = toSimRow(makeRow({ grossIncome: 80_000, totalGrowth: 10_000 }))
+    expect(sim.incomeBreakdown).toBeUndefined()
+    expect(sim.expenseBreakdown).toBeUndefined()
+  })
+})

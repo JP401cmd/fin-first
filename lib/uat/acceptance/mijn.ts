@@ -68,12 +68,12 @@ const criteria: AcceptanceCriterion[] = [
     scenarioId: 'UAT-MIJN-01',
     titel: 'Mijn-hub verkennen en naar een instellingenpagina navigeren',
     kriticiteit: 'OVERIG',
-    given: 'Ingelogd, open /mijn (de instellingen-hub).',
+    given: 'Ingelogd, open /mijn (de instellingen-hub). Sinds fase 4 van de eenvoudige weergave toont de hub géén subnav-tabbalk meer (MIJN-1): die herhaalde het kaart-grid exact. Op de subpagina\'s staat de balk er wél.',
     when: 'De gebruiker leest het kaart-grid en klikt door naar een onderwerp (profiel, account, privacy, notificaties, koppelingen, uiterlijk, geavanceerd).',
-    then: 'Elke kaart landt op de juiste /mijn/*-subroute; het grid dekt de in de nav geregistreerde onderwerpen (feedback is bewust verweesd — alleen via ⌘K/URL bereikbaar).',
+    then: 'Elke kaart landt op de juiste /mijn/*-subroute; het grid dekt de in de nav geregistreerde onderwerpen (feedback is bewust verweesd — alleen via ⌘K/URL bereikbaar). Op /mijn zelf staat boven het grid geen tabbalk (in BEIDE weergavemodi — dit is een dubbeling wegnemen, geen diepte verbergen); zodra je op een subpagina landt verschijnt de tabbalk als zijwaartse navigatie.',
     assertion: {
       kind: 'ui-only',
-      source: 'components/mijn/mijn-overview.tsx + lib/navigation.ts#mijnNav — navigatie zonder cijfermatige uitkomst',
+      source: 'components/mijn/mijn-overview.tsx + lib/navigation.ts#mijnNav + components/app/module-nav.tsx (hideOnBasePath) — navigatie zonder cijfermatige uitkomst; regressietest components/app/module-nav.test.tsx',
     },
   },
   {
@@ -293,12 +293,12 @@ const criteria: AcceptanceCriterion[] = [
     scenarioId: 'UAT-MIJN-20',
     titel: 'Notificatievoorkeuren instellen (push-types + maandelijkse geldcheck-in)',
     kriticiteit: 'BELANGRIJK',
-    given: 'Ingelogd, /mijn/notificaties.',
-    when: 'De gebruiker kiest welke meldingstypes binnenkomen en zet de maandelijkse check-in-herinnering aan/uit.',
-    then: 'De gekozen types en de check-in-herinnering worden bewaard; de "push-types" sturen uitsluitend in-app meldingen (geen browser-push — bevestigd geen web-push in de repo).',
+    given: 'Ingelogd, /mijn/notificaties. Sinds fase 4 van de eenvoudige weergave hangt de vorm aan de weergavemodus (MIJN-3): in Eenvoudig drie hoofdschakelaars (meldingen in de app, briefing per e-mail, maandelijkse geldcheck-in) plus een ingeklapte disclosure "Alle meldingstypen"; in Volledig de vlakke lijst met alle zeven types los.',
+    when: 'De gebruiker kiest welke meldingstypes binnenkomen en zet de maandelijkse check-in-herinnering aan/uit — in Eenvoudig via de hoofdschakelaar of via de disclosure.',
+    then: 'De gekozen types en de check-in-herinnering worden bewaard; de "push-types" sturen uitsluitend in-app meldingen (geen browser-push — bevestigd geen web-push in de repo). De hoofdschakelaar "Meldingen in de app" is PRESENTATIE over dezelfde voorkeuren-blob: aan = minstens één type aan, uitzetten = alle types uit, aanzetten = alle types aan; er is geen tweede opslagveld en het opslagpad blijft PUT /api/notifications. De disclosure klapt in (niet weg), zodat elke afzonderlijke keuze in Eenvoudig één klik ver blijft. Het partner-blok verschijnt uitsluitend bij een huishouden (beide modi).',
     assertion: {
       kind: 'ui-only',
-      source: 'app/(app)/mijn/notificaties/page.tsx (notificatie-preferences) — in-app meldingen, geen cijfermatige uitkomst',
+      source: 'app/(app)/mijn/notificaties/page.tsx (notificatie-preferences) — in-app meldingen, geen cijfermatige uitkomst; regressietest app/(app)/mijn/notificaties/page.test.tsx',
     },
   },
   {
@@ -317,14 +317,14 @@ const criteria: AcceptanceCriterion[] = [
   {
     workflow: 'WF-MIJN-22',
     scenarioId: 'UAT-MIJN-22',
-    titel: 'Uiterlijk aanpassen: palet, typografie en geavanceerde kleuren',
+    titel: 'Uiterlijk aanpassen: weergavekeuze, palet, typografie en geavanceerde kleuren',
     kriticiteit: 'BELANGRIJK',
-    given: 'Ingelogd, /mijn/uiterlijk.',
-    when: 'De gebruiker kiest een palet, een typografie-thema, module-accentkleuren (kern/wil/horizon), budget-tints en categoriekaart-tinten, en reset (randgeval) één accentkaart.',
-    then: 'Wijzigingen zijn direct zichtbaar zonder page-reload en blijven na herladen bewaard (palet = per apparaat/localStorage; accentkleur+font = account-gebonden/DB); een accentkaart-reset zet alleen die kleur terug; geen licht/donker-toggle (de drie paletten zijn lichtgetint — bevestigd gedrag).',
+    given: 'Ingelogd, /mijn/uiterlijk. Bovenaan de pagina staat sinds fase 1 van de eenvoudige weergave het weergave-keuzeblok ("Eenvoudig — de kern" / "Volledig — alle detail", APP-1); daaronder palet, typografie en de "Geavanceerd"-disclosure.',
+    when: 'De gebruiker kiest een weergave, een palet, een typografie-thema, module-accentkleuren (kern/wil/horizon), budget-tints en categoriekaart-tinten, en reset (randgeval) één accentkaart.',
+    then: 'Wijzigingen zijn direct zichtbaar zonder page-reload en blijven na herladen bewaard (palet = per apparaat/localStorage; weergavemodus+accentkleur+font = account-gebonden/DB, dus ook op een tweede apparaat); de weergavekeuze schrijft via hetzelfde `PUT /api/display-mode` als de ⌘K-actie en de aangeklikte kaart krijgt direct `aria-pressed="true"`; een accentkaart-reset zet alleen die kleur terug; geen licht/donker-toggle (de drie paletten zijn lichtgetint — bevestigd gedrag).',
     assertion: {
       kind: 'ui-only',
-      source: 'components/mijn/{palette-picker,font-picker,module-accent-picker,budget-tint-picker,category-tint-picker}.tsx + PUT /api/appearance, geen cijfermatige uitkomst',
+      source: 'components/mijn/{display-mode-picker,palette-picker,font-picker,module-accent-picker,budget-tint-picker,category-tint-picker}.tsx + PUT /api/appearance + PUT /api/display-mode, geen cijfermatige uitkomst',
     },
   },
   {
@@ -382,14 +382,14 @@ const criteria: AcceptanceCriterion[] = [
   {
     workflow: 'WF-MIJN-28',
     scenarioId: 'UAT-MIJN-28',
-    titel: 'Feedback insturen',
+    titel: 'Feedback-verwijspagina opent het meldvenster in het gesprek met Fin',
     kriticiteit: 'OVERIG',
-    given: 'Ingelogd, /mijn/feedback (verweesd in de nav — alleen via ⌘K/URL bereikbaar).',
-    when: 'De gebruiker kiest een type (bug/idee/vraag), typt een bericht en verstuurt.',
-    then: 'De feedback wordt verstuurd naar het team met een bevestiging; een leeg bericht wordt niet verstuurd.',
+    given: 'Ingelogd, /mijn/feedback (verweesd in de nav — alleen via ⌘K/URL bereikbaar; ADR 0096: de meldmodus in de chat is de enige invoerweg).',
+    when: 'De gebruiker leest de uitleg dat melden via het gesprek met Fin gaat (drie types: Bug · Vraag · Aanbeveling) en tikt op "Open het meldvenster".',
+    then: 'Er is geen formulier of categoriekiezer meer op deze pagina; de primaire actie roept `openMelding()` op de chat-context aan en opent de chat rechtstreeks in meldmodus. De pagina vermeldt dat eerder ingestuurde feedback bewaard blijft en in de gegevensexport zit. `POST /api/feedback` beantwoordt losstaand met 410 Gone (WF-MIJN-28 test dat niet zelf — geen route-call vanaf deze pagina meer). De meldmodus-criteria onder WILL (megafoon → user_reports → werkqueue) blijven leidend voor het melden zelf; dit scenario toetst alléén de verwijzing.',
     assertion: {
       kind: 'ui-only',
-      source: 'app/(app)/mijn/feedback/page.tsx — formulier-inzending, geen cijfermatige uitkomst',
+      source: 'app/(app)/mijn/feedback/page.tsx (verwijspagina, primaire actie roept openMelding() aan) + components/app/chat/chat-provider.tsx (openMelding op de chat-context) — geen cijfermatige uitkomst',
     },
   },
   {
@@ -410,8 +410,8 @@ const criteria: AcceptanceCriterion[] = [
     scenarioId: 'UAT-MIJN-30',
     titel: 'Per functionaliteit kiezen waar de AI draait (lokaal/cloud-override)',
     kriticiteit: 'KERN',
-    given: 'Ingelogd, /mijn/privacy, sectie "Liever per onderdeel kiezen?" (AiExecutionGroupList) — de zeven groepen uit `lib/ai/execution-groups.ts` (gesprek, transacties, briefing, tips, rapporten, documenten, nieuws), elk standaard zonder eigen override. Hoofdschakelaar (privacy_mode) staat op Cloud-AI.',
-    when: 'De gebruiker klapt een groep open en zet "Transacties & vaste lasten" op "Lokaal op je apparaat" (vereist het ai-abonnement + desktop), en zet die daarna terug via "Eigen keuze — volg weer de hoofdkeuze".',
+    given: 'Ingelogd, /mijn/privacy, sectie "Liever per onderdeel kiezen?" (AiExecutionGroupList) — de zeven groepen uit `lib/ai/execution-groups.ts` (gesprek, transacties, briefing, tips, rapporten, documenten, nieuws), elk standaard zonder eigen override. Hoofdschakelaar (privacy_mode) staat op Cloud-AI. Sinds fase 4 van de eenvoudige weergave staat deze sectie in Eenvoudig standaard INGEKLAPT achter één regel "Liever per onderdeel kiezen?" (MIJN-4, `DepthSection`); in Volledig staat ze open met haar eigen kop. Bewust inklappen-met-behoud en géén hard-hide: dit is de enige plek waar je per functionaliteit kiest waar je gegevens heen gaan.',
+    when: 'De gebruiker klapt (in Eenvoudig eerst de sectie, daarna) een groep open en zet "Transacties & vaste lasten" op "Lokaal op je apparaat" (vereist het ai-abonnement + desktop), en zet die daarna terug via "Eigen keuze — volg weer de hoofdkeuze".',
     then: 'Direct na de eerste keuze toont alléén "Transacties & vaste lasten" de chip "Lokaal"; alle andere groepen blijven "Cloud" (ze volgen de hoofdschakelaar). Bij "gedeeltelijk" lokaal ondersteunde groepen (tips, rapporten, documenten) verschijnt zichtbaar — niet achter een tooltip — wat er wordt ingeleverd zodra die groep op lokaal staat. Na "volg weer de hoofdkeuze" verdwijnt de override en toont de groep weer "Cloud" (volgt de hoofdschakelaar). Zonder het ai-abonnement of op een coarse-pointer-toestel is de "Lokaal"-knop disabled met een zichtbare reden. Zet je vervolgens de hoofdschakelaar op privé-modus, dan volgen alle groepen zonder eigen override automatisch mee naar "Lokaal".',
     assertion: {
       kind: 'exact',

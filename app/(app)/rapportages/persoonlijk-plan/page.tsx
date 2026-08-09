@@ -152,7 +152,10 @@ export default function PersoonlijkPlanPage() {
       </div>
 
       {/* ── Mini-hero — FiguresStrip ── */}
+      {/* APP-7-opt-out: een rapportage is een gegenereerd (print)document —
+          het mag nooit cijfers verliezen door de weergavemodus van het scherm. */}
       <FiguresStrip
+        alwaysFull
         cols={4}
         figures={[
           {

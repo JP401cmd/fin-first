@@ -7,6 +7,7 @@ import { Target, Pencil, ArrowUpRight, MoreHorizontal } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import { formatGoalValue, GOAL_TYPE_META } from '@/lib/goal-data'
 import type { GoalWithBudget } from '@/lib/fin-data-loader'
+import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { DoelToevoegenSheet } from './doel-toevoegen-sheet'
 import { DoelBewerkenSheet } from './doel-bewerken-sheet'
 import { DoelLoslatenConfirm } from './doel-loslaten-confirm'
@@ -27,6 +28,13 @@ import { MilestoneCelebration } from '@/components/app/milestone-celebration'
  * lijst — klik opent het /toekomst-lab i.p.v. GoalForm — en de hele groep is in
  * één keer los te laten via de server-route. Handmatige doelen behouden hun
  * bestaande edit-gedrag (regressie-eis).
+ *
+ * Weergavemodus "Eenvoudig" (audit TOE-2): die tweedeling verdwijnt en alles
+ * staat onder één kop "Je doelen" — de technische herkomst (afgeleid uit je
+ * doelsituatie vs. handmatig ingevoerd) zegt de gebruiker niets. Dat is puur
+ * een PRESENTATIE-keuze: dezelfde doel-objecten uit dezelfde bron, dezelfde
+ * voortgang, alleen anders gegroepeerd. In "Volledig" blijft de tweedeling
+ * ongewijzigd.
  *
  * Status-codering is identiek aan vier-hefbomen-kompas (groen/oranje/rood)
  * zodat het visuele verhaal in de app consistent blijft.
@@ -69,6 +77,191 @@ function statusFor(progress: GoalDisplay['progress']): {
   return { label: 'Achter op planning', color: 'text-negative', bg: 'bg-negative/10' }
 }
 
+/**
+ * Kaart voor een parameter-doel (doelsituatie uit het lab). Read-only: klik
+ * opent het lab i.p.v. een bewerk-sheet. Bewust een los component zodat zowel
+ * de gegroepeerde weergave (Volledig) als de samengevoegde lijst (Eenvoudig)
+ * exact dezelfde kaart rendert.
+ */
+function ParameterGoalCard({ goal, progress }: GoalDisplay) {
+  const isFire = goal.goal_type === 'fire_age'
+  const current = progress.current
+  // "Nog geen meting": de consume-only bron kon (nog) geen actuele
+  // stand leveren (0/null op dag 0). Toon dat eerlijk i.p.v. een
+  // misleidende rood-status/0%.
+  const measured = Number.isFinite(current) && current > 0
+  const marge =
+    typeof goal.metadata?.margeDoelJaren === 'number'
+      ? (goal.metadata.margeDoelJaren as number)
+      : null
+  // Marge-status blijft bewust BUITEN deze lijst (live op /toekomst);
+  // FIRE-kaart toont dus geen stoplicht-pill. Overige parameter-doelen
+  // hergebruiken de bestaande statusweergave zodra er een meting is.
+  const status = !isFire && measured ? statusFor(progress) : null
+  const pct = Math.min(100, Math.max(0, Math.round(progress.pct)))
+  return (
+    <Link
+      href="/toekomst#verken-je-aannames"
+      aria-label={`Bekijk ${goal.name} in het lab`}
+      className="block rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-5 hover:border-[var(--ink-3)] hover:shadow-sm transition-all"
+    >
+      <header className="flex items-start justify-between gap-2 mb-2">
+        <h3 className="text-sm font-semibold text-[var(--ink)] leading-tight flex-1 min-w-0 truncate inline-flex items-center gap-1.5">
+          {goal.name}
+          <ArrowUpRight
+            className="w-3 h-3 text-[var(--ink-4)] shrink-0"
+            aria-hidden="true"
+          />
+        </h3>
+        {status && (
+          <span
+            className={`text-[10px] uppercase tracking-[0.08em] font-semibold px-2 py-0.5 rounded-full ${status.bg} ${status.color} shrink-0`}
+          >
+            {status.label}
+          </span>
+        )}
+      </header>
+
+      {isFire ? (
+        <>
+          <div className="flex items-baseline gap-1.5 mb-1">
+            <span className="font-serif text-lg font-semibold text-[var(--ink)] tabular-nums">
+              {measured
+                ? `nu ${formatGoalValue(current, 'fire_age')} → doel ${formatGoalValue(progress.target, 'fire_age')}`
+                : `Doel: ${formatGoalValue(progress.target, 'fire_age')}`}
+            </span>
+          </div>
+          <p className="text-[11px] italic text-[var(--ink-3)]">
+            {measured
+              ? marge != null
+                ? `≥ ${formatMarge(marge)} jr marge — bekijk live in het lab`
+                : 'bekijk live in het lab'
+              : 'nog geen meting — bekijk live in het lab'}
+          </p>
+        </>
+      ) : !measured ? (
+        <>
+          <div className="flex items-baseline gap-1.5 mb-1">
+            <span className="font-serif text-lg font-semibold text-[var(--ink)] tabular-nums">
+              {formatGoalValue(progress.target, goal.goal_type)}
+            </span>
+            <span className="text-xs text-[var(--ink-3)]">doel</span>
+          </div>
+          <p className="text-[11px] italic text-[var(--ink-3)]">
+            nog geen meting — bekijk live in het lab
+          </p>
+        </>
+      ) : (
+        <>
+          <div className="flex items-baseline gap-1.5 mb-2">
+            <span className="font-serif text-lg font-semibold text-[var(--ink)] tabular-nums">
+              {formatGoalValue(current, goal.goal_type)}
+            </span>
+            <span className="text-xs text-[var(--ink-3)]">
+              van {formatGoalValue(progress.target, goal.goal_type)}
+            </span>
+          </div>
+          <div
+            className="relative h-1.5 rounded-full bg-[var(--subtle)] overflow-hidden mb-1"
+            role="progressbar"
+            aria-valuenow={pct}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label={`Voortgang ${goal.name}: ${pct}%`}
+          >
+            <div
+              className={`h-full ${
+                pct >= 100
+                  ? 'bg-positive'
+                  : progress.onTrack
+                    ? 'bg-positive'
+                    : pct >= 50
+                      ? 'bg-amber-500'
+                      : 'bg-negative'
+              } transition-all duration-700`}
+              style={{ width: `${pct}%` }}
+            />
+            <ProgressMilestones className="bg-[var(--paper)]/70" />
+          </div>
+          <div className="flex items-center justify-between gap-2 text-[11px]">
+            <span className="text-[var(--ink-3)] tabular-nums">{pct}%</span>
+          </div>
+        </>
+      )}
+    </Link>
+  )
+}
+
+/**
+ * Kaart voor een handmatig doel — klik opent de bewerk-sheet. Zelfde kaart in
+ * beide weergavemodi (zie ParameterGoalCard).
+ */
+function ManualGoalCard({
+  goal,
+  progress,
+  onEdit,
+}: GoalDisplay & { onEdit: () => void }) {
+  const status = statusFor(progress)
+  const pct = Math.min(100, Math.max(0, Math.round(progress.pct)))
+  // Kaart is een button die de edit-sheet opent. Geen genest-Link.
+  return (
+    <button
+      type="button"
+      onClick={onEdit}
+      aria-label={`Bewerk doel ${goal.name}`}
+      className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-5 text-left w-full hover:border-[var(--ink-3)] hover:shadow-sm transition-all"
+    >
+      <header className="flex items-start justify-between gap-2 mb-2">
+        <h3 className="text-sm font-semibold text-[var(--ink)] leading-tight flex-1 min-w-0 truncate inline-flex items-center gap-1.5">
+          {goal.name}
+          <Pencil className="w-3 h-3 text-[var(--ink-4)] shrink-0" aria-hidden="true" />
+        </h3>
+        <span
+          className={`text-[10px] uppercase tracking-[0.08em] font-semibold px-2 py-0.5 rounded-full ${status.bg} ${status.color} shrink-0`}
+        >
+          {status.label}
+        </span>
+      </header>
+      <div className="flex items-baseline gap-1.5 mb-2">
+        <span className="font-serif text-lg font-semibold text-[var(--ink)] tabular-nums">
+          {formatCurrency(progress.current)}
+        </span>
+        <span className="text-xs text-[var(--ink-3)]">
+          van {formatCurrency(progress.target)}
+        </span>
+      </div>
+      <div
+        className="relative h-1.5 rounded-full bg-[var(--subtle)] overflow-hidden mb-1"
+        role="progressbar"
+        aria-valuenow={pct}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={`Voortgang ${goal.name}: ${pct}%`}
+      >
+        <div
+          className={`h-full ${
+            pct >= 100
+              ? 'bg-positive'
+              : progress.onTrack
+                ? 'bg-positive'
+                : pct >= 50
+                  ? 'bg-amber-500'
+                  : 'bg-negative'
+          } transition-all duration-700`}
+          style={{ width: `${pct}%` }}
+        />
+        <ProgressMilestones className="bg-[var(--paper)]/70" />
+      </div>
+      <div className="flex items-center justify-between gap-2 text-[11px]">
+        <span className="text-[var(--ink-3)] tabular-nums">{pct}%</span>
+        {progress.eta && (
+          <span className="text-[var(--ink-3)]">{progress.eta}</span>
+        )}
+      </div>
+    </button>
+  )
+}
+
 export function DoelenView({
   goals,
   goalProgresses,
@@ -83,6 +276,9 @@ export function DoelenView({
   monthlyExpenses?: number
 }) {
   const router = useRouter()
+  // Weergavemodus: single source of truth (geen prop-drilling van de modus).
+  const { mode } = useDisplayMode()
+  const simple = mode === 'simple'
 
   // DoelToevoegenSheet = scenario-tool → alleen in Plannen-modus (plan A-5).
   // Edit-sheet state: het volledige Goal-object wordt doorgegeven zodat
@@ -138,6 +334,19 @@ export function DoelenView({
       return Number(bOff) - Number(aOff)
     })
 
+  /**
+   * Eenvoudig (TOE-2) — één lijst "Je doelen".
+   *
+   * SORTEERKEUZE (bewust, niet toevallig): doelsituatie-doelen eerst, daarna de
+   * handmatige doelen in hun bestaande volgorde (off-track bovenaan). Reden: je
+   * doelsituatie is het anker waar alle andere doelen onder hangen — die hoort
+   * bovenaan te blijven, ook als hij "op koers" staat. Binnen de handmatige
+   * doelen blijft aandacht-eerst gelden, precies zoals in Volledig. Er wordt
+   * hier NIETS herberekend of hersorteerd op waarde: dezelfde objecten,
+   * dezelfde voortgang, alleen zonder de herkomst-scheiding.
+   */
+  const mergedDisplay = [...parameterDisplay, ...manualDisplay]
+
   if (all.length === 0) {
     return (
       <section className="mx-auto max-w-6xl px-4 sm:px-6 pb-8">
@@ -168,8 +377,8 @@ export function DoelenView({
 
   return (
     <section className="mx-auto max-w-6xl px-4 sm:px-6 pb-8">
-      {/* ── Groep: Jouw doelsituatie (lab-parameter-doelen) ── */}
-      {parameterDisplay.length > 0 && (
+      {/* ── Groep: Jouw doelsituatie (lab-parameter-doelen) — alleen Volledig ── */}
+      {!simple && parameterDisplay.length > 0 && (
         <div className="mb-8">
           <header className="mb-2 flex items-end justify-between gap-3 flex-wrap">
             <div>
@@ -227,133 +436,42 @@ export function DoelenView({
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-            {parameterDisplay.map(({ goal, progress }) => {
-              const isFire = goal.goal_type === 'fire_age'
-              const current = progress.current
-              // "Nog geen meting": de consume-only bron kon (nog) geen actuele
-              // stand leveren (0/null op dag 0). Toon dat eerlijk i.p.v. een
-              // misleidende rood-status/0%.
-              const measured = Number.isFinite(current) && current > 0
-              const marge =
-                typeof goal.metadata?.margeDoelJaren === 'number'
-                  ? (goal.metadata.margeDoelJaren as number)
-                  : null
-              // Marge-status blijft bewust BUITEN deze lijst (live op /toekomst);
-              // FIRE-kaart toont dus geen stoplicht-pill. Overige parameter-doelen
-              // hergebruiken de bestaande statusweergave zodra er een meting is.
-              const status = !isFire && measured ? statusFor(progress) : null
-              const pct = Math.min(100, Math.max(0, Math.round(progress.pct)))
-              return (
-                <Link
-                  key={goal.id}
-                  href="/toekomst#verken-je-aannames"
-                  aria-label={`Bekijk ${goal.name} in het lab`}
-                  className="block rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-5 hover:border-[var(--ink-3)] hover:shadow-sm transition-all"
-                >
-                  <header className="flex items-start justify-between gap-2 mb-2">
-                    <h3 className="text-sm font-semibold text-[var(--ink)] leading-tight flex-1 min-w-0 truncate inline-flex items-center gap-1.5">
-                      {goal.name}
-                      <ArrowUpRight
-                        className="w-3 h-3 text-[var(--ink-4)] shrink-0"
-                        aria-hidden="true"
-                      />
-                    </h3>
-                    {status && (
-                      <span
-                        className={`text-[10px] uppercase tracking-[0.08em] font-semibold px-2 py-0.5 rounded-full ${status.bg} ${status.color} shrink-0`}
-                      >
-                        {status.label}
-                      </span>
-                    )}
-                  </header>
-
-                  {isFire ? (
-                    <>
-                      <div className="flex items-baseline gap-1.5 mb-1">
-                        <span className="font-serif text-lg font-semibold text-[var(--ink)] tabular-nums">
-                          {measured
-                            ? `nu ${formatGoalValue(current, 'fire_age')} → doel ${formatGoalValue(progress.target, 'fire_age')}`
-                            : `Doel: ${formatGoalValue(progress.target, 'fire_age')}`}
-                        </span>
-                      </div>
-                      <p className="text-[11px] italic text-[var(--ink-3)]">
-                        {measured
-                          ? marge != null
-                            ? `≥ ${formatMarge(marge)} jr marge — bekijk live in het lab`
-                            : 'bekijk live in het lab'
-                          : 'nog geen meting — bekijk live in het lab'}
-                      </p>
-                    </>
-                  ) : !measured ? (
-                    <>
-                      <div className="flex items-baseline gap-1.5 mb-1">
-                        <span className="font-serif text-lg font-semibold text-[var(--ink)] tabular-nums">
-                          {formatGoalValue(progress.target, goal.goal_type)}
-                        </span>
-                        <span className="text-xs text-[var(--ink-3)]">doel</span>
-                      </div>
-                      <p className="text-[11px] italic text-[var(--ink-3)]">
-                        nog geen meting — bekijk live in het lab
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <div className="flex items-baseline gap-1.5 mb-2">
-                        <span className="font-serif text-lg font-semibold text-[var(--ink)] tabular-nums">
-                          {formatGoalValue(current, goal.goal_type)}
-                        </span>
-                        <span className="text-xs text-[var(--ink-3)]">
-                          van {formatGoalValue(progress.target, goal.goal_type)}
-                        </span>
-                      </div>
-                      <div
-                        className="relative h-1.5 rounded-full bg-[var(--subtle)] overflow-hidden mb-1"
-                        role="progressbar"
-                        aria-valuenow={pct}
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                        aria-label={`Voortgang ${goal.name}: ${pct}%`}
-                      >
-                        <div
-                          className={`h-full ${
-                            pct >= 100
-                              ? 'bg-positive'
-                              : progress.onTrack
-                                ? 'bg-positive'
-                                : pct >= 50
-                                  ? 'bg-amber-500'
-                                  : 'bg-negative'
-                          } transition-all duration-700`}
-                          style={{ width: `${pct}%` }}
-                        />
-                        <ProgressMilestones className="bg-[var(--paper)]/70" />
-                      </div>
-                      <div className="flex items-center justify-between gap-2 text-[11px]">
-                        <span className="text-[var(--ink-3)] tabular-nums">{pct}%</span>
-                      </div>
-                    </>
-                  )}
-                </Link>
-              )
-            })}
+            {parameterDisplay.map((d) => (
+              <ParameterGoalCard key={d.goal.id} goal={d.goal} progress={d.progress} />
+            ))}
           </div>
         </div>
       )}
 
-      {/* ── Handmatige doelen ── */}
+      {/* ── Doelen — Eenvoudig: één lijst; Volledig: alleen de handmatige ── */}
       <header className="mb-4 flex items-end justify-between gap-3 flex-wrap">
         <div>
           <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
             Toekomst — doelen
           </div>
           <h2 className="font-serif text-xl text-[var(--ink)] mt-1">
-            {manualHeading}
+            {simple ? 'Je doelen' : manualHeading}
           </h2>
         </div>
         <DoelToevoegenSheet monthlyIncome={monthlyIncome} monthlyExpenses={monthlyExpenses} />
       </header>
 
-      {manualCount === 0 ? (
+      {simple ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+          {mergedDisplay.map((d) =>
+            isParameterGoal(d.goal) ? (
+              <ParameterGoalCard key={d.goal.id} goal={d.goal} progress={d.progress} />
+            ) : (
+              <ManualGoalCard
+                key={d.goal.id}
+                goal={d.goal}
+                progress={d.progress}
+                onEdit={() => setEditingGoal(d.goal)}
+              />
+            ),
+          )}
+        </div>
+      ) : manualCount === 0 ? (
         <p className="text-sm text-[var(--ink-2)] leading-relaxed">
           Je hebt nog geen eigen doelen naast je doelsituatie. Formuleer een
           spaardoel, aflossingsdoel of vermogensgroeidoel om je voortgang hier
@@ -361,76 +479,21 @@ export function DoelenView({
         </p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-          {manualDisplay.map(({ goal, progress }) => {
-            const status = statusFor(progress)
-            const pct = Math.min(100, Math.max(0, Math.round(progress.pct)))
-            // Kaart is een button die de edit-sheet opent. Geen genest-Link.
-            const cardClass =
-              'rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-5 text-left w-full'
-            const cardProps = {
-              type: 'button' as const,
-              onClick: () => setEditingGoal(goal),
-              'aria-label': `Bewerk doel ${goal.name}`,
-              className: `${cardClass} hover:border-[var(--ink-3)] hover:shadow-sm transition-all`,
-            }
-            return (
-              <button key={goal.id} {...cardProps}>
-                <header className="flex items-start justify-between gap-2 mb-2">
-                  <h3 className="text-sm font-semibold text-[var(--ink)] leading-tight flex-1 min-w-0 truncate inline-flex items-center gap-1.5">
-                    {goal.name}
-                    <Pencil className="w-3 h-3 text-[var(--ink-4)] shrink-0" aria-hidden="true" />
-                  </h3>
-                  <span
-                    className={`text-[10px] uppercase tracking-[0.08em] font-semibold px-2 py-0.5 rounded-full ${status.bg} ${status.color} shrink-0`}
-                  >
-                    {status.label}
-                  </span>
-                </header>
-                <div className="flex items-baseline gap-1.5 mb-2">
-                  <span className="font-serif text-lg font-semibold text-[var(--ink)] tabular-nums">
-                    {formatCurrency(progress.current)}
-                  </span>
-                  <span className="text-xs text-[var(--ink-3)]">
-                    van {formatCurrency(progress.target)}
-                  </span>
-                </div>
-                <div
-                  className="relative h-1.5 rounded-full bg-[var(--subtle)] overflow-hidden mb-1"
-                  role="progressbar"
-                  aria-valuenow={pct}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-label={`Voortgang ${goal.name}: ${pct}%`}
-                >
-                  <div
-                    className={`h-full ${
-                      pct >= 100
-                        ? 'bg-positive'
-                        : progress.onTrack
-                          ? 'bg-positive'
-                          : pct >= 50
-                            ? 'bg-amber-500'
-                            : 'bg-negative'
-                    } transition-all duration-700`}
-                    style={{ width: `${pct}%` }}
-                  />
-                  <ProgressMilestones className="bg-[var(--paper)]/70" />
-                </div>
-                <div className="flex items-center justify-between gap-2 text-[11px]">
-                  <span className="text-[var(--ink-3)] tabular-nums">{pct}%</span>
-                  {progress.eta && (
-                    <span className="text-[var(--ink-3)]">{progress.eta}</span>
-                  )}
-                </div>
-              </button>
-            )
-          })}
+          {manualDisplay.map((d) => (
+            <ManualGoalCard
+              key={d.goal.id}
+              goal={d.goal}
+              progress={d.progress}
+              onEdit={() => setEditingGoal(d.goal)}
+            />
+          ))}
         </div>
       )}
 
       <p className="mt-6 text-[11px] italic text-[var(--ink-3)]">
-        Klik op een doel om voortgang bij te werken of het te verwijderen.
-        Volledige edit van naam/bedrag/datum via /will.
+        {simple
+          ? 'Klik op een doel om je voortgang bij te werken.'
+          : 'Klik op een doel om voortgang bij te werken of het te verwijderen. Volledige edit van naam/bedrag/datum via /will.'}
       </p>
 
       {editingGoal && (

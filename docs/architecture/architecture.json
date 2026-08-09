@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-08T18:27:43.630Z",
+  "generatedAt": "2026-08-08T23:07:21.986Z",
   "generatedDate": "2026-08-08",
   "repo": {
     "name": "fin",
@@ -193,7 +193,7 @@
     "tables": 88,
     "migrations": 197,
     "integrations": 25,
-    "components": 896,
+    "components": 897,
     "providers": 14,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -8402,11 +8402,11 @@
     }
   ],
   "components": {
-    "total": 896,
+    "total": 897,
     "groups": [
       {
         "group": "app",
-        "count": 354,
+        "count": 356,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -8660,6 +8660,8 @@
           "phase-modal-onttrekking",
           "phase-modal-opbouw",
           "phase-modal-overgang",
+          "pill-row",
+          "pill-row.test",
           "platform-banner",
           "portfolio-allocation-chart",
           "postpone-form",
@@ -9021,7 +9023,7 @@
       },
       {
         "group": "core",
-        "count": 68,
+        "count": 67,
         "items": [
           "account-source-icon",
           "account-source-icon.test",
@@ -9065,7 +9067,6 @@
           "debt-detail-sheet",
           "debt-payoff-strategy",
           "equity-buildup-bar",
-          "euro-view-badge",
           "fire-progress-strip",
           "holding-row",
           "holdings-client",
@@ -15941,6 +15942,21 @@
       ],
       "summary": "ADR 0090 (wave 1) legde het choke point en de scalar-voorkeur vast, maar liet de dekking van `/toekomst`, de fase-kassabons, `/overzicht` en de AI-context expliciet open (gefaseerd). Dit besluit is die uitwerking: hoe een bedrag zijn deflatie-klasse krijgt, hoe dubbele deflatie e",
       "file": "docs/adr/0093-euro-weergave-deflatieklassen-en-render-grens.md"
+    },
+    {
+      "id": "0094-euro-weergave-status-in-de-sidebar",
+      "title": "De euro-weergave-status hangt in de sidebar, niet per grafiek",
+      "status": "aanvaard",
+      "date": "2026-08-09",
+      "elements": [
+        "as-planning",
+        "as-vermogen",
+        "fn-toekomstplannen",
+        "app-comp",
+        "do-meta"
+      ],
+      "summary": "Vervangt ADR 0090 §8 (badge onzichtbaar in nominaal) en de badge-plaatsing uit ADR 0093 §12. `EuroViewBadge` is verwijderd; de euro-weergave-status staat voortaan app-breed bovenaan de sidebar en is in béíde standen zichtbaar — neutraal in de standaardstand, met horizon-accent zo",
+      "file": "docs/adr/0094-euro-weergave-status-in-de-sidebar.md"
     }
   ],
   "churn": {
@@ -15948,11 +15964,11 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 125
+        "commits": 126
       },
       {
         "path": "lib/ai",
-        "commits": 59
+        "commits": 60
       },
       {
         "path": "app/(app)/toekomst",
@@ -15990,13 +16006,13 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 8852,
+        "loc": 9038,
         "commits": 92
       },
       {
         "file": "components/app/budgets-client.tsx",
         "loc": 5045,
-        "commits": 34
+        "commits": 33
       },
       {
         "file": "components/core/assets-client.tsx",
@@ -16016,7 +16032,7 @@
       {
         "file": "lib/dashboard-data-loader.ts",
         "loc": 2690,
-        "commits": 51
+        "commits": 52
       },
       {
         "file": "app/(app)/core/cash/import/page.tsx",
@@ -17120,16 +17136,8 @@
   "diff": {
     "baseline": false,
     "previousDate": "2026-08-08",
-    "hasChanges": true,
-    "sections": [
-      {
-        "label": "Componenten (aantal)",
-        "added": [
-          "+1"
-        ],
-        "removed": []
-      }
-    ]
+    "hasChanges": false,
+    "sections": []
   },
   "statsHistory": [
     {
@@ -17394,7 +17402,7 @@
     {
       "date": "2026-08-08",
       "api": 289,
-      "components": 896,
+      "components": 897,
       "tables": 88,
       "routesProduction": 99
     }

@@ -1,16 +1,19 @@
 /**
  * Tests voor de besteedbaar-vermogenslijn (Toekomst-grafiek, Pad-modus).
  *
- * Pinnen twee dingen:
+ * Pinnen drie dingen:
  *  1. de CONDITIE — de tweede lijn verschijnt zodra er een eigen woning is ÉN de
  *     woonstrategie de woning buiten de FIRE-pot houdt; hij verdwijnt zonder eigen
  *     woning en bij `include_full` (daar geldt J ≡ I, dus de lijn zou samenvallen);
- *  2. de MAPPING — de punten komen één-op-één uit `nettoLiquide` op de as-conventie
+ *  2. de STANDAARDSTAND van de toggle die de lijn sinds de "te druk"-melding
+ *     schakelt — AAN bij uitsluiten, UIT bij de rest;
+ *  3. de MAPPING — de punten komen één-op-één uit `nettoLiquide` op de as-conventie
  *     van de hoofdlijn (`age + 1`), zonder eigen som.
  */
 import { describe, it, expect } from 'vitest'
 import {
   shouldShowLiquidWealthLine,
+  defaultLiquidWealthLineVisible,
   buildLiquidWealthPoints,
   type LiquidWealthRow,
 } from './liquid-wealth-line'
@@ -88,6 +91,36 @@ describe('shouldShowLiquidWealthLine — eigen woning ÉN een niet-meetellen-str
     expect(modes.slice().sort()).toEqual(
       ['downsize', 'exclude_from_fire', 'include_full', 'reverse_mortgage'],
     )
+  })
+})
+
+// ── Standaardstand van de toggle ────────────────────────────────────────────
+
+describe('defaultLiquidWealthLineVisible — conditioneel op de woonstrategie', () => {
+  // De lijn zit sinds de "te druk"-melding achter een eigen pill naast de
+  // Doel-pill. De standaardstand is NIET één vaste keuze: bij uitsluiten staat
+  // de voortgangsbalk / het vrijheids-% al op de zonder-woning-grondslag, dus
+  // dáár moet de lijn meteen zichtbaar zijn — anders liegt de grafiek t.o.v. de
+  // balk eronder. Bij downsize/opeethypotheek is de totaallijn het hoofdverhaal.
+
+  it('staat AAN bij exclude_from_fire (daar is zonder-woning het hoofdverhaal)', () => {
+    expect(defaultLiquidWealthLineVisible('exclude_from_fire')).toBe(true)
+  })
+
+  it('staat UIT bij downsize en reverse_mortgage — verdieping, geen openingsbeeld', () => {
+    expect(defaultLiquidWealthLineVisible('downsize')).toBe(false)
+    expect(defaultLiquidWealthLineVisible('reverse_mortgage')).toBe(false)
+  })
+
+  it('staat UIT bij include_full — daar bestaat de lijn (en dus de pill) niet eens', () => {
+    expect(defaultLiquidWealthLineVisible('include_full')).toBe(false)
+    // Dubbele grendel: de conditie zet 'm daar sowieso al uit.
+    expect(shouldShowLiquidWealthLine(context(true), 'include_full')).toBe(false)
+  })
+
+  it('zet precies één van de vier modi standaard aan', () => {
+    const modes = Object.keys(STRATEGIES) as Array<HousingStrategyConfig['mode']>
+    expect(modes.filter(defaultLiquidWealthLineVisible)).toEqual(['exclude_from_fire'])
   })
 })
 

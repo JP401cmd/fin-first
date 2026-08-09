@@ -16,6 +16,18 @@ type ChatContextType = {
   /** Auto-message to send when chat is opened from a specific page context */
   autoOpenMessage: string | null
   setAutoOpenMessage: (msg: string | null) => void
+  /**
+   * Open de chat rechtstreeks in de MELDMODUS (megafoon) — de enige invoerweg
+   * voor bugs, vragen en aanbevelingen sinds ADR 0096. Gebruikt door de
+   * verwijspagina `/mijn/feedback`.
+   *
+   * De modus zelf is state van ChatPanel (het gesprek moet blijven staan terwijl
+   * je meldt), dus dit is een intent-vlag die ChatPanel oppikt en direct wist.
+   */
+  openMelding: () => void
+  /** True zolang ChatPanel de meldmodus-intent nog moet oppakken. */
+  meldingRequested: boolean
+  clearMeldingRequest: () => void
 }
 
 const ChatContext = createContext<ChatContextType | null>(null)
@@ -42,6 +54,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [pendingMessage, setPendingMessage] = useState<string | null>(null)
   const [isPinned, setIsPinnedState] = useState(false)
   const [autoOpenMessage, setAutoOpenMessageState] = useState<string | null>(null)
+  const [meldingRequested, setMeldingRequested] = useState(false)
 
   // Restore pin state from localStorage on mount
   useEffect(() => {
@@ -69,6 +82,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const open = useCallback(() => setIsOpen(true), [])
   const close = useCallback(() => {
     setIsOpen(false)
+    // Meldmodus-intent altijd laten vallen bij sluiten. ChatPanel wist 'm
+    // normaal zelf, maar komt via next/dynamic binnen: faalt die chunk-fetch,
+    // dan blijft de vlag anders de hele sessie staan en landt de gebruiker
+    // later ongevraagd in de meldmodus bij een gewone chat-opening.
+    setMeldingRequested(false)
     // Unpin when closing
     setIsPinnedState(false)
     try { localStorage.setItem(PIN_STORAGE_KEY, 'false') } catch {}
@@ -103,12 +121,22 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setAutoOpenMessageState(msg)
   }, [])
 
+  const openMelding = useCallback(() => {
+    setMeldingRequested(true)
+    setIsOpen(true)
+  }, [])
+
+  const clearMeldingRequest = useCallback(() => {
+    setMeldingRequested(false)
+  }, [])
+
   return (
     <ChatContext.Provider value={{
       isOpen, open, close, toggle, openWithMessage,
       pendingMessage, clearPendingMessage,
       isPinned, togglePin, setIsPinned,
       autoOpenMessage, setAutoOpenMessage,
+      openMelding, meldingRequested, clearMeldingRequest,
     }}>
       {children}
     </ChatContext.Provider>

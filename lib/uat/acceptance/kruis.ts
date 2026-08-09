@@ -424,7 +424,7 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'KERN',
     persona: 'willem',
     given: "Euro-weergave op 'real' (Notion-kaart 39cf9e8d-568a-80fb-8a99-e090c080b964, brok B/F/H). Eén canonieke deflator per leeftijd (`lib/euro-display.ts#buildFactorByAge`, gevoed uit dezelfde kernelrijen — géén tweede bron, D1).",
-    when: 'De gebruiker leest het gedeflateerde FIRE-doelbedrag achtereenvolgens op de /toekomst-hero (brok B, `sim-chart.tsx`-props via `horizon-client.tsx`), op de /overzicht-widget (brok F, o.a. `vrijheidsvoortgang-widget.tsx`) en op het mini-chart-/palette-label-oppervlak (`lib/command-palette/actions.ts#buildActionItems` + `EuroViewBadge`).',
+    when: 'De gebruiker leest het gedeflateerde FIRE-doelbedrag achtereenvolgens op de /toekomst-hero (brok B, `sim-chart.tsx`-props via `horizon-client.tsx`), op de /overzicht-widget (brok F, o.a. `vrijheidsvoortgang-widget.tsx`) en op het mini-chart-/palette-label-oppervlak (`lib/command-palette/actions.ts#buildActionItems`; de weergave-status zelf hangt sinds ADR 0094 in de sidebar — `SidebarEuroViewBadge` — niet meer als badge per grafiek).',
     then: 'Het getoonde bedrag is op de drie oppervlakken identiek tot op afronding — dezelfde `deflate(fireTarget, factorAtAge(unifiedRows, fireAge), \'real\')`-aanroep op dezelfde kernelrijen, nooit een tweede/eigen herberekening per widget (NFR-X1/X2). Dit is de kern-eis van AC-F4/T13: zonder deze rij kunnen drie oppervlakken elk voor zich "groen" zijn en toch onderling verschillen.',
     assertion: {
       kind: 'consistency',

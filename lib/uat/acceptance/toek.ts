@@ -139,15 +139,15 @@ const criteria: AcceptanceCriterion[] = [
   {
     workflow: 'WF-TOEK-08',
     scenarioId: 'UAT-TOEK-08',
-    titel: "Rendement-scenario's en Monte Carlo over de grafiek leggen",
+    titel: "Rendement-scenario's en de marktcheck over de grafiek leggen",
     kriticiteit: 'BELANGRIJK',
     persona: 'willem',
     given: 'Persona Willem geladen (basisrendement 6%).',
-    when: 'De gebruiker klikt "Scenario\'s" (±2pp → 4%/8%-lijnen) en "Monte Carlo" (band + mediaan + FIRE-kans).',
-    then: 'De optimistische lijn (8%) toont op elk toekomstig jaar een gelijk-of-hoger vermogen dan de basislijn (6%); de pessimistische (4%) gelijk-of-lager. Richtingstoets, geen exact cijfer.',
+    when: 'De gebruiker klikt "Scenario\'s" (±2pp → 4%/8%-lijnen) en "Marktcheck" (p25–p75-band + mediaan + de RENDEMENT-MARGE). De pil heette tot 2026-08-08 "Monte Carlo" en toonde een FIRE-kans uit een losstaande motor; daarna kort een "Plan houdt stand"-percentage. Sinds 2026-08-09 staat er een marge: hoeveel het rendement per jaar mag tegenvallen voordat het plan omvalt, getoetst op de GEKOZEN stopleeftijd (of, zonder keuze, op de AOW-leeftijd — de copy noemt dat anker expliciet). Het percentage is verdwenen omdat het op de gesolvede FIRE-leeftijd werd geëvalueerd en daardoor structureel ~51% was, ongeacht het plan.',
+    then: 'De optimistische lijn (8%) toont op elk toekomstig jaar een gelijk-of-hoger vermogen dan de basislijn (6%); de pessimistische (4%) gelijk-of-lager. Richtingstoets, geen exact cijfer. De marktcheck-band toont p25–p75 (niet p10–p90) en de marge beweegt zichtbaar mee met de stop-slider: later stoppen = meer speling. Pil, legenda, explainer en aria-label zeggen alle vier hetzelfde (één copy-bron).',
     assertion: {
       kind: 'direction',
-      source: 'richtingstoets: 8%-lijn ≥ 6%-basislijn ≥ 4%-lijn per jaar (kernel-scenariolijnen).',
+      source: 'richtingstoets: 8%-lijn ≥ 6%-basislijn ≥ 4%-lijn per jaar (kernel-scenariolijnen). Marge: lib/horizon-kernel/rendement-marge.ts#computeRendementMarge — monotoon in de stopleeftijd en in de uitgaven, gepind in lib/horizon-kernel/marktcheck.test.ts + rendement-marge.test.ts.',
     },
   },
   {

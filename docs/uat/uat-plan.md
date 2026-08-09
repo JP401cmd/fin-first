@@ -381,7 +381,7 @@ Kriticiteit: **KERN** = raakt financiële uitkomsten of gebruikersdata · **BELA
 | WF-MIJN-25 | Alle gegevens resetten en opnieuw beginnen | Alle financiële data wissen (account blijft) en de onboarding opnieuw doorlopen. | KERN | nee | 2 |
 | WF-MIJN-26 | Maandelijkse geldcheck-in doorlopen (7 stappen) | Maandelijks financiën langslopen: terugblik, herwaarderingen, doelen, budgetten, vooruitblik en reflectie met snapshot. | KERN | ja | 6 |
 | WF-MIJN-27 | Check-in-historie bekijken en een oude maand terugzien | Door afgeronde check-ins bladeren, maanden vergelijken en oude snapshots read-only terugzien. | BELANGRIJK | ja | 3 |
-| WF-MIJN-28 | Feedback insturen | Een bug, idee of vraag aan het team melden. | OVERIG | nee | 2 |
+| WF-MIJN-28 | Feedback-verwijspagina opent het meldvenster | De oude feedback-route verwijst naar de enige invoerweg: de meldmodus in het gesprek met Fin (ADR 0096). | OVERIG | nee | 2 |
 | WF-MIJN-29 | Openstaande huishoud-uitnodiging intrekken | Een verstuurde maar nog niet geaccepteerde uitnodiging annuleren zodat de verkeerde ontvanger geen toegang krijgt. | KERN | nee | 3 |
 
 ### Will (AI-coach), berichten & krant (WF-WILL)
@@ -1644,7 +1644,7 @@ Scope: `/overzicht` (hoofdpagina/hub), `/dashboard` (redirect), `/overzicht/tips
 - **Kriticiteit:** BELANGRIJK
 - **Rekenend:** ja — het detailpaneel toont `pillar.rawValue` (bv. schuldratio) en `improvementTip` uit de gezondheidsscore-pijlers (`lib/financial-health.ts`); de statuskleur komt uit `loadLeverScores` (`lib/lever-scores-loader.ts`) gemapt via `leverToLeverageStatus`.
 - **Varianten & randgevallen:**
-  - Belasting-kaart heeft geen eigen pijler → drill-down toont alleen de proxy-substatus "Verken je Box 3-positie"; zonder pijler is er géén detailpaneel-inhoud.
+  - Belasting-kaart heeft geen eigen pijler → drill-down toont alleen de proxy-substatus "Mogelijk betaal je meer dan nodig"; zonder pijler is er géén detailpaneel-inhoud.
   - Status 'neutral' én geen pijler → geen chevron (niet uitklapbaar).
   - Eenvoudige weergave (display_mode 'simple') → chevrons verborgen, kaarten blijven wel klikbaar.
 - **Cross-module effecten:** Deeplinks naar de vier deelgebieden onder /overzicht; actie-link (`pillar.actionHref`) kan dieper linken.
@@ -3590,13 +3590,13 @@ Scope: `/overzicht/schulden`, `/overzicht/schulden/[type]`, `/core/debts`, `/cor
 - **/core/cash** — pure redirect naar /overzicht/cashflow (app/(app)/core/cash/page.tsx); geen eigen UI. Interne links ("Naar Kas overzicht" op de connect-succespagina, "Rekening toevoegen" in de import-lege-staat) lopen bewust via deze redirect.
 - **/core/cash/connect/callback** — alleen een fallback-doorstuurpagina (spinner "Verbinding verwerken..."); de echte afhandeling zit in /api/bank-connect/callback. Zelfstandig niet zinvol te testen behalve als onderdeel van WF-CASH-30.
 - **Budget-detail-kassabon in components/app/cash-overview.tsx** (derde BottomSheet, "Kassabon: Budget detail" rond regel 1208): onbereikbaar — `setExpenseReceiptBudgetId` wordt nergens op een waarde gezet (alleen op null bij sluiten). Dode UI; de uitgaven-kassabon heeft geen doorklik per budget.
-- **"Beheer rekeningen"-link in de KoppelRekeningBanner** (components/overview/koppel-rekening-banner.tsx) verwijst naar /overzicht/cashflow — circulair vanaf /overzicht/cashflow/transacties; er is geen aparte rekeningen-beheerpagina in deze scope.
+- ~~**"Beheer rekeningen"-link in de KoppelRekeningBanner** verwijst naar /overzicht/cashflow — circulair vanaf /overzicht/cashflow/transacties; er is geen aparte rekeningen-beheerpagina in deze scope.~~ **VERVALLEN (Eenvoudige weergave fase 2, TXN-1):** `KoppelRekeningBanner` heeft nu maar één toestand (uitnodiging bij 0 gekoppelde rekeningen, in beide modi) — de "X rekeningen gekoppeld"-strip met de "Beheer rekeningen"/"Extra bank koppelen"-links bestaat niet meer, dus ook de circulaire link niet.
 - **Lege-staat-CTA van de tijdlijn** ("Koppel of importeer") linkt naar /overzicht/bezittingen/cash — buiten dit deelgebied (Bezittingen); niet dood, maar de dekking van die landingsplek ligt elders.
 
 #### Onbevestigd
 
 - **?maand=-deeplink naar /overzicht/cashflow/budget**: de geldstroom-banner biedt "Naar budget ?maand=JJJJ-MM", maar of de budget-pagina die parameter consumeert is niet geverifieerd (route valt onder het deelgebied Budgetten; grep in app/(app)/overzicht/cashflow/budget vond geen searchParams-gebruik).
-- **Provider-naamgeving open banking**: de koppel-banner spreekt van "GoCardless", de connect-pagina van "TrueLayer". Welke provider daadwerkelijk achter /api/bank-connect zit is niet in de API-code geverifieerd — mogelijk verouderde copy in één van beide (UAT-aandachtspunt).
+- ~~**Provider-naamgeving open banking**: de koppel-banner spreekt van "GoCardless", de connect-pagina van "TrueLayer".~~ **VERVALLEN**: `koppel-rekening-banner.tsx` noemt sinds fase 2 (TXN-1-herschrijving) alleen nog "TrueLayer" — een grep op "GoCardless" levert nul treffers in `app/**`/`components/**`. Geen copy-inconsistentie meer om te noteren.
 - **Server-gedrag /api/bank-connect/sync**: de succespagina toont "X nieuw, Y dup" uit de API-response; de dedupe-logica server-side is niet regel-voor-regel gecontroleerd.
 - **Inhoud/niveaus van de PageStatusBanner per cashflow-route**: de banner/dot-mechaniek is geverifieerd (layout + provider), maar welke statusniveaus wanneer verschijnen komt uit een aparte status-API die niet is doorgelicht.
 - **Sidebar-status-dots**: volgens code-commentaar in lib/cashflow-cards.ts consumeert /api/overzicht/cashflow-status dezelfde statusfuncties als de kaarten; die route zelf is niet gelezen.
@@ -4174,10 +4174,10 @@ Alle live belasting-UI leeft onder `/overzicht/belasting` (hub + drie box-subpag
 
 #### WF-BELAST-02 — Via de box-kaarten naar een box navigeren (status + KPI + drilldown)
 - **Doel:** De gebruiker kiest op de hub de juiste box en ziet vooraf per box de jaarheffing (KPI) en een stoplicht-status.
-- **Trigger/startpunt:** /overzicht/belasting, de drie kaarten "Werk + woning" / "Aanmerkelijk belang" / "Sparen + beleggen" bovenaan.
+- **Trigger/startpunt:** /overzicht/belasting, de kaarten "Werk + woning" / "Sparen + beleggen" bovenaan — plus "Aanmerkelijk belang" alleen wanneer die box relevant is (BEL-1, alle weergavemodi).
 - **Eindresultaat:** De gebruiker landt op de gekozen box-subpagina; optioneel heeft hij eerst via de chevron de drilldown met "Box N"-kicker en beschrijving uitgeklapt.
 - **Stappen:**
-  1. Bekijk per kaart de KPI (€X/jr of "—"), het statuspunt rechtsboven en de status-tekst (bv. "Onbenutte jaarruimte", "Geen aanmerkelijk belang", "Optimaliseer Box 3").
+  1. Bekijk per kaart de KPI (€X/jr of "—"), het statuspunt rechtsboven en de status-tekst (bv. "Onbenutte jaarruimte", "Optimaliseer Box 3"). De Box 2-kaart heeft bewust géén status-tekst meer: haar aanwezigheid ís het signaal (BEL-1).
   2. Klik op de chevron rechtsonder om de drilldown met de één-zin-beschrijving uit te klappen (accordeon: één kaart tegelijk open).
   3. Klik op de kaart zelf → navigeert naar /overzicht/belasting/box1, /box2 of /box3.
 - **Schermen/componenten:** /overzicht/belasting → `components/overview/belasting-box-cards.tsx` (hergebruikt `components/overview/leverage-card.tsx`); statusberekening in `app/(app)/overzicht/belasting/page.tsx`.
@@ -6215,23 +6215,23 @@ Alle workflows zijn gebaseerd op de daadwerkelijke code onder `app/(app)/mijn/**
 
 ---
 
-#### WF-MIJN-28 — Feedback insturen
-- **Doel:** De gebruiker meldt een bug, idee of vraag aan het team.
-- **Trigger/startpunt:** `/mijn/feedback` — in de praktijk bereikbaar via de command-palette (⌘K → "Feedback") of directe URL; de pagina staat niet in de /mijn-tabs of het kaart-grid.
-- **Eindresultaat:** Groene bevestiging "Dank je — je feedback is verstuurd." met optie "Nog iets insturen".
+#### WF-MIJN-28 — Feedback-verwijspagina opent het meldvenster
+- **Doel:** De gebruiker die op de oude feedback-route belandt, wordt naar de enige invoerweg geleid: de meldmodus in het gesprek met Fin (ADR 0096).
+- **Trigger/startpunt:** `/mijn/feedback` — bereikbaar via de command-palette (⌘K → "Melden") of directe URL; de pagina staat niet in de /mijn-tabs of het kaart-grid.
+- **Eindresultaat:** De chat opent rechtstreeks in meldmodus (megafoon actief, kop "Melding maken").
 - **Stappen:**
   1. Open `/mijn/feedback`.
-  2. Kies een categorie: Bug / Idee / Vraag / Overig (default: Idee).
-  3. Typ het bericht in het tekstvak.
-  4. Klik "Versturen" (disabled bij leeg bericht).
-  5. Controleer de bevestiging; klik desgewenst "Nog iets insturen" voor een volgend bericht.
-- **Schermen/componenten:** `/mijn/feedback` — `app/(app)/mijn/feedback/page.tsx`; API `POST /api/feedback`.
+  2. Constateer dat er géén categoriekiezer en géén tekstvak meer is — de pagina legt uit dat melden via het gesprek met Fin gaat en somt de drie meldtypen op (Bug · Vraag · Aanbeveling).
+  3. Klik de primaire actie "Open het meldvenster".
+  4. Controleer dat het chatvenster opengaat en meteen in meldmodus staat.
+- **Schermen/componenten:** `/mijn/feedback` — `app/(app)/mijn/feedback/page.tsx`; chat-context `openMelding()` (`components/app/chat/chat-provider.tsx`) → `ChatPanel`.
 - **Kriticiteit:** OVERIG
 - **Rekenend:** nee
 - **Varianten & randgevallen:**
-  - Serverfout → rode foutmelding met de API-tekst; het bericht blijft staan om opnieuw te proberen.
-  - Alleen whitespace → knop blijft disabled.
-- **Cross-module effecten:** feedback landt in het beheer-domein (`/beheer/feedback`).
+  - Het melden zélf (typen, screenshot, verzenden, 5/uur-rem) valt onder de WILL-criteria voor de meldmodus — die zijn leidend; hier alleen de verwijzing.
+  - Zonder AI-abonnement moet de knop nog steeds werken: de meldmodus staat bewust boven alle AI-gates.
+  - `POST /api/feedback` is gesloten en antwoordt met **410 Gone**; er is geen UI meer die dat endpoint aanroept.
+- **Cross-module effecten:** nieuwe meldingen landen in `user_reports` + de Notion-werkqueue, niet meer in `/beheer/feedback` (dat is nu archief — zie WF-BEHEER-19).
 
 ---
 
@@ -7848,9 +7848,9 @@ Alle routes onder /beheer zijn afgeschermd in één centrale layout: `app/(app)/
   - Verbergen van een rekenhulp die meerdere open meldingen heeft.
 - **Cross-module effecten:** "Verberg calculator" haalt een gedeelde rekenhulp direct uit de publieke bibliotheek (/toekomst/bibliotheek).
 
-#### WF-BEHEER-19 — Gebruikersfeedback afhandelen
-- **Doel:** Ingezonden feedback (bugs, ideeën, vragen) doorlopen en als afgehandeld markeren.
-- **Trigger/startpunt:** Hub → "Feedback" (/beheer/feedback).
+#### WF-BEHEER-19 — Feedback-archief afhandelen
+- **Doel:** De historie van het oude feedbackformulier doorlopen en als afgehandeld markeren. **Gesloten instroom** sinds ADR 0096: `POST /api/feedback` antwoordt met 410 Gone, dus deze inbox groeit niet meer. Nieuwe meldingen komen via de meldmodus in de chat binnen (`user_reports` → Notion-werkqueue), niet hier.
+- **Trigger/startpunt:** Hub → "Feedback (archief)" (/beheer/feedback).
 - **Eindresultaat:** Items hebben de juiste status (nieuw/beoordeeld).
 - **Stappen:**
   1. Open /beheer/feedback; de lijst toont per item categorie (Bug/Idee/Vraag/Overig), bericht, e-mail (optioneel) en datum.
@@ -7861,7 +7861,7 @@ Alle routes onder /beheer zijn afgeschermd in één centrale layout: `app/(app)/
 - **Varianten & randgevallen:**
   - Lege lijst (geen feedback).
   - Status terugzetten van reviewed naar new.
-- **Cross-module effecten:** geen (bron: het feedback-formulier op /mijn/feedback).
+- **Cross-module effecten:** geen. De bron (het formulier op /mijn/feedback) is gesloten; die route is nu een verwijspagina naar de meldmodus — zie WF-MIJN-28.
 
 #### WF-BEHEER-20 — Persona-testdata laden (seeden)
 - **Doel:** Het eigen (admin-)account vullen met een complete, realistische testdataset door een persona te kiezen — de basis voor de UAT-testomgeving.
@@ -8282,7 +8282,7 @@ Deze onderdelen bestaan in de code maar worden door geen enkele gebruikersworkfl
 - /core/cash is een pure redirect naar /overzicht/cashflow — geen eigen UI
 - /core/cash/connect/callback is alleen een fallback-doorstuurpagina (spinner); echte afhandeling in /api/bank-connect/callback
 - Budget-detail-kassabon in components/app/cash-overview.tsx (derde BottomSheet) is onbereikbaar: setExpenseReceiptBudgetId wordt nergens op een waarde gezet — dode UI
-- 'Beheer rekeningen'-link in KoppelRekeningBanner verwijst circulair naar /overzicht/cashflow; geen aparte beheerpagina
+- ~~'Beheer rekeningen'-link in KoppelRekeningBanner verwijst circulair naar /overzicht/cashflow; geen aparte beheerpagina~~ VERVALLEN (fase 2 TXN-1): banner heeft nu één toestand, die link bestaat niet meer
 - Lege-staat-CTA van de tijdlijn linkt naar /overzicht/bezittingen/cash (buiten dit deelgebied)
 
 **Budgetteren:**
@@ -9377,7 +9377,7 @@ WF-NAV-13 (Uitloggen) → **géén eigen scenario** in dit document; gedekt door
   4. Klik op een andere kaart se chevron → *verwacht:* het vorige paneel sluit (max. één open, accordeon-gedrag).
   - **Eindresultaat:** navigatie werkt, precies één detailpaneel tegelijk open.
   - **Berekening verwachting (rekenend):** schuldratio (pillar `rawValue`, `lib/financial-health.ts` regel 154-160) = totalDebts/totalAssets = €13.900/€9.700 = **1,433 (143%)** → `ratio ≥ 1 → score 0` → statuskleur **rood**, verbetertip in rode toon (bv. gericht op schuldreductie). Dit is een bewust "slecht" cijfer (schuld groter dan bezit) — precies wat de drill-down-tip moet duiden.
-- **c. Variant — Belasting-kaart zonder pijler:** open het detailpaneel van de Belasting-kaart bij Daan → *verwacht:* alleen de proxy-substatus "Verken je Box 3-positie" zichtbaar, géén rawValue/verbetertip (Belasting heeft geen eigen gezondheidspijler). Zet weergavemodus op Eenvoudig → *verwacht:* chevrons verdwijnen, kaarten blijven klikbaar.
+- **c. Variant — Belasting-kaart zonder pijler:** open het detailpaneel van de Belasting-kaart bij Daan → *verwacht:* alleen de proxy-substatus "Mogelijk betaal je meer dan nodig" zichtbaar, géén rawValue/verbetertip (Belasting heeft geen eigen gezondheidspijler). Zet weergavemodus op Eenvoudig → *verwacht:* chevrons verdwijnen, kaarten blijven klikbaar.
 
 ---
 
@@ -10445,7 +10445,7 @@ Datum;Naam / Omschrijving;Rekening;Tegenrekening;Code;Af Bij;Bedrag (EUR);Mutati
 #### UAT-CASH-30 — Bank koppelen via open banking en de eerste synchronisatie draaien (dekt WF-CASH-30)
 - **Kriticiteit:** KERN · **Platform:** webapp+mobiel · **Rooktest:** nee · **Duur:** ~8 min (toetsbaar deel; sync/succes vereist sandbox-koppeling)
 - **Preconditie:** Persona Daan Bakker, /core/cash/connect.
-- **a. Toetsbaar tot de bank-redirect:** 1) Zoek een bank in de zoekbalk (bv. "ING"). 2) Klik het bank-logo. → *verwacht:* bevestigingsscherm met tekst over een veilige, alleen-lezen verbinding (90 dagen geldig) en een "Verbind met ING"-knop. 3) Klik "Verbind met ING". → *verwacht:* een auth-link wordt aangevraagd (POST /api/bank-connect/auth-link) en de browser wordt doorgestuurd naar de bank-autorisatiepagina — verifieer alleen dát de doorverwijzing plaatsvindt (naar een externe URL), niet het bank-eigen inlogscherm zelf. **Bevinding om te noteren:** de "Beheer rekeningen"/koppel-banner elders in de app (components/overview/koppel-rekening-banner.tsx) noemt de provider **"GoCardless"**, terwijl deze connect-pagina expliciet **"TrueLayer"** noemt — dit is een bekende, verwachte copy-inconsistentie; noteer als bevinding, niet als nieuwe bug.
+- **a. Toetsbaar tot de bank-redirect:** 1) Zoek een bank in de zoekbalk (bv. "ING"). 2) Klik het bank-logo. → *verwacht:* bevestigingsscherm met tekst over een veilige, alleen-lezen verbinding (90 dagen geldig) en een "Verbind met ING"-knop. 3) Klik "Verbind met ING". → *verwacht:* een auth-link wordt aangevraagd (POST /api/bank-connect/auth-link) en de browser wordt doorgestuurd naar de bank-autorisatiepagina — verifieer alleen dát de doorverwijzing plaatsvindt (naar een externe URL), niet het bank-eigen inlogscherm zelf. ~~**Bevinding om te noteren:** de "Beheer rekeningen"/koppel-banner elders in de app noemt de provider "GoCardless", terwijl deze connect-pagina expliciet "TrueLayer" noemt.~~ **VERVALLEN (fase 2):** de koppel-banner (components/overview/koppel-rekening-banner.tsx) noemt sinds de TXN-1-herschrijving alleen nog "TrueLayer" — geen copy-inconsistentie meer. In **Eenvoudig** ligt de ingang naar deze wizard bovendien niet meer direct in de actie-rij van /overzicht/cashflow/transacties maar achter het "…"-menu (TXN-1); in **Volledig** staat "Bank koppelen" ongewijzigd als eigen knop.
 - **b. Callback-foutafhandeling met nepparameters:** Navigeer direct naar /core/cash/connect?error=missing_reference (en herhaal met andere foutcodes als connection_not_found, authorization_incomplete, callback_failed, missing_code). → *verwacht:* elk van deze querystring-foutcodes toont een passende, begrijpelijke Nederlandstalige foutmelding op /core/cash/connect, geen crash, geen halve state.
 - **c. Providers laden mislukt / geen zoekresultaat:** Zoek op een onzinnige banknaam ("xyzxyzbank"). → *verwacht:* "Geen banken gevonden". (Providers-laadfout zelf is alleen te forceren door de API te blokkeren — noteer als "vereist sandbox/dev-toggle" als niet reproduceerbaar.)
 - **Niet toetsbaar zonder sandbox-koppeling:** de daadwerkelijke bank-autorisatie, de callback-succesflow naar /core/cash/connect/success, "Synchroniseer nu" (X nieuw/Y dup) en de 90-dagen-hergeldigheid vereisen een echte of sandbox TrueLayer-koppeling — expliciet buiten bereik van deze UAT-ronde.
@@ -11950,14 +11950,15 @@ Drie workflows zijn hier bewust géén volledig scenario maar een verwijsregel, 
 
 ---
 
-#### UAT-MIJN-28 — Feedback insturen (dekt WF-MIJN-28)
+#### UAT-MIJN-28 — Feedback-verwijspagina opent het meldvenster (dekt WF-MIJN-28)
 - **Kriticiteit:** OVERIG · **Platform:** webapp · **Rooktest:** nee · **Duur:** ~3 min
-- **Preconditie:** ingelogd; open `/mijn/feedback` rechtstreeks via URL of command-palette (⌘K → "Feedback") — de pagina staat niet in de /mijn-tabs of het kaart-grid.
+- **Preconditie:** ingelogd; open `/mijn/feedback` rechtstreeks via URL of command-palette (⌘K → "Melden") — de pagina staat niet in de /mijn-tabs of het kaart-grid.
 - **a. Happy path:**
-  1. Kies categorie "Idee" (default) of een andere (Bug/Vraag/Overig).
-  2. Typ een synthetisch testbericht, bv. "Test: graag een export naar Excel naast CSV."
-  3. Klik "Versturen" (disabled bij leeg bericht) → *verwacht:* groene bevestiging "Dank je — je feedback is verstuurd." met optie "Nog iets insturen".
-  **Eindresultaat:** feedback landt in het beheer-domein (`/beheer/feedback`) voor verdere opvolging (niet in deze scope te toetsen).
+  1. Controleer de pagina → *verwacht:* geen categoriekiezer en geen tekstvak; de kop zegt dat melden vanuit je gesprek met Fin gaat, met de drie meldtypen (Bug · Vraag · Aanbeveling) als uitleg. De oude categorie "Overig" bestaat niet meer (ADR 0096, bewust).
+  2. Klik "Open het meldvenster" → *verwacht:* het chatvenster opent en staat meteen in meldmodus (megafoon actief, subtitel "Melding maken").
+  3. Sluit het venster en heropen de chat op de gewone manier → *verwacht:* de chat opent in gespreksmodus, niet opnieuw in meldmodus.
+  **Eindresultaat:** de gebruiker staat in het meldvenster. Het melden zelf (typen, scherm meesturen, verzenden, 5/uur-rem) wordt getoetst onder de WILL-criteria voor de meldmodus — die zijn leidend.
+- **b. Randgeval — zonder AI-abonnement:** herhaal stap 2 op een account zonder AI-abonnement → *verwacht:* de knop werkt gewoon; de meldmodus staat bewust boven alle AI-gates.
 
 ---
 

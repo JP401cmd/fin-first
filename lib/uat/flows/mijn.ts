@@ -70,7 +70,7 @@ export const MIJN_FLOW: UatFlow = {
     // ── 2 · check-in ──────────────────────────────────────────────────────
     { id: 'checkin', scenarioId: 'UAT-MIJN-26', label: 'WF-MIJN-26 · Maandelijkse geldcheck-in (7 stappen)', kind: 'screen', stage: 2, lane: 'checkin' },
     { id: 'checkin-historie', scenarioId: 'UAT-MIJN-27', label: 'WF-MIJN-27 · Check-in-historie bekijken', kind: 'screen', stage: 2, lane: 'checkin', subOf: 'checkin' },
-    { id: 'feedback', scenarioId: 'UAT-MIJN-28', label: 'WF-MIJN-28 · Feedback insturen', kind: 'action', stage: 2, lane: 'checkin' },
+    { id: 'feedback', scenarioId: 'UAT-MIJN-28', label: 'WF-MIJN-28 · Feedback-verwijspagina → meldvenster', kind: 'action', stage: 2, lane: 'checkin' },
 
     // ── 4 · uitkomst ──────────────────────────────────────────────────────
     { id: 'klaar', label: 'Profiel, huishouden, account & voorkeuren ingericht', kind: 'outcome', stage: 4 },

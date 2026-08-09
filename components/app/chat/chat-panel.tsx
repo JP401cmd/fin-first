@@ -456,7 +456,7 @@ function QuickActionChips({
 /* ── Main ChatPanel ────────────────────────────────────────────────── */
 
 export function ChatPanel() {
-  const { isOpen, close, pendingMessage, clearPendingMessage, isPinned, togglePin, autoOpenMessage, setAutoOpenMessage } = useChatContext()
+  const { isOpen, close, pendingMessage, clearPendingMessage, isPinned, togglePin, autoOpenMessage, setAutoOpenMessage, meldingRequested, clearMeldingRequest } = useChatContext()
   const router = useRouter()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -515,6 +515,16 @@ export function ChatPanel() {
   // die blokkade verdwijnt een trage upload halverwege, ziet de gebruiker geen
   // bevestiging en meldt hij hetzelfde nóg een keer.
   const [meldingBezig, setMeldingBezig] = useState(false)
+
+  // Meldmodus-intent van buiten (verwijspagina /mijn/feedback, ADR 0096):
+  // openMelding() opent de chat én zet deze vlag. We pakken 'm hier op en
+  // wissen 'm meteen, zodat een latere handmatige terugschakeling naar 'chat'
+  // niet alsnog door een blijven-hangende vlag wordt overruled.
+  useEffect(() => {
+    if (!meldingRequested) return
+    setMode('melding')
+    clearMeldingRequest()
+  }, [meldingRequested, clearMeldingRequest])
 
   // Dynamic domain: route-aware and gated by active modules
   const pathname = usePathname()

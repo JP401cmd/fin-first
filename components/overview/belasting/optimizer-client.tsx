@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { formatMaskedCurrency } from '@/lib/format'
 import { VoorkeurBewerkenSheet } from '@/components/future/voorkeur-bewerken-sheet'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { ScenarioCallout, OrnamentColophon } from '@/components/editorial'
 import { BesprekMetWillButton } from '@/components/app/chat/bespreek-met-fin-button'
 import { OPTIMIZER_DISCLAIMER, OPTIMIZER_DISCLAIMER_SHORT } from '@/lib/tax-optimizer/compliance'
@@ -67,6 +68,15 @@ function scrollToId(id: string) {
  * pensioenpot over de hele looptijd (IV) en de voetnoten. Vergelijken komt
  * eerst; het detail volgt op aanvraag.
  *
+ * BEL-2 (eenvoudige weergave): in `simple` blijft alléén katern II over — de
+ * vergelijking op één as — plus de Wft-callout en de voetnoten. Katern I
+ * (uitgangspunt), III (uitwerking per kans) en IV (levenslange varianten) zijn
+ * de expert-laag en verdwijnen, net als de sorteerstanden en de "bekijk
+ * uitwerking"-uitgang in de vergelijkingstabel (die laatste twee zitten in
+ * `optimizer-compare.tsx`, dat de modus zelf leest). Puur presentatie-reductie:
+ * dezelfde server-data, alleen minder ervan in beeld — nergens een tweede
+ * berekening of een "eenvoudige" variant van een cijfer.
+ *
  * De scenario-generatie, de ranking, de netto-effect-velden en de topkans komen
  * server-side uit `lib/tax-optimizer` (die op zijn beurt de canonieke Box 3-/
  * Box 1-motoren consumeert). Deze component rendert die data puur: sorteren en
@@ -112,6 +122,12 @@ export function Box3OptimizerClient({
 }) {
   const { masked } = useMaskedAmounts()
   const fc = (v: number) => formatMaskedCurrency(v, masked)
+
+  // Eén leespad voor de weergavemodus: de gedeelde hook (ADR 0026). Buiten een
+  // DisplayModeProvider valt die stil terug op 'simple' — in tests dus expliciet
+  // in een provider renderen wanneer je de Volledig-tak bedoelt.
+  const { mode } = useDisplayMode()
+  const simple = mode === 'simple'
 
   const [sortMode, setSortMode] = useState<SortMode>('netto')
   const [openId, setOpenId] = useState<string | null>(null)
@@ -189,15 +205,24 @@ export function Box3OptimizerClient({
           onClose={() => setRendementOpen(false)}
         />
 
-      {/* ── Katern I ────────────────────────────────────────────────── */}
-      <OptimizerStanding
-        standing={standing}
-        year={year}
-        perspectiveAware={perspectiveAware}
-        fc={fc}
-      />
+      {/* ── Katern I ──────────────────────────────────────────────────
+          In Eenvoudig valt dit katern in zijn geheel weg (BEL-2), inclusief de
+          scheidingslijn eronder — de vergelijking is dan de eerste sectie.
+          Daarmee vervalt ook de strip-reductie die katern I zelf nog voor
+          Eenvoudig kent (APP-7, optimizer-standing.tsx): die stand is hier
+          simpelweg niet meer bereikbaar. */}
+      {!simple && (
+        <>
+          <OptimizerStanding
+            standing={standing}
+            year={year}
+            perspectiveAware={perspectiveAware}
+            fc={fc}
+          />
 
-      <hr className="my-11 border-t border-[var(--border-ed)]" />
+          <hr className="my-11 border-t border-[var(--border-ed)]" />
+        </>
+      )}
 
       {/* ── Katern II ───────────────────────────────────────────────── */}
       {opportunities.length === 0 ? (
@@ -244,26 +269,33 @@ export function Box3OptimizerClient({
         </ScenarioCallout>
       </div>
 
-      <hr className="my-11 border-t border-[var(--border-ed)]" />
+      {/* ── Katern III + IV ────────────────────────────────────────────
+          De expert-laag: inzoomen per kans en de levenslange varianten. Beide
+          verdwijnen in Eenvoudig (BEL-2) met hun scheidingslijnen erbij, zodat
+          de voetnoten direct op de Wft-callout volgen zonder losse streep.
 
-      {/* ── Katern III ──────────────────────────────────────────────── */}
-      <OptimizerDetails
-        opportunities={sorted}
-        jaarruimteSection={jaarruimteSection}
-        openId={openId}
-        onToggle={toggleDetail}
-        fc={fc}
-        year={year}
-      />
+          Katern IV is niet langer een "binnenkort"-belofte maar een echte,
+          doorgerekende sectie. De drie kernel-solves draaien client-side achter
+          een expliciete actie — daarom staat hier alleen de bedrading
+          (dagtarief + maskering), niet de uitkomst. */}
+      {!simple && (
+        <>
+          <hr className="my-11 border-t border-[var(--border-ed)]" />
 
-      <hr className="my-11 border-t border-[var(--border-ed)]" />
+          <OptimizerDetails
+            opportunities={sorted}
+            jaarruimteSection={jaarruimteSection}
+            openId={openId}
+            onToggle={toggleDetail}
+            fc={fc}
+            year={year}
+          />
 
-      {/* ── Katern IV ───────────────────────────────────────────────
-          Het vierde fiscale doel is niet langer een "binnenkort"-belofte maar
-          een echte, doorgerekende sectie. De drie kernel-solves draaien
-          client-side achter een expliciete actie — daarom staat hier alleen de
-          bedrading (dagtarief + maskering), niet de uitkomst. */}
-      <OptimizerLevenslang fc={fc} dailyExpenses={dailyExpenses} />
+          <hr className="my-11 border-t border-[var(--border-ed)]" />
+
+          <OptimizerLevenslang fc={fc} dailyExpenses={dailyExpenses} />
+        </>
+      )}
 
       {/* ── Voetnoten ───────────────────────────────────────────────── */}
       <div className="mt-14 grid grid-cols-2 gap-6 border-t-4 border-double border-[var(--ink)] pt-6 md:grid-cols-3">

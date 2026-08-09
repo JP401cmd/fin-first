@@ -550,11 +550,18 @@ export function AssetCategoryPage({
       <CategoryHero type={type} total={total} count={count} />
 
       <div className="px-4 sm:px-6">
+        {/* BEZ-4: de verdiepings-tabs (aandelen-/crypto-holdings,
+            verhuurrendement, hypotheekplanner) zijn Volledig-materiaal. In
+            Eenvoudig blijft alleen de items-tab staan; `activeTabKey` en de
+            URL-correctie hierboven blijven bewust op de VOLLEDIGE `tabs`-lijst
+            werken, zodat een expliciete ?tab=…-deeplink de verdieping nog
+            steeds opent (en dan ook zichtbaar blijft als weg terug). */}
         <CategoryTabs
           tabs={tabs}
           activeKey={activeTabKey}
           onChange={handleTabChange}
           className="mt-4"
+          simpleBaseTabKey={ITEMS_TAB_KEY}
         />
 
         <div
@@ -659,8 +666,14 @@ export function AssetCategoryPage({
           ) : null}
         </div>
 
+        {/* De tip-strip nodigt uit om de verdiepings-app aan te zetten. In
+            Eenvoudig is de bijbehorende tab verborgen (BEZ-4), dus zou de
+            strip naar iets wijzen dat je daarna niet ziet — daarom mee
+            verborgen. */}
         {showTipStrip && primaryDeepening && (
-          <ModuleTipStrip copy={primaryDeepening.tipStripCopy} className="mb-6" />
+          <HideInSimple>
+            <ModuleTipStrip copy={primaryDeepening.tipStripCopy} className="mb-6" />
+          </HideInSimple>
         )}
       </div>
 

@@ -23,6 +23,7 @@ import {
   buildCashflowCards,
   budgetCardStatus,
   transactiesCardStatus,
+  currentMonthWindowLabel,
 } from './cashflow-cards'
 import { MOCK_DASHBOARD_DATA } from './mock-dashboard-data'
 import { formatCurrency } from './format'
@@ -237,6 +238,95 @@ describe('buildCashflowCards — Bug B: Transacties-KPI draait op de gerealiseer
     expect(card.kpi).toBeNull()
     expect(card.subText).toBe('Nog geen transacties')
     expect(card.status).toBe('neutral')
+  })
+})
+
+// ── CF-3 — venster-label bij de maandcijfers ───────────────────────────────
+// De Transacties-KPI is de gerealiseerde LOPENDE kalendermaand; op
+// /overzicht/cashflow/transacties staan 30-DAGEN-cijfers. Zonder venster zijn
+// die twee niet uit elkaar te houden — dezelfde verwarringsklasse als ADR 0073,
+// alleen nu in de copy i.p.v. in de grondslag. Deze suite pint het label vast
+// TEGEN de velden die het beschrijft, zodat een label niet stil kan blijven
+// staan terwijl de grondslag eronder verschuift.
+
+describe('buildCashflowCards — CF-3: maandcijfers dragen hun venster', () => {
+  // 9 augustus 2026, lokaal — bewust midden in de maand: "tot nu toe" is dan
+  // een echte bewering en niet toevallig waar.
+  const NOW = new Date(2026, 7, 9)
+
+  function cardsAt(dashboardData: DashboardData, now: Date = NOW) {
+    return buildCashflowCards(dashboardData, EMPTY_CASHFLOW, EMPTY_VASTE_LASTEN, now)
+  }
+
+  it('currentMonthWindowLabel benoemt de maand van `now`, niet "deze maand"', () => {
+    expect(currentMonthWindowLabel(NOW)).toBe('augustus tot nu toe')
+    expect(currentMonthWindowLabel(new Date(2026, 0, 31))).toBe('januari tot nu toe')
+    expect(currentMonthWindowLabel(new Date(2027, 11, 1))).toBe('december tot nu toe')
+  })
+
+  it('Transacties: het venster-label hoort bij de KPI die het beschrijft (gerealiseerde maand, niet de profielinschatting)', () => {
+    const dashboardData = baseDashboard({
+      // Effective/manual-override — mag de kaart NIET voeden (ADR 0073).
+      monthlyIncome: 5000,
+      monthlyExpenses: 3000,
+      currentMonthIncome: 4200,
+      currentMonthExpenses: 3100,
+    })
+    const card = cardsAt(dashboardData).find((c) => c.key === 'transacties')!
+
+    // Runtime-assertie: het gelabelde cijfer IS het verschil van de twee
+    // canonieke `currentMonth*`-velden — niet van de effective velden.
+    expect(card.kpi).toBe(`+${formatCurrency(4200 - 3100)}`)
+    expect(card.kpi).not.toBe(`+${formatCurrency(5000 - 3000)}`)
+    expect(card.kpiWindow).toBe('in augustus tot nu toe')
+  })
+
+  it('Transacties: het uitklap-detail draagt hetzelfde venster als label', () => {
+    const card = cardsAt(
+      baseDashboard({ currentMonthIncome: 4200, currentMonthExpenses: 3100 }),
+    ).find((c) => c.key === 'transacties')!
+    expect(card.detail.label).toBe('augustus tot nu toe')
+  })
+
+  it('Transacties: geen transacties → geen venster-regel (er is niets om te labelen)', () => {
+    const card = cardsAt(
+      baseDashboard({ currentMonthIncome: 0, currentMonthExpenses: 0 }),
+    ).find((c) => c.key === 'transacties')!
+    expect(card.kpi).toBeNull()
+    expect(card.kpiWindow).toBeNull()
+  })
+
+  it('Budget: de bestedings-tip noemt het venster; de KPI zelf krijgt géén venster-regel (het is een restant, geen som over de maand)', () => {
+    const dashboardData = baseDashboard({
+      budgetingActive: true,
+      budgetTotals: {
+        income: { limit: 5200, spent: 5200 },
+        expense: { limit: 3950, spent: 2000 },
+        savings: { limit: 1500, spent: 1400 },
+        debt: { limit: 500, spent: 500 },
+      },
+    })
+    const card = cardsAt(dashboardData).find((c) => c.key === 'budget')!
+    expect(card.detail.tip).toBe(
+      `${formatCurrency(2000)} van ${formatCurrency(3950)} besteed in augustus tot nu toe.`,
+    )
+    expect(card.kpiWindow).toBeNull()
+  })
+
+  it('Vaste lasten en Forecast dragen geen venster-regel — hun eenheid/tip doet dat al', () => {
+    const cards = cardsAt(baseDashboard({}))
+    expect(cards.find((c) => c.key === 'vaste-lasten')!.kpiWindow).toBeNull()
+    expect(cards.find((c) => c.key === 'forecast')!.kpiWindow).toBeNull()
+  })
+
+  it('`now` is optioneel: zonder argument blijft de bestaande callsite werken', () => {
+    const cards = buildCashflowCards(
+      baseDashboard({ currentMonthIncome: 100, currentMonthExpenses: 50 }),
+      EMPTY_CASHFLOW,
+      EMPTY_VASTE_LASTEN,
+    )
+    const card = cards.find((c) => c.key === 'transacties')!
+    expect(card.kpiWindow).toBe(`in ${currentMonthWindowLabel(new Date())}`)
   })
 })
 

@@ -83,7 +83,12 @@ export function AspirationQuestionnaire({
         >
           Jouw pensioenleven, opgeteld
         </h3>
+        {/* APP-7-opt-out: dit is geen KPI-strip maar de opsplitsing van het
+            eindbedrag dat er direct onder staat — de vier cellen tellen op tot
+            dat getal. Twee cellen tonen zou een optelsom laten zien die niet
+            klopt; dat is misleiden, niet vereenvoudigen. */}
         <FiguresStrip
+          alwaysFull
           cols={4}
           figures={[
             {

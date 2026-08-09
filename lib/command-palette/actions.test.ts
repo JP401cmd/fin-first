@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { buildActionItems, type ActionRunContext } from './actions'
+import { buildActionItems, ACTIONS_LIMIT_VISIBLE, type ActionRunContext } from './actions'
 import type { PerspectiveOption } from '@/lib/types/perspective'
 
 /**
@@ -115,6 +115,21 @@ describe('buildActionItems — perspectief-acties', () => {
   })
 })
 
+describe('buildActionItems — zichtbaarheid binnen de standaard-cap', () => {
+  // Given een gebruiker met vermogensregistratie en de euro-toggle in het
+  // register, When de palette zonder zoekterm de eerste ACTIONS_LIMIT_VISIBLE
+  // algemene acties toont, Then vallen zowel 'Synchroniseer prijzen' als de
+  // euro-toggle binnen die cap — een nieuwe actie mag de sync-knop niet uit
+  // de standaardlijst drukken.
+  it("toont 'Synchroniseer prijzen' én de euro-toggle in de standaardlijst", () => {
+    const items = buildActionItems(makeCtx(), ['vermogensregistratie'])
+    const general = items.filter((i) => !i.id.startsWith('action:perspective-'))
+    const defaultVisible = general.slice(0, ACTIONS_LIMIT_VISIBLE).map((i) => i.id)
+    expect(defaultVisible).toContain('action:sync-prices')
+    expect(defaultVisible).toContain('action:toggle-euro-view')
+  })
+})
+
 describe('buildActionItems — euro-weergave', () => {
   function euroItem(ctx: ActionRunContext) {
     const item = buildActionItems(ctx, []).find((i) => i.id === 'action:toggle-euro-view')
@@ -148,5 +163,21 @@ describe('buildActionItems — euro-weergave', () => {
     expect(ids.indexOf('action:toggle-euro-view')).toBe(
       ids.indexOf('action:toggle-display-mode') + 1,
     )
+  })
+})
+
+describe('buildActionItems — weergavemodus (APP-3)', () => {
+  /**
+   * De oude omschrijving ("Diepte-secties standaard tonen of inklappen")
+   * beloofde inklapbaar-maar-bereikbaar. Dat gedrag bestaat niet: HideInSimple
+   * haalt secties hard weg. De sublabel moet beschrijven wat er écht gebeurt.
+   */
+  it('omschrijft de modus als meer/minder detail, niet als inklappen', () => {
+    const item = buildActionItems(makeCtx(), []).find(
+      (i) => i.id === 'action:toggle-display-mode',
+    )
+    if (!item) throw new Error('action:toggle-display-mode ontbreekt in het register')
+    expect(item.sublabel).toBe('Meer/minder detail op elke pagina')
+    expect(item.sublabel).not.toMatch(/inklappen/i)
   })
 })

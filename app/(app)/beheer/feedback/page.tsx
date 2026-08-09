@@ -65,9 +65,15 @@ export default function BeheerFeedbackPage() {
       <div className="mb-6">
         <div className="flex items-center gap-2">
           <MessageSquare className="h-5 w-5 text-[var(--ink-3)]" />
-          <h2 className="text-xl font-bold text-[var(--ink)]">Feedback</h2>
+          <h2 className="text-xl font-bold text-[var(--ink)]">Feedback (archief)</h2>
         </div>
-        <p className="mt-1 text-sm text-[var(--ink-3)]">Wat gebruikers insturen — bugs, ideeën en vragen.</p>
+        {/* ADR 0096: het formulier op /mijn/feedback is gesloten. Deze inbox
+            groeit niet meer; nieuwe meldingen lopen via de meldmodus in de chat
+            naar de werkqueue. De historie blijft hier leesbaar. */}
+        <p className="mt-1 text-sm text-[var(--ink-3)]">
+          Historie van het oude feedbackformulier. Nieuwe meldingen komen binnen via de meldmodus in
+          de chat — die staan in de werkqueue, niet hier.
+        </p>
       </div>
 
       {loading ? (

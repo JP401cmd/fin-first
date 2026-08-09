@@ -125,11 +125,23 @@ export type HouseholdPathGeometry = {
   fireDot: { cx: number; cy: number } | null
 }
 
+/**
+ * De getekende marktcheck-band. **p25–p75 is sinds 2026-08-09 de zichtbare band**;
+ * p10–p90 wordt niet meer getekend (en bepaalt dus ook de Y-as niet meer).
+ *
+ * Waarom: p10–p90 op een 49-jaars decumulatie is zó breed dat de plan-lijn zelf
+ * tot ~9% van de ashoogte werd platgedrukt (gemeten: 8,7% · 10,7% · 8,7% · 22,1%
+ * over vier plannen). Op de p75-as wordt dat 19,1% · 23,2% · 19,3% · 45,4% —
+ * ruwweg een verdubbeling, en de lijn waar het plan over gaat is weer leesbaar.
+ * De veldnamen dragen daarom hun percentiel: geen `outermost`/`inner` meer die
+ * suggereren dat er nog een rand omheen zit.
+ */
 export type MonteCarloPathGeometry = {
-  outermost: string
-  outerMid: string
-  inner: string
-  innerMid: string
+  /** p25–p75 — de zichtbare band (buitenrand van wat er getekend wordt). */
+  band: string
+  /** p35–p65 — extra vulling rond de mediaan, puur voor het verloop. */
+  bandKern: string
+  /** p50 — de mediaanlijn. */
   median: string
 }
 
@@ -305,8 +317,12 @@ export function buildSimChartGeometry(input: SimChartGeometryInput): SimChartGeo
   const overlayMax = scenarioOverlays?.length
     ? Math.max(...scenarioOverlays.flatMap(o => o.points.filter(inRange).map(([, v]) => v)))
     : 0
+  // Y-as volgt de GETEKENDE band. Dat is sinds 2026-08-09 p25–p75, niet meer
+  // p90: een percentiel dat niet getekend wordt mag de schaal niet bepalen —
+  // anders drukt een onzichtbare rand de plan-lijn plat (zie
+  // `MonteCarloPathGeometry` voor de gemeten ashoogte-aandelen).
   const mcMax = monteCarloOverlay
-    ? Math.max(...monteCarloOverlay.p90.filter((_, i) => {
+    ? Math.max(...monteCarloOverlay.p75.filter((_, i) => {
         const age = monteCarloOverlay.startAge + i
         return age >= minAge && age <= maxAge
       }))
@@ -572,19 +588,17 @@ export function buildSimChartGeometry(input: SimChartGeometryInput): SimChartGeo
         return `${cmd} ${x.toFixed(1)} ${y.toFixed(1)}`
       }).filter(Boolean).join(' ')
     }
-    // Additional bands for smoother gradient effect (interpolated percentiles)
-    function interpolatePercentile(a: number[], b: number[], t: number): number[] {
+    // Eén extra tussenband voor het verloop naar de mediaan. p15/p85 (uit p10/p90)
+    // zijn vervallen: die lagen buiten de zichtbare p25–p75-band en zouden er als
+    // losse rand overheen steken.
+    function interpolatePercentile(a: readonly number[], b: readonly number[], t: number): number[] {
       return a.map((v, i) => v + (b[i] - v) * t)
     }
-    const p15 = interpolatePercentile(mc.p10, mc.p25, 0.5)
     const p35 = interpolatePercentile(mc.p25, mc.p50, 0.5)
     const p65 = interpolatePercentile(mc.p50, mc.p75, 0.5)
-    const p85 = interpolatePercentile(mc.p75, mc.p90, 0.5)
     return {
-      outermost: bandPath(mc.p90, mc.p10),       // p10-p90: lightest
-      outerMid: bandPath(p85, p15),               // p15-p85: slightly denser
-      inner: bandPath(mc.p75, mc.p25),            // p25-p75: medium
-      innerMid: bandPath(p65, p35),               // p35-p65: denser
+      band: bandPath(mc.p75, mc.p25), // p25–p75: de zichtbare band
+      bandKern: bandPath(p65, p35), // p35–p65: dichter bij de mediaan
       median: linePath(mc.p50),
     }
   })() : null

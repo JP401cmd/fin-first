@@ -4,7 +4,10 @@ import { loadCashflowData } from '@/lib/cashflow-data-loader'
 import { loadVasteLastenSummary } from '@/lib/vaste-lasten-summary'
 import { buildCashflowCards, cashflowCardStatuses } from '@/lib/cashflow-cards'
 import { CashflowStatusSeed } from '@/components/app/cashflow-status-provider'
-import { CashflowLandingCards } from '@/components/overview/cashflow-landing-cards'
+import {
+  CashflowLandingCards,
+  CashflowLandingCardsSkeleton,
+} from '@/components/overview/cashflow-landing-cards'
 import { InflationImpactCard } from '@/components/overview/inflation-impact-card'
 import { HideInSimple } from '@/components/app/hide-in-simple'
 import { Kicker } from '@/components/editorial'
@@ -75,24 +78,16 @@ export async function CashflowCardsLoader({ perspective }: { perspective: Perspe
 }
 
 /**
- * Suspense-fallback voor het kaartenblok. Reserveert de hoogte van de vier
+ * Suspense-fallback voor het kaartenblok. Reserveert de hoogte van de
  * `LeverageCard`s zodat de instroom geen layout-shift geeft (CLS ~0).
  *
- * De hoogtes zijn NAGETELD uit `components/overview/leverage-card.tsx`, niet
- * geschat — elk blok komt overeen met de line-height van de regel die het
- * vervangt (Tailwind-defaults):
- *
- *   icon-chip   w-8 h-8 / sm:w-9 sm:h-9      → h-8 w-8 / sm:h-9 sm:w-9
- *   label       text-sm (20px) / sm:text-base (24px)  → h-5 / sm:h-6
- *   kpi         text-base (24px) / sm:text-lg (28px)  → h-6 / sm:h-7
- *   substext-rij min-h-[16px]                → h-4
- *
- * plus de kaart-padding `p-3 sm:p-4` en dezelfde `rounded-2xl border`-shell.
- *
- * De KPI-regel wordt bewust WÉL gereserveerd, terwijl `LeverageCard` 'm bij
- * `kpi === null` weglaat: dat is de lege-account-staat (nog geen budget, geen
- * transacties). Reserveren kiest de veelvoorkomende kant; de lege staat krijgt
- * één keer een krimp van ~24px i.p.v. iedereen-met-data een groei.
+ * De skeleton-vorm zelf woont in `CashflowLandingCardsSkeleton` (naast de
+ * kaarten die hij nabootst) en is CLIENT: sinds CF-1/CF-2 hangt het aantal én
+ * de vorm van de kaarten van de weergavemodus af, en een fallback die altijd
+ * vier hoge tegels reserveert zou in Eenvoudig juist de layout-shift
+ * introduceren die deze reservering moet voorkomen. Alleen de sectie-wrapper
+ * blijft hier, zodat de fallback dezelfde breedte/uitlijning houdt als het
+ * echte blok.
  *
  * De INFLATIEKAART krijgt géén gereserveerde hoogte: hij verschijnt alleen boven
  * €500 baseline-uitgaven én kan client-side verborgen zijn
@@ -103,19 +98,7 @@ export async function CashflowCardsLoader({ perspective }: { perspective: Perspe
 export function CashflowCardsFallback() {
   return (
     <section aria-hidden="true" className="mx-auto max-w-6xl px-4 sm:px-6">
-      <div className="grid animate-pulse grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4">
-        {[0, 1, 2, 3].map((i) => (
-          <div
-            key={i}
-            className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-3 sm:p-4"
-          >
-            <div className="h-8 w-8 rounded-lg bg-[var(--subtle)] sm:h-9 sm:w-9" />
-            <div className="mt-2 h-5 w-20 bg-[var(--subtle)] sm:h-6" />
-            <div className="mt-0.5 h-6 w-24 bg-[var(--subtle)] sm:h-7" />
-            <div className="mt-1 h-4 w-16 bg-[var(--subtle)]" />
-          </div>
-        ))}
-      </div>
+      <CashflowLandingCardsSkeleton />
     </section>
   )
 }

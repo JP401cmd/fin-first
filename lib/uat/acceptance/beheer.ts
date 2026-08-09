@@ -358,16 +358,16 @@ const criteria: AcceptanceCriterion[] = [
   {
     workflow: 'WF-BEHEER-19',
     scenarioId: 'UAT-BEHEER-19',
-    titel: 'Gebruikersfeedback afhandelen',
+    titel: 'Feedback (archief) — historische inbox afhandelen',
     kriticiteit: 'OVERIG',
-    given: '/beheer/feedback (ingezonden feedback: bug/idee/vraag/overig).',
-    when: 'De beheerder wisselt per item de status new ↔ reviewed.',
+    given: '/beheer/feedback (nu "Feedback (archief)"): historische feedback ingezonden vóór ADR 0096 (bug/idee/vraag/overig). De inbox groeit niet meer — POST /api/feedback antwoordt sinds ADR 0096 onvoorwaardelijk met 410 Gone, dus er stromen geen nieuwe items meer binnen; nieuwe meldingen komen via de meldmodus in de chat binnen in de Notion-werkqueue (zie WILL-zone).',
+    when: 'De beheerder wisselt per bestaand archiefitem de status new ↔ reviewed.',
     then:
-      'Items krijgen de juiste status; bron is het feedback-formulier op /mijn/feedback; een lege lijst is mogelijk. Geen eigen berekening.',
+      'Items krijgen de juiste status; de lijst bevat uitsluitend historische rijen uit tabel `feedback` en is functioneel ongewijzigd — alleen kop/omschrijving zijn aangepast om het archief-karakter te benoemen. Een lege lijst is mogelijk. Geen eigen berekening.',
     assertion: {
       kind: 'ui-only',
       source:
-        'app/(app)/beheer/feedback/page.tsx; API /api/admin/feedback (GET/PATCH) — statusbeheer, geen cijfermatige uitkomst',
+        'app/(app)/beheer/feedback/page.tsx (kop "Feedback (archief)"); lib/beheer-sections.ts; API /api/admin/feedback (GET/PATCH) — statusbeheer op een niet meer groeiend archief, geen cijfermatige uitkomst',
     },
   },
   {

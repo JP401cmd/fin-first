@@ -64,6 +64,12 @@ die dit besluit opheft.
 default byte-identiek blijft aan vandaag en geen enkel bestaand scherm ruis krijgt. In `'real'`
 verschijnt hij — daar is hij noodzakelijk, want dan wijken de bedragen af van de nominale projectie.
 
+> **⚠️ ACHTERHAALD — vervangen door [ADR 0094](0094-euro-weergave-status-in-de-sidebar.md) (9 aug 2026).**
+> `EuroViewBadge` bestaat niet meer. De weergave-status hangt nu app-breed bovenaan de sidebar
+> (`SidebarEuroViewBadge`) en is in béíde standen zichtbaar — onzichtbaar-in-nominaal beantwoordde de
+> vraag "welke meetlat lees ik hier?" niet. Wat blijft: de standaardstand maakt geen herrie (neutrale
+> ink, accent alleen in `'real'`). De rest van deze ADR is ongewijzigd van kracht.
+
 **9. Geen `calculations.ts`-entry.** Dit is presentatie, geen rekenmotor. Wel deze ADR.
 
 ## Gevolgen

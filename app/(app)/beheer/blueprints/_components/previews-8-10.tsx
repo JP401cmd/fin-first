@@ -421,7 +421,10 @@ export function CalculatorPreview() {
             op — incl. waardestijging.
           </PullQuote>
 
+          {/* APP-7-opt-out: blueprint-preview — toont de primitive bewust in
+              zijn volle vorm, ongeacht de weergavemodus van de beheerder. */}
           <FiguresStrip
+            alwaysFull
             figures={[
               { kicker: 'Bruto huur', amount: '€ 206.350', sub: '10 jaar' },
               { kicker: 'Belasting', amount: '€ 70.122', sub: '70%×50%', variant: 'negative' },

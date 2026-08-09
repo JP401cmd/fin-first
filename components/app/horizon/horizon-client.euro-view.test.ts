@@ -209,6 +209,18 @@ describe('horizon-client.tsx — euro-weergave-render-grens (T4)', () => {
     expect(fieldsMatch![1]).not.toContain("'age'")
   })
 
+  it('classificeert élk SimRow-veld — de gard werkt andersom dan `satisfies`', () => {
+    // `satisfies readonly (keyof SimRow)[]` bewijst alleen dat de GENOEMDE
+    // sleutels bestaan, niet dat alle geldvelden genoemd ZIJN. Een nieuw
+    // euro-veld op SimRow zou dus ongedeflateerd de rendergrens kruisen zonder
+    // compile-fout. De dekkingsgard (`Exclude<keyof SimRow, …>` → `never`) draait
+    // dat om; deze pin zorgt dat hij niet stil weggehaald wordt.
+    const src = readFileSync(SOURCE_PATH, 'utf8')
+    expect(src).toMatch(/const SIM_ROW_NON_MONEY_FIELDS = \[/)
+    expect(src).toMatch(/type OngeclassificeerdSimRowVeld = Exclude</)
+    expect(src).toMatch(/AlleSimRowVeldenGeclassificeerd<OngeclassificeerdSimRowVeld>/)
+  })
+
   it('passeert de rekenrijen nominaal naar de fase-modals (kruis-regime, N3)', () => {
     const src = readFileSync(SOURCE_PATH, 'utf8')
     // De modals lezen `useEuroView()` zelf en deflateren per klasse; zouden ze

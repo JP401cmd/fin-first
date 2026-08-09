@@ -77,7 +77,10 @@ export function BudgetterenPreview() {
       </EditorialDeck>
 
       {/* Maandcyclus-totalen */}
+      {/* APP-7-opt-out: blueprint-preview — toont de primitive bewust in zijn
+          volle vorm, ongeacht de weergavemodus van de beheerder. */}
       <FiguresStrip
+        alwaysFull
         figures={[
           {
             kicker: 'Inkomsten',

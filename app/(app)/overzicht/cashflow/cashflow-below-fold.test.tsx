@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, act, waitFor } from '@testing-library/react'
+import { render, screen, act, waitFor, fireEvent } from '@testing-library/react'
+import { DisplayModeProvider, type DisplayMode } from '@/lib/hooks/use-display-mode'
 import { CashflowInstellingenBlokLazy } from './cashflow-below-fold'
 
 /**
@@ -19,8 +20,16 @@ import { CashflowInstellingenBlokLazy } from './cashflow-below-fold'
  */
 
 vi.mock('@/components/overview/cashflow-instellingen-blok', () => ({
-  CashflowInstellingenBlok: ({ data }: { data: { netMonthlyIncome: number } }) => (
-    <div data-testid="instellingen-blok">{data.netMonthlyIncome}</div>
+  CashflowInstellingenBlok: ({
+    data,
+    hideHeading,
+  }: {
+    data: { netMonthlyIncome: number }
+    hideHeading?: boolean
+  }) => (
+    <div data-testid="instellingen-blok" data-hide-heading={hideHeading ? 'true' : 'false'}>
+      {data.netMonthlyIncome}
+    </div>
   ),
 }))
 
@@ -156,6 +165,68 @@ describe('CashflowInstellingenBlokLazy — StrictMode (dubbele mount in dev)', (
 
     expect(await screen.findByTestId('instellingen-blok')).toHaveTextContent('4200')
     expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+})
+
+// ── CF-4 — het instellingenblok als disclosure, in Eenvoudig standaard dicht ──
+//
+// De waarde van CF-4 zit in twee dingen tegelijk: in Eenvoudig staat het blok
+// DICHT (rust op het eerste scherm) en het is er nog WEL (één klik, geen
+// hard-hide — instellingen mag je niet wegnemen). En "Volledig blijft
+// ongewijzigd" is een acceptatiecriterium, dus daar mag er geen disclosure om
+// heen komen te staan.
+
+describe('CashflowInstellingenBlokLazy — CF-4: disclosure in Eenvoudig', () => {
+  async function renderReady(mode: DisplayMode) {
+    fetchMock.mockResolvedValue(jsonOk({ netMonthlyIncome: 4200 }))
+    const result = render(
+      <DisplayModeProvider initialMode={mode}>
+        <CashflowInstellingenBlokLazy />
+      </DisplayModeProvider>,
+    )
+    await scrollIntoView()
+    await screen.findByTestId('instellingen-blok')
+    return result
+  }
+
+  it('Eenvoudig: het blok hangt in een disclosure die standaard DICHT staat', async () => {
+    const { container } = await renderReady('simple')
+
+    const section = container.querySelector('[data-testid="depth-section"]')
+    expect(section).not.toBeNull()
+    expect(section?.getAttribute('data-collapsed')).toBe('true')
+    expect(screen.getByTestId('depth-section-title')).toHaveTextContent(
+      'Instellingen & toekomst',
+    )
+  })
+
+  it('Eenvoudig: de inhoud is niet weggegooid — één klik zet de disclosure open', async () => {
+    const { container } = await renderReady('simple')
+
+    // Ingeklapt is het blok al gemount (geen hard-hide): de data staat er.
+    expect(screen.getByTestId('instellingen-blok')).toHaveTextContent('4200')
+
+    fireEvent.click(screen.getByTestId('depth-section-toggle'))
+    expect(
+      container.querySelector('[data-testid="depth-section"]')?.getAttribute('data-collapsed'),
+    ).toBe('false')
+  })
+
+  it('Eenvoudig: de disclosure draagt de kop, dus het blok onderdrukt zijn eigen kicker', async () => {
+    await renderReady('simple')
+    expect(screen.getByTestId('instellingen-blok').getAttribute('data-hide-heading')).toBe(
+      'true',
+    )
+  })
+
+  it('Volledig: geen disclosure — het blok rendert onveranderd, mét eigen kop', async () => {
+    const { container } = await renderReady('full')
+
+    expect(container.querySelector('[data-testid="depth-section"]')).toBeNull()
+    expect(screen.getByTestId('instellingen-blok')).toHaveTextContent('4200')
+    expect(screen.getByTestId('instellingen-blok').getAttribute('data-hide-heading')).toBe(
+      'false',
+    )
   })
 })
 

@@ -150,3 +150,57 @@ describe('VoorkeurenView — pot-regels zijn nu instelbaar', () => {
     expect(screen.getByText('Naar beleggingen')).toBeTruthy()
   })
 })
+
+// ── Weergavemodus: Eenvoudig vs. Volledig (audit TOE-3) ───────────────────
+
+/**
+ * TOE-3: in Eenvoudig blijven alleen de twee regels over die bepalen hoe lang
+ * je vermogen meegaat (eindstrategie + onttrekkingsstrategie). De drie
+ * pot-regels en de markt-aannames zijn Volledig-materie.
+ *
+ * De provider is hier niet optioneel: buiten een DisplayModeProvider valt
+ * useDisplayMode() terug op 'simple' (ADR 0026), waardoor een Volledig-test
+ * zonder wrapper de verkeerde tak zou keuren.
+ */
+describe('VoorkeurenView — weergavemodus (TOE-3)', () => {
+  /** Kaarten zijn div[role="button"]; GlossaryTerm-buttons tellen zo niet mee. */
+  function cardCount(container: HTMLElement): number {
+    return container.querySelectorAll('[role="button"]').length
+  }
+
+  it('Eenvoudig: alleen eindstrategie + onttrekkingsstrategie', () => {
+    const { container } = render(
+      <DisplayModeProvider initialMode="simple">
+        <VoorkeurenView {...baseProps} />
+      </DisplayModeProvider>,
+    )
+    expect(screen.getByText('Eindstrategie')).toBeTruthy()
+    expect(screen.getByText('Onttrekkingsstrategie')).toBeTruthy()
+    expect(screen.queryByText('Onttrekkingsvolgorde')).toBeNull()
+    expect(screen.queryByText('Verdeling bij toename')).toBeNull()
+    expect(screen.queryByText('Onttrekking bij afname')).toBeNull()
+    // Precies twee klikbare kaarten — markt-aannames zitten ook niet in beeld.
+    expect(cardCount(container)).toBe(2)
+    expect(screen.queryByText('Inflatie')).toBeNull()
+    expect(screen.queryByText('Bruto rendement')).toBeNull()
+  })
+
+  it('Volledig: alle vijf regels + de drie markt-aannames blijven staan', () => {
+    const { container } = render(
+      <DisplayModeProvider initialMode="full">
+        <VoorkeurenView {...baseProps} />
+      </DisplayModeProvider>,
+    )
+    for (const label of [
+      'Eindstrategie',
+      'Onttrekkingsstrategie',
+      'Onttrekkingsvolgorde',
+      'Verdeling bij toename',
+      'Onttrekking bij afname',
+    ]) {
+      expect(screen.getByText(label)).toBeTruthy()
+    }
+    // 5 regel-kaarten + inflatie + bruto rendement (effectief SWR is statisch).
+    expect(cardCount(container)).toBe(7)
+  })
+})

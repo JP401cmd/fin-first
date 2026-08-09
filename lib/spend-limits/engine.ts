@@ -93,6 +93,14 @@ export const SPEND_LIMIT_NEAR_LIMIT_PCT = 0.8
 /** Aantal afgesloten periodes per trend-blok (voortschrijdend gemiddelde). */
 export const SPEND_LIMIT_TREND_WINDOW = 3
 
+/**
+ * Onder welk procentueel verschil tussen twee trend-blokken de richting 'stable'
+ * heet — de ruisdrempel van de trend. Vaste motor-constante, net als de twee
+ * hierboven: de UI leest `direction`, nooit dit getal, zodat er geen tweede
+ * "is dit nog vlak?"-oordeel naast dat van de motor kan ontstaan.
+ */
+export const SPEND_LIMIT_TREND_STABLE_PCT = 5
+
 /** De regel zoals de rekenmotor 'm nodig heeft (subset van de DB-rij). */
 export interface SpendLimitRule {
   ruleType: SpendLimitRuleType
@@ -359,6 +367,33 @@ function isCountable(row: SpendLimitAggregateRow): boolean {
 }
 
 /**
+ * Netto uitgave uit een paar aggregaat-sommen — de ENIGE plek waar het teken en
+ * de nul-normalisatie van het grens-rekenwerk staan.
+ *
+ * `sumNegatief ≤ 0`, `sumPositief ≥ 0` → netto uitgave = −(beide opgeteld). Een
+ * refund of chargeback op dezelfde grens verlaagt het bedrag dus.
+ *
+ * De `Object.is`-normalisatie is geen kosmetiek: in IEEE-754 levert −(0 + 0) een
+ * NEGATIEVE nul op, en dat is precies wat een lege periode oplevert. Die zou als
+ * "−€ 0" op het scherm belanden en maakt elke `Object.is`-vergelijking
+ * stroomafwaarts verrassend. Alleen −0 wordt omgezet; NaN blijft NaN, zodat een
+ * echte rekenfout zichtbaar blijft in plaats van als 0 te worden gepoetst.
+ *
+ * Waarom geëxporteerd: de motor, de loader (`lib/spend-limits/loader.ts`) en de
+ * breakdown-route lezen dezelfde aggregaten in drie verschillende RIJVORMEN. De
+ * vormen laten zich niet samenvouwen, de REGEL wel — en die stond eerder drie
+ * keer letterlijk overgeschreven met een comment "identiek aan de motor".
+ * Accepteert `string` omdat Postgres numerieke sommen als string teruggeeft.
+ */
+export function netSpendFromSums(
+  sumNegatief: number | string,
+  sumPositief: number | string,
+): number {
+  const raw = -(Number(sumNegatief) + Number(sumPositief))
+  return Object.is(raw, -0) ? 0 : raw
+}
+
+/**
  * Bereken de uitkomst van één periode uit de aggregaat-rijen die eraan toebehoren.
  *
  * `periodMatchedAmount` is NETTO: |uitgaven| − ontvangsten. Een refund of
@@ -389,15 +424,7 @@ export function computePeriodOutcome(
     for (const n of row.matchedNames ?? []) if (n) names.add(n)
   }
 
-  // sumNegatief ≤ 0, sumPositief ≥ 0 → netto uitgave = −(beide opgeteld).
-  //
-  // De `Object.is`-normalisatie is geen kosmetiek: in IEEE-754 levert −(0 + 0)
-  // een NEGATIEVE nul op, en dat is precies wat een lege periode oplevert. Die
-  // zou als "−€ 0" op het scherm belanden en maakt elke `Object.is`-vergelijking
-  // stroomafwaarts verrassend. Alleen −0 wordt omgezet; NaN blijft NaN, zodat
-  // een echte rekenfout zichtbaar blijft in plaats van als 0 te worden gepoetst.
-  const rawMatched = -(sumNegatief + sumPositief)
-  const periodMatchedAmount = Object.is(rawMatched, -0) ? 0 : rawMatched
+  const periodMatchedAmount = netSpendFromSums(sumNegatief, sumPositief)
   const status: SpendLimitStatus = periodMatchedAmount > limitAmount ? 'exceeded' : 'within'
 
   return {
@@ -597,7 +624,7 @@ export function computeSpendLimitTrend(
 
   const changePct = (change / Math.abs(priorAvgMatchedAmount)) * 100
   const direction: SpendLimitTrendDirection =
-    Math.abs(changePct) < 5 ? 'stable' : change > 0 ? 'worsening' : 'improving'
+    Math.abs(changePct) < SPEND_LIMIT_TREND_STABLE_PCT ? 'stable' : change > 0 ? 'worsening' : 'improving'
 
   return {
     ...base,

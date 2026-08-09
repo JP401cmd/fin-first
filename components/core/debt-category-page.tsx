@@ -450,11 +450,18 @@ export function DebtCategoryPage({
       <DebtCategoryHero type={type} total={total} count={count} />
 
       <div className="px-4 sm:px-6">
+        {/* BEZ-4 geldt óók hier. De audit noemt de hypotheekplanner bij de
+            bezittingen, maar diezelfde verdieping hangt als tab aan de
+            schulden-categorie `mortgage`. Zonder deze regel zou de tab in
+            Eenvoudig verdwijnen op /overzicht/bezittingen/eigen_huis en blijven
+            staan op /overzicht/schulden/mortgage — dezelfde app, twee
+            antwoorden. Deeplinks blijven werken (zie CategoryTabs). */}
         <CategoryTabs
           tabs={tabs}
           activeKey={activeTabKey}
           onChange={handleTabChange}
           className="mt-4"
+          simpleBaseTabKey={ITEMS_TAB_KEY}
         />
 
         <div

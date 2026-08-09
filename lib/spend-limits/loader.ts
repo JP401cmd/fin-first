@@ -48,6 +48,7 @@ import { recentDailyExpenseRateFromRows } from '@/lib/expense-rate'
 import {
   SPEND_LIMIT_WINDOW_BY_PERIOD,
   buildSpendLimitReport,
+  netSpendFromSums,
   resolveSpendLimitPeriods,
   sliceContainsMonth,
   type SpendLimitAggregateRow,
@@ -565,13 +566,13 @@ function buildBudgetSplit(
       }
       byKey.set(key, entry)
     }
-    // Netto uitgave = −(negatieve som + positieve som), identiek aan de motor.
-    entry.matchedAmount += -(Number(r.sum_negatief) + Number(r.sum_positief))
+    // Netto uitgave: de motorregel, niet een kopie ervan.
+    entry.matchedAmount += netSpendFromSums(r.sum_negatief, r.sum_positief)
     entry.matchedTransactionCount += Number(r.count)
   }
 
-  return [...byKey.values()].map((e) => ({
-    ...e,
-    matchedAmount: Object.is(e.matchedAmount, -0) ? 0 : e.matchedAmount,
-  }))
+  // Geen tweede −0-normalisatie op de som: elke term komt genormaliseerd binnen
+  // en `entry.matchedAmount` start op +0 — in IEEE-754 is een som alleen −0 als
+  // álle termen −0 zijn, en dat kan hier per constructie niet meer.
+  return [...byKey.values()]
 }

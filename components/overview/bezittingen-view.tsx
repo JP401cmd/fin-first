@@ -17,6 +17,12 @@ import type { AssetsPageData } from '@/lib/assets-data-loader'
  * hun drempel-logica op de page-server gebeurt; de filter-state mag die
  * niet beïnvloeden — een gebruiker die op "Cash" filtert moet de
  * fee-impact-tip nog steeds zien als hij €25k+ belegd heeft.
+ *
+ * De filter komt als render-functie mee zodat `<AssetsPage>` z'n LIVE
+ * bezittingen-telling kan doorgeven (BEZ-2-drempel). Die telling herladen we
+ * hier bewust niet zelf: `AssetsPage` is de enige plek die de lijst na een
+ * perspectief-wissel of CRUD ververst — een eigen telling uit `initialData`
+ * zou daar stil van weg driften.
  */
 interface BezittingenViewProps {
   initialData?: AssetsPageData
@@ -29,7 +35,9 @@ export function BezittingenView({ initialData, inspirationCards }: BezittingenVi
   return (
     <AssetsPage
       initialData={initialData}
-      toolbarFilter={<BezittingenFilter value={filter} onChange={setFilter} />}
+      toolbarFilter={({ assetCount }: { assetCount: number }) => (
+        <BezittingenFilter value={filter} onChange={setFilter} assetCount={assetCount} />
+      )}
       inspirationCards={inspirationCards}
       assetTypeFilter={filter}
       // De page-shell (`overzicht/bezittingen/page.tsx`) rendert de i +

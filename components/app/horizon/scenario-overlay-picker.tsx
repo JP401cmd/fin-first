@@ -85,7 +85,7 @@ export function ScenarioOverlayPicker({
           </span>
         )}
         <Layers size={12} className={hasActive ? 'text-horizon-600' : 'text-[var(--ink-4)]'} />
-        <span className="hidden sm:inline max-w-[100px] truncate">
+        <span data-pill-label className="hidden sm:inline max-w-[100px] truncate">
           {hasActive ? `${activeCount} overlay${activeCount > 1 ? 's' : ''}` : 'Overlays'}
         </span>
         <ChevronDown

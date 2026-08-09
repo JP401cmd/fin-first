@@ -13,6 +13,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, cleanup, act } from '@testing-library/react'
 import { WelcomeGuideBanner } from './welcome-guide-banner'
 import { DEFAULT_WELCOME_GUIDE, DEFAULT_WELCOME_GUIDE_STATE } from '@/lib/welcome-guide'
+import { DisplayModeProvider, type DisplayMode } from '@/lib/hooks/use-display-mode'
 
 const SESSION_CLOSED_KEY = 'welcome_guide_closed'
 
@@ -112,5 +113,57 @@ describe('WelcomeGuideBanner', () => {
     })
     expect(screen.queryByText('Welkom bij TriFinity')).not.toBeInTheDocument()
     expect(fn).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * APP-6 (gids comprimeren in Eenvoudig) + APP-2 (de gids noemt de weergave-
+ * keuze). De seed-route wordt gebruikt zodat er geen fetch aan te pas komt.
+ */
+describe('WelcomeGuideBanner — weergavemodus', () => {
+  afterEach(() => {
+    cleanup()
+    vi.unstubAllGlobals()
+  })
+
+  function renderSeeded(mode: DisplayMode) {
+    vi.stubGlobal('fetch', vi.fn())
+    return render(
+      <DisplayModeProvider initialMode={mode}>
+        <WelcomeGuideBanner
+          seed={{ config: DEFAULT_WELCOME_GUIDE, state: DEFAULT_WELCOME_GUIDE_STATE }}
+        />
+      </DisplayModeProvider>,
+    )
+  }
+
+  it('Eenvoudig: geen "Scherm N van M"-teller en geen stapomschrijvingen', async () => {
+    renderSeeded('simple')
+    expect(await screen.findByText('Zijn al je bezittingen geregistreerd?')).toBeInTheDocument()
+    expect(screen.queryByText(/Scherm 1 van/)).not.toBeInTheDocument()
+    expect(
+      screen.queryByText('Zoals eigen huis, cash rekeningen en aandelen.'),
+    ).not.toBeInTheDocument()
+  })
+
+  it('Volledig: teller én stapomschrijvingen blijven staan', async () => {
+    renderSeeded('full')
+    expect(await screen.findByText('Zijn al je bezittingen geregistreerd?')).toBeInTheDocument()
+    expect(screen.getByText(/Scherm 1 van/)).toBeInTheDocument()
+    expect(screen.getByText('Zoals eigen huis, cash rekeningen en aandelen.')).toBeInTheDocument()
+  })
+
+  it('noemt de weergavekeuze en linkt naar /mijn/uiterlijk — in beide modi', async () => {
+    for (const [mode, zin] of [
+      ['simple', /Je kijkt in de eenvoudige weergave/],
+      ['full', /Je kijkt in de volledige weergave/],
+    ] as const) {
+      const { unmount } = renderSeeded(mode)
+      expect(await screen.findByText('Zijn al je bezittingen geregistreerd?')).toBeInTheDocument()
+      expect(screen.getByText(zin, { exact: false })).toBeInTheDocument()
+      const link = screen.getByRole('link', { name: 'Mijn → Uiterlijk' })
+      expect(link.getAttribute('href')).toBe('/mijn/uiterlijk')
+      unmount()
+    }
   })
 })

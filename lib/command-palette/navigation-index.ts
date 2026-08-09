@@ -90,7 +90,10 @@ const GLOBAL_PAGES: StaticPage[] = [
   { label: 'Berichten',                 sublabel: 'Al je meldingen op één plek',        href: '/berichten',                             icon: Bell,        module: 'globaal' },
   { label: 'Nieuws',                    sublabel: 'Financieel marktnieuws',             href: '/nieuws',                                icon: Newspaper,   module: 'globaal',  requiredModule: 'nieuws' },
   { label: 'Rapportages',               sublabel: 'Maand- / kwartaal- / jaarrapport',   href: '/rapportages',                           icon: FileText,    module: 'globaal' },
-  { label: 'Feedback',                  sublabel: 'Bug, idee of vraag insturen',        href: '/mijn/feedback',                         icon: MessageSquare, module: 'globaal' },
+  // ADR 0096: het formulier is weg — deze route is een verwijspagina naar de
+  // meldmodus in de chat. Sublabel benoemt dat, zodat ⌘K geen inzendformulier
+  // meer belooft dat er niet is.
+  { label: 'Melden',                    sublabel: 'Melden gaat via je gesprek met Fin', href: '/mijn/feedback',                         icon: MessageSquare, module: 'globaal' },
   { label: 'FIRE-simulatie',            sublabel: 'Standalone tool met sliders',        href: '/tools/fire-sim',                        icon: Calculator,  module: 'globaal' },
 ]
 

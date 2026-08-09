@@ -5,7 +5,8 @@
  *  - `runKernelAsync(rawContext)`   → hoofd- én scenario-projectie
  *  - `runForcedStopPathAsync(input)`→ het gekozen-stop-pad
  *  - `runScenarioPresetsAsync(ctx)` → de vijf preset-kaarten (~5 solves)
- *  - `runMonteCarloAsync(...)`      → Monte-Carlo (radar + volledige overlay)
+ *  - `runMarktcheckAsync(ctx)`      → kernel-marktcheck (percentielband /toekomst)
+ *  - `runMonteCarloAsync(...)`      → losstaande legacy-MC (fase-modals/radar)
  *
  * ## Twee paden — worker of synchrone fallback
  *  - **Browser met `Worker`**: één lazy-gecreëerde `module`-worker
@@ -31,6 +32,8 @@ import type {
   ConvergentieRawContext,
   ConvergentieProjectionOutcome,
 } from '@/lib/horizon-kernel/convergentie-router'
+import type { WhatifRawContext } from '@/lib/horizon-kernel/whatif-router'
+import type { MarktcheckOutcome } from '@/lib/horizon-kernel/marktcheck'
 import type {
   ForcedStopPathInput,
   ForcedStopPathResult,
@@ -105,22 +108,42 @@ function getWorker(): Worker | null {
 }
 
 /**
+ * Antwoord wanneer `workerOnly` geldt en er geen bruikbare worker is. Bewust een
+ * gewone `ok:false`-response zodat de aanroepers hun bestaande uitpak-tak volgen
+ * (die levert dan `null`) — geen throw, geen stille main-thread-run.
+ */
+function geenWorkerResponse(id: number): KernelWorkerResponse {
+  return { id, ok: false, error: 'kernel-worker niet beschikbaar' }
+}
+
+/**
  * Dispatch één verzoek: via de worker wanneer beschikbaar, anders synchroon.
  * Bij een worker-fout valt deze aanroep alsnog terug op de synchrone runner,
  * zodat een kapotte worker de projectie hooguit trager maakt, nooit stuk.
+ *
+ * `workerOnly` schakelt die terugval UIT. Nodig voor runs die te zwaar zijn om
+ * ooit op de main thread te belanden (de marktcheck: tot 200 volledige
+ * kernel-projecties, 2,6–5,1 s). Let op dat `workerBroken` sticky is voor de hele
+ * sessie: zonder deze vlag zou één eerdere worker-fout élke volgende marktcheck
+ * in een meerdere-seconden-freeze veranderen.
  */
-function dispatch(req: KernelWorkerRequest): Promise<KernelWorkerResponse> {
+function dispatch(
+  req: KernelWorkerRequest,
+  opts?: { workerOnly?: boolean },
+): Promise<KernelWorkerResponse> {
+  const workerOnly = opts?.workerOnly === true
   const worker = isKernelWorkerAvailable() ? getWorker() : null
   if (!worker) {
-    // Synchrone fallback (test/SSR/oude runtime/kapotte worker).
-    return Promise.resolve(executeKernelRequest(req))
+    // Synchrone fallback (test/SSR/oude runtime/kapotte worker) — tenzij de
+    // aanroeper die expliciet verbiedt.
+    return Promise.resolve(workerOnly ? geenWorkerResponse(req.id) : executeKernelRequest(req))
   }
   return new Promise<KernelWorkerResponse>((resolve) => {
     pending.set(req.id, {
       resolve,
       reject: () => {
         // Worker onderweg gesneuveld → val terug op de synchrone runner.
-        resolve(executeKernelRequest(req))
+        resolve(workerOnly ? geenWorkerResponse(req.id) : executeKernelRequest(req))
       },
     })
     try {
@@ -131,7 +154,7 @@ function dispatch(req: KernelWorkerRequest): Promise<KernelWorkerResponse> {
         console.warn('[horizon-worker] worker faalde — synchrone fallback actief', err)
       }
       pending.delete(req.id)
-      resolve(executeKernelRequest(req))
+      resolve(workerOnly ? geenWorkerResponse(req.id) : executeKernelRequest(req))
     }
   })
 }
@@ -188,6 +211,43 @@ export async function runVariantenSweepAsync(
 ): Promise<VariantenSweepResultaat | null> {
   const res = await dispatch({ id: claimId(), kind: 'taxvarianten', snapshot })
   if (res.ok && res.kind === 'taxvarianten') return res.result
+  return null
+}
+
+/**
+ * Marktcheck (kernel-Monte-Carlo, percentielband) — **uitsluitend** in de worker.
+ *
+ * `null` zodra er geen bruikbare worker is (jsdom/SSR/oude runtime/kapotte
+ * worker) of bij een onverwachte response-vorm. Dat is een harde garantie, geen
+ * voornemen: `workerOnly` schakelt de synchrone terugval in `dispatch` uit. Dit
+ * zijn tot `MARKTCHECK_MAX_RUNS` VOLLEDIGE kernel-projecties (gemeten 13–25 ms
+ * per run, samen 2,6–5,1 s); die horen nooit op de main thread. De overlay zit
+ * achter een expliciete pil-klik en het oppervlak handelt "geen band" al af.
+ */
+export async function runMarktcheckAsync(
+  rawContext: ConvergentieRawContext,
+  maxRuns?: number,
+  stopAge?: number | null,
+): Promise<MarktcheckOutcome | null> {
+  const res = await dispatch(
+    { id: claimId(), kind: 'marktcheck', rawContext, maxRuns, stopAge },
+    { workerOnly: true },
+  )
+  if (res.ok && res.kind === 'marktcheck') return res.result
+  return null
+}
+
+/** Dezelfde marktcheck op de what-if-context (mét rendement-slider), ook worker-only. */
+export async function runWhatifMarktcheckAsync(
+  rawContext: WhatifRawContext,
+  maxRuns?: number,
+  stopAge?: number | null,
+): Promise<MarktcheckOutcome | null> {
+  const res = await dispatch(
+    { id: claimId(), kind: 'whatif-marktcheck', rawContext, maxRuns, stopAge },
+    { workerOnly: true },
+  )
+  if (res.ok && res.kind === 'whatif-marktcheck') return res.result
   return null
 }
 

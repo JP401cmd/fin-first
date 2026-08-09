@@ -24,7 +24,7 @@ import { Box1EigenWoning } from '@/components/overview/belasting/box1-eigen-woni
 import { getServerPerspective } from '@/lib/household/server-perspective'
 import { loadPerspectiveTransactions } from '@/lib/household/perspective-loader'
 import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
-import { Kicker, SectionLabel, FiguresStrip, OrnamentColophon } from '@/components/editorial'
+import { Kicker, SectionLabel, FiguresStrip, OrnamentColophon, type FigureProps } from '@/components/editorial'
 import { Reveal } from '@/components/landing/reveal'
 import { HideInSimple } from '@/components/app/hide-in-simple'
 
@@ -311,6 +311,38 @@ function Box1DrukHero({
     dailyExpenses > 0
       ? formatFreedomTimeString(calculateFreedomTime(result.tax, dailyExpenses))
       : null
+  // Vier kerncijfers van de Box 1-motor — één bron, hieronder zowel voor de
+  // volledige strip als voor de Eenvoudig-selectie gebruikt (geen duplicaat).
+  const figures: FigureProps[] = [
+    {
+      kicker: 'Geschat bruto',
+      amount: (
+        <Box1GrossIncomeEditor
+          grossYearly={income.grossYearly}
+          estimateGross={income.estimateGross}
+          estimateNetYearly={income.estimateNetYearly}
+          isManual={income.isManual}
+        />
+      ),
+      sub: income.isManual ? 'handmatig · per jaar' : 'geschat · tik om te wijzigen',
+    },
+    {
+      kicker: 'Effectief tarief',
+      amount: `${(result.effectiveRate * 100).toFixed(1)}%`,
+      sub: 'over je inkomen',
+    },
+    {
+      kicker: 'Marginaal tarief',
+      amount: `${(result.marginalRate * 100).toFixed(1)}%`,
+      sub: 'op je laatste euro',
+    },
+    {
+      kicker: 'Netto besteedbaar',
+      amount: formatCurrency(Math.round(result.nettoBesteedbaar)),
+      sub: 'wat je overhoudt',
+      variant: 'winner',
+    },
+  ]
   // K-01a: zelfde kerncijfer-kaart-behandeling als Box2Detail/Box3Detail
   // (ink-border + 3px module-accent-strip + kerncijfer op 34/44px). Zo openen
   // de drie boxpagina's onder de gedeelde BelastingBoxPageHeader visueel als
@@ -341,37 +373,13 @@ function Box1DrukHero({
         </div>
       )}
 
+      {/* BEL-4 / APP-7: in Eenvoudig blijven de twee cijfers staan die de vraag
+          "wat kost het en wat houd ik over" beantwoorden — effectief tarief +
+          netto besteedbaar. "Geschat bruto" (invoer/bewerkbaar) en het
+          marginale tarief zijn expert-diepte en blijven Volledig. */}
       <FiguresStrip
-        figures={[
-          {
-            kicker: 'Geschat bruto',
-            amount: (
-              <Box1GrossIncomeEditor
-                grossYearly={income.grossYearly}
-                estimateGross={income.estimateGross}
-                estimateNetYearly={income.estimateNetYearly}
-                isManual={income.isManual}
-              />
-            ),
-            sub: income.isManual ? 'handmatig · per jaar' : 'geschat · tik om te wijzigen',
-          },
-          {
-            kicker: 'Effectief tarief',
-            amount: `${(result.effectiveRate * 100).toFixed(1)}%`,
-            sub: 'over je inkomen',
-          },
-          {
-            kicker: 'Marginaal tarief',
-            amount: `${(result.marginalRate * 100).toFixed(1)}%`,
-            sub: 'op je laatste euro',
-          },
-          {
-            kicker: 'Netto besteedbaar',
-            amount: formatCurrency(Math.round(result.nettoBesteedbaar)),
-            sub: 'wat je overhoudt',
-            variant: 'winner',
-          },
-        ]}
+        figures={figures}
+        simpleFigures={[figures[1], figures[3]]}
       />
 
       <p

@@ -26,7 +26,15 @@ import type { LifeEvent } from '@/lib/horizon-data'
 import type { AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import type { TaxYear } from '@/lib/box3-data'
 import { runKernelUnified } from '@/lib/horizon-kernel/run-unified'
-import type { KernelAdapterInput, KernelAdapterProfile } from '@/lib/horizon-kernel/adapter'
+import {
+  buildKernelInputFromAppWithNotices,
+  type KernelAdapterInput,
+  type KernelAdapterProfile,
+} from '@/lib/horizon-kernel/adapter'
+import {
+  runMarktcheckOnKernelInput,
+  type MarktcheckOutcome,
+} from '@/lib/horizon-kernel/marktcheck'
 import type {
   KernelHousingSale,
   KernelUnifiedResult,
@@ -166,6 +174,51 @@ export function computeConvergentieProjection(
   } catch (err) {
     // Een kern-fout (bv. ontbrekende geboortedatum) mag het oppervlak nooit laten
     // crashen → expliciete fout met reden; de surface toont zijn lege/fout-staat.
+    const message = err instanceof Error ? err.message : 'onbekende kernel-fout'
+    return { ok: false, reason: message }
+  }
+}
+
+// ── Marktcheck (Monte Carlo op dezelfde context als de hoofdprojectie) ────────
+
+/**
+ * De **marktcheck** voor /toekomst: draai het plan `n` keer opnieuw met verstoorde
+ * rendementen en lever de percentielband per leeftijd, plus de rendement-marge
+ * (hoeveel het rendement mag tegenvallen voordat het plan omvalt, getoetst op de
+ * gekozen stopleeftijd — `rendement-marge.ts`).
+ *
+ * Consumeert EXACT dezelfde `ConvergentieRawContext` als `computeConvergentieProjection`
+ * en bouwt de kernel-invoer via dezelfde adapter — band en hoofdlijn komen dus
+ * gegarandeerd van hetzelfde plan, op dezelfde leeftijdsas en dezelfde grondslag
+ * (netto vermogen, Prognose!I). De begrenzing en de uitkomstvorm leven in
+ * `marktcheck.ts`, gedeeld met de what-if-router.
+ */
+export function computeMarktcheck(params: {
+  readonly rawContext: ConvergentieRawContext
+  /** Optionele extra begrenzing; effectief is altijd ≤ `MARKTCHECK_MAX_RUNS`. */
+  readonly maxRuns?: number
+  /**
+   * De gekozen stopleeftijd van het oppervlak — het anker van de rendement-marge.
+   * Ontbreekt hij, dan valt de marge terug op de AOW-leeftijd. Raakt de band niet.
+   */
+  readonly stopAge?: number | null
+}): MarktcheckOutcome {
+  const { rawContext } = params
+  try {
+    const adapterInput: KernelAdapterInput = {
+      profile: buildConvergentieAdapterProfile(rawContext.profile),
+      assets: rawContext.assets,
+      debts: rawContext.debts,
+      lifeEvents: rawContext.lifeEvents,
+      aowRows: rawContext.aowRows,
+      taxYear: rawContext.taxYear,
+    }
+    const { input } = buildKernelInputFromAppWithNotices(adapterInput)
+    return runMarktcheckOnKernelInput(input, {
+      maxRuns: params.maxRuns,
+      stopAge: params.stopAge,
+    })
+  } catch (err) {
     const message = err instanceof Error ? err.message : 'onbekende kernel-fout'
     return { ok: false, reason: message }
   }
