@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/janpa/.claude/**)",
+      "Read(//c/Users/janpa/cd/Trifinity/fin-first/.claude/**)",
+      "Read(//c/Users/janpa/cd/Trifinity/fin-first/.claude/commands/**)",
+      "Read(//c/Users/janpa/cd/Trifinity/fin-first/.claude/skills/**)",
+      "Bash(python -c ' *)",
+      "Bash(node -e ' *)",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(node -e \"console.log\\(require.resolve\\('vitest'\\)\\)\")",
+      "Bash(git check-ignore *)",
+      "Bash(echo \"exit=$?\")"
+    ]
+  }
+}
