@@ -39,10 +39,28 @@ import type { KernelInput } from './types'
  * fixtures), dus dit is een PRESTATIE-, geen rekengrens — en de reden dat elke
  * marktcheck verplicht in de web worker draait. Gelijk aan de Excel-parity-default
  * `EXCEL_ONZEKERHEID_DEFAULTS.mcAantalRuns` en aan `TOTAALPLAN_MC_RUNS`, zodat de
- * overlays en het totaalplan-rapport op hetzelfde aantal marktverlopen dezelfde
- * kans rapporteren.
+ * overlays en het totaalplan-rapport op hetzelfde aantal marktverlopen rekenen.
+ *
+ * LET OP — géén gedeelde METRIEK: de overlays tonen sinds 2026-08-09 de
+ * rendement-marge en géén kans meer, terwijl het totaalplan-rapport nog
+ * `successProbability` als "slagingskans" toont. Zie de note bij calc
+ * `marktcheck-band` in `lib/architecture/calculations.ts`.
  */
 export const MARKTCHECK_MAX_RUNS = 200
+
+/**
+ * Wachttijd vóór een marktcheck de worker in gaat. Ruim onder de duur van één
+ * run (2,6–5,1 s) maar lang genoeg om de tussenstanden van een gebaar op te
+ * slokken (een marker-drag op /toekomst, de rendement-slider op /toekomst/whatif),
+ * zodat er nooit meer dan één job per gebaar in de seriële worker-wachtrij
+ * belandt.
+ *
+ * Woont hier en niet in een component: **beide** marktcheck-surfaces moeten
+ * dezelfde rem hebben. Stond deze constante in de component-body van
+ * `horizon-client.tsx`, dan kon de zustersurface hem niet lezen — en precies dat
+ * liet de what-if-slider ongeremd jobs versturen.
+ */
+export const MARKTCHECK_DEBOUNCE_MS = 400
 
 /**
  * Schaal `MC!B3` van JAARvolatiliteit naar de onzekerheid in het GEMIDDELDE

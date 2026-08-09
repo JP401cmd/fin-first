@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-09T14:58:12.825Z",
+  "generatedAt": "2026-08-09T17:37:37.726Z",
   "generatedDate": "2026-08-09",
   "repo": {
     "name": "fin",
@@ -16010,7 +16010,7 @@
       },
       {
         "path": "lib/horizon-data.ts",
-        "commits": 10
+        "commits": 9
       },
       {
         "path": "lib/fire-simulation.ts",
@@ -16028,8 +16028,8 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 9112,
-        "commits": 93
+        "loc": 9105,
+        "commits": 92
       },
       {
         "file": "components/app/budgets-client.tsx",
@@ -17157,17 +17157,9 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-08-08",
-    "hasChanges": true,
-    "sections": [
-      {
-        "label": "Componenten (aantal)",
-        "added": [
-          "+12"
-        ],
-        "removed": []
-      }
-    ]
+    "previousDate": "2026-08-09",
+    "hasChanges": false,
+    "sections": []
   },
   "statsHistory": [
     {

@@ -24,7 +24,7 @@ import {
   type CatalogField,
   type UserDefinedCashflow,
 } from '@/lib/horizon-data'
-import type { MarktcheckOutcome } from '@/lib/horizon-kernel/marktcheck'
+import { MARKTCHECK_DEBOUNCE_MS, type MarktcheckOutcome } from '@/lib/horizon-kernel/marktcheck'
 import {
   margeAnkerKort,
   margeKort,
@@ -532,13 +532,6 @@ export default function HorizonPage({
   const [mcFailed, setMcFailed] = useState(false)
   /** Monotone generatie: alleen het antwoord van de NIEUWSTE aanvraag telt. */
   const marktcheckGenRef = useRef(0)
-  /**
-   * Wachttijd vóór een marktcheck de worker in gaat. Ruim onder de duur van één
-   * run (2,6–5,1 s) maar lang genoeg om de tussenstanden van een marker-drag
-   * (`setEvents` per hele jaarstap) op te slokken, zodat er nooit meer dan één
-   * job per gebaar in de seriële worker-wachtrij belandt.
-   */
-  const MARKTCHECK_DEBOUNCE_MS = 400
   // Scenario's-naast-elkaar (5 preset-kaarten) — deferred doorgerekend op de BASIS-grondslag.
   const [scenarioPresets, setScenarioPresets] = useState<ScenarioPresetResult[] | null>(null)
   const [scenarioPresetsLoading, setScenarioPresetsLoading] = useState(false)

@@ -600,16 +600,18 @@ export const SimChart = memo(function SimChart({
         if (hoveredRow.oneTimeNet < 0) drukkers.push({ label: 'Eenmalig', value: Math.abs(hoveredRow.oneTimeNet) })
         if (hoveredRow.growth < 0) drukkers.push({ label: 'Rendement', value: Math.abs(hoveredRow.growth) })
 
-        // Monte Carlo percentile values at hovered age
+        // Monte Carlo percentile values at hovered age.
+        // ALLEEN de getekende band: p25–p75 (+ de mediaan). p10/p90 worden sinds
+        // 2026-08-09 niet meer getekend en bepalen ook de Y-as niet meer (zie
+        // lib/horizon/sim-chart-geometry.ts) — ze hier tóch tonen gaf een bedrag
+        // ver boven de hoogste lijn op het scherm.
         const mcPercentiles = monteCarloOverlay ? (() => {
           const idx = hoveredAge - monteCarloOverlay.startAge
           if (idx < 0 || idx >= monteCarloOverlay.p50.length) return null
           return {
-            p10: monteCarloOverlay.p10[idx],
             p25: monteCarloOverlay.p25[idx],
             p50: monteCarloOverlay.p50[idx],
             p75: monteCarloOverlay.p75[idx],
-            p90: monteCarloOverlay.p90[idx],
           }
         })() : null
 
@@ -700,11 +702,9 @@ export const SimChart = memo(function SimChart({
                     MONTE CARLO
                   </div>
                   {([
-                    { label: 'p90', value: mcPercentiles.p90, opacity: 0.5 },
                     { label: 'p75', value: mcPercentiles.p75, opacity: 0.65 },
                     { label: 'p50', value: mcPercentiles.p50, opacity: 1 },
                     { label: 'p25', value: mcPercentiles.p25, opacity: 0.65 },
-                    { label: 'p10', value: mcPercentiles.p10, opacity: 0.5 },
                   ] as const).map(p => (
                     <div key={p.label} className="flex items-baseline justify-between mt-0.5" style={{ fontSize: 9, opacity: p.opacity }}>
                       <span style={{ color: p.label === 'p50' ? 'var(--color-horizon-300, #d4b88a)' : 'var(--ink-4, #bbb8b0)' }}>

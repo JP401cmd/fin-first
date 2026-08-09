@@ -49,7 +49,7 @@ import {
 import { buildHorizonInput } from '@/lib/horizon/build-input'
 import { type LifeEvent } from '@/lib/horizon-data'
 import { computeWhatifProjection, type WhatifRawContext } from '@/lib/horizon-kernel/whatif-router'
-import type { MarktcheckOutcome } from '@/lib/horizon-kernel/marktcheck'
+import { MARKTCHECK_DEBOUNCE_MS, type MarktcheckOutcome } from '@/lib/horizon-kernel/marktcheck'
 import { runWhatifMarktcheckAsync } from '@/lib/horizon-kernel/worker/run-in-worker'
 import type { WhatifRawProfileRow } from '@/lib/horizon-kernel/adapter/whatif-varianten'
 import { WITHDRAWAL_DEFAULTS, resolveWithdrawalStrategy, type WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
@@ -828,13 +828,36 @@ export default function WhatIfPage() {
     }
   }, [mcEnabled, deferredWhatIfSimInput])
 
+  // Dezelfde drie remmen als de zustersurface (`horizon-client.tsx`) — de
+  // rendement-slider hiernaast maakt ze hier zo mogelijk nóg harder nodig:
+  //  1. STALE-CLEAR — tijdens het herrekenen NOOIT de vorige band laten staan.
+  //     Die hoort bij het vorige plan en zou seconden lang over de al
+  //     bijgewerkte hoofdlijn liggen: precies de "band en lijn zijn
+  //     verschillende plannen"-fout die deze motor opruimt.
+  //  2. DEBOUNCE — een `cancelled`-closure negeert alleen het ANTWOORD; de
+  //     seriële worker rekent een eenmaal verstuurde job volledig uit. Zonder
+  //     rem zet elke gecommitte sliderstand een verse job van 200 projecties in
+  //     dezelfde wachtrij die ook de what-if-hoofdprojectie bedient.
+  //  3. GENERATIE-GUARD — alleen het antwoord van de nieuwste aanvraag mag nog
+  //     state schrijven.
+  const marktcheckGenRef = useRef(0)
   useEffect(() => {
-    if (!marktcheckContext) { setMcResult(null); return }
-    let cancelled = false
-    runWhatifMarktcheckAsync(marktcheckContext)
-      .then((res) => { if (!cancelled) setMcResult(res !== null && res.ok ? res : null) })
-      .catch((err) => console.warn('[horizon-worker] what-if-marktcheck faalde', err))
-    return () => { cancelled = true }
+    if (!marktcheckContext) {
+      marktcheckGenRef.current += 1
+      setMcResult(null)
+      return
+    }
+    const gen = ++marktcheckGenRef.current
+    setMcResult(null)
+    const timer = setTimeout(() => {
+      runWhatifMarktcheckAsync(marktcheckContext)
+        .then((res) => {
+          if (gen !== marktcheckGenRef.current) return
+          setMcResult(res !== null && res.ok ? res : null)
+        })
+        .catch((err) => console.warn('[horizon-worker] what-if-marktcheck faalde', err))
+    }, MARKTCHECK_DEBOUNCE_MS)
+    return () => clearTimeout(timer)
   }, [marktcheckContext])
 
   const monteCarloOverlay = useMemo<MonteCarloOverlay | undefined>(() => {

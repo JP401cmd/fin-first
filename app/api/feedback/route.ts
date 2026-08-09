@@ -14,9 +14,12 @@ import { gone } from '@/lib/api/respond'
  * in de AVG-export via `lib/user-data-tables.ts` en heeft geen eigen-rij
  * DELETE-policy).
  *
- * Er wordt hier bewust NIETS meer gelezen of geschreven — ook geen
- * auth-check. Een gesloten endpoint hoort geen datapad meer te hebben, en een
- * 401-vóór-410 zou de indruk wekken dat inloggen het weer opent.
+ * Er wordt hier bewust NIETS meer gelezen of geschreven — ook geen eigen
+ * auth-check: een gesloten endpoint hoort geen datapad meer te hebben dat
+ * beschermd moet worden. In de praktijk zie je 410 dus als je ingelogd bent;
+ * uitgelogd geeft de proxy (`lib/supabase/proxy.ts`, prefix `/api/`) eerst een
+ * 401 — beide zonder datapad. `/api/feedback` hoort daarom NIET in
+ * `publicPaths`: publiek maken zou een inerte route onnodig blootstellen.
  */
 export async function POST() {
   return gone(
