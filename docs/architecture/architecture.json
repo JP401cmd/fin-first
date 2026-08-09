@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-08T23:07:21.986Z",
-  "generatedDate": "2026-08-08",
+  "generatedAt": "2026-08-09T14:58:12.825Z",
+  "generatedDate": "2026-08-09",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -193,7 +193,7 @@
     "tables": 88,
     "migrations": 197,
     "integrations": 25,
-    "components": 897,
+    "components": 909,
     "providers": 14,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -8402,11 +8402,11 @@
     }
   ],
   "components": {
-    "total": 897,
+    "total": 909,
     "groups": [
       {
         "group": "app",
-        "count": 356,
+        "count": 359,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -8593,6 +8593,7 @@
           "levensinkomen-strook",
           "lever-compass",
           "lever-compass.deeplinks.test",
+          "lever-compass.simple-view.test",
           "life-events-in-phase",
           "lifeline-readout",
           "lifeline-readout.test",
@@ -8619,6 +8620,7 @@
           "module-color-provider",
           "module-color-provider.persist.test",
           "module-nav",
+          "module-nav.test",
           "monte-carlo-onttrekken",
           "monte-carlo-opbouw",
           "monte-carlo-overgang",
@@ -8693,6 +8695,7 @@
           "shell-contexts",
           "shell-overlay",
           "sidebar",
+          "sidebar.eenvoudig.test",
           "sim-chart",
           "sim-chart-widget",
           "sim-chart-widget.test",
@@ -8768,7 +8771,7 @@
       },
       {
         "group": "overview",
-        "count": 152,
+        "count": 154,
         "items": [
           "aandachtspunt-actie-button",
           "atomic-cards",
@@ -8804,6 +8807,7 @@
           "briefing-panel.test",
           "cashflow-cards-loader",
           "cashflow-forecast",
+          "cashflow-forecast-sparkline",
           "cashflow-forecast.test",
           "cashflow-instellingen-blok",
           "cashflow-instellingen-blok.test",
@@ -8879,6 +8883,7 @@
           "overzicht-secondary-loader",
           "overzicht-streaming.test",
           "periode-selector",
+          "periode-selector.test",
           "periode-trend",
           "print-overzicht-button",
           "print-overzicht-button.test",
@@ -9023,7 +9028,7 @@
       },
       {
         "group": "core",
-        "count": 67,
+        "count": 68,
         "items": [
           "account-source-icon",
           "account-source-icon.test",
@@ -9046,6 +9051,7 @@
           "category-group-header",
           "category-history-chart",
           "category-tabs",
+          "category-tabs.test",
           "connection-indicator",
           "core-hero",
           "core-kengetallen",
@@ -9161,7 +9167,7 @@
       },
       {
         "group": "mijn",
-        "count": 36,
+        "count": 39,
         "items": [
           "abonnement-section",
           "account-basis-section",
@@ -9170,6 +9176,7 @@
           "ai-execution-choice",
           "ai-execution-group-list",
           "ai-execution-group-list.test",
+          "ai-execution-groups.eenvoudig.test",
           "ai-privacy-settings",
           "ai-privacy-settings.test",
           "budget-tint-picker",
@@ -9177,6 +9184,8 @@
           "category-tint-picker",
           "category-tint-picker.test",
           "danger-zone",
+          "display-mode-picker",
+          "display-mode-picker.test",
           "font-picker",
           "font-picker.test",
           "geavanceerd-settings",
@@ -9273,11 +9282,12 @@
       },
       {
         "group": "editorial",
-        "count": 15,
+        "count": 16,
         "items": [
           "button",
           "button.test",
           "chart-tips",
+          "figures-strip.test",
           "glossary-term",
           "index",
           "info-icon-tooltip",
@@ -9312,6 +9322,23 @@
         ]
       },
       {
+        "group": "berichten",
+        "count": 11,
+        "items": [
+          "archive-edition-card",
+          "archive-section",
+          "berichten-client",
+          "berichten-client.density.test",
+          "masthead",
+          "masthead.test",
+          "news-components",
+          "newspaper-footer",
+          "nieuws-only-client",
+          "nieuws-only-client.test",
+          "section-heading"
+        ]
+      },
+      {
         "group": "connections",
         "count": 10,
         "items": [
@@ -9325,21 +9352,6 @@
           "isin-resolver-status",
           "market-data-sources-card",
           "sync-status-badge"
-        ]
-      },
-      {
-        "group": "berichten",
-        "count": 9,
-        "items": [
-          "archive-edition-card",
-          "archive-section",
-          "berichten-client",
-          "masthead",
-          "news-components",
-          "newspaper-footer",
-          "nieuws-only-client",
-          "nieuws-only-client.test",
-          "section-heading"
         ]
       },
       {
@@ -10271,12 +10283,6 @@
       "feature-visits": [
         {
           "name": "user_feature_visits",
-          "write": true
-        }
-      ],
-      "feedback": [
-        {
-          "name": "feedback",
           "write": true
         }
       ],
@@ -12567,14 +12573,6 @@
           "routes": [
             "/api/admin/feedback"
           ]
-        },
-        {
-          "domain": "feedback",
-          "label": "feedback",
-          "write": true,
-          "routes": [
-            "/api/feedback"
-          ]
         }
       ],
       "fire_assumptions": [
@@ -14006,7 +14004,6 @@
       "bank_accounts",
       "budgets",
       "debts",
-      "feedback",
       "goals",
       "investment_holdings",
       "life_events",
@@ -15957,6 +15954,31 @@
       ],
       "summary": "Vervangt ADR 0090 §8 (badge onzichtbaar in nominaal) en de badge-plaatsing uit ADR 0093 §12. `EuroViewBadge` is verwijderd; de euro-weergave-status staat voortaan app-breed bovenaan de sidebar en is in béíde standen zichtbaar — neutraal in de standaardstand, met horizon-accent zo",
       "file": "docs/adr/0094-euro-weergave-status-in-de-sidebar.md"
+    },
+    {
+      "id": "0095-voor-jou-ingang-tips-en-berichten",
+      "title": "Tips & acties en Berichten blijven aparte ingangen; de mobiele nav krijgt Tips erbij",
+      "status": "aanvaard",
+      "date": "2026-08-09",
+      "elements": [
+        "sp-inzicht",
+        "as-coach"
+      ],
+      "summary": "Het audit-voorstel NAV-4 wilde \"Tips & acties\" en \"Berichten\" samenvoegen tot één ingang \"Voor jou · N\". Verificatie in de code laat zien dat de dubbeling alleen op de desktop-sidebar bestaat, dat er nooit twee badges waren, en dat één gedeelde teller twee onverenigbare datamodel",
+      "file": "docs/adr/0095-voor-jou-ingang-tips-en-berichten.md"
+    },
+    {
+      "id": "0096-een-feedback-ingang",
+      "title": "Melden gaat uitsluitend via het gesprek met Fin; /mijn/feedback wordt een verwijzing",
+      "status": "aanvaard",
+      "date": "2026-08-09",
+      "elements": [
+        "as-coach",
+        "do-melding",
+        "t-notion"
+      ],
+      "summary": "TriFinity heeft twee volledig gescheiden feedback-systemen: het oude formulier op `/mijn/feedback` (tabel `feedback`, eigen admin-inbox) en de meldmodus in de chat (tabel `user_reports`, doorstroom naar de Notion-werkqueue). Het oude pad is al uit de navigatie verdwenen en staat ",
+      "file": "docs/adr/0096-een-feedback-ingang.md"
     }
   ],
   "churn": {
@@ -15964,7 +15986,7 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 126
+        "commits": 127
       },
       {
         "path": "lib/ai",
@@ -16006,18 +16028,18 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 9038,
-        "commits": 92
+        "loc": 9112,
+        "commits": 93
       },
       {
         "file": "components/app/budgets-client.tsx",
-        "loc": 5045,
-        "commits": 33
+        "loc": 5130,
+        "commits": 34
       },
       {
         "file": "components/core/assets-client.tsx",
-        "loc": 4486,
-        "commits": 41
+        "loc": 4498,
+        "commits": 42
       },
       {
         "file": "components/app/cash-account-view.tsx",
@@ -17136,8 +17158,16 @@
   "diff": {
     "baseline": false,
     "previousDate": "2026-08-08",
-    "hasChanges": false,
-    "sections": []
+    "hasChanges": true,
+    "sections": [
+      {
+        "label": "Componenten (aantal)",
+        "added": [
+          "+12"
+        ],
+        "removed": []
+      }
+    ]
   },
   "statsHistory": [
     {
@@ -17403,6 +17433,13 @@
       "date": "2026-08-08",
       "api": 289,
       "components": 897,
+      "tables": 88,
+      "routesProduction": 99
+    },
+    {
+      "date": "2026-08-09",
+      "api": 289,
+      "components": 909,
       "tables": 88,
       "routesProduction": 99
     }
